@@ -72,13 +72,9 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LU
 	    echo "pflua:"						>&2; \
 	    echo "  require: $(PFLUA_VSN)"				>&2; \
 	    echo "  found:   $(shell cat ../deps/pflua.vsn) "		>&2; \
-	    echo "Please update and rebuild submodules."		>&2; \
-	    echo ""							>&2; \
-	    echo "Cheat sheet:"						>&2; \
-	    echo "  cd snabbswitch"					>&2; \
-	    echo "  git submodule update"				>&2; \
-	    echo "  make clean"						>&2; \
-	    echo "  make -j"						>&2; \
+	    echo ""                                                     >&2; \
+	    echo "Please update your submodules like this:"             >&2; \
+	    echo "  make submods"                                       >&2; \
 	    echo ""							>&2; \
 	    exit 1; \
 	 fi
@@ -91,6 +87,10 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LU
 	@ls -sh snabb
 
 all: $(EXE)
+
+# Rebuild after git submodules are updated.
+submods:
+	(cd ..; git submodule update; make clean; make)
 
 $(EXE): snabb
 	$(E) "PROGRAM   $@"
