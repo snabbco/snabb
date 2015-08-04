@@ -59,7 +59,10 @@ function delete (name)
    if not number then error("counter not found for deletion: " .. name) end
    -- Free shm object
    shm.unmap(public[number])
-   shm.unlink(name)
+   -- If we "own" the counter for writing then we unlink it too.
+   if public[number] ~= private[number] then
+      shm.unlink(name)
+   end
    -- Free local state
    numbers[name] = false
    public[number] = false
