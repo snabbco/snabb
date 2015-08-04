@@ -98,23 +98,10 @@ void checksum_update_incremental_32(uint16_t* checksum_cell,
   *value_cell = htonl(new_value);
 }
 
-// Calculate the TCP Pseudo Header Checksum.
-uint32_t tcp_pseudo_checksum(uint16_t *sip, uint16_t *dip,
-                             int addr_halfwords, int len)
-{
-  uint32_t result = 6 /* PKT_IP_PROTO_TCP */ + len;
-  int i;
-  for(i = 0; i < addr_halfwords; i++) {
-    result += ntohs(sip[i]);
-    result += ntohs(dip[i]);
-  }
-  return result;
-}
-
 // calculates the initial checksum value resulting from
 // the pseudo header.
 // return values:
-// 0x0000 - 0xFFFF : initial checksum (in network order).
+// 0x0000 - 0xFFFF : initial checksum (in host byte order).
 // 0xFFFF0001 : unknown packet (non IPv4/6 or non TCP/UDP)
 // 0xFFFF0002 : bad header
 uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
@@ -159,7 +146,7 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     }
     sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
     sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
-    return sum;
+    return ntohs(sum);
   }
   return 0xFFFF0001;
 }

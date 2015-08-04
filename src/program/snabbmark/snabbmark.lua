@@ -41,12 +41,12 @@ function basic1 (npackets)
    engine.configure(c)
    local start = C.get_monotonic_time()
    timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
-   while engine.app_table.Source.output.tx.stats.txpackets < npackets do
+   while link.stats(engine.app_table.Source.output.tx).txpackets < npackets do
       engine.main({duration = 0.01, no_report = true})
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
-   local packets = engine.app_table.Source.output.tx.stats.txpackets
+   local packets = link.stats(engine.app_table.Source.output.tx).txpackets
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
@@ -206,7 +206,7 @@ function solarflare (npackets, packet_size, timeout)
    if timeout then
       n_max = timeout * 100
    end
-   while engine.app_table.source.output.tx.stats.txpackets < npackets
+   while link.stats(engine.app_table.source.output.tx).txpackets < npackets
       and (not timeout or n < n_max)
    do
       engine.main({duration = 0.01, no_report = true})
@@ -214,7 +214,7 @@ function solarflare (npackets, packet_size, timeout)
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
-   local packets = engine.app_table.source.output.tx.stats.txpackets
+   local packets = link.stats(engine.app_table.source.output.tx).txpackets
    engine.report()
    engine.app_table[send_device.interface]:report()
    engine.app_table[receive_device.interface]:report()
@@ -222,7 +222,7 @@ function solarflare (npackets, packet_size, timeout)
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s)."):format(packets / 1e6,
                                                                                                    runtime, packets / runtime / 1e6,
                                                                                                    ((packets * packet_size * 8) / runtime) / (1024*1024*1024)))
-   if engine.app_table.source.output.tx.stats.txpackets < npackets then
+   if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
       print("Packets lost. Test failed!")
       main.exit(1)
    end

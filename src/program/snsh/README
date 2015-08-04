@@ -7,6 +7,7 @@ Execute SCRIPT if specified and then exit.
   -i,        --interactive   Start an interactive Read-Eval-Print Loop.
   -e EXPR,   --eval EXPR     Evaluate the Lua expression EXPR.
   -l MODULE, --load MODULE   Load (require) the Lua module MODULE.
+  -p PROG,   --program PROG  Run the program PROG instead of snsh.
   -t MODULE, --test MODULE   Test (selftest) the Lua module MODULE.
   -d,        --debug         Enable additional debugging checks.
   -j CMD,    --jit CMD       Control LuaJIT behavior. Available commands:
