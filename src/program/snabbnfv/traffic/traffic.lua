@@ -7,6 +7,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local timer = require("core.timer")
 local pci = require("lib.hardware.pci")
+local counter = require("core.counter")
 
 local long_opts = {
    benchmark     = "B",
@@ -127,13 +128,14 @@ function bench (pciaddr, confpath, sockpath, npackets)
    local finish = C.get_monotonic_time()
 
    local runtime = finish - start
+   local breaths = tonumber(counter.read(engine.breaths))
    local input = link.stats(engine.app_table[nic].input.rx)
    packets = input.rxpackets - packets
    bytes = input.rxbytes - bytes
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (%d bytes; %.2f Gbps)"):format(packets / 1e6, runtime, bytes, bytes * 8.0 / 1e9 / runtime))
-   print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(engine.breaths), packets / engine.breaths, runtime / engine.breaths * 1e6))
+   print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(breaths), packets / breaths, runtime / breaths * 1e6))
    print(("Rate(Mpps):\t%.3f"):format(packets / runtime / 1e6))
    require("jit.p").stop()
 end
