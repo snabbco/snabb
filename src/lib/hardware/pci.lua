@@ -37,6 +37,7 @@ function device_info (pciaddress)
    info.pciaddress = pciaddress
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
+   info.model = which_model(info.vendor, info.device)
    info.driver = which_driver(info.vendor, info.device)
    if info.driver then
       info.interface = lib.firstfile(p.."/net")
@@ -51,36 +52,35 @@ end
 --- Return the path to the sysfs directory for `pcidev`.
 function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
 
--- Supported drivers indexed by vendor and device id.
-local drivers = {
-   ["0x8086"] =  {
-      ["0x10fb"] = 'apps.intel.intel_app', -- Intel 82599 SFP
-      ["0x10d3"] = 'apps.intel.intel_app', -- Intel 82574L
-      ["0x105e"] = 'apps.intel.intel_app', -- Intel 82571
-   },
-   ["0x1924"] =  {
-      ["0x0903"] = 'apps.solarflare.solarflare'
-   },
+model = {
+   ["82599_SFP"] = 'Intel 82599 SFP',
+   ["82574L"]    = 'Intel 82574L',
+   ["82571"]     = 'Intel 82571',
+   ["82599_T3"]  = 'Intel 82599 T3',
 }
 
--- Not fully supportted drivers indexed by vendor and device id.
-local experimental_drivers = {
-   ["0x8086"] = {
-      ["0x151c"] = 'apps.intel.intel_app', -- Intel 82599 T3
-   }
+-- Supported cards indexed by vendor and device id.
+local cards = {
+   ["0x8086"] =  {
+      ["0x10fb"] = {model = model["82599_SFP"], driver = 'apps.intel.intel_app'},
+      ["0x10d3"] = {model = model["82574L"],    driver = 'apps.intel.intel_app'},
+      ["0x105e"] = {model = model["82571"],     driver = 'apps.intel.intel_app'},
+      ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
+   },
+   ["0x1924"] =  {
+      ["0x0903"] = {model = '', driver = 'apps.solarflare.solarflare'}
+   },
 }
 
 -- Return the name of the Lua module that implements support for this device.
 function which_driver (vendor, device)
-   local driver = drivers[vendor] and drivers[vendor][device] or nil
-   if not driver then
-      driver = experimental_drivers[vendor] and experimental_drivers[vendor][device] or nil
-      if driver then
-         print(("Warning: Support for device (%s-%s) is not reliable. "):format(vendor, device)..
-            "Use it at your own risk.")
-      end
-   end
-   return driver
+   local card = cards[vendor] and cards[vendor][device]
+   return card and card.driver
+end
+
+function which_model (vendor, device)
+   local card = cards[vendor] and cards[vendor][device]
+   return card and card.model
 end
 
 --- ### Device manipulation.
