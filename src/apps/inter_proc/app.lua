@@ -18,12 +18,12 @@ ffi.cdef [[
   //    struct packet *packets[LINK_RING_SIZE];
   //    int head, tail;
       struct link_t *link;
-      int64_t txpackets, txbytes, txdrop;
+      int64_t txpackets, txbytes, txdrop, txcycles;
    } transmit_t;
 
    typedef struct {
       struct link_t *link;
-      int64_t rxpackets, rxbytes;
+      int64_t rxpackets, rxbytes, rxcycles;
    } receive_t;
 */
 ]]
@@ -41,7 +41,7 @@ Transmit.__index = Transmit
 function Transmit:new(arg)
    return setmetatable({
       link = shm.map('//'..root..arg.linkname, 'struct link_t'),
-      txpackets = 0, txbytes = 0, txdrop = 0,
+      txpackets = 0, txbytes = 0, txdrop = 0, txcycles = 0,
    }, Transmit)
 end
 
@@ -63,13 +63,15 @@ function Transmit:push()
       l.write = lw
       self.txpackets = self.txpackets + n
       self.txbytes = self.txbytes + txbytes
+      self.txcycles = self.txcycles + 1
    end
 end
 
 
 function Transmit:report()
-   print (string.format("Transmit app: %16s packets, %16s bytes",
-      lib.comma_value(self.txpackets), lib.comma_value(self.txbytes)))
+   print (string.format("Transmit app: %16s packets, %16s bytes in %16s cycles (%g packets/cycle)",
+      lib.comma_value(self.txpackets), lib.comma_value(self.txbytes), lib.comma_value(self.txcycles),
+      (tonumber(self.txpackets) / tonumber(self.txcycles))))
 end
 
 
@@ -81,7 +83,7 @@ Receive.__index = Receive
 function Receive:new(arg)
    return setmetatable({
       link = shm.map('//'..root..arg.linkname, 'struct link_t'),
-      rxpackets = 0, rxbytes = 0,
+      rxpackets = 0, rxbytes = 0, rxcycles = 0,
    }, Receive)
 end
 
@@ -103,13 +105,15 @@ function Receive:pull()
       l.read = lr
       self.rxpackets = self.rxpackets + n
       self.rxbytes = self.rxbytes + rxbytes
+      self.rxcycles = self.rxcycles + 1
    end
 end
 
 
 function Receive:report()
-   print (string.format("Receive app: %16s packets, %16s bytes",
-      lib.comma_value(self.rxpackets), lib.comma_value(self.rxbytes)))
+   print (string.format("Receive app: %16s packets, %16s bytes, %16s cycles (%g packets/cycle)",
+      lib.comma_value(self.rxpackets), lib.comma_value(self.rxbytes), lib.comma_value(self.rxcycles),
+      tonumber(self.rxpackets) / tonumber(self.rxcycles)))
 end
 
 
@@ -120,10 +124,10 @@ local engine = require('core.app')
 local basic_apps = require('apps.basic.basic_apps')
 
 function selftest()
-   S.unlink(root..'inter_test')
+   S.unlink(shm.root..'/'..root..'inter_test')
    local c = config.new()
-   config.cpu(c, 'proc1')
-   config.cpu(c, 'proc2')
+   config.cpu(c, 'proc1', {busywait=true})
+   config.cpu(c, 'proc2', {busywait=true})
    config.app(c, 'source', basic_apps.Source, {size=120, cpu='proc1'})
    config.app(c, 'transmit', Transmit, {linkname='inter_test', cpu='proc1'})
    config.app(c, 'receive', Receive, {linkname='inter_test', cpu='proc2'})

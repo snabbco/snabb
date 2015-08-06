@@ -12,7 +12,6 @@ local C       = ffi.C
 local fork   = require("core.fork")
 local shm    = require('core.shm')
 local S      = require('syscall')
-local inter_link = require("core.inter_link")
 require("core.packet_h")
 
 -- Set to true to enable logging
@@ -243,25 +242,20 @@ function apply_config_actions (actions, conf)
    -- Setup links: create (or reuse) and renumber.
    for linkspec in pairs(conf.links) do
       local fa, fl, ta, tl = config.parse_link(linkspec)
-      local fa_app = new_app_table[fa]
-      local ta_app = new_app_table[ta]
-      local l = nil
-      if fa_app or ta_app then
-         l = inter_link(linkspec)
-      end
-      if l then
-         if fa_app then
-            fa_app.output[fl] = l
-            table.insert(fa_app.output, l)
-         end
-         if ta_app then
-            l.receiving_app = app_name_to_index[ta]
-            l.receiving_pid = fa_app and 0 or S.getpid()
-            ta_app.input[tl] = l
-            table.insert(ta_app.input, l)
-            new_link_table[linkspec] = l
-            table.insert(new_link_array, l)
-         end
+      if new_app_table[fa] and new_app_table[ta] then
+         if not new_app_table[fa] then error("no such app: " .. fa) end
+         if not new_app_table[ta] then error("no such app: " .. ta) end
+         -- Create or reuse a link and assign/update receiving app index
+         local link = link_table[linkspec] or link.new(linkspec)
+         link.receiving_app = app_name_to_index[ta]
+         -- Add link to apps
+         new_app_table[fa].output[fl] = link
+         table.insert(new_app_table[fa].output, link)
+         new_app_table[ta].input[tl] = link
+         table.insert(new_app_table[ta].input, link)
+         -- Remember link
+         new_link_table[linkspec] = link
+         table.insert(new_link_array, link)
       end
    end
    -- Free obsolete links.
@@ -274,9 +268,7 @@ function apply_config_actions (actions, conf)
 end
 
 -- Call this to "run snabb switch".
-local pid = nil
 function main (options)
-   pid = S.getpid()
    options = options or {}
    local done = options.done
    local no_timers = options.no_timers
@@ -301,6 +293,8 @@ end
 
 local nextbreath
 local lastfrees = 0
+local lastfreebits = 0
+local lastfreebytes = 0
 -- Wait between breaths to keep frequency with Hz.
 function pace_breathing ()
    if Hz then
