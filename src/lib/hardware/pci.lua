@@ -68,7 +68,7 @@ local cards = {
       ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
    },
    ["0x1924"] =  {
-      ["0x0903"] = {model = '', driver = 'apps.solarflare.solarflare'}
+      ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
    },
 }
 
