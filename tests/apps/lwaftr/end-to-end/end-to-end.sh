@@ -47,16 +47,6 @@ echo "Testing: from-b4 IPv6 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-fromb4-ipv6.pcap ${TEST_BASE}/decap-ipv4.pcap
 
-echo "Testing: from-b4 IPv6 packet, no hairpinning, B4-IPv6 non-B4-IPv4 dest"
-# The idea is that with hairpinning off, the packet goes out the inet interface
-# and something else routes it back for re-encapsulation. It's not clear why
-# this would be desired behaviour, but it's my reading of the RFC draft.
-# Note: this works regardless of the destination IPv4 address and whether
-# it is actually associated with the destination B4, which is even more
-# questionable.
-snabb_run_and_cmp ${TEST_BASE}/no_hairpin.conf \
-   ${TEST_BASE}/tcp-fromb4-partly-tob4-ipv6.pcap ${TEST_BASE}/decap-ipv4-nohair-iffy.pcap
-
 echo "Testing: from-b4 IPv6 packet, no hairpinning, B4-IPv6 and IPv4 dest"
 # The idea is that with hairpinning off, the packet goes out the inet interface
 # and something else routes it back for re-encapsulation. It's not clear why
