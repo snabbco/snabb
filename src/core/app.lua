@@ -134,6 +134,7 @@ function configure (new_config)
    for procname, procarg in pairs(new_config.cpus) do
       fork.spawn(procname, function()
          local actions = compute_config_actions(configuration, new_config)
+         if procarg.cpu_set then S.sched_setaffinity(nil, procarg.cpu_set) end
          if procarg.profile then require("jit.p").start(procarg.profile) end
          apply_config_actions(actions, new_config)
          configuration = new_config
