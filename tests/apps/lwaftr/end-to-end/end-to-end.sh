@@ -31,7 +31,7 @@ snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-bound.pcap ${TEST_BASE}/tcp-afteraftr-ipv6.pcap
 
 
-echo "Testing: from-internet IPv4 packet NOT found in the binding table."
+echo "Testing: from-internet IPv4 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-frominet-unbound.pcap ${TEST_BASE}/empty.pcap
 
@@ -39,26 +39,28 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
 #snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
 #   ${TEST_BASE}/tcp-frominet-unbound.pcap ${TEST_BASE}/empty.pcap
 
-echo "Testing: from-b4 IPv6 packet NOT found in the binding table."
+echo "Testing: from-to-b4 IPv6 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-afteraftr-ipv6.pcap ${TEST_BASE}/empty.pcap
 
-echo "Testing: from-b4 IPv6 packet found in the binding table."
+echo "Testing: from-b4 to-internet IPv6 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-fromb4-ipv6.pcap ${TEST_BASE}/decap-ipv4.pcap
 
-echo "Testing: from-b4 IPv6 packet, no hairpinning, B4-IPv6 and IPv4 dest"
+echo "Testing: from-to-b4 IPv6 packet, no hairpinning"
 # The idea is that with hairpinning off, the packet goes out the inet interface
 # and something else routes it back for re-encapsulation. It's not clear why
 # this would be desired behaviour, but it's my reading of the RFC draft.
 snabb_run_and_cmp ${TEST_BASE}/no_hairpin.conf \
    ${TEST_BASE}/tcp-fromb4-tob4-ipv6.pcap ${TEST_BASE}/decap-ipv4-nohair.pcap
 
-# TODO: verify that the partly-tob4 pcap errors with hairpinning, with-icmp.
-
-echo "Testing: from-b4 IPv6 packet, with hairpinning"
+echo "Testing: from-to-b4 IPv6 packet, with hairpinning"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-fromb4-tob4-ipv6.pcap ${TEST_BASE}/recap-ipv6.pcap
+
+echo "Testing: from-b4 IPv6 packet, with hairpinning, different lwAFTR addresses"
+snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
+   ${TEST_BASE}/tcp-fromb4-tob4-customBRIP-ipv6.pcap ${TEST_BASE}/recap-twoBR-IPs-ipv6.pcap
 
 # echo "Testing: from-b4 IPv6 packet NOT found in the binding table (ICMP-on-fail)."
 
