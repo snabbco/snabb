@@ -58,8 +58,13 @@ local function format_ipv4(uint32)
       bit.band(uint32, 0xff))
 end
 
+function LwAftr:_get_lwAFTR_ipv6(binding_entry)
+   local lwaftr_ipv6 = binding_entry[5]
+   if not lwaftr_ipv6 then lwaftr_ipv6 = self.aftr_ipv6_ip end
+   return lwaftr_ipv6
+end
 
--- TODO: make this O(1)
+-- TODO: make this O(1), and seriously optimize it for cache lines
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    print(ipv4_ip, 'port: ', port)
    pp(self.binding_table)
@@ -67,7 +72,8 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
       if debug then print("CHECK", string.format("%x, %x", bind[2], ipv4_ip)) end
       if bind[2] == ipv4_ip then
          if port >= bind[3] and port <= bind[4] then
-            return bind[1]
+            local lwaftr_ipv6 = self:_get_lwAFTR_ipv6(bind)
+            return bind[1], lwaftr_ipv6
          end
       end
    end
@@ -75,6 +81,8 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
       string.format("%i (0x%x)", port, port))
 end
 
+-- https://www.ietf.org/id/draft-farrer-softwire-br-multiendpoints-01.txt
+-- Return the destination IPv6 address, *and the source IPv6 address*
 function LwAftr:binding_lookup_ipv4_from_pkt(pkt, pre_ipv4_bytes)
    local dst_ip_start = pre_ipv4_bytes + 16
    -- Note: ip is kept in network byte order, regardless of host byte order
@@ -87,7 +95,7 @@ function LwAftr:binding_lookup_ipv4_from_pkt(pkt, pre_ipv4_bytes)
 end
 
 -- Todo: make this O(1)
-function LwAftr:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port)
+function LwAftr:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port)
    for _, bind in ipairs(self.binding_table) do
       if debug then
          print("CHECKB4", string.format("%x, %x", bind[2], ipv4_src_ip), ipv4_src_port)
@@ -98,7 +106,13 @@ function LwAftr:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port)
             print_ipv6(bind[1])
             print_ipv6(ipv6_src_ip)
             if C.memcmp(bind[1], ipv6_src_ip, 16) == 0 then
-               return true
+               local expected_dst = self:_get_lwAFTR_ipv6(bind)
+               print("DST_MEMCMP", expected_dst, ipv6_dst_ip)
+               print_ipv6(expected_dst)
+               print_ipv6(ipv6_dst_ip)
+               if C.memcmp(expected_dst, ipv6_dst_ip, 16) == 0 then
+                  return true
+               end
             end
          end
       end
@@ -208,7 +222,7 @@ end
 -- TODO: correctly deal with IPv6 packets that need to be fragmented
 -- The incoming packet is a complete one with ethernet headers.
 function LwAftr:_encapsulate_ipv4(pkt)
-   local ipv6_dst = self:binding_lookup_ipv4_from_pkt(pkt, ethernet_header_size)
+   local ipv6_dst, ipv6_src = self:binding_lookup_ipv4_from_pkt(pkt, ethernet_header_size)
    if not ipv6_dst then
       if debug then print("lookup failed") end
       if self.ipv4_lookup_failed_policy == lwconf.policies['DROP'] then
@@ -222,7 +236,6 @@ function LwAftr:_encapsulate_ipv4(pkt)
          error("LwAftr: unknown policy" .. self.ipv4_lookup_failed_policy)
       end
    end
-   local ipv6_src = self.aftr_ipv6_ip
 
    local ether_src = self.aftr_mac_b4_side 
    local ether_dst = self.b4_mac -- FIXME: this should probaby use NDP
@@ -265,15 +278,17 @@ end
 function LwAftr:from_b4(pkt)
    -- check src ipv4, ipv6, and port against the binding table
    local ipv6_src_ip_offset = ethernet_header_size + 8
+   local ipv6_dst_ip_offset = ethernet_header_size + 24
    -- FIXME: deal with multiple IPv6 headers
    local ipv4_src_ip_offset = ethernet_header_size + ipv6_header_size + 12
    -- FIXME: as above + varlen ipv4 + non-tcp/non-udp payloads
    local ipv4_src_port_offset = ethernet_header_size + ipv6_header_size +
                                 ipv4_header_size
    local ipv6_src_ip = pkt.data + ipv6_src_ip_offset
+   local ipv6_dst_ip = pkt.data + ipv6_dst_ip_offset
    local ipv4_src_ip = ffi.cast("uint32_t*", pkt.data + ipv4_src_ip_offset)[0]
    local ipv4_src_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + ipv4_src_port_offset)[0])
-   if self:in_binding_table(ipv6_src_ip, ipv4_src_ip, ipv4_src_port) then
+   if self:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port) then
       -- Is it worth optimizing this to change src_eth, src_ipv6, ttl, checksum,
       -- rather than decapsulating + re-encapsulating? It would be faster, but more code.
       self:decapsulate(pkt)
