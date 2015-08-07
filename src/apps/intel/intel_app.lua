@@ -174,6 +174,10 @@ function selftest ()
    sq_sq(pcideva, pcidevb)
    if device_info_a.model == pci.model["82599_T3"] or
          device_info_b.model == pci.model["82599_T3"] then
+      -- Test experience in the lab suggests that the 82599 T3 NIC
+      -- requires at least two seconds before it will reliably pass
+      -- traffic. The test case sleeps for this reason.
+      -- See https://github.com/SnabbCo/snabbswitch/pull/569
       C.usleep(2e6)
    end
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
