@@ -58,9 +58,17 @@ echo "Testing: from-to-b4 IPv6 packet, with hairpinning"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-fromb4-tob4-ipv6.pcap ${TEST_BASE}/recap-ipv6.pcap
 
-echo "Testing: from-b4 IPv6 packet, with hairpinning, different lwAFTR addresses"
+echo "Testing: from-b4 IPv6 packet, with hairpinning, to B4 with custom lwAFTR address"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
-   ${TEST_BASE}/tcp-fromb4-tob4-customBRIP-ipv6.pcap ${TEST_BASE}/recap-twoBR-IPs-ipv6.pcap
+   ${TEST_BASE}/tcp-fromb4-tob4-customBRIP-ipv6.pcap ${TEST_BASE}/recap-tocustom-BRIP-ipv6.pcap
+
+echo "Testing: from-b4 IPv6 packet, with hairpinning, from B4 with custom lwAFTR address"
+snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
+   ${TEST_BASE}/tcp-fromb4-customBRIP-tob4-ipv6.pcap ${TEST_BASE}/recap-fromcustom-BRIP-ipv6.pcap
+
+echo "Testing: from-b4 IPv6 packet, with hairpinning, different non-default lwAFTR addresses"
+snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
+   ${TEST_BASE}/tcp-fromb4-customBRIP1-tob4-customBRIP2-ipv6.pcap ${TEST_BASE}/recap-customBR-IPs-ipv6.pcap
 
 # echo "Testing: from-b4 IPv6 packet NOT found in the binding table (ICMP-on-fail)."
 
