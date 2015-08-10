@@ -174,3 +174,7 @@ function selftest (options)
    print("HugeTLB page allocation OK.")
 end
 
+print("Installing SIGSEGV handler")
+C.setup_signal()
+
+
