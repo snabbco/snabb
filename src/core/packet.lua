@@ -26,9 +26,9 @@ local packets_allocated = 0
 local packets_fl = nil
 
 
-function postfork()
+-- function postfork()
    packets_fl = freelist.new('struct packet *', max_packets)
-end
+-- end
 
 -- Return an empty packet.
 function allocate ()

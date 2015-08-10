@@ -51,17 +51,17 @@ function prefork()
    end
 end
 
-function postfork()
-   local err
-   -- to abritrate between processes, each process needs a different fd to the same file
-   lock_fd, err = syscall.open(('%s/%d/dma_heap'):format(shm.root, syscall.getpgid()), 'rdonly')
-   if not lock_fd then error(err) end
-end
+-- function postfork()
+--    local err
+--    -- to abritrate between processes, each process needs a different fd to the same file
+--    lock_fd, err = syscall.open(('%s/%d/dma_heap'):format(shm.root, syscall.getpgid()), 'rdonly')
+--    if not lock_fd then error(err) end
+-- end
 
 -- Allocate DMA-friendly memory.
 -- Return virtual memory pointer, physical address, and actual size.
 function dma_alloc (bytes)
-   assert(lock_fd:flock('ex'))
+--    assert(lock_fd:flock('ex'))
    assert(bytes <= huge_page_size)
    bytes = lib.align(bytes, 128)
    if _h.num_chunks == 0 then
@@ -81,13 +81,13 @@ function dma_alloc (bytes)
 
    local where = chunk.used
    chunk.used = chunk.used + bytes
-   assert(lock_fd:flock('un'))
+--    assert(lock_fd:flock('un'))
    return chunk.pointer + where, chunk.physical + where, bytes
 end
 
 -- Add a new chunk.
 function allocate_next_chunk ()
-   assert (lock_fd == nil, "allocating after forks!")
+--    assert (lock_fd == nil, "allocating after forks!")
    assert (_h.num_chunks < C.MAX_NUM_CHUNKS-1, "chunk array overflow!")
    local ptr = assert(allocate_hugetlb_chunk(huge_page_size),
                       "Failed to allocate a huge page for DMA")
@@ -154,6 +154,8 @@ function virtual_to_physical (virt_addr)
    end
    return bit.bxor(u64, 0x500000000000ULL)
 end
+
+prefork()
 
 --- ### selftest
 

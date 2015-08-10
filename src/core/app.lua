@@ -131,23 +131,23 @@ end
 -- Successive calls to configure() will migrate from the old to the
 -- new app network by making the changes needed.
 function configure (new_config)
-   for procname, procarg in pairs(new_config.cpus) do
-      fork.spawn(procname, function()
+--    for procname, procarg in pairs(new_config.cpus) do
+--       fork.spawn(procname, function()
          local actions = compute_config_actions(configuration, new_config)
-         if procarg.cpu_set then S.sched_setaffinity(nil, procarg.cpu_set) end
-         if procarg.profile then require("jit.p").start(procarg.profile) end
+--          if procarg.cpu_set then S.sched_setaffinity(nil, procarg.cpu_set) end
+--          if procarg.profile then require("jit.p").start(procarg.profile) end
          apply_config_actions(actions, new_config)
          configuration = new_config
-         engine.busywait = procarg.busywait or false
-         repeat
-            while engine_state.state ~= 'running' do
-               C.usleep(1000)
-            end
-            main{duration=1, report={showlinks=true, showapps=true}}
-         until engine_state.state == 'finished'
-         if procarg.profile then require("jit.p").stop() end
-      end)
-   end
+--          engine.busywait = procarg.busywait or false
+--          repeat
+--             while engine_state.state ~= 'running' do
+--                C.usleep(1000)
+--             end
+--             main{duration=1, report={showlinks=true, showapps=true}}
+--          until engine_state.state == 'finished'
+--          if procarg.profile then require("jit.p").stop() end
+--       end)
+--    end
    counter.add(configs)
 end
 
@@ -166,7 +166,7 @@ function compute_config_actions (old, new)
    local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
    local procname = fork.get_procname()
    for appname, info in pairs(new.apps) do
-      if info.arg.cpu == procname then
+--       if info.arg.cpu == procname then
          local class, arg = info.class, info.arg
          local action = nil
          if not old.apps[appname]                then action = 'start'
@@ -175,7 +175,7 @@ function compute_config_actions (old, new)
                                                 then action = 'reconfig'
          else                                         action = 'keep'  end
          table.insert(actions[action], appname)
-      end
+--       end
       for appname in pairs(old.apps) do
          if not new.apps[appname] then
             table.insert(actions['stop'], appname)
@@ -277,14 +277,14 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
-   if fork.get_procname() == '_master_' then engine_state.state = 'running' end
+   if engine_state and fork.get_procname() == '_master_' then engine_state.state = 'running' end
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
       if not no_timers then timer.run() end
       if not busywait then pace_breathing() end
    until done and done()
-   if fork.get_procname() == '_master_' then
+   if engine_state and fork.get_procname() == '_master_' then
       engine_state.state = 'finished'
       fork.wait_all()
    end
