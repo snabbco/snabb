@@ -23,12 +23,7 @@ local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 local max_packets = 1e5
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = nil
-
-
--- function postfork()
-   packets_fl = freelist.new('struct packet *', max_packets)
--- end
+local packets_fl = freelist.new('struct packet *', max_packets)
 
 -- Return an empty packet.
 function allocate ()
