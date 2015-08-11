@@ -62,3 +62,10 @@ The current state of each branch with respect to master is visible here:
     
     Maintainer: Alexander Gall <gall@switch.ch>
 
+#### virtualopensystems-contributions
+    
+    BRANCH: virtualopensystems-contributions git://github.com/virtualopensystems/snabbswitch.git
+    Virtual Open Systems SAS contributions for upstreaming.
+    
+    Maintainer: Nikolay Nikolaev <n.nikolaev@virtualopensystems.com>
+
