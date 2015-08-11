@@ -13,19 +13,6 @@ ffi.cdef [[
       struct packet *ret_pks[LINK_RING_SIZE];
       int write, read;
    };
-
-/*   typedef struct {
-  //    struct packet *packets[LINK_RING_SIZE];
-  //    int head, tail;
-      struct link_t *link;
-      int64_t txpackets, txbytes, txdrop, txcycles;
-   } transmit_t;
-
-   typedef struct {
-      struct link_t *link;
-      int64_t rxpackets, rxbytes, rxcycles;
-   } receive_t;
-*/
 ]]
 
 local root = 'link/'
