@@ -9,16 +9,8 @@ local lib = require("core.lib")
 function new ()
    return {
       apps = {},         -- list of {name, class, args}
-      links = {},        -- table with keys like "a.out -> b.in"
-      cpus = {},         -- table of name=args
+      links = {}         -- table with keys like "a.out -> b.in"
    }
-end
-
-
--- API: Add a process to the configuration.
-function cpu (config, name, arg)
-   assert(type(name) == 'string', "name must be a string")
-   config.cpus[name] = arg or {}
 end
 
 -- API: Add an app to the configuration.

@@ -1,6 +1,0 @@
-addr, value = unpack(core.main.parameters)
-print(addr,value)
-print("Setting "..addr.." to "..value)
-io.flush()
-ptr = require("ffi").cast("char*", tonumber(addr))
-ptr[0] = tonumber(value)

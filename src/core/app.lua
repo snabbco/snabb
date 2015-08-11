@@ -9,9 +9,6 @@ local counter = require("core.counter")
 local zone    = require("jit.zone")
 local ffi     = require("ffi")
 local C       = ffi.C
-local fork   = require("core.fork")
-local shm    = require('core.shm')
-local S      = require('syscall')
 require("core.packet_h")
 
 -- Set to true to enable logging
@@ -53,28 +50,6 @@ configs   = counter.open("engine/configs")   -- Total configurations loaded
 Hz = false
 sleep = 0
 maxsleep = 100
-
-ffi.cdef [[
-   typedef struct {
-      enum {
-         stopped,
-         running,
-         paused,
-         finished,
-      } state;
-   } engine_state;
-]]
-
-local engine_state = nil
-local state_mapname = ('//%d/engine_state'):format(S.getpgid())
-function prefork()
-   engine_state = shm.map(state_mapname, 'engine_state', false)
-   engine_state.state = 'stopped'
-end
-
-function postfork()
-   engine_state = shm.map(state_mapname, 'engine_state', true)
-end
 
 -- busywait: If true then the engine will poll for new data in a tight
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
@@ -131,26 +106,11 @@ end
 -- Successive calls to configure() will migrate from the old to the
 -- new app network by making the changes needed.
 function configure (new_config)
---    for procname, procarg in pairs(new_config.cpus) do
---       fork.spawn(procname, function()
-         local actions = compute_config_actions(configuration, new_config)
---          if procarg.cpu_set then S.sched_setaffinity(nil, procarg.cpu_set) end
---          if procarg.profile then require("jit.p").start(procarg.profile) end
-         apply_config_actions(actions, new_config)
-         configuration = new_config
---          engine.busywait = procarg.busywait or false
---          repeat
---             while engine_state.state ~= 'running' do
---                C.usleep(1000)
---             end
---             main{duration=1, report={showlinks=true, showapps=true}}
---          until engine_state.state == 'finished'
---          if procarg.profile then require("jit.p").stop() end
---       end)
---    end
+   local actions = compute_config_actions(configuration, new_config)
+   apply_config_actions(actions, new_config)
+   configuration = new_config
    counter.add(configs)
 end
-
 
 -- Return the configuration actions needed to migrate from old config to new.
 --
@@ -164,22 +124,19 @@ end
 --   }
 function compute_config_actions (old, new)
    local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
-   local procname = fork.get_procname()
    for appname, info in pairs(new.apps) do
---       if info.arg.cpu == procname then
-         local class, arg = info.class, info.arg
-         local action = nil
-         if not old.apps[appname]                then action = 'start'
-         elseif old.apps[appname].class ~= class then action = 'restart'
-         elseif not lib.equal(old.apps[appname].arg, arg)
-                                                then action = 'reconfig'
-         else                                         action = 'keep'  end
-         table.insert(actions[action], appname)
---       end
-      for appname in pairs(old.apps) do
-         if not new.apps[appname] then
-            table.insert(actions['stop'], appname)
-         end
+      local class, arg = info.class, info.arg
+      local action = nil
+      if not old.apps[appname]                then action = 'start'
+      elseif old.apps[appname].class ~= class then action = 'restart'
+      elseif not lib.equal(old.apps[appname].arg, arg)
+                                              then action = 'reconfig'
+      else                                         action = 'keep'  end
+      table.insert(actions[action], appname)
+   end
+   for appname in pairs(old.apps) do
+      if not new.apps[appname] then
+         table.insert(actions['stop'], appname)
       end
    end
    return actions
@@ -243,21 +200,19 @@ function apply_config_actions (actions, conf)
    -- Setup links: create (or reuse) and renumber.
    for linkspec in pairs(conf.links) do
       local fa, fl, ta, tl = config.parse_link(linkspec)
-      if new_app_table[fa] and new_app_table[ta] then
-         if not new_app_table[fa] then error("no such app: " .. fa) end
-         if not new_app_table[ta] then error("no such app: " .. ta) end
-         -- Create or reuse a link and assign/update receiving app index
-         local link = link_table[linkspec] or link.new(linkspec)
-         link.receiving_app = app_name_to_index[ta]
-         -- Add link to apps
-         new_app_table[fa].output[fl] = link
-         table.insert(new_app_table[fa].output, link)
-         new_app_table[ta].input[tl] = link
-         table.insert(new_app_table[ta].input, link)
-         -- Remember link
-         new_link_table[linkspec] = link
-         table.insert(new_link_array, link)
-      end
+      if not new_app_table[fa] then error("no such app: " .. fa) end
+      if not new_app_table[ta] then error("no such app: " .. ta) end
+      -- Create or reuse a link and assign/update receiving app index
+      local link = link_table[linkspec] or link.new(linkspec)
+      link.receiving_app = app_name_to_index[ta]
+      -- Add link to apps
+      new_app_table[fa].output[fl] = link
+      table.insert(new_app_table[fa].output, link)
+      new_app_table[ta].input[tl] = link
+      table.insert(new_app_table[ta].input, link)
+      -- Remember link
+      new_link_table[linkspec] = link
+      table.insert(new_link_array, link)
    end
    -- Free obsolete links.
    for linkspec, r in pairs(link_table) do
@@ -277,17 +232,12 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
-   if engine_state and fork.get_procname() == '_master_' then engine_state.state = 'running' end
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
       if not no_timers then timer.run() end
       if not busywait then pace_breathing() end
    until done and done()
-   if engine_state and fork.get_procname() == '_master_' then
-      engine_state.state = 'finished'
-      fork.wait_all()
-   end
    counter.commit()
    if not options.no_report then report(options.report) end
 end
@@ -412,7 +362,7 @@ function report_load ()
 end
 
 function report_links ()
-   print("link report:", fork.get_procname())
+   print("link report:")
    local function loss_rate(drop, sent)
       sent = tonumber(sent)
       if not sent or sent == 0 then return 0 end
@@ -431,20 +381,18 @@ function report_links ()
 end
 
 function report_apps ()
-   print ("apps report:", fork.get_procname())
+   print ("apps report:")
    for name, app in pairs(app_table) do
       if app.dead then
          print(name, ("[dead: %s]"):format(app.dead.error))
-      else
+      elseif app.report then
          print(name)
-         if app.report then
-            -- Restarts are currently disabled, still we want to not die on
-            -- errors during app reports, thus this workaround:
-            -- with_restart(app, app.report)
-            local status, err = pcall(app.report, app)
-            if not status then
-               print("Warning: "..name.." threw an error during report: "..err)
-            end
+         -- Restarts are currently disabled, still we want to not die on
+         -- errors during app reports, thus this workaround:
+         -- with_restart(app, app.report)
+         local status, err = pcall(app.report, app)
+         if not status then
+            print("Warning: "..name.." threw an error during report: "..err)
          end
       end
    end
