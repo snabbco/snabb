@@ -32,6 +32,16 @@ end
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
 
+--[[
+   Unbind the device from the Linux kernel. If the device is already unbound, io.open fails
+   and we silently skip the write operation.
+]]--
+   local unbind_fd = io.open("/sys/bus/pci/devices/"..conf.pciaddr.."/driver/unbind", "w")
+   if unbind_fd then
+      unbind_fd:write(conf.pciaddr)
+      unbind_fd:close()
+   end
+
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
          devices[conf.pciaddr] = {pf=intel10g.new_pf(conf):open(), vflist={}}
