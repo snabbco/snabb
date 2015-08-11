@@ -17,7 +17,7 @@ function snabb_run_and_cmp {
    rm -f ${TEST_OUT}/endout.pcap
    #echo "${SNABB_BASE}/src/snabb snsh ${SNABB_BASE}/src/apps/lwaftr/main.lua \
    # $1 $2 ${TEST_OUT}/endout.pcap"
-   ${SNABB_BASE}/src/snabb snsh ${SNABB_BASE}/src/apps/lwaftr/pcapui.lua \
+   ${SNABB_BASE}/src/snabb snsh ${SNABB_BASE}/src/apps/lwaftr/pcapui.lua ${TEST_BASE}/binding.table \
       $1 $2 ${TEST_OUT}/endout.pcap $SNABB_OUT || quit_with_msg \
         "Snabb failed: ${SNABB_BASE}/src/snabb snsh \
          ${SNABB_BASE}/src/apps/lwaftr/pcapui.lua  $1 $2 ${TEST_OUT}/endout.pcap"

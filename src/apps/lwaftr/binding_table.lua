@@ -4,13 +4,13 @@ local ffi = require("ffi")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 
-local binding_table = {
- {'127:2:3:4:5:6:7:128', '178.79.150.233', 1, 100, '8:9:a:b:c:d:e:f'},
- {'127:11:12:13:14:15:16:128', '178.79.150.233', 101, 64000},
- {'127:22:33:44:55:66:77:128', '178.79.150.15', 5, 7000},
- {'127:24:35:46:57:68:79:128', '178.79.150.2', 7800, 7900, '1E:1:1:1:1:1:1:af'},
- {'127:14:25:36:47:58:69:128', '178.79.150.3', 4000, 5050, '1E:2:2:2:2:2:2:af'}
-}
+-- TODO: rewrite this after netconf integration
+local function read_binding_table(bt_file)
+  local input = io.open(bt_file)
+  local entries = input:read('*a')
+  local full_bt = 'return ' .. entries
+  return assert(loadstring(full_bt))()
+end
 
 local machine_friendly_binding_table
 
@@ -32,8 +32,12 @@ local function pton_binding_table(bt)
    return pbt
 end
 
-function get_binding_table()
+function get_binding_table(bt_file)
    if not machine_friendly_binding_table then
+      if not bt_file then
+         error("bt_file must be specified or the BT pre-initialized")
+      end
+      local binding_table = read_binding_table(bt_file)
       machine_friendly_binding_table = pton_binding_table(binding_table)
    end
    return machine_friendly_binding_table
