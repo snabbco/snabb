@@ -10,6 +10,7 @@ local lib      = require("core.lib")
 local memory   = require("core.memory")
 local counter  = require("core.counter")
 local freelist_add, freelist_remove, freelist_nfree = freelist.add, freelist.remove, freelist.nfree
+local counter_add = counter.add
 
 require("core.packet_h")
 
@@ -83,11 +84,11 @@ local function free_internal (p)
 end   
 
 function free (p)
-   counter.add(engine.frees)
-   counter.add(engine.freebytes, p.length)
+   counter_add(engine.frees)
+   counter_add(engine.freebytes, p.length)
    -- Calculate bits of physical capacity required for packet on 10GbE
    -- Account for minimum data size and overhead of CRC and inter-packet gap
-   counter.add(engine.freebits, (math.max(p.length, 46) + 4 + 5) * 8)
+   counter_add(engine.freebits, (math.max(p.length, 46) + 4 + 5) * 8)
    free_internal(p)
 end
 

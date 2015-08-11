@@ -10,6 +10,7 @@ local packet = require("core.packet")
 require("core.packet_h")
 
 local counter = require("core.counter")
+local counter_add, counter_read = counter.add, counter.read
 require("core.counter_h")
 
 require("core.link_h")
@@ -42,8 +43,8 @@ function receive (r)
    local p = r.packets[r.read]
    r.read = band(r.read + 1, size - 1)
 
-   counter.add(r.stats.rxpackets)
-   counter.add(r.stats.rxbytes, p.length)
+   counter_add(r.stats.rxpackets)
+   counter_add(r.stats.rxbytes, p.length)
    return p
 end
 
@@ -54,13 +55,13 @@ end
 function transmit (r, p)
 --   assert(p)
    if full(r) then
-      counter.add(r.stats.txdrop)
+      counter_add(r.stats.txdrop)
       packet.free(p)
    else
       r.packets[r.write] = p
       r.write = band(r.write + 1, size - 1)
-      counter.add(r.stats.txpackets)
-      counter.add(r.stats.txbytes, p.length)
+      counter_add(r.stats.txpackets)
+      counter_add(r.stats.txbytes, p.length)
       r.has_new_data = true
    end
 end
@@ -92,7 +93,7 @@ function stats (r)
    local stats = {}
    for _, c
    in ipairs(counternames) do
-      stats[c] = tonumber(counter.read(r.stats[c]))
+      stats[c] = tonumber(counter_read(r.stats[c]))
    end
    return stats
 end
@@ -101,24 +102,24 @@ function selftest ()
    print("selftest: link")
    local r = new("test")
    local p = packet.allocate()
-   assert(counter.read(r.stats.txpackets) == 0 and empty(r) == true  and full(r) == false)
+   assert(counter_read(r.stats.txpackets) == 0 and empty(r) == true  and full(r) == false)
    assert(nreadable(r) == 0)
    transmit(r, p)
-   assert(counter.read(r.stats.txpackets) == 1 and empty(r) == false and full(r) == false)
+   assert(counter_read(r.stats.txpackets) == 1 and empty(r) == false and full(r) == false)
    for i = 1, max-2 do
       transmit(r, p)
    end
-   assert(counter.read(r.stats.txpackets) == max-1 and empty(r) == false and full(r) == false)
-   assert(nreadable(r) == counter.read(r.stats.txpackets))
+   assert(counter_read(r.stats.txpackets) == max-1 and empty(r) == false and full(r) == false)
+   assert(nreadable(r) == counter_read(r.stats.txpackets))
    transmit(r, p)
-   assert(counter.read(r.stats.txpackets) == max   and empty(r) == false and full(r) == true)
+   assert(counter_read(r.stats.txpackets) == max   and empty(r) == false and full(r) == true)
    transmit(r, p)
-   assert(counter.read(r.stats.txpackets) == max and counter.read(r.stats.txdrop) == 1)
+   assert(counter_read(r.stats.txpackets) == max and counter_read(r.stats.txdrop) == 1)
    assert(not empty(r) and full(r))
    while not empty(r) do
       receive(r)
    end
-   assert(counter.read(r.stats.rxpackets) == max)
+   assert(counter_read(r.stats.rxpackets) == max)
    link.free(r, "test")
    print("selftest OK")
 end
