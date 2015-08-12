@@ -2,6 +2,7 @@ module(...,package.seeall)
 
 local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
+local ffi      = require("ffi")
 local lib      = require("core.lib")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
@@ -10,6 +11,8 @@ local freelist = require("core.freelist")
 local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
 Intel82599 = {}
 Intel82599.__index = Intel82599
+
+local C = ffi.C
 
 -- The `driver' variable is used as a reference to the driver class in
 -- order to interchangably use NIC drivers.
@@ -165,7 +168,18 @@ function selftest ()
       end
    end
 
+   local device_info_a = pci.device_info(pcideva)
+   local device_info_b = pci.device_info(pcidevb)
+
    sq_sq(pcideva, pcidevb)
+   if device_info_a.model == pci.model["82599_T3"] or
+         device_info_b.model == pci.model["82599_T3"] then
+      -- Test experience in the lab suggests that the 82599 T3 NIC
+      -- requires at least two seconds before it will reliably pass
+      -- traffic. The test case sleeps for this reason.
+      -- See https://github.com/SnabbCo/snabbswitch/pull/569
+      C.usleep(2e6)
+   end
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
@@ -185,6 +199,10 @@ function selftest ()
    end
 
    mq_sq(pcideva, pcidevb)
+   if device_info_a.model == pci.model["82599_T3"] or
+         device_info_b.model == pci.model["82599_T3"] then
+      C.usleep(2e6)
+   end
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
