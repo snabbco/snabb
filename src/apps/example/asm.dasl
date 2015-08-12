@@ -1,0 +1,62 @@
+-- Example app written in x86-64 assembly language.
+module(...,package.seeall)
+
+local ffi = require("ffi")
+local C = ffi.C
+
+local dasm = require("dasm")
+
+--
+-- Compile machine code
+--
+-- This is a really simple example. We are going to assigned 'fptr' to
+-- a machine code function that simply stores a magic number in the
+-- 'asm_status' struct so that we know it has executed.
+
+local fptr
+local asm_status = ffi.new("uint32_t[1]")
+
+|.arch x64
+|.actionlist actions
+local Dst = dasm.new(actions)
+| mov dword [asm_status], 0xdeadbeef
+| ret
+code = Dst:build() -- assign to 'code' to avoid machine code being GC'd
+fptr = ffi.cast("void(*)()", code)
+
+--
+-- Lua app
+--
+
+local config = require("core.config")
+local app = require("core.app")
+local basic_apps = require("apps.basic.basic_apps")
+
+Asm = {}
+
+function Asm:new ()
+   return setmetatable({}, {__index=Asm})
+end
+
+function Asm:pull ()
+end
+
+function Asm:push ()
+   -- Call generated code.
+   fptr()
+end
+
+function selftest ()
+   print("selftest: asm")
+   local c = config.new()
+   config.app(c, "source", basic_apps.Source)
+   config.app(c, "sink",   basic_apps.Sink)
+   config.app(c, "asm", Asm)
+   config.link(c, "source.tx -> asm.rx")
+   config.link(c, "asm.tx    -> sink.rx")
+   app.configure(c)
+   app.main({duration = 0.1})
+   print("magic number: 0x"..bit.tohex(asm_status[0]))
+   assert(asm_status[0] == 0xdeadbeef, "bad magic")
+   print("selftest: ok")
+end
