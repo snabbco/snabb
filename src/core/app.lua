@@ -31,6 +31,8 @@ freebits  = counter.open("engine/freebits")  -- Total packet bits freed (for 10G
 freebytes = counter.open("engine/freebytes") -- Total packet bytes freed
 configs   = counter.open("engine/configs")   -- Total configurations loaded
 
+local counter_add, counter_read, counter_commit = counter.add, counter.read, counter.commit
+
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
 -- There are two modes available:
@@ -109,7 +111,7 @@ function configure (new_config)
    local actions = compute_config_actions(configuration, new_config)
    apply_config_actions(actions, new_config)
    configuration = new_config
-   counter.add(configs)
+   counter_add(configs)
 end
 
 -- Return the configuration actions needed to migrate from old config to new.
@@ -238,7 +240,7 @@ function main (options)
       if not no_timers then timer.run() end
       if not busywait then pace_breathing() end
    until done and done()
-   counter.commit()
+   counter_commit()
    if not options.no_report then report(options.report) end
 end
 
@@ -257,15 +259,15 @@ function pace_breathing ()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
-      if lastfrees == counter.read(frees) then
+      if lastfrees == counter_read(frees) then
          sleep = math.min(sleep + 1, maxsleep)
          C.usleep(sleep)
       else
          sleep = math.floor(sleep/2)
       end
-      lastfrees = counter.read(frees)
-      lastfreebytes = counter.read(freebytes)
-      lastfreebits = counter.read(freebits)
+      lastfrees = counter_read(frees)
+      lastfreebytes = counter_read(freebytes)
+      lastfreebits = counter_read(freebits)
    end
 end
 
@@ -304,9 +306,9 @@ function breathe ()
       end
       firstloop = false
    until not progress  -- Stop after no link had new data
-   counter.add(breaths)
+   counter_add(breaths)
    -- Commit counters at a reasonable frequency
-   if counter.read(breaths) % 100 == 0 then counter.commit() end
+   if counter_read(breaths) % 100 == 0 then counter_commit() end
 end
 
 function report (options)
@@ -332,10 +334,10 @@ local reportedfreebits = nil
 local reportedfreebytes = nil
 local reportedbreaths = nil
 function report_load ()
-   local frees = counter.read(frees)
-   local freebits = counter.read(freebits)
-   local freebytes = counter.read(freebytes)
-   local breaths = counter.read(breaths)
+   local frees = counter_read(frees)
+   local freebits = counter_read(freebits)
+   local freebytes = counter_read(freebytes)
+   local breaths = counter_read(breaths)
    if lastloadreport then
       local interval = now() - lastloadreport
       local newfrees   = tonumber(frees - reportedfrees)
@@ -373,8 +375,8 @@ function report_links ()
    table.sort(names)
    for i, name in ipairs(names) do
       l = link_table[name]
-      local txpackets = counter.read(l.stats.txpackets)
-      local txdrop = counter.read(l.stats.txdrop)
+      local txpackets = counter_read(l.stats.txpackets)
+      local txdrop = counter_read(l.stats.txdrop)
       print(("%20s sent on %s (loss rate: %d%%)"):format(
             lib.comma_value(txpackets), name, loss_rate(txdrop, txpackets)))
    end
