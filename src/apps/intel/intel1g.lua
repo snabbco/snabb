@@ -164,13 +164,13 @@ function intel1g:new (conf)
       r.RDT    = 0xc018 + rxq*0x40
       r.RXDCTL = 0xc028 + rxq*0x40
 
-      local rxdesc_t = ffi.typeof("
+      local rxdesc_t = ffi.typeof([[
         struct { 
           uint64_t address;
           uint16_t length, cksum;
           uint8_t status, errors;
           uint16_t vlan;
-        } __attribute__((packed))")
+        } __attribute__((packed))]])
       local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, ndesc)
       local rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
                               memory.dma_alloc(ffi.sizeof(rxdesc_ring_t)))
@@ -247,5 +247,25 @@ function intel1g:new (conf)
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
    end
+end
+
+function selftest ()
+   print("selftest: intel1g")
+   local pciaddr = os.getenv("SNABB_SELFTEST_INTEL1G_0")
+   if not pciaddr then
+      print("SNABB_SELFTEST_INTEL1G_0 not set")
+      os.exit(engine.test_skipped_code)
+   end
+   
+   local c = config.new()
+   local basic = require("apps.basic.basic_apps")
+   config.app(c, "source", basic.Source)
+   config.app(c, "sink", basic.Sink)
+   config.app(c, "nic0", intel1g, {pciaddr=pciaddr})
+   config.link(c, "source.tx->nix.rx")
+   config.link(c, "nic.tx->sink.rx")
+   engine.configure(c)
+   engine.main({duration = 1.0, report = {showapps = true, showlinks = true}})
+   print("selftest: ok")
 end
 
