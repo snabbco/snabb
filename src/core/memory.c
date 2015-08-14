@@ -97,17 +97,14 @@ void *allocate_huge_page(int size)
   memset(realptr, 0, size); // zero memory to avoid potential surprises
   shmdt(tmpptr);
   //shmctl(shmid, IPC_RMID, 0);
-  
-  // proof-of-concept hack: write shm id to a file.
+
+  // write shm id to a mmap()ed structure.
   {
-    char fname[256];
-    FILE *f;
-    snprintf(fname, sizeof(fname), "/tmp/%p", (void*)physical_address);
-    f = fopen(fname, "w");
-    fprintf(f, "%d\n", shmid);
-    fclose(f);
+    int offst = physical_address >> map_ids->huge_page_bits;
+    assert(offst < (sizeof(map_ids->ids) / sizeof(int)));
+    map_ids->ids[offst] = shmid;
   }
-  
+
   return realptr;
  fail:
   if (tmpptr  != MAP_FAILED) { shmdt(tmpptr); }
@@ -125,15 +122,14 @@ void allocate_on_sigsegv(int sig, siginfo_t *si, void *unused)
     // This is not DMA memory: die.
     //exit(139);
   } else {
-    char fname[256];
     uint64_t physaddr = address  & ~0x500000000000ULL;
     uint64_t physpage = physaddr & ~(2*1024*1024-1);
     uint64_t virtpage = address  & ~(2*1024*1024-1);
-    snprintf(fname, sizeof(fname), "/tmp/%p", (void*)physpage);
-    FILE *f = fopen(fname, "r");
-    int id;
-    fscanf(f, "%d", &id);
-    fclose(f);
+
+    int offst = physpage >> map_ids->huge_page_bits;
+    assert(offst < (sizeof(map_ids->ids) / sizeof(int)));
+    int id = map_ids->ids[offst];
+
     shmat(id, (void*)virtpage, 0);
   }
 }

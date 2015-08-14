@@ -9,6 +9,7 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local syscall = require("syscall")
+local shm = require("core.shm")
 
 local lib = require("core.lib")
 require("core.memory_h")
@@ -84,6 +85,8 @@ base_page_size = 4096
 huge_page_size = get_huge_page_size()
 -- Address bits per huge page (2MB = 21 bits; 1GB = 30 bits)
 huge_page_bits = math.log(huge_page_size, 2)
+C.map_ids = shm.map('//dma_map_ids', 'struct map_ids_t')
+C.map_ids.huge_page_bits = huge_page_bits
 
 --- ### Physical address translation
 
