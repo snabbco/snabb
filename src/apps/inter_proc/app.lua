@@ -104,24 +104,3 @@ function Receive:report()
 end
 
 
----------------------
-local S = require('syscall')
-local config = require('core.config')
-local engine = require('core.app')
-local basic_apps = require('apps.basic.basic_apps')
-
-function selftest()
-   S.unlink(shm.root..'/'..root..'inter_test')
-   local c = config.new()
-   config.cpu(c, 'proc1', {busywait=true, cpu_set={12}})
-   config.cpu(c, 'proc2', {busywait=true, cpu_set={13}})
-   config.app(c, 'source', basic_apps.Source, {size=120, cpu='proc1'})
-   config.app(c, 'transmit', Transmit, {linkname='inter_test', cpu='proc1'})
-   config.app(c, 'receive', Receive, {linkname='inter_test', cpu='proc2'})
-   config.app(c, 'sink', basic_apps.Sink, {cpu='proc2'})
-   config.link(c, 'source.output -> transmit.input')
-   config.link(c, 'receive.output -> sink.input')
-   engine.configure(c)
-
-   engine.main{duration=1, report={showlinks=true, showapps=true}}
-end
