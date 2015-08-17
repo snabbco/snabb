@@ -1,0 +1,144 @@
+-- Performance Monitoring Unix: assembler library routines -*- lua -*-
+--
+-- This module contains assembly language routines for accessing CPU
+-- Performance Monitoring Unit (PMU) counter registers. The number of
+-- available registers is determined using the CPUID instruction and
+-- these registers are then read with the RDPMC instruction.
+--
+-- For details see:
+--   Intel 64 and IA-32 Architecture Software Developer's Manual vol 3
+--   (chapter: Performance Monitoring)
+--   http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
+
+module(..., package.seeall)
+
+local debug = true
+
+local ffi = require("ffi")
+local C = ffi.C
+
+local dasm = require("dasm")
+
+|.arch x64
+|.actionlist actions
+
+local gen = {}
+
+-- Utility: assemble code and optionally dump disassembly.
+function assemble (name, prototype, generator)
+   local Dst = dasm.new(actions)
+   generator(Dst)
+   local mcode, size = Dst:build()
+   if debug then
+      print("mcode dump: "..name)
+      dasm.dump(mcode, size)
+   end
+   return ffi.cast(prototype, mcode)
+end
+
+-- CPUID instruction interface.
+--
+-- This could be moved to a separate module in the future. Here
+-- now because the PMU code needs to use CPUID.
+
+-- Struct to store the output of the CPUID instruction in.
+cpuid_t = ffi.typeof[[
+  struct {
+    uint32_t eax, ebx, ecx, edx;
+  } __attribute__((packed))
+]]
+
+-- cpuid(int eax, cpuid_t *output))
+function gen_cpuid (Dst)
+   | push rbx                   -- rbx is a callee-save register
+   | mov eax, edi
+   | cpuid
+   | mov [rsi], eax
+   | mov [rsi+4], ebx
+   | mov [rsi+8], ecx
+   | mov [rsi+12], edx
+   | pop rbx
+   | ret
+end
+cpuid = assemble("cpuid", "void(*)(int, void *)", gen_cpuid)
+
+-- cpu_model: String name of the detected CPU model.
+-- Example: GenuineIntel-6-3F
+-- 
+-- This is formatted to be a suitable key for Intel's performance
+-- counter listing files (see pmu_cpu.lua).
+local id = ffi.new(cpuid_t)
+local name = ffi.new[[
+// Union to describe the 12-byte string that CPUID returns in three registers
+union {
+  struct { uint32_t ebx, edx, ecx; } __attribute__((packed)) reg;
+  char string[12];
+}
+]]
+cpuid(0x0, id)
+name.reg.ebx, name.reg.ecx, name.reg.edx = id.ebx, id.ecx, id.edx
+local vendor = ffi.string(name.string, 12)
+cpuid(0x1, id)
+local family = bit.band(bit.rshift(id.eax, 8), 0xf)
+local model  = bit.band(bit.rshift(id.eax, 4), 0xf)
+local extmodel = bit.band(bit.rshift(id.eax, 16), 0xf)
+
+-- XXX This is a simplified CPU ID formatting function.
+--     See Intel CPUID instruction documentation for full algorithm.
+--     (Could alternatively grovel this from /proc/cpuinfo.)
+cpu_model = ("%s-%X-%X%X"):format(vendor, family, extmodel, model)
+
+-- Calculate 'nfixed' and 'ngeneral' number of CPU performance
+-- counters for the running CPU.
+local id = ffi.new(cpuid_t)
+cpuid(0xa, id)
+nfixed   = bit.band(id.edx, 0x1f)
+ngeneral = bit.band(bit.rshift(id.eax, 8), 0xff)
+
+-- rdpmc_multi(uint64_t[nfixed+ngeneral] *dst)
+-- 
+-- Read all hardware performance registers and write their values into
+-- the destination array. The fixed-purpose registers are stored first
+-- followed by the general purpose registers.
+--
+-- The total number of elements stored is nfixed+ngeneral i.e. it
+-- depends on the number of hardware performance counters in the
+-- current CPU. Practically speaking the expected number of counters
+-- on Sandy Bridge - Skylake CPUs is three fixed purpose registers and
+-- either four (hyperthreads enabled) or eight (hyperthreads disabled)
+-- general purpose registers.
+function gen_rdpmc_multi (Dst)
+   local offset = 0
+   -- Read a PMC register value into the next slot of the destination buffer
+   local function rdpmc (isfixed, index)
+      local arg = (isfixed and 0x40000000 or 0) + index
+      |  mov ecx, arg
+      |  rdpmc
+      |  mov [edi+offset], eax
+      |  mov [edi+offset+4], edx
+      offset = offset + 8
+   end
+   for i = 0, nfixed-1   do rdpmc(true, i)  end
+   for i = 0, ngeneral-1 do rdpmc(false, i) end
+   |  ret
+end
+rdpmc_multi = assemble("rdpmc_multi", "void(*)(void*)", gen_rdpmc_multi)
+
+function selftest ()
+   print("selftest: pmu_x86")
+   -- Expected values for Sandy Bridge - Skylake
+   print("nfixed", nfixed, "ngeneral", ngeneral)
+   assert(nfixed == 3,                    "nfixed: " .. nfixed)
+   assert(ngeneral == 4 or ngeneral == 8, "ngeneral: " .. ngeneral)
+   local buf = ffi.new("uint64_t[?]", nfixed + ngeneral + 1)
+   local magic = 0x0001020304050607ULL
+   -- Store magic number in all fields (including extra sentinel)
+   for i = 0, nfixed+ngeneral do buf[i] = magic end
+   rdpmc_multi(buf)
+   for i = 0, 9-1 do print("buf["..i.."]", tonumber(buf[i])) end
+   -- Check that all values are written
+   for i = 0, nfixed+ngeneral-1 do assert(buf[i] ~= magic, "overwrite") end
+   assert(buf[nfixed+ngeneral] == magic, "sentinel")
+   print("selftest: ok")
+end
+
