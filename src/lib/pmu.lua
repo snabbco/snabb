@@ -37,8 +37,8 @@ module(..., package.seeall)
 -- 
 --   The counter_set will be valid only until the next call to setup().
 -- 
--- switch(counter_set)
---   Switch to a new set of counters to accumulate events in. Has the
+-- switch_to(counter_set)
+--   Switch_To to a new set of counters to accumulate events in. Has the
 --   side-effect of committing the current accumulators to the
 --   previous record.
 -- 
@@ -61,7 +61,7 @@ module(..., package.seeall)
 --      br_misp_retired.all_branches =       419
 --     }
 -- 
--- report(counter_set,  auxnames, auxvalues)
+-- report(counter_set,  aux)
 --   Print a textual report on the values accumulated in a counter set.
 --   Optionally include auxiliary application-level counters. The
 --   ratio of each event to each auxiliary counter is also reported.
@@ -142,18 +142,23 @@ function is_available ()
    return true
 end
 
-print("n", pmu_x86.ncounters)
 counter_set_t = ffi.typeof("int64_t [$]", pmu_x86.ncounters)
 
 function new_counter_set ()
    return ffi.new(counter_set_t)
 end
 
+function to_table (set)
+   local t = {}
+   for i = 1, #enabled do t[enabled[i]] = set[i-1] end
+   return t
+end
+
 local current_counter_set = nil
 local base_counters = ffi.new(counter_set_t)
 local tmp_counters = ffi.new(counter_set_t)
 
-function switch (set)
+function switch_to (set)
    -- Credit the previous counter set for its events
    if current_counter_set then
       pmu_x86.rdpmc_multi(tmp_counters)
@@ -161,13 +166,17 @@ function switch (set)
          local v = tmp_counters[i] - base_counters[i]
          -- Account for wrap-around of the 40-bit counter value.
          if v < 0 then v = v + bit.lshift(1, 40) end
+         current_counter_set[i] = current_counter_set[i] + v
       end
    end
+   -- Switch_To to the new set and "start the clock"
+   current_counter_set = set
+   pmu_x86.rdpmc_multi(base_counters)
 end
 
 -- API function (see above)
 function setup (set)
-   set = lib.array_copy(set)
+   set = set and lib.array_copy(set) or {}
    local ndropped = math.max(0, #set - pmu_x86.ngeneral)
    if ndropped > 0 then set[pmu_x86.ngeneral+1] = nil end
    local avail, err = is_available()
@@ -183,7 +192,8 @@ function setup (set)
       local EN = bit.lshift(1, 22)
       writemsr(0, 0x186+n, bit.bor(0x10000, USR, EN, code))
    end
-   enabled = set
+   enabled = {"instructions", "cycles", "ref-cycles"}
+   for i = 1, #set do table.insert(enabled, set[i]) end
    return ndropped
 end
 
@@ -198,8 +208,17 @@ function writemsr (cpu, msr, value)
    fd:close()
 end
 
--- Parameters are all optional.
-function report (names, values, auxnames, auxvalues)
+-- API function (see above)
+function report (set, aux)
+   aux = aux or {}
+   local names = lib.array_copy(enabled)
+   local values = {}
+   for i = 0, pmu_x86.ncounters do table.insert(values, set[i]) end
+   local auxnames, auxvalues = {}, {}
+   for k,v in pairs(aux) do 
+      table.insert(auxnames,k) 
+      table.insert(auxvalues,v) 
+   end
    -- print titles
    io.write(("%-30s %14s"):format("EVENT", "TOTAL"))
    for i = 1, #auxnames do
@@ -221,6 +240,16 @@ function report (names, values, auxnames, auxvalues)
    end
 end
 
+-- API function (see above)
+function profile (f, events, aux)
+   setup(events)
+   local set = new_counter_set()
+   switch_to(set)
+   f()
+   switch_to(nil)
+   report(set, aux)
+end
+
 function selftest ()
    print("selftest: pmu")
    local avail, err = is_available()
@@ -235,22 +264,18 @@ function selftest ()
       for k,v in pairs(defs) do n=n+1 end   
    end
    print(tostring(n).." counters found for CPU model "..pmu_x86.cpu_model)
-   setup({"uops_issued.any",
-          "uops_retired.all",
-          "br_inst_retired.conditional",
-          "br_misp_retired.all_branches"})
-   local buf0 = ffi.new("uint64_t[7]")
-   local buf1 = ffi.new("uint64_t[7]")
-   local nloop = 2.67e7
-   local acc = 0
-   pmu_x86.rdpmc_multi(buf0)
-   for i = 0, nloop do acc = acc / 1.2 + 1 end
-   pmu_x86.rdpmc_multi(buf1)
-   local names = {"instructions", "cycles", "ref-cycles"}
-   for i = 1, #enabled do table.insert(names, enabled[i]) end
-   local values = {}
-   for i = 1, #names do values[i] = buf1[i-1] - buf0[i-1] end
-   report(names, values, {"packet", "breath"}, {nloop, math.floor(nloop/128)})
+   local nloop = 123456
+   local set = new_counter_set()
+   local f = function ()
+      local acc = 0
+      for i = 0, nloop do acc = acc + 1 end
+   end
+   local events = {"uops_issued.any",
+                   "uops_retired.all",
+                   "br_inst_retired.conditional",
+                   "br_misp_retired.all_branches"}
+   local aux = {packet = nloop, breath = math.floor(nloop/128)}
+   profile(f, events, aux)
    print("selftest ok")
 end
 

@@ -68,12 +68,12 @@ cpuid = assemble("cpuid", "void(*)(int, void *)", gen_cpuid)
 -- This is formatted to be a suitable key for Intel's performance
 -- counter listing files (see pmu_cpu.lua).
 local id = ffi.new(cpuid_t)
+-- Union to describe the 12-byte string that CPUID returns in three registers
 local name = ffi.new[[
-// Union to describe the 12-byte string that CPUID returns in three registers
-union {
-  struct { uint32_t ebx, edx, ecx; } __attribute__((packed)) reg;
-  char string[12];
-}
+  union {
+    struct { uint32_t ebx, edx, ecx; } __attribute__((packed)) reg;
+    char string[12];
+  }
 ]]
 cpuid(0x0, id)
 name.reg.ebx, name.reg.ecx, name.reg.edx = id.ebx, id.ecx, id.edx
@@ -88,12 +88,13 @@ local extmodel = bit.band(bit.rshift(id.eax, 16), 0xf)
 --     (Could alternatively grovel this from /proc/cpuinfo.)
 cpu_model = ("%s-%X-%X%X"):format(vendor, family, extmodel, model)
 
--- Calculate 'nfixed' and 'ngeneral' number of CPU performance
+-- Calculate nfixed, ngeneral, ncounters: number of CPU performance
 -- counters for the running CPU.
 local id = ffi.new(cpuid_t)
 cpuid(0xa, id)
 nfixed   = bit.band(id.edx, 0x1f)
 ngeneral = bit.band(bit.rshift(id.eax, 8), 0xff)
+ncounters = nfixed + ngeneral
 
 -- rdpmc_multi(uint64_t[nfixed+ngeneral] *dst)
 -- 
@@ -108,6 +109,7 @@ ngeneral = bit.band(bit.rshift(id.eax, 8), 0xff)
 -- either four (hyperthreads enabled) or eight (hyperthreads disabled)
 -- general purpose registers.
 function gen_rdpmc_multi (Dst)
+   -- XXX Consider serializing the CPU with either CPUID or RDTSCP.
    local offset = 0
    -- Read a PMC register value into the next slot of the destination buffer
    local function rdpmc (isfixed, index)
