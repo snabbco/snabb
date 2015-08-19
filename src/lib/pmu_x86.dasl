@@ -12,7 +12,7 @@
 
 module(..., package.seeall)
 
-local debug = true
+local debug = false
 
 local ffi = require("ffi")
 local C = ffi.C

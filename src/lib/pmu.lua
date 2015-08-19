@@ -25,6 +25,11 @@ module(..., package.seeall)
 -- setup(event_list)
 --   Setup the hardware performance counters to track a given list of
 --   events (in addition to the built-in fixed-function counters).
+--   
+--   Each event is a Lua string pattern. This could be a full event name:
+--     'mem_load_uops_retired.l1_hit'
+--   or a more general pattern that matches several counters:
+--     'mem_load.*l._hit'
 -- 
 --   Return the number of overflowed counters that could not be
 --   tracked due to hardware constraints. These will be the last
@@ -179,14 +184,22 @@ function switch_to (set)
 end
 
 -- API function (see above)
-function setup (set)
-   set = set and lib.array_copy(set) or {}
-   local ndropped = math.max(0, #set - pmu_x86.ngeneral)
-   if ndropped > 0 then set[pmu_x86.ngeneral+1] = nil end
+function setup (patterns)
    local avail, err = is_available()
    if not avail then
       error("PMU not available: " .. err)
    end
+   local set = {}
+   for event in pairs(defs) do
+      for _, pattern in pairs(patterns) do
+         if event:match(pattern) then 
+            table.insert(set, event) 
+         end
+      end
+      table.sort(set)
+   end
+   local ndropped = math.max(0, #set - pmu_x86.ngeneral)
+   if ndropped > 0 then set[pmu_x86.ngeneral+1] = nil end
    local cpu = cpu_set()[1]
    -- Enable all fixed-function counters (IA32_FIXED_CTR_CTRL)
    writemsr(0, 0x38d, 0x333)
@@ -217,7 +230,7 @@ function report (set, aux)
    aux = aux or {}
    local names = lib.array_copy(enabled)
    local values = {}
-   for i = 0, pmu_x86.ncounters do table.insert(values, set[i]) end
+   for i = 0, #names-1 do table.insert(values, tonumber(set[i])) end
    local auxnames, auxvalues = {}, {}
    for k,v in pairs(aux) do 
       table.insert(auxnames,k) 
