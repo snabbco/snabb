@@ -217,7 +217,7 @@ function report (set, aux)
    aux = aux or {}
    local names = lib.array_copy(enabled)
    local values = {}
-   for i = 0, pmu_x86.ncounters do table.insert(values, set[i]) end
+   for i = 0, #names-1 do table.insert(values, tonumber(set[i])) end
    local auxnames, auxvalues = {}, {}
    for k,v in pairs(aux) do 
       table.insert(auxnames,k) 
