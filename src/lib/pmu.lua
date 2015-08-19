@@ -191,7 +191,7 @@ function setup (patterns)
    end
    local set = {}
    for event in pairs(defs) do
-      for _, pattern in pairs(patterns) do
+      for _, pattern in pairs(patterns or {}) do
          if event:match(pattern) then 
             table.insert(set, event) 
          end
@@ -237,7 +237,7 @@ function report (set, aux)
       table.insert(auxvalues,v) 
    end
    -- print titles
-   io.write(("%-30s %14s"):format("EVENT", "TOTAL"))
+   io.write(("%-40s %14s"):format("EVENT", "TOTAL"))
    for i = 1, #auxnames do
       io.write(("%12s"):format("/"..auxnames[i]))
    end
@@ -249,7 +249,7 @@ function report (set, aux)
    end
    -- print values
    for i = 1, #names do
-      io.write(("%-30s %14s"):format(names[i], core.lib.comma_value(values[i])))
+      io.write(("%-40s %14s"):format(names[i], core.lib.comma_value(values[i])))
       for j = 1, #auxnames do
          io.write(("%12.3f"):format(tonumber(values[i]/auxvalues[j])))
       end
