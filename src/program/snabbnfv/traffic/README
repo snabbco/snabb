@@ -10,6 +10,8 @@ snabbnfv traffic [OPTIONS] <pci-address> <config-file> <socket-path>
                              Print a debug report every SECONDS.
 			     The debug report includes a NIC register dump.
 			     Default: 600s (10 minutes)
+  -b, --busy                 Run in a busy-loop without sleeping.
+                             This minimizes latency but consumes 100% CPU.
   -B NPACKETS, --benchmark NPACKETS
                              Benchmark processing NPACKETS.
   -h, --help
