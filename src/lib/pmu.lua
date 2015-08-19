@@ -10,10 +10,14 @@ module(..., package.seeall)
 -- 
 -- API:
 -- 
--- profile(fn, event_list) => <printed report>
+-- profile(fn[, event_list, aux]) => value [and print report]
 --   Execute 'fn' and print a measurement report for event_list.
 --   This is a simple convenience function over the API below.
 -- 
+-- measure(fn[, event_list]) => result, table {counter->value}
+--   Execute 'fn' and return the event counters as a second value.
+--   This is a convenience similar to profile().
+--
 -- is_available() => true | false, why
 --   Return true if hardware performance counters are available.
 --   Otherwise return false with a string briefly explaining why.
@@ -150,7 +154,7 @@ end
 
 function to_table (set)
    local t = {}
-   for i = 1, #enabled do t[enabled[i]] = set[i-1] end
+   for i = 1, #enabled do t[enabled[i]] = tonumber(set[i-1]) end
    return t
 end
 
@@ -241,13 +245,24 @@ function report (set, aux)
 end
 
 -- API function (see above)
-function profile (f, events, aux)
+function measure (f,  events, aux)
    setup(events)
    local set = new_counter_set()
    switch_to(set)
-   f()
+   local res = f()
    switch_to(nil)
-   report(set, aux)
+   return res, to_table(set)
+end
+
+-- API function (see above)
+function profile (f,  events, aux, quiet)
+   setup(events)
+   local set = new_counter_set()
+   switch_to(set)
+   local res = f()
+   switch_to(nil)
+   if not quiet then report(set, aux) end
+   return res
 end
 
 function selftest ()
@@ -269,13 +284,24 @@ function selftest ()
    local f = function ()
       local acc = 0
       for i = 0, nloop do acc = acc + 1 end
+      return 42
    end
    local events = {"uops_issued.any",
                    "uops_retired.all",
                    "br_inst_retired.conditional",
                    "br_misp_retired.all_branches"}
    local aux = {packet = nloop, breath = math.floor(nloop/128)}
-   profile(f, events, aux)
+   print("testing profile()")
+   assert(profile(f, events, aux) == 42, "profile return value")
+   print("testing measure()")
+   local val, tab = measure(f)
+   assert(val == 42, "measure return value")
+   local n = 0
+   for k, v in pairs(tab) do
+      print('', k, v)
+      n = n + 1
+   end
+   assert(n == 3)
    print("selftest ok")
 end
 
