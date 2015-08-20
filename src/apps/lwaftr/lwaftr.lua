@@ -1,61 +1,26 @@
 module(..., package.seeall)
 
 local lwconf = require("apps.lwaftr.conf")
+local lwutil = require("apps.lwaftr.lwutil")
+local constants = require("apps.lwaftr.constants")
+
+local packet = require("core.packet")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
-local ffi = require("ffi")
 local icmp = require("lib.protocol.icmp.header")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
-local packet = require("core.packet")
 
+local ffi = require("ffi")
 local C = ffi.C
+
+local debug = true
 
 LwAftr = {}
 
-local function pp(t) for k,v in pairs(t) do print(k,v) end end
-
-local function print_ipv6(addr)
-   chunks = {}
-   for i = 0,7 do
-      table.insert(chunks, string.format("%x%x", addr[2*i], addr[2*i+1]))
-   end
-   print(table.concat(chunks, ':'))
-end
-
--- http://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
-local proto_icmp = 1
-local proto_tcp = 6
-local proto_icmpv6 = 58
-
--- http://www.iana.org/assignments/ieee-802-numbers/ieee-802-numbers.xhtml
-local ethertype_ipv4 = 0x0800
-local ethertype_ipv6 = 0x86DD
-
-local ethernet_header_size = 14 -- TODO: deal with 802.1Q tags?
-local ipv6_header_size = 40
-local ipv4_header_size = 20
-local debug = true
-
 function LwAftr:new(conf)
-   pp(conf)
+   lwutil.pp(conf)
    return setmetatable(conf, {__index=LwAftr})
-end
-
-local function print_pkt(pkt)
-   local fbytes = {}
-   for i=0,pkt.length - 1 do
-      table.insert(fbytes, string.format("0x%x", pkt.data[i]))
-   end
-   print(string.format("Len: %i: ", pkt.length) .. table.concat(fbytes, " "))
-end
-
-local function format_ipv4(uint32)
-   return string.format("%i.%i.%i.%i",
-      bit.rshift(bit.band(uint32, 0xff000000), 24),
-      bit.rshift(bit.band(uint32, 0xff0000), 16),
-      bit.rshift(bit.band(uint32, 0xff00), 8),
-      bit.band(uint32, 0xff))
 end
 
 function LwAftr:_get_lwAFTR_ipv6(binding_entry)
@@ -67,7 +32,7 @@ end
 -- TODO: make this O(1), and seriously optimize it for cache lines
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    print(ipv4_ip, 'port: ', port)
-   pp(self.binding_table)
+   lwutil.pp(self.binding_table)
    for _, bind in ipairs(self.binding_table) do
       if debug then print("CHECK", string.format("%x, %x", bind[2], ipv4_ip)) end
       if bind[2] == ipv4_ip then
@@ -77,7 +42,7 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
          end
       end
    end
-   print("Nothing found for ipv4:port", format_ipv4(ipv4_ip),
+   print("Nothing found for ipv4:port", lwutil.format_ipv4(ipv4_ip),
       string.format("%i (0x%x)", port, port))
 end
 
@@ -103,13 +68,13 @@ function LwAftr:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src
       if bind[2] == ipv4_src_ip then
          if ipv4_src_port >= bind[3] and ipv4_src_port <= bind[4] then
             print("ipv6bind")
-            print_ipv6(bind[1])
-            print_ipv6(ipv6_src_ip)
+            lwutil.print_ipv6(bind[1])
+            lwutil.print_ipv6(ipv6_src_ip)
             if C.memcmp(bind[1], ipv6_src_ip, 16) == 0 then
                local expected_dst = self:_get_lwAFTR_ipv6(bind)
                print("DST_MEMCMP", expected_dst, ipv6_dst_ip)
-               print_ipv6(expected_dst)
-               print_ipv6(ipv6_dst_ip)
+               lwutil.print_ipv6(expected_dst)
+               lwutil.print_ipv6(ipv6_dst_ip)
                if C.memcmp(expected_dst, ipv6_dst_ip, 16) == 0 then
                   return true
                end
@@ -143,12 +108,12 @@ function LwAftr:_icmp_after_discard(to_ip)
    print("gothere1")
    local icmp_header = icmp:new(3, 1) -- TODO: make symbolic
    print(self.aftr_ipv4_ip, to_ip)
-   local ipv4_header = ipv4:new({ttl = 255, protocol = proto_icmp,
+   local ipv4_header = ipv4:new({ttl = 255, protocol = constants.proto_icmp,
                                  src = self.aftr_ipv4_ip, dst = to_ip})
    print("got here 2")
    local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
                                         dst = self.inet_mac,
-                                        type = ethertype_ipv4})
+                                        type = constants.ethertype_ipv4})
    dgram:push(icmp_header)
    dgram:push(ipv4_header)
    dgram:push(ethernet_header)
@@ -162,11 +127,11 @@ function LwAftr:_icmp_b4_lookup_failed(to_ip)
    local new_pkt = packet.new_packet() -- TODO: recycle
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
    local icmp_header = icmp:new(1, 5) -- TODO: make symbolic, FIXME make ICMPv6
-   local ipv6_header = ipv6:new({ttl = 255, next_header = proto_icmpv6,
+   local ipv6_header = ipv6:new({ttl = 255, next_header = constants.proto_icmpv6,
                                  src = self.aftr_ipv6_ip, dst = to_ip})
    local ethernet_header = ethernet:new({src = self.aftr_mac_b4_side,
                                         dst = self.b4_mac,
-                                        type = ethertype_ipv6})
+                                        type = constants.ethertype_ipv6})
    dgram:push(icmp_header)
    dgram:push(ipv6_header)
    dgram:push(ethernet_header)
@@ -177,7 +142,7 @@ function LwAftr:_add_inet_ethernet(pkt)
    local dgram = datagram:new(pkt, ipv4) -- TODO: recycle this
    local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
                                          dst = self.inet_mac,
-                                         type = ethertype_ipv4})
+                                         type = constants.ethertype_ipv4})
    dgram:push(ethernet_header)
    return pkt
 end
@@ -188,23 +153,23 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    -- TODO: decrement the IPv4 ttl as this is part of forwarding
    -- TODO: do not encapsulate if ttl was already 0; send icmp
    local dgram = datagram:new(pkt, ethernet) -- TODO: recycle this
-   dgram:pop_raw(ethernet_header_size)
+   dgram:pop_raw(constants.ethernet_header_size)
    print("ipv6", ipv6_src, ipv6_dst)
    local payload_len = pkt.length
    if debug then
       print("Original packet, minus ethernet:")
-      print_pkt(pkt)
+      lwutil.print_pkt(pkt)
    end
 
    local ipv6_hdr = ipv6:new({next_header = next_hdr_type,
                               hop_limit = 255,
                               src = ipv6_src,
                               dst = ipv6_dst}) 
-   pp(ipv6_hdr)
+   lwutil.pp(ipv6_hdr)
 
    local eth_hdr = ethernet:new({src = ether_src,
                                  dst = ether_dst,
-                                 type = ethertype_ipv6})
+                                 type = constants.ethertype_ipv6})
    dgram:push(ipv6_hdr)
    -- The API makes setting the payload length awkward; set it manually
    -- Todo: less awkward way to write 16 bits of a number into cdata
@@ -213,7 +178,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    dgram:push(eth_hdr)
    if debug then
       print("encapsulated packet:")
-      print_pkt(pkt)
+      lwutil.print_pkt(pkt)
    end
    return pkt
 end
@@ -222,13 +187,13 @@ end
 -- TODO: correctly deal with IPv6 packets that need to be fragmented
 -- The incoming packet is a complete one with ethernet headers.
 function LwAftr:_encapsulate_ipv4(pkt)
-   local ipv6_dst, ipv6_src = self:binding_lookup_ipv4_from_pkt(pkt, ethernet_header_size)
+   local ipv6_dst, ipv6_src = self:binding_lookup_ipv4_from_pkt(pkt, constants.ethernet_header_size)
    if not ipv6_dst then
       if debug then print("lookup failed") end
       if self.ipv4_lookup_failed_policy == lwconf.policies['DROP'] then
          return nil -- lookup failed
       elseif self.ipv4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMP'] then
-         local src_ip_start = ethernet_header_size + 12
+         local src_ip_start = constants.ethernet_header_size + 12
          --local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
          local to_ip = pkt.data + src_ip_start
          return self:_icmp_after_discard(to_ip)-- ICMPv4 type 3 code 1
@@ -240,20 +205,22 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local ether_src = self.aftr_mac_b4_side 
    local ether_dst = self.b4_mac -- FIXME: this should probaby use NDP
 
-   local ttl_offset = ethernet_header_size + 8
+   local ttl_offset = constants.ethernet_header_size + 8
    local ttl = pkt.data[ttl_offset]
    print('ttl', ttl, pkt.data[ttl_offset])
    -- Do not encapsulate packets that already had a ttl of zero
    if ttl == 0 then return nil end
  
-   local proto_offset = ethernet_header_size + 9
+   local proto_offset = constants.ethernet_header_size + 9
    local proto = pkt.data[proto_offset]
 
-   if proto == proto_icmp and self.icmp_policy == conf.policies['DROP'] then return nil end
+   if proto == constants.proto_icmp and self.icmp_policy == conf.policies['DROP'] then
+      return nil
+   end
 
    pkt.data[ttl_offset] = ttl - 1
-   if proto == proto_tcp then
-      local csum_offset = ethernet_header_size + 10
+   if proto == constants.proto_tcp then
+      local csum_offset = constants.ethernet_header_size + 10
       -- ttl_offset is even, so multiply the ttl change by 0x100.
       -- It's added, because the checksum is is ones-complement.
       fixup_tcp_checksum(pkt, csum_offset, 0x100)
@@ -269,7 +236,7 @@ end
 function LwAftr:decapsulate(pkt)
    local dgram = datagram:new(pkt) -- TODO: recycle this
    -- FIXME: don't hardcode the values like this
-   dgram:pop_raw(ethernet_header_size + ipv6_header_size)
+   dgram:pop_raw(constants.ethernet_header_size + constants.ipv6_header_size)
    return pkt
 end
 
@@ -277,13 +244,14 @@ end
 -- TODO: rewrite this to use parse
 function LwAftr:from_b4(pkt)
    -- check src ipv4, ipv6, and port against the binding table
-   local ipv6_src_ip_offset = ethernet_header_size + 8
-   local ipv6_dst_ip_offset = ethernet_header_size + 24
+   local ipv6_src_ip_offset = constants.ethernet_header_size + 8
+   local ipv6_dst_ip_offset = constants.ethernet_header_size + 24
    -- FIXME: deal with multiple IPv6 headers
-   local ipv4_src_ip_offset = ethernet_header_size + ipv6_header_size + 12
+   local ipv4_src_ip_offset = constants.ethernet_header_size + 
+      constants.ipv6_header_size + 12
    -- FIXME: as above + varlen ipv4 + non-tcp/non-udp payloads
-   local ipv4_src_port_offset = ethernet_header_size + ipv6_header_size +
-                                ipv4_header_size
+   local ipv4_src_port_offset = constants.ethernet_header_size + 
+      constants.ipv6_header_size + constants.ipv4_header_size
    local ipv6_src_ip = pkt.data + ipv6_src_ip_offset
    local ipv6_dst_ip = pkt.data + ipv6_dst_ip_offset
    local ipv4_src_ip = ffi.cast("uint32_t*", pkt.data + ipv4_src_ip_offset)[0]
@@ -300,7 +268,7 @@ function LwAftr:from_b4(pkt)
          local dgram = datagram:new(pkt) -- TODO: recycle this
          local ethernet_header = ethernet:new({src = self.b4_mac,
                                                dst = self.aftr_mac_b4_side,
-                                               type = ethertype_ipv4})
+                                               type = constants.ethertype_ipv4})
          dgram:push(ethernet_header)
          return self:_encapsulate_ipv4(pkt)
       else
@@ -326,9 +294,9 @@ function LwAftr:push ()
       local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + ethertype_offset)[0])
       local out_pkt = nil
 
-      if ethertype == ethertype_ipv4 then -- Incoming packet from the internet
+      if ethertype == constants.ethertype_ipv4 then -- Incoming packet from the internet
          out_pkt = self:_encapsulate_ipv4(pkt)
-      elseif ethertype == ethertype_ipv6 then
+      elseif ethertype == constants.ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin
          out_pkt = self:from_b4(pkt)
       end -- FIXME: silently drop other types; is this the right thing to do?
