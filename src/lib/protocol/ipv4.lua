@@ -196,10 +196,28 @@ function ipv4:pseudo_header (ulplen, proto)
    return(ph)
 end
 
+local function test_ipv4_checksum ()
+   local IP_BASE      = 14
+   local IP_HDR_SIZE  = 20
+
+   local p = packet.from_string(lib.hexundump([[
+      52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
+      00 34 59 1a 40 00 40 06 00 00 c0 a8 14 a9 6b 15
+      f0 b4 de 0b 01 bb e7 db 57 bc 91 cd 18 32 80 10
+      05 9f 00 00 00 00 01 01 08 0a 06 0c 5c bd fa 4a
+      e1 65
+   ]], 66))
+
+   local ip_hdr = ipv4:new_from_mem(p.data + IP_BASE, IP_HDR_SIZE)
+   local csum = ip_hdr:checksum()
+   assert(csum == 0xb08e, "Wrong IPv4 checksum")
+end
+
 function selftest()
    local ipv4_address = "192.168.1.1"
    assert(ipv4_address == ipv4:ntop(ipv4:pton(ipv4_address)),
       'ipv4 text to binary conversion failed.')
+   test_ipv4_checksum()
 end
 
 ipv4.selftest = selftest
