@@ -13,7 +13,7 @@ function run (args)
    local command = table.remove(args, 1)
    if command == 'basic1' and #args == 1 then
       basic1(unpack(args))
-   elseif command == 'nfvconfig' and #args == 4 then
+   elseif command == 'nfvconfig' and #args == 3 then
       nfvconfig(unpack(args))
    elseif command == 'solarflare' and #args >= 2 and #args <= 3 then
       solarflare(unpack(args))
@@ -52,10 +52,16 @@ function basic1 (npackets)
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
 end
 
-function nfvconfig (pciaddr, confpath_x, confpath_y, nloads)
+function nfvconfig (confpath_x, confpath_y, nloads)
    local nfvconfig = require("program.snabbnfv.nfvconfig")
    nloads = tonumber(nloads)
       or error("Invalid number of iterations: " .. nloads)
+
+   local pciaddr = os.getenv("SNABB_PCI0")
+   if not pciaddr then
+      print("SNABB_PCI0 not set.")
+      os.exit(engine.test_skipped_code)
+   end
 
    local load_times, apply_times = {}, {}
 
@@ -95,19 +101,6 @@ function nfvconfig (pciaddr, confpath_x, confpath_y, nloads)
 end
 
 function sumf(a, ...) return a and a + sumf(...) or 0 end
-
-function get_sf_devices()
-   pci.scan_devices()
-
-   local sf_devices = {}
-   for _, device in pairs(pci.devices) do
-      if device.usable and device.driver == 'apps.solarflare.solarflare' then
-         sf_devices[#sf_devices + 1] = device
-      end
-   end
-
-   return sf_devices
-end
 
 Source = {}
 
@@ -162,17 +155,21 @@ function solarflare (npackets, packet_size, timeout)
    local status, SolarFlareNic = pcall(load_driver)
    if not status then
       print(SolarFlareNic)
-      main.exit(43)
+      os.exit(engine.test_skipped_code)
    end
 
-   local sf_devices = get_sf_devices()
-   if #sf_devices < 2 then
-      print([[did not find two Solarflare NICs in system, can't continue]])
-      main.exit(43)
+   local pciaddr0 = os.getenv("SNABB_PCI_SOLARFLARE0") or os.getenv("SNABB_PCI0")
+   local pciaddr1 = os.getenv("SNABB_PCI_SOLARFLARE1") or os.getenv("SNABB_PCI1")
+   local send_device = pciaddr0 and pci.device_info(pciaddr0)
+   local receive_device = pciaddr1 and pci.device_info(pciaddr1)
+   if not send_device
+      or send_device.driver ~= 'apps.solarflare.solarflare'
+      or not receive_device
+      or receive_device.driver ~= 'apps.solarflare.solarflare'
+   then
+      print("SNABB_PCI_SOLARFLARE[0|1]/SNABB_PCI[0|1] not set or not suitable.")
+      os.exit(engine.test_skipped_code)
    end
-
-   local send_device = sf_devices[1]
-   local receive_device = sf_devices[2]
 
    print(string.format("Sending through %s (%s), receiving through %s (%s)",
                        send_device.interface, send_device.pciaddress,

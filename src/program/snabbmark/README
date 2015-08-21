@@ -2,9 +2,11 @@ Usage:
   snabbmark basic1    <npackets>
     Benchmark basic app network packet flow.
 
-  snabbmark nfvconfig  <pci-address> <config-file-x> <config-file-y> <n>
+  snabbmark nfvconfig  <config-file-x> <config-file-y> <n>
     Benchmark loading <config-file-y> and transitioning from <config-file-x>
     to <config-file-y> <n> times.
+
+    Uses SNABB_PCI0.
 
   snabbmark solarflare <npackets> <packet-size> [<timeout>]
     Send the given number of packets through a Solarflare NIC.  The test
@@ -14,6 +16,9 @@ Usage:
     The optional <timeout> parameter can be used to specify a timeout in
     seconds. If supplied the benchmark run for no longer than <timeout>
     seconds.
+
+    Uses SNABB_PCI_SOLARFLARE0 or SNABB_PCI0 and SNABB_PCI_SOLARFLARE1 or
+    SNABB_PCI1.
 
     Example usage with 10 million packets, packet size 128 bytes:
     solarflare 10e6 128
