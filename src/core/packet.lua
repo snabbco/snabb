@@ -23,7 +23,7 @@ local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 local max_packets = 1e5
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = freelist.new("struct packet *", max_packets)
+local packets_fl = freelist.new('struct packet *', max_packets)
 
 -- Return an empty packet.
 function allocate ()
@@ -80,7 +80,7 @@ function from_string (d)         return from_pointer(d, #d) end
 local function free_internal (p)
    p.length = 0
    freelist_add(packets_fl, p)
-end   
+end
 
 function free (p)
    counter.add(engine.frees)
@@ -109,3 +109,12 @@ function preallocate_step()
    packet_allocation_step = 2 * packet_allocation_step
 end
 
+ffi.metatype(packet_t, {__index = {
+   clone = clone,
+   append = append,
+   prepend = prepend,
+   shiftleft = shiftleft,
+   free = free,
+   data = data,
+   length = length,
+}})

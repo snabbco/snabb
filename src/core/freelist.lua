@@ -1,12 +1,25 @@
 module(...,package.seeall)
 
 local ffi = require("ffi")
+local shm = require('core.shm')
 
-function new (type, size)
-   return { nfree = 0,
-            max = size,
-            -- XXX Better LuaJIT idiom for specifying the array type?
-            list = ffi.new(type.."[?]", size) }
+local function maketype(elmtype, size)
+   return ffi.typeof([[
+      struct {
+         int nfree, max;
+         $ list[$];
+      } ]], elmtype, size)
+end
+
+local function type_to_name(elmtype)
+   return tostring(elmtype)
+      :gsub('^ctype<(.*)>$', '%1')
+      :gsub('[^%w*]+', '_'):gsub('*', '#')
+end
+
+function new (elmtype, size)
+   elmtype = ffi.typeof(elmtype)
+   return shm.map('/freelists/'..type_to_name(elmtype), maketype(elmtype, size))
 end
 
 function add (freelist, element)
@@ -28,4 +41,3 @@ end
 function nfree (freelist)
    return freelist.nfree
 end
-

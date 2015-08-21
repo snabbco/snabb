@@ -4,6 +4,7 @@ local app = require("core.app")
 local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
+local lib = require("core.lib")
 local transmit, receive = link.transmit, link.receive
 
 
@@ -22,9 +23,10 @@ function Source:new(size)
 end
 
 function Source:pull ()
-   for _, o in ipairs(self.output) do
-      for i = 1, link.nwritable(o) do
-         transmit(o, packet.clone(self.packet))
+   local p = self.packet
+   for i, o in ipairs(self.output) do
+      for j = 1, o:nwritable() do
+         o:transmit(p:clone())
       end
    end
 end
@@ -78,10 +80,9 @@ function Sink:new ()
 end
 
 function Sink:push ()
-   for _, i in ipairs(self.input) do
-      for _ = 1, link.nreadable(i) do
-        local p = receive(i)
-        packet.free(p)
+   for i, l in ipairs(self.input) do
+      for j = 1, l:nreadable() do
+         l:receive():free()
       end
    end
 end
