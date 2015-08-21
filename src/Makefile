@@ -236,5 +236,8 @@ mrproper: clean
 	$(E) "RM        $(RMOBJS)"
 	$(Q)-rm -rf $(RMOBJS)
 
-.PHONY: clean $(TESTMODS) $(TESTSCRIPTS)
+benchmarks:
+	$(Q) (scripts/bench.sh)
+
+.PHONY: clean $(TESTMODS) $(TESTSCRIPTS) benchmarks
 

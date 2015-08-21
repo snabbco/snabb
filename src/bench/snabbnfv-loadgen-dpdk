@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+out=$(program/snabbnfv/packetblaster_bench.sh)
+# Extract floating point Mpps number from output.
+echo "$out" | tail -n 1 | cut -f 2
