@@ -1,5 +1,6 @@
 module(..., package.seeall)
 
+local fragment = require("apps.lwaftr.fragment")
 local lwconf = require("apps.lwaftr.conf")
 local lwutil = require("apps.lwaftr.lwutil")
 local constants = require("apps.lwaftr.constants")
@@ -176,9 +177,21 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    pkt.data[4] = bit.rshift(bit.band(payload_len, 0xff00), 8)
    pkt.data[5] = bit.band(payload_len, 0xff)
    dgram:push(eth_hdr)
-   if debug then
-      print("encapsulated packet:")
-      lwutil.print_pkt(pkt)
+   if pkt.length > self.ipv6_mtu then
+      local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_header_size
+      pkt = fragment.fragment_ipv6(pkt, unfrag_header_size, self.ipv6_mtu)
+      if debug then
+         print("Encapsulated packet into fragments")
+         for idx,fpkt in ipairs(pkt) do
+            print(string.format("    Fragment %i", idx))
+            lwutil.print_pkt(fpkt)
+         end
+      end
+   else
+      if debug then
+         print("encapsulated packet:")
+         lwutil.print_pkt(pkt)
+      end
    end
    return pkt
 end
@@ -302,7 +315,13 @@ function LwAftr:push ()
       end -- FIXME: silently drop other types; is this the right thing to do?
       --if debug then print("encapsulated") end
       if out_pkt then
-         link.transmit(o, out_pkt)
+         if type(out_pkt) == type({}) then -- Fragmented
+            for _,opkt in ipairs(out_pkt) do
+               link.transmit(o, opkt)
+            end
+         else -- Normal, unfragmented case
+            link.transmit(o, out_pkt)
+         end
          if debug then print("tx'd") end
       else 
          if debug then print ("Nothing transmitted") end
