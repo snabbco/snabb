@@ -1,0 +1,41 @@
+## Inter-process sample program
+
+The `program/spoon` directory contains a sample (and test, and benchmark)
+for the inter_proc app.
+
+The `director.sh` script starts several pairs of producers and consumers,
+each one on a different core, and waits for all the consumers to finish
+before killing the producers.
+
+before and after the test, it runs a cleanup routine to delete all the
+persistent shared objects, and also to unmap all the hugepages mentioned
+in the `core.memory` `map_ids` structure.
+
+
+### producer (program/spoon/produce.lua)
+
+    snsh program/spoon/produce.lua <linkname> <corenumber>
+
+Creates a simple packet-producing network:
+
+![producer](.images/producer.png)
+
+Where <linkname> is the name of the interprocess link where packets are sent.
+The engine is run indefinitely, sending packets to any SnabbSwitch instance
+that connects to the same <linkname>.
+
+Before starting it binds itself to the CPU core indicated by <corenumber>.
+
+
+### consumer (program/spoon/consume.lua)
+
+    snsh program/spoon/consume.lua <linkname> <corenumber>
+
+Creates a simple packet-consuming network:
+
+![consumer](.images/consumer.png)
+
+Where <linkname> is the name of the interprocess link to read packets from.
+The engine is run for 10 seconds and then a report is printed.
+
+Before starting it binds itself to the CPU core indicated by <corenumber>.
