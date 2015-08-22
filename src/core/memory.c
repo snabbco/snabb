@@ -8,11 +8,19 @@
 // This makes it possible to resolve physical addresses directly from
 // virtual addresses (remove the tag bits) and to test addresses for
 // validity (check the tag bits).
+//
+// This also means that it's possible to pass pointers to objects
+// within this area between different processes.  For this, the
+// global variable map_ids must point to a shared object,  If not null,
+// it's used to store the mapping IDs of each hugepage, so that
+// allocate_on_sigsegv() can map the same pages on demand.
+
 
 #define _GNU_SOURCE
 
 #include <assert.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -95,7 +103,15 @@ void *allocate_huge_page(int size)
   if (mlock(realptr, size) != 0) { goto fail; }
   memset(realptr, 0, size); // zero memory to avoid potential surprises
   shmdt(tmpptr);
-  shmctl(shmid, IPC_RMID, 0);
+  //shmctl(shmid, IPC_RMID, 0);
+
+  // write shm id to a mmap()ed structure.
+  if (map_ids) {
+    int offst = physical_address >> map_ids->huge_page_bits;
+    assert(offst < (sizeof(map_ids->ids) / sizeof(int)));
+    map_ids->ids[offst] = shmid;
+  }
+
   return realptr;
  fail:
   if (tmpptr  != MAP_FAILED) { shmdt(tmpptr); }
@@ -104,3 +120,33 @@ void *allocate_huge_page(int size)
   return NULL;
 }
 
+// SIGSEGV handler: attempts map packet memory on demand
+void allocate_on_sigsegv(int sig, siginfo_t *si, void *unused)
+{
+  uint64_t address = (uint64_t)si->si_addr;
+  if ((address & 0x500000000000ULL) != 0x500000000000ULL) {
+    // This is not DMA memory: die.
+    //exit(139);
+  } else {
+    uint64_t physaddr = address  & ~0x500000000000ULL;
+    uint64_t physpage = physaddr & ~(2*1024*1024-1);
+    uint64_t virtpage = address  & ~(2*1024*1024-1);
+
+    int offst = physpage >> map_ids->huge_page_bits;
+    assert(offst < (sizeof(map_ids->ids) / sizeof(int)));
+    int id = map_ids->ids[offst];
+
+    shmat(id, (void*)virtpage, 0);
+  }
+}
+
+void setup_signal()
+{
+  if (map_ids) {
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = allocate_on_sigsegv;
+    assert(sigaction(SIGSEGV, &sa, NULL) != -1);
+  }
+}

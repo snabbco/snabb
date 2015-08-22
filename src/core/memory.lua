@@ -9,6 +9,7 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local syscall = require("syscall")
+local shm = require("core.shm")
 
 local lib = require("core.lib")
 require("core.memory_h")
@@ -115,4 +116,9 @@ function selftest (options)
    print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
    print("HugeTLB page allocation OK.")
 end
+
+C.map_ids = shm.map('//dma_map_ids', 'struct map_ids_t')
+C.map_ids.huge_page_bits =  huge_page_bits
+C.setup_signal()
+
 
