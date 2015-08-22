@@ -2,8 +2,9 @@ module(..., package.seeall)
 
 local lib = require("core.lib")
 local shm = require("core.shm")
+local memory = require("core.memory")
 local syscall = require("syscall")
-local usage = require("program.gc.README_inc")
+local usage = 'help' --require("program.gc.README_inc")
 
 local long_opts = {
    help = "h"
@@ -18,10 +19,14 @@ function run (args)
 
    -- Unlink stale snabb resources.
    for _, pid in ipairs(shm.children("//")) do
-      if not syscall.kill(tonumber(pid), 0) then
+      if tonumber(pid) and not syscall.kill(tonumber(pid), 0) then
          shm.unlink("//"..pid)
       end
    end
+
+   -- unmap hugepages
+   memory.cleanup()
+
    -- Unlink own resource
    shm.unlink("//"..syscall.getpid())
 end

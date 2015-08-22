@@ -35,6 +35,9 @@
 
 #include "memory.h"
 
+#define ARRAY_SIZE(A) (sizeof(A)/sizeof(A[0]))
+
+
 // Convert from virtual addresses in our own process address space to
 // physical addresses in the RAM chips.
 uint64_t virtual_to_physical(void *ptr)
@@ -108,7 +111,7 @@ void *allocate_huge_page(int size)
   // write shm id to a mmap()ed structure.
   if (map_ids) {
     int offst = physical_address >> map_ids->huge_page_bits;
-    assert(offst < (sizeof(map_ids->ids) / sizeof(int)));
+    assert(offst < ARRAY_SIZE(map_ids->ids));
     map_ids->ids[offst] = shmid;
   }
 
@@ -133,7 +136,7 @@ void allocate_on_sigsegv(int sig, siginfo_t *si, void *unused)
     uint64_t virtpage = address  & ~(2*1024*1024-1);
 
     int offst = physpage >> map_ids->huge_page_bits;
-    assert(offst < (sizeof(map_ids->ids) / sizeof(int)));
+    assert(offst < ARRAY_SIZE(map_ids->ids));
     int id = map_ids->ids[offst];
 
     shmat(id, (void*)virtpage, 0);
@@ -148,5 +151,19 @@ void setup_signal()
     sigemptyset(&sa.sa_mask);
     sa.sa_sigaction = allocate_on_sigsegv;
     assert(sigaction(SIGSEGV, &sa, NULL) != -1);
+  }
+}
+
+
+void cleanup_hugepage_shms()
+{
+  if (!map_ids) return;
+
+  int i = 0;
+  for (i=0; i < ARRAY_SIZE(map_ids->ids); i++) {
+    int shmid = map_ids->ids[i];
+    if (shmid != 0) {
+      shmctl(shmid, IPC_RMID, 0);
+    }
   }
 }

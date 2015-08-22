@@ -98,6 +98,13 @@ function virtual_to_physical (virt_addr)
    return bit.bxor(u64, 0x500000000000ULL)
 end
 
+
+function cleanup()
+   C.cleanup_hugepage_shms()
+   shm.unmap(C.map_ids)
+   shm.unlink('//dma_map_ids')
+end
+
 --- ### selftest
 
 function selftest (options)
