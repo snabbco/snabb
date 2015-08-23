@@ -19,3 +19,6 @@ ethernet_header_size = 14 -- TODO: deal with 802.1Q tags?
 ipv6_header_size = 40
 ipv6_frag_header_size = 8
 ipv4_header_size = 20
+
+-- Offsets, 0-indexed
+ipv4_flags = 6

@@ -35,6 +35,10 @@ echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
    ${TEST_BASE}/tcp-frominet-bound1494.pcap ${TEST_BASE}/tcp-afteraftr-ipv6-2frags.pcap
 
+echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation, DF set, no ICMP."
+snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
+   ${TEST_BASE}/tcp-frominet-bound1494-DF.pcap ${TEST_BASE}/empty.pcap
+
 echo "Testing: from-internet IPv4 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-frominet-unbound.pcap ${TEST_BASE}/empty.pcap
