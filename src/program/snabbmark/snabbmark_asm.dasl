@@ -1,0 +1,160 @@
+-- Benchmark code written in assembler. -*- lua -*-
+module(...,package.seeall)
+
+local ffi = require("ffi")
+local C = ffi.C
+
+local dasm = require("dasm")
+
+|.arch x64
+|.actionlist actions
+local Dst = dasm.new(actions)
+
+-- Use a customer link struct / ring buffer.
+ffi.cdef[[
+struct ring {
+  struct packet *packets[256];
+  uint64_t read, write; // cursor positions
+}
+]]
+
+local function ptr (x) return ffi.cast("void *", x) end
+
+-- app network topology:
+-- source -> sink
+
+local fl   = ffi.new("struct ring")
+local source_to_sink = ffi.new("struct ring")
+
+-- Populate the freelist
+for i = 0, 255 do
+   fl.packets[i] = ffi.cast("struct packet *",
+                            memory.dma_alloc(ffi.sizeof("struct packet")))
+   fl.write = i
+end
+
+-- Setup fixed-purpose registers
+|  push r15
+|  push r14
+|  push r13
+|  push r12
+|.type freelist, struct ring,   r15
+|.type input,    struct ring,   r14
+|.type output,   struct ring,   r13
+|.type packet,   struct packet, r12
+
+|  mov64 freelist, ptr(fl)
+
+|->top:
+
+-- ----------------------------------------
+-- Source: allocate from freelist and write to output
+-- ----------------------------------------
+
+|  mov64 output, ptr(source_to_sink)
+|->source:
+-- Load number of freelist elements into rax.
+-- (Handle wrap around.)
+|  mov rdx, 255
+|  xor rcx, rcx
+|  mov rax, freelist->write
+|  sub rax, freelist->read
+|  cmovs rcx, rdx
+|  add rax, rcx
+|
+-- Load number of input packets into rdx (like above).
+|  mov rdx, 255
+|  xor rcx, rcx
+|  mov rdx, input->write
+|  sub rdx, input->read
+|  cmovs rcx, rdx
+|  add rdx, rcx
+|
+-- Load max packets to process into r8 (min of the values above)
+|  mov r8, rax
+|  cmp r8, rdx
+|  cmovs r8, rdx
+|
+-- Transfer packets
+|  xor rcx, rcx
+|->sourceloop:
+|
+-- Load 'packet' register from freelist
+|  mov rax, freelist->read
+|  add rax, rcx
+|  and rax, 255
+|  mov packet, [freelist + rax * 8] -- XXX better syntax to index freelist->packets?
+
+-- Initialize packet
+|  mov word packet->length, 64
+
+-- Write onto output link
+|  mov rax, output->write
+|  add rax, rcx
+|  and rax, 255
+|  mov [output + rax * 8], packet
+
+|  add rcx, 1
+|  cmp rcx, r8
+|  jne ->sourceloop
+
+-- Update freelist and link
+|  add freelist->read, r8
+|  add output->write, r8
+
+-- ----------------------------------------
+-- Sink: transfer packets from input link onto freelist
+-- ----------------------------------------
+
+|  mov64 input, ptr(source_to_sink)
+|->sink:
+-- Load the number of input packets into r8
+|  mov rdx, 255
+|  xor rcx, rcx
+|  mov r8, input->write
+|  sub r8, input->read
+|  cmovs rcx, rdx
+|  add r8, rcx
+
+-- (Assume the freelist has space for all packets)
+
+|  xor rcx, rcx
+|->sinkloop:
+|  cmp rcx, r8
+|  je >1
+-- Load 'packet' register from input link
+|  mov rax, input->read
+|  add rax, rcx
+|  and rax, 255
+|  mov packet, [output + rax * 8]
+-- Store on output link
+|  mov rax, freelist->write
+|  add rax, rcx
+|  and rax, 255
+|  mov [freelist + rax * 8], packet
+|
+|  add rcx, 1
+| jmp ->sinkloop
+|1:
+
+|  add freelist->write, r8
+|  add input->read, r8
+
+|  mov eax, 1e9
+|  cmp freelist->write, rax
+|  jl ->top
+
+-- Return result
+|  mov rax, r8
+
+|  pop r12
+|  pop r13
+|  pop r14
+|  pop r15
+|  ret 
+
+code, size = Dst:build() -- assign to 'code' to avoid machine code being GC'd
+fptr = ffi.cast("int64_t(*)()", code)
+dasm.dump(code, size)
+print("result: "..tonumber(fptr()))
+print("done")
