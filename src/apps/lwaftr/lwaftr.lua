@@ -179,21 +179,22 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    dgram:push(eth_hdr)
    if pkt.length > self.ipv6_mtu then
       local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_header_size
-      pkt = fragment.fragment_ipv6(pkt, unfrag_header_size, self.ipv6_mtu)
-      if debug then
+      local pkts = fragment.fragment_ipv6(pkt, unfrag_header_size, self.ipv6_mtu)
+      if debug and pkts then
          print("Encapsulated packet into fragments")
-         for idx,fpkt in ipairs(pkt) do
+         for idx,fpkt in ipairs(pkts) do
             print(string.format("    Fragment %i", idx))
             lwutil.print_pkt(fpkt)
          end
       end
+      return pkts
    else
       if debug then
          print("encapsulated packet:")
          lwutil.print_pkt(pkt)
+         return pkt
       end
    end
-   return pkt
 end
 
 -- TODO: correctly handle fragmented IPv4 packets
