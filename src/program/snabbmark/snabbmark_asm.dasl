@@ -24,7 +24,9 @@ local function ptr (x) return ffi.cast("void *", x) end
 -- source -> sink
 
 local fl   = ffi.new("struct ring")
-local source_to_sink = ffi.new("struct ring")
+local source_to_tee = ffi.new("struct ring")
+local tee1_to_sink  = ffi.new("struct ring")
+local tee2_to_sink  = ffi.new("struct ring")
 
 -- Populate the freelist
 for i = 0, 255 do
@@ -33,15 +35,21 @@ for i = 0, 255 do
    fl.write = i
 end
 
--- Setup fixed-purpose registers
+  -- Setup fixed-purpose registers
 |  push r15
 |  push r14
 |  push r13
 |  push r12
+|  push r11
+|  push r10
+|  push r9
 |.type freelist, struct ring,   r15
 |.type input,    struct ring,   r14
+|.type input2,   struct ring,   r9
 |.type output,   struct ring,   r13
+|.type output2,  struct ring,   r11
 |.type packet,   struct packet, r12
+|.type packet2,  struct packet, r10
 
 |  mov64 freelist, ptr(fl)
 
@@ -51,17 +59,8 @@ end
 -- Source: allocate from freelist and write to output
 -- ----------------------------------------
 
-|  mov64 output, ptr(source_to_sink)
+|  mov64 output, ptr(source_to_tee)
 |->source:
--- Load number of freelist elements into rax.
--- (Handle wrap around.)
-|  mov rdx, 255
-|  xor rcx, rcx
-|  mov rax, freelist->write
-|  sub rax, freelist->read
-|  cmovs rcx, rdx
-|  add rax, rcx
-|
 -- Load number of input packets into rdx (like above).
 |  mov rdx, 255
 |  xor rcx, rcx
@@ -69,11 +68,12 @@ end
 |  sub rdx, input->read
 |  cmovs rcx, rdx
 |  add rdx, rcx
-|
--- Load max packets to process into r8 (min of the values above)
-|  mov r8, rax
-|  cmp r8, rdx
-|  cmovs r8, rdx
+
+-- (Assume the freelist has enough packets available).
+
+-- Max burst: 100.
+-- (XXX This is actually important to keep the freelist from running empty.)
+|  mov r8, 100
 |
 -- Transfer packets
 |  xor rcx, rcx
@@ -83,7 +83,7 @@ end
 |  mov rax, freelist->read
 |  add rax, rcx
 |  and rax, 255
-|  mov packet, [freelist + rax * 8] -- XXX better syntax to index freelist->packets?
+|  mov packet, [freelist + rax * 8]
 
 -- Initialize packet
 |  mov word packet->length, 64
@@ -103,50 +103,137 @@ end
 |  add output->write, r8
 
 -- ----------------------------------------
--- Sink: transfer packets from input link onto freelist
+-- Tee: duplicate input packets to transmit them on two output links
 -- ----------------------------------------
 
-|  mov64 input, ptr(source_to_sink)
-|->sink:
--- Load the number of input packets into r8
-|  mov rdx, 255
+|  mov64 input,   ptr(source_to_tee)
+|  mov64 output,  ptr(tee1_to_sink)
+|  mov64 output2, ptr(tee2_to_sink)
+-- Load the number of available input packets into r8
+|  mov rdx, 256
+|  xor rcx, rcx
+|  mov r8, input->write
+|  sub r8, input->read
+|  cmovs rcx, rdx
+|  add r8, rcx
+-- XXX I don't understand why this is needed, but it is.
+--     I suppose the calculation immediately above is broken (or the
+--     'source' is messing up its output link)
+|  mov r8, 100
+
+-- First loop: transfer packets to first output 1
+|  xor rcx, rcx
+|->teeloop:
+|  cmp rcx, r8
+|  jge >1
+-- Load 'packet' from input link
+|  mov rax, input->read
+|  add rax, rcx
+|  and rax, 255
+|  mov packet, [input + rax * 8]
+
+-- Allocate a new packet
+|  mov rax, freelist->read
+|  add rax, rcx
+|  and rax, 255
+|  mov packet2, [freelist + rax * 8]
+-- Copy length field
+|  mov rax, packet->length
+|  mov packet2->length, rax
+-- Copy payload (XXX assume 64 bytes)
+-- XXX Conservatively use SSE2 (128-bit) SIMD
+--     (On AVX512 a whole 64-byte payload will fit in one register...)
+|  movdqu xmm0, [packet];    movdqu [packet2], xmm0
+|  movdqu xmm0, [packet+16]; movdqu [packet2+16], xmm0
+|  movdqu xmm0, [packet+32]; movdqu [packet2+32], xmm0
+|  movdqu xmm0, [packet+48]; movdqu [packet2+48], xmm0
+
+|  mov rax, 1
+|  add freelist->read, rax
+
+-- Transmit to first output
+|  mov rax, output->write
+|  add rax, rcx
+|  and rax, 255
+|  mov [output + rax * 8], packet
+
+-- Transmit to second output
+|  mov rax, output2->write
+|  add rax, rcx
+|  and rax, 255
+|  mov [output2 + rax * 8], packet2
+
+|  add rcx, 1
+|  jmp ->teeloop
+|1:
+|  add output->write, rcx
+|  add output2->write, rcx
+
+-- ----------------------------------------
+-- Sink: transfer packets from input links onto freelist
+-- ----------------------------------------
+
+-- Setup input registers
+|  mov64 input,  ptr(tee1_to_sink)
+|  mov64 input2, ptr(tee2_to_sink)
+
+-- Calculate how many packets to process
+-- XXX assume same number of packets available on both inputs
+|  mov rdx, 256
 |  xor rcx, rcx
 |  mov r8, input->write
 |  sub r8, input->read
 |  cmovs rcx, rdx
 |  add r8, rcx
 
--- (Assume the freelist has space for all packets)
-
 |  xor rcx, rcx
-|->sinkloop:
+|->sink:
 |  cmp rcx, r8
 |  je >1
--- Load 'packet' register from input link
+
+-- input 1
 |  mov rax, input->read
 |  add rax, rcx
 |  and rax, 255
-|  mov packet, [output + rax * 8]
--- Store on output link
+|  mov packet, [input + rax * 8]
+
 |  mov rax, freelist->write
 |  add rax, rcx
 |  and rax, 255
 |  mov [freelist + rax * 8], packet
-|
+
+-- input 2
+|  mov rax, input2->read
+|  add rax, rcx
+|  and rax, 255
+|  mov packet, [input2 + rax * 8]
+
+|  mov rax, freelist->write
+|  add rax, rcx
+|  and rax, 255
+|  mov [freelist + rax * 8], packet
+
 |  add rcx, 1
-| jmp ->sinkloop
+|  jmp ->sink
 |1:
 
-|  add freelist->write, r8
+|  add freelist->write, r8      -- for input1
+|  add freelist->write, r8      -- for input2
 |  add input->read, r8
+|  add input2->read, r8
 
-|  mov eax, 1e9
-|  cmp freelist->write, rax
+|  mov64 rax, 1e9
+|  mov64 rdx, ptr(source_to_tee)
+|  cmp input->write, rax
 |  jl ->top
 
 -- Return result
+|->out:
 |  mov rax, r8
 
+|  pop r9
+|  pop r10
+|  pop r11
 |  pop r12
 |  pop r13
 |  pop r14
@@ -157,4 +244,8 @@ code, size = Dst:build() -- assign to 'code' to avoid machine code being GC'd
 fptr = ffi.cast("int64_t(*)()", code)
 dasm.dump(code, size)
 print("result: "..tonumber(fptr()))
+print("tee1.read", tee1_to_sink.read, "tee1.write", tee1_to_sink.write)
+print("tee2.read", tee2_to_sink.read, "tee2.write", tee2_to_sink.write)
+print("fl  .read", fl.read, "fl  .write", fl.write)
+print("s2t .read", source_to_tee.read, "s2t .write", source_to_tee.write)
 print("done")
