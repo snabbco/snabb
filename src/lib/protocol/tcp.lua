@@ -168,4 +168,34 @@ function tcp:eq (other)
          (self:ack_num() == other:ack_num())
 end
 
+local function test_tcp_checksum ()
+   local ipv4 = require("lib.protocol.ipv4")
+
+   local IP_BASE      = 14
+   local IP_HDR_SIZE  = 20
+   local TCP_BASE     = IP_BASE + IP_HDR_SIZE
+   local TCP_HDR_SIZE = 20
+   local PAYLOAD_BASE = TCP_BASE + TCP_HDR_SIZE
+
+   local p = packet.from_string(lib.hexundump([[
+      52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
+      00 34 59 1a 40 00 40 06 00 00 c0 a8 14 a9 6b 15
+      f0 b4 de 0b 01 bb e7 db 57 bc 91 cd 18 32 80 10
+      05 9f 00 00 00 00 01 01 08 0a 06 0c 5c bd fa 4a
+      e1 65
+   ]], 66))
+
+   local ip_hdr = ipv4:new_from_mem(p.data + IP_BASE, IP_HDR_SIZE)
+   local tcp_hdr = tcp:new_from_mem(p.data + TCP_BASE, TCP_HDR_SIZE)
+   local payload_length = p.length - PAYLOAD_BASE
+   local csum = tcp_hdr:checksum(p.data + PAYLOAD_BASE, payload_length, ip_hdr)
+   assert(csum == 0x382a, "Wrong TCP checksum")
+end
+
+function selftest ()
+   test_tcp_checksum()
+end
+
+tcp.selftest = selftest
+
 return tcp
