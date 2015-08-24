@@ -54,7 +54,7 @@ ipv4._ulp = {
 
 function ipv4:new (config)
    local o = ipv4:superClass().new(self)
-   o:header().ihl_v_tos = C.htonl(0x4000) -- v4
+   o:header().ihl_v_tos = C.htons(0x4000) -- v4
    o:ihl(o:sizeof() / 4)
    o:dscp(config.dscp or 0)
    o:ecn(config.ecn or 0)
@@ -200,6 +200,10 @@ function selftest()
    local ipv4_address = "192.168.1.1"
    assert(ipv4_address == ipv4:ntop(ipv4:pton(ipv4_address)),
       'ipv4 text to binary conversion failed.')
+
+   local ipv4hdr = ipv4:new({})
+   assert(C.ntohs(ipv4hdr:header().ihl_v_tos) == 0x4500,
+      'ipv4 header field ihl_v_tos not initialized correctly.')
 end
 
 ipv4.selftest = selftest
