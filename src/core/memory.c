@@ -132,8 +132,9 @@ void allocate_on_sigsegv(int sig, siginfo_t *si, void *unused)
     //exit(139);
   } else {
     uint64_t physaddr = address  & ~0x500000000000ULL;
-    uint64_t physpage = physaddr & ~(2*1024*1024-1);
-    uint64_t virtpage = address  & ~(2*1024*1024-1);
+    int hugepage_mask = ~((1<<map_ids->huge_page_bits) - 1);
+    uint64_t physpage = physaddr & hugepage_mask;
+    uint64_t virtpage = address  & hugepage_mask;
 
     int offst = physpage >> map_ids->huge_page_bits;
     assert(offst < ARRAY_SIZE(map_ids->ids));
