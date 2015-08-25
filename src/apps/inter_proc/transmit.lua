@@ -16,6 +16,27 @@ local size = ffi.C.LINK_RING_SIZE
 local mask = ffi.C.LINK_RING_SIZE-1
 
 
+-- inter-process Transmit app
+--
+-- Sends packet pointers to a `Receive` app on a different process,
+-- bound to the same <linkname>.  Packet pointers should be valid on
+-- both processes if allocated on the DMA-friendly pool managed by
+-- core.memory
+--
+-- Each interprocess link is a shared memory struct (allocated with
+-- core.shm) with two synchronized rings: .packets[] holds packet pointers,
+-- and .ret_pks[] with "payback" empty packet pointers.
+--
+-- Packet ownership is transferred too, once transferred, we're not
+-- responsible to deallocate a packet. To avoid freelist starvation, the
+-- .ret_pks ring can contain "payback" packets that we can recycle into
+-- the local freelist.
+--
+-- To reduce cache trashing, this app only transmits when the `input` link
+-- contains at least 128 packets (half capacity) and the interprocess link
+-- has enough free space for all available packets.
+
+
 local Transmit = {_NAME = _NAME}
 Transmit.__index = Transmit
 

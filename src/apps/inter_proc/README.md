@@ -4,24 +4,12 @@ The `inter_proc` apps makes it possible to integrate several SnabbSwitch
 processes, each with its own collection of apps, to make use of more than
 one CPU core.
 
-Each interprocess link is a shared memory struct (allocated with `core.shm`)
-with two syncronized rings: one (`.packets[]`) holds packet pointers,
-and the other (`.ret_pks[]`) with "payback" empty packet pointers.
+One Transmit and one Receive apps are paired by mapping a shared memory
+struct in `/var/run/snabb/link/<linkname>`. Note that there must be only
+one transmit and one receive app on each link in the whole system.  In other
+words, each transmit/receive pair needs its own private <linkname>.
 
-Since packest buffers are allocated from the `core.memory` subsystem, their
-pointers are valid on any SnabbSwitch process running on the same host.
-That makes it possible for this apps to transmit only the pointers.
-
-The transmission of a packet from a process to another transfers ownership
-too; no matter which process initially allocated it, after transmission it
-can be recycled via the destination process' `freelist`.
-
-To avoid starving a process that sends a lot of packets and receives few
-or none, there's a "payback" channel: for each packet sent from process A
-to process B, there's an empty packet allocated on process B and recycled
-on process A.
-
-On simple netowrks, it might be better to set the `engine.busywait` flag
+On simple networks, it might be better to set the `engine.busywait` flag
 to force it to run at 100% busy.  Since the core engine can't "see" the
 packets transmitted between processes, it might erroneously assume there's
 no useful work to do.
@@ -34,10 +22,6 @@ Before sending each packet, it checks if there's a "payback" packet to be
 disposed (and keep the local freelist well fed).
 
 ![Transmit](.images/Transmit.png)
-
-To reduce cache trashing, this app only transmits when the `input` link
-contains at least 128 packets (half capacity) and the interprocess link
-has enough free space for all available packets.
 
 ### Configuration
 

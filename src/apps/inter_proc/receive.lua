@@ -16,6 +16,19 @@ local size = ffi.C.LINK_RING_SIZE
 local mask = ffi.C.LINK_RING_SIZE-1
 
 
+-- inter-process Receive app
+--
+-- Receives packet pointers sent from a `Transmit` app on a different process,
+-- bound to the same <linkname>.
+--
+-- Received packets are our responsibility now, must be eventually recycled.
+-- To maintain allocation/recycling balance between both processes, for
+-- each packet received, an empty packet buffer is sent to the transmitting
+-- process.
+--
+-- No packets are received until the interprocess link is half full (128 packets)
+-- and the output link has enough capacity to receive them all.
+
 local Receive = {_NAME = _NAME}
 Receive.__index = Receive
 

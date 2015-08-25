@@ -29,7 +29,8 @@ Where <linkname> is the name of the interprocess link where packets are sent.
 The engine is run indefinitely, sending packets to any SnabbSwitch instance
 that connects to the same <linkname>.
 
-Before starting it binds itself to the CPU core indicated by <corenumber>.
+Before starting it binds itself to the CPU core indicated by <corenumber> and
+sets the `engine.busywait` flag.
 
 
 ### consumer (program/spoon/consume.lua)
@@ -48,4 +49,5 @@ Creates a simple packet-consuming network:
 Where <linkname> is the name of the interprocess link to read packets from.
 The engine is run for 10 seconds and then a report is printed.
 
-Before starting it binds itself to the CPU core indicated by <corenumber>.
+Before starting it binds itself to the CPU core indicated by <corenumber> and
+sets the `engine.busywait` flag.
