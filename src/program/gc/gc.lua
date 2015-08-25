@@ -4,7 +4,7 @@ local lib = require("core.lib")
 local shm = require("core.shm")
 local memory = require("core.memory")
 local syscall = require("syscall")
-local usage = 'help' --require("program.gc.README_inc")
+local usage = require("program.gc.README_inc")
 
 local long_opts = {
    help = "h"
