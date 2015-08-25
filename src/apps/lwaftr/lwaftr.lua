@@ -179,6 +179,13 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    dgram:push(eth_hdr)
    if pkt.length > self.ipv6_mtu then
       local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_header_size
+      local flags = pkt.data[unfrag_header_size + constants.ipv4_flags]
+      if bit.band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
+         -- According to RFC 791, the packet must be discarded.
+         -- TODO: add an option to return ICMP(3, 4)
+         return nil
+      end
+
       local pkts = fragment.fragment_ipv6(pkt, unfrag_header_size, self.ipv6_mtu)
       if debug and pkts then
          print("Encapsulated packet into fragments")

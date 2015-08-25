@@ -37,15 +37,6 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
       return ipv6_pkt -- No fragmentation needed
    end
 
-   -- This assumes that the payload is an IPv4 packet. Revisit this assumption
-   -- if this is ever going to be generalized....
-   local flags = ipv6_pkt.data[unfrag_header_size + constants.ipv4_flags]
-   if bit.band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
-      -- According to RFC 791, the packet must be discarded.
-      -- TODO: add an option to return ICMP(3, 4)
-      return nil
-   end
-
    local more = 1
    -- TODO: carefully evaluate the boundary conditions here
    local new_header_size = unfrag_header_size + constants.ipv6_frag_header_size
