@@ -182,7 +182,8 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
       local flags = pkt.data[unfrag_header_size + constants.ipv4_flags]
       if bit.band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
          -- According to RFC 791, the packet must be discarded.
-         -- TODO: add an option to return ICMP(3, 4)
+         -- TODO: return a packet with ICMP(3, 4) and the appropriate MTU
+         -- as per https://tools.ietf.org/html/rfc2473#section-7.2
          return nil
       end
 
