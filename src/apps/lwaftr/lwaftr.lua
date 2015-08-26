@@ -1,16 +1,17 @@
 module(..., package.seeall)
 
+local constants = require("apps.lwaftr.constants")
 local fragment = require("apps.lwaftr.fragment")
+local icmpv4 = require("apps.lwaftr.icmpv4")
 local lwconf = require("apps.lwaftr.conf")
 local lwutil = require("apps.lwaftr.lwutil")
-local constants = require("apps.lwaftr.constants")
 
-local packet = require("core.packet")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
-local icmp = require("lib.protocol.icmp.header")
+--local icmp = require("lib.protocol.icmp.header")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
+local packet = require("core.packet")
 
 local ffi = require("ffi")
 local C = ffi.C
@@ -109,7 +110,8 @@ function LwAftr:_icmp_after_discard(to_ip)
    print("gothere1")
    local icmp_header = icmp:new(3, 1) -- TODO: make symbolic
    print(self.aftr_ipv4_ip, to_ip)
-   local ipv4_header = ipv4:new({ttl = 255, protocol = constants.proto_icmp,
+   local ipv4_header = ipv4:new({ttl = constants.default_ttl,
+                                 protocol = constants.proto_icmp,
                                  src = self.aftr_ipv4_ip, dst = to_ip})
    print("got here 2")
    local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
@@ -128,7 +130,8 @@ function LwAftr:_icmp_b4_lookup_failed(to_ip)
    local new_pkt = packet.new_packet() -- TODO: recycle
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
    local icmp_header = icmp:new(1, 5) -- TODO: make symbolic, FIXME make ICMPv6
-   local ipv6_header = ipv6:new({ttl = 255, next_header = constants.proto_icmpv6,
+   local ipv6_header = ipv6:new({ttl = constants.default_ttl,
+                                 next_header = constants.proto_icmpv6,
                                  src = self.aftr_ipv6_ip, dst = to_ip})
    local ethernet_header = ethernet:new({src = self.aftr_mac_b4_side,
                                         dst = self.b4_mac,
@@ -151,6 +154,13 @@ end
 -- Given a packet containing IPv4 and Ethernet, encapsulate the IPv4 portion.
 function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                                  ether_src, ether_dst)
+   -- TODO: explicitly clean these up
+   local ipv4_remote_eth, ipv4_remote_ip
+   remote_eth = ffi.new("uint8_t[6]")
+   ffi.copy(remote_eth, pkt.data + constants.ethernet_src_addr, 6)
+   remote_ipv4_addr = ffi.new("uint8_t[4]")
+   ffi.copy(remote_ipv4_addr, pkt.data + constants.ethernet_header_size + constants.ipv4_src_addr, 4)
+
    -- TODO: decrement the IPv4 ttl as this is part of forwarding
    -- TODO: do not encapsulate if ttl was already 0; send icmp
    local dgram = datagram:new(pkt, ethernet) -- TODO: recycle this
@@ -163,7 +173,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    end
 
    local ipv6_hdr = ipv6:new({next_header = next_hdr_type,
-                              hop_limit = 255,
+                              hop_limit = constants.default_ttl,
                               src = ipv6_src,
                               dst = ipv6_dst}) 
    lwutil.pp(ipv6_hdr)
@@ -177,32 +187,42 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    pkt.data[4] = bit.rshift(bit.band(payload_len, 0xff00), 8)
    pkt.data[5] = bit.band(payload_len, 0xff)
    dgram:push(eth_hdr)
-   if pkt.length > self.ipv6_mtu then
-      local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_header_size
-      local flags = pkt.data[unfrag_header_size + constants.ipv4_flags]
-      if bit.band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
-         -- According to RFC 791, the packet must be discarded.
-         -- TODO: return a packet with ICMP(3, 4) and the appropriate MTU
-         -- as per https://tools.ietf.org/html/rfc2473#section-7.2
-         return nil
-      end
-
-      local pkts = fragment.fragment_ipv6(pkt, unfrag_header_size, self.ipv6_mtu)
-      if debug and pkts then
-         print("Encapsulated packet into fragments")
-         for idx,fpkt in ipairs(pkts) do
-            print(string.format("    Fragment %i", idx))
-            lwutil.print_pkt(fpkt)
-         end
-      end
-      return pkts
-   else
+   if pkt.length <= self.ipv6_mtu then
       if debug then
          print("encapsulated packet:")
          lwutil.print_pkt(pkt)
          return pkt
       end
+    end
+
+   -- Otherwise, fragment if possible
+   local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_header_size
+   local flags = pkt.data[unfrag_header_size + constants.ipv4_flags]
+   if bit.band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
+      -- According to RFC 791, the original packet must be discarded.
+      -- Return a packet with ICMP(3, 4) and the appropriate MTU
+      -- as per https://tools.ietf.org/html/rfc2473#section-7.2
+      lwutil.print_pkt(pkt)
+      local icmp_config = {type = constants.icmpv4_dst_unreachable,
+                           code = constants.icmpv4_datagram_too_big_df,
+                           payload_p = pkt.data + constants.ethernet_header_size + constants.ipv6_header_size,
+                           payload_len = constants.icmpv4_default_payload_size,
+                           next_hop_mtu = self.ipv6_mtu - constants.ipv6_header_size
+                           }
+      return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, remote_eth,
+                               self.aftr_ipv4_ip, remote_ipv4_addr, icmp_config)
    end
+
+   -- DF wasn't set; fragment the large packet
+   local pkts = fragment.fragment_ipv6(pkt, unfrag_header_size, self.ipv6_mtu)
+   if debug and pkts then
+      print("Encapsulated packet into fragments")
+      for idx,fpkt in ipairs(pkts) do
+         print(string.format("    Fragment %i", idx))
+         lwutil.print_pkt(fpkt)
+      end
+   end
+   return pkts
 end
 
 -- TODO: correctly handle fragmented IPv4 packets
@@ -244,7 +264,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
    if proto == constants.proto_tcp then
       local csum_offset = constants.ethernet_header_size + 10
       -- ttl_offset is even, so multiply the ttl change by 0x100.
-      -- It's added, because the checksum is is ones-complement.
+      -- It's added, because the checksum is ones-complement.
       fixup_tcp_checksum(pkt, csum_offset, 0x100)
    end
    local next_hdr = 4 -- IPv4
