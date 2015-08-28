@@ -119,7 +119,7 @@ end
 -- That is: "Destination unreachable: destination host unreachable"
 -- The target IPv4 address + port is not in the table.
 function LwAftr:_icmp_after_discard(to_ip)
-   local new_pkt = packet.new_packet() -- TODO: recycle
+   local new_pkt = packet.allocate()
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
    local icmp_header = icmp:new(3, 1) -- TODO: make symbolic
    if debug then print(self.aftr_ipv4_ip, to_ip) end
@@ -139,7 +139,7 @@ end
 -- 'Destination unreachable: source address failed ingress/egress policy'
 -- The source (ipv6, ipv4, port) tuple is not in the table.
 function LwAftr:_icmp_b4_lookup_failed(to_ip)
-   local new_pkt = packet.new_packet() -- TODO: recycle
+   local new_pkt = packet.allocate()
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
    local icmp_header = icmp:new(1, 5) -- TODO: make symbolic, FIXME make ICMPv6
    local ipv6_header = ipv6:new({ttl = constants.default_ttl,

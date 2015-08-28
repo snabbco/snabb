@@ -47,7 +47,7 @@ function write_icmp(pkt, config)
 end
 
 function new_icmp_packet(from_eth, to_eth, from_ip, to_ip, config)
-   local new_pkt = packet.new_packet() -- TODO: recycle
+   local new_pkt = packet.allocate()
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
    local ipv4_header = ipv4:new({ttl = constants.default_ttl,
                                  protocol = constants.proto_icmp,

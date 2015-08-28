@@ -59,7 +59,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    local raw_frag_offset = payload_bytes_per_packet
 
    for i=2,num_packets - 1 do
-      local frag_pkt = packet.new_packet()
+      local frag_pkt = packet.allocate()
       ffi.copy(frag_pkt.data, ipv6_pkt.data, unfrag_header_size)
       write_ipv6_frag_header(frag_pkt.data, unfrag_header_size, fnext_header,
                              raw_frag_offset, more, frag_id)
@@ -72,7 +72,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    end
 
    -- last packet
-   local last_pkt = packet.new_packet()
+   local last_pkt = packet.allocate()
    more = 0
    ffi.copy(last_pkt.data, ipv6_pkt.data, unfrag_header_size)
    write_ipv6_frag_header(last_pkt.data, unfrag_header_size, fnext_header,
