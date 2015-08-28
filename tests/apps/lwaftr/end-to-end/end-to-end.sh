@@ -30,6 +30,9 @@ echo "Testing: from-internet IPv4 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-bound.pcap ${TEST_BASE}/tcp-afteraftr-ipv6.pcap
 
+echo "Testing: from-internet IPv4 packet found in the binding table, original TTL=1."
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/tcp-frominet-bound-ttl1.pcap ${TEST_BASE}/icmpv4-time-expired.pcap
 
 echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation."
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
