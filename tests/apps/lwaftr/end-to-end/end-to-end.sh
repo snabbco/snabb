@@ -46,9 +46,9 @@ echo "Testing: from-internet IPv4 packet NOT found in the binding table, no ICMP
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-frominet-unbound.pcap ${TEST_BASE}/empty.pcap
 
-#echo "Testing: from-internet IPv4 packet NOT found in the binding table (ICMP-on-fail)."
-#snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
-#   ${TEST_BASE}/tcp-frominet-unbound.pcap ${TEST_BASE}/empty.pcap
+echo "Testing: from-internet IPv4 packet NOT found in the binding table (ICMP-on-fail)."
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/tcp-frominet-unbound.pcap ${TEST_BASE}/icmpv4-dst-host-unreachable.pcap
 
 echo "Testing: from-to-b4 IPv6 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
