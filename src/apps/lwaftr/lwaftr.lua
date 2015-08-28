@@ -21,10 +21,8 @@ local debug = false
 LwAftr = {}
 
 -- TODO: refactor this
-local scratch_eth, scratch_ipv4, scratch_ipv6
-scratch_eth = ffi.new("uint8_t[6]")
+local scratch_ipv4, scratch_ipv6
 scratch_ipv4 = ffi.new("uint8_t[4]")
-scratch_ipv6 = ffi.new("uint8_t[16]")
 
 function LwAftr:new(conf)
    if debug then lwutil.pp(conf) end
@@ -118,21 +116,14 @@ end
 -- ICMPv4 type 3 code 1, as per the internet draft.
 -- That is: "Destination unreachable: destination host unreachable"
 -- The target IPv4 address + port is not in the table.
-function LwAftr:_icmp_after_discard(to_ip)
-   local new_pkt = packet.allocate()
-   local dgram = datagram:new(new_pkt) -- TODO: recycle this
-   local icmp_header = icmp:new(3, 1) -- TODO: make symbolic
-   if debug then print(self.aftr_ipv4_ip, to_ip) end
-   local ipv4_header = ipv4:new({ttl = constants.default_ttl,
-                                 protocol = constants.proto_icmp,
-                                 src = self.aftr_ipv4_ip, dst = to_ip})
-   local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
-                                        dst = self.inet_mac,
-                                        type = constants.ethertype_ipv4})
-   dgram:push(icmp_header)
-   dgram:push(ipv4_header)
-   dgram:push(ethernet_header)
-   return new_pkt
+function LwAftr:_icmp_after_discard(pkt, to_ip)
+   local icmp_config = {type = constants.icmpv4_dst_unreachable,
+                        code = constants.icmpv4_host_unreachable,
+                        payload_p = pkt.data + constants.ethernet_header_size,
+                        payload_len = constants.icmpv4_default_payload_size,
+                        }
+   return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, self.inet_mac,
+                                 self.aftr_ipv4_ip, to_ip, icmp_config)
 end
 
 -- ICMPv6 type 1 code 5, as per the internet draft.
@@ -214,8 +205,10 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                            payload_len = constants.icmpv4_default_payload_size,
                            next_hop_mtu = self.ipv6_mtu - constants.ipv6_header_size
                            }
-      return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, scratch_eth,
-                               self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
+      local icmp_pkt = icmpv4.new_icmp_packet(self.aftr_mac_inet_side, self.inet_mac,
+                                              self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
+      packet.free(pkt)
+      return icmp_pkt
    end
 
    -- DF wasn't set; fragment the large packet
@@ -244,7 +237,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
          local src_ip_start = constants.ethernet_header_size + 12
          --local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
          local to_ip = pkt.data + src_ip_start
-         return self:_icmp_after_discard(to_ip)-- ICMPv4 type 3 code 1
+         return self:_icmp_after_discard(pkt, to_ip)-- ICMPv4 type 3 code 1 (dst/host unreachable)
       else
          error("LwAftr: unknown policy" .. self.ipv4_lookup_failed_policy)
       end
@@ -263,7 +256,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
                            payload_p = pkt.data + constants.ethernet_header_size,
                            payload_len = constants.icmpv4_default_payload_size
                            }
-      return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, scratch_eth,
+      return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, self.inet_mac,
                                     self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
    end
  
@@ -354,7 +347,6 @@ function LwAftr:push ()
       local out_pkt = nil
 
       if ethertype == constants.ethertype_ipv4 then -- Incoming packet from the internet
-         ffi.copy(scratch_eth, pkt.data + constants.ethernet_src_addr, 6)
          ffi.copy(scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.ipv4_src_addr, 4)
          out_pkt = self:_encapsulate_ipv4(pkt)
       elseif ethertype == constants.ethertype_ipv6 then
