@@ -100,14 +100,19 @@ function LwAftr:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src
 end
 
 local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
-   local csum = C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0])
+   assert(math.abs(fixup_val) <= 0xffff, "Invalid fixup")
+   local csum = bit.bnot(C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0]))
    if debug then print("old csum", string.format("%x", csum)) end
    csum = csum + fixup_val
-   -- TODO/FIXME: *test* the following loop
-   while csum > 0xffff do -- process the carry nibbles
-      local carry = bit.rshift(csum, 16)
-      csum = bit.band(csum, 0xffff) + carry
-   end
+   -- TODO/FIXME: *test* this code
+   -- Manually unrolled loop; max 2 iterations, extra iterations
+   -- don't hurt, bitops are fast and ifs are slow.
+   local overflow = bit.rshift(bit.band(0xffff0000, csum), 16)
+   csum = bit.band(csum, 0xffff) + overflow
+   local overflow = bit.rshift(bit.band(0xffff0000, csum), 16)
+   csum = bit.band(csum, 0xffff) + overflow
+   csum = bit.bnot(csum)
+
    if debug then print("new csum", string.format("%x", csum)) end
    pkt.data[csum_offset] = bit.rshift(bit.band(csum, 0xff00), 8)
    pkt.data[csum_offset + 1] = bit.band(csum, 0xff)
@@ -271,8 +276,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
    if proto == constants.proto_tcp then -- TODO: handle non-TCP packets
       local csum_offset = constants.ethernet_header_size + 10
       -- ttl_offset is even, so multiply the ttl change by 0x100.
-      -- It's added, because the checksum is ones-complement.
-      fixup_tcp_checksum(pkt, csum_offset, 0x100)
+      fixup_tcp_checksum(pkt, csum_offset, -0x100)
    end
    local next_hdr = 4 -- IPv4
 
