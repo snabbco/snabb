@@ -238,6 +238,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
    if not ipv6_dst then
       if debug then print("lookup failed") end
       if self.ipv4_lookup_failed_policy == lwconf.policies['DROP'] then
+         packet.free(pkt)
          return nil -- lookup failed
       elseif self.ipv4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMP'] then
          local src_ip_start = constants.ethernet_header_size + 12
@@ -270,6 +271,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local proto = pkt.data[proto_offset]
 
    if proto == constants.proto_icmp and self.icmp_policy == conf.policies['DROP'] then
+      packet.free(pkt)
       return nil
    end
 
@@ -333,6 +335,7 @@ function LwAftr:from_b4(pkt)
    elseif self.from_b4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMPv6'] then
       return self:_icmp_b4_lookup_failed(ipv6_src_ip)
    else
+      packet.free(pkt)
       return nil
    end
 end
