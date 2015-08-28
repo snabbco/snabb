@@ -17,8 +17,10 @@ ethertype_ipv6 = 0x86DD
 icmpv4_echo_reply = 0
 icmpv4_dst_unreachable = 3
 icmpv4_echo_request = 8
+icmpv4_time_exceeded = 11
 
 -- ICMPv4 codes
+ttl_exceeded_in_transit = 0
 icmpv4_host_unreachable = 1
 icmpv4_datagram_too_big_df = 4
 icmpv4_communication_admin_prohibited = 13

@@ -20,6 +20,12 @@ local debug = true
 
 LwAftr = {}
 
+-- TODO: refactor this
+local scratch_eth, scratch_ipv4, scratch_ipv6
+scratch_eth = ffi.new("uint8_t[6]")
+scratch_ipv4 = ffi.new("uint8_t[4]")
+scratch_ipv6 = ffi.new("uint8_t[16]")
+
 function LwAftr:new(conf)
    lwutil.pp(conf)
    return setmetatable(conf, {__index=LwAftr})
@@ -154,13 +160,6 @@ end
 -- Given a packet containing IPv4 and Ethernet, encapsulate the IPv4 portion.
 function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                                  ether_src, ether_dst)
-   -- TODO: explicitly clean these up
-   local ipv4_remote_eth, ipv4_remote_ip
-   remote_eth = ffi.new("uint8_t[6]")
-   ffi.copy(remote_eth, pkt.data + constants.ethernet_src_addr, 6)
-   remote_ipv4_addr = ffi.new("uint8_t[4]")
-   ffi.copy(remote_ipv4_addr, pkt.data + constants.ethernet_header_size + constants.ipv4_src_addr, 4)
-
    -- TODO: decrement the IPv4 ttl as this is part of forwarding
    -- TODO: do not encapsulate if ttl was already 0; send icmp
    local dgram = datagram:new(pkt, ethernet) -- TODO: recycle this
@@ -209,8 +208,8 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                            payload_len = constants.icmpv4_default_payload_size,
                            next_hop_mtu = self.ipv6_mtu - constants.ipv6_header_size
                            }
-      return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, remote_eth,
-                               self.aftr_ipv4_ip, remote_ipv4_addr, icmp_config)
+      return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, scratch_eth,
+                               self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
    end
 
    -- DF wasn't set; fragment the large packet
@@ -248,10 +247,18 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local ether_dst = self.b4_mac -- FIXME: this should probaby use NDP
 
    local ttl_offset = constants.ethernet_header_size + 8
+   pkt.data[ttl_offset] = pkt.data[ttl_offset] - 1
    local ttl = pkt.data[ttl_offset]
-   print('ttl', ttl, pkt.data[ttl_offset])
-   -- Do not encapsulate packets that already had a ttl of zero
-   if ttl == 0 then return nil end
+   -- Do not encapsulate packets that now have a ttl of zero
+   if ttl == 0 then -- TODO: make this conditional on icmp_policy?
+      local icmp_config = {type = constants.icmpv4_time_exceeded,
+                           code = constants.ttl_exceeded_in_transit,
+                           payload_p = pkt.data + constants.ethernet_header_size,
+                           payload_len = constants.icmpv4_default_payload_size
+                           }
+      return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, scratch_eth,
+                                    self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
+   end
  
    local proto_offset = constants.ethernet_header_size + 9
    local proto = pkt.data[proto_offset]
@@ -260,8 +267,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
       return nil
    end
 
-   pkt.data[ttl_offset] = ttl - 1
-   if proto == constants.proto_tcp then
+   if proto == constants.proto_tcp then -- TODO: handle non-TCP packets
       local csum_offset = constants.ethernet_header_size + 10
       -- ttl_offset is even, so multiply the ttl change by 0x100.
       -- It's added, because the checksum is ones-complement.
@@ -337,6 +343,8 @@ function LwAftr:push ()
       local out_pkt = nil
 
       if ethertype == constants.ethertype_ipv4 then -- Incoming packet from the internet
+         ffi.copy(scratch_eth, pkt.data + constants.ethernet_src_addr, 6)
+         ffi.copy(scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.ipv4_src_addr, 4)
          out_pkt = self:_encapsulate_ipv4(pkt)
       elseif ethertype == constants.ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin
