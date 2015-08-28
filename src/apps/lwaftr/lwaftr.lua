@@ -16,7 +16,7 @@ local packet = require("core.packet")
 local ffi = require("ffi")
 local C = ffi.C
 
-local debug = true
+local debug = false
 
 LwAftr = {}
 
@@ -27,7 +27,7 @@ scratch_ipv4 = ffi.new("uint8_t[4]")
 scratch_ipv6 = ffi.new("uint8_t[16]")
 
 function LwAftr:new(conf)
-   lwutil.pp(conf)
+   if debug then lwutil.pp(conf) end
    return setmetatable(conf, {__index=LwAftr})
 end
 
@@ -39,8 +39,10 @@ end
 
 -- TODO: make this O(1), and seriously optimize it for cache lines
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
-   print(ipv4_ip, 'port: ', port)
-   lwutil.pp(self.binding_table)
+   if debug then
+      print(ipv4_ip, 'port: ', port)
+      lwutil.pp(self.binding_table)
+   end
    for _, bind in ipairs(self.binding_table) do
       if debug then print("CHECK", string.format("%x, %x", bind[2], ipv4_ip)) end
       if bind[2] == ipv4_ip then
@@ -50,8 +52,10 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
          end
       end
    end
-   print("Nothing found for ipv4:port", lwutil.format_ipv4(ipv4_ip),
+   if debug then
+      print("Nothing found for ipv4:port", lwutil.format_ipv4(ipv4_ip),
       string.format("%i (0x%x)", port, port))
+   end
 end
 
 -- https://www.ietf.org/id/draft-farrer-softwire-br-multiendpoints-01.txt
@@ -75,14 +79,18 @@ function LwAftr:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src
       end
       if bind[2] == ipv4_src_ip then
          if ipv4_src_port >= bind[3] and ipv4_src_port <= bind[4] then
-            print("ipv6bind")
-            lwutil.print_ipv6(bind[1])
-            lwutil.print_ipv6(ipv6_src_ip)
+            if debug then
+               print("ipv6bind")
+               lwutil.print_ipv6(bind[1])
+               lwutil.print_ipv6(ipv6_src_ip)
+            end
             if C.memcmp(bind[1], ipv6_src_ip, 16) == 0 then
                local expected_dst = self:_get_lwAFTR_ipv6(bind)
-               print("DST_MEMCMP", expected_dst, ipv6_dst_ip)
-               lwutil.print_ipv6(expected_dst)
-               lwutil.print_ipv6(ipv6_dst_ip)
+               if debug then
+                  print("DST_MEMCMP", expected_dst, ipv6_dst_ip)
+                  lwutil.print_ipv6(expected_dst)
+                  lwutil.print_ipv6(ipv6_dst_ip)
+               end
                if C.memcmp(expected_dst, ipv6_dst_ip, 16) == 0 then
                   return true
                end
@@ -95,14 +103,14 @@ end
 
 local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
    local csum = C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0])
-   print("old csum", string.format("%x", csum))
+   if debug then print("old csum", string.format("%x", csum)) end
    csum = csum + fixup_val
    -- TODO/FIXME: *test* the following loop
    while csum > 0xffff do -- process the carry nibbles
       local carry = bit.rshift(csum, 16)
       csum = bit.band(csum, 0xffff) + carry
    end
-   print("new csum", string.format("%x", csum))
+   if debug then print("new csum", string.format("%x", csum)) end
    pkt.data[csum_offset] = bit.rshift(bit.band(csum, 0xff00), 8)
    pkt.data[csum_offset + 1] = bit.band(csum, 0xff)
 end
@@ -113,13 +121,11 @@ end
 function LwAftr:_icmp_after_discard(to_ip)
    local new_pkt = packet.new_packet() -- TODO: recycle
    local dgram = datagram:new(new_pkt) -- TODO: recycle this
-   print("gothere1")
    local icmp_header = icmp:new(3, 1) -- TODO: make symbolic
-   print(self.aftr_ipv4_ip, to_ip)
+   if debug then print(self.aftr_ipv4_ip, to_ip) end
    local ipv4_header = ipv4:new({ttl = constants.default_ttl,
                                  protocol = constants.proto_icmp,
                                  src = self.aftr_ipv4_ip, dst = to_ip})
-   print("got here 2")
    local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
                                         dst = self.inet_mac,
                                         type = constants.ethertype_ipv4})
@@ -164,7 +170,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    -- TODO: do not encapsulate if ttl was already 0; send icmp
    local dgram = datagram:new(pkt, ethernet) -- TODO: recycle this
    dgram:pop_raw(constants.ethernet_header_size)
-   print("ipv6", ipv6_src, ipv6_dst)
+   if debug then print("ipv6", ipv6_src, ipv6_dst) end
    local payload_len = pkt.length
    if debug then
       print("Original packet, minus ethernet:")
@@ -175,7 +181,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                               hop_limit = constants.default_ttl,
                               src = ipv6_src,
                               dst = ipv6_dst}) 
-   lwutil.pp(ipv6_hdr)
+   if debug then lwutil.pp(ipv6_hdr) end
 
    local eth_hdr = ethernet:new({src = ether_src,
                                  dst = ether_dst,
@@ -190,8 +196,8 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
       if debug then
          print("encapsulated packet:")
          lwutil.print_pkt(pkt)
-         return pkt
       end
+      return pkt
     end
 
    -- Otherwise, fragment if possible
@@ -201,7 +207,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
       -- According to RFC 791, the original packet must be discarded.
       -- Return a packet with ICMP(3, 4) and the appropriate MTU
       -- as per https://tools.ietf.org/html/rfc2473#section-7.2
-      lwutil.print_pkt(pkt)
+      if debug then lwutil.print_pkt(pkt) end
       local icmp_config = {type = constants.icmpv4_dst_unreachable,
                            code = constants.icmpv4_datagram_too_big_df,
                            payload_p = pkt.data + constants.ethernet_header_size + constants.ipv6_header_size,
@@ -308,8 +314,10 @@ function LwAftr:from_b4(pkt)
       -- Is it worth optimizing this to change src_eth, src_ipv6, ttl, checksum,
       -- rather than decapsulating + re-encapsulating? It would be faster, but more code.
       self:decapsulate(pkt)
-      print("self.hairpinning is", self.hairpinning)
-      print("binding_lookup...", self:binding_lookup_ipv4_from_pkt(pkt, 0))
+      if debug then
+         print("self.hairpinning is", self.hairpinning)
+         print("binding_lookup...", self:binding_lookup_ipv4_from_pkt(pkt, 0))
+      end
       if self.hairpinning and self:binding_lookup_ipv4_from_pkt(pkt, 0) then
          -- FIXME: shifting the packet ethernet_header_size right would suffice here
          -- The ethernet data is thrown away by _encapsulate_ipv4 anyhow.

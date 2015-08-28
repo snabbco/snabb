@@ -44,7 +44,6 @@ end
 
 -- The checksum bytes must be set to 0 before calling this.
 function ipv4_checksum(pkt, start_offset, bytes_to_checksum)
-   print(start_offset, bytes_to_checksum)
    local checksum = 0
    for i = start_offset, start_offset + bytes_to_checksum + 2, 2 do
       checksum = checksum + pkt.data[i] * 0x100 + pkt.data[i+1]
