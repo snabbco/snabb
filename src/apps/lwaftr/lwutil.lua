@@ -33,20 +33,3 @@ function format_ipv4(uint32)
       bit.rshift(bit.band(uint32, 0xff00), 8),
       bit.band(uint32, 0xff))
 end
-
-function csum_carry_and_not(checksum)
-   while checksum > 0xffff do -- process the carry nibbles
-      local carry = bit.rshift(checksum, 16)
-      checksum = bit.band(checksum, 0xffff) + carry
-   end
-   return bit.band(bit.bnot(checksum), 0xffff)
-end
-
--- The checksum bytes must be set to 0 before calling this.
-function ipv4_checksum(pkt_data, start_offset, bytes_to_checksum, base_checksum)
-   local checksum = base_checksum or 0
-   for i = start_offset, start_offset + bytes_to_checksum + 2, 2 do
-      checksum = checksum + pkt_data[i] * 0x100 + pkt_data[i+1]
-   end
-   return csum_carry_and_not(checksum)
-end
