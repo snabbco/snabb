@@ -7,7 +7,7 @@ LUAJIT   := deps/luajit.vsn
 SYSCALL  := deps/syscall.vsn
 PFLUA    := deps/pflua.vsn
 
-LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h
+LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h -fPIC
 
 all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	@echo "Building snabbswitch"

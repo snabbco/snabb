@@ -54,7 +54,7 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
-snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
+libsnabb.so: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	$(E) "SUBMODULES"
 	@if test ! -f ../deps/luajit.vsn			|| \
 	    test ! -f ../deps/ljsyscall.vsn			|| \
@@ -79,12 +79,11 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LU
 	    exit 1; \
 	 fi
 	$(E) "LINK      $@"
-	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
+	$(Q) gcc $(DEBUG) -fPIC -shared -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
-	@ln -fs snabb snabbswitch
-	@ls -sh snabb
+	@ls -sh $@
 
 all: $(EXE)
 
@@ -152,15 +151,15 @@ $(PFLUAOBJ): obj/%_lua.o: ../deps/pflua/src/%.lua Makefile
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) gcc -fPIC $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/avx2_c.o: arch/avx2.c Makefile
 	$(E) "C(AVX2)   $@"
-	$(Q) gcc -O2 -mavx2 $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) gcc -fPIC -O2 -mavx2 $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/sse2_c.o: arch/sse2.c Makefile
 	$(E) "C(SSE2)   $@"
-	$(Q) gcc -O2 -msse2 $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) gcc -fPIC -O2 -msse2 $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
@@ -207,7 +206,7 @@ obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
 
 obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
+	$(Q) gcc -fPIC $(DEBUG) -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
 
 book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
 

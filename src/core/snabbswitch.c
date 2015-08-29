@@ -7,8 +7,7 @@
 int argc;
 char** argv;
 
-int main(int snabb_argc, char **snabb_argv)
-{
+int start_snabb_switch(int snabb_argc, char **snabb_argv) {
   /* Store for use by LuaJIT code via FFI. */
   argc = snabb_argc;
   argv = snabb_argv;
