@@ -28,14 +28,14 @@ function intel1g:new (conf)
    -- bitvalue(0x42)      => 0x42
    -- bitvalue({a=7,b=2}) => 0x42
    local function bitvalue (value)
-      return (type(value) == 'number') and value or bits(value)
+      return (type(value) == 'table') and bits(value) or tonumber(value)
    end
    local function poke32 (offset, value)
       value = bitvalue(value)
-      lib.poke32(regs, offset, value)
+      regs[offset/4] = value
    end
    local function peek32 (offset)
-      returnlib.peek32(regs, offset)
+      return regs[offset/4]
    end
    local function set32 (offset, value)
       value = bitvalue(value)
@@ -124,13 +124,13 @@ function intel1g:new (conf)
       -- Free packets that have  been transmitted.
       local function sync_transmit ()
          local cursor = tdh
-         tdh = regs[r.TDH]
+         tdh = peek32(r.TDH)
          while cursor ~= tdh do
             packet.free(packets[cursor])
             packets[cursor] = nil
             cursor = ringnext(cursor)
          end
-         regs[r.TDT] = tdt
+         poke32(r.TDT, tdt)
       end
 
       -- Define push() method for app instance.
@@ -247,6 +247,8 @@ function intel1g:new (conf)
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
    end
+
+   return self
 end
 
 function selftest ()
@@ -259,10 +261,11 @@ function selftest ()
    
    local c = config.new()
    local basic = require("apps.basic.basic_apps")
+   print(basic.Source, basic.Sink, intel1g)
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
-   config.app(c, "nic0", intel1g, {pciaddr=pciaddr})
-   config.link(c, "source.tx->nix.rx")
+   config.app(c, "nic", intel1g, {pciaddr=pciaddr})
+   config.link(c, "source.tx->nic.rx")
    config.link(c, "nic.tx->sink.rx")
    engine.configure(c)
    engine.main({duration = 1.0, report = {showapps = true, showlinks = true}})
