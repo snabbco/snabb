@@ -43,10 +43,10 @@ function csum_carry_and_not(checksum)
 end
 
 -- The checksum bytes must be set to 0 before calling this.
-function ipv4_checksum(pkt, start_offset, bytes_to_checksum)
-   local checksum = 0
+function ipv4_checksum(pkt_data, start_offset, bytes_to_checksum, base_checksum)
+   local checksum = base_checksum or 0
    for i = start_offset, start_offset + bytes_to_checksum + 2, 2 do
-      checksum = checksum + pkt.data[i] * 0x100 + pkt.data[i+1]
+      checksum = checksum + pkt_data[i] * 0x100 + pkt_data[i+1]
    end
    return csum_carry_and_not(checksum)
 end

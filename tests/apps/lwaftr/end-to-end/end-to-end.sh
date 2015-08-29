@@ -58,6 +58,14 @@ echo "Testing: from-b4 to-internet IPv6 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-fromb4-ipv6.pcap ${TEST_BASE}/decap-ipv4.pcap
 
+echo "Testing: from-b4 to-internet IPv6 packet NOT found in the binding table, no ICMP"
+snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
+   ${TEST_BASE}/tcp-fromb4-ipv6-unbound.pcap ${TEST_BASE}/empty.pcap
+
+echo "Testing: from-b4 to-internet IPv6 packet NOT found in the binding table (ICMP-on-fail)"
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/tcp-fromb4-ipv6-unbound.pcap ${TEST_BASE}/icmpv6-nogress.pcap
+
 echo "Testing: from-to-b4 IPv6 packet, no hairpinning"
 # The idea is that with hairpinning off, the packet goes out the inet interface
 # and something else routes it back for re-encapsulation. It's not clear why
