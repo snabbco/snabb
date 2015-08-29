@@ -2,13 +2,12 @@ module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
 local fragment = require("apps.lwaftr.fragment")
-local icmpv4 = require("apps.lwaftr.icmpv4")
+local icmp = require("apps.lwaftr.icmp")
 local lwconf = require("apps.lwaftr.conf")
 local lwutil = require("apps.lwaftr.lwutil")
 
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
---local icmp = require("lib.protocol.icmp.header")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local packet = require("core.packet")
@@ -127,27 +126,30 @@ function LwAftr:_icmp_after_discard(pkt, to_ip)
                         payload_p = pkt.data + constants.ethernet_header_size,
                         payload_len = constants.icmpv4_default_payload_size,
                         }
-   return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, self.inet_mac,
+   return icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
                                  self.aftr_ipv4_ip, to_ip, icmp_config)
 end
 
 -- ICMPv6 type 1 code 5, as per the internet draft.
 -- 'Destination unreachable: source address failed ingress/egress policy'
 -- The source (ipv6, ipv4, port) tuple is not in the table.
-function LwAftr:_icmp_b4_lookup_failed(to_ip)
-   local new_pkt = packet.allocate()
-   local dgram = datagram:new(new_pkt) -- TODO: recycle this
-   local icmp_header = icmp:new(1, 5) -- TODO: make symbolic, FIXME make ICMPv6
-   local ipv6_header = ipv6:new({ttl = constants.default_ttl,
-                                 next_header = constants.proto_icmpv6,
-                                 src = self.aftr_ipv6_ip, dst = to_ip})
-   local ethernet_header = ethernet:new({src = self.aftr_mac_b4_side,
-                                        dst = self.b4_mac,
-                                        type = constants.ethertype_ipv6})
-   dgram:push(icmp_header)
-   dgram:push(ipv6_header)
-   dgram:push(ethernet_header)
-   return new_pkt
+function LwAftr:_icmp_b4_lookup_failed(pkt, to_ip)
+   -- https://tools.ietf.org/html/rfc7596 calls for "As much of invoking packet                 |
+   -- as possible without the ICMPv6 packet
+   -- exceeding the minimum IPv6 MTU".
+   -- Does this mean 1280 or the path-specific one?
+   local headers_len = constants.ethernet_header_size + constants.ipv6_header_size + constants.icmp_base_size
+   local plen = pkt.length - constants.ethernet_header_size
+   if plen + headers_len >= constants.min_ipv6_mtu then
+      plen = constants.min_ipv6_mtu - headers_len
+   end
+   local icmp_config = {type = constants.icmpv6_dst_unreachable,
+                        code = constants.icmpv6_failed_ingress_egress_policy,
+                        payload_p = pkt.data + constants.ethernet_header_size,
+                        payload_len = plen
+                       }
+   return icmp.new_icmpv6_packet(self.aftr_mac_b4_side, self.b4_mac, self.aftr_ipv6_ip,
+                          to_ip, icmp_config)
 end
 
 function LwAftr:_add_inet_ethernet(pkt)
@@ -210,7 +212,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                            payload_len = constants.icmpv4_default_payload_size,
                            next_hop_mtu = self.ipv6_mtu - constants.ipv6_header_size
                            }
-      local icmp_pkt = icmpv4.new_icmp_packet(self.aftr_mac_inet_side, self.inet_mac,
+      local icmp_pkt = icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
                                               self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
       packet.free(pkt)
       return icmp_pkt
@@ -257,11 +259,11 @@ function LwAftr:_encapsulate_ipv4(pkt)
    -- Do not encapsulate packets that now have a ttl of zero
    if ttl == 0 then -- TODO: make this conditional on icmp_policy?
       local icmp_config = {type = constants.icmpv4_time_exceeded,
-                           code = constants.ttl_exceeded_in_transit,
+                           code = constants.icmpv4_ttl_exceeded_in_transit,
                            payload_p = pkt.data + constants.ethernet_header_size,
                            payload_len = constants.icmpv4_default_payload_size
                            }
-      return icmpv4.new_icmp_packet(self.aftr_mac_inet_side, self.inet_mac,
+      return icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
                                     self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
    end
  
@@ -330,7 +332,9 @@ function LwAftr:from_b4(pkt)
          return self:_add_inet_ethernet(pkt)
       end
    elseif self.from_b4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMPv6'] then
-      return self:_icmp_b4_lookup_failed(ipv6_src_ip)
+      local icmp_pkt = self:_icmp_b4_lookup_failed(pkt, ipv6_src_ip)
+      packet.free(pkt)
+      return icmp_pkt
    else
       packet.free(pkt)
       return nil

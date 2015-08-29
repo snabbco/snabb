@@ -20,10 +20,16 @@ icmpv4_echo_request = 8
 icmpv4_time_exceeded = 11
 
 -- ICMPv4 codes
-ttl_exceeded_in_transit = 0
+icmpv4_ttl_exceeded_in_transit = 0
 icmpv4_host_unreachable = 1
 icmpv4_datagram_too_big_df = 4
-icmpv4_communication_admin_prohibited = 13
+-- icmpv4_communication_admin_prohibited = 13 -- May be received from B4s
+
+-- ICMPv6 types
+icmpv6_dst_unreachable = 1
+
+-- ICMPv6 codes
+icmpv6_failed_ingress_egress_policy = 5
 
 -- Header sizes
 -- TODO: refactor these; they're not actually constant
@@ -31,10 +37,10 @@ ethernet_header_size = 14 -- TODO: deal with 802.1Q tags/other extensions?
 ipv6_header_size = 40
 ipv6_frag_header_size = 8
 ipv4_header_size = 20
-icmpv4_base_size = 8 -- size excluding the IP header
+icmp_base_size = 8 -- size excluding the IP header
 icmp_orig_datagram = 8 -- as per RFC792; IP header + 8 octects original datagram
 icmpv4_default_payload_size = ipv4_header_size + icmp_orig_datagram
-icmpv4_total_size =  icmpv4_base_size + icmpv4_default_payload_size
+icmpv4_total_size =  icmp_base_size + icmpv4_default_payload_size
 
 -- Offsets, 0-indexed
 ethernet_src_addr = 6
@@ -43,6 +49,6 @@ ipv4_checksum = 10
 ipv4_src_addr = 12
 ipv4_dst_addr = 16
 
-
 -- Config values
 default_ttl = 255
+min_ipv6_mtu = 1280
