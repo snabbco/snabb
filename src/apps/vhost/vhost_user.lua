@@ -323,7 +323,8 @@ function VhostUser:reply (req)
 end
 
 function VhostUser:report()
-   self.dev:report()
+   if self.connected then self.dev:report()
+   else print("Not connected.") end
 end
 
 function VhostUser:rx_buffers()
@@ -380,6 +381,9 @@ function selftest ()
       end
    end
    timer.activate(timer.new("report", fn, 10e9, 'repeating'))
+
+   -- Check that vhost_user:report() works in unconnected state.
+   vhost_user:report()
 
    app.main()
 end

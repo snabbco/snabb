@@ -2,25 +2,36 @@
 
 ## Introduction
 
-[Snabb NFV](http://snabb.co/nfv.html) is typically deployed for OpenStack with
-components on the Network Node, the Database Node, and the Compute
-Nodes. 
-This guide however documents the minimal steps required to connect two virtual machines over Snabb Switch using the Snabbnfv Traffic application. No need to install OpenStack or even virsh. A single compute node with at least 2 10GbE ports is sufficient to launch two VMs and pass traffic between them. 
+[Snabb NFV](http://snabb.co/nfv.html) is typically deployed for OpenStack
+with components on the Network Node, the Database Node, and the Compute
+Nodes.  This guide however documents the minimal steps required to
+connect two virtual machines over LAN using Snabb NFV. No need to install
+OpenStack or even `virsh`. A single compute node with at least 2 10GbE
+ports is sufficient to launch two VMs and pass traffic between them.
 
 ## Prerequisites
 
-* Compute node with a suitable PCIe slot for the NIC card (PCIe 2.0/3.0 x8)
-* [Ubuntu 14.04.2 LTS](http://releases.ubuntu.com/14.04/) installed on the compute node
-* 2 10GbE Ethernet SFP+ ports based on [Intel 82599](http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf) controller
+* Compute node with a suitable PCIe slot for the NIC card (PCIe 2.0/3.0
+  x8)
+* [Ubuntu 14.04.2 LTS](http://releases.ubuntu.com/14.04/) installed on
+  the compute node
+* 2 10GbE Ethernet SFP+ ports based on [Intel
+  82599](http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf)
+  controller
 * Direct Attach/Twinaxial SFP+ loopback cable
 
 ## Hardware setup
 
-Use the direct attach SFP+ cable to create a loop between both 10GbE Ethernet ports. 
+Use the direct attach SFP+ cable to create a loop between both 10GbE
+Ethernet ports.
 
 ## Compute node Kernel settings
  
-IOMMU must be disabled on the server as documented under [Compute Node Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288 pages). Allocating persistent huge pages on the kernel boot command line is the most reliable method as memory has not yet become fragmented.
+IOMMU must be disabled on the server as documented under [Compute Node
+Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable
+intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288
+pages). Allocating persistent huge pages on the kernel boot command line
+is the most reliable method as memory has not yet become fragmented.
 
 edit /etc/default/grub:
 
@@ -69,7 +80,7 @@ $ sudo mkdir /mnt/huge
 $ sudo mount -t hugetlbfs nodev /mnt/huge
 ```
 	
-Optionally, to make this permanent, updated /etc/fstab as user root:
+Optionally, to make this permanent, update `/etc/fstab` as user `root`:
 
 ```
 # cat >> /etc/fstab <<EOF
@@ -87,7 +98,9 @@ $ sudo apt-get --no-install-recommends -y build-dep qemu
 
 ## Download, compile and install QEMU
 
-We use here the v2.1.0-vhostuser branch from the QEMU fork on SnabbCo to reduce the risk of running in any incompatibilities with current versions. This branch is maintained by snabb developers. 
+We use the `v2.1.0-vhostuser` branch from the QEMU fork on SnabbCo to
+reduce the risk of running in any incompatibilities with current
+versions. This branch is maintained by Snabb Switch developers.
 
 ```
 $ git clone -b v2.1.0-vhostuser --depth 50 https://github.com/SnabbCo/qemu
@@ -105,14 +118,14 @@ $ make -j
 $ sudo make install
 ```
 
-You should have now qemu installed on your system:
+You should now have QEMU installed on your system:
 
 ```
 /usr/local/bin/qemu-system-x86_64  --version
 QEMU emulator version 2.1.0, Copyright (c) 2003-2008 Fabrice Bellard
 ```
 	
-## Download and build snabbswitch 
+## Download and build Snabb Switch
 
 ```
 $ git clone --recursive https://github.com/SnabbCo/snabbswitch.git
@@ -120,7 +133,8 @@ $ cd snabbswitch; make
 $ make -j
 ```
  
-If all goes well, you will find the snabb executable in the src directory:
+If all goes well, you will find the `snabb` executable in the `src/`
+directory:
 
 ```
 $ src/snabb
@@ -141,7 +155,12 @@ If you rename (or copy or symlink) this executable with one of
 the names above then that program will be chosen automatically.
 ```
 
-Install numactl to control [NUMA](https://en.wikipedia.org/wiki/Non-uniform_memory_access) policy for processes or shared memory. We won't use numactl in this getting started guide, but its use will be essential to run any performance tests. Numactl runs processes with a specific NUMA scheduling or memory placement policy.
+Install `numactl` to control
+[NUMA](https://en.wikipedia.org/wiki/Non-uniform_memory_access) policy
+for processes or shared memory. We will not use `numactl` in this guide,
+but its use will be essential to run any performance tests. `numactl`
+runs processes with a specific NUMA scheduling or memory placement
+policy.
 
 ```
 $ sudo apt-get install numactl
@@ -174,9 +193,10 @@ use --cpunodebind or --physcpubind instead
 <length> can have g (GB), m (MB) or k (KB) suffixes
 ```
 
-## Run the Snabb selftest app
+## Run the Intel 82599 driver selftest
 	
-Find the PCI addresses of the available 10-Gigabit Intel 82599 ports in the system:
+Find the PCI addresses of the available 10-Gigabit Intel 82599 ports in
+the system:
 
 ```
 $ lspci|grep 82599
@@ -184,7 +204,10 @@ $ lspci|grep 82599
 04:00.1 Ethernet controller: Intel Corporation 82599ES 10-Gigabit SFI/SFP+ Network Connection (rev 01)
 ```
 
-Now run some Intel tests with snabb snsh using a loopback cable between the two 10GbE ports. The application will unbind the specified 10GbE ports (PCI address) from the Linux kernel, but won't "return" them. So don't be surprised when 'ifconfig -a' won't show these ports anymore.
+Now run the Intel 82599 driver tests with `snabb snsh` using a loopback
+cable between the two 10GbE ports. The application will unbind the
+specified 10GbE ports (PCI address) from the Linux kernel, but will not
+"return" them. E.g. `ifconfig -a` will not show these ports anymore.
 
 ```
 $ cd ~/snabbswitch/src
@@ -196,206 +219,7 @@ Running iterated VMDq test...
 test #  1: VMDq VLAN=101; 100ms burst. packet sent: 300,645
 test #  2: VMDq VLAN=102; 100ms burst. packet sent: 661,725
 test #  3: VMDq VLAN=103; 100ms burst. packet sent: 1,020,000
-test #  4: VMDq VLAN=104; 100ms burst. packet sent: 1,376,235
-test #  5: VMDq VLAN=105; 100ms burst. packet sent: 1,730,175
-test #  6: VMDq VLAN=106; 100ms burst. packet sent: 2,082,330
-test #  7: VMDq VLAN=107; 100ms burst. packet sent: 2,434,485
-test #  8: VMDq VLAN=108; 100ms burst. packet sent: 2,784,090
-test #  9: VMDq VLAN=109; 100ms burst. packet sent: 3,132,420
-test # 10: VMDq VLAN=110; 100ms burst. packet sent: 3,478,455
-test # 11: VMDq VLAN=111; 100ms burst. packet sent: 3,824,235
-test # 12: VMDq VLAN=112; 100ms burst. packet sent: 4,168,740
-test # 13: VMDq VLAN=113; 100ms burst. packet sent: 4,511,205
-test # 14: VMDq VLAN=114; 100ms burst. packet sent: 4,852,395
-test # 15: VMDq VLAN=115; 100ms burst. packet sent: 5,192,310
-test # 16: VMDq VLAN=116; 100ms burst. packet sent: 5,530,440
-test # 17: VMDq VLAN=117; 100ms burst. packet sent: 5,867,805
-test # 18: VMDq VLAN=118; 100ms burst. packet sent: 6,203,385
-test # 19: VMDq VLAN=119; 100ms burst. packet sent: 6,538,200
-test # 20: VMDq VLAN=120; 100ms burst. packet sent: 6,871,230
-test # 21: VMDq VLAN=121; 100ms burst. packet sent: 7,203,495
-test # 22: VMDq VLAN=122; 100ms burst. packet sent: 7,534,485
-test # 23: VMDq VLAN=123; 100ms burst. packet sent: 7,863,945
-test # 24: VMDq VLAN=124; 100ms burst. packet sent: 8,192,385
-test # 25: VMDq VLAN=125; 100ms burst. packet sent: 8,519,805
-test # 26: VMDq VLAN=126; 100ms burst. packet sent: 8,846,205
-test # 27: VMDq VLAN=127; 100ms burst. packet sent: 9,171,585
-test # 28: VMDq VLAN=128; 100ms burst. packet sent: 9,495,180
-test # 29: VMDq VLAN=129; 100ms burst. packet sent: 9,818,775
-test # 30: VMDq VLAN=130; 100ms burst. packet sent: 10,141,095
-test # 31: VMDq VLAN=131; 100ms burst. packet sent: 10,462,650
-test # 32: VMDq VLAN=132; 100ms burst. packet sent: 10,783,440
-test # 33: VMDq VLAN=133; 100ms burst. packet sent: 11,102,700
-test # 34: VMDq VLAN=134; 100ms burst. packet sent: 11,421,450
-test # 35: VMDq VLAN=135; 100ms burst. packet sent: 11,739,435
-test # 36: VMDq VLAN=136; 100ms burst. packet sent: 12,056,400
-test # 37: VMDq VLAN=137; 100ms burst. packet sent: 12,372,090
-test # 38: VMDq VLAN=138; 100ms burst. packet sent: 12,687,015
-test # 39: VMDq VLAN=139; 100ms burst. packet sent: 13,000,665
-test # 40: VMDq VLAN=140; 100ms burst. packet sent: 13,312,530
-test # 41: VMDq VLAN=141; 100ms burst. packet sent: 13,624,395
-test # 42: VMDq VLAN=142; 100ms burst. packet sent: 13,935,495
-test # 43: VMDq VLAN=143; 100ms burst. packet sent: 14,245,320
-test # 44: VMDq VLAN=144; 100ms burst. packet sent: 14,554,635
-test # 45: VMDq VLAN=145; 100ms burst. packet sent: 14,863,185
-test # 46: VMDq VLAN=146; 100ms burst. packet sent: 15,170,970
-test # 47: VMDq VLAN=147; 100ms burst. packet sent: 15,477,735
-test # 48: VMDq VLAN=148; 100ms burst. packet sent: 15,784,245
-test # 49: VMDq VLAN=149; 100ms burst. packet sent: 16,089,480
-test # 50: VMDq VLAN=150; 100ms burst. packet sent: 16,394,205
-test # 51: VMDq VLAN=151; 100ms burst. packet sent: 16,698,420
-test # 52: VMDq VLAN=152; 100ms burst. packet sent: 17,001,615
-test # 53: VMDq VLAN=153; 100ms burst. packet sent: 17,304,300
-test # 54: VMDq VLAN=154; 100ms burst. packet sent: 17,606,475
-test # 55: VMDq VLAN=155; 100ms burst. packet sent: 17,908,140
-test # 56: VMDq VLAN=156; 100ms burst. packet sent: 18,208,785
-test # 57: VMDq VLAN=157; 100ms burst. packet sent: 18,508,920
-test # 58: VMDq VLAN=158; 100ms burst. packet sent: 18,808,290
-test # 59: VMDq VLAN=159; 100ms burst. packet sent: 19,106,895
-test # 60: VMDq VLAN=160; 100ms burst. packet sent: 19,404,990
-test # 61: VMDq VLAN=161; 100ms burst. packet sent: 19,702,320
-test # 62: VMDq VLAN=162; 100ms burst. packet sent: 19,999,395
-test # 63: VMDq VLAN=163; 100ms burst. packet sent: 20,295,450
-test # 64: VMDq VLAN=164; 100ms burst. packet sent: 20,590,995
-test # 65: VMDq VLAN=165; 100ms burst. packet sent: 20,885,520
-test # 66: VMDq VLAN=166; 100ms burst. packet sent: 21,179,790
-test # 67: VMDq VLAN=167; 100ms burst. packet sent: 21,473,550
-test # 68: VMDq VLAN=168; 100ms burst. packet sent: 21,766,290
-test # 69: VMDq VLAN=169; 100ms burst. packet sent: 22,058,265
-test # 70: VMDq VLAN=170; 100ms burst. packet sent: 22,349,985
-test # 71: VMDq VLAN=171; 100ms burst. packet sent: 22,641,195
-test # 72: VMDq VLAN=172; 100ms burst. packet sent: 22,931,640
-test # 73: VMDq VLAN=173; 100ms burst. packet sent: 23,221,320
-test # 74: VMDq VLAN=174; 100ms burst. packet sent: 23,510,235
-test # 75: VMDq VLAN=175; 100ms burst. packet sent: 23,798,385
-test # 76: VMDq VLAN=176; 100ms burst. packet sent: 24,085,770
-test # 77: VMDq VLAN=177; 100ms burst. packet sent: 24,372,900
-test # 78: VMDq VLAN=178; 100ms burst. packet sent: 24,659,265
-test # 79: VMDq VLAN=179; 100ms burst. packet sent: 24,945,375
-test # 80: VMDq VLAN=180; 100ms burst. packet sent: 25,230,210
-test # 81: VMDq VLAN=181; 100ms burst. packet sent: 25,514,790
-test # 82: VMDq VLAN=182; 100ms burst. packet sent: 25,798,605
-test # 83: VMDq VLAN=183; 100ms burst. packet sent: 26,082,165
-test # 84: VMDq VLAN=184; 100ms burst. packet sent: 26,364,705
-test # 85: VMDq VLAN=185; 100ms burst. packet sent: 26,646,990
-test # 86: VMDq VLAN=186; 100ms burst. packet sent: 26,928,255
-test # 87: VMDq VLAN=187; 100ms burst. packet sent: 27,209,010
-test # 88: VMDq VLAN=188; 100ms burst. packet sent: 27,488,490
-test # 89: VMDq VLAN=189; 100ms burst. packet sent: 27,768,225
-test # 90: VMDq VLAN=190; 100ms burst. packet sent: 28,047,705
-test # 91: VMDq VLAN=191; 100ms burst. packet sent: 28,326,420
-test # 92: VMDq VLAN=192; 100ms burst. packet sent: 28,604,625
-test # 93: VMDq VLAN=193; 100ms burst. packet sent: 28,882,065
-test # 94: VMDq VLAN=194; 100ms burst. packet sent: 29,158,995
-test # 95: VMDq VLAN=195; 100ms burst. packet sent: 29,435,415
-test # 96: VMDq VLAN=196; 100ms burst. packet sent: 29,711,070
-test # 97: VMDq VLAN=197; 100ms burst. packet sent: 29,986,215
-test # 98: VMDq VLAN=198; 100ms burst. packet sent: 30,260,850
-test # 99: VMDq VLAN=199; 100ms burst. packet sent: 30,535,230
-test #100: VMDq VLAN=200; 100ms burst. packet sent: 30,808,845
-0000:04:00.0: avg wait_lu: 187, max redos: 0, avg: 0
-100 PF full cycles
-
-Running iterated VMDq test...
-test #  1: VMDq VLAN=101; 100ms burst. packet sent: 363,885
-test #  2: VMDq VLAN=102; 100ms burst. packet sent: 353,940
-test #  3: VMDq VLAN=103; 100ms burst. packet sent: 362,865
-test #  4: VMDq VLAN=104; 100ms burst. packet sent: 361,590
-test #  5: VMDq VLAN=105; 100ms burst. packet sent: 363,630
-test #  6: VMDq VLAN=106; 100ms burst. packet sent: 364,395
-test #  7: VMDq VLAN=107; 100ms burst. packet sent: 271,320
-test #  8: VMDq VLAN=108; 100ms burst. packet sent: 358,530
-test #  9: VMDq VLAN=109; 100ms burst. packet sent: 357,510
-test # 10: VMDq VLAN=110; 100ms burst. packet sent: 345,270
-test # 11: VMDq VLAN=111; 100ms burst. packet sent: 355,470
-test # 12: VMDq VLAN=112; 100ms burst. packet sent: 352,155
-test # 13: VMDq VLAN=113; 100ms burst. packet sent: 347,565
-test # 14: VMDq VLAN=114; 100ms burst. packet sent: 352,410
-test # 15: VMDq VLAN=115; 100ms burst. packet sent: 357,000
-test # 16: VMDq VLAN=116; 100ms burst. packet sent: 343,995
-test # 17: VMDq VLAN=117; 100ms burst. packet sent: 345,780
-test # 18: VMDq VLAN=118; 100ms burst. packet sent: 353,940
-test # 19: VMDq VLAN=119; 100ms burst. packet sent: 351,135
-test # 20: VMDq VLAN=120; 100ms burst. packet sent: 354,195
-test # 21: VMDq VLAN=121; 100ms burst. packet sent: 352,410
-test # 22: VMDq VLAN=122; 100ms burst. packet sent: 186,915
-test # 23: VMDq VLAN=123; 100ms burst. packet sent: 351,645
-test # 24: VMDq VLAN=124; 100ms burst. packet sent: 339,405
-test # 25: VMDq VLAN=125; 100ms burst. packet sent: 348,585
-test # 26: VMDq VLAN=126; 100ms burst. packet sent: 352,155
-test # 27: VMDq VLAN=127; 100ms burst. packet sent: 353,940
-test # 28: VMDq VLAN=128; 100ms burst. packet sent: 347,055
-test # 29: VMDq VLAN=129; 100ms burst. packet sent: 353,430
-test # 30: VMDq VLAN=130; 100ms burst. packet sent: 340,680
-test # 31: VMDq VLAN=131; 100ms burst. packet sent: 330,990
-test # 32: VMDq VLAN=132; 100ms burst. packet sent: 350,625
-test # 33: VMDq VLAN=133; 100ms burst. packet sent: 352,920
-test # 34: VMDq VLAN=134; 100ms burst. packet sent: 346,545
-test # 35: VMDq VLAN=135; 100ms burst. packet sent: 353,940
-test # 36: VMDq VLAN=136; 100ms burst. packet sent: 335,070
-test # 37: VMDq VLAN=137; 100ms burst. packet sent: 347,565
-test # 38: VMDq VLAN=138; 100ms burst. packet sent: 349,095
-test # 39: VMDq VLAN=139; 100ms burst. packet sent: 351,900
-test # 40: VMDq VLAN=140; 100ms burst. packet sent: 339,915
-test # 41: VMDq VLAN=141; 100ms burst. packet sent: 326,400
-test # 42: VMDq VLAN=142; 100ms burst. packet sent: 333,795
-test # 43: VMDq VLAN=143; 100ms burst. packet sent: 348,840
-test # 44: VMDq VLAN=144; 100ms burst. packet sent: 336,855
-test # 45: VMDq VLAN=145; 100ms burst. packet sent: 346,035
-test # 46: VMDq VLAN=146; 100ms burst. packet sent: 344,250
-test # 47: VMDq VLAN=147; 100ms burst. packet sent: 339,405
-test # 48: VMDq VLAN=148; 100ms burst. packet sent: 342,210
-test # 49: VMDq VLAN=149; 100ms burst. packet sent: 335,070
-test # 50: VMDq VLAN=150; 100ms burst. packet sent: 346,545
-test # 51: VMDq VLAN=151; 100ms burst. packet sent: 338,385
-test # 52: VMDq VLAN=152; 100ms burst. packet sent: 352,410
-test # 53: VMDq VLAN=153; 100ms burst. packet sent: 337,875
-test # 54: VMDq VLAN=154; 100ms burst. packet sent: 29,580
-test # 55: VMDq VLAN=155; 100ms burst. packet sent: 339,405
-test # 56: VMDq VLAN=156; 100ms burst. packet sent: 346,290
-test # 57: VMDq VLAN=157; 100ms burst. packet sent: 346,800
-test # 58: VMDq VLAN=158; 100ms burst. packet sent: 346,035
-test # 59: VMDq VLAN=159; 100ms burst. packet sent: 335,325
-test # 60: VMDq VLAN=160; 100ms burst. packet sent: 344,760
-test # 61: VMDq VLAN=161; 100ms burst. packet sent: 338,130
-test # 62: VMDq VLAN=162; 100ms burst. packet sent: 346,800
-test # 63: VMDq VLAN=163; 100ms burst. packet sent: 320,535
-test # 64: VMDq VLAN=164; 100ms burst. packet sent: 335,580
-test # 65: VMDq VLAN=165; 100ms burst. packet sent: 314,925
-test # 66: VMDq VLAN=166; 100ms burst. packet sent: 312,885
-test # 67: VMDq VLAN=167; 100ms burst. packet sent: 336,600
-test # 68: VMDq VLAN=168; 100ms burst. packet sent: 347,055
-test # 69: VMDq VLAN=169; 100ms burst. packet sent: 337,875
-test # 70: VMDq VLAN=170; 100ms burst. packet sent: 340,170
-test # 71: VMDq VLAN=171; 100ms burst. packet sent: 338,895
-test # 72: VMDq VLAN=172; 100ms burst. packet sent: 341,445
-test # 73: VMDq VLAN=173; 100ms burst. packet sent: 339,405
-test # 74: VMDq VLAN=174; 100ms burst. packet sent: 348,585
-test # 75: VMDq VLAN=175; 100ms burst. packet sent: 324,870
-test # 76: VMDq VLAN=176; 100ms burst. packet sent: 351,900
-test # 77: VMDq VLAN=177; 100ms burst. packet sent: 339,150
-test # 78: VMDq VLAN=178; 100ms burst. packet sent: 344,505
-test # 79: VMDq VLAN=179; 100ms burst. packet sent: 342,975
-test # 80: VMDq VLAN=180; 100ms burst. packet sent: 327,165
-test # 81: VMDq VLAN=181; 100ms burst. packet sent: 339,915
-test # 82: VMDq VLAN=182; 100ms burst. packet sent: 326,910
-test # 83: VMDq VLAN=183; 100ms burst. packet sent: 349,605
-test # 84: VMDq VLAN=184; 100ms burst. packet sent: 343,995
-test # 85: VMDq VLAN=185; 100ms burst. packet sent: 338,895
-test # 86: VMDq VLAN=186; 100ms burst. packet sent: 344,505
-test # 87: VMDq VLAN=187; 100ms burst. packet sent: 319,260
-test # 88: VMDq VLAN=188; 100ms burst. packet sent: 337,620
-test # 89: VMDq VLAN=189; 100ms burst. packet sent: 338,640
-test # 90: VMDq VLAN=190; 100ms burst. packet sent: 325,125
-test # 91: VMDq VLAN=191; 100ms burst. packet sent: 344,250
-test # 92: VMDq VLAN=192; 100ms burst. packet sent: 347,565
-test # 93: VMDq VLAN=193; 100ms burst. packet sent: 323,595
-test # 94: VMDq VLAN=194; 100ms burst. packet sent: 336,855
-test # 95: VMDq VLAN=195; 100ms burst. packet sent: 335,835
-test # 96: VMDq VLAN=196; 100ms burst. packet sent: 339,150
-test # 97: VMDq VLAN=197; 100ms burst. packet sent: 339,150
-test # 98: VMDq VLAN=198; 100ms burst. packet sent: 336,600
-test # 99: VMDq VLAN=199; 100ms burst. packet sent: 324,870
+[...]
 test #100: VMDq VLAN=200; 100ms burst. packet sent: 346,545
 0000:04:00.0: avg wait_lu: 161.71, max redos: 0, avg: 0
 -------
@@ -427,7 +251,8 @@ selftest: ok
 
 ## Re-attach the 10GbE ports back to the host (optional)
 
-If you need to re-attach a 10GbE ports back to the host OS, send its PCI address to the ixgbe driver. 
+If you need to re-attach a 10GbE ports back to the host OS, send its PCI
+address to the ixgbe driver.
 
 ```
 # ifconfig p2p1
@@ -443,9 +268,12 @@ p2p1      Link encap:Ethernet  HWaddr 0c:c4:7a:1f:7e:60
 
 ```
 
-## Create and launch two VM's
+## Create and launch two VMs
 
-Now that snabbswitch can talk to both 10GbE ports successfully, lets build and launch 2 test VM's and connect each of them to one of the 10GbE port. First, we have to build an empty disk, download and install Ubuntu in it:
+Now that Snabb Switch can talk to both 10GbE ports successfully, lets
+build and launch 2 test VMs and connect each of them to one of the 10GbE
+port. First, we have to build an empty disk and then download and install
+Ubuntu in it.
 
 Create a disk for the VM:
 
@@ -453,13 +281,14 @@ Create a disk for the VM:
 $ qemu-img create -f qcow2 ubuntu.qcow2 16G
 ```
 	
-Download ubuntu server 14.04.2:
+Download Ubuntu Server 14.04.2:
 
 ```
 $ wget http://releases.ubuntu.com/14.04.2/ubuntu-14.04.2-server-amd64.iso
 ```
 	
-Launch the ubuntu installer via qemu and connect to its VNC console running at <host>:5901. This can be done via a suitable VNC client.
+Launch the Ubuntu installer via QEMU and connect to its VNC console
+running at <host>:5901. This can be done via a suitable VNC client.
 
 ```
 $ sudo qemu-system-x86_64 -m 1024 -enable-kvm \
@@ -467,50 +296,59 @@ $ sudo qemu-system-x86_64 -m 1024 -enable-kvm \
 -cdrom ubuntu-14.04.2-server-amd64.iso -vnc :1
 ```
 
-The installer guides you thru the setup of ubuntu. I picked username ubuntu with password ubuntu and use the whole disk without LVM, no automatic updates and selected openssh as the only optional package to install.
-Kill qemu after the reboot. 
-
-We have now a master VM ubuntu virtual disk to create two VM's from and launch them individually. Create first two copies:
+The installer will guide you through the setup of Ubuntu. Power down the
+VM once you are done with the installation. We have now a master disk
+image to create two VMs from and launch them individually. Create two
+copies of the master image:
 
 ```
 $ cp ubuntu.qcow2 ubuntu1.qcow2
 $ cp ubuntu.qcow2 ubuntu2.qcow2
 ```
 	
-Before launching the VM's, we need to prepare snabb to work as virtio interface for the VM's. Snabb offers snabnfv traffic app for this, which is built-into the snabb binary that was built earlier. Source and documentation can be found at [https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/next/src/program/snabbnfv)
+Before launching the VMs, we need to start Snabb Switch acting as a
+virtio interface for the VMs. Snabb provides the `snabnfv traffic`
+program for this, which is built into the `snabb` binary that we built
+earlier. Source and documentation can be found at
+[src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv).
 
-One Snabbnfv traffic process is required per 10 Gigabit port and uses a configuration file with port information for every vhost interface:
+One `snabbnfv traffic` process is required per physical 10G port. A
+configuration file specifies which packets are forwarded to the VM. You
+can define more that one virtual port for each physical port, but we will
+stick to a basic configuration that defines:
 
-* VLAN
-* MAC address of the VM
-* Id, which is used to identify a socket name
+* the MAC address of the VM
+* the port ID, which is used to identify a socket name
 
-VLAN and MAC are used to pass ethernet frames based on destination address to the correct vhost interface. I created a separate config file per 10GbE port.
+Create one `snabbnfv` configuration for each 10G port, `port1.cfg` and
+`port2.cfg`:
 
 ```
-$ cat port1.cfg
 return {
-  { vlan = 431,
-    mac_address = "52:54:00:00:00:01",
+  { mac_address = "52:54:00:00:00:01",
     port_id = "id1",
   },
 }
-$ cat port2.cfg
+```
+
+```
 return {
-  { vlan = 431,
-    mac_address = "52:54:00:00:00:02",
+  { mac_address = "52:54:00:00:00:02",
     port_id = "id2",
   },
 }
 ```
 	
-Create a directory, where the vhost sockets will be created by qemu and connected to by snabbnfv:
+Create a directory, where the vhost sockets will be created by QEMU and
+connected to by `snabbnfv`:
 
 ```
 $ mkdir ~/vhost-sockets
 ```
 	
-Launch snabbnfv in different terminals. For production and performance testing, it is advised to pin the processes to CPU core's using numactl, but for basic connectivity testing I left this complexity out for now.
+Launch `snabbnfv` in different terminals. For production and performance
+testing, it is advised to pin the processes to CPU cores using `numactl`,
+but for basic connectivity testing you can omit this.
 
 Port 1:
 
@@ -526,7 +364,9 @@ $ sudo ./snabbswitch/src/snabb snabbnfv traffic -k 10 -D 0 \
   0000:04:00.1 ./port2.cfg ./vhost-sockets/vm2.socket
 ```
 
-Finally launch now the two VM's, either in different terminals or putting them into the background. You can access their consoles via VNC ports 5901 and 5902 after launch.
+Finally launch now the two VMs, either in different terminals or putting
+them into the background. You can access their consoles via VNC ports
+5901 and 5902 after launch.
 
 ubuntu1:
 
@@ -554,9 +394,13 @@ $ sudo /usr/local/bin/qemu-system-x86_64 \
   -vnc :2
 ```
 	
-Connect via VNC to ports 5901 and 5902, set a hostname and statically assign an IP address to the eth0 interfaces (edit /etc/network/interfaces; ifdown eth0; ifup eth0).
+Connect via VNC to ports 5901 and 5902, set a hostname and statically
+assign an IP address to the eth0 interfaces (edit
+`/etc/network/interfaces`; `ifdown eth0`; `ifup eth0`).
 
-Have a peek at the terminals running both snabbnfv traffic commands. You will see messages when it connects to the vhost sockets created by qemu:
+Have a peek at the terminals running both `snabbnfv traffic`
+instances. You will see messages when it connects to the vhost sockets
+created by qemu:
 
 ```
 VIRTIO_F_ANY_LAYOUT VIRTIO_NET_F_MQ VIRTIO_NET_F_CTRL_VQ VIRTIO_NET_F_MRG_RXBUF VIRTIO_RING_F_INDIRECT_DESC VIRTIO_NET_F_CSUM
@@ -564,7 +408,11 @@ vhost_user: Caching features (0x18028001) in /tmp/vhost_features_.__vhost-socket
 VIRTIO_F_ANY_LAYOUT VIRTIO_NET_F_CTRL_VQ VIRTIO_NET_F_MRG_RXBUF VIRTIO_RING_F_INDIRECT_DESC VIRTIO_NET_F_CSUM
 ```
  
-If all went well so far, you can finally ping between both VM's. If you used non-Linux virtual machines for this test, e.g. [OpenBSD](http://www.openbsd.org), you might not be able to send or receive packets within the guest OS. This issue can be solved (for OpenBSD 5.7 at least) by forcing qemu to use vhost (vhostforce=on):
+If all went well so far, you can finally ping between both VMs. If you
+used non-Linux virtual machines for this test,
+e.g. [OpenBSD](http://www.openbsd.org), you might not be able to send or
+receive packets within the guest OS. This issue can be solved (for
+OpenBSD 5.7 at least) by forcing qemu to use vhost (vhostforce=on):
 
 ```
 $ sudo /usr/local/bin/qemu-system-x86_64 \
@@ -577,7 +425,7 @@ $ sudo /usr/local/bin/qemu-system-x86_64 \
   -vnc :1
 ```
 
-The snabbnfv terminals will show counter output similar to:
+The `snabbnfv traffic` processes will print output like this:
 
 ```
 link report:
@@ -613,7 +461,9 @@ load: time: 1.00s  fps: 3         fpGbps: 0.000 fpb: 0   bpp: 98   sleep: 100 us
 load: time: 1.00s  fps: 3         fpGbps: 0.000 fpb: 0   bpp: 98   sleep: 100 us
 ```
 
-The difference in packet counters is a result of me stopping and starting one of the snabbnfv processes mid-flight. According to the documentation thats ok and it does indeed work just fine. 
+The difference in packet counters is a result of stopping and starting
+one of the `snabbnfv traffic` processes mid-flight. This might not work
+with upstream QEMU versions.
 
 ## Next Steps
 
@@ -621,8 +471,9 @@ Here are some suggested steps to continue learning about Snabb Switch.
 
 1. Read more on snabbnfv
 [README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/README.md) and the other documents in the doc folder [https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc)
-2. Before running any performance tests, familiarize userself with numactl and how it affects snabbswitch. (TODO: is there a good intro page to this topics I can link to?)
+2. Before running any performance tests, familiarize yourself with
+numactl and how it affects Snabb Switch.
 
-Don't hesitate to contact the Snabb community on the
+Do not hesitate to contact the Snabb community on the
 [snabb-devel@googlegroups.com](https://groups.google.com/forum/#!forum/snabb-devel)
 mailing list.

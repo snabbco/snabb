@@ -38,9 +38,12 @@ do
    local c5 = 0xe6546b64ULL
    local max32 = 0xffffffffULL
 
+   local tail = ffi.new("uint32_t[1]")
+
    function MurmurHash3_x86_32:hash (data, length, seed)
       local nblocks = rshift(length, 2)
       local h1 = (seed and seed + 0ULL) or 0ULL
+      local data = ffi.cast(uint8_ptr_t, data)
 
       if nblocks > 0 then
          for i = 0, nblocks-1 do
@@ -54,17 +57,11 @@ do
          end
       end
 
-      local tail = ffi.cast(uint8_ptr_t, data) + lshift(nblocks, 2)
-      local k1 = 0ULL
       local l = band(length, 3)
-      if l > 2 then
-         k1 = bxor(k1, lshift(tail[2]+0ULL, 16))
-      end
-      if l > 1 then
-         k1 = bxor(k1, lshift(tail[1]+0ULL, 8))
-      end
       if l > 0 then
-         k1 = bxor(k1, tail[0]+0ULL)
+         local k1 = 0ULL
+         tail[0] = ffi.cast(uint32_ptr_t, data + lshift(nblocks, 2))[0]
+         k1 = band(tail[0], rshift(0x00FFFFFF, (3-l)*8)) 
          k1 = band(k1*c1, max32)
          k1 = bxor(lshift(k1, 15), rshift(k1, 17))
          k1 = band(k1*c2, max32)
@@ -95,10 +92,19 @@ do
    local c5 = 0x52dce729ULL
    local c6 = 0x38495ab5ULL
 
+   local taill = ffi.new("uint64_t[1]")
+   local tailh = ffi.new("uint64_t[1]")
+
+   local masks = {}
+   for i = 1, 15 do
+      masks[i] = rshift(0xFFFFFFFFFFFFFFFFULL, band(16-i, 7)*8)
+   end
+
    function MurmurHash3_x64_128:hash (data, length, seed)
       local nblocks = rshift(length, 4)
       local h1 = (seed and seed+0ULL) or 0ULL
       local h2 = h1
+      local data = ffi.cast(uint8_ptr_t, data)
 
       if nblocks > 0 then
          for i = 0, nblocks - 1 do
@@ -120,59 +126,23 @@ do
          end
       end
 
-      local k1 = 0ULL
-      local k2 = 0ULL
-      local tail = ffi.cast(uint8_ptr_t, data) + lshift(nblocks, 4)
+      data = data + lshift(nblocks, 4)
       local l = band(length, 15)
-
-      if l > 14 then
-         k2 = bxor(k2, lshift(tail[14]+0ULL, 48))
-      end
-      if l > 13 then
-         k2 = bxor(k2, lshift(tail[13]+0ULL, 40))
-      end
-      if l > 12 then
-         k2 = bxor(k2, lshift(tail[12]+0ULL, 32))
-      end
-      if l > 11 then
-         k2 = bxor(k2, lshift(tail[11]+0ULL, 24))
-      end
-      if l > 10 then
-         k2 = bxor(k2, lshift(tail[10]+0ULL, 16))
-      end
-      if l > 9 then
-         k2 = bxor(k2, lshift(tail[9]+0ULL, 8))
-      end
       if l > 8 then
-         k2 = bxor(k2, tail[8]+0ULL)
+         local k2 = 0ULL
+         tailh[0] = ffi.cast(uint64_ptr_t, data+8)[0]
+         k2 = band(tailh[0], masks[l])
          k2 = k2*c2
          k2 = bxor(lshift(k2, 33), rshift(k2, 31))
          k2 = k2*c1
          h2 = bxor(h2, k2)
+         l = 8
       end
-      if l > 7 then
-         k1 = bxor(k1, lshift(tail[7]+0ULL, 56))
-      end
-      if l > 6 then
-         k1 = bxor(k1, lshift(tail[6]+0ULL, 48))
-      end
-      if l > 5 then
-         k1 = bxor(k1, lshift(tail[5]+0ULL, 40))
-      end
-      if l > 4 then
-         k1 = bxor(k1, lshift(tail[4]+0ULL, 32))
-      end
-      if l > 3 then
-         k1 = bxor(k1, lshift(tail[3]+0ULL, 24))
-      end
-      if l > 2 then
-         k1 = bxor(k1, lshift(tail[2]+0ULL, 16))
-      end
-      if l > 1 then
-         k1 = bxor(k1, lshift(tail[1]+0ULL, 8))
-      end
+
       if l > 0 then
-         k1 = bxor(k1, tail[0]+0ULL)
+         local k1 = 0ULL
+         taill[0] = ffi.cast(uint64_ptr_t, data)[0]
+         k1 = band(taill[0], masks[l])
          k1 = k1*c1
          k1 = bxor(lshift(k1, 31), rshift(k1, 33))
          k1 = k1*c2
@@ -230,10 +200,9 @@ local function selftest_hash (hash, expected, perf)
       local v = ffi.new("uint8_t[1024]")
 
       for j = perf.min or 1, perf.max do
-         local start = ffi.C.get_time_ns()
          jit.flush()
+         local start = ffi.C.get_time_ns()
          for i = 1, perf.iter do
-            v[j-1] = v[j-1]+1
             hash:hash(v, j, 0)
          end
          local stop = ffi.C.get_time_ns()

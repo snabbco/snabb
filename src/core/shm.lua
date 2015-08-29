@@ -103,6 +103,11 @@ end
 -- Make directories needed for a named object.
 -- Given the name "foo/bar/baz" create /var/run/foo and /var/run/foo/bar.
 function mkdir (name)
+   -- Create root with mode "rwxrwxrwt" (R/W for all and sticky)
+   local mask = S.umask(0)
+   S.mkdir(root, "01777")
+   S.umask(mask)
+   -- Create sub directories
    local dir = root
    name:gsub("([^/]+)",
              function (x) S.mkdir(dir, "rwxu")  dir = dir.."/"..x end)

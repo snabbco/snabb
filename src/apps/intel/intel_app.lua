@@ -156,8 +156,8 @@ function selftest ()
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
    do
-      local a0Sends = engine.app_table.nicAm0.input.rx.stats.txpackets
-      local a1Gets = engine.app_table.nicAm1.output.tx.stats.rxpackets
+      local a0Sends = link.stats(engine.app_table.nicAm0.input.rx).txpackets
+      local a1Gets = link.stats(engine.app_table.nicAm1.output.tx).rxpackets
       -- Check propertions with some modest margin for error
       if a1Gets < a0Sends * 0.45 or a1Gets > a0Sends * 0.55 then
          print("mq_sw: wrong proportion of packets passed/discarded")
@@ -169,10 +169,10 @@ function selftest ()
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
-      local aSends = engine.app_table.nicA.input.rx.stats.txpackets
-      local aGets = engine.app_table.nicA.output.tx.stats.rxpackets
-      local bSends = engine.app_table.nicB.input.rx.stats.txpackets
-      local bGets = engine.app_table.nicB.output.tx.stats.rxpackets
+      local aSends = link.stats(engine.app_table.nicA.input.rx).txpackets
+      local aGets = link.stats(engine.app_table.nicA.output.tx).rxpackets
+      local bSends = link.stats(engine.app_table.nicB.input.rx).txpackets
+      local bGets = link.stats(engine.app_table.nicB.output.tx).rxpackets
 
       if bGets < aSends/2
          or aGets < bSends/2
@@ -188,9 +188,9 @@ function selftest ()
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
-      local aSends = engine.app_table.nicAs.input.rx.stats.txpackets
-      local b0Gets = engine.app_table.nicBm0.output.tx.stats.rxpackets
-      local b1Gets = engine.app_table.nicBm1.output.tx.stats.rxpackets
+      local aSends = link.stats(engine.app_table.nicAs.input.rx).txpackets
+      local b0Gets = link.stats(engine.app_table.nicBm0.output.tx).rxpackets
+      local b1Gets = link.stats(engine.app_table.nicBm1.output.tx).rxpackets
 
       if b0Gets < b1Gets/2 or
          b1Gets < b0Gets/2 or
@@ -376,7 +376,7 @@ function manyreconf(pcidevA, pcidevB, n, do_pf)
       redos = redos + engine.app_table.nicAm1.dev.pf.redos
       maxredos = math.max(maxredos, engine.app_table.nicAm1.dev.pf.redos)
       waits = waits + engine.app_table.nicAm1.dev.pf.waitlu_ms
-      local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
+      local sent = link.stats(engine.app_table.nicAm0.input.rx).txpackets
       io.write (('test #%3d: VMDq VLAN=%d; 100ms burst. packet sent: %s\n'):format(i, 100+i, lib.comma_value(sent-prevsent)))
       if sent == prevsent then
          io.write("error: NIC transmit counter did not increase\n")

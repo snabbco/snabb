@@ -7,6 +7,7 @@ local long_opts = {
    ["package-path"] = "P",
    eval = "e",
    load = "l",
+   program = "p",
    test = "t",
    interactive = "i",
    debug = "d",
@@ -18,12 +19,14 @@ function run (parameters)
    local profiling = false
    local start_repl = false
    local noop = true -- are we doing nothing?
+   local program -- should we run a different program?
    -- Table of functions implementing command-line arguments
    local opt = {}
    function opt.h (arg) print(usage) main.exit(0)            end
    function opt.l (arg) require(arg)            noop = false end
    function opt.t (arg) require(arg).selftest() noop = false end
    function opt.d (arg) _G.developer_debug = true            end
+   function opt.p (arg) program = arg                        end
    function opt.i (arg) start_repl = true       noop = false end
    function opt.j (arg)
       if arg:match("^v") then
@@ -51,9 +54,12 @@ function run (parameters)
    end
 
    -- Execute command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hl:t:die:j:P:", long_opts)
+   parameters = lib.dogetopt(parameters, opt, "hl:p:t:die:j:P:", long_opts)
 
-   if #parameters > 0 then
+   if program then
+      local mod = (("program.%s.%s"):format(program, program))
+      require(mod).run(parameters)
+   elseif #parameters > 0 then
       run_script(parameters)
    elseif noop then
       print(usage)
