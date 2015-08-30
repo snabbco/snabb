@@ -1,4 +1,34 @@
 -- intel1g: Device driver app for Intel 1G network cards
+-- 
+-- This is a device driver for the Intel I350 family of 1G network cards.
+-- 
+-- The driver aims to be fairly flexible about how it can be used. The
+-- user can specify whether to initialize the NIC, which hardware TX
+-- and RX queue should be used (or none), and the size of the TX/RX
+-- descriptor rings. This should accomodate users who want to
+-- initialize the NIC in an exotic way (e.g. with Linux igbe/ethtool),
+-- or to dispatch packets across input queues in a specific way
+-- (e.g. RSS and FlowDirector), or want to create many transmit-only
+-- apps with private TX queues as a fast-path to get packets onto the
+-- wire. The driver does not directly support these use cases but it
+-- avoids abstractions that would potentially come into conflict with
+-- them.
+-- 
+-- This flexibility does require more work from the user. For contrast
+-- consider the intel10g driver: its VMDq mode automatically selects
+-- available transmit/receive queues from a pool and initializes the
+-- NIC to dispatch traffic to them based on MAC/VLAN. This is very
+-- convenient but it also assumes that the NIC will only be used by
+-- one driver in one process. This driver on the other hand does not
+-- perform automatic queue assignment and so that must be done
+-- separately (for example when constructing the app network with a
+-- suitable configuration). The notion is that people constructing app
+-- networks will have creative ideas that we are not able to
+-- anticipate and so it is important to avoid assumptions about how
+-- the driver will be used.
+-- 
+-- Data sheet (reference documentation):
+-- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/ethernet-controller-i350-datasheet.pdf
 
 module(..., package.seeall)
 
