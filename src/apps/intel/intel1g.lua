@@ -343,7 +343,7 @@ function selftest ()
    local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
    assert(li, "intel1g: no input link")
    local s= link.stats(li)
-   print("input link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+   print("input link:  txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 
    --local lo = engine.app_table.nic.output[1]
    local lo = engine.app_table.nic.output["tx"]		-- same-same as [1]
