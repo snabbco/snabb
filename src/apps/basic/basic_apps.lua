@@ -22,15 +22,16 @@ function Source:new(size)
 end
 
 function Source:pull ()
-   for _, o in ipairs(self.output) do
-      for i = 1, link.nwritable(o) do
-         transmit(o, packet.clone(self.packet))
+   local pkt = self.packet
+   for _, outport in ipairs(self.output) do
+      while not outport:full() do
+         outport:transmit(pkt:clone())
       end
    end
 end
 
 function Source:stop ()
-   packet.free(self.packet)
+   self.packet:free()
 end
 
 --- # `Join` app: Merge multiple inputs onto one output
@@ -42,9 +43,10 @@ function Join:new()
 end
 
 function Join:push ()
+   local outport = self.output.out
    for _, inport in ipairs(self.input) do
-      for n = 1,math.min(link.nreadable(inport), link.nwritable(self.output.out)) do
-         transmit(self.output.out, receive(inport))
+      while not inport:empty() and not outport:full() do
+         outport:transmit(inport:receive())
       end
    end
 end
@@ -60,10 +62,10 @@ function Split:new ()
 end
 
 function Split:push ()
-   for _, i in ipairs(self.input) do
-      for _, o in ipairs(self.output) do
-         for _ = 1, math.min(link.nreadable(i), link.nwritable(o)) do
-            transmit(o, receive(i))
+   for _, inport in ipairs(self.input) do
+      for _, outport in ipairs(self.output) do
+         while not inport:empty() and not outport:full() do
+            outport:transmit(inport:receive())
          end
       end
    end
@@ -78,10 +80,9 @@ function Sink:new ()
 end
 
 function Sink:push ()
-   for _, i in ipairs(self.input) do
-      for _ = 1, link.nreadable(i) do
-        local p = receive(i)
-        packet.free(p)
+   for _, inport in ipairs(self.input) do
+      while not inport:empty() do
+         inport:receive():free()
       end
    end
 end
@@ -95,20 +96,14 @@ function Tee:new ()
 end
 
 function Tee:push ()
-   noutputs = #self.output
-   if noutputs > 0 then
-      local maxoutput = link.max
-      for _, o in ipairs(self.output) do
-         maxoutput = math.min(maxoutput, link.nwritable(o))
-      end
-      for _, i in ipairs(self.input) do
-         for _ = 1, math.min(link.nreadable(i), maxoutput) do
-            local p = receive(i)
-            maxoutput = maxoutput - 1
-            do local output = self.output
-               for k = 1, #output do
-                  transmit(output[k], k == #output and p or packet.clone(p))
-               end
+   for _, inport in ipairs(self.input) do
+      while not inport:empty() do
+         local pkt = inport:receive()
+         local used = false
+         for _, outport in ipairs(self.outport) do
+            if not outport:full() then
+               outport:transmit(used and pkt:clone() or pkt)
+               used = true
             end
          end
       end
@@ -125,24 +120,26 @@ function Repeater:new ()
 end
 
 function Repeater:push ()
-   local i, o = self.input.input, self.output.output
-   for _ = 1, link.nreadable(i) do
-      local p = receive(i)
-      table.insert(self.packets, p)
+   local inport, outport = self.input.input, self.output.output
+   local packets = self.packets
+   while not inport:empty() do
+      table.insert(packets, inport:receive())
    end
-   local npackets = #self.packets
+   local npackets = #packets
    if npackets > 0 then
-      for i = 1, link.nwritable(o) do
-         assert(self.packets[self.index])
-         transmit(o, packet.clone(self.packets[self.index]))
-         self.index = (self.index % npackets) + 1
+      local index = self.index
+      while not outport:full() do
+         assert(packets[index])
+         outport:transmit(packets[index]:clone())
+         index = (index % npackets) + 1
       end
+      self.index = index
    end
 end
 
 function Repeater:stop ()
-   for i = 1, #self.packets do
-      packet.free(self.packets[i])
+   for _, pkt in ipairs(self.packets) do
+      pkt:free()
    end
 end
 
