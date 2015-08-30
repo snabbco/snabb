@@ -178,20 +178,20 @@ function SimpleKeyedTunnel:push()
    local l_out = self.output.encapsulated
    assert(l_in and l_out)
 
-   while not link.empty(l_in) and not link.full(l_out) do
-      local p = link.receive(l_in)
-      packet.prepend(p, self.header, HEADER_SIZE)
+   while not l_in:empty() and not l_out:full() do
+      local p = l_in:receive()
+      p:prepend(self.header, HEADER_SIZE)
       local plength = ffi.cast(plength_ctype, p.data + LENGTH_OFFSET)
       plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length - HEADER_SIZE)
-      link.transmit(l_out, p)
+      l_out:transmit(p)
    end
 
    -- decapsulation path
    l_in = self.input.encapsulated
    l_out = self.output.decapsulated
    assert(l_in and l_out)
-   while not link.empty(l_in) and not link.full(l_out) do
-      local p = link.receive(l_in)
+   while not l_in:empty() and not l_out:full() do
+      local p = l_in:receive()
       -- match next header, cookie, src/dst addresses
       local drop = true
       repeat
@@ -227,10 +227,10 @@ function SimpleKeyedTunnel:push()
 
       if drop then
          -- discard packet
-         packet.free(p)
+         p:free()
       else
-         packet.shiftleft(p, HEADER_SIZE)
-         link.transmit(l_out, p)
+         p:shiftleft(HEADER_SIZE)
+         l_out:transmit(p)
       end
    end
 end
