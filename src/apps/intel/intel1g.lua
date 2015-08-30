@@ -36,7 +36,9 @@ local ffi = require("ffi")
 local C   = ffi.C
 local pci = require("lib.hardware.pci")
 local band, bor, bnot, lshift = bit.band, bit.bor, bit.bnot, bit.lshift
-local bits = require("core.lib").bits
+local lib  = require("core.lib")
+local bits = lib.bits
+local compiler_barrier = lib.compiler_barrier
 local tophysical = core.memory.virtual_to_physical
 
 -- app class
@@ -62,9 +64,11 @@ function intel1g:new (conf)
    end
    local function poke32 (offset, value)
       value = bitvalue(value)
+      compiler_barrier()
       regs[offset/4] = value
    end
    local function peek32 (offset)
+      compiler_barrier()
       return regs[offset/4]
    end
    local function set32 (offset, value)
