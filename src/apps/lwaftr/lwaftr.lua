@@ -158,6 +158,8 @@ function LwAftr:_add_inet_ethernet(pkt)
                                          dst = self.inet_mac,
                                          type = constants.ethertype_ipv4})
    dgram:push(ethernet_header)
+   ethernet_header:free()
+   dgram:free()
    return pkt
 end
 
@@ -185,11 +187,14 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                                  dst = ether_dst,
                                  type = constants.ethertype_ipv6})
    dgram:push(ipv6_hdr)
+   ipv6_hdr:free()
    -- The API makes setting the payload length awkward; set it manually
    -- Todo: less awkward way to write 16 bits of a number into cdata
    pkt.data[4] = bit.rshift(bit.band(payload_len, 0xff00), 8)
    pkt.data[5] = bit.band(payload_len, 0xff)
    dgram:push(eth_hdr)
+   eth_hdr:free()
+   dgram:free()
    if pkt.length <= self.ipv6_mtu then
       if debug then
          print("encapsulated packet:")
@@ -292,6 +297,7 @@ function LwAftr:decapsulate(pkt)
    local dgram = datagram:new(pkt) -- TODO: recycle this
    -- FIXME: don't hardcode the values like this
    dgram:pop_raw(constants.ethernet_header_size + constants.ipv6_header_size)
+   dgram:free()
    return pkt
 end
 
@@ -327,6 +333,8 @@ function LwAftr:from_b4(pkt)
                                                dst = self.aftr_mac_b4_side,
                                                type = constants.ethertype_ipv4})
          dgram:push(ethernet_header)
+         ethernet_header:free()
+         dgram:free()
          return self:_encapsulate_ipv4(pkt)
       else
          return self:_add_inet_ethernet(pkt)
