@@ -63,6 +63,9 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, config)
                                          type = constants.ethertype_ipv4})
    dgram:push(ipv4_header)
    dgram:push(ethernet_header)
+   ethernet_header:free()
+   ipv4_header:free()
+   dgram:free()
    write_icmp(new_pkt, config)
 
    local ip_checksum_p = new_pkt.data + constants.ethernet_header_size + constants.ipv4_checksum
@@ -88,6 +91,9 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, config)
                                          type = constants.ethertype_ipv6})
    dgram:push(ipv6_header)
    dgram:push(ethernet_header)
+   ethernet_header:free()
+   ipv6_header:free()
+   dgram:free()
    write_icmp(new_pkt, config, ph_csum)
    return new_pkt
 end
