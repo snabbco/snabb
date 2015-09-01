@@ -40,7 +40,8 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
       print(ipv4_ip, 'port: ', port)
       lwutil.pp(self.binding_table)
    end
-   for _, bind in ipairs(self.binding_table) do
+   for i=1,#self.binding_table do
+      local bind = self.binding_table[i]
       if debug then print("CHECK", string.format("%x, %x", bind[2], ipv4_ip)) end
       if bind[2] == ipv4_ip then
          if port >= bind[3] and port <= bind[4] then
