@@ -114,7 +114,7 @@ local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
    csum = bit.bnot(csum)
 
    if debug then print("new csum", string.format("%x", csum)) end
-   pkt.data[csum_offset] = bit.rshift(bit.band(csum, 0xff00), 8)
+   pkt.data[csum_offset] = bit.rshift(csum, 8)
    pkt.data[csum_offset + 1] = bit.band(csum, 0xff)
 end
 
@@ -191,7 +191,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    ipv6_hdr:free()
    -- The API makes setting the payload length awkward; set it manually
    -- Todo: less awkward way to write 16 bits of a number into cdata
-   pkt.data[4] = bit.rshift(bit.band(payload_len, 0xff00), 8)
+   pkt.data[4] = bit.rshift(payload_len, 8)
    pkt.data[5] = bit.band(payload_len, 0xff)
    dgram:push(eth_hdr)
    eth_hdr:free()
