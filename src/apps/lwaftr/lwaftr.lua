@@ -276,7 +276,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local proto_offset = constants.ethernet_header_size + 9
    local proto = pkt.data[proto_offset]
 
-   if proto == constants.proto_icmp and self.icmp_policy == conf.policies['DROP'] then
+   if proto == constants.proto_icmp and self.icmp_policy == lwconf.policies['DROP'] then
       packet.free(pkt)
       return nil
    end
