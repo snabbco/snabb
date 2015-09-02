@@ -11,6 +11,7 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local packet = require("core.packet")
+local bit = require("bit")
 
 local ffi = require("ffi")
 local C = ffi.C
