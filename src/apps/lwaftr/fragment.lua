@@ -201,6 +201,8 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    local frag_id = fresh_frag_id()
    write_ipv6_frag_header(ipv6_pkt.data, unfrag_header_size, fnext_header, 0, more, frag_id)
    ipv6_pkt.data[next_header_idx] = constants.ipv6_frag
+   ffi.cast("uint16_t*", ipv6_pkt.data + constants.ethernet_header_size + constants.ipv6_payload_len)[0] =
+      C.htons(payload_bytes_per_packet + constants.ipv6_frag_header_size)
    local raw_frag_offset = payload_bytes_per_packet
 
    for i=2,num_packets - 1 do
@@ -226,6 +228,8 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    ffi.copy(last_pkt.data + new_header_size,
             ipv6_pkt.data + new_header_size + raw_frag_offset,
             last_payload_len)
+   ffi.cast("uint16_t*", last_pkt.data + constants.ethernet_header_size + constants.ipv6_payload_len)[0] =
+      C.htons(last_payload_len + constants.ipv6_frag_header_size)
    last_pkt.length = new_header_size + last_payload_len
    pkts[num_packets] = last_pkt
 
