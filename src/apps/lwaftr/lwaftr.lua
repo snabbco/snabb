@@ -26,6 +26,7 @@ scratch_ipv4 = ffi.new("uint8_t[4]")
 
 function LwAftr:new(conf)
    if debug then lwutil.pp(conf) end
+   conf.fragment_cache = {}
    return setmetatable(conf, {__index=LwAftr})
 end
 
@@ -140,7 +141,7 @@ function LwAftr:_icmp_b4_lookup_failed(pkt, to_ip)
    -- as possible without the ICMPv6 packet
    -- exceeding the minimum IPv6 MTU".
    -- Does this mean 1280 or the path-specific one?
-   local headers_len = constants.ethernet_header_size + constants.ipv6_header_size + constants.icmp_base_size
+   local headers_len = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.icmp_base_size
    local plen = pkt.length - constants.ethernet_header_size
    if plen + headers_len >= constants.min_ipv6_mtu then
       plen = constants.min_ipv6_mtu - headers_len
@@ -206,7 +207,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
     end
 
    -- Otherwise, fragment if possible
-   local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_header_size
+   local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_fixed_header_size
    local flags = pkt.data[unfrag_header_size + constants.ipv4_flags]
    if bit.band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
       -- According to RFC 791, the original packet must be discarded.
@@ -215,9 +216,9 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
       if debug then lwutil.print_pkt(pkt) end
       local icmp_config = {type = constants.icmpv4_dst_unreachable,
                            code = constants.icmpv4_datagram_too_big_df,
-                           payload_p = pkt.data + constants.ethernet_header_size + constants.ipv6_header_size,
+                           payload_p = pkt.data + constants.ethernet_header_size + constants.ipv6_fixed_header_size,
                            payload_len = constants.icmpv4_default_payload_size,
-                           next_hop_mtu = self.ipv6_mtu - constants.ipv6_header_size
+                           next_hop_mtu = self.ipv6_mtu - constants.ipv6_fixed_header_size
                            }
       local icmp_pkt = icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
                                               self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
@@ -298,27 +299,52 @@ end
 function LwAftr:decapsulate(pkt)
    local dgram = datagram:new(pkt) -- TODO: recycle this
    -- FIXME: don't hardcode the values like this
-   dgram:pop_raw(constants.ethernet_header_size + constants.ipv6_header_size)
+   dgram:pop_raw(constants.ethernet_header_size + constants.ipv6_fixed_header_size)
    dgram:free()
    return pkt
 end
 
+-- TODO: rewrite this to either also have the source and dest IPs in the table,
+-- or rewrite the fragment reassembler to check rather than assuming
+-- all the fragments it is passed are the same in this regard
+function LwAftr:_cache_fragment(frag)
+  local frag_id = fragment.get_ipv6_frag_id(frag)
+  if not self.fragment_cache[frag_id] then
+     self.fragment_cache[frag_id] = {}
+  end
+  table.insert(self.fragment_cache[frag_id], frag)
+  return self.fragment_cache[frag_id]
+end
 
 -- TODO: rewrite this to use parse
 function LwAftr:from_b4(pkt)
+   -- TODO: only send ICMP on failure for packets that plausibly would be bound?
+   if fragment.is_ipv6_fragment(pkt) then
+      local frags = self:_cache_fragment(pkt)
+      local frag_status, maybe_pkt = fragment.reassemble_ipv6(frags)
+      -- TODO: finish clearing out the fragment cache?
+      if frag_status ~= fragment.REASSEMBLY_OK then
+         return maybe_pkt -- nil or an ICMPv6 packet
+      else
+         -- The spec mandates that reassembly must occur before decapsulation
+         pkt = maybe_pkt -- do the rest of the processing on the reassembled packet
+      end
+   end
+
    -- check src ipv4, ipv6, and port against the binding table
-   local ipv6_src_ip_offset = constants.ethernet_header_size + 8
-   local ipv6_dst_ip_offset = constants.ethernet_header_size + 24
+   local ipv6_src_ip_offset = constants.ethernet_header_size + constants.ipv6_src_addr
+   local ipv6_dst_ip_offset = constants.ethernet_header_size + constants.ipv6_dst_addr
    -- FIXME: deal with multiple IPv6 headers
    local ipv4_src_ip_offset = constants.ethernet_header_size + 
-      constants.ipv6_header_size + 12
+      constants.ipv6_fixed_header_size + constants.ipv4_src_addr
    -- FIXME: as above + varlen ipv4 + non-tcp/non-udp payloads
    local ipv4_src_port_offset = constants.ethernet_header_size + 
-      constants.ipv6_header_size + constants.ipv4_header_size
+      constants.ipv6_fixed_header_size + constants.ipv4_header_size
    local ipv6_src_ip = pkt.data + ipv6_src_ip_offset
    local ipv6_dst_ip = pkt.data + ipv6_dst_ip_offset
    local ipv4_src_ip = ffi.cast("uint32_t*", pkt.data + ipv4_src_ip_offset)[0]
    local ipv4_src_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + ipv4_src_port_offset)[0])
+
    if self:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port) then
       -- Is it worth optimizing this to change src_eth, src_ipv6, ttl, checksum,
       -- rather than decapsulating + re-encapsulating? It would be faster, but more code.

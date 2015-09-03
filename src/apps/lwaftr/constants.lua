@@ -1,5 +1,8 @@
 module(..., package.seeall)
 
+local ffi = require("ffi")
+local C = ffi.C
+
 -- IPv6 next-header values
 -- http://www.iana.org/assignments/protocol-numbers/protocol-numbers.xhtml
 proto_icmp = 1
@@ -34,21 +37,38 @@ icmpv6_failed_ingress_egress_policy = 5
 -- Header sizes
 -- TODO: refactor these; they're not actually constant
 ethernet_header_size = 14 -- TODO: deal with 802.1Q tags/other extensions?
-ipv6_header_size = 40
-ipv6_frag_header_size = 8
+
 ipv4_header_size = 20
+
+ipv6_fixed_header_size = 40
+ipv6_frag_header_size = 8
+
 icmp_base_size = 8 -- size excluding the IP header
 icmp_orig_datagram = 8 -- as per RFC792; IP header + 8 octects original datagram
 icmpv4_default_payload_size = ipv4_header_size + icmp_orig_datagram
 icmpv4_total_size =  icmp_base_size + icmpv4_default_payload_size
 
 -- Offsets, 0-indexed
+ethernet_dst_addr = 0
 ethernet_src_addr = 6
+
 ipv4_flags = 6
 ipv4_checksum = 10
 ipv4_src_addr = 12
 ipv4_dst_addr = 16
 
+ipv6_payload_len = 4
+ipv6_next_header = 6
+ipv6_src_addr = 8
+ipv6_dst_addr = 24
+
+ipv6_frag_offset = 2
+ipv6_frag_id = 4
+
 -- Config values
 default_ttl = 255
 min_ipv6_mtu = 1280
+
+-- The following should actually be 2^16, but that will require support for
+-- larger packets. TODO FIXME
+ipv6_max_packet_size = C.PACKET_PAYLOAD_SIZE
