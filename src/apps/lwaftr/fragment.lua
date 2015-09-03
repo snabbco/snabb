@@ -1,10 +1,155 @@
 module(..., package.seeall)
 
+local datagram = require("lib.protocol.datagram")
+local ethernet = require("lib.protocol.ethernet")
+local ipv4 = require("lib.protocol.ipv4")
+local ipv6 = require("lib.protocol.ipv6")
+
 --local lwutil = require("apps.lwaftr.lwutil")
 local constants = require("apps.lwaftr.constants")
 local packet = require("core.packet")
 local ffi = require("ffi")
 local C = ffi.C
+
+REASSEMBLY_OK = 1
+FRAGMENT_MISSING = 2
+REASSEMBLY_INVALID = 3
+
+local ipv6_payload_len = constants.ethernet_header_size + constants.ipv6_payload_len
+local frag_id_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_id
+local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_offset
+
+local function compare_fragment_offsets(pkt1, pkt2)
+   return pkt1.data[ipv6_frag_offset_offset] < pkt2.data[ipv6_frag_offset_offset]
+end
+
+function is_ipv6_fragment(pkt)
+   return pkt.data[constants.ethernet_header_size + constants.ipv6_next_header] == constants.ipv6_frag
+end
+
+function get_ipv6_frag_id(pkt)
+   return C.ntohl(ffi.cast("uint32_t*", pkt.data + frag_id_start)[0])
+end
+
+local function get_ipv6_frag_len(pkt)
+   return C.ntohs(ffi.cast("uint16_t*", pkt.data + ipv6_payload_len)[0]) - constants.ipv6_frag_header_size
+end
+
+-- This is the 'M' bit of the IPv6 fragment header, in the
+-- least significant bit of the 4th byte
+local ipv6_frag_more_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + 3
+local function is_last_fragment(frag)
+   return 0 == bit.band(1, frag.data[ipv6_frag_more_offset])
+end
+
+local function get_frag_offset(frag)
+   -- Layout: 8 fragment offset bits, 5 fragment offset bits, 2 reserved bits, 'M'ore-frags-expected bit
+   local raw_frag_offset = ffi.cast("uint16_t*", frag.data + ipv6_frag_offset_offset)[0]
+   return bit.band(0xfffff8, C.ntohs(raw_frag_offset))
+end
+
+-- IPv6 reassembly, as per https://tools.ietf.org/html/rfc2460#section-4.5
+-- with RFC 5722's recommended exclusion of overlapping packets.
+
+-- This frees the fragments if reassembly is completed successfully
+-- or known to be invalid, and leaves them alone if fragments
+-- are still missing.
+
+-- TODO: handle the 60-second timeout, and associated ICMP iff the fragment
+-- with offset 0 was received
+-- TODO: handle silently discarding fragments that arrive later if
+-- an overlapping fragment was detected (keep a list for a few minutes?)
+-- TODO: send ICMP parameter problem code 0 if needed, as per RFC2460
+-- (if the fragment's data isn't a multiple of 8 octets and M=1, or
+-- if the length of the reassembled packet would exceed 65535 octets)
+-- TODO: handle packets of > 10240 octets correctly...
+-- TODO: test every branch of this
+
+local function _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_lengths)
+   local repkt = packet.allocate()
+   -- The first byte of the fragment header is the next header type
+   local ipv6_next_header = fragments[1].data[constants.ethernet_header_size + constants.ipv6_fixed_header_size]
+   local eth_src = ffi.cast("uint8_t*", fragments[1].data + constants.ethernet_src_addr)
+   local eth_dst = ffi.cast("uint8_t*", fragments[1].data + constants.ethernet_dst_addr)
+   local ipv6_src = ffi.cast("uint8_t*", fragments[1].data + constants.ethernet_header_size + constants.ipv6_src_addr)
+   local ipv6_dst = ffi.cast("uint8_t*", fragments[1].data + constants.ethernet_header_size + constants.ipv6_dst_addr)
+
+   local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
+   local eth_header = ethernet:new({src = eth_src, dst = eth_dst, type = constants.ethertype_ipv6})
+   local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
+   local dgram = datagram:new(repkt)
+   local frag_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size
+
+   dgram:push(ipv6_header)
+   dgram:push(eth_header)
+   dgram:free()
+   ipv6_header:free()
+   eth_header:free()
+   local frag_indata_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_header_size
+   local frag_outdata_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size
+   for i = 1, #fragments do
+      ffi.copy(repkt.data + frag_outdata_start + fragment_offsets[i], fragments[i].data + frag_indata_start, fragment_lengths[i])
+   end
+   repkt.length = repkt.length + fragment_offsets[#fragments] + fragment_lengths[#fragments]
+   return REASSEMBLY_OK, repkt
+end
+
+function reassemble_ipv6(fragments)
+   table.sort(fragments, compare_fragment_offsets)
+
+   local status
+   local fragment_offsets = {}
+   local fragment_lengths = {}
+   local reassembled_size = constants.ethernet_header_size + constants.ipv6_fixed_header_size
+   local err_pkt
+   local frag_id
+   if get_frag_offset(fragments[1]) ~= 0 then
+      return FRAGMENT_MISSING
+   else
+      fragment_offsets[1] = 0
+      fragment_lengths[1] = get_ipv6_frag_len(fragments[1])
+      frag_id = get_ipv6_frag_id(fragments[1])
+   end
+   for i = 2, #fragments do
+      local frag_size = get_frag_offset(fragments[i])
+      fragment_offsets[i] = frag_size
+      local plen = get_ipv6_frag_len(fragments[i])
+      fragment_lengths[i] = plen
+      reassembled_size = reassembled_size + plen
+      if frag_size % 8 ~= 0 and not is_last_fragment(fragments[i]) then
+         -- TODO: send ICMP error code; this is an RFC should
+         status = REASSEMBLY_INVALID
+      end
+      if reassembled_size > constants.ipv6_max_packet_size then
+         -- TODO: send ICMP error code
+         status = REASSEMBLY_INVALID
+      end
+      if frag_id ~= get_ipv6_frag_id(fragments[i]) then
+         -- This function should never be called with fragment IDs that don't all correspond, but just in case...
+         status = REASSEMBLY_INVALID
+      end
+
+      if fragment_offsets[i] ~= fragment_offsets[i - 1] + fragment_lengths[i - 1] then
+         if fragment_offsets[i] > fragment_offsets[i - 1] + fragment_lengths[i - 1] then
+            return FRAGMENT_MISSING
+         else
+            return REASSEMBLY_INVALID -- this prohibits overlapping fragments
+         end
+      end
+   end
+   if not is_last_fragment(fragments[#fragments]) then
+      return FRAGMENT_MISSING
+   end
+
+   if status == REASSEMBLY_INVALID then
+      for i = 1, #fragments do
+         packet.free(fragments[i])
+      end
+      return REASSEMBLY_INVALID, err_pkt
+   end
+   -- It appears that there's a valid and complete set of fragments.
+   return _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_lengths)
+end
 
 -- IPv6 fragmentation, as per https://tools.ietf.org/html/rfc5722
 
