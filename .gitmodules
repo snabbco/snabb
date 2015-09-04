@@ -1,7 +1,3 @@
-[submodule "deps/luajit"]
-	path = deps/luajit
-	url = http://github.com/SnabbCo/luajit.git
-        ignore = dirty
 [submodule "deps/ljsyscall"]
 	path = deps/ljsyscall
 	url = https://github.com/justincormack/ljsyscall.git
