@@ -1151,6 +1151,7 @@ local map_op = {
   bts_2 =	"mrqdw:0FABRm|miqdw:0FBA5mU",
 
   rdtsc_0 =	"0F31", -- P1+
+  rdpmc_0 =	"0F33",
   cpuid_0 =	"0FA2", -- P1+
 
   -- floating point ops

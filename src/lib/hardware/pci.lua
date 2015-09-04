@@ -37,6 +37,7 @@ function device_info (pciaddress)
    info.pciaddress = pciaddress
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
+   info.model = which_model(info.vendor, info.device)
    info.driver = which_driver(info.vendor, info.device)
    if info.driver then
       info.interface = lib.firstfile(p.."/net")
@@ -51,16 +52,37 @@ end
 --- Return the path to the sysfs directory for `pcidev`.
 function path(pcidev) return "/sys/bus/pci/devices/"..pcidev end
 
+model = {
+   ["82599_SFP"] = 'Intel 82599 SFP',
+   ["82574L"]    = 'Intel 82574L',
+   ["82571"]     = 'Intel 82571',
+   ["82599_T3"]  = 'Intel 82599 T3',
+   ["X540"]      = 'Intel X540',
+}
+
+-- Supported cards indexed by vendor and device id.
+local cards = {
+   ["0x8086"] =  {
+      ["0x10fb"] = {model = model["82599_SFP"], driver = 'apps.intel.intel_app'},
+      ["0x10d3"] = {model = model["82574L"],    driver = 'apps.intel.intel_app'},
+      ["0x105e"] = {model = model["82571"],     driver = 'apps.intel.intel_app'},
+      ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
+      ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
+   },
+   ["0x1924"] =  {
+      ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
+   },
+}
+
 -- Return the name of the Lua module that implements support for this device.
 function which_driver (vendor, device)
-   if vendor == '0x8086' then
-      if device == '0x10fb' then return 'apps.intel.intel_app' end -- Intel 82599
-      if device == '0x10d3' then return 'apps.intel.intel_app' end -- Intel 82574L
-      if device == '0x105e' then return 'apps.intel.intel_app' end -- Intel 82571
-   elseif vendor == '0x1924' then
-      if device == '0x0903' then return 'apps.solarflare.solarflare' end
---      if device == '0x0803' then return 'apps.solarflare.solarflare' end
-   end
+   local card = cards[vendor] and cards[vendor][device]
+   return card and card.driver
+end
+
+function which_model (vendor, device)
+   local card = cards[vendor] and cards[vendor][device]
+   return card and card.model
 end
 
 --- ### Device manipulation.

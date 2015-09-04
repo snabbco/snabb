@@ -48,13 +48,6 @@ The current state of each branch with respect to master is visible here:
     
     Maintainer: Max Rottenkolber <max@mr.gy>
 
-#### nfv
-    
-    BRANCH: nfv git://github.com/lukego/snabbswitch
-    snabbnfv application development branch.
-    
-    Maintainer: Luke Gorrie <luke@snabb.co>
-
 #### vpn
     
     BRANCH: vpn git://github.com/alexandergall/snabbswitch
