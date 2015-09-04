@@ -1,16 +1,50 @@
-README for LuaJIT 2.1.0-beta1
------------------------------
+abcJIT: a JIT for Snabb Switch (descended from LuaJIT)
 
-LuaJIT is a Just-In-Time (JIT) compiler for the Lua programming language.
+    abcJIT is a descendent of LuaJIT that is targeted at Snabb Switch. The
+    development philosophy of "what would Mike do?" is replaced with "what
+    would be best for Snabb Switch?".
 
-Project Homepage: http://luajit.org/
+    abcJIT is a response of sorts to Mike Pall's call for the community to
+    take charge of the future development of LuaJIT:
+    http://www.freelists.org/post/luajit/Looking-for-new-LuaJIT-maintainers
 
-LuaJIT is Copyright (C) 2005-2015 Mike Pall.
-LuaJIT is free software, released under the MIT license.
-See full Copyright Notice in the COPYRIGHT file or in luajit.h.
+    abcJIT moves in a new direction:
+    - Ruthlessly eliminate code that Snabb Switch does not use.
+    - Helpfully write and review comments to explain the code.
+    - Experimentally add features that make Snabb Switch easier to develop.
 
-Documentation for LuaJIT is available in HTML format.
-Please point your favorite browser to:
+    abcJIT benefits Snabb Switch hackers:
+    - Learn about JIT internals by making simple changes.
+    - Optimize more effectively thanks to better community expertise.
+    - Defend the self-sufficiency that is one of the core Snabb values.
 
- doc/luajit.html
+    abcJIT benefits LuaJIT hackers:
+    - Grow the pool of people with maintenance experience.
+    - Explore design ideas in the post-"what would Mike do?"-era.
+    - Cooperate with maintainers of other trees to share code and ideas.
+
+    abcJIT exists only while it is beneficial to Snabb Switch. In all
+    likelihood it will be merged into another more mainstream LuaJIT tree
+    in the future. However, we would keep the valuable experience of
+    having taken charge of the code we depend on, even if only for a while.
+
+    The Snabb Switch community forked abcJIT from LuaJIT v2.1 in September 2015.
+
+original README from LuaJIT:
+
+    README for LuaJIT 2.1.0-beta1
+    -----------------------------
+
+    LuaJIT is a Just-In-Time (JIT) compiler for the Lua programming language.
+
+    Project Homepage: http://luajit.org/
+
+    LuaJIT is Copyright (C) 2005-2015 Mike Pall.
+    LuaJIT is free software, released under the MIT license.
+    See full Copyright Notice in the COPYRIGHT file or in luajit.h.
+
+    Documentation for LuaJIT is available in HTML format.
+    Please point your favorite browser to:
+
+     doc/luajit.html
 
