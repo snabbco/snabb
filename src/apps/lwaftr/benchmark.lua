@@ -95,7 +95,6 @@ local function testInternalLoopbackFromPcapFile (params)
 
    engine.configure(c)
 
-   print("-- testInternalLoopbackFromPcapFile")
    bench(engine, {duration=5, report={showlinks=true}})
 end
 
