@@ -26,8 +26,8 @@ $(LUAJIT):
 	 $(MAKE) PREFIX=`pwd`/usr/local \
 	         CFLAGS="$(LUAJIT_CFLAGS)" && \
 	 $(MAKE) DESTDIR=`pwd` install && \
-         git describe > ../luajit.vsn)
-	(cd deps/luajit/usr/local/bin; ln -fs luajit-2.1.0-alpha luajit)
+         echo "(builtin)" > ../luajit.vsn)
+	(cd deps/luajit/usr/local/bin; ln -fs luajit-2.1.0-beta1 luajit)
 
 $(PFLUA): $(LUAJIT)
 	@if [ ! -f deps/pflua/src/pf.lua ]; then \
