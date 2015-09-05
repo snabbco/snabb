@@ -1,0 +1,3 @@
+#!/bin/bash
+thisdir=$(dirname $0)
+"${thisdir}/../../env" pflua-pipelines-match "${thisdir}/../data/arp.pcap" "portrange 1-2 and arp" 1

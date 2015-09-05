@@ -1,0 +1,4 @@
+accept all: 43:
+ip: 43: ip
+tcp: 41: tcp
+tcp port 80: 41: tcp port 80

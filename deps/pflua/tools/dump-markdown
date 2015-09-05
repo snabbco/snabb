@@ -1,0 +1,18 @@
+#!/usr/bin/env luajit
+
+package.path = package.path .. ";../src/?.lua"
+
+local pf = require("pf")
+
+local filter = ...
+assert(filter, "usage: dump-markdown FILTER")
+
+function out(...) print(string.format(...)) end
+
+out("# %s\n\n", filter)
+out("## BPF\n\n```\n%s```\n\n",
+    pf.compile_filter(filter, {libpcap=true, source=true}))
+out("## BPF cross-compiled to Lua\n\n```\n%s\n```\n\n",
+    pf.compile_filter(filter, {bpf=true, source=true}))
+out("## Direct pflang compilation\n\n```\n%s\n```\n",
+    pf.compile_filter(filter, {source=true}))
