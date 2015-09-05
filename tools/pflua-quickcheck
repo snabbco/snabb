@@ -1,0 +1,13 @@
+#!/usr/bin/env luajit
+-- -*- lua -*-
+package.path = package.path .. ";../src/?.lua"
+
+local quickcheck = require('pf.quickcheck')
+
+function main(...)
+   local args = { ... }
+   quickcheck.initialize_from_command_line(args)
+   quickcheck.run()
+end
+
+main(...)

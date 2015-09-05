@@ -1,0 +1,90 @@
+#!/usr/bin/env luajit
+-- -*- lua -*-
+package.path = package.path .. ';../src/?.lua'
+
+local pf = require('pf')
+local ffi = require('ffi')
+local savefile = require('pf.savefile')
+
+ffi.cdef[[
+struct DIR *opendir(const char *name);
+typedef unsigned long ino_t;
+struct dirent {
+    ino_t          d_ino;       /* inode number */
+    off_t          d_off;       /* not an offset; see NOTES */
+    unsigned short d_reclen;    /* length of this record */
+    unsigned char  d_type;      /* type of file; not supported
+                                   by all filesystem types */
+    char           d_name[256]; /* filename */
+};
+struct dirent *readdir(struct DIR *dirp);
+]]
+
+function scandir(dirname)
+   if type(dirname) ~= 'string' then error("dirname not a string:", dirname) end
+   local dir = ffi.C.opendir(dirname)
+   if dir == nil then error("directory not found: "..dirname) end
+   local entries = {}
+   local dirent = ffi.C.readdir(dir)
+   while dirent ~= nil do
+      table.insert(entries, ffi.string(dirent.d_name))
+      dirent = ffi.C.readdir(dir)
+   end
+   return entries
+end
+
+function read_expectations(file)
+   local tests = {}
+   for line in io.lines(file) do
+      local description, count, filter =
+         line:match("^%s*([^:]+)%s*:%s*(%d+)%s*:%s*(.*)%s*$")
+      assert(filter, "failed to parse line "..line)
+      local test = {
+         description=description,
+         count=assert(tonumber(count)),
+         filter=filter,
+      }
+      table.insert(tests, test)
+   end
+   return tests
+end
+
+function run_tests(pcap, tests)
+   local function write(...)
+      for _,str in ipairs({...}) do io.write(str) end
+      io.flush()
+   end
+   write('Running tests on ', pcap, ':\n')
+   local packets = savefile.load_packets(pcap)
+   for _,test in ipairs(tests) do
+      write('  ', test.description, ': ')
+      local pred = pf.compile_filter(test.filter)
+      local count = 0
+      for _, packet in ipairs(packets) do
+         if pred(packet.packet, packet.len) then
+            count = count + 1
+         end
+      end
+      write(count, ' matches: ')
+      if count == test.count then
+         write('PASS\n')
+      else
+         write('FAIL: expected ', test.count, ' matches.\n')
+         os.exit(1)
+      end
+   end
+   write('All pass.\n\n')
+end
+
+function main(dir)
+   local entries = scandir(dir)
+   for _,x in ipairs(entries) do
+      local file = dir..'/'..x
+      if file:match("%.pcap%.test") then
+         local pcap = file:match('^(.*%.pcap)%.test$')
+         run_tests(pcap, read_expectations(file))
+      end
+   end
+end
+
+main(...)
