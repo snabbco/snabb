@@ -1,0 +1,28 @@
+language: c
+
+before_install: 
+ - sudo add-apt-repository ppa:mwild1/ppa -y
+ - sudo apt-get update -y
+ - sudo apt-get install luajit -y --force-yes
+ - sudo apt-get install luarocks -y
+ - sudo apt-get install strace -y
+ - git submodule update --init --recursive
+
+env:
+  - LD_LIBRARY_PATH=./include/buildrump.sh/rump/lib
+
+script:
+ - luajit test/test.lua
+ - mkdir -p ./obj
+ - luajit test/ctest.lua > ./obj/ctest.c && cc -std=c99 ./obj/ctest.c -o ./obj/ctest && ./obj/ctest
+ - ./test/globals.sh
+ - test ! -n "`./test/check-rockspec.sh`"
+ - cd ./include/buildrump.sh && ./buildrump.sh -qq -j16 -V NOSTATICLIB=1 && cd ../..
+ - luajit test/test.lua rump
+ - luajit test/linux-constants.lua x64 > ./obj/c.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/c ./obj/c.c && ./obj/c
+ - luajit test/linux-constants.lua x86 > ./obj/c.c && cc -D__i386__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/i386/include -o ./obj/c ./obj/c.c && ./obj/c
+ - luajit test/linux-constants.lua arm > ./obj/c.c && cc -D__ARM_EABI__ -DBITS_PER_LONG=32 -I./include/linux-kernel-headers/arm/include -o ./obj/c ./obj/c.c && ./obj/c
+ - luajit test/linux-constants.lua ppc > ./obj/c.c && cc -I./include/linux-kernel-headers/powerpc/include -o ./obj/c ./obj/c.c && ./obj/c
+ - luajit test/linux-constants.lua mips > ./obj/c.c && cc -D__MIPSEL__ -D_MIPS_SIM=_MIPS_SIM_ABI32 -DCONFIG_32BIT -DBITS_PER_LONG=32 -D_MIPS_SZLONG=32 -D__LITTLE_ENDIAN_BITFIELD -D__LITTLE_ENDIAN -DCONFIG_CPU_LITTLE_ENDIAN -I./include/linux-kernel-headers/mips/include  -o ./obj/c ./obj/c.c && ./obj/c
+ - luajit test/linux-structures.lua x64 > ./obj/c.c && cc -U__i386__ -DBITS_PER_LONG=64 -I./include/linux-kernel-headers/x86_64/include -o ./obj/c ./obj/c.c && ./obj/c
+

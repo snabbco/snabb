@@ -1,0 +1,36 @@
+#!/usr/bin/env luajit
+-- -*- lua -*-
+
+package.path = package.path .. ";../src/?.lua"
+
+local pf = require("pf")
+local utils = require("pf.utils")
+
+local function usage()
+   local content = [=[
+Usage: pflua-expand [-O0] <pflang-expression>
+Options:
+   -O0       Disable optimizations; optimizations are on by default.]=]
+   print(content);
+   os.exit()
+end
+
+-- Print help
+if #arg == 0 then
+   usage()
+end
+
+local flags = utils.set(...)
+
+-- Print help
+if flags["--help"] or flags["-h"] then
+   usage()
+end
+
+local filter = arg[#arg]
+local expanded = pf.expand.expand(pf.parse.parse(filter), "EN10MB")
+if flags["-O0"] then
+   utils.pp(expanded)
+else
+   utils.pp(pf.optimize.optimize(expanded))
+end
