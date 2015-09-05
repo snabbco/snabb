@@ -4,12 +4,6 @@ E= @echo
 #Q=
 #E= @:
 
-# Required submodule versions.
-# Defined here to detect version mismatches at build time.
-LUAJIT_VSN    := "v2.0.4-330-g5feb63a"
-LJSYSCALL_VSN := "v0.10-65-g7081d97"
-PFLUA_VSN     := "5e2c56baa0cf1ec471719bac83e2a99c4e2d5495"
-
 TEST_SKIPPED="43"
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
@@ -55,29 +49,6 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 PATH := ../deps/luajit/usr/local/bin:$(PATH)
 
 snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
-	$(E) "SUBMODULES"
-	@if test ! -f ../deps/luajit.vsn			|| \
-	    test ! -f ../deps/ljsyscall.vsn			|| \
-	    test ! -f ../deps/pflua.vsn				|| \
-	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn	|| \
-	    grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn	|| \
-	    grep -vqF $(PFLUA_VSN)     ../deps/pflua.vsn; then \
-	    echo "Error: Submodule version mismatch"			>&2; \
-	    echo "luajit:"						>&2; \
-	    echo "  require: $(LUAJIT_VSN)"				>&2; \
-	    echo "  found:   $(shell cat ../deps/luajit.vsn)"		>&2; \
-	    echo "ljsyscall:"						>&2; \
-	    echo "  require: $(LJSYSCALL_VSN)"				>&2; \
-	    echo "  found:   $(shell cat ../deps/ljsyscall.vsn) "	>&2; \
-	    echo "pflua:"						>&2; \
-	    echo "  require: $(PFLUA_VSN)"				>&2; \
-	    echo "  found:   $(shell cat ../deps/pflua.vsn) "		>&2; \
-	    echo ""                                                     >&2; \
-	    echo "Please update your submodules like this:"             >&2; \
-	    echo "  make submods"                                       >&2; \
-	    echo ""							>&2; \
-	    exit 1; \
-	 fi
 	$(E) "LINK      $@"
 	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../deps/luajit/src/libluajit.a \
