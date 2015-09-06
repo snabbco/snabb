@@ -95,20 +95,14 @@ function Tee:new ()
 end
 
 function Tee:push ()
-   noutputs = #self.output
-   if noutputs > 0 then
-      local maxoutput = link.max
-      for _, o in ipairs(self.output) do
-         maxoutput = math.min(maxoutput, link.nwritable(o))
-      end
-      for _, i in ipairs(self.input) do
-         for _ = 1, math.min(link.nreadable(i), maxoutput) do
-            local p = receive(i)
-            maxoutput = maxoutput - 1
-            do local output = self.output
-               for k = 1, #output do
-                  transmit(output[k], k == #output and p or packet.clone(p))
-               end
+   for _, inport in ipairs(self.input) do
+      while not inport:empty() do
+         local pkt = inport:receive()
+         local used = false
+         for _, outport in ipairs(self.output) do
+            if not outport:full() then
+               outport:transmit(used and pkt:clone() or pkt)
+               used = true
             end
          end
       end
