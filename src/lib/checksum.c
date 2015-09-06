@@ -2,7 +2,7 @@
  *
  * See src/arch/ for architecture specific SIMD versions.
  *
- * Generic checksm routine taken from DPDK: 
+ * Generic checksm routine taken from DPDK:
  *   BSD license; (C) Intel 2010-2015, 6WIND 2014.
  */
 
@@ -149,4 +149,48 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     return ntohs(sum);
   }
   return 0xFFFF0001;
+}
+
+int startoffset[2];
+int *prepare_packet(int8_t *buf, size_t len)
+{
+//   printf ("prepare_packet %p %ld\n", buf, len);
+  uint16_t *hwbuf = (uint16_t *)buf;
+//   printf ("hwbuf: %p\n", hwbuf);
+  int8_t ipv = (buf[0] & 0xF0) >> 4;
+  int8_t proto = 0;
+  uint32_t pheader = 0;
+
+
+  if (ipv == 4) {
+//     printf ("ipv4\n");
+    proto = buf[9];
+    startoffset[0] = (buf[0] & 0x0F) * 4;
+//     printf ("proto: %d startoffset[0]: %d\n", proto, startoffset[0]);
+    hwbuf[5] = htons(cksum_generic((unsigned char *)buf, startoffset[0], -ntohs(hwbuf[5])));
+//     printf ("ip header csum: %d\n", hwbuf[5]);
+  } else if (ipv == 6) {    // IPv6
+//     printf ("ipv6\n");
+    proto = buf[6];
+    startoffset[0] = 40;
+//     printf ("proto: %d startoffset[0]: %d\n", proto, startoffset[0]);
+  } else {
+//     printf ("no IP\n");
+    return NULL;
+  }
+
+  pheader = pseudo_header_initial(buf, len);
+  if (pheader & 0xFFFF0000) {
+    return NULL;
+  }
+
+  if (proto == 6) {     // TCP
+    startoffset[1] = 16;
+  } else if (proto == 17) {     // UDP
+    startoffset[1] = 6;
+  } else {
+    return NULL;
+  }
+  *(uint16_t *)(buf+startoffset[0]+startoffset[1]) = htons(pheader & 0x0000FFFF);
+  return startoffset;
 }

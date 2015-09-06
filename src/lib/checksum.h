@@ -21,3 +21,4 @@ void checksum_update_incremental_32(uint16_t* checksum_cell,
                                     uint32_t new_value);
 
 uint32_t pseudo_header_initial(const int8_t *buf, size_t len);
+int *prepare_packet(int8_t *buf, size_t len);
