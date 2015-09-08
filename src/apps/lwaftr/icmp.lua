@@ -30,7 +30,6 @@ function write_icmp(pkt, config, base_checksum)
    assert(config.payload_len)
 
    local off = pkt.length
-   local icmp_bytes = constants.icmp_base_size + config.payload_len
    pkt.data[off] = config.type
    pkt.data[off + 1] = config.code
    ffi.cast("uint16_t*", pkt.data + off + 2)[0] = 0 -- checksum
@@ -38,12 +37,12 @@ function write_icmp(pkt, config, base_checksum)
    if config.next_hop_mtu then
       ffi.cast("uint16_t*", pkt.data + off +  6)[0] = C.htons(config.next_hop_mtu)
    end
-   for i=0,config.payload_len -1 do -- TODO: optimize this?
-      pkt.data[off + 8 + i] = ffi.cast("uint8_t*", config.payload_p + i)[0]
-   end
+   local dest = pkt.data + (off + constants.ipv6_frag_header_size)
+   C.memmove(dest, config.payload_p, config.payload_len)
 
-   local icmp_start = ffi.cast("uint8_t*", pkt.data + pkt.length)
-   local csum = checksum.ipsum(icmp_start, icmp_bytes, base_checksum or 0)
+   local icmp_bytes = constants.icmp_base_size + config.payload_len
+   local icmp_start = pkt.data + pkt.length
+   local csum = checksum.ipsum(icmp_start, icmp_bytes, base_checksum)
    ffi.cast("uint16_t*", pkt.data + off + 2)[0] = C.htons(csum)
 
    pkt.length = pkt.length + icmp_bytes
@@ -66,7 +65,7 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, config)
    ethernet_header:free()
    ipv4_header:free()
    dgram:free()
-   write_icmp(new_pkt, config)
+   write_icmp(new_pkt, config, 0)
 
    local ip_checksum_p = new_pkt.data + constants.ethernet_header_size + constants.ipv4_checksum
    ffi.cast("uint16_t*", ip_checksum_p)[0] = 0 -- zero out the checksum before recomputing
