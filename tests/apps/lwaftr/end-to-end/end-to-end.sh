@@ -34,9 +34,13 @@ echo "Testing: from-internet IPv4 packet found in the binding table, original TT
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-bound-ttl1.pcap ${TEST_BASE}/icmpv4-time-expired.pcap
 
-echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation."
+echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation (2)."
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
    ${TEST_BASE}/tcp-frominet-bound1494.pcap ${TEST_BASE}/tcp-afteraftr-ipv6-2frags.pcap
+
+echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation (3)."
+snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
+   ${TEST_BASE}/tcp-frominet-bound-2734.pcap ${TEST_BASE}/tcp-afteraftr-ipv6-3frags.pcap
 
 echo "Testing: IPv6 reassembly (followed by decapsulation)."
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
