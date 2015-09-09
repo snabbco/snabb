@@ -399,7 +399,7 @@ function LwAftr:push ()
       end -- FIXME: silently drop other types; is this the right thing to do?
       --if debug then print("encapsulated") end
       if out_pkt then
-         if type(out_pkt) == type({}) then -- Fragmented
+         if type(out_pkt) == "table" then -- Fragmented
             for _,opkt in ipairs(out_pkt) do
                link.transmit(o, opkt)
             end
