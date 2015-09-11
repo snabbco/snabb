@@ -1,5 +1,8 @@
 module(..., package.seeall)
 
+local bit = require("bit")
+local band, bor, rshift = bit.band, bit.bor, bit.rshift
+
 function pp(t) for k,v in pairs(t) do print(k,v) end end
 
 function print_ethernet(addr)
@@ -28,12 +31,12 @@ end
 
 function format_ipv4(uint32)
    return string.format("%i.%i.%i.%i",
-      bit.rshift(uint32, 24),
-      bit.rshift(uint32, 16),
-      bit.rshift(uint32, 8),
-      bit.band(uint32, 0xff))
+      rshift(uint32, 24),
+      rshift(band(uint32, 0xff0000), 16),
+      rshift(band(uint32, 0xff00), 8),
+      band(uint32, 0xff))
 end
 
 function selftest ()
-   assert(format_ipv4(65535) == "0.0.255.255", "Bad conversion in format_ipv4")
+   assert(format_ipv4(0xfffefdfc) == "255.254.253.252", "Bad conversion in format_ipv4")
 end
