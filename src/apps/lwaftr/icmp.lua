@@ -8,8 +8,10 @@ local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
-
+local bit = require("bit")
 local ffi = require("ffi")
+
+local band, bnot = bit.band, bit.bnot
 local C = ffi.C
 
 -- Write ICMP data to the end of a packet
@@ -85,7 +87,7 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, config)
    ipv6_header:payload_length(ipv6_payload_len)
    local ph = ipv6_header:pseudo_header(ipv6_payload_len, constants.proto_icmpv6)
    local ph_csum = checksum.ipsum(ffi.cast("uint8_t *", ph), ffi.sizeof(ph), 0)
-   local ph_csum = bit.band(bit.bnot(ph_csum), 0xffff)
+   local ph_csum = band(bnot(ph_csum), 0xffff)
    local ethernet_header = ethernet:new({src = from_eth,
                                          dst = to_eth,
                                          type = constants.ethertype_ipv6})
