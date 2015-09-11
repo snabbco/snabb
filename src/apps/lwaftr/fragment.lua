@@ -19,6 +19,8 @@ local ipv6_payload_len = constants.ethernet_header_size + constants.ipv6_payload
 local frag_id_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_id
 local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_offset
 
+local dgram = datagram:new()
+
 local function compare_fragment_offsets(pkt1, pkt2)
    return pkt1.data[ipv6_frag_offset_offset] < pkt2.data[ipv6_frag_offset_offset]
 end
@@ -77,12 +79,11 @@ local function _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_
    local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
    local eth_header = ethernet:new({src = eth_src, dst = eth_dst, type = constants.ethertype_ipv6})
    local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
-   local dgram = datagram:new(repkt)
    local frag_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size
 
+   local dgram = dgram:reuse(repkt)
    dgram:push(ipv6_header)
    dgram:push(eth_header)
-   dgram:free()
    ipv6_header:free()
    eth_header:free()
    local frag_indata_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_header_size

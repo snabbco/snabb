@@ -26,6 +26,7 @@ function LwAftr:new(conf)
    for k,v in pairs(conf) do
       o[k] = v
    end
+   o.dgram = datagram:new()
    o.fragment_cache = {}
    o.scratch_ipv4 = ffi.new("uint8_t[4]")
    return setmetatable(o, {__index=LwAftr})
@@ -157,13 +158,12 @@ function LwAftr:_icmp_b4_lookup_failed(pkt, to_ip)
 end
 
 function LwAftr:_add_inet_ethernet(pkt)
-   local dgram = datagram:new(pkt, ipv4) -- TODO: recycle this
+   local dgram = self.dgram:reuse(pkt, ipv4)
    local ethernet_header = ethernet:new({src = self.aftr_mac_inet_side,
                                          dst = self.inet_mac,
                                          type = constants.ethertype_ipv4})
    dgram:push(ethernet_header)
    ethernet_header:free()
-   dgram:free()
    return pkt
 end
 
@@ -172,7 +172,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                                  ether_src, ether_dst)
    -- TODO: decrement the IPv4 ttl as this is part of forwarding
    -- TODO: do not encapsulate if ttl was already 0; send icmp
-   local dgram = datagram:new(pkt, ethernet) -- TODO: recycle this
+   local dgram = self.dgram:reuse(pkt, ethernet)
    dgram:pop_raw(constants.ethernet_header_size)
    if debug then print("ipv6", ipv6_src, ipv6_dst) end
    local payload_len = pkt.length
@@ -198,7 +198,6 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    pkt.data[5] = bit.band(payload_len, 0xff)
    dgram:push(eth_hdr)
    eth_hdr:free()
-   dgram:free()
    if pkt.length <= self.ipv6_mtu then
       if debug then
          print("encapsulated packet:")
@@ -298,10 +297,9 @@ end
 -- Return a packet without ethernet or IPv6 headers.
 -- TODO: this does not decrement TTL; is this correct?
 function LwAftr:decapsulate(pkt)
-   local dgram = datagram:new(pkt) -- TODO: recycle this
+   local dgram = self.dgram:reuse(pkt)
    -- FIXME: don't hardcode the values like this
    dgram:pop_raw(constants.ethernet_header_size + constants.ipv6_fixed_header_size)
-   dgram:free()
    return pkt
 end
 
@@ -357,13 +355,12 @@ function LwAftr:from_b4(pkt)
       if self.hairpinning and self:binding_lookup_ipv4_from_pkt(pkt, 0) then
          -- FIXME: shifting the packet ethernet_header_size right would suffice here
          -- The ethernet data is thrown away by _encapsulate_ipv4 anyhow.
-         local dgram = datagram:new(pkt) -- TODO: recycle this
+         local dgram = self.dgram:reuse(pkt)
          local ethernet_header = ethernet:new({src = self.b4_mac,
                                                dst = self.aftr_mac_b4_side,
                                                type = constants.ethertype_ipv4})
          dgram:push(ethernet_header)
          ethernet_header:free()
-         dgram:free()
          return self:_encapsulate_ipv4(pkt)
       else
          return self:_add_inet_ethernet(pkt)

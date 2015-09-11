@@ -20,6 +20,8 @@ local C = ffi.C
 
 -- Config may contain a next_hop_mtu.
 
+local dgram = datagram:new()
+
 function write_icmp(pkt, config, base_checksum)
    local bytes_needed = constants.icmp_base_size + config.payload_len
    assert(bytes_needed + pkt.length <= tonumber(C.PACKET_PAYLOAD_SIZE),
@@ -50,7 +52,7 @@ end
 
 function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, config)
    local new_pkt = packet.allocate()
-   local dgram = datagram:new(new_pkt) -- TODO: recycle this
+   local dgram = dgram:reuse(new_pkt)
    local ipv4_header = ipv4:new({ttl = constants.default_ttl,
                                  protocol = constants.proto_icmp,
                                  src = from_ip, dst = to_ip})
@@ -64,7 +66,6 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, config)
    dgram:push(ethernet_header)
    ethernet_header:free()
    ipv4_header:free()
-   dgram:free()
    write_icmp(new_pkt, config, 0)
 
    local ip_checksum_p = new_pkt.data + constants.ethernet_header_size + constants.ipv4_checksum
@@ -76,7 +77,7 @@ end
 
 function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, config)
    local new_pkt = packet.allocate()
-   local dgram = datagram:new(new_pkt) -- TODO: recycle this
+   local dgram = dgram:reuse(new_pkt)
    local ipv6_payload_len = config.payload_len + constants.icmp_base_size
    local ipv6_header = ipv6:new({hop_limit = constants.default_ttl,
                                  next_header = constants.proto_icmpv6,
@@ -92,7 +93,6 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, config)
    dgram:push(ethernet_header)
    ethernet_header:free()
    ipv6_header:free()
-   dgram:free()
    write_icmp(new_pkt, config, ph_csum)
    return new_pkt
 end
