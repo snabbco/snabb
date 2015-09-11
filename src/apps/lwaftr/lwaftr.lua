@@ -12,8 +12,9 @@ local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local packet = require("core.packet")
 local bit = require("bit")
-
 local ffi = require("ffi")
+
+local band, bnot, rshift = bit.band, bit.bnot, bit.rshift
 local C = ffi.C
 
 local debug = false
@@ -105,21 +106,21 @@ end
 
 local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
    assert(math.abs(fixup_val) <= 0xffff, "Invalid fixup")
-   local csum = bit.bnot(C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0]))
+   local csum = bnot(C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0]))
    if debug then print("old csum", string.format("%x", csum)) end
    csum = csum + fixup_val
    -- TODO/FIXME: *test* this code
    -- Manually unrolled loop; max 2 iterations, extra iterations
    -- don't hurt, bitops are fast and ifs are slow.
-   local overflow = bit.rshift(csum, 16)
-   csum = bit.band(csum, 0xffff) + overflow
-   local overflow = bit.rshift(csum, 16)
-   csum = bit.band(csum, 0xffff) + overflow
-   csum = bit.bnot(csum)
+   local overflow = rshift(csum, 16)
+   csum = band(csum, 0xffff) + overflow
+   local overflow = rshift(csum, 16)
+   csum = band(csum, 0xffff) + overflow
+   csum = bnot(csum)
 
    if debug then print("new csum", string.format("%x", csum)) end
-   pkt.data[csum_offset] = bit.rshift(csum, 8)
-   pkt.data[csum_offset + 1] = bit.band(csum, 0xff)
+   pkt.data[csum_offset] = rshift(csum, 8)
+   pkt.data[csum_offset + 1] = band(csum, 0xff)
 end
 
 -- ICMPv4 type 3 code 1, as per the internet draft.
@@ -177,8 +178,8 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    if debug then lwutil.pp(ipv6_hdr) end
    -- The API makes setting the payload length awkward; set it manually
    -- Todo: less awkward way to write 16 bits of a number into cdata
-   pkt.data[4] = bit.rshift(payload_len, 8)
-   pkt.data[5] = bit.band(payload_len, 0xff)
+   pkt.data[4] = rshift(payload_len, 8)
+   pkt.data[5] = band(payload_len, 0xff)
    self:_add_ethernet_header(dgram, {src = ether_src,
                                      dst = ether_dst,
                                      type = constants.ethertype_ipv6})
@@ -193,7 +194,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    -- Otherwise, fragment if possible
    local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_fixed_header_size
    local flags = pkt.data[unfrag_header_size + constants.ipv4_flags]
-   if bit.band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
+   if band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
       -- According to RFC 791, the original packet must be discarded.
       -- Return a packet with ICMP(3, 4) and the appropriate MTU
       -- as per https://tools.ietf.org/html/rfc2473#section-7.2

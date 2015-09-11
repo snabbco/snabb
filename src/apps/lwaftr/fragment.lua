@@ -8,7 +8,10 @@ local ipv6 = require("lib.protocol.ipv6")
 --local lwutil = require("apps.lwaftr.lwutil")
 local constants = require("apps.lwaftr.constants")
 local packet = require("core.packet")
+local bit = require("bit")
 local ffi = require("ffi")
+
+local band, bor, lshift, rshift = bit.band, bit.bor, bit.lshift, bit.rshift
 local C = ffi.C
 
 REASSEMBLY_OK = 1
@@ -41,13 +44,13 @@ end
 -- least significant bit of the 4th byte
 local ipv6_frag_more_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + 3
 local function is_last_fragment(frag)
-   return bit.band(frag.data[ipv6_frag_more_offset], 1) == 0
+   return band(frag.data[ipv6_frag_more_offset], 1) == 0
 end
 
 local function get_frag_offset(frag)
    -- Layout: 8 fragment offset bits, 5 fragment offset bits, 2 reserved bits, 'M'ore-frags-expected bit
    local raw_frag_offset = ffi.cast("uint16_t*", frag.data + ipv6_frag_offset_offset)[0]
-   return bit.band(C.ntohs(raw_frag_offset), 0xfffff8)
+   return band(C.ntohs(raw_frag_offset), 0xfffff8)
 end
 
 -- IPv6 reassembly, as per https://tools.ietf.org/html/rfc2460#section-4.5
@@ -158,7 +161,7 @@ end
 -- TODO: consider security/performance tradeoffs of randomization
 local internal_frag_id = 0x42424242
 local function fresh_frag_id()
-   internal_frag_id = bit.band(internal_frag_id + 1, 0xffffffff)
+   internal_frag_id = band(internal_frag_id + 1, 0xffffffff)
    return internal_frag_id
 end
 
@@ -170,8 +173,8 @@ local function write_ipv6_frag_header(pkt_data, unfrag_header_size, next_header,
    -- The frag_offset represents 8-octet chunks.
    -- M is 1 iff more packets from the same fragmentable data are expected
    frag_offset = frag_offset / 8
-   pkt_data[unfrag_header_size + 2] = bit.rshift(frag_offset, 5)
-   pkt_data[unfrag_header_size + 3] = bit.bor(bit.lshift(bit.band(frag_offset, 0x1f), 3), more_frags)
+   pkt_data[unfrag_header_size + 2] = rshift(frag_offset, 5)
+   pkt_data[unfrag_header_size + 3] = bor(lshift(band(frag_offset, 0x1f), 3), more_frags)
    local base = pkt_data + unfrag_header_size
    ffi.cast("uint32_t*", base + 4)[0] = C.htonl(frag_id)
 end
@@ -189,7 +192,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    local new_header_size = unfrag_header_size + constants.ipv6_frag_header_size
    local payload_size = ipv6_pkt.length - unfrag_header_size
    -- Payload bytes per packet must be a multiple of 8
-   local payload_bytes_per_packet = bit.band(mtu - new_header_size, 0xfff8)
+   local payload_bytes_per_packet = band(mtu - new_header_size, 0xfff8)
    local num_packets = math.ceil(payload_size / payload_bytes_per_packet)
 
    local pkts = {ipv6_pkt}
