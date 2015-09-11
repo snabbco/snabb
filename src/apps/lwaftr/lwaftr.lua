@@ -20,14 +20,15 @@ local debug = false
 
 LwAftr = {}
 
--- TODO: refactor this
-local scratch_ipv4, scratch_ipv6
-scratch_ipv4 = ffi.new("uint8_t[4]")
-
 function LwAftr:new(conf)
    if debug then lwutil.pp(conf) end
-   conf.fragment_cache = {}
-   return setmetatable(conf, {__index=LwAftr})
+   local o = {}
+   for k,v in pairs(conf) do
+      o[k] = v
+   end
+   o.fragment_cache = {}
+   o.scratch_ipv4 = ffi.new("uint8_t[4]")
+   return setmetatable(o, {__index=LwAftr})
 end
 
 function LwAftr:_get_lwAFTR_ipv6(binding_entry)
@@ -221,7 +222,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                            next_hop_mtu = self.ipv6_mtu - constants.ipv6_fixed_header_size
                            }
       local icmp_pkt = icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
-                                              self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
+                                              self.aftr_ipv4_ip, self.scratch_ipv4, icmp_config)
       packet.free(pkt)
       return icmp_pkt
    end
@@ -272,7 +273,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
                            payload_len = constants.icmpv4_default_payload_size
                            }
       return icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
-                                    self.aftr_ipv4_ip, scratch_ipv4, icmp_config)
+                                    self.aftr_ipv4_ip, self.scratch_ipv4, icmp_config)
    end
  
    local proto_offset = constants.ethernet_header_size + 9
@@ -391,7 +392,7 @@ function LwAftr:push ()
       local out_pkt = nil
 
       if ethertype == constants.ethertype_ipv4 then -- Incoming packet from the internet
-         ffi.copy(scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.ipv4_src_addr, 4)
+         ffi.copy(self.scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.ipv4_src_addr, 4)
          out_pkt = self:_encapsulate_ipv4(pkt)
       elseif ethertype == constants.ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin
