@@ -28,8 +28,12 @@ end
 
 function format_ipv4(uint32)
    return string.format("%i.%i.%i.%i",
-      bit.rshift(bit.band(uint32, 0xff000000), 24),
-      bit.rshift(bit.band(uint32, 0xff0000), 16),
-      bit.rshift(bit.band(uint32, 0xff00), 8),
+      bit.rshift(uint32, 24),
+      bit.rshift(uint32, 16),
+      bit.rshift(uint32, 8),
       bit.band(uint32, 0xff))
+end
+
+function selftest ()
+   assert(format_ipv4(65535) == "0.0.255.255", "Bad conversion in format_ipv4")
 end

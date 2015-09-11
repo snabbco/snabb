@@ -111,9 +111,9 @@ local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
    -- TODO/FIXME: *test* this code
    -- Manually unrolled loop; max 2 iterations, extra iterations
    -- don't hurt, bitops are fast and ifs are slow.
-   local overflow = bit.rshift(bit.band(0xffff0000, csum), 16)
+   local overflow = bit.rshift(csum, 16)
    csum = bit.band(csum, 0xffff) + overflow
-   local overflow = bit.rshift(bit.band(0xffff0000, csum), 16)
+   local overflow = bit.rshift(csum, 16)
    csum = bit.band(csum, 0xffff) + overflow
    csum = bit.bnot(csum)
 
