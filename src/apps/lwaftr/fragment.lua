@@ -41,13 +41,13 @@ end
 -- least significant bit of the 4th byte
 local ipv6_frag_more_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + 3
 local function is_last_fragment(frag)
-   return 0 == bit.band(1, frag.data[ipv6_frag_more_offset])
+   return bit.band(frag.data[ipv6_frag_more_offset], 1) == 0
 end
 
 local function get_frag_offset(frag)
    -- Layout: 8 fragment offset bits, 5 fragment offset bits, 2 reserved bits, 'M'ore-frags-expected bit
    local raw_frag_offset = ffi.cast("uint16_t*", frag.data + ipv6_frag_offset_offset)[0]
-   return bit.band(0xfffff8, C.ntohs(raw_frag_offset))
+   return bit.band(C.ntohs(raw_frag_offset), 0xfffff8)
 end
 
 -- IPv6 reassembly, as per https://tools.ietf.org/html/rfc2460#section-4.5
@@ -70,11 +70,12 @@ end
 local function _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_lengths)
    local repkt = packet.allocate()
    -- The first byte of the fragment header is the next header type
-   local ipv6_next_header = fragments[1].data[constants.ethernet_header_size + constants.ipv6_fixed_header_size]
-   local eth_src = ffi.cast("uint8_t*", fragments[1].data + constants.ethernet_src_addr)
-   local eth_dst = ffi.cast("uint8_t*", fragments[1].data + constants.ethernet_dst_addr)
-   local ipv6_src = ffi.cast("uint8_t*", fragments[1].data + constants.ethernet_header_size + constants.ipv6_src_addr)
-   local ipv6_dst = ffi.cast("uint8_t*", fragments[1].data + constants.ethernet_header_size + constants.ipv6_dst_addr)
+   local first_fragment = fragments[1]
+   local ipv6_next_header = first_fragment.data[constants.ethernet_header_size + constants.ipv6_fixed_header_size]
+   local eth_src = first_fragment.data + constants.ethernet_src_addr
+   local eth_dst = first_fragment.data + constants.ethernet_dst_addr
+   local ipv6_src = first_fragment.data + constants.ethernet_header_size + constants.ipv6_src_addr
+   local ipv6_dst = first_fragment.data + constants.ethernet_header_size + constants.ipv6_dst_addr
 
    local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
    local eth_header = ethernet:new({src = eth_src, dst = eth_dst, type = constants.ethertype_ipv6})
@@ -170,7 +171,7 @@ local function write_ipv6_frag_header(pkt_data, unfrag_header_size, next_header,
    -- M is 1 iff more packets from the same fragmentable data are expected
    frag_offset = frag_offset / 8
    pkt_data[unfrag_header_size + 2] = bit.rshift(frag_offset, 5)
-   pkt_data[unfrag_header_size + 3] = bit.bor(bit.lshift(bit.band(0x1f, frag_offset), 3), more_frags)
+   pkt_data[unfrag_header_size + 3] = bit.bor(bit.lshift(bit.band(frag_offset, 0x1f), 3), more_frags)
    local base = pkt_data + unfrag_header_size
    ffi.cast("uint32_t*", base + 4)[0] = C.htonl(frag_id)
 end
@@ -188,7 +189,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    local new_header_size = unfrag_header_size + constants.ipv6_frag_header_size
    local payload_size = ipv6_pkt.length - unfrag_header_size
    -- Payload bytes per packet must be a multiple of 8
-   local payload_bytes_per_packet = bit.band(0xfff8, mtu - new_header_size)
+   local payload_bytes_per_packet = bit.band(mtu - new_header_size, 0xfff8)
    local num_packets = math.ceil(payload_size / payload_bytes_per_packet)
 
    local pkts = {ipv6_pkt}
