@@ -51,6 +51,7 @@ icmpv4_total_size =  icmp_base_size + icmpv4_default_payload_size
 -- Offsets, 0-indexed
 ethernet_dst_addr = 0
 ethernet_src_addr = 6
+ethernet_ethertype = 12
 
 ipv4_flags = 6
 ipv4_checksum = 10
