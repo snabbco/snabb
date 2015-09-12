@@ -18,8 +18,9 @@ local function bench(engine, params)
       end
       return str
    end
-   local function report (breaths, bytes, packets, runtime)
+   local function report (name, breaths, bytes, packets, runtime)
       local values = {
+         name                 = name,
          breath_in_nanosecond = ("%.2f"):format(runtime / breaths * 1e6),
          breaths              = lib.comma_value(breaths),
          bytes                = bytes,
@@ -29,11 +30,19 @@ local function bench(engine, params)
          rate_mpps            = ("%.3f"):format(packets / runtime / 1e6),
          runtime              = ("%.2f"):format(runtime),
       }
-      print("\n"..format([[
-Processed {million_packets} million packets in {runtime} seconds ({bytes} bytes; {rate_gbps} Gbps)
+      print("\n"..format([[{name} processed {million_packets} million packets in {runtime} seconds ({bytes} bytes; {rate_gbps} Gbps)
 Made {breaths} breaths: {packets_per_breath} packets per breath; {breath_in_nanosecond} us per breath
 Rate(Mpps): {rate_mpps}
       ]], values))
+   end
+   local function report_bench(input, name, engine, finish, start)
+      local breaths = tonumber(engine.breaths)
+      local bytes = input.txbytes
+      -- Don't bother to report on interfaces that were boring
+      if bytes == 0 then return nil end
+      local packets = input.txpackets
+      local runtime = finish - start
+      report(name, breaths, bytes, packets, runtime)
    end
 
    local start = C.get_monotonic_time()
@@ -42,12 +51,18 @@ Rate(Mpps): {rate_mpps}
 
    -- local input = link.stats(engine.app_table.nic2.output.tx)
    -- local input = link.stats(engine.app_table.lwaftr.output.output)
-   local input = link.stats(engine.app_table.nic1.input.rx)
-   local breaths = tonumber(engine.breaths)
-   local bytes = input.txbytes
-   local packets = input.txpackets
-   local runtime = finish - start
-   report(breaths, bytes, packets, runtime)
+   -- local input = link.stats(engine.app_table.nic1.input.rx)
+
+   report_bench(link.stats(engine.app_table.nicv4.input.rx), "nicv4-in", engine, finish, start)
+   report_bench(link.stats(engine.app_table.nicv6.input.rx), "nicv6-in", engine, finish, start)
+--[[
+   report_bench(link.stats(engine.app_table.nicv4.output.tx), "nicv4-out", engine, finish, start)
+   report_bench(link.stats(engine.app_table.nicv6.output.tx), "nicv6-out", engine, finish, start)
+   report_bench(link.stats(engine.app_table.lwaftr.output.v4), "lwaftrv4-out", engine, finish, start)
+   report_bench(link.stats(engine.app_table.lwaftr.output.v6), "lwaftrv6-out", engine, finish, start)
+   report_bench(link.stats(engine.app_table.lwaftr.input.v4), "lwaftrv4-in", engine, finish, start)
+   report_bench(link.stats(engine.app_table.lwaftr.input.v6), "lwaftrv6-in", engine, finish, start)
+--]]
 end
 
 local function usage ()
@@ -63,8 +78,8 @@ Usage: <bt_file> <conf_file> <pcap_file> <pci_dev>
 end
 
 local function testInternalLoopbackFromPcapFile (params)
-   if #params < 4 then usage() end
-   local bt_file, conf_file, pcap_file, pcidev = unpack(params)
+   if #params < 6 then usage() end
+   local bt_file, conf_file, pcapv4_file, pcapv6_file, pcidev_v4, pcidev_v6 = unpack(params)
 
    bt.get_binding_table(bt_file)
    local aftrconf = conf.get_aftrconf(conf_file)
@@ -72,26 +87,34 @@ local function testInternalLoopbackFromPcapFile (params)
    engine.configure(config.new())
    local c = config.new()
    config.app(c, 'lwaftr', lwaftr.LwAftr, aftrconf)
-   config.app(c, 'pcap', PcapReader, pcap_file)
-   config.app(c, 'repeater_ms', basic_apps.Repeater)
+   config.app(c, 'pcapv4', PcapReader, pcapv4_file)
+   config.app(c, 'pcapv6', PcapReader, pcapv6_file)
+   config.app(c, 'repeater_v4', basic_apps.Repeater)
+   config.app(c, 'repeater_v6', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
-   -- Origin
-   config.app(c, 'nic1', Intel82599, {
-      pciaddr = pcidev,
+
+   -- Both nics are full-duplex
+   config.app(c, 'nicv4', Intel82599, {
+      pciaddr = pcidev_v4,
       vmdq = true,
       macaddr = '22:22:22:22:22:22',
    })
-   -- Destination
-   config.app(c, 'nic2', Intel82599, {
-      pciaddr = pcidev,
+
+   config.app(c, 'nicv6', Intel82599, {
+      pciaddr = pcidev_v6,
       vmdq = true,
       macaddr = '44:44:44:44:44:44',
    })
 
-   config.link(c, 'pcap.output        -> repeater_ms.input')
-   config.link(c, 'repeater_ms.output -> lwaftr.input')
-   config.link(c, 'lwaftr.output      -> nic1.rx')
-   config.link(c, 'nic2.tx            -> sink.in1')
+   config.link(c, 'pcapv4.output      -> repeater_v4.input')
+   config.link(c, 'repeater_v4.output -> lwaftr.v4')
+   config.link(c, 'lwaftr.v4          -> nicv4.rx')
+   config.link(c, 'nicv4.tx           -> sink.in1')
+
+   config.link(c, 'pcapv6.output      -> repeater_v6.input')
+   config.link(c, 'repeater_v6.output -> lwaftr.v6')
+   config.link(c, 'lwaftr.v6          -> nicv6.rx')
+   config.link(c, 'nicv6.tx           -> sink.in1')
 
    engine.configure(c)
 
