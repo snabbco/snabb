@@ -250,10 +250,14 @@ events = {"mem_load_uops_retired.l1_hit",
           "mem_load_uops_retired.l3_miss",
           "br_misp_retired.all_branches$"}
 
-function appbench (mod, app, configstring)
-   print("module: " .. mod)
-   print("app:    " .. app)
-   print("config: " .. (configstring or ''))
+function appbench (mod, app, configstring, inlink, outlink)
+   print("module:  " .. mod)
+   print("app:     " .. app)
+   print("config:  " .. (configstring or ''))
+   print("inlink:  " .. (inlink or '[default: rx]'))
+   print("outlink: " .. (outlink or '[default: tx]'))
+   inlink  = inlink  or 'rx'
+   outlink = outlink or 'tx'
    local cfg = configstring and core.lib.load_string(configstring)()
    print(mod, app, cfg)
    local pmu = require("lib.pmu")
@@ -277,10 +281,10 @@ function appbench (mod, app, configstring)
    engine.configure(config.new())
    local c1 = config.new()
    config.app(c1, "source", basic_apps.Source)
-   config.app(c1, "tee",    require(mod)[app], cfg)
+   config.app(c1, "app",    require(mod)[app], cfg)
    config.app(c1, "sink",   basic_apps.Sink)
-   config.link(c1, "source.tx->tee.rx")
-   config.link(c1, "tee.tx->sink.rx")
+   config.link(c1, "source.tx->app."..inlink)
+   config.link(c1, "app."..outlink.."->sink.rx")
    engine.configure(c1)
    print("\nstarting production run...")
    local _, t1 = pmu.measure(run, events)
