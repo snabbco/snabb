@@ -37,7 +37,7 @@ function basic1 (npackets)
    config.app(c, "Sink", basic_apps.Sink)
    config.link(c, "Source.tx -> Tee.rx")
    config.link(c, "Tee.tx1 -> Sink.rx1")
-   config.link(c, "Tee.tx2 -> Sink.rx2")
+--   config.link(c, "Tee.tx2 -> Sink.rx2")
    engine.configure(c)
    local start = C.get_monotonic_time()
    timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
@@ -48,6 +48,7 @@ function basic1 (npackets)
    local runtime = finish - start
    local packets = link.stats(engine.app_table.Source.output.tx).txpackets
    engine.report()
+   engine.report_pmu()
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
 end
