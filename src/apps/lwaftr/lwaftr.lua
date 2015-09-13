@@ -105,7 +105,7 @@ function LwAftr:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src
    return false
 end
 
-local function fixup_tcp_checksum(pkt, csum_offset, fixup_val)
+local function fixup_checksum(pkt, csum_offset, fixup_val)
    assert(math.abs(fixup_val) <= 0xffff, "Invalid fixup")
    local csum = bnot(C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0]))
    if debug then print("old csum", string.format("%x", csum)) end
@@ -246,6 +246,16 @@ function LwAftr:_add_ethernet_header(dgram, eth_params)
    eth_hdr:free()
 end
 
+local function decrement_ttl(pkt)
+   local ttl_offset = constants.ethernet_header_size + constants.ipv4_ttl
+   pkt.data[ttl_offset] = pkt.data[ttl_offset] - 1
+   local ttl = pkt.data[ttl_offset]
+   local csum_offset = constants.ethernet_header_size + constants.ipv4_checksum
+   -- ttl_offset is even, so multiply the ttl change by 0x100.
+   fixup_checksum(pkt, csum_offset, -0x100)
+   return ttl
+end
+
 -- TODO: correctly handle fragmented IPv4 packets
 -- TODO: correctly deal with IPv6 packets that need to be fragmented
 -- The incoming packet is a complete one with ethernet headers.
@@ -269,36 +279,32 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local ether_src = self.aftr_mac_b4_side 
    local ether_dst = self.b4_mac -- FIXME: this should probaby use NDP
 
-   local ttl_offset = constants.ethernet_header_size + 8
-   pkt.data[ttl_offset] = pkt.data[ttl_offset] - 1
-   local ttl = pkt.data[ttl_offset]
-   -- Do not encapsulate packets that now have a ttl of zero
-   if ttl == 0 then -- TODO: make this conditional on icmp_policy?
+   local ttl = decrement_ttl(pkt)
+   -- Do not encapsulate packets that now have a ttl of zero or wrapped around
+   if ttl == 0 or ttl == 255 then -- TODO: make this conditional on icmp_policy?
       local icmp_config = {type = constants.icmpv4_time_exceeded,
                            code = constants.icmpv4_ttl_exceeded_in_transit,
                            payload_p = pkt.data + constants.ethernet_header_size,
                            payload_len = constants.icmpv4_default_payload_size
                            }
       local ttl0_icmp =  icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
-                                                 self.aftr_ipv4_ip, self.scratch_ipv4, icmp_config)
+                                                self.aftr_ipv4_ip, self.scratch_ipv4, icmp_config)
       return ttl0_icmp, empty
    end
  
-   local proto_offset = constants.ethernet_header_size + 9
+   local proto_offset = constants.ethernet_header_size + constants.ipv4_proto
    local proto = pkt.data[proto_offset]
 
-   if proto == constants.proto_icmp and self.icmp_policy == lwconf.policies['DROP'] then
-      packet.free(pkt)
-      return empty, empty
+   if proto == constants.proto_icmp then
+      if self.icmp_policy == lwconf.policies['DROP'] then
+         packet.free(pkt)
+         return empty, empty
+      else
+         return self:_icmpv4_incoming(pkt)
+      end
    end
 
-   if proto == constants.proto_tcp then -- TODO: handle non-TCP packets
-      local csum_offset = constants.ethernet_header_size + 10
-      -- ttl_offset is even, so multiply the ttl change by 0x100.
-      fixup_tcp_checksum(pkt, csum_offset, -0x100)
-   end
-   local next_hdr = 4 -- IPv4
-
+   local next_hdr = constants.proto_ipv4
    return self:ipv6_encapsulate(pkt, next_hdr, ipv6_src, ipv6_dst,
                                 ether_src, ether_dst)
 end

@@ -54,6 +54,8 @@ ethernet_src_addr = 6
 ethernet_ethertype = 12
 
 ipv4_flags = 6
+ipv4_ttl = 8
+ipv4_proto = 9
 ipv4_checksum = 10
 ipv4_src_addr = 12
 ipv4_dst_addr = 16

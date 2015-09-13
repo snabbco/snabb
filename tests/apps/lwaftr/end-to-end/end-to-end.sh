@@ -126,7 +126,7 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-customBRIP1-tob4-customBRIP2-ipv6.pcap \
    ${EMPTY} ${TEST_BASE}/recap-customBR-IPs-ipv6.pcap
 
-# echo "Testing: from-b4 IPv6 packet NOT found in the binding table (ICMP-on-fail)."
+# Test UDP input
 
 # Test ICMP inputs (with and without drop policy)
 
