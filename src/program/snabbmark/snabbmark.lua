@@ -17,6 +17,8 @@ function run (args)
       nfvconfig(unpack(args))
    elseif command == 'solarflare' and #args >= 2 and #args <= 3 then
       solarflare(unpack(args))
+   elseif command == 'appbench' then
+      appbench(unpack(args))
    else
       print(usage) 
       main.exit(1)
@@ -227,3 +229,68 @@ function solarflare (npackets, packet_size, timeout)
       main.exit(1)
    end
 end
+
+-- snabbmark appbench
+-- 
+-- Benchmark an individual app and print detailed measurements of its
+-- per-packet performance and behavior.
+-- 
+-- The benchmark is done like this:
+-- 
+-- 1. Process very many packets in a loop.
+-- 
+-- 2. Use CPU performance counters (PMU) to precisely measure performance.
+-- 
+-- 3. Isolate the performance impact of the app by comparing an app
+--    network with the app vs without it.
+
+events = {"mem_load_uops_retired.l1_hit",
+          "mem_load_uops_retired.l2_hit",
+          "mem_load_uops_retired.l3_hit",
+          "mem_load_uops_retired.l3_miss",
+          "br_misp_retired.all_branches$"}
+
+function appbench (mod, app, configstring)
+   print("module: " .. mod)
+   print("app:    " .. app)
+   print("config: " .. (configstring or ''))
+   local cfg = configstring and core.lib.load_string(configstring)()
+   print(mod, app, cfg)
+   local pmu = require("lib.pmu")
+   -- First test the "null app network".
+   local c0 = config.new()
+   config.app(c0, "source", basic_apps.Source)
+   config.app(c0, "sink",   basic_apps.Sink)
+   config.link(c0, "source.tx->sink.rx")
+   engine.configure(c0)
+   local start = C.get_monotonic_time()
+   local npackets = 100e6
+   print("starting reference run...")
+   local run = function ()
+      while link.stats(engine.app_table.source.output.tx).txpackets < npackets do
+         engine.main({duration = 0.01, no_report = true})
+      end
+   end
+   local _, t0 = pmu.measure(run, events)
+   print("reference result:")
+   pmu.report(t0, {packet = npackets})
+   engine.configure(config.new())
+   local c1 = config.new()
+   config.app(c1, "source", basic_apps.Source)
+   config.app(c1, "tee",    require(mod)[app], cfg)
+   config.app(c1, "sink",   basic_apps.Sink)
+   config.link(c1, "source.tx->tee.rx")
+   config.link(c1, "tee.tx->sink.rx")
+   engine.configure(c1)
+   print("\nstarting production run...")
+   local _, t1 = pmu.measure(run, events)
+   print("production result:")
+   pmu.report(t1, {packet = npackets})
+   local tdelta = {}
+   for k, v in pairs(t1) do tdelta[k] = v - t0[k] end
+   print("\ndifference from reference to production:")
+   pmu.report(tdelta, {packet = npackets})
+   local finish = C.get_monotonic_time()
+   local runtime = finish - start
+end
+
