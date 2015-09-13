@@ -8,6 +8,7 @@ local timer   = require("core.timer")
 local counter = require("core.counter")
 local zone    = require("jit.zone")
 local ffi     = require("ffi")
+local pmu     = require("lib.pmu")
 local C       = ffi.C
 require("core.packet_h")
 
@@ -62,6 +63,13 @@ function now ()
    return monotonic_now or C.get_monotonic_time()
 end
 
+events = {"mem_load_uops_retired.l1_hit",
+          "mem_load_uops_retired.l2_hit",
+          "mem_load_uops_retired.l3_hit",
+          "mem_load_uops_retired.l3_miss",
+          "br_misp_retired.all_branches$"}
+pmu.setup(events)
+
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
 local function with_restart (app, method)
@@ -73,7 +81,9 @@ local function with_restart (app, method)
       -- of death).
       if not status then app.dead = { error = err, time = now() } end
    else
+      pmu.switch_to(app.pmu)
       method(app)
+      pmu.switch_to(nil)
    end
 end
 
@@ -167,6 +177,7 @@ function apply_config_actions (actions, conf)
       app.appname = name
       app.output = {}
       app.input = {}
+      app.pmu = pmu.new_counter_set()
       new_app_table[name] = app
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
@@ -395,6 +406,22 @@ function report_apps ()
             print("Warning: "..name.." threw an error during report: "..err)
          end
       end
+   end
+end
+
+function report_pmu ()
+   print("pmu report:")
+   for name, app in pairs(app_table) do
+      print('*** '..name)
+      local rx = 0
+      for i = 1, #app.input do
+         rx = rx + counter.read(app.input[i].stats.rxpackets)
+      end
+      local tx = 0
+      for i = 1, #app.output do
+         tx = tx + counter.read(app.output[i].stats.txpackets)
+      end
+      pmu.report(pmu.to_table(app.pmu), {packet=math.max(tonumber(rx),tonumber(tx))})
    end
 end
 
