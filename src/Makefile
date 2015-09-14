@@ -92,9 +92,11 @@ all: $(EXE)
 submods:
 	(cd ..; git submodule update; make clean; make)
 
-$(EXE): snabb
-	$(E) "PROGRAM   $@"
-	$(Q) install -D snabb $@
+$(EXE): snabb bin
+	$(E) "COMPRESS  $@"
+	$(Q) upx -f --brute -o$@ snabb
+	@echo -n "BINARY    "
+	@ls -sh $@
 
 markdown: $(RMOBJS)
 
