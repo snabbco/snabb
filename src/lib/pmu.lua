@@ -202,14 +202,14 @@ function setup (patterns)
    if ndropped > 0 then set[pmu_x86.ngeneral+1] = nil end
    local cpu = cpu_set()[1]
    -- Enable all fixed-function counters (IA32_FIXED_CTR_CTRL)
-   writemsr(0, 0x38d, 0x333)
+   writemsr(cpu, 0x38d, 0x333)
    for n = 0, #set-1 do
       local code = defs[set[n+1]]
       local USR = bit.lshift(1, 16)
       local EN = bit.lshift(1, 22)
-      writemsr(0, 0x186+n, bit.bor(0x10000, USR, EN, code))
+      writemsr(cpu, 0x186+n, bit.bor(0x10000, USR, EN, code))
    end
-   enabled = {"instructions", "cycles", "ref-cycles"}
+   enabled = {"instructions", "cycles", "ref_cycles"}
    for i = 1, #set do table.insert(enabled, set[i]) end
    return ndropped
 end
@@ -226,11 +226,15 @@ function writemsr (cpu, msr, value)
 end
 
 -- API function (see above)
-function report (set, aux)
+function report (tab, aux)
    aux = aux or {}
-   local names = lib.array_copy(enabled)
-   local values = {}
-   for i = 0, #names-1 do table.insert(values, tonumber(set[i])) end
+   local data = {}
+   for k,v in pairs(tab) do  table.insert(data, {k=k,v=v})  end
+   -- Sort fixed-purpose counters to come first in definite order
+   local fixed = {cycles='0', ref_cycles='1', instructions='2'}
+   table.sort(data, function(x,y)
+                       return (fixed[x.k] or x.k) < (fixed[y.k] or y.k)
+                    end)
    local auxnames, auxvalues = {}, {}
    for k,v in pairs(aux) do 
       table.insert(auxnames,k) 
@@ -244,14 +248,13 @@ function report (set, aux)
    print()
    -- include aux values in results
    for i = 1, #auxnames do
-      table.insert(names, auxnames[i])
-      table.insert(values, auxvalues[i])
+      table.insert(data, {k=auxnames[i], v=auxvalues[i]})
    end
    -- print values
-   for i = 1, #names do
-      io.write(("%-40s %14s"):format(names[i], core.lib.comma_value(values[i])))
+   for i = 1, #data do
+      io.write(("%-40s %14s"):format(data[i].k, core.lib.comma_value(data[i].v)))
       for j = 1, #auxnames do
-         io.write(("%12.3f"):format(tonumber(values[i]/auxvalues[j])))
+         io.write(("%12.3f"):format(tonumber(data[i].v/auxvalues[j])))
       end
       print()
    end
@@ -274,7 +277,7 @@ function profile (f,  events, aux, quiet)
    switch_to(set)
    local res = f()
    switch_to(nil)
-   if not quiet then report(set, aux) end
+   if not quiet then report(to_table(set), aux) end
    return res
 end
 
