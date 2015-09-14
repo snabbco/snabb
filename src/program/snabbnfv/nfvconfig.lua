@@ -31,9 +31,16 @@ function load (file, pciaddr, sockpath)
       local name = port_name(t)
       local NIC = name.."_NIC"
       local Virtio = name.."_Virtio"
+      local vmdq = true
+      if not t.mac_address then
+         if #ports ~= 1 then
+            error("multiple ports defined but promiscuous mode requested for port: "..name)
+         end
+        vmdq = false
+      end
       config.app(c, NIC, require(device_info.driver).driver,
                  {pciaddr = pciaddr,
-                  vmdq = true,
+                  vmdq = vmdq,
                   macaddr = mac_address,
                   vlan = vlan})
       config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
