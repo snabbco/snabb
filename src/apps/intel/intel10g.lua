@@ -166,7 +166,8 @@ do
       -- (write to illegal address) instead of overwriting physical
       -- memory near address 0.
       ffi.fill(ptr, 0xff, num_descriptors * ffi.sizeof(ct))
-      ptr = lib.bounds_checked(ct, ptr, 0, num_descriptors)
+      -- ptr = lib.bounds_checked(ct, ptr, 0, num_descriptors)
+      ptr = ffi.cast(ffi.typeof("$*", ct), ptr)
       return ptr, phy
    end
 
