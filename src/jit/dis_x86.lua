@@ -1,1 +1,1 @@
-../../deps/luajit/src/jit/dis_x86.lua
+../../lib/luajit/src/jit/dis_x86.lua
