@@ -202,12 +202,12 @@ function setup (patterns)
    if ndropped > 0 then set[pmu_x86.ngeneral+1] = nil end
    local cpu = cpu_set()[1]
    -- Enable all fixed-function counters (IA32_FIXED_CTR_CTRL)
-   writemsr(0, 0x38d, 0x333)
+   writemsr(cpu, 0x38d, 0x333)
    for n = 0, #set-1 do
       local code = defs[set[n+1]]
       local USR = bit.lshift(1, 16)
       local EN = bit.lshift(1, 22)
-      writemsr(0, 0x186+n, bit.bor(0x10000, USR, EN, code))
+      writemsr(cpu, 0x186+n, bit.bor(0x10000, USR, EN, code))
    end
    enabled = {"instructions", "cycles", "ref_cycles"}
    for i = 1, #set do table.insert(enabled, set[i]) end
