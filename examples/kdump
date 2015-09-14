@@ -1,0 +1,23 @@
+#!/usr/bin/env luajit
+
+local function assert(cond, err, ...)
+  if cond == nil then error(tostring(err)) end -- annoyingly, assert does not call tostring!
+  if type(cond) == "function" then return cond, err, ... end
+  if cond == true then return ... end
+  return cond, ...
+end
+
+local kfile = arg[1] or "ktrace.out"
+
+local S = require "syscall"
+local N = require "syscall.netbsd.init"
+
+local fd = assert(S.open(kfile, "rdonly"))
+local buf = S.t.buffer(32768)
+local n = assert(fd:read(buf, 32768))
+for _, ktr in N.util.kdump(buf, n) do
+  if ktr.version ~= 2 then error "currently only v2 supported" end
+  print(ktr)
+end
+assert(fd:close())
+
