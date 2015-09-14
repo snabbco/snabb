@@ -155,7 +155,7 @@ static void profile_trigger(ProfileState *ps)
   mask = g->hookmask;
   if (!(mask & (HOOK_PROFILE|HOOK_VMEVENT))) {  /* Set profile hook. */
     int st = g->vmstate;
-    ps->vmstate = st >= 0 ? 'N' :
+    ps->vmstate = st >= 0 ? 256+st :
 		  st == ~LJ_VMST_INTERP ? 'I' :
 		  st == ~LJ_VMST_C ? 'C' :
 		  st == ~LJ_VMST_GC ? 'G' : 'J';

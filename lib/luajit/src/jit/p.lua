@@ -74,7 +74,7 @@ local function prof_cb(th, samples, vmmode)
   -- Collect keys for sample.
   if prof_states then
     if prof_states == "v" then
-      key_state = map_vmmode[vmmode] or vmmode
+      key_state = map_vmmode[vmmode] or "TRACE "..vmmode
     else
       key_state = zone:get() or "(none)"
     end
