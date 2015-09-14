@@ -24,7 +24,7 @@ commands is omitted.
 ```
 sudo apt-get update
 sudo apt-get -y install build-essential git
-git clone --recursive https://github.com/SnabbCo/snabbswitch.git
+git clone https://github.com/SnabbCo/snabbswitch.git
 cd snabbswitch
 make -j
 ```

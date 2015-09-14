@@ -1,0 +1,98 @@
+#!/usr/bin/env luajit
+
+package.path = package.path .. ";../src/?.lua"
+
+local io = require("io")
+local pf = require("pf")
+
+-- Given a command like "pflua-match wingolog.pcap tcp", get its trace.
+-- Note: Extra argument can be passed to luajit thusly:
+-- "-O-cse -other-arbitrary-luajit-argument pflua-match wingolog.pcap tcp"
+function get_trace(...)
+   table.insert(arg, 1, "luajit")
+   table.insert(arg, 2, "-jdump=+rs")
+   cmdline = table.concat(arg, " ")
+   print("Running: " .. cmdline)
+   return io.popen(cmdline):read("*all")
+end
+
+-- An 'interesting' start is currently one that's in a filter, not library code.
+function find_first_interesting_start(raw_traces)
+   local i = 1
+   local boring = {}
+   -- pf.* is library code.
+   for _,v in pairs(pf) do
+      if type(v) == "table" then -- turn pf.bpf into bpf, etc.
+         local pf_name = string.match(v._NAME, ".*%.(%a[_%w]*)")
+         if pf_name and pf_name ~= "" then boring[pf_name] = true end
+      end
+   end
+
+   while true do
+      local tstart, tend = raw_traces:find("---- TRACE %d+ start ", i)
+      assert(tstart, "Failed to find an interesting trace!")
+      local tracing_in = raw_traces:match("[a-z]+", tend)
+      if not boring[tracing_in] then break end
+      i = tend
+   end
+   return i
+end
+
+function filter_interesting_ir_traces(raw_traces)
+   local i = find_first_interesting_start(raw_traces)
+   local interesting_traces = {}
+   while true do
+      local interesting_start, _ = raw_traces:find("---- TRACE %d+ IR", i)
+      if not interesting_start then break end
+      local interesting_end, nexti = raw_traces:find("---- TRACE %d+ mcode", i)
+      assert(interesting_end, "The trace appears to be truncated.")
+      interesting_ir_trace = raw_traces:sub(interesting_start, interesting_end)
+      table.insert(interesting_traces, interesting_ir_trace)
+      i = nexti
+   end
+   return interesting_traces
+end
+
+function find_unsunk_allocs_in(trace)
+   local unsunk_allocs = {}
+   local allocation_ops = {"SNEW", "XSNEW", "TNEW", "TDUP", "CNEW", "CNEWI"}
+   for _, alloc_op in ipairs(allocation_ops) do
+      local i = 1
+      while true do
+         local astart, aend = trace:find("[^\n]*" .. alloc_op, i)
+         local alloc = trace:match("[^\n]*" .. alloc_op, astart)
+         if not astart then break end
+         local is_sunk = alloc:find("sink")
+         if not is_sunk then table.insert(unsunk_allocs, alloc) end
+         i = aend
+      end
+   end
+   return unsunk_allocs
+end
+
+function main(...)
+   local raw_traces = get_trace(...)
+   local interesting_ir_traces = filter_interesting_ir_traces(raw_traces)
+   local unsunk_allocs = {}
+   local unsunk_alloc_traces = {}
+   for _,trace in ipairs(interesting_ir_traces) do
+      local uas = find_unsunk_allocs_in(trace)
+      if next(uas) then
+         for _,ua in ipairs(uas) do table.insert(unsunk_allocs, ua) end
+         table.insert(unsunk_alloc_traces, trace)
+      end
+   end
+   if next(unsunk_allocs) then
+      print(table.concat(unsunk_allocs, "\n"))
+      if os.getenv("PF_VERBOSE") then
+         print(table.concat(unsunk_alloc_traces, "\n"))
+      end
+   else
+      print("No unsunk allocations detected in the SSA IR.")
+   end
+end
+
+assert(..., "usage: pflua-allocchecker program-to-run-with-its-args")
+
+main(...)
+
