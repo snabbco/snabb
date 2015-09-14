@@ -555,7 +555,10 @@ static void jit_profile_callback(lua_State *L2, lua_State *L, int samples,
     setfuncV(L2, L2->top++, funcV(tv));
     setthreadV(L2, L2->top++, L);
     setintV(L2->top++, samples);
-    setstrV(L2, L2->top++, lj_str_new(L2, &vmst, 1));
+    if (vmstate >= 256)
+      setintV(L2->top++, vmstate-256);
+    else
+      setstrV(L2, L2->top++, lj_str_new(L2, &vmst, 1));
     status = lua_pcall(L2, 3, 0, 0);  /* callback(thread, samples, vmstate) */
     if (status) {
       if (G(L2)->panic) G(L2)->panic(L2);

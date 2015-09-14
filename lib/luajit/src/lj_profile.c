@@ -5,6 +5,7 @@
 
 #define lj_profile_c
 #define LUA_CORE
+#define _GNU_SOURCE 1
 
 #include "lj_obj.h"
 
@@ -28,6 +29,17 @@
 #include <signal.h>
 #define profile_lock(ps)	UNUSED(ps)
 #define profile_unlock(ps)	UNUSED(ps)
+
+#if 1
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/syscall.h>
+#include <sys/ioctl.h>
+#include <linux/perf_event.h>
+#include <sys/prctl.h>
+#endif
+
 
 #elif LJ_PROFILE_PTHREAD
 
@@ -62,6 +74,8 @@ typedef struct ProfileState {
   SBuf sb;			/* String buffer for stack dumps. */
   int interval;			/* Sample interval in milliseconds. */
   int samples;			/* Number of samples for next callback. */
+  char *flavour;		/* What generates profiling events. */
+  int perf_event_fd;		/* Performace event file descriptor */
   int vmstate;			/* VM state when profile timer triggered. */
 #if LJ_PROFILE_SIGPROF
   struct sigaction oldsa;	/* Previous SIGPROF state. */
@@ -155,7 +169,7 @@ static void profile_trigger(ProfileState *ps)
   mask = g->hookmask;
   if (!(mask & (HOOK_PROFILE|HOOK_VMEVENT))) {  /* Set profile hook. */
     int st = g->vmstate;
-    ps->vmstate = st >= 0 ? 'N' :
+    ps->vmstate = st >= 0 ? 256+st :
 		  st == ~LJ_VMST_INTERP ? 'I' :
 		  st == ~LJ_VMST_C ? 'C' :
 		  st == ~LJ_VMST_GC ? 'G' : 'J';
@@ -176,29 +190,178 @@ static void profile_signal(int sig)
   profile_trigger(&profile_state);
 }
 
+
+static int perf_event_open(struct perf_event_attr *attr,
+			   pid_t pid, int cpu, int group_fd,
+			   unsigned long flags)
+{
+  return syscall(SYS_perf_event_open, attr, pid, cpu, group_fd, flags);
+}
+
+
+static void register_prof_events(ProfileState *ps)
+{
+  struct flavour_t {
+    char *name; uint32_t type; uint64_t config;
+  };
+
+  static struct flavour_t flavours[] =
+      {
+	{ "sw-cpu-clock",
+	  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CPU_CLOCK },
+
+	{ "sw-context-switches",
+	  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_CONTEXT_SWITCHES },
+
+	{ "sw-page-faults",
+	  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS },
+
+	{ "sw-minor-page-faults",
+	  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MIN },
+
+	{ "sw-major-page-faults",
+	  PERF_TYPE_SOFTWARE, PERF_COUNT_SW_PAGE_FAULTS_MAJ },
+
+	{ "branch-instructions",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS },
+
+	{ "cpu-cycles",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CPU_CYCLES },
+
+	{ "instructions",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_INSTRUCTIONS },
+
+	{ "cache-references",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_REFERENCES },
+
+	{ "cache-misses",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_CACHE_MISSES },
+
+	{ "branch-instructions",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_INSTRUCTIONS },
+
+	{ "branch-misses",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BRANCH_MISSES },
+
+	{ "bus-cycles",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_BUS_CYCLES },
+
+	{ "stalled-cycles-frontend",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_FRONTEND },
+
+	{ "stalled-cycles-backend",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_STALLED_CYCLES_BACKEND },
+
+	{ "cpu-cycles",
+	  PERF_TYPE_HARDWARE, PERF_COUNT_HW_REF_CPU_CYCLES },
+
+	{ 0, 0, 0 }
+  };
+
+
+  struct perf_event_attr attr = { };
+
+  memset(&attr, 0, sizeof(struct perf_event_attr));
+
+  const struct flavour_t *f;
+  for (f = flavours; f->name != 0; f++)
+    {
+      if (strcmp (ps->flavour, f->name) == 0)
+	{
+	  attr.type = f->type;
+	  attr.config = f->config;
+	  break;
+	}
+    }
+
+  if (strcmp (ps->flavour, "?") == 0)
+    {
+      const struct flavour_t *f;
+      fprintf (stderr, "I know: ");
+      for (f = flavours; f->name != 0; f++)
+	fprintf (stderr, "%s ", f->name);
+      fprintf(stderr, "\n");
+    }
+  else if (! f->name)
+    {
+      fprintf (stderr, "unknown profiling flavour `%s', S[?] to list\n", ps->flavour);
+    }
+
+  attr.size = sizeof(struct perf_event_attr);
+  attr.sample_type = PERF_SAMPLE_IP;
+  /* attr.read_format = PERF_FORMAT_GROUP | PERF_FORMAT_ID; */
+  attr.disabled=1;
+  attr.pinned=1;
+  attr.exclude_kernel=1;
+  attr.exclude_hv=1;
+
+  attr.sample_period = ps->interval;
+  /* attr.watermark=0; */
+  /* attr.wakeup_events=1; */
+  
+  int fd = perf_event_open(&attr, 0, -1, -1, 0);
+  if (fd == -1)
+    {
+      printf ("! perf_event_open %m\n");
+    }
+
+  ps->perf_event_fd = fd;
+
+  fcntl(fd, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC);
+  fcntl(fd, F_SETSIG, SIGPROF);
+  fcntl(fd, F_SETOWN, getpid());
+
+  ioctl(fd, PERF_EVENT_IOC_RESET, 0);
+
+  int err = ioctl(fd, PERF_EVENT_IOC_ENABLE, 0);
+  if (err != 0)
+    printf ("! perf_events enable\n");
+}
+
+
+
 /* Start profiling timer. */
 static void profile_timer_start(ProfileState *ps)
 {
-  int interval = ps->interval;
-  struct itimerval tm;
-  struct sigaction sa;
-  tm.it_value.tv_sec = tm.it_interval.tv_sec = interval / 1000;
-  tm.it_value.tv_usec = tm.it_interval.tv_usec = (interval % 1000) * 1000;
-  setitimer(ITIMER_PROF, &tm, NULL);
-  sa.sa_flags = SA_RESTART;
-  sa.sa_handler = profile_signal;
+  struct sigaction sa = {
+    .sa_flags = SA_RESTART,
+    .sa_handler = profile_signal
+  };
+
   sigemptyset(&sa.sa_mask);
   sigaction(SIGPROF, &sa, &ps->oldsa);
+
+  if (strcmp(ps->flavour, "vanilla") == 0)
+    {
+      int interval = ps->interval;
+      struct itimerval tm;
+      tm.it_value.tv_sec = tm.it_interval.tv_sec = interval / 1000;
+      tm.it_value.tv_usec = tm.it_interval.tv_usec = (interval % 1000) * 1000;
+      setitimer(ITIMER_PROF, &tm, NULL);
+    }
+  else
+    {
+      register_prof_events(ps);
+    }
 }
+
+
 
 /* Stop profiling timer. */
 static void profile_timer_stop(ProfileState *ps)
 {
-  struct itimerval tm;
-  tm.it_value.tv_sec = tm.it_interval.tv_sec = 0;
-  tm.it_value.tv_usec = tm.it_interval.tv_usec = 0;
-  setitimer(ITIMER_PROF, &tm, NULL);
-  sigaction(SIGPROF, &ps->oldsa, NULL);
+  if (ps->perf_event_fd)
+    {
+      ioctl(ps->perf_event_fd, PERF_EVENT_IOC_DISABLE, 0);
+    }
+  else
+    {
+      struct itimerval tm;
+      tm.it_value.tv_sec = tm.it_interval.tv_sec = 0;
+      tm.it_value.tv_usec = tm.it_interval.tv_usec = 0;
+      setitimer(ITIMER_PROF, &tm, NULL);
+      sigaction(SIGPROF, &ps->oldsa, NULL);
+    }
 }
 
 #elif LJ_PROFILE_PTHREAD
@@ -300,6 +463,8 @@ LUA_API void luaJIT_profile_start(lua_State *L, const char *mode,
 {
   ProfileState *ps = &profile_state;
   int interval = LJ_PROFILE_INTERVAL_DEFAULT;
+  char *flavour;
+
   while (*mode) {
     int m = *mode++;
     switch (m) {
@@ -315,6 +480,13 @@ LUA_API void luaJIT_profile_start(lua_State *L, const char *mode,
       lj_trace_flushall(L);
       break;
 #endif
+    case 'S':
+      {
+	int k;
+	if (sscanf (mode, "[%m[^]]]%n", &flavour, &k) > 0)
+	  mode += k;
+      }
+
     default:  /* Ignore unknown mode chars. */
       break;
     }
@@ -328,6 +500,7 @@ LUA_API void luaJIT_profile_start(lua_State *L, const char *mode,
   ps->cb = cb;
   ps->data = data;
   ps->samples = 0;
+  ps->flavour = flavour;
   lj_buf_init(L, &ps->sb);
   profile_timer_start(ps);
 }

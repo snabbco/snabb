@@ -36,6 +36,7 @@
 --   G  Produce raw output suitable for graphical tools (e.g. flame graphs).
 --   m<number> Minimum sample percentage to be shown. Default: 3.
 --   i<number> Sampling interval in milliseconds. Default: 10.
+--   S[<string>] Events source if performace events are enabled
 --
 ----------------------------------------------------------------------------
 
@@ -44,6 +45,8 @@ local jit = require("jit")
 assert(jit.version_num == 20100, "LuaJIT core/library version mismatch")
 local profile = require("jit.profile")
 local vmdef = require("jit.vmdef")
+local jutil = require("jit.util")
+local dump = require("jit.dump")
 local math = math
 local pairs, ipairs, tonumber, floor = pairs, ipairs, tonumber, math.floor
 local sort, format = table.sort, string.format
@@ -74,7 +77,38 @@ local function prof_cb(th, samples, vmmode)
   -- Collect keys for sample.
   if prof_states then
     if prof_states == "v" then
-      key_state = map_vmmode[vmmode] or vmmode
+      if map_vmmode[vmmode] then
+        key_state = map_vmmode[vmmode]
+      else
+         -- Sampling a trace: make an understandable one-line description.
+         local tr = tonumber(vmmode)
+         local info = jutil.traceinfo(tr)
+         local extra = dump.info[tr]
+         -- Show the parent of this trace (if this is a side trace)
+         local parent = ""
+         if extra and extra.otr and extra.oex then
+            parent = "("..extra.otr.."/"..extra.oex..")"
+         end
+         -- Show what the end of the trace links to (e.g. loop or other trace)
+         local lnk = ""
+         local link, ltype = info.link, info.linktype
+         if     link == tr or link == 0 then lnk = "->"..ltype
+         elseif ltype == "root"         then lnk = "->"..link
+         else                                lnk = "->"..link.." "..ltype end
+         -- Show the current zone (if zone profiling is enabled)
+         local z = ""
+         if zone and zone:get() then
+            z = (" %-16s"):format(zone:get())
+         end
+         -- Show the source location where the trace starts
+         local loc = ""
+         if extra and extra.func then
+            local fi = jutil.funcinfo(extra.func, extra.pc)
+            if fi.loc then loc = fi.loc end
+         end
+         local s = ("TRACE %3d %-8s %-10s%s %s"):format(vmmode, parent, lnk, z, loc)
+         key_state = map_vmmode[vmmode] or s
+      end
     else
       key_state = zone:get() or "(none)"
     end
@@ -243,15 +277,18 @@ end
 -- Start profiling.
 local function prof_start(mode)
   local interval = ""
-  mode = mode:gsub("i%d*", function(s) interval = s; return "" end)
+  mode = mode:gsub("i%d+", function(s) interval = s; return "" end)
   prof_min = 3
   mode = mode:gsub("m(%d+)", function(s) prof_min = tonumber(s); return "" end)
   prof_depth = 1
   mode = mode:gsub("%-?%d+", function(s) prof_depth = tonumber(s); return "" end)
+  local flavour = "S[vanilla]"
+  mode = mode:gsub("S%[.+%]", function(s) flavour = s; return "" end)
+
   local m = {}
   for c in mode:gmatch(".") do m[c] = c end
-  prof_states = m.z or m.v
-  if prof_states == "z" then zone = require("jit.zone") end
+  prof_states = m.v or m.z
+  if m.z == "z" then zone = require("jit.zone") end
   local scope = m.l or m.f or m.F or (prof_states and "" or "f")
   local flags = (m.p or "")
   prof_raw = m.r
@@ -285,7 +322,7 @@ local function prof_start(mode)
   prof_count1 = {}
   prof_count2 = {}
   prof_samples = 0
-  profile.start(scope:lower()..interval, prof_cb)
+  profile.start(scope:lower()..interval..flavour, prof_cb)
   prof_ud = newproxy(true)
   getmetatable(prof_ud).__gc = prof_finish
 end
