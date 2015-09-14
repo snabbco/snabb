@@ -1,0 +1,9 @@
+# Lua isn't a supported language; using fake-erlang, as per
+# http://thejacklawson.com/2012/09/lua-testing-with-busted-and-travis-ci/
+language: erlang
+
+before_install: git submodule update --init
+
+install: sudo apt-get install libpcap-dev
+
+script: make && make check
