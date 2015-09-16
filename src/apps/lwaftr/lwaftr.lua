@@ -6,6 +6,7 @@ local icmp = require("apps.lwaftr.icmp")
 local lwconf = require("apps.lwaftr.conf")
 local lwutil = require("apps.lwaftr.lwutil")
 
+local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
@@ -43,7 +44,7 @@ end
 -- TODO: make this O(1), and seriously optimize it for cache lines
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    if debug then
-      print(ipv4_ip, 'port: ', port)
+      print(lwutil.format_ipv4(ipv4_ip), 'port: ', port, string.format("%x", port))
       lwutil.pp(self.binding_table)
    end
    for i=1,#self.binding_table do
@@ -178,7 +179,6 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                                  hop_limit = constants.default_ttl,
                                  src = ipv6_src,
                                  dst = ipv6_dst})
-   if debug then lwutil.pp(ipv6_hdr) end
    -- The API makes setting the payload length awkward; set it manually
    -- Todo: less awkward way to write 16 bits of a number into cdata
    pkt.data[4] = rshift(payload_len, 8)
@@ -246,6 +246,55 @@ function LwAftr:_add_ethernet_header(dgram, eth_params)
    eth_hdr:free()
 end
 
+function LwAftr:_icmpv4_incoming(pkt)
+   local icmp_base = constants.ethernet_header_size + constants.ipv4_header_size
+   local ip_base = icmp_base + constants.icmp_base_size
+   local icmp_type_offset = icmp_base -- it's the zeroeth byte of the ICMP header
+   local icmp_type = pkt.data[icmp_type_offset]
+   local source_port, ipv4_dst
+
+   -- RFC 7596 is silent on whether to validate echo request/reply checksums.
+   -- ICMP checksums SHOULD be validated according to RFC 5508.
+   -- Choose to verify the echo reply/request ones too.
+   -- Note: the lwaftr SHOULD NOT validate the transport checksum of the embedded packet.
+   -- Were it to nonetheless do so, RFC 4884 extension headers MUST NOT
+   -- be taken into account when validating the checksum
+   local o_tl = constants.ethernet_header_size + constants.o_ipv4_total_length
+   local icmp_bytes = C.ntohs(ffi.cast("uint16_t*", pkt.data + o_tl)[0]) - constants.ipv4_header_size
+   if checksum.ipsum(pkt.data + icmp_base, icmp_bytes, 0) ~= 0 then
+      packet.free(pkt)
+      return empty, empty -- Silently drop the packet, as per RFC 5508
+   end
+
+   -- checksum was ok
+   if icmp_type == constants.icmpv4_echo_reply or icmp_type == constants.icmpv4_echo_request then
+      source_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + icmp_base + constants.o_icmpv4_echo_identifier)[0])
+      -- Use the outermost IP header for the destination; it's not repeated in the payload
+      ipv4_dst = ffi.cast("uint32_t*", pkt.data + constants.ethernet_header_size + constants.ipv4_dst_addr)[0]
+   else
+      -- source port is the zeroeth byte of an encapsulated tcp or udp packet
+      -- TODO: explicitly check for tcp/udp?
+      -- As per REQ-3, use the ip address embedded in the ICMP payload
+      -- The Internet Header Length is the low 4 bits, in 32-bit words; convert it to bytes
+      local embedded_ipv4_header_size = bit.band(pkt.data[ip_base + constants.o_ipv4_ver_and_ihl], 0xf) * 4
+      local o_sp = ip_base + embedded_ipv4_header_size
+      source_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + o_sp)[0])
+      local o_ip = ip_base + constants.ipv4_src_addr
+      ipv4_dst = ffi.cast("uint32_t*", pkt.data + o_ip)[0]
+   end
+   -- IPs are stored in network byte order in the binding table
+   local ipv6_dst, ipv6_src = self:binding_lookup_ipv4(ipv4_dst, source_port)
+   if not ipv6_dst then
+      -- No match found in the binding table; the packet MUST be discarded
+      packet.free(pkt)
+      return empty, empty
+   end
+   -- Otherwise, the packet MUST be forwarded
+   local next_hdr = constants.proto_ipv4
+   return self:ipv6_encapsulate(pkt, next_hdr, ipv6_src, ipv6_dst,
+                                self.aftr_mac_b4_side, self.b4_mac)
+end
+
 local function decrement_ttl(pkt)
    local ttl_offset = constants.ethernet_header_size + constants.ipv4_ttl
    pkt.data[ttl_offset] = pkt.data[ttl_offset] - 1
@@ -260,6 +309,20 @@ end
 -- TODO: correctly deal with IPv6 packets that need to be fragmented
 -- The incoming packet is a complete one with ethernet headers.
 function LwAftr:_encapsulate_ipv4(pkt)
+   -- Check incoming ICMP -first-, because it has different binding table lookup logic
+   -- than other protocols.
+   local proto_offset = constants.ethernet_header_size + constants.ipv4_proto
+   local proto = pkt.data[proto_offset]
+   if proto == constants.proto_icmp then
+      if self.icmp_incoming_policy == lwconf.policies['DROP'] then
+         packet.free(pkt)
+         return empty, empty
+      else
+         return self:_icmpv4_incoming(pkt)
+      end
+   end
+
+   -- It's not incoming ICMP; back to regular processing
    local ipv6_dst, ipv6_src = self:binding_lookup_ipv4_from_pkt(pkt, constants.ethernet_header_size)
    if not ipv6_dst then
       if debug then print("lookup failed") end
@@ -279,9 +342,12 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local ether_src = self.aftr_mac_b4_side 
    local ether_dst = self.b4_mac -- FIXME: this should probaby use NDP
 
-   local ttl = decrement_ttl(pkt)
    -- Do not encapsulate packets that now have a ttl of zero or wrapped around
-   if ttl == 0 or ttl == 255 then -- TODO: make this conditional on icmp_policy?
+   local ttl = decrement_ttl(pkt)
+   if ttl == 0 or ttl == 255 then
+      if self.icmp_outgoing_policy == lwconf.policies['DROP'] then
+         return empty, empty
+      end
       local icmp_config = {type = constants.icmpv4_time_exceeded,
                            code = constants.icmpv4_ttl_exceeded_in_transit,
                            payload_p = pkt.data + constants.ethernet_header_size,
@@ -292,18 +358,6 @@ function LwAftr:_encapsulate_ipv4(pkt)
       return ttl0_icmp, empty
    end
  
-   local proto_offset = constants.ethernet_header_size + constants.ipv4_proto
-   local proto = pkt.data[proto_offset]
-
-   if proto == constants.proto_icmp then
-      if self.icmp_policy == lwconf.policies['DROP'] then
-         packet.free(pkt)
-         return empty, empty
-      else
-         return self:_icmpv4_incoming(pkt)
-      end
-   end
-
    local next_hdr = constants.proto_ipv4
    return self:ipv6_encapsulate(pkt, next_hdr, ipv6_src, ipv6_dst,
                                 ether_src, ether_dst)
@@ -403,7 +457,6 @@ end
 -- loops; handle unusual cases (ie, ICMP going through the same interface as it
 -- was received from) where they occur.
 -- TODO: handle fragmentation elsewhere too?
-local app = require('core.app')
 function LwAftr:push ()
    local i4, o4 = self.input.v4, self.output.v4
    local i6, o6 = self.input.v6, self.output.v6

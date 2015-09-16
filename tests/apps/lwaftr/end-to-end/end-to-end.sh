@@ -66,7 +66,7 @@ snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
 echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation, DF set, ICMP-3,4."
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
    ${TEST_BASE}/tcp-frominet-bound1494-DF.pcap  ${EMPTY} \
-   ${TEST_BASE}/tcp-frominet-bound1494-DF-ICMP34.pcap ${EMPTY}
+   ${TEST_BASE}/icmpv4-fromlwaftr-replyto-tcp-frominet-bound1494-DF.pcap ${EMPTY}
 
 echo "Testing: from-internet IPv4 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
@@ -129,5 +129,34 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
 # Test UDP input
 
 # Test ICMP inputs (with and without drop policy)
+echo "Testing: incoming ICMP echo request, matches binding table"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${TEST_BASE}/incoming-icmpv4-echo-request.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/ipv6-tunneled-incoming-icmpv4-echo-request.pcap
+
+echo "Testing: incoming ICMP echo request, matches binding table"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${TEST_BASE}/incoming-icmpv4-echo-request-invalid-icmp-checksum.pcap ${EMPTY} \
+   ${EMPTY} ${EMPTY}
+
+echo "Testing: incoming ICMP echo request, matches binding table, dropping ICMP"
+snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
+   ${TEST_BASE}/incoming-icmpv4-echo-request.pcap ${EMPTY} \
+   ${EMPTY} ${EMPTY}
+
+echo "Testing: incoming ICMP echo request, doesn't match binding table"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${TEST_BASE}/incoming-icmpv4-echo-request-unbound.pcap ${EMPTY} \
+   ${EMPTY} ${EMPTY}
+
+echo "Testing: incoming ICMP echo reply, matches binding table"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${TEST_BASE}/incoming-icmpv4-echo-reply.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/ipv6-tunneled-incoming-icmpv4-echo-reply.pcap
+
+echo "Testing: incoming ICMP 34 'too big' notification, matches binding table"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${TEST_BASE}/incoming-icmpv4-34toobig.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/ipv6-tunneled-incoming-icmpv4-34toobig.pcap
 
 echo "All end-to-end lwAFTR tests passed."

@@ -8,8 +8,9 @@ local bt = require("apps.lwaftr.binding_table")
 
 policies = {
    DROP = 1,
-   DISCARD_PLUS_ICMP = 2,
-   DISCARD_PLUS_ICMPv6 = 3
+   ALLOW = 2,
+   DISCARD_PLUS_ICMP = 3,
+   DISCARD_PLUS_ICMPv6 = 4
 }
 
 local aftrconf

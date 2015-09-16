@@ -53,6 +53,8 @@ ethernet_dst_addr = 0
 ethernet_src_addr = 6
 ethernet_ethertype = 12
 
+o_ipv4_ver_and_ihl = 0
+o_ipv4_total_length = 2
 ipv4_flags = 6
 ipv4_ttl = 8
 ipv4_proto = 9
@@ -67,6 +69,9 @@ ipv6_dst_addr = 24
 
 ipv6_frag_offset = 2
 ipv6_frag_id = 4
+
+o_icmpv4_checksum = 2
+o_icmpv4_echo_identifier = 4
 
 -- Config values
 default_ttl = 255
