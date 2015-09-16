@@ -10,7 +10,7 @@ fi
 
 # Simple test: Just make sure packetblaster runs for a period of time
 # (doesn't crash on startup).
-timeout 5 ./snabb packetblaster replay program/packetblaster/selftest.pcap ${SNABB_PCI0}
+timeout 5 ./snabb packetblaster replay program/snabbnfv/test_fixtures/pcap/64.pcap ${SNABB_PCI0}
 status=$?
 if [ $status != 124 ]; then
     echo "Error: expected timeout (124) but got ${status}"
