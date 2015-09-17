@@ -314,7 +314,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local proto_offset = constants.ethernet_header_size + constants.o_ipv4_proto
    local proto = pkt.data[proto_offset]
    if proto == constants.proto_icmp then
-      if self.icmp_incoming_policy == lwconf.policies['DROP'] then
+      if self.policy_icmpv4_incoming == lwconf.policies['DROP'] then
          packet.free(pkt)
          return empty, empty
       else
@@ -326,16 +326,14 @@ function LwAftr:_encapsulate_ipv4(pkt)
    local ipv6_dst, ipv6_src = self:binding_lookup_ipv4_from_pkt(pkt, constants.ethernet_header_size)
    if not ipv6_dst then
       if debug then print("lookup failed") end
-      if self.ipv4_lookup_failed_policy == lwconf.policies['DROP'] then
+      if self.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
          packet.free(pkt)
          return empty, empty -- lookup failed
-      elseif self.ipv4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMP'] then
+      else
          local src_ip_start = constants.ethernet_header_size + constants.o_ipv4_src_addr
          --local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
          local to_ip = pkt.data + src_ip_start
          return self:_icmp_after_discard(pkt, to_ip)-- ICMPv4 type 3 code 1 (dst/host unreachable)
-      else
-         error("LwAftr: unknown policy" .. self.ipv4_lookup_failed_policy)
       end
    end
 
@@ -345,7 +343,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
    -- Do not encapsulate packets that now have a ttl of zero or wrapped around
    local ttl = decrement_ttl(pkt)
    if ttl == 0 or ttl == 255 then
-      if self.icmp_outgoing_policy == lwconf.policies['DROP'] then
+      if self.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
          return empty, empty
       end
       local icmp_config = {type = constants.icmpv4_time_exceeded,
@@ -428,7 +426,7 @@ function LwAftr:from_b4(pkt)
                                            type = constants.ethertype_ipv4})
          return pkt, empty
       end
-   elseif self.from_b4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMPv6'] then
+   elseif self.policy_icmpv6_outgoing == lwconf.policies['ALLOW'] then
       local _, icmp_pkt = self:_icmp_b4_lookup_failed(pkt, ipv6_src_ip)
       packet.free(pkt)
       return empty, icmp_pkt
