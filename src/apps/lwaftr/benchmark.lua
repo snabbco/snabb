@@ -59,7 +59,7 @@ Rate(Mpps): {rate_mpps}
       local breaths = tonumber(engine.breaths)
       local bytes = input.txbytes
       -- Don't bother to report on interfaces that were boring
-      if bytes == 0 then return nil end
+      if bytes == 0 then return end
       local packets = input.txpackets
       local runtime = finish - start
       report(name, breaths, bytes, packets, runtime)
