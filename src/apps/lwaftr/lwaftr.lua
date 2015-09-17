@@ -196,7 +196,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
 
    -- Otherwise, fragment if possible
    local unfrag_header_size = constants.ethernet_header_size + constants.ipv6_fixed_header_size
-   local flags = pkt.data[unfrag_header_size + constants.ipv4_flags]
+   local flags = pkt.data[unfrag_header_size + constants.o_ipv4_flags]
    if band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
       -- According to RFC 791, the original packet must be discarded.
       -- Return a packet with ICMP(3, 4) and the appropriate MTU
@@ -270,7 +270,7 @@ function LwAftr:_icmpv4_incoming(pkt)
    if icmp_type == constants.icmpv4_echo_reply or icmp_type == constants.icmpv4_echo_request then
       source_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + icmp_base + constants.o_icmpv4_echo_identifier)[0])
       -- Use the outermost IP header for the destination; it's not repeated in the payload
-      ipv4_dst = ffi.cast("uint32_t*", pkt.data + constants.ethernet_header_size + constants.ipv4_dst_addr)[0]
+      ipv4_dst = ffi.cast("uint32_t*", pkt.data + constants.ethernet_header_size + constants.o_ipv4_dst_addr)[0]
    else
       -- source port is the zeroeth byte of an encapsulated tcp or udp packet
       -- TODO: explicitly check for tcp/udp?
@@ -279,7 +279,7 @@ function LwAftr:_icmpv4_incoming(pkt)
       local embedded_ipv4_header_size = bit.band(pkt.data[ip_base + constants.o_ipv4_ver_and_ihl], 0xf) * 4
       local o_sp = ip_base + embedded_ipv4_header_size
       source_port = C.ntohs(ffi.cast("uint16_t*", pkt.data + o_sp)[0])
-      local o_ip = ip_base + constants.ipv4_src_addr
+      local o_ip = ip_base + constants.o_ipv4_src_addr
       ipv4_dst = ffi.cast("uint32_t*", pkt.data + o_ip)[0]
    end
    -- IPs are stored in network byte order in the binding table
@@ -296,10 +296,10 @@ function LwAftr:_icmpv4_incoming(pkt)
 end
 
 local function decrement_ttl(pkt)
-   local ttl_offset = constants.ethernet_header_size + constants.ipv4_ttl
+   local ttl_offset = constants.ethernet_header_size + constants.o_ipv4_ttl
    pkt.data[ttl_offset] = pkt.data[ttl_offset] - 1
    local ttl = pkt.data[ttl_offset]
-   local csum_offset = constants.ethernet_header_size + constants.ipv4_checksum
+   local csum_offset = constants.ethernet_header_size + constants.o_ipv4_checksum
    -- ttl_offset is even, so multiply the ttl change by 0x100.
    fixup_checksum(pkt, csum_offset, -0x100)
    return ttl
@@ -311,7 +311,7 @@ end
 function LwAftr:_encapsulate_ipv4(pkt)
    -- Check incoming ICMP -first-, because it has different binding table lookup logic
    -- than other protocols.
-   local proto_offset = constants.ethernet_header_size + constants.ipv4_proto
+   local proto_offset = constants.ethernet_header_size + constants.o_ipv4_proto
    local proto = pkt.data[proto_offset]
    if proto == constants.proto_icmp then
       if self.icmp_incoming_policy == lwconf.policies['DROP'] then
@@ -330,7 +330,7 @@ function LwAftr:_encapsulate_ipv4(pkt)
          packet.free(pkt)
          return empty, empty -- lookup failed
       elseif self.ipv4_lookup_failed_policy == lwconf.policies['DISCARD_PLUS_ICMP'] then
-         local src_ip_start = constants.ethernet_header_size + 12
+         local src_ip_start = constants.ethernet_header_size + constants.o_ipv4_src_addr
          --local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
          local to_ip = pkt.data + src_ip_start
          return self:_icmp_after_discard(pkt, to_ip)-- ICMPv4 type 3 code 1 (dst/host unreachable)
@@ -392,11 +392,11 @@ function LwAftr:from_b4(pkt)
    end
 
    -- check src ipv4, ipv6, and port against the binding table
-   local ipv6_src_ip_offset = constants.ethernet_header_size + constants.ipv6_src_addr
-   local ipv6_dst_ip_offset = constants.ethernet_header_size + constants.ipv6_dst_addr
+   local ipv6_src_ip_offset = constants.ethernet_header_size + constants.o_ipv6_src_addr
+   local ipv6_dst_ip_offset = constants.ethernet_header_size + constants.o_ipv6_dst_addr
    -- FIXME: deal with multiple IPv6 headers
    local ipv4_src_ip_offset = constants.ethernet_header_size + 
-      constants.ipv6_fixed_header_size + constants.ipv4_src_addr
+      constants.ipv6_fixed_header_size + constants.o_ipv4_src_addr
    -- FIXME: as above + varlen ipv4 + non-tcp/non-udp payloads
    local ipv4_src_port_offset = constants.ethernet_header_size + 
       constants.ipv6_fixed_header_size + constants.ipv4_header_size
@@ -463,10 +463,10 @@ function LwAftr:push ()
    while not link.empty(i4) and not link.full(o4) and not link.full(o6) do
       local pkt = link.receive(i4)
       if debug then print("got a pkt") end
-      local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + constants.ethernet_ethertype)[0])
+      local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0])
 
       if ethertype == constants.ethertype_ipv4 then -- Incoming packet from the internet
-         ffi.copy(self.scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.ipv4_src_addr, 4)
+         ffi.copy(self.scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.o_ipv4_src_addr, 4)
          local v4_pkts, v6_pkts = self:_encapsulate_ipv4(pkt)
          transmit_pkts(v4_pkts, link, o4)
          transmit_pkts(v6_pkts, link, o6)
@@ -476,7 +476,7 @@ function LwAftr:push ()
    while not link.empty(i6) and not link.full(o4) and not link.full(o6) do
       local pkt = link.receive(i6)
       if debug then print("got a pkt") end
-      local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + constants.ethernet_ethertype)[0])
+      local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0])
       local out_pkt = nil
       if ethertype == constants.ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin/ICMPv6 as needed
