@@ -140,6 +140,14 @@ function intel1g:new (conf)
       local tdh, tdt = 0, 0     -- Cache of DMA head/tail indexes
       local txdesc_flags = bits({ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24})
 
+      -- Initialize transmit queue
+      poke32(r.TDBAL, tophysical(txdesc) % 2^32)
+      poke32(r.TDBAH, tophysical(txdesc) / 2^32)
+      poke32(r.TDLEN, ndesc)
+      set32(r.TCTL, 2)
+      poke32(r.TXDCTL, {wthresh=16, enable=25})
+      poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
+
       -- Return true if we can enqueue another packet for transmission.
       local function can_transmit ()
          return ringnext(tdt) ~= tdh
@@ -150,7 +158,7 @@ function intel1g:new (conf)
       local function transmit (p)
          txdesc[tdt].address = tophysical(p.data)
          txdesc[tdt].flags = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
-         txpackets[tdt] = packet
+         txpackets[tdt] = p
          tdt = ringnext(tdt)
       end
 
@@ -160,8 +168,10 @@ function intel1g:new (conf)
          local cursor = tdh
          tdh = peek32(r.TDH)
          while cursor ~= tdh do
-            packet.free(packets[cursor])
-            packets[cursor] = nil
+            if txpackets[cursor] then
+               packet.free(txpackets[cursor])
+               txpackets[cursor] = nil
+            end
             cursor = ringnext(cursor)
          end
          poke32(r.TDT, tdt)
@@ -212,6 +222,12 @@ function intel1g:new (conf)
       -- Receive state
       local rxpackets = {}
       local rdh, rdt, rxnext = 0, 0, 0
+
+      -- Initialize receive queue
+      poke32(r.RDBAL, tophysical(rxdesc) % 2^32)
+      poke32(r.RDBAH, tophysical(rxdesc) / 2^32)
+      poke32(r.RDLEN, ndesc)
+      
 
       -- Return true if we can enqueue another packet buffer.
       local function can_add_receive_buffer ()
@@ -298,11 +314,11 @@ function selftest ()
    print(basic.Source, basic.Sink, intel1g)
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
-   config.app(c, "nic", intel1g, {pciaddr=pciaddr})
+   config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
    config.link(c, "source.tx->nic.rx")
    config.link(c, "nic.tx->sink.rx")
    engine.configure(c)
-   engine.main({duration = 1.0, report = {showapps = true, showlinks = true}})
+   engine.main({duration = 0.1, report = {showapps = true, showlinks = true}})
    print("selftest: ok")
 end
 
