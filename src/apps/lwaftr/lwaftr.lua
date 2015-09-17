@@ -131,11 +131,9 @@ end
 function LwAftr:_icmp_after_discard(pkt, to_ip)
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_host_unreachable,
-                        payload_p = pkt.data + constants.ethernet_header_size,
-                        payload_len = constants.icmpv4_default_payload_size,
                         }
    local icmp_dis = icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
-                                           self.aftr_ipv4_ip, to_ip, icmp_config)
+                                           self.aftr_ipv4_ip, to_ip, pkt, icmp_config)
    return icmp_dis, empty
 end
 
@@ -154,11 +152,9 @@ function LwAftr:_icmp_b4_lookup_failed(pkt, to_ip)
    end
    local icmp_config = {type = constants.icmpv6_dst_unreachable,
                         code = constants.icmpv6_failed_ingress_egress_policy,
-                        payload_p = pkt.data + constants.ethernet_header_size,
-                        payload_len = plen
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(self.aftr_mac_b4_side, self.b4_mac, self.aftr_ipv6_ip,
-                                              to_ip, icmp_config)
+                                              to_ip, pkt, icmp_config)
    return empty, b4fail_icmp
 end
 
@@ -204,12 +200,11 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
       if debug then lwutil.print_pkt(pkt) end
       local icmp_config = {type = constants.icmpv4_dst_unreachable,
                            code = constants.icmpv4_datagram_too_big_df,
-                           payload_p = pkt.data + constants.ethernet_header_size + constants.ipv6_fixed_header_size,
-                           payload_len = constants.icmpv4_default_payload_size,
+                           extra_payload_offset = constants.ipv6_fixed_header_size,
                            next_hop_mtu = self.ipv6_mtu - constants.ipv6_fixed_header_size
                            }
       local icmp_pkt = icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
-                                              self.aftr_ipv4_ip, self.scratch_ipv4, icmp_config)
+                                              self.aftr_ipv4_ip, self.scratch_ipv4, pkt, icmp_config)
       packet.free(pkt)
       return icmp_pkt, empty
    end
@@ -348,11 +343,9 @@ function LwAftr:_encapsulate_ipv4(pkt)
       end
       local icmp_config = {type = constants.icmpv4_time_exceeded,
                            code = constants.icmpv4_ttl_exceeded_in_transit,
-                           payload_p = pkt.data + constants.ethernet_header_size,
-                           payload_len = constants.icmpv4_default_payload_size
                            }
       local ttl0_icmp =  icmp.new_icmpv4_packet(self.aftr_mac_inet_side, self.inet_mac,
-                                                self.aftr_ipv4_ip, self.scratch_ipv4, icmp_config)
+                                                self.aftr_ipv4_ip, self.scratch_ipv4, pkt, icmp_config)
       return ttl0_icmp, empty
    end
  

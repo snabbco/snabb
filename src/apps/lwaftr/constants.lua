@@ -43,10 +43,9 @@ ipv4_header_size = 20
 ipv6_fixed_header_size = 40
 ipv6_frag_header_size = 8
 
-icmp_base_size = 8 -- size excluding the IP header
-icmp_orig_datagram = 8 -- as per RFC792; IP header + 8 octects original datagram
-icmpv4_default_payload_size = ipv4_header_size + icmp_orig_datagram
-icmpv4_total_size =  icmp_base_size + icmpv4_default_payload_size
+icmp_base_size = 8 -- size excluding the IP header/playload
+max_icmpv4_packet_size = 576 -- RFC 1812
+max_icmpv6_packet_size = 1280
 
 -- Offsets, 0-indexed
 o_ethernet_dst_addr = 0
