@@ -18,9 +18,9 @@ REASSEMBLY_OK = 1
 FRAGMENT_MISSING = 2
 REASSEMBLY_INVALID = 3
 
-local ipv6_payload_len = constants.ethernet_header_size + constants.ipv6_payload_len
-local frag_id_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_id
-local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_offset
+local ipv6_payload_len = constants.ethernet_header_size + constants.o_ipv6_payload_len
+local frag_id_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_id
+local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
 
 local dgram = datagram:new()
 
@@ -29,7 +29,7 @@ local function compare_fragment_offsets(pkt1, pkt2)
 end
 
 function is_ipv6_fragment(pkt)
-   return pkt.data[constants.ethernet_header_size + constants.ipv6_next_header] == constants.ipv6_frag
+   return pkt.data[constants.ethernet_header_size + constants.o_ipv6_next_header] == constants.ipv6_frag
 end
 
 function get_ipv6_frag_id(pkt)
@@ -75,10 +75,12 @@ local function _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_
    -- The first byte of the fragment header is the next header type
    local first_fragment = fragments[1]
    local ipv6_next_header = first_fragment.data[constants.ethernet_header_size + constants.ipv6_fixed_header_size]
-   local eth_src = first_fragment.data + constants.ethernet_src_addr
-   local eth_dst = first_fragment.data + constants.ethernet_dst_addr
-   local ipv6_src = first_fragment.data + constants.ethernet_header_size + constants.ipv6_src_addr
-   local ipv6_dst = first_fragment.data + constants.ethernet_header_size + constants.ipv6_dst_addr
+   local eth_src = first_fragment.data + constants.o_ethernet_src_addr
+   local eth_dst = first_fragment.data + constants.o_ethernet_dst_addr
+   local ipv6_src = first_fragment.data + constants.ethernet_header_size + constants.o_ipv6_src_addr
+
+   local ipv6_dst = first_fragment.data + constants.ethernet_header_size + constants.o_ipv6_dst_addr
+
 
    local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
    local eth_header = ethernet:new({src = eth_src, dst = eth_dst, type = constants.ethertype_ipv6})
@@ -206,7 +208,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    local frag_id = fresh_frag_id()
    write_ipv6_frag_header(ipv6_pkt.data, unfrag_header_size, fnext_header, 0, more, frag_id)
    ipv6_pkt.data[next_header_idx] = constants.ipv6_frag
-   ffi.cast("uint16_t*", ipv6_pkt.data + constants.ethernet_header_size + constants.ipv6_payload_len)[0] =
+   ffi.cast("uint16_t*", ipv6_pkt.data + constants.ethernet_header_size + constants.o_ipv6_payload_len)[0] =
       C.htons(payload_bytes_per_packet + constants.ipv6_frag_header_size)
    local raw_frag_offset = payload_bytes_per_packet
 
@@ -233,7 +235,8 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    ffi.copy(last_pkt.data + new_header_size,
             ipv6_pkt.data + new_header_size + raw_frag_offset,
             last_payload_len)
-   ffi.cast("uint16_t*", last_pkt.data + constants.ethernet_header_size + constants.ipv6_payload_len)[0] =
+   ffi.cast("uint16_t*", last_pkt.data + constants.ethernet_header_size + constants.o_ipv6_payload_len)[0] =
+
       C.htons(last_payload_len + constants.ipv6_frag_header_size)
    last_pkt.length = new_header_size + last_payload_len
    pkts[num_packets] = last_pkt

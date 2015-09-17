@@ -49,26 +49,26 @@ icmpv4_default_payload_size = ipv4_header_size + icmp_orig_datagram
 icmpv4_total_size =  icmp_base_size + icmpv4_default_payload_size
 
 -- Offsets, 0-indexed
-ethernet_dst_addr = 0
-ethernet_src_addr = 6
-ethernet_ethertype = 12
+o_ethernet_dst_addr = 0
+o_ethernet_src_addr = 6
+o_ethernet_ethertype = 12
 
 o_ipv4_ver_and_ihl = 0
 o_ipv4_total_length = 2
-ipv4_flags = 6
-ipv4_ttl = 8
-ipv4_proto = 9
-ipv4_checksum = 10
-ipv4_src_addr = 12
-ipv4_dst_addr = 16
+o_ipv4_flags = 6
+o_ipv4_ttl = 8
+o_ipv4_proto = 9
+o_ipv4_checksum = 10
+o_ipv4_src_addr = 12
+o_ipv4_dst_addr = 16
 
-ipv6_payload_len = 4
-ipv6_next_header = 6
-ipv6_src_addr = 8
-ipv6_dst_addr = 24
+o_ipv6_payload_len = 4
+o_ipv6_next_header = 6
+o_ipv6_src_addr = 8
+o_ipv6_dst_addr = 24
 
-ipv6_frag_offset = 2
-ipv6_frag_id = 4
+o_ipv6_frag_offset = 2
+o_ipv6_frag_id = 4
 
 o_icmpv4_checksum = 2
 o_icmpv4_echo_identifier = 4

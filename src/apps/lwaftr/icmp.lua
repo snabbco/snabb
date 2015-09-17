@@ -70,7 +70,7 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, config)
    ipv4_header:free()
    write_icmp(new_pkt, config, 0)
 
-   local ip_checksum_p = new_pkt.data + constants.ethernet_header_size + constants.ipv4_checksum
+   local ip_checksum_p = new_pkt.data + constants.ethernet_header_size + constants.o_ipv4_checksum
    ffi.cast("uint16_t*", ip_checksum_p)[0] = 0 -- zero out the checksum before recomputing
    local csum = checksum.ipsum(new_pkt.data + constants.ethernet_header_size, ipv4_header:total_length(), 0)
    ffi.cast("uint16_t*", ip_checksum_p)[0] = C.htons(csum)
