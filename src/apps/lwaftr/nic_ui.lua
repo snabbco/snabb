@@ -15,10 +15,7 @@ local usage="thisapp binding_table_file conf_file inet_nic_pci b4side_nic_pci"
 
 function run (parameters)
    if not (#parameters == 4) then print(usage) main.exit(1) end
-   local bt_file = parameters[1]
-   local conf_file = parameters[2]
-   local inet_nic_pci = parameters[3]
-   local b4side_nic_pci = parameters[4]
+   local bt_file, conf_file, inet_nic_pci, b4side_nic_pci = unpack(parameters)
 
    -- It's essential to initialize the binding table before the aftrconf
    bt.get_binding_table(bt_file)
@@ -37,12 +34,6 @@ function run (parameters)
    config.app(c, "lwaftr", lwaftr.LwAftr, aftrconf)
    print("gh4")
 
---[[
-   config.link(c, 'inetNic.irx -> lwaftr.v4')
-   config.link(c, 'b4sideNic.brx -> lwaftr.v6')
-   config.link(c, 'lwaftr.v4 -> inetNic.itx')
-   config.link(c, 'lwaftr.v6 -> b4sideNic.btx')
---]]
    config.link(c, 'inetNic.rx -> lwaftr.v4')
    config.link(c, 'b4sideNic.rx -> lwaftr.v6')
    config.link(c, 'lwaftr.v4 -> inetNic.tx')
