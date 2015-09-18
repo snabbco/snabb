@@ -454,9 +454,10 @@ function LwAftr:push ()
    while not link.empty(i4) and not link.full(o4) and not link.full(o6) do
       local pkt = link.receive(i4)
       if debug then print("got a pkt") end
-      local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0])
+      -- Keep the ethertype in network byte order
+      local ethertype = ffi.cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0]
 
-      if ethertype == constants.ethertype_ipv4 then -- Incoming packet from the internet
+      if ethertype == constants.n_ethertype_ipv4 then -- Incoming packet from the internet
          ffi.copy(self.scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.o_ipv4_src_addr, 4)
          local v4_pkts, v6_pkts = self:_encapsulate_ipv4(pkt)
          transmit_pkts(v4_pkts, link, o4)
@@ -467,9 +468,9 @@ function LwAftr:push ()
    while not link.empty(i6) and not link.full(o4) and not link.full(o6) do
       local pkt = link.receive(i6)
       if debug then print("got a pkt") end
-      local ethertype = C.ntohs(ffi.cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0])
+      local ethertype = ffi.cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0]
       local out_pkt = nil
-      if ethertype == constants.ethertype_ipv6 then
+      if ethertype == constants.n_ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin/ICMPv6 as needed
          local v4_pkts, v6_pkts = self:from_b4(pkt)
          transmit_pkts(v4_pkts, link, o4)
