@@ -16,6 +16,9 @@ proto_icmpv6 = 58
 ethertype_ipv4 = 0x0800
 ethertype_ipv6 = 0x86DD
 
+n_ethertype_ipv4 = C.htons(0x0800)
+n_ethertype_ipv6 = C.htons(0x86DD)
+
 -- ICMPv4 types
 icmpv4_echo_reply = 0
 icmpv4_dst_unreachable = 3
