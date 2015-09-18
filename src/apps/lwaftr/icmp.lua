@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
-local lwutil = require("apps.lwaftr.lwutil")
 
 local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")

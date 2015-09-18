@@ -4,7 +4,7 @@ local constants = require("apps.lwaftr.constants")
 local fragment = require("apps.lwaftr.fragment")
 local icmp = require("apps.lwaftr.icmp")
 local lwconf = require("apps.lwaftr.conf")
-local lwutil = require("apps.lwaftr.lwutil")
+local lwdebug = require("apps.lwaftr.lwdebug")
 
 local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
@@ -24,7 +24,7 @@ local empty = {}
 LwAftr = {}
 
 function LwAftr:new(conf)
-   if debug then lwutil.pp(conf) end
+   if debug then lwdebug.pp(conf) end
    local o = {}
    for k,v in pairs(conf) do
       o[k] = v
@@ -44,8 +44,8 @@ end
 -- TODO: make this O(1), and seriously optimize it for cache lines
 function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
    if debug then
-      print(lwutil.format_ipv4(ipv4_ip), 'port: ', port, string.format("%x", port))
-      lwutil.pp(self.binding_table)
+      print(lwdebug.format_ipv4(ipv4_ip), 'port: ', port, string.format("%x", port))
+      lwdebug.pp(self.binding_table)
    end
    for i=1,#self.binding_table do
       local bind = self.binding_table[i]
@@ -58,7 +58,7 @@ function LwAftr:binding_lookup_ipv4(ipv4_ip, port)
       end
    end
    if debug then
-      print("Nothing found for ipv4:port", lwutil.format_ipv4(ipv4_ip),
+      print("Nothing found for ipv4:port", lwdebug.format_ipv4(ipv4_ip),
       string.format("%i (0x%x)", port, port))
    end
 end
@@ -86,15 +86,15 @@ function LwAftr:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src
          if ipv4_src_port >= bind[3] and ipv4_src_port <= bind[4] then
             if debug then
                print("ipv6bind")
-               lwutil.print_ipv6(bind[1])
-               lwutil.print_ipv6(ipv6_src_ip)
+               lwdebug.print_ipv6(bind[1])
+               lwdebug.print_ipv6(ipv6_src_ip)
             end
             if C.memcmp(bind[1], ipv6_src_ip, 16) == 0 then
                local expected_dst = self:_get_lwAFTR_ipv6(bind)
                if debug then
                   print("DST_MEMCMP", expected_dst, ipv6_dst_ip)
-                  lwutil.print_ipv6(expected_dst)
-                  lwutil.print_ipv6(ipv6_dst_ip)
+                  lwdebug.print_ipv6(expected_dst)
+                  lwdebug.print_ipv6(ipv6_dst_ip)
                end
                if C.memcmp(expected_dst, ipv6_dst_ip, 16) == 0 then
                   return true
@@ -168,7 +168,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    self:_decapsulate(dgram, constants.ethernet_header_size)
    if debug then
       print("Original packet, minus ethernet:")
-      lwutil.print_pkt(pkt)
+      lwdebug.print_pkt(pkt)
    end
    local payload_len = pkt.length
    self:_add_ipv6_header(dgram, {next_header = next_hdr_type,
@@ -185,7 +185,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    if pkt.length <= self.ipv6_mtu then
       if debug then
          print("encapsulated packet:")
-         lwutil.print_pkt(pkt)
+         lwdebug.print_pkt(pkt)
       end
       return empty, pkt
    end
@@ -197,7 +197,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
       -- According to RFC 791, the original packet must be discarded.
       -- Return a packet with ICMP(3, 4) and the appropriate MTU
       -- as per https://tools.ietf.org/html/rfc2473#section-7.2
-      if debug then lwutil.print_pkt(pkt) end
+      if debug then lwdebug.print_pkt(pkt) end
       local icmp_config = {type = constants.icmpv4_dst_unreachable,
                            code = constants.icmpv4_datagram_too_big_df,
                            extra_payload_offset = constants.ipv6_fixed_header_size,
@@ -215,7 +215,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
       print("Encapsulated packet into fragments")
       for idx,fpkt in ipairs(pkts) do
          print(string.format("    Fragment %i", idx))
-         lwutil.print_pkt(fpkt)
+         lwdebug.print_pkt(fpkt)
       end
    end
    return empty, pkts
