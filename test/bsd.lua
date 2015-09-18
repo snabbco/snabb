@@ -266,7 +266,8 @@ test.bsd_extattr = {
     assert(S.unlink(tmpfile))
     local n, err = fd:extattr_get("user", "myattr", false) -- false does raw call with no buffer to return length
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
-    assert(not n and err.NOATTR)
+    assert(not n, "expected to fail")
+    assert(err.NOATTR, err)
     assert(fd:close())
   end,
   test_extattr_getsetdel_fd = function()
@@ -275,7 +276,8 @@ test.bsd_extattr = {
     assert(S.unlink(tmpfile))
     local n, err = fd:extattr_get("user", "myattr", false) -- false does raw call with no buffer to return length
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support extattr
-    assert(not n and err.NOATTR)
+    assert(not n, "expected to fail")
+    assert(err.NOATTR, err)
     local n, err = fd:extattr_set("user", "myattr", "myvalue")
     if not n and err.OPNOTSUPP then error "skipped" end -- fs does not support setting extattr
     assert(n, err)
