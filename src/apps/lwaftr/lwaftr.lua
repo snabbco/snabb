@@ -35,6 +35,46 @@ function LwAftr:new(conf)
    return setmetatable(o, {__index=LwAftr})
 end
 
+local function fixup_checksum(pkt, csum_offset, fixup_val)
+   assert(math.abs(fixup_val) <= 0xffff, "Invalid fixup")
+   local csum = bnot(C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0]))
+   if debug then print("old csum", string.format("%x", csum)) end
+   csum = csum + fixup_val
+   -- TODO/FIXME: *test* this code
+   -- Manually unrolled loop; max 2 iterations, extra iterations
+   -- don't hurt, bitops are fast and ifs are slow.
+   local overflow = rshift(csum, 16)
+   csum = band(csum, 0xffff) + overflow
+   local overflow = rshift(csum, 16)
+   csum = band(csum, 0xffff) + overflow
+   csum = bnot(csum)
+
+   if debug then print("new csum", string.format("%x", csum)) end
+   pkt.data[csum_offset] = rshift(csum, 8)
+   pkt.data[csum_offset + 1] = band(csum, 0xff)
+end
+
+local function decrement_ttl(pkt)
+   local ttl_offset = constants.ethernet_header_size + constants.o_ipv4_ttl
+   pkt.data[ttl_offset] = pkt.data[ttl_offset] - 1
+   local ttl = pkt.data[ttl_offset]
+   local csum_offset = constants.ethernet_header_size + constants.o_ipv4_checksum
+   -- ttl_offset is even, so multiply the ttl change by 0x100.
+   fixup_checksum(pkt, csum_offset, -0x100)
+   return ttl
+end
+
+local function get_ihl(pkt)
+   -- It's byte 0 of an IPv4 header
+   local ver_and_ihl = pkt.data[constants.ethernet_header_size]
+   return bit.band(ver_and_ihl, 0xf) * 4
+end
+
+local function get_ihl_from_offset(pkt, offset)
+   local ver_and_ihl = pkt.data[offset]
+   return bit.band(ver_and_ihl, 0xf) * 4
+end
+
 function LwAftr:_get_lwAFTR_ipv6(binding_entry)
    local lwaftr_ipv6 = binding_entry[5]
    if not lwaftr_ipv6 then lwaftr_ipv6 = self.aftr_ipv6_ip end
@@ -70,8 +110,7 @@ function LwAftr:binding_lookup_ipv4_from_pkt(pkt, pre_ipv4_bytes)
    -- Note: ip is kept in network byte order, regardless of host byte order
    local ip = ffi.cast("uint32_t*", pkt.data + dst_ip_start)[0]
    -- TODO: don't assume the length of the IPv4 header; check IHL
-   local ipv4_header_len = 20
-   local dst_port_start = pre_ipv4_bytes + ipv4_header_len + 2
+   local dst_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes) + 2
    local port = C.ntohs(ffi.cast("uint16_t*", pkt.data + dst_port_start)[0])
    return self:binding_lookup_ipv4(ip, port)
 end
@@ -104,25 +143,6 @@ function LwAftr:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src
       end
    end
    return false
-end
-
-local function fixup_checksum(pkt, csum_offset, fixup_val)
-   assert(math.abs(fixup_val) <= 0xffff, "Invalid fixup")
-   local csum = bnot(C.ntohs(ffi.cast("uint16_t*", pkt.data + csum_offset)[0]))
-   if debug then print("old csum", string.format("%x", csum)) end
-   csum = csum + fixup_val
-   -- TODO/FIXME: *test* this code
-   -- Manually unrolled loop; max 2 iterations, extra iterations
-   -- don't hurt, bitops are fast and ifs are slow.
-   local overflow = rshift(csum, 16)
-   csum = band(csum, 0xffff) + overflow
-   local overflow = rshift(csum, 16)
-   csum = band(csum, 0xffff) + overflow
-   csum = bnot(csum)
-
-   if debug then print("new csum", string.format("%x", csum)) end
-   pkt.data[csum_offset] = rshift(csum, 8)
-   pkt.data[csum_offset + 1] = band(csum, 0xff)
 end
 
 -- ICMPv4 type 3 code 1, as per the internet draft.
@@ -242,7 +262,8 @@ function LwAftr:_add_ethernet_header(dgram, eth_params)
 end
 
 function LwAftr:_icmpv4_incoming(pkt)
-   local icmp_base = constants.ethernet_header_size + constants.ipv4_header_size
+   local ipv4_header_size = get_ihl(pkt)
+   local icmp_base = constants.ethernet_header_size + ipv4_header_size
    local ip_base = icmp_base + constants.icmp_base_size
    local icmp_type_offset = icmp_base -- it's the zeroeth byte of the ICMP header
    local icmp_type = pkt.data[icmp_type_offset]
@@ -255,7 +276,7 @@ function LwAftr:_icmpv4_incoming(pkt)
    -- Were it to nonetheless do so, RFC 4884 extension headers MUST NOT
    -- be taken into account when validating the checksum
    local o_tl = constants.ethernet_header_size + constants.o_ipv4_total_length
-   local icmp_bytes = C.ntohs(ffi.cast("uint16_t*", pkt.data + o_tl)[0]) - constants.ipv4_header_size
+   local icmp_bytes = C.ntohs(ffi.cast("uint16_t*", pkt.data + o_tl)[0]) - ipv4_header_size
    if checksum.ipsum(pkt.data + icmp_base, icmp_bytes, 0) ~= 0 then
       packet.free(pkt)
       return empty, empty -- Silently drop the packet, as per RFC 5508
@@ -288,16 +309,6 @@ function LwAftr:_icmpv4_incoming(pkt)
    local next_hdr = constants.proto_ipv4
    return self:ipv6_encapsulate(pkt, next_hdr, ipv6_src, ipv6_dst,
                                 self.aftr_mac_b4_side, self.b4_mac)
-end
-
-local function decrement_ttl(pkt)
-   local ttl_offset = constants.ethernet_header_size + constants.o_ipv4_ttl
-   pkt.data[ttl_offset] = pkt.data[ttl_offset] - 1
-   local ttl = pkt.data[ttl_offset]
-   local csum_offset = constants.ethernet_header_size + constants.o_ipv4_checksum
-   -- ttl_offset is even, so multiply the ttl change by 0x100.
-   fixup_checksum(pkt, csum_offset, -0x100)
-   return ttl
 end
 
 -- TODO: correctly handle fragmented IPv4 packets
@@ -385,12 +396,11 @@ function LwAftr:from_b4(pkt)
    -- check src ipv4, ipv6, and port against the binding table
    local ipv6_src_ip_offset = constants.ethernet_header_size + constants.o_ipv6_src_addr
    local ipv6_dst_ip_offset = constants.ethernet_header_size + constants.o_ipv6_dst_addr
-   -- FIXME: deal with multiple IPv6 headers
-   local ipv4_src_ip_offset = constants.ethernet_header_size + 
-      constants.ipv6_fixed_header_size + constants.o_ipv4_src_addr
-   -- FIXME: as above + varlen ipv4 + non-tcp/non-udp payloads
-   local ipv4_src_port_offset = constants.ethernet_header_size + 
-      constants.ipv6_fixed_header_size + constants.ipv4_header_size
+   -- FIXME: deal with multiple IPv6 headers?
+   local eth_and_ipv6 = constants.ethernet_header_size + constants.ipv6_fixed_header_size
+   local ipv4_src_ip_offset = eth_and_ipv6 + constants.o_ipv4_src_addr
+   -- FIXME: as above + non-tcp/non-udp payloads
+   local ipv4_src_port_offset = eth_and_ipv6 + get_ihl_from_offset(pkt, eth_and_ipv6)
    local ipv6_src_ip = pkt.data + ipv6_src_ip_offset
    local ipv6_dst_ip = pkt.data + ipv6_dst_ip_offset
    local ipv4_src_ip = ffi.cast("uint32_t*", pkt.data + ipv4_src_ip_offset)[0]

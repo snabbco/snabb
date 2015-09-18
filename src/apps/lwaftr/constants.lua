@@ -41,8 +41,6 @@ icmpv6_failed_ingress_egress_policy = 5
 -- TODO: refactor these; they're not actually constant
 ethernet_header_size = 14 -- TODO: deal with 802.1Q tags/other extensions?
 
-ipv4_header_size = 20
-
 ipv6_fixed_header_size = 40
 ipv6_frag_header_size = 8
 
