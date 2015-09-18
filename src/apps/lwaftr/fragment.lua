@@ -5,7 +5,6 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 
---local lwutil = require("apps.lwaftr.lwutil")
 local constants = require("apps.lwaftr.constants")
 local packet = require("core.packet")
 local bit = require("bit")
