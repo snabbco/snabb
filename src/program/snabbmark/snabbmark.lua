@@ -6,6 +6,7 @@ local basic_apps = require("apps.basic.basic_apps")
 local pci           = require("lib.hardware.pci")
 local ethernet      = require("lib.protocol.ethernet")
 local freelist      = require("core.freelist")
+local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -57,7 +58,7 @@ function nfvconfig (confpath_x, confpath_y, nloads)
    nloads = tonumber(nloads)
       or error("Invalid number of iterations: " .. nloads)
 
-   local pciaddr = os.getenv("SNABB_PCI0")
+   local pciaddr = lib.getenv("SNABB_PCI0")
    if not pciaddr then
       print("SNABB_PCI0 not set.")
       os.exit(engine.test_skipped_code)
@@ -158,8 +159,8 @@ function solarflare (npackets, packet_size, timeout)
       os.exit(engine.test_skipped_code)
    end
 
-   local pciaddr0 = os.getenv("SNABB_PCI_SOLARFLARE0") or os.getenv("SNABB_PCI0")
-   local pciaddr1 = os.getenv("SNABB_PCI_SOLARFLARE1") or os.getenv("SNABB_PCI1")
+   local pciaddr0 = lib.getenv("SNABB_PCI_SOLARFLARE0") or lib.getenv("SNABB_PCI0")
+   local pciaddr1 = lib.getenv("SNABB_PCI_SOLARFLARE1") or lib.getenv("SNABB_PCI1")
    local send_device = pciaddr0 and pci.device_info(pciaddr0)
    local receive_device = pciaddr1 and pci.device_info(pciaddr1)
    if not send_device
