@@ -1,7 +1,7 @@
 module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
-local fragment = require("apps.lwaftr.fragment")
+local fragmentv6 = require("apps.lwaftr.fragmentv6")
 local icmp = require("apps.lwaftr.icmp")
 local lwconf = require("apps.lwaftr.conf")
 local lwdebug = require("apps.lwaftr.lwdebug")
@@ -230,7 +230,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
    end
 
    -- DF wasn't set; fragment the large packet
-   local pkts = fragment.fragment_ipv6(pkt, unfrag_header_size, self.ipv6_mtu)
+   local pkts = fragmentv6.fragment_ipv6(pkt, unfrag_header_size, self.ipv6_mtu)
    if debug and pkts then
       print("Encapsulated packet into fragments")
       for idx,fpkt in ipairs(pkts) do
@@ -369,7 +369,7 @@ end
 -- or rewrite the fragment reassembler to check rather than assuming
 -- all the fragments it is passed are the same in this regard
 function LwAftr:_cache_fragment(frag)
-  local frag_id = fragment.get_ipv6_frag_id(frag)
+  local frag_id = fragmentv6.get_ipv6_frag_id(frag)
   if not self.fragment_cache[frag_id] then
      self.fragment_cache[frag_id] = {}
   end
@@ -380,11 +380,11 @@ end
 -- TODO: rewrite this to use parse
 function LwAftr:from_b4(pkt)
    -- TODO: only send ICMP on failure for packets that plausibly would be bound?
-   if fragment.is_ipv6_fragment(pkt) then
+   if fragmentv6.is_ipv6_fragment(pkt) then
       local frags = self:_cache_fragment(pkt)
-      local frag_status, maybe_pkt = fragment.reassemble_ipv6(frags)
+      local frag_status, maybe_pkt = fragmentv6.reassemble_ipv6(frags)
       -- TODO: finish clearing out the fragment cache?
-      if frag_status ~= fragment.REASSEMBLY_OK then
+      if frag_status ~= fragmentv6.REASSEMBLY_OK then
          if maybe_pkt == nil then maybe_pkt = empty end
          return empty, maybe_pkt -- empty or an ICMPv6 packet
       else
