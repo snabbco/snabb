@@ -196,9 +196,7 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
                                  src = ipv6_src,
                                  dst = ipv6_dst})
    -- The API makes setting the payload length awkward; set it manually
-   -- Todo: less awkward way to write 16 bits of a number into cdata
-   pkt.data[4] = rshift(payload_len, 8)
-   pkt.data[5] = band(payload_len, 0xff)
+   ffi.cast("uint16_t*", pkt.data + 4)[0] = C.htons(payload_len)
    self:_add_ethernet_header(dgram, {src = ether_src,
                                      dst = ether_dst,
                                      type = constants.ethertype_ipv6})
