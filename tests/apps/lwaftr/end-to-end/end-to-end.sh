@@ -129,34 +129,64 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
 # Test UDP input
 
 # Test ICMP inputs (with and without drop policy)
-echo "Testing: incoming ICMP echo request, matches binding table"
+echo "Testing: incoming ICMPv4 echo request, matches binding table"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${TEST_BASE}/incoming-icmpv4-echo-request.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/ipv6-tunneled-incoming-icmpv4-echo-request.pcap
 
-echo "Testing: incoming ICMP echo request, matches binding table"
+echo "Testing: incoming ICMPv4 echo request, matches binding table"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${TEST_BASE}/incoming-icmpv4-echo-request-invalid-icmp-checksum.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY}
 
-echo "Testing: incoming ICMP echo request, matches binding table, dropping ICMP"
+echo "Testing: incoming ICMPv4 echo request, matches binding table, dropping ICMP"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/incoming-icmpv4-echo-request.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY}
 
-echo "Testing: incoming ICMP echo request, doesn't match binding table"
+echo "Testing: incoming ICMPv4 echo request, doesn't match binding table"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${TEST_BASE}/incoming-icmpv4-echo-request-unbound.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY}
 
-echo "Testing: incoming ICMP echo reply, matches binding table"
+echo "Testing: incoming ICMPv4 echo reply, matches binding table"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${TEST_BASE}/incoming-icmpv4-echo-reply.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/ipv6-tunneled-incoming-icmpv4-echo-reply.pcap
 
-echo "Testing: incoming ICMP 34 'too big' notification, matches binding table"
+echo "Testing: incoming ICMPv4 3,4 'too big' notification, matches binding table"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${TEST_BASE}/incoming-icmpv4-34toobig.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/ipv6-tunneled-incoming-icmpv4-34toobig.pcap
+
+echo "Testing: incoming ICMPv6 1,3 destination/address unreachable, OPE from internet"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/incoming-icmpv6-13dstaddressunreach-inet-OPE.pcap \
+   ${TEST_BASE}/response-ipv4-icmp31-inet.pcap ${EMPTY}
+
+echo "Testing: incoming ICMPv6 2,0 'too big' notification, OPE from internet"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/incoming-icmpv6-20pkttoobig-inet-OPE.pcap \
+   ${TEST_BASE}/response-ipv4-icmp34-inet.pcap ${EMPTY}
+
+echo "Testing: incoming ICMPv6 3,0 hop limit exceeded, OPE from internet"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/incoming-icmpv6-30hoplevelexceeded-inet-OPE.pcap \
+   ${TEST_BASE}/response-ipv4-icmp31-inet.pcap ${EMPTY}
+
+echo "Testing: incoming ICMPv6 3,1 frag reasembly time exceeded, OPE from internet"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/incoming-icmpv6-31fragreassemblytimeexceeded-inet-OPE.pcap \
+   ${EMPTY} ${EMPTY}
+
+echo "Testing: incoming ICMPv6 4,3 parameter problem, OPE from internet"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/incoming-icmpv6-43paramprob-inet-OPE.pcap \
+   ${TEST_BASE}/response-ipv4-icmp31-inet.pcap ${EMPTY}
+
+echo "Testing: incoming ICMPv6 3,0 hop limit exceeded, OPE hairpinned"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/incoming-icmpv6-30hoplevelexceeded-hairpinned-OPE.pcap \
+   ${EMPTY} ${TEST_BASE}/response-ipv6-tunneled-icmpv4_31-tob4.pcap
 
 echo "All end-to-end lwAFTR tests passed."
