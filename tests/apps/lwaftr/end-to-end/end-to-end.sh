@@ -38,10 +38,16 @@ function snabb_run_and_cmp {
    echo "Test passed"
 }
 
+
 echo "Testing: from-internet IPv4 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-bound.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6.pcap
+
+echo "Testing: traffic class mapping"
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/tcp-frominet-trafficclass.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6-trafficclass.pcap
 
 echo "Testing: from-internet IPv4 packet found in the binding table, original TTL=1."
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \

@@ -145,8 +145,7 @@ function LwAftr:in_binding_table(ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src
    return false
 end
 
--- ICMPv4 type 3 code 1, as per the internet draft.
--- That is: "Destination unreachable: destination host unreachable"
+-- ICMPv4 type 3 code 1, as per RFC 7596.
 -- The target IPv4 address + port is not in the table.
 function LwAftr:_icmp_after_discard(pkt, to_ip)
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
@@ -157,14 +156,9 @@ function LwAftr:_icmp_after_discard(pkt, to_ip)
    return icmp_dis, empty
 end
 
--- ICMPv6 type 1 code 5, as per the internet draft.
--- 'Destination unreachable: source address failed ingress/egress policy'
+-- ICMPv6 type 1 code 5, as per RFC 7596.
 -- The source (ipv6, ipv4, port) tuple is not in the table.
 function LwAftr:_icmp_b4_lookup_failed(pkt, to_ip)
-   -- https://tools.ietf.org/html/rfc7596 calls for "As much of invoking packet                 |
-   -- as possible without the ICMPv6 packet
-   -- exceeding the minimum IPv6 MTU".
-   -- Does this mean 1280 or the path-specific one?
    local headers_len = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.icmp_base_size
    local plen = pkt.length - constants.ethernet_header_size
    if plen + headers_len >= constants.min_ipv6_mtu then
@@ -191,8 +185,10 @@ function LwAftr:ipv6_encapsulate(pkt, next_hdr_type, ipv6_src, ipv6_dst,
       lwdebug.print_pkt(pkt)
    end
    local payload_len = pkt.length
+   local dscp_and_ecn = pkt.data[constants.o_ipv4_dscp_and_ecn]
    self:_add_ipv6_header(dgram, {next_header = next_hdr_type,
                                  hop_limit = constants.default_ttl,
+                                 traffic_class = dscp_and_ecn,
                                  src = ipv6_src,
                                  dst = ipv6_dst})
    -- The API makes setting the payload length awkward; set it manually
