@@ -58,7 +58,7 @@ for i = 1, rounds do
 	local sample_set = 1
 	for line in proc:lines() do
 		-- Rate: N.M MPPS
-		local value, nsubs = string.gsub(line, "^Rate:%s+([%d%.]+)%s+MPPS$", "%1")
+		local value, nsubs = string.gsub(line, "^[Rr]ate[^%d]*([%d%.]+)", "%1")
 		if nsubs > 0 then
 			if sample_sets[sample_set] == nil then
 				sample_sets[sample_set] = {}
