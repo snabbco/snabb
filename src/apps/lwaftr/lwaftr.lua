@@ -363,6 +363,85 @@ function LwAftr:_encapsulate_ipv4(pkt)
                                 ether_src, ether_dst)
 end
 
+local function tunnel_packet_too_big(lwstate, pkt)
+   local ipv6_hs = constants.ipv6_fixed_header_size
+   local eth_hs = constants.ethernet_header_size
+   local icmp_hs = constants.icmp_base_size
+   local orig_packet_offset = eth_hs + ipv6_hs + icmp_hs + ipv6_hs
+
+   local next_hop_mtu_offset = 6
+   local o_mtu = eth_hs + ipv6_hs + next_hop_mtu_offset
+   local specified_mtu = C.ntohs(ffi.cast("uint16_t*", pkt.data + o_mtu)[0])
+   local icmp_config = {type = constants.icmpv4_dst_unreachable,
+                        code = constants.icmpv4_datagram_too_big_df,
+                        extra_payload_offset = orig_packet_offset - eth_hs,
+                        next_hop_mtu = specified_mtu - constants.ipv6_fixed_header_size
+                        }
+   ffi.copy(lwstate.scratch_ipv4, pkt.data + orig_packet_offset + constants.o_ipv4_src_addr, 4)
+   local icmp_reply = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
+                                             lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
+   return icmp_reply
+end
+
+-- This is highly redundant code, but it avoids conditionals
+local function tunnel_generic_unreachable(lwstate, pkt)
+   local ipv6_hs = constants.ipv6_fixed_header_size
+   local eth_hs = constants.ethernet_header_size
+   local icmp_hs = constants.icmp_base_size
+   local orig_packet_offset = eth_hs + ipv6_hs + icmp_hs + ipv6_hs
+   local icmp_config = {type = constants.icmpv4_dst_unreachable,
+                        code = constants.icmpv4_host_unreachable,
+                        extra_payload_offset = orig_packet_offset - eth_hs
+                        }
+   ffi.copy(lwstate.scratch_ipv4, pkt.data + orig_packet_offset + constants.o_ipv4_src_addr, 4)
+   local icmp_reply = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
+                                             lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
+   return icmp_reply
+end
+
+function LwAftr:_icmpv6_incoming(pkt)
+   local icmpv6_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size
+   local icmp_type = pkt.data[icmpv6_offset]
+   local icmp_code = pkt.data[icmpv6_offset + 1]
+   local icmpv4_reply
+   if icmp_type == constants.icmpv6_packet_too_big then
+      if icmp_code ~= constants.icmpv6_code_packet_too_big then
+         return empty, empty -- Invalid code
+      end
+      icmpv4_reply = tunnel_packet_too_big(self, pkt)
+
+   -- Take advantage of having already checked for 'packet too big' (2), and
+   -- unreachable node/hop limit exceeded/paramater problem being 1, 3, 4 respectively
+   elseif icmp_type <= constants.icmpv6_parameter_problem then
+      -- If the time limit was exceeded, require it was a hop limit code
+      if icmp_type == constants.icmpv6_time_limit_exceeded then
+         if icmp_code ~= constants.icmpv6_hop_limit_exceeded then
+            return empty, empty
+         end
+      end
+      -- Accept all unreachable or parameter problem codes
+      icmpv4_reply = tunnel_generic_unreachable(self, pkt)
+   else -- No other types of ICMPv6, including echo request/reply, are handled
+      return empty, empty
+   end
+
+   -- There's an ICMPv4 packet. If it's in response to a packet from the external
+   -- network, send it there. If hairpinning is/was enabled, it could be from a
+   -- b4; if it was from a b4, encapsulate the generaced IPv4 message and send it.
+   -- This is the most plausible reading of RFC 2473, although not unambigous.
+   local ipv6_dst, ipv6_src = self:binding_lookup_ipv4_from_pkt(icmpv4_reply, constants.ethernet_header_size)
+   if ipv6_dst and self.hairpinning then
+      -- Hairpinning was implicitly allowed now or in the recent past if the
+      -- binding table lookup succeeded. Nonetheless, require that it be
+      -- currently true to encapsulate and hairpin the outgoing packet.
+      -- If it's false, send it out through the normal internet interface,
+      -- like notifications to any non-bound host.
+      return self:_icmpv4_incoming(icmpv4_reply) -- to B4
+   else
+      return icmpv4_reply, empty -- to Internet
+   end
+end
+
 -- TODO: rewrite this to either also have the source and dest IPs in the table,
 -- or rewrite the fragment reassembler to check rather than assuming
 -- all the fragments it is passed are the same in this regard
@@ -388,6 +467,17 @@ function LwAftr:from_b4(pkt)
       else
          -- The spec mandates that reassembly must occur before decapsulation
          pkt = maybe_pkt -- do the rest of the processing on the reassembled packet
+      end
+   end
+
+   local proto_offset = constants.ethernet_header_size + constants.o_ipv6_next_header
+   local proto = pkt.data[proto_offset]
+   if proto == constants.proto_icmpv6 then
+      if self.policy_icmpv6_incoming == lwconf.policies['DROP'] then
+         packet.free(pkt)
+         return empty, empty
+      else
+         return self:_icmpv6_incoming(pkt)
       end
    end
 

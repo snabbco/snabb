@@ -29,12 +29,16 @@ icmpv4_time_exceeded = 11
 icmpv4_ttl_exceeded_in_transit = 0
 icmpv4_host_unreachable = 1
 icmpv4_datagram_too_big_df = 4
--- icmpv4_communication_admin_prohibited = 13 -- May be received from B4s
 
 -- ICMPv6 types
 icmpv6_dst_unreachable = 1
+icmpv6_packet_too_big = 2
+icmpv6_time_limit_exceeded = 3
+icmpv6_parameter_problem = 4
 
 -- ICMPv6 codes
+icmpv6_code_packet_too_big = 0
+icmpv6_hop_limit_exceeded = 0
 icmpv6_failed_ingress_egress_policy = 5
 
 -- Header sizes
