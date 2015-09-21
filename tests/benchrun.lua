@@ -67,6 +67,7 @@ for i = 1, rounds do
 			sample_set = sample_set + 1
 		end
 	end
+	proc:close()
 end
 io.stdout:write("\n")
 
