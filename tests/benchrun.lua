@@ -1,5 +1,8 @@
 #! /usr/bin/env luajit
 
+local ffi = require("ffi")
+ffi.cdef("int isatty(int)")
+
 local function printfln(fmt, ...)
 	print(fmt:format(...))
 end
@@ -31,8 +34,26 @@ end
 local rounds = tonumber(arg[1])
 local command = arg[2]
 
+
+local progress
+if ffi.C.isatty(1) ~= 0 then
+	report_progress = function (round)
+		io.stdout:write(string.format("\rProgress: %d%% (%d/%d)",
+			round / rounds * 100, round, rounds))
+		io.stdout:flush()
+	end
+else
+	report_progress = function (round)
+		io.stdout:write(".")
+		io.stdout:flush()
+	end
+end
+
+
 local sample_sets = {}
 for i = 1, rounds do
+	report_progress(i)
+
 	local proc = io.popen(command, "r")
 	local sample_set = 1
 	for line in proc:lines() do
@@ -47,6 +68,7 @@ for i = 1, rounds do
 		end
 	end
 end
+io.stdout:write("\n")
 
 for setnum, samples in ipairs(sample_sets) do
 	printfln("set %d", setnum)
