@@ -72,6 +72,13 @@ function shiftleft (p, bytes)
    p.length = p.length - bytes
 end
 
+-- Move packet data to the right. This leaves length bytes of data
+-- at the beginning of the packet.
+function shiftright (p, bytes)
+   C.memmove(p.data + bytes, p.data, p.length)
+   p.length = p.length + bytes
+end
+
 -- Conveniently create a packet by copying some existing data.
 function from_pointer (ptr, len) return append(allocate(), ptr, len) end
 function from_string (d)         return from_pointer(d, #d) end

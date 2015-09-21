@@ -12,10 +12,12 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local packet = require("core.packet")
+local lib = require("core.lib")
 local bit = require("bit")
 local ffi = require("ffi")
 
 local band, bnot, rshift = bit.band, bit.bnot, bit.rshift
+local bitfield = lib.bitfield
 local C = ffi.C
 
 local debug = false
@@ -198,24 +200,30 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
    -- TODO: decrement the IPv4 ttl as this is part of forwarding
    -- TODO: do not encapsulate if ttl was already 0; send icmp
    if debug then print("ipv6", ipv6_src, ipv6_dst) end
-   local dgram = lwstate.dgram:reuse(pkt, ethernet)
-   decapsulate(dgram, constants.ethernet_header_size)
-   if debug then
-      print("Original packet, minus ethernet:")
-      lwdebug.print_pkt(pkt)
-   end
-   local payload_len = pkt.length
-   local dscp_and_ecn = pkt.data[constants.o_ipv4_dscp_and_ecn]
-   add_ipv6_header(dgram, {next_header = next_hdr_type,
-                           hop_limit = constants.default_ttl,
-                           traffic_class = dscp_and_ecn,
-                           src = ipv6_src,
-                           dst = ipv6_dst})
-   -- The API makes setting the payload length awkward; set it manually
-   ffi.cast("uint16_t*", pkt.data + 4)[0] = C.htons(payload_len)
-   add_ethernet_header(dgram, {src = ether_src,
-                               dst = ether_dst,
-                               type = constants.ethertype_ipv6})
+
+   -- As if it were Ethernet decapsulated.
+   local offset = constants.ethernet_header_size
+   local payload_length = pkt.length - offset
+   local dscp_and_ecn = pkt.data[offset + constants.o_ipv4_dscp_and_ecn]
+   -- Make room at the beginning for IPv6 header.
+   packet.shiftright(pkt, constants.ipv6_fixed_header_size)
+   C.memset(pkt.data, 0, constants.ethernet_header_size + constants.ipv6_fixed_header_size)
+   -- Modify Ethernet header.
+   local eth_hdr = ffi.cast(ethernet._header_ptr_type, pkt.data)
+   eth_hdr.ether_shost = ether_src
+   eth_hdr.ether_dhost = ether_dst
+   eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
+   -- Modify IPv6 header.
+   local ipv6_hdr = ffi.cast(ipv6._header_ptr_type,
+      pkt.data + constants.ethernet_header_size)
+   bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6)            -- IPv6 Version
+   bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, dscp_and_ecn) -- Traffic class
+   ipv6_hdr.payload_length = C.htons(payload_length)
+   ipv6_hdr.next_header = next_hdr_type
+   ipv6_hdr.hop_limit = constants.default_ttl
+   ipv6_hdr.src_ip = ipv6_src
+   ipv6_hdr.dst_ip = ipv6_dst
+
    if pkt.length <= lwstate.ipv6_mtu then
       if debug then
          print("encapsulated packet:")
@@ -353,7 +361,7 @@ local function encapsulate_ipv4(lwstate, pkt)
                                                 lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
       return ttl0_icmp, empty
    end
- 
+
    local next_hdr = constants.proto_ipv4
    return ipv6_encapsulate(lwstate, pkt, next_hdr, ipv6_src, ipv6_dst,
                            ether_src, ether_dst)
