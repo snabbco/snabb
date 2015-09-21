@@ -77,26 +77,6 @@ local function get_ihl_from_offset(pkt, offset)
    return bit.band(ver_and_ihl, 0xf) * 4
 end
 
--- Return a packet without ethernet or IPv6 headers.
-local function decapsulate(dgram, length)
-   -- FIXME: don't hardcode the values like this
-   local length = length or constants.ethernet_header_size + constants.ipv6_fixed_header_size
-   dgram:pop_raw(length)
-end
-
-local function add_ipv6_header(dgram, ipv6_params)
-   local ipv6_hdr = ipv6:new(ipv6_params)
-   dgram:push(ipv6_hdr)
-   ipv6_hdr:free()
-end
-
-local function add_ethernet_header(dgram, eth_params)
-   local eth_hdr = ethernet:new(eth_params)
-   dgram:push(eth_hdr)
-   eth_hdr:free()
-end
-
-
 local function get_lwAFTR_ipv6(lwstate, binding_entry)
    local lwaftr_ipv6 = binding_entry[5]
    if not lwaftr_ipv6 then lwaftr_ipv6 = lwstate.aftr_ipv6_ip end
@@ -501,24 +481,28 @@ local function from_b4(lwstate, pkt)
    if in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port) then
       -- Is it worth optimizing this to change src_eth, src_ipv6, ttl, checksum,
       -- rather than decapsulating + re-encapsulating? It would be faster, but more code.
-      local dgram = lwstate.dgram:reuse(pkt)
-      decapsulate(dgram)
+      local offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size
       if debug then
          print("lwstate.hairpinning is", lwstate.hairpinning)
-         print("binding_lookup...", binding_lookup_ipv4_from_pkt(lwstate, pkt, 0))
+         print("binding_lookup...", binding_lookup_ipv4_from_pkt(lwstate, pkt, offset))
       end
-      if lwstate.hairpinning and binding_lookup_ipv4_from_pkt(lwstate, pkt, 0) then
-         -- FIXME: shifting the packet ethernet_header_size right would suffice here
-         -- The ethernet data is thrown away by _encapsulate_ipv4 anyhow.
-         add_ethernet_header(dgram, {src = lwstate.b4_mac,
-                                     dst = lwstate.aftr_mac_b4_side,
-                                     type = constants.ethertype_ipv4})
+      if lwstate.hairpinning and binding_lookup_ipv4_from_pkt(lwstate, pkt, offset) then
+         -- Remove IPv6 header.
+         packet.shiftleft(pkt, constants.ipv6_fixed_header_size)
+         local eth_hdr = ffi.cast(ethernet._header_ptr_type, pkt.data)
+         eth_hdr.ether_shost = lwstate.b4_mac
+         eth_hdr.ether_dhost = lwstate.aftr_mac_b4_side
+         eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
+
          return encapsulate_ipv4(lwstate, pkt)
       else
-         local dgram = lwstate.dgram:reuse(pkt, ipv4)
-         add_ethernet_header(dgram, {src = lwstate.aftr_mac_inet_side,
-                                     dst = lwstate.inet_mac,
-                                     type = constants.ethertype_ipv4})
+         -- Remove IPv6 header.
+         packet.shiftleft(pkt, constants.ipv6_fixed_header_size)
+         local eth_hdr = ffi.cast(ethernet._header_ptr_type, pkt.data)
+         eth_hdr.ether_shost = lwstate.aftr_mac_inet_side
+         eth_hdr.ether_dhost = lwstate.inet_mac
+         eth_hdr.ether_type = C.htons(constants.ethertype_ipv4)
+
          return pkt, empty
       end
    elseif lwstate.policy_icmpv6_outgoing == lwconf.policies['ALLOW'] then
