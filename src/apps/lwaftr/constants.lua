@@ -60,6 +60,7 @@ o_ethernet_ethertype = 12
 o_ipv4_ver_and_ihl = 0
 o_ipv4_dscp_and_ecn = 1
 o_ipv4_total_length = 2
+o_ipv4_identification = 4
 o_ipv4_flags = 6
 o_ipv4_ttl = 8
 o_ipv4_proto = 9
