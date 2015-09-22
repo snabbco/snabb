@@ -36,7 +36,7 @@ function run (parameters)
    config.link(c, 'lwaftr.v6 -> b4sideNic.tx')
 
    app.configure(c)
-   app.main({duration=1})
+   app.main({report={showlinks=true}})
 end
 
 run(main.parameters)
