@@ -22,28 +22,21 @@ function run (parameters)
    local aftrconf = conf.get_aftrconf(conf_file)
 
    local c = config.new()
-   print("gh1")
    config.app(c, 'inetNic', Intel82599, {pciaddr=inet_nic_pci,
                                          vmdq = true,
                                          macaddr = ethernet:ntop(aftrconf.aftr_mac_inet_side)})
-   print("gh2")
    config.app(c, 'b4sideNic', Intel82599, {pciaddr=b4side_nic_pci,
                                            vmdq = true,
                                            macaddr = ethernet:ntop(aftrconf.aftr_mac_b4_side)})
-   print("gh3")
    config.app(c, "lwaftr", lwaftr.LwAftr, aftrconf)
-   print("gh4")
 
    config.link(c, 'inetNic.rx -> lwaftr.v4')
    config.link(c, 'b4sideNic.rx -> lwaftr.v6')
    config.link(c, 'lwaftr.v4 -> inetNic.tx')
    config.link(c, 'lwaftr.v6 -> b4sideNic.tx')
-   print("linked")
 
    app.configure(c)
-   print("confed")
    app.main({duration=1})
-   print("done")
 end
 
 run(main.parameters)
