@@ -17,6 +17,7 @@ local long_opts = {
 
 function run (parameters)
    local profiling = false
+   local traceprofiling = false
    local start_repl = false
    local noop = true -- are we doing nothing?
    local program -- should we run a different program?
@@ -42,6 +43,9 @@ function run (parameters)
          local opts, file = arg:match("^dump=([^,]*),?(.*)")
          if file == '' then file = nil end
          require("jit.dump").on(opts, file)
+      elseif arg:match("^tprof") then
+         require("lib.traceprof.traceprof").start()
+         traceprofiling = true
       end
    end
    function opt.e (arg)
@@ -68,6 +72,9 @@ function run (parameters)
 
    if start_repl then repl() end
    if profiling then require("jit.p").stop() end
+   if traceprofiling then
+      require("lib.traceprof.traceprof").stop()
+   end
 end
 
 function run_script (parameters)
