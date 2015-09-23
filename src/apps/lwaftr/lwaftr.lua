@@ -21,7 +21,6 @@ local bitfield = lib.bitfield
 local C = ffi.C
 
 local debug = false
-local empty = {}
 
 LwAftr = {}
 
@@ -35,6 +34,19 @@ function LwAftr:new(conf)
    o.fragment6_cache = {}
    o.scratch_ipv4 = ffi.new("uint8_t[4]")
    return setmetatable(o, {__index=LwAftr})
+end
+
+local function guarded_transmit(pkt, o)
+   -- The assert was never being hit, and the assert+link check slow the code
+   -- down about 5-18%, by comparing best and worst runs of 5 seconds at their
+   -- starts and ends.
+   -- The downside is that if the link actually is full, the packet will be dropped.
+   -- Given the requirements of this project, rare dropped packets (none so far in
+   -- testing) are better than a non-trivial speed decrease).
+   -- The assert should never appear in production, but code to cache packets
+   -- on a link full condition could.
+   --assert(not link.full(o), "need a cache...")
+   link.transmit(o, pkt)
 end
 
 local function fixup_checksum(pkt, csum_offset, fixup_val)
@@ -155,7 +167,7 @@ local function icmp_after_discard(lwstate, pkt, to_ip)
                         }
    local icmp_dis = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                            lwstate.aftr_ipv4_ip, to_ip, pkt, icmp_config)
-   return icmp_dis, empty
+   guarded_transmit(icmp_dis, lwstate.o4)
 end
 
 -- ICMPv6 type 1 code 5, as per RFC 7596.
@@ -171,7 +183,7 @@ local function icmp_b4_lookup_failed(lwstate, pkt, to_ip)
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(lwstate.aftr_mac_b4_side, lwstate.b4_mac, lwstate.aftr_ipv6_ip,
                                               to_ip, pkt, icmp_config)
-   return empty, b4fail_icmp
+   guarded_transmit(b4fail_icmp, lwstate.o6)
 end
 
 -- Given a packet containing IPv4 and Ethernet, encapsulate the IPv4 portion.
@@ -209,7 +221,8 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
          print("encapsulated packet:")
          lwdebug.print_pkt(pkt)
       end
-      return empty, pkt
+      guarded_transmit(pkt, lwstate.o6)
+      return
    end
 
    -- Otherwise, fragment if possible
@@ -228,7 +241,8 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
       local icmp_pkt = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                               lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
       packet.free(pkt)
-      return icmp_pkt, empty
+      guarded_transmit(icmp_pkt, lwstate.o4)
+      return
    end
 
    -- DF wasn't set; fragment the large packet
@@ -240,7 +254,9 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
          lwdebug.print_pkt(fpkt)
       end
    end
-   return empty, pkts
+   for i=1,#pkts do
+      guarded_transmit(pkts[i], lwstate.o6)
+   end
 end
 
 local function icmpv4_incoming(lwstate, pkt)
@@ -261,7 +277,7 @@ local function icmpv4_incoming(lwstate, pkt)
    local icmp_bytes = C.ntohs(ffi.cast("uint16_t*", pkt.data + o_tl)[0]) - ipv4_header_size
    if checksum.ipsum(pkt.data + icmp_base, icmp_bytes, 0) ~= 0 then
       packet.free(pkt)
-      return empty, empty -- Silently drop the packet, as per RFC 5508
+      return -- Silently drop the packet, as per RFC 5508
    end
 
    -- checksum was ok
@@ -285,7 +301,7 @@ local function icmpv4_incoming(lwstate, pkt)
    if not ipv6_dst then
       -- No match found in the binding table; the packet MUST be discarded
       packet.free(pkt)
-      return empty, empty
+      return
    end
    -- Otherwise, the packet MUST be forwarded
    local next_hdr = constants.proto_ipv4
@@ -296,7 +312,7 @@ end
 -- TODO: correctly handle fragmented IPv4 packets
 -- TODO: correctly deal with IPv6 packets that need to be fragmented
 -- The incoming packet is a complete one with ethernet headers.
-local function encapsulate_ipv4(lwstate, pkt)
+local function from_inet(lwstate, pkt)
    -- Check incoming ICMP -first-, because it has different binding table lookup logic
    -- than other protocols.
    local proto_offset = constants.ethernet_header_size + constants.o_ipv4_proto
@@ -304,7 +320,7 @@ local function encapsulate_ipv4(lwstate, pkt)
    if proto == constants.proto_icmp then
       if lwstate.policy_icmpv4_incoming == lwconf.policies['DROP'] then
          packet.free(pkt)
-         return empty, empty
+         return
       else
          return icmpv4_incoming(lwstate, pkt)
       end
@@ -316,7 +332,7 @@ local function encapsulate_ipv4(lwstate, pkt)
       if debug then print("lookup failed") end
       if lwstate.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
          packet.free(pkt)
-         return empty, empty -- lookup failed
+         return -- lookup failed
       else
          local src_ip_start = constants.ethernet_header_size + constants.o_ipv4_src_addr
          --local to_ip = ffi.cast("uint32_t*", pkt.data + src_ip_start)[0]
@@ -332,14 +348,15 @@ local function encapsulate_ipv4(lwstate, pkt)
    local ttl = decrement_ttl(pkt)
    if ttl == 0 or ttl == 255 then
       if lwstate.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
-         return empty, empty
+         return
       end
       local icmp_config = {type = constants.icmpv4_time_exceeded,
                            code = constants.icmpv4_ttl_exceeded_in_transit,
                            }
       local ttl0_icmp =  icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                                 lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
-      return ttl0_icmp, empty
+      guarded_transmit(ttl0_icmp, lwstate.o4)
+      return
    end
 
    local next_hdr = constants.proto_ipv4
@@ -390,7 +407,7 @@ local function icmpv6_incoming(lwstate, pkt)
    local icmpv4_reply
    if icmp_type == constants.icmpv6_packet_too_big then
       if icmp_code ~= constants.icmpv6_code_packet_too_big then
-         return empty, empty -- Invalid code
+         return -- Invalid code
       end
       icmpv4_reply = tunnel_packet_too_big(lwstate, pkt)
 
@@ -400,13 +417,13 @@ local function icmpv6_incoming(lwstate, pkt)
       -- If the time limit was exceeded, require it was a hop limit code
       if icmp_type == constants.icmpv6_time_limit_exceeded then
          if icmp_code ~= constants.icmpv6_hop_limit_exceeded then
-            return empty, empty
+            return
          end
       end
       -- Accept all unreachable or parameter problem codes
       icmpv4_reply = tunnel_generic_unreachable(lwstate, pkt)
    else -- No other types of ICMPv6, including echo request/reply, are handled
-      return empty, empty
+      return
    end
 
    -- There's an ICMPv4 packet. If it's in response to a packet from the external
@@ -422,7 +439,7 @@ local function icmpv6_incoming(lwstate, pkt)
       -- like notifications to any non-bound host.
       return icmpv4_incoming(lwstate, icmpv4_reply) -- to B4
    else
-      return icmpv4_reply, empty -- to Internet
+      guarded_transmit(icmpv4_reply, lwstate.o4)
    end
 end
 
@@ -446,8 +463,10 @@ local function from_b4(lwstate, pkt)
       local frag_status, maybe_pkt = fragmentv6.reassemble_ipv6(frags)
       -- TODO: finish clearing out the fragment cache?
       if frag_status ~= fragmentv6.REASSEMBLY_OK then
-         if maybe_pkt == nil then maybe_pkt = empty end
-         return empty, maybe_pkt -- empty or an ICMPv6 packet
+         if maybe_pkt then
+            guarded_transmit(pkt, lwstate.o6)
+            return
+         end
       else
          -- The spec mandates that reassembly must occur before decapsulation
          pkt = maybe_pkt -- do the rest of the processing on the reassembled packet
@@ -459,7 +478,7 @@ local function from_b4(lwstate, pkt)
    if proto == constants.proto_icmpv6 then
       if lwstate.policy_icmpv6_incoming == lwconf.policies['DROP'] then
          packet.free(pkt)
-         return empty, empty
+         return
       else
          return icmpv6_incoming(lwstate, pkt)
       end
@@ -493,8 +512,8 @@ local function from_b4(lwstate, pkt)
          eth_hdr.ether_shost = lwstate.b4_mac
          eth_hdr.ether_dhost = lwstate.aftr_mac_b4_side
          eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
-
-         return encapsulate_ipv4(lwstate, pkt)
+         -- TODO:  refactor so this doesn't actually seem to be from the internet?
+         return from_inet(lwstate, pkt)
       else
          -- Remove IPv6 header.
          packet.shiftleft(pkt, constants.ipv6_fixed_header_size)
@@ -502,26 +521,15 @@ local function from_b4(lwstate, pkt)
          eth_hdr.ether_shost = lwstate.aftr_mac_inet_side
          eth_hdr.ether_dhost = lwstate.inet_mac
          eth_hdr.ether_type = C.htons(constants.ethertype_ipv4)
-
-         return pkt, empty
+         guarded_transmit(pkt, lwstate.o4)
+         return
       end
    elseif lwstate.policy_icmpv6_outgoing == lwconf.policies['ALLOW'] then
-      local _, icmp_pkt = icmp_b4_lookup_failed(lwstate, pkt, ipv6_src_ip)
+      icmp_b4_lookup_failed(lwstate, pkt, ipv6_src_ip)
       packet.free(pkt)
-      return empty, icmp_pkt
    else
       packet.free(pkt)
-      return empty, empty
-   end
-end
-
-local function transmit_pkts(pkts, link, o)
-   if type(pkts) == "table" then
-      for i = 1, #pkts do
-         link.transmit(o, pkts[i])
-      end
-   else -- Just one packet
-      link.transmit(o, pkts)
+      return
    end
 end
 
@@ -535,9 +543,12 @@ end
 -- was received from) where they occur.
 -- TODO: handle fragmentation elsewhere too?
 function LwAftr:push ()
-   local i4, o4 = self.input.v4, self.output.v4
-   local i6, o6 = self.input.v6, self.output.v6
-   while not link.empty(i4) and not link.full(o4) and not link.full(o6) do
+   local i4 = self.input.v4
+   local i6 = self.input.v6
+   self.o4 = self.output.v4
+   self.o6 = self.output.v6
+
+   while not link.empty(i4) do --and not link.full(o4) and not link.full(o6) do
       local pkt = link.receive(i4)
       if debug then print("got a pkt") end
       -- Keep the ethertype in network byte order
@@ -545,22 +556,18 @@ function LwAftr:push ()
 
       if ethertype == constants.n_ethertype_ipv4 then -- Incoming packet from the internet
          ffi.copy(self.scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.o_ipv4_src_addr, 4)
-         local v4_pkts, v6_pkts = encapsulate_ipv4(self, pkt)
-         transmit_pkts(v4_pkts, link, o4)
-         transmit_pkts(v6_pkts, link, o6)
+         from_inet(self, pkt)
       end -- Silently drop all other types coming from the internet interface
    end
 
-   while not link.empty(i6) and not link.full(o4) and not link.full(o6) do
+   while not link.empty(i6) do --and not link.full(o4) and not link.full(o6) do
       local pkt = link.receive(i6)
       if debug then print("got a pkt") end
       local ethertype = ffi.cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0]
       local out_pkt = nil
       if ethertype == constants.n_ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin/ICMPv6 as needed
-         local v4_pkts, v6_pkts = from_b4(self, pkt)
-         transmit_pkts(v4_pkts, link, o4)
-         transmit_pkts(v6_pkts, link, o6)
+         from_b4(self, pkt)
       end -- FIXME: silently drop other types; is this the right thing to do?
    end
 end
