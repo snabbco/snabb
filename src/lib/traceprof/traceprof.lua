@@ -133,8 +133,8 @@ function report (samples, nsamples)
          local fi = jutil.funcinfo(info.func, info.pc)
          if fi.loc then loc = fi.loc end
       end
-      local line = ("%3d%% TRACE %3d%-5s %-8s %s"):format(
-         pct, tracenr, traceinfo, parent, loc)
+      local line = ("%3d%% TRACE %3d%-5s %-8s %-10s%s"):format(
+         pct, tracenr, traceinfo, parent, lnk, loc)
       if pct >= 1 then
          print(line)
       end
