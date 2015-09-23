@@ -32,7 +32,6 @@ function LwAftr:new(conf)
    end
    o.dgram = datagram:new()
    o.fragment6_cache = {}
-   o.scratch_ipv4 = ffi.new("uint8_t[4]")
    return setmetatable(o, {__index=LwAftr})
 end
 
@@ -233,13 +232,16 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
       -- Return a packet with ICMP(3, 4) and the appropriate MTU
       -- as per https://tools.ietf.org/html/rfc2473#section-7.2
       if debug then lwdebug.print_pkt(pkt) end
+      -- The source address of the packet is where the ICMP packet should be sent
+      local o_src = constants.ethernet_header_size + constants.o_ipv4_src_addr
+      local dst_ip = pkt.data + constants.ipv6_fixed_header_size + o_src
       local icmp_config = {type = constants.icmpv4_dst_unreachable,
                            code = constants.icmpv4_datagram_too_big_df,
                            extra_payload_offset = constants.ipv6_fixed_header_size,
                            next_hop_mtu = lwstate.ipv6_mtu - constants.ipv6_fixed_header_size
                            }
       local icmp_pkt = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
-                                              lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
+                                              lwstate.aftr_ipv4_ip, dst_ip, pkt, icmp_config)
       packet.free(pkt)
       guarded_transmit(icmp_pkt, lwstate.o4)
       return
@@ -350,11 +352,13 @@ local function from_inet(lwstate, pkt)
       if lwstate.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
          return
       end
+      local o_src = constants.ethernet_header_size + constants.o_ipv4_src_addr
+      local dst_ip = pkt.data + o_src
       local icmp_config = {type = constants.icmpv4_time_exceeded,
                            code = constants.icmpv4_ttl_exceeded_in_transit,
                            }
       local ttl0_icmp =  icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
-                                                lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
+                                                lwstate.aftr_ipv4_ip, dst_ip, pkt, icmp_config)
       guarded_transmit(ttl0_icmp, lwstate.o4)
       return
    end
@@ -378,9 +382,10 @@ local function tunnel_packet_too_big(lwstate, pkt)
                         extra_payload_offset = orig_packet_offset - eth_hs,
                         next_hop_mtu = specified_mtu - constants.ipv6_fixed_header_size
                         }
-   ffi.copy(lwstate.scratch_ipv4, pkt.data + orig_packet_offset + constants.o_ipv4_src_addr, 4)
+   local o_src = orig_packet_offset + constants.o_ipv4_src_addr
+   local dst_ip = pkt.data + o_src
    local icmp_reply = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
-                                             lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
+                                             lwstate.aftr_ipv4_ip, dst_ip, pkt, icmp_config)
    return icmp_reply
 end
 
@@ -394,9 +399,10 @@ local function tunnel_generic_unreachable(lwstate, pkt)
                         code = constants.icmpv4_host_unreachable,
                         extra_payload_offset = orig_packet_offset - eth_hs
                         }
-   ffi.copy(lwstate.scratch_ipv4, pkt.data + orig_packet_offset + constants.o_ipv4_src_addr, 4)
+   local o_src = orig_packet_offset + constants.o_ipv4_src_addr
+   local dst_ip = pkt.data + o_src
    local icmp_reply = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
-                                             lwstate.aftr_ipv4_ip, lwstate.scratch_ipv4, pkt, icmp_config)
+                                             lwstate.aftr_ipv4_ip, dst_ip, pkt, icmp_config)
    return icmp_reply
 end
 
@@ -555,7 +561,6 @@ function LwAftr:push ()
       local ethertype = ffi.cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0]
 
       if ethertype == constants.n_ethertype_ipv4 then -- Incoming packet from the internet
-         ffi.copy(self.scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.o_ipv4_src_addr, 4)
          from_inet(self, pkt)
       else
          packet.free(pkt)
