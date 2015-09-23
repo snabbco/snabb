@@ -299,6 +299,9 @@ LJLIB_CF(jit_util_traceinfo)
     setintfield(L, t, "nk", REF_BIAS - (int32_t)T->nk);
     setintfield(L, t, "link", T->link);
     setintfield(L, t, "nexit", T->nsnap);
+    setintfield(L, t, "szmcode", T->szmcode);
+    setintfield(L, t, "mcode", T->mcode);
+    setintfield(L, t, "mcloop", T->mcloop);
     setstrV(L, L->top++, lj_str_newz(L, jit_trlinkname[T->linktype]));
     lua_setfield(L, -2, "linktype");
     /* There are many more fields. Add them only when needed. */
