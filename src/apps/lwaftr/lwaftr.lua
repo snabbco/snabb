@@ -557,6 +557,8 @@ function LwAftr:push ()
       if ethertype == constants.n_ethertype_ipv4 then -- Incoming packet from the internet
          ffi.copy(self.scratch_ipv4, pkt.data + constants.ethernet_header_size + constants.o_ipv4_src_addr, 4)
          from_inet(self, pkt)
+      else
+         packet.free(pkt)
       end -- Silently drop all other types coming from the internet interface
    end
 
@@ -568,6 +570,8 @@ function LwAftr:push ()
       if ethertype == constants.n_ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin/ICMPv6 as needed
          from_b4(self, pkt)
+      else
+         packet.free(pkt)
       end -- FIXME: silently drop other types; is this the right thing to do?
    end
 end
