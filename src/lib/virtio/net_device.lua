@@ -417,9 +417,9 @@ end
 function VirtioNetDevice:set_vring_addr(idx, ring)
 
    self.virtq[idx].virtq = ring
-   self.virtq[idx].avail = tonumber(ring.used.idx)
+   self.virtq[idx].avail = tonumber(ring.avail.idx)
    self.virtq[idx].used = tonumber(ring.used.idx)
-   print(string.format("rxavail = %d rxused = %d", self.virtq[idx].avail, self.virtq[idx].used))
+   debug(string.format("rxavail = %d rxused = %d", self.virtq[idx].avail, self.virtq[idx].used))
    ring.used.flags = C.VRING_F_NO_NOTIFY
 end
 
