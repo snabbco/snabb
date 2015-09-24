@@ -53,16 +53,15 @@ function run (args)
    local sofile = args[1]
 
    -- Load shared object
-   print("Loading shared object: "..sofile)
+   -- print("Loading shared object: "..sofile)
    local ffi = require("ffi")
-   local C = ffi.C
-   local so = ffi.load(sofile)
+   -- local so = ffi.load(sofile)
    ffi.cdef[[
 void firehose_start();
 void firehose_stop();
-int firehose_callback_v1(const char *pciaddr, char **packets, void *rxring,
-                         int ring_size, int index);
+int firehose_callback_v1(const char *pciaddr, char **packets, void *rxring, int ring_size, int index);
 ]]
+   local C = ffi.C
 
    -- Array where we store a function for each NIC that will process the traffic.
    local run_functions = {}
@@ -117,14 +116,14 @@ int firehose_callback_v1(const char *pciaddr, char **packets, void *rxring,
       local index = 0 -- ring index of next packet
       local rxring = nic.rxdesc._ptr
       local run = function ()
-         index = so.firehose_callback_v1(pciaddr, packets, rxring, ring_size, index)
+         index = C.firehose_callback_v1(pciaddr, packets, rxring, ring_size, index)
          nic.r.RDT(index==0 and ring_size or index-1)
       end
       table.insert(run_functions, run)
    end
 
    print("Initializing callback library")
-   so.firehose_start()
+   -- so.firehose_start()
 
    -- Process traffic in infinite loop
    print("Processing traffic...")
