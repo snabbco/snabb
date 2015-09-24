@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export SKIPPED_CODE=43
+
 if [ -z "$SNABB_PCI0" ]; then echo "Need SNABB_PCI0"; exit $SKIPPED_CODE; fi
 if [ -z "$SNABB_PCI1" ]; then echo "Need SNABB_PCI1"; exit $SKIPPED_CODE; fi
 
