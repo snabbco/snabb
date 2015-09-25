@@ -25,6 +25,14 @@ local empty, full = link.empty, link.full
 
 local debug = false
 
+local function compute_binding_table_by_ipv4(binding_table)
+   local ret = {}
+   for i,bind in ipairs(binding_table) do
+      ret[bind[2]] = bind
+   end
+   return ret
+end
+
 LwAftr = {}
 
 function LwAftr:new(conf)
@@ -33,6 +41,7 @@ function LwAftr:new(conf)
    for k,v in pairs(conf) do
       o[k] = v
    end
+   o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
    o.dgram = datagram:new()
    o.fragment6_cache = {}
    return setmetatable(o, {__index=LwAftr})
@@ -131,9 +140,20 @@ local function binding_lookup_ipv4_from_pkt(lwstate, pkt, pre_ipv4_bytes)
    return binding_lookup_ipv4(lwstate, ip, port)
 end
 
+-- https://www.ietf.org/id/draft-farrer-softwire-br-multiendpoints-01.txt
+-- Return true if the destination ipv4 address is within our managed set of addresses
+local function ipv4_dst_in_binding_table(lwstate, pkt, pre_ipv4_bytes)
+   local dst_ip_start = pre_ipv4_bytes + 16
+   -- Note: ip is kept in network byte order, regardless of host byte order
+   local ip = cast("uint32_t*", pkt.data + dst_ip_start)[0]
+   return lwstate.binding_table_by_ipv4[ip]
+end
+
 -- Todo: make this O(1)
 local function in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port)
-   for _, bind in ipairs(lwstate.binding_table) do
+   local binding_table = lwstate.binding_table
+   for i=1,#binding_table do
+      local bind = binding_table[i]
       if debug then
          print("CHECKB4", string.format("%x, %x", bind[2], ipv4_src_ip), ipv4_src_port)
       end
@@ -514,7 +534,7 @@ local function from_b4(lwstate, pkt)
          print("lwstate.hairpinning is", lwstate.hairpinning)
          print("binding_lookup...", binding_lookup_ipv4_from_pkt(lwstate, pkt, offset))
       end
-      if lwstate.hairpinning and binding_lookup_ipv4_from_pkt(lwstate, pkt, offset) then
+      if lwstate.hairpinning and ipv4_dst_in_binding_table(lwstate, pkt, offset) then
          -- Remove IPv6 header.
          packet.shiftleft(pkt, constants.ipv6_fixed_header_size)
          local eth_hdr = cast(ethernet._header_ptr_type, pkt.data)
