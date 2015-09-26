@@ -360,7 +360,6 @@ local function from_inet(lwstate, pkt)
          return -- lookup failed
       else
          local src_ip_start = constants.ethernet_header_size + constants.o_ipv4_src_addr
-         --local to_ip = cast("uint32_t*", pkt.data + src_ip_start)[0]
          local to_ip = pkt.data + src_ip_start
          return icmp_after_discard(lwstate, pkt, to_ip)-- ICMPv4 type 3 code 1 (dst/host unreachable)
       end
