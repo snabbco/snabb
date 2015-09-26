@@ -1,6 +1,7 @@
 module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
+local lwutil = require("apps.lwaftr.lwutil")
 
 local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
@@ -14,6 +15,7 @@ local math = require("math")
 
 local band, bnot = bit.band, bit.bnot
 local C = ffi.C
+local wr16, wr32 = lwutil.wr16, lwutil.wr32
 
 local function calculate_payload_size(dst_pkt, initial_pkt, max_size, config)
    local original_bytes_to_skip = constants.ethernet_header_size
@@ -42,10 +44,10 @@ local function write_icmp(dst_pkt, initial_pkt, max_size, base_checksum, config)
    local off = dst_pkt.length
    dst_pkt.data[off] = config.type
    dst_pkt.data[off + 1] = config.code
-   ffi.cast("uint16_t*", dst_pkt.data + off + 2)[0] = 0 -- checksum
-   ffi.cast("uint32_t*", dst_pkt.data + off + 4)[0] = 0 -- Reserved
+   wr16(dst_pkt.data + off + 2, 0) -- checksum
+   wr32(dst_pkt.data + off + 4, 0) -- Reserved
    if config.next_hop_mtu then
-      ffi.cast("uint16_t*", dst_pkt.data + off + 6)[0] = C.htons(config.next_hop_mtu)
+      wr16(dst_pkt.data + off + 6, C.htons(config.next_hop_mtu))
    end
    local dest = dst_pkt.data + non_payload_bytes
    C.memmove(dest, initial_pkt.data + original_bytes_to_skip, payload_size)
@@ -53,7 +55,7 @@ local function write_icmp(dst_pkt, initial_pkt, max_size, base_checksum, config)
    local icmp_bytes = constants.icmp_base_size + payload_size
    local icmp_start = dst_pkt.data + dst_pkt.length
    local csum = checksum.ipsum(icmp_start, icmp_bytes, base_checksum)
-   ffi.cast("uint16_t*", dst_pkt.data + off + 2)[0] = C.htons(csum)
+   wr16(dst_pkt.data + off + 2, C.htons(csum))
 
    dst_pkt.length = dst_pkt.length + icmp_bytes
 end
@@ -82,11 +84,11 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config
    -- Fix up the IPv4 total length and checksum
    local new_ipv4_len = new_pkt.length - constants.ethernet_header_size
    local ip_tl_p = new_pkt.data + constants.ethernet_header_size + constants.o_ipv4_total_length
-   ffi.cast("uint16_t*", ip_tl_p)[0] = C.ntohs(new_ipv4_len)
+   wr16(ip_tl_p, C.ntohs(new_ipv4_len))
    local ip_checksum_p = new_pkt.data + constants.ethernet_header_size + constants.o_ipv4_checksum
-   ffi.cast("uint16_t*", ip_checksum_p)[0] = 0 -- zero out the checksum before recomputing
+   wr16(ip_checksum_p,  0) -- zero out the checksum before recomputing
    local csum = checksum.ipsum(new_pkt.data + constants.ethernet_header_size, new_ipv4_len, 0)
-   ffi.cast("uint16_t*", ip_checksum_p)[0] = C.htons(csum)
+   wr16(ip_checksum_p, C.htons(csum))
 
    return new_pkt
 end
@@ -108,13 +110,13 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config
    local max_size = constants.max_icmpv6_packet_size
    local ph_len = calculate_payload_size(new_pkt, initial_pkt, max_size, config) + constants.icmp_base_size
    local ph = ipv6_header:pseudo_header(ph_len, constants.proto_icmpv6)
-   local ph_csum = checksum.ipsum(ffi.cast("uint8_t *", ph), ffi.sizeof(ph), 0)
+   local ph_csum = checksum.ipsum(ffi.cast("uint8_t*", ph), ffi.sizeof(ph), 0)
    local ph_csum = band(bnot(ph_csum), 0xffff)
    write_icmp(new_pkt, initial_pkt, max_size, ph_csum, config)
 
    local new_ipv6_len = new_pkt.length - (constants.ipv6_fixed_header_size + constants.ethernet_header_size)
    local ip_pl_p = new_pkt.data + constants.ethernet_header_size + constants.o_ipv6_payload_len
-   ffi.cast("uint16_t*", ip_pl_p)[0] = C.ntohs(new_ipv6_len)
+   wr16(ip_pl_p, C.ntohs(new_ipv6_len))
 
    return new_pkt
 end

@@ -5,6 +5,7 @@ local fragmentv6 = require("apps.lwaftr.fragmentv6")
 local icmp = require("apps.lwaftr.icmp")
 local lwconf = require("apps.lwaftr.conf")
 local lwdebug = require("apps.lwaftr.lwdebug")
+local lwutil = require("apps.lwaftr.lwutil")
 
 local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
@@ -22,6 +23,7 @@ local C = ffi.C
 local cast = ffi.cast
 local receive, transmit = link.receive, link.transmit
 local empty, full = link.empty, link.full
+local rd16, rd32, get_ihl, get_ihl_from_offset = lwutil.rd16, lwutil.rd32, lwutil.get_ihl, lwutil.get_ihl_from_offset
 
 local debug = false
 
@@ -62,7 +64,7 @@ end
 
 local function fixup_checksum(pkt, csum_offset, fixup_val)
    assert(math.abs(fixup_val) <= 0xffff, "Invalid fixup")
-   local csum = bnot(C.ntohs(cast("uint16_t*", pkt.data + csum_offset)[0]))
+   local csum = bnot(C.ntohs(rd16(pkt.data + csum_offset)))
    if debug then print("old csum", string.format("%x", csum)) end
    csum = csum + fixup_val
    -- TODO/FIXME: *test* this code
@@ -87,17 +89,6 @@ local function decrement_ttl(pkt)
    -- ttl_offset is even, so multiply the ttl change by 0x100.
    fixup_checksum(pkt, csum_offset, -0x100)
    return ttl
-end
-
-local function get_ihl(pkt)
-   -- It's byte 0 of an IPv4 header
-   local ver_and_ihl = pkt.data[constants.ethernet_header_size]
-   return bit.band(ver_and_ihl, 0xf) * 4
-end
-
-local function get_ihl_from_offset(pkt, offset)
-   local ver_and_ihl = pkt.data[offset]
-   return bit.band(ver_and_ihl, 0xf) * 4
 end
 
 local function get_lwAFTR_ipv6(lwstate, binding_entry)
@@ -133,10 +124,10 @@ end
 local function binding_lookup_ipv4_from_pkt(lwstate, pkt, pre_ipv4_bytes)
    local dst_ip_start = pre_ipv4_bytes + 16
    -- Note: ip is kept in network byte order, regardless of host byte order
-   local ip = cast("uint32_t*", pkt.data + dst_ip_start)[0]
+   local ip = rd32(pkt.data + dst_ip_start)
    -- TODO: don't assume the length of the IPv4 header; check IHL
    local dst_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes) + 2
-   local port = C.ntohs(cast("uint16_t*", pkt.data + dst_port_start)[0])
+   local port = C.ntohs(rd16(pkt.data + dst_port_start))
    return binding_lookup_ipv4(lwstate, ip, port)
 end
 
@@ -145,7 +136,7 @@ end
 local function ipv4_dst_in_binding_table(lwstate, pkt, pre_ipv4_bytes)
    local dst_ip_start = pre_ipv4_bytes + 16
    -- Note: ip is kept in network byte order, regardless of host byte order
-   local ip = cast("uint32_t*", pkt.data + dst_ip_start)[0]
+   local ip = rd32(pkt.data + dst_ip_start)
    return lwstate.binding_table_by_ipv4[ip]
 end
 
@@ -299,7 +290,7 @@ local function icmpv4_incoming(lwstate, pkt)
    -- Were it to nonetheless do so, RFC 4884 extension headers MUST NOT
    -- be taken into account when validating the checksum
    local o_tl = constants.ethernet_header_size + constants.o_ipv4_total_length
-   local icmp_bytes = C.ntohs(cast("uint16_t*", pkt.data + o_tl)[0]) - ipv4_header_size
+   local icmp_bytes = C.ntohs(rd16(pkt.data + o_tl)) - ipv4_header_size
    if checksum.ipsum(pkt.data + icmp_base, icmp_bytes, 0) ~= 0 then
       packet.free(pkt)
       return -- Silently drop the packet, as per RFC 5508
@@ -307,9 +298,9 @@ local function icmpv4_incoming(lwstate, pkt)
 
    -- checksum was ok
    if icmp_type == constants.icmpv4_echo_reply or icmp_type == constants.icmpv4_echo_request then
-      source_port = C.ntohs(cast("uint16_t*", pkt.data + icmp_base + constants.o_icmpv4_echo_identifier)[0])
+      source_port = C.ntohs(rd16(pkt.data + icmp_base + constants.o_icmpv4_echo_identifier))
       -- Use the outermost IP header for the destination; it's not repeated in the payload
-      ipv4_dst = cast("uint32_t*", pkt.data + constants.ethernet_header_size + constants.o_ipv4_dst_addr)[0]
+      ipv4_dst = rd32(pkt.data + constants.ethernet_header_size + constants.o_ipv4_dst_addr)
    else
       -- source port is the zeroeth byte of an encapsulated tcp or udp packet
       -- TODO: explicitly check for tcp/udp?
@@ -317,9 +308,9 @@ local function icmpv4_incoming(lwstate, pkt)
       -- The Internet Header Length is the low 4 bits, in 32-bit words; convert it to bytes
       local embedded_ipv4_header_size = bit.band(pkt.data[ip_base + constants.o_ipv4_ver_and_ihl], 0xf) * 4
       local o_sp = ip_base + embedded_ipv4_header_size
-      source_port = C.ntohs(cast("uint16_t*", pkt.data + o_sp)[0])
+      source_port = C.ntohs(rd16(pkt.data + o_sp))
       local o_ip = ip_base + constants.o_ipv4_src_addr
-      ipv4_dst = cast("uint32_t*", pkt.data + o_ip)[0]
+      ipv4_dst = rd32(pkt.data + o_ip)
    end
    -- IPs are stored in network byte order in the binding table
    local ipv6_dst, ipv6_src = binding_lookup_ipv4(lwstate, ipv4_dst, source_port)
@@ -398,7 +389,7 @@ local function tunnel_packet_too_big(lwstate, pkt)
 
    local next_hop_mtu_offset = 6
    local o_mtu = eth_hs + ipv6_hs + next_hop_mtu_offset
-   local specified_mtu = C.ntohs(cast("uint16_t*", pkt.data + o_mtu)[0])
+   local specified_mtu = C.ntohs(rd16(pkt.data + o_mtu))
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_datagram_too_big_df,
                         extra_payload_offset = orig_packet_offset - eth_hs,
@@ -522,8 +513,8 @@ local function from_b4(lwstate, pkt)
    local ipv4_src_port_offset = eth_and_ipv6 + get_ihl_from_offset(pkt, eth_and_ipv6)
    local ipv6_src_ip = pkt.data + ipv6_src_ip_offset
    local ipv6_dst_ip = pkt.data + ipv6_dst_ip_offset
-   local ipv4_src_ip = cast("uint32_t*", pkt.data + ipv4_src_ip_offset)[0]
-   local ipv4_src_port = C.ntohs(cast("uint16_t*", pkt.data + ipv4_src_port_offset)[0])
+   local ipv4_src_ip = rd32(pkt.data + ipv4_src_ip_offset)
+   local ipv4_src_port = C.ntohs(rd16(pkt.data + ipv4_src_port_offset))
 
    if in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port) then
       -- Is it worth optimizing this to change src_eth, src_ipv6, ttl, checksum,
@@ -580,7 +571,7 @@ function LwAftr:push ()
       local pkt = receive(i4)
       if debug then print("got a pkt") end
       -- Keep the ethertype in network byte order
-      local ethertype = cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0]
+      local ethertype = rd16(pkt.data + constants.o_ethernet_ethertype)
 
       if ethertype == constants.n_ethertype_ipv4 then -- Incoming packet from the internet
          from_inet(self, pkt)
@@ -592,7 +583,7 @@ function LwAftr:push ()
    while not empty(i6) do --and not full(o4) and not full(o6) do
       local pkt = receive(i6)
       if debug then print("got a pkt") end
-      local ethertype = cast('uint16_t*', pkt.data + constants.o_ethernet_ethertype)[0]
+      local ethertype = rd16(pkt.data + constants.o_ethernet_ethertype)
       local out_pkt = nil
       if ethertype == constants.n_ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin/ICMPv6 as needed

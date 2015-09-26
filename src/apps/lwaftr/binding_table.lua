@@ -3,6 +3,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
+local lwutil = require("apps.lwaftr.lwutil")
 
 -- TODO: rewrite this after netconf integration
 local function read_binding_table(bt_file)
@@ -19,7 +20,7 @@ local function pton_binding_table(bt)
    local pbt = {}
    for _, v in ipairs(bt) do
       local b4_v6 = ipv6:pton(v[1])
-      local pv4 = ffi.cast("uint32_t*", ipv4:pton(v[2]))[0]
+      local pv4 = lwutil.rd32(ipv4:pton(v[2]))
       local pentry
       if v[5] then
          local br_v6 = ipv6:pton(v[5])
