@@ -18,7 +18,7 @@ local ffi = require("ffi")
 local band, bnot, rshift = bit.band, bit.bnot, bit.rshift
 local bitfield = lib.bitfield
 local C = ffi.C
-local cast = ffi.cast
+local cast, fstring = ffi.cast, ffi.string
 local receive, transmit = link.receive, link.transmit
 local empty, full = link.empty, link.full
 local rd16, rd32, get_ihl, get_ihl_from_offset = lwutil.rd16, lwutil.rd32, lwutil.get_ihl, lwutil.get_ihl_from_offset
@@ -484,27 +484,44 @@ local function icmpv6_incoming(lwstate, pkt)
    end
 end
 
+local function get_ipv6_src_ip(pkt)
+   local ipv6_src = constants.ethernet_header_size + constants.o_ipv6_src_addr
+   return fstring(pkt.data + ipv6_src, 16)
+end
+
+local function get_ipv6_dst_ip(pkt)
+   local ipv6_dst = constants.ethernet_header_size + constants.o_ipv6_dst_addr
+   return fstring(pkt.data + ipv6_dst, 16)
+end
+
 -- TODO: rewrite this to either also have the source and dest IPs in the table,
 -- or rewrite the fragment reassembler to check rather than assuming
 -- all the fragments it is passed are the same in this regard
 local function cache_ipv6_fragment(lwstate, frag)
-  local frag_id = fragmentv6.get_ipv6_frag_id(frag)
-  if not lwstate.fragment6_cache[frag_id] then
-     lwstate.fragment6_cache[frag_id] = {}
-  end
-  table.insert(lwstate.fragment6_cache[frag_id], frag)
-  return lwstate.fragment6_cache[frag_id]
+   local cache = lwstate.fragment6_cache
+   local frag_id = fragmentv6.get_ipv6_frag_id(frag)
+   local src_ip = get_ipv6_src_ip(frag)
+   local dst_ip = get_ipv6_dst_ip(frag)
+   local src_dst = src_ip..dst_ip
+   cache[frag_id] = cache[frag_id] or {}
+   cache[frag_id][src_dst] = cache[frag_id][src_dst] or {}
+   table.insert(cache[frag_id][src_dst], frag)
+   return cache[frag_id][src_dst], frag_id
+end
+
+local function clean_fragment_cache(lwstate, frag_id)
+   lwstate.fragment6_cache[frag_id] = nil
 end
 
 -- TODO: rewrite this to use parse
 local function from_b4(lwstate, pkt)
    -- TODO: only send ICMP on failure for packets that plausibly would be bound?
    if fragmentv6.is_ipv6_fragment(pkt) then
-      local frags = cache_ipv6_fragment(lwstate, pkt)
+      local frags, frag_id = cache_ipv6_fragment(lwstate, pkt)
       local frag_status, maybe_pkt = fragmentv6.reassemble_ipv6(frags)
-      -- TODO: finish clearing out the fragment cache?
       if frag_status ~= fragmentv6.REASSEMBLY_OK then
          if maybe_pkt then
+            clean_fragment_cache(lwstate, frag_id)
             guarded_transmit(pkt, lwstate.o6)
             return
          end
