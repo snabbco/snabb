@@ -2,7 +2,6 @@ module(..., package.seeall)
 
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
-local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 
 local constants = require("apps.lwaftr.constants")
@@ -87,7 +86,6 @@ local function _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_
    local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
    local eth_header = ethernet:new({src = eth_src, dst = eth_dst, type = constants.ethertype_ipv6})
    local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
-   local frag_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size
 
    local dgram = dgram:reuse(repkt)
    dgram:push(ipv6_header)

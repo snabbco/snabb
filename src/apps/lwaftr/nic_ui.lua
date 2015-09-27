@@ -1,18 +1,14 @@
-local C = require("ffi").C
-
 local config = require("core.config")
 local lib = require("core.lib")
 
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
-local pcap = require("apps.pcap.pcap")
 
 local bt = require("apps.lwaftr.binding_table")
 local lwaftr = require("apps.lwaftr.lwaftr")
 local conf = require("apps.lwaftr.conf")
 
 local ethernet = require("lib.protocol.ethernet")
-local ipv6 = require("lib.protocol.ipv6")
 
 local usage="thisapp binding_table_file conf_file inet_nic_pci b4side_nic_pci"
 

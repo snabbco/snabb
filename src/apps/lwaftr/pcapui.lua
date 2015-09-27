@@ -3,7 +3,6 @@ local config = require("core.config")
 local pcap = require("apps.pcap.pcap")
 local lwaftr = require("apps.lwaftr.lwaftr")
 local bt = require("apps.lwaftr.binding_table")
-local ipv6 = require("lib.protocol.ipv6")
 
 local conf = require("apps.lwaftr.conf")
 

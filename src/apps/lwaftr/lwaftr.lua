@@ -8,9 +8,7 @@ local lwdebug = require("apps.lwaftr.lwdebug")
 local lwutil = require("apps.lwaftr.lwutil")
 
 local checksum = require("lib.checksum")
-local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
-local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local packet = require("core.packet")
 local lib = require("core.lib")
@@ -29,7 +27,7 @@ local debug = false
 
 local function compute_binding_table_by_ipv4(binding_table)
    local ret = {}
-   for i,bind in ipairs(binding_table) do
+   for _,bind in ipairs(binding_table) do
       ret[bind[2]] = bind
    end
    return ret
@@ -86,7 +84,6 @@ function LwAftr:new(conf)
       o[k] = v
    end
    o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
-   o.dgram = datagram:new()
    o.fragment6_cache = {}
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
    return setmetatable(o, {__index=LwAftr})
@@ -216,11 +213,6 @@ end
 -- ICMPv6 type 1 code 5, as per RFC 7596.
 -- The source (ipv6, ipv4, port) tuple is not in the table.
 local function icmp_b4_lookup_failed(lwstate, pkt, to_ip)
-   local headers_len = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.icmp_base_size
-   local plen = pkt.length - constants.ethernet_header_size
-   if plen + headers_len >= constants.min_ipv6_mtu then
-      plen = constants.min_ipv6_mtu - headers_len
-   end
    local icmp_config = {type = constants.icmpv6_dst_unreachable,
                         code = constants.icmpv6_failed_ingress_egress_policy,
                        }
@@ -479,7 +471,7 @@ local function icmpv6_incoming(lwstate, pkt)
    -- network, send it there. If hairpinning is/was enabled, it could be from a
    -- b4; if it was from a b4, encapsulate the generaced IPv4 message and send it.
    -- This is the most plausible reading of RFC 2473, although not unambigous.
-   local ipv6_dst, ipv6_src = binding_lookup_ipv4_from_pkt(lwstate, icmpv4_reply, constants.ethernet_header_size)
+   local ipv6_dst = binding_lookup_ipv4_from_pkt(lwstate, icmpv4_reply, constants.ethernet_header_size)
    if ipv6_dst and lwstate.hairpinning then
       -- Hairpinning was implicitly allowed now or in the recent past if the
       -- binding table lookup succeeded. Nonetheless, require that it be
@@ -614,7 +606,6 @@ function LwAftr:push ()
       local pkt = receive(i6)
       if debug then print("got a pkt") end
       local ethertype = rd16(pkt.data + constants.o_ethernet_ethertype)
-      local out_pkt = nil
       if ethertype == constants.n_ethertype_ipv6 then
          -- decapsulate iff the source was a b4, and forward/hairpin/ICMPv6 as needed
          from_b4(self, pkt)

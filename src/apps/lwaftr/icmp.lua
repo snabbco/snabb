@@ -11,7 +11,6 @@ local ipv6 = require("lib.protocol.ipv6")
 
 local bit = require("bit")
 local ffi = require("ffi")
-local math = require("math")
 
 local band, bnot = bit.band, bit.bnot
 local C = ffi.C
