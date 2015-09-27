@@ -35,20 +35,6 @@ local function compute_binding_table_by_ipv4(binding_table)
    return ret
 end
 
-LwAftr = {}
-
-function LwAftr:new(conf)
-   if debug then lwdebug.pp(conf) end
-   local o = {}
-   for k,v in pairs(conf) do
-      o[k] = v
-   end
-   o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
-   o.dgram = datagram:new()
-   o.fragment6_cache = {}
-   return setmetatable(o, {__index=LwAftr})
-end
-
 local function guarded_transmit(pkt, o)
    -- The assert was never being hit, and the assert+link check slow the code
    -- down about 5-18%, by comparing best and worst runs of 5 seconds at their
@@ -60,6 +46,50 @@ local function guarded_transmit(pkt, o)
    -- on a link full condition could.
    --assert(not full(o), "need a cache...")
    transmit(o, pkt)
+end
+
+local transmit_icmpv6_with_rate_limit
+
+local function init_transmit_icmpv6_with_rate_limit(lwstate)
+   assert(lwstate.icmpv6_rate_limiter_n_seconds > 0,
+      "Incorrect icmpv6_rate_limiter_n_seconds value, must be > 0")
+   assert(lwstate.icmpv6_rate_limiter_n_packets >= 0,
+      "Incorrect icmpv6_rate_limiter_n_packets value, must be >= 0")
+   local icmpv6_rate_limiter_n_seconds = lwstate.icmpv6_rate_limiter_n_seconds
+   local icmpv6_rate_limiter_n_packets = lwstate.icmpv6_rate_limiter_n_packets
+   local counter = 0
+   local last_time
+   return function (pkt, o)
+      local cur_now = tonumber(engine.now())
+      last_time = last_time or cur_now
+      -- Reset if elapsed time reached.
+      if cur_now - last_time >= icmpv6_rate_limiter_n_seconds then
+         last_time = cur_now
+         counter = 0
+      end
+      -- Send packet if limit not reached.
+      if counter < icmpv6_rate_limiter_n_packets then
+         guarded_transmit(pkt, o)
+         counter = counter + 1
+      else
+         packet.free(pkt)
+      end
+   end
+end
+
+LwAftr = {}
+
+function LwAftr:new(conf)
+   if debug then lwdebug.pp(conf) end
+   local o = {}
+   for k,v in pairs(conf) do
+      o[k] = v
+   end
+   o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
+   o.dgram = datagram:new()
+   o.fragment6_cache = {}
+   transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
+   return setmetatable(o, {__index=LwAftr})
 end
 
 local function fixup_checksum(pkt, csum_offset, fixup_val)
@@ -196,7 +226,7 @@ local function icmp_b4_lookup_failed(lwstate, pkt, to_ip)
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(lwstate.aftr_mac_b4_side, lwstate.b4_mac, lwstate.aftr_ipv6_ip,
                                               to_ip, pkt, icmp_config)
-   guarded_transmit(b4fail_icmp, lwstate.o6)
+   transmit_icmpv6_with_rate_limit(b4fail_icmp, lwstate.o6)
 end
 
 -- Given a packet containing IPv4 and Ethernet, encapsulate the IPv4 portion.
