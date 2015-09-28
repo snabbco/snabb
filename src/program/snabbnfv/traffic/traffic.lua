@@ -15,6 +15,7 @@ local long_opts = {
    ["link-report-interval"] = "k",
    ["load-report-interval"] = "l",
    ["debug-report-interval"] = "D",
+   ["busy"] = "b",
    ["long-help"] = "H"
 }
 
@@ -30,7 +31,8 @@ function run (args)
    function opt.k (arg) linkreportinterval = tonumber(arg) end
    function opt.l (arg) loadreportinterval = tonumber(arg) end
    function opt.D (arg) debugreportinterval = tonumber(arg) end
-   args = lib.dogetopt(args, opt, "hHB:k:l:D:", long_opts)
+   function opt.b (arg) engine.busywait = true              end
+   args = lib.dogetopt(args, opt, "hHB:k:l:D:b", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
       local ok, info = pcall(pci.device_info, pciaddr)
