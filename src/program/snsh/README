@@ -21,4 +21,6 @@ Execute SCRIPT if specified and then exit.
                                http://luajit.org/running.html
   -P PATH,   --package-path PATH
                              Use PATH as the Lua 'package.path'.
+  -q,        --sigquit-repl  Enter the REPL on SIGQUIT (Control-\).
+                             (Hook is only effective during engine.main().)
   -h,        --help          Print this usage message.
