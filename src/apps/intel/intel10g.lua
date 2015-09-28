@@ -135,6 +135,7 @@ function M_sf:init ()
          :init_statistics()
          :init_receive()
          :init_transmit()
+         :init_txdesc_prefetch()
          :wait_enable()
          :wait_linkup()
 
@@ -420,8 +421,12 @@ end
 function M_sf:init_transmit ()
    self.r.HLREG0:set(bits{TXCRCEN=0})
    self:set_transmit_descriptors()
-   self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26, hthresh=8} + 32)
    self.r.DMATXCTL:set(bits{TE=0})
+   return self
+end
+
+function M_sf:init_txdesc_prefetch ()
+   self.r.TXDCTL:set(bits{SWFLSH=26, hthresh=8} + 32)
    return self
 end
 
