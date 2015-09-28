@@ -1,6 +1,7 @@
 module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
+local fragmentv4 = require("apps.lwaftr.fragmentv4")
 local fragmentv6 = require("apps.lwaftr.fragmentv6")
 local icmp = require("apps.lwaftr.icmp")
 local lwconf = require("apps.lwaftr.conf")
@@ -513,7 +514,6 @@ local function clean_fragment_cache(lwstate, frag_id)
    lwstate.fragment6_cache[frag_id] = nil
 end
 
--- TODO: rewrite this to use parse
 local function from_b4(lwstate, pkt)
    -- TODO: only send ICMP on failure for packets that plausibly would be bound?
    if fragmentv6.is_ipv6_fragment(pkt) then
@@ -579,8 +579,24 @@ local function from_b4(lwstate, pkt)
          eth_hdr.ether_shost = lwstate.aftr_mac_inet_side
          eth_hdr.ether_dhost = lwstate.inet_mac
          eth_hdr.ether_type = C.htons(constants.ethertype_ipv4)
-         guarded_transmit(pkt, lwstate.o4)
-         return
+
+         -- Fragment if necessary
+         if pkt.length > lwstate.ipv4_mtu then
+            local fragstatus, frags = fragmentv4.fragment_ipv4(pkt, lwstate.ipv4_mtu)
+            if fragstatus == fragmentv4.FRAGMENT_OK then
+               for i=1,#frags do
+                  guarded_transmit(frags[i], lwstate.o4)
+               end
+               return
+            else
+               -- TODO: send ICMPv4 info if allowed by policy
+               packet.free(pkt)
+               return
+            end
+         else -- No fragmentation needed
+            guarded_transmit(pkt, lwstate.o4)
+            return
+         end
       end
    elseif lwstate.policy_icmpv6_outgoing == lwconf.policies['ALLOW'] then
       icmp_b4_lookup_failed(lwstate, pkt, ipv6_src_ip)

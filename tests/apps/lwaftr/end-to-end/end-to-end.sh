@@ -38,7 +38,6 @@ function snabb_run_and_cmp {
    echo "Test passed"
 }
 
-
 echo "Testing: from-internet IPv4 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-bound.pcap ${EMPTY} \
@@ -53,6 +52,16 @@ echo "Testing: from-internet IPv4 packet found in the binding table, original TT
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-bound-ttl1.pcap ${EMPTY}\
    ${TEST_BASE}/icmpv4-time-expired.pcap ${EMPTY}
+
+echo "Testing: from-B4 IPv4 fragmentation (2)"
+snabb_run_and_cmp ${TEST_BASE}/small_ipv4_mtu_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-ipv6-fromb4-toinet-1046.pcap \
+   ${TEST_BASE}/tcp-ipv4-toinet-2fragments.pcap ${EMPTY}
+
+echo "Testing: from-B4 IPv4 fragmentation (3)"
+snabb_run_and_cmp ${TEST_BASE}/small_ipv4_mtu_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-ipv6-fromb4-toinet-1500.pcap \
+   ${TEST_BASE}/tcp-ipv4-toinet-3fragments.pcap ${EMPTY}
 
 echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation (2)."
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
