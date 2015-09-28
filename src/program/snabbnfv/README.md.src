@@ -54,6 +54,9 @@ port := { port_id        = <id>,          -- A unique string
           tx_police_gbps = <n> }          -- Allowed output rate in Gbps
 ```
 
+If `mac_address` isn't set, all traffic will be accepted. Note that this disables the use of
+virtual queues on the same Ethernet port (it sets vmdq to false).
+
 The `tunnel` section deviates a little from `SimpleKeyedTunnel`'s
 terminology:
 
