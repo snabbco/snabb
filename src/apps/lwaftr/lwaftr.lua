@@ -21,7 +21,6 @@ local bitfield = lib.bitfield
 local C = ffi.C
 local cast, fstring = ffi.cast, ffi.string
 local receive, transmit = link.receive, link.transmit
-local empty, full = link.empty, link.full
 local rd16, rd32, get_ihl, get_ihl_from_offset = lwutil.rd16, lwutil.rd32, lwutil.get_ihl, lwutil.get_ihl_from_offset
 
 local debug = false
@@ -617,12 +616,22 @@ end
 -- was received from) where they occur.
 -- TODO: handle fragmentation elsewhere too?
 function LwAftr:push ()
-   local i4 = self.input.v4
-   local i6 = self.input.v6
-   self.o4 = self.output.v4
-   self.o6 = self.output.v6
+   local i4, i6 = self.input.v4, self.input.v6
+   local o4, o6 = self.output.v4, self.output.v6
+   self.o4, self.o6 = o4, o6
 
-   while not empty(i4) do --and not full(o4) and not full(o6) do
+   -- If we are really slammed and can't keep up, packets are going to
+   -- drop one way or another.  The nwritable() check is just to prevent
+   -- us from burning the CPU on packets that we're pretty sure would be
+   -- dropped anyway, so that when we're in an overload situation things
+   -- don't get worse as the traffic goes up.  It's not a fool-proof
+   -- check that we in fact will be able to successfully handle the
+   -- packet, given that the packet might require fragmentation,
+   -- hairpinning, or ICMP error messages, all of which might result in
+   -- transmission of packets on the "other" interface or multiple
+   -- packets on the "right" interface.
+
+   for _=1,math.min(link.nreadable(i4), link.nwritable(o6)) do
       local pkt = receive(i4)
       if debug then print("got a pkt") end
       -- Keep the ethertype in network byte order
@@ -635,7 +644,7 @@ function LwAftr:push ()
       end -- Silently drop all other types coming from the internet interface
    end
 
-   while not empty(i6) do --and not full(o4) and not full(o6) do
+   for _=1,math.min(link.nreadable(i6), link.nwritable(o4)) do
       local pkt = receive(i6)
       if debug then print("got a pkt") end
       local ethertype = rd16(pkt.data + constants.o_ethernet_ethertype)
