@@ -129,8 +129,6 @@ ffi.metatype(packet_t, {__index = {
    prepend = prepend,
    shiftleft = shiftleft,
    free = free,
---    data = data,
    physical = physical,
---    length = length,
    dump = dump,
 }})
