@@ -1,0 +1,6 @@
+Usage:
+  snabb-lwaftr run
+
+Use --help for per-command usage.
+Example:
+    snabb-lwaftr run --help
