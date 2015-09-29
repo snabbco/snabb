@@ -204,6 +204,10 @@ function RateLimitedRepeater:new (arg)
    return setmetatable(o, {__index=RateLimitedRepeater})
 end
 
+function RateLimitedRepeater:set_rate (byte_rate)
+   self.rate = math.max(byte_rate, 0)
+end
+
 function RateLimitedRepeater:push ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
@@ -222,7 +226,7 @@ function RateLimitedRepeater:push ()
    end
 
    local npackets = #self.packets
-   if npackets > 0 then
+   if npackets > 0 and self.rate > 0 then
       for _ = 1, link.nwritable(o) do
          local p = self.packets[self.index]
          if p.length > self.bucket_content then break end
