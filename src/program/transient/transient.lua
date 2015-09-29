@@ -1,17 +1,16 @@
 module(..., package.seeall)
 
-local engine    = require("core.app")
-local counter   = require("core.counter")
-local config    = require("core.config")
-local timer     = require("core.timer")
-local pci       = require("lib.hardware.pci")
-local Intel82599= require("apps.intel.intel_app").Intel82599
+local engine = require("core.app")
+local counter = require("core.counter")
+local config = require("core.config")
+local timer = require("core.timer")
+local pci = require("lib.hardware.pci")
+local Intel82599 = require("apps.intel.intel_app").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
-local main      = require("core.main")
-local PcapReader= require("apps.pcap.pcap").PcapReader
+local main = require("core.main")
+local PcapReader = require("apps.pcap.pcap").PcapReader
 local lib = require("core.lib")
 local ffi = require("ffi")
-local C = ffi.C
 
 function show_usage(code)
    print(require("program.transient.README_inc"))
@@ -37,10 +36,7 @@ function find_device(pattern)
    elseif #devices == 1 then
       return devices[1]
    else
-      local devices_str = ''
-      for _,device_str in ipairs(devices) do
-         devices_str = devices_str .. ' ' .. device_str
-      end
+      local devices_str = table.concat(devices, ' ')
       error('multiple devices matched pattern "'..pattern..'":'..devices_str)
    end
 end
@@ -60,7 +56,7 @@ function parse_args(args)
    function handlers.p(arg)
       opts.period = assert(tonumber(arg), 'period must be a number')
    end
-   function handlers.h(arg) show_usage(0) end
+   function handlers.h() show_usage(0) end
    args = lib.dogetopt(args, handlers, "hb:s:D:p:",
                        { bitrate="b", step="s", duration="D", period="p",
                          help="h" })
@@ -175,7 +171,7 @@ end
 function run(args)
    local opts, streams = parse_args(args)
    local c = config.new()
-   for i, stream in ipairs(streams) do
+   for _,stream in ipairs(streams) do
       stream.pcap_id = 'pcap_'..stream.id
       stream.repeater_id = 'repeater_'..stream.id
       stream.nic_id = 'nic_'..stream.id
