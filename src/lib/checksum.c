@@ -151,44 +151,39 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
   return 0xFFFF0001;
 }
 
-int startoffset[2];
-int *prepare_packet(int8_t *buf, size_t len)
+uint8_t startoffset[2];
+uint8_t *prepare_packet(int8_t *buf, size_t len)
 {
-//   printf ("prepare_packet %p %ld\n", buf, len);
   uint16_t *hwbuf = (uint16_t *)buf;
-//   printf ("hwbuf: %p\n", hwbuf);
   int8_t ipv = (buf[0] & 0xF0) >> 4;
   int8_t proto = 0;
   uint32_t pheader = 0;
 
-
+  // IPv4.
   if (ipv == 4) {
-//     printf ("ipv4\n");
     proto = buf[9];
     startoffset[0] = (buf[0] & 0x0F) * 4;
-//     printf ("proto: %d startoffset[0]: %d\n", proto, startoffset[0]);
     hwbuf[5] = htons(cksum_generic((unsigned char *)buf, startoffset[0], -ntohs(hwbuf[5])));
-//     printf ("ip header csum: %d\n", hwbuf[5]);
-  } else if (ipv == 6) {    // IPv6
-//     printf ("ipv6\n");
+  // IPv6.
+  } else if (ipv == 6) {
     proto = buf[6];
     startoffset[0] = 40;
-//     printf ("proto: %d startoffset[0]: %d\n", proto, startoffset[0]);
   } else {
-//     printf ("no IP\n");
+    return NULL;
+  }
+
+  // TCP.
+  if (proto == 6) {
+    startoffset[1] = 16; // Checksum offset.
+  // UDP.
+  } else if (proto == 17) {
+    startoffset[1] = 6;  // Checksum offset.
+  } else {
     return NULL;
   }
 
   pheader = pseudo_header_initial(buf, len);
   if (pheader & 0xFFFF0000) {
-    return NULL;
-  }
-
-  if (proto == 6) {     // TCP
-    startoffset[1] = 16;
-  } else if (proto == 17) {     // UDP
-    startoffset[1] = 6;
-  } else {
     return NULL;
   }
   *(uint16_t *)(buf+startoffset[0]+startoffset[1]) = htons(pheader & 0x0000FFFF);

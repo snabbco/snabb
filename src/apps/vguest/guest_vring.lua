@@ -1,10 +1,9 @@
-
+module(..., package.seeall)
 
 local ffi    = require("ffi")
 local C      = ffi.C
 local memory = require('core.memory')
-local packet = require('core.packet')
-local band = require('bit').band
+local band   = require('bit').band
 
 local VRing = {}
 VRing.__index = VRing
@@ -50,29 +49,11 @@ local function vring_type(n)
    return t
 end
 
-
--- local function allocate_vring(n)
---    local ct = vring_type(n)
---    local ptr, phys, sz = memory.dma_alloc(ffi.sizeof(ct))
---    ffi.fill(ptr, ffi.sizeof(ct))
---    ptr = ffi.cast(ffi.typeof('$ *', ct), ptr)
---    local obj = ptr[0]
---
---    -- arrange descs in a free list
---    for i = 0, n-1 do
---       obj.vring.desc[i].next = i+1
---    end
---    obj.num_free = n;
---
---    return obj, phys, sz
--- end
-
-
 local function allocate_vring(n)
    local ct = vring_type(n)
    local vr = ffi.new(ct, { num = n })
    local ring_t = ffi.typeof(vr.vring[0])
-   local ptr, phys, sz = memory.dma_alloc(ffi.sizeof(vr.vring[0]))
+   local ptr, phys = memory.dma_alloc(ffi.sizeof(vr.vring[0]))
    vr.vring = ffi.cast(ring_t, ptr)
    vr.vring_physaddr = phys
 
@@ -84,11 +65,9 @@ local function allocate_vring(n)
    return vr
 end
 
-
 function VRing:can_add()
    return self.num_free > 0
 end
-
 
 function VRing:add(p, len)
    assert(self:can_add(), "trying to add when can't")
@@ -103,16 +82,14 @@ function VRing:add(p, len)
    desc.flags = 0       -- TODO: flags
    desc.next = -1
 
-   self.vring.avail.ring[band (self.vring.avail.idx, self.num-1)] = idx
+   self.vring.avail.ring[band(self.vring.avail.idx, self.num-1)] = idx
    C.full_memory_barrier()
    self.vring.avail.idx = self.vring.avail.idx + 1
 end
 
-
 function VRing:more_used()
    return self.vring.used.idx ~= self.last_used_idx
 end
-
 
 function VRing:get()
    if not self:more_used() then return nil end
@@ -131,7 +108,6 @@ function VRing:get()
 
    return p
 end
-
 
 return {
    vring_type = vring_type,
