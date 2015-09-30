@@ -31,15 +31,15 @@ function CSVStatsTimer:add_app(id, links, link_names)
    end
 
    local app = assert(engine.app_table[id], "App named "..id.." not found")
-   if links == nil then
-      for name,link in pairs(app.input) do add_link_data(name, link) end
-      for name,link in pairs(app.output) do add_link_data(name, link) end
-   else
+   if links then
       for _,name in ipairs(links) do
          local link = app.input[name] or app.output[name]
          assert(link, "Link named "..name.." not found in "..id)
          add_link_data(name, link)
       end
+   else
+      for name,link in pairs(app.input) do add_link_data(name, link) end
+      for name,link in pairs(app.output) do add_link_data(name, link) end
    end
 end
 
