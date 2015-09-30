@@ -18,7 +18,7 @@ function scmp {
     if ! cmp $1 $2 ; then
         ls -l $1
         ls -l $2
-        quit_with_msg $3
+        quit_with_msg "$3"
     fi
 }
 
@@ -28,13 +28,15 @@ function snabb_run_and_cmp {
       echo "not enough arguments to snabb_run_and_cmp"
       exit 1
    fi
-   ${SNABB_BASE}/src/snabb snsh ${SNABB_BASE}/src/apps/lwaftr/pcapui.lua ${TEST_BASE}/binding.table \
+   ${SNABB_BASE}/src/snabb-lwaftr check ${TEST_BASE}/binding.table \
       $1 $2 $3 ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap || quit_with_msg \
-        "Snabb failed: ${SNABB_BASE}/src/snabb snsh \
-         ${SNABB_BASE}/src/apps/lwaftr/pcapui.lua ${TEST_BASE}/binding.table $1 \
-         $2 $3 ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap"
-   scmp $4 ${TEST_OUT}/endoutv4.pcap "snabb snsh apps/lwaftr/main.lua $1 $2 $3 $4 $5"
-   scmp $5 ${TEST_OUT}/endoutv6.pcap "snabb snsh apps/lwaftr/main.lua $1 $2 $3 $4 $5"
+        "Failure: ${SNABB_BASE}/src/snabb-lwaftr check \
+         ${TEST_BASE}/binding.table $1 $2 $3 \
+         ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap"
+   scmp $4 ${TEST_OUT}/endoutv4.pcap \
+    "Failure: ${SNABB_BASE}/src/snabb-lwaftr check ${TEST_BASE}/binding.table $1 $2 $3 $4 $5"
+   scmp $5 ${TEST_OUT}/endoutv6.pcap \
+    "Failure: ${SNABB_BASE}/src/snabb-lwaftr check ${TEST_BASE}/binding.table $1 $2 $3 $4 $5"
    echo "Test passed"
 }
 
