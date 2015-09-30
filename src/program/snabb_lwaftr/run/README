@@ -6,5 +6,4 @@ Usage: run --help
        --v4-pci <pci-addr>      PCI device number for the INET-side NIC
        --v6-pci <pci-addr>      PCI device number for the B4-side NIC
        -D       <seconds>       Duration in seconds
-       -v                       Verbose
-       -u                       Ultraverbose (implies verbose)
+       -v                       Verbose (repeat for more verbosity)
