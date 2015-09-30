@@ -217,7 +217,7 @@ end
 function writemsr (cpu, msr, value)
    local msrfile = ("/dev/cpu/%d/msr"):format(cpu)
    if not S.stat(msrfile) then
-      error("Cannot open "..msr.." (consider 'modprobe msr')")
+      error("Cannot open "..msrfile.." (consider 'modprobe msr')")
    end
    local fd = assert(S.open(msrfile, "rdwr"))
    assert(fd:lseek(msr, "set"))
