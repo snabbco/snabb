@@ -4,6 +4,7 @@ local engine = require("core.app")
 local counter = require("core.counter")
 local config = require("core.config")
 local timer = require("core.timer")
+local csv_stats = require("lib.csv_stats")
 local pci = require("lib.hardware.pci")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
@@ -13,7 +14,7 @@ local lib = require("core.lib")
 local ffi = require("ffi")
 
 function show_usage(code)
-   print(require("program.transient.README_inc"))
+   print(require("program.snabb_lwaftr.transient.README_inc"))
    main.exit(code)
 end
 
@@ -95,79 +96,6 @@ function adjust_rate(opts, streams)
    end
 end
 
-local function fout(tmpl, ...)
-   io.write(tmpl:format(...))
-end
-
-local function print_headings(streams)
-   fout('Time (s)')
-   for _,stream in ipairs(streams) do
-      fout(',%s TX (MPPS),%s TX (Gbps),%s RX (MPPS),%s RX (Gbps)',
-           stream.name, stream.name, stream.name, stream.name)
-   end
-   fout('\n')
-   io.flush()
-end
-
-local function print_sample(sample)
-   fout('%f', sample.elapsed)
-   for _,stat in ipairs(sample) do
-      fout(',%f,%f,%f,%f', stat.sent_mpps, stat.sent_gbps,
-           stat.received_mpps, stat.received_gbps)
-   end
-   fout('\n')
-   io.flush()
-end
-
-local statistics = {}
-function record_stats(opts, streams)
-   local count = 0
-   local elapsed = 0
-   local prev_stats = {}
-   print_headings(streams)
-   for _,stream in ipairs(streams) do
-      prev_stats[stream.id] = {
-         sent_bytes = 0,
-         sent_packets = 0,
-         received_bytes = 0,
-         received_packets = 0
-      }
-   end
-   return function()
-      elapsed = elapsed + opts.period
-      count = count + 1
-      local sample = { elapsed = elapsed, count = count }
-      for _,stream in ipairs(streams) do
-         local app = engine.app_table[stream.nic_id]
-         local prev = prev_stats[stream.id]
-         local sent, received = app.input.rx, app.output.tx
-         local cur = {
-            sent_bytes = counter.read(sent.stats.txbytes),
-            sent_packets = counter.read(sent.stats.txpackets),
-            received_bytes = counter.read(received.stats.txbytes),
-            received_packets = counter.read(received.stats.txpackets)
-         }
-         prev_stats[stream.id] = cur
-         local diff = {
-            sent_bytes = tonumber(cur.sent_bytes - prev.sent_bytes),
-            sent_packets = tonumber(cur.sent_packets - prev.sent_packets),
-            received_bytes = tonumber(cur.received_bytes - prev.received_bytes),
-            received_packets = tonumber(cur.received_packets - prev.received_packets)
-         }
-         local stat = {
-            name = stream.name,
-            sent_mpps = diff.sent_packets / opts.period / 1e6,
-            sent_gbps = diff.sent_bytes * 8 / opts.period / 1e9,
-            received_mpps = diff.received_packets / opts.period / 1e6,
-            received_gbps = diff.received_bytes * 8 / opts.period / 1e9
-         }
-         table.insert(sample, stat)
-      end
-      table.insert(statistics, sample)
-      print_sample(sample)
-   end
-end
-
 function run(args)
    local opts, streams = parse_args(args)
    local c = config.new()
@@ -194,8 +122,11 @@ function run(args)
    rate_adjuster()
    timer.activate(timer.new("adjust_rate", rate_adjuster,
                             opts.duration * 1e9, 'repeating'))
-   timer.activate(timer.new("record_stats", record_stats(opts, streams),
-                            opts.period * 1e9, 'repeating'))
-
+   local csv = csv_stats.CSVStatsTimer.new()
+   for _,stream in ipairs(streams) do
+      csv:add_app(stream.nic_id, { 'rx', 'tx' },
+                  { rx=stream.name..' TX', tx=stream.name..' RX' })
+   end
+   csv:activate()
    engine.main({duration=opts.duration*((opts.bitrate/opts.step)*2+1)})
 end

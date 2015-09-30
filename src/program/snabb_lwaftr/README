@@ -1,5 +1,6 @@
 Usage:
   snabb-lwaftr run
+  snabb-lwaftr transient
 
 Use --help for per-command usage.
 Example:
