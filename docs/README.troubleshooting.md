@@ -11,6 +11,13 @@ v4_stats: 0.000 MPPS, 0.000 Gbps.
 v6_stats: 0.000 MPPS, 0.000 Gbps.
 ```
 
+or like this:
+
+```
+Time (s),IPv4 RX MPPS,IPv4 RX Gbps,IPv4 TX MPPS,IPv4 TX Gbps,IPv6 RX MPPS,IPv6 RX Gbps,IPv6 TX MPPS,IPv6 TX Gbps
+0.999885,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000
+```
+
 **Resolution:**
 
 The lwaftr is running, but not receiving packets from the load generator.
@@ -55,12 +62,13 @@ choose a different card, and try again.
 
 **Problem:**
 
-Running some tools, such as `nic_ui.lua`, with identifiers from `lspci` can
-result in the following:
+Running some tools with identifiers from `lspci` can result in the following:
 
 ```
 lib/hardware/pci.lua:131: assertion failed!
 ```
+
+Reminder: the lspci output will look something like this:
 
 ```bash
 $ lspci | grep 82599
@@ -73,7 +81,7 @@ $ lspci | grep 82599
 **Resolution:**
 
 Many tools accept the short form of the PCI addresses (ie, _'01:00.0'_), but
-some, such as `nic_ui.lua`, require them to match a filename in
+some require them to match a filename in
 `/sys/bus/pci/devices/`, such as `/sys/bus/pci/devices/0000:01:00.1` : in such
 cases, you must write _'0000:01:00.0'_, with the appropriate prefix (_'0000:'_,
 in this example).

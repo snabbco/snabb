@@ -20,5 +20,5 @@ $ make
 
 Note that this requires internet access to fetch the submodules.
 
-This is all that is needed to build snabb-lwaftr. See `bin/` for **snabb-lwaftr**,
-and see [README.first.md](README.first.md) for instructions on how to use it.
+This is all that is needed to build snabb-lwaftr.
+See [README.first.md](README.first.md) for instructions on how to use it.

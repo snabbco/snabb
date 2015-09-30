@@ -54,15 +54,15 @@ $ cd ${SNABB_LW_DIR} # The directory snabb-lwaftr is checked out into
 $ sudo ./bin/snabb-lwaftr-blaster \
     --v4-pcap tests/apps/lwaftr/benchdata/ipv4-0550.pcap \
     --v6-pcap tests/apps/lwaftr/benchdata/ipv6-0550.pcap \
-    --v4-pci 01:00.0 --v6-pci 02:00.0
+    --v4-pci 0000:01:00.0 --v6-pci 0000:02:00.0
 ```
 
 Now, run the lwaftr itself:
 ```
-$ sudo ./bin/snabb-lwaftr \
+$ sudo ./src/snabb-lwaftr run \
     --bt tests/apps/lwaftr/data/binding.table \
     --conf tests/apps/lwaftr/data/icmp_on_fail.conf \
-    --v4-pci 01:00.1 --v6-pci 02:00.1
+    --v4-pci 0000:01:00.1 --v6-pci 0000:02:00.1
 ```
 
 # Section 4. Troubleshooting
