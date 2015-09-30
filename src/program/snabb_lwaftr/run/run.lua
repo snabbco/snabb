@@ -1,8 +1,15 @@
 module(..., package.seeall)
 
-local lib        = require("core.lib")
-local nic_common = require("apps.lwaftr.nic_common")
 local syscall    = require("syscall")
+local config     = require("core.config")
+local lib        = require("core.lib")
+local csv_stats  = require("lib.csv_stats")
+local ethernet   = require("lib.protocol.ethernet")
+local Intel82599 = require("apps.intel.intel_app").Intel82599
+local basic_apps = require("apps.basic.basic_apps")
+local bt         = require("apps.lwaftr.binding_table")
+local conf       = require("apps.lwaftr.conf")
+local lwaftr     = require("apps.lwaftr.lwaftr")
 
 local function show_usage(exit_code)
    print(require("program.snabb_lwaftr.run.README_inc"))
@@ -31,8 +38,8 @@ local function nic_exists(pci_addr)
       dir_exists(("%s/0000:%s"):format(devices, pci_addr))
 end
 
-function run(parameters)
-   if #parameters == 0 then show_usage(1) end
+function parse_args(args)
+   if #args == 0 then show_usage(1) end
    local bt_file, conf_file, v4_pci, v6_pci
    local opts = { verbose = true }
    local handlers = {}
@@ -78,8 +85,51 @@ function run(parameters)
       end
    end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(parameters, handlers, "b:c:n:m:vuDh",
+   lib.dogetopt(args, handlers, "b:c:n:m:vuDh",
       { bt = "b", conf = "c", ["v4-pci"] = "n", ["v6-pci"] = "m",
          verbose = "v", ultraverbose = "u", duration = "D", help = "h" })
-   nic_common.run(bt_file, conf_file, v4_pci, v6_pci, opts)
+   return opts, bt_file, conf_file, v4_pci, v6_pci
+end
+
+function run(args)
+   -- It's essential to initialize the binding table before the aftrconf
+   local opts, bt_file, conf_file, v4_pci, v6_pci = parse_args(args)
+   bt.get_binding_table(bt_file)
+   local aftrconf = conf.get_aftrconf(conf_file)
+
+   local c = config.new()
+   config.app(c, 'inetNic', Intel82599, {
+      pciaddr=v4_pci,
+      macaddr = ethernet:ntop(aftrconf.aftr_mac_inet_side)})
+   config.app(c, 'b4sideNic', Intel82599, {
+      pciaddr=v6_pci,
+      macaddr = ethernet:ntop(aftrconf.aftr_mac_b4_side)})
+   config.app(c, 'lwaftr', lwaftr.LwAftr, aftrconf)
+
+   config.link(c, 'inetNic.tx -> lwaftr.v4')
+   config.link(c, 'b4sideNic.tx -> lwaftr.v6')
+   config.link(c, 'lwaftr.v4 -> inetNic.rx')
+   config.link(c, 'lwaftr.v6 -> b4sideNic.rx')
+   engine.configure(c)
+
+   if opts.ultra_verbose then
+      local function lnicui_info()
+         app.report_apps()
+      end
+      local t = timer.new("report", lnicui_info, 1e9, 'repeating')
+      timer.activate(t)
+   end
+
+   if opts.verbose then
+      local csv = csv_stats.CSVStatsTimer.new()
+      csv:add_app('inetNic', { 'tx', 'rx' }, { tx='IPv4 RX', rx='IPv4 TX' })
+      csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx='IPv6 RX', rx='IPv6 TX' })
+      csv:activate()
+   end
+
+   if opts.duration then
+      engine.main({duration=opts.duration, report={showlinks=true}})
+   else
+      engine.main({report={showlinks=true}})
+   end
 end
