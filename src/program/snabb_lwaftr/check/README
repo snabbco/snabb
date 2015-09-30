@@ -1,0 +1,8 @@
+Usage: check BINDING-TABLE CONF IPV4-IN.PCAP IPV6-IN.PCAP IPV6-OUT.PCAP IPV6-OUT.PCAP
+
+  -h, --help
+                             Print usage information.
+
+Run the lwAFTR with input from IPV4-IN.PCAP and IPV6-IN.PCAP, and record
+output to IPV6-OUT.PCAP and IPV6-OUT.PCAP.  Exit when finished.  This
+program is used in the lwAFTR test suite.
