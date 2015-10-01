@@ -135,6 +135,7 @@ function M_sf:init ()
          :init_statistics()
          :init_receive()
          :init_transmit()
+         :init_txdesc_prefetch()
          :wait_enable()
          :wait_linkup()
 
@@ -422,6 +423,11 @@ function M_sf:init_transmit ()
    self.r.HLREG0:set(bits{TXCRCEN=0})
    self:set_transmit_descriptors()
    self.r.DMATXCTL:set(bits{TE=0})
+   return self
+end
+
+function M_sf:init_txdesc_prefetch ()
+   self.r.TXDCTL:set(bits{SWFLSH=26, hthresh=8} + 32)
    return self
 end
 
@@ -939,7 +945,7 @@ end
 
 function M_vf:enable_transmit()
    self.pf.r.DMATXCTL:set(bits{TE=0})
-   self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
+   self.r.TXDCTL:set(bits({Enable=25, SWFLSH=26, hthresh=8}) + 32)
    self.r.TXDCTL:wait(bits{Enable=25})
    return self
 end
@@ -953,7 +959,7 @@ function M_vf:disable_transmit(reenable)
    self.pf.r.PFVFTE[math.floor(self.poolnum/32)]:clr(bits{VFTE=self.poolnum%32})
 
    if reenable then
-      self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
+      self.r.TXDCTL:set(bits({Enable=25, SWFLSH=26, hthresh=8}) + 32)
    --    self.r.TXDCTL:wait(bits{Enable=25})
    end
    return self
