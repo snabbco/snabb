@@ -156,7 +156,7 @@ function post_status { id=$1; status=$2; gist=$3
 {"context": "$CONTEXT",
  "description": "$INFO",
  "state": "$status",
- "target_url": $www_log }
+ "target_url": $gist }
 EOF
     # POST status.
     curl -X POST -u "$GITHUB_CREDENTIALS" -d @"$tmpdir/request" \
