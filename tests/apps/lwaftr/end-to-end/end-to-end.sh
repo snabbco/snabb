@@ -45,6 +45,11 @@ snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-bound.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6.pcap
 
+echo "Testing: from-internet IPv4 packet found in the binding table with vlan tag."
+snabb_run_and_cmp ${TEST_BASE}/vlan.conf \
+   ${TEST_BASE}/tcp-frominet-bound-vlan.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6-vlan.pcap
+
 echo "Testing: traffic class mapping"
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-trafficclass.pcap ${EMPTY} \
@@ -105,6 +110,11 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6.pcap \
    ${TEST_BASE}/decap-ipv4.pcap ${EMPTY}
 
+echo "Testing: from-b4 to-internet IPv6 packet found in the binding table with vlan tag."
+snabb_run_and_cmp ${TEST_BASE}/vlan.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6-vlan.pcap \
+   ${TEST_BASE}/decap-ipv4-vlan.pcap ${EMPTY}
+
 echo "Testing: from-b4 to-internet IPv6 packet NOT found in the binding table, no ICMP"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6-unbound.pcap \
@@ -127,6 +137,11 @@ echo "Testing: from-to-b4 IPv6 packet, with hairpinning"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6.pcap \
    ${EMPTY} ${TEST_BASE}/recap-ipv6.pcap
+
+echo "Testing: from-to-b4 IPv6 packet, with hairpinning, with vlan tag"
+snabb_run_and_cmp ${TEST_BASE}/vlan.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6-vlan.pcap \
+   ${EMPTY} ${TEST_BASE}/recap-ipv6-vlan.pcap
 
 echo "Testing: from-b4 IPv6 packet, with hairpinning, to B4 with custom lwAFTR address"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \

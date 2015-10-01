@@ -19,13 +19,11 @@ REASSEMBLY_OK = 1
 FRAGMENT_MISSING = 2
 REASSEMBLY_INVALID = 3
 
-local ipv6_payload_len = constants.ethernet_header_size + constants.o_ipv6_payload_len
-local frag_id_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_id
-local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
 
 local dgram = datagram:new()
 
 local function compare_fragment_offsets(pkt1, pkt2)
+   local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
    return pkt1.data[ipv6_frag_offset_offset] < pkt2.data[ipv6_frag_offset_offset]
 end
 
@@ -34,22 +32,25 @@ function is_ipv6_fragment(pkt)
 end
 
 function get_ipv6_frag_id(pkt)
+   local frag_id_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_id
    return C.ntohl(rd32(pkt.data + frag_id_start))
 end
 
 local function get_ipv6_frag_len(pkt)
+   local ipv6_payload_len = constants.ethernet_header_size + constants.o_ipv6_payload_len
    return C.ntohs(rd16(pkt.data + ipv6_payload_len)) - constants.ipv6_frag_header_size
 end
 
 -- This is the 'M' bit of the IPv6 fragment header, in the
 -- least significant bit of the 4th byte
-local ipv6_frag_more_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + 3
 local function is_last_fragment(frag)
+   local ipv6_frag_more_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + 3
    return band(frag.data[ipv6_frag_more_offset], 1) == 0
 end
 
 local function get_frag_offset(frag)
    -- Layout: 8 fragment offset bits, 5 fragment offset bits, 2 reserved bits, 'M'ore-frags-expected bit
+   local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
    local raw_frag_offset = rd16(frag.data + ipv6_frag_offset_offset)
    return band(C.ntohs(raw_frag_offset), 0xfffff8)
 end
@@ -189,6 +190,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
       return ipv6_pkt -- No fragmentation needed
    end
 
+   local ipv6_payload_len = constants.ethernet_header_size + constants.o_ipv6_payload_len
    local more = 1
    -- TODO: carefully evaluate the boundary conditions here
    local new_header_size = unfrag_header_size + constants.ipv6_frag_header_size

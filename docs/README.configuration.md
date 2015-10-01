@@ -19,7 +19,10 @@ ipv6_mtu = 1500,
 policy_icmpv4_incoming = policies['ALLOW'],
 policy_icmpv6_incoming = policies['ALLOW'],
 policy_icmpv4_outgoing = policies['ALLOW'],
-policy_icmpv6_outgoing = policies['ALLOW']
+policy_icmpv6_outgoing = policies['ALLOW'],
+v4_vlan_tag = C.htonl(0x81000444),
+v6_vlan_tag = C.htonl(0x81000666),
+vlan_tagging = true
 ```
 
 The lwaftr is associated with two physical network cards. One of these cards
@@ -90,9 +93,22 @@ updated on receiving ICMP packet too big messages.
 policy_icmpv4_incoming = policies['ALLOW'],
 policy_icmpv6_incoming = policies['ALLOW'],
 policy_icmpv4_outgoing = policies['ALLOW'],
-policy_icmpv6_outgoing = policies['ALLOW']
+policy_icmpv6_outgoing = policies['ALLOW'],
 ```
 
 Snabb-lwaftr can be configured to ALLOW or DROP incoming and outgoing ICMPv4
 and ICMPv6 messages. If a finer granularity of control is desired, contact the
 development team via github or email.
+
+```lua
+v4_vlan_tag = C.htonl(0x81000444),
+v6_vlan_tag = C.htonl(0x81000666),
+vlan_tagging = true
+```
+
+Enable/disable 4-byte 802.1Q Ethernet tagging with 'vlan_tagging'.
+If it is enabled, set one tag per interface to tag outgoing packets with, and
+assume that incoming packets are tagged. If it is 'false', v4_vlan_tag and
+v6_vlan_tag are currently optional (and unused).
+More sophisticated support, including for mixes of tagged/untagged packets,
+will be provided upon request.

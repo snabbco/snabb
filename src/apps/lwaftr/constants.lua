@@ -42,7 +42,6 @@ icmpv6_hop_limit_exceeded = 0
 icmpv6_failed_ingress_egress_policy = 5
 
 -- Header sizes
--- TODO: refactor these; they're not actually constant
 ethernet_header_size = 14 -- TODO: deal with 802.1Q tags/other extensions?
 
 ipv6_fixed_header_size = 40

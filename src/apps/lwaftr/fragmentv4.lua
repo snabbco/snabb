@@ -13,18 +13,11 @@ local C = ffi.C
 local band, bor = bit.band, bit.bor
 local ceil = math.ceil
 
-local ver_and_ihl_offset = constants.ethernet_header_size + constants.o_ipv4_ver_and_ihl
-local total_length_offset = constants.ethernet_header_size + constants.o_ipv4_total_length
-local frag_id_offset = constants.ethernet_header_size + constants.o_ipv4_identification
-local flags_and_frag_offset_offset = constants.ethernet_header_size + constants.o_ipv4_flags
-local checksum_offset = constants.ethernet_header_size + constants.o_ipv4_checksum
-
 -- Constants to manipulate the flags next to the frag-offset field directly
 -- as a 16-bit integer, without needing to shift the 3 flag bits.
 local flag_dont_fragment_mask  = 0x4000
 local flag_more_fragments_mask = 0x2000
 local frag_offset_field_mask   = 0x1FFF
-
 
 -- TODO: Consider security/performance tradeoffs of randomization
 local fresh_frag_id = (function ()
@@ -34,7 +27,6 @@ local fresh_frag_id = (function ()
       return internal_frag_id
    end
 end)()
-
 
 FRAGMENT_OK = 1
 FRAGMENT_UNNEEDED = 2
@@ -68,6 +60,11 @@ function fragment_ipv4(ipv4_pkt, mtu)
       return FRAGMENT_UNNEEDED, ipv4_pkt
    end
 
+   local ver_and_ihl_offset = constants.ethernet_header_size + constants.o_ipv4_ver_and_ihl
+   local total_length_offset = constants.ethernet_header_size + constants.o_ipv4_total_length
+   local frag_id_offset = constants.ethernet_header_size + constants.o_ipv4_identification
+   local flags_and_frag_offset_offset = constants.ethernet_header_size + constants.o_ipv4_flags
+   local checksum_offset = constants.ethernet_header_size + constants.o_ipv4_checksum
    -- Discard packets with the DF (dont't fragment) flag set
    do
       local flags_and_frag_offset = C.ntohs(rd16(ipv4_pkt.data + flags_and_frag_offset_offset))

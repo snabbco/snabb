@@ -13,4 +13,5 @@ ipv6_mtu = 1500,
 policy_icmpv4_incoming = policies['DROP'],
 policy_icmpv6_incoming = policies['DROP'],
 policy_icmpv4_outgoing = policies['DROP'],
-policy_icmpv6_outgoing = policies['DROP']
+policy_icmpv6_outgoing = policies['DROP'],
+vlan_tagging = false

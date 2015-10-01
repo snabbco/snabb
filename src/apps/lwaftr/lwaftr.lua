@@ -21,7 +21,8 @@ local bitfield = lib.bitfield
 local C = ffi.C
 local cast, fstring = ffi.cast, ffi.string
 local receive, transmit = link.receive, link.transmit
-local rd16, rd32, get_ihl, get_ihl_from_offset = lwutil.rd16, lwutil.rd32, lwutil.get_ihl, lwutil.get_ihl_from_offset
+local rd16, rd32, wr16, wr32, get_ihl, get_ihl_from_offset = lwutil.rd16,
+   lwutil.rd32, lwutil.wr16, lwutil.wr32, lwutil.get_ihl, lwutil.get_ihl_from_offset
 
 local debug = false
 
@@ -78,6 +79,13 @@ end
 LwAftr = {}
 
 function LwAftr:new(conf)
+   -- It's a bit of a hack to deal with tagging here, but the front-ends are
+   -- rapidly evolving, and this will happen regardless of which one is used.
+   if conf.vlan_tagging then
+      constants.ethernet_header_size = constants.ethernet_header_size + 4
+      constants.o_ethernet_tag = constants.o_ethernet_ethertype
+      constants.o_ethernet_ethertype = constants.o_ethernet_ethertype + 4
+   end
    if debug then lwdebug.pp(conf) end
    local o = {}
    for k,v in pairs(conf) do
@@ -239,7 +247,13 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
    local eth_hdr = cast(ethernet._header_ptr_type, pkt.data)
    eth_hdr.ether_shost = ether_src
    eth_hdr.ether_dhost = ether_dst
-   eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
+   if lwstate.vlan_tagging then
+      wr32(pkt.data + constants.o_ethernet_tag, lwstate.v6_vlan_tag)
+      wr16(pkt.data + constants.o_ethernet_ethertype,
+           C.htons(constants.ethertype_ipv6))
+   else
+      eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
+   end
    -- Modify IPv6 header.
    local ipv6_hdr = cast(ipv6._header_ptr_type,
       pkt.data + constants.ethernet_header_size)
@@ -568,7 +582,13 @@ local function from_b4(lwstate, pkt)
          local eth_hdr = cast(ethernet._header_ptr_type, pkt.data)
          eth_hdr.ether_shost = lwstate.b4_mac
          eth_hdr.ether_dhost = lwstate.aftr_mac_b4_side
-         eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
+         if lwstate.vlan_tagging then
+            wr32(pkt.data + constants.o_ethernet_tag, lwstate.v6_vlan_tag)
+            wr16(pkt.data + constants.o_ethernet_ethertype,
+                 C.htons(constants.ethertype_ipv6))
+         else
+            eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
+         end
          -- TODO:  refactor so this doesn't actually seem to be from the internet?
          return from_inet(lwstate, pkt)
       else
@@ -577,8 +597,13 @@ local function from_b4(lwstate, pkt)
          local eth_hdr = cast(ethernet._header_ptr_type, pkt.data)
          eth_hdr.ether_shost = lwstate.aftr_mac_inet_side
          eth_hdr.ether_dhost = lwstate.inet_mac
-         eth_hdr.ether_type = C.htons(constants.ethertype_ipv4)
-
+         if lwstate.vlan_tagging then
+            wr32(pkt.data + constants.o_ethernet_tag, lwstate.v4_vlan_tag)
+            wr16(pkt.data + constants.o_ethernet_ethertype,
+                 C.htons(constants.ethertype_ipv4))
+         else
+            eth_hdr.ether_type = C.htons(constants.ethertype_ipv4)
+         end
          -- Fragment if necessary
          if pkt.length > lwstate.ipv4_mtu then
             local fragstatus, frags = fragmentv4.fragment_ipv4(pkt, lwstate.ipv4_mtu)
