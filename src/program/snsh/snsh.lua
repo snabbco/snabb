@@ -12,7 +12,7 @@ local long_opts = {
    interactive = "i",
    debug = "d",
    jit = "j",
-   ["sigquit-repl"] = "q",
+   sigquit = "q",
    help = "h",
 }
 
@@ -26,7 +26,7 @@ function run (parameters)
    function opt.h (arg) print(usage) main.exit(0)            end
    function opt.l (arg) require(arg)            noop = false end
    function opt.t (arg) require(arg).selftest() noop = false end
-   function opt.q (arg) hook_repl_on_sigquit()               end
+   function opt.q (arg) hook_sigquit(arg)                    end
    function opt.d (arg) _G.developer_debug = true            end
    function opt.p (arg) program = arg                        end
    function opt.i (arg) start_repl = true       noop = false end
@@ -56,7 +56,7 @@ function run (parameters)
    end
 
    -- Execute command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hl:p:t:die:j:P:q", long_opts)
+   parameters = lib.dogetopt(parameters, opt, "hl:p:t:die:j:P:q:", long_opts)
 
    if program then
       local mod = (("program.%s.%s"):format(program, program))
@@ -112,7 +112,11 @@ end
 
 -- Cause SIGQUIT to enter the REPL.
 -- SIGQUIT can be triggered interactively with `Control \' in a terminal.
-function hook_repl_on_sigquit ()
+function hook_sigquit (action)
+   if action ~= 'repl' then
+      print("ignoring unrecognized SIGQUIT action: " .. action)
+      os.exit(1)
+   end
    local S = require("syscall")
    local fd = S.signalfd("quit", "nonblock") -- handle SIGQUIT via fd
    S.sigprocmask("block", "quit")            -- block traditional handler
