@@ -599,7 +599,7 @@ function logger:log (msg)
       local throttle  = self._throttle
       local date = ''
       if config.date then
-	 date = os.date(config.date_fmt)
+         date = os.date(config.date_fmt)
       end
       local preamble = date..self._preamble
       local fh = config.fh
@@ -609,35 +609,35 @@ function logger:log (msg)
       local drate = throttle.discards/interval
       local current_rate = self._tb:rate()
       if samples >= 1 then
-	 if throttle.discards > 0 then
-	    fh:write(string.format(preamble.."%d messages discarded in %d seconds\n",
-				   throttle.discards, now-throttle.tstamp))
-	 end
-	 if drate > throttle.rate then
-	    local min_rate = throttle.min_rate
-	    if current_rate > min_rate then
-	       local throttle_rate = math.max(min_rate,
-					      current_rate/2^samples)
-	       fh:write(string.format(preamble.."throttling logging rate to "
-				      .."%.2f Hz%s\n",
-				   throttle_rate,
-				   (throttle_rate == min_rate and ' (minimum)') or ''))
-	       self._tb:rate(throttle_rate)
-	    end
-	 else
-	    local configured_rate = config.rate
-	    if current_rate < configured_rate then
-	       local throttle_rate = math.min(configured_rate,
-					      current_rate + throttle.increment*samples)
-	       fh:write(string.format(preamble.."unthrottling logging rate to "
-				      .."%.2f Hz%s\n",
-				   throttle_rate,
-				   (throttle_rate == configured_rate and ' (maximum)') or ''))
-	       self._tb:rate(throttle_rate)
-	    end
-	 end
-	 throttle.discards = 0
-	 throttle.tstamp = now
+         if throttle.discards > 0 then
+            fh:write(string.format(preamble.."%d messages discarded in %d seconds\n",
+                                   throttle.discards, now-throttle.tstamp))
+         end
+         if drate > throttle.rate then
+            local min_rate = throttle.min_rate
+            if current_rate > min_rate then
+               local throttle_rate = math.max(min_rate,
+                                              current_rate/2^samples)
+               fh:write(string.format(preamble.."throttling logging rate to "
+                                      .."%.2f Hz%s\n",
+                                   throttle_rate,
+                                   (throttle_rate == min_rate and ' (minimum)') or ''))
+               self._tb:rate(throttle_rate)
+            end
+         else
+            local configured_rate = config.rate
+            if current_rate < configured_rate then
+               local throttle_rate = math.min(configured_rate,
+                                              current_rate + throttle.increment*samples)
+               fh:write(string.format(preamble.."unthrottling logging rate to "
+                                      .."%.2f Hz%s\n",
+                                   throttle_rate,
+                                   (throttle_rate == configured_rate and ' (maximum)') or ''))
+               self._tb:rate(throttle_rate)
+            end
+         end
+         throttle.discards = 0
+         throttle.tstamp = now
       end
       fh:write(preamble..msg..'\n')
       if config.flush then fh:flush() end
