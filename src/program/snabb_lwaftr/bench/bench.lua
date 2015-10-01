@@ -1,18 +1,30 @@
+module(..., package.seeall)
+
 local app = require("core.app")
-local config = require("core.config")
-local pcap = require("apps.pcap.pcap")
 local basic_apps = require("apps.basic.basic_apps")
-local lwaftr = require("apps.lwaftr.lwaftr")
 local bt = require("apps.lwaftr.binding_table")
-local ipv6 = require("lib.protocol.ipv6")
-
 local conf = require("apps.lwaftr.conf")
+local config = require("core.config")
+local lib = require("core.lib")
+local pcap = require("apps.pcap.pcap")
+local lwaftr
 
-local usage="benchui binding.table lwaftr.conf inv4.pcap inv6.pcap"
+function show_usage(code)
+   print(require("program.snabb_lwaftr.check.README_inc"))
+   main.exit(code)
+end
 
-function run (parameters)
-   if not (#parameters == 4) then print(usage) main.exit(1) end
-   local bt_file, conf_file, inv4_pcap, inv6_pcap = unpack(parameters)
+function parse_args(args)
+   local handlers = {}
+   function handlers.h() show_usage(0) end
+   args = lib.dogetopt(args, handlers, "h", { help="h" })
+   if #args ~= 4 then show_usage(1) end
+   return unpack(args)
+end
+
+function run(args)
+   local bt_file, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
+   lwaftr = require("apps.lwaftr.lwaftr")
 
    -- It's essential to initialize the binding table before the aftrconf
    bt.get_binding_table(bt_file)
@@ -42,5 +54,3 @@ function run (parameters)
    app.configure(c)
    app.main({})
 end
-
-run(main.parameters)

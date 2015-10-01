@@ -1,0 +1,6 @@
+Usage: bench BINDING-TABLE CONF IPV4-IN.PCAP IPV6-IN.PCAP
+
+  -h, --help
+                             Print usage information.
+
+Run the lwAFTR with input from IPV4-IN.PCAP and IPV6-IN.PCAP. The bench command is used to get an idea of the raw speed of the lwaftr without interaction with NICs, or check the impact of changes on a development machine that may not have Intel 82599 NICs.  Exit when finished.  This program is used in the lwAFTR test suite.

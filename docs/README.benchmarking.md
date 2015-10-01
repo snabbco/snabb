@@ -196,22 +196,24 @@ This is a fast, solid run, with extremely consistent speeds.
 
 To get an idea of the raw speed of the lwaftr without interaction with NICs, 
 or check the impact of changes on a development machine that may not have 
-Intel 82599 NICs, `benchui.lua` may be used:
+Intel 82599 NICs, `snabb-lwaftr bench` may be used:
 
 ```bash
-$ sudo ./snabb snsh ./apps/lwaftr/benchui.lua \
+$ sudo ./snabb-lwaftr bench \
     ../tests/apps/lwaftr/data/binding.table \
     ../tests/apps/lwaftr/data/icmp_on_fail.conf \
     ../tests/apps/lwaftr/benchdata/ipv4-0550.pcap \
-    ../tests/apps/lwaftr/benchdata/ipv6-0550.pcap 
-statisticsv6: 4.101 MPPS, 19.358 Gbps.
-statisticsv4: 4.101 MPPS, 16.734 Gbps.
-statisticsv6: 4.128 MPPS, 19.486 Gbps.
-statisticsv4: 4.128 MPPS, 16.844 Gbps.
-statisticsv6: 4.126 MPPS, 19.474 Gbps.
-statisticsv4: 4.126 MPPS, 16.833 Gbps.
-statisticsv6: 4.127 MPPS, 19.481 Gbps.
-statisticsv4: 4.127 MPPS, 16.840 Gbps.
+    ../tests/apps/lwaftr/benchdata/ipv6-0550.pcap
+statisticsv6: 4.246 MPPS, 20.043 Gbps.
+statisticsv4: 4.246 MPPS, 17.325 Gbps.
+statisticsv6: 4.237 MPPS, 19.999 Gbps.
+statisticsv4: 4.237 MPPS, 17.287 Gbps.
+statisticsv6: 4.266 MPPS, 20.133 Gbps.
+statisticsv4: 4.266 MPPS, 17.403 Gbps.
+statisticsv6: 4.238 MPPS, 20.002 Gbps.
+statisticsv4: 4.238 MPPS, 17.290 Gbps.
+statisticsv6: 4.149 MPPS, 19.584 Gbps.
+statisticsv4: 4.149 MPPS, 16.928 Gbps.
 ```
 
 The processing is not limited to 10 Gbps, as no NIC hardware is involved.
