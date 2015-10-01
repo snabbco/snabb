@@ -2,18 +2,11 @@
 
 ## Background
 
-Currently, SnabbSwitch works on the 'host' (bare metal) and uses a driver
-called **VhostUser** (See `apps/vhost/vhost_user.lua`) to bypass several
-things: the typical linux bridge used in VMs, the tun/tap device, the QEMU
-device emulator and the host kernel vhost-net handler. That way, the SnS
-process gets access to the very same memory pages presented to the virtio
-device in the VM.
-
-- there was a prototype implementation of a driver called 'vhost-net'
-that was supposed to be "the other side of VhostUser", but it's still
-on the host and not the guest side.  I think it was supposed to be a
-way to use VhostUser and virtqueues to talk to another process running
-vhost-net, instead of a VM.
+Currently, SnabbSwitch works on the 'host' (bare metal) and uses a driver called
+**VhostUser** (See `apps/vhost/vhost_user.lua`) to bypass several things: the
+typical linux bridge used in VMs, the tun/tap device, the QEMU device emulator
+and the host kernel vhost-net handler. That way, the SnabbSwitch process gets
+access to the very same memory pages presented to the virtio device in the VM.
 
 However the implementation of Snabb Switch running within a VM can be still
 further improved. The current approach assumes the VM would run third-party
@@ -47,11 +40,11 @@ and the 'app' that implements the 'push/pull' methods. See `src/apps/vguest`.
 ## Example of use
 
 The development of the Vguest driver is still work in progress, but the approach
-has been proved succesful. The driver contains a test app that basically sends
+has been proved successful. The driver contains a test app that basically sends
 packets from the guest to the host side. It's possible to observe packets arriving
 on the host using tcpdump.
 
-In order to run the seldtest, it is necessary to prepare a Linux OS image and launch
+In order to run the selftest, it is necessary to prepare a Linux OS image and launch
 it with QEMU:
 
 ```
@@ -91,4 +84,4 @@ And see packets out on the host's tap1 (with tcpdump).
 It does handle guest-to-host traffic very well, but incoming traffic is still
 work in progress. The default virtio device has little virtqueue rings and
 a light trigger for interrupts. That doesn't play well with the QEMU-KVM, which
-ocassionally terminates abruptely.
+occasionally terminates abruptly.

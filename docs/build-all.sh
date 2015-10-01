@@ -25,3 +25,5 @@ echo "Generating pdf/README.testing.pdf"
 pandoc README.testing.md          -o pdf/README.testing.pdf
 echo "Generating pdf/README.troubleshooting.pdf"
 pandoc README.troubleshooting.md  -o pdf/README.troubleshooting.pdf
+echo "Generating pdf/README.virtualization.pdf"
+pandoc README.virtualization.md   -o pdf/README.virtualization.pdf

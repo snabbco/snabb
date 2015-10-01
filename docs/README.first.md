@@ -84,3 +84,7 @@ See [README.benchmarking.md](README.benchmarking.md).
 # Section 8. Performance 
 
 See [README.performance.md](README.performance.md).
+
+# Section 9. Virtualization
+
+See [README.virtualization.md](README.virtualization.md).
