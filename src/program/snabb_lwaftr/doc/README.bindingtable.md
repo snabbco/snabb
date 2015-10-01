@@ -14,7 +14,7 @@ $ cat binding.table
 ```
 
 The format is a [Lua table](http://www.lua.org/pil/2.5.html), containing more Lua tables.
-Each of these subtables (each shown on one line, above) has several parts. As an 
+Each of these subtables (each shown on one line, above) has several parts. As an
 example, look at the following entry:
 
 ```lua

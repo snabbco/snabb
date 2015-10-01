@@ -1,12 +1,12 @@
 # Benchmarking
 
-The instructions in [README.first.md](README.first.md) for running the lwaftr with a load 
-generator are the instructions for the primary way to benchmark the lwaftr. 
+The instructions in [README.first.md](README.first.md) for running the lwaftr with a load
+generator are the instructions for the primary way to benchmark the lwaftr.
 In short:
 
-To run a load generator and an lwaftr, you will need four interfaces. The 
-following example assumes that `01:00.0` is cabled to `01:00.1`, and that 
-`02:00.0` is cabled to `02:00.1`. Change the concrete pci devices specified to 
+To run a load generator and an lwaftr, you will need four interfaces. The
+following example assumes that `01:00.0` is cabled to `01:00.1`, and that
+`02:00.0` is cabled to `02:00.1`. Change the concrete pci devices specified to
 match the current system; See [README.first.md](README.first.md).
 
 First, start the lwAFTR:
@@ -29,10 +29,10 @@ $ sudo ./src/snabb-lwaftr transient  \
     tests/apps/lwaftr/benchdata/ipv6-0550.pcap IPv6 0000:02:00.0 \
 ```
 
-By varying the `--v4-pcap` and `--v6-pcap` arguments, the performance of the 
+By varying the `--v4-pcap` and `--v6-pcap` arguments, the performance of the
 lwaftr can be benchmarked with different types of loads.
 
-The contents of the pcap file are fed repeatedly through each NIC, to the 
+The contents of the pcap file are fed repeatedly through each NIC, to the
 lwaftr, by the load generator.
 
 ## NUMA
@@ -85,8 +85,8 @@ them to CPUs in the NUMA node 0.
 
 ## Approximate benchmarking, without physical NICs
 
-To get an idea of the raw speed of the lwaftr without interaction with NICs, 
-or check the impact of changes on a development machine that may not have 
+To get an idea of the raw speed of the lwaftr without interaction with NICs,
+or check the impact of changes on a development machine that may not have
 Intel 82599 NICs, `snabb-lwaftr bench` may be used:
 
 ```bash

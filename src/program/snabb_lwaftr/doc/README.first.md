@@ -13,7 +13,7 @@ It is ready for experimentation, but not recommended for production use yet.
 
 # Section 1. Finding out the PCI addresses of your NICs
 
-Snabb-lwaftr is designed to run on **Intel 82599 10-Gigabit** NICs. Find the 
+Snabb-lwaftr is designed to run on **Intel 82599 10-Gigabit** NICs. Find the
 address of NICs on your system with `lspci`:
 
 ```bash
@@ -31,8 +31,8 @@ $ lspci | grep 82599
 ```
 
 Many tools accept the short form of the PCI addresses (ie, '01:00.0'), but some
-require them to match the filenames in `/sys/bus/pci/devices/`, such as 
-`/sys/bus/pci/devices/0000:04:00.1`: in such cases, you must write `0000:01:00.0`, 
+require them to match the filenames in `/sys/bus/pci/devices/`, such as
+`/sys/bus/pci/devices/0000:04:00.1`: in such cases, you must write `0000:01:00.0`,
 with the appropriate prefix (`0000:`, in this example).
 
 # Section 2. Compiling snabb
@@ -41,7 +41,7 @@ See [README.build.md](README.build.md).
 
 # Section 3. Running a load generator and the lwaftr
 
-Note: Compile Snabb (see [README.build.md](README.build.md)) before attempting 
+Note: Compile Snabb (see [README.build.md](README.build.md)) before attempting
 the following.
 
 To run a load generator and an `lwaftr`, you will need four
@@ -95,7 +95,7 @@ See [README.rfccompliance.md](README.rfccompliance.md).
 
 See [README.benchmarking.md](README.benchmarking.md).
 
-# Section 8. Performance 
+# Section 8. Performance
 
 See [README.performance.md](README.performance.md).
 
