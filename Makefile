@@ -43,7 +43,7 @@ dist: all
 	rm -rf "$(DISTDIR)/$(PACKAGE)/deps/luajit/.git"
 	rm -rf "$(DISTDIR)/$(PACKAGE)/deps/ljsyscall/.git"
 	rm -rf "$(DISTDIR)/$(PACKAGE)/deps/pflua/.git"
-	cp "$(BUILDDIR)/src/$(DIST_BINARY)" "$(DISTDIR)/"
+	cp "$(BUILDDIR)/src/$(DIST_BINARY)" "$(DISTDIR)/$(DIST_BINARY)"
 	cd "$(DISTDIR)/.." && tar cJvf "`basename '$(DISTDIR)'`.tar.xz" "`basename '$(DISTDIR)'`"
 	rm -rf "$(DISTDIR)"
 
