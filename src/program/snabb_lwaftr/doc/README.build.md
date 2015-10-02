@@ -1,18 +1,18 @@
 # How to build snabb-lwaftr
 
-## Step 1: Fetch the sources
+## Fetch the sources
 
 ```bash
 $ git clone https://github.com/Igalia/snabbswitch.git
 ```
 
-## Step 2: Check out the lwaftr development branch:
+## Check out the lwaftr development branch:
 
 ```bash
 $ cd snabbswitch && git checkout lwaftr_nutmeg
 ```
 
-## Step 3: Build
+## Build
 
 ```bash
 $ make

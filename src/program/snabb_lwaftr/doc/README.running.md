@@ -1,17 +1,6 @@
-# Welcome to Snabb-lwaftr!
+#  Running
 
-Here is how to get started with it.
-
-This document assumes that `${SNABB_LW_DIR}` is the location where your checkout
-of the **snabb-lwaftr** project.
-
-# Current status
-
-Snabb-lwaftr is alpha/prototype software. It can run 2 10-Gbit NICs at over 90%
-of line speed, and it is believed to be [RFC 7596](https://tools.ietf.org/html/rfc7596) compliant.
-It is ready for experimentation, but not recommended for production use yet.
-
-# Section 1. Finding out the PCI addresses of your NICs
+## Finding out the PCI addresses of your NICs
 
 Snabb-lwaftr is designed to run on **Intel 82599 10-Gigabit** NICs. Find the
 address of NICs on your system with `lspci`:
@@ -35,14 +24,10 @@ require them to match the filenames in `/sys/bus/pci/devices/`, such as
 `/sys/bus/pci/devices/0000:04:00.1`: in such cases, you must write `0000:01:00.0`,
 with the appropriate prefix (`0000:`, in this example).
 
-# Section 2. Compiling snabb
-
-See [README.build.md](README.build.md).
-
-# Section 3. Running a load generator and the lwaftr
-
 Note: Compile Snabb (see [README.build.md](README.build.md)) before attempting
 the following.
+
+## Running a load generator and the lwaftr
 
 To run a load generator and an `lwaftr`, you will need four
 interfaces. The following example assumes that `01:00.0` is cabled to
@@ -78,27 +63,3 @@ ramping up from 0 Gbps to 10 Gbps (by default) and then coming back
 down.  It also measures the return traffic from the lwAFTR, and prints
 out all this information to the console in CSV format.  The load
 generator stops when the transient is done.
-
-# Section 4. Troubleshooting
-
-See [README.troubleshooting.md](README.troubleshooting.md).
-
-# Section 5. Configuration
-
-See [README.bindingtable.md](README.bindingtable.md) and [README.configuration.md](README.configuration.md).
-
-# Section 6. RFC Compliance
-
-See [README.rfccompliance.md](README.rfccompliance.md).
-
-# Section 7. Benchmarking
-
-See [README.benchmarking.md](README.benchmarking.md).
-
-# Section 8. Performance
-
-See [README.performance.md](README.performance.md).
-
-# Section 9. Virtualization
-
-See [README.virtualization.md](README.virtualization.md).

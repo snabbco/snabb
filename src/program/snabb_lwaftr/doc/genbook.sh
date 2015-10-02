@@ -21,9 +21,11 @@ cat <<EOF
              END { print("") }')
 % Version $(git log -n1 --format="format:%h, %ad%n")
 
-$(cat README.first.md)
+$(cat README.welcome.md)
 
 $(cat README.build.md)
+
+$(cat README.running.md)
 
 $(cat README.testing.md)
 
