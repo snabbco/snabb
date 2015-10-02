@@ -38,7 +38,6 @@ stack traceback:
 	[C]: in function 'assert'
 	lib/hardware/pci.lua:114: in function 'map_pci_memory'
 	apps/intel/intel10g.lua:89: in function 'open'
-	apps/intel/loadgen.lua:20: in function 'new'
 	core/app.lua:165: in function <core/app.lua:162>
 	core/app.lua:197: in function 'apply_config_actions'
 	core/app.lua:110: in function 'configure'
