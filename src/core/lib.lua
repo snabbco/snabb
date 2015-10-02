@@ -560,9 +560,9 @@ end
 -- is increased by 1/4 of the original rate, i.e. it takes at least 40
 -- seconds to ramp back up to the original rate.
 --
-local logger = {}
--- Default configuration
-logger.default = {
+-- The tables lib.logger_default and lib.logger_throttle are exposed
+-- to the user as part of the API.
+logger_default = {
    rate = 10,
    discard_rate = 0.5,
    fh = io.stdout,
@@ -571,12 +571,15 @@ logger.default = {
    date = true,
    date_fmt = "%b %Y %H:%M:%S ",
 }
--- Auto-throttle configuration
-logger.throttle = {
+logger_throttle = {
    interval = 10, -- Sampling interval for discard rate
    excess = 5,   -- Multiple of rate at which to start throttling
    increment = 4, -- Fraction of rate to increase for un-throttling
    min_rate = 0.1, -- Minimum throttled rate
+}
+local logger = {
+   default = logger_default,
+   throttle = logger_throttle,
 }
 logger.mt = { __index = logger }
 
