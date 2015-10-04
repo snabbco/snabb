@@ -109,3 +109,12 @@ function preallocate_step()
    packet_allocation_step = 2 * packet_allocation_step
 end
 
+ffi.metatype(packet_t, {__index = {
+   clone = clone,
+   append = append,
+   prepend = prepend,
+   shiftleft = shiftleft,
+   free = free,
+   data = data,
+   length = length,
+}})
