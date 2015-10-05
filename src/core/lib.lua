@@ -569,7 +569,7 @@ logger_default = {
    flush = true,
    module = '',
    date = true,
-   date_fmt = "%b %Y %H:%M:%S ",
+   date_fmt = "%b %d %Y %H:%M:%S ",
 }
 logger_throttle = {
    interval = 10, -- Sampling interval for discard rate
