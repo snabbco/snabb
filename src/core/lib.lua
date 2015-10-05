@@ -473,14 +473,16 @@ function token_bucket_new (config)
    return tb
 end
 
--- The rate can be set with the rate() method at any time, which
--- empties the token bucket an also returns the previous value.  If
--- called with a nil argument, returns the currently configured rate.
+-- The rate can be set with the rate() method at any time, which fills
+-- the token bucket an also returns the previous value.  If called
+-- with a nil argument, returns the currently configured rate.
 function token_bucket:rate (rate)
    if rate ~= nil then
+      local old_rate = self._rate
       self._rate = rate
       self._max_tokens = math.max(rate, 1)
       self._tokens = self._max_tokens
+      return old_rate
    end
    return self._rate
 end
