@@ -1,0 +1,16 @@
+Installation instructions
+
+Make sure you have LuaJIT, at least version 2.0.2, installed.
+
+You need to put the file syscall.lua and the directory syscall and its contents in the same directory where they will be found by LuaJIT. This can vary by system, but you can find out with `luajit -e 'print(package.path)'` for your system. You do not need all the files, you can delete operating system and architecture files you do not require.
+
+You can use the stable versions in the luarocks repository, or you can install the head version using ```luarocks install rockspec/ljsyscall-scm-1.rockspec``` or one of the other versions in that directory, which will pull the version from github and install in the right place.
+
+None of the files in include/ are needed to use the code, just to run the tests. You need to run `git submodule update --init --recursive` to load them before running the tests with `luajit test/test.lua`.
+
+The optional NetBSD rump kernel support requires building the libraries using the `include/buildrump.sh` submodule, for more information see http://rumpkernel.org/
+
+There is some work in progress towards other build patterns such as building into a single binary, see in the examples directory, this will have more documentation later; this is currently used by the Xen runtime for example, or can be used to make static executables. If you want to link into a C program (or something else interfacing to C, such as another scripting language), there are some example scripts. `examples/bytecode.sh` creates an `ar` file with all the bytecode in, and `examples/cbuild.sh` makes a hello world program in C with ljsyscall and luajit linked in. These are only intended as examples to be customised as appropriate, and they link in all files not just the required ones for your architecture.
+
+
+

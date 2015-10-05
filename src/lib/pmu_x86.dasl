@@ -24,11 +24,15 @@ local dasm = require("dasm")
 
 local gen = {}
 
+-- Table keeping machine code alive to the GC.
+local anchor = {}
+
 -- Utility: assemble code and optionally dump disassembly.
 function assemble (name, prototype, generator)
    local Dst = dasm.new(actions)
    generator(Dst)
    local mcode, size = Dst:build()
+   table.insert(anchor, mcode)
    if debug then
       print("mcode dump: "..name)
       dasm.dump(mcode, size)
