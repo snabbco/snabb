@@ -480,7 +480,7 @@ function token_bucket:rate (rate)
    if rate ~= nil then
       self._rate = rate
       self._max_tokens = math.max(rate, 1)
-      self._tokens = 0
+      self._tokens = self._max_tokens
    end
    return self._rate
 end
