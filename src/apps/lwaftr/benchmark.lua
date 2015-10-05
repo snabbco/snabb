@@ -5,6 +5,7 @@ local PcapReader = require("apps.pcap.pcap").PcapReader
 local basic_apps = require("apps.basic.basic_apps")
 local bt         = require("apps.lwaftr.binding_table")
 local conf       = require("apps.lwaftr.conf")
+local counter    = require("core.counter")
 local ffi        = require("ffi")
 local lib        = require("core.lib")
 local lwaftr     = require("apps.lwaftr.lwaftr")
@@ -56,7 +57,7 @@ Rate(Mpps): {rate_mpps}
       ]], values))
    end
    local function report_bench(input, name, engine, finish, start)
-      local breaths = tonumber(engine.breaths)
+      local breaths = tonumber(counter.read(engine.breaths))
       local bytes = input.txbytes
       -- Don't bother to report on interfaces that were boring
       if bytes == 0 then return end
