@@ -318,3 +318,26 @@ function nd_light:stop ()
    packet.free(self._next_hop.packet)
    packet.free(self._sna.packet)
 end
+
+function selftest ()
+   local sink = require("apps.basic.basic_apps").Sink
+   local c = config.new()
+   config.app(c, "nd1", nd_light, { local_mac = "00:00:00:00:00:01",
+                                    local_ip  = "2001:DB8::1",
+                                    next_hop  = "2001:DB8::2" })
+   config.app(c, "nd2", nd_light, { local_mac = "00:00:00:00:00:02",
+                                    local_ip  = "2001:DB8::2",
+                                    next_hop  = "2001:DB8::1" })
+   config.app(c, "sink1", sink)
+   config.app(c, "sink2", sink)
+   config.link(c, "nd1.south -> nd2.south")
+   config.link(c, "nd2.south -> nd1.south")
+   config.link(c, "sink1.tx -> nd1.north")
+   config.link(c, "nd1.north -> sink1.rx")
+   config.link(c, "sink2.tx -> nd2.north")
+   config.link(c, "nd2.north -> sink2.rx")
+   engine.configure(c)
+   engine.main({ duration = 2 })
+   assert(engine.app_table.nd1._eth_header)
+   assert(engine.app_table.nd2._eth_header)
+end
