@@ -19,8 +19,7 @@ REASSEMBLY_OK = 1
 FRAGMENT_MISSING = 2
 REASSEMBLY_INVALID = 3
 
-
-local dgram = datagram:new()
+local dgram
 
 local function compare_fragment_offsets(pkt1, pkt2)
    local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
@@ -53,6 +52,11 @@ local function get_frag_offset(frag)
    local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
    local raw_frag_offset = rd16(frag.data + ipv6_frag_offset_offset)
    return band(C.ntohs(raw_frag_offset), 0xfffff8)
+end
+
+local function to_datagram(pkt)
+   if not dgram then dgram = datagram:new() end
+   return dgram:reuse(pkt)
 end
 
 -- IPv6 reassembly, as per https://tools.ietf.org/html/rfc2460#section-4.5
@@ -88,7 +92,7 @@ local function _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_
    local eth_header = ethernet:new({src = eth_src, dst = eth_dst, type = constants.ethertype_ipv6})
    local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
 
-   local dgram = dgram:reuse(repkt)
+   local dgram = to_datagram(repkt)
    dgram:push(ipv6_header)
    dgram:push(eth_header)
    ipv6_header:free()

@@ -16,6 +16,8 @@ local band, bnot = bit.band, bit.bnot
 local C = ffi.C
 local wr16, wr32 = lwutil.wr16, lwutil.wr32
 
+local dgram
+
 local function calculate_payload_size(dst_pkt, initial_pkt, max_size, config)
    local original_bytes_to_skip = constants.ethernet_header_size
    if config.extra_payload_offset then
@@ -34,8 +36,6 @@ end
 -- Write ICMP data to the end of a packet
 -- Config must contain code and type
 -- Config may contain a 'next_hop_mtu' setting.
-
-local dgram = datagram:new()
 
 local function write_icmp(dst_pkt, initial_pkt, max_size, base_checksum, config)
    local payload_size, original_bytes_to_skip, non_payload_bytes =
@@ -59,10 +59,15 @@ local function write_icmp(dst_pkt, initial_pkt, max_size, base_checksum, config)
    dst_pkt.length = dst_pkt.length + icmp_bytes
 end
 
+local function to_datagram(pkt)
+   if not dgram then dgram = datagram:new() end
+   return dgram:reuse(pkt)
+end
+
 -- initial_pkt is the one to embed (a subset of) in the ICMP payload
 function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config)
    local new_pkt = packet.allocate()
-   local dgram = dgram:reuse(new_pkt)
+   local dgram = to_datagram(new_pkt)
    local ipv4_header = ipv4:new({ttl = constants.default_ttl,
                                  protocol = constants.proto_icmp,
                                  src = from_ip, dst = to_ip})
@@ -94,7 +99,7 @@ end
 
 function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config)
    local new_pkt = packet.allocate()
-   local dgram = dgram:reuse(new_pkt)
+   local dgram = to_datagram(new_pkt)
    local ipv6_header = ipv6:new({hop_limit = constants.default_ttl,
                                  next_header = constants.proto_icmpv6,
                                  src = from_ip, dst = to_ip})
