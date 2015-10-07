@@ -7,7 +7,7 @@ local conf = require("apps.lwaftr.conf")
 local config = require("core.config")
 local lib = require("core.lib")
 local pcap = require("apps.pcap.pcap")
-local lwaftr
+local lwaftr = require("apps.lwaftr.lwaftr")
 
 function show_usage(code)
    print(require("program.snabb_lwaftr.check.README_inc"))
@@ -24,7 +24,6 @@ end
 
 function run(args)
    local bt_file, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
-   lwaftr = require("apps.lwaftr.lwaftr")
 
    -- It's essential to initialize the binding table before the aftrconf
    bt.get_binding_table(bt_file)

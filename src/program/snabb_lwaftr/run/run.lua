@@ -9,7 +9,7 @@ local Intel82599 = require("apps.intel.intel_app").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
 local bt         = require("apps.lwaftr.binding_table")
 local conf       = require("apps.lwaftr.conf")
-local lwaftr
+local lwaftr     = require("apps.lwaftr.lwaftr")
 
 local function show_usage(exit_code)
    print(require("program.snabb_lwaftr.run.README_inc"))
@@ -93,8 +93,6 @@ end
 function run(args)
    -- It's essential to initialize the binding table before the aftrconf
    local opts, bt_file, conf_file, v4_pci, v6_pci = parse_args(args)
-   -- FIXME: If header is included on the top, cannot run --help without being sudo
-   local lwaftr = require("apps.lwaftr.lwaftr")
    bt.get_binding_table(bt_file)
    local aftrconf = conf.get_aftrconf(conf_file)
 
