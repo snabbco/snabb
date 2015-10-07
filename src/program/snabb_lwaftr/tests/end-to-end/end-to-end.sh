@@ -1,7 +1,7 @@
 #!/bin/bash
 
-SNABB_BASE=../../../..
-TEST_BASE=${SNABB_BASE}/tests/apps/lwaftr/data
+SNABB_LWAFTR=../../../../snabb-lwaftr
+TEST_BASE=../data
 TEST_OUT=/tmp
 EMPTY=${TEST_BASE}/empty.pcap
 
@@ -28,15 +28,15 @@ function snabb_run_and_cmp {
       echo "not enough arguments to snabb_run_and_cmp"
       exit 1
    fi
-   ${SNABB_BASE}/src/snabb-lwaftr check ${TEST_BASE}/binding.table \
+   ${SNABB_LWAFTR} check ${TEST_BASE}/binding.table \
       $1 $2 $3 ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap || quit_with_msg \
-        "Failure: ${SNABB_BASE}/src/snabb-lwaftr check \
+        "Failure: ${SNABB_LWAFTR} check \
          ${TEST_BASE}/binding.table $1 $2 $3 \
          ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap"
    scmp $4 ${TEST_OUT}/endoutv4.pcap \
-    "Failure: ${SNABB_BASE}/src/snabb-lwaftr check ${TEST_BASE}/binding.table $1 $2 $3 $4 $5"
+    "Failure: ${SNABB_LWAFTR} check ${TEST_BASE}/binding.table $1 $2 $3 $4 $5"
    scmp $5 ${TEST_OUT}/endoutv6.pcap \
-    "Failure: ${SNABB_BASE}/src/snabb-lwaftr check ${TEST_BASE}/binding.table $1 $2 $3 $4 $5"
+    "Failure: ${SNABB_LWAFTR} check ${TEST_BASE}/binding.table $1 $2 $3 $4 $5"
    echo "Test passed"
 }
 
