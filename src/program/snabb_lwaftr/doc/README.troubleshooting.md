@@ -34,22 +34,22 @@ reflect the physical wiring, rather than being swapped.
 failed to lock /sys/bus/pci/devices/0000:01:00.0/resource0
 lib/hardware/pci.lua:114: assertion failed!
 stack traceback:
-	core/main.lua:116: in function <core/main.lua:114>
-	[C]: in function 'assert'
-	lib/hardware/pci.lua:114: in function 'map_pci_memory'
-	apps/intel/intel10g.lua:89: in function 'open'
-	core/app.lua:165: in function <core/app.lua:162>
-	core/app.lua:197: in function 'apply_config_actions'
-	core/app.lua:110: in function 'configure'
-	program/packetblaster/packetblaster.lua:51: in function 'run'
-	core/main.lua:56: in function <core/main.lua:32>
-	[C]: in function 'xpcall'
-	core/main.lua:121: in main chunk
-	[C]: at 0x0044e580
-	[C]: in function 'pcall'
-	core/startup.lua:1: in main chunk
-	[C]: in function 'require'
-	[string "require "core.startup""]:1: in main chunk
+    core/main.lua:116: in function <core/main.lua:114>
+    [C]: in function 'assert'
+    lib/hardware/pci.lua:114: in function 'map_pci_memory'
+    apps/intel/intel10g.lua:89: in function 'open'
+    core/app.lua:165: in function <core/app.lua:162>
+    core/app.lua:197: in function 'apply_config_actions'
+    core/app.lua:110: in function 'configure'
+    program/packetblaster/packetblaster.lua:51: in function 'run'
+    core/main.lua:56: in function <core/main.lua:32>
+    [C]: in function 'xpcall'
+    core/main.lua:121: in main chunk
+    [C]: at 0x0044e580
+    [C]: in function 'pcall'
+    core/startup.lua:1: in main chunk
+    [C]: in function 'require'
+    [string "require "core.startup""]:1: in main chunk
 ```
 
 **Resolution:**

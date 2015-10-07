@@ -232,7 +232,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    more = 0
    ffi.copy(last_pkt.data, ipv6_pkt.data, unfrag_header_size)
    write_ipv6_frag_header(last_pkt.data, unfrag_header_size, fnext_header,
-		     raw_frag_offset, more, frag_id)
+            raw_frag_offset, more, frag_id)
    local last_payload_len = payload_size % payload_bytes_per_packet
    ffi.copy(last_pkt.data + new_header_size,
             ipv6_pkt.data + new_header_size + raw_frag_offset,
