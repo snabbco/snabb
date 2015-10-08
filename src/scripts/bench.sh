@@ -2,7 +2,7 @@
 
 function n_times {
     for i in $(seq $1); do
-        echo $(bench/$bench || echo "0")
+        echo $(bench/$2 || echo "0")
     done
 }
 
@@ -12,9 +12,9 @@ function median_stdev {
 }
 
 for bench in $(ls bench/); do
-    if [ -z "$SAMPLESIZE" ]; then
+    if [ -z "$SNABB_PERF_SAMPLESIZE" ]; then
         echo $bench $(n_times 1 $bench) "-"
     else
-        echo $bench $(n_times $SAMPLESIZE $bench | median_stdev)
+        echo $bench $(n_times $SNABB_PERF_SAMPLESIZE $bench | median_stdev)
     fi
 done
