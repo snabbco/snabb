@@ -10,7 +10,7 @@ export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:-eugeneia/snabb-nfv-test}
 export CONTEXT=${CONTEXT:-"$(hostname)-$SNABB_TEST_IMAGE"}
 cpu=$(grep 'model name' /proc/cpuinfo | head -n1 | cut -d ':' -f 2)
 export INFO=${INFO:-"$(uname -n -s -r -m)$cpu / $SNABB_TEST_IMAGE"}
-export SAMPLESIZE=${SAMPLESIZE:-5} # For scripts/bench.sh
+export SNABB_PERF_SAMPLESIZE=${SNABB_PERF_SAMPLESIZE:-5} # For scripts/bench.sh
 
 
 function init {

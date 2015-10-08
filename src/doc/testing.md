@@ -20,3 +20,6 @@ the tests:
 
 * `SNABB_PCAP`—Optional PCAP file for use in tests that require one. The
   default depends on the individual test.
+
+* `SNABB_PERF_SAMPLESIZE`—Optional sample size for
+  `scripts/bench.sh`. The default is 1.

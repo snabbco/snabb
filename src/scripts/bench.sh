@@ -13,8 +13,8 @@ function median_stdev {
 
 for bench in $(ls bench/); do
     if [ -z "$SAMPLESIZE" ]; then
-        echo $bench $(n_times $SAMPLESIZE $bench | median_stdev)
-    else
         echo $bench $(n_times 1 $bench) "-"
+    else
+        echo $bench $(n_times $SAMPLESIZE $bench | median_stdev)
     fi
 done

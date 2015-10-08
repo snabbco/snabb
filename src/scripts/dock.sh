@@ -14,5 +14,6 @@ docker run --rm --privileged -i -v $(dirname $PWD):/snabbswitch $DOCKERFLAGS \
     -e SNABB_TELNET0=$SNABB_TELNET0 \
     -e SNABB_TELNET1=$SNABB_TELNET1 \
     -e SNABB_PCAP=$SNABB_PCAP \
+    -e SNABB_PERF_SAMPLESIZE=$SNABB_PERF_SAMPLESIZE \
     $SNABB_TEST_IMAGE \
     bash -c "mount -t hugetlbfs none /hugetlbfs && (cd snabbswitch/src; $*)"
