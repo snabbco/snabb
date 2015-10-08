@@ -27,4 +27,4 @@ will be taken each PERIOD seconds, which defaults to 1.
 
 Examples:
   transient cap1.pcap tx 01:00.0
-  transient -d 1 -b 5e9 -s 0.2e9 cap1.pcap "Name 1" 01:00.0 cap2 "Name 2" 01:00.1
+  transient -D 1 -b 5e9 -s 0.2e9 cap1.pcap "Name 1" 01:00.0 cap2.pcap "Name 2" 01:00.1
