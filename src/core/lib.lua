@@ -4,6 +4,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local getopt = require("lib.lua.alt_getopt")
 local syscall = require("syscall")
+local pci = require("lib.hardware.pci")
 require("core.clib_h")
 local bit = require("bit")
 local band, bor, bnot, lshift, rshift, bswap =
@@ -684,6 +685,30 @@ function getenv (name)
    local value = os.getenv(name)
    if value and #value ~= 0 then return value
    else return nil end
+end
+
+local function find_devices(pattern)
+   if #pci.devices == 0 then pci.scan_devices() end
+   local ret = {}
+   for _,device in ipairs(pci.devices) do
+      if (device.usable and device.driver == 'apps.intel.intel_app' and
+          device.pciaddress:match(pattern)) then
+         table.insert(ret, device.pciaddress)
+      end
+   end
+   return ret
+end
+
+function find_device(pattern)
+   local devices = find_devices(pattern)
+   if #devices == 0 then
+      error('no devices matched pattern "'..pattern..'"')
+   elseif #devices == 1 then
+      return devices[1]
+   else
+      local devices_str = table.concat(devices, ' ')
+      error('multiple devices matched pattern "'..pattern..'":'..devices_str)
+   end
 end
 
 function selftest ()
