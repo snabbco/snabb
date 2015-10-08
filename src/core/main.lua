@@ -45,9 +45,9 @@ function main ()
          table.remove(args, 1)
       end
    end
-   local program = table.remove(args, 1)
+   program = table.remove(args, 1)
    if not lib.have_module(modulename(program)) then
-      print("unsupported program: "..programname(program))
+      print("unsupported program: "..programname(program):gsub("_", "-"))
       print()
       print("Rename this executable (cp, mv, ln) to choose a supported program:")
       print("  snabb "..(require("programs_inc"):gsub("\n", " ")))
@@ -70,15 +70,13 @@ function usage ()
    print("the names above then that program will be chosen automatically.")
 end
 
-
--- programname("snabbnfv-1.0") => "snabbnfv"
-function programname (program) 
-   program = program:gsub("^.*/", "") -- /bin/snabb-1.0 => snabb-1.0
-   program = program:gsub("[-.].*$", "") -- snabb-1.0   => snabb
-   return program
+function programname (program)
+   return program:gsub("^.*/", ""):
+                  gsub("-[0-9.]+$", ""):
+                  gsub("-", "_")
 end
--- modulename("nfv-sync-master.2.0") => "program.nfv.nfv_sync_master")
-function modulename (program) 
+
+function modulename (program)
    program = programname(program)
    return ("program.%s.%s"):format(program, program)
 end
@@ -118,5 +116,15 @@ function handler (reason)
    os.exit(1)
 end
 
-xpcall(main, handler)
+function selftest ()
+   assert(programname("/bin/snabb-1.0") == "snabb",
+      "Incorrect program name parsing")
+   assert(programname("/bin/snabb-nfv") == "snabb_nfv",
+      "Incorrect program name parsing")
+   assert(programname("/bin/snabb-nfv-1.0") == "snabb_nfv",
+      "Incorrect program name parsing")
+   assert(modulename("nfv-sync-master-2.0") == "program.nfv_sync_master.nfv_sync_master",
+      "Incorrect module name parsing")
+end
 
+xpcall(main, handler)
