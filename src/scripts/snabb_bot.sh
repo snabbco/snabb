@@ -6,10 +6,11 @@
 export SNABBBOTDIR=${SNABBBOTDIR:-"/tmp/snabb_bot"}
 export REPO=${REPO:-"SnabbCo/snabbswitch"}
 export JQ=${JQ:-$(which jq)}
-export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:=eugeneia/snabb-nfv-test}
+export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:-eugeneia/snabb-nfv-test}
 export CONTEXT=${CONTEXT:-"$(hostname)-$SNABB_TEST_IMAGE"}
 cpu=$(grep 'model name' /proc/cpuinfo | head -n1 | cut -d ':' -f 2)
 export INFO=${INFO:-"$(uname -n -s -r -m)$cpu / $SNABB_TEST_IMAGE"}
+export SAMPLESIZE=${SAMPLESIZE:-5} # For scripts/bench.sh
 
 
 function init {
@@ -110,11 +111,11 @@ BEGIN {
     minratio = 0.85;
 }
 
-{ if ($2+0 != 0) { ratio = $4 / $2; } else { ratio = $4; }
+{ if ($2+0 != 0) { ratio = $5 / $2; } else { ratio = $5; }
   if (ratio < minratio) {
-      print "ERROR", $1, "->", ratio, "of", $2;
+      print "ERROR", $1, "->", ratio, "of", $2, SD, $3;
   } else {
-      print "BENCH",    $1, "->", ratio, "of", $2;
+      print "BENCH", $1, "->", ratio, "of", $2, SD, $3;
   }
 }
 '
