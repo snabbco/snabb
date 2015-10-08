@@ -128,6 +128,8 @@ function check_test_suite { head=$1
     echo "Checking test suite:"
     build $head || return
     if ! dock_make test_ci; then
+        echo
+        echo "ERROR during tests:"
         for log in src/testlog/*; do
             echo $log:
             cat $log
