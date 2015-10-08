@@ -8,7 +8,7 @@ function n_times {
 
 function median_stdev {
     awk '{sum+=$1; sumsq+=$1*$1}
-          END{print sum/NR,sqrt(sumsq/NR - (sum/NR)**2)}'
+          END{print sum/NR,sqrt(sumsq/NR - (sum/NR)^2)}'
 }
 
 for bench in $(ls bench/); do
