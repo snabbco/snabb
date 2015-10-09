@@ -73,3 +73,7 @@ void prefetch_for_write(const void *address)
   __builtin_prefetch(address, 1);
 }
 
+void nop()
+{
+}
+
