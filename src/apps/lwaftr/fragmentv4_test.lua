@@ -28,7 +28,6 @@ local function make_ipv4_packet(payload_size)
    eth_header:type(0x0800) -- IPv4
 
    -- IPv4 header
-   ip4_header:version(4)
    ip4_header:ihl(ip4_header:sizeof() / 4)
    ip4_header:dscp(0)
    ip4_header:ecn(0)

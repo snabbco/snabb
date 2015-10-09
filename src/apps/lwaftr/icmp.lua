@@ -71,7 +71,6 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config
    local ipv4_header = ipv4:new({ttl = constants.default_ttl,
                                  protocol = constants.proto_icmp,
                                  src = from_ip, dst = to_ip})
-   ipv4_header:version(4) -- It was being set to 0, which is bogus...
 
    local ethernet_header = ethernet:new({src = from_eth,
                                          dst = to_eth,
