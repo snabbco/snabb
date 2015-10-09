@@ -66,8 +66,12 @@ function clone_pull_request_repo {
     git clone $(pull_request_repo $1) $(repo_path)
 }
 
+function dock_build {
+    (cd src && scripts/dock.sh "(cd .. && make)")
+}
+
 function build1 {
-    git checkout $1 && git submodule update --init && make
+    git checkout $1 && git submodule update --init && dock_build
 }
 
 function build {
@@ -113,9 +117,9 @@ BEGIN {
 
 { if ($2+0 != 0) { ratio = $5 / $2; } else { ratio = $5; }
   if (ratio < minratio) {
-      print "ERROR", $1, "->", ratio, "of", $2, SD, $3;
+      print "ERROR", $1, "->", ratio, "of", $2, "(SD:", $3, ")";
   } else {
-      print "BENCH", $1, "->", ratio, "of", $2, SD, $3;
+      print "BENCH", $1, "->", ratio, "of", $2, "(SD:", $3, ")";
   }
 }
 '
