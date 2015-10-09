@@ -5,6 +5,7 @@ local C = ffi.C
 local getopt = require("lib.lua.alt_getopt")
 local syscall = require("syscall")
 require("core.clib_h")
+local bit = require("bit")
 local band, bor, bnot, lshift, rshift, bswap =
    bit.band, bit.bor, bit.bnot, bit.lshift, bit.rshift, bit.bswap
 
@@ -358,22 +359,6 @@ else
 end
 ntohl = htonl
 ntohs = htons
-
--- The fact that BitOps return signed integers is irritating, to say
--- the least.  One counter-intuitive consequence is that, for example,
---
---   bit.bswap(bit.bswap(0x80000000)) == 0x80000000
---
--- is false, because the lhs is a negative number.  To compare a
--- 32-bit quantity with the result of ntohl() or htonl(), one needs to
--- use the equivalent of
---
---   bit.band(number, 0xFFFFFFFF) == ntohl(other_number)
---
--- The followig utility can be used for that purpose.
-function eq32 (a, b)
-   return band(a, 0xFFFFFFFF) == band(b, 0xFFFFFFFF)
-end
 
 -- Manipulation of bit fields in uint{8,16,32)_t stored in network
 -- byte order.  Using bit fields in C structs is compiler-dependent
