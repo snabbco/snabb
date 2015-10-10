@@ -142,6 +142,31 @@ function root_check ()
    lib.root_check("error: must run as root to access PCI devices")
 end
 
+local function find_devices(pattern)
+   if #pci.devices == 0 then scan_devices() end
+   local ret = {}
+   for _,device in ipairs(pci.devices) do
+      if (device.usable and device.driver == 'apps.intel.intel_app' and
+         device.pciaddress:match(pattern)) then
+         table.insert(ret, device.pciaddress)
+      end
+   end
+   return ret
+end
+
+-- Return device's PCI address matching pattern
+function find_device(pattern)
+   local devices = find_devices(pattern)
+   if #devices == 0 then
+      error('no devices matched pattern "'..pattern..'"')
+   elseif #devices == 1 then
+      return devices[1]
+   else
+      local devices_str = table.concat(devices, ' ')
+      error('multiple devices matched pattern "'..pattern..'":'..devices_str)
+   end
+end
+
 --- ### Selftest
 ---
 --- PCI selftest scans for available devices and performs our driver's

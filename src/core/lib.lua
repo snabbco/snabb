@@ -4,7 +4,6 @@ local ffi = require("ffi")
 local C = ffi.C
 local getopt = require("lib.lua.alt_getopt")
 local syscall = require("syscall")
-local pci = require("lib.hardware.pci")
 require("core.clib_h")
 local bit = require("bit")
 local band, bor, bnot, lshift, rshift, bswap =
