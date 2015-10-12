@@ -1,13 +1,11 @@
 #!/bin/bash
 set -e
 
-export PCIADDR=$SNABB_PCI_INTEL0
-[ ! -z "$PCIADDR" ] || export PCIADDR=$SNABB_PCI0
-[ ! -z "$PCIADDR" ] || exit 1
+[ ! -z "$SNABB_PCI_INTEL0" ] || exit 1
 
 out=$(./snabb packetblaster replay --duration 1 \
     program/snabbnfv/test_fixtures/pcap/64.pcap \
-    "$PCIADDR")
+    "$SNABB_PCI_INTEL0")
 # Extract floating point Mpps number from output.
 pps=$(echo "$out" | grep TXDGPC | cut -f 3 | sed s/,//g)
 echo "scale=2; $pps / 1000000" | bc
