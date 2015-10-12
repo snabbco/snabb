@@ -8,8 +8,8 @@ export REPO=${REPO:-"SnabbCo/snabbswitch"}
 export JQ=${JQ:-$(which jq)}
 export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:-eugeneia/snabb-nfv-test}
 export CONTEXT=${CONTEXT:-"$(hostname)-$SNABB_TEST_IMAGE"}
-cpu=$(grep 'model name' /proc/cpuinfo | head -n1 | cut -d ':' -f 2)
-export INFO=${INFO:-"$(uname -n -s -r -m)$cpu / $SNABB_TEST_IMAGE"}
+machine="$(uname -n -s -r -m) $(grep 'model name' /proc/cpuinfo | head -n1 | cut -d ':' -f 2)"
+export INFO=${INFO:-"$machine / $SNABB_TEST_IMAGE"}
 export SNABB_PERF_SAMPLESIZE=${SNABB_PERF_SAMPLESIZE:-5} # For scripts/bench.sh
 
 
@@ -92,9 +92,21 @@ function log_status {
     fi
 }
 
+function pci_info { var=$1; value=$2
+    [ -z  "$2" ] || echo $1=$(lspci -D | grep $2)
+}
+
 function log_header {
-    echo Node / Image: $INFO
-    echo PR / Head: \#$1 / $(pull_request_head $id)
+    echo Host: $machine
+    echo Image: $SNABB_TEST_IMAGE
+    echo PR: \#$1
+    echo Head: $(pull_request_head $1)
+    pci_info SNABB_PCI0 $SNABB_PCI0
+    pci_info SNABB_PCI1 $SNABB_PCI1
+    pci_info SNABB_PCI_INTEL0 $SNABB_PCI_INTEL0
+    pci_info SNABB_PCI_INTEL1 $SNABB_PCI_INTEL1
+    pci_info SNABB_PCI_SOLARFLARE0 $SNABB_PCI_SOLARFLARE0
+    pci_info SNABB_PCI_SOLARFLARE1 $SNABB_PCI_SOLARFLARE1
     echo
 }
 
