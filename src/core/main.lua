@@ -33,19 +33,20 @@ function main ()
    zone("startup")
    require "lib.lua.strict"
    initialize()
-   local program
    local args = parse_command_line()
    if programname(args[1]) == 'snabb' then
-      -- Print usage when no arguments or -h/--help
-      if #args == 1 or args[2] == '-h' or args[2] == '--help' then
-         usage()
-         os.exit(1)
-      else
-         -- Strip 'snabb' and use next argument as program name
-         table.remove(args, 1)
+      -- Print usage with exit status 0 if help requested
+      if args[2] == '-h' or args[2] == '--help' then
+         usage(0)
       end
+      -- Print usage with exit status 1 if no arguments supplied
+      if #args == 1 then
+         usage(1)
+      end
+      -- Strip 'snabb' and use next argument as program name
+      table.remove(args, 1)
    end
-   program = table.remove(args, 1)
+   local program = table.remove(args, 1)
    if not lib.have_module(modulename(program)) then
       print("unsupported program: "..programname(program):gsub("_", "-"))
       print()
@@ -57,7 +58,7 @@ function main ()
    end
 end
 
-function usage ()
+function usage (status)
    print("Usage: "..ffi.string(C.argv[0]).." <program> ...")
    local programs = require("programs_inc"):gsub("%S+", "  %1")
    print()
@@ -68,6 +69,7 @@ function usage ()
    print()
    print("If you rename (or copy or symlink) this executable with one of")
    print("the names above then that program will be chosen automatically.")
+   os.exit(statis)
 end
 
 function programname (program)
@@ -88,10 +90,6 @@ function parse_command_line ()
       table.insert(array, ffi.string(C.argv[i]))
    end
    return array
-end
-
-function exit (status)
-   os.exit(status)
 end
 
 --- Globally initialize some things. Module can depend on this being done.
