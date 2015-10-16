@@ -73,9 +73,9 @@ function usage (status)
 end
 
 function programname (program)
-   return program:gsub("^.*/", ""):
-                  gsub("-[0-9.]+$", ""):
-                  gsub("-", "_")
+   return program:gsub("^.*/", "")
+                 :gsub("-[0-9.]+[-%w]+$", "")
+                 :gsub("-", "_")
 end
 
 function modulename (program)
@@ -116,6 +116,8 @@ end
 
 function selftest ()
    assert(programname("/bin/snabb-1.0") == "snabb",
+      "Incorrect program name parsing")
+   assert(programname("/bin/snabb-1.0-alpha2") == "snabb",
       "Incorrect program name parsing")
    assert(programname("/bin/snabb-nfv") == "snabb_nfv",
       "Incorrect program name parsing")
