@@ -34,7 +34,8 @@ function main ()
    require "lib.lua.strict"
    initialize()
    local args = parse_command_line()
-   if programname(args[1]) == 'snabb' then
+   local program = programname(args[1])
+   if program == 'snabb' then
       -- Print usage with exit status 0 if help requested
       if args[2] == '-h' or args[2] == '--help' then
          usage(0)
@@ -46,9 +47,9 @@ function main ()
       -- Strip 'snabb' and use next argument as program name
       table.remove(args, 1)
    end
-   local program = table.remove(args, 1)
+   program = select_program(program, args)
    if not lib.have_module(modulename(program)) then
-      print("unsupported program: "..programname(program):gsub("_", "-"))
+      print("unsupported program: "..program:gsub("_", "-"))
       print()
       print("Rename this executable (cp, mv, ln) to choose a supported program:")
       print("  snabb "..(require("programs_inc"):gsub("\n", " ")))
@@ -56,6 +57,15 @@ function main ()
    else
       require(modulename(program)).run(args)
    end
+end
+
+-- If program stars with prefix 'snabb_' removes the prefix
+-- If not, use the next argument as program name
+function select_program (program, args)
+   if program:match("^snabb_") then
+      return program:gsub("^snabb_", "")
+   end
+   return programname(table.remove(args, 1)):gsub("^snabb_", "")
 end
 
 function usage (status)
@@ -72,10 +82,10 @@ function usage (status)
    os.exit(statis)
 end
 
-function programname (program)
-   return program:gsub("^.*/", "")
-                 :gsub("-[0-9.]+[-%w]+$", "")
-                 :gsub("-", "_")
+function programname (name)
+   return name:gsub("^.*/", "")
+              :gsub("-[0-9.]+[-%w]+$", "")
+              :gsub("-", "_")
 end
 
 function modulename (program)
@@ -115,6 +125,7 @@ function handler (reason)
 end
 
 function selftest ()
+   print("selftest")
    assert(programname("/bin/snabb-1.0") == "snabb",
       "Incorrect program name parsing")
    assert(programname("/bin/snabb-1.0-alpha2") == "snabb",
@@ -125,6 +136,16 @@ function selftest ()
       "Incorrect program name parsing")
    assert(modulename("nfv-sync-master-2.0") == "program.nfv_sync_master.nfv_sync_master",
       "Incorrect module name parsing")
+   local pn = programname
+   -- snabb foo => foo
+   assert(select_program(pn'snabb', { pn'foo' }) == "foo",
+      "Incorrect program name selected")
+   -- snabb-foo => foo
+   assert(select_program(pn'snabb-foo', { }) == "foo",
+      "Incorrect program name selected")
+   -- snabb snabb-foo => foo
+   assert(select_program(pn'snabb', { pn'snabb-foo' }) == "foo",
+      "Incorrect program name selected")
 end
 
 xpcall(main, handler)
