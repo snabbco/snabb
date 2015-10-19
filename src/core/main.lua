@@ -102,6 +102,10 @@ function parse_command_line ()
    return array
 end
 
+function exit (status)
+   os.exit(status)
+end
+
 --- Globally initialize some things. Module can depend on this being done.
 function initialize ()
    require("core.lib")
