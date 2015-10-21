@@ -88,3 +88,4 @@ min_ipv6_mtu = 1280
 -- The following should actually be 2^16, but that will require support for
 -- larger packets. TODO FIXME
 ipv6_max_packet_size = C.PACKET_PAYLOAD_SIZE
+ipv4_max_packet_size = C.PACKET_PAYLOAD_SIZE
