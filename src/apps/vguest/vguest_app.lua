@@ -48,7 +48,7 @@ function VGuest:add_receive_buffers()
 end
 
 function selftest()
-   local pcidev = '0000:00:07.0'
+   local pcidev = '0000:00:03.0'
    local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
 
    engine.configure(config.new())
