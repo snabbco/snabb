@@ -79,7 +79,7 @@ function usage (status)
    print()
    print("If you rename (or copy or symlink) this executable with one of")
    print("the names above then that program will be chosen automatically.")
-   os.exit(statis)
+   os.exit(status)
 end
 
 function programname (name)
