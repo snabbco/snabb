@@ -2,7 +2,7 @@ module(...,package.seeall)
 
 -- Default to not using any Lua code on the filesystem.
 -- (Can be overridden with -P argument: see below.)
-package.path = ''
+--package.path = ''
 
 local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
