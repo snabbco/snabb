@@ -8,6 +8,7 @@ local S         = require('syscall')
 local pci       = require("lib.hardware.pci")
 local bit       = require('bit')
 local gvring    = require('apps.vguest.guest_vring')
+require("lib.checksum")
 require('lib.virtio.virtio_h')
 
 local band, bor, rshift = bit.band, bit.bor, bit.rshift
