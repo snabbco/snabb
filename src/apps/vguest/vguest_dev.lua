@@ -85,22 +85,22 @@ function VGdev:new(args)
    local bar = open_bar(pci.path(args.pciaddr..'/resource0'), virtio_pci_bar0)
 
    bar.status = 0 -- Reset device.
-   bar.status = band(bar.status, 1) -- Acknowledge.
+   bar.status = bor(bar.status, 1) -- Acknowledge.
    -- Check something.
-   bar.status = band(bar.status, 2) -- Driver.
+   bar.status = bor(bar.status, 2) -- Driver.
    local features = bar.host_features
    if debug then print('host_features', features) end
    if band(features, min_features) ~= min_features then
-      bar.status = band(bar.status, 128) -- Failure.
+      bar.status = bor(bar.status, 128) -- Failure.
       bar:close()
       return nil, "doesn't provide minimum features"
    end
    if debug then print('set features to:', band(features, want_features)) end
    bar.guest_features = band(features, want_features)
-   bar.status = band(bar.status, 8) -- Features OK.
+   bar.status = bor(bar.status, 8) -- Features OK.
    if debug then print('got features: ', bar.host_features, bar.guest_features) end
    if band(bar.status, 8) ~= 8 then
-      bar.status = band(bar.status, 128) -- Failure.
+      bar.status = bor(bar.status, 128) -- Failure.
       bar:close()
       return nil, "feature set wasn't accepted by device"
    end
@@ -120,12 +120,12 @@ function VGdev:new(args)
    end
 
    if not(vqs[0] and vqs[1]) then
-      bar.status = band(bar.status, 128) -- Failure.
+      bar.status = bor(bar.status, 128) -- Failure.
       bar:close()
       return nil, "missing required virtqueues"
    end
 
-   bar.status = band(bar.status, 4) -- Driver OK.
+   bar.status = bor(bar.status, 4) -- Driver OK.
 
    return setmetatable({
       bar = bar,
