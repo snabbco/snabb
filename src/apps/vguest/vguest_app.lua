@@ -22,8 +22,8 @@ function VGuest:push()
    local l = self.input.rx
    if not dev or not l then return end
 
-   while not l:empty() and dev:can_transmit() do
-      dev:transmit(l:receive())
+   while not link.empty(l) and dev:can_transmit() do
+      dev:transmit(link.receive(l))
    end
    dev:sync_transmit()
 end
@@ -34,8 +34,8 @@ function VGuest:pull()
    if not dev or not l then return end
 
    dev:sync_receive()
-   while not l:full() and dev:can_receive() do
-      l:transmit(dev:receive())
+   while not link.full(l) and dev:can_receive() do
+      link.transmit(l, dev:receive())
    end
    self:add_receive_buffers()
 end
