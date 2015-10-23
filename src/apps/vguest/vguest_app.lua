@@ -48,6 +48,8 @@ function VGuest:add_receive_buffers()
 end
 
 function selftest()
+   local pcidev = os.getenv("SNABB_TEST_VIRTIO_PCIDEV")
+   assert(pcidev, "Environment variable SNABB_TEST_VIRTIO_PCIDEV not defined")
    local pcidev = '0000:00:03.0'
    local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
 
