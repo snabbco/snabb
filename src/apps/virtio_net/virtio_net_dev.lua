@@ -7,7 +7,7 @@ local C         = ffi.C
 local S         = require('syscall')
 local pci       = require("lib.hardware.pci")
 local bit       = require('bit')
-local gvring    = require('apps.vguest.guest_vring')
+local gvring    = require('apps.virtio_net.guest_vring')
 require("lib.checksum_h")
 require('lib.virtio.virtio_h')
 
