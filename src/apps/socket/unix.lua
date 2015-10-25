@@ -9,7 +9,7 @@ local link   = require("core.link")
 local packet = require("core.packet")
 local S      = require("syscall")
 
-local UnixSocket = {}
+UnixSocket = {}
 UnixSocket.__index = UnixSocket
 
 function UnixSocket:new (arg)
