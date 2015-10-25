@@ -18,9 +18,12 @@ local aftrconf
 local function read_conf(conf_file)
    local input = io.open(conf_file)
    local conf_vars = input:read('*a')
-   local conf_prolog = "function _conff(policies, C, ipv4, ipv6, ethernet, bt)\n return {"
-   local conf_epilog = "   }\nend\nreturn _conff\n"
-   local full_config = conf_prolog .. conf_vars .. conf_epilog
+   local full_config = ([[
+      function _conff(policies, C, ipv4, ipv6, ethernet, bt)
+         return {%s}
+      end
+      return _conff
+   ]]):format(conf_vars)
    local conf = assert(loadstring(full_config))()
    return conf(policies, ffi.C, ipv4, ipv6, ethernet, bt)
 end
