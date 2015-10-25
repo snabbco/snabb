@@ -38,7 +38,7 @@ function run (args)
 
    local c = config.new()
 
-   config.app(c, "ctl", unix.UnixSocket, {file = CONTROL_SOCK, listen = true})
+   config.app(c, "ctl", unix.UnixSocket, {filename = CONTROL_SOCK, listen = true})
 	--[[
    config.app(c, "punt", raw.RawSocket, PUNT_IF)
    config.link(c, "capture.output -> playback.rx")
