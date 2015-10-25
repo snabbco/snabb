@@ -1,10 +1,10 @@
 module(..., package.seeall)
 
 local lib = require("core.lib")
-local raw = require("apps.socket.raw")
 local usage = require("program.lisper.README_inc")
+local unix = require("apps.socket.unix")
 
-CONTROL_SOCK = 'ctrl.socket'
+CONTROL_SOCK = '/var/tmp/ctrl.socket'
 PUNT_IF = 'veth0'
 NET_IF = "01:00.0"
 LOCAL_IP = ""
@@ -29,21 +29,17 @@ function opt.i (arg) LOCAL_IP = arg end
 function opt.m (arg) LOCAL_MAC = arg end
 function opt.N (arg) NEXT_HOP = arg end
 
-local UnixSocket = {}
-
-function UnixSocket:new()
-
-end
-
-
 function run (args)
 
-   print'hello3'
+   --unix.selftest()
+   --os.exit()
+
    local args = lib.dogetopt(args, opt, "hc:p:n:i:m:N:", long_opts)
 
    local c = config.new()
-   --[[
-   config.app(c, "ctl", raw.RawSocket, PUNT_IF)
+
+   config.app(c, "ctl", unix.UnixSocket, {file = CONTROL_SOCK, listen = true})
+	--[[
    config.app(c, "punt", raw.RawSocket, PUNT_IF)
    config.link(c, "capture.output -> playback.rx")
    ]]
