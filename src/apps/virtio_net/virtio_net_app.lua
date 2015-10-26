@@ -3,6 +3,7 @@ module(..., package.seeall)
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
 local virtio_dev = require("apps.virtio_net.virtio_net_dev")
+local main       = require("core.main")
 
 local virtio_net = {}
 virtio_net.__index = virtio_net
@@ -49,8 +50,10 @@ end
 
 function selftest()
    local pcidev = os.getenv("SNABB_TEST_VIRTIO_PCIDEV")
-   assert(pcidev, "Environment variable SNABB_TEST_VIRTIO_PCIDEV not defined")
-   local pcidev = '0000:00:03.0'
+   if not pcidev then
+      print("SNABB_TEST_VIRTIO_PCIDEV was not set\nTest skipped")
+      os.exit(engine.test_skipped_code)
+   end
    local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
 
    engine.configure(config.new())
