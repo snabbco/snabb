@@ -1,5 +1,6 @@
 module(..., package.seeall)
 
+local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
 local fragmentv4 = require("apps.lwaftr.fragmentv4")
 local fragmentv6 = require("apps.lwaftr.fragmentv6")
@@ -8,6 +9,8 @@ local lwconf = require("apps.lwaftr.conf")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local lwutil = require("apps.lwaftr.lwutil")
 
+local S = require("syscall")
+local timer = require("core.timer")
 local checksum = require("lib.checksum")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
@@ -76,11 +79,24 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
    end
 end
 
-LwAftr = {}
-
-local function reload_binding_table(lwstate, path)
+local function reload_binding_table(lwstate)
+   lwstate.binding_table = bt.load_binding_table(lwstate.bt_file)
    lwstate.binding_table_by_ipv4 = compute_binding_table_by_ipv4(lwstate.binding_table)
 end
+
+local function reload_binding_table_on_hup(lwstate)
+   if not lwstate.bt_file then return end
+   local fd = S.signalfd("hup", "nonblock") -- handle SIGHUP via fd
+   S.sigprocmask("block", "hup")            -- block traditional handler
+   timer.activate(timer.new("sighup-reload-binding-table", function ()
+      if (#S.util.signalfd_read(fd) > 0) then
+         print("[snabb-lwaftr: SIGHUP caught - reload binding table]")
+         reload_binding_table(lwstate)
+      end
+  end, 1e4, 'repeating'))
+end
+
+LwAftr = {}
 
 function LwAftr:new(conf)
    -- It's a bit of a hack to deal with tagging here, but the front-ends are
@@ -98,6 +114,7 @@ function LwAftr:new(conf)
    o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
    o.fragment6_cache = {}
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
+   reload_binding_table_on_hup(o)
    return setmetatable(o, {__index=LwAftr})
 end
 
