@@ -33,13 +33,18 @@ local function pton_binding_table(bt)
    return pbt
 end
 
+function load_binding_table(bt_file)
+   if not bt_file then
+      error("bt_file must be specified or the BT pre-initialized")
+   end
+   local binding_table = read_binding_table(bt_file)
+   machine_friendly_binding_table = pton_binding_table(binding_table)
+   return machine_friendly_binding_table
+end
+
 function get_binding_table(bt_file)
    if not machine_friendly_binding_table then
-      if not bt_file then
-         error("bt_file must be specified or the BT pre-initialized")
-      end
-      local binding_table = read_binding_table(bt_file)
-      machine_friendly_binding_table = pton_binding_table(binding_table)
+      load_binding_table(bt_file)
    end
    return machine_friendly_binding_table
 end
