@@ -1,6 +1,6 @@
 module(..., package.seeall)
 
-local syscall    = require("syscall")
+local S          = require("syscall")
 local config     = require("core.config")
 local lib        = require("core.lib")
 local csv_stats  = require("lib.csv_stats")
@@ -23,12 +23,12 @@ local function fatal(msg)
 end
 
 local function file_exists(path)
-   local stat = syscall.stat(path)
+   local stat = S.stat(path)
    return stat and stat.isreg
 end
 
 local function dir_exists(path)
-   local stat = syscall.stat(path)
+   local stat = S.stat(path)
    return stat and stat.isdir
 end
 

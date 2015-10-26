@@ -78,6 +78,10 @@ end
 
 LwAftr = {}
 
+local function reload_binding_table(lwstate, path)
+   lwstate.binding_table_by_ipv4 = compute_binding_table_by_ipv4(lwstate.binding_table)
+end
+
 function LwAftr:new(conf)
    -- It's a bit of a hack to deal with tagging here, but the front-ends are
    -- rapidly evolving, and this will happen regardless of which one is used.
