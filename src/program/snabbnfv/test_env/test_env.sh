@@ -34,6 +34,13 @@ export qemu_vectors=$((2*$QUEUES + 1))
 export sockets=""
 export assets=$HOME/.test_env
 export qemu=qemu/obj/x86_64-softmmu/qemu-system-x86_64
+export host_qemu=$(which qemu-system-x86_64)
+
+if [ -z "$QEMU" ]; then
+    export QEMU=${host_qemu:-"$assets/$qemu"}
+    echo "Defaulting to QEMU=$QEMU"
+fi
+[ -x "$QEMU" ] || (echo "Not found: $QEMU"; exit 1)
 
 export tmux_session=""
 
@@ -100,7 +107,7 @@ function launch_qemu {
     tmux_launch \
         "qemu$qemu_n" \
         "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
-        $assets/$qemu \
+        $QEMU \
         -kernel $assets/$4 \
         -append \"earlyprintk root=/dev/vda rw console=ttyS0 ip=$(ip $qemu_n)\" \
         -m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on \
