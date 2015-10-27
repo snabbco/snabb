@@ -128,7 +128,7 @@ BEGIN {
 }
 
 { if ($2+0 != 0) { ratio = $5 / $2; } else { ratio = $5; }
-  if (ratio < minratio) {
+  if ((ratio < minratio) && ($2+0 != 0)) {
       print "ERROR", $1, "->", ratio, "of", $2, "(SD:", $3, ")";
   } else {
       print "BENCH", $1, "->", ratio, "of", $2, "(SD:", $3, ")";
