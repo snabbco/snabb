@@ -9,7 +9,7 @@ if arch == 'x64' then arch = 'x86' end --same linker for x64
 local C = ffi.C
 local M = {C = C}
 
-M._VERSION = 10300
+M._VERSION = 10400
 
 ffi.cdef[[
 enum {
