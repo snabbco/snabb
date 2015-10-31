@@ -3,6 +3,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
+local htons, ntohs = lib.htons, lib.ntohs
 
 local AF_INET6 = 10
 local INET6_ADDRSTRLEN = 48
@@ -126,9 +127,9 @@ end
 
 function ipv6:payload_length (length)
    if length ~= nil then
-      self:header().payload_length = C.htons(length)
+      self:header().payload_length = htons(length)
    else
-      return(C.ntohs(self:header().payload_length))
+      return(ntohs(self:header().payload_length))
    end
 end
 
@@ -182,7 +183,7 @@ function ipv6:pseudo_header (plen, nh)
    ffi.fill(ph, ffi.sizeof(ph))
    local h = self:header()
    ffi.copy(ph, h.src_ip, 32)  -- Copy source and destination
-   ph.ulp_length = C.htons(plen)
+   ph.ulp_length = htons(plen)
    ph.next_header = nh
    return(ph)
 end

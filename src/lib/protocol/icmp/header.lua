@@ -74,11 +74,11 @@ end
 
 function icmp:checksum (payload, length, ipv6)
    local header = self:header()
-   header.checksum = C.htons(checksum(header, payload, length, ipv6))
+   header.checksum = lib.htons(checksum(header, payload, length, ipv6))
 end
 
 function icmp:checksum_check (payload, length, ipv6)
-   return checksum(self:header(), payload, length, ipv6) == C.ntohs(self:header().checksum)
+   return checksum(self:header(), payload, length, ipv6) == lib.ntohs(self:header().checksum)
 end
 
 return icmp

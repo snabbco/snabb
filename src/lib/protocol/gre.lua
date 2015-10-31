@@ -5,6 +5,8 @@ local header = require("lib.protocol.header")
 local lib = require("core.lib")
 local bitfield = lib.bitfield
 local ipsum = require("lib.checksum").ipsum
+local ntohs, htons, ntohl, htonl =
+   lib.ntohs, lib.htons, lib.ntohl, lib.htonl
 
 -- GRE uses a variable-length header as specified by RFCs 2784 and
 -- 2890.  The actual size is determined by flag bits in the base
@@ -123,16 +125,16 @@ function gre:checksum (payload, length)
    end
    if payload ~= nil then
       -- Calculate and set the checksum
-      self:header().csum = C.htons(checksum(self:header(), payload, length))
+      self:header().csum = htons(checksum(self:header(), payload, length))
    end
-   return C.ntohs(self:header().csum)
+   return ntohs(self:header().csum)
 end
 
 function gre:checksum_check (payload, length)
    if not self._checksum then
       return true
    end
-   return checksum(self:header(), payload, length) == C.ntohs(self:header().csum)
+   return checksum(self:header(), payload, length) == lib.ntohs(self:header().csum)
 end
 
 -- Returns nil if keying is disabled. Otherwise, the key is set to the
@@ -143,17 +145,17 @@ function gre:key (key)
       return nil
    end
    if key ~= nil then
-      self:header().key = C.htonl(key)
+      self:header().key = htonl(key)
    else
-      return C.ntohl(self:header().key)
+      return ntohl(self:header().key)
    end
 end
 
 function gre:protocol (protocol)
    if protocol ~= nil then
-      self:header().protocol = C.htons(protocol)
+      self:header().protocol = htons(protocol)
    end
-   return(C.ntohs(self:header().protocol))
+   return(ntohs(self:header().protocol))
 end
 
 return gre
