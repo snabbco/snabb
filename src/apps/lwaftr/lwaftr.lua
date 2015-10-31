@@ -181,7 +181,6 @@ local function binding_lookup_ipv4_from_pkt(lwstate, pkt, pre_ipv4_bytes)
    local dst_ip_start = pre_ipv4_bytes + 16
    -- Note: ip is kept in network byte order, regardless of host byte order
    local ip = rd32(pkt.data + dst_ip_start)
-   -- TODO: don't assume the length of the IPv4 header; check IHL
    local dst_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes) + 2
    local port = C.ntohs(rd16(pkt.data + dst_port_start))
    return binding_lookup_ipv4(lwstate, ip, port)
@@ -383,7 +382,6 @@ local function icmpv4_incoming(lwstate, pkt)
 end
 
 -- TODO: correctly handle fragmented IPv4 packets
--- TODO: correctly deal with IPv6 packets that need to be fragmented
 -- The incoming packet is a complete one with ethernet headers.
 local function from_inet(lwstate, pkt)
    -- Check incoming ICMP -first-, because it has different binding table lookup logic
@@ -529,9 +527,6 @@ local function get_ipv6_dst_ip(pkt)
    return fstring(pkt.data + ipv6_dst, 16)
 end
 
--- TODO: rewrite this to either also have the source and dest IPs in the table,
--- or rewrite the fragment reassembler to check rather than assuming
--- all the fragments it is passed are the same in this regard
 local function cache_ipv6_fragment(lwstate, frag)
    local cache = lwstate.fragment6_cache
    local frag_id = fragmentv6.get_ipv6_frag_id(frag)
@@ -654,13 +649,10 @@ end
 
 -- Modify the given packet in-place, and forward it, drop it, or reply with
 -- an ICMP or ICMPv6 packet as per the internet draft and configuration policy.
--- TODO: handle ICMPv6 as per RFC 2473
--- TODO: revisit this and check on performance idioms
 
 -- Check each input device. Handle transmission through the system in the following
 -- loops; handle unusual cases (ie, ICMP going through the same interface as it
 -- was received from) where they occur.
--- TODO: handle fragmentation elsewhere too?
 function LwAftr:push ()
    local i4, i6 = self.input.v4, self.input.v6
    local o4, o6 = self.output.v4, self.output.v6
