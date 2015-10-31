@@ -11,6 +11,9 @@ Packets received from the network are put on the `tx` port.
 
 ![Solarflare](.images/Solarflare.png)
 
+The `Solarflare` app requires [OpenOnload](http://www.openonload.org/)
+version *201502* to be installed and the `sfc` module to be loaded.
+
 ### Configuration
 
 The `Solarflare` app accepts a table as its configuration argument. The
