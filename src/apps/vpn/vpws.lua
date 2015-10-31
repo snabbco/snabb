@@ -72,7 +72,7 @@ function vpws:push()
       assert(l_out)
       while not link.full(l_out) and not link.empty(l_in) do
          local p = link.receive(l_in)
-         local datagram = self._dgram:reuse(p, ethernet)
+         local datagram = self._dgram:new(p, ethernet)
          if port_in == 'customer' then
             local encap = self._encap
             -- Encapsulate Ethernet frame coming in on customer port

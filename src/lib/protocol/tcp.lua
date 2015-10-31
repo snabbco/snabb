@@ -7,26 +7,26 @@ local ipsum = require("lib.checksum").ipsum
 local ntohs, htons, ntohl, htonl =
    lib.ntohs, lib.htons, lib.ntohl, lib.htonl
 
-local tcp_header_t = ffi.typeof[[
-struct {
-   uint16_t    src_port;
-   uint16_t    dst_port;
-   uint32_t    seq;
-   uint32_t    ack;
-   uint16_t    off_flags; //data offset:4 reserved:3 NS:1 CWR:1 ECE:1 URG:1 ACK:1 PSH:1 RST:1 SYN:1 FIN:1
-   uint16_t    window_size;
-   uint16_t    checksum;
-   uint16_t    pad;
-} __attribute__((packed))
-]]
-
 local tcp = subClass(header)
 
 -- Class variables
 tcp._name = "tcp"
-tcp._header_type = tcp_header_t
-tcp._header_ptr_type = ffi.typeof("$*", tcp_header_t)
 tcp._ulp = { method = nil }
+tcp:init(
+   {
+      [1] = ffi.typeof[[
+	    struct {
+	       uint16_t    src_port;
+	       uint16_t    dst_port;
+	       uint32_t    seq;
+	       uint32_t    ack;
+	       uint16_t    off_flags; //data offset:4 reserved:3 NS:1 CWR:1 ECE:1 URG:1 ACK:1 PSH:1 RST:1 SYN:1 FIN:1
+	       uint16_t    window_size;
+	       uint16_t    checksum;
+	       uint16_t    pad;
+	    } __attribute__((packed))
+      ]],
+   })
 
 -- Class methods
 

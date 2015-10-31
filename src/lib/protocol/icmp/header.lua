@@ -9,24 +9,24 @@ local ipsum = require("lib.checksum").ipsum
 -- number spaces for type and code.  This class needs to be subclassed
 -- accordingly.
 
-local icmp_t = ffi.typeof[[
-      struct {
-         uint8_t type;
-         uint8_t code;
-         int16_t checksum;
-      } __attribute__((packed))
-]]
-
 local icmp = subClass(header)
 
 -- Class variables
 icmp._name = "icmp"
-icmp._header_type = icmp_t
-icmp._header_ptr_type = ffi.typeof("$*", icmp_t)
 icmp._ulp = {
    class_map = { [135] = "lib.protocol.icmp.nd.ns",
                  [136] = "lib.protocol.icmp.nd.na" },
    method    = "type" }
+icmp:init(
+   {
+      [1] = ffi.typeof[[
+            struct {
+               uint8_t type;
+               uint8_t code;
+               int16_t checksum;
+            } __attribute__((packed))
+      ]]
+   })
 
 -- Class methods
 

@@ -6,22 +6,22 @@ local ipsum = require("lib.checksum").ipsum
 local lib = require("core.lib")
 local htons, ntohs = lib.htons, lib.ntohs
 
-local udp_header_t = ffi.typeof[[
-struct {
-   uint16_t    src_port;
-   uint16_t    dst_port;
-   uint16_t    len;
-   uint16_t    checksum;
-} __attribute__((packed))
-]]
-
 local udp = subClass(header)
 
 -- Class variables
 udp._name = "udp"
-udp._header_type = udp_header_t
-udp._header_ptr_type = ffi.typeof("$*", udp_header_t)
 udp._ulp = { method = nil }
+udp:init(
+   {
+      [1] = ffi.typeof[[
+	    struct {
+	       uint16_t    src_port;
+	       uint16_t    dst_port;
+	       uint16_t    len;
+	       uint16_t    checksum;
+	    } __attribute__((packed))
+      ]],
+   })
 
 -- Class methods
 

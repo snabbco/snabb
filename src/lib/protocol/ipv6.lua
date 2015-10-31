@@ -15,17 +15,6 @@ local defaults = {
    hop_limit = 64,
 }
 
-local ipv6hdr_t = ffi.typeof[[
-      struct {
-         uint32_t v_tc_fl; // version, tc, flow_label
-         uint16_t payload_length;
-         uint8_t  next_header;
-         uint8_t hop_limit;
-         uint8_t src_ip[16];
-         uint8_t dst_ip[16];
-      } __attribute__((packed))
-]]
-
 local ipv6hdr_pseudo_t = ffi.typeof[[
       struct {
          char src_ip[16];
@@ -42,8 +31,6 @@ local ipv6 = subClass(header)
 
 -- Class variables
 ipv6._name = "ipv6"
-ipv6._header_type = ipv6hdr_t
-ipv6._header_ptr_type = ffi.typeof("$*", ipv6hdr_t)
 ipv6._ulp = {
    class_map = {
        [6] = "lib.protocol.tcp",
@@ -53,6 +40,19 @@ ipv6._ulp = {
       [115] = "lib.protocol.keyed_ipv6_tunnel",
    },
    method    = 'next_header' }
+header.init(ipv6,
+            {
+               [1] = ffi.typeof[[
+                     struct {
+                        uint32_t v_tc_fl; // version, tc, flow_label
+                        uint16_t payload_length;
+                        uint8_t  next_header;
+                        uint8_t hop_limit;
+                        uint8_t src_ip[16];
+                        uint8_t dst_ip[16];
+                     } __attribute__((packed))
+               ]]
+            })
 
 -- Class methods
 

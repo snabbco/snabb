@@ -37,7 +37,7 @@ local function process (self, p)
    if not self._filter:match(packet.data(p), packet.length(p)) then
       return false
    end
-   local dgram = self._dgram:reuse(p, ethernet)
+   local dgram = self._dgram:new(p, ethernet)
    -- Parse the ethernet, ipv6 amd icmp headers
    dgram:parse_n(3)
    local eth, ipv6, icmp = unpack(dgram:stack())

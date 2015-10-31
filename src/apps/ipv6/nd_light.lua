@@ -179,7 +179,7 @@ function nd_light:new (arg)
                              type = 0x86dd }))
    -- Parse the headers we want to modify later on from our template
    -- packet.
-   dgram = dgram:reuse(sna.packet, ethernet)
+   dgram = dgram:new(sna.packet, ethernet)
    dgram:parse_n(3)
    sna.eth, sna.ipv6, sna.icmp = unpack(dgram:stack())
    sna.dgram = dgram
