@@ -1,0 +1,84 @@
+#!/usr/bin/env luajit
+
+package.path = package.path .. ";../src/?.lua"
+
+local ffi = require("ffi")
+local pf = require("pf")
+local utils = require("pf.utils")
+local savefile = require("pf.savefile")
+
+local function usage()
+   print([[
+Usage: pflua-match [--bpf] IN.PCAP FILTER
+   IN.PCAP     Input file in .pcap format.
+   FILTER      Filter to apply, as a string or file.
+
+   --bpf       Compile expression using libpcap.
+   ]])
+   os.exit(false)
+end
+
+local function filter(packets, pred)
+   local seen, matched = 0, 0
+   for i = 1,#packets do
+      packet = packets[i]
+      seen = seen + 1
+      if pred(packet.packet, packet.len) then matched = matched + 1 end
+   end
+   return seen, matched
+end
+
+function get_predicate(filter_input, opts)
+   -- If the filter seems to be a filename, read the filter from the file.
+   -- Otherwise, compile it as a filter string.
+   local filter_file_pred = loadfile(filter_input)
+   if filter_file_pred then
+      if not getfenv(0).ffi then getfenv(0).ffi = require('ffi') end
+      return filter_file_pred()
+   else
+      return pf.compile_filter(filter_input, opts)
+   end
+end
+
+local function run_filter(min_time, packets, pred)
+   local start = utils.now()
+   local finish = start
+   local seen, matched = 0
+   local iterations = 0
+   while finish - start < min_time do
+      seen, matched = filter(packets, pred)
+      finish = utils.now()
+      iterations = iterations + 1
+   end
+   return seen, matched, (finish - start), iterations
+end
+
+function main(in_file, filter_input, opts)
+   local packets = savefile.load_packets(in_file)
+   local pred = get_predicate(filter_input, opts)
+   -- Untimed warm up - this may involve disk access, etc.
+   filter(packets, pred)
+   -- Full warm-up, hopefully. 0.5s is a guess; most JIT will(?) occur.
+   local seen, matched = run_filter(0.5, packets, pred)
+   -- Very short timing runs are highly inaccurate. 0.002s is not ok.
+   -- By 1s, results are more consistent.
+   -- Seen and matched are the same for every run.
+   seen, matched, elapsed, iterations = run_filter(1, packets, pred)
+   print(string.format("Matched %d/%d packets in %s iterations: %s (%f MPPS).",
+                       matched, seen, iterations, in_file,
+                       (seen * iterations / elapsed) / 1e6))
+end
+
+-- Parse args
+local opts = { }
+for i=1, #arg do
+   if arg[i] == "--bpf" then
+      opts = { bpf = true }
+      table.remove(arg, i)
+   end
+end
+
+local in_file, filter_input = arg[1], arg[2]
+if not filter_input then usage() end
+
+main(in_file, filter_input, opts)

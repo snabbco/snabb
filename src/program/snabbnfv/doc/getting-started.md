@@ -128,7 +128,7 @@ QEMU emulator version 2.1.0, Copyright (c) 2003-2008 Fabrice Bellard
 ## Download and build Snabb Switch
 
 ```
-$ git clone --recursive https://github.com/SnabbCo/snabbswitch.git
+$ git clone https://github.com/SnabbCo/snabbswitch.git
 $ cd snabbswitch; make
 $ make -j
 ```

@@ -1,0 +1,174 @@
+#!/usr/bin/env luajit
+-- Do a 3-way compare between the pure-lua, bpf-lua and pure-libpcap pipelines,
+-- given pflang, indicating whether or not all three match.
+-- Input: pflang by default, or pflua IR if --ir is specified.
+package.path = package.path .. ";../src/?.lua;../tests/?.lua"
+
+local pf = require("pf")
+local savefile = require("pf.savefile")
+local optimize = require('pf.optimize')
+local utils = require("pf.utils")
+local pfcompile = require('pfquickcheck.pfcompile')
+local libpcap = require("pf.libpcap")
+
+local function usage()
+   print([[
+Usage: pflua-pipelines-match [-O0 | --force-opt] IN.PCAP FILTER PKT_NUMBER
+       pflua-pipelines-match --ir IN.PCAP IR_FILE IR_FILE PKT_NUMBER
+       pflua-pipelines-match --ir --opt-ir IN.PCAP IR_FILE PKT_NUMBER
+
+   IN.PCAP     Input file in .pcap format.
+   FILTER      Filter to apply, as a string or file.
+   PKT_NUMBER  Check if the pipelines match on the specified packet
+   IR_FILE     filename containing IR
+
+   --ir: the input is a file containing IR, not pflang
+   --opt-ir: instead of a 2nd IR file, optimize the first IR and use that
+      (valid if --ir specified)
+
+   -O0: force optimizations to be disabled
+   --force-opt: only check pflang compiled with optimizations enabled.
+   Default: check with optimizations both enabled and disabled.
+   ]])
+   os.exit(false)
+end
+
+local OPT_FALSE, OPT_TRUE, OPT_BOTH = 0, 1, 2
+
+local function filter(packets, preds, pkt_number)
+   local pkt = packets[pkt_number]
+   local results = {}
+   for d, pred in pairs(preds) do results[d] = pred(pkt.packet, pkt.len) end
+
+   local results_match, res = utils.table_values_all_equal(results)
+
+   if results_match then
+      local p = {}
+      for k,_ in pairs(results) do table.insert(p, k) end
+      local pipelines = table.concat(p, ' ')
+      local msg = "OK: %s concur: all were %s"
+      print(msg:format(pipelines, res))
+   else
+      print("BUG: pipelines diverged.")
+      print(libpcap.pcap_version())
+      local trues, falses = {}, {}
+      for k, v in pairs(results) do
+         if v then
+            table.insert(trues, k)
+         else
+            table.insert(falses, k)
+         end
+      end
+      print((" true: %s"):format(table.concat(trues, ', ')))
+      print((" false: %s"):format(table.concat(falses, ', ')))
+   end
+   return results_match
+end
+
+local function create_preds(filter_input, opt)
+   local pflua_pred = pf.compile_filter(filter_input, {optimize=opt})
+   local bpf_pred = pf.compile_filter(filter_input, {bpf=true, optimize=opt})
+   local lpcap = pf.compile_filter(filter_input, {libpcap=true, optimize=opt})
+   return pflua_pred, bpf_pred, lpcap
+end
+
+local function main_pflang(pcap_file, filter_input, pkt_number, opt)
+   local packets = savefile.load_packets(pcap_file)
+   local preds = {}
+   if opt == OPT_FALSE or opt == OPT_TRUE then
+      local o = true
+      if opt == OPT_FALSE then o = false end
+
+      local p, b, l = create_preds(filter_input, o)
+      preds["pure-lua"] = p
+      preds["bpf-lua"] = b
+      preds["libpcap"] = l
+   elseif opt == OPT_BOTH then
+      local p, b, l = create_preds(filter_input, false)
+      preds["pure-lua-unopt"] = p
+      preds["bpf-lua-unopt"] = b
+      preds["libpcap-unopt"] = l
+      p, b, l = create_preds(filter_input, true)
+      preds["pure-lua-opt"] = p
+      preds["bpf-lua-opt"] = b
+      preds["libpcap-opt"] = l
+   else
+      error("Invalid optimization value")
+   end
+   return filter(packets, preds, pkt_number)
+end
+
+local function read_and_compile_ast(ir_file, optimize_ast)
+   local ir_in = assert(io.open(ir_file))
+   local ir_str = ir_in:read('*a')
+   local ast = assert(loadstring('return ' .. ir_str))()
+   ir_in:close()
+   if optimize_ast then ast = optimize.optimize(ast) end
+   return pfcompile.compile_ast(ast, ir_file)
+end
+
+local function main_ir(pcap_file, ir1, ir2, opt_ir, pkt_number)
+   local packets = savefile.load_packets(pcap_file)
+   local preds = {}
+   preds["ir1_pred"] = read_and_compile_ast(ir1, false)
+   -- It's more useful to check the *current* optimization rather than some
+   -- known good past one, for the sake of regression testing.
+   -- The flag opt_ir indicates that the only IR given should be optimized
+   -- should be optimized, instead of compared against a different given IR.
+   if opt_ir then
+      preds["ir2_pred"] = read_and_compile_ast(ir1, true)
+   else -- Leave given IR alone; do not modify it, do not optimize it
+      preds["ir2_pred"] = read_and_compile_ast(ir2, false)
+   end
+   return filter(packets, preds, pkt_number)
+end
+
+local function get_nonflag_args(args)
+   local nf = {}
+   local idx = 1
+   for _,v in pairs(args) do
+      if not v:match("^-") then
+         nf[idx] = v
+         idx = idx + 1
+      end
+   end
+   return nf
+end
+
+local function run_filters(...)
+   local opts = utils.set(...)
+   local arg = get_nonflag_args({...})
+
+   if opts['--ir'] then
+      local pcap_file, ir1, ir2, pkt_number
+      local opt_ir
+      if opts['--opt-ir'] then
+         opt_ir = true
+         pcap_file, ir1, ir2, pkt_number = arg[1], arg[2], nil, arg[3]
+      else
+         opt_ir = false
+         pcap_file, ir1, ir2, pkt_number = arg[1], arg[2], arg[3], arg[4]
+      end
+
+      if not pkt_number then usage() end
+      os.exit(main_ir(pcap_file, ir1, ir2, opt_ir, tonumber(pkt_number)))
+   end
+
+   -- Do a 3-way compare between the pure-lua, bpf-lua and pure-libpcap pipelines,
+   local optimize = OPT_BOTH
+   if opts['-O0'] and opts['--force-opts'] then
+      print("It's invalid to specify -O0 with --force-opts")
+      usage()
+      os.exit(1)
+   elseif opts['-O0'] then
+      optimize = OPT_FALSE
+   elseif opts['--force-opt'] then
+      optimize = OPT_TRUE
+   end
+   local pcap_file, filter_str, pkt_number = arg[1], arg[2], arg[3]
+   if not pkt_number then usage() end
+   os.exit(main_pflang(pcap_file, filter_str, tonumber(pkt_number), optimize))
+end
+
+-- Parse args and run everything.
+run_filters(...)
