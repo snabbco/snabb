@@ -31,6 +31,11 @@ function RawSocket:push ()
    end
 end
 
+function RawSocket:close ()
+   assert(self.dev)
+   return self.dev:close()
+end
+
 function selftest ()
    -- Send a packet over the loopback device and check
    -- that it is received correctly.
@@ -65,6 +70,7 @@ function selftest ()
                                    return(ipv6:src_eq(localhost) and
                                        ipv6:dst_eq(localhost))
                                 end } }), "loopback test failed")
+   lo:close()
 
    -- Another useful test would be to feed a pcap file with
    -- pings to 127.0.0.1 and ::1 into lo and capture/compare

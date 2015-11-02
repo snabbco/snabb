@@ -37,3 +37,9 @@ int open_raw(const char *name)
     }
     return fd;
 }
+
+/* Close a raw socket */
+int close_raw(int fd)
+{
+    return close(fd);
+}
