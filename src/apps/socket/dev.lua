@@ -37,7 +37,7 @@ function dev:can_receive ()
    return C.can_receive(self.fd) == 1
 end
 
-function dev:close ()
+function dev:stop ()
    assert(self.fd)
    return C.close_raw(self.fd)
 end

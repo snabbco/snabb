@@ -31,9 +31,9 @@ function RawSocket:push ()
    end
 end
 
-function RawSocket:close ()
+function RawSocket:stop ()
    assert(self.dev)
-   return self.dev:close()
+   return self.dev:stop()
 end
 
 function selftest ()
@@ -70,7 +70,7 @@ function selftest ()
                                    return(ipv6:src_eq(localhost) and
                                        ipv6:dst_eq(localhost))
                                 end } }), "loopback test failed")
-   lo:close()
+   lo:stop()
 
    -- Another useful test would be to feed a pcap file with
    -- pings to 127.0.0.1 and ::1 into lo and capture/compare
