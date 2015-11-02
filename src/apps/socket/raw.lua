@@ -9,8 +9,10 @@ RawSocket = {}
 
 function RawSocket:new (ifname)
    assert(ifname)
+   local dev = dev:new(ifname)
+   if not dev then return nil end
    self.__index = self
-   return setmetatable({dev = dev:new(ifname)}, self)
+   return setmetatable({dev = dev}, self)
 end
 
 function RawSocket:pull ()
