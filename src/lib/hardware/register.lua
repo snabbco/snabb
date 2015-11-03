@@ -110,12 +110,12 @@ end
 
 --- returns true if an index string represents a range of registers
 function is_range (index)
-   return index:match('^%+[0-9xa-fA-F]+%*%d+%.%.%d+$') ~= nil
+   return index:match('^%+[%xx]+%*%d+%.%.%d+$') ~= nil
 end
 
 --- iterates the offset as defined in a range of registers
 function iter_range (offset, index)
-   local step,s,e =  string.match(index, '+([%dxa-fA-F]+)%*(%d+)%.%.(%d+)')
+   local step,s,e =  string.match(index, '+([%xx]+)%*(%d+)%.%.(%d+)')
    step, s, e = tonumber(step), tonumber(s), tonumber(e)
    local function iter(e, i)
       i = i + 1
@@ -130,7 +130,7 @@ function in_range (offset, index, n)
    offset = tonumber(offset)
    if offset == nil then return nil end
    n = tonumber(n) or 0
-   local step,s,e =  string.match(index, '+([%dxa-fA-F]+)%*(%d+)%.%.(%d+)')
+   local step,s,e =  string.match(index, '+([%xx]+)%*(%d+)%.%.(%d+)')
    if not step then return offset end
    step, s, e = tonumber(step), tonumber(s), tonumber(e)
    if s <= n and n <= e then
@@ -141,7 +141,7 @@ end
 
 --- formats a name for a specific member of a register range
 function range_name (index, name, i)
-   local step,s,e =  string.match(index, '+([%dxa-fA-F]+)%*(%d+)%.%.(%d+)')
+   local step,s,e =  string.match(index, '+([%xx]+)%*(%d+)%.%.(%d+)')
    local ndigits = #(tostring(tonumber(e)))
    local fmt = string.format('%%s[%%0%dd]', ndigits)
    return string.format(fmt, name, i)

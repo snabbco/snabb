@@ -14,7 +14,7 @@ function mac_mt:new (m)
    end
    local macobj = mac_t()
    local i = 0;
-   for b in m:gmatch('[0-9a-fA-F][0-9a-fA-F]') do
+   for b in m:gmatch('%x%x') do
       if i == 6 then
          -- avoid out of bound array index
          return nil, "malformed MAC address: " .. m
