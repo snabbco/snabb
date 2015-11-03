@@ -5,7 +5,8 @@ local pcap       = require("apps.pcap.pcap")
 local virtio_dev = require("apps.virtio_net.virtio_net_dev")
 local main       = require("core.main")
 
-local virtio_net = {}
+virtio_net = {}
+
 virtio_net.__index = virtio_net
 
 function virtio_net:new(args)
