@@ -39,61 +39,41 @@ function RawSocket:stop ()
 end
 
 function selftest ()
-   local function file_max()
-      local file = io.open("/proc/sys/fs/file-max", "rt")
-      local content = file:read("*all")
-      return tonumber(content)
-   end
-   -- Test too many opened file descriptors
-   local function test_too_many_opened_sockets()
-      local i, max = 1, file_max()
-      while i < max do
-         local lo = RawSocket:new("lo")
-         if not lo then break end
-      end
-      assert(i == max, "Too many opened sockets")
-   end
-
    -- Send a packet over the loopback device and check
    -- that it is received correctly.
    -- XXX beware of a race condition with unrelated traffic over the
    -- loopback device
-   local function test_send_packet_and_receive()
-      local datagram = require("lib.protocol.datagram")
-      local ethernet = require("lib.protocol.ethernet")
-      local ipv6 = require("lib.protocol.ipv6")
-      local dg_tx = datagram:new()
-      local src = ethernet:pton("00:00:00:00:00:01")
-      local dst = ethernet:pton("00:00:00:00:00:02")
-      local localhost = ipv6:pton("0:0:0:0:0:0:0:1")
-      dg_tx:push(ipv6:new({src = localhost,
-                           dst = localhost,
-                           next_header = 59, -- no next header
-                           hop_limit = 1}))
-      dg_tx:push(ethernet:new({src = src, dst = dst, type = 0x86dd}))
+   local datagram = require("lib.protocol.datagram")
+   local ethernet = require("lib.protocol.ethernet")
+   local ipv6 = require("lib.protocol.ipv6")
+   local dg_tx = datagram:new()
+   local src = ethernet:pton("00:00:00:00:00:01")
+   local dst = ethernet:pton("00:00:00:00:00:02")
+   local localhost = ipv6:pton("0:0:0:0:0:0:0:1")
+   dg_tx:push(ipv6:new({src = localhost,
+                        dst = localhost,
+                        next_header = 59, -- no next header
+                        hop_limit = 1}))
+   dg_tx:push(ethernet:new({src = src, dst = dst, type = 0x86dd}))
 
-      local link = require("core.link")
-      local lo = RawSocket:new("lo")
-      lo.input, lo.output = {}, {}
-      lo.input.rx, lo.output.tx = link.new("test1"), link.new("test2")
-      link.transmit(lo.input.rx, dg_tx:packet())
-      lo:push()
-      lo:pull()
-      local dg_rx = datagram:new(link.receive(lo.output.tx), ethernet)
-      assert(dg_rx:parse({ { ethernet, function(eth)
-                                          return(eth:src_eq(src) and eth:dst_eq(dst)
-                                           and eth:type() == 0x86dd)
-                                       end },
-                           { ipv6, function(ipv6)
-                                      return(ipv6:src_eq(localhost) and
-                                          ipv6:dst_eq(localhost))
-                                   end } }), "loopback test failed")
-      lo:stop()
-   end
-   test_send_packet_and_receive()
-   test_too_many_opened_sockets()
+   local link = require("core.link")
+   local lo = RawSocket:new("lo")
+   lo.input, lo.output = {}, {}
+   lo.input.rx, lo.output.tx = link.new("test1"), link.new("test2")
+   link.transmit(lo.input.rx, dg_tx:packet())
+   lo:push()
+   lo:pull()
+   local dg_rx = datagram:new(link.receive(lo.output.tx), ethernet)
+   assert(dg_rx:parse({ { ethernet, function(eth)
+                                       return(eth:src_eq(src) and eth:dst_eq(dst)
+                                        and eth:type() == 0x86dd)
+                                    end },
+                        { ipv6, function(ipv6)
+                                   return(ipv6:src_eq(localhost) and
+                                       ipv6:dst_eq(localhost))
+                                end } }), "loopback test failed")
+   lo:stop()
 
-   print("Selftest passed")
    -- Another useful test would be to feed a pcap file with
    -- pings to 127.0.0.1 and ::1 into lo and capture/compare
    -- the responses with a pre-recorded pcap.
