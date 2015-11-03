@@ -46,20 +46,12 @@ function selftest ()
    end
    -- Test too many opened file descriptors
    local function test_too_many_opened_sockets()
-      local opened = {}
       local i, max = 1, file_max()
       while i < max do
          local lo = RawSocket:new("lo")
          if not lo then break end
-         table.insert(opened, lo)
       end
-      if i < max then
-         while #opened > 0 do
-            local rs = table.remove(opened)
-            rs:stop()
-         end
-         assert(#opened == 0)
-      end
+      assert(i == max, "Too many opened sockets")
    end
 
    -- Send a packet over the loopback device and check
