@@ -12,7 +12,7 @@ dev = {}
 function dev:new (ifname)
    assert(ifname)
    local fd = C.open_raw(ifname)
-   if fd == -1 then return nil end
+   if fd == -1 then return nil, -1 end
    self.__index = self
    return setmetatable({fd = fd}, self)
 end

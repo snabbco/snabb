@@ -9,8 +9,8 @@ RawSocket = {}
 
 function RawSocket:new (ifname)
    assert(ifname)
-   local dev = dev:new(ifname)
-   if not dev then return nil end
+   local dev, err = dev:new(ifname)
+   if err then return nil, err end
    self.__index = self
    return setmetatable({dev = dev}, self)
 end
@@ -57,7 +57,8 @@ function selftest ()
    dg_tx:push(ethernet:new({src = src, dst = dst, type = 0x86dd}))
 
    local link = require("core.link")
-   local lo = RawSocket:new("lo")
+   local lo, err = RawSocket:new("lo")
+   assert(not err, "Cannot create RawSocket on loopback devicex")
    lo.input, lo.output = {}, {}
    lo.input.rx, lo.output.tx = link.new("test1"), link.new("test2")
    link.transmit(lo.input.rx, dg_tx:packet())
