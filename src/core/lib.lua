@@ -678,6 +678,14 @@ function logger:can_log ()
    return false
 end
 
+-- Wrapper around os.getenv which only returns the variable's value if it
+-- is non-empty.
+function getenv (name)
+   local value = os.getenv(name)
+   if value and #value ~= 0 then return value
+   else return nil end
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")
