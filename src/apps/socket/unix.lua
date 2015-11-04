@@ -12,19 +12,23 @@ local S      = require("syscall")
 UnixSocket = {}
 UnixSocket.__index = UnixSocket
 
+local modes = {stream = "stream", packet = "dgram"}
+
 function UnixSocket:new (arg)
 
    --process args
 
    assert(arg, "filename or options expected")
 
-   local file, listen
+   local file, listen, mode
    if type(arg) == "string" then
       file = arg
    else
       file = arg.filename
       listen = arg.listen
+		mode = arg.mode 
    end
+   mode = assert(modes[mode or "stream"], "invalid mode")
    assert(file, "filename expected")
 
    --ljsyscall returns error as a a cdata instead of a string,
@@ -40,11 +44,13 @@ function UnixSocket:new (arg)
 
    if listen then --server mode
 
-      local sock = assert(S.socket("unix", "stream, nonblock"))
+      local sock = assert(S.socket("unix", mode..", nonblock"))
       S.unlink(file) --unlink to avoid EINVAL on bind()
       local sa = S.t.sockaddr_un(file)
       assert(sock:bind(sa))
-      assert(sock:listen())
+      if mode == "stream" then
+         assert(sock:listen())
+      end
 
       function close()
          S.close(sock)
@@ -52,6 +58,9 @@ function UnixSocket:new (arg)
       end
 
       function open()
+         if mode == "dgram" then 
+            return sock 
+         end
          local sa = S.t.sockaddr_un()
          local csock, err = sock:accept(sa)
          if not csock then
@@ -68,7 +77,7 @@ function UnixSocket:new (arg)
 
    else --client mode
 
-      local sock = assert(S.socket("unix", "stream, nonblock"))
+      local sock = assert(S.socket("unix", mode..", nonblock"))
 
       function open()
          local sa = S.t.sockaddr_un(file)
