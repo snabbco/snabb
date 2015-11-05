@@ -11,9 +11,10 @@ dev = {}
 
 function dev:new (ifname)
    assert(ifname)
+   local fd = C.open_raw(ifname)
+   if fd == -1 then return nil, -1 end
    self.__index = self
-   local dev = {fd = C.open_raw(ifname)}
-   return setmetatable(dev, self)
+   return setmetatable({fd = fd}, self)
 end
 
 function dev:transmit (p)
@@ -35,4 +36,9 @@ end
 
 function dev:can_receive ()
    return C.can_receive(self.fd) == 1
+end
+
+function dev:stop ()
+   assert(self.fd)
+   return C.close_raw(self.fd)
 end

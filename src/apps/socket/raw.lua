@@ -9,8 +9,10 @@ RawSocket = {}
 
 function RawSocket:new (ifname)
    assert(ifname)
+   local dev, err = dev:new(ifname)
+   if err then return nil, err end
    self.__index = self
-   return setmetatable({dev = dev:new(ifname)}, self)
+   return setmetatable({dev = dev}, self)
 end
 
 function RawSocket:pull ()
@@ -29,6 +31,11 @@ function RawSocket:push ()
       self.dev:transmit(p)
       packet.free(p)
    end
+end
+
+function RawSocket:stop ()
+   assert(self.dev)
+   return self.dev:stop()
 end
 
 function selftest ()
@@ -50,7 +57,8 @@ function selftest ()
    dg_tx:push(ethernet:new({src = src, dst = dst, type = 0x86dd}))
 
    local link = require("core.link")
-   local lo = RawSocket:new("lo")
+   local lo, err = RawSocket:new("lo")
+   assert(not err, "Cannot create RawSocket on loopback devicex")
    lo.input, lo.output = {}, {}
    lo.input.rx, lo.output.tx = link.new("test1"), link.new("test2")
    link.transmit(lo.input.rx, dg_tx:packet())
@@ -65,6 +73,7 @@ function selftest ()
                                    return(ipv6:src_eq(localhost) and
                                        ipv6:dst_eq(localhost))
                                 end } }), "loopback test failed")
+   lo:stop()
 
    -- Another useful test would be to feed a pcap file with
    -- pings to 127.0.0.1 and ::1 into lo and capture/compare
