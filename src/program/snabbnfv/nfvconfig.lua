@@ -109,9 +109,9 @@ end
 
 function selftest ()
    print("selftest: lib.nfv.config")
-   local pcideva = os.getenv("SNABB_TEST_INTEL10G_PCIDEVA")
+   local pcideva = lib.getenv("SNABB_PCI0")
    if not pcideva then
-      print("SNABB_TEST_INTEL10G_PCIDEVA was not set\nTest skipped")
+      print("SNABB_PCI0 not set\nTest skipped")
       os.exit(engine.test_skipped_code)
    end
    engine.log = true

@@ -4,27 +4,29 @@ local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
 local ipsum = require("lib.checksum").ipsum
-
-local tcp_header_t = ffi.typeof[[
-struct {
-   uint16_t    src_port;
-   uint16_t    dst_port;
-   uint32_t    seq;
-   uint32_t    ack;
-   uint16_t    off_flags; //data offset:4 reserved:3 NS:1 CWR:1 ECE:1 URG:1 ACK:1 PSH:1 RST:1 SYN:1 FIN:1
-   uint16_t    window_size;
-   uint16_t    checksum;
-   uint16_t    pad;
-} __attribute__((packed))
-]]
+local ntohs, htons, ntohl, htonl =
+   lib.ntohs, lib.htons, lib.ntohl, lib.htonl
 
 local tcp = subClass(header)
 
 -- Class variables
 tcp._name = "tcp"
-tcp._header_type = tcp_header_t
-tcp._header_ptr_type = ffi.typeof("$*", tcp_header_t)
 tcp._ulp = { method = nil }
+tcp:init(
+   {
+      [1] = ffi.typeof[[
+	    struct {
+	       uint16_t    src_port;
+	       uint16_t    dst_port;
+	       uint32_t    seq;
+	       uint32_t    ack;
+	       uint16_t    off_flags; //data offset:4 reserved:3 NS:1 CWR:1 ECE:1 URG:1 ACK:1 PSH:1 RST:1 SYN:1 FIN:1
+	       uint16_t    window_size;
+	       uint16_t    checksum;
+	       uint16_t    pad;
+	    } __attribute__((packed))
+      ]],
+   })
 
 -- Class methods
 
@@ -55,33 +57,33 @@ end
 function tcp:src_port (port)
    local h = self:header()
    if port ~= nil then
-      h.src_port = C.htons(port)
+      h.src_port = htons(port)
    end
-   return C.ntohs(h.src_port)
+   return ntohs(h.src_port)
 end
 
 function tcp:dst_port (port)
    local h = self:header()
    if port ~= nil then
-      h.dst_port = C.htons(port)
+      h.dst_port = htons(port)
    end
-   return C.ntohs(h.dst_port)
+   return ntohs(h.dst_port)
 end
 
 function tcp:seq_num (seq)
    local h = self:header()
    if seq ~= nil then
-      h.seq = C.htonl(seq)
+      h.seq = htonl(seq)
    end
-   return C.ntohl(h.seq)
+   return ntohl(h.seq)
 end
 
 function tcp:ack_num (ack)
    local h = self:header()
    if ack ~= nil then
-      h.ack = C.htonl(ack)
+      h.ack = htonl(ack)
    end
-   return C.ntohl(h.ack)
+   return ntohl(h.ack)
 end
 
 function tcp:offset (offset)
@@ -135,9 +137,9 @@ end
 function tcp:window_size (window_size)
    local h = self:header()
    if window_size ~= nil then
-      h.window_size = C.htons(window_size)
+      h.window_size = htons(window_size)
    end
-   return C.ntohs(h.window_size)
+   return ntohs(h.window_size)
 end
 
 function tcp:checksum (payload, length, ip)
@@ -154,9 +156,9 @@ function tcp:checksum (payload, length, ip)
       csum = ipsum(ffi.cast("uint8_t *", h),
                    self:sizeof(), bit.bnot(csum))
       -- Add TCP payload
-      h.checksum = C.htons(ipsum(payload, length, bit.bnot(csum)))
+      h.checksum = htons(ipsum(payload, length, bit.bnot(csum)))
    end
-   return C.ntohs(h.checksum)
+   return ntohs(h.checksum)
 end
 
 -- override the default equality method

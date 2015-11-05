@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+out=$(program/snabbnfv/selftest.sh bench)
+# Extract floating point Gbits number from output.
+echo "$out" | grep IPERF-1500 | cut -d " " -f 2
