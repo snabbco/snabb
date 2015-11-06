@@ -1,16 +1,14 @@
-module(...,package.seeall)
+module(..., package.seeall)
 
-local app    = require("core.app")
-local link   = require("core.link")
+local link = require("core.link")
 local packet = require("core.packet")
-local dev    = require("apps.socket.dev").dev
+local dev = require("apps.socket.dev").RawSocketDev
 
 RawSocket = {}
 
 function RawSocket:new (ifname)
    assert(ifname)
-   self.__index = self
-   return setmetatable({dev = dev:new(ifname)}, self)
+   return setmetatable({dev = dev:new(ifname)}, {__index = RawSocket})
 end
 
 function RawSocket:pull ()
@@ -31,42 +29,50 @@ function RawSocket:push ()
    end
 end
 
+function RawSocket:stop()
+   self.dev:stop()
+end
+
 function selftest ()
    -- Send a packet over the loopback device and check
    -- that it is received correctly.
-   -- XXX beware of a race condition with unrelated traffic over the
-   -- loopback device
+   -- XXX Beware of a race condition with unrelated traffic over the
+   -- loopback device.
    local datagram = require("lib.protocol.datagram")
    local ethernet = require("lib.protocol.ethernet")
    local ipv6 = require("lib.protocol.ipv6")
+
+   -- Initialize RawSocket.
+   local lo = RawSocket:new("lo")
+   lo.input, lo.output = {}, {}
+   lo.input.rx, lo.output.tx = link.new("test1"), link.new("test2")
+   -- Construct packet.
    local dg_tx = datagram:new()
    local src = ethernet:pton("02:00:00:00:00:01")
    local dst = ethernet:pton("02:00:00:00:00:02")
    local localhost = ipv6:pton("0:0:0:0:0:0:0:1")
    dg_tx:push(ipv6:new({src = localhost,
                         dst = localhost,
-                        next_header = 59, -- no next header
+                        next_header = 59, -- No next header.
                         hop_limit = 1}))
-   dg_tx:push(ethernet:new({src = src, dst = dst, type = 0x86dd}))
-
-   local link = require("core.link")
-   local lo = RawSocket:new("lo")
-   lo.input, lo.output = {}, {}
-   lo.input.rx, lo.output.tx = link.new("test1"), link.new("test2")
+   dg_tx:push(ethernet:new({src = src, 
+                            dst = dst, 
+                            type = 0x86dd}))
+   -- Transmit packet.
    link.transmit(lo.input.rx, dg_tx:packet())
    lo:push()
+   -- Receive packet.
    lo:pull()
    local dg_rx = datagram:new(link.receive(lo.output.tx), ethernet)
-   assert(dg_rx:parse({ { ethernet, function(eth)
-                                       return(eth:src_eq(src) and eth:dst_eq(dst)
-                                        and eth:type() == 0x86dd)
-                                    end },
-                        { ipv6, function(ipv6)
-                                   return(ipv6:src_eq(localhost) and
-                                       ipv6:dst_eq(localhost))
-                                end } }), "loopback test failed")
+   -- Assert packet was received OK.
+   assert(dg_rx:parse({{ethernet, function(eth)
+      return(eth:src_eq(src) and eth:dst_eq(dst) and eth:type() == 0x86dd)
+   end }, { ipv6, function(ipv6)
+      return(ipv6:src_eq(localhost) and ipv6:dst_eq(localhost))
+   end } }), "loopback test failed")
+   print("selftest passed")
 
-   -- Another useful test would be to feed a pcap file with
+   -- XXX Another useful test would be to feed a pcap file with
    -- pings to 127.0.0.1 and ::1 into lo and capture/compare
    -- the responses with a pre-recorded pcap.
 end

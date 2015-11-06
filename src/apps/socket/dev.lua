@@ -1,38 +1,58 @@
-module(...,package.seeall)
+module(..., package.seeall)
 
+local S = require("syscall")
+local h = require("syscall.helpers")
+local packet = require("core.packet")
+local bit = require("bit")
 local ffi = require("ffi")
 local C = ffi.C
 
-local packet = require("core.packet")
-require("lib.raw.raw_h")
-require("apps.socket.io_h")
+local c, t = S.c, S.types.t
 
-dev = {}
+RawSocketDev = {}
 
-function dev:new (ifname)
-   assert(ifname)
-   self.__index = self
-   local dev = {fd = C.open_raw(ifname)}
-   return setmetatable(dev, self)
+function RawSocketDev:new (name)
+   local tp = h.htons(c.ETH_P["ALL"])
+   local sock, err = S.socket(c.AF.PACKET, bit.bor(c.SOCK.RAW, c.SOCK.NONBLOCK), tp)
+   if not sock then return nil, err end
+   local index, err = S.util.if_nametoindex(name, sock)
+   if err then
+      sock:close()
+      return nil, err
+   end
+   local addr = t.sockaddr_ll{sll_family = c.AF.PACKET, sll_ifindex = index, sll_protocol = tp}
+   local ok, err = S.bind(sock, addr)
+   if not ok then
+      S.close(sock)
+      return nil, err
+   end
+   return setmetatable({sock = sock}, {__index = RawSocketDev})
 end
 
-function dev:transmit (p)
-   assert(self.fd)
-   assert(C.send_packet(self.fd, p) ~= -1)
+function RawSocketDev:transmit (p)
+   local _, err = S.write(self.sock, p.data, p.length)
+   if err then return err; end
+   return 0;
 end
 
-function dev:can_transmit ()
-   return C.can_transmit(self.fd) == 1
+function RawSocketDev:can_transmit ()
+   local ok, err = S.select({writefds = {self.sock}}, 0)
+   return not (err or ok.count == 0)
 end
 
-function dev:receive ()
-   assert(self.fd)
+function RawSocketDev:receive ()
    local p = packet.allocate()
-   local s = C.receive_packet(self.fd, p)
-   assert(s ~= -1)
+   local ret, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
+   if err then return err end
+   p.length = ret
    return p
 end
 
-function dev:can_receive ()
-   return C.can_receive(self.fd) == 1
+function RawSocketDev:can_receive ()
+   local ok, err = S.select({readfds = {self.sock}}, 0)
+   return not (err or ok.count == 0)
+end
+
+function RawSocketDev:stop ()
+   S.close(self.sock)
 end
