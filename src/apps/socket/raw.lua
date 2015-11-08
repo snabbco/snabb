@@ -1,36 +1,80 @@
 module(..., package.seeall)
 
+local S = require("syscall")
+local h = require("syscall.helpers")
+local bit = require("bit")
 local link = require("core.link")
 local packet = require("core.packet")
-local dev = require("apps.socket.dev").RawSocketDev
+local ffi = require("ffi")
+local C = ffi.C
+
+local c, t = S.c, S.types.t
 
 RawSocket = {}
 
 function RawSocket:new (ifname)
    assert(ifname)
-   return setmetatable({dev = dev:new(ifname)}, {__index = RawSocket})
+   local tp = h.htons(c.ETH_P["ALL"])
+   local sock, err = S.socket(c.AF.PACKET, bit.bor(c.SOCK.RAW, c.SOCK.NONBLOCK), tp)
+   if not sock then return nil, err end
+   local index, err = S.util.if_nametoindex(ifname, sock)
+   if err then
+      S.close(sock)
+      return nil, err
+   end
+   local addr = t.sockaddr_ll{sll_family = c.AF.PACKET, sll_ifindex = index, sll_protocol = tp}
+   local ok, err = S.bind(sock, addr)
+   if not ok then
+      S.close(sock)
+      return nil, err
+   end
+   return setmetatable({sock = sock}, {__index = RawSocket})
 end
 
 function RawSocket:pull ()
    local l = self.output.tx
    if l == nil then return end
-   while not link.full(l) and self.dev:can_receive() do
-      link.transmit(l, self.dev:receive())
+   while not link.full(l) and self:can_receive() do
+      link.transmit(l, self:receive())
    end
+end
+
+function RawSocket:can_receive ()
+   local ok, err = S.select({readfds = {self.sock}}, 0)
+   return not (err or ok.count == 0)
+end
+
+function RawSocket:receive ()
+   local p = packet.allocate()
+   local sz, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
+   if not sz then return err end
+   p.length = sz
+   return p
 end
 
 function RawSocket:push ()
    local l = self.input.rx
    if l == nil then return end
-   while not link.empty(l) and self.dev:can_transmit() do
+   while not link.empty(l) and self:can_transmit() do
       local p = link.receive(l)
-      self.dev:transmit(p)
+      self:transmit(p)
       packet.free(p)
    end
 end
 
+function RawSocket:can_transmit ()
+   local ok, err = S.select({writefds = {self.sock}}, 0)
+   return not (err or ok.count == 0)
+end
+
+function RawSocket:transmit (p)
+   local sz, err = S.write(self.sock, p.data, p.length)
+   if not sz then return err end
+   return sz
+end
+
 function RawSocket:stop()
-   self.dev:stop()
+   S.close(self.sock)
 end
 
 function selftest ()
@@ -70,6 +114,7 @@ function selftest ()
    end }, { ipv6, function(ipv6)
       return(ipv6:src_eq(localhost) and ipv6:dst_eq(localhost))
    end } }), "loopback test failed")
+   lo:stop()
    print("selftest passed")
 
    -- XXX Another useful test would be to feed a pcap file with
