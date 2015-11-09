@@ -26,7 +26,7 @@ function UnixSocket:new (arg)
    else
       file = arg.filename
       listen = arg.listen
-		mode = arg.mode 
+      mode = arg.mode
    end
    mode = assert(modes[mode or "stream"], "invalid mode")
    assert(file, "filename expected")
@@ -58,8 +58,8 @@ function UnixSocket:new (arg)
       end
 
       function open()
-         if mode == "dgram" then 
-            return sock 
+         if mode == "dgram" then
+            return sock
          end
          local sa = S.t.sockaddr_un()
          local csock, err = sock:accept(sa)
@@ -126,7 +126,7 @@ function UnixSocket:new (arg)
    end
 
    local function send(p)
-		assert(S.write(sock, p.data, p.length))
+      assert(S.write(sock, p.data, p.length))
    end
 
    --app object
@@ -149,7 +149,7 @@ function UnixSocket:new (arg)
       if l == nil then return end
       while not link.empty(l) and can_send() do
          local p = link.receive(l) --we own p now so we must free it
-			send(p)
+         send(p)
          packet.free(p)
       end
    end
