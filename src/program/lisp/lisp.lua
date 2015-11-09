@@ -5,7 +5,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local S   = require("syscall")
 
-CONTROL_SOCK = '/var/tmp/ctrl.socket'
+CONTROL_SOCK = "/var/tmp/ctrl.socket"
 CONTROL_DATA = [[
 [5]  08:00:27:7f:05:37 fd80:1::1,fd80:1::2
 [7]  4a:86:5c:50:33:5a fd80:2::1

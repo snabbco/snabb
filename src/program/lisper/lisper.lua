@@ -33,30 +33,30 @@ function opt.m (arg) LOCAL_MAC = arg end
 function opt.N (arg) NEXT_HOP = arg end
 
 local function parse_fib_line(s)
-	local id, mac, ips = s:match"^%s*%[([^%]]+)%]%s*([^%s]+)%s+(.*)$"
-	assert(id, "invalid FIB line: "..s)
-	local t = {}
-	for ip in ips:split"%s*,%s*" do
-		t[#t+1] = ip
-	end
-	return id, mac, t
+   local id, mac, ips = s:match"^%s*%[([^%]]+)%]%s*([^%s]+)%s+(.*)$"
+   assert(id, "invalid FIB line: "..s)
+   local t = {}
+   for ip in ips:split"%s*,%s*" do
+      t[#t+1] = ip
+   end
+   return id, mac, t
 end
 
 local fib = {} --{vlan_id = {mac = {dest_ip1, ...}}}
 
 local function update_fib_line(self, s)
-	local id, mac, ips = parse_fib_line(s)
-	local vlan = fib[id]
-	if not vlan then
-		vlan = {}
-		fib[id] = vlan
-	end
-	vlan[mac] = ips
-	print('added ', id, mac, table.concat(ips, ', '))
+   local id, mac, ips = parse_fib_line(s)
+   local vlan = fib[id]
+   if not vlan then
+      vlan = {}
+      fib[id] = vlan
+   end
+   vlan[mac] = ips
+   print('added ', id, mac, table.concat(ips, ', '))
 end
 
 local function dest_ips(id, mac)
-	return fib[id] and fib[id][mac]
+   return fib[id] and fib[id][mac]
 end
 
 function run (args)
@@ -71,17 +71,17 @@ function run (args)
 
    config.app(c, "ctl_socket", unix.UnixSocket, {filename = CONTROL_SOCK, listen = true})
    config.app(c, "fib_lines", lines.Lines, {callback = update_fib_line})
-	config.link(c, "ctl_socket.tx -> fib_lines.rx")
-	config.app(c, "punt", raw.RawSocket, PUNT_IF)
+   config.link(c, "ctl_socket.tx -> fib_lines.rx")
+   config.app(c, "punt", raw.RawSocket, PUNT_IF)
 
    engine.configure(c)
    print("LISPER started.")
-	print("  network interface : "..NET_IF)
-	print("  punt interface    : "..PUNT_IF)
-	print("  control socket    : "..CONTROL_SOCK)
-	print("  local IP          : "..LOCAL_IP)
-	print("  local MAC         : "..LOCAL_MAC)
-	print("  next hop          : "..NEXT_HOP)
-	engine.main({report = {showlinks=true}})
+   print("  network interface : "..NET_IF)
+   print("  punt interface    : "..PUNT_IF)
+   print("  control socket    : "..CONTROL_SOCK)
+   print("  local IP          : "..LOCAL_IP)
+   print("  local MAC         : "..LOCAL_MAC)
+   print("  next hop          : "..NEXT_HOP)
+   engine.main({report = {showlinks=true}})
 
 end
