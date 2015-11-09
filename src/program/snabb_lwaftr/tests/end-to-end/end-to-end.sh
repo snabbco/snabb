@@ -50,6 +50,11 @@ snabb_run_and_cmp ${TEST_BASE}/vlan.conf \
    ${TEST_BASE}/tcp-frominet-bound-vlan.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6-vlan.pcap
 
+echo "Testing: from-internet IPv4 fragmented packets found in the binding table."
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/tcp-ipv4-3frags-bound.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6-reassembled.pcap
+
 echo "Testing: traffic class mapping"
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-trafficclass.pcap ${EMPTY} \
