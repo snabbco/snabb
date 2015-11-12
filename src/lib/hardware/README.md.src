@@ -73,6 +73,11 @@ enabled on device identified by *pciaddress* before calling his function.
 Closes memory mapped *file_descriptor* of sysfs resource file and unmaps
 it from *pointer* as returned by `pci.map_pci_memory`.
 
+— Function **pci.find_device**
+
+Return device's PCI address matching pattern. It can be useful to select a
+device's PCI address using a shorter form, for instance ':01:00.0' instead
+of '0000:01:00.0'.
 
 ### Register (lib.hardware.register)
 
