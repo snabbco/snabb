@@ -31,9 +31,50 @@ function scan_devices ()
    end
 end
 
+-- Expands a PCI address to BDF format: '0000:00:00.0'
+function expand_pciaddr (pciaddress)
+   pciaddress = assert(tostring(pciaddress))
+   local ret = {}
+   -- Iterate on each part.
+   local each, pos, i = "", 0, 0
+   while true do
+      each, i = pciaddress:match("(%x+):()", pos)
+      if not each then break end
+      table.insert(ret, each)
+      pos = i
+   end
+   -- Last part.
+   if pos < #pciaddress then
+      table.insert(ret, pciaddress:sub(pos):match("([%x.]+)"))
+   end
+   -- Empty part?
+   if pos == #pciaddress + 1 then
+      table.insert(ret, "0")
+   end
+   -- Rearrange parts according to total size.
+   local pci, bus = "0000", "00"
+   if #ret == 1 then
+      ret = {pci, bus, ret[1]}
+   end
+   if #ret == 2 then
+      ret = {pci, ret[1], ret[2]}
+   end
+   local device, func = ret[3]:match("(%x%x).(%x)")
+   if not device then
+      device, func = ret[3], "0"
+   end
+   -- Format each part and return.
+   ret = {
+      ("%.4x"):format(tonumber(ret[1], 16)), -- PCI.
+      ("%.2x"):format(tonumber(ret[2], 16)), -- Bus.
+      ("%.2x.%x"):format(tonumber(device, 16), tonumber(func, 16)),
+   }
+   return table.concat(ret, ":")
+end
+
 function device_info (pciaddress)
    local info = {}
-   local p = path(pciaddress)
+   local p = path(expand_pciaddr(pciaddress))
    info.pciaddress = pciaddress
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
@@ -97,6 +138,7 @@ end
 --- The corresponding network interface (e.g. `eth0`) will disappear.
 function unbind_device_from_linux (pciaddress)
    root_check()
+   pciaddress = expand_pciaddr(pciaddress)
     local p = path(pciaddress).."/driver/unbind"
     if lib.can_write(p) then
         lib.writefile(path(pciaddress).."/driver/unbind", pciaddress)
@@ -151,6 +193,15 @@ function selftest ()
    print("selftest: pci")
    scan_devices()
    print_device_summary()
+   -- Test PCI address expansion
+   assert(expand_pciaddr("1:")           == "0000:01:00.0")
+   assert(expand_pciaddr("01:")          == "0000:01:00.0")
+   assert(expand_pciaddr("01:00.0")      == "0000:01:00.0")
+   assert(expand_pciaddr(":01:")         == "0000:01:00.0")
+   assert(expand_pciaddr("0000:01:")     == "0000:01:00.0")
+   assert(expand_pciaddr("0000:01:00.0") == "0000:01:00.0")
+   assert(expand_pciaddr(":1")           == "0000:00:01.0")
+   assert(expand_pciaddr("1")            == "0000:00:01.0")
 end
 
 function print_device_summary ()
