@@ -5,7 +5,10 @@ local bit = require "bit"
 local ffi = require "ffi"
 
 local mac_t = ffi.typeof('union { int64_t bits; uint8_t bytes[6];}')
-local mac_mt = {}
+local mac_mt = {
+   ETHER_ADDR_LEN = 6
+}
+
 mac_mt.__index = mac_mt
 
 function mac_mt:new (m)
