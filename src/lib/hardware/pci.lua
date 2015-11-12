@@ -146,8 +146,7 @@ local function find_devices(pattern)
    if #pci.devices == 0 then scan_devices() end
    local ret = {}
    for _,device in ipairs(pci.devices) do
-      if (device.usable and device.driver == 'apps.intel.intel_app' and
-         device.pciaddress:match(pattern)) then
+      if device.usable and device.pciaddress:match(pattern) then
          table.insert(ret, device.pciaddress)
       end
    end
