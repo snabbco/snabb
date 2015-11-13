@@ -4,7 +4,7 @@ E= @echo
 #Q=
 #E= @:
 
-TEST_SKIPPED="43"
+export TEST_SKIPPED=43
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
