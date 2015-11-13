@@ -11,7 +11,6 @@ local mac_addr_t = ffi.typeof("uint8_t[6]")
 local ethernet = subClass(header)
 
 -- Class variables
-ethernet.ETHER_ADDR_LEN = 6
 ethernet._name = "ethernet"
 ethernet._ulp = {
    class_map = {
