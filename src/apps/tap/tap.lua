@@ -42,6 +42,7 @@ function Tap:pull ()
          return
       end
       if not len then
+         packet.free(p)
          error("Failed read on " .. self.name .. ": " .. tostring(err))
       end
       p.length = len
