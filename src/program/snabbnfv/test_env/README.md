@@ -1,9 +1,8 @@
 # test_env - Easy to use rewrite of bench_env
 
-`test_env` is an *easy to use* rewrite of `bench_env`. It handles asset
-fetching and resource management automatically and requires zero
-configuration. It is used as follows (must be at the top of the
-`snabbswitch` repository):
+`test_env` is an *easy to use* rewrite of `bench_env`. It handles
+resource management automatically and requires zero configuration. It is
+used as follows (must be at the top of the `snabbswitch` repository):
 
 ## Usage
 
@@ -56,9 +55,9 @@ be overwritten by the caller. `test_env` will tell you when it uses a
 default value so that you know which variables you did not set and what
 their defaults are. The variables in question are:
 
-* `ASSETSOURCE` - A `wget(1)` compatible URI prefix,
-  `$ASSETSOURCE/{qemu.tar.gz,bzImage,qemu.img.gz}` must point to a qemu
-  tarball, a kernel image and a disk image respectively.
+* `QEMU` - Path of `qemu-system-x86_64`. The default is the host's qemu
+  installation (if it exists) or
+  `$HOME/.test_env/qemu/obj/x86_64-softmmu/qemu-system-x86_64`.
 * `MAC` - MAC address prefix for virtual machines, must include
   everything but the last segment. E.g.: `52:54:00:00:00:`
 * `IP` - IPv6 address prefix for virtual machines, must include

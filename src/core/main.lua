@@ -2,8 +2,7 @@ module(...,package.seeall)
 
 -- Default to not using any Lua code on the filesystem.
 -- (Can be overridden with -P argument: see below.)
---package.path = ''
-package.loaders[1], package.loaders[2] = package.loaders[2], package.loaders[1]
+package.path = ''
 
 local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
@@ -73,13 +72,13 @@ end
 
 
 -- programname("snabbnfv-1.0") => "snabbnfv"
-function programname (program)
+function programname (program) 
    program = program:gsub("^.*/", "") -- /bin/snabb-1.0 => snabb-1.0
    program = program:gsub("[-.].*$", "") -- snabb-1.0   => snabb
    return program
 end
 -- modulename("nfv-sync-master.2.0") => "program.nfv.nfv_sync_master")
-function modulename (program)
+function modulename (program) 
    program = programname(program)
    return ("program.%s.%s"):format(program, program)
 end
@@ -87,7 +86,7 @@ end
 -- Return all command-line paramters (argv) in an array.
 function parse_command_line ()
    local array = {}
-   for i = 0, C.argc - 1 do
+   for i = 0, C.argc - 1 do 
       table.insert(array, ffi.string(C.argv[i]))
    end
    return array

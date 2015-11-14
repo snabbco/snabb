@@ -43,6 +43,7 @@ local na = require("lib.protocol.icmp.nd.na")
 local tlv = require("lib.protocol.icmp.nd.options.tlv")
 local filter = require("lib.pcap.filter")
 local timer = require("core.timer")
+local lib = require("core.lib")
 
 nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
@@ -135,8 +136,8 @@ function nd_light:new (arg)
    -- Timer for retransmits of neighbor solicitations
    nh.timer_cb = function (t)
                     local nh = o._next_hop
-                    print(string.format("Sending neighbor solicitation for next-hop %s",
-                                        ipv6:ntop(conf.next_hop)))
+                    o._logger:log(string.format("Sending neighbor solicitation for next-hop %s",
+                                                ipv6:ntop(conf.next_hop)))
                     link.transmit(o.output.south, packet.clone(nh.packet))
                     nh.nsent = nh.nsent + 1
                     if (not o._config.retrans or nh.nsent <= o._config.retrans)
@@ -178,7 +179,7 @@ function nd_light:new (arg)
                              type = 0x86dd }))
    -- Parse the headers we want to modify later on from our template
    -- packet.
-   dgram = dgram:reuse(sna.packet, ethernet)
+   dgram = dgram:new(sna.packet, ethernet)
    dgram:parse_n(3)
    sna.eth, sna.ipv6, sna.icmp = unpack(dgram:stack())
    sna.dgram = dgram
@@ -190,6 +191,7 @@ function nd_light:new (arg)
       p = ffi.new("struct packet *[1]"),
       mem = ffi.new("uint8_t *[1]")
    }
+   o._logger = lib.logger_new({ module = 'nd_light' })
    return o
 end
 
@@ -198,7 +200,7 @@ local function ns (self, dgram, eth, ipv6, icmp)
    local mem, length = self._cache.mem
    mem[0], length = dgram:payload()
    if not icmp:checksum_check(mem[0], length, ipv6) then
-      print(self:name()..": bad icmp checksum")
+      self._logger:log("bad icmp checksum")
       return nil
    end
    -- Parse the neighbor solicitation and check if it contains our own
@@ -239,8 +241,8 @@ local function na (self, dgram, eth, ipv6, icmp)
    self._eth_header = ethernet:new({ src = self._config.local_mac,
                                      dst = option[1]:option():addr(),
                                      type = 0x86dd })
-   print(string.format("Resolved next-hop %s to %s", ipv6:ntop(self._config.next_hop),
-                       ethernet:ntop(option[1]:option():addr())))
+   self._logger:log(string.format("Resolved next-hop %s to %s", ipv6:ntop(self._config.next_hop),
+                                  ethernet:ntop(option[1]:option():addr())))
    return nil
 end
 
@@ -315,4 +317,27 @@ end
 function nd_light:stop ()
    packet.free(self._next_hop.packet)
    packet.free(self._sna.packet)
+end
+
+function selftest ()
+   local sink = require("apps.basic.basic_apps").Sink
+   local c = config.new()
+   config.app(c, "nd1", nd_light, { local_mac = "00:00:00:00:00:01",
+                                    local_ip  = "2001:DB8::1",
+                                    next_hop  = "2001:DB8::2" })
+   config.app(c, "nd2", nd_light, { local_mac = "00:00:00:00:00:02",
+                                    local_ip  = "2001:DB8::2",
+                                    next_hop  = "2001:DB8::1" })
+   config.app(c, "sink1", sink)
+   config.app(c, "sink2", sink)
+   config.link(c, "nd1.south -> nd2.south")
+   config.link(c, "nd2.south -> nd1.south")
+   config.link(c, "sink1.tx -> nd1.north")
+   config.link(c, "nd1.north -> sink1.rx")
+   config.link(c, "sink2.tx -> nd2.north")
+   config.link(c, "nd2.north -> sink2.rx")
+   engine.configure(c)
+   engine.main({ duration = 2 })
+   assert(engine.app_table.nd1._eth_header)
+   assert(engine.app_table.nd2._eth_header)
 end

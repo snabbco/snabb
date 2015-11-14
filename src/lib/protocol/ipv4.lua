@@ -4,24 +4,12 @@ local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
 local ipsum = require("lib.checksum").ipsum
+local htons, ntohs, htonl, ntohl =
+   lib.htons, lib.ntohs, lib.htonl, lib.ntohl
 
 -- TODO: generalize
 local AF_INET = 2
 local INET_ADDRSTRLEN = 16
-
-local ipv4hdr_t = ffi.typeof[[
-      struct {
-      uint16_t ihl_v_tos; // ihl:4, version:4, tos(dscp:6 + ecn:2)
-      uint16_t total_length;
-      uint16_t id;
-      uint16_t frag_off; // flags:3, fragmen_offset:13
-      uint8_t  ttl;
-      uint8_t  protocol;
-      uint16_t checksum;
-      uint8_t  src_ip[4];
-      uint8_t  dst_ip[4];
-      } __attribute__((packed))
-]]
 
 local ipv4hdr_pseudo_t = ffi.typeof[[
       struct {
@@ -39,8 +27,6 @@ local ipv4 = subClass(header)
 
 -- Class variables
 ipv4._name = "ipv4"
-ipv4._header_type = ipv4hdr_t
-ipv4._header_ptr_type = ffi.typeof("$*", ipv4hdr_t)
 ipv4._ulp = {
    class_map = {
        [6] = "lib.protocol.tcp",
@@ -49,12 +35,28 @@ ipv4._ulp = {
       [58] = "lib.protocol.icmp.header",
    },
    method    = 'protocol' }
+ipv4:init(
+   {
+      [1] = ffi.typeof[[
+	    struct {
+	       uint16_t ihl_v_tos; // ihl:4, version:4, tos(dscp:6 + ecn:2)
+	       uint16_t total_length;
+	       uint16_t id;
+	       uint16_t frag_off; // flags:3, fragmen_offset:13
+	       uint8_t  ttl;
+	       uint8_t  protocol;
+	       uint16_t checksum;
+	       uint8_t  src_ip[4];
+	       uint8_t  dst_ip[4];
+	    } __attribute__((packed))
+      ]],
+   })
 
 -- Class methods
 
 function ipv4:new (config)
    local o = ipv4:superClass().new(self)
-   o:header().ihl_v_tos = C.htons(0x4000) -- v4
+   o:header().ihl_v_tos = htons(0x4000) -- v4
    o:ihl(o:sizeof() / 4)
    o:dscp(config.dscp or 0)
    o:ecn(config.ecn or 0)
@@ -105,17 +107,17 @@ end
 
 function ipv4:total_length (length)
    if length ~= nil then
-      self:header().total_length = C.htons(length)
+      self:header().total_length = htons(length)
    else
-      return(C.ntohs(self:header().total_length))
+      return(ntohs(self:header().total_length))
    end
 end
 
 function ipv4:id (id)
    if id ~= nil then
-      self:header().id = C.htons(id)
+      self:header().id = htons(id)
    else
-      return(C.ntohs(self:header().id))
+      return(ntohs(self:header().id))
    end
 end
 
@@ -144,9 +146,9 @@ function ipv4:protocol (protocol)
 end
 
 function ipv4:checksum ()
-   self:header().checksum = C.htons(ipsum(ffi.cast("uint8_t *", self:header()),
-                                          self:sizeof(), 0))
-   return C.ntohs(self:header().checksum)
+   self:header().checksum = htons(ipsum(ffi.cast("uint8_t *", self:header()),
+                                        self:sizeof(), 0))
+   return ntohs(self:header().checksum)
 end
 
 function ipv4:src (ip)
@@ -191,7 +193,7 @@ function ipv4:pseudo_header (ulplen, proto)
    local ph = ipv4hdr_pseudo_t()
    local h = self:header()
    ffi.copy(ph, h.src_ip, 2*ipv4_addr_t_size)  -- Copy source and destination
-   ph.ulp_length = C.htons(ulplen)
+   ph.ulp_length = htons(ulplen)
    ph.ulp_protocol = proto
    return(ph)
 end

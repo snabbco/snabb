@@ -5,6 +5,9 @@ local C = ffi.C
 local getopt = require("lib.lua.alt_getopt")
 local syscall = require("syscall")
 require("core.clib_h")
+local bit = require("bit")
+local band, bor, bnot, lshift, rshift, bswap =
+   bit.band, bit.bor, bit.bnot, bit.lshift, bit.rshift, bit.bswap
 
 -- Returns true if x and y are structurally similar (isomorphic).
 function equal (x, y)
@@ -159,49 +162,14 @@ end
 function bits (bitset, basevalue)
    local sum = basevalue or 0
    for _,n in pairs(bitset) do
-      sum = bit.bor(sum, bit.lshift(1, n))
+      sum = bor(sum, lshift(1, n))
    end
    return sum
 end
 
 -- Return true if bit number 'n' of 'value' is set.
 function bitset (value, n)
-   return bit.band(value, bit.lshift(1, n)) ~= 0
-end
-
--- Manipulation of bit fields in uint{8,16,32)_t stored in network
--- byte order.  Using bit fields in C structs is compiler-dependent
--- and a little awkward for handling endianness and fields that cross
--- byte boundaries.  We're bound to the LuaJIT compiler, so I guess
--- this would be save, but masking and shifting is guaranteed to be
--- portable.  Performance could be an issue, though.
-
-local bitfield_endian_conversion =
-   { [16] = { ntoh = C.ntohs, hton = C.htons },
-     [32] = { ntoh = C.ntohl, hton = C.htonl }
-  }
-
-function bitfield(size, struct, member, offset, nbits, value)
-   local conv = bitfield_endian_conversion[size]
-   local field
-   if conv then
-      field = conv.ntoh(struct[member])
-   else
-      field = struct[member]
-   end
-   local shift = size-(nbits+offset)
-   local mask = bit.lshift(2^nbits-1, shift)
-   local imask = bit.bnot(mask)
-   if value then
-      field = bit.bor(bit.band(field, imask), bit.lshift(value, shift))
-      if conv then
-         struct[member] = conv.hton(field)
-      else
-         struct[member] = field
-      end
-   else
-      return bit.rshift(bit.band(field, mask), shift)
-   end
+   return band(value, lshift(1, n)) ~= 0
 end
 
 -- Iterator factory for splitting a string by pattern
@@ -326,17 +294,17 @@ function update_csum (ptr, len,  csum0)
    ptr = ffi.cast("uint8_t*", ptr)
    local sum = csum0 or 0LL
    for i = 0, len-2, 2 do
-      sum = sum + bit.lshift(ptr[i], 8) + ptr[i+1]
+      sum = sum + lshift(ptr[i], 8) + ptr[i+1]
    end
-   if len % 2 == 1 then sum = sum + bit.lshift(ptr[len-1], 1) end
+   if len % 2 == 1 then sum = sum + lshift(ptr[len-1], 1) end
    return sum
 end
 
 function finish_csum (sum)
-   while bit.band(sum, 0xffff) ~= sum do
-      sum = bit.band(sum + bit.rshift(sum, 16), 0xffff)
+   while band(sum, 0xffff) ~= sum do
+      sum = band(sum + rshift(sum, 16), 0xffff)
    end
-   return bit.band(bit.bnot(sum), 0xffff)
+   return band(bnot(sum), 0xffff)
 end
 
 
@@ -386,11 +354,47 @@ if ffi.abi("be") then
    function htonl(b) return b end
    function htons(b) return b end
 else
-   function htonl(b) return bit.bswap(b) end
-   function htons(b) return bit.rshift(bit.bswap(b), 16) end
+   function htonl(b) return bswap(b) end
+   function htons(b) return rshift(bswap(b), 16) end
 end
 ntohl = htonl
 ntohs = htons
+
+-- Manipulation of bit fields in uint{8,16,32)_t stored in network
+-- byte order.  Using bit fields in C structs is compiler-dependent
+-- and a little awkward for handling endianness and fields that cross
+-- byte boundaries.  We're bound to the LuaJIT compiler, so I guess
+-- this would be save, but masking and shifting is guaranteed to be
+-- portable.
+
+local bitfield_endian_conversion = 
+   { [16] = { ntoh = ntohs, hton = htons },
+     [32] = { ntoh = ntohl, hton = htonl }
+  }
+
+function bitfield(size, struct, member, offset, nbits, value)
+   local conv = bitfield_endian_conversion[size]
+   local field
+   if conv then
+      field = conv.ntoh(struct[member])
+   else
+      field = struct[member]
+   end
+   local shift = size-(nbits+offset)
+   local mask = lshift(2^nbits-1, shift)
+   local imask = bnot(mask)
+   if value then
+      field = bor(band(field, imask),
+                  band(lshift(value, shift), mask))
+      if conv then
+         struct[member] = conv.hton(field)
+      else
+         struct[member] = field
+      end
+   else
+      return rshift(band(field, mask), shift)
+   end
+end
 
 -- Process ARGS using ACTIONS with getopt OPTS/LONG_OPTS.
 -- Return the remaining unprocessed arguments.
@@ -433,7 +437,7 @@ function root_check (message)
 end
 
 -- Simple token bucket for rate-limiting of events.  A token bucket is
--- create through
+-- created through
 --
 --  local tb = token_bucket_new({ rate = <rate> })
 --
@@ -454,14 +458,16 @@ function token_bucket_new (config)
    return tb
 end
 
--- The rate can be set with the rate() method at any time, which
--- empties the token bucket an also returns the previous value.  If
--- called with a nil argument, returns the currently configured rate.
+-- The rate can be set with the rate() method at any time, which fills
+-- the token bucket an also returns the previous value.  If called
+-- with a nil argument, returns the currently configured rate.
 function token_bucket:rate (rate)
    if rate ~= nil then
+      local old_rate = self._rate
       self._rate = rate
       self._max_tokens = math.max(rate, 1)
-      self._tokens = 0
+      self._tokens = self._max_tokens
+      return old_rate
    end
    return self._rate
 end
@@ -512,25 +518,28 @@ end
 -- Simple rate-limited logging facility.  Usage:
 --
 --   local logger = lib.logger_new({ rate = <rate>,
+--                                   discard_rate = <drate>,
 --                                   fh = <fh>,
 --                                   flush = true|false,
 --                                   module = <module>,
 --                                   date = true|false })
 --   logger:log(message)
 --
--- <rate> maximum rate of messages per second.  Additional
---        messages are discarded. Default: 10
--- <fh>   file handle to log to.  Default: io.stdout
--- flush  flush <fh> after each message if true
+-- <rate>   maximum rate of messages per second.  Additional
+--          messages are discarded. Default: 10
+-- <drate>  maximum rate of logging of the number of discarded
+--          messages.  Default: 0.5
+-- <fh>     file handle to log to.  Default: io.stdout
+-- flush    flush <fh> after each message if true
 -- <module> name of the module to include in the message
--- date   include date in messages if true
+-- date     include date in messages if true
 --
 -- The output format is
 -- <date> <module>: message
 --
 -- The logger uses an automatic throttling mechanism to dynamically
 -- lower the logging rate when the rate of discarded messages exceeds
--- the maximum log rate by a factor of 5 over one or multiple adacent
+-- the maximum log rate by a factor of 5 over one or multiple adjacent
 -- intervals of 10 seconds.  For each such interval, the logging rate
 -- is reduced by a factor of 2 with a lower bound of 0.1 Hz (i.e. one
 -- message per 10 seconds).  For each 10-second interval for which the
@@ -538,22 +547,26 @@ end
 -- is increased by 1/4 of the original rate, i.e. it takes at least 40
 -- seconds to ramp back up to the original rate.
 --
-local logger = {}
--- Default configuration
-logger.default = {
+-- The tables lib.logger_default and lib.logger_throttle are exposed
+-- to the user as part of the API.
+logger_default = {
    rate = 10,
+   discard_rate = 0.5,
    fh = io.stdout,
    flush = true,
    module = '',
    date = true,
-   date_fmt = "%b %Y %H:%M:%S ",
+   date_fmt = "%b %d %Y %H:%M:%S ",
 }
--- Auto-throttle configuration
-logger.throttle = {
+logger_throttle = {
    interval = 10, -- Sampling interval for discard rate
    excess = 5,   -- Multiple of rate at which to start throttling
    increment = 4, -- Fraction of rate to increase for un-throttling
    min_rate = 0.1, -- Minimum throttled rate
+}
+local logger = {
+   default = logger_default,
+   throttle = logger_throttle,
 }
 logger.mt = { __index = logger }
 
@@ -567,6 +580,8 @@ function logger_new (config)
    end
    l._config = _config
    l._tb = token_bucket_new({ rate = _config.rate })
+   l._discard_tb = token_bucket_new({ rate = _config.discard_rate })
+   l._discards = 0
    local _throttle = {
       discards = 0,
       tstamp = C.get_monotonic_time(),
@@ -597,52 +612,56 @@ function logger:log (msg)
    if self._tb:take(1) then
       local config = self._config
       local throttle  = self._throttle
+      throttle.discards = throttle.discards + self._discards
       local date = ''
       if config.date then
-	 date = os.date(config.date_fmt)
+         date = os.date(config.date_fmt)
       end
       local preamble = date..self._preamble
       local fh = config.fh
-      now = C.get_monotonic_time()
+      local now = C.get_monotonic_time()
       local interval = now-throttle.tstamp
       local samples = interval/throttle.interval
       local drate = throttle.discards/interval
       local current_rate = self._tb:rate()
+      if self._discards > 0 and self._discard_tb:take(1) then
+         fh:write(string.format(preamble.."%d messages discarded\n",
+                                self._discards))
+         throttle.discards = self._discards
+         self._discards = 0
+      end
       if samples >= 1 then
-	 if throttle.discards > 0 then
-	    fh:write(string.format(preamble.."%d messages discarded in %d seconds\n",
-				   throttle.discards, now-throttle.tstamp))
-	 end
-	 if drate > throttle.rate then
-	    local min_rate = throttle.min_rate
-	    if current_rate > min_rate then
-	       local throttle_rate = math.max(min_rate,
-					      current_rate/2^samples)
-	       fh:write(string.format(preamble.."throttling logging rate to "
-				      .."%.2f Hz%s\n",
-				   throttle_rate,
-				   (throttle_rate == min_rate and ' (minimum)') or ''))
-	       self._tb:rate(throttle_rate)
-	    end
-	 else
-	    local configured_rate = config.rate
-	    if current_rate < configured_rate then
-	       local throttle_rate = math.min(configured_rate,
-					      current_rate + throttle.increment*samples)
-	       fh:write(string.format(preamble.."unthrottling logging rate to "
-				      .."%.2f Hz%s\n",
-				   throttle_rate,
-				   (throttle_rate == configured_rate and ' (maximum)') or ''))
-	       self._tb:rate(throttle_rate)
-	    end
-	 end
-	 throttle.discards = 0
-	 throttle.tstamp = now
+         if drate > throttle.rate then
+            local min_rate = throttle.min_rate
+            if current_rate > min_rate then
+               local throttle_rate = math.max(min_rate,
+                                              current_rate/2^samples)
+               fh:write(string.format(preamble.."message discard rate %.2f exceeds "
+                                      .."threshold (%.2f), throttling logging rate to "
+                                      .."%.2f Hz%s\n",
+                                   drate, throttle.rate, throttle_rate,
+                                   (throttle_rate == min_rate and ' (minimum)') or ''))
+               self._tb:rate(throttle_rate)
+            end
+         else
+            local configured_rate = config.rate
+            if current_rate < configured_rate then
+               local throttle_rate = math.min(configured_rate,
+                                              current_rate + throttle.increment*samples)
+               fh:write(string.format(preamble.."unthrottling logging rate to "
+                                      .."%.2f Hz%s\n",
+                                   throttle_rate,
+                                   (throttle_rate == configured_rate and ' (maximum)') or ''))
+               self._tb:rate(throttle_rate)
+            end
+         end
+         throttle.discards = 0
+         throttle.tstamp = now
       end
       fh:write(preamble..msg..'\n')
       if config.flush then fh:flush() end
    else
-      self._throttle.discards = self._throttle.discards + 1
+      self._discards = self._discards + 1
    end
 end
 
@@ -655,8 +674,16 @@ function logger:can_log ()
    if self._tb:can_take(1) then
       return true
    end
-   self._throttle.discards = self._throttle.discards + 1
+   self._discards = self._discards + 1
    return false
+end
+
+-- Wrapper around os.getenv which only returns the variable's value if it
+-- is non-empty.
+function getenv (name)
+   local value = os.getenv(name)
+   if value and #value ~= 0 then return value
+   else return nil end
 end
 
 function selftest ()
