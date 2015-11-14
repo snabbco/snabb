@@ -1,0 +1,79 @@
+#!/bin/bash
+
+# This creates a virtual network of 3 machines in 3 different subnets
+# connected to a router. Besides that, app1 and app2 machines create
+# two static l2tp tunnels which connect _to the same endpoint_ in the
+# lisp machine where lisper responds back.
+
+bringup() {
+ip netns add r2
+ip netns add app1
+ip netns add app2
+ip netns add lisp
+
+ip link add netns app1 e0 address aa:aa:aa:aa:aa:01 type veth peer name e1 netns r2
+ip link add netns app2 e0 address aa:aa:aa:aa:aa:02 type veth peer name e2 netns r2
+ip link add netns lisp e0 address aa:aa:aa:aa:aa:04 type veth peer name e4 netns r2
+
+ip netns exec r2 ip addr add fd80:1::1/56 dev e1
+ip netns exec r2 ip addr add fd80:2::1/56 dev e2
+ip netns exec r2 ip addr add fd80:4::1/56 dev e4
+
+ip netns exec app1 ip addr add fd80:1::2/56 dev e0
+ip netns exec app2 ip addr add fd80:2::2/56 dev e0
+ip netns exec lisp ip addr add fd80:4::2/56 dev e0
+
+ip netns exec app1 ip -6 route add default via fd80:1::1
+ip netns exec app2 ip -6 route add default via fd80:2::1
+ip netns exec lisp ip -6 route add default via fd80:4::1
+
+ip netns exec app1 ip link set e0 up
+ip netns exec app2 ip link set e0 up
+ip netns exec lisp ip link set e0 up
+
+ip netns exec r2 sysctl -wq net.ipv6.conf.all.forwarding=1
+
+ip netns exec r2 ip link set e1 up
+ip netns exec r2 ip link set e2 up
+ip netns exec r2 ip link set e4 up
+
+if false; then
+# NOTE: l2tp ip-over-ipv6 encapsulation doesn't work with namespaces.
+# Hence we're using our own little Lua script which does the same thing in userspace.
+modprobe l2tp_ip6
+modprobe l2tp_eth
+modprobe l2tp_core
+modprobe l2tp_netlink
+ip netns exec app1 ip l2tp add tunnel tunnel_id 1 peer_tunnel_id 1 encap ip local fd80:1::2 remote fd80:4::2
+ip netns exec app2 ip l2tp add tunnel tunnel_id 1 peer_tunnel_id 1 encap ip local fd80:2::2 remote fd80:4::2
+ip netns exec app1 ip l2tp add session name t0 tunnel_id 1 session_id 4660 peer_session_id 17185
+ip netns exec app2 ip l2tp add session name t0 tunnel_id 1 session_id 4660 peer_session_id 17185
+ip netns exec app1 ip link set t0 up
+ip netns exec app2 ip link set t0 up
+ip netns exec lisp ip l2tp add tunnel tunnel_id 1 peer_tunnel_id 1 encap ip local fd80:4::2 remote fd80:1::2
+ip netns exec lisp ip l2tp add session name t0 tunnel_id 1 session_id 17185 peer_session_id 4660
+ip netns exec lisp ip link set t0 up
+else
+./l2tp.app1 &
+echo $! > l2tp.app1.pid
+./l2tp.app2 &
+echo $! > l2tp.app2.pid
+sleep 0.2
+ip netns exec app1 ifconfig t0 10.0.0.1/24 up
+ip netns exec app2 ifconfig t0 10.0.0.2/24 up
+fi
+}
+
+
+teardown() {
+kill -9 `cat l2tp.app1.pid`; rm l2tp.app1.pid
+kill -9 `cat l2tp.app2.pid`; rm l2tp.app2.pid
+ip netns del r2
+ip netns del app1
+ip netns del app2
+ip netns del lisp
+}
+
+
+action=$1; [ "$action" ] || action=bringup
+$action
