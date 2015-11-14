@@ -1,0 +1,1 @@
+ip netns exec app1 bash
