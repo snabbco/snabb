@@ -77,6 +77,15 @@ end
 local tapname, ethname, smac, dmac, sip, dip, sid, did = ...
 if not (tapname and ethname and smac and dmac and sip and dip and sid and did) then
 	print('Usage: '..arg[0]..' TAP ETH SMAC DMAC SIP DIP SID DID')
+	print'   TAP:  the tunneled interface: will be created if not present.'
+	print'   ETH:  the tunneling interface: must have an IPv6 assigned.'
+	print'   SMAC: the MAC address of ETH.'
+	print'   DMAC: the MAC address of the gateway interface.'
+	print'   SIP:  the IPv6 of ETH (long form).'
+	print'   SIP:  the IPv6 of ETH (long form).'
+	print'   DIP:  the IPv6 of ETH at the other endpoint (long form).'
+	print'   SID:  session ID (hex)'
+	print'   DID:  peer session ID (hex)'
 	os.exit(1)
 end
 smac = parsehex(smac)
