@@ -7,7 +7,7 @@ local S      = require'syscall'
 local C      = ffi.C
 local htons  = require'syscall.helpers'.htons
 
-local DEBUG  = true
+local DEBUG  = false
 
 local function assert(v, ...)
 	if v then return v, ... end
@@ -16,7 +16,7 @@ end
 
 local function hex(s)
 	return (s:gsub('(.)(.?)', function(c1, c2)
-		return c2 and
+		return c2 and #c2 == 1 and
 			string.format('%02x%02x ', c1:byte(), c2:byte()) or
 			string.format('%02x ', c1:byte())
 	end))
@@ -99,8 +99,12 @@ print('sid  ', hex(sid))
 print('did  ', hex(did))
 
 local function decap_l2tp(s)
-	local dmac = s:sub(1, 6)
+	local dmac = s:sub(1, 1+6-1)
 	local smac = s:sub(1+6, 1+6+6-1)
+	local eth_proto = s:sub(1+6+6, 1+6+6+2-1)
+	if eth_proto ~= '\x86\xdd' then return nil, 'invalid eth_proto '..hex(eth_proto) end --not ipv6
+	local ipv6_proto = s:sub(21, 21)
+	if ipv6_proto ~= '\115' then return nil, 'invalid ipv6_proto '..hex(ipv6_proto) end --not l2tp
 	local sip = s:sub(23, 23+16-1)
 	local dip = s:sub(23+16, 23+16+16-1)
 	local sid = s:sub(55, 55+4-1)
@@ -125,20 +129,22 @@ while true do
 		if can_read(raw) then
 			local s = read(raw)
 			local smac1, dmac1, sip1, dip1, did1, payload = decap_l2tp(s)
-			local accept =
-				smac1 == dmac
+			local accept = smac1
+				and smac1 == dmac
 				and dmac1 == smac
 				and dip1 == sip
 				and sip1 == dip
 				and did1 == sid
 			if DEBUG then
-				print('read   ', accept and 'accepted' or 'rejected')
-				print('  smac ', hex(smac1))
-				print('  dmac ', hex(dmac1))
-				print('  sip  ', hex(sip1))
-				print('  dip  ', hex(dip1))
-				print('  did  ', hex(did1))
-				print('  #    ', #payload)
+				print('read   ', accept and 'accepted' or ('rejected '..(smac1 and hex(dmac1) or dmac1)))
+				if accept then
+					print('  smac ', hex(smac1))
+					print('  dmac ', hex(dmac1))
+					print('  sip  ', hex(sip1))
+					print('  dip  ', hex(dip1))
+					print('  did  ', hex(did1))
+					print('  #    ', #payload)
+				end
 			end
 			if accept then
 				write(tap, payload)
