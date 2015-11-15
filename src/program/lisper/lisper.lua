@@ -11,13 +11,18 @@ local raw      = require("apps.socket.raw")
 local lines    = require("apps.lines")
 local nd       = require("apps.ipv6.nd_light")
 
+local function assert(v, ...)
+	if v then return v, ... end
+	error(tostring((...)), 2)
+end
+
 --program args ---------------------------------------------------------------
 
 local VERBOSE = false
 local CONTROL_SOCK = "/var/tmp/ctrl.socket"
 local PUNT_IF = "veth0"
 local NET_IF = "e0"
-local LOCAL_IP = "fd80:4::2"
+local LOCAL_IP = ipv6:pton"fd80:4::2"
 local LOCAL_MAC = "00:00:00:00:01:04"
 local NEXT_HOP_IP = "fd80:4::1"
 
@@ -35,7 +40,7 @@ function opt.h (arg) print(usage) main.exit(0) end
 function opt.c (arg) CONTROL_SOCK = arg end
 function opt.p (arg) PUNT_IF = arg end
 function opt.n (arg) NET_IF = arg end
-function opt.i (arg) LOCAL_IP = arg end
+function opt.i (arg) LOCAL_IP = assert(ipv6:pton(arg)) end
 function opt.m (arg) LOCAL_MAC = arg end
 function opt.N (arg) NEXT_HOP_IP = arg end
 
@@ -106,18 +111,41 @@ struct {
 
 local uint32p_ct = ffi.typeof'uint32_t*'
 
+local function macstr(mac)
+	local mac = ffi.string(mac, 6)
+	return lib.hexdump(mac):gsub(' ', ':')
+end
+
+local function ip6str(ip6)
+	return ipv6:ntop(ip6)
+end
+
+local function l2tp_dump(p, text)
+   local p = ffi.cast(l2tp_ct, p)
+   if lib.htons(p.ethertype) == 0x86dd and p.next_header == 115 then
+		local sessid = string.format('%04x', lib.ntohl(p.session_id))
+		print('L2TP: '..text..' [0x'..sessid..'] '..
+			macstr(p.smac)..','..ip6str(p.src_ip)..' -> '..
+			macstr(p.dmac)..','..ip6str(p.dst_ip)..
+			' ['..macstr(p.l2tp_smac)..' -> '..macstr(p.l2tp_dmac)..']')
+	else
+		print('INVALID: ', string.format('%04x', lib.htons(p.ethertype)), p.next_header)
+	end
+end
+
 local function l2tp_parse(p)
    local p = ffi.cast(l2tp_ct, p)
    if lib.htons(p.ethertype) == 0x86dd and p.next_header == 115 then
       local sessid = lib.ntohl(p.session_id)
-      local smac = ffi.string(p.l2tp_smac, 6)
-      print(sessid, lib.hexdump(smac))
-      return sessid, smac
+      local l2tp_smac = ffi.string(p.l2tp_smac, 6)
+      return sessid, l2tp_smac
    end
 end
 
-local function l2tp_set_dest_ip(p, dest_ip)
-   ffi.copy(ffi.cast(l2tp_ct, p.data).dst_ip, dest_ip, 8)
+local function l2tp_update(p, dest_ip)
+   local p = ffi.cast(l2tp_ct, p.data)
+	ffi.copy(p.src_ip, LOCAL_IP, 16)
+	ffi.copy(p.dst_ip, dest_ip, 16)
 end
 
 --data plane -----------------------------------------------------------------
@@ -129,17 +157,17 @@ function Lisper:new (t)
 end
 
 function Lisper:_route (p, tx)
-   local sessid, smac = l2tp_parse(p)
+   local sessid, smac, dmac = l2tp_parse(p)
    if not sessid then return end --invalid packet
    local ips = self._lookup(sessid, smac)
    if ips then
       for i=1,#ips do
          local ip = ips[i]
-         print('forwarding ['..sessid..'] '..
-            lib.hexdump(smac):gsub(' ', ':')..' to '..ipv6:ntop(ip))
-         local p = packet.clone(p)
-         l2tp_set_dest_ip(p, ip)
-         link.transmit(tx, p)
+         local p = packet.clone(p), packet.free(p)
+			l2tp_update(p, ip)
+			--TODO: check if tx is full and put it back in rx but remember
+			--the `i` to avoid duplicating packets.
+			link.transmit(tx, p)
       end
    else
       local p = packet.clone(p)
@@ -151,7 +179,7 @@ function Lisper:push ()
    local rx = self.input.rx
    local tx = self.output.tx
    if rx == nil or tx == nil then return end
-   while not link.empty(rx) do
+   while not link.empty(rx) and not link.full(tx) do
       local p = link.receive(rx)
       self:_route(p, tx)
       packet.free(p)
@@ -167,6 +195,23 @@ function PuntQueue:new ()
 end
 
 --program wiring -------------------------------------------------------------
+
+local intercept = {}
+
+function intercept:new(name)
+	return setmetatable({text = name}, {__index = self})
+end
+
+function intercept:push ()
+   local rx = self.input.rx
+   local tx = self.output.tx
+   if rx == nil or tx == nil then return end
+   while not link.empty(rx) do
+      local p = link.receive(rx)
+		l2tp_dump(p, self.text)
+		link.transmit(tx, p)
+   end
+end
 
 function run (args)
 
@@ -184,8 +229,12 @@ function run (args)
    config.app(c, "data", raw.RawSocket, NET_IF)
    config.link(c, "lisper.tx -> nd.north")
    config.link(c, "nd.north -> lisper.rx")
-   config.link(c, "data.tx -> nd.south")
-   config.link(c, "nd.south -> data.rx")
+   config.app(c, "intercept_out", intercept, '>')
+   config.app(c, "intercept_in", intercept, '<')
+	config.link(c, "nd.south -> intercept_out.rx")
+   config.link(c, "intercept_out.tx -> data.rx")
+	config.link(c, "data.tx -> intercept_in.rx")
+	config.link(c, "intercept_in.tx -> nd.south")
 
    --control plane
    config.app(c, "ctl", unix.UnixSocket, {filename = CONTROL_SOCK, listen = true})
@@ -203,7 +252,7 @@ function run (args)
    print("  network interface : "..NET_IF)
    print("  punt interface    : "..PUNT_IF)
    print("  control socket    : "..CONTROL_SOCK)
-   print("  local IP          : "..LOCAL_IP)
+   print("  local IP          : "..ip6str(LOCAL_IP))
    print("  local MAC         : "..LOCAL_MAC)
    print("  next hop IP       : "..NEXT_HOP_IP)
 
