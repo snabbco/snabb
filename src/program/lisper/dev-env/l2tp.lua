@@ -82,7 +82,6 @@ if not (tapname and ethname and smac and dmac and sip and dip and sid and did) t
 	print'   SMAC: the MAC address of ETH.'
 	print'   DMAC: the MAC address of the gateway interface.'
 	print'   SIP:  the IPv6 of ETH (long form).'
-	print'   SIP:  the IPv6 of ETH (long form).'
 	print'   DIP:  the IPv6 of ETH at the other endpoint (long form).'
 	print'   SID:  session ID (hex)'
 	print'   DID:  peer session ID (hex)'
@@ -111,9 +110,13 @@ local function decap_l2tp(s)
 	local dmac = s:sub(1, 1+6-1)
 	local smac = s:sub(1+6, 1+6+6-1)
 	local eth_proto = s:sub(1+6+6, 1+6+6+2-1)
-	if eth_proto ~= '\x86\xdd' then return nil, 'invalid eth_proto '..hex(eth_proto) end --not ipv6
+	if eth_proto ~= '\x86\xdd' then
+		return nil, 'invalid eth_proto '..hex(eth_proto)
+	end --not ipv6
 	local ipv6_proto = s:sub(21, 21)
-	if ipv6_proto ~= '\115' then return nil, 'invalid ipv6_proto '..hex(ipv6_proto) end --not l2tp
+	if ipv6_proto ~= '\115' then
+		return nil, 'invalid ipv6_proto '..hex(ipv6_proto)
+	end --not l2tp
 	local sip = s:sub(23, 23+16-1)
 	local dip = s:sub(23+16, 23+16+16-1)
 	local sid = s:sub(55, 55+4-1)
@@ -146,7 +149,8 @@ while true do
 				and sip1 == dip
 				and did1 == sid
 			if DEBUG then
-				print('read   ', accept and 'accepted' or ('rejected '..(smac1 and hex(dmac1) or dmac1)))
+				print('read   ', accept and 'accepted' or
+					('rejected '..(smac1 and hex(dmac1) or dmac1)))
 				if accept then
 					print('  smac ', hex(smac1))
 					print('  dmac ', hex(dmac1))

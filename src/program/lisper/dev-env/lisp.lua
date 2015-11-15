@@ -10,13 +10,15 @@ local function assert(v, ...)
 	error(tostring((...)), 2)
 end
 
+local function print() end --comment this to debug
+
 local ffi = require("ffi")
 local S   = require("syscall")
 
 local CONTROL_SOCK = "/var/tmp/ctrl.socket"
 local CONTROL_DATA = [[
 [17185] 00:00:00:00:aa:01 fd80:2::2
-[17185] 00:00:00:00:aa:02 fd80:1::2
+[4660]  00:00:00:00:aa:02 fd80:1::2
 ]]
 
 S.signal('pipe', 'ign') --I 💔 Linux
