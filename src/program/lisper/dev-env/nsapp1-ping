@@ -1,0 +1,2 @@
+ip netns exec app1 ping 10.0.0.2
+

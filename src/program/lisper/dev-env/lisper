@@ -1,0 +1,1 @@
+ip netns exec lisp snabb/src/snabb lisper
