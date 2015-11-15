@@ -56,16 +56,19 @@ ip netns exec lisp ip link set t0 up
 else
 ip netns exec app1 tunctl -t t0
 ip netns exec app2 tunctl -t t0
+ip netns exec app1 ip link set address 00:00:00:00:aa:01 dev t0
+ip netns exec app2 ip link set address 00:00:00:00:aa:02 dev t0
 ip netns exec app1 ifconfig t0 10.0.0.1/24 up
 ip netns exec app2 ifconfig t0 10.0.0.2/24 up
 ./l2tp.app1 &
 ./l2tp.app2 &
+./lisp &
 fi
 }
 
 
 teardown() {
-pgrep -lf 'l2tp.lua' | awk '{print $1}' | xargs kill -9
+{ pgrep -lf 'l2tp.lua'; pgrep -lf 'lisp.lua'; } | awk '{print $1}' | xargs kill -9
 ip netns del r2
 ip netns del app1
 ip netns del app2

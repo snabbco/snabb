@@ -7,9 +7,8 @@ local S   = require("syscall")
 
 CONTROL_SOCK = "/var/tmp/ctrl.socket"
 CONTROL_DATA = [[
-[5]  08:00:27:7f:05:37 fd80:1::1,fd80:1::2
-[7]  4a:86:5c:50:33:5a fd80:2::1
-[2]  00:16:3e:01:01:02 fd80:3::1
+[17185] 00:00:00:00:aa:01 fd80:2::2
+[17185] 00:00:00:00:aa:02 fd80:1::2
 ]]
 
 local sock = assert(S.socket("unix", "stream, nonblock"))
