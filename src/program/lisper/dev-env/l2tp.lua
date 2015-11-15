@@ -117,12 +117,13 @@ local function decap_l2tp(s)
 	local sip = s:sub(23, 23+16-1)
 	local dip = s:sub(23+16, 23+16+16-1)
 	local sid = s:sub(55, 55+4-1)
-	local payload = s:sub(63)
+	local payload = s:sub(67)
 	return smac, dmac, sip, dip, sid, payload
 end
 
 local function encap_l2tp(smac, dmac, sip, dip, did, payload)
-	local l2tp = did..'\0\0\0\0'
+	local cookie = '\0\0\0\0\0\0\0\0'
+	local l2tp = did..cookie
 	local len = #payload + #l2tp
 	local len = string.char(bit.rshift(len, 8)) .. string.char(bit.band(len, 0xff))
 	local ipv6_proto = '\115' --l2tp
