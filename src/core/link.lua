@@ -37,6 +37,10 @@ function free (r, name)
    shm.unlink("links/"..name)
 end
 
+function peek (r)
+   return r.packets[r.read]
+end
+
 function receive (r)
 --   if debug then assert(not empty(r), "receive on empty link") end
    local p = r.packets[r.read]
