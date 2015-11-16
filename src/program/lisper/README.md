@@ -98,10 +98,7 @@ to create more complex topologies that require connecting more than two
 machines together.
 
 
-#### Setting up a dev environment
+#### Developing and testing
 
-The goal is to make a dev environment that reproduces the whole network
-in software using only readily-available lightweight virtual machines
-and virtual interfaces.
+Refer to [dev-env](dev-env).
 
-Stay tuned.
