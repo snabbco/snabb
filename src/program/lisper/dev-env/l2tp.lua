@@ -14,6 +14,8 @@ local S      = require'syscall'
 local C      = ffi.C
 local htons  = require'syscall.helpers'.htons
 
+local DEBUG = os.getenv'DEBUG'
+
 local function hex(s)
    return (s:gsub('(.)(.?)', function(c1, c2)
       return c2 and #c2 == 1 and
@@ -148,16 +150,18 @@ while true do
             and dip1 == sip
             and sip1 == dip
             and did1 == sid
-         print('read   ', accept and 'accepted' or
-            ('rejected '..(smac1 and hex(dmac1) or dmac1)))
-         if accept then
-            print('  smac ', hex(smac1))
-            print('  dmac ', hex(dmac1))
-            print('  sip  ', hex(sip1))
-            print('  dip  ', hex(dip1))
-            print('  did  ', hex(did1))
-            print('  #    ', #payload)
-         end
+         if DEBUG then
+				print('read   ', accept and 'accepted' or
+					('rejected '..(smac1 and hex(dmac1) or dmac1)))
+				if accept then
+					print('  smac ', hex(smac1))
+					print('  dmac ', hex(dmac1))
+					print('  sip  ', hex(sip1))
+					print('  dip  ', hex(dip1))
+					print('  did  ', hex(did1))
+					print('  #    ', #payload)
+				end
+			end
          if accept then
             write(tap, payload)
          end
@@ -165,13 +169,15 @@ while true do
       if can_read(0, tap) then
          local payload = read(tap)
          local s = encap_l2tp(smac, dmac, sip, dip, did, payload)
-         print('write')
-         print('  smac ', hex(smac))
-         print('  dmac ', hex(dmac))
-         print('  sip  ', hex(sip))
-         print('  dip  ', hex(dip))
-         print('  did  ', hex(did))
-         print('  #    ', #payload)
+         if DEBUG then
+				print('write')
+				print('  smac ', hex(smac))
+				print('  dmac ', hex(dmac))
+				print('  sip  ', hex(sip))
+				print('  dip  ', hex(dip))
+				print('  did  ', hex(did))
+				print('  #    ', #payload)
+			end
          write(raw, s)
       end
    end
