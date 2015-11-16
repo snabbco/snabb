@@ -50,12 +50,16 @@ end
 
 --control plane --------------------------------------------------------------
 
+--a FIB line has the form: `<mac>/48 rloc <ip6> <p> <w>, <ip6> <p> <w>, ...`
 local function parse_fib_line(s)
-   local id, mac, ips = s:match"^%s*%[([^%]]+)%]%s*([^%s]+)%s+(.*)$"
+   local id, mac, ips = s:match"^%s*%[([^%]]+)%]%s*([^%s]+)%s+rloc%s+(.*)$"
    local id = assert(tonumber(id), "invalid FIB line: "..s)
+   local mac = mac:gsub('/%d+$', '') --remove '/48' from 'mac/48'
    local mac = ffi.string(ethernet:pton(mac), 6)
    local t = {}
-   for ip in ips:split"%s*,%s*" do
+   for s in ips:split"%s*,%s*" do
+      local ip, p, w = s:match'^([^%s]+)%s+(%d+)%s+(%d+)$' --TODO: use p and w
+      assert(ip, "invalid FIB entry: "..s)
       t[#t+1] = assert(ipv6:pton(ip))
    end
    return id, mac, t
@@ -143,12 +147,12 @@ end
 
 local function l2tp_parse(p)
    if p.length < l2tp_ct_size then return end
-	local p = ffi.cast(l2tp_ct, p.data)
+   local p = ffi.cast(l2tp_ct, p.data)
    if lib.htons(p.ethertype) ~= 0x86dd then return end
-	if p.next_header ~= 115 then return end
-	local sessid = lib.ntohl(p.session_id)
-	local l2tp_dmac = ffi.string(p.l2tp_dmac, 6)
-	return sessid, l2tp_dmac
+   if p.next_header ~= 115 then return end
+   local sessid = lib.ntohl(p.session_id)
+   local l2tp_dmac = ffi.string(p.l2tp_dmac, 6)
+   return sessid, l2tp_dmac
 end
 
 local function l2tp_update(p, dest_ip)
