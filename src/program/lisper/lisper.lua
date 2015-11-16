@@ -117,7 +117,7 @@ struct {
 } __attribute__((packed)) *
 ]]
 
-local uint32p_ct = ffi.typeof'uint32_t*'
+local l2tp_ct_size = ffi.sizeof(l2tp_ct)
 
 local function macstr(mac)
    local mac = ffi.string(mac, 6)
@@ -129,7 +129,7 @@ local function ip6str(ip6)
 end
 
 local function l2tp_dump(p, text)
-   local p = ffi.cast(l2tp_ct, p)
+   local p = ffi.cast(l2tp_ct, p.data)
    if lib.htons(p.ethertype) == 0x86dd and p.next_header == 115 then
       local sessid = string.format('%04x', lib.ntohl(p.session_id))
       print('L2TP: '..text..' [0x'..sessid..'] '..
@@ -142,12 +142,13 @@ local function l2tp_dump(p, text)
 end
 
 local function l2tp_parse(p)
-   local p = ffi.cast(l2tp_ct, p)
-   if lib.htons(p.ethertype) == 0x86dd and p.next_header == 115 then
-      local sessid = lib.ntohl(p.session_id)
-      local l2tp_dmac = ffi.string(p.l2tp_dmac, 6)
-      return sessid, l2tp_dmac
-   end
+   if p.length < l2tp_ct_size then return end
+	local p = ffi.cast(l2tp_ct, p.data)
+   if lib.htons(p.ethertype) ~= 0x86dd then return end
+	if p.next_header ~= 115 then return end
+	local sessid = lib.ntohl(p.session_id)
+	local l2tp_dmac = ffi.string(p.l2tp_dmac, 6)
+	return sessid, l2tp_dmac
 end
 
 local function l2tp_update(p, dest_ip)
