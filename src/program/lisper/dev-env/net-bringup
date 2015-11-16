@@ -85,6 +85,7 @@ teardown() {
 ip netns del r2
 ip netns del app1
 ip netns del app2
+ip netns del app3
 ip netns del lisp
 }
 
