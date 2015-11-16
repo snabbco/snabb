@@ -1,5 +1,5 @@
 run()     { ip netns exec lisp ./lisp.lua; }
 start()   { run >/dev/null & }
 stop()    { pgrep -f 'lisp.lua' | xargs kill -9; }
-restart() { stop; start; }D
+restart() { stop; start; }
 if [ "$1" ]; then $1; else stop; run; fi
