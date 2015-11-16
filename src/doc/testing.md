@@ -28,7 +28,7 @@ images used by the test suite from
 
 ```
 mkdir ~/.test_env
-curl http://lab1.snabb.co:2008/~max/assets/vm-ubuntu-trusty-14.04-dpdk-vosys.tar.gz \
+curl http://lab1.snabb.co:2008/~max/assets/vm-ubuntu-trusty-14.04-dpdk-snabb.tar.gz \
      | tar xvz -C ~/.test_env/
 ```
 
@@ -93,7 +93,7 @@ the tests:
 
 SnabbBot (`src/scripts/snabb_bot.sh`) is a shell script that acts as a
 continuous integration service for Snabb Switch repositories hosted on
-GitHub. You can run it on your own test hardware to provide unit and
+GitHub. The You can run it on your own test hardware to provide unit and
 performance regression testing for the upstream repository or even your
 own Snabb Switch fork. SnabbBot is configured through the following
 environment variables:
@@ -103,6 +103,9 @@ environment variables:
 
 * `REPO`—Optional. Target GitHub repository. Default is
   `SnabbCo/snabbswitch` (upstream).
+
+* `CURRENT`—Optional. The branch to merge pull requests with. Default is
+  `master`.
 
 * `SNABBBOTDIR`—Optional. SnabbBot cache directory. Default is
   `/tmp/snabb_bot`.
