@@ -51,12 +51,12 @@ local function open_raw(name)
    return fd
 end
 
-local function can_read(...)
-   return assert(S.select({readfds = {...}}, 0)).count == 1
+local function can_read(timeout, ...)
+   return assert(S.select({readfds = {...}}, timeout)).count > 0
 end
 
-local function can_write(...)
-   return assert(S.select({writefds = {...}}, 0)).count == 1
+local function can_write(timeout, ...)
+   return assert(S.select({writefds = {...}}, timeout)).count > 0
 end
 
 local mtu = 1500
@@ -138,8 +138,8 @@ local function encap_l2tp(smac, dmac, sip, dip, did, payload)
 end
 
 while true do
-   if can_read(tap, raw) then
-      if can_read(raw) then
+   if can_read(1, tap, raw) then
+		if can_read(0, raw) then
          local s = read(raw)
          local smac1, dmac1, sip1, dip1, did1, payload = decap_l2tp(s)
          local accept = smac1
@@ -162,7 +162,7 @@ while true do
             write(tap, payload)
          end
       end
-      if can_read(tap) then
+      if can_read(0, tap) then
          local payload = read(tap)
          local s = encap_l2tp(smac, dmac, sip, dip, did, payload)
          print('write')
