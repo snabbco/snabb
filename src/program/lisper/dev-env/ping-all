@@ -1,4 +1,4 @@
-o="-c2 -i0"
+o="-c1000 -i0"
 {
 ip netns exec app1 ping $o 10.0.0.2
 ip netns exec app1 ping $o 10.0.0.3
