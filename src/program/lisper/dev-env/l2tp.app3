@@ -6,6 +6,7 @@ ip netns exec app3 ./l2tp.lua t0 e0 \
     fd80:0004:0000:0000:0000:0000:0000:0002 \
     00001234 00001234
 }
-start() { run >/dev/null & }
-stop()  { pgrep -f 'l2tp.lua .*?01:03 ' | xargs kill -9; }
+start()   { run >/dev/null & }
+stop()    { pgrep -f 'l2tp.lua .*?01:03 ' | xargs kill -9; }
+restart() { stop; start; }
 if [ "$1" ]; then $1; else stop; run; fi
