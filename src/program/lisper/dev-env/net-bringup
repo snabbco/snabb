@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# This creates a virtual network of 3 machines in 3 different subnets
-# connected to a router. Besides that, app1 and app2 machines create
-# two static l2tp tunnels which connect _to the same endpoint_ in the
-# lisp machine where lisper responds back.
-
 bringup() {
 ip netns add r2
 ip netns add app1
