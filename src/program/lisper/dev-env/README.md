@@ -54,7 +54,8 @@ the contents of the `lisp.fib` file to the lisper program every second.
 
 # Why does it work?
 
-A L2 frame sent into `app1.t0` destined to `app2.t0` travels like this:
+A L2 frame sent into `app1.t0` destined to `app2.t0` travels like this
+(get a pen):
 
 `app1.t0` -> (L2TPv3-encap by `l2tp.lua`) ->
 `app1.e0` -> (veth bridging) ->
