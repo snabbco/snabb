@@ -31,10 +31,12 @@ There are 4 namespaces in total named `app1`, `app2`, `app3`, `lisp`, and `r2`.
 
 The namespaces are connected through veth interfaces whose end-points are:
 
-   r2.e1 <-> app1.e0
-   r2.e2 <-> app2.e0
-   r2.e3 <-> app3.e0
-   r2.e4 <-> lisp.e0
+~~~
+r2.e1 <-> app1.e0
+r2.e2 <-> app2.e0
+r2.e3 <-> app3.e0
+r2.e4 <-> lisp.e0
+~~~
 
 An instance of `l2tp.lua` runs on each `appN` namespace. Its job is to expose
 a TAP interface `appN.t0`. Ethernet frames coming into `appN.t0` are
