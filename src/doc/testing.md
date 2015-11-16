@@ -95,8 +95,38 @@ SnabbBot (`src/scripts/snabb_bot.sh`) is a shell script that acts as a
 continuous integration service for Snabb Switch repositories hosted on
 GitHub. The You can run it on your own test hardware to provide unit and
 performance regression testing for the upstream repository or even your
-own Snabb Switch fork. SnabbBot is configured through the following
-environment variables:
+own Snabb Switch fork.
+
+
+### System Requirements
+
+* Linux distribution (e.g. Ubuntu, RHEL, NixOS) including
+ - bash
+ - curl
+ - awk
+ - git
+ - docker
+ - jq
+* Intel 82599 NIC and an idle CPU core on the same NUMA node (optional,
+  for Intel driver and Snabb NFV tests)
+* Solarflare SFN7 NIC and an idle CPU core on the same NUMA node
+  (optional, for Solarflare driver tests)
+
+SnabbBot must be run as root. It is recommended to run `snabb_bot.sh` as
+a cron job like so:
+
+```
+#!/usr/bin/env bash
+
+# SnabbBot configuration:
+export GITHUB_CREDENTIALS=foo:bar
+
+flock -x -n /var/lock/snabb_bot /path/to/snabb_bot.sh
+```
+
+### Configuration
+
+SnabbBot is configured through the following environment variables:
 
 * `GITHUB_CREDENTIALS`—Required. GitHub credentials of the form
   `username:password` used to post statuses.
@@ -109,14 +139,3 @@ environment variables:
 
 * `SNABBBOTDIR`—Optional. SnabbBot cache directory. Default is
   `/tmp/snabb_bot`.
-
-SnabbBot requires Docker to be installed on the host and must be run as
-root. It is recommended to run `snabb_bot.sh` as a cron job like so:
-
-```
-#!/usr/bin/env bash
-
-export GITHUB_CREDENTIALS=foo:bar
-
-flock -x -n /var/lock/snabb_bot /path/to/snabb_bot.sh
-```
