@@ -1,0 +1,9 @@
+o="-c2 -i0"
+{
+ip netns exec app1 ping $o 10.0.0.2
+ip netns exec app1 ping $o 10.0.0.3
+ip netns exec app2 ping $o 10.0.0.1
+ip netns exec app2 ping $o 10.0.0.3
+ip netns exec app3 ping $o 10.0.0.1
+ip netns exec app3 ping $o 10.0.0.2
+} | grep loss
