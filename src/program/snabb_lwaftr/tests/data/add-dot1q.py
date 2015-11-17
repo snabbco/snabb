@@ -19,8 +19,6 @@ packets = []
 for packet in rdpcap(sys.argv[1]):
     layer = packet.firstlayer()
     while not isinstance(layer, NoPayload):
-        if 'chksum' in layer.default_fields:
-            del layer.chksum
         if type(layer) is Ether:
             # adjust ether type
             layer.type = 0x8100
