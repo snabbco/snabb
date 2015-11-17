@@ -548,13 +548,19 @@ local function from_b4(lwstate, pkt)
    if fragmentv6.is_ipv6_fragment(pkt) then
       local frags, frag_id = cache_ipv6_fragment(lwstate, pkt)
       local frag_status, maybe_pkt = fragmentv6.reassemble_ipv6(frags)
-      if frag_status ~= fragmentv6.REASSEMBLY_OK then
-         if maybe_pkt then
+      if frag_status == fragmentv6.FRAGMENT_MISSING then
+           return -- Nothing useful to be done yet
+      elseif frag_status == fragmentv6.REASSEMBLY_INVALID then
+         if maybe_pkt then -- This is an ICMP packet
             clean_fragment_cache(lwstate, frag_id)
-            guarded_transmit(pkt, lwstate.o6)
+            if lwstate.policy_icmpv6_outgoing == lwconf.policies['DROP'] then
+               packet.free(maybe_pkt)
+            else
+               guarded_transmit(maybe_pkt, lwstate.o6)
+            end
             return
          end
-      else
+      else -- It was successfully reassembled
          -- The spec mandates that reassembly must occur before decapsulation
          pkt = maybe_pkt -- do the rest of the processing on the reassembled packet
       end
