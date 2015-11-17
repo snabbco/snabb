@@ -7,7 +7,7 @@ local ipsum = require("lib.checksum").ipsum
 local bit = require("bit")
 local ffi = require("ffi")
 
-local rd16, wr16, get_ihl = lwutil.rd16, lwutil.wr16, lwutil.get_ihl
+local rd16, wr16, get_ihl_from_offset = lwutil.rd16, lwutil.wr16, lwutil.get_ihl_from_offset
 local cast = ffi.cast
 local C = ffi.C
 local band, bor = bit.band, bit.bor
@@ -55,16 +55,16 @@ FRAGMENT_FORBIDDEN = 3
 --     its size is bigger than "mtu" bytes. Client code may want to return
 --     an ICMP Datagram Too Big (Type 3, Code 4) packet back to the sender.
 --
-function fragment_ipv4(ipv4_pkt, mtu)
+function fragment_ipv4(ipv4_pkt, l2_size, mtu)
    if ipv4_pkt.length <= mtu then
       return FRAGMENT_UNNEEDED, ipv4_pkt
    end
 
-   local ver_and_ihl_offset = constants.ethernet_header_size + constants.o_ipv4_ver_and_ihl
-   local total_length_offset = constants.ethernet_header_size + constants.o_ipv4_total_length
-   local frag_id_offset = constants.ethernet_header_size + constants.o_ipv4_identification
-   local flags_and_frag_offset_offset = constants.ethernet_header_size + constants.o_ipv4_flags
-   local checksum_offset = constants.ethernet_header_size + constants.o_ipv4_checksum
+   local ver_and_ihl_offset = l2_size + constants.o_ipv4_ver_and_ihl
+   local total_length_offset = l2_size + constants.o_ipv4_total_length
+   local frag_id_offset = l2_size + constants.o_ipv4_identification
+   local flags_and_frag_offset_offset = l2_size + constants.o_ipv4_flags
+   local checksum_offset = l2_size + constants.o_ipv4_checksum
    -- Discard packets with the DF (dont't fragment) flag set
    do
       local flags_and_frag_offset = C.ntohs(rd16(ipv4_pkt.data + flags_and_frag_offset_offset))
@@ -73,8 +73,8 @@ function fragment_ipv4(ipv4_pkt, mtu)
       end
    end
 
-   local ihl = get_ihl(ipv4_pkt)
-   local header_size = constants.ethernet_header_size + ihl
+   local ihl = get_ihl_from_offset(ipv4_pkt, l2_size)
+   local header_size = l2_size + ihl
    local payload_size = ipv4_pkt.length - header_size
    -- Payload bytes per packet must be a multiple of 8
    local payload_bytes_per_packet = band(mtu - header_size, 0xFFF8)

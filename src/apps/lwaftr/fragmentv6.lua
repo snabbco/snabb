@@ -1,9 +1,5 @@
 module(..., package.seeall)
 
-local datagram = require("lib.protocol.datagram")
-local ethernet = require("lib.protocol.ethernet")
-local ipv6 = require("lib.protocol.ipv6")
-
 local constants = require("apps.lwaftr.constants")
 local lwutil = require("apps.lwaftr.lwutil")
 
@@ -21,42 +17,32 @@ REASSEMBLY_INVALID = 3
 
 local dgram
 
-local function compare_fragment_offsets(pkt1, pkt2)
-   local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
-   return pkt1.data[ipv6_frag_offset_offset] < pkt2.data[ipv6_frag_offset_offset]
+function is_ipv6_fragment(pkt, l2_size)
+   return pkt.data[l2_size + constants.o_ipv6_next_header] == constants.ipv6_frag
 end
 
-function is_ipv6_fragment(pkt)
-   return pkt.data[constants.ethernet_header_size + constants.o_ipv6_next_header] == constants.ipv6_frag
-end
-
-function get_ipv6_frag_id(pkt)
-   local frag_id_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_id
+function get_ipv6_frag_id(pkt, l2_size)
+   local frag_id_start = l2_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_id
    return C.ntohl(rd32(pkt.data + frag_id_start))
 end
 
-local function get_ipv6_frag_len(pkt)
-   local ipv6_payload_len = constants.ethernet_header_size + constants.o_ipv6_payload_len
+local function get_ipv6_frag_len(pkt, l2_size)
+   local ipv6_payload_len = l2_size + constants.o_ipv6_payload_len
    return C.ntohs(rd16(pkt.data + ipv6_payload_len)) - constants.ipv6_frag_header_size
 end
 
 -- This is the 'M' bit of the IPv6 fragment header, in the
 -- least significant bit of the 4th byte
-local function is_last_fragment(frag)
-   local ipv6_frag_more_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + 3
+local function is_last_fragment(frag, l2_size)
+   local ipv6_frag_more_offset = l2_size + constants.ipv6_fixed_header_size + 3
    return band(frag.data[ipv6_frag_more_offset], 1) == 0
 end
 
-local function get_frag_offset(frag)
+local function get_frag_offset(frag, l2_size)
    -- Layout: 8 fragment offset bits, 5 fragment offset bits, 2 reserved bits, 'M'ore-frags-expected bit
-   local ipv6_frag_offset_offset = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
+   local ipv6_frag_offset_offset = l2_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
    local raw_frag_offset = rd16(frag.data + ipv6_frag_offset_offset)
    return band(C.ntohs(raw_frag_offset), 0xfffff8)
-end
-
-local function to_datagram(pkt)
-   if not dgram then dgram = datagram:new() end
-   return dgram:reuse(pkt)
 end
 
 -- IPv6 reassembly, as per https://tools.ietf.org/html/rfc2460#section-4.5
@@ -76,59 +62,56 @@ end
 -- TODO: handle packets of > 10240 octets correctly...
 -- TODO: test every branch of this
 
-local function _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_lengths)
+local lwdebug = require("apps.lwaftr.lwdebug")
+local function _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_lengths, l2_size)
    local repkt = packet.allocate()
    -- The first byte of the fragment header is the next header type
    local first_fragment = fragments[1]
-   local ipv6_next_header = first_fragment.data[constants.ethernet_header_size + constants.ipv6_fixed_header_size]
-   local eth_src = first_fragment.data + constants.o_ethernet_src_addr
-   local eth_dst = first_fragment.data + constants.o_ethernet_dst_addr
-   local ipv6_src = first_fragment.data + constants.ethernet_header_size + constants.o_ipv6_src_addr
+   local ipv6_next_header = first_fragment.data[l2_size + constants.ipv6_fixed_header_size]
+ 
+   -- Copy the original headers; this automatically does the right thing in the face of vlans.
+   local fixed_headers_size = l2_size + constants.ipv6_fixed_header_size
+   ffi.copy(repkt.data, first_fragment, l2_size + constants.ipv6_fixed_header_size)
+   -- Update the next header; it's not a fragment anymore
+   repkt.data[l2_size + constants.o_ipv6_next_header] = ipv6_next_header
 
-   local ipv6_dst = first_fragment.data + constants.ethernet_header_size + constants.o_ipv6_dst_addr
+   local frag_indata_start = l2_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_header_size
+   local frag_outdata_start = l2_size + constants.ipv6_fixed_header_size
 
-
-   local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
-   local eth_header = ethernet:new({src = eth_src, dst = eth_dst, type = constants.ethertype_ipv6})
-   local ipv6_header = ipv6:new({next_header = ipv6_next_header, hop_limit = constants.default_ttl, src = ipv6_src, dst = ipv6_dst})
-
-   local dgram = to_datagram(repkt)
-   dgram:push(ipv6_header)
-   dgram:push(eth_header)
-   ipv6_header:free()
-   eth_header:free()
-   local frag_indata_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size + constants.ipv6_frag_header_size
-   local frag_outdata_start = constants.ethernet_header_size + constants.ipv6_fixed_header_size
    for i = 1, #fragments do
       ffi.copy(repkt.data + frag_outdata_start + fragment_offsets[i], fragments[i].data + frag_indata_start, fragment_lengths[i])
    end
-   repkt.length = repkt.length + fragment_offsets[#fragments] + fragment_lengths[#fragments]
+   repkt.length = fixed_headers_size + fragment_offsets[#fragments] + fragment_lengths[#fragments]
    return REASSEMBLY_OK, repkt
 end
 
-function reassemble_ipv6(fragments)
+function reassemble_ipv6(fragments, l2_size)
+   local function compare_fragment_offsets(pkt1, pkt2)
+      local ipv6_frag_offset_offset = l2_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
+      return pkt1.data[ipv6_frag_offset_offset] < pkt2.data[ipv6_frag_offset_offset]
+   end
    table.sort(fragments, compare_fragment_offsets)
 
    local status
    local fragment_offsets = {}
    local fragment_lengths = {}
-   local reassembled_size = constants.ethernet_header_size + constants.ipv6_fixed_header_size
+   local reassembled_size = l2_size + constants.ipv6_fixed_header_size
    local err_pkt
    local frag_id
-   if get_frag_offset(fragments[1]) ~= 0 then
+   if get_frag_offset(fragments[1], l2_size) ~= 0 then
       return FRAGMENT_MISSING
    else
       fragment_offsets[1] = 0
-      fragment_lengths[1] = get_ipv6_frag_len(fragments[1])
-      frag_id = get_ipv6_frag_id(fragments[1])
+      fragment_lengths[1] = get_ipv6_frag_len(fragments[1], l2_size)
+      frag_id = get_ipv6_frag_id(fragments[1], l2_size)
    end
    for i = 2, #fragments do
-      local frag_size = get_frag_offset(fragments[i])
+      local frag_size = get_frag_offset(fragments[i], l2_size)
       fragment_offsets[i] = frag_size
-      local plen = get_ipv6_frag_len(fragments[i])
+      local plen = get_ipv6_frag_len(fragments[i], l2_size)
       fragment_lengths[i] = plen
       reassembled_size = reassembled_size + plen
-      if frag_size % 8 ~= 0 and not is_last_fragment(fragments[i]) then
+      if frag_size % 8 ~= 0 and not is_last_fragment(fragments[i], l2_size) then
          -- TODO: send ICMP error code; this is an RFC should
          status = REASSEMBLY_INVALID
       end
@@ -136,7 +119,7 @@ function reassemble_ipv6(fragments)
          -- TODO: send ICMP error code
          status = REASSEMBLY_INVALID
       end
-      if frag_id ~= get_ipv6_frag_id(fragments[i]) then
+      if frag_id ~= get_ipv6_frag_id(fragments[i], l2_size) then
          -- This function should never be called with fragment IDs that don't all correspond, but just in case...
          status = REASSEMBLY_INVALID
       end
@@ -149,7 +132,7 @@ function reassemble_ipv6(fragments)
          end
       end
    end
-   if not is_last_fragment(fragments[#fragments]) then
+   if not is_last_fragment(fragments[#fragments], l2_size) then
       return FRAGMENT_MISSING
    end
 
@@ -160,7 +143,7 @@ function reassemble_ipv6(fragments)
       return REASSEMBLY_INVALID, err_pkt
    end
    -- It appears that there's a valid and complete set of fragments.
-   return _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_lengths)
+   return _reassemble_ipv6_validated(fragments, fragment_offsets, fragment_lengths, l2_size)
 end
 
 -- IPv6 fragmentation, as per https://tools.ietf.org/html/rfc5722
@@ -189,12 +172,12 @@ end
 -- TODO: enforce a lower bound mtu of 1280, as per the spec?
 -- Packets have two parts: an 'unfragmentable' set of headers, and a
 -- fragmentable payload.
-function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
+function fragment_ipv6(ipv6_pkt, unfrag_header_size, l2_size, mtu)
    if ipv6_pkt.length <= mtu then
       return ipv6_pkt -- No fragmentation needed
    end
 
-   local ipv6_payload_len = constants.ethernet_header_size + constants.o_ipv6_payload_len
+   local ipv6_payload_len = l2_size + constants.o_ipv6_payload_len
    local more = 1
    -- TODO: carefully evaluate the boundary conditions here
    local new_header_size = unfrag_header_size + constants.ipv6_frag_header_size
@@ -214,7 +197,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    local frag_id = fresh_frag_id()
    write_ipv6_frag_header(ipv6_pkt.data, unfrag_header_size, fnext_header, 0, more, frag_id)
    ipv6_pkt.data[next_header_idx] = constants.ipv6_frag
-   wr16(ipv6_pkt.data + constants.ethernet_header_size + constants.o_ipv6_payload_len,
+   wr16(ipv6_pkt.data + l2_size + constants.o_ipv6_payload_len,
         C.htons(payload_bytes_per_packet + constants.ipv6_frag_header_size))
    local raw_frag_offset = payload_bytes_per_packet
 
@@ -241,7 +224,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, mtu)
    ffi.copy(last_pkt.data + new_header_size,
             ipv6_pkt.data + new_header_size + raw_frag_offset,
             last_payload_len)
-   wr16(last_pkt.data + constants.ethernet_header_size + constants.o_ipv6_payload_len,
+   wr16(last_pkt.data + l2_size + constants.o_ipv6_payload_len,
         C.htons(last_payload_len + constants.ipv6_frag_header_size))
    last_pkt.length = new_header_size + last_payload_len
    pkts[num_packets] = last_pkt

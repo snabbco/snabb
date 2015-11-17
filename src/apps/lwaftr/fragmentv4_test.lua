@@ -1,10 +1,11 @@
 -- Allow both importing this script as a module and running as a script
 if type((...)) == "string" then module(..., package.seeall) end
 
+local constants = require("apps.lwaftr.constants")
 local fragmentv4 = require("apps.lwaftr.fragmentv4")
 local eth_proto = require("lib.protocol.ethernet")
 local ip4_proto = require("lib.protocol.ipv4")
-local get_ihl = require("apps.lwaftr.lwutil").get_ihl
+local get_ihl_from_offset = require("apps.lwaftr.lwutil").get_ihl_from_offset
 local packet = require("core.packet")
 local band = require("bit").band
 local ffi = require("ffi")
@@ -55,7 +56,7 @@ local function pkt_payload_size(pkt)
                                              pkt.length - eth_proto:sizeof())
    local total_length = ip4_header:total_length()
    local ihl = ip4_header:ihl() * 4
-   assert(ihl == get_ihl(pkt))
+   assert(ihl == get_ihl_from_offset(pkt, constants.ethernet_header_size))
    assert(ihl == ip4_header:sizeof())
    assert(total_length - ihl >= 0)
    assert(total_length == pkt.length - eth_proto:sizeof())
@@ -116,7 +117,7 @@ function test_payload_1200_mtu_1500()
    print("test:   payload=1200 mtu=1500")
 
    local pkt = assert(make_ipv4_packet(1200))
-   local code, result = fragmentv4.fragment_ipv4(pkt, 1500)
+   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 1500)
    assert(code == fragmentv4.FRAGMENT_UNNEEDED)
    assert(pkt == result)
 end
@@ -133,7 +134,7 @@ function test_payload_1200_mtu_1000()
 
    assert(pkt.length > 1200, "packet short than payload size")
 
-   local code, result = fragmentv4.fragment_ipv4(pkt, 1000)
+   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 1000)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 2, "fragmentation returned " .. #result .. " packets (2 expected)")
 
@@ -157,7 +158,7 @@ function test_payload_1200_mtu_400()
    orig_pkt.length = pkt.length
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
-   local code, result = fragmentv4.fragment_ipv4(pkt, 400)
+   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 400)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 4,
           "fragmentation returned " .. #result .. " packets (4 expected)")
@@ -184,7 +185,7 @@ function test_dont_fragment_flag()
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_proto:sizeof(),
                                              pkt.length - eth_proto:sizeof())
    ip4_header:flags(0x2) -- Set "don't fragment"
-   local code, result = fragmentv4.fragment_ipv4(pkt, 500)
+   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 500)
    assert(code == fragmentv4.FRAGMENT_FORBIDDEN)
    assert(type(result) == "nil")
 end
@@ -215,7 +216,7 @@ function test_reassemble_pattern_fragments()
    local orig_pkt = packet.allocate()
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
-   local code, result = fragmentv4.fragment_ipv4(pkt, 520)
+   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 520)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 3)
 
@@ -226,8 +227,9 @@ function test_reassemble_pattern_fragments()
    local data = ffi.new("uint8_t[?]", size)
 
    for i = 1, #result do
+      local ih = get_ihl_from_offset(result[i], constants.ethernet_header_size)
       ffi.copy(data + pkt_frag_offset(result[i]),
-               result[i].data + eth_proto:sizeof() + get_ihl(result[i]),
+               result[i].data + eth_proto:sizeof() + ih,
                pkt_payload_size(result[i]))
    end
    pattern_check(data, size)
