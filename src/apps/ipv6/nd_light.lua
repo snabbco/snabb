@@ -136,6 +136,9 @@ function nd_light:new (arg)
    -- Timer for retransmits of neighbor solicitations
    nh.timer_cb = function (t)
                     local nh = o._next_hop
+                    -- If nh.packet is nil the app was stopped and we
+                    -- bail out.
+                    if nh.packet then return nil end
                     o._logger:log(string.format("Sending neighbor solicitation for next-hop %s",
                                                 ipv6:ntop(conf.next_hop)))
                     link.transmit(o.output.south, packet.clone(nh.packet))
@@ -316,7 +319,9 @@ end
 -- Free static packets on `stop'.
 function nd_light:stop ()
    packet.free(self._next_hop.packet)
+   self._next_hop.packet = nil
    packet.free(self._sna.packet)
+   self._sna.packet = nil
 end
 
 function selftest ()
