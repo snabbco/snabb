@@ -138,7 +138,7 @@ function nd_light:new (arg)
                     local nh = o._next_hop
                     -- If nh.packet is nil the app was stopped and we
                     -- bail out.
-                    if nh.packet then return nil end
+                    if not nh.packet then return nil end
                     o._logger:log(string.format("Sending neighbor solicitation for next-hop %s",
                                                 ipv6:ntop(conf.next_hop)))
                     link.transmit(o.output.south, packet.clone(nh.packet))
