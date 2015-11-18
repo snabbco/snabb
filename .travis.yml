@@ -1,0 +1,4 @@
+language: generic
+sudo: required
+dist: trusty
+script: make && ( cd src/program/snabb_lwaftr/tests/end-to-end; sudo ./end-to-end.sh )
