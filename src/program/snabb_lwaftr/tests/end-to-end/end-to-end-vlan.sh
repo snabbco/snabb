@@ -52,11 +52,10 @@ snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
    ${TEST_DATA}/tcp-frominet-trafficclass.pcap ${EMPTY} \
    ${EMPTY} ${TEST_DATA}/tcp-afteraftr-ipv6-trafficclass.pcap
 
-# Fail
-# echo "Testing: from-internet IPv4 packet found in the binding table, original TTL=1."
-# snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
-#    ${TEST_DATA}/tcp-frominet-bound-ttl1.pcap ${EMPTY}\
-#    ${TEST_DATA}/icmpv4-time-expired.pcap ${EMPTY}
+echo "Testing: from-internet IPv4 packet found in the binding table, original TTL=1."
+snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
+   ${TEST_DATA}/tcp-frominet-bound-ttl1.pcap ${EMPTY}\
+   ${TEST_DATA}/icmpv4-time-expired.pcap ${EMPTY}
 
 echo "Testing: from-B4 IPv4 fragmentation (2)"
 snabb_run_and_cmp ${TEST_CONF}/small_ipv4_mtu_icmp_vlan.conf \
@@ -96,11 +95,10 @@ snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
    ${TEST_DATA}/tcp-frominet-unbound.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY}
 
-# Fail
-# echo "Testing: from-internet IPv4 packet NOT found in the binding table (ICMP-on-fail)."
-# snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
-#    ${TEST_DATA}/tcp-frominet-unbound.pcap ${EMPTY} \
-#    ${TEST_DATA}/icmpv4-dst-host-unreachable.pcap ${EMPTY}
+echo "Testing: from-internet IPv4 packet NOT found in the binding table (ICMP-on-fail)."
+snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
+   ${TEST_DATA}/tcp-frominet-unbound.pcap ${EMPTY} \
+   ${TEST_DATA}/icmpv4-dst-host-unreachable.pcap ${EMPTY}
 
 echo "Testing: from-to-b4 IPv6 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
@@ -117,11 +115,10 @@ snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/tcp-fromb4-ipv6-unbound.pcap \
    ${EMPTY} ${EMPTY}
 
-# Fail
-# echo "Testing: from-b4 to-internet IPv6 packet NOT found in the binding table (ICMP-on-fail)"
-# snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
-#    ${EMPTY} ${TEST_DATA}/tcp-fromb4-ipv6-unbound.pcap \
-#    ${EMPTY} ${TEST_DATA}/icmpv6-nogress.pcap
+echo "Testing: from-b4 to-internet IPv6 packet NOT found in the binding table (ICMP-on-fail)"
+snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
+   ${EMPTY} ${TEST_DATA}/tcp-fromb4-ipv6-unbound.pcap \
+   ${EMPTY} ${TEST_DATA}/icmpv6-nogress.pcap
 
 echo "Testing: from-to-b4 IPv6 packet, no hairpinning"
 # The idea is that with hairpinning off, the packet goes out the inet interface

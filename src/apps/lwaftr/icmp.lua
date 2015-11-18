@@ -1,6 +1,7 @@
 module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
+local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
 
 local checksum = require("lib.checksum")
@@ -15,6 +16,7 @@ local ffi = require("ffi")
 local band, bnot = bit.band, bit.bnot
 local C = ffi.C
 local wr16, wr32 = lwutil.wr16, lwutil.wr32
+local write_eth_header = lwheader.write_eth_header
 
 local dgram
 
@@ -71,14 +73,10 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, l2_siz
    local ipv4_header = ipv4:new({ttl = constants.default_ttl,
                                  protocol = constants.proto_icmp,
                                  src = from_ip, dst = to_ip})
-
-   local ethernet_header = ethernet:new({src = from_eth,
-                                         dst = to_eth,
-                                         type = constants.ethertype_ipv4})
    dgram:push(ipv4_header)
-   dgram:push(ethernet_header)
-   ethernet_header:free()
    ipv4_header:free()
+   packet.shiftright(new_pkt, l2_size)
+   write_eth_header(new_pkt.data, from_eth, to_eth, constants.n_ethertype_ipv4, config.vlan_tag)
 
    -- Generate RFC 1812 ICMPv4 packets, which carry as much payload as they can,
    -- rather than RFC 792 packets, which only carry the original IPv4 header + 8 octets
@@ -102,13 +100,9 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, l2_siz
    local ipv6_header = ipv6:new({hop_limit = constants.default_ttl,
                                  next_header = constants.proto_icmpv6,
                                  src = from_ip, dst = to_ip})
-   local ethernet_header = ethernet:new({src = from_eth,
-                                         dst = to_eth,
-                                         type = constants.ethertype_ipv6})
    dgram:push(ipv6_header)
-   dgram:push(ethernet_header)
-   ethernet_header:free()
-   ipv6_header:free()
+   packet.shiftright(new_pkt, l2_size)
+   write_eth_header(new_pkt.data, from_eth, to_eth, constants.n_ethertype_ipv6, config.vlan_tag)
 
    local max_size = constants.max_icmpv6_packet_size
    local ph_len = calculate_payload_size(new_pkt, initial_pkt, l2_size, max_size, config) + constants.icmp_base_size
@@ -121,5 +115,6 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, l2_siz
    local ip_pl_p = new_pkt.data + l2_size + constants.o_ipv6_payload_len
    wr16(ip_pl_p, C.ntohs(new_ipv6_len))
 
+   ipv6_header:free()
    return new_pkt
 end

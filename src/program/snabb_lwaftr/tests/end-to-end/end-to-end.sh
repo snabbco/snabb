@@ -62,7 +62,7 @@ snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
 
 echo "Testing: from-internet IPv4 packet found in the binding table, original TTL=1."
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
-   ${TEST_BASE}/tcp-frominet-bound-ttl1.pcap ${EMPTY}\
+   ${TEST_BASE}/tcp-frominet-bound-ttl1.pcap ${EMPTY} \
    ${TEST_BASE}/icmpv4-time-expired.pcap ${EMPTY}
 
 echo "Testing: from-B4 IPv4 fragmentation (2)"

@@ -7,6 +7,7 @@ local fragmentv6 = require("apps.lwaftr.fragmentv6")
 local icmp = require("apps.lwaftr.icmp")
 local lwconf = require("apps.lwaftr.conf")
 local lwdebug = require("apps.lwaftr.lwdebug")
+local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
 
 local S = require("syscall")
@@ -20,12 +21,11 @@ local bit = require("bit")
 local ffi = require("ffi")
 
 local band, bor, bnot, rshift, lshift = bit.band, bit.bor, bit.bnot, bit.rshift, bit.lshift
-local bitfield = lib.bitfield
 local C = ffi.C
 local cast, fstring = ffi.cast, ffi.string
 local receive, transmit = link.receive, link.transmit
-local rd16, rd32, wr16, wr32, get_ihl_from_offset = lwutil.rd16,
-   lwutil.rd32, lwutil.wr16, lwutil.wr32, lwutil.get_ihl_from_offset
+local rd16, rd32, get_ihl_from_offset = lwutil.rd16, lwutil.rd32, lwutil.get_ihl_from_offset
+local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.write_ipv6_header 
 
 local debug = false
 
@@ -239,6 +239,7 @@ end
 local function icmp_after_discard(lwstate, pkt, to_ip)
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_host_unreachable,
+                        vlan_tag = lwstate.v4_vlan_tag
                         }
    local icmp_dis = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                            lwstate.aftr_ipv4_ip, to_ip, pkt,
@@ -251,6 +252,7 @@ end
 local function icmp_b4_lookup_failed(lwstate, pkt, to_ip)
    local icmp_config = {type = constants.icmpv6_dst_unreachable,
                         code = constants.icmpv6_failed_ingress_egress_policy,
+                        vlan_tag = lwstate.v6_vlan_tag
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(lwstate.aftr_mac_b4_side, lwstate.b4_mac,
                                               lwstate.aftr_ipv6_ip, to_ip, pkt,
@@ -271,28 +273,13 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
    local dscp_and_ecn = pkt.data[offset + constants.o_ipv4_dscp_and_ecn]
    -- Make room at the beginning for IPv6 header.
    packet.shiftright(pkt, constants.ipv6_fixed_header_size)
-   C.memset(pkt.data, 0, lwstate.l2_size + constants.ipv6_fixed_header_size)
    -- Modify Ethernet header.
-   local eth_hdr = cast(ethernet._header_ptr_type, pkt.data)
-   eth_hdr.ether_shost = ether_src
-   eth_hdr.ether_dhost = ether_dst
-   if lwstate.vlan_tagging then
-      wr32(pkt.data + lwstate.o_ethernet_tag, lwstate.v6_vlan_tag)
-      wr16(pkt.data + lwstate.o_ethernet_ethertype,
-           C.htons(constants.ethertype_ipv6))
-   else
-      eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
-   end
+   local eth_type = constants.n_ethertype_ipv6
+   write_eth_header(pkt.data, ether_src, ether_dst, eth_type, lwstate.v6_vlan_tag)
+
    -- Modify IPv6 header.
-   local ipv6_hdr = cast(ipv6._header_ptr_type,
-      pkt.data + lwstate.l2_size)
-   bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6)            -- IPv6 Version
-   bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, dscp_and_ecn) -- Traffic class
-   ipv6_hdr.payload_length = C.htons(payload_length)
-   ipv6_hdr.next_header = next_hdr_type
-   ipv6_hdr.hop_limit = constants.default_ttl
-   ipv6_hdr.src_ip = ipv6_src
-   ipv6_hdr.dst_ip = ipv6_dst
+   write_ipv6_header(pkt.data + lwstate.l2_size, ipv6_src, ipv6_dst,
+                     dscp_and_ecn, next_hdr_type, payload_length)
 
    if pkt.length <= lwstate.ipv6_mtu then
       if debug then
@@ -317,7 +304,8 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
       local icmp_config = {type = constants.icmpv4_dst_unreachable,
                            code = constants.icmpv4_datagram_too_big_df,
                            extra_payload_offset = constants.ipv6_fixed_header_size,
-                           next_hop_mtu = lwstate.ipv6_mtu - constants.ipv6_fixed_header_size
+                           next_hop_mtu = lwstate.ipv6_mtu - constants.ipv6_fixed_header_size,
+                           vlan_tag = lwstate.v4_vlan_tag
                            }
       local icmp_pkt = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                               lwstate.aftr_ipv4_ip, dst_ip, pkt,
@@ -434,6 +422,7 @@ local function from_inet(lwstate, pkt)
       local dst_ip = pkt.data + o_src
       local icmp_config = {type = constants.icmpv4_time_exceeded,
                            code = constants.icmpv4_ttl_exceeded_in_transit,
+                           vlan_tag = lwstate.v4_vlan_tag
                            }
       local ttl0_icmp =  icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                                 lwstate.aftr_ipv4_ip, dst_ip, pkt,
@@ -459,7 +448,8 @@ local function tunnel_packet_too_big(lwstate, pkt)
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_datagram_too_big_df,
                         extra_payload_offset = orig_packet_offset - eth_hs,
-                        next_hop_mtu = specified_mtu - constants.ipv6_fixed_header_size
+                        next_hop_mtu = specified_mtu - constants.ipv6_fixed_header_size,
+                        vlan_tag = lwstate.l4_vlan_tag,
                         }
    local o_src = orig_packet_offset + constants.o_ipv4_src_addr
    local dst_ip = pkt.data + o_src
@@ -615,31 +605,15 @@ local function from_b4(lwstate, pkt)
       if lwstate.hairpinning and ipv4_dst_in_binding_table(lwstate, pkt, offset) then
          -- Remove IPv6 header.
          packet.shiftleft(pkt, constants.ipv6_fixed_header_size)
-         local eth_hdr = cast(ethernet._header_ptr_type, pkt.data)
-         eth_hdr.ether_shost = lwstate.b4_mac
-         eth_hdr.ether_dhost = lwstate.aftr_mac_b4_side
-         if lwstate.vlan_tagging then
-            wr32(pkt.data + lwstate.o_ethernet_tag, lwstate.v6_vlan_tag)
-            wr16(pkt.data + lwstate.o_ethernet_ethertype,
-                 C.htons(constants.ethertype_ipv6))
-         else
-            eth_hdr.ether_type = C.htons(constants.ethertype_ipv6)
-         end
+         write_eth_header(pkt.data, lwstate.b4_mac, lwstate.aftr_mac_b4_side,
+                          constants.n_ethertype_ipv4, lwstate.v4_vlan_tag)
          -- TODO:  refactor so this doesn't actually seem to be from the internet?
          return from_inet(lwstate, pkt)
       else
          -- Remove IPv6 header.
          packet.shiftleft(pkt, constants.ipv6_fixed_header_size)
-         local eth_hdr = cast(ethernet._header_ptr_type, pkt.data)
-         eth_hdr.ether_shost = lwstate.aftr_mac_inet_side
-         eth_hdr.ether_dhost = lwstate.inet_mac
-         if lwstate.vlan_tagging then
-            wr32(pkt.data + lwstate.o_ethernet_tag, lwstate.v4_vlan_tag)
-            wr16(pkt.data + lwstate.o_ethernet_ethertype,
-                 C.htons(constants.ethertype_ipv4))
-         else
-            eth_hdr.ether_type = C.htons(constants.ethertype_ipv4)
-         end
+         write_eth_header(pkt.data, lwstate.aftr_mac_inet_side, lwstate.inet_mac,
+                          constants.n_ethertype_ipv4, lwstate.v4_vlan_tag)
          -- Fragment if necessary
          if pkt.length > lwstate.ipv4_mtu then
             local fragstatus, frags = fragmentv4.fragment_ipv4(pkt, lwstate.l2_size, lwstate.ipv4_mtu)
