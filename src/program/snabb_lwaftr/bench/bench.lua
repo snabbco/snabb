@@ -10,7 +10,7 @@ local pcap = require("apps.pcap.pcap")
 local lwaftr = require("apps.lwaftr.lwaftr")
 
 function show_usage(code)
-   print(require("program.snabb_lwaftr.check.README_inc"))
+   print(require("program.snabb_lwaftr.bench.README_inc"))
    main.exit(code)
 end
 
