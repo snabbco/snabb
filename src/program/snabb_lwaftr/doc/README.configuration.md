@@ -20,8 +20,8 @@ policy_icmpv4_incoming = policies['ALLOW'],
 policy_icmpv6_incoming = policies['ALLOW'],
 policy_icmpv4_outgoing = policies['ALLOW'],
 policy_icmpv6_outgoing = policies['ALLOW'],
-v4_vlan_tag = C.htonl(0x81000444),
-v6_vlan_tag = C.htonl(0x81000666),
+v4_vlan_tag = 0x444,
+v6_vlan_tag = 0x666,
 vlan_tagging = true
 ```
 
@@ -101,14 +101,20 @@ and ICMPv6 messages. If a finer granularity of control is desired, contact the
 development team via github or email.
 
 ```lua
-v4_vlan_tag = C.htonl(0x81000444),
-v6_vlan_tag = C.htonl(0x81000666),
+v4_vlan_tag = 0x444,
+v6_vlan_tag = 0x666,
 vlan_tagging = true
 ```
 
-Enable/disable 4-byte 802.1Q Ethernet tagging with 'vlan_tagging'.
+Enable/disable 802.1Q Ethernet tagging with 'vlan_tagging'.
+
 If it is enabled, set one tag per interface to tag outgoing packets with, and
 assume that incoming packets are tagged. If it is 'false', v4_vlan_tag and
 v6_vlan_tag are currently optional (and unused).
+
+Values of `v4_vlan_tag` and `v6_vlan_tag` represent the identifier value in a
+VLAN tag. It must be a value between 0 and 4095. Conversely to the other values
+in this file, this value is set in host-byte order.
+
 More sophisticated support, including for mixes of tagged/untagged packets,
 will be provided upon request.

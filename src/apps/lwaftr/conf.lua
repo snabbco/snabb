@@ -19,13 +19,13 @@ local function read_conf(conf_file)
    local input = io.open(conf_file)
    local conf_vars = input:read('*a')
    local full_config = ([[
-      function _conff(policies, C, ipv4, ipv6, ethernet, bt)
+      function _conff(policies, ipv4, ipv6, ethernet, bt)
          return {%s}
       end
       return _conff
    ]]):format(conf_vars)
    local conf = assert(loadstring(full_config))()
-   return conf(policies, ffi.C, ipv4, ipv6, ethernet, bt)
+   return conf(policies, ipv4, ipv6, ethernet, bt)
 end
 
 function get_aftrconf(conf_file)

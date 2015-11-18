@@ -51,6 +51,9 @@ icmp_base_size = 8 -- size excluding the IP header/playload
 max_icmpv4_packet_size = 576 -- RFC 1812
 max_icmpv6_packet_size = 1280
 
+-- 802.1q
+dotq_tpid = 0x8100
+
 -- Offsets, 0-indexed
 o_ethernet_dst_addr = 0
 o_ethernet_src_addr = 6

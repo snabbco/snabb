@@ -19,7 +19,7 @@ local lib = require("core.lib")
 local bit = require("bit")
 local ffi = require("ffi")
 
-local band, bnot, rshift = bit.band, bit.bnot, bit.rshift
+local band, bor, bnot, rshift, lshift = bit.band, bit.bor, bit.bnot, bit.rshift, bit.lshift
 local bitfield = lib.bitfield
 local C = ffi.C
 local cast, fstring = ffi.cast, ffi.string
@@ -105,9 +105,15 @@ function LwAftr:new(conf)
       o[k] = v
    end
    if conf.vlan_tagging then
+      assert(o.v4_vlan_tag > 0 and o.v4_vlan_tag < 4096,
+         "VLAN tag should be a value between 0 and 4095")
+      assert(o.v6_vlan_tag > 0 and o.v6_vlan_tag < 4096,
+         "VLAN tag should be a value between 0 and 4095")
       o.l2_size = constants.ethernet_header_size + 4
       o.o_ethernet_tag = constants.o_ethernet_ethertype
       o.o_ethernet_ethertype = constants.o_ethernet_ethertype + 4
+      o.v4_vlan_tag = C.htonl(bor(lshift(constants.dotq_tpid, 16), o.v4_vlan_tag))
+      o.v6_vlan_tag = C.htonl(bor(lshift(constants.dotq_tpid, 16), o.v6_vlan_tag))
    else
       o.l2_size = constants.ethernet_header_size
       o.o_ethernet_ethertype = constants.o_ethernet_ethertype
