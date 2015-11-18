@@ -18,7 +18,6 @@ V4=(
     incoming-icmpv4-echo-request.pcap
     response-ipv4-icmp31-inet.pcap
     response-ipv4-icmp34-inet.pcap
-    small_ipv4_mtu_icmp.conf
     tcp-frominet-bound-2734.pcap
     tcp-frominet-bound-ttl1.pcap
     tcp-frominet-bound.pcap
@@ -47,7 +46,6 @@ V6=(
     recap-ipv6.pcap
     recap-tocustom-BRIP-ipv6.pcap
     response-ipv6-tunneled-icmpv4_31-tob4.pcap
-    small_ipv6_mtu_no_icmp.conf
     tcp-afteraftr-ipv6-2frags.pcap
     tcp-afteraftr-ipv6-3frags.pcap
     tcp-afteraftr-ipv6-trafficclass.pcap
