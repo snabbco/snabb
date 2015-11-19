@@ -5,3 +5,4 @@ script:
     - make
     - sudo make -C src test
     - cd src/program/snabb_lwaftr/tests/end-to-end && sudo ./end-to-end.sh
+    - sudo ./end-to-end-vlan.sh
