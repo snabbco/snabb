@@ -11,7 +11,7 @@ local rd16, wr16, wr32, get_ihl_from_offset = lwutil.rd16, lwutil.wr16, lwutil.w
 local cast = ffi.cast
 local C = ffi.C
 local band, bor = bit.band, bit.bor
-local ceil, pairs = math.ceil, pairs
+local ceil = math.ceil
 
 -- Constants to manipulate the flags next to the frag-offset field directly
 -- as a 16-bit integer, without needing to shift the 3 flag bits.
