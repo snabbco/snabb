@@ -119,6 +119,7 @@ function LwAftr:new(conf)
    end
    o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
    o.fragment6_cache = {}
+   o.fragment4_cache = {}
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
    reload_binding_table_on_hup(o)
    if debug then lwdebug.pp(conf) end
@@ -379,9 +380,55 @@ local function icmpv4_incoming(lwstate, pkt)
                            lwstate.aftr_mac_b4_side, lwstate.b4_mac)
 end
 
--- TODO: correctly handle fragmented IPv4 packets
+
+local function key_ipv4_frag(lwstate, frag)
+   local frag_id = rd16(frag.data + lwstate.l2_size + constants.o_ipv4_identification)
+   local src_ip = fstring(frag.data + lwstate.l2_size + constants.o_ipv4_src_addr, 4)
+   local dst_ip = fstring(frag.data + lwstate.l2_size + constants.o_ipv4_dst_addr, 4)
+   return frag_id .. "|" .. src_ip .. dst_ip
+end
+
+local function cache_ipv4_fragment(lwstate, frag)
+   local cache = lwstate.fragment4_cache
+   local key = key_ipv4_frag(lwstate, frag)
+   cache[key] = cache[key] or {}
+   table.insert(cache[key], frag)
+   return cache[key]
+end
+
+local function clean_ipv4_fragment_cache(lwstate, frags)
+   local key = key_ipv4_frag(lwstate, frags[1])
+   lwstate.fragment4_cache[key] = nil
+   for _, p in ipairs(frags) do
+      packet.free(p)
+   end
+end
+
+
 -- The incoming packet is a complete one with ethernet headers.
 local function from_inet(lwstate, pkt)
+   if fragmentv4.is_ipv4_fragment(pkt, lwstate.l2_size) then
+      local frags = cache_ipv4_fragment(lwstate, pkt)
+      local frag_status, maybe_pkt = fragmentv4.reassemble_ipv4(frags, lwstate.l2_size)
+      if frag_status == fragmentv4.REASSEMBLE_MISSING_FRAGMENT then
+         return -- Nothing useful to be done yet
+      elseif frag_status == fragmentv4.REASSEMBLE_INVALID then
+         if maybe_pkt then -- This is an ICMP packet
+            clean_ipv4_fragment_cache(lwstate, frags)
+            if lwstate.policy_icmpv4_outgoing == lwconf.policies["DROP"] then
+               packet.free(maybe_pkt)
+            else
+               guarded_transmit(maybe_pkt, lwstate.o4)
+            end
+         end
+         return
+      else -- Reassembly was successful
+         clean_ipv4_fragment_cache(lwstate, frags)
+         if debug then lwdebug.print_pkt(maybe_pkt) end
+         pkt = maybe_pkt -- Do the rest of the processing on the reassembled packet
+      end
+   end
+
    -- Check incoming ICMP -first-, because it has different binding table lookup logic
    -- than other protocols.
    local proto_offset = lwstate.l2_size + constants.o_ipv4_proto

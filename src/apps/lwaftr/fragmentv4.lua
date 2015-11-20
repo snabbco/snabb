@@ -132,6 +132,15 @@ function fragment_ipv4(ipv4_pkt, l2_size, mtu)
 end
 
 
+function is_ipv4_fragment(pkt, l2_size)
+   -- Either the packet has the "more fragments" flag set,
+   -- or the fragment offset is non-zero, or both.
+   local flags_and_frag_offset = C.ntohs(rd16(pkt.data + l2_size + constants.o_ipv4_flags))
+   return band(flags_and_frag_offset, flag_more_fragments_mask) ~= 0 or
+      band(flags_and_frag_offset, frag_offset_field_mask) ~= 0
+end
+
+
 REASSEMBLE_OK = 1
 REASSEMBLE_INVALID = 2
 REASSEMBLE_MISSING_FRAGMENT = 3
