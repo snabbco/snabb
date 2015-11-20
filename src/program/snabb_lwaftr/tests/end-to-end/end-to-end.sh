@@ -100,10 +100,20 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-frominet-unbound.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY}
 
+echo "Testing: from-internet IPv4 packet NOT found in the binding table (IPv4 matches, but port doesn't), no ICMP."
+snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
+   ${TEST_BASE}/tcp-frominet-ip-bound-port-unbound.pcap ${EMPTY} \
+   ${EMPTY} ${EMPTY}
+
 echo "Testing: from-internet IPv4 packet NOT found in the binding table (ICMP-on-fail)."
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-unbound.pcap ${EMPTY} \
    ${TEST_BASE}/icmpv4-dst-host-unreachable.pcap ${EMPTY}
+
+echo "Testing: from-internet IPv4 packet NOT found in the binding table (IPv4 matches, but port doesn't) (ICMP-on-fail)."
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/tcp-frominet-ip-bound-port-unbound.pcap ${EMPTY} \
+   ${TEST_BASE}/icmpv4-dst-host-unreachable-ip-bound-port-unbound.pcap ${EMPTY}
 
 echo "Testing: from-to-b4 IPv6 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
@@ -125,10 +135,20 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6-unbound.pcap \
    ${EMPTY} ${EMPTY}
 
+echo "Testing: from-b4 to-internet IPv6 packet NOT found in the binding table, (IPv4 matches, but port doesn't), no ICMP"
+snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6-bound-port-unbound.pcap \
+   ${EMPTY} ${EMPTY}
+
 echo "Testing: from-b4 to-internet IPv6 packet NOT found in the binding table (ICMP-on-fail)"
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6-unbound.pcap \
    ${EMPTY} ${TEST_BASE}/icmpv6-nogress.pcap
+
+echo "Testing: from-b4 to-internet IPv6 packet NOT found in the binding table (IPv4 matches, but port doesn't) (ICMP-on-fail)"
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6-bound-port-unbound.pcap \
+   ${EMPTY} ${TEST_BASE}/icmpv6-nogress-ip-bound-port-unbound.pcap
 
 echo "Testing: from-to-b4 IPv6 packet, no hairpinning"
 # The idea is that with hairpinning off, the packet goes out the inet interface

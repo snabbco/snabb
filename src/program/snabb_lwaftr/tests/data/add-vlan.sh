@@ -8,6 +8,7 @@
 V4=(
     decap-ipv4-nohair.pcap
     decap-ipv4.pcap
+    icmpv4-dst-host-unreachable-ip-bound-port-unbound.pcap
     icmpv4-dst-host-unreachable.pcap
     icmpv4-fromlwaftr-replyto-tcp-frominet-bound1494-DF.pcap
     icmpv4-time-expired.pcap
@@ -23,6 +24,7 @@ V4=(
     tcp-frominet-bound.pcap
     tcp-frominet-bound1494-DF.pcap
     tcp-frominet-bound1494.pcap
+    tcp-frominet-ip-bound-port-unbound.pcap
     tcp-frominet-trafficclass.pcap
     tcp-frominet-unbound.pcap
     tcp-ipv4-2ipv6frags-reassembled.pcap
@@ -31,6 +33,7 @@ V4=(
 )
 
 V6=(
+    icmpv6-nogress-ip-bound-port-unbound.pcap
     icmpv6-nogress.pcap
     incoming-icmpv6-13dstaddressunreach-inet-OPE.pcap
     incoming-icmpv6-20pkttoobig-inet-OPE.pcap
@@ -52,6 +55,7 @@ V6=(
     tcp-afteraftr-ipv6.pcap
     tcp-fromb4-customBRIP-tob4-ipv6.pcap
     tcp-fromb4-customBRIP1-tob4-customBRIP2-ipv6.pcap
+    tcp-fromb4-ipv6-bound-port-unbound.pcap
     tcp-fromb4-ipv6-unbound.pcap
     tcp-fromb4-ipv6.pcap
     tcp-fromb4-tob4-customBRIP-ipv6.pcap
