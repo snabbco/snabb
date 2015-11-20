@@ -56,9 +56,10 @@ FRAGMENT_FORBIDDEN = 3
 --     an ICMP Datagram Too Big (Type 3, Code 4) packet back to the sender.
 --
 function fragment_ipv4(ipv4_pkt, l2_size, mtu)
-   if ipv4_pkt.length <= mtu then
+   if ipv4_pkt.length - l2_size <= mtu then
       return FRAGMENT_UNNEEDED, ipv4_pkt
    end
+   mtu = mtu + l2_size
 
    local ver_and_ihl_offset = l2_size + constants.o_ipv4_ver_and_ihl
    local total_length_offset = l2_size + constants.o_ipv4_total_length

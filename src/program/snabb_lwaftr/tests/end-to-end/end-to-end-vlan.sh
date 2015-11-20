@@ -67,28 +67,25 @@ snabb_run_and_cmp ${TEST_CONF}/small_ipv4_mtu_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/tcp-ipv6-fromb4-toinet-1500.pcap \
    ${TEST_DATA}/tcp-ipv4-toinet-3fragments.pcap ${EMPTY}
 
-# Fail
-# echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation (2)."
-# snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
-#    ${TEST_BASE}/tcp-frominet-bound1494.pcap ${EMPTY} \
-#    ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6-2frags.pcap
+echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation (2)."
+snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
+   ${TEST_DATA}/tcp-frominet-bound1494.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_DATA}/tcp-afteraftr-ipv6-2frags.pcap
 
-# Fail
-# echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation (3)."
-# snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
-#    ${TEST_DATA}/tcp-frominet-bound-2734.pcap ${EMPTY} \
-#    ${EMPTY} ${TEST_DATA}/tcp-afteraftr-ipv6-3frags.pcap
+echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation (3)."
+snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
+   ${TEST_DATA}/tcp-frominet-bound-2734.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_DATA}/tcp-afteraftr-ipv6-3frags.pcap
 
 echo "Testing: IPv6 reassembly (followed by decapsulation)."
 snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/tcp-ipv6-2frags-bound.pcap \
    ${TEST_DATA}/tcp-ipv4-2ipv6frags-reassembled.pcap ${EMPTY}
 
-# Fail
-# echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation, DF set, ICMP-3,4."
-# snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
-#    ${TEST_DATA}/tcp-frominet-bound1494-DF.pcap  ${EMPTY} \
-#    ${TEST_DATA}/icmpv4-fromlwaftr-replyto-tcp-frominet-bound1494-DF.pcap ${EMPTY}
+echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation, DF set, ICMP-3,4."
+snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
+   ${TEST_DATA}/tcp-frominet-bound1494-DF.pcap  ${EMPTY} \
+   ${TEST_DATA}/icmpv4-fromlwaftr-replyto-tcp-frominet-bound1494-DF.pcap ${EMPTY}
 
 echo "Testing: from-internet IPv4 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \

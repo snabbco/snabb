@@ -168,8 +168,8 @@ function test_payload_1200_mtu_1000()
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
    assert(pkt.length > 1200, "packet short than payload size")
-
-   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 1000)
+   local ehs = constants.ethernet_header_size
+   local code, result = fragmentv4.fragment_ipv4(pkt, ehs, 1000 - ehs)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 2, "fragmentation returned " .. #result .. " packets (2 expected)")
 
@@ -193,7 +193,8 @@ function test_payload_1200_mtu_400()
    orig_pkt.length = pkt.length
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
-   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 400)
+   local ehs = constants.ethernet_header_size
+   local code, result = fragmentv4.fragment_ipv4(pkt, ehs, 400 - ehs)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 4,
           "fragmentation returned " .. #result .. " packets (4 expected)")
@@ -282,7 +283,8 @@ function test_vlan_tagging()
    orig_pkt.length = pkt.length
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
-   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size + 4, 1000)
+   local vehs = constants.ethernet_header_size + 4
+   local code, result = fragmentv4.fragment_ipv4(pkt, vehs, 1000 - vehs)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 2, "fragmentation returned " .. #result .. " packets (2 expected)")
 

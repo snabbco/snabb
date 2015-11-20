@@ -173,9 +173,12 @@ end
 -- Packets have two parts: an 'unfragmentable' set of headers, and a
 -- fragmentable payload.
 function fragment_ipv6(ipv6_pkt, unfrag_header_size, l2_size, mtu)
-   if ipv6_pkt.length <= mtu then
+   if ipv6_pkt.length - l2_size <= mtu then
       return ipv6_pkt -- No fragmentation needed
    end
+   -- Hack: continue to use the previous code, even though MTU is now defined
+   -- as an l3 rather than l2 size.
+   mtu = mtu + l2_size
 
    local ipv6_payload_len = l2_size + constants.o_ipv6_payload_len
    local more = 1
