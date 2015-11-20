@@ -99,7 +99,6 @@ end
 LwAftr = {}
 
 function LwAftr:new(conf)
-   if debug then lwdebug.pp(conf) end
    local o = {}
    for k,v in pairs(conf) do
       o[k] = v
@@ -122,6 +121,7 @@ function LwAftr:new(conf)
    o.fragment6_cache = {}
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
    reload_binding_table_on_hup(o)
+   if debug then lwdebug.pp(conf) end
    return setmetatable(o, {__index=LwAftr})
 end
 
@@ -449,7 +449,7 @@ local function tunnel_packet_too_big(lwstate, pkt)
                         code = constants.icmpv4_datagram_too_big_df,
                         extra_payload_offset = orig_packet_offset - eth_hs,
                         next_hop_mtu = specified_mtu - constants.ipv6_fixed_header_size,
-                        vlan_tag = lwstate.l4_vlan_tag,
+                        vlan_tag = lwstate.v4_vlan_tag,
                         }
    local o_src = orig_packet_offset + constants.o_ipv4_src_addr
    local dst_ip = pkt.data + o_src
@@ -467,7 +467,8 @@ local function tunnel_generic_unreachable(lwstate, pkt)
    local orig_packet_offset = eth_hs + ipv6_hs + icmp_hs + ipv6_hs
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_host_unreachable,
-                        extra_payload_offset = orig_packet_offset - eth_hs
+                        extra_payload_offset = orig_packet_offset - eth_hs,
+                        vlan_tag = lwstate.v4_vlan_tag
                         }
    local o_src = orig_packet_offset + constants.o_ipv4_src_addr
    local dst_ip = pkt.data + o_src
