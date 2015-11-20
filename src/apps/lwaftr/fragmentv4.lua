@@ -44,7 +44,8 @@ FRAGMENT_FORBIDDEN = 3
 --   * FRAGMENT_OK: the returned "packets" is a list of IPv4 packets, all
 --     of them smaller or equal than "mtu" bytes, which contain the payload
 --     from the "input_packet" properly fragmented. Note that "input_packet"
---     is modified in-place.
+--     is modified in-place. Note that the MTU is for layer 3, excluding
+--     L2 ethernet/vlan headers.
 --
 --   * FRAGMENT_UNNEEDED: the returned "packets" is the same object as
 --     "input_packet", unmodified. This is the case when the size of packet
@@ -59,7 +60,7 @@ function fragment_ipv4(ipv4_pkt, l2_size, mtu)
    if ipv4_pkt.length - l2_size <= mtu then
       return FRAGMENT_UNNEEDED, ipv4_pkt
    end
-   mtu = mtu + l2_size
+   l2_mtu = mtu + l2_size
 
    local ver_and_ihl_offset = l2_size + constants.o_ipv4_ver_and_ihl
    local total_length_offset = l2_size + constants.o_ipv4_total_length
@@ -78,7 +79,7 @@ function fragment_ipv4(ipv4_pkt, l2_size, mtu)
    local header_size = l2_size + ihl
    local payload_size = ipv4_pkt.length - header_size
    -- Payload bytes per packet must be a multiple of 8
-   local payload_bytes_per_packet = band(mtu - header_size, 0xFFF8)
+   local payload_bytes_per_packet = band(l2_mtu - header_size, 0xFFF8)
    local total_length_per_packet = payload_bytes_per_packet + ihl
    local num_packets = ceil(payload_size / payload_bytes_per_packet)
 

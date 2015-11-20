@@ -176,9 +176,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, l2_size, mtu)
    if ipv6_pkt.length - l2_size <= mtu then
       return ipv6_pkt -- No fragmentation needed
    end
-   -- Hack: continue to use the previous code, even though MTU is now defined
-   -- as an l3 rather than l2 size.
-   mtu = mtu + l2_size
+   l2_mtu = mtu + l2_size
 
    local ipv6_payload_len = l2_size + constants.o_ipv6_payload_len
    local more = 1
@@ -186,7 +184,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, l2_size, mtu)
    local new_header_size = unfrag_header_size + constants.ipv6_frag_header_size
    local payload_size = ipv6_pkt.length - unfrag_header_size
    -- Payload bytes per packet must be a multiple of 8
-   local payload_bytes_per_packet = band(mtu - new_header_size, 0xfff8)
+   local payload_bytes_per_packet = band(l2_mtu - new_header_size, 0xfff8)
    local num_packets = math.ceil(payload_size / payload_bytes_per_packet)
 
    local pkts = {ipv6_pkt}
