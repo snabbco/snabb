@@ -57,6 +57,11 @@ snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
    ${TEST_DATA}/tcp-frominet-bound-ttl1.pcap ${EMPTY}\
    ${TEST_DATA}/icmpv4-time-expired.pcap ${EMPTY}
 
+echo "Testing: from-internet IPv4 fragmented packets found in the binding table"
+snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
+	${TEST_DATA}/tcp-ipv4-3frags-bound.pcap ${EMPTY} \
+	${EMPTY} ${TEST_DATA}/tcp-afteraftr-ipv6-reassembled.pcap
+
 echo "Testing: from-B4 IPv4 fragmentation (2)"
 snabb_run_and_cmp ${TEST_CONF}/small_ipv4_mtu_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/tcp-ipv6-fromb4-toinet-1046.pcap \
