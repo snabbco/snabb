@@ -531,32 +531,40 @@ local function get_ipv6_dst_ip(lwstate, pkt)
    return fstring(pkt.data + ipv6_dst, 16)
 end
 
-local function cache_ipv6_fragment(lwstate, frag)
-   local cache = lwstate.fragment6_cache
+local function key_ipv6_frag(lwstate, frag)
    local frag_id = fragmentv6.get_ipv6_frag_id(frag, lwstate.l2_size)
    local src_ip = get_ipv6_src_ip(lwstate, frag)
    local dst_ip = get_ipv6_dst_ip(lwstate, frag)
    local src_dst = src_ip..dst_ip
-   cache[frag_id] = cache[frag_id] or {}
-   cache[frag_id][src_dst] = cache[frag_id][src_dst] or {}
-   table.insert(cache[frag_id][src_dst], frag)
-   return cache[frag_id][src_dst], frag_id
+   return frag_id .. '|' .. src_dst
 end
 
-local function clean_fragment_cache(lwstate, frag_id)
-   lwstate.fragment6_cache[frag_id] = nil
+local function cache_ipv6_fragment(lwstate, frag)
+   local cache = lwstate.fragment6_cache
+   local key = key_ipv6_frag(lwstate, frag)
+   cache[key] = cache[key] or {}
+   table.insert(cache[key], frag)
+   return cache[key]
+end
+
+local function clean_ipv6_fragment_cache(lwstate, frags)
+   local key = key_ipv6_frag(lwstate, frags[1])
+   lwstate.fragment6_cache[key] = nil
+   for i=1,#frags do
+      packet.free(frags[i])
+   end
 end
 
 local function from_b4(lwstate, pkt)
    -- TODO: only send ICMP on failure for packets that plausibly would be bound?
    if fragmentv6.is_ipv6_fragment(pkt, lwstate.l2_size) then
-      local frags, frag_id = cache_ipv6_fragment(lwstate, pkt)
+      local frags = cache_ipv6_fragment(lwstate, pkt)
       local frag_status, maybe_pkt = fragmentv6.reassemble_ipv6(frags, lwstate.l2_size)
       if frag_status == fragmentv6.FRAGMENT_MISSING then
            return -- Nothing useful to be done yet
       elseif frag_status == fragmentv6.REASSEMBLY_INVALID then
          if maybe_pkt then -- This is an ICMP packet
-            clean_fragment_cache(lwstate, frag_id)
+            clean_ipv6_fragment_cache(lwstate, frags)
             if lwstate.policy_icmpv6_outgoing == lwconf.policies['DROP'] then
                packet.free(maybe_pkt)
             else
@@ -566,6 +574,7 @@ local function from_b4(lwstate, pkt)
          end
       else -- It was successfully reassembled
          -- The spec mandates that reassembly must occur before decapsulation
+         clean_ipv6_fragment_cache(lwstate, frags)
          if debug then lwdebug.print_pkt(maybe_pkt) end
          pkt = maybe_pkt -- do the rest of the processing on the reassembled packet
       end
