@@ -5,12 +5,16 @@
 # | TPID   | PRI   | CFI   | TAG |
 # | 0x8100 | 3-bit | 1-bit | 12-bit |
 
+# Intentionally do not add to the list:
+# icmpv4-fromlwaftr-replyto-tcp-frominet-bound1494-DF.pcap
+# It needs to be 576 bytes, so requires truncation after the VLAN tag is added
+# Do not automatically regenerate it.
+
 V4=(
     decap-ipv4-nohair.pcap
     decap-ipv4.pcap
     icmpv4-dst-host-unreachable-ip-bound-port-unbound.pcap
     icmpv4-dst-host-unreachable.pcap
-    icmpv4-fromlwaftr-replyto-tcp-frominet-bound1494-DF.pcap
     icmpv4-time-expired.pcap
     incoming-icmpv4-34toobig.pcap
     incoming-icmpv4-echo-reply.pcap
@@ -28,6 +32,7 @@ V4=(
     tcp-frominet-trafficclass.pcap
     tcp-frominet-unbound.pcap
     tcp-ipv4-2ipv6frags-reassembled.pcap
+    tcp-ipv4-3frags-bound.pcap
     tcp-ipv4-toinet-2fragments.pcap
     tcp-ipv4-toinet-3fragments.pcap
 )
@@ -51,6 +56,7 @@ V6=(
     response-ipv6-tunneled-icmpv4_31-tob4.pcap
     tcp-afteraftr-ipv6-2frags.pcap
     tcp-afteraftr-ipv6-3frags.pcap
+    tcp-afteraftr-ipv6-reassembled.pcap
     tcp-afteraftr-ipv6-trafficclass.pcap
     tcp-afteraftr-ipv6.pcap
     tcp-fromb4-customBRIP-tob4-ipv6.pcap
