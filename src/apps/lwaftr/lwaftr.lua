@@ -99,6 +99,7 @@ end
 LwAftr = {}
 
 function LwAftr:new(conf)
+   if conf.debug then debug = true end
    local o = {}
    for k,v in pairs(conf) do
       o[k] = v
