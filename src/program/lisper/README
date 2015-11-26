@@ -6,6 +6,7 @@ Usage: lisper --control SOCK --punt-interface IF --network-device IPv6
   -i IPv6,  --local-ip IPv6         Local IP address
   -m MAC,   --local-mac MAC         Local MAC address
   -N IPv6,  --next-hop IPv6         Next hop address
+  -P PCI,   --local-pci             PCI address (optional; enables Intel10G)
   -h,       --help                  Print usage information
 
 Snabb Switch extension to support interfacing with an external control plane

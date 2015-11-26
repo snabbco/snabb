@@ -10,6 +10,9 @@ local unix     = require("apps.socket.unix")
 local raw      = require("apps.socket.raw")
 local lines    = require("apps.lines")
 local nd       = require("apps.ipv6.nd_light")
+local pcap     = require("apps.pcap.pcap")
+local basic    = require("apps.basic.basic_apps")
+local intel    = require("apps.intel.intel_app")
 
 local function assert(v, ...)
    if v then return v, ... end
@@ -18,13 +21,17 @@ end
 
 --program args ---------------------------------------------------------------
 
-local DEBUG        = os.getenv"DEBUG"
-local CONTROL_SOCK = "/var/tmp/ctrl.socket"
-local PUNT_IF      = "veth0"
-local NET_IF       = "e0"
-local LOCAL_IP     = ipv6:pton"fd80:4::2"
-local LOCAL_MAC    = ethernet:pton"00:00:00:00:01:04"
-local NEXT_HOP_IP  = ipv6:pton"fd80:4::1"
+local PCAP_IN_FILE  = 'perftest-in.pcap'
+local PCAP_OUT_FILE = 'perftest-out.pcap'
+local DEBUG         = os.getenv"LISPER_DEBUG" --if set, print packets to stdout
+local MODE          = os.getenv"LISPER_MODE" --if 'record' then record packets to pcap files
+local CONTROL_SOCK  = "/var/tmp/ctrl.socket"
+local PUNT_IF       = "veth0"
+local NET_IF        = "e0"
+local LOCAL_IP      = ipv6:pton"fd80:4::2"
+local LOCAL_MAC     = ethernet:pton"00:00:00:00:01:04"
+local NEXT_HOP_IP   = ipv6:pton"fd80:4::1"
+local LOCAL_PCI     = nil --use Intel10G instead of Raw
 
 local long_opts = {
    control = "c",
@@ -33,6 +40,7 @@ local long_opts = {
    ["local-ip"] = "i",
    ["local-mac"] = "m",
    ["next-hop"] = "N",
+   ["local-pci"] = "P",
    help = "h",
 }
 local opt = {}
@@ -43,6 +51,7 @@ function opt.n (arg) NET_IF = arg end
 function opt.i (arg) LOCAL_IP = assert(ipv6:pton(arg)) end
 function opt.m (arg) LOCAL_MAC = assert(ethernet:pton(arg)) end
 function opt.N (arg) NEXT_HOP_IP = assert(ipv6:pton(arg)) end
+function opt.P (arg) LOCAL_PCI = arg end
 
 local function parse_args(args)
    return lib.dogetopt(args, opt, "hc:p:n:i:m:N:", long_opts)
@@ -242,19 +251,41 @@ function run (args)
       local_ip = LOCAL_IP,
       next_hop = NEXT_HOP_IP,
    })
-   config.app(c, "data", raw.RawSocket, NET_IF)
    config.link(c, "lisper.tx -> nd.north")
    config.link(c, "nd.north -> lisper.rx")
-   if DEBUG then
-      config.app(c, "intercept_out", intercept, '>')
-      config.app(c, "intercept_in", intercept, '<')
-      config.link(c, "nd.south -> intercept_out.rx")
-      config.link(c, "intercept_out.tx -> data.rx")
-      config.link(c, "data.tx -> intercept_in.rx")
-      config.link(c, "intercept_in.tx -> nd.south")
+
+   if MODE == 'record' then
+      config.app(c, "data", raw.RawSocket, NET_IF)
+      config.app(c, "pcap_in",  pcap.PcapWriter, PCAP_IN_FILE)
+      config.app(c, "pcap_out", pcap.PcapWriter, PCAP_OUT_FILE)
+      config.app(c, "tee_in",  basic.Tee)
+      config.app(c, "tee_out", basic.Tee)
+      config.link(c, "nd.south -> tee_out.in")
+      config.link(c, "tee_out.out1 -> data.rx")
+      config.link(c, "tee_out.out2 -> pcap_out.input")
+      config.link(c, "data.tx -> tee_in.in")
+      config.link(c, "tee_in.out1 -> nd.south")
+      config.link(c, "tee_in.out2 -> pcap_in.input")
    else
-      config.link(c, "nd.south -> data.rx")
-      config.link(c, "data.tx -> nd.south")
+      if LOCAL_PCI then
+         config.app(c, "data", intel.Intel10G, {
+            pciaddr = LOCAL_PCI,
+            macaddr = LOCAL_MAC,
+         })
+      else
+         config.app(c, "data", raw.RawSocket, NET_IF)
+      end
+      if DEBUG then
+         config.app(c, "intercept_out", intercept, '>')
+         config.app(c, "intercept_in", intercept, '<')
+         config.link(c, "nd.south -> intercept_out.rx")
+         config.link(c, "intercept_out.tx -> data.rx")
+         config.link(c, "data.tx -> intercept_in.rx")
+         config.link(c, "intercept_in.tx -> nd.south")
+      else
+         config.link(c, "nd.south -> data.rx")
+         config.link(c, "data.tx -> nd.south")
+      end
    end
 
    --control plane
@@ -276,6 +307,7 @@ function run (args)
    print("  local IP          : "..ip6str(LOCAL_IP))
    print("  local MAC         : "..macstr(LOCAL_MAC))
    print("  next hop IP       : "..ip6str(NEXT_HOP_IP))
+   print("  local PCI addr    : "..(LOCAL_PCI or 'n/a'))
 
    engine.main({report = {showlinks=true}})
 
