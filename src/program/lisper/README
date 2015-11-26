@@ -1,12 +1,12 @@
-Usage: lisper --control SOCK --punt-interface IF --network-device IPv6
+Usage: lisper OPTIONS...
 
   -c SOCK,  --control SOCK          Control socket
   -p IF,    --punt-interface IF     Punt interface
-  -n IF,    --network-device IF     Network device
+  -n IF,    --network-interface IF  Network interface (Raw Socket mode)
+  -P PCI,   --network-device PCI    Network device PCI address (Intel10G mode)
   -i IPv6,  --local-ip IPv6         Local IP address
   -m MAC,   --local-mac MAC         Local MAC address
   -N IPv6,  --next-hop IPv6         Next hop address
-  -P PCI,   --local-pci             PCI address (optional; enables Intel10G)
   -h,       --help                  Print usage information
 
 Snabb Switch extension to support interfacing with an external control plane

@@ -28,19 +28,19 @@ local MODE          = os.getenv"LISPER_MODE" --if 'record' then record packets t
 local CONTROL_SOCK  = "/var/tmp/ctrl.socket"
 local PUNT_IF       = "veth0"
 local NET_IF        = "e0"
+local NET_PCI       = nil --use Intel10G instead of RawSocket
 local LOCAL_IP      = ipv6:pton"fd80:4::2"
 local LOCAL_MAC     = ethernet:pton"00:00:00:00:01:04"
 local NEXT_HOP_IP   = ipv6:pton"fd80:4::1"
-local LOCAL_PCI     = nil --use Intel10G instead of Raw
 
 local long_opts = {
    control = "c",
    ["punt-interface"] = "p",
-   ["network-device"] = "n",
+   ["network-interface"] = "n",
+   ["network-device"] = "P",
    ["local-ip"] = "i",
    ["local-mac"] = "m",
    ["next-hop"] = "N",
-   ["local-pci"] = "P",
    help = "h",
 }
 local opt = {}
@@ -267,9 +267,9 @@ function run (args)
       config.link(c, "tee_in.out1 -> nd.south")
       config.link(c, "tee_in.out2 -> pcap_in.input")
    else
-      if LOCAL_PCI then
+      if NET_PCI then
          config.app(c, "data", intel.Intel10G, {
-            pciaddr = LOCAL_PCI,
+            pciaddr = NET_PCI,
             macaddr = LOCAL_MAC,
          })
       else
@@ -301,13 +301,12 @@ function run (args)
    engine.configure(c)
 
    print("LISPER started.")
-   print("  network interface : "..NET_IF)
+   print("  network interface : "..(NET_PCI or NET_IF))
    print("  punt interface    : "..PUNT_IF)
    print("  control socket    : "..CONTROL_SOCK)
    print("  local IP          : "..ip6str(LOCAL_IP))
    print("  local MAC         : "..macstr(LOCAL_MAC))
    print("  next hop IP       : "..ip6str(NEXT_HOP_IP))
-   print("  local PCI addr    : "..(LOCAL_PCI or 'n/a'))
 
    engine.main({report = {showlinks=true}})
 
