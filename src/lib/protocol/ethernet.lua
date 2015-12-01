@@ -44,7 +44,7 @@ function ethernet:pton (p)
    local result = mac_addr_t()
    local i = 0
    for v in p:split(":") do
-      if string.match(v:lower(), '^[0-9a-f][0-9a-f]$') then
+      if string.match(v, '^%x%x$') then
          result[i] = tonumber("0x"..v)
       else
          error("invalid mac address "..p)
