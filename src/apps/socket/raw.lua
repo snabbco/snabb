@@ -47,7 +47,10 @@ end
 function RawSocket:receive ()
    local p = packet.allocate()
    local sz, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
-   if not sz then return err end
+   if not sz then
+      packet.free(p)
+      return err
+   end
    p.length = sz
    return p
 end
