@@ -45,14 +45,10 @@ function RawSocket:can_receive ()
 end
 
 function RawSocket:receive ()
-   local p = packet.allocate()
-   local sz, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
-   if not sz then
-      packet.free(p)
-      return err
-   end
-   p.length = sz
-   return p
+   local buffer = ffi.new("uint8_t[?]", C.PACKET_PAYLOAD_SIZE)
+   local sz, err = S.read(self.sock, buffer, C.PACKET_PAYLOAD_SIZE)
+   if not sz then return err end
+   return packet.from_pointer(buffer, sz)
 end
 
 function RawSocket:push ()
@@ -71,7 +67,7 @@ function RawSocket:can_transmit ()
 end
 
 function RawSocket:transmit (p)
-   local sz, err = S.write(self.sock, p.data, p.length)
+   local sz, err = S.write(self.sock, packet.data(p), packet.length(p))
    if not sz then return err end
    return sz
 end
