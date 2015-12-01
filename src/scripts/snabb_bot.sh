@@ -5,6 +5,7 @@
 
 export SNABBBOTDIR=${SNABBBOTDIR:-"/tmp/snabb_bot"}
 export REPO=${REPO:-"SnabbCo/snabbswitch"}
+export CURRENT=${CURRENT:-"master"}
 export JQ=${JQ:-$(which jq)}
 export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:-eugeneia/snabb-nfv-test}
 export CONTEXT=${CONTEXT:-"$(hostname)-$SNABB_TEST_IMAGE"}
@@ -45,47 +46,29 @@ function pull_request_head {
     echo "$(pull_request_by_id $1)" | "$JQ" -r ".head.sha"
 }
 
-function pull_request_base {
-    echo "$(pull_request_by_id $1)" | "$JQ" -r ".base.sha"
-}
-
-function pull_request_repo {
-    echo "$(pull_request_by_id $1)" | "$JQ" -r ".head.repo.clone_url"
-}
-
-function pull_request_log { echo "$logdir/$(pull_request_head $id)"; }
-
-function pull_request_new_p {
-    test ! -f "$logdir/$(pull_request_head $1)"
-}
-
 function repo_path { echo "$tmpdir/repo"; }
 
-function clone_pull_request_repo {
-    rm -rf $(repo_path)
-    git clone $(pull_request_repo $1) $(repo_path)
+function current_head {
+    (cd $(repo_path) && git log --format=%H -n1 $CURRENT)
 }
 
-function dock_build {
-    (cd src && scripts/dock.sh "(cd .. && make)")
+function pull_request_log {
+    echo "$logdir/$(current_head)+$(pull_request_head $id)"
 }
 
-function build1 {
-    git checkout $1 && git submodule update --init && dock_build
+function pull_request_new_p {
+    test ! -f "$(pull_request_log $1)"
 }
 
-function build {
-    out=$(build1 $1 2>&1)
-    if [ "$?" != 0 ]; then
-        echo "ERROR: Failed to build $1"
-        echo "$out"
-        echo
-        return 1
-    fi
+function clone_upstream {
+    git clone https://github.com/$REPO.git $(repo_path)
 }
+
+function dock_build { (cd src && scripts/dock.sh "(cd .. && make)"); }
+function build { git submodule update --init && dock_build; }
 
 function log_status {
-    if grep "ERROR" $(pull_request_log $1) 2>&1 >/dev/null; then
+    if grep "ERROR" $(pull_request_log $1) >/dev/null 2>&1; then
         echo "failure"
     else
         echo "success"
@@ -99,8 +82,9 @@ function pci_info { var=$1; value=$2
 function log_header {
     echo Host: $machine
     echo Image: $SNABB_TEST_IMAGE
-    echo PR: \#$1
-    echo Head: $(pull_request_head $1)
+    echo Pull Request: \#$1
+    echo Current Head: $(current_head)
+    echo Pull Request Head: $(pull_request_head $1)
     pci_info SNABB_PCI0 $SNABB_PCI0
     pci_info SNABB_PCI1 $SNABB_PCI1
     pci_info SNABB_PCI_INTEL0 $SNABB_PCI_INTEL0
@@ -110,18 +94,40 @@ function log_header {
     echo
 }
 
+function benchmark_results { echo $tmpdir/$1_benchmarks; }
+
+function benchmark_current1 {
+    git checkout --force $CURRENT \
+        && build \
+        && dock_make benchmarks > $(benchmark_results current)
+}
+function benchmark_current { benchmark_current1 >/dev/null 2>&1; }
+
+function merge_pr_with_current1 {
+    git fetch origin pull/$1/head:pr$1 \
+        && git checkout --force pr$1 \
+        && git merge $CURRENT \
+        && build
+}
+function merge_pr_with_current {
+    out=$(merge_pr_with_current1 $1 2>&1)
+    if [ "$?" != 0 ]; then
+        echo "ERROR: Failed to build $1"
+        echo "$out"
+        echo
+        return 1
+    fi
+}
+
 function dock_make { (cd src/; scripts/dock.sh make $1); }
 
-function check_for_performance_regressions { base=$1; head=$2
+function check_for_performance_regressions {
     echo "Checking for performance regressions:"
-    build $base || return
-    dock_make benchmarks > $tmpdir/base_benchmarks
-    build $head || return
-    dock_make benchmarks > $tmpdir/head_benchmarks
-    for bench in $(cut -d " " -f 1 $tmpdir/head_benchmarks); do
-        if grep $bench $tmpdir/base_benchmarks 2>&1 >/dev/null; then
-            echo $(grep $bench $tmpdir/base_benchmarks) \
-                 $(grep $bench $tmpdir/head_benchmarks) \
+    dock_make benchmarks > $(benchmark_results pr)
+    for bench in $(cut -d " " -f 1 $(benchmark_results pr)); do
+        if grep $bench $(benchmark_results current) >/dev/null 2>&1; then
+            echo $(grep $bench $(benchmark_results current)) \
+                 $(grep $bench $(benchmark_results pr)) \
                 | awk '
 BEGIN {
     minratio = 0.85;
@@ -140,9 +146,8 @@ BEGIN {
     echo
 }
 
-function check_test_suite { head=$1
+function check_test_suite {
     echo "Checking test suite:"
-    build $head || return
     if ! dock_make test_ci; then
         echo
         echo "ERROR during tests:"
@@ -185,14 +190,16 @@ EOF
 
 
 init
-fetch_pull_requests || exit 1
+fetch_pull_requests && clone_upstream || exit 1
 for id in $(pull_request_ids); do
-    (pull_request_new_p $id && clone_pull_request_repo $id) || continue
+    pull_request_new_p $id || continue
     (cd $(repo_path)
+        [ -f $(benchmark_results current) ] || benchmark_current
         log_header $id
-        check_for_performance_regressions $(pull_request_base $id) $(pull_request_head $id)
-        check_test_suite $(pull_request_head $id)) \
-            2>&1 > $(pull_request_log $id)
+        if merge_pr_with_current $id; then
+            check_for_performance_regressions
+            check_test_suite
+        fi) 2>&1 > $(pull_request_log $id)
     [ ! -z "$GITHUB_CREDENTIALS" ] || continue
     post_status $id $(log_status $id) $(post_gist $(pull_request_log $id))
 done
