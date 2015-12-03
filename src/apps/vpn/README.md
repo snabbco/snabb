@@ -34,7 +34,7 @@ representation.
 — Key **remote_mac**
 
 *Optional*. Remote MAC address as a string or in binary
-representation. Default is `00:00:00:00:00:00`.
+representation. Default is `02:00:00:00:00:00`.
 
 If *remote_mac* is not supplied, the `uplink` port needs to be connected
 to something that performs address resolution and overwrites the Ethernet
