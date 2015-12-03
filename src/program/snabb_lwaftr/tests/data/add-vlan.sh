@@ -35,6 +35,10 @@ V4=(
     tcp-ipv4-3frags-bound.pcap
     tcp-ipv4-toinet-2fragments.pcap
     tcp-ipv4-toinet-3fragments.pcap
+    udp-afteraftr-ipv4-3frags.pcap
+    udp-afteraftr-reassembled-ipv4.pcap
+    udp-frominet-3frag-bound.pcap
+    udp-frominet-bound.pcap
 )
 
 V6=(
@@ -69,6 +73,10 @@ V6=(
     tcp-ipv6-2frags-bound.pcap
     tcp-ipv6-fromb4-toinet-1046.pcap
     tcp-ipv6-fromb4-toinet-1500.pcap
+    udp-afteraftr-ipv6-2frags.pcap
+    udp-afteraftr-ipv6.pcap
+    udp-afteraftr-reassembled-ipv6-2frags.pcap
+    udp-fromb4-2frags-bound.pcap
 )
 
 IPV4_TAG=1092 # 0x444

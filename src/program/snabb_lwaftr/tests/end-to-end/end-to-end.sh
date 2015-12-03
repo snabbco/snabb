@@ -183,7 +183,31 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-customBRIP1-tob4-customBRIP2-ipv6.pcap \
    ${EMPTY} ${TEST_BASE}/recap-customBR-IPs-ipv6.pcap
 
-# Test UDP input
+# Test UDP packets
+echo "Testing: from-internet bound IPv4 UDP packet"
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/udp-frominet-bound.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/udp-afteraftr-ipv6.pcap
+
+echo "Testing: unfragmented IPv4 UDP -> outgoing IPv6 UDP fragments"
+snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
+   ${TEST_BASE}/udp-frominet-bound.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/udp-afteraftr-ipv6-2frags.pcap
+
+echo "Testing: IPv6 incoming UDP fragments -> unfragmented IPv4"
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${EMPTY} ${TEST_BASE}/udp-fromb4-2frags-bound.pcap \
+   ${TEST_BASE}/udp-afteraftr-reassembled-ipv4.pcap ${EMPTY}
+
+echo "Testing: IPv6 incoming UDP fragments -> outgoing IPv4 UDP fragments"
+snabb_run_and_cmp ${TEST_BASE}/small_ipv4_mtu_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/udp-fromb4-2frags-bound.pcap \
+   ${TEST_BASE}/udp-afteraftr-ipv4-3frags.pcap ${EMPTY}
+
+echo "Testing: IPv4 incoming UDP fragments -> outgoing IPv6 UDP fragments"
+snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
+   ${TEST_BASE}/udp-frominet-3frag-bound.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/udp-afteraftr-reassembled-ipv6-2frags.pcap
 
 # Test ICMP inputs (with and without drop policy)
 echo "Testing: incoming ICMPv4 echo request, matches binding table"
