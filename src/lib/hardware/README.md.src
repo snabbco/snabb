@@ -23,6 +23,19 @@ An array of supported hardware devices. Must be populated by calling
 `pci.scan_devices`. Each entry is a table as returned by
 `pci.device_info`.
 
+— Function **pci.canonical** *pciaddress*
+
+Returns the canonical representation of a PCI address. The canonical
+representation is preferred internally in Snabb Switch and for
+presenting to users. It shortens addresses with leading zeros like
+this: `0000:01:00.0` becomes `01:00.0`.
+
+— Function **pci.qualified** *pciaddress*
+
+Returns the fully qualified representation of a PCI address. Fully
+qualified addresses have the form `0000:01:00.0` and so this function
+undoes any abbreviation in the canonical representation.
+
 — Function **pci.scan_devices**
 
 Scans for available PCI devices and populates the `pci.devices` table.
