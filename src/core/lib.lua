@@ -197,7 +197,7 @@ end
 function hexundump(h, n)
    local buf = ffi.new('char[?]', n)
    local i = 0
-   for b in h:gmatch('[0-9a-fA-F][0-9a-fA-F]') do
+   for b in h:gmatch('%x%x') do
       buf[i] = tonumber(b, 16)
       i = i+1
       if i >= n then break end

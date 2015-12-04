@@ -67,7 +67,7 @@ function is_device_suitable (pcidev, patterns)
       return true
    end
    for _, pattern in ipairs(patterns) do
-      if pcidev.pciaddress:gmatch(pattern)() then
+      if pci.qualified(pcidev.pciaddress):gmatch(pattern)() then
          return true
       end
    end

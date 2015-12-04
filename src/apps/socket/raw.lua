@@ -40,8 +40,8 @@ function selftest ()
    local ethernet = require("lib.protocol.ethernet")
    local ipv6 = require("lib.protocol.ipv6")
    local dg_tx = datagram:new()
-   local src = ethernet:pton("00:00:00:00:00:01")
-   local dst = ethernet:pton("00:00:00:00:00:02")
+   local src = ethernet:pton("02:00:00:00:00:01")
+   local dst = ethernet:pton("02:00:00:00:00:02")
    local localhost = ipv6:pton("0:0:0:0:0:0:0:1")
    dg_tx:push(ipv6:new({src = localhost,
                         dst = localhost,
