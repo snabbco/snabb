@@ -199,8 +199,13 @@ function setup (patterns)
       table.sort(set)
    end
    local ndropped = math.max(0, #set - pmu_x86.ngeneral)
-   if ndropped > 0 then set[pmu_x86.ngeneral+1] = nil end
+   while (#set - pmu_x86.ngeneral) > 0 do table.remove(set) end
    local cpu = cpu_set()[1]
+   -- All available counters are globally enabled
+   -- (IA32_PERF_GLOBAL_CTRL).
+   writemsr(cpu, 0x38f,
+            bit.bor(bit.lshift(0x3ULL, 32),
+                    bit.lshift(1ULL, pmu_x86.ngeneral) - 1))
    -- Enable all fixed-function counters (IA32_FIXED_CTR_CTRL)
    writemsr(cpu, 0x38d, 0x333)
    for n = 0, #set-1 do
