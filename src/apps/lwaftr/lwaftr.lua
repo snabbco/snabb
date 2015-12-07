@@ -15,6 +15,7 @@ local timer = require("core.timer")
 local checksum = require("lib.checksum")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
+local ipv4 = require("lib.protocol.ipv4")
 local packet = require("core.packet")
 local lib = require("core.lib")
 local bit = require("bit")
@@ -25,9 +26,14 @@ local C = ffi.C
 local cast, fstring = ffi.cast, ffi.string
 local receive, transmit = link.receive, link.transmit
 local rd16, rd32, get_ihl_from_offset = lwutil.rd16, lwutil.rd32, lwutil.get_ihl_from_offset
+local set, keys, write_to_file = lwutil.set, lwutil.keys, lwutil.write_to_file
+local ipv4number_to_str = lwutil.ipv4number_to_str
 local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.write_ipv6_header 
 
 local debug = false
+
+local CONF_FILE_DUMP = "/tmp/lwaftr-%s.conf"
+local BINDING_TABLE_FILE_DUMP = "/tmp/binding-%s.table"
 
 local function compute_binding_table_by_ipv4(binding_table)
    local ret = {}
@@ -79,21 +85,85 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
    end
 end
 
+local function on_signal(sig, f)
+   local fd = S.signalfd(sig, "nonblock") -- handle signal via fd
+   S.sigprocmask("block", sig)            -- block traditional handler
+   timer.activate(timer.new("sighup-reload-binding-table", function ()
+      if (#S.util.signalfd_read(fd) > 0) then
+         print(("[snabb-lwaftr: %s caught]"):format(sig:upper()))
+         f()
+      end
+  end, 1e4, 'repeating'))
+end
+
 local function reload_binding_table(lwstate)
+   if not lwstate.bt_file then return end
+   print("Reload binding table")
    lwstate.binding_table = bt.load_binding_table(lwstate.bt_file)
    lwstate.binding_table_by_ipv4 = compute_binding_table_by_ipv4(lwstate.binding_table)
 end
 
-local function reload_binding_table_on_hup(lwstate)
-   if not lwstate.bt_file then return end
-   local fd = S.signalfd("hup", "nonblock") -- handle SIGHUP via fd
-   S.sigprocmask("block", "hup")            -- block traditional handler
-   timer.activate(timer.new("sighup-reload-binding-table", function ()
-      if (#S.util.signalfd_read(fd) > 0) then
-         print("[snabb-lwaftr: SIGHUP caught - reload binding table]")
-         reload_binding_table(lwstate)
+local function dump_configuration(lwstate)
+   print("Dump configuration")
+   local result = {}
+   local etharr = set('aftr_mac_b4_side',  'aftr_mac_inet_side', 'b4_mac',  'inet_mac')
+   local ipv4arr = set('aftr_ipv4_ip')
+   local ipv6arr = set('aftr_ipv6_ip')
+   local val
+   for _, k in ipairs(lwstate.conf_keys) do
+      local v = lwstate[k]
+      if etharr[k] then
+         val = ("ethernet:pton('%s')"):format(ethernet:ntop(v))
+      elseif ipv4arr[k] then
+         val = ("ipv4:pton('%s')"):format(ipv4:ntop(v))
+      elseif ipv6arr[k] then
+         val = ("ipv6:pton('%s')"):format(ipv6:ntop(v))
+      elseif type(v) == "bool" then
+         val = v and "true" or "false"
+      elseif k == "binding_table" then
+         val = "bt.get_binding_table()"
+      else
+         val = lwstate[k]
       end
-  end, 1e4, 'repeating'))
+      table.insert(result, ("%s = %s"):format(k, val))
+   end
+   local filename = (CONF_FILE_DUMP):format(os.date("%Y-%m-%d-%H:%M:%S"))
+   local content = table.concat(result, ",\n")
+   write_to_file(filename, content)
+   print(("Configuration written to %s"):format(filename))
+end
+
+local function dump_binding_table(lwstate)
+   print("Dump binding table")
+   local content = {}
+   local function write(str)
+      table.insert(content, str)
+   end
+   local function dump()
+      return table.concat(content, "\n")
+   end
+   local function format_entry(entry)
+      local v6, v4, port_start, port_end, br_v6 = entry[1], entry[2], entry[3], entry[4], entry[5]
+      local result = {}
+      table.insert(result, ("'%s'"):format(ipv6:ntop(v6)))
+      table.insert(result, ("'%s'"):format(ipv4number_to_str(v4)))
+      table.insert(result, port_start)
+      table.insert(result, port_end)
+      if br_v6 then
+         table.insert(result, ("'%s'"):format(ipv6:ntop(br_v6)))
+      end
+      return table.concat(result, ",")
+   end
+   -- Write entries to content
+   write("{")
+   for _, entry in ipairs(lwstate.binding_table) do
+      write(("\t{%s},"):format(format_entry(entry)))
+   end
+   write("}")
+   -- Dump content to file
+   local filename = (BINDING_TABLE_FILE_DUMP):format(os.date("%Y-%m-%d-%H:%M:%S"))
+   write_to_file(filename, dump())
+   print(("Binding table written to %s"):format(filename))
 end
 
 LwAftr = {}
@@ -122,7 +192,12 @@ function LwAftr:new(conf)
    o.fragment6_cache = {}
    o.fragment4_cache = {}
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
-   reload_binding_table_on_hup(o)
+   on_signal("hup", function() reload_binding_table(o) end)
+   on_signal("usr1", function()
+      dump_configuration(o)
+      dump_binding_table(o)
+   end)
+   o.conf_keys = keys(conf)
    if debug then lwdebug.pp(conf) end
    return setmetatable(o, {__index=LwAftr})
 end

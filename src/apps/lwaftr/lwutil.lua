@@ -31,3 +31,34 @@ end
 function wr32(offset, val)
    cast(uint32_ptr_t, offset)[0] = val
 end
+
+function set(...)
+   local result = {}
+   for _, v in ipairs({...}) do
+      result[v] = true
+   end
+   return result
+end
+
+function keys(t)
+   local result = {}
+   for k,_ in pairs(t) do
+      table.insert(result, k)
+   end
+   return result
+end
+
+function write_to_file(filename, content)
+   local fd = io.open(filename, "wt")
+   fd:write(content)
+   fd:close()
+end
+
+-- 'ip' is in host bit order, convert to network bit order
+function ipv4number_to_str(ip)
+   local a = bit.band(ip, 0xff)
+   local b = bit.band(bit.rshift(ip, 8), 0xff)
+   local c = bit.band(bit.rshift(ip, 16), 0xff)
+   local d = bit.rshift(ip, 24)
+   return ("%d.%d.%d.%d"):format(a, b, c, d)
+end
