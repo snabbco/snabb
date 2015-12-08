@@ -1,4 +1,4 @@
-run()     { ip netns exec lisp snabb/src/snabb lisper; }
+run()     { ip netns exec lisp snabb/src/snabb lisper -c lisper.conf; }
 start()   { run >/dev/null & }
 stop()    { pgrep -f 'snabb lisper' | xargs kill -9; }
 restart() { stop; start; }

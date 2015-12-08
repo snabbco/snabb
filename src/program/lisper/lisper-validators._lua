@@ -1,0 +1,58 @@
+
+	local function all(...)
+      return function(x)
+         local val, err
+         for i=1,select('#',...) do
+            local check = select(i,...)
+            val, err = check(x)
+            if err then return nil, err end
+         end
+         return val
+      end
+   end
+   local function one(...)
+      return function(x)
+         local errs = {}
+         for i=1,select('#',...) do
+            local check = select(i,...)
+            local val, err = check(x)
+            if not err then return val end
+            table.insert(errs, err)
+         end
+         return nil, "not one of "..table.concat(errs, ", ")
+      end
+   end
+   local function required(x)
+      if x ~= nil then return x end
+      return nil, "required" end
+   end
+   local function is(val)
+      return function(x)
+         if x == val then return x end
+         return "not "..tostring(val)
+      end
+   end
+   local function istype(tp)
+      return function(x)
+         if type(x) == tp then return x end
+         return nil, "not "..tp
+      end
+   end
+   local function isarray(x)
+      if type(x) == "table" then return x end
+      return nil, "not array"
+   end
+   local function notempty(x)
+      if #x == 0 then return nil, "empty" end
+      return x
+   end)
+   local function ip6(x)
+      local x = ipv6:pton(x)
+      if x then return x
+      return nil, "not an IPv6 address" end
+   end
+   local function validate(t, name, check, context)
+      local val, err = check(t[name])
+      if not err then return val end
+      error("`"..name.."` "..err.." in "..context)
+   end

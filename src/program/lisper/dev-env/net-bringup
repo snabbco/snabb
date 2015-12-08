@@ -65,9 +65,9 @@ ip netns exec app3 tunctl -t t0
 ip netns exec app1 ip link set address 00:00:00:00:aa:01 dev t0
 ip netns exec app2 ip link set address 00:00:00:00:aa:02 dev t0
 ip netns exec app3 ip link set address 00:00:00:00:aa:03 dev t0
-ip netns exec app1 ifconfig t0 10.0.0.1/24 up
-ip netns exec app2 ifconfig t0 10.0.0.2/24 up
-ip netns exec app3 ifconfig t0 10.0.0.3/24 up
+ip netns exec app1 ifconfig t0 10.0.0.1/24 mtu 1400 up
+ip netns exec app2 ifconfig t0 10.0.0.2/24 mtu 1400 up
+ip netns exec app3 ifconfig t0 10.0.0.3/24 mtu 1400 up
 ./l2tp.app1 start
 ./l2tp.app2 start
 ./l2tp.app3 start

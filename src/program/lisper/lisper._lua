@@ -1,0 +1,56 @@
+
+      --[[
+      config.app(c, "nd", nd.nd_light, {
+         local_mac = iface.mac,
+         local_ip = iface.ip,
+         next_hop = iface.gateway.address,
+      })
+      config.link(c, "lisper.tx -> nd.north")
+      config.link(c, "nd.north -> lisper.rx")
+
+      if MODE == "record" then
+         config.app(c, "data", raw.RawSocket, conf.if_name)
+         config.app(c, "pcap_in",  pcap.PcapWriter, conf.pcap_in_file)
+         config.app(c, "pcap_out", pcap.PcapWriter, conf.pcap_out_file)
+         config.app(c, "tee_in",  basic.Tee)
+         config.app(c, "tee_out", basic.Tee)
+         config.link(c, "nd.south -> tee_out.in")
+         config.link(c, "tee_out.out1 -> data.rx")
+         config.link(c, "tee_out.out2 -> pcap_out.input")
+         config.link(c, "data.tx -> tee_in.in")
+         config.link(c, "tee_in.out1 -> nd.south")
+         config.link(c, "tee_in.out2 -> pcap_in.input")
+      else
+         if iface.pci then
+            config.app(c, "data", intel.Intel10G, {
+               pciaddr = iface.pci,
+               macaddr = iface.mac,
+            })
+         else
+            config.app(c, "data", raw.RawSocket, iface.name)
+         end
+         if DEBUG then
+            config.app(c, "dump_out", L2TP_Dump, ">")
+            config.app(c, "dump_in", L2TP_Dump, "<")
+            config.link(c, "nd.south -> dump_out.rx")
+            config.link(c, "dump_out.tx -> data.rx")
+            config.link(c, "data.tx -> dump_in.rx")
+            config.link(c, "dump_in.tx -> nd.south")
+         else
+            config.link(c, "nd.south -> data.rx")
+            config.link(c, "data.tx -> nd.south")
+         end
+      end
+      ]]
+
+
+
+   --[[
+   print("LISPER started.")
+   print("  network interface : "..(NET_PCI or NET_IF))
+   print("  punt interface    : "..PUNT_IF)
+   print("  control socket    : "..conf.control_sock)
+   print("  local IP          : "..ip6str(t.local_ip))
+   print("  local MAC         : "..macstr(conf.local_mac))
+   print("  next hop IP       : "..ip6str(t.next_hop_ip))
+   ]]

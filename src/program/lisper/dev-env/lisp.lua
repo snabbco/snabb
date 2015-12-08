@@ -12,7 +12,8 @@ end
 local ffi = require("ffi")
 local S   = require("syscall")
 
-local CONTROL_SOCK = "/var/tmp/ctrl.socket"
+local CONTROL_SOCK = "/var/tmp/lisp-ipc-map-cache"
+local PUNT_SOCK    = "/var/tmp/lispers.net-itr"
 
 S.signal('pipe', 'ign') --I 💔 Linux
 

@@ -53,27 +53,15 @@ local function open_raw(name)
    return fd
 end
 
-local function can_read(timeout, ...)
-   return assert(S.select({readfds = {...}}, timeout)).count > 0
-end
-
-local function can_write(timeout, ...)
-   return assert(S.select({writefds = {...}}, timeout)).count > 0
-end
-
 local mtu = 1500
-local buf = ffi.new('uint8_t[?]', mtu)
-local function read(fd)
-   local len = assert(S.read(fd, buf, mtu))
-   return ffi.string(buf, len)
+local rawbuf = ffi.new('uint8_t[?]', mtu)
+local tapbuf = ffi.new('uint8_t[?]', mtu)
+local function read_buf(buf, fd)
+   return buf, assert(S.read(fd, buf, mtu))
 end
 
 local function write(fd, s, len)
-   assert(S.write(fd, s, len or #s))
-end
-
-local function close(fd)
-   S.close(fd)
+   assert(S.write(fd, s, len))
 end
 
 local tapname, ethname, smac, dmac, sip, dip, sid, did = ...
@@ -108,42 +96,119 @@ print('dip  ', hex(dip))
 print('sid  ', hex(sid))
 print('did  ', hex(did))
 
-local function decap_l2tp(s)
-   local dmac = s:sub(1, 1+6-1)
-   local smac = s:sub(1+6, 1+6+6-1)
-   local eth_proto = s:sub(1+6+6, 1+6+6+2-1)
-   if eth_proto ~= '\x86\xdd' then
-      return nil, 'invalid eth_proto '..hex(eth_proto)
-   end --not ipv6
-   local ipv6_proto = s:sub(21, 21)
-   if ipv6_proto ~= '\115' then
-      return nil, 'invalid ipv6_proto '..hex(ipv6_proto)
-   end --not l2tp
-   local sip = s:sub(23, 23+16-1)
-   local dip = s:sub(23+16, 23+16+16-1)
-   local sid = s:sub(55, 55+4-1)
-   local payload = s:sub(67)
-   return smac, dmac, sip, dip, sid, payload
+local l2tp_ct = ffi.typeof[[
+struct {
+
+   // ethernet
+   char     dmac[6];
+   char     smac[6];
+   uint16_t ethertype;
+
+   // ipv6
+   uint32_t flow_id; // version, tc, flow_id
+   int8_t   payload_length_hi;
+   int8_t   payload_length_lo;
+   int8_t   next_header;
+   uint8_t  hop_limit;
+   char     src_ip[16];
+   char     dst_ip[16];
+
+   // l2tp
+   //uint32_t session_id;
+   char     session_id[4];
+	char     cookie[8];
+
+} __attribute__((packed))
+]]
+
+local l2tp_ct_size = ffi.sizeof(l2tp_ct)
+local l2tp_ctp = ffi.typeof('$*', l2tp_ct)
+
+local function decap_l2tp_buf(buf, len)
+   if len < l2tp_ct_size then return nil, 'packet too small' end
+	local p = ffi.cast(l2tp_ctp, buf)
+	if p.ethertype ~= 0xdd86 then return nil, 'not ipv6' end
+	if p.next_header ~= 115 then return nil, 'not l2tp' end
+	local dmac = ffi.string(p.dmac, 6)
+   local smac = ffi.string(p.smac, 6)
+	local sip = ffi.string(p.src_ip, 16)
+	local dip = ffi.string(p.dst_ip, 16)
+   local sid = ffi.string(p.session_id, 4) --p.session_id
+	local payload_size = len - l2tp_ct_size
+	return smac, dmac, sip, dip, sid, l2tp_ct_size, payload_size
 end
 
-local function encap_l2tp(smac, dmac, sip, dip, did, payload)
-   local cookie = '\0\0\0\0\0\0\0\0'
-   local l2tp = did..cookie
-   local len = #payload + #l2tp
-   local len = string.char(bit.rshift(len, 8)) .. string.char(bit.band(len, 0xff))
-   local ipv6_proto = '\115' --l2tp
-   local maxhops = '\64'
-   local ipv6 = '\x60\0\0\0'..len..ipv6_proto..maxhops..sip..dip
-   local eth_proto = '\x86\xdd' --ipv6
-   local eth = dmac..smac..eth_proto
-   return eth..ipv6..l2tp..payload
+local function encap_l2tp_buf(smac, dmac, sip, dip, did, payload, payload_size, outbuf)
+   local p = ffi.cast(l2tp_ctp, outbuf)
+	ffi.copy(p.dmac, dmac)
+	ffi.copy(p.smac, smac)
+	p.ethertype = 0xdd86
+	p.flow_id = 0x60
+	local ipsz = payload_size + 12
+	p.payload_length_hi = bit.rshift(ipsz, 8)
+	p.payload_length_lo = bit.band(ipsz, 0xff)
+	p.next_header = 115
+	p.hop_limit = 64
+	ffi.copy(p.src_ip, sip)
+	ffi.copy(p.dst_ip, dip)
+	ffi.copy(p.session_id, did)
+	ffi.fill(p.cookie, 8)
+	ffi.copy(p + 1, payload, payload_size)
+	return outbuf, l2tp_ct_size + payload_size
 end
+
+--fast select ----------------------------------------------------------------
+--select() is gruesome.
+
+local band, bor, shl, shr = bit.band, bit.bor, bit.lshift, bit.rshift
+
+local function getbit(b, bits)
+	return band(bits[shr(b, 3)], shl(1, band(b, 7))) ~= 0
+end
+
+local function setbit(b, bits)
+	bits[shr(b, 3)] = bor(bits[shr(b, 3)], shl(1, band(b, 7)))
+end
+
+ffi.cdef[[
+typedef struct {
+	uint8_t bits[128]; // 1024 bits
+} xfd_set;
+int xselect(int, xfd_set*, xfd_set*, xfd_set*, void*) asm("select");
+]]
+local function FD_ISSET(d, set) return getbit(d, set.bits) end
+local function FD_SET(d, set)
+	assert(d <= 1024)
+	setbit(d, set.bits)
+end
+local fds0 = ffi.new'xfd_set'
+local fds  = ffi.new'xfd_set'
+local fds_size = ffi.sizeof(fds)
+local rawfd = raw:getfd()
+local tapfd = tap:getfd()
+FD_SET(rawfd, fds0)
+FD_SET(tapfd, fds0)
+local maxfd = math.max(rawfd, tapfd) + 1
+local EINTR = 4
+local function can_read() --returns true if fd has data, false if timed out
+	ffi.copy(fds, fds0, fds_size)
+	::retry::
+	local ret = C.xselect(maxfd, fds, nil, nil, nil)
+	if ret == -1 then
+		if C.errno() == EINTR then goto retry end
+		error('select errno '..tostring(C.errno()))
+	end
+	return FD_ISSET(rawfd, fds), FD_ISSET(tapfd, fds)
+end
+
+------------------------------------------------------------------------------
 
 while true do
-   if can_read(1, tap, raw) then
-		if can_read(0, raw) then
-         local s = read(raw)
-         local smac1, dmac1, sip1, dip1, did1, payload = decap_l2tp(s)
+	local can_raw, can_tap = can_read()
+	if can_raw or can_tap then
+		if can_raw then
+         local buf, len = read_buf(rawbuf, raw)
+			local smac1, dmac1, sip1, dip1, did1, payload_offset, payload_size = decap_l2tp_buf(buf, len)
          local accept = smac1
             and smac1 == dmac
             and dmac1 == smac
@@ -151,35 +216,35 @@ while true do
             and sip1 == dip
             and did1 == sid
          if DEBUG then
-				print('read   ', accept and 'accepted' or
-					('rejected '..(smac1 and hex(dmac1) or dmac1)))
-				if accept then
+				if accept or smac1 then
+					print('read', accept and 'accepted' or 'rejected')
 					print('  smac ', hex(smac1))
 					print('  dmac ', hex(dmac1))
 					print('  sip  ', hex(sip1))
 					print('  dip  ', hex(dip1))
 					print('  did  ', hex(did1))
-					print('  #    ', #payload)
+					print('  #    ', payload_size)
 				end
 			end
          if accept then
-            write(tap, payload)
+				write(tap, buf + payload_offset, payload_size)
          end
       end
-      if can_read(0, tap) then
-         local payload = read(tap)
-         local s = encap_l2tp(smac, dmac, sip, dip, did, payload)
-         if DEBUG then
+      if can_tap then
+         local payload, payload_size = read_buf(tapbuf, tap)
+			local frame, frame_size = encap_l2tp_buf(smac, dmac, sip, dip, did, payload, payload_size, rawbuf)
+			if DEBUG then
 				print('write')
 				print('  smac ', hex(smac))
 				print('  dmac ', hex(dmac))
 				print('  sip  ', hex(sip))
 				print('  dip  ', hex(dip))
 				print('  did  ', hex(did))
-				print('  #    ', #payload)
+				print('  #in  ', payload_size)
+				print('  #out ', frame_size)
 			end
-         write(raw, s)
-      end
+			write(raw, frame, frame_size)
+	   end
    end
 end
 

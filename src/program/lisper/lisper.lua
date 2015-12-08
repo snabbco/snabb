@@ -8,226 +8,192 @@ local ipv6     = require("lib.protocol.ipv6")
 local ethernet = require("lib.protocol.ethernet")
 local unix     = require("apps.socket.unix")
 local raw      = require("apps.socket.raw")
-local lines    = require("apps.lines")
 local nd       = require("apps.ipv6.nd_light")
 local pcap     = require("apps.pcap.pcap")
 local basic    = require("apps.basic.basic_apps")
 local intel    = require("apps.intel.intel_app")
+local trunk    = require("apps.802_1q.trunk")
+local json     = require("lib.json")
 
-local function assert(v, ...)
+--utils ----------------------------------------------------------------------
+
+local function assert(v, ...) --assert overload because
    if v then return v, ... end
    error(tostring((...)), 2)
 end
 
---program args ---------------------------------------------------------------
-
-local PCAP_IN_FILE  = 'perftest-in.pcap'
-local PCAP_OUT_FILE = 'perftest-out.pcap'
-local DEBUG         = os.getenv"LISPER_DEBUG" --if set, print packets to stdout
-local MODE          = os.getenv"LISPER_MODE" --if 'record' then record packets to pcap files
-local CONTROL_SOCK  = "/var/tmp/ctrl.socket"
-local PUNT_IF       = "veth0"
-local NET_IF        = "e0"
-local NET_PCI       = nil --use Intel10G instead of RawSocket
-local LOCAL_IP      = ipv6:pton"fd80:4::2"
-local LOCAL_MAC     = ethernet:pton"00:00:00:00:01:04"
-local NEXT_HOP_IP   = ipv6:pton"fd80:4::1"
-
-local long_opts = {
-   control = "c",
-   ["punt-interface"] = "p",
-   ["network-interface"] = "n",
-   ["network-device"] = "P",
-   ["local-ip"] = "i",
-   ["local-mac"] = "m",
-   ["next-hop"] = "N",
-   help = "h",
-}
-local opt = {}
-function opt.h (arg) print(usage) main.exit(0) end
-function opt.c (arg) CONTROL_SOCK = arg end
-function opt.p (arg) PUNT_IF = arg end
-function opt.n (arg) NET_IF = arg end
-function opt.i (arg) LOCAL_IP = assert(ipv6:pton(arg)) end
-function opt.m (arg) LOCAL_MAC = assert(ethernet:pton(arg)) end
-function opt.N (arg) NEXT_HOP_IP = assert(ipv6:pton(arg)) end
-function opt.P (arg) LOCAL_PCI = arg end
-
-local function parse_args(args)
-   return lib.dogetopt(args, opt, "hc:p:n:i:m:N:", long_opts)
+local function parsehex(s)
+   return s and s ~= "" and (s:gsub("[0-9a-fA-F][0-9a-fA-F]", function(cc)
+     return char(tonumber(cc, 16))
+   end))
 end
-
---control plane --------------------------------------------------------------
-
---a FIB line has the form: `<mac>/48 rloc <ip6> <p> <w>, <ip6> <p> <w>, ...`
-local function parse_fib_line(s)
-   local id, mac, ips = s:match"^%s*%[([^%]]+)%]%s*([^%s]+)%s+rloc%s+(.*)$"
-   local id = assert(tonumber(id), "invalid FIB line: "..s)
-   local mac = mac:gsub('/%d+$', '') --remove '/48' from 'mac/48'
-   local mac = ffi.string(ethernet:pton(mac), 6)
-   local t = {}
-   for s in ips:split"%s*,%s*" do
-      local ip, p, w = s:match'^([^%s]+)%s+(%d+)%s+(%d+)$' --TODO: use p and w
-      assert(ip, "invalid FIB entry: "..s)
-      t[#t+1] = assert(ipv6:pton(ip))
-   end
-   return id, mac, t
-end
-
-local fib = {} --{session_id = {dest_mac = {dest_ip1, ...}}}
-
-local function update_fib_line(_, s)
-   local id, mac, ips = parse_fib_line(s)
-   local vlan = fib[id]
-   if not vlan then
-      vlan = {}
-      fib[id] = vlan
-   end
-   vlan[mac] = ips
-
-   if DEBUG then
-      local t = {}
-      for i, ip in ipairs(ips) do
-         t[i] = ipv6:ntop(ip)
-      end
-      print('added ',
-         string.format('0x%04x', id),
-         lib.hexdump(mac):gsub(' ', ':'),
-         table.concat(t, ', '))
-   end
-end
-
-local function lookup_fib(id, mac)
-   return fib[id] and fib[id][mac]
-end
-
---L2TPv3/IPv6 frame format ---------------------------------------------------
-
-local l2tp_ct = ffi.typeof[[
-struct {
-
-   // ethernet
-   char     dmac[6];
-   char     smac[6];
-   uint16_t ethertype;
-
-   // ipv6
-   uint32_t flow_id; // version, tc, flow_id
-   int16_t  payload_length;
-   int8_t   next_header;
-   uint8_t  hop_limit;
-   char     src_ip[16];
-   char     dst_ip[16];
-
-   // l2tp
-   uint32_t session_id;
-   char     cookie[8];
-
-   // tunneled ethernet frame
-   char l2tp_dmac[6];
-   char l2tp_smac[6];
-
-} __attribute__((packed)) *
-]]
-
-local l2tp_ct_size = ffi.sizeof(l2tp_ct)
 
 local function macstr(mac)
    local mac = ffi.string(mac, 6)
-   return lib.hexdump(mac):gsub(' ', ':')
+   return lib.hexdump(mac):gsub(" ", ":")
 end
 
 local function ip6str(ip6)
    return ipv6:ntop(ip6)
 end
 
-local function l2tp_dump(p, text)
-   local p = ffi.cast(l2tp_ct, p.data)
-   if lib.htons(p.ethertype) == 0x86dd and p.next_header == 115 then
-      local sessid = string.format('%04x', lib.ntohl(p.session_id))
-      print('L2TP: '..text..' [0x'..sessid..'] '..
-         macstr(p.smac)..','..ip6str(p.src_ip)..' -> '..
-         macstr(p.dmac)..','..ip6str(p.dst_ip)..
-         ' ['..macstr(p.l2tp_smac)..' -> '..macstr(p.l2tp_dmac)..']')
-   else
-      print('INVALID: ', string.format('%04x', lib.htons(p.ethertype)), p.next_header)
+local _ = string.format
+
+--config ---------------------------------------------------------------------
+
+local DEBUG = os.getenv"LISPER_DEBUG" --if set, print packets to stdout
+local MODE  = os.getenv"LISPER_MODE" --if set to "record" then record packets to pcap files
+
+local conf
+
+local function update_config(s)
+   local t = assert(json.decode(s)) --see dev-env/lisper.conf for the format
+   t.interfaces = t.interfaces or {}
+   --map interfaces by name
+   for i,iface in ipairs(t.interfaces) do
+      t.interfaces[iface.name] = iface
+   end
+   --associate vlans to interfaces
+   if t.vlans then
+      for i,vlan in ipairs(t.vlans) do
+         local iface = assert(t.interfaces[vlan.interface],
+            "invalid interface "..vlan.interface.." for vlan "..vlan.name)
+         iface.vlans = iface.vlans or {}
+         table.insert(iface.vlans, vlan)
+         vlan.mac = vlan.mac or iface.mac
+         vlan.ip = vlan.ip or iface.ip
+         vlan.gateway = vlan.gateway or iface.gateway
+      end
+   end
+   --associate lispers with interfaces
+   if t.lispers then
+      for i,t in ipairs(t.lispers) do
+      end
+   end
+   if t.local_networks then
+      for i,t in ipairs(t.local_networks) do
+      end
+   end
+   conf = t
+end
+
+--fib ------------------------------------------------------------------------
+
+local fib = {} --{iid = {dest_mac = {rloc1, ...}}}
+
+local function update_fib(s)
+   local t = assert(json.decode(s))
+   for k,v in pairs(t) do
+      local iid = assert(k["instance-id"])
+      local dt = {}
+      fib[iid] = dt
+      local eid_prefix = assert(k["eid-prefix"])
+      local mac = eid_prefix:gsub("/d+$", "") --MAC/48
+      local mac = ethernet:pton(mac)
+      local rt = {}
+      dt[mac] = rt
+      local rlocs = k.rlocs or k.rles
+      if #rlocs > 0 then
+         for i,t in ipairs(rlocs) do
+            local dt = {}
+            table.insert(rt, dt)
+            dt.ip = assert(t.rloc or t.rle)
+            dt.priority = tonumber(t.priority)
+            dt.weight = tonumber(t.weight)
+            dt.key = parsehex(t.key)
+         end
+      end
    end
 end
 
+local function lookup_fib(iid, mac)
+   return fib[iid] and fib[id][mac]
+end
+
+--punting --------------------------------------------------------------------
+
+local punt = {} --{{mac=,name=,},...}
+
+local function punt_mac(mac, ifname)
+   table.insert(punt, {mac = mac, ifname = ifname})
+end
+
+local function get_punt_message()
+   local t = table.remove(punt)
+   if not t then return end
+   return _('{"eid-prefix" : "%s", "interface" : "%s"}', macstr(t.mac), t.ifname)
+end
+
+--L2TPv3/IPv6 frame format ---------------------------------------------------
+
+local l2tp_ct = ffi.typeof[[
+   struct {
+      // ethernet
+      char     dmac[6];
+      char     smac[6];
+      uint16_t ethertype; // dd:86 = ipv6
+
+      // ipv6
+      uint32_t flow_id; // version, tc, flow_id
+      int16_t  payload_length;
+      int8_t   next_header; // 115 = l2tpv3
+      uint8_t  hop_limit;
+      char     src_ip[16];
+      char     dst_ip[16];
+
+      // l2tp
+      uint32_t session_id;
+      char     cookie[8];
+
+      // tunneled ethernet frame
+      char l2tp_dmac[6];
+      char l2tp_smac[6];
+
+   } __attribute__((packed))
+   ]]
+local l2tp_ct_size = ffi.sizeof(l2tp_ct)
+local l2tp_ctp = ffi.typeof("$*", l2tp_ct)
+
 local function l2tp_parse(p)
    if p.length < l2tp_ct_size then return end
-   local p = ffi.cast(l2tp_ct, p.data)
-   if lib.htons(p.ethertype) ~= 0x86dd then return end
-   if p.next_header ~= 115 then return end
+   local p = ffi.cast(l2tp_ctp, p.data)
+   if p.ethertype ~= 0xdd86 then return end --not ipv6
+   if p.next_header ~= 115 then return end --not l2tpv3
    local sessid = lib.ntohl(p.session_id)
    local l2tp_dmac = ffi.string(p.l2tp_dmac, 6)
    return sessid, l2tp_dmac
 end
 
-local function l2tp_update(p, dest_ip)
-   local p = ffi.cast(l2tp_ct, p.data)
-   ffi.copy(p.src_ip, LOCAL_IP, 16)
+local function l2tp_update(p, dest_ip, local_ip)
+   local p = ffi.cast(l2tp_ctp, p.data)
+   ffi.copy(p.src_ip, local_ip, 16)
    ffi.copy(p.dst_ip, dest_ip, 16)
 end
 
---data plane -----------------------------------------------------------------
+--frame dumper ---------------------------------------------------------------
 
-local Lisper = {}
-
-function Lisper:new (t)
-   return setmetatable({_lookup = t.lookup}, {__index = self})
-end
-
-function Lisper:_route (p, tx)
-   local sessid, dmac = l2tp_parse(p)
-   if not sessid then return true end --invalid packet
-   local ips = self._lookup(sessid, dmac)
-   if ips then
-      if link.nwritable(tx) < #ips then return end --dest. ringbuffer full
-      for i=1,#ips do
-         local p = packet.clone(p)
-         l2tp_update(p, ips[i])
-         link.transmit(tx, p)
-      end
-   else
-      local p = packet.clone(p)
-      --TODO: punt
+local function l2tp_dump(p, text)
+   local p = ffi.cast(l2tp_ctp, p.data)
+   if not (p.length >= l2tp_ct_size
+      and p.ethertype == 0xdd86
+      and p.next_header == 115)
+   then
+      print("INVALID: ", _("%04x", lib.htons(p.ethertype)), p.next_header)
    end
-   return true
+   local sessid = _("%04x", lib.ntohl(p.session_id))
+   print("L2TP: "..text.." [0x"..sessid.."] "..
+      macstr(p.smac)..","..ip6str(p.src_ip).." -> "..
+      macstr(p.dmac)..","..ip6str(p.dst_ip)..
+      " ["..macstr(p.l2tp_smac).." -> "..macstr(p.l2tp_dmac).."]")
 end
 
-function Lisper:push ()
-   local rx = self.input.rx
-   local tx = self.output.tx
-   if rx == nil or tx == nil then return end
-   while not link.empty(rx) do
-      local p = link.peek(rx)
-      if self:_route(p, tx) then
-         packet.free(link.receive(rx))
-      else
-         --dest. ringbuffer full, we'll try again on the next push
-         break
-      end
-   end
-end
+local L2TP_Dump = {}
 
---packet punting -------------------------------------------------------------
-
-local PuntQueue = {}
-
-function PuntQueue:new ()
-   return {}
-end
-
---program wiring -------------------------------------------------------------
-
-local intercept = {}
-
-function intercept:new(name)
+function L2TP_Dump:new(name)
    return setmetatable({text = name}, {__index = self})
 end
 
-function intercept:push ()
+function L2TP_Dump:push()
    local rx = self.input.rx
    local tx = self.output.tx
    if rx == nil or tx == nil then return end
@@ -238,75 +204,219 @@ function intercept:push ()
    end
 end
 
-function run (args)
+--control plane --------------------------------------------------------------
+
+local Ctl = {}
+
+function Ctl:new()
+   return setmetatable({}, {__index = self})
+end
+
+function Ctl:push()
+   local rx = self.input.rx
+   if rx == nil then return end
+   while not link.empty(rx) do
+      local p = link.receive(rx)
+      local s = ffi.string(p.data, p.length)
+      update_fib(s)
+   end
+end
+
+local Punt = {}
+
+function Punt:new()
+   return setmetatable({}, {__index = self})
+end
+
+function Punt:pull()
+   local tx = self.output.tx
+   if tx == nil then return end
+   while not link.full(tx) do
+      local s = get_punt_message()
+      if not s then break end
+      link.transmit(rx, s)
+   end
+end
+
+--data plane -----------------------------------------------------------------
+
+local function rloc_interface(rloc)
+   --TODO
+end
+
+local function route_packet(p, rxname, txports)
+   local iid, dmac = l2tp_parse(p)
+   if not idd then return true end --invalid packet
+   local rlocs = lookup_fib(iid, dmac)
+   if rlocs then
+      --check if all rloc interfaces have room for the packet
+      for i=1,#rlocs do
+         local txname = rloc_interface(rlocs[i])
+         local tx = txports[txname]
+         if link.full(tx) then return end --dest. buffer full
+      end
+      for i=1,#rlocs do
+         local txname, local_ip = rloc_interface(rlocs[i])
+         local tx = txports[txname]
+         local p = packet.clone(p)
+         l2tp_update(p, rlocs[i].ip, local_ip)
+         link.transmit(tx, p)
+      end
+   else
+      punt_mac(dmac, rxname)
+   end
+   return true
+end
+
+local Lisper = {}
+
+function Lisper:new()
+   return setmetatable({}, {__index = self})
+end
+
+function Lisper:push()
+   for rxname, rx in pairs(self.input) do
+      while not link.empty(rx) do
+         local p = link.peek(rx)
+         if route_packet(p, rxname, self.output) then
+            packet.free(link.receive(rx))
+         else
+            --dest. ringbuffer full, we'll try again on the next push
+            break
+         end
+      end
+   end
+end
+
+--program args ---------------------------------------------------------------
+
+local long_opts = {
+   ["config-file"] = "c",
+   help = "h",
+}
+
+local opt = {}
+
+function opt.h(arg)
+   print(usage)
+   main.exit(0)
+end
+
+function opt.c(arg)
+   local s = assert(lib.readfile(arg, "*a"), "file not found: "..arg)
+   s = s:gsub("//.-([\r\n])", "%1") --strip comments
+   update_config(s)
+end
+
+local function parse_args(args)
+   return lib.dogetopt(args, opt, "hc:", long_opts)
+end
+
+--main loop ------------------------------------------------------------------
+
+function run(args)
 
    parse_args(args)
 
    local c = config.new()
 
-   --data plane
-   config.app(c, "lisper", Lisper, {lookup = lookup_fib})
-   config.app(c, "nd", nd.nd_light, {
-      local_mac = LOCAL_MAC,
-      local_ip = LOCAL_IP,
-      next_hop = NEXT_HOP_IP,
-   })
-   config.link(c, "lisper.tx -> nd.north")
-   config.link(c, "nd.north -> lisper.rx")
+   --control plane
 
-   if MODE == 'record' then
-      config.app(c, "data", raw.RawSocket, NET_IF)
-      config.app(c, "pcap_in",  pcap.PcapWriter, PCAP_IN_FILE)
-      config.app(c, "pcap_out", pcap.PcapWriter, PCAP_OUT_FILE)
-      config.app(c, "tee_in",  basic.Tee)
-      config.app(c, "tee_out", basic.Tee)
-      config.link(c, "nd.south -> tee_out.in")
-      config.link(c, "tee_out.out1 -> data.rx")
-      config.link(c, "tee_out.out2 -> pcap_out.input")
-      config.link(c, "data.tx -> tee_in.in")
-      config.link(c, "tee_in.out1 -> nd.south")
-      config.link(c, "tee_in.out2 -> pcap_in.input")
-   else
-      if NET_PCI then
-         config.app(c, "data", intel.Intel10G, {
-            pciaddr = NET_PCI,
-            macaddr = LOCAL_MAC,
+   config.app(c, "ctl", Ctl)
+   config.app(c, "ctl_sock", unix.UnixSocket, {
+      filename = conf.control_sock,
+      listen = true,
+      mode = "packet",
+   })
+   config.link(c, "ctl_sock.tx -> ctl.rx")
+
+   config.app(c, "punt", Punt)
+   config.app(c, "punt_sock", unix.UnixSocket, {
+      filename = conf.punt_sock,
+      listen = false,
+      mode = "packet",
+   })
+   config.link(c, "punt.tx -> punt_sock.rx")
+
+   --data plane
+
+   config.app(c, "lisper", Lisper)
+
+   for i,iface in ipairs(conf.interfaces) do
+
+      local ifname = iface.name
+
+      if iface.pci then
+         config.app(c, "if_"..ifname, intel.Intel82599, {
+            pciaddr = iface.pci,
+            macaddr = iface.mac,
          })
       else
-         config.app(c, "data", raw.RawSocket, NET_IF)
+         config.app(c, "if_"..ifname, raw.RawSocket, ifname)
       end
-      if DEBUG then
-         config.app(c, "intercept_out", intercept, '>')
-         config.app(c, "intercept_in", intercept, '<')
-         config.link(c, "nd.south -> intercept_out.rx")
-         config.link(c, "intercept_out.tx -> data.rx")
-         config.link(c, "data.tx -> intercept_in.rx")
-         config.link(c, "intercept_in.tx -> nd.south")
-      else
-         config.link(c, "nd.south -> data.rx")
-         config.link(c, "data.tx -> nd.south")
+
+      if iface.vlans then
+
+         local ports = {}
+         for i,vlan in ipairs(iface.vlans) do
+            ports[vlan.id] = vlan.name
+         end
+         config.app(c, "trunk_"..ifname, trunk.Trunk, ports)
+
+         config.link(c, _("trunk_%s.trunk -> if_%s.rx", ifname, ifname))
+         config.link(c, _("if_%s.tx -> trunk_%s.trunk", ifname, ifname))
+
+         for i,vlan in ipairs(iface.vlans) do
+
+            local vname = vlan.name
+
+            if vlan.gateway then -- if -> trunk -> nd -> lisper
+
+               config.app(c, "nd_"..vname, nd.nd_light, {
+                  local_mac = vlan.mac,
+                  local_ip = vlan.ip,
+                  next_hop = vlan.gateway,
+               })
+               config.link(c, _("nd_%s.south -> trunk_%s.%s", vname, ifname, vname))
+               config.link(c, _("trunk_%s.%s -> nd_%s.south", ifname, vname, vname))
+
+               config.link(c, _("lisper.%s -> nd_%s.north", vname, vname))
+               config.link(c, _("nd_%s.north -> lisper.%s", vname, vname))
+
+            else -- if -> trunk -> lisper
+
+               config.link(c, _("lisper.%s -> trunk_%s.%s", vname, ifname, vname))
+               config.link(c, _("trunk_%s.%s -> lisper.%s", ifname, vname, vname))
+
+            end
+
+         end
+
+      elseif iface.gateway then -- if -> nd -> lisper
+
+         config.app(c, "nd_"..ifname, nd.nd_light, {
+            local_mac = iface.mac,
+            local_ip = iface.ip,
+            next_hop = iface.gateway,
+         })
+         config.link(c, _("nd_%s.south -> if_%s.rx", ifname, ifname))
+         config.link(c, _("if_%s.tx -> nd_%s.south", ifname, ifname))
+
+         config.link(c, _("lisper.%s -> nd_%s.north", ifname, ifname))
+         config.link(c, _("nd_%s.north -> lisper.%s", ifname, ifname))
+
+      else -- if -> lisper
+
+         config.link(c, _("lisper.%s -> if_%s.rx", ifname, ifname))
+         config.link(c, _("if_%s.tx -> lisper.%s", ifname, ifname))
+
       end
+
    end
-
-   --control plane
-   config.app(c, "ctl", unix.UnixSocket, {filename = CONTROL_SOCK, listen = true})
-   config.app(c, "fib", lines.Lines, {callback = update_fib_line})
-   config.link(c, "ctl.tx -> fib.rx")
-
-   --punting
-   config.app(c, "puntq", PuntQueue)
-   config.app(c, "punt", raw.RawSocket, PUNT_IF)
-   config.link(c, "puntq.tx -> punt.rx")
 
    engine.configure(c)
 
-   print("LISPER started.")
-   print("  network interface : "..(NET_PCI or NET_IF))
-   print("  punt interface    : "..PUNT_IF)
-   print("  control socket    : "..CONTROL_SOCK)
-   print("  local IP          : "..ip6str(LOCAL_IP))
-   print("  local MAC         : "..macstr(LOCAL_MAC))
-   print("  next hop IP       : "..ip6str(NEXT_HOP_IP))
+   print(config.graphviz(c))
 
    engine.main({report = {showlinks=true}})
 
