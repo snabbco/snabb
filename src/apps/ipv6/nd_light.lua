@@ -77,8 +77,12 @@ local function check_ip_address(ip, desc)
 end
 
 function nd_light:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   local o = nd_light:superClass().new(self)
+   local arg = arg and config.parse_app_arg(arg) or {}
+   local conf = {}
+	for k,v in pairs(arg) do
+		conf[k] = v
+	end
+	local o = nd_light:superClass().new(self)
    conf.delay = conf.delay or 1000
    conf.retrans = conf.retrans
    assert(conf.local_mac, "nd_light: missing local MAC address")
