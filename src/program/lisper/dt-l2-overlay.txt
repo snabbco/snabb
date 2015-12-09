@@ -1,0 +1,271 @@
+
+	 Layer-2 Overlay Design Specification for Terastream
+	 ---------------------------------------------------
+		  Date: Wed Dec  2 14:26:42 PST 2015
+		   Authors: Dino, Luke, and Cosmin
+
+
+Introduction
+------------
+
+This document describes the overlay design used by DT's Terastream network.
+The layer-2 overlay will be used to connect applications across an IPv6
+core network.
+
+Requirements
+------------
+
+(1) Allow applications to become layer-2 adjacent even when not attached
+    to a layer-2 bridge domain.
+
+(2) The applications will need unicast and multicast/broadcast services 
+    provided by the overlay.
+
+(3) The solution should not require any specific proprietary hardware. The
+    solution is software-based and runs on commodity server hardware.
+
+(4) The solution must support multi-tenancy. This means some group of
+    MAC addresses will need to be isolated from others.
+
+(5) The data-plane must use L2TP encapsulation of MAC frames.
+
+(6) Encapsulated packets must be encrypted.
+
+Parts of the Solution
+---------------------
+
+The data-plane will use Luke's snabb high-performance forwarding code. The
+control-plane will use Dino's lispers.net LISP mapping database code. This
+specification is defining the interface between snabb and LISP.
+
+Definition of Terms
+-------------------
+
+xTR: 
+    Is an overlay node that runs the snabb code and the lispers.net LISP 
+    control-plane.
+
+ITR: 
+    Is an xTR overlay node that encapsulates packets at the data-plane and
+    sends LISP Map-Request messages at the control-plane.
+
+ETR: 
+    Is an xTR overlay node that decapsulates packets at the data-plane and
+    sends LISP Map-Register messages at the control-plane.
+
+Instance-ID;
+    Is used as a VPN-ID for multi-tenancy.
+
+Extended EID:
+    Is a 2-tuple of (instance-ID, MAC-address) that is registered and looked
+    up in the LISP mapping database. Simply called "EID" throughout this
+    specification.
+
+RLOC:
+    The routing locator associated with an EID. This will be an IPv6 address
+    routable by the core network.
+
+Map-Cache:
+    It is a mapping cache FIB that holds EID to RLOC-set mappings which were
+    retrieved from the LISP mapping database.
+
+High-Level Functionality Description
+------------------------------------
+
+(1) Applications send MAC frames. 
+
+(2) xTRs discover source MAC address EIDs and register them to the LISP
+    mapping database using Map-Register messages.
+
+(3) xTRs use the destination MAC address EID to resolve the RLOC by sending
+    Map-Requests to the LISP mapping database. This is how the map-cache
+    is populated.
+
+(4) When the map-cache is populated, an ITR will lookup a destination MAC
+    address EID in the map-cache to retrieve an IPv6 RLOC address. The
+    ITR prepends a L2TP header and IPv6 header, inserts its own IPv6 RLOC 
+    address in the source address field of the IPv6 header and inserts the 
+    IPv6 RLOC address from the map-cache in the destination address field
+    of the IPv6 header.
+
+(5) The ITR does a FIB lookup on the destination IPv6 RLOC address to 
+    determine which interface to send the IPv6 packet.
+
+(6) The IPv6 core network delivers the packet to the IPv6 RLOC of the ETR.
+
+(7) The ETR decapsulates the packet and looks up the destination MAC
+    address EID from the inner MAC header to determine which interface
+    to deliver the frame.
+
+Snabb Deliverables
+------------------
+
+(1) Will encapsulate packets acting as an ITR and decapsulate packets acting
+    as an ETR.
+
+(2) Will receive IPC updates from the control-plane to populate the map-cache.
+
+(3) Will discover, on its own, which interface MAC addresses are learned on.
+    An interface can be physical but when the xTR runs on the same system
+    as the application the interface may be virtual (i.e. a vNIC perhaps).
+
+(4) Will provide AES-GCM crypto services to encapsulated packets.
+
+Lispers.net Deliverables
+------------------------
+
+(1) Will send Map-Requests and Map-Registers on an xTR co-located with the
+    snabb data-plane code.
+
+(2) Will process Map-Replies on an xTR to populate the map-cache.
+
+(3) Will provide the Map-Resolver and Map-Server as part of the LISP
+    mapping database system.
+
+(4) Will do Diffie-Hellman key exchange and provide encryption keys to the
+    data-plane.
+
+Map-Cache Population IPC Interface
+----------------------------------
+
+The lispers.net code will create a named socket called "lisp-ipc-map-cache". 
+The path name of the named socket will be in the lispers.net directory. 
+The snabb code will be responsible for creating the named socket in the 
+above directory. The snabb code will listen on the socket and the lispers.net 
+will send on the socket. The format of each IPC message sent on the socket 
+from lispers.net to snabb will be in JSON form:
+
+Unicast form:
+
+{ "instance-id" : <iid>, "eid-prefix" : <eid-prefix-in-ascii>, "rlocs" :
+  [ { "rloc" : <rloc-1>, "key" : <encryption-key>, "priority" : <p>, 
+    "weight" : <w> }, ...
+    { "rloc" : <rloc-n>, "key" : <encryption-key>, "priority" : <p>, 
+    "weight" : <w> } ]
+}
+
+Multicast form:
+
+{ "instance-id" : <iid>, "eid-prefix" : <eid-prefix-in-ascii>, "rles" :
+  [ { "rle" : <rloc-1>, "key" : <encryption-key> }, ...
+    { "rle" : <rloc-n>, "key" : <encryption-key> } ]
+}
+
+The <iid> is the configured VPN-ID that is assigned to an interface and
+will be used to register MAC address EIDs when they are learned on the
+interface. And will be used for sending Map-Requests for MAC address EIDs
+needing RLOC resolution.
+
+For the unicast form, the <eid-prefix> is a MAC-address in the format of 
+aaaa-bbbb-cccc/48. For the multicast form, the <eid-prefix> is a broadcast
+MAC address (ffff-ffff-ffff/48) or a multicast MAC address (01xx-xxxx-xxxx/48).
+
+The "rloc" is an IPv6 address in standard colon format. The "rle" is an IPv6 
+unicast address in standard colon format. The <encryption-key> is a list of 
+ascii hex digits and used by the data-plane to encrypt and decrypt encapsualted
+packets. The <p> and <w> values are the priority and weight values that can 
+be used for active/active or active/backup load-splitting. Or, they can be 
+ignored. Note that multiple <rloc><p><w> records can be supplied.
+
+When an entry is in the form of no RLOCs or RLEs:
+
+{ "instance-id" : <iid>, "eid-prefix" : <eid-prefix-in-ascii>, "rlocs" : [] }
+{ "instance-id" : <iid>, "eid-prefix" : <eid-prefix-in-ascii>, "rles" : [] }
+
+The data-plane has the option of removing the entry for [<iid>]<eid-prefix>
+from its forwarding cache.
+
+The lispers.net configuration command is used to create the named socket:
+
+lisp xtr-parameters {
+    ipc-map-cache = yes
+}
+
+An example unicast map-cache entry could be:
+
+[251]0001-0002-0003/48 rloc 2001::1111 1 50, 2001::2222 1 50
+
+Which is encoded as an IPC record:
+
+{ "instance-id" : "251", "eid-prefix" : "0001-0002-0003/48", "rlocs" :
+  [ { "rloc" : "2001::1111", "key" : "", "priority" : "1", "weight" : "50" },
+    { "rloc" : "2001::2222", "key" : "", "priority" : "1", "weight" : "50" } ] 
+}
+
+Which means the MAC address 0001-0002-0003 is in VPN 251 and is multihomed
+to 2 IPv6 RLOCs 2001::1111 and 2001::2222. And since both have priority 1
+with a weight of 50, flows to this MAC address should be load-split across
+the two RLOCs.
+
+An example multicast map-cache entry could be:
+
+[251]ffff--ffff-ffff/48 rloc 2001::1111 1 50, 2001::2222 1 50
+
+Which is encoded as as IPC record:
+
+{ "instance-id" : "251", "eid-prefix" : "ffff-ffff-ffff/48", "rles" :
+  [ { "rloc" : "dfdf::1", "key" : "" },
+    { "rloc" : "dfdf::2", "key" : "" } ]
+}
+
+Which means any source that sends to MAC address ffff-ffff-ffff that resides
+in VPN 251 will get the MAC frame replicated to dfdf::1 and dfdf::2. That is,
+the broadcast frame will be unicast encapsulated to each RLOC in the RLE list.
+
+Punt IPC Interface
+------------------
+
+The lispers.net code will create a named socket like this:
+
+  s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+  s.bind("lispers.net-itr")
+
+And when it sends an IPC record to the data-plane to populate the map-cache,
+the target is "lisp-ipc-map-cache".
+
+For discovering MAC addresses and registering them in their respective VPNs,
+the lispers.net code will listen on this socket and the snabb code will send
+to "lispers.net-itr". The data-plane will decide when to send an IPC record 
+for registration. The format of the IPC message is in JSON format:
+
+{ "eid-prefix" : <mac-address>, "interface" : <device-or-any-string-of-data> }
+
+The <mac-address> will be the source MAC address of a received frame the
+data-plane decides should be discovered by the lispers.net code. 
+
+The <device-or-any-string-of-data> is typically a Linux device name of
+the interface the frame from source <mac-address> was received on.
+
+For the first release, a device name will not be supplied. For the first
+release, the MAC address is actually learned via an OpenStack based tunnel
+and the snabb code handles this specifically. In this case, the snabb code
+will supply a self-documenting string so the lispers.net code can display
+this on its web interface for network management purposes (and also via its
+API interface).
+
+Data-Plane Confidentiality
+--------------------------
+
+As part of the draft-ietf-lisp-crypto-03 Internet Draft, the lispers.net code
+will do a secure key-exchange when it performs a Map-Request/Map-Reply 
+message exchange. A shared-secret will be computed and run through a KDF
+to produce an encryption-key. This key is passed down to the snabb data-plane
+to be used for encryption before encapsulation and decapsulation before
+decryption.
+
+There are two possibilies on how to encapsulate encrypted data:
+
+(1) Add key-id bits to the L2TP header and model the design off of the
+    data-plane design of draft-ietf-lisp-crypto-03. The advantage is no
+    new header or mechanism required. The disadvanage is to have to define
+    non-standard bit sin the L2TP header.
+
+(2) Use IPsec's ESP header to encode key-id bits. The advantage is that ESP
+    supports multiple key-ids and rekeying. The disadvantage is that another
+    header, and therefore more packet overhead is added.
+
+Note, once we get unicast and multicast encap/decap working, we can start
+looking at getting data-plane security to work. At that time, we'll make the
+call to go with (1) or (2), or something else perhaps.
+
+-------------------------------------------------------------------------------
