@@ -2215,9 +2215,6 @@ test_proc = {
     local found = false
     if #ps == 0 then error "skipped" end -- not mounted but mount point exists
     for i = 1, #ps do
-      if ps[i].pid == 1 then
-        assert(ps[i].cmdline:find("init") or ps[i].cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
-      end
       if ps[i].pid == me then found = true end
     end
     assert(found, "expect to find my process in ps")
@@ -2234,7 +2231,6 @@ test_proc = {
     local p = util.proc(1)
     if not p.cmdline then error "skipped" end -- no files found, /proc not mounted
     assert(p and p.cmdline, "expect init to have cmdline")
-    assert(p.cmdline:find("init") or p.cmdline:find("systemd"), "expect init or systemd to be process 1 usually")
   end,
 }
 
@@ -2312,8 +2308,6 @@ test_processes = {
   end,
   test_fork_wait = function()
     local pid0 = S.getpid()
-    assert(pid0 > 1, "expecting my pid to be larger than 1")
-    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
     local pid = assert(S.fork())
     if pid == 0 then -- child
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
@@ -2327,8 +2321,6 @@ test_processes = {
   end,
   test_fork_waitpid = function()
     local pid0 = S.getpid()
-    assert(pid0 > 1, "expecting my pid to be larger than 1")
-    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
     local pid = assert(S.fork())
     if pid == 0 then -- child
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
@@ -2357,8 +2349,6 @@ test_processes = {
   end,
   test_fork_wait4 = function()
     local pid0 = S.getpid()
-    assert(pid0 > 1, "expecting my pid to be larger than 1")
-    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
     local pid = assert(S.fork())
     if pid == 0 then -- child
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
@@ -2373,8 +2363,6 @@ test_processes = {
   end,
   test_fork_wait3 = function()
     local pid0 = S.getpid()
-    assert(pid0 > 1, "expecting my pid to be larger than 1")
-    assert(S.getppid() > 1, "expecting my parent pid to be larger than 1")
     local pid = assert(S.fork())
     if pid == 0 then -- child
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
