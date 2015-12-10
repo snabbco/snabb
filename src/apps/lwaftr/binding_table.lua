@@ -5,6 +5,23 @@ local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local lwutil = require("apps.lwaftr.lwutil")
 
+ffi.cdef[[
+// 4 bytes for the hash, which precedes the key.
+// 8 bytes for the key.
+struct binding_table_key {
+   uint8_t ipv4[4];     // Public IPv4 address of this tunnel.
+   uint16_t psid;       // Port set ID.
+   uint8_t a, k;        // A and K parameters used to divide the port
+                        // range for this IP.
+} __attribute__((packed));
+// 20 bytes for the value.
+struct binding_table_value {
+   uint32_t br;         // Which border router (lwAFTR)?
+   uint8_t b4_ipv6[16]; // Address of B4.
+} __attribute__((packed));
+// Sum: 32 bytes, which has nice cache alignment properties.
+]]
+
 -- TODO: rewrite this after netconf integration
 local function read_binding_table(bt_file)
   local input = io.open(bt_file)
