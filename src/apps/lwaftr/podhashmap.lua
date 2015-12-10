@@ -36,11 +36,34 @@ local function hash_to_index(hash, scale)
    return floor(hash*scale + 0.5)
 end
 
+local function make_equal_fn(key_type)
+   local size = ffi.sizeof(key_type)
+   if pcall(tonumber, ffi.new(key_type)) then
+      return function (a, b)
+         return a == b
+      end
+   elseif size == 4 then
+      local cast = ffi.cast
+      return function (a, b)
+         return cast('uint32_t[1]', a)[0] == cast('uint32_t[1]', b)[0]
+      end
+   elseif size == 8 then
+      return function (a, b)
+         return cast('uint64_t[1]', a)[0] == cast('uint64_t[1]', b)[0]
+      end
+   else
+      return function (a, b)
+         return C.memcmp(a, b, size) == 0
+      end
+   end
+end
+
 function PodHashMap.new(key_type, value_type, hash_fn)
    local phm = {}   
    phm.entry_type = make_entry_type(key_type, value_type)
    phm.type = make_entries_type(phm.entry_type)
    phm.hash_fn = hash_fn
+   phm.equal_fn = make_equal_fn(key_type)
    phm.size = 0
    phm.occupancy = 0
    phm.max_occupancy_rate = MAX_OCCUPANCY_RATE
@@ -198,7 +221,7 @@ function PodHashMap:lookup(key)
    local index = hash_to_index(hash, self.scale)
    local other_hash = entries[index].hash
 
-   if hash == other_hash and key == entries[index].key then
+   if hash == other_hash and self.equal_fn(key, entries[index].key) then
       -- Found!
       return index
    end
@@ -209,7 +232,7 @@ function PodHashMap:lookup(key)
    end
 
    while other_hash == hash do
-      if key == entries[index].key then
+      if self.equal_fn(key, entries[index].key) then
          -- Found!
          return index
       end
@@ -337,6 +360,7 @@ function PodHashMap:make_lookup_streamer(stride)
       all_entries = self.entries,
       stride = stride,
       hash_fn = self.hash_fn,
+      equal_fn = self.equal_fn,
       entries_per_lookup = self.max_displacement + 1,
       scale = self.scale,
       pointers = ffi.new('void*['..stride..']'),
@@ -372,6 +396,7 @@ function LookupStreamer:stream()
    local pointers = self.pointers
    local stream_entries = self.stream_entries
    local entries_per_lookup = self.entries_per_lookup
+   local equal_fn = self.equal_fn
 
    for i=0,stride-1 do
       local hash = self.hash_fn(entries[i].key)
@@ -385,7 +410,7 @@ function LookupStreamer:stream()
    -- Copy results into entries.
    for i=0,stride-1 do
       local hash = entries[i].hash
-      local index = i * self.entries_per_lookup
+      local index = i * entries_per_lookup
       local offset = self.binary_search(stream_entries + index, hash)
       local found = index + offset
       -- It could be that we read one beyond the ENTRIES_PER_LOOKUP
@@ -393,7 +418,7 @@ function LookupStreamer:stream()
       -- make_lookup_streamer.
       if stream_entries[found].hash == hash then
          -- Direct hit?
-         if stream_entries[found].key == entries[i].key then
+         if equal_fn(stream_entries[found].key, entries[i].key) then
             entries[i].value = stream_entries[found].value
          else
             -- Mark this result as not found unless we prove
@@ -403,7 +428,7 @@ function LookupStreamer:stream()
             -- Collision?
             found = found + 1
             while stream_entries[found].hash == hash do
-               if stream_entries[found].key == entries[i].key then
+               if equal_fn(stream_entries[found].key, entries[i].key) then
                   -- Yay!  Re-mark this result as found.
                   entries[i].hash = hash
                   entries[i].value = stream_entries[found].value
