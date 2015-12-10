@@ -294,7 +294,9 @@ local function in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, 
    for i=1,#binding_table do
       local bind = binding_table[i]
       if debug then
-         print("CHECKB4", string.format("%x, %x", bind[2], ipv4_src_ip), ipv4_src_port)
+         print("CHECKB4", string.format("%s, src=%s:%i",
+               lwdebug.format_ipv4(C.ntohl(bind[2])),
+               lwdebug.format_ipv4(C.ntohl(ipv4_src_ip)), ipv4_src_port))
       end
       if bind[2] == ipv4_src_ip then
          if ipv4_src_port >= bind[3] and ipv4_src_port <= bind[4] then
