@@ -261,12 +261,21 @@ end
 
 -- https://www.ietf.org/id/draft-farrer-softwire-br-multiendpoints-01.txt
 -- Return the destination IPv6 address, *and the source IPv6 address*
-local function binding_lookup_ipv4_from_pkt(lwstate, pkt, pre_ipv4_bytes)
-   local dst_ip_start = pre_ipv4_bytes + 16
+local function binding_lookup_dst_ipv4_from_pkt(lwstate, pkt, pre_ipv4_bytes)
+   local dst_ip_start = pre_ipv4_bytes + constants.o_ipv4_dst_addr
    -- Note: ip is kept in network byte order, regardless of host byte order
    local ip = rd32(pkt.data + dst_ip_start)
    local dst_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes) + 2
    local port = C.ntohs(rd16(pkt.data + dst_port_start))
+   return binding_lookup_ipv4(lwstate, ip, port)
+end
+
+local function binding_lookup_src_ipv4_from_pkt(lwstate, pkt, pre_ipv4_bytes)
+   local src_ip_start = pre_ipv4_bytes + constants.o_ipv4_src_addr
+   -- Note: ip is kept in network byte order, regardless of host byte order
+   local ip = rd32(pkt.data + src_ip_start)
+   local src_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes)
+   local port = C.ntohs(rd16(pkt.data + src_port_start))
    return binding_lookup_ipv4(lwstate, ip, port)
 end
 
@@ -519,7 +528,7 @@ local function from_inet(lwstate, pkt)
    end
 
    -- It's not incoming ICMP; back to regular processing
-   local ipv6_dst, ipv6_src = binding_lookup_ipv4_from_pkt(lwstate, pkt, lwstate.l2_size)
+   local ipv6_dst, ipv6_src = binding_lookup_dst_ipv4_from_pkt(lwstate, pkt, lwstate.l2_size)
    if not ipv6_dst then
       if debug then print("lookup failed") end
       if lwstate.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
@@ -629,10 +638,13 @@ local function icmpv6_incoming(lwstate, pkt)
 
    -- There's an ICMPv4 packet. If it's in response to a packet from the external
    -- network, send it there. If hairpinning is/was enabled, it could be from a
-   -- b4; if it was from a b4, encapsulate the generaced IPv4 message and send it.
+   -- b4; if it was from a b4, encapsulate the generated IPv4 message and send it.
    -- This is the most plausible reading of RFC 2473, although not unambigous.
-   local ipv6_dst = binding_lookup_ipv4_from_pkt(lwstate, icmpv4_reply, lwstate.l2_size)
+   local first_ipv4_header_bytes = get_ihl_from_offset(icmpv4_reply, lwstate.l2_size)
+   local pre_embed_ipv4_bytes = lwstate.l2_size + first_ipv4_header_bytes + constants.icmp_base_size
+   local ipv6_dst = binding_lookup_src_ipv4_from_pkt(lwstate, icmpv4_reply, pre_embed_ipv4_bytes)
    if ipv6_dst and lwstate.hairpinning then
+      if debug then print("Hairpinning ICMPv4 mapped from ICMPv6") end
       -- Hairpinning was implicitly allowed now or in the recent past if the
       -- binding table lookup succeeded. Nonetheless, require that it be
       -- currently true to encapsulate and hairpin the outgoing packet.
@@ -733,7 +745,7 @@ local function from_b4(lwstate, pkt)
       local offset = lwstate.l2_size + constants.ipv6_fixed_header_size
       if debug then
          print("lwstate.hairpinning is", lwstate.hairpinning)
-         print("binding_lookup...", binding_lookup_ipv4_from_pkt(lwstate, pkt, offset))
+         print("binding_lookup...", binding_lookup_dst_ipv4_from_pkt(lwstate, pkt, offset))
       end
       if lwstate.hairpinning and ipv4_dst_in_binding_table(lwstate, pkt, offset) then
          -- Remove IPv6 header.
