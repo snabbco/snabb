@@ -114,7 +114,7 @@ function PodHashMap:resize(size)
    local mem, err
    if try_huge_pages and byte_size > 1e6 then
       mem, err = S.mmap(nil, byte_size, 'read, write',
-                              'private, anonymous, hugetlb')
+                        'private, anonymous, hugetlb')
       if not mem then
          print("hugetlb mmap failed ("..tostring(err)..'), falling back.')
          try_use_huge_pages = false
@@ -523,9 +523,10 @@ function selftest()
    rhh:resize(2e6 / 0.4 + 1)
 
    local function test_insertion(count)
-      for i = 1, count do
-         local v = bnot(i)
-         rhh:add(i, ffi.new('int32_t[6]', {v, v, v, v, v, v}))
+      local v = ffi.new('int32_t[6]');
+      for i = 1,count do
+         for j=0,5 do v[j] = bnot(i) end
+         rhh:add(i, v)
       end
    end
 
@@ -570,8 +571,9 @@ function selftest()
          end
          return result
       end
-      -- Note that "result" is an index into `results', not the phm, and
-      -- so we expect the results to be different from rhh:lookup().
+      -- Note that "result" is part of the value, not an index into
+      -- the table, and so we expect the results to be different from
+      -- rhh:lookup().
       check_perf(test_lookup_streamer, 2e6, 1000, 100,
                  'streaming lookup, stride='..stride)
       stride = stride * 2
