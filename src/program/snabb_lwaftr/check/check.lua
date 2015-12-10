@@ -42,6 +42,6 @@ function run(args)
    config.link(c, "lwaftr.v6 -> output_filev6.input")
 
    app.configure(c)
-   app.main({duration=1})
+   app.main({duration=0.10})
    print("done")
 end
