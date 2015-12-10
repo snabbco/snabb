@@ -38,18 +38,18 @@ end
 
 local function make_equal_fn(key_type)
    local size = ffi.sizeof(key_type)
-   if pcall(tonumber, ffi.new(key_type)) then
+   local cast = ffi.cast
+   if tonumber(ffi.new(key_type)) then
       return function (a, b)
          return a == b
       end
    elseif size == 4 then
-      local cast = ffi.cast
       return function (a, b)
-         return cast('uint32_t[1]', a)[0] == cast('uint32_t[1]', b)[0]
+         return cast('uint32_t*', a)[0] == cast('uint32_t*', b)[0]
       end
    elseif size == 8 then
       return function (a, b)
-         return cast('uint64_t[1]', a)[0] == cast('uint64_t[1]', b)[0]
+         return cast('uint64_t*', a)[0] == cast('uint64_t*', b)[0]
       end
    else
       return function (a, b)
@@ -605,4 +605,27 @@ function selftest()
    until stride > 256
 
    check_perf(test_lookup, 2e6, 300, 100, 'lookup (40% occupancy)')
+
+   -- A check that our equality functions work as intended.
+   local numbers_equal = make_equal_fn(ffi.typeof('int'))
+   local four_byte = ffi.typeof('struct { uint32_t x[1]; }')
+   local eight_byte = ffi.typeof('struct { uint32_t x[2]; }')
+   local twelve_byte = ffi.typeof('struct { uint32_t x[3]; }')
+   local four_byte_equal = make_equal_fn(four_byte)
+   local eight_byte_equal = make_equal_fn(eight_byte)
+   local twelve_byte_equal = make_equal_fn(twelve_byte)
+   assert(numbers_equal(1,1))
+   assert(not numbers_equal(1,2))
+   assert(four_byte_equal(ffi.new(four_byte, {{1}}),
+                          ffi.new(four_byte, {{1}})))
+   assert(not four_byte_equal(ffi.new(four_byte, {{1}}),
+                              ffi.new(four_byte, {{2}})))
+   assert(eight_byte_equal(ffi.new(eight_byte, {{1,1}}),
+                           ffi.new(eight_byte, {{1,1}})))
+   assert(not eight_byte_equal(ffi.new(eight_byte, {{1,1}}),
+                               ffi.new(eight_byte, {{1,2}})))
+   assert(twelve_byte_equal(ffi.new(twelve_byte, {{1,1,1}}),
+                            ffi.new(twelve_byte, {{1,1,1}})))
+   assert(not twelve_byte_equal(ffi.new(twelve_byte, {{1,1,1}}),
+                                ffi.new(twelve_byte, {{1,1,2}})))
 end
