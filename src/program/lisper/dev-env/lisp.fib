@@ -1,4 +1,10 @@
-[4660] 00:00:00:00:aa:01 rloc fd80:1::2 1 50
-[4660] 00:00:00:00:aa:02 rloc fd80:2::2 1 50
-[4660] 00:00:00:00:aa:03 rloc fd80:3::2 1 50
-[4660] FF:FF:FF:FF:FF:FF rloc fd80:1::2 1 50, fd80:2::2 1 50, fd80:3::2 1 50
+{ "instance-id": 1, "eid-prefix": "000000-00bb01/48", "rlocs": [{ "rloc": "fd80:8::2", "priority": 1, "weight": 50 }] }
+
+{ "instance-id": 1, "eid-prefix": "000000-00bb02/48", "rlocs": [{ "rloc": "fd80:8::2", "priority": 1, "weight": 50 }] }
+
+{ "instance-id": 1, "eid-prefix": "000000-00bb03/48", "rlocs": [{ "rloc": "fd80:8::2", "priority": 1, "weight": 50 }] }
+
+{ "instance-id": 4660, "eid-prefix": "ffffff-ffffff/48", "rles":  [
+    { "rle":  "fd80:8::2", "priority": 1, "weight": 50 }
+]}
+
