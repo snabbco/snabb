@@ -29,5 +29,8 @@ References:
 
 — Key **keymat**
 
-*Required*. Hex string containing key material as specified in RFC 4106.
+*Required*. Hex string containing 16 bytes of key material as specified in RFC 4106.
 
+— Key **salt**
+
+*Required*. Hex string containing four bytes of salt as specified in RFC 4106.
