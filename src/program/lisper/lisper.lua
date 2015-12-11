@@ -447,6 +447,7 @@ local function route_packet(p, rxname, txports)
       if not src_ip then return end --invalid packet
       if lispers[src_ip] then --packet came from a lisper
          iid = session_id --iid comes in the session_id field, cookie is ignored
+         log_l2tp("(((", p, rxname)
       else --packet came from a l2tp tunnel
          local t = l2tps[session_id] and l2tps[session_id][cookie]
          log_l2tp("<<<", p, rxname)
