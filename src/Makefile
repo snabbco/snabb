@@ -52,6 +52,8 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LU
 	$(E) "LINK      $@"
 	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../lib/luajit/src/libluajit.a \
+	    ../lib/intel-ipsec/code/obj/gcm_avx_gen4.o \
+	    ../lib/intel-ipsec/code/obj/aes_keyexp_128.o \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
 	@ln -fs snabb snabbswitch
