@@ -11,9 +11,11 @@ end
 
 local ffi = require("ffi")
 local S   = require("syscall")
+local _   = string.format
 
-local CONTROL_SOCK = "/var/tmp/lisp-ipc-map-cache"
-local PUNT_SOCK    = "/var/tmp/lispers.net-itr"
+local N            = os.getenv("LISP_N") or ""
+local CONTROL_SOCK = "/var/tmp/lisp-ipc-map-cache"..N
+local PUNT_SOCK    = "/var/tmp/lispers.net-itr"..N
 
 S.signal('pipe', 'ign') --I 💔 Linux
 
@@ -22,7 +24,7 @@ sock = sock or assert(S.socket("unix", "dgram, nonblock"))
 local sa = S.t.sockaddr_un(CONTROL_SOCK)
 local ok, err = sock:connect(sa)
 if not ok then
-	if err.CONNREFUSED or err.AGAIN then
+	if err.CONNREFUSED or err.AGAIN or err.NOENT then
 		S.sleep(1)
 		print'retrying...'
 		goto retry
@@ -34,11 +36,8 @@ print'connected'
 while true do
 	if assert(S.select({writefds = {sock}}, 0)).count == 1 then
 
-		local f = assert(io.open'lisp.fib')
-		local s = f:read'*a'
-		f:close()
 		local t = {}
-		for s in s:gmatch'(.-)[\r?\n][\r?\n]' do
+		for s in io.lines('lisp'..N..'.fib') do
 			table.insert(t, s)
 		end
 

@@ -1,12 +1,2 @@
-run() {
-ip netns exec app2 ./l2tp.lua t0 e0 \
-    00:00:00:00:01:02 \
-    00:00:00:00:00:02 \
-    fd80:0002:0000:0000:0000:0000:0000:0002 \
-    fd80:0004:0000:0000:0000:0000:0000:0002 \
-    00000002 00000002
-}
-start()   { run >/dev/null & }
-stop()    { pgrep -f 'l2tp.lua .*?01:02 ' | xargs kill -9; }
-restart() { stop; start; }
-if [ "$1" ]; then $1; else stop; run; fi
+APP_N=2 LISP_N=4 ./l2tp.app "$@"
+

@@ -18,6 +18,12 @@ local json     = require("lib.json")
 
 --utils ----------------------------------------------------------------------
 
+local htons = lib.htons
+local htonl = lib.htonl
+local ntohl = lib.ntohl
+local getenv = lib.getenv
+local hexdump = lib.hexdump
+
 local function assert(v, ...) --assert overload because
    if v then return v, ... end
    error(tostring((...)), 2)
@@ -30,8 +36,9 @@ local function parsehex(s)
 end
 
 local function parsemac(s)
-   return ffi.string(ethernet:pton(s:gsub('[%:%s%-]', '')
-      :gsub('..', function(d) return d..':' end):gsub('%:$', '')), 6)
+   local s = parsehex(s:gsub("[%:%s%-]", ""))
+   assert(#s == 6)
+   return s
 end
 
 local function parseip6(s)
@@ -40,7 +47,12 @@ end
 
 local function macstr(mac)
    local mac = ffi.string(mac, 6)
-   return lib.hexdump(mac):gsub(" ", ":")
+   return hexdump(mac):gsub(" ", ":"):lower()
+end
+
+local function macstr2(mac)
+   local mac = macstr(mac):gsub(":", "")
+   return mac:sub(1, 6).."-"..mac:sub(7)
 end
 
 local function ip6str(ip6)
@@ -51,16 +63,12 @@ local function padhex(s, n) --pad a hex string to a fixed number of bytes
    return ("0"):rep(n*2 - #s)..s
 end
 
-local function parsesessid(sid) --4-byte L2TPV3 session id given as a number
-   return lib.htonl(assert(tonumber(sid)))
-end
-
 local function parsecookie(cookie) --8-byte L2TPv3 cookie given in hex
    return parsehex(padhex(cookie, 8))
 end
 
 local function cookiestr(cookie)
-   local s = lib.hexdump(ffi.string(cookie, 8)):gsub(" ", "")
+   local s = hexdump(ffi.string(cookie, 8)):gsub(" ", "")
    return s == ("0"):rep(16) and "0" or s
 end
 
@@ -82,8 +90,8 @@ local empty_mac     = parsemac("000000-000000")
 
 --config ---------------------------------------------------------------------
 
-local DEBUG = lib.getenv"LISPER_DEBUG" --if set, print packets to stdout
-local MODE  = lib.getenv"LISPER_MODE"  --if set to "record" then record packets to pcap files
+local DEBUG = getenv"LISPER_DEBUG" --if set, print packets to stdout
+local MODE  = getenv"LISPER_MODE"  --if set to "record" then record packets to pcap files
 
 --phy_t:         {name=s, mac=mac, pci=s, vlans={vlan1_t, ...}, exits={exit1_t,...}}
 --vlan_t:        {name=s, mac=mac, id=n, interface=phy_t, exits={exit1_t,...}}
@@ -178,8 +186,7 @@ local function update_config(s)
       for i,net in ipairs(t.local_networks) do
          local context = "local network #"..i
          if net.type and net.type:lower() == "l2tpv3" then
-            assert(net.session_id, "session_id missing on "..context)
-            local sid = parsesessid(net.session_id)
+            local sid = assert(net.session_id, "session_id missing on "..context)
             local cookie = parsecookie(net.cookie)
             local ip = parseip6(net.ip)
             local exit = exits[net.exit]
@@ -211,12 +218,14 @@ local function update_config(s)
    if t.lispers then
       for i,t in ipairs(t.lispers) do
          local ip = parseip6(t.ip)
-         local exit = ifs[t.exit]
+         local exit = exits[t.exit]
          assert(exit, "invalid exit "..t.exit)
          lispers[ip] = exit
       end
    end
 end
+
+local log_learn --fw. decl.
 
 --see "Map-Cache Population IPC Interface" section in dt-l2-overlay.txt
 --for the format of s.
@@ -228,6 +237,19 @@ local function update_fib(s)
    local mac = eid_prefix:gsub("/%d+$", "") --MAC/48
    local mac = parsemac(mac)
    local rt = {}
+   if mac == broadcast_mac then
+      --when learning about a broadcast address we learn which remote lispers
+      --are configured to transport a certain iid, but we must preserve
+      --the statically configured locations.
+      local cur_locs = dt[mac]
+      if cur_locs then
+         for i,loc in ipairs(cur_locs) do
+            if loc.type ~= "lisper" then
+               table.insert(rt, loc)
+            end
+         end
+      end
+   end
    dt[mac] = rt
    local rlocs = t.rlocs or t.rles
    if rlocs and #rlocs > 0 then
@@ -248,6 +270,7 @@ local function update_fib(s)
             exit = exit,
          }
          table.insert(rt, loc)
+         log_learn(iid, mac, loc)
       end
    end
 end
@@ -310,7 +333,7 @@ local function parse_l2tp(p)
    if p.ethertype ~= 0xdd86 then return end --not IPv6
    if p.next_header ~= 115 then return end --not L2TPv3
    local src_ip = ffi.string(p.src_ip, 16)
-   local sid = p.session_id
+   local sid = ntohl(p.session_id)
    local cookie = ffi.string(p.cookie, 8)
    local l2tp_smac = ffi.string(p.l2tp_smac, 6)
    local l2tp_dmac = ffi.string(p.l2tp_dmac, 6)
@@ -340,12 +363,12 @@ local function format_l2tp(srcp, payload_offset, smac, dmac, src_ip, dst_ip, sid
    p.ethertype = 0xdd86 --ipv6
    p.flow_id = 0x60 --ipv6
    local plen = srcp.length - payload_offset
-   p.payload_length = lib.htons(plen + 12) --payload + L2TPv3 header
+   p.payload_length = htons(plen + 12) --payload + L2TPv3 header
    p.next_header = 115 --L2TPv3
    p.hop_limit = 64 --default
    ffi.copy(p.src_ip, src_ip, 16)
    ffi.copy(p.dst_ip, dst_ip, 16)
-   p.session_id = sid
+   p.session_id = htonl(sid)
    ffi.copy(p.cookie, cookie, 8)
    return dstp
 end
@@ -360,7 +383,7 @@ local function log_eth(text, p, ifname)
    end
 
    print(_("ETH %s %s (%4d): [%s -> %s]",
-      ifname, text, pk.length, macstr(p.smac), macstr(p.dmac)))
+      ifname, text, pk.length, macstr2(p.smac), macstr2(p.dmac)))
 end
 
 local function log_l2tp(text, pk, ifname)
@@ -373,33 +396,36 @@ local function log_l2tp(text, pk, ifname)
 
    if not valid then
       print("L2TP %s %s (%4d): INVALID: ethertype: 0x%04x, next_header: %d",
-         ifname, text, pk.length, lib.htons(p.ethertype), p.next_header)
+         ifname, text, pk.length, htons(p.ethertype), p.next_header)
       return
    end
 
    print(_("L2TP %s %s (%4d): [%s -> %s] 0x%04x/%s %s,%s -> %s,%s",
       ifname, text, pk.length,
-      macstr(p.l2tp_smac),
-      macstr(p.l2tp_dmac),
-      lib.ntohl(p.session_id),
+      macstr2(p.l2tp_smac),
+      macstr2(p.l2tp_dmac),
+      ntohl(p.session_id),
       cookiestr(p.cookie),
-      macstr(p.smac), ip6str(p.src_ip),
-      macstr(p.dmac), ip6str(p.dst_ip)))
+      macstr2(p.smac), ip6str(p.src_ip),
+      macstr2(p.dmac), ip6str(p.dst_ip)))
 end
 
-local function log_learn(iid, smac, sloc)
+function log_learn(iid, smac, sloc)
    if not DEBUG then return end
-   print(_("LEARN: [%d] %s <- %s %s", iid, macstr(smac), sloc.type,
+   print(_("LEARN: [%d] %s <- type: %s, %s", iid, macstr2(smac), sloc.type,
       sloc.type == "ethernet"
          and ip6str(sloc.interface.name)
       or sloc.type == "l2tpv3"
          and _("ip: %s, session_id: 0x%04x, cookie: %s",
             ip6str(sloc.ip),
-            lib.ntohl(sloc.session_id),
+            sloc.session_id,
             cookiestr(sloc.cookie)
          )
       or sloc.type == "lisper"
-         and _("ip: %s", ip6str(sloc.ip))
+         and _("ip: %s%s%s%s", ip6str(sloc.ip),
+            sloc.p and ", p: "..sloc.p or "",
+            sloc.w and ", w: "..sloc.w or "",
+            sloc.key and ", key: "..hexdump(sloc.key):gsub(" ", "") or "")
    ))
 end
 
@@ -462,6 +488,8 @@ local function route_packet(p, rxname, txports)
          local txname = loc.exit.interface.name
          tx = txports[txname]
          log_l2tp(">>>", dp, txname)
+      elseif not sloc then
+         return --came from a lisper, drop it to prevent ringing
       elseif loc.type == "lisper" then
          dp = format_l2tp(p, payload_offset,
             loc.exit.interface.mac,
@@ -472,7 +500,7 @@ local function route_packet(p, rxname, txports)
             "\0\0\0\0\0\0\0\0")
          local txname = loc.exit.interface.name
          tx = txports[txname]
-         log_l2tp(">>>", dp, txname)
+         log_l2tp(")))", dp, txname)
       end
       if link.full(tx) then return end
       link.transmit(tx, dp)
