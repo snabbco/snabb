@@ -1,2 +1,0 @@
-APP_N=2 LISP_N=4 ./l2tp.app "$@"
-

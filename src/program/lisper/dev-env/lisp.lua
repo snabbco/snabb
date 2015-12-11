@@ -13,9 +13,9 @@ local ffi = require("ffi")
 local S   = require("syscall")
 local _   = string.format
 
-local N            = os.getenv("LISP_N") or ""
-local CONTROL_SOCK = "/var/tmp/lisp-ipc-map-cache"..N
-local PUNT_SOCK    = "/var/tmp/lispers.net-itr"..N
+local LISP_N       = os.getenv("LISP_N") or ""
+local CONTROL_SOCK = "/var/tmp/lisp-ipc-map-cache"..LISP_N
+local PUNT_SOCK    = "/var/tmp/lispers.net-itr"..LISP_N
 
 S.signal('pipe', 'ign') --I 💔 Linux
 
@@ -37,7 +37,7 @@ while true do
 	if assert(S.select({writefds = {sock}}, 0)).count == 1 then
 
 		local t = {}
-		for s in io.lines('lisp'..N..'.fib') do
+		for s in io.lines('lisp'..LISP_N..'.fib') do
 			table.insert(t, s)
 		end
 
