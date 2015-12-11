@@ -98,13 +98,13 @@ function esp_v6_decrypt:decrypt (payload, length)
    local data_start = payload + esp_length
    local data_length = length - esp_length - self.aes_128_gcm.auth_size
    local esp = esp:new_from_mem(payload, esp_length)
-   -- How do we know if authentication failed?
-   self.aes_128_gcm:decrypt(data_start, data_start, data_length, esp)
-   local esp_tail_start = data_start + data_length - esp_tail_length
-   local esp_tail = esp_tail:new_from_mem(esp_tail_start, esp_tail_length)
-   local cleartext_length = data_length - esp_tail:pad_length() - esp_tail_length
-   local p = packet.from_pointer(data_start, cleartext_length)
-   return esp:seq_no(), p, esp_tail:next_header()
+   if self.aes_128_gcm:decrypt(data_start, data_start, data_length, esp) then
+      local esp_tail_start = data_start + data_length - esp_tail_length
+      local esp_tail = esp_tail:new_from_mem(esp_tail_start, esp_tail_length)
+      local cleartext_length = data_length - esp_tail:pad_length() - esp_tail_length
+      local p = packet.from_pointer(data_start, cleartext_length)
+      return esp:seq_no(), p, esp_tail:next_header()
+   end
 end
 
 function esp_v6_decrypt:push ()

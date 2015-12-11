@@ -75,6 +75,7 @@ function aes_128_gcm:new (conf)
    C.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
    o.blocksize = 128
    o.auth_size = 16
+   o.auth_buf = ffi.new("uint8_t[?]", o.auth_size)
    o.aad_size = 16
    return setmetatable(o, {__index=aes_128_gcm})
 end
@@ -96,7 +97,8 @@ function aes_128_gcm:decrypt (out_ptr, ciphertext, length, esp)
                             ciphertext, length,
                             u8_ptr(self.iv:header_ptr()),
                             u8_ptr(esp:header_ptr()), esp:sizeof(),
-                            ciphertext + length, self.auth_size)
+                            self.auth_buf, self.auth_size)
+   return C.memcmp(self.auth_buf, ciphertext + length, self.auth_size) == 0
 end
 
 return aes_128_gcm
