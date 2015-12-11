@@ -26,7 +26,7 @@ local hexdump = lib.hexdump
 
 local function assert(v, ...) --assert overload because
    if v then return v, ... end
-   error(tostring((...)), 2)
+   error(tostring((...) or "Assertion failed"), 2)
 end
 
 local function parsehex(s)
@@ -202,10 +202,10 @@ local function update_config(s)
             local blocs = attr(attr(locs, net.iid), broadcast_mac)
             table.insert(blocs, loc)
          else
-            assert(ifs[net.interface], "invalid interface "..net.interface)
+            local iface = assert(ifs[net.interface], "invalid interface "..net.interface)
             local loc = {
                type = "ethernet",
-               interface = net.interface,
+               interface = iface,
             }
             eths[net.interface] = {iid = net.iid, loc = loc}
             local blocs = attr(attr(locs, net.iid), broadcast_mac)
@@ -373,16 +373,16 @@ local function format_l2tp(srcp, payload_offset, smac, dmac, src_ip, dst_ip, sid
    return dstp
 end
 
-local function log_eth(text, p, ifname)
+local function log_eth(text, pk, ifname)
    if not DEBUG then return end
    local p = ffi.cast(l2tp_ctp, pk.data)
 
-   if not pk.length >= 12 then
-      print(_("ETH %s %s (%4d): INVALID", ifname, text, p.length))
+   if pk.length < 12 then
+      print(_("ETH  %-4s %s (%4d): INVALID", ifname, text, pk.length))
       return
    end
 
-   print(_("ETH %s %s (%4d): [%s -> %s]",
+   print(_("ETH  %-4s %s (%4d): [%s -> %s]",
       ifname, text, pk.length, macstr2(p.smac), macstr2(p.dmac)))
 end
 
@@ -390,17 +390,18 @@ local function log_l2tp(text, pk, ifname)
    if not DEBUG then return end
    local p = ffi.cast(l2tp_ctp, pk.data)
 
-   local valid = pk.length >= l2tp_ct_size
+   local valid =
+      pk.length >= l2tp_ct_size
       and p.ethertype == 0xdd86
       and p.next_header == 115
 
    if not valid then
-      print("L2TP %s %s (%4d): INVALID: ethertype: 0x%04x, next_header: %d",
+      print("L2TP %-4s %s (%4d): INVALID: ethertype: 0x%04x, next_header: %d",
          ifname, text, pk.length, htons(p.ethertype), p.next_header)
       return
    end
 
-   print(_("L2TP %s %s (%4d): [%s -> %s] 0x%04x/%s %s,%s -> %s,%s",
+   print(_("L2TP %-4s %s (%4d): [%s -> %s] 0x%04x/%s %s,%s -> %s,%s",
       ifname, text, pk.length,
       macstr2(p.l2tp_smac),
       macstr2(p.l2tp_dmac),
@@ -439,6 +440,7 @@ local function route_packet(p, rxname, txports)
       iid, sloc = t.iid, t.loc
       smac, dmac, payload_offset = parse_eth(p)
       if not smac then return end --invalid packet
+      log_eth("<<<", p, rxname)
    else --packet came from a l2tp tunnel or a lisper
       local src_ip, session_id, cookie
       src_ip, session_id, cookie, smac, dmac, payload_offset = parse_l2tp(p)
@@ -502,8 +504,9 @@ local function route_packet(p, rxname, txports)
          tx = txports[txname]
          log_l2tp(")))", dp, txname)
       end
-      if link.full(tx) then return end
-      link.transmit(tx, dp)
+      if not link.full(tx) then
+         link.transmit(tx, dp)
+      end
    end
 end
 
@@ -546,12 +549,22 @@ end
 
 local Lisper = {}
 
+local ports = {} --{ifname1,...}
+
 function Lisper:new()
+   --make a list of ports connected to lisper for faster iteration
+   for ifname,iface in pairs(ifs) do
+      if not iface.vlans or #iface.vlans == 0 then
+         table.insert(ports, ifname)
+      end
+   end
    return setmetatable({}, {__index = self})
 end
 
 function Lisper:push()
-   for rxname, rx in pairs(self.input) do
+   for i=1,#ports do
+      local rxname = ports[i]
+      local rx = self.input[rxname]
       while not link.empty(rx) do
          local p = link.receive(rx)
          route_packet(p, rxname, self.output)

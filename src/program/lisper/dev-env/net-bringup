@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-appnodes="1 2 3 5 6"
+appnodes="1 2 5 6"
 lispnodes="4 8"
 nodes="$appnodes $lispnodes"
 
@@ -19,16 +19,28 @@ for n in $nodes; do
     ip netns exec r2 ip link set e$n up
 done
 
+eth() {
+local p="$1"
+local n="$2"
+ip link add netns node$p e$n address 00:00:00:00:01:0$n type veth peer name t$n netns node$p address 00:00:00:00:aa:0$n
+ip netns exec node$p ip addr add 10.0.0.$n/24 dev t$n
+ip netns exec node$p ip link set e$n up
+ip netns exec node$p ip link set t$n up
+}
+eth 4 3
+eth 8 7
+
 for n in $appnodes; do
     ip netns exec node$n tunctl -t t0
     ip netns exec node$n ip link set address 00:00:00:00:aa:0$n dev t0
     ip netns exec node$n ifconfig t0 10.0.0.$n/24 mtu 1400 up
     ./l2tp.app$n start
 done
-./lisp4 start
-./lisp8 start
-./lisper4 start
-./lisper8 start
+
+for n in $lispnodes; do
+    ./lisp$n start
+    ./lisper$n start
+done
 }
 
 teardown() {
@@ -37,10 +49,10 @@ for n in $appnodes; do
     ./l2tp.app$n stop
 done
 
-./lisp4 stop
-./lisp8 stop
-./lisper4 stop
-./lisper8 stop
+for n in $lispnodes; do
+    ./lisp$n stop
+    ./lisper$n stop
+done
 
 for n in $nodes; do
     ip netns del node$n

@@ -1,9 +1,16 @@
 o="-q -c2000 -i0 -s1000"
 {
+# l2tp-l2tp
 ip netns exec node1 ping $o 10.0.0.2
+ip netns exec node5 ping $o 10.0.0.6
+# l2tp-eth
 ip netns exec node1 ping $o 10.0.0.3
-ip netns exec node2 ping $o 10.0.0.1
-ip netns exec node2 ping $o 10.0.0.3
-ip netns exec node3 ping $o 10.0.0.1
-ip netns exec node3 ping $o 10.0.0.2
+ip netns exec node5 ping $o 10.0.0.7
+# eth-l2tp
+ip netns exec node4 ping $o 10.0.0.1
+ip netns exec node8 ping $o 10.0.0.5
+# l2tp-lisper-l2tp
+ip netns exec node5 ping $o 10.0.0.1
+ip netns exec node1 ping $o 10.0.0.5
+# TODO: eth-eth
 } | grep loss
