@@ -300,7 +300,7 @@ LJLIB_CF(jit_util_traceinfo)
     setintfield(L, t, "link", T->link);
     setintfield(L, t, "nexit", T->nsnap);
     setintfield(L, t, "szmcode", T->szmcode);
-    setintfield(L, t, "mcode", T->mcode);
+    setintfield(L, t, "mcode", (int32_t)(intptr_t)T->mcode);
     setintfield(L, t, "mcloop", T->mcloop);
     setstrV(L, L->top++, lj_str_newz(L, jit_trlinkname[T->linktype]));
     lua_setfield(L, -2, "linktype");
