@@ -44,10 +44,7 @@ local function macstr(mac)
 end
 
 local function ip6str(ip6)
-   assert(ip6, "ip missing")
-   return
-      --type(ip6) == "string" and lib.hexdump(ip6):gsub(" ", ":") or
-      ipv6:ntop(ip6)
+   return ipv6:ntop(assert(ip6))
 end
 
 local function padhex(s, n) --pad a hex string to a fixed number of bytes
@@ -55,11 +52,16 @@ local function padhex(s, n) --pad a hex string to a fixed number of bytes
 end
 
 local function parsesessid(sid) --4-byte L2TPV3 session id given as a number
-   return lib.htonl(tonumber(sid))
+   return lib.htonl(assert(tonumber(sid)))
 end
 
 local function parsecookie(cookie) --8-byte L2TPv3 cookie given in hex
    return parsehex(padhex(cookie, 8))
+end
+
+local function cookiestr(cookie)
+   local s = lib.hexdump(ffi.string(cookie, 8)):gsub(" ", "")
+   return s == ("0"):rep(16) and "0" or s
 end
 
 local _ = string.format
@@ -76,6 +78,7 @@ local function attr(t, k)
 end
 
 local broadcast_mac = parsemac("ffffff-ffffff")
+local empty_mac     = parsemac("000000-000000")
 
 --config ---------------------------------------------------------------------
 
@@ -85,7 +88,7 @@ local MODE  = lib.getenv"LISPER_MODE"  --if set to "record" then record packets 
 --phy_t:         {name=s, mac=mac, pci=s, vlans={vlan1_t, ...}, exits={exit1_t,...}}
 --vlan_t:        {name=s, mac=mac, id=n, interface=phy_t, exits={exit1_t,...}}
 --if_t:          phy_t|vlan_t
---exit_t:        {ip=ipv6, interface=if_t, next_hop=ip6}
+--exit_t:        {ip=ipv6, interface=if_t, next_hop=ip6[, next_hop_mac=s]}
 --loc_t:         eth_loc_t|l2tp_loc_t|lisper_loc_t
 --eth_loc_t:     {type="ethernet", interface=if_t}
 --l2tp_loc_t:    {type="l2tpv3", ip=ip6, session_id=n, cookie=s, exit=exit_t}
@@ -163,6 +166,7 @@ local function update_config(s)
             ip = ip,
             interface = iface,
             next_hop = t.next_hop and parseip6(t.next_hop),
+            next_hop_mac = t.next_hop_mac and parsemac(t.next_hop_mac),
          }
          exits[t.name] = exit_t
          table.insert(iface.exits, exit_t)
@@ -175,7 +179,7 @@ local function update_config(s)
          local context = "local network #"..i
          if net.type and net.type:lower() == "l2tpv3" then
             assert(net.session_id, "session_id missing on "..context)
-            local sid = assert(parsesessid(net.session_id), "invalid session id")
+            local sid = parsesessid(net.session_id)
             local cookie = parsecookie(net.cookie)
             local ip = parseip6(net.ip)
             local exit = exits[net.exit]
@@ -274,7 +278,7 @@ local l2tp_ct = ffi.typeof[[
       // ipv6
       uint32_t flow_id; // version, tc, flow_id
       int16_t  payload_length;
-      int8_t   next_header; // 115 = l2tpv3
+      int8_t   next_header; // 115 = L2TPv3
       uint8_t  hop_limit;
       char     src_ip[16];
       char     dst_ip[16];
@@ -292,7 +296,7 @@ local l2tp_ct = ffi.typeof[[
 local l2tp_ct_size = ffi.sizeof(l2tp_ct)
 local l2tp_ctp = ffi.typeof("$*", l2tp_ct)
 
-local function eth_parse(p)
+local function parse_eth(p)
    if p.length < 12 then return end
    local p = ffi.cast(l2tp_ctp, p.data)
    local smac = ffi.string(p.smac, 6)
@@ -300,11 +304,11 @@ local function eth_parse(p)
    return smac, dmac, 0
 end
 
-local function l2tp_parse(p)
+local function parse_l2tp(p)
    if p.length < l2tp_ct_size then return end
    local p = ffi.cast(l2tp_ctp, p.data)
-   if p.ethertype ~= 0xdd86 then return end --not ipv6
-   if p.next_header ~= 115 then return end --not l2tpv3
+   if p.ethertype ~= 0xdd86 then return end --not IPv6
+   if p.next_header ~= 115 then return end --not L2TPv3
    local src_ip = ffi.string(p.src_ip, 16)
    local sid = p.session_id
    local cookie = ffi.string(p.cookie, 8)
@@ -313,72 +317,111 @@ local function l2tp_parse(p)
    return src_ip, sid, cookie, l2tp_smac, l2tp_dmac, 66
 end
 
-local function eth_format(srcp, payload_offset, smac, dmac)
-   local dstp = packet.clone(srcp)
-   local len = srcp.length - payload_offset
-   ffi.copy(dstp.data, srcp.data + payload_offset, len)
-   dstp.length = len
+local function copy_payload(srcp, src_payload_offset, dst_payload_offset)
+   local dstp = packet.allocate()
+   local payload_length = srcp.length - src_payload_offset
+   ffi.copy(
+      dstp.data + dst_payload_offset,
+      srcp.data + src_payload_offset,
+      payload_length)
+   dstp.length = dst_payload_offset + payload_length
+   return dstp
+end
+
+local function format_eth(srcp, payload_offset)
+   return copy_payload(srcp, payload_offset, 0)
+end
+
+local function format_l2tp(srcp, payload_offset, smac, dmac, src_ip, dst_ip, sid, cookie)
+   local dstp = copy_payload(srcp, payload_offset, 66)
    local p = ffi.cast(l2tp_ctp, dstp.data)
    ffi.copy(p.smac, smac, 6)
    ffi.copy(p.dmac, dmac, 6)
-   return dstp, p
-end
-
-local function ip6_format(srcp, payload_offset, smac, dmac, src_ip, dst_ip)
-   local dstp, p = eth_format(srcp, payload_offset, smac, dmac)
+   p.ethertype = 0xdd86 --ipv6
+   p.flow_id = 0x60 --ipv6
+   local plen = srcp.length - payload_offset
+   p.payload_length = lib.htons(plen + 12) --payload + L2TPv3 header
+   p.next_header = 115 --L2TPv3
+   p.hop_limit = 64 --default
    ffi.copy(p.src_ip, src_ip, 16)
    ffi.copy(p.dst_ip, dst_ip, 16)
-   return dstp, p
-end
-
-local function l2tp_format(srcp, payload_offset, smac, dmac, src_ip, dst_ip, sid, cookie)
-   local dstp, p = ip6_format(srcp, payload_offset, smac, dmac, src_ip, dst_ip)
    p.session_id = sid
    ffi.copy(p.cookie, cookie, 8)
    return dstp
 end
 
---[[
-local function l2tp_update(p, dest_ip, local_ip)
-   local p = ffi.cast(l2tp_ctp, p.data)
-   ffi.copy(p.src_ip, local_ip, 16)
-   ffi.copy(p.dst_ip, dest_ip, 16)
-end
-]]
+local function log_eth(text, p, ifname)
+   if not DEBUG then return end
+   local p = ffi.cast(l2tp_ctp, pk.data)
 
-local function l2tp_dump(p, text)
-   local p = ffi.cast(l2tp_ctp, p.data)
-   if not (p.length >= l2tp_ct_size
-      and p.ethertype == 0xdd86
-      and p.next_header == 115)
-   then
-      print("INVALID: ", _("%04x", lib.htons(p.ethertype)), p.next_header)
+   if not pk.length >= 12 then
+      print(_("ETH %s %s (%4d): INVALID", ifname, text, p.length))
+      return
    end
-   local sessid = _("%04x", lib.ntohl(p.session_id))
-   print("L2TP: "..text.." [0x"..sessid.."] "..
-      macstr(p.smac)..","..ip6str(p.src_ip).." -> "..
-      macstr(p.dmac)..","..ip6str(p.dst_ip)..
-      " ["..macstr(p.l2tp_smac).." -> "..macstr(p.l2tp_dmac).."]")
+
+   print(_("ETH %s %s (%4d): [%s -> %s]",
+      ifname, text, pk.length, macstr(p.smac), macstr(p.dmac)))
+end
+
+local function log_l2tp(text, pk, ifname)
+   if not DEBUG then return end
+   local p = ffi.cast(l2tp_ctp, pk.data)
+
+   local valid = pk.length >= l2tp_ct_size
+      and p.ethertype == 0xdd86
+      and p.next_header == 115
+
+   if not valid then
+      print("L2TP %s %s (%4d): INVALID: ethertype: 0x%04x, next_header: %d",
+         ifname, text, pk.length, lib.htons(p.ethertype), p.next_header)
+      return
+   end
+
+   print(_("L2TP %s %s (%4d): [%s -> %s] 0x%04x/%s %s,%s -> %s,%s",
+      ifname, text, pk.length,
+      macstr(p.l2tp_smac),
+      macstr(p.l2tp_dmac),
+      lib.ntohl(p.session_id),
+      cookiestr(p.cookie),
+      macstr(p.smac), ip6str(p.src_ip),
+      macstr(p.dmac), ip6str(p.dst_ip)))
+end
+
+local function log_learn(iid, smac, sloc)
+   if not DEBUG then return end
+   print(_("LEARN: [%d] %s <- %s %s", iid, macstr(smac), sloc.type,
+      sloc.type == "ethernet"
+         and ip6str(sloc.interface.name)
+      or sloc.type == "l2tpv3"
+         and _("ip: %s, session_id: 0x%04x, cookie: %s",
+            ip6str(sloc.ip),
+            lib.ntohl(sloc.session_id),
+            cookiestr(sloc.cookie)
+         )
+      or sloc.type == "lisper"
+         and _("ip: %s", ip6str(sloc.ip))
+   ))
 end
 
 local function route_packet(p, rxname, txports)
 
-   --step #1: find the iid and source location of the packet
+   --step #1: find the iid and source location of the packet.
+   --NOTE: smac and dmac are the MACs of the payload ethernet frame!
    local iid, sloc, smac, dmac, payload_offset
    local t = eths[rxname]
    if t then --packet came from a local ethernet
       iid, sloc = t.iid, t.loc
-      smac, dmac, payload_offset = eth_parse(p)
+      smac, dmac, payload_offset = parse_eth(p)
       if not smac then return end --invalid packet
    else --packet came from a l2tp tunnel or a lisper
       local src_ip, session_id, cookie
-      src_ip, session_id, cookie, smac, dmac, payload_offset = l2tp_parse(p)
+      src_ip, session_id, cookie, smac, dmac, payload_offset = parse_l2tp(p)
       if not src_ip then return end --invalid packet
       if lispers[src_ip] then --packet came from a lisper
-         assert(false)
          iid = session_id --iid comes in the session_id field, cookie is ignored
       else --packet came from a l2tp tunnel
          local t = l2tps[session_id] and l2tps[session_id][cookie]
+         log_l2tp("<<<", p, rxname)
          if not t then return end --invalid packet: bad l2tp config
          iid, sloc = t.iid, t.loc
       end
@@ -390,6 +433,7 @@ local function route_packet(p, rxname, txports)
       local slocs = locs[smac]
       if not slocs or slocs[1] ~= sloc then
          locs[smac] = {sloc}
+         log_learn(iid, smac, sloc)
          punt_mac(smac, rxname)
       end
    end
@@ -403,24 +447,32 @@ local function route_packet(p, rxname, txports)
       local loc = dlocs[i]
       local dp, tx
       if loc.type == "ethernet" then
-         dp = eth_format(p, payload_offset, smac, dmac)
-         tx = txports[loc.interface.name]
+         dp = format_eth(p, payload_offset)
+         local txname = loc.interface.name
+         tx = txports[txname]
+         log_eth(">>>", dp, txname)
       elseif loc.type == "l2tpv3" then
-         dp = l2tp_format(p, payload_offset, smac, dmac,
+         dp = format_l2tp(p, payload_offset,
+            loc.exit.interface.mac,
+            loc.exit.next_hop_mac or empty_mac, --replaced by nd_light
             loc.exit.ip,
             loc.ip,
             loc.session_id,
             loc.cookie)
-         tx = txports[loc.exit.interface.name]
-         --print(ip6str(loc.exit.ip), ip6str(loc.ip), lib.ntohl(loc.session_id),
-         --   lib.hexdump(loc.cookie), loc.exit.interface.name)
+         local txname = loc.exit.interface.name
+         tx = txports[txname]
+         log_l2tp(">>>", dp, txname)
       elseif loc.type == "lisper" then
-         dp = l2tp_format(p, payload_offset, smac, dmac,
+         dp = format_l2tp(p, payload_offset,
+            loc.exit.interface.mac,
+            loc.exit.next_hop_mac or empty_mac, --replaced by nd_light
             loc.exit.ip,
             loc.ip,
             iid,
             "\0\0\0\0\0\0\0\0")
-         tx = txports[loc.exit.interface.name]
+         local txname = loc.exit.interface.name
+         tx = txports[txname]
+         log_l2tp(">>>", dp, txname)
       end
       if link.full(tx) then return end
       link.transmit(tx, dp)
@@ -562,6 +614,12 @@ function run(args)
          config.app(c, "if_"..ifname, raw.RawSocket, ifname)
       end
 
+      local function needs_nd(exits)
+         if #exits == 0 then return end
+         assert(#exits == 1, "multiple exits per interface not supported")
+         return not exits[1].next_hop_mac
+      end
+
       if #iface.vlans > 0 then
 
          local ports = {}
@@ -577,9 +635,8 @@ function run(args)
 
             local vname = vlan.name
 
-            if #vlan.exits > 0 then
+            if needs_nd(vlan.exits) then
 
-               assert(#vlan.exits == 1, "multiple exits per interface not supported")
                local exit = vlan.exits[1]
 
                config.app(c, "nd_"..vname, nd.nd_light, {
@@ -602,9 +659,8 @@ function run(args)
 
          end
 
-      elseif #iface.exits > 0 then -- phy -> nd -> lisper
+      elseif needs_nd(iface.exits) then -- phy -> nd -> lisper
 
-         assert(#iface.exits == 1, "multiple exits per interface not supported")
          local exit = iface.exits[1]
 
          config.app(c, "nd_"..ifname, nd.nd_light, {
