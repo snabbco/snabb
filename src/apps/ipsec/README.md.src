@@ -20,17 +20,17 @@ References:
 - [LISP Data-Plane Confidentiality](https://tools.ietf.org/html/draft-ietf-lisp-crypto-02) example of a software layer above these apps that includes key exchange.
 
     DIAGRAM: esp
-               +----------------+
-               |                |
-          ---->* esp_v6_encrypt *---->
-               |                |
-               +----------------+
+                +----------------+
+                |                |
+     input ---->* esp_v6_encrypt *----> output
+                |                |
+                +----------------+
     
-               +----------------+
-               |                |
-          <----* esp_v6_decrypt *<----
-               |                |
-               +----------------+
+                +----------------+
+                |                |
+    output <----* esp_v6_decrypt *<---- input
+                |                |
+                +----------------+
 
 ## Configuration
 
@@ -40,5 +40,8 @@ References:
 
 — Key **keymat**
 
-*Required*. Hex string containing key material as specified in RFC 4106.
+*Required*. Hex string containing 16 bytes of key material as specified in RFC 4106.
 
+— Key **salt**
+
+*Required*. Hex string containing four bytes of salt as specified in RFC 4106.
