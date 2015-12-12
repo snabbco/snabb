@@ -150,7 +150,7 @@ local function update_config(s)
       for i,vlan in ipairs(t.vlans) do
          local iface = assert(phys[vlan.interface],
             "invalid interface "..vlan.interface.." for vlan "..vlan.name)
-         assert(not ifs[iface.name], "duplicate interface name: "..iface.name)
+         assert(not ifs[vlan.name], "duplicate interface name: "..iface.name)
          local vlan_t = {
             name = vlan.name,
             mac = parsemac(vlan.mac or iface.mac),

@@ -12,7 +12,7 @@ local ct = ffi.typeof[[
 	struct {
 		char     dmac[6];
 		char     smac[6];
-		uint16_t tpid; // 00:81 = 802.1q
+		uint16_t tpid; // 81:00 = 802.1q
 		struct {
 			uint16_t pcp: 3;
 			uint16_t dei: 1;
@@ -38,7 +38,7 @@ function Trunk:push()
 			local h = ffi.cast(ctp, p.data)
 			if p.length >= ct_size then
 				if h.tpid == 0x81 then --802.1Q frame
-					local vlan_id = lib.htons(h.vid)
+					local vlan_id = lib.ntohs(h.vid)
 					local port = self.ports[vlan_id]
 					if port then
 						local tx = self.output[port]
@@ -69,13 +69,14 @@ function Trunk:push()
 				while not link.empty(rx) and not link.full(tx) do --TODO: round-robin
 					local p = link.receive(rx)
 					local dp = packet.allocate()
+					dp.length = p.length + 4
 					ffi.copy(dp.data, p.data, 12)
 					ffi.copy(dp.data + 16, p.data + 12, p.length - 12)
 					dh = ffi.cast(ctp, dp.data)
 					dh.tpid = 0x81
 					dh.tci.pcp = 0
 					dh.tci.dei = 0
-					dh.tci.vid = lib.ntohs(vlan_id)
+					dh.tci.vid = lib.htons(vlan_id)
 					link.transmit(tx, dp)
 					packet.free(p)
 				end
