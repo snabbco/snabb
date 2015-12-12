@@ -77,12 +77,12 @@ local _ = string.format
 --get the value of a table field, and if the field is not present in the
 --table, create it as an empty table, and return it.
 local function attr(t, k)
-	local v = t[k]
-	if v == nil then
-		v = {}
-		t[k] = v
-	end
-	return v
+   local v = t[k]
+   if v == nil then
+      v = {}
+      t[k] = v
+   end
+   return v
 end
 
 local broadcast_mac = parsemac("ffffff-ffffff")

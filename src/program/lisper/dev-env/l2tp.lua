@@ -116,7 +116,7 @@ struct {
    // l2tp
    //uint32_t session_id;
    char     session_id[4];
-	char     cookie[8];
+   char     cookie[8];
 
 } __attribute__((packed))
 ]]
@@ -126,35 +126,35 @@ local l2tp_ctp = ffi.typeof('$*', l2tp_ct)
 
 local function decap_l2tp_buf(buf, len)
    if len < l2tp_ct_size then return nil, 'packet too small' end
-	local p = ffi.cast(l2tp_ctp, buf)
-	if p.ethertype ~= 0xdd86 then return nil, 'not ipv6' end
-	if p.next_header ~= 115 then return nil, 'not l2tp' end
-	local dmac = ffi.string(p.dmac, 6)
+   local p = ffi.cast(l2tp_ctp, buf)
+   if p.ethertype ~= 0xdd86 then return nil, 'not ipv6' end
+   if p.next_header ~= 115 then return nil, 'not l2tp' end
+   local dmac = ffi.string(p.dmac, 6)
    local smac = ffi.string(p.smac, 6)
-	local sip = ffi.string(p.src_ip, 16)
-	local dip = ffi.string(p.dst_ip, 16)
+   local sip = ffi.string(p.src_ip, 16)
+   local dip = ffi.string(p.dst_ip, 16)
    local sid = ffi.string(p.session_id, 4) --p.session_id
-	local payload_size = len - l2tp_ct_size
-	return smac, dmac, sip, dip, sid, l2tp_ct_size, payload_size
+   local payload_size = len - l2tp_ct_size
+   return smac, dmac, sip, dip, sid, l2tp_ct_size, payload_size
 end
 
 local function encap_l2tp_buf(smac, dmac, sip, dip, did, payload, payload_size, outbuf)
    local p = ffi.cast(l2tp_ctp, outbuf)
-	ffi.copy(p.dmac, dmac)
-	ffi.copy(p.smac, smac)
-	p.ethertype = 0xdd86
-	p.flow_id = 0x60
-	local ipsz = payload_size + 12
-	p.payload_length_hi = bit.rshift(ipsz, 8)
-	p.payload_length_lo = bit.band(ipsz, 0xff)
-	p.next_header = 115
-	p.hop_limit = 64
-	ffi.copy(p.src_ip, sip)
-	ffi.copy(p.dst_ip, dip)
-	ffi.copy(p.session_id, did)
-	ffi.fill(p.cookie, 8)
-	ffi.copy(p + 1, payload, payload_size)
-	return outbuf, l2tp_ct_size + payload_size
+   ffi.copy(p.dmac, dmac)
+   ffi.copy(p.smac, smac)
+   p.ethertype = 0xdd86
+   p.flow_id = 0x60
+   local ipsz = payload_size + 12
+   p.payload_length_hi = bit.rshift(ipsz, 8)
+   p.payload_length_lo = bit.band(ipsz, 0xff)
+   p.next_header = 115
+   p.hop_limit = 64
+   ffi.copy(p.src_ip, sip)
+   ffi.copy(p.dst_ip, dip)
+   ffi.copy(p.session_id, did)
+   ffi.fill(p.cookie, 8)
+   ffi.copy(p + 1, payload, payload_size)
+   return outbuf, l2tp_ct_size + payload_size
 end
 
 --fast select ----------------------------------------------------------------
@@ -163,23 +163,23 @@ end
 local band, bor, shl, shr = bit.band, bit.bor, bit.lshift, bit.rshift
 
 local function getbit(b, bits)
-	return band(bits[shr(b, 3)], shl(1, band(b, 7))) ~= 0
+   return band(bits[shr(b, 3)], shl(1, band(b, 7))) ~= 0
 end
 
 local function setbit(b, bits)
-	bits[shr(b, 3)] = bor(bits[shr(b, 3)], shl(1, band(b, 7)))
+   bits[shr(b, 3)] = bor(bits[shr(b, 3)], shl(1, band(b, 7)))
 end
 
 ffi.cdef[[
 typedef struct {
-	uint8_t bits[128]; // 1024 bits
+   uint8_t bits[128]; // 1024 bits
 } xfd_set;
 int xselect(int, xfd_set*, xfd_set*, xfd_set*, void*) asm("select");
 ]]
 local function FD_ISSET(d, set) return getbit(d, set.bits) end
 local function FD_SET(d, set)
-	assert(d <= 1024)
-	setbit(d, set.bits)
+   assert(d <= 1024)
+   setbit(d, set.bits)
 end
 local fds0 = ffi.new'xfd_set'
 local fds  = ffi.new'xfd_set'
@@ -191,24 +191,24 @@ FD_SET(tapfd, fds0)
 local maxfd = math.max(rawfd, tapfd) + 1
 local EINTR = 4
 local function can_read() --returns true if fd has data, false if timed out
-	ffi.copy(fds, fds0, fds_size)
-	::retry::
-	local ret = C.xselect(maxfd, fds, nil, nil, nil)
-	if ret == -1 then
-		if C.errno() == EINTR then goto retry end
-		error('select errno '..tostring(C.errno()))
-	end
-	return FD_ISSET(rawfd, fds), FD_ISSET(tapfd, fds)
+   ffi.copy(fds, fds0, fds_size)
+   ::retry::
+   local ret = C.xselect(maxfd, fds, nil, nil, nil)
+   if ret == -1 then
+      if C.errno() == EINTR then goto retry end
+      error('select errno '..tostring(C.errno()))
+   end
+   return FD_ISSET(rawfd, fds), FD_ISSET(tapfd, fds)
 end
 
 ------------------------------------------------------------------------------
 
 while true do
-	local can_raw, can_tap = can_read()
-	if can_raw or can_tap then
-		if can_raw then
+   local can_raw, can_tap = can_read()
+   if can_raw or can_tap then
+      if can_raw then
          local buf, len = read_buf(rawbuf, raw)
-			local smac1, dmac1, sip1, dip1, did1, payload_offset, payload_size = decap_l2tp_buf(buf, len)
+         local smac1, dmac1, sip1, dip1, did1, payload_offset, payload_size = decap_l2tp_buf(buf, len)
          local accept = smac1
             and smac1 == dmac
             and dmac1 == smac
@@ -216,35 +216,35 @@ while true do
             and sip1 == dip
             and did1 == sid
          if DEBUG then
-				if accept or smac1 then
-					print('read', accept and 'accepted' or 'rejected')
-					print('  smac ', hex(smac1))
-					print('  dmac ', hex(dmac1))
-					print('  sip  ', hex(sip1))
-					print('  dip  ', hex(dip1))
-					print('  did  ', hex(did1))
-					print('  #    ', payload_size)
-				end
-			end
+            if accept or smac1 then
+               print('read', accept and 'accepted' or 'rejected')
+               print('  smac ', hex(smac1))
+               print('  dmac ', hex(dmac1))
+               print('  sip  ', hex(sip1))
+               print('  dip  ', hex(dip1))
+               print('  did  ', hex(did1))
+               print('  #    ', payload_size)
+            end
+         end
          if accept then
-				write(tap, buf + payload_offset, payload_size)
+            write(tap, buf + payload_offset, payload_size)
          end
       end
       if can_tap then
          local payload, payload_size = read_buf(tapbuf, tap)
-			local frame, frame_size = encap_l2tp_buf(smac, dmac, sip, dip, did, payload, payload_size, rawbuf)
-			if DEBUG then
-				print('write')
-				print('  smac ', hex(smac))
-				print('  dmac ', hex(dmac))
-				print('  sip  ', hex(sip))
-				print('  dip  ', hex(dip))
-				print('  did  ', hex(did))
-				print('  #in  ', payload_size)
-				print('  #out ', frame_size)
-			end
-			write(raw, frame, frame_size)
-	   end
+         local frame, frame_size = encap_l2tp_buf(smac, dmac, sip, dip, did, payload, payload_size, rawbuf)
+         if DEBUG then
+            print('write')
+            print('  smac ', hex(smac))
+            print('  dmac ', hex(dmac))
+            print('  sip  ', hex(sip))
+            print('  dip  ', hex(dip))
+            print('  did  ', hex(did))
+            print('  #in  ', payload_size)
+            print('  #out ', frame_size)
+         end
+         write(raw, frame, frame_size)
+      end
    end
 end
 

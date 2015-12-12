@@ -83,7 +83,7 @@ function UnixSocket:new (arg)
          local sa = S.t.sockaddr_un(file)
          local ok, err = sock:connect(sa)
          if not ok then
-				if err.CONNREFUSED or err.AGAIN or err.NOENT then return end
+            if err.CONNREFUSED or err.AGAIN or err.NOENT then return end
             assert(nil, err)
          end
          return sock

@@ -5,8 +5,8 @@ io.stderr:setvbuf'no'
 --LISP controller mock-up program for testing.
 
 local function assert(v, ...)
-	if v then return v, ... end
-	error(tostring((...)), 2)
+   if v then return v, ... end
+   error(tostring((...)), 2)
 end
 
 local ffi = require("ffi")
@@ -24,32 +24,32 @@ sock = sock or assert(S.socket("unix", "dgram, nonblock"))
 local sa = S.t.sockaddr_un(CONTROL_SOCK)
 local ok, err = sock:connect(sa)
 if not ok then
-	if err.CONNREFUSED or err.AGAIN or err.NOENT then
-		S.sleep(1)
-		print'retrying...'
-		goto retry
-	end
-	assert(nil, err)
+   if err.CONNREFUSED or err.AGAIN or err.NOENT then
+      S.sleep(1)
+      print'retrying...'
+      goto retry
+   end
+   assert(nil, err)
 end
 print'connected'
 
 while true do
-	if assert(S.select({writefds = {sock}}, 0)).count == 1 then
+   if assert(S.select({writefds = {sock}}, 0)).count == 1 then
 
-		local t = {}
-		for s in io.lines('lisp'..LISP_N..'.fib') do
-			table.insert(t, s)
-		end
+      local t = {}
+      for s in io.lines('lisp'..LISP_N..'.fib') do
+         table.insert(t, s)
+      end
 
-		print'sending...'
-		for i,s in ipairs(t) do
-			if not S.write(sock, s, #s) then
-				print'write error'
-				sock:close()
-				sock = nil
-				goto retry
-			end
-		end
-	end
-	S.sleep(1)
+      print'sending...'
+      for i,s in ipairs(t) do
+         if not S.write(sock, s, #s) then
+            print'write error'
+            sock:close()
+            sock = nil
+            goto retry
+         end
+      end
+   end
+   S.sleep(1)
 end
