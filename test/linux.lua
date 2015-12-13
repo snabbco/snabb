@@ -1850,13 +1850,11 @@ test.swap = {
     assert_equal(c.SWAP_FLAG["23, discard"], c.SWAP_FLAG["prefer, discard"] + bit.lshift(23, c.SWAP_FLAG["prio_shift"]))
   end,
   test_swap_fail = function()
-    local ex = "PERM" -- EPERM if not root
-    if S.geteuid() == 0 then ex = "INVAL" end
     local ok, err = S.swapon("/dev/null", "23, discard")
     if not ok and err.NOSYS then return end -- Android does not implement swap, so skip test
-    assert(not ok and err[ex], "should not create swap on /dev/null")
+    assert(not ok and (err.PERM or err.INVAL), "should not create swap on /dev/null")
     local ok, err = S.swapoff("/dev/null")
-    assert(not ok and err[ex], "no swap on /dev/null")
+    assert(not ok and (err.PERM or err.INVAL), "no swap on /dev/null")
   end,
   -- TODO need mkswap to test success
 }
