@@ -1764,7 +1764,7 @@ test.processes_linux = {
       fork_assert(S.getppid() == pid0, "parent pid should be previous pid")
       S.exit(23)
     else -- parent
-      local infop, rusage = assert(S.waitid("all", 0, "exited, stopped, continued"))
+      local infop, rusage = assert(S.waitid("pid", pid, "exited, stopped, continued"))
       assert_equal(infop.signo, c.SIG.CHLD, "waitid to return SIGCHLD")
       assert_equal(infop.status, 23, "exit should be 23")
       assert_equal(infop.code, c.SIGCLD.EXITED, "normal exit expected")
