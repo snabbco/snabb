@@ -1412,7 +1412,7 @@ test_sockets_pipes = {
     local ok, err = cs:connect(ba6)
     local as = ss:accept()
     local ok, err = cs:connect(ba6)
-    if err.ADDRNOTAVAIL then error "skipped" end
+    if err.ADDRNOTAVAIL or err.NETUNREACH then error "skipped" end
     assert(ok or err.ISCONN, "unexpected error " .. tostring(err));
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:accept())
