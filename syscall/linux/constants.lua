@@ -1162,6 +1162,10 @@ c.RTA = strflag {
   MP_ALGO = 14,
   TABLE = 15,
   MARK = 16,
+  MFC_STATS = 17,
+  VIA = 18,
+  NEWDST = 19,
+  PREF = 20,
 }
 
 -- route flags
