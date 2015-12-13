@@ -482,7 +482,9 @@ test.netlink = {
   test_interfaces = function()
     local i = assert(nl.interfaces())
     assert_equal(tostring(i.lo.inet[1].addr), "127.0.0.1", "loopback ipv4 on lo")
-    assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
+    if i.lo.inet6[1] then
+      assert_equal(tostring(i.lo.inet6[1].addr), "::1", "loopback ipv6 on lo")
+    end
   end,
   test_newlink_flags_root = function()
     local p = assert(S.clone())
@@ -666,6 +668,7 @@ test.netlink = {
   test_getroute_inet6 = function()
     local r = assert(nl.routes("inet6", "unspec"))
     local nr = r:match("::1/128")
+    if #nr == 0 then error "skipped" end -- no ipv6 support
     assert(#nr >= 1, "expect at least one matched route") -- one of my machines has two
     local lor = nr[1]
     assert_equal(tostring(lor.source), "::", "expect empty source route")
