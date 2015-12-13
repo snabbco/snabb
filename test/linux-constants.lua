@@ -155,6 +155,10 @@ local function fixup_constants(abi, c)
   c.SECCOMP_MODE = nil
   c.SECCOMP_RET = nil
   c.MFD = nil
+  c.RTA.NEWDST = nil
+  c.RTA.PREF = nil
+  c.RTA.VIA = nil
+  c.RTA.MFC_STATS = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil
