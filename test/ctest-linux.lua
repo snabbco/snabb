@@ -223,6 +223,10 @@ c.TCP.QUEUE_SEQ = nil
 c.TCP.TIMESTAMP = nil
 c.TCP.USER_TIMEOUT = nil
 c.TCP.REPAIR_QUEUE = nil
+c.RTA.NEWDST = nil
+c.RTA.PREF = nil
+c.RTA.VIA = nil
+c.RTA.MFC_STATS = nil
 
 -- these are not in Musl at present TODO send patches to get them in
 c.IPPROTO.UDPLITE = nil
