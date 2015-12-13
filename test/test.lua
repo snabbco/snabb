@@ -1356,7 +1356,9 @@ test_sockets_pipes = {
     assert(ss:nonblock())
     local sa = assert(t.sockaddr_in6(0, "loopback"))
     assert_equal(sa.family, c.AF.INET6)
-    assert(ss:bind(sa))
+    ok, err = ss:bind(sa)
+    if err.ADDRNOTAVAIL then error "skipped" end
+    assert(ok, err)
     local ba = assert(ss:getsockname())
     assert_equal(ba.family, c.AF.INET6)
     assert(ss:listen()) -- will fail if we did not bind
@@ -1410,6 +1412,7 @@ test_sockets_pipes = {
     local ok, err = cs:connect(ba6)
     local as = ss:accept()
     local ok, err = cs:connect(ba6)
+    if err.ADDRNOTAVAIL then error "skipped" end
     assert(ok or err.ISCONN, "unexpected error " .. tostring(err));
     assert(ss:block()) -- force accept to wait
     as = as or assert(ss:accept())
@@ -1455,7 +1458,9 @@ test_sockets_pipes = {
     assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 1))
     local sa = assert(t.sockaddr_in6(0, "loopback"))
     assert_equal(sa.family, c.AF.INET6)
-    assert(ss:bind(sa))
+    ok, err = ss:bind(sa)
+    if err.ADDRNOTAVAIL then error "skipped" end
+    assert(ok, err)
     local ba = assert(ss:getsockname())
     assert_equal(ba.family, c.AF.INET6)
     assert(ss:listen()) -- will fail if we did not bind
@@ -1497,7 +1502,9 @@ test_sockets_pipes = {
     assert(ss:setsockopt(c.IPPROTO.IPV6, c.IPV6.V6ONLY, 1))
     local sa = assert(t.sockaddr_in6(0, "loopback"))
     assert_equal(sa.family, c.AF.INET6)
-    assert(ss:bind(sa))
+    ok, err = ss:bind(sa)
+    if err.ADDRNOTAVAIL then error "skipped" end
+    assert(ok, err)
     local ba = assert(ss:getsockname())
     assert_equal(ba.family, c.AF.INET6)
     assert(ss:listen()) -- will fail if we did not bind
@@ -1534,7 +1541,9 @@ test_sockets_pipes = {
     local loop6 = "::1"
     local cs = assert(S.socket("inet6", "dgram"))
     local sa = assert(t.sockaddr_in6(0, loop6))
-    assert(ss:bind(sa))
+    ok, err = ss:bind(sa)
+    if err.ADDRNOTAVAIL then error "skipped" end
+    assert(ok, err)
     local bsa = ss:getsockname() -- find bound address
     local n = assert(cs:sendto(teststring, nil, c.MSG.NOSIGNAL or 0, bsa)) -- got a sigpipe here on MIPS
     local f = assert(ss:recv(buf, size))
@@ -1645,7 +1654,9 @@ test_sockets_pipes = {
     assert(s, err)
     local s = assert(S.socket("inet6", "stream"))
     local sa = t.sockaddr_in6(0, "loopback")
-    assert(s:bind(sa))
+    ok, err = s:bind(sa)
+    if err.ADDRNOTAVAIL then error "skipped" end
+    assert(ok, err)
     assert_equal(s:getsockopt("socket", "keepalive"), 0)
     assert(s:setsockopt("socket", "keepalive", 1))
     assert(s:getsockopt("socket", "keepalive") ~= 0)
@@ -1668,7 +1679,9 @@ test_sockets_pipes = {
     assert(s, err)
     local s = assert(S.socket("inet6", "stream"))
     local sa = t.sockaddr_in6(0, "loopback")
-    assert(s:bind(sa))
+    ok, err = s:bind(sa)
+    if err.ADDRNOTAVAIL then error "skipped" end
+    assert(ok, err)
     assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
     assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
     assert(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY) ~= 0)
