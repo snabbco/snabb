@@ -1357,7 +1357,7 @@ test_sockets_pipes = {
     local sa = assert(t.sockaddr_in6(0, "loopback"))
     assert_equal(sa.family, c.AF.INET6)
     ok, err = ss:bind(sa)
-    if err.ADDRNOTAVAIL then error "skipped" end
+    if not ok and err.ADDRNOTAVAIL then error "skipped" end
     assert(ok, err)
     local ba = assert(ss:getsockname())
     assert_equal(ba.family, c.AF.INET6)
@@ -1459,7 +1459,7 @@ test_sockets_pipes = {
     local sa = assert(t.sockaddr_in6(0, "loopback"))
     assert_equal(sa.family, c.AF.INET6)
     ok, err = ss:bind(sa)
-    if err.ADDRNOTAVAIL then error "skipped" end
+    if not ok and err.ADDRNOTAVAIL then error "skipped" end
     assert(ok, err)
     local ba = assert(ss:getsockname())
     assert_equal(ba.family, c.AF.INET6)
@@ -1503,7 +1503,7 @@ test_sockets_pipes = {
     local sa = assert(t.sockaddr_in6(0, "loopback"))
     assert_equal(sa.family, c.AF.INET6)
     ok, err = ss:bind(sa)
-    if err.ADDRNOTAVAIL then error "skipped" end
+    if not ok and err.ADDRNOTAVAIL then error "skipped" end
     assert(ok, err)
     local ba = assert(ss:getsockname())
     assert_equal(ba.family, c.AF.INET6)
@@ -1542,7 +1542,7 @@ test_sockets_pipes = {
     local cs = assert(S.socket("inet6", "dgram"))
     local sa = assert(t.sockaddr_in6(0, loop6))
     ok, err = ss:bind(sa)
-    if err.ADDRNOTAVAIL then error "skipped" end
+    if not ok and err.ADDRNOTAVAIL then error "skipped" end
     assert(ok, err)
     local bsa = ss:getsockname() -- find bound address
     local n = assert(cs:sendto(teststring, nil, c.MSG.NOSIGNAL or 0, bsa)) -- got a sigpipe here on MIPS
@@ -1655,7 +1655,7 @@ test_sockets_pipes = {
     local s = assert(S.socket("inet6", "stream"))
     local sa = t.sockaddr_in6(0, "loopback")
     ok, err = s:bind(sa)
-    if err.ADDRNOTAVAIL then error "skipped" end
+    if not ok and err.ADDRNOTAVAIL then error "skipped" end
     assert(ok, err)
     assert_equal(s:getsockopt("socket", "keepalive"), 0)
     assert(s:setsockopt("socket", "keepalive", 1))
@@ -1680,7 +1680,7 @@ test_sockets_pipes = {
     local s = assert(S.socket("inet6", "stream"))
     local sa = t.sockaddr_in6(0, "loopback")
     ok, err = s:bind(sa)
-    if err.ADDRNOTAVAIL then error "skipped" end
+    if not ok and err.ADDRNOTAVAIL then error "skipped" end
     assert(ok, err)
     assert_equal(s:getsockopt(c.IPPROTO.TCP, c.TCP.NODELAY), 0)
     assert(s:setsockopt(c.IPPROTO.TCP, c.TCP.NODELAY, 1))
