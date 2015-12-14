@@ -135,6 +135,7 @@ local function update_config(s)
          assert(not ifs[iface.name], "duplicate interface name: "..iface.name)
          local phy_t = {
             name = iface.name,
+            realname = iface.realname,
             pci = iface.pci,
             mac = parsemac(iface.mac),
             vlans = {},
@@ -645,7 +646,7 @@ function run(args)
 
    config.app(c, "lisper", Lisper)
 
-   for ifname,iface in pairs(phys) do
+   for ifname, iface in pairs(phys) do
 
       if iface.pci then
          config.app(c, "if_"..ifname, intel.Intel82599, {

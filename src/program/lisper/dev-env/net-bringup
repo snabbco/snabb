@@ -3,26 +3,60 @@
 appnodes="01 02 05 06"
 lispnodes="04 08"
 nodes="$appnodes $lispnodes"
+intel=   # set this to 1 if on churn
 
 bringup() {
 
 ip netns add r2
 ip netns exec r2 sysctl -wq net.ipv6.conf.all.forwarding=1
 
-for n in $nodes; do
+appnode() {
+    local n="$1"
     ip netns add node$n
-    ip link add netns node$n e0 address 00:00:00:00:01:$n type veth peer name e$n netns r2 address 00:00:00:00:00:$n
-    ip netns exec r2 ip addr add fd80:$n::1/56 dev e$n
+    ip link add netns node$n e0 address 00:00:00:00:01:$n type veth \
+        peer name e$n netns r2 address 00:00:00:00:00:$n
+    ip netns exec r2     ip addr add fd80:$n::1/56 dev e$n
     ip netns exec node$n ip addr add fd80:$n::2/56 dev e0
     ip netns exec node$n ip -6 route add default via fd80:$n::1
     ip netns exec node$n ip link set e0 up
-    ip netns exec r2 ip link set e$n up
-done
+    ip netns exec r2     ip link set e$n up
+}
+
+intelnode() {
+    local n="$1"
+    local pci0="$2"
+    local e0="$3"
+    local pcin="$4"
+    local en="$5"
+    ip netns add node$n
+    echo -n $pci0 > /sys/bus/pci/drivers/ixgbe/unbind # e0
+    echo -n $pcin > /sys/bus/pci/drivers/ixgbe/bind   # e$n
+    # ip netns exec node$n ip link set $e0 address 00:00:00:00:01:$n
+    ip netns exec r2     ip link set dev $en address 00:00:00:00:00:$n
+    ip netns exec r2     ip addr add fd80:$n::1/56 dev $en
+    ip netns exec node$n ip addr add fd80:$n::2/56 dev $e0
+    #ip netns exec node$n ip -6 route add default via fd80:$n::1
+    #ip netns exec node$n ip link set $e0 up
+    ip netns exec r2     ip link set $en up
+}
+
+if [ "$intel" ]; then
+    for n in $appnodes; do
+        appnode $n
+    done
+    intelnode 04 0000:05:00.0 enp5s0f0 enp5s0f1
+    intelnode 08 0000:07:00.0 enp7s0f0 enp7s0f1
+else
+    for n in $nodes; do
+        appnode $n
+    done
+fi
 
 eth() {
 local p="$1"
 local n="$2"
-ip link add netns node$p e$n address 00:00:00:00:01:$n type veth peer name t$n netns node$p address 00:00:00:00:aa:$n
+ip link add netns node$p e$n address 00:00:00:00:01:$n type veth \
+   peer name t$n netns node$p address 00:00:00:00:aa:$n
 ip netns exec node$p ip addr add 10.0.0.$n/24 dev t$n
 ip netns exec node$p ip link set e$n up
 ip netns exec node$p ip link set t$n up
