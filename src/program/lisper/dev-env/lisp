@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 run()     { ip netns exec node${LISP_N} ./lisp.lua ${LISP_N}; }
 start()   { run >/dev/null & }
 stop()    { pgrep -f "lisp.lua ${LISP_N}" | xargs kill -9; }
