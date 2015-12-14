@@ -93,17 +93,13 @@ local empty_mac     = parsemac("000000-000000")
 local DEBUG = getenv"LISPER_DEBUG" --if set, print packets to stdout
 local MODE  = getenv"LISPER_MODE"  --if set to "record" then record packets to pcap files
 
---phy_t:         {name=s, mac=mac, pci=s, vlans={vlan1_t, ...}, exits={exit1_t,...}}
---vlan_t:        {name=s, mac=mac, id=n, interface=phy_t, exits={exit1_t,...}}
---if_t:          phy_t|vlan_t
+--if_t:          {name=s, mac=mac, pci=s, vlan_id=n, exits={exit1_t,...}}
 --exit_t:        {ip=ipv6, interface=if_t, next_hop=ip6[, next_hop_mac=s]}
 --loc_t:         eth_loc_t|l2tp_loc_t|lisper_loc_t
 --eth_loc_t:     {type="ethernet", interface=if_t}
 --l2tp_loc_t:    {type="l2tpv3", ip=ip6, session_id=n, cookie=s, exit=exit_t}
 --lisper_loc_t:  {type="lisper", ip=ip6, p=n, w=n, key=s, exit=exit_t}
 local conf     --{control_sock=s, punt_sock=s}
-local phys     --{ifname -> phy_t}
-local vlans    --{id -> vlan_t}
 local ifs      --{ifname -> if_t}
 local exits    --{exitname -> exit_t}
 local eths     --{ifname -> {iid=n, loc=eth_loc_t}}
@@ -116,8 +112,6 @@ local function update_config(s)
    local t = assert(json.decode(s))
 
    conf = {}
-   phys = {}
-   vlans = {}
    ifs = {}
    exits = {}
    eths = {}
@@ -129,39 +123,19 @@ local function update_config(s)
    conf.control_sock = t.control_sock
    conf.punt_sock = t.punt_sock
 
-   --map physical interfaces
+   --map interfaces
    if t.interfaces then
       for i,iface in ipairs(t.interfaces) do
          assert(not ifs[iface.name], "duplicate interface name: "..iface.name)
-         local phy_t = {
+         assert(not iface.vlan_id or iface.pci, "vlan_id requires pci for "..iface.name)
+         local if_t = {
             name = iface.name,
-            realname = iface.realname,
-            pci = iface.pci,
             mac = parsemac(iface.mac),
-            vlans = {},
+            pci = iface.pci,
+            vlan_id = iface.vlan_id,
             exits = {},
          }
-         phys[iface.name] = phy_t
-         ifs[iface.name] = phy_t
-      end
-   end
-
-   --map 802.1Q interfaces
-   if t.vlans then
-      for i,vlan in ipairs(t.vlans) do
-         local iface = assert(phys[vlan.interface],
-            "invalid interface "..vlan.interface.." for vlan "..vlan.name)
-         assert(not ifs[vlan.name], "duplicate interface name: "..iface.name)
-         local vlan_t = {
-            name = vlan.name,
-            mac = parsemac(vlan.mac or iface.mac),
-            id = vlan.id,
-            interface = iface,
-            exits = {},
-         }
-         table.insert(iface.vlans, vlan_t)
-         vlans[vlan.id] = vlan_t
-         ifs[vlan.name] = vlan_t
+         ifs[iface.name] = if_t
       end
    end
 
@@ -646,12 +620,14 @@ function run(args)
 
    config.app(c, "lisper", Lisper)
 
-   for ifname, iface in pairs(phys) do
+   for ifname, iface in pairs(ifs) do
 
       if iface.pci then
          config.app(c, "if_"..ifname, intel.Intel82599, {
             pciaddr = iface.pci,
             macaddr = macstr(iface.mac),
+            vlan = iface.vlan_id,
+            vmdq = iface.vlan_id or nil,
          })
       else
          config.app(c, "if_"..ifname, raw.RawSocket, ifname)
@@ -663,46 +639,7 @@ function run(args)
          return not exits[1].next_hop_mac
       end
 
-      if #iface.vlans > 0 then
-
-         local ports = {}
-         for i,vlan in ipairs(iface.vlans) do
-            ports[vlan.id] = vlan.name
-         end
-         config.app(c, "trunk_"..ifname, trunk.Trunk, ports)
-
-         config.link(c, _("trunk_%s.trunk -> if_%s.rx", ifname, ifname))
-         config.link(c, _("if_%s.tx -> trunk_%s.trunk", ifname, ifname))
-
-         for i,vlan in ipairs(iface.vlans) do
-
-            local vname = vlan.name
-
-            if needs_nd(vlan.exits) then
-
-               local exit = vlan.exits[1]
-
-               config.app(c, "nd_"..vname, nd.nd_light, {
-                  local_mac = macstr(vlan.mac),
-                  local_ip = ip6str(exit.ip),
-                  next_hop = ip6str(exit.next_hop),
-               })
-               config.link(c, _("nd_%s.south -> trunk_%s.%s", vname, ifname, vname))
-               config.link(c, _("trunk_%s.%s -> nd_%s.south", ifname, vname, vname))
-
-               config.link(c, _("lisper.%s -> nd_%s.north", vname, vname))
-               config.link(c, _("nd_%s.north -> lisper.%s", vname, vname))
-
-            else -- phy -> trunk -> lisper
-
-               config.link(c, _("lisper.%s -> trunk_%s.%s", vname, ifname, vname))
-               config.link(c, _("trunk_%s.%s -> lisper.%s", ifname, vname, vname))
-
-            end
-
-         end
-
-      elseif needs_nd(iface.exits) then -- phy -> nd -> lisper
+      if needs_nd(iface.exits) then -- phy/vlan -> nd -> lisper
 
          local exit = iface.exits[1]
 
