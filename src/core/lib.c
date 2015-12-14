@@ -73,3 +73,15 @@ void prefetch_for_write(const void *address)
   __builtin_prefetch(address, 1);
 }
 
+/* Bitswap uint64_t. */
+uint64_t bswap64 (uint64_t b)
+{
+  return ((((uint64_t) b & (uint64_t) 0x00000000000000ff) << 56) |
+          (((uint64_t) b & (uint64_t) 0x000000000000ff00) << 40) |
+          (((uint64_t) b & (uint64_t) 0x0000000000ff0000) << 24) |
+          (((uint64_t) b & (uint64_t) 0x00000000ff000000) <<  8) |
+          (((uint64_t) b & (uint64_t) 0x000000ff00000000) >>  8) |
+          (((uint64_t) b & (uint64_t) 0x0000ff0000000000) >> 24) |
+          (((uint64_t) b & (uint64_t) 0x00ff000000000000) >> 40) |
+          (((uint64_t) b & (uint64_t) 0xff00000000000000) >> 56));
+}

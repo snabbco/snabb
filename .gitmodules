@@ -1,0 +1,3 @@
+[submodule "lib/intel-ipsec"]
+	path = lib/intel-ipsec
+	url = https://github.com/lukego/intel-ipsec.git
