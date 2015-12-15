@@ -104,7 +104,7 @@ function RangeMapBuilder:build()
    local range_count = #ranges
    local packed_entries = self.type(range_count)
    for i,entry in ipairs(ranges) do
-      packed_entries[range_count-i] = ranges[i]
+      packed_entries[range_count-i] = entry
    end
 
    local map = {
