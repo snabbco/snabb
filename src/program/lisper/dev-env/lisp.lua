@@ -1,4 +1,4 @@
-#!/usr/bin/env luajit
+#!snabb/src/snabb snsh
 io.stdout:setvbuf'no'
 io.stderr:setvbuf'no'
 
@@ -19,6 +19,7 @@ local PUNT_SOCK    = "/var/tmp/lispers.net-itr"..LISP_N
 
 S.signal('pipe', 'ign') --I 💔 Linux
 
+local sock
 ::retry::
 sock = sock or assert(S.socket("unix", "dgram, nonblock"))
 local sa = S.t.sockaddr_un(CONTROL_SOCK)

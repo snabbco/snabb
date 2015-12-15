@@ -1,4 +1,4 @@
-#!/usr/bin/env luajit
+#!snabb/src/snabb snsh
 io.stdout:setvbuf'no'
 io.stderr:setvbuf'no'
 
@@ -64,9 +64,9 @@ local function write(fd, s, len)
    assert(S.write(fd, s, len))
 end
 
-local tapname, ethname, smac, dmac, sip, dip, sid, did = ...
+local tapname, ethname, smac, dmac, sip, dip, sid, did = unpack(main.parameters)
 if not (tapname and ethname and smac and dmac and sip and dip and sid and did) then
-   print('Usage: '..arg[0]..' TAP ETH SMAC DMAC SIP DIP SID DID')
+   print('Usage: l2tp.lua TAP ETH SMAC DMAC SIP DIP SID DID')
    print'   TAP:  the tunneled interface: will be created if not present.'
    print'   ETH:  the tunneling interface: must have an IPv6 assigned.'
    print'   SMAC: the MAC address of ETH.'
