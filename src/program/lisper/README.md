@@ -133,6 +133,11 @@ cd src/program/lisper/dev-env
 ./net-teardown            # kill everything and clean up
 ```
 
+__NOTE:__ `net-bringup-intel10g` requires 4 network cards with loopback
+cables between cards 1,2 and 3,4. Edit the script to set their names
+and PCI addresses and also edit `lisperXX.conf.intel10g` config files
+and change the `pci` and `vlan_id` fields as needed.
+
 ##### What does it do
 
 The test network is comprised of multiple network nodes that are all connected
