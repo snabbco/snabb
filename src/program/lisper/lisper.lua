@@ -13,7 +13,6 @@ local nd       = require("apps.ipv6.nd_light")
 local pcap     = require("apps.pcap.pcap")
 local basic    = require("apps.basic.basic_apps")
 local intel    = require("apps.intel.intel_app")
-local trunk    = require("apps.802_1q.trunk")
 local json     = require("lib.json")
 
 --utils ----------------------------------------------------------------------
@@ -623,11 +622,12 @@ function run(args)
    for ifname, iface in pairs(ifs) do
 
       if iface.pci then
+         print(iface.vlan_id)
          config.app(c, "if_"..ifname, intel.Intel82599, {
             pciaddr = iface.pci,
             macaddr = macstr(iface.mac),
             vlan = iface.vlan_id,
-            vmdq = iface.vlan_id or nil,
+            vmdq = iface.vlan_id and true or nil,
          })
       else
          config.app(c, "if_"..ifname, raw.RawSocket, ifname)
