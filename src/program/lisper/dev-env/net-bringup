@@ -31,13 +31,12 @@ intelnode() {
     ip netns add node$n
     echo -n $pci0 > /sys/bus/pci/drivers/ixgbe/unbind # e0
     echo -n $pcin > /sys/bus/pci/drivers/ixgbe/bind   # e$n
-    # ip netns exec node$n ip link set $e0 address 00:00:00:00:01:$n
-    ip netns exec r2     ip link set dev $en address 00:00:00:00:00:$n
-    ip netns exec r2     ip addr add fd80:$n::1/56 dev $en
-    ip netns exec node$n ip addr add fd80:$n::2/56 dev $e0
-    #ip netns exec node$n ip -6 route add default via fd80:$n::1
-    #ip netns exec node$n ip link set $e0 up
-    ip netns exec r2     ip link set $en up
+    ip link set $en netns r2
+    ip netns exec r2 ip link add link $en name $en.2 type vlan id 2
+    ip netns exec r2 ip link set dev $en.2 address 00:00:00:00:00:$n
+    ip netns exec r2 ip addr add fd80:$n::1/56 dev $en.2
+    ip netns exec r2 ip link set $en up
+    ip netns exec r2 ip link set $en.2 up
 }
 
 if [ "$intel" ]; then
