@@ -3,7 +3,6 @@
 appnodes="01 02 05 06"
 lispnodes="04 08"
 nodes="$appnodes $lispnodes"
-intel=   # set this to 1 if on churn
 
 bringup() {
 
@@ -39,13 +38,17 @@ intelnode() {
     ip netns exec r2 ip link set $en.2 up
 }
 
-if [ "$intel" ]; then
+if [ "$intel1" ]; then
+    ln -sf lisper04.conf.intel10g lisper04.conf
+    ln -sf lisper08.conf.intel10g lisper08.conf
     for n in $appnodes; do
         appnode $n
     done
-    intelnode 04 0000:05:00.0 enp5s0f0 0000:05:00.1 enp5s0f1
-    intelnode 08 0000:07:00.0 enp7s0f0 0000:07:00.1 enp7s0f1
+    intelnode 04 $intel1_pci $intel1 $intel2_pci $intel2
+    intelnode 08 $intel3_pci $intel3 $intel4_pci $intel4
 else
+    ln -sf lisper04.conf.veth lisper04.conf
+    ln -sf lisper08.conf.veth lisper08.conf
     for n in $nodes; do
         appnode $n
     done
@@ -87,6 +90,7 @@ done
 for n in $lispnodes; do
     ./lisp$n stop
     ./lisper$n stop
+    rm -f lisper$n.conf
 done
 
 for n in $nodes; do
