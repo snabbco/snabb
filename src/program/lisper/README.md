@@ -139,6 +139,28 @@ and PCI addresses and also edit `lisperXX.conf.intel10g` config files
 and change the `pci` and `vlan_id` fields as needed. You can find
 the PCI addresses with `lspci | grep 82599`.
 
+`./ping-all` sends 2000 IPv4 pings 1000-byte each between various nodes.
+It's output should look like this:
+
+
+```
+l2tp-l2tp
+2000 packets transmitted, 2000 received, 0% packet loss, time 443ms
+2000 packets transmitted, 2000 received, 0% packet loss, time 603ms
+l2tp-eth
+2000 packets transmitted, 2000 received, 0% packet loss, time 358ms
+2000 packets transmitted, 2000 received, 0% packet loss, time 502ms
+eth-l2tp
+2000 packets transmitted, 2000 received, 0% packet loss, time 354ms
+2000 packets transmitted, 2000 received, 0% packet loss, time 507ms
+l2tp-lisper-l2tp
+2000 packets transmitted, 2000 received, 0% packet loss, time 1026ms
+2000 packets transmitted, 2000 received, 0% packet loss, time 1037ms
+eth-lisper-eth
+2000 packets transmitted, 2000 received, 0% packet loss, time 926ms
+2000 packets transmitted, 2000 received, 0% packet loss, time 876ms
+```
+
 ##### What does it do
 
 The test network is comprised of multiple network nodes that are all connected
