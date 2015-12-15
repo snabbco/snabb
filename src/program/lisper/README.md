@@ -137,7 +137,7 @@ __NOTE:__ `net-bringup-intel10g` requires 4 network cards with loopback
 cables between cards 1,2 and 3,4. Edit the script to set their names
 and PCI addresses and also edit `lisperXX.conf.intel10g` config files
 and change the `pci` and `vlan_id` fields as needed. You can find
-the PCI addresses with `lspci | grep 82599`.
+the PCI addresses of the cards in your machine with `lspci | grep 82599`.
 
 `./ping-all` sends 2000 IPv4 pings 1000-byte each between various nodes.
 It's output should look like this:
