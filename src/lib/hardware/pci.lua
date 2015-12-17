@@ -2,6 +2,7 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
+local S = require("syscall")
 
 local lib = require("core.lib")
 
@@ -34,6 +35,7 @@ end
 function device_info (pciaddress)
    local info = {}
    local p = path(pciaddress)
+   assert(S.stat(p), ("No such device: %s"):format(pciaddress))
    info.pciaddress = canonical(pciaddress)
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
