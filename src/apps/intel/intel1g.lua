@@ -273,6 +273,7 @@ function intel1g:new (conf)
          while limit > 0 and can_receive() do
             link.transmit(l, receive())
             limit = limit - 1
+ print(".")
          end
          sync_receive()
       end
@@ -298,6 +299,7 @@ function intel1g:new (conf)
       if stop_nic      then stop_nic()      end
    end
 
+-- print("self= ")  print_r(self)
    return self
 end
 
@@ -314,11 +316,91 @@ function selftest ()
    print(basic.Source, basic.Sink, intel1g)
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
-   config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
-   config.link(c, "source.tx->nic.rx")
-   config.link(c, "nic.tx->sink.rx")
+   -- try i210
+    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
+    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
+    config.link(c, "source.tx->nic.rx")
+    config.link(c, "nic.tx->sink.rx")
+   -- replace intel1g by Repeater
+    --config.app(c, "repeater", basic.Repeater)
+    --config.link(c, "source.tx->repeater.input")
+    --config.link(c, "repeater.output->sink.rx")
    engine.configure(c)
-   engine.main({duration = 0.1, report = {showapps = true, showlinks = true}})
+   -- showlinks: src/core/app.lua calls report_links()
+   --engine.main({duration = 1, report = {showapps = true, showlinks = true}})
+   engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
    print("selftest: ok")
+
+ -- for k, v in pairs(c) do
+ --  print(k, v)
+ -- end
+ --print("c= ") print_r(c)
+ --tprint(c, 2)
+
+ --print("engine= ") print_r(engine)
+
+   --local li = engine.app_table.nic.input[1]
+   local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
+   assert(li, "intel1g: no input link")
+   local s= link.stats(li)
+   print("input link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+
+   --local lo = engine.app_table.nic.output[1]
+   local lo = engine.app_table.nic.output["tx"]		-- same-same as [1]
+   assert(lo, "intel1g: no output link")
+   local s= link.stats(lo)
+   print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+end
+
+-- https://coronalabs.com/blog/2014/09/02/tutorial-printing-table-contents/
+function print_r ( t )  
+    local print_r_cache={}
+    local function sub_print_r(t,indent)
+        if (print_r_cache[tostring(t)]) then
+            print(indent.."*"..tostring(t))
+        else
+            print_r_cache[tostring(t)]=true
+            if (type(t)=="table") then
+                for pos,val in pairs(t) do
+                    if (type(val)=="table") then
+                        print(indent.."["..pos.."] => "..tostring(t).." {")
+                        sub_print_r(val,indent..string.rep(" ",string.len(pos)+8))
+                        print(indent..string.rep(" ",string.len(pos)+6).."}")
+                    elseif (type(val)=="string") then
+                        print(indent.."["..pos..'] => "'..val..'"')
+                    else
+                        print(indent.."["..pos.."] => "..tostring(val))
+                    end
+                end
+            else
+                print(indent..tostring(t))
+            end
+        end
+    end
+    if (type(t)=="table") then
+        print(tostring(t).." {")
+        sub_print_r(t,"  ")
+        print("}")
+    else
+        sub_print_r(t,"  ")
+    end
+    print()
+end
+
+
+-- http://stackoverflow.com/questions/9168058/lua-beginner-table-dump-to-console
+function tprint (tbl, indent)
+  if not indent then indent = 0 end
+  for k, v in pairs(tbl) do
+    formatting = string.rep("  ", indent) .. k .. ": "
+    if type(v) == "table" then
+      print(formatting)
+      tprint(v, indent+1)
+    elseif type(v) == 'boolean' then
+      print(formatting .. tostring(v))      
+    else
+      print(formatting .. v)
+    end
+  end
 end
 
