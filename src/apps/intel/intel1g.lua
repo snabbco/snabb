@@ -106,9 +106,12 @@ function intel1g:new (conf)
     print("Tx status")
      print("  TCTL        = " .. bit.tohex(tctl))
      print("  TXDCTL      = " .. bit.tohex(peek32(r.TXDCTL)))
+     print("  TX Enable   = " .. yesno(tctl, 1))
     print("Rx status")
      print("  RCTL        = " .. bit.tohex(rctl))
      print("  RXDCTL      = " .. bit.tohex(peek32(r.RXDCTL)))
+     print("  RX Enable   = " .. yesno(rctl, 1))
+     print("  RX Loopback = " .. yesno(rctl, 6))
     print("PHY status")
      print(" ")
    end
@@ -145,10 +148,15 @@ function intel1g:new (conf)
       poke32(r.CTRL, {reset = 26})    -- reset
       wait32(r.CTRL, {reset = 26}, 0) -- wait reset complete
       poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
-      set32 (r.CTRL, {setlinkup = 6})
+      -- 3.7.6.2.1 Setting the I210 to MAC loopback Mode
+      set32 (r.CTRL, {setlinkup = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
       if conf.loopback then
-         set32(r.RCTL, {loopbackmode0 = 6})
+         set32(r.RCTL, {loopbackmode0 = 6})		-- Set RCTL.LBM to 01b (bits 7:6)
+	 set32(r.CTRL, {frcspd=11, frcdplx=12})		-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
+	 set32(r.CTRL, {fd=0, speed1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
+--XXX	 set32(r.EEER, {eee_frc_an=})	-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
       end
+      set32(r.RCTL, {exen = 1})		-- Set Receiver Enable (bit 1)
       pci.set_bus_master(pciaddress, true)
 
       -- Define shutdown function for the NIC itself
