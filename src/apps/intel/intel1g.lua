@@ -37,7 +37,7 @@ local C   = ffi.C
 local pci = require("lib.hardware.pci")
 local band, bor, bnot, lshift = bit.band, bit.bor, bit.bnot, bit.lshift
 local lib  = require("core.lib")
-local bits = lib.bits
+local bits, bitset = lib.bits, lib.bitset
 local compiler_barrier = lib.compiler_barrier
 local tophysical = core.memory.virtual_to_physical
 
@@ -90,17 +90,35 @@ function intel1g:new (conf)
       return band(index+1, ndesc-1)
    end
 
+   local function yesno (value, bit)
+    return bitset(value, bit) and 'yes' or 'no'
+   end
+
    local function print_status(r)
     local status, tctl, rctl = peek32(r.STATUS), peek32(r.TCTL), peek32(r.RCTL)
     print("MAC status")
-    print("  STATUS      = " .. bit.tohex(status))
+     print("  STATUS      = " .. bit.tohex(status))
+     print("  Full Duplex = " .. yesno(status, 0))
+     print("  Link Up     = " .. yesno(status, 1))
+     print("  PHYRA       = " .. yesno(status, 10))
+     speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
+     print("  Speed       = " .. speed .. ' Mb/s')
     print("Tx status")
-    print("  TCTL        = " .. bit.tohex(tctl))
-    print("  TXDCTL      = " .. bit.tohex(peek32(r.TXDCTL)))
+     print("  TCTL        = " .. bit.tohex(tctl))
+     print("  TXDCTL      = " .. bit.tohex(peek32(r.TXDCTL)))
     print("Rx status")
-    print("  RCTL        = " .. bit.tohex(rctl))
-    print("  RXDCTL      = " .. bit.tohex(peek32(r.RXDCTL)))
+     print("  RCTL        = " .. bit.tohex(rctl))
+     print("  RXDCTL      = " .. bit.tohex(peek32(r.RXDCTL)))
+    print("PHY status")
+     print(" ")
+   end
 
+   local function print_stats(r)
+    print("Stats")
+     --print("  Total Packets Received     = " .. bit.tohex(peek32(r.TPR)))
+     --print("  Total Packets Transmitted  = " .. bit.tohex(peek32(r.TPT)))
+     print("  Total Packets Received     = " .. (peek32(r.TPR)))
+     print("  Total Packets Transmitted  = " .. (peek32(r.TPT)))
    end
 
    -- Shutdown functions.
@@ -115,7 +133,12 @@ function intel1g:new (conf)
    r.TCTL = 0x0400
    r.TCTL_EXT = 0x0404
    r.TXDCTL = 0x03828
-print_status(r)
+
+   r.TPR = 0x040D0		-- Total Packets Received
+   r.TPT = 0x040D4		-- Total Packets Transmitted
+
+   print("Status before Init: ", print_status(r))
+   print_stats(r)
    if not attach then
       -- Initialize device
       poke32(r.EIMC, 0xffffffff)      -- disable interrupts
@@ -135,6 +158,8 @@ print_status(r)
          pci.set_bus_master(pciaddress, false) -- disable DMA
       end
    end
+   print("Status after Init: ", print_status(r))
+   print_stats(r)
 
    -- Transmit support
    if txq then
@@ -216,6 +241,7 @@ print_status(r)
          end
       end
    end
+
    -- Receive support
    if rxq then
       r.RDBAL  = 0xc000 + rxq*0x40
@@ -314,9 +340,10 @@ print_status(r)
       if stop_receive  then stop_receive()  end
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
+      print("Status after Stop: ", print_status(r))
+      print_stats(r)
    end
 
--- print("self= ")  print_r(self)
    return self
 end
 
@@ -334,7 +361,8 @@ function selftest ()
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
    -- try i210
-    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
+    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
+    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx->nic.rx")
     config.link(c, "nic.tx->sink.rx")
@@ -356,7 +384,8 @@ function selftest ()
  --print("c= ") print_r(c)
  --tprint(c, 2)
 
- --print("engine= ") print_r(engine)
+-- print("engine= ") print_r(engine)
+   engine.app_table.nic.stop()
 
    --local li = engine.app_table.nic.input[1]
    local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
