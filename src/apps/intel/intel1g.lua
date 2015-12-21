@@ -137,6 +137,7 @@ function intel1g:new (conf)
    r.TCTL_EXT = 0x0404
    r.TXDCTL = 0x03828
 
+   r.EEER = 0x0E30		-- Energy Efficient Ethernet (EEE) Register
    r.TPR = 0x040D0		-- Total Packets Received
    r.TPT = 0x040D4		-- Total Packets Transmitted
 
@@ -154,7 +155,7 @@ function intel1g:new (conf)
          set32(r.RCTL, {loopbackmode0 = 6})		-- Set RCTL.LBM to 01b (bits 7:6)
 	 set32(r.CTRL, {frcspd=11, frcdplx=12})		-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
 	 set32(r.CTRL, {fd=0, speed1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
---XXX	 set32(r.EEER, {eee_frc_an=})	-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
+	 set32(r.EEER, {eee_frc_an=24})			-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
       end
       set32(r.RCTL, {exen = 1})		-- Set Receiver Enable (bit 1)
       pci.set_bus_master(pciaddress, true)
