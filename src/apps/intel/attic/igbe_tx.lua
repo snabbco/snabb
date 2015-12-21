@@ -1,3 +1,4 @@
+--[[
 -- igbe_tx.lua -- Intel Gigabit Ethernet: transmit driver
 
 local igbe_tx = {}
@@ -85,3 +86,4 @@ function igbe_tx.stop ()
 end
 
 return igbe_tx
+]]--
