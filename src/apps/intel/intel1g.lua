@@ -90,15 +90,32 @@ function intel1g:new (conf)
       return band(index+1, ndesc-1)
    end
 
+   local function print_status(r)
+    local status, tctl, rctl = peek32(r.STATUS), peek32(r.TCTL), peek32(r.RCTL)
+    print("MAC status")
+    print("  STATUS      = " .. bit.tohex(status))
+    print("Tx status")
+    print("  TCTL        = " .. bit.tohex(tctl))
+    print("  TXDCTL      = " .. bit.tohex(peek32(r.TXDCTL)))
+    print("Rx status")
+    print("  RCTL        = " .. bit.tohex(rctl))
+    print("  RXDCTL      = " .. bit.tohex(peek32(r.RXDCTL)))
+
+   end
+
    -- Shutdown functions.
    local stop_nic, stop_transmit, stop_receive
 
    -- Device setup and initialization
    r.CTRL = 0x0000
+   r.STATUS = 0x0008
    r.EIMC = 0x1528
    r.RCTL = 0x0100
+   r.RXDCTL = 0x02828
    r.TCTL = 0x0400
    r.TCTL_EXT = 0x0404
+   r.TXDCTL = 0x03828
+print_status(r)
    if not attach then
       -- Initialize device
       poke32(r.EIMC, 0xffffffff)      -- disable interrupts
@@ -326,9 +343,11 @@ function selftest ()
     --config.link(c, "source.tx->repeater.input")
     --config.link(c, "repeater.output->sink.rx")
    engine.configure(c)
+
    -- showlinks: src/core/app.lua calls report_links()
    --engine.main({duration = 1, report = {showapps = true, showlinks = true}})
    engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
+
    print("selftest: ok")
 
  -- for k, v in pairs(c) do
@@ -351,6 +370,12 @@ function selftest ()
    local s= link.stats(lo)
    print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 end
+
+
+-- ---
+
+
+-- ---
 
 -- https://coronalabs.com/blog/2014/09/02/tutorial-printing-table-contents/
 function print_r ( t )  
