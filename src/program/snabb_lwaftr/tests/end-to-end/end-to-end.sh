@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 SNABB_LWAFTR=../../../../snabb-lwaftr
 TEST_BASE=../data

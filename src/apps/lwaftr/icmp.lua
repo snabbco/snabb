@@ -62,8 +62,7 @@ local function write_icmp(dst_pkt, initial_pkt, l2_size, max_size, base_checksum
 end
 
 local function to_datagram(pkt)
-   if not dgram then dgram = datagram:new() end
-   return dgram:reuse(pkt)
+   return datagram:new(pkt)
 end
 
 -- initial_pkt is the one to embed (a subset of) in the ICMP payload

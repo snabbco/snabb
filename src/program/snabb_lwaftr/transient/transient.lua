@@ -20,10 +20,11 @@ end
 
 function find_devices(pattern)
    if #pci.devices == 0 then pci.scan_devices() end
+   pattern = pci.qualified(pattern)
    local ret = {}
    for _,device in ipairs(pci.devices) do
       if (device.usable and device.driver == 'apps.intel.intel_app' and
-          device.pciaddress:match(pattern)) then
+          pattern:match(device.pciaddress)) then
          table.insert(ret, device.pciaddress)
       end
    end
