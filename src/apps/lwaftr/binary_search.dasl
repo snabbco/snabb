@@ -35,14 +35,15 @@ local function assemble (name, prototype, generator)
    return ffi.cast(prototype, mcode)
 end
 
-function gen(count, entry_byte_size)
+function gen(count, entry_type)
    local function gen_binary_search(Dst)
       if count == 1 then
-         | mov rax, 0
+         | mov rax, rdi
          | ret
          return
       end
 
+      local entry_byte_size = ffi.sizeof(entry_type)
       local size = 1
       while size < count do size = size * 2 end
 
@@ -75,31 +76,12 @@ function gen(count, entry_byte_size)
          size = next_size
       end
 
-      -- Now rdi points at the answer (if we have one).  Subtract off
-      -- the base and convert to an index.
-      | sub rdi, rdx
-
-      if bit.band(entry_byte_size, entry_byte_size - 1) == 0 then
-         -- The entry size is a power of two, yay.
-         local bits = 0
-         while bit.lshift(1, bits) ~= entry_byte_size do
-            bits = bits + 1
-         end
-         | sar rdi, bits
-         | mov rax, rdi
-      else
-         -- Not a power of two: boo.  Subtract rdx and divide by the
-         -- entry size to get the offset into the vector.
-         | mov rax, rdi
-         | xor rdx, rdx
-         | mov esi, entry_byte_size
-         | div esi
-      end
-
-      -- Div leaves its result in eax, which is what we want.  Done.
+      -- Now rdi points at the answer (if we have one).  Done!
+      | mov rax, rdi
       | ret
    end
-   return assemble("binary_search_"..count, "int(*)(void*, uint32_t)",
+   return assemble("binary_search_"..count,
+                   ffi.typeof("$*(*)($*, uint32_t)", entry_type, entry_type),
                    gen_binary_search)
 end
 
@@ -108,10 +90,10 @@ function selftest ()
    local test = ffi.new('uint32_t[15]',
                         { 1, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 5 })
    local searchers = {}
-   for i=1,10 do searchers[i] = gen(i, 4) end
+   for i=1,10 do searchers[i] = gen(i, ffi.typeof('uint32_t')) end
 
    local function assert_search(size, key, expected)
-      local res = searchers[size](test, key)
+      local res = searchers[size](test, key) - test
       if res ~= expected then
          error(('in search of size %d for key %d: expected %d, got %d'):format(
                   size, key, expected, res))

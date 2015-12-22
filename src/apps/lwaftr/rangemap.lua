@@ -114,17 +114,13 @@ function RangeMapBuilder:build()
       entries = packed_entries,
       size = range_count
    }
-   map.binary_search = binary_search.gen(map.size, ffi.sizeof(map.entry_type))
+   map.binary_search = binary_search.gen(map.size, map.entry_type)
    map = setmetatable(map, { __index = RangeMap })
    return map
 end
 
 function RangeMap:lookup(k)
    return self.binary_search(self.entries, k)
-end
-
-function RangeMap:val_at(i)
-   return self.entries[i].value
 end
 
 function selftest()
@@ -146,29 +142,29 @@ function selftest()
    local map = builder:build()
 
    assert(map.size == 12)
-   assert(map:val_at(map:lookup(0)) == 1)
-   assert(map:val_at(map:lookup(1)) == 2)
-   assert(map:val_at(map:lookup(2)) == 10)
-   assert(map:val_at(map:lookup(99)) == 10)
-   assert(map:val_at(map:lookup(100)) == 10)
-   assert(map:val_at(map:lookup(101)) == 20)
-   assert(map:val_at(map:lookup(102)) == 30)
-   assert(map:val_at(map:lookup(199)) == 30)
-   assert(map:val_at(map:lookup(200)) == 30)
-   assert(map:val_at(map:lookup(201)) == 40)
-   assert(map:val_at(map:lookup(300)) == 40)
-   assert(map:val_at(map:lookup(301)) == 50)
-   assert(map:val_at(map:lookup(302)) == 60)
-   assert(map:val_at(map:lookup(303)) == 70)
-   assert(map:val_at(map:lookup(349)) == 70)
-   assert(map:val_at(map:lookup(350)) == 70)
-   assert(map:val_at(map:lookup(399)) == 70)
-   assert(map:val_at(map:lookup(400)) == 70)
-   assert(map:val_at(map:lookup(401)) == 80)
-   assert(map:val_at(map:lookup(402)) == 99)
-   assert(map:val_at(map:lookup(UINT32_MAX-2)) == 99)
-   assert(map:val_at(map:lookup(UINT32_MAX-1)) == 99)
-   assert(map:val_at(map:lookup(UINT32_MAX)) == 100)
+   assert(map:lookup(0).value == 1)
+   assert(map:lookup(1).value == 2)
+   assert(map:lookup(2).value == 10)
+   assert(map:lookup(99).value == 10)
+   assert(map:lookup(100).value == 10)
+   assert(map:lookup(101).value == 20)
+   assert(map:lookup(102).value == 30)
+   assert(map:lookup(199).value == 30)
+   assert(map:lookup(200).value == 30)
+   assert(map:lookup(201).value == 40)
+   assert(map:lookup(300).value == 40)
+   assert(map:lookup(301).value == 50)
+   assert(map:lookup(302).value == 60)
+   assert(map:lookup(303).value == 70)
+   assert(map:lookup(349).value == 70)
+   assert(map:lookup(350).value == 70)
+   assert(map:lookup(399).value == 70)
+   assert(map:lookup(400).value == 70)
+   assert(map:lookup(401).value == 80)
+   assert(map:lookup(402).value == 99)
+   assert(map:lookup(UINT32_MAX-2).value == 99)
+   assert(map:lookup(UINT32_MAX-1).value == 99)
+   assert(map:lookup(UINT32_MAX).value == 100)
 
    local pmu = require('lib.pmu')
    local has_pmu_counters, err = pmu.is_available()
@@ -216,7 +212,7 @@ function selftest()
    local function test_lookup(iterations)
       local inc = math.floor(UINT32_MAX / iterations)
       local result = 0
-      for i=0,UINT32_MAX,inc do result = map:lookup(i) end
+      for i=0,UINT32_MAX,inc do result = map:lookup(i).value end
       return result
    end
 

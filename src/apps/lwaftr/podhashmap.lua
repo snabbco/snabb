@@ -387,7 +387,7 @@ function PodHashMap:make_lookup_streamer(stride)
    -- specialized for this table and this stride.
    local entry_size = ffi.sizeof(self.entry_type)
    res.multi_copy = multi_copy.gen(stride, res.entries_per_lookup * entry_size)
-   res.binary_search = binary_search.gen(res.entries_per_lookup, entry_size)
+   res.binary_search = binary_search.gen(res.entries_per_lookup, self.entry_type)
 
    return setmetatable(res, { __index = LookupStreamer })
 end
@@ -413,15 +413,14 @@ function LookupStreamer:stream()
    for i=0,stride-1 do
       local hash = entries[i].hash
       local index = i * entries_per_lookup
-      local offset = self.binary_search(stream_entries + index, hash)
-      local found = index + offset
+      local found = self.binary_search(stream_entries + index, hash)
       -- It could be that we read one beyond the ENTRIES_PER_LOOKUP
       -- entries allocated for this key; that's fine.  See note in
       -- make_lookup_streamer.
-      if stream_entries[found].hash == hash then
+      if found.hash == hash then
          -- Direct hit?
-         if equal_fn(stream_entries[found].key, entries[i].key) then
-            entries[i].value = stream_entries[found].value
+         if equal_fn(found.key, entries[i].key) then
+            entries[i].value = found.value
          else
             -- Mark this result as not found unless we prove
             -- otherwise.
@@ -429,11 +428,11 @@ function LookupStreamer:stream()
 
             -- Collision?
             found = found + 1
-            while stream_entries[found].hash == hash do
-               if equal_fn(stream_entries[found].key, entries[i].key) then
+            while found.hash == hash do
+               if equal_fn(found.key, entries[i].key) then
                   -- Yay!  Re-mark this result as found.
                   entries[i].hash = hash
-                  entries[i].value = stream_entries[found].value
+                  entries[i].value = found.value
                   break
                end
                found = found + 1
