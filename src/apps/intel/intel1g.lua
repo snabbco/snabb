@@ -301,7 +301,7 @@ function intel1g:new (conf)
       -- Return true if there is a DMA-completed packet ready to be received.
       local function can_receive ()
          local r= (rdt ~= rdh) and (band(rxdesc[rdt].status, 0x1) ~= 0)
-	 --print(r)
+	 print("can_receive():  r=",r, "  rdh=",rdh, "  rdt=",rdt)
          return r
       end
 
@@ -323,6 +323,7 @@ function intel1g:new (conf)
          rdh = band(peek32(r.RDH), ndesc-1)
          --rdh = math.min(peek32(r.RDH), ndesc-1)	-- from intel10g
          poke32(r.RDT, rdt)
+	 print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
       end
       
       -- Define pull() method for app instance.
