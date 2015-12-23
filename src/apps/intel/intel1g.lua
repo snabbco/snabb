@@ -157,7 +157,6 @@ function intel1g:new (conf)
 	 set32(r.CTRL, {fd=0, speed1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
 	 set32(r.EEER, {eee_frc_an=24})			-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
       end
-      set32(r.RCTL, {exen = 1})		-- Set Receiver Enable (bit 1)
       pci.set_bus_master(pciaddress, true)
 
       -- Define shutdown function for the NIC itself
@@ -273,13 +272,16 @@ function intel1g:new (conf)
       
       -- Receive state
       local rxpackets = {}
-      local rdh, rdt, rxnext = 0, 0, 0
+      local rdh, rdt, rxnext = 0, 0, 1
 
       -- Initialize receive queue
       poke32(r.RDBAL, tophysical(rxdesc) % 2^32)
       poke32(r.RDBAH, tophysical(rxdesc) / 2^32)
       poke32(r.RDLEN, ndesc)
-      
+      poke32(r.RDH, 0)
+      poke32(r.RDT, 0)
+
+      set32(r.RCTL, {rxen = 1})		-- Set Receiver Enable (bit 1)
 
       -- Return true if we can enqueue another packet buffer.
       local function can_add_receive_buffer ()
@@ -297,7 +299,11 @@ function intel1g:new (conf)
 
       -- Return true if there is a DMA-completed packet ready to be received.
       local function can_receive ()
-         return rxnext ~= rdh and band(rxdesc[rxnext].status, 0x1) ~= 0
+         local r
+         r= (rxnext ~= rdh) and (band(rxdesc[rxnext].status, 0x1) ~= 0)
+	 --print(r)
+         return r
+         --return rxnext ~= rdh and band(rxdesc[rxnext].status, 0x1) ~= 0
       end
 
       -- Receive a packet.
@@ -322,6 +328,7 @@ function intel1g:new (conf)
          local l = self.output[1]
          assert(l, "intel1g: no output link")
          local limit = rxburst
+ --print(limit)
          while limit > 0 and can_receive() do
             link.transmit(l, receive())
             limit = limit - 1
@@ -370,9 +377,9 @@ function selftest ()
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
    -- try i210
-    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
+    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
-    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
+    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx->nic.rx")
     config.link(c, "nic.tx->sink.rx")
    -- replace intel1g by Repeater
