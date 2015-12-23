@@ -193,7 +193,7 @@ function intel1g:new (conf)
       -- Initialize transmit queue
       poke32(r.TDBAL, tophysical(txdesc) % 2^32)
       poke32(r.TDBAH, tophysical(txdesc) / 2^32)
-      poke32(r.TDLEN, ndesc)
+      poke32(r.TDLEN, ndesc * ffi.sizeof(txdesc_t))
       set32(r.TCTL, 2)
       poke32(r.TXDCTL, {wthresh=16, enable=25})
       poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
@@ -277,7 +277,7 @@ function intel1g:new (conf)
       -- Initialize receive queue
       poke32(r.RDBAL, tophysical(rxdesc) % 2^32)
       poke32(r.RDBAH, tophysical(rxdesc) / 2^32)
-      poke32(r.RDLEN, ndesc)
+      poke32(r.RDLEN, ndesc * ffi.sizeof(rxdesc_t))
       poke32(r.RDH, 0)
       poke32(r.RDT, 0)
 
