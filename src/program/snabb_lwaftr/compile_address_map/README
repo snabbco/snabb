@@ -1,0 +1,15 @@
+Usage: compile-address-map ADDRESSES.TXT [ADDRESSES.MAP]
+
+  -h, --help
+                             Print usage information.
+
+Validate and compile an address map.  An address map defines the set of
+IPv4 addresses that are provisioned by an lwAFTR.  It also defines the
+way in which those addresses are shared, by specifying the "psid_length"
+and "shift" parameters for each address.  See RFC 7597 for more details
+on the PSID scheme for how to share IPv4 addresses.
+
+This command will atomically overwrite the output file.  If the output
+file name ADDRESSES.MAP is not given as an argument, the output file
+will be the name of the input file, minus a ".TXT" suffix if present,
+plus a ".MAP" suffix.

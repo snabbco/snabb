@@ -12,6 +12,7 @@ module(..., package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
+local S = require('syscall')
 local binary_search = require('apps.lwaftr.binary_search')
 
 local UINT32_MAX = 0xFFFFFFFF
@@ -121,6 +122,25 @@ end
 
 function RangeMap:lookup(k)
    return self.binary_search(self.entries, k)
+end
+
+function RangeMap:save(filename)
+   local fd, err = S.open(filename, "creat, wronly, trunc", "rusr, wusr, rgrp, roth")
+   if not fd then
+      error("error saving range map, while creating "..filename..": "..tostring(err))
+   end
+   local size = ffi.sizeof(self.type, self.size)
+   local ptr = ffi.cast("uint8_t*", self.entries)
+   while size > 0 do
+      local written, err = S.write(fd, ptr, size)
+      if not written then
+         fd:close()
+         error("error saving range map, while writing "..filename..": "..tostring(err))
+      end
+      ptr = ptr + written
+      size = size - written
+   end
+   fd:close()
 end
 
 function selftest()

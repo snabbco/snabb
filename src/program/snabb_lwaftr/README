@@ -3,6 +3,7 @@ Usage:
   snabb-lwaftr check
   snabb-lwaftr run
   snabb-lwaftr transient
+  snabb-lwaftr compile-address-map
 
 Use --help for per-command usage.
 Example:
