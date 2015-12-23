@@ -272,7 +272,7 @@ function intel1g:new (conf)
       
       -- Receive state
       local rxpackets = {}
-      local rdh, rdt, rxnext = 0, 0, 1
+      local rdh, rdt= 0, 0
 
       -- Initialize receive queue
       poke32(r.RDBAL, tophysical(rxdesc) % 2^32)
@@ -285,41 +285,43 @@ function intel1g:new (conf)
 
       -- Return true if we can enqueue another packet buffer.
       local function can_add_receive_buffer ()
-         return ringnext(rdt) ~= rxnext
+         return ringnext(rdh) ~= rdt
       end
 
-      -- Enqueue a packet for DMA receive.
+      -- NIC hardware enqueues packets using DMA. Never called by software.
       local function add_receive_buffer (p)
-         local desc = rxdesc[rdt]
+         assert(can_add_receive_buffer())
+         local desc = rxdesc[rdh]
          desc.address = tophysical(p.data)
          desc.flags = 0
-         rxpackets[rdt] = p
-         rdt = ringnext(rdt)
+         rxpackets[rdh] = p
+         rdh = ringnext(rdh)
       end
 
       -- Return true if there is a DMA-completed packet ready to be received.
       local function can_receive ()
-         local r
-         r= (rxnext ~= rdh) and (band(rxdesc[rxnext].status, 0x1) ~= 0)
+         local r= (rdt ~= rdh) and (band(rxdesc[rdt].status, 0x1) ~= 0)
 	 --print(r)
          return r
-         --return rxnext ~= rdh and band(rxdesc[rxnext].status, 0x1) ~= 0
       end
 
       -- Receive a packet.
       -- Precondition: can_receive() => true
       local function receive ()
-         local desc = rxdesc[rxnext]
-         local p = rxpackets[rxnext]
+         assert(can_receive())
+         local desc = rxdesc[rdt]
+         local p = rxpackets[rdt]
          p.length = desc.length
-         rxpackets[rxnext] = nil
-         rxnext = ringnext(rxnext)
+         rxpackets[rdt] = nil		-- free buffer
+         rdt = ringnext(rdt)
          return p
       end
 
       -- Synchronize receive registers with hardware.
       local function sync_receive ()
+         --rdh = peek32(r.RDH)
          rdh = band(peek32(r.RDH), ndesc-1)
+         --rdh = math.min(peek32(r.RDH), ndesc-1)	-- from intel10g
          poke32(r.RDT, rdt)
       end
       
