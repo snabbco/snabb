@@ -229,10 +229,10 @@ function intel1g:new (conf)
 
       -- Define push() method for app instance.
       function self:push ()
-         local l = self.input[1]
-         assert(l, "intel1g: no input link")
-         while not link.empty(l) and can_transmit() do
-            transmit(link.receive(l))
+         local li = self.input[1]
+         assert(li, "intel1g: no input link")
+         while not link.empty(li) and can_transmit() do
+            transmit(link.receive(li))
          end
          sync_transmit()
       end
@@ -325,12 +325,12 @@ function intel1g:new (conf)
       
       -- Define pull() method for app instance.
       function self:pull ()
-         local l = self.output[1]
-         assert(l, "intel1g: no output link")
+         local lo = self.output[1]
+         assert(lo, "intel1g: no output link")
          local limit = rxburst
  --print(limit)
          while limit > 0 and can_receive() do
-            link.transmit(l, receive())
+            link.transmit(lo, receive())
             limit = limit - 1
  print(".")
          end
