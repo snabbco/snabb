@@ -118,8 +118,6 @@ function intel1g:new (conf)
 
    local function print_stats(r)
     print("Stats")
-     --print("  Total Packets Received     = " .. bit.tohex(peek32(r.TPR)))
-     --print("  Total Packets Transmitted  = " .. bit.tohex(peek32(r.TPT)))
      print("  Total Packets Received     = " .. (peek32(r.TPR)))
      print("  Total Packets Transmitted  = " .. (peek32(r.TPT)))
    end
@@ -128,18 +126,17 @@ function intel1g:new (conf)
    local stop_nic, stop_transmit, stop_receive
 
    -- Device setup and initialization
-   r.CTRL = 0x0000
-   r.STATUS = 0x0008
-   r.EIMC = 0x1528
-   r.RCTL = 0x0100
-   r.RXDCTL = 0x02828
-   r.TCTL = 0x0400
-   r.TCTL_EXT = 0x0404
-   r.TXDCTL = 0x03828
-
-   r.EEER = 0x0E30		-- Energy Efficient Ethernet (EEE) Register
-   r.TPR = 0x040D0		-- Total Packets Received
-   r.TPT = 0x040D4		-- Total Packets Transmitted
+   r.CTRL = 	0x00000		-- Device Control - RW
+   r.STATUS = 	0x00008		-- Device Status - RO
+   r.RCTL = 	0x00100		-- RX Control - RW
+   r.TCTL = 	0x00400		-- TX Control - RW
+   r.TCTL_EXT =	0x00404		-- Extended TX Control - RW
+   r.EEER = 	0x00E30		-- Energy Efficient Ethernet (EEE) Register
+   r.EIMC = 	0x01528		-- 
+   r.RXDCTL = 	0x02828		-- RX Descriptor Control queue 0 - RW
+   r.TXDCTL = 	0x03828		-- TX Descriptor Control - RW
+   r.TPR = 	0x040D0		-- Total Packets Received - R/clr
+   r.TPT = 	0x040D4		-- Total Packets Transmitted - R/clr
 
    print("Status before Init: ", print_status(r))
    print_stats(r)
@@ -275,13 +272,31 @@ function intel1g:new (conf)
       local rdh, rdt= 0, 0
 
       -- Initialize receive queue
+      -- see em_initialize_receive_unit() in http://cvsweb.openbsd.org/cgi-bin/cvsweb/src/sys/dev/pci/if_em.c
+      clear32(r.RCTL, {rxen = 1})	-- disable receiver while setting up descriptor ring
+      --poke32(r.RDTR, )		-- set Receive Delay Timer Register (only for interrupt ops?)
       poke32(r.RDBAL, tophysical(rxdesc) % 2^32)
       poke32(r.RDBAH, tophysical(rxdesc) / 2^32)
       poke32(r.RDLEN, ndesc * ffi.sizeof(rxdesc_t))
-      poke32(r.RDH, 0)
-      poke32(r.RDT, 0)
 
-      set32(r.RCTL, {rxen = 1})		-- Set Receiver Enable (bit 1)
+      local rctl= {}
+      rctl.en= 1			-- enable receiver
+      rctl.sbp= 2			-- store bad packet
+      rctl.RCTL_UPE= 3			-- unicast promiscuous enable
+      rctl.RCTL_MPE= 4			-- multicast promiscuous enable
+      rctl.lpe= 5			-- Long Packet Enable
+      rctl.lbm_mac= 6			-- MAC loopback mode
+      rctl.bam= 15			-- broadcast enable
+      rctl.sz_512= 17			-- buffer size
+      --rctl.RCTL_RDMTS_HALF=		-- rx desc min threshold size
+      rctl.secrc= 26			-- i350 has a bug where it always strips the CRC, so strip CRC and cope in rxeof
+
+      set32(r.RXDCTL, {rxdctl_queue_enable= 24})	-- enable the RX queue
+
+      poke32(r.RCTL, rctl)		-- enable receiver
+
+      poke32(r.RDH, 0)			-- Rx descriptor Head
+      poke32(r.RDT, 0)			-- Rx descriptor Tail
 
       -- Return true if we can enqueue another packet buffer.
       local function can_add_receive_buffer ()
@@ -313,6 +328,7 @@ function intel1g:new (conf)
          local p = rxpackets[rdt]
          p.length = desc.length
          rxpackets[rdt] = nil		-- free buffer
+	 rxdesc[rdt].status= 0		-- see 7.1.4.5: zero status before bumping tail pointer
          rdt = ringnext(rdt)
          return p
       end
@@ -380,9 +396,9 @@ function selftest ()
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
    -- try i210
-    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
+    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
-    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
+    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx->nic.rx")
     config.link(c, "nic.tx->sink.rx")
    -- replace intel1g by Repeater
