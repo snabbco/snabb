@@ -94,25 +94,26 @@ function intel1g:new (conf)
     return bitset(value, bit) and 'yes' or 'no'
    end
 
-   local function print_status(r)
+   local function print_status(r, title)
+    print(title)
     local status, tctl, rctl = peek32(r.STATUS), peek32(r.TCTL), peek32(r.RCTL)
-    print("MAC status")
+    print(" MAC status")
      print("  STATUS      = " .. bit.tohex(status))
      print("  Full Duplex = " .. yesno(status, 0))
      print("  Link Up     = " .. yesno(status, 1))
      print("  PHYRA       = " .. yesno(status, 10))
      speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
      print("  Speed       = " .. speed .. ' Mb/s')
-    print("Tx status")
+    print(" Tx status")
      print("  TCTL        = " .. bit.tohex(tctl))
      print("  TXDCTL      = " .. bit.tohex(peek32(r.TXDCTL)))
      print("  TX Enable   = " .. yesno(tctl, 1))
-    print("Rx status")
+    print(" Rx status")
      print("  RCTL        = " .. bit.tohex(rctl))
      print("  RXDCTL      = " .. bit.tohex(peek32(r.RXDCTL)))
      print("  RX Enable   = " .. yesno(rctl, 1))
      print("  RX Loopback = " .. yesno(rctl, 6))
-    print("PHY status")
+    print(" PHY status")
      print(" ")
    end
 
@@ -133,12 +134,12 @@ function intel1g:new (conf)
    r.TCTL_EXT =	0x00404		-- Extended TX Control - RW
    r.EEER = 	0x00E30		-- Energy Efficient Ethernet (EEE) Register
    r.EIMC = 	0x01528		-- 
-   r.RXDCTL = 	0x02828		-- RX Descriptor Control queue 0 - RW
-   r.TXDCTL = 	0x03828		-- TX Descriptor Control - RW
+   --r.RXDCTL =	0x02828		-- legacy alias: RX Descriptor Control queue 0 - RW
+   --r.TXDCTL =	0x03828		-- legacy alias: TX Descriptor Control queue 0 - RW
    r.TPR = 	0x040D0		-- Total Packets Received - R/clr
    r.TPT = 	0x040D4		-- Total Packets Transmitted - R/clr
 
-   print("Status before Init: ", print_status(r))
+   --print_status(r, "Status before Init: ")
    print_stats(r)
    if not attach then
       -- Initialize device
@@ -163,18 +164,19 @@ function intel1g:new (conf)
          pci.set_bus_master(pciaddress, false) -- disable DMA
       end
    end
-   print("Status after Init: ", print_status(r))
+   --print_status(r, "Status after Init: ")
    print_stats(r)
 
    -- Transmit support
    if txq then
+      assert(txq/4 == 0, "txq must be in 0..3 for i210!")
       -- Define registers for the transmit queue that we are using
       r.TDBAL  = 0xe000 + txq*0x40
       r.TDBAH  = 0xe004 + txq*0x40
       r.TDLEN  = 0xe008 + txq*0x40
       r.TXDCTL = 0xe028 + txq*0x40
-      r.TDH    = 0xe010 + txq*0x40
-      r.TDT    = 0xe018 + txq*0x40
+      r.TDH    = 0xe010 + txq*0x40			-- Tx Descriptor Head - RO!
+      r.TDT    = 0xe018 + txq*0x40			-- Tx Descriptor Head - RW
 
       -- Setup transmit descriptor memory
       local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
@@ -195,6 +197,8 @@ function intel1g:new (conf)
       poke32(r.TXDCTL, {wthresh=16, enable=25})
       poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
 
+      --print_status(r, "Status after init transmit: ")
+
       -- Return true if we can enqueue another packet for transmission.
       local function can_transmit ()
          return ringnext(tdt) ~= tdh
@@ -213,7 +217,7 @@ function intel1g:new (conf)
       -- Free packets that have  been transmitted.
       local function sync_transmit ()
          local cursor = tdh
-         tdh = peek32(r.TDH)
+         tdh = peek32(r.TDH)			-- possible race condition, see 7.1.4.4, 7.2.3 
          while cursor ~= tdh do
             if txpackets[cursor] then
                packet.free(txpackets[cursor])
@@ -249,11 +253,12 @@ function intel1g:new (conf)
 
    -- Receive support
    if rxq then
+      assert(rxq/4 == 0, "rxq must be in 0..3 for i210!")
       r.RDBAL  = 0xc000 + rxq*0x40
       r.RDBAH  = 0xc004 + rxq*0x40
       r.RDLEN  = 0xc008 + rxq*0x40
-      r.RDH    = 0xc010 + rxq*0x40
-      r.RDT    = 0xc018 + rxq*0x40
+      r.RDH    = 0xc010 + rxq*0x40				-- Rx Descriptor Head - RO
+      r.RDT    = 0xc018 + rxq*0x40				-- Rx Descriptor Tail - RW
       r.RXDCTL = 0xc028 + rxq*0x40
 
       local rxdesc_t = ffi.typeof([[
@@ -298,6 +303,8 @@ function intel1g:new (conf)
       poke32(r.RDH, 0)			-- Rx descriptor Head
       poke32(r.RDT, 0)			-- Rx descriptor Tail
 
+      print_status(r, "Status after init receive: ")
+
       -- Return true if we can enqueue another packet buffer.
       local function can_add_receive_buffer ()
          return ringnext(rdh) ~= rdt
@@ -335,8 +342,8 @@ function intel1g:new (conf)
 
       -- Synchronize receive registers with hardware.
       local function sync_receive ()
-         --rdh = peek32(r.RDH)
-         rdh = band(peek32(r.RDH), ndesc-1)
+         rdh = peek32(r.RDH)				-- possible race condition, see 7.1.4.4, 7.2.3
+         --rdh = band(peek32(r.RDH), ndesc-1)		-- from intel1g: Luke observed (RDH == ndesc) !?
          --rdh = math.min(peek32(r.RDH), ndesc-1)	-- from intel10g
          poke32(r.RDT, rdt)
 	 print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
@@ -347,7 +354,6 @@ function intel1g:new (conf)
          local lo = self.output[1]
          assert(lo, "intel1g: no output link")
          local limit = rxburst
- --print(limit)
          while limit > 0 and can_receive() do
             link.transmit(lo, receive())
             limit = limit - 1
@@ -375,7 +381,7 @@ function intel1g:new (conf)
       if stop_receive  then stop_receive()  end
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
-      print("Status after Stop: ", print_status(r))
+      print_status(r, "Status after Stop: ")
       print_stats(r)
    end
 
@@ -434,9 +440,6 @@ function selftest ()
    local s= link.stats(lo)
    print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 end
-
-
--- ---
 
 
 -- ---
