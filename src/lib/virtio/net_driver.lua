@@ -35,7 +35,6 @@ local VIRTIO_NET_HDR_F_NEEDS_CSUM = 1
 local min_features =   C.VIRTIO_RING_F_INDIRECT_DESC + C.VIRTIO_NET_F_CSUM
 local want_features =  C.VIRTIO_F_ANY_LAYOUT +
                        C.VIRTIO_RING_F_INDIRECT_DESC +
-                       C.VIRTIO_NET_F_CSUM +
                        C.VIRTIO_NET_F_MAC
 
 local RXQ = 0
@@ -48,12 +47,22 @@ function VirtioNetDriver:new(args)
 
    local virtio_pci = VirtioPci:new(args.pciaddr)
 
+   self.min_features = min_features
+   self.want_features = want_features
+
+   if args.use_checksum then
+      self.transmit = self._transmit_checksum
+      self.want_features = self.want_features + C.VIRTIO_NET_F_CSUM
+   else
+      self.transmit = self._transmit
+   end
+
    virtio_pci:reset()
    virtio_pci:acknowledge()
 
    virtio_pci:driver()
 
-   local error = virtio_pci:set_guest_features(min_features, want_features)
+   local error = virtio_pci:set_guest_features(self.min_features, self.want_features)
    if error then
       virtio_pci:free()
       return nil, error
@@ -73,12 +82,6 @@ function VirtioNetDriver:new(args)
    end
 
    virtio_pci:driver_ok()
-
-   if args.use_checksum then
-      self.transmit = self._transmit_checksum
-   else
-      self.transmit = self._transmit
-   end
 
    return setmetatable({
       virtio_pci = virtio_pci,
@@ -126,16 +129,18 @@ function VirtioNetDriver:_transmit(p)
 end
 
 function VirtioNetDriver:sync_transmit()
-  local txq = self.vqs[TXQ]
-  txq:update_avail_idx()
+   local txq = self.vqs[TXQ]
+
+   txq:update_avail_idx()
 end
 
 function VirtioNetDriver:notify_transmit()
-  local txq = self.vqs[TXQ]
-  -- Notify the device if needed
-  if txq:should_notify() then
-    self.virtio_pci:notify_queue(TXQ)
-  end
+   local txq = self.vqs[TXQ]
+
+   -- Notify the device if needed
+   if txq:should_notify() then
+      self.virtio_pci:notify_queue(TXQ)
+   end
 end
 
 function VirtioNetDriver:recycle_transmit_buffers()
@@ -158,14 +163,14 @@ function VirtioNetDriver:receive()
 end
 
 function VirtioNetDriver:add_receive_buffers()
-  local rxq = self.vqs[RXQ]
-  local to_add = rxq:can_add()
-  for i=0, to_add - 1 do
-    rxq:add_empty_header(new_packet(), C.PACKET_PAYLOAD_SIZE)
-  end
+   local rxq = self.vqs[RXQ]
+   local to_add = rxq:can_add()
+   if to_add  == 0 then return end
+
+   for i=0, to_add - 1 do
+      rxq:add_empty_header(new_packet(), C.PACKET_PAYLOAD_SIZE)
+   end
+
+   rxq:update_avail_idx()
 end
 
-function VirtioNetDriver:sync_receive()
-  local rxq = self.vqs[RXQ]
-  rxq:update_avail_idx()
-end

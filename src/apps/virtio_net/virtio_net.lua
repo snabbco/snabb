@@ -36,6 +36,8 @@ function VirtioNet:push()
 
    local to_transmit = math.min(nreadable(l), dev:can_transmit())
 
+   if to_transmit == 0 then return end
+
    for i=0, to_transmit - 1 do
       dev:transmit(receive(l))
    end
@@ -47,12 +49,11 @@ function VirtioNet:pull()
    local dev = self.device
    local l = self.output.tx
    local to_receive = math.min(nwritable(l), dev:can_receive())
-   
+
    for i=0, to_receive - 1 do
       transmit(l, dev:receive())
    end
    dev:add_receive_buffers()
-   dev:sync_receive()
 end
 
 function selftest()

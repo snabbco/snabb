@@ -199,10 +199,8 @@ function VirtioVirtq:add_empty_header(p, len)
 end
 
 function VirtioVirtq:update_avail_idx()
-   if self.vring.avail.idx ~= self.last_avail_idx then
-      C.full_memory_barrier()
-      self.vring.avail.idx = self.last_avail_idx
-   end
+   C.full_memory_barrier()
+   self.vring.avail.idx = self.last_avail_idx
 end
 
 function VirtioVirtq:can_get()
