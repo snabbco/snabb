@@ -119,8 +119,11 @@ function intel1g:new (conf)
 
    local function print_stats(r)
     print("Stats")
-     print("  Total Packets Received     = " .. (peek32(r.TPR)))
-     print("  Total Packets Transmitted  = " .. (peek32(r.TPT)))
+     print("  Rx Packets=        " .. peek32(r.TPR) .. "  Octets= " .. peek32(r.TORH) *2^32 +peek32(r.TORL))
+     print("  Tx Packets=        " .. peek32(r.TPT) .. "  Octets= " .. peek32(r.TOTH) *2^32 +peek32(r.TOTL))
+     print("  Rx Good Packets=   " .. peek32(r.GPRC))
+     print("  Rx No Buffers=     " .. peek32(r.RNBC))
+     print("  Rx Packets to Host=" .. peek32(r.RPTHC))
    end
 
    -- Shutdown functions.
@@ -136,8 +139,15 @@ function intel1g:new (conf)
    r.EIMC = 	0x01528		-- 
    --r.RXDCTL =	0x02828		-- legacy alias: RX Descriptor Control queue 0 - RW
    --r.TXDCTL =	0x03828		-- legacy alias: TX Descriptor Control queue 0 - RW
+   r.GPRC = 	0x04074		-- Good Packets Receive Count - R/clr
+   r.RNBC = 	0x040A0		-- Receive No Buffers Count - R/clr
+   r.TORL = 	0x040C0		-- Total Octets Received - R/clr
+   r.TORH = 	0x040C4		-- Total Octets Received - R/clr
+   r.TOTL = 	0x040C8		-- Total Octets Transmitted - R/clr
+   r.TOTH = 	0x040CC		-- Total Octets Transmitted - R/clr
    r.TPR = 	0x040D0		-- Total Packets Received - R/clr
    r.TPT = 	0x040D4		-- Total Packets Transmitted - R/clr
+   r.RPTHC = 	0x04104		-- Rx Packets to Host Count - R/clr
 
    --print_status(r, "Status before Init: ")
    print_stats(r)
@@ -174,9 +184,10 @@ function intel1g:new (conf)
       r.TDBAL  = 0xe000 + txq*0x40
       r.TDBAH  = 0xe004 + txq*0x40
       r.TDLEN  = 0xe008 + txq*0x40
-      r.TXDCTL = 0xe028 + txq*0x40
       r.TDH    = 0xe010 + txq*0x40			-- Tx Descriptor Head - RO!
       r.TDT    = 0xe018 + txq*0x40			-- Tx Descriptor Head - RW
+      r.TXDCTL = 0xe028 + txq*0x40
+      r.TXCTL  = 0xe014 + txq*0x40
 
       -- Setup transmit descriptor memory
       local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
@@ -257,9 +268,11 @@ function intel1g:new (conf)
       r.RDBAL  = 0xc000 + rxq*0x40
       r.RDBAH  = 0xc004 + rxq*0x40
       r.RDLEN  = 0xc008 + rxq*0x40
+      r.SRRCTL = 0xc00c + rxq*0x40
       r.RDH    = 0xc010 + rxq*0x40				-- Rx Descriptor Head - RO
       r.RDT    = 0xc018 + rxq*0x40				-- Rx Descriptor Tail - RW
       r.RXDCTL = 0xc028 + rxq*0x40
+      r.RXCTL  = 0xc014 + rxq*0x40
 
       local rxdesc_t = ffi.typeof([[
         struct { 
