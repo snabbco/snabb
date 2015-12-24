@@ -23,7 +23,7 @@ require('lib.virtio.virtio_h')
 
 local band, bor, rshift, lshift = bit.band, bit.bor, bit.rshift, bit.lshift
 local prepare_packet4, prepare_packet6 = checksum.prepare_packet4, checksum.prepare_packet6
-local new_packet = packet.allocate
+local new_packet, free = packet.allocate, packet.free
 
 -- constants
 local ETHERTYPE_IPv4 = C.htons(0x0800)
@@ -149,7 +149,7 @@ function VirtioNetDriver:recycle_transmit_buffers()
 
   for i=0, to_free - 1 do
     local p = txq:get()
-    p:free()
+    free(p)
   end
 end
 

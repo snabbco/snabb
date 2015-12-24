@@ -114,21 +114,3 @@ function preallocate_step()
    packet_allocation_step = 2 * packet_allocation_step
 end
 
-function dump(p, w)
-   w = w or io.write
-   for i = 0, p.length-1 do
-      if i % 16 == 0 then w('\n', bit.tohex(i, -4), ': ') end
-      w(bit.tohex(p.data[i], -2), ' ')
-   end
-   w('\n')
-end
-
-ffi.metatype(packet_t, {__index = {
-   clone = clone,
-   append = append,
-   prepend = prepend,
-   shiftleft = shiftleft,
-   free = free,
-   physical = physical,
-   dump = dump,
-}})
