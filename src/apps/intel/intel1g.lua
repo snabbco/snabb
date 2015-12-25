@@ -154,23 +154,23 @@ function intel1g:new (conf)
    if not attach then
       -- Initialize device
       poke32(r.EIMC, 0xffffffff)      -- disable interrupts
-      poke32(r.CTRL, {reset = 26})    -- reset
-      wait32(r.CTRL, {reset = 26}, 0) -- wait reset complete
+      poke32(r.CTRL, {RESET = 26})    -- reset
+      wait32(r.CTRL, {RESET = 26}, 0) -- wait reset complete
       poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
       -- 3.7.6.2.1 Setting the I210 to MAC loopback Mode
-      set32 (r.CTRL, {setlinkup = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
+      set32 (r.CTRL, {SETLINKUP = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
       if conf.loopback then
-         set32(r.RCTL, {loopbackmode0 = 6})		-- Set RCTL.LBM to 01b (bits 7:6)
-	 set32(r.CTRL, {frcspd=11, frcdplx=12})		-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
-	 set32(r.CTRL, {fd=0, speed1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
-	 set32(r.EEER, {eee_frc_an=24})			-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
+         set32(r.RCTL, {LOOPBACKMODE0 = 6})		-- Set RCTL.LBM to 01b (bits 7:6)
+	 set32(r.CTRL, {FRCSPD=11, FRCDPLX=12})		-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
+	 set32(r.CTRL, {FD=0, SPEED1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
+	 set32(r.EEER, {EEE_FRC_AN=24})			-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
       end
       pci.set_bus_master(pciaddress, true)
 
       -- Define shutdown function for the NIC itself
       stop_nic = function ()
          -- XXX Are these the right actions?
-         clear32(r.CTRL, {setlinkup = 6})        -- take the link down
+         clear32(r.CTRL, {SETLINKUP = 6})        -- take the link down
          pci.set_bus_master(pciaddress, false) -- disable DMA
       end
    end
@@ -205,7 +205,7 @@ function intel1g:new (conf)
       poke32(r.TDBAH, tophysical(txdesc) / 2^32)
       poke32(r.TDLEN, ndesc * ffi.sizeof(txdesc_t))
       set32(r.TCTL, 2)
-      poke32(r.TXDCTL, {wthresh=16, enable=25})
+      poke32(r.TXDCTL, {WTHRESH=16, ENABLE=25})
       poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
 
       --print_status(r, "Status after init transmit: ")
@@ -268,9 +268,9 @@ function intel1g:new (conf)
       r.RDBAL  = 0xc000 + rxq*0x40
       r.RDBAH  = 0xc004 + rxq*0x40
       r.RDLEN  = 0xc008 + rxq*0x40
-      r.SRRCTL = 0xc00c + rxq*0x40
-      r.RDH    = 0xc010 + rxq*0x40				-- Rx Descriptor Head - RO
-      r.RDT    = 0xc018 + rxq*0x40				-- Rx Descriptor Tail - RW
+      r.SRRCTL = 0xc00c + rxq*0x40	-- Split and Replication Receive Control
+      r.RDH    = 0xc010 + rxq*0x40	-- Rx Descriptor Head - RO
+      r.RDT    = 0xc018 + rxq*0x40	-- Rx Descriptor Tail - RW
       r.RXDCTL = 0xc028 + rxq*0x40
       r.RXCTL  = 0xc014 + rxq*0x40
 
@@ -299,16 +299,18 @@ function intel1g:new (conf)
 
       local rctl= {}
       rctl.RXEN= 1			-- enable receiver
-      rctl.sbp= 2			-- store bad packet
+      rctl.SBP= 2			-- store bad packet
       rctl.RCTL_UPE= 3			-- unicast promiscuous enable
       rctl.RCTL_MPE= 4			-- multicast promiscuous enable
-      rctl.lpe= 5			-- Long Packet Enable
-      rctl.lbm_mac= 6			-- MAC loopback mode
-      rctl.bam= 15			-- broadcast enable
-      rctl.sz_512= 17			-- buffer size
+      rctl.LPE= 5			-- Long Packet Enable
+      rctl.LBM_MAC= 6			-- MAC loopback mode
+      rctl.BAM= 15			-- broadcast enable
+      --rctl.SZ_512= 17			-- buffer size: use SRRCTL for larger buffer sizes
       --rctl.RCTL_RDMTS_HALF=		-- rx desc min threshold size
-      rctl.secrc= 26			-- i350 has a bug where it always strips the CRC, so strip CRC and cope in rxeof
+      rctl.SECRC= 26			-- i350 has a bug where it always strips the CRC, so strip CRC and cope in rxeof
 
+      poke32(r.SRRCTL, 10)		-- buffer size in 1 KB increments
+      set32(r.SRRCTL, {Drop_En= 31})	-- drop packets when no descriptors available
       set32(r.RXDCTL, {ENABLE= 25})	-- enable the RX queue
 
       poke32(r.RCTL, rctl)		-- enable receiver
@@ -328,14 +330,14 @@ function intel1g:new (conf)
          assert(can_add_receive_buffer())
          local desc = rxdesc[rdh]
          desc.address = tophysical(p.data)
-         desc.flags = 0
+         desc.status = 0x01		-- NIC sets DD upon transfer completed
          rxpackets[rdh] = p
          rdh = ringnext(rdh)
       end
 
       -- Return true if there is a DMA-completed packet ready to be received.
       local function can_receive ()
-         local r= (rdt ~= rdh) and (band(rxdesc[rdt].status, 0x1) ~= 0)
+         local r= (rdt ~= rdh) and (band(rxdesc[rdt].status, 0x01) ~= 0)
 	 print("can_receive():  r=",r, "  rdh=",rdh, "  rdt=",rdt)
          return r
       end
