@@ -298,7 +298,7 @@ function intel1g:new (conf)
       poke32(r.RDLEN, ndesc * ffi.sizeof(rxdesc_t))
 
       local rctl= {}
-      rctl.en= 1			-- enable receiver
+      rctl.RXEN= 1			-- enable receiver
       rctl.sbp= 2			-- store bad packet
       rctl.RCTL_UPE= 3			-- unicast promiscuous enable
       rctl.RCTL_MPE= 4			-- multicast promiscuous enable
@@ -309,7 +309,7 @@ function intel1g:new (conf)
       --rctl.RCTL_RDMTS_HALF=		-- rx desc min threshold size
       rctl.secrc= 26			-- i350 has a bug where it always strips the CRC, so strip CRC and cope in rxeof
 
-      set32(r.RXDCTL, {rxdctl_queue_enable= 24})	-- enable the RX queue
+      set32(r.RXDCTL, {ENABLE= 25})	-- enable the RX queue
 
       poke32(r.RCTL, rctl)		-- enable receiver
 
