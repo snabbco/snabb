@@ -27,8 +27,10 @@
 -- anticipate and so it is important to avoid assumptions about how
 -- the driver will be used.
 -- 
--- Data sheet (reference documentation):
+-- Data sheets (reference documentation):
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/ethernet-controller-i350-datasheet.pdf
+-- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/i210-ethernet-controller-datasheet.pdf
+
 
 module(..., package.seeall)
 
@@ -52,14 +54,17 @@ function intel1g:new (conf)
    local rxq = conf.rxqueue or 0
    local ndesc = conf.ndescriptors or 512
    local rxburst = conf.rxburst or 128
+
    -- Setup device access
    pci.unbind_device_from_linux(pciaddress)
+   pci.set_bus_master(pciaddress, true)
    local regs, mmiofd = pci.map_pci_memory(pciaddress, 0)
    local r = {}
-   -- Common utilities
-   -- bitvalue(0x42)      => 0x42
-   -- bitvalue({a=7,b=2}) => 0x42
+
+   -- Common utilities, see snabbswitch/src/lib/hardware/register.lua
    local function bitvalue (value)
+      -- bitvalue(0x42)      => 0x42
+      -- bitvalue({a=7,b=2}) => 0x42
       return (type(value) == 'table') and bits(value) or tonumber(value)
    end
    local function poke32 (offset, value)
@@ -80,10 +85,13 @@ function intel1g:new (conf)
       poke32(offset, band(peek32(offset), bnot(value)))
    end
    local function wait32 (offset, mask, value)
+      -- Block until applying `bitmask` to the register value gives `value`.
+      -- if `value` is not given then block until all bits in the mask are set.
       mask = bitvalue(mask)
       value = bitvalue(value)
       repeat until band(peek32(offset), mask) == (value or mask)
    end
+
    -- Return the next index into a ring buffer.
    -- (ndesc is a power of 2 and the ring wraps after ndesc-1.)
    local function ringnext (index)
@@ -153,19 +161,21 @@ function intel1g:new (conf)
    print_stats(r)
    if not attach then
       -- Initialize device
-      poke32(r.EIMC, 0xffffffff)      -- disable interrupts
-      poke32(r.CTRL, {RESET = 26})    -- reset
-      wait32(r.CTRL, {RESET = 26}, 0) -- wait reset complete
-      poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
+      poke32(r.EIMC, 0xffffffff)	-- disable interrupts
+      poke32(r.CTRL, {RST = 26})	-- software / global reset, self clearing
+      --poke32(r.CTRL, {DEV_RST = 29})	-- device reset (incl. DMA), self clearing
+      C.usleep(4*1000)			-- wait at least 3 ms before reading, see 7.6.1.1
+      wait32(r.CTRL, {RST = 26}, 0)	-- wait port reset complete
+      --wait32(r.CTRL, {DEV_RST = 29}, 0)	-- wait device reset complete
+      poke32(r.EIMC, 0xffffffff)	-- re-disable interrupts
       -- 3.7.6.2.1 Setting the I210 to MAC loopback Mode
-      set32 (r.CTRL, {SETLINKUP = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
+      set32 (r.CTRL, {SETLINKUP = 6})	-- Set CTRL.SLU (bit 6, should be set by default)
       if conf.loopback then
          set32(r.RCTL, {LOOPBACKMODE0 = 6})		-- Set RCTL.LBM to 01b (bits 7:6)
 	 set32(r.CTRL, {FRCSPD=11, FRCDPLX=12})		-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
 	 set32(r.CTRL, {FD=0, SPEED1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
 	 set32(r.EEER, {EEE_FRC_AN=24})			-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
       end
-      pci.set_bus_master(pciaddress, true)
 
       -- Define shutdown function for the NIC itself
       stop_nic = function ()
@@ -252,7 +262,7 @@ function intel1g:new (conf)
       -- Define shutdown function for transmit
       stop_transmit = function ()
          poke32(r.TXDCTL, 0)
-         wait32(r.TXDCTL, {enable = 25}, 0)
+         wait32(r.TXDCTL, {ENABLE=25}, 0)
          for i = 0, ndesc-1 do
             if txpackets[i] then
                packet.free(txpackets[i])
@@ -270,9 +280,9 @@ function intel1g:new (conf)
       r.RDLEN  = 0xc008 + rxq*0x40
       r.SRRCTL = 0xc00c + rxq*0x40	-- Split and Replication Receive Control
       r.RDH    = 0xc010 + rxq*0x40	-- Rx Descriptor Head - RO
+      r.RXCTL  = 0xc014 + rxq*0x40	-- Rx DCA Control Registers
       r.RDT    = 0xc018 + rxq*0x40	-- Rx Descriptor Tail - RW
-      r.RXDCTL = 0xc028 + rxq*0x40
-      r.RXCTL  = 0xc014 + rxq*0x40
+      r.RXDCTL = 0xc028 + rxq*0x40	-- Receive Descriptor Control
 
       local rxdesc_t = ffi.typeof([[
         struct { 
@@ -319,33 +329,35 @@ function intel1g:new (conf)
       poke32(r.SRRCTL, 10)		-- buffer size in 1 KB increments
       set32(r.SRRCTL, {Drop_En= 31})	-- drop packets when no descriptors available
       set32(r.RXDCTL, {ENABLE= 25})	-- enable the RX queue
+      wait32(r.RXDCTL, {ENABLE=25})	-- wait until enabled
 
       poke32(r.RCTL, rctl)		-- enable receiver
 
-      poke32(r.RDH, 0)			-- Rx descriptor Head
-      poke32(r.RDT, 0)			-- Rx descriptor Tail
+      --poke32(r.RDH, 0)		-- Rx descriptor Head (RO)
+      --poke32(r.RDT, 0)		-- Rx descriptor Tail
+      poke32(r.RDT, ndesc-1)		-- Rx descriptor Tail, trigger NIC to cache descriptors
 
       print_status(r, "Status after init receive: ")
 
       -- Return true if there is a DMA-completed packet ready to be received.
       local function can_receive ()
          local r= (rdt ~= rdh) and (band(rxdesc[rdt].status, 0x01) ~= 0)
-	 print("can_receive():  r=",r, "  rdh=",rdh, "  rdt=",rdt)
+	 --print("can_receive():  r=",r, "  rdh=",rdh, "  rdt=",rdt)
          return r
       end
 
-      -- Receive a packet.
-      -- Precondition: can_receive() => true
+      -- Receive a packet
       local function receive ()
-         assert(can_receive())
+         assert(can_receive())		-- precondition
          local desc = rxdesc[rdt]
          local p = rxpackets[rdt]
          p.length = desc.length
-         np= packet.allocate()		-- get empty packet buffer
+         local np= packet.allocate()	-- get empty packet buffer
          rxpackets[rdt] = np		-- disconnect received packet, connect new buffer
          rxdesc[rdt].address= tophysical(np.data)
 	 rxdesc[rdt].status= 0		-- see 7.1.4.5: zero status before bumping tail pointer
          rdt = ringnext(rdt)
+         --print("receive(): p.length= ", p.length)
          return p
       end
 
@@ -354,8 +366,10 @@ function intel1g:new (conf)
          rdh = peek32(r.RDH)				-- possible race condition, see 7.1.4.4, 7.2.3
          --rdh = band(peek32(r.RDH), ndesc-1)		-- from intel1g: Luke observed (RDH == ndesc) !?
          --rdh = math.min(peek32(r.RDH), ndesc-1)	-- from intel10g
+         assert(rdh <ndesc)
+         C.full_memory_barrier()			-- from intel10g, why???
          poke32(r.RDT, rdt)
-	 print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
+	 --print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
       end
       
       -- Define pull() method for app instance.
@@ -366,14 +380,14 @@ function intel1g:new (conf)
          while limit > 0 and can_receive() do
             link.transmit(lo, receive())
             limit = limit - 1
- print(".")
          end
          sync_receive()
       end
 
-      -- Define shutdown function for receive
+      -- stop receiver, see 4.5.9.2
       stop_receive = function ()
-         poke32(r.RXDCTL, 0)
+         --poke32(r.RXDCTL, 0)
+         clear32(r.RXDCTL, {ENABLE=25})
          wait32(r.RXDCTL, {ENABLE=25}, 0)
          for i = 0, ndesc-1 do
             if rxpackets[i] then
@@ -411,7 +425,8 @@ function selftest ()
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
    -- try i210
-    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
+    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
+    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, rxburst=64})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx->nic.rx")
