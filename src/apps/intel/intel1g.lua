@@ -297,6 +297,13 @@ function intel1g:new (conf)
       poke32(r.RDBAH, tophysical(rxdesc) / 2^32)
       poke32(r.RDLEN, ndesc * ffi.sizeof(rxdesc_t))
 
+      for i = 0, ndesc-1 do
+	local p= packet.allocate()
+	rxpackets[i]= p
+        rxdesc[i].address= tophysical(p.data)
+        rxdesc[i].status= 0
+      end
+
       local rctl= {}
       rctl.RXEN= 1			-- enable receiver
       rctl.SBP= 2			-- store bad packet
@@ -334,7 +341,9 @@ function intel1g:new (conf)
          local desc = rxdesc[rdt]
          local p = rxpackets[rdt]
          p.length = desc.length
-         rxpackets[rdt] = nil		-- free buffer
+         np= packet.allocate()		-- get empty packet buffer
+         rxpackets[rdt] = np		-- disconnect received packet, connect new buffer
+         rxdesc[rdt].address= tophysical(np.data)
 	 rxdesc[rdt].status= 0		-- see 7.1.4.5: zero status before bumping tail pointer
          rdt = ringnext(rdt)
          return p
@@ -365,14 +374,14 @@ function intel1g:new (conf)
       -- Define shutdown function for receive
       stop_receive = function ()
          poke32(r.RXDCTL, 0)
-         wait32(r.RXDCTL, {enable = 25}, 0)
+         wait32(r.RXDCTL, {ENABLE=25}, 0)
          for i = 0, ndesc-1 do
             if rxpackets[i] then
                packet.free(rxpackets[i])
                rxpackets[i] = nil
             end
          end
-         -- XXX return dma memory
+         -- XXX return dma memory of Rx descriptor ring
       end
    end
 
@@ -495,4 +504,3 @@ function tprint (tbl, indent)
     end
   end
 end
-
