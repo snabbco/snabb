@@ -126,7 +126,7 @@ function intel1g:new (conf)
      print("  Rx Packets to Host=" .. peek32(r.RPTHC))
    end
 
-   -- Shutdown functions.
+   -- Shutdown functions
    local stop_nic, stop_transmit, stop_receive
 
    -- Device setup and initialization
@@ -225,7 +225,7 @@ function intel1g:new (conf)
       end
 
       -- Synchronize DMA ring state with hardware.
-      -- Free packets that have  been transmitted.
+      -- Free packets that have been transmitted.
       local function sync_transmit ()
          local cursor = tdh
          tdh = peek32(r.TDH)			-- possible race condition, see 7.1.4.4, 7.2.3 
@@ -319,21 +319,6 @@ function intel1g:new (conf)
       poke32(r.RDT, 0)			-- Rx descriptor Tail
 
       print_status(r, "Status after init receive: ")
-
-      -- Return true if we can enqueue another packet buffer.
-      local function can_add_receive_buffer ()
-         return ringnext(rdh) ~= rdt
-      end
-
-      -- NIC hardware enqueues packets using DMA. Never called by software.
-      local function add_receive_buffer (p)
-         assert(can_add_receive_buffer())
-         local desc = rxdesc[rdh]
-         desc.address = tophysical(p.data)
-         desc.status = 0x01		-- NIC sets DD upon transfer completed
-         rxpackets[rdh] = p
-         rdh = ringnext(rdh)
-      end
 
       -- Return true if there is a DMA-completed packet ready to be received.
       local function can_receive ()
