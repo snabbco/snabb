@@ -125,13 +125,18 @@ function intel1g:new (conf)
      print(" ")
    end
 
+   local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0}
+
    local function print_stats(r)
-    print("Stats")
+    print("Stats from NIC registers:")
      print("  Rx Packets=        " .. peek32(r.TPR) .. "  Octets= " .. peek32(r.TORH) *2^32 +peek32(r.TORL))
      print("  Tx Packets=        " .. peek32(r.TPT) .. "  Octets= " .. peek32(r.TOTH) *2^32 +peek32(r.TOTL))
      print("  Rx Good Packets=   " .. peek32(r.GPRC))
      print("  Rx No Buffers=     " .. peek32(r.RNBC))
      print("  Rx Packets to Host=" .. peek32(r.RPTHC))
+    print("Stats from counters:")
+     print("  rxPackets=         " .. counters.rxPackets .. "  rxBytes= " .. counters.rxBytes)
+     print("  txPackets=         " .. counters.txPackets .. "  txBytes= " .. counters.txBytes)
    end
 
    -- Shutdown functions
@@ -158,7 +163,7 @@ function intel1g:new (conf)
    r.RPTHC = 	0x04104		-- Rx Packets to Host Count - R/clr
 
    --print_status(r, "Status before Init: ")
-   print_stats(r)
+   --print_stats(r)
    if not attach then
       -- Initialize device
       poke32(r.EIMC, 0xffffffff)	-- disable interrupts
@@ -185,7 +190,7 @@ function intel1g:new (conf)
       end
    end
    --print_status(r, "Status after Init: ")
-   print_stats(r)
+   --print_stats(r)
 
    -- Transmit support
    if txq then
@@ -232,6 +237,8 @@ function intel1g:new (conf)
          txdesc[tdt].flags = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
          txpackets[tdt] = p
          tdt = ringnext(tdt)
+	 counters.txPackets= counters.txPackets +1
+	 counters.txBytes= counters.txBytes +p.length
       end
 
       -- Synchronize DMA ring state with hardware.
@@ -337,7 +344,7 @@ function intel1g:new (conf)
       --poke32(r.RDT, 0)		-- Rx descriptor Tail
       poke32(r.RDT, ndesc-1)		-- Rx descriptor Tail, trigger NIC to cache descriptors
 
-      print_status(r, "Status after init receive: ")
+      --print_status(r, "Status after init receive: ")
 
       -- Return true if there is a DMA-completed packet ready to be received.
       local function can_receive ()
@@ -352,6 +359,8 @@ function intel1g:new (conf)
          local desc = rxdesc[rdt]
          local p = rxpackets[rdt]
          p.length = desc.length
+	 counters.rxPackets= counters.rxPackets +1
+	 counters.rxBytes= counters.rxBytes +p.length
          local np= packet.allocate()	-- get empty packet buffer
          rxpackets[rdt] = np		-- disconnect received packet, connect new buffer
          rxdesc[rdt].address= tophysical(np.data)
@@ -366,8 +375,8 @@ function intel1g:new (conf)
          rdh = peek32(r.RDH)				-- possible race condition, see 7.1.4.4, 7.2.3
          --rdh = band(peek32(r.RDH), ndesc-1)		-- from intel1g: Luke observed (RDH == ndesc) !?
          --rdh = math.min(peek32(r.RDH), ndesc-1)	-- from intel10g
-         assert(rdh <ndesc)
-         C.full_memory_barrier()			-- from intel10g, why???
+         assert(rdh <ndesc)				-- from intel1g: Luke observed (RDH == ndesc) !?
+         --C.full_memory_barrier()			-- from intel10g, why???
          poke32(r.RDT, rdt)
 	 --print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
       end
@@ -404,7 +413,7 @@ function intel1g:new (conf)
       if stop_receive  then stop_receive()  end
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
-      print_status(r, "Status after Stop: ")
+      --print_status(r, "Status after Stop: ")
       print_stats(r)
    end
 
@@ -426,7 +435,7 @@ function selftest ()
    config.app(c, "sink", basic.Sink)
    -- try i210
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
-    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, rxburst=64})
+    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx->nic.rx")
@@ -438,7 +447,6 @@ function selftest ()
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
-   --engine.main({duration = 1, report = {showapps = true, showlinks = true}})
    engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
 
    print("selftest: ok")
