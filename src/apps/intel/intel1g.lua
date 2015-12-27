@@ -27,8 +27,10 @@
 -- anticipate and so it is important to avoid assumptions about how
 -- the driver will be used.
 -- 
--- Data sheet (reference documentation):
+-- Data sheets (reference documentation):
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/ethernet-controller-i350-datasheet.pdf
+-- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/i210-ethernet-controller-datasheet.pdf
+
 
 module(..., package.seeall)
 
@@ -37,7 +39,7 @@ local C   = ffi.C
 local pci = require("lib.hardware.pci")
 local band, bor, bnot, lshift = bit.band, bit.bor, bit.bnot, bit.lshift
 local lib  = require("core.lib")
-local bits = lib.bits
+local bits, bitset = lib.bits, lib.bitset
 local compiler_barrier = lib.compiler_barrier
 local tophysical = core.memory.virtual_to_physical
 
@@ -52,14 +54,17 @@ function intel1g:new (conf)
    local rxq = conf.rxqueue or 0
    local ndesc = conf.ndescriptors or 512
    local rxburst = conf.rxburst or 128
+
    -- Setup device access
    pci.unbind_device_from_linux(pciaddress)
+   pci.set_bus_master(pciaddress, true)
    local regs, mmiofd = pci.map_pci_memory(pciaddress, 0)
    local r = {}
-   -- Common utilities
-   -- bitvalue(0x42)      => 0x42
-   -- bitvalue({a=7,b=2}) => 0x42
+
+   -- Common utilities, see snabbswitch/src/lib/hardware/register.lua
    local function bitvalue (value)
+      -- bitvalue(0x42)      => 0x42
+      -- bitvalue({a=7,b=2}) => 0x42
       return (type(value) == 'table') and bits(value) or tonumber(value)
    end
    local function poke32 (offset, value)
@@ -80,54 +85,95 @@ function intel1g:new (conf)
       poke32(offset, band(peek32(offset), bnot(value)))
    end
    local function wait32 (offset, mask, value)
+      -- Block until applying `bitmask` to the register value gives `value`.
+      -- if `value` is not given then block until all bits in the mask are set.
       mask = bitvalue(mask)
       value = bitvalue(value)
       repeat until band(peek32(offset), mask) == (value or mask)
    end
+
    -- Return the next index into a ring buffer.
    -- (ndesc is a power of 2 and the ring wraps after ndesc-1.)
    local function ringnext (index)
       return band(index+1, ndesc-1)
    end
 
-   -- Shutdown functions.
+   local function yesno (value, bit)
+    return bitset(value, bit) and 'yes' or 'no'
+   end
+
+   local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0}
+
+   local function print_stats(r)
+    print("Stats from NIC registers:")
+     print("  Rx Packets=        " .. peek32(r.TPR) .. "  Octets= " .. peek32(r.TORH) *2^32 +peek32(r.TORL))
+     print("  Tx Packets=        " .. peek32(r.TPT) .. "  Octets= " .. peek32(r.TOTH) *2^32 +peek32(r.TOTL))
+     print("  Rx Good Packets=   " .. peek32(r.GPRC))
+     print("  Rx No Buffers=     " .. peek32(r.RNBC))
+     print("  Rx Packets to Host=" .. peek32(r.RPTHC))
+    print("Stats from counters:")
+     print("  rxPackets=         " .. counters.rxPackets .. "  rxBytes= " .. counters.rxBytes)
+     print("  txPackets=         " .. counters.txPackets .. "  txBytes= " .. counters.txBytes)
+   end
+
+   -- Shutdown functions
    local stop_nic, stop_transmit, stop_receive
 
    -- Device setup and initialization
-   r.CTRL = 0x0000
-   r.EIMC = 0x1528
-   r.RCTL = 0x0100
-   r.TCTL = 0x0400
-   r.TCTL_EXT = 0x0404
+   r.CTRL = 	0x00000		-- Device Control - RW
+   r.STATUS = 	0x00008		-- Device Status - RO
+   r.RCTL = 	0x00100		-- RX Control - RW
+   r.TCTL = 	0x00400		-- TX Control - RW
+   r.TCTL_EXT =	0x00404		-- Extended TX Control - RW
+   r.EEER = 	0x00E30		-- Energy Efficient Ethernet (EEE) Register
+   r.EIMC = 	0x01528		-- 
+   --r.RXDCTL =	0x02828		-- legacy alias: RX Descriptor Control queue 0 - RW
+   --r.TXDCTL =	0x03828		-- legacy alias: TX Descriptor Control queue 0 - RW
+   r.GPRC = 	0x04074		-- Good Packets Receive Count - R/clr
+   r.RNBC = 	0x040A0		-- Receive No Buffers Count - R/clr
+   r.TORL = 	0x040C0		-- Total Octets Received - R/clr
+   r.TORH = 	0x040C4		-- Total Octets Received - R/clr
+   r.TOTL = 	0x040C8		-- Total Octets Transmitted - R/clr
+   r.TOTH = 	0x040CC		-- Total Octets Transmitted - R/clr
+   r.TPR = 	0x040D0		-- Total Packets Received - R/clr
+   r.TPT = 	0x040D4		-- Total Packets Transmitted - R/clr
+   r.RPTHC = 	0x04104		-- Rx Packets to Host Count - R/clr
+
    if not attach then
       -- Initialize device
-      poke32(r.EIMC, 0xffffffff)      -- disable interrupts
-      poke32(r.CTRL, {reset = 26})    -- reset
-      wait32(r.CTRL, {reset = 26}, 0) -- wait reset complete
-      poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
-      set32 (r.CTRL, {setlinkup = 6})
+      poke32(r.EIMC, 0xffffffff)	-- disable interrupts
+      poke32(r.CTRL, {RST = 26})	-- software / global reset, self clearing
+      C.usleep(4*1000)			-- wait at least 3 ms before reading, see 7.6.1.1
+      wait32(r.CTRL, {RST = 26}, 0)	-- wait port reset complete
+      poke32(r.EIMC, 0xffffffff)	-- re-disable interrupts
+      -- 3.7.6.2.1 Setting the I210 to MAC loopback Mode
+      set32 (r.CTRL, {SETLINKUP = 6})	-- Set CTRL.SLU (bit 6, should be set by default)
       if conf.loopback then
-         set32(r.RCTL, {loopbackmode0 = 6})
+         set32(r.RCTL, {LOOPBACKMODE0 = 6})		-- Set RCTL.LBM to 01b (bits 7:6)
+	 set32(r.CTRL, {FRCSPD=11, FRCDPLX=12})		-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
+	 set32(r.CTRL, {FD=0, SPEED1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
+	 set32(r.EEER, {EEE_FRC_AN=24})			-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
       end
-      pci.set_bus_master(pciaddress, true)
 
       -- Define shutdown function for the NIC itself
       stop_nic = function ()
          -- XXX Are these the right actions?
-         clear32(r.CTRL, {setlinkup = 6})        -- take the link down
+         clear32(r.CTRL, {SETLINKUP = 6})        -- take the link down
          pci.set_bus_master(pciaddress, false) -- disable DMA
       end
    end
 
    -- Transmit support
    if txq then
+      assert(txq/4 == 0, "txq must be in 0..3 for i210!")
       -- Define registers for the transmit queue that we are using
       r.TDBAL  = 0xe000 + txq*0x40
       r.TDBAH  = 0xe004 + txq*0x40
       r.TDLEN  = 0xe008 + txq*0x40
+      r.TDH    = 0xe010 + txq*0x40			-- Tx Descriptor Head - RO!
+      r.TDT    = 0xe018 + txq*0x40			-- Tx Descriptor Head - RW
       r.TXDCTL = 0xe028 + txq*0x40
-      r.TDH    = 0xe010 + txq*0x40
-      r.TDT    = 0xe018 + txq*0x40
+      r.TXCTL  = 0xe014 + txq*0x40
 
       -- Setup transmit descriptor memory
       local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
@@ -143,9 +189,9 @@ function intel1g:new (conf)
       -- Initialize transmit queue
       poke32(r.TDBAL, tophysical(txdesc) % 2^32)
       poke32(r.TDBAH, tophysical(txdesc) / 2^32)
-      poke32(r.TDLEN, ndesc)
+      poke32(r.TDLEN, ndesc * ffi.sizeof(txdesc_t))
       set32(r.TCTL, 2)
-      poke32(r.TXDCTL, {wthresh=16, enable=25})
+      poke32(r.TXDCTL, {WTHRESH=16, ENABLE=25})
       poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
 
       -- Return true if we can enqueue another packet for transmission.
@@ -160,13 +206,15 @@ function intel1g:new (conf)
          txdesc[tdt].flags = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
          txpackets[tdt] = p
          tdt = ringnext(tdt)
+	 counters.txPackets= counters.txPackets +1
+	 counters.txBytes= counters.txBytes +p.length
       end
 
       -- Synchronize DMA ring state with hardware.
-      -- Free packets that have  been transmitted.
+      -- Free packets that have been transmitted.
       local function sync_transmit ()
          local cursor = tdh
-         tdh = peek32(r.TDH)
+         tdh = peek32(r.TDH)			-- possible race condition, see 7.1.4.4, 7.2.3 
          while cursor ~= tdh do
             if txpackets[cursor] then
                packet.free(txpackets[cursor])
@@ -179,10 +227,10 @@ function intel1g:new (conf)
 
       -- Define push() method for app instance.
       function self:push ()
-         local l = self.input[1]
-         assert(l, "intel1g: no input link")
-         while not link.empty(l) and can_transmit() do
-            transmit(link.receive(l))
+         local li = self.input[1]
+         assert(li, "intel1g: no input link")
+         while not link.empty(li) and can_transmit() do
+            transmit(link.receive(li))
          end
          sync_transmit()
       end
@@ -190,7 +238,7 @@ function intel1g:new (conf)
       -- Define shutdown function for transmit
       stop_transmit = function ()
          poke32(r.TXDCTL, 0)
-         wait32(r.TXDCTL, {enable = 25}, 0)
+         wait32(r.TXDCTL, {ENABLE=25}, 0)
          for i = 0, ndesc-1 do
             if txpackets[i] then
                packet.free(txpackets[i])
@@ -199,14 +247,18 @@ function intel1g:new (conf)
          end
       end
    end
+
    -- Receive support
    if rxq then
+      assert(rxq/4 == 0, "rxq must be in 0..3 for i210!")
       r.RDBAL  = 0xc000 + rxq*0x40
       r.RDBAH  = 0xc004 + rxq*0x40
       r.RDLEN  = 0xc008 + rxq*0x40
-      r.RDH    = 0xc010 + rxq*0x40
-      r.RDT    = 0xc018 + rxq*0x40
-      r.RXDCTL = 0xc028 + rxq*0x40
+      r.SRRCTL = 0xc00c + rxq*0x40	-- Split and Replication Receive Control
+      r.RDH    = 0xc010 + rxq*0x40	-- Rx Descriptor Head - RO
+      r.RXCTL  = 0xc014 + rxq*0x40	-- Rx DCA Control Registers
+      r.RDT    = 0xc018 + rxq*0x40	-- Rx Descriptor Tail - RW
+      r.RXDCTL = 0xc028 + rxq*0x40	-- Receive Descriptor Control
 
       local rxdesc_t = ffi.typeof([[
         struct { 
@@ -221,74 +273,97 @@ function intel1g:new (conf)
       
       -- Receive state
       local rxpackets = {}
-      local rdh, rdt, rxnext = 0, 0, 0
+      local rdh, rdt= 0, 0
 
       -- Initialize receive queue
+      -- see em_initialize_receive_unit() in http://cvsweb.openbsd.org/cgi-bin/cvsweb/src/sys/dev/pci/if_em.c
+      clear32(r.RCTL, {rxen = 1})	-- disable receiver while setting up descriptor ring
       poke32(r.RDBAL, tophysical(rxdesc) % 2^32)
       poke32(r.RDBAH, tophysical(rxdesc) / 2^32)
-      poke32(r.RDLEN, ndesc)
-      
+      poke32(r.RDLEN, ndesc * ffi.sizeof(rxdesc_t))
 
-      -- Return true if we can enqueue another packet buffer.
-      local function can_add_receive_buffer ()
-         return ringnext(rdt) ~= rxnext
+      for i = 0, ndesc-1 do
+	local p= packet.allocate()
+	rxpackets[i]= p
+        rxdesc[i].address= tophysical(p.data)
+        rxdesc[i].status= 0
       end
 
-      -- Enqueue a packet for DMA receive.
-      local function add_receive_buffer (p)
-         local desc = rxdesc[rdt]
-         desc.address = tophysical(p.data)
-         desc.flags = 0
-         rxpackets[rdt] = p
-         rdt = ringnext(rdt)
-      end
+      local rctl= {}
+      rctl.RXEN= 1			-- enable receiver
+      rctl.SBP= 2			-- store bad packet
+      rctl.RCTL_UPE= 3			-- unicast promiscuous enable
+      rctl.RCTL_MPE= 4			-- multicast promiscuous enable
+      rctl.LPE= 5			-- Long Packet Enable
+      rctl.LBM_MAC= 6			-- MAC loopback mode
+      rctl.BAM= 15			-- broadcast enable
+      --rctl.SZ_512= 17			-- buffer size: use SRRCTL for larger buffer sizes
+      --rctl.RCTL_RDMTS_HALF=		-- rx desc min threshold size
+      rctl.SECRC= 26			-- i350 has a bug where it always strips the CRC, so strip CRC and cope in rxeof
+
+      poke32(r.SRRCTL, 10)		-- buffer size in 1 KB increments
+      set32(r.SRRCTL, {Drop_En= 31})	-- drop packets when no descriptors available
+      set32(r.RXDCTL, {ENABLE= 25})	-- enable the RX queue
+      wait32(r.RXDCTL, {ENABLE=25})	-- wait until enabled
+
+      poke32(r.RCTL, rctl)		-- enable receiver
+
+      poke32(r.RDT, ndesc-1)		-- Rx descriptor Tail, trigger NIC to cache descriptors
 
       -- Return true if there is a DMA-completed packet ready to be received.
       local function can_receive ()
-         return rxnext ~= rdh and band(rxdesc[rxnext].status, 0x1) ~= 0
+         local r= (rdt ~= rdh) and (band(rxdesc[rdt].status, 0x01) ~= 0)
+         return r
       end
 
-      -- Receive a packet.
-      -- Precondition: can_receive() => true
+      -- Receive a packet
       local function receive ()
-         local desc = rxdesc[rxnext]
-         local p = rxpackets[rxnext]
+         assert(can_receive())		-- precondition
+         local desc = rxdesc[rdt]
+         local p = rxpackets[rdt]
          p.length = desc.length
-         rxpackets[rxnext] = nil
-         rxnext = ringnext(rxnext)
+	 counters.rxPackets= counters.rxPackets +1
+	 counters.rxBytes= counters.rxBytes +p.length
+         local np= packet.allocate()	-- get empty packet buffer
+         rxpackets[rdt] = np		-- disconnect received packet, connect new buffer
+         rxdesc[rdt].address= tophysical(np.data)
+	 rxdesc[rdt].status= 0		-- see 7.1.4.5: zero status before bumping tail pointer
+         rdt = ringnext(rdt)
          return p
       end
 
       -- Synchronize receive registers with hardware.
       local function sync_receive ()
-         rdh = band(peek32(r.RDH), ndesc-1)
+         rdh = peek32(r.RDH)				-- possible race condition, see 7.1.4.4, 7.2.3
+         assert(rdh <ndesc)				-- from intel1g: Luke observed (RDH == ndesc) !?
+         --C.full_memory_barrier()			-- from intel10g, why???
          poke32(r.RDT, rdt)
       end
       
       -- Define pull() method for app instance.
       function self:pull ()
-         local l = self.output[1]
-         assert(l, "intel1g: no output link")
+         local lo = self.output[1]
+         assert(lo, "intel1g: no output link")
          local limit = rxburst
          while limit > 0 and can_receive() do
-            link.transmit(l, receive())
+            link.transmit(lo, receive())
             limit = limit - 1
- print(".")
          end
          sync_receive()
       end
 
-      -- Define shutdown function for receive
+      -- stop receiver, see 4.5.9.2
       stop_receive = function ()
-         poke32(r.RXDCTL, 0)
-         wait32(r.RXDCTL, {enable = 25}, 0)
+         --poke32(r.RXDCTL, 0)
+         clear32(r.RXDCTL, {ENABLE=25})
+         wait32(r.RXDCTL, {ENABLE=25}, 0)
          for i = 0, ndesc-1 do
             if rxpackets[i] then
                packet.free(rxpackets[i])
                rxpackets[i] = nil
             end
          end
-         -- XXX return dma memory
+         -- XXX return dma memory of Rx descriptor ring
       end
    end
 
@@ -297,9 +372,9 @@ function intel1g:new (conf)
       if stop_receive  then stop_receive()  end
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
+      print_stats(r)
    end
 
--- print("self= ")  print_r(self)
    return self
 end
 
@@ -316,8 +391,9 @@ function selftest ()
    print(basic.Source, basic.Sink, intel1g)
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
-   -- try i210
-    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
+   -- try MAC loopback with i210 or i350 NIC
+    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
+    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx->nic.rx")
     config.link(c, "nic.tx->sink.rx")
@@ -326,18 +402,12 @@ function selftest ()
     --config.link(c, "source.tx->repeater.input")
     --config.link(c, "repeater.output->sink.rx")
    engine.configure(c)
+
    -- showlinks: src/core/app.lua calls report_links()
-   --engine.main({duration = 1, report = {showapps = true, showlinks = true}})
    engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
+
    print("selftest: ok")
-
- -- for k, v in pairs(c) do
- --  print(k, v)
- -- end
- --print("c= ") print_r(c)
- --tprint(c, 2)
-
- --print("engine= ") print_r(engine)
+   engine.app_table.nic.stop()
 
    --local li = engine.app_table.nic.input[1]
    local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
@@ -351,56 +421,3 @@ function selftest ()
    local s= link.stats(lo)
    print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 end
-
--- https://coronalabs.com/blog/2014/09/02/tutorial-printing-table-contents/
-function print_r ( t )  
-    local print_r_cache={}
-    local function sub_print_r(t,indent)
-        if (print_r_cache[tostring(t)]) then
-            print(indent.."*"..tostring(t))
-        else
-            print_r_cache[tostring(t)]=true
-            if (type(t)=="table") then
-                for pos,val in pairs(t) do
-                    if (type(val)=="table") then
-                        print(indent.."["..pos.."] => "..tostring(t).." {")
-                        sub_print_r(val,indent..string.rep(" ",string.len(pos)+8))
-                        print(indent..string.rep(" ",string.len(pos)+6).."}")
-                    elseif (type(val)=="string") then
-                        print(indent.."["..pos..'] => "'..val..'"')
-                    else
-                        print(indent.."["..pos.."] => "..tostring(val))
-                    end
-                end
-            else
-                print(indent..tostring(t))
-            end
-        end
-    end
-    if (type(t)=="table") then
-        print(tostring(t).." {")
-        sub_print_r(t,"  ")
-        print("}")
-    else
-        sub_print_r(t,"  ")
-    end
-    print()
-end
-
-
--- http://stackoverflow.com/questions/9168058/lua-beginner-table-dump-to-console
-function tprint (tbl, indent)
-  if not indent then indent = 0 end
-  for k, v in pairs(tbl) do
-    formatting = string.rep("  ", indent) .. k .. ": "
-    if type(v) == "table" then
-      print(formatting)
-      tprint(v, indent+1)
-    elseif type(v) == 'boolean' then
-      print(formatting .. tostring(v))      
-    else
-      print(formatting .. v)
-    end
-  end
-end
-
