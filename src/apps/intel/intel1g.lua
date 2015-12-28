@@ -353,6 +353,9 @@ function intel1g:new (conf)
          return r
       end
 
+      lastSeqNo= -1
+      lostSeq= 0
+
       -- Receive a packet
       local function receive ()
          assert(can_receive())		-- precondition
@@ -367,6 +370,15 @@ function intel1g:new (conf)
 	 rxdesc[rdt].status= 0		-- see 7.1.4.5: zero status before bumping tail pointer
          rdt = ringnext(rdt)
          --print("receive(): p.length= ", p.length)
+         rxSeqNo= p.data[3] *2^24 + p.data[2] *2^16 + p.data[1] *2^8 + p.data[0]
+         --print("receive(): txFrame= ", rxSeqNo)
+         lastSeqNo= lastSeqNo +1
+         while lastSeqNo < rxSeqNo do
+          --print("receive(): lastSeqNo , rxSeqNo= ", lastSeqNo, rxSeqNo)
+	  --print("receive(): missing ", lastSeqNo)
+          lostSeq= lostSeq +1
+          lastSeqNo= lastSeqNo +1
+         end
          return p
       end
 
@@ -405,6 +417,7 @@ function intel1g:new (conf)
             end
          end
          -- XXX return dma memory of Rx descriptor ring
+	print("stop_receive(): lostSeq ", lostSeq)
       end
    end
 
@@ -433,7 +446,7 @@ function selftest ()
    print(basic.Source, basic.Sink, intel1g)
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
-   -- try i210
+   -- try MAC loopback with i210 or i350 NIC
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
     config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
