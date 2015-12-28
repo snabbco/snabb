@@ -103,10 +103,20 @@ function RangeMapBuilder:build()
    local range_end = self.entries[#self.entries].min
    for i=#self.entries-1,1,-1 do
       local entry = self.entries[i]
-      if entry.max.key >= range_end.key then
-         error("Multiple range map entries for key: "..entry.max.key)
-      end
+      -- FIXME: We are using range maps for the address maps, but
+      -- currently are specifying these parameters in the binding table
+      -- where naturally one IPv4 address appears multiple times.  When
+      -- we switch to a separate address map, we can assert that ranges
+      -- are disjoint.  Until then, just assert that if ranges overlap
+      -- that they have the same value.
+      -- if entry.max.key >= range_end.key then
+      --    error("Multiple range map entries for key: "..entry.max.key)
+      -- end
       if not self.equal_fn(entry.max.value, range_end.value) then
+         -- Remove this when the above test is enabled.
+         if entry.max.key >= range_end.key then
+            error("Key maps to multiple values: "..entry.max.key)
+         end
          table.insert(ranges, entry.max)
          range_end = entry.min
       end
