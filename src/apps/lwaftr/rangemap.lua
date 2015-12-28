@@ -61,12 +61,14 @@ local function make_equal_fn(type)
    end
 end
 
-function RangeMapBuilder.new(value_type)
+function RangeMapBuilder.new(value_type, mtime_sec, mtime_nsec)
    local builder = {}
    builder.value_type = value_type
    builder.entry_type = make_entry_type(builder.value_type)
    builder.type = make_entries_type(builder.entry_type)
    builder.equal_fn = make_equal_fn(builder.value_type)
+   builder.mtime_sec = mtime_sec or 0
+   builder.mtime_nsec = mtime_nsec or 0
    builder.entries = {}
    builder = setmetatable(builder, { __index = RangeMapBuilder })
    return builder
@@ -133,7 +135,9 @@ function RangeMapBuilder:build()
       entry_type = self.entry_type,
       type = self.type,
       entries = packed_entries,
-      size = range_count
+      size = range_count,
+      mtime_sec = self.mtime_sec,
+      mtime_nsec = self.mtime_nsec
    }
    map.binary_search = binary_search.gen(map.size, map.entry_type)
    map = setmetatable(map, { __index = RangeMap })
@@ -149,6 +153,8 @@ struct {
    uint8_t magic[8];
    uint32_t size;
    uint32_t entry_size;
+   uint64_t mtime_sec;
+   uint32_t mtime_nsec;
 }
 ]]
 
@@ -171,7 +177,8 @@ function RangeMap:save(filename)
       return size, nil
    end
    local entry_size = ffi.sizeof(self.entry_type)
-   local header = range_map_header_t("rangemap", self.size, entry_size)
+   local header = range_map_header_t("rangemap", self.size, entry_size,
+                                     self.mtime_sec, self.mtime_nsec)
    local header_size = ffi.sizeof(range_map_header_t)
    local written, err = write(header, header_size)
    if written then
@@ -225,6 +232,8 @@ function RangeMap.load(filename, value_type)
                           ffi.cast('uint8_t*', mem) + offset)
    map.size = size
    map.binary_search = binary_search.gen(map.size, map.entry_type)
+   map.mtime_sec = header.mtime_sec
+   map.mtime_nsec = header.mtime_nsec
    map = setmetatable(map, { __index = RangeMap })
 
    ffi.gc(map.entries, function (ptr) S.munmap(mem, size) end)
