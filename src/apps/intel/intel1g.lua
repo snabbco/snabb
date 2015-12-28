@@ -195,6 +195,7 @@ function intel1g:new (conf)
    -- Transmit support
    if txq then
       assert(txq/4 == 0, "txq must be in 0..3 for i210!")
+      assert(txq/8 == 0, "txq must be in 0..7 for i350!")
       -- Define registers for the transmit queue that we are using
       r.TDBAL  = 0xe000 + txq*0x40
       r.TDBAH  = 0xe004 + txq*0x40
@@ -353,8 +354,7 @@ function intel1g:new (conf)
          return r
       end
 
-      lastSeqNo= -1
-      lostSeq= 0
+      local lostSeq, lastSeqNo = 0, -1
 
       -- Receive a packet
       local function receive ()
@@ -460,7 +460,7 @@ function selftest ()
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
-   engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
+   engine.main({duration = 100, report = {showapps = true, showlinks = true, showload= true}})
 
    print("selftest: ok")
 
