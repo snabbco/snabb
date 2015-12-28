@@ -144,23 +144,92 @@ function RangeMap:lookup(k)
    return self.binary_search(self.entries, k)
 end
 
+local range_map_header_t = ffi.typeof[[
+struct {
+   uint8_t magic[8];
+   uint32_t size;
+   uint32_t entry_size;
+}
+]]
+
+local function round_up(x, y) return y*math.ceil(x/y) end
+
 function RangeMap:save(filename)
    local fd, err = S.open(filename, "creat, wronly, trunc", "rusr, wusr, rgrp, roth")
    if not fd then
       error("error saving range map, while creating "..filename..": "..tostring(err))
    end
-   local size = ffi.sizeof(self.type, self.size)
-   local ptr = ffi.cast("uint8_t*", self.entries)
-   while size > 0 do
-      local written, err = S.write(fd, ptr, size)
-      if not written then
-         fd:close()
-         error("error saving range map, while writing "..filename..": "..tostring(err))
+   local function write(ptr, size)
+      ptr = ffi.cast("uint8_t*", ptr)
+      local to_write = size
+      while to_write > 0 do
+         local written, err = S.write(fd, ptr, to_write)
+         if not written then return size - to_write, err end
+         ptr = ptr + written
+         to_write = to_write - written
       end
-      ptr = ptr + written
-      size = size - written
+      return size, nil
+   end
+   local entry_size = ffi.sizeof(self.entry_type)
+   local header = range_map_header_t("rangemap", self.size, entry_size)
+   local header_size = ffi.sizeof(range_map_header_t)
+   local written, err = write(header, header_size)
+   if written then
+      local padding = header_size - round_up(header_size, entry_size)
+      written, err = write(string.rep(' ', padding), padding)
+   end
+   if written then
+      local size = ffi.sizeof(self.type, self.size)
+      written, err = write(self.entries, size)
    end
    fd:close()
+   if err then error("error writing "..filename..": "..tostring(err)) end
+end
+
+function RangeMap.load(filename, value_type)
+   local map = {}
+   map.value_type = value_type
+   map.entry_type = make_entry_type(map.value_type)
+   map.type = make_entries_type(map.entry_type)
+
+   local fd, err = S.open(filename, "rdonly")
+   if not fd then
+      error("error opening saved range map ("..filename.."): "..tostring(err))
+   end
+   local header_size = ffi.sizeof(range_map_header_t)
+   local byte_size = S.fstat(fd).size
+   if byte_size < header_size then
+      fd:close()
+      error("corrupted saved range map ("..filename.."): too short")
+   end
+   local mem, err = S.mmap(nil, byte_size, 'read, write', 'private', fd, 0)
+   fd:close()
+   if not mem then error("mmap failed: " .. tostring(err)) end
+   local header = ffi.cast(ffi.typeof('$*', range_map_header_t), mem)
+   local magic = ffi.string(header.magic, 8)
+   if magic ~= "rangemap" then
+      error("corrupted saved range map ("..filename.."): bad magic: "..magic)
+   end
+   local size = header.size
+   local entry_size = header.entry_size
+   if entry_size ~= ffi.sizeof(map.entry_type) then
+      error("corrupted saved range map ("..filename.."): bad entry size: "..entry_size)
+   end
+   local offset = round_up(ffi.sizeof(range_map_header_t), entry_size)
+   if byte_size ~= offset + entry_size*size then
+      error("corrupted saved range map ("..filename.."): bad size: "..byte_size)
+   end
+
+   -- OK!
+   map.entries = ffi.cast(ffi.typeof('$*', self.entry_type),
+                          ffi.cast('uint8_t*', mem) + offset)
+   map.size = size
+   map.binary_search = binary_search.gen(map.size, map.entry_type)
+   map = setmetatable(map, { __index = RangeMap })
+
+   ffi.gc(map.entries, function (ptr) S.munmap(mem, size) end)
+
+   return map
 end
 
 function selftest()
