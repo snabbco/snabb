@@ -37,15 +37,8 @@ end
 function run(args)
    local in_file, out_file = parse_args(args)
    local map = address_map.compile(in_file)
-   if not out_file then
-      local base = in_file
-      print(base)
-      if base:match('[.]txt$') then base = base:sub(0, #base-4) end
-      print(base)
-      out_file = base .. '.map'
-   end
+   if not out_file then out_file = in_file:gsub("%.txt$", "")..'.map' end
    local tmp_file, err = mktemp(out_file)
-   print(tmp_file)
    if not tmp_file then
       local dir = ffi.string(ffi.C.dirname(out_file))
       io.stderr:write(

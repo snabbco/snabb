@@ -31,5 +31,5 @@ disjoint.
 
 This command will atomically overwrite the output file.  If the output
 file name ADDRESSES.MAP is not given as an argument, the output file
-will be the name of the input file, minus a ".TXT" suffix if present,
-plus a ".MAP" suffix.
+will be the name of the input file, minus a ".txt" suffix if present,
+plus a ".map" suffix.

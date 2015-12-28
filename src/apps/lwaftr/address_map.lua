@@ -51,11 +51,13 @@ function Parser.new(file)
    if type(file) == 'string' then name, file = file, io.open(file) end
    local ret = { column=0, line=0, name=name }
    function ret.read_char() return file:read(1) end
+   function ret.cleanup() return file:close() end
    ret.peek_char = ret.read_char()
    return setmetatable(ret, {__index=Parser})
 end
 
 function Parser:error(msg, ...)
+   self.cleanup()
    error(('%s:%d:%d: error: '..msg):format(self.name, self.line, self.column,
                                            ...))
 end
@@ -226,6 +228,7 @@ function Parser:parse_entries()
       table.insert(entries, self:parse_entry())
       self:skip_whitespace()
    end
+   self.cleanup()
    return entries
 end
 
@@ -283,7 +286,8 @@ function selftest()
                pos = pos + 1
             end
             return ret
-         end
+         end,
+         close = function(self) str = nil end
       }
    end
    local function parse_string(str) return parse(string_file(str)) end
