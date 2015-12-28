@@ -23,163 +23,166 @@ local address_map_value = ffi.typeof([[
    struct { uint16_t psid_length; uint16_t shift; }
 ]])
 
-local function read_char(f)
-   local chr = f.next()
-   if chr then
-      if chr == '\n' then
-         f.column = 0
-         f.line = f.line + 1
-      else
-         f.column = f.column + 1
-      end
+Parser = {}
+
+function Parser.new(file)
+   local name = '<unknown>'
+   if type(file) == 'string' then name, file = file, io.open(file) end
+   local ret = { column=0, line=0, name=name }
+   function ret.read_char() return file:read(1) end
+   ret.peek_char = ret.read_char()
+   return setmetatable(ret, {__index=Parser})
+end
+
+function Parser:error(msg, ...)
+   error(('%s:%d:%d: error: '..msg):format(self.name, self.line, self.column,
+                                           ...))
+end
+
+function Parser:next()
+   local chr = self.peek_char
+   if chr == '\n' then
+      self.column = 0
+      self.line = self.line + 1
+   elseif chr then
+      self.column = self.column + 1
    end
+   self.peek_char = self.read_char()
    return chr
 end
 
-local function parse_error(f, message)
-   error(f.name..':'..f.line..':'..f.column..': error: '..message)
+function Parser:peek() return self.peek_char end
+function Parser:is_eof() return not self:peek() end
+
+function Parser:check(expected)
+   if self:is_eof() then
+      self:error("while looking for '%s', got EOF", expected)
+   elseif self:peek() == expected then
+      self:next()
+      return true
+   end
+   return false
 end
 
-local function consume_char(f, chr, expected)
-   if chr == nil then parse_error(f, 'expected '..expected..', got EOF') end
-   if chr ~= expected then
-      parse_error(f, 'expected '..expected..' instead of '..chr)
+function Parser:consume(expected)
+   if not self:check(expected) then
+      self:error("expected '%s', got '%s'", expected, self:peek())
    end
 end
 
-local function take_while(f, chr, pattern)
-   if not chr then chr = read_char(f) end
+function Parser:take_while(pattern)
    local res = {}
-   while chr and chr:match(pattern) do
-      table.insert(res, chr)
-      chr = read_char(f)
+   while not self:is_eof() and self:peek():match(pattern) do
+      table.insert(res, self:next())
    end
-   return table.concat(res), chr
+   return table.concat(res)
 end
 
-local function skip_whitespace(f, chr)
-   local _, chr = take_while(f, chr, '%s')
-   return chr
-end
+function Parser:skip_whitespace() self:take_while('%s') end
 
-local function parse_uint(f, chr, min, max)
-   local tok, chr = take_while(f, chr, '%d')
-   if tok == '' then parse_error(f, 'expected a number') end
+function Parser:parse_uint(min, max)
+   local tok = self:take_while('%d')
+   if tok == '' then self:error('expected a number') end
    if #tok > #(tostring(max)) then
-      parse_error('numeric constant too long: '..tok)
+      self:error('numeric constant too long: %s', tok)
    end
    local uint = tonumber(tok)
    if uint < min or uint > max then
-      parse_error('numeric constant out of range: '..uint)
+      self:error('numeric constant out of range: %d', uint)
    end
-   return uint, chr
+   return uint
 end
 
-local function parse_psid_param(f, chr)
-   return parse_uint(f, chr, 0, 16)
-end
+function Parser:parse_psid_param() return self:parse_uint(0, 16) end
+function Parser:parse_ipv4_quad() return self:parse_uint(0, 255) end
 
-local function parse_ipv4_quad(f, chr)
-   return parse_uint(f, chr, 0, 255)
-end
-
-local function read_kvlist(f, chr, spec)
-   chr = skip_whitespace(f, chr)
-   consume_char(f, chr, '{')
+function Parser:parse_kvlist(spec)
    local res = {}
-   chr = skip_whitespace(f)
-   local tok
-   while chr and chr ~= '}' do
-      tok, chr = take_while(f, chr, '[%w_]')
-      local key = tok
-      if key == '' then break end
-      if res[key] then parse_error(f, 'duplicate key: '..key) end
-      if not spec.parse[key] then parse_error(f, 'unexpected key: '..key) end
-      chr = skip_whitespace(f, chr)
-      consume_char(f, chr, '=')
-      chr = skip_whitespace(f)
-      tok, chr = spec.parse[key](f, chr)
-      res[key] = tok
-      local line = f.line
-      if chr == '\n' then line = line - 1 end
-      chr = skip_whitespace(f, chr)
-      if chr == ',' then
-         chr = skip_whitespace(f)
-      elseif chr ~= '}' and f.line == line then
-         parse_error(f, 'expected comma, new line, or }')
+   self:skip_whitespace()
+   self:consume('{')
+   self:skip_whitespace()
+   while not self:check('}') do
+      local key = self:take_while('[%w_]')
+      if key == '' then
+         self:error("expected a key=value property or a closing '}'")
+      end
+      if res[key] then self:error('duplicate key: %s', key) end
+      if not spec.parse[key] then self:error('unexpected key: %s', key) end
+      self:skip_whitespace()
+      self:consume('=')
+      self:skip_whitespace()
+      local val = spec.parse[key](self)
+      res[key] = val
+
+      -- Key-value pairs are separated by newlines or commas, and
+      -- terminated by }.  A trailing comma is optional.
+      local line = self.line
+      self:skip_whitespace()
+      local has_comma = self:check(',')
+      if has_comma then self:skip_whitespace() end
+      if self:check('}') then break end
+      if not has_comma and self.line == line then
+         self:error('properties should be separated by commas or newlines')
       end
    end
-   consume_char(f, chr, '}')
    for k, default in pairs(spec.defaults) do
       if not res[k] then res[k] = default(res) end
    end
-   spec.validate(f, res)
+   spec.validate(self, res)
    return res
 end
 
 local psid_info_spec = {
    parse={
-      psid_length=parse_psid_param,
-      shift=parse_psid_param
+      psid_length=Parser.parse_psid_param,
+      shift=Parser.parse_psid_param
    },
    defaults={
-      psid_length=function (config) return 16 - (config.shift or 16) end,
+      psid_length=function(config) return 16 - (config.shift or 16) end,
       shift=function(config) return 16 - (config.psid_length or 0) end
    },
-   validate=function(f, config)
+   validate=function(self, config)
       if config.psid_length + config.shift ~= 16 then
-         parse_error(f, 'psid_length '..config.psid_length..' + shift '..config.shift..' should add to 16')
+         self:error('psid_length %d + shift %d should add up to 16',
+                    config.psid_length, config.shift)
       end
    end
 }
 
-local function read_psid_info(f, chr)
-   return read_kvlist(f, chr, psid_info_spec)
+function Parser:parse_psid_info()
+   return self:parse_kvlist(psid_info_spec)
 end
 
-local function read_ipv4(f, chr)
-   local q1, chr = parse_ipv4_quad(f, chr)
-   consume_char(f, chr, '.')
-   local q2, chr = parse_ipv4_quad(f)
-   consume_char(f, chr, '.')
-   local q3, chr = parse_ipv4_quad(f)
-   consume_char(f, chr, '.')
-   local q4, chr = parse_ipv4_quad(f)
-   return { q1, q2, q3, q4 }, chr
+function Parser:parse_ipv4()
+   local q1 = self:parse_ipv4_quad()
+   self:consume('.')
+   local q2 = self:parse_ipv4_quad()
+   self:consume('.')
+   local q3 = self:parse_ipv4_quad()
+   self:consume('.')
+   local q4 = self:parse_ipv4_quad()
+   return { q1, q2, q3, q4 }
 end
 
-local function read_entry(f, chr)
-   local ipv4, chr = read_ipv4(f, chr)
-   local info, chr = read_psid_info(f, chr)
+function Parser:parse_entry()
+   local ipv4 = self:parse_ipv4()
+   local info = self:parse_psid_info()
    info.host_endian_ipv4 = ipv4[1]*2^24 + ipv4[2]*2^16 + ipv4[3]*2^8 + ipv4[4]
-   return info, chr
+   return info
 end
 
-local function read_entries(f)
+function Parser:parse_entries()
    local entries = {}
-   local chr = skip_whitespace(f)
-   while chr do
-      local info
-      info, chr = read_entry(f, chr)
-      table.insert(entries, info)
-      chr = skip_whitespace(f, chr)
+   self:skip_whitespace()
+   while not self:is_eof() do
+      table.insert(entries, self:parse_entry())
+      self:skip_whitespace()
    end
    return entries
 end
 
-local function parse(file)
-   local stream = {}
-   if type(file) == 'string' then
-      f = io.open(file)
-      function stream.next() return f:read(1) end
-      stream.name = file
-   else
-      function stream.next() return file:read(1) end
-      stream.name = '<unknown>'
-   end
-   stream.column = 0
-   stream.line = 1
-   return read_entries(stream)
+local function parse(stream)
+   return Parser.new(stream):parse_entries()
 end
 
 local function attach_lookup_helper(map)
