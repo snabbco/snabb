@@ -1,5 +1,13 @@
-module(..., package.seeall)
--- 
+-- Address maps
+--
+-- The lw4o6 architecture supports sharing of IPv4 addresses by
+-- partitioning the space of TCP/UDP/ICMP ports into disjoint "port
+-- sets".  Each softwire associated with an IPv4 address corresponds to
+-- a different set of ports on that address.  The way that the ports are
+-- partitioned is specified in RFC 7597: each address has an associated
+-- set of parameters that specifies how to compute a "port set
+-- identifier" (PSID) from a given port.
+--
 --                      0                   1
 --                      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
 --                     +-----------+-----------+-------+
@@ -7,14 +15,27 @@ module(..., package.seeall)
 --    the CE port set  |    > 0    |           |       |
 --                     +-----------+-----------+-------+
 --                     |  a bits   |  k bits   |m bits |
--- 
+--
 --             Figure 2: Structure of a Port-Restricted Port Field
--- 
+--
+-- Source: http://tools.ietf.org/html/rfc7597#section-5.1 
+--
+-- We find the specification's names to be a bit obtuse, so we refer to
+-- them using the following names:
+--
 --   a bits = reserved_ports_bit_count.
 --   k bits = psid_length.
 --   m bits = shift.
+--
+-- Anyway, an address map is a lookup table that, given an IPv4 address
+-- and a port, uses the appropriate "psid_length" and "shift" parameters
+-- to compute a PSID.  If the IPv4 address is not under control of the
+-- lwAFTR, the address map still returns a PSID, under the assumption
+-- that the subsequent binding table lookup will fail.  After all, what
+-- we're really interested in is mapping a packet to a binding table
+-- entry, and computing the PSID is just a detail.
 -- 
--- Source: http://tools.ietf.org/html/rfc7597#section-5.1 
+module(..., package.seeall)
 
 local ffi = require("ffi")
 local rangemap = require("apps.lwaftr.rangemap")
@@ -23,7 +44,7 @@ local address_map_value = ffi.typeof([[
    struct { uint16_t psid_length; uint16_t shift; }
 ]])
 
-Parser = {}
+local Parser = {}
 
 function Parser.new(file)
    local name = '<unknown>'
@@ -153,6 +174,7 @@ function Parser:parse_psid_info()
    return self:parse_kvlist(psid_info_spec)
 end
 
+-- Parse IPv4 address as host-endian integer.
 function Parser:parse_ipv4()
    local q1 = self:parse_ipv4_quad()
    self:consume('.')
@@ -161,13 +183,39 @@ function Parser:parse_ipv4()
    local q3 = self:parse_ipv4_quad()
    self:consume('.')
    local q4 = self:parse_ipv4_quad()
-   return { q1, q2, q3, q4 }
+   return q1*2^24 + q2*2^16 + q3*2^8 + q4
+end
+
+function Parser:parse_ipv4_range()
+   local range_begin, range_end
+   range_begin = self:parse_ipv4()
+   self:skip_whitespace()
+   if self:check('-') then
+      self:skip_whitespace()
+      range_end = self:parse_ipv4()
+   else
+      range_end = range_begin
+   end
+   if range_end < range_begin then
+      self:error('invalid IPv4 address range (end before begin)')
+   end
+   return { min=range_begin, max=range_end }
+end
+
+function Parser:parse_ipv4_range_list()
+   local ranges = {}
+   repeat
+      self:skip_whitespace()
+      table.insert(ranges, self:parse_ipv4_range())
+      self:skip_whitespace()
+   until not self:check(',')
+   return ranges
 end
 
 function Parser:parse_entry()
-   local ipv4 = self:parse_ipv4()
+   local range_list = self:parse_ipv4_range_list()
    local info = self:parse_psid_info()
-   info.host_endian_ipv4 = ipv4[1]*2^24 + ipv4[2]*2^16 + ipv4[3]*2^8 + ipv4[4]
+   info.range_list = range_list
    return info
 end
 
@@ -189,12 +237,12 @@ local function attach_lookup_helper(map)
    local function port_to_psid(port, psid_len, shift)
       local psid_mask = lshift(1, psid_len)-1
       local psid = band(rshift(port, shift), psid_mask)
-      -- There are restricted ports.
+      -- Are there are restricted ports for this address?
       if psid_len + shift < 16 then
          local reserved_ports_bit_count = 16 - psid_len - shift
          local first_allocated_port = lshift(1, reserved_ports_bit_count)
-         -- Port is within the range of restricted ports, assign bogus
-         -- PSID so lookup will fail.
+         -- The port is within the range of restricted ports.  Assign a
+         -- bogus PSID so that lookup will fail.
          if port < first_allocated_port then psid = psid_mask + 1 end
       end
       return psid
@@ -214,7 +262,9 @@ function compile(file)
    for _, entry in ipairs(parse(file)) do
       value.psid_length = entry.psid_length
       value.shift = entry.shift
-      builder:add(entry.host_endian_ipv4, value)
+      for _, range in ipairs(entry.range_list) do
+         builder:add_range(range.min, range.max, value)
+      end
    end
    return attach_lookup_helper(builder:build())
 end
@@ -243,20 +293,21 @@ function selftest()
    end
    test('', {})
    test('1.0.0.0{}',
-        {{host_endian_ipv4=2^24, psid_length=0, shift=16}})
+        {{range_list={{min=2^24,max=2^24}}, psid_length=0, shift=16}})
    test('1.0.0.0 {psid_length=10}',
-        {{host_endian_ipv4=2^24, psid_length=10, shift=6}})
+        {{range_list={{min=2^24,max=2^24}}, psid_length=10, shift=6}})
    test('1.0.0.0 {shift=6}',
-        {{host_endian_ipv4=2^24, psid_length=10, shift=6}})
+        {{range_list={{min=2^24,max=2^24}}, psid_length=10, shift=6}})
    test('1.0.0.0 {shift=7,psid_length=9}',
-        {{host_endian_ipv4=2^24, psid_length=9, shift=7}})
+        {{range_list={{min=2^24,max=2^24}}, psid_length=9, shift=7}})
    test('1.0.0.0 {psid_length=7,shift=9}',
-        {{host_endian_ipv4=2^24, psid_length=7, shift=9}})
+        {{range_list={{min=2^24,max=2^24}}, psid_length=7, shift=9}})
    test([[
-            1.0.0.0 {psid_length=7,shift=9}
-            2.0.0.0 {}
+            1.0.0.0-1.255.255.255 {psid_length=7,shift=9}
+            2.0.0.0,2.0.0.1 {}
         ]],
-        {{host_endian_ipv4=2^24, psid_length=7, shift=9},
-         {host_endian_ipv4=2^25, psid_length=0, shift=16}})
+        {{range_list={{min=2^24,max=2^25-1}}, psid_length=7, shift=9},
+         {range_list={{min=2^25,max=2^25}, {min=2^25+1,max=2^25+1}},
+          psid_length=0, shift=16}})
    print('ok')
 end

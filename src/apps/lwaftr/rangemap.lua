@@ -72,15 +72,20 @@ function RangeMapBuilder.new(value_type)
    return builder
 end
 
+function RangeMapBuilder:add_range(key_min, key_max, value)
+   assert(key_min <= key_max)
+   local min, max = ffi.new(self.entry_type), ffi.new(self.entry_type)
+   min.key, min.value = key_min, value
+   max.key, max.value = key_max, value
+   table.insert(self.entries, { min=min, max=max })
+end
+
 function RangeMapBuilder:add(key, value)
-   local entry = ffi.new(self.entry_type)
-   entry.key = key
-   entry.value = value
-   table.insert(self.entries, entry)
+   self:add_range(key, key, value)
 end
 
 function RangeMapBuilder:build()
-   table.sort(self.entries, function(a,b) return a.key < b.key end)
+   table.sort(self.entries, function(a,b) return a.max.key < b.max.key end)
 
    -- The optimized binary search routines in binary_search.dasl want to
    -- search for the entry whose key is *greater* than or equal to the K
@@ -88,17 +93,22 @@ function RangeMapBuilder:build()
    -- contiguous entries with the highest K having a value V, starting
    -- with UINT32_MAX and working our way down.
    local ranges = {}
-   if #self.entries == 0 then error('what') end
-   local range_end = self.entries[#self.entries]
-   range_end.key = UINT32_MAX
-   table.insert(ranges, range_end)
-   for i=#self.entries,1,-1 do
+   if #self.entries == 0 then error('empty range map') end
+   do
+      local last_entry = ffi.new(self.entry_type)
+      last_entry.key = UINT32_MAX
+      last_entry.value = self.entries[#self.entries].max.value
+      table.insert(ranges, last_entry)
+   end
+   local range_end = self.entries[#self.entries].min
+   for i=#self.entries-1,1,-1 do
       local entry = self.entries[i]
-      if not self.equal_fn(entry.value, range_end.value) then
-         assert(entry.key < range_end.key,
-                "Key has differing values: "..entry.key)
-         range_end = entry
-         table.insert(ranges, range_end)
+      if entry.max.key >= range_end.key then
+         error("Multiple range map entries for key: "..entry.max.key)
+      end
+      if not self.equal_fn(entry.max.value, range_end.value) then
+         table.insert(ranges, entry.max)
+         range_end = entry.min
       end
    end
 
