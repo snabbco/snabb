@@ -38,6 +38,7 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
+local S = require("syscall")
 local rangemap = require("apps.lwaftr.rangemap")
 
 local address_map_value = ffi.typeof([[
@@ -48,8 +49,17 @@ local Parser = {}
 
 function Parser.new(file)
    local name = '<unknown>'
-   if type(file) == 'string' then name, file = file, io.open(file) end
-   local ret = { column=0, line=0, name=name }
+   local mtime_sec, mtime_nsec
+   if type(file) == 'string' then
+      name, file = file, io.open(file)
+      -- Seems to be no way to fstat() the file.  Oh well.
+      local stat = S.stat(name)
+      mtime_sec, mtime_nsec = stat.st_mtime, stat.st_mtime_nsec
+      print(mtime_sec, mtime_nsec)
+   end
+   local ret = {
+      column=0, line=0, name=name, mtime_sec=mtime_sec, mtime_nsec=mtime_nsec
+   }
    function ret.read_char() return file:read(1) end
    function ret.cleanup() return file:close() end
    ret.peek_char = ret.read_char()
@@ -260,9 +270,12 @@ local function attach_lookup_helper(map)
 end
 
 function compile(file)
-   local builder = rangemap.RangeMapBuilder.new(address_map_value)
+   local parser = Parser.new(file)
+   local builder = rangemap.RangeMapBuilder.new(address_map_value,
+                                                parser.mtime_sec,
+                                                parser.mtime_nsec)
    local value = address_map_value()
-   for _, entry in ipairs(parse(file)) do
+   for _, entry in ipairs(parser:parse_entries()) do
       value.psid_length = entry.psid_length
       value.shift = entry.shift
       for _, range in ipairs(entry.range_list) do
@@ -270,6 +283,77 @@ function compile(file)
       end
    end
    return attach_lookup_helper(builder:build())
+end
+
+local verbose = os.getenv('SNABB_LWAFTR_VERBOSE') or true
+local function log(msg, ...)
+   if verbose then print(msg:format(...)) end
+end
+
+function load(file)
+   if RangeMap.has_magic(file) then
+      log('loading compiled address map from %s', file)
+      return attach_lookup_helper(RangeMap.load(file))
+   end
+
+   -- If the file doesn't have the magic, assume it's a source file.
+   -- First, see if we compiled it previously and saved a compiled file
+   -- in a well-known place.
+   local compiled = file:gsub("%.txt$", "")..'.map'
+   if RangeMap.has_magic(compiled) then
+      log('loading compiled address map from %s', compiled)
+      local map = attach_lookup_helper(RangeMap.load(file))
+      local stat = S.stat(file)
+      if (map.mtime_sec ~= stat.st_mtime and
+          map.mtime_nsec ~= stat.st_mtime_nsec) then
+         -- The compiled file is fresh.
+         log('compiled address map %s is up to date', compiled)
+         return map
+      end
+      log('compiled address map %s is out of date; recompiling.', compiled)
+   end
+
+   -- Load and compile it.
+   log('loading source address map from %s', file)
+   local map = compile(file)
+
+   -- Save it, if we can.
+   local success, err = pcall(save, map, compiled)
+   if not success then
+      log('error saving compiled address map %s: %s', compiled, err)
+   end
+
+   -- Done.
+   return map
+end
+
+local function mktemp(name, mode)
+   if not mode then mode = "rusr, wusr, rgrp, roth" end
+   t = math.random(1e7)
+   local tmpnam, fd, err
+   for i = t, t+10 do
+      tmpnam = name .. '.' .. i
+      fd, err = S.open(tmpnam, "creat, wronly, excl", mode)
+      if fd then
+         fd:close()
+         return tmpnam, nil
+      end
+      i = i + 1
+   end
+   return nil, err
+end
+
+function save(map, file)
+   local tmp_file, err = mktemp(file)
+   if not tmp_file then
+      local dir = ffi.string(ffi.C.dirname(file))
+      error("failed to create temporary file in "..dir..": "..err)
+   end
+   map:save(tmp_file)
+   local res, err = S.rename(tmp_file, file)
+   if not res then
+      error("failed to rename "..tmp_file.." to "..file..": "..err)
+   end
 end
 
 function selftest()

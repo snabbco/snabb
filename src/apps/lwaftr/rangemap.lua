@@ -193,6 +193,18 @@ function RangeMap:save(filename)
    if err then error("error writing "..filename..": "..tostring(err)) end
 end
 
+function RangeMap.has_magic(filename)
+   local fd, err = S.open(filename, "rdonly")
+   if not fd then return false end
+   local magic = ffi.string(fd:read(8))
+   -- This function introduces a TOCTTOU situation, but that isn't
+   -- terrible; we call this function just to know if the file exists
+   -- and might be a compiled file.  We re-do these checks later in
+   -- RangeMap.load().
+   fd:close()
+   return magic == 'rangemap'
+end
+
 function RangeMap.load(filename, value_type)
    local map = {}
    map.value_type = value_type
