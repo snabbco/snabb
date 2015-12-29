@@ -17,7 +17,6 @@ function Parser.new(file)
       -- Seems to be no way to fstat() the file.  Oh well.
       local stat = S.stat(name)
       mtime_sec, mtime_nsec = stat.st_mtime, stat.st_mtime_nsec
-      print(mtime_sec, mtime_nsec)
    end
    local ret = {
       column=0, line=0, name=name, mtime_sec=mtime_sec, mtime_nsec=mtime_nsec
