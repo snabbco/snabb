@@ -145,7 +145,7 @@ end
 
 -- Returns a uint8_t[4].
 function Parser:parse_ipv4()
-   local addr, err = ipv4:pton(self:take_while('[0-9.]'))
+   local addr, err = ipv4:pton(self:take_while('[%d.]'))
    if not addr then self:error('%s', err) end
    return addr
 end
@@ -157,7 +157,7 @@ end
 
 -- Returns a uint8_t[16].
 function Parser:parse_ipv6()
-   local addr, err = ipv6:pton(self:take_while('[a-fA-F0-9:]'))
+   local addr, err = ipv6:pton(self:take_while('[%x:]'))
    if not addr then self:error('%s', err) end
    return addr
 end
@@ -167,7 +167,7 @@ function Parser:parse_mac()
    -- FIXME: Unlike ipv6:pton, ethernet:pton raises an error if the
    -- address is invalid.
    local success, addr_or_err = pcall(
-      ethernet.pton, ethernet, self:take_while('[a-fA-F0-9:]'))
+      ethernet.pton, ethernet, self:take_while('[%x:]'))
    if not success then self:error('%s', addr_or_err) end
    return addr_or_err
 end
@@ -230,21 +230,14 @@ function Parser:parse_file_name()
 end
 
 function Parser:parse_boolean()
-   local tok = self:take_while('[a-zA-Z]')
+   local tok = self:take_while('[%a]')
    if tok:lower() == 'true' then return true end
    if tok:lower() == 'false' then return false end
    self:error('expected "true" or "false", instead got "%s"', tok)
 end
 
 function Parser:parse_number()
-   local tok = self:take_while('[0-9.eExX]')
-   local num = tonumber(tok)
-   if not num then self:error('expected a number, instead got "%s"', tok) end
-   return num
-end
-
-function Parser:parse_positive_number()
-   local tok = self:take_while('[0-9.eExX]')
+   local tok = self:take_while('[%d.eExX]')
    local num = tonumber(tok)
    if not num then self:error('expected a number, instead got "%s"', tok) end
    return num
@@ -269,8 +262,7 @@ function Parser:parse_non_negative_number()
 end
 
 function Parser:parse_mtu()
-   -- FIXME: what's a maximum MTU?
-   return self:parse_uint(0,2^16)
+   return self:parse_uint(0,2^16-1)
 end
 
 function Parser.enum_parser(enums)
@@ -281,7 +273,7 @@ function Parser.enum_parser(enums)
       end
       -- Not found; make a nice error.
       local keys = {}
-      for k,v in pairs(enums) do table.insert(keys, k) end
+      for k,_ in pairs(enums) do table.insert(keys, k) end
       keys = table.concat(keys, ', ')
       self:error('bad value: "%s".  expected one of %s', tok, keys)
    end
