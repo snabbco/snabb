@@ -200,7 +200,7 @@ local function binding_lookup_ipv4(lwstate, ipv4_ip, port)
       print(lwdebug.format_ipv4(ipv4_ip), 'port: ', port, string.format("%x", port))
       lwdebug.pp(lwstate.binding_table)
    end
-   local host_endian_ipv4 = C.htonl(ipv4_ip)
+   local host_endian_ipv4 = C.ntohl(ipv4_ip)
    local psid = lwstate.psid_info_map:lookup_psid(host_endian_ipv4, port)
    for i=1,#lwstate.binding_table do
       local bind = lwstate.binding_table[i]
@@ -251,7 +251,7 @@ end
 -- Todo: make this O(1)
 local function in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port)
    local binding_table = lwstate.binding_table
-   local host_endian_ipv4 = C.htonl(ipv4_src_ip)
+   local host_endian_ipv4 = C.ntohl(ipv4_src_ip)
    local psid = lwstate.psid_info_map:lookup_psid(host_endian_ipv4, ipv4_src_port)
    for i=1,#binding_table do
       local bind = binding_table[i]

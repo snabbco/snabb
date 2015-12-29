@@ -84,12 +84,12 @@ local function parse(stream)
 end
 
 local function attach_lookup_helper(map)
-   local function port_to_psid(port, psid_len, shift)
-      local psid_mask = lshift(1, psid_len)-1
+   local function port_to_psid(port, psid_length, shift)
+      local psid_mask = lshift(1, psid_length)-1
       local psid = band(rshift(port, shift), psid_mask)
       -- Are there are restricted ports for this address?
-      if psid_len + shift < 16 then
-         local reserved_ports_bit_count = 16 - psid_len - shift
+      if psid_length + shift < 16 then
+         local reserved_ports_bit_count = 16 - psid_length - shift
          local first_allocated_port = lshift(1, reserved_ports_bit_count)
          -- The port is within the range of restricted ports.  Assign a
          -- bogus PSID so that lookup will fail.
@@ -100,8 +100,8 @@ local function attach_lookup_helper(map)
 
    function map:lookup_psid(ipv4, port)
       local psid_info = self:lookup(ipv4).value
-      local psid_len, shift = psid_info.psid_length, psid_info.shift
-      return port_to_psid(port, psid_len, shift)
+      local psid_length, shift = psid_info.psid_length, psid_info.shift
+      return port_to_psid(port, psid_length, shift)
    end
    return map
 end
