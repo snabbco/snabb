@@ -4,24 +4,24 @@ Snabb-lwaftr alpha is configured by a text file.
 
 ```bash
 $ cat sample.conf
-aftr_ipv4_ip = ipv4:pton("10.10.10.10"),
-aftr_ipv6_ip = ipv6:pton('8:9:a:b:c:d:e:f'),
-aftr_mac_b4_side = ethernet:pton("22:22:22:22:22:22"),
-aftr_mac_inet_side = ethernet:pton("12:12:12:12:12:12"),
-b4_mac = ethernet:pton("44:44:44:44:44:44"),
-binding_table = bt.get_binding_table(),
-hairpinning = true,
-icmpv6_rate_limiter_n_packets=3e5,
-icmpv6_rate_limiter_n_seconds=4,
-inet_mac = ethernet:pton("68:68:68:68:68:68"),
-ipv4_mtu = 1460,
-ipv6_mtu = 1500,
-policy_icmpv4_incoming = policies['ALLOW'],
-policy_icmpv6_incoming = policies['ALLOW'],
-policy_icmpv4_outgoing = policies['ALLOW'],
-policy_icmpv6_outgoing = policies['ALLOW'],
-v4_vlan_tag = 0x444,
-v6_vlan_tag = 0x666,
+aftr_ipv4_ip = 10.10.10.10
+aftr_ipv6_ip = 8:9:a:b:c:d:e:f
+aftr_mac_b4_side = 22:22:22:22:22:22
+aftr_mac_inet_side = 12:12:12:12:12:12
+b4_mac = 44:44:44:44:44:44
+binding_table = path/to/binding.table
+hairpinning = true
+icmpv6_rate_limiter_n_packets=3e5
+icmpv6_rate_limiter_n_seconds=4
+inet_mac = 68:68:68:68:68:68
+ipv4_mtu = 1460
+ipv6_mtu = 1500
+policy_icmpv4_incoming = ALLOW
+policy_icmpv6_incoming = ALLOW
+policy_icmpv4_outgoing = ALLOW
+policy_icmpv6_outgoing = ALLOW
+v4_vlan_tag = 1234
+v6_vlan_tag = 42
 vlan_tagging = true
 ```
 
@@ -34,10 +34,10 @@ internal network, and communicates primarily with B4s.
 First, the IP and MAC addresses for both interfaces are set:
 
 ```lua
-aftr_ipv4_ip = ipv4:pton("10.10.10.10"),
-aftr_ipv6_ip = ipv6:pton('8:9:a:b:c:d:e:f'),
-aftr_mac_b4_side = ethernet:pton("22:22:22:22:22:22"),
-aftr_mac_inet_side = ethernet:pton("12:12:12:12:12:12"),
+aftr_ipv4_ip = 10.10.10.10
+aftr_ipv6_ip = 8:9:a:b:c:d:e:f
+aftr_mac_b4_side = 22:22:22:22:22:22
+aftr_mac_inet_side = 12:12:12:12:12:12
 ```
 
 This associates **12:12:12:12:12:12** and **10.10.10.10** with the
@@ -51,15 +51,15 @@ it will talk directly to only one host on each side, and specifies their MAC
 addresses for the outgoing packets.
 
 ```lua
-b4_mac = ethernet:pton("44:44:44:44:44:44"),
-inet_mac = ethernet:pton("68:68:68:68:68:68"),
+b4_mac = 44:44:44:44:44:44
+inet_mac = 68:68:68:68:68:68
 ```
 
 The alpha lwaftr can talk to any host, but assumes that the above ones are the
 next hop.
 
 ```lua
-binding_table = bt.get_binding_table(),
+binding_table = path/to/binding.table,
 ```
 
 See [README.bindingtable.md](README.bindingtable.md) for binding table details.
@@ -90,10 +90,10 @@ The current MTU handling is otherwise underdeveloped. It is not dynamically
 updated on receiving ICMP packet too big messages.
 
 ```lua
-policy_icmpv4_incoming = policies['ALLOW'],
-policy_icmpv6_incoming = policies['ALLOW'],
-policy_icmpv4_outgoing = policies['ALLOW'],
-policy_icmpv6_outgoing = policies['ALLOW'],
+policy_icmpv4_incoming = ALLOW,
+policy_icmpv6_incoming = ALLOW,
+policy_icmpv4_outgoing = ALLOW,
+policy_icmpv6_outgoing = ALLOW,
 ```
 
 Snabb-lwaftr can be configured to ALLOW or DROP incoming and outgoing ICMPv4
@@ -101,8 +101,8 @@ and ICMPv6 messages. If a finer granularity of control is desired, contact the
 development team via github or email.
 
 ```lua
-v4_vlan_tag = 0x444,
-v6_vlan_tag = 0x666,
+v4_vlan_tag = 1234,
+v6_vlan_tag = 42,
 vlan_tagging = true
 ```
 
@@ -113,8 +113,7 @@ assume that incoming packets are tagged. If it is 'false', v4_vlan_tag and
 v6_vlan_tag are currently optional (and unused).
 
 Values of `v4_vlan_tag` and `v6_vlan_tag` represent the identifier value in a
-VLAN tag. It must be a value between 0 and 4095. Conversely to the other values
-in this file, this value is set in host-byte order.
+VLAN tag. It must be a value between 0 and 4095.
 
 More sophisticated support, including for mixes of tagged/untagged packets,
 will be provided upon request.

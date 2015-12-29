@@ -1,4 +1,4 @@
-Usage: check BINDING-TABLE CONF IPV4-IN.PCAP IPV6-IN.PCAP IPV4-OUT.PCAP IPV6-OUT.PCAP
+Usage: check CONF IPV4-IN.PCAP IPV6-IN.PCAP IPV4-OUT.PCAP IPV6-OUT.PCAP
 
   -h, --help
                              Print usage information.

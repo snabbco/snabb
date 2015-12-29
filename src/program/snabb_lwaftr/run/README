@@ -1,7 +1,6 @@
 Usage: run --help
-       run --bt <binding-table> --conf <conf-file> --v4-pci <pci-addr> --v6-pci <pci-addr> [-D <seconds>] [-v] [-u]
+       run --conf <conf-file> --v4-pci <pci-addr> --v6-pci <pci-addr> [-D <seconds>] [-v] [-u]
 
-       --bt     <binding-table> Sets binding table
        --conf   <conf-file>     Sets configuration policy table
        --v4-pci <pci-addr>      PCI device number for the INET-side NIC
        --v6-pci <pci-addr>      PCI device number for the B4-side NIC

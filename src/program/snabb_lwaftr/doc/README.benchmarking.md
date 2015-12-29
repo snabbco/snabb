@@ -13,7 +13,6 @@ First, start the lwAFTR:
 
 ```
 $ sudo ./src/snabb-lwaftr run \
-    --bt tests/apps/lwaftr/data/binding.table \
     --conf tests/apps/lwaftr/data/icmp_on_fail.conf \
     --v4-pci 0000:01:00.1 --v6-pci 0000:02:00.1
 ```
@@ -91,7 +90,6 @@ Intel 82599 NICs, `snabb-lwaftr bench` may be used:
 
 ```bash
 $ sudo ./snabb-lwaftr bench \
-    ../tests/apps/lwaftr/data/binding.table \
     ../tests/apps/lwaftr/data/icmp_on_fail.conf \
     ../tests/apps/lwaftr/benchdata/ipv4-0550.pcap \
     ../tests/apps/lwaftr/benchdata/ipv6-0550.pcap

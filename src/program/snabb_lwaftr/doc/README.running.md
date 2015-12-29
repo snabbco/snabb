@@ -44,7 +44,6 @@ First, start the lwAFTR:
 
 ```
 $ sudo ./src/snabb-lwaftr run \
-    --bt tests/apps/lwaftr/data/binding.table \
     --conf tests/apps/lwaftr/data/icmp_on_fail.conf \
     --v4-pci 0000:01:00.1 --v6-pci 0000:02:00.1
 ```

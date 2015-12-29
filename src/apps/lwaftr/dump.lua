@@ -33,29 +33,24 @@ end
 function dump_configuration(lwstate)
    print("Dump configuration")
    local result = {}
-   local etharr = set('aftr_mac_b4_side',  'aftr_mac_inet_side', 'b4_mac',  'inet_mac')
+   local etharr = set('aftr_mac_b4_side', 'aftr_mac_inet_side', 'b4_mac', 'inet_mac')
    local ipv4arr = set('aftr_ipv4_ip')
    local ipv6arr = set('aftr_ipv6_ip')
    local val
-   for _, k in ipairs(lwstate.conf_keys) do
-      local v = lwstate[k]
+   for k,v in pairs(lwstate.conf) do
       if etharr[k] then
-         val = ("ethernet:pton('%s')"):format(ethernet:ntop(v))
+         v = ethernet:ntop(v)
       elseif ipv4arr[k] then
-         val = ("ipv4:pton('%s')"):format(ipv4:ntop(v))
+         v = ipv4:ntop(v)
       elseif ipv6arr[k] then
-         val = ("ipv6:pton('%s')"):format(ipv6:ntop(v))
+         v = ipv6:ntop(v)
       elseif type(v) == "bool" then
-         val = v and "true" or "false"
-      elseif k == "binding_table" then
-         val = "bt.get_binding_table()"
-      else
-         val = lwstate[k]
+         v = v and "true" or "false"
       end
-      table.insert(result, ("%s = %s"):format(k, val))
+      table.insert(result, ("%s = %s"):format(k, v))
    end
    local filename = (CONF_FILE_DUMP):format(os.date("%Y-%m-%d-%H:%M:%S"))
-   local content = table.concat(result, ",\n")
+   local content = table.concat(result, "\n")
    write_to_file(filename, content)
    print(("Configuration written to %s"):format(filename))
 end

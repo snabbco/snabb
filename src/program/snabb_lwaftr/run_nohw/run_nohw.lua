@@ -4,8 +4,6 @@ local CSVStatsTimer = require("lib.csv_stats").CSVStatsTimer
 local ethernet = require("lib.protocol.ethernet")
 local RawSocket = require("apps.socket.raw").RawSocket
 local LwAftr = require("apps.lwaftr.lwaftr").LwAftr
-local conf = require("apps.lwaftr.conf")
-local bt = require("apps.lwaftr.binding_table")
 local lib = require("core.lib")
 local S = require("syscall")
 
@@ -23,15 +21,10 @@ end
 
 local function parse_args(args)
    local verbosity = 0
-   local bt_file, conf_file, b4_if, inet_if
+   local conf_file, b4_if, inet_if
    local handlers = {
       v = function ()
          verbosity = verbosity + 1
-      end;
-      b = function (arg)
-         check(arg, "argument to '--bt' not specified")
-         check(file_exists(arg), "no such file '%s'", arg)
-         bt_file = arg
       end;
       c = function (arg)
          check(arg, "argument to '--conf' not specified")
@@ -52,26 +45,22 @@ local function parse_args(args)
 	  end;
    }
    lib.dogetopt(args, handlers, "b:c:B:I:vh", {
-      help = "h", bt = "b", conf = "c", verbose = "v",
+      help = "h", conf = "c", verbose = "v",
       ["b4-if"] = "B", ["inet-if"] = "I",
    })
-   check(bt_file, "no binding table specified (--bt/-b)")
    check(conf_file, "no configuration specified (--conf/-c)")
    check(b4_if, "no B4-side interface specified (--b4-if/-B)")
    check(inet_if, "no Internet-side interface specified (--inet-if/-I)")
-   return verbosity, bt_file, conf_file, b4_if, inet_if
+   return verbosity, conf_file, b4_if, inet_if
 end
 
 
 function run(parameters)
-   local verbosity, bt_file, conf_file, b4_if, inet_if = parse_args(parameters)
+   local verbosity, conf_file, b4_if, inet_if = parse_args(parameters)
    local c = config.new()
 
    -- AFTR
-   bt.get_binding_table(bt_file)
-   local aftrconf = conf.get_aftrconf(conf_file)
-   aftrconf.bt_file = bt_file
-   config.app(c, "aftr", LwAftr, aftrconf)
+   config.app(c, "aftr", LwAftr, conf_file)
 
    -- B4 side interface
    config.app(c, "b4if", RawSocket, b4_if)

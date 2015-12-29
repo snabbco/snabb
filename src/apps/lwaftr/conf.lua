@@ -3,8 +3,6 @@ module(..., package.seeall)
 local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
-
-local bt = require("apps.lwaftr.binding_table")
 local Parser = require("apps.lwaftr.conf_parser").Parser
 
 policies = {
@@ -76,30 +74,8 @@ local lwaftr_conf_spec = {
    validate=function(parser, config) end
 }
 
-local function parse_lwaftr_conf(stream)
+function load_lwaftr_config(stream)
    return Parser.new(stream):parse_property_list(lwaftr_conf_spec)
-end
-
--- TODO: rewrite this after netconf integration
-local function read_conf(conf_file)
-   local input = io.open(conf_file)
-   local conf_vars = input:read('*a')
-   local full_config = ([[
-      function _conff(policies, ipv4, ipv6, ethernet, bt)
-         return {%s}
-      end
-      return _conff
-   ]]):format(conf_vars)
-   local conf = assert(loadstring(full_config))()
-   return conf(policies, ipv4, ipv6, ethernet, bt)
-end
-
-local aftrconf
-function get_aftrconf(conf_file)
-   if not aftrconf then
-      aftrconf = read_conf(conf_file)
-   end
-   return aftrconf
 end
 
 function selftest()
@@ -121,7 +97,7 @@ function selftest()
       }
    end
    local function test(str, expected)
-      if not equal(expected, parse_lwaftr_conf(string_file(str))) then
+      if not equal(expected, load_lwaftr_config(string_file(str))) then
          error('lwaftr conf parse produced unexpected result; string:\n'..str)
       end
    end

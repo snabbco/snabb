@@ -3,8 +3,6 @@
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapReader = require("apps.pcap.pcap").PcapReader
 local basic_apps = require("apps.basic.basic_apps")
-local bt         = require("apps.lwaftr.binding_table")
-local conf       = require("apps.lwaftr.conf")
 local counter    = require("core.counter")
 local ffi        = require("ffi")
 local lib        = require("core.lib")
@@ -82,9 +80,8 @@ end
 
 local function usage ()
    print([[
-Usage: <bt_file> <conf_file> <pcap_file_v4> <pcap_file_v6> <pci_dev_v4> <pci_dev_v6>
+Usage: <conf_file> <pcap_file_v4> <pcap_file_v6> <pci_dev_v4> <pci_dev_v6>
 
-   <bt_file>:      Path to binding table.
    <conf_file>:    Path to lwaftr configuration file.
    <pcap_file_v4>: Path to pcap file contain IPv4 packet/s to be sent.
    <pcap_file_v6>: Path to pcap file contain IPv6 packet/s to be sent.
@@ -95,15 +92,12 @@ Usage: <bt_file> <conf_file> <pcap_file_v4> <pcap_file_v6> <pci_dev_v4> <pci_dev
 end
 
 local function testInternalLoopbackFromPcapFile (params)
-   if #params < 6 then usage() end
-   local bt_file, conf_file, pcapv4_file, pcapv6_file, pcidev_v4, pcidev_v6 = unpack(params)
-
-   bt.get_binding_table(bt_file)
-   local aftrconf = conf.get_aftrconf(conf_file)
+   if #params ~= 5 then usage() end
+   local conf_file, pcapv4_file, pcapv6_file, pcidev_v4, pcidev_v6 = unpack(params)
 
    engine.configure(config.new())
    local c = config.new()
-   config.app(c, 'lwaftr', lwaftr.LwAftr, aftrconf)
+   config.app(c, 'lwaftr', lwaftr.LwAftr, conf_file)
    config.app(c, 'pcapv4', PcapReader, pcapv4_file)
    config.app(c, 'pcapv6', PcapReader, pcapv6_file)
    config.app(c, 'repeater_v4', basic_apps.Repeater)

@@ -28,15 +28,15 @@ function snabb_run_and_cmp {
       echo "not enough arguments to snabb_run_and_cmp"
       exit 1
    fi
-   ${SNABB_LWAFTR} check ${TEST_BASE}/binding.table \
+   ${SNABB_LWAFTR} check \
       $1 $2 $3 ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap || quit_with_msg \
         "Failure: ${SNABB_LWAFTR} check \
-         ${TEST_BASE}/binding.table $1 $2 $3 \
+         $1 $2 $3 \
          ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap"
    scmp $4 ${TEST_OUT}/endoutv4.pcap \
-    "Failure: ${SNABB_LWAFTR} check ${TEST_BASE}/binding.table $1 $2 $3 $4 $5"
+    "Failure: ${SNABB_LWAFTR} check $1 $2 $3 $4 $5"
    scmp $5 ${TEST_OUT}/endoutv6.pcap \
-    "Failure: ${SNABB_LWAFTR} check ${TEST_BASE}/binding.table $1 $2 $3 $4 $5"
+    "Failure: ${SNABB_LWAFTR} check $1 $2 $3 $4 $5"
    echo "Test passed"
 }
 

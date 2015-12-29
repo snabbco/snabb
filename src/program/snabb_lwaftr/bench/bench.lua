@@ -2,8 +2,6 @@ module(..., package.seeall)
 
 local app = require("core.app")
 local basic_apps = require("apps.basic.basic_apps")
-local bt = require("apps.lwaftr.binding_table")
-local conf = require("apps.lwaftr.conf")
 local config = require("core.config")
 local lib = require("core.lib")
 local pcap = require("apps.pcap.pcap")
@@ -23,18 +21,14 @@ function parse_args(args)
 end
 
 function run(args)
-   local bt_file, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
-
-   -- It's essential to initialize the binding table before the aftrconf
-   bt.get_binding_table(bt_file)
-   local aftrconf = conf.get_aftrconf(conf_file)
+   local conf_file, inv4_pcap, inv6_pcap = parse_args(args)
 
    local c = config.new()
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "repeaterv4", basic_apps.Repeater)
    config.app(c, "repeaterv6", basic_apps.Repeater)
-   config.app(c, "lwaftr", lwaftr.LwAftr, aftrconf)
+   config.app(c, "lwaftr", lwaftr.LwAftr, conf_file)
    config.app(c, "statisticsv4", basic_apps.Statistics)
    config.app(c, "statisticsv6", basic_apps.Statistics)
    config.app(c, "sinkv4", basic_apps.Sink)

@@ -26,12 +26,11 @@ fi
 
 function run_benchmark {
     local script=${SNABB_BASE}/apps/lwaftr/benchmark.lua
-    local binding_table=${TEST_BASE}/binding.table
     local conf=$1
     local pcap_file_v4=$2
     local pcap_file_v6=$3
 
-    ${SNABB_BASE}/snabb snsh $script $binding_table $conf $pcap_file_v4 $pcap_file_v6 $pcidev_v4 $pcidev_v6
+    ${SNABB_BASE}/snabb snsh $script $conf $pcap_file_v4 $pcap_file_v6 $pcidev_v4 $pcidev_v6
 }
 
 echo "Benchmarking: from-internet IPv4 packet found in the binding table."

@@ -140,25 +140,47 @@ local function on_signal(sig, f)
 end
 
 local function reload_binding_table(lwstate)
-   if not lwstate.bt_file then return end
    print("Reload binding table")
-   lwstate.binding_table = bt.load_binding_table(lwstate.bt_file)
+   lwstate.binding_table = bt.load_binding_table(lwstate.conf.binding_table)
    lwstate.binding_table_by_ipv4 = compute_binding_table_by_ipv4(lwstate.binding_table)
 end
 
 LwAftr = {}
 
 function LwAftr:new(conf)
+   if type(conf) == 'string' then
+      conf = lwconf.load_lwaftr_config(conf)
+   end
    if conf.debug then debug = true end
    local o = {}
-   for k,v in pairs(conf) do
-      o[k] = v
-   end
+   o.conf = conf
+
+   -- FIXME: Access these from the conf instead of splatting them onto
+   -- the lwaftr app, if there is no performance impact.
+   o.aftr_ipv4_ip = conf.aftr_ipv4_ip
+   o.aftr_ipv6_ip = conf.aftr_ipv6_ip
+   o.aftr_mac_b4_side = conf.aftr_mac_b4_side
+   o.aftr_mac_inet_side = conf.aftr_mac_inet_side
+   o.b4_mac = conf.b4_mac
+   o.hairpinning = conf.hairpinning
+   o.icmpv6_rate_limiter_n_packets = conf.icmpv6_rate_limiter_n_packets
+   o.icmpv6_rate_limiter_n_seconds = conf.icmpv6_rate_limiter_n_seconds
+   o.inet_mac = conf.inet_mac
+   o.ipv4_mtu = conf.ipv4_mtu
+   o.ipv6_mtu = conf.ipv6_mtu
+   o.policy_icmpv4_incoming = conf.policy_icmpv4_incoming
+   o.policy_icmpv4_outgoing = conf.policy_icmpv4_outgoing
+   o.policy_icmpv6_incoming = conf.policy_icmpv6_incoming
+   o.policy_icmpv6_outgoing = conf.policy_icmpv6_outgoing
+   o.v4_vlan_tag = conf.v4_vlan_tag
+   o.v6_vlan_tag = conf.v6_vlan_tag
+   o.vlan_tagging = conf.vlan_tagging
+
+   o.binding_table = bt.load_binding_table(conf.binding_table)
+   o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
+   o.psid_info_map = compute_psid_info_map(o.binding_table)
+
    if conf.vlan_tagging then
-      assert(o.v4_vlan_tag > 0 and o.v4_vlan_tag < 4096,
-         "VLAN tag should be a value between 0 and 4095")
-      assert(o.v6_vlan_tag > 0 and o.v6_vlan_tag < 4096,
-         "VLAN tag should be a value between 0 and 4095")
       o.l2_size = constants.ethernet_header_size + 4
       o.o_ethernet_tag = constants.o_ethernet_ethertype
       o.o_ethernet_ethertype = constants.o_ethernet_ethertype + 4
@@ -168,8 +190,6 @@ function LwAftr:new(conf)
       o.l2_size = constants.ethernet_header_size
       o.o_ethernet_ethertype = constants.o_ethernet_ethertype
    end
-   o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
-   o.psid_info_map = compute_psid_info_map(o.binding_table)
    o.fragment6_cache = {}
    o.fragment4_cache = {}
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
@@ -178,7 +198,6 @@ function LwAftr:new(conf)
       dump.dump_configuration(o)
       dump.dump_binding_table(o)
    end)
-   o.conf_keys = keys(conf)
    if debug then lwdebug.pp(conf) end
    return setmetatable(o, {__index=LwAftr})
 end

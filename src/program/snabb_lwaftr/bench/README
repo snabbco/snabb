@@ -1,4 +1,4 @@
-Usage: bench BINDING-TABLE CONF IPV4-IN.PCAP IPV6-IN.PCAP
+Usage: bench CONF IPV4-IN.PCAP IPV6-IN.PCAP
 
   -h, --help
                              Print usage information.

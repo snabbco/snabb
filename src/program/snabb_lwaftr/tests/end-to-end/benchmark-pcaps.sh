@@ -29,12 +29,11 @@ fi
 
 function run_benchmark {
     local script=${SNABB_SRC}/apps/lwaftr/benchmark.lua
-    local binding_table=${TEST_BASE}/binding.table
     local conf=$1
     local pcap_file_v4=$2
     local pcap_file_v6=$3
 
-    ${SNABB_SRC}/snabb snsh $script $binding_table $conf $pcap_file_v4 $pcap_file_v6 $pcidev_v4 $pcidev_v6
+    ${SNABB_SRC}/snabb snsh $script $conf $pcap_file_v4 $pcap_file_v6 $pcidev_v4 $pcidev_v6
 }
 
 echo "Benchmarking..."

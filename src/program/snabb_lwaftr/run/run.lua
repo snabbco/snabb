@@ -7,8 +7,6 @@ local csv_stats  = require("lib.csv_stats")
 local ethernet   = require("lib.protocol.ethernet")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
-local bt         = require("apps.lwaftr.binding_table")
-local conf       = require("apps.lwaftr.conf")
 local lwaftr     = require("apps.lwaftr.lwaftr")
 
 local function show_usage(exit_code)
@@ -40,21 +38,12 @@ end
 
 function parse_args(args)
    if #args == 0 then show_usage(1) end
-   local bt_file, conf_file, v4_pci, v6_pci
+   local conf_file, v4_pci, v6_pci
    local opts = { verbosity = 0 }
    local handlers = {}
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
-   end
-   function handlers.b(arg)
-      bt_file = arg
-      if not arg then
-         fatal("Argument '--bt' was not set")
-      end
-      if not file_exists(bt_file) then
-         fatal(("Couldn't locate binding-table at %s"):format(bt_file))
-      end
    end
    function handlers.c(arg)
       conf_file = arg
@@ -85,26 +74,24 @@ function parse_args(args)
    end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:n:m:vD:h",
-      { bt = "b", conf = "c", ["v4-pci"] = "n", ["v6-pci"] = "m",
-         verbose = "v", duration = "D", help = "h" })
-   return opts, bt_file, conf_file, v4_pci, v6_pci
+      { conf = "c", ["v4-pci"] = "n", ["v6-pci"] = "m",
+        verbose = "v", duration = "D", help = "h" })
+   return opts, conf_file, v4_pci, v6_pci
 end
 
 function run(args)
-   -- It's essential to initialize the binding table before the aftrconf
-   local opts, bt_file, conf_file, v4_pci, v6_pci = parse_args(args)
-   bt.get_binding_table(bt_file)
-   local aftrconf = conf.get_aftrconf(conf_file)
-   aftrconf.bt_file = bt_file
+   local opts, conf_file, v4_pci, v6_pci = parse_args(args)
+
+   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
    local c = config.new()
    config.app(c, 'inetNic', Intel82599, {
       pciaddr=v4_pci,
-      macaddr = ethernet:ntop(aftrconf.aftr_mac_inet_side)})
+      macaddr = ethernet:ntop(conf.aftr_mac_inet_side)})
    config.app(c, 'b4sideNic', Intel82599, {
       pciaddr=v6_pci,
-      macaddr = ethernet:ntop(aftrconf.aftr_mac_b4_side)})
-   config.app(c, 'lwaftr', lwaftr.LwAftr, aftrconf)
+      macaddr = ethernet:ntop(conf.aftr_mac_b4_side)})
+   config.app(c, 'lwaftr', lwaftr.LwAftr, conf)
 
    config.link(c, 'inetNic.tx -> lwaftr.v4')
    config.link(c, 'b4sideNic.tx -> lwaftr.v6')
