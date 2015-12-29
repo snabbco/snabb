@@ -55,6 +55,17 @@ function intel1g:new (conf)
    local ndesc = conf.ndescriptors or 512
    local rxburst = conf.rxburst or 128
 
+   -- checks
+   local deviceInfo= pci.device_info(pciaddress)
+   assert(pci.is_usable(deviceInfo), "NIC is in use")
+   assert(deviceInfo.driver == 'apps.intel.intel1g', "intel1g does not support this NIC")
+   if deviceInfo.device == "0x1521" then ringSize= 8		-- i350
+   elseif deviceInfo.device == "0x157b" then ringSize= 4	-- i210
+   else ringSize= 0
+   end
+   assert(txq/ringSize == 0, "txq must be in 0.." .. ringSize-1)
+   assert(rxq/ringSize == 0, "rxq must be in 0.." .. ringSize-1)
+
    -- Setup device access
    pci.unbind_device_from_linux(pciaddress)
    pci.set_bus_master(pciaddress, true)
@@ -194,8 +205,6 @@ function intel1g:new (conf)
 
    -- Transmit support
    if txq then
-      assert(txq/4 == 0, "txq must be in 0..3 for i210!")
-      assert(txq/8 == 0, "txq must be in 0..7 for i350!")
       -- Define registers for the transmit queue that we are using
       r.TDBAL  = 0xe000 + txq*0x40
       r.TDBAH  = 0xe004 + txq*0x40
@@ -460,7 +469,7 @@ function selftest ()
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
-   engine.main({duration = 100, report = {showapps = true, showlinks = true, showload= true}})
+   engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
 
    print("selftest: ok")
 
