@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local ffi = require("ffi")
 local S = require("syscall")
+local lib = require("core.lib")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local ethernet = require("lib.protocol.ethernet")
@@ -137,7 +138,7 @@ function Parser:parse_property_list(spec, bra, ket)
       end
    end
    for k, default in pairs(spec.defaults) do
-      if not res[k] then res[k] = default(res) end
+      if res[k] == nil then res[k] = default(res) end
    end
    spec.validate(self, res)
    return res
@@ -224,7 +225,7 @@ function Parser:parse_file_name()
    -- Relative paths in conf files are relative to the location of the
    -- conf file, not the current working directory.
    if not str:match('^/') and self.name then
-      str = ffi.C.dirname(self.name)..'/'..str
+      str = lib.dirname(self.name)..'/'..str
    end
    return str
 end

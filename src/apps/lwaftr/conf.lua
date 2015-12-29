@@ -132,7 +132,7 @@ function selftest()
             aftr_mac_inet_side = 12:12:12:12:12:12
             b4_mac = 44:44:44:44:44:44
             binding_table = "foo.table"
-            hairpinning = true
+            hairpinning = false
             icmpv6_rate_limiter_n_packets=6e3
             icmpv6_rate_limiter_n_seconds=2
             inet_mac = 68:68:68:68:68:68
@@ -153,7 +153,7 @@ function selftest()
          aftr_mac_inet_side = ethernet:pton("12:12:12:12:12:12"),
          b4_mac = ethernet:pton("44:44:44:44:44:44"),
          binding_table = "foo.table",
-         hairpinning = true,
+         hairpinning = false,
          icmpv6_rate_limiter_n_packets=6e3,
          icmpv6_rate_limiter_n_seconds=2,
          inet_mac = ethernet:pton("68:68:68:68:68:68"),
