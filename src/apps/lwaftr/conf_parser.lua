@@ -2,11 +2,13 @@ module(..., package.seeall)
 
 local ffi = require("ffi")
 local S = require("syscall")
+local ipv6 = require("lib.protocol.ipv6")
+local ethernet = require("lib.protocol.ethernet")
 
 Parser = {}
 
 function Parser.new(file)
-   local name = '<unknown>'
+   local name
    local mtime_sec, mtime_nsec
    if type(file) == 'string' then
       name, file = file, io.open(file)
@@ -19,15 +21,18 @@ function Parser.new(file)
       column=0, line=0, name=name, mtime_sec=mtime_sec, mtime_nsec=mtime_nsec
    }
    function ret.read_char() return file:read(1) end
-   function ret.cleanup() return file:close() end
+   function ret.cleanup()
+      function ret.cleanup() end
+      return file:close()
+   end
    ret.peek_char = ret.read_char()
    return setmetatable(ret, {__index=Parser})
 end
 
 function Parser:error(msg, ...)
    self.cleanup()
-   error(('%s:%d:%d: error: '..msg):format(self.name, self.line, self.column,
-                                           ...))
+   error(('%s:%d:%d: error: '..msg):format(
+         self.name or '<unknown>', self.line, self.column, ...))
 end
 
 function Parser:next()
@@ -37,6 +42,8 @@ function Parser:next()
       self.line = self.line + 1
    elseif chr then
       self.column = self.column + 1
+   else
+      self.cleanup()
    end
    self.peek_char = self.read_char()
    return chr
@@ -46,11 +53,8 @@ function Parser:peek() return self.peek_char end
 function Parser:is_eof() return not self:peek() end
 
 function Parser:check(expected)
-   if self:is_eof() then
-      if expected == nil then return true end
-      self:error("while looking for '%s', got EOF", expected)
-   elseif self:peek() == expected then
-      self:next()
+   if self:peek() == expected then
+      if expected then self:next() end
       return true
    end
    return false
@@ -58,7 +62,12 @@ end
 
 function Parser:consume(expected)
    if not self:check(expected) then
-      self:error("expected '%s', got '%s'", expected, self:peek())
+      local ch = self:peek()
+      if ch == nil then
+         self:error("while looking for '%s', got EOF", expected)
+      else
+         self:error("expected '%s', got '%s'", expected, ch)
+      end
    end
 end
 
@@ -70,7 +79,14 @@ function Parser:take_while(pattern)
    return table.concat(res)
 end
 
-function Parser:skip_whitespace() self:take_while('%s') end
+function Parser:skip_whitespace()
+   self:take_while('%s')
+   -- Skip comments, which start with # and continue to the end of line.
+   while self:check('#') do
+      self:take_while('[^\n]')
+      self:take_while('%s')
+   end
+end
 
 function Parser:parse_uint(min, max)
    local tok = self:take_while('%d')
@@ -138,6 +154,23 @@ function Parser:parse_ipv4()
    return q1*2^24 + q2*2^16 + q3*2^8 + q4
 end
 
+-- Returns a uint8_t[16].
+function Parser:parse_ipv6()
+   local addr, err = ipv6:pton(self:take_while('[a-fA-F0-9:]'))
+   if not addr then self:error('%s', err) end
+   return addr
+end
+
+-- Returns a uint8_t[6].
+function Parser:parse_mac()
+   -- FIXME: Unlike ipv6:pton, ethernet:pton raises an error if the
+   -- address is invalid.
+   local success, addr_or_err = pcall(
+      ethernet.pton, ethernet, self:take_while('[a-fA-F0-9:]'))
+   if not success then self:error('%s', addr_or_err) end
+   return addr_or_err
+end
+
 function Parser:parse_ipv4_range()
    local range_begin, range_end
    range_begin = self:parse_ipv4()
@@ -162,4 +195,97 @@ function Parser:parse_ipv4_range_list()
       self:skip_whitespace()
    until not self:check(',')
    return ranges
+end
+
+function Parser:parse_quoted_string(quote, escape)
+   local res = {}
+   escape = escape or '\\'
+   while not self:check(quote) do
+      local ch = self:next()
+      if ch == escape then ch = self:next() end
+      if not ch then self:error('EOF while reading quoted string') end
+      table.insert(res, ch)
+   end
+   return table.concat(res)
+end
+
+function Parser:parse_string()
+   local str
+   if self:check("'") then str = self:parse_quoted_string("'")
+   elseif self:check('"') then str = self:parse_quoted_string('"')
+   else str = self:take_while('[^%s,]') end
+   return str
+end
+
+function Parser:parse_file_name()
+   local str = self:parse_string()
+   if str == '' then self:error('file name is empty') end
+   -- Relative paths in conf files are relative to the location of the
+   -- conf file, not the current working directory.
+   if not str:match('^/') and self.name then
+      str = ffi.C.dirname(self.name)..'/'..str
+   end
+   return str
+end
+
+function Parser:parse_boolean()
+   local tok = self:take_while('[a-zA-Z]')
+   if tok:lower() == 'true' then return true end
+   if tok:lower() == 'false' then return false end
+   self:error('expected "true" or "false", instead got "%s"', tok)
+end
+
+function Parser:parse_number()
+   local tok = self:take_while('[0-9.eExX]')
+   local num = tonumber(tok)
+   if not num then self:error('expected a number, instead got "%s"', tok) end
+   return num
+end
+
+function Parser:parse_positive_number()
+   local tok = self:take_while('[0-9.eExX]')
+   local num = tonumber(tok)
+   if not num then self:error('expected a number, instead got "%s"', tok) end
+   return num
+end
+
+function Parser:parse_positive_number()
+   local num = self:parse_number()
+   if num <= 0 then
+      self:error('expected a positive number, instead got %s',
+                 tostring(num))
+   end
+   return num
+end
+
+function Parser:parse_non_negative_number()
+   local num = self:parse_number()
+   if num < 0 then
+      self:error('expected a non-negative number, instead got %s',
+                 tostring(num))
+   end
+   return num
+end
+
+function Parser:parse_mtu()
+   -- FIXME: what's a maximum MTU?
+   return self:parse_uint(0,2^16)
+end
+
+function Parser.enum_parser(enums)
+   return function(self)
+      local tok = self:parse_string()
+      for k,v in pairs(enums) do
+         if k:lower() == tok:lower() then return v end
+      end
+      -- Not found; make a nice error.
+      local keys = {}
+      for k,v in pairs(enums) do table.insert(keys, k) end
+      keys = table.concat(keys, ', ')
+      self:error('bad value: "%s".  expected one of %s', tok, keys)
+   end
+end
+
+function Parser:parse_vlan_tag()
+   return self:parse_uint(0,2^12-1)
 end

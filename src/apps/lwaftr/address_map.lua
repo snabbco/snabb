@@ -73,7 +73,6 @@ function parse_address_map(parser)
       table.insert(entries, info)
       parser:skip_whitespace()
    end
-   parser.cleanup()
    return entries
 end
 
