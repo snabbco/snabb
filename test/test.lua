@@ -953,7 +953,7 @@ test_file_operations_at = {
     local fd = assert(S.open("."))
     assert(util.writefile(tmpfile, teststring, "RWXU"))
     local stat = assert(fd:fstatat(tmpfile))
-    assert(stat.size == #teststring, "expect length to br what was written")
+    assert(stat.size == #teststring, "expect length to be what was written")
     assert(fd:close())
     assert(S.unlink(tmpfile))
   end,
