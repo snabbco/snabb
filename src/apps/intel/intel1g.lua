@@ -63,8 +63,9 @@ function intel1g:new (conf)
    elseif deviceInfo.device == "0x157b" then ringSize= 4	-- i210
    else ringSize= 0
    end
-   assert(txq/ringSize == 0, "txq must be in 0.." .. ringSize-1)
-   assert(rxq/ringSize == 0, "rxq must be in 0.." .. ringSize-1)
+   assert(txq/ringSize == 0, "txq must be in 0.." .. ringSize-1 .. " for " .. deviceInfo.model)
+   assert(rxq/ringSize == 0, "rxq must be in 0.." .. ringSize-1 .. " for " .. deviceInfo.model)
+   assert((ndesc %128) ==0, "ndesc must be a multiple of 128 (for Rx only)")	-- see 7.1.4.5
 
    -- Setup device access
    pci.unbind_device_from_linux(pciaddress)
@@ -307,7 +308,9 @@ function intel1g:new (conf)
           uint16_t length, cksum;
           uint8_t status, errors;
           uint16_t vlan;
-        } __attribute__((packed))]])
+        } __attribute__((packed))
+      ]])
+      assert(ffi.sizeof(rxdesc_t), "sizeof(rxdesc_t)= ".. ffi.sizeof(rxdesc_t) .. ", but must be 16 Byte")
       local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, ndesc)
       local rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
                               memory.dma_alloc(ffi.sizeof(rxdesc_ring_t)))
