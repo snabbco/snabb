@@ -75,58 +75,38 @@ function PodHashMap.new(key_type, value_type, hash_fn)
    return phm
 end
 
-function PodHashMap:save(filename)
-   local fd, err = S.open(filename, "creat, wronly, trunc", "rusr, wusr, rgrp, roth")
-   if not fd then
-      error("error saving hash table, while creating "..filename..": "..tostring(err))
-   end
-   local size = ffi.sizeof(self.type, self.size * 2)
-   local ptr = ffi.cast("uint8_t*", self.entries)
-   while size > 0 do
-      local written, err = S.write(fd, ptr, size)
-      if not written then
-         fd:close()
-         error("error saving hash table, while writing "..filename..": "..tostring(err))
-      end
-      ptr = ptr + written
-      size = size - written
-   end
-   fd:close()
+local header_t = ffi.typeof[[
+struct {
+   uint32_t size;
+   uint32_t entry_size;
+   uint32_t occupancy;
+   uint32_t max_displacement;
+}
+]]
+
+function PodHashMap:save(stream)
+   stream:write(header_t(self.size, ffi.sizeof(self.entry_type),
+                         self.occupancy, self.max_displacement))
+   stream:write_array(self.entries,
+                      self.entry_type,
+                      self.size + self.max_displacement + 1)
 end
 
-function PodHashMap:load(filename)
-   local fd, err = S.open(filename, "rdonly")
-   if not fd then
-      error("error opening saved hash table ("..filename.."): "..tostring(err))
-   end
-   local size = S.fstat(fd).size
-   local entry_count = floor(size / ffi.sizeof(self.type, 1))
-   if size ~= ffi.sizeof(self.type, entry_count) then
-      fd:close()
-      error("corrupted saved hash table ("..filename.."): bad size: "..size)
-   end
-   local mem, err = S.mmap(nil, size, 'read, write', 'private', fd, 0)
-   fd:close()
-   if not mem then error("mmap failed: " .. tostring(err)) end
+function load(stream, key_t, value_t, hash_fn)
+   local map = PodHashMap.new(key_t, value_t, hash_fn)
+   local header = stream:read_ptr(header_t)
+   assert(header.entry_size == header.entry_size)
+   map.size = header.size
+   map.scale = map.size / HASH_MAX
+   map.occupancy = header.occupancy
+   map.max_displacement = header.max_displacement
+   map.entries = stream:read_array(map.entry_type,
+                                   map.size + map.max_displacement + 1)
+   -- ?
+   map.occupancy_hi = ceil(map.size * map.max_occupancy_rate)
+   map.occupancy_lo = floor(map.size * map.min_occupancy_rate)
 
-   -- OK!
-   self.size = floor(entry_count / 2)
-   self.scale = self.size / HASH_MAX
-   self.occupancy = 0
-   self.max_displacement = 0
-   self.entries = ffi.cast(ffi.typeof('$*', self.entry_type), mem)
-   self.occupancy_hi = ceil(self.size * self.max_occupancy_rate)
-   self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
-
-   ffi.gc(self.entries, function (ptr) S.munmap(ptr, size) end)
-
-   for i=0,self.size*2-1 do
-      if self.entries[i].hash ~= HASH_MAX then
-         self.occupancy = self.occupancy + 1
-         local displacement = i - hash_to_index(self.entries[i].hash, self.scale)
-         self.max_displacement = max(self.max_displacement, displacement)
-      end
-   end
+   return map
 end
 
 local try_huge_pages = true
@@ -164,18 +144,16 @@ function PodHashMap:resize(size)
 
    for i=0,old_size*2-1 do
       if old_entries[i].hash ~= HASH_MAX then
-         self:add(old_entries[i].hash, old_entries[i].key, old_entries[i].value)
+         self:insert(old_entries[i].hash, old_entries[i].key, old_entries[i].value)
       end
    end
 end
 
-function PodHashMap:add(key, value)
+function PodHashMap:insert(hash, key, value)
    if self.occupancy + 1 > self.occupancy_hi then
       self:resize(self.size * 2)
    end
 
-   local hash = self.hash_fn(key)
-   assert(hash ~= HASH_MAX)
    local entries = self.entries
    local scale = self.scale
    local start_index = hash_to_index(hash, self.scale)
@@ -215,6 +193,12 @@ function PodHashMap:add(key, value)
    entries[index].key = key
    entries[index].value = value
    return index
+end
+
+function PodHashMap:add(key, value)
+   local hash = self.hash_fn(key)
+   assert(hash ~= HASH_MAX)
+   return self:insert(hash, key, value)
 end
 
 function PodHashMap:lookup(key)

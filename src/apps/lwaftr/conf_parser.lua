@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
-local S = require("syscall")
 local lib = require("core.lib")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
@@ -10,17 +9,11 @@ local ethernet = require("lib.protocol.ethernet")
 Parser = {}
 
 function Parser.new(file)
-   local name
-   local mtime_sec, mtime_nsec
+   local name = file.name
    if type(file) == 'string' then
       name, file = file, io.open(file)
-      -- Seems to be no way to fstat() the file.  Oh well.
-      local stat = S.stat(name)
-      mtime_sec, mtime_nsec = stat.st_mtime, stat.st_mtime_nsec
    end
-   local ret = {
-      column=0, line=0, name=name, mtime_sec=mtime_sec, mtime_nsec=mtime_nsec
-   }
+   local ret = { column=0, line=0, name=name }
    function ret.read_char() return file:read(1) end
    function ret.cleanup()
       function ret.cleanup() end
@@ -66,8 +59,10 @@ function Parser:consume(expected)
       local ch = self:peek()
       if ch == nil then
          self:error("while looking for '%s', got EOF", expected)
-      else
+      elseif expected then
          self:error("expected '%s', got '%s'", expected, ch)
+      else
+         self:error("expected EOF, got '%s'", ch)
       end
    end
 end
@@ -78,6 +73,13 @@ function Parser:take_while(pattern)
       table.insert(res, self:next())
    end
    return table.concat(res)
+end
+
+function Parser:consume_token(pattern, expected)
+   local tok = self:take_while(pattern)
+   if tok:lower() ~= expected then
+      self:error("expected '%s', got '%s'", expected, tok)
+   end
 end
 
 function Parser:skip_whitespace()
@@ -118,7 +120,7 @@ function Parser:parse_property_list(spec, bra, ket)
          self:error("expected a key=value property or a closing '%s'", ket)
       end
       if res[key] then self:error('duplicate key: %s', key) end
-      if not spec.parse[key] then self:error('unexpected key: %s', key) end
+      if not spec.parse[key] then self:error('unexpected key: "%s"', key) end
       self:skip_whitespace()
       self:consume('=')
       self:skip_whitespace()
@@ -262,6 +264,10 @@ function Parser:parse_non_negative_number()
 end
 
 function Parser:parse_mtu()
+   return self:parse_uint(0,2^16-1)
+end
+
+function Parser:parse_psid()
    return self:parse_uint(0,2^16-1)
 end
 

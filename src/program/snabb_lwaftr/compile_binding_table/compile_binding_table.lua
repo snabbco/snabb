@@ -1,10 +1,11 @@
 module(..., package.seeall)
 
 local lib = require('core.lib')
-local address_map = require("apps.lwaftr.address_map")
+local stream = require("apps.lwaftr.stream")
+local binding_table = require("apps.lwaftr.binding_table")
 
 function show_usage(code)
-   print(require("program.snabb_lwaftr.compile_address_map.README_inc"))
+   print(require("program.snabb_lwaftr.compile_binding_table.README_inc"))
    main.exit(code)
 end
 
@@ -18,12 +19,14 @@ end
 
 function run(args)
    local in_file, out_file = parse_args(args)
-   local map = address_map.compile(in_file)
    if not out_file then out_file = in_file:gsub("%.txt$", "")..'.map' end
-   local success, err = pcall(address_map.save, map, out_file)
+   -- We use the stream module because it gives us the mtime.
+   local stream = stream.open_input_text_stream(in_file)
+   local success, bt_or_err = pcall(binding_table.load_source, stream)
    if not success then
-      io.stderr:write(err..'\n')
+      io.stderr:write(tostring(bt_or_err)..'\n')
       main.exit(1)
    end
+   bt:save(out_file, stream.mtime_sec, stream.mtime_nsec)
    main.exit(0)
 end

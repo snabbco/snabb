@@ -16,7 +16,7 @@ function parse_args(args)
    local handlers = {}
    function handlers.h() show_usage(0) end
    args = lib.dogetopt(args, handlers, "h", { help="h" })
-   if #args ~= 4 then show_usage(1) end
+   if #args ~= 3 then show_usage(1) end
    return unpack(args)
 end
 
@@ -45,5 +45,5 @@ function run(args)
    config.link(c, "statisticsv6.output -> sinkv6.input")
 
    app.configure(c)
-   app.main({})
+   app.main({duration=10})
 end

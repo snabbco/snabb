@@ -1,6 +1,5 @@
 module(..., package.seeall)
 
-local address_map = require("apps.lwaftr.address_map")
 local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
 local dump = require('apps.lwaftr.dump')
@@ -32,14 +31,6 @@ local keys = lwutil.keys
 local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.write_ipv6_header 
 
 local debug = false
-
-local function compute_binding_table_by_ipv4(binding_table)
-   local ret = {}
-   for _,bind in ipairs(binding_table) do
-      ret[bind[2]] = bind
-   end
-   return ret
-end
 
 local function guarded_transmit(pkt, o)
    -- The assert was never being hit, and the assert+link check slow the code
@@ -96,12 +87,6 @@ local function on_signal(sig, f)
   end, 1e4, 'repeating'))
 end
 
-local function reload_binding_table(lwstate)
-   print("Reload binding table")
-   lwstate.binding_table = bt.load_binding_table(lwstate.conf.binding_table)
-   lwstate.binding_table_by_ipv4 = compute_binding_table_by_ipv4(lwstate.binding_table)
-end
-
 LwAftr = {}
 
 function LwAftr:new(conf)
@@ -109,7 +94,7 @@ function LwAftr:new(conf)
       conf = lwconf.load_lwaftr_config(conf)
    end
    if conf.debug then debug = true end
-   local o = {}
+   local o = setmetatable({}, {__index=LwAftr})
    o.conf = conf
 
    -- FIXME: Access these from the conf instead of splatting them onto
@@ -133,9 +118,7 @@ function LwAftr:new(conf)
    o.v6_vlan_tag = conf.v6_vlan_tag
    o.vlan_tagging = conf.vlan_tagging
 
-   o.binding_table = bt.load_binding_table(conf.binding_table)
-   o.binding_table_by_ipv4 = compute_binding_table_by_ipv4(o.binding_table)
-   o.psid_info_map = address_map.load(conf.address_map)
+   o.binding_table = bt.load(o.conf.binding_table)
 
    if conf.vlan_tagging then
       o.l2_size = constants.ethernet_header_size + 4
@@ -150,13 +133,16 @@ function LwAftr:new(conf)
    o.fragment6_cache = {}
    o.fragment4_cache = {}
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
-   on_signal("hup", function() reload_binding_table(o) end)
+   on_signal("hup", function()
+      print('Reloading binding table.')
+      o.binding_table = bt.load(o.conf.binding_table)
+   end)
    on_signal("usr1", function()
       dump.dump_configuration(o)
       dump.dump_binding_table(o)
    end)
    if debug then lwdebug.pp(conf) end
-   return setmetatable(o, {__index=LwAftr})
+   return o
 end
 
 local function fixup_checksum(pkt, csum_offset, fixup_val)
@@ -194,24 +180,15 @@ local function get_lwAFTR_ipv6(lwstate, binding_entry)
    return lwaftr_ipv6
 end
 
--- TODO: make this O(1), and seriously optimize it for cache lines
 local function binding_lookup_ipv4(lwstate, ipv4_ip, port)
    if debug then
       print(lwdebug.format_ipv4(ipv4_ip), 'port: ', port, string.format("%x", port))
       lwdebug.pp(lwstate.binding_table)
    end
-   local host_endian_ipv4 = C.ntohl(ipv4_ip)
-   local psid = lwstate.psid_info_map:lookup_psid(host_endian_ipv4, port)
-   for i=1,#lwstate.binding_table do
-      local bind = lwstate.binding_table[i]
-      if debug then print("CHECK", string.format("%x, %x", bind[2], ipv4_ip)) end
-      if bind[2] == ipv4_ip then
-         local psid_info = bind[3]
-         if psid_info.psid == psid then
-            local lwaftr_ipv6 = get_lwAFTR_ipv6(lwstate, bind)
-            return bind[1], lwaftr_ipv6
-         end
-      end
+   local host_endian_ipv4 = C.htonl(ipv4_ip)
+   local val = lwstate.binding_table:lookup(host_endian_ipv4, port)
+   if val then
+      return val.b4_ipv6, lwstate.binding_table:get_br_address(val.br)
    end
    if debug then
       print("Nothing found for ipv4:port", lwdebug.format_ipv4(ipv4_ip),
@@ -243,46 +220,26 @@ end
 -- Return true if the destination ipv4 address is within our managed set of addresses
 local function ipv4_dst_in_binding_table(lwstate, pkt, pre_ipv4_bytes)
    local dst_ip_start = pre_ipv4_bytes + 16
-   -- Note: ip is kept in network byte order, regardless of host byte order
+   local dst_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes) + 2
+
+   -- FIXME: we should be able to look in the address map for this and
+   -- avoid going through the binding table.
+
+   -- network byte order ip, regardless of host byte order
    local ip = rd32(pkt.data + dst_ip_start)
-   return lwstate.binding_table_by_ipv4[ip]
+   local port = C.ntohs(rd16(pkt.data + dst_port_start))
+   return binding_lookup_ipv4(lwstate, ip, port) ~= nil
 end
 
--- Todo: make this O(1)
+local uint64_ptr_t = ffi.typeof('uint64_t*')
+local function ipv6_equals(a, b)
+   local a, b = ffi.cast(uint64_ptr_t, a), ffi.cast(uint64_ptr_t, b)
+   return a[0] == b[0] and a[1] == b[1]
+end
+
 local function in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port)
-   local binding_table = lwstate.binding_table
-   local host_endian_ipv4 = C.ntohl(ipv4_src_ip)
-   local psid = lwstate.psid_info_map:lookup_psid(host_endian_ipv4, ipv4_src_port)
-   for i=1,#binding_table do
-      local bind = binding_table[i]
-      if debug then
-         print("CHECKB4", string.format("%s, src=%s:%i",
-               lwdebug.format_ipv4(C.ntohl(bind[2])),
-               lwdebug.format_ipv4(C.ntohl(ipv4_src_ip)), ipv4_src_port))
-      end
-      if bind[2] == ipv4_src_ip then
-         local psid_info = bind[3]
-         if psid_info.psid == psid then
-            if debug then
-               print("ipv6bind")
-               lwdebug.print_ipv6(bind[1])
-               lwdebug.print_ipv6(ipv6_src_ip)
-            end
-            if C.memcmp(bind[1], ipv6_src_ip, 16) == 0 then
-               local expected_dst = get_lwAFTR_ipv6(lwstate, bind)
-               if debug then
-                  print("DST_MEMCMP", expected_dst, ipv6_dst_ip)
-                  lwdebug.print_ipv6(expected_dst)
-                  lwdebug.print_ipv6(ipv6_dst_ip)
-               end
-               if C.memcmp(expected_dst, ipv6_dst_ip, 16) == 0 then
-                  return true
-               end
-            end
-         end
-      end
-   end
-   return false
+   local b4, br = binding_lookup_ipv4(lwstate, ipv4_src_ip, ipv4_src_port)
+   return b4 and ipv6_equals(b4, ipv6_src_ip) and ipv6_equals(br, ipv6_dst_ip)
 end
 
 -- ICMPv4 type 3 code 1, as per RFC 7596.
