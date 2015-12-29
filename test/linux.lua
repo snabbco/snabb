@@ -269,7 +269,9 @@ test.misc_linux = {
   end,
 ]]
   test_adjtimex = function()
-    local tt = assert(S.adjtimex())
+    local tt, err = S.adjtimex()
+    if not tt and err.PERM then error "skipped" end
+    assert(tt, err)
   end,
   test_prctl = function()
     local n
