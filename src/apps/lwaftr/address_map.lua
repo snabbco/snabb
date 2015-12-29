@@ -285,7 +285,7 @@ function compile(file)
    return attach_lookup_helper(builder:build())
 end
 
-local verbose = os.getenv('SNABB_LWAFTR_VERBOSE') or true
+local verbose = os.getenv('SNABB_LWAFTR_VERBOSE')
 local function log(msg, ...)
    if verbose then print(msg:format(...)) end
 end
@@ -329,7 +329,7 @@ end
 
 local function mktemp(name, mode)
    if not mode then mode = "rusr, wusr, rgrp, roth" end
-   t = math.random(1e7)
+   local t = math.random(1e7)
    local tmpnam, fd, err
    for i = t, t+10 do
       tmpnam = name .. '.' .. i

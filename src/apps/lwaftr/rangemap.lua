@@ -248,7 +248,7 @@ function RangeMap.load(filename, value_type)
    map.mtime_nsec = header.mtime_nsec
    map = setmetatable(map, { __index = RangeMap })
 
-   ffi.gc(map.entries, function (ptr) S.munmap(mem, size) end)
+   ffi.gc(map.entries, function () S.munmap(mem, size) end)
 
    return map
 end
