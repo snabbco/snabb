@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local ffi = require("ffi")
 local S = require("syscall")
+local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local ethernet = require("lib.protocol.ethernet")
 
@@ -142,16 +143,16 @@ function Parser:parse_property_list(spec, bra, ket)
    return res
 end
 
--- Parse IPv4 address as host-endian integer.
+-- Returns a uint8_t[4].
 function Parser:parse_ipv4()
-   local q1 = self:parse_ipv4_quad()
-   self:consume('.')
-   local q2 = self:parse_ipv4_quad()
-   self:consume('.')
-   local q3 = self:parse_ipv4_quad()
-   self:consume('.')
-   local q4 = self:parse_ipv4_quad()
-   return q1*2^24 + q2*2^16 + q3*2^8 + q4
+   local addr, err = ipv4:pton(self:take_while('[0-9.]'))
+   if not addr then self:error('%s', err) end
+   return addr
+end
+
+function Parser:parse_ipv4_as_uint32()
+   local addr = self:parse_ipv4()
+   return ffi.C.htonl(ffi.cast('uint32_t*', addr)[0])
 end
 
 -- Returns a uint8_t[16].
@@ -173,11 +174,11 @@ end
 
 function Parser:parse_ipv4_range()
    local range_begin, range_end
-   range_begin = self:parse_ipv4()
+   range_begin = self:parse_ipv4_as_uint32()
    self:skip_whitespace()
    if self:check('-') then
       self:skip_whitespace()
-      range_end = self:parse_ipv4()
+      range_end = self:parse_ipv4_as_uint32()
    else
       range_end = range_begin
    end

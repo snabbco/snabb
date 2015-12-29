@@ -147,7 +147,7 @@ function selftest()
             vlan_tagging = true
         ]],
       {
-         aftr_ipv4_ip = 1*2^24 + 2*2^16 + 3*2^8 + 4,
+         aftr_ipv4_ip = ipv4:pton('1.2.3.4'),
          aftr_ipv6_ip = ipv6:pton('8:9:a:b:c:d:e:f'),
          aftr_mac_b4_side = ethernet:pton("22:22:22:22:22:22"),
          aftr_mac_inet_side = ethernet:pton("12:12:12:12:12:12"),
