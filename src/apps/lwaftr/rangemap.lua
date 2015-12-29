@@ -196,7 +196,9 @@ end
 function RangeMap.has_magic(filename)
    local fd, err = S.open(filename, "rdonly")
    if not fd then return false end
-   local magic = ffi.string(fd:read(8))
+   local buf = ffi.new('uint8_t[9]')
+   fd:read(buf, 8)
+   local magic = ffi.string(buf)
    -- This function introduces a TOCTTOU situation, but that isn't
    -- terrible; we call this function just to know if the file exists
    -- and might be a compiled file.  We re-do these checks later in
@@ -240,7 +242,7 @@ function RangeMap.load(filename, value_type)
    end
 
    -- OK!
-   map.entries = ffi.cast(ffi.typeof('$*', self.entry_type),
+   map.entries = ffi.cast(ffi.typeof('$*', map.entry_type),
                           ffi.cast('uint8_t*', mem) + offset)
    map.size = size
    map.binary_search = binary_search.gen(map.size, map.entry_type)
