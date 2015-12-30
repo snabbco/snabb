@@ -1,51 +1,19 @@
+-- skeletton for program see
+--  https://github.com/SnabbCo/snabbswitch/blob/master/src/doc/getting-started.md
+
 module(...,package.seeall)
 
-local basic_apps= require("apps.basic.basic_apps")
+local basic= require("apps.basic.basic_apps")
 local intel1g= require("apps.intel.intel1g")
-local lib= require("core.lib")
-
-Intel1g = {}
-Intel1g.__index = Intel1g
-
-driver= Intel1g
+--local lib= require("core.lib")
 
 
-function Intel1g:new(arg)
-
-end
-
-
-function Intel1g:stop()
-
-end
-
-
-function Intel1g:reconfig(arg)
-
-end
-
-
-function Intel1g:pull()
-
-end
-
-
-function Intel1g:push()
-
-end
-
-
-function Intel1g:report()
-
-end
-
-
-function selftest()
+function run()
  print("selftest: txIntel1g")
  local pciaddr= os.getenv("SNABB_INTEL1G_1")
  if not pciaddr then
   print("SNABB_INTEL1G_1 not set")
-  os.exit(engine.test_skipped_code)
+  main.exit(1)
  end
 
  local c= config.new()
