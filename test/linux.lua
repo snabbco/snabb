@@ -566,12 +566,6 @@ test.netlink = {
     assert(i.dummy0:down())
     assert(i.dummy0:delete())
   end,
-  test_interface_set_macaddr_fail = function()
-    local i = assert(nl.interfaces())
-    assert(i.lo, "expect to find lo")
-    local ok, err = nl.newlink(i.lo.index, 0, 0, 0, "address", "46:9d:c9:06:dd:dd")
-    assert(not ok and err and (err.PERM or err.OPNOTSUPP), "should not be able to change macaddr on lo")
-  end,
   test_newlink_error_root = function()
     local ok, err = nl.newlink(-1, 0, "up", "up")
     assert(not ok, "expect bogus newlink to fail")
