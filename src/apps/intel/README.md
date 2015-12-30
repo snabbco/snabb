@@ -118,7 +118,7 @@ The `intel1g` app drives one port of an Intel Gigabit Ethernet
 controller.
 
 Hardware support:
-- Intel I350 (in progress)
+- Intel i210, i350 (in progress)
 
 Features:
 - Optionally attach to a pre-initialized NIC.
@@ -149,13 +149,16 @@ Features:
 — Key **ndesc**
 
 *Optional*. Number of DMA descriptors to use i.e. size of the DMA
-transmit and receive queues. Default is not specified but assumed to
-be broadly applicable.
+transmit and receive queues. Must be a multiple of 128. Default is not 
+specified but assumed to be broadly applicable.
 
 — Key **rxburst**
 
 *Optional*. Maximum number of packets to receive on one
 breath. Default is not specified but assumed to be broadly applicable.
+
+— Key **loopback**
+*Optional*. Set to `true` for MAC loopback mode.
 
 ## LoadGen (apps.intel.loadgen)
 
