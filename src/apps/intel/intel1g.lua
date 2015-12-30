@@ -1,6 +1,6 @@
 -- intel1g: Device driver app for Intel 1G network cards
 -- 
--- This is a device driver for the Intel I350 family of 1G network cards.
+-- This is a device driver for Intel i210, i350 families of 1G network cards.
 -- 
 -- The driver aims to be fairly flexible about how it can be used. The
 -- user can specify whether to initialize the NIC, which hardware TX
@@ -173,6 +173,36 @@ function intel1g:new (conf)
    r.TPR = 	0x040D0		-- Total Packets Received - R/clr
    r.TPT = 	0x040D4		-- Total Packets Transmitted - R/clr
    r.RPTHC = 	0x04104		-- Rx Packets to Host Count - R/clr
+   r.MANC =	0x05820		-- 
+   r.SWSM =	0x05b50		-- 
+   r.SW_FW_SYNC=0x05b5c		-- Software Firmware Synchronization
+   r.EEMNGCTL=	0x12030		-- Management EEPROM Control Register
+
+   local function initPHY()
+     -- 4.3.1.4 PHY Reset
+     wait32(r.MANC, {BLK_Phy_Rst_On_IDE=18}, 0)	-- wait untill IDE link stable
+print("PHY: 1")
+     set32(r.SWSM, {SWESMBI= 1})		-- a. get software/firmware semaphore
+     while band(peek32(r.SWSM), 0x02) ==0 do
+       set32(r.SWSM, {SWESMBI= 1})
+     end
+print("PHY: 2")
+     wait32(r.SW_FW_SYNC, {SW_PHY_SM=1}, 0)	-- b. wait until firmware releases PHY
+print("PHY: 3")
+     clear32(r.SWSM, {SWESMBI= 1})		-- c. release software/firmware semaphore
+     set32(r.CTRL, {PHYreset= 31})		-- 3. set PHY reset
+     C.usleep(1*100)				-- 4. wait 100 us
+     clear32(r.CTRL, {PHYreset= 31})		-- 5. release PHY reset
+print("PHY: reset done")
+     set32(r.SWSM, {SWESMBI= 1})		-- 6. release ownership
+     while band(peek32(r.SWSM), 0x02) ==0 do
+       set32(r.SWSM, {SWESMBI= 1})
+     end
+     clear32(r.SW_FW_SYNC, {SW_PHY_SM=1})
+     clear32(r.SWSM, {SWESMBI= 1})
+     wait32(r.EEMNGCTL, {CFG_DONE0=18})		-- 7. wait for CFG_DONE
+print("PHY: end")
+   end
 
    --print_status(r, "Status before Init: ")
    --print_stats(r)
@@ -186,14 +216,16 @@ function intel1g:new (conf)
       --wait32(r.CTRL, {DEV_RST = 29}, 0)	-- wait device reset complete
       poke32(r.EIMC, 0xffffffff)	-- re-disable interrupts
       -- 3.7.6.2.1 Setting the I210 to MAC loopback Mode
-      set32 (r.CTRL, {SETLINKUP = 6})	-- Set CTRL.SLU (bit 6, should be set by default)
+      set32(r.CTRL, {SETLINKUP = 6})	-- Set CTRL.SLU (bit 6, should be set by default)
       if conf.loopback then
          set32(r.RCTL, {LOOPBACKMODE0 = 6})		-- Set RCTL.LBM to 01b (bits 7:6)
 	 set32(r.CTRL, {FRCSPD=11, FRCDPLX=12})		-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
 	 set32(r.CTRL, {FD=0, SPEED1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
 	 set32(r.EEER, {EEE_FRC_AN=24})			-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
+      else						-- setup PHY
+       initPHY()
       end
-
+      
       -- Define shutdown function for the NIC itself
       stop_nic = function ()
          -- XXX Are these the right actions?
@@ -460,7 +492,8 @@ function selftest ()
    config.app(c, "sink", basic.Sink)
    -- try MAC loopback with i210 or i350 NIC
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
-    config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
+    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
+    config.app(c, "nic", intel1g, {pciaddr=pciaddr, rxburst=512})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
     --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx->nic.rx")
