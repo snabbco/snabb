@@ -34,8 +34,8 @@ function run(args)
 
  local c= config.new()
  config.app(c, "source", basic.Source)
- --config.app(c, "nic", intel1g, {pciaddr=pciaddr, rxburst=512})
- config.app(c, "nic", basic.Sink)
+ config.app(c, "nic", intel1g, {pciaddr=pciaddr, rxburst=512})
+ --config.app(c, "nic", basic.Sink)
  config.link(c, "source.tx->nic.rx")
 
  engine.configure(c)
