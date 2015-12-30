@@ -1,6 +1,12 @@
--- skelettons for program see
+-- skelettons for program, see
 --  https://github.com/SnabbCo/snabbswitch/blob/master/src/doc/getting-started.md
 --  src/program/top/
+--
+-- run:
+--  cd /home/rs/snabbswitch/hb9cwp/snabbswitch/src
+--  make -j
+--  sudo ./snabb txintel1g "0000:02:00.0"
+
 
 module(..., package.seeall)
 
@@ -27,14 +33,16 @@ function run(args)
  end
 
  local c= config.new()
- print(basic.Source, basic.Sink, intel1g)
  config.app(c, "source", basic.Source)
- config.app(c, "nic", intel1g, {pciaddr=pciaddr, rxburst=512})
+ --config.app(c, "nic", intel1g, {pciaddr=pciaddr, rxburst=512})
+ config.app(c, "nic", basic.Sink)
  config.link(c, "source.tx->nic.rx")
+
  engine.configure(c)
- engine.main({duration = 60, report = {showapps = true, showlinks = true, showload= true}})
+ engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
+
  print("selftest: done")
- engine.app_table.nic.stop()
+-- engine.app_table.nic.stop()
  --local li = engine.app_table.nic.input[1]
  local li = engine.app_table.nic.input["rx"]          -- same-same as [1]
  assert(li, "txintel1g: no input link")
