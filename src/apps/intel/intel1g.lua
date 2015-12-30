@@ -201,6 +201,17 @@ print("PHY: reset done")
      clear32(r.SW_FW_SYNC, {SW_PHY_SM=1})
      clear32(r.SWSM, {SWESMBI= 1})
      wait32(r.EEMNGCTL, {CFG_DONE0=18})		-- 7. wait for CFG_DONE
+
+     set32(r.SWSM, {SWESMBI= 1})		-- 8. a. get software/firmware semaphore
+     while band(peek32(r.SWSM), 0x02) ==0 do
+       set32(r.SWSM, {SWESMBI= 1})
+     end
+print("PHY: 4")
+     wait32(r.SW_FW_SYNC, {SW_PHY_SM=1}, 0)	-- b. wait until firmware releases PHY
+     clear32(r.SWSM, {SWESMBI= 1})		-- c. release software/firmware semaphore
+						-- 9. configure PHY
+
+     set32(r.SWSM, {SWESMBI= 1})		-- 10. release ownership
 print("PHY: end")
    end
 
@@ -470,7 +481,7 @@ print("PHY: end")
       if stop_receive  then stop_receive()  end
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
-      --print_status(r, "Status after Stop: ")
+      print_status(r, "Status after Stop: ")
       print_stats(r)
    end
 
@@ -505,7 +516,7 @@ function selftest ()
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
-   engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
+   engine.main({duration = 100, report = {showapps = true, showlinks = true, showload= true}})
 
    print("selftest: ok")
 
