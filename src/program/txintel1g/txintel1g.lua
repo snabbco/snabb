@@ -7,11 +7,8 @@
 --  make -j
 --  sudo ./snabb txintel1g "0000:02:00.0"
 
-
 module(..., package.seeall)
 
-local basic= require("apps.basic.basic_apps")
-local intel1g= require("apps.intel.intel1g")
 local lib= require("core.lib")
 local usage= require("program.txintel1g.Usage_inc")
 
@@ -20,7 +17,7 @@ local long_opts= {
 }
 
 function run(args)
- print("selftest: txintel1g")
+ print("txintel1g: run")
  --local pciaddr= os.getenv("SNABB_INTEL1G_1")
  local opt= {}
  function opt.h(arg) print(usage) main.exit(1) end
@@ -32,11 +29,14 @@ function run(args)
   main.exit(1)
  end
 
+ local basic= require("apps.basic.basic_apps")
+ local intel1g= require("apps.intel.intel1g")
  local c= config.new()
  config.app(c, "source", basic.Source)
- config.app(c, "nic", intel1g, {pciaddr=pciaddr, rxburst=512})
- --config.app(c, "nic", basic.Sink)
- config.link(c, "source.tx->nic.rx")
+ config.app(c, "sink", basic.Sink)
+ config.app(c, "nic", intel1g.intel1g, {pciaddr=pciaddr, rxburst=512})
+ config.link(c, "source.tx -> nic.rx")
+ config.link(c, "nic.tx -> sink.rx")
 
  engine.configure(c)
  engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})

@@ -46,7 +46,7 @@ local tophysical = core.memory.virtual_to_physical
 -- app class
 intel1g = {}
 
-function intel1g:new (conf)
+function intel1g:new(conf)
    local self = {}
    local pciaddress = conf.pciaddr
    local attach = conf.attach
@@ -486,6 +486,7 @@ print("PHY: end")
    end
 
    return self
+   --return setmetatable(self, {__index = intel1g})
 end
 
 function selftest ()
