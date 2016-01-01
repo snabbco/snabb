@@ -43,10 +43,9 @@ local bits, bitset = lib.bits, lib.bitset
 local compiler_barrier = lib.compiler_barrier
 local tophysical = core.memory.virtual_to_physical
 
--- app class
-intel1g = {}
+Intel1g = {}
 
-function intel1g:new(conf)
+function Intel1g:new(conf)
    local self = {}
    local pciaddress = conf.pciaddr
    local attach = conf.attach
@@ -486,11 +485,11 @@ print("PHY: end")
    end
 
    return self
-   --return setmetatable(self, {__index = intel1g})
+   --return setmetatable(self, {__index = Intel1g})
 end
 
 function selftest ()
-   print("selftest: intel1g")
+   print("selftest: Intel1g")
    local pciaddr = os.getenv("SNABB_SELFTEST_INTEL1G_0")
    if not pciaddr then
       print("SNABB_SELFTEST_INTEL1G_0 not set")
@@ -499,21 +498,22 @@ function selftest ()
    
    local c = config.new()
    local basic = require("apps.basic.basic_apps")
-   print(basic.Source, basic.Sink, intel1g)
+   print(basic.Source, basic.Sink, Intel1g)
+   --print(basic.Source, basic.Sink, intel1g.Intel1g)
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
    -- try MAC loopback with i210 or i350 NIC
-    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true})
-    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
-    config.app(c, "nic", intel1g, {pciaddr=pciaddr, rxburst=512})
-    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
-    --config.app(c, "nic", intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
-    config.link(c, "source.tx->nic.rx")
-    config.link(c, "nic.tx->sink.rx")
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true})
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
+    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, rxburst=512})
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
+    config.link(c, "source.tx -> nic.rx")
+    config.link(c, "nic.tx -> sink.rx")
    -- replace intel1g by Repeater
     --config.app(c, "repeater", basic.Repeater)
-    --config.link(c, "source.tx->repeater.input")
-    --config.link(c, "repeater.output->sink.rx")
+    --config.link(c, "source.tx -> repeater.input")
+    --config.link(c, "repeater.output -> sink.rx")
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
@@ -532,13 +532,13 @@ function selftest ()
 
    --local li = engine.app_table.nic.input[1]
    local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
-   assert(li, "intel1g: no input link")
+   assert(li, "Intel1g: no input link")
    local s= link.stats(li)
    print("input link:  txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 
    --local lo = engine.app_table.nic.output[1]
    local lo = engine.app_table.nic.output["tx"]		-- same-same as [1]
-   assert(lo, "intel1g: no output link")
+   assert(lo, "Intel1g: no output link")
    local s= link.stats(lo)
    print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 end

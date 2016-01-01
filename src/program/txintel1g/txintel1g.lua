@@ -34,7 +34,7 @@ function run(args)
  local c= config.new()
  config.app(c, "source", basic.Source)
  config.app(c, "sink", basic.Sink)
- config.app(c, "nic", intel1g.intel1g, {pciaddr=pciaddr, rxburst=512})
+ config.app(c, "nic", intel1g.Intel1g, {pciaddr=pciaddr, rxburst=512})
  config.link(c, "source.tx -> nic.rx")
  config.link(c, "nic.tx -> sink.rx")
 
