@@ -33,6 +33,12 @@ function Source:stop ()
    packet.free(self.packet)
 end
 
+function benchmarkSourceToSink (c)
+   config.app(c, "source", Source)
+   config.link(c, "source.output -> sink.input")
+   return c
+end
+
 --- # `Join` app: Merge multiple inputs onto one output
 
 Join = {}
@@ -113,6 +119,16 @@ function Tee:push ()
          end
       end
    end
+end
+
+function benchmarkTee (c)
+   config.app(c, "source", Source)
+   config.app(c, "t1", Tee)
+   config.app(c, "t2", Tee)
+   config.link(c, "source.output -> t1.input")
+   config.link(c, "t1.output -> t2.input")
+   config.link(c, "t2.output -> sink.input")
+   return c
 end
 
 --- ### `Repeater` app: Send all received packets in a loop

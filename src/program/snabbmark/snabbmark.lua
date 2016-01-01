@@ -9,10 +9,16 @@ local freelist      = require("core.freelist")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
+local bench = require("lib.benchmark")
+local json = require("lib.json")
 
 function run (args)
    local command = table.remove(args, 1)
-   if command == 'basic1' and #args == 1 then
+   if command == 'lib' and (#args == 1 or #args == 2) then
+      for _, v in pairs(bench.runbenchmarks(unpack(args))) do
+         print(json.encode(v))
+      end
+   elseif command == 'basic1' and #args == 1 then
       basic1(unpack(args))
    elseif command == 'nfvconfig' and #args == 3 then
       nfvconfig(unpack(args))
