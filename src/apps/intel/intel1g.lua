@@ -58,12 +58,14 @@ function Intel1g:new(conf)
    local deviceInfo= pci.device_info(pciaddress)
    assert(pci.is_usable(deviceInfo), "NIC is in use")
    assert(deviceInfo.driver == 'apps.intel.intel1g', "intel1g does not support this NIC")
-   if deviceInfo.device == "0x1521" then ringSize= 8		-- i350
-   elseif deviceInfo.device == "0x157b" then ringSize= 4	-- i210
-   else ringSize= 0
+   local ringSize= 1
+   if deviceInfo.device == "0x1521" then		-- i350
+    ringSize= 8
+   elseif deviceInfo.device == "0x157b" then		-- i210
+    ringSize= 4
    end
-   assert(txq/ringSize == 0, "txq must be in 0.." .. ringSize-1 .. " for " .. deviceInfo.model)
-   assert(rxq/ringSize == 0, "rxq must be in 0.." .. ringSize-1 .. " for " .. deviceInfo.model)
+   assert((txq >=0) and (txq <ringSize), "txqueue must be in 0.." .. ringSize-1 .. " for " .. deviceInfo.model)
+   assert((rxq >=0) and (rxq <ringSize), "rxqueue must be in 0.." .. ringSize-1 .. " for " .. deviceInfo.model)
    assert((ndesc %128) ==0, "ndesc must be a multiple of 128 (for Rx only)")	-- see 7.1.4.5
 
    -- Setup device access
@@ -334,7 +336,6 @@ print("PHY: end")
 
    -- Receive support
    if rxq then
-      assert(rxq/4 == 0, "rxq must be in 0..3 for i210!")
       r.RDBAL  = 0xc000 + rxq*0x40
       r.RDBAH  = 0xc004 + rxq*0x40
       r.RDLEN  = 0xc008 + rxq*0x40
@@ -498,14 +499,11 @@ function selftest ()
    
    local c = config.new()
    local basic = require("apps.basic.basic_apps")
-   print(basic.Source, basic.Sink, Intel1g)
-   --print(basic.Source, basic.Sink, intel1g.Intel1g)
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
    -- try MAC loopback with i210 or i350 NIC
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true})
-    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
-    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, rxburst=512})
+    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx -> nic.rx")
@@ -517,17 +515,9 @@ function selftest ()
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
-   engine.main({duration = 100, report = {showapps = true, showlinks = true, showload= true}})
-
+   engine.main({duration = 10, report = {showapps = true, showlinks = true, showload= true}})
    print("selftest: ok")
 
- -- for k, v in pairs(c) do
- --  print(k, v)
- -- end
- --print("c= ") print_r(c)
- --tprint(c, 2)
-
--- print("engine= ") print_r(engine)
    engine.app_table.nic.stop()
 
    --local li = engine.app_table.nic.input[1]
@@ -541,59 +531,4 @@ function selftest ()
    assert(lo, "Intel1g: no output link")
    local s= link.stats(lo)
    print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
-end
-
-
--- ---
-
--- https://coronalabs.com/blog/2014/09/02/tutorial-printing-table-contents/
-function print_r ( t )  
-    local print_r_cache={}
-    local function sub_print_r(t,indent)
-        if (print_r_cache[tostring(t)]) then
-            print(indent.."*"..tostring(t))
-        else
-            print_r_cache[tostring(t)]=true
-            if (type(t)=="table") then
-                for pos,val in pairs(t) do
-                    if (type(val)=="table") then
-                        print(indent.."["..pos.."] => "..tostring(t).." {")
-                        sub_print_r(val,indent..string.rep(" ",string.len(pos)+8))
-                        print(indent..string.rep(" ",string.len(pos)+6).."}")
-                    elseif (type(val)=="string") then
-                        print(indent.."["..pos..'] => "'..val..'"')
-                    else
-                        print(indent.."["..pos.."] => "..tostring(val))
-                    end
-                end
-            else
-                print(indent..tostring(t))
-            end
-        end
-    end
-    if (type(t)=="table") then
-        print(tostring(t).." {")
-        sub_print_r(t,"  ")
-        print("}")
-    else
-        sub_print_r(t,"  ")
-    end
-    print()
-end
-
-
--- http://stackoverflow.com/questions/9168058/lua-beginner-table-dump-to-console
-function tprint (tbl, indent)
-  if not indent then indent = 0 end
-  for k, v in pairs(tbl) do
-    formatting = string.rep("  ", indent) .. k .. ": "
-    if type(v) == "table" then
-      print(formatting)
-      tprint(v, indent+1)
-    elseif type(v) == 'boolean' then
-      print(formatting .. tostring(v))      
-    else
-      print(formatting .. v)
-    end
-  end
 end
