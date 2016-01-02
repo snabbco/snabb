@@ -2,6 +2,7 @@ module(...,package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
+local S = require("syscall")
 
 local lib = require("core.lib")
 
@@ -34,6 +35,7 @@ end
 function device_info (pciaddress)
    local info = {}
    local p = path(pciaddress)
+   assert(S.stat(p), ("No such device: %s"):format(pciaddress))
    info.pciaddress = canonical(pciaddress)
    info.vendor = lib.firstline(p.."/vendor")
    info.device = lib.firstline(p.."/device")
@@ -58,6 +60,8 @@ model = {
    ["82571"]     = 'Intel 82571',
    ["82599_T3"]  = 'Intel 82599 T3',
    ["X540"]      = 'Intel X540',
+   ["i350"]      = 'Intel 350',
+   ["i210"]      = 'Intel 210',
 }
 
 -- Supported cards indexed by vendor and device id.
@@ -68,6 +72,8 @@ local cards = {
       ["0x105e"] = {model = model["82571"],     driver = 'apps.intel.intel_app'},
       ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
       ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
+      ["0x1521"] = {model = model["i350"],      driver = 'apps.intel.intel1g'},
+      ["0x157b"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
    },
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}

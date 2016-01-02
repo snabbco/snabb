@@ -686,6 +686,14 @@ function getenv (name)
    else return nil end
 end
 
+-- Compiler barrier.
+-- Prevents LuaJIT from moving load/store operations over this call.
+-- Any FFI call is sufficient to achieve this, see:
+-- http://www.freelists.org/post/luajit/Compiler-loadstore-barrier-volatile-pointer-barriers-in-general,3
+function compiler_barrier ()
+   C.nop()
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")
