@@ -187,14 +187,14 @@ function Intel1g:new(conf)
    r.EEMNGCTL=	0x12030		-- Management EEPROM Control Register
 
 
-   local MDIOpage= 0		-- 8.27.3.21
+   local MDIOpage= -1		-- 8.27.3.21 HW resets to 0, but persists with SW reset!
 
    local function writePHY(page, register, data)	-- 8.2.4 Media Dependent Interface Control
     if page ~= MDIOpage then
      MDIOpage= page
-     writePHY(page, 22, (page %256))	-- page select: any page, register 22
+     writePHY(page, 22, (page %256))	-- select page by writing page to register 22 (from any page)
     end
-    poke32(r.MDIC, 1 *2^26 + (register %2^5)*2^16  + data %2^16)
+    poke32(r.MDIC, 1 *2^26 + (register %2^5)*2^16  + (data %2^16))
     wait32(r.MDIC, {Ready=28})
     assert(band(peek32(r.MDIC), bitvalue({Error=30})) ==0, "writePHY(): error")
    end
@@ -202,7 +202,7 @@ function Intel1g:new(conf)
    local function readPHY(page, register)
     if page ~= MDIOpage then
      MDIOpage= page
-     writePHY(page, 22, (page %256))    -- page select: any page, register 22
+     writePHY(page, 22, (page %256))	-- select page by writing page to register 22 (from any page)
     end
     poke32(r.MDIC, 0 *2^26 + (regAddr %2^5)*2^16)
     wait32(r.MDIC, {Ready=28})
@@ -264,14 +264,18 @@ print("PHY: end")
 	 set32(r.CTRL, {FRCSPD=11, FRCDPLX=12})	-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
 	 set32(r.CTRL, {FD=0, SPEED1=9})	-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
 	 set32(r.EEER, {EEE_FRC_AN=24})		-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
+         print("MAC Loopback set")
       elseif conf.loopback == "PHY" then	-- 3.7.6.3.1 Setting the I210 to Internal PHY Loopback Mode
-	 clear32(r.CTRL_EXT, {LinkMode1=23,LinkMode=22})	-- set Link mode to internal PHY
+         set32(r.CTRL, {SETLINKUP = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
+	 clear32(r.CTRL_EXT, {LinkMode1=23,LinkMode0=22})	-- set Link mode to internal PHY
          writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6}))	-- PHYREG 8.27.3 Copper Control
          writePHY(2, 21, 0x06)					-- MAC interface speed 1GE
          writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, CopperReset=15})) -- Copper Reset
          writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14}))	-- Loopback
+         print("PHY Loopback set")
       else				-- setup PHY
        initPHY()
+
       end
       
       -- Define shutdown function for the NIC itself
