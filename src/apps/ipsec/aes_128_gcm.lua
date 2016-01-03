@@ -1,9 +1,9 @@
 module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
+local ASM = require("apps.ipsec.aes_128_gcm_avx")
 local header = require("lib.protocol.header")
 local lib = require("core.lib")
-require("apps.ipsec.aes_128_gcm_h")
 local ntohl, htonl, htonll = lib.ntohl, lib.htonl, lib.htonll
 
 
@@ -71,8 +71,8 @@ function aes_128_gcm:new (conf)
    -- Compute subkey (H)
    o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 128)
    o.gcm_data = ffi.new("gcm_data[1] __attribute__((aligned(16)))")
-   C.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data[0].expanded_keys)
-   C.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
+   ASM.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data[0].expanded_keys)
+   ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
    o.blocksize = 128
    o.auth_size = 16
    o.auth_buf = ffi.new("uint8_t[?]", o.auth_size)
@@ -82,7 +82,7 @@ end
 
 function aes_128_gcm:encrypt (out_ptr, payload, length, esp)
    self.iv:iv(esp:seq_no())
-   C.aesni_gcm_enc_avx_gen4(self.gcm_data,
+   ASM.aesni_gcm_enc_avx_gen4(self.gcm_data,
                             out_ptr,
                             payload, length,
                             u8_ptr(self.iv:header_ptr()),
@@ -92,7 +92,7 @@ end
 
 function aes_128_gcm:decrypt (out_ptr, ciphertext, length, esp)
    self.iv:iv(esp:seq_no())
-   C.aesni_gcm_dec_avx_gen4(self.gcm_data,
+   ASM.aesni_gcm_dec_avx_gen4(self.gcm_data,
                             out_ptr,
                             ciphertext, length,
                             u8_ptr(self.iv:header_ptr()),

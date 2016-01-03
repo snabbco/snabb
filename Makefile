@@ -19,9 +19,6 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	@cp -p  lib/ljsyscall/syscall/linux/*.lua src/syscall/linux/
 	@cp -pr lib/ljsyscall/syscall/linux/x64   src/syscall/linux/
 	@cp -pr lib/ljsyscall/syscall/shared      src/syscall/
-#	Intel IPsec
-	@(cd lib/intel-ipsec/code && \
-	 $(MAKE) YASM=yasm obj/gcm_avx_gen4.o obj/aes_keyexp_128.o)
 	cd src && $(MAKE)
 
 install: all
