@@ -31,6 +31,10 @@
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/ethernet-controller-i350-datasheet.pdf
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/i210-ethernet-controller-datasheet.pdf
 
+-- run selftest() on APU2's second/middle NIC:
+--  sudo SNABB_SELFTEST_INTEL1G_0="0000:02:00.0" ./snabb snsh -t apps.intel.intel1g
+
+-- Note: rxqueue >0 not working yet!
 
 module(..., package.seeall)
 
@@ -158,9 +162,12 @@ function Intel1g:new(conf)
    -- Device setup and initialization
    r.CTRL = 	0x00000		-- Device Control - RW
    r.STATUS = 	0x00008		-- Device Status - RO
+   r.CTRL_EXT =	0x00018		-- Extended Device Control - RW
+   r.MDIC = 	0x00020		-- MDI Control - RW
    r.RCTL = 	0x00100		-- RX Control - RW
    r.TCTL = 	0x00400		-- TX Control - RW
    r.TCTL_EXT =	0x00404		-- Extended TX Control - RW
+   r.MDICNFG = 	0x00E04		-- MDI Configuration - RW
    r.EEER = 	0x00E30		-- Energy Efficient Ethernet (EEE) Register
    r.EIMC = 	0x01528		-- 
    --r.RXDCTL =	0x02828		-- legacy alias: RX Descriptor Control queue 0 - RW
@@ -178,6 +185,30 @@ function Intel1g:new(conf)
    r.SWSM =	0x05b50		-- 
    r.SW_FW_SYNC=0x05b5c		-- Software Firmware Synchronization
    r.EEMNGCTL=	0x12030		-- Management EEPROM Control Register
+
+
+   local MDIOpage= 0		-- 8.27.3.21
+
+   local function writePHY(page, register, data)	-- 8.2.4 Media Dependent Interface Control
+    if page ~= MDIOpage then
+     MDIOpage= page
+     writePHY(page, 22, (page %256))	-- page select: any page, register 22
+    end
+    poke32(r.MDIC, 1 *2^26 + (register %2^5)*2^16  + data %2^16)
+    wait32(r.MDIC, {Ready=28})
+    assert(band(peek32(r.MDIC), bitvalue({Error=30})) ==0, "writePHY(): error")
+   end
+
+   local function readPHY(page, register)
+    if page ~= MDIOpage then
+     MDIOpage= page
+     writePHY(page, 22, (page %256))    -- page select: any page, register 22
+    end
+    poke32(r.MDIC, 0 *2^26 + (regAddr %2^5)*2^16)
+    wait32(r.MDIC, {Ready=28})
+    assert(band(peek32(r.MDIC), bitvalue({Error=30})) ==0, "readPHY(): error")
+    return peek(r.MDIC) %2^16
+   end
 
    local function initPHY()
      -- 4.3.1.4 PHY Reset
@@ -211,8 +242,8 @@ print("PHY: 4")
      wait32(r.SW_FW_SYNC, {SW_PHY_SM=1}, 0)	-- b. wait until firmware releases PHY
      clear32(r.SWSM, {SWESMBI= 1})		-- c. release software/firmware semaphore
 						-- 9. configure PHY
-
      set32(r.SWSM, {SWESMBI= 1})		-- 10. release ownership
+
 print("PHY: end")
    end
 
@@ -227,14 +258,19 @@ print("PHY: end")
       wait32(r.CTRL, {RST = 26}, 0)	-- wait port reset complete
       --wait32(r.CTRL, {DEV_RST = 29}, 0)	-- wait device reset complete
       poke32(r.EIMC, 0xffffffff)	-- re-disable interrupts
-      -- 3.7.6.2.1 Setting the I210 to MAC loopback Mode
-      set32(r.CTRL, {SETLINKUP = 6})	-- Set CTRL.SLU (bit 6, should be set by default)
-      if conf.loopback then
-         set32(r.RCTL, {LOOPBACKMODE0 = 6})		-- Set RCTL.LBM to 01b (bits 7:6)
-	 set32(r.CTRL, {FRCSPD=11, FRCDPLX=12})		-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
-	 set32(r.CTRL, {FD=0, SPEED1=9})		-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
-	 set32(r.EEER, {EEE_FRC_AN=24})			-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
-      else						-- setup PHY
+      if conf.loopback == "MAC" then		-- 3.7.6.2.1 Setting the I210 to MAC Loopback Mode
+         set32(r.CTRL, {SETLINKUP = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
+         set32(r.RCTL, {LOOPBACKMODE0 = 6})	-- Set RCTL.LBM to 01b (bits 7:6)
+	 set32(r.CTRL, {FRCSPD=11, FRCDPLX=12})	-- Set CTRL.FRCSPD and FRCDPLX (bits 11 and 12)
+	 set32(r.CTRL, {FD=0, SPEED1=9})	-- Set the CTRL.FD bit and program the CTRL.SPEED field to 10b (1 GbE)
+	 set32(r.EEER, {EEE_FRC_AN=24})		-- Set EEER.EEE_FRC_AN to 1b to enable checking EEE operation in MAC loopback mode
+      elseif conf.loopback == "PHY" then	-- 3.7.6.3.1 Setting the I210 to Internal PHY Loopback Mode
+	 clear32(r.CTRL_EXT, {LinkMode1=23,LinkMode=22})	-- set Link mode to internal PHY
+         writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6}))	-- PHYREG 8.27.3 Copper Control
+         writePHY(2, 21, 0x06)					-- MAC interface speed 1GE
+         writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, CopperReset=15})) -- Copper Reset
+         writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14}))	-- Loopback
+      else				-- setup PHY
        initPHY()
       end
       
@@ -503,7 +539,9 @@ function selftest ()
    config.app(c, "sink", basic.Sink)
    -- try MAC loopback with i210 or i350 NIC
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true})
-    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="MAC", rxburst=512})
+    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="PHY", rxburst=512})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx -> nic.rx")
