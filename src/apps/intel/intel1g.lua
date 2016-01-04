@@ -127,7 +127,7 @@ function Intel1g:new(conf)
      print("  Full Duplex = " .. yesno(status, 0))
      print("  Link Up     = " .. yesno(status, 1))
      print("  PHYRA       = " .. yesno(status, 10))
-     speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
+     local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
      print("  Speed       = " .. speed .. ' Mb/s')
     print(" Tx status")
      print("  TCTL        = " .. bit.tohex(tctl))
@@ -187,14 +187,16 @@ function Intel1g:new(conf)
    r.EEMNGCTL=	0x12030		-- Management EEPROM Control Register
 
 
+   -- 3.7.4.4.4 Using PHY Registers, 
    local MDIOpage= -1		-- 8.27.3.21 HW resets to 0, but persists with SW reset!
+   poke32(r.MDICNFG, 0)		-- 8.2.5 MDC/MDIO Config: 0x0000 = internal PHY
 
    local function writePHY(page, register, data)	-- 8.2.4 Media Dependent Interface Control
     if page ~= MDIOpage then
      MDIOpage= page
      writePHY(page, 22, (page %256))	-- select page by writing page to register 22 (from any page)
     end
-    poke32(r.MDIC, 1 *2^26 + (register %2^5)*2^16  + (data %2^16))
+    poke32(r.MDIC, 1 *2^26 + (register %2^5)*2^16  + (data %2^16))	-- OpCode 01b = MDI write
     wait32(r.MDIC, {Ready=28})
     assert(band(peek32(r.MDIC), bitvalue({Error=30})) ==0, "writePHY(): error")
    end
@@ -204,10 +206,10 @@ function Intel1g:new(conf)
      MDIOpage= page
      writePHY(page, 22, (page %256))	-- select page by writing page to register 22 (from any page)
     end
-    poke32(r.MDIC, 0 *2^26 + (regAddr %2^5)*2^16)
+    poke32(r.MDIC, 2 *2^26 + (register %2^5)*2^16)	-- OpCode 10b = MDI read
     wait32(r.MDIC, {Ready=28})
     assert(band(peek32(r.MDIC), bitvalue({Error=30})) ==0, "readPHY(): error")
-    return peek(r.MDIC) %2^16
+    return peek32(r.MDIC) %2^16
    end
 
    local function initPHY()
@@ -270,12 +272,43 @@ print("PHY: end")
 	 clear32(r.CTRL_EXT, {LinkMode1=23,LinkMode0=22})	-- set Link mode to internal PHY
          writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6}))	-- PHYREG 8.27.3 Copper Control
          writePHY(2, 21, 0x06)					-- MAC interface speed 1GE
-         writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, CopperReset=15})) -- Copper Reset
-         writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14}))	-- Loopback
+         --writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, CopperReset=15})) -- Copper Reset
+         --writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14}))	-- Loopback
+         writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14, CopperReset=15}))	-- Loopback & Reset
          print("PHY Loopback set")
-      else				-- setup PHY
-       initPHY()
+      else				-- 3.7.4.4 Copper (Internal) PHY Link Config
+					-- PHY tells MAC after auto-neg. (PCS and 802.3 clauses 28 (extensions) & 40 (.3ab)
+					-- config generally determined by PHY auto-neg. (speed, duplex, flow control)
+					-- PHY asserts link indication (LINK) to MAC
+					-- SW driver must Set Link Up (CTRL.SLU) before MAC recognizes LINK from PHY and consider link up
 
+         initPHY()				-- 4.5.7.2.1 Full Duplx, Speed auto neg. by PHY
+         set32(r.CTRL, {SETLINKUP = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
+
+         print("PHY set")
+				-- STATUS.LU
+				-- STATUS.FD
+				-- STATUS.SPEED
+         print("MAC Status:")
+         local status= peek32(r.STATUS)
+         print("  STATUS      = " .. bit.tohex(status))
+         print("  Full Duplex = " .. yesno(status, 0))
+         print("  Link Up     = " .. yesno(status, 1))
+         print("  PHYRA       = " .. yesno(status, 10))
+         local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
+         print("  Speed       = " .. speed .. ' Mb/s')
+
+         print("PHY Status:")
+	 local phyStatus= readPHY(0, 17)	-- 8.27.3.16 Copper Specific Status Reg 1 (page 0, register 17), p.556
+         print("  STATUS      = " .. bit.tohex(phyStatus))
+         print("  Full Duplex = " .. yesno(phyStatus, 13))
+         print("  Copper Link = " .. yesno(phyStatus, 10))
+         print("  Glabal Link = " .. yesno(phyStatus, 3))
+         local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(phyStatus, 14),3)])
+         print("  Speed       = " .. speed .. ' Mb/s')
+         print("  MDI-X       = " .. yesno(phyStatus, 6))
+         print("  Copper Sleep= " .. yesno(phyStatus, 4))	-- Copper Energy Detect Status
+         
       end
       
       -- Define shutdown function for the NIC itself
@@ -542,10 +575,10 @@ function selftest ()
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
    -- try MAC loopback with i210 or i350 NIC
-    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true})
+    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="MAC", rxburst=512})
-    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="PHY", rxburst=512})
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="PHY", rxburst=512})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
     config.link(c, "source.tx -> nic.rx")

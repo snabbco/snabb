@@ -41,8 +41,9 @@ function run(args)
  engine.configure(c)
  engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
 
- print("selftest: done")
--- engine.app_table.nic.stop()
+ print("txintel1g: done")
+ engine.app_table.nic.stop()
+
  --local li = engine.app_table.nic.input[1]
  local li = engine.app_table.nic.input["rx"]          -- same-same as [1]
  assert(li, "txintel1g: no input link")
