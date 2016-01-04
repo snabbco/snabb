@@ -105,7 +105,11 @@ end
 function mkdir (name)
    -- Create root with mode "rwxrwxrwt" (R/W for all and sticky)
    local mask = S.umask(0)
-   S.mkdir(root, "01777")
+   local ok, err = S.mkdir(root, "01777")
+   if not ok and err.ACCES then
+      print("failed to create "..root..": "..tostring(err).."; need to run as root")
+      os.exit(1)
+   end
    S.umask(mask)
    -- Create sub directories
    local dir = root
