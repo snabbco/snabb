@@ -73,10 +73,10 @@ function VirtioNetDriver:new(args)
    for n = 0, 1 do
       local queue_num = virtio_pci:get_queue_num(n)
       if not queue_num then
-        virtio_pci:failed()
-        virtio_pci:free()
-        return nil, "missing required virtqueues"
-      end 
+         virtio_pci:failed()
+         virtio_pci:free()
+         return nil, "missing required virtqueues"
+      end
       vqs[n] = virtq.allocate_virtq(queue_num)
       virtio_pci:set_queue_vring(n, vqs[n].vring_physaddr)
    end
@@ -91,14 +91,14 @@ end
 
 function VirtioNetDriver:close()
    for n, _ in ipairs(self.vqs) do
-     self.virtio_pci:disable_queue(n)
+      self.virtio_pci:disable_queue(n)
    end
    self.virtio_pci:free()
 end
 
 -- Device operation
 function VirtioNetDriver:can_transmit()
-   local txq = self.vqs[TXQ] 
+   local txq = self.vqs[TXQ]
    return txq:can_add()
 end
 
@@ -109,9 +109,9 @@ function VirtioNetDriver:_transmit_checksum(p)
    local csum_start, csum_off
 
    if ethertype == ETHERTYPE_IPv4 then
-       csum_start, csum_off = prepare_packet4(l3p, l3len)
+      csum_start, csum_off = prepare_packet4(l3p, l3len)
    elseif ethertype == ETHERTYPE_IPv6 then
-       csum_start, csum_off = prepare_packet6(l3p, l3len)
+      csum_start, csum_off = prepare_packet6(l3p, l3len)
    end
 
    if csum_start ~= nil then
@@ -144,13 +144,13 @@ function VirtioNetDriver:notify_transmit()
 end
 
 function VirtioNetDriver:recycle_transmit_buffers()
-  local txq = self.vqs[TXQ]
-  local to_free = txq:can_get()
+   local txq = self.vqs[TXQ]
+   local to_free = txq:can_get()
 
-  for i=0, to_free - 1 do
-    local p = txq:get()
-    free(p)
-  end
+   for i=0, to_free - 1 do
+      local p = txq:get()
+      free(p)
+   end
 end
 
 function VirtioNetDriver:can_receive()

@@ -686,6 +686,17 @@ function getenv (name)
    else return nil end
 end
 
+-- Parses a C struct description
+-- and creates a table which maps each field name
+-- to size, offset and ctype. An example string argument:
+-- [[
+--    uint32_t a;
+--    uint16_t b;
+-- ]]
+--
+-- This will create a table with the following content:
+-- { a = { fieldname = "a", ct = cdata<unsigned int>, size = 4, offset = 0},
+--   b = { fieldname = "b", ct = cdata<unsigned short>, size = 2, offset = 4} }
 function fstruct(def)
    local struct = {}
    local offset = 0
@@ -702,6 +713,9 @@ function fstruct(def)
    return struct, offset
 end
 
+-- Takes a field description as created by the fstruct function
+-- and a file descriptor. A value of the field specified ctype,
+-- size and offset is read from the file designated from the fd
 function fieldrd(field, fd)
    local buf = ffi.typeof('$ [1]', field.ct)()
    local r, err = fd:pread(buf, field.size, field.offset)
@@ -709,6 +723,9 @@ function fieldrd(field, fd)
    return buf[0]
 end
 
+-- Takes a field description as created by the fstruct function,
+-- a file descriptor and a value. The value is written in the file,
+-- specified by the fd, at the offset specified by the field
 function fieldwr(field, fd, val)
    local buf = ffi.typeof('$ [1]', field.ct)()
    buf[0] = val

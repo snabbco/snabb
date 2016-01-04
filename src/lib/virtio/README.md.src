@@ -3,7 +3,7 @@
 
 The `Virtio` library implements the virt-queue handling as described in
 [virtio-net](http://docs.oasis-open.org/virtio/virtio/v1.0/csprd04/virtio-v1.0-csprd04.html)
-specification. The device part is used in the VhostUse, while the driver part is used
+specification. The device part is used in the VhostUser, while the driver part is used
 in the VirtioNet app.
 
 The Basic operation of the virtqueues is presented on the picture. The driver puts a packet in

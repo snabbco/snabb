@@ -13,7 +13,7 @@ packets send by the virtual machine will arrive on the `tx` port.
 
 ## Configuration
 
-The `VhostUser` app accepts a table as its configuration argument. The
+The `VirtioNet` app accepts a table as its configuration argument. The
 following keys are defined:
 
 — Key **pciaddr**

@@ -25,11 +25,11 @@ local VRING_USED_F_NO_NOTIFY = 1
 -- The Guest uses this in avail->flags to advise the Host: don't interrupt me when you consume a buffer
 local VRING_AVAIL_F_NO_INTERRUPT = 1
 
--- This marks a buffer as continuing via the next field. 
+-- This marks a buffer as continuing via the next field.
 local VRING_DESC_F_NEXT = 1
 -- This marks a buffer as write-only (otherwise read-only).
 local VRING_DESC_F_WRITE = 2
--- This means the buffer contains a list of buffer descriptors. 
+-- This means the buffer contains a list of buffer descriptors.
 local VRING_DESC_F_INDIRECT = 4
 
 ffi.cdef([[
@@ -111,7 +111,7 @@ local function allocate_virtq(n)
       local len = 2 * ffi.sizeof(vring_desc_t)
       ptr, phys = memory.dma_alloc(len)
       vr.desc_tables[i] = ffi.cast("struct vring_desc *", ptr)
-      
+
       desc.addr = phys
       desc.len = len
       desc.flags = VRING_DESC_F_INDIRECT
@@ -120,7 +120,7 @@ local function allocate_virtq(n)
 
    for i = 0, n-1 do
       local desc_table = vr.desc_tables[i]
-      
+
       -- Packet header descriptor
       local desc = desc_table[0]
       ptr, phys = memory.dma_alloc(pk_header_size)
@@ -218,27 +218,27 @@ end
 
 function VirtioVirtq:get()
 
-  local last_used_idx = band(self.last_used_idx, self.num-1)
-  local used = self.vring.used.ring[last_used_idx]
-  local idx = used.id
-  local desc = self.vring.desc[idx]
+   local last_used_idx = band(self.last_used_idx, self.num-1)
+   local used = self.vring.used.ring[last_used_idx]
+   local idx = used.id
+   local desc = self.vring.desc[idx]
 
-  local p = self.packets[idx]
-  if debug then assert(p ~= nil) end
-  p.length = used.len - pk_header_size
-  if debug then assert(physical(p.data) == self.desc_tables[idx][1].addr) end
+   local p = self.packets[idx]
+   if debug then assert(p ~= nil) end
+   p.length = used.len - pk_header_size
+   if debug then assert(physical(p.data) == self.desc_tables[idx][1].addr) end
 
-  self.last_used_idx = self.last_used_idx + 1
-  desc.next = self.free_head
-  self.free_head = idx
-  self.num_free = self.num_free + 1
+   self.last_used_idx = self.last_used_idx + 1
+   desc.next = self.free_head
+   self.free_head = idx
+   self.num_free = self.num_free + 1
 
-  return p
+   return p
 end
 
 function VirtioVirtq:should_notify()
-  -- Notify only if the used ring lacks the "no notify" flag
-  return band(self.vring.used.flags, VRING_USED_F_NO_NOTIFY) == 0
+   -- Notify only if the used ring lacks the "no notify" flag
+   return band(self.vring.used.flags, VRING_USED_F_NO_NOTIFY) == 0
 end
 
 return {

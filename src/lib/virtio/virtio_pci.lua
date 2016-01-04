@@ -46,110 +46,110 @@ local virtio_pci_bar0 = lib.fstruct[[
 
 local
 function open_bar (fname, struct)
-  local fd, err = S.open(fname, 'rdwr')
-  if not fd then error(err) end
-  return setmetatable ({
-    fd = fd,
-    struct = struct,
-    close = function(self) return self.fd:close() end,
-  }, {
-    __index = function (self, key)
-      return lib.fieldrd(self.struct[key], self.fd)
-    end,
-    __newindex = function (self, key, value)
-      return lib.fieldwr(self.struct[key], self.fd, value)
-    end,
-  })
+   local fd, err = S.open(fname, 'rdwr')
+   if not fd then error(err) end
+   return setmetatable ({
+      fd = fd,
+      struct = struct,
+      close = function(self) return self.fd:close() end,
+   }, {
+      __index = function (self, key)
+         return lib.fieldrd(self.struct[key], self.fd)
+      end,
+      __newindex = function (self, key, value)
+         return lib.fieldwr(self.struct[key], self.fd, value)
+      end,
+   })
 end
 
 function VirtioPci:new(pciaddr)
-  local o = VirtioPci:superClass().new(self)
+   local o = VirtioPci:superClass().new(self)
 
-  pci.unbind_device_from_linux (pciaddr)
+   pci.unbind_device_from_linux (pciaddr)
 
-  o._bar = open_bar(pci.path(pciaddr..'/resource0'), virtio_pci_bar0)
+   o._bar = open_bar(pci.path(pciaddr..'/resource0'), virtio_pci_bar0)
 
-  return o
+   return o
 end
 
 function VirtioPci:free()
-  self._bar:close()
-  VirtioPci:superClass().free(self)
+   self._bar:close()
+   VirtioPci:superClass().free(self)
 end
 
 function VirtioPci:set_status(status)
-  local bar = self._bar
-  bar.status = bor(bar.status, status)
+   local bar = self._bar
+   bar.status = bor(bar.status, status)
 end
 
 function VirtioPci:reset()
-  self._bar.status = 0
+   self._bar.status = 0
 end
 
 function VirtioPci:acknowledge()
-  self:set_status(ACKNOWLEDGE)
+   self:set_status(ACKNOWLEDGE)
 end
 
 function VirtioPci:driver()
-  self:set_status(DRIVER)
+   self:set_status(DRIVER)
 end
 
 function VirtioPci:features_ok()
-  self:set_status(FEATURES_OK)
+   self:set_status(FEATURES_OK)
 end
 
 function VirtioPci:driver_ok()
-  self:set_status(DRIVER_OK)
+   self:set_status(DRIVER_OK)
 end
 
 function VirtioPci:failed()
-  self:set_status(FAILED)
+   self:set_status(FAILED)
 end
 
 function VirtioPci:set_guest_features(min_features, want_features)
-  local bar = self._bar
-  local features = bar.host_features
-  if debug then print('host_features', features) end
-  if band(features, min_features) ~= min_features then
-    self:failed()
-    return "doesn't provide minimum features"
-  end
-  if debug then print('set features to:', band(features, want_features)) end
-  bar.guest_features = band(features, want_features)
-  self:features_ok()
-  if debug then print('got features: ', bar.host_features, bar.guest_features) end
-  if band(bar.status, FEATURES_OK) ~= FEATURES_OK then
-    self:failed()
-    return "feature set wasn't accepted by device"
-  end
+   local bar = self._bar
+   local features = bar.host_features
+   if debug then print('host_features', features) end
+   if band(features, min_features) ~= min_features then
+      self:failed()
+      return "doesn't provide minimum features"
+   end
+   if debug then print('set features to:', band(features, want_features)) end
+   bar.guest_features = band(features, want_features)
+   self:features_ok()
+   if debug then print('got features: ', bar.host_features, bar.guest_features) end
+   if band(bar.status, FEATURES_OK) ~= FEATURES_OK then
+      self:failed()
+      return "feature set wasn't accepted by device"
+   end
 end
 
 function VirtioPci:get_queue_num(n)
-  local bar = self._bar
+   local bar = self._bar
 
-  bar.queue_sel = n
-  local queue_num = bar.queue_num
+   bar.queue_sel = n
+   local queue_num = bar.queue_num
 
-  if queue_num == 0 then return end
+   if queue_num == 0 then return end
 
-  if debug then print(('queue %d: size: %d'):format(n, queue_num)) end
-  return queue_num
+   if debug then print(('queue %d: size: %d'):format(n, queue_num)) end
+   return queue_num
 end
 
 function VirtioPci:set_queue_vring(n, physaddr)
-  local bar = self._bar
-  bar.queue_sel = n
+   local bar = self._bar
+   bar.queue_sel = n
 
-  bar.queue_pfn = rshift(physaddr, VIRTIO_PCI_QUEUE_ADDR_SHIFT)
+   bar.queue_pfn = rshift(physaddr, VIRTIO_PCI_QUEUE_ADDR_SHIFT)
 end
 
 function VirtioPci:disable_queue(n)
-  local bar = self._bar
-  bar.queue_sel = n
-  bar.queue_pfn = 0
+   local bar = self._bar
+   bar.queue_sel = n
+   bar.queue_pfn = 0
 end
 
 function VirtioPci:notify_queue(n)
-  local bar = self._bar
-  bar.queue_notify = n
+   local bar = self._bar
+   bar.queue_notify = n
 end
