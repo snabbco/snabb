@@ -15,7 +15,7 @@ local C      = ffi.C
 local memory = require('core.memory')
 local band   = require('bit').band
 
-local physical = packet.physical
+local physical = memory.virtual_to_physical
 
 local VirtioVirtq = {}
 VirtioVirtq.__index = VirtioVirtq
@@ -165,7 +165,7 @@ function VirtioVirtq:add(p, len, flags, csum_start, csum_offset)
 
    -- Packet
    desc = desc_table[1]
-   desc.addr = physical(p)
+   desc.addr = physical(p.data)
    desc.len = len
    desc.flags = 0
    desc.next = -1
@@ -189,7 +189,7 @@ function VirtioVirtq:add_empty_header(p, len)
 
    -- Packet
    desc = desc_table[1]
-   desc.addr = physical(p)
+   desc.addr = physical(p.data)
 
    desc.len = len
    desc.flags = 0
@@ -226,7 +226,7 @@ function VirtioVirtq:get()
   local p = self.packets[idx]
   if debug then assert(p ~= nil) end
   p.length = used.len - pk_header_size
-  if debug then assert(physical(p) == self.desc_tables[idx][1].addr) end
+  if debug then assert(physical(p.data) == self.desc_tables[idx][1].addr) end
 
   self.last_used_idx = self.last_used_idx + 1
   desc.next = self.free_head

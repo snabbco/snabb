@@ -94,11 +94,6 @@ end
 -- Return pointer to packet data.
 function data (p) return p.data end
 
--- Return physical address of packet data
-function physical (p)
-   return memory.memory.virtual_to_physical(p.data)
-end
-
 -- Return packet data length.
 function length (p) return p.length end
 
