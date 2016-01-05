@@ -158,7 +158,7 @@ specified but assumed to be broadly applicable.
 breath. Default is not specified but assumed to be broadly applicable.
 
 — Key **loopback**
-*Optional*. Set to `true` for MAC loopback mode.
+*Optional*. Set to `"MAC"` for MAC loopback, or to `"PHY"` for PHY loopback modes.
 
 ## LoadGen (apps.intel.loadgen)
 
