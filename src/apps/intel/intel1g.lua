@@ -168,7 +168,6 @@ function Intel1g:new(conf)
      print("  txPackets=         " .. counters.txPackets .. "  txBytes= " .. counters.txBytes)
    end
 
-   -- Shutdown functions
    local stop_nic, stop_transmit, stop_receive
 
    -- Device setup and initialization
@@ -229,23 +228,19 @@ function Intel1g:new(conf)
    local function initPHY()
      -- 4.3.1.4 PHY Reset, p.131
      wait32(r.MANC, {BLK_Phy_Rst_On_IDE=18}, 0)	-- wait untill IDE link stable
-print("initPHY: 1")
      -- 4.6.1 Acquiring Ownership over a Shared Resource, p.147
-     -- see also 4.6.2 Releasing Ownership
-     -- e.g. both software/software (SWSM.SMBI) & software/firmware (SWSM.SWESMBI) semamphores
+     -- and 4.6.2 Releasing Ownership
+     -- XXX to do: wraps for both software/software (SWSM.SMBI) & software/firmware (SWSM.SWESMBI) semamphores
      set32(r.SWSM, {SWESMBI= 1})		-- a. get software/firmware semaphore
      while band(peek32(r.SWSM), 0x02) ==0 do
        set32(r.SWSM, {SWESMBI= 1})
      end
-print("initPHY: 2")
      wait32(r.SW_FW_SYNC, {SW_PHY_SM=1}, 0)	-- b. wait until firmware releases PHY
      set32(r.SW_FW_SYNC, {SW_PHY_SM=1})		-- set semaphore bit to own PHY
-print("initPHY: 3")
      clear32(r.SWSM, {SWESMBI= 1})		-- c. release software/firmware semaphore
      set32(r.CTRL, {PHYreset= 31})		-- 3. set PHY reset
      C.usleep(1*100)				-- 4. wait 100 us
      clear32(r.CTRL, {PHYreset= 31})		-- 5. release PHY reset
-print("initPHY: reset done")
      set32(r.SWSM, {SWESMBI= 1})		-- 6. release ownership
      while band(peek32(r.SWSM), 0x02) ==0 do
        set32(r.SWSM, {SWESMBI= 1})
@@ -258,7 +253,6 @@ print("initPHY: reset done")
      while band(peek32(r.SWSM), 0x02) ==0 do
        set32(r.SWSM, {SWESMBI= 1})
      end
-print("initPHY: 4")
      wait32(r.SW_FW_SYNC, {SW_PHY_SM=1}, 0)	-- b. wait until firmware releases PHY
      clear32(r.SWSM, {SWESMBI= 1})		-- c. release software/firmware semaphore
      --XXXXXXXXXXXXXXXXXXXXX			-- 9. configure PHY
@@ -267,8 +261,6 @@ print("initPHY: 4")
      --XXXXXXXXXXXXXXXXXXXXX			-- 10. release ownership, see 4.6.2, p.148
      clear32(r.SW_FW_SYNC, {SW_PHY_SM=1})	-- release PHY
      clear32(r.SWSM, {SWESMBI= 1})		-- release software/firmware semaphore
-
-print("initPHY: end")
    end
 
    --print_status(r, "Status before Init: ")
@@ -293,10 +285,9 @@ print("initPHY: end")
          set32(r.CTRL, {SETLINKUP = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
 	 clear32(r.CTRL_EXT, {LinkMode1=23,LinkMode0=22})	-- set Link mode to internal PHY
          writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6}))	-- PHYREG 8.27.3 Copper Control
-         writePHY(2, 21, 0x06)					-- MAC interface speed 1GE
+         writePHY(2, 21, 0x06)					-- MAC interface speed 1GE, 8.27.3.27 MAC Specific Control 2, p.563
          --writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, CopperReset=15})) -- Copper Reset
-         --writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14}))	-- Loopback
-         writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14, CopperReset=15}))	-- Loopback & Reset
+         writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14}))	-- Loopback
          print("PHY Loopback set")
       else				-- 3.7.4.4 Copper (Internal) PHY Link Config
 					-- PHY tells MAC after auto-neg. (PCS and 802.3 clauses 28 (extensions) & 40 (.3ab)
@@ -304,21 +295,18 @@ print("initPHY: end")
 					-- PHY asserts link indication (LINK) to MAC
 					-- SW driver must Set Link Up (CTRL.SLU) before MAC recognizes LINK from PHY and consider link up
 
-         initPHY()				-- 4.5.7.2.1 Full Duplx, Speed auto neg. by PHY
-         C.usleep(1000*1000)			-- wait for init to settle
+         initPHY()						-- 4.5.7.2.1 Full Duplx, Speed auto neg. by PHY
+         C.usleep(1*1000*1000)					-- wait 1s for init to settle
          print("initPHY() done")
-         clear32(r.STATUS, {PHYReset=10})	-- p.373
-         --C.usleep(10*1000*1000)
-
+         clear32(r.STATUS, {PHYReset=10})			-- p.373
          set32(r.CTRL, {SETLINKUP = 6})				-- Set CTRL.SLU (bit 6, should be set by default)
          clear32(r.CTRL_EXT, {LinkMode1=23,LinkMode0=22})	-- set Link mode to direct copper / internal PHY
          clear32(r.CTRL_EXT, {PowerDown=20})			-- disable power down
          set32(r.CTRL_EXT, {AutoSpeedDetect = 12})		-- p.373
          --set32(r.CTRL_EXT, {DriverLoaded = 28})		-- signal Device Driver Loaded
 
-         --C.usleep(10*1000*1000)				-- wait for auto-neg.
          print("Waiting for link-up...")
-         wait32(r.STATUS, {LinkUp=1})
+         wait32(r.STATUS, {LinkUp=1})				-- wait for auto-neg. to complete
          print("We have link-up!")
 
          print("MAC Status:")
@@ -372,22 +360,18 @@ print("initPHY: end")
          print("  PHYREG(0,23)= " .. bit.tohex(readPHY(0,23)) .. " Copper Specific Control 3")	-- p.560
          print("  PHYREG(2,16)= " .. bit.tohex(readPHY(2,16)) .. " MAC Specific Control 1")	-- p.561
          print("  PHYREG(2,19)= " .. bit.tohex(readPHY(2,19)) .. " MAC Specific Status")	-- p.561
-         print("  PHYREG(2,21)= " .. bit.tohex(readPHY(2,21)) .. " MAC Specific Control 2")	-- p.563
-         
+         print("  PHYREG(2,21)= " .. bit.tohex(readPHY(2,21)) .. " MAC Specific Control 2")	-- p.563         
       end
       
       -- Define shutdown function for the NIC itself
       stop_nic = function ()
          -- XXX Are these the right actions?
-         clear32(r.CTRL, {SETLINKUP = 6})        -- take the link down
-         pci.set_bus_master(pciaddress, false) -- disable DMA
+         clear32(r.CTRL, {SETLINKUP = 6})		-- take the link down
+         pci.set_bus_master(pciaddress, false)		-- disable DMA
       end
-   end
-   --print_status(r, "Status after Init: ")
-   --print_stats(r)
+   end  -- if not attach then
 
-   -- Transmit support
-   if txq then
+   if txq then						-- Transmitter
       -- Define registers for the transmit queue that we are using
       r.TDBAL  = 0xe000 + txq*0x40
       r.TDBAH  = 0xe004 + txq*0x40
@@ -412,7 +396,7 @@ print("initPHY: end")
       poke32(r.TDBAL, tophysical(txdesc) % 2^32)
       poke32(r.TDBAH, tophysical(txdesc) / 2^32)
       poke32(r.TDLEN, ndesc * ffi.sizeof(txdesc_t))
-      set32(r.TCTL, 2)
+      set32(r.TCTL, {TxEnable=1})
       poke32(r.TXDCTL, {WTHRESH=16, ENABLE=25})
       poke32(r.EIMC, 0xffffffff)      -- re-disable interrupts
 
@@ -470,10 +454,9 @@ print("initPHY: end")
             end
          end
       end
-   end
+   end  -- if txq then
 
-   -- Receive support
-   if rxq then
+   if rxq then				-- Receiver
       r.RDBAL  = 0xc000 + rxq*0x40
       r.RDBAH  = 0xc004 + rxq*0x40
       r.RDLEN  = 0xc008 + rxq*0x40
@@ -521,7 +504,6 @@ print("initPHY: end")
       rctl.RCTL_UPE= 3			-- unicast promiscuous enable
       rctl.RCTL_MPE= 4			-- multicast promiscuous enable
       rctl.LPE= 5			-- Long Packet Enable
--- deadly!      rctl.LBM_MAC= 6			-- MAC loopback mode
       rctl.BAM= 15			-- broadcast enable
       --rctl.SZ_512= 17			-- buffer size: use SRRCTL for larger buffer sizes
       --rctl.RCTL_RDMTS_HALF=		-- rx desc min threshold size
@@ -532,11 +514,12 @@ print("initPHY: end")
       set32(r.RXDCTL, {ENABLE= 25})	-- enable the RX queue
       wait32(r.RXDCTL, {ENABLE=25})	-- wait until enabled
 
-      poke32(r.RCTL, rctl)		-- enable receiver
+      --poke32(r.RCTL, rctl)		-- enable receiver only once Rx queue/descriptors are setup
+      set32(r.RCTL, rctl)		-- enable receiver only once Rx queue/descriptors are setup
 
       --poke32(r.RDH, 0)		-- Rx descriptor Head (RO)
       --poke32(r.RDT, 0)		-- Rx descriptor Tail
-      poke32(r.RDT, ndesc-1)		-- Rx descriptor Tail, trigger NIC to cache descriptors
+      poke32(r.RDT, ndesc-1)		-- Rx descriptor Tail, trigger NIC to cache descriptors with index ~=0
 
       --print_status(r, "Status after init receive: ")
 
@@ -549,8 +532,7 @@ print("initPHY: end")
 
       local lostSeq, lastSeqNo = 0, -1
 
-      -- Receive a packet
-      local function receive ()
+      local function receive ()		-- Receive a packet
          assert(can_receive())		-- precondition
          local desc = rxdesc[rdt]
          local p = rxpackets[rdt]
@@ -575,8 +557,7 @@ print("initPHY: end")
          return p
       end
 
-      -- Synchronize receive registers with hardware.
-      local function sync_receive ()
+      local function sync_receive ()			-- Synchronize receive registers with hardware
          rdh = peek32(r.RDH)				-- possible race condition, see 7.1.4.4, 7.2.3
          --rdh = band(peek32(r.RDH), ndesc-1)		-- from intel1g: Luke observed (RDH == ndesc) !?
          --rdh = math.min(peek32(r.RDH), ndesc-1)	-- from intel10g
@@ -586,8 +567,7 @@ print("initPHY: end")
 	 --print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
       end
       
-      -- Define pull() method for app instance.
-      function self:pull ()
+      function self:pull ()				-- Define pull() method for app instance
          local lo = self.output[1]
          assert(lo, "intel1g: no output link")
          local limit = rxburst
@@ -598,8 +578,7 @@ print("initPHY: end")
          sync_receive()
       end
 
-      -- stop receiver, see 4.5.9.2
-      stop_receive = function ()
+      stop_receive = function ()			-- stop receiver, see 4.5.9.2
          --poke32(r.RXDCTL, 0)
          clear32(r.RXDCTL, {ENABLE=25})
          wait32(r.RXDCTL, {ENABLE=25}, 0)
@@ -612,10 +591,9 @@ print("initPHY: end")
          -- XXX return dma memory of Rx descriptor ring
 	print("stop_receive(): lostSeq ", lostSeq)
       end
-   end
+   end  -- if rxq then
 
-   -- Stop all functions that are running.
-   function self:stop ()
+   function self:stop ()				-- Stop all functions that are running
       if stop_receive  then stop_receive()  end
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
@@ -636,7 +614,7 @@ print("initPHY: end")
 
    return self
    --return setmetatable(self, {__index = Intel1g})
-end
+end  -- function Intel1g:new()
 
 function selftest ()
    print("selftest: Intel1g")
@@ -651,12 +629,10 @@ function selftest ()
    config.app(c, "source", basic.Source)
    config.app(c, "sink", basic.Sink)
    -- try MAC loopback with i210 or i350 NIC
-    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true})
-    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, rxburst=512})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="MAC", rxburst=512})
-    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="PHY", rxburst=512})
-    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1})
-    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback=true, txqueue=1, rxqueue=1})
+    config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="PHY", rxburst=512})
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="MAC", txqueue=1})
+    --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="MAC", txqueue=1, rxqueue=1})
     config.link(c, "source.tx -> nic.rx")
     config.link(c, "nic.tx -> sink.rx")
    -- replace intel1g by Repeater
@@ -666,7 +642,7 @@ function selftest ()
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
-   engine.main({duration = 10, report = {showapps = true, showlinks = true, showload= true}})
+   engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
    print("selftest: ok")
 
    engine.app_table.nic.stop()
