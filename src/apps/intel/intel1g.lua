@@ -306,34 +306,73 @@ print("initPHY: end")
 
          initPHY()				-- 4.5.7.2.1 Full Duplx, Speed auto neg. by PHY
          C.usleep(1000*1000)			-- wait for init to settle
+         print("initPHY() done")
+         clear32(r.STATUS, {PHYReset=10})	-- p.373
+         --C.usleep(10*1000*1000)
 
-         set32(r.CTRL, {SETLINKUP = 6})		-- Set CTRL.SLU (bit 6, should be set by default)
+         set32(r.CTRL, {SETLINKUP = 6})				-- Set CTRL.SLU (bit 6, should be set by default)
+         clear32(r.CTRL_EXT, {LinkMode1=23,LinkMode0=22})	-- set Link mode to direct copper / internal PHY
+         clear32(r.CTRL_EXT, {PowerDown=20})			-- disable power down
+         set32(r.CTRL_EXT, {AutoSpeedDetect = 12})		-- p.373
+         --set32(r.CTRL_EXT, {DriverLoaded = 28})		-- signal Device Driver Loaded
 
-         print("PHY set")
-				-- STATUS.LU
-				-- STATUS.FD
-				-- STATUS.SPEED
+         --C.usleep(10*1000*1000)				-- wait for auto-neg.
+         print("Waiting for link-up...")
+         wait32(r.STATUS, {LinkUp=1})
+         print("We have link-up!")
+
          print("MAC Status:")
-         local status= peek32(r.STATUS)
+         local status= peek32(r.STATUS)				-- p.372, 8.2.2
          print("  STATUS      = " .. bit.tohex(status))
          print("  Full Duplex = " .. yesno(status, 0))
          print("  Link Up     = " .. yesno(status, 1))
-         print("  PHYRA       = " .. yesno(status, 10))
+         print("  TxOFF Paused= " .. yesno(status, 4))
          local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
          print("  Speed       = " .. speed .. ' Mb/s')
+         local autoSpeed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 8),3)])
+         print("  Auto Speed  = " .. autoSpeed .. ' Mb/s')	-- Auto-Speed Detection Value (ASDV), result after setting CTRL_EXT.ASDCHK
+         print("  PHY Reset   = " .. yesno(status, 10))
          print("  RxFlowCtrl  = " .. yesno(status, 27))		-- should be set by SW driver to auto-neg. from PHY
          print("  TxFlowCtrl  = " .. yesno(status, 28))		-- should be set by SW driver to auto-neg. from PHY
 
          print("PHY Status:")
-	 local phyStatus= readPHY(0, 17)	-- 8.27.3.16 Copper Specific Status Reg 1 (page 0, register 17), p.556
-         print("  STATUS      = " .. bit.tohex(phyStatus))
-         print("  Full Duplex = " .. yesno(phyStatus, 13))
-         print("  Copper Link = " .. yesno(phyStatus, 10))
-         print("  Glabal Link = " .. yesno(phyStatus, 3))
+         print("  PHYREG(0,0) = " .. bit.tohex(readPHY(0,0)) .. " Copper Control")	-- p.545, 
+         print("  PHYREG(0,1) = " .. bit.tohex(readPHY(0,1)) .. " Copper Status")	-- p.546, 
+         local phyID1= readPHY(0,2)
+         print("  PHYREG(0,2) = " .. bit.tohex(phyID1) .. " PHY ID 1")		-- p.547, 8.27.3.3 PHY Identifier 1
+	 assert(phyID1 == 0x0141, "PHY ID1 is not 0x0141")
+         print("  PHYREG(0,4) = " .. bit.tohex(readPHY(0,4)) .. " Copper Auto-Neg Adv")	-- p.548, p.114, auto-neg. flow control (bits 10, 11)
+         print("  PHYREG(0,5) = " .. bit.tohex(readPHY(0,5)) .. " Copper Link Partner Ability")	-- p.549, p.115, auto-neg. flow control (bits 10, 11) of partner
+         print("  PHYREG(0,6) = " .. bit.tohex(readPHY(0,6)) .. " Copper Auto-Neg Expansion")  -- p.550
+         print("  PHYREG(0,9) = " .. bit.tohex(readPHY(0,9)) .. " 1000BASE-T Control")  -- p.552
+         print("  PHYREG(0,10) = " .. bit.tohex(readPHY(0,10)) .. " 1000BASE-T Status")  -- p.553
+         print("  PHYREG(0,15) = " .. bit.tohex(readPHY(0,15)) .. " Extended Status")  -- p.554
+         print("  PHYREG(0,16) = " .. bit.tohex(readPHY(0,16)) .. " Copper Specific Control 1")  -- p.554
+
+	 local phyStatus= readPHY(0, 17)
+         print("  PHYREG(0,17) = " .. bit.tohex(phyStatus) .. " Copper Specific Status 1")	-- p.556, 8.27.3.16
          local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(phyStatus, 14),3)])
          print("  Speed       = " .. speed .. ' Mb/s')
+         print("  Full Duplex = " .. yesno(phyStatus, 13))
+         print("  Page Rx     = " .. yesno(phyStatus, 12))
+         print("  Spd Dplx Resolved = " .. yesno(phyStatus, 11))
+         print("  Copper Link = " .. yesno(phyStatus, 10))
+         print("  Tx Pause    = " .. yesno(phyStatus, 9))
+         print("  Rx Pause    = " .. yesno(phyStatus, 8))
          print("  MDI-X       = " .. yesno(phyStatus, 6))
+         print("  Downshift   = " .. yesno(phyStatus, 5))
          print("  Copper Sleep= " .. yesno(phyStatus, 4))	-- Copper Energy Detect Status
+         print("  Glabal Link = " .. yesno(phyStatus, 3))
+         print("  Polarity Rev= " .. yesno(phyStatus, 1))
+         print("  Jabber      = " .. yesno(phyStatus, 0))
+
+         print("  PHYREG(0,20) = " .. bit.tohex(readPHY(0,20)) .. " Copper Specific Control 2")  -- p.559
+         print("  PHYREG(0,21)= " .. bit.tohex(readPHY(0,21)) .. " Copper Specific Rx Errors")	-- p.559
+         print("  PHYREG(0,22)= " .. bit.tohex(readPHY(0,22)) .. " Page Addres")	-- p.559
+         print("  PHYREG(0,23)= " .. bit.tohex(readPHY(0,23)) .. " Copper Specific Control 3")	-- p.560
+         print("  PHYREG(2,16)= " .. bit.tohex(readPHY(2,16)) .. " MAC Specific Control 1")	-- p.561
+         print("  PHYREG(2,19)= " .. bit.tohex(readPHY(2,19)) .. " MAC Specific Status")	-- p.561
+         print("  PHYREG(2,21)= " .. bit.tohex(readPHY(2,21)) .. " MAC Specific Control 2")	-- p.563
          
       end
       
@@ -482,7 +521,7 @@ print("initPHY: end")
       rctl.RCTL_UPE= 3			-- unicast promiscuous enable
       rctl.RCTL_MPE= 4			-- multicast promiscuous enable
       rctl.LPE= 5			-- Long Packet Enable
-      rctl.LBM_MAC= 6			-- MAC loopback mode
+-- deadly!      rctl.LBM_MAC= 6			-- MAC loopback mode
       rctl.BAM= 15			-- broadcast enable
       --rctl.SZ_512= 17			-- buffer size: use SRRCTL for larger buffer sizes
       --rctl.RCTL_RDMTS_HALF=		-- rx desc min threshold size
