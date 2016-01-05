@@ -399,10 +399,6 @@ function report_apps ()
 end
 
 function selftest ()
-   if not use_restart then
-      print("with_restart disabled\nTest skipped")
-      os.exit(test_skipped_code)
-   end
    print("selftest: app")
    local App = {}
    function App:new () return setmetatable({}, {__index = App}) end
@@ -446,6 +442,7 @@ function selftest ()
    assert(#app_array == 0)
    assert(#link_array == 0)
    -- Test app restarts on failure.
+   use_restart = true
    print("c_fail")
    local App1 = {zone="test"}
    function App1:new () return setmetatable({}, {__index = App1}) end
