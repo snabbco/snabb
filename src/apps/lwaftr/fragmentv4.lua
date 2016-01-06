@@ -57,7 +57,7 @@ FRAGMENT_FORBIDDEN = 3
 --     its size is bigger than "mtu" bytes. Client code may want to return
 --     an ICMP Datagram Too Big (Type 3, Code 4) packet back to the sender.
 --
-function fragment_ipv4(ipv4_pkt, l2_size, mtu)
+function fragment(ipv4_pkt, l2_size, mtu)
    if ipv4_pkt.length - l2_size <= mtu then
       return FRAGMENT_UNNEEDED, ipv4_pkt
    end
@@ -133,7 +133,7 @@ function fragment_ipv4(ipv4_pkt, l2_size, mtu)
 end
 
 
-function is_ipv4_fragment(pkt, l2_size)
+function is_fragment(pkt, l2_size)
    -- Either the packet has the "more fragments" flag set,
    -- or the fragment offset is non-zero, or both.
    local flags_and_frag_offset = ntohs(rd16(pkt.data + l2_size + constants.o_ipv4_flags))
@@ -147,7 +147,7 @@ REASSEMBLE_INVALID = 2
 REASSEMBLE_MISSING_FRAGMENT = 3
 
 
-function reassemble_ipv4(fragments, l2_size)
+function reassemble(fragments, l2_size)
    local flags_and_frag_offset_offset = l2_size + constants.o_ipv4_flags
    table.sort(fragments, function (pkt1, pkt2)
        local pkt1_offset = band(ntohs(rd16(pkt1.data + flags_and_frag_offset_offset)),

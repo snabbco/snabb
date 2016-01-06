@@ -417,9 +417,9 @@ end
 
 -- The incoming packet is a complete one with ethernet headers.
 local function from_inet(lwstate, pkt)
-   if fragmentv4.is_ipv4_fragment(pkt, lwstate.l2_size) then
+   if fragmentv4.is_fragment(pkt, lwstate.l2_size) then
       local frags = cache_ipv4_fragment(lwstate, pkt)
-      local frag_status, maybe_pkt = fragmentv4.reassemble_ipv4(frags, lwstate.l2_size)
+      local frag_status, maybe_pkt = fragmentv4.reassemble(frags, lwstate.l2_size)
       if frag_status == fragmentv4.REASSEMBLE_MISSING_FRAGMENT then
          return -- Nothing useful to be done yet
       elseif frag_status == fragmentv4.REASSEMBLE_INVALID then
@@ -685,7 +685,7 @@ local function from_b4(lwstate, pkt)
                           n_ethertype_ipv4, lwstate.v4_vlan_tag)
          -- Fragment if necessary
          if pkt.length - lwstate.l2_size > lwstate.ipv4_mtu then
-            local fragstatus, frags = fragmentv4.fragment_ipv4(pkt, lwstate.l2_size, lwstate.ipv4_mtu)
+            local fragstatus, frags = fragmentv4.fragment(pkt, lwstate.l2_size, lwstate.ipv4_mtu)
             if fragstatus == fragmentv4.FRAGMENT_OK then
                for i=1,#frags do
                   transmit(lwstate.o4, frags[i])
