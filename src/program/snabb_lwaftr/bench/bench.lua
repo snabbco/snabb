@@ -14,14 +14,19 @@ end
 
 function parse_args(args)
    local handlers = {}
+   local opts = {}
+   function handlers.D(arg)
+      opts.duration = assert(tonumber(arg), "duration must be a number")
+      assert(opts.duration >= 0, "duration can't be negative")
+   end
    function handlers.h() show_usage(0) end
-   args = lib.dogetopt(args, handlers, "h", { help="h" })
+   args = lib.dogetopt(args, handlers, "hD:", { help="h", duration="D" })
    if #args ~= 3 then show_usage(1) end
-   return unpack(args)
+   return opts, unpack(args)
 end
 
 function run(args)
-   local conf_file, inv4_pcap, inv6_pcap = parse_args(args)
+   local opts, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
 
    local c = config.new()
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
@@ -45,5 +50,5 @@ function run(args)
    config.link(c, "statisticsv6.output -> sinkv6.input")
 
    app.configure(c)
-   app.main({duration=10})
+   app.main({duration=opts.duration})
 end
