@@ -193,7 +193,7 @@ function Intel1g:new(conf)
     print("  PHYREG(0,1)  = " .. bit.tohex(readPHY(0,1)) .. " Copper Status")	-- p.546, 
     local phyID1= readPHY(0,2)
     print("  PHYREG(0,2)  = " .. bit.tohex(phyID1) .. " PHY ID 1")		-- p.547, 8.27.3.3 PHY Identifier 1
-    assert(phyID1 == 0x0141, "PHY ID1 is not 0x0141")
+    assert((phyID1 == 0x0141) or (phyID1 == 0x0154), "PHY ID1 is not 0x0141 (i210) or 0x0154 (i350)")
     print("  PHYREG(0,4)  = " .. bit.tohex(readPHY(0,4)) .. " Copper Auto-Neg Adv")	-- p.548, p.114, auto-neg. flow control (bits 10, 11)
     print("  PHYREG(0,5)  = " .. bit.tohex(readPHY(0,5)) .. " Copper Link Partner Ability")	-- p.549, p.115, auto-neg. flow control (bits 10, 11) of partner
     print("  PHYREG(0,6)  = " .. bit.tohex(readPHY(0,6)) .. " Copper Auto-Neg Expansion")  -- p.550
