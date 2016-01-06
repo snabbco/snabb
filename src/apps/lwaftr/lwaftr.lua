@@ -185,7 +185,7 @@ local function binding_lookup_ipv4(lwstate, ipv4_ip, port)
       print(lwdebug.format_ipv4(ipv4_ip), 'port: ', port, string.format("%x", port))
       lwdebug.pp(lwstate.binding_table)
    end
-   local host_endian_ipv4 = C.htonl(ipv4_ip)
+   local host_endian_ipv4 = C.ntohl(ipv4_ip)
    local val = lwstate.binding_table:lookup(host_endian_ipv4, port)
    if val then
       return val.b4_ipv6, lwstate.binding_table:get_br_address(val.br)
