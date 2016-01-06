@@ -172,7 +172,7 @@ function PodHashMap:insert(hash, key, value)
    while entries[index].hash == hash do
       --- Update currently unsupported.
       --print('update?', index)
-      assert(key ~= entries[index].key)
+      assert(not self.equal_fn(key, entries[index].key))
       index = index + 1
    end
 
