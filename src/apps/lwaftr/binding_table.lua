@@ -193,11 +193,11 @@ end
 
 function BindingTable:save(filename, mtime_sec, mtime_nsec)
    local out = stream.open_temporary_output_byte_stream(filename)
-   out:write(binding_table_header_t(
-                BINDING_TABLE_MAGIC, BINDING_TABLE_VERSION,
-                mtime_sec or 0, mtime_nsec or 0))
+   out:write_ptr(binding_table_header_t(
+                    BINDING_TABLE_MAGIC, BINDING_TABLE_VERSION,
+                    mtime_sec or 0, mtime_nsec or 0))
    self.psid_map:save(out)
-   out:write(br_addresses_header_t(self.br_address_count))
+   out:write_ptr(br_addresses_header_t(self.br_address_count))
    out:write_array(self.br_addresses, br_address_t, self.br_address_count)
    self.softwires:save(out)
    out:close_and_rename(filename)

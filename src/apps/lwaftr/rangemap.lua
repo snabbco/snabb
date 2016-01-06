@@ -152,7 +152,7 @@ struct {
 
 function RangeMap:save(stream)
    local entry_size = ffi.sizeof(self.entry_type)
-   stream:write(range_map_header_t(self.size, entry_size))
+   stream:write_ptr(range_map_header_t(self.size, entry_size))
    stream:write_array(self.entries, self.entry_type, self.size)
 end
 

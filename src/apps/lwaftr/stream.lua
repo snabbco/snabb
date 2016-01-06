@@ -21,7 +21,7 @@ function open_output_byte_stream(filename)
       error('while writing file '..filename..': '..msg)
    end
    function ret:write(ptr, size)
-      if not size then size = ffi.sizeof(ptr) end
+      assert(size)
       ptr = ffi.cast("uint8_t*", ptr)
       local to_write = size
       while to_write > 0 do
@@ -31,6 +31,10 @@ function open_output_byte_stream(filename)
          self.written = self.written + written
          to_write = to_write - written
       end
+   end
+   function ret:write_ptr(ptr)
+      self:align(ffi.alignof(ptr))
+      self:write(ptr, ffi.sizeof(ptr))
    end
    function ret:write_array(ptr, type, count)
       self:align(ffi.alignof(type))

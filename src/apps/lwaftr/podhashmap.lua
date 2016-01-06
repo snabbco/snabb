@@ -81,12 +81,15 @@ struct {
    uint32_t entry_size;
    uint32_t occupancy;
    uint32_t max_displacement;
+   double max_occupancy_rate;
+   double min_occupancy_rate;
 }
 ]]
 
 function PodHashMap:save(stream)
-   stream:write(header_t(self.size, ffi.sizeof(self.entry_type),
-                         self.occupancy, self.max_displacement))
+   stream:write_ptr(header_t(self.size, ffi.sizeof(self.entry_type),
+                             self.occupancy, self.max_displacement,
+                             self.max_occupancy_rate, self.min_occupancy_rate))
    stream:write_array(self.entries,
                       self.entry_type,
                       self.size + self.max_displacement + 1)
@@ -102,7 +105,8 @@ function load(stream, key_t, value_t, hash_fn)
    map.max_displacement = header.max_displacement
    map.entries = stream:read_array(map.entry_type,
                                    map.size + map.max_displacement + 1)
-   -- ?
+   map.min_occupancy_rate = header.min_occupancy_rate
+   map.max_occupancy_rate = header.max_occupancy_rate
    map.occupancy_hi = ceil(map.size * map.max_occupancy_rate)
    map.occupancy_lo = floor(map.size * map.min_occupancy_rate)
 
