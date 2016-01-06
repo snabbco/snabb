@@ -107,6 +107,8 @@ local softwire_value_t = ffi.typeof[[
    } __attribute__((packed))
 ]]
 
+local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
+
 local function maybe(f, ...)
    local function catch(success, ...)
       if success then return ... end
@@ -313,9 +315,7 @@ local function parse_softwires(parser, psid_map, br_address_count)
       local entry = parser:parse_property_list(softwire_spec, '{', '}')
       key.ipv4, key.psid = entry.ipv4, entry.psid
       value.br, value.b4_ipv6 = entry.aftr, entry.b4
-      map:add(key, value)
-      local success = true
-      --local success = pcall(map.add, map, key, value)
+      local success = pcall(map.add, map, key, value)
       if not success then
          parser:error('duplicate softwire for ipv4=%s, psid=%d',
                       lwdebug.format_ipv4(key.ipv4), key.psid)
@@ -323,6 +323,7 @@ local function parse_softwires(parser, psid_map, br_address_count)
       parser:skip_whitespace()
       if parser:check(',') then parser:skip_whitespace() end
    end
+   map:resize(map.size / SOFTWIRE_TABLE_LOAD_FACTOR)
    return map
 end
 
