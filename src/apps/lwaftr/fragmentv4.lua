@@ -9,7 +9,8 @@ local ffi = require("ffi")
 
 local rd16, wr16, wr32, get_ihl_from_offset = lwutil.rd16, lwutil.wr16, lwutil.wr32, lwutil.get_ihl_from_offset
 local cast = ffi.cast
-local C = ffi.C
+local htons, htonl = lwutil.htons, lwutil.htonl
+local ntohs, ntohl = htons, htonl
 local band, bor = bit.band, bit.bor
 local ceil = math.ceil
 
@@ -69,7 +70,7 @@ function fragment_ipv4(ipv4_pkt, l2_size, mtu)
    local checksum_offset = l2_size + constants.o_ipv4_checksum
    -- Discard packets with the DF (dont't fragment) flag set
    do
-      local flags_and_frag_offset = C.ntohs(rd16(ipv4_pkt.data + flags_and_frag_offset_offset))
+      local flags_and_frag_offset = ntohs(rd16(ipv4_pkt.data + flags_and_frag_offset_offset))
       if band(flags_and_frag_offset, flag_dont_fragment_mask) ~= 0 then
          return FRAGMENT_FORBIDDEN, nil
       end
@@ -85,9 +86,9 @@ function fragment_ipv4(ipv4_pkt, l2_size, mtu)
 
    local pkts = { ipv4_pkt }
 
-   wr16(ipv4_pkt.data + frag_id_offset, C.htons(fresh_frag_id()))
-   wr16(ipv4_pkt.data + total_length_offset, C.htons(total_length_per_packet))
-   wr16(ipv4_pkt.data + flags_and_frag_offset_offset, C.htons(flag_more_fragments_mask))
+   wr16(ipv4_pkt.data + frag_id_offset, htons(fresh_frag_id()))
+   wr16(ipv4_pkt.data + total_length_offset, htons(total_length_per_packet))
+   wr16(ipv4_pkt.data + flags_and_frag_offset_offset, htons(flag_more_fragments_mask))
    wr16(ipv4_pkt.data + checksum_offset, 0)
 
    local raw_frag_offset = payload_bytes_per_packet
@@ -99,10 +100,10 @@ function fragment_ipv4(ipv4_pkt, l2_size, mtu)
                ipv4_pkt.data + header_size + raw_frag_offset,
                payload_bytes_per_packet)
       wr16(frag_pkt.data + flags_and_frag_offset_offset,
-           C.htons(bor(flag_more_fragments_mask,
+           htons(bor(flag_more_fragments_mask,
                        band(frag_offset_field_mask, raw_frag_offset / 8))))
       wr16(frag_pkt.data + checksum_offset,
-           C.htons(ipsum(frag_pkt.data + ver_and_ihl_offset, ihl, 0)))
+           htons(ipsum(frag_pkt.data + ver_and_ihl_offset, ihl, 0)))
       frag_pkt.length = header_size + payload_bytes_per_packet
       raw_frag_offset = raw_frag_offset + payload_bytes_per_packet
       pkts[i] = frag_pkt
@@ -116,17 +117,17 @@ function fragment_ipv4(ipv4_pkt, l2_size, mtu)
             ipv4_pkt.data + header_size + raw_frag_offset,
             last_payload_len)
    wr16(last_pkt.data + flags_and_frag_offset_offset,
-        C.htons(band(frag_offset_field_mask, raw_frag_offset / 8)))
-   wr16(last_pkt.data + total_length_offset, C.htons(last_payload_len + ihl))
+        htons(band(frag_offset_field_mask, raw_frag_offset / 8)))
+   wr16(last_pkt.data + total_length_offset, htons(last_payload_len + ihl))
    wr16(last_pkt.data + checksum_offset,
-        C.htons(ipsum(last_pkt.data + ver_and_ihl_offset, ihl, 0)))
+        htons(ipsum(last_pkt.data + ver_and_ihl_offset, ihl, 0)))
    last_pkt.length = header_size + last_payload_len
    pkts[num_packets] = last_pkt
 
    -- Truncate the original packet, and update its checksum
    ipv4_pkt.length = header_size + payload_bytes_per_packet
    wr16(ipv4_pkt.data + checksum_offset,
-        C.htons(ipsum(ipv4_pkt.data + ver_and_ihl_offset, ihl, 0)))
+        htons(ipsum(ipv4_pkt.data + ver_and_ihl_offset, ihl, 0)))
 
    return FRAGMENT_OK, pkts
 end
@@ -135,7 +136,7 @@ end
 function is_ipv4_fragment(pkt, l2_size)
    -- Either the packet has the "more fragments" flag set,
    -- or the fragment offset is non-zero, or both.
-   local flags_and_frag_offset = C.ntohs(rd16(pkt.data + l2_size + constants.o_ipv4_flags))
+   local flags_and_frag_offset = ntohs(rd16(pkt.data + l2_size + constants.o_ipv4_flags))
    return band(flags_and_frag_offset, flag_more_fragments_mask) ~= 0 or
       band(flags_and_frag_offset, frag_offset_field_mask) ~= 0
 end
@@ -149,22 +150,22 @@ REASSEMBLE_MISSING_FRAGMENT = 3
 function reassemble_ipv4(fragments, l2_size)
    local flags_and_frag_offset_offset = l2_size + constants.o_ipv4_flags
    table.sort(fragments, function (pkt1, pkt2)
-       local pkt1_offset = band(C.ntohs(rd16(pkt1.data + flags_and_frag_offset_offset)),
+       local pkt1_offset = band(ntohs(rd16(pkt1.data + flags_and_frag_offset_offset)),
                                 frag_offset_field_mask)
-       local pkt2_offset = band(C.ntohs(rd16(pkt2.data + flags_and_frag_offset_offset)),
+       local pkt2_offset = band(ntohs(rd16(pkt2.data + flags_and_frag_offset_offset)),
                                 frag_offset_field_mask)
        return pkt1_offset < pkt2_offset
    end)
 
    -- Check that first fragment has a 0 as fragment offset.
-   if band(C.ntohs(rd16(fragments[1].data + flags_and_frag_offset_offset)),
+   if band(ntohs(rd16(fragments[1].data + flags_and_frag_offset_offset)),
            frag_offset_field_mask) ~= 0
    then
       return REASSEMBLE_MISSING_FRAGMENT
    end
 
    -- Check that the last fragment does not have "more fragments" flag set
-   if band(C.ntohs(rd16(fragments[#fragments].data + flags_and_frag_offset_offset)),
+   if band(ntohs(rd16(fragments[#fragments].data + flags_and_frag_offset_offset)),
            flag_more_fragments_mask) ~= 0
    then
       return REASSEMBLE_MISSING_FRAGMENT
@@ -193,7 +194,7 @@ function reassemble_ipv4(fragments, l2_size)
       end
 
       --   3. The "more fragments" flag is set (except for last fragment)
-      local flags_and_frag_offset = C.ntohs(rd16(fragment.data + flags_and_frag_offset_offset))
+      local flags_and_frag_offset = ntohs(rd16(fragment.data + flags_and_frag_offset_offset))
       if band(flags_and_frag_offset, flag_more_fragments_mask) == 0 then
          if i ~= #fragments then
             status = REASSEMBLE_INVALID
@@ -242,7 +243,7 @@ function reassemble_ipv4(fragments, l2_size)
 
    -- Set the total length field
    local total_length_offset = l2_size + constants.o_ipv4_total_length
-   wr16(pkt.data + total_length_offset, C.htons(packet_size - header_size + ihl))
+   wr16(pkt.data + total_length_offset, htons(packet_size - header_size + ihl))
 
    -- Clear fragmentation flags and offset, and fragmentation id
    wr32(pkt.data + frag_id_offset, 0)
@@ -252,7 +253,7 @@ function reassemble_ipv4(fragments, l2_size)
    local checksum_offset = l2_size + constants.o_ipv4_checksum
    wr16(pkt.data + checksum_offset, 0)
    wr16(pkt.data + checksum_offset,
-        C.htons(ipsum(pkt.data + ver_and_ihl_offset, ihl, 0)))
+        htons(ipsum(pkt.data + ver_and_ihl_offset, ihl, 0)))
 
    return REASSEMBLE_OK, pkt
 end

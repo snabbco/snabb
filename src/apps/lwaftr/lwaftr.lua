@@ -22,11 +22,13 @@ local lib = require("core.lib")
 local bit = require("bit")
 local ffi = require("ffi")
 
-local band, bor, bnot, rshift, lshift = bit.band, bit.bor, bit.bnot, bit.rshift, bit.lshift
-local C = ffi.C
+local band, bor, bnot = bit.band, bit.bor, bit.bnot
+local rshift, lshift = bit.rshift, bit.lshift
 local cast, fstring = ffi.cast, ffi.string
 local receive, transmit = link.receive, link.transmit
 local rd16, rd32, get_ihl_from_offset = lwutil.rd16, lwutil.rd32, lwutil.get_ihl_from_offset
+local htons, htonl = lwutil.htons, lwutil.htonl
+local ntohs, ntohl = htons, htonl
 local keys = lwutil.keys
 local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.write_ipv6_header 
 
@@ -124,8 +126,8 @@ function LwAftr:new(conf)
       o.l2_size = constants.ethernet_header_size + 4
       o.o_ethernet_tag = constants.o_ethernet_ethertype
       o.o_ethernet_ethertype = constants.o_ethernet_ethertype + 4
-      o.v4_vlan_tag = C.htonl(bor(lshift(constants.dotq_tpid, 16), o.v4_vlan_tag))
-      o.v6_vlan_tag = C.htonl(bor(lshift(constants.dotq_tpid, 16), o.v6_vlan_tag))
+      o.v4_vlan_tag = htonl(bor(lshift(constants.dotq_tpid, 16), o.v4_vlan_tag))
+      o.v6_vlan_tag = htonl(bor(lshift(constants.dotq_tpid, 16), o.v6_vlan_tag))
    else
       o.l2_size = constants.ethernet_header_size
       o.o_ethernet_ethertype = constants.o_ethernet_ethertype
@@ -147,7 +149,7 @@ end
 
 local function fixup_checksum(pkt, csum_offset, fixup_val)
    assert(math.abs(fixup_val) <= 0xffff, "Invalid fixup")
-   local csum = bnot(C.ntohs(rd16(pkt.data + csum_offset)))
+   local csum = bnot(ntohs(rd16(pkt.data + csum_offset)))
    if debug then print("old csum", string.format("%x", csum)) end
    csum = csum + fixup_val
    -- TODO/FIXME: *test* this code
@@ -185,7 +187,7 @@ local function binding_lookup_ipv4(lwstate, ipv4_ip, port)
       print(lwdebug.format_ipv4(ipv4_ip), 'port: ', port, string.format("%x", port))
       lwdebug.pp(lwstate.binding_table)
    end
-   local host_endian_ipv4 = C.ntohl(ipv4_ip)
+   local host_endian_ipv4 = ntohl(ipv4_ip)
    local val = lwstate.binding_table:lookup(host_endian_ipv4, port)
    if val then
       return val.b4_ipv6, lwstate.binding_table:get_br_address(val.br)
@@ -203,7 +205,7 @@ local function binding_lookup_dst_ipv4_from_pkt(lwstate, pkt, pre_ipv4_bytes)
    -- Note: ip is kept in network byte order, regardless of host byte order
    local ip = rd32(pkt.data + dst_ip_start)
    local dst_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes) + 2
-   local port = C.ntohs(rd16(pkt.data + dst_port_start))
+   local port = ntohs(rd16(pkt.data + dst_port_start))
    return binding_lookup_ipv4(lwstate, ip, port)
 end
 
@@ -212,7 +214,7 @@ local function binding_lookup_src_ipv4_from_pkt(lwstate, pkt, pre_ipv4_bytes)
    -- Note: ip is kept in network byte order, regardless of host byte order
    local ip = rd32(pkt.data + src_ip_start)
    local src_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes)
-   local port = C.ntohs(rd16(pkt.data + src_port_start))
+   local port = ntohs(rd16(pkt.data + src_port_start))
    return binding_lookup_ipv4(lwstate, ip, port)
 end
 
@@ -220,7 +222,7 @@ end
 -- Return true if the destination ipv4 address is within our managed set of addresses
 local function ipv4_dst_in_binding_table(lwstate, pkt, pre_ipv4_bytes)
    local dst_ip_start = pre_ipv4_bytes + 16
-   local host_endian_ipv4 = C.htonl(rd32(pkt.data + dst_ip_start))
+   local host_endian_ipv4 = htonl(rd32(pkt.data + dst_ip_start))
    return lwstate.binding_table:is_managed_ipv4_address(host_endian_ipv4)
 end
 
@@ -345,7 +347,7 @@ local function icmpv4_incoming(lwstate, pkt)
    -- Were it to nonetheless do so, RFC 4884 extension headers MUST NOT
    -- be taken into account when validating the checksum
    local o_tl = lwstate.l2_size + constants.o_ipv4_total_length
-   local icmp_bytes = C.ntohs(rd16(pkt.data + o_tl)) - ipv4_header_size
+   local icmp_bytes = ntohs(rd16(pkt.data + o_tl)) - ipv4_header_size
    if checksum.ipsum(pkt.data + icmp_base, icmp_bytes, 0) ~= 0 then
       packet.free(pkt)
       return -- Silently drop the packet, as per RFC 5508
@@ -353,7 +355,7 @@ local function icmpv4_incoming(lwstate, pkt)
 
    -- checksum was ok
    if icmp_type == constants.icmpv4_echo_reply or icmp_type == constants.icmpv4_echo_request then
-      source_port = C.ntohs(rd16(pkt.data + icmp_base + constants.o_icmpv4_echo_identifier))
+      source_port = ntohs(rd16(pkt.data + icmp_base + constants.o_icmpv4_echo_identifier))
       -- Use the outermost IP header for the destination; it's not repeated in the payload
       ipv4_dst = rd32(pkt.data + lwstate.l2_size + constants.o_ipv4_dst_addr)
    else
@@ -363,7 +365,7 @@ local function icmpv4_incoming(lwstate, pkt)
       -- The Internet Header Length is the low 4 bits, in 32-bit words; convert it to bytes
       local embedded_ipv4_header_size = bit.band(pkt.data[ip_base + constants.o_ipv4_ver_and_ihl], 0xf) * 4
       local o_sp = ip_base + embedded_ipv4_header_size
-      source_port = C.ntohs(rd16(pkt.data + o_sp))
+      source_port = ntohs(rd16(pkt.data + o_sp))
       local o_ip = ip_base + constants.o_ipv4_src_addr
       ipv4_dst = rd32(pkt.data + o_ip)
    end
@@ -491,7 +493,7 @@ local function tunnel_packet_too_big(lwstate, pkt)
 
    local next_hop_mtu_offset = 6
    local o_mtu = eth_hs + ipv6_hs + next_hop_mtu_offset
-   local specified_mtu = C.ntohs(rd16(pkt.data + o_mtu))
+   local specified_mtu = ntohs(rd16(pkt.data + o_mtu))
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_datagram_too_big_df,
                         extra_payload_offset = orig_packet_offset - eth_hs,
@@ -652,7 +654,7 @@ local function from_b4(lwstate, pkt)
    local ipv6_src_ip = pkt.data + ipv6_src_ip_offset
    local ipv6_dst_ip = pkt.data + ipv6_dst_ip_offset
    local ipv4_src_ip = rd32(pkt.data + ipv4_src_ip_offset)
-   local ipv4_src_port = C.ntohs(rd16(pkt.data + ipv4_src_port_offset))
+   local ipv4_src_port = ntohs(rd16(pkt.data + ipv4_src_port_offset))
 
    if in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port) then
       -- Is it worth optimizing this to change src_eth, src_ipv6, ttl, checksum,

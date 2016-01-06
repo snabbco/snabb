@@ -3,7 +3,7 @@ module(..., package.seeall)
 local bit = require("bit")
 local ffi = require("ffi")
 
-local band = bit.band
+local band, rshift, bswap = bit.band, bit.rshift, bit.bswap
 local cast = ffi.cast
 
 local uint16_ptr_t = ffi.typeof("uint16_t*")
@@ -31,6 +31,15 @@ end
 function wr32(offset, val)
    cast(uint32_ptr_t, offset)[0] = val
 end
+
+local to_uint32_buf = ffi.new('uint32_t[1]')
+local function to_uint32(x)
+   to_uint32_buf[0] = x
+   return to_uint32_buf[0]
+end
+
+function htons(s) return rshift(bswap(s), 16) end
+function htonl(s) return to_uint32(bswap(s)) end
 
 function keys(t)
    local result = {}
