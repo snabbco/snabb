@@ -142,114 +142,6 @@ function Intel1g:new(conf)
       repeat until band(peek32(offset), mask) == (value or mask)
    end
 
-   -- Return the next index into a ring buffer.
-   -- (ndesc is a power of 2 and the ring wraps after ndesc-1.)
-   local function ringnext (index)
-      return band(index+1, ndesc-1)
-   end
-
-   local function yesno (value, bit)
-    return bitset(value, bit) and 'yes' or 'no'
-   end
-
-   local function printMACstatus()
-    print("MAC Status:")
-    local status= peek32(r.STATUS)				-- p.372, 8.2.2
-    print("  STATUS      = " .. bit.tohex(status))
-    print("  Full Duplex = " .. yesno(status, 0))
-    print("  Link Up     = " .. yesno(status, 1))
-    print("  TxOFF Paused= " .. yesno(status, 4))
-    local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
-    print("  Speed       = " .. speed .. ' Mb/s')
-    local autoSpeed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 8),3)])
-    print("  Auto Speed  = " .. autoSpeed .. ' Mb/s')	-- Auto-Speed Detection Value (ASDV), result after setting CTRL_EXT.ASDCHK
-    print("  PHY Reset   = " .. yesno(status, 10))
-    print("  RxFlowCtrl  = " .. yesno(status, 27))		-- should be set by SW driver to auto-neg. from PHY
-    print("  TxFlowCtrl  = " .. yesno(status, 28))		-- should be set by SW driver to auto-neg. from PHY
-   end
-
-   local function printPHYstatus()
-    print("PHY Status:")
-    print("  PHYREG(0,0) = " .. bit.tohex(readPHY(0,0)) .. " Copper Control")	-- p.545, 
-    print("  PHYREG(0,1) = " .. bit.tohex(readPHY(0,1)) .. " Copper Status")	-- p.546, 
-    local phyID1= readPHY(0,2)
-    print("  PHYREG(0,2) = " .. bit.tohex(phyID1) .. " PHY ID 1")		-- p.547, 8.27.3.3 PHY Identifier 1
-    assert(phyID1 == 0x0141, "PHY ID1 is not 0x0141")
-    print("  PHYREG(0,4) = " .. bit.tohex(readPHY(0,4)) .. " Copper Auto-Neg Adv")	-- p.548, p.114, auto-neg. flow control (bits 10, 11)
-    print("  PHYREG(0,5) = " .. bit.tohex(readPHY(0,5)) .. " Copper Link Partner Ability")	-- p.549, p.115, auto-neg. flow control (bits 10, 11) of partner
-    print("  PHYREG(0,6) = " .. bit.tohex(readPHY(0,6)) .. " Copper Auto-Neg Expansion")  -- p.550
-    print("  PHYREG(0,9) = " .. bit.tohex(readPHY(0,9)) .. " 1000BASE-T Control")  -- p.552
-    print("  PHYREG(0,10) = " .. bit.tohex(readPHY(0,10)) .. " 1000BASE-T Status")  -- p.553
-    print("  PHYREG(0,15) = " .. bit.tohex(readPHY(0,15)) .. " Extended Status")  -- p.554
-    print("  PHYREG(0,16) = " .. bit.tohex(readPHY(0,16)) .. " Copper Specific Control 1")  -- p.554
-
-    local phyStatus= readPHY(0, 17)
-    print("  PHYREG(0,17) = " .. bit.tohex(phyStatus) .. " Copper Specific Status 1")	-- p.556, 8.27.3.16
-    local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(phyStatus, 14),3)])
-    print("  Speed       = " .. speed .. ' Mb/s')
-    print("  Full Duplex = " .. yesno(phyStatus, 13))
-    print("  Page Rx     = " .. yesno(phyStatus, 12))
-    print("  Spd Dplx Resolved = " .. yesno(phyStatus, 11))
-    print("  Copper Link = " .. yesno(phyStatus, 10))
-    print("  Tx Pause    = " .. yesno(phyStatus, 9))
-    print("  Rx Pause    = " .. yesno(phyStatus, 8))
-    print("  MDI-X       = " .. yesno(phyStatus, 6))
-    print("  Downshift   = " .. yesno(phyStatus, 5))
-    print("  Copper Sleep= " .. yesno(phyStatus, 4))	-- Copper Energy Detect Status
-    print("  Glabal Link = " .. yesno(phyStatus, 3))
-    print("  Polarity Rev= " .. yesno(phyStatus, 1))
-    print("  Jabber      = " .. yesno(phyStatus, 0))
-
-    print("  PHYREG(0,20) = " .. bit.tohex(readPHY(0,20)) .. " Copper Specific Control 2")  -- p.559
-    print("  PHYREG(0,21)= " .. bit.tohex(readPHY(0,21)) .. " Copper Specific Rx Errors")	-- p.559
-    print("  PHYREG(0,22)= " .. bit.tohex(readPHY(0,22)) .. " Page Addres")	-- p.559
-    print("  PHYREG(0,23)= " .. bit.tohex(readPHY(0,23)) .. " Copper Specific Control 3")	-- p.560
-    print("  PHYREG(2,16)= " .. bit.tohex(readPHY(2,16)) .. " MAC Specific Control 1")	-- p.561
-    print("  PHYREG(2,19)= " .. bit.tohex(readPHY(2,19)) .. " MAC Specific Status")	-- p.561
-    print("  PHYREG(2,21)= " .. bit.tohex(readPHY(2,21)) .. " MAC Specific Control 2")	-- p.563         
-   end
-
-   local function printTxStatus()
-    print(" Tx status")
-    local tctl= peek32(r.TCTL)
-    print("  TCTL        = " .. bit.tohex(tctl))
-    print("  TXDCTL      = " .. bit.tohex(peek32(r.TXDCTL)))
-    print("  TX Enable   = " .. yesno(tctl, 1))
-   end
-
-   local function printRxStatus()
-    print(" Rx status")
-    local rctl= peek32(r.RCTL)
-    print("  RCTL        = " .. bit.tohex(rctl))
-    print("  RXDCTL      = " .. bit.tohex(peek32(r.RXDCTL)))
-    print("  RX Enable   = " .. yesno(rctl, 1))
-    print("  RX Loopback = " .. yesno(rctl, 6))
-   end
-   
-   local function printHWstatus(r, title)
-    print(title)
-    printMACstatus()
-    printPHYstatus()
-    printTxStatus()
-    printRxStatus()
-   end
-
-   local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0}
-
-   local function printStats(r)
-    print("Stats from NIC registers:")
-     print("  Rx Packets=        " .. peek32(r.TPR) .. "  Octets= " .. peek32(r.TORH) *2^32 +peek32(r.TORL))
-     print("  Tx Packets=        " .. peek32(r.TPT) .. "  Octets= " .. peek32(r.TOTH) *2^32 +peek32(r.TOTL))
-     print("  Rx Good Packets=   " .. peek32(r.GPRC))
-     print("  Rx No Buffers=     " .. peek32(r.RNBC))
-     print("  Rx Packets to Host=" .. peek32(r.RPTHC))
-    print("Stats from counters:")
-     print("  rxPackets=         " .. counters.rxPackets .. "  rxBytes= " .. counters.rxBytes)
-     print("  txPackets=         " .. counters.txPackets .. "  txBytes= " .. counters.txBytes)
-   end
-
-   local stop_nic, stop_transmit, stop_receive
-
    -- 3.7.4.4.4 Using PHY Registers, 
    local MDIOpage= -1		-- 8.27.3.21 HW resets to 0, but persists with SW reset!
    poke32(r.MDICNFG, 0)		-- 8.2.5 MDC/MDIO Config: 0x0000 = internal PHY
@@ -274,6 +166,114 @@ function Intel1g:new(conf)
     assert(band(peek32(r.MDIC), bitvalue({Error=30})) ==0, "readPHY(): error")
     return peek32(r.MDIC) %2^16
    end
+
+   local function yesno (value, bit)
+    return bitset(value, bit) and 'yes' or 'no'
+   end
+
+   local function printMACstatus()
+    print("MAC Status:")
+    local status= peek32(r.STATUS)				-- p.372, 8.2.2
+    print("  STATUS       = " .. bit.tohex(status))
+    print("  Full Duplex  = " .. yesno(status, 0))
+    print("  Link Up      = " .. yesno(status, 1))
+    print("  TxOFF Paused = " .. yesno(status, 4))
+    local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 6),3)])
+    print("  Speed        = " .. speed .. ' Mb/s')
+    local autoSpeed = (({10,100,1000,1000})[1+bit.band(bit.rshift(status, 8),3)])
+    print("  Auto Speed   = " .. autoSpeed .. ' Mb/s')	-- Auto-Speed Detection Value (ASDV), result after setting CTRL_EXT.ASDCHK
+    print("  PHY Reset    = " .. yesno(status, 10))
+    print("  RxFlowCtrl   = " .. yesno(status, 27))		-- should be set by SW driver to auto-neg. from PHY
+    print("  TxFlowCtrl   = " .. yesno(status, 28))		-- should be set by SW driver to auto-neg. from PHY
+   end
+
+   local function printPHYstatus()
+    print("PHY Status:")
+    print("  PHYREG(0,0)  = " .. bit.tohex(readPHY(0,0)) .. " Copper Control")	-- p.545, 
+    print("  PHYREG(0,1)  = " .. bit.tohex(readPHY(0,1)) .. " Copper Status")	-- p.546, 
+    local phyID1= readPHY(0,2)
+    print("  PHYREG(0,2)  = " .. bit.tohex(phyID1) .. " PHY ID 1")		-- p.547, 8.27.3.3 PHY Identifier 1
+    assert(phyID1 == 0x0141, "PHY ID1 is not 0x0141")
+    print("  PHYREG(0,4)  = " .. bit.tohex(readPHY(0,4)) .. " Copper Auto-Neg Adv")	-- p.548, p.114, auto-neg. flow control (bits 10, 11)
+    print("  PHYREG(0,5)  = " .. bit.tohex(readPHY(0,5)) .. " Copper Link Partner Ability")	-- p.549, p.115, auto-neg. flow control (bits 10, 11) of partner
+    print("  PHYREG(0,6)  = " .. bit.tohex(readPHY(0,6)) .. " Copper Auto-Neg Expansion")  -- p.550
+    print("  PHYREG(0,9)  = " .. bit.tohex(readPHY(0,9)) .. " 1000BASE-T Control")  -- p.552
+    print("  PHYREG(0,10) = " .. bit.tohex(readPHY(0,10)) .. " 1000BASE-T Status")  -- p.553
+    print("  PHYREG(0,15) = " .. bit.tohex(readPHY(0,15)) .. " Extended Status")  -- p.554
+    print("  PHYREG(0,16) = " .. bit.tohex(readPHY(0,16)) .. " Copper Specific Control 1")  -- p.554
+
+    local phyStatus= readPHY(0, 17)
+    print("  PHYREG(0,17) = " .. bit.tohex(phyStatus) .. " Copper Specific Status 1")	-- p.556, 8.27.3.16
+    local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(phyStatus, 14),3)])
+    print("  Speed        = " .. speed .. ' Mb/s')
+    print("  Full Duplex  = " .. yesno(phyStatus, 13))
+    print("  Page Rx      = " .. yesno(phyStatus, 12))
+    print("  Spd Dplx Resolved = " .. yesno(phyStatus, 11))
+    print("  Copper Link  = " .. yesno(phyStatus, 10))
+    print("  Tx Pause     = " .. yesno(phyStatus, 9))
+    print("  Rx Pause     = " .. yesno(phyStatus, 8))
+    print("  MDI-X        = " .. yesno(phyStatus, 6))
+    print("  Downshift    = " .. yesno(phyStatus, 5))
+    print("  Copper Sleep = " .. yesno(phyStatus, 4))	-- Copper Energy Detect Status
+    print("  Glabal Link  = " .. yesno(phyStatus, 3))
+    print("  Polarity Rev = " .. yesno(phyStatus, 1))
+    print("  Jabber       = " .. yesno(phyStatus, 0))
+
+    print("  PHYREG(0,20) = " .. bit.tohex(readPHY(0,20)) .. " Copper Specific Control 2")  -- p.559
+    print("  PHYREG(0,21) = " .. bit.tohex(readPHY(0,21)) .. " Copper Specific Rx Errors")	-- p.559
+    print("  PHYREG(0,22) = " .. bit.tohex(readPHY(0,22)) .. " Page Addres")	-- p.559
+    print("  PHYREG(0,23) = " .. bit.tohex(readPHY(0,23)) .. " Copper Specific Control 3")	-- p.560
+    print("  PHYREG(2,16) = " .. bit.tohex(readPHY(2,16)) .. " MAC Specific Control 1")	-- p.561
+    print("  PHYREG(2,19) = " .. bit.tohex(readPHY(2,19)) .. " MAC Specific Status")	-- p.561
+    print("  PHYREG(2,21) = " .. bit.tohex(readPHY(2,21)) .. " MAC Specific Control 2")	-- p.563         
+   end
+
+   local function printTxStatus()
+    print(" Tx status")
+    local tctl= peek32(r.TCTL)
+    print("  TCTL        = " .. bit.tohex(tctl))
+    print("  TXDCTL      = " .. bit.tohex(peek32(r.TXDCTL)))
+    print("  TX Enable   = " .. yesno(tctl, 1))
+   end
+
+   local function printRxStatus()
+    print(" Rx status")
+    local rctl= peek32(r.RCTL)
+    print("  RCTL        = " .. bit.tohex(rctl))
+    print("  RXDCTL      = " .. bit.tohex(peek32(r.RXDCTL)))
+    print("  RX Enable   = " .. yesno(rctl, 1))
+    print("  RX Loopback = " .. yesno(rctl, 6))
+   end
+   
+   local function printNICstatus(r, title)
+    print(title)
+    printMACstatus()
+    printPHYstatus()
+    printTxStatus()
+    printRxStatus()
+   end
+
+   local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0}
+
+   local function printStats(r)
+    print("Stats from NIC registers:")
+     print("  Rx Packets=        " .. peek32(r.TPR) .. "  Octets= " .. peek32(r.TORH) *2^32 +peek32(r.TORL))
+     print("  Tx Packets=        " .. peek32(r.TPT) .. "  Octets= " .. peek32(r.TOTH) *2^32 +peek32(r.TOTL))
+     print("  Rx Good Packets=   " .. peek32(r.GPRC))
+     print("  Rx No Buffers=     " .. peek32(r.RNBC))
+     print("  Rx Packets to Host=" .. peek32(r.RPTHC))
+    print("Stats from counters:")
+     print("  rxPackets=         " .. counters.rxPackets .. "  rxBytes= " .. counters.rxBytes)
+     print("  txPackets=         " .. counters.txPackets .. "  txBytes= " .. counters.txBytes)
+   end
+
+   -- Return the next index into a ring buffer.
+   -- (ndesc is a power of 2 and the ring wraps after ndesc-1.)
+   local function ringnext (index)
+      return band(index+1, ndesc-1)
+   end
+
+   local stop_nic, stop_transmit, stop_receive
 
    local function initPHY()
      -- 4.3.1.4 PHY Reset, p.131
@@ -314,7 +314,7 @@ function Intel1g:new(conf)
    end
 
    -- Device setup and initialization
-   --printNICStatus(r, "Status before Init: ")
+   --printNICstatus(r, "Status before Init: ")
    --printStats(r)
    if not attach then				-- Initialize device
       poke32(r.EIMC, 0xffffffff)		-- disable interrupts
