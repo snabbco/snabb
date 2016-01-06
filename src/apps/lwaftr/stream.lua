@@ -101,6 +101,7 @@ function open_input_byte_stream(filename)
       mtime_nsec=stat.st_mtime_nsec
    }
    function ret:close()
+      -- FIXME: Currently we don't unmap any memory.
       -- S.munmap(mem, size)
       mem, pos = nil, nil
    end
