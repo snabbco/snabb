@@ -13,7 +13,7 @@ function Parser.new(file)
    if type(file) == 'string' then
       name, file = file, io.open(file)
    end
-   local ret = { column=0, line=0, name=name }
+   local ret = { column=0, line=1, name=name }
    function ret.read_char() return file:read(1) end
    function ret.cleanup()
       function ret.cleanup() end
