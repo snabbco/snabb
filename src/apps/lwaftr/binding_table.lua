@@ -74,7 +74,7 @@ local phm = require("apps.lwaftr.podhashmap")
 local band, bor, bxor, lshift, rshift = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift
 
 local BINDING_TABLE_MAGIC = "\0bindingtabl"
-local BINDING_TABLE_VERSION = 0x00001000
+local BINDING_TABLE_VERSION = 0x00002000
 local binding_table_header_t = ffi.typeof[[
    struct {
       uint8_t magic[12];
@@ -172,6 +172,14 @@ function BindingTable:lookup(ipv4, port)
    return nil
 end
 
+function BindingTable:is_managed_ipv4_address(ipv4)
+   -- The PSID info map covers only the addresses that are declared in
+   -- the binding table.  Other addresses are recorded as having
+   -- psid_length == shift == 0.
+   local psid_info = self.psid_map:lookup(ipv4).value
+   return psid_info.psid_length + psid_info.shift > 0
+end
+
 function BindingTable:lookup_psid(ipv4, port)
    local psid_info = self.psid_map:lookup(ipv4).value
    local psid_len, shift = psid_info.psid_length, psid_info.shift
@@ -252,7 +260,7 @@ local function parse_psid_map(parser)
          parser:skip_whitespace()
       end
    end
-   return builder:build()
+   return builder:build(psid_map_value_t())
 end
 
 local function parse_br_addresses(parser)

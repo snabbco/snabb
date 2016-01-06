@@ -220,15 +220,8 @@ end
 -- Return true if the destination ipv4 address is within our managed set of addresses
 local function ipv4_dst_in_binding_table(lwstate, pkt, pre_ipv4_bytes)
    local dst_ip_start = pre_ipv4_bytes + 16
-   local dst_port_start = pre_ipv4_bytes + get_ihl_from_offset(pkt, pre_ipv4_bytes) + 2
-
-   -- FIXME: we should be able to look in the address map for this and
-   -- avoid going through the binding table.
-
-   -- network byte order ip, regardless of host byte order
-   local ip = rd32(pkt.data + dst_ip_start)
-   local port = C.ntohs(rd16(pkt.data + dst_port_start))
-   return binding_lookup_ipv4(lwstate, ip, port) ~= nil
+   local host_endian_ipv4 = C.htonl(rd32(pkt.data + dst_ip_start))
+   return lwstate.binding_table:is_managed_ipv4_address(host_endian_ipv4)
 end
 
 local uint64_ptr_t = ffi.typeof('uint64_t*')

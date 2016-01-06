@@ -83,7 +83,8 @@ function RangeMapBuilder:add(key, value)
    self:add_range(key, key, value)
 end
 
-function RangeMapBuilder:build()
+function RangeMapBuilder:build(default_value)
+   assert(default_value)
    table.sort(self.entries, function(a,b) return a.max.key < b.max.key end)
 
    -- The optimized binary search routines in binary_search.dasl want to
@@ -92,33 +93,29 @@ function RangeMapBuilder:build()
    -- contiguous entries with the highest K having a value V, starting
    -- with UINT32_MAX and working our way down.
    local ranges = {}
-   if #self.entries == 0 then error('empty range map') end
-   do
-      local last_entry = ffi.new(self.entry_type)
-      last_entry.key = UINT32_MAX
-      last_entry.value = self.entries[#self.entries].max.value
-      table.insert(ranges, last_entry)
+   if self.entries[#self.entries].max.key < UINT32_MAX then
+      table.insert(self.entries,
+                   { min=self.entry_type(UINT32_MAX, default_value),
+                     max=self.entry_type(UINT32_MAX, default_value) })
    end
+
+   table.insert(ranges, self.entries[#self.entries].max)
    local range_end = self.entries[#self.entries].min
    for i=#self.entries-1,1,-1 do
       local entry = self.entries[i]
-      -- FIXME: We are using range maps for the address maps, but
-      -- currently are specifying these parameters in the binding table
-      -- where naturally one IPv4 address appears multiple times.  When
-      -- we switch to a separate address map, we can assert that ranges
-      -- are disjoint.  Until then, just assert that if ranges overlap
-      -- that they have the same value.
-      -- if entry.max.key >= range_end.key then
-      --    error("Multiple range map entries for key: "..entry.max.key)
-      -- end
-      if not self.equal_fn(entry.max.value, range_end.value) then
-         -- Remove this when the above test is enabled.
-         if entry.max.key >= range_end.key then
-            error("Key maps to multiple values: "..entry.max.key)
-         end
-         table.insert(ranges, entry.max)
-         range_end = entry.min
+      if entry.max.key >= range_end.key then
+         error("Multiple range map entries for key: "..entry.max.key)
+      elseif entry.max.key + 1 ~= range_end.key then
+         table.insert(ranges, self.entry_type(range_end.key - 1, default_value))
+         range_end = self.entry_type(entry.max.key + 1, default_value)
       end
+      if not self.equal_fn(entry.max.value, range_end.value) then
+         table.insert(ranges, entry.max)
+      end
+      range_end = entry.min
+   end
+   if range_end.key > 0 then
+      table.insert(ranges, self.entry_type(range_end.key - 1, default_value))
    end
 
    local range_count = #ranges
@@ -181,35 +178,41 @@ function selftest()
    builder:add(301, 50)
    builder:add(302, 60)
    builder:add(350, 70)
+   builder:add(351, 70)
    builder:add(370, 70)
    builder:add(400, 70)
    builder:add(401, 80)
    builder:add(UINT32_MAX-1, 99)
    builder:add(UINT32_MAX, 100)
-   local map = builder:build()
+   local map = builder:build(0)
 
-   assert(map.size == 12)
+   assert(map.size == 21)
    assert(map:lookup(0).value == 1)
    assert(map:lookup(1).value == 2)
-   assert(map:lookup(2).value == 10)
-   assert(map:lookup(99).value == 10)
+   assert(map:lookup(2).value == 0)
+   assert(map:lookup(99).value == 0)
    assert(map:lookup(100).value == 10)
    assert(map:lookup(101).value == 20)
-   assert(map:lookup(102).value == 30)
-   assert(map:lookup(199).value == 30)
+   assert(map:lookup(102).value == 0)
+   assert(map:lookup(199).value == 0)
    assert(map:lookup(200).value == 30)
-   assert(map:lookup(201).value == 40)
+   assert(map:lookup(201).value == 0)
    assert(map:lookup(300).value == 40)
    assert(map:lookup(301).value == 50)
    assert(map:lookup(302).value == 60)
-   assert(map:lookup(303).value == 70)
-   assert(map:lookup(349).value == 70)
+   assert(map:lookup(303).value == 0)
+   assert(map:lookup(349).value == 0)
    assert(map:lookup(350).value == 70)
-   assert(map:lookup(399).value == 70)
+   assert(map:lookup(351).value == 70)
+   assert(map:lookup(352).value == 0)
+   assert(map:lookup(369).value == 0)
+   assert(map:lookup(370).value == 70)
+   assert(map:lookup(371).value == 0)
+   assert(map:lookup(399).value == 0)
    assert(map:lookup(400).value == 70)
    assert(map:lookup(401).value == 80)
-   assert(map:lookup(402).value == 99)
-   assert(map:lookup(UINT32_MAX-2).value == 99)
+   assert(map:lookup(402).value == 0)
+   assert(map:lookup(UINT32_MAX-2).value == 0)
    assert(map:lookup(UINT32_MAX-1).value == 99)
    assert(map:lookup(UINT32_MAX).value == 100)
 
