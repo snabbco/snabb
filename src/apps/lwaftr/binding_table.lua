@@ -177,7 +177,7 @@ function BindingTable:lookup_psid(ipv4, port)
    local psid_len, shift = psid_info.psid_length, psid_info.shift
    local psid_mask = lshift(1, psid_len) - 1
    local psid = band(rshift(port, shift), psid_mask)
-   -- Are there are restricted ports for this address?
+   -- Are there any restricted ports for this address?
    if psid_len + shift < 16 then
       local reserved_ports_bit_count = 16 - psid_len - shift
       local first_allocated_port = lshift(1, reserved_ports_bit_count)
