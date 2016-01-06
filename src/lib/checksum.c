@@ -2,7 +2,7 @@
  *
  * See src/arch/ for architecture specific SIMD versions.
  *
- * Generic checksm routine taken from DPDK: 
+ * Generic checksm routine taken from DPDK:
  *   BSD license; (C) Intel 2010-2015, 6WIND 2014.
  */
 
@@ -149,4 +149,43 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     return ntohs(sum);
   }
   return 0xFFFF0001;
+}
+
+uint8_t startoffset[2];
+uint8_t *prepare_packet(int8_t *buf, size_t len)
+{
+  uint16_t *hwbuf = (uint16_t *)buf;
+  int8_t ipv = (buf[0] & 0xF0) >> 4;
+  int8_t proto = 0;
+  uint32_t pheader = 0;
+
+  // IPv4.
+  if (ipv == 4) {
+    proto = buf[9];
+    startoffset[0] = (buf[0] & 0x0F) * 4;
+    hwbuf[5] = htons(cksum_generic((unsigned char *)buf, startoffset[0], -ntohs(hwbuf[5])));
+  // IPv6.
+  } else if (ipv == 6) {
+    proto = buf[6];
+    startoffset[0] = 40;
+  } else {
+    return NULL;
+  }
+
+  // TCP.
+  if (proto == 6) {
+    startoffset[1] = 16; // Checksum offset.
+  // UDP.
+  } else if (proto == 17) {
+    startoffset[1] = 6;  // Checksum offset.
+  } else {
+    return NULL;
+  }
+
+  pheader = pseudo_header_initial(buf, len);
+  if (pheader & 0xFFFF0000) {
+    return NULL;
+  }
+  *(uint16_t *)(buf+startoffset[0]+startoffset[1]) = htons(pheader & 0x0000FFFF);
+  return startoffset;
 }
