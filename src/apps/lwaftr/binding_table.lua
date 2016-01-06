@@ -346,10 +346,10 @@ local function log(msg, ...)
 end
 
 function load(file)
-   local stream = stream.open_input_byte_stream(file)
-   if has_magic(stream) then
+   local source = stream.open_input_byte_stream(file)
+   if has_magic(source) then
       log('loading compiled binding table from %s', file)
-      return load_compiled(stream)
+      return load_compiled(source)
    end
 
    -- If the file doesn't have the magic, assume it's a source file.
@@ -362,7 +362,7 @@ function load(file)
    if compiled_stream then
       if has_magic(compiled_stream) then
          log('loading compiled binding table from %s', compiled_file)
-         if is_fresh(compiled_stream, stream.mtime_sec, stream.mtime_nsec) then
+         if is_fresh(compiled_stream, source.mtime_sec, source.mtime_nsec) then
             log('compiled binding table %s is up to date.', compiled_file)
             return load_compiled(compiled_stream)
          end
@@ -374,11 +374,11 @@ function load(file)
       
    -- Load and compile it.
    log('loading source binding table from %s', file)
-   local bt = load_source(stream:as_text_stream())
+   local bt = load_source(source:as_text_stream())
 
    -- Save it, if we can.
    local success, err = pcall(bt.save, bt, compiled_file,
-                              stream.mtime_sec, stream.mtime_nsec)
+                              source.mtime_sec, source.mtime_nsec)
    if not success then
       log('error saving compiled binding table %s: %s', compiled_file, err)
    end
