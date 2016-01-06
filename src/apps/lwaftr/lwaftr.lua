@@ -327,7 +327,7 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
    end
 
    -- DF wasn't set; fragment the large packet
-   local pkts = fragmentv6.fragment_ipv6(pkt, unfrag_header_size, lwstate.l2_size, lwstate.ipv6_mtu)
+   local pkts = fragmentv6.fragment(pkt, unfrag_header_size, lwstate.l2_size, lwstate.ipv6_mtu)
    if debug and pkts then
       print("Encapsulated packet into fragments")
       for idx,fpkt in ipairs(pkts) do
@@ -591,7 +591,7 @@ local function get_ipv6_dst_ip(lwstate, pkt)
 end
 
 local function key_ipv6_frag(lwstate, frag)
-   local frag_id = fragmentv6.get_ipv6_frag_id(frag, lwstate.l2_size)
+   local frag_id = fragmentv6.get_frag_id(frag, lwstate.l2_size)
    local src_ip = get_ipv6_src_ip(lwstate, frag)
    local dst_ip = get_ipv6_dst_ip(lwstate, frag)
    local src_dst = src_ip..dst_ip
@@ -616,9 +616,9 @@ end
 
 local function from_b4(lwstate, pkt)
    -- TODO: only send ICMP on failure for packets that plausibly would be bound?
-   if fragmentv6.is_ipv6_fragment(pkt, lwstate.l2_size) then
+   if fragmentv6.is_fragment(pkt, lwstate.l2_size) then
       local frags = cache_ipv6_fragment(lwstate, pkt)
-      local frag_status, maybe_pkt = fragmentv6.reassemble_ipv6(frags, lwstate.l2_size)
+      local frag_status, maybe_pkt = fragmentv6.reassemble(frags, lwstate.l2_size)
       if frag_status == fragmentv6.FRAGMENT_MISSING then
            return -- Nothing useful to be done yet
       elseif frag_status == fragmentv6.REASSEMBLY_INVALID then
