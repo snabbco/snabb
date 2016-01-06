@@ -229,7 +229,7 @@ function Intel1g:new(conf)
    end
 
    local function printTxStatus()
-    print(" Tx status")
+    print("Tx status")
     local tctl= peek32(r.TCTL)
     print("  TCTL        = " .. bit.tohex(tctl))
     print("  TXDCTL      = " .. bit.tohex(peek32(r.TXDCTL)))
@@ -237,7 +237,7 @@ function Intel1g:new(conf)
    end
 
    local function printRxStatus()
-    print(" Rx status")
+    print("Rx status")
     local rctl= peek32(r.RCTL)
     print("  RCTL        = " .. bit.tohex(rctl))
     print("  RXDCTL      = " .. bit.tohex(peek32(r.RXDCTL)))
@@ -280,7 +280,8 @@ function Intel1g:new(conf)
      wait32(r.MANC, {BLK_Phy_Rst_On_IDE=18}, 0)	-- wait untill IDE link stable
      -- 4.6.1 Acquiring Ownership over a Shared Resource, p.147
      -- and 4.6.2 Releasing Ownership
-     -- XXX to do: wraps for both software/software (SWSM.SMBI) & software/firmware (SWSM.SWESMBI) semamphores
+     -- XXX to do: write wrappers for both software/software (SWSM.SMBI) 
+     -- software/firmware (SWSM.SWESMBI) semamphores, then apply them...
      set32(r.SWSM, {SWESMBI= 1})		-- a. get software/firmware semaphore
      while band(peek32(r.SWSM), 0x02) ==0 do
        set32(r.SWSM, {SWESMBI= 1})
@@ -305,10 +306,8 @@ function Intel1g:new(conf)
      end
      wait32(r.SW_FW_SYNC, {SW_PHY_SM=1}, 0)	-- b. wait until firmware releases PHY
      clear32(r.SWSM, {SWESMBI= 1})		-- c. release software/firmware semaphore
-     --XXXXXXXXXXXXXXXXXXXXX			-- 9. configure PHY
-
-
-     --XXXXXXXXXXXXXXXXXXXXX			-- 10. release ownership, see 4.6.2, p.148
+     --XXX to do...				-- 9. configure PHY
+     --XXX to do...				-- 10. release ownership, see 4.6.2, p.148
      clear32(r.SW_FW_SYNC, {SW_PHY_SM=1})	-- release PHY
      clear32(r.SWSM, {SWESMBI= 1})		-- release software/firmware semaphore
    end
@@ -336,15 +335,14 @@ function Intel1g:new(conf)
 	 clear32(r.CTRL_EXT, {LinkMode1=23,LinkMode0=22})	-- set Link mode to internal PHY
          writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6}))	-- PHYREG 8.27.3 Copper Control
          writePHY(2, 21, 0x06)					-- MAC interface speed 1GE, 8.27.3.27 MAC Specific Control 2, p.563
-         --writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, CopperReset=15})) -- Copper Reset
+         --writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, CopperReset=15})) -- Copper Reset: not required, so don't!
          writePHY(0, 0, bitvalue({Duplex=8, SpeedMSB=6, Loopback=14}))	-- Loopback
          print("PHY Loopback set")
-      else				-- 3.7.4.4 Copper (Internal) PHY Link Config
-					-- PHY tells MAC after auto-neg. (PCS and 802.3 clauses 28 (extensions) & 40 (.3ab)
-					-- config generally determined by PHY auto-neg. (speed, duplex, flow control)
-					-- PHY asserts link indication (LINK) to MAC
-					-- SW driver must Set Link Up (CTRL.SLU) before MAC recognizes LINK from PHY and consider link up
-
+      else					-- 3.7.4.4 Copper (Internal) PHY Link Config
+	 -- PHY tells MAC after auto-neg. (PCS and 802.3 clauses 28 (extensions) & 40 (.3ab)
+	 -- config generally determined by PHY auto-neg. (speed, duplex, flow control)
+	 -- PHY asserts link indication (LINK) to MAC
+	 -- SW driver must Set Link Up (CTRL.SLU) before MAC recognizes LINK from PHY and consider link up
          initPHY()						-- 4.5.7.2.1 Full Duplx, Speed auto neg. by PHY
          C.usleep(1*1000*1000)					-- wait 1s for init to settle
          print("initPHY() done")
@@ -360,7 +358,7 @@ function Intel1g:new(conf)
          print("We have link-up!")
          printMACstatus()
       end
-      
+
       -- Define shutdown function for the NIC itself
       stop_nic = function ()
          -- XXX Are these the right actions?
@@ -595,19 +593,8 @@ function Intel1g:new(conf)
       if stop_receive  then stop_receive()  end
       if stop_transmit then stop_transmit() end
       if stop_nic      then stop_nic()      end
-      printNICstatus(r, "Status after Stop: ")
+      --printNICstatus(r, "Status after Stop: ")
       printStats(r)
-
-      print(" PHY status")
-      local phyStatus= readPHY(0, 17)	-- 8.27.3.16 Copper Specific Status Reg 1 (page 0, register 17), p.556
-       print("  STATUS      = " .. bit.tohex(phyStatus))
-       print("  Full Duplex = " .. yesno(phyStatus, 13))
-       print("  Copper Link = " .. yesno(phyStatus, 10))
-       print("  Glabal Link = " .. yesno(phyStatus, 3))
-       local speed = (({10,100,1000,1000})[1+bit.band(bit.rshift(phyStatus, 14),3)])
-       print("  Speed       = " .. speed .. ' Mb/s')
-       print("  MDI-X       = " .. yesno(phyStatus, 6))
-       print("  Copper Sleep= " .. yesno(phyStatus, 4))	-- Copper Energy Detect Status
    end
 
    return self
