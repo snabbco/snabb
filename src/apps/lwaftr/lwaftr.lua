@@ -56,19 +56,6 @@ local proto_icmp = constants.proto_icmp
 local proto_icmpv6 = constants.proto_icmpv6
 local proto_ipv4 = constants.proto_ipv4
 
-local function guarded_transmit(pkt, o)
-   -- The assert was never being hit, and the assert+link check slow the code
-   -- down about 5-18%, by comparing best and worst runs of 5 seconds at their
-   -- starts and ends.
-   -- The downside is that if the link actually is full, the packet will be dropped.
-   -- Given the requirements of this project, rare dropped packets (none so far in
-   -- testing) are better than a non-trivial speed decrease).
-   -- The assert should never appear in production, but code to cache packets
-   -- on a link full condition could.
-   --assert(not full(o), "need a cache...")
-   transmit(o, pkt)
-end
-
 local transmit_icmpv6_with_rate_limit
 
 local function init_transmit_icmpv6_with_rate_limit(lwstate)
@@ -80,7 +67,7 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
    local icmpv6_rate_limiter_n_packets = lwstate.icmpv6_rate_limiter_n_packets
    local counter = 0
    local last_time
-   return function (pkt, o)
+   return function (o, pkt)
       local cur_now = tonumber(engine.now())
       last_time = last_time or cur_now
       -- Reset if elapsed time reached.
@@ -90,8 +77,8 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
       end
       -- Send packet if limit not reached.
       if counter < icmpv6_rate_limiter_n_packets then
-         guarded_transmit(pkt, o)
          counter = counter + 1
+         return transmit(o, pkt)
       else
          packet.free(pkt)
       end
@@ -269,7 +256,7 @@ local function icmp_after_discard(lwstate, pkt, to_ip)
    local icmp_dis = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                            lwstate.aftr_ipv4_ip, to_ip, pkt,
                                            lwstate.l2_size, icmp_config)
-   guarded_transmit(icmp_dis, lwstate.o4)
+   return transmit(lwstate.o4, icmp_dis)
 end
 
 -- ICMPv6 type 1 code 5, as per RFC 7596.
@@ -282,7 +269,7 @@ local function icmp_b4_lookup_failed(lwstate, pkt, to_ip)
    local b4fail_icmp = icmp.new_icmpv6_packet(lwstate.aftr_mac_b4_side, lwstate.b4_mac,
                                               lwstate.aftr_ipv6_ip, to_ip, pkt,
                                               lwstate.l2_size, icmp_config)
-   transmit_icmpv6_with_rate_limit(b4fail_icmp, lwstate.o6)
+   transmit_icmpv6_with_rate_limit(lwstate.o6, b4fail_icmp)
 end
 
 -- Given a packet containing IPv4 and Ethernet, encapsulate the IPv4 portion.
@@ -311,7 +298,7 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
          print("encapsulated packet:")
          lwdebug.print_pkt(pkt)
       end
-      guarded_transmit(pkt, lwstate.o6)
+      transmit(lwstate.o6, pkt)
       return
    end
 
@@ -336,8 +323,7 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
                                               lwstate.aftr_ipv4_ip, dst_ip, pkt,
                                               lwstate.l2_size, icmp_config)
       packet.free(pkt)
-      guarded_transmit(icmp_pkt, lwstate.o4)
-      return
+      return transmit(lwstate.o4, icmp_pkt)
    end
 
    -- DF wasn't set; fragment the large packet
@@ -350,7 +336,7 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
       end
    end
    for i=1,#pkts do
-      guarded_transmit(pkts[i], lwstate.o6)
+      transmit(lwstate.o6, pkts[i])
    end
 end
 
@@ -442,7 +428,7 @@ local function from_inet(lwstate, pkt)
             if lwstate.policy_icmpv4_outgoing == lwconf.policies["DROP"] then
                packet.free(maybe_pkt)
             else
-               guarded_transmit(maybe_pkt, lwstate.o4)
+               return transmit(lwstate.o4, maybe_pkt)
             end
          end
          return
@@ -498,8 +484,7 @@ local function from_inet(lwstate, pkt)
       local ttl0_icmp =  icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                                 lwstate.aftr_ipv4_ip, dst_ip, pkt,
                                                 lwstate.l2_size, icmp_config)
-      guarded_transmit(ttl0_icmp, lwstate.o4)
-      return
+      return transmit(lwstate.o4, ttl0_icmp)
    end
 
    local next_hdr = proto_ipv4
@@ -591,7 +576,7 @@ local function icmpv6_incoming(lwstate, pkt)
       -- like notifications to any non-bound host.
       return icmpv4_incoming(lwstate, icmpv4_reply) -- to B4
    else
-      guarded_transmit(icmpv4_reply, lwstate.o4)
+      return transmit(lwstate.o4, icmpv4_reply)
    end
 end
 
@@ -642,7 +627,7 @@ local function from_b4(lwstate, pkt)
             if lwstate.policy_icmpv6_outgoing == lwconf.policies['DROP'] then
                packet.free(maybe_pkt)
             else
-               guarded_transmit(maybe_pkt, lwstate.o6)
+               return transmit(lwstate.o6, maybe_pkt)
             end
             return
          end
@@ -703,7 +688,7 @@ local function from_b4(lwstate, pkt)
             local fragstatus, frags = fragmentv4.fragment_ipv4(pkt, lwstate.l2_size, lwstate.ipv4_mtu)
             if fragstatus == fragmentv4.FRAGMENT_OK then
                for i=1,#frags do
-                  guarded_transmit(frags[i], lwstate.o4)
+                  transmit(lwstate.o4, frags[i])
                end
                return
             else
@@ -712,8 +697,7 @@ local function from_b4(lwstate, pkt)
                return
             end
          else -- No fragmentation needed
-            guarded_transmit(pkt, lwstate.o4)
-            return
+            return transmit(lwstate.o4, pkt)
          end
       end
    elseif lwstate.policy_icmpv6_outgoing == lwconf.policies['ALLOW'] then
