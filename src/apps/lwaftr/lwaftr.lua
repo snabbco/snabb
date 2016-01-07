@@ -123,22 +123,11 @@ function LwAftr:new(conf)
    o.policy_icmpv4_outgoing = conf.policy_icmpv4_outgoing
    o.policy_icmpv6_incoming = conf.policy_icmpv6_incoming
    o.policy_icmpv6_outgoing = conf.policy_icmpv6_outgoing
-   o.v4_vlan_tag = conf.v4_vlan_tag
-   o.v6_vlan_tag = conf.v6_vlan_tag
-   o.vlan_tagging = conf.vlan_tagging
 
    o.binding_table = bt.load(o.conf.binding_table)
 
-   if conf.vlan_tagging then
-      o.l2_size = constants.ethernet_header_size + 4
-      o.o_ethernet_tag = constants.o_ethernet_ethertype
-      o.o_ethernet_ethertype = constants.o_ethernet_ethertype + 4
-      o.v4_vlan_tag = htonl(bor(lshift(constants.dotq_tpid, 16), o.v4_vlan_tag))
-      o.v6_vlan_tag = htonl(bor(lshift(constants.dotq_tpid, 16), o.v6_vlan_tag))
-   else
-      o.l2_size = constants.ethernet_header_size
-      o.o_ethernet_ethertype = constants.o_ethernet_ethertype
-   end
+   o.l2_size = constants.ethernet_header_size
+   o.o_ethernet_ethertype = constants.o_ethernet_ethertype
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
    on_signal("hup", function()
       print('Reloading binding table.')
@@ -247,7 +236,6 @@ end
 local function icmp_after_discard(lwstate, pkt, to_ip)
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_host_unreachable,
-                        vlan_tag = lwstate.v4_vlan_tag
                         }
    local icmp_dis = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                            lwstate.aftr_ipv4_ip, to_ip, pkt,
@@ -260,7 +248,6 @@ end
 local function icmp_b4_lookup_failed(lwstate, pkt, to_ip)
    local icmp_config = {type = constants.icmpv6_dst_unreachable,
                         code = constants.icmpv6_failed_ingress_egress_policy,
-                        vlan_tag = lwstate.v6_vlan_tag
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(lwstate.aftr_mac_b4_side, lwstate.b4_mac,
                                               lwstate.aftr_ipv6_ip, to_ip, pkt,
@@ -294,7 +281,6 @@ local function cannot_fragment_df_packet_error(lwstate, pkt)
       code = constants.icmpv4_datagram_too_big_df,
       extra_payload_offset = 0,
       next_hop_mtu = lwstate.ipv6_mtu - constants.ipv6_fixed_header_size,
-      vlan_tag = lwstate.v4_vlan_tag
    }
    return icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                  lwstate.aftr_ipv4_ip, dst_ip, pkt,
@@ -322,7 +308,7 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
    packet.shiftright(pkt, ipv6_fixed_header_size)
    -- Modify Ethernet header.
    local eth_type = n_ethertype_ipv6
-   write_eth_header(pkt.data, ether_src, ether_dst, eth_type, lwstate.v6_vlan_tag)
+   write_eth_header(pkt.data, ether_src, ether_dst, eth_type)
 
    -- Modify IPv6 header.
    write_ipv6_header(pkt.data + lwstate.l2_size, ipv6_src, ipv6_dst,
@@ -428,7 +414,6 @@ local function from_inet(lwstate, pkt)
       local dst_ip = pkt.data + o_src
       local icmp_config = {type = constants.icmpv4_time_exceeded,
                            code = constants.icmpv4_ttl_exceeded_in_transit,
-                           vlan_tag = lwstate.v4_vlan_tag
                            }
       local ttl0_icmp =  icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                                 lwstate.aftr_ipv4_ip, dst_ip, pkt,
@@ -454,7 +439,6 @@ local function tunnel_packet_too_big(lwstate, pkt)
                         code = constants.icmpv4_datagram_too_big_df,
                         extra_payload_offset = orig_packet_offset - eth_hs,
                         next_hop_mtu = specified_mtu - constants.ipv6_fixed_header_size,
-                        vlan_tag = lwstate.v4_vlan_tag,
                         }
    local o_src = orig_packet_offset + constants.o_ipv4_src_addr
    local dst_ip = pkt.data + o_src
@@ -473,7 +457,6 @@ local function tunnel_generic_unreachable(lwstate, pkt)
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_host_unreachable,
                         extra_payload_offset = orig_packet_offset - eth_hs,
-                        vlan_tag = lwstate.v4_vlan_tag
                         }
    local o_src = orig_packet_offset + constants.o_ipv4_src_addr
    local dst_ip = pkt.data + o_src
@@ -576,14 +559,14 @@ local function from_b4(lwstate, pkt)
          -- Remove IPv6 header.
          packet.shiftleft(pkt, ipv6_fixed_header_size)
          write_eth_header(pkt.data, lwstate.b4_mac, lwstate.aftr_mac_b4_side,
-                          n_ethertype_ipv4, lwstate.v4_vlan_tag)
+                          n_ethertype_ipv4)
          -- TODO:  refactor so this doesn't actually seem to be from the internet?
          return from_inet(lwstate, pkt)
       else
          -- Remove IPv6 header.
          packet.shiftleft(pkt, ipv6_fixed_header_size)
          write_eth_header(pkt.data, lwstate.aftr_mac_inet_side, lwstate.inet_mac,
-                          n_ethertype_ipv4, lwstate.v4_vlan_tag)
+                          n_ethertype_ipv4)
          return transmit(lwstate.o4, pkt)
       end
    elseif lwstate.policy_icmpv6_outgoing == lwconf.policies['ALLOW'] then
