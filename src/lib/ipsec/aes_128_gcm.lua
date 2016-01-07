@@ -1,7 +1,7 @@
 module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
-local ASM = require("apps.ipsec.aes_128_gcm_avx")
+local ASM = require("lib.ipsec.aes_128_gcm_avx")
 local header = require("lib.protocol.header")
 local lib = require("core.lib")
 local ntohl, htonl, htonll = lib.ntohl, lib.htonl, lib.htonll
@@ -61,13 +61,13 @@ local function u8_ptr (ptr) return ffi.cast("uint8_t *", ptr) end
 
 local aes_128_gcm = {}
 
-function aes_128_gcm:new (conf)
-   assert(conf.keymat and #conf.keymat == 32, "Need 16 bytes of key material.")
-   assert(conf.salt and #conf.salt == 8, "Need 4 bytes of salt.")
+function aes_128_gcm:new (keymat, salt)
+   assert(keymat and #keymat == 32, "Need 16 bytes of key material.")
+   assert(salt and #salt == 8, "Need 4 bytes of salt.")
    local o = {}
    o.keymat = ffi.new("uint8_t[16]")
-   ffi.copy(o.keymat, lib.hexundump(conf.keymat, 16), 16)
-   o.iv = iv:new(lib.hexundump(conf.salt, 4))
+   ffi.copy(o.keymat, lib.hexundump(keymat, 16), 16)
+   o.iv = iv:new(lib.hexundump(salt, 4))
    -- Compute subkey (H)
    o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 128)
    o.gcm_data = ffi.new("gcm_data[1] __attribute__((aligned(16)))")
