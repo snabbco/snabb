@@ -311,8 +311,8 @@ receive_device.interface= "rx1GE"
    local runtime = finish - start
    local packets = link.stats(engine.app_table.source.output.tx).txpackets
    engine.report()
---   engine.app_table[send_device.interface]:report()
---   engine.app_table[receive_device.interface]:report()
+   engine.app_table[send_device.interface]:report()
+   engine.app_table[receive_device.interface]:report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s)."):format(packets / 1e6,
                                                                                                    runtime, packets / runtime / 1e6,

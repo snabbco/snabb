@@ -354,10 +354,10 @@ function Intel1g:new(conf)
          set32(r.CTRL_EXT, {AutoSpeedDetect = 12})		-- p.373
          --set32(r.CTRL_EXT, {DriverLoaded = 28})		-- signal Device Driver Loaded
 
-         print("Waiting for link-up...")
+         print("Waiting for link...")
          wait32(r.STATUS, {LinkUp=1})				-- wait for auto-neg. to complete
          print("We have link-up!")
-         printMACstatus()
+         --printMACstatus()
       end
 
       -- Define shutdown function for the NIC itself
@@ -366,6 +366,15 @@ function Intel1g:new(conf)
          clear32(r.CTRL, {SETLINKUP = 6})		-- take the link down
          pci.set_bus_master(pciaddress, false)		-- disable DMA
       end
+
+      function self:report ()				-- for snabbmark, from SolarFlareNic:report()
+       print("report on Intel1g device", self.ifname)
+       for name,value in pairs(counters) do
+        print(string.format('%s: %d ', name, value))
+       end
+       print("\n")
+      end
+
    end  -- if not attach then
 
    if txq then						-- Transmitter
