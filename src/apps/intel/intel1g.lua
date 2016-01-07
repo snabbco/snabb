@@ -30,6 +30,7 @@
 -- Data sheets (reference documentation):
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/ethernet-controller-i350-datasheet.pdf
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/i210-ethernet-controller-datasheet.pdf
+-- Note: section and page numbers in the comments below refer to the i210 data sheet
 
 -- run selftest() on APU2's second/middle NIC:
 --  sudo SNABB_SELFTEST_INTEL1G_0="0000:02:00.0" ./snabb snsh -t apps.intel.intel1g
@@ -565,13 +566,15 @@ function Intel1g:new(conf)
       
       function self:pull ()				-- Define pull() method for app instance
          local lo = self.output[1]
-         assert(lo, "intel1g: no output link")
+--         assert(lo, "intel1g: no output link")
+if lo then
          local limit = rxburst
          while limit > 0 and can_receive() do
             link.transmit(lo, receive())
             limit = limit - 1
          end
          sync_receive()
+end
       end
 
       stop_receive = function ()			-- stop receiver, see 4.5.9.2
