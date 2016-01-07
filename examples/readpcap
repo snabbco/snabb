@@ -1,0 +1,251 @@
+#! /usr/bin/env luajit
+--
+-- readpcap
+-- Copyright (C) 2016 Adrian Perez <aperez@igalia.com>
+--
+-- Distributed under terms of the MIT license.
+--
+
+local pcap = require("examples.pcap")
+local ndpi = require("ndpi")
+local bit  = require("bit")
+local ffi  = require("ffi")
+local C    = ffi.C
+
+ffi.cdef [[
+   uint16_t ntohs (uint16_t);
+   uint32_t ntohl (uint32_t);
+]]
+
+local uint16_ptr_t = ffi.typeof("uint16_t*")
+local function rd16(address)
+   return ffi.cast(uint16_ptr_t, address)[0]
+end
+
+local uint32_ptr_t = ffi.typeof("uint32_t*")
+local function rd32(address)
+   return ffi.cast(uint32_ptr_t, address)[0]
+end
+
+local ETH_HEADER_SIZE = 14
+local ETH_TYPE_OFFSET = 12
+local ETH_TYPE_IPv4   = 0x0800
+local ETH_TYPE_IPv6   = 0x86DD
+local ETH_TYPE_VLAN   = 0x8100
+
+local IPv4_VER_IHL_OFFSET  = 0
+local IPv4_DSCP_ECN_OFFSET = 1
+local IPv4_LEN_OFFSET      = 2
+local IPv4_FRAGID_OFFSET   = 4
+local IPv4_FLAGS_OFFSET    = 6
+local IPv4_TTL_OFFSET      = 8
+local IPv4_PROTO_OFFSET    = 9
+local IPv4_CHECKSUM_OFFSET = 10
+local IPv4_SRC_ADDR_OFFSET = 12
+local IPv4_DST_ADDR_OFFSET = 16
+local IPv4_PROTO_TCP       = 6
+local IPv4_PROTO_UDP       = 17
+
+local TCP_HEADER_SIZE      = 20
+local TCP_SRC_PORT_OFFSET  = 0
+local TCP_DST_PORT_OFFSET  = 2
+
+local UDP_HEADER_SIZE      = 8
+local UDP_SRC_PORT_OFFSET  = 0
+local UDP_DST_PORT_OFFSET  = 2
+
+local TICK_RESOLUTION  = 1000
+local NUM_ROOTS        = 512
+
+local input = pcap.file("examples/lamernews.pcap")
+local link_type = input:data_link()
+
+-- Instantiate a detection_module and enable all protocols
+local detector = ndpi.detection_module(TICK_RESOLUTION)
+detector:set_protocol_bitmask(ndpi.protocol_bitmask():set_all())
+
+local num_packets, num_bytes, num_total_bytes, num_vlan = 0, 0, 0, 0
+local pcap_start, pcap_end = nil, 0
+
+local function calculate_type_and_offset(header, data)
+   if link_type == pcap.DLT_NULL then
+      if C.ntohl(rd32(data)) == 2 then
+         return ETH_TYPE_IPv4, 4
+      else
+         return ETH_TYPE_IPv6, 4
+      end
+   elseif link_type == pcap.DLT_EN10MB then
+      return C.ntohs(rd16(data + ETH_TYPE_OFFSET)), ETH_HEADER_SIZE
+   elseif link_type == pcap.DLT_LINUX_SLL then
+      return (lshift(data[14], 8) + data[15]), 16
+   else
+      return nil, nil
+   end
+end
+
+local flow_table = {}
+local function get_flow(vlan_id, data, ip_offset)
+   local ver = data[ip_offset + IPv4_VER_IHL_OFFSET]
+   local ihl = bit.band(ver, 0x0F) * 4
+   local ver = bit.rshift(ver, 4)
+
+   if ver ~= 4 then
+      return nil
+   end
+
+   local length = C.ntohs(rd16(data + ip_offset + IPv4_LEN_OFFSET))
+   local proto  = C.ntohs(rd16(data + ip_offset + IPv4_PROTO_OFFSET))
+   local lo_ip  = C.ntohl(rd32(data + ip_offset + IPv4_SRC_ADDR_OFFSET))
+   local hi_ip  = C.ntohl(rd32(data + ip_offset + IPv4_DST_ADDR_OFFSET))
+
+   if lo_ip > hi_ip then
+      lo_ip, hi_ip = hi_ip, lo_ip
+   end
+
+   local payload_length = length - ihl
+   assert(payload_length >= 0)
+
+   local lo_port, hi_port = 0, 0
+   if proto == IPv4_PROTO_TCP or proto == IPv4_PROTO_UDP then
+      lo_port = C.ntohs(rd16(data + ip_offset + ihl + TCP_SRC_PORT_OFFSET))
+      hi_port = C.ntohs(rd16(data + ip_offset + ihl + TCP_DST_PORT_OFFSET))
+      if lo_port > hi_port then
+         lo_port, hi_port = hi_port, lo_port
+      end
+   end
+
+   local key = string.format("%04x%08x%08x%04x%04x%04x", vlan_id or 0,
+   lo_ip, hi_ip, proto, lo_port, hi_port)
+
+   local flow = flow_table[key]
+   if flow == nil then
+      flow = {
+         ndpi_flow   = ndpi.flow();
+         ndpi_src_id = ndpi.id();
+         ndpi_dst_id = ndpi.id();
+         proto       = proto;
+         vlan_id     = vlan_id;
+         lo_ip       = lo_ip;
+         hi_ip       = hi_ip;
+         lo_port     = lo_port;
+         hi_port     = hi_port;
+         last_seen   = 0;
+         num_packets = 0;
+         num_bytes   = 0;
+         detected    = ndpi.protocol.PROTOCOL_UNKNOWN;
+         master      = ndpi.protocol.PROTOCOL_UNKNOWN;
+      }
+      flow_table[key] = flow
+   end
+
+   local src_id, dst_id = flow.ndpi_src_id, flow.ndpi_dst_id
+   if (lo_ip ~= flow.lo_ip or hi_ip ~= flow.hi_ip or
+      lo_port ~= flow.lo_port or hi_port ~= flow.hi_port)
+   then
+      src_id, dst_id = dst_id, src_id
+   end
+   return flow, src_id, dst_id, length
+end
+
+local function handle_packet(header, data)
+   local time = header.ts_sec * TICK_RESOLUTION + header.ts_usec / (1000000 / TICK_RESOLUTION)
+
+   if pcap_start == nil then
+      pcap_start = time
+   end
+   if pcap_end > time then
+      io.stderr:write("Timestamp (", tostring(time), "): bug in pcap file, repairing\n")
+      time = pcap_end
+   else
+      pcap_end = time
+   end
+
+   local eth_type, ip_offset = calculate_type_and_offset(header, data)
+   if eth_type == nil then
+      return false
+   end
+
+   local vlan_id = nil
+   while true do
+      if eth_type == ETH_TYPE_VLAN then
+         vlan_id = C.ntohs(rd16(data + ip_offset))
+         eth_type = C.ntohs(rd16(data + ip_offset + 2))
+         ip_offset = ip_offset + 4
+      else
+         break
+      end
+   end
+
+   if vlan_id ~= nil then
+      num_vlan = num_vlan + 1
+   end
+
+   if eth_type ~= ETH_TYPE_IPv4 then
+      return false
+   end
+
+   local flow, src_id, dst_id, ip_size = get_flow(vlan_id, data, ip_offset)
+   if flow == nil then
+      return false
+   end
+
+   flow.num_packets = flow.num_packets + 1
+   flow.num_bytes = flow.num_bytes + header.orig_len
+   flow.last_seen = time
+
+   if flow.detected ~= ndpi.protocol.PROTOCOL_UNKNOWN then
+      return true
+   end
+
+   flow.master, flow.detected = detector:process_packet(flow.ndpi_flow,
+                                                        data + ip_offset,
+                                                        ip_size,
+                                                        time,
+                                                        src_id,
+                                                        dst_id)
+   if flow.detected == ndpi.protocol.PROTOCOL_UNKNOWN and
+      ((proto == IPv4_PROTO_UDP and flow.num_packets > 8) or
+       (proto == IPv4_PROTO_TCP and flow.num_packets > 10))
+   then
+      flow.master, flow.detected = detector:guess_undetected_protocol(flow.proto,
+                                                                      flow.lo_ip,
+                                                                      flow.lo_port,
+                                                                      flow.hi_ip,
+                                                                      flow.hi_port)
+   end
+   return true
+end
+
+for header, data in input:packets() do
+   num_packets = num_packets + 1
+   num_total_bytes = num_total_bytes + header.orig_len
+   if handle_packet(header, data) then
+      num_bytes = num_bytes + header.orig_len
+   end
+end
+
+print("Packets: " .. num_packets .. " (VLAN-tagged: " .. num_vlan .. ")")
+print("Bytes: " .. num_total_bytes .. " (inspected: " .. num_bytes .. ")")
+
+local ipv4_address_format = "%d.%d.%d.%d"
+local function format_ip(ipaddr)
+   return ipv4_address_format:format(bit.band(bit.rshift(ipaddr, 24), 0xFF),
+                                     bit.band(bit.rshift(ipaddr, 16), 0xFF),
+                                     bit.band(bit.rshift(ipaddr,  8), 0xFF),
+                                     bit.band(ipaddr, 0xFF))
+end
+
+local num_flows = 0
+for _, flow in pairs(flow_table) do
+   num_flows = num_flows + 1
+   if flow.detected ~= ndpi.protocol.PROTOCOL_UNKNOWN then
+      print("")
+      print(flow.ndpi_flow)
+      print("    protocol: " .. ndpi.protocol[flow.detected] .. "/" .. ndpi.protocol[flow.master])
+      print("   addresses: " .. format_ip(flow.lo_ip) .. ":" .. flow.lo_port
+                    .. " - " .. format_ip(flow.hi_ip) .. ":" .. flow.hi_port)
+      print("     VLAN id: " .. (flow.vlan or "none"))
+      print("     packets: " .. flow.num_packets)
+      print("       bytes: " .. flow.num_bytes)
+   end
+end
