@@ -8,6 +8,9 @@ local ethernet   = require("lib.protocol.ethernet")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
 local lwaftr     = require("apps.lwaftr.lwaftr")
+local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
+local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+local setup      = require("program.snabb_lwaftr.setup")
 
 local function show_usage(exit_code)
    print(require("program.snabb_lwaftr.run.README_inc"))
@@ -82,21 +85,8 @@ end
 function run(args)
    local opts, conf_file, v4_pci, v6_pci = parse_args(args)
 
-   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
+   local c = setup.load(conf_file, 'inetNic', v4_pci, 'b4sideNic', v6_pci)
 
-   local c = config.new()
-   config.app(c, 'inetNic', Intel82599, {
-      pciaddr=v4_pci,
-      macaddr = ethernet:ntop(conf.aftr_mac_inet_side)})
-   config.app(c, 'b4sideNic', Intel82599, {
-      pciaddr=v6_pci,
-      macaddr = ethernet:ntop(conf.aftr_mac_b4_side)})
-   config.app(c, 'lwaftr', lwaftr.LwAftr, conf)
-
-   config.link(c, 'inetNic.tx -> lwaftr.v4')
-   config.link(c, 'b4sideNic.tx -> lwaftr.v6')
-   config.link(c, 'lwaftr.v4 -> inetNic.rx')
-   config.link(c, 'lwaftr.v6 -> b4sideNic.rx')
    engine.configure(c)
 
    if opts.verbosity >= 2 then
