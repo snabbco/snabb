@@ -255,7 +255,7 @@ function Intel1g:new(conf)
    end
 
    local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0, pull=0, push=0,
-    pullTxLinkFull=0, pushRxLinkEmpty=0, pushTxRingFull=0}
+    pullTxLinkFull=0, pullNoTxLink=0, pushRxLinkEmpty=0, pushTxRingFull=0}
 
    local function printStats(r)
     print("Stats from NIC registers:")
@@ -361,7 +361,6 @@ function Intel1g:new(conf)
          --printMACstatus()
       end
 
-      -- Define shutdown function for the NIC itself
       stop_nic = function ()
          -- XXX Are these the right actions?
          clear32(r.CTRL, {SETLINKUP = 6})		-- take the link down
@@ -414,7 +413,7 @@ function Intel1g:new(conf)
          return ringnext(tdt) ~= tdh
       end
 
-      -- Queue a packet for transmission.
+      -- Queue a packet for transmission
       -- Precondition: can_transmit() => true
       local function transmit (p)
          txdesc[tdt].address = tophysical(p.data)
@@ -425,8 +424,8 @@ function Intel1g:new(conf)
 	 counters.txBytes= counters.txBytes +p.length
       end
 
-      -- Synchronize DMA ring state with hardware.
-      -- Free packets that have been transmitted.
+      -- Synchronize DMA ring state with hardware
+      -- Free packets that have been transmitted
       local function sync_transmit ()
          local cursor = tdh
          tdh = peek32(r.TDH)			-- possible race condition, see 7.1.4.4, 7.2.3 
@@ -440,11 +439,11 @@ function Intel1g:new(conf)
          poke32(r.TDT, tdt)
       end
 
-      -- Define push() method for app instance.
-      function self:push ()
+      function self:push ()				-- move frames from link.rx to NIC.txQueue for transmission
          counters.push= counters.push +1
-         local li = self.input[1]
-         assert(li, "intel1g: no input link")
+         --local li = self.input[1]
+         local li = self.input["rx"]			-- same-same as [1]
+         assert(li, "intel1g:push: no input link")
          if link.empty(li) then				-- from SolarFlareNic:push()
           counters.pushRxLinkEmpty= counters.pushRxLinkEmpty +1
          elseif not can_transmit() then
@@ -456,7 +455,6 @@ function Intel1g:new(conf)
          sync_transmit()
       end
 
-      -- Define shutdown function for transmit
       stop_transmit = function ()
          poke32(r.TXDCTL, 0)
          wait32(r.TXDCTL, {ENABLE=25}, 0)
@@ -580,23 +578,27 @@ function Intel1g:new(conf)
 	 --print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
       end
       
-      function self:pull ()				-- Define pull() method for app instance
+      function self:pull ()				-- move received frames from NIC.rxQueue to link.tx
          counters.pull= counters.pull +1
-         local lo = self.output[1]
---         assert(lo, "intel1g: no output link")
-if lo then
+         --local lo = self.output[1]
+         local lo = self.output["tx"]			-- same-same as [1]
+         --assert(lo, "intel1g: no output link")
          local limit = rxburst
          while limit > 0 and can_receive() do
-            limit = limit - 1
-            if not link.full(lo) then			-- from SolarFlareNic:pull()
-             link.transmit(lo, receive())
-            else
-             counters.pullTxLinkFull= counters.pullTxLinkFull +1
-             packet.free(receive())
-            end
+          limit = limit - 1
+          if lo then					-- a link connects NIC to a sink
+           if not link.full(lo) then			-- from SolarFlareNic:pull()
+            link.transmit(lo, receive())
+           else
+            counters.pullTxLinkFull= counters.pullTxLinkFull +1
+            packet.free(receive())
+           end
+          else
+           counters.pullNoTxLink= counters.pullNoTxLink +1
+           packet.free(receive())
+          end
          end
          sync_receive()
-end
       end
 
       stop_receive = function ()			-- stop receiver, see 4.5.9.2
@@ -684,7 +686,7 @@ function selftest ()
    print("sink:        txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
    local rxpackets= s.rxpackets
 
-   print(("Processed %.1f M 60 Byte packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s, %.2f %% packet loss).")
+   print(("Processed %.1f M 60 Byte packets in %.2f s (rate: %.1f Mpps, %.2f Gbit/s, %.2f %% packet loss).")
     :format(
      txpackets / 1e6, runtime,
      txpackets / runtime / 1e6,
