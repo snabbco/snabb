@@ -10,6 +10,8 @@ local ffi = require("ffi")
 local band, bor, lshift, rshift = bit.band, bit.bor, bit.lshift, bit.rshift
 local C = ffi.C
 local rd16, rd32, wr16, wr32 = lwutil.rd16, lwutil.rd32, lwutil.wr16, lwutil.wr32
+local htons, htonl = lwutil.htons, lwutil.htonl
+local ntohs, ntohl = htons, htonl
 
 REASSEMBLY_OK = 1
 FRAGMENT_MISSING = 2
@@ -23,12 +25,12 @@ end
 
 function get_ipv6_frag_id(pkt, l2_size)
    local frag_id_start = l2_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_id
-   return C.ntohl(rd32(pkt.data + frag_id_start))
+   return ntohl(rd32(pkt.data + frag_id_start))
 end
 
 local function get_ipv6_frag_len(pkt, l2_size)
    local ipv6_payload_len = l2_size + constants.o_ipv6_payload_len
-   return C.ntohs(rd16(pkt.data + ipv6_payload_len)) - constants.ipv6_frag_header_size
+   return ntohs(rd16(pkt.data + ipv6_payload_len)) - constants.ipv6_frag_header_size
 end
 
 -- This is the 'M' bit of the IPv6 fragment header, in the
@@ -42,7 +44,7 @@ local function get_frag_offset(frag, l2_size)
    -- Layout: 8 fragment offset bits, 5 fragment offset bits, 2 reserved bits, 'M'ore-frags-expected bit
    local ipv6_frag_offset_offset = l2_size + constants.ipv6_fixed_header_size + constants.o_ipv6_frag_offset
    local raw_frag_offset = rd16(frag.data + ipv6_frag_offset_offset)
-   return band(C.ntohs(raw_frag_offset), 0xfffff8)
+   return band(ntohs(raw_frag_offset), 0xfffff8)
 end
 
 -- IPv6 reassembly, as per https://tools.ietf.org/html/rfc2460#section-4.5
@@ -166,7 +168,7 @@ local function write_ipv6_frag_header(pkt_data, unfrag_header_size, next_header,
    pkt_data[unfrag_header_size + 2] = rshift(frag_offset, 5)
    pkt_data[unfrag_header_size + 3] = bor(lshift(band(frag_offset, 0x1f), 3), more_frags)
    local base = pkt_data + unfrag_header_size
-   wr32(base + 4,  C.htonl(frag_id))
+   wr32(base + 4,  htonl(frag_id))
 end
 
 -- TODO: enforce a lower bound mtu of 1280, as per the spec?
@@ -199,7 +201,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, l2_size, mtu)
    write_ipv6_frag_header(ipv6_pkt.data, unfrag_header_size, fnext_header, 0, more, frag_id)
    ipv6_pkt.data[next_header_idx] = constants.ipv6_frag
    wr16(ipv6_pkt.data + l2_size + constants.o_ipv6_payload_len,
-        C.htons(payload_bytes_per_packet + constants.ipv6_frag_header_size))
+        htons(payload_bytes_per_packet + constants.ipv6_frag_header_size))
    local raw_frag_offset = payload_bytes_per_packet
 
    for i=2,num_packets - 1 do
@@ -226,7 +228,7 @@ function fragment_ipv6(ipv6_pkt, unfrag_header_size, l2_size, mtu)
             ipv6_pkt.data + new_header_size + raw_frag_offset,
             last_payload_len)
    wr16(last_pkt.data + l2_size + constants.o_ipv6_payload_len,
-        C.htons(last_payload_len + constants.ipv6_frag_header_size))
+        htons(last_payload_len + constants.ipv6_frag_header_size))
    last_pkt.length = new_header_size + last_payload_len
    pkts[num_packets] = last_pkt
 

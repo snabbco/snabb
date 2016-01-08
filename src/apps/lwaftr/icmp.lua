@@ -16,6 +16,8 @@ local ffi = require("ffi")
 local band, bnot = bit.band, bit.bnot
 local C = ffi.C
 local wr16, wr32 = lwutil.wr16, lwutil.wr32
+local htons, htonl = lwutil.htons, lwutil.htonl
+local ntohs, ntohl = htons, htonl
 local write_eth_header = lwheader.write_eth_header
 
 local dgram
@@ -48,7 +50,7 @@ local function write_icmp(dst_pkt, initial_pkt, l2_size, max_size, base_checksum
    wr16(dst_pkt.data + off + 2, 0) -- checksum
    wr32(dst_pkt.data + off + 4, 0) -- Reserved
    if config.next_hop_mtu then
-      wr16(dst_pkt.data + off + 6, C.htons(config.next_hop_mtu))
+      wr16(dst_pkt.data + off + 6, htons(config.next_hop_mtu))
    end
    local dest = dst_pkt.data + non_payload_bytes
    C.memmove(dest, initial_pkt.data + original_bytes_to_skip, payload_size)
@@ -56,7 +58,7 @@ local function write_icmp(dst_pkt, initial_pkt, l2_size, max_size, base_checksum
    local icmp_bytes = constants.icmp_base_size + payload_size
    local icmp_start = dst_pkt.data + dst_pkt.length
    local csum = checksum.ipsum(icmp_start, icmp_bytes, base_checksum)
-   wr16(dst_pkt.data + off + 2, C.htons(csum))
+   wr16(dst_pkt.data + off + 2, htons(csum))
 
    dst_pkt.length = dst_pkt.length + icmp_bytes
 end
@@ -84,11 +86,11 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, l2_siz
    -- Fix up the IPv4 total length and checksum
    local new_ipv4_len = new_pkt.length - l2_size
    local ip_tl_p = new_pkt.data + l2_size + constants.o_ipv4_total_length
-   wr16(ip_tl_p, C.ntohs(new_ipv4_len))
+   wr16(ip_tl_p, ntohs(new_ipv4_len))
    local ip_checksum_p = new_pkt.data + l2_size + constants.o_ipv4_checksum
    wr16(ip_checksum_p,  0) -- zero out the checksum before recomputing
    local csum = checksum.ipsum(new_pkt.data + l2_size, new_ipv4_len, 0)
-   wr16(ip_checksum_p, C.htons(csum))
+   wr16(ip_checksum_p, htons(csum))
 
    return new_pkt
 end
@@ -112,7 +114,7 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, l2_siz
 
    local new_ipv6_len = new_pkt.length - (constants.ipv6_fixed_header_size + l2_size)
    local ip_pl_p = new_pkt.data + l2_size + constants.o_ipv6_payload_len
-   wr16(ip_pl_p, C.ntohs(new_ipv6_len))
+   wr16(ip_pl_p, ntohs(new_ipv6_len))
 
    ipv6_header:free()
    return new_pkt
