@@ -657,15 +657,25 @@ function selftest ()
 
    engine.app_table.nic.stop()
 
+   local source= engine.app_table.source.output.tx
+   assert(source, "Intel1g: no source?")
+   local s= link.stats(source)
+   print("source:      txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+
    --local li = engine.app_table.nic.input[1]
    local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
-   assert(li, "Intel1g: no input link")
+   assert(li, "Intel1g: no input link?")
    local s= link.stats(li)
    print("input link:  txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 
    --local lo = engine.app_table.nic.output[1]
    local lo = engine.app_table.nic.output["tx"]		-- same-same as [1]
-   assert(lo, "Intel1g: no output link")
+   assert(lo, "Intel1g: no output link?")
    local s= link.stats(lo)
    print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+
+   local sink= engine.app_table.sink.input.rx
+   assert(sink, "Intel1g: no sink?")
+   local s= link.stats(sink)
+   print("sink:        txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 end
