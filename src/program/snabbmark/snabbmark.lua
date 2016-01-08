@@ -309,14 +309,18 @@ receive_device.interface= "rx1GE"
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
-   local packets = link.stats(engine.app_table.source.output.tx).txpackets
+   local txpackets = link.stats(engine.app_table.source.output.tx).txpackets
+   local rxpackets = link.stats(engine.app_table.sink.input.rx).rxpackets
    engine.report()
    engine.app_table[send_device.interface]:report()
    engine.app_table[receive_device.interface]:report()
    print()
-   print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s)."):format(packets / 1e6,
-                                                                                                   runtime, packets / runtime / 1e6,
-                                                                                                   ((packets * packet_size * 8) / runtime) / (1024*1024*1024)))
+   print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s, %.2f %% packet loss)."):format(
+    txpackets / 1e6, runtime, 
+    txpackets / runtime / 1e6,
+    ((txpackets * packet_size * 8) / runtime) / (1024*1024*1024),
+    (txpackets - rxpackets) *100 / txpackets
+   ))
    if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
       print("Packets lost. Test failed!")
       main.exit(1)
