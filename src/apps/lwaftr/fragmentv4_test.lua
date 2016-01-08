@@ -152,7 +152,7 @@ function test_payload_1200_mtu_1500()
    print("test:   payload=1200 mtu=1500")
 
    local pkt = assert(make_ipv4_packet(1200))
-   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 1500)
+   local code, result = fragmentv4.fragment(pkt, constants.ethernet_header_size, 1500)
    assert(code == fragmentv4.FRAGMENT_UNNEEDED)
    assert(pkt == result)
 end
@@ -169,7 +169,7 @@ function test_payload_1200_mtu_1000()
 
    assert(pkt.length > 1200, "packet short than payload size")
    local ehs = constants.ethernet_header_size
-   local code, result = fragmentv4.fragment_ipv4(pkt, ehs, 1000 - ehs)
+   local code, result = fragmentv4.fragment(pkt, ehs, 1000 - ehs)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 2, "fragmentation returned " .. #result .. " packets (2 expected)")
 
@@ -194,7 +194,7 @@ function test_payload_1200_mtu_400()
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
    local ehs = constants.ethernet_header_size
-   local code, result = fragmentv4.fragment_ipv4(pkt, ehs, 400 - ehs)
+   local code, result = fragmentv4.fragment(pkt, ehs, 400 - ehs)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 4,
           "fragmentation returned " .. #result .. " packets (4 expected)")
@@ -221,7 +221,7 @@ function test_dont_fragment_flag()
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_proto:sizeof(),
                                              pkt.length - eth_proto:sizeof())
    ip4_header:flags(0x2) -- Set "don't fragment"
-   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 500)
+   local code, result = fragmentv4.fragment(pkt, constants.ethernet_header_size, 500)
    assert(code == fragmentv4.FRAGMENT_FORBIDDEN)
    assert(type(result) == "nil")
 end
@@ -252,7 +252,7 @@ function test_reassemble_pattern_fragments()
    local orig_pkt = packet.allocate()
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
-   local code, result = fragmentv4.fragment_ipv4(pkt, constants.ethernet_header_size, 520)
+   local code, result = fragmentv4.fragment(pkt, constants.ethernet_header_size, 520)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 3)
 
@@ -284,7 +284,7 @@ function test_vlan_tagging()
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
    local vehs = constants.ethernet_header_size + 4
-   local code, result = fragmentv4.fragment_ipv4(pkt, vehs, 1000 - vehs)
+   local code, result = fragmentv4.fragment(pkt, vehs, 1000 - vehs)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#result == 2, "fragmentation returned " .. #result .. " packets (2 expected)")
 
@@ -311,7 +311,7 @@ function test_reassemble_unneeded(vlan_id)
    pattern_fill(pkt.data + ip4_proto:sizeof() + eth_size,
                 pkt.length - ip4_proto:sizeof() - eth_size)
 
-   local code, r = fragmentv4.reassemble_ipv4({ pkt }, eth_size)
+   local code, r = fragmentv4.reassemble({ pkt }, eth_size)
    assert(code == fragmentv4.REASSEMBLE_OK)
    assert(r.length == pkt.length)
    pattern_check(r.data + ip4_proto:sizeof() + eth_size,
@@ -323,14 +323,14 @@ function test_reassemble_two_missing_fragments(vlan_id)
    print("test:   two fragments (one missing)")
    local pkt = assert(make_ipv4_packet(1200), vlan_id)
    local eth_size = eth_header_size(pkt)
-   local code, fragments = fragmentv4.fragment_ipv4(pkt, eth_size, 1000)
+   local code, fragments = fragmentv4.fragment(pkt, eth_size, 1000)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#fragments == 2)
 
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[1] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[1] }, eth_size)))
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[2] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[2] }, eth_size)))
 end
 
 
@@ -338,30 +338,30 @@ function test_reassemble_three_missing_fragments(vlan_id)
    print("test:   three fragments (one/two missing)")
    local pkt = assert(make_ipv4_packet(1000))
    local eth_size = eth_header_size(pkt)
-   local code, fragments = fragmentv4.fragment_ipv4(pkt, eth_size, 400)
+   local code, fragments = fragmentv4.fragment(pkt, eth_size, 400)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#fragments == 3)
 
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[1] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[1] }, eth_size)))
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[2] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[2] }, eth_size)))
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[3] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[3] }, eth_size)))
 
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[1], fragments[2] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[1], fragments[2] }, eth_size)))
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[1], fragments[3] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[1], fragments[3] }, eth_size)))
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[3], fragments[3] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[3], fragments[3] }, eth_size)))
 
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[2], fragments[1] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[2], fragments[1] }, eth_size)))
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[3], fragments[1] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[3], fragments[1] }, eth_size)))
    assert(fragmentv4.REASSEMBLE_MISSING_FRAGMENT ==
-          (fragmentv4.reassemble_ipv4({ fragments[2], fragments[3] }, eth_size)))
+          (fragmentv4.reassemble({ fragments[2], fragments[3] }, eth_size)))
 end
 
 
@@ -376,12 +376,12 @@ function test_reassemble_two(vlan_id)
    orig_pkt.length = pkt.length
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
-   local code, fragments = fragmentv4.fragment_ipv4(pkt, eth_size, 1000)
+   local code, fragments = fragmentv4.fragment(pkt, eth_size, 1000)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#fragments == 2)
 
    local function try(f)
-      local code, pkt = fragmentv4.reassemble_ipv4(f, eth_size)
+      local code, pkt = fragmentv4.reassemble(f, eth_size)
       assert(code == fragmentv4.REASSEMBLE_OK, "returned: " .. code)
       assert(pkt.length == orig_pkt.length)
 
@@ -406,12 +406,12 @@ function test_reassemble_three(vlan_id)
    orig_pkt.length = pkt.length
    ffi.copy(orig_pkt.data, pkt.data, pkt.length)
 
-   local code, fragments = fragmentv4.fragment_ipv4(pkt, eth_size, 400)
+   local code, fragments = fragmentv4.fragment(pkt, eth_size, 400)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#fragments == 3)
 
    local function try(f)
-      local code, pkt = fragmentv4.reassemble_ipv4(f, eth_size)
+      local code, pkt = fragmentv4.reassemble(f, eth_size)
       assert(code == fragmentv4.REASSEMBLE_OK, "returned: " .. code)
       assert(pkt.length == orig_pkt.length)
 

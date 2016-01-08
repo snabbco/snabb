@@ -3,8 +3,6 @@ module(..., package.seeall)
 local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
 local dump = require('apps.lwaftr.dump')
-local fragmentv4 = require("apps.lwaftr.fragmentv4")
-local fragmentv6 = require("apps.lwaftr.fragmentv6")
 local icmp = require("apps.lwaftr.icmp")
 local lwconf = require("apps.lwaftr.conf")
 local lwdebug = require("apps.lwaftr.lwdebug")
@@ -125,24 +123,11 @@ function LwAftr:new(conf)
    o.policy_icmpv4_outgoing = conf.policy_icmpv4_outgoing
    o.policy_icmpv6_incoming = conf.policy_icmpv6_incoming
    o.policy_icmpv6_outgoing = conf.policy_icmpv6_outgoing
-   o.v4_vlan_tag = conf.v4_vlan_tag
-   o.v6_vlan_tag = conf.v6_vlan_tag
-   o.vlan_tagging = conf.vlan_tagging
 
    o.binding_table = bt.load(o.conf.binding_table)
 
-   if conf.vlan_tagging then
-      o.l2_size = constants.ethernet_header_size + 4
-      o.o_ethernet_tag = constants.o_ethernet_ethertype
-      o.o_ethernet_ethertype = constants.o_ethernet_ethertype + 4
-      o.v4_vlan_tag = htonl(bor(lshift(constants.dotq_tpid, 16), o.v4_vlan_tag))
-      o.v6_vlan_tag = htonl(bor(lshift(constants.dotq_tpid, 16), o.v6_vlan_tag))
-   else
-      o.l2_size = constants.ethernet_header_size
-      o.o_ethernet_ethertype = constants.o_ethernet_ethertype
-   end
-   o.fragment6_cache = {}
-   o.fragment4_cache = {}
+   o.l2_size = constants.ethernet_header_size
+   o.o_ethernet_ethertype = constants.o_ethernet_ethertype
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
    on_signal("hup", function()
       print('Reloading binding table.')
@@ -251,7 +236,6 @@ end
 local function icmp_after_discard(lwstate, pkt, to_ip)
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_host_unreachable,
-                        vlan_tag = lwstate.v4_vlan_tag
                         }
    local icmp_dis = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                            lwstate.aftr_ipv4_ip, to_ip, pkt,
@@ -264,12 +248,43 @@ end
 local function icmp_b4_lookup_failed(lwstate, pkt, to_ip)
    local icmp_config = {type = constants.icmpv6_dst_unreachable,
                         code = constants.icmpv6_failed_ingress_egress_policy,
-                        vlan_tag = lwstate.v6_vlan_tag
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(lwstate.aftr_mac_b4_side, lwstate.b4_mac,
                                               lwstate.aftr_ipv6_ip, to_ip, pkt,
                                               lwstate.l2_size, icmp_config)
    transmit_icmpv6_with_rate_limit(lwstate.o6, b4fail_icmp)
+end
+
+local function encapsulating_packet_with_df_flag_would_exceed_mtu(lwstate, pkt)
+   local encapsulated_len = pkt.length + ipv6_fixed_header_size
+   if encapsulated_len - lwstate.l2_size <= lwstate.ipv6_mtu then
+      -- Packet will not exceed MTU.
+      return false
+   end
+
+   -- The result would exceed the IPv6 MTU; signal an error via ICMPv4 if
+   -- the IPv4 fragment has the DF flag.
+   local flags = pkt.data[lwstate.l2_size + o_ipv4_flags]
+   return band(flags, 0x40) == 0x40
+end
+
+local function cannot_fragment_df_packet_error(lwstate, pkt)
+   -- According to RFC 791, the original packet must be discarded.
+   -- Return a packet with ICMP(3, 4) and the appropriate MTU
+   -- as per https://tools.ietf.org/html/rfc2473#section-7.2
+   if debug then lwdebug.print_pkt(pkt) end
+   -- The source address of the packet is where the ICMP packet should be sent
+   local o_src = lwstate.l2_size + constants.o_ipv4_src_addr
+   local dst_ip = pkt.data + o_src
+   local icmp_config = {
+      type = constants.icmpv4_dst_unreachable,
+      code = constants.icmpv4_datagram_too_big_df,
+      extra_payload_offset = 0,
+      next_hop_mtu = lwstate.ipv6_mtu - constants.ipv6_fixed_header_size,
+   }
+   return icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
+                                 lwstate.aftr_ipv4_ip, dst_ip, pkt,
+                                 lwstate.l2_size, icmp_config)
 end
 
 -- Given a packet containing IPv4 and Ethernet, encapsulate the IPv4 portion.
@@ -279,6 +294,12 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
    -- TODO: do not encapsulate if ttl was already 0; send icmp
    if debug then print("ipv6", ipv6_src, ipv6_dst) end
 
+   if encapsulating_packet_with_df_flag_would_exceed_mtu(lwstate, pkt) then
+      local icmp_pkt = cannot_fragment_df_packet_error(lwstate, pkt)
+      packet.free(pkt)
+      return transmit(lwstate.o4, icmp_pkt)
+   end
+
    -- As if it were Ethernet decapsulated.
    local offset = lwstate.l2_size
    local payload_length = pkt.length - offset
@@ -287,57 +308,17 @@ local function ipv6_encapsulate(lwstate, pkt, next_hdr_type, ipv6_src, ipv6_dst,
    packet.shiftright(pkt, ipv6_fixed_header_size)
    -- Modify Ethernet header.
    local eth_type = n_ethertype_ipv6
-   write_eth_header(pkt.data, ether_src, ether_dst, eth_type, lwstate.v6_vlan_tag)
+   write_eth_header(pkt.data, ether_src, ether_dst, eth_type)
 
    -- Modify IPv6 header.
    write_ipv6_header(pkt.data + lwstate.l2_size, ipv6_src, ipv6_dst,
                      dscp_and_ecn, next_hdr_type, payload_length)
 
-   if pkt.length - lwstate.l2_size <= lwstate.ipv6_mtu then
-      if debug then
-         print("encapsulated packet:")
-         lwdebug.print_pkt(pkt)
-      end
-      transmit(lwstate.o6, pkt)
-      return
+   if debug then
+      print("encapsulated packet:")
+      lwdebug.print_pkt(pkt)
    end
-
-   -- Otherwise, fragment if possible
-   local unfrag_header_size = lwstate.l2_size + ipv6_fixed_header_size
-   local flags = pkt.data[unfrag_header_size + o_ipv4_flags]
-   if band(flags, 0x40) == 0x40 then -- The Don't Fragment bit is set
-      -- According to RFC 791, the original packet must be discarded.
-      -- Return a packet with ICMP(3, 4) and the appropriate MTU
-      -- as per https://tools.ietf.org/html/rfc2473#section-7.2
-      if debug then lwdebug.print_pkt(pkt) end
-      -- The source address of the packet is where the ICMP packet should be sent
-      local o_src = lwstate.l2_size + constants.o_ipv4_src_addr
-      local dst_ip = pkt.data + constants.ipv6_fixed_header_size + o_src
-      local icmp_config = {type = constants.icmpv4_dst_unreachable,
-                           code = constants.icmpv4_datagram_too_big_df,
-                           extra_payload_offset = constants.ipv6_fixed_header_size,
-                           next_hop_mtu = lwstate.ipv6_mtu - constants.ipv6_fixed_header_size,
-                           vlan_tag = lwstate.v4_vlan_tag
-                           }
-      local icmp_pkt = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
-                                              lwstate.aftr_ipv4_ip, dst_ip, pkt,
-                                              lwstate.l2_size, icmp_config)
-      packet.free(pkt)
-      return transmit(lwstate.o4, icmp_pkt)
-   end
-
-   -- DF wasn't set; fragment the large packet
-   local pkts = fragmentv6.fragment_ipv6(pkt, unfrag_header_size, lwstate.l2_size, lwstate.ipv6_mtu)
-   if debug and pkts then
-      print("Encapsulated packet into fragments")
-      for idx,fpkt in ipairs(pkts) do
-         print(string.format("    Fragment %i", idx))
-         lwdebug.print_pkt(fpkt)
-      end
-   end
-   for i=1,#pkts do
-      transmit(lwstate.o6, pkts[i])
-   end
+   return transmit(lwstate.o6, pkt)
 end
 
 local function icmpv4_incoming(lwstate, pkt)
@@ -391,54 +372,8 @@ local function icmpv4_incoming(lwstate, pkt)
 end
 
 
-local function key_ipv4_frag(lwstate, frag)
-   local frag_id = rd16(frag.data + lwstate.l2_size + o_ipv4_identification)
-   local src_ip = fstring(frag.data + lwstate.l2_size + o_ipv4_src_addr, 4)
-   local dst_ip = fstring(frag.data + lwstate.l2_size + o_ipv4_dst_addr, 4)
-   return frag_id .. "|" .. src_ip .. dst_ip
-end
-
-local function cache_ipv4_fragment(lwstate, frag)
-   local cache = lwstate.fragment4_cache
-   local key = key_ipv4_frag(lwstate, frag)
-   cache[key] = cache[key] or {}
-   table.insert(cache[key], frag)
-   return cache[key]
-end
-
-local function clean_ipv4_fragment_cache(lwstate, frags)
-   local key = key_ipv4_frag(lwstate, frags[1])
-   lwstate.fragment4_cache[key] = nil
-   for _, p in ipairs(frags) do
-      packet.free(p)
-   end
-end
-
-
 -- The incoming packet is a complete one with ethernet headers.
 local function from_inet(lwstate, pkt)
-   if fragmentv4.is_ipv4_fragment(pkt, lwstate.l2_size) then
-      local frags = cache_ipv4_fragment(lwstate, pkt)
-      local frag_status, maybe_pkt = fragmentv4.reassemble_ipv4(frags, lwstate.l2_size)
-      if frag_status == fragmentv4.REASSEMBLE_MISSING_FRAGMENT then
-         return -- Nothing useful to be done yet
-      elseif frag_status == fragmentv4.REASSEMBLE_INVALID then
-         if maybe_pkt then -- This is an ICMP packet
-            clean_ipv4_fragment_cache(lwstate, frags)
-            if lwstate.policy_icmpv4_outgoing == lwconf.policies["DROP"] then
-               packet.free(maybe_pkt)
-            else
-               return transmit(lwstate.o4, maybe_pkt)
-            end
-         end
-         return
-      else -- Reassembly was successful
-         clean_ipv4_fragment_cache(lwstate, frags)
-         if debug then lwdebug.print_pkt(maybe_pkt) end
-         pkt = maybe_pkt -- Do the rest of the processing on the reassembled packet
-      end
-   end
-
    -- Check incoming ICMP -first-, because it has different binding table lookup logic
    -- than other protocols.
    local proto_offset = lwstate.l2_size + o_ipv4_proto
@@ -479,7 +414,6 @@ local function from_inet(lwstate, pkt)
       local dst_ip = pkt.data + o_src
       local icmp_config = {type = constants.icmpv4_time_exceeded,
                            code = constants.icmpv4_ttl_exceeded_in_transit,
-                           vlan_tag = lwstate.v4_vlan_tag
                            }
       local ttl0_icmp =  icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                                 lwstate.aftr_ipv4_ip, dst_ip, pkt,
@@ -505,7 +439,6 @@ local function tunnel_packet_too_big(lwstate, pkt)
                         code = constants.icmpv4_datagram_too_big_df,
                         extra_payload_offset = orig_packet_offset - eth_hs,
                         next_hop_mtu = specified_mtu - constants.ipv6_fixed_header_size,
-                        vlan_tag = lwstate.v4_vlan_tag,
                         }
    local o_src = orig_packet_offset + constants.o_ipv4_src_addr
    local dst_ip = pkt.data + o_src
@@ -524,7 +457,6 @@ local function tunnel_generic_unreachable(lwstate, pkt)
    local icmp_config = {type = constants.icmpv4_dst_unreachable,
                         code = constants.icmpv4_host_unreachable,
                         extra_payload_offset = orig_packet_offset - eth_hs,
-                        vlan_tag = lwstate.v4_vlan_tag
                         }
    local o_src = orig_packet_offset + constants.o_ipv4_src_addr
    local dst_ip = pkt.data + o_src
@@ -590,55 +522,7 @@ local function get_ipv6_dst_ip(lwstate, pkt)
    return fstring(pkt.data + ipv6_dst, 16)
 end
 
-local function key_ipv6_frag(lwstate, frag)
-   local frag_id = fragmentv6.get_ipv6_frag_id(frag, lwstate.l2_size)
-   local src_ip = get_ipv6_src_ip(lwstate, frag)
-   local dst_ip = get_ipv6_dst_ip(lwstate, frag)
-   local src_dst = src_ip..dst_ip
-   return frag_id .. '|' .. src_dst
-end
-
-local function cache_ipv6_fragment(lwstate, frag)
-   local cache = lwstate.fragment6_cache
-   local key = key_ipv6_frag(lwstate, frag)
-   cache[key] = cache[key] or {}
-   table.insert(cache[key], frag)
-   return cache[key]
-end
-
-local function clean_ipv6_fragment_cache(lwstate, frags)
-   local key = key_ipv6_frag(lwstate, frags[1])
-   lwstate.fragment6_cache[key] = nil
-   for i=1,#frags do
-      packet.free(frags[i])
-   end
-end
-
 local function from_b4(lwstate, pkt)
-   -- TODO: only send ICMP on failure for packets that plausibly would be bound?
-   if fragmentv6.is_ipv6_fragment(pkt, lwstate.l2_size) then
-      local frags = cache_ipv6_fragment(lwstate, pkt)
-      local frag_status, maybe_pkt = fragmentv6.reassemble_ipv6(frags, lwstate.l2_size)
-      if frag_status == fragmentv6.FRAGMENT_MISSING then
-           return -- Nothing useful to be done yet
-      elseif frag_status == fragmentv6.REASSEMBLY_INVALID then
-         if maybe_pkt then -- This is an ICMP packet
-            clean_ipv6_fragment_cache(lwstate, frags)
-            if lwstate.policy_icmpv6_outgoing == lwconf.policies['DROP'] then
-               packet.free(maybe_pkt)
-            else
-               return transmit(lwstate.o6, maybe_pkt)
-            end
-            return
-         end
-      else -- It was successfully reassembled
-         -- The spec mandates that reassembly must occur before decapsulation
-         clean_ipv6_fragment_cache(lwstate, frags)
-         if debug then lwdebug.print_pkt(maybe_pkt) end
-         pkt = maybe_pkt -- do the rest of the processing on the reassembled packet
-      end
-   end
-
    local proto_offset = lwstate.l2_size + o_ipv6_next_header
    local proto = pkt.data[proto_offset]
    if proto == proto_icmpv6 then
@@ -675,30 +559,15 @@ local function from_b4(lwstate, pkt)
          -- Remove IPv6 header.
          packet.shiftleft(pkt, ipv6_fixed_header_size)
          write_eth_header(pkt.data, lwstate.b4_mac, lwstate.aftr_mac_b4_side,
-                          n_ethertype_ipv4, lwstate.v4_vlan_tag)
+                          n_ethertype_ipv4)
          -- TODO:  refactor so this doesn't actually seem to be from the internet?
          return from_inet(lwstate, pkt)
       else
          -- Remove IPv6 header.
          packet.shiftleft(pkt, ipv6_fixed_header_size)
          write_eth_header(pkt.data, lwstate.aftr_mac_inet_side, lwstate.inet_mac,
-                          n_ethertype_ipv4, lwstate.v4_vlan_tag)
-         -- Fragment if necessary
-         if pkt.length - lwstate.l2_size > lwstate.ipv4_mtu then
-            local fragstatus, frags = fragmentv4.fragment_ipv4(pkt, lwstate.l2_size, lwstate.ipv4_mtu)
-            if fragstatus == fragmentv4.FRAGMENT_OK then
-               for i=1,#frags do
-                  transmit(lwstate.o4, frags[i])
-               end
-               return
-            else
-               -- TODO: send ICMPv4 info if allowed by policy
-               packet.free(pkt)
-               return
-            end
-         else -- No fragmentation needed
-            return transmit(lwstate.o4, pkt)
-         end
+                          n_ethertype_ipv4)
+         return transmit(lwstate.o4, pkt)
       end
    elseif lwstate.policy_icmpv6_outgoing == lwconf.policies['ALLOW'] then
       icmp_b4_lookup_failed(lwstate, pkt, ipv6_src_ip)

@@ -30,8 +30,8 @@ local function calculate_payload_size(dst_pkt, initial_pkt, l2_size, max_size, c
    local payload_size = initial_pkt.length - original_bytes_to_skip
    local non_payload_bytes = dst_pkt.length + constants.icmp_base_size
    local full_pkt_size = payload_size + non_payload_bytes
-   if full_pkt_size > max_size then
-      full_pkt_size = max_size
+   if full_pkt_size > max_size + l2_size then
+      full_pkt_size = max_size + l2_size
       payload_size = full_pkt_size - non_payload_bytes
    end
    return payload_size, original_bytes_to_skip, non_payload_bytes
