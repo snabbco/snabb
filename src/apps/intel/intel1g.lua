@@ -254,7 +254,8 @@ function Intel1g:new(conf)
     printRxStatus()
    end
 
-   local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0}
+   local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0, pull=0, push=0,
+    pullTxLinkFull=0, pushRxLinkEmpty=0, pushTxRingFull=0}
 
    local function printStats(r)
     print("Stats from NIC registers:")
@@ -264,8 +265,7 @@ function Intel1g:new(conf)
      print("  Rx No Buffers=     " .. peek32(r.RNBC))
      print("  Rx Packets to Host=" .. peek32(r.RPTHC))
     print("Stats from counters:")
-     print("  rxPackets=         " .. counters.rxPackets .. "  rxBytes= " .. counters.rxBytes)
-     print("  txPackets=         " .. counters.txPackets .. "  txBytes= " .. counters.txBytes)
+     self:report()
    end
 
    -- Return the next index into a ring buffer.
@@ -354,9 +354,10 @@ function Intel1g:new(conf)
          set32(r.CTRL_EXT, {AutoSpeedDetect = 12})		-- p.373
          --set32(r.CTRL_EXT, {DriverLoaded = 28})		-- signal Device Driver Loaded
 
-         print("Waiting for link...")
+         io.write("Waiting for link...")
+         io.flush()
          wait32(r.STATUS, {LinkUp=1})				-- wait for auto-neg. to complete
-         print("We have link-up!")
+         print(" We have link-up!")
          --printMACstatus()
       end
 
@@ -367,12 +368,12 @@ function Intel1g:new(conf)
          pci.set_bus_master(pciaddress, false)		-- disable DMA
       end
 
-      function self:report ()				-- for snabbmark, from SolarFlareNic:report()
-       print("report on Intel1g device", self.ifname)
+      function self:report()				-- from SolarFlareNic:report() for snabbmark, etc.
+       io.write("Intel1g device " .. pciaddress .. ":  ")
        for name,value in pairs(counters) do
-        print(string.format('%s: %d ', name, value))
+        io.write(string.format('%s: %d ', name, value))
        end
-       print("\n")
+       print("")
       end
 
    end  -- if not attach then
@@ -441,8 +442,14 @@ function Intel1g:new(conf)
 
       -- Define push() method for app instance.
       function self:push ()
+         counters.push= counters.push +1
          local li = self.input[1]
          assert(li, "intel1g: no input link")
+         if link.empty(li) then				-- from SolarFlareNic:push()
+          counters.pushRxLinkEmpty= counters.pushRxLinkEmpty +1
+         elseif not can_transmit() then
+          counters.pushTxRingFull= counters.pushTxRingFull +1
+         end
          while not link.empty(li) and can_transmit() do
             transmit(link.receive(li))
          end
@@ -574,13 +581,19 @@ function Intel1g:new(conf)
       end
       
       function self:pull ()				-- Define pull() method for app instance
+         counters.pull= counters.pull +1
          local lo = self.output[1]
 --         assert(lo, "intel1g: no output link")
 if lo then
          local limit = rxburst
          while limit > 0 and can_receive() do
-            link.transmit(lo, receive())
             limit = limit - 1
+            if not link.full(lo) then			-- from SolarFlareNic:pull()
+             link.transmit(lo, receive())
+            else
+             counters.pullTxLinkFull= counters.pullTxLinkFull +1
+             packet.free(receive())
+            end
          end
          sync_receive()
 end
