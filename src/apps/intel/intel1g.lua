@@ -652,15 +652,19 @@ function selftest ()
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
+   local startTime = C.get_monotonic_time()
    engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
+   local endTime = C.get_monotonic_time()
    print("selftest: ok")
 
-   engine.app_table.nic.stop()
+   local runtime = endTime - startTime
+   engine.app_table.nic.stop()				-- outputs :report()
 
    local source= engine.app_table.source.output.tx
    assert(source, "Intel1g: no source?")
    local s= link.stats(source)
    print("source:      txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+   local txpackets= s.txpackets
 
    --local li = engine.app_table.nic.input[1]
    local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
@@ -678,4 +682,14 @@ function selftest ()
    assert(sink, "Intel1g: no sink?")
    local s= link.stats(sink)
    print("sink:        txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+   local rxpackets= s.rxpackets
+
+   print(("Processed %.1f M 60 Byte packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s, %.2f %% packet loss).")
+    :format(
+     txpackets / 1e6, runtime,
+     txpackets / runtime / 1e6,
+     ((txpackets * 60 * 8) / runtime) / (1024*1024*1024),
+     (txpackets - rxpackets) *100 / txpackets
+   ))
 end
+
