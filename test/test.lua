@@ -1894,6 +1894,7 @@ test_termios = {
     local ws, err = S.stdout:ioctl("TIOCGWINSZ")
     if not ws and err.NOTTY then error "skipped" end -- stdout might not be a tty in test env
     assert(ws, err)
+    if ws.row == 0 and ws.col == 0 then error "skipped" end
     assert(ws.row > 0 and ws.col > 0, "expect positive winsz")
   end,
 }
