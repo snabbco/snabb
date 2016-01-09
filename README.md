@@ -16,7 +16,7 @@ The [video of my FOSDEM 2013 talk](http://www.myriabit.com/ljsyscall/) here, and
 
 ## Install
 
-A Docker hub automated build (currently only for Linux) is available via `docker pull justincormack/ljsyscall`.
+A Docker hub automated build (currently only for Linux) is available via `docker pull justincormack/ljsyscall`. You can run the test suite with `docker run justincormack/ljsyscall test/test.lua`, use in a scripted way eg `docker run justincormack/ljsyscall -e "print(require('syscall').nl.interfaces())"` or get an interactive session with `docker -it run justincormack/ljsyscall`.
 
 The stable release is now available in the luarocks repository, so you should be able to run ```luarocks install ljsyscall```. There will be a ```ljsyscall-rump``` rock soon, but I need to fix the install for the rump libraries.
 
