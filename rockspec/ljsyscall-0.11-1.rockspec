@@ -25,7 +25,6 @@ build =
     ["syscall.abi"] = "syscall/abi.lua";
     ["syscall.helpers"] = "syscall/helpers.lua";
     ["syscall.syscalls"] = "syscall/syscalls.lua";
-    ["syscall.ffifunctions"] = "syscall/ffifunctions.lua";
     ["syscall.libc"] = "syscall/libc.lua";
     ["syscall.methods"] = "syscall/methods.lua";
     ["syscall.ffitypes"] = "syscall/ffitypes.lua";
