@@ -14,7 +14,6 @@ local ffi       = require("ffi")
 local C         = ffi.C
 local S         = require('syscall')
 local pci       = require("lib.hardware.pci")
-local lib       = require("core.lib")
 local bit       = require('bit')
 
 local band, bor, rshift, lshift = bit.band, bit.bor, bit.rshift, bit.lshift
@@ -31,7 +30,56 @@ local VIRTIO_PCI_QUEUE_ADDR_SHIFT = 12 -- the default page bit
 VirtioPci = subClass(nil)
 VirtioPci._name = "virtio pci"
 
-local virtio_pci_bar0 = lib.fstruct[[
+-- Parses a C struct description
+-- and creates a table which maps each field name
+-- to size, offset and ctype. An example string argument:
+-- [[
+--    uint32_t a;
+--    uint16_t b;
+-- ]]
+--
+-- This will create a table with the following content:
+-- { a = { fieldname = "a", ct = cdata<unsigned int>, size = 4, offset = 0},
+--   b = { fieldname = "b", ct = cdata<unsigned short>, size = 2, offset = 4} }
+local function fstruct(def)
+   local struct = {}
+   local offset = 0
+   for ct, fld in def:gmatch('([%a_][%w_]*)%s+([%a_][%w_]*);') do
+      ct = ffi.typeof(ct)
+      struct[fld] = {
+         fieldname = fld,
+         ct = ct,
+         size = ffi.sizeof(ct),
+         offset = offset,
+      }
+      offset = offset + struct[fld].size
+   end
+   return struct, offset
+end
+
+-- Takes a field description as created by the fstruct function
+-- and a file descriptor. A value of the field specified ctype,
+-- size and offset is read from the file designated from the fd
+local function fieldrd(field, fd)
+   local buf = ffi.typeof('$ [1]', field.ct)()
+   local r, err = fd:pread(buf, field.size, field.offset)
+   if not r then error(err) end
+   return buf[0]
+end
+
+-- Takes a field description as created by the fstruct function,
+-- a file descriptor and a value. The value is written in the file,
+-- specified by the fd, at the offset specified by the field
+local function fieldwr(field, fd, val)
+   local buf = ffi.typeof('$ [1]', field.ct)()
+   buf[0] = val
+   assert(fd:seek(field.offset))
+   local r, err = fd:write(buf, field.size)
+   if not r then error(err) end
+   return buf[0]
+end
+
+local virtio_pci_bar0 = fstruct[[
    uint32_t host_features;
    uint32_t guest_features;
    uint32_t queue_pfn;
@@ -54,10 +102,10 @@ function open_bar (fname, struct)
       close = function(self) return self.fd:close() end,
    }, {
       __index = function (self, key)
-         return lib.fieldrd(self.struct[key], self.fd)
+         return fieldrd(self.struct[key], self.fd)
       end,
       __newindex = function (self, key, value)
-         return lib.fieldwr(self.struct[key], self.fd, value)
+         return fieldwr(self.struct[key], self.fd, value)
       end,
    })
 end

@@ -603,31 +603,7 @@ integers *n* respectively.
 Network to host byte order conversion functions for 32 and 16 bit
 integers *n* respectively.
 
-— Function **lib.fstruct** *def*
 
-Parses a C struct description and creates a table which maps each field name
-to size, offset and ctype. An example string argument:
-
-```
-   [[
-      uint32_t a;
-      uint16_t b;
-   ]]
-```
-
-This will create a table with the following content:
-
-```
-   { a = { fieldname = "a", ct = cdata<unsigned int>, size = 4, offset = 0},
-     b = { fieldname = "b", ct = cdata<unsigned short>, size = 2, offset = 4} }
-```
-— Function **lib.fieldrd** *field*, *fd*
-
-— Function **lib.fieldwr** *field*, *fd*, *value*
-
-Takes a *field* description as created by the fstruct function,
-a file descriptor *fd* and a *value*. The *field* description designates
-the offset and the size where the *value* will be written or read
 
 ## Main
 
