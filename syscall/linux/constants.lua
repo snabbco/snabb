@@ -1958,6 +1958,7 @@ c.EM = strflag {
   MN10300     = 89,
   BLACKFIN    = 106,
   TI_C6000    = 140,
+  AARCH64     = 183,
   FRV         = 0x5441,
   AVR32       = 0x18ad,
   ALPHA       = 0x9026,
@@ -1974,6 +1975,7 @@ local __AUDIT_ARCH_64BIT = 0x80000000
 local __AUDIT_ARCH_LE    = 0x40000000
 
 c.AUDIT_ARCH = strflag {
+  AARCH64 = c.EM.AARCH64 + __AUDIT_ARCH_64BIT + __AUDIT_ARCH_LE,
   ALPHA = c.EM.ALPHA + __AUDIT_ARCH_64BIT + __AUDIT_ARCH_LE,
   ARM = c.EM.ARM + __AUDIT_ARCH_LE,
   ARMEB = c.EM.ARM,
