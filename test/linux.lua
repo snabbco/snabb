@@ -1476,7 +1476,7 @@ test.seccomp = {
       local pid = S.getpid()
       local ofd, err = S.open("/dev/null", "rdonly") -- not allowed
       fork_assert(not ofd, "should not run open")
-      fork_assert(err.errno == nr.SYS.open, "syscall that did not work should be open")
+      fork_assert(err.errno == nr.SYS.open or err.errno == nr.SYS.openat, "syscall that did not work should be open[at]")
       local pid = S.getpid()
       S._exit()
     else
