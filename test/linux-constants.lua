@@ -159,6 +159,7 @@ local function fixup_constants(abi, c)
   c.RTA.PREF = nil
   c.RTA.VIA = nil
   c.RTA.MFC_STATS = nil
+  c.AUDIT_ARCH.AARCH64 = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil
