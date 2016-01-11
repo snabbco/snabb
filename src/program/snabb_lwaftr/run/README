@@ -1,0 +1,8 @@
+Usage: run --help
+       run --conf <conf-file> --v4-pci <pci-addr> --v6-pci <pci-addr> [-D <seconds>] [-v] [-u]
+
+       --conf   <conf-file>     Sets configuration policy table
+       --v4-pci <pci-addr>      PCI device number for the INET-side NIC
+       --v6-pci <pci-addr>      PCI device number for the B4-side NIC
+       -D       <seconds>       Duration in seconds
+       -v                       Verbose (repeat for more verbosity)

@@ -199,7 +199,7 @@ function setup (patterns)
       table.sort(set)
    end
    local ndropped = math.max(0, #set - pmu_x86.ngeneral)
-   while (#set - pmu_x86.ngeneral) > 0 do table.remove(set) end
+   while #set > pmu_x86.ngeneral do table.remove(set) end
    local cpu = cpu_set()[1]
    -- All available counters are globally enabled
    -- (IA32_PERF_GLOBAL_CTRL).

@@ -1,4 +1,3 @@
-bin
 obj
 *~
 *.so
@@ -15,3 +14,4 @@ obj
 /src/syscall
 /deps/*.vsn
 /src/programs.inc
+/src/program/snabb_lwaftr/tests/data/addresses.map

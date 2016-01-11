@@ -28,4 +28,23 @@ clean:
 	(cd lib/luajit && $(MAKE) clean)
 	(cd src; $(MAKE) clean; rm -rf syscall.lua syscall)
 
-.SERIAL: all
+PACKAGE:=snabbswitch
+DIST_BINARY:=snabb
+BUILDDIR:=$(shell pwd)
+
+dist: DISTDIR:=$(BUILDDIR)/$(PACKAGE)-$(shell git describe --tags)
+dist: all
+	mkdir "$(DISTDIR)"
+	git clone "$(BUILDDIR)" "$(DISTDIR)/snabbswitch"
+	git clone "$(BUILDDIR)/deps/luajit" "$(DISTDIR)/snabbswitch/deps/luajit"
+	git clone "$(BUILDDIR)/deps/ljsyscall" "$(DISTDIR)/snabbswitch/deps/ljsyscall"
+	git clone "$(BUILDDIR)/deps/pflua" "$(DISTDIR)/snabbswitch/deps/pflua"
+	rm -rf "$(DISTDIR)/snabbswitch/.git"
+	rm -rf "$(DISTDIR)/snabbswitch/deps/luajit/.git"
+	rm -rf "$(DISTDIR)/snabbswitch/deps/ljsyscall/.git"
+	rm -rf "$(DISTDIR)/snabbswitch/deps/pflua/.git"
+	cp "$(BUILDDIR)/src/$(DIST_BINARY)" "$(DISTDIR)/$(DIST_BINARY)"
+	cd "$(DISTDIR)/.." && tar cJvf "`basename '$(DISTDIR)'`.tar.xz" "`basename '$(DISTDIR)'`"
+	rm -rf "$(DISTDIR)"
+
+p.SERIAL: all

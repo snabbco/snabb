@@ -59,13 +59,11 @@ function main ()
    end
 end
 
--- If program stars with prefix 'snabb_' removes the prefix
+-- If no more arguments return program as program name
 -- If not, use the next argument as program name
 function select_program (program, args)
-   if program:match("^snabb_") then
-      return program:gsub("^snabb_", "")
-   end
-   return programname(table.remove(args, 1)):gsub("^snabb_", "")
+   if not args or #args == 0 then return program end
+   return string.gsub(table.remove(args, 1), "-", "_")
 end
 
 function usage (status)
@@ -144,11 +142,11 @@ function selftest ()
    -- snabb foo => foo
    assert(select_program(pn'snabb', { pn'foo' }) == "foo",
       "Incorrect program name selected")
-   -- snabb-foo => foo
-   assert(select_program(pn'snabb-foo', { }) == "foo",
+   -- snabb-foo => snabb_foo
+   assert(select_program(pn'snabb-foo', { }) == "snabb_foo",
       "Incorrect program name selected")
-   -- snabb snabb-foo => foo
-   assert(select_program(pn'snabb', { pn'snabb-foo' }) == "foo",
+   -- snabb snabb-foo => snabb_foo
+   assert(select_program(pn'snabb', { pn'snabb-foo' }) == "snabb_foo",
       "Incorrect program name selected")
 end
 
