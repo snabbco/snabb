@@ -322,6 +322,8 @@ c.CBAUDEX = nil
 
 -- missing on my mips box
 c.AUDIT_ARCH.H8300 = nil
+-- missing on CI
+c.AUDIT_ARCH.AARCH64 = nil
 
 -- defined only in linux/termios.h which we cannot include on mips
 c.TIOCM.OUT1 = nil
