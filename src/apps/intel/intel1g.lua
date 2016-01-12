@@ -30,6 +30,7 @@
 -- Data sheets (reference documentation):
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/ethernet-controller-i350-datasheet.pdf
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/i210-ethernet-controller-datasheet.pdf
+-- Note: section and page numbers in the comments below refer to the i210 data sheet
 
 -- run selftest() on APU2's second/middle NIC:
 --  sudo SNABB_SELFTEST_INTEL1G_0="0000:02:00.0" ./snabb snsh -t apps.intel.intel1g
@@ -253,7 +254,8 @@ function Intel1g:new(conf)
     printRxStatus()
    end
 
-   local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0}
+   local counters= {rxPackets=0, rxBytes=0, txPackets=0, txBytes=0, pull=0, push=0,
+    pullTxLinkFull=0, pullNoTxLink=0, pushRxLinkEmpty=0, pushTxRingFull=0}
 
    local function printStats(r)
     print("Stats from NIC registers:")
@@ -263,8 +265,7 @@ function Intel1g:new(conf)
      print("  Rx No Buffers=     " .. peek32(r.RNBC))
      print("  Rx Packets to Host=" .. peek32(r.RPTHC))
     print("Stats from counters:")
-     print("  rxPackets=         " .. counters.rxPackets .. "  rxBytes= " .. counters.rxBytes)
-     print("  txPackets=         " .. counters.txPackets .. "  txBytes= " .. counters.txBytes)
+     self:report()
    end
 
    -- Return the next index into a ring buffer.
@@ -353,18 +354,27 @@ function Intel1g:new(conf)
          set32(r.CTRL_EXT, {AutoSpeedDetect = 12})		-- p.373
          --set32(r.CTRL_EXT, {DriverLoaded = 28})		-- signal Device Driver Loaded
 
-         print("Waiting for link-up...")
+         io.write("Waiting for link...")
+         io.flush()
          wait32(r.STATUS, {LinkUp=1})				-- wait for auto-neg. to complete
-         print("We have link-up!")
-         printMACstatus()
+         print(" We have link-up!")
+         --printMACstatus()
       end
 
-      -- Define shutdown function for the NIC itself
       stop_nic = function ()
          -- XXX Are these the right actions?
          clear32(r.CTRL, {SETLINKUP = 6})		-- take the link down
          pci.set_bus_master(pciaddress, false)		-- disable DMA
       end
+
+      function self:report()				-- from SolarFlareNic:report() for snabbmark, etc.
+       io.write("Intel1g device " .. pciaddress .. ":  ")
+       for name,value in pairs(counters) do
+        io.write(string.format('%s: %d ', name, value))
+       end
+       print("")
+      end
+
    end  -- if not attach then
 
    if txq then						-- Transmitter
@@ -403,7 +413,7 @@ function Intel1g:new(conf)
          return ringnext(tdt) ~= tdh
       end
 
-      -- Queue a packet for transmission.
+      -- Queue a packet for transmission
       -- Precondition: can_transmit() => true
       local function transmit (p)
          txdesc[tdt].address = tophysical(p.data)
@@ -414,8 +424,8 @@ function Intel1g:new(conf)
 	 counters.txBytes= counters.txBytes +p.length
       end
 
-      -- Synchronize DMA ring state with hardware.
-      -- Free packets that have been transmitted.
+      -- Synchronize DMA ring state with hardware
+      -- Free packets that have been transmitted
       local function sync_transmit ()
          local cursor = tdh
          tdh = peek32(r.TDH)			-- possible race condition, see 7.1.4.4, 7.2.3 
@@ -429,17 +439,22 @@ function Intel1g:new(conf)
          poke32(r.TDT, tdt)
       end
 
-      -- Define push() method for app instance.
-      function self:push ()
-         local li = self.input[1]
-         assert(li, "intel1g: no input link")
+      function self:push ()				-- move frames from link.rx to NIC.txQueue for transmission
+         counters.push= counters.push +1
+         --local li = self.input[1]
+         local li = self.input["rx"]			-- same-same as [1]
+         assert(li, "intel1g:push: no input link")
+         if link.empty(li) then				-- from SolarFlareNic:push()
+          counters.pushRxLinkEmpty= counters.pushRxLinkEmpty +1
+         elseif not can_transmit() then
+          counters.pushTxRingFull= counters.pushTxRingFull +1
+         end
          while not link.empty(li) and can_transmit() do
             transmit(link.receive(li))
          end
          sync_transmit()
       end
 
-      -- Define shutdown function for transmit
       stop_transmit = function ()
          poke32(r.TXDCTL, 0)
          wait32(r.TXDCTL, {ENABLE=25}, 0)
@@ -563,13 +578,25 @@ function Intel1g:new(conf)
 	 --print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
       end
       
-      function self:pull ()				-- Define pull() method for app instance
-         local lo = self.output[1]
-         assert(lo, "intel1g: no output link")
+      function self:pull ()				-- move received frames from NIC.rxQueue to link.tx
+         counters.pull= counters.pull +1
+         --local lo = self.output[1]
+         local lo = self.output["tx"]			-- same-same as [1]
+         --assert(lo, "intel1g: no output link")
          local limit = rxburst
          while limit > 0 and can_receive() do
+          limit = limit - 1
+          if lo then					-- a link connects NIC to a sink
+           if not link.full(lo) then			-- from SolarFlareNic:pull()
             link.transmit(lo, receive())
-            limit = limit - 1
+           else
+            counters.pullTxLinkFull= counters.pullTxLinkFull +1
+            packet.free(receive())
+           end
+          else
+           counters.pullNoTxLink= counters.pullNoTxLink +1
+           packet.free(receive())
+          end
          end
          sync_receive()
       end
@@ -627,20 +654,43 @@ function selftest ()
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
+   local startTime = C.get_monotonic_time()
    engine.main({duration = 1, report = {showapps = true, showlinks = true, showload= true}})
+   local endTime = C.get_monotonic_time()
    print("selftest: ok")
 
-   engine.app_table.nic.stop()
+   local runtime = endTime - startTime
+   engine.app_table.nic.stop()				-- outputs :report()
+
+   local source= engine.app_table.source.output.tx
+   assert(source, "Intel1g: no source?")
+   local s= link.stats(source)
+   print("source:      txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+   local txpackets= s.txpackets
 
    --local li = engine.app_table.nic.input[1]
    local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
-   assert(li, "Intel1g: no input link")
+   assert(li, "Intel1g: no input link?")
    local s= link.stats(li)
    print("input link:  txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
 
    --local lo = engine.app_table.nic.output[1]
    local lo = engine.app_table.nic.output["tx"]		-- same-same as [1]
-   assert(lo, "Intel1g: no output link")
+   assert(lo, "Intel1g: no output link?")
    local s= link.stats(lo)
    print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+
+   local sink= engine.app_table.sink.input.rx
+   assert(sink, "Intel1g: no sink?")
+   local s= link.stats(sink)
+   print("sink:        txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+   local rxpackets= s.rxpackets
+
+   print(("Processed %.1f M 60 Byte packets in %.2f s (rate: %.1f Mpps, %.2f Gbit/s, %.2f %% packet loss).")
+    :format(
+     txpackets / 1e6, runtime,
+     txpackets / runtime / 1e6,
+     ((txpackets * 60 * 8) / runtime) / (1024*1024*1024),
+     (txpackets - rxpackets) *100 / txpackets
+   ))
 end

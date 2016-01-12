@@ -1,3 +1,4 @@
+#include <time.h>
 
 /* etherfabric/base.h */
 

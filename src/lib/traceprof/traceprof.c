@@ -1,8 +1,9 @@
 // Location where the next instruction pointer value will be stored.
 
+#define _GNU_SOURCE 1
+
 #include <assert.h>
 #include <stdio.h>
-#define __USE_GNU
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/time.h>
