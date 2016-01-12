@@ -694,4 +694,3 @@ function selftest ()
      (txpackets - rxpackets) *100 / txpackets
    ))
 end
-

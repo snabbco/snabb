@@ -115,7 +115,7 @@ int firehose_callback_v1(const char *pciaddr, char **packets, void *rxring,
       nic.r.RDT(ring_size-1)
 
       local index = 0 -- ring index of next packet
-      local rxring = nic.rxdesc._ptr
+      local rxring = nic.rxdesc
       local run = function ()
          index = so.firehose_callback_v1(pciaddr, packets, rxring, ring_size, index)
          nic.r.RDT(index==0 and ring_size or index-1)
