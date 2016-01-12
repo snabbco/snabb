@@ -22,3 +22,17 @@ Usage:
 
     Example usage with 10 million packets, packet size 128 bytes:
     solarflare 10e6 128
+
+  snabbmark intel1g <npackets> <packet-size> [<timeout>]
+    Send the given number of packets through a Intel i210/i350 NIC. The test
+    assumes that the two Intel NICs are connected
+    back-to-back.
+
+    The optional <timeout> parameter can be used to specify a timeout in
+    seconds. If supplied the benchmark run for no longer than <timeout>
+    seconds.
+
+    Uses SNABB_PCI0 and SNABB_PCI1.
+
+    Example usage with 10 million packets, packet size 128 bytes:
+    sudo SNABB_PCI0="0000:02:00.0"  SNABB_PCI1="0000:03:00.0" ./snabb snabbmark intel1g 10e6 128
