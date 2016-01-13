@@ -109,7 +109,7 @@ local function get_flow(vlan_id, data, ip_offset)
    end
 
    local length = C.ntohs(rd16(data + ip_offset + IPv4_LEN_OFFSET))
-   local proto  = C.ntohs(rd16(data + ip_offset + IPv4_PROTO_OFFSET))
+   local proto  = data[ip_offset + IPv4_PROTO_OFFSET]
    local lo_ip  = C.ntohl(rd32(data + ip_offset + IPv4_SRC_ADDR_OFFSET))
    local hi_ip  = C.ntohl(rd32(data + ip_offset + IPv4_DST_ADDR_OFFSET))
    debug(" length: %d (%d)\n", length, length + ip_offset)
