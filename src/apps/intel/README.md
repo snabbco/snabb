@@ -126,7 +126,7 @@ Features:
 - Configuration and statistics registers are mirrored to shared memory objects (NYI).
 - Receive and transmit links are optional and can have any name.
 
-![Intel1G](.images/Intel1G.png)
+![Intel1g](.images/Intel1g.png)
 
 ### Configuration
 
@@ -157,7 +157,7 @@ specified but assumed to be broadly applicable.
 *Optional*. Maximum number of packets to receive on one
 breath. Default is not specified but assumed to be broadly applicable.
 
-— Key **loopback**
++— Key **loopback**
 *Optional*. Set to `"MAC"` for MAC loopback, or to `"PHY"` for PHY loopback modes.
 
 ## LoadGen (apps.intel.loadgen)
