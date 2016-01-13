@@ -249,28 +249,25 @@ for header, data in input:packets() do
    end
 end
 
-print("Packets: " .. num_packets .. " (VLAN-tagged: " .. num_vlan .. ")")
-print("Bytes: " .. num_total_bytes .. " (inspected: " .. num_bytes .. ")")
-
-local ipv4_address_format = "%d.%d.%d.%d"
-local function format_ip(ipaddr)
-   return ipv4_address_format:format(bit.band(bit.rshift(ipaddr, 24), 0xFF),
-                                     bit.band(bit.rshift(ipaddr, 16), 0xFF),
-                                     bit.band(bit.rshift(ipaddr,  8), 0xFF),
-                                     bit.band(ipaddr, 0xFF))
-end
-
-local num_flows = 0
-for _, flow in pairs(flow_table) do
+print("Input: " .. input_file)
+print("Flows:")
+local num_flows, detected_flows = 0, 0
+local line_format = "%15s:%-5d - %15s:%-5d  pkts: %3d  bytes: %8d  %s"
+for flowid, flow in pairs(flow_table) do
    num_flows = num_flows + 1
    if flow.detected ~= ndpi.protocol.PROTOCOL_UNKNOWN then
-      print("")
-      print(flow.ndpi_flow)
-      print("    protocol: " .. ndpi.protocol[flow.detected] .. "/" .. ndpi.protocol[flow.master])
-      print("   addresses: " .. format_ip(flow.lo_ip) .. ":" .. flow.lo_port
-                    .. " - " .. format_ip(flow.hi_ip) .. ":" .. flow.hi_port)
-      print("     VLAN id: " .. (flow.vlan or "none"))
-      print("     packets: " .. flow.num_packets)
-      print("       bytes: " .. flow.num_bytes)
+      detected_flows = detected_flows + 1
    end
+   local l7proto = ndpi.protocol[flow.detected]:match("^[^_]+_(.*)$")
+   if flow.master ~= ndpi.protocol.PROTOCOL_UNKNOWN then
+      l7proto = l7proto .. "/" .. ndpi.protocol[flow.master]:match("^[^_]+_(.*)$")
+   end
+   print(line_format:format(format_ip(flow.lo_ip), flow.lo_port,
+                            format_ip(flow.hi_ip), flow.hi_port,
+                            flow.num_packets,
+                            flow.num_bytes,
+                            l7proto))
 end
+print("Packets: " .. num_packets .. " (VLAN-tagged: " .. num_vlan .. ")")
+print("Bytes: " .. num_total_bytes .. " (inspected: " .. num_bytes .. ")")
+print("Flows: " .. num_flows .. " (identified: " .. detected_flows .. ")")
