@@ -71,7 +71,8 @@ local UDP_DST_PORT_OFFSET  = 2
 local TICK_RESOLUTION  = 1000
 local NUM_ROOTS        = 512
 
-local input = pcap.file("examples/lamernews.pcap")
+local input_file = arg[1] or "examples/lamernews.pcap"
+local input = pcap.file(input_file)
 local link_type = input:data_link()
 
 -- Instantiate a detection_module and enable all protocols
