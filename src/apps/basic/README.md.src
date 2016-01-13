@@ -102,3 +102,36 @@ link. The packets are transmitted in the order they were received.
               |          |
               +----------+
 
+## Match
+The `Match` app compares packets received on `rx` with those received on
+the reference input `comparator`.
+```
+config.app(c, "match", apps.Match, { mode = "exact" | "monotonic" })
+```
+In exact mode every packet received on `rx` must also be received on
+`comparator` and every packet received on `comparator` must also be received
+on `rx`. The packets must arrive in the same order
+rx.pkt1 == comparator.pkt1
+rx.pkt2 == comparator.pkt2
+rx.pkt3 == comparator.pkt3
+rx.pkt4 == comparator.pkt4
+
+In monotonic mode packets can be received on rx that don't have a corresponding
+packet on comparator.
+rx.pkt1 == comparator.pkt1
+rx.pkt2 == skipped
+rx.pkt3 == comparator.pkt2
+rx.pkt4 == comparator.pkt3
+rx.pkt4 == skipped
+
+Errors including packet hexdumps can be access via
+```engine.app_table.MatchAppName:errors()``` which returns a table of error strings.
+
+    DIAGRAM: Match
+              +----------+
+              |          |
+       rx ----*          |
+              |   Match  |
+comparator ---*          |
+              |          |
+              +----------+

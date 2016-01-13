@@ -5,6 +5,7 @@ local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
 local transmit, receive = link.transmit, link.receive
+local lib = require("core.lib")
 
 
 local ffi = require("ffi")
@@ -86,6 +87,69 @@ function Sink:push ()
    end
 end
 
+--- ### `Match` app: Compare packets recieved on rx and comparator
+Match = {}
+
+function Match:new(cfg)
+   if cfg == "nil" then
+      cfg = { mode = "exact" }
+   end
+   assert(cfg.mode == "exact" or cfg.mode == "monotonic", ("Unsupported mode %s"):format(cfg.mode))
+   return setmetatable({ cfg = cfg, seen = 0, errs = { }, done = false }, { __index=Match })
+end
+
+function Match:push()
+   assert(self.input.rx, "input rx not found")
+   assert(self.input.comparator, "input comparator not found")
+   if self.cfg.mode == "exact" then
+      while not link.empty(self.input.rx) and not link.empty(self.input.comparator) do
+         local p = link.receive(self.input.rx)
+         local cmp = link.receive(self.input.comparator)
+         if packet.length(cmp) ~= packet.length(p) or
+            C.memcmp(packet.data(cmp), packet.data(p), packet.length(cmp)) ~= 0 then
+            self:log(cmp, p)
+         end
+         packet.free(p)
+         packet.free(cmp)
+         self.seen = self.seen + 1
+      end
+   elseif self.cfg.mode == "monotonic" then
+      while not link.empty(self.input.rx) and not link.empty(self.input.comparator) do
+         local p = link.receive(self.input.rx)
+         local cmp = link.front(self.input.comparator)
+         if packet.length(cmp) == packet.length(p) and
+            C.memcmp(packet.data(cmp), packet.data(p), packet.length(cmp)) == 0 then
+            packet.free(link.receive(self.input.comparator))
+            self.seen = self.seen + 1
+         end
+         packet.free(p)
+      end
+   end
+end
+
+function Match:log(a,b)
+   local str = "Packets differ\n" .. lib.hexdump(ffi.string(packet.data(a), packet.length(a)))
+      .. "\n" .. lib.hexdump(ffi.string(packet.data(b), packet.length(b)))
+      table.insert(self.errs, str)
+end
+
+function Match:errors()
+   if self.done then return self.errs end
+   self.done = true
+   if self.cfg.mode == 'exact' then
+      if not link.empty(self.input.rx) then
+         table.insert(self.errs, ("rx empty, packets after packet %d not matched"):format(self.seen))
+      elseif not link.empty(self.input.comparator) then
+         table.insert(self.errs, ("comparator empty, packets after packet %d not matched"):format(self.seen))
+      end
+   elseif self.cfg.mode == 'monotonic' then
+      if link.empty(self.input.rx) and not link.empty(self.input.comparator) then
+         table.insert(self.errs, ("rx empty, packets after packet %d not matched, extend run time?"):format(self.seen))
+      end
+   end
+   return self.errs
+end
+
 --- ### `Tee` app: Send inputs to all outputs
 
 Tee = {}
@@ -146,3 +210,85 @@ function Repeater:stop ()
    end
 end
 
+function selftest()
+   local pcap = require("apps.pcap.pcap")
+   local c = config.new()
+
+   --- Compare the same file
+   engine.configure(config.new())
+   config.app(c, "sink", Match)
+   config.app(c, "src", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.app(c, "comparator", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.link(c, "src.output -> sink.rx")
+   config.link(c, "comparator.output -> sink.comparator")
+   engine.configure(c)
+   engine.main({duration=1, no_report = true })
+   assert(#engine.app_table.sink:errors() == 0)
+
+   --- Compare with broken file
+   engine.configure(config.new())
+   config.app(c, "sink", Match)
+   config.app(c, "src", pcap.PcapReader, "apps/basic/match3.pcap")
+   config.app(c, "comparator", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.link(c, "src.output -> sink.rx")
+   config.link(c, "comparator.output -> sink.comparator")
+   engine.configure(c)
+   engine.main({duration=1, no_report = true })
+   assert(#engine.app_table.sink:errors() == 1)
+
+   --- Compare with no input on rx
+   engine.configure(config.new())
+   config.app(c, "sink", Match)
+   config.app(c, "src", Sink)
+   config.app(c, "comparator", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.link(c, "src.output -> sink.rx")
+   config.link(c, "comparator.output -> sink.comparator")
+   engine.configure(c)
+   engine.main({ duration=1, no_report = true })
+   assert(#engine.app_table.sink:errors() == 1)
+
+   --- Compare with no input on comparator
+   engine.configure(config.new())
+   config.app(c, "sink", Match)
+   config.app(c, "comparator", Sink)
+   config.app(c, "src", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.link(c, "src.output -> sink.rx")
+   config.link(c, "comparator.output -> sink.comparator")
+   engine.configure(c)
+   engine.main({ duration=1, no_report = true })
+   assert(#engine.app_table.sink:errors() == 1)
+
+   --- Compare the same file in monotonic mode
+   engine.configure(config.new())
+   config.app(c, "sink", Match, { mode = "monotonic" })
+   config.app(c, "src", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.app(c, "comparator", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.link(c, "src.output -> sink.rx")
+   config.link(c, "comparator.output -> sink.comparator")
+   engine.configure(c)
+   engine.main({duration=1, no_report = true })
+   assert(#engine.app_table.sink:errors() == 0) 
+
+ --- match2 has half the packets match1 has
+   engine.configure(config.new())
+   config.app(c, "sink", Match, { mode = "monotonic" })
+   config.app(c, "src", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.app(c, "comparator", pcap.PcapReader, "apps/basic/match2.pcap")
+   config.link(c, "src.output -> sink.rx")
+   config.link(c, "comparator.output -> sink.comparator")
+   engine.configure(c)
+   engine.main({duration=1, no_report = true })
+   assert(#engine.app_table.sink:errors() == 0) 
+
+--- match2 has half the packets match1 has
+   engine.configure(config.new())
+   config.app(c, "sink", Match, { mode = "monotonic" })
+   config.app(c, "src", pcap.PcapReader, "apps/basic/match2.pcap")
+   config.app(c, "comparator", pcap.PcapReader, "apps/basic/match1.pcap")
+   config.link(c, "src.output -> sink.rx")
+   config.link(c, "comparator.output -> sink.comparator")
+   engine.configure(c)
+   engine.main({duration=1, no_report = true })
+   assert(#engine.app_table.sink:errors() == 1)
+   assert(engine.app_table.sink:errors()[1] == "rx empty, packets after packet 0 not matched, extend run time?")
+end
