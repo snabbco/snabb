@@ -39,9 +39,9 @@ local bitmask_struct_size = ffi.sizeof("ndpi_protocol_bitmask_t")
 --
 -- Note that most of the functions return the bitmask itself, which allows
 -- to conveniently chain operations. This is particularly neat when using
--- the FFI metatype, e.g:
+-- methods attached to the FFI metatype, e.g:
 --
---   mask = meta_type():set_all():del(42):del(12)
+--   mask = bitmask():set_all():del(42):del(12)
 --
 
 local function bitmask_add(self, n)
@@ -91,9 +91,8 @@ return {
    bitmask_set     = bitmask_set;
    bitmask_is_set  = bitmask_is_set;
 
-   -- Types. The metatype allows invoking methods directly on the objects.
-   base_type = base_type;
-   meta_type = ffi.metatype("ndpi_protocol_bitmask_t", {
+   -- Types.
+   bitmask = ffi.metatype("ndpi_protocol_bitmask_t", {
       __index = {
          add     = bitmask_add;
          del     = bitmask_del;
