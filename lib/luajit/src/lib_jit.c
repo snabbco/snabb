@@ -299,9 +299,6 @@ LJLIB_CF(jit_util_traceinfo)
     setintfield(L, t, "nk", REF_BIAS - (int32_t)T->nk);
     setintfield(L, t, "link", T->link);
     setintfield(L, t, "nexit", T->nsnap);
-    setintfield(L, t, "szmcode", T->szmcode);
-    setintfield(L, t, "mcode", (int32_t)(intptr_t)T->mcode);
-    setintfield(L, t, "mcloop", T->mcloop);
     setstrV(L, L->top++, lj_str_newz(L, jit_trlinkname[T->linktype]));
     lua_setfield(L, -2, "linktype");
     /* There are many more fields. Add them only when needed. */
@@ -558,10 +555,7 @@ static void jit_profile_callback(lua_State *L2, lua_State *L, int samples,
     setfuncV(L2, L2->top++, funcV(tv));
     setthreadV(L2, L2->top++, L);
     setintV(L2->top++, samples);
-    if (vmstate >= 256)
-      setintV(L2->top++, vmstate-256);
-    else
-      setstrV(L2, L2->top++, lj_str_new(L2, &vmst, 1));
+    setstrV(L2, L2->top++, lj_str_new(L2, &vmst, 1));
     status = lua_pcall(L2, 3, 0, 0);  /* callback(thread, samples, vmstate) */
     if (status) {
       if (G(L2)->panic) G(L2)->panic(L2);

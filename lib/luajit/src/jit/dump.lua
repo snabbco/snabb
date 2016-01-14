@@ -75,9 +75,6 @@ local bcline, disass
 -- Active flag, output file handle and dump mode.
 local active, out, dumpmode
 
--- Information about traces that is remembered for future reference.
-local info = {}
-
 ------------------------------------------------------------------------------
 
 local symtabmt = { __index = false }
@@ -553,7 +550,6 @@ local function dump_trace(what, tr, func, pc, otr, oex)
     if dumpmode.m then dump_mcode(tr) end
   end
   if what == "start" then
-    info[tr] = { func = func, pc = pc, otr = otr, oex = oex }
     if dumpmode.H then out:write('<pre class="ljdump">\n') end
     out:write("---- TRACE ", tr, " ", what)
     if otr then out:write(" ", otr, "/", oex) end
@@ -575,6 +571,7 @@ local function dump_trace(what, tr, func, pc, otr, oex)
     end
     if dumpmode.H then out:write("</pre>\n\n") else out:write("\n") end
   else
+    if what == "flush" then symtab, nexitsym = {}, 0 end
     out:write("---- TRACE ", what, "\n\n")
   end
   out:flush()
@@ -705,7 +702,6 @@ end
 return {
   on = dumpon,
   off = dumpoff,
-  start = dumpon, -- For -j command line option.
-  info = info
+  start = dumpon -- For -j command line option.
 }
 
