@@ -101,6 +101,6 @@ return {
    id               = id_type;
    flow             = flow_type;
    detection_module = detection_module_type;
-   protocol_bitmask = require("ndpi.protocol_bitmask").meta_type;
+   protocol_bitmask = require("ndpi.protocol_bitmask").bitmask;
    protocol         = require("ndpi.protocol_ids");
 }
