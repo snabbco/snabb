@@ -1141,14 +1141,13 @@ local function setlang(infile)
       g_opt.comment = "--|"
       g_opt.endcomment = ""
     end
+    -- Set initial defines only available in Lua mode.
+    local ffi = require("ffi")
+    map_def.ARCH = ffi.arch          --for `.arch ARCH`
+    map_def[upper(ffi.arch)] = 1     --for `.if X86 ...`
+    map_def.OS = ffi.os              --for `.if OS == 'Windows'`
+    map_def[upper(ffi.os)] = 1       --for `.if WINDOWS ...`
   end
-
-  -- Set initial defines only available in Lua mode.
-  local ffi = require'ffi'
-  map_def.ARCH = ffi.arch          --for `.arch ARCH`
-  map_def[upper(ffi.arch)] = 1     --for `.if X86 ...`
-  map_def.OS = ffi.os              --for `.if OS == 'Windows'`
-  map_def[upper(ffi.os)] = 1       --for `.if WINDOWS ...`
 end
 
 -- Parse arguments.
