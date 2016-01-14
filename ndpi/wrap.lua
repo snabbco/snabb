@@ -1,4 +1,4 @@
-#! /usr/bin/env lua
+#! /usr/bin/env luajit
 --
 -- wrap.lua
 -- Copyright (C) 2016 Adrian Perez <aperez@igalia.com>
