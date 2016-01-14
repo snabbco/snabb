@@ -1,12 +1,12 @@
 
---binding to the DynASM encoding engine.
+--Binding to the DynASM encoding engine.
 --Written by Cosmin Apreutesei. Public Domain.
 
 local ffi = require'ffi'
 local bit = require'bit'
 local arch = ffi.arch
 if arch == 'x64' then arch = 'x86' end --same linker for x64
-local C = ffi.C
+local C = ffi.load('dasm_'..arch)
 local M = {C = C}
 
 M._VERSION = 10400
