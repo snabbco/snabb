@@ -102,6 +102,8 @@ end
 Match = {}
 
 function Match:new(cfg)
+   local cfg = config.parse_app_arg(cfg) or {}
+   cfg.mode = cfg.mode or "exact"
    if cfg == "nil" then
       cfg = { mode = "exact" }
    end
@@ -246,9 +248,9 @@ function selftest()
    local pcap = require("apps.pcap.pcap")
    local c = config.new()
 
-   --- Compare the same file
+   --- Compare the same file and pass string for config
    engine.configure(config.new())
-   config.app(c, "sink", Match)
+   config.app(c, "sink", Match, "{}")
    config.app(c, "src", pcap.PcapReader, "apps/basic/match1.pcap")
    config.app(c, "comparator", pcap.PcapReader, "apps/basic/match1.pcap")
    config.link(c, "src.output -> sink.rx")
@@ -257,9 +259,9 @@ function selftest()
    engine.main({duration=1, no_report = true })
    assert(#engine.app_table.sink:errors() == 0)
 
-   --- Compare with broken file
+   --- Compare with broken file and pass nil as config
    engine.configure(config.new())
-   config.app(c, "sink", Match)
+   config.app(c, "sink", Match, "nil")
    config.app(c, "src", pcap.PcapReader, "apps/basic/match3.pcap")
    config.app(c, "comparator", pcap.PcapReader, "apps/basic/match1.pcap")
    config.link(c, "src.output -> sink.rx")
