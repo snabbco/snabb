@@ -13,4 +13,4 @@ export intel2_pci=0000:05:00.1
 export intel3_pci=0000:07:00.0
 export intel4_pci=0000:07:00.1
 
-./net-bringup
+./testnet bringup
