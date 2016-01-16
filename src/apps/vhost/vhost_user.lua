@@ -42,7 +42,7 @@ function VhostUser:new (args)
       )
    }
    self = setmetatable(o, {__index = VhostUser})
-   self.dev = net_device.VirtioNetDevice:new(self)
+   self.dev = net_device.VirtioNetDevice:new(self, args.disable_mrg_rxbuf)
    if args.is_server then
       self.listen_socket = C.vhost_user_listen(self.socket_path)
       assert(self.listen_socket >= 0)
