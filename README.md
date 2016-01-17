@@ -32,9 +32,9 @@ Snabb Switch is written using these main techniques:
 
 Snabb Switch compiles into a stand-alone executable called
 `snabb`. This single binary includes multiple applications and runs on
-any modern Linux distribution. (You could think of it as a
-[busybox](http://en.wikipedia.org/wiki/BusyBox#Single_binary) for
-networking.)
+any modern [Linux/x86-64](src/doc/porting.md) distribution. (You could
+think of it as a [busybox](http://en.wikipedia.org/wiki/BusyBox#Single_binary)
+for networking.)
 
 ## How is it being used?
 
