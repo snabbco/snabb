@@ -1,0 +1,132 @@
+-- blit.lua - offload engine for memory operations
+
+module(..., package.seeall)
+
+local dasm = require("dasm")
+local ffi = require("ffi")
+
+|.arch x64
+|.actionlist actions
+
+-- The blit module provides "blitter" operation to offload
+-- performance-critical memory operations. The API allows scheduling a
+-- series of operations, that can be performed at any time and in any
+-- order, and then executing a "barrier" to wait for completion.
+
+ffi.cdef[[
+  struct blit_queue_entry {
+    void *src;
+    void *dst;
+    uint64_t len;
+  };
+]]
+
+-- Queue of memory operations
+local maxqueue = 10000
+local queue = ffi.new("struct blit_queue_entry[?]", maxqueue+2)
+local nqueued = 0
+
+function copy (dst, src, len)
+   assert(len%32==0)
+   if nqueued == maxqueue then barrier() end
+   queue[nqueued].src = src
+   queue[nqueued].dst = dst
+   queue[nqueued].len = len
+   nqueued = nqueued + 1
+   -- Sentinel
+   queue[nqueued].src = nil
+end
+
+-- Assembler code for the barrier operation
+function gen_barrier (Dst)
+   | ret
+   | mov64 r8, queue
+
+   |->queue:
+   | cmp qword [r8], 0          -- sentinel?
+   | je >9
+
+   -- Load parameters for the next copy
+   | mov rsi, [r8]
+   | mov rdi, [r8+8]
+   | mov rax, [r8+16]
+
+   -- Copy 32 bytes at a time
+   | xor rcx, rcx
+   |->copy:
+   | vmovdqu ymm0, [rsi+rcx]
+   | vmovdqu [rdi+rcx], ymm0
+   | add rcx, 32
+   | cmp rcx, rax
+   | jl ->copy
+
+   -- Advance to the next copy in the queue
+   | add r8, ffi.sizeof('struct blit_queue_entry')
+   | jmp ->queue
+   |9:
+   | ret
+end
+
+-- XXX the code below is copy-paste and should be reused somehow.
+local debug = false
+local anchor = {}
+-- Utility: assemble code and optionally dump disassembly.
+local function assemble (name, prototype, generator)
+   local Dst = dasm.new(actions)
+   generator(Dst)
+   local mcode, size = Dst:build()
+   table.insert(anchor, mcode)
+   if debug then
+      print("mcode dump: "..name)
+      dasm.dump(mcode, size)
+   end
+   return ffi.cast(prototype, mcode)
+end
+
+-- Machine code for the barrier function
+local asm_barrier = assemble("barrier", "void(*)()", gen_barrier)
+
+-- Wait until all copies have completed.
+function barrier ()
+   asm_barrier()
+   nqueued = 0
+   queue[0].src = nil           -- sentinel
+end
+
+-- Test by doing the same random copies with blit and ffi.copy() and
+-- comparing the results.
+function selftest ()
+   print("selftest: blit")
+   local membytes = 10240
+   local memx = ffi.new("char[?]", membytes)
+   local memy = ffi.new("char[?]", membytes)
+   for i = 0, 10 do
+      print("loop "..i)
+      -- Initialize memx and memy with identical randomly chosen values
+      for i = 0, membytes-1 do
+         local n = math.random(256)
+         memx[i] = n
+         memy[i] = n
+      end
+      -- Perform some random copies
+      for i = 0, math.random(1000) do
+         local srcoffset = math.random(1000)
+	 local dstoffset = math.random(1000)
+         local length = math.random(8) * 32 + 32
+	 copy    (memx+dstoffset, memx+srcoffset+5120, length)
+	 ffi.copy(memy+dstoffset, memy+srcoffset+5120, length)
+      end
+      -- Execute deferred copies
+      barrier()
+      -- Check for same contents
+      for i = 0, membytes-1 do
+         if memx[i] ~= memy[i] then
+	    print(require("core.lib").hexdump(ffi.string(memx+i, 32)))
+	    print(require("core.lib").hexdump(ffi.string(memy+i, 32)))
+	    error("mismatch at byte " .. i)
+	 end
+      end
+   end
+   print("selftest: ok")
+end
+
