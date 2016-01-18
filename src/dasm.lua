@@ -6,7 +6,7 @@ local ffi = require'ffi'
 local bit = require'bit'
 local arch = ffi.arch
 if arch == 'x64' then arch = 'x86' end --same linker for x64
-local C = ffi.load('dasm_'..arch)
+local C = ffi.C
 local M = {C = C}
 
 M._VERSION = 10400
