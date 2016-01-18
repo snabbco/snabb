@@ -1,53 +1,21 @@
 # Porting Snabb Switch
 
-## Background
+Snabb Switch targets Linux/x86-64 on the master branch. The source
+code includes device drivers, assembler code, and optimization for
+specific CPU families.
 
-Snabb Switch is a low-level program. The source code includes device
-drivers, assembler code, and optimizations for specific CPU families.
+You are welcome to port Snabb Switch to a new platform. To do this you
+can create a branch for your port and advertise this in
+[branches.md](branches.md). See below for some technical tips.
 
-Simplicity, performance, and portability are all important. However,
-simplicity and performance have been more *urgent* than portability.
-For this reason we have allowed ourselves to focus on:
+Currently there is no roadmap for supporting more platforms on the
+master branch. The first step in this direction would be to have a
+well-maintained port that is important for users.
 
-- Linux/x86-64
-- The most popular commodity network adapters
-- Optimizations for Intel "Sandy Bridge" and later processors
+The master branch accepts code that is specific to Linux/x86-64. It
+does not accept code intended for other platforms.
 
-This allows us to create simple and performant software but it also
-means that porting work is necessary to support further platforms.
-
-## How to port Snabb Switch
-
-Suppose you want to run Snabb Switch on a new CPU architecture (i386,
-ARM, PPC, ...) or a new operating system (FreeBSD, SmartOS, Windows,
-...). How do you do it?
-
-The short answer is that you run the test suite, see what breaks, and
-keep fixing things until the functional tests succeed and the
-performance tests yield adequate results. Once you are satisfied with
-the results you have ported Snabb Switch: congratulations!
-
-You can submit your port in a Pull Request to have it merged
-"upstream" onto the master branch. This will be accepted if the
-community deems the port to be a net benefit. In that case the
-project will also acquire the relevant hardware and provide automatic
-test coverage via our [Continuous Integration](http://mr.gy/blog/snabb-ci.html)
-system.
-
-If you are actively working on a port that you plan to complete then
-you can advertise this fact by adding your development branch to
-[branches.md](branches.md). This will help potential contributions to
-find your work.
-
-If you are not sure where to start then you are welcome gather
-feedback by filing an Issue or a Pull Request with some draft code.
-However, don't expect portability code to be merged until it is
-complete enough to be useful for end-users and has test coverage. (If
-you update the C sources with `#ifdef WIN32` sections then this only
-becomes interesting for the master branch once it means that users can
-actually run the software on the new platform.)
-
-## Notes on challenges
+## Technical tips
 
 Here are a few challenges you are likely to encounter when porting
 Snabb Switch:
