@@ -1,10 +1,5 @@
 #!/bin/bash
 
-if [ -z "$ASSETSOURCE" ]; then
-    export ASSETSOURCE="http://lab1.snabb.co:2008/~max/test_env"
-    echo "Defaulting to ASSETSOURCE=$ASSETSOURCE"
-fi
-
 if [ -z "$MAC" ]; then
     export MAC=52:54:00:00:00:
     echo "Defaulting to MAC=$MAC"
@@ -39,6 +34,13 @@ export qemu_vectors=$((2*$QUEUES + 1))
 export sockets=""
 export assets=$HOME/.test_env
 export qemu=qemu/obj/x86_64-softmmu/qemu-system-x86_64
+export host_qemu=$(which qemu-system-x86_64)
+
+if [ -z "$QEMU" ]; then
+    export QEMU=${host_qemu:-"$assets/$qemu"}
+    echo "Defaulting to QEMU=$QEMU"
+fi
+[ -x "$QEMU" ] || (echo "Not found: $QEMU"; exit 1)
 
 export tmux_session=""
 
@@ -90,33 +92,6 @@ function qemu_image {
     echo $image
 }
 
-function provide_qemu {
-    if ! [ -d $assets/qemu ]; then
-        mkdir -p $assets
-        echo "Fetching qemu source code:"
-        (cd $assets
-            wget "$ASSETSOURCE/qemu.tar.gz" \
-                && tar xzf qemu.tar.gz \
-                && rm qemu.tar.gz
-        ) || return 1
-    fi
-    echo "Building qemu:"
-    (cd $assets/qemu
-        mkdir obj; cd obj
-        ../configure --target-list=x86_64-softmmu && make -j4)
-}
-
-function provide_file {
-    mkdir -p $assets
-    echo "Fetching $1:"
-    (cd $assets
-        wget "$ASSETSOURCE/$1")
-}
-
-function provide_file_gz {
-    provide_file $1.gz && gunzip $assets/$1.gz
-}
-
 function mac {
     printf "$MAC%02X\n" $1
 }
@@ -132,7 +107,7 @@ function launch_qemu {
     tmux_launch \
         "qemu$qemu_n" \
         "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
-        $assets/$qemu \
+        $QEMU \
         -kernel $assets/$4 \
         -append \"earlyprintk root=/dev/vda rw console=ttyS0 ip=$(ip $qemu_n)\" \
         -m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on \
@@ -148,22 +123,15 @@ function launch_qemu {
 }
 
 function qemu {
-    [ -f $assets/$qemu ]    || provide_qemu             || return 1
-    [ -f $assets/bzImage ]  || provide_file bzImage     || return 1
-    [ -f $assets/qemu.img ] || provide_file_gz qemu.img || return 1
     launch_qemu $1 $2 $3 bzImage qemu
 }
 
 function packetblaster {
-    [ -f $assets/$2.pcap ] || provide_file $2.pcap || return 1
-    snabb $1 "packetblaster replay $assets/$2.pcap $1"
+    snabb $1 "packetblaster replay program/snabbnfv/test_fixtures/pcap/$2.pcap $1"
 }
 
 function qemu_dpdk {
-    [ -f $assets/$qemu ]                 || provide_qemu                       || return 1
-    [ -f $assets/bzImage-no-virtio-net ] || provide_file bzImage-no-virtio-net || return 1
-    [ -f $assets/qemu-dpdk.img ]         || provide_file_gz qemu-dpdk.img      || return 1
-    launch_qemu $1 $2 $3 bzImage-no-virtio-net qemu-dpdk
+    launch_qemu $1 $2 $3 bzImage qemu-dpdk
 }
 
 function snabbnfv_bench {

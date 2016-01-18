@@ -3,6 +3,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
+local htons, ntohs = lib.htons, lib.ntohs
 
 local AF_INET6 = 10
 local INET6_ADDRSTRLEN = 48
@@ -13,17 +14,6 @@ local defaults = {
    next_header = 59, -- no next header
    hop_limit = 64,
 }
-
-local ipv6hdr_t = ffi.typeof[[
-      struct {
-         uint32_t v_tc_fl; // version, tc, flow_label
-         uint16_t payload_length;
-         uint8_t  next_header;
-         uint8_t hop_limit;
-         uint8_t src_ip[16];
-         uint8_t dst_ip[16];
-      } __attribute__((packed))
-]]
 
 local ipv6hdr_pseudo_t = ffi.typeof[[
       struct {
@@ -41,8 +31,6 @@ local ipv6 = subClass(header)
 
 -- Class variables
 ipv6._name = "ipv6"
-ipv6._header_type = ipv6hdr_t
-ipv6._header_ptr_type = ffi.typeof("$*", ipv6hdr_t)
 ipv6._ulp = {
    class_map = {
        [6] = "lib.protocol.tcp",
@@ -52,6 +40,19 @@ ipv6._ulp = {
       [115] = "lib.protocol.keyed_ipv6_tunnel",
    },
    method    = 'next_header' }
+header.init(ipv6,
+            {
+               [1] = ffi.typeof[[
+                     struct {
+                        uint32_t v_tc_fl; // version, tc, flow_label
+                        uint16_t payload_length;
+                        uint8_t  next_header;
+                        uint8_t hop_limit;
+                        uint8_t src_ip[16];
+                        uint8_t dst_ip[16];
+                     } __attribute__((packed))
+               ]]
+            })
 
 -- Class methods
 
@@ -126,9 +127,9 @@ end
 
 function ipv6:payload_length (length)
    if length ~= nil then
-      self:header().payload_length = C.htons(length)
+      self:header().payload_length = htons(length)
    else
-      return(C.ntohs(self:header().payload_length))
+      return(ntohs(self:header().payload_length))
    end
 end
 
@@ -182,7 +183,7 @@ function ipv6:pseudo_header (plen, nh)
    ffi.fill(ph, ffi.sizeof(ph))
    local h = self:header()
    ffi.copy(ph, h.src_ip, 32)  -- Copy source and destination
-   ph.ulp_length = C.htons(plen)
+   ph.ulp_length = htons(plen)
    ph.next_header = nh
    return(ph)
 end

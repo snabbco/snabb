@@ -46,6 +46,7 @@ function run (args)
          config.link(c, "tee."..tostring(nics).."->"..name..".input")
       end
    end
+   assert(nics > 0, "<PCI> matches no suitable devices.")
    engine.busywait = true
    intel10g.num_descriptors = 32*1024
    engine.configure(c)
@@ -67,7 +68,7 @@ function is_device_suitable (pcidev, patterns)
       return true
    end
    for _, pattern in ipairs(patterns) do
-      if pcidev.pciaddress:gmatch(pattern)() then
+      if pci.qualified(pcidev.pciaddress):gmatch(pattern)() then
          return true
       end
    end

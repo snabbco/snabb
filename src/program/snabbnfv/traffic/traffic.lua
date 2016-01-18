@@ -78,6 +78,9 @@ function long_usage () return usage end
 function traffic (pciaddr, confpath, sockpath)
    engine.log = true
    local mtime = 0
+   if C.stat_mtime(confpath) == 0 then
+      print(("WARNING: File '%s' does not exist."):format(confpath))
+   end
    while true do
       local mtime2 = C.stat_mtime(confpath)
       if mtime2 ~= mtime then

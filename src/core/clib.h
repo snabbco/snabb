@@ -61,3 +61,5 @@ uint16_t ntohs(uint16_t);
 uint32_t htonl(uint32_t);
 uint32_t ntohl(uint32_t);
 
+// Do nothing. Can be called via FFI to achieve a memory barrier.
+void nop();

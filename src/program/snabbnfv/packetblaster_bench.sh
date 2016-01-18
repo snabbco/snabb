@@ -1,8 +1,14 @@
 #!/bin/bash
 
-if [ -z "$TESTPCI0" ];     then echo "Need TESTPCI0";    exit 1; fi
-if [ -z "$TESTPCI1" ];     then echo "Need TESTPCI1";    exit 1; fi
-if [ -z "$TELNET_PORT" ];  then echo "Need TELNET_PORT"; exit 1; fi
+export SKIPPED_CODE=43
+
+if [ -z "$SNABB_PCI_INTEL0" ]; then echo "Need SNABB_PCI_INTEL0"; exit $SKIPPED_CODE; fi
+if [ -z "$SNABB_PCI_INTEL1" ]; then echo "Need SNABB_PCI_INTEL1"; exit $SKIPPED_CODE; fi
+
+if [ -z "$SNABB_TELNET0" ]; then
+    export SNABB_TELNET0=5000
+    echo "Defaulting to SNABB_TELNET0=$SNABB_TELNET0"
+fi
 
 if [ -z "$PACKETS" ]; then
     echo "Defaulting to PACKETS=100e6"
@@ -16,6 +22,6 @@ fi
 
 source program/snabbnfv/test_env/test_env.sh
 
-packetblaster $TESTPCI0 $CAPFILE
-qemu_dpdk $TESTPCI1 vhost_B.sock $TELNET_PORT
-snabbnfv_bench $TESTPCI1 $PACKETS
+packetblaster $SNABB_PCI_INTEL0 $CAPFILE
+qemu_dpdk $SNABB_PCI_INTEL1 vhost_B.sock $SNABB_TELNET0
+snabbnfv_bench $SNABB_PCI_INTEL1 $PACKETS

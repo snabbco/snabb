@@ -9,7 +9,7 @@
 // virtual addresses (remove the tag bits) and to test addresses for
 // validity (check the tag bits).
 
-#define _GNU_SOURCE
+#define _GNU_SOURCE 1
 
 #include <assert.h>
 #include <fcntl.h>
