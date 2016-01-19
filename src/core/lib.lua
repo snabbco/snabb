@@ -107,7 +107,7 @@ end
 
 -- Load Lua value from string.
 function load_string (string)
-   return loadstring("return "..string)
+   return loadstring("return "..string)()
 end
 
 -- Read a Lua conf from file and return value.
@@ -700,6 +700,8 @@ function selftest ()
    assert(true == equal({foo="bar"}, {foo="bar"}))
    assert(false == equal({foo="bar"}, {foo="bar", baz="foo"}))
    assert(false == equal({foo="bar", baz="foo"}, {foo="bar"}))
+   print("Testing load_string")
+   assert(equal(load_string("{1,2}"), {1,2}), "load_string failed.")
    print("Testing load/store_conf")
    local conf = { foo="1", bar=42, arr={2,"foo",4}}
    local testpath = "/tmp/snabb_lib_test_conf"
