@@ -43,6 +43,18 @@ for packet in iterate_packets() do
 end
 ```
 
+## Requirements
+
+* [LuaJIT 2.0](http://www.luajit.org) or later.
+* [nDPI 1.7][ndpi] or later.
+
+## Installation
+
+For the moment being, there is no automated installation: just place the
+`ndpi` subdirectory and the `ndpi.lua` file in any location where LuaJIT
+will be able to find them.
+
+
 ## Documentation
 
 None yet. The API follows that of the nDPI C library loosely, building on
@@ -95,20 +107,24 @@ section](http://www.ntop.org/support/documentation/documentation/) is helpful
 to get overview of how to use nDPI, which also applies to using `ljndpi`.
 
 
-## Requirements
+## Bugs
 
-* [LuaJIT 2.0](http://www.luajit.org) or later.
-* [nDPI 1.7][ndpi] or later.
+Check the [issue tracker](https://github.com/aperezdc/ljndpi/issues) for known
+bugs, and please file a bug if you find one.
 
-## Installation
-
-For the moment being, there is no automated installation: just place the
-`ndpi` subdirectory and the `ndpi.lua` file in any location where LuaJIT
-will be able to find them.
 
 ## License
 
 All the `ljndpi` code is under the [MIT license](http://opensource.org/licenses/mit).
 
+
+## Authors
+
+`ljndpi` was written by Adrián Pérez at [Igalia S.L.](http://www.igalia.com),
+initially as part of [SnabbWall](http://snabbwall.org). Development was
+sponsored by the [NLnet Foundation](https://nlnet.nl/).
+
+![](http://snabbwall.org/images/igalia-logo.png) &nbsp;&nbsp;
+![](http://snabbwall.org/images/nlnet-logo.gif)
 
 [ndpi]: http://www.ntop.org/products/deep-packet-inspection/ndpi/
