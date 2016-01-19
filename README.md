@@ -1,9 +1,11 @@
 # nDPI FFI binding for LuaJIT
 
-This is a Lua [FFI](http://luajit.org/ext_ffi.html) binding for the
+`ljndpi` is a Lua [FFI](http://luajit.org/ext_ffi.html) binding for the
 [nDPI][ndpi] deep packet inspection library.
 
 ## Usage
+
+The following program skeleton outlines the usage of the module:
 
 ```lua
 local ndpi = require "ndpi"
@@ -40,6 +42,21 @@ for packet in iterate_packets() do
   end
 end
 ```
+
+## Documentation
+
+None yet. The API follows that of the nDPI C library loosely, building on
+metatypes to provide a more idiomatic feeling.
+
+The following table summarizes the equivalence between C and Lua types:
+
+| Lua Type | C Type |
+|:--------:|:------:|
+| `ndpi.detection_module` | `struct ndpi_detection_module_struct` |
+| `ndpi.flow` | `struct ndpi_flow_struct` |
+| `ndpi.id` | `struct ndpi_id_struct` |
+| `ndpi.protocol_bitmask` | `NDPI_PROTOCOL_BITMASK` |
+
 
 ## Requirements
 
