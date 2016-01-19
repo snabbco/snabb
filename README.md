@@ -46,16 +46,48 @@ end
 ## Documentation
 
 None yet. The API follows that of the nDPI C library loosely, building on
-metatypes to provide a more idiomatic feeling.
-
-The following table summarizes the equivalence between C and Lua types:
+metatypes to provide a more idiomatic feeling. The following table summarizes
+the equivalence between C and Lua types:
 
 | Lua Type | C Type |
-|:--------:|:------:|
+|:---------|:-------|
 | `ndpi.detection_module` | `struct ndpi_detection_module_struct` |
 | `ndpi.flow` | `struct ndpi_flow_struct` |
 | `ndpi.id` | `struct ndpi_id_struct` |
 | `ndpi.protocol_bitmask` | `NDPI_PROTOCOL_BITMASK` |
+
+As for the functions, they can be accessed Lua's method invocation syntax
+(`foo:bar()`), for example the following C code:
+
+```c
+NDPI_PROTOCOL_BITMASK all_bits;
+NDPI_BITMASK_SET_ALL(all_bits);
+
+#define RESOLUTION 1000
+struct ndpi_detection_module_struct *dm =
+        ndpi_init_detection_module(RESOLUTION, malloc, free, NULL);
+ndpi_set_protocol_detection_bitmask2(dm, &all_bits);
+```
+
+becomes:
+
+```lua
+local RESOLUTION = 1000
+local all_bits = ndpi.protocol_bitmask()
+all_bits:set_all()
+
+local dm = ndpi.detection_module(RESOLUTION)
+dm:set_protocol_bitmask(all_bits)
+```
+
+Note that many methods return the objects themselves, allowing for chained
+method calls, which allows the above snippet to be simplified into:
+
+```lua
+local RESOLUTION = 1000
+local dm = ndpi.detection_module(RESOLUTION)
+    :set_protocol_bitmask(ndpi.protocol_bitmask():set_all())
+```
 
 
 ## Requirements
