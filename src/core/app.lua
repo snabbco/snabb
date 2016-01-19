@@ -387,22 +387,21 @@ function report_apps ()
          print(name, ("[dead: %s]"):format(app.dead.error))
       elseif app.report then
          print(name)
-         -- Restarts are currently disabled, still we want to not die on
-         -- errors during app reports, thus this workaround:
-         -- with_restart(app, app.report)
-         local status, err = pcall(app.report, app)
-         if not status then
-            print("Warning: "..name.." threw an error during report: "..err)
+         if use_restart then
+            with_restart(app, app.report)
+         else
+            -- Restarts are disabled, still we want to not die on
+            -- errors during app reports, thus this workaround:
+            local status, err = pcall(app.report, app)
+            if not status then
+               print("Warning: "..name.." threw an error during report: "..err)
+            end
          end
       end
    end
 end
 
 function selftest ()
-   if not use_restart then
-      print("with_restart disabled\nTest skipped")
-      os.exit(test_skipped_code)
-   end
    print("selftest: app")
    local App = {}
    function App:new () return setmetatable({}, {__index = App}) end
@@ -446,6 +445,7 @@ function selftest ()
    assert(#app_array == 0)
    assert(#link_array == 0)
    -- Test app restarts on failure.
+   use_restart = true
    print("c_fail")
    local App1 = {zone="test"}
    function App1:new () return setmetatable({}, {__index = App1}) end
