@@ -46,8 +46,11 @@ end
 ## Documentation
 
 None yet. The API follows that of the nDPI C library loosely, building on
-metatypes to provide a more idiomatic feeling. The following table summarizes
-the equivalence between C and Lua types:
+metatypes to provide a more idiomatic feeling. For the moment the best option
+is to check the [example
+program](https://github.com/aperezdc/ljndpi/blob/master/examples/readpcap).
+
+The following table summarizes the equivalence between C and Lua types:
 
 | Lua Type | C Type |
 |:---------|:-------|
@@ -60,23 +63,21 @@ As for the functions, they can be accessed Lua's method invocation syntax
 (`foo:bar()`), for example the following C code:
 
 ```c
+#define TICKS 1000
 NDPI_PROTOCOL_BITMASK all_bits;
 NDPI_BITMASK_SET_ALL(all_bits);
-
-#define RESOLUTION 1000
 struct ndpi_detection_module_struct *dm =
-        ndpi_init_detection_module(RESOLUTION, malloc, free, NULL);
+        ndpi_init_detection_module(TICKS, malloc, free, NULL);
 ndpi_set_protocol_detection_bitmask2(dm, &all_bits);
 ```
 
 becomes:
 
 ```lua
-local RESOLUTION = 1000
+local TICKS = 1000
 local all_bits = ndpi.protocol_bitmask()
 all_bits:set_all()
-
-local dm = ndpi.detection_module(RESOLUTION)
+local dm = ndpi.detection_module(TICKS)
 dm:set_protocol_bitmask(all_bits)
 ```
 
@@ -84,10 +85,14 @@ Note that many methods return the objects themselves, allowing for chained
 method calls, which allows the above snippet to be simplified into:
 
 ```lua
-local RESOLUTION = 1000
-local dm = ndpi.detection_module(RESOLUTION)
-    :set_protocol_bitmask(ndpi.protocol_bitmask():set_all())
+local TICKS = 1000
+local dm = ndpi.detection_module(TICKS):set_protocol_bitmask(ndpi.protocol_bitmask():set_all())
 ```
+
+The “nDPI QuickStart Guide” from the
+[http://www.ntop.org/support/documentation/documentation/](ntop documentation
+downloads section) is helpful to get overview of how to use nDPI, which also
+applies to using `ljndpi`.
 
 
 ## Requirements
