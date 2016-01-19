@@ -13,6 +13,10 @@ local ffi = require("ffi")
 -- series of operations, that can be performed at any time and in any
 -- order, and then executing a "barrier" to wait for completion.
 
+-- This module implements a blitter that defers all copy operations
+-- until the barrier() is invoked and then executes them with a single
+-- assembler code routine.
+
 ffi.cdef[[
   struct blit_queue_entry {
     void *src;
@@ -27,7 +31,8 @@ local queue = ffi.new("struct blit_queue_entry[?]", maxqueue+2)
 local nqueued = 0
 
 function copy (dst, src, len)
-   assert(len%32==0)
+   -- XXX This routine is hard-coded for multiples of 32 bytes.
+   assert(len%32 == 0)
    if nqueued == maxqueue then barrier() end
    queue[nqueued].src = src
    queue[nqueued].dst = dst
@@ -39,7 +44,6 @@ end
 
 -- Assembler code for the barrier operation
 function gen_barrier (Dst)
-   | ret
    | mov64 r8, queue
 
    |->queue:
@@ -47,17 +51,17 @@ function gen_barrier (Dst)
    | je >9
 
    -- Load parameters for the next copy
-   | mov rsi, [r8]
-   | mov rdi, [r8+8]
-   | mov rax, [r8+16]
+   | mov rsi, [r8]     -- source
+   | mov rdi, [r8+8]   -- destination
+   | mov rcx, [r8+16]  -- length
 
    -- Copy 32 bytes at a time
-   | xor rcx, rcx
+   | xor rax, rax
    |->copy:
-   | vmovdqu ymm0, [rsi+rcx]
-   | vmovdqu [rdi+rcx], ymm0
-   | add rcx, 32
-   | cmp rcx, rax
+   | vmovdqu ymm0, [rsi+rax]
+   | vmovdqu [rdi+rax], ymm0
+   | add rax, 32
+   | cmp rax, rcx
    | jl ->copy
 
    -- Advance to the next copy in the queue
@@ -69,7 +73,7 @@ end
 
 -- XXX the code below is copy-paste and should be reused somehow.
 local debug = false
-local anchor = {}
+anchor = {}
 -- Utility: assemble code and optionally dump disassembly.
 local function assemble (name, prototype, generator)
    local Dst = dasm.new(actions)
@@ -130,3 +134,5 @@ function selftest ()
    print("selftest: ok")
 end
 
+function copy (dst, src, len) ffi.copy(dst, src, len) end
+function barrier () end
