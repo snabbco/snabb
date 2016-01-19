@@ -127,4 +127,10 @@ sponsored by the [NLnet Foundation](https://nlnet.nl/).
 ![](http://snabbwall.org/images/igalia-logo.png) &nbsp;&nbsp;
 ![](http://snabbwall.org/images/nlnet-logo.gif)
 
+Feedback is very welcome! If you are interested in `ljndpi` in a Snabb
+context, probably the best thing is to post a message to the
+[snabb-devel](https://groups.google.com/forum/#!forum/snabb-devel) group. Or,
+if you like, you can contact Adrián directly at `aperez@igalia.com`. If you
+have a problem that `ljndpi` can help solve, let us know!
+
 [ndpi]: http://www.ntop.org/products/deep-packet-inspection/ndpi/
