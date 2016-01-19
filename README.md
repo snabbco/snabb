@@ -90,9 +90,9 @@ local dm = ndpi.detection_module(TICKS):set_protocol_bitmask(ndpi.protocol_bitma
 ```
 
 The “nDPI QuickStart Guide” from the
-[http://www.ntop.org/support/documentation/documentation/](ntop documentation
-downloads section) is helpful to get overview of how to use nDPI, which also
-applies to using `ljndpi`.
+[ntop documentation downloads
+section](http://www.ntop.org/support/documentation/documentation/) is helpful
+to get overview of how to use nDPI, which also applies to using `ljndpi`.
 
 
 ## Requirements
