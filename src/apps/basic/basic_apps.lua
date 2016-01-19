@@ -4,6 +4,7 @@ local app = require("core.app")
 local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
+--local struct = require("struct")
 local transmit, receive = link.transmit, link.receive
 
 
@@ -21,10 +22,20 @@ function Source:new(size)
    return setmetatable({size=size, packet=p}, {__index=Source})
 end
 
+txSeqNo= 0
+
 function Source:pull ()
    for _, o in ipairs(self.output) do
       for i = 1, link.nwritable(o) do
-         transmit(o, packet.clone(self.packet))
+         --transmit(o, packet.clone(self.packet))
+         local p= packet.clone(self.packet)
+         p.data[0]= txSeqNo %256
+         p.data[1]= (txSeqNo /2^8) %256
+         p.data[2]= (txSeqNo /2^16) %256
+         p.data[3]= (txSeqNo /2^24) %256
+         --p.data[0]= struct.pack("l", txSeqNo)
+         txSeqNo= txSeqNo +1
+         transmit(o, p)
       end
    end
 end
