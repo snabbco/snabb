@@ -39,9 +39,15 @@ function selftest ()
    config.app(c, "synth", Synth, { size = 128, 
 				   src = "11:11:11:11:11:11",
 				   dst = "22:22:22:22:22:22" })
-   config.app(c, "writer", pcap.PcapWriter, "apps/test/synth.pcap")
+   config.app(c, "writer", pcap.PcapWriter, "apps/test/synth.pcap.output")
    config.link(c, "synth.output->writer.input")
    engine.configure(c)
-   engine.main( {duration = 0.1,
+   engine.main( {duration = 0.00000001, -- hack: one breath.
 		 report   = { showlinks = true } } )
+
+   if io.open("apps/test/synth.pcap"):read('*a') ~=
+      io.open("apps/test/synth.pcap.output"):read('*a')
+   then
+      error("synth.pcap and synth.pcap.output differ.")
+   end
 end
