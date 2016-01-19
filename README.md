@@ -96,7 +96,7 @@ For example, to install on the local machine and use as a load generator:
 
 ```
 $ cp src/snabb /usr/local/bin/
-$ sudo snabb packetblaster capture.pcap 0000:01:00.0
+$ sudo snabb packetblaster replay capture.pcap 01:00.0
 ```
 
 ## How do I get involved?
