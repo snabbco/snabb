@@ -9,6 +9,7 @@ local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
 local PcapReader= require("apps.pcap.pcap").PcapReader
+local Synth     = require("apps.test.synth").Synth
 local LoadGen   = require("apps.intel.loadgen").LoadGen
 local lib = require("core.lib")
 local ffi = require("ffi")
@@ -18,24 +19,43 @@ local usage = require("program.packetblaster.README_inc")
 
 local long_opts = {
    duration     = "D",
-   help         = "h"
+   help         = "h",
+   pcapfile     = "p",
+   source       = "s",
+   destination  = "d",
+   size         = "S",
+   
 }
 
 function run (args)
    local opt = {}
    local duration
+   local filename
+   local source
+   local destination
+   local size
    function opt.D (arg) duration = tonumber(arg)  end
    function opt.h (arg) print(usage) main.exit(1) end
-   if #args < 3 or table.remove(args, 1) ~= 'replay' then opt.h() end
-   args = lib.dogetopt(args, opt, "hD:", long_opts)
-   local filename = table.remove(args, 1)
+   function opt.p (arg) filename = arg end
+   function opt.s (arg) source = arg end
+   function opt.d (arg) destination = arg end
+   function opt.S (arg) size = arg end
+   if #args < 2 or table.remove(args, 1) ~= 'replay' then opt.h() end
+   args = lib.dogetopt(args, opt, "hD:p:s:d:S:", long_opts)
+   
    local patterns = args
    local c = config.new()
-   config.app(c, "pcap", PcapReader, filename)
-   config.app(c, "loop", basic_apps.Repeater)
-   config.app(c, "tee", basic_apps.Tee)
-   config.link(c, "pcap.output -> loop.input")
-   config.link(c, "loop.output -> tee.input")
+   if filename ~= nil then
+      config.app(c, "pcap", PcapReader, filename)
+      config.app(c, "loop", basic_apps.Repeater)
+      config.app(c, "source", apps.test.synth)
+      config.link(c, "pcap.output -> loop.input")
+      config.link(c, "loop.output -> source.input")
+   else
+      config.app(c, "source", Synth, { size = size, 
+				       src = source,
+				       dst = destination })
+   end
    local nics = 0
    pci.scan_devices()
    for _,device in ipairs(pci.devices) do
@@ -43,7 +63,7 @@ function run (args)
          nics = nics + 1
          local name = "nic"..nics
          config.app(c, name, LoadGen, device.pciaddress)
-         config.link(c, "tee."..tostring(nics).."->"..name..".input")
+         config.link(c, "source."..tostring(nics).."->"..name..".input")
       end
    end
    assert(nics > 0, "<PCI> matches no suitable devices.")
@@ -73,5 +93,4 @@ function is_device_suitable (pcidev, patterns)
       end
    end
 end
-
 
