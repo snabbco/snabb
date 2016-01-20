@@ -262,7 +262,7 @@ end
 local function get_punt_message()
    local t = table.remove(punt)
    if not t then return end
-   return _('{"eid-prefix" : "%s", "interface" : "%s"}', macstr(t.mac), t.ifname)
+   return _('{"eid-prefix" : "%s", "interface" : "%s"}', macstr2(t.mac), t.ifname)
 end
 
 --data plane -----------------------------------------------------------------
