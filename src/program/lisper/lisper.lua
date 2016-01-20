@@ -391,7 +391,7 @@ function log_learn(iid, smac, sloc)
    if not DEBUG then return end
    print(_("LEARN: [%d] %s <- type: %s, %s", iid, macstr2(smac), sloc.type,
       sloc.type == "ethernet"
-         and ip6str(sloc.interface.name)
+         and sloc.interface.name
       or sloc.type == "l2tpv3"
          and _("ip: %s, session_id: 0x%04x, cookie: %s",
             ip6str(sloc.ip),
