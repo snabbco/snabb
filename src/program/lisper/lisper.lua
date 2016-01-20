@@ -1,4 +1,6 @@
 module(..., package.seeall)
+io.stdout:setvbuf'no'
+io.stderr:setvbuf'no'
 
 local ffi      = require("ffi")
 local app      = require("core.app")
