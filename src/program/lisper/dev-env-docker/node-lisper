@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+
+start() {
+    local n="$1"
+    local x="$((10#$n))"
+    ifconfig eth0 down
+    ifconfig eth0 hw ether 00:00:00:00:01:$x
+    ifconfig eth0 up
+    ip addr add fd80::$x/80 dev eth0
+    ./lisp$n start
+    ./lisper$n start
+}
+
+stop() {
+    local n="$1"
+    local x="$((10#$n))"
+    ./lisper$n stop
+    ./lisp$n stop
+    ip addr del fd80::$x/80 dev eth0
+}
+
+if [ "$1" ]; then $@; else echo "Usage: $0 <command> <node>"; fi
