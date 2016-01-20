@@ -16,6 +16,8 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local usage = require("program.packetblaster.README_inc")
+local usage_replay = require("program.packetblaster.replay.README_inc")
+local usage_synth = require("program.packetblaster.synth.README_inc")
 
 local long_opts = {
    duration     = "D",
@@ -23,39 +25,45 @@ local long_opts = {
    pcapfile     = "p",
    source       = "s",
    destination  = "d",
-   size         = "S",
-   
+   size         = "S"
 }
 
 function run (args)
    local opt = {}
+   local mode = table.remove(args, 1)
    local duration
-   local filename
-   local source
-   local destination
-   local size
-   function opt.D (arg) duration = tonumber(arg)  end
-   function opt.h (arg) print(usage) main.exit(1) end
-   function opt.p (arg) filename = arg end
-   function opt.s (arg) source = arg end
-   function opt.d (arg) destination = arg end
-   function opt.S (arg) size = arg end
-   if #args < 2 or table.remove(args, 1) ~= 'replay' then opt.h() end
-   args = lib.dogetopt(args, opt, "hD:p:s:d:S:", long_opts)
-   
-   local patterns = args
    local c = config.new()
-   if filename ~= nil then
+   function opt.D (arg) duration = tonumber(arg)  end
+   function opt.h (arg)
+      if mode == 'replay' then print(usage_replay)
+      elseif mode == 'synth' then print(usage_synth)
+      else print(usage) end
+      main.exit(1)
+   end
+   if mode == 'replay' and #args > 1 then
+      local filename = table.remove(args, 1)
+      args = lib.dogetopt(args, opt, "hD:", long_opts)
       config.app(c, "pcap", PcapReader, filename)
       config.app(c, "loop", basic_apps.Repeater)
-      config.app(c, "source", apps.test.synth)
+      config.app(c, "source", basic_apps.Tee)
       config.link(c, "pcap.output -> loop.input")
       config.link(c, "loop.output -> source.input")
-   else
+   elseif mode == 'synth' and #args >= 1 then
+      local source
+      local destination
+      local size
+      function opt.D (arg) duration = tonumber(arg)  end
+      function opt.s (arg) source = arg end
+      function opt.d (arg) destination = arg end
+      function opt.S (arg) size = arg end
+      args = lib.dogetopt(args, opt, "hD:s:d:S:", long_opts)
       config.app(c, "source", Synth, { size = size, 
 				       src = source,
 				       dst = destination })
+   else
+      opt.h()
    end
+   local patterns = args
    local nics = 0
    pci.scan_devices()
    for _,device in ipairs(pci.devices) do
