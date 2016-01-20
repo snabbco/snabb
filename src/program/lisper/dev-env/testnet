@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 appnodes="01 02 05 06"
-lispnodes="04 08"
+lispnodes="08"
 nodes="$appnodes $lispnodes"
 
 # -----------------------------------------------------------------------------
@@ -10,8 +10,10 @@ addbridge() {
     ip link add name b0 type bridge
     ip link set b0 up
     ip link set eth0 master b0
-    ip addr del $IP/16 dev eth0
-    ip addr add $IP/16 dev b0
+    ip addr del $IP dev eth0
+    ip addr del $IP6 dev eth0
+    ip addr add $IP dev b0
+    ip addr add $IP6 dev b0
     ip route add default via $GW
 }
 
