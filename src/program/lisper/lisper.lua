@@ -636,7 +636,7 @@ function run(args)
       local function needs_nd(exits)
          if #exits == 0 then return end
          assert(#exits == 1, "multiple exits per interface not supported")
-         return not exits[1].next_hop_mac
+         return exits[1].next_hop and not exits[1].next_hop_mac
       end
 
       if needs_nd(iface.exits) then -- phy/vlan -> nd -> lisper
