@@ -14,8 +14,8 @@ local S   = require("syscall")
 local _   = string.format
 
 local LISP_N       = os.getenv("LISP_N") or ""
-local CONTROL_SOCK = "/var/tmp/lisp-ipc-map-cache"..LISP_N
-local PUNT_SOCK    = "/var/tmp/lispers.net-itr"..LISP_N
+local CONTROL_SOCK = os.getenv("LISP_CONTROL_SOCK") or "/root/lisper.net/lisp-ipc-map-cache"..LISP_N
+local PUNT_SOCK    = os.getenv("LISP_PUNT_SOCK") or "/root/lispers.net/lispers.net-itr"..LISP_N
 
 S.signal('pipe', 'ign') --I 💔 Linux
 
