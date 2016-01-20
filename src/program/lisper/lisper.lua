@@ -202,6 +202,7 @@ local function update_config(s)
 end
 
 local log_learn --fw. decl.
+local log_punt  --fw. decl.
 
 --see "Map-Cache Population IPC Interface" section in dt-l2-overlay.txt
 --for the format of s.
@@ -262,7 +263,9 @@ end
 local function get_punt_message()
    local t = table.remove(punt)
    if not t then return end
-   return _('{"eid-prefix" : "%s", "interface" : "%s"}', macstr2(t.mac), t.ifname)
+   local s = _('{"eid-prefix" : "%s", "interface" : "%s"}', macstr2(t.mac), t.ifname)
+   log_punt(s)
+   return s
 end
 
 --data plane -----------------------------------------------------------------
@@ -404,6 +407,11 @@ function log_learn(iid, smac, sloc)
             sloc.w and ", w: "..sloc.w or "",
             sloc.key and ", key: "..hexdump(sloc.key):gsub(" ", "") or "")
    ))
+end
+
+function log_punt(msg)
+    if not DEBUG then return end
+    print(_("PUNT: %s", msg))
 end
 
 local function route_packet(p, rxname, txports)
