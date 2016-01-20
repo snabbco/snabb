@@ -1,5 +1,5 @@
 
---binding to the DynASM encoding engine.
+--Binding to the DynASM encoding engine.
 --Written by Cosmin Apreutesei. Public Domain.
 
 local ffi = require'ffi'
