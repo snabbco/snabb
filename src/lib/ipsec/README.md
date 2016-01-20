@@ -36,7 +36,8 @@ be a table with the following keys:
 — Method **esp_v6_encrypt:encapsulate** *packet*
 
 Returns a freshly allocated packet that is the encrypted and encapsulated
-version of *packet*.
+version of *packet*. The contents of *packet* are destroyed in the
+process.
 
 — Method **esp_v6_decrypt:decapsulate** *packet*
 
