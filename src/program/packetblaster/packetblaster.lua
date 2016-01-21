@@ -22,7 +22,6 @@ local usage_synth = require("program.packetblaster.synth.README_inc")
 local long_opts = {
    duration     = "D",
    help         = "h",
-   pcapfile     = "p",
    source       = "s",
    destination  = "d",
    size         = "S"
