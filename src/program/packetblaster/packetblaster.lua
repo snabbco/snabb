@@ -33,7 +33,9 @@ function run (args)
    local mode = table.remove(args, 1)
    local duration
    local c = config.new()
-   function opt.D (arg) duration = tonumber(arg)  end
+   function opt.D (arg) 
+      duration = assert(tonumber(arg), "duration is not a number!")  
+   end
    function opt.h (arg)
       if mode == 'replay' then print(usage_replay)
       elseif mode == 'synth' then print(usage_synth)
@@ -52,10 +54,12 @@ function run (args)
       local source
       local destination
       local size
-      function opt.D (arg) duration = tonumber(arg)  end
       function opt.s (arg) source = arg end
       function opt.d (arg) destination = arg end
-      function opt.S (arg) size = arg end
+      function opt.S (arg) 
+	 size = assert(tonumber(arg), "size is not a number!") 
+      end
+      
       args = lib.dogetopt(args, opt, "hD:s:d:S:", long_opts)
       config.app(c, "source", Synth, { size = size, 
 				       src = source,
