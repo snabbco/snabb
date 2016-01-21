@@ -20,8 +20,8 @@ end
 local function gen_eth_eth(name, len)
 	local f = file(name)
 	local e = eth:new{
-		src = eth:pton'00:00:00:00:01:01',
-		dst = eth:pton'00:00:00:00:01:02',
+		src = eth:pton'00:00:00:00:02:01',
+		dst = eth:pton'00:00:00:00:02:02',
 		type = 0x86dd,
 	}
 	local d = dtg:new()

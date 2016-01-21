@@ -1,0 +1,25 @@
+Links:
+  lisper.e1 -> if_e1.rx
+  ctl_sock.tx -> ctl.rx
+  if_e1.tx -> lisper.e1
+  punt.tx -> punt_sock.rx
+  lisper.e0 -> if_e0.rx
+  if_e0.tx -> lisper.e0
+Params:
+  punt_sock   : 
+    listen    : false
+    mode      : packet
+    filename  : /var/tmp/lispers.net-itr
+  ctl_sock    : 
+    listen    : true
+    mode      : packet
+    filename  : /var/tmp/lisp-ipc-map-cache
+  punt        : 
+  if_e0       : 
+    pciaddr   : 0000:01:00.0
+    macaddr   : 00:00:00:00:01:01
+  lisper      : 
+  ctl         : 
+  if_e1       : 
+    pciaddr   : 0000:03:00.0
+    macaddr   : 00:00:00:00:01:02
