@@ -24,7 +24,7 @@ local long_opts = {
    help         = "h",
    source       = "s",
    destination  = "d",
-   size         = "S"
+   sizes        = "S"
 }
 
 function run (args)
@@ -52,15 +52,18 @@ function run (args)
    elseif mode == 'synth' and #args >= 1 then
       local source
       local destination
-      local size
+      local sizes
       function opt.s (arg) source = arg end
       function opt.d (arg) destination = arg end
-      function opt.S (arg) 
-	 size = assert(tonumber(arg), "size is not a number!") 
+      function opt.S (arg)
+         sizes = {}
+	 for size in string.gmatch(arg, "%d+") do
+	    sizes[#sizes+1] = tonumber(size)
+	 end
       end
       
       args = lib.dogetopt(args, opt, "hD:s:d:S:", long_opts)
-      config.app(c, "source", Synth, { size = size, 
+      config.app(c, "source", Synth, { sizes = sizes,
 				       src = source,
 				       dst = destination })
    else
