@@ -56,6 +56,11 @@ local function macstr2(mac)
    return mac:sub(1, 6).."-"..mac:sub(7)
 end
 
+local function macstr3(mac)
+    local mac = macstr(mac):gsub(":", "")
+    return mac:sub(1, 4).."-"..mac:sub(5, 8).."-"..mac:sub(9)
+end
+
 local function ip6str(ip6)
    return ipv6:ntop(assert(ip6))
 end
@@ -263,7 +268,7 @@ end
 local function get_punt_message()
    local t = table.remove(punt)
    if not t then return end
-   local s = _('{"eid-prefix" : "%s", "interface" : "%s"}', macstr2(t.mac), t.ifname)
+   local s = _('{"eid-prefix" : "%s", "interface" : "%s"}', macstr3(t.mac), t.ifname)
    log_punt(s)
    return s
 end
