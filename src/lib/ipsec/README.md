@@ -26,6 +26,7 @@ References:
 Returns a new encryption/decryption context respectively. *Config* must a
 be a table with the following keys:
 
+* `spi` - “Security Parameter Index” as specified in RFC 4303.
 * `mode` - Encryption mode (string). The only accepted value is the
   string `"aes-128-gcm"`.
 * `keymat` - Hex string containing 16 bytes of key material as specified

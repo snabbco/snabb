@@ -27,7 +27,7 @@ function esp_v6_encrypt:new (conf)
    o.esp_buf = ffi.new("uint8_t[?]", o.aes_128_gcm.aad_size)
    -- Fix me https://tools.ietf.org/html/rfc4303#section-3.3.3
    o.esp = esp:new_from_mem(o.esp_buf, esp_length)
-   o.esp:spi(0x0) -- Fix me, set esp:spi value.
+   o.esp:spi(assert(conf.spi, "Need SPI."))
    o.esp_tail = esp_tail:new({})
    return setmetatable(o, {__index=esp_v6_encrypt})
 end
@@ -125,7 +125,8 @@ end
 function selftest ()
    local C = require("ffi").C
    local ipv6 = require("lib.protocol.ipv6")
-   local conf = { mode = "aes-128-gcm",
+   local conf = { spi = 0x0,
+                  mode = "aes-128-gcm",
                   keymat = "00112233445566778899AABBCCDDEEFF",
                   salt = "00112233"}
    local enc, dec = esp_v6_encrypt:new(conf), esp_v6_decrypt:new(conf)
