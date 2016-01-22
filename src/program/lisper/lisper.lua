@@ -637,7 +637,6 @@ function run(args)
    for ifname, iface in pairs(ifs) do
 
       if iface.pci then
-         print(iface.vlan_id)
          config.app(c, "if_"..ifname, intel.Intel82599, {
             pciaddr = iface.pci,
             macaddr = macstr(iface.mac),
