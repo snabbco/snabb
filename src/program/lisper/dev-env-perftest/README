@@ -1,7 +1,7 @@
 
 Here's what the files in this directory do:
 
-baseline.lua        connects 0000:01:00.0 to 0000:03:00.0 directly to establish a baseline
+baseline.lua        connects 0000:01:00.0 to 0000:03:00.0 directly to establish a baseline speed
 baseline            start/stop script for baseline.lua
 
 blast               blasts packets into 0000:01:00.1
