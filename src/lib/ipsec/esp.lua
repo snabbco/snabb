@@ -1,4 +1,5 @@
 module(..., package.seeall)
+local header = require("lib.protocol.header")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local esp = require("lib.protocol.esp")
@@ -9,13 +10,15 @@ local ffi = require("ffi")
 
 
 local esp_nh = 50 -- https://tools.ietf.org/html/rfc4303#section-2
-local esp_length = esp:sizeof()
-local esp_tail_length = esp_tail:sizeof()
+local esp_size = esp:sizeof()
+local esp_tail_size = esp_tail:sizeof()
+local seq_no_t = ffi.typeof("union { uint64_t no; uint32_t no32[2]; }")
 
 function esp_v6_new (conf)
    assert(conf.mode == "aes-128-gcm", "Only supports aes-128-gcm.")
    return { aes_128_gcm = aes_128_gcm:new(conf.keymat, conf.salt),
-            seq_no = 0 }
+            seq = ffi.new(seq_no_t),
+            pad_to = 4 } -- minimal padding
 end
 
 
@@ -23,37 +26,49 @@ local esp_v6_encrypt = {}
 
 function esp_v6_encrypt:new (conf)
    local o = esp_v6_new(conf)
-   o.pad_buf = ffi.new("uint8_t[?]", o.aes_128_gcm.blocksize-1)
-   o.esp_buf = ffi.new("uint8_t[?]", o.aes_128_gcm.aad_size)
-   -- Fix me https://tools.ietf.org/html/rfc4303#section-3.3.3
-   o.esp = esp:new_from_mem(o.esp_buf, esp_length)
+   o.zero_buf = ffi.new("uint8_t[?]", math.max(o.pad_to, o.aes_128_gcm.auth_size))
+   o.esp = esp:new({})
    o.esp:spi(assert(conf.spi, "Need SPI."))
    o.esp_tail = esp_tail:new({})
    return setmetatable(o, {__index=esp_v6_encrypt})
 end
 
--- Return next sequence number.
-function esp_v6_encrypt:next_seq_no ()
-   self.seq_no = self.seq_no + 1
-   return self.seq_no
+if ffi.abi("le") then
+   function esp_v6_encrypt:seq_no () return self.seq.no32[0] end
+else
+   function esp_v6_encrypt:seq_no () return self.seq.no32[1] end
 end
 
+-- Return next sequence number.
+function esp_v6_encrypt:next_seq_no ()
+   self.seq.no = self.seq.no + 1
+   -- TODO: Detect the 32bit seq_no overflow and log this as an
+   -- “auditable event”: https://tools.ietf.org/html/rfc4303#section-3.3.3
+   return self:seq_no()
+end
+
+local function padding (a, l) return (a - l%a) % a end
+
 function esp_v6_encrypt:encrypt (nh, payload, length)
+   local gcm = self.aes_128_gcm
    local p = packet.allocate()
    self.esp:seq_no(self:next_seq_no())
-   packet.append(p, self.esp:header_ptr(), esp_length)
+   packet.append(p, self.esp:header_ptr(), esp_size)
+   packet.append(p, self.seq, gcm.iv_size)
    packet.append(p, payload, length)
-   local pad_length = self.aes_128_gcm.blocksize
-      - ((length + esp_tail_length) % self.aes_128_gcm.blocksize)
-   packet.append(p, self.pad_buf, pad_length)
+   -- Padding, see https://tools.ietf.org/html/rfc4303#section-2.4
+   local pad_length = padding(self.pad_to, gcm.iv_size + length + esp_tail_size)
+   packet.append(p, self.zero_buf, pad_length)
    self.esp_tail:next_header(nh)
    self.esp_tail:pad_length(pad_length)
-   packet.append(p, self.esp_tail:header_ptr(), esp_tail_length)
-   packet.append(p, self.pad_buf, self.aes_128_gcm.auth_size)
-   self.aes_128_gcm:encrypt(packet.data(p) + esp_length,
-                            packet.data(p) + esp_length,
-                            length + pad_length + esp_tail_length,
-                            self.esp)
+   packet.append(p, self.esp_tail:header_ptr(), esp_tail_size)
+   packet.append(p, self.zero_buf, gcm.auth_size)
+   local cleartext = packet.data(p) + esp_size + gcm.iv_size
+   gcm:encrypt(cleartext,
+               self.seq,
+               cleartext,
+               length + pad_length + esp_tail_size,
+               self.esp)
    return p
 end
 
@@ -76,28 +91,29 @@ local esp_v6_decrypt = {}
 
 function esp_v6_decrypt:new (conf)
    local o = esp_v6_new(conf)
-   o.esp_overhead_size = esp_length + o.aes_128_gcm.auth_size
-   o.min_payload_length = o.aes_128_gcm.blocksize + o.esp_overhead_size
+   local gcm = o.aes_128_gcm
+   local esp_overhead = esp_size + esp_tail_size + gcm.iv_size + gcm.auth_size
+   o.min_size = esp_overhead + padding(o.pad_to, esp_overhead)
    return setmetatable(o, {__index=esp_v6_decrypt})
 end
 
 -- Verify sequence number.
 function esp_v6_decrypt:check_seq_no (seq_no)
-   self.seq_no = self.seq_no + 1
-   return self.seq_no <= seq_no
+   -- FIXME: Check seq_no here, see https://tools.ietf.org/html/rfc4303#page-38
+   return true
 end
 
 function esp_v6_decrypt:decrypt (payload, length)
-   if length < self.min_payload_length
-      or (length - self.esp_overhead_size) % self.aes_128_gcm.blocksize ~= 0
-   then return end
-   local data_start = payload + esp_length
-   local data_length = length - esp_length - self.aes_128_gcm.auth_size
-   local esp = esp:new_from_mem(payload, esp_length)
-   if self.aes_128_gcm:decrypt(data_start, data_start, data_length, esp) then
-      local esp_tail_start = data_start + data_length - esp_tail_length
-      local esp_tail = esp_tail:new_from_mem(esp_tail_start, esp_tail_length)
-      local cleartext_length = data_length - esp_tail:pad_length() - esp_tail_length
+   local gcm = self.aes_128_gcm
+   if length < self.min_size then return end
+   local iv_start = payload + esp_size
+   local data_start = payload + esp_size + gcm.iv_size
+   local data_length = length - esp_size - gcm.iv_size - gcm.auth_size
+   local esp = esp:new_from_mem(payload, esp_size)
+   if gcm:decrypt(data_start, iv_start, data_start, data_length, esp) then
+      local esp_tail_start = data_start + data_length - esp_tail_size
+      local esp_tail = esp_tail:new_from_mem(esp_tail_start, esp_tail_size)
+      local cleartext_length = data_length - esp_tail:pad_length() - esp_tail_size
       local p = packet.from_pointer(data_start, cleartext_length)
       return esp:seq_no(), p, esp_tail:next_header()
    end

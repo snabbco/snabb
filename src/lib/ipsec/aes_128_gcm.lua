@@ -18,7 +18,7 @@ iv:init(
       [1] = ffi.typeof[[
             struct {
                uint8_t salt[4];
-               uint64_t iv;
+               uint8_t iv[8];
                uint32_t padding;
             } __attribute__((packed, aligned(16)))
       ]]
@@ -48,7 +48,7 @@ end
 function iv:iv (iv)
    local h = self:header()
    if iv ~= nil then
-      h.iv = htonll(iv)
+      ffi.copy(h.iv, iv, 8)
    else
       return self:header_ptr()+4, 8
    end
@@ -73,31 +73,30 @@ function aes_128_gcm:new (keymat, salt)
    o.gcm_data = ffi.new("gcm_data[1] __attribute__((aligned(16)))")
    ASM.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data[0].expanded_keys)
    ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
-   o.blocksize = 128
+   o.iv_size = 8
    o.auth_size = 16
    o.auth_buf = ffi.new("uint8_t[?]", o.auth_size)
-   o.aad_size = 16
    return setmetatable(o, {__index=aes_128_gcm})
 end
 
-function aes_128_gcm:encrypt (out_ptr, payload, length, esp)
-   self.iv:iv(esp:seq_no())
+function aes_128_gcm:encrypt (out_ptr, iv, payload, length, esp)
+   self.iv:iv(iv)
    ASM.aesni_gcm_enc_avx_gen4(self.gcm_data,
-                            out_ptr,
-                            payload, length,
-                            u8_ptr(self.iv:header_ptr()),
-                            u8_ptr(esp:header_ptr()), esp:sizeof(),
-                            payload + length, self.auth_size)
+                              out_ptr,
+                              payload, length,
+                              u8_ptr(self.iv:header_ptr()),
+                              u8_ptr(esp:header_ptr()), esp:sizeof(),
+                              payload + length, self.auth_size)
 end
 
-function aes_128_gcm:decrypt (out_ptr, ciphertext, length, esp)
-   self.iv:iv(esp:seq_no())
+function aes_128_gcm:decrypt (out_ptr, iv, ciphertext, length, esp)
+   self.iv:iv(iv)
    ASM.aesni_gcm_dec_avx_gen4(self.gcm_data,
-                            out_ptr,
-                            ciphertext, length,
-                            u8_ptr(self.iv:header_ptr()),
-                            u8_ptr(esp:header_ptr()), esp:sizeof(),
-                            self.auth_buf, self.auth_size)
+                              out_ptr,
+                              ciphertext, length,
+                              u8_ptr(self.iv:header_ptr()),
+                              u8_ptr(esp:header_ptr()), esp:sizeof(),
+                              self.auth_buf, self.auth_size)
    return C.memcmp(self.auth_buf, ciphertext + length, self.auth_size) == 0
 end
 
