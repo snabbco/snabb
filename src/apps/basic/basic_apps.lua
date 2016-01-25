@@ -4,7 +4,6 @@ local app = require("core.app")
 local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
---local struct = require("struct")
 local transmit, receive = link.transmit, link.receive
 
 
