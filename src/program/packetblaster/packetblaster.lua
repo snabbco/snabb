@@ -22,8 +22,8 @@ local usage_synth = require("program.packetblaster.synth.README_inc")
 local long_opts = {
    duration     = "D",
    help         = "h",
-   source       = "s",
-   destination  = "d",
+   src          = "s",
+   dst          = "d",
    sizes        = "S"
 }
 
