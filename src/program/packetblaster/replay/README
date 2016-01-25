@@ -3,7 +3,7 @@ Usage: packetblaster replay [OPTIONS] <PCAPFILE> <PCI>...
   -D DURATION, --duration DURATION
                              Run for DURATION seconds.
 			     Default: unlimited
-  -h, --help-
+  -h, --help
                              Print usage information.
 
 packetblaster transmits packets continuously to one or more network adapters.
