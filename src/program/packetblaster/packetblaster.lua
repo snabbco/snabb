@@ -42,8 +42,8 @@ function run (args)
       main.exit(1)
    end
    if mode == 'replay' and #args > 1 then
-      local filename = table.remove(args, 1)
       args = lib.dogetopt(args, opt, "hD:", long_opts)
+      local filename = table.remove(args, 1)
       config.app(c, "pcap", PcapReader, filename)
       config.app(c, "loop", basic_apps.Repeater)
       config.app(c, "source", basic_apps.Tee)
