@@ -13,12 +13,11 @@ end
 local function write(file, p)
 	local buf, len = p.data, p.length
 	pcap.write_record_header(file, len)
+	print(string.format('writing %d bytes packet', p.length))
 	file:write(ffi.string(buf, len))
-	file:flush()
 end
 
-local function gen_eth_eth(name, len)
-	local f = file(name)
+local function gen_eth_eth(f, len)
 	local e = eth:new{
 		src = eth:pton'00:00:00:00:02:01',
 		dst = eth:pton'00:00:00:00:02:02',
@@ -29,9 +28,28 @@ local function gen_eth_eth(name, len)
 	local s = ('x'):rep(len)
 	d:payload(s, #s)
 	local p = d:packet()
-	print(p.length)
 	write(f, p)
-	f:close()
 end
 
-gen_eth_eth('eth-eth.pcap', 150)
+local function gen_l2tp_l2tp(f, len)
+	local e = eth:new{
+		src = eth:pton'00:00:00:00:02:01',
+		dst = eth:pton'00:00:00:00:02:02',
+		type = 0x86dd,
+	}
+	local d = dtg:new()
+	d:push(e)
+	local s = ('x'):rep(len)
+	d:payload(s, #s)
+	local p = d:packet()
+	write(f, p)
+end
+
+local gen_funcs = {gen_l2tp_l2tp, gen_l2tp_lisper, gen_lisper_l2tp}
+
+local f = file'random.pcap'
+for i=1,math.random(100, 200) do
+	local gen = gen_funcs(math.random(1, #gen_funcs))
+	gen(math.random(50, 500))
+end
+f:close()
