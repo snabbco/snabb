@@ -212,6 +212,9 @@ local log_punt  --fw. decl.
 --see "Map-Cache Population IPC Interface" section in dt-l2-overlay.txt
 --for the format of s.
 local function update_fib(s)
+   if DEBUG then
+      print("FIB: "..s)
+   end
    local t = assert(json.decode(s))
    local iid = assert(t["instance-id"])
    local dt = attr(locs, iid)
@@ -236,7 +239,10 @@ local function update_fib(s)
    local rlocs = t.rlocs or t.rles
    if rlocs and #rlocs > 0 then
       for i,t in ipairs(rlocs) do
-         local rloc = assert(t.rloc or t.rle)
+			if DEBUG then
+				print(i, t.rloc, t.rle)
+         end
+			local rloc = assert(t.rloc or t.rle)
          local ip = parseip6(rloc)
          local exit = lispers[ip]
          assert(exit, "invalid rloc "..rloc)
@@ -712,7 +718,7 @@ function run(args)
       local traceprof = require("lib.traceprof.traceprof")
       jdump.start("+rs", "tracedump.txt")
       traceprof.start()
-      engine.main({report = {showlinks=true, duration = 10.0}})
+      engine.main({report = {showlinks=true}, duration = 10.0})
       traceprof.stop()
       jdump.stop()
    end
