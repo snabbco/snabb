@@ -239,10 +239,10 @@ local function update_fib(s)
    local rlocs = t.rlocs or t.rles
    if rlocs and #rlocs > 0 then
       for i,t in ipairs(rlocs) do
-			if DEBUG then
-				print(i, t.rloc, t.rle)
+         if DEBUG then
+            print(i, t.rloc, t.rle)
          end
-			local rloc = assert(t.rloc or t.rle)
+         local rloc = assert(t.rloc or t.rle)
          local ip = parseip6(rloc)
          local exit = lispers[ip]
          assert(exit, "invalid rloc "..rloc)
