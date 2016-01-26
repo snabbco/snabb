@@ -614,21 +614,25 @@ function run(args)
 
    --control plane
 
-   config.app(c, "ctl", Ctl)
-   config.app(c, "ctl_sock", unix.UnixSocket, {
-      filename = conf.control_sock,
-      listen = true,
-      mode = "packet",
-   })
-   config.link(c, "ctl_sock.tx -> ctl.rx")
+   if conf.control_sock then
+      config.app(c, "ctl", Ctl)
+      config.app(c, "ctl_sock", unix.UnixSocket, {
+         filename = conf.control_sock,
+         listen = true,
+         mode = "packet",
+      })
+      config.link(c, "ctl_sock.tx -> ctl.rx")
+   end
 
-   config.app(c, "punt", Punt)
-   config.app(c, "punt_sock", unix.UnixSocket, {
-      filename = conf.punt_sock,
-      listen = false,
-      mode = "packet",
-   })
-   config.link(c, "punt.tx -> punt_sock.rx")
+   if conf.punt_sock then
+      config.app(c, "punt", Punt)
+      config.app(c, "punt_sock", unix.UnixSocket, {
+         filename = conf.punt_sock,
+         listen = false,
+         mode = "packet",
+      })
+      config.link(c, "punt.tx -> punt_sock.rx")
+   end
 
    --data plane
 
@@ -701,6 +705,15 @@ function run(args)
       print(_("  %-12s: %s", appname, s))
    end
 
-   engine.main({report = {showlinks=true}})
-
+   if not getfenv'LISP_PERFTEST' then
+      engine.main({report = {showlinks=true}})
+   else
+      local jdump = require("jit.dump")
+      local traceprof = require("lib.traceprof.traceprof")
+      jdump.start("+rs", "tracedump.txt")
+      traceprof.start()
+      engine.main({report = {showlinks=true, duration = 10.0}})
+      traceprof.stop()
+      jdump.stop()
+   end
 end

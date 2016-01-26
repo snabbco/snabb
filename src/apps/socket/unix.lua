@@ -105,12 +105,22 @@ function UnixSocket:new (arg)
 
    local function can_receive()
       if not connect() then return end
-      return assert(S.select({readfds = {sock}}, 0)).count == 1
+      local t, err = S.select({readfds = {sock}}, 0)
+      while not t and (err.AGAIN or err.INTR) do
+         t, err = S.select({readfds = {sock}}, 0)
+      end
+      assert(t)
+      return t.count == 1
    end
 
    local function can_send()
       if not connect() then return end
-      return assert(S.select({writefds = {sock}}, 0)).count == 1
+      local t, err = S.select({writefds = {sock}}, 0)
+      while not t and (err.AGAIN or err.INTR) do
+         t, err = S.select({writefds = {sock}}, 0)
+      end
+      assert(t)
+      return t.count == 1
    end
 
    local function receive()
