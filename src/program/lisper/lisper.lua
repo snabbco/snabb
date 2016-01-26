@@ -705,7 +705,7 @@ function run(args)
       print(_("  %-12s: %s", appname, s))
    end
 
-   if not getfenv'LISP_PERFTEST' then
+   if not os.getenv'LISP_PERFTEST' then
       engine.main({report = {showlinks=true}})
    else
       local jdump = require("jit.dump")
