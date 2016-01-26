@@ -155,7 +155,11 @@
 #define LJ_ARCH_NAME		"x64"
 #define LJ_ARCH_BITS		64
 #define LJ_ARCH_ENDIAN		LUAJIT_LE
-#define LJ_ABI_WIN		LJ_TARGET_WINDOWS
+#if LJ_TARGET_WINDOWS || __CYGWIN__
+#define LJ_ABI_WIN		1
+#else
+#define LJ_ABI_WIN		0
+#endif
 #define LJ_TARGET_X64		1
 #define LJ_TARGET_X86ORX64	1
 #define LJ_TARGET_EHRETREG	0
@@ -300,6 +304,13 @@
 #define LJ_TARGET_UNIFYROT	2	/* Want only IR_BROR. */
 #define LJ_ARCH_NUMMODE		LJ_NUMMODE_SINGLE
 
+#if !defined(LJ_ARCH_HASFPU) && defined(__mips_soft_float)
+#define LJ_ARCH_HASFPU		0
+#endif
+#if !defined(LJ_ABI_SOFTFP) && defined(__mips_soft_float)
+#define LJ_ABI_SOFTFP		1
+#endif
+
 #if _MIPS_ARCH_MIPS32R2
 #define LJ_ARCH_VERSION		20
 #else
@@ -382,9 +393,6 @@
 #error "No support for PPC/e500 anymore (use LuaJIT 2.0)"
 #endif
 #elif LJ_TARGET_MIPS
-#if defined(__mips_soft_float)
-#error "No support for MIPS CPUs without FPU"
-#endif
 #if defined(_LP64)
 #error "No support for MIPS64"
 #endif
@@ -493,6 +501,9 @@
 #endif
 #if defined(__symbian__) || LJ_TARGET_WINDOWS
 #define LUAJIT_NO_EXP2
+#endif
+#if LJ_TARGET_CONSOLE || (LJ_TARGET_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_8_0)
+#define LJ_NO_SYSTEM		1
 #endif
 
 #if defined(LUAJIT_NO_UNWIND) || defined(__symbian__) || LJ_TARGET_IOS || LJ_TARGET_PS3 || LJ_TARGET_PS4

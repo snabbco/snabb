@@ -2,7 +2,6 @@
 set -e
 
 [ ! -z "$SNABB_PCI_INTEL0" ] || exit 1
-
 out=$(./snabb packetblaster replay --duration 1 \
     program/snabbnfv/test_fixtures/pcap/64.pcap \
     "$SNABB_PCI_INTEL0")

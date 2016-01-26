@@ -41,6 +41,17 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Luke Gorrie <luke@snabb.co>
 
+#### max-next
+
+    BRANCH: max-next git://github.com/eugeneia/snabbswitch
+    Test and integration branch for maintenance & development.
+
+    - Contains changes proposed to be merged into next.
+    - Merges Pull Requests that pass code review on GitHub.
+    - Integration branch for code vetted by Max
+
+    Maintainer: Max Rottenkolber <max@mr.gy>
+
 #### documenation-fixups
 
     BRANCH: documentation-fixups git://github.com/eugeneia/snabbswitch
