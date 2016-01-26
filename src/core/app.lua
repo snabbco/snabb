@@ -163,6 +163,10 @@ function apply_config_actions (actions, conf)
       local class = conf.apps[name].class
       local arg = conf.apps[name].arg
       local app = class:new(arg)
+      if type(app) ~= 'table' then
+         error(("bad return value from app '%s' start() method: %s"):format(
+                  name, tostring(app)))
+      end
       local zone = app.zone or getfenv(class.new)._NAME or name
       app.appname = name
       app.output = {}
