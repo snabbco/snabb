@@ -402,7 +402,7 @@ local function log_l2tp(text, pk, ifname)
 end
 
 function log_learn(iid, smac, sloc)
-   if not DEBUG then return end
+   --if not DEBUG then return end
    print(_("LEARN: [%d] %s <- type: %s, %s", iid, macstr2(smac), sloc.type,
       sloc.type == "ethernet"
          and sloc.interface.name
@@ -421,7 +421,7 @@ function log_learn(iid, smac, sloc)
 end
 
 function log_punt(msg)
-    if not DEBUG then return end
+    --if not DEBUG then return end
     print(_("PUNT: %s", msg))
 end
 
