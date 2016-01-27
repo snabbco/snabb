@@ -157,6 +157,26 @@ function selftest ()
       assert(C.memcmp(p, o, length) == 0)
       assert(C.memcmp(icv, o + length, gcm.auth_size) == 0)
    end
+   -- Microbenchmarks.
+   local length = 1000 * 1000 * 100 -- 100MB
+   local gcm = aes_128_gcm:new(test[1].key, test[1].salt)
+   local p = ffi.new("uint8_t[?]", length + gcm.auth_size)
+   local start = C.get_monotonic_time()
+   ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
+                              p, p, length,
+                              u8_ptr(gcm.iv:header_ptr()),
+                              p, 0, -- No AAD
+                              p + length, gcm.auth_size)
+   local finish = C.get_monotonic_time()
+   print("Encrypted", length, "bytes in", finish-start, "seconds")
+   local start = C.get_monotonic_time()
+   ASM.aesni_gcm_dec_avx_gen4(gcm.gcm_data,
+                              p, p, length,
+                              u8_ptr(gcm.iv:header_ptr()),
+                              p, 0, -- No AAD
+                              p + length, gcm.auth_size)
+   local finish = C.get_monotonic_time()
+   print("Decrypted", length, "bytes in", finish-start, "seconds")
 end
 
 
