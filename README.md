@@ -64,7 +64,7 @@ is the master line of development.
 
 [packetblaster](src/program/packetblaster/) generates load by
 replaying a [pcap format](http://en.wikipedia.org/wiki/Pcap) trace
-file onto any number of Intel 82599 10-Gigabit network
+file or synthesizing customizable packets onto any number of Intel 82599 10-Gigabit network
 interfaces. This is very efficient: only a small % of one core per CPU
 is required even for hundreds of Gbps of traffic. Because so little
 CPU resources are required you can run packetblaster on a small server
@@ -96,7 +96,7 @@ For example, to install on the local machine and use as a load generator:
 
 ```
 $ cp src/snabb /usr/local/bin/
-$ sudo snabb packetblaster capture.pcap 0000:01:00.0
+$ sudo snabb packetblaster replay capture.pcap 01:00.0
 ```
 
 ## How do I get involved?
