@@ -1,0 +1,4 @@
+#./mklisper
+export LISP_N=02
+./lisp restart
+./lisper restart
