@@ -86,7 +86,7 @@ function aes_128_gcm:encrypt (out_ptr, iv, payload, length, esp)
                               payload, length,
                               u8_ptr(self.iv:header_ptr()),
                               u8_ptr(esp:header_ptr()), esp:sizeof(),
-                              payload + length, self.auth_size)
+                              out_ptr + length, self.auth_size)
 end
 
 function aes_128_gcm:decrypt (out_ptr, iv, ciphertext, length, esp)
