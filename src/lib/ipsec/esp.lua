@@ -19,7 +19,9 @@ function esp_v6_new (conf)
    assert(conf.mode == "aes-128-gcm", "Only supports aes-128-gcm.")
    return { aes_128_gcm = aes_128_gcm:new(conf.keymat, conf.salt),
             seq = ffi.new(seq_no_t),
-            pad_to = 4 } -- minimal padding
+            pad_to = 4, -- minimal padding
+            d_in = datagram:new(),
+            d_out = datagram:new()}
 end
 
 
@@ -74,11 +76,11 @@ function esp_v6_encrypt:encrypt (nh, payload, length)
 end
 
 function esp_v6_encrypt:encapsulate (p)
-   local plain = datagram:new(p)
+   local plain = self.d_in:new(p)
    if not plain:parse({{ethernet}, {ipv6}}) then return nil end
    local eth, ip = unpack(plain:stack())
    local nh = ip:next_header()
-   local encrypted = datagram:new(self:encrypt(nh, plain:payload()))
+   local encrypted = self.d_out:new(self:encrypt(nh, plain:payload()))
    local _, length = encrypted:payload()
    ip:next_header(esp_nh)
    ip:payload_length(length)
@@ -121,13 +123,13 @@ function esp_v6_decrypt:decrypt (payload, length)
 end
 
 function esp_v6_decrypt:decapsulate (p)
-   local encrypted = datagram:new(p)
+   local encrypted = self.d_in:new(p)
    if not encrypted:parse({{ethernet}, {ipv6}}) then return nil end
    local eth, ip = unpack(encrypted:stack())
    if ip:next_header() == esp_nh then
       local seq_no, payload, nh = self:decrypt(encrypted:payload())
       if payload and self:check_seq_no(seq_no) then
-         local plain = datagram:new(payload)
+         local plain = self.d_out:new(payload)
          ip:next_header(nh)
          ip:payload_length(packet.length(payload))
          plain:push(ip)
