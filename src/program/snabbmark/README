@@ -3,7 +3,7 @@ Usage:
     Benchmark basic app network packet flow.
 
   snabbmark nfvconfig  <config-file-x> <config-file-y> <n>
-    Benchmark loading <config-file-y> and transitioning from <config-file-x>
+    Benchmark loading <config-file-x> and transitioning from <config-file-x>
     to <config-file-y> <n> times.
 
     Uses SNABB_PCI0.
@@ -22,3 +22,7 @@ Usage:
 
     Example usage with 10 million packets, packet size 128 bytes:
     solarflare 10e6 128
+
+  snabbmark esp <npackets> <packet-size>
+    Benchmark ESP encapsulating and decapsulatiing <npackets> of
+    <packet-size>.
