@@ -22,7 +22,7 @@ function esp_v6_new (conf)
 end
 
 
-local esp_v6_encrypt = {}
+esp_v6_encrypt = {}
 
 function esp_v6_encrypt:new (conf)
    local o = esp_v6_new(conf)
@@ -87,7 +87,7 @@ function esp_v6_encrypt:encapsulate (p)
 end
 
 
-local esp_v6_decrypt = {}
+esp_v6_decrypt = {}
 
 function esp_v6_decrypt:new (conf)
    local o = esp_v6_new(conf)
