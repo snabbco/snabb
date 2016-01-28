@@ -37,11 +37,11 @@ be a table with the following keys:
 — Method **esp_v6_encrypt:encapsulate** *packet*
 
 Returns a freshly allocated packet that is the encrypted and encapsulated
-version of *packet*. The contents of *packet* are destroyed in the
-process.
+version of *packet* or `nil` if header parsing failed. The contents of *packet*
+are destroyed in the process.
 
 — Method **esp_v6_decrypt:decapsulate** *packet*
 
 Returns a freshly allocated packet that is the decrypted and decapsulated
-version of *packet* or `nil` if authentication failed. The contents of
-*packet* are destroyed in the process.
+version of *packet* or `nil` if header parsing or authentication failed. The
+contents of *packet* are destroyed in the process.

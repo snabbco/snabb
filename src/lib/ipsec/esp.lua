@@ -2,6 +2,7 @@ module(..., package.seeall)
 local header = require("lib.protocol.header")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
+local ipv6 = require("lib.protocol.ipv6")
 local esp = require("lib.protocol.esp")
 local esp_tail = require("lib.protocol.esp_tail")
 local aes_128_gcm = require("lib.ipsec.aes_128_gcm")
@@ -73,9 +74,9 @@ function esp_v6_encrypt:encrypt (nh, payload, length)
 end
 
 function esp_v6_encrypt:encapsulate (p)
-   local plain = datagram:new(p, ethernet)
-   local eth = plain:parse_match()
-   local ip = plain:parse_match()
+   local plain = datagram:new(p)
+   if not plain:parse({{ethernet}, {ipv6}}) then return nil end
+   local eth, ip = unpack(plain:stack())
    local nh = ip:next_header()
    local encrypted = datagram:new(self:encrypt(nh, plain:payload()))
    local _, length = encrypted:payload()
@@ -120,10 +121,9 @@ function esp_v6_decrypt:decrypt (payload, length)
 end
 
 function esp_v6_decrypt:decapsulate (p)
-   local encrypted = datagram:new(p, ethernet)
-   local eth = encrypted:parse_match()
-   local ip = encrypted:parse_match()
-   local decrypted = nil
+   local encrypted = datagram:new(p)
+   if not encrypted:parse({{ethernet}, {ipv6}}) then return nil end
+   local eth, ip = unpack(encrypted:stack())
    if ip:next_header() == esp_nh then
       local seq_no, payload, nh = self:decrypt(encrypted:payload())
       if payload and self:check_seq_no(seq_no) then
