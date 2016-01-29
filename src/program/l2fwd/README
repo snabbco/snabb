@@ -1,0 +1,12 @@
+Usage: l2fwd <PCI1> <PCI2>
+
+PCI1: [tap:iface|virtio:pciaddr|pciaddr]
+PCI2: [tap:iface|virtio:pciaddr|pciaddr]
+
+Forwards all traffic from PCI1 to PCI2.
+
+Examples:
+
+  l2fwd 0000:02:00.0 0000:01:00.1
+  l2fwd 0000:02:00.0 tap:eth0
+  l2fwd virtio:0000:02:00.0 tap:eth0
