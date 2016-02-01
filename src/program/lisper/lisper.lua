@@ -268,14 +268,15 @@ end
 
 local punt = {} --{{mac=,name=}, ...}
 
-local function punt_mac(mac, ifname)
-   table.insert(punt, {mac = mac, ifname = ifname})
+local function punt_mac(smac, dmac, ifname)
+   table.insert(punt, {smac = smac, dmac = dmac, ifname = ifname})
 end
 
 local function get_punt_message()
    local t = table.remove(punt)
    if not t then return end
-   local s = _('{"eid-prefix" : "%s", "interface" : "%s"}', macstr3(t.mac), t.ifname)
+   local s = _('{"source-eid" : "%s", "dest-eid" : "%s", "interface" : "%s"}', 
+      macstr3(t.smac), macstr3(t.dmac), t.ifname)
    log_punt(s)
    return s
 end
@@ -459,7 +460,7 @@ local function route_packet(p, rxname, txports)
       if not slocs or slocs[1] ~= sloc then
          locs[smac] = {sloc}
          log_learn(iid, smac, sloc)
-         punt_mac(smac, rxname)
+         punt_mac(smac, dmac, rxname)
       end
    end
 
