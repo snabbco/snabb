@@ -216,7 +216,7 @@ local function update_fib(s)
       print("FIB: "..s)
    end
    local t = assert(json.decode(s))
-   local iid = assert(t["instance-id"])
+   local iid = assert(tonumber(t["instance-id"]))
    local dt = attr(locs, iid)
    local eid_prefix = assert(t["eid-prefix"])
    local mac = eid_prefix:gsub("/%d+$", "") --MAC/48
@@ -362,7 +362,7 @@ local function format_l2tp(srcp, payload_offset, smac, dmac, src_ip, dst_ip, sid
    return dstp
 end
 
-local function log_eth(text, pk, ifname)
+local function log_eth(text, pk, ifname, iid)
    if not DEBUG then return end
    local p = ffi.cast(l2tp_ctp, pk.data)
 
@@ -371,8 +371,8 @@ local function log_eth(text, pk, ifname)
       return
    end
 
-   print(_("ETH  %-4s %s (%4d): [%s -> %s]",
-      ifname, text, pk.length, macstr2(p.smac), macstr2(p.dmac)))
+   print(_("ETH [%-4s] %-4s %s (%4d): [%s -> %s]",
+      iid, ifname, text, pk.length, macstr2(p.smac), macstr2(p.dmac)))
 end
 
 local function log_l2tp(text, pk, ifname)
@@ -434,7 +434,7 @@ local function route_packet(p, rxname, txports)
       iid, sloc = t.iid, t.loc
       smac, dmac, payload_offset = parse_eth(p)
       if not smac then return end --invalid packet
-      log_eth("<<<", p, rxname)
+      log_eth("<<<", p, rxname, iid)
    else --packet came from a l2tp tunnel or a lisper
       local src_ip, session_id, cookie
       src_ip, session_id, cookie, smac, dmac, payload_offset = parse_l2tp(p)
@@ -473,7 +473,7 @@ local function route_packet(p, rxname, txports)
          dp = format_eth(p, payload_offset)
          local txname = loc.interface.name
          tx = txports[txname]
-         log_eth(">>>", dp, txname)
+         log_eth(">>>", dp, txname, iid)
       elseif loc.type == "l2tpv3" then
          dp = format_l2tp(p, payload_offset,
             loc.exit.interface.mac,
