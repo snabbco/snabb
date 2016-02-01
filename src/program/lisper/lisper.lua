@@ -245,20 +245,21 @@ local function update_fib(s)
          local rloc = assert(t.rloc or t.rle)
          local ip = parseip6(rloc)
          local exit = lispers[ip]
-         assert(exit, "invalid rloc "..rloc)
-         local key = t.key and t.key ~= "" and parsehex(t.key)
-         local p = tonumber(t.priority)
-         local w = tonumber(t.weight)
-         local loc = {
-            type = "lisper",
-            ip = ip,
-            p = p,
-            w = w,
-            key = key,
-            exit = exit,
-         }
-         table.insert(rt, loc)
-         log_learn(iid, mac, loc)
+         if exit then
+            local key = t.key and t.key ~= "" and parsehex(t.key)
+            local p = tonumber(t.priority)
+            local w = tonumber(t.weight)
+            local loc = {
+               type = "lisper",
+               ip = ip,
+               p = p,
+               w = w,
+               key = key,
+               exit = exit,
+            }
+            table.insert(rt, loc)
+            log_learn(iid, mac, loc)
+         end
       end
    end
 end
