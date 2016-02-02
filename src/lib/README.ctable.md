@@ -16,7 +16,7 @@ robin-hood hash table with linear probing.  This means that to look up a
 key in the table, we take its hash value (using a user-supplied hash
 function), map that hash value to an index into the table by scaling the
 hash to the table size, and then scan forward in the table until we find
-an entry whose hash value that is greater than or equal to the hash in
+an entry whose hash value is greater than or equal to the hash in
 question.  Each entry stores its hash value, and empty entries have a
 hash of `0xFFFFFFFF`.  If the entry's hash matches and the entry's key
 is equal to the one we are looking for, then we have our match.  If the
