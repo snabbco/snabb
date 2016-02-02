@@ -27,13 +27,24 @@
 
 #include "memory.h"
 
+static long page_size = 0;
+
+// global initalizer before running main()
+// GCC specific:
+// https://gcc.gnu.org/onlinedocs/gcc/Common-Function-Attributes.html
+void __attribute__((constructor, used)) initializer(void)
+{
+  // get the system page size
+  page_size = sysconf(_SC_PAGESIZE);
+}
+
 // Convert from virtual addresses in our own process address space to
 // physical addresses in the RAM chips.
 uint64_t virtual_to_physical(void *ptr)
 {
   uint64_t virt_page;
   static int pagemap_fd;
-  virt_page = ((uint64_t)ptr) / 4096;
+  virt_page = ((uint64_t)ptr) / page_size;
   if (pagemap_fd == 0) {
     if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY)) <= 0) {
       perror("open pagemap");
@@ -51,7 +62,7 @@ uint64_t virtual_to_physical(void *ptr)
     fprintf(stderr, "page %lx not present: %lx", virt_page, data);
     return 0;
   }
-  return (data & ((1ULL << 55) - 1)) * 4096;
+  return (data & ((1ULL << 55) - 1)) * page_size;
 }
 
 // Map a new HugeTLB page to an appropriate virtual address.
