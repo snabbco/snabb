@@ -265,8 +265,13 @@ end
 
 local punt = {} --{{mac=,name=}, ...}
 
+local punted = {} --{[smac..dmac] -> true}
+
 local function punt_mac(smac, dmac, ifname)
+   local k = smac..dmac
+   if punted[k] then return end
    table.insert(punt, {smac = smac, dmac = dmac, ifname = ifname})
+   punted[k] = true
 end
 
 local function get_punt_message()
@@ -371,7 +376,7 @@ local function log_eth(text, pk, ifname, iid)
       return
    end
 
-   print(_("ETH [%-4s] %-4s %s (%4d): [%s -> %s]",
+   print(_("ETH [%4s] %-4s %s (%4d): [%s -> %s]",
       iid, ifname, text, pk.length, macstr2(p.smac), macstr2(p.dmac)))
 end
 
@@ -451,14 +456,14 @@ local function route_packet(p, rxname, txports)
    end
    local locs = locs[iid] --contextualize locations
 
-   --step #2: remember the location of the smac and punt it if it's new
+   --step #2: remember the location of the smac and punt it
    if sloc then --didn't come from a lisper
       local slocs = locs[smac]
       if not slocs or slocs[1] ~= sloc then
          locs[smac] = {sloc}
          log_learn(iid, smac, sloc)
-         punt_mac(smac, dmac, rxname)
       end
+      punt_mac(smac, dmac, rxname)
    end
 
    --step #3: find the location(s) of the dest. mac and send the payload
