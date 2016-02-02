@@ -10,39 +10,21 @@ local ntohl, htonl, htonll = lib.ntohl, lib.htonl, lib.htonll
 -- IV pseudo header
 
 local iv = subClass(header)
-
--- Class variables
 iv._name = "iv"
-iv:init(
-   {
-      [1] = ffi.typeof[[
+iv:init({ffi.typeof[[
             struct {
                uint8_t salt[4];
                uint8_t iv[8];
                uint32_t padding;
             } __attribute__((packed, aligned(16)))
-      ]]
-   })
-
--- Class methods
+         ]]})
 
 function iv:new (salt)
    local o = iv:superClass().new(self)
    local h = o:header()
-   o:salt(salt)
+   ffi.copy(h.salt, salt, 4)
    h.padding = htonl(0x1)
    return o
-end
-
--- Instance methods
-
-function iv:salt (salt)
-   local h = self:header()
-   if salt ~= nil then
-      ffi.copy(h.salt, salt, 4)
-   else
-      return h.salt
-   end
 end
 
 function iv:iv (iv)
@@ -55,47 +37,78 @@ function iv:iv (iv)
 end
 
 
+-- AAD pseudo header
+
+local aad = subClass(header)
+aad._name = "aad"
+aad:init({ffi.typeof[[
+            struct {
+               uint32_t spi;
+               uint32_t seq_no[2];
+               uint32_t padding;
+            } __attribute__((packed))
+          ]]})
+
+function aad:new (spi)
+   local o = iv:superClass().new(self)
+   local h = o:header()
+   h.spi = htonl(spi)
+   return o
+end
+
+function aad:seq_no (seq_l, seq_h)
+   local h = self:header()
+   h.seq_no[0] = htonl(seq_h)
+   h.seq_no[1] = htonl(seq_l)
+end
+
+
 -- AES-128-GCM wrapper
 
 local function u8_ptr (ptr) return ffi.cast("uint8_t *", ptr) end
 
 local aes_128_gcm = {}
 
-function aes_128_gcm:new (keymat, salt)
+function aes_128_gcm:new (spi, keymat, salt)
+   assert(spi, "Need SPI.")
    assert(keymat and #keymat == 32, "Need 16 bytes of key material.")
    assert(salt and #salt == 8, "Need 4 bytes of salt.")
    local o = {}
    o.keymat = ffi.new("uint8_t[16]")
    ffi.copy(o.keymat, lib.hexundump(keymat, 16), 16)
+   o.iv_size = 8
    o.iv = iv:new(lib.hexundump(salt, 4))
+   o.auth_size = 16
+   o.auth_buf = ffi.new("uint8_t[?]", o.auth_size)
+   o.aad_size = 12
+   o.aad = aad:new(spi)
    -- Compute subkey (H)
    o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 128)
    o.gcm_data = ffi.new("gcm_data[1] __attribute__((aligned(16)))")
    ASM.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data[0].expanded_keys)
    ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
-   o.iv_size = 8
-   o.auth_size = 16
-   o.auth_buf = ffi.new("uint8_t[?]", o.auth_size)
    return setmetatable(o, {__index=aes_128_gcm})
 end
 
-function aes_128_gcm:encrypt (out_ptr, iv, payload, length, esp)
-   self.iv:iv(iv)
+function aes_128_gcm:encrypt (out_ptr, seq_no, payload, length)
+   self.iv:iv(seq_no)
+   self.aad:seq_no(seq_no:low(), seq_no:high())
    ASM.aesni_gcm_enc_avx_gen4(self.gcm_data,
                               out_ptr,
                               payload, length,
                               u8_ptr(self.iv:header_ptr()),
-                              u8_ptr(esp:header_ptr()), esp:sizeof(),
+                              u8_ptr(self.aad:header_ptr()), self.aad_size,
                               out_ptr + length, self.auth_size)
 end
 
-function aes_128_gcm:decrypt (out_ptr, iv, ciphertext, length, esp)
+function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length)
    self.iv:iv(iv)
+   self.aad:seq_no(seq_low, seq_high)
    ASM.aesni_gcm_dec_avx_gen4(self.gcm_data,
                               out_ptr,
                               ciphertext, length,
                               u8_ptr(self.iv:header_ptr()),
-                              u8_ptr(esp:header_ptr()), esp:sizeof(),
+                              u8_ptr(self.aad:header_ptr()), self.aad_size,
                               self.auth_buf, self.auth_size)
    return C.memcmp(self.auth_buf, ciphertext + length, self.auth_size) == 0
 end

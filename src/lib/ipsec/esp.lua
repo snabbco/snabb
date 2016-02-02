@@ -6,6 +6,7 @@ local ipv6 = require("lib.protocol.ipv6")
 local esp = require("lib.protocol.esp")
 local esp_tail = require("lib.protocol.esp_tail")
 local aes_128_gcm = require("lib.ipsec.aes_128_gcm")
+local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
 local ffi = require("ffi")
 
@@ -13,17 +14,15 @@ local ffi = require("ffi")
 local esp_nh = 50 -- https://tools.ietf.org/html/rfc4303#section-2
 local esp_size = esp:sizeof()
 local esp_tail_size = esp_tail:sizeof()
-local seq_no_t = ffi.typeof("union { uint64_t no; uint32_t no32[2]; }")
 
 function esp_v6_new (conf)
    assert(conf.mode == "aes-128-gcm", "Only supports aes-128-gcm.")
-   return { aes_128_gcm = aes_128_gcm:new(conf.keymat, conf.salt),
+   return { aes_128_gcm = aes_128_gcm:new(conf.spi, conf.keymat, conf.salt),
             seq = ffi.new(seq_no_t),
             pad_to = 4, -- minimal padding
             d_in = datagram:new(),
             d_out = datagram:new()}
 end
-
 
 esp_v6_encrypt = {}
 
@@ -36,18 +35,10 @@ function esp_v6_encrypt:new (conf)
    return setmetatable(o, {__index=esp_v6_encrypt})
 end
 
-if ffi.abi("le") then
-   function esp_v6_encrypt:seq_no () return self.seq.no32[0] end
-else
-   function esp_v6_encrypt:seq_no () return self.seq.no32[1] end
-end
-
 -- Return next sequence number.
 function esp_v6_encrypt:next_seq_no ()
    self.seq.no = self.seq.no + 1
-   -- TODO: Detect the 32bit seq_no overflow and log this as an
-   -- “auditable event”: https://tools.ietf.org/html/rfc4303#section-3.3.3
-   return self:seq_no()
+   return self.seq:low()
 end
 
 local function padding (a, l) return (a - l%a) % a end
@@ -67,11 +58,7 @@ function esp_v6_encrypt:encrypt (nh, payload, length)
    packet.append(p, self.esp_tail:header_ptr(), esp_tail_size)
    packet.append(p, self.zero_buf, gcm.auth_size)
    local cleartext = packet.data(p) + esp_size + gcm.iv_size
-   gcm:encrypt(cleartext,
-               self.seq,
-               cleartext,
-               length + pad_length + esp_tail_size,
-               self.esp)
+   gcm:encrypt(cleartext, self.seq, cleartext, length + pad_length + esp_tail_size)
    return p
 end
 
@@ -103,7 +90,7 @@ end
 -- Verify sequence number.
 function esp_v6_decrypt:check_seq_no (seq_no)
    -- FIXME: Check seq_no here, see https://tools.ietf.org/html/rfc4303#page-38
-   return true
+   return seq_no, self.seq:high()
 end
 
 function esp_v6_decrypt:decrypt (payload, length)
@@ -113,12 +100,15 @@ function esp_v6_decrypt:decrypt (payload, length)
    local data_start = payload + esp_size + gcm.iv_size
    local data_length = length - esp_size - gcm.iv_size - gcm.auth_size
    local esp = esp:new_from_mem(payload, esp_size)
-   if gcm:decrypt(data_start, iv_start, data_start, data_length, esp) then
+   local seq_low, seq_high = self:check_seq_no(esp:seq_no())
+   if seq_low and gcm:decrypt(data_start, seq_low, seq_high, iv_start, data_start, data_length) then
       local esp_tail_start = data_start + data_length - esp_tail_size
       local esp_tail = esp_tail:new_from_mem(esp_tail_start, esp_tail_size)
       local cleartext_length = data_length - esp_tail:pad_length() - esp_tail_size
       local p = packet.from_pointer(data_start, cleartext_length)
-      return esp:seq_no(), p, esp_tail:next_header()
+      self.seq:low(seq_low)
+      self.seq:high(seq_high)
+      return p, esp_tail:next_header()
    end
 end
 
@@ -127,8 +117,8 @@ function esp_v6_decrypt:decapsulate (p)
    if not encrypted:parse({{ethernet}, {ipv6}}) then return nil end
    local eth, ip = unpack(encrypted:stack())
    if ip:next_header() == esp_nh then
-      local seq_no, payload, nh = self:decrypt(encrypted:payload())
-      if payload and self:check_seq_no(seq_no) then
+      local payload, nh = self:decrypt(encrypted:payload())
+      if payload then
          local plain = self.d_out:new(payload)
          ip:next_header(nh)
          ip:payload_length(packet.length(payload))
