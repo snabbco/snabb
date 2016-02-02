@@ -11,6 +11,9 @@ local max, floor, ceil = math.max, math.floor, math.ceil
 CTable = {}
 
 local HASH_MAX = 0xFFFFFFFF
+local uint16_ptr_t = ffi.typeof('uint16_t*')
+local uint32_ptr_t = ffi.typeof('uint32_t*')
+local uint64_ptr_t = ffi.typeof('uint64_t*')
 
 local function make_entry_type(key_type, value_type)
    return ffi.typeof([[struct {
@@ -38,13 +41,20 @@ local function make_equal_fn(key_type)
       return function (a, b)
          return a == b
       end
+   elseif size == 2 then
+      return function (a, b)
+         return cast(uint16_ptr_t, a)[0] == cast(uint16_ptr_t, b)[0]
+      end
    elseif size == 4 then
-      local uint32_ptr_t = ffi.typeof('uint32_t*')
       return function (a, b)
          return cast(uint32_ptr_t, a)[0] == cast(uint32_ptr_t, b)[0]
       end
+   elseif size == 6 then
+      return function (a, b)
+         return (cast(uint32_ptr_t, a)[0] == cast(uint32_ptr_t, b)[0] and
+                 cast(uint16_ptr_t, a)[2] == cast(uint16_ptr_t, b)[2])
+      end
    elseif size == 8 then
-      local uint64_ptr_t = ffi.typeof('uint64_t*')
       return function (a, b)
          return cast(uint64_ptr_t, a)[0] == cast(uint64_ptr_t, b)[0]
       end
@@ -360,7 +370,7 @@ end
 -- TODO: Switch to a hash function with good security properties,
 -- perhaps by using the DynASM support for AES.
 local uint32_cast = ffi.new('uint32_t[1]')
-function hash_i32(i32)
+function hash_32(i32)
    i32 = tobit(i32)
    i32 = i32 + bnot(lshift(i32, 15))
    i32 = bxor(i32, (rshift(i32, 10)))
@@ -377,6 +387,25 @@ function hash_i32(i32)
    return uint32_cast[0]
 end
 
+function hashv_32(key)
+   return hash_32(cast(uint32_ptr_t, key)[0])
+end
+
+function hashv_48(key)
+   local hi = cast(uint32_ptr_t, key)[0]
+   local lo = cast(uint16_ptr_t, key)[2]
+   -- Extend lo to the upper half too so that the hash function isn't
+   -- spreading around needless zeroes.
+   lo = bor(lo, lshift(lo, 16))
+   return hash_32(bxor(hi, hash_32(lo)))
+end
+
+function hashv_64(key)
+   local hi = cast(uint32_ptr_t, key)[0]
+   local lo = cast(uint32_ptr_t, key)[1]
+   return hash_32(bxor(hi, hash_32(lo)))
+end
+
 function selftest()
    print("selftest: ctable")
 
@@ -385,7 +414,7 @@ function selftest()
    local params = {
       key_type = ffi.typeof('uint32_t'),
       value_type = ffi.typeof('int32_t[6]'),
-      hash_fn = hash_i32,
+      hash_fn = hash_32,
       max_occupancy_rate = 0.4,
       initial_size = ceil(occupancy / 0.4)
    }
@@ -419,26 +448,19 @@ function selftest()
 
    -- A check that our equality functions work as intended.
    local numbers_equal = make_equal_fn(ffi.typeof('int'))
-   local four_byte = ffi.typeof('uint32_t[1]')
-   local eight_byte = ffi.typeof('uint32_t[2]')
-   local twelve_byte = ffi.typeof('uint32_t[3]')
-   local four_byte_equal = make_equal_fn(four_byte)
-   local eight_byte_equal = make_equal_fn(eight_byte)
-   local twelve_byte_equal = make_equal_fn(twelve_byte)
    assert(numbers_equal(1,1))
    assert(not numbers_equal(1,2))
-   assert(four_byte_equal(ffi.new(four_byte, {1}),
-                          ffi.new(four_byte, {1})))
-   assert(not four_byte_equal(ffi.new(four_byte, {1}),
-                              ffi.new(four_byte, {2})))
-   assert(eight_byte_equal(ffi.new(eight_byte, {1,1}),
-                           ffi.new(eight_byte, {1,1})))
-   assert(not eight_byte_equal(ffi.new(eight_byte, {1,1}),
-                               ffi.new(eight_byte, {1,2})))
-   assert(twelve_byte_equal(ffi.new(twelve_byte, {1,1,1}),
-                            ffi.new(twelve_byte, {1,1,1})))
-   assert(not twelve_byte_equal(ffi.new(twelve_byte, {1,1,1}),
-                                ffi.new(twelve_byte, {1,1,2})))
+
+   local function check_bytes_equal(type, a, b)
+      local equal_fn = make_equal_fn(type)
+      assert(equal_fn(ffi.new(type, a), ffi.new(type, a)))
+      assert(not equal_fn(ffi.new(type, a), ffi.new(type, b)))
+   end
+   check_bytes_equal(ffi.typeof('uint16_t[1]'), {1}, {2})         -- 2 byte
+   check_bytes_equal(ffi.typeof('uint32_t[1]'), {1}, {2})         -- 4 byte
+   check_bytes_equal(ffi.typeof('uint16_t[3]'), {1,1,1}, {1,1,2}) -- 6 byte
+   check_bytes_equal(ffi.typeof('uint32_t[2]'), {1,1}, {1,2})     -- 8 byte
+   check_bytes_equal(ffi.typeof('uint32_t[3]'), {1,1,1}, {1,1,2}) -- 12 byte
 
    print("selftest: ok")
 end
