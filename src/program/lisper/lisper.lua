@@ -105,7 +105,7 @@ local MODE  = getenv"LISPER_MODE"  --if set to "record" then record packets to p
 --eth_loc_t:     {type="ethernet", interface=if_t}
 --l2tp_loc_t:    {type="l2tpv3", ip=ip6, session_id=n, cookie=s, exit=exit_t}
 --lisper_loc_t:  {type="lisper", ip=ip6, p=n, w=n, key=s, exit=exit_t}
-local conf     --{control_sock=s, punt_sock=s}
+local conf     --{control_sock=s, punt_sock=s, arp_timeout=n}
 local ifs      --{ifname -> if_t}
 local exits    --{exitname -> exit_t}
 local eths     --{ifname -> {iid=n, loc=eth_loc_t}}
@@ -128,6 +128,7 @@ local function update_config(s)
    --globals
    conf.control_sock = t.control_sock
    conf.punt_sock = t.punt_sock
+   conf.arp_timeout = tonumber(t.arp_timeout or 60)
 
    --map interfaces
    if t.interfaces then
@@ -265,13 +266,13 @@ end
 
 local punt = {} --{{mac=,name=}, ...}
 
-local punted = {} --{[smac..dmac] -> true}
+local punted = {} --{[smac..dmac] -> expire_time}
 
 local function punt_mac(smac, dmac, ifname)
    local k = smac..dmac
-   if punted[k] then return end
+   if punted[k] and punted[k] < os.time() + conf.arp_timeout then return end
    table.insert(punt, {smac = smac, dmac = dmac, ifname = ifname})
-   punted[k] = true
+   punted[k] = os.time()
 end
 
 local function get_punt_message()
