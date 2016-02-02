@@ -61,6 +61,10 @@ $(cat ../lib/hardware/README.md)
 
 $(cat ../lib/protocol/README.md)
 
+## Specialized data structures
+
+$(cat ../lib/README.ctable.md)
+
 ## Snabb NFV
 
 $(cat ../program/snabbnfv/README.md)
