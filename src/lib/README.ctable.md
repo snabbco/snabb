@@ -4,12 +4,12 @@ A ctable is a hash table whose keys and values are instances of FFI
 data types.  In Lua parlance, an FFI value is a "cdata" value, hence the
 name "ctable".
 
-A ctable is parameterized the specific types for its keys and values.
-This allows for the table to be stored in an efficient manner.  Adding
-an entry to a ctable will copy the value into the table.  Logically, the
-table "owns" the value.  Lookup can either return a pointer to the value
-in the table, or copy the value into a user-supplied buffer, depending
-on what is most convenient for the user.
+A ctable is parameterized for the specific types for its keys and
+values.  This allows for the table to be stored in an efficient manner.
+Adding an entry to a ctable will copy the value into the table.
+Logically, the table "owns" the value.  Lookup can either return a
+pointer to the value in the table, or copy the value into a
+user-supplied buffer, depending on what is most convenient for the user.
 
 As an implementation detail, the table is stored as an open-addressed
 robin-hood hash table with linear probing.  This means that to look up a
