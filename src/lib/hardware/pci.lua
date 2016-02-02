@@ -180,9 +180,9 @@ function selftest ()
 end
 
 function print_device_summary ()
-   local attrs = {"pciaddress", "vendor", "device", "interface", "status",
+   local attrs = {"pciaddress", "model", "interface", "status",
                   "driver", "usable"}
-   local fmt = "%-13s %-7s %-7s %-10s %-9s %-11s %s"
+   local fmt = "%-11s %-18s %-10s %-7s %-20s %s"
    print(fmt:format(unpack(attrs)))
    for _,info in ipairs(devices) do
       local values = {}
