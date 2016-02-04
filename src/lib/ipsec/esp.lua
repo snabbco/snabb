@@ -1,3 +1,30 @@
+-- Implementation of ESP over IPv6 using AES-128-GCM using a 12 byte ICV and
+-- “Extended Sequence Number” (see RFC 4303 and RFC 4106).
+--
+-- Notes:
+--
+--  * Auditing is *not* implemented, see the “Auditing” section of RFC 4303 for
+--    details: https://tools.ietf.org/html/rfc4303#section-4
+--
+--  * Anti-replay protection for packets within `window_size' on the receiver
+--    side is *not* implemented, see `esp_v6_decrypt:check_seq_no'.
+--
+--  * Recovery from synchronisation loss is is *not* implemented, see
+--    Appendix 3: “Handling Loss of Synchronization due to Significant Packet
+--    Loss” of RFC 4303 for details: https://tools.ietf.org/html/rfc4303#page-42
+--
+--  * Wrapping around of the Extended Sequence Number is *not* detected because
+--    it is assumed to be an unrealistic scenario as it would take 584 years to
+--    overflow the counter when transmitting 10^9 packets per second.
+--
+--  * Rejection of IP fragments is *not* implemented because
+--    `lib.protocol.ipv6' does not support fragmentation. E.g. fragments will
+--    be rejected because they can not be parsed as IPv6 packets. If however
+--    `lib.protocol.ipv6' were to be updated to be able to parse IP fragments
+--    this implementation would have to be updated as well to remain correct.
+--    See the “Reassembly” section of RFC 4303 for details:
+--    https://tools.ietf.org/html/rfc4303#section-3.4.1
+--
 module(..., package.seeall)
 local header = require("lib.protocol.header")
 local datagram = require("lib.protocol.datagram")
