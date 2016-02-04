@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e 
 
 [ ! -z "$SNABB_PCI_INTEL0" ] || exit 1
