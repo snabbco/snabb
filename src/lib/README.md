@@ -1,6 +1,8 @@
-### `ctable` (lib.ctable)
+## Specialized data structures
 
-A ctable is a hash table whose keys and values are instances of FFI
+### Ctable (lib.ctable)
+
+A *ctable* is a hash table whose keys and values are instances of FFI
 data types.  In Lua parlance, an FFI value is a "cdata" value, hence the
 name "ctable".
 
@@ -25,7 +27,7 @@ collisions are possible as well of course; in that case we continue
 scanning forward.
 
 The distance travelled while scanning for the matching hash is known as
-the /displacement/.  The table measures its maximum displacement, for a
+the *displacement*.  The table measures its maximum displacement, for a
 number of purposes, but you might be interested to know that a maximum
 displacement for a table with 2 million entries and a 40% load factor is
 around 8 or 9.  Smaller tables will have smaller maximum displacements.
@@ -55,15 +57,13 @@ local params = {
 local ctab = ctable.new(params)
 ```
 
-— Function **ctable.new** *params*
+— Function **ctable.new** *parameters*
 
-Create a new ctable.  *params* is a table of key/value pairs.  The
+Create a new ctable.  *parameters* is a table of key/value pairs.  The
 following keys are required:
 
- * `key_type`: An FFI type for keys in this table.
- * `value_type`: An FFI type for values in this table.  (In the future,
-   `value_type` will be optional; a nil `value_type` will create a
-   set).
+ * `key_type`: An FFI type (LuaJIT "ctype") for keys in this table.
+ * `value_type`: An FFI type (LuaJT "ctype") for values in this table.
  * `hash_fn`: A function that takes a key and returns a hash value.
 
 Hash values are unsigned 32-bit integers in the range `[0,
@@ -71,7 +71,7 @@ Hash values are unsigned 32-bit integers in the range `[0,
 integer that is not a valid hash value.  The `hash_fn` must return a
 hash value in the correct range.
 
-Optional entries that may be present in the *params* table include:
+Optional entries that may be present in the *parameters* table include:
 
  * `initial_size`: The initial size of the hash table, including free
    space.  Defaults to 8 slots.
@@ -93,7 +93,7 @@ should be a ctable.
 
 Resize the ctable to have *size* total entries, including empty space.
 
-— Method **:insert** *hash* *key* *value* *updates_allowed*
+— Method **:insert** *hash*, *key*, *value*, *updates_allowed*
 
 An internal helper method that does the bulk of updates to hash table.
 *hash* is the hash of *key*.  This method takes the hash as an explicit
@@ -104,18 +104,18 @@ values for the key and the value, of course.
 *updates_allowed* is an optional parameter.  If not present or false,
 then the `:insert` method will raise an error if the *key* is already
 present in the table.  If *updates_allowed* is the string `"required"`,
-then an error will be raised if *key* is /not/ already in the table.
+then an error will be raised if *key* is *not* already in the table.
 Any other true value allows updates but does not require them.  An
 update will replace the existing entry in the table.
 
 Returns the index of the inserted entry.
 
-— Method **:add** *key* *value* *updates_allowed*
+— Method **:add** *key*, *value*, *updates_allowed*
 
 Add an entry to the ctable, returning the index of the added entry.  See
 the documentation for `:insert` for a description of the parameters.
 
-— Method **:update** *key* *value*
+— Method **:update** *key*, *value*
 
 Update the entry in a ctable with the key *key* to have the new value
 *value*.  Throw an error if *key* is not present in the table.
@@ -126,7 +126,7 @@ Look up *key* in the table, and if found return a pointer to the entry.
 Return nil if the value is not found.
 
 An entry pointer has three fields: the `hash` value, which must not be
-modified; the `key' itself; and the `value`.  Access them as usual in
+modified; the `key` itself; and the `value`.  Access them as usual in
 Lua:
 
 ```lua
@@ -137,7 +137,7 @@ if ptr then print(ptr.value) end
 Note that pointers are only valid until the next modification of a
 table.
 
-— Method **:lookup_and_copy** *key* *entry*
+— Method **:lookup_and_copy** *key*, *entry*
 
 Look up *key* in the table, and if found, copy that entry into *entry*
 and return true.  Otherwise return false.
@@ -148,7 +148,7 @@ Remove an entry from a ctable.  *entry* should be a pointer that points
 into the table.  Note that pointers are only valid until the next
 modification of a table.
 
-— Method **:remove** *key* *missing_allowed*
+— Method **:remove** *key*, *missing_allowed*
 
 Remove an entry from a ctable, keyed by *key*.
 
@@ -178,21 +178,25 @@ end
 
 #### Hash functions
 
-Any hash function will do, as long as it produces values in the right
-range.  In practice we include some functions for hashing byte sequences
-of some common small lengths.
+Any hash function will do, as long as it produces values in the `[0,
+0xFFFFFFFF)` range.  In practice we include some functions for hashing
+byte sequences of some common small lengths.
 
 — Function **ctable.hash_32** *number*
+
 Hash a 32-bit integer.  As a `hash_fn` parameter, this will only work if
 your key type's Lua representation is a Lua number.  For example, use
 `hash_32` on `ffi.typeof('uint32_t')`, but use `hashv_32` on
 `ffi.typeof('uint8_t[4]')`.
 
 — Function **ctable.hashv_32** *ptr*
+
 Hash the first 32 bits of a byte sequence.
 
 — Function **ctable.hashv_48** *ptr*
+
 Hash the first 48 bits of a byte sequence.
 
 — Function **ctable.hashv_64** *ptr*
+
 Hash the first 64 bits of a byte sequence.

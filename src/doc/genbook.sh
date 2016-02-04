@@ -53,6 +53,8 @@ $(cat ../apps/socket/README.md)
 
 # Libraries
 
+$(cat ../lib/README.md)
+
 ## Hardware
 
 $(cat ../lib/hardware/README.md)
@@ -60,10 +62,6 @@ $(cat ../lib/hardware/README.md)
 ## Protocols
 
 $(cat ../lib/protocol/README.md)
-
-## Specialized data structures
-
-$(cat ../lib/README.ctable.md)
 
 ## Snabb NFV
 
