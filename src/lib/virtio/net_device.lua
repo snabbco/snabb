@@ -328,20 +328,6 @@ function VirtioNetDevice:tx_signal_used()
    end
 end
 
-local pagebits = memory.huge_page_bits
-
--- Cache of the latest referenced physical page.
-function VirtioNetDevice:translate_physical_addr (addr)
-   local page = bit.rshift(addr, pagebits)
-   if page == self.last_virt_page then
-      return addr + self.last_virt_offset
-   end
-   local phys = memory.virtual_to_physical(addr)
-   self.last_virt_page = page
-   self.last_virt_offset = phys - addr
-   return phys
-end
-
 function VirtioNetDevice:map_from_guest (addr)
    local result
    local m = self.mem_table[0]
