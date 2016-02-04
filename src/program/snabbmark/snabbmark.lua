@@ -284,6 +284,7 @@ function esp (npackets, packet_size)
          :format(packet_size, gbits(bps)))
 
    for _, p in ipairs(packets) do
+      assert(p.plain, "Decapsulation of some packets failed.")
       packet.free(p.plain)
       packet.free(p.encapsulated)
    end
