@@ -16,7 +16,7 @@ CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P '
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
-MDSRC  = $(shell find . -regex '[^\#]*\.md.src' -printf '%P ')
+RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
@@ -30,7 +30,7 @@ ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
 ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
-MDOBJS := $(patsubst %.src,%,$(MDSRC))
+RMOBJS := $(patsubst %.src,%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
@@ -69,7 +69,7 @@ $(EXE): snabb bin
 	@echo -n "BINARY    "
 	@ls -sh $@
 
-markdown: $(MDOBJS)
+markdown: $(RMOBJS)
 
 test: $(TESTMODS) $(TESTSCRIPTS)
 
@@ -152,7 +152,7 @@ $(JITOBJS): obj/jit_%.o: ../lib/luajit/src/jit/%.lua $(OBJDIR)
 	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
 
 
-$(MDOBJS): %: %.src
+$(RMOBJS): %: %.src
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
 
@@ -206,8 +206,8 @@ clean:
 	$(Q)-rm -rf $(CLEAN)
 
 mrproper: clean
-	$(E) "RM        $(MDOBJS)"
-	$(Q)-rm -rf $(MDOBJS)
+	$(E) "RM        $(RMOBJS)"
+	$(Q)-rm -rf $(RMOBJS)
 
 benchmarks:
 	$(Q) (scripts/bench.sh)
