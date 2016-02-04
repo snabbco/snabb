@@ -50,7 +50,7 @@ aad:init({ffi.typeof[[
           ]]})
 
 function aad:new (spi)
-   local o = iv:superClass().new(self)
+   local o = aad:superClass().new(self)
    local h = o:header()
    h.spi = htonl(spi)
    return o
@@ -137,7 +137,7 @@ function selftest ()
                     icv        = "3247184b3c4f69a44dbcd22887bbb418"}, }
    for i, t in ipairs(test) do
       print("Test vector:", i)
-      local gcm = aes_128_gcm:new(t.key, t.salt)
+      local gcm = aes_128_gcm:new(0x0, t.key, t.salt)
       local iv = lib.hexundump(t.iv, gcm.iv_size)
       local length = #t.plaintext/2
       local p = ffi.new("uint8_t[?]", length + gcm.auth_size)
@@ -172,7 +172,7 @@ function selftest ()
    end
    -- Microbenchmarks.
    local length = 1000 * 1000 * 100 -- 100MB
-   local gcm = aes_128_gcm:new(test[1].key, test[1].salt)
+   local gcm = aes_128_gcm:new(0x0, test[1].key, test[1].salt)
    local p = ffi.new("uint8_t[?]", length + gcm.auth_size)
    local start = C.get_monotonic_time()
    ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
