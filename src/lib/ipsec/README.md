@@ -26,13 +26,16 @@ References:
 Returns a new encryption/decryption context respectively. *Config* must a
 be a table with the following keys:
 
-* `spi` - “Security Parameter Index” as specified in RFC 4303.
 * `mode` - Encryption mode (string). The only accepted value is the
   string `"aes-128-gcm"`.
 * `keymat` - Hex string containing 16 bytes of key material as specified
   in RFC 4106.
 * `salt` - Hex string containing four bytes of salt as specified in
   RFC 4106.
+* `spi` - “Security Parameter Index” as specified in RFC 4303.
+  (`esp_v6_encrypt` only.)
+* `window_size` - *Optional*. Width of the window in which out of order packets
+  are accepted. The default is 128. (`esp_v6_decrypt` only.)
 
 — Method **esp_v6_encrypt:encapsulate** *packet*
 

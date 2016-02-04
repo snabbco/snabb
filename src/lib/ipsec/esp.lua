@@ -84,13 +84,25 @@ function esp_v6_decrypt:new (conf)
    local gcm = o.aes_128_gcm
    local esp_overhead = esp_size + esp_tail_size + gcm.iv_size + gcm.auth_size
    o.min_size = esp_overhead + padding(o.pad_to, esp_overhead)
+   o.window_size = conf.window_size or 128
    return setmetatable(o, {__index=esp_v6_decrypt})
 end
 
 -- Verify sequence number.
 function esp_v6_decrypt:check_seq_no (seq_no)
-   -- FIXME: Check seq_no here, see https://tools.ietf.org/html/rfc4303#page-38
-   return seq_no, self.seq:high()
+   -- See https://tools.ietf.org/html/rfc4303#page-38
+   -- This is a only partial implementation that attempts to keep track of the
+   -- ESN counter, but does not detect replayed packets.
+   local function bit32 (n) return n % 2^32 end
+   local W = self.window_size
+   local Tl, Th = self.seq:low(), self.seq:high()
+   if Tl >= bit32(W - 1) then -- Case A
+      if seq_no >= bit32(Tl - W + 1) then return seq_no, Th
+      else                                return seq_no, bit32(Th + 1) end
+   else                       -- Case B
+      if seq_no >= bit32(Tl - W + 1) then return seq_no, bit32(Th - 1)
+      else                                return seq_no, Th end
+   end
 end
 
 function esp_v6_decrypt:decrypt (payload, length)
@@ -148,8 +160,8 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    ip:payload_length(packet.length(payload))
    d:push(ip)
    d:push(ethernet:new({type=0x86dd}))
-   -- Check integrity
    local p = d:packet()
+   -- Check integrity
    print("original", lib.hexdump(ffi.string(packet.data(p), packet.length(p))))
    local p_enc = enc:encapsulate(packet.clone(p))
    print("encrypted", lib.hexdump(ffi.string(packet.data(p_enc), packet.length(p_enc))))
@@ -161,4 +173,22 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
       print("integrity check failed")
       os.exit(1)
    end
+   -- Check transmitted Sequence Number wrap around
+   enc.seq:low(0)
+   enc.seq:high(1)
+   dec.seq:low(2^32 - dec.window_size)
+   dec.seq:high(0)
+   assert(dec:decapsulate(enc:encapsulate(packet.clone(p))),
+          "Transmitted Sequence Number wrap around failed.")
+   assert(dec.seq:high() == 1 and dec.seq:low() == 1,
+          "Lost Sequence Number synchronization.")
+   -- Check Sequence Number exceeding window
+   enc.seq:low(0)
+   enc.seq:high(1)
+   dec.seq:low(dec.window_size+1)
+   dec.seq:high(1)
+   assert(not dec:decapsulate(enc:encapsulate(packet.clone(p))),
+          "Accepted out of window Sequence Number.")
+   assert(dec.seq:high() == 1 and dec.seq:low() == dec.window_size+1,
+          "Corrupted Sequence Number.")
 end
