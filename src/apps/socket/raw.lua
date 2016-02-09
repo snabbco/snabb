@@ -14,14 +14,13 @@ RawSocket = {}
 
 function RawSocket:new (ifname)
    assert(ifname)
+   local index, err = S.util.if_nametoindex(ifname)
+   if not index then error(err) end
+
    local tp = h.htons(c.ETH_P["ALL"])
    local sock, err = S.socket(c.AF.PACKET, bit.bor(c.SOCK.RAW, c.SOCK.NONBLOCK), tp)
    if not sock then error(err) end
-   local index, err = S.util.if_nametoindex(ifname, sock)
-   if err then
-      S.close(sock)
-      error(err)
-   end
+
    local addr = t.sockaddr_ll{sll_family = c.AF.PACKET, sll_ifindex = index, sll_protocol = tp}
    local ok, err = S.bind(sock, addr)
    if not ok then
