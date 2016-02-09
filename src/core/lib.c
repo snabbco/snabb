@@ -53,27 +53,3 @@ unsigned int stat_mtime(const char *path)
   }
 }
 
-/* Execute a full CPU hardware memory barrier.
-   See: http://en.wikipedia.org/wiki/Memory_barrier */
-void full_memory_barrier()
-{
-  // See http://gcc.gnu.org/onlinedocs/gcc-4.1.1/gcc/Atomic-Builtins.html
-  __sync_synchronize();
-}
-
-/* Prefetch memory at address into CPU cache. */
-void prefetch_for_read(const void *address)
-{
-  __builtin_prefetch(address, 0);
-}
-
-/* Prefetch memory at address into CPU cache. */
-void prefetch_for_write(const void *address)
-{
-  __builtin_prefetch(address, 1);
-}
-
-void nop()
-{
-}
-
