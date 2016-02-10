@@ -53,6 +53,8 @@ $(cat ../apps/socket/README.md)
 
 # Libraries
 
+$(cat ../lib/README.md)
+
 ## Hardware
 
 $(cat ../lib/hardware/README.md)
