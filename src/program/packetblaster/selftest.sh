@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 echo "selftest: packetblaster"
 export PCIADDR=$SNABB_PCI_INTEL0
