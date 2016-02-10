@@ -52,6 +52,17 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Max Rottenkolber <max@mr.gy>
 
+#### wingo-next
+
+    BRANCH: wingo-next git://github.com/wingo/snabbswitch
+    Test and integration branch for maintenance & development.
+
+    - Contains changes proposed to be merged into next.
+    - Merges Pull Requests that pass code review on GitHub.
+    - Integration branch for code vetted by Andy
+
+    Maintainer: Andy Wingo <wingo@igalia.com>
+
 #### documenation-fixups
 
     BRANCH: documentation-fixups git://github.com/eugeneia/snabbswitch
