@@ -11,7 +11,6 @@ local C = ffi.C
 local syscall = require("syscall")
 
 local lib = require("core.lib")
-require("core.memory_h")
 
 --- ### Serve small allocations from hugepage "chunks"
 
@@ -49,7 +48,7 @@ end
 
 function allocate_hugetlb_chunk ()
    for i =1, 3 do
-      local page = C.allocate_huge_page(huge_page_size)
+      local page = allocate_huge_page(huge_page_size)
       if page ~= nil then return page else reserve_new_page() end
    end
 end
@@ -85,8 +84,23 @@ huge_page_size = get_huge_page_size()
 -- Address bits per huge page (2MB = 21 bits; 1GB = 30 bits)
 huge_page_bits = math.log(huge_page_size, 2)
 
---- ### Physical address translation
+--- Physical memory allocation
 
+-- Allocate HugeTLB memory pages for DMA. HugeTLB memory is always
+-- mapped to a virtual address with a specific scheme:
+--
+--   virtual_address = physical_address | 0x500000000000ULL
+--
+-- This makes it possible to resolve physical addresses directly from
+-- virtual addresses (remove the tag bits) and to test addresses for
+-- validity (check the tag bits).
+
+-- Tag applied to physical addresses to calculate virtual address.
+local tag = 0x500000000000ULL
+
+-- virtual_to_physical(ptr) => uint64_t
+--
+-- Return the physical address of specially mapped DMA memory.
 local uint64_t = ffi.typeof("uint64_t")
 function virtual_to_physical (virt_addr)
    local u64 = ffi.cast(uint64_t, virt_addr)
@@ -97,13 +111,72 @@ function virtual_to_physical (virt_addr)
    return bit.bxor(u64, 0x500000000000ULL)
 end
 
+-- function allocate_huge_page(size[, persistent]):
+--
+-- Map a new HugeTLB page to an appropriate virtual address.
+--
+-- The page is allocated via the hugetlbfs filesystem
+-- /var/run/snabb/hugetlbfs that is mounted automatically.
+-- The page has to be file-backed because the Linux kernel seems to
+-- not support remap() on anonymous pages.
+--
+-- Further reading:
+--   https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt
+--   http://stackoverflow.com/questions/27997934/mremap2-with-hugetlb-to-change-virtual-address
+function allocate_huge_page (size,  persistent)
+   ensure_hugetlbfs()
+   local tmpfile = "/var/run/snabb/hugetlbfs/alloc."..syscall.getpid()
+   local fd = syscall.open(tmpfile, "creat, rdwr", "RWXU")
+   assert(fd, "create hugetlb")
+   assert(syscall.ftruncate(fd, size), "ftruncate")
+   local tmpptr = syscall.mmap(nil, size, "read, write", "shared, hugetlb", fd, 0)
+   assert(tmpptr, "mmap hugetlb")
+   assert(syscall.mlock(tmpptr, size))
+   local phys = resolve_physical(tmpptr)
+   local virt = bit.bor(phys, tag)
+   local ptr = syscall.mmap(virt, size, "read, write", "shared, hugetlb, fixed", fd, 0)
+   if persistent then
+      assert(syscall.rename(tmpfile, "/var/run/snabb/hugetlbfs/dma.%012x", phys))
+   else
+      assert(syscall.unlink(tmpfile))
+   end
+   syscall.close(fd)
+   return ptr
+end
+
+-- resolve_physical(ptr) => uint64_t
+--
+-- Resolve the physical address of the given pointer via the kernel.
+function resolve_physical (ptr)
+   local pagesize = 4096
+   local virtpage = ffi.cast("uint64_t", ptr) / pagesize
+   local pagemapfd = assert(syscall.open("/proc/self/pagemap", "rdonly"))
+   local data = ffi.new("uint64_t[1]")
+   syscall.pread(pagemapfd, data, 8, virtpage * 8)
+   syscall.close(pagemapfd)
+   assert(bit.band(data[0], bit.lshift(1, 63)) ~= 0ULL, "page not present")
+   local physpage = bit.band(data[0], 0xFFFFFFFFFFFFF)
+   return physpage * pagesize
+end
+
+-- Make sure that /var/run/snabb/hugetlbfs is mounted.
+function ensure_hugetlbfs ()
+   syscall.mkdir("/var/run/snabb/hugetlbfs")
+   if not syscall.mount("none", "/var/run/snabb/hugetlbfs", "hugetlbfs", "rw,nosuid,nodev,noexec,relatime,remount") then
+      io.write("[mounting /var/run/snabb/hugetlbfs]\n")
+      assert(syscall.mount("none", "/var/run/snabb/hugetlbfs", "hugetlbfs", "rw,nosuid,nodev,noexec,relatime"),
+             "failed to (re)mount /var/run/snabb/hugetlbfs")
+   end
+end
+
 --- ### selftest
 
 function selftest (options)
    print("selftest: memory")
    print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
+   ensure_hugetlbfs() -- can print a message, let that go first
    for i = 1, 4 do
-      io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB: ")
+      io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB:")
       io.flush()
       local dmaptr, physptr, dmalen = dma_alloc(huge_page_size)
       print("Got "..(dmalen/1024^2).."MB")
