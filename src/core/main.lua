@@ -34,7 +34,7 @@ function main ()
    require "lib.lua.strict"
    -- Warn on unsupported platforms
    if ffi.arch ~= 'x64' or ffi.os ~= 'Linux' then
-      io.stderr:write("Warning: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
+      error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
    end
    initialize()
    local args = parse_command_line()
