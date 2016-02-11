@@ -32,6 +32,10 @@ debug_on_error = false
 function main ()
    zone("startup")
    require "lib.lua.strict"
+   -- Warn on unsupported platforms
+   if ffi.arch ~= 'x64' or ffi.os ~= 'Linux' then
+      error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
+   end
    initialize()
    local args = parse_command_line()
    local program = programname(args[1])
