@@ -1,6 +1,6 @@
 # Contributing Documentation in SnabbSwitch
 
-## README.md, README.md.src and README(.inc)
+## README.md, README.src.md and README(.inc)
 
 The SnabbSwitch documentation is organized in README's spread across the
 code base. If you commit changes you should look for the "nearest" README
@@ -10,7 +10,7 @@ different kinds of README files:
 * `README.md` — A portion of the SnabbSwitch manual, embedded by GitHub
   too. These are often (but not always) artifacts built from a `.src`
   file. Edit these if no `.src` is available (see below).
-* `README.md.src` — A build recipe. If available, this is the one you
+* `README.src.md` — A build recipe. If available, this is the one you
   must edit. These are formatted in [GitHub Flavored
   Markdown](https://help.github.com/articles/github-flavored-markdown/).
 * `README(.inc)` — Plain text files included as the `--help` message of
@@ -18,7 +18,7 @@ different kinds of README files:
   set to ensure compatibility with older terminals.
 
 For instance if you had changed the API of `lib.protocol.ethernet` you'd
-need to update the documentation in `lib/protocol/README.md.src`. It is
+need to update the documentation in `lib/protocol/README.src.md`. It is
 important that you use the correct header level (e.g. `##`, `###`,
 ...). Which level you are at can be seen in `doc/genbook.sh` (see
 *Building A Standalone Documentation*).
@@ -36,7 +36,8 @@ groups:
 * **Contributors:** Some documents (like the one you are reading now) are
   facing towards Snabb Switch contributors. They can be frequently
   updating and even contain open questions. We should ensure that these
-  always reflect the current state of affairs.
+  always reflect the current state of affairs. This also includes
+  implementation details which should be documented as source code comments.
 
 ### Building README.md Files
 
@@ -49,11 +50,11 @@ make lib/protocol/README.md
 
 You need to commit the resulting `README.md` (and possibly generated
 diagram images, see *Including Diagrams*) alongside the updated
-`README.md.src`.
+`README.src.md`.
 
 ### Including Diagrams
 
-The main reason for the `README.md.src` to `README.md` step is that we
+The main reason for the `README.src.md` to `README.md` step is that we
 use a custom Markdown pre-processor to be able to embed ASCII diagrams in
 our documentation. These ASCII diagrams will be rendered to pretty images
 by [ditaa](http://ditaa.sourceforge.net/). In order to build `README.md`
