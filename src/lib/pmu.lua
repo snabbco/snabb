@@ -96,6 +96,11 @@ local lib = require("core.lib")
 
 local S = require("syscall")
 
+--Have to use signed ints instead of unsigned for output registers otherwise they get boxed
+ffi.cdef[[
+  void cpuid(int32_t eax, int32_t ecx) __mcode("0FA2_E") __reglist(out, int32_t eax, int32_t ebx, int32_t ecx, int32_t edx);
+  void rdpmc(int32_t ecx) __mcode("0F33_E") __reglist(out, int32_t eax, int32_t edx);
+]]
 -- defs: counter definitions
 --   nil => not initialized
 --   false => none available
