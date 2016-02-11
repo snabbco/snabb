@@ -98,10 +98,6 @@ that concatenates the various `README.md` files we have.
 ## General Considerations
 
 Documentation is most effective when it is precise, concise and uniform.
-Documentation is not a novel, or a blog post. It should not be fun to read.
-Documentation should be normative, and as such be an especially unsurprising
-and bare read. Described below are the cornerstones of boring writing. Embrace
-them!
 
  - **Preciseness**. Vague descriptions do more harm than good as different
    readers will derive different interpretations. Make sure you use the most
