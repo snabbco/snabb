@@ -4,6 +4,10 @@
 #include "lualib.h"
 #include "lauxlib.h"
 
+#if sizeof(uint64_t) != sizeof(uintptr_t)
+#error "Snabb only supports 64-bit platforms. See https://github.com/SnabbCo/snabbswitch/blob/master/src/doc/porting.md"
+#end
+
 int argc;
 char** argv;
 
