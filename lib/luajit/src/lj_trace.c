@@ -283,7 +283,7 @@ int lj_trace_flushall(lua_State *L)
   /* Clear penalty cache. */
   memset(J->penalty, 0, sizeof(J->penalty));
   /* Free the whole machine code and invalidate all exit stub groups. */
-  lj_mcode_free(J);
+  lj_mcode_free(J, &J->mcarea);
   lj_ir_k64_freeall(J);
   memset(J->exitstubgroup, 0, sizeof(J->exitstubgroup));
   lj_vmevent_send(L, TRACE,
@@ -297,6 +297,7 @@ void lj_trace_initstate(global_State *g)
 {
   jit_State *J = G2J(g);
   TValue *tv;
+  J->curmcarea = &J->mcarea;
   /* Initialize SIMD constants. */
   tv = LJ_KSIMD(J, LJ_KSIMD_ABS);
   tv[0].u64 = U64x(7fffffff,ffffffff);
@@ -317,7 +318,10 @@ void lj_trace_freestate(global_State *g)
       lua_assert(i == (ptrdiff_t)J->cur.traceno || traceref(J, i) == NULL);
   }
 #endif
-  lj_mcode_free(J);
+  lj_mcode_free(J, &J->mcarea);
+#if LJ_HASINTRINSICS
+  lj_mcode_free(J, &J->mcarea_intrins);
+#endif
   lj_ir_k64_freeall(J);
   lj_mem_freevec(g, J->snapmapbuf, J->sizesnapmap, SnapEntry);
   lj_mem_freevec(g, J->snapbuf, J->sizesnap, SnapShot);
