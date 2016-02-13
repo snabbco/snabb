@@ -20,6 +20,8 @@ function run (args)
       solarflare(unpack(args))
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
+   elseif command == 'byteops' and #args == 0 then
+      byteops()
    else
       print(usage) 
       main.exit(1)
@@ -326,3 +328,99 @@ receive_device.interface= "rx1GE"
       main.exit(1)
    end
 end
+
+-- Byteops benchmark
+
+function byteops ()
+   print("byteops benchmark:")
+   local pmu = require("lib.pmu")
+   local cpu = io.open('/proc/cpuinfo'):read('*a'):match("(E5[^\n]*) @")
+   print(require("lib.pmu_x86").cpu_model)
+   local rowfmt = "@@ %-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s;%-10s"
+   print(rowfmt:format("cpu", "name", "nbatch", "nbytes", "disp", "lendist", "lenalign", "dstalign", "srcalign",
+                       "nanos", "cycle", "refcycle", "instr", "l1-hit", "l2-hit", "l3-hit", "l3-miss", "br-miss"))
+   local function row (name, nbatch, nbytes, disp, lendist, lenalign, dstalign, srcalign, nanos, cycle, refcycle, instr, l1h, l2h, l3h, l3m, brm)
+      print(rowfmt:format(cpu, name, tostring(nbatch), tostring(nbytes), tostring(disp), tostring(lendist), tostring(lenalign), tostring(dstalign), tostring(srcalign), tostring(nanos), tostring(cycle), tostring(refcycle), tostring(instr), tostring(l1h), tostring(l2h), tostring(l3h), tostring(l3m), tostring(brm)))
+   end
+   local nbatch = 10000
+   local batch = ffi.new("struct { char *src, *dst; uint32_t len; }[?]", nbatch)
+   local nbuffer = 10*1024*1024
+   local src = ffi.new("char[?]", nbuffer)
+   local dst = ffi.new("char[?]", nbuffer)
+   local tmp = ffi.new("char[?]", nbuffer)
+   local functions = { memcpy = ffi.C.memcpy }
+
+   local function flushcache ()
+      ffi.copy(tmp, src, nbuffer)
+   end
+
+   -- Set of alignments for src / dst / len values.
+   local alignments = {1,2,4,8,16,32,48,64}
+   -- Distributions of data sizes (probability density functions).
+   -- Test with constant sizes, with uniform sizes, and with
+   -- loguniform sizes (proportionally more smaller sizes).
+   local sizedist = {'k=64', 'k=256', 'k=1500', 'k=10240', 'uniform', 'loguniform'}
+   -- Displacements in memory: fixed location, within L1 cache, within
+   -- L2 cache, within L3 cache, main memory.
+   local displacement  = {0, 12*1024, 384*1024, 2*1024*1024, nbuffer-10240}
+
+   require("lib.checksum")
+   local functions = {memcpy = function (dst, src, len) ffi.C.memcpy(dst, src, len) end,
+                      cksum     = function (dst, src, len)  ffi.C.cksum_generic(src, len, 0) end,
+--                      cksumsse2 = function (dst, src, len) ffi.C.cksum_sse2(src, len, 0) end,
+                      cksumavx2 = function (dst, src, len) ffi.C.cksum_avx2(src, len, 0) end}
+
+   local function align (n, a)
+      return n - (n%a)
+   end
+
+   local function pick (d)
+      if d == 'k=64' then return 64 end
+      if d == 'k=256' then return 256 end
+      if d == 'k=1500' then return 1500 end
+      if d == 'uniform' then return math.random(0, 10240) end
+      if d == 'loguniform' then return math.floor(math.exp(math.log(10240)*math.random())) end
+      return 0
+   end
+
+   for _, srcalign in ipairs(alignments) do
+      for _, dstalign in ipairs(alignments) do
+         for _, lenalign in ipairs(alignments) do
+            for _, lendist in ipairs(sizedist) do
+               for _, displacement in ipairs(displacement) do
+                  for fname, func in pairs(functions) do
+                     local nbytes = 0
+                     for i = 0, nbatch-1 do
+                        batch[i].src = src + align(math.random(displacement), srcalign)
+                        batch[i].dst = dst + align(math.random(displacement), dstalign)
+                        batch[i].len = align(pick(lendist), lenalign)
+                        nbytes = nbytes + batch[i].len
+                     end
+                     local function run ()
+                        for i = 0, nbatch-1 do
+                           local spec = batch[i]
+                           func(batch[i].dst, batch[i].src, batch[i].len)
+                        end
+                     end
+                     -- XXX not available on all processors?
+                     local events = {'mem_load_uops_retired.l1_hit',
+                                     'mem_load_uops_retired.l2_hit',
+                                     'mem_load_uops_retired.l3_hit',
+                                     'mem_load_uops_retired.l3_miss',
+                                     'br_misp_retired.all_branches'}
+                     local start = ffi.C.get_time_ns()
+                     local _, profile = pmu.measure(run, events)
+                     local finish = ffi.C.get_time_ns()
+--                     for k,v in pairs(profile) do print(k,v) end
+                     row(fname, nbatch, nbytes, displacement, lendist, lenalign, dstalign, srcalign,
+                         tonumber(finish-start), profile.cycles, profile.ref_cycles, profile.instructions,
+                         profile[events[1]], profile[events[2]], profile[events[3]], profile[events[4]], profile[events[5]])
+                  end
+               end
+            end
+         end
+      end
+   end
+   print("byteops: ok")
+end
+
