@@ -20,6 +20,10 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	@cp -p  lib/ljsyscall/syscall/linux/*.lua src/syscall/linux/
 	@cp -pr lib/ljsyscall/syscall/linux/x64   src/syscall/linux/
 	@cp -pr lib/ljsyscall/syscall/shared      src/syscall/
+#       ljndpi
+	@mkdir -p src/ndpi
+	@cp -p lib/ljndpi/ndpi.lua src/
+	@cp -p lib/ljndpi/ndpi/*.lua src/ndpi/
 	cd src && $(MAKE)
 
 install: all
