@@ -266,19 +266,24 @@ end
 
 local punt = {} --{{mac=,name=}, ...}
 
-local punted = {} --{[smac..dmac] -> expire_time}
+local punted = {} --{smac -> {dmac -> expire_time}}
 
 local function punt_mac(smac, dmac, ifname)
-   local k = smac..dmac
-   if punted[k] and punted[k] < os.time() + conf.arp_timeout then return end
+   local t = punted[smac]
+	local exp = t and t[dmac]
+	if exp and < os.time() + conf.arp_timeout then return end
    table.insert(punt, {smac = smac, dmac = dmac, ifname = ifname})
-   punted[k] = os.time()
+	if not t then
+		t = {}
+		punted[smac] = t
+	end
+	t[dmac] = os.time()
 end
 
 local function get_punt_message()
    local t = table.remove(punt)
    if not t then return end
-   local s = _('{"source-eid" : "%s", "dest-eid" : "%s", "interface" : "%s"}', 
+   local s = _('{"source-eid" : "%s", "dest-eid" : "%s", "interface" : "%s"}',
       macstr3(t.smac), macstr3(t.dmac), t.ifname)
    log_punt(s)
    return s
