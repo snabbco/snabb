@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 /* poll.c - Poll multiple ef_vi interfaces in one FFI call to save on FFI overhead */
 
 #include <stdint.h>

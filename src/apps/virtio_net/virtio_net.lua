@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Application to connect to a virtio-net driver implementation
 --
 -- Licensed under the Apache 2.0 license
