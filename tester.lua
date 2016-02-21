@@ -115,7 +115,7 @@ end
 -- @param fn string containing filename where the test should be extracted (default:os.tmpname())
 -- @return filename to where the test was extracted
 local function extract_test(test,fn)
-  fn = fn or os.tmpname()
+  fn = fn or os.tmpname()..".lua"
   local f = io.open(fn,"w")
   if not f then
     error("Could not write to file "..fn)
@@ -126,13 +126,14 @@ local function extract_test(test,fn)
 end
 
 --- Run a single test, possibly externally with luajitcmd.
--- @param test: single test object containing name, description, tags, code.
+-- @param test single test object containing name, description, tags, code.
+-- @param verbose boolean indicating verbosity
 -- @param luajitcmd string containing the luajit command to run external tests.
 -- If luajitcmd is defined, the test is extracted into a file and run externally.
 -- If left empty, the test is run internally with pcall.
 -- @return true (pass) or false (fail)
 -- @return msg error message in case of failure
-local function run_single_test(test,luajitcmd)
+local function run_single_test(test,verbose,luajitcmd)
   if luajitcmd then
     local fn = extract_test(test)
     local ret = os.execute(luajitcmd.." "..fn)
@@ -141,14 +142,23 @@ local function run_single_test(test,luajitcmd)
   local code = build_codestring(test)
   local load_ok, load_res = pcall(loadstring,code)
   if load_ok then
-    return pcall(load_res)
+    local ok, res = pcall(load_res)
+    if verbose then 
+      io.write(ok and "PASS " or "FAIL ",test.name,"\n")
+      if not ok then io.write("    "..(res or "(no error message)"),"\n") end
+    end
+    return ok, res
   else
+    if verbose then 
+      io.write("SYNT ",test.name,load_res or "(no error message)","\n")
+    end
     return load_ok, load_res
   end
 end
 
 --- Recursively run tests in paths.
 -- @param paths array of paths to recursively run tests in.
+-- @param verbose boolean indicating verbosity
 -- @param luajitcmd string containing the luajit command to run external tests.
 -- If luajitcmd is defined, the test is extracted into a file and run externally.
 -- If left empty, the test is run internally with pcall.
@@ -156,13 +166,13 @@ end
 -- @return number of failed tests
 -- @return array of failed tests
 -- @return array of corresponding error messages
-local function run_tests(test_index,luajitcmd)
+local function run_tests(test_index,verbose,luajitcmd)
   local pass, fail = 0,0
   local failed_tests = {}
   local errors = {}
   for i,test_block in ipairs(test_index) do
     for j,test in ipairs(test_block) do
-      local ok, res = run_single_test(test)
+      local ok, res = run_single_test(test,verbose,luajitcmd)
       if ok then
         pass = pass+1
       else
@@ -176,11 +186,14 @@ local function run_tests(test_index,luajitcmd)
 end
 
 --- Check whether tags are in tags_inc and none are in tags_exc.
+-- If tags_inc is empty, default inclusion is true.
 -- @param tags Array of tags to test
 -- @param tags_inc Array of tags to include
 -- @param tags_exc Array of tags to exclude
+-- @return boolean indicating inclusion
 local function check_tags(tags,tags_inc,tags_exc)
   local include = false
+  if #tags_inc==0 then include = true end
   for _,tag_inc in ipairs(tags_inc) do
     if tags[tag_inc] then
       include = true
@@ -197,6 +210,7 @@ local function check_tags(tags,tags_inc,tags_exc)
 end
 
 --- Select tests with tags_inc without tags_exc.
+-- If tags_inc is empty, select all tests by default.
 -- @param test_index array of test_blocks 
 -- @param tags_inc array of tags to include
 -- @param tags_exc array of tags to exclude
