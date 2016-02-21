@@ -1,3 +1,6 @@
+local lfs = require("lfs")
+local tconcat = table.concat
+
 --- Shallow table copy
 local function cp(t)
   local t1 = {}
@@ -33,8 +36,6 @@ local function parse_test(fn)
   local current_test = prelude
   local function store_test()
     if current_test and current_test~=prelude then 
-      current_test.code = table.concat(current_test.code,"\n")
-      current_test.description = table.concat(current_test.description,"\n")
       tests[#tests+1] = current_test
       lookup_tests[current_test.name] = #tests
     end
@@ -70,7 +71,63 @@ local function parse_test(fn)
   return tests, lookup_tests, prelude
 end
 
+-- Recursively parse the path and store the tests in test_index
+-- @param path string containing a path to a file or directory
+-- @param test_index array containing the tables with {tests,lookup,prelude}
+-- @param test_index_lookup lookup table containing keys = paths of the test
+-- files and values = respective indices in test_index
+local function recursive_parse(path,test_index,test_index_lookup)
+  print(path)
+  local att = lfs.attributes(path)
+  if att.mode=="directory" then
+    for path2 in lfs.dir(path) do
+      if path2~=".." and path2~="." then
+        recursive_parse(path.."/"..path2,test_index,test_index_lookup)
+      end
+    end
+  elseif att.mode=="file" then
+    local tests, tests_lookup, prelude = parse_test(path)
+    if tests then 
+      test_index[#test_index+1] = {tests=tests, lookup=tests_lookup, prelude=prelude}
+      test_index_lookup[path] = #test_index
+    end
+  end
+end
+
+--- Walk the directory tree and index tests.
+-- @param paths array of paths that should be indexed.
+-- @return array of tables containing { tests, lookup, prelude } as returned by
+-- parse
+-- @return lookup table containing keys = paths of the test files and values =
+-- respective indices in test_index
+local function index_tests(paths)
+  local test_index = {}
+  local test_index_lookup = {}
+  for _,path in ipairs(paths) do
+    recursive_parse(path,test_index,test_index_lookup)
+  end
+  return test_index, test_index_lookup
+end
+
+--- Extract a test into a directory
+--@param test the test table returned by parse, containing name, description, tags, code 
+--@param fn string containing filename where the test should be extracted (default:os.tmpname())
+--@return filename to where the test was extracted
+local function extract_test(test,fn)
+  fn = fn or os.tmpname()
+  local f = io.open(fn,"w")
+  if not f then
+    error("Could not write to file "..fn)
+  end
+  f:write("--- ",test.name,"\n")
+  f:write("--",tconcat(test.description,"\n--"),"\n")
+  f:write(tconcat(test.code,"\n"))
+  f:close()
+  return fn
+end
 
 return {
-  parse = parse_test
+  parse = parse_test,
+  index = index_tests,
+  extract = extract_test,
 }
