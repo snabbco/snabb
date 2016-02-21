@@ -23,11 +23,9 @@ end
 --- Parser for the tests.
 -- @param fn string containing a filename (fullpath)
 -- @return array containing test specs (name, code, description, tags)
--- @return lookup table for tests
--- @return prelude table containing prelude code, description and tags.
 local function parse_test(fn)
   local tests = {}
-  local lookup_tests = {}
+  local lookup = {}
   local prelude = {
     name = "prelude of "..fn,
     fn = fn,
@@ -37,17 +35,15 @@ local function parse_test(fn)
   }
   local current_test = prelude
   local function store_test()
-    if current_test~=prelude then
-      tests[#tests+1] = current_test
-      lookup_tests[current_test.name] = #tests
-    end
+    tests[#tests+1] = current_test
+    lookup[current_test.name] = #tests
   end
   for line in io.lines(fn) do
     if line:match("^%-%-%-") then
       -- Next test is reached
       store_test()
       local testname = line:match("^%-%-%-%s*(.*)$")
-      if lookup_tests[testname] then
+      if lookup[testname] then
         error("Test "..testname.." is defined twice in the same file. Please give the tests unique names.")
       end
       -- Add current test to the tests table and start new current test table.
@@ -69,45 +65,37 @@ local function parse_test(fn)
     end
   end
   store_test()
-  tests[0] = prelude
-  return tests, lookup_tests
+  return tests
 end
 
 -- Recursively parse the path and store the tests in test_index
 -- @param path string containing a path to a file or directory
--- @param test_index array containing the tables with {tests,lookup,prelude}
--- @param test_index_lookup lookup table containing keys = paths of the test
--- files and values = respective indices in test_index
-local function recursive_parse(path,test_index,test_index_lookup)
-  local att = lfs.attributes(path)
+-- @param test_index array containing the tables with tests per file
+local function recursive_parse(path,test_index)
+  local att, err = lfs.attributes(path)
+  if not att then 
+    error("Could not parse "..path..": "..err)
+  end
   if att.mode=="directory" then
     for path2 in lfs.dir(path) do
       if path2~=".." and path2~="." then
-        recursive_parse(path.."/"..path2,test_index,test_index_lookup)
+        recursive_parse(path.."/"..path2,test_index)
       end
     end
   elseif att.mode=="file" and path:match("%.lua$") then
-    local tests, tests_lookup, prelude = parse_test(path)
-    if tests then
-      test_index[#test_index+1] = {tests=tests, lookup=tests_lookup, prelude=prelude}
-      test_index_lookup[path] = #test_index
-    end
+    test_index[#test_index+1] = parse_test(path)
   end
 end
 
 --- Walk the directory tree and index tests.
 -- @param paths array of paths that should be indexed.
--- @return array of tables containing { tests, lookup, prelude } as returned by
--- parse
--- @return lookup table containing keys = paths of the test files and values =
--- respective indices in test_index
+-- @return array of tables containing tests returned by parse
 local function index_tests(paths)
   local test_index = {}
-  local test_index_lookup = {}
   for _,path in ipairs(paths) do
-    recursive_parse(path,test_index,test_index_lookup)
+    recursive_parse(path,test_index)
   end
-  return test_index, test_index_lookup
+  return test_index
 end
 
 --- Build the string containing the chunk of a single test, including name and
@@ -159,7 +147,7 @@ local function run_single_test(test,luajitcmd)
   end
 end
 
--- Recursively run tests in paths.
+--- Recursively run tests in paths.
 -- @param paths array of paths to recursively run tests in.
 -- @param luajitcmd string containing the luajit command to run external tests.
 -- If luajitcmd is defined, the test is extracted into a file and run externally.
@@ -168,15 +156,12 @@ end
 -- @return number of failed tests
 -- @return array of failed tests
 -- @return array of corresponding error messages
-local function run_tests(paths,luajitcmd)
+local function run_tests(test_index,luajitcmd)
   local pass, fail = 0,0
   local failed_tests = {}
   local errors = {}
-  local test_index = index_tests(paths)
   for i,test_block in ipairs(test_index) do
-    -- key 0 is the prelude block.
-    for j=0,#test_block.tests do
-      local test = test_block.tests[j]
+    for j,test in ipairs(test_block) do
       local ok, res = run_single_test(test)
       if ok then
         pass = pass+1
@@ -190,10 +175,51 @@ local function run_tests(paths,luajitcmd)
   return pass, fail, failed_tests, errors
 end
 
+--- Check whether tags are in tags_inc and none are in tags_exc.
+-- @param tags Array of tags to test
+-- @param tags_inc Array of tags to include
+-- @param tags_exc Array of tags to exclude
+local function check_tags(tags,tags_inc,tags_exc)
+  local include = false
+  for _,tag_inc in ipairs(tags_inc) do
+    if tags[tag_inc] then
+      include = true
+      break
+    end
+  end
+  if not include then return false end
+  for _,tag_exc in ipairs(tags_exc) do
+    if tags[tag_exc] then
+      return false 
+    end
+  end
+  return true
+end
+
+--- Select tests with tags_inc without tags_exc.
+-- @param test_index array of test_blocks 
+-- @param tags_inc array of tags to include
+-- @param tags_exc array of tags to exclude
+local function filter_tests(test_index,tags_inc,tags_exc)
+  local tests_filtered = {}
+  for i,test_block in ipairs(test_index) do
+    local tests_i
+    for j, test in ipairs(test_block) do
+      if check_tags(test.tags,tags_inc,tags_exc) then
+        tests_i = tests_i or {}
+        tests_i[#tests_i+1]= test 
+      end
+    end
+    tests_filtered[#tests_filtered+1] = tests_i
+  end
+  return tests_filtered
+end
+
 return {
   parse = parse_test,
   index = index_tests,
   extract = extract_test,
   run_single = run_single_test,
   run = run_tests,
+  filter = filter_tests,
 }
