@@ -1,5 +1,5 @@
-
--- ABC elim
+-- ABC elim 
+-- +opt +abc
 do
   local s, t = {}, {}
   for i=1,100 do t[i] = 1 end
@@ -9,7 +9,8 @@ do
   for i=1,n do s[i][i] = i end
 end
 
--- TSETM
+--- TSETM
+-- Initialize table with multiple return values
 do
   local function f(a,b,c)
     return a,b,c
@@ -41,25 +42,17 @@ do
   assert(t[255] == 1 and t[256] == 2 and t[257] == 3 and t[258] == 4 and t[259] == nil)
 end
 
+--- TSETM 2
+-- Initialize table with function returning 2 constant return values
 do
   local function f() return 9, 10 end
+  local t
   for i=1,100 do t = { 1, 2, 3, f() } end
   assert(t[1] == 1 and t[2] == 2 and t[3] == 3 and t[4] == 9 and t[5] == 10 and
 	 t[6] == nil)
 end
 
--- table.new
-do
-  local tnew = require("table.new")
-  local x, y
-  for i=1,100 do
-    x = tnew(100, 30)
-    if i == 90 then y = x end
-  end
-  assert(x ~= y)
-end
-
--- table.concat
+--- table.concat
 do
   local t = {a=1,b=2,c=3,d=4,e=5}
   t[1] = 4
@@ -82,7 +75,7 @@ do
   assert(q[93] == "9x8x7")
 end
 
--- table.concat must inhibit CSE and DSE
+--- table.concat must inhibit CSE and DSE
 do
   local t = {1,2,3}
   local y, z
@@ -95,6 +88,7 @@ do
   assert(z == "1x100x3")
 end
 
+--- table.concat must inhibit CSE and DSE 2
 do
   local y
   for i=1,100 do
@@ -106,6 +100,7 @@ do
   assert(y == "1x4x3")
 end
 
+--- table.concat must inhibit CSE and DSE 3
 do
   local t = {[0]={}, {}, {}, {}}
   for i=1,30 do
@@ -113,19 +108,5 @@ do
       t[j].x = t[j-1]
     end
   end
-end
-
--- table.pack
-if os.getenv("LUA52") then
-  local t
-
-  t = table.pack()
-  assert(t.n == 0 and t[0] == nil and t[1] == nil)
-
-  t = table.pack(99)
-  assert(t.n == 1 and t[0] == nil and t[1] == 99 and t[2] == nil)
-
-  t = table.pack(nil, nil, nil)
-  assert(t.n == 3 and t[0] == nil and t[1] == nil and t[2] == nil and t[3] == nil and t[4] == nil)
 end
 

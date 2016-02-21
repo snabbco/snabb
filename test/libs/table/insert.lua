@@ -2,6 +2,7 @@
 local tinsert = table.insert
 local assert = assert
 
+--- table.insert(t,i)
 do
   local t = {}
   for i=1,100 do t[i] = i end
@@ -9,6 +10,7 @@ do
   assert(#t == 200 and t[100] == 100 and t[200] == 100)
 end
 
+--- table.insert(t,i,i)
 do
   local t = {}
   for i=1,200 do t[i] = i end
