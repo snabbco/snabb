@@ -29,13 +29,15 @@ local function parse_test(fn)
   local tests = {}
   local lookup_tests = {}
   local prelude = {
+    name = "prelude of "..fn,
+    fn = fn,
     description = {},
     code = {},
     tags = tags_from_path(fn),
   }
   local current_test = prelude
   local function store_test()
-    if current_test and current_test~=prelude then 
+    if current_test~=prelude then
       tests[#tests+1] = current_test
       lookup_tests[current_test.name] = #tests
     end
@@ -51,6 +53,7 @@ local function parse_test(fn)
       -- Add current test to the tests table and start new current test table.
       current_test = {
         name = testname,
+        fn = fn,
         description = cp(prelude.description),
         tags = cp(prelude.tags),
         code = cp(prelude.code),
@@ -61,14 +64,13 @@ local function parse_test(fn)
       for tag in line:gmatch("%+([A-Za-z_][A-Za-z0-9_]*)") do
         current_test.tags[tag] = true
       end
-    else 
+    else
       current_test.code[#current_test.code+1] = line
     end
   end
   store_test()
-  prelude.code = table.concat(prelude.code,"\n")
-  prelude.description = table.concat(prelude.description,"\n")
-  return tests, lookup_tests, prelude
+  tests[0] = prelude
+  return tests, lookup_tests
 end
 
 -- Recursively parse the path and store the tests in test_index
@@ -77,7 +79,6 @@ end
 -- @param test_index_lookup lookup table containing keys = paths of the test
 -- files and values = respective indices in test_index
 local function recursive_parse(path,test_index,test_index_lookup)
-  print(path)
   local att = lfs.attributes(path)
   if att.mode=="directory" then
     for path2 in lfs.dir(path) do
@@ -85,9 +86,9 @@ local function recursive_parse(path,test_index,test_index_lookup)
         recursive_parse(path.."/"..path2,test_index,test_index_lookup)
       end
     end
-  elseif att.mode=="file" then
+  elseif att.mode=="file" and path:match("%.lua$") then
     local tests, tests_lookup, prelude = parse_test(path)
-    if tests then 
+    if tests then
       test_index[#test_index+1] = {tests=tests, lookup=tests_lookup, prelude=prelude}
       test_index_lookup[path] = #test_index
     end
@@ -109,25 +110,90 @@ local function index_tests(paths)
   return test_index, test_index_lookup
 end
 
+--- Build the string containing the chunk of a single test, including name and
+-- description.
+-- @param test table containing a test's name, description and code
+-- @return string containing the code snippet for the test, including comments.
+local function build_codestring(test)
+  return tconcat({
+    "--- ", test.name,
+    "\n--", tconcat(test.description,"\n--"), "\n",
+    tconcat(test.code,"\n")
+  })
+end
+
 --- Extract a test into a directory
---@param test the test table returned by parse, containing name, description, tags, code 
---@param fn string containing filename where the test should be extracted (default:os.tmpname())
---@return filename to where the test was extracted
+-- @param test the test table returned by parse, containing name, description, tags, code
+-- @param fn string containing filename where the test should be extracted (default:os.tmpname())
+-- @return filename to where the test was extracted
 local function extract_test(test,fn)
   fn = fn or os.tmpname()
   local f = io.open(fn,"w")
   if not f then
     error("Could not write to file "..fn)
   end
-  f:write("--- ",test.name,"\n")
-  f:write("--",tconcat(test.description,"\n--"),"\n")
-  f:write(tconcat(test.code,"\n"))
+  f:write(build_codestring(test))
   f:close()
   return fn
+end
+
+--- Run a single test, possibly externally with luajitcmd.
+-- @param test: single test object containing name, description, tags, code.
+-- @param luajitcmd string containing the luajit command to run external tests.
+-- If luajitcmd is defined, the test is extracted into a file and run externally.
+-- If left empty, the test is run internally with pcall.
+-- @return true (pass) or false (fail)
+-- @return msg error message in case of failure
+local function run_single_test(test,luajitcmd)
+  if luajitcmd then
+    local fn = extract_test(test)
+    local ret = os.execute(luajitcmd.." "..fn)
+    return ret==0
+  end
+  local code = build_codestring(test)
+  local load_ok, load_res = pcall(loadstring,code)
+  if load_ok then
+    return pcall(load_res)
+  else
+    return load_ok, load_res
+  end
+end
+
+-- Recursively run tests in paths.
+-- @param paths array of paths to recursively run tests in.
+-- @param luajitcmd string containing the luajit command to run external tests.
+-- If luajitcmd is defined, the test is extracted into a file and run externally.
+-- If left empty, the test is run internally with pcall.
+-- @return number of passed tests
+-- @return number of failed tests
+-- @return array of failed tests
+-- @return array of corresponding error messages
+local function run_tests(paths,luajitcmd)
+  local pass, fail = 0,0
+  local failed_tests = {}
+  local errors = {}
+  local test_index = index_tests(paths)
+  for i,test_block in ipairs(test_index) do
+    -- key 0 is the prelude block.
+    for j=0,#test_block.tests do
+      local test = test_block.tests[j]
+      local ok, res = run_single_test(test)
+      if ok then
+        pass = pass+1
+      else
+        fail = fail+1
+        failed_tests[#failed_tests+1] = test
+        errors[#errors+1] = res
+      end
+    end
+  end
+  return pass, fail, failed_tests, errors
 end
 
 return {
   parse = parse_test,
   index = index_tests,
   extract = extract_test,
+  run_single = run_single_test,
+  run = run_tests,
 }
