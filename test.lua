@@ -52,7 +52,7 @@ if fail==0 then return end
 
 iowrite("Failed tests:\n")
 for i=1,fail do
-  iowrite(string.rep("-",72),"\n")
+  iowrite("----------------------------------------------------------")
   iowrite("Name: ",failed_tests[i].name,"\n")
   iowrite("Error: ",errors[i] or "(no error message)","\n")
   iowrite("Filename: ",t.extract(failed_tests[i]),"\n")
