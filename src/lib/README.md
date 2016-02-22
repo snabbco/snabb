@@ -1,4 +1,202 @@
+## Library routines
+
+### PMU (CPU Performance Monitoring Unit) (lib.pmu)
+
+This module counts and reports on CPU events such as cache misses,
+branch mispredictions, utilization of internal CPU resources such
+as execution units, and so on.
+
+Hundreds of low-level counters are available. The exact list
+depends on CPU model. See pmu_cpu.lua for our definitions.
+
+API:
+
+```
+profile(fn[, event_list, aux]) => value [and print report]
+  Execute 'fn' and print a measurement report for event_list.
+  This is a simple convenience function over the API below.
+
+measure(fn[, event_list]) => result, table {counter->value}
+  Execute 'fn' and return the event counters as a second value.
+  This is a convenience similar to profile().
+
+is_available() => true | false, why
+  Return true if hardware performance counters are available.
+  Otherwise return false with a string briefly explaining why.
+
+setup(event_list)
+  Setup the hardware performance counters to track a given list of
+  events (in addition to the built-in fixed-function counters).
+  
+  Each event is a Lua string pattern. This could be a full event name:
+    'mem_load_uops_retired.l1_hit'
+  or a more general pattern that matches several counters:
+    'mem_load.*l._hit'
+
+  Return the number of overflowed counters that could not be
+  tracked due to hardware constraints. These will be the last
+  counters in the list.
+
+  Example:
+    setup({"uops_issued.any",
+           "uops_retired.all",
+           "br_inst_retired.conditional",
+           "br_misp_retired.all_branches"}) => 0
+
+new_counter_set()
+  Return a "counter_set" object that can be used for accumulating events.
+
+  The counter_set will be valid only until the next call to setup().
+
+switch_to(counter_set)
+  Switch_To to a new set of counters to accumulate events in. Has the
+  side-effect of committing the current accumulators to the
+  previous record.
+
+  If counter_set is nil then do not accumulate events.
+
+to_table(counter_set) => table {eventname = count}
+  Return a table containing the values accumulated in the counter set.
+
+Example:
+  to_table(cs) =>
+    {
+     -- Fixed-function counters
+     instructions                 = 133973703,
+     cycles                       = 663011188,
+     ref-cycles                   = 664029720,
+     -- General purpose counters selected with setup()
+     uops_issued.any              = 106860997,
+     uops_retired.all             = 106844204,
+     br_inst_retired.conditional  =  26702830,
+     br_misp_retired.all_branches =       419
+    }
+
+report(counter_set,  aux)
+  Print a textual report on the values accumulated in a counter set.
+  Optionally include auxiliary application-level counters. The
+  ratio of each event to each auxiliary counter is also reported.
+
+  Example:
+    report(my_counter_set, {packet = 26700000, breath = 208593})
+  prints output approximately like:
+    EVENT                                   TOTAL     /packet     /breath
+    instructions                      133,973,703       5.000     642.000
+    cycles                            663,011,188      24.000    3178.000
+    ref-cycles                        664,029,720      24.000    3183.000
+    uops_issued.any                   106,860,997       4.000     512.000
+    uops_retired.all                  106,844,204       4.000     512.000
+    br_inst_retired.conditional        26,702,830       1.000     128.000
+    br_misp_retired.all_branches              419       0.000       0.000
+    packet                             26,700,000       1.000     128.000
+    breath                                208,593       0.008       1.000
+```
+
+### Checksum calculation (lib.checksum)
+
+```
+This module exposes the interface:
+  checksum.ipsum(pointer, length, initial) => checksum
+
+pointer is a pointer to an array of data to be checksummed. initial
+is an unsigned 16-bit number in host byte order which is used as
+the starting value of the accumulator.  The result is the IP
+checksum over the data in host byte order.
+
+The initial argument can be used to verify a checksum or to
+calculate the checksum in an incremental manner over chunks of
+memory.  The synopsis to check whether the checksum over a block of
+data is equal to a given value is the following
+
+ if ipsum(pointer, length, value) == 0 then
+   -- checksum correct
+ else
+   -- checksum incorrect
+ end
+
+To chain the calculation of checksums over multiple blocks of data
+together to obtain the overall checksum, one needs to pass the
+one's complement of the checksum of one block as initial value to
+the call of ipsum() for the following block, e.g.
+
+ local sum1 = ipsum(data1, length1, 0)
+ local total_sum = ipsum(data2, length2, bit.bnot(sum1))
+
+The actual implementation is chosen based on running CPU.
+```
+
+### Mac addresses (lib.macaddress)
+
+```
+ MAC address handling object.
+depends on LuaJIT's 64-bit capabilities,
+both for numbers and bit.* library
+```
+
+### JSON encode/decode (lib.json)
+
+```
+function decode(s, startPos):
+
+Decodes a JSON string and returns the decoded value as a Lua data structure / value.
+
+@param s The string to scan.
+@param [startPos] Optional starting position where the JSON string is located. Defaults to 1.
+@param Lua object, number The object that was scanned, as a Lua table / string / number / boolean or nil,
+and the position of the first character after
+the scanned JSON object.
+```
+
 ## Specialized data structures
+
+
+ filter (lib.bloom_filter)
+
+```
+Given the expected number of items n to be stored in the filter and
+the maxium acceptable false-positive rate p when the filter
+contains that number of items, the size m of the storage cell in
+bits and the number k of hash calculations are determined by
+
+ m = -n ln(p)/ln(2)^2
+ k = m/n ln(2) = -ln(p)/ln(2)
+
+According to
+<http://www.eecs.harvard.edu/~kirsch/pubs/bbbf/esa06.pdf>, the k
+independent hash functions can be replaced by two h1, h2 and the
+"linear combinations" h[i] = h1 + i*h2 (i=1..k) without changing
+the statistics of the filter.  Furthermore, h1 and h2 can be
+derived from the same hash function using double hashing or seeded
+hashing.  This implementation requires the "x64_128" variant of the
+Murmur hash family provided by lib.hash.murmur.
+
+Storing a sequence of bytes of length l in the filter proceeds as
+follows.  First, the hash function is applied to the data with seed
+value 0.
+
+ h1 = hash(data, l, 0)
+
+In this pseudo-code, h1 represents the lower 64 bits of the actual
+hash.  The second hash is obtained by using h1 as seed
+
+ h2 = hash(data, l, h1)
+
+Finally, k values in the range [0, m-1] are calculated as
+
+ k_i = (h1 + i*h2) % m
+
+In order to be able to implement the mod m operation using bitops,
+m is rounded up to the next power of 2.  In that case, the k_i can
+be calculated efficiently by
+
+ k_i = bit.band(h1 + i*h2, m-1)
+
+The values k_i represent the original data.  Such a set of values
+is called an *item*.  The actual filter consists of a data
+structure that stores one bit for each of the m elements in the
+filter, called a *cell*.  To store an item in a cell, the bits at
+the positions given by the values k_i are set to one.
+```
 
 ### Ctable (lib.ctable)
 
