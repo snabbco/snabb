@@ -5,9 +5,10 @@ the upstream to communicate clearly if there are any issues preventing your PR
 from being merged, and how they can be fixed. Once merged, the upstream will
 add the `merged` label to your PR.
 
-You can also submit PRs that are not ready to be merged: include the labels
-`[wip]` in the title of PRs that require further work, and `[sketch]` for PRs
-that are not meant to be merged at all.
+You are also welcome to submit PRs you would like to receive feedback on, but
+which are not ready to be merged: include the labels `[wip]` in the title of
+PRs that require further work, and `[sketch]` for PRs that are not meant to be
+merged at all.
 
 Please cross reference related issues and PRs extensively by mentioning them in
 descriptions or comments (#XXX), as it helps maintainers to read up on related
