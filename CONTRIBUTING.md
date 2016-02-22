@@ -10,10 +10,6 @@ which are not ready to be merged: include the labels `[wip]` in the title of
 PRs that require further work, and `[sketch]` for PRs that are not meant to be
 merged at all.
 
-Please cross reference related issues and PRs extensively by mentioning them in
-descriptions or comments (#XXX), as it helps maintainers to read up on related
-information.
-
 Our [Documentation Guide](https://github.com/SnabbCo/snabbswitch/blob/master/src/doc/documentation-guide.md)
 gives pointers on how to contribute to the project's documentation.
 
