@@ -14,6 +14,7 @@ local link = require("core.link")
 local lib = require("core.lib")
 local packet = require("core.packet")
 local config = require("core.config")
+local counter = require("core.counter")
 
 local macaddress = require("lib.macaddress")
 
@@ -166,7 +167,13 @@ function SimpleKeyedTunnel:new (arg)
       header = header,
       remote_address = remote_address,
       local_address = local_address,
-      remote_cookie = remote_cookie[0]
+      remote_cookie = remote_cookie[0],
+      -- Counters:
+      drop_bad_length = counter.open('drop_bad_length'),
+      drop_bad_protocol = counter.open('drop_bad_protocol'),
+      drop_bad_cookie = counter.open('drop_bad_cookie'),
+      drop_bad_remote_address = counter.open('drop_bad_remote_address'),
+      drop_bad_local_address = counter.open('drop_bad_local_address')
    }
 
    return setmetatable(o, {__index = SimpleKeyedTunnel})
@@ -196,15 +203,18 @@ function SimpleKeyedTunnel:push()
       local drop = true
       repeat
          if p.length < HEADER_SIZE then
+            counter.add(self.drop_bad_length)
             break
          end
          local next_header = ffi.cast(next_header_ctype, p.data + NEXT_HEADER_OFFSET)
          if next_header[0] ~= L2TPV3_NEXT_HEADER then
+            counter.add(self.drop_bad_protocol)
             break
          end
 
          local cookie = ffi.cast(pcookie_ctype, p.data + COOKIE_OFFSET)
          if cookie[0] ~= self.remote_cookie then
+            counter.add(self.drop_bad_cookie)
             break
          end
 
@@ -212,6 +222,7 @@ function SimpleKeyedTunnel:push()
          if remote_address[0] ~= self.remote_address[0] or
             remote_address[1] ~= self.remote_address[1]
          then
+            counter.add(self.drop_bad_remote_address)
             break
          end
 
@@ -219,6 +230,7 @@ function SimpleKeyedTunnel:push()
          if local_address[0] ~= self.local_address[0] or
             local_address[1] ~= self.local_address[1]
          then
+            counter.add(self.drop_bad_local_address)
             break
          end
 
