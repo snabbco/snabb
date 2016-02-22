@@ -3,7 +3,6 @@ local ffi = require("ffi")
 local header = require("lib.protocol.header")
 local lib = require("core.lib")
 local ntohl, htonl = lib.ntohl, lib.htonl
-local ntohll, htonll = lib.ntohll, lib.htonll
 
 local esp = subClass(header)
 
@@ -14,7 +13,7 @@ esp:init(
       [1] = ffi.typeof[[
             struct {
                uint32_t spi;
-               uint64_t seq_no;
+               uint32_t seq_no;
             } __attribute__((packed))
       ]]
    })
@@ -42,9 +41,9 @@ end
 function esp:seq_no (seq_no)
    local h = self:header()
    if seq_no ~= nil then
-      h.seq_no = htonll(seq_no)
+      h.seq_no = htonl(seq_no)
    else
-      return(ntohll(h.seq_no))
+      return(ntohl(h.seq_no))
    end
 end
 
