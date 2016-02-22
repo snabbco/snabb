@@ -15,4 +15,3 @@ obj
 /src/syscall
 /deps/*.vsn
 /src/programs.inc
-/lib/luajit/usr
