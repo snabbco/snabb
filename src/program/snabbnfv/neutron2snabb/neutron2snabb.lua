@@ -242,7 +242,7 @@ end
 function selftest ()
    print("selftest: neutron2snabb")
    local function checkrule (rule, filter)
-      local got = rulestofilter(lib.load_string(rule)(), 'ingress')
+      local got = rulestofilter(lib.load_string(rule), 'ingress')
       if got ~= filter then
          print(([[Unexpected translation of %s"
   Expected: %q
