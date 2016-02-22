@@ -1,4 +1,0 @@
-#./mklisper
-export LISP_N=02
-./lisp stop
-./lisper stop

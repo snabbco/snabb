@@ -2,6 +2,7 @@ LUASRC = $(wildcard src/lua/*.lua)
 LUAOBJ = $(LUASRC:.lua=.o)
 CSRC   = $(wildcard src/c/*.c)
 COBJ   = $(CSRC:.c=.o)
+PREFIX = /usr/local
 
 LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h
 
@@ -25,7 +26,7 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	cd src && $(MAKE)
 
 install: all
-	install -D src/snabb ${PREFIX}/usr/local/bin/snabb
+	install -D src/snabb ${DESTDIR}${PREFIX}/bin/snabb
 
 clean:
 	(cd lib/luajit && $(MAKE) clean)

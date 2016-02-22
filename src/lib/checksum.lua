@@ -33,7 +33,7 @@ require("lib.checksum_h")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
-local band = bit.band
+local band, lshift = bit.band, bit.lshift
 
 -- Select ipsum(pointer, len, initial) function based on hardware
 -- capability.
@@ -66,6 +66,61 @@ function verify_packet (buf, len)
    end
 
    return ipsum(buf+headersize, len-headersize, initial) == 0
+end
+
+local function prepare_packet_l4 (buf, len, csum_start, csum_off)
+
+  local hwbuf =  ffi.cast('uint16_t*', buf)
+
+  local pheader = C.pseudo_header_initial(buf, len)
+  if band(pheader, 0xFFFF0000) == 0 then
+    hwbuf[(csum_start+csum_off)/2] = C.htons(band(pheader, 0x0000FFFF))
+  else
+    csum_start, csum_off = nil, nil
+  end
+
+  return csum_start, csum_off
+end
+
+function prepare_packet4 (buf, len)
+
+  local hwbuf =  ffi.cast('uint16_t*', buf)
+  local proto = buf[9];
+
+  local csum_start = lshift(band(buf[0], 0x0F),2)
+  local csum_off
+
+  -- Update the IPv4 checksum (use in-place pseudoheader, by setting it to 0)
+  hwbuf[5] = 0;
+  hwbuf[5] = C.htons(ipsum(buf, csum_start, 0));
+
+  -- TCP
+  if proto == 6 then
+    csum_off = 16
+  -- UDP
+  elseif proto == 17 then
+    csum_off = 6
+  end
+
+  return prepare_packet_l4( buf, len, csum_start, csum_off)
+end
+
+function prepare_packet6 (buf, len)
+  local hwbuf =  ffi.cast('uint16_t*', buf)
+  local proto = buf[6];
+
+  local csum_start = 40
+  local csum_off
+
+  -- TCP
+  if proto == 6 then
+    csum_off = 16
+  -- UDP
+  elseif proto == 17 then
+    csum_off = 6
+  end
+
+  return prepare_packet_l4( buf, len, csum_start, csum_off)
 end
 
 -- See checksum.h for more utility functions that can be added.

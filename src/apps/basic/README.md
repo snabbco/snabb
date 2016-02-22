@@ -5,9 +5,9 @@ functionality for use in you app networks.
 
 ## Source
 
-The `Source` app is a synthetic packet generator. On each breath it
-outputs 1,000 new packets to each attached output port. The packet
-data is uninitialized garbage and each packet is 60 bytes long.
+The `Source` app is a synthetic packet generator. On each breath it fills
+each attached output link with new packets. The packet data is
+uninitialized garbage and each packet is 60 bytes long.
 
 ![Source](.images/Source.png)
 

@@ -1,122 +1,119 @@
+module(..., package.seeall)
 
---TAP I/O app: send and receive data through a TAP device.
---A TAP is a virtual ethernet device whose "wire" can be implemented 
---in userspace. On one hand, A TAP presents itself to the kernel as a normal 
---ethernet interface which can be assigned an IP address and connected to 
---via socket APIs. On the other hand it is assigned a device file which 
---can be written to and read from to implement its wire. This app opens up 
---that device file for I/O.
-
-module(...,package.seeall)
-
-local ffi    = require("ffi")
-local link   = require("core.link")
+local S = require("syscall")
+local link = require("core.link")
 local packet = require("core.packet")
-local S      = require("syscall")
-local C      = ffi.C
+local ffi = require("ffi")
+local C = ffi.C
+local const = require("syscall.linux.constants")
+local os = require("os")
 
-ffi.cdef'int open_tap(const char *name);'
+local t = S.types.t
 
-TAP = {}
-TAP.__index = TAP
+Tap = { }
 
-function TAP:new (name)
-
-   name = name or "" --empty string means create a temporary device
-   assert(type(name) == "string", "interface name expected")
-
-   local fd = C.open_tap(name) 
-   assert(fd >= 0, "failed to openm TAP interface")
-      
-   local function can_receive()
-      return assert(S.select({readfds = {fd}}, 0)).count == 1
+function Tap:new (name)
+   assert(name, "missing tap interface name")
+   
+   local sock, err = S.open("/dev/net/tun", "rdwr, nonblock");
+   assert(sock, "Error opening /dev/net/tun: " .. tostring(err))
+   local ifr = t.ifreq()
+   ifr.flags = "tap, no_pi"
+   ifr.name = name
+   local ok, err = sock:ioctl("TUNSETIFF", ifr)
+   if not ok then
+      S.close(sock)
+      error("Error opening /dev/net/tun: " .. tostring(err))
    end
+   
+   return setmetatable({sock = sock, name = name}, {__index = Tap})
+end
 
-   local function can_send()
-      return assert(S.select({writefds = {fd}}, 0)).count == 1
-   end
-
-   local function receive()
+function Tap:pull ()
+   local l = self.output.output
+   if l == nil then return end
+   while not link.full(l) do
       local p = packet.allocate()
-      local maxsz = ffi.sizeof(p.data)
-      local len, err = S.read(fd, p.data, maxsz)
-      if len == 0 then return end
+      local len, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
+      -- errno == EAGAIN indicates that the read would of blocked as there is no 
+      -- packet waiting. It is not a failure.
+      if not len and err.errno == const.E.AGAIN then 
+         packet.free(p)
+         return
+      end
       if not len then
-         assert(nil, err)
+         packet.free(p)
+         error("Failed read on " .. self.name .. ": " .. tostring(err))
       end
       p.length = len
-      return p
+      link.transmit(l, p)
    end
-
-   local function send(p)
-		assert(S.write(fd, p.data, p.length))
-   end
-
-   --app object
-
-   local self = setmetatable({}, self)
-
-   function self:pull()
-      local l = self.output.tx
-      if l == nil then return end
-      while not link.full(l) and can_receive() do
-         local p = receive()
-         if p then
-            link.transmit(l, p) --link owns p now so we mustn't free it
-         end
-      end
-   end
-
-   function self:push()
-      local l = self.input.rx
-      if l == nil then return end
-      while not link.empty(l) and can_send() do
-         local p = link.receive(l) --we own p now so we must free it
-			send(p)
-         packet.free(p)
-      end
-   end
-
-   function self:stop()
-      S.close(fd)
-   end
-
-   return self
 end
 
-
-function selftest ()
-
-   local function hexdump(s)
-      return (s:gsub(".", function(c) 
-         return string.format("%02x ", c:byte())
-      end))
+function Tap:push ()
+   local l = self.input.input
+   while not link.empty(l) do
+      -- The socket write might of blocked so don't dequeue the packet from the link
+      -- until the write has completed.
+      local p = link.front(l)
+      local len, err = S.write(self.sock, p.data, p.length)
+      -- errno == EAGAIN indicates that the write would of blocked
+      if not len and err.errno ~= const.E.AGAIN or len and len ~= p.length then
+         error("Failed write on " .. self.name .. tostring(err))
+      end
+      if len ~= p.length and err.errno == const.E.AGAIN then
+         return
+      end
+      -- The write completed so dequeue it from the link and free the packet
+      link.receive(l)
+      packet.free(p)
    end
+end
 
-   local printapp = {}
-   function printapp:new (name)
-      return {
-         push = function(self)
-            local l = self.input.rx
-            if l == nil then return end
-            while not link.empty(l) do
-               local p = link.receive(l)
-               print(hexdump(ffi.string(p.data, p.length)))
-               packet.free(p)
+function Tap:stop()
+   S.close(self.sock)
+end
+
+function selftest()
+   -- tapsrc and tapdst are bridged together in linux. Packets are sent out of tapsrc and they are expected
+   -- to arrive back on tapdst. Linux may create other control-plane packets so to avoid races if a packet doesn't
+   -- match the one we just sent keep looking until it does match. 
+
+   -- The linux bridge does mac address learning so some care must be taken with the preparation of selftest.cap
+   -- A mac address should appear only as the source address or destination address
+
+   -- This test should only be run from inside apps/tap/selftest.sh
+   if not os.getenv("SNABB_TAPTEST") then os.exit(engine.test_skipped_code) end
+   local pcap = require("lib.pcap.pcap")
+   local tapsrc = Tap:new("tapsrc")
+   local tapdst = Tap:new("tapdst")
+   local linksrc = link.new("linksrc")
+   local linkreturn = link.new("linkreturn")
+   tapsrc.input = { input = linksrc }
+   tapdst.output = { output = linkreturn }
+   local records = pcap.records("apps/tap/selftest.cap")
+   local i = 0
+   repeat
+         i = i + 1
+         local data, record, extra = records()
+         if data then
+            local p = packet.from_string(data)
+            link.transmit(linksrc, packet.clone(p))
+            tapsrc:push()
+            while true do
+               local ok, err = S.select({readfds = {tapdst.sock}}, 10)
+               if err then error("Select error: " .. tostring(err)) end
+               if ok.count == 0 then error("select timed out or packet " .. tostring(i) .. " didn't match") end
+
+               tapdst:pull()
+               local pret = link.receive(linkreturn)
+               if packet.length(pret) == packet.length(p) and C.memcmp(packet.data(pret), packet.data(p), packet.length(pret)) then
+                  packet.free(pret)
+                  break
+               end
+               packet.free(pret)
             end
+            packet.free(p)
          end
-      }
-   end
-
-   local tap = "tap0"
-   local c = config.new()
-   config.app(c,  "tap", TAP, tap)
-   config.app(c,  "print", printapp, tap)
-   config.link(c, "tap.tx -> print.rx")
-   engine.configure(c)
-   print("type `tunctl & ifconfig tap0 up` to create and activate tap0")
-   print("and then ping "..tap.." to see the ethernet frames rolling.")
-   engine.main()
-   
+   until not data
 end
-

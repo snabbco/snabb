@@ -271,7 +271,7 @@ local punted = {} --{smac -> {dmac -> expire_time}}
 local function punt_mac(smac, dmac, ifname)
    local t = punted[smac]
 	local exp = t and t[dmac]
-	if exp and < os.time() + conf.arp_timeout then return end
+	if exp and exp < os.time() + conf.arp_timeout then return end
    table.insert(punt, {smac = smac, dmac = dmac, ifname = ifname})
 	if not t then
 		t = {}

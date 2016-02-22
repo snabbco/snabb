@@ -107,7 +107,7 @@ end
 
 -- Load Lua value from string.
 function load_string (string)
-   return loadstring("return "..string)
+   return loadstring("return "..string)()
 end
 
 -- Read a Lua conf from file and return value.
@@ -197,7 +197,7 @@ end
 function hexundump(h, n)
    local buf = ffi.new('char[?]', n)
    local i = 0
-   for b in h:gmatch('[0-9a-fA-F][0-9a-fA-F]') do
+   for b in h:gmatch('%x%x') do
       buf[i] = tonumber(b, 16)
       i = i+1
       if i >= n then break end
@@ -690,12 +690,22 @@ function getenv (name)
    else return nil end
 end
 
+-- Compiler barrier.
+-- Prevents LuaJIT from moving load/store operations over this call.
+-- Any FFI call is sufficient to achieve this, see:
+-- http://www.freelists.org/post/luajit/Compiler-loadstore-barrier-volatile-pointer-barriers-in-general,3
+function compiler_barrier ()
+   C.nop()
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")
    assert(true == equal({foo="bar"}, {foo="bar"}))
    assert(false == equal({foo="bar"}, {foo="bar", baz="foo"}))
    assert(false == equal({foo="bar", baz="foo"}, {foo="bar"}))
+   print("Testing load_string")
+   assert(equal(load_string("{1,2}"), {1,2}), "load_string failed.")
    print("Testing load/store_conf")
    local conf = { foo="1", bar=42, arr={2,"foo",4}}
    local testpath = "/tmp/snabb_lib_test_conf"

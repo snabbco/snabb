@@ -52,7 +52,7 @@ function vpws:new(arg)
    -- overwrites the Ethernet header (e.g. the nd_light app)
    -- accordinly.
    o._encap.ether = ethernet:new({ src = conf.local_mac,
-                                   dst = conf.remote_mac or ethernet:pton('00:00:00:00:00:00'),
+                                   dst = conf.remote_mac or ethernet:pton('02:00:00:00:00:00'),
                                    type = 0x86dd })
    -- Pre-computed size of combined Ethernet and IPv6 header
    o._eth_ipv6_size = ethernet:sizeof() + ipv6:sizeof()

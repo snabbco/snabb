@@ -20,5 +20,5 @@ Params:
   lisper      : 
 LEARN: [1] 000000-000101 <- type: l2tpv3, ip: fd80::22, session_id: 0x0001, cookie: 0
 LEARN: [1] 000000-000102 <- type: l2tpv3, ip: fd80::22, session_id: 0x0001, cookie: 0
-PUNT: {"eid-prefix" : "0000-0000-0102", "interface" : "e0"}
-PUNT: {"eid-prefix" : "0000-0000-0101", "interface" : "e0"}
+PUNT: {"source-eid" : "0000-0000-0102", "dest-eid" : "0000-0000-0101", "interface" : "e0"}
+PUNT: {"source-eid" : "0000-0000-0101", "dest-eid" : "0000-0000-0102", "interface" : "e0"}

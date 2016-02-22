@@ -1,0 +1,10 @@
+#!/bin/bash
+set -e 
+
+[ ! -z "$SNABB_PCI_INTEL0" ] || exit 1
+
+out=$(./snabb packetblaster synth --src 11:11:11:11:11:11 --dst 22:22:22:22:22:22 --sizes 64 --duration 1 \
+    "$SNABB_PCI_INTEL0")
+# Extract floating point Mpps number from output.
+pps=$(echo "$out" | grep TXDGPC | cut -f 3 | sed s/,//g)
+echo "scale=2; $pps / 1000000" | bc
