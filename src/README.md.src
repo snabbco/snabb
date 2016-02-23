@@ -373,7 +373,7 @@ Returns a pointer to *bytes* of new DMA memory.
 
 Returns the physical address (`uint64_t`) the DMA memory at *pointer*.
 
-— Variable **memory.huge_page_size** [**DEPRECATED**]
+— Variable **memory.huge_page_size**
 
 Size of a single huge page in bytes. Read-only.
 
