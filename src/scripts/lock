@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+if [ "$1" == "--help" -o "$1" == "-h" ]; then
+    cat >&2 <<EOF
+Lock a Snabb lab server for mutually-exclusive use.
+
+Usage:
+  $0 command...
+    Run a command with the lock held.
+  $0
+    Start an interactive shell with the lock held.
+    Uses TMOUT to set a 1h idle timeout.
+EOF
+    exit 1
+fi
+
+lock=/var/lock/lab
+
+echo -n "locking $lock.. ">&2
+(flock --verbose 9 || exit 1
+ if [ $# == 0 ]; then
+     echo "starting shell 1h idle timeout"
+     TMOUT=60 ${SHELL} -i
+ else
+     "$@"
+ fi
+) 9>/var/lock/lab
+
+
