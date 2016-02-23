@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Neutron synchronization master process to run on the Network Node.
 
