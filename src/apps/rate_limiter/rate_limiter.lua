@@ -49,8 +49,8 @@ end
 function RateLimiter:get_stat_snapshot ()
    return
    {
-      rx = self.input.input.stats.txpackets,
-      tx = self.output.output.stats.txpackets,
+      rx = link.stats(self.input.input).txpackets,
+      tx = link.stats(self.output.output).txpackets,
       time = tonumber(C.get_time_ns()),
    }
 end
@@ -87,7 +87,7 @@ end
 local function compute_effective_rate (rl, rate, snapshot)
    local elapsed_time =
       (tonumber(C.get_time_ns()) - snapshot.time) / 1e9
-   local tx = tonumber(rl.output.output.stats.txpackets - snapshot.tx)
+   local tx = link.stats(rl.output.output).txpackets - snapshot.tx
    return floor(tx * PACKET_SIZE / elapsed_time)
 end
 
@@ -194,7 +194,7 @@ function selftest ()
          (tonumber(C.get_time_ns()) - snapshot.time) / 1e9
       print("elapsed time ", elapsed_time, "seconds")
 
-      local rx = tonumber(rl.input.input.stats.txpackets - snapshot.rx)
+      local rx = link.stats(rl.input.input).txpackets - snapshot.rx
       print("packets received", rx, floor(rx / elapsed_time / 1e6), "Mpps")
 
       effective_rate_busy_loop = compute_effective_rate(

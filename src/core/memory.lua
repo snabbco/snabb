@@ -19,10 +19,6 @@ require("core.memory_h")
 -- The last element is used to service new DMA allocations.
 chunks = {}
 
--- Lowest and highest addresses of valid DMA memory.
--- (Useful information for creating memory maps.)
-dma_min_addr, dma_max_addr = false, false
-
 -- Allocate DMA-friendly memory.
 -- Return virtual memory pointer, physical address, and actual size.
 function dma_alloc (bytes)
@@ -47,9 +43,6 @@ function allocate_next_chunk ()
                            physical = mem_phy,
                            size = huge_page_size,
                            used = 0 }
-   local addr = tonumber(ffi.cast("uint64_t",ptr))
-   dma_min_addr = math.min(dma_min_addr or addr, addr)
-   dma_max_addr = math.max(dma_max_addr or 0, addr + huge_page_size)
 end
 
 --- ### HugeTLB: Allocate contiguous memory in bulk from Linux

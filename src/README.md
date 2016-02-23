@@ -172,8 +172,15 @@ variable.
 
 — Function **engine.configure** *config*
 
-Configure the engine to use a new config *config*.
+Configure the engine to use a new config *config*. You can safely call
+this method many times to incrementally update the running app
+network. The engine updates the app network as follows:
 
+ * Apps that did not exist in the old configuration are started.
+ * Apps that do not exist in the new configuration are stopped. (The app `stop()` method is called if defined.)
+ * Apps with unchanged configurations are preserved.
+ * Apps with changed configurations are updated by calling their `reconfig()` method. If the `reconfig()` method is not implemented then the old instance is stopped a new one started.
+ * Links with unchanged endpoints are preserved.
 
 — Function **engine.main** *options*
 
@@ -350,13 +357,6 @@ represented by a table with the following keys:
 * `physical` - Physical address
 * `size` -  Size in bytes
 * `used` - Bytes used
-
-— Variable **memory.dma_min_addr**
-
-— Variable **memory.dma_max_addr**
-
-Lowest and highest addresses of valid DMA memory. Useful information for
-creating memory maps. Read-only.
 
 — Variable **memory.huge_page_size**
 

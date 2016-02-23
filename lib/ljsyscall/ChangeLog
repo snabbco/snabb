@@ -1,0 +1,101 @@
+    unreleased
++ OSX time functions
++ OSX Mach types
++ arm64 support
++ OpenBSD 5.6 and 5.7 support
++ ppc64le support, by Gustavo Serra Scalet
++ mipsel support
+
+    0.10 release
+
++ Additional ioctls
++ FreeBSD 9 support
++ Linux MIPS now fully supported
++ more timer, clock and signal functions for BSDs.
++ error message fixes
++ FreeBSD, OSX extended attribute support
++ Linux PPC fixes
++ Luafilesystem compatibility module
++ New rockspecs for stable version, thanks to Hisham
++ Add remap_file_pages, thanks to Brian Downing
++ Add getpagesize
++ All syscalls now direct not via libc on Linux
++ OpenBSD support (5.4 and 5.5), thanks to tedu
++ sysctl support
++ timer_* syscall support
++ time functions for rump kernel
++ fix backtraces on error
++ improved tests for OS versions
++ add recvmmsg, sendmmsg
+
+    0.9 release
+
++ Bug fixes and better tests
++ Reworking of how methods are called
++ More NetBSD support
++ termios interface rework
++ improved ioctl that understands type and direction of arguments
++ More NetBSD network config
++ Rump kernel Linux ABI support
++ Full Linux ppc support, endian fixes
++ Android fixes
++ Xen support
++ kqueue, poll and epoll interface improvements
++ additional syscalls
++ luaffi supported again
++ Better kernel headers and fixes against them
++ More Linux MIPS support
++ Improved APIs with multiple return values
++ Initial NetBSD ktrace support
++ FreeBSD support
++ More OSX support
++ Sharing of common BSD code.
+
+    0.8 release
+
++ Rump kernel fixes
++ NetBSD 64 bit fixes
++ Initial arp/neighbour support
++ Work towards MIPS support
++ Cmsg cleanup, shm_open, iterators for directory iteration and ls
++ More OSX and NetBSD support
++ Initial cgroups support
++ Initial support of NetBSD network config.
+
+    0.7 release
+
++ Bug fixes, general cleanups
++ Filesystem capabilities, xattr bug fixes, signal handler functions, cpu affinity support, scheduler functions, POSIX message queues, tun/tap support, ioctl additions and improvements
++ Initial NetBSD and OSX support
++ Initial NetBSD rump kernel support
++ Some fixes to allow Android to work.
+
+    0.6 release
+
++ Add support for raw sockets, BPF, seccomp mode 2 (syscall filtering), capabilities
++ feature tests
++ bug fixes
+
+    0.5 release
+
++ Add support for ppc
++ Some bug fixes for 64 bit file handling on 32 bit architectures
++ Better organisation of files
+
+   0.4 release
+
++ Works well with LuaJIT 2.0.0 and has had extensive testing.
++ Somewhat modular code now, which makes it easier to use and understand.
+
+    0.3 release
+
++ The last release to work with luaffi.
+
+    0.2 release
+
++ Work in progress release.
+
+    0.1 release
+
++ Very early prototype.
+

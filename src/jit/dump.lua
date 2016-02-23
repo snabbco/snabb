@@ -1,1 +1,1 @@
-../../deps/luajit/src/jit/dump.lua
+../../lib/luajit/src/jit/dump.lua

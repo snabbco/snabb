@@ -3,21 +3,22 @@ local ffi = require("ffi")
 local C = ffi.C
 local bitfield = require("core.lib").bitfield
 local nd_header = require("lib.protocol.icmp.nd.header")
+local proto_header = require("lib.protocol.header")
 
 local na = subClass(nd_header)
 
-local na_t = ffi.typeof[[
-      struct {
-         uint32_t flags;
-         uint8_t  target[16];
-      } __attribute__((packed))
-]]
-
 -- Class variables
 na._name = "neighbor advertisement"
-na._header_type = na_t
-na._header_ptr_type = ffi.typeof("$*", na_t)
 na._ulp = { method = nil }
+proto_header.init(na,
+                  {
+                     [1] = ffi.typeof[[
+                           struct {
+                              uint32_t flags;
+                              uint8_t  target[16];
+                           } __attribute__((packed))
+                     ]]
+                  })
 
 -- Class methods
 

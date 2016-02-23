@@ -52,7 +52,7 @@ function vpws:new(arg)
    -- overwrites the Ethernet header (e.g. the nd_light app)
    -- accordinly.
    o._encap.ether = ethernet:new({ src = conf.local_mac,
-                                   dst = conf.remote_mac or ethernet:pton('00:00:00:00:00:00'),
+                                   dst = conf.remote_mac or ethernet:pton('02:00:00:00:00:00'),
                                    type = 0x86dd })
    -- Pre-computed size of combined Ethernet and IPv6 header
    o._eth_ipv6_size = ethernet:sizeof() + ipv6:sizeof()
@@ -72,7 +72,7 @@ function vpws:push()
       assert(l_out)
       while not link.full(l_out) and not link.empty(l_in) do
          local p = link.receive(l_in)
-         local datagram = self._dgram:reuse(p, ethernet)
+         local datagram = self._dgram:new(p, ethernet)
          if port_in == 'customer' then
             local encap = self._encap
             -- Encapsulate Ethernet frame coming in on customer port

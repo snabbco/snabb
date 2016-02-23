@@ -7,6 +7,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local timer = require("core.timer")
 local pci = require("lib.hardware.pci")
+local counter = require("core.counter")
 
 local long_opts = {
    benchmark     = "B",
@@ -14,6 +15,7 @@ local long_opts = {
    ["link-report-interval"] = "k",
    ["load-report-interval"] = "l",
    ["debug-report-interval"] = "D",
+   ["busy"] = "b",
    ["long-help"] = "H"
 }
 
@@ -29,7 +31,8 @@ function run (args)
    function opt.k (arg) linkreportinterval = tonumber(arg) end
    function opt.l (arg) loadreportinterval = tonumber(arg) end
    function opt.D (arg) debugreportinterval = tonumber(arg) end
-   args = lib.dogetopt(args, opt, "hHB:k:l:D:", long_opts)
+   function opt.b (arg) engine.busywait = true              end
+   args = lib.dogetopt(args, opt, "hHB:k:l:D:b", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
       local ok, info = pcall(pci.device_info, pciaddr)
@@ -75,6 +78,9 @@ function long_usage () return usage end
 function traffic (pciaddr, confpath, sockpath)
    engine.log = true
    local mtime = 0
+   if C.stat_mtime(confpath) == 0 then
+      print(("WARNING: File '%s' does not exist."):format(confpath))
+   end
    while true do
       local mtime2 = C.stat_mtime(confpath)
       if mtime2 ~= mtime then
@@ -102,10 +108,11 @@ function bench (pciaddr, confpath, sockpath, npackets)
    -- From designs/nfv
    local start, packets, bytes = 0, 0, 0
    local done = function ()
-      if start == 0 and engine.app_table[nic].input.rx.stats.rxpackets > 0 then
+      local input = link.stats(engine.app_table[nic].input.rx)
+      if start == 0 and input.rxpackets > 0 then
          -- started receiving, record time and packet count
-         packets = engine.app_table[nic].input.rx.stats.rxpackets
-         bytes = engine.app_table[nic].input.rx.stats.rxbytes
+         packets = input.rxpackets
+         bytes = input.rxbytes
          start = C.get_monotonic_time()
          if os.getenv("NFV_PROF") then
             require("jit.p").start(os.getenv("NFV_PROF"), os.getenv("NFV_PROF_FILE"))
@@ -119,19 +126,21 @@ function bench (pciaddr, confpath, sockpath, npackets)
             print("No LuaJIT dump enabled ($NFV_DUMP unset).")
          end
       end
-      return engine.app_table[nic].input.rx.stats.rxpackets - packets >= npackets
+      return input.rxpackets - packets >= npackets
    end
 
    engine.main({done = done, no_report = true})
    local finish = C.get_monotonic_time()
 
    local runtime = finish - start
-   packets = engine.app_table[nic].input.rx.stats.rxpackets - packets
-   bytes = engine.app_table[nic].input.rx.stats.rxbytes - bytes
+   local breaths = tonumber(counter.read(engine.breaths))
+   local input = link.stats(engine.app_table[nic].input.rx)
+   packets = input.rxpackets - packets
+   bytes = input.rxbytes - bytes
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (%d bytes; %.2f Gbps)"):format(packets / 1e6, runtime, bytes, bytes * 8.0 / 1e9 / runtime))
-   print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(engine.breaths), packets / engine.breaths, runtime / engine.breaths * 1e6))
+   print(("Made %s breaths: %.2f packets per breath; %.2fus per breath"):format(lib.comma_value(breaths), packets / breaths, runtime / breaths * 1e6))
    print(("Rate(Mpps):\t%.3f"):format(packets / runtime / 1e6))
    require("jit.p").stop()
 end

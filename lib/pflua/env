@@ -1,0 +1,21 @@
+#!/bin/bash
+
+function prepend {
+    local var=$1; shift
+    local sep=$1; shift
+    local i; for i in "$@"; do
+        if test -z "${!var}"; then
+            export "$var=$i"
+        else
+            export "$var=$i$sep${!var}"
+        fi
+    done
+}
+
+thisdir=$(cd $(dirname $0) && pwd)
+
+prepend LUA_PATH ';' "${thisdir}/tests/?.lua"
+prepend LUA_PATH ';' "${thisdir}/src/?.lua"
+prepend PATH ':' "${thisdir}/tools"
+
+exec "$@"

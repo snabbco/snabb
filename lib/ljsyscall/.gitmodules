@@ -1,0 +1,9 @@
+[submodule "include/buildrump.sh"]
+	path = include/buildrump.sh
+	url = https://github.com/rumpkernel/buildrump.sh.git
+[submodule "include/ffi-reflect"]
+	path = include/ffi-reflect
+	url = https://github.com/corsix/ffi-reflect
+[submodule "include/linux-kernel-headers"]
+	path = include/linux-kernel-headers
+	url = https://github.com/sabotage-linux/kernel-headers.git

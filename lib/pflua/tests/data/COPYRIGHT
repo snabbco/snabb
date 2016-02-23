@@ -1,0 +1,14 @@
+The following packet captures are from
+http://wiki.wireshark.org/SampleCaptures, and available under
+http://wiki.wireshark.org/License:
+
+  telnet-cooked.pcap
+  tftp_wrq.pcap
+  v4.pcap
+  v6.pcap
+
+
+The following packet captures are from http://www.igalia.com, and are
+available under the license of pflua itself:
+
+  empty.pcap

@@ -1,0 +1,41 @@
+#!/usr/bin/env luajit
+
+package.path = package.path .. ";../src/?.lua"
+
+local ffi = require("ffi")
+local pf = require("pf")
+local savefile = require("pf.savefile")
+
+local function filter(ptr, ptr_end, out, pred)
+   local seen, written = 0, 0
+   while ptr < ptr_end do
+      local record = ffi.cast("struct pcap_record *", ptr)
+      local packet = ffi.cast("unsigned char *", record + 1)
+      local ptr_next = packet + record.incl_len
+      if pred(packet, record.incl_len) then
+         out:write(ffi.string(ptr, ptr_next - ptr))
+         written = written + 1
+      end
+      seen = seen + 1
+      ptr = ptr_next
+   end
+   out:flush()
+   return seen, written
+end
+
+function main(in_file, out_file, filter_str)
+   local header, ptr, ptr_end = savefile.open_and_mmap(in_file)
+   local out = assert(io.open(out_file, 'w'))
+   out:setvbuf('full')
+   out:write(ffi.string(header, ffi.sizeof("struct pcap_file")))
+   local pred = pf.compile_filter(filter_str)
+   local seen, written = filter(ptr, ptr_end, out, pred)
+   out:close()
+   print(string.format("Filtered %d/%d packets from %s to %s.",
+                       written, seen, in_file, out_file))
+end
+
+local in_file, out_file, filter_str = ...
+assert(filter_str, "usage: pflua-filter IN.PCAP OUT.PCAP FILTER")
+
+main(in_file, out_file, filter_str)

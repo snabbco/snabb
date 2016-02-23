@@ -2,21 +2,22 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local nd_header = require("lib.protocol.icmp.nd.header")
-
-local ns_t = ffi.typeof[[
-      struct {
-         uint32_t reserved;
-         uint8_t  target[16];
-      }
-]]
+local proto_header = require("lib.protocol.header")
 
 local ns = subClass(nd_header)
 
 -- Class variables
 ns._name = "neighbor solicitation"
-ns._header_type = ns_t
-ns._header_ptr_type = ffi.typeof("$*", ns_t)
 ns._ulp = { method = nil }
+proto_header.init(ns,
+                  {
+                     [1] = ffi.typeof[[
+                           struct {
+                              uint32_t reserved;
+                              uint8_t  target[16];
+                           }
+                     ]]
+                  })
 
 -- Class methods
 

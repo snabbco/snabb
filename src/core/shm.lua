@@ -103,6 +103,16 @@ end
 -- Make directories needed for a named object.
 -- Given the name "foo/bar/baz" create /var/run/foo and /var/run/foo/bar.
 function mkdir (name)
+   -- Create root with mode "rwxrwxrwt" (R/W for all and sticky) if it
+   -- does not exist yet.
+   if not S.stat(root) then
+      local mask = S.umask(0)
+      local status, err = S.mkdir(root, "01777")
+      assert(status, ("Unable to create %s: %s"):format(
+                root, tostring(err or "unspecified error")))
+      S.umask(mask)
+   end
+   -- Create sub directories
    local dir = root
    name:gsub("([^/]+)",
              function (x) S.mkdir(dir, "rwxu")  dir = dir.."/"..x end)

@@ -2,6 +2,7 @@ module(...,package.seeall)
 
 local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
+local ffi      = require("ffi")
 local lib      = require("core.lib")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
@@ -10,6 +11,8 @@ local freelist = require("core.freelist")
 local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
 Intel82599 = {}
 Intel82599.__index = Intel82599
+
+local C = ffi.C
 
 -- The `driver' variable is used as a reference to the driver class in
 -- order to interchangably use NIC drivers.
@@ -141,10 +144,14 @@ end
 function selftest ()
    print("selftest: intel_app")
 
-   local pcideva = os.getenv("SNABB_TEST_INTEL10G_PCIDEVA")
-   local pcidevb = os.getenv("SNABB_TEST_INTEL10G_PCIDEVB")
-   if not pcideva or not pcidevb then
-      print("SNABB_TEST_INTEL10G_[PCIDEVA | PCIDEVB] was not set\nTest skipped")
+   local pcideva = lib.getenv("SNABB_PCI_INTEL0") or lib.getenv("SNABB_PCI0")
+   local pcidevb = lib.getenv("SNABB_PCI_INTEL1") or lib.getenv("SNABB_PCI1")
+   if not pcideva
+      or pci.device_info(pcideva).driver ~= 'apps.intel.intel_app'
+      or not pcidevb
+      or pci.device_info(pcidevb).driver ~= 'apps.intel.intel_app'
+   then
+      print("SNABB_PCI_INTEL[0|1]/SNABB_PCI[0|1] not set or not suitable.")
       os.exit(engine.test_skipped_code)
    end
 
@@ -156,8 +163,8 @@ function selftest ()
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
    do
-      local a0Sends = engine.app_table.nicAm0.input.rx.stats.txpackets
-      local a1Gets = engine.app_table.nicAm1.output.tx.stats.rxpackets
+      local a0Sends = link.stats(engine.app_table.nicAm0.input.rx).txpackets
+      local a1Gets = link.stats(engine.app_table.nicAm1.output.tx).rxpackets
       -- Check propertions with some modest margin for error
       if a1Gets < a0Sends * 0.45 or a1Gets > a0Sends * 0.55 then
          print("mq_sw: wrong proportion of packets passed/discarded")
@@ -165,14 +172,25 @@ function selftest ()
       end
    end
 
+   local device_info_a = pci.device_info(pcideva)
+   local device_info_b = pci.device_info(pcidevb)
+
    sq_sq(pcideva, pcidevb)
+   if device_info_a.model == pci.model["82599_T3"] or
+         device_info_b.model == pci.model["82599_T3"] then
+      -- Test experience in the lab suggests that the 82599 T3 NIC
+      -- requires at least two seconds before it will reliably pass
+      -- traffic. The test case sleeps for this reason.
+      -- See https://github.com/SnabbCo/snabbswitch/pull/569
+      C.usleep(2e6)
+   end
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
-      local aSends = engine.app_table.nicA.input.rx.stats.txpackets
-      local aGets = engine.app_table.nicA.output.tx.stats.rxpackets
-      local bSends = engine.app_table.nicB.input.rx.stats.txpackets
-      local bGets = engine.app_table.nicB.output.tx.stats.rxpackets
+      local aSends = link.stats(engine.app_table.nicA.input.rx).txpackets
+      local aGets = link.stats(engine.app_table.nicA.output.tx).rxpackets
+      local bSends = link.stats(engine.app_table.nicB.input.rx).txpackets
+      local bGets = link.stats(engine.app_table.nicB.output.tx).rxpackets
 
       if bGets < aSends/2
          or aGets < bSends/2
@@ -185,12 +203,16 @@ function selftest ()
    end
 
    mq_sq(pcideva, pcidevb)
+   if device_info_a.model == pci.model["82599_T3"] or
+         device_info_b.model == pci.model["82599_T3"] then
+      C.usleep(2e6)
+   end
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
-      local aSends = engine.app_table.nicAs.input.rx.stats.txpackets
-      local b0Gets = engine.app_table.nicBm0.output.tx.stats.rxpackets
-      local b1Gets = engine.app_table.nicBm1.output.tx.stats.rxpackets
+      local aSends = link.stats(engine.app_table.nicAs.input.rx).txpackets
+      local b0Gets = link.stats(engine.app_table.nicBm0.output.tx).rxpackets
+      local b1Gets = link.stats(engine.app_table.nicBm1.output.tx).rxpackets
 
       if b0Gets < b1Gets/2 or
          b1Gets < b0Gets/2 or
@@ -376,7 +398,7 @@ function manyreconf(pcidevA, pcidevB, n, do_pf)
       redos = redos + engine.app_table.nicAm1.dev.pf.redos
       maxredos = math.max(maxredos, engine.app_table.nicAm1.dev.pf.redos)
       waits = waits + engine.app_table.nicAm1.dev.pf.waitlu_ms
-      local sent = engine.app_table.nicAm0.input.rx.stats.txpackets
+      local sent = link.stats(engine.app_table.nicAm0.input.rx).txpackets
       io.write (('test #%3d: VMDq VLAN=%d; 100ms burst. packet sent: %s\n'):format(i, 100+i, lib.comma_value(sent-prevsent)))
       if sent == prevsent then
          io.write("error: NIC transmit counter did not increase\n")

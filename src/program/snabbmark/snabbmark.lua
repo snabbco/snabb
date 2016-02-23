@@ -6,6 +6,7 @@ local basic_apps = require("apps.basic.basic_apps")
 local pci           = require("lib.hardware.pci")
 local ethernet      = require("lib.protocol.ethernet")
 local freelist      = require("core.freelist")
+local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -13,10 +14,12 @@ function run (args)
    local command = table.remove(args, 1)
    if command == 'basic1' and #args == 1 then
       basic1(unpack(args))
-   elseif command == 'nfvconfig' and #args == 4 then
+   elseif command == 'nfvconfig' and #args == 3 then
       nfvconfig(unpack(args))
    elseif command == 'solarflare' and #args >= 2 and #args <= 3 then
       solarflare(unpack(args))
+   elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
+      intel1g(unpack(args))
    else
       print(usage) 
       main.exit(1)
@@ -41,21 +44,27 @@ function basic1 (npackets)
    engine.configure(c)
    local start = C.get_monotonic_time()
    timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
-   while engine.app_table.Source.output.tx.stats.txpackets < npackets do
+   while link.stats(engine.app_table.Source.output.tx).txpackets < npackets do
       engine.main({duration = 0.01, no_report = true})
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
-   local packets = engine.app_table.Source.output.tx.stats.txpackets
+   local packets = link.stats(engine.app_table.Source.output.tx).txpackets
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
 end
 
-function nfvconfig (pciaddr, confpath_x, confpath_y, nloads)
+function nfvconfig (confpath_x, confpath_y, nloads)
    local nfvconfig = require("program.snabbnfv.nfvconfig")
    nloads = tonumber(nloads)
       or error("Invalid number of iterations: " .. nloads)
+
+   local pciaddr = lib.getenv("SNABB_PCI0")
+   if not pciaddr then
+      print("SNABB_PCI0 not set.")
+      os.exit(engine.test_skipped_code)
+   end
 
    local load_times, apply_times = {}, {}
 
@@ -95,19 +104,6 @@ function nfvconfig (pciaddr, confpath_x, confpath_y, nloads)
 end
 
 function sumf(a, ...) return a and a + sumf(...) or 0 end
-
-function get_sf_devices()
-   pci.scan_devices()
-
-   local sf_devices = {}
-   for _, device in pairs(pci.devices) do
-      if device.usable and device.driver == 'apps.solarflare.solarflare' then
-         sf_devices[#sf_devices + 1] = device
-      end
-   end
-
-   return sf_devices
-end
 
 Source = {}
 
@@ -162,17 +158,21 @@ function solarflare (npackets, packet_size, timeout)
    local status, SolarFlareNic = pcall(load_driver)
    if not status then
       print(SolarFlareNic)
-      main.exit(43)
+      os.exit(engine.test_skipped_code)
    end
 
-   local sf_devices = get_sf_devices()
-   if #sf_devices < 2 then
-      print([[did not find two Solarflare NICs in system, can't continue]])
-      main.exit(43)
+   local pciaddr0 = lib.getenv("SNABB_PCI_SOLARFLARE0") or lib.getenv("SNABB_PCI0")
+   local pciaddr1 = lib.getenv("SNABB_PCI_SOLARFLARE1") or lib.getenv("SNABB_PCI1")
+   local send_device = pciaddr0 and pci.device_info(pciaddr0)
+   local receive_device = pciaddr1 and pci.device_info(pciaddr1)
+   if not send_device
+      or send_device.driver ~= 'apps.solarflare.solarflare'
+      or not receive_device
+      or receive_device.driver ~= 'apps.solarflare.solarflare'
+   then
+      print("SNABB_PCI_SOLARFLARE[0|1]/SNABB_PCI[0|1] not set or not suitable.")
+      os.exit(engine.test_skipped_code)
    end
-
-   local send_device = sf_devices[1]
-   local receive_device = sf_devices[2]
 
    print(string.format("Sending through %s (%s), receiving through %s (%s)",
                        send_device.interface, send_device.pciaddress,
@@ -206,7 +206,7 @@ function solarflare (npackets, packet_size, timeout)
    if timeout then
       n_max = timeout * 100
    end
-   while engine.app_table.source.output.tx.stats.txpackets < npackets
+   while link.stats(engine.app_table.source.output.tx).txpackets < npackets
       and (not timeout or n < n_max)
    do
       engine.main({duration = 0.01, no_report = true})
@@ -214,7 +214,7 @@ function solarflare (npackets, packet_size, timeout)
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
-   local packets = engine.app_table.source.output.tx.stats.txpackets
+   local packets = link.stats(engine.app_table.source.output.tx).txpackets
    engine.report()
    engine.app_table[send_device.interface]:report()
    engine.app_table[receive_device.interface]:report()
@@ -222,7 +222,106 @@ function solarflare (npackets, packet_size, timeout)
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s)."):format(packets / 1e6,
                                                                                                    runtime, packets / runtime / 1e6,
                                                                                                    ((packets * packet_size * 8) / runtime) / (1024*1024*1024)))
-   if engine.app_table.source.output.tx.stats.txpackets < npackets then
+   if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
+      print("Packets lost. Test failed!")
+      main.exit(1)
+   end
+end
+
+-- ---
+
+
+function intel1g (npackets, packet_size, timeout)
+   npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
+   packet_size = tonumber(packet_size) or error("Invalid packet size: " .. packet_size)
+   if timeout then
+      timeout = tonumber(timeout) or error("Invalid timeout: " .. timeout)
+   end
+
+   local function load_driver ()
+      return require("apps.intel.intel1g").Intel1g
+   end
+
+   local status, Intel1gNic = pcall(load_driver)
+   if not status then
+      print(Intel1gNic)
+      os.exit(engine.test_skipped_code)
+   end
+
+   local pciaddr0 = lib.getenv("SNABB_PCI0")
+   local pciaddr1 = lib.getenv("SNABB_PCI1")
+   local send_device = pciaddr0 and pci.device_info(pciaddr0)
+   local receive_device = pciaddr1 and pci.device_info(pciaddr1)
+print("send_device= ", send_device, "  receive_device= ", receive_device)
+   if not send_device
+      or send_device.driver ~= 'apps.intel.intel1g'
+      or not receive_device
+      or receive_device.driver ~= 'apps.intel.intel1g'
+   then
+      print("SNABB_PCI[0|1] not set, or not suitable Intel i210/i350 NIC.")
+      os.exit(engine.test_skipped_code)
+   end
+
+send_device.interface= "tx1GE"
+receive_device.interface= "rx1GE"
+
+   print(string.format("Sending through %s (%s), receiving through %s (%s)",
+                       send_device.interface, send_device.pciaddress,
+                       receive_device.interface, receive_device.pciaddress))
+
+   local c = config.new()
+
+   -- Topology:
+   -- Source -> Intel1g NIC#1 => Intel1g NIC#2 -> Sink
+
+   config.app(c, "source", Source)
+   --config.app(c, send_device.interface, Intel1gNic, {ifname=send_device.interface, mac_address = ethernet:pton("02:00:00:00:00:01")})
+   --config.app(c, receive_device.interface, Intel1gNic, {ifname=receive_device.interface, mac_address = ethernet:pton("02:00:00:00:00:02")})
+   config.app(c, send_device.interface, Intel1gNic, {pciaddr=pciaddr0})
+   config.app(c, receive_device.interface, Intel1gNic, {pciaddr=pciaddr1, rxburst=512})
+   config.app(c, "sink", basic_apps.Sink)
+
+   config.link(c, "source.tx -> " .. send_device.interface .. ".rx")
+   config.link(c, receive_device.interface .. ".tx -> sink.rx")
+
+   engine.configure(c)
+
+   --engine.app_table.source:set_packet_addresses(engine.app_table[send_device.interface].mac_address,
+   --                                             engine.app_table[receive_device.interface].mac_address)
+   engine.app_table.source:set_packet_addresses(ethernet:pton("02:00:00:00:00:01"),
+                                                ethernet:pton("02:00:00:00:00:02"))
+   engine.app_table.source:set_packet_size(packet_size)
+
+   engine.Hz = false
+
+   local start = C.get_monotonic_time()
+   timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
+   local n = 0
+   local n_max
+   if timeout then
+      n_max = timeout * 100
+   end
+   while link.stats(engine.app_table.source.output.tx).txpackets < npackets
+      and (not timeout or n < n_max)
+   do
+      engine.main({duration = 0.01, no_report = true})
+      n = n + 1
+   end
+   local finish = C.get_monotonic_time()
+   local runtime = finish - start
+   local txpackets = link.stats(engine.app_table.source.output.tx).txpackets
+   local rxpackets = link.stats(engine.app_table.sink.input.rx).rxpackets
+   engine.report()
+   engine.app_table[send_device.interface]:report()
+   engine.app_table[receive_device.interface]:report()
+   print()
+   print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s, %.2f %% packet loss)."):format(
+    txpackets / 1e6, runtime, 
+    txpackets / runtime / 1e6,
+    ((txpackets * packet_size * 8) / runtime) / (1024*1024*1024),
+    (txpackets - rxpackets) *100 / txpackets
+   ))
+   if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
       print("Packets lost. Test failed!")
       main.exit(1)
    end

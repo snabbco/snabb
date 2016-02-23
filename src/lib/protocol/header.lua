@@ -7,14 +7,6 @@
 -- _name          a string that describes the header type in a
 --                human readable form
 --
--- _header_type   a constructor for the C type object that stores
---                the actual header.  Typically the result of
---                ffi.typeof("struct ...")
---
--- _header_ptr_type a C type object for the pointer to the header
---                  type, i.e. ffi/typeof("$*", _header_type)
---                  This is pre-defined here for performance.
---
 -- _ulp           a table that holds information about the "upper
 --                layer protocols" supported by the header.  It
 --                contains two keys
@@ -29,69 +21,135 @@
 --                            be the name of the header class that
 --                            parses this particular ULP
 --
--- For example, an ethernet header could use
+-- In the simplest case, a protocol header consists of a single data
+-- structure of a fixed size, e.g. an untagged Ethernet II header.
+-- Such headers are supported by this framework in a straight forward
+-- manner.  More complex headers may have representations that differ
+-- in size and structure, depending on the use-case, e.g. GRE.
+-- Headers of that kind can be supported as long as all variants can
+-- be enumerated and represented by a separate fixed-sized data
+-- structure.  This requirement is necessary because all data
+-- structures must be pre-allocated for performance reasons and to
+-- support the instance recycling mechanism of the class framework.
+-- Each header is described by a ctype object that serves as a
+-- template for the header.
 --
--- local ether_header_t = ffi.typeof[[
--- struct {
---    uint8_t  ether_dhost[6];
---    uint8_t  ether_shost[6];
---    uint16_t ether_type;
--- } __attribute__((packed))
--- ]]
+-- A protocol header can be created in two different manners.  In the
+-- first case (provided by the new() constructor method), the protocol
+-- instance contains the header structure itself, where as in the
+-- second case (provided by the new_from_mem() constructor), the
+-- protocol instance contains a pointer to an arbitrary location in
+-- memory where the actual header resides (usually a packet buffer).
+-- The pointer is cast to the appropriate ctype to access the fields
+-- of the header.
 --
--- ethernet._name = "ethernet"
--- ethernet._header_type = ether_header_t
--- ethernet._header_ptr_type = ffi.typeof("$*", ether_header_t)
--- ethernet._ulp = {
---    class_map = { [0x86dd] = "lib.protocol.ipv6" },
---    method    = 'type' }
+-- To support the second mode of creation for protocols with variable
+-- header structures, one of the headers must be designated as the
+-- "base header".  It must be chosen such that it contains enough
+-- information to determine the actual header that is present in
+-- memory.
 --
--- In this case, the ULP is identified by the "type" method, which
--- would return the value of the ether_type element.  In this example,
--- only the type value 0x86dd is defined, which is mapped to the class
--- that handles IPv6 headers.
+-- The constructors in the header base class deal exclusively with the
+-- base header, i.e. the instances created by the new() and
+-- new_from_mem() methods only provide access to the fields present in
+-- the base header.  Protocols that implement variable headers must
+-- extend the base methods to select the appropriate header variant.
 --
--- Header-dependent initializations can be handled by overriding the
--- standard constructor, e.g.
+-- The header class uses the following data structures to support this
+-- mechanism.  Each header variant is described by a table with the
+-- following elements
 --
--- function ethernet:new (config)
---    local o = ethernet:superClass().new(self)
---    o:dst(config.dst)
---    o:src(config.src)
---    o:type(config.type)
---    return o
--- end
+--   t      the ctype that represents the header itself
+--   ptr_t  a ctype constructed by ffi.typeof("$*", ctype) used for
+--          casting of pointers
+--   box_t  a ctype that represents a "box" to store a ptr_t, i.e.
+--          ffi.typeof("$[1]", ptr_t)
 --
--- The generic code here assumes that every protocol has a fixed
--- header of a given type.  This is required by the garbage-saving
--- hacks and the object recycling mechanism of the OOP system.
--- Protocols of variable header types must be handled by subclasses,
--- each of which must implement exactly one variant.  The base class
--- must implement at least as much as is necessary to determine which
--- subclass needs to be selected. The GRE protocol serves as an
--- example of how this can be implemented.
+-- These tables are stored as an array in the class variable _headers,
+-- where, by definition, the first element designates the base header.
+-- 
+-- This array is initialized by the class method init(), which must be
+-- called by every derived class.
 --
--- The header is stored in the instance variable _header. To avoid the
--- creation of garbage, this is actually an array of pointers with a
--- single element defined as
+-- When a new instance of a protocol class is created, it receives its
+-- own, private array of headers stored in the instance variable of
+-- the same name.  The elements from the header tables stored in the
+-- class are inherited by the instance by means of setmetatable().
+-- For each header, one instance of the header itself and one instance
+-- of a box are created from the t and box_t ctypes, respectively.
+-- These objects are stored in the keys "data" and "box" and are
+-- private to the instance.  The following schematic should make the
+-- relationship clearer
 --
---   ffi.typeof("$*[1]", self._header_ptr_type)
+-- class._headers = {
+--     [1] = { t     = ...,
+--             ptr_t = ...,
+--             box_t = ...,
+--           }, <---------------+
+--     [2] = { t     = ...,     |
+--             ptr_t = ...,     |
+--             box_t = ...,     |
+--           }, <------------+  |
+--     ...                   |  |
+--   }                       |  |
+--                           |  |
+-- instance._headers = {     |  |
+--     [1] = { data = t(),   |  |
+--             box  = box_t()|  |
+--           }, ----------------+ metatable
+--     [2] = { data = t(),   |
+--             box  = box_t()|
+--           }, -------------+ metatable
+--     ...
+--   }
 --
--- The pointer points to either a ctype object or a region of buffer
--- memory, depending on whether the instance was created via the new()
--- or new_from_mem() methods, respectively (or whether the header has
--- been relocated by a call of the copy() method with the relocate
--- argument set to true).  This array is allocated once upon instance
--- creation and avoids the overhead of "boxing" when the instance is
--- recycled by new_from_mem().  As a consequence, the header must be
--- accessed by indexing this array, e.g.
+-- The constructors of the base class store a reference to the base
+-- header (i.e. _headers[1]) in the instance variable _header.  In
+-- other words, the box and data can be accessed by dereferencing
+-- _header.data and _header.box, respectively.
 --
---   self._header[0].some_header_element
+-- This initialization is common to both constructors.  The difference
+-- lies in the contents of the pointer stored in the box.  The new()
+-- constructor stores a pointer to the data object, i.e.
 --
--- Caution: to access the actual header, e.g. for ffi.sizeof(), you
--- need to dereference the pointer, i.e. _header[0][0].  This is what
--- the header() method does.
+--   _header.box[0] = ffi.cast(_header.ptr_t, _header.data)
 --
+-- where as the new_from_mem() constructor stores the pointer to the
+-- region of memory supplied as argument to the method call, i.e.
+--
+--   _header.box[0] = ffi.cast(_header.ptr_t, mem)
+--
+-- In that case, the _header.data object is not used at all.
+--
+-- When a derived class overrides these constructors, it should first
+-- call the construcor of the super class, which will initialize the
+-- base header as described above.  An extension of the new() method
+-- will replace the reference to the base header stored in _header by
+-- a reference to the header variant selected by the configuration
+-- passed as arguments to the method, i.e. it will eventually do
+--
+--   _header = _headers[foo]
+--
+-- where <foo> is the index of the selected header.
+--
+-- An extension of the new_from_mem() constructor uses the base header
+-- to determine the actual header variant to use and override the base
+-- header with it.
+--
+-- Refer to the lib.protocol.ethernet and lib.protocol.gre classes for
+-- examples.
+--
+-- For convenience, the class variable class._header exists as well
+-- and contains a reference to the base header class._headers[1].
+-- This promotes the instance methods sizeof() and ctype() to class
+-- methods, which will provide the size and ctype of a protocol's base
+-- header from the class itself.  For example, the size of an ethernet
+-- header can be obtained by
+--
+--  local ethernet = require("lib.protocol.ethernet")
+--  local ether_size = ethernet:sizeof()
+--
+-- without creating an instance first.
 
 module(..., package.seeall)
 local ffi = require("ffi")
@@ -100,54 +158,109 @@ local header = subClass(nil)
 
 -- Class methods
 
--- The standard constructor creates a new ctype object for the header.
--- Note that ffi.typeof with a cdecl cannot be compiled (reported as
--- "NYI" by the compiler).  Due to the recycling mechanism, it is not
--- expected that this code will ever be called in a hot trace.  If
--- this turns out to be a problem, the ctype can be created in
--- advance.
---
--- Note that the header is initialized to zero in all cases, i.e. the
--- protocol-specific constructors must perform all initialization even
--- if the object is recycled.
-function header:new ()
+-- Initialize a subclass with a set of headers, which must contain at
+-- least one element (the base header).
+function header:init (headers)
+   assert(self and headers and #headers > 0)
+   self._singleton_p = #headers == 1
+   local _headers = {}
+   for i = 1, #headers do
+      local header = {}
+      local ctype = headers[i]
+      header.t = ctype
+      header.ptr_t = ffi.typeof("$*", ctype)
+      header.box_t = ffi.typeof("$*[1]", ctype)
+      header.meta = { __index = header }
+      _headers[i] = header
+   end
+   self._headers = _headers
+   self._header = _headers[1]
+end
+
+-- Initialize an instance of the class.  If the instance is new (has
+-- not been recycled), an instance of each header struct and a box
+-- that holds a pointer to it are allocated.  A reference to the base
+-- header is installed in the _header instance variable.
+local function _new (self)
    local o = header:superClass().new(self)
    if not o._recycled then
-      o._header = ffi.typeof("$[1]", o._header_ptr_type)()
-      o._header_aux = self._header_type()
-      o._header[0] = ffi.cast(o._header_ptr_type, o._header_aux)
-   else
-      ffi.fill(o._header[0], ffi.sizeof(o._header[0][0]))
+      -- Allocate boxes and headers for all variants of the
+      -- classe's header structures
+      o._headers = {}
+      for i = 1, #self._headers do
+         -- This code is only executed when a new instance is created
+         -- via the class construcor, i.e. self is the class itself
+         -- (as opposed to the case when an instance is recycled by
+         -- calling the constructor as an instance method, in which
+         -- case self would be the instance instead of the class).
+         -- This is why it is safe to use self._headers[i].meta as
+         -- metatable here.  The effect is that the ctypes are
+         -- inherited from the class while the data and box table are
+         -- private to the instance.
+         local _header = setmetatable({}, self._headers[i].meta)
+         _header.data = _header.t()
+         _header.box  = _header.box_t()
+         o._headers[i] = _header
+      end
    end
+   -- Make the base header the active header
+   o._header = o._headers[1]
+   return o
+end
+
+-- Initialize the base protocol header with 0 and store a pointer to
+-- it in the header box.
+function header:new ()
+   local o = _new(self)
+   local header = o._header
+   ffi.fill(header.data, ffi.sizeof(header.t))
+   header.box[0] = ffi.cast(header.ptr_t, header.data)
    return o
 end
 
 -- This alternative constructor creates a protocol header from a chunk
--- of memory by "overlaying" a header structure.
+-- of memory by "overlaying" a header structure.  In this mode, the
+-- protocol ctype _header.data is unused and _header.box stores the
+-- pointer to the memory location supplied by the caller.
 function header:new_from_mem (mem, size)
-   assert(ffi.sizeof(self._header_type) <= size)
-   local o = header:superClass().new(self)
-   if not o._recycled then
-      o._header = ffi.typeof("$[1]", o._header_ptr_type)()
-   end
-   o._header[0] = ffi.cast(self._header_ptr_type, mem)
+   local o = _new(self)
+   local header = o._header
+   assert(ffi.sizeof(header.t) <= size)
+   header.box[0] = ffi.cast(header.ptr_t, mem)
    return o
 end
 
 -- Instance methods
 
+-- Return a reference to the header
 function header:header ()
-   return (self._header[0][0])
+   return self._header.box[0][0]
 end
 
+-- Return a pointer to the header
+function header:header_ptr ()
+   return self._header.box[0]
+end
+
+-- Return the ctype of header
+function header:ctype ()
+   return self._header.t
+end
+
+-- Return the size of the header
 function header:sizeof ()
-   return (ffi.sizeof(self._header_type))
+   return ffi.sizeof(self._header.t)
 end
 
--- default equality method, can be overriden in the ancestors
+-- Return true if <other> is of the same type and contains identical
+-- data, false otherwise.
 function header:eq (other)
-   return (ffi.string(self._header[0], self:sizeof()) ==
-        ffi.string(other._header[0],self:sizeof()))
+   local ctype = self:ctype()
+   local size = self:sizeof()
+   local other_ctype = other:ctype()
+   return (ctype == other_ctype and
+           ffi.string(self:header_ptr(), size) ==
+        ffi.string(other:header_ptr(), size))
 end
 
 -- Copy the header to some location in memory (usually a packet
@@ -155,9 +268,9 @@ end
 -- the destination.  If relocate is a true value, the copy is promoted
 -- to be the active storage of the header.
 function header:copy (dst, relocate)
-   ffi.copy(dst, self._header[0], ffi.sizeof(self._header[0][0]))
+   ffi.copy(dst, self:header_ptr(), self:sizeof())
    if relocate then
-      self._header[0] = ffi.cast(self._header_ptr_type, dst)
+      self._header.box[0] = ffi.cast(self._header.ptr_t, dst)
    end
 end
 
@@ -165,9 +278,9 @@ end
 -- This is horribly inefficient and should not be used in the fast
 -- path.
 function header:clone ()
-   local header = self._header_type()
+   local header = self:ctype()()
    local sizeof = ffi.sizeof(header)
-   ffi.copy(header, self._header[0], sizeof)
+   ffi.copy(header, self:header_ptr(), sizeof)
    return self:class():new_from_mem(header, sizeof)
 end
 

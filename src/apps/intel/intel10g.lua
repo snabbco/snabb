@@ -135,6 +135,7 @@ function M_sf:init ()
          :init_statistics()
          :init_receive()
          :init_transmit()
+         :init_txdesc_prefetch()
          :wait_enable()
          :wait_linkup()
 
@@ -166,7 +167,8 @@ do
       -- (write to illegal address) instead of overwriting physical
       -- memory near address 0.
       ffi.fill(ptr, 0xff, num_descriptors * ffi.sizeof(ct))
-      ptr = lib.bounds_checked(ct, ptr, 0, num_descriptors)
+      -- ptr = lib.bounds_checked(ct, ptr, 0, num_descriptors)
+      ptr = ffi.cast(ffi.typeof("$*", ct), ptr)
       return ptr, phy
    end
 
@@ -271,6 +273,7 @@ function M_sf:init_snmp ()
          r[k].v[0] = r[k].r()
       end
    end
+   self.logger = lib.logger_new({ module = 'intel10g' })
    local t = timer.new("Interface "..self.pciaddress.." status checker",
                        function(t)
                           local old = ifTable:get('ifOperStatus')
@@ -279,9 +282,9 @@ function M_sf:init_snmp ()
                              new = 2
                           end
                           if old ~= new then
-                             print("Interface "..self.pciaddress..
-                                   " status change: "..status[old]..
-                                   " => "..status[new])
+                             self.logger:log("Interface "..self.pciaddress..
+                                             " status change: "..status[old]..
+                                             " => "..status[new])
                              ifTable:set('ifOperStatus', new)
                              ifTable:set('ifLastChange', 0)
                              ifTable:set('_X_ifLastChange_TicksBase',
@@ -421,6 +424,11 @@ function M_sf:init_transmit ()
    self.r.HLREG0:set(bits{TXCRCEN=0})
    self:set_transmit_descriptors()
    self.r.DMATXCTL:set(bits{TE=0})
+   return self
+end
+
+function M_sf:init_txdesc_prefetch ()
+   self.r.TXDCTL:set(bits{SWFLSH=26, hthresh=8} + 32)
    return self
 end
 
@@ -938,7 +946,7 @@ end
 
 function M_vf:enable_transmit()
    self.pf.r.DMATXCTL:set(bits{TE=0})
-   self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
+   self.r.TXDCTL:set(bits({Enable=25, SWFLSH=26, hthresh=8}) + 32)
    self.r.TXDCTL:wait(bits{Enable=25})
    return self
 end
@@ -952,7 +960,7 @@ function M_vf:disable_transmit(reenable)
    self.pf.r.PFVFTE[math.floor(self.poolnum/32)]:clr(bits{VFTE=self.poolnum%32})
 
    if reenable then
-      self.r.TXDCTL:set(bits{Enable=25, SWFLSH=26})
+      self.r.TXDCTL:set(bits({Enable=25, SWFLSH=26, hthresh=8}) + 32)
    --    self.r.TXDCTL:wait(bits{Enable=25})
    end
    return self

@@ -1,0 +1,85 @@
+#!/usr/bin/env luajit
+-- -*- lua -*-
+
+package.path = package.path .. ";../src/?.lua;../tests/?.lua"
+
+local optimize = require('pf.optimize')
+local savefile = require('pf.savefile')
+local utils = require('pf.utils')
+
+local pfcompile = require('pfquickcheck.pfcompile')
+
+local function usage()
+   local content = [=[
+Usage: pflua-optimize [--match-packet #packet file.pcap] [FILE]
+
+Takes an expanded AST expression, optimizes it, and prints out the
+result.  Useful when tracking down optimizer bugs.  If FILE is given as
+a command-line argument, we read the expression from the file; otherwise
+it is read from standard input.
+   ]=]
+   print(content);
+end
+
+local function run(input, options)
+   local expr = assert(loadstring('return '..input:read('*a')))()
+
+   print('Optimizing:')
+   utils.pp(expr)
+   local optimized_expr = optimize.optimize(expr)
+   print('Result:')
+   utils.pp(optimized_expr)
+
+   if options.pktfile then
+      local unopt_pred, opt_pred, packets, packet, P, len, unopt_res, opt_res
+      unopt_pred = pfcompile.compile_ast(expr, "Unopt")
+      opt_pred = pfcompile.compile_ast(optimized_expr, "Opt")
+      packets = savefile.load_packets(options.pktfile)
+      packet = packets[options.pktnum]
+      P, len = packet.packet, packet.len
+
+      unopt_res = unopt_pred(P, len)
+      opt_res = opt_pred(P, len)
+      if unopt_res ~= opt_res then
+         print("Packet results did not match!")
+         print(("Unoptimized: %s, optimized: %s"):format(unopt_res, opt_res))
+         os.exit(1)
+      else
+         print("Match status the same before and after optimization.")
+      end
+   end
+end
+
+local function parse_command_line(args)
+   local input
+   local options = {}
+   while #args >= 1 and args[1]:match("^%-%-") do
+      local param_arg = table.remove(args, 1)
+      if param_arg == '--match-packet' then
+         options.pktnum = tonumber(table.remove(args, 1))
+         options.pktfile = table.remove(args, 1)
+         print(options.pktnum, options.pktfile)
+      else error("Unknown argument: " .. arg) end
+   end
+
+   if #args == 0 then
+      input = io.stdin
+   elseif #args == 1 then
+      if args[1] == '--help' or args[1] == '-h' then
+         usage()
+         os.exit(0)
+      end
+      input = assert(io.open(args[1]))
+   else
+      usage()
+      os.exit(1)
+   end
+   return input, options
+end
+
+local function main(...)
+   local args = { ... }
+   run(parse_command_line(args))
+end
+
+main(...)

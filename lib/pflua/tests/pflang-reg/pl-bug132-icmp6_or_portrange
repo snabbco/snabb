@@ -1,0 +1,3 @@
+#!/bin/bash
+thisdir=$(dirname $0)
+"${thisdir}/../../env" pflua-pipelines-match "${thisdir}/../data/wingolog.pcap" "icmp6 or portrange 14682-50101" 14951

@@ -1,1 +1,1 @@
-../../deps/luajit/src/jit/zone.lua
+../../lib/luajit/src/jit/zone.lua

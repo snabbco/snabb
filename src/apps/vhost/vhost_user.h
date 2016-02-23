@@ -43,7 +43,7 @@ enum {
 };
 
 struct vhost_user_msg {
-    int request;
+    uint32_t request;
     uint32_t flags;
     uint32_t size;
     union {

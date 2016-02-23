@@ -2,7 +2,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#include <sys/unistd.h>
+#include <unistd.h>
 
 /* Return the current wall-clock time in nanoseconds. */
 uint64_t get_time_ns()
@@ -71,5 +71,9 @@ void prefetch_for_read(const void *address)
 void prefetch_for_write(const void *address)
 {
   __builtin_prefetch(address, 1);
+}
+
+void nop()
+{
 }
 

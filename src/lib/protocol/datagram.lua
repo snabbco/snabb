@@ -11,6 +11,8 @@
 --
 --   Creation of a new packet
 --
+--   Appending payload to a packet
+--
 -- It keeps track of a "parse stack" consisting of an (indexed) stack of
 -- header objects and an offset into the packet.
 --
@@ -23,67 +25,129 @@
 -- the size of the parsed header (and the payload reduced
 -- correspondingly).
 --
--- Also note that parsing does not change the packet itself.  However,
--- the header at the bottom of the parse stack (which is located at the
--- beginning of the buffer's valid data) can be removed from the packet
--- by calling the pop() method, which truncates the underlying packet
--- accordingly.
+-- Note that parsing does not change the packet itself.  However, the
+-- header at the bottom of the parse stack (which is located at the
+-- beginning of the buffer's valid data) can be removed from the
+-- packet by calling the pop() method, which truncates the underlying
+-- packet accordingly.
 --
 -- The push() method can be used to prepend headers in front of the
 -- packet.
 --
--- IMPORTANT: Both pop() and push() destructively modify the packet and
--- headers previously obtained by calls to parse_*() will be corrupted.
+-- A datagram can be used in two modes of operation, called "immediate
+-- commit" and "delayed commit".  In immediate commit mode, the
+-- push*() and pop*() methods immediately modify the underlying
+-- packet.  However, this can be undesireable.
 --
--- To construct a packet from scratch, the constructor is called without
--- a reference to a packet.  In this case, a new empty packet is
--- allocated.  All methods are applicable to such a datagram.
+-- Even though the manipulations are relatively fast by using SIMD
+-- instructions to move and copy data when possible, performance-aware
+-- applications usually try to avoid as much of them as possible.
+-- This creates a conflict if the caller performs operations to push
+-- or parse a sequence of protocol headers in immediate commit mode.
+--
+-- This problem can be avoided by using delayed commit mode.  In this
+-- mode, the push*() methods add the data to a separate buffer as
+-- intermediate storage.  The buffer is prepended to the actual packet
+-- in a single operation by calling the commit() method.
+--
+-- The pop*() methods are made light-weight in delayed commit mode by
+-- keeping track of an additional offset that indicates where the
+-- actual packet starts in the packet buffer.  Each call to one of the
+-- pop*() methods simply increases the offset by the size of the
+-- popped piece of data.  The accumulated actions will be applied as a
+-- single operation by the commit() method.
+--
+-- The push*() and pop*() methods can be freely mixed in delayed
+-- commit mode.
+--
+-- Due to the destructive nature of these methods in immediate commit
+-- mode, they cannot be applied when the parse stack is not empty,
+-- because moving the data in the packet buffer will invalidate the
+-- parsed headers.  The push*() and pop*() methods will raise an error
+-- in that case.
+--
+-- The buffer used in delayed commit mode has a fixed size of 512
+-- bytes.  This limits the size of data that can be pushed in a single
+-- operation.  A sequence of push/commit operations can be used to
+-- push an arbitrary amount of data in chunks of up to 512 bytes.
+--
+-- To construct a packet from scratch, the constructor is called
+-- without a reference to a packet.  In this case, a new empty packet
+-- is allocated.  All methods are applicable to such a datagram.
 
 module(..., package.seeall)
 local packet = require("core.packet")
 local ffi    = require("ffi")
+local C = ffi.C
 
 local datagram = subClass(nil)
+datagram._name = 'datagram'
+datagram.push_buffer_size = 512
 
 -- Class methods
 
 -- Create a datagram from a packet or from scratch (if p == nil).  The
 -- class argument is only relevant for parsing and can be set to the
--- header class of the the outermost packet header.
-local function init (o, p, class)
+-- header class of the outermost packet header.  <options> is a table
+-- used to pass configuration options to the constructor:
+--
+--   options = {
+--        delayed_commit = true|false, -- default false
+--   }
+--
+-- If a datagram instance is recycled, any protocol headers still on
+-- the parse stack are freed.
+local empty = {}
+local push_buffer_type = ffi.typeof("uint8_t [?]")
+function datagram:new (p, class, options)
+   local options = options or empty
+   local o = datagram:superClass().new(self)
    if not o._recycled then
       o._parse = { stack = {}, index = 0 }
+      o._push = { buffer = push_buffer_type(datagram.push_buffer_size) }
       o._packet = ffi.new("struct packet *[1]")
-   elseif o._parse.stack[1] then
-      for i, _ in ipairs(o._parse.stack) do
-         o._parse.stack[i]:free()
-         o._parse.stack[i] = nil
+   elseif o._parse.index > 0 then
+      local parse = o._parse
+      for i = 1, parse.index do
+         parse.stack[i]:free()
+         parse.stack[i] = nil
       end
       o._parse.index = 0
    end
+   o._offset = 0
    o._parse.offset = 0
+   o._push.offset = datagram.push_buffer_size
+   o._push.size = 0
    o._parse.ulp = class
+   o._delayed_commit = options.delayed_commit
    o._packet[0] = p or packet.allocate()
    return o
-end
-
-function datagram:new (p, class)
-   return(init(datagram:superClass().new(self), p, class))
-end
-
--- Reuse an existing object to avoid putting it on the freelist.
--- Caution: This will free the datagram's current packet.
-function datagram:reuse (p, class)
-   self._recycled = true
-   return(init(self, p, class))
 end
 
 -- Instance methods
 
 -- Push a new protocol header to the front of the packet.
 function datagram:push (proto)
-   packet.prepend(self._packet[0], proto:header(), proto:sizeof())
-   self._parse.offset = self._parse.offset + proto:sizeof()
+   self:push_raw(proto:header(), proto:sizeof())
+end
+
+-- Push <length> bytes pointed to by <data> to the front of the
+-- packet.  An error is raised if the datagram uses immediate commit
+-- mode and the parse stack is not empty.
+function datagram:push_raw (data, length)
+   if self._delayed_commit then
+      local push = self._push
+      assert(length <= push.offset)
+      push.offset = push.offset - length
+      push.size = push.size + length
+      ffi.copy(push.buffer + push.offset, data, length)
+   else
+      -- The memmove() would invalidate the data pointer of headers
+      -- that have already been parsed.
+      assert(self._parse.index == 0, "parse stack not empty")
+      packet.prepend(self._packet[0], data, length)
+      self._parse.offset = self._parse.offset + length
+   end
 end
 
 -- The following methods create protocol header objects from the
@@ -199,10 +263,20 @@ function datagram:pop (n)
    self._parse.offset = self._parse.offset - n_bytes
 end
 
--- Remove <length> bytes from the start of the packet and set upper-layer
--- protocol to <ulp> if <ulp> is supplied.
+-- Remove <length> bytes from the start of the packet and set
+-- upper-layer protocol to <ulp> if <ulp> is supplied.  An error is
+-- raised if the datagram operates in immediate commit mode but the
+-- parse stack is not empty.
 function datagram:pop_raw (length, ulp)
-   packet.shiftleft(self._packet[0], length)
+   if self._delayed_commit then
+      self._offset = self._offset + length
+      self._parse.offset = self._parse.offset + length
+   else
+      -- The memmove() would invalidate the data pointer of headers
+      -- that have already been parsed.
+      assert(self._parse.index == 0, "parse stack not empty")
+      packet.shiftleft(self._packet[0], length)
+   end
    if ulp then self._parse.ulp = ulp end
 end
 
@@ -222,5 +296,98 @@ function datagram:payload (mem, size)
    return packet.data(self._packet[0]) + self._parse.offset,
           packet.length(self._packet[0]) - self._parse.offset
 end
+
+-- Return the location and size of the entire packet buffer
+function datagram:data ()
+   local p = self._packet
+   return packet.data(p[0]), packet.length(p[0])
+end
+
+-- Commit the changes induced by previous calles to the push*() and
+-- pop*() methods to the packet data.  An error is raised if the parse
+-- stack is not empty.
+function datagram:commit ()
+   if self._delayed_commit then
+      assert(self._parse.index == 0, "parse stack not empty")
+      local p = self:packet()
+      local offset = self._offset
+      local push = self._push
+      C.memmove(p.data + push.size, p.data + offset, p.length - offset)
+      ffi.copy(p.data, push.buffer + push.offset, push.size)
+      local diff = offset - push.size
+      p.length = p.length - diff
+
+      self._parse.offset = self._parse.offset - diff
+      push.offset = datagram.push_buffer_size
+      push.size = 0
+      self._offset = 0
+   end
+end
+
+function selftest ()
+   local ethernet = require("lib.protocol.ethernet")
+   local ipv6 = require("lib.protocol.ipv6")
+   local l2tpv3 = require("lib.protocol.keyed_ipv6_tunnel")
+
+   local mac_addr = ethernet:pton('00:00:00:00:00:00')
+   local ether = ethernet:new({ src = mac_addr, dst = mac_addr,
+                                type = 0x86dd })
+   local ip_addr = ipv6:pton('::1')
+   local ip = ipv6:new({ src = ip_addr, dst = ip_addr,
+                         next_header = 115 })
+   local l2tp = l2tpv3:new()
+   local p = packet.allocate()
+   local data_size = 512
+   local data = ffi.new("uint8_t [?]", data_size)
+
+   -- Check immediate commit semantics
+   local dgram = datagram:new(p)
+   dgram:push(l2tp)
+   dgram:push(ip)
+   dgram:push(ether)
+   local _, p_size = dgram:payload(data, data_size)
+   assert(p_size == data_size)
+   local _, d_size = dgram:data()
+   assert(d_size == ether:sizeof() + ip:sizeof() + l2tp:sizeof() + data_size)
+
+   -- Parse the pushed headers
+   dgram:new(p, ethernet)
+   assert(ether:eq(dgram:parse()))
+   assert(ip:eq(dgram:parse()))
+   assert(l2tp:eq(dgram:parse()))
+   _, p_size = dgram:payload()
+   assert(p_size == data_size)
+
+   -- Check delayed commit semantics.  The packet still contains the
+   -- data added above.
+   dgram:new(p, ethernet, { delayed_commit = true })
+   local mac_addr2 = ethernet:pton('00:00:00:00:00:01')
+   local ether2 = ethernet:new({ src = mac_addr2, dst = mac_addr2,
+                                 type = 0x86dd })
+   local ip_addr2 = ipv6:pton('::2')
+   local ip2 = ipv6:new({ src = ip_addr2, dst = ip_addr2,
+                       next_header = 115 })
+   dgram:push(ip2)
+   dgram:push(ether2)
+   local stack = dgram:stack()
+   assert(#stack == 0)
+   assert(ether:eq(dgram:parse()))
+   assert(ip:eq(dgram:parse()))
+   dgram:pop(2)
+   dgram:commit()
+   _, d_size = dgram:data()
+   assert(d_size == ether2:sizeof() + ip2:sizeof() + l2tp:sizeof() + data_size)
+   dgram:new(p, ethernet, { delayed_commit = true })
+   assert(ether2:eq(dgram:parse()))
+   assert(ip2:eq(dgram:parse()))
+   assert(l2tp:eq(dgram:parse()))
+   dgram:pop(3)
+   dgram:pop_raw(data_size)
+   dgram:commit()
+   _, d_size = dgram:data()
+   assert(d_size == 0, d_size)
+end
+
+datagram.selftest = selftest
 
 return datagram

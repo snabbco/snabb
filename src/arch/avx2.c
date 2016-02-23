@@ -7,10 +7,8 @@
 #include <stdint.h>
 #include <arpa/inet.h>
 #include <x86intrin.h>
+#include "lib/checksum.h"
 #include "lib/checksum_lib.h"
-
-// For fallback onto non-SIMD checksum:
-extern uint16_t cksum_generic(unsigned char *p, size_t n, uint32_t initial);
 
 static inline uint32_t cksum_avx2_loop(unsigned char *p, size_t n)
 {
@@ -61,7 +59,7 @@ static inline uint32_t cksum_avx2_loop(unsigned char *p, size_t n)
     return sum2;
 }
 
-uint16_t cksum_avx2(unsigned char *p, size_t n, uint32_t initial)
+uint16_t cksum_avx2(unsigned char *p, size_t n, uint16_t initial)
 {
     uint32_t sum = initial;
 

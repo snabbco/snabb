@@ -45,12 +45,13 @@ struct vhost {
 // Below are structures imported from Linux headers.
 // This is purely to avoid a compile-time dependency on those headers,
 // which has been an problem on certain development machines.
-struct vhostu_vring_state { unsigned int index, num; };
-struct vhostu_vring_file { unsigned int index; int fd; };
+struct vhostu_vring_state { 
+  uint32_t index, num;
+} __attribute__((packed));
 struct vhostu_vring_addr {
-  unsigned int index, flags;
+  uint32_t index, flags;
   uint64_t desc_user_addr, used_user_addr, avail_user_addr, log_guest_addr;
-};
+} __attribute__((packed));
 
 // These were printed out with a little throw-away C program.
 enum {

@@ -1,0 +1,5 @@
+#!/bin/bash
+set -e
+out=$(program/snabbnfv/selftest.sh bench jumbo)
+# Extract floating point Gbits number from output.
+echo "$out" | grep IPERF-JUMBO | cut -d " " -f 2

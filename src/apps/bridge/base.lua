@@ -16,23 +16,46 @@
 --              ...},
 --            config = { <bridge-specific-config> } }
 --
+-- Port names have to be unique by themselves, irrespective of whether
+-- they are free ports or belong to a split-horizon group.
+--
 -- The "config" table contains configuration options specific to a
--- derived class.  It is ignored by the base class.
+-- derived class.  It is ignored by the base class.  A derived class
+-- can access the configuration via self._conf.config.  If config is
+-- not set, it is initialiezed to an empty table.
 --
--- The base constructor checks the configuration and creates the
--- following arrays as private instance variables for efficient access
--- in the push() method (which must be provided by any derived class).
+-- Note that it is necessary to call the method post_config() after
+-- the app has been configured with engine.configure() to complete the
+-- initialization.  This step will add the ringbuffers associated with
+-- the ports to an internal data structure to save a lookup in the
+-- input and output tables during packet processing.
 --
---  self._src_ports
+-- To make processing in the fast path easier, each port and group is
+-- assigned a unique integer greater than zero to serve as a "handle".
+-- The group handle 0 is assigned to all free ports.
 --
---     This array contains the names of all ports connected to the
---     bridge.
+-- The base constructor creates the following arrays as private
+-- instance variables for efficient access in the push() method (which
+-- must be provided by any derived class).
+--
+--  self._ports
+--
+--     Each port is assigned a table containing the following information
+--
+--         { name = <port-name>,
+--           group = <group-handle>,
+--           handle = <handle> }
+--
+--     The tables of all ports is stored in the self._ports table,
+--     which can be indexed by both, the port name as well as the port
+--     handle to access the information for a particular port.
 --
 --  self._dst_ports
 --
---     This table is keyed by the name of an input port and associates
---     it with an array of output ports according to the split-horizon
---     topology.
+--     This is an array which stores an array of egress port handles
+--     for every ingress port handle.  According to the split-horizon
+--     semantics, this includes all port handles except the ingress
+--     handle and all handles that belong to the same group.
 --
 -- The push() method of a derived class should iterate over all source
 -- ports and forward the incoming packets to the associated output
@@ -54,18 +77,43 @@ function bridge:new (arg)
    local conf = arg and config.parse_app_arg(arg) or {}
    assert(conf.ports, self._name..": invalid configuration")
    o._conf = conf
+   if not o._conf.config then
+      o._conf.config = {}
+   end
 
    -- Create a list of forwarding ports for all ports connected to the
    -- bridge, taking split horizon groups into account
-   local ports = {}
+   local ports, groups = {}, {}
    local function add_port(port, group)
       assert(not ports[port],
              self:name()..": duplicate definition of port "..port)
-      ports[port] = group
+      local group_handle = 0
+      if group then
+         local desc = groups[group]
+         if not desc then
+            desc = { name = group, ports = {} }
+            groups[group] = desc
+            table.insert(groups, desc)
+            desc.handle = #groups
+         end
+         group_handle = desc.handle
+      end
+      local desc = { name = port,
+                     group = group_handle }
+      ports[port] = desc
+      table.insert(ports, desc)
+      desc.handle = #ports
+      if group_handle ~= 0 then
+         table.insert(groups[group_handle].ports, desc.handle)
+      end
    end
+
+   -- Add free ports
    for _, port in ipairs(conf.ports) do
-      add_port(port, '')
+      add_port(port)
    end
+
+   -- Add split horizon groups
    if conf.split_horizon_groups then
       for group, ports in pairs(conf.split_horizon_groups) do
          for _, port in ipairs(ports) do
@@ -73,17 +121,67 @@ function bridge:new (arg)
          end
       end
    end
-   local src_ports, dst_ports = {}, {}
-   for sport, sgroup in pairs(ports) do
-      table.insert(src_ports, sport)
+
+   -- Create list of egress ports for each ingress port, containing
+   -- all free ports as well as all ports from different split-horizon
+   -- groups
+   local dst_ports = {}
+   for sport, sdesc in ipairs(ports) do
       dst_ports[sport] = {}
-      for dport, dgroup in pairs(ports) do
-         if not (sport == dport or (sgroup ~= '' and sgroup == dgroup)) then
+      for dport, ddesc in ipairs(ports) do
+         if not (sport == dport or (sdesc.group ~= 0 and
+                                    sdesc.group == ddesc.group)) then
             table.insert(dst_ports[sport], dport)
          end
       end
    end
-   o._src_ports = src_ports
+   o._groups = groups
+   o._ports = ports
    o._dst_ports = dst_ports
    return o
+end
+
+-- API
+--
+-- Add the ingress and egress links to the port descriptor tables,
+-- accessible via the keys l_in and l_out, respectively.  This helps
+-- to speed up packet forwarding by eliminating a lookup in the input
+-- and output tables.
+function bridge:post_config ()
+   assert(self.input and self.output)
+   for _, port in ipairs(self._ports) do
+      port.l_in = self.input[port.name]
+      port.l_out = self.output[port.name]
+   end
+end
+
+-- API
+--
+-- Print the port configuration and forwarding tables of the bridge.
+-- This is primarily intended for debugging.
+function bridge:info ()
+   local ports, groups = self._ports, self._groups
+   local function nh (n, h)
+      return n.."("..h..")"
+   end
+   print("Free ports:")
+   for p, desc in ipairs(ports) do
+      if desc.group == 0 then
+         print("\t"..nh(desc.name, p))
+      end
+   end
+   print("Split-horizon groups:")
+   for g, desc in ipairs(groups) do
+      print("\t"..nh(desc.name, g)..", members:")
+      for _, p in ipairs(desc.ports) do
+         print("\t\t"..nh(ports[p].name, p))
+      end
+   end
+   print("Forwarding tables:")
+   for p, dst in ipairs(self._dst_ports) do
+      print("\t"..nh(ports[p].name, p))
+      for _, d in ipairs(dst) do
+         print("\t\t"..nh(ports[d].name, d))
+      end
+   end
 end

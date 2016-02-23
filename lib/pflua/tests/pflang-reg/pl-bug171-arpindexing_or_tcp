@@ -1,0 +1,3 @@
+#!/bin/bash
+thisdir=$(dirname $0)
+"${thisdir}/../../env" pflua-pipelines-match "${thisdir}/../data/wingolog.pcap" "arp[1] > 1 or tcp" 3584

@@ -7,23 +7,29 @@ local long_opts = {
    ["package-path"] = "P",
    eval = "e",
    load = "l",
+   program = "p",
    test = "t",
    interactive = "i",
    debug = "d",
    jit = "j",
+   sigquit = "q",
    help = "h",
 }
 
 function run (parameters)
    local profiling = false
+   local traceprofiling = false
    local start_repl = false
    local noop = true -- are we doing nothing?
+   local program -- should we run a different program?
    -- Table of functions implementing command-line arguments
    local opt = {}
    function opt.h (arg) print(usage) main.exit(0)            end
    function opt.l (arg) require(arg)            noop = false end
    function opt.t (arg) require(arg).selftest() noop = false end
+   function opt.q (arg) hook_sigquit(arg)                    end
    function opt.d (arg) _G.developer_debug = true            end
+   function opt.p (arg) program = arg                        end
    function opt.i (arg) start_repl = true       noop = false end
    function opt.j (arg)
       if arg:match("^v") then
@@ -39,6 +45,9 @@ function run (parameters)
          local opts, file = arg:match("^dump=([^,]*),?(.*)")
          if file == '' then file = nil end
          require("jit.dump").on(opts, file)
+      elseif arg:match("^tprof") then
+         require("lib.traceprof.traceprof").start()
+         traceprofiling = true
       end
    end
    function opt.e (arg)
@@ -51,9 +60,12 @@ function run (parameters)
    end
 
    -- Execute command line arguments
-   parameters = lib.dogetopt(parameters, opt, "hl:t:die:j:P:", long_opts)
+   parameters = lib.dogetopt(parameters, opt, "hl:p:t:die:j:P:q:", long_opts)
 
-   if #parameters > 0 then
+   if program then
+      local mod = (("program.%s.%s"):format(program, program))
+      require(mod).run(parameters)
+   elseif #parameters > 0 then
       run_script(parameters)
    elseif noop then
       print(usage)
@@ -62,6 +74,9 @@ function run (parameters)
 
    if start_repl then repl() end
    if profiling then require("jit.p").stop() end
+   if traceprofiling then
+      require("lib.traceprof.traceprof").stop()
+   end
 end
 
 function run_script (parameters)
@@ -100,6 +115,28 @@ function repl ()
          io.stdout:flush()
       end
    until not line
+end
+
+-- Cause SIGQUIT to enter the REPL.
+-- SIGQUIT can be triggered interactively with `Control \' in a terminal.
+function hook_sigquit (action)
+   if action ~= 'repl' then
+      print("ignoring unrecognized SIGQUIT action: " .. action)
+      os.exit(1)
+   end
+   local S = require("syscall")
+   local fd = S.signalfd("quit", "nonblock") -- handle SIGQUIT via fd
+   S.sigprocmask("block", "quit")            -- block traditional handler
+   local timer = require("core.timer")
+   timer.activate(timer.new("sigquit-repl",
+                            function ()
+                               if (#S.util.signalfd_read(fd) > 0) then
+                                  print("[snsh: SIGQUIT caught - entering REPL]")
+                                  repl()
+                               end
+                            end,
+                            1e4,
+                            'repeating'))
 end
 
 

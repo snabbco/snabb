@@ -4,35 +4,30 @@ E= @echo
 #Q=
 #E= @:
 
-# Required submodule versions.
-# Defined here to detect version mismatches at build time.
-LUAJIT_VSN    := "v2.0.4-306-gfe56522"
-LJSYSCALL_VSN := "v0.10-65-g7081d97"
-PFLUA_VSN     := "27523953c03745d4c4fbbcf81f676bc774e4329e"
-
-TEST_SKIPPED="43"
+export TEST_SKIPPED=43
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
 
 LUASRC = $(shell find . -regex '[^\#]*\.lua' -printf '%P ')
-PFLUASRC = $(shell cd ../deps/pflua/src && \
+PFLUASRC = $(shell cd ../lib/pflua/src && \
 	         find . -regex '[^\#]*\.lua' -printf '%P ')
 CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
-ASM    = $(shell find . -regex '[^\#]*\.dasc' -printf '%P ')
+ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
 RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
-INCSRC = $(shell find . -regex '[^\#]*\.inc' -printf '%P ')
+# sort to eliminate potential duplicate of programs.inc
+INCSRC = $(sort $(shell find . -regex '[^\#]*\.inc' -printf '%P ') programs.inc)
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
 COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
-ASMOBJ := $(patsubst %.dasc,obj/%_dasc.o,   $(ASM))
+ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %.src,%,$(RMSRC))
@@ -51,39 +46,12 @@ TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
 # for each executable selftext.sh script in src.
 TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
-PATH := ../deps/luajit/usr/local/bin:$(PATH)
+PATH := ../lib/luajit/usr/local/bin:$(PATH)
 
 snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
-	$(E) "SUBMODULES"
-	@if test ! -f ../deps/luajit.vsn			|| \
-	    test ! -f ../deps/ljsyscall.vsn			|| \
-	    test ! -f ../deps/pflua.vsn				|| \
-	    grep -vqF $(LJSYSCALL_VSN) ../deps/ljsyscall.vsn	|| \
-	    grep -vqF $(LUAJIT_VSN)    ../deps/luajit.vsn	|| \
-	    grep -vqF $(PFLUA_VSN)     ../deps/pflua.vsn; then \
-	    echo "Error: Submodule version mismatch"			>&2; \
-	    echo "luajit:"						>&2; \
-	    echo "  require: $(LUAJIT_VSN)"				>&2; \
-	    echo "  found:   $(shell cat ../deps/luajit.vsn)"		>&2; \
-	    echo "ljsyscall:"						>&2; \
-	    echo "  require: $(LJSYSCALL_VSN)"				>&2; \
-	    echo "  found:   $(shell cat ../deps/ljsyscall.vsn) "	>&2; \
-	    echo "pflua:"						>&2; \
-	    echo "  require: $(PFLUA_VSN)"				>&2; \
-	    echo "  found:   $(shell cat ../deps/pflua.vsn) "		>&2; \
-	    echo "Please update and rebuild submodules."		>&2; \
-	    echo ""							>&2; \
-	    echo "Cheat sheet:"						>&2; \
-	    echo "  cd snabbswitch"					>&2; \
-	    echo "  git submodule update"				>&2; \
-	    echo "  make clean"						>&2; \
-	    echo "  make -j"						>&2; \
-	    echo ""							>&2; \
-	    exit 1; \
-	 fi
 	$(E) "LINK      $@"
 	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
-	    ../deps/luajit/src/libluajit.a \
+	    ../lib/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
 	@ln -fs snabb snabbswitch
@@ -91,9 +59,15 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LU
 
 all: $(EXE)
 
-$(EXE): snabb
-	$(E) "PROGRAM   $@"
-	$(Q) install -D snabb $@
+# Rebuild after git submodules are updated.
+submods:
+	(cd ..; git submodule update; make clean; make)
+
+$(EXE): snabb bin
+	$(E) "COMPRESS  $@"
+	$(Q) upx -f --brute -o$@ snabb
+	@echo -n "BINARY    "
+	@ls -sh $@
 
 markdown: $(RMOBJS)
 
@@ -144,22 +118,22 @@ $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 	$(E) "LUA       $@"
 	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
 
-$(PFLUAOBJ): obj/%_lua.o: ../deps/pflua/src/%.lua Makefile
+$(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile
 	$(E) "LUA       $@"
 	$(Q) mkdir -p $(dir $@)
 	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) gcc $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/avx2_c.o: arch/avx2.c Makefile
 	$(E) "C(AVX2)   $@"
-	$(Q) gcc -O2 -mavx2 $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) gcc -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/sse2_c.o: arch/sse2.c Makefile
 	$(E) "C(SSE2)   $@"
-	$(Q) gcc -O2 -msse2 $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) gcc -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
@@ -168,12 +142,12 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	 echo "]=============]") > $(basename $@).luah
 	$(Q) luajit -bg -n $(subst /,.,$*)_h $(basename $@).luah $@
 
-$(ASMOBJ): obj/%_dasc.o: %.dasc $(CHDR) Makefile | $(OBJDIR)
+$(ASMOBJ): obj/%_dasl.o: %.dasl $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
-	$(Q) luajit ../deps/luajit/dynasm/dynasm.lua -o $@.gen $<
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../deps/luajit/src -I . -I ../deps/luajit -c -Wall -Werror -x c -o $@ $@.gen
+	$(Q) luajit dynasm.lua -o $@.gen $<
+	$(Q) luajit -bg -n $(subst /,.,$*) $@.gen $@
 
-$(JITOBJS): obj/jit_%.o: ../deps/luajit/src/jit/%.lua $(OBJDIR)
+$(JITOBJS): obj/jit_%.o: ../lib/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
 	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
 
@@ -182,7 +156,7 @@ $(RMOBJS): %: %.src
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
 
-$(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
+$(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	$(E) "INC       $@"
 	@(echo -n "return [=============["; \
 	 cat $<; \
@@ -190,7 +164,7 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile program/programs.inc | $(OBJDIR)
 	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
 
 # Create list of programs that exist
-program/programs.inc:
+programs.inc: program
 	@(for d in program/*/; do basename $$d; done) > $@
 
 FORCE:
@@ -206,7 +180,7 @@ obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
 
 obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../deps/luajit/src -c -Wall -Werror -o $@ $<
+	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
 
 book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
 
@@ -225,7 +199,7 @@ doc/snabbswitch.epub: doc/snabbswitch.md
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
 
-CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog deps/*.vsn
+CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog programs.inc
 
 clean:
 	$(E) "RM        $(CLEAN)"
@@ -235,5 +209,8 @@ mrproper: clean
 	$(E) "RM        $(RMOBJS)"
 	$(Q)-rm -rf $(RMOBJS)
 
-.PHONY: clean $(TESTMODS) $(TESTSCRIPTS)
+benchmarks:
+	$(Q) (scripts/bench.sh)
+
+.PHONY: clean $(TESTMODS) $(TESTSCRIPTS) benchmarks
 
