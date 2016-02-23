@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 sudo ip netns add snabbtest || exit $TEST_SKIPPED
 sudo ip netns exec snabbtest ip link add name snabbtest type bridge
 sudo ip netns exec snabbtest ip link set up dev snabbtest

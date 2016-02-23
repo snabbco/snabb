@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Neutron synchronization slave process to run on the Compute Nodes.
 
