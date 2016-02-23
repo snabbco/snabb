@@ -13,5 +13,6 @@ merged at all.
 Our [Documentation Guide](https://github.com/SnabbCo/snabbswitch/blob/master/src/doc/documentation-guide.md)
 gives pointers on how to contribute to the project's documentation.
 
-Copyright notices belong into `src/COPYRIGHT`; copyright notices in other files
-will be rejected.
+If you wish to record a copyright notice with your contribution then you can
+optionally do this in the file `src/COPYRIGHT`; copyright notices in other
+files will be rejected.
