@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
 
-if [ "$1" == "--help" -o "$1" == "-h" ]; then
+if [ "$#" == 0 -o "$1" == "--help" -o "$1" == "-h" ]; then
     cat >&2 <<EOF
-Lock a Snabb lab server for mutually-exclusive use.
+Usage: $0 command...
 
-Usage:
-  $0 command...
-    Run a command with the lock held.
-  $0
-    Start an interactive shell with the lock held.
-    Uses TMOUT to set a 1h idle timeout.
+Run a command with the machine-wide Snabb Lab lock held.
+
+Holding this lock entitles the process to use resources such as PCI
+devices and CPU cores that are (informally) reserved for lab tests.
+
+(Please don't access those resources except when using this command to
+hold the lock. That could make your tests interfere with somebody
+else.)
+
+Note: This command sets the TMOUT environment variable so if you start
+an interactive shell such as bash then you will automatically have a
+one-hour idle timeout at the prompt.
+
 EOF
     exit 1
 fi
@@ -18,12 +25,9 @@ lock=/var/lock/lab
 
 echo -n "locking $lock.. ">&2
 (flock --verbose 9 || exit 1
- if [ $# == 0 ]; then
-     echo "starting shell 1h idle timeout"
-     TMOUT=60 ${SHELL} -i
- else
-     "$@"
- fi
+ # Set TMOUT variable in case the command is an interactive Unix shell.
+ # This is a bit magical but hopefully okay for setting an idle timeout.
+ TMOUT=$[60*60] "$@"
 ) 9>/var/lock/lab
 
 
