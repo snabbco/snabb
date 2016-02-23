@@ -67,6 +67,10 @@ end
 
 local function u8_ptr (ptr) return ffi.cast("uint8_t *", ptr) end
 
+local function aes_128_block (block, keymat)
+   -- FIXME: use AES-128 to encrypt `block' with `keymat'
+end
+
 local aes_128_gcm = {}
 
 function aes_128_gcm:new (spi, keymat, salt)
@@ -83,7 +87,8 @@ function aes_128_gcm:new (spi, keymat, salt)
    o.aad_size = 12
    o.aad = aad:new(spi)
    -- Compute subkey (H)
-   o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 128)
+   o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 16)
+   aes_128_block(o.hash_subkey, o.keymat)
    o.gcm_data = ffi.new("gcm_data[1] __attribute__((aligned(16)))")
    ASM.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data[0].expanded_keys)
    ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
@@ -190,6 +195,25 @@ function selftest ()
                               p + length, gcm.auth_size)
    local finish = C.get_monotonic_time()
    print("Decrypted", length, "bytes in", finish-start, "seconds")
+   -- Test aes_128_block with vectors from
+   -- http://www.inconteam.com/software-development/41-encryption/55-aes-test-vectors 
+   local test_key = ffi.new("uint8_t[16]")
+   ffi.copy(test_key, lib.hexundump("2b7e151628aed2a6abf7158809cf4f3c", 16), 16)
+   local block = ffi.new("uint8_t[16]")
+   local should = ffi.new("uint8_t[16]")
+   local test_blocks = {
+      { "6bc1bee22e409f96e93d7e117393172a", "3ad77bb40d7a3660a89ecaf32466ef97" },
+      { "ae2d8a571e03ac9c9eb76fac45af8e51", "f5d3d58503b9699de785895a96fdbaaf" },
+      { "30c81c46a35ce411e5fbc1191a0a52ef", "43b1cd7f598ece23881b00e3ed030688" },
+      { "f69f2445df4f9b17ad2b417be66c3710", "7b0c785e27e8ad3f8223207104725dd4" }
+   }
+   for _, b in ipairs(test_blocks) do
+      print("Block:", b[1], b[2])
+      ffi.copy(block, lib.hexundump(b[1], 16), 16)
+      ffi.copy(should, lib.hexundump(b[2], 16), 16)
+      aes_128_block(block, test_key)
+      assert(C.memcmp(should, block, length) == 0)
+   end
 end
 
 
