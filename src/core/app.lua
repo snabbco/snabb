@@ -236,6 +236,15 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+
+   local breathe = breathe
+   if options.measure_latency or options.measure_latency == nil then
+      local histogram = require('lib.histogram')
+      local latency = histogram.create('engine/latency', 1e-6, 1e0)
+      print('hi')
+      breathe = latency:wrap_thunk(breathe, now)
+   end
+
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
