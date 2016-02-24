@@ -34,7 +34,7 @@ local function parse_args(args)
       opts.duration = assert(tonumber(arg), "duration must be a number")
    end
    args = lib.dogetopt(args, handlers, "hvD:", { help="h", verbose="v", duration="D"})
-   if #args ~= 2 then show_usage(1) end
+   if #args ~= 3 then show_usage(1) end
    return opts, unpack(args)
 end
 
@@ -60,18 +60,19 @@ local function config_nic(c, app_name, dev_addr)
 end
 
 function run(args)
-   local opts, arg1, arg2 = parse_args(args)
+   local opts, arg1, arg2, arg3 = parse_args(args)
    local c = config.new()
 
    config.app(c, "l2fwd1", L2Fwd)
    config.app(c, "l2fwd2", L2Fwd)
    config_nic(c, "nic1", arg1)
    config_nic(c, "nic2", arg2)
+   config_nic(c, "nic3", arg3)
 
    config.link(c, "nic1.tx -> l2fwd1.input")
    config.link(c, "l2fwd1.output -> nic2.rx")
-   config.link(c, "nic2.tx -> l2fwd2.input")
-   config.link(c, "l2fwd2.output -> nic2.rx")
+   config.link(c, "nic3.tx -> l2fwd2.input")
+   config.link(c, "l2fwd2.output -> nic1.rx")
 
    engine.configure(c)
    if opts.verbose then
