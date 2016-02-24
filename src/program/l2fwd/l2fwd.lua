@@ -25,7 +25,7 @@ end
 
 local function parse_args(args)
    local handlers = {}
-   local opts = { duration = 3 }
+   local opts = {}
    function handlers.h() show_usage(0) end
    function handlers.v()
       opts.verbose = true
@@ -76,11 +76,18 @@ function run(args)
 
    engine.configure(c)
    if opts.verbose then
-      while true do
-         engine.main({duration = opts.duration, report = {showlinks=true, showload=true}})
+      local fn = function()
+         print("Report (last 1 sec):")
+         engine.report_links()
+         engine.report_load()
       end
+      local t = timer.new("report", fn, 1e9, 'repeating')
+      timer.activate(t)
+   end
+   if opts.duration then
+      engine.main({duration=opts.duration})
    else
-      engine.main({duration = opts.duration, noreport = true})
+      engine.main()
    end
 end
 
