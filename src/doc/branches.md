@@ -41,6 +41,17 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Luke Gorrie <luke@snabb.co>
 
+#### kbara-next
+
+    BRANCH: kbara-next git://github.com/kbara/snabbswitch
+    Test and integration branch for maintenance & development.
+
+    - Contains changes proposed to be merged into next.
+    - Merges Pull Requests that pass code review on GitHub.
+    - Integration branch for code vetted by Kat
+
+    Maintainer: Katerina Barone-Adesi <kbarone@igalia.com>
+
 #### max-next
 
     BRANCH: max-next git://github.com/eugeneia/snabbswitch
