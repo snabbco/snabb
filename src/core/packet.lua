@@ -21,7 +21,8 @@ local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 ffi.cdef[[
 struct freelist {
-    int nfree, max;
+    uint64_t nfree;
+    uint64_t max;
     struct packet *list[?];
 };
 ]]
