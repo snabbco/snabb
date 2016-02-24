@@ -63,10 +63,12 @@ function run(args)
    local opts, arg1, arg2 = parse_args(args)
    local c = config.new()
 
+   config.app(c, "l2fwd", L2Fwd)
    config_nic(c, "nic1", arg1)
    config_nic(c, "nic2", arg2)
 
-   config.link(c, "nic1.tx -> nic2.rx")
+   config.link(c, "nic1.tx -> l2fwd.input")
+   config.link(c, "l2fwd.output -> nic2.rx")
 
    engine.configure(c)
    if opts.verbose then
