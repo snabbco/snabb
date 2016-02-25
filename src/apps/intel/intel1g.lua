@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- intel1g: Device driver app for Intel 1G network cards
 -- 
 -- This is a device driver for Intel i210, i350 families of 1G network cards.

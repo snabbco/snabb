@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Implements virtio-net device
 
 
@@ -326,20 +328,6 @@ function VirtioNetDevice:tx_signal_used()
    for i = 0, self.virtq_pairs-1 do
       self.virtq[2*i]:signal_used()
    end
-end
-
-local pagebits = memory.huge_page_bits
-
--- Cache of the latest referenced physical page.
-function VirtioNetDevice:translate_physical_addr (addr)
-   local page = bit.rshift(addr, pagebits)
-   if page == self.last_virt_page then
-      return addr + self.last_virt_offset
-   end
-   local phys = memory.virtual_to_physical(addr)
-   self.last_virt_page = page
-   self.last_virt_offset = phys - addr
-   return phys
 end
 
 function VirtioNetDevice:map_from_guest (addr)
