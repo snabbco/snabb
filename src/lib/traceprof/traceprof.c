@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 // Location where the next instruction pointer value will be stored.
 
 #define _GNU_SOURCE 1
