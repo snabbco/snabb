@@ -4,8 +4,8 @@ Usage:
 
 Available subcommands:
 
-  pcap    Analyze a .pcap capture and report statistics
+  spy     Analyze traffic and report statistics
 
 Use --help for per-command usage. Example:
 
-  snabb wall pcap --help
+  snabb wall spy --help

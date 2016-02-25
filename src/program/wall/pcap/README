@@ -1,5 +1,0 @@
-Usage:
-  snabb wall pcap <input.pcap>
-  snabb wall pcap --help
-
-Analyzes a .pcap capture using SnabbWall's L7spy and reports statistics.
