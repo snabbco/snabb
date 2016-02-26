@@ -43,13 +43,18 @@ local function parse_args (args, short_opts, long_opts)
    function handlers.s (arg) opts.source = arg end
    function handlers.d (arg) opts.destination = arg end
    function handlers.S (arg)
-      opts.sizes = {}
+      local sizes = {}
       for size in string.gmatch(arg, "%d+") do
          sizes[#sizes+1] = tonumber(size)
       end
+      opts.sizes = sizes
    end
    args = lib.dogetopt(args, handlers, short_opts, long_opts)
-   if #args <= 1 then show_usage(1) end
+   if (mode == 'replay' and #args <= 1) or
+      (mode == 'synth' and #args < 1) or
+      (mode == 'bounce' and not #args == 3) then
+         show_usage(1)
+   end
    return opts, args
 end
 
@@ -75,14 +80,13 @@ function run (args)
       c = config.new()
       opts, args = parse_args(args, "hD:rs:d:S:", {help="h", duration="D",
             src="s", dst="d", sizes="S"})
-      config.app(c, "source", Synth, { sizes = sizes,
-				       src = source,
-				       dst = destination })
+      config.app(c, "source", Synth, { sizes = opts.sizes,
+				       src = opts.source,
+				       dst = opts.destination })
       config_sources(c, args)
    elseif mode == 'bounce' then
       c = config.new()
       opts, args = parse_args(args, "hD:r", {help="h", duration="D"})
-      if #args > 3 then show_usage(1) end
       local filename, nic, bouncer = unpack(args)
       config.app(c, "pcap", PcapReader, filename)
       config.app(c, "loop", basic_apps.Repeater)
