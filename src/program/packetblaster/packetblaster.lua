@@ -68,7 +68,7 @@ function run (args)
    mode = table.remove(args, 1)
    if mode == 'replay' then
       c = config.new()
-      opts, args = parse_args(args, "hD:r", {help="h", duration="D"})
+      opts, args = parse_args(args, "hD:", {help="h", duration="D"})
       local filename = table.remove(args, 1)
       config.app(c, "pcap", PcapReader, filename)
       config.app(c, "loop", basic_apps.Repeater)
@@ -78,7 +78,7 @@ function run (args)
       config_sources(c, args)
    elseif mode == 'synth' then
       c = config.new()
-      opts, args = parse_args(args, "hD:rs:d:S:", {help="h", duration="D",
+      opts, args = parse_args(args, "hD:s:d:S:", {help="h", duration="D",
             src="s", dst="d", sizes="S"})
       config.app(c, "source", Synth, { sizes = opts.sizes,
 				       src = opts.source,
@@ -86,7 +86,7 @@ function run (args)
       config_sources(c, args)
    elseif mode == 'bounce' then
       c = config.new()
-      opts, args = parse_args(args, "hD:r", {help="h", duration="D"})
+      opts, args = parse_args(args, "hD:", {help="h", duration="D"})
       local filename, nic, bouncer = unpack(args)
       config.app(c, "pcap", PcapReader, filename)
       config.app(c, "loop", basic_apps.Repeater)
