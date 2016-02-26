@@ -3,21 +3,6 @@ module(...,package.seeall)
 local lib = require("core.lib")
 local main = require("core.main")
 
-L2Fwd = {}
-
-function L2Fwd.new(conf)
-   local o = {}
-   return setmetatable(o, { __index = L2Fwd })
-end
-
-function L2Fwd:push()
-   local input, output = assert(self.input.input), assert(self.output.output)
-
-   while not link.empty(input) do
-      link.transmit(output, link.receive(input))
-   end
-end
-
 local function show_usage(code)
    print(require("program.l2fwd.README_inc"))
    main.exit(code)
@@ -34,47 +19,38 @@ local function parse_args(args)
       opts.duration = assert(tonumber(arg), "duration must be a number")
    end
    args = lib.dogetopt(args, handlers, "hvD:", { help="h", verbose="v", duration="D"})
-   if #args ~= 3 then show_usage(1) end
+   if #args ~= 2 then show_usage(1) end
    return opts, unpack(args)
 end
 
 local function parse_nic_driver(arg)
-   local driver_class, pciaddr_or_iface = arg:match("(%a+):([%w:.]+)")
+   local driver_class, pciaddr = arg:match("(%a+):([%w:.]+)")
    if not driver_class then return "pci", arg end
-   return driver_class, pciaddr_or_iface
+   return driver_class, pciaddr
 end
 
-local function config_nic(c, app_name, dev_addr)
+local function config_nic(c, app_name, pciaddr)
    local driver
-   local driver_class, pciaddr_or_iface  = parse_nic_driver(dev_addr)
-   if driver_class == "tap" then
-      driver = require("apps.socket.raw").RawSocket
-      config.app(c, app_name, driver, pciaddr_or_iface)
-   elseif driver_class == "virtio" then
+   local driver_class, pciaddr  = parse_nic_driver(pciaddr)
+   if driver_class == "virtio" then
       driver = require("apps.virtio_net.virtio_net").VirtioNet
-      config.app(c, app_name, driver, {pciaddr = pciaddr_or_iface})
+      config.app(c, app_name, driver, {pciaddr = pciaddr})
    else
       driver = require("apps.intel.intel_app").Intel82599
-      config.app(c, app_name, driver, {pciaddr = pciaddr_or_iface})
+      config.app(c, app_name, driver, {pciaddr = pciaddr})
    end
 end
 
 function run(args)
-   local opts, arg1, arg2, arg3 = parse_args(args)
+   local opts, arg1, arg2 = parse_args(args)
    local c = config.new()
 
-   config.app(c, "l2fwd1", L2Fwd)
-   config.app(c, "l2fwd2", L2Fwd)
    config_nic(c, "nic1", arg1)
    config_nic(c, "nic2", arg2)
-   config_nic(c, "nic3", arg3)
 
-   config.link(c, "nic1.tx -> l2fwd1.input")
-   config.link(c, "l2fwd1.output -> nic2.rx")
-   config.link(c, "nic3.tx -> l2fwd2.input")
-   config.link(c, "l2fwd2.output -> nic1.rx")
+   config.link(c, "nic1.tx -> nic2.rx")
+   config.link(c, "nic2.tx -> nic1.rx")
 
-   engine.configure(c)
    if opts.verbose then
       local fn = function()
          print("Report (last 1 sec):")
@@ -84,6 +60,8 @@ function run(args)
       local t = timer.new("report", fn, 1e9, 'repeating')
       timer.activate(t)
    end
+
+   engine.configure(c)
    if opts.duration then
       engine.main({duration=opts.duration})
    else
@@ -93,14 +71,12 @@ end
 
 function selftest()
    print("selftest: l2fwd")
-   local driver_class, pciaddr_or_iface
-   driver_class, pciaddr_or_iface = parse_nic_driver("virtio:0000:00:01.0")
-   assert(driver_class == "virtio" and pciaddr_or_iface == "0000:00:01.0")
-   driver_class, pciaddr_or_iface = parse_nic_driver("tap:eth0")
-   assert(driver_class == "tap" and pciaddr_or_iface == "eth0")
-   driver_class, pciaddr_or_iface = parse_nic_driver("pci:0000:00:01.0")
-   assert(driver_class == "pci" and pciaddr_or_iface == "0000:00:01.0")
-   driver_class, pciaddr_or_iface = parse_nic_driver("0000:00:01.0")
-   assert(driver_class == "pci" and pciaddr_or_iface == "0000:00:01.0")
+   local driver_class, pciaddr
+   driver_class, pciaddr = parse_nic_driver("virtio:0000:00:01.0")
+   assert(driver_class == "virtio" and pciaddr == "0000:00:01.0")
+   driver_class, pciaddr = parse_nic_driver("pci:0000:00:01.0")
+   assert(driver_class == "pci" and pciaddr == "0000:00:01.0")
+   driver_class, pciaddr = parse_nic_driver("0000:00:01.0")
+   assert(driver_class == "pci" and pciaddr == "0000:00:01.0")
    print("OK")
 end
