@@ -1,3 +1,9 @@
+-- test.lua
+--
+-- Recursively run tests in the given paths, filtered by the given tags.
+-- Failed tests are extracted to the directory "failed_tests", and error
+-- details are appended.
+
 local t = require("tester")
 local tconcat, iowrite = table.concat, io.write
 local tagpat_inc = "^%+([_%a][_%w]*)$"
@@ -55,11 +61,26 @@ local pass, fail, failed_tests, errors = t.run(index,verbose,runcmd)
 iowrite("Passed ",pass,"/",pass+fail," tests.\n")
 if fail==0 then return end
 
+local function report_fail(test,err)
+  local extfn = t.extract(test,"failed_tests")
+  iowrite("----------------------------------------------------------",
+          "\nname: ",test.name,
+          "\nerror: ",err or "(no error message)",
+          "\nsource file: ",test.fn,
+          "\nextracted to file: ",extfn,
+          "\n")
+  -- Append error message for completeness
+  local extf = io.open(extfn,"a")
+  if extf then
+    extf:write("\n--[===[\nTest failed at ",os.date(),
+               "\nruncmd: ",runcmd or "(internal pcall)",
+               "\nerror:\n",err or "(no error message)",
+               "\n]===]\n")
+  end
+end
+
 iowrite("Failed tests:\n")
-for i=1,fail do
-  iowrite("----------------------------------------------------------")
-  iowrite("Name: ",failed_tests[i].name,"\n")
-  iowrite("Error: ",errors[i] or "(no error message)","\n")
-  iowrite("Filename: ",t.extract(failed_tests[i]),"\n")
+for i,failed_test in ipairs(failed_tests) do
+  report_fail(failed_test,errors[i])
 end
 
