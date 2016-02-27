@@ -1,10 +1,10 @@
 local t = require("tester")
 local tconcat, iowrite = table.concat, io.write
-local tagpat_inc = "^%+([A-Za-z_][A-Za-z0-9_]*)$"
-local tagpat_exc = "^%-([A-Za-z_][A-Za-z0-9_]*)$"
-local args = {...}
+local tagpat_inc = "^%+([_%a][_%w]*)$"
+local tagpat_exc = "^%-([_%a][_%w]*)$"
 local paths, tags_inc, tags_exc = {}, {}, {}
 local verbose = false
+local arg = arg or {...}
 
 local function print_help()
   io.write[[
@@ -18,16 +18,16 @@ Options:
 ]]
 end
 
-for _,arg in ipairs(args) do
-  if not arg:match("^[+-]") then
-    paths[#paths+1]=arg
-  elseif arg:match(tagpat_inc) then
-    tags_inc[#tags_inc+1]=arg:match(tagpat_inc)
-  elseif arg:match(tagpat_exc) then
-    tags_exc[#tags_exc+1]=arg:match(tagpat_exc)
-  elseif arg:match("%-%-verbose") then
+for _,a in ipairs(arg) do
+  if not a:match("^[+-]") then
+    paths[#paths+1]=a
+  elseif a:match(tagpat_inc) then
+    tags_inc[#tags_inc+1]=a:match(tagpat_inc)
+  elseif a:match(tagpat_exc) then
+    tags_exc[#tags_exc+1]=a:match(tagpat_exc)
+  elseif a:match("%-%-verbose") then
     verbose = true
-  elseif arg:match("%-%-help") then
+  elseif a:match("%-%-help") then
     print_help()
     return
   end
