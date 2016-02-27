@@ -5,7 +5,7 @@ local tagpat_exc = "^%-([_%a][_%w]*)$"
 local paths, tags_inc, tags_exc = {}, {}, {}
 local verbose = false
 local arg = arg or {...}
-
+local runcmd
 local function print_help()
   io.write[[
 Usage: luajit test.lua path1 path2 +tagtofilter +orthistag -tagtoexclude -andthistag
@@ -15,6 +15,9 @@ Options:
   -tag_exc  Exclude tests with tag tag_exc.
   --help    Print this help message.
   --verbose Explicitly list all tests.
+  --runcmd='cmd'
+            If runcmd is defined, Command to run the tests with, externally, e.g.
+              --runcmd="luajit -joff"
 ]]
 end
 
@@ -30,6 +33,8 @@ for _,a in ipairs(arg) do
   elseif a:match("%-%-help") then
     print_help()
     return
+  elseif a:match("%-%-runcmd") then
+    runcmd = a:match("%-%-runcmd=(.*)")
   end
 end
 
@@ -45,7 +50,7 @@ iowrite("\n")
 
 local index = t.index(paths)
 index = t.filter(index,tags_inc,tags_exc)
-local pass, fail, failed_tests, errors = t.run(index,verbose)
+local pass, fail, failed_tests, errors = t.run(index,verbose,runcmd)
 
 iowrite("Passed ",pass,"/",pass+fail," tests.\n")
 if fail==0 then return end
