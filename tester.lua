@@ -20,6 +20,14 @@ local function tags_from_path(fn)
   return tags
 end
 
+-- Patterns for parsing out test data.
+local identifier_pat = "([_%a][_%w]*)"
+local delim_pat = "^%-%-%-"
+local name_pat = delim_pat.."%s*(.*)"
+local desc_pat = "^%-%-(.*)"
+local tag_pat = "%+"..identifier_pat
+local kv_pat = "@"..identifier_pat.."%s*:%s*([^@]*)"
+
 --- Parser for the tests.
 -- @param fn string containing a filename (fullpath)
 -- @return array containing test specs (name, code, description, tags)
@@ -39,10 +47,10 @@ local function parse_test(fn)
     lookup[current_test.name] = #tests
   end
   for line in io.lines(fn) do
-    if line:match("^%-%-%-") then
+    if line:match(delim_pat) then
       -- Next test is reached
       store_test()
-      local testname = line:match("^%-%-%-%s*(.*)$")
+      local testname = line:match(name_pat)
       if lookup[testname] then
         error("Test "..testname.." is defined twice in the same file. Please give the tests unique names.")
       end
@@ -54,11 +62,14 @@ local function parse_test(fn)
         tags = cp(prelude.tags),
         code = cp(prelude.code),
       }
-    elseif line:match("^%-%-") and #current_test.code==#prelude.code then
-    -- Continue building current test description (and possibly tags)
-      current_test.description[#current_test.description+1] = line:match("^%-%-%s*(.*)$")
-      for tag in line:gmatch("%+([A-Za-z_][A-Za-z0-9_]*)") do
+    elseif line:match(desc_pat) and #current_test.code==#prelude.code then
+      -- Continue building current test description, and possibly extract tags and key-value pairs
+      current_test.description[#current_test.description+1] = line:match(desc_pat)
+      for tag in line:gmatch(tag_pat) do
         current_test.tags[tag] = true
+      end
+      for key,value in line:gmatch(kv_pat) do
+        current_test[key] = value:gsub("%s*$","")
       end
     else
       current_test.code[#current_test.code+1] = line
