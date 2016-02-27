@@ -26,7 +26,7 @@ local delim_pat = "^%-%-%-"
 local name_pat = delim_pat.."%s*(.*)"
 local desc_pat = "^%-%-(.*)"
 local tag_pat = "%+"..identifier_pat
-local kv_pat = "@"..identifier_pat.."%s*:%s*([^@]*)"
+local attrib_pat = "@"..identifier_pat.."%s*:%s*([^@]*)"
 
 --- Parser for the tests.
 -- @param fn string containing a filename (fullpath)
@@ -40,6 +40,7 @@ local function parse_test(fn)
     description = {},
     code = {},
     tags = tags_from_path(fn),
+    attributes = {},
   }
   local current_test = prelude
   local function store_test()
@@ -61,6 +62,7 @@ local function parse_test(fn)
         description = cp(prelude.description),
         tags = cp(prelude.tags),
         code = cp(prelude.code),
+        attributes = cp(prelude.attributes),
       }
     elseif line:match(desc_pat) and #current_test.code==#prelude.code then
       -- Continue building current test description, and possibly extract tags and key-value pairs
@@ -68,8 +70,8 @@ local function parse_test(fn)
       for tag in line:gmatch(tag_pat) do
         current_test.tags[tag] = true
       end
-      for key,value in line:gmatch(kv_pat) do
-        current_test[key] = value:gsub("%s*$","")
+      for key,value in line:gmatch(attrib_pat) do
+        current_test.attributes[key] = value:gsub("%s*$","")
       end
     else
       current_test.code[#current_test.code+1] = line
