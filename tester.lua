@@ -124,7 +124,7 @@ local function build_codestring(test)
   })
 end
 
---- Extract a test into a directory
+--- Extract a test to a file.
 -- @param test the test table returned by parse, containing name, description, tags, code
 -- @param fn string containing filename where the test should be extracted (default:os.tmpname())
 -- @return filename to where the test was extracted
@@ -139,54 +139,67 @@ local function extract_test(test,fn)
   return fn
 end
 
---- Run a single test, possibly externally with luajitcmd.
+--- Run a single test, possibly externally with runcmd.
 -- @param test single test object containing name, description, tags, code.
 -- @param verbose boolean indicating verbosity
--- @param luajitcmd string containing the luajit command to run external tests.
--- If luajitcmd is defined, the test is extracted into a file and run externally.
+-- @param runcmd string containing the luajit command to run external tests.
+-- If runcmd is defined, the test is extracted into a file and run externally.
 -- If left empty, the test is run internally with pcall.
+-- @param workdir string containing the directory where runcmd is run and
+-- the test is extracted.
 -- @return true (pass) or false (fail)
 -- @return msg error message in case of failure
-local function run_single_test(test,verbose,luajitcmd)
-  if luajitcmd then
-    local fn = extract_test(test)
-    local ret = os.execute(luajitcmd.." "..fn)
-    return ret==0
-  end
-  local code = build_codestring(test)
-  local load_ok, load_res = pcall(loadstring,code)
-  if load_ok then
-    local ok, res = pcall(load_res)
-    if verbose then 
-      io.write(ok and "PASS " or "FAIL ",test.name,"\n")
-      if not ok then io.write("    "..(res or "(no error message)"),"\n") end
+local function run_single_test(test,verbose,runcmd,workdir)
+  local ok, res
+  if runcmd then
+    workdir = workdir or "."
+    local fn = extract_test(test,workdir.."/current_test.lua")
+    local fnerr = fn:gsub("%.lua$",".err")
+    local status = os.execute(runcmd.." "..fn.." 2> "..fnerr)
+    ok = status==0
+    if not ok then
+      local ferr = io.open(fnerr)
+      if ferr then
+        res = ferr:read("*a")
+        ferr:close()
+      end
     end
-    return ok, res
   else
-    if verbose then 
-      io.write("SYNT ",test.name,load_res or "(no error message)","\n")
+    local code = build_codestring(test)
+    local load_ok, load_res = pcall(loadstring,code)
+    if not load_ok then
+      if verbose then
+        io.write("SYNT ",test.name,"\n     ",load_res or "(no error message)","\n")
+      end
+      return load_ok, load_res
+    else
+      ok, res = pcall(load_res)
     end
-    return load_ok, load_res
   end
+  if verbose then
+    io.write(ok and "PASS " or "FAIL ",test.name,"\n")
+    if not ok then io.write("     "..(res or "(no error message)"),"\n") end
+  end
+  return ok, res
 end
 
 --- Recursively run tests in paths.
 -- @param paths array of paths to recursively run tests in.
 -- @param verbose boolean indicating verbosity
--- @param luajitcmd string containing the luajit command to run external tests.
--- If luajitcmd is defined, the test is extracted into a file and run externally.
+-- @param runcmd string containing the luajit command to run external tests.
+-- If runcmd is defined, the test is extracted into a file and run externally.
 -- If left empty, the test is run internally with pcall.
 -- @return number of passed tests
 -- @return number of failed tests
 -- @return array of failed tests
 -- @return array of corresponding error messages
-local function run_tests(test_index,verbose,luajitcmd)
+local function run_tests(test_index,verbose,runcmd)
   local pass, fail = 0,0
   local failed_tests = {}
   local errors = {}
   for i,test_block in ipairs(test_index) do
     for j,test in ipairs(test_block) do
-      local ok, res = run_single_test(test,verbose,luajitcmd)
+      local ok, res = run_single_test(test,verbose,runcmd)
       if ok then
         pass = pass+1
       else
