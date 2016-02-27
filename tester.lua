@@ -116,7 +116,8 @@ end
 local function build_codestring(test)
   return tconcat({
     "--- ", test.name,
-    "\n--", tconcat(test.description,"\n--"), "\n",
+    #test.description>0 and "\n--" or "",
+    tconcat(test.description,"\n--"), "\n",
     tconcat(test.code,"\n")
   })
 end
