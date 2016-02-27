@@ -125,11 +125,19 @@ local function build_codestring(test)
 end
 
 --- Extract a test to a file.
--- @param test the test table returned by parse, containing name, description, tags, code
--- @param fn string containing filename where the test should be extracted (default:os.tmpname())
+-- @param test the test table returned by parse, containing name, description,
+-- tags, code and attributes
+-- @param workdir string containing the directory where the test is extracted;
+-- the directory is created if needed  (default: ".")
+-- @param fn string containing filename where the test should be extracted
+-- (default: test_fn__test_name.lua)
 -- @return filename to where the test was extracted
-local function extract_test(test,fn)
-  fn = fn or os.tmpname()..".lua"
+local function extract_test(test,workdir,fn)
+  fn = fn or (test.fn:gsub("%.lua$","").."__"..test.name):gsub("[^%a]","_")..".lua"
+  if workdir then
+    lfs.mkdir(workdir)
+    fn = workdir.."/"..fn
+  end
   local f = io.open(fn,"w")
   if not f then
     error("Could not write to file "..fn)
@@ -153,7 +161,7 @@ local function run_single_test(test,verbose,runcmd,workdir)
   local ok, res
   if runcmd then
     workdir = workdir or "."
-    local fn = extract_test(test,workdir.."/current_test.lua")
+    local fn = extract_test(test,workdir,"current_test.lua")
     local fnerr = fn:gsub("%.lua$",".err")
     local status = os.execute(runcmd.." "..fn.." 2> "..fnerr)
     ok = status==0
