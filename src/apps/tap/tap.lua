@@ -14,7 +14,7 @@ Tap = { }
 
 function Tap:new (name)
    assert(name, "missing tap interface name")
-   
+
    local sock, err = S.open("/dev/net/tun", "rdwr, nonblock");
    assert(sock, "Error opening /dev/net/tun: " .. tostring(err))
    local ifr = t.ifreq()
@@ -22,10 +22,10 @@ function Tap:new (name)
    ifr.name = name
    local ok, err = sock:ioctl("TUNSETIFF", ifr)
    if not ok then
-      S.close(sock)
+      sock:close()
       error("Error opening /dev/net/tun: " .. tostring(err))
    end
-   
+
    return setmetatable({sock = sock, name = name}, {__index = Tap})
 end
 
@@ -35,9 +35,9 @@ function Tap:pull ()
    while not link.full(l) do
       local p = packet.allocate()
       local len, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
-      -- errno == EAGAIN indicates that the read would of blocked as there is no 
+      -- errno == EAGAIN indicates that the read would of blocked as there is no
       -- packet waiting. It is not a failure.
-      if not len and err.errno == const.E.AGAIN then 
+      if not len and err.errno == const.E.AGAIN then
          packet.free(p)
          return
       end
@@ -71,13 +71,13 @@ function Tap:push ()
 end
 
 function Tap:stop()
-   S.close(self.sock)
+   self.sock:close()
 end
 
 function selftest()
    -- tapsrc and tapdst are bridged together in linux. Packets are sent out of tapsrc and they are expected
    -- to arrive back on tapdst. Linux may create other control-plane packets so to avoid races if a packet doesn't
-   -- match the one we just sent keep looking until it does match. 
+   -- match the one we just sent keep looking until it does match.
 
    -- The linux bridge does mac address learning so some care must be taken with the preparation of selftest.cap
    -- A mac address should appear only as the source address or destination address
