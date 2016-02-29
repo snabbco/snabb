@@ -1,3 +1,4 @@
+--go@ plink root@10.0.0.123 "cd snabb/src && make"
 module(..., package.seeall)
 io.stdout:setvbuf'no'
 io.stderr:setvbuf'no'
@@ -9,6 +10,7 @@ local packet   = require("core.packet")
 local usage    = require("program.lisper.README_inc")
 local ipv6     = require("lib.protocol.ipv6")
 local ethernet = require("lib.protocol.ethernet")
+local esp      = require("lib.ipsec.esp")
 local unix     = require("apps.socket.unix")
 local raw      = require("apps.socket.raw")
 local nd       = require("apps.ipv6.nd_light")
@@ -104,7 +106,7 @@ local MODE  = getenv"LISPER_MODE"  --if set to "record" then record packets to p
 --loc_t:         eth_loc_t|l2tp_loc_t|lisper_loc_t
 --eth_loc_t:     {type="ethernet", interface=if_t}
 --l2tp_loc_t:    {type="l2tpv3", ip=ip6, session_id=n, cookie=s, exit=exit_t}
---lisper_loc_t:  {type="lisper", ip=ip6, p=n, w=n, key=s, exit=exit_t}
+--lisper_loc_t:  {type="lisper", ip=ip6, p=n, w=n, encrypt=encrypt_func, exit=exit_t}
 local conf     --{control_sock=s, punt_sock=s, arp_timeout=n}
 local ifs      --{ifname -> if_t}
 local exits    --{exitname -> exit_t}
@@ -112,6 +114,7 @@ local eths     --{ifname -> {iid=n, loc=eth_loc_t}}
 local l2tps    --{sesson_id -> {cookie -> {iid=n, loc=l2tp_loc_t}}}
 local locs     --{iid -> {dest_mac -> {loc1_t, ...}}}
 local lispers  --{ipv6 -> exit_t}
+local spis     --{spi -> decrypt_func}
 
 --see dev-env/lisper.conf for the format of s.
 local function update_config(s)
@@ -124,11 +127,13 @@ local function update_config(s)
    l2tps = {}
    locs = {}
    lispers = {}
+   spis = {}
 
    --globals
    conf.control_sock = t.control_sock
    conf.punt_sock = t.punt_sock
    conf.arp_timeout = tonumber(t.arp_timeout or 60)
+   conf.esp_salt = t.esp_salt or "00000000"
 
    --map interfaces
    if t.interfaces then
@@ -244,15 +249,39 @@ local function update_fib(s)
          local ip = parseip6(rloc)
          local exit = lispers[ip]
          if exit then
-            local key = t.key and t.key ~= "" and parsehex(t.key)
+            local k = t["encap-key"]; local encap_key = k and k ~= "" and k
+            local k = t["decap-key"]; local decap_key = k and k ~= "" and k
+            local k = t["key-id"];    local key_id    = k and k ~= "" and tonumber(k)
             local p = tonumber(t.priority)
             local w = tonumber(t.weight)
+            local encrypt
+            if key_id and encap_key and decap_key then
+               local enc = esp.esp_v6_encrypt:new{
+                  spi = key_id,
+                  mode = "aes-128-gcm",
+                  keymat = encap_key,
+                  salt = conf.esp_salt,
+               }
+               function encrypt(p)
+                  return enc:encapsulate(p)
+               end
+               local dec = esp.esp_v6_decrypt:new{
+                  spi = key_id,
+                  mode = "aes-128-gcm",
+                  keymat = decap_key,
+                  salt = conf.esp_salt,
+               }
+               local function decrypt(p)
+                  return dec:decapsulate(p)
+               end
+               spis[key_id] = decrypt
+            end
             local loc = {
                type = "lisper",
                ip = ip,
                p = p,
                w = w,
-               key = key,
+               encrypt = encrypt,
                exit = exit,
             }
             table.insert(rt, loc)
@@ -269,15 +298,16 @@ local punt = {} --{{mac=,name=}, ...}
 local punted = {} --{smac -> {dmac -> expire_time}}
 
 local function punt_mac(smac, dmac, ifname)
+   if not conf.punt_sock then return end
    local t = punted[smac]
-	local exp = t and t[dmac]
-	if exp and exp < os.time() + conf.arp_timeout then return end
+   local exp = t and t[dmac]
+   if exp and exp < os.time() + conf.arp_timeout then return end
    table.insert(punt, {smac = smac, dmac = dmac, ifname = ifname})
-	if not t then
-		t = {}
-		punted[smac] = t
-	end
-	t[dmac] = os.time()
+   if not t then
+      t = {}
+      punted[smac] = t
+   end
+   t[dmac] = os.time()
 end
 
 local function get_punt_message()
@@ -291,32 +321,41 @@ end
 
 --data plane -----------------------------------------------------------------
 
-local l2tp_ct = ffi.typeof[[
-   struct {
-      // ethernet
-      char     dmac[6];
-      char     smac[6];
-      uint16_t ethertype; // dd:86 = ipv6
+local ipv6_ct = ffi.typeof[[struct __attribute__((packed)) {
+   // ethernet header
+   char     dmac[6];
+   char     smac[6];
+   uint16_t ethertype; // dd:86 = ipv6
 
-      // ipv6
-      uint32_t flow_id; // version, tc, flow_id
-      int16_t  payload_length;
-      int8_t   next_header; // 115 = L2TPv3
-      uint8_t  hop_limit;
-      char     src_ip[16];
-      char     dst_ip[16];
+   // ipv6 header
+   uint32_t flow_id; // version, tc, flow_id
+   int16_t  payload_length;
+   int8_t   next_header; // 115 = L2TPv3; 50 = ESP
+   uint8_t  hop_limit;
+   char     src_ip[16];
+   char     dst_ip[16];
+}]]
 
-      // l2tp
-      uint32_t session_id;
-      char     cookie[8];
+local l2tp_ct = ffi.typeof([[struct __attribute__((packed)) {
+   $;
+   // L2TP header
+   uint32_t session_id;
+   char     cookie[8];
+   // tunneled ethernet frame
+   char l2tp_dmac[6];
+   char l2tp_smac[6];
+}]], ipv6_ct)
 
-      // tunneled ethernet frame
-      char l2tp_dmac[6];
-      char l2tp_smac[6];
+local esp_ct = ffi.typeof([[struct __attribute__((packed)) {
+   $;
+   // ESP header
+   uint32_t spi;
+}]], ipv6_ct)
 
-   } __attribute__((packed))
-   ]]
+local ipv6_ct_size = ffi.sizeof(ipv6_ct)
+local esp_ct_size  = ffi.sizeof(esp_ct)
 local l2tp_ct_size = ffi.sizeof(l2tp_ct)
+local esp_ctp  = ffi.typeof("$*", esp_ct)
 local l2tp_ctp = ffi.typeof("$*", l2tp_ct)
 
 local function parse_eth(p)
@@ -325,6 +364,14 @@ local function parse_eth(p)
    local smac = ffi.string(p.smac, 6)
    local dmac = ffi.string(p.dmac, 6)
    return smac, dmac, 0
+end
+
+local function parse_esp(p)
+   if p.length < esp_ct_size then return end
+   local p = ffi.cast(esp_ctp, p.data)
+   if p.ethertype ~= 0xdd86 then return end --not IPv6
+   if p.next_header ~= 50 then return end --not ESP
+   return ntohl(p.spi)
 end
 
 local function parse_l2tp(p)
@@ -438,7 +485,7 @@ end
 local function route_packet(p, rxname, txports)
 
    --step #1: find the iid and source location of the packet.
-   --NOTE: smac and dmac are the MACs of the payload ethernet frame!
+   --NOTE: smac and dmac are the MACs of the _payload_ ethernet frame!
    local iid, sloc, smac, dmac, payload_offset
    local t = eths[rxname]
    if t then --packet came from a local ethernet
@@ -447,6 +494,13 @@ local function route_packet(p, rxname, txports)
       if not smac then return end --invalid packet
       log_eth("<<<", p, rxname, iid)
    else --packet came from a l2tp tunnel or a lisper
+      local spi = parse_esp(p)
+      if spi then --packed is encrypted, decrypt it
+         local decrypt = spis[spi]
+         if not decrypt then return end --invalid packet
+         p = decrypt(p)
+         if not p then return end --invalid packet
+      end
       local src_ip, session_id, cookie
       src_ip, session_id, cookie, smac, dmac, payload_offset = parse_l2tp(p)
       if not src_ip then return end --invalid packet
@@ -506,6 +560,9 @@ local function route_packet(p, rxname, txports)
             loc.ip,
             iid,
             "\0\0\0\0\0\0\0\0")
+         if loc.encrypt then
+            dp = loc.encrypt(dp)
+         end
          local txname = loc.exit.interface.name
          tx = txports[txname]
          log_l2tp(")))", dp, txname)
@@ -514,6 +571,8 @@ local function route_packet(p, rxname, txports)
          link.transmit(tx, dp)
       end
    end
+
+   return p
 end
 
 --data processing apps -------------------------------------------------------
@@ -573,8 +632,10 @@ function Lisper:push()
       local rx = self.input[rxname]
       while not link.empty(rx) do
          local p = link.receive(rx)
-         route_packet(p, rxname, self.output)
-         packet.free(p)
+         local p2 = route_packet(p, rxname, self.output)
+         if not p2 or p2 == p then
+            packet.free(p)
+         end
       end
    end
 end
@@ -720,6 +781,8 @@ function run(args)
       end
       print(_("  %-12s: %s", appname, s))
    end
+
+   collectgarbage()
 
    if not os.getenv'LISP_PERFTEST' then
       engine.main({report = {showlinks=true}})
