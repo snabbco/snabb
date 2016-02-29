@@ -53,7 +53,11 @@ $(cat ../apps/socket/README.md)
 
 # Libraries
 
-$(cat ../lib/README.md)
+$(cat ../lib/README.checksum.md)
+
+$(cat ../lib/README.ctable.md)
+
+$(cat ../lib/README.pmu.md)
 
 ## Hardware
 
