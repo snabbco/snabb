@@ -1,5 +1,3 @@
-## Specialized data structures
-
 ### Ctable (lib.ctable)
 
 A *ctable* is a hash table whose keys and values are instances of FFI
