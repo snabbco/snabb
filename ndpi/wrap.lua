@@ -16,7 +16,7 @@ local id_struct_ptr_t = ffi.typeof("ndpi_id_t*")
 local id_struct_size  = lib.ndpi_detection_get_sizeof_ndpi_id_struct()
 
 local function id_new(ctype)
-   local id = ffi.cast(id_struct_ptr_t, ffi.gc(C.malloc(id_struct_size), id_free))
+   local id = ffi.cast(id_struct_ptr_t, C.malloc(id_struct_size))
    ffi.fill(id, id_struct_size)
    return id
 end
@@ -32,7 +32,7 @@ local flow_struct_ptr_t = ffi.typeof("ndpi_flow_t*")
 local flow_struct_size  = lib.ndpi_detection_get_sizeof_ndpi_flow_struct()
 
 local function flow_new(ctype)
-   local flow = ffi.cast(flow_struct_ptr_t, ffi.gc(C.malloc(flow_struct_size), flow_free))
+   local flow = ffi.cast(flow_struct_ptr_t, C.malloc(flow_struct_size))
    ffi.fill(flow, flow_struct_size)
    return flow
 end
