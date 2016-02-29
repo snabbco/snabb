@@ -36,6 +36,8 @@ local function config_nic(c, app_name, pciaddr)
       driver = require("apps.virtio_net.virtio_net").VirtioNet
       config.app(c, app_name, driver, {pciaddr = pciaddr})
    else
+      assert(driver_class == "pci",
+         ("Not supported driver class '%s'"):format(driver_class))
       driver = require("apps.intel.intel_app").Intel82599
       config.app(c, app_name, driver, {pciaddr = pciaddr})
    end

@@ -1,7 +1,7 @@
 Usage: l2fwd <PCI1> <PCI2>
 
-PCI1: [pciaddr|pci:pciaddr|virtio:pciaddr]
-PCI2: [pciaddr|pci:pciaddr|virtio:pciaddr]
+PCI1: [pciaddr|virtio:pciaddr]
+PCI2: [pciaddr|virtio:pciaddr]
 
 Creates a full-duplex softwire between PCI1 and PCI2.
 

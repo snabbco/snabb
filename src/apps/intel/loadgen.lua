@@ -74,22 +74,18 @@ function LoadGen:report ()
    local function format(reg)
       return lib.comma_value(tonumber(reg()))
    end
-   local function reset(...)
-      for _, reg in ipairs{...} do
-         reg:reset()
-      end
-   end
 
    print(self.pciaddr,
          "TXDGPC (TX packets)", format(s.TXDGPC),
          "GOTCL (TX octets)",   format(s.GOTCL))
-   reset(s.TXDGPC, s.GOTCL)
+   s.TXDGPC:reset()
+   s.GOTCL:reset()
    if self.report_rx then
       print(self.pciaddr,
             -- TODO: RXDGPC reported 0 packets received, but non-filtered got packets.
             "RXNFGPC (RX packets)", format(s.RXNFGPC),
             "GORCL (RX octets)",    format(s.GORCL))
-      reset(s.RXNFGPC, s.GORCL)
+      s.RXNFGPC:reset()
+      s.GORCL:reset()
    end
 end
-
