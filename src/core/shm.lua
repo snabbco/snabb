@@ -4,10 +4,10 @@
 
 -- API:
 --   shm.create(name, type) => ptr
---     Map a shared object into memory via a heirarchical name, creating it
+--     Map a shared object into memory via a hierarchical name, creating it
 --     if needed.
 --   shm.open(name, type[, readonly]) => ptr
---     Map a shared object into memory via a heirarchical name.  Fail if
+--     Map a shared object into memory via a hierarchical name.  Fail if
 --     the shared object does not already exist.
 --   shm.unmap(ptr)
 --     Delete a memory mapping.
