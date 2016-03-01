@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- AUTOMATICALLY GENERATED FILE
 -- Date: Fri Aug 14 14:34:23 CEST 2015
 -- Cmd:  scripts/generate-pmu.sh 

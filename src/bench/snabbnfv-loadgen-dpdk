@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 out=$(timeout 120 program/snabbnfv/packetblaster_bench.sh)
 # Extract floating point Mpps number from output.

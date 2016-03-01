@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- traceprof.lua: Low-level trace profiler
 -- 
 -- Traceprof analyzes the time spent in JIT-compiled traces.  It is an
