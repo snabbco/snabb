@@ -95,7 +95,11 @@ local function map (name, type, readonly, create)
       fd, err = S.open(root..'/'..path, "rdonly")
    end
    if not fd then error("shm open error ("..path.."):"..tostring(err)) end
-   assert(fd:ftruncate(size), "shm: ftruncate failed")
+   if create then
+      assert(fd:ftruncate(size), "shm: ftruncate failed")
+   else
+      assert(fd:fstat().size == size, "shm: unexpected size")
+   end
    local mem, err = S.mmap(nil, size, mapmode, "shared", fd, 0)
    fd:close()
    if mem == nil then error("mmap failed: " .. tostring(err)) end
