@@ -18,8 +18,8 @@ fields:
 
 — Method **RateLimiter:set_rate** byte_rate
 
-Configure the rate limiter to refill its empty its bucket at the new
-rate of `byte_rate` bytes per second.
+Configure the rate limiter to limit throughput to `byte_rate` bytes
+per second.
 
 
 ## Configuration
