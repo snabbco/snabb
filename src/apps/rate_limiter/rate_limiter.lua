@@ -25,8 +25,10 @@ local PACKET_SIZE = 60
 
 function RateLimiter:new (arg)
    local conf = arg and config.parse_app_arg(arg) or {}
-   assert(conf.rate)
-   assert(conf.bucket_capacity)
+   --- By default, limit to 10 Mbps, just to have a default.
+   conf.rate = conf.rate or (10e6 / 8)
+   -- By default, allow for 255 standard packets in the queue.
+   conf.bucket_capacity = conf.bucket_capacity or (255 * 1500)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o =
    {
