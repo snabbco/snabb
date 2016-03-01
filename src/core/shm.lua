@@ -3,8 +3,12 @@
 -- shm.lua -- shared memory alternative to ffi.new()
 
 -- API:
---   shm.map(name, type[, readonly]) => ptr
---     Map a shared object into memory via a heirarchical name.
+--   shm.create(name, type) => ptr
+--     Map a shared object into memory via a heirarchical name, creating it
+--     if needed.
+--   shm.open(name, type[, readonly]) => ptr
+--     Map a shared object into memory via a heirarchical name.  Fail if
+--     the shared object does not already exist.
 --   shm.unmap(ptr)
 --     Delete a memory mapping.
 --   shm.unlink(path)
@@ -49,11 +53,11 @@
 -- of the 'path' variable. Here are examples of names and how they are
 -- resolved:
 --   Fully qualified:
---     //snabb/1234/foo/bar => /var/run/snabb/1234/foo/bar
+--     //1234/foo/bar => /var/run/snabb/1234/foo/bar
 --   Path qualified:
---     /foo/bar             => /var/run/snabb/$pid/foo/bar
+--     /foo/bar       => /var/run/snabb/$pid/foo/bar
 --   Local:
---     bar                  => /var/run/snabb/$pid/$path/bar
+--     bar            => /var/run/snabb/$pid/$path/bar
 -- .. where $pid is the PID of this process and $path is the current
 -- value of the 'path' variable in this module.
 
@@ -72,7 +76,7 @@ path = ""
 mappings = {}
 
 -- Map an object into memory.
-function map (name, type,  readonly)
+local function map (name, type, readonly, create)
    local path = resolve(name)
    local mapmode = readonly and 'read' or 'read, write'
    local ctype = ffi.typeof(type)
@@ -82,9 +86,14 @@ function map (name, type,  readonly)
       print(("shm warning: resizing %s from %d to %d bytes")
             :format(path, stat.size, size))
    end
-   -- Create the parent directories. If this fails then so will the open().
-   mkdir(path)
-   local fd, err = S.open(root..'/'..path, "creat, rdwr", "rwxu")
+   local fd, err
+   if create then
+      -- Create the parent directories. If this fails then so will the open().
+      mkdir(path)
+      fd, err = S.open(root..'/'..path, "creat, rdwr", "rwxu")
+   else
+      fd, err = S.open(root..'/'..path, "rdonly")
+   end
    if not fd then error("shm open error ("..path.."):"..tostring(err)) end
    assert(fd:ftruncate(size), "shm: ftruncate failed")
    local mem, err = S.mmap(nil, size, mapmode, "shared", fd, 0)
@@ -92,6 +101,14 @@ function map (name, type,  readonly)
    if mem == nil then error("mmap failed: " .. tostring(err)) end
    mappings[pointer_to_number(mem)] = size
    return ffi.cast(ffi.typeof("$&", ctype), mem)
+end
+
+function create (name, type)
+   return map(name, type, false, true)
+end
+
+function open (name, type, readonly)
+   return map(name, type, readonly, false)
 end
 
 function resolve (name)
@@ -169,10 +186,10 @@ function selftest ()
    path = 'shm/selftest'
    local name = "obj"
    print("create "..name)
-   local p1 = map(name, "struct { int x, y, z; }")
-   local p2 = map(name, "struct { int x, y, z; }")
+   local p1 = create(name, "struct { int x, y, z; }")
+   local p2 = create(name, "struct { int x, y, z; }")
    alias(name, name..".alias")
-   local p3 = map(name..".alias", "struct { int x, y, z; }")
+   local p3 = create(name..".alias", "struct { int x, y, z; }")
    assert(p1 ~= p2)
    assert(p1.x == p2.x)
    p1.x = 42
@@ -188,7 +205,7 @@ function selftest ()
    local n = 10000
    local objs = {}
    for i = 1, n do
-      table.insert(objs, map("obj/"..i, "uint64_t[1]"))
+      table.insert(objs, create("obj/"..i, "uint64_t[1]"))
    end
    print(n.." objects created")
    for i = 1, n do unmap(objs[i]) end
