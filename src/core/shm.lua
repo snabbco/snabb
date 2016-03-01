@@ -92,7 +92,7 @@ local function map (name, type, readonly, create)
       mkdir(path)
       fd, err = S.open(root..'/'..path, "creat, rdwr", "rwxu")
    else
-      fd, err = S.open(root..'/'..path, "rdonly")
+      fd, err = S.open(root..'/'..path, readonly and "rdonly" or "rdwr")
    end
    if not fd then error("shm open error ("..path.."):"..tostring(err)) end
    if create then
