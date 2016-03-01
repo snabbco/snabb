@@ -50,7 +50,8 @@ function load (file, pciaddr, sockpath)
       if t.tx_police_gbps then
          local TxLimit = name.."_TxLimit"
          local rate = t.tx_police_gbps * 1e9 / 8
-         config.app(c, TxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
+         config.app(c, TxLimit, RateLimiter,
+                    {rate = rate, bucket_capacity = rate, leaky = true})
          config.link(c, VM_tx.." -> "..TxLimit..".input")
          VM_tx = TxLimit..".output"
       end
@@ -97,7 +98,8 @@ function load (file, pciaddr, sockpath)
       if t.rx_police_gbps then
          local RxLimit = name.."_RxLimit"
          local rate = t.rx_police_gbps * 1e9 / 8
-         config.app(c, RxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
+         config.app(c, RxLimit, RateLimiter,
+                    {rate = rate, bucket_capacity = rate, leaky = true})
          config.link(c, RxLimit..".output -> "..VM_rx)
          VM_rx = RxLimit..".input"
       end

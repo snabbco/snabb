@@ -27,12 +27,15 @@ local PACKET_SIZE = 60
 
 function RateLimiter:new (arg)
    local conf = arg and config.parse_app_arg(arg) or {}
-   assert(conf.rate)
-   assert(conf.bucket_capacity)
+   --- By default, limit to 10 Mbps, just to have a default.
+   conf.rate = conf.rate or (10e6 / 8)
+   -- By default, allow for 255 standard packets in the queue.
+   conf.bucket_capacity = conf.bucket_capacity or (255 * 1500)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o =
    {
       rate = conf.rate,
+      leaky = conf.leaky,
       bucket_capacity = conf.bucket_capacity,
       bucket_content = conf.initial_capacity
     }
@@ -45,6 +48,10 @@ function RateLimiter:reset(rate, bucket_capacity, initial_capacity)
    self.rate = rate
    self.bucket_capacity = bucket_capacity
    self.bucket_content = initial_capacity or bucket_capacity
+end
+
+function RateLimiter:set_rate (byte_rate)
+   self.rate = math.max(byte_rate, 0)
 end
 
 -- return statistics snapshot
@@ -72,16 +79,16 @@ function RateLimiter:push ()
    end
 
 
-   while not link.empty(i) and not link.full(o) do
-      local p = link.receive(i)
-      local length = p.length
+   while not link.empty(i) do
+      local length = link.front(i).length
 
       if length <= self.bucket_content then
          self.bucket_content = self.bucket_content - length
-         link.transmit(o, p)
+         link.transmit(o, link.receive(i))
+      elseif self.leaky then
+         packet.free(link.receive(i))
       else
-         -- discard packet
-         packet.free(p)
+         break
       end
    end
 end
@@ -110,7 +117,8 @@ function selftest ()
    -- small value may limit effective rate
 
    local arg = { rate = rate_non_busy_loop,
-                 bucket_capacity = rate_non_busy_loop / 4 }
+                 bucket_capacity = rate_non_busy_loop / 4,
+                 leaky = true }
    config.app(c, "ratelimiter", RateLimiter, arg)
    config.app(c, "sink", basic_apps.Sink)
 
