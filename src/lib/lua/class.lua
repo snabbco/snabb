@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Support for basic OO programming.  Apart from the usual
 -- incantations of setmetatable(), it implements a simple mechanism to
 -- avoid table allocations by recycling objects that have been

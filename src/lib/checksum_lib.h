@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 /*
  * Checksum library routines that are inline functions.
  * For inclusion by checksum implementations.

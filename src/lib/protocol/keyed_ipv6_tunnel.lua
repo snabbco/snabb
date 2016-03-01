@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This is an implementation of the "Keyed IPv6 Tunnel" specification
 -- conforming to
 -- http://tools.ietf.org/html/draft-mkonstan-keyed-ipv6-tunnel-01.  It
