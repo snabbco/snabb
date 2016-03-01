@@ -7,7 +7,7 @@ the `input` port and transmits conforming packets to the `output` port.
 
 ![RateLimiter](.images/RateLimiter.png)
 
-— Method **RateLimiter:snapshot**
+— Method **RateLimiter:get_stat_snapshot**
 
 Returns throughput statistics in form of a table with the following
 fields:
@@ -15,6 +15,11 @@ fields:
 * `rx` - Number of packets received
 * `tx` - Number of packets transmitted
 * `time` - Current time in nanoseconds
+
+— Method **RateLimiter:set_rate** byte_rate
+
+Configure the rate limiter to refill its empty its bucket at the new
+rate of `byte_rate` bytes per second.
 
 
 ## Configuration
@@ -26,6 +31,14 @@ following keys are defined:
 
 *Required*. Rate in bytes per second to which throughput should be
 limited.
+
+— Key **leaky**
+
+*Optional*.  If true, any incoming traffic that is beyond the configured
+throughput will be dropped.  Otherwise, incoming traffic beyond the
+configured threshold is left on the input link and will be dequeued when
+enough time has passed that the throughput will not be exceeded.
+Defaults to false.
 
 — Key **bucket_capacity**
 
