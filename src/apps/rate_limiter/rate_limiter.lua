@@ -25,10 +25,12 @@ RateLimiter = {}
 -- Source produces synthetic packets of such size
 local PACKET_SIZE = 60
 
+local required = {'rate', 'bucket_capacity'}
+local optional = {initial_capacity=false}
+
 function RateLimiter:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   assert(conf.rate)
-   assert(conf.bucket_capacity)
+   local conf = parameters.parse(config.parse_app_arg(arg or {}),
+                                 required, optional)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o =
    {
