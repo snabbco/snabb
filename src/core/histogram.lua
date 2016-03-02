@@ -86,41 +86,51 @@ function add(histogram, measurement)
    histogram.buckets[bucket] = histogram.buckets[bucket] + 1
 end
 
-function report(histogram, prev)
-   local lo, hi = 0, histogram.minimum
-   local factor = math.exp(histogram.growth_factor_log)
-   local total = histogram.count
-   if prev then total = total - prev.count end
-   total = tonumber(total)
-   for bucket = 0, 508 do
+function iterate(histogram, prev)
+   local function next_bucket(histogram, bucket)
+      bucket = bucket + 1
+      if bucket < 0 or bucket > 508 then return end
+      local lo, hi
+      local minimum = histogram.minimum
+      if bucket == 0 then
+	 lo, hi = 0, histogram.minimum
+      else
+	 local factor = math.exp(histogram.growth_factor_log)
+	 lo = histogram.minimum * math.pow(factor, bucket - 1)
+	 hi = histogram.minimum * math.pow(factor, bucket)
+	 if bucket == 508 then hi = 1/0 end
+      end
       local count = histogram.buckets[bucket]
       if prev then count = count - prev.buckets[bucket] end
+      return bucket, lo, hi, count
+   end
+   return next_bucket, histogram, -1
+end
+
+function report(histogram, prev)
+   local total = histogram.count
+   if prev then total = total - prev.count end
+   for bucket, lo, hi, count in histogram:iterate(prev) do
       if count ~= 0 then
-         print(string.format('%.3e - %.3e: %u (%.5f%%)', lo, hi, tonumber(count),
-                             tonumber(count) / total * 100.))
+	 print(string.format('%.3e - %.3e: %u (%.5f%%)', lo, hi, tonumber(count),
+			     tonumber(count) / total * 100.))
       end
-      lo, hi = hi, hi * factor
    end
 end
 
 function summarize(histogram, prev)
-   local lo, hi = 0, histogram.minimum
-   local factor = math.exp(histogram.growth_factor_log)
    local total = histogram.count
    if prev then total = total - prev.count end
-   total = tonumber(total)
-   local min, max, cumulative = 1/0, 0, 0
-   for bucket = 0, 508 do
-      local count = histogram.buckets[bucket]
-      if prev then count = count - prev.buckets[bucket] end
+   if total == 0 then return 0, 0, 0 end
+   local min, max, cumulative = nil, 0, 0
+   for bucket, lo, hi, count in histogram:iterate(prev) do
       if count ~= 0 then
-         if lo < min then min = lo end
-         if hi > max then max = hi end
-         cumulative = cumulative + (lo + hi) / 2 * tonumber(count)
+	 if not min then min = lo end
+	 max = hi
+	 cumulative = cumulative + (lo + hi) / 2 * tonumber(count)
       end
-      lo, hi = hi, hi * factor
    end
-   return min, cumulative / total, max
+   return min, cumulative / tonumber(total), max
 end
 
 function snapshot(a, b)
@@ -144,6 +154,7 @@ end
 
 ffi.metatype(histogram_t, {__index = {
    add = add,
+   iterate = iterate,
    report = report,
    summarize = summarize,
    snapshot = snapshot,
