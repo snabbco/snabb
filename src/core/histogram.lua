@@ -17,16 +17,16 @@
 --     Add a measurement to a histogram.
 --
 --   histogram.iterate(histogram, prev)
---     When used as "for bucket, lo, hi, count in histogram:iterate()",
---     visits all buckets in a histogram.  BUCKET is the bucket index,
---     starting from zero, LO and HI are the lower and upper bounds of
---     the bucket, and COUNT is the number of samples recorded in that
---     bucket.  Note that COUNT is an unsigned 64-bit integer; to get it
---     as a Lua number, use tonumber().
+--     When used as "for count, lo, hi in histogram:iterate()",
+--     visits all buckets in a histogram in order from lowest to
+--     highest.  COUNT is the number of samples recorded in that bucket,
+--     and LO and HI are the lower and upper bounds of the bucket.  Note
+--     that COUNT is an unsigned 64-bit integer; to get it as a Lua
+--     number, use tonumber().
 --
 --     If PREV is given, it should be a snapshot of the previous version
 --     of the histogram.  In that case, the COUNT values will be
---     returned as a diffference between their values in HISTOGRAM and
+--     returned as a difference between their values in HISTOGRAM and
 --     their values in PREV.
 --
 --   histogram.snapshot(a, b)
@@ -96,24 +96,25 @@ function add(histogram, measurement)
 end
 
 function iterate(histogram, prev)
-   local function next_bucket(histogram, bucket)
+   local bucket = -1
+   local factor = math.exp(histogram.growth_factor_log)
+   local minimum = histogram.minimum
+   local function next_bucket()
       bucket = bucket + 1
-      if bucket < 0 or bucket > 508 then return end
+      if bucket > 508 then return end
       local lo, hi
-      local minimum = histogram.minimum
       if bucket == 0 then
-	 lo, hi = 0, histogram.minimum
+	 lo, hi = 0, minimum
       else
-	 local factor = math.exp(histogram.growth_factor_log)
-	 lo = histogram.minimum * math.pow(factor, bucket - 1)
-	 hi = histogram.minimum * math.pow(factor, bucket)
+	 lo = minimum * math.pow(factor, bucket - 1)
+	 hi = minimum * math.pow(factor, bucket)
 	 if bucket == 508 then hi = 1/0 end
       end
       local count = histogram.buckets[bucket]
       if prev then count = count - prev.buckets[bucket] end
-      return bucket, lo, hi, count
+      return count, lo, hi
    end
-   return next_bucket, histogram, -1
+   return next_bucket
 end
 
 function snapshot(a, b)
@@ -163,7 +164,8 @@ function selftest ()
    assert(h:snapshot().buckets[508] == 1)
 
    local total = 0
-   for bucket, lo, hi, count in h:iterate() do
+   local bucket = 0
+   for count, lo, hi in h:iterate() do
       local function check(val, expected_count)
 	 if val then
 	    assert(lo <= val)
@@ -177,8 +179,10 @@ function selftest ()
       elseif bucket == 508 then check(1.5, 1)
       else check(nil, 0) end
       total = total + count
+      bucket = bucket + 1
    end
    assert(total == 4)
+   assert(bucket == 509)
 
    h:clear()
    assert(h.total == 0)

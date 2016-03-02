@@ -129,7 +129,7 @@ function summarize_latency(histogram, prev)
    if prev then total = total - prev.total end
    if total == 0 then return 0, 0, 0 end
    local min, max, cumulative = nil, 0, 0
-   for bucket, lo, hi, count in histogram:iterate(prev) do
+   for count, lo, hi in histogram:iterate(prev) do
       if count ~= 0 then
 	 if not min then min = lo end
 	 max = hi
