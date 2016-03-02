@@ -7,6 +7,7 @@ local link = require("core.link")
 local config = require("core.config")
 local packet = require("core.packet")
 local timer = require("core.timer")
+local parameters = require("lib.parameters")
 local basic_apps = require("apps.basic.basic_apps")
 local ffi = require("ffi")
 local C = ffi.C
