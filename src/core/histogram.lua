@@ -49,6 +49,7 @@ local log, floor, max, min = math.log, math.floor, math.max, math.min
 
 -- Fill a 4096-byte page with buckets.  4096/8 = 512, minus the three
 -- header words means 509 buckets.  The first and last buckets are catch-alls.
+local bucket_count = 509
 local histogram_t = ffi.typeof([[struct {
    double minimum;
    double growth_factor_log;
@@ -59,9 +60,9 @@ local histogram_t = ffi.typeof([[struct {
 local function compute_growth_factor_log(minimum, maximum)
    assert(minimum > 0)
    assert(maximum > minimum)
-   -- 507 buckets for precise steps within minimum and maximum, 2 for
-   -- the catch-alls.
-   return log(maximum / minimum) / 507
+   -- The first and last buckets are the catch-alls; the ones in between
+   -- partition the range between the minimum and the maximum.
+   return log(maximum / minimum) / (bucket_count - 2)
 end
 
 function new(minimum, maximum)
@@ -89,7 +90,7 @@ function add(histogram, measurement)
       bucket = bucket / histogram.growth_factor_log
       bucket = floor(bucket) + 1
       bucket = max(0, bucket)
-      bucket = min(508, bucket)
+      bucket = min(bucket_count - 1, bucket)
    end
    histogram.total = histogram.total + 1
    histogram.buckets[bucket] = histogram.buckets[bucket] + 1
@@ -101,14 +102,14 @@ function iterate(histogram, prev)
    local minimum = histogram.minimum
    local function next_bucket()
       bucket = bucket + 1
-      if bucket > 508 then return end
+      if bucket >= bucket_count then return end
       local lo, hi
       if bucket == 0 then
 	 lo, hi = 0, minimum
       else
 	 lo = minimum * math.pow(factor, bucket - 1)
 	 hi = minimum * math.pow(factor, bucket)
-	 if bucket == 508 then hi = 1/0 end
+	 if bucket == bucket_count - 1 then hi = 1/0 end
       end
       local count = histogram.buckets[bucket]
       if prev then count = count - prev.buckets[bucket] end
@@ -125,7 +126,7 @@ end
 
 function clear(histogram)
    histogram.total = 0
-   for bucket = 0, 508 do histogram.buckets[bucket] = 0 end
+   for bucket = 0, bucket_count - 1 do histogram.buckets[bucket] = 0 end
 end
 
 function wrap_thunk(histogram, thunk, now)
@@ -155,13 +156,13 @@ function selftest ()
    h:add(1e-6 + 1e-9)
    assert(h.buckets[1] == 1)
    h:add(1.0 - 1e-9)
-   assert(h.buckets[507] == 1)
+   assert(h.buckets[bucket_count - 2] == 1)
    h:add(1.5)
-   assert(h.buckets[508] == 1)
+   assert(h.buckets[bucket_count - 1] == 1)
 
    assert(h.total == 4)
    assert(h:snapshot().total == 4)
-   assert(h:snapshot().buckets[508] == 1)
+   assert(h:snapshot().buckets[bucket_count - 1] == 1)
 
    local total = 0
    local bucket = 0
@@ -175,18 +176,18 @@ function selftest ()
       end
       if bucket == 0 then check(1e-7, 1)
       elseif bucket == 1 then check(1e-6 + 1e-9, 1)
-      elseif bucket == 507 then check(1 - 1e-9, 1)
-      elseif bucket == 508 then check(1.5, 1)
+      elseif bucket == bucket_count - 2 then check(1 - 1e-9, 1)
+      elseif bucket == bucket_count - 1 then check(1.5, 1)
       else check(nil, 0) end
       total = total + count
       bucket = bucket + 1
    end
    assert(total == 4)
-   assert(bucket == 509)
+   assert(bucket == bucket_count)
 
    h:clear()
    assert(h.total == 0)
-   assert(h.buckets[508] == 0)
+   assert(h.buckets[bucket_count - 1] == 0)
 
    print("selftest ok")
 end
