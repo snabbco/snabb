@@ -52,7 +52,7 @@ local log, floor, max, min = math.log, math.floor, math.max, math.min
 local histogram_t = ffi.typeof([[struct {
    double minimum;
    double growth_factor_log;
-   uint64_t count;
+   uint64_t total;
    uint64_t buckets[509];
 }]])
 
@@ -91,7 +91,7 @@ function add(histogram, measurement)
       bucket = max(0, bucket)
       bucket = min(508, bucket)
    end
-   histogram.count = histogram.count + 1
+   histogram.total = histogram.total + 1
    histogram.buckets[bucket] = histogram.buckets[bucket] + 1
 end
 
@@ -123,7 +123,7 @@ function snapshot(a, b)
 end
 
 function clear(histogram)
-   histogram.count = 0
+   histogram.total = 0
    for bucket = 0, 508 do histogram.buckets[bucket] = 0 end
 end
 
@@ -158,8 +158,8 @@ function selftest ()
    h:add(1.5)
    assert(h.buckets[508] == 1)
 
-   assert(h.count == 4)
-   assert(h:snapshot().count == 4)
+   assert(h.total == 4)
+   assert(h:snapshot().total == 4)
    assert(h:snapshot().buckets[508] == 1)
 
    local total = 0
@@ -181,7 +181,7 @@ function selftest ()
    assert(total == 4)
 
    h:clear()
-   assert(h.count == 0)
+   assert(h.total == 0)
    assert(h.buckets[508] == 0)
 
    print("selftest ok")

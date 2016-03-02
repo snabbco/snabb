@@ -125,8 +125,8 @@ function print_global_metrics (new_stats, last_stats)
 end
 
 function summarize_latency(histogram, prev)
-   local total = histogram.count
-   if prev then total = total - prev.count end
+   local total = histogram.total
+   if prev then total = total - prev.total end
    if total == 0 then return 0, 0, 0 end
    local min, max, cumulative = nil, 0, 0
    for bucket, lo, hi, count in histogram:iterate(prev) do
