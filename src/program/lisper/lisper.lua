@@ -1,4 +1,4 @@
---go@ plink root@10.0.0.123 "cd snabb/src && make"
+--go@ plink root@10.0.0.123 "cd snabb/src/program/lisper/dev-env && ./mm"
 module(..., package.seeall)
 io.stdout:setvbuf'no'
 io.stderr:setvbuf'no'
@@ -18,6 +18,7 @@ local pcap     = require("apps.pcap.pcap")
 local basic    = require("apps.basic.basic_apps")
 local intel    = require("apps.intel.intel_app")
 local json     = require("lib.json")
+local timer    = require("core.timer")
 
 --utils ----------------------------------------------------------------------
 
@@ -189,7 +190,8 @@ local function update_config(s)
             local blocs = attr(attr(locs, net.iid), broadcast_mac)
             table.insert(blocs, loc)
          else
-            local iface = assert(ifs[net.interface], "invalid interface "..net.interface)
+            local iface = assert(ifs[net.interface],
+					"invalid interface "..net.interface)
             local loc = {
                type = "ethernet",
                interface = iface,
@@ -443,8 +445,8 @@ local function log_l2tp(text, pk, ifname)
       and p.next_header == 115
 
    if not valid then
-      print("L2TP %-4s %s (%4d): INVALID: ethertype: 0x%04x, next_header: %d",
-         ifname, text, pk.length, htons(p.ethertype), p.next_header)
+      print(_("L2TP %-4s %s (%4d): INVALID: ethertype: 0x%04x, next_header: %d",
+         ifname, text, pk.length, htons(p.ethertype), p.next_header))
       return
    end
 
@@ -482,7 +484,14 @@ function log_punt(msg)
     print(_("PUNT: %s", msg))
 end
 
+local stats = {
+	rx = 0,
+	tx = 0,
+}
+
 local function route_packet(p, rxname, txports)
+
+	stats.rx = stats.rx + 1
 
    --step #1: find the iid and source location of the packet.
    --NOTE: smac and dmac are the MACs of the _payload_ ethernet frame!
@@ -560,15 +569,16 @@ local function route_packet(p, rxname, txports)
             loc.ip,
             iid,
             "\0\0\0\0\0\0\0\0")
-         if loc.encrypt then
-            dp = loc.encrypt(dp)
-         end
          local txname = loc.exit.interface.name
          tx = txports[txname]
          log_l2tp(")))", dp, txname)
+         if loc.encrypt then
+            dp = loc.encrypt(dp)
+         end
       end
       if not link.full(tx) then
          link.transmit(tx, dp)
+			stats.tx = stats.tx + 1
       end
    end
 
@@ -781,6 +791,11 @@ function run(args)
       end
       print(_("  %-12s: %s", appname, s))
    end
+
+	local t = timer.new("stats", function()
+		print("STATS: RX="..stats.rx.." TX="..stats.tx)
+	end, 10^9, "repeating")
+	timer.activate(t)
 
    collectgarbage()
 
