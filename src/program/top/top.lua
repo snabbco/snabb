@@ -124,10 +124,25 @@ function print_global_metrics (new_stats, last_stats)
              {float_s(frees / 1000), float_s(bytes / (1000^3)), tostring(breaths)})
 end
 
+function summarize_latency(histogram, prev)
+   local total = histogram.count
+   if prev then total = total - prev.count end
+   if total == 0 then return 0, 0, 0 end
+   local min, max, cumulative = nil, 0, 0
+   for bucket, lo, hi, count in histogram:iterate(prev) do
+      if count ~= 0 then
+	 if not min then min = lo end
+	 max = hi
+	 cumulative = cumulative + (lo + hi) / 2 * tonumber(count)
+      end
+   end
+   return min, cumulative / tonumber(total), max
+end
+
 function print_latency_metrics (new_stats, last_stats)
    local cur, prev = new_stats.latency, last_stats.latency
    if not cur then return end
-   local min, avg, max = cur:summarize(prev)
+   local min, avg, max = summarize_latency(cur, prev)
    print_row(global_metrics_row,
              {"Min breath (us)", "Average", "Maximum"})
    

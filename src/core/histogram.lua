@@ -107,32 +107,6 @@ function iterate(histogram, prev)
    return next_bucket, histogram, -1
 end
 
-function report(histogram, prev)
-   local total = histogram.count
-   if prev then total = total - prev.count end
-   for bucket, lo, hi, count in histogram:iterate(prev) do
-      if count ~= 0 then
-	 print(string.format('%.3e - %.3e: %u (%.5f%%)', lo, hi, tonumber(count),
-			     tonumber(count) / total * 100.))
-      end
-   end
-end
-
-function summarize(histogram, prev)
-   local total = histogram.count
-   if prev then total = total - prev.count end
-   if total == 0 then return 0, 0, 0 end
-   local min, max, cumulative = nil, 0, 0
-   for bucket, lo, hi, count in histogram:iterate(prev) do
-      if count ~= 0 then
-	 if not min then min = lo end
-	 max = hi
-	 cumulative = cumulative + (lo + hi) / 2 * tonumber(count)
-      end
-   end
-   return min, cumulative / tonumber(total), max
-end
-
 function snapshot(a, b)
    b = b or histogram_t()
    ffi.copy(b, a, ffi.sizeof(histogram_t))
@@ -155,8 +129,6 @@ end
 ffi.metatype(histogram_t, {__index = {
    add = add,
    iterate = iterate,
-   report = report,
-   summarize = summarize,
    snapshot = snapshot,
    wrap_thunk = wrap_thunk,
    clear = clear
@@ -181,7 +153,23 @@ function selftest ()
    assert(h:snapshot().count == 4)
    assert(h:snapshot().buckets[508] == 1)
 
-   h:report()
+   local total = 0
+   for bucket, lo, hi, count in h:iterate() do
+      local function check(val, expected_count)
+	 if val then
+	    assert(lo <= val)
+	    assert(val <= hi)
+	 end
+	 assert(count == expected_count)
+      end
+      if bucket == 0 then check(1e-7, 1)
+      elseif bucket == 1 then check(1e-6 + 1e-9, 1)
+      elseif bucket == 507 then check(1 - 1e-9, 1)
+      elseif bucket == 508 then check(1.5, 1)
+      else check(nil, 0) end
+      total = total + count
+   end
+   assert(total == 4)
 
    h:clear()
    assert(h.count == 0)
