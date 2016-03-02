@@ -16,9 +16,18 @@
 --   histogram.add(histogram, measurement)
 --     Add a measurement to a histogram.
 --
---   histogram.report(histogram, prev)
---     Print out non-empty buckets and their ranges.  If PREV is given,
---     it should be a snapshot of the previous version of the histogram.
+--   histogram.iterate(histogram, prev)
+--     When used as "for bucket, lo, hi, count in histogram:iterate()",
+--     visits all buckets in a histogram.  BUCKET is the bucket index,
+--     starting from zero, LO and HI are the lower and upper bounds of
+--     the bucket, and COUNT is the number of samples recorded in that
+--     bucket.  Note that COUNT is an unsigned 64-bit integer; to get it
+--     as a Lua number, use tonumber().
+--
+--     If PREV is given, it should be a snapshot of the previous version
+--     of the histogram.  In that case, the COUNT values will be
+--     returned as a diffference between their values in HISTOGRAM and
+--     their values in PREV.
 --
 --   histogram.snapshot(a, b)
 --     Copy out the contents of A into B and return B.  If B is not given,
