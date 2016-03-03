@@ -1,7 +1,6 @@
-/* virtio.h - Virtual I/O device support in Linux/KVM style
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- */
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
+/* virtio.h - Virtual I/O device support in Linux/KVM style */
 
 enum { VIO_VRING_SIZE = 512 };
 

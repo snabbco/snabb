@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 // Calculate IP checksum using SSE2 instructions.
 // (This will crash if you call it on a CPU that does not support SSE.)
 uint16_t cksum_sse2(unsigned char *p, size_t n, uint16_t initial);

@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 // vhost_memory structure is used to declare which memory address
 // ranges we want to use for DMA. The kernel uses this to create a
 // shared memory mapping.

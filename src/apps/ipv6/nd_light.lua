@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This app implements a small subset of IPv6 neighbor discovery
 -- (RFC4861).  It has two ports, north and south.  The south port
 -- attaches to a port on which ND must be performed.  The north port

@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Virtual Private Wire Service (VPWS)
 -- Provides a L2 VPN on top of IP (v4/v6) and GRE
 --

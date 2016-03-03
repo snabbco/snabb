@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 --- Device driver for the Intel 82599 10-Gigabit Ethernet controller.
 --- This is one of the most popular production 10G Ethernet
 --- controllers on the market and it is readily available in

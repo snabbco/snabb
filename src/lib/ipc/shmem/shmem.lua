@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- The shmem base class provides a simple IPC mechanism to exchange
 -- arbitrary cdata objects with other processes through a file-backed
 -- shared memeory region, referred to as the "data file".  The memory
