@@ -62,6 +62,7 @@ local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (conf)
    local dev = { pciaddress = conf.pciaddr, -- PCI device address
+                 promisc = conf.promisc,    -- Network card in promisc mode
                  mtu = (conf.mtu or default.mtu),
                  fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
@@ -80,6 +81,8 @@ function new_sf (conf)
                  rxnext = 0,       -- Index of next buffer to receive
                  snmp = conf.snmp,
               }
+   -- If not set, promisc on is the default mode.
+   if dev.promisc == nil then dev.promisc = true end
    return setmetatable(dev, M_sf)
 end
 
@@ -367,7 +370,11 @@ end
 
 function M_sf:init_receive ()
    self.r.RXCTRL:clr(bits{RXEN=0})
-   self:set_promiscuous_mode() -- NB: don't need to program MAC address filter
+   if self.promisc then
+      self:set_promiscuous_mode() -- NB: don't need to program MAC address filter
+   else
+      self:unset_promiscuous_mode()
+   end
    self.r.HLREG0(bits{
       TXCRCEN=0, RXCRCSTRP=1, rsv2=3, TXPADEN=10,
       rsvd3=11, rsvd4=13, MDCSPD=16
@@ -417,6 +424,11 @@ end
 
 function M_sf:set_promiscuous_mode ()
    self.r.FCTRL(bits({MPE=8, UPE=9, BAM=10}))
+   return self
+end
+
+function M_sf:unset_promiscuous_mode ()
+   self.r.FCTRL:clr(bits({MPE=8, UPE=9, BAM=10}))
    return self
 end
 
