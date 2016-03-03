@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 
 ./snabb snsh ./lib/watchdog/selftest_design alert
 if [ $? != 0 ]; then exit 1; fi
