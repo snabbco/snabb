@@ -7,6 +7,7 @@ local lib     = require("core.lib")
 local link    = require("core.link")
 local config  = require("core.config")
 local timer   = require("core.timer")
+local shm     = require("core.shm")
 local counter = require("core.counter")
 local zone    = require("jit.zone")
 local ffi     = require("ffi")
@@ -67,6 +68,8 @@ end
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
 local function with_restart (app, method)
+   local oldshm = shm.path
+   shm.path = app.shmpath
    if use_restart then
       -- Run fn in protected mode using pcall.
       local status, err = pcall(method, app)
@@ -77,6 +80,7 @@ local function with_restart (app, method)
    else
       method(app)
    end
+   shm.path = oldshm
 end
 
 -- Restart dead apps.
@@ -164,7 +168,11 @@ function apply_config_actions (actions, conf)
    function ops.start (name)
       local class = conf.apps[name].class
       local arg = conf.apps[name].arg
+      local shmpath, shmorig = "app/"..name, shm.path
+      shm.path = shmpath
       local app = class:new(arg)
+      shm.path = shmorig
+      local shmpath = "app/"..name
       if type(app) ~= 'table' then
          error(("bad return value from app '%s' start() method: %s"):format(
                   name, tostring(app)))
@@ -173,6 +181,7 @@ function apply_config_actions (actions, conf)
       app.appname = name
       app.output = {}
       app.input = {}
+      app.shmpath = shmpath
       new_app_table[name] = app
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
