@@ -198,6 +198,11 @@ following keys are recognized:
    set to boolean values to force or suppress link and app reporting
    individually. By default `engine.main()' will report on links but not
    on apps.
+ * `measure_latency` - By default, the `breathe()` loop is instrumented
+   to record the latency distribution of running the app graph.  This
+   information can be processed by the `snabb top` program.  Passing
+   `measure_latency=false` in the *options* will disable this
+   instrumentation.
  * `no_report` - A boolean value. If `true` no final report will be
    printed.
 
