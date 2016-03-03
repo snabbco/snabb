@@ -559,6 +559,26 @@ function M_sf:wait_linkup ()
    return self
 end
 
+local mac_t = ffi.typeof([[
+   union {
+      uint8_t addr[6];
+      struct {
+         uint32_t lo;
+         uint16_t hi;
+      };
+   }
+]])
+
+function M_sf:get_mac ()
+   local ral, rah = self.r.RAL[0](), self.r.RAH[0]()
+   assert(bit.band(rah, bits({ AV = 31 })) == bits({ AV = 31 }),
+          "MAC address on "..self.pciaddress.." is not valid ")
+   local mac = ffi.new(mac_t)
+   mac.lo = ral
+   mac.hi = bit.band(rah, 0xFFFF)
+   return mac.addr
+end
+
 --- ### Status and diagnostics
 
 
