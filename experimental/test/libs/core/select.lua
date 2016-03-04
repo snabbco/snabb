@@ -1,4 +1,8 @@
+-- Tests for the basic function select().
+-- +select +fast
 
+--- select #
+-- Test whether select("#", 3, 4) returns the correct number of arguments. 
 do
   local x = 0
   for i=1,100 do
@@ -7,6 +11,8 @@ do
   assert(x == 200)
 end
 
+--- select modf
+-- Test whether select("#", func()) also works with func returning multiple values
 do
   local x = 0
   for i=1,100 do
@@ -15,6 +21,7 @@ do
   assert(x == 200)
 end
 
+--- select 1 
 do
   local x = 0
   for i=1,100 do
@@ -23,6 +30,7 @@ do
   assert(x == 5050)
 end
 
+--- select 2
 do
   local x, y = 0, 0
   for i=1,100 do
@@ -33,6 +41,7 @@ do
   assert(x == 5050 and y == 6050)
 end
 
+--- select vararg #
 do
   local function f(a, ...)
     local x = 0
@@ -50,6 +59,7 @@ do
   end
 end
 
+--- select vararg i
 do
   local function f(a, ...)
     local x = 0
@@ -68,6 +78,7 @@ do
   end
 end
 
+--- select vararg 4
 do
   local function f(a, ...)
     local x = 0
