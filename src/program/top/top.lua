@@ -8,6 +8,7 @@ local lib = require("core.lib")
 local shm = require("core.shm")
 local counter = require("core.counter")
 local S = require("syscall")
+local histogram = require("core.histogram")
 local usage = require("program.top.README_inc")
 
 local long_opts = {
@@ -38,6 +39,7 @@ function run (args)
          clearterm()
          print_global_metrics(new_stats, last_stats)
          io.write("\n")
+         print_latency_metrics(new_stats, last_stats)
          print_link_metrics(new_stats, last_stats)
          io.flush()
       end
@@ -69,6 +71,8 @@ function open_counters (tree)
    for _, name in ipairs({"configs", "breaths", "frees", "freebytes"}) do
       counters[name] = counter.open(tree.."/engine/"..name, 'readonly')
    end
+   local success, latency = pcall(histogram.open, tree..'/engine/latency')
+   if success then counters.latency = latency end
    counters.links = {} -- These will be populated on demand.
    return counters
 end
@@ -98,6 +102,7 @@ function get_stats (counters)
    for _, name in ipairs({"configs", "breaths", "frees", "freebytes"}) do
       new_stats[name] = counter.read(counters[name])
    end
+   if counters.latency then new_stats.latency = counters.latency:snapshot() end
    new_stats.links = {}
    for linkspec, link in pairs(counters.links) do
       new_stats.links[linkspec] = {}
@@ -117,6 +122,33 @@ function print_global_metrics (new_stats, last_stats)
    print_row(global_metrics_row, {"Kfrees/s", "freeGbytes/s", "breaths/s"})
    print_row(global_metrics_row,
              {float_s(frees / 1000), float_s(bytes / (1000^3)), tostring(breaths)})
+end
+
+function summarize_latency(histogram, prev)
+   local total = histogram.total
+   if prev then total = total - prev.total end
+   if total == 0 then return 0, 0, 0 end
+   local min, max, cumulative = nil, 0, 0
+   for count, lo, hi in histogram:iterate(prev) do
+      if count ~= 0 then
+	 if not min then min = lo end
+	 max = hi
+	 cumulative = cumulative + (lo + hi) / 2 * tonumber(count)
+      end
+   end
+   return min, cumulative / tonumber(total), max
+end
+
+function print_latency_metrics (new_stats, last_stats)
+   local cur, prev = new_stats.latency, last_stats.latency
+   if not cur then return end
+   local min, avg, max = summarize_latency(cur, prev)
+   print_row(global_metrics_row,
+             {"Min breath (us)", "Average", "Maximum"})
+   
+   print_row(global_metrics_row,
+             {float_s(min*1e6), float_s(avg*1e6), float_s(max*1e6)})
+   print("\n")
 end
 
 local link_metrics_row = {31, 7, 7, 7, 7, 7}

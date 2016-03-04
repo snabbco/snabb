@@ -1,0 +1,451 @@
+Warming up at 5.000000 Gb/s for 2 seconds.
+Applying 0.200000 Gbps of load.
+  NIC 0:
+    TX 45455 packets (0.045455 MPPS), 25000250 bytes (0.200002 Gbps)
+    RX 45455 packets (0.045455 MPPS), 26818450 bytes (0.214548 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 45455 packets (0.045455 MPPS), 25000250 bytes (0.200002 Gbps)
+    RX 45455 packets (0.045455 MPPS), 23182050 bytes (0.185456 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 0.400000 Gbps of load.
+  NIC 0:
+    TX 90908 packets (0.090908 MPPS), 49999400 bytes (0.399995 Gbps)
+    RX 90908 packets (0.090908 MPPS), 53635720 bytes (0.429086 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 90908 packets (0.090908 MPPS), 49999400 bytes (0.399995 Gbps)
+    RX 90908 packets (0.090908 MPPS), 46363080 bytes (0.370905 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 0.600000 Gbps of load.
+  NIC 0:
+    TX 136364 packets (0.136364 MPPS), 75000200 bytes (0.600002 Gbps)
+    RX 136364 packets (0.136364 MPPS), 80454760 bytes (0.643638 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 136364 packets (0.136364 MPPS), 75000200 bytes (0.600002 Gbps)
+    RX 136364 packets (0.136364 MPPS), 69545640 bytes (0.556365 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 0.800000 Gbps of load.
+  NIC 0:
+    TX 181818 packets (0.181818 MPPS), 99999900 bytes (0.799999 Gbps)
+    RX 181818 packets (0.181818 MPPS), 107272620 bytes (0.858181 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 181818 packets (0.181818 MPPS), 99999900 bytes (0.799999 Gbps)
+    RX 181818 packets (0.181818 MPPS), 92727180 bytes (0.741817 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 1.000000 Gbps of load.
+  NIC 0:
+    TX 227272 packets (0.227272 MPPS), 124999600 bytes (0.999997 Gbps)
+    RX 227272 packets (0.227272 MPPS), 134090480 bytes (1.072724 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 227272 packets (0.227272 MPPS), 124999600 bytes (0.999997 Gbps)
+    RX 227272 packets (0.227272 MPPS), 115908720 bytes (0.927270 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 1.200000 Gbps of load.
+  NIC 0:
+    TX 272727 packets (0.272727 MPPS), 149999850 bytes (1.199999 Gbps)
+    RX 272727 packets (0.272727 MPPS), 160908930 bytes (1.287271 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 272727 packets (0.272727 MPPS), 149999850 bytes (1.199999 Gbps)
+    RX 272727 packets (0.272727 MPPS), 139090770 bytes (1.112726 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 1.400000 Gbps of load.
+  NIC 0:
+    TX 318182 packets (0.318182 MPPS), 175000100 bytes (1.400001 Gbps)
+    RX 318182 packets (0.318182 MPPS), 187727380 bytes (1.501819 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 318182 packets (0.318182 MPPS), 175000100 bytes (1.400001 Gbps)
+    RX 318182 packets (0.318182 MPPS), 162272820 bytes (1.298183 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 1.600000 Gbps of load.
+  NIC 0:
+    TX 363637 packets (0.363637 MPPS), 200000350 bytes (1.600003 Gbps)
+    RX 363637 packets (0.363637 MPPS), 214545830 bytes (1.716367 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 363637 packets (0.363637 MPPS), 200000350 bytes (1.600003 Gbps)
+    RX 363637 packets (0.363637 MPPS), 185454870 bytes (1.483639 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 1.800000 Gbps of load.
+  NIC 0:
+    TX 409090 packets (0.409090 MPPS), 224999500 bytes (1.799996 Gbps)
+    RX 409090 packets (0.409090 MPPS), 241363100 bytes (1.930905 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 409090 packets (0.409090 MPPS), 224999500 bytes (1.799996 Gbps)
+    RX 409090 packets (0.409090 MPPS), 208635900 bytes (1.669087 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 2.000000 Gbps of load.
+  NIC 0:
+    TX 454543 packets (0.454543 MPPS), 249998650 bytes (1.999989 Gbps)
+    RX 454543 packets (0.454543 MPPS), 268180370 bytes (2.145443 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 454543 packets (0.454543 MPPS), 249998650 bytes (1.999989 Gbps)
+    RX 454543 packets (0.454543 MPPS), 231816930 bytes (1.854535 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 2.200000 Gbps of load.
+  NIC 0:
+    TX 499999 packets (0.499999 MPPS), 274999450 bytes (2.199996 Gbps)
+    RX 499999 packets (0.499999 MPPS), 294999410 bytes (2.359995 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 499999 packets (0.499999 MPPS), 274999450 bytes (2.199996 Gbps)
+    RX 499999 packets (0.499999 MPPS), 254999490 bytes (2.039996 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 2.400000 Gbps of load.
+  NIC 0:
+    TX 545453 packets (0.545453 MPPS), 299999150 bytes (2.399993 Gbps)
+    RX 545453 packets (0.545453 MPPS), 321817270 bytes (2.574538 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 545453 packets (0.545453 MPPS), 299999150 bytes (2.399993 Gbps)
+    RX 545453 packets (0.545453 MPPS), 278181030 bytes (2.225448 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 2.600000 Gbps of load.
+  NIC 0:
+    TX 590910 packets (0.590910 MPPS), 325000500 bytes (2.600004 Gbps)
+    RX 590910 packets (0.590910 MPPS), 348636900 bytes (2.789095 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 590910 packets (0.590910 MPPS), 325000500 bytes (2.600004 Gbps)
+    RX 590910 packets (0.590910 MPPS), 301364100 bytes (2.410913 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 2.800000 Gbps of load.
+  NIC 0:
+    TX 636361 packets (0.636361 MPPS), 349998550 bytes (2.799988 Gbps)
+    RX 636361 packets (0.636361 MPPS), 375452990 bytes (3.003624 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 636361 packets (0.636361 MPPS), 349998550 bytes (2.799988 Gbps)
+    RX 636361 packets (0.636361 MPPS), 324544110 bytes (2.596353 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 3.000000 Gbps of load.
+  NIC 0:
+    TX 681816 packets (0.681816 MPPS), 374998800 bytes (2.999990 Gbps)
+    RX 681816 packets (0.681816 MPPS), 402271440 bytes (3.218172 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 681816 packets (0.681816 MPPS), 374998800 bytes (2.999990 Gbps)
+    RX 681816 packets (0.681816 MPPS), 347726160 bytes (2.781809 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 3.200000 Gbps of load.
+  NIC 0:
+    TX 727273 packets (0.727273 MPPS), 400000150 bytes (3.200001 Gbps)
+    RX 727273 packets (0.727273 MPPS), 429091070 bytes (3.432729 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 727273 packets (0.727273 MPPS), 400000150 bytes (3.200001 Gbps)
+    RX 727273 packets (0.727273 MPPS), 370909230 bytes (2.967274 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 3.400000 Gbps of load.
+  NIC 0:
+    TX 772724 packets (0.772724 MPPS), 424998200 bytes (3.399986 Gbps)
+    RX 772724 packets (0.772724 MPPS), 455907160 bytes (3.647257 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 772724 packets (0.772724 MPPS), 424998200 bytes (3.399986 Gbps)
+    RX 772724 packets (0.772724 MPPS), 394089240 bytes (3.152714 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 3.600000 Gbps of load.
+  NIC 0:
+    TX 818180 packets (0.818180 MPPS), 449999000 bytes (3.599992 Gbps)
+    RX 818180 packets (0.818180 MPPS), 482726200 bytes (3.861810 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 818180 packets (0.818180 MPPS), 449999000 bytes (3.599992 Gbps)
+    RX 818180 packets (0.818180 MPPS), 417271800 bytes (3.338174 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 3.800000 Gbps of load.
+  NIC 0:
+    TX 863632 packets (0.863632 MPPS), 474997600 bytes (3.799981 Gbps)
+    RX 863632 packets (0.863632 MPPS), 509542880 bytes (4.076343 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 863632 packets (0.863632 MPPS), 474997600 bytes (3.799981 Gbps)
+    RX 863632 packets (0.863632 MPPS), 440452320 bytes (3.523619 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 4.000000 Gbps of load.
+  NIC 0:
+    TX 909086 packets (0.909086 MPPS), 499997300 bytes (3.999978 Gbps)
+    RX 909086 packets (0.909086 MPPS), 536360740 bytes (4.290886 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 909086 packets (0.909086 MPPS), 499997300 bytes (3.999978 Gbps)
+    RX 909086 packets (0.909086 MPPS), 463633860 bytes (3.709071 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 4.200000 Gbps of load.
+  NIC 0:
+    TX 954539 packets (0.954539 MPPS), 524996450 bytes (4.199972 Gbps)
+    RX 954539 packets (0.954539 MPPS), 563178010 bytes (4.505424 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 954539 packets (0.954539 MPPS), 524996450 bytes (4.199972 Gbps)
+    RX 954539 packets (0.954539 MPPS), 486814890 bytes (3.894519 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 4.400000 Gbps of load.
+  NIC 0:
+    TX 999996 packets (0.999996 MPPS), 549997800 bytes (4.399982 Gbps)
+    RX 999996 packets (0.999996 MPPS), 589997640 bytes (4.719981 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 999996 packets (0.999996 MPPS), 549997800 bytes (4.399982 Gbps)
+    RX 999996 packets (0.999996 MPPS), 509997960 bytes (4.079984 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 4.600000 Gbps of load.
+  NIC 0:
+    TX 1045451 packets (1.045451 MPPS), 574998050 bytes (4.599984 Gbps)
+    RX 1045451 packets (1.045451 MPPS), 616816090 bytes (4.934529 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1045451 packets (1.045451 MPPS), 574998050 bytes (4.599984 Gbps)
+    RX 1045451 packets (1.045451 MPPS), 533180010 bytes (4.265440 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 4.800000 Gbps of load.
+  NIC 0:
+    TX 1090909 packets (1.090909 MPPS), 599999950 bytes (4.800000 Gbps)
+    RX 1090909 packets (1.090909 MPPS), 643636310 bytes (5.149090 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1090909 packets (1.090909 MPPS), 599999950 bytes (4.800000 Gbps)
+    RX 1090909 packets (1.090909 MPPS), 556363590 bytes (4.450909 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 5.000000 Gbps of load.
+  NIC 0:
+    TX 1136355 packets (1.136355 MPPS), 624995250 bytes (4.999962 Gbps)
+    RX 1136355 packets (1.136355 MPPS), 670449450 bytes (5.363596 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1136355 packets (1.136355 MPPS), 624995250 bytes (4.999962 Gbps)
+    RX 1136355 packets (1.136355 MPPS), 579541050 bytes (4.636328 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 5.200000 Gbps of load.
+  NIC 0:
+    TX 1181815 packets (1.181815 MPPS), 649998250 bytes (5.199986 Gbps)
+    RX 1181815 packets (1.181815 MPPS), 697270850 bytes (5.578167 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1181815 packets (1.181815 MPPS), 649998250 bytes (5.199986 Gbps)
+    RX 1181815 packets (1.181815 MPPS), 602725650 bytes (4.821805 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 5.400000 Gbps of load.
+  NIC 0:
+    TX 1227261 packets (1.227261 MPPS), 674993550 bytes (5.399948 Gbps)
+    RX 1227261 packets (1.227261 MPPS), 724083990 bytes (5.792672 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1227261 packets (1.227261 MPPS), 674993550 bytes (5.399948 Gbps)
+    RX 1227261 packets (1.227261 MPPS), 625903110 bytes (5.007225 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 5.600000 Gbps of load.
+  NIC 0:
+    TX 1272719 packets (1.272719 MPPS), 699995450 bytes (5.599964 Gbps)
+    RX 1272719 packets (1.272719 MPPS), 750904210 bytes (6.007234 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1272719 packets (1.272719 MPPS), 699995450 bytes (5.599964 Gbps)
+    RX 1272719 packets (1.272719 MPPS), 649086690 bytes (5.192694 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 5.800000 Gbps of load.
+  NIC 0:
+    TX 1318173 packets (1.318173 MPPS), 724995150 bytes (5.799961 Gbps)
+    RX 1318173 packets (1.318173 MPPS), 777722070 bytes (6.221777 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1318173 packets (1.318173 MPPS), 724995150 bytes (5.799961 Gbps)
+    RX 1318173 packets (1.318173 MPPS), 672268230 bytes (5.378146 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 6.000000 Gbps of load.
+  NIC 0:
+    TX 1363627 packets (1.363627 MPPS), 749994850 bytes (5.999959 Gbps)
+    RX 1363627 packets (1.363627 MPPS), 804539930 bytes (6.436319 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1363627 packets (1.363627 MPPS), 749994850 bytes (5.999959 Gbps)
+    RX 1363627 packets (1.363627 MPPS), 695449770 bytes (5.563598 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 6.200000 Gbps of load.
+  NIC 0:
+    TX 1409089 packets (1.409089 MPPS), 774998950 bytes (6.199992 Gbps)
+    RX 1409089 packets (1.409089 MPPS), 831362510 bytes (6.650900 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1409089 packets (1.409089 MPPS), 774998950 bytes (6.199992 Gbps)
+    RX 1409089 packets (1.409089 MPPS), 718635390 bytes (5.749083 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 6.400000 Gbps of load.
+  NIC 0:
+    TX 1454537 packets (1.454537 MPPS), 799995350 bytes (6.399963 Gbps)
+    RX 1454537 packets (1.454537 MPPS), 858176830 bytes (6.865415 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1454537 packets (1.454537 MPPS), 799995350 bytes (6.399963 Gbps)
+    RX 1454537 packets (1.454537 MPPS), 741813870 bytes (5.934511 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 6.600000 Gbps of load.
+  NIC 0:
+    TX 1499987 packets (1.499987 MPPS), 824992850 bytes (6.599943 Gbps)
+    RX 1499987 packets (1.499987 MPPS), 884992330 bytes (7.079939 Gbps)
+    Loss: 0 packets (0.000000%)
+  NIC 1:
+    TX 1499987 packets (1.499987 MPPS), 824992850 bytes (6.599943 Gbps)
+    RX 1499987 packets (1.499987 MPPS), 764993370 bytes (6.119947 Gbps)
+    Loss: 0 packets (0.000000%)
+Applying 6.800000 Gbps of load.
+  NIC 0:
+    TX 1545442 packets (1.545442 MPPS), 849993100 bytes (6.799945 Gbps)
+    RX 1545435 packets (1.545435 MPPS), 911806650 bytes (7.294453 Gbps)
+    Loss: 7 packets (0.000453%)
+  NIC 1:
+    TX 1545442 packets (1.545442 MPPS), 849993100 bytes (6.799945 Gbps)
+    RX 1545438 packets (1.545438 MPPS), 788173380 bytes (6.305387 Gbps)
+    Loss: 4 packets (0.000259%)
+Applying 7.000000 Gbps of load.
+  NIC 0:
+    TX 1590902 packets (1.590902 MPPS), 874996100 bytes (6.999969 Gbps)
+    RX 1589689 packets (1.589689 MPPS), 937916510 bytes (7.503332 Gbps)
+    Loss: 1213 packets (0.076246%)
+  NIC 1:
+    TX 1590902 packets (1.590902 MPPS), 874996100 bytes (6.999969 Gbps)
+    RX 1589693 packets (1.589693 MPPS), 810743430 bytes (6.485947 Gbps)
+    Loss: 1209 packets (0.075995%)
+Applying 7.200000 Gbps of load.
+  NIC 0:
+    TX 1636356 packets (1.636356 MPPS), 899995800 bytes (7.199966 Gbps)
+    RX 1625618 packets (1.625618 MPPS), 959114620 bytes (7.672917 Gbps)
+    Loss: 10738 packets (0.656214%)
+  NIC 1:
+    TX 1636356 packets (1.636356 MPPS), 899995800 bytes (7.199966 Gbps)
+    RX 1625625 packets (1.625625 MPPS), 829068750 bytes (6.632550 Gbps)
+    Loss: 10731 packets (0.655786%)
+Applying 7.400000 Gbps of load.
+  NIC 0:
+    TX 1681820 packets (1.681820 MPPS), 925001000 bytes (7.400008 Gbps)
+    RX 1654527 packets (1.654527 MPPS), 976170930 bytes (7.809367 Gbps)
+    Loss: 27293 packets (1.622825%)
+  NIC 1:
+    TX 1681820 packets (1.681820 MPPS), 925001000 bytes (7.400008 Gbps)
+    RX 1654542 packets (1.654542 MPPS), 843816420 bytes (6.750531 Gbps)
+    Loss: 27278 packets (1.621933%)
+Applying 7.600000 Gbps of load.
+  NIC 0:
+    TX 1727267 packets (1.727267 MPPS), 949996850 bytes (7.599975 Gbps)
+    RX 1676373 packets (1.676373 MPPS), 989060070 bytes (7.912481 Gbps)
+    Loss: 50894 packets (2.946505%)
+  NIC 1:
+    TX 1727267 packets (1.727267 MPPS), 949996850 bytes (7.599975 Gbps)
+    RX 1676385 packets (1.676385 MPPS), 854956350 bytes (6.839651 Gbps)
+    Loss: 50882 packets (2.945810%)
+Applying 7.800000 Gbps of load.
+  NIC 0:
+    TX 1772723 packets (1.772723 MPPS), 974997650 bytes (7.799981 Gbps)
+    RX 1689707 packets (1.689707 MPPS), 996927130 bytes (7.975417 Gbps)
+    Loss: 83016 packets (4.682965%)
+  NIC 1:
+    TX 1772723 packets (1.772723 MPPS), 974997650 bytes (7.799981 Gbps)
+    RX 1689759 packets (1.689759 MPPS), 861777090 bytes (6.894217 Gbps)
+    Loss: 82964 packets (4.680032%)
+Applying 8.000000 Gbps of load.
+  NIC 0:
+    TX 1818160 packets (1.818160 MPPS), 999988000 bytes (7.999904 Gbps)
+    RX 1692924 packets (1.692924 MPPS), 998825160 bytes (7.990601 Gbps)
+    Loss: 125236 packets (6.888063%)
+  NIC 1:
+    TX 1818160 packets (1.818160 MPPS), 999988000 bytes (7.999904 Gbps)
+    RX 1692999 packets (1.692999 MPPS), 863429490 bytes (6.907436 Gbps)
+    Loss: 125161 packets (6.883938%)
+Applying 8.200000 Gbps of load.
+  NIC 0:
+    TX 1863629 packets (1.863629 MPPS), 1024995950 bytes (8.199968 Gbps)
+    RX 1694149 packets (1.694149 MPPS), 999547910 bytes (7.996383 Gbps)
+    Loss: 169480 packets (9.094085%)
+  NIC 1:
+    TX 1863629 packets (1.863629 MPPS), 1024995950 bytes (8.199968 Gbps)
+    RX 1694167 packets (1.694167 MPPS), 864025170 bytes (6.912201 Gbps)
+    Loss: 169462 packets (9.093119%)
+Applying 8.400000 Gbps of load.
+  NIC 0:
+    TX 1909089 packets (1.909089 MPPS), 1049998950 bytes (8.399992 Gbps)
+    RX 1692624 packets (1.692624 MPPS), 998648160 bytes (7.989185 Gbps)
+    Loss: 216465 packets (11.338654%)
+  NIC 1:
+    TX 1909089 packets (1.909089 MPPS), 1049998950 bytes (8.399992 Gbps)
+    RX 1692650 packets (1.692650 MPPS), 863251500 bytes (6.906012 Gbps)
+    Loss: 216439 packets (11.337292%)
+Applying 8.600000 Gbps of load.
+  NIC 0:
+    TX 1954509 packets (1.954509 MPPS), 1074979950 bytes (8.599840 Gbps)
+    RX 1691242 packets (1.691242 MPPS), 997832780 bytes (7.982662 Gbps)
+    Loss: 263267 packets (13.469726%)
+  NIC 1:
+    TX 1954509 packets (1.954509 MPPS), 1074979950 bytes (8.599840 Gbps)
+    RX 1691257 packets (1.691257 MPPS), 862541070 bytes (6.900329 Gbps)
+    Loss: 263252 packets (13.468958%)
+Applying 8.800000 Gbps of load.
+  NIC 0:
+    TX 1999981 packets (1.999981 MPPS), 1099989550 bytes (8.799916 Gbps)
+    RX 1691764 packets (1.691764 MPPS), 998140760 bytes (7.985126 Gbps)
+    Loss: 308217 packets (15.410996%)
+  NIC 1:
+    TX 1999981 packets (1.999981 MPPS), 1099989550 bytes (8.799916 Gbps)
+    RX 1691771 packets (1.691771 MPPS), 862803210 bytes (6.902426 Gbps)
+    Loss: 308210 packets (15.410646%)
+Applying 9.000000 Gbps of load.
+  NIC 0:
+    TX 2045410 packets (2.045410 MPPS), 1124975500 bytes (8.999804 Gbps)
+    RX 1692184 packets (1.692184 MPPS), 998388560 bytes (7.987108 Gbps)
+    Loss: 353226 packets (17.269203%)
+  NIC 1:
+    TX 2045410 packets (2.045410 MPPS), 1124975500 bytes (8.999804 Gbps)
+    RX 1692196 packets (1.692196 MPPS), 863019960 bytes (6.904160 Gbps)
+    Loss: 353214 packets (17.268616%)
+Applying 9.200000 Gbps of load.
+  NIC 0:
+    TX 2090890 packets (2.090890 MPPS), 1149989500 bytes (9.199916 Gbps)
+    RX 1689989 packets (1.689989 MPPS), 997093510 bytes (7.976748 Gbps)
+    Loss: 400901 packets (19.173701%)
+  NIC 1:
+    TX 2090890 packets (2.090890 MPPS), 1149989500 bytes (9.199916 Gbps)
+    RX 1690019 packets (1.690019 MPPS), 861909690 bytes (6.895278 Gbps)
+    Loss: 400871 packets (19.172266%)
+Applying 9.400000 Gbps of load.
+  NIC 0:
+    TX 2136326 packets (2.136326 MPPS), 1174979300 bytes (9.399834 Gbps)
+    RX 1691420 packets (1.691420 MPPS), 997937800 bytes (7.983502 Gbps)
+    Loss: 444906 packets (20.825754%)
+  NIC 1:
+    TX 2136326 packets (2.136326 MPPS), 1174979300 bytes (9.399834 Gbps)
+    RX 1691432 packets (1.691432 MPPS), 862630320 bytes (6.901043 Gbps)
+    Loss: 444894 packets (20.825192%)
+Applying 9.600000 Gbps of load.
+  NIC 0:
+    TX 2178425 packets (2.178425 MPPS), 1198133750 bytes (9.585070 Gbps)
+    RX 1692568 packets (1.692568 MPPS), 998615120 bytes (7.988921 Gbps)
+    Loss: 485857 packets (22.303132%)
+  NIC 1:
+    TX 2178373 packets (2.178373 MPPS), 1198105150 bytes (9.584841 Gbps)
+    RX 1692525 packets (1.692525 MPPS), 863187750 bytes (6.905502 Gbps)
+    Loss: 485848 packets (22.303251%)
+Applying 9.800000 Gbps of load.
+  NIC 0:
+    TX 2178253 packets (2.178253 MPPS), 1198039150 bytes (9.584313 Gbps)
+    RX 1696463 packets (1.696463 MPPS), 1000913170 bytes (8.007305 Gbps)
+    Loss: 481790 packets (22.118184%)
+  NIC 1:
+    TX 2178229 packets (2.178229 MPPS), 1198025950 bytes (9.584208 Gbps)
+    RX 1696479 packets (1.696479 MPPS), 865204290 bytes (6.921634 Gbps)
+    Loss: 481750 packets (22.116591%)
+Applying 10.000000 Gbps of load.
+  NIC 0:
+    TX 2178323 packets (2.178323 MPPS), 1198077650 bytes (9.584621 Gbps)
+    RX 1696703 packets (1.696703 MPPS), 1001054770 bytes (8.008438 Gbps)
+    Loss: 481620 packets (22.109669%)
+  NIC 1:
+    TX 2178299 packets (2.178299 MPPS), 1198064450 bytes (9.584516 Gbps)
+    RX 1696739 packets (1.696739 MPPS), 865336890 bytes (6.922695 Gbps)
+    Loss: 481560 packets (22.107158%)
