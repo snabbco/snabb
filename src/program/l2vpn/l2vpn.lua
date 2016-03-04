@@ -301,7 +301,8 @@ function run (parameters)
                         -- For a p2p VPN, pass the name of the AC
                         -- interface so the PW module can set up the
                         -- proper service-specific MIB
-                        interface = (#acs == 1 and acs[1].config.interface) or '',
+                        interface = (#vpls_config.pw == 1 and
+                                        #acs == 1 and acs[1].config.interface) or '',
                         ethernet = pw_eth_config,
                         transport = { type = 'ipv6',
                                       src = vpls_config.address,
