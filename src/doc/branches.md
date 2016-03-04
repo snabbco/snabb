@@ -77,3 +77,10 @@ The current state of each branch with respect to master is visible here:
     
     Maintainer: Alexander Gall <gall@switch.ch>
 
+#### lwaftr
+
+    BRANCH: lwaftr git://github.com/Igalia/snabbswitch
+    Lightweight 4-over-6 AFTR application development branch.
+
+    Maintainer: Collectively maintained by lwAFTR application developers.
+    Next hop: kbara-next
