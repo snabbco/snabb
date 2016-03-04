@@ -33,7 +33,8 @@ end
 PcapWriter = {}
 
 function PcapWriter:new (filename)
-   local file = io.open(filename, "w")
+   local file, errno = io.open(filename, "w+")
+   if errno then error(errno) end
    pcap.write_file_header(file)
    return setmetatable({file = file}, {__index = PcapWriter})
 end
