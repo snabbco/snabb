@@ -31,6 +31,8 @@ function mp_ring (nprocesses, totalpackets, burstpackets)
    local start = C.get_time_ns()
    for i = 0, nprocesses-1 do
       if S.fork() == 0 then
+         -- Child <i> has affinity to CPU core <i>
+         S.sched_setaffinity(0, i)
          -- terminate when parent does
          S.prctl("set_pdeathsig", "hup")
          local input = links[i]
