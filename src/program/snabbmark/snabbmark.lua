@@ -23,7 +23,7 @@ function run (args)
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
    elseif command == 'mp-ring' then
-      require("program.snabbmark.mp").mp_ring(unpack(args))
+      require("program.snabbmark.mp").mp_ring(args)
    else
       print(usage) 
       main.exit(1)
