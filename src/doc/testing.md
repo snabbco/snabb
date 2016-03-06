@@ -37,7 +37,7 @@ test suite:
 
 ```
 cd snabbswitch/src
-make test
+sudo make test
 ```
 
 
