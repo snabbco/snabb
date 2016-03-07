@@ -87,14 +87,14 @@ The current state of each branch with respect to master is visible here:
 
 #### mellanox
 
-    BRANCH: mellanox git://github.com/lukego/mellanox
+    BRANCH: mellanox git://github.com/lukego/snabbswitch
     Mellanox ConnectX device driver development.
 
     Maintainer: Luke Gorrie <luke@snabb.co>
 
 #### multiproc
 
-    BRANCH: multiproc git://github.com/lukego/multiproc
+    BRANCH: multiproc git://github.com/lukego/snabbswitch
     Multiple process parallel processing development branch.
 
     Maintainer: Luke Gorrie <luke@snabb.co>
