@@ -53,6 +53,10 @@ function clone_upstream {
     git clone https://github.com/$REPO.git $(repo_path)
 }
 
+function fetch_pr_head {
+    (cd $(repo_path) && git fetch origin pull/$1/head:pr$1)
+}
+
 function ensure_docs_cloned {
     [ -d $docdir ] || git clone git@github.com:$DOCREPO.git $docdir
     mkdir -p $docdir/{sha1,tag}
@@ -114,6 +118,7 @@ fi
 # Build manual for open PRs and link it as status
 for id in $(pull_request_ids); do
     [ -f $(sha1_out $(pull_request_head $id)) ] && continue
+    fetch_pr_head $id || continue
     build_doc $(pull_request_head $id) $(sha1_out $(pull_request_head $id))
     status=$?
     [ -z "$GITHUB_CREDENTIALS" ] && continue
