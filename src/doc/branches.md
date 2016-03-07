@@ -12,18 +12,18 @@ The current state of each branch with respect to master is visible here:
 
     BRANCH: master git://github.com/lukego/snabbswitch
     Stable branch suitable for development and deployment.
-    
+
     - Always contains a stable release that is safe to pull from.
     - Updated monthly with new features and weekly with new bug fixes.
     - Changes are gated by the SnabbBot CI.
-    
+
     Maintainer: Luke Gorrie <luke@snabb.co> and Max Rottenkolber <max@mr.gy>
 
 #### next
 
     BRANCH: next git://github.com/lukego/snabbswitch
     Test and integration branch for new development.
-    
+
     - Contains the changes for the next monthly feature release.
     - Merges Pull Requests that pass code review on Github.
     - Cycles between unstable and stable with the release schedule.
@@ -56,13 +56,19 @@ The current state of each branch with respect to master is visible here:
 
     BRANCH: documentation-fixups git://github.com/eugeneia/snabbswitch
     Documentation fixes and improvements.
-    
+
     Maintainer: Max Rottenkolber <max@mr.gy>
 
 #### vpn
-    
+
     BRANCH: vpn git://github.com/alexandergall/snabbswitch
     VPN application development branch.
-    
+
     Maintainer: Alexander Gall <gall@switch.ch>
 
+#### lisper
+
+    BRANCH: lisper git://github.com/capr/snabbswitch
+    LISPER program for creating L2 networks over IPv6 networks.
+
+    Maintainer: Cosmin Apreutesei <cosmin.apreutesei@gmail.com>
