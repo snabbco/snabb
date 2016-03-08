@@ -43,6 +43,24 @@ od -j 305 -A none -N 4 -t u4 /tmp/0000\:81\:00.0
 ```
 Above example shows 94543 discarded packets at ingress on Port 0 since launching Snabb.
 
+## Qemu & Vhost-User
+[Vhost-User](http://www.virtualopensystems.com/en/solutions/guides/snabbswitch-qemu/) is used to connect Snabb with a high performance virtual interface attached to a Qemu based virtual machine.  This requires hugepages (explained further down) made available to Qemu:
+
+```
+cd <qemu-dir>/bin/x86_64-softmmu/
+qemu-system-x86_64 -enable-kvm -m 8000 -smp 2 \
+    -chardev socket,id=char0,path=./xe0.socket,server \
+    -netdev type=vhost-user,id=net0,chardev=char0 \
+    -device virtio-net-pci,netdev=net0,mac=02:cf:69:15:0b:00   \
+    -object memory-backend-file,id=mem,size=8000M,mem-path=/hugetlbfs,share=on \
+    -numa node,memdev=mem -mem-prealloc \
+    -realtime mlock=on  \
+    /path/to/img
+```
+
+The allocated memory must match the memory-backend-file size (example shows 8GB). While qemu will fail to boot if there isn't enough hugepages allocated, it is recommended to have some spare and note that the pages are split amongst the NUMA nodes. Check the paragraph on NUMA in this  document.
+It is recommended to specify the qemu option '-realtime mlock=on', despite it being the default. This ensures memory doesn't get swapped out. 
+
 ## Hardware / BIOS
 ### Disable Hyper-Threading
 Disable hyper-threading (HT) in the BIOS. Even with isolating the correct hyper-threaded CPU's, can create latency spikes, leading to packet loss, when enabled. (TODO: do we have one of the automated tests showing this?)
