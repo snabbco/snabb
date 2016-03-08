@@ -466,6 +466,12 @@ local function generator(Dst)
   |.align 16
   |->aesni_gcm_dec_avx_gen4:
   || gcm_enc_dec(Dst, "dec", 8)
+  |.align 16
+  |->aesni_encrypt_single_block:
+  | vmovdqu xmm0, [arg2]
+  || encrypt_single_block(Dst, 0)
+  | vmovdqu [arg2], xmm0
+  | ret
 
   -- Data
   |.align 64
@@ -495,4 +501,5 @@ return setmetatable({
   aesni_gcm_precomp_avx_gen4 = ffi.cast("void(*)(gcm_data*, uint8_t*)", entry.aesni_gcm_precomp_avx_gen4),
   aesni_gcm_enc_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_enc_avx_gen4),
   aesni_gcm_dec_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_dec_avx_gen4),
+  aesni_encrypt_single_block = ffi.cast("void(*)(void *key, void *data)", entry.aesni_encrypt_single_block)
 }, {_anchor = mcode})
