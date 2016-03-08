@@ -66,7 +66,6 @@ function mp_ring (args)
    local counters = ffi.cast("uint64_t *",
                              memory.dma_alloc(c.processes*ffi.sizeof("uint64_t")))
    -- Start child processes
-   if c.pmuevents then error("PMU support NYI") end
    local start = C.get_time_ns()
    for i = 0, c.processes-1 do
       if S.fork() == 0 then
@@ -76,6 +75,14 @@ function mp_ring (args)
          S.prctl("set_pdeathsig", "hup")
          local input = links[i]
          local output = links[(i+1) % c.processes]
+         -- Setup PMU if configured
+         local pmuctr
+         if c.pmuevents and i == 0 then
+            -- Enable PMU if requires and only for process #0.
+            pmu.setup({c.pmuevents})
+            pmuctr = pmu.new_counter_set()
+            pmu.switch_to(pmuctr)
+         end
          if c.mode == "basic" then
             -- Simple reference implementation in idiomatic Lua.
             local acc = ffi.new("uint8_t[1]")
@@ -100,6 +107,12 @@ function mp_ring (args)
             print("mode not recognized: " .. c.mode)
             os.exit(1)
          end
+         if pmuctr then
+            C.usleep(1e4) -- XXX print after parent
+            print("PMU report for child #0:")
+            pmu.switch_to(nil)
+            pmu.report(pmu.to_table(pmuctr), {packet=c.packets})
+         end
          os.exit(0)
       end
    end
@@ -111,4 +124,9 @@ function mp_ring (args)
    local seconds = tonumber(finish-start)/1e9
    local packets = tonumber(counters[0])
    print(("%7.2f Mpps ring throughput per process"):format(packets/seconds/1e6))
+   -- XXX Sleep for a short while before terminating.
+   -- This allows the children to print a report before the parent
+   -- exiting causes them to die. (It would be better to synchronize
+   -- this properly.)
+   C.usleep(1e5)
 end
