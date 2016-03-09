@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 /* Type for port and split-horizon group handles */
 typedef uint16_t handle_t;
 

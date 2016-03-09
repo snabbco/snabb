@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- counter.lua - Count discrete events for diagnostic purposes
 -- 
 -- This module provides a thin layer for representing 64-bit counters

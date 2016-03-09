@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- shm.lua -- shared memory alternative to ffi.new()
 
 -- API:

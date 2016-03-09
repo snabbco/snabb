@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local ffi = require("ffi")
@@ -20,6 +22,10 @@ function equal (x, y)
          if x[k] == nil then return false end
       end
       return true
+   elseif type(x) == 'cdata' then
+      local size = ffi.sizeof(x)
+      if ffi.sizeof(y) ~= size then return false end
+      return C.memcmp(x, y, size) == 0
    else
       return x == y
    end
