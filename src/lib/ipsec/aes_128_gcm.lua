@@ -91,16 +91,15 @@ function aes_128_gcm:new (spi, keymat, salt)
    o.aad = aad:new(spi)
    -- Compute subkey (H)
    o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 16)
-   -- XXX Unit test currently assumes this call is a NOP.
-   --aes_128_block(o.hash_subkey, o.keymat)
+   aes_128_block(o.hash_subkey, o.keymat)
    o.gcm_data = ffi.new("gcm_data[1] __attribute__((aligned(16)))")
    ASM.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data[0].expanded_keys)
    ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
    return setmetatable(o, {__index=aes_128_gcm})
 end
 
-function aes_128_gcm:encrypt (out_ptr, seq_no, payload, length)
-   self.iv:iv(seq_no)
+function aes_128_gcm:encrypt (out_ptr, iv, seq_no, payload, length)
+   self.iv:iv(iv)
    self.aad:seq_no(seq_no:low(), seq_no:high())
    ASM.aesni_gcm_enc_avx_gen4(self.gcm_data,
                               out_ptr,
@@ -124,64 +123,141 @@ end
 
 
 function selftest ()
-   -- Test vectors (2 and 3) from McGrew, D. and J. Viega, "The Galois/Counter
-   -- Mode of Operation (GCM)"
-   local test = { { key        = "00000000000000000000000000000000",
-                    salt       = "00000000",
-                    iv         =         "0000000000000000",
-                    plaintext  = "00000000000000000000000000000000",
-                    ciphertext = "0388dace60b6a392f328c2b971b2fe78",
-                    icv        = "58e2fccefa7e3061367f1d57a4e7455a"},
-                  { key        = "feffe9928665731c6d6a8f9467308308",
-                    salt       = "cafebabe",
-                    iv         =         "facedbaddecaf888",
-                    plaintext  = "d9313225f88406e5a55909c5aff5269a"..
-                                 "86a7a9531534f7da2e4c303d8a318a72"..
-                                 "1c3c0c95956809532fcf0e2449a6b525"..
-                                 "b16aedf5aa0de657ba637b391aafd255",
-                    ciphertext = "42831ec2217774244b7221b784d0d49c"..
-                                 "e3aa212f2c02a4e035c17e2329aca12e"..
-                                 "21d514b25466931c7d8f6a5aac84aa05"..
-                                 "1ba30b396a0aac973d58e091473f5985",
-                    icv        = "3247184b3c4f69a44dbcd22887bbb418"}, }
+   local seq_no_t = require("lib.ipsec.seq_no_t")
+   -- Test decryption against vectors from “Test Cases for the use of GCM [...]
+   -- in IPsec ESP”, see: https://tools.ietf.org/html/draft-mcgrew-gcm-test-01
+   local test = { { key   = "4c80cdefbb5d10da906ac73c3613a634",
+                    salt  = "2e443b68",
+                    spi   = 0x00004321,
+                    seq   = 0x8765432100000000ULL,
+                    iv    = "4956ed7e3b244cfe",
+                    ctag  = "fecf537e729d5b07dc30df528dd22b76"..
+                            "8d1b98736696a6fd348509fa13ceac34"..
+                            "cfa2436f14a3f3cf65925bf1f4a13c5d"..
+                            "15b21e1884f5ff6247aeabb786b93bce"..
+                            "61bc17d768fd9732459018148f6cbe72"..
+                            "2fd04796562dfdb4",
+                    plain = "45000048699a000080114db7c0a80102"..
+                            "c0a801010a9bf15638d3010000010000"..
+                            "00000000045f736970045f7564700373"..
+                            "69700963796265726369747902646b00"..
+                            "0021000101020201" },
+                  { key   = "3de09874b388e6491988d0c3607eae1f",
+                    salt  = "57690e43",
+                    spi   = 0x42f67e3f,
+                    seq   = 0x1010101010101010ULL,
+                    iv    = "4e280000a2fca1a3",
+                    ctag  = "fba2caa4853cf9f0f22cb10d86dd83b0"..
+                            "fec75691cf1a04b00d1138ec9c357917"..
+                            "65acbd8701ad79845bf9fe3fba487bc9"..
+                            "1755e6662b4c8d0d1f5e22739530320a"..
+                            "e0d731cc978ecafaeae88f00e80d6e48",
+                    plain = "4500003c99c300008001cb7c40679318"..
+                            "010101010800085c0200430061626364"..
+                            "65666768696a6b6c6d6e6f7071727374"..
+                            "75767761626364656667686901020201" },
+                  { key   = "3de09874b388e6491988d0c3607eae1f",
+                    salt  = "57690e43",
+                    spi   = 0x42f67e3f,
+                    seq   = 0x1010101010101010ULL,
+                    iv    = "4e280000a2fca1a3",
+                    ctag  = "fba2ca845e5df9f0f22c3e6e86dd831e"..
+                            "1fc65792cd1af9130e1379ed369f071f"..
+                            "35e034be95f112e4e7d05d35",
+                    plain = "4500001c42a200008001441f406793b6"..
+                            "e00000020a00f5ff01020201" },
+                  { key   = "abbccddef00112233445566778899aab",
+                    salt  = "decaf888",
+                    spi   = 0x00000100,
+                    seq   = 0x0000000000000001ULL,
+                    iv    = "cafedebaceface74",
+                    ctag  = "18a6fd42f72cbf4ab2a2ea901f73d814"..
+                            "e3e7f243d95412e1c349c1d2fbec168f"..
+                            "9190feebaf2cb01984e65863965d7472"..
+                            "b79da345e0e780191f0d2f0e0f496c22"..
+                            "6f2127b27db35724e7845d68651f57e6"..
+                            "5f354f75ff17015769623436",
+                    plain = "4500004933ba00007f119106c3fb1d10"..
+                            "c2b1d326c02831ce0035dd7b800302d5"..
+                            "00004e20001e8c18d75b81dc91baa047"..
+                            "6b91b924b280389d92c963bac046ec95"..
+                            "9b6266c04722b14923010101" },
+                  { key   = "3de09874b388e6491988d0c3607eae1f",
+                    salt  = "57690e43",
+                    spi   = 0x42f67e3f,
+                    seq   = 0x1010101010101010ULL,
+                    iv    = "4e280000a2fca1a3",
+                    ctag  = "fba2cad12fc1f9f00d3cebf305410db8"..
+                            "3d7784b607323d220f24b0a97d541828"..
+                            "00cadb0f68d99ef0e0c0c89ae9bea888"..
+                            "4e52d65bc1afd0740f742444747b5b39"..
+                            "ab533163aad4550ee5160975cdb608c5"..
+                            "769189609763b8e18caa81e2",
+                    plain = "45000049333e00007f119182c3fb1d10"..
+                            "c2b1d326c02831ce0035cb458003025b"..
+                            "000001e0001e8c18d65759d52284a035"..
+                            "2c71475c8880391c764d6e5ee0496b32"..
+                            "5ae270c03899493915010101" },
+                  { key   = "abbccddef00112233445566778899aab",
+                    salt  = "decaf888",
+                    spi   = 0x00000100,
+                    seq   = 0x0000000000000001ULL,
+                    iv    = "cafedebaceface74",
+                    ctag  = "29c9fc69a197d038ccdd14e2ddfcaa05"..
+                            "43332164412503524303ed3c6c5f2838"..
+                            "43af8c3e",
+                    plain = "746f016265016f72016e6f7401746f01"..
+                            "62650001" },
+                  { key   = "3de09874b388e6491988d0c3607eae1f",
+                    salt  = "57690e43",
+                    spi   = 0x3f7ef642,
+                    seq   = 0x1010101010101010ULL,
+                    iv    = "4e280000a2fca1a3",
+                    ctag  = "fba2caa8c6c5f9f0f22ca54a061210ad"..
+                            "3f6e5791cf1aca210d117cec9c357917"..
+                            "65acbd8701ad79845bf9fe3fba487bc9"..
+                            "6321930684eecadb56912546e7a95c97"..
+                            "40d7cb05",
+                    plain = "45000030da3a00008001df3bc0a80005"..
+                            "c0a800010800c6cd0200070061626364"..
+                            "65666768696a6b6c6d6e6f7071727374"..
+                            "01020201" },
+                  { key   = "4c80cdefbb5d10da906ac73c3613a634",
+                    salt  = "22433c64",
+                    spi   = 0x00004321,
+                    seq   = 0x8765432100000007ULL,
+                    iv    = "4855ec7d3a234bfd",
+                    ctag  = "74752e8aeb5d873cd7c0f4acc36c4bff"..
+                            "84b7d7b98f0ca8b6acda6894bc619069"..
+                            "ef9cbc28fe1b56a7c4e0d58c86cd2bc0",
+                    plain = "0800c6cd020007006162636465666768"..
+                            "696a6b6c6d6e6f707172737401020201" } }
    for i, t in ipairs(test) do
       print("Test vector:", i)
-      local gcm = aes_128_gcm:new(0x0, t.key, t.salt)
+      local gcm = aes_128_gcm:new(t.spi, t.key, t.salt)
       local iv = lib.hexundump(t.iv, gcm.iv_size)
-      local length = #t.plaintext/2
+      local seq = ffi.new(seq_no_t)
+      seq.no = t.seq
+      local length = #t.plain/2
       local p = ffi.new("uint8_t[?]", length + gcm.auth_size)
       local c = ffi.new("uint8_t[?]", length + gcm.auth_size)
       local o = ffi.new("uint8_t[?]", length + gcm.auth_size)
-      local icv = lib.hexundump(t.icv, gcm.auth_size)
-      ffi.copy(p, lib.hexundump(t.plaintext, length), length)
-      ffi.copy(c, lib.hexundump(t.ciphertext, length), length)
-      gcm.iv:iv(iv)
-      ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
-                                 o, p, length,
-                                 u8_ptr(gcm.iv:header_ptr()),
-                                 iv, 0, -- No AAD
-                                 o + length, gcm.auth_size)
-      print("ciphertext", lib.hexdump(ffi.string(c, length)))
-      print("is        ", lib.hexdump(ffi.string(o, length)))
-      print("auth      ", lib.hexdump(ffi.string(icv, gcm.auth_size)))
-      print("is        ", lib.hexdump(ffi.string(o + length, gcm.auth_size)))
-      assert(C.memcmp(c, o, length) == 0)
-      assert(C.memcmp(icv, o + length, gcm.auth_size) == 0)
-      ASM.aesni_gcm_dec_avx_gen4(gcm.gcm_data,
-                                 o, c, length,
-                                 u8_ptr(gcm.iv:header_ptr()),
-                                 iv, 0, -- No AAD
-                                 o + length, gcm.auth_size)
-      print("plaintext ", lib.hexdump(ffi.string(p, length)))
-      print("is        ", lib.hexdump(ffi.string(o, length)))
-      print("auth      ", lib.hexdump(ffi.string(icv, gcm.auth_size)))
-      print("is        ", lib.hexdump(ffi.string(o + length, gcm.auth_size)))
+      ffi.copy(p, lib.hexundump(t.plain, length), length)
+      ffi.copy(c, lib.hexundump(t.ctag, length + gcm.auth_size), length + gcm.auth_size)
+      gcm:encrypt(o, iv, seq, p, length)
+      print("ctext+tag", lib.hexdump(ffi.string(c, length + gcm.auth_size)))
+      print("is       ", lib.hexdump(ffi.string(o, length + gcm.auth_size)))
+      assert(C.memcmp(c, o, length + gcm.auth_size) == 0)
+      gcm:decrypt(o, seq:low(), seq:high(), iv, c, length)
+      print("plaintext", lib.hexdump(ffi.string(p, length)))
+      print("is       ", lib.hexdump(ffi.string(o, length)))
       assert(C.memcmp(p, o, length) == 0)
-      assert(C.memcmp(icv, o + length, gcm.auth_size) == 0)
+      assert(C.memcmp(c + length, o + length, gcm.auth_size) == 0,
+             "Authentication failed.")
    end
    -- Microbenchmarks.
    local length = 1000 * 1000 * 100 -- 100MB
-   local gcm = aes_128_gcm:new(0x0, test[1].key, test[1].salt)
+   local gcm = aes_128_gcm:new(0x0, "00000000000000000000000000000000", "00000000")
    local p = ffi.new("uint8_t[?]", length + gcm.auth_size)
    local start = C.get_monotonic_time()
    ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,

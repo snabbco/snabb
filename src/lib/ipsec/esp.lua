@@ -85,7 +85,7 @@ function esp_v6_encrypt:encrypt (nh, payload, length)
    packet.append(p, self.esp_tail:header_ptr(), esp_tail_size)
    packet.append(p, self.zero_buf, gcm.auth_size)
    local cleartext = packet.data(p) + esp_size + gcm.iv_size
-   gcm:encrypt(cleartext, self.seq, cleartext, length + pad_length + esp_tail_size)
+   gcm:encrypt(cleartext, self.seq, self.seq, cleartext, length + pad_length + esp_tail_size)
    return p
 end
 
