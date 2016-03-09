@@ -47,7 +47,7 @@ function mp_ring (args)
    function opt.r (arg) c.readbytes = tonumber(arg) end
    function opt.w (arg) c.writebytes = tonumber(arg) end
    function opt.h (arg) usage() end
-   local leftover = lib.dogetopt(args, opt, "hn:p:b:e:r:w:", long_opts)
+   local leftover = lib.dogetopt(args, opt, "hm:n:p:b:e:r:w:", long_opts)
    if #leftover > 0 then usage () end
    -- Print summary of configuration
    print("Benchmark configuration:")
@@ -103,6 +103,28 @@ function mp_ring (args)
                -- Sync registers with memory
                core.lib.compiler_barrier()
             end
+	 elseif c.mode == "ff" then
+            local acc = ffi.new("uint8_t[1]")
+	    while counters[i] < c.packets do
+	       local p = link.maybe_rx(input)
+	       if p ~= nil then
+                  -- Read some packet data
+                  for j = 0, c.readbytes do
+                     acc[0] = acc[0] + p.data[j]
+                  end
+                  -- Write some packet data
+                  for j = 0, c.writebytes do
+                     p.data[j] = i
+                  end
+
+		  local sent = nil
+		  repeat
+		     sent = link.maybe_tx(output, p)
+		  until sent ~= nil
+		  counters[i] = counters[i] + 1
+	       end
+	       core.lib.compiler_barrier()
+	    end
          else
             print("mode not recognized: " .. c.mode)
             os.exit(1)
