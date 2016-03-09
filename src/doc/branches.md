@@ -63,6 +63,17 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Andy Wingo <wingo@igalia.com>
 
+#### kbara-next
+
+    BRANCH: kbara-next git://github.com/kbara/snabbswitch
+    Test and integration branch for maintenance & development.
+
+    - Contains changes proposed to be merged into next.
+    - Merges Pull Requests that pass code review on GitHub.
+    - Integration branch for code vetted by Katerina
+
+    Maintainer: Katerina Barone-Adesi <kbarone@igalia.com>
+
 #### documenation-fixups
 
     BRANCH: documentation-fixups git://github.com/eugeneia/snabbswitch
