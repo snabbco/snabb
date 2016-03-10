@@ -125,9 +125,27 @@ function setup (patterns)
    -- Enable all fixed-function counters (IA32_FIXED_CTR_CTRL)
    writemsr(cpu, 0x38d, 0x333)
    for n = 0, #set-1 do
-      local code = defs[set[n+1]]
+      local name = set[n+1]
+      local code = defs[name]
       local USR = bit.lshift(1, 16)
       local EN = bit.lshift(1, 22)
+      local latency = name:match("mem_trans_retired[.]load_latency_gt_(%d+)")
+      if latency then
+         -- Special case: latency measurement requires threshold to be
+         -- programmed into MSR 0x3F6 (MSR_PEBS_LD_LAT_THRESHOLD).
+         --
+         -- XXX This is always reporting 0. I believe this is because
+         -- PEBS mode needs to be enabled for the counter. I am not
+         -- sure if that is safe to do from userspace e.g. in case it
+         -- causes an unexpected interrupt for the kernel. Some
+         -- thought required.
+         --
+         -- Also worth noting that this counter is based on random
+         -- sampling rather than precise counting.
+         --
+         -- See Intel System Programming Guide, volume 3 section 18.7.2.1.
+         writemsr(cpu, 0x3f6, tonumber(latency))
+      end
       writemsr(cpu, 0x186+n, bit.bor(0x10000, USR, EN, code))
    end
    enabled = {"instructions", "cycles", "ref_cycles"}
