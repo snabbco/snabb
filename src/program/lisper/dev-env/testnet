@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+#set -x
 
 appnodes="01 02 05 06"
-lispnodes="08"
+lispnodes="04 08"
 nodes="$appnodes $lispnodes"
 
 # -----------------------------------------------------------------------------

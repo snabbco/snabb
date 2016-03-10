@@ -9,6 +9,13 @@ local link   = require("core.link")
 local packet = require("core.packet")
 local S      = require("syscall")
 
+--ljsyscall returns error as a a cdata instead of a string,
+--and the standard assert() doesn't use tostring() on it.
+local function assert(v, ...)
+   if not v then error(tostring(... or 'assertion failed'), 2) end
+   return v, ...
+end
+
 UnixSocket = {}
 UnixSocket.__index = UnixSocket
 
@@ -31,13 +38,6 @@ function UnixSocket:new (arg)
    mode = assert(modes[mode or "stream"], "invalid mode")
    assert(file, "filename expected")
 
-   --ljsyscall returns error as a a cdata instead of a string,
-   --and the standard assert() doesn't use tostring() on it.
-   local function assert(v, ...)
-      if not v then error(tostring((...)), 2) end
-      return v, ...
-   end
-
    --open/close socket
 
    local open, close
@@ -53,7 +53,7 @@ function UnixSocket:new (arg)
       end
 
       function close()
-         S.close(sock)
+         sock:close()
          S.unlink(file)
       end
 
@@ -69,7 +69,7 @@ function UnixSocket:new (arg)
          end
          local close0 = close
          function close()
-            S.close(csock)
+            csock:close()
             close0()
          end
          return csock
@@ -90,7 +90,7 @@ function UnixSocket:new (arg)
       end
 
       function close()
-         S.close(sock)
+         sock:close()
       end
 
    end
@@ -109,7 +109,7 @@ function UnixSocket:new (arg)
       while not t and (err.AGAIN or err.INTR) do
          t, err = S.select({readfds = {sock}}, 0)
       end
-      assert(t)
+      assert(t, err)
       return t.count == 1
    end
 
@@ -119,7 +119,7 @@ function UnixSocket:new (arg)
       while not t and (err.AGAIN or err.INTR) do
          t, err = S.select({writefds = {sock}}, 0)
       end
-      assert(t)
+      assert(t, err)
       return t.count == 1
    end
 
@@ -136,7 +136,9 @@ function UnixSocket:new (arg)
    end
 
    local function send(p)
-      assert(S.write(sock, p.data, p.length))
+      local sz, err = S.write(sock, p.data, p.length)
+      assert(sz, err)
+      assert(sz == p.length)
    end
 
    --app object

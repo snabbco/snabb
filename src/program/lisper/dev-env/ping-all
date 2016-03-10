@@ -8,6 +8,7 @@ ip netns exec node05 ping $o 10.0.0.7 | grep loss
 echo eth-l2tp
 ip netns exec node04 ping $o 10.0.0.1 | grep loss
 ip netns exec node08 ping $o 10.0.0.5 | grep loss
+
 echo l2tp-lisper-l2tp
 ip netns exec node05 ping $o 10.0.0.1 | grep loss
 ip netns exec node01 ping $o 10.0.0.5 | grep loss
