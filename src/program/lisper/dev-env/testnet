@@ -117,7 +117,7 @@ eth 08 07
 eth 08 17
 
 for n in $appnodes; do
-    ip netns exec node$n tunctl -t t0
+    ip netns exec node$n ip tuntap add dev t0 mode tap
     ip netns exec node$n ip link set address 00:00:00:00:aa:$n dev t0
     ip netns exec node$n ifconfig t0 10.0.0.$n/24 mtu 1400 up
     ./l2tp.app$n start
