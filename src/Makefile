@@ -16,7 +16,7 @@ CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P '
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
-RMSRC  = $(shell find . -name  README.src.md -printf '%P ')
+RMSRC  = $(shell find . -name  '*.src.md' -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
