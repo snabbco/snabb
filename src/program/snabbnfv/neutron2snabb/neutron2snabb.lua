@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(..., package.seeall)
 
 local lib  = require("core.lib")
@@ -242,7 +244,7 @@ end
 function selftest ()
    print("selftest: neutron2snabb")
    local function checkrule (rule, filter)
-      local got = rulestofilter(lib.load_string(rule)(), 'ingress')
+      local got = rulestofilter(lib.load_string(rule), 'ingress')
       if got ~= filter then
          print(([[Unexpected translation of %s"
   Expected: %q

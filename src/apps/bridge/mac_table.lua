@@ -1,3 +1,4 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 --
 -- This module implements a MAC address table as part of the learning
 -- bridge app (apps.bridge.learning).  It associates a MAC address

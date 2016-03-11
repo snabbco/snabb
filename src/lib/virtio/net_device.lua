@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Implements virtio-net device
 
 
@@ -9,7 +11,7 @@ local link      = require("core.link")
 local memory    = require("core.memory")
 local packet    = require("core.packet")
 local timer     = require("core.timer")
-local vq        = require("lib.virtio.virtq")
+local vq        = require("lib.virtio.virtq_device")
 local checksum  = require("lib.checksum")
 local ffi       = require("ffi")
 local C         = ffi.C
@@ -55,7 +57,6 @@ local supported_features = C.VIRTIO_F_ANY_LAYOUT +
                            C.VIRTIO_RING_F_INDIRECT_DESC +
                            C.VIRTIO_NET_F_CTRL_VQ +
                            C.VIRTIO_NET_F_MQ +
-                           C.VIRTIO_NET_F_MRG_RXBUF +
                            C.VIRTIO_NET_F_CSUM
 --[[
    The following offloading flags are also available:
@@ -69,7 +70,7 @@ local max_virtq_pairs = 16
 
 VirtioNetDevice = {}
 
-function VirtioNetDevice:new(owner)
+function VirtioNetDevice:new(owner, disable_mrg_rxbuf)
    assert(owner)
    local o = {
       owner = owner,
@@ -99,6 +100,12 @@ function VirtioNetDevice:new(owner)
    self.virtq_pairs = 1
    self.hdr_type = virtio_net_hdr_type
    self.hdr_size = virtio_net_hdr_size
+
+   if disable_mrg_rxbuf then
+      self.supported_features = supported_features
+   else
+      self.supported_features = supported_features + C.VIRTIO_NET_F_MRG_RXBUF
+   end
 
    return o
 end
@@ -227,6 +234,7 @@ function VirtioNetDevice:tx_packet_start(addr, len)
    if band(self.features, C.VIRTIO_NET_F_CSUM) == 0 then
       tx_hdr.flags = 0
    else
+      assert(tx_p.length > 14)
       tx_hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
    end
 
@@ -322,20 +330,6 @@ function VirtioNetDevice:tx_signal_used()
    end
 end
 
-local pagebits = memory.huge_page_bits
-
--- Cache of the latest referenced physical page.
-function VirtioNetDevice:translate_physical_addr (addr)
-   local page = bit.rshift(addr, pagebits)
-   if page == self.last_virt_page then
-      return addr + self.last_virt_offset
-   end
-   local phys = memory.virtual_to_physical(addr)
-   self.last_virt_page = page
-   self.last_virt_offset = phys - addr
-   return phys
-end
-
 function VirtioNetDevice:map_from_guest (addr)
    local result
    local m = self.mem_table[0]
@@ -373,8 +367,10 @@ function VirtioNetDevice:map_from_qemu (addr)
 end
 
 function VirtioNetDevice:get_features()
-   print(string.format("Get features 0x%x\n%s", tonumber(supported_features), get_feature_names(supported_features)))
-   return supported_features
+   print(string.format("Get features 0x%x\n%s",
+                        tonumber(self.supported_features), 
+                        get_feature_names(self.supported_features)))
+   return self.supported_features
 end
 
 function VirtioNetDevice:set_features(features)

@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- 'config' is a data structure that describes an app network.
 
 module(..., package.seeall)

@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(..., package.seeall)
 
 local engine    = require("core.app")
@@ -9,33 +11,67 @@ local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
 local PcapReader= require("apps.pcap.pcap").PcapReader
+local Synth     = require("apps.test.synth").Synth
 local LoadGen   = require("apps.intel.loadgen").LoadGen
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 
 local usage = require("program.packetblaster.README_inc")
+local usage_replay = require("program.packetblaster.replay.README_inc")
+local usage_synth = require("program.packetblaster.synth.README_inc")
 
 local long_opts = {
    duration     = "D",
-   help         = "h"
+   help         = "h",
+   src          = "s",
+   dst          = "d",
+   sizes        = "S"
 }
 
 function run (args)
    local opt = {}
+   local mode = table.remove(args, 1)
    local duration
-   function opt.D (arg) duration = tonumber(arg)  end
-   function opt.h (arg) print(usage) main.exit(1) end
-   if #args < 3 or table.remove(args, 1) ~= 'replay' then opt.h() end
-   args = lib.dogetopt(args, opt, "hD:", long_opts)
-   local filename = table.remove(args, 1)
-   local patterns = args
    local c = config.new()
-   config.app(c, "pcap", PcapReader, filename)
-   config.app(c, "loop", basic_apps.Repeater)
-   config.app(c, "tee", basic_apps.Tee)
-   config.link(c, "pcap.output -> loop.input")
-   config.link(c, "loop.output -> tee.input")
+   function opt.D (arg) 
+      duration = assert(tonumber(arg), "duration is not a number!")  
+   end
+   function opt.h (arg)
+      if mode == 'replay' then print(usage_replay)
+      elseif mode == 'synth' then print(usage_synth)
+      else print(usage) end
+      main.exit(1)
+   end
+   if mode == 'replay' and #args > 1 then
+      args = lib.dogetopt(args, opt, "hD:", long_opts)
+      local filename = table.remove(args, 1)
+      config.app(c, "pcap", PcapReader, filename)
+      config.app(c, "loop", basic_apps.Repeater)
+      config.app(c, "source", basic_apps.Tee)
+      config.link(c, "pcap.output -> loop.input")
+      config.link(c, "loop.output -> source.input")
+   elseif mode == 'synth' and #args >= 1 then
+      local source
+      local destination
+      local sizes
+      function opt.s (arg) source = arg end
+      function opt.d (arg) destination = arg end
+      function opt.S (arg)
+         sizes = {}
+	 for size in string.gmatch(arg, "%d+") do
+	    sizes[#sizes+1] = tonumber(size)
+	 end
+      end
+      
+      args = lib.dogetopt(args, opt, "hD:s:d:S:", long_opts)
+      config.app(c, "source", Synth, { sizes = sizes,
+				       src = source,
+				       dst = destination })
+   else
+      opt.h()
+   end
+   local patterns = args
    local nics = 0
    pci.scan_devices()
    for _,device in ipairs(pci.devices) do
@@ -43,7 +79,7 @@ function run (args)
          nics = nics + 1
          local name = "nic"..nics
          config.app(c, name, LoadGen, device.pciaddress)
-         config.link(c, "tee."..tostring(nics).."->"..name..".input")
+         config.link(c, "source."..tostring(nics).."->"..name..".input")
       end
    end
    assert(nics > 0, "<PCI> matches no suitable devices.")
@@ -73,5 +109,4 @@ function is_device_suitable (pcidev, patterns)
       end
    end
 end
-
 

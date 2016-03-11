@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This module implements a basic Bloom filter as described in
 -- <http://en.wikipedia.org/wiki/Bloom_filter>.
 --

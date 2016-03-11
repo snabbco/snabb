@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 struct bpf_program {
   uint32_t bf_len;
   void *bf_insns;

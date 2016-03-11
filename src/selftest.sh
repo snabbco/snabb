@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 echo "selftest: ./snabb binary portability"
 echo "Scanning for symbols requiring GLIBC > 2.7"
 if objdump -T snabb | \
