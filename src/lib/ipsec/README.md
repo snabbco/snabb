@@ -13,6 +13,9 @@ UDP, L2TPv3) and also encrypts the contents of the inner protocol
 header. The decrypt class does the reverse: it decrypts the inner
 protocol header and removes the ESP protocol header.
 
+Anti-replay protection as well as recovery from synchronization loss due to
+excessive packet loss are *not* implemented.
+
 References:
 
 - [IPsec Wikipedia page](https://en.wikipedia.org/wiki/IPsec).
@@ -41,10 +44,10 @@ be a table with the following keys:
 
 Returns a freshly allocated packet that is the encrypted and encapsulated
 version of *packet* or `nil` if header parsing failed. The contents of *packet*
-are destroyed in the process.
+are destructively modified in the process.
 
 — Method **esp_v6_decrypt:decapsulate** *packet*
 
 Returns a freshly allocated packet that is the decrypted and decapsulated
 version of *packet* or `nil` if header parsing or authentication failed. The
-contents of *packet* are destroyed in the process.
+contents of *packet* are destructively modified in the process.
