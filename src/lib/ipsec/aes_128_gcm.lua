@@ -4,7 +4,7 @@ local C = ffi.C
 local ASM = require("lib.ipsec.aes_128_gcm_avx")
 local header = require("lib.protocol.header")
 local lib = require("core.lib")
-local ntohl, htonl, htonll = lib.ntohl, lib.htonl, lib.htonll
+local ntohl, htonl = lib.ntohl, lib.htonl
 
 
 -- IV pseudo header

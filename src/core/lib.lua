@@ -357,18 +357,14 @@ end
 -- avoid C function call overhead while using C.xxxx counterparts
 if ffi.abi("be") then
    -- nothing to do
-   function htonll(b) return b end
    function htonl(b) return b end
    function htons(b) return b end
 else
-   function htonll(b) return C.bswap64(b) end
    function htonl(b) return bswap(b) end
    function htons(b) return rshift(bswap(b), 16) end
 end
-ntohll = htonll
 ntohl = htonl
 ntohs = htons
-
 
 -- Manipulation of bit fields in uint{8,16,32)_t stored in network
 -- byte order.  Using bit fields in C structs is compiler-dependent
