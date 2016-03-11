@@ -11,14 +11,10 @@ struct link {
   struct {
     struct counter *txbytes, *rxbytes, *txpackets, *rxpackets, *txdrop;
   } stats;
-  char pad[24];
   // Two cursors:
   //   read:  the next element to be read
   //   write: the next element to be written
-  int read;
-  char read_pad[60];
-  int write;
-  char write_pad[60];
+  int read, write;
   // Index (into the Lua app.active_apps array) of the app that
   // receives from this link.
   int receiving_app;
