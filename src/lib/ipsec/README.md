@@ -1,4 +1,4 @@
-### IPsec/ESP (lib.ipsec.esp)
+### Encapsulating Security Payload (lib.ipsec.esp)
 
 The `lib.ipsec.esp` module contains two classes `esp_v6_encrypt` and
 `esp_v6_decrypt` which implement implement packet encryption and
