@@ -250,13 +250,6 @@ function mp_ring (args)
 
    links = make_links(c.mode, c.processes, c.burst)
    
-   -- Create links to connect the processes in a loop
-   -- for i = 0, c.processes-1 do
-   --    links[i] = link.new(tostring(i))
-   --    for j = 1, c.burst do
-   --       link.transmit(links[i], packet.allocate())
-   --    end
-   -- end
    -- Create per-process counters
    local counters = ffi.cast("uint64_t *",
                              memory.dma_alloc(c.processes*ffi.sizeof("uint64_t")))
