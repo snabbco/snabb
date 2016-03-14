@@ -49,27 +49,6 @@ function receive (r)
    return p
 end
 
-function maybe_rx (r)
-   local p = r.packets[r.read]
-   if p == nil then
-      return nil
-   else
-      r.packets[r.read] = nil
-      r.read = band(r.read + 1, size - 1)
-      return p
-   end
-end
-
-function maybe_tx (r, p)
-   if r.packets[r.write] ~= nil then
-      return nil
-   else
-      r.packets[r.write] = p
-      r.write = band(r.write + 1, size - 1)
-      return p
-   end
-end
-
 function front (r)
    return (r.read ~= r.write) and r.packets[r.read] or nil
 end
