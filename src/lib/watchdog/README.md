@@ -1,3 +1,5 @@
+### `watchdog`: Terminate a hanging process
+
 The `lib.watchdog.watchdog` module implements a per-thread watchdog
 functionality. Its purpose is to watch and kill processes which fail to
 call the watchdog periodically (e.g. hang).

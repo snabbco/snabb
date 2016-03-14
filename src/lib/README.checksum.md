@@ -1,4 +1,4 @@
-### IP checksum (lib.checksum)
+### `checksum`: IP checksum
 
 The checksum module provides an optimized ones-complement checksum
 routine.

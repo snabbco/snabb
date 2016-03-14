@@ -1,9 +1,9 @@
-# Basic Apps (apps.basic.basic_apps)
+## Basic: App network plumbing
 
 The module *apps.basic.basic_apps* provides apps with general
 functionality for use in you app networks.
 
-## Source
+### `source`: Transmit artificial packets
 
 The `Source` app is a synthetic packet generator. On each breath it fills
 each attached output link with new packets. The packet data is
@@ -11,7 +11,7 @@ uninitialized garbage and each packet is 60 bytes long.
 
 ![Source](.images/Source.png)
 
-## Join
+### `join`: Combine from multiple inputs
 
 The `Join` app joins together packets from N input links onto one
 output link. On each breath it outputs as many packets as possible
@@ -19,7 +19,7 @@ from the inputs onto the output.
 
 ![Join](.images/Join.png)
 
-## Split
+### `split`: Split onto multiple outputs
 
 The `Split` app splits packets from multiple inputs across multiple
 outputs. On each breath it transfers as many packets as possible from
@@ -27,14 +27,14 @@ the input links to the output links.
 
 ![Split](.images/Split.png)
 
-## Sink
+### `sink`: Discard incoming packets
 
 The `Sink` app receives all packets from any number of input links and
 discards them. This can be handy in combination with a `Source`.
 
 ![Sink](.images/Sink.png)
 
-## Tee
+### `tee`: Duplicate to multiple outputs
 
 The `Tee` app receives all packets from any number of input links and
 transfers each received packet to all output links. It can be used to
@@ -42,7 +42,7 @@ merge and/or duplicate packet streams
 
 ![Tee](.images/Tee.png)
 
-## Repeater
+### `repeater`: Loop input to output
 
 The `Repeater` app collects all packets received from the `input` link
 and repeatedly transfers the accumulated packets to the `output`

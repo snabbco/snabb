@@ -29,50 +29,98 @@ being said, discrepancies between this document and the actual Snabb
 Switch implementation are considered to be bugs. Please report them in
 order to help improve this document.*
 
+# Introduction
+
+## Snabb in a nutshell
+## Core software architecture
+## Zen of Snabb
+
+# API
+
+## Core modules
+
 $(cat ../README.md)
 
-$(cat ../apps/basic/README.md)
-
-$(cat ../apps/intel/README.md)
-
-$(cat ../apps/solarflare/README.md)
-
-$(cat ../apps/rate_limiter/README.md)
-
-$(cat ../apps/packet_filter/README.md)
-
-$(cat ../apps/ipv6/README.md)
-
-$(cat ../apps/vhost/README.md)
-
-$(cat ../apps/pcap/README.md)
-
-$(cat ../apps/vpn/README.md)
-
-$(cat ../apps/socket/README.md)
-
-# Libraries
+## Traffic processing
 
 $(cat ../lib/README.checksum.md)
 
 $(cat ../lib/README.ctable.md)
 
-$(cat ../lib/README.pmu.md)
-
-## Hardware
+## System programming
 
 $(cat ../lib/hardware/README.md)
 
-## Protocols
+$(cat ../lib/watchdog/README.md)
+
+$(cat ../lib/README.pmu.md)
+
+## Protocol headers
 
 $(cat ../lib/protocol/README.md)
 
-## Snabb NFV
+# Apps
+
+$(cat ../apps/basic/README.md)
+
+## Hardware I/O
+
+$(cat ../apps/intel/README.md)
+
+$(cat ../apps/solarflare/README.md)
+
+## Software I/O
+
+$(cat ../apps/vhost/README.md)
+
+$(cat ../apps/pcap/README.md)
+
+$(cat ../apps/socket/README.md)
+
+## Protocols
+
+$(cat ../apps/ipv6/README.md)
+
+$(cat ../apps/vpn/README.md)
+
+## Traffic restriction
+
+$(cat ../apps/rate_limiter/README.md)
+
+$(cat ../apps/packet_filter/README.md)
+
+# Programs
+
+## NFV: optimized Virtio-net for QEMU
 
 $(cat ../program/snabbnfv/README.md)
 
-## Watchdog (lib.watchdog.watchdog)
+## lwAFTR: lightweight 4-over-6
+## ALX: Agile Lan eXtender (VPLS)
+## Lisper: LISP dataplane
+## packetblaster: "Infinite load" generator
 
-$(cat ../lib/watchdog/README.md)
+# Development processs
+
+## Git workflow
+
+### Github repository
+### Branches and upstreaming
+### Making a contribution
+### Continuous Integration
+### Mailing list
+
+## Snabb Lab
+
+### Servers for community use
+### NixOS server configuration
+### Getting started
+
+## Policies
+
+### Apache license
+### Copyright
+### Trademarks
+### Code of conduct
 
 EOF
