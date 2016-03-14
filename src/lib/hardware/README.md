@@ -1,4 +1,4 @@
-### PCI (lib.hardware.pci)
+### `pci`: PCI device access
 
 The `lib.hardware.pci` module provides functions that abstract common
 operations on PCI devices on Linux. In order to drive a PCI device using
@@ -87,7 +87,7 @@ Closes memory mapped *file_descriptor* of sysfs resource file and unmaps
 it from *pointer* as returned by `pci.map_pci_memory`.
 
 
-### Register (lib.hardware.register)
+### `register`: Hardware register access
 
 The `lib.hardware.register` module provides an abstraction for hardware
 device registers. This abstraction can be used to declaratively specify

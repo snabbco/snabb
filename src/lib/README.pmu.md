@@ -1,4 +1,4 @@
-### PMU (lib.pmu)
+### `pmu`: CPU Performance Monitoring Unit counters
 
 The CPU's PMU (Performance Monitoring Unit) collects information about
 specific *performance events* such as cache misses, branch

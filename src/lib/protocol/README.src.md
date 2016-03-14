@@ -1,4 +1,4 @@
-### Protocol Header (lib.protocol.header)
+### `protocol.header`
 
 The `lib.protocol.header` module contains the base class from which the
 supported protocol classes are derived. It defines generic methods on all
@@ -41,7 +41,7 @@ layer.
 For instance, on an Ethernet header object this method might return a
 IPv4 or IPv6 header class.
 
-### Ethernet (lib.protocol.ethernet)
+### `protocol.ethernet`
 
 The `lib.protocol.ethernet` module contains a class for representing
 *Ethernet headers*. The `ethernet` protocol class supports two upper
@@ -104,7 +104,7 @@ Returns the MAC address for IPv6 multicast *ip* as defined by RFC2464,
 section 7.
 
 
-### IPv4 (lib.protocol.ipv4)
+### `protocol.ipv4`
 
 The `lib.protocol.ipv4` module contains a class for representing
 *IPv4 headers*. The `ipv4` protocol class supports four upper
@@ -197,7 +197,7 @@ Returns the binary representation of IPv4 address denoted by *string*.
 Returns the string representation of *ip* address.
 
 
-### IPv6 (lib.protocol.ipv6)
+### `protocol.ipv6`
 
 The `lib.protocol.ipv6` module contains a class for representing
 *IPv6 headers*. The `ipv6` protocol class supports four upper
@@ -286,7 +286,7 @@ Returns the solicited-node multicast address from the given unicast
 *ip*.
 
 
-### TCP (lib.protocol.tcp)
+### `protocol.tcp`
 
 The `lib.protocol.tcp` module contains a class for representing *TCP
 headers*.
@@ -365,7 +365,7 @@ and optionally *ip*. If no argument is given the current value of the
 "Checksum" field is returned.
 
 
-### UDP (lib.protocol.udp)
+### `protocol.udp`
 
 The `lib.protocol.udp` module contains a class for representing *UDP
 headers*.
@@ -402,7 +402,7 @@ and optionally *ip*. If no argument is given the current value of the
 "Checksum" field is returned.
 
 
-### GRE (lib.protocol.gre)
+### `protocol.gre`
 
 The `lib.protocol.gre` module contains a class for representing *GRE
 headers*. The `gre` protocol class only supports the checksum and key
@@ -444,7 +444,7 @@ the upper layer protocol to *protocol*. If no argument is given the
 current upper layer protocol is returned.
 
 
-### ICMP (lib.protocol.icmp.header)
+### `protocol.icmp.header`
 
 The `lib.protocol.icmp.header` module contains a class for representing
 *ICMP headers*.  The `icmp` protocol class currently supports two upper
@@ -481,7 +481,7 @@ of *payload*. If the lower protocol layer is `lib.protocol.ipv6` then
 *ipv6* must be set to a true value.
 
 
-#### Neighbor Solicitation (lib.protocol.icmp.nd.ns)
+### `protocol.icmp.nd.ns`
 
 — Method **ns:new** *target*
 
@@ -500,7 +500,7 @@ Predicate to test if the header's value in the "Target Address" field is
 equivalent to *target*.
 
 
-#### Neighbor Advertisement (lib.protocol.icmp.nd.na)
+### `protocol.icmp.nd.na`
 
 — Method **na:new** *target*, *router*, *solicited*, *override*
 
@@ -527,7 +527,7 @@ Predicate to test if the header's value in the "Target Address" field is
 equivalent to *target*.
 
 
-#### Neighbor Discovery Options (lib.protocol.icmp.nd.header)
+### `protocol.icmp.nd.header`
 
 Both Neighbor Solicitation and Advertisement (`lib.protocol.icmp.nd.ns`
 and `lib.protocol.icmp.nd.na`) headers implement an `options` method for
@@ -548,7 +548,7 @@ Parses and returns an array of TLV Options (see
 `lib.protocol.icmp.nd.options.tlv`) from *length* bytes of *payload*.
 
 
-#### TLV Option (lib.protocol.icmp.nd.options.tlv)
+### `protocol.icmp.nd.options.tlv`
 
 The `lib.protocol.icmp.nd.options.tlv` module contains a class for
 representing TLV Options. Currently only two types of options are
@@ -583,7 +583,7 @@ returned.
 Returns an object of the class denoted by the type field. Currently that
 only includes `lladdr` instances.
 
-#### Link-Layer Address Option (lib.protocol.icmp.nd.options.lladdr)
+### `protocol.icmp.nd.options.lladdr`
 
 The `lib.protocol.icmp.nd.options.lladdr` module contains a class for
 representing Link-Layer Address Options.
@@ -604,7 +604,7 @@ to *address*. If no argument is given the current value of the address
 field is returned.
 
 
-### Datagram (lib.protocol.datagram)
+### `protocol.datagram`
 
 The `lib.protocol.datagram` module provides basic mechanisms for parsing,
 building and manipulating a hierarchy of protocol headers and the

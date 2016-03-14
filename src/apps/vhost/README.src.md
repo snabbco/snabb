@@ -1,4 +1,4 @@
-# VhostUser App (apps.vhost.vhost_user)
+### `vhost_user`: Virtio-net interface to QEMU/KVM VMs
 
 The `VhostUser` app implements portions of the
 [Virtio](http://ozlabs.org/~rusty/virtio-spec/virtio-paper.pdf) protocol
@@ -20,7 +20,7 @@ packets send by the virtual machine will arrive on the `tx` port.
            |           |
            +-----------+
 
-## Configuration
+#### Configuration
 
 The `VhostUser` app accepts a table as its configuration argument. The
 following keys are defined:

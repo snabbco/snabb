@@ -1,4 +1,4 @@
-### Ctable (lib.ctable)
+### `ctable`: Scalable hashtable
 
 A *ctable* is a hash table whose keys and values are instances of FFI
 data types.  In Lua parlance, an FFI value is a "cdata" value, hence the

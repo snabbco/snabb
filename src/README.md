@@ -1,51 +1,110 @@
-# Introduction
+### `packet`: Packet data in memory
+   
+A *packet* is a data structure describing one of the network packets that
+is currently being processed. The packet is used to explicitly manage the
+life cycle of the packet. Packets are explicitly allocated and freed by
+using `packet.allocate` and `packet.free`. When a packet is received
+using `link.receive` its ownership is acquired by the calling app. The
+app must then ensure to either transfer the packet ownership to another
+app by calling `link.transmit` on the packet or free the packet using
+`packet.free`. Apps may only use packets they own, e.g. packets that have
+not been transmitted or freed. The number of allocatable packets is
+limited by the size of the underlying "freelist", e.g. a pool of unused
+packet objects from and to which packets are allocated and freed.
 
-*Snabb Switch* is an extensible, virtualized, Ethernet networking
-toolkit.  With Snabb Switch you can implement networking applications
-using the *Lua language*. Snabb Switch includes all the tools you need to
-quickly realize your network designs and its really fast too!
-Furthermore, Snabb Switch is extensible and encourages you to grow the
-ecosystem to match your requirements.
+— Function **packet.allocate**
 
-![Architecture](.images/Architecture.png)
+Returns a new empty packet. An an error is raised if there are no packets
+left on the freelist.
 
-The Snabb Switch Core forms a runtime environment (*engine*) which
-executes your *design*. A design is simply a Lua script used to drive the
-Snabb Switch stack, you can think of it as your top-level "main" routine.
+— Function **packet.free** *packet*
 
-In order to add functionality to the Snabb Switch stack you can load
-modules into the Snabb Switch engine. These can be Lua modules as well as
-native code objects. We differentiate between two classes of modules,
-namely libraries and *Apps*. Libraries are simple collections of program
-utilities to be used in your designs, apps or other libraries, just as
-you might expect. Apps, on the other hand, are code objects that
-implement a specific interface, which is used by the Snabb Switch engine
-to organize an *App Network*.
+Frees *packet* and puts in back onto the freelist.
 
-![Network](.images/Network.png)
+— Function **packet.data** *packet*
 
-Usually, a Snabb Switch design will create a series of apps, interconnect
-these in a desired way using *links* and finally pass the resulting app
-network on to the Snabb Switch engine. The engine's job is to:
+Returns a pointer to the payload of *packet*.
 
- * Pump traffic through the app network
- * Keep the app network running (e.g. restart failed apps)
- * Report on the network status
+— Function **packet.length** *packet*
+
+Returns the payload length of *packet*.
+
+— Function **packet.clone** *packet*
+
+Returns an exact copy of *packet*.
+
+— Function **packet.append** *packet*, *pointer*, *length*
+
+Appends *length* bytes starting at *pointer* to the end of *packet*. An
+error is raised if there is not enough space in *packet* to accomodate
+*length* additional bytes.
+
+— Function **packet.prepend** *packet*, *pointer*, *length*
+
+Prepends *length* bytes starting at *pointer* to the front of
+*packet*. An error is raised if there is not enough space in *packet* to
+accomodate *length* additional bytes.
+
+— Function **packet.shiftleft** *packet*, *length*
+
+Truncates *packet* by *length* bytes from the front.
+
+— Function **packet.from_pointer** *pointer*, *length*
+
+Allocate packet and fill it with *length* bytes from *pointer*.
+
+— Function **packet.from_string** *string*
+
+Allocate packet and fill it with the contents of *string*.
 
 
-# Snabb Switch API
+### `link`: Ring to transfer packets
 
-The core modules defined below  can be loaded using Lua's `require`. For
-example:
+A *link* is a [ring buffer](http://en.wikipedia.org/wiki/Circular_buffer)
+used to store packets between apps. Links can be treated either like
+arrays—accessing their internal structure directly—or as streams of
+packets by using their API functions.
 
-```
-local config = require("core.config")
+— Function **link.empty** *link*
 
-local c = config.new()
-...
-```
+Predicate used to test if a link is empty. Returns true if *link* is
+empty and false otherwise.
 
-## App
+
+— Function **link.full** *link*
+
+Predicate used to test if a link is full. Returns true if *link* is full
+and false otherwise.
+
+
+— Function **link.receive** *link*
+
+Returns the next available packet (and advances the read cursor) on
+*link*. If the link is empty an error is signaled.
+
+
+— Function **link.front** *link*
+
+Return the next available packet without advancing the read cursor on
+*link*. If the link is empty, `nil` is returned.
+
+
+— Function **link.transmit** *link*, *packet*
+
+Transmits *packet* onto *link*. If the link is full *packet* is dropped
+(and the drop counter increased).
+
+
+— Function **link.stats** *link*
+
+Returns a structure holding ring statistics for the *link*:
+
+ * `txbytes`, `rxbytes`: Counts of transferred bytes.
+ * `txpackets`, `rxpackets`: Counts of transferred packets.
+ * `txdrop`: Count of packets dropped due to ring overflow.
+
+
+### *app*: Interface for developing apps
 
 An *app* is an isolated implementation of a specific networking
 function. For example, a switch, a router, or a packet filter.
@@ -111,8 +170,7 @@ implemented the app instance is discarded and a new instance is created.
 (descriptive string). The default is the module name.
 
 
-
-## Config (core.config)
+### `config`: Define an app network
 
 A *config* is a description of a packet-processing network. The network
 is a directed graph. Nodes in the graph are *apps* that each process
@@ -161,8 +219,7 @@ config.link(c, "nic1.tx->nic2.rx")
 ```
 
 
-
-## Engine (core.app)
+### `engine`: Execute an app network
 
 The *engine* executes a config by initializing apps, creating links, and
 driving the flow of execution. The engine also performs profiling and
@@ -225,113 +282,10 @@ how many times per second to poll.
 
 This setting is not used when engine.busywait is true.
 
-## Link (core.link)
 
-A *link* is a [ring buffer](http://en.wikipedia.org/wiki/Circular_buffer)
-used to store packets between apps. Links can be treated either like
-arrays—accessing their internal structure directly—or as streams of
-packets by using their API functions.
+## Base library modules
 
-— Function **link.empty** *link*
-
-Predicate used to test if a link is empty. Returns true if *link* is
-empty and false otherwise.
-
-
-— Function **link.full** *link*
-
-Predicate used to test if a link is full. Returns true if *link* is full
-and false otherwise.
-
-
-— Function **link.receive** *link*
-
-Returns the next available packet (and advances the read cursor) on
-*link*. If the link is empty an error is signaled.
-
-
-— Function **link.front** *link*
-
-Return the next available packet without advancing the read cursor on
-*link*. If the link is empty, `nil` is returned.
-
-
-— Function **link.transmit** *link*, *packet*
-
-Transmits *packet* onto *link*. If the link is full *packet* is dropped
-(and the drop counter increased).
-
-
-— Function **link.stats** *link*
-
-Returns a structure holding ring statistics for the *link*:
-
- * `txbytes`, `rxbytes`: Counts of transferred bytes.
- * `txpackets`, `rxpackets`: Counts of transferred packets.
- * `txdrop`: Count of packets dropped due to ring overflow.
-
-
-## Packet (core.packet)
-   
-A *packet* is a data structure describing one of the network packets that
-is currently being processed. The packet is used to explicitly manage the
-life cycle of the packet. Packets are explicitly allocated and freed by
-using `packet.allocate` and `packet.free`. When a packet is received
-using `link.receive` its ownership is acquired by the calling app. The
-app must then ensure to either transfer the packet ownership to another
-app by calling `link.transmit` on the packet or free the packet using
-`packet.free`. Apps may only use packets they own, e.g. packets that have
-not been transmitted or freed. The number of allocatable packets is
-limited by the size of the underlying "freelist", e.g. a pool of unused
-packet objects from and to which packets are allocated and freed.
-
-— Function **packet.allocate**
-
-Returns a new empty packet. An an error is raised if there are no packets
-left on the freelist.
-
-— Function **packet.free** *packet*
-
-Frees *packet* and puts in back onto the freelist.
-
-— Function **packet.data** *packet*
-
-Returns a pointer to the payload of *packet*.
-
-— Function **packet.length** *packet*
-
-Returns the payload length of *packet*.
-
-— Function **packet.clone** *packet*
-
-Returns an exact copy of *packet*.
-
-— Function **packet.append** *packet*, *pointer*, *length*
-
-Appends *length* bytes starting at *pointer* to the end of *packet*. An
-error is raised if there is not enough space in *packet* to accomodate
-*length* additional bytes.
-
-— Function **packet.prepend** *packet*, *pointer*, *length*
-
-Prepends *length* bytes starting at *pointer* to the front of
-*packet*. An error is raised if there is not enough space in *packet* to
-accomodate *length* additional bytes.
-
-— Function **packet.shiftleft** *packet*, *length*
-
-Truncates *packet* by *length* bytes from the front.
-
-— Function **packet.from_pointer** *pointer*, *length*
-
-Allocate packet and fill it with *length* bytes from *pointer*.
-
-— Function **packet.from_string** *string*
-
-Allocate packet and fill it with the contents of *string*.
-
-
-## Memory (core.memory)
+### `memory`: Allocate physical memory for DMA
 
 Snabb Switch allocates special
 [DMA](https://en.wikipedia.org/wiki/Direct_memory_access) memory that
@@ -352,7 +306,7 @@ Returns the physical address (`uint64_t`) the DMA memory at *pointer*.
 Size of a single huge page in bytes. Read-only.
 
 
-## Lib (core.lib)
+### `lib`: Common library routines
 
 The `core.lib` module contains miscellaneous utilities.
 
@@ -579,8 +533,7 @@ Network to host byte order conversion functions for 32 and 16 bit
 integers *n* respectively.
 
 
-
-## Main
+### `main`: Process start and stop
 
 Snabb Switch designs can be run either with:
 

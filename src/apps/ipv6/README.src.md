@@ -1,6 +1,4 @@
-# IPv6 Apps
-
-## Nd_light (apps.ipv6.nd_light)
+### `nd_light`: IPv6 neighbor discovery
 
 The `nd_light` app implements a small subset of IPv6 neighbor discovery
 (RFC4861).  It has two duplex ports, `north` and `south`.  The `south`
@@ -28,7 +26,7 @@ to the `north` port unaltered.
                |          |   south
                +----------+
 
-### Configuration
+#### Configuration
 
 The `nd_light` app accepts a table as its configuration argument. The
 following keys are defined:
@@ -56,7 +54,7 @@ milliseconds. Default is 1,000ms.
 *Optional*. Number of neighbor solicitation retransmissions. Default is
 unlimited retransmissions.
 
-## SimpleKeyedTunnel (apps.keyed_ipv6_tunnel.tunnel)
+### `keyed_ipv6_tunnel`: Ethernet-over-IPv6 tunnel
 
 The `SimpleKeyedTunnel` app implements "a simple L2 Ethernet over IPv6
 tunnel encapsulation" as described in
@@ -81,7 +79,7 @@ on the `encapsulated` output port. Packets transmitted on the
                           \-----/          decapsulated
 
 
-### Configuration
+#### Configuration
 
 The `SimpleKeyedTunnel` app accepts a table as its configuration
 argument. The following keys are defined:

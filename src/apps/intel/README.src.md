@@ -1,6 +1,4 @@
-# Intel 82599 Ethernet Controller Apps
-
-## Intel10G (apps.intel.intel_app)
+### `intel10g`: Intel 82599/X520 (10G) driver
 
 The `Intel10G` drives one port of an Intel 82599 Ethernet controller.
 Packets taken from the `rx` port are transmitted onto the network.
@@ -30,7 +28,7 @@ Returns a table with the following keys:
 * `packets` - Number of packets sent
 * `bytes` - Total bytes sent
 
-### Configuration
+#### Configuration
 
 The `Intel10G` app accepts a table as its configuration argument. The
 following keys are defined:
@@ -103,12 +101,12 @@ For example, if two apps without *rate_limit* set have the same
 Note that even a low-priority app can use the whole line rate unless other
 (higher priority) apps are using up the available bandwidth.
 
-### Performance
+#### Performance
 
 The `Intel10G` app can transmit and receive at approximately 10 Mpps per
 processor core.
 
-### Hardware limits
+#### Hardware limits
 
 Each physical Intel 82599 port supports the use of up to:
 
@@ -117,7 +115,7 @@ Each physical Intel 82599 port supports the use of up to:
 * 64 VLANs (see the `vlan` configuration option)
 * 4 *mirror pools* (see the `mirror` configuration option)
 
-## Intel1G (apps.intel.intel1g.intel1g)
+### `intel1g`: Intel I210/I350 (1G) driver
 
 The `intel1g` app drives one port of an Intel Gigabit Ethernet
 controller.
@@ -138,7 +136,7 @@ Features:
               |          |
               +----------+
 
-### Configuration
+#### Configuration
 
 — Key **pciaddr**
 
@@ -170,7 +168,7 @@ breath. Default is not specified but assumed to be broadly applicable.
 +— Key **loopback**
 *Optional*. Set to `"MAC"` for MAC loopback, or to `"PHY"` for PHY loopback modes.
 
-## LoadGen (apps.intel.loadgen)
+### `loadgen`: Load generator (based on intel10g)
 
 `LoadGen` is a *load generator* app based on the Intel 82599 Ethernet
 controller. It reads up to 32,000 packets from the `input` port and
@@ -184,12 +182,12 @@ dropped.
                |          |
                +----------+
 
-### Configuration
+#### Configuration
 
 The `LoadGen` app accepts a string as its configuration argument. The
 given string denotes the PCI address of the NIC to use.
 
-### Performance
+#### Performance
 
 The `LoadGen` app can transmit at line-rate (14 Mpps) without significant
 CPU usage.
