@@ -77,3 +77,9 @@ The current state of each branch with respect to master is visible here:
     
     Maintainer: Alexander Gall <gall@switch.ch>
 
+#### ipsec
+
+    BRANCH: ipsec git://github.com/eugeneia/snabbswitch
+    IPsec library development branch.
+
+    Maintainer: Max Rottenkolber <max@mr.gy>
