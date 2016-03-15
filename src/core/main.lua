@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 -- Default to not using any Lua code on the filesystem.
@@ -33,31 +35,37 @@ function main ()
    zone("startup")
    require "lib.lua.strict"
    initialize()
-   local program
-   local args = parse_command_line()
-   if programname(args[1]) == 'snabb' then
-      -- Print usage when no arguments or -h/--help
-      if #args == 1 or args[2] == '-h' or args[2] == '--help' then
-         usage()
-         os.exit(1)
-      else
-         -- Strip 'snabb' and use next argument as program name
-         table.remove(args, 1)
-      end
-   end
-   local program = table.remove(args, 1)
+   local program, args = select_program(parse_command_line())
    if not lib.have_module(modulename(program)) then
-      print("unsupported program: "..programname(program))
-      print()
-      print("Rename this executable (cp, mv, ln) to choose a supported program:")
-      print("  snabb "..(require("programs_inc"):gsub("\n", " ")))
-      os.exit(1)
+      print("unsupported program: "..program:gsub("_", "-"))
+      usage(1)
    else
       require(modulename(program)).run(args)
    end
 end
 
-function usage ()
+-- Take the program name from the first argument, unless the first
+-- argument is "snabb", in which case pop it off, handle any options
+-- passed to snabb itself, and use the next argument.
+function select_program (args)
+   local program = programname(table.remove(args, 1))
+   if program == 'snabb' then
+      while #args > 0 and args[1]:match('^-') do
+         local opt = table.remove(args, 1)
+         if opt == '-h' or opt == '--help' then
+            usage(0)
+         else
+            print("unrecognized option: "..opt)
+            usage(1)
+         end
+      end
+      if #args == 0 then usage(1) end
+      program = programname(table.remove(args, 1))
+   end
+   return program, args
+end
+
+function usage (status)
    print("Usage: "..ffi.string(C.argv[0]).." <program> ...")
    local programs = require("programs_inc"):gsub("%S+", "  %1")
    print()
@@ -68,17 +76,17 @@ function usage ()
    print()
    print("If you rename (or copy or symlink) this executable with one of")
    print("the names above then that program will be chosen automatically.")
+   os.exit(status)
 end
 
-
--- programname("snabbnfv-1.0") => "snabbnfv"
-function programname (program) 
-   program = program:gsub("^.*/", "") -- /bin/snabb-1.0 => snabb-1.0
-   program = program:gsub("[-.].*$", "") -- snabb-1.0   => snabb
-   return program
+function programname (name)
+   return name:gsub("^.*/", "")
+              :gsub("-[0-9.]+[-%w]+$", "")
+              :gsub("-", "_")
+              :gsub("^snabb_", "")
 end
--- modulename("nfv-sync-master.2.0") => "program.nfv.nfv_sync_master")
-function modulename (program) 
+
+function modulename (program)
    program = programname(program)
    return ("program.%s.%s"):format(program, program)
 end
@@ -118,5 +126,28 @@ function handler (reason)
    os.exit(1)
 end
 
-xpcall(main, handler)
+function selftest ()
+   print("selftest")
+   assert(programname("/bin/snabb-1.0") == "snabb",
+      "Incorrect program name parsing")
+   assert(programname("/bin/snabb-1.0-alpha2") == "snabb",
+      "Incorrect program name parsing")
+   assert(programname("/bin/snabb-nfv") == "nfv",
+      "Incorrect program name parsing")
+   assert(programname("/bin/nfv-1.0") == "nfv",
+      "Incorrect program name parsing")
+   assert(modulename("nfv-sync-master-2.0") == "program.nfv_sync_master.nfv_sync_master",
+      "Incorrect module name parsing")
+   local pn = programname
+   -- snabb foo => foo
+   assert(select_program({ 'foo' }) == "foo",
+      "Incorrect program name selected")
+   -- snabb-foo => foo
+   assert(select_program({ 'snabb-foo' }) == "foo",
+      "Incorrect program name selected")
+   -- snabb snabb-foo => foo
+   assert(select_program({ 'snabb', 'snabb-foo' }) == "foo",
+      "Incorrect program name selected")
+end
 
+xpcall(main, handler)
