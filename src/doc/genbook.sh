@@ -67,6 +67,10 @@ $(cat ../lib/hardware/README.md)
 
 $(cat ../lib/protocol/README.md)
 
+## IPsec
+
+$(cat ../lib/ipsec/README.md)
+
 ## Snabb NFV
 
 $(cat ../program/snabbnfv/README.md)
