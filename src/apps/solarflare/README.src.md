@@ -1,6 +1,4 @@
-# Solarflare Ethernet Controller Apps
-
-## Solarflare (apps.solarflare.solarflare)
+### `solarflare`: Solarflare OpenOnload interface
 
 The `Solarflare` app drives one port of a Solarflare SFN7 Ethernet
 controller. Multiple instances of the Solarflare app can be instantiated
@@ -19,7 +17,7 @@ Packets received from the network are put on the `tx` port.
 The `Solarflare` app requires [OpenOnload](http://www.openonload.org/)
 version *201502* to be installed and the `sfc` module to be loaded.
 
-### Configuration
+#### Configuration
 
 The `Solarflare` app accepts a table as its configuration argument. The
 following keys are defined:

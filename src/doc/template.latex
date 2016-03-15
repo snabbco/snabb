@@ -4,6 +4,7 @@
 % Use sans for sections, serif for main
 \usepackage{sectsty}
 \allsectionsfont{\sffamily}
+\def\tightlist{}
 % Nicer chapter headings
 \usepackage{titlesec,color}
 \definecolor{gray75}{gray}{0.75}

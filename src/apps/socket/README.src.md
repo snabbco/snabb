@@ -1,4 +1,4 @@
-# RawSocket App (apps.socket.raw)
+### `raw_socket`: Unix raw socket I/O
 
 The `RawSocket` app is a bridge between Linux network interfaces (`eth0`,
 `lo`, etc.) and a Snabb app network. Packets taken from the `rx` port are
@@ -12,7 +12,7 @@ interface are put on the `tx` port.
               |           |
               +-----------+
 
-## Configuration
+#### Configuration
 
 The `RawSocket` app accepts a string as its configuration argument. The
 string denotes the interface to bridge to.

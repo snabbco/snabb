@@ -1,4 +1,4 @@
-# VPWS App (apps.vpn.vpws)
+### `vpws`: Virtual Private Wire Service
 
 The `VPWS` app implements a so-called Virtual Private Wire Service
 (VPWS). It provides a L2 VPN on top of IP (v4/v6) and GRE.
@@ -23,7 +23,7 @@ output port.
           <------|---/ /----->
                  \-----/    uplink
 
-## Configuration
+#### Configuration
 
 The `vpws` app accepts a table as its configuration argument. The
 following keys are defined:

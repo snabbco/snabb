@@ -1,4 +1,4 @@
-# PcapFilter App (apps.packet_filter.pcap_filter)
+### `pcap_filter`: "Pflang" packet filter
 
 The `PcapFilter` app receives packets on the `input` port and transmits
 conforming packets to the `output` port. In order to conform, a packet
@@ -17,7 +17,7 @@ refer to the same connection by sharing a state table identifer.
                |            |
                +------------+
 
-## Configuration
+#### Configuration
 
 The `PcapFilter` app accepts a table as its configuration argument. The
 following keys are available:

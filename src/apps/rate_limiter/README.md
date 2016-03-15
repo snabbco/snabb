@@ -1,4 +1,4 @@
-# RateLimiter App (apps.rate_limiter.rate_limiter)
+### `rate_limiter`: Traffic rate policing
 
 The `RateLimiter` app implements a
 [Token bucket](http://en.wikipedia.org/wiki/Token_bucket) algorithm with a
@@ -17,7 +17,7 @@ fields:
 * `time` - Current time in nanoseconds
 
 
-## Configuration
+#### Configuration
 
 The `RateLimiter` app accepts a table as its configuration argument. The
 following keys are defined:
@@ -37,7 +37,7 @@ limited.
 *Optional*. Initial bucket capacity in bytes. Defaults to
 *bucket_capacity*.
 
-## Performance
+#### Performance
 
 The `RateLimiter` app is able to process more than 20 Mpps per CPU
 core. Refer to its selftest for details.

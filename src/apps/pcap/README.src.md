@@ -1,4 +1,5 @@
-# PcapReader and PcapWriter Apps (apps.pcap.pcap)
+### `pcap_reader`: Read packets from file
+### `pcap_writer`: Write packets to file
 
 The `PcapReader` and `PcapWriter` apps can be used to inject and log raw
 packet data into and out of the app network using the
@@ -14,7 +15,7 @@ port to a PCAP file.
     |            |                          |            |
     +------------+                          +------------+
 
-## Configuration
+#### Configuration
 
 Both `PcapReader` and `PcapWriter` expect a filename string as their
 configuration arguments to read from and write to respectively.
