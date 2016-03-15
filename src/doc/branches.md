@@ -77,3 +77,13 @@ The current state of each branch with respect to master is visible here:
     
     Maintainer: Alexander Gall <gall@switch.ch>
 
+#### pdf-manual
+
+    BRANCH: pdf-manual git://github.com/lukego/pdf-manual
+    Maintenance branch for the PDF edition of the Snabb manual.
+
+    - Ensures that the PDF manual builds and looks good.
+    - Supports documentation revision and integration efforts.
+    - Feeds upstream to documentation-fixes.
+
+    Maintainer: Luke Gorrie <luke@snabb.co>
