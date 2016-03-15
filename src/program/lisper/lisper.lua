@@ -191,7 +191,7 @@ local function update_config(s)
             table.insert(blocs, loc)
          else
             local iface = assert(ifs[net.interface],
-					"invalid interface "..net.interface)
+               "invalid interface "..net.interface)
             local loc = {
                type = "ethernet",
                interface = iface,
@@ -257,7 +257,7 @@ local function update_fib(s)
             local p = tonumber(t.priority)
             local w = tonumber(t.weight)
             local encrypt
-            if key_id and encap_key and decap_key then
+            if false and key_id and encap_key and decap_key then
                local enc = esp.esp_v6_encrypt:new{
                   spi = key_id,
                   mode = "aes-128-gcm",
@@ -485,13 +485,13 @@ function log_punt(msg)
 end
 
 local stats = {
-	rx = 0,
-	tx = 0,
+   rx = 0,
+   tx = 0,
 }
 
 local function route_packet(p, rxname, txports)
 
-	stats.rx = stats.rx + 1
+   stats.rx = stats.rx + 1
 
    --step #1: find the iid and source location of the packet.
    --NOTE: smac and dmac are the MACs of the _payload_ ethernet frame!
@@ -507,8 +507,10 @@ local function route_packet(p, rxname, txports)
       if spi then --packed is encrypted, decrypt it
          local decrypt = spis[spi]
          if not decrypt then return end --invalid packet
+         local p0 = p
          p = decrypt(p)
          if not p then return end --invalid packet
+         packet.free(p0)
       end
       local src_ip, session_id, cookie
       src_ip, session_id, cookie, smac, dmac, payload_offset = parse_l2tp(p)
@@ -573,12 +575,16 @@ local function route_packet(p, rxname, txports)
          tx = txports[txname]
          log_l2tp(")))", dp, txname)
          if loc.encrypt then
+            local dp0 = dp
             dp = loc.encrypt(dp)
+            packet.free(dp0)
          end
       end
       if not link.full(tx) then
          link.transmit(tx, dp)
-			stats.tx = stats.tx + 1
+         stats.tx = stats.tx + 1
+      else
+         packet.free(dp)
       end
    end
 
@@ -642,10 +648,8 @@ function Lisper:push()
       local rx = self.input[rxname]
       while not link.empty(rx) do
          local p = link.receive(rx)
-         local p2 = route_packet(p, rxname, self.output)
-         if not p2 or p2 == p then
-            packet.free(p)
-         end
+         local p = route_packet(p, rxname, self.output) or p
+         packet.free(p)
       end
    end
 end
@@ -792,10 +796,10 @@ function run(args)
       print(_("  %-12s: %s", appname, s))
    end
 
-	local t = timer.new("stats", function()
-		print("STATS: RX="..stats.rx.." TX="..stats.tx)
-	end, 10^9, "repeating")
-	timer.activate(t)
+   local t = timer.new("stats", function()
+      print("STATS: RX="..stats.rx.." TX="..stats.tx)
+   end, 10^9, "repeating")
+   timer.activate(t)
 
    collectgarbage()
 
