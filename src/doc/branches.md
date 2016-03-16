@@ -127,3 +127,10 @@ The current state of each branch with respect to master is visible here:
     - Feeds upstream to documentation-fixes.
 
     Maintainer: Luke Gorrie <luke@snabb.co>
+
+#### ipsec
+
+    BRANCH: ipsec git://github.com/eugeneia/snabbswitch
+    IPsec library development branch.
+
+    Maintainer: Max Rottenkolber <max@mr.gy>
