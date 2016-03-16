@@ -357,6 +357,7 @@ function mp_ring (args)
    end
    -- Spin until enough packets have been processed
    while counters[0] < c.packets do
+      C.usleep(100)
       core.lib.compiler_barrier()
    end
    local finish = C.get_time_ns()
