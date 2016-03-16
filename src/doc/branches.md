@@ -79,7 +79,7 @@ The current state of each branch with respect to master is visible here:
 
 #### pdf-manual
 
-    BRANCH: pdf-manual git://github.com/lukego/pdf-manual
+    BRANCH: pdf-manual git://github.com/lukego/snabbswitch
     Maintenance branch for the PDF edition of the Snabb manual.
 
     - Ensures that the PDF manual builds and looks good.
