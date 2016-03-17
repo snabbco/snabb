@@ -110,7 +110,7 @@ $(TESTSCRIPTS): testlog snabb
 		) \
 	)
 
-$(OBJDIR) bin testlog:
+$(OBJDIR) bin testlog $(OBJDIR/doc):
 	$(E) "DIR       $@"
 	$(Q) mkdir -p $@
 
@@ -151,7 +151,6 @@ $(JITOBJS): obj/jit_%.o: ../lib/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
 	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
 
-
 $(RMOBJS): obj/%: %
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
@@ -184,20 +183,20 @@ obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 
 book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
 
-doc/snabbswitch.md: markdown Makefile doc/genbook.sh
+obj/doc/snabbswitch.markdown: snabb markdown Makefile doc/genbook.sh
 	(cd doc; ./genbook.sh) > $@
 
-doc/snabbswitch.pdf: doc/snabbswitch.md
+obj/doc/snabbswitch.pdf: obj/doc/snabbswitch.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o snabbswitch.pdf snabbswitch.md)
+	$(Q) (cd doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../$@ ../$<)
 
-doc/snabbswitch.html: doc/snabbswitch.md
+obj/doc/snabbswitch.html: obj/doc/snabbswitch.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.html snabbswitch.md)
+	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o ../$@ ../$<)
 
-doc/snabbswitch.epub: doc/snabbswitch.md
+obj/doc/snabbswitch.epub: obj/doc/snabbswitch.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
+	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o ../$@ ../$<)
 
 CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog programs.inc
 
