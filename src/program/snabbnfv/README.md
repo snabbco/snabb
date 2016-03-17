@@ -7,7 +7,20 @@ file format to describe NFV configurations which it then compiles to app
 networks. This NFV component is compatible with [OpenStack
 Neutron](https://wiki.openstack.org/wiki/Neutron).
 
-![NFV](.images/NFV.png)
+    DIAGRAM: NFV
+    +------+
+    |{d}   |
+    | NFV  |         /---------\
+    | conf |         | App     |
+    +------+    /--->| network |
+       |        |    \-=-------/
+       :        :
+       v        |
+     +----------+-+
+     |{io}        |
+     | nfvconfig  |
+     |            |
+     +------------+
 
 — Function **nfvconfig.load** *file*, *pci_address*, *socket_path*
 
