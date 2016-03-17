@@ -18,7 +18,13 @@ port. All packets from the `north` port are discarded as long as ND has
 not yet succeeded. Packets received from the `south` port are transmitted
 to the `north` port unaltered.
 
-![nd_light](.images/nd_light.png)
+    DIAGRAM: nd_light
+               +----------+
+       north   |          |
+          ---->* nd_light *<----
+          <----*          *---->
+               |          |   south
+               +----------+
 
 #### Configuration
 
@@ -59,7 +65,18 @@ on the `encapsulated` output port. Packets transmitted on the
 `encapsulated` input port will be decapsulated and put on the
 `decapsulated` output port.
 
-![SimpleKeyedTunnel](.images/SimpleKeyedTunnel.png)
+    DIAGRAM: SimpleKeyedTunnel
+                   +-------------------+
+    encapsulated   |                   |
+              ---->* SimpleKeyedTunnel *<----
+              <----*                   *---->
+                   |                   |   decapsulated
+                   +-------------------+
+    
+    encapsulated    
+              ------------\   /--------------
+              <-----------|---/ /----------->
+                          \-----/          decapsulated
 
 
 #### Configuration

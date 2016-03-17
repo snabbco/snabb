@@ -5,7 +5,12 @@ The `RateLimiter` app implements a
 single bucket dropping non-conforming packets.  It receives packets on
 the `input` port and transmits conforming packets to the `output` port.
 
-![RateLimiter](.images/RateLimiter.png)
+    DIAGRAM: RateLimiter
+               +--------------+
+               |              |
+    input ---->* RateLimiter  *----> output
+               |              |
+               +--------------+
 
 — Method **RateLimiter:snapshot**
 

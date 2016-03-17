@@ -11,6 +11,9 @@ for png in $(find .. -name "*.png"); do
     ln -s ../$png .images/
 done
 
+# Root directory for markdown files
+mdroot=../obj
+
 cat <<EOF
 % Snabb Switch Reference Manual
 % $(git log --pretty=format:%an | \
@@ -39,61 +42,61 @@ order to help improve this document.*
 
 ## Core modules
 
-$(cat ../README.md)
+$(cat $mdroot/README.md)
 
 ## Traffic processing
 
-$(cat ../lib/README.checksum.md)
+$(cat $mdroot/lib/README.checksum.md)
 
-$(cat ../lib/README.ctable.md)
+$(cat $mdroot/lib/README.ctable.md)
 
 ## System programming
 
-$(cat ../lib/hardware/README.md)
+$(cat $mdroot/lib/hardware/README.md)
 
-$(cat ../lib/watchdog/README.md)
+$(cat $mdroot/lib/watchdog/README.md)
 
-$(cat ../lib/README.pmu.md)
+$(cat $mdroot/lib/README.pmu.md)
 
 ## Protocol headers
 
-$(cat ../lib/protocol/README.md)
+$(cat $mdroot/lib/protocol/README.md)
 
 # Apps
 
-$(cat ../apps/basic/README.md)
+$(cat $mdroot/apps/basic/README.md)
 
 ## Hardware I/O
 
-$(cat ../apps/intel/README.md)
+$(cat $mdroot/apps/intel/README.md)
 
-$(cat ../apps/solarflare/README.md)
+$(cat $mdroot/apps/solarflare/README.md)
 
 ## Software I/O
 
-$(cat ../apps/vhost/README.md)
+$(cat $mdroot/apps/vhost/README.md)
 
-$(cat ../apps/pcap/README.md)
+$(cat $mdroot/apps/pcap/README.md)
 
-$(cat ../apps/socket/README.md)
+$(cat $mdroot/apps/socket/README.md)
 
 ## Protocols
 
-$(cat ../apps/ipv6/README.md)
+$(cat $mdroot/apps/ipv6/README.md)
 
-$(cat ../apps/vpn/README.md)
+$(cat $mdroot/apps/vpn/README.md)
 
 ## Traffic restriction
 
-$(cat ../apps/rate_limiter/README.md)
+$(cat $mdroot/apps/rate_limiter/README.md)
 
-$(cat ../apps/packet_filter/README.md)
+$(cat $mdroot/apps/packet_filter/README.md)
 
 # Programs
 
 ## NFV: optimized Virtio-net for QEMU
 
-$(cat ../program/snabbnfv/README.md)
+$(cat $mdroot/program/snabbnfv/README.md)
 
 ## lwAFTR: lightweight 4-over-6
 ## ALX: Agile Lan eXtender (VPLS)

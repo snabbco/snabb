@@ -4,7 +4,12 @@ The `Intel10G` drives one port of an Intel 82599 Ethernet controller.
 Packets taken from the `rx` port are transmitted onto the network.
 Packets received from the network are put on the `tx` port.
 
-![Intel10G](.images/Intel10G.png)
+    DIAGRAM: Intel10G
+              +----------+
+              |          |
+      rx ---->* Intel10G *----> tx
+              |          |
+              +----------+
 
 — Method **Intel10G.dev:get_rxstats**
 
@@ -124,7 +129,12 @@ Features:
 - Configuration and statistics registers are mirrored to shared memory objects (NYI).
 - Receive and transmit links are optional and can have any name.
 
-![Intel1g](.images/Intel1g.png)
+    DIAGRAM: Intel1g
+              +----------+
+              |          |
+         -=-->* Intel1g  *--=->
+              |          |
+              +----------+
 
 #### Configuration
 
@@ -165,7 +175,12 @@ controller. It reads up to 32,000 packets from the `input` port and
 transmits them repeatedly onto the network. All incoming packets are
 dropped.
 
-![LoadGen](.images/LoadGen.png)
+    DIAGRAM: LoadGen
+               +----------+
+               |          |
+    input ---->*  LoadGen |
+               |          |
+               +----------+
 
 #### Configuration
 
