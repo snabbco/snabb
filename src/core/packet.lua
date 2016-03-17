@@ -99,6 +99,12 @@ function data (p) return p.data end
 -- Return packet data length.
 function length (p) return p.length end
 
+-- Set packet data length.
+function resize (p, len)
+   assert(len <= max_payload, "packet payload overflow")
+   p.length = len
+end
+
 function preallocate_step()
    if _G.developer_debug then
       assert(packets_allocated + packet_allocation_step <= max_packets)
