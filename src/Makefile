@@ -16,7 +16,7 @@ CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P '
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
-RMSRC  = $(shell find . -name  README.src.md -printf '%P ')
+RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
@@ -30,7 +30,7 @@ ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
 ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
-RMOBJS := $(patsubst %.src.md,%.md,$(RMSRC))
+RMOBJS := $(patsubst %,obj/%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
@@ -152,7 +152,7 @@ $(JITOBJS): obj/jit_%.o: ../lib/luajit/src/jit/%.lua $(OBJDIR)
 	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
 
 
-$(RMOBJS): %.md: %.src.md
+$(RMOBJS): obj/%: %
 	$(E) "MARKDOWN  $@"
 	$(Q) scripts/process-markdown $< > $@
 
