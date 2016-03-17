@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 # This shell scripts generates the top-level Markdown structure of the
 # Snabb Switch book.
