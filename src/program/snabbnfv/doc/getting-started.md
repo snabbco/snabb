@@ -211,7 +211,7 @@ specified 10GbE ports (PCI address) from the Linux kernel, but will not
 
 ```
 $ cd ~/snabbswitch/src
-$ sudo SNABB_TEST_INTEL10G_PCIDEVA="0000:04:00.0" SNABB_TEST_INTEL10G_PCIDEVB="0000:04:00.1" ./snabb snsh -t apps.intel.intel_app
+$ sudo SNABB_PCI_INTEL0="0000:04:00.0" SNABB_PCI_INTEL1="0000:04:00.1" ./snabb snsh -t apps.intel.intel_app
 selftest: intel_app
 100 VF initializations:
 
@@ -388,9 +388,9 @@ $ sudo /usr/local/bin/qemu-system-x86_64 \
   -drive if=virtio,file=/home/mwiget/ubuntu2.qcow2 -M pc -smp 1 \
   --enable-kvm -cpu host -m 1024 -numa node,memdev=mem \
   -object memory-backend-file,id=mem,size=1024M,mem-path=/mnt/huge,share=on \
-  -chardev socket,id=char0,path=/home/mwiget/vhost-sockets/vm2.socket,server \
-  -netdev type=vhost-user,id=net0,chardev=char0 \
-  -device virtio-net-pci,netdev=net0,mac=52:54:00:00:00:02 \
+  -chardev socket,id=char1,path=/home/mwiget/vhost-sockets/vm2.socket,server \
+  -netdev type=vhost-user,id=net1,chardev=char1 \
+  -device virtio-net-pci,netdev=net1,mac=52:54:00:00:00:02 \
   -vnc :2
 ```
 	
