@@ -74,7 +74,9 @@ function index_out { echo $docdir/index.html;   }
 
 function build_doc1 {
     (cd $(repo_path)/src && git checkout $1 && make doc/snabbswitch.html) \
-        && mv $(repo_path)/src/doc/snabbswitch.html $2
+        && mv $(repo_path)/src/doc/snabbswitch.html $2 \
+ || (cd $(repo_path)/src && git checkout $1 && make obj/doc/snabbswitch.html) \
+        && mv $(repo_path)/src/obj/doc/snabbswitch.html $2
 }
 
 function build_doc {
