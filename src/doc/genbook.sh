@@ -109,6 +109,8 @@ $(cat $mdroot/program/snabbnfv/README.md)
 
 # Development processs
 
+$(cat $mdroot/doc/git-workflow.md)
+
 ## Git workflow
 
 ### Github repository
