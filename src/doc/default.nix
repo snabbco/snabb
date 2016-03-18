@@ -17,7 +17,8 @@ stdenv.mkDerivation rec {
   ];
 
   patchPhase = ''
-    patchShebangs src/doc src/scripts
+    patchShebangs src/doc
+    patchShebangs src/scripts
   '';
 
   buildPhase = ''
