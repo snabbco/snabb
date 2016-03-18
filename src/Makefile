@@ -153,7 +153,7 @@ $(JITOBJS): obj/jit_%.o: ../lib/luajit/src/jit/%.lua $(OBJDIR)
 
 $(RMOBJS): obj/%: %
 	$(E) "MARKDOWN  $@"
-	$(Q) scripts/process-markdown $< > $@
+	$(Q) scripts/process-markdown $< $@
 
 $(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	$(E) "INC       $@"
@@ -181,9 +181,9 @@ obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
 	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
 
-book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
+book: obj/doc/snabbswitch.pdf obj/doc/snabbswitch.html obj/doc/snabbswitch.epub
 
-obj/doc/snabbswitch.markdown: snabb markdown Makefile doc/genbook.sh
+obj/doc/snabbswitch.markdown: markdown Makefile doc/genbook.sh
 	(cd doc; ./genbook.sh) > $@
 
 obj/doc/snabbswitch.pdf: obj/doc/snabbswitch.markdown
