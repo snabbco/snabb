@@ -58,3 +58,56 @@ Here is how to be the upstream for a change:
     4. Is there somebody else who should also review the code? If so then ask them for help with a @mention.
     5. Do you see an obvious thing to fix that requires no discussion? You can simply do that yourself as part of your merge commit.
 3. Manage the discussion. Everybody on Github is able to make comments on Pull Requests, often many people do, but as the upstream assignee you are the one who says what is necessary. Contributors can easily be overwhelmed by feedback from many sources so it is important for the upstream assignee to clearly explain what actions they have to take in order for their changes to be merged.
+
+#### Sending collected changes upstream to your next-hop
+
+So you merge some good changes onto your subsystem branch. What next?
+
+The next step is to open a Pull Request from your specific subsystem
+branch to the more general "next hop" upstream branch. This is your
+way to say "hey, I have collected some good changes here, please merge
+them!"
+
+The upstreaming process is the same one described above, but now you
+are the one submitting the changes and expecting clear feedback on
+what actions you need to take for them to be accepted.
+
+#### Putting it all together
+
+Here is a complete example of how this can all fit together:
+
+You decide that you want to be the maintainer of the Intel I350
+ethernet driver. You create a branch called `i350` and open a Pull
+Request to describe this branch in `src/doc/branches.md`. The other
+maintainers are happy that you want to join in and gladly agree to
+refer Pull Requests concerned the Intel I350 driver to you. You agree
+that once you have good changes on your `i350` branch you will open a
+Pull Request to the more general `drivers` branch as your "next hop"
+upstream.
+
+People in the community start contributing improvements to the I350
+driver. You set yourself as the *Assignee* to these Pull Requests and
+engage with the contributors to get the changes in good shape. You
+merge the good changes onto your `i350` branch and periodically open a
+Pull Request to the `drivers` branch to send this code upstream. The
+`drivers` branch will in turn be merged to its next hop upstream and
+step-by-step the changes will make their way towards release on the
+`master` branch.
+
+The time scales involved are not written in stone but it is important
+to find a rhythm that is comfortable for everybody involved. You might
+aim to set yourself as the *Assignee* for relevant Pull Requests
+within one day, to provide a review within a few days, and to send
+Pull Requests to your next-hop upstream once or twice per week when
+you have changes.
+
+#### Don't be shy!
+
+Becoming a Snabb Switch maintainer is a great service to the community
+and you can learn all the skills that you need "on the job." If you are
+tempted to give it a try then please do!
+
+The more subsystem maintainers we have the more capacity we have to
+incorporate improvements into Snabb Switch. The Linux kernel has
+more than one thousand registered subsystems. The sky is the limit!
+
