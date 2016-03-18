@@ -6,34 +6,36 @@
 
 with import <nixpkgs> {};
 
-stdenv.mkDerivation rec {
-  name = "snabb-manual";
-  src = ./../../.;
+{ manual =
+  stdenv.mkDerivation rec {
+    name = "snabb-manual";
+    src = ./../../.;
 
-  buildInputs = [ ditaa pandoc git
-   (texlive.combine {
-      inherit (texlive) scheme-small luatex luatexbase sectsty titlesec cprotect bigfoot titling droid;
-    })
-  ];
+    buildInputs = [ ditaa pandoc git
+     (texlive.combine {
+        inherit (texlive) scheme-small luatex luatexbase sectsty titlesec cprotect bigfoot titling droid;
+      })
+    ];
 
-  patchPhase = ''
-    patchShebangs src/doc
-    patchShebangs src/scripts
-  '';
+    patchPhase = ''
+      patchShebangs src/doc
+      patchShebangs src/scripts
+    '';
 
-  buildPhase = ''
-    # needed for font cache
-    export TEXMFCACHE=`pwd`
+    buildPhase = ''
+      # needed for font cache
+      export TEXMFCACHE=`pwd`
 
-    make book -C src
-  '';
+      make book -C src
+    '';
 
-  installPhase = ''
-    mkdir -p $out/share/doc
-    cp src/obj/doc/snabbswitch.* $out/share/doc
-    # Give manual to Hydra
-    mkdir -p $out/nix-support
-    echo "doc-pdf manual $out/share/doc/snabbswitch.pdf" \
-      >> $out/nix-support/hydra-build-products;
-  '';
+    installPhase = ''
+      mkdir -p $out/share/doc
+      cp src/obj/doc/snabbswitch.* $out/share/doc
+      # Give manual to Hydra
+      mkdir -p $out/nix-support
+      echo "doc-pdf manual $out/share/doc/snabbswitch.pdf" \
+        >> $out/nix-support/hydra-build-products;
+    '';
+  };
 }
