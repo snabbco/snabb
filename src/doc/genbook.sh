@@ -8,7 +8,7 @@
 
 # Link images in local .images/
 for png in $(find .. -name "*.png"); do
-    ln -s ../$png .images/
+    ln -f -s ../$png .images/
 done
 
 # Root directory for markdown files

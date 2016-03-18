@@ -20,7 +20,12 @@ Apps can be connected with any number of input and output links and
 each link can either be named or anonymous.
 
 
-![SimpleApp](.images/SimpleApp.png)
+    DIAGRAM: SimpleApp
+         +-------+
+         |       |
+    ---->*  App  *--->
+         |       |
+         +-------+
 
 
 The name "app" is supposed to make you think of an App Store on your
@@ -35,7 +40,20 @@ interface towards a network card or a virtual machine, an ethernet
 switch, a router, a firewall, or really anything else that can receive
 and transmit packets.
 
-![KindsOfApps](.images/KindsOfApps.png)
+    DIAGRAM: KindsOfApps
+          +-------+                   ^    ^       
+          |       |                   |    |       
+     ---->*  I/O  *--->               v    v       
+          |       |                 +-*----*-+     
+          +-------+                 |        |     
+                               <--->*   L2   *<--> 
+          +-----------+             | Switch |     
+     ---->*           *---->   <--->*        *<--> 
+    inside|  Firewall |outside      |        |     
+     <----*           *<----        +-*----*-+     
+          +-----------+               ^    ^       
+                                      |    |       
+                                      v    v       
    
 ### App networks
 
@@ -47,7 +65,12 @@ device by taking two apps that perform I/O (e.g. 10G ethernet drivers)
 and connecting them together via a firewall app that performs packet
 filtering.
 
-![FirewallAppNetwork](.images/FirewallAppNetwork.png)
+    DIAGRAM: FirewallAppNetwork
+    +-------+        +-----------+         +-------+
+    |       *------->*           *-------->*       |
+    |  I/O  |  inside|  Firewall |outside  |  I/O  |
+    |       *<-------*           *<--------*       |
+    +-------+        +-----------+         +-------+
 
 The app network executes as a simple event loop. On each iteration it
 receives a batch of approximately 100 packets from the I/O sources and
@@ -70,7 +93,30 @@ a separate CPU core. (Your challenge will be to dispatch traffic to
 the processes by some suitable means, for example assigning separate
 hardware NICs to each process.)
 
-![Processes](.images/Processes.png)
+    DIAGRAM: Processes
+               +-----+    +-----+
+               |     |    |     |
+               | cRED|    | cBLU|
+               |     |    |     |
+               +--*--+    +--*--+
+                  |          |
+    +-----+    +--*--+    +--*--+    +-----+
+    |     |    |     |    |     |    |     |
+    | cRED*----* cRED|    | cBLU*----* cBLU|
+    |     |    |     |    |     |    |     |
+    +-----+    +-----+    +-----+    +-----+
+                                            
+    +-----+    +-----+    +-----+    +-----+
+    |     |    |     |    |     |    |     |
+    | cGRE*----* cGRE|    | cPNK*----* cPNK|
+    |     |    |     |    |     |    |     |
+    +-----+    +--*--+    +--*--+    +-----+
+                  |          |
+               +--*--+    +--*--+
+               |     |    |     |
+               | cGRE|    | cPNK|
+               |     |    |     |
+               +-----+    +-----+
 
 
 Separate app networks can pass traffic between each other by simply
