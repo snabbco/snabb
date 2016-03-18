@@ -38,9 +38,9 @@ order to help improve this document.*
 
 $(cat $mdroot/doc/in-a-nutshell.md)
 
-## Core software architecture
+## Core data structures
 
-$(cat $mdroot/doc/core-software-architecture.md)
+$(cat $mdroot/doc/core-data-structures.md)
 
 # API
 
