@@ -1,7 +1,7 @@
 # nix expression to build the Snabb manual.
 #
 # Run like this:
-#   nix-build /path/to/manual.nix
+#   nix-build /path/to/this/directory
 # ... and the files are produced in ./result/
 
 with import <nixpkgs> {};
@@ -15,6 +15,10 @@ stdenv.mkDerivation rec {
       inherit (texlive) scheme-small luatex luatexbase sectsty titlesec cprotect bigfoot titling droid;
     })
   ];
+
+  patchPhase = ''
+    patchShebangs src/doc src/scripts
+  '';
 
   buildPhase = ''
     # needed for font cache
