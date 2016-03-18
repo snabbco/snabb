@@ -35,8 +35,12 @@ order to help improve this document.*
 # Introduction
 
 ## Snabb in a nutshell
+
+$(cat $mdroot/doc/in-a-nutshell.md)
+
 ## Core software architecture
-## Zen of Snabb
+
+$(cat $mdroot/doc/core-software-architecture.md)
 
 # API
 
