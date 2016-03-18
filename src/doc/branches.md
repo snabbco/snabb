@@ -77,3 +77,12 @@ The current state of each branch with respect to master is visible here:
     
     Maintainer: Alexander Gall <gall@switch.ch>
 
+### nix
+
+    BRANCH: nix git://github.com/domenkozar/snabbswitch
+    Nix expressions for building/testing Snabb.
+
+    - Contains changes proposed to be merged into next
+    - Contains infrastructure changes built by https://hydra.snabb.co
+
+    Maintainer: Domen Kožar <domen@dev.si>
