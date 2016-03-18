@@ -1,86 +1,113 @@
-# Snabb Switch Git Workflow
+## Git workflow
 
-This document explains the Git workflows that we use to develop and
-release Snabb Switch.
+Snabb Switch is developed on Github using the distributed workflow
+that was pioneered by the Linux kernel.
 
-## Overview
+The latest Snabb Switch release can always be found on the `master`
+branch of the Github `SnabbCo/snabbswitch` repository.
 
-Snabb Switch development follows a few well-known patterns:
+### Being a contributor
 
-- We follow the distributed development model [described by Linus
-  Torvald](https://www.youtube.com/watch?v=4XpnKHJAok8) and pioneered
-  by the Linux kernel.
-- We use a [merge based workflow](https://www.atlassian.com/git/articles/git-team-workflows-merge-or-rebase/).
-- We use the [fork and pull](https://help.github.com/articles/using-pull-requests/#fork--pull)
-  model of collaboration.
-- We aim to support ad-hoc collaboration inspired by the
-  [DMZ Flow](https://gist.github.com/djspiewak/9f2f91085607a4859a66).
+So you have decided to contribute an improvement to Snabb Switch. Great! This is what to do:
 
-## HOWTO
+1. Create your own "fork" of Snabb Switch on Github. Do this by clicking the "Fork" button on the Github UI. (You only have to do this the first time you are making a change.)
+2. Create a topic branch based on `master`. Example: `git branch -b my-feature master`.
+3. Develop your feature and push your branch to your Github fork. Example: `emacs`, `git commit`, `git push`.
+4. Open a Github Pull Request from your branch to the SnabbCo/snabbswitch master branch. Clicking the Pull Request button on Github should do the right thing.
 
-### Download and update the latest release
+Once your Pull Request is open you can wait a short while, usually a day or two, for a maintainer to engage with you and take responsibility for merging your change "upstream".
 
-1. Clone the [SnabbCo/snabbswitch](https://github.com/SnabbCo/snabbswitch) repository.
-2. Check out and build the `master` branch.
-3. Pull when you want to update to the latest stable release.
+Tips for making your contribution smoothly:
 
-### Develop and contribute an improvement
+- Explain why your change is a good idea using the text area of the Pull Request.
+- Don't rebase your branch after the pull request is open; make corrections by pushing new commits.
+- If your change is a work in progress then prefix the Pull Request name with `[wip]`.
+- If your change is a rough draft for early feedback then prefix the Pull Request name with `[sketch]`.
 
-1. [Create your own fork](https://help.github.com/articles/fork-a-repo/) of Snabb Switch on Github.
-2. Develop and debug your contribution on a new [topic branch](https://git-scm.com/book/en/v2/Git-Branching-Branching-Workflows#Topic-Branches) based on the latest `master`.
-3. Make a final cleanup of your code before review. (Last chance to rebase.)
-4. Submit a Github [Pull Request](https://help.github.com/articles/using-pull-requests/#initiating-the-pull-request)
-   to the `master` branch.
-5. Respond to feedback and correct problems by pushing additional commits.
+### Being a maintainer
 
-There are two milestones in the process of accepting your change:
+So you have decided to help with the upstream maintenance of Snabb
+Switch. Fantastic! You can do this by creating and maintaining a
+"subsystem branch" where you take responsibility for reviewing and
+merging some of the Pull Requests submitted to Snabb Switch.
 
-1. Your change is merged onto a branch that feeds `master`, for
-   example `next`, `fixes`, `documentation-fixes`, or `nfv`. From this
-   point the owner of that branch will push your work upstream
-   together with other related changes. They might ask you for help
-   but otherwise your work is done.
-2. Your change is merged onto `master`. This could happen in a series
-   of merge steps, for example `nfv->next->master`. Once this happens
-   your code has been officially released as part of Snabb Switch.
+#### Registering a subsystem branch
 
-### Develop and maintain a new program
+The first step is to create and register your subsystem branch:
 
-Snabb Switch includes programs like `snabbnfv`, `packetblaster`, and
-`snsh`. Here is how you can create a new program and take charge of
-its development.
+1. Pick your technical area of interest. What kind of changes will you be responsible for reviewing and merging? Try to pick an area that is easy to identify, for example "the packetblaster program", "the Intel I350 device driver", or "the Git Workflow chapter of the manual".
+2. Create a branch with a suitable name on your Github fork, for example `packetblaster`, `i350`, or `git-workflow`. This is where you will merge relevant changes.
+3. Describe this branch in the file `src/doc/branches.md` and open a Github Pull Request. This will kick off two discussions: how to clearly identify the changes that you are responsible for, and to which "next-hop" upstream branch you should send the changes that you have accepted by merging.
 
-1. [Fork](https://help.github.com/articles/fork-a-repo/) your own
-   repository on Github.
-2. Create a [long-lived branch](branches.md) where new development of your program will be done.
-3. Create a directory `src/program/myapplication/` and develop your program.
-4. `git merge master` regularly to stay synchronized with the main line of development.
-5. Optional: Send releases of your application to `master` with Pull Requests.
+Once those details are worked out and your branch is registered then
+you are a Snabb Switch maintainer. Congratulations!
 
-The code in your `src/program/myapplication/` directory is developed
-according to your own rules and tastes. If there are parts of this
-code that you especially want to have reviewed (or do not want to have
-reviewed) then please explain this in your Pull Request. The only
-necessary review is to make sure that programs do not negatively
-impact each other or change shared code without enough review.
+#### Being "the upstream" for Pull Requests
 
-Pull Requests that make changes to your application will be referred
-to you for merge onto your branch.
+Now as a maintainer your job is to watch for Pull Requests opened to
+the Github repository and act as the responsible person (the
+"upstream") when your branch most specifically matches a change.
 
-Use the *Develop and contribute an improvement* workflow to make
-changes to the core Snabb Switch code. Please do not bundle
-substantial changes to the core software with updates to your program.
+Here is how to be the upstream for a change:
 
-If you do not want to include your program in the main Snabb Switch
-release then this is no problem. You can simply pull from `master` to
-receive updates and skip the step of pushing back.
+1. Set yourself as the *Assignee* of the Pull Request. This clearly signals to everybody that you are the one responsible for reviewing and merging the change.
+2. Review the submitted changes:
+    1. Does it all look good? If so then merge the changes onto your branch and add the label `merged` to the Pull Request.
+    2. Do you see some serious problems? Tell the contributor exactly what they need to change in order for you to merge the changes.
+    3. Do you see minor ways that the change could be improved? Suggest those and ask the contributor whether they want to do that before you merge the change.
+    4. Is there somebody else who should also review the code? If so then ask them for help with a @mention.
+    5. Do you see an obvious thing to fix that requires no discussion? You can simply do that yourself as part of your merge commit.
+3. Manage the discussion. Everybody on Github is able to make comments on Pull Requests, often many people do, but as the upstream assignee you are the one who says what is necessary. Contributors can easily be overwhelmed by feedback from many sources so it is important for the upstream assignee to clearly explain what actions they have to take in order for their changes to be merged.
 
-### To help maintain Snabb Switch
+#### Sending collected changes upstream to your next-hop
 
-Here are the best ways to help maintain Snabb Switch:
+So you merge some good changes onto your subsystem branch. What next?
 
-1. Review Pull Requests to help people quickly improve them.
-2. Test the `next` branch and help fix problems before releases.
-3. Contribute new `selftest` cases to make our CI more effective.
-4. Maintain a [branch](branches.md) where you accept Pull Requests and push them upstream.
+The next step is to open a Pull Request from your specific subsystem
+branch to the more general "next hop" upstream branch. This is your
+way to say "hey, I have collected some good changes here, please merge
+them!"
+
+The upstreaming process is the same one described above, but now you
+are the one submitting the changes and expecting clear feedback on
+what actions you need to take for them to be accepted.
+
+#### Putting it all together
+
+Here is a complete example of how this can all fit together:
+
+You decide that you want to be the maintainer of the Intel I350
+ethernet driver. You create a branch called `i350` and open a Pull
+Request to describe this branch in `src/doc/branches.md`. The other
+maintainers are happy that you want to join in and gladly agree to
+refer Pull Requests concerned the Intel I350 driver to you. You agree
+that once you have good changes on your `i350` branch you will open a
+Pull Request to the more general `drivers` branch as your "next hop"
+upstream.
+
+People in the community start contributing improvements to the I350
+driver. You set yourself as the *Assignee* to these Pull Requests and
+engage with the contributors to get the changes in good shape. You
+merge the good changes onto your `i350` branch and periodically open a
+Pull Request to the `drivers` branch to send this code upstream. The
+`drivers` branch will in turn be merged to its next hop upstream and
+step-by-step the changes will make their way towards release on the
+`master` branch.
+
+The time scales involved are not written in stone but it is important
+to find a rhythm that is comfortable for everybody involved. You might
+aim to set yourself as the *Assignee* for relevant Pull Requests
+within one day, to provide a review within a few days, and to send
+Pull Requests to your next-hop upstream once or twice per week when
+you have changes.
+
+#### Don't be shy!
+
+Becoming a Snabb Switch maintainer is a great service to the community
+and you can learn all the skills that you need "on the job." If you are
+tempted to give it a try then please do!
+
+The more subsystem maintainers we have the more capacity we have to
+incorporate improvements into Snabb Switch. The Linux kernel has
+more than one thousand registered subsystems. The sky is the limit!
 
