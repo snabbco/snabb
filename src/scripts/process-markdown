@@ -12,13 +12,13 @@
 # output markdown.
 
 set -e
- if [ $# != 2 ]; then
+if [ $# != 2 ]; then
     echo "Usage: $0 <input> <output>" >&2
     exit 1
 fi
 
-input=$(readlink -f $1)
-output=$(readlink -f $2)
+input=$(readlink -m $1)
+output=$(readlink -m $2)
 
 [ -d $(dirname "$output") ] || mkdir -p "$(dirname $output)"
 cd $(dirname $output)
