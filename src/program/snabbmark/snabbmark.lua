@@ -351,7 +351,7 @@ function esp (npackets, packet_size)
       d:payload(payload, payload_size)
       d:push(ip)
       d:push(eth)
-      packets[i] = { plain = d:packet(), encapsulated = 0 }
+      packets[i] = d:packet()
    end
    local conf = { spi = 0x0,
                   mode = "aes-128-gcm",
@@ -361,8 +361,8 @@ function esp (npackets, packet_size)
 
    require("jit.p").start("Fpv")
    local start = C.get_monotonic_time()
-   for _, p in ipairs(packets) do
-      p.encapsulated = enc:encapsulate(p.plain)
+   for i, p in ipairs(packets) do
+      packets[i] = enc:encapsulate(p)
    end
    local finish = C.get_monotonic_time()
    require("jit.p").stop()
@@ -370,12 +370,10 @@ function esp (npackets, packet_size)
    print(("Encapsulation (packet size = %d): %.2f Gbit/s")
          :format(packet_size, gbits(bps)))
 
-   for _, p in ipairs(packets) do packet.free(p.plain) end
-
    require("jit.p").start("Fpv")
    local start = C.get_monotonic_time()
-   for _, p in ipairs(packets) do
-      p.plain = dec:decapsulate(p.encapsulated)
+   for i, p in ipairs(packets) do
+      packets[i] = dec:decapsulate(p)
    end
    local finish = C.get_monotonic_time()
    require("jit.p").stop()
@@ -384,8 +382,7 @@ function esp (npackets, packet_size)
          :format(packet_size, gbits(bps)))
 
    for _, p in ipairs(packets) do
-      assert(p.plain, "Decapsulation of some packets failed.")
-      packet.free(p.plain)
-      packet.free(p.encapsulated)
+      assert(p, "Decapsulation of some packets failed.")
+      packet.free(p)
    end
 end

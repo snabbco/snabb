@@ -83,11 +83,11 @@ function aes_128_gcm:new (spi, keymat, salt)
    local o = {}
    o.keymat = ffi.new("uint8_t[16]")
    ffi.copy(o.keymat, lib.hexundump(keymat, 16), 16)
-   o.iv_size = 8
+   o.IV_SIZE = 8
    o.iv = iv:new(lib.hexundump(salt, 4))
-   o.auth_size = 16
-   o.auth_buf = ffi.new("uint8_t[?]", o.auth_size)
-   o.aad_size = 12
+   o.AUTH_SIZE = 16
+   o.auth_buf = ffi.new("uint8_t[?]", o.AUTH_SIZE)
+   o.AAD_SIZE = 12
    o.aad = aad:new(spi)
    -- Compute subkey (H)
    o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 16)
@@ -105,8 +105,8 @@ function aes_128_gcm:encrypt (out_ptr, iv, seq_no, payload, length)
                               out_ptr,
                               payload, length,
                               u8_ptr(self.iv:header_ptr()),
-                              u8_ptr(self.aad:header_ptr()), self.aad_size,
-                              out_ptr + length, self.auth_size)
+                              u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
+                              out_ptr + length, self.AUTH_SIZE)
 end
 
 function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length)
@@ -116,9 +116,9 @@ function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length
                               out_ptr,
                               ciphertext, length,
                               u8_ptr(self.iv:header_ptr()),
-                              u8_ptr(self.aad:header_ptr()), self.aad_size,
-                              self.auth_buf, self.auth_size)
-   return C.memcmp(self.auth_buf, ciphertext + length, self.auth_size) == 0
+                              u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
+                              self.auth_buf, self.AUTH_SIZE)
+   return C.memcmp(self.auth_buf, ciphertext + length, self.AUTH_SIZE) == 0
 end
 
 
@@ -235,36 +235,36 @@ function selftest ()
    for i, t in ipairs(test) do
       print("Test vector:", i)
       local gcm = aes_128_gcm:new(t.spi, t.key, t.salt)
-      local iv = lib.hexundump(t.iv, gcm.iv_size)
+      local iv = lib.hexundump(t.iv, gcm.IV_SIZE)
       local seq = ffi.new(seq_no_t)
       seq.no = t.seq
       local length = #t.plain/2
-      local p = ffi.new("uint8_t[?]", length + gcm.auth_size)
-      local c = ffi.new("uint8_t[?]", length + gcm.auth_size)
-      local o = ffi.new("uint8_t[?]", length + gcm.auth_size)
+      local p = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
+      local c = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
+      local o = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
       ffi.copy(p, lib.hexundump(t.plain, length), length)
-      ffi.copy(c, lib.hexundump(t.ctag, length + gcm.auth_size), length + gcm.auth_size)
+      ffi.copy(c, lib.hexundump(t.ctag, length + gcm.AUTH_SIZE), length + gcm.AUTH_SIZE)
       gcm:encrypt(o, iv, seq, p, length)
-      print("ctext+tag", lib.hexdump(ffi.string(c, length + gcm.auth_size)))
-      print("is       ", lib.hexdump(ffi.string(o, length + gcm.auth_size)))
-      assert(C.memcmp(c, o, length + gcm.auth_size) == 0)
+      print("ctext+tag", lib.hexdump(ffi.string(c, length + gcm.AUTH_SIZE)))
+      print("is       ", lib.hexdump(ffi.string(o, length + gcm.AUTH_SIZE)))
+      assert(C.memcmp(c, o, length + gcm.AUTH_SIZE) == 0)
       gcm:decrypt(o, seq:low(), seq:high(), iv, c, length)
       print("plaintext", lib.hexdump(ffi.string(p, length)))
       print("is       ", lib.hexdump(ffi.string(o, length)))
       assert(C.memcmp(p, o, length) == 0)
-      assert(C.memcmp(c + length, o + length, gcm.auth_size) == 0,
+      assert(C.memcmp(c + length, o + length, gcm.AUTH_SIZE) == 0,
              "Authentication failed.")
    end
    -- Microbenchmarks.
    local length = 1000 * 1000 * 100 -- 100MB
    local gcm = aes_128_gcm:new(0x0, "00000000000000000000000000000000", "00000000")
-   local p = ffi.new("uint8_t[?]", length + gcm.auth_size)
+   local p = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
    local start = C.get_monotonic_time()
    ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
                               p, p, length,
                               u8_ptr(gcm.iv:header_ptr()),
                               p, 0, -- No AAD
-                              p + length, gcm.auth_size)
+                              p + length, gcm.AUTH_SIZE)
    local finish = C.get_monotonic_time()
    print("Encrypted", length, "bytes in", finish-start, "seconds")
    local start = C.get_monotonic_time()
@@ -272,7 +272,7 @@ function selftest ()
                               p, p, length,
                               u8_ptr(gcm.iv:header_ptr()),
                               p, 0, -- No AAD
-                              p + length, gcm.auth_size)
+                              p + length, gcm.AUTH_SIZE)
    local finish = C.get_monotonic_time()
    print("Decrypted", length, "bytes in", finish-start, "seconds")
    -- Test aes_128_block with vectors from
