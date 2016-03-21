@@ -88,6 +88,7 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Alexander Gall <gall@switch.ch>
 
+<<<<<<< HEAD
 #### lwaftr
 
     BRANCH: lwaftr git://github.com/Igalia/snabbswitch
@@ -134,3 +135,15 @@ The current state of each branch with respect to master is visible here:
     IPsec library development branch.
 
     Maintainer: Max Rottenkolber <max@mr.gy>
+
+### nix
+
+    BRANCH: nix git://github.com/domenkozar/snabbswitch
+    Nix expressions for building/testing Snabb.
+
+    - Contains changes proposed to be merged into next
+    - Contains infrastructure changes built by https://hydra.snabb.co
+    - Feeds upstream to kbara-next.
+
+    Maintainer: Domen Kožar <domen@dev.si>
+
