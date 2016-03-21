@@ -4,7 +4,7 @@ How do you engage with the Snabb Switch developer community? The answer depends 
 
 - Use the software, ask questions, report bugs.
 - Contribute fixes and improvements.
-- Maintain Snabb Switch by reviewing and merging pull requests.
+- Maintain a part of Snabb Switch by reviewing and merging pull requests.
 - Create a new application to develop together with the community.
 
 ### Using the software
@@ -63,34 +63,78 @@ Here are some tips for making your contribution smoothly:
 
 Snabb Switch maintainers are the people who review and merge the Pull
 Requests on Github. Each maintainer takes care of one or more specific
-aspects of Snabb Switch. These aspects are called *subsystems*.
+part of Snabb Switch. These parts are called *subsystems*.
 
 Each subsystem has a dedicated branch and these branches are organized
-as a network:
+as a tree:
 
 ![Branches](.images/Branches.png)
 
-Pull Requests are first merged onto the subsystem branch that most
-specifically matches their subject matter. For example, a change to
-the PDF formatting of the manual would first be reviewed and accepted
-by the maintainer of the `pdf-manual` branch. Later, that whole
-subsystem branch is merged onto its "next-hop upstream" branch. For
-example, the maintainer of the `documentation` branch would merge the
-entire `pdf-manual` branch at regular intervals.
+Pull Requests are merged onto the most specifically relevant branch to
+begin with. Later, whole child branches are merged "upstream" onto
+their parent branches. This way once a change has been merged onto any
+branch in the tree it will naturally flow upstream to the `master`
+branch for release.
+
+For example, a change to the LaTeX template for the PDF edition of the
+manual would first be reviewed and merged by the maintainer of the
+`pdf-manual` branch. The change would then be included in successive
+merges upstream to branches `documentation`, `max-next`, `next`, and
+finally `master`. Each of these steps provides the opportunity for a
+maintainer to improve some aspect of the change before release.
 
 #### Registering a subsystem branch
 
-XXX rewrite.
+So you are interested in becoming a Snabb Switch maintainer. Great!
+The other maintainers are looking forward to working with you and will
+be more than happy to help you learn the ropes. You can learn
+everything you need to know on the job: no special qualifications are
+required.
 
-#### Being "the upstream" for Pull Requests
+The first step to becoming a maintainer is to decide which kind of
+Pull Requests you want to be responsible for. For example you could be
+responsible for changes to the Makefiles, or the Intel 10G device
+driver, or the `packetblaster` load generator program, or any other
+part of the software that is easy to identify when assigning Pull
+Requests. You do not have to be an expert in this area already: it is
+enough that you are committed to learning about it and being
+responsive to contributors.
 
-XXX rewrite.
+Once you have worked out which part you want to maintain then you can
+propose this to the community by sending a Pull Request that registers
+your new branch in the file `src/doc/branches.md`. This Pull Request
+will be the vehicle for talking with the other maintainers about where
+to fit your new branch into the tree.
+
+The moment this Pull Request is merged onto the `next` branch then you
+are officially a Snabb Switch maintainer. (Congratulations in advance!)
+
+#### Being the assigned maintainer for Pull Requests
+
+Now that you are a registered maintainer you will watch Github for new
+Pull Requests and mark yourself as the *Assignee* for changes that
+match your area of responsibility. You are the reviewer for these
+changes and you decide when to accept them from the contributor.
+
+Here is the basic criteria for merging a Pull Request:
+
+- Does the change improve Snabb Switch? It does not have to be perfect
+  but it should clearly have a net-positive impact.
+- Will the next-hop upstream maintainer agree? If not then getting
+  your branch merged upstream may require you to make some
+  improvements or even revert the change.
+
+Beyond this the most important thing is to communicate with the
+contributor to make sure they understand exactly what they have to do
+in order for their change to be merged. Contributors can easily be
+overwhelmed by comments on Pull Requests, often from many different
+people, so the assigned maintainer needs to explain very clearly what
+the requirements are for merge. (Contributors will be frustrated if
+they do not know what feedback they are required to act on, especially
+when receiving conflicting ideas from different people, so you need to
+decide for yourself what is required and clearly explain this.)
 
 #### Sending collected changes upstream to your next-hop
-
-XXX rewrite.
-
-#### Putting it all together
 
 XXX rewrite.
 
