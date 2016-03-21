@@ -68,7 +68,18 @@ aspects of Snabb Switch. These aspects are called *subsystems*.
 Each subsystem has a dedicated branch and these branches are organized
 as a network:
 
-![Branches](.images/Branches.png)
+    DIAGRAM: Branches
+                                       +--lisper
+                       +--max next<----+--documentation<--pdf manual
+                       |
+           fixes       |
+             |         |
+    master<--+--next<--+--kbara next<--+--nix
+                       |               +--mellanox
+                       |
+                       |
+                       +--wingo next<--+--lwaftr
+                                       +--multiproc
 
 Pull Requests are first merged onto the subsystem branch that most
 specifically matches their subject matter. For example, a change to
