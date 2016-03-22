@@ -172,7 +172,7 @@ lstopo --of pdf > lstopo.pdf
 ```
 
 Example from a Lenovo RD650 (Intel(R) Xeon(R) CPU E5-2650 v3): 
-![lstopo.pdf](lstopo.pdf)
+![lstopo.png](lstopo.png)
 
 ### PCI Card and Snabb on same NUMA node
 Memory shared between Snabb (by means of huge page mapping) and the NIC must share the same node. This is achieved via 'numactl', once the correct node is identified for a given NIC port/PCI address. 
