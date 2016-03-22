@@ -401,7 +401,8 @@ function selftest()
    set_dst_ethernet(nsp, lmac) -- Not a meaningful thing to do, just a test
    
    local sol_na = form_nsolicitation_reply(lmac, lip, nsp)
-   get_dst_ethernet(sol_na, {rip})
+   local dst_eth = get_dst_ethernet(sol_na, {rip})
+   assert(ethernet:ntop(dst_eth) == "01:02:03:04:05:06")
    assert(sol_na, "an na packet should have been formed")
    assert(is_ndp(sol_na), "sol_na must be ndp!")
    assert(is_solicited_neighbor_advertisement(sol_na), "sol_na must be sna!")
