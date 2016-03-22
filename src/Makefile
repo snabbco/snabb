@@ -16,7 +16,7 @@ CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P '
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
-RMSRC  = $(shell find . -name  '*.src.md' -printf '%P ')
+RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
@@ -30,7 +30,7 @@ ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
 ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
-RMOBJS := $(patsubst %.src.md,%.md,$(RMSRC))
+RMOBJS := $(patsubst %,obj/%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
@@ -110,7 +110,7 @@ $(TESTSCRIPTS): testlog snabb
 		) \
 	)
 
-$(OBJDIR) bin testlog:
+$(OBJDIR) bin testlog $(OBJDIR/doc):
 	$(E) "DIR       $@"
 	$(Q) mkdir -p $@
 
@@ -151,10 +151,9 @@ $(JITOBJS): obj/jit_%.o: ../lib/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
 	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
 
-
-$(RMOBJS): %.md: %.src.md
+$(RMOBJS): obj/%: %
 	$(E) "MARKDOWN  $@"
-	$(Q) scripts/process-markdown $< > $@
+	$(Q) scripts/process-markdown $< $@
 
 $(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	$(E) "INC       $@"
@@ -182,22 +181,22 @@ obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
 	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
 
-book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
+book: obj/doc/snabbswitch.pdf obj/doc/snabbswitch.html obj/doc/snabbswitch.epub
 
-doc/snabbswitch.md: markdown Makefile doc/genbook.sh
+obj/doc/snabbswitch.markdown: markdown Makefile doc/genbook.sh
 	(cd doc; ./genbook.sh) > $@
 
-doc/snabbswitch.pdf: doc/snabbswitch.md
+obj/doc/snabbswitch.pdf: obj/doc/snabbswitch.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o snabbswitch.pdf snabbswitch.md)
+	$(Q) (cd doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../$@ ../$<)
 
-doc/snabbswitch.html: doc/snabbswitch.md
+obj/doc/snabbswitch.html: obj/doc/snabbswitch.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.html snabbswitch.md)
+	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o ../$@ ../$<)
 
-doc/snabbswitch.epub: doc/snabbswitch.md
+obj/doc/snabbswitch.epub: obj/doc/snabbswitch.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
+	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o ../$@ ../$<)
 
 CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog programs.inc
 

@@ -211,7 +211,7 @@ specified 10GbE ports (PCI address) from the Linux kernel, but will not
 
 ```
 $ cd ~/snabbswitch/src
-$ sudo SNABB_TEST_INTEL10G_PCIDEVA="0000:04:00.0" SNABB_TEST_INTEL10G_PCIDEVB="0000:04:00.1" ./snabb snsh -t apps.intel.intel_app
+$ sudo SNABB_PCI_INTEL0="0000:04:00.0" SNABB_PCI_INTEL1="0000:04:00.1" ./snabb snsh -t apps.intel.intel_app
 selftest: intel_app
 100 VF initializations:
 
