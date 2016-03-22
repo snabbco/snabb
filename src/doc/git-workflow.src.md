@@ -45,24 +45,24 @@ $ make -j
 
 ### Contributing fixes and improvements
 
-The recommended way to contribute improvements to Snabb Switch is with Github Pull Requests. You can do this by following the Github [Using pull requests](https://help.github.com/articles/using-pull-requests/) instructions. Here is a brief summary.
+The recommended way to contribute improvements to Snabb Switch is with Github *pull requests*. You can do this by following the Github [Using pull requests](https://help.github.com/articles/using-pull-requests/) instructions. Here is a brief summary.
 
 1. "Fork" your own copy of the [`snabbco/snabbswitch`](https://github.com/snabbco/snabbswitch) repository.
 2. Push your proposed change to a branch on your repository.
-3. Open a Pull Request from your branch. Choose the `master` branch of the `snabbco/snabbswitch` repository as the target branch (this should be the default choice.)
-4. Expect that within a few days a qualified maintainer will become the *Assignee* of your Pull Request and work with you to get the change merged. The maintainer may ask you some questions and even require some changes. Once they are satisfied they will merge the change onto their own branch and apply the label `merged` on the Pull Request. Then your work is done and the change is in the pipeline leading to release on the master branch.
+3. Open a pull request from your branch. Choose the `master` branch of the `snabbco/snabbswitch` repository as the target branch (this should be the default choice.)
+4. Expect that within a few days a qualified maintainer will become the *Assignee* of your pull request and work with you to get the change merged. The maintainer may ask you some questions and even require some changes. Once they are satisfied they will merge the change onto their own branch and apply the label `merged` on the pull request. Then your work is done and the change is in the pipeline leading to release on the master branch.
 
 Here are some tips for making your contribution smoothly:
 
 - Use a dedicated "topic branch" for each feature or fix.
-- Use the Pull Request text to explain why you are proposing the change.
-- If the change is a work in progress then prefix the Pull Request title with `[wip]`. This signals that you intened to push more commits before the change is complete.
-- If the change is a rough draft that you want early feedback on then prefix the Pull Request name with `[sketch]`. This signals that you may throw the branch away and start over on a new one.
+- Use the pull request text to explain why you are proposing the change.
+- If the change is a work in progress then prefix the pull request title with `[wip]`. This signals that you intened to push more commits before the change is complete.
+- If the change is a rough draft that you want early feedback on then prefix the pull request name with `[sketch]`. This signals that you may throw the branch away and start over on a new one.
 
 ### Becoming a maintainer
 
-Snabb Switch maintainers are the people who review and merge the Pull
-Requests on Github. Each maintainer takes care of one or more specific
+Snabb Switch maintainers are the people who review and merge the pull
+requests on Github. Each maintainer takes care of one or more specific
 part of Snabb Switch. These parts are called *subsystems*.
 
 Each subsystem has a dedicated branch and these branches are organized
@@ -81,7 +81,7 @@ as a tree:
                        +--wingo next<--+--lwaftr
                                        +--multiproc
 
-Pull Requests are merged onto the most specifically relevant branch to
+Pull requests are merged onto the most specifically relevant branch to
 begin with. Later, whole child branches are merged "upstream" onto
 their parent branches. This way once a change has been merged onto any
 branch in the tree it will naturally flow upstream to the `master`
@@ -103,31 +103,31 @@ everything you need to know on the job: no special qualifications are
 required.
 
 The first step to becoming a maintainer is to decide which kind of
-Pull Requests you want to be responsible for. For example you could be
+pull requests you want to be responsible for. For example you could be
 responsible for changes to the Makefiles, or the Intel 10G device
 driver, or the `packetblaster` load generator program, or any other
-part of the software that is easy to identify when assigning Pull
-Requests. You do not have to be an expert in this area already: it is
+part of the software that is easy to identify when assigning pull
+requests. You do not have to be an expert in this area already: it is
 enough that you are committed to learning about it and being
 responsive to contributors.
 
 Once you have worked out which part you want to maintain then you can
-propose this to the community by sending a Pull Request that registers
-your new branch in the file `src/doc/branches.md`. This Pull Request
+propose this to the community by sending a pull request that registers
+your new branch in the file `src/doc/branches.md`. This pull request
 will be the vehicle for talking with the other maintainers about where
 to fit your new branch into the tree.
 
-The moment this Pull Request is merged onto the `next` branch then you
+The moment this pull request is merged onto the `next` branch then you
 are officially a Snabb Switch maintainer. (Congratulations in advance!)
 
-#### Being the assigned maintainer for Pull Requests
+#### Being the assigned maintainer for pull requests
 
 Now that you are a registered maintainer you will watch Github for new
-Pull Requests and mark yourself as the *Assignee* for changes that
+pull requests and mark yourself as the *Assignee* for changes that
 match your area of responsibility. You are the reviewer for these
 changes and you decide when to accept them from the contributor.
 
-Here is the basic criteria for merging a Pull Request:
+Here is the basic criteria for merging a pull request:
 
 - Does the change improve Snabb Switch? It does not have to be perfect
   but it should clearly have a net-positive impact.
@@ -138,14 +138,43 @@ Here is the basic criteria for merging a Pull Request:
 Beyond this the most important thing is to communicate with the
 contributor to make sure they understand exactly what they have to do
 in order for their change to be merged. Contributors can easily be
-overwhelmed by comments on Pull Requests, often from many different
+overwhelmed by comments on pull requests, often from many different
 people, so the assigned maintainer needs to explain very clearly what
 the requirements are for merge. (Contributors will be frustrated if
 they do not know what feedback they are required to act on, especially
 when receiving conflicting ideas from different people, so you need to
 decide for yourself what is required and clearly explain this.)
 
-#### Sending collected changes upstream to your next-hop
+#### Sending your accepted changes upstream
 
-XXX rewrite.
+Once you have merged one or more changes onto your branch the next
+step is to open a pull request asking the next upstream maintainer to
+merge your whole branch. This way all of the changes you merged will
+make their way upstream step-by-step and ultimately be released by
+being merged onto the `master` branch.
+
+This is where it comes in handy that the branches are organized in the
+tree structure shown above. When your subsystem branch contains
+changes that are ready to merge further upstream then you would open a
+pull request to the parent branch in the tree. For example, if you are
+the maintainer of the `pdf-manual` branch and you have changes ready
+for integration then you would open a pull request to the
+`documentation` parent branch.
+
+How do you decide when to open this pull request? This is a latency
+verses throughput trade-off that you need to agree on with the
+upstream maintainer. On the one hand it is important for changes to
+move upstream quickly when they are beneficial to users or likely to
+conflict with other work, on the other hand you may overwhelm the
+upstream maintainer if you open pull requests too often. One
+suggestion to use as a starting point would be to open a pull request
+once or twice per week whenever your branch contains new changes.
+
+The upstream branch maintainer will be responsible for considering the
+broader impact of the changes on your branch. They may need to resolve
+conflicts with other changes that they have merged, or want to ask for
+input from people who will be affected by the changes, or they may
+want to refactor the changes together with some other related code.
+They will tell you if they need your help with this and if they have
+ideas for how you can make their merging work easier in the future.
 
