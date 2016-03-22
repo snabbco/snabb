@@ -1,10 +1,10 @@
 # Introduction
 
-*Snabb Switch* is an extensible, virtualized, Ethernet networking
-toolkit.  With Snabb Switch you can implement networking applications
-using the *Lua language*. Snabb Switch includes all the tools you need to
+*Snabb* is an extensible, virtualized, Ethernet networking
+toolkit.  With Snabb you can implement networking applications
+using the *Lua language*. Snabb includes all the tools you need to
 quickly realize your network designs and its really fast too!
-Furthermore, Snabb Switch is extensible and encourages you to grow the
+Furthermore, Snabb is extensible and encourages you to grow the
 ecosystem to match your requirements.
 
     DIAGRAM: Architecture
