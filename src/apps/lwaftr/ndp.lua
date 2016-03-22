@@ -151,6 +151,12 @@ function is_neighbor_solicitation_for_ips(pkt, local_ips)
    return false
 end
 
+local function to_ether_addr(pkt, offset)
+   local ether_src = ffi.new("uint8_t[?]", 6)
+   ffi.copy(ether_src, pkt.data + offset, 6)
+   return ether_src
+end
+
 -- The option format is, for ethernet networks:
 -- 1 byte option type, 1 byte option length (in chunks of 8 bytes)
 -- 6 bytes MAC address
@@ -161,7 +167,13 @@ function get_dst_ethernet(pkt, target_ipv6_addrs)
       if ipv6_equals(target_ipv6_addrs[i], pkt.data + na_addr_offset) then
          local na_option_offset = eth_ipv6_size + o_icmp_first_option
          if pkt.data[na_option_offset] == option_target_link_layer_address then
-            return pkt.data + na_option_offset + 2
+            return to_ether_addr(pkt, na_option_offset + 2)
+         end
+         -- When responding to unicast solicitations, the option can be omitted
+         -- since the sender of the solicitation has the correct link-layer
+         -- address (See 4.4. Neighbor Advertisement Message Format)
+         if pkt.length == na_option_offset then
+            return to_ether_addr(pkt, 6)
          end
       end
    end
