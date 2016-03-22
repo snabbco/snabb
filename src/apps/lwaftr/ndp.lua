@@ -391,7 +391,24 @@ function form_nsolicitation_reply(local_eth, local_ipv6, ns_pkt)
    return form_sna(local_eth, local_ipv6, true, ns_pkt)
 end
 
+local function test_ndp_without_target_link()
+   local lib = require("core.lib")
+   -- Neighbor Advertisement packet.
+   local na_pkt = lib.hexundump([[
+      02:aa:aa:aa:aa:aa 90:e2:ba:a9:89:2d 86 dd 60 00 
+      00 00 00 18 3a ff fe 80 00 00 00 00 00 00 92 e2 
+      ba ff fe a9 89 2d fc 00 00 00 00 00 00 00 00 00 
+      00 00 00 00 01 00 88 00 92 36 40 00 00 00 fe 80 
+      00 00 00 00 00 00 92 e2 ba ff fe a9 89 2d
+   ]], 78)
+   local dst_eth = get_dst_ethernet(packet.from_string(na_pkt),
+      {ipv6:pton("fe80::92e2:baff:fea9:892d")})
+   assert(ethernet:ntop(dst_eth) == "90:e2:ba:a9:89:2d")
+end
+
 function selftest()
+   print("selftest: ndp")
+
    local lmac = ethernet:pton("01:02:03:04:05:06")
    local lip = ipv6:pton("1:2:3:4:5:6:7:8")
    local rip = ipv6:pton("9:a:b:c:d:e:f:0")
@@ -406,4 +423,8 @@ function selftest()
    assert(sol_na, "an na packet should have been formed")
    assert(is_ndp(sol_na), "sol_na must be ndp!")
    assert(is_solicited_neighbor_advertisement(sol_na), "sol_na must be sna!")
+
+   test_ndp_without_target_link()
+
+   print("selftest: ok")
 end
