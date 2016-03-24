@@ -7,7 +7,7 @@
 --    details: https://tools.ietf.org/html/rfc4303#section-4
 --
 --  * Anti-replay protection for packets within `window_size' on the receiver
---    side is *not* implemented, see `esp_v6_decrypt:check_seq_no'.
+--    side is *not* implemented, see `track_seq_no.c'.
 --
 --  * Recovery from synchronisation loss is is *not* implemented, see
 --    Appendix 3: “Handling Loss of Synchronization due to Significant Packet
@@ -37,6 +37,7 @@ local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
+require("lib.ipsec.track_seq_no_h")
 
 
 local ETHERNET_SIZE = ethernet:sizeof()
@@ -126,23 +127,6 @@ function esp_v6_decrypt:new (conf)
    return setmetatable(o, {__index=esp_v6_decrypt})
 end
 
--- Verify sequence number.
-function esp_v6_decrypt:check_seq_no (seq_no)
-   -- See https://tools.ietf.org/html/rfc4303#page-38
-   -- This is a only partial implementation that attempts to keep track of the
-   -- ESN counter, but does not detect replayed packets.
-   local function bit32 (n) return n % 2^32 end
-   local W = self.window_size
-   local Tl, Th = self.seq:low(), self.seq:high()
-   if Tl >= bit32(W - 1) then -- Case A
-      if seq_no >= bit32(Tl - W + 1) then return seq_no, Th
-      else                                return seq_no, bit32(Th + 1) end
-   else                       -- Case B
-      if seq_no >= bit32(Tl - W + 1) then return seq_no, bit32(Th - 1)
-      else                                return seq_no, Th end
-   end
-end
-
 -- Decapsulation is performed as follows:
 --   1. Parse IP and ESP headers and check Sequence Number
 --   2. Decrypt ciphertext in place
@@ -159,8 +143,9 @@ function esp_v6_decrypt:decapsulate (p)
    local iv_start = payload + ESP_SIZE
    local ctext_start = payload + self.CTEXT_OFFSET
    local ctext_length = length - self.PLAIN_OVERHEAD
-   local seq_low, seq_high = self:check_seq_no(self.esp:seq_no())
-   if seq_low and gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
+   local seq_low = self.esp:seq_no()
+   local seq_high = C.track_seq_no(seq_low, self.seq:low(), self.seq:high(), self.window_size)
+   if gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
       self.seq:low(seq_low)
       self.seq:high(seq_high)
       local esp_tail_start = ctext_start + ctext_length - ESP_TAIL_SIZE
