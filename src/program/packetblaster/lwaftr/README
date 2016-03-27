@@ -70,7 +70,6 @@ Example 1: Measure performance of single stick LWAFTR (handling IPv4 and IPv6
 traffic over a single interface). Packetblaster lwaftr generates 50% IPv4 and
 50% IPv6 encapsulated traffic of IMIX line traffic:
 
-```
   $ sudo ./snabb packetblaster lwaftr --rate 3.2 --count 1000000000:05:00.0
   packetblaster lwaftr: Sending 1000000 clients at 3.200 MPPS to 0000:05:00.0
 
@@ -89,14 +88,12 @@ traffic over a single interface). Packetblaster lwaftr generates 50% IPv4 and
   v6+v4: 1.574+1.574 = 3.148 MPPS, 4.950+4.446 = 9.395 Gbps, lost 0 pkts
   v6+v4: 1.574+1.574 = 3.148 MPPS, 4.950+4.446 = 9.395 Gbps, lost 0 pkts
   v6+v4: 1.574+1.574 = 3.148 MPPS, 4.950+4.446 = 9.395 Gbps, lost 0 pkts
-```
 
 Example 2: Uni-directional througput test with two instances. 
 Run one client1 with 0 MPPS and on client2 on the other end of the wire
 with the desired packet rate. The first instance will report on received
 traffic:
 
-```
   client1$ sudo ./snabb packetblaster lwaftr --rate 0 --pci 0000:05:00 --size 40
   packetblaster lwaftr: Sending 1 clients at 0.000 MPPS to 0000:05:00.0
 
@@ -136,11 +133,9 @@ traffic:
   v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
   v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
   v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
-```
 
 Example with Linux tap interface:
 
-```
   $ sudo ip tuntap add dev tap0 mode tap
   $ sudo ifconfig tap0 mtu 9000 up
   $ tcpdump -n -i tap0 -e -s 1500 -c 12 &
@@ -163,5 +158,3 @@ Example with Linux tap interface:
 14:04:43.573161 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 608: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 558
   14:04:43.573297 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 1514: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 1464
   14:04:43.573430 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
-```
-
