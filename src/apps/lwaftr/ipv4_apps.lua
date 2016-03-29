@@ -183,6 +183,9 @@ function ICMPEcho:push()
             local ihl = get_ihl_from_offset(pkt, o_ipv4_ver_and_ihl)
             pkt.data[o_icmpv4_msg_type_sans_ihl + ihl] = icmpv4_echo_reply
 
+            -- Clear out flags
+            pkt_ipv4:flags(0)
+
             -- Recalculate checksums
             wr16(pkt.data + o_icmpv4_checksum_sans_ihl + ihl, 0)
             local icmp_offset = ethernet_header_size + ihl
