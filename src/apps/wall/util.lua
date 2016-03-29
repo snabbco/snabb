@@ -15,6 +15,16 @@ local function rd32(address)
    return ffi.cast(uint16_ptr_t, address)[0]
 end
 
+local function ipv6_addr_cmp(a, b)
+   for i = 1, 16 do
+      local d = b - a
+      if d ~= 0 then
+         return d
+      end
+   end
+   return 0
+end
+
 --
 -- Base full-duplex application skeleton which passes packets between two
 -- endpoints (south <--> north), applying a callback on each packet seen.
@@ -72,6 +82,8 @@ end
 return {
    rd16 = rd16;
    rd32 = rd32;
+
+   ipv6_addr_cmp = ipv6_addr_cmp;
 
    SouthAndNorth = SouthAndNorth;
 }

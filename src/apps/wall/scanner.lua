@@ -5,7 +5,7 @@ local lib  = require("core.lib")
 local bit  = require("bit")
 local ffi  = require("ffi")
 
-local rd16, rd32 = util.rd16, util.rd32
+local rd16, rd32, ipv6_addr_cmp = util.rd16, util.rd32, util.ipv6_addr_cmp
 local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
 local band, bxor, bnot = bit.band, bit.bxor, bit.bnot
 
@@ -32,6 +32,23 @@ IPv4_PROTO_TCP       = 6   -- uint8_t
 IPv4_PROTO_UDP       = 17  -- uint8_t
 
 -- Constants: IPv6
+IPv6_MIN_HEADER_SIZE = 40
+IPv6_PLOADLEN_OFFSET = 4
+IPv6_NEXTHDR_OFFSET  = 6
+IPv6_HOPLIMIT_OFFSET = 7
+IPv6_SRC_ADDR_OFFSET = 8
+IPv6_DST_ADDR_OFFSET = 26
+
+IPv6_NEXTHDR_HOPBYHOP= 0
+IPv6_NEXTHDR_TCP     = 6
+IPv6_NEXTHDR_UDP     = 17
+IPv6_NEXTHDR_ROUTING = 43
+IPv6_NEXTHDR_FRAGMENT= 44
+IPv6_NEXTHDR_ESP     = 50
+IPv6_NEXTHDR_AH      = 51
+IPv6_NEXTHDR_ICMPv6  = 58
+IPv6_NEXTHDR_NONE    = 59
+IPv6_NEXTHDR_DSTOPTS = 60
 
 -- Constants: TCP
 TCP_HEADER_SIZE      = 20
@@ -150,6 +167,52 @@ local function ihl(p, offset)
 end
 
 
+--
+-- Traverse an IPv6 header which has the following layout:
+--
+--     0         8        16
+--     | NextHdr | HdrLen | ...
+--
+--  where "NextHdr" is the type code of the next header, and "HdrLen" is the
+--  length of the header in 8-octet units, sans the first 8 octets.
+--
+local function ipv6_nexthdr_type_len_skip (p)
+   return p[0], p + 8 + (p[1] * 8)
+end
+
+local ipv6_walk_header_funcs = {
+   [IPv6_NEXTHDR_HOPBYHOP] = ipv6_nexthdr_type_len_skip;
+   [IPv6_NEXTHDR_ROUTING]  = ipv6_nexthdr_type_len_skip;
+   [IPv6_NEXTHDR_DSTOPTS]  = ipv6_nexthdr_type_len_skip;
+   [IPv6_NEXTHDR_FRAGMENT] = function (p)
+      return p[0], p + 8
+   end;
+   [IPv6_NEXTHDR_AH] = function (p)
+      -- Size specified in 4-octet units (plus two octets).
+      return p[0], p + 2 + (p[1] * 4)
+   end;
+}
+
+--
+-- Traverses all the IPv6 headers (using the "next header" fields) until an
+-- upper-level protocol header (e.g. TCP, UDP) is found. The returned value
+-- is the type of the upper level protocol code and pointer to the beginning
+-- of the upper level protocol header data.
+--
+local function ipv6_walk_headers (p)
+   local ptr = p.data
+   local nexthdr = ptr[IPv6_NEXTHDR_OFFSET]
+   while ipv6_walk_header_funcs[nexthdr] do
+      local new_nexthdr, new_ptr = ipv6_walk_header_funcs[nexthdr](ptr)
+      if new_ptr > p.data + p.length then
+         break
+      end
+      nexthdr, ptr = new_nexthdr, new_ptr
+   end
+   return nexthdr, ptr
+end
+
+
 Scanner = subClass()
 Scanner._name = "SnabbWall base packet Scanner"
 
@@ -169,8 +232,13 @@ function Scanner:extract_packet_info(p)
       key = flow_key_ipv4()
       src_addr = rd32(p.data + ip_offset + IPv4_SRC_ADDR_OFFSET)
       dst_addr = rd32(p.data + ip_offset + IPv4_DST_ADDR_OFFSET)
-      ip_proto = p.data[ip_offset + IPv4_PROTO_OFFSET]
+      if src_addr < dst_addr then
+         key.lo_addr, key.hi_addr = src_addr, dst_addr
+      else
+         key.lo_addr, key.hi_addr = dst_addr, src_addr
+      end
 
+      ip_proto = p.data[ip_offset + IPv4_PROTO_OFFSET]
       local ip_payload_offset = ip_offset + ihl(p, ip_offset)
       if ip_proto == IPv4_PROTO_TCP then
          src_port = rd16(p.data + ip_payload_offset + TCP_SRC_PORT_OFFSET)
@@ -181,19 +249,31 @@ function Scanner:extract_packet_info(p)
       end
    elseif eth_type == ETH_TYPE_IPv6 then
       key = flow_key_ipv6()
-      assert(false, "unimplemented")  -- TODO
+      src_addr = p.data + IPv6_SRC_ADDR_OFFSET
+      dst_addr = p.data + IPv6_DST_ADDR_OFFSET
+      if ipv6_addr_cmp(src_addr, dst_addr) <= 0 then
+         ffi.copy(key:lo_addr_ptr(), src_addr, 16)
+         ffi.copy(key:hi_addr_ptr(), dst_addr, 16)
+      else
+         ffi.copy(key:lo_addr_ptr(), dst_addr, 16)
+         ffi.copy(key:hi_addr_ptr(), dst_addr, 16)
+      end
+
+      local proto_header_ptr
+      ip_proto, proto_header_ptr = ipv6_walk_headers (p)
+      if ip_proto == IPv6_NEXTHDR_TCP then
+         src_port = rd16(proto_header_ptr + TCP_SRC_PORT_OFFSET)
+         dst_port = rd16(proto_header_ptr + TCP_DST_PORT_OFFSET)
+      elseif ip_proto == IPv6_NEXTHDR_UDP then
+         src_port = rd16(proto_header_ptr + UDP_SRC_PORT_OFFSET)
+         dst_port = rd16(proto_header_ptr + UDP_DST_PORT_OFFSET)
+      end
    else
       return nil
    end
 
    key.vlan_id = vlan_id
    key.ip_proto = ip_proto
-
-   if src_addr < dst_addr then
-      key.lo_addr, key.hi_addr = src_addr, dst_addr
-   else
-      key.lo_addr, key.hi_addr = dst_addr, src_addr
-   end
 
    if src_port and dst_port then
       if src_port < dst_port then
