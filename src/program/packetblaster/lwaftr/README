@@ -5,6 +5,9 @@ Usage: packetblaster lwaftr [OPTIONS]
 
   --pci PCI             Interface PCI address, e.g. 0000:05:00.0 or
                         Linux tap interface name, e.g. tap0
+
+  --vlan VLANID         VLAN tag traffic with VLANID if set
+
   --src_mac SOURCE
                         Source MAC-Address
 			Default: 00:00:00:00:00:00
