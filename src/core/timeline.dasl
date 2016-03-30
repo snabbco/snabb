@@ -1,0 +1,92 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+-- timeline: high-resolution event log.
+--
+-- This module implements an event log that is suitable for logging
+-- very fine-grained events during traffic processing.
+-- 
+-- Design goals:
+--   Fast enough to log 1M msg/sec with <1% CPU overhead.
+--   Precise timestamps for cross-referencing processes (and PEBS events).
+--   Simple format that is easy to post-process.
+
+module(..., package.seeall)
+
+local dasm = require("dasm")
+local ffi = require("ffi")
+local C = ffi.C
+
+-- Log message format
+ffi.cdef[[
+struct timeline_entry {
+  // CPU Time Stamp Counter (cycles)
+  uint64_t tsc;
+  // Instruction Pointer where log is taken
+  uint64_t ip;
+  // Message (could be generalized...)
+  uint64_t msg;
+}
+]]
+
+-- XXX For test purposes just allocate a 1GB log.
+local log = ffi.cast("struct timeline_entry *", C.malloc(1*1024*1024*1024))
+local log_ptr = ffi.new("struct timeline_entry *[1]", log)
+
+|.arch x64
+|.actionlist actions
+|.globalnames globalnames
+
+|.define arg1, rdi
+
+|.type msg, struct timeline_entry
+
+-- void log(uint64_t msg)
+local function asmlog (Dst)
+   |->log:
+   -- (No registers to save. Using rax, rdx, rcx, rdi, r8 which are
+   -- all caller-save.)
+   | rdtscp                 -- read timestamp counter into edx:eax (trash ecx)
+   | shl rdx, 32            -- reconstruct 64-bit TSC in rax
+   | or rax, rdx            --   ...
+   | mov r8, [log_ptr]      -- Load address of next log entry
+   | mov msg:r8->tsc, rax   -- Store timestamp in log
+   | mov rax, [rsp]         -- Grab caller address from stack
+   | mov msg:r8->ip, rax    --   ... and store in message
+   | mov msg:r8->msg, arg1  -- Store message in log
+   | add r8, #msg           -- Advance log pointer
+   | mov [log_ptr], r8      --   ... XXX must check for overflow
+   -- (No saved registers to restore.)
+   | ret
+end
+
+local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
+asmlog(Dst)
+local mcode, size = Dst:build()
+--dasm.dump(mcode, size)
+local entry = dasm.globals(globals, globalnames)
+
+event = ffi.cast("void(*)(uint64_t)", entry.log)
+_anchor = mcode
+
+function selftest ()
+   print("selftest: timeline")
+   local n = 1e6
+   -- Log events
+   for i = 0, n-1 do
+      event(i)
+   end
+   -- Check log
+   for i = 0, n-1 do
+      assert(i==0 or log[i].tsc > log[i-1].tsc, "tsc increase")
+      assert(log[i].msg == i, "message value")
+   end
+   -- Print statistics
+   local times = {}
+   for i = 0, n-1 do
+      if i > 0 then times[#times+1] = tonumber(log[i].tsc - log[i-1].tsc) end
+   end
+   table.sort(times)
+   print("median logging time", times[n/2])
+   print("selftest: ok")
+end
+
