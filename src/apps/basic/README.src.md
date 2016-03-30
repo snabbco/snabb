@@ -37,6 +37,17 @@ from the inputs onto the output.
               |        |
               +--------+
 
+## Sample
+The `Sample` app forwards packets every `n`th packet from `input`
+to `output` all others are dropped.
+
+    DIAGRAM: Sample
+              +--------+
+              |        |
+    input ----* Sample *---- output
+              |        |
+              +--------+
+
 ## Split
 
 The `Split` app splits packets from multiple inputs across multiple
@@ -86,6 +97,17 @@ merge and/or duplicate packet streams
     (any) ----*        *----- (any)
               |        |
               +--------+
+
+## Truncate
+The `Truncate` app sends all packets received on `input` to `output`
+and truncates or zero pads packets to length `n` in the process
+
+    DIAGRAM: Sample
+              +----------+
+              |          |
+    input ----* Truncate *---- output
+              |          |
+              +----------+
 
 ## Repeater
 

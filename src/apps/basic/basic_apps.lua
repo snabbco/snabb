@@ -12,6 +12,43 @@ local transmit, receive = link.transmit, link.receive
 local ffi = require("ffi")
 local C = ffi.C
 
+--- # `Truncate` app: truncate or zero pad packet to length n
+Truncate = {}
+function Truncate:new(n)
+   return setmetatable({n = n}, {__index=Truncate})
+end
+function Truncate:push()
+   for _ = 1, link.nreadable(self.input.input) do
+      local p = receive(self.input.input)
+      if p.length > self.n then
+         p.length = self.n
+      else
+         for i = self.n - p.length, self.n do
+            p.data[i] = 0
+         end
+      end
+      transmit(self.output.output,p)
+   end
+end
+
+--- # `Sample` app: let through every nth packet
+Sample = {}
+function Sample:new(n)
+   return setmetatable({n = n, seen = 1}, {__index=Sample})
+end
+function Sample:push()
+   for _ = 1, link.nreadable(self.input.input) do
+      local p = receive(self.input.input)
+      if self.n == self.seen then
+         transmit(self.output.output, p)
+         self.seen = 1
+      else
+         self.seen = self.seen + 1
+         packet.free(p)
+      end
+   end
+end
+
 --- # `Source` app: generate synthetic packets
 
 Source = {}
