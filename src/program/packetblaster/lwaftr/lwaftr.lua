@@ -123,7 +123,7 @@ function run (args)
    function opt.E () ipv6_only = true end
 
    local vlan = nil
-   function opt.v () 
+   function opt.v (arg) 
      vlan = assert(tonumber(arg), "duration is not a number!")
    end
 
@@ -177,14 +177,14 @@ function run (args)
      input, output = "tap.input", "tap.output"
    else
      local device_info = pci.device_info(pciaddr)
-     print(string.format("src_mac=%s", src_mac))
+     local vmdq = false
+     if vlan then
+       vmdq = true
+       print(string.format("vlan set to %d", vlan))
+     end
      if device_info then
-       local vmdq = false
-       if vlan then
-         vmdq = true
-       end
        config.app(c, "nic", require(device_info.driver).driver,
-       {pciaddr = pciaddr, vmdq = vmdq, vlan = vlan, mtu = 9500})
+       {pciaddr = pciaddr, vmdq = vmdq, macaddr = src_mac, vlan = vlan, mtu = 9500})
        input, output = "nic.rx", "nic.tx"
      else
        fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))
