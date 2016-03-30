@@ -7,23 +7,18 @@ local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
 local intel10g  = require("apps.intel.intel10g")
-local intel_app = require("apps.intel.intel_app")
 local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
 local PcapReader= require("apps.pcap.pcap").PcapReader
 local LoadGen   = require("apps.intel.loadgen").LoadGen
 local lib = require("core.lib")
 local ffi = require("ffi")
-local C = ffi.C
 
 local usage = require("program.packetblaster.replay.README_inc")
 
 local long_opts = {
    duration     = "D",
-   help         = "h",
-   src          = "s",
-   dst          = "d",
-   sizes        = "S"
+   help         = "h"
 }
 
 function run (args)

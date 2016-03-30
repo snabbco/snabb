@@ -7,14 +7,11 @@ local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
 local intel10g  = require("apps.intel.intel10g")
-local intel_app = require("apps.intel.intel_app")
-local basic_apps = require("apps.basic.basic_apps")
 local main      = require("core.main")
 local Synth     = require("apps.test.synth").Synth
 local LoadGen   = require("apps.intel.loadgen").LoadGen
 local lib = require("core.lib")
 local ffi = require("ffi")
-local C = ffi.C
 
 local usage = require("program.packetblaster.synth.README_inc")
 
@@ -52,8 +49,7 @@ function run (args)
 
    args = lib.dogetopt(args, opt, "hD:s:d:S:", long_opts)
    config.app(c, "source", Synth, { sizes = sizes,
-   src = source,
-   dst = destination })
+     src = source, dst = destination })
 
    local patterns = args
    local nics = 0

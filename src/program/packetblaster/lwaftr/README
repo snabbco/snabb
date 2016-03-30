@@ -138,7 +138,7 @@ Example with Linux tap interface:
 
   $ sudo ip tuntap add dev tap0 mode tap
   $ sudo ifconfig tap0 mtu 9000 up
-  $ tcpdump -n -i tap0 -e -s 1500 -c 12 &
+  $ sudo tcpdump -n -i tap0 -e -s 1500 -c 12 &
   $ sudo ./snabb packetblaster lwaftr --rate 0.001 --pci tap0 -v4only -D 1
   packetblaster lwaftr: Sending 1 clients at 0.001 MPPS to tap0
 

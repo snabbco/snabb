@@ -26,6 +26,7 @@ local long_opts = {
    size         = "S",    -- packet size list (defaults to IMIX)
    src_mac      = "s",    -- source ethernet address
    dst_mac      = "d",    -- destination ethernet address
+   vlan         = "v",    -- VLAN id
    b4           = "b",    -- B4 start IPv6_address,IPv4_address,port
    aftr         = "a",    -- fix AFTR public IPv6_address
    ipv4         = "I",    -- fix public IPv4 address
@@ -56,7 +57,7 @@ function run (args)
 
    function opt.h (arg)
       print(usage)
-      main.exit(1)
+      main.exit(0)
    end
 
    local sizes = { 64, 64, 64, 64, 64, 64, 64, 594, 594, 594, 1500 }
@@ -121,8 +122,13 @@ function run (args)
    local ipv6_only = false
    function opt.E () ipv6_only = true end
 
+   local vlan = nil
+   function opt.v () 
+     vlan = assert(tonumber(arg), "duration is not a number!")
+   end
+
    -- TODO how can I use digit options like -4? function opt.4 isn't valid in lua
-   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:PEp:", long_opts)
+   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:PEp:v:", long_opts)
 
    if not pciaddr then
       print(usage)
@@ -145,7 +151,7 @@ function run (args)
     print("IPv4 packet sizes: " .. table.concat(sizes,","))
    end
 
-    print()
+   print()
 
    if ipv4_only and ipv6_only then
      print("Remove options v4only and v6only to generate both")
@@ -171,9 +177,14 @@ function run (args)
      input, output = "tap.input", "tap.output"
    else
      local device_info = pci.device_info(pciaddr)
+     print(string.format("src_mac=%s", src_mac))
      if device_info then
+       local vmdq = false
+       if vlan then
+         vmdq = true
+       end
        config.app(c, "nic", require(device_info.driver).driver,
-       {pciaddr = pciaddr, vmdq = false, mtu = 9500})
+       {pciaddr = pciaddr, vmdq = vmdq, vlan = vlan, mtu = 9500})
        input, output = "nic.rx", "nic.tx"
      else
        fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))

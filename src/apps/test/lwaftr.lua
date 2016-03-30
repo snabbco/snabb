@@ -6,7 +6,6 @@ local packet = require("core.packet")
 local link = require("core.link")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
-local udp = require("lib.protocol.udp")
 local ipv6 = require("lib.protocol.ipv6")
 local ipsum = require("lib.checksum").ipsum
 
@@ -30,6 +29,7 @@ struct {
 } __attribute__((packed))
 ]]
 local ether_header_ptr_type = ffi.typeof("$*", ether_header_t)
+local ethernet_header_size = ffi.sizeof(ether_header_t)
 local OFFSET_ETHERTYPE = 12
 
 local ipv4hdr_t = ffi.typeof[[
@@ -123,14 +123,15 @@ function Lwaftrgen:new(arg)
   eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
   eth_hdr.ether_type = PROTO_IPV4
 
-  local ipv4_hdr = cast(ipv4_header_ptr_type, ipv4_pkt.data + 14)
+  local ipv4_hdr = cast(ipv4_header_ptr_type, ipv4_pkt.data + ethernet_header_size)
   ipv4_hdr.src_ip = public_ipv4
+  ipv4_hdr.dst_ip = b4_ipv4
   ipv4_hdr.ttl = 15
   ipv4_hdr.ihl_v_tos = C.htons(0x4500) -- v4
   ipv4_hdr.id = 0
   ipv4_hdr.frag_off = 0
 
-  local ipv4_udp_hdr, ip4_payload
+  local ipv4_udp_hdr, ipv4_payload
 
   ipv4_hdr.protocol = 17  -- UDP(17)
   ipv4_udp_hdr = cast(udp_header_ptr_type, ipv4_pkt.data + 34)
@@ -147,14 +148,14 @@ function Lwaftrgen:new(arg)
   eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
   eth_hdr.ether_type = C.htons(0x86DD)
 
-  local ipv6_hdr = cast(ipv6_header_ptr_type, ipv6_pkt.data + 14)
+  local ipv6_hdr = cast(ipv6_header_ptr_type, ipv6_pkt.data + ethernet_header_size)
   lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6) -- IPv6 Version
   lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, 1) -- Traffic class
   ipv6_hdr.next_header = PROTO_IPV4_ENCAPSULATION
   ipv6_hdr.hop_limit = DEFAULT_TTL
   ipv6_hdr.dst_ip = aftr_ipv6
 
-  local ipv6_ipv4_hdr = cast(ipv4_header_ptr_type, ipv6_pkt.data + 14 + ipv6_header_size)
+  local ipv6_ipv4_hdr = cast(ipv4_header_ptr_type, ipv6_pkt.data + ethernet_header_size + ipv6_header_size)
   ipv6_ipv4_hdr.dst_ip = public_ipv4
   ipv6_ipv4_hdr.ttl = 15
   ipv6_ipv4_hdr.ihl_v_tos = C.htons(0x4500) -- v4
@@ -231,7 +232,7 @@ function Lwaftrgen:push ()
     if cast(uint16_ptr_t, pkt.data + OFFSET_ETHERTYPE)[0] == PROTO_IPV6 then
       ipv6_bytes = ipv6_bytes + pkt.length
       ipv6_packets = ipv6_packets + 1
-      payload = cast(payload_ptr_type, pkt.data + 34 + ipv6_header_size + udp_header_size)
+      local payload = cast(payload_ptr_type, pkt.data + 34 + ipv6_header_size + udp_header_size)
       if payload.magic == MAGIC then
         if self.last_rx_ipv6_packet_number > 0 then
           lost_packets = lost_packets + payload.number - self.last_rx_ipv6_packet_number - 1  
@@ -241,7 +242,7 @@ function Lwaftrgen:push ()
     else
       ipv4_bytes = ipv4_bytes + pkt.length
       ipv4_packets = ipv4_packets + 1
-      payload = cast(payload_ptr_type, pkt.data + 34 + udp_header_size)
+      local payload = cast(payload_ptr_type, pkt.data + 34 + udp_header_size)
       if payload.magic == MAGIC then
         if self.last_rx_ipv4_packet_number > 0 then
           lost_packets = lost_packets + payload.number - self.last_rx_ipv4_packet_number - 1  
@@ -288,6 +289,8 @@ function Lwaftrgen:push ()
     self.total_packet_count <= self.bucket_content do
       self.bucket_content = self.bucket_content - self.total_packet_count
 
+      ipv4_hdr.dst_ip = self.b4_ipv4
+      ipv6_ipv4_hdr.src_ip = self.b4_ipv4
       ipv6_hdr.src_ip = self.b4_ipv6
       local ipdst = C.ntohl(rd32(ipv4_hdr.dst_ip))
       ipdst = C.htonl(ipdst + self.b4_ipv4_offset)
@@ -302,10 +305,10 @@ function Lwaftrgen:push ()
         if not self.ipv6_only then
           ipv4_hdr.total_length = C.htons(size)
           ipv4_udp_hdr.len = C.htons(size - 28)
-          self.ipv4_pkt.length = size + 14
+          self.ipv4_pkt.length = size + ethernet_header_size
           ipv4_hdr.checksum =  0
-          ipv4_hdr.checksum = C.htons(ipsum(self.ipv4_pkt.data + 14, 20, 0))
-          ipv4_payload.number = self.ipv4_packet_number;
+          ipv4_hdr.checksum = C.htons(ipsum(self.ipv4_pkt.data + ethernet_header_size, 20, 0))
+          self.ipv4_payload.number = self.ipv4_packet_number;
           self.ipv4_packet_number = self.ipv4_packet_number + 1
           local ipv4_pkt = packet.clone(self.ipv4_pkt)
           transmit(output, ipv4_pkt)
