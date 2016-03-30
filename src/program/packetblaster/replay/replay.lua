@@ -23,7 +23,6 @@ local long_opts = {
 
 function run (args)
    local opt = {}
-   local mode = table.remove(args, 1)
    local duration
    local c = config.new()
    function opt.D (arg) 
@@ -36,6 +35,7 @@ function run (args)
 
    args = lib.dogetopt(args, opt, "hD:", long_opts)
    local filename = table.remove(args, 1)
+   print (string.format("filename=%s", filename))
    config.app(c, "pcap", PcapReader, filename)
    config.app(c, "loop", basic_apps.Repeater)
    config.app(c, "source", basic_apps.Tee)
