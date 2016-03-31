@@ -2,7 +2,7 @@
 
 export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:=eugeneia/snabb-nfv-test}
 
-# Snabb Switch Docker environment
+# Snabb Docker environment
 
 docker run --rm --privileged -i -v $(dirname $PWD):/snabbswitch $DOCKERFLAGS \
     -e SNABB_PCI0=$SNABB_PCI0 \

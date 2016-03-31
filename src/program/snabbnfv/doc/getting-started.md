@@ -100,7 +100,7 @@ $ sudo apt-get --no-install-recommends -y build-dep qemu
 
 We use the `v2.1.0-vhostuser` branch from the QEMU fork on SnabbCo to
 reduce the risk of running in any incompatibilities with current
-versions. This branch is maintained by Snabb Switch developers.
+versions. This branch is maintained by Snabb developers.
 
 ```
 $ git clone -b v2.1.0-vhostuser --depth 50 https://github.com/SnabbCo/qemu
@@ -125,7 +125,7 @@ You should now have QEMU installed on your system:
 QEMU emulator version 2.1.0, Copyright (c) 2003-2008 Fabrice Bellard
 ```
 	
-## Download and build Snabb Switch
+## Download and build Snabb
 
 ```
 $ git clone https://github.com/SnabbCo/snabbswitch.git
@@ -270,7 +270,7 @@ p2p1      Link encap:Ethernet  HWaddr 0c:c4:7a:1f:7e:60
 
 ## Create and launch two VMs
 
-Now that Snabb Switch can talk to both 10GbE ports successfully, lets
+Now that Snabb can talk to both 10GbE ports successfully, lets
 build and launch 2 test VMs and connect each of them to one of the 10GbE
 port. First, we have to build an empty disk and then download and install
 Ubuntu in it.
@@ -306,7 +306,7 @@ $ cp ubuntu.qcow2 ubuntu1.qcow2
 $ cp ubuntu.qcow2 ubuntu2.qcow2
 ```
 	
-Before launching the VMs, we need to start Snabb Switch acting as a
+Before launching the VMs, we need to start Snabb acting as a
 virtio interface for the VMs. Snabb provides the `snabnfv traffic`
 program for this, which is built into the `snabb` binary that we built
 earlier. Source and documentation can be found at
@@ -467,12 +467,12 @@ with upstream QEMU versions.
 
 ## Next Steps
 
-Here are some suggested steps to continue learning about Snabb Switch.
+Here are some suggested steps to continue learning about Snabb.
 
 1. Read more on snabbnfv
 [README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/README.md) and the other documents in the doc folder [https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc)
 2. Before running any performance tests, familiarize yourself with
-numactl and how it affects Snabb Switch.
+numactl and how it affects Snabb.
 
 Do not hesitate to contact the Snabb community on the
 [snabb-devel@googlegroups.com](https://groups.google.com/forum/#!forum/snabb-devel)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Snabb Switch CI for GitHub Pull Requests. Depends on `jq'
+# Snabb CI for GitHub Pull Requests. Depends on `jq'
 # (http://stedolan.github.io/jq/).
 
 export SNABBBOTDIR=${SNABBBOTDIR:-"/tmp/snabb_bot"}

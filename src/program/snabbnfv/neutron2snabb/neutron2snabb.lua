@@ -41,7 +41,7 @@ default_schemas = {
    securitygroupportbindings = {'port_id', 'security_group_id'}
 }
 
--- Create a Snabb Switch traffic process configuration.
+-- Create a Snabb traffic process configuration.
 --
 -- INPUT_DIR contains the Neutron database dump.
 --

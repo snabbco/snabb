@@ -55,14 +55,14 @@ function select_snabb_instance (pid)
       for _, instance in ipairs(instances) do
          if instance == pid then return pid end
       end
-      print("No such Snabb Switch instance: "..pid)
+      print("No such Snabb instance: "..pid)
    elseif #instances == 2 then
       -- Two means one is us, so we pick the other.
       local own_pid = tostring(S.getpid())
       if instances[1] == own_pid then return instances[2]
       else                            return instances[1] end
-   elseif #instances == 1 then print("No Snabb Switch instance found.")
-   else print("Multple Snabb Switch instances found. Select one.") end
+   elseif #instances == 1 then print("No Snabb instance found.")
+   else print("Multple Snabb instances found. Select one.") end
    os.exit(1)
 end
 

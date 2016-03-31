@@ -1,4 +1,4 @@
-## Snabb Switch development branches
+## Snabb development branches
 
 The branches listed below are automatically synchronized with the
 SnabbCo account on Github. Users typically get all of these branches

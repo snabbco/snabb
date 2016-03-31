@@ -1,10 +1,10 @@
-# Snabb Switch Getting Started Guide
+# Snabb Getting Started Guide
 
 ## Introduction
 
-Welcome to Snabb Switch, a software switch for the NFV world! The purpose
+Welcome to Snabb, a software switch for the NFV world! The purpose
 of this guide is to introduce end users and developers to how to use
-Snabb Switch. We'll delve into several aspects of Snabb Switch at a high
+Snabb. We'll delve into several aspects of Snabb Switch at a high
 level prior to implementing an example network function using the Snabb
 Switch concept of an *App*.
 
@@ -13,11 +13,11 @@ Switch concept of an *App*.
 Running the code in this guide requires a recent distribution of
 Linux. The examples were written on a fresh install of a 64-bit Ubuntu
 14.04 distribution on an IaaS virtual machine. There is no requirement
-for a hardware NIC supported by Snabb Switch for these examples.
+for a hardware NIC supported by Snabb for these examples.
 
-## Downloading, Compiling, and Installing Snabb Switch
+## Downloading, Compiling, and Installing Snabb
 
-The following commands clone the Snabb Switch repository, compile the
+The following commands clone the Snabb repository, compile the
 software, and install the `snabb` executable. Note that the output of the
 commands is omitted.
 
@@ -29,13 +29,13 @@ cd snabbswitch
 make -j
 ```
 
-## Your First Snabb Switch Program
+## Your First Snabb Program
 
-Snabb Switch provides you with many reusable network components out of
-the box. In Snabb Switch terminology we call these components *Apps*,
+Snabb provides you with many reusable network components out of
+the box. In Snabb terminology we call these components *Apps*,
 because they perform a specific function and can be combined with each
 other in arbitrary ways. In this guide we will use two of the apps
-bundled with Snabb Switch to build a small but useful tool.
+bundled with Snabb to build a small but useful tool.
 
 1. [PcapReader](../apps/pcap/README.md) - This app reads packets from a
 PCAP capture file.
@@ -78,7 +78,7 @@ function run (parameters)
    local interface = parameters[2]
 ```
 
-Snabb Switch treats modules under `src/program` specially: if a module
+Snabb treats modules under `src/program` specially: if a module
 exposes a top-level `run` function it can be invoked from the `snabb`
 executable. E.g. to execute `run` you would invoke `snabb` like so:
 
@@ -153,7 +153,7 @@ Open a second terminal window and run `tcpdump` on `veth0`:
 sudo tcpdump -i veth0
 ```
 
-From Snabb Switch directory, run the following invocation of our example
+From Snabb directory, run the following invocation of our example
 program:
 
 ```
@@ -185,21 +185,21 @@ listening on veth0, link-type EN10MB (Ethernet), capture size 65535 bytes
 0 packets dropped by kernel
 ```
 
-Congratulations! You have successfully run your first Snabb Switch
+Congratulations! You have successfully run your first Snabb
 program.
 
-## Your First Snabb Switch App
+## Your First Snabb App
 
 The example program described above configures an app network using apps
-already included with Snabb Switch. But writing custom Snabb Switch apps
+already included with Snabb. But writing custom Snabb Switch apps
 its easy. Let's inspect an example app to get you going!
 
 Our forwarding logic for the app will be simple (and silly): the app
 will send every other packet on its output port. The odd numbered
 packets will be silently discarded. While this is not useful, the
-purpose is to show the anatomy of a Snabb Switch *app*.
+purpose is to show the anatomy of a Snabb *app*.
 
-Snabb Switch apps are required to implement one method: new. The `new`
+Snabb apps are required to implement one method: new. The `new`
 method returns an instance of your app. An optional method we'll use is
 `push`, which moves packets from the input to output ports. Let's examine
 the example app defined in `src/program/example_spray/sprayer.lua`.
@@ -247,7 +247,7 @@ end
 ```
 
 Now we loop over the available packets on `i` or until `o` is full and
-process each individually. This is a common Snabb Switch idiom. The
+process each individually. This is a common Snabb idiom. The
 actual logic of our app is performed by a call to the `process_packet`
 method which is defined below. Note that we increment the
 `packet_counter` of our instance for every packet processed.
@@ -320,7 +320,7 @@ The app sent packets numbered 2 and 4. Packets numbered 1, 3, and 5 are discarde
 
 ## Next Steps
 
-Here are some suggested steps to continue learning about Snabb Switch.
+Here are some suggested steps to continue learning about Snabb.
 
 
 1. Read the source documentation. Start with the

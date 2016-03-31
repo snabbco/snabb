@@ -32,9 +32,9 @@ groups:
 * **Power users:** Public APIs like `core.packet` or
   `lib.protocol.ethernet` are there for app designers to use. These
   should be well documented but may require knowledge of Lua and other
-  parts of the Snabb Switch system.
+  parts of the Snabb system.
 * **Contributors:** Some documents (like the one you are reading now) are
-  facing towards Snabb Switch contributors. They can be frequently
+  facing towards Snabb contributors. They can be frequently
   updating and even contain open questions. We should ensure that these
   always reflect the current state of affairs. This also includes
   implementation details which should be documented as source code comments.

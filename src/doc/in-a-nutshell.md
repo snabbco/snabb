@@ -1,12 +1,12 @@
-## Snabb Switch in a Nutshell
+## Snabb in a Nutshell
 
-Snabb Switch is an open source project for simple and fast packet
+Snabb is an open source project for simple and fast packet
 networking. Here is what you should know about its software
 architecture.
 
 ### Apps
 
-*Apps* are the fundamental atoms of the Snabb Switch universe. Apps
+*Apps* are the fundamental atoms of the Snabb universe. Apps
 are the software counterparts of physical network equipment like
 routers, switches, and load generators.
 
@@ -29,7 +29,7 @@ that are easy for developers to distribute and for users to install.
 
 Each app is a "black box" that receives packets from its input links,
 processes the packets in its own peculiar way, and transmits packets
-on its output links. Snabb Switch developers write new apps when they
+on its output links. Snabb developers write new apps when they
 need new packet processing functionality. An app could be an I/O
 interface towards a network card or a virtual machine, an ethernet
 switch, a router, a firewall, or really anything else that can receive
@@ -39,7 +39,7 @@ and transmit packets.
    
 ### App networks
 
-To solve a networking problem with Snabb Switch you connect apps
+To solve a networking problem with Snabb you connect apps
 together to create an *app network*.
 
 For example, you could create a inline ("bump in the wire") firewall
@@ -81,14 +81,14 @@ problems in the same way you would approach physical networks.
 
 ### Programs
 
-Programs are shrink-wrapped applications built on Snabb Switch. They
+Programs are shrink-wrapped applications built on Snabb. They
 are front ends that can be used to hide an app network behind a simple
 command-line interface for an end user. This means that only system
 designers need to think about apps and app networks: end users can use
 simpler interfaces reminiscent of familiar tools like tcpdump, netcat,
 iperf, and so on.
 
-Snabb Switch uses the same trick as BusyBox to implement many programs
+Snabb uses the same trick as BusyBox to implement many programs
 in the same executable: it behaves differently depending on the name
 that you use to invoke it. This means that when you compile Snabb
 Switch you get a single executable that supports all available
@@ -103,9 +103,9 @@ by running `snabb --help`.
 
 ### Summary
 
-Now you know what Snabb Switch is about!
+Now you know what Snabb is about!
 
-The Snabb Switch community is now busy creating apps, app networks,
+The Snabb community is now busy creating apps, app networks,
 and programs. Over time we are improving our tooling and experience
 for the common themes such as regression testing, benchmarking, code
 optimization, interoperability testing, operation and maintenance

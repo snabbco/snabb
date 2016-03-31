@@ -58,7 +58,7 @@ configure it all at the command like with little text files :)
 ### Building the lwAFTR
 
 Building the lwAFTR is pretty simple.  At a shell, just check out the
-right branch of Snabb Switch, type make, and you're done!
+right branch of Snabb, type make, and you're done!
 
 ```bash
 git clone https://github.com/Igalia/snabbswitch.git

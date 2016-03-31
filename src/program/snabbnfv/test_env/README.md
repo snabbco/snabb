@@ -13,7 +13,7 @@ cd snabbswitch/src
 source program/snabbnfv/test_env/test_env.sh
 ```
 
-To start a Snabb Switch instance using `<pciaddr>` or NUMA `<node>`:
+To start a Snabb instance using `<pciaddr>` or NUMA `<node>`:
 
 ```
 snabb <pciaddr|node> <args>
