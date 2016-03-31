@@ -33,6 +33,8 @@ struct thread_params {
 extern void errchk(int, char *);
 extern void fatal(char *fmt, ...) __attribute__ ((noreturn));
 
+extern int debug;
+
 extern int ncpus;
 extern int runflag;
 extern uint64_t total_packets;
@@ -54,5 +56,20 @@ enum {
 
 extern void pipeline_test(int);
 extern void fan_test(int);
+
+#include <inttypes.h>
+#include <x86intrin.h>
+
+#define copmiler_barrier() __asm__ __volatile__("" ::: "memory")
+
+static inline void
+rdtsc_spin(uint64_t ticks)
+{
+  uint64_t deadline = __rdtsc() + ticks;
+
+  while (__rdtsc() < deadline) {
+    compiler_barrier();
+  }
+}
 
 #endif

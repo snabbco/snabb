@@ -7,6 +7,8 @@
 
 #include "linktest.h"
 
+int debug = 0;
+
 int ncpus;
 int runflag;
 uint64_t total_packets;
@@ -17,6 +19,8 @@ long work_nanoseconds;
 static struct option longopts[] = {
   { "mode", required_argument, NULL, 'm' },
   { "threads", required_argument, NULL, 't' },
+  { "packets", required_argument, NULL, 'p' },
+  { "debug", no_argument, NULL, 'd' },
   { NULL, 0, NULL, 0}
 };
 
@@ -46,14 +50,24 @@ main(int argc, char *argv[])
   mode = PIPELINE_TEST;
   nthreads = 2;
 
-  while ((ch = getopt_long(argc, argv, "m:t:", longopts, NULL)) != -1) {
+  while ((ch = getopt_long(argc, argv, "m:p:t:", longopts, NULL)) != -1) {
     switch (ch) {
+    case 'd':
+      debug = 1;
+      break;
     case 'm':
       if (strcmp(optarg, "pipeline") == 0) {
 	mode = PIPELINE_TEST;
       } else if (strcmp(optarg, "fan") == 0) {
 	mode = FAN_TEST;
       } else {
+	usage(argv);
+      }
+      break;
+    case 'p':
+      total_packets = strtol(optarg, NULL, 10);
+      if (total_packets < 1) {
+	printf("the argument to -p/--packets must be an integer > 0\n");
 	usage(argv);
       }
       break;
@@ -80,6 +94,7 @@ main(int argc, char *argv[])
   }
 
   printf("link type: %s\n", LINKTYPE);
+  printf("sending %" PRIu64 " packets\n", total_packets);
   if (mode == PIPELINE_TEST) {
     printf("pipeline test with %d stages\n", nthreads);
     pipeline_test(nthreads);
