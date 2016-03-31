@@ -1,6 +1,7 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <getopt.h>
 
@@ -33,7 +34,7 @@ main(int argc, char *argv[])
 {
   int ch;
   int nthreads;
-  int test;
+  int mode;
 
   ncpus = sysconf(_SC_NPROCESSORS_ONLN);
   runflag = 1;
@@ -42,19 +43,35 @@ main(int argc, char *argv[])
   total_dropped = 0;
 
   /* defaults */
-  test = PIPELINE_TEST;
+  mode = PIPELINE_TEST;
   nthreads = 2;
 
   while ((ch = getopt_long(argc, argv, "m:t:", longopts, NULL)) != -1) {
     switch (ch) {
     case 'm':
+      if (strcmp(optarg, "pipeline") == 0) {
+	mode = PIPELINE_TEST;
+      } else if (strcmp(optarg, "fan") == 0) {
+	mode = FAN_TEST;
+      } else {
+	usage(argv);
+      }
       break;
     case 't':
+      nthreads = strtol(optarg, NULL, 10);
+      if (nthreads < 2) {
+	printf("the argument to -t/--threads must be a number >= 2\n");
+	usage(argv);
+      }
       break;
     default:
       usage(argv);
       break;
     }
+  }
+
+  if (mode == FAN_TEST && nthreads < 3) {
+    fatal("the fan test needs at least 3 threads\n");
   }
 
   if (nthreads > ncpus) {
@@ -63,10 +80,10 @@ main(int argc, char *argv[])
   }
 
   printf("link type: %s\n", LINKTYPE);
-  if (test == PIPELINE_TEST) {
+  if (mode == PIPELINE_TEST) {
     printf("pipeline test with %d stages\n", nthreads);
     pipeline_test(nthreads);
-  } else if (test == FAN_TEST) {
+  } else if (mode == FAN_TEST) {
     printf("fanout test with generator and %d outputs\n", nthreads - 1);
     fan_test(nthreads);
   }
