@@ -117,10 +117,12 @@ function run (args)
    end
 
    local ipv4_only = false
-   function opt.P () ipv4_only = true end
+   function opt.v4 () ipv4_only = true end
+   opt["4"] = opt.v4
 
    local ipv6_only = false
-   function opt.E () ipv6_only = true end
+   function opt.v6 () ipv6_only = true end
+   opt["6"] = opt.v6
 
    local vlan = nil
    function opt.v (arg) 
@@ -128,7 +130,7 @@ function run (args)
    end
 
    -- TODO how can I use digit options like -4? function opt.4 isn't valid in lua
-   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:PEp:v:", long_opts)
+   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:", long_opts)
 
    if not pciaddr then
       print(usage)

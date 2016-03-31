@@ -45,9 +45,9 @@ Usage: packetblaster lwaftr [OPTIONS]
                         Setting rate to 0 turns it to listening only mode while
                         reporting on incoming packets
                         Default: 1 MPPS
-  --v4only
+  --v4only, -4
                         Generate only IPv4 packets from the Internet towards lwaftr
-  --v6only
+  --v6only, -6
                         Generate only IPv6 packets from B4 to lwaftr
   --duration DURATION
                         Run for DURATION seconds.
