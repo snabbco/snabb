@@ -129,7 +129,6 @@ function run (args)
      vlan = assert(tonumber(arg), "duration is not a number!")
    end
 
-   -- TODO how can I use digit options like -4? function opt.4 isn't valid in lua
    args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:", long_opts)
 
    if not pciaddr then
