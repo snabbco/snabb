@@ -6,8 +6,8 @@
  */
 struct basic_link {
   void *buffer[LINK_RING_SIZE];
-  int32_t read;
-  int32_t write;
+  volatile int32_t read;
+  volatile int32_t write;
 };
 
 static inline void *

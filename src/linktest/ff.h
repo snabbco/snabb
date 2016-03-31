@@ -7,8 +7,8 @@
  */
 struct ff_link {
   void *buffer[LINK_RING_SIZE];
-  int32_t read __attribute__((aligned(CACHE_LINE_SIZE)));
-  int32_t write __attribute__((aligned(CACHE_LINE_SIZE)));
+  volatile int32_t read __attribute__((aligned(CACHE_LINE_SIZE)));
+  volatile int32_t write __attribute__((aligned(CACHE_LINE_SIZE)));
 };
 
 static inline void *
