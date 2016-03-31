@@ -143,7 +143,7 @@ myprogram` or you can `cp snabb /usr/local/bin/myprogram` and then
 simply run `myprogram`.
 
 You can browse the available programs and their documentation in
-[src/program/](https://github.com/SnabbCo/snabbswitch/tree/master/src/program).
+[src/program/](https://github.com/SnabbCo/snabb/tree/master/src/program).
 You can also list the programs included with a given Snabb executable
 by running `snabb --help`.
 

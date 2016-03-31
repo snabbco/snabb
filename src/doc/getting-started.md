@@ -24,8 +24,8 @@ commands is omitted.
 ```
 sudo apt-get update
 sudo apt-get -y install build-essential git
-git clone https://github.com/SnabbCo/snabbswitch.git
-cd snabbswitch
+git clone https://github.com/snabbco/snabb.git
+cd snabb
 make -j
 ```
 
@@ -324,13 +324,13 @@ Here are some suggested steps to continue learning about Snabb.
 
 
 1. Read the source documentation. Start with the
-[README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/README.md)
-in the [src](https://github.com/SnabbCo/snabbswitch/blob/master/src)
+[README.md](https://github.com/snabbco/snabb/blob/master/src/README.md)
+in the [src](https://github.com/snabbco/snabb/blob/master/src)
 directory.
 2. Read the code for the example apps in
-[basic_apps.lua](https://github.com/SnabbCo/snabbswitch/blob/master/src/apps/basic/basic_apps.lua).
+[basic_apps.lua](https://github.com/snabbco/snabb/blob/master/src/apps/basic/basic_apps.lua).
 3. Continue reading the source for other apps in the
-[apps](https://github.com/SnabbCo/snabbswitch/tree/master/src/apps)
+[apps](https://github.com/snabbco/snabb/tree/master/src/apps)
 directory.
 4. Modify the sprayer.lua program to make decisions based on the contents
 of the packet's Layer 3 header. Hint: The `snabb` executable must be

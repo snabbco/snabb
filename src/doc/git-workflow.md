@@ -20,7 +20,7 @@ Snabb development follows a few well-known patterns:
 
 ### Download and update the latest release
 
-1. Clone the [SnabbCo/snabbswitch](https://github.com/SnabbCo/snabbswitch) repository.
+1. Clone the [snabbco/snabb](https://github.com/snabbco/snabb) repository.
 2. Check out and build the `master` branch.
 3. Pull when you want to update to the latest stable release.
 

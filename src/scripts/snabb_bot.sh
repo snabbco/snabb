@@ -4,7 +4,7 @@
 # (http://stedolan.github.io/jq/).
 
 export SNABBBOTDIR=${SNABBBOTDIR:-"/tmp/snabb_bot"}
-export REPO=${REPO:-"SnabbCo/snabbswitch"}
+export REPO=${REPO:-"snabbco/snabb"}
 export CURRENT=${CURRENT:-"master"}
 export JQ=${JQ:-$(which jq)}
 export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:-eugeneia/snabb-nfv-test}

@@ -28,7 +28,7 @@ Ethernet ports.
 ## Compute node Kernel settings
  
 IOMMU must be disabled on the server as documented under [Compute Node
-Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable
+Requirements](https://github.com/snabbco/snabb/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable
 intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288
 pages). Allocating persistent huge pages on the kernel boot command line
 is the most reliable method as memory has not yet become fragmented.
@@ -128,8 +128,8 @@ QEMU emulator version 2.1.0, Copyright (c) 2003-2008 Fabrice Bellard
 ## Download and build Snabb
 
 ```
-$ git clone https://github.com/SnabbCo/snabbswitch.git
-$ cd snabbswitch; make
+$ git clone https://github.com/SnabbCo/snabb.git
+$ cd snabb; make
 $ make -j
 ```
  
@@ -210,7 +210,7 @@ specified 10GbE ports (PCI address) from the Linux kernel, but will not
 "return" them. E.g. `ifconfig -a` will not show these ports anymore.
 
 ```
-$ cd ~/snabbswitch/src
+$ cd ~/snabb/src
 $ sudo SNABB_PCI_INTEL0="0000:04:00.0" SNABB_PCI_INTEL1="0000:04:00.1" ./snabb snsh -t apps.intel.intel_app
 selftest: intel_app
 100 VF initializations:
@@ -310,7 +310,7 @@ Before launching the VMs, we need to start Snabb acting as a
 virtio interface for the VMs. Snabb provides the `snabnfv traffic`
 program for this, which is built into the `snabb` binary that we built
 earlier. Source and documentation can be found at
-[src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv).
+[src/program/snabbnfv](https://github.com/SnabbCo/snabb/tree/master/src/program/snabbnfv).
 
 One `snabbnfv traffic` process is required per physical 10G port. A
 configuration file specifies which packets are forwarded to the VM. You
@@ -353,14 +353,14 @@ but for basic connectivity testing you can omit this.
 Port 1:
 
 ```
-$ sudo ./snabbswitch/src/snabb snabbnfv traffic -k 10 -D 0 \
+$ sudo ./snabb/src/snabb snabbnfv traffic -k 10 -D 0 \
   0000:04:00.0 ./port1.cfg ./vhost-sockets/vm1.socket
 ```
 
 Port 2:
 
 ```
-$ sudo ./snabbswitch/src/snabb snabbnfv traffic -k 10 -D 0 \
+$ sudo ./snabb/src/snabb snabbnfv traffic -k 10 -D 0 \
   0000:04:00.1 ./port2.cfg ./vhost-sockets/vm2.socket
 ```
 
@@ -470,7 +470,7 @@ with upstream QEMU versions.
 Here are some suggested steps to continue learning about Snabb.
 
 1. Read more on snabbnfv
-[README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/README.md) and the other documents in the doc folder [https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc)
+[README.md](https://github.com/snabbco/snabb/blob/master/src/program/snabbnfv/README.md) and the other documents in the doc folder [https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/doc](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/doc)
 2. Before running any performance tests, familiarize yourself with
 numactl and how it affects Snabb.
 

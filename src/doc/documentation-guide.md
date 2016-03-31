@@ -1,20 +1,20 @@
-# Contributing Documentation in SnabbSwitch
+# Contributing Documentation in Snabb
 
 ## README.md, README.src.md and README(.inc)
 
-The SnabbSwitch documentation is organized in README's spread across the
+The Snabb documentation is organized in README's spread across the
 code base. If you commit changes you should look for the "nearest" README
 file related to the modules you changed and update these. There are three
 different kinds of README files:
 
-* `README.md` — A portion of the SnabbSwitch manual, embedded by GitHub
+* `README.md` — A portion of the Snabb manual, embedded by GitHub
   too. These are often (but not always) artifacts built from a `.src`
   file. Edit these if no `.src` is available (see below).
 * `README.src.md` — A build recipe. If available, this is the one you
   must edit. These are formatted in [GitHub Flavored
   Markdown](https://help.github.com/articles/github-flavored-markdown/).
 * `README(.inc)` — Plain text files included as the `--help` message of
-  SnabbSwitch programs. These should be using only the ASCII character
+  Snabb programs. These should be using only the ASCII character
   set to ensure compatibility with older terminals.
 
 For instance if you had changed the API of `lib.protocol.ethernet` you'd
@@ -75,9 +75,9 @@ Normal paragraph...
 
 ## Building A Standalone Documentation
 
-In order to build a complete SnabbSwitch reference manual you can use
-`make doc/snabbswitch.html`, `make doc/snabbswitch.epub` and `make
-doc/snabbswitch.pdf` to build the HTML, ePUB and PDF versions
+In order to build a complete Snabb reference manual you can use
+`make obj/doc/snabb.html`, `make obj/doc/snabb.epub` and `make
+obj/doc/snabb.pdf` to build the HTML, ePUB and PDF versions
 respectively. Alternatively, `make book` can be used to build all three
 at once. For these tasks to work you will need a local installation of
 [Pandoc](http://johnmacfarlane.net/pandoc/).
@@ -159,7 +159,7 @@ for linguistic and stylistic reference.
 
 ## Anatomy Of A Module Section
 
-Every module has its own subsection in the SnabbSwitch manual, and all
+Every module has its own subsection in the Snabb manual, and all
 these sections start off the same way:
 
 ```

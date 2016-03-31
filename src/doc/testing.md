@@ -9,7 +9,7 @@ Docker image that already contains everything needed, such as
 
 ```
 docker pull eugeneia/snabb-nfv-test
-cd snabbswitch/src
+cd snabb/src
 scripts/dock.sh "(cd .. && make)" # Build within container
 scripts/dock.sh make test
 ```
@@ -36,7 +36,7 @@ Once you have installed QEMU and populated `~/test_env` you can run the
 test suite:
 
 ```
-cd snabbswitch/src
+cd snabb/src
 sudo make test
 ```
 
@@ -46,7 +46,7 @@ sudo make test
 Benchmarking Snabb is just one command away:
 
 ```
-cd snabbswitch/src
+cd snabb/src
 make benchmarks # Prefix with “scripts/dock.sh ” to run in container.
 ```
 
@@ -132,7 +132,7 @@ SnabbBot is configured through the following environment variables:
   `username:password` used to post statuses.
 
 * `REPO`—Optional. Target GitHub repository. Default is
-  `SnabbCo/snabbswitch` (upstream).
+  `snabbco/snabb` (upstream).
 
 * `CURRENT`—Optional. The branch to merge pull requests with. Default is
   `master`.
