@@ -61,8 +61,8 @@ Building the lwAFTR is pretty simple.  At a shell, just check out the
 right branch of Snabb, type make, and you're done!
 
 ```bash
-git clone https://github.com/Igalia/snabbswitch.git
-cd snabbswitch
+git clone https://github.com/Igalia/snabb.git
+cd snabb
 git checkout lwaftr_starfruit
 make
 ```
@@ -70,7 +70,7 @@ make
 That's all!  You'll find a self-contained `snabb` binary in your current
 directory that you can copy whereever you like.
 
-We're working on merging to upstream snabb; follow the progress in [this GitHub issue](https://github.com/Igalia/snabbswitch/issues/215).
+We're working on merging to upstream snabb; follow the progress in [this GitHub issue](https://github.com/Igalia/snabb/issues/215).
 
 ### Run the end-to-end tests
 
