@@ -10,7 +10,7 @@
 int debug = 0;
 
 int ncpus;
-int runflag;
+volatile int runflag;
 uint64_t total_packets;
 uint64_t total_discarded;
 uint64_t total_dropped;

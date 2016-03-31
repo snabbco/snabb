@@ -36,7 +36,7 @@ extern void fatal(char *fmt, ...) __attribute__ ((noreturn));
 extern int debug;
 
 extern int ncpus;
-extern int runflag;
+extern volatile int runflag;
 extern uint64_t total_packets;
 extern uint64_t total_dropped;
 extern long work_nanoseconds;
