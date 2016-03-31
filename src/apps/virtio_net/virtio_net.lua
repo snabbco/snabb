@@ -50,6 +50,7 @@ end
 function VirtioNet:pull()
    local dev = self.device
    local l = self.output.tx
+   if not l then return end
    local to_receive = math.min(nwritable(l), dev:can_receive())
 
    for i=0, to_receive - 1 do

@@ -1,8 +1,34 @@
 /* Rudimentary CSS for SnabbSwitch HTML documentation. */
 
+#TOC {
+    position: fixed;
+    overflow: scroll;
+    top: 0;
+    left: 0;
+    width: 19.6em;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+#TOC > header {
+    margin-top: 1.4em;
+}
+#TOC ul, #TOC ol {
+    padding-left: 1.4em;
+    margin: 0;
+}
+#TOC > ul, #TOC > ol {
+    padding-top: 0.7em;
+    width: 25.2em;
+}
+
+body {
+    margin: 0 0 0 21em;
+}
+
+
 body {
     max-width: 40em;
-    margin:auto;
     font-family: sans-serif;
 }
 
@@ -63,17 +89,6 @@ div#TOC a {
     text-decoration: none;
 }
 
-div#TOC ul {
-    padding-left: 2em;
-}
-
-div#TOC li {
-    list-style-type: none;
-}
-
-div#TOC {
-    margin-bottom: 3em;
-}
 
 h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
     text-decoration: none;
