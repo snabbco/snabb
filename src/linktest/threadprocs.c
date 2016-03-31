@@ -1,7 +1,6 @@
 #include <inttypes.h>
 #include <pthread.h>
 #include <sys/time.h>
-#include <time.h>
 #include <assert.h>
 
 #include "linktest.h"
@@ -19,18 +18,24 @@ relay_simple(void *arg)
 
   LINK *input = params->inputs[0];
   LINK *output = params->outputs[0];
-  struct timespec ts = { 0, params->delay };
+  void *datum;
 
   while (runflag) {
-    void *datum = RECEIVE(input);
-    if (params->delay) nanosleep(&ts, NULL);
+    datum = RECEIVE(input);
+    if (params->delay) rdtsc_spin(params->delay);
     if (datum) {
       void *sent = NULL;
-      while (sent == NULL) {
-	TRANSMIT(output, datum);
+      while (sent == NULL && runflag) {
+	sent = TRANSMIT(output, datum);
       }
     }
   }
+  /*
+   * It's possible that there will still be some data in the input
+   * link.  We could try to relay it here, but by the  time we finish,
+   * the consumer thread on the output link will probably already be
+   * gone.
+   */
   return NULL;
 }
 
@@ -46,14 +51,18 @@ discard_single_input(void *arg)
   assert(params->ninputs == 1);
 
   LINK *input = params->inputs[0];
-  struct timespec ts = { 0, params->delay };
+  void *datum;
 
   while (runflag) {
-    void *datum = RECEIVE(input);
+    datum = RECEIVE(input);
     if (datum) {
-      if (params->delay) nanosleep(&ts, NULL);
+      if (params->delay) rdtsc_spin(params->delay);
       discarded++;
     }
+  }
+  /* drain anything left in the input link */
+  while ((datum = RECEIVE(input)) != NULL) {
+    discarded++;
   }
   pthread_exit((void *)discarded);
   return NULL;
@@ -70,15 +79,11 @@ discard_inputs(void *arg)
 
   assert(params->ninputs > 0);
 
-  LINK *input = params->inputs[0];
-  LINK *output = params->outputs[0];
-  struct timespec ts = { 0, params->delay };
-
   while (runflag) {
     for (int i = 0; i < params->ninputs; i++) {
       void *datum = RECEIVE(params->inputs[i]);
       if (datum) {
-	if (params->delay) nanosleep(&ts, NULL);
+	if (params->delay) rdtsc_spin(params->delay);
 	discarded++;
       }
     }
@@ -100,10 +105,9 @@ generate_single_output(void *arg)
 
   uint64_t n = 0;
   void *datum;
-  struct timespec ts = {0, params->delay};
 
   for (int i = 0; i < total_packets; i++) {
-    if (params->delay) nanosleep(&ts, NULL);
+    if (params->delay) rdtsc_spin(params->delay);
     datum = TRANSMIT(params->outputs[0], (void *)++n);
     if (datum == NULL) total_dropped++;
   }
@@ -123,10 +127,9 @@ generate_broadcast(void *arg)
   assert(params->noutputs > 0);
 
   uint64_t n = 0;
-  struct timespec ts = {0, params->delay};
 
   for (int i = 0; i < total_packets; i++) {
-    if (params->delay) nanosleep(&ts, NULL);
+    if (params->delay) rdtsc_spin(params->delay);
     n = n + 1;
     for (int j = 0; j < params->noutputs; j++) {
       TRANSMIT(params->outputs[0], (void *)n);
@@ -149,13 +152,14 @@ generate_round_robin(void *arg)
   assert(params->noutputs > 0);
 
   uint64_t n = 0;
+  void *datum;
   int dest = 0;
-  struct timespec ts = {0, params->delay};
 
   for (int i = 0; i < total_packets; i++) {
-    if (params->delay) nanosleep(&ts, NULL);
+    if (params->delay) rdtsc_spin(params->delay);
     n = n + 1;
-    TRANSMIT(params->outputs[dest], (void *)n);
+    datum = TRANSMIT(params->outputs[dest], (void *)n);
+    if (datum == NULL) total_dropped++;
     dest = dest + 1;
     if (dest == params->noutputs) dest = 0;
   }
