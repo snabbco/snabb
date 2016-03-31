@@ -60,7 +60,7 @@ extern void fan_test(int);
 #include <inttypes.h>
 #include <x86intrin.h>
 
-#define copmiler_barrier() __asm__ __volatile__("" ::: "memory")
+#define compiler_barrier() __asm__ __volatile__("" ::: "memory")
 
 static inline void
 rdtsc_spin(uint64_t ticks)
