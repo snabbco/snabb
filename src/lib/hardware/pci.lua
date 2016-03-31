@@ -82,6 +82,9 @@ local cards = {
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
    },
+	["0x15b3"] = {
+		["0x1013" ] = {model = 'MT27700', driver = 'apps.mellanox.connectx4'}
+	},
 }
 
 -- Return the name of the Lua module that implements support for this device.
@@ -153,7 +156,7 @@ function root_check ()
 end
 
 -- Return the canonical (abbreviated) representation of the PCI address.
--- 
+--
 -- example: canonical("0000:01:00.0") -> "01:00.0"
 function canonical (address)
    return address:gsub("^0000:", "")
