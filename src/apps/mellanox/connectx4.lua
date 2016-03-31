@@ -13,7 +13,7 @@ local macaddress = require("lib.macaddress")
 local mib = require("lib.ipc.shmem.mib")
 local timer = require("core.timer")
 local bits, bitset = lib.bits, lib.bitset
-local band, bor, lshift = bit.band, bit.bor, bit.lshift
+local band, bor, shl, shr = bit.band, bit.bor, bit.lshift, bit.rshift
 
 ConnectX4 = {}
 ConnectX4.__index = ConnectX4
@@ -34,7 +34,8 @@ function ConnectX4:new(arg)
 
    register.define(init_segment_desc, r, base)
 
-   print(r.fw_rev())
+   local rev = r.fw_rev()
+   print(band(rev, 0xffff), shr(rev, 16))
 
    function self:stop()
       if not base then return end
