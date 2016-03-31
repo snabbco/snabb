@@ -81,8 +81,8 @@ fan_test(int n)
   double seconds = elapsed.tv_sec + elapsed.tv_usec/1000000.0;
   printf("elapsed time for %" PRIu64 " elements: %f sec\n", total_discarded,
 	 seconds);
-  printf("dropped packets: %" PRIu64 " (%.1f%%)\n", total_dropped,
-	 (double)total_dropped/(double)total_packets);
+  printf("dropped packets: %" PRIu64 " (%.2f%%)\n", total_dropped,
+	 100 * total_dropped/(double)total_packets);
   printf("%7.2f Mpps\n", total_discarded/seconds/1e6);
 }
 

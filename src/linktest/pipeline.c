@@ -34,7 +34,7 @@ pipeline_test(int n)
   pthread_t generator_thread, discarder_thread;
   pthread_t *relay_threads;
   
-  int nrelayers = nlinks - 2;
+  int nrelayers = nthreads - 2;
   
   if (nrelayers > 0) {
     relay_threads = calloc(nrelayers, sizeof(pthread_t));
@@ -54,6 +54,9 @@ pipeline_test(int n)
   pthread_attr_setaffinity_np(&attrs, sizeof(set), &set);
   params[nthreads - 1].inputs[0] = links[nlinks - 1];
   params[nthreads - 1].ninputs = 1;
+  if (debug) {
+    printf("creating discarder thread, on cpu %d\n", n - 1);
+  }
   error = pthread_create(&discarder_thread, &attrs, discard_single_input,
 			 &params[nthreads - 1]);
   errchk(error, "discarder pthread_create");
@@ -66,9 +69,12 @@ pipeline_test(int n)
     params[threadno].ninputs = 1;
     params[threadno].outputs[0] = links[threadno];
     params[threadno].noutputs = 1;
+    if (debug) {
+      printf("creating relayer thread, on cpu %d\n", threadno);
+    }
     error = pthread_create(&relay_threads[i], &attrs, relay_simple,
 			   &params[threadno]);
-    errchk(error, "relayerer pthread_create");
+    errchk(error, "relayer pthread_create");
     pthread_detach(relay_threads[i]);
   }
 
@@ -77,6 +83,10 @@ pipeline_test(int n)
   pthread_attr_setaffinity_np(&attrs, sizeof(set), &set);
   params[0].outputs[0] = links[0];
   params[0].noutputs = 1;
+  params[0].delay = 0;
+  if (debug) {
+    printf("creating generator thread, on cpu %d\n", 0);
+  }
   error = pthread_create(&generator_thread, &attrs, generate_single_output,
 			 &params[0]);
   errchk(error, "generator pthread_create");
