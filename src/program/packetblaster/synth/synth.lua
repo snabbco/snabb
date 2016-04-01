@@ -13,6 +13,7 @@ local LoadGen   = require("apps.intel.loadgen").LoadGen
 local lib = require("core.lib")
 local ffi = require("ffi")
 
+local packetblaster = require("program.packetblaster.packetblaster")
 local usage = require("program.packetblaster.synth.README_inc")
 
 local long_opts = {
@@ -55,7 +56,7 @@ function run (args)
    local nics = 0
    pci.scan_devices()
    for _,device in ipairs(pci.devices) do
-      if is_device_suitable(device, patterns) then
+      if packetblaster.is_device_suitable(device, patterns) then
          nics = nics + 1
          local name = "nic"..nics
          config.app(c, name, LoadGen, device.pciaddress)
@@ -66,27 +67,8 @@ function run (args)
    engine.busywait = true
    intel10g.num_descriptors = 32*1024
    engine.configure(c)
-   local fn = function ()
-                 print("Transmissions (last 1 sec):")
-                 engine.report_apps()
-              end
-   local t = timer.new("report", fn, 1e9, 'repeating')
+   local t = timer.new("report", packetblaster.report, 1e9, 'repeating')
    timer.activate(t)
    if duration then engine.main({duration=duration})
    else             engine.main() end
 end
-
-function is_device_suitable (pcidev, patterns)
-   if not pcidev.usable or pcidev.driver ~= 'apps.intel.intel_app' then
-      return false
-   end
-   if #patterns == 0 then
-      return true
-   end
-   for _, pattern in ipairs(patterns) do
-      if pci.qualified(pcidev.pciaddress):gmatch(pattern)() then
-         return true
-      end
-   end
-end
-
