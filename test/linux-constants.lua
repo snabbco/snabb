@@ -207,9 +207,27 @@ local function fixup_constants(abi, c)
   c.SYS.getrandom = nil
   c.SYS.memfd_create = nil
   c.SYS.kexec_file_load = nil
+  c.SYS.bpf = nil
 
   -- new constants
   c.GRND = nil
+  -- requires Linux 3.19+, not supported on Travis
+  c.BPF_MAP = {}
+  c.BPF_CMD = {}
+  c.BPF_PROG = {}
+  c.BPF.ALU64 = nil
+  c.BPF.DW = nil
+  c.BPF.JSGT = nil
+  c.BPF.JSGE = nil
+  c.BPF.CALL = nil
+  c.BPF.EXIT = nil
+  c.BPF.TO_LE = nil
+  c.BPF.TO_BE = nil
+  c.BPF.END = nil
+  c.BPF.ARSH = nil
+  c.BPF.XADD = nil
+  c.BPF.JNE = nil
+  c.BPF.MOV = nil
 
   return c
 end

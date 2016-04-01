@@ -1,6 +1,7 @@
     unreleased
 
 + Fix seccomp on arm64
++ Linux added support for eBPF
 
     0.11 release
 

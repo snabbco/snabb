@@ -66,6 +66,27 @@ ctypes["struct termios"] = nil
 -- not defined by glibc
 ctypes["struct k_sigaction"] = nil
 
+-- eBPF not available on Travis / opaque types
+ctypes["struct bpf_insn"] = nil
+ctypes["union bpf_attr"] = nil
+c.BPF_MAP = {}
+c.BPF_CMD = {}
+c.BPF_PROG = {}
+c.BPF.ALU64 = nil
+c.BPF.DW = nil
+c.BPF.JSGT = nil
+c.BPF.JSGE = nil
+c.BPF.CALL = nil
+c.BPF.EXIT = nil
+c.BPF.TO_LE = nil
+c.BPF.TO_BE = nil
+c.BPF.END = nil
+c.BPF.ARSH = nil
+c.BPF.XADD = nil
+c.BPF.JNE = nil
+c.BPF.MOV = nil
+c.SYS.bpf = nil
+
 if abi.arch == "arm" then ctypes["struct statfs64"] = nil end -- padding difference, not that important
 
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end

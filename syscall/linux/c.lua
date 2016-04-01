@@ -690,6 +690,13 @@ if sys.time then
   function C.time(t) return syscall(sys.time, void(t)) end
 end
 
+-- bpf syscall that is only on Linux 3.19+
+if sys.bpf then
+  function C.bpf(cmd, attr)
+    return syscall(sys.bpf, int(cmd), void(attr), u64(ffi.sizeof('union bpf_attr')))
+  end
+end
+
 -- socketcalls
 if not sys.socketcall then
   function C.socket(domain, tp, protocol) return syscall(sys.socket, int(domain), int(tp), int(protocol)) end

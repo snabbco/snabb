@@ -115,6 +115,7 @@ local addstructs = {
   ff_rumble_effect = "struct ff_rumble_effect",
   ff_effect = "struct ff_effect",
   sock_fprog = "struct sock_fprog",
+  bpf_attr = "union bpf_attr",
   user_cap_header = "struct user_cap_header",
   user_cap_data = "struct user_cap_data",
   xt_get_revision = "struct xt_get_revision",
@@ -139,6 +140,7 @@ pt.inotify_event = ptt("struct inotify_event") -- still need pointer to this
 
 t.aio_context1 = ffi.typeof("aio_context_t[1]")
 t.sock_fprog1 = ffi.typeof("struct sock_fprog[1]")
+t.bpf_attr1 = ffi.typeof("union bpf_attr[1]")
 
 t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
 
@@ -147,6 +149,8 @@ local iocbs = ffi.typeof("struct iocb[?]")
 t.iocbs = function(n, ...) return ffi.new(iocbs, n, ...) end
 local sock_filters = ffi.typeof("struct sock_filter[?]")
 t.sock_filters = function(n, ...) return ffi.new(sock_filters, n, ...) end
+local bpf_insns = ffi.typeof("struct bpf_insn[?]")
+t.bpf_insns = function(n, ...) return ffi.new(bpf_insns, n, ...) end
 local iocb_ptrs = ffi.typeof("struct iocb *[?]")
 t.iocb_ptrs = function(n, ...) return ffi.new(iocb_ptrs, n, ...) end
 
@@ -760,6 +764,14 @@ mt.sock_filter = {
 
 addtype(types, "sock_filter", "struct sock_filter", mt.sock_filter)
 
+mt.bpf_insn = {
+  __new = function(tp, code, dst_reg, src_reg, off, imm)
+    return ffi.new(tp, c.BPF[code], dst_reg or 0, src_reg or 0, off or 0, imm or 0)
+  end
+}
+
+addtype(types, "bpf_insn", "struct bpf_insn", mt.bpf_insn)
+
 -- capabilities data is an array so cannot put metatable on it. Also depends on version, so combine into one structure.
 
 -- TODO maybe add caching
@@ -1162,6 +1174,8 @@ mt.mmsghdrs = {
 }
 
 addtype_var(types, "mmsghdrs", "struct {int count; struct mmsghdr msg[?];}", mt.mmsghdrs)
+
+addtype(types, "bpf_attr", "union bpf_attr")
 
 -- this is declared above
 samap_pt = {
