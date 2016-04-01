@@ -24,4 +24,11 @@ if [ $status != 124 ]; then
     exit 1
 fi
 
+timeout 5 ./snabb packetblaster lwaftr --pci ${PCIADDR}
+status=$?
+if [ $status != 124 ]; then
+    echo "Error: expected timeout (124) but got ${status}"
+    exit 1
+fi
+
 echo "selftest: ok"
