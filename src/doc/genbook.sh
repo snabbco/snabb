@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # This shell scripts generates the top-level Markdown structure of the
-# Snabb Switch book.
+# Snabb book.
 #
 # The authors list is automatically generated from Git history,
 # ordered from most to least commits.
@@ -15,7 +15,7 @@ done
 mdroot=../obj
 
 cat <<EOF
-% Snabb Switch Reference Manual
+% Snabb Reference Manual
 % $(git log --pretty=format:%an | \
         grep -v -e '^root$' | \
         sort | uniq -c | sort -nr | sed 's/^[0-9 ]*//' | \
@@ -27,7 +27,7 @@ cat <<EOF
 
 ***Note:** This reference manual is a draft. The API defined in this
 document is not guaranteed to be stable or complete and future versions
-of Snabb Switch will introduce backwards incompatible changes. With that
+of Snabb will introduce backwards incompatible changes. With that
 being said, discrepancies between this document and the actual Snabb
 Switch implementation are considered to be bugs. Please report them in
 order to help improve this document.*

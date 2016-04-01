@@ -1,8 +1,8 @@
 LWAFTR=../snabb
 
-IPV4_PCAP:=../snabbswitch/tests/apps/lwaftr/benchdata/ipv4-0550.pcap
-IPV6_PCAP:=../snabbswitch/tests/apps/lwaftr/benchdata/ipv6-0550.pcap
-LWAFTR_CONF=../snabbswitch/tests/apps/lwaftr/data/icmp_on_fail.conf
+IPV4_PCAP:=../snabb/tests/apps/lwaftr/benchdata/ipv4-0550.pcap
+IPV6_PCAP:=../snabb/tests/apps/lwaftr/benchdata/ipv6-0550.pcap
+LWAFTR_CONF=../snabb/tests/apps/lwaftr/data/icmp_on_fail.conf
 
 LWAFTR_IPV4_PCIADDR=0000:81:00.1
 LWAFTR_IPV6_PCIADDR=0000:82:00.1

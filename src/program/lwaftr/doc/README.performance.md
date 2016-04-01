@@ -52,7 +52,7 @@ them to CPUs in the NUMA node 0.
 ## Isolate CPUs
 
 Force the Linux kernel to use a limited amount of CPUs to schedule its
-processes, leaving all the other CPUs for running Snabb Switch.
+processes, leaving all the other CPUs for running Snabb.
 
 To isolate CPUs, boot your Linux kernel with the `isolcpus` parameter.
 Under NixOS, edit `/etc/nixos/configuration.nix` to add this parameter:

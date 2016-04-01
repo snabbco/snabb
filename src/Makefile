@@ -54,7 +54,6 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LU
 	    ../lib/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
-	@ln -fs snabb snabbswitch
 	@ls -sh snabb
 
 all: $(EXE)
@@ -181,24 +180,24 @@ obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
 	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
 
-book: obj/doc/snabbswitch.pdf obj/doc/snabbswitch.html obj/doc/snabbswitch.epub
+book: obj/doc/snabb.pdf obj/doc/snabb.html obj/doc/snabb.epub
 
-obj/doc/snabbswitch.markdown: markdown Makefile doc/genbook.sh
+obj/doc/snabb.markdown: markdown Makefile doc/genbook.sh
 	(cd doc; ./genbook.sh) > $@
 
-obj/doc/snabbswitch.pdf: obj/doc/snabbswitch.markdown
+obj/doc/snabb.pdf: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../$@ ../$<)
 
-obj/doc/snabbswitch.html: obj/doc/snabbswitch.markdown
+obj/doc/snabb.html: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o ../$@ ../$<)
 
-obj/doc/snabbswitch.epub: obj/doc/snabbswitch.markdown
+obj/doc/snabb.epub: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
 	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o ../$@ ../$<)
 
-CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog programs.inc
+CLEAN = snabb obj bin testlog programs.inc
 
 clean:
 	$(E) "RM        $(CLEAN)"
