@@ -774,6 +774,67 @@ function S.sysctl(name, new)
   return old
 end
 
+-- BPF syscall has a complex semantics with one union serving for all purposes
+-- The interface exports both raw syscall and helper functions based on libbpf
+if C.bpf then
+  local function ptr_to_u64(p) return ffi.cast('uint64_t', ffi.cast('void *', p)) end
+  function S.bpf(cmd, attr)
+    return C.bpf(cmd, attr)
+  end
+  function S.bpf_prog_load(type, insns, len, license, version)
+    if not license then license = "GPL" end       -- Must stay alive during the syscall
+    local bpf_log_buf = ffi.new('char [?]', 4096) -- Must stay alive during the syscall
+    if not version then
+      -- We have no better way to extract current kernel hex-string other
+      -- than parsing headers, compiling a helper function or reading /proc
+      local ver_str, count = S.sysctl('kernel.version'):match('%d.%d.%d'), 2
+      version = 0
+      for i in ver_str:gmatch('%d') do -- Convert 'X.Y.Z' to 0xXXYYZZ
+        version = bit.bor(version, bit.lshift(tonumber(i), 8*count))
+        count = count - 1
+      end
+    end
+    local attr = t.bpf_attr1()
+    attr[0].prog_type = type
+    attr[0].insns = ptr_to_u64(insns)
+    attr[0].insn_cnt = len
+    attr[0].license = ptr_to_u64(license)
+    attr[0].log_buf = ptr_to_u64(bpf_log_buf)
+    attr[0].log_size = 4096
+    attr[0].log_level = 1
+    attr[0].kern_version = version -- MUST match current kernel version
+    local fd = S.bpf(c.BPF_CMD.PROG_LOAD, attr)
+    if fd < 0 then
+      return nil, t.error(errno()), ffi.string(bpf_log_buf)
+    end
+    return fd
+  end
+  function S.bpf_map_create(type, key_size, value_size, max_entries)
+    local attr = t.bpf_attr1()
+    attr[0].map_type = type
+    attr[0].key_size = key_size
+    attr[0].value_size = value_size
+    attr[0].max_entries = max_entries
+    local fd = S.bpf(c.BPF_CMD.MAP_CREATE, attr)
+    if fd < 0 then
+      return nil, t.error(errno())
+    end
+    return fd
+  end
+  function S.bpf_map_op(op, fd, key, val_or_next, flags)
+    local attr = t.bpf_attr1()
+    attr[0].map_fd = fd
+    attr[0].key = ptr_to_u64(key)
+    attr[0].value = ptr_to_u64(val_or_next)
+    attr[0].flags = flags or 0
+    local ret = S.bpf(op, attr)
+    if ret ~= 0 then
+      return nil, t.error(errno())
+    end
+    return ret
+  end
+end
+
 return S
 
 end

@@ -1310,6 +1310,34 @@ test.bpf = {
   end,
 }
 
+-- test eBPF filters
+if S.bpf and not S.__rump then
+  test.bpf_root = {}
+  test.bpf_root.test_bpf_map_create = function()
+    local bpf = t.sock_filters(1, {
+      t.sock_filter("RET,K", 0)
+    })
+    -- Update
+    local key, klen = ffi.new('int [1]', 0xdead), ffi.sizeof('int')
+    local fd, err = assert(S.bpf_map_create(c.BPF_MAP.HASH, klen, klen, 10))
+    assert(S.bpf_map_op(c.BPF_CMD.MAP_UPDATE_ELEM, fd, key, key) == 0)
+    -- Retrieve
+    local val = ffi.new('int [1]', 0xbeef)
+    local ok, err = S.bpf_map_op(c.BPF_CMD.MAP_LOOKUP_ELEM, fd, key, val)
+    assert(ok and key[0] == val[0])
+    S.close(fd)
+  end
+  test.bpf_root.test_bpf_prog_load = function()
+    local bpf = t.bpf_insns(2, {
+      t.bpf_insn("ALU64,MOV,K", 0, 0, 0, 1),
+      t.bpf_insn("JMP,EXIT"),
+    })
+    local fd, err, log = S.bpf_prog_load(c.BPF_PROG.SOCKET_FILTER, bpf, 2)
+    if not fd then assert(false, err..': '..log) end
+    S.close(fd)
+  end
+end
+
 -- TODO remove arch tests. Unclear if my ppc/arm does not support or a bug, retest later with newer kernel
 -- still ppc issues with 3.12.6 ppc, need to debug more, and mips issues
 if not (abi.arch == "ppc64le" or abi.arch == "ppc" or abi.arch == "mips" or S.__rump) then -- cannot test on rump as uses clone()

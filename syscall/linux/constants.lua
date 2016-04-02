@@ -2013,6 +2013,7 @@ c.BPF = multiflags {
   ST         = 0x02,
   STX        = 0x03,
   ALU        = 0x04,
+  ALU64      = 0x07,
   JMP        = 0x05,
   RET        = 0x06,
   MISC       = 0x07,
@@ -2020,6 +2021,7 @@ c.BPF = multiflags {
   W          = 0x00,
   H          = 0x08,
   B          = 0x10,
+  DW         = 0x18,
 -- mode
   IMM        = 0x00,
   ABS        = 0x20,
@@ -2036,12 +2038,23 @@ c.BPF = multiflags {
   AND        = 0x50,
   LSH        = 0x60,
   RSH        = 0x70,
+  ARSH       = 0xc0,
   NEG        = 0x80,
+  MOD        = 0x90,
+  XOR        = 0xa0,
+  MOV        = 0xb0,
+  XADD       = 0xc0,
+  END        = 0xd0,
   JA         = 0x00,
   JEQ        = 0x10,
   JGT        = 0x20,
   JGE        = 0x30,
   JSET       = 0x40,
+  JNE        = 0x50,
+  JSGT       = 0x60,
+  JSGE       = 0x70,
+  CALL       = 0x80,
+  EXIT       = 0x90,
 -- src
   K          = 0x00,
   X          = 0x08,
@@ -2050,6 +2063,36 @@ c.BPF = multiflags {
 -- miscop
   TAX        = 0x00,
   TXA        = 0x80,
+  TO_LE      = 0x00,
+  TO_BE      = 0x08,
+}
+
+-- eBPF flags
+c.BPF_MAP = {
+  UNSPEC           = 0,
+  HASH             = 1,
+  ARRAY            = 2,
+  PROG_ARRAY       = 3,
+  PERF_EVENT_ARRAY = 4,
+}
+
+c.BPF_CMD = {
+  MAP_CREATE       = 0,
+  MAP_LOOKUP_ELEM  = 1,
+  MAP_UPDATE_ELEM  = 2,
+  MAP_DELETE_ELEM  = 3,
+  MAP_GET_NEXT_KEY = 4,
+  PROG_LOAD        = 5,
+  OBJ_PIN          = 6,
+  OBJ_GET          = 7,
+}
+
+c.BPF_PROG = {
+  UNSPEC        = 0,
+  SOCKET_FILTER = 1,
+  KPROBE        = 2,
+  SCHED_CLS     = 3,
+  SCHED_ACT     = 4,
 }
 
 -- termios - c_cc characters

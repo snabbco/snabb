@@ -349,6 +349,15 @@ local nr = {
   kcmp                  = 354,
   sched_setattr         = 355,
   sched_getattr         = 356,
+  kcmp                  = 357,
+  finit_module          = 358,
+  sched_setattr         = 359,
+  sched_getattr         = 360,
+  renameat2             = 361,
+  seccomp               = 362,
+  getrandom             = 363,
+  memfd_create          = 364,
+  bpf                   = 365,
 }
 }
 

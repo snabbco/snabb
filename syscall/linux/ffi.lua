@@ -498,10 +498,48 @@ struct sock_filter {
   uint8_t    jf;
   uint32_t   k;
 };
+struct bpf_insn {
+  uint8_t code;   /* opcode */
+  uint8_t dst_reg:4;  /* dest register */
+  uint8_t src_reg:4;  /* source register */
+  uint16_t off;   /* signed offset */
+  uint32_t imm;   /* signed immediate constant */
+};
 struct sock_fprog {
   unsigned short len;
   struct sock_filter *filter;
 };
+union bpf_attr {
+  struct {
+    uint32_t   map_type;
+    uint32_t   key_size;
+    uint32_t   value_size;
+    uint32_t   max_entries;
+  };
+  struct {
+    uint32_t   map_fd;
+    uint64_t   key __attribute__((aligned(8)));
+    union {
+      uint64_t value __attribute__((aligned(8)));
+      uint64_t next_key __attribute__((aligned(8)));
+    };
+    uint64_t   flags;
+  };
+  struct {
+    uint32_t   prog_type;
+    uint32_t   insn_cnt;
+    uint64_t   insns __attribute__((aligned(8)));
+    uint64_t   license __attribute__((aligned(8)));
+    uint32_t   log_level;
+    uint32_t   log_size;
+    uint64_t   log_buf __attribute__((aligned(8)));
+    uint32_t   kern_version;
+  };
+  struct {
+    uint64_t   pathname __attribute__((aligned(8)));
+    uint32_t   bpf_fd;
+  };
+} __attribute__((aligned(8)));
 struct mq_attr {
   long mq_flags, mq_maxmsg, mq_msgsize, mq_curmsgs, __unused[4];
 };
