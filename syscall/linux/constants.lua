@@ -2068,7 +2068,7 @@ c.BPF = multiflags {
 }
 
 -- eBPF flags
-c.BPF_MAP = {
+c.BPF_MAP = strflag {
   UNSPEC           = 0,
   HASH             = 1,
   ARRAY            = 2,
@@ -2076,7 +2076,7 @@ c.BPF_MAP = {
   PERF_EVENT_ARRAY = 4,
 }
 
-c.BPF_CMD = {
+c.BPF_CMD = strflag {
   MAP_CREATE       = 0,
   MAP_LOOKUP_ELEM  = 1,
   MAP_UPDATE_ELEM  = 2,
@@ -2087,7 +2087,7 @@ c.BPF_CMD = {
   OBJ_GET          = 7,
 }
 
-c.BPF_PROG = {
+c.BPF_PROG = strflag {
   UNSPEC        = 0,
   SOCKET_FILTER = 1,
   KPROBE        = 2,
