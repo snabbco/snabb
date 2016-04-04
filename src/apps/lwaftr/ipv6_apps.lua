@@ -188,8 +188,10 @@ function NDP:push()
       self.do_ns_request = false
       local ns_pkt = ndp.form_ns(self.conf.src_eth, self.conf.src_ipv6,
          self.conf.dst_ipv6)
+      -- Send a NS packet inmediately.
+      transmit(osouth, packet.clone(ns_pkt))
 
-      -- Send new NS solicitation every second.
+      -- Send a new NS packet after every second.
       timer.activate(timer.new("retry_ns",
                                function ()
                                  transmit(osouth, packet.clone(ns_pkt))
