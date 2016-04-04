@@ -32,6 +32,9 @@ function lwaftr_app(c, conf)
               { src_ipv6 = conf.aftr_ipv6_ip, src_eth = conf.aftr_mac_b4_side,
                 dst_eth = conf.next_hop6_mac, dst_ipv6 = conf.next_hop_ipv6_addr,
                 all_ipv6_addrs = conf.preloaded_binding_table:get_br_addresses() })
+   config.app(c, "arp", ipv4_apps.ARP,
+              { src_ipv4 = conf.aftr_ipv4_ip, src_eth = conf.aftr_mac_b4_side,
+                dst_eth = conf.inet_mac, dst_ipv4 = conf.next_hop_ipv4_addr})
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
    local preprocessing_apps_v6  = { "reassemblerv6" }
@@ -55,8 +58,10 @@ function lwaftr_app(c, conf)
       prepend(postprocessing_apps_v6, "egress_filterv6")
    end
 
+   append(preprocessing_apps_v4,   { name = "arp",        input = "south", output = "north" })
    append(preprocessing_apps_v4,   { name = "icmpechov4", input = "south", output = "north" })
    prepend(postprocessing_apps_v4, { name = "icmpechov4", input = "north", output = "south" })
+   prepend(postprocessing_apps_v4, { name = "arp",        input = "north", output = "south" })
 
    append(preprocessing_apps_v6,   { name = "ndp",        input = "south", output = "north" })
    append(preprocessing_apps_v6,   { name = "icmpechov6", input = "south", output = "north" })

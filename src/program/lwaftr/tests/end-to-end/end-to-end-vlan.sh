@@ -87,6 +87,16 @@ snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_withoutmac_vlan.conf \
    ${EMPTY} ${TEST_DATA}/ndp_getna_compound.pcap \
    ${TEST_DATA}/decap-ipv4.pcap ${TEST_DATA}/ndp_ns_and_recap.pcap
 
+echo "Testing: ARP: incoming ARP request"
+snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
+   ${TEST_DATA}/arp_request_recv.pcap ${EMPTY} \
+   ${TEST_DATA}/arp_reply_send.pcap ${EMPTY}
+
+echo "Testing: ARP: IPv4 but not eth addr of next IPv4 hop set, send an ARP request"
+snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_without_mac4_vlan.conf \
+   ${EMPTY} ${EMPTY} \
+   ${TEST_DATA}/arp_request_send.pcap ${EMPTY}
+
 echo "Testing: from-internet IPv4 packet found in the binding table, original TTL=1."
 snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
    ${TEST_DATA}/tcp-frominet-bound-ttl1.pcap ${EMPTY}\

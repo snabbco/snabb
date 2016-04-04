@@ -70,6 +70,16 @@ snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_withoutmac.conf \
    ${EMPTY} ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/ndp_outgoing_ns.pcap
 
+echo "Testing: ARP: incoming ARP request"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${TEST_BASE}/arp_request_recv.pcap ${EMPTY} \
+   ${TEST_BASE}/arp_reply_send.pcap ${EMPTY}
+
+echo "Testing: ARP: IPv4 but not eth addr of next IPv4 hop set, send an ARP request"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_without_mac4.conf \
+   ${EMPTY} ${EMPTY} \
+   ${TEST_BASE}/arp_request_send.pcap ${EMPTY}
+
 # mergecap -F pcap -w ndp_without_dst_eth_compound.pcap tcp-fromb4-ipv6.pcap tcp-fromb4-tob4-ipv6.pcap
 # mergecap -F pcap -w ndp_ns_and_recap.pcap recap-ipv6.pcap ndp_outgoing_ns.pcap
 echo "Testing: NDP: Without receiving NA, next_hop6_mac not set"

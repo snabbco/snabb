@@ -192,7 +192,7 @@ function LwAftr:new(conf)
    o.hairpinning = conf.hairpinning
    o.icmpv6_rate_limiter_n_packets = conf.icmpv6_rate_limiter_n_packets
    o.icmpv6_rate_limiter_n_seconds = conf.icmpv6_rate_limiter_n_seconds
-   o.inet_mac = conf.inet_mac
+   o.inet_mac = conf.inet_mac or ethernet:pton("00:00:00:00:00:00")
    o.ipv4_mtu = conf.ipv4_mtu
    o.ipv6_mtu = conf.ipv6_mtu
    o.policy_icmpv4_incoming = conf.policy_icmpv4_incoming

@@ -2,10 +2,11 @@ module(..., package.seeall)
 
 -- NDP address resolution.
 -- Given a remote IPv6 address, try to find out its MAC address.
--- Exit if this fails.
 -- If resolution succeeds:
 -- All packets coming through the 'south' interface (ie, via the network card)
 -- are silently forwarded.
+-- Note that the network card can drop packets; if it does, they will not get
+-- to this app.
 -- All packets coming through the 'north' interface (the lwaftr) will have
 -- their Ethernet headers rewritten.
 
@@ -284,11 +285,6 @@ local function form_sna(local_eth, local_ipv6, is_router, soliciting_pkt)
    return na_pkt
 end
 
--- This does not deal with vlans
-function set_dst_ethernet(pkt, dst_eth)
-   ffi.copy(pkt.data, dst_eth, 6)
-end
-
 local function verify_icmp_checksum(pkt)
    local offset = ethernet_header_size + o_ipv6_payload_len
    local icmp_length = C.ntohs(rd16(pkt.data + offset))
@@ -415,7 +411,7 @@ function selftest()
    local nsp = form_ns(lmac, lip, rip)
    assert(is_ndp(nsp))
    assert(is_solicited_neighbor_advertisement(nsp) == false)
-   set_dst_ethernet(nsp, lmac) -- Not a meaningful thing to do, just a test
+   lwutil.set_dst_ethernet(nsp, lmac) -- Not a meaningful thing to do, just a test
    
    local sol_na = form_nsolicitation_reply(lmac, lip, nsp)
    local dst_eth = get_dst_ethernet(sol_na, {rip})
