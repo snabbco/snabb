@@ -1,0 +1,7 @@
+#! /bin/bash
+echo "Stopping $1"
+ifconfig $1 down
+if [[ $1 == olan ]] ; then
+	echo "Removing $1 from bridge"
+	brctl delif owrt olan
+fi
