@@ -2,17 +2,14 @@
 
 module(..., package.seeall)
 
-local engine    = require("core.app")
-local config    = require("core.config")
-local timer     = require("core.timer")
-local pci       = require("lib.hardware.pci")
-local intel10g  = require("apps.intel.intel10g")
+local engine     = require("core.app")
+local config     = require("core.config")
+local timer      = require("core.timer")
+local intel10g   = require("apps.intel.intel10g")
 local basic_apps = require("apps.basic.basic_apps")
-local main      = require("core.main")
-local PcapReader= require("apps.pcap.pcap").PcapReader
-local LoadGen   = require("apps.intel.loadgen").LoadGen
-local lib = require("core.lib")
-local ffi = require("ffi")
+local main       = require("core.main")
+local PcapReader = require("apps.pcap.pcap").PcapReader
+local lib        = require("core.lib")
 
 local packetblaster = require("program.packetblaster.packetblaster")
 local usage = require("program.packetblaster.replay.README_inc")
@@ -44,16 +41,7 @@ function run (args)
    config.link(c, "loop.output -> source.input")
 
    local patterns = args
-   local nics = 0
-   pci.scan_devices()
-   for _,device in ipairs(pci.devices) do
-      if packetblaster.is_device_suitable(device, patterns) then
-         nics = nics + 1
-         local name = "nic"..nics
-         config.app(c, name, LoadGen, device.pciaddress)
-         config.link(c, "source."..tostring(nics).."->"..name..".input")
-      end
-   end
+   local nics = packetblaster.config_loadgen(c, patterns)
    assert(nics > 0, "<PCI> matches no suitable devices.")
    engine.busywait = true
    intel10g.num_descriptors = 32*1024
