@@ -226,7 +226,7 @@ function Lwaftrgen:push ()
   local ipv4_bytes = self.ipv4_bytes
   local lost_packets = self.lost_packets
 
-  -- count and trach incoming packets
+  -- count and trash incoming packets
   for _=1,link.nreadable(input) do
     local pkt = receive(input)
     if cast(uint16_ptr_t, pkt.data + OFFSET_ETHERTYPE)[0] == PROTO_IPV6 then
