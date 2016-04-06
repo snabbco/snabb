@@ -72,8 +72,8 @@ proc(50, 60, 8)
 The log now contains these entries:
 
 ```
-<TIMESTAMP> processed tcp(10), udp(20), and other(3)
-<TIMESTAMP> processed tcp(50), udp(60), and other(8)
+<TIMESTAMP> example    processed tcp(10), udp(20), and other(3)
+<TIMESTAMP> example    processed tcp(50), udp(60), and other(8)
 ```
 
 #### API
@@ -84,9 +84,29 @@ Create a new timeline at the given shared memory path.
 
 — Function **define** *timeline* *category* *priority* *message*
 
-Defines a message that can be logged to this timeline. Returns a function that is called to log the event.
+Defines a message that can be logged to this timeline. Returns a
+function that is called to log the event.
 
 - *category* is a short descriptive string like "luajit", "engine", "pci01:00.0".
-- *priority* is one of the strings `fatal`, `error`, `warning`, `info`, `debug`, `trace`, `trace+`, `trace++`, `trace+++`.
-- *message* is text describing the event. This can be a one-liner or a detailed multiline description. Words on the first line starting with `$` define arguments to the logger function which will be stored as 64-bit values (maximum four per message).
+- *priority* is one of the strings `fatal`, `error`, `warning`,
+   `info`, `debug`, `trace`, `trace+`, `trace++`, `trace+++`.
+- *message* is text describing the event. This can be a one-liner or a
+   detailed multiline description. Words on the first line starting
+   with `$` define arguments to the logger function which will be
+   stored as 64-bit values (maximum four per message).
+
+— Function **save** *timeline* *filename*
+
+Save a snapshot of the timeline to a file. The file format is the raw binary timeline format.
+
+— Function **priority** *timeline* *level*
+
+Set the minimum priority that is required for a message to be logged
+on the timeline. This can be used to control the rate at which
+messages are logged to the timeline to manage processing overhead and
+the rate of churn in the ring buffer.
+
+— Function **dump** *filename* *[maxentries]*
+
+Print the contents of a timeline, ordered from newest to oldest.
 
