@@ -82,6 +82,9 @@ The log now contains these entries:
 
 Create a new timeline at the given shared memory path.
 
+- *entries* defaults to 1024*1024 entries (64 megabytes). This could be increased if more events are needed. The value must be a power of 2.
+- *stringtablesize* defaults to one megabyte. This is expected to be more than sufficient.
+
 — Function **define** *timeline* *category* *priority* *message*
 
 Defines a message that can be logged to this timeline. Returns a
