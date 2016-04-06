@@ -28,6 +28,7 @@ The binary representation has three components:
 - entires: array of 64-byte log entries.
 - stringtable: string constants (to referenced by their byte-index)
 
+```
     DIAGRAM: Timeline
     +-------------------------+
     |      header (64B)       |
@@ -40,6 +41,7 @@ The binary representation has three components:
     +-------------------------+
     |   stringtable (~1MB)    |
     +-------------------------+
+```
 
 The timeline can be read by scanning through the entries and detecting
 the first and last entries by comparing timestamps. The entires can be
