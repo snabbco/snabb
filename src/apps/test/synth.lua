@@ -46,19 +46,16 @@ end
 
 function selftest ()
    local pcap = require("apps.pcap.pcap")
+   local Match = require("apps.test.match").Match
    local c = config.new()
+   config.app(c, "match", Match)
+   config.app(c, "reader", pcap.PcapReader, "apps/test/synth.pcap")
    config.app(c, "synth", Synth, { sizes = {32, 64, 128},
 				   src = "11:11:11:11:11:11",
 				   dst = "22:22:22:22:22:22" })
-   config.app(c, "writer", pcap.PcapWriter, "apps/test/synth.pcap.output")
-   config.link(c, "synth.output->writer.input")
+   config.link(c, "reader.output->match.comparator")
+   config.link(c, "synth.output->match.rx")
    engine.configure(c)
-   engine.main({ duration = 0.00000001, -- hack: one breath.
-                 report = { showlinks = true } })
-
-   if io.open("apps/test/synth.pcap"):read('*a') ~=
-      io.open("apps/test/synth.pcap.output"):read('*a')
-   then
-      error("synth.pcap and synth.pcap.output differ.")
-   end
+   engine.main({ duration = 0.0001, report = {showapps=true,showlinks=true}})
+   assert(#engine.app_table.match:errors() == 0)
 end
