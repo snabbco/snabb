@@ -1,92 +1,293 @@
+-- timeline: high-resolution event log using in-memory ring buffer
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
-
--- timeline: high-resolution event log.
---
--- This module implements an event log that is suitable for logging
--- very fine-grained events during traffic processing.
--- 
--- Design goals:
---   Fast enough to log 1M msg/sec with <1% CPU overhead.
---   Precise timestamps for cross-referencing processes (and PEBS events).
---   Simple format that is easy to post-process.
 
 module(..., package.seeall)
 
 local dasm = require("dasm")
 local ffi = require("ffi")
 local C = ffi.C
+local S = require("syscall")
+local shm = require("core.shm")
 
--- Log message format
+------------------------------------------------------------
+-- Binary data structures
+
+-- Log entry format (ring item)
+
 ffi.cdef[[
-struct timeline_entry {
-  // CPU Time Stamp Counter (cycles)
-  uint64_t tsc;
-  // Instruction Pointer where log is taken
-  uint64_t ip;
-  // Message (could be generalized...)
-  uint64_t msg;
-}
+  struct timeline_entry {
+    uint64_t tsc;                    // CPU timestamp
+    uint64_t ip;                     // Instruction pointer of logger
+    uint64_t msg_id;                 // category:24, message:24, priority:16
+    uint64_t msg0, msg1, msg2, msg3; // message arguments
+    uint64_t reserved;               // pad to 64 bytes
+  };
 ]]
 
--- XXX For test purposes just allocate a 1GB log.
-local log = ffi.cast("struct timeline_entry *", C.malloc(1*1024*1024*1024))
-local log_ptr = ffi.new("struct timeline_entry *[1]", log)
+-- Header of the log file
+
+local magic = 0xa3ff7223441d0001
+local version = 0x00010001
+
+ffi.cdef[[
+  struct timeline_header {
+    // File format magic number.
+    uint32_t magic;
+    uint8_t major_version, minor_version;
+    uint16_t flags;
+    // XXX: does not really need to be stored in the file?
+    uint64_t priority_mask;
+    uint64_t next;
+    uint64_t last;
+    char pad[32];
+    struct timeline_entry entries[0];
+  };
+]]
+
+------------------------------------------------------------
+-- API
+
+-- Create a new timeline under the given shared memory path.
+function new (shmpath,  entries, size_stringtable)
+   entries = entries or 1024*1024
+   size_stringtable = size_stringtable or 1e6
+   -- Calculate size based on number of log entries
+   local size_header = ffi.sizeof("struct timeline_header")
+   local size_entries = entries * ffi.sizeof("struct timeline_entry")
+   local size = size_header + size_entries + size_stringtable
+   -- Allocate one shm object with memory for all data structures
+   local memory      = shm.map(shmpath, ffi.typeof("char["..size.."]"))
+   local header      = ffi.cast("struct timeline_header *", memory)
+   local ring        = ffi.cast("struct timeline_entry *", memory + size_header)
+   local stringtable = ffi.cast("char*", memory + size_header + size_entries)
+   -- Return an object
+   return { memory = memory,
+            entries = entries,
+            header = init_header(ffi.cast("struct timeline_header *", memory), entries),
+            ring = ring,
+            stringtable = init_stringtable(stringtable, size_stringtable) }
+end
+
+function init_header (header, entries)
+   header.magic = magic
+   header.major_version, header.minor_version = 0, 0
+   header.flags = 0
+   header.priority_mask = 0xffff
+   header.next = 0
+   header.last = entries-1      -- XXX entries must be a power of 2
+   return header
+end
+
+local priorities = {['fatal']=1, ['error']=2, ['warning']=3, ['info']=4, ['debug']=5,
+                    ['trace']=6, ['trace+']=7, ['trace++']=8, ['trace+++']=9}
+
+-- Define an event and return the logger function.
+function define (timeline, category, priority, message)
+   local icategory = intern(timeline.stringtable, category)
+   local imessage = intern(timeline.stringtable, message)
+   local prio = priorities[priority] or error("unrecognized priority: "..priority)
+   local id = bit.bor(bit.lshift(icategory, 40),
+                      bit.lshift(imessage, 16),
+                      prio)
+   local n = #(message_args(message))
+   local event = event -- move asm function into local scope
+   local log = timeline.header
+   if n==0 then return function ()        event(log,id,0,0,0,0) end end
+   if n==1 then return function (a)       event(log,id,a,0,0,0) end end
+   if n==2 then return function (a,b)     event(log,id,a,b,0,0) end end
+   if n==3 then return function (a,b,c)   event(log,id,a,b,c,0) end end
+   if n==4 then return function (a,b,c,d) event(log,id,a,b,c,d) end end
+   error("illegal number of arguments: "..n)
+end
+
+function message_args (string)
+   local args = {}
+   string:gsub("[$](%w)+", function (arg) table.insert(args, arg) end)
+   return args
+end
+
+-- Write a copy of the timeline to a file
+function save (tl, filename)
+   local fd, err = S.open(filename, "rdwr,creat", "0600")
+   if not fd then return fd, err end
+   S.write(fd, tl.memory, ffi.sizeof(tl.memory))
+   S.close(fd)
+   return true
+end
+
+-- Choose the minimum priority for a message to be logged
+function priority (level)
+   error("NYI")
+end
+
+-- Print log entries from the file
+function dump (filename,  maxentries)
+   local stat, err = S.stat(filename)
+   if not stat then return stat, err end
+   local fd, err = S.open(filename, "rdonly")
+   if not fd then return fd, err end
+   local ptr = S.mmap(nil, stat.size, "read", "private", fd, 0)
+   local header = ffi.cast("struct timeline_header *", ptr)
+   local ring = header.entries
+   local strings = ffi.cast("char*", header.entries + (header.last + 1))
+   local last = tonumber(header.last)
+   local size = last + 1
+   print(("%8s %-16s %s"):format("cycles", "category", "message"))
+   -- "Fast-forward" to the end (when following entry has earlier timestamp)
+   local index = 0
+   while ring[index].tsc <= ring[(index+1) % size].tsc do
+      index = (index+1) % size
+   end
+   -- "Rewind" printing messages
+   local ref_tsc = nil
+   for i = 0, size-1 do
+      if maxentries and i > maxentries then break end
+      local timedelta = ref_tsc and (ref_tsc - ring[index].tsc) or 0
+      local msgid = ring[index].msg_id
+      local icategory = bit.band(0xffff, bit.rshift(msgid, 40))
+      local imessage = bit.band(0xffff, bit.rshift(msgid, 16))
+      -- Lookup the messages and perform arg substitution
+      local category = ffi.string(strings + icategory)
+      local format = ffi.string(strings + imessage)
+      local args = {tonumber(ring[index].msg3),
+                    tonumber(ring[index].msg2),
+                    tonumber(ring[index].msg1),
+                    tonumber(ring[index].msg0)}
+      local subst = function (match)
+         -- convert "$foo" to "foo(10)"
+         return match:gsub("^[$]", "", 1).."("..table.remove(args)..")"
+      end
+      local message = format:gsub("($%w+)", subst)
+      print(("%8d %-16s %s"):format(tonumber(timedelta), category, message))
+      ref_tsc = ring[index].tsc
+      index = (index == 0) and last or index-1
+   end
+end
+
+------------------------------------------------------------
+-- Defining log message formats
+
+function init_stringtable (pointer, size)
+   return { base = pointer, position = 0, space = size, known = {} }
+end
+
+-- Interns a string in the string table and returns the string's index.
+function intern (tab, str)
+   if tab.known[str] then
+      return tab.known[str]
+   else
+      local bytes = #str + 1 -- include null terminator byte
+      tab.space = tab.space - bytes
+      assert(tab.space >= 0, "timeline string table overflow")
+      local pos = tab.position
+      ffi.copy(tab.base + tab.position, str, bytes)
+      tab.position = tab.position + bytes
+      tab.known[str] = pos
+      return pos
+   end
+end
+
+-- Lookup an interned string by index and return as a Lua string.
+function lookup (tab, index)
+   return ffi.string(tab.base + index)
+end
+
+------------------------------------------------------------
+-- Logging messages
 
 |.arch x64
 |.actionlist actions
 |.globalnames globalnames
 
-|.define arg1, rdi
 
+|.define arg0, rdi
+|.define arg1, rsi
+|.define arg2, rdx
+|.define arg3, rcx
+|.define arg4, r8
+|.define arg5, r9
+
+|.type log, struct timeline_header
 |.type msg, struct timeline_entry
-
--- void log(uint64_t msg)
 local function asmlog (Dst)
    |->log:
-   -- (No registers to save. Using rax, rdx, rcx, rdi, r8 which are
-   -- all caller-save.)
-   | rdtscp                 -- read timestamp counter into edx:eax (trash ecx)
-   | shl rdx, 32            -- reconstruct 64-bit TSC in rax
-   | or rax, rdx            --   ...
-   | mov r8, [log_ptr]      -- Load address of next log entry
-   | mov msg:r8->tsc, rax   -- Store timestamp in log
-   | mov rax, [rsp]         -- Grab caller address from stack
-   | mov msg:r8->ip, rax    --   ... and store in message
-   | mov msg:r8->msg, arg1  -- Store message in log
-   | add r8, #msg           -- Advance log pointer
-   | mov [log_ptr], r8      --   ... XXX must check for overflow
-   -- (No saved registers to restore.)
+   -- Exit if this log message is disabled
+   | mov rax, log:arg0->priority_mask
+   | and rax, arg1
+   | jnz >1
+   | ret
+   |1:
+
+   -- Load and advance next log entry index
+   | mov r11, log:arg0->next
+   | mov rax, r11
+   | add rax, 1
+   | and rax, log:arg0->last
+   | mov log:arg0->next, rax
+
+   -- Convert log entry number to pointer
+   | shl r11, 6
+   | lea r10, log:arg0->entries
+   | add r10, r11
+
+   -- Log the arguments
+   | mov msg:r10->msg_id, arg1
+   | mov msg:r10->msg0, arg2
+   | mov msg:r10->msg1, arg3
+   | mov msg:r10->msg2, arg4
+   | mov msg:r10->msg3, arg5
+
+   -- Log the timestamp
+   | rdtscp
+   | mov msg:r10->tsc, eax
+   | mov [r10+4], edx
+
+   -- Log the instruction pointer
+   | mov rax, [rsp]
+   | mov msg:r10->ip, rax
+
    | ret
 end
 
 local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
 asmlog(Dst)
 local mcode, size = Dst:build()
---dasm.dump(mcode, size)
 local entry = dasm.globals(globals, globalnames)
 
-event = ffi.cast("void(*)(uint64_t)", entry.log)
+event = ffi.cast("void(*)(struct timeline_header *, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t)", entry.log)
+
 _anchor = mcode
+
+--dasm.dump(mcode, size)
 
 function selftest ()
    print("selftest: timeline")
-   local n = 1e6
+   local tl = new("selftest/timeline")
+   local event1 = define(tl, 'selftest', 'trace', 'event1 $a $b $c $d')
+   local event2 = define(tl, 'selftest', 'trace', 'event2 $a')
+   local event3 = define(tl, 'selftest', 'trace', 'event3')
    -- Log events
-   for i = 0, n-1 do
-      event(i)
-   end
-   -- Check log
-   for i = 0, n-1 do
-      assert(i==0 or log[i].tsc > log[i-1].tsc, "tsc increase")
-      assert(log[i].msg == i, "message value")
+   for i = 0, tl.entries-1 do
+      if i % 3 == 0 then event1(i, i*2, i*3, i*4) end
+      if i % 3 == 1 then event2(i) end
+      if i % 3 == 2 then event3() end
    end
    -- Print statistics
    local times = {}
-   for i = 0, n-1 do
-      if i > 0 then times[#times+1] = tonumber(log[i].tsc - log[i-1].tsc) end
+   for i = 0, tl.entries-1 do
+      if i > 0 then times[#times+1] = tonumber(tl.ring[i].tsc - tl.ring[i-1].tsc) end
    end
    table.sort(times)
-   print("median logging time", times[n/2])
+   local n = tl.entries
+   --print("times:", times[1], times[n/2], times[n/4], times[n*3/4])
+   print("median logging time: "..times[tl.entries/2].." cycles")
+   -- Check log
+   for i = 0, tl.entries-1 do
+      assert(i==0 or tl.ring[i].tsc > tl.ring[i-1].tsc, "tsc increase")
+   end
+   print("selftest: save and dump")
+   save(tl, "selftest-timeline.dat")
+   dump("selftest-timeline.dat", 10)
    print("selftest: ok")
 end
 
