@@ -25,7 +25,7 @@ FFI call.)
 The binary representation has three components:
 
 - header: magic number, file format version, flags.
-- entires: array of 64-byte log entries.
+- entries: array of 64-byte log entries.
 - stringtable: string constants (to referenced by their byte-index)
 
 ```
@@ -44,7 +44,7 @@ The binary representation has three components:
 ```
 
 The timeline can be read by scanning through the entries and detecting
-the first and last entries by comparing timestamps. The entires can be
+the first and last entries by comparing timestamps. The entries can be
 converted from binary data to human-readable strings by using the
 format strings that they reference.
 
