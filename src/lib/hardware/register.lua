@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- register.lua -- Hardware device register abstraction
 
 module(...,package.seeall)

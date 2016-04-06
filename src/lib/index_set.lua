@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 --- index set object: keeps a set of indexed values
 local NDX_mt = {}
 NDX_mt.__index = NDX_mt

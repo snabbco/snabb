@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Markdown preprocessor.
 #
@@ -9,15 +9,19 @@
 #
 # which uses ditaa (http://ditaa.sourceforge.net/) to create a PNG
 # image from the ascii art and put an inline image link in the
-# outpt markdown.
+# output markdown.
 
 set -e
-if [ $# != 1 ]; then
-    echo "Usage: $0 <filename>" >&2
+if [ $# != 2 ]; then
+    echo "Usage: $0 <input> <output>" >&2
     exit 1
 fi
 
-cd $(dirname $1)
+input=$(readlink -m $1)
+output=$(readlink -m $2)
+
+[ -d $(dirname "$output") ] || mkdir -p "$(dirname $output)"
+cd $(dirname $output)
 
 awk '/^    DIAGRAM:/ { diagram = $2;
                        printf("") > diagram
@@ -30,5 +34,5 @@ awk '/^    DIAGRAM:/ { diagram = $2;
                        system("mkdir .images 2>/dev/null || true")
                        system("ditaa " diagram " .images/" diagram ".png > /dev/null");
                        system("rm " diagram)
-                       diagram = 0 }' < $(basename $1)
+                       diagram = 0 }' < $input > $output
 

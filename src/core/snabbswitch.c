@@ -1,8 +1,16 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 #include <stdio.h>
 
 #include "lua.h"
 #include "lualib.h"
 #include "lauxlib.h"
+
+#include <stdint.h>
+
+#if UINTPTR_MAX != UINT64_MAX
+#error "64-bit word size required. See doc/porting.md."
+#endif
 
 int argc;
 char** argv;

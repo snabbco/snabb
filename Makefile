@@ -2,6 +2,7 @@ LUASRC = $(wildcard src/lua/*.lua)
 LUAOBJ = $(LUASRC:.lua=.o)
 CSRC   = $(wildcard src/c/*.c)
 COBJ   = $(CSRC:.c=.o)
+PREFIX = /usr/local
 
 LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h
 
@@ -22,10 +23,23 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	cd src && $(MAKE)
 
 install: all
-	install -D src/snabb ${PREFIX}/usr/local/bin/snabb
+	install -D src/snabb ${DESTDIR}${PREFIX}/bin/snabb
 
 clean:
 	(cd lib/luajit && $(MAKE) clean)
 	(cd src; $(MAKE) clean; rm -rf syscall.lua syscall)
+
+PACKAGE:=snabbswitch
+DIST_BINARY:=snabb
+BUILDDIR:=$(shell pwd)
+
+dist: DISTDIR:=$(BUILDDIR)/$(PACKAGE)-$(shell git describe --tags)
+dist: all
+	mkdir "$(DISTDIR)"
+	git clone "$(BUILDDIR)" "$(DISTDIR)/snabbswitch"
+	rm -rf "$(DISTDIR)/snabbswitch/.git"
+	cp "$(BUILDDIR)/src/snabb" "$(DISTDIR)/$(DIST_BINARY)"
+	cd "$(DISTDIR)/.." && tar cJvf "`basename '$(DISTDIR)'`.tar.xz" "`basename '$(DISTDIR)'`"
+	rm -rf "$(DISTDIR)"
 
 .SERIAL: all

@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This class derives from lib.bridge.base and implements the simplest
 -- possible bridge, which floods a packet arriving on a port to all
 -- destination ports within its scope according to the split-horizon

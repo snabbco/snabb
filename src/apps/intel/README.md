@@ -6,7 +6,12 @@ The `Intel10G` drives one port of an Intel 82599 Ethernet controller.
 Packets taken from the `rx` port are transmitted onto the network.
 Packets received from the network are put on the `tx` port.
 
-![Intel10G](.images/Intel10G.png)
+    DIAGRAM: Intel10G
+              +----------+
+              |          |
+      rx ---->* Intel10G *----> tx
+              |          |
+              +----------+
 
 — Method **Intel10G.dev:get_rxstats**
 
@@ -112,6 +117,59 @@ Each physical Intel 82599 port supports the use of up to:
 * 64 VLANs (see the `vlan` configuration option)
 * 4 *mirror pools* (see the `mirror` configuration option)
 
+## Intel1G (apps.intel.intel1g.intel1g)
+
+The `intel1g` app drives one port of an Intel Gigabit Ethernet
+controller.
+
+Hardware support:
+- Intel i210, i350 (in progress)
+
+Features:
+- Optionally attach to a pre-initialized NIC.
+- Optionally use specific TX and RX queue numbers (or none).
+- Configuration and statistics registers are mirrored to shared memory objects (NYI).
+- Receive and transmit links are optional and can have any name.
+
+    DIAGRAM: Intel1g
+              +----------+
+              |          |
+         -=-->* Intel1g  *--=->
+              |          |
+              +----------+
+
+### Configuration
+
+— Key **pciaddr**
+
+*Required*. The PCI address of the NIC as a string.
+
+— Key **attach**
+
+*Optional*. True means attach to a transmit and/or receive queue of an already-initialized NIC.
+
+— Key **txq**
+
+*Optional*. Transmit queue number to use. `false` means no transmit function. Default: 0.
+
+— Key **rxq**
+
+*Optional*. Receive queue number to use. `false` means no receive function. Default: 0.
+
+— Key **ndesc**
+
+*Optional*. Number of DMA descriptors to use i.e. size of the DMA
+transmit and receive queues. Must be a multiple of 128. Default is not 
+specified but assumed to be broadly applicable.
+
+— Key **rxburst**
+
+*Optional*. Maximum number of packets to receive on one
+breath. Default is not specified but assumed to be broadly applicable.
+
++— Key **loopback**
+*Optional*. Set to `"MAC"` for MAC loopback, or to `"PHY"` for PHY loopback modes.
+
 ## LoadGen (apps.intel.loadgen)
 
 `LoadGen` is a *load generator* app based on the Intel 82599 Ethernet
@@ -119,7 +177,12 @@ controller. It reads up to 32,000 packets from the `input` port and
 transmits them repeatedly onto the network. All incoming packets are
 dropped.
 
-![LoadGen](.images/LoadGen.png)
+    DIAGRAM: LoadGen
+               +----------+
+               |          |
+    input ---->*  LoadGen |
+               |          |
+               +----------+
 
 ### Configuration
 

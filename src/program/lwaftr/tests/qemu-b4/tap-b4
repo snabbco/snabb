@@ -1,0 +1,14 @@
+#! /bin/bash
+echo "Configuring $1"
+ifconfig $1 up
+if [[ $1 == aftr ]] ; then
+	echo "A: 2003:1b0b:fffd:ffff::4000/64 | H: e2:20:35:1b:01:41"
+	ip -6 addr add '2003:1b0b:fffd:ffff::4000/64' dev $1
+	ip link set $1 address 'e2:20:35:1b:01:41'
+fi
+if [[ $1 == olan ]] ; then
+	echo "Adding $1 to bridge, H: 6a:44:d8:7e:73:f7"
+	ip link set $1 address '6a:44:d8:7e:73:f7'
+	brctl addif owrt olan
+fi
+sleep 1

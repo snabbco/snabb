@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 --- Device driver for the Intel 82599 10-Gigabit Ethernet controller.
 --- This is one of the most popular production 10G Ethernet
 --- controllers on the market and it is readily available in
@@ -548,14 +550,14 @@ end
 function M_sf:wait_linkup ()
    self.waitlu_ms = 0
    local mask = bits{Link_up=30}
-   for count = 1, 250 do
+   for count = 1, 1000 do
       if band(self.r.LINKS(), mask) == mask then
          self.waitlu_ms = count
          return self
       end
       C.usleep(1000)
    end
-   self.waitlu_ms = 250
+   self.waitlu_ms = 1000
    return self
 end
 

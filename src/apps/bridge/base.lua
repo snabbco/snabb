@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Base class for an Ethernet bridge with split-horizon semantics.
 --
 -- A bridge conists of any number of ports, each of which is a member

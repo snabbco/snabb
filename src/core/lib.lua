@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local ffi = require("ffi")
@@ -20,6 +22,10 @@ function equal (x, y)
          if x[k] == nil then return false end
       end
       return true
+   elseif type(x) == 'cdata' then
+      local size = ffi.sizeof(x)
+      if ffi.sizeof(y) ~= size then return false end
+      return C.memcmp(x, y, size) == 0
    else
       return x == y
    end
@@ -107,7 +113,7 @@ end
 
 -- Load Lua value from string.
 function load_string (string)
-   return loadstring("return "..string)
+   return loadstring("return "..string)()
 end
 
 -- Read a Lua conf from file and return value.
@@ -700,6 +706,8 @@ function selftest ()
    assert(true == equal({foo="bar"}, {foo="bar"}))
    assert(false == equal({foo="bar"}, {foo="bar", baz="foo"}))
    assert(false == equal({foo="bar", baz="foo"}, {foo="bar"}))
+   print("Testing load_string")
+   assert(equal(load_string("{1,2}"), {1,2}), "load_string failed.")
    print("Testing load/store_conf")
    local conf = { foo="1", bar=42, arr={2,"foo",4}}
    local testpath = "/tmp/snabb_lib_test_conf"

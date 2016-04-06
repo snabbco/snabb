@@ -7,7 +7,12 @@ packet data into and out of the app network using the
 `output` port while `PcapWriter` writes packets received on its `input`
 port to a PCAP file.
 
-![PcapReader](.images/PcapReader.png)
+    DIAGRAM: PcapReader and PcapWriter
+    +------------+                          +------------+
+    |            |                          |            |
+    | PcapReader *---> output    input ---->* PcapWriter |
+    |            |                          |            |
+    +------------+                          +------------+
 
 ## Configuration
 
