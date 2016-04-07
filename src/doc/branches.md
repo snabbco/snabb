@@ -146,3 +146,9 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Domen Kožar <domen@dev.si>
 
+#### timeline
+
+    BRANCH: timeline git://github.com/lukego/snabb
+    Timeline (core.timeline) logging feature development branch.
+
+    Maintainer: Luke Gorrie <luke@snabb.co>
