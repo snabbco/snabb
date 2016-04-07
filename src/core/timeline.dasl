@@ -142,7 +142,7 @@ function dump (filename,  maxentries)
    local size = last + 1
    -- Print column headers.
    -- Note: "-cycles" column is time delta between entries (moving backwards in time)
-   print(("%4s %4s %8s %-16s %s"):format("numa", "core", "-cycles", "category", "message"))
+   print(("%4s %4s %12s %-16s %s"):format("numa", "core", "-cycles", "category", "message"))
    -- "Fast-forward" to the end (when following entry has earlier timestamp)
    local index = 0
    while ring[index].tsc <= ring[(index+1) % size].tsc do
@@ -151,13 +151,9 @@ function dump (filename,  maxentries)
    -- "Rewind" printing messages
    local ref_tsc = nil
    for i = 0, size-1 do
+      local previndex = (index == 0) and last or index-1
       if maxentries and i > maxentries then break end
-      local timedelta
-      if ref_tsc == nil then
-         timedelta = '<last>'
-      else
-         timedelta = tonumber(ref_tsc - ring[index].tsc)
-      end
+      local timedelta = tonumber(ring[index].tsc - ring[previndex].tsc)
       local msgid = ring[index].msg_id
       local icategory = bit.band(0xffff, bit.rshift(msgid, 40))
       local imessage = bit.band(0xffff, bit.rshift(msgid, 16))
@@ -175,7 +171,7 @@ function dump (filename,  maxentries)
          return match:gsub("^[$]", "", 1).."("..table.remove(args)..")"
       end
       local message = format:gsub("($%w+)", subst)
-      print(("%-4d %-4d %8s %-16s %s"):format(
+      print(("%-4d %-4d %12s %-16s %s"):format(
             numa, core, timedelta, category, message))
       ref_tsc = ring[index].tsc
       index = (index == 0) and last or index-1
