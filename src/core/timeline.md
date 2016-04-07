@@ -91,12 +91,22 @@ Defines a message that can be logged to this timeline. Returns a
 function that is called to log the event.
 
 - *category* is a short descriptive string like "luajit", "engine", "pci01:00.0".
-- *priority* is one of the strings `fatal`, `error`, `warning`,
-   `info`, `debug`, `trace`, `trace+`, `trace++`, `trace+++`.
+- *priority* is one of the strings `error`, `warning`, `info`,
+   `trace`, `app`, `packet`, `library`.
 - *message* is text describing the event. This can be a one-liner or a
    detailed multiline description. Words on the first line starting
    with `$` define arguments to the logger function which will be
    stored as 64-bit values (maximum four per message).
+
+The priority should be chosen according to how frequently events will
+occur. This will make it possible for users to control how much detail
+is included in the log, and how quickly it wraps around, by choosing a
+suitable minimum event priority. Specifically choose `trace` for
+occasional events, `app` for per-breath events, `packet` for
+per-packet events, and `library` for events in library functions that
+could potentially be called in a tight loop. (If none of these
+priority names perfectly describes your use case then pick the one you
+think best matches the frequency of your events.)
 
 — Function **save** *timeline* *filename*
 
@@ -108,6 +118,9 @@ Set the minimum priority that is required for a message to be logged
 on the timeline. This can be used to control the rate at which
 messages are logged to the timeline to manage processing overhead and
 the rate of churn in the ring buffer.
+
+The level can be the strings accepted by `define()` or one of the
+strings `all` or `none`.
 
 — Function **dump** *filename* *[maxentries]*
 

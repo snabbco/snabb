@@ -79,8 +79,8 @@ function init_header (header, entries)
    return header
 end
 
-local priorities = {['fatal']=1, ['error']=2, ['warning']=3, ['info']=4, ['debug']=5,
-                    ['trace']=6, ['trace+']=7, ['trace++']=8, ['trace+++']=9}
+local priorities = {['error']=1, ['warning']=2, ['info']=3,
+                   ['trace']=4, ['app']=5, ['packet']=6, ['library']=7}
 
 -- Define an event and return the logger function.
 function define (timeline, category, priority, message)
@@ -89,8 +89,11 @@ function define (timeline, category, priority, message)
    local prio = priorities[priority] or error("unrecognized priority: "..priority)
    local id = bit.bor(bit.lshift(icategory, 40),
                       bit.lshift(imessage, 16),
-                      prio)
-   local n = #(message_args(message))
+                      bit.lshift(1, prio))
+   -- Parse message arguments on first line
+   local args = {}
+   message:match("^[^\n]*"):gsub("[$](%w+)", function (arg) table.insert(args, arg) end)
+   local n = #(args)
    local event = event -- move asm function into local scope
    local log = timeline.header
    if n==0 then return function ()        event(log,id,0,0,0,0) end end
@@ -102,8 +105,6 @@ function define (timeline, category, priority, message)
 end
 
 function message_args (string)
-   local args = {}
-   string:gsub("[$](%w+)", function (arg) table.insert(args, arg) end)
    return args
 end
 
@@ -117,8 +118,14 @@ function save (tl, filename)
 end
 
 -- Choose the minimum priority for a message to be logged
-function priority (level)
-   error("NYI")
+function priority (timeline, priority)
+   local n
+   if     priority == 'all'  then n = 15
+   elseif priority == 'none' then n = 0
+   else   n = priorities[priority] or error("unrecognized priority: "..priority)
+   end
+   -- Enable all priorities up to this level
+   timeline.header.priority_mask = bit.lshift(1, n+1) - 1
 end
 
 -- Print log entries from the file
@@ -297,9 +304,33 @@ function selftest ()
    for i = 0, tl.entries-1 do
       assert(i==0 or tl.ring[i].tsc > tl.ring[i-1].tsc, "tsc increase")
    end
+
    print("selftest: save and dump")
    save(tl, "selftest-timeline.dat")
    dump("selftest-timeline.dat", 15)
+
+   print("selftest: priorities")
+   local p_info = define(tl, 'selftest', 'info', 'info event')
+   local p_trace = define(tl, 'selftest', 'trace', 'trace event')
+   local p_packet = define(tl, 'selftest', 'packet', 'packet event')
+   local ref_next = tl.header.next
+   -- no: assert that no message was logged
+   local no = function ()
+      assert(ref_next == tl.header.next, "no log message expected")
+   end
+   -- yes: assert that a message was logged
+   local yes = function ()
+      assert(ref_next ~= tl.header.next, "log message expected")
+      ref_next = tl.header.next
+   end
+   -- (default priority: all)
+                            p_info() yes()  p_trace() yes()  p_packet() yes()
+   priority(tl, 'all')      p_info() yes()  p_trace() yes()  p_packet() yes()
+   priority(tl, 'library')  p_info() yes()  p_trace() yes()  p_packet() yes()
+   priority(tl, 'app')      p_info() yes()  p_trace() yes()  p_packet() no()
+   priority(tl, 'info')     p_info() yes()  p_trace() no()   p_packet() no()
+   priority(tl, 'none')     p_info() no()   p_trace() no()   p_packet() no()
+
    print("selftest: ok")
 end
 
