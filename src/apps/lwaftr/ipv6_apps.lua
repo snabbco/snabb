@@ -221,7 +221,7 @@ function NDP:push()
          -- drop all southbound packets until the next hop's ethernet address is known
           packet.free(p)
       else
-          ndp.set_dst_ethernet(p, self.dst_eth)
+          lwutil.set_dst_ethernet(p, self.dst_eth)
           transmit(osouth, p)
       end
    end

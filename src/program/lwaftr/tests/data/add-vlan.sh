@@ -11,6 +11,9 @@
 # Do not automatically regenerate it.
 
 V4=(
+    arp_reply_send.pcap
+    arp_request_recv.pcap
+    arp_request_send.pcap
     decap-ipv4-nohair.pcap
     decap-ipv4.pcap
     icmpv4-dst-host-unreachable-ip-bound-port-unbound.pcap
