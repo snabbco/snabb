@@ -14,11 +14,10 @@ that the log always includes a sample of interesting data for
 analysis.
 
 Logging to the timeline is efficient. Logging costs around 50 cycles
-when a message is enabled. The cost of skipping disabled messages is
-much less. The logging function is written in assembly language and is
-called by LuaJIT via the FFI. (Checking whether log messages are
-enabled is invisible to the trace compiler because it is done in the
-FFI call.)
+when a message is enabled and around 5 cycles when disabled. The
+logging function is written in assembly language and is called by
+LuaJIT via the FFI. (Checking whether log messages are enabled is
+invisible to the trace compiler because it is done in the FFI call.)
 
 #### File format and binary representation
 
