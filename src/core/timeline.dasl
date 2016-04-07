@@ -301,6 +301,24 @@ function selftest ()
       assert(i==0 or tl.ring[i].tsc > tl.ring[i-1].tsc, "tsc increase")
    end
 
+   -- Create some log entries showing the logging throughput for
+   -- messages that are disabled by priority.
+   -- (These will be printed below.)
+   local timing_start = define(tl, 'timing', 'trace', 'timing tight loop of disabled events')
+   local timing_loop  = define(tl, 'timing', 'trace',  'invoked many $events')
+   local timing_dis   = define(tl, 'timing', 'library', 'this message will not be logged')
+   priority(tl, 'trace')
+   timing_start()
+   for i = 1, 3 do
+      -- Loop running many disabled events
+      local n = 1e6
+      for j = 1, n do
+         -- Call an event that is disabled
+         timing_dis()
+      end
+      timing_loop(n)
+   end
+
    print("selftest: save and dump")
    save(tl, "selftest-timeline.dat")
    dump("selftest-timeline.dat", 15)
@@ -319,8 +337,6 @@ function selftest ()
       assert(ref_next ~= tl.header.next, "log message expected")
       ref_next = tl.header.next
    end
-   -- (default priority: all)
-                            p_info() yes()  p_trace() yes()  p_packet() yes()
    priority(tl, 'all')      p_info() yes()  p_trace() yes()  p_packet() yes()
    priority(tl, 'library')  p_info() yes()  p_trace() yes()  p_packet() yes()
    priority(tl, 'app')      p_info() yes()  p_trace() yes()  p_packet() no()
