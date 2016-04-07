@@ -60,6 +60,32 @@ function activate (t)
    end
 end
 
+local function find_timer (name)
+   for tick, set in pairs(timers) do
+      for i, t in ipairs(set) do
+         if t.name == name then
+            return tick, i
+         end
+      end
+   end
+   return nil
+end
+
+local function is_timer (t)
+   return type(t) == "table" and (t.name and t.fn and t.ticks)
+end
+
+function deactivate (timer_or_name)
+   local name = timer_or_name
+   if is_timer(timer_or_name) then
+      name = timer_or_name.name
+   end
+   assert(type(name) == "string", "Incorrect value. Timer name expected")
+   local tick, pos = find_timer(name)
+   if not tick then return end
+   table.remove(timers[tick], pos)
+end
+
 function new (name, fn, nanos, mode)
    return { name = name,
             fn = fn,
@@ -69,6 +95,12 @@ end
 
 function selftest ()
    print("selftest: timer")
+
+   -- Test deactivate.
+   local t = new("timer", function() end, 1e6)
+   activate(t)
+   deactivate(t)
+
    ticks = 0
    local ntimers, runtime = 10000, 100000
    local count, expected_count = 0, 0

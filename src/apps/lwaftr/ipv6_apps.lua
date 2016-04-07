@@ -165,6 +165,8 @@ function Fragmenter:push ()
    end
 end
 
+local NS_RESOLVE_THRESHOLD = 5 -- Time limit to resolve IPv6 addr to MAC.
+
 -- TODO: handle any NS retry policy code here
 function NDP:new(conf)
    local o = setmetatable({}, {__index=NDP})
@@ -172,10 +174,7 @@ function NDP:new(conf)
    -- TODO: verify that the src and dst ipv6 addresses and src mac address
    -- have been provided, in pton format.
    if not conf.dst_eth then
-      o.ns_pkt = ndp.form_ns(conf.src_eth, conf.src_ipv6, conf.dst_ipv6)
       o.do_ns_request = true
-   else
-       o.do_ns_request = false
    end
    o.dst_eth = conf.dst_eth -- Intentionally nil if to request by NS
    o.all_local_ipv6_ips = conf.all_ipv6_addrs
@@ -186,8 +185,30 @@ function NDP:push()
    local isouth, osouth = self.input.south, self.output.south
    local inorth, onorth = self.input.north, self.output.north
    if self.do_ns_request then
-      self.do_ns_request = false -- TODO: have retries, etc
-      transmit(osouth, packet.clone(self.ns_pkt))
+      self.do_ns_request = false
+      local ns_pkt = ndp.form_ns(self.conf.src_eth, self.conf.src_ipv6,
+         self.conf.dst_ipv6)
+      -- Send a NS packet inmediately.
+      transmit(osouth, packet.clone(ns_pkt))
+
+      -- Send a new NS packet after every second.
+      timer.activate(timer.new("retry_ns",
+                               function ()
+                                 transmit(osouth, packet.clone(ns_pkt))
+                               end,
+                               1e9,
+                               "repeating"))
+
+      -- Abort execution if NS_RESOLVE_THRESHOLD expires.
+      local function abort()
+         error(("Could not resolve IPv6 address: %s"):format(
+            ipv6:ntop(self.conf.dst_ipv6)))
+         main.exit(1)
+      end
+      timer.activate(timer.new("retry_ns_threshold",
+                               abort,
+                               NS_RESOLVE_THRESHOLD * 1e9))
+
       -- TODO: do unsolicited neighbor advertisement on start and on
       -- configuration reloads?
       -- This would be an optimization, not a correctness issue
@@ -199,6 +220,8 @@ function NDP:push()
             local dst_ethernet = ndp.get_dst_ethernet(p, {self.conf.dst_ipv6})
             if dst_ethernet then
                self.dst_eth = dst_ethernet
+               timer.deactivate("retry_ns_threshold")
+               timer.deactivate("retry_ns")
             end
             packet.free(p)
          elseif ndp.is_neighbor_solicitation_for_ips(p, self.all_local_ipv6_ips) then
