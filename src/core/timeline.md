@@ -126,3 +126,27 @@ strings `all` or `none`.
 
 Print the contents of a timeline, ordered from newest to oldest.
 
+This dump function is intended as a simple example. More sophisticated
+log viewing and analysis tools are eagerly anticipated.
+
+Here is the output:
+
+```
+numa core      -cycles category         message
+0    4         5033652 selftest         invoked many events(1000000)
+0    4         5013972 selftest         invoked many events(1000000)
+0    4         5178340 selftest         invoked many events(1000000)
+0    4      1753835508 selftest         timing tight loop of disabled events
+0    4              60 selftest         event with no args
+0    4              40 selftest         event with one arg: i(1048575)
+0    4              40 selftest         event with four args: i(1048575), 2i(2097150), 3i(3145725), and 4i(4194300)
+0    4              36 selftest         event with no args
+0    4              40 selftest         event with one arg: i(1048574)
+0    4              40 selftest         event with four args: i(1048574), 2i(2097148), 3i(3145722), and 4i(4194296)
+0    4              36 selftest         event with no args
+0    4              40 selftest         event with one arg: i(1048573)
+0    4              40 selftest         event with four args: i(1048573), 2i(2097146), 3i(3145719), and 4i(4194292)
+0    4              36 selftest         event with no args
+0    4              40 selftest         event with one arg: i(1048572)
+0    4              40 selftest         event with four args: i(1048572), 2i(2097144), 3i(3145716), and 4i(4194288)
+```
