@@ -103,7 +103,7 @@ end
 
 function message_args (string)
    local args = {}
-   string:gsub("[$](%w)+", function (arg) table.insert(args, arg) end)
+   string:gsub("[$](%w+)", function (arg) table.insert(args, arg) end)
    return args
 end
 
