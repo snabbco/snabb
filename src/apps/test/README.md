@@ -29,6 +29,12 @@ keys are defined:
 *Optional.* If this key is `true` packets from `rx` that do not match the next
 packet from `comparator` are ignored. The default is `false`.
 
+— Key **modest**
+
+*Optional.* If this key is `true` unmatched packets from `comparator` are
+ignored if at least one packet from ´rx´ was successfully matched. The default
+is `false`.
+
 
 ## Synth (apps.test.synth)
 

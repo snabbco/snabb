@@ -12,7 +12,10 @@ Match = {}
 
 function Match:new (arg)
    local conf = arg and config.parse_app_arg(arg) or {}
-   return setmetatable({ fuzzy = conf.fuzzy, seen = 0, errs = { } },
+   return setmetatable({ fuzzy = conf.fuzzy,
+                         modest = conf.modest,
+                         seen = 0,
+                         errs = { } },
                        { __index=Match })
 end
 
@@ -41,10 +44,12 @@ function Match:report ()
 end
 
 function Match:errors ()
-   while not link.empty(self.input.comparator) do
-      local p = link.receive(self.input.comparator)
-      table.insert(self.errs, "Not matched:\n"..dump(p))
-      packet.free(p)
+   if not (self.modest and self.seen > 0) then
+      while not link.empty(self.input.comparator) do
+         local p = link.receive(self.input.comparator)
+         table.insert(self.errs, "Not matched:\n"..dump(p))
+         packet.free(p)
+      end
    end
    return self.errs
 end
@@ -53,11 +58,19 @@ function selftest()
    local basic_apps = require("apps.basic.basic_apps")
    local c = config.new()
 
+   config.app(c, "sink", Match, {modest=true})
+   config.app(c, "comparator", basic_apps.Source, 8)
+   config.link(c, "comparator.output -> sink.comparator")
+   engine.configure(c)
+   engine.app_table.sink.input.rx = link.new("null")
+   engine.app_table.sink.seen = 1
+   engine.main({duration=0.0001})
+   assert(#engine.app_table.sink:errors() == 0)
+
+   engine.configure(config.new())
    config.app(c, "sink", Match)
    config.app(c, "src", basic_apps.Source, 8)
-   config.app(c, "comparator", basic_apps.Source, 8)
    config.link(c, "src.output -> sink.rx")
-   config.link(c, "comparator.output -> sink.comparator")
    engine.configure(c)
    engine.main({duration=0.0001})
    assert(#engine.app_table.sink:errors() == 0)
