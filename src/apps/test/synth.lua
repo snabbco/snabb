@@ -17,11 +17,14 @@ function Synth:new (arg)
    conf.dst = conf.dst or '00:00:00:00:00:00'
    local packets = {}
    for i, size in ipairs(conf.sizes) do
-      local ether = ethernet:new({ src = ethernet:pton(conf.src),
-				   dst = ethernet:pton(conf.dst) })
       local payload_size = size - ethernet:sizeof()
+      assert(payload_size >= 0 and payload_size <= 1536,
+             "Invalid payload size: "..payload_size)
       local data = ffi.new("char[?]", payload_size)
       local dgram = datagram:new(packet.from_pointer(data, payload_size))
+      local ether = ethernet:new({ src = ethernet:pton(conf.src),
+				   dst = ethernet:pton(conf.dst),
+                                   type = payload_size })
       dgram:push(ether)
       packets[i] = dgram:packet()
    end
