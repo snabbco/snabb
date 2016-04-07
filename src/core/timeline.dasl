@@ -133,7 +133,9 @@ function dump (filename,  maxentries)
    local strings = ffi.cast("char*", header.entries + (header.last + 1))
    local last = tonumber(header.last)
    local size = last + 1
-   print(("%8s %-16s %s"):format("cycles", "category", "message"))
+   -- Print column headers.
+   -- Note: "-cycles" column is time delta between entries (moving backwards in time)
+   print(("%4s %4s %8s %-16s %s"):format("numa", "core", "-cycles", "category", "message"))
    -- "Fast-forward" to the end (when following entry has earlier timestamp)
    local index = 0
    while ring[index].tsc <= ring[(index+1) % size].tsc do
@@ -143,10 +145,17 @@ function dump (filename,  maxentries)
    local ref_tsc = nil
    for i = 0, size-1 do
       if maxentries and i > maxentries then break end
-      local timedelta = ref_tsc and (ref_tsc - ring[index].tsc) or 0
+      local timedelta
+      if ref_tsc == nil then
+         timedelta = '<last>'
+      else
+         timedelta = tonumber(ref_tsc - ring[index].tsc)
+      end
       local msgid = ring[index].msg_id
       local icategory = bit.band(0xffff, bit.rshift(msgid, 40))
       local imessage = bit.band(0xffff, bit.rshift(msgid, 16))
+      local core = bit.band(0xff, ring[index].aux)
+      local numa = bit.band(0x0f, bit.rshift(ring[index].aux, 12))
       -- Lookup the messages and perform arg substitution
       local category = ffi.string(strings + icategory)
       local format = ffi.string(strings + imessage)
@@ -159,7 +168,8 @@ function dump (filename,  maxentries)
          return match:gsub("^[$]", "", 1).."("..table.remove(args)..")"
       end
       local message = format:gsub("($%w+)", subst)
-      print(("%8d %-16s %s"):format(tonumber(timedelta), category, message))
+      print(("%-4d %-4d %8s %-16s %s"):format(
+            numa, core, timedelta, category, message))
       ref_tsc = ring[index].tsc
       index = (index == 0) and last or index-1
    end
@@ -265,14 +275,14 @@ _anchor = mcode
 function selftest ()
    print("selftest: timeline")
    local tl = new("selftest/timeline")
-   local event1 = define(tl, 'selftest', 'trace', 'event1 $a $b $c $d')
-   local event2 = define(tl, 'selftest', 'trace', 'event2 $a')
-   local event3 = define(tl, 'selftest', 'trace', 'event3')
+   local event1 = define(tl, 'selftest', 'trace', 'event with four args: $i, $2i, $3i, and $4i')
+   local event2 = define(tl, 'selftest', 'trace', 'event with one arg: $i')
+   local event3 = define(tl, 'selftest', 'trace', 'event with no args')
    -- Log events
    for i = 0, tl.entries-1 do
-      if i % 3 == 0 then event1(i, i*2, i*3, i*4) end
-      if i % 3 == 1 then event2(i) end
-      if i % 3 == 2 then event3() end
+      event1(i, i*2, i*3, i*4)
+      event2(i)
+      event3()
    end
    -- Print statistics
    local times = {}
@@ -289,7 +299,7 @@ function selftest ()
    end
    print("selftest: save and dump")
    save(tl, "selftest-timeline.dat")
-   dump("selftest-timeline.dat", 10)
+   dump("selftest-timeline.dat", 15)
    print("selftest: ok")
 end
 
