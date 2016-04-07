@@ -18,9 +18,10 @@ ffi.cdef[[
   struct timeline_entry {
     uint64_t tsc;                    // CPU timestamp
     uint64_t ip;                     // Instruction pointer of logger
+    uint32_t aux;                    // TSC_AUX: core (bits 0-7) + numa (12-15)
+    uint32_t reserved;               // (pad to 64 bytes)
     uint64_t msg_id;                 // category:24, message:24, priority:16
     uint64_t msg0, msg1, msg2, msg3; // message arguments
-    uint64_t reserved;               // pad to 64 bytes
   };
 ]]
 
@@ -241,6 +242,7 @@ local function asmlog (Dst)
    | rdtscp
    | mov msg:r10->tsc, eax
    | mov [r10+4], edx
+   | mov msg:r10->aux, ecx
 
    -- Log the instruction pointer
    | mov rax, [rsp]
