@@ -144,11 +144,6 @@ function run (args)
      main.exit(1)
    end
 
-   if pcap_file and vlan then
-     print("VLAN support requires real hardware NICs with VMDq")
-     main.exit(1)
-   end
-
    print(string.format("packetblaster lwaftr: Sending %d clients at %.3f MPPS to %s", count, rate, pciaddr))
    print()
 
@@ -172,7 +167,7 @@ function run (args)
 
    config.app(c, "generator", Lwaftrgen, { 
      sizes = sizes, count = count, aftr_ipv6 = aftr_ipv6, rate = rate,
-     src_mac = src_mac, dst_mac = dst_mac, 
+     src_mac = src_mac, dst_mac = dst_mac, vlan = vlan,
      b4_ipv6 = b4_ipv6, b4_ipv4 = b4_ipv4, b4_port = b4_port,
      public_ipv4 = public_ipv4, single_pass = single_pass,
      ipv4_only = ipv4_only, ipv6_only = ipv6_only })
@@ -184,14 +179,12 @@ function run (args)
      input, output = "tap.input", "tap.output"
    elseif pciaddr then
      local device_info = pci.device_info(pciaddr)
-     local vmdq = false
      if vlan then
-       vmdq = true
        print(string.format("vlan set to %d", vlan))
      end
      if device_info then
        config.app(c, "nic", require(device_info.driver).driver,
-       {pciaddr = pciaddr, vmdq = vmdq, macaddr = src_mac, vlan = vlan, mtu = 9500})
+       {pciaddr = pciaddr, vmdq = false, macaddr = src_mac, mtu = 9500})
        input, output = "nic.rx", "nic.tx"
      else
        fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))

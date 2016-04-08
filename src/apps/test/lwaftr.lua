@@ -15,6 +15,7 @@ local cast = ffi.cast
 local copy = ffi.copy
 
 local PROTO_IPV4_ENCAPSULATION = 0x4
+local PROTO_VLAN = C.htons(0x8100)
 local PROTO_IPV4 = C.htons(0x0800)
 local PROTO_IPV6 = C.htons(0x86DD)
 
@@ -31,6 +32,16 @@ struct {
 local ether_header_ptr_type = ffi.typeof("$*", ether_header_t)
 local ethernet_header_size = ffi.sizeof(ether_header_t)
 local OFFSET_ETHERTYPE = 12
+
+local ether_vlan_header_type = ffi.typeof([[
+struct {
+  uint16_t tag;
+  uint16_t ether_type;
+}
+]])
+ether_vlan_header_ptr_type = ffi.typeof("$*", ether_vlan_header_type)
+ether_vlan_header_size = ffi.sizeof(ether_vlan_header_type)
+local OFFSET_ETHERTYPE_VLAN = OFFSET_ETHERTYPE + ether_vlan_header_size
 
 local ipv4hdr_t = ffi.typeof[[
 struct {
@@ -113,6 +124,7 @@ function Lwaftrgen:new(arg)
   local conf = arg and config.parse_app_arg(arg) or {}
   local dst_mac = ethernet:pton(conf.dst_mac)
   local src_mac = ethernet:pton(conf.src_mac)
+  local vlan = conf.vlan
   local b4_ipv6 = conf.b4_ipv6 and ipv6:pton(conf.b4_ipv6)
   local b4_ipv4 = conf.b4_ipv4 and ipv4:pton(conf.b4_ipv4)
   local public_ipv4 = conf.public_ipv4 and ipv4:pton(conf.public_ipv4)
@@ -121,9 +133,21 @@ function Lwaftrgen:new(arg)
   local ipv4_pkt = packet.allocate()
   local eth_hdr = cast(ether_header_ptr_type, ipv4_pkt.data)
   eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
-  eth_hdr.ether_type = PROTO_IPV4
 
-  local ipv4_hdr = cast(ipv4_header_ptr_type, ipv4_pkt.data + ethernet_header_size)
+  local ipv4_hdr, udp_offset
+  if vlan then
+    udp_offset = 38
+    eth_hdr.ether_type = PROTO_VLAN
+    local vlan_hdr = cast(ether_vlan_header_ptr_type, ipv4_pkt.data + ethernet_header_size)
+    vlan_hdr.ether_type = PROTO_IPV4
+    vlan_hdr.tag = C.htons(vlan)
+    ipv4_hdr = cast(ipv4_header_ptr_type, ipv4_pkt.data + ethernet_header_size + ether_vlan_header_size)
+  else
+    udp_offset = 34
+    eth_hdr.ether_type = PROTO_IPV4
+    ipv4_hdr = cast(ipv4_header_ptr_type, ipv4_pkt.data + ethernet_header_size)
+  end
+
   ipv4_hdr.src_ip = public_ipv4
   ipv4_hdr.dst_ip = b4_ipv4
   ipv4_hdr.ttl = 15
@@ -134,10 +158,10 @@ function Lwaftrgen:new(arg)
   local ipv4_udp_hdr, ipv4_payload
 
   ipv4_hdr.protocol = 17  -- UDP(17)
-  ipv4_udp_hdr = cast(udp_header_ptr_type, ipv4_pkt.data + 34)
+  ipv4_udp_hdr = cast(udp_header_ptr_type, ipv4_pkt.data + udp_offset)
   ipv4_udp_hdr.src_port = C.htons(12345)
   ipv4_udp_hdr.checksum = 0
-  ipv4_payload = cast(payload_ptr_type, ipv4_pkt.data + 34 + udp_header_size)
+  ipv4_payload = cast(payload_ptr_type, ipv4_pkt.data + udp_offset + udp_header_size)
   ipv4_payload.magic = MAGIC
   ipv4_payload.number = 0
 
@@ -146,16 +170,28 @@ function Lwaftrgen:new(arg)
   local ipv6_pkt = packet.allocate()
   local eth_hdr = cast(ether_header_ptr_type, ipv6_pkt.data)
   eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
-  eth_hdr.ether_type = C.htons(0x86DD)
 
-  local ipv6_hdr = cast(ipv6_header_ptr_type, ipv6_pkt.data + ethernet_header_size)
+
+  local ipv6_hdr, ipv6_ipv4_hdr
+  if vlan then
+    eth_hdr.ether_type = PROTO_VLAN
+    local vlan_hdr = cast(ether_vlan_header_ptr_type, ipv6_pkt.data + ethernet_header_size)
+    vlan_hdr.ether_type = PROTO_IPV6
+    vlan_hdr.tag = C.htons(vlan)
+    ipv6_hdr = cast(ipv6_header_ptr_type, ipv6_pkt.data + ethernet_header_size + ether_vlan_header_size)
+    ipv6_ipv4_hdr = cast(ipv4_header_ptr_type, ipv6_pkt.data + ethernet_header_size + ether_vlan_header_size + ipv6_header_size)
+  else
+    eth_hdr.ether_type = PROTO_IPV6
+    ipv6_hdr = cast(ipv6_header_ptr_type, ipv6_pkt.data + ethernet_header_size)
+    ipv6_ipv4_hdr = cast(ipv4_header_ptr_type, ipv6_pkt.data + ethernet_header_size + ipv6_header_size)
+  end
+
   lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6) -- IPv6 Version
   lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, 1) -- Traffic class
   ipv6_hdr.next_header = PROTO_IPV4_ENCAPSULATION
   ipv6_hdr.hop_limit = DEFAULT_TTL
   ipv6_hdr.dst_ip = aftr_ipv6
 
-  local ipv6_ipv4_hdr = cast(ipv4_header_ptr_type, ipv6_pkt.data + ethernet_header_size + ipv6_header_size)
   ipv6_ipv4_hdr.dst_ip = public_ipv4
   ipv6_ipv4_hdr.ttl = 15
   ipv6_ipv4_hdr.ihl_v_tos = C.htons(0x4500) -- v4
@@ -175,10 +211,10 @@ function Lwaftrgen:new(arg)
   end
 
   ipv6_ipv4_hdr.protocol = 17  -- UDP(17)
-  ipv6_ipv4_udp_hdr = cast(udp_header_ptr_type, ipv6_pkt.data + 34 + ipv6_header_size)
+  ipv6_ipv4_udp_hdr = cast(udp_header_ptr_type, ipv6_pkt.data + udp_offset + ipv6_header_size)
   ipv6_ipv4_udp_hdr.dst_port = C.htons(12345)
   ipv6_ipv4_udp_hdr.checksum = 0
-  ipv6_payload = cast(payload_ptr_type, ipv6_pkt.data + 34 + ipv6_header_size + udp_header_size)
+  ipv6_payload = cast(payload_ptr_type, ipv6_pkt.data + udp_offset + ipv6_header_size + udp_header_size)
   ipv6_payload.magic = MAGIC
   ipv6_payload.number = 0
 
@@ -203,6 +239,7 @@ function Lwaftrgen:new(arg)
     ipv6_ipv4_udp_hdr = ipv6_ipv4_udp_hdr,
     ipv4_only = conf.ipv4_only,
     ipv6_only = conf.ipv6_only,
+    vlan = vlan,
     protocol = conf.protocol,
     rate = conf.rate,
     sizes = conf.sizes,
@@ -237,7 +274,7 @@ function Lwaftrgen:push ()
     if cast(uint16_ptr_t, pkt.data + OFFSET_ETHERTYPE)[0] == PROTO_IPV6 then
       ipv6_bytes = ipv6_bytes + pkt.length
       ipv6_packets = ipv6_packets + 1
-      local payload = cast(payload_ptr_type, pkt.data + 34 + ipv6_header_size + udp_header_size)
+      local payload = cast(payload_ptr_type, pkt.data + offset + ipv6_header_size + udp_header_size)
       if payload.magic == MAGIC then
         if self.last_rx_ipv6_packet_number > 0 then
           lost_packets = lost_packets + payload.number - self.last_rx_ipv6_packet_number - 1  
@@ -247,7 +284,7 @@ function Lwaftrgen:push ()
     else
       ipv4_bytes = ipv4_bytes + pkt.length
       ipv4_packets = ipv4_packets + 1
-      local payload = cast(payload_ptr_type, pkt.data + 34 + udp_header_size)
+      local payload = cast(payload_ptr_type, pkt.data + offset + udp_header_size)
       if payload.magic == MAGIC then
         if self.last_rx_ipv4_packet_number > 0 then
           lost_packets = lost_packets + payload.number - self.last_rx_ipv4_packet_number - 1  
@@ -309,8 +346,13 @@ function Lwaftrgen:push ()
 
         if not self.ipv6_only then
           ipv4_hdr.total_length = C.htons(size)
-          ipv4_udp_hdr.len = C.htons(size - 28)
-          self.ipv4_pkt.length = size + ethernet_header_size
+          if self.vlan then
+            ipv4_udp_hdr.len = C.htons(size - 28 + 4)
+            self.ipv4_pkt.length = size + ethernet_header_size + 4
+          else
+            ipv4_udp_hdr.len = C.htons(size - 28)
+            self.ipv4_pkt.length = size + ethernet_header_size
+          end
           ipv4_hdr.checksum =  0
           ipv4_hdr.checksum = C.htons(ipsum(self.ipv4_pkt.data + ethernet_header_size, 20, 0))
           self.ipv4_payload.number = self.ipv4_packet_number;
@@ -322,8 +364,13 @@ function Lwaftrgen:push ()
         if not self.ipv4_only then
           ipv6_hdr.payload_length = C.htons(size)
           ipv6_ipv4_hdr.total_length = C.htons(size)
-          ipv6_ipv4_udp_hdr.len = C.htons(size - 28)
-          self.ipv6_pkt.length = size + 54
+          if self.vlan then
+            ipv6_ipv4_udp_hdr.len = C.htons(size - 28 + 4)
+            self.ipv6_pkt.length = size + 54 + 4
+          else
+            ipv6_ipv4_udp_hdr.len = C.htons(size - 28)
+            self.ipv6_pkt.length = size + 54
+          end
           self.ipv6_payload.number = self.ipv6_packet_number;
           self.ipv6_packet_number = self.ipv6_packet_number + 1
           local ipv6_pkt = packet.clone(self.ipv6_pkt)
