@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 
 echo "selftest: packetblaster"
+
+# do tests first that don't require PCI
+TEMP_PCAP=/tmp/lwaftr$$.pcap
+./snabb packetblaster lwaftr --pcap $TEMP_PCAP --count 1
+status=$?
+if [ $status != 0 ]; then
+    echo "Error: lwaftr pcap generation failed with ${status}"
+    exit 1
+fi
+cmp $TEMP_PCAP test_lwaftr_1.pcap
+status=$?
+rm $TEMP_PCAP
+if [ $status != 0 ]; then
+    echo "Error: lwaftr pcap generated file differs from test_lwaftr_1.pcap"
+    exit 1
+fi
+
 export PCIADDR=$SNABB_PCI_INTEL0
 [ ! -z "$PCIADDR" ] || export PCIADDR=$SNABB_PCI0
 if [ -z "${PCIADDR}" ]; then
