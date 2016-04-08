@@ -387,9 +387,9 @@ function Lwaftrgen:push ()
           self.b4_ipv4_offset = self.b4_ipv4_offset + 1
         end
 
-        if self.current_count >= self.count then
+        if self.current_count >= self.count * self.total_packet_count then
           if self.single_pass then
-            print(string.format("generated packets for %d bindings", self.current_count))
+            print(string.format("generated %d packets", self.current_count))
             -- make sure we won't generate more packets in the same breath, then exit
             self.current = 0
             self.bucket_content = 0 
