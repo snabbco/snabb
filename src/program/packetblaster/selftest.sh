@@ -10,7 +10,7 @@ if [ $status != 0 ]; then
     echo "Error: lwaftr pcap generation failed with ${status}"
     exit 1
 fi
-cmp $TEMP_PCAP test_lwaftr_1.pcap
+cmp $TEMP_PCAP program/packetblaster/lwaftr/test_lwaftr_1.pcap
 status=$?
 rm $TEMP_PCAP
 if [ $status != 0 ]; then
