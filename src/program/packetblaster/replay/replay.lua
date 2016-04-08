@@ -2,10 +2,7 @@
 
 module(..., package.seeall)
 
-local engine     = require("core.app")
 local config     = require("core.config")
-local timer      = require("core.timer")
-local intel10g   = require("apps.intel.intel10g")
 local basic_apps = require("apps.basic.basic_apps")
 local main       = require("core.main")
 local PcapReader = require("apps.pcap.pcap").PcapReader
@@ -39,15 +36,5 @@ function run (args)
    config.app(c, "source", basic_apps.Tee)
    config.link(c, "pcap.output -> loop.input")
    config.link(c, "loop.output -> source.input")
-
-   local patterns = args
-   local nics = packetblaster.config_loadgen(c, patterns)
-   assert(nics > 0, "<PCI> matches no suitable devices.")
-   engine.busywait = true
-   intel10g.num_descriptors = 32*1024
-   engine.configure(c)
-   local t = timer.new("report", packetblaster.report, 1e9, 'repeating')
-   timer.activate(t)
-   if duration then engine.main({duration=duration})
-   else             engine.main() end
+   packetblaster.run_loadgen(c, args, duration)
 end

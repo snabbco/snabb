@@ -2,8 +2,11 @@
 
 module(..., package.seeall)
 
-local lib = require("core.lib")
-local pci = require("lib.hardware.pci")
+local engine    = require("core.app")
+local timer     = require("core.timer")
+local intel10g  = require("apps.intel.intel10g")
+local lib       = require("core.lib")
+local pci       = require("lib.hardware.pci")
 local LoadGen   = require("apps.intel.loadgen").LoadGen
 
 local function is_device_suitable (pcidev, patterns)
@@ -20,7 +23,7 @@ local function is_device_suitable (pcidev, patterns)
    end
 end
 
-function config_loadgen(c, patterns)
+function run_loadgen (c, patterns, duration)
   local nics = 0
   pci.scan_devices()
   for _,device in ipairs(pci.devices) do
@@ -31,19 +34,23 @@ function config_loadgen(c, patterns)
       config.link(c, "source."..tostring(nics).."->"..name..".input")
     end
   end
-  return nics
+  assert(nics > 0, "<PCI> matches no suitable devices.")
+  engine.busywait = true
+  intel10g.num_descriptors = 32*1024
+  engine.configure(c)
+  local fn = function ()
+                print("Transmissions (last 1 sec):")
+                engine.report_apps()
+             end
+  local t = timer.new("report", fn, 1e9, 'repeating')
+  timer.activate(t)
+  if duration then engine.main({duration=duration})
+  else             engine.main() end
 end
-
 local function show_usage(exit_code)
   print(require("program.packetblaster.README_inc"))
   main.exit(exit_code)
 end
-
-function report ()
-  print("Transmissions (last 1 sec):")
-  engine.report_apps()
-end
-
 
 function run(args)
   if #args == 0 then show_usage(1) end
