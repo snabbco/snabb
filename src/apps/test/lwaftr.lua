@@ -190,6 +190,7 @@ function Lwaftrgen:new(arg)
     b4_ipv4_offset = 0,
     ipv6_address = n_cache_src_ipv6,
     count = conf.count,
+    single_pass = conf.single_pass,
     current_count = 0,
     ipv4_pkt = ipv4_pkt,
     ipv4_hdr = ipv4_hdr,
@@ -225,6 +226,10 @@ function Lwaftrgen:push ()
   local ipv4_packets = self.ipv4_packets
   local ipv4_bytes = self.ipv4_bytes
   local lost_packets = self.lost_packets
+
+  if self.current == 0 then
+    main.exit(0)
+  end
 
   -- count and trash incoming packets
   for _=1,link.nreadable(input) do
@@ -336,6 +341,12 @@ function Lwaftrgen:push ()
         end
 
         if self.current_count >= self.count then
+          if self.single_pass then
+            print(string.format("generated packets for %d bindings", self.current_count))
+            -- make sure we won't generate more packets in the same breath, then exit
+            self.current = 0
+            self.bucket_content = 0 
+          end
           self.current_count = 0
           self.current_port = self.b4_port
           self.b4_ipv4_offset = 0

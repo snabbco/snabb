@@ -12,6 +12,7 @@ local main      = require("core.main")
 local S         = require("syscall")
 local Lwaftrgen = require("apps.test.lwaftr").Lwaftrgen
 local Tap       = require("apps.tap.tap").Tap
+local pcap      = require("apps.pcap.pcap")
 local lib       = require("core.lib")
 local ffi       = require("ffi")
 local C         = ffi.C
@@ -33,7 +34,8 @@ local long_opts = {
    count        = "c",    -- how many b4 clients to simulate
    rate         = "r",    -- rate in MPPS (0 => listen only)
    v4only       = "P",    -- generate only public IPv4 traffic
-   v6only       = "E"     -- generate only public IPv6 encapsulated traffic
+   v6only       = "E",    -- generate only public IPv6 encapsulated traffic
+   pcap         = "o"     -- output packet to the pcap file
 }
 
 local function dir_exists(path)
@@ -129,11 +131,22 @@ function run (args)
      vlan = assert(tonumber(arg), "duration is not a number!")
    end
 
-   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:", long_opts)
+   local pcap_file, single_pass
+   function opt.o (arg) 
+     pcap_file = arg
+     single_pass = true
+   end
 
-   if not pciaddr then
-      print(usage)
-      main.exit(1)
+   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:", long_opts)
+
+   if not pciaddr and not pcap_file then
+     print("either --pci or --pcap are required parameters")
+     main.exit(1)
+   end
+
+   if pcap_file and vlan then
+     print("VLAN support requires real hardware NICs with VMDq")
+     main.exit(1)
    end
 
    print(string.format("packetblaster lwaftr: Sending %d clients at %.3f MPPS to %s", count, rate, pciaddr))
@@ -152,8 +165,6 @@ function run (args)
     print("IPv4 packet sizes: " .. table.concat(sizes,","))
    end
 
-   print()
-
    if ipv4_only and ipv6_only then
      print("Remove options v4only and v6only to generate both")
      main.exit(1)
@@ -163,20 +174,15 @@ function run (args)
      sizes = sizes, count = count, aftr_ipv6 = aftr_ipv6, rate = rate,
      src_mac = src_mac, dst_mac = dst_mac, 
      b4_ipv6 = b4_ipv6, b4_ipv4 = b4_ipv4, b4_port = b4_port,
-     public_ipv4 = public_ipv4,
+     public_ipv4 = public_ipv4, single_pass = single_pass,
      ipv4_only = ipv4_only, ipv6_only = ipv6_only })
-
-   if nil == pciaddr then
-      print(usage)
-      main.exit(1)
-   end
 
    local input, output
 
    if dir_exists(("/sys/devices/virtual/net/%s"):format(pciaddr)) then
      config.app(c, "tap", Tap, pciaddr)
      input, output = "tap.input", "tap.output"
-   else
+   elseif pciaddr then
      local device_info = pci.device_info(pciaddr)
      local vmdq = false
      if vlan then
@@ -190,6 +196,9 @@ function run (args)
      else
        fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))
      end
+   else
+     config.app(c, "pcap", pcap.PcapWriter, pcap_file)
+     input, output = "pcap.input", "pcap.output"
    end
 
    config.link(c, output .. " -> generator.input")
