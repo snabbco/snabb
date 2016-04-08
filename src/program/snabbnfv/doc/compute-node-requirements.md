@@ -13,9 +13,9 @@ recommendations for more background.)
 3. Network cards connected to CPUs (NUMA nodes) as desired. For example,
 spread equally between nodes.
 
-#### Reserve CPU cores for Snabb Switch
+#### Reserve CPU cores for Snabb
 
-Snabb Switch traffic processes run on dedicated CPU cores. The peak
+Snabb traffic processes run on dedicated CPU cores. The peak
 performance configuration is to reserve one core (and its hyperthread)
 for each 10G network port.
 
@@ -30,7 +30,7 @@ You could reserve these resources:
 * Corresponding Hyperthreads 36-39 (CPU0) and 54-57 (CPU1). (If
   Hyperthreads are enabled in hardware.)
 
-The details of how to reserve CPUs and assign them to Snabb Switch
+The details of how to reserve CPUs and assign them to Snabb
 processes are given below.
 
 #### Kernel parameters setup
@@ -38,7 +38,7 @@ processes are given below.
 1. Disable the IOMMU: `intel_iommu=off`.
 2. Reserve all memory for virtual machines as huge pages. Example for
 24GB x 2MB pages: `hugepages=12288`.
-3. Reserve CPU cores for Snabb Switch traffic processes by isolating them
+3. Reserve CPU cores for Snabb traffic processes by isolating them
 from the Linux scheduler. Based on the example above:
 `isolcpus=0-3,18-21,36-39,54-57`.
 

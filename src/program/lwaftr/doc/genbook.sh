@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This shell scripts generates the top-level Markdown structure of the
-# Snabb Switch lwAFTR manual.
+# Snabb lwAFTR manual.
 #
 # The authors list is automatically generated from Git history,
 # ordered from most to least commits.
@@ -11,7 +11,7 @@
 lwaftr_app=../../../apps/lwaftr/
 
 cat <<EOF
-% Snabb Switch lwAFTR Manual
+% Snabb lwAFTR Manual
 % $(git log --pretty="%an" $lwaftr_app | \
         grep -v -e '^root$' | \
         sort | uniq -c | sort -nr | sed 's/^[0-9 ]*//' | \

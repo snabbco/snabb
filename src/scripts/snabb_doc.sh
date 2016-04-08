@@ -5,7 +5,7 @@
 # (http://stedolan.github.io/jq/).
 
 export SNABBDOCDIR=${SNABBDOCDIR:-"/tmp/snabb_doc"}
-export REPO=${REPO:-"SnabbCo/snabbswitch"}
+export REPO=${REPO:-"snabbco/snabb"}
 export DOCREPO=${DOCREPO:-"snabbco/snabbco.github.io"}
 export DOCURL=${DOCURL:-"https://snabbco.github.io"}
 export JQ=${JQ:-$(which jq)}
@@ -76,7 +76,9 @@ function build_doc1 {
     ((cd $(repo_path)/src && git checkout $1 && make doc/snabbswitch.html) \
         && mv $(repo_path)/src/doc/snabbswitch.html $2) \
  || ((cd $(repo_path)/src && git checkout $1 && make obj/doc/snabbswitch.html) \
-        && mv $(repo_path)/src/obj/doc/snabbswitch.html $2)
+        && mv $(repo_path)/src/obj/doc/snabbswitch.html $2) \
+ || ((cd $(repo_path)/src && git checkout $1 && make obj/doc/snabb.html) \
+        && mv $(repo_path)/src/obj/doc/snabb.html $2)
 }
 
 function build_doc {

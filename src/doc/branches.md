@@ -1,4 +1,4 @@
-## Snabb Switch development branches
+## Snabb development branches
 
 The branches listed below are automatically synchronized with the
 SnabbCo account on Github. Users typically get all of these branches
@@ -12,18 +12,18 @@ The current state of each branch with respect to master is visible here:
 
     BRANCH: master git://github.com/lukego/snabbswitch
     Stable branch suitable for development and deployment.
-    
+
     - Always contains a stable release that is safe to pull from.
     - Updated monthly with new features and weekly with new bug fixes.
     - Changes are gated by the SnabbBot CI.
-    
+
     Maintainer: Luke Gorrie <luke@snabb.co> and Max Rottenkolber <max@mr.gy>
 
 #### next
 
     BRANCH: next git://github.com/lukego/snabbswitch
     Test and integration branch for new development.
-    
+
     - Contains the changes for the next monthly feature release.
     - Merges Pull Requests that pass code review on Github.
     - Cycles between unstable and stable with the release schedule.
@@ -74,17 +74,75 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Andy Wingo <wingo@igalia.com>
 
-#### documenation-fixups
+#### documenation
 
-    BRANCH: documentation-fixups git://github.com/eugeneia/snabbswitch
-    Documentation fixes and improvements.
-    
+    BRANCH: documentation git://github.com/eugeneia/snabbswitch
+    Editing and integration branch for documentation changes.
+
     Maintainer: Max Rottenkolber <max@mr.gy>
 
 #### vpn
-    
+
     BRANCH: vpn git://github.com/alexandergall/snabbswitch
     VPN application development branch.
-    
+
     Maintainer: Alexander Gall <gall@switch.ch>
+
+#### lwaftr
+
+    BRANCH: lwaftr git://github.com/Igalia/snabbswitch
+    Lightweight 4-over-6 AFTR application development branch.
+
+    Maintainer: Collectively maintained by lwAFTR application developers.
+    Next hop: kbara-next
+
+#### mellanox
+
+    BRANCH: mellanox git://github.com/lukego/snabbswitch
+    Mellanox ConnectX device driver development.
+
+    Maintainer: Luke Gorrie <luke@snabb.co>
+
+#### multiproc
+
+    BRANCH: multiproc git://github.com/lukego/snabbswitch
+    Multiple process parallel processing development branch.
+
+    Maintainer: Luke Gorrie <luke@snabb.co>
+
+#### lisper
+
+    BRANCH: lisper git://github.com/capr/snabbswitch
+    LISPER program for creating L2 networks over IPv6 networks.
+
+    Maintainer: Cosmin Apreutesei <cosmin.apreutesei@gmail.com>
+
+#### pdf-manual
+
+    BRANCH: pdf-manual git://github.com/lukego/snabbswitch
+    Maintenance branch for the PDF edition of the Snabb manual.
+
+    - Ensures that the PDF manual builds and looks good.
+    - Supports documentation revision and integration efforts.
+    - Feeds upstream to documentation-fixes.
+
+    Maintainer: Luke Gorrie <luke@snabb.co>
+
+#### ipsec
+
+    BRANCH: ipsec git://github.com/eugeneia/snabbswitch
+    IPsec library development branch.
+
+    Maintainer: Max Rottenkolber <max@mr.gy>
+
+### nix
+
+    BRANCH: nix git://github.com/domenkozar/snabbswitch
+    Nix expressions for building/testing Snabb.
+
+    - Contains changes proposed to be merged into next
+    - Contains infrastructure changes built by https://hydra.snabb.co
+    - Feeds upstream to kbara-next.
+
+    Maintainer: Domen Kožar <domen@dev.si>
 

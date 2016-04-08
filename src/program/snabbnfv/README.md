@@ -2,7 +2,7 @@
 
 The `program.snabbnfv.nfvconfig` module implements a [Network Functions
 Virtualization](https://en.wikipedia.org/wiki/Network_Functions_Virtualization)
-component based on Snabb Switch. It introduces a simple configuration
+component based on Snabb. It introduces a simple configuration
 file format to describe NFV configurations which it then compiles to app
 networks. This NFV component is compatible with [OpenStack
 Neutron](https://wiki.openstack.org/wiki/Neutron).

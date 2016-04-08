@@ -8,7 +8,7 @@ typical linux bridge used in VMs, the tun/tap device, the QEMU device emulator
 and the host kernel vhost-net handler.  That way, the SnabbSwitch process gets
 access to the very same memory pages presented to the virtio device in the VM.
 
-However the implementation of Snabb Switch running within a VM can be still
+However the implementation of Snabb running within a VM can be still
 further improved.  The current approach assumes the VM would run third-party
 applications that use TCP/UDP endpoints given by a stock OS, and with a
 virtio-net driver that interacts with the virtio device by attaching buffers to

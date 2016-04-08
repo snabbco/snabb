@@ -183,7 +183,7 @@ function selftest ()
       -- Test experience in the lab suggests that the 82599 T3 NIC
       -- requires at least two seconds before it will reliably pass
       -- traffic. The test case sleeps for this reason.
-      -- See https://github.com/SnabbCo/snabbswitch/pull/569
+      -- See https://github.com/SnabbCo/snabb/pull/569
       C.usleep(2e6)
    end
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
