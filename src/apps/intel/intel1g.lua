@@ -109,7 +109,7 @@ function Intel1g:new(conf)
    pci.set_bus_master(pciaddress, true)
    local regs, mmiofd = pci.map_pci_memory(pciaddress, 0)
 
-   -- Common utilities, see snabbswitch/src/lib/hardware/register.lua
+   -- Common utilities, see snabb/src/lib/hardware/register.lua
    local function bitvalue (value)
       -- bitvalue(0x42)      => 0x42
       -- bitvalue({a=7,b=2}) => 0x42

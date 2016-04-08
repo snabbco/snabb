@@ -550,14 +550,14 @@ end
 function M_sf:wait_linkup ()
    self.waitlu_ms = 0
    local mask = bits{Link_up=30}
-   for count = 1, 250 do
+   for count = 1, 1000 do
       if band(self.r.LINKS(), mask) == mask then
          self.waitlu_ms = count
          return self
       end
       C.usleep(1000)
    end
-   self.waitlu_ms = 250
+   self.waitlu_ms = 1000
    return self
 end
 
