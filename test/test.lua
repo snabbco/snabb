@@ -18,6 +18,9 @@ local function default_tags()
   if loadstring"return 0xep+9" then
     tags.hexfloat = true
   end
+  if loadstring"goto x ::x::" then
+    tags["goto"] = true
+  end
 
   -- Libraries
   for _, lib in ipairs{"bit", "ffi", "jit.profile", "table.new"} do

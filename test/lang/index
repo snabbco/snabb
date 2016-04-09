@@ -10,3 +10,4 @@ upvalue
 coroutine.lua
 tail_recursion.lua
 gc.lua
+goto.lua +goto
