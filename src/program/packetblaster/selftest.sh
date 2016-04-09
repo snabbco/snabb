@@ -3,20 +3,29 @@
 echo "selftest: packetblaster"
 
 # do tests first that don't require PCI
-TEMP_PCAP=/tmp/lwaftr$$.pcap
-./snabb packetblaster lwaftr --pcap $TEMP_PCAP --count 1
-status=$?
-if [ $status != 0 ]; then
-    echo "Error: lwaftr pcap generation failed with ${status}"
+
+function test_lwaftr_pcap {
+  PCAP=$1
+  shift
+  TEMP_PCAP=/tmp/lwaftr$$.pcap
+  echo "testing lwaftr pcap $PCAP ..."
+  ./snabb packetblaster lwaftr --pcap $TEMP_PCAP $@
+  status=$?
+  if [ $status != 0 ]; then
+    echo "Error: lwaftr pcap generation failed for ${PCAP} with ${status}"
+    rm $TEMP_PCAP
     exit 1
-fi
-cmp $TEMP_PCAP program/packetblaster/lwaftr/test_lwaftr_1.pcap
-status=$?
-rm $TEMP_PCAP
-if [ $status != 0 ]; then
-    echo "Error: lwaftr pcap generated file differs from test_lwaftr_1.pcap"
+  fi
+  cmp $TEMP_PCAP $PCAP
+  rm $TEMP_PCAP
+  if [ $status != 0 ]; then
+    echo "Error: lwaftr generated pcap differs from ${PCAP}"
     exit 1
-fi
+  fi
+}
+
+test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_1.pcap --count 1
+test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_2.pcap --count 2 --vlan 100 --size 0
 
 export PCIADDR=$SNABB_PCI_INTEL0
 [ ! -z "$PCIADDR" ] || export PCIADDR=$SNABB_PCI0
