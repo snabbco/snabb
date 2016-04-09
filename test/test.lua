@@ -370,13 +370,17 @@ local function execute_plan(plan, opts)
     local plan_i = plan[i]
     local test = plan_i[3]
     if test then
+      local file, name = plan_i[1], plan_i[2]
       if not opts.quiet then
-        local file, name = plan_i[1], plan_i[2]
         io_write(progress_format:format(i), file)
         io_write(file == "" and "" or " --- ", name, "\n")
       end
       local ok, err = xpcall(test, debug_traceback)
       if not ok then
+        if opts.quiet then
+          io_write(progress_format:format(i), file)
+          io_write(file == "" and "" or " --- ", name, "\n")
+        end
         fail_numbers[#fail_numbers + 1] = i
         io_write(err, "\n")
       end
