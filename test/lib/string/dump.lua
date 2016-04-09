@@ -1,3 +1,5 @@
+local loadstring = loadstring or load
+
 do --- Must unpatch modified bytecode with ILOOP/JLOOP etc.
   local function foo()
     local t = {}

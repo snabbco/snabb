@@ -20,8 +20,6 @@ do --- misc
   assert(y == "aaaaaaaaaa")
   for i=1,100 do y = rep("ab", 10) end
   assert(y == "abababababababababab")
-  for i=1,100 do y = rep("ab", 10, "c") end
-  assert(y == "abcabcabcabcabcabcabcabcabcab")
   local x = "a"
   for i=1,100 do y = rep(x, 10) end
   assert(y == "aaaaaaaaaa")
@@ -37,10 +35,20 @@ do --- misc
   assert(y == "12121212121212121212")
 end
 
+do --- separator +goto
+  local y
+  for i=1,100 do y = rep("ab", 10, "c") end
+  assert(y == "abcabcabcabcabcabcabcabcabcab")
+end
+
 do --- iterate to table
   local t = {}
   for i=1,100 do t[i] = rep("ab", i-85) end
   assert(t[100] == "ababababababababababababababab")
+end
+
+do --- iterate to table with sep +goto
+  local t = {}
   for i=1,100 do t[i] = rep("ab", i-85, "c") end
   assert(t[85] == "")
   assert(t[86] == "ab")
