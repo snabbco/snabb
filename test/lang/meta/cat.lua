@@ -1,16 +1,15 @@
-
-do
-  local a, b, c = "foo", "bar", "baz"
-  assert(a..b == "foobar")
-  assert(a..b..c == "foobarbaz")
-end
-
 local function create(cat, v1, v2)
   local meta = { __concat = cat }
   return setmetatable({v1}, meta), setmetatable({v2}, meta)
 end
 
-do
+do --- default
+  local a, b, c = "foo", "bar", "baz"
+  assert(a..b == "foobar")
+  assert(a..b..c == "foobarbaz")
+end
+
+do --- lhs
   local a, b = create(function(a, b) return a end)
   assert(a..b == a)
   assert(b..a == b)
@@ -20,7 +19,7 @@ do
   assert(a..b..b..b..b..b..b..b == a)
 end
 
-do
+do --- rhs
   local a, b = create(function(a, b) return b end)
   assert(a..b == b)
   assert(b..a == a)
@@ -30,7 +29,7 @@ do
   assert(a..a..a..a..a..a..a..b == b)
 end
 
-do
+do --- mixed types
   local a, b = create(function(a, b)
     return (type(a) == "string" and a or a[1])..
 	   (type(b) == "string" and b or b[1])
@@ -45,7 +44,7 @@ do
   assert(a..b..a..b..a.."x".."x".."x" == "ababaxxx")
 end
 
-do
+do --- jit mixed types
   local a, b = create(function(a, b)
     if a ~= b then local x = gg end
     return (type(a) == "string" and a or a[1])..

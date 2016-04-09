@@ -1,5 +1,5 @@
 
-do
+do --- coverage
   local eq = false
   local t, u = {}, {}
   local x, ax, bx
@@ -25,7 +25,7 @@ do
   x = 0; for i=1,100 do x = not (t ~= u) and 2 or 1 end ck(2, t, u)
 end
 
-do
+do --- non-constant objects +bit
   local bit = require("bit")
   local mt = { __eq = function(a, b) return true end }
   local tt = { [0] = setmetatable({}, mt), setmetatable({}, mt) }
@@ -33,4 +33,3 @@ do
     assert(tt[0] == tt[bit.band(i, 1)])
   end
 end
-

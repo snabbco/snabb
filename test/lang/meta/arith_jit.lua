@@ -1,5 +1,5 @@
 
-do
+do --- assert rhs
   local t = {}
   local mt = {
     __add = function(a, b) assert(b == t); return a+11 end,
@@ -20,7 +20,7 @@ do
   do local x = 0; for i=1,100 do x = x + (-t) end; assert(x == 1700); end
 end
 
-do
+do --- assert lhs
   local t = {}
   local mt = {
     __add = function(a, b) assert(a == t); return b+11 end,
@@ -39,7 +39,7 @@ do
   do local x = 0; for i=1,100 do x = t ^ x end; assert(x == 1600); end
 end
 
-do
+do --- assert both sides
   local t = {}
   local mt = {
     __add = function(a, b) assert(a == t and b == t); return 11 end,
@@ -58,7 +58,7 @@ do
   do local x = 0; for i=1,100 do x = t ^ t end; assert(x == 16); end
 end
 
-do
+do --- adjust no result to one result
   local t = {}
   local mt = { __add = function(a, b) end }
   t = setmetatable(t, mt)

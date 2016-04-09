@@ -1,5 +1,5 @@
 
-do
+do --- nometatable
   local t = {}
   for i=1,10 do t[i] = i+100 end
   local a, b = 0, 0
@@ -12,7 +12,7 @@ do
   assert(b == 105500)
 end
 
-do
+do --- empty metatable
   local t = setmetatable({}, {})
   for i=1,10 do t[i] = i+100 end
   local a, b = 0, 0
@@ -25,7 +25,7 @@ do
   assert(b == 105500)
 end
 
-if os.getenv("LUA52") then
+do --- metamethods +compat5.2
   local function iter(t, i)
     i = i + 1
     if t[i] then return i, t[i]+2 end

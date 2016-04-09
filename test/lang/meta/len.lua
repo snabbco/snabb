@@ -1,8 +1,6 @@
-
-local lua52 = os.getenv("LUA52")
-
+local compat52 = table.pack
 local mt = { __len = function(o, o2)
-  if lua52 then
+  if compat52 then
     assert(o2 == o)
   else
     assert(o2 == nil)
@@ -10,7 +8,7 @@ local mt = { __len = function(o, o2)
   return 42
 end }
 
-do
+do --- table
   local t = {1,2,3}
   assert(#t == 3)
   assert(#"abcdef" == 6)
@@ -20,7 +18,7 @@ do
   assert(#t == 3)
 
   setmetatable(t, mt)
-  if lua52 then
+  if compat52 then
     assert(#t == 42) -- __len DOES work on tables.
     assert(rawlen(t) == 3)
   else
@@ -28,7 +26,7 @@ do
   end
 end
 
-do
+do --- userdata +lua<5.2
   local u = newproxy(true)
   getmetatable(u).__len = function(o) return 42 end
   assert(#u == 42)
@@ -37,7 +35,8 @@ do
   assert(x == 4200)
 end
 
-debug.setmetatable(0, mt)
-assert(#1 == 42)
-debug.setmetatable(0, nil)
-
+do --- number
+  debug.setmetatable(0, mt)
+  assert(#1 == 42)
+  debug.setmetatable(0, nil)
+end

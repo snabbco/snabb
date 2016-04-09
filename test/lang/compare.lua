@@ -247,3 +247,77 @@ do --- string 1 255
   assert(a >= b)
   assert(b <= a)
 end
+
+do --- String comparisons:
+  local function str_cmp(a, b, lt, gt, le, ge)
+    assert(a<b == lt)
+    assert(a>b == gt)
+    assert(a<=b == le)
+    assert(a>=b == ge)
+    assert((not (a<b)) == (not lt))
+    assert((not (a>b)) == (not gt))
+    assert((not (a<=b)) == (not le))
+    assert((not (a>=b)) == (not ge))
+  end
+
+  local function str_lo(a, b)
+    str_cmp(a, b, true, false, true, false)
+  end
+
+  local function str_eq(a, b)
+    str_cmp(a, b, false, false, true, true)
+  end
+
+  local function str_hi(a, b)
+    str_cmp(a, b, false, true, false, true)
+  end
+
+  str_lo("a", "b")
+  str_eq("a", "a")
+  str_hi("b", "a")
+
+  str_lo("a", "aa")
+  str_hi("aa", "a")
+
+  str_lo("a", "a\0")
+  str_hi("a\0", "a")
+end
+
+do --- obj_eq/ne
+  local function obj_eq(a, b)
+    assert(a==b == true)
+    assert(a~=b == false)
+  end
+
+  local function obj_ne(a, b)
+    assert(a==b == false)
+    assert(a~=b == true)
+  end
+
+  obj_eq(nil, nil)
+  obj_ne(nil, false)
+  obj_ne(nil, true)
+
+  obj_ne(false, nil)
+  obj_eq(false, false)
+  obj_ne(false, true)
+
+  obj_ne(true, nil)
+  obj_ne(true, false)
+  obj_eq(true, true)
+
+  obj_eq(1, 1)
+  obj_ne(1, 2)
+  obj_ne(2, 1)
+
+  obj_eq("a", "a")
+  obj_ne("a", "b")
+  obj_ne("a", 1)
+  obj_ne(1, "a")
+
+  local t, t2 = {}, {}
+  obj_eq(t, t)
+  obj_ne(t, t2)
+  obj_ne(t, 1)
+  obj_ne(t, "")
+end
