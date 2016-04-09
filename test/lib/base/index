@@ -2,6 +2,9 @@ assert.lua
 error.lua
 getfenv.lua +lua<5.2
 getsetmetatable.lua
+ipairs.lua
+next.lua
 pairs.lua
 select.lua
+tonumber_tostring.lua
 xpcall_jit.lua +compat5.2

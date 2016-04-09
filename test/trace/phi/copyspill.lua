@@ -1,3 +1,4 @@
+do --- mat4mul !private_G
 function mat4mul(a11, a21, a31, a41,
                  a12, a22, a32, a42,
                  a13, a23, a33, a43,
@@ -49,3 +50,4 @@ for i = 1, 1000 do
 end
 assert(a11 == 1)
 assert(a31 == 0)
+end

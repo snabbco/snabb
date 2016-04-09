@@ -45,3 +45,29 @@ do --- metamethods +compat5.2
   assert(b == 107500)
 end
 
+do --- _G
+  local n = 0
+  for k,v in pairs(_G) do
+    assert(_G[k] == v)
+    n = n + 1
+  end
+  assert(n >= 35)
+end
+
+do --- count
+  local function count(t)
+    local n = 0
+    for i,v in pairs(t) do
+      n = n + 1
+    end
+    return n;
+  end
+  assert(count({ 4,5,6,nil,8,nil,10}) == 5)
+  assert(count({ [0] = 3, 4,5,6,nil,8,nil,10}) == 6)
+  assert(count({ foo=1, bar=2, baz=3 }) == 3)
+  assert(count({ foo=1, bar=2, baz=3, boo=4 }) == 4)
+  assert(count({ 4,5,6,nil,8,nil,10, foo=1, bar=2, baz=3 }) == 8)
+  local t = { foo=1, bar=2, baz=3, boo=4 }
+  t.bar = nil; t.boo = nil
+  assert(count(t) == 2)
+end

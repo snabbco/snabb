@@ -3,6 +3,7 @@ assignment.lua
 compare.lua
 constant
 for.lua
+length.lua
 modulo.lua
 concat.lua
 self.lua

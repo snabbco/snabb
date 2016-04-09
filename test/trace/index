@@ -1,5 +1,6 @@
 exit_frame.lua
 exit_growstack.lua
 exit_jfuncf.lua
+phi
 snap.lua
 stitch.lua

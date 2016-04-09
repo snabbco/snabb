@@ -1,35 +1,34 @@
--- rref points into invariant part
-do
+do --- rref points into invariant part 1
   local x,y=1,2; for i=1,100 do x=x+y; y=i end
   assert(y == 100)
 end
 
-do
+do --- rref points into invariant part 2
   local x,y=1,2; for i=1,100.5 do x=x+y; y=i end
   assert(y == 100)
 end
 
-do
+do --- rref points into invariant part 3
   local x,y=1,2; for i=1,100 do x,y=y,x end
   assert(x == 1)
   assert(y == 2)
 end
 
-do
+do --- rref points into invariant part 4
   local x,y,z=1,2,3; for i=1,100 do x,y,z=y,z,x end
   assert(x == 2)
   assert(y == 3)
   assert(z == 1)
 end
 
-do
+do --- rref points into invariant part 5
   local x,y,z=1,2,3; for i=1,100 do x,y,z=z,x,y end
   assert(x == 3)
   assert(y == 1)
   assert(z == 2)
 end
 
-do
+do --- rref points into invariant part 6
   local a,x,y,z=0,1,2,3; for i=1,100 do a=a+x; x=y; y=z; z=i end
   assert(a == 4759)
   assert(x == 98)
@@ -37,41 +36,37 @@ do
   assert(z == 100)
 end
 
--- variant slot, but no corresponding SLOAD
-do
+do --- variant slot, but no corresponding SLOAD i-1
   local x,y=1,2; for i=1,100 do x=i; y=i-1 end
   assert(x == 100)
   assert(y == 99)
 end
 
-do
+do --- variant slot, but no corresponding SLOAD i+1
   local x,y=1,2; for i=1,100 do x=i; y=i+1 end
   assert(x == 100)
   assert(y == 101)
 end
 
-do
+do --- variant slot, but no corresponding SLOAD side exit
   local x=0; for i=1,100 do if i==90 then break end x=i end
   assert(x == 89)
 end
 
--- dup lref from variant slot (suppressed)
-do
+do --- dup lref from variant slot (suppressed)
   local x,y=1,2; for i=1,100 do x=i; y=i end
   assert(x == 100)
   assert(y == 100)
 end
 
--- const rref
-do
+do --- const rref
   local x,y=1,2 local bxor,tobit=bit.bxor,bit.tobit;
   for i=1,100 do x=bxor(i,y); y=tobit(i+1) end
   assert(x == 0)
   assert(y == 101)
 end
 
--- dup rref (ok)
-do
+do --- dup rref (ok)
   local x,y,z1,z2=1,2,3,4 local bxor,tobit=bit.bxor,bit.tobit;
   for i=1,100 do x=bxor(i,y); z2=tobit(i+5); z1=bxor(x,i+5); y=tobit(i+1) end
   assert(x == 0)
@@ -80,8 +75,7 @@ do
   assert(z2 == 105)
 end
 
--- variant slot, no corresponding SLOAD,
-do
+do --- variant slot, no corresponding SLOAD
   for i=1,5 do
     local a, b = 1, 2
     local bits = 0
@@ -94,8 +88,7 @@ do
   end
 end
 
--- don't eliminate PHI if referenced from snapshot
-do
+do --- don't eliminate PHI if referenced from snapshot
   local t = { 0 }
   local a = 0
   for i=1,100 do
@@ -107,8 +100,7 @@ do
   assert(t[1] == 2550)
 end
 
--- don't eliminate PHI if referenced from snapshot
-do
+do --- don't eliminate PHI if referenced from snapshot
   local x = 1
   local function f()
     local t = {}
@@ -122,8 +114,7 @@ do
   assert(f() == 100)
 end
 
--- don't eliminate PHI if referenced from another non-redundant PHI
-do
+do --- don't eliminate PHI if referenced from another non-redundant PHI
   local t = {}
   for i=1,256 do
     local a, b, k = i, math.floor(i/2), -i
@@ -138,4 +129,3 @@ do
   for i=1,256 do x = x + bit.bxor(i, t[i]) end
   assert(x == -41704)
 end
-
