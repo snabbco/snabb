@@ -3,8 +3,9 @@ and report MPPS, Gbps and packet loss on received traffic.
 
 Usage: packetblaster lwaftr [OPTIONS]
 
-  --pci PCI             Interface PCI address, e.g. 0000:05:00.0 or
-                        Linux tap interface name, e.g. tap0
+  --pci PCI             Interface PCI address, e.g. 0000:05:00.0
+
+  --tap TAP_INTERFACE   Linux tap interface name, e.g. tap0
 
   --pcap PCAP_FILE      Write packets into the pcap file. Program terminates
                         after one cycle of packets (COUNT x SIZES per protocol)

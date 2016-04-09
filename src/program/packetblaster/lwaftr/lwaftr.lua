@@ -20,7 +20,8 @@ local C         = ffi.C
 local usage = require("program.packetblaster.lwaftr.README_inc")
 
 local long_opts = {
-   pci          = "p",    -- PCI/tap address
+   pci          = "p",    -- PCI address
+   tap          = "t",    -- tap interface
    duration     = "D",    -- terminate after n seconds
    verbose      = "V",    -- verbose, display stats
    help         = "h",    -- display help text
@@ -113,9 +114,17 @@ function run (args)
      rate = assert(tonumber(arg), "rate is not a number!")
    end
 
+   local target 
    local pciaddr
    function opt.p (arg) 
      pciaddr = arg
+     target = pciaddr
+   end
+
+   local tap_interface
+   function opt.t (arg) 
+     tap_interface = arg
+     target = tap_interface
    end
 
    local ipv4_only = false
@@ -134,17 +143,18 @@ function run (args)
    local pcap_file, single_pass
    function opt.o (arg) 
      pcap_file = arg
+     target = pcap_file
      single_pass = true
    end
 
-   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:", long_opts)
+   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:", long_opts)
 
-   if not pciaddr and not pcap_file then
-     print("either --pci or --pcap are required parameters")
+   if not target then
+     print("either --pci, --tap or --pcap are required parameters")
      main.exit(1)
    end
 
-   print(string.format("packetblaster lwaftr: Sending %d clients at %.3f MPPS to %s", count, rate, pciaddr))
+   print(string.format("packetblaster lwaftr: Sending %d clients at %.3f MPPS to %s", count, rate, target))
    print()
 
    if not ipv4_only then
@@ -174,9 +184,14 @@ function run (args)
 
    local input, output
 
-   if dir_exists(("/sys/devices/virtual/net/%s"):format(pciaddr)) then
-     config.app(c, "tap", Tap, pciaddr)
-     input, output = "tap.input", "tap.output"
+   if tap_interface then
+     if dir_exists(("/sys/devices/virtual/net/%s"):format(tap_interface)) then
+       config.app(c, "tap", Tap, tap_interface)
+       input, output = "tap.input", "tap.output"
+     else
+       print(string.format("tap interface %s doesn't exist", tap_interface))
+       main.exit(1)
+     end
    elseif pciaddr then
      local device_info = pci.device_info(pciaddr)
      if vlan then

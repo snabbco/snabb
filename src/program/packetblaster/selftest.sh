@@ -27,6 +27,19 @@ function test_lwaftr_pcap {
 test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_1.pcap --count 1
 test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_2.pcap --count 2 --vlan 100 --size 0
 
+# lwaftr tap test
+sudo ip netns add snabbtest || exit $TEST_SKIPPED
+sudo ip netns exec snabbtest ip tuntap add tap0 mode tap
+sudo ip netns exec snabbtest ip link set up dev tap0
+sudo ip netns exec snabbtest ./snabb packetblaster lwaftr --tap tap0 -D 1
+status=$?
+ip netns exec snabbtest ifconfig tap0
+sudo ip netns delete snabbtest
+if [ $status != 0 ]; then
+  echo "Error: lwaftr tap failed for tap0 with ${status}"
+  exit 1
+fi
+
 export PCIADDR=$SNABB_PCI_INTEL0
 [ ! -z "$PCIADDR" ] || export PCIADDR=$SNABB_PCI0
 if [ -z "${PCIADDR}" ]; then

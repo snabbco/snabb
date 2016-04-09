@@ -240,6 +240,7 @@ function Lwaftrgen:new(arg)
     ipv4_only = conf.ipv4_only,
     ipv6_only = conf.ipv6_only,
     vlan = vlan,
+    udp_offset = udp_offset,
     protocol = conf.protocol,
     rate = conf.rate,
     sizes = conf.sizes,
@@ -263,6 +264,7 @@ function Lwaftrgen:push ()
   local ipv4_packets = self.ipv4_packets
   local ipv4_bytes = self.ipv4_bytes
   local lost_packets = self.lost_packets
+  local udp_offset = self.udp_offset
 
   if self.current == 0 then
     main.exit(0)
@@ -274,7 +276,7 @@ function Lwaftrgen:push ()
     if cast(uint16_ptr_t, pkt.data + OFFSET_ETHERTYPE)[0] == PROTO_IPV6 then
       ipv6_bytes = ipv6_bytes + pkt.length
       ipv6_packets = ipv6_packets + 1
-      local payload = cast(payload_ptr_type, pkt.data + offset + ipv6_header_size + udp_header_size)
+      local payload = cast(payload_ptr_type, pkt.data + udp_offset + ipv6_header_size + udp_header_size)
       if payload.magic == MAGIC then
         if self.last_rx_ipv6_packet_number > 0 then
           lost_packets = lost_packets + payload.number - self.last_rx_ipv6_packet_number - 1  
@@ -284,7 +286,7 @@ function Lwaftrgen:push ()
     else
       ipv4_bytes = ipv4_bytes + pkt.length
       ipv4_packets = ipv4_packets + 1
-      local payload = cast(payload_ptr_type, pkt.data + offset + udp_header_size)
+      local payload = cast(payload_ptr_type, pkt.data + udp_offset + udp_header_size)
       if payload.magic == MAGIC then
         if self.last_rx_ipv4_packet_number > 0 then
           lost_packets = lost_packets + payload.number - self.last_rx_ipv4_packet_number - 1  
