@@ -5,5 +5,7 @@ dump.lua
 format
 len.lua
 lower_upper.lua
+multiple_functions.lua
 rep.lua
+reverse.lua
 sub.lua
