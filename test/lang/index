@@ -1,6 +1,7 @@
 andor.lua
 assignment.lua
 compare.lua
+compare_nan.lua
 constant
 for.lua
 length.lua
@@ -10,6 +11,7 @@ self.lua
 upvalue
 coroutine.lua
 tail_recursion.lua
+vararg_jit.lua
 gc.lua
 goto.lua +goto
 meta

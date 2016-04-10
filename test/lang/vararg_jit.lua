@@ -1,5 +1,5 @@
 
-do
+do --- 1
   local function f(a, b, c, ...)
     assert(c == nil)
     assert(a == 100-b)
@@ -12,7 +12,7 @@ do
   end
 end
 
-do
+do --- 2
   local function f(a, b, ...)
     if a > b then return b end
     return a
@@ -24,7 +24,7 @@ do
   assert(x == 15050)
 end
 
-do
+do --- 3
   local function f(a, b, ...)
     local c, d = ...
     if c > d then return d end
@@ -37,7 +37,7 @@ do
   assert(x == 15050)
 end
 
-do
+do --- 4
   local function f(a, b, ...)
     if a > b then end
     return ...
@@ -51,7 +51,7 @@ do
   assert(x == 20100)
 end
 
-do
+do --- 5
   local function f(a, ...)
     local x, y = 0, 0
     for i=1,100 do
@@ -64,7 +64,7 @@ do
   f(1, 2, 3)
 end
 
-do
+do --- 6
   local function f(a, ...)
     local t = {[0]=9, 9}
     local v, w, x, y = 0, 0, 0, 0
@@ -78,7 +78,7 @@ do
   f(1, 2, 3)
 end
 
-do
+do --- 7
   local function f(a, b, ...)
     for i=1,100 do
       local c, d = ...
