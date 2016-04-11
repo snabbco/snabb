@@ -6,8 +6,8 @@ local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local stream = require("apps.lwaftr.stream")
 
-local CONF_FILE_DUMP = "/tmp/lwaftr-%s.conf"
-local BINDING_TABLE_FILE_DUMP = "/tmp/binding-%s.table"
+local CONF_FILE_DUMP = "/tmp/lwaftr-%d.conf"
+local BINDING_TABLE_FILE_DUMP = "/tmp/binding-table-%d.txt"
 
 Dumper = {}
 
@@ -90,7 +90,7 @@ local function write_to_file(filename, content)
 end
 
 function dump_configuration(lwstate)
-   local dest = (CONF_FILE_DUMP):format(os.date("%Y-%m-%d-%H:%M:%S"))
+   local dest = (CONF_FILE_DUMP):format(os.time())
    print(("Dump lwAFTR configuration: '%s'"):format(dest))
    write_to_file(dest, do_dump_configuration(lwstate.conf))
 end
@@ -133,7 +133,7 @@ function dump_binding_table (lwstate)
       error("Binding table file is outdated: '%s'"):format(bt_txt)
       main.exit(1)
    end
-   local dest = (BINDING_TABLE_FILE_DUMP):format(os.date("%Y-%m-%d-%H:%M:%S"))
+   local dest = (BINDING_TABLE_FILE_DUMP):format(os.time())
    print(("Dump lwAFTR configuration: '%s'"):format(dest))
    copy_file(dest, bt_txt)
 end
