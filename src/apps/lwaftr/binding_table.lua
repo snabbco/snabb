@@ -109,7 +109,7 @@ local softwire_value_t = ffi.typeof[[
 
 local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
 
-local function maybe(f, ...)
+function maybe(f, ...)
    local function catch(success, ...)
       if success then return ... end
    end
@@ -127,13 +127,13 @@ local function read_magic(stream)
    end
 end
 
-local function has_magic(stream)
+function has_magic(stream)
    local res = pcall(read_magic, stream)
    stream:seek(0)
    return res
 end
 
-local function is_fresh(stream, mtime_sec, mtime_nsec)
+function is_fresh(stream, mtime_sec, mtime_nsec)
    local header = stream:read_ptr(binding_table_header_t)
    local res = header.mtime_sec == mtime_sec and header.mtime_nsec == mtime_nsec
    stream:seek(0)

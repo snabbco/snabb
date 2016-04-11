@@ -1,22 +1,13 @@
 module(..., package.seeall)
 
+local binding_table = require("apps.lwaftr.binding_table")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
-local binding_table = require("apps.lwaftr.binding_table")
 local stream = require("apps.lwaftr.stream")
 
 local CONF_FILE_DUMP = "/tmp/lwaftr-%s.conf"
 local BINDING_TABLE_FILE_DUMP = "/tmp/binding-%s.table"
-
--- 'ip' is in host bit order, convert to network bit order
-local function ipv4number_to_str(ip)
-   local a = bit.band(ip, 0xff)
-   local b = bit.band(bit.rshift(ip, 8), 0xff)
-   local c = bit.band(bit.rshift(ip, 16), 0xff)
-   local d = bit.rshift(ip, 24)
-   return ("%d.%d.%d.%d"):format(a, b, c, d)
-end
 
 Dumper = {}
 
@@ -104,37 +95,47 @@ function dump_configuration(lwstate)
    write_to_file(dest, do_dump_configuration(lwstate.conf))
 end
 
-function dump_binding_table(lwstate)
-   print("Dump binding table")
-   local content = {}
-   local function write(str)
-      table.insert(content, str)
+local function bt_is_fresh (bt_txt, bt_o)
+   local source = stream.open_input_byte_stream(bt_txt)
+   local compiled_stream = binding_table.maybe(stream.open_input_byte_stream, bt_o)
+   return compiled_stream and
+      binding_table.has_magic(compiled_stream) and
+      binding_table.is_fresh(compiled_stream, source.mtime_sec, source.mtime_nsec)
+end
+
+local function copy_file (dest, src)
+   local fin = assert(io.open(src, "rt"),
+      ("Couldn't open file: '%s'"):format(src))
+   local fout = assert(io.open(dest, "wt"),
+      ("Couldn't open file: '%s'"):format(dest))
+   while true do
+      local str = fin:read(4096)
+      if not str then break end
+      fout:write(str)
    end
-   local function dump()
-      return table.concat(content, "\n")
+   fin:close()
+   fout:close()
+end
+
+--[[
+A compiled binding table doesn't allow access to its internal data, so it's
+not possible to iterate through it and dump it to a text file.  The compiled
+binding table must match with the binding table in text format.  What we do is
+to check whether the compiled binding table is the result of compiling the
+text version.  The compiled binding table contains a header that can be checked
+to verify this information.  If that's the case, we copy the text version of
+the binding table to /tmp.
+--]]
+function dump_binding_table (lwstate)
+   local bt_txt = lwstate.conf.binding_table
+   local bt_o = bt_txt:gsub("%.txt$", "%.o")
+   if not bt_is_fresh(bt_txt, bt_o) then
+      error("Binding table file is outdated: '%s'"):format(bt_txt)
+      main.exit(1)
    end
-   local function format_entry(entry)
-      local v6, v4, port_start, port_end, br_v6 = entry[1], entry[2], entry[3], entry[4], entry[5]
-      local result = {}
-      table.insert(result, ("'%s'"):format(ipv6:ntop(v6)))
-      table.insert(result, ("'%s'"):format(ipv4number_to_str(v4)))
-      table.insert(result, port_start)
-      table.insert(result, port_end)
-      if br_v6 then
-         table.insert(result, ("'%s'"):format(ipv6:ntop(br_v6)))
-      end
-      return table.concat(result, ",")
-   end
-   -- Write entries to content
-   write("{")
-   for _, entry in ipairs(lwstate.binding_table) do
-      write(("\t{%s},"):format(format_entry(entry)))
-   end
-   write("}")
-   -- Dump content to file
-   local filename = (BINDING_TABLE_FILE_DUMP):format(os.date("%Y-%m-%d-%H:%M:%S"))
-   write_to_file(filename, dump())
-   print(("Binding table written to %s"):format(filename))
+   local dest = (BINDING_TABLE_FILE_DUMP):format(os.date("%Y-%m-%d-%H:%M:%S"))
+   print(("Dump lwAFTR configuration: '%s'"):format(dest))
+   copy_file(dest, bt_txt)
 end
 
 function selftest ()
