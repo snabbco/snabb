@@ -53,6 +53,17 @@ network.
 You can deploy Snabb NFV stand-alone with QEMU or you can integrate it
 with a cloud computing platform such as OpenStack.
 
+### lwAFTR
+
+[Snabb lwAFTR](src/program/lwaftr/) is the internet-facing component of
+"lightweight 4-over-6" (lw4o6), an IPv6 transition technology.  An ISP
+can use lwAFTR functions to provide its users with access to the IPv4
+internet while maintaining a simple IPv6-only internal network.  An ISP
+deploying Snabb lwAFTR can also configure lw4o6 to share IPv4 addresses
+between multiple different customers, ameliorating the IPv4 address
+space exhaustion problem and lowering costs.  See the [lwAFTR
+documentation](src/program/lwaftr/doc/) for more details.
+
 ### VPWS
 
 VPWS (Virtual Private Wire Service) is a Layer-2 VPN application being

@@ -27,6 +27,6 @@ point to the location of the neutron2snabb command. The default is
                              Default: $SYNC_INTERVAL or 1
   -t DIR, --tmp-dir DIR
                              Store temporary files in DIR.
-			     Default: $TMP_DIR or /tmp/snabbswitch
+			     Default: $TMP_DIR or /tmp/snabb
   -h, --help
                              Print this help message and exit.
