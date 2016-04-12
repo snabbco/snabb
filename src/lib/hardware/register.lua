@@ -37,6 +37,29 @@ end
 function Register:set (bitmask) self(bit.bor(self(), bitmask)) end
 function Register:clr (bitmask) self(bit.band(self(), bit.bnot(bitmask))) end
 
+-- Get / set length bits of the register at offset start
+-- if bits == nil then return length bits from the register at offset start
+-- if bits ~= nil then set length bits in the register at offset start
+function Register:bits (start, length, bits)
+  if bits == nil then
+    return bit.band(bit.rshift(self(), start), 2^length - 1)
+  else
+    local tmp = self()
+    local offmask = bit.bnot(bit.lshift(2^length - 1, start))
+    tmp = bit.band(tmp, offmask)
+    tmp = bit.bor(tmp, bit.lshift(bits, start))
+    self(tmp)
+  end
+end
+-- Get / set a byte length bytes from an offset of start bytes
+function Register:byte (start, byte)
+  if bits == nil then
+    return self:bits(start * 8, 8)
+  else
+    return self:bits(start * 8, 8, byte)
+  end
+end
+
 --- Block until applying `bitmask` to the register value gives `value`.
 --- If `value` is not given then until all bits in the mask are set.
 function Register:wait (bitmask, value)
@@ -81,8 +104,8 @@ local mt = {
                     reset=Register.noop, print=Register.print},
         __call = Register.read, __tostring = Register.__tostring},
   RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait,
-                    set=Register.set, clr=Register.clr, reset=Register.noop,
-                    print=Register.print},
+                    set=Register.set, clr=Register.clr, reset=Register.noop, bits=Register.bits,
+                    bytes=Register.bytes, print=Register.print},
         __call = Register.__call, __tostring = Register.__tostring},
   RC = {__index = { read=Register.readrc, reset=Register.reset,
                     print=Register.printrc},
