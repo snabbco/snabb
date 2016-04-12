@@ -156,7 +156,13 @@ function apply_config_actions (actions, conf)
    -- Table of functions that execute config actions
    local ops = {}
    function ops.stop (name)
-      if app_table[name].stop then app_table[name]:stop() end
+      if app_table[name].stop then
+         local shmorig = shm.path
+         shm.path = app_table[name].shmpath
+         app_table[name]:stop()
+         shm.path = shmorig
+         shm.unlink(app_table[name].shmpath)
+      end
    end
    function ops.keep (name)
       new_app_table[name] = app_table[name]
@@ -166,11 +172,10 @@ function apply_config_actions (actions, conf)
    function ops.start (name)
       local class = conf.apps[name].class
       local arg = conf.apps[name].arg
-      local shmpath, shmorig = "app/"..name, shm.path
+      local shmpath, shmorig = "apps/"..name, shm.path
       shm.path = shmpath
       local app = class:new(arg)
       shm.path = shmorig
-      local shmpath = "app/"..name
       if type(app) ~= 'table' then
          error(("bad return value from app '%s' start() method: %s"):format(
                   name, tostring(app)))
@@ -492,6 +497,34 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
+   -- Test shm.path management
+   print("shm.path management")
+   local S = require("syscall")
+   local App4 = {zone="test"}
+   function App4:new ()
+      local c = counter.open('test')
+      counter.set(c, 42)
+      counter.commit()
+      return setmetatable({test_counter = c},
+                          {__index = App4})
+   end
+   function App4:pull ()
+      assert(counter.read(self.test_counter) == 42, "Invalid counter value")
+      counter.add(self.test_counter)
+   end
+   function App4:stop ()
+      assert(counter.read(self.test_counter) == 43, "Invalid counter value")
+      counter.delete('test')
+   end
+   local c_counter = config.new()
+   config.app(c_counter, "App4", App4)
+   configure(c_counter)
+   main({done = function () return app_table.App4.test_counter end})
+   assert(S.stat(shm.root.."/"..shm.resolve("apps/App4/test")),
+          "Missing : apps/App4/test")
+   configure(config.new())
+   assert(not S.stat(shm.root.."/"..shm.resolve("apps/App4")),
+          "Failed to unlink apps/App4")
    print("OK")
 end
 
