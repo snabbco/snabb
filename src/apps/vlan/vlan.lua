@@ -12,7 +12,7 @@ Tagger = {}
 Untagger = {}
 
 -- 802.1q
-local dotq_tpid = 0x8100
+local dot1q_tpid = 0x8100
 local o_ethernet_ethertype = 12
 local uint32_ptr_t = ffi.typeof('uint32_t*')
 
@@ -21,7 +21,7 @@ local uint32_ptr_t = ffi.typeof('uint32_t*')
 -- TCI field which in turns consists of PCP, DEI and VID (VLAN id). Both PCP
 -- and DEI is always 0
 local function build_tag(vid)
-   return ffi.C.htonl(bit.bor(bit.lshift(dotq_tpid, 16), vid))
+   return ffi.C.htonl(bit.bor(bit.lshift(dot1q_tpid, 16), vid))
 end
 
 -- pop a VLAN tag (4 byte of TPID and TCI) from a packet
@@ -96,7 +96,7 @@ end
 VlanMux = {}
 function VlanMux:new(conf)
    local self = setmetatable({}, {__index=VlanMux})
-   self.ethertype_8100 = ffi.cast("uint16_t", 0x0081) -- 0x8100 in network byte order
+   self.dot1q_tpid = htons(dot1q_tpid)
    return self
 end
 
@@ -121,7 +121,7 @@ function VlanMux:push()
 
                if name == "trunk" then -- trunk
                   -- check for ethertype 0x8100 (802.1q VLAN tag)
-                  if ethertype == self.ethertype_8100 then
+                  if ethertype == self.dot1q_tpid then
                      -- dig out TCI field
                      local tci = extract_tci(p)
                      local vid = tci_to_vid(tci)
