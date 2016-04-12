@@ -97,7 +97,7 @@ end
 
 
 VlanMux = {}
-function VlanMux:new(conf)
+function VlanMux:new()
    local self = setmetatable({}, {__index=VlanMux})
    self.dot1q_tpid = htons(dot1q_tpid)
    return self
