@@ -31,7 +31,7 @@ interface. Packets with other VLAN tags than the configured tag will be dropped.
 
 ## VlanMux
 
-Despite the name, VlanMux can act both as a multiplexer, i.e. receive packes
+Despite the name, VlanMux can act both as a multiplexer, i.e. receive packets
 from multiple different inputs, add a VLAN tag and send them out onto one, as
 well as receiving packets from a "trunk" interface and demultiplex it over many
 interfaces based on the VLAN tag of the received packet.
