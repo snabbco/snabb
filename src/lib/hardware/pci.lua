@@ -163,7 +163,7 @@ end
 --
 -- example: qualified("01:00.0") -> "0000:01:00.0"
 function qualified (address)
-   return address:gsub("^[0-9a-f][0-9a-f]:[0-9a-f][0-9a-f][.][0-9a-f]+$", "0000:%1")
+   return address:gsub("^%x%x:%x%x[.]%x+$", "0000:%1")
 end
 
 --- ### Selftest
