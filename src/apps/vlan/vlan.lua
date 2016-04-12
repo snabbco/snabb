@@ -3,10 +3,13 @@ module(..., package.seeall)
 local packet = require("core.packet")
 local bit = require("bit")
 local ffi = require("ffi")
+local lib = require("core.lib")
 
 local C = ffi.C
 local receive, transmit = link.receive, link.transmit
 local cast = ffi.cast
+local htons, htonl = lib.htons, lib.htonl
+local ntohs, ntohl = htons, htonl
 
 Tagger = {}
 Untagger = {}
@@ -21,7 +24,7 @@ local uint32_ptr_t = ffi.typeof('uint32_t*')
 -- TCI field which in turns consists of PCP, DEI and VID (VLAN id). Both PCP
 -- and DEI is always 0
 local function build_tag(vid)
-   return ffi.C.htonl(bit.bor(bit.lshift(dot1q_tpid, 16), vid))
+   return htonl(bit.bor(bit.lshift(dot1q_tpid, 16), vid))
 end
 
 -- pop a VLAN tag (4 byte of TPID and TCI) from a packet
@@ -45,7 +48,7 @@ end
 -- packet is carrying a VLAN tag, if it's an untagged frame these bytes will be
 -- Ethernet payload
 function extract_tci(pkt)
-   return ffi.C.ntohs(ffi.cast("uint16_t*", packet.data(pkt) + o_ethernet_ethertype + 2)[0])
+   return ntohs(cast("uint16_t*", packet.data(pkt) + o_ethernet_ethertype + 2)[0])
 end
 
 -- extract VLAN id from TCI
@@ -117,7 +120,7 @@ function VlanMux:push()
          if type(name) == "string" then
             for _ = 1, math.min(link.nreadable(l), maxoutput) do
                local p = receive(l)
-               local ethertype = ffi.cast("uint16_t*", packet.data(p) + o_ethernet_ethertype)[0]
+               local ethertype = cast("uint16_t*", packet.data(p) + o_ethernet_ethertype)[0]
 
                if name == "trunk" then -- trunk
                   -- check for ethertype 0x8100 (802.1q VLAN tag)
