@@ -781,9 +781,9 @@ if C.bpf then
   function S.bpf(cmd, attr)
     return C.bpf(cmd, attr)
   end
-  function S.bpf_prog_load(type, insns, len, license, version)
-    if not license then license = "GPL" end       -- Must stay alive during the syscall
-    local bpf_log_buf = ffi.new('char [?]', 4096) -- Must stay alive during the syscall
+  function S.bpf_prog_load(type, insns, len, license, version, log_level)
+    if not license then license = "GPL" end          -- Must stay alive during the syscall
+    local bpf_log_buf = ffi.new('char [?]', 64*1024) -- Must stay alive during the syscall
     if not version then
       -- We have no better way to extract current kernel hex-string other
       -- than parsing headers, compiling a helper function or reading /proc
@@ -800,14 +800,14 @@ if C.bpf then
     attr[0].insn_cnt = len
     attr[0].license = ptr_to_u64(license)
     attr[0].log_buf = ptr_to_u64(bpf_log_buf)
-    attr[0].log_size = 4096
-    attr[0].log_level = 1
+    attr[0].log_size = ffi.sizeof(bpf_log_buf)
+    attr[0].log_level = log_level or 1
     attr[0].kern_version = version -- MUST match current kernel version
     local fd = S.bpf(c.BPF_CMD.PROG_LOAD, attr)
     if fd < 0 then
       return nil, t.error(errno()), ffi.string(bpf_log_buf)
     end
-    return fd
+    return retfd(fd), ffi.string(bpf_log_buf)
   end
   function S.bpf_map_create(type, key_size, value_size, max_entries)
     local attr = t.bpf_attr1()
@@ -819,7 +819,7 @@ if C.bpf then
     if fd < 0 then
       return nil, t.error(errno())
     end
-    return fd
+    return retfd(fd)
   end
   function S.bpf_map_op(op, fd, key, val_or_next, flags)
     local attr = t.bpf_attr1()

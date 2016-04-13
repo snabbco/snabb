@@ -426,7 +426,7 @@ c.SO = strflag(arch.SO or {
   PRIORITY    = 12,
   LINGER      = 13,
   BSDCOMPAT   = 14,
---REUSEPORT   = 15, -- new, may not be defined yet
+  REUSEPORT   = 15, -- new, may not be defined yet
   PASSCRED    = 16,
   PEERCRED    = 17,
   RCVLOWAT    = 18,
@@ -455,9 +455,19 @@ c.SO = strflag(arch.SO or {
   WIFI_STATUS        = 41,
   PEEK_OFF           = 42,
   NOFCS              = 43,
+  LOCK_FILTER        = 44,
+  SELECT_ERR_QUEUE   = 45,
+  BUSY_POLL          = 46,
+  MAX_PACING_RATE    = 47,
+  BPF_EXTENSIONS     = 48,
+  INCOMING_CPU       = 49,
+  ATTACH_BPF         = 50,
+  ATTACH_REUSEPORT_CBPF = 51,
+  ATTACH_REUSEPORT_EBPF = 52,
 })
 
 c.SO.GET_FILTER = c.SO.ATTACH_FILTER
+c.SO.DETACH_BPF = c.SO.DETACH_FILTER
 
 -- Maximum queue length specifiable by listen.
 c.SOMAXCONN = 128
@@ -2065,6 +2075,10 @@ c.BPF = multiflags {
   TXA        = 0x80,
   TO_LE      = 0x00,
   TO_BE      = 0x08,
+-- flags
+  ANY        = 0,
+  NOEXIST    = 1,
+  EXIST      = 2,
 }
 
 -- eBPF flags

@@ -160,6 +160,13 @@ local function fixup_constants(abi, c)
   c.RTA.VIA = nil
   c.RTA.MFC_STATS = nil
   c.AUDIT_ARCH.AARCH64 = nil
+  c.SO.MAX_PACING_RATE = nil
+  c.SO.BPF_EXTENSIONS = nil
+  c.SO.INCOMING_CPU = nil
+  c.SO.ATTACH_BPF = nil
+  c.SO.DETACH_BPF = nil
+  c.SO.ATTACH_REUSEPORT_CBPF = nil
+  c.SO.ATTACH_REUSEPORT_EBPF = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil
@@ -228,6 +235,9 @@ local function fixup_constants(abi, c)
   c.BPF.XADD = nil
   c.BPF.JNE = nil
   c.BPF.MOV = nil
+  c.BPF.ANY = nil
+  c.BPF.EXIST = nil
+  c.BPF.NOEXIST = nil
 
   return c
 end
