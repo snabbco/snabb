@@ -540,6 +540,101 @@ union bpf_attr {
     uint32_t   bpf_fd;
   };
 } __attribute__((aligned(8)));
+struct perf_event_attr {
+  uint32_t pe_type;
+  uint32_t size;
+  uint64_t pe_config;
+  union {
+    uint64_t sample_period;
+    uint64_t sample_freq;
+  };
+  uint64_t pe_sample_type;
+  uint64_t read_format;
+  uint32_t disabled:1,
+    inherit:1,
+    pinned:1,
+    exclusive:1,
+    exclude_user:1,
+    exclude_kernel:1,
+    exclude_hv:1,
+    exclude_idle:1,
+    mmap:1,
+    comm:1,
+    freq:1,
+    inherit_stat:1,
+    enable_on_exec:1,
+    task:1,
+    watermark:1,
+    precise_ip:2,
+    mmap_data:1,
+    sample_id_all:1,
+    exclude_host:1,
+    exclude_guest:1,
+    exclude_callchain_kernel:1,
+    exclude_callchain_user:1,
+    mmap2:1,
+    comm_exec:1,
+    use_clockid:1,
+    __reserved_1a:6;
+    uint32_t __reserved_1b;
+  union {
+    uint32_t wakeup_events;
+    uint32_t wakeup_watermark;
+  };
+  uint32_t bp_type;
+  union {
+    uint64_t bp_addr;
+    uint64_t config1;
+  };
+  union {
+    uint64_t bp_len;
+    uint64_t config2;
+  };
+  uint64_t branch_sample_type;
+  uint64_t sample_regs_user;
+  uint32_t sample_stack_user;
+  int32_t clockid;
+  uint64_t sample_regs_intr;
+  uint32_t aux_watermark;
+  uint32_t __reserved_2;
+};
+struct perf_event_mmap_page {
+  uint32_t version;
+  uint32_t compat_version;
+  uint32_t lock;
+  uint32_t index;
+  int64_t offset;
+  uint64_t time_enabled;
+  uint64_t time_running;
+  union {
+     uint64_t   capabilities;
+     struct {
+         uint32_t cap_bit0 : 1,
+           cap_bit0_is_deprecated : 1,
+           cap_user_rdpmc         : 1,
+           cap_user_time          : 1,
+           cap_user_time_zero     : 1;
+     };
+  };
+  uint16_t pmc_width;
+  uint16_t time_shift;
+  uint32_t time_mult;
+  uint64_t time_offset;
+  uint64_t __reserved[120];
+  volatile uint64_t data_head;
+  volatile uint64_t data_tail;
+  volatile uint64_t data_offset;
+  volatile uint64_t data_size;
+  uint64_t aux_head;
+  uint64_t aux_tail;
+  uint64_t aux_offset;
+  uint64_t aux_size;
+};
+struct perf_event_header {
+  uint32_t   type;
+  uint16_t   misc;
+  uint16_t   size;
+};
 struct mq_attr {
   long mq_flags, mq_maxmsg, mq_msgsize, mq_curmsgs, __unused[4];
 };

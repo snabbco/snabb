@@ -835,6 +835,86 @@ if C.bpf then
   end
 end
 
+-- Linux performance monitoring
+if C.perf_event_open then
+  -- Open perf event fd
+  -- @note see man 2 perf_event_open
+  -- @return fd, err
+  function S.perf_event_open(attr, pid, cpu, group_fd, flags)
+    if attr[0].size == 0 then attr[0].size = ffi.sizeof(attr[0]) end
+    local fd = C.perf_event_open(attr, pid or 0, cpu or -1, group_fd or -1, c.PERF_FLAG[flags or 0])
+    if fd < 0 then
+      return nil, t.error(errno())
+    end
+    return retfd(fd)
+  end
+  -- Read the tracepoint configuration (see "/sys/kernel/debug/tracing/available_events")
+  -- @param event_path path to tracepoint (e.g. "/sys/kernel/debug/tracing/events/syscalls/sys_enter_write")
+  -- @return tp, err (e.g. 538, nil)
+  function S.perf_tracepoint(event_path)
+    local config = nil
+    event_path = event_path.."/id"
+    local fd, err = S.open(event_path, c.O.RDONLY)
+    if fd then
+      local ret, err = fd:read(nil, 256)
+      if ret then
+        config = tonumber(ret)
+      end
+      fd:close()
+    end
+    return config, err
+  end
+  -- Attach or detach a probe, same semantics as Lua tables.
+  -- See https://www.kernel.org/doc/Documentation/trace/kprobetrace.txt
+  -- (When the definition is not nil, it will be created, otherwise it will be detached)
+  -- @param probe_type either "kprobe" or "uprobe", no other probe types are supported
+  -- @param name chosen probe name (e.g. "myprobe")
+  -- @param definition (set to nil to disable probe) (e.g. "do_sys_open $retval")
+  -- @param retval true/false if this should be entrypoint probe or return probe
+  -- @return tp, err (e.g. 1099, nil)
+  function S.perf_probe(probe_type, name, definition, retval)
+    local event_path = string.format('/sys/kernel/debug/tracing/%s_events', probe_type)
+    local probe_path = string.format('/sys/kernel/debug/tracing/events/%ss/%s', probe_type, name)
+    -- Check if probe already exists
+    if definition and S.statfs(probe_path) then return nil, t.error(c.E.EEXIST) end
+    local fd, err = S.open(event_path, "wronly, append")
+    if not fd then return nil, err end
+    -- Format a probe definition
+    if not definition then
+      definition = "-:"..name -- Detach
+    else
+      definition = string.format("%s:%s %s", retval and "r" or "p", name, definition)
+    end
+    local ok, err = fd:write(definition)
+    fd:close()
+    -- Return tracepoint or success
+    if ok and definition then
+      return S.perf_tracepoint(probe_path)
+    end
+    return ok, err
+  end
+  -- Attach perf event reader to tracepoint (see "/sys/kernel/debug/tracing/available_events")
+  -- @param tp tracepoint identifier (e.g.: 538, use `S.perf_tracepoint()`)
+  -- @param type perf_attr.sample_type (default: "raw")
+  -- @param attrs table of attributes (e.g. {sample_type="raw, callchain"}, see `struct perf_event_attr`)
+  -- @return reader, err
+  function S.perf_attach_tracepoint(tp, pid, cpu, group_fd, attrs)
+    local pe = t.perf_event_attr1()
+    pe[0].type = "tracepoint"
+    pe[0].config = tp
+    pe[0].sample_type = "raw"
+    pe[0].sample_period = 1
+    pe[0].wakeup_events = 1
+    if attrs then
+      for k,v in pairs(attrs) do pe[0][k] = v end
+    end
+    -- Open perf event reader with given parameters
+    local fd, err = S.perf_event_open(pe, pid, cpu, group_fd, "fd_cloexec")
+    if not fd then return nil, err end
+    return t.perf_reader(fd)
+  end
+end
+
 return S
 
 end

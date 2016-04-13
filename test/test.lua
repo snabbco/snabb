@@ -2494,7 +2494,8 @@ if S.geteuid() == 0 then
       local i = assert(nl.interfaces())
       local lo = assert(i.lo)
       assert(lo:up())
-      assert(S.mount("none", "/sys", "sysfs"))
+      -- Do not destroy "/sys" if it is mounted
+      assert(S.statfs("/sys/kernel") or S.mount("none", "/sys", "sysfs"))
     end
   else -- not Linux
     -- run all tests, no namespaces available

@@ -137,10 +137,12 @@ for k, v in pairs(addstructs) do addtype(types, k, v, lenmt) end
 -- these ones not in table as not helpful with vararg or arrays TODO add more addtype variants
 t.inotify_event = ffi.typeof("struct inotify_event")
 pt.inotify_event = ptt("struct inotify_event") -- still need pointer to this
+pt.perf_event_header = ptt("struct perf_event_header")
 
 t.aio_context1 = ffi.typeof("aio_context_t[1]")
 t.sock_fprog1 = ffi.typeof("struct sock_fprog[1]")
 t.bpf_attr1 = ffi.typeof("union bpf_attr[1]")
+t.perf_event_attr1 = ffi.typeof("struct perf_event_attr[1]")
 
 t.user_cap_data2 = ffi.typeof("struct user_cap_data[2]")
 
@@ -1176,6 +1178,21 @@ mt.mmsghdrs = {
 addtype_var(types, "mmsghdrs", "struct {int count; struct mmsghdr msg[?];}", mt.mmsghdrs)
 
 addtype(types, "bpf_attr", "union bpf_attr")
+
+-- Metatype for Linux perf events
+mt.perf_event_attr = {
+  index = {
+    type = function(self)   return self.pe_type end,
+    config = function(self) return self.pe_config end,
+    sample_type = function(self) return self.pe_sample_type end,
+  },
+  newindex = {
+    type = function(self, v) self.pe_type = c.PERF_TYPE[v] end,
+    config = function(self, v) self.pe_config = c.PERF_COUNT[v] end,
+    sample_type = function(self, v) self.pe_sample_type = c.PERF_SAMPLE[v] end,
+  },
+}
+addtype(types, "perf_event_attr", "struct perf_event_attr", mt.perf_event_attr)
 
 -- this is declared above
 samap_pt = {

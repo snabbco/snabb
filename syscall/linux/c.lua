@@ -696,6 +696,11 @@ if sys.bpf then
     return syscall(sys.bpf, int(cmd), void(attr), u64(ffi.sizeof('union bpf_attr')))
   end
 end
+if sys.perf_event_open then
+  function C.perf_event_open(attr, pid, cpu, group_fd, flags)
+    return syscall(sys.perf_event_open, void(attr), int(pid), int(cpu), int(group_fd), ulong(flags))
+  end
+end
 
 -- socketcalls
 if not sys.socketcall then
