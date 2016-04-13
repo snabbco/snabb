@@ -29,6 +29,7 @@ function run (args)
 
    if app_name then app(select_snabb_instance(target_pid), app_name)
    else             top(select_snabb_instance(target_pid)) end
+   ordered_exit(0)
 end
 
 function select_snabb_instance (pid)
@@ -46,7 +47,12 @@ function select_snabb_instance (pid)
       else                            return instances[1] end
    elseif #instances == 1 then print("No Snabb instance found.")
    else print("Multple Snabb instances found. Select one.") end
-   os.exit(1)
+   ordered_exit(1)
+end
+
+function ordered_exit (value)
+   shm.unlink("//"..S.getpid()) -- Unlink own shm tree to avoid clutter
+   os.exit(value)
 end
 
 function app (instance_pid, app_name)
