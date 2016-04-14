@@ -80,6 +80,9 @@ c.BPF.CALL = nil
 c.BPF.EXIT = nil
 c.BPF.TO_LE = nil
 c.BPF.TO_BE = nil
+c.BPF.ANY = nil
+c.BPF.NOEXIST = nil
+c.BPF.EXIST = nil
 c.BPF.END = nil
 c.BPF.ARSH = nil
 c.BPF.XADD = nil
@@ -304,6 +307,17 @@ c.SO.PEEK_OFF = nil
 c.SO.GET_FILTER = nil
 c.SO.NOFCS = nil
 c.SO.WIFI_STATUS = nil
+c.SO.REUSEPORT = nil
+c.SO.LOCK_FILTER = nil
+c.SO.SELECT_ERR_QUEUE = nil
+c.SO.BUSY_POLL = nil
+c.SO.MAX_PACING_RATE = nil
+c.SO.BPF_EXTENSIONS = nil
+c.SO.INCOMING_CPU = nil
+c.SO.ATTACH_BPF = nil
+c.SO.DETACH_BPF = nil
+c.SO.ATTACH_REUSEPORT_CBPF = nil
+c.SO.ATTACH_REUSEPORT_EBPF = nil
 
 -- Musl changes some of the syscall constants in its 32/64 bit handling
 c.SYS.getdents = nil
