@@ -4,7 +4,8 @@ Usage:
   -h, --help
                              Print usage information.
   -a, --app <name>
-                             Print counters of app by <name> and exit.
+  -l, --link <name>
+                             Print counters of app or link by <name> and exit.
 
 Display realtime performance statistics for a running Snabb instance with
 <pid>. If <pid> is not supplied and there is only one Snabb instance, top will

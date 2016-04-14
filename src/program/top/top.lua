@@ -12,7 +12,7 @@ local histogram = require("core.histogram")
 local usage = require("program.top.README_inc")
 
 local long_opts = {
-   help = "h", app = "a"
+   help = "h", app = "a", link = "l"
 }
 
 function clearterm () io.write('\027[2J') end
@@ -20,15 +20,18 @@ function clearterm () io.write('\027[2J') end
 function run (args)
    local opt = {}
    local app_name = nil
+   local link_name = nil
    function opt.h (arg) print(usage) main.exit(1) end
    function opt.a (arg) app_name = arg            end
-   args = lib.dogetopt(args, opt, "ha:", long_opts)
+   function opt.l (arg) link_name = arg           end
+   args = lib.dogetopt(args, opt, "ha:l:", long_opts)
 
    if #args > 1 then print(usage) main.exit(1) end
-   local target_pid = args[1]
+   local target_pid = select_snabb_instance(args[1])
 
-   if app_name then app(select_snabb_instance(target_pid), app_name)
-   else             top(select_snabb_instance(target_pid)) end
+   if     app_name  then list_counters("//"..target_pid.."/apps/"..app_name)
+   elseif link_name then list_counters("//"..target_pid.."/counters/"..link_name)
+   else                  top(target_pid) end
    ordered_exit(0)
 end
 
@@ -55,12 +58,11 @@ function ordered_exit (value)
    os.exit(value)
 end
 
-function app (instance_pid, app_name)
-   local app_tree = "//"..instance_pid.."/apps/"..app_name
-   local cnames = shm.children(app_tree)
+function list_counters (path)
+   local cnames = shm.children(path)
    table.sort(cnames, function (a, b) return a < b end)
    for _, cname in ipairs(cnames) do
-      local cpath = app_tree.."/"..cname
+      local cpath = path.."/"..cname
       local value = counter.read(counter.open(cpath, 'readonly'))
       print_row({30, 30}, {cname, lib.comma_value(value)})
       counter.delete(cpath)
