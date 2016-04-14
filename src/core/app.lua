@@ -175,7 +175,7 @@ function apply_config_actions (actions, conf)
    function ops.start (name)
       local class = conf.apps[name].class
       local arg = conf.apps[name].arg
-      local shmpath, shmorig = "apps/"..name, shm.path
+      local shmpath, shmorig = "counters/"..name, shm.path
       shm.path = shmpath
       local app = class:new(arg)
       shm.path = shmorig
@@ -530,11 +530,11 @@ function selftest ()
    config.app(c_counter, "App4", App4)
    configure(c_counter)
    main({done = function () return app_table.App4.test_counter end})
-   assert(S.stat(shm.root.."/"..shm.resolve("apps/App4/test")),
-          "Missing : apps/App4/test")
+   assert(S.stat(shm.root.."/"..shm.resolve("counters/App4/test")),
+          "Missing : counters/App4/test")
    configure(config.new())
-   assert(not S.stat(shm.root.."/"..shm.resolve("apps/App4")),
-          "Failed to unlink apps/App4")
+   assert(not S.stat(shm.root.."/"..shm.resolve("counters/App4")),
+          "Failed to unlink counters/App4")
    print("OK")
 end
 

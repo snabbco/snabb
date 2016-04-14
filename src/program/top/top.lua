@@ -12,26 +12,23 @@ local histogram = require("core.histogram")
 local usage = require("program.top.README_inc")
 
 local long_opts = {
-   help = "h", app = "a", link = "l"
+   help = "h", counters = "c"
 }
 
 function clearterm () io.write('\027[2J') end
 
 function run (args)
    local opt = {}
-   local app_name = nil
-   local link_name = nil
+   local object = nil
    function opt.h (arg) print(usage) main.exit(1) end
-   function opt.a (arg) app_name = arg            end
-   function opt.l (arg) link_name = arg           end
-   args = lib.dogetopt(args, opt, "ha:l:", long_opts)
+   function opt.c (arg) object = arg              end
+   args = lib.dogetopt(args, opt, "hc:", long_opts)
 
    if #args > 1 then print(usage) main.exit(1) end
    local target_pid = select_snabb_instance(args[1])
 
-   if     app_name  then list_counters("//"..target_pid.."/apps/"..app_name)
-   elseif link_name then list_counters("//"..target_pid.."/counters/"..link_name)
-   else                  top(target_pid) end
+   if object then list_counters(target_pid, object)
+   else           top(target_pid) end
    ordered_exit(0)
 end
 
@@ -58,7 +55,8 @@ function ordered_exit (value)
    os.exit(value)
 end
 
-function list_counters (path)
+function list_counters (pid, object)
+   local path = "//"..pid.."/counters/"..object
    local cnames = shm.children(path)
    table.sort(cnames, function (a, b) return a < b end)
    for _, cname in ipairs(cnames) do
