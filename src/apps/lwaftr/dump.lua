@@ -140,30 +140,60 @@ end
 
 function selftest ()
    print("selftest: dump")
-   local icmp_policy = {
-      DROP = 1,
-      ALLOW = 2,
-   }
-   local conf = {
-      binding_table = "binding_table.txt",
-      aftr_ipv6_ip = ipv6:pton("fc00::100"),
-      aftr_mac_inet_side = ethernet:pton("08:AA:AA:AA:AA:AA"),
-      inet_mac = ethernet:pton("08:99:99:99:99:99"),
-      ipv6_mtu = 9500,
-      policy_icmpv6_incoming = icmp_policy.DROP,
-      policy_icmpv6_outgoing = icmp_policy.DROP,
-      icmpv6_rate_limiter_n_packets = 6e5,
-      icmpv6_rate_limiter_n_seconds = 2,
-      aftr_ipv4_ip = ipv4:pton("10.0.1.1"),
-      aftr_mac_b4_side = ethernet:pton("02:AA:AA:AA:AA:AA"),
-      next_hop6_mac = ethernet:pton("02:99:99:99:99:99"),
-      ipv4_mtu = 1460,
-      policy_icmpv4_incoming = icmp_policy.DROP,
-      policy_icmpv4_outgoing = icmp_policy.DROP,
-      vlan_tagging = true,
-      v4_vlan_tag = 444,
-      v6_vlan_tag = 666,
-   }
-   do_dump_configuration(conf)
+   local conf = require("apps.lwaftr.conf")
+   local policies = conf.policies
+   function test(conf_file_table, expected)
+      -- Remove leading whitespaces for each line.
+      local lines = {}
+      for line in expected:gmatch("([^\n]+)") do
+         line = line:gsub("^%s+", "")
+         if #line > 0 then
+            table.insert(lines, line)
+         end
+      end
+      expected = table.concat(lines, "\n")
+      assert(do_dump_configuration(conf_file_table) == expected)
+   end
+   test({
+         aftr_ipv4_ip = ipv4:pton('1.2.3.4'),
+         aftr_ipv6_ip = ipv6:pton('8:9:a:b:c:d:e:f'),
+         aftr_mac_b4_side = ethernet:pton("22:22:22:22:22:22"),
+         aftr_mac_inet_side = ethernet:pton("12:12:12:12:12:12"),
+         next_hop6_mac = ethernet:pton("44:44:44:44:44:44"),
+         binding_table = "foo-table.txt",
+         hairpinning = false,
+         icmpv6_rate_limiter_n_packets=6e3,
+         icmpv6_rate_limiter_n_seconds=2,
+         inet_mac = ethernet:pton("68:68:68:68:68:68"),
+         ipv4_mtu = 1460,
+         ipv6_mtu = 1500,
+         policy_icmpv4_incoming = policies['ALLOW'],
+         policy_icmpv6_incoming = policies['ALLOW'],
+         policy_icmpv4_outgoing = policies['ALLOW'],
+         policy_icmpv6_outgoing = policies['ALLOW'],
+         v4_vlan_tag = 0x444,
+         v6_vlan_tag = 0x666,
+         vlan_tagging = true
+   },[[
+         policy_icmpv6_outgoing = ALLOW
+         ipv4_mtu = 1460
+         hairpinning = false
+         aftr_ipv4_ip = 1.2.3.4
+         next_hop6_mac = 44:44:44:44:44:44
+         icmpv6_rate_limiter_n_packets = 6000
+         vlan_tagging = true
+         aftr_ipv6_ip = 8:9:a:b:c:d:e:f
+         binding_table = foo-table.txt
+         policy_icmpv4_outgoing = ALLOW
+         aftr_mac_inet_side = 12:12:12:12:12:12
+         policy_icmpv6_incoming = ALLOW
+         ipv6_mtu = 1500
+         policy_icmpv4_incoming = ALLOW
+         inet_mac = 68:68:68:68:68:68
+         icmpv6_rate_limiter_n_seconds = 2
+         v6_vlan_tag = 1638
+         v4_vlan_tag = 1092
+         aftr_mac_b4_side = 22:22:22:22:22:22
+   ]])
    print("ok")
 end
