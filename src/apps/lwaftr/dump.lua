@@ -79,6 +79,7 @@ local function do_dump_configuration (conf)
          table.insert(result, ("%s = %s"):format(k, fn(v)))
       end
    end
+   table.sort(result)
    return table.concat(result, "\n")
 end
 
@@ -140,60 +141,90 @@ end
 
 function selftest ()
    print("selftest: dump")
-   local conf = require("apps.lwaftr.conf")
-   local policies = conf.policies
-   function test(conf_file_table, expected)
-      -- Remove leading whitespaces for each line.
+   local lwconf = require("apps.lwaftr.conf")
+   local policies = lwconf.policies
+   local equal = require('core.lib').equal
+   local function string_file(str)
+      local pos = 1
+      return {
+         read = function(self, n)
+            assert(n==1)
+            local ret
+            if pos <= #str then
+               ret = str:sub(pos,pos)
+               pos = pos + 1
+            end
+            return ret
+         end,
+         close = function(self) str = nil end
+      }
+   end
+   local function remove_leading_spaces(str)
       local lines = {}
-      for line in expected:gmatch("([^\n]+)") do
+      for line in str:gmatch("([^\n]+)") do
          line = line:gsub("^%s+", "")
          if #line > 0 then
             table.insert(lines, line)
          end
       end
-      expected = table.concat(lines, "\n")
-      assert(do_dump_configuration(conf_file_table) == expected)
+      return table.concat(lines, "\n")
    end
-   test({
-         aftr_ipv4_ip = ipv4:pton('1.2.3.4'),
-         aftr_ipv6_ip = ipv6:pton('8:9:a:b:c:d:e:f'),
-         aftr_mac_b4_side = ethernet:pton("22:22:22:22:22:22"),
-         aftr_mac_inet_side = ethernet:pton("12:12:12:12:12:12"),
-         next_hop6_mac = ethernet:pton("44:44:44:44:44:44"),
-         binding_table = "foo-table.txt",
-         hairpinning = false,
-         icmpv6_rate_limiter_n_packets=6e3,
-         icmpv6_rate_limiter_n_seconds=2,
-         inet_mac = ethernet:pton("68:68:68:68:68:68"),
-         ipv4_mtu = 1460,
-         ipv6_mtu = 1500,
-         policy_icmpv4_incoming = policies['ALLOW'],
-         policy_icmpv6_incoming = policies['ALLOW'],
-         policy_icmpv4_outgoing = policies['ALLOW'],
-         policy_icmpv6_outgoing = policies['ALLOW'],
-         v4_vlan_tag = 0x444,
-         v6_vlan_tag = 0x666,
-         vlan_tagging = true
-   },[[
-         policy_icmpv6_outgoing = ALLOW
+   local function test(conf, expected)
+      local conf_table = lwconf.load_lwaftr_config(string_file(conf))
+      conf = do_dump_configuration(conf_table)
+      expected = remove_leading_spaces(expected)
+      if not equal(conf, expected) then
+         error("lwAFTR's configuration and dumped version don't match")
+      end
+   end
+   test([[
+         aftr_ipv4_ip=1.2.3.4
+         aftr_ipv6_ip=8:9:a:b:c:d:e:f
+         aftr_mac_b4_side=22:22:22:22:22:22
+         aftr_mac_inet_side=12:12:12:12:12:12
+         next_hop6_mac=44:44:44:44:44:44
+         binding_table="foo-table.txt"
+         hairpinning=false
+         icmpv6_rate_limiter_n_packets=6e3
+         icmpv6_rate_limiter_n_seconds=2
+         inet_mac = 68:68:68:68:68:68
          ipv4_mtu = 1460
-         hairpinning = false
-         aftr_ipv4_ip = 1.2.3.4
-         next_hop6_mac = 44:44:44:44:44:44
-         icmpv6_rate_limiter_n_packets = 6000
-         vlan_tagging = true
-         aftr_ipv6_ip = 8:9:a:b:c:d:e:f
-         binding_table = foo-table.txt
-         policy_icmpv4_outgoing = ALLOW
-         aftr_mac_inet_side = 12:12:12:12:12:12
-         policy_icmpv6_incoming = ALLOW
          ipv6_mtu = 1500
          policy_icmpv4_incoming = ALLOW
-         inet_mac = 68:68:68:68:68:68
-         icmpv6_rate_limiter_n_seconds = 2
-         v6_vlan_tag = 1638
-         v4_vlan_tag = 1092
+         policy_icmpv6_incoming = ALLOW
+         policy_icmpv4_outgoing = ALLOW
+         policy_icmpv6_outgoing = ALLOW
+         v4_vlan_tag = 1092 # 0x444
+         v6_vlan_tag = 1638 # 0x666
+         vlan_tagging = true
+         ipv4_ingress_filter="ip"
+         ipv4_egress_filter="ip"
+         ipv6_ingress_filter="ip6"
+         ipv6_egress_filter="ip6"
+   ]], [[
+         aftr_ipv4_ip = 1.2.3.4
+         aftr_ipv6_ip = 8:9:a:b:c:d:e:f
          aftr_mac_b4_side = 22:22:22:22:22:22
+         aftr_mac_inet_side = 12:12:12:12:12:12
+         binding_table = foo-table.txt
+         hairpinning = false
+         icmpv6_rate_limiter_n_packets = 6000
+         icmpv6_rate_limiter_n_seconds = 2
+         inet_mac = 68:68:68:68:68:68
+         ipv4_egress_filter = ip
+         ipv4_ingress_filter = ip
+         ipv4_mtu = 1460
+         ipv6_egress_filter = ip6
+         ipv6_ingress_filter = ip6
+         ipv6_mtu = 1500
+         next_hop6_mac = 44:44:44:44:44:44
+         policy_icmpv4_incoming = ALLOW
+         policy_icmpv4_outgoing = ALLOW
+         policy_icmpv6_incoming = ALLOW
+         policy_icmpv6_outgoing = ALLOW
+         v4_vlan_tag = 1092
+         v6_vlan_tag = 1638
+         vlan_tagging = true
    ]])
    print("ok")
 end
