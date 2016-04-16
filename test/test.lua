@@ -272,7 +272,7 @@ local function append_tree_to_plan(test_tree, opts, plan, prefix)
           local G = setmetatable({}, {__index = _G})
           G._G = G
           local function Gfn() return G end
-          for i = planlen, #plan do
+          for i = planlen+1, #plan do
             local test = plan[i][3]
             if setfenv then
               setfenv(test, G)
