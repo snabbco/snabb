@@ -8,8 +8,6 @@ local S = require("syscall")
 
 local lib = require("core.lib")
 
-require("lib.hardware.pci_h")
-
 --- ### Hardware device information
 
 devices = {}
