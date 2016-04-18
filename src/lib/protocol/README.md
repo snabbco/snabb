@@ -631,7 +631,20 @@ payload by the header. Finally, synthetic headers can be prepended to the
 datagram using `datagram:push`.  To get the whole datagram as a packet
 use `datagram:packet`.
 
-![Datagram](.images/Datagram.png)
+    DIAGRAM: Datagram
+    datagram packet
+    +------------------+
+    |packet            |
+    |                  |
+    |+------=---------+|
+    || Pushed headers ||
+    |+----------------+|
+    |+------=---------+|<---Beginning of initial packet
+    || Parsed headers ||
+    ||------=---------||
+    ||    Payload     ||
+    |+----------------+|
+    +------------------+
 
 A datagram can be used in two modes of operation, called "immediate
 commit" and "delayed commit".  In immediate commit mode, the `push`

@@ -5,7 +5,12 @@ The `RawSocket` app is a bridge between Linux network interfaces (`eth0`,
 transmitted over the selected interface. Packets received on the
 interface are put on the `tx` port.
 
-![RawSocket](.images/RawSocket.png)
+    DIAGRAM: RawSocket
+              +-----------+
+              |           |
+      rx ---->* RawSocket *----> tx
+              |           |
+              +-----------+
 
 ## Configuration
 
