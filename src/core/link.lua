@@ -28,6 +28,8 @@ function new (name)
    for _, c in ipairs(counternames) do
       r.stats[c] = counter.open("counters/"..name.."/"..c)
    end
+   counter.set(counter.open("counters/"..name.."/discontinuity-time"),
+               C.get_unix_time())
    return r
 end
 
@@ -35,6 +37,7 @@ function free (r, name)
    for _, c in ipairs(counternames) do
       counter.delete("counters/"..name.."/"..c)
    end
+   counter.delete("counters/"..name.."/discontinuity-time")
    shm.unmap(r)
    shm.unlink("links/"..name)
 end
