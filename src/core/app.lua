@@ -33,6 +33,57 @@ freebits  = counter.open("engine/freebits")  -- Total packet bits freed (for 10G
 freebytes = counter.open("engine/freebytes") -- Total packet bytes freed
 configs   = counter.open("engine/configs")   -- Total configurations loaded
 
+-- Events
+
+local tl = require("core.timeline")
+timeline = tl.new("engine/timeline")
+
+local function define_event(level, message)
+   return tl.define(timeline, 'engine', level, message)
+end
+
+-- Sleeping
+
+local event_sleep_Hz = define_event('trace', [[sleeping $usec for $Hz
+The engine requests that the kernel suspend this process for a period of
+microseconds in order to reduce CPU utilization and achieve a fixed
+frequency of breaths per second (Hz).]])
+
+local event_sleep_idle = define_event('trace', [[sleeping $usec on idle
+The engine requests that the kernel suspend this process for a period
+of microseconds in order to reduce CPU utilization because idleness
+has been detected (a breath in which no packets were processed.)]])
+
+local event_wakeup = define_event('trace', [[wakeup from sleep
+The engine resumes operation after sleeping voluntarily.]])
+
+-- Traffic processing start/stop
+
+local event_traffic_start = define_event('info', [[start traffic processing
+The engine starts the traffic processing loop.]])
+
+local event_traffic_stop = define_event('info', [[stop traffic processing
+The engine stops the traffic processing loop.]])
+
+-- Breath steps
+
+local event_breath_start = define_event('trace', [[start $breath
+The engine starts an iteration of the packet-processing event loop (a
+"breath".)]])
+
+local event_breath_pulled = define_event('trace', [[pulled input packets
+The engine has "pulled" new packets into the event loop for processing.]])
+
+local event_breath_pushed = define_event('trace', [[pushed output packets
+The engine has "pushed" packets one step through the processing network.]])
+
+local event_breath_end = define_event('trace', [[end $breath
+The engine completes an iteration of the event loop (a "breath.")]])
+
+local event_commit_counters = define_event('trace', [[commit counters
+The engine commits the latest counter values to externally visible
+shared memory.]])
+
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
 -- There are two modes available:
@@ -77,6 +128,7 @@ local function with_restart (app, method)
    else
       method(app)
    end
+   app.event()
 end
 
 -- Restart dead apps.
@@ -170,6 +222,8 @@ function apply_config_actions (actions, conf)
                   name, tostring(app)))
       end
       local zone = app.zone or getfenv(class.new)._NAME or name
+      local event = define_event('trace', ("called app %s (type: %s)"):format(
+                                    name, zone))
       app.appname = name
       app.output = {}
       app.input = {}
@@ -177,6 +231,7 @@ function apply_config_actions (actions, conf)
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
       app.zone = zone
+      app.event = event
    end
    function ops.restart (name)
       ops.stop(name)
@@ -231,6 +286,7 @@ end
 
 -- Call this to "run snabb switch".
 function main (options)
+   event_traffic_start()
    options = options or {}
    local done = options.done
    local no_timers = options.no_timers
@@ -246,6 +302,7 @@ function main (options)
    until done and done()
    counter.commit()
    if not options.no_report then report(options.report) end
+   event_traffic_stop()
 end
 
 local nextbreath
@@ -258,14 +315,18 @@ function pace_breathing ()
       nextbreath = nextbreath or monotonic_now
       local sleep = tonumber(nextbreath - monotonic_now)
       if sleep > 1e-6 then
+         event_sleep_Hz(Hz, math.round(sleep*1e6))
          C.usleep(sleep * 1e6)
          monotonic_now = C.get_monotonic_time()
+         event_wakeup()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
       if lastfrees == counter.read(frees) then
          sleep = math.min(sleep + 1, maxsleep)
+         event_sleep_idle(sleep)
          C.usleep(sleep)
+         event_wakeup()
       else
          sleep = math.floor(sleep/2)
       end
@@ -277,6 +338,7 @@ end
 
 function breathe ()
    monotonic_now = C.get_monotonic_time()
+   event_breath_start(counter.read(breaths))
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
@@ -290,6 +352,7 @@ function breathe ()
          zone()
       end
    end
+   event_breath_pulled()
    -- Exhale: push work out through the app network
    local firstloop = true
    repeat
@@ -307,12 +370,17 @@ function breathe ()
                progress = true
             end
          end
+         event_breath_pushed()
       end
       firstloop = false
    until not progress  -- Stop after no link had new data
+   event_breath_end(counter.read(breaths))
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
-   if counter.read(breaths) % 100 == 0 then counter.commit() end
+   if counter.read(breaths) % 100 == 0 then
+      counter.commit()
+      event_commit_counters()
+   end
 end
 
 function report (options)
