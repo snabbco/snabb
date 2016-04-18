@@ -4,11 +4,14 @@ local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
 local bit = require("bit")
+local binary_search = require("lib.binary_search")
+local multi_copy = require("lib.multi_copy")
 local bxor, bnot = bit.bxor, bit.bnot
 local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
 local max, floor, ceil = math.max, math.floor, math.ceil
 
 CTable = {}
+LookupStreamer = {}
 
 local HASH_MAX = 0xFFFFFFFF
 local uint16_ptr_t = ffi.typeof('uint16_t*')
@@ -292,6 +295,103 @@ function CTable:remove(key, missing_allowed)
    return true
 end
 
+function CTable:make_lookup_streamer(stride)
+   local res = {
+      all_entries = self.entries,
+      stride = stride,
+      hash_fn = self.hash_fn,
+      equal_fn = self.equal_fn,
+      entries_per_lookup = self.max_displacement + 1,
+      scale = self.scale,
+      pointers = ffi.new('void*['..stride..']'),
+      entries = self.type(stride),
+      -- Binary search over N elements can return N if no entry was
+      -- found that was greater than or equal to the key.  We would
+      -- have to check the result of binary search to ensure that we
+      -- are reading a value in bounds.  To avoid this, allocate one
+      -- more entry.
+      stream_entries = self.type(stride * (self.max_displacement + 1) + 1)
+   }
+   -- Give res.pointers sensible default values in case the first lookup
+   -- doesn't fill the pointers vector.
+   for i = 0, stride-1 do res.pointers[i] = self.entries end
+
+   -- Initialize the stream_entries to HASH_MAX for sanity.
+   for i = 0, stride * (self.max_displacement + 1) do
+      res.stream_entries[i].hash = HASH_MAX
+   end
+
+   -- Compile multi-copy and binary-search procedures that are
+   -- specialized for this table and this stride.
+   local entry_size = ffi.sizeof(self.entry_type)
+   res.multi_copy = multi_copy.gen(stride, res.entries_per_lookup * entry_size)
+   res.binary_search = binary_search.gen(res.entries_per_lookup, self.entry_type)
+
+   return setmetatable(res, { __index = LookupStreamer })
+end
+
+function LookupStreamer:stream()
+   local stride = self.stride
+   local entries = self.entries
+   local pointers = self.pointers
+   local stream_entries = self.stream_entries
+   local entries_per_lookup = self.entries_per_lookup
+   local equal_fn = self.equal_fn
+
+   for i=0,stride-1 do
+      local hash = self.hash_fn(entries[i].key)
+      local index = hash_to_index(hash, self.scale)
+      entries[i].hash = hash
+      pointers[i] = self.all_entries + index
+   end
+
+   self.multi_copy(stream_entries, pointers)
+
+   -- Copy results into entries.
+   for i=0,stride-1 do
+      local hash = entries[i].hash
+      local index = i * entries_per_lookup
+      local found = self.binary_search(stream_entries + index, hash)
+      -- It could be that we read one beyond the ENTRIES_PER_LOOKUP
+      -- entries allocated for this key; that's fine.  See note in
+      -- make_lookup_streamer.
+      if found.hash == hash then
+         -- Direct hit?
+         if equal_fn(found.key, entries[i].key) then
+            entries[i].value = found.value
+         else
+            -- Mark this result as not found unless we prove
+            -- otherwise.
+            entries[i].hash = HASH_MAX
+
+            -- Collision?
+            found = found + 1
+            while found.hash == hash do
+               if equal_fn(found.key, entries[i].key) then
+                  -- Yay!  Re-mark this result as found.
+                  entries[i].hash = hash
+                  entries[i].value = found.value
+                  break
+               end
+               found = found + 1
+            end
+         end
+      else
+         -- Not found.
+         entries[i].hash = HASH_MAX
+      end
+   end
+end
+
+function LookupStreamer:is_empty(i)
+   assert(i >= 0 and i < self.stride)
+   return self.entries[i].hash == HASH_MAX
+end
+
+function LookupStreamer:is_found(i)
+   return not self:is_empty(i)
+end
+
 function CTable:selfcheck()
    local occupancy = 0
    local max_displacement = 0
@@ -444,7 +544,25 @@ function selftest()
    for entry in ctab:iterate() do iterated = iterated + 1 end
    assert(iterated == occupancy)
 
-   -- OK, all looking good with our ctab.
+   -- OK, all looking good with the normal interfaces; let's check out
+   -- streaming lookup.
+   local stride = 1
+   repeat
+      local streamer = ctab:make_lookup_streamer(stride)
+      for i = 1, occupancy, stride do
+         local n = math.min(stride, occupancy-i+1)
+         for j = 0, n-1 do
+            streamer.entries[j].key = i + j
+         end
+         streamer:stream()
+         for j = 0, n-1 do
+            assert(streamer:is_found(j))
+            local value = streamer.entries[j].value[0]
+            assert(value == bnot(i + j))
+         end
+      end
+      stride = stride * 2
+   until stride > 256
 
    -- A check that our equality functions work as intended.
    local numbers_equal = make_equal_fn(ffi.typeof('int'))
