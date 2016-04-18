@@ -64,7 +64,7 @@ function Intel82599:new (arg)
    if conf.vmdq then
       self.counters['phys-address'] = counter.open('phys-address')
       counter.set(self.counters['phys-address'],
-                  macaddress:new(conf.macaddr).bits)
+                  macaddress:new(conf.macaddr):int())
    end
 
    return self
@@ -102,7 +102,7 @@ function Intel82599:reconfig(arg)
 
    if conf.vmdq then
       counter.set(self.counters['phys-address'],
-                  macaddress:new(conf.macaddr).bits)
+                  macaddress:new(conf.macaddr):int())
    end
 end
 
