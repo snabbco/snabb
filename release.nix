@@ -40,7 +40,7 @@ in rec {
 
       # setup the environment
       mkdir ~/.test_env
-      tar xvzf ${test_env} -C ~/.test_env/ 
+      tar xvzf ${test_env} -C ~/.test_env/
     '';
 
     doCheck = true;
