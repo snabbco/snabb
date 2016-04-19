@@ -41,7 +41,7 @@ default_schemas = {
    securitygroupportbindings = {'port_id', 'security_group_id'}
 }
 
--- Create a Snabb Switch traffic process configuration.
+-- Create a Snabb traffic process configuration.
 --
 -- INPUT_DIR contains the Neutron database dump.
 --
@@ -86,7 +86,7 @@ function create_config (input_dir, output_dir, hostname)
       print("BindingID ", binding.id, " has driver ", binding.driver)
       if binding.driver == "snabb" then
          local vif_details = json.decode(binding.vif_details)
-         -- See https://github.com/SnabbCo/snabbswitch/pull/423
+         -- See https://github.com/snabbco/snabb/pull/423
          local profile = vif_details["binding:profile"]
          profile = profile or {}
          print("vif_details has hostname ", vif_details.zone_host, "(we want ", hostname, ")")
