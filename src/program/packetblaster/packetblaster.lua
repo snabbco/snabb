@@ -84,7 +84,6 @@ function run (args)
    end
    assert(nics > 0, "<PCI> matches no suitable devices.")
    engine.busywait = true
-   intel10g.num_descriptors = 32*1024
    engine.configure(c)
    local fn = function ()
                  print("Transmissions (last 1 sec):")
