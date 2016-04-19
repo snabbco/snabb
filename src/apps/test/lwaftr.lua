@@ -257,8 +257,8 @@ end
 
 function Lwaftrgen:push ()
 
-  local input = self.input.input
   local output = self.output.output
+  local input = self.input.input
   local ipv6_packets = self.ipv6_packets
   local ipv6_bytes = self.ipv6_bytes
   local ipv4_packets = self.ipv4_packets
@@ -305,9 +305,10 @@ function Lwaftrgen:push ()
     local ipv4_packet_rate = ipv4_packets / elapsed / 1e6
     local ipv6_octet_rate = ipv6_bytes * 8 / 1e9 / elapsed
     local ipv4_octet_rate = ipv4_bytes * 8 / 1e9 / elapsed
-    print(string.format('v6+v4: %.3f+%.3f = %.3f MPPS, %.3f+%.3f = %.3f Gbps, lost %d pkts',
+    local lost_rate = math.abs(lost_packets / (ipv6_octet_rate + ipv4_octet_rate) / 10000)
+    print(string.format('v6+v4: %.3f+%.3f = %.6f MPPS, %.3f+%.3f = %.6f Gbps, lost %.3f%%',
     ipv6_packet_rate, ipv4_packet_rate, ipv6_packet_rate + ipv4_packet_rate,
-    ipv6_octet_rate, ipv4_octet_rate, ipv6_octet_rate + ipv4_octet_rate, lost_packets))
+    ipv6_octet_rate, ipv4_octet_rate, ipv6_octet_rate + ipv4_octet_rate, lost_rate))
     self.period_start = cur_now
     self.ipv6_bytes, self.ipv6_packets = 0, 0
     self.ipv4_bytes, self.ipv4_packets = 0, 0

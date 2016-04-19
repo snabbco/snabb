@@ -7,8 +7,12 @@ Usage: packetblaster lwaftr [OPTIONS]
 
   --tap TAP_INTERFACE   Linux tap interface name, e.g. tap0
 
+  --int                 Linux network interface, e.g. eth0
+
   --pcap PCAP_FILE      Write packets into the pcap file. Program terminates
                         after one cycle of packets (COUNT x SIZES per protocol)
+
+  --sock <SOCKET>       Socket name for virtio interface
 
   --vlan VLANID         VLAN tag traffic with VLANID if set
 

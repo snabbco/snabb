@@ -12,7 +12,9 @@ local main      = require("core.main")
 local S         = require("syscall")
 local Lwaftrgen = require("apps.test.lwaftr").Lwaftrgen
 local Tap       = require("apps.tap.tap").Tap
+local raw       = require("apps.socket.raw")
 local pcap      = require("apps.pcap.pcap")
+local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local lib       = require("core.lib")
 local ffi       = require("ffi")
 local C         = ffi.C
@@ -22,6 +24,8 @@ local usage = require("program.packetblaster.lwaftr.README_inc")
 local long_opts = {
    pci          = "p",    -- PCI address
    tap          = "t",    -- tap interface
+   int          = "i",    -- Linux network interface, e.g. eth0
+   sock         = "k",    -- socket name for virtio
    duration     = "D",    -- terminate after n seconds
    verbose      = "V",    -- verbose, display stats
    help         = "h",    -- display help text
@@ -127,6 +131,18 @@ function run (args)
      target = tap_interface
    end
 
+   local int_interface
+   function opt.i (arg) 
+     int_interface = arg
+     target = int_interface
+   end
+
+   local sock_interface
+   function opt.k (arg) 
+     sock_interface = arg
+     target = sock_interface
+   end
+
    local ipv4_only = false
    function opt.v4 () ipv4_only = true end
    opt["4"] = opt.v4
@@ -147,10 +163,10 @@ function run (args)
      single_pass = true
    end
 
-   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:", long_opts)
+   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:i:k:", long_opts)
 
    if not target then
-     print("either --pci, --tap or --pcap are required parameters")
+     print("either --pci, --tap, --sock, --int or --pcap are required parameters")
      main.exit(1)
    end
 
@@ -204,6 +220,12 @@ function run (args)
      else
        fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))
      end
+   elseif int_interface then
+     config.app(c, "int", raw.RawSocket, int_interface)
+     input, output = "int.rx", "int.tx"
+   elseif sock_interface then
+     config.app(c, "virtio", VhostUser, { socket_path=sock_interface } )
+     input, output = "virtio.rx", "virtio.tx"
    else
      config.app(c, "pcap", pcap.PcapWriter, pcap_file)
      input, output = "pcap.input", "pcap.output"
