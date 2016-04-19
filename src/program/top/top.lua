@@ -9,10 +9,12 @@ local shm = require("core.shm")
 local counter = require("core.counter")
 local S = require("syscall")
 local histogram = require("core.histogram")
+local json = require("lib.json")
+local macaddress = require("lib.macaddress")
 local usage = require("program.top.README_inc")
 
 local long_opts = {
-   help = "h", counters = "c"
+   help = "h", counters = "c", yang = "y"
 }
 
 function clearterm () io.write('\027[2J') end
@@ -20,15 +22,18 @@ function clearterm () io.write('\027[2J') end
 function run (args)
    local opt = {}
    local object = nil
+   local yang = false
    function opt.h (arg) print(usage) main.exit(1) end
    function opt.c (arg) object = arg              end
-   args = lib.dogetopt(args, opt, "hc:", long_opts)
+   function opt.y ()    yang = true               end
+   args = lib.dogetopt(args, opt, "hc:y", long_opts)
 
    if #args > 1 then print(usage) main.exit(1) end
    local target_pid = select_snabb_instance(args[1])
 
-   if object then list_counters(target_pid, object)
-   else           top(target_pid) end
+   if     object then list_counters(target_pid, object)
+   elseif yang   then dump_yang(target_pid)
+   else               top(target_pid) end
    ordered_exit(0)
 end
 
@@ -55,17 +60,105 @@ function ordered_exit (value)
    os.exit(value)
 end
 
+function read_counter (name, path)
+   if path then name = path.."/"..name end
+   local value = counter.read(counter.open(name, 'readonly'))
+   counter.delete(name)
+   return value
+end
+
 function list_counters (pid, object)
    local path = "//"..pid.."/counters/"..object
    local cnames = shm.children(path)
    table.sort(cnames, function (a, b) return a < b end)
    for _, cname in ipairs(cnames) do
-      local cpath = path.."/"..cname
-      local value = counter.read(counter.open(cpath, 'readonly'))
-      print_row({30, 30}, {cname, lib.comma_value(value)})
-      counter.delete(cpath)
+      print_row({30, 30}, {cname, lib.comma_value(read_counter(cname, path))})
    end
 end
+
+function dump_yang (instance_pid)
+   local instance_tree = "//"..instance_pid
+   local interface_state = {}
+   local types = { [0x1000] = 'hardware',
+                   [0x1001] = 'virtual',
+                   [0x1002] = 'link' }
+
+   for _, link in ipairs(shm.children(instance_tree.."/links")) do
+      local counters = instance_tree.."/counters/"..link
+      local statistics = {}
+      statistics['discontinuity-time'] =
+         totime(read_counter('discontinuity-time', counters))
+      statistics['in-octets'] =
+         tohex64(read_counter('rxbytes', counters))
+      statistics['out-octets'] =
+         tohex64(read_counter('txbytes', counters))
+      statistics['out-discards'] =
+         truncate32(tonumber(read_counter('txdrop', counters)))
+      table.insert(interface_state, { name = link,
+                                      type = types[0x1002],
+                                      statistics = statistics })
+   end
+
+   for _, name in ipairs(shm.children(instance_tree.."/counters")) do
+      local counters = instance_tree.."/counters/"..name
+      local exists = {}
+      for _, c in ipairs(shm.children(counters)) do exists[c] = true end
+      local type = nil
+      if exists['type'] then
+         type = types[tonumber(read_counter('type', counters))]
+      end
+      if type then
+         local statistics = {}
+         statistics['discontinuity-time'] =
+            totime(read_counter('discontinuity-time', counters))
+         for _, c in ipairs({'in-octets', 'in-unicast',
+                             'in-broadcast', 'in-multicast',
+                             'out-octets', 'out-unicast',
+                             'out-broadcast', 'out-multicast'}) do
+            if exists[c] then
+               statistics[c] = tohex64(read_counter(c, counters))
+            end
+         end
+         for _, c in ipairs({'in-discards', 'out-discards'}) do
+            if exists[c] then
+               statistics[c] = truncate32(read_counter(c, counters))
+            end
+         end
+         local interface = { name = name, type = type, statistics = statistics}
+         if exists['phys-address'] then
+            interface['phys-address'] =
+               tomac(read_counter('phys-address', counters))
+         end
+         table.insert(interface_state, interface)
+      end
+   end
+
+   print(json.encode({['interface-state'] = interface_state}))
+end
+
+function tomac (n)
+   return tostring(macaddress:new(n))
+end
+
+function totime (n)
+   return os.date("!%FT%TZ", tonumber(n))
+end
+
+function truncate32 (n)
+   local box = ffi.new("union { uint64_t i64; uint32_t i32[2]; }")
+   box.i64 = n
+   if ffi.abi("le") then return tonumber(box.i32[0])
+   elseif ffi.abi("be") then return tonumber(box.i32[1]) end
+end
+
+function tohex64 (n)
+   local box = ffi.new("uint64_t[1]")
+   box[0] = n
+   local s = ffi.string(box, 8)
+   if ffi.abi("le") then s = s:reverse() end
+   return string.format("0x%02X%02X%02X%02X%02X%02X%02X%02X", s:byte(1, 8))
+end
+
 
 function top (instance_pid)
    local instance_tree = "//"..instance_pid
