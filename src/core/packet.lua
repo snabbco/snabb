@@ -107,9 +107,7 @@ function data (p) return p.data end
 function length (p) return p.length end
 
 function preallocate_step()
-   if _G.developer_debug then
-      assert(packets_allocated + packet_allocation_step <= max_packets)
-   end
+   assert(packets_allocated + packet_allocation_step <= max_packets)
 
    for i=1, packet_allocation_step do
       free_internal(new_packet(), true)
