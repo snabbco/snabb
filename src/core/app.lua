@@ -80,6 +80,13 @@ The engine has "pushed" packets one step through the processing network.]])
 local event_breath_end = define_event('trace', [[end $breath
 The engine completes an iteration of the event loop (a "breath.")]])
 
+local event_breath_initialized = define_event('trace', [[initialized breath
+The engine has completed initialization for the breath: synchronized
+the current time and handled any pending error recovery.]])
+
+local event_ran_timers = define_event('trace', [[ran timers
+The engine polled its timers and executed any that were expired.]])
+
 local event_commit_counters = define_event('trace', [[commit counters
 The engine commits the latest counter values to externally visible
 shared memory.]])
@@ -297,7 +304,7 @@ function main (options)
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
-      if not no_timers then timer.run() end
+      if not no_timers then timer.run() event_ran_timers() end
       if not busywait then pace_breathing() end
    until done and done()
    counter.commit()
@@ -337,11 +344,12 @@ function pace_breathing ()
 end
 
 function breathe ()
-   monotonic_now = C.get_monotonic_time()
    event_breath_start(counter.read(breaths))
+   monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
+   event_breath_initialized()
    for i = 1, #app_array do
       local app = app_array[i]
 --      if app.pull then
@@ -370,8 +378,8 @@ function breathe ()
                progress = true
             end
          end
-         event_breath_pushed()
       end
+      event_breath_pushed()
       firstloop = false
    until not progress  -- Stop after no link had new data
    event_breath_end(counter.read(breaths))
