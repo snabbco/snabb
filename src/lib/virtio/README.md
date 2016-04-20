@@ -13,8 +13,42 @@ the available ring points to descriptors with real packets. The Rx virtqueue on 
 empty buffers (packets) to the device, so the packet is received in the descriptor pointed by the 
 used ring indexes.
 
-![Virtio](.images/Virtio.png)
+    DIAGRAM: Virtio operation
+            DESCRIPTOR TABLE             AVAILABLE RING              USED RING
 
+
+                    +--------------------------------------------------+
+                    |                                                  |
+             +-----------------------------+                           |
+             |      |                      |                           |
+             v      v                      |                           |
+          +------+------+------+-------+---+--+------+--------------+--+---+------+--------+
+          |  D   |  D   |  D   |       |  I   |      |              |  I   |      |        |
+          |  E   |  E   |  E   |       |  D   |      |              |  D   |      |        |
+          |  S   |  S   |  S   |       |  X   |      |              |  X   |      |        |
+          |  C   |  C   |  C   |       |      |      |              |      |      |        |
+          |  0   |  1   |  2   |       |  0   |      |              |  1   |      |        |
+          +--+---+--+---+------+-------+------+------+--------------+------+------+--------+
+             |      |
+   +---------+      +--------------------------------+
+   |                                                 |
+   v                                                 v
++------+------+                                   +------+------+
+|  D   |  D   |                                   |  D   |  D   |
+|  E   |  E   |                                   |  E   |  E   |
+|  S   |  S   |                                   |  S   |  S   |
+|  C   |  C   |                                   |  C   |  C   |
+|      |      |                                   |      |      |
++--+---+---+--+                                   +--+---+---+--+
+   |       |                                         |       |
+   v       |                                         v       |
++--------+ | +-----------------------+            +--------+ | +-----------------------+
+|        | | |                       |            |        | | |                       |
+| Virtio | | |                       |            | Virtio | | |                       |
+| packet | +-> packet.data           |            | packet | +-> packet.data           |
+| header |   |                       |            | header |   |                       |
+|        |   |                       |            |        |   |                       |
++--------+   +-----------------------+            +--------+   +-----------------------+
 
 The virtio-net specification mandates that each packet is prepended with a packet header which contains
 information such as checksum and segmentation offloading. The picture shows the usage of indirect 
@@ -27,5 +61,5 @@ During the initialization of the virtio-net driver, the following structures are
  * the virtio packet headers
 
 After that sending a packet, or giving and empty buffer to the device is just a matter of finding the free
-descriptor and attach a pointer to it.
+descriptor and attach apointer to it.
 

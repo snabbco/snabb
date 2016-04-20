@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- intel1g: Device driver app for Intel 1G network cards
 -- 
 -- This is a device driver for Intel i210, i350 families of 1G network cards.
@@ -107,7 +109,7 @@ function Intel1g:new(conf)
    pci.set_bus_master(pciaddress, true)
    local regs, mmiofd = pci.map_pci_memory(pciaddress, 0)
 
-   -- Common utilities, see snabbswitch/src/lib/hardware/register.lua
+   -- Common utilities, see snabb/src/lib/hardware/register.lua
    local function bitvalue (value)
       -- bitvalue(0x42)      => 0x42
       -- bitvalue({a=7,b=2}) => 0x42

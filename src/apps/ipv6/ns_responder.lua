@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This app acts as a responder for neighbor solicitaions for a
 -- specific target address and as a relay for all other packets.  It
 -- has two ports, north and south.  The south port attaches to a port

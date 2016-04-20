@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local debug = _G.developer_debug
@@ -70,6 +72,13 @@ end
 function shiftleft (p, bytes)
    C.memmove(p.data, p.data+bytes, p.length-bytes)
    p.length = p.length - bytes
+end
+
+-- Move packet data to the right. This leaves length bytes of data
+-- at the beginning of the packet.
+function shiftright (p, bytes)
+   C.memmove(p.data + bytes, p.data, p.length)
+   p.length = p.length + bytes
 end
 
 -- Conveniently create a packet by copying some existing data.

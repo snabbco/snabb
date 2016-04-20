@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This class provides basic mechanisms for parsing, building and
 -- manipulating a hierarchy of protocol headers and associated payload
 -- contained in a data packet.  In particular, it supports
