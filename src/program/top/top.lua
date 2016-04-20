@@ -89,9 +89,9 @@ function dump_yang (instance_pid)
       statistics['discontinuity-time'] =
          totime(read_counter('discontinuity-time', counters))
       statistics['in-octets'] =
-         tohex64(read_counter('rxbytes', counters))
+         tostring64(read_counter('rxbytes', counters))
       statistics['out-octets'] =
-         tohex64(read_counter('txbytes', counters))
+         tostring64(read_counter('txbytes', counters))
       statistics['out-discards'] =
          truncate32(tonumber(read_counter('txdrop', counters)))
       table.insert(interface_state, { name = link,
@@ -116,7 +116,7 @@ function dump_yang (instance_pid)
                              'out-octets', 'out-unicast',
                              'out-broadcast', 'out-multicast'}) do
             if exists[c] then
-               statistics[c] = tohex64(read_counter(c, counters))
+               statistics[c] = tostring64(read_counter(c, counters))
             end
          end
          for _, c in ipairs({'in-discards', 'out-discards'}) do
@@ -151,12 +151,10 @@ function truncate32 (n)
    elseif ffi.abi("be") then return tonumber(box.i32[1]) end
 end
 
-function tohex64 (n)
-   local box = ffi.new("uint64_t[1]")
-   box[0] = n
-   local s = ffi.string(box, 8)
-   if ffi.abi("le") then s = s:reverse() end
-   return string.format("0x%02X%02X%02X%02X%02X%02X%02X%02X", s:byte(1, 8))
+function tostring64 (n)
+   assert(ffi.istype('uint64_t', n))
+   local s = tostring(n)
+   return s:sub(1, #s - 3)
 end
 
 
