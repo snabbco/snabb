@@ -310,7 +310,7 @@ Returns an exact copy of *packet*.
 
 Sets the payload length of *packet*, truncating or extending its payload. In
 the latter case the contents of the extended area at the end of the payload are
-undefined.
+filled with zeros.
 
 — Function **packet.append** *packet*, *pointer*, *length*
 

@@ -102,6 +102,7 @@ function length (p) return p.length end
 -- Set packet data length.
 function resize (p, len)
    assert(len <= max_payload, "packet payload overflow")
+   ffi.fill(p.data + p.length, math.max(0, len - p.length))
    p.length = len
 end
 
