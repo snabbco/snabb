@@ -630,6 +630,7 @@ end
 function C.timer_gettime(timerid, curr_value) return syscall(sys.timer_gettime, int(timerid), void(curr_value)) end
 function C.timer_delete(timerid) return syscall(sys.timer_delete, int(timerid)) end
 function C.timer_getoverrun(timerid) return syscall(sys.timer_getoverrun, int(timerid)) end
+function C.vhangup() return syscall(sys.vhangup) end
 
 -- only on some architectures
 if sys.waitpid then
