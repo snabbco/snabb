@@ -94,7 +94,7 @@ function esp_v6_encrypt:encapsulate (p)
    local overhead = self.ESP_OVERHEAD + pad_length
    packet.resize(p, length + overhead)
    local padding_start = data + length
-   C.memset(padding_start, 0, pad_length)
+   ffi.fill(padding_start, pad_length)
    self.ip:new_from_mem(data + ETHERNET_SIZE, IPV6_SIZE)
    self.esp_tail:new_from_mem(padding_start + pad_length, ESP_TAIL_SIZE)
    self.esp_tail:next_header(self.ip:next_header())
