@@ -50,9 +50,18 @@ end
 --- ### HugeTLB: Allocate contiguous memory in bulk from Linux
 
 function allocate_hugetlb_chunk ()
+   local fd, err = syscall.open("/proc/sys/vm/nr_hugepages","rdonly")
+   assert(fd, tostring(err))
+   fd:flock("ex")
    for i =1, 3 do
       local page = C.allocate_huge_page(huge_page_size)
-      if page ~= nil then return page else reserve_new_page() end
+      if page ~= nil then
+         fd:flock("un")
+         fd:close()
+         return page
+      else
+         reserve_new_page()
+      end
    end
 end
 

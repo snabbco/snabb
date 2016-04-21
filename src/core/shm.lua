@@ -67,6 +67,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local lib = require("core.lib")
 local S = require("syscall")
+local const = require("syscall.linux.constants")
 
 -- Root directory where the object tree is created.
 root = "/var/run/snabb"
@@ -131,7 +132,7 @@ function mkdir (name)
    if not S.stat(root) then
       local mask = S.umask(0)
       local status, err = S.mkdir(root, "01777")
-      assert(status, ("Unable to create %s: %s"):format(
+      assert(status or err.errno == const.E.EXIST, ("Unable to create %s: %s"):format(
                 root, tostring(err or "unspecified error")))
       S.umask(mask)
    end
