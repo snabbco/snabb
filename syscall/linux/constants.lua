@@ -2109,6 +2109,154 @@ c.BPF_PROG = strflag {
   SCHED_ACT     = 4,
 }
 
+-- Linux performance monitoring
+-- perf_event_attr.type
+c.PERF_TYPE = strflag {
+  HARDWARE   = 0,
+  SOFTWARE   = 1,
+  TRACEPOINT = 2,
+  HW_CACHE   = 3,
+  RAW        = 4,
+  BREAKPOINT = 5,
+}
+
+-- perf_event_attr.event_id
+c.PERF_COUNT = strflag {
+  -- Generalized performance event event_id types
+  HW_CPU_CYCLES                = 0,
+  HW_INSTRUCTIONS              = 1,
+  HW_CACHE_REFERENCES          = 2,
+  HW_CACHE_MISSES              = 3,
+  HW_BRANCH_INSTRUCTIONS       = 4,
+  HW_BRANCH_MISSES             = 5,
+  HW_BUS_CYCLES                = 6,
+  HW_STALLED_CYCLES_FRONTEND   = 7,
+  HW_STALLED_CYCLES_BACKEND    = 8,
+  HW_REF_CPU_CYCLES            = 9,
+  -- Generalized hardware cache events
+  HW_CACHE_L1D                 = 0,
+  HW_CACHE_L1I                 = 1,
+  HW_CACHE_LL                  = 2,
+  HW_CACHE_DTLB                = 3,
+  HW_CACHE_ITLB                = 4,
+  HW_CACHE_BPU                 = 5,
+  HW_CACHE_NODE                = 6,
+  HW_CACHE_OP_READ             = 0,
+  HW_CACHE_OP_WRITE            = 1,
+  HW_CACHE_OP_PREFETCH         = 2,
+  HW_CACHE_RESULT_ACCESS       = 0,
+  HW_CACHE_RESULT_MISS         = 1,
+  -- Special "software" events provided by the kernel
+  SW_CPU_CLOCK                 = 0,
+  SW_TASK_CLOCK                = 1,
+  SW_PAGE_FAULTS               = 2,
+  SW_CONTEXT_SWITCHES          = 3,
+  SW_CPU_MIGRATIONS            = 4,
+  SW_PAGE_FAULTS_MIN           = 5,
+  SW_PAGE_FAULTS_MAJ           = 6,
+  SW_ALIGNMENT_FAULTS          = 7,
+  SW_EMULATION_FAULTS          = 8,
+  SW_DUMMY                     = 9,
+  SW_BPF_OUTPUT                = 10,
+}
+
+-- Bits that can be set in perf_event_attr.sample_type to request information
+c.PERF_SAMPLE = multiflags {
+  IP                          = bit.lshift(1, 0),
+  TID                         = bit.lshift(1, 1),
+  TIME                        = bit.lshift(1, 2),
+  ADDR                        = bit.lshift(1, 3),
+  READ                        = bit.lshift(1, 4),
+  CALLCHAIN                   = bit.lshift(1, 5),
+  ID                          = bit.lshift(1, 6),
+  CPU                         = bit.lshift(1, 7),
+  PERIOD                      = bit.lshift(1, 8),
+  STREAM_ID                   = bit.lshift(1, 9),
+  RAW                         = bit.lshift(1, 10),
+  BRANCH_STACK                = bit.lshift(1, 11),
+  REGS_USER                   = bit.lshift(1, 12),
+  STACK_USER                  = bit.lshift(1, 13),
+  WEIGHT                      = bit.lshift(1, 14),
+  DATA_SRC                    = bit.lshift(1, 15),
+  IDENTIFIER                  = bit.lshift(1, 16),
+  TRANSACTION                 = bit.lshift(1, 17),
+  REGS_INTR                   = bit.lshift(1, 18),
+}
+
+-- values to program into perf_event_attr.branch_sample_type when PERF_SAMPLE_BRANCH is set
+c.PERF_SAMPLE_BRANCH = multiflags {
+  USER_SHIFT           = 0,
+  KERNEL_SHIFT         = 1,
+  HV_SHIFT             = 2,
+  ANY_SHIFT            = 3,
+  ANY_CALL_SHIFT       = 4,
+  ANY_RETURN_SHIFT     = 5,
+  IND_CALL_SHIFT       = 6,
+  ABORT_TX_SHIFT       = 7,
+  IN_TX_SHIFT          = 8,
+  NO_TX_SHIFT          = 9,
+  COND_SHIFT           = 10,
+  CALL_STACK_SHIFT     = 11,
+  IND_JUMP_SHIFT       = 12,
+  CALL_SHIFT           = 13,
+  NO_FLAGS_SHIFT       = 14,
+  NO_CYCLES_SHIFT      = 15,
+}
+c.PERF_SAMPLE_BRANCH.USER          = bit.lshift(1, c.PERF_SAMPLE_BRANCH.USER_SHIFT)
+c.PERF_SAMPLE_BRANCH.KERNEL        = bit.lshift(1, c.PERF_SAMPLE_BRANCH.KERNEL_SHIFT)
+c.PERF_SAMPLE_BRANCH.HV            = bit.lshift(1, c.PERF_SAMPLE_BRANCH.HV_SHIFT)
+c.PERF_SAMPLE_BRANCH.ANY           = bit.lshift(1, c.PERF_SAMPLE_BRANCH.ANY_SHIFT)
+c.PERF_SAMPLE_BRANCH.ANY_CALL      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.ANY_CALL_SHIFT)
+c.PERF_SAMPLE_BRANCH.ANY_RETURN    = bit.lshift(1, c.PERF_SAMPLE_BRANCH.ANY_RETURN_SHIFT)
+c.PERF_SAMPLE_BRANCH.IND_CALL      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.IND_CALL_SHIFT)
+c.PERF_SAMPLE_BRANCH.ABORT_TX      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.ABORT_TX_SHIFT)
+c.PERF_SAMPLE_BRANCH.IN_TX         = bit.lshift(1, c.PERF_SAMPLE_BRANCH.IN_TX_SHIFT)
+c.PERF_SAMPLE_BRANCH.NO_TX         = bit.lshift(1, c.PERF_SAMPLE_BRANCH.NO_TX_SHIFT)
+c.PERF_SAMPLE_BRANCH.COND          = bit.lshift(1, c.PERF_SAMPLE_BRANCH.COND_SHIFT)
+c.PERF_SAMPLE_BRANCH.CALL_STACK    = bit.lshift(1, c.PERF_SAMPLE_BRANCH.CALL_STACK_SHIFT)
+c.PERF_SAMPLE_BRANCH.IND_JUMP      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.IND_JUMP_SHIFT)
+c.PERF_SAMPLE_BRANCH.CALL          = bit.lshift(1, c.PERF_SAMPLE_BRANCH.CALL_SHIFT)
+c.PERF_SAMPLE_BRANCH.NO_FLAGS      = bit.lshift(1, c.PERF_SAMPLE_BRANCH.NO_FLAGS_SHIFT)
+c.PERF_SAMPLE_BRANCH.NO_CYCLES     = bit.lshift(1, c.PERF_SAMPLE_BRANCH.NO_CYCLES_SHIFT)
+
+-- Flags for perf_attr.read_format
+c.PERF_READ_FORMAT = multiflags {
+  TOTAL_TIME_ENABLED = bit.lshift(1, 0),
+  TOTAL_TIME_RUNNING = bit.lshift(1, 1),
+  ID                 = bit.lshift(1, 2),
+  GROUP              = bit.lshift(1, 3),
+}
+
+-- Flags for perf_event_open
+c.PERF_FLAG = multiflags {
+  FD_NO_GROUP    = bit.lshift(1, 0),
+  FD_OUTPUT      = bit.lshift(1, 1),
+  PID_CGROUP     = bit.lshift(1, 2),
+  FD_CLOEXEC     = bit.lshift(1, 3),
+}
+
+
+-- If perf_event_attr.sample_id_all is set then all event types will
+-- have the sample_type selected fields related to where/when
+-- (identity) an event took place (TID, TIME, ID, STREAM_ID, CPU, IDENTIFIER)
+c.PERF_RECORD = strflag {
+  MMAP           = 1,
+  LOST           = 2,
+  COMM           = 3,
+  EXIT           = 4,
+  THROTTLE       = 5,
+  UNTHROTTLE     = 6,
+  FORK           = 7,
+  READ           = 8,
+  SAMPLE         = 9,
+  MMAP2          = 10,
+  AUX            = 11,
+  ITRACE_START   = 12,
+  LOST_SAMPLES   = 13,
+  SWITCH         = 14,
+  SWITCH_CPU_WIDE= 15,
+}
+
 -- termios - c_cc characters
 c.CC = strflag(arch.CC or {
   VINTR    = 0,

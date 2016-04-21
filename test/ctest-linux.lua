@@ -90,6 +90,30 @@ c.BPF.JNE = nil
 c.BPF.MOV = nil
 c.SYS.bpf = nil
 
+-- no perf_event_open on Travis CI
+ctypes["struct perf_event_attr"] = nil
+ctypes["struct perf_event_reader"] = nil
+ctypes["struct perf_event_header"] = nil
+ctypes["struct perf_event_mmap_page"] = nil
+c.PERF_TYPE = {}
+c.PERF_COUNT = {}
+c.PERF_SAMPLE = {}
+c.PERF_FLAG = {}
+c.PERF_SAMPLE_REGS = {}
+c.PERF_SAMPLE_BRANCH = {}
+c.PERF_READ_FORMAT = {}
+c.PERF_RECORD = {}
+-- no perf_event_open ioctls on Travis CI
+c.IOCTL.PERF_EVENT_IOC_ENABLE = nil
+c.IOCTL.PERF_EVENT_IOC_DISABLE = nil
+c.IOCTL.PERF_EVENT_IOC_REFRESH = nil
+c.IOCTL.PERF_EVENT_IOC_RESET = nil
+c.IOCTL.PERF_EVENT_IOC_PERIOD = nil
+c.IOCTL.PERF_EVENT_IOC_SET_OUTPUT = nil
+c.IOCTL.PERF_EVENT_IOC_SET_FILTER = nil
+c.IOCTL.PERF_EVENT_IOC_ID = nil
+c.IOCTL.PERF_EVENT_IOC_SET_BPF = nil
+
 if abi.arch == "arm" then ctypes["struct statfs64"] = nil end -- padding difference, not that important
 
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end

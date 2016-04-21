@@ -238,6 +238,15 @@ local function fixup_constants(abi, c)
   c.BPF.ANY = nil
   c.BPF.EXIST = nil
   c.BPF.NOEXIST = nil
+  -- no perf_event_open on Travis CI
+  c.PERF_TYPE = {}
+  c.PERF_COUNT = {}
+  c.PERF_SAMPLE = {}
+  c.PERF_FLAG = {}
+  c.PERF_SAMPLE_REGS = {}
+  c.PERF_SAMPLE_BRANCH = {}
+  c.PERF_READ_FORMAT = {}
+  c.PERF_RECORD = {}
 
   return c
 end
