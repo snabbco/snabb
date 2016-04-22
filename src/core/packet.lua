@@ -22,7 +22,7 @@ local header_size = 8
 local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
-local max_packets = 1e5
+local max_packets = 1e6
 local packet_allocation_step = 1000
 local packets_allocated = 0
 local packets_fl = freelist.new("struct packet *", max_packets)
@@ -108,7 +108,8 @@ function length (p) return p.length end
 
 function preallocate_step()
    if _G.developer_debug then
-      assert(packets_allocated + packet_allocation_step <= max_packets)
+      assert(packets_allocated + packet_allocation_step <= max_packets,
+             "packet allocation overflow")
    end
 
    for i=1, packet_allocation_step do
