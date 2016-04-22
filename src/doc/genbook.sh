@@ -6,13 +6,13 @@
 # The authors list is automatically generated from Git history,
 # ordered from most to least commits.
 
-# Link images in local .images/
-for png in $(find .. -name "*.png"); do
-    ln -f -s ../$png .images/
-done
-
 # Root directory for markdown files
 mdroot=../obj
+
+# Link images in local .images/
+for png in $(find .. -name "*.png"); do
+    ln -s ../../$png $mdroot/doc/.images/
+done
 
 cat <<EOF
 % Snabb Reference Manual
