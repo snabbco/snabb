@@ -38,7 +38,7 @@ IPv6_PLOADLEN_OFFSET = 4
 IPv6_NEXTHDR_OFFSET  = 6
 IPv6_HOPLIMIT_OFFSET = 7
 IPv6_SRC_ADDR_OFFSET = 8
-IPv6_DST_ADDR_OFFSET = 26
+IPv6_DST_ADDR_OFFSET = 24
 
 IPv6_NEXTHDR_HOPBYHOP= 0
 IPv6_NEXTHDR_TCP     = 6
@@ -249,8 +249,8 @@ function Scanner:extract_packet_info(p)
       end
    elseif eth_type == ETH_TYPE_IPv6 then
       key = flow_key_ipv6()
-      src_addr = p.data + IPv6_SRC_ADDR_OFFSET
-      dst_addr = p.data + IPv6_DST_ADDR_OFFSET
+      src_addr = p.data + ip_offset + IPv6_SRC_ADDR_OFFSET
+      dst_addr = p.data + ip_offset + IPv6_DST_ADDR_OFFSET
       if ipv6_addr_cmp(src_addr, dst_addr) <= 0 then
          ffi.copy(key:lo_addr_ptr(), src_addr, 16)
          ffi.copy(key:hi_addr_ptr(), dst_addr, 16)
