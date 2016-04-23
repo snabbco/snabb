@@ -15,14 +15,22 @@ local function rd32(address)
    return ffi.cast(uint16_ptr_t, address)[0]
 end
 
-local function ipv6_addr_cmp(a, b)
-   for i = 1, 16 do
-      local d = b - a
-      if d ~= 0 then
-         return d
+--
+-- Factory function to create memcmp()-style functions in pure-Lua to avoid
+-- calling into C via the FFI, with the amount of bytes being compared set
+-- to a fixed amount. This is used to create functions to compare IPv4 and
+-- IPv6 addresses below.
+--
+local function make_fixed_memcmp_function(len)
+   return function (a, b)
+      for i = 0, len - 1 do
+         local d = a[i] - b[i]
+         if d ~= 0 then
+            return d
+         end
       end
+      return 0
    end
-   return 0
 end
 
 --
@@ -83,7 +91,8 @@ return {
    rd16 = rd16;
    rd32 = rd32;
 
-   ipv6_addr_cmp = ipv6_addr_cmp;
+   ipv4_addr_cmp = make_fixed_memcmp_function(4),
+   ipv6_addr_cmp = make_fixed_memcmp_function(16),
 
-   SouthAndNorth = SouthAndNorth;
+   SouthAndNorth = SouthAndNorth,
 }

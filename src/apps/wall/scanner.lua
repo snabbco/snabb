@@ -5,7 +5,8 @@ local lib  = require("core.lib")
 local bit  = require("bit")
 local ffi  = require("ffi")
 
-local rd16, rd32, ipv6_addr_cmp = util.rd16, util.rd32, util.ipv6_addr_cmp
+local rd16, rd32 = util.rd16, util.rd32
+local ipv4_addr_cmp, ipv6_addr_cmp = util.ipv4_addr_cmp, util.ipv6_addr_cmp
 local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
 local band, bxor, bnot = bit.band, bit.bxor, bit.bnot
 
@@ -165,7 +166,6 @@ local function ihl(p, offset)
    local ver_and_ihl = p.data[offset]
    return band(ver_and_ihl, 0x0F) * 4
 end
-
 
 --
 -- Traverse an IPv6 header which has the following layout:
