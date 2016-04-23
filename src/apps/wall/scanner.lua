@@ -281,3 +281,94 @@ end
 function Scanner:protocol_name(protocol)
    return tostring(protocol)
 end
+
+function selftest()
+   local ipv6 = require("lib.protocol.ipv6")
+   local ipv4 = require("lib.protocol.ipv4")
+
+   do -- Test comparison of IPv6 addresses
+      assert(ipv6_addr_cmp(ipv6:pton("2001:fd::1"),
+                           ipv6:pton("2001:fd::2")) <= 0)
+
+      local a = ipv6:pton("2001:fd48::01")
+      local b = ipv6:pton("2001:fd48::02")  -- Last byte differs
+      local c = ipv6:pton("2002:fd48::01")  -- Second byte differs
+      local d = ipv6:pton("2102:fd48::01")  -- First byte differs
+
+      assert(ipv6_addr_cmp(a, a) == 0)
+      assert(ipv6_addr_cmp(b, b) == 0)
+      assert(ipv6_addr_cmp(c, c) == 0)
+      assert(ipv6_addr_cmp(d, d) == 0)
+
+      assert(ipv6_addr_cmp(a, b) < 0)
+      assert(ipv6_addr_cmp(a, c) < 0)
+      assert(ipv6_addr_cmp(a, d) < 0)
+
+      assert(ipv6_addr_cmp(b, a) > 0)
+      assert(ipv6_addr_cmp(b, c) < 0)
+      assert(ipv6_addr_cmp(b, d) < 0)
+
+      assert(ipv6_addr_cmp(c, a) > 0)
+      assert(ipv6_addr_cmp(c, b) > 0)
+      assert(ipv6_addr_cmp(c, d) < 0)
+   end
+
+   do -- Test hashing of IPv4 flow keys
+      local function make_ipv4_key()
+         local key = flow_key_ipv4()
+         key.vlan_id = 10
+         key.ip_proto = IPv4_PROTO_UDP
+         ffi.copy(key.lo_addr, ipv4:pton("10.0.0.1"), 4)
+         ffi.copy(key.hi_addr, ipv4:pton("10.0.0.2"), 4)
+         key.lo_port = 8080
+         key.hi_port = 1010
+         return key
+      end
+      local k = make_ipv4_key()
+      assert(k:hash() == make_ipv4_key():hash())
+      -- Changing any value makes the hash vary
+      k.lo_port = 2020
+      assert(k:hash() ~= make_ipv4_key():hash())
+   end
+
+   do -- Test hashing of IPv6 flow keys
+      local function make_ipv6_key()
+         local key = flow_key_ipv6()
+         key.vlan_id = 42
+         key.ip_proto = IPv6_NEXTHDR_TCP
+         ffi.copy(key.lo_addr, ipv6:pton("2001:fd::1"), 16)
+         ffi.copy(key.hi_addr, ipv6:pton("2001:fd::2"), 16)
+         key.lo_port = 4040
+         key.hi_port = 3030
+         return key
+      end
+      local k = make_ipv6_key()
+      assert(k:hash() == make_ipv6_key():hash())
+      -- Changing any value makes the hash vary
+      k.lo_port = IPv6_NEXTHDR_UDP
+      assert(k:hash() ~= make_ipv6_key():hash())
+   end
+
+   do -- Test Scanner:extract_packet_info()
+      local s = Scanner:new()
+
+      local datagram = require("lib.protocol.datagram")
+      local ethernet = require("lib.protocol.ethernet")
+      local dg = datagram:new()
+      dg:push(ipv6:new({ src = ipv6:pton("2001:fd::1"),
+                         dst = ipv6:pton("2001:fd::2"),
+                         next_header = IPv6_NEXTHDR_NONE }))
+      dg:push(ethernet:new({ src = ethernet:pton("02:00:00:00:00:01"),
+                             dst = ethernet:pton("02:00:00:00:00:02"),
+                             type = lib.ntohs(ETH_TYPE_IPv6) }))
+
+      local key, ip_offset, src_addr, src_port, dst_addr, dst_port =
+            s:extract_packet_info(dg:packet())
+      assert(key.vlan_id == 0)
+      assert(key.ip_proto == IPv6_NEXTHDR_NONE)
+      assert(ipv6_addr_cmp(key.lo_addr, ipv6:pton("2001:fd::1")) == 0)
+      assert(ipv6_addr_cmp(key.hi_addr, ipv6:pton("2001:fd::2")) == 0)
+      assert(key.lo_port == 0)
+      assert(key.hi_port == 0)
+   end
+end
