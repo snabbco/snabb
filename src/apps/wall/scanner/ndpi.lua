@@ -1,5 +1,8 @@
 local scanner = require("apps.wall.scanner")
+local util    = require("apps.wall.util")
 local ndpi    = require("ndpi")
+
+local rd32, ipv4_addr_cmp, ipv6_addr_cmp = util.rd32, util.ipv4_addr_cmp, util.ipv6_addr_cmp
 
 local NdpiFlow = subClass()
 NdpiFlow._name = "SnabbWall nDPI Flow"
@@ -69,8 +72,20 @@ function NdpiScanner:scan_packet(p, time)
    end
 
    local src_id, dst_id = flow._ndpi_src_id, flow._ndpi_dst_id
-   if src_addr ~= flow.lo_port then
-      src_id, dst_id = dst_id, src_id
+   if key:eth_type() == scanner.ETH_TYPE_IPv4 then
+      if ipv4_addr_cmp(src_addr, key.lo_addr) ~= 0 or
+         ipv4_addr_cmp(dst_addr, key.hi_addr) ~= 0 or
+         src_port ~= key.lo_port or dst_port ~= key.hi_port
+      then
+         src_id, dst_id = dst_id, src_id
+      end
+   elseif key:eth_type() == scanner.ETH_TYPE_IPv6 then
+      if ipv6_addr_cmp(src_addr, key.lo_addr) ~= 0 or
+         ipv6_addr_cmp(dst_addr, key.hi_addr) ~= 0 or
+         src_port ~= key.lo_port or dst_port ~= key.hi_port
+      then
+         src_id, dst_id = dst_id, src_id
+      end
    end
 
    flow.proto_master, flow.protocol =
@@ -86,13 +101,15 @@ function NdpiScanner:scan_packet(p, time)
    end
 
    -- TODO: Check and tune-up the constants for number of packets
+   -- TODO: Do similarly for IPv6 packets once nDPI supports using IPv6
+   --       addresses here (see https://github.com/ntop/nDPI/issues/183)
    if (flow.key.ip_proto == scanner.IPv4_PROTO_UDP and flow.packets > 8) or
       (flow.key.ip_proto == scanner.IPv4_PROTO_TCP and flow.packets > 10)
    then
       flow.proto_master, flow.protocol =
             self._ndpi:guess_undetected_protocol(flow.key.ip_proto,
-                                                 src_addr, src_port,
-                                                 dst_addr, dst_port)
+                                                 rd32(src_addr), src_port,
+                                                 rd32(dst_addr), dst_port)
       -- TODO: Check whether we should check again for PROTOCOL_UNKNOWN
       return true, flow
    end

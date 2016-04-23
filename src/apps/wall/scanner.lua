@@ -67,8 +67,8 @@ ffi.cdef [[
       uint16_t vlan_id;
       uint8_t  __pad;
       uint8_t  ip_proto;
-      uint32_t lo_addr;
-      uint32_t hi_addr;
+      uint8_t  lo_addr[4];
+      uint8_t  hi_addr[4];
       uint16_t lo_port;
       uint16_t hi_port;
    } __attribute__((packed));
@@ -77,8 +77,8 @@ ffi.cdef [[
       uint16_t vlan_id;
       uint8_t  __pad;
       uint8_t  ip_proto;
-      uint64_t lo_addr;
-      uint64_t hi_addr;
+      uint8_t  lo_addr[16];
+      uint8_t  hi_addr[16];
       uint16_t lo_port;
       uint16_t hi_port;
    } __attribute__((packed));
@@ -116,47 +116,25 @@ local function make_cdata_hash_function(sizeof)
    end
 end
 
-local uint8_ptr_t = ffi.typeof("uint8_t*")
 
 local flow_key_ipv4_size = ffi.sizeof("struct swall_flow_key_ipv4")
 assert(flow_key_ipv4_size % 4 == 0)
-
-local flow_key_ipv4_lo_addr_offset =
-   ffi.offsetof("struct swall_flow_key_ipv4", "lo_addr")
-local flow_key_ipv4_hi_addr_offset =
-   ffi.offsetof("struct swall_flow_key_ipv4", "hi_addr")
 
 local flow_key_ipv4 = ffi.metatype("struct swall_flow_key_ipv4", {
    __index = {
       hash = make_cdata_hash_function(flow_key_ipv4_size),
       eth_type = function (self) return ETH_TYPE_IPv4 end,
-      lo_addr_ptr = function (self)
-         return ffi.cast(uint8_ptr_t, self) + flow_key_ipv4_lo_addr_offset
-      end,
-      hi_addr_ptr = function (self)
-         return ffi.cast(uint8_ptr_t, self) + flow_key_ipv4_hi_addr_offset
-      end,
    }
 })
 
+
 local flow_key_ipv6_size = ffi.sizeof("struct swall_flow_key_ipv6")
 assert(flow_key_ipv6_size % 4 == 0)
-
-local flow_key_ipv6_lo_addr_offset =
-   ffi.offsetof("struct swall_flow_key_ipv6", "lo_addr")
-local flow_key_ipv6_hi_addr_offset =
-   ffi.offsetof("struct swall_flow_key_ipv6", "hi_addr")
 
 local flow_key_ipv6 = ffi.metatype("struct swall_flow_key_ipv6", {
    __index = {
       hash = make_cdata_hash_function(flow_key_ipv6_size),
       eth_type = function (self) return ETH_TYPE_IPv6 end,
-      lo_addr_ptr = function (self)
-         return ffi.cast(uint8_ptr_t, self) + flow_key_ipv6_lo_addr_offset
-      end,
-      hi_addr_ptr = function (self)
-         return ffi.cast(uint8_ptr_t, self) + flow_key_ipv6_hi_addr_offset
-      end,
    }
 })
 
@@ -230,12 +208,14 @@ function Scanner:extract_packet_info(p)
    local key, src_addr, src_port, dst_addr, dst_port, ip_proto
    if eth_type == ETH_TYPE_IPv4 then
       key = flow_key_ipv4()
-      src_addr = rd32(p.data + ip_offset + IPv4_SRC_ADDR_OFFSET)
-      dst_addr = rd32(p.data + ip_offset + IPv4_DST_ADDR_OFFSET)
-      if src_addr < dst_addr then
-         key.lo_addr, key.hi_addr = src_addr, dst_addr
+      src_addr = p.data + ip_offset + IPv4_SRC_ADDR_OFFSET
+      dst_addr = p.data + ip_offset + IPv4_DST_ADDR_OFFSET
+      if ipv4_addr_cmp(src_addr, dst_addr) <= 0 then
+         ffi.copy(key.lo_addr, src_addr, 4)
+         ffi.copy(key.hi_addr, dst_addr, 4)
       else
-         key.lo_addr, key.hi_addr = dst_addr, src_addr
+         ffi.copy(key.lo_addr, dst_addr, 4)
+         ffi.copy(key.hi_addr, src_addr, 4)
       end
 
       ip_proto = p.data[ip_offset + IPv4_PROTO_OFFSET]
@@ -252,11 +232,11 @@ function Scanner:extract_packet_info(p)
       src_addr = p.data + ip_offset + IPv6_SRC_ADDR_OFFSET
       dst_addr = p.data + ip_offset + IPv6_DST_ADDR_OFFSET
       if ipv6_addr_cmp(src_addr, dst_addr) <= 0 then
-         ffi.copy(key:lo_addr_ptr(), src_addr, 16)
-         ffi.copy(key:hi_addr_ptr(), dst_addr, 16)
+         ffi.copy(key.lo_addr, src_addr, 16)
+         ffi.copy(key.hi_addr, dst_addr, 16)
       else
-         ffi.copy(key:lo_addr_ptr(), dst_addr, 16)
-         ffi.copy(key:hi_addr_ptr(), src_addr, 16)
+         ffi.copy(key.lo_addr, dst_addr, 16)
+         ffi.copy(key.hi_addr, src_addr, 16)
       end
 
       local proto_header_ptr

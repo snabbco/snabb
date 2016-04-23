@@ -19,11 +19,11 @@ local function report_flow(scanner, flow)
    local lo_addr, hi_addr = "<unknown>", "<unknown>"
    local eth_type = flow.key:eth_type()
    if eth_type == scan.ETH_TYPE_IPv4 then
-      lo_addr = ipv4:ntop(flow.key:lo_addr_ptr())
-      hi_addr = ipv4:ntop(flow.key:hi_addr_ptr())
+      lo_addr = ipv4:ntop(flow.key.lo_addr)
+      hi_addr = ipv4:ntop(flow.key.hi_addr)
    elseif eth_type == scan.ETH_TYPE_IPv6 then
-      lo_addr = ipv6:ntop(flow.key:lo_addr_ptr())
-      hi_addr = ipv6:ntop(flow.key:hi_addr_ptr())
+      lo_addr = ipv6:ntop(flow.key.lo_addr)
+      hi_addr = ipv6:ntop(flow.key.hi_addr)
    end
 
    printf("%#010x %4dp %15s:%-5d - %15s:%-5d  %s:%s\n",
