@@ -7,8 +7,8 @@ local util = require("apps.wall.util")
 local scan = require("apps.wall.scanner")
 
 local long_opts = {
-   help    = "h";
-   verbose = "v";
+   help    = "h",
+   verbose = "v",
 }
 
 local function printf(fmt, ...)
@@ -39,8 +39,8 @@ Report.__index = Report
 
 function Report:new (scanner)
    return setmetatable({
-      scanner = scanner;
-      packets = 0;
+      scanner = scanner,
+      packets = 0,
    }, self)
 end
 
@@ -100,11 +100,11 @@ function run (args)
    local opt = {
       v = function (arg)
          verbosity = verbosity + 1
-      end;
+      end,
       h = function (arg)
          print(require("program.wall.spy.README_inc"))
          main.exit(0)
-      end;
+      end,
    }
 
    args = lib.dogetopt(args, opt, "hv", long_opts)

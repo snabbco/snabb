@@ -88,8 +88,8 @@ end
 
 
 return {
-   rd16 = rd16;
-   rd32 = rd32;
+   rd16 = rd16,
+   rd32 = rd32,
 
    ipv4_addr_cmp = make_fixed_memcmp_function(4),
    ipv6_addr_cmp = make_fixed_memcmp_function(16),

@@ -100,14 +100,14 @@ local function hash32(i32)
    return i32 - INT32_MIN
 end
 
-local uint32_ptr = ffi.typeof("uint32_t*")
+local uint32_ptr_t = ffi.typeof("uint32_t*")
 local function make_cdata_hash_function(sizeof)
    assert(sizeof >= 4)
    assert(sizeof % 4 == 0)
 
    local rounds = (sizeof / 4) - 1
    return function (cdata)
-      cdata = ffi.cast(uint32_ptr, cdata)
+      cdata = ffi.cast(uint32_ptr_t, cdata)
       local h = hash32(cdata[0])
       for i = 1, rounds do
          h = hash32(cdata[i])
@@ -116,7 +116,7 @@ local function make_cdata_hash_function(sizeof)
    end
 end
 
-local uint8_ptr = ffi.typeof("uint8_t*")
+local uint8_ptr_t = ffi.typeof("uint8_t*")
 
 local flow_key_ipv4_size = ffi.sizeof("struct swall_flow_key_ipv4")
 assert(flow_key_ipv4_size % 4 == 0)
@@ -128,14 +128,14 @@ local flow_key_ipv4_hi_addr_offset =
 
 local flow_key_ipv4 = ffi.metatype("struct swall_flow_key_ipv4", {
    __index = {
-      hash = make_cdata_hash_function(flow_key_ipv4_size);
-      eth_type = function (self) return ETH_TYPE_IPv4 end;
+      hash = make_cdata_hash_function(flow_key_ipv4_size),
+      eth_type = function (self) return ETH_TYPE_IPv4 end,
       lo_addr_ptr = function (self)
-         return ffi.cast(uint8_ptr, self) + flow_key_ipv4_lo_addr_offset
-      end;
+         return ffi.cast(uint8_ptr_t, self) + flow_key_ipv4_lo_addr_offset
+      end,
       hi_addr_ptr = function (self)
-         return ffi.cast(uint8_ptr, self) + flow_key_ipv4_hi_addr_offset
-      end;
+         return ffi.cast(uint8_ptr_t, self) + flow_key_ipv4_hi_addr_offset
+      end,
    }
 })
 
@@ -149,14 +149,14 @@ local flow_key_ipv6_hi_addr_offset =
 
 local flow_key_ipv6 = ffi.metatype("struct swall_flow_key_ipv6", {
    __index = {
-      hash = make_cdata_hash_function(flow_key_ipv6_size);
-      eth_type = function (self) return ETH_TYPE_IPv6 end;
+      hash = make_cdata_hash_function(flow_key_ipv6_size),
+      eth_type = function (self) return ETH_TYPE_IPv6 end,
       lo_addr_ptr = function (self)
-         return ffi.cast(uint8_ptr, self) + flow_key_ipv6_lo_addr_offset
-      end;
+         return ffi.cast(uint8_ptr_t, self) + flow_key_ipv6_lo_addr_offset
+      end,
       hi_addr_ptr = function (self)
-         return ffi.cast(uint8_ptr, self) + flow_key_ipv6_hi_addr_offset
-      end;
+         return ffi.cast(uint8_ptr_t, self) + flow_key_ipv6_hi_addr_offset
+      end,
    }
 })
 
@@ -181,16 +181,16 @@ local function ipv6_nexthdr_type_len_skip (p)
 end
 
 local ipv6_walk_header_funcs = {
-   [IPv6_NEXTHDR_HOPBYHOP] = ipv6_nexthdr_type_len_skip;
-   [IPv6_NEXTHDR_ROUTING]  = ipv6_nexthdr_type_len_skip;
-   [IPv6_NEXTHDR_DSTOPTS]  = ipv6_nexthdr_type_len_skip;
+   [IPv6_NEXTHDR_HOPBYHOP] = ipv6_nexthdr_type_len_skip,
+   [IPv6_NEXTHDR_ROUTING]  = ipv6_nexthdr_type_len_skip,
+   [IPv6_NEXTHDR_DSTOPTS]  = ipv6_nexthdr_type_len_skip,
    [IPv6_NEXTHDR_FRAGMENT] = function (p)
       return p[0], p + 8
-   end;
+   end,
    [IPv6_NEXTHDR_AH] = function (p)
       -- Size specified in 4-octet units (plus two octets).
       return p[0], p + 2 + (p[1] * 4)
-   end;
+   end,
 }
 
 --
@@ -256,7 +256,7 @@ function Scanner:extract_packet_info(p)
          ffi.copy(key:hi_addr_ptr(), dst_addr, 16)
       else
          ffi.copy(key:lo_addr_ptr(), dst_addr, 16)
-         ffi.copy(key:hi_addr_ptr(), dst_addr, 16)
+         ffi.copy(key:hi_addr_ptr(), src_addr, 16)
       end
 
       local proto_header_ptr
