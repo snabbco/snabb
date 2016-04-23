@@ -1,31 +1,32 @@
 local ffi = require("ffi")
 
 ffi.cdef[[
-typedef union foo_t {
+typedef union meta_tostring_foo_t {
   int64_t i64;
   uint64_t u64;
   complex cd;
   double d[2];
   complex float cf;
   float f[2];
-} foo_t;
+} meta_tostring_foo_t;
 ]]
 
-do
-  local foo_t = ffi.typeof("foo_t")
-  local x = foo_t()
-  local s
-
-  assert(tostring(foo_t) == "ctype<union foo_t>")
-  assert(string.match(tostring(x), "^cdata<union foo_t>: "))
-
+do --- tostring/typeof semi-roundtrip
   assert(tostring(ffi.typeof("int (*(*[1][2])[3][4])[5][6]")) ==
-	 "ctype<int (*(*[1][2])[3][4])[5][6]>")
+   "ctype<int (*(*[1][2])[3][4])[5][6]>")
   assert(tostring(ffi.typeof("int (*const)(void)")) ==
-	 "ctype<int (*const)()>")
+   "ctype<int (*const)()>")
   assert(tostring(ffi.typeof("complex float(*(void))[2]")) ==
-	 "ctype<complex float (*())[2]>")
+   "ctype<complex float (*())[2]>")
   assert(tostring(ffi.typeof("complex*")) == "ctype<complex *>")
+end
+
+do --- assorted union fields
+  local foo_t = ffi.typeof("meta_tostring_foo_t")
+  local x = foo_t()
+
+  assert(tostring(foo_t) == "ctype<union meta_tostring_foo_t>")
+  assert(string.find(tostring(x), "^cdata<union meta_tostring_foo_t>: "))
 
   x.i64 = -1;
   assert(tostring(x.i64) == "-1LL")

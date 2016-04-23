@@ -1,17 +1,17 @@
 local ffi = require("ffi")
 
 ffi.cdef[[
-typedef struct { int a, b, c; } foo_t;
-typedef struct { int a, b, c; } foo2_t;
-typedef struct { int a[10]; int b[10]; } sarr_t;
-typedef struct chain_t {
-  struct chain_t *next;
+typedef struct { int a, b, c; } jit_struct_foo_t;
+typedef struct { int a, b, c; } jit_struct_foo2_t;
+typedef struct { int a[10]; int b[10]; } jit_struct_sarr_t;
+typedef struct jit_struct_chain_t {
+  struct jit_struct_chain_t *next;
   int v;
-} chain_t;
+} jit_struct_chain_t;
 ]]
 
-do
-  local s = ffi.new("foo_t")
+do --- iteration variable as field name
+  local s = ffi.new("jit_struct_foo_t")
   for j,k in ipairs{ "a", "b", "c" } do
     for i=1,100 do s[k] = s[k] + j end
   end
@@ -20,8 +20,8 @@ do
   assert(s.c == 300)
 end
 
-do
-  local s = ffi.new("foo_t")
+do --- constant field names
+  local s = ffi.new("jit_struct_foo_t")
   for i=1,100 do
     s.a = s.a + 1
     s.b = s.b + 2
@@ -32,9 +32,9 @@ do
   assert(s.c == 300)
 end
 
-do
-  local s = ffi.new("foo_t")
-  local s2 = ffi.new("foo2_t", 1, 2, 3)
+do --- constants from structure
+  local s = ffi.new("jit_struct_foo_t")
+  local s2 = ffi.new("jit_struct_foo2_t", 1, 2, 3)
   for i=1,100 do
     s.a = s.a + s2.a
     s.b = s.b + s2.b
@@ -45,8 +45,8 @@ do
   assert(s.c == 300)
 end
 
-do
-  local s = ffi.new("sarr_t")
+do --- adding to array elements
+  local s = ffi.new("jit_struct_sarr_t")
   for i=1,100 do
     s.a[5] = s.a[5] + 1
     s.b[5] = s.b[5] + 2
@@ -55,7 +55,7 @@ do
   assert(s.b[5] == 200)
 end
 
-do
+do --- double indexing
   local s = ffi.new([[
 	struct {
 	  struct {
@@ -72,7 +72,7 @@ do
   assert(x == 105)
 end
 
-do
+do --- structurally identical
   local s1 = ffi.new("struct { int a; }")
   local s2 = ffi.new("struct { int a; }")
   local x = 0
@@ -92,7 +92,7 @@ do
   end
 end
 
-do
+do --- structurally different
   local s1 = ffi.new("struct { int a; }")
   local s2 = ffi.new("struct { char a; }")
   local x = 0
@@ -112,7 +112,7 @@ do
   end
 end
 
-do
+do --- union
   local s = ffi.new("union { uint8_t a; int8_t b; }")
   local x = 0
   for i=1,200 do
@@ -122,10 +122,10 @@ do
   assert(x == 1412)
 end
 
-do
-  local s1 = ffi.new("chain_t")
-  local s2 = ffi.new("chain_t")
-  local s3 = ffi.new("chain_t")
+do --- circular chain
+  local s1 = ffi.new("jit_struct_chain_t")
+  local s2 = ffi.new("jit_struct_chain_t")
+  local s3 = ffi.new("jit_struct_chain_t")
   s1.next = s2
   s2.next = s3
   s3.next = s1
@@ -139,7 +139,7 @@ do
   assert(s3.v == 99)
 end
 
-do
+do --- int struct initialiser
   local ct = ffi.typeof("struct { int a,b,c; }")
   local x,y,z = 0,0,0
   for i=1,100 do
@@ -153,7 +153,7 @@ do
   assert(z == 0)
 end
 
-do
+do --- double struct initialiser
   local ct = ffi.typeof("struct { double a,b,c; }")
   local x,y,z = 0,0,0
   for i=1,100 do
@@ -167,28 +167,28 @@ do
   assert(z == 0)
 end
 
-do
-  local s1 = ffi.new("chain_t")
+do --- pointer / int struct initialiser
+  local s1 = ffi.new("jit_struct_chain_t")
   local s
   for i=1,100 do
-    s = ffi.new("chain_t", s1, i)
+    s = ffi.new("jit_struct_chain_t", s1, i)
   end
   assert(tonumber(ffi.cast("int", s.next)) ==
-	 tonumber(ffi.cast("int", ffi.cast("chain_t *", s1))))
+	 tonumber(ffi.cast("int", ffi.cast("jit_struct_chain_t *", s1))))
   assert(s.v == 100)
 end
 
-do
+do --- unstable pointer/int type struct initialiser
   local ct = ffi.typeof("struct { int *p; int y; }")
   local s
   for i=1,200 do
-    if i == 100 then ct = ffi.typeof("chain_t") end
+    if i == 100 then ct = ffi.typeof("jit_struct_chain_t") end
     s = ct(nil, 10)
   end
   assert(s.v == 10)
 end
 
-do
+do --- upvalued int box
   local s = ffi.new("struct { int x; }", 42)
   local function f()
     for i=1,100 do

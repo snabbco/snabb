@@ -16,8 +16,7 @@ union {
 }
 ]])
 
--- float -> u32 type punning at same offset
-do
+do --- float -> u32 type punning at same offset
   local x = 0LL
   for i=1,100 do
     u.f[0] = i
@@ -26,8 +25,7 @@ do
   assert(x == 110888222720LL)
 end
 
--- double -> u64 type punning at same offset
-do
+do --- double -> u64 type punning at same offset
   local x = 0LL
   for i=1,100 do
     u.d[0] = i
@@ -36,8 +34,7 @@ do
   assert(x == 1886586031403171840ULL)
 end
 
--- i8 -> u8 type punning at same offset (fwd -> CONV.int.u8)
-do
+do --- i8 -> u8 type punning at same offset (fwd -> CONV.int.u8)
   local x = 0
   for i=-100,100 do
     u.i8[0] = i
@@ -46,8 +43,7 @@ do
   assert(x == 25600)
 end
 
--- p32/p64 -> u64 type punning at same offset (32 bit: different size)
-do
+do --- p32/p64 -> u64 type punning at same offset (32 bit: different size)
   local x = 0LL
   u.u64[0] = 0
   for i=-100,150 do
@@ -58,8 +54,7 @@ do
 	       (ffi.abi"le" and 0x6400001883ULL or 0x188300000000ULL)))
 end
 
--- u16 -> u8 type punning at overlapping offsets
-do
+do --- u16 -> u8 type punning at overlapping offsets [0]
   local x = 0
   for i=255,520 do
     u.u16[0] = i
@@ -68,7 +63,7 @@ do
   assert(x == (ffi.abi"be" and 274 or 32931))
 end
 
-do
+do --- u16 -> u8 type punning at overlapping offsets [1]
   local x = 0
   for i=255,520 do
     u.u16[0] = i
@@ -77,8 +72,7 @@ do
   assert(x == (ffi.abi"le" and 274 or 32931))
 end
 
--- i16 -> i32 type punning at overlapping offsets
-do
+do --- i16 -> i32 type punning at overlapping offsets [0]
   local x = 0
   u.i32[0] = 0
   for i=-100,150 do
@@ -88,7 +82,7 @@ do
   assert(x == (ffi.abi"be" and 411238400 or 6559875))
 end
 
-do
+do --- i16 -> i32 type punning at overlapping offsets [1]
   local x = 0
   u.i32[0] = 0
   for i=-100,150 do
@@ -98,8 +92,7 @@ do
   assert(x == (ffi.abi"le" and 411238400 or 6559875))
 end
 
--- double -> i32 type punning at overlapping offsets
-do
+do --- double -> i32 type punning at overlapping offsets [0]
   local x = 0
   for i=1.5,120,1.1 do
     u.d[0] = i
@@ -108,7 +101,7 @@ do
   assert(x == (ffi.abi"be" and 116468870297 or -858993573))
 end
 
-do
+do --- double -> i32 type punning at overlapping offsets [1]
   local x = 0
   for i=1.5,120,1.1 do
     u.d[0] = i
@@ -117,8 +110,7 @@ do
   assert(x == (ffi.abi"le" and 116468870297 or -858993573))
 end
 
--- u32 -> u64 type punning, constify u, 32 bit SPLIT: fold KPTR
-do
+do --- u32 -> u64 type punning, constify u, 32 bit SPLIT: fold KPTR
   local u = ffi.new("union { struct { uint32_t lo, hi; }; uint64_t u64; }")
 
   local function conv(lo, hi)
@@ -134,8 +126,7 @@ do
   assert(x == 21689584849850ULL)
 end
 
--- u64 -> u32 -> u64 type punning with KPTR
-do
+do --- u64 -> u32 -> u64 type punning with KPTR
   local s = ffi.new("union { int64_t q; int32_t i[2]; }")
   local function f()
     s.q = 0

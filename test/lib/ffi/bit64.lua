@@ -11,27 +11,37 @@ typedef enum { ZZI = -1 } ienum_t;
 typedef enum { ZZU } uenum_t;
 ]]
 
-assert(tobit(0xfedcba9876543210ll) == 0x76543210)
-assert(tobit(0xfedcba9876543210ull) == 0x76543210)
-
-assert(tostring(band(1ll, 1, 1ll, -1)) == "1LL")
-assert(tostring(band(1ll, 1, 1ull, -1)) == "1ULL")
-
-assert(shl(10ll, 2) == 40)
-assert(shl(10, 2ll) == 40)
-assert(shl(10ll, 2ll) == 40)
-
-assert(bit.tohex(0x123456789abcdef0LL) == "123456789abcdef0")
-
-for _,tp in ipairs{ "int", "ienum_t", "uenum_t", "int64_t", "uint64_t"} do
-  local x = ffi.new(tp, 10)
-  local y = tobit(x)
-  local z = band(x)
-  assert(type(y) == "number" and y == 10)
-  assert(type(z) == "cdata" and z == 10)
+do --- smoke tobit
+  assert(tobit(0xfedcba9876543210ll) == 0x76543210)
+  assert(tobit(0xfedcba9876543210ull) == 0x76543210)
 end
 
-do
+do --- smoke band
+  assert(tostring(band(1ll, 1, 1ll, -1)) == "1LL")
+  assert(tostring(band(1ll, 1, 1ull, -1)) == "1ULL")
+end
+
+do --- smoke shl
+  assert(shl(10ll, 2) == 40)
+  assert(shl(10, 2ll) == 40)
+  assert(shl(10ll, 2ll) == 40)
+end
+
+do --- smoke tohex
+  assert(bit.tohex(0x123456789abcdef0LL) == "123456789abcdef0")
+end
+
+do --- tobit/band assorted C types
+  for _,tp in ipairs{"int", "ienum_t", "uenum_t", "int64_t", "uint64_t"} do
+    local x = ffi.new(tp, 10)
+    local y = tobit(x)
+    local z = band(x)
+    assert(type(y) == "number" and y == 10)
+    assert(type(z) == "cdata" and z == 10)
+  end
+end
+
+do --- tobit/band negative unsigned enum
   local x = ffi.new("uenum_t", -10)
   local y = tobit(x)
   local z = band(x)
@@ -41,7 +51,7 @@ do
   assert(z == 2^32-10)
 end
 
-do
+do --- jit band/bor/bxor
   local a = 0x123456789abcdef0LL
   local y1, y2, y3, y4, y5, y6
   for i=1,100 do
@@ -88,7 +98,7 @@ do
   assert(y6 == 0x123456786543210fLL)
 end
 
-do
+do --- jit shift/xor
   local a, b = 0x123456789abcdef0LL, 0x31415926535898LL
   for i=1,200 do
     a = bxor(a, b); b = sar(b, 14) + shl(b, 50)
@@ -98,7 +108,7 @@ do
   assert(b == -7993764627526027113LL)
 end
 
-do
+do --- jit rotate/xor
   local a, b = 0x123456789abcdef0LL, 0x31415926535898LL
   for i=1,200 do
     a = bxor(a, b); b = rol(b, 14)
@@ -108,7 +118,7 @@ do
   assert(b == -6199148037344061526LL)
 end
 
-do
+do --- jit all ops
   local a, b = 0x123456789abcdef0LL, 0x31415926535898LL
   for i=1,200 do
     a = bxor(a, b); b = rol(b, a)

@@ -1,6 +1,6 @@
 local ffi = require("ffi")
 
-do
+do --- misc
   local arr = ffi.typeof("char[11]")
   local a = arr()
   local b = arr()
@@ -43,14 +43,14 @@ do
   assert(ffi.string(c, 5) == "AAAAA")
 end
 
-do
+do --- jit char[10]
   local a = ffi.new("char[10]", 64)
   local x
   for i=1,100 do a[0] = i; x = ffi.string(a, 10) end
   assert(x == "d@@@@@@@@@")
 end
 
-do
+do --- jit char[1]
   local a = ffi.new("char[1]")
   local x, y
   for i=1,100 do
