@@ -177,8 +177,8 @@ local ipv6_walk_header_funcs = {
 -- is the type of the upper level protocol code and pointer to the beginning
 -- of the upper level protocol header data.
 --
-local function ipv6_walk_headers (p)
-   local ptr = p.data
+local function ipv6_walk_headers (p, offset)
+   local ptr = p.data + offset
    local nexthdr = ptr[IPv6_NEXTHDR_OFFSET]
    while ipv6_walk_header_funcs[nexthdr] do
       local new_nexthdr, new_ptr = ipv6_walk_header_funcs[nexthdr](ptr)
@@ -240,7 +240,7 @@ function Scanner:extract_packet_info(p)
       end
 
       local proto_header_ptr
-      ip_proto, proto_header_ptr = ipv6_walk_headers (p)
+      ip_proto, proto_header_ptr = ipv6_walk_headers (p, ip_offset)
       if ip_proto == IPv6_NEXTHDR_TCP then
          src_port = rd16(proto_header_ptr + TCP_SRC_PORT_OFFSET)
          dst_port = rd16(proto_header_ptr + TCP_DST_PORT_OFFSET)
