@@ -140,6 +140,10 @@ local flow_key_ipv6 = ffi.metatype("struct swall_flow_key_ipv6", {
 
 -- Helper functions
 
+--
+-- Obtain the Internet Header Length (IHL) of an IPv4 packet, and return
+-- its value converted to bytes.
+--
 local function ihl(p, offset)
    local ver_and_ihl = p.data[offset]
    return band(ver_and_ihl, 0x0F) * 4
