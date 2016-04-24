@@ -1,12 +1,6 @@
 local ffi = require("ffi")
 
-ffi.cdef[[
-typedef int arr_t[10];
-typedef const arr_t carr_t;
-typedef struct { int x; } struct_t;
-]]
-
-do
+do --- 1
   local void_t = ffi.typeof("void")
   assert(ffi.istype(void_t, void_t))
   assert(ffi.istype("const void", void_t))
@@ -15,7 +9,7 @@ do
   assert(ffi.istype("double", 1.5) == false) -- 2nd arg is a number.
 end
 
-do
+do --- 2
   local i8_t = ffi.typeof("int8_t")
   local u8_t = ffi.typeof("uint8_t")
   local i32_t = ffi.typeof("int32_t")
@@ -32,7 +26,7 @@ do
   assert(ffi.istype("long long", ffi.typeof("int64_t")))
 end
 
-do
+do --- 3
   local ptr_t = ffi.typeof("int *")
   local p = ptr_t()
   assert(ffi.istype(ptr_t, ptr_t) == true)
@@ -46,9 +40,15 @@ do
   assert(ffi.istype("void *", ptr_t) == false)
 end
 
-do
-  local arr_t = ffi.typeof("arr_t")
-  local carr_t = ffi.typeof("carr_t")
+do --- 4
+  ffi.cdef[[
+typedef int istype_arr_t[10];
+typedef const istype_arr_t istype_carr_t;
+typedef struct { int x; } istype_struct_t;
+]]
+
+  local arr_t = ffi.typeof("istype_arr_t")
+  local carr_t = ffi.typeof("istype_carr_t")
   assert(ffi.istype(arr_t, arr_t) == true)
   assert(ffi.istype("int[10]", arr_t) == true)
 
@@ -60,16 +60,16 @@ do
   assert(ffi.istype("volatile int[10]", arr_t) == true)
   assert(ffi.istype(carr_t, arr_t) == true)
 
-  local struct_t = ffi.typeof("struct_t")
-  local structp_t = ffi.typeof("struct_t *")
+  local struct_t = ffi.typeof("istype_struct_t")
+  local structp_t = ffi.typeof("istype_struct_t *")
   assert(ffi.istype(struct_t, struct_t) == true)
-  assert(ffi.istype("const struct_t", struct_t) == true)
+  assert(ffi.istype("const istype_struct_t", struct_t) == true)
   assert(ffi.istype("struct { int x; }", struct_t) == false)
   assert(ffi.istype(struct_t, structp_t) == true) -- struct ptr is ok for struct.
   assert(ffi.istype(structp_t, struct_t) == false)
 end
 
-do
+do --- 5
   local int_t = ffi.typeof("int")
   local t = {}
   for i=1,200 do t[i] = int_t() end
@@ -86,4 +86,3 @@ do
   for i=1,200 do if not ffi.istype(t[i], int_t) then x = x + i end end
   assert(x == 100)
 end
-

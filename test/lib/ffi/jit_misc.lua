@@ -1,6 +1,6 @@
 local ffi = require("ffi")
 
-do
+do --- errno
   ffi.errno(42)
   local x = 0
   for i=1,100 do x = x + ffi.errno() end
@@ -8,7 +8,7 @@ do
   ffi.errno(0)
 end
 
-do
+do --- string
   local a = ffi.new("uint8_t[?]", 101)
   for i=0,99 do a[i] = i end
   local s
@@ -18,7 +18,7 @@ do
   assert(s == "Z[\\]^_`abc")
 end
 
-do
+do --- fill
   local a = ffi.new("uint8_t[?]", 100)
   local x = 0
   for i=0,90 do x = x + a[i]; ffi.fill(a+i, 10, i); x = x + a[i] end
@@ -31,7 +31,7 @@ do
   assert(b[103] == (ffi.abi("le") and 0x343434 or 0x34343400))
 end
 
-do
+do --- copy array elements
   local a = ffi.new("uint8_t[?]", 100)
   local b = ffi.new("uint8_t[?]", 100)
   for i=0,99 do b[i] = i end
@@ -43,7 +43,7 @@ do
   assert(x == 4095)
 end
 
-do
+do --- copy from string
   local a = ffi.new("uint8_t[?]", 100, 42)
   for i=0,90 do ffi.copy(a+i, "abc") end
   local x = 0
@@ -51,7 +51,7 @@ do
   assert(x == 9276)
 end
 
-do
+do --- copy structures
   local tp = ffi.typeof("struct { int x, y; }")
   local a = tp(1, 2)
   local b = tp(3, 4)
@@ -63,7 +63,7 @@ do
   assert(x == 5050)
 end
 
-do
+do --- init struct from first field, complex
   local tp = ffi.typeof("struct { complex x, y; }")
   local cx = ffi.typeof("complex")
   local a = tp(cx(1, 2), cx(3, 4))
@@ -72,7 +72,7 @@ do
   assert(x == 5050)
 end
 
-do
+do --- int array as parameterised type
   local tp = ffi.typeof("int[10]")
   local a = tp(42)
   local b = ffi.new(ffi.typeof("struct { $ x; }", tp))
@@ -80,7 +80,7 @@ do
   assert(b.x[0] == 42 and b.x[9] == 42)
 end
 
-do
+do --- double array as parameterised type
   local tp = ffi.typeof("double[5]")
   local a = tp(42)
   local b = ffi.new(ffi.typeof("struct { $ x; }", tp))
@@ -91,7 +91,7 @@ do
   assert(b.x[0] == 42 and b.x[4] == 42)
 end
 
-do
+do --- abi
   local x, y
   for i=1,100 do x = ffi.abi("32bit"); y = ffi.abi("64bit") end
   assert(x == ffi.abi("32bit"))
@@ -102,9 +102,8 @@ do
   end
 end
 
-do
+do --- typeof constructed typeof
   local ct = ffi.typeof("struct { int x; }")
   local cd = ct()
   for i=1,100 do assert(ffi.typeof(cd) == ct) end
 end
-

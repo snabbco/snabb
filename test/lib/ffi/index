@@ -1,6 +1,10 @@
 bit64.lua +bit
 copy_fill.lua
+err.lua
+istype.lua
 jit_array.lua
+jit_complex.lua
+jit_misc.lua
 jit_struct.lua
 meta_tostring.lua
 redir.lua

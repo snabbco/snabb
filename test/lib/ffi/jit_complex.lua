@@ -4,13 +4,13 @@ local cx = ffi.typeof("complex")
 local cxf = ffi.typeof("complex float")
 
 ffi.cdef[[
-typedef struct cc_t {
-  struct cc_t *next;
+typedef struct jit_complex_chain_t {
+  struct jit_complex_chain_t *next;
   complex c;
-} cc_t;
+} jit_complex_chain_t;
 ]]
 
-do
+do --- field access
   local c = cx(1, 2)
   local x
   for i=1,100 do
@@ -19,8 +19,8 @@ do
   assert(x == 3)
 end
 
-do
-  local cp = ffi.new("cc_t")
+do --- one element circular chain, named indexing
+  local cp = ffi.new("jit_complex_chain_t")
   local p = cp
   p.next = p
   p.c = cx(1, 2)
@@ -34,8 +34,8 @@ do
   assert(y == 200)
 end
 
-do
-  local cp = ffi.new("cc_t")
+do --- one element circular chain, array indexing
+  local cp = ffi.new("jit_complex_chain_t")
   local p = cp
   p.next = p
   p.c = cx(1, 2)
@@ -49,7 +49,7 @@ do
   assert(y == 200)
 end
 
-do
+do --- one-arg initialiser
   local ca = ffi.new("complex[?]", 101)
   for i=1,100 do
     ca[i] = cx(i) -- handled as init single
@@ -63,7 +63,7 @@ do
   assert(y == 0)
 end
 
-do
+do --- two-arg initialiser
   local ca = ffi.new("complex[?]", 101)
   for i=1,100 do
     ca[i] = cx(i, -i)
@@ -77,7 +77,7 @@ do
   assert(y == -5050)
 end
 
-do
+do --- float<>double conversions
   local ca = ffi.new("complex[?]", 101)
   local caf = ffi.new("complex float[?]", 101)
   for i=1,100 do
@@ -93,7 +93,7 @@ do
   assert(y == -2*5050)
 end
 
-do
+do --- Complex struct field
   local s = ffi.new("struct { complex x;}")
   for i=1,100 do
     s.x = 12.5i
@@ -102,10 +102,8 @@ do
   assert(s.x.im == 12.5)
 end
 
--- Index overflow for complex is ignored
-do
+do --- Index overflow for complex is ignored
   local c = cx(1, 2)
   local x
   for i=1e7,1e7+100 do x = c[i] end
 end
-

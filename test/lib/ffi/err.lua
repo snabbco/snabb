@@ -1,7 +1,6 @@
 local ffi = require("ffi")
 
--- error in FFI metamethod: don't print metamethod frame.
-do
+do --- error in FFI metamethod: don't print metamethod frame.
   local ok, err = xpcall(function()
     local x = (1ll).foo
   end, debug.traceback)
@@ -9,8 +8,7 @@ do
   assert(not string.find(err, "__index"))
 end
 
--- tailcall in regular metamethod: keep metamethod frame.
-do
+do --- tailcall in regular metamethod: keep metamethod frame.
   local ok, err = xpcall(function()
     local t = setmetatable({}, {__index = function() return rawget("x") end })
     local y = t[1]
@@ -19,13 +17,12 @@ do
   assert(string.find(err, "__index"))
 end
 
--- error in FFI metamethod: set correct PC.
-do
+do --- error in FFI metamethod: set correct PC.
   ffi.cdef[[
-typedef struct { int x; int y; } point;
-point strchr(point* op1, point* op2);
+typedef struct { int x; int y; } ffi_err_point;
+ffi_err_point ffi_err_strchr(ffi_err_point* op1, ffi_err_point* op2) asm("strchr");
 ]]
-  local point = ffi.metatype("point", { __add = ffi.C.strchr })
+  local point = ffi.metatype("ffi_err_point", { __add = ffi.C.ffi_err_strchr })
   local function foo()
     local p = point{ 3, 4 }
     local r = p + p
