@@ -117,23 +117,16 @@ local function make_cdata_hash_function(sizeof)
 end
 
 
-local flow_key_ipv4_size = ffi.sizeof("struct swall_flow_key_ipv4")
-assert(flow_key_ipv4_size % 4 == 0)
-
 local flow_key_ipv4 = ffi.metatype("struct swall_flow_key_ipv4", {
    __index = {
-      hash = make_cdata_hash_function(flow_key_ipv4_size),
+      hash = make_cdata_hash_function(ffi.sizeof("struct swall_flow_key_ipv4")),
       eth_type = function (self) return ETH_TYPE_IPv4 end,
    }
 })
 
-
-local flow_key_ipv6_size = ffi.sizeof("struct swall_flow_key_ipv6")
-assert(flow_key_ipv6_size % 4 == 0)
-
 local flow_key_ipv6 = ffi.metatype("struct swall_flow_key_ipv6", {
    __index = {
-      hash = make_cdata_hash_function(flow_key_ipv6_size),
+      hash = make_cdata_hash_function(ffi.sizeof("struct swall_flow_key_ipv6")),
       eth_type = function (self) return ETH_TYPE_IPv6 end,
    }
 })
