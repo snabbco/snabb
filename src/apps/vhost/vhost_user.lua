@@ -102,20 +102,16 @@ end
 
 function VhostUser:tx_callback (p)
    counter.add(self.counters['out-octets'], packet.length(p))
-   if ethernet:is_mcast(packet.data(p)) then
-      counter.add(self.counters['out-multicast'])
-   else
-      counter.add(self.counters['out-unicast'])
-   end
+   local mcast = ethernet:n_mcast(packet.data(p))
+   counter.add(self.counters['out-multicast'], mcast)
+   counter.add(self.counters['out-unicast'], 1 - mcast)
 end
 
 function VhostUser:rx_callback (p)
    counter.add(self.counters['in-octets'], packet.length(p))
-   if ethernet:is_mcast(packet.data(p)) then
-      counter.add(self.counters['in-multicast'])
-   else
-      counter.add(self.counters['in-unicast'])
-   end
+   local mcast = ethernet:n_mcast(packet.data(p))
+   counter.add(self.counters['in-multicast'], mcast)
+   counter.add(self.counters['in-unicast'], 1 - mcast)
 end
 
 function VhostUser:rxdrop_callback (p)
