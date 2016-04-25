@@ -1,22 +1,39 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+-- This module implements a YANG parser which will parse a YANG module to a
+-- Lua table. This is used by instantiating the Parser with the module and
+-- optionally the filename. You then should call Parser:parse_module
+--
+-- The parser uses the same termanology as the specification (rfc6020). The
+-- following is an example YANG module and lua representation:
+-- YANG:
+--
+-- leaf port {
+--     type inet:port-number;
+--     default;
+--     description "The port to which the SSH server listens"
+--  }
+--
+-- Lua table:
+-- {
+--     {argument="port", keyword="leaf", statements={
+--         {keyword="type", argument="inet:port-number"},
+--         {keyword="default"},
+--         {
+--             keyword="description",
+--             argument="The port to which the SSH server listens"
+--         }}
+--     }
+-- }
+
 module(..., package.seeall)
 
 local lib = require('core.lib')
 
-local function new_type()
-   local Type = {}
-   Type.__index = Type
-   return Type
-end
-
-local Leaf = new_type()
-function Leaf.new(properties)
-   return setmetatable(properties, Leaf)
-end
-
-local Parser = new_type()
+local Parser = {}
 function Parser.new(str, filename)
-   local ret = { pos=1, str=str, filename=filename, line=1, column=0, line_pos=1}
-   ret = setmetatable(ret, Parser)
+   local ret = {pos=1, str=str, filename=filename, line=1, column=0, line_pos=1}
+   ret = setmetatable(ret, {__index = Parser})
    ret.peek_char = ret:read_char()
    return ret
 end
@@ -226,15 +243,19 @@ function Parser:parse_statement()
 
    local returnval = {}
 
-   -- Then must be a string that is the leaf's identifier
+   -- Then must be a string that is the statement's identifier
    local keyword = self:parse_keyword()
    if keyword == "" then
       self:error("keyword expected")
    end
    returnval.keyword = keyword
-   self:consume_whitespace()
+   if self:check(";") then
+      -- We've ended the statement without an argument.
+      return returnval
+   end
 
    -- Take the identifier
+   self:consume_whitespace()
    local argument = self:parse_string()
    if argument ~= "" then returnval.argument = argument end
    self:skip_whitespace()
@@ -312,26 +333,29 @@ function selftest()
    test_string('"// foo bar;"', '// foo bar;')
    test_string('"/* foo bar */"', '/* foo bar */')
    test_string([["foo \"bar\""]], 'foo "bar"')
-   test_string(lines("  'foo",
-		     "    bar'"),
+   test_string(lines("  'foo", "    bar'"),
 	       lines("foo", " bar"))
-   test_string(lines("  'foo",
-		     "  bar'"),
+   test_string(lines("  'foo", "  bar'"),
 	       lines("foo", "bar"))
-   test_string(lines("   'foo",
-		     "\tbar'"),
+   test_string(lines("   'foo", "\tbar'"),
 	       lines("foo", "    bar"))
-   test_string(lines("   'foo",
-		     " bar'"),
+   test_string(lines("   'foo", " bar'"),
 	       lines("foo", "bar"))
 
 
+   test_module("type;", {{keyword="type"}})
    test_module("type string;", {{keyword="type", argument="string"}})
    test_module("/** **/", {})
    test_module("// foo bar;", {})
    test_module("// foo bar;\nleaf port;", {{keyword="leaf", argument="port"}})
    test_module("type/** hellooo */string;", {{keyword="type", argument="string"}})
    test_module('type "hello\\pq";', {{keyword="type", argument="hello\\pq"}})
+   test_module(lines("leaf port {", "type number;", "}"),
+	       {{keyword="leaf", argument="port",
+		 statements={{keyword="type", argument="number"}}}})
+   test_module(lines("leaf port {", "type;", "}"),
+	       {{keyword="leaf", argument="port",
+		 statements={{keyword="type"}}}})
 
 
    local fin = assert(io.open("example.yang"))
