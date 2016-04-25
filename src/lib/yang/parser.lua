@@ -273,6 +273,17 @@ function Parser:parse_statement()
    self:error("Unexpected character found")
 end
 
+function parse_string(str, filename)
+   local parser = Parser.new(str, filename)
+   return parser:parse_module()
+end
+
+function parse_file(filename)
+   local file_in = assert(io.open(filename))
+   local contents = file_in:read("*a")
+   return parse_string(contents, filename)
+end
+
 function selftest()
    local function assert_equal(a, b)
       if not lib.equal(a, b) then
@@ -310,8 +321,7 @@ function selftest()
 
 
    local function test_module(src, exp)
-      local parser = Parser.new(src)
-      local result = parser:parse_module()
+      local result = parse_string(src)
       if not lib.equal(result, exp) then
 	 pp(result)
 	 pp(exp)
@@ -333,14 +343,10 @@ function selftest()
    test_string('"// foo bar;"', '// foo bar;')
    test_string('"/* foo bar */"', '/* foo bar */')
    test_string([["foo \"bar\""]], 'foo "bar"')
-   test_string(lines("  'foo", "    bar'"),
-	       lines("foo", " bar"))
-   test_string(lines("  'foo", "  bar'"),
-	       lines("foo", "bar"))
-   test_string(lines("   'foo", "\tbar'"),
-	       lines("foo", "    bar"))
-   test_string(lines("   'foo", " bar'"),
-	       lines("foo", "bar"))
+   test_string(lines("  'foo", "    bar'"), lines("foo", " bar"))
+   test_string(lines("  'foo", "  bar'"), lines("foo", "bar"))
+   test_string(lines("   'foo", "\tbar'"), lines("foo", "    bar"))
+   test_string(lines("   'foo", " bar'"), lines("foo", "bar"))
 
 
    test_module("type;", {{keyword="type"}})
@@ -350,16 +356,12 @@ function selftest()
    test_module("// foo bar;\nleaf port;", {{keyword="leaf", argument="port"}})
    test_module("type/** hellooo */string;", {{keyword="type", argument="string"}})
    test_module('type "hello\\pq";', {{keyword="type", argument="hello\\pq"}})
-   test_module(lines("leaf port {", "type number;", "}"),
-	       {{keyword="leaf", argument="port",
-		 statements={{keyword="type", argument="number"}}}})
-   test_module(lines("leaf port {", "type;", "}"),
-	       {{keyword="leaf", argument="port",
-		 statements={{keyword="type"}}}})
+   test_module(lines("leaf port {", "type number;", "}"), {{keyword="leaf",
+	argument="port", statements={{keyword="type", argument="number"}}}})
+   test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
+	argument="port", statements={{keyword="type"}}}})
 
 
-   local fin = assert(io.open("example.yang"))
-   local yangexample = fin:read("*a")
-   local parser = Parser.new(yangexample, "example.yang")
-   parser:parse_module()
+   -- Expects tests to be run from the "src" directory at the root of the repo
+   parse_file("lib/yang/example.yang")
 end
