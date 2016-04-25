@@ -224,18 +224,14 @@ end
 
 function Parser:parse_statement_list()
    local statements = {}
-
    while true do
       self:skip_whitespace()
       if self:is_eof() or self:peek() == "}" then
 	 break
       end
-
       table.insert(statements, self:parse_statement())
    end
-
    return statements
-
 end
 
 function Parser:parse_statement()
@@ -295,7 +291,6 @@ function selftest()
    local function test_string(src, exp)
       local parser = Parser.new(src)
       parser:skip_whitespace()
-
       assert_equal(parser:parse_string(), exp)
    end
 
@@ -347,8 +342,6 @@ function selftest()
    test_string(lines("  'foo", "  bar'"), lines("foo", "bar"))
    test_string(lines("   'foo", "\tbar'"), lines("foo", "    bar"))
    test_string(lines("   'foo", " bar'"), lines("foo", "bar"))
-
-
    test_module("type;", {{keyword="type"}})
    test_module("type string;", {{keyword="type", argument="string"}})
    test_module("/** **/", {})
@@ -360,7 +353,6 @@ function selftest()
 	argument="port", statements={{keyword="type", argument="number"}}}})
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
 	argument="port", statements={{keyword="type"}}}})
-
 
    -- Expects tests to be run from the "src" directory at the root of the repo
    parse_file("lib/yang/example.yang")
