@@ -110,7 +110,7 @@ local function make_cdata_hash_function(sizeof)
       cdata = ffi.cast(uint32_ptr_t, cdata)
       local h = hash32(cdata[0])
       for i = 1, rounds do
-         h = hash32(cdata[i])
+         h = hash32(bxor(h, hash32(cdata[i])))
       end
       return h
    end
