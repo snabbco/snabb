@@ -13,87 +13,139 @@ local main      = require("core.main")
 local PcapReader= require("apps.pcap.pcap").PcapReader
 local Synth     = require("apps.test.synth").Synth
 local LoadGen   = require("apps.intel.loadgen").LoadGen
+local Intel82599 = require("apps.intel.intel_app").Intel82599
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 
-local usage = require("program.packetblaster.README_inc")
-local usage_replay = require("program.packetblaster.replay.README_inc")
-local usage_synth = require("program.packetblaster.synth.README_inc")
+local mode
 
-local long_opts = {
-   duration     = "D",
-   help         = "h",
-   src          = "s",
-   dst          = "d",
-   sizes        = "S"
-}
+local function show_usage (code)
+   if mode == 'replay' then
+      print(require("program.packetblaster.replay.README_inc"))
+   elseif mode == 'synth' then
+      print(require("program.packetblaster.synth.README_inc"))
+   elseif mode == 'bounce' then
+      print(require("program.packetblaster.bounce.README_inc"))
+   else
+      print(require("program.packetblaster.README_inc"))
+   end
+   main.exit(code)
+end
+
+local function parse_args (args, short_opts, long_opts)
+   local handlers = {}
+   local opts = {}
+   function handlers.D (arg)
+      opts.duration = assert(tonumber(arg), "duration is not a number!")
+   end
+   function handlers.h (arg)
+      show_usage(0)
+   end
+   function handlers.s (arg) opts.source = arg end
+   function handlers.d (arg) opts.destination = arg end
+   function handlers.S (arg)
+      local sizes = {}
+      for size in string.gmatch(arg, "%d+") do
+         sizes[#sizes+1] = tonumber(size)
+      end
+      opts.sizes = sizes
+   end
+   args = lib.dogetopt(args, handlers, short_opts, long_opts)
+   if (mode == 'replay' and #args <= 1) or
+      (mode == 'synth' and #args < 1) or
+      (mode == 'bounce' and not #args == 3) then
+         show_usage(1)
+   end
+   return opts, args
+end
+
+local function report_fn ()
+   print("Transmissions (last 1 sec):")
+   engine.report_apps()
+end
 
 function run (args)
-   local opt = {}
-   local mode = table.remove(args, 1)
-   local duration
-   local c = config.new()
-   function opt.D (arg) 
-      duration = assert(tonumber(arg), "duration is not a number!")  
-   end
-   function opt.h (arg)
-      if mode == 'replay' then print(usage_replay)
-      elseif mode == 'synth' then print(usage_synth)
-      else print(usage) end
-      main.exit(1)
-   end
-   if mode == 'replay' and #args > 1 then
-      args = lib.dogetopt(args, opt, "hD:", long_opts)
+   local opts, c
+   mode = table.remove(args, 1)
+   if mode == 'replay' then
+      c = config.new()
+      opts, args = parse_args(args, "hD:", {help="h", duration="D"})
       local filename = table.remove(args, 1)
       config.app(c, "pcap", PcapReader, filename)
       config.app(c, "loop", basic_apps.Repeater)
       config.app(c, "source", basic_apps.Tee)
       config.link(c, "pcap.output -> loop.input")
       config.link(c, "loop.output -> source.input")
-   elseif mode == 'synth' and #args >= 1 then
-      local source
-      local destination
-      local sizes
-      function opt.s (arg) source = arg end
-      function opt.d (arg) destination = arg end
-      function opt.S (arg)
-         sizes = {}
-	 for size in string.gmatch(arg, "%d+") do
-	    sizes[#sizes+1] = tonumber(size)
-	 end
+      config_sources(c, args)
+   elseif mode == 'synth' then
+      c = config.new()
+      opts, args = parse_args(args, "hD:s:d:S:", {help="h", duration="D",
+            src="s", dst="d", sizes="S"})
+      config.app(c, "source", Synth, { sizes = opts.sizes,
+				       src = opts.source,
+				       dst = opts.destination })
+      config_sources(c, args)
+   elseif mode == 'bounce' then
+      c = config.new()
+      opts, args = parse_args(args, "hD:", {help="h", duration="D"})
+      local filename, nic, bouncer = unpack(args)
+      config.app(c, "pcap", PcapReader, filename)
+      config.app(c, "loop", basic_apps.Repeater)
+      config.app(c, "source", basic_apps.Tee)
+      config.link(c, "pcap.output -> loop.input")
+      config.link(c, "loop.output -> source.input")
+      local nics = config_sources(c, {nic}, {report_rx = true})
+      assert(#nics == 1, "Too many nics")
+      config.app(c, "bouncer", Intel82599, {
+         pciaddr = bouncer
+      })
+      config.link(c, "bouncer.tx -> bouncer.rx")
+      local nic_name = nics[1]
+      report_fn = function()
+         print("Transmissions and receptions (last 1 sec):")
+         engine.app_table[nic_name]:report()
       end
-      
-      args = lib.dogetopt(args, opt, "hD:s:d:S:", long_opts)
-      config.app(c, "source", Synth, { sizes = sizes,
-				       src = source,
-				       dst = destination })
    else
-      opt.h()
+      show_usage(1)
    end
-   local patterns = args
-   local nics = 0
-   pci.scan_devices()
-   for _,device in ipairs(pci.devices) do
-      if is_device_suitable(device, patterns) then
-         nics = nics + 1
-         local name = "nic"..nics
-         config.app(c, name, LoadGen, device.pciaddress)
-         config.link(c, "source."..tostring(nics).."->"..name..".input")
-      end
-   end
-   assert(nics > 0, "<PCI> matches no suitable devices.")
+
    engine.busywait = true
    intel10g.num_descriptors = 32*1024
    engine.configure(c)
    local fn = function ()
                  print("Transmissions (last 1 sec):")
-                 engine.report_apps()
+                 engine.app_table.nic1:report()
               end
-   local t = timer.new("report", fn, 1e9, 'repeating')
+   local t = timer.new("report", report_fn, 1e9, 'repeating')
    timer.activate(t)
-   if duration then engine.main({duration=duration})
-   else             engine.main() end
+   if opts.duration then engine.main({duration=opts.duration})
+   else                  engine.main() end
+end
+
+function config_sources (c, patterns, opts)
+   local nic_name = (function()
+      local id = 0
+      return function()
+         id = id + 1
+         return id, "nic"..id
+      end
+   end)()
+   local nics = {}
+   pci.scan_devices()
+   for _,device in ipairs(pci.devices) do
+      if is_device_suitable(device, patterns) then
+         local id, name = nic_name()
+         config.app(c, name, LoadGen, {
+            pciaddr = device.pciaddress,
+            report_rx = opts and opts.report_rx or false,
+         })
+         config.link(c, ("source.%d -> %s.input"):format(id, name))
+         table.insert(nics, name)
+      end
+   end
+   assert(#nics > 0, "<PCI> matches no suitable devices.")
+   return nics
 end
 
 function is_device_suitable (pcidev, patterns)

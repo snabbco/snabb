@@ -16,9 +16,10 @@ local can_transmit, transmit
 
 LoadGen = {}
 
-function LoadGen:new (pciaddress)
-   local o = { pciaddress = pciaddress,
-               dev = intel10g.new_sf({pciaddr=pciaddress}) }
+function LoadGen:new (conf)
+   local o = { pciaddr= conf.pciaddr,
+               dev = intel10g.new_sf({pciaddr=conf.pciaddr}),
+               report_rx = conf.report_rx, }
    o.dev:open()
    o.dev:wait_linkup()
    disable_tx_descriptor_writeback(o.dev)
@@ -71,10 +72,22 @@ function LoadGen:pull ()
 end
 
 function LoadGen:report ()
-   print(self.pciaddress,
-         "TXDGPC (TX packets)", lib.comma_value(tonumber(self.dev.s.TXDGPC())),
-         "GOTCL (TX octets)", lib.comma_value(tonumber(self.dev.s.GOTCL())))
-   self.dev.s.TXDGPC:reset()
-   self.dev.s.GOTCL:reset()
-end
+   local s = self.dev.s
+   local function format(reg)
+      return lib.comma_value(tonumber(reg()))
+   end
 
+   print(self.pciaddr,
+         "TXDGPC (TX packets)", format(s.TXDGPC),
+         "GOTCL (TX octets)",   format(s.GOTCL))
+   s.TXDGPC:reset()
+   s.GOTCL:reset()
+   if self.report_rx then
+      print(self.pciaddr,
+            -- TODO: RXDGPC reported 0 packets received, but non-filtered got packets.
+            "RXNFGPC (RX packets)", format(s.RXNFGPC),
+            "GORCL (RX octets)",    format(s.GORCL))
+      s.RXNFGPC:reset()
+      s.GORCL:reset()
+   end
+end

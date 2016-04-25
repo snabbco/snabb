@@ -1,0 +1,11 @@
+Usage: l2fwd <PCI1> <PCI2>
+
+PCI1: [pciaddr|virtio:pciaddr]
+PCI2: [pciaddr|virtio:pciaddr]
+
+Creates a full-duplex softwire between PCI1 and PCI2.
+
+Examples:
+
+  l2fwd 0000:01:00.0 0000:02:00.0
+  l2fwd virtio:0000:01:00.0 virtio:0000:02:00.0

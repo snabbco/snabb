@@ -1,0 +1,14 @@
+Usage: packetblaster bounce [OPTIONS] <PCAPFILE> <PCI1> <PCI2>
+
+  -D DURATION, --duration DURATION
+                             Run for DURATION seconds.
+			     Default: unlimited
+  -h, --help
+                             Print usage information.
+
+packetblaster transmits packets continuously to <PCI1> network adapter.
+Packets will eventually reach <PCI2>, if both network adapters are wired together.
+Packets bounce on <PCI2> and get back to <PCI1>.
+
+Examples:
+  packetblaster bounce myfile.cap 0000:01:00.0 0000:01:00.1
