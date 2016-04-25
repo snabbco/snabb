@@ -45,7 +45,7 @@ function Parser:next()
       self.line_pos = self.pos + 1
       self.column = 0
       self.line = self.line + 1
-   elseif char == "\t" then
+   elseif chr == "\t" then
       self.column = self.column + 8
       self.column = 8 * math.floor(self.column / 8)
    elseif chr then
@@ -84,15 +84,26 @@ function Parser:take_while(pattern)
    return table.concat(res)
 end
 
+function Parser:skip_c_comment()
+   repeat
+      self:take_while("[^*]")
+      self:consume("*")
+   until self:check("/")
+end
+
 -- Returns true if has consumed any whitespace
 function Parser:skip_whitespace()
    local result = false
    if self:take_while('%s') ~= "" then result = true end
    -- Skip comments, which start with # and continue to the end of line.
-   while self:check('#') do
+   while self:check('/') do
       result = true
-      self:take_while('[^\n]')
-      self:take_while('%s')
+      if self:check("*") then self:skip_c_comment()
+      else
+	 self:consume("/")
+	 self:take_while('[^\n]')
+	 self:take_while('%s')
+      end
    end
    return result
 end
@@ -126,14 +137,17 @@ function Parser:parse_qstring(quote)
 	 end
 	 result = result.."\n"
 	 if self.column > start_column then
-	    result = result..stirng.rep(" ", self.column-start_column)
+	    result = result..string.rep(" ", self.column-start_column)
 	 end
       elseif self:check("\\") then
 	 if self:check("n") then result = result.."\n"
 	 elseif self:check("t") then result = result.."\t"
 	 elseif self:check('"') then result = result..'"'
 	 elseif self:check("\\") then result = result.."\\"
-	 else self:error("Invalid escaped character") end
+	 else
+	    result = result.."\\"
+	 end
+
       end
    end
    self:check(quote)
@@ -152,15 +166,16 @@ function Parser:parse_qstring(quote)
    end
 end
 
+function Parser:parse_string()
+   if self:check("'") then return self:parse_qstring("'")
+   elseif self:check('"') then return self:parse_qstring('"')
+   else return self:take_while("[^%s;{}\"'/]") end
+end
+
 function Parser:parse_identifier()
-   local id
-   if self:check("'") then id = self:parse_qstirng("'")
-   elseif self:check('"') then id = self:parse_qstring('"')
-   else id = self:take_while("[%w_.-]") end
-
+   local id = self:parse_string()
    if not id == "" then self:error("Expected identifier") end
-   if not id:match("^[%a_]") then self:error("Invalid identifier") end
-
+   if not id:match("^[%a_][%w_.-]*$") then self:error("Invalid identifier") end
    return id
 end
 
@@ -181,43 +196,60 @@ function Parser:parse_keyword()
    end
 
    if is_prefix then error("Expected colon") end
-
    return id
 end
 
+function Parser:parse_module()
+   local statements = self:parse_statement_list()
+   if not self:is_eof() then error("Not end of file") end
+   return statements
+end
+
+function Parser:parse_statement_list()
+   local statements = {}
+
+   while true do
+      self:skip_whitespace()
+      if self:is_eof() or self:peek() == "}" then
+	 break
+      end
+
+      table.insert(statements, self:parse_statement())
+   end
+
+   return statements
+
+end
+
 function Parser:parse_statement()
-   self:consume_whitespace()
+   self:skip_whitespace()
+
+   local returnval = {}
 
    -- Then must be a string that is the leaf's identifier
-   local leaf_identifier = self:take_while("%a")
-   if leaf_identifier == "" then
-      self:error("Leaf identifier expected")
+   local keyword = self:parse_keyword()
+   if keyword == "" then
+      self:error("keyword expected")
    end
+   returnval.keyword = keyword
+   self:consume_whitespace()
+
+   -- Take the identifier
+   local argument = self:parse_string()
+   if argument ~= "" then returnval.argument = argument end
    self:skip_whitespace()
 
-   -- Consume the opening curly brace.
-   self:consume("{")
-   self:skip_whitespace()
-
-   -- Next we have the property name, some whitespace then the value.
-   local properties = {}
-   while not self:expect("}") do
-      -- Read in the property name
-      local property = self:take_while("%a+")
-      self:consume_whitespace()
-
-      -- Take the value
-      local value = self:take_while("[%w:]")
-
-      -- Check there is a new line (can they also be seperated by commas?)
-      local line = self.line
-      self:skip_whitespace()
-      if self.line == line then
-	 self:error("properties should be split by a new line")
-      end
+   if self:check(";") then
+      return returnval
    end
 
-   return Leaf.new(properties)
+   if self:check("{") then
+      returnval.statements = self:parse_statement_list()
+      self:consume("}")
+      return returnval
+   end
+
+   self:error("Unexpected character found")
 end
 
 function selftest()
@@ -228,26 +260,82 @@ function selftest()
       end
    end
 
-   assert(getmetatable(Leaf.new({})) == Leaf)
+   local function test_string(src, exp)
+      local parser = Parser.new(src)
+      parser:skip_whitespace()
 
-   local parser = Parser.new("foo", "bar")
-   assert_equal(parser:next(), "f")
-   assert(parser:next() == "o")
-   assert(parser:next() == "o")
-   assert(parser:is_eof())
-   assert(not parser:next())
+      assert_equal(parser:parse_string(), exp)
+   end
 
-   -- Test tsyes' code
-   local parser = Parser.new([[
-       leaf foo {
-           type string;
-       }
-   ]], "bar")
-   -- for now lets just consume the leaf keyword here.
-   parser:skip_whitespace()
-   parser:consume_token("%a", "leaf")
-   local leaf = parser:parse_leaf()
+   local function pp(x)
+      if type(x) == "table" then
+	 io.write("{")
+	 local first = true
+	 for k,v in pairs(x) do
+	    if not first then
+	       io.write(", ")
+	    end
+	    io.write(k.."=")
+	    pp(v)
+	    first = false
+	 end
+	 io.write("}")
+      elseif type(x) == "string" then
+	 io.write(x)
+      else
+	 error("Unsupported type")
+      end
+   end
 
-   assert(leaf.type == "string")
 
+   local function test_module(src, exp)
+      local parser = Parser.new(src)
+      local result = parser:parse_module()
+      if not lib.equal(result, exp) then
+	 pp(result)
+	 pp(exp)
+	 error("no equal")
+      end
+   end
+
+   local function lines(...)
+      return table.concat({...}, "\n")
+   end
+
+   -- Test the string parser
+   test_string("foo", "foo")
+   test_string([["foo"]], "foo")
+   test_string([["foo"+"bar"]], "foobar")
+   test_string([['foo'+"bar"]], "foobar")
+   test_string("'foo\\nbar'", "foo\\nbar")
+   test_string('"foo\\nbar"', "foo\nbar")
+   test_string('"// foo bar;"', '// foo bar;')
+   test_string('"/* foo bar */"', '/* foo bar */')
+   test_string([["foo \"bar\""]], 'foo "bar"')
+   test_string(lines("  'foo",
+		     "    bar'"),
+	       lines("foo", " bar"))
+   test_string(lines("  'foo",
+		     "  bar'"),
+	       lines("foo", "bar"))
+   test_string(lines("   'foo",
+		     "\tbar'"),
+	       lines("foo", "    bar"))
+   test_string(lines("   'foo",
+		     " bar'"),
+	       lines("foo", "bar"))
+
+
+   test_module("type string;", {{keyword="type", argument="string"}})
+   test_module("/** **/", {})
+   test_module("// foo bar;", {})
+   test_module("// foo bar;\nleaf port;", {{keyword="leaf", argument="port"}})
+   test_module("type/** hellooo */string;", {{keyword="type", argument="string"}})
+   test_module('type "hello\\pq";', {{keyword="type", argument="hello\\pq"}})
+
+
+   local fin = assert(io.open("example.yang"))
+   local yangexample = fin:read("*a")
+   local parser = Parser.new(yangexample, "example.yang")
+   parser:parse_module()
 end
