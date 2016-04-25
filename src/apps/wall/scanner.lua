@@ -84,7 +84,6 @@ ffi.cdef [[
    } __attribute__((packed));
 ]]
 
-local INT32_MIN = -0x80000000
 local function hash32(i32)
    i32 = tobit(i32)
    i32 = i32 + bnot(lshift(i32, 15))
@@ -93,11 +92,7 @@ local function hash32(i32)
    i32 = bxor(i32, rshift(i32, 6))
    i32 = i32 + bnot(lshift(i32, 11))
    i32 = bxor(i32, rshift(i32, 16))
-
-   -- Unset the low bit, to distinguish valid hashes from HASH_MAX.
-   i32 = lshift(i32, 1)
-   -- Project result to u32 range.
-   return i32 - INT32_MIN
+   return i32
 end
 
 local uint32_ptr_t = ffi.typeof("uint32_t*")
