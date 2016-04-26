@@ -75,6 +75,7 @@ local cards = {
       ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
       ["0x154d"] = {model = model["X520"],      driver = 'apps.intel.intel_app'},
       ["0x1521"] = {model = model["i350"],      driver = 'apps.intel.intel1g'},
+      ["0x1533"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
       ["0x157b"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
    },
    ["0x1924"] =  {
