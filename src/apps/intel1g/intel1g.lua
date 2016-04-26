@@ -2,7 +2,7 @@
 -- This is a device driver for Intel i210, i350 families of 1G network cards.
 --
 -- The driver supports multiple processes connecting to the same physical nic.
--- Per process RX / TX queues are available via RSS. Statistics collection 
+-- Per process RX / TX queues are available via RSS. Statistics collection
 -- processes can read counter registers
 --
 -- Data sheets (reference documentation):
@@ -22,12 +22,17 @@ local tophysical = core.memory.virtual_to_physical
 local register = require("lib.hardware.register")
 
 Intel1g = {}
+-- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
+-- both use 1010 but the docs say 12030
+-- https://sourceforge.net/p/e1000/mailman/message/34457421/
+-- http://dpdk.org/browse/dpdk/tree/drivers/net/e1000/base/e1000_regs.h
 
 gbl_registers = [[
 CTRL      0x00000 -            RW Device Control
 CTRL_EXT  0x00018 -            RW Extended Device Control
 EEER      0x00E30 -            RW Energy Efficient Ethernet (EEE) Register
-EEMNGCTL  0x12030 -            RW Manageability EEPROM-Mode Control Register
+EEMNGCTL_i350  0x01010 -       RW Manageability EEPROM-Mode Control Register
+EEMNGCTL_i210  0x12030 -       RW Manageability EEPROM-Mode Control Register
 EIMC      0x01528 -            RW Extended Interrupt Mask Clear
 MANC      0x05820 -            RW Management Control
 MDIC      0x00020 -            RW MDI Control
@@ -233,16 +238,18 @@ function Intel1g:new(conf)
     rxq = conf.rxq,
     rssseed = conf.rssseed or 314159
   }, {__index = Intel1g})
-  local deviceInfo= pci.device_info(self.pciaddress)
-  assert(deviceInfo.driver == 'apps.intel.intel1g',
-    "intel1g does not support this NIC")
-  self.ringSize= 4
-  self.model = deviceInfo.model
-  if deviceInfo.device == "0x1521" then		-- i350
-    self.ringSize= 8
-  elseif deviceInfo.device == "0x157b" then	-- i210
-    self.ringSize= 4
-  end
+  local deviceInfo = pci.device_info(self.pciaddress)
+  assert(deviceInfo.vendor == '0x8086', "unsupported nic")
+  local models = {}
+  models["0x1521"] = "i350"
+  models["0x1533"] = "i210"
+  models["0x157b"] = "i210"
+  local ringSize = {}
+  ringSize["i350"] = 8
+  ringSize["i210"] = 4
+
+  self.model    = models[deviceInfo.device]
+  self.ringSize = ringSize[self.model]
 
   -- Setup device access
   self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
@@ -250,6 +257,7 @@ function Intel1g:new(conf)
 
   register.define(gbl_registers, self.r, self.base)
   register.define_array(gbl_array_registers, self.r, self.base)
+  self.r["EEMNGCTL"] = self.r["EEMNGCTL_"..self.model]
 
   self:init()
   self.fd:flock("sh")
