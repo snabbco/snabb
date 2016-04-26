@@ -31,7 +31,7 @@ userspace both virtio-net and virtio-pci.  For that, it handles the emulated
 PCI bus device to get hold of the virtqueues, that allow communication with
 the outer world.
 
-# How to run lwAFTR inside a VM
+## How to run lwAFTR inside a VM
 
 The script `program/lwaftr/virt/lwaftrctl` eases the process of launching a 
 virtualized lwAFTR.  The script provides a series of commands and actions to start
@@ -135,7 +135,7 @@ iface eth2 inet static
 The `lwaftrctl vm` commands makes a pause of 30 seconds, after that it pins QEMU
 and all its child process to a core.
 
-# Start lwAFTR in a guest
+## Start lwAFTR in a guest
 
 It is possible to automatically start the lwAFTR inside the guest from the host:
 
@@ -192,6 +192,5 @@ There is also a `restart` action that will stop a command and start it again.
 
 As the lwAFTR is started running `snabbnfv`, `vm` and `lwaftr` commands one after
 another, the whole process should be stopped in inverse order, that is:  `lwaftr`,
-`vm` and `snabbnfv`.
-
-There is a special command, called `all` that will do the whole process in one step.
+`vm` and `snabbnfv`
+.
