@@ -36,7 +36,6 @@ be a table with the following keys:
 * `salt` - Hex string containing four bytes of salt as specified in
   RFC 4106.
 * `spi` - “Security Parameter Index” as specified in RFC 4303.
-  (`esp_v6_encrypt` only.)
 * `window_size` - *Optional*. Width of the window in which out of order packets
   are accepted. The default is 128. (`esp_v6_decrypt` only.)
 

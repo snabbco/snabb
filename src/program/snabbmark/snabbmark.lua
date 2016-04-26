@@ -22,7 +22,7 @@ function run (args)
       solarflare(unpack(args))
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
-   elseif command == 'esp' and #args == 2 then
+   elseif command == 'esp' and #args >= 2 then
       esp(unpack(args))
    else
       print(usage) 
@@ -332,11 +332,12 @@ receive_device.interface= "rx1GE"
    end
 end
 
-function esp (npackets, packet_size)
+function esp (npackets, packet_size, mode, profile)
    local esp = require("lib.ipsec.esp")
    local ethernet = require("lib.protocol.ethernet")
    local ipv6 = require("lib.protocol.ipv6")
    local datagram = require("lib.protocol.datagram")
+   local profiler = profile and require("jit.p")
 
    npackets = assert(tonumber(npackets), "Invalid number of packets: " .. npackets)
    packet_size = assert(tonumber(packet_size), "Invalid packet size: " .. packet_size)
@@ -345,47 +346,43 @@ function esp (npackets, packet_size)
    local ip = ipv6:new({})
    ip:payload_length(payload_size)
    local eth = ethernet:new({type=0x86dd})
-   local packets = {}
-   for i = 1, npackets do
-      local d = datagram:new(packet.allocate())
-      d:payload(payload, payload_size)
-      d:push(ip)
-      d:push(eth)
-      packets[i] = { plain = d:packet(), encapsulated = 0 }
-   end
+   local d = datagram:new(packet.allocate())
+   d:payload(payload, payload_size)
+   d:push(ip)
+   d:push(eth)
+   local plain = d:packet()
    local conf = { spi = 0x0,
                   mode = "aes-128-gcm",
                   keymat = "00112233445566778899AABBCCDDEEFF",
                   salt = "00112233"}
    local enc, dec = esp.esp_v6_encrypt:new(conf), esp.esp_v6_decrypt:new(conf)
 
-   require("jit.p").start("Fpv")
-   local start = C.get_monotonic_time()
-   for _, p in ipairs(packets) do
-      p.encapsulated = enc:encapsulate(p.plain)
-   end
-   local finish = C.get_monotonic_time()
-   require("jit.p").stop()
-   local bps = (packet_size * npackets) / (finish - start)
-   print(("Encapsulation (packet size = %d): %.2f Gbit/s")
-         :format(packet_size, gbits(bps)))
-
-   for _, p in ipairs(packets) do packet.free(p.plain) end
-
-   require("jit.p").start("Fpv")
-   local start = C.get_monotonic_time()
-   for _, p in ipairs(packets) do
-      p.plain = dec:decapsulate(p.encapsulated)
-   end
-   local finish = C.get_monotonic_time()
-   require("jit.p").stop()
-   local bps = (packet_size * npackets) / (finish - start)
-   print(("Decapsulation (packet size = %d): %.2f Gbit/s")
-         :format(packet_size, gbits(bps)))
-
-   for _, p in ipairs(packets) do
-      assert(p.plain, "Decapsulation of some packets failed.")
-      packet.free(p.plain)
-      packet.free(p.encapsulated)
+   if mode == "encapsulate" then
+      if profile then profiler.start(profile) end
+      local start = C.get_monotonic_time()
+      local encapsulated
+      for i = 1, npackets do
+         encapsulated = enc:encapsulate(packet.clone(plain))
+         packet.free(encapsulated)
+      end
+      local finish = C.get_monotonic_time()
+      if profile then profiler.stop() end
+      local bps = (packet_size * npackets) / (finish - start)
+      print(("Encapsulation (packet size = %d): %.2f Gbit/s")
+            :format(packet_size, gbits(bps)))
+   else
+      local encapsulated = enc:encapsulate(plain)
+      if profile then profiler.start(profile) end
+      local start = C.get_monotonic_time()
+      local plain
+      for i = 1, npackets do
+         plain = dec:decapsulate(packet.clone(encapsulated))
+         packet.free(plain)
+      end
+      local finish = C.get_monotonic_time()
+      if profile then profiler.stop() end
+      local bps = (packet_size * npackets) / (finish - start)
+      print(("Decapsulation (packet size = %d): %.2f Gbit/s")
+            :format(packet_size, gbits(bps)))
    end
 end

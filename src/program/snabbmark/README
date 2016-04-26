@@ -37,6 +37,9 @@ Usage:
     Example usage with 10 million packets, packet size 128 bytes:
     sudo SNABB_PCI0="0000:02:00.0"  SNABB_PCI1="0000:03:00.0" ./snabb snabbmark intel1g 10e6 128
 
-  snabbmark esp <npackets> <packet-size>
-    Benchmark ESP encapsulating and decapsulatiing <npackets> of
-    <packet-size>.
+  snabbmark esp <npackets> <packet-size> [<mode>] [<profile>]
+    Benchmark ESP encapsulating or decapsulatiing <npackets> of
+    <packet-size>. <mode> can be either "encapsulate" or "decapsulate", the
+    latter being the default. Optionally, a LuaJIT profiler option string can
+    be supplied as <profile>, which will cause the benchmark run to be profiled
+    accordingly.
