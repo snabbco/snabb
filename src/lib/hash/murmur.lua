@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Implementation of the MurmurHash3 hash function according to the
 -- reference implementation
 -- https://code.google.com/p/smhasher/source/browse/trunk/MurmurHash3.cpp

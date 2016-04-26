@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local ffi = require("ffi")
@@ -60,6 +62,7 @@ model = {
    ["82571"]     = 'Intel 82571',
    ["82599_T3"]  = 'Intel 82599 T3',
    ["X540"]      = 'Intel X540',
+   ["X520"]      = 'Intel X520',
    ["i350"]      = 'Intel 350',
    ["i210"]      = 'Intel 210',
 }
@@ -72,6 +75,7 @@ local cards = {
       ["0x105e"] = {model = model["82571"],     driver = 'apps.intel.intel_app'},
       ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
       ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
+      ["0x154d"] = {model = model["X520"],      driver = 'apps.intel.intel_app'},
       ["0x1521"] = {model = model["i350"],      driver = 'apps.intel.intel1g'},
       ["0x157b"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
    },

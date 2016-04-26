@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local debug = _G.developer_debug
@@ -22,7 +24,7 @@ max        = C.LINK_MAX_PACKETS
 local counternames = {"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}
 
 function new (name)
-   local r = shm.map("links/"..name, "struct link")
+   local r = shm.create("links/"..name, "struct link")
    for _, c in ipairs(counternames) do
       r.stats[c] = counter.open("counters/"..name.."/"..c)
    end

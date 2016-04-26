@@ -1,11 +1,11 @@
-# Snabb Switch Git Workflow
+# Snabb Git Workflow
 
 This document explains the Git workflows that we use to develop and
-release Snabb Switch.
+release Snabb.
 
 ## Overview
 
-Snabb Switch development follows a few well-known patterns:
+Snabb development follows a few well-known patterns:
 
 - We follow the distributed development model [described by Linus
   Torvald](https://www.youtube.com/watch?v=4XpnKHJAok8) and pioneered
@@ -20,13 +20,13 @@ Snabb Switch development follows a few well-known patterns:
 
 ### Download and update the latest release
 
-1. Clone the [SnabbCo/snabbswitch](https://github.com/SnabbCo/snabbswitch) repository.
+1. Clone the [snabbco/snabb](https://github.com/snabbco/snabb) repository.
 2. Check out and build the `master` branch.
 3. Pull when you want to update to the latest stable release.
 
 ### Develop and contribute an improvement
 
-1. [Create your own fork](https://help.github.com/articles/fork-a-repo/) of Snabb Switch on Github.
+1. [Create your own fork](https://help.github.com/articles/fork-a-repo/) of Snabb on Github.
 2. Develop and debug your contribution on a new [topic branch](https://git-scm.com/book/en/v2/Git-Branching-Branching-Workflows#Topic-Branches) based on the latest `master`.
 3. Make a final cleanup of your code before review. (Last chance to rebase.)
 4. Submit a Github [Pull Request](https://help.github.com/articles/using-pull-requests/#initiating-the-pull-request)
@@ -42,11 +42,11 @@ There are two milestones in the process of accepting your change:
    but otherwise your work is done.
 2. Your change is merged onto `master`. This could happen in a series
    of merge steps, for example `nfv->next->master`. Once this happens
-   your code has been officially released as part of Snabb Switch.
+   your code has been officially released as part of Snabb.
 
 ### Develop and maintain a new program
 
-Snabb Switch includes programs like `snabbnfv`, `packetblaster`, and
+Snabb includes programs like `snabbnfv`, `packetblaster`, and
 `snsh`. Here is how you can create a new program and take charge of
 its development.
 
@@ -68,16 +68,16 @@ Pull Requests that make changes to your application will be referred
 to you for merge onto your branch.
 
 Use the *Develop and contribute an improvement* workflow to make
-changes to the core Snabb Switch code. Please do not bundle
+changes to the core Snabb code. Please do not bundle
 substantial changes to the core software with updates to your program.
 
-If you do not want to include your program in the main Snabb Switch
+If you do not want to include your program in the main Snabb
 release then this is no problem. You can simply pull from `master` to
 receive updates and skip the step of pushing back.
 
-### To help maintain Snabb Switch
+### To help maintain Snabb
 
-Here are the best ways to help maintain Snabb Switch:
+Here are the best ways to help maintain Snabb:
 
 1. Review Pull Requests to help people quickly improve them.
 2. Test the `next` branch and help fix problems before releases.

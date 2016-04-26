@@ -1,6 +1,6 @@
 Usage: snsh [OPTION]... [SCRIPT] [PARAMETER]...
 
-Snabb Shell: Load the Snabb Switch core and execute Lua source code.
+Snabb Shell: Load the Snabb core and execute Lua source code.
 
 Execute SCRIPT if specified and then exit.
 
