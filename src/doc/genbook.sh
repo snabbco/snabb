@@ -78,4 +78,8 @@ $(cat $mdroot/program/snabbnfv/README.md)
 
 $(cat $mdroot/lib/watchdog/README.md)
 
+# Snabblab
+
+$(cat $mdroot/doc/snabblab.md)
+
 EOF
