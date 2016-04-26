@@ -6,11 +6,8 @@ local app = require("core.app")
 local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
-local transmit, receive = link.transmit, link.receive
-
-
 local ffi = require("ffi")
-local C = ffi.C
+local transmit, receive = link.transmit, link.receive
 
 --- # `Truncate` app: truncate or zero pad packet to length n
 Truncate = {}
@@ -20,13 +17,8 @@ end
 function Truncate:push()
    for _ = 1, link.nreadable(self.input.input) do
       local p = receive(self.input.input)
-      if p.length > self.n then
-         p.length = self.n
-      else
-         for i = self.n - p.length, self.n do
-            p.data[i] = 0
-         end
-      end
+      ffi.fill(p.data, math.min(0, self.n - p.length))
+      p.length = self.n
       transmit(self.output.output,p)
    end
 end
