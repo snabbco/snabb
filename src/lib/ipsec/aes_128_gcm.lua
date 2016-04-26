@@ -69,9 +69,9 @@ local function u8_ptr (ptr) return ffi.cast("uint8_t *", ptr) end
 
 -- Encrypt a single 128-bit block with the basic AES block cipher.
 local function aes_128_block (block, keymat)
-   local state = ffi.new("uint8_t[16] __attribute__((aligned(16)))")
-   ASM.aes_keyexp_128_enc_avx(keymat, state)
-   ASM.aesni_encrypt_single_block(state, block)
+   local gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
+   ASM.aes_keyexp_128_enc_avx(keymat, gcm_data)
+   ASM.aesni_encrypt_single_block(gcm_data, block)
 end
 
 local aes_128_gcm = {}
@@ -92,8 +92,8 @@ function aes_128_gcm:new (spi, keymat, salt)
    -- Compute subkey (H)
    o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 16)
    aes_128_block(o.hash_subkey, o.keymat)
-   o.gcm_data = ffi.new("gcm_data[1] __attribute__((aligned(16)))")
-   ASM.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data[0].expanded_keys)
+   o.gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
+   ASM.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data)
    ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
    return setmetatable(o, {__index=aes_128_gcm})
 end
