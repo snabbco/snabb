@@ -42,7 +42,7 @@ local private = {}
 local numbers = {} -- name -> number
 
 function open (name, readonly)
-   if numbers[name] then error("counter already opened: " .. name) end
+   if numbers[name] then return private[numbers[name]] end
    local n = #public+1
    numbers[name] = n
    public[n] = shm.map(name, counter_t, readonly)
