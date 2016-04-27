@@ -1,0 +1,111 @@
+-- checksum_simd: SIMD checksum routines
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(..., package.seeall)
+
+local dasm = require("dasm")
+local ffi = require("ffi")
+local C = ffi.C
+
+|.arch x64
+|.actionlist actions
+|.globalnames globalnames
+
+-- Calculate checksum using AVX2 vector instructions. Optimized for
+-- both speed and short/simple code.
+--
+-- Algorithm:
+--
+-- Operate on 32-byte chunks:
+--   Divide each chunk into 16xU16 values.
+--   Sum 1st 8xU16 into 8xU32 accumulators
+--   Sum 2nd 8xU16 into 8xU32 accumulators
+-- "Fold" accumulators from 8xU32 down to the 1xU16 result.
+--
+-- The input is temporarily padded with a 32-byte "trailer" block of
+-- zeros at the end. This means there is no "remainder" to worry about.
+-- This requires input pointers for which this is safe (e.g. 'struct
+-- packet').
+--
+-- TODO:
+--   Check carry/overflow conditions more closely. Currently not
+--   correct and possibly in a fatal way. Define boundaries e.g.
+--   maximum safe input length.
+--
+--   Check for a better/faster idea/method than zero-padding the end.
+--   Writing 32-bytes to an unaligned address seems to cost 20 cycles
+--   both with vector (VMOVDQU) and with integer (4 x MOVQ) moves.
+--
+-- This algorithm is a new formulation based on:
+--   Tony Rogvall's C intrinsics code (Snabb arch/avx2.c) and ideas.
+--   RFC 1071 "Computing the Internet Checksum"
+--   Article http://locklessinc.com/articles/tcp_checksum/
+--   Article https://www.klittlepage.com/2013/12/10/accelerated-fix-processing-via-avx2-vector-instructions/ 
+
+function asm_checksum_avx2 (Dst)
+      |->checksum_avx2:
+      | add rsi, rdi                 -- rsi = data pointer, rdi = end address
+      | vpxor ymm0, ymm0, ymm0       -- ymm0 = 0 (useful constant zero)
+      | vpxor ymm1, ymm1, ymm1       -- ymm1 = 0 (8 x u32 accumulators)
+      | vmovdqu ymm6, [rsi]          -- Save the "trailer" 32-bytes
+      | vmovdqu [rsi], ymm0          -- Overwrite the trailer with zeros
+      |1:
+      | vmovdqu ymm2, [rdi]          -- Load 32-byte chunk
+      | vpunpcklwd ymm3, ymm2, ymm0  -- Unpack low 8*u16 values into 8*u32 vector
+      | vpaddd     ymm1, ymm1, ymm3  -- .. sum into 8*u32 accumulator
+      | vpunpckhwd ymm3, ymm2, ymm0  -- Repeat with high 8*u16 values
+      | vpaddd     ymm1, ymm1, ymm3  -- ...
+      | add rdi, 0x20                -- Advance input pointer
+      | cmp rdi, rsi                 -- Check for end of input
+      | jl <1
+      -- Finish up:
+      | vmovdqu [rsi], ymm6          -- Restore the "trailer"
+      | vphaddd ymm1, ymm1, ymm0     -- Fold from 8xU32 to 4xU32 accumulators
+      | vphaddd ymm1, ymm1, ymm0     -- Fold from 4xU32 to 2xU32 accumulators
+      | vextracti128 xmm2, ymm1, 1   -- Separate remaining accumulators
+      | vpaddw xmm1, xmm1, xmm2      -- Fold into 1xU32 accumulator
+      | vmovd edx, xmm1              -- Extract U32 accumulator into integer reg
+      | movzx rax, dx                -- Get low 16 bits in dx
+      | shr edx, 16                  -- Get high 16 bits in ax
+      | add ax, dx                   -- Sum into U16 accumulator
+      | adc ax, 0                    -- Add carry
+      | xchg al, ah                  -- Swap to network byte order
+      | ret
+end
+
+local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
+asm_checksum_avx2(Dst)
+local mcode, size = Dst:build()
+local entry = dasm.globals(globals, globalnames)
+
+cksum = ffi.cast("int(*)(void *, int)", entry.checksum_avx2)
+
+_anchor = mcode
+
+dasm.dump(mcode, size)
+
+function selftest ()
+   require("lib.checksum")
+   local pmu = require("lib.pmu")
+   local sz = 32
+   local s = ffi.new("char["..sz.."]")
+   for i = 0, sz do
+      s[i] = i % 256
+   end
+   local n = 1e6
+   print("asm")
+   -- Simple benchmark vs C intrinsics code.
+   -- Tweak value of 'sz' to see different sizes.
+   if pmu.is_available() then
+      pmu.profile(function () for i = 1, n do cksum(s, sz) end end,
+            {}, {call=n, byte=sz*n, block=sz*n/32})
+      print("c")
+      pmu.profile(function () for i = 1, n do C.cksum_avx2(s, sz, 0) end end,
+            {}, {call=n, byte=sz*n, block=sz*n/32})
+   end
+   local v = cksum(s, sz-1)
+   print("value", v, bit.tohex(v))
+   local r = bit.bxor(0xffff, require("lib.checksum").ipsum(s, sz-1, 0))
+   print("ref", r, bit.tohex(r))
+end
+
