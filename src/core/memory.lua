@@ -78,7 +78,6 @@ function reserve_new_page ()
       local have = tonumber(lib.firstline("/proc/sys/vm/nr_hugepages"))
       local want = have + 1
       lib.writefile("/proc/sys/vm/nr_hugepages", tostring(want))
-      syscall.sysctl("vm.nr_hugepages", tostring(want))
       io.write("[memory: Provisioned a huge page: sysctl vm.nr_hugepages ", have, " -> ", want, "]\n")
    end
 end
