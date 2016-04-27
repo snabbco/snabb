@@ -74,12 +74,15 @@ Enables or disables PCI bus mastering for device identified by
 value. PCI bus mastering must be enabled in order to perform DMA on the
 PCI device.
 
-— Function **pci.map_pci_memory** *pciaddress*, *n*
+— Function **pci.map_pci_memory_unlocked** *pciaddress*, *n*
+— Function **pci.map_pci_memory_locked** *pciaddress*, *n*
 
 Memory maps configuration space *n* of PCI device identified by
 *pciaddress*. Returns a pointer to the memory mapped region and a file
 descriptor of the opened sysfs resource file. PCI bus mastering must be
-enabled on device identified by *pciaddress* before calling his function.
+enabled on the device identified by *pciaddress* before calling this function.
+The 2 variants indicate if the underlying memory mapped file should be
+exclusively `flocked` or not.
 
 — Function **pci.close_pci_resource** *file_descriptor*, *pointer*
 
@@ -190,6 +193,19 @@ in read-write mode.
 
 Clears bits of register according to *bitmask*. Only available on
 registers in read-write mode.
+
+- Method **Register:bits** *start*, *length*, *bits*
+
+Get / set *length* bits of the register at offset *start*
+if bits == nil then return *length* bits from the register at offset *start*
+if bits ~= nil then set *length* bits in the register at offset *start* to
+*bits*
+
+- Method **Register:byte** *start*, *byte*
+
+Get / set a byte offset by *start* into the register
+if *byte* == nil then return byte offset by *start*
+if *byte* ~= nil then set byte offset by *start* to *byte*
 
 — Method **Register:wait**  *bitmask*, *value*
 
