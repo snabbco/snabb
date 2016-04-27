@@ -32,7 +32,8 @@ Snabb is written using these main techniques:
 
 Snabb compiles into a stand-alone executable called
 `snabb`. This single binary includes multiple applications and runs on
-any modern Linux distribution. (You could think of it as a
+any modern [Linux/x86-64](src/doc/porting.md) distribution. (You could
+think of it as a
 [busybox](https://en.wikipedia.org/wiki/BusyBox#Single_binary) for
 networking.)
 
