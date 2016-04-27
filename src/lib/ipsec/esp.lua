@@ -87,6 +87,7 @@ local function padding (a, l) return (a - l%a) % a end
 function esp_v6_encrypt:encapsulate (p)
    local gcm = self.aes_128_gcm
    local data, length = packet.data(p), packet.length(p)
+   if length < PAYLOAD_OFFSET then return false end
    local payload = data + PAYLOAD_OFFSET
    local payload_length = length - PAYLOAD_OFFSET
    -- Padding, see https://tools.ietf.org/html/rfc4303#section-2.4
@@ -190,6 +191,11 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    assert(packet.length(p2) == packet.length(p)
           and C.memcmp(p, p2, packet.length(p)) == 0,
           "integrity check failed")
+   -- Check invalid packets.
+   local p_invalid = packet.from_string("invalid")
+   assert(not enc:encapsulate(p_invalid), "encapsulated invalid packet")
+   local p_invalid = packet.from_string("invalid")
+   assert(not dec:decapsulate(p_invalid), "decapsulated invalid packet")
    -- Check transmitted Sequence Number wrap around
    enc.seq:low(0)
    enc.seq:high(1)
