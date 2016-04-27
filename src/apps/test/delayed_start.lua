@@ -11,7 +11,7 @@ NIC completely initialize before sending packets so none are dropped.
 ]]
 function Delayed_start:new(delay)
    return setmetatable({ start = engine.now() + delay },
-					  { __index = Delayed_start })
+                       { __index = Delayed_start })
 end
 
 function Delayed_start:push()
