@@ -27,6 +27,36 @@ link_table, link_array = {}, {}
 
 configuration = config.new()
 
+-- Ingress packet drop monitor.
+ingress_drop_monitor = {
+   threshold = 100000,
+   wait = 20,
+   last_flush = 0,
+   last_value = ffi.new('uint64_t[1]'),
+   current_value = ffi.new('uint64_t[1]')
+}
+
+function ingress_drop_monitor:sample()
+   local sum = self.current_value
+   sum[0] = 0
+   for i = 1, #app_array do
+      local app = app_array[i]
+      if app.ingress_packet_drops and not app.dead then
+         sum[0] = sum[0] + app:ingress_packet_drops()
+      end
+   end
+end
+
+function ingress_drop_monitor:jit_flush_if_needed()
+   if self.current_value[0] - self.last_value[0] < self.threshold then return end
+   if app.now() - self.last_flush < self.wait then return end
+   self.last_flush = app.now()
+   self.last_value[0] = self.current_value[0]
+   jit.flush()
+   print("jit.flush")
+   --- TODO: Change last_flush, last_value and current_value fields to be counters.
+end
+
 -- Counters for statistics.
 breaths   = counter.open("engine/breaths")   -- Total breaths taken
 frees     = counter.open("engine/frees")     -- Total packets freed
@@ -244,6 +274,16 @@ function main (options)
    if options.measure_latency or options.measure_latency == nil then
       local latency = histogram.create('engine/latency', 1e-6, 1e0)
       breathe = latency:wrap_thunk(breathe, now)
+   end
+
+   if options.ingress_drop_monitor or options.ingress_drop_monitor == nil then
+      local interval = 1e8   -- Every 100 milliseconds.
+      local function fn()
+         ingress_drop_monitor:sample()
+         ingress_drop_monitor:jit_flush_if_needed()
+      end
+      local t = timer.new("ingress drop monitor", fn, interval, "repeating")
+      timer.activate(t)
    end
 
    monotonic_now = C.get_monotonic_time()
