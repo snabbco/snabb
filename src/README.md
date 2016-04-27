@@ -17,7 +17,7 @@ ecosystem to match your requirements.
     
                  |     |     |
            +-----*-----*-----*-----+
-           |   Snabb Core   |
+           |      Snabb Core       |
            +-----------------------+
 
 The Snabb Core forms a runtime environment (*engine*) which
