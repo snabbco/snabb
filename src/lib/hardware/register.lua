@@ -63,7 +63,7 @@ function Register:byte (start, byte)
   if byte == nil then
     return ro_byte(self, start, byte)
   else
-    return self:bits(start * 8, 8, byte)
+    self:bits(start * 8, 8, byte)
   end
 end
 
