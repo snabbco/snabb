@@ -2,15 +2,16 @@
 
 module(...,package.seeall)
 
-local packet  = require("core.packet")
-local lib     = require("core.lib")
-local link    = require("core.link")
-local config  = require("core.config")
-local timer   = require("core.timer")
-local counter = require("core.counter")
-local zone    = require("jit.zone")
-local ffi     = require("ffi")
-local C       = ffi.C
+local packet    = require("core.packet")
+local lib       = require("core.lib")
+local link      = require("core.link")
+local config    = require("core.config")
+local timer     = require("core.timer")
+local histogram = require('core.histogram')
+local counter   = require("core.counter")
+local zone      = require("jit.zone")
+local ffi       = require("ffi")
+local C         = ffi.C
 require("core.packet_h")
 
 -- Set to true to enable logging
@@ -238,6 +239,13 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+
+   local breathe = breathe
+   if options.measure_latency or options.measure_latency == nil then
+      local latency = histogram.create('engine/latency', 1e-6, 1e0)
+      breathe = latency:wrap_thunk(breathe, now)
+   end
+
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()

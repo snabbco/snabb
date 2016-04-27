@@ -2,7 +2,7 @@ snabbnfv neutron2snabb <csv-dir> <output-dir> [<hostname>]
 
 (This program is used internally by the neutron-sync-master command.)
 
-Generate configuration files for Snabb Switch traffic processes based
+Generate configuration files for Snabb traffic processes based
 on an OpenStack Neutron database dump in CSV format (from mysqldump).
 
 <csv-dir> must contain ports.txt, networks.txt, and ml2_nework_segments.txt.

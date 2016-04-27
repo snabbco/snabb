@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 
 # This shell scripts generates the top-level Markdown structure of the
-# Snabb Switch book.
+# Snabb book.
 #
 # The authors list is automatically generated from Git history,
 # ordered from most to least commits.
 
+# Root directory for markdown files
+mdroot=../obj
+
 # Link images in local .images/
 for png in $(find .. -name "*.png"); do
-    ln -s ../$png .images/
+    ln -s ../../$png $mdroot/doc/.images/
 done
 
 cat <<EOF
-% Snabb Switch Reference Manual
+% Snabb Reference Manual
 % $(git log --pretty=format:%an | \
         grep -v -e '^root$' | \
         sort | uniq -c | sort -nr | sed 's/^[0-9 ]*//' | \
@@ -24,48 +27,48 @@ cat <<EOF
 
 ***Note:** This reference manual is a draft. The API defined in this
 document is not guaranteed to be stable or complete and future versions
-of Snabb Switch will introduce backwards incompatible changes. With that
+of Snabb will introduce backwards incompatible changes. With that
 being said, discrepancies between this document and the actual Snabb
 Switch implementation are considered to be bugs. Please report them in
 order to help improve this document.*
 
-$(cat ../README.md)
+$(cat $mdroot/README.md)
 
-$(cat ../apps/basic/README.md)
+$(cat $mdroot/apps/basic/README.md)
 
-$(cat ../apps/intel/README.md)
+$(cat $mdroot/apps/intel/README.md)
 
-$(cat ../apps/solarflare/README.md)
+$(cat $mdroot/apps/solarflare/README.md)
 
-$(cat ../apps/rate_limiter/README.md)
+$(cat $mdroot/apps/rate_limiter/README.md)
 
-$(cat ../apps/packet_filter/README.md)
+$(cat $mdroot/apps/packet_filter/README.md)
 
-$(cat ../apps/ipv6/README.md)
+$(cat $mdroot/apps/ipv6/README.md)
 
-$(cat ../apps/vhost/README.md)
+$(cat $mdroot/apps/vhost/README.md)
 
-$(cat ../apps/pcap/README.md)
+$(cat $mdroot/apps/pcap/README.md)
 
-$(cat ../apps/vpn/README.md)
+$(cat $mdroot/apps/vpn/README.md)
 
-$(cat ../apps/socket/README.md)
+$(cat $mdroot/apps/socket/README.md)
 
 # Libraries
 
-$(cat ../lib/README.checksum.md)
+$(cat $mdroot/lib/README.checksum.md)
 
-$(cat ../lib/README.ctable.md)
+$(cat $mdroot/lib/README.ctable.md)
 
-$(cat ../lib/README.pmu.md)
+$(cat $mdroot/lib/README.pmu.md)
 
 ## Hardware
 
-$(cat ../lib/hardware/README.md)
+$(cat $mdroot/lib/hardware/README.md)
 
 ## Protocols
 
-$(cat ../lib/protocol/README.md)
+$(cat $mdroot/lib/protocol/README.md)
 
 ## IPsec
 
@@ -73,10 +76,10 @@ $(cat ../lib/ipsec/README.md)
 
 ## Snabb NFV
 
-$(cat ../program/snabbnfv/README.md)
+$(cat $mdroot/program/snabbnfv/README.md)
 
 ## Watchdog (lib.watchdog.watchdog)
 
-$(cat ../lib/watchdog/README.md)
+$(cat $mdroot/lib/watchdog/README.md)
 
 EOF

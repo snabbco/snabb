@@ -1,0 +1,273 @@
+#!/usr/bin/env bash
+
+# Eases deployment of lwaftr inside a virtual machine.
+#
+# The scripts enables several commands:
+#
+# * lwaftrctl snabbnfv start|stop. Starts or stops snabbnfv.
+# * lwaftrctl vm       start|stop. Starts or stops virtual machine
+# * lwaftrctl lwaftr   start|stop. Starts or stops lwaftr inside virtual machine.
+#
+# A configuration file named 'lwaftrctl.conf' must exist in the current
+# directory. This file contains all the variable definitions needed to run the
+# available commands. See 'lwaftrctl.conf.example'.
+#
+# The usual workflow to run the script would be the following:
+#
+# * lwaftrctl snabbnfv start.
+#       Brings up NICs in host that will be used by virtual machine.
+#
+# * lwaftrctl vm start.
+#       Brings up VM. After this step it should be possible to log into
+#       the VM: ssh igalia@10.21.21.2.
+#
+# * lwaftrctl lwaftr start.
+#       Starts lwaftr inside VM. This commands logs into VM and runs file
+#       "~/run_lwaftr.sh". See run_lwaftr.sh.example.
+#
+# Once the lwaftr is running within the VM, run 'lwaftr transient' from
+# host to check everything is working fine.
+#
+# The command 'lwaftrctl all start', run all the steps above.
+
+qemu_start_vm() {
+    echo "Starting QEMU. Please wait..."
+    cd $VM_DIR
+    sudo qemu-system-x86_64 \
+        --enable-kvm -name ${NAME} -drive file=${DISK},if=virtio \
+        -m ${MEM} -cpu host -smp 2 \
+        -fsdev local,security_model=passthrough,id=fsdev0,path=${SHARED_LOCATION} \
+            -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=share \
+        -object memory-backend-file,id=mem,size=${MEM},mem-path=/dev/hugepages,share=on \
+        -numa node,memdev=mem \
+        -chardev socket,id=char1,path=${VHU_SOCK1},server \
+            -netdev type=vhost-user,id=net0,chardev=char1 \
+            -device virtio-net-pci,netdev=net0,addr=0x8,mac=52:54:00:00:00:01 \
+        -chardev socket,id=char2,path=${VHU_SOCK2},server \
+            -netdev type=vhost-user,id=net1,chardev=char2 \
+            -device virtio-net-pci,netdev=net1,addr=0x9,mac=52:54:00:00:00:02 \
+        -netdev type=tap,id=net2,ifname=${IFACE},vhost=on,script=${NETSCRIPT} \
+            -device virtio-net-pci,netdev=net2,addr=0xa,mac=52:54:00:00:00:03 \
+        -vnc :${VNC_DISPLAY} -daemonize &
+}
+
+vm_pid() {
+    echo `ps aux | grep -i "name $1" | grep -v "grep" | awk '{ print $2 }'`
+}
+
+start_vm() {
+    qemu_start_vm
+    sleep 30
+
+    pid=$(vm_pid "${NAME}")
+    for each in `ls /proc/$pid/task`; do sudo taskset -cp $QEMU_CORE $each; done
+    echo "Pinned QEMU to core $QEMU_CORE"
+}
+
+stop_vm() {
+    echo "Switching off VM. Please wait..."
+    ssh ${VM_USER}@${VM_IP} 'sudo halt'
+    sleep 10
+    pid=`pidof qemu-system-x86_64`
+    sudo kill ${pid} 2>/dev/null
+    echo "VM switched off"
+}
+
+restart_vm() {
+    stop_vm
+    start_vm
+}
+
+start_lwaftr() {
+    echo "Start lwAFTR"
+
+    ssh ${VM_USER}@${VM_IP} "~/run_lwaftr.sh"
+}
+
+stop_lwaftr() {
+    echo "Stop lwAFTR"
+
+    ssh ${VM_USER}@${VM_IP} 'sudo killall snabb 2>/dev/null'
+}
+
+restart_lwaftr() {
+    stop_lwaftr
+    start_lwaftr
+}
+
+start_snabbnfv() {
+    start_snabbnfv_process "snabbnfv-1" $SNABBNFV_CORE1 $SNABBNFV_PCI1 $SNABBNFV_CONF1 $VHU_SOCK1
+    start_snabbnfv_process "snabbnfv-2" $SNABBNFV_CORE2 $SNABBNFV_PCI2 $SNABBNFV_CONF2 $VHU_SOCK2
+}
+
+start_snabbnfv_process() {
+    local screen=$1
+    local core=$2
+    local pci=$3
+    local conf=$4
+    local sock=$5
+
+    echo "Start snabbnfv (screen: '$screen') at core $core (pci: $pci; conf: $conf}; socket: $sock)"
+    screen -dmS $screen bash -c "cd ${SNABB_HOST_PATH}/src; sudo taskset -c ${core} sudo ./snabb snabbnfv traffic ${pci} ${conf} ${sock}"
+}
+
+restart_snabbnfv() {
+    stop_snabbnfv
+    start_snabbnfv
+}
+
+kill_all() {
+    local name=$1
+    pids=`ps aux | grep "$name" | awk '{ print $2 }'`
+    for pid in ${pids[@]}; do
+        sudo kill $pid 2>/dev/null
+    done
+    sleep 1
+    screen -wipe
+}
+
+remove_file() {
+    sudo rm -f $1
+}
+
+stop_snabbnfv() {
+    echo "Stop snabbnfv"
+
+    kill_all "snabbnfv traffic"
+    remove_file $VHU_SOCK1
+    remove_file $VHU_SOCK2
+}
+
+start_command() {
+    COMMAND=$1
+    case $COMMAND in
+        "all")
+            start_snabbnfv
+            start_vm
+            start_lwaftr
+            ;;
+        "snabbnfv")
+            start_snabbnfv
+            ;;
+        "lwaftr")
+            start_lwaftr
+            ;;
+        "vm")
+            start_vm
+            ;;
+        *)
+            bad_usage
+            ;;
+    esac
+}
+
+restart_command() {
+    COMMAND=$1
+    case $COMMAND in
+        "all")
+            restart_vm
+            restart_lwaftr
+            ;;
+        "snabbnfv")
+            restart_snabbnfv
+            ;;
+        "lwaftr")
+            restart_lwaftr
+            ;;
+        "vm")
+            restart_vm
+            ;;
+        *)
+            bad_usage
+            ;;
+    esac
+}
+
+stop_command() {
+    COMMAND=$1
+    case $COMMAND in
+        "all")
+            stop_lwaftr
+            stop_vm
+            stop_snabbnfv
+            ;;
+        "snabbnfv")
+            stop_snabbnfv
+            ;;
+        "lwaftr")
+            stop_lwaftr
+            ;;
+        "vm")
+            stop_vm
+            ;;
+        *)
+            bad_usage
+            ;;
+    esac
+}
+
+# Main
+
+usage() {
+    local exit_code=$1
+    echo "Usage: lwaftrctl -f lwaftrctl.conf [all|snabbnfv|vm|lwaftr] [start|stop|restart]"
+    exit $exit_code
+}
+
+bad_usage() {
+    usage -1
+}
+
+help() {
+    usage 0
+}
+
+AFTRCTL_CONF=confs/lwaftrctl1.conf
+ARGS=()
+while [[ $# > 0 ]]; do
+    key="$1"
+
+    case $key in
+        -f|--file)
+            AFTRCTL_CONF="$2"
+            shift
+            ;;
+        *)
+            ARGS+=($key)
+            ;;
+    esac
+    shift
+done
+
+if [ ${#ARGS[@]} -ne 2 ]; then
+    help
+fi
+
+if [ ! -f "$AFTRCTL_CONF" ]; then
+    echo "Could not find lwaftrctl.conf in current directory. See lwaftrctl.conf.example."
+    exit -1
+fi
+
+source $AFTRCTL_CONF
+
+PROGRAM_NAME=$0
+COMMAND=${ARGS[0]}
+ACTION=${ARGS[1]}
+
+case $ACTION in
+    "start")
+        start_command $COMMAND;
+        ;;
+    "stop")
+        stop_command $COMMAND;
+        ;;
+    "restart")
+        restart_command $COMMAND;
+        ;;
+    *)
+        echo "Unknown action: $ACTION"
+        exit -1
+        ;;
+esac
+
+exit 0
