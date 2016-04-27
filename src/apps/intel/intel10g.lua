@@ -23,8 +23,7 @@ local timer = require("core.timer")
 local bits, bitset = lib.bits, lib.bitset
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
 
-num_descriptors = 512
---num_descriptors = 32
+num_descriptors = 2048
 
 -- Defaults for configurable items
 local default = {
