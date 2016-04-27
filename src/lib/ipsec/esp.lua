@@ -109,7 +109,7 @@ function esp_v6_encrypt:encapsulate (p)
    ffi.copy(iv, self.seq, gcm.IV_SIZE)
    self.ip:next_header(ESP_NH)
    self.ip:payload_length(payload_length + overhead)
-   return p
+   return true
 end
 
 
@@ -134,7 +134,7 @@ end
 function esp_v6_decrypt:decapsulate (p)
    local gcm = self.aes_128_gcm
    local data, length = packet.data(p), packet.length(p)
-   if length - PAYLOAD_OFFSET < self.MIN_SIZE then return end
+   if length - PAYLOAD_OFFSET < self.MIN_SIZE then return false end
    self.ip:new_from_mem(data + ETHERNET_SIZE, IPV6_SIZE)
    local payload = data + PAYLOAD_OFFSET
    self.esp:new_from_mem(payload, ESP_SIZE)
@@ -153,7 +153,9 @@ function esp_v6_decrypt:decapsulate (p)
       self.ip:payload_length(ptext_length)
       C.memmove(payload, ctext_start, ptext_length)
       packet.resize(p, PAYLOAD_OFFSET + ptext_length)
-      return p
+      return true
+   else
+      return false
    end
 end
 
@@ -179,22 +181,23 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    local p = d:packet()
    -- Check integrity
    print("original", lib.hexdump(ffi.string(packet.data(p), packet.length(p))))
-   local p_enc = enc:encapsulate(packet.clone(p))
+   local p_enc = packet.clone(p)
+   assert(enc:encapsulate(p_enc), "encapsulation failed")
    print("encrypted", lib.hexdump(ffi.string(packet.data(p_enc), packet.length(p_enc))))
-   local p2 = dec:decapsulate(p_enc)
+   local p2 = packet.clone(p_enc)
+   assert(dec:decapsulate(p2), "decapsulation failed")
    print("decrypted", lib.hexdump(ffi.string(packet.data(p2), packet.length(p2))))
-   if p2 and p2.length == p.length and C.memcmp(p, p2, p.length) == 0 then
-      print("selftest passed")
-   else
-      print("integrity check failed")
-      os.exit(1)
-   end
+   assert(packet.length(p2) == packet.length(p)
+          and C.memcmp(p, p2, packet.length(p)) == 0,
+          "integrity check failed")
    -- Check transmitted Sequence Number wrap around
    enc.seq:low(0)
    enc.seq:high(1)
    dec.seq:low(2^32 - dec.window_size)
    dec.seq:high(0)
-   assert(dec:decapsulate(enc:encapsulate(packet.clone(p))),
+   local p3 = packet.clone(p)
+   enc:encapsulate(p3)
+   assert(dec:decapsulate(p3),
           "Transmitted Sequence Number wrap around failed.")
    assert(dec.seq:high() == 1 and dec.seq:low() == 1,
           "Lost Sequence Number synchronization.")
@@ -203,7 +206,9 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    enc.seq:high(1)
    dec.seq:low(dec.window_size+1)
    dec.seq:high(1)
-   assert(not dec:decapsulate(enc:encapsulate(packet.clone(p))),
+   local p4 = packet.clone(p)
+   enc:encapsulate(p4)
+   assert(not dec:decapsulate(p4),
           "Accepted out of window Sequence Number.")
    assert(dec.seq:high() == 1 and dec.seq:low() == dec.window_size+1,
           "Corrupted Sequence Number.")
