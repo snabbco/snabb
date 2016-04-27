@@ -150,9 +150,9 @@ function map_pci_memory (device, n, lock)
    return ffi.cast("uint32_t *", mem), f
 end
 function close_pci_resource (fd, base)
-   local st, err = f:stat()
+   local st, err = fd:stat()
    assert(st, tostring(err))
-   S.munmap(base, fs.size)
+   S.munmap(base, st.size)
    fd:close()
 end
 
