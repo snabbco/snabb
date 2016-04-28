@@ -6,6 +6,8 @@ local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
 local ffi      = require("ffi")
 local lib      = require("core.lib")
+local shm      = require("core.shm")
+local counter  = require("core.counter")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
@@ -36,21 +38,49 @@ end
 -- Create an Intel82599 App for the device with 'pciaddress'.
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
+   local self = {}
 
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
-         devices[conf.pciaddr] = {pf=intel10g.new_pf(conf):open(), vflist={}}
+         local pf = intel10g.new_pf(conf):open()
+         devices[conf.pciaddr] = {pf=pf, vflist={}, stats={register=pf.s}}
       end
       local dev = devices[conf.pciaddr]
       local poolnum = firsthole(dev.vflist)-1
       local vf = dev.pf:new_vf(poolnum)
       dev.vflist[poolnum+1] = vf
-      return setmetatable({dev=vf:open(conf)}, Intel82599)
+      self.dev = vf:open(conf)
+      self.stats = devices[conf.pciaddr].stats
    else
-      local dev = intel10g.new_sf(conf):open()
-      if not dev then return null end
-      return setmetatable({dev=dev, zone="intel"}, Intel82599)
+      self.dev = assert(intel10g.new_sf(conf):open(), "Can not open device.")
+      self.stats = { register = self.dev.s }
+      self.zone = "intel"
    end
+   if not self.stats.counters then
+      local counters = {}
+      local path = "/counters/"..conf.pciaddr.."/"
+      counters['type']               = counter.open(path..'type')
+      counters['discontinuity-time'] = counter.open(path..'discontinuity-time')
+      counters['in-octets']          = counter.open(path..'in-octets')
+      counters['in-multicast']       = counter.open(path..'in-multicast')
+      counters['in-broadcast']       = counter.open(path..'in-broadcast')
+      counters['in-discards']        = counter.open(path..'in-discards')
+      counters['out-octets']         = counter.open(path..'out-octets')
+      counters['out-multicast']      = counter.open(path..'out-multicast')
+      counters['out-broadcast']      = counter.open(path..'out-broadcast')
+      counters['out-discards']       = counter.open(path..'out-discards')
+      counter.set(counters['type'], 0x1000) -- Hardware interface
+      counter.set(counters['discontinuity-time'], C.get_unix_time())
+      if not conf.vmdq and conf.macaddr then
+         counters['phys-address'] = counter.open(path..'phys-address')
+         counter.set(counters['phys-address'],
+                     macaddress:new(conf.macaddr):int())
+      end
+      self.stats.counters = counters
+      self.stats.path = path
+      self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
+   end
+   return setmetatable(self, Intel82599)
 end
 
 function Intel82599:stop()
@@ -71,6 +101,12 @@ function Intel82599:stop()
    if close_pf then
       close_pf:close()
    end
+   if not self.dev.pf or close_pf then
+      for name, _ in pairs(self.stats.counters) do
+         counter.delete(self.stats.path..name)
+      end
+      shm.unlink(self.stats.path)
+   end
 end
 
 
@@ -79,6 +115,11 @@ function Intel82599:reconfig(arg)
    assert((not not self.dev.pf) == (not not conf.vmdq), "Can't reconfig from VMDQ to single-port or viceversa")
 
    self.dev:reconfig(conf)
+
+   if not self.dev.pf and conf.macaddr then
+      counter.set(self.stats.counters['phys-address'],
+                  macaddress:new(conf.macaddr):int())
+   end
 end
 
 -- Allocate receive buffers from the given freelist.
@@ -96,6 +137,9 @@ function Intel82599:pull ()
       transmit(l, self.dev:receive())
    end
    self:add_receive_buffers()
+   if self.stats.sync_timer() then
+      self:sync_stats()
+   end
 end
 
 function Intel82599:add_receive_buffers ()
@@ -103,6 +147,21 @@ function Intel82599:add_receive_buffers ()
    while self.dev:can_add_receive_buffer() do
       self.dev:add_receive_buffer(packet.allocate())
    end
+end
+
+-- Synchronize self.stats.register a and self.stats.counters.
+function Intel82599:sync_stats ()
+   --- XXX - it is questionable if I choose the right register to counter
+   --- mapping
+   local counters, register = self.stats.counters, self.stats.register
+   counter.set(counters['in-octets'],     register.GORC64())
+   counter.set(counters['in-multicast'],  register.MPRC())
+   counter.set(counters['in-broadcast'],  register.BPRC())
+   counter.set(counters['in-discards'],   register.TPR() - register.GPRC())
+   counter.set(counters['out-octets'],    register.GOTC64())
+   counter.set(counters['out-multicast'], register.MPTC())
+   counter.set(counters['out-broadcast'], register.BPTC())
+   counter.set(counters['out-discards'],  register.TPT() - register.GPTC())
 end
 
 -- Push packets from our 'rx' link onto the network.
