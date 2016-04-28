@@ -4,7 +4,7 @@ Usage:
   -h, --help
                              Print usage information.
 
-Display realtime performance statistics for a running Snabb Switch
+Display realtime performance statistics for a running Snabb
 instance with <pid>. If <pid> is not supplied and there is only one Snabb
 Switch instance, top will connect to that instance.
 

@@ -9,7 +9,6 @@ local lib      = require("core.lib")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
-local freelist = require("core.freelist")
 local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
 Intel82599 = {}
 Intel82599.__index = Intel82599
@@ -183,7 +182,7 @@ function selftest ()
       -- Test experience in the lab suggests that the 82599 T3 NIC
       -- requires at least two seconds before it will reliably pass
       -- traffic. The test case sleeps for this reason.
-      -- See https://github.com/SnabbCo/snabbswitch/pull/569
+      -- See https://github.com/SnabbCo/snabb/pull/569
       C.usleep(2e6)
    end
    engine.main({duration = 1, report={showlinks=true, showapps=false}})

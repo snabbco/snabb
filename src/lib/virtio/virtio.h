@@ -127,7 +127,7 @@ struct vio_memory {
   struct vio_memory_region regions[VIO_MEMORY_MAX_NREGIONS];
 };
 
-// Snabb Switch data structures
+// Snabb data structures
 
 struct vio_vring {
   // eventfd(2) for notifying the kernel (kick) and being notified (call)

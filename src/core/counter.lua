@@ -38,13 +38,13 @@ local counter_t = ffi.typeof("struct counter")
 -- This is important for a subtle performance reason: the shared
 -- memory counters all have page-aligned addresses (thanks to mmap)
 -- and accessing many of them can lead to expensive cache misses (due
--- to set-associative CPU cache). See SnabbCo/snabbswitch#558.
+-- to set-associative CPU cache). See snabbco/snabb#558.
 local public  = {}
 local private = {}
 local numbers = {} -- name -> number
 
 function open (name, readonly)
-   if numbers[name] then error("counter already opened: " .. name) end
+   if numbers[name] then return private[numbers[name]] end
    local n = #public+1
    if readonly then
       public[n] = shm.open(name, counter_t, readonly)
