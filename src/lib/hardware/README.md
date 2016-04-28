@@ -26,7 +26,7 @@ An array of supported hardware devices. Must be populated by calling
 — Function **pci.canonical** *pciaddress*
 
 Returns the canonical representation of a PCI address. The canonical
-representation is preferred internally in Snabb Switch and for
+representation is preferred internally in Snabb and for
 presenting to users. It shortens addresses with leading zeros like
 this: `0000:01:00.0` becomes `01:00.0`.
 

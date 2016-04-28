@@ -9,7 +9,7 @@
 
 #include "ef_vi.h"
 
-/* We would like to be able to link this module to snabbswitch without
+/* We would like to be able to link this module to snabb without
  * linking the SolarFlare libraries, which is loaded at run time by
  * the SolarFlare app.  Thus we set a pointer to the
  * ef_vi_transmit_unbundle function at run time: */

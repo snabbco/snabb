@@ -52,7 +52,7 @@ operation to the 82599 hardware.
 ## [2.0] - 2016-02-09
 
 A major release; see the documentation at
-https://github.com/Igalia/snabbswitch/tree/lwaftr_starfruit/src/program/lwaftr/doc
+https://github.com/Igalia/snabb/tree/lwaftr_starfruit/src/program/lwaftr/doc
 for more details on how to use all of these features.  Besides
 bug-fixes, notable additions include:
 
