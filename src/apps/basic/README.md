@@ -102,3 +102,25 @@ link. The packets are transmitted in the order they were received.
               |          |
               +----------+
 
+## Truncate
+
+The `Truncate` app sends all packets received on `input` to `output`
+and truncates or zero pads packets to length `n` in the process
+
+    DIAGRAM: Sample
+              +----------+
+              |          |
+    input ----* Truncate *---- output
+              |          |
+              +----------+
+
+## Sample
+The `Sample` app forwards packets every `n`th packet from `input`
+to `output` all others are dropped.
+
+    DIAGRAM: Sample
+              +--------+
+              |        |
+    input ----* Sample *---- output
+              |        |
+              +--------+
