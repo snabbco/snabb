@@ -6,10 +6,8 @@ local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
 local ffi      = require("ffi")
 local lib      = require("core.lib")
-local counter  = require("core.counter")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
-local macaddress = require("lib.macaddress")
 local intel10g = require("apps.intel.intel10g")
 local freelist = require("core.freelist")
 local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
@@ -38,7 +36,6 @@ end
 -- Create an Intel82599 App for the device with 'pciaddress'.
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
-   local self = setmetatable({counters = {}}, Intel82599)
 
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
@@ -48,26 +45,12 @@ function Intel82599:new (arg)
       local poolnum = firsthole(dev.vflist)-1
       local vf = dev.pf:new_vf(poolnum)
       dev.vflist[poolnum+1] = vf
-      self.dev = vf:open(conf)
+      return setmetatable({dev=vf:open(conf)}, Intel82599)
    else
-      self.dev = assert(intel10g.new_sf(conf):open(), "Can not open device.")
-      self.zone = "intel"
+      local dev = intel10g.new_sf(conf):open()
+      if not dev then return null end
+      return setmetatable({dev=dev, zone="intel"}, Intel82599)
    end
-
-   self.counters['type']               = counter.open('type')
-   self.counters['discontinuity-time'] = counter.open('discontinuity-time')
-   self.counters['in-octets']          = counter.open('in-octets')
-   self.counters['in-discards']        = counter.open('in-discards')
-   self.counters['out-octets']         = counter.open('out-octets')
-   counter.set(self.counters['type'], 0x1000) -- Hardware interface
-   counter.set(self.counters['discontinuity-time'], C.get_unix_time())
-   if conf.vmdq then
-      self.counters['phys-address'] = counter.open('phys-address')
-      counter.set(self.counters['phys-address'],
-                  macaddress:new(conf.macaddr):int())
-   end
-
-   return self
 end
 
 function Intel82599:stop()
@@ -88,9 +71,6 @@ function Intel82599:stop()
    if close_pf then
       close_pf:close()
    end
-
-   -- delete counters
-   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
 
 
@@ -99,11 +79,6 @@ function Intel82599:reconfig(arg)
    assert((not not self.dev.pf) == (not not conf.vmdq), "Can't reconfig from VMDQ to single-port or viceversa")
 
    self.dev:reconfig(conf)
-
-   if conf.vmdq then
-      counter.set(self.counters['phys-address'],
-                  macaddress:new(conf.macaddr):int())
-   end
 end
 
 -- Allocate receive buffers from the given freelist.
@@ -121,13 +96,6 @@ function Intel82599:pull ()
       transmit(l, self.dev:receive())
    end
    self:add_receive_buffers()
-   if self.dev.rxstats then
-      counter.set(self.counters['in-octets'],
-                  bit.lshift(self.dev.pf.qs.QBRC_H[self.dev.rxstats]()+0LL, 32)
-                     + self.dev.pf.qs.QBRC_L[self.dev.rxstats]())
-      counter.set(self.counters['in-discards'],
-                  self.dev.pf.qs.QPRDC[self.dev.rxstats]())
-   end
 end
 
 function Intel82599:add_receive_buffers ()
@@ -148,11 +116,6 @@ function Intel82599:push ()
       end
    end
    self.dev:sync_transmit()
-   if self.dev.txstats then
-      counter.set(self.counters['out-octets'],
-                  bit.lshift(self.dev.pf.qs.QBTC_H[self.dev.txstats]()+0LL, 32)
-                     + self.dev.pf.qs.QBTC_L[self.dev.txstats]())
-   end
 end
 
 -- Report on relevant status and statistics.
