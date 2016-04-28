@@ -63,7 +63,7 @@ function asm_checksum_avx2 (Dst)
       | vphaddd ymm1, ymm1, ymm0     -- Fold from 8xU32 to 4xU32 accumulators
       | vphaddd ymm1, ymm1, ymm0     -- Fold from 4xU32 to 2xU32 accumulators
       | vextracti128 xmm2, ymm1, 1   -- Separate remaining accumulators
-      | vpaddw xmm1, xmm1, xmm2      -- Fold into 1xU32 accumulator
+      | vpaddd xmm1, xmm1, xmm2      -- Fold into 1xU32 accumulator
       | vmovd edx, xmm1              -- Extract U32 accumulator into integer reg
       | movzx rax, dx                -- Get low 16 bits in dx
       | shr edx, 16                  -- Get high 16 bits in ax
