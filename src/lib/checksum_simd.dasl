@@ -28,13 +28,10 @@ local C = ffi.C
 -- packet').
 --
 -- TODO:
---   Check carry/overflow conditions more closely. Currently not
---   correct and possibly in a fatal way. Define boundaries e.g.
---   maximum safe input length.
---
---   Check for a better/faster idea/method than zero-padding the end.
---   Writing 32-bytes to an unaligned address seems to cost 20 cycles
---   both with vector (VMOVDQU) and with integer (4 x MOVQ) moves.
+--   Confirm maximum input size before overflow. Empirically when
+--   checksumming an all-ones array I see the first overflow (checksum
+--   mismatch compared with reference) at 128KB. That would be more
+--   than sufficient for network packets.
 --
 -- This algorithm is a new formulation based on:
 --   Tony Rogvall's C intrinsics code (Snabb arch/avx2.c) and ideas.
@@ -65,8 +62,8 @@ function asm_checksum_avx2 (Dst)
       | vextracti128 xmm2, ymm1, 1   -- Separate remaining accumulators
       | vpaddd xmm1, xmm1, xmm2      -- Fold into 1xU32 accumulator
       | vmovd edx, xmm1              -- Extract U32 accumulator into integer reg
-      | movzx rax, dx                -- Get low 16 bits in dx
-      | shr edx, 16                  -- Get high 16 bits in ax
+      | movzx rax, dx                -- Get low 16 bits in rdx
+      | shr edx, 16                  -- Get high 16 bits in dx
       | add ax, dx                   -- Sum into U16 accumulator
       | adc ax, 0                    -- Add carry
       | xchg al, ah                  -- Swap to network byte order
@@ -82,30 +79,41 @@ cksum = ffi.cast("int(*)(void *, int)", entry.checksum_avx2)
 
 _anchor = mcode
 
-dasm.dump(mcode, size)
+--dasm.dump(mcode, size)
 
 function selftest ()
+   print("selftest: checksum_simd")
    require("lib.checksum")
    local pmu = require("lib.pmu")
-   local sz = 32
+   local sz = 10*1024
    local s = ffi.new("char["..sz.."]")
    for i = 0, sz do
       s[i] = i % 256
    end
-   local n = 1e6
-   print("asm")
+   local n = 1e5
    -- Simple benchmark vs C intrinsics code.
    -- Tweak value of 'sz' to see different sizes.
    if pmu.is_available() then
+      print("ASM")
       pmu.profile(function () for i = 1, n do cksum(s, sz) end end,
             {}, {call=n, byte=sz*n, block=sz*n/32})
-      print("c")
+      print()
+      print("C")
       pmu.profile(function () for i = 1, n do C.cksum_avx2(s, sz, 0) end end,
             {}, {call=n, byte=sz*n, block=sz*n/32})
+   else
+      local _, reason = pmu.is_available()
+      print("Skipping benchmark. PMU not available: " .. reason)
    end
-   local v = cksum(s, sz-1)
-   print("value", v, bit.tohex(v))
-   local r = bit.bxor(0xffff, require("lib.checksum").ipsum(s, sz-1, 0))
-   print("ref", r, bit.tohex(r))
+   -- Compare values for all input sizes
+   for i = 1, sz do
+      local v = cksum(s, sz-1)
+      local r = bit.bxor(0xffff, require("lib.checksum").ipsum(s, sz-1, 0))
+      if v ~= r then
+         print(i, bit.tohex(v), bit.tohex(r))
+         error("checksum mismatch")
+      end
+   end
+   print("selftest: ok")
 end
 
