@@ -178,6 +178,7 @@ function apply_config_actions (actions, conf)
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
       app.zone = zone
+      if app_table[name].start then app_table[name]:start() end
    end
    function ops.restart (name)
       ops.stop(name)

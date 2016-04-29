@@ -126,6 +126,14 @@ implemented the app instance is discarded and a new instance is created.
 *Optional*. Print a report of the current app status.
 
 
+— Method **myapp:start**
+
+*Optional*. Starts the app.
+
+At this point links and app name are set. The app has a chance to do
+additional initialization if needed.
+
+
 — Method **myapp:stop**
 
 *Optional*. Stop the app and release associated external resources.
