@@ -1,4 +1,4 @@
-# lwAFTR configuration
+# Configuration
 
 The lwAFTR is configured by a text file.  Here's an example:
 
@@ -8,6 +8,9 @@ aftr_ipv6_ip = 8:9:a:b:c:d:e:f
 aftr_mac_b4_side = 22:22:22:22:22:22
 aftr_mac_inet_side = 12:12:12:12:12:12
 next_hop6_mac = 44:44:44:44:44:44
+# next_hop_ipv6_addr = fd00::1
+inet_mac = 52:54:00:00:00:01
+# next_hop_ipv4_addr = 192.168.0.1
 binding_table = path/to/binding-table.txt
 hairpinning = true
 icmpv6_rate_limiter_n_packets=3e5
@@ -68,10 +71,14 @@ inet_mac = 68:68:68:68:68:68
 The lwAFTR can talk to any host, but assumes that the above ones are the
 next hop.
 
-The lwAFTR does support
-[NDP](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol),
-though, so the `next_hop6_mac` entry is optional.  See [the NDP
-documentation](./README.ndp.md), for more.
+Alternatively, it is possible to use IP addresses for the next hops. The lwAFTR
+will resolve the IP addresses to their correspondent MAC addresses, using
+the NDP and ARP protocols.
+
+```
+next_hop_ipv6_addr = fd00::1
+next_hop_ipv4_addr = 192.168.0.1
+```
 
 ### The binding table
 
