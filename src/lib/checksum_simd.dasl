@@ -27,6 +27,14 @@ local C = ffi.C
 -- This requires input pointers for which this is safe (e.g. 'struct
 -- packet').
 --
+-- This routine executes a VZEROUPPER instruction before returning in
+-- order to flush 256-bit AVX register state and avoid potential
+-- expensive SSE-AVX transition penalties. This is a cheap form of
+-- insurance against taking ~ 75 cycle penalties when mixing SSE and
+-- AVX code in the same program. See
+-- https://software.intel.com/en-us/articles/avoiding-avx-sse-transition-penalties
+-- and particularly section 3.3.
+--
 -- TODO:
 --   Confirm maximum input size before overflow. Empirically when
 --   checksumming an all-ones array I see the first overflow (checksum
@@ -67,6 +75,7 @@ function asm_checksum_avx2 (Dst)
       | add ax, dx                   -- Sum into U16 accumulator
       | adc ax, 0                    -- Add carry
       | xchg al, ah                  -- Swap to network byte order
+      | vzeroupper                   -- Avoid potential AVX-SSE transition penalty
       | ret
 end
 
