@@ -22,6 +22,8 @@ function run (args)
       solarflare(unpack(args))
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
+   elseif command == 'checksum' then
+      checksum(args)
    else
       print(usage) 
       main.exit(1)
@@ -327,4 +329,62 @@ receive_device.interface= "rx1GE"
       print("Packets lost. Test failed!")
       main.exit(1)
    end
+end
+
+-- Checksum benchmark
+
+function checksum1 (size_min, size_max, verbose)
+   local loops = 1000
+   local inputs = 1000
+   local sizes  = {}
+   local arrays = {}
+   local bytes = 0
+   for i = 1, inputs do
+      -- Random sizes up to 10K from a "log uniform" distribution i.e.
+      -- proportionally more smaller values.
+      local size = size_min + math.floor(math.exp(math.log(size_max-size_min)*math.random()))
+      sizes[i] = size
+      bytes = bytes + size
+      -- Use even but otherwise random alignment.
+      -- XXX odd alignment breaks SSE2 checksum -- fix separately!
+      local align = math.random(32) * 2
+      arrays[i] = ffi.new("char[?]", size + align) + align
+      -- Fill with random data
+      for j = 0, size-1 do
+         arrays[i][j] = math.random(256)
+      end
+   end
+   local pmu = require("lib.pmu")
+ simd = require("lib.checksum_simd")
+   local checksum = require("lib.checksum")
+   local cksum = function (f)
+      return function ()
+         for i = 1, loops do
+            for i = 1, inputs do
+               f(arrays[i], sizes[i], 0)
+            end
+         end
+      end
+   end
+   local r = {}
+   local pmu_aux = {byte=bytes*loops, call=inputs*loops}
+   local pmu_events = {}
+   _, r.asm  = pmu.measure(cksum(simd.cksum),      pmu_events, pmu_aux)
+   _, r.avx2 = pmu.measure(cksum(C.cksum_avx2),    pmu_events, pmu_aux)
+   _, r.sse2 = pmu.measure(cksum(C.cksum_sse2),    pmu_events, pmu_aux)
+   _, r.base  = pmu.measure(cksum(C.cksum_generic), pmu_events, pmu_aux)
+   print(("%-14s %14s %14s %14s"):format("VARIANT", "BYTES/PACKET", "BYTES/CYCLE", "CYCLES/PACKET"))
+   local totalbytes = bytes * loops
+   for variant, result in pairs(r) do
+      local bpp = bytes / inputs
+      local bpc = totalbytes / result.cycles
+      local cpp = result.cycles / (inputs * loops)
+      print(("%-14s %14.3f %14.3f %14.3f"):format(variant, bpp, bpc, cpp))
+      if verbose then pmu.report(result, pmu_aux) print() end
+   end
+end
+
+function checksum (args)
+   -- XXX add a useful command-line syntax
+   checksum1(20, 5000, false)
 end
