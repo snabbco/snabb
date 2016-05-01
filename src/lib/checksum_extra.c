@@ -1,67 +1,9 @@
-/* Use of this source code is governed by the Apache 2.0 license; see COPYING.
- * Generic checksm routine originally taken from DPDK: 
- *   BSD license; (C) Intel 2010-2015, 6WIND 2014. */
-
-/* IP checksum routines.
- *
- * See src/arch/ for architecture specific SIMD versions. */
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+/* IP checksum routines. */
 
 #include <arpa/inet.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <string.h>
-#include <stdlib.h>
 #include <stdint.h>
-#include <sys/time.h>
-
-uint16_t cksum_generic(unsigned char *p, size_t len, uint16_t initial)
-{
-  uint32_t sum = htons(initial);
-  const uint16_t *u16 = (const uint16_t *)p;
-
-  while (len >= (sizeof(*u16) * 4)) {
-    sum += u16[0];
-    sum += u16[1];
-    sum += u16[2];
-    sum += u16[3];
-    len -= sizeof(*u16) * 4;
-    u16 += 4;
-  }
-  while (len >= sizeof(*u16)) {
-    sum += *u16;
-    len -= sizeof(*u16);
-    u16 += 1;
-  }
-
-  /* if length is in odd bytes */
-  if (len == 1)
-    sum += *((const uint8_t *)u16);
-
-  while(sum>>16)
-    sum = (sum & 0xFFFF) + (sum>>16);
-  return ntohs((uint16_t)~sum);
-}
-
-// SIMD versions
-
-//
-// A unaligned version of the cksum,
-// n is number of 16-bit values to sum over, n in it self is a
-// 16 bit number in order to avoid overflow in the loop
-//
-static inline uint32_t cksum_ua_loop(unsigned char *p, uint16_t n)
-{
-  uint32_t s0 = 0;
-  uint32_t s1 = 0;
-
-  while (n) {
-    s0 += p[0];
-    s1 += p[1];
-    p += 2;
-    n--;
-  }
-  return (s0<<8)+s1;
-}
+#include "checksum.h"
 
 // Incrementally update checksum when modifying a 16-bit value.
 void checksum_update_incremental_16(uint16_t* checksum_cell,
@@ -125,7 +67,7 @@ uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
     uint32_t sum = 0;
     len -= headersize;
     if (ipv == 4) {                         // IPv4
-      if (cksum_generic((unsigned char *)buf, headersize, 0) != 0) {
+      if (cksum((unsigned char *)buf, headersize, 0) != 0) {
         return 0xFFFF0002;
       }
       sum = htons(len & 0x0000FFFF) + (proto << 8)

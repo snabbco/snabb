@@ -334,7 +334,7 @@ end
 -- Checksum benchmark
 
 function checksum1 (size_min, size_max, verbose)
-   local loops = 1000
+   local loops = 10000
    local inputs = 1000
    local sizes  = {}
    local arrays = {}
@@ -371,8 +371,7 @@ function checksum1 (size_min, size_max, verbose)
    local pmu_events = {}
    _, r.asm  = pmu.measure(cksum(simd.cksum),      pmu_events, pmu_aux)
    _, r.avx2 = pmu.measure(cksum(C.cksum_avx2),    pmu_events, pmu_aux)
-   _, r.sse2 = pmu.measure(cksum(C.cksum_sse2),    pmu_events, pmu_aux)
-   _, r.base  = pmu.measure(cksum(C.cksum_generic), pmu_events, pmu_aux)
+   _, r.base  = pmu.measure(cksum(C.cksum), pmu_events, pmu_aux)
    print(("%-14s %14s %14s %14s"):format("VARIANT", "BYTES/PACKET", "BYTES/CYCLE", "CYCLES/PACKET"))
    local totalbytes = bytes * loops
    for variant, result in pairs(r) do
