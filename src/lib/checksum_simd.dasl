@@ -1,0 +1,136 @@
+-- checksum_simd: SIMD checksum routines
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(..., package.seeall)
+
+local dasm = require("dasm")
+local ffi = require("ffi")
+local C = ffi.C
+
+|.arch x64
+|.actionlist actions
+|.globalnames globalnames
+
+-- Calculate checksum using AVX2 vector instructions. Optimized for
+-- both speed and short/simple code.
+--
+-- Algorithm:
+--
+-- Operate on 32-byte chunks:
+--   Divide each chunk into 16xU16 values.
+--   Sum 1st 8xU16 into 8xU32 accumulators
+--   Sum 2nd 8xU16 into 8xU32 accumulators
+-- "Fold" accumulators from 8xU32 down to the 1xU16 result.
+--
+-- The input is temporarily padded with a 32-byte "trailer" block of
+-- zeros at the end. This means there is no "remainder" to worry about.
+-- This requires input pointers for which this is safe (e.g. 'struct
+-- packet').
+--
+-- This routine executes a VZEROUPPER instruction before returning in
+-- order to flush 256-bit AVX register state and avoid potential
+-- expensive SSE-AVX transition penalties. This is a cheap form of
+-- insurance against taking ~ 75 cycle penalties when mixing SSE and
+-- AVX code in the same program. See
+-- https://software.intel.com/en-us/articles/avoiding-avx-sse-transition-penalties
+-- and particularly section 3.3.
+--
+-- TODO:
+--   Confirm maximum input size before overflow. Empirically when
+--   checksumming an all-ones array I see the first overflow (checksum
+--   mismatch compared with reference) at 128KB. That would be more
+--   than sufficient for network packets.
+--
+-- This algorithm is a new formulation based on:
+--   Tony Rogvall's C intrinsics code (Snabb arch/avx2.c) and ideas.
+--   RFC 1071 "Computing the Internet Checksum"
+--   Article http://locklessinc.com/articles/tcp_checksum/
+--   Article https://www.klittlepage.com/2013/12/10/accelerated-fix-processing-via-avx2-vector-instructions/ 
+
+-- Generate the function:
+--   uint16_t asm_checksum_avx2(char *ptr, int length, uint16_t initial)
+function asm_checksum_avx2 (Dst)
+      |->checksum_avx2:
+      | add rsi, rdi                 -- rsi = end address, rdi = data pointer
+      | vpxor ymm0, ymm0, ymm0       -- ymm0 = 0 (useful constant zero)
+      | vpxor ymm1, ymm1, ymm1       -- ymm1 = 0 (8 x u32 accumulators)
+      | vmovdqu ymm6, [rsi]          -- Save the "trailer" 32-bytes
+      | vmovdqu [rsi], ymm0          -- Overwrite the trailer with zeros
+      |1:
+      | vmovdqu ymm2, [rdi]          -- Load 32-byte chunk
+      | vpunpcklwd ymm3, ymm2, ymm0  -- Unpack low 8*u16 values into 8*u32 vector
+      | vpaddd     ymm1, ymm1, ymm3  -- .. sum into 8*u32 accumulator
+      | vpunpckhwd ymm3, ymm2, ymm0  -- Repeat with high 8*u16 values
+      | vpaddd     ymm1, ymm1, ymm3  -- ...
+      | add rdi, 0x20                -- Advance input pointer
+      | cmp rdi, rsi                 -- Check for end of input
+      | jl <1
+      -- Finish up:
+      | vmovdqu [rsi], ymm6          -- Restore the "trailer"
+      | vphaddd ymm1, ymm1, ymm0     -- Fold from 8xU32 to 4xU32 accumulators
+      | vphaddd ymm1, ymm1, ymm0     -- Fold from 4xU32 to 2xU32 accumulators
+      | vextracti128 xmm2, ymm1, 1   -- Separate remaining accumulators
+      | vpaddd xmm1, xmm1, xmm2      -- Fold into 1xU32 accumulator
+      | vmovd ecx, xmm1              -- Extract U32 accumulator into integer reg
+      | movzx rax, cx                -- Get low 16 bits in rdx
+      | shr ecx, 16                  -- Get high 16 bits in dx
+      | add ax, cx                   -- Sum into U16 accumulator
+      | adc ax, 0                    -- Add carry
+      | xchg al, ah                  -- Swap to network byte order
+      | add ax, dx                   -- Add 'initial' argument (edx = arg 3)
+      | adc ax, 0                    -- Add carry
+      | xor ax, 0xffff               -- Convert to one's complement
+      | vzeroupper                   -- Avoid potential AVX-SSE transition penalty
+      | ret
+end
+
+local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
+asm_checksum_avx2(Dst)
+local mcode, size = Dst:build()
+local entry = dasm.globals(globals, globalnames)
+
+cksum = ffi.cast("uint16_t(*)(unsigned char *, size_t, uint16_t)", entry.checksum_avx2)
+
+_anchor = mcode
+
+--dasm.dump(mcode, size)
+
+-- See also 'snabbmark checksum' command
+function selftest ()
+   print("selftest: checksum_simd")
+   require("lib.checksum")
+   local pmu = require("lib.pmu")
+   local sz = 10*1024
+   local s = ffi.new("char["..sz.."]")
+   for i = 0, sz do
+      s[i] = i % 256
+   end
+   local n = 1e5
+   -- Simple benchmark vs C intrinsics code.
+   -- Tweak value of 'sz' to see different sizes.
+   if pmu.is_available() then
+      local rand = math.random(256*256)
+      print("ASM")
+      pmu.profile(function () for i = 1, n do cksum(s, sz, rand) end end,
+            {}, {call=n, byte=sz*n, block=sz*n/32})
+      print()
+      print("C")
+      pmu.profile(function () for i = 1, n do C.cksum_avx2(s, sz, rand) end end,
+            {}, {call=n, byte=sz*n, block=sz*n/32})
+   else
+      local _, reason = pmu.is_available()
+      print("Skipping benchmark. PMU not available: " .. reason)
+   end
+   -- Compare values for all input sizes
+   for i = 1, sz do
+      local rand = math.random(256*256)
+      local v = cksum(s, sz-1, rand)
+      local r = require("lib.checksum").ipsum(s, sz-1, rand)
+      if v ~= r then
+         print(i, bit.tohex(v), bit.tohex(r))
+         error("checksum mismatch")
+      end
+   end
+   print("selftest: ok")
+end
+
