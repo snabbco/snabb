@@ -1,13 +1,13 @@
-# Snabb Switch
+# Snabb
 
-Snabb Switch is a simple and fast packet networking toolkit.
+Snabb (formerly "Snabb Switch") is a simple and fast packet networking toolkit.
 
 We are also a grassroots community of programmers and network
 engineers who help each other to build and deploy new network
 elements. We care about practical applications and finding simpler
 ways to do things.
 
-The Snabb Switch community are active in
+The Snabb community are active in
 [applying modern programming techniques](http://blog.ipspace.net/2014/09/snabb-switch-deep-dive-on-software-gone.html),
 [do-it-yourself operator networking](http://blog.ipspace.net/2014/12/l2vpn-over-ipv6-with-snabb-switch-on.html),
 [high-level device drivers](https://github.com/SnabbCo/snabbswitch/blob/master/src/apps/intel/intel10g.lua),
@@ -24,13 +24,13 @@ on.
 
 ## How does it work?
 
-Snabb Switch is written using these main techniques:
+Snabb is written using these main techniques:
 
 - Lua, a high-level programming language that is easy to learn.
 - LuaJIT, a just-in-time compiler that is competitive with C.
 - Ethernet I/O with no kernel overhead ("kernel bypass" mode).
 
-Snabb Switch compiles into a stand-alone executable called
+Snabb compiles into a stand-alone executable called
 `snabb`. This single binary includes multiple applications and runs on
 any modern Linux distribution. (You could think of it as a
 [busybox](http://en.wikipedia.org/wiki/BusyBox#Single_binary) for
@@ -38,7 +38,7 @@ networking.)
 
 ## How is it being used?
 
-The first generation of Snabb Switch applications include:
+The first generation of Snabb applications include:
 
 ### snabbnfv
 
@@ -52,6 +52,17 @@ network.
 
 You can deploy Snabb NFV stand-alone with QEMU or you can integrate it
 with a cloud computing platform such as OpenStack.
+
+### lwAFTR
+
+[Snabb lwAFTR](src/program/lwaftr/) is the internet-facing component of
+"lightweight 4-over-6" (lw4o6), an IPv6 transition technology.  An ISP
+can use lwAFTR functions to provide its users with access to the IPv4
+internet while maintaining a simple IPv6-only internal network.  An ISP
+deploying Snabb lwAFTR can also configure lw4o6 to share IPv4 addresses
+between multiple different customers, ameliorating the IPv4 address
+space exhaustion problem and lowering costs.  See the [lwAFTR
+documentation](src/program/lwaftr/doc/) for more details.
 
 ### VPWS
 
@@ -73,13 +84,13 @@ or even directly on a Device Under Test.
 ### snsh
 
 [snsh](src/program/snsh/) (Snabb Shell) is a tool for interactively
-experimenting with Snabb Switch. It provides direct access to all APIs
+experimenting with Snabb. It provides direct access to all APIs
 using a Lua shell. You can operate snsh either from script files or
 from an interactive shell.
 
 ## How do I get started?
 
-Setting up a Snabb Switch development environment takes around one
+Setting up a Snabb development environment takes around one
 minute:
 
 ```
@@ -103,7 +114,7 @@ $ sudo snabb packetblaster replay capture.pcap 01:00.0
 
 Here are the ways you can get involved:
 
-- Use the Snabb Switch applications in your network.
+- Use the Snabb applications in your network.
 - Join the [snabb-devel mailing list](https://groups.google.com/forum/#!forum/snabb-devel).
 - Send a mail to [introduce yourself](https://groups.google.com/forum/#!searchin/snabb-devel/introduce/snabb-devel/d8t6hGClnQY/flztyLiIGzoJ) to the community (don't be shy!).
 - Create your very own application: [Getting Started](src/doc/getting-started.md).

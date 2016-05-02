@@ -9,7 +9,7 @@ and init scripts to write.
 There is only one file to install: the `snabb` executable.
 
 To create this file you can checkout the
-[snabbswitch](https://github.com/SnabbCo/snabbswitch/) repository and run
+[snabb](https://github.com/snabbco/snabb/) repository and run
 `make` at the top level to produce `src/snabb`. You can install this in a
 standard location such as `/usr/bin/snabb`.
 
@@ -18,17 +18,17 @@ functions as sub-commands (in the style of busybox).
 
 The relevant usages are:
 
-* [`snabb snabbnfv traffic ...`](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/traffic)
+* [`snabb snabbnfv traffic ...`](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/traffic)
   on the compute node does the traffic processing.
 
-* [`snabb snabbnfv neutron-sync-master ...`](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/neutron_sync_master)
+* [`snabb snabbnfv neutron-sync-master ...`](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/neutron_sync_master)
   on the database node(s) makes the Neutron configuration available to
   compute nodes. 
 
-* [`snabb snabbnfv neutron-sync-agent ...`](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/neutron_sync_agent)
+* [`snabb snabbnfv neutron-sync-agent ...`](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/neutron_sync_agent)
   on the compute nodes to poll the master for configuration updates.
 
-* [`snabb snabbnfv neutron2snabb ...`](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/neutron2snabb)
+* [`snabb snabbnfv neutron2snabb ...`](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/neutron2snabb)
   to translate the Neutron database into configuration files for the local traffic processes. This command is called automatically from `neutron-sync-agent`.
 
 The `traffic` command has no external software dependencies. Other

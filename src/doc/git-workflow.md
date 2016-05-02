@@ -1,21 +1,21 @@
 ## Git workflow
 
-How do you engage with the Snabb Switch developer community? The answer depends on what you want to do:
+How do you engage with the Snabb developer community? The answer depends on what you want to do:
 
 - Use the software, ask questions, report bugs.
 - Contribute fixes and improvements.
-- Maintain a part of Snabb Switch by reviewing and merging pull requests.
+- Maintain a part of Snabb by reviewing and merging pull requests.
 - Create a new application to develop together with the community.
 
 ### Using the software
 
-The recommended way to download Snabb Switch is with `git` directly
+The recommended way to download Snabb is with `git` directly
 from from the `master` branch of the `snabbco` repository. This branch
 always contains the latest release.
 
 ```
-$ git checkout https://github.com/snabbco/snabbswitch
-$ cd snabbswitch
+$ git checkout https://github.com/snabbco/snabb
+$ cd snabb
 $ make -j
 ```
 
@@ -45,11 +45,11 @@ $ make -j
 
 ### Contributing fixes and improvements
 
-The recommended way to contribute improvements to Snabb Switch is with Github *pull requests*. You can do this by following the Github [Using pull requests](https://help.github.com/articles/using-pull-requests/) instructions. Here is a brief summary.
+The recommended way to contribute improvements to Snabb is with Github *pull requests*. You can do this by following the Github [Using pull requests](https://help.github.com/articles/using-pull-requests/) instructions. Here is a brief summary.
 
-1. "Fork" your own copy of the [`snabbco/snabbswitch`](https://github.com/snabbco/snabbswitch) repository.
+1. "Fork" your own copy of the [`snabbco/snabb`](https://github.com/snabbco/snabb) repository.
 2. Push your proposed change to a branch on your repository.
-3. Open a pull request from your branch. Choose the `master` branch of the `snabbco/snabbswitch` repository as the target branch (this should be the default choice.)
+3. Open a pull request from your branch. Choose the `master` branch of the `snabbco/snabb` repository as the target branch (this should be the default choice.)
 4. Expect that within a few days a qualified maintainer will become the *Assignee* of your pull request and work with you to get the change merged. The maintainer may ask you some questions and even require some changes. Once they are satisfied they will merge the change onto their own branch and apply the label `merged` on the pull request. Then your work is done and the change is in the pipeline leading to release on the master branch.
 
 Here are some tips for making your contribution smoothly:
@@ -61,14 +61,25 @@ Here are some tips for making your contribution smoothly:
 
 ### Becoming a maintainer
 
-Snabb Switch maintainers are the people who review and merge the pull
+Snabb maintainers are the people who review and merge the pull
 requests on Github. Each maintainer takes care of one or more specific
-part of Snabb Switch. These parts are called *subsystems*.
+part of Snabb. These parts are called *subsystems*.
 
 Each subsystem has a dedicated branch and these branches are organized
 as a tree:
 
-![Branches](.images/Branches.png)
+    DIAGRAM: Branches
+                                       +--lisper
+                       +--max next<----+--documentation<--pdf manual
+                       |
+           fixes       |
+             |         |
+    master<--+--next<--+--kbara next<--+--nix
+                       |               +--mellanox
+                       |
+                       |
+                       +--wingo next<--+--lwaftr
+                                       +--multiproc
 
 Pull requests are merged onto the most specifically relevant branch to
 begin with. Later, whole child branches are merged "upstream" onto
@@ -85,7 +96,7 @@ maintainer to improve some aspect of the change before release.
 
 #### Registering a subsystem branch
 
-So you are interested in becoming a Snabb Switch maintainer. Great!
+So you are interested in becoming a Snabb maintainer. Great!
 The other maintainers are looking forward to working with you and will
 be more than happy to help you learn the ropes. You can learn
 everything you need to know on the job: no special qualifications are
@@ -107,7 +118,7 @@ will be the vehicle for talking with the other maintainers about where
 to fit your new branch into the tree.
 
 The moment this pull request is merged onto the `next` branch then you
-are officially a Snabb Switch maintainer. (Congratulations in advance!)
+are officially a Snabb maintainer. (Congratulations in advance!)
 
 #### Being the assigned maintainer for pull requests
 
@@ -118,7 +129,7 @@ changes and you decide when to accept them from the contributor.
 
 Here is the basic criteria for merging a pull request:
 
-- Does the change improve Snabb Switch? It does not have to be perfect
+- Does the change improve Snabb? It does not have to be perfect
   but it should clearly have a net-positive impact.
 - Will the next-hop upstream maintainer agree? If not then getting
   your branch merged upstream may require you to make some
