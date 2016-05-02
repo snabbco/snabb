@@ -1,0 +1,19 @@
+#!../../snabb snsh
+
+local args = main.parameters
+local sfx = args[1]
+local base = "results." .. sfx .. "."
+local lib = require("core.lib")
+local total = 0
+for i,v in pairs(lib.files_in_directory(".")) do
+	if string.sub(v,1,base:len())==base then
+		total = total + tonumber(lib.firstline(v))
+	end
+end
+if args[2] == "eq" and tonumber(args[3]) == total then
+	os.exit(0)
+elseif args[2] == "gt" and total > tonumber(args[3]) then
+	os.exit(0)
+else
+	os.exit(-1)
+end

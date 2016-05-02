@@ -14,7 +14,14 @@ config.app(c, "nic", intel.Intel1g, {pciaddr=args[2], rxq = tonumber(args[3])})
 config.app(c, "sink", basic.Sink)
 config.link(c, "nic.output -> sink.input")
 engine.configure(c)
-engine.main({duration = tonumber(args[1])})
+local lastpkts = 0
+local penpkts = 0
+for i=1,args[1] do
+  engine.main({duration = 1})
+  penpkts = lastpkts
+  lastpkts = counter.read(engine.app_table.sink.input.input.stats.txpackets)
+end
 local slink = counter.read(engine.app_table.sink.input.input.stats.txpackets)
-lib.writefile("results." .. tostring(S.getpid()), tostring(tonumber(slink)))
+lib.writefile("results.pkts." .. tostring(S.getpid()), tostring(tonumber(slink)))
+lib.writefile("results.pps." .. tostring(S.getpid()), tostring(tonumber(lastpkts - penpkts)))
 os.exit(0)

@@ -397,6 +397,9 @@ function Intel1g:stats ()
 CRCERRS   0x04000 - RC CRC Error Count
 MPC       0x04010 - RC Missed Packet Count
 RNBC      0x040A0 - RC Receive No Buffers Count
+GPTC      0x04080 - RC Good Packets Transmitted Count
+GPRC      0x04074 - RC Good Packets Received Count
+GORC      0x04088 - RC64 Good Octets Received Count
 ]]
   local r = {}
   register.define(stats_registers, r, self.base)

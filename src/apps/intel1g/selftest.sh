@@ -11,4 +11,5 @@ for i in $TESTS; do
       ESTATUS=-1
    fi
 done
+rm -f results.*
 exit $ESTATUS
