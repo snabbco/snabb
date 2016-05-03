@@ -118,10 +118,9 @@ function run(args)
    engine.configure(c)
 
    local function adjust_rates(bit_rate)
-      local byte_rate = bit_rate / 8
       for _,stream in ipairs(streams) do
          local app = engine.app_table[stream.repeater_id]
-         app:set_rate(byte_rate)
+         app:set_rate(bit_rate)
       end
    end
 

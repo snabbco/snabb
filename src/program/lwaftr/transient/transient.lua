@@ -89,10 +89,10 @@ end
 function adjust_rate(opts, streams)
    local count = math.ceil(opts.bitrate / opts.step)
    return function()
-      local byte_rate = (opts.bitrate - math.abs(count) * opts.step) / 8
+      local bitrate = opts.bitrate - math.abs(count) * opts.step
       for _,stream in ipairs(streams) do
          local app = engine.app_table[stream.repeater_id]
-         app:set_rate(byte_rate)
+         app:set_rate(bitrate)
       end
       count = count - 1
    end
