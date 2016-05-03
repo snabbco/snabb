@@ -33,7 +33,8 @@ function init {
 function clean { rm -rf "$tmpdir"; }
 
 function fetch_pull_requests {
-    curl "https://api.github.com/repos/$REPO/pulls" > "$tmpdir/pulls"
+    curl "https://api.github.com/repos/$REPO/pulls?per_page=100" \
+        > "$tmpdir/pulls"
 }
 
 function pull_request_ids { "$JQ" ".[].number" "$tmpdir/pulls"; }
