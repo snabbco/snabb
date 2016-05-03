@@ -43,7 +43,8 @@ function ingress_drop_monitor:sample()
    for i = 1, #app_array do
       local app = app_array[i]
       if app.ingress_packet_drops and not app.dead then
-         sum[0] = sum[0] + app:ingress_packet_drops()
+         local status, value = with_restart(app, app.ingress_packet_drops)
+         if status then sum[0] = sum[0] + value end
       end
    end
 end
@@ -101,13 +102,16 @@ end
 local function with_restart (app, method)
    if use_restart then
       -- Run fn in protected mode using pcall.
-      local status, err = pcall(method, app)
+      local status, result_or_error = pcall(method, app)
 
       -- If pcall caught an error mark app as "dead" (record time and cause
       -- of death).
-      if not status then app.dead = { error = err, time = now() } end
+      if not status then
+         app.dead = { error = result_or_error, time = now() }
+      end
+      return status, result_or_error
    else
-      method(app)
+      return true, method(app)
    end
 end
 
