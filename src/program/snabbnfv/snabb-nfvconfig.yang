@@ -1,0 +1,136 @@
+module snabb-nfvconfig {
+  namespace "http://snabb.co/nfvconfig";
+  prefix snabb-nfvconfig;
+
+  import ietf-yang-types { prefix yang; }
+  import ietf-inet-types { prefix inet; }
+
+  description
+    "This module describes the configuration of SnabbNFV.";
+
+
+  typedef pcap-filter {
+    type string;
+    description "A pcap-filter(7) expression.";
+  }
+
+  typedef gbps {
+    type decimal64 {
+      fraction-digits 4;
+      range "0..max";
+    }
+
+    description "Gigabytes per second.";
+  }
+
+  identity tunnel-type {
+    description "Base identity from which all tunnel types are derived.";
+  }
+
+  identity L2TPv3 {
+    base "tunnel-type";
+    description "Layer 2 Tunneling Protocol Version 3";
+  }
+
+  typedef hexstring8 {
+    type "string" {
+      pattern "[0-9a-fA-F]{16}";
+    }
+    description "Eight bytes encoded as a hexadecimal string.";
+  }
+
+  list port {
+    key port_id;
+    description
+      "An entry containing configuration information applicable to a particular
+    virtual port.";
+
+    leaf port_id {
+      mandatory true;
+      type string;
+      description "The unique identifier of the port.";
+    }
+
+    leaf mac_address {
+      mandatory true;
+      type yang:mac-address;
+      description "MAC address of the port.";
+    }
+
+    leaf vlan {
+      type uint16 {
+        range "0..4095";
+      }
+      description "";
+    }
+
+    leaf ingress_filter {
+      type pcap-filter;
+      description "Ingress traffic filtering rules.";
+    }
+
+    leaf egress_filter {
+      type pcap-filter;
+      description "Egress traffic filtering rules.";
+    }
+
+    container tunnel {
+      description "L2TPv3 tunnel configuration.";
+
+      leaf type {
+        mandatory true;
+        type identityref {
+          base "tunnel-type";
+        }
+        description
+          "Tunnel type identifier. Only \"L2TPv3\" is currently allowed.";
+      }
+
+      leaf local_cookie {
+        mandatory true;
+        type hexstring8;
+        description "Local cookie";
+      }
+
+      leaf remote_cookie {
+        mandatory true;
+        type hexstring8;
+        description "Remote cookie";
+      }
+
+      leaf next_hop {
+        type yang:mac-address;
+        description "Gateway MAC address.";
+      }
+
+      leaf local_ip {
+        mandatory true;
+        type inet:ipv6-address-no-zone;
+        description "Local IPv6 address.";
+      }
+
+      leaf remote_ip {
+        mandatory true;
+        type inet:ipv6-address-no-zone;
+        description "Remote IPv6 address.";
+      }
+
+      leaf session {
+        type int32;
+        description
+          "The session field of the L2TPv3 header will be overwritten with this
+        value.";
+      }
+    }
+
+    leaf rx_police_gbps {
+      type gbps;
+      description "Allowed input rate in Gigabytes per second.";
+    }
+
+    leaf tx_police_gbps {
+      type gbps;
+      description "Allowed output rate in Gigabytes per second.";
+    }
+  }
+}
