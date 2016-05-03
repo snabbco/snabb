@@ -152,6 +152,11 @@ function run(args)
    end
 
    local function print_counter_diff(before, after)
+      local function bitrate(diff)
+         -- 7 bytes preamble, 1 start-of-frame, 4 CRC, 12 interpacket gap.
+         local overhead = 7 + 1 + 4 + 12
+         return (diff.txbytes + diff.txpackets * overhead) * 8 / opts.duration
+      end
       for _, stream in ipairs(streams) do
          print(string.format('  %s:', stream.tx_name))
          local nic_id = stream.nic_tx_id
@@ -160,10 +165,10 @@ function run(args)
          local rx = diff_counters(nic_before.rx, nic_after.rx)
          print(string.format('    TX %d packets (%f MPPS), %d bytes (%f Gbps)',
                              tx.txpackets, tx.txpackets / opts.duration / 1e6,
-                             tx.txbytes, tx.txbytes / opts.duration / 1e9 * 8))
+                             tx.txbytes, bitrate(tx) / 1e9))
          print(string.format('    RX %d packets (%f MPPS), %d bytes (%f Gbps)',
                              rx.txpackets, rx.txpackets / opts.duration / 1e6,
-                             rx.txbytes, rx.txbytes / opts.duration / 1e9 * 8))
+                             rx.txbytes, bitrate(rx) / 1e9))
          print(string.format('    Loss: %d packets (%f%%)',
                              tx.txpackets - rx.txpackets,
                              (tx.txpackets - rx.txpackets) / tx.txpackets * 100))
