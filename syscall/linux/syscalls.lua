@@ -787,9 +787,9 @@ if C.bpf then
     if not version then
       -- We have no better way to extract current kernel hex-string other
       -- than parsing headers, compiling a helper function or reading /proc
-      local ver_str, count = S.sysctl('kernel.version'):match('%d.%d.%d'), 2
+      local ver_str, count = S.sysctl('kernel.osrelease'):match('%d+.%d+.%d+'), 2
       version = 0
-      for i in ver_str:gmatch('%d') do -- Convert 'X.Y.Z' to 0xXXYYZZ
+      for i in ver_str:gmatch('%d+') do -- Convert 'X.Y.Z' to 0xXXYYZZ
         version = bit.bor(version, bit.lshift(tonumber(i), 8*count))
         count = count - 1
       end
