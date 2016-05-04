@@ -83,7 +83,7 @@ module snabb-nfvconfig {
           base "tunnel-type";
         }
         description
-          "Tunnel type identifier. Only \"L2TPv3\" is currently allowed.";
+          "Tunnel type identifier.";
       }
 
       leaf local_cookie {
