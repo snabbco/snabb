@@ -20,7 +20,7 @@ module snabb-nfvconfig {
       range "0..max";
     }
 
-    description "Gigabytes per second.";
+    description "Gigabits per second.";
   }
 
   identity tunnel-type {
@@ -125,12 +125,12 @@ module snabb-nfvconfig {
 
     leaf rx_police_gbps {
       type gbps;
-      description "Allowed input rate in Gigabytes per second.";
+      description "Allowed input rate in Gigabits per second.";
     }
 
     leaf tx_police_gbps {
       type gbps;
-      description "Allowed output rate in Gigabytes per second.";
+      description "Allowed output rate in Gigabits per second.";
     }
   }
 }
