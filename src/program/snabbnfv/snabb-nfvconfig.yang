@@ -8,6 +8,10 @@ module snabb-nfvconfig {
   description
     "This module describes the configuration of SnabbNFV.";
 
+  revision "2016-05-04" {
+    description
+     "Initial version that reflects Snabb Switch 2016.04 “Uvilla”.";
+  }
 
   typedef pcap-filter {
     type string;
