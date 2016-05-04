@@ -99,7 +99,7 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-local function with_restart (app, method)
+function with_restart (app, method)
    if use_restart then
       -- Run fn in protected mode using pcall.
       local status, result_or_error = pcall(method, app)
