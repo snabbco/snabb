@@ -367,7 +367,14 @@ accomodate *length* additional bytes.
 
 — Function **packet.shiftleft** *packet*, *length*
 
-Truncates *packet* by *length* bytes from the front.
+Truncates *packet* by *length* bytes from the front. *Length* must be less than
+or equal to `length` of *packet*.
+
+— Function **packet.shiftright** *packet*, *length*
+
+Move *packet* payload to the right by *length* bytes, growing *packet* by
+*length*. The sum of *length* and `length` of *packet* must be less than or
+equal to `packet.max_payload`.
 
 — Function **packet.from_pointer** *pointer*, *length*
 
