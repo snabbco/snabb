@@ -115,7 +115,7 @@ function launch_qemu {
         -device virtio-net-pci,netdev=net0,mac=$(mac $qemu_n),mq=$qemu_mq,vectors=$qemu_vectors \
         -M pc -smp $qemu_smp -cpu host --enable-kvm \
         -serial telnet:localhost:$3,server,nowait \
-        -drive if=virtio,file=$(qemu_image $5) \
+        -drive if=virtio,format=raw,file=$(qemu_image $5) \
         -nographic" \
         $(qemu_log)
     qemu_n=$(expr $qemu_n + 1)
