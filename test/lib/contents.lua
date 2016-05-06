@@ -147,5 +147,9 @@ do --- bit +bit
 end
 
 do --- ffi +ffi
-  check(require"ffi", "C:abi:alignof:arch:cast:cdef:copy:errno:fill:gc:istype:load:metatype:new:offsetof:os:sizeof:string:typeinfo:typeof")
+  check(require"ffi", "C:abi:alignof:arch:cast:cdef:copy:errno:fill:gc:istype:load:metatype:new:offsetof:os:sizeof:string:typeof", "typeinfo")
+end
+
+do --- ffi 2.1 +fii +luajit>=2.1
+  assert(require"ffi".typeinfo)
 end

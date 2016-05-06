@@ -76,6 +76,6 @@ do --- sqrt exp log trig
   for i=1,100 do local a=23; y=math.tan(a) end assert(y==math.tan(23))
 end
 
-do --- exp
+do --- exp -luajit==2.0
   assert((10^-2 - 0.01) == 0)
 end

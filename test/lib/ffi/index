@@ -1,4 +1,4 @@
-bit64.lua +bit
+bit64.lua +luajit>=2.1
 copy_fill.lua
 err.lua
 istype.lua
