@@ -36,4 +36,7 @@ stdenv.mkDerivation rec {
     mkdir -p $out/bin
     cp src/snabb $out/bin
   '';
+
+  enableParallelBuilding = true;
+
 }
