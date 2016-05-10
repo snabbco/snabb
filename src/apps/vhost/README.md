@@ -13,7 +13,12 @@ by *QEMU virtual machines*. When connected via a UNIX socket, packets can
 be sent to the virtual machine by transmitting them on the `rx` port and
 packets send by the virtual machine will arrive on the `tx` port.
 
-![VhostUser](.images/VhostUser.png)
+    DIAGRAM: VhostUser
+           +-----------+
+           |           |
+    rx --->* VhostUser *----> tx
+           |           |
+           +-----------+
 
 ## Configuration
 

@@ -28,7 +28,7 @@ Ethernet ports.
 ## Compute node Kernel settings
  
 IOMMU must be disabled on the server as documented under [Compute Node
-Requirements](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable
+Requirements](https://github.com/snabbco/snabb/blob/master/src/program/snabbnfv/doc/compute-node-requirements.md). Disable
 intel_iommu and set hugepages for 24GB (each page has 2MB -> 12288
 pages). Allocating persistent huge pages on the kernel boot command line
 is the most reliable method as memory has not yet become fragmented.
@@ -100,7 +100,7 @@ $ sudo apt-get --no-install-recommends -y build-dep qemu
 
 We use the `v2.1.0-vhostuser` branch from the QEMU fork on SnabbCo to
 reduce the risk of running in any incompatibilities with current
-versions. This branch is maintained by Snabb Switch developers.
+versions. This branch is maintained by Snabb developers.
 
 ```
 $ git clone -b v2.1.0-vhostuser --depth 50 https://github.com/SnabbCo/qemu
@@ -125,11 +125,11 @@ You should now have QEMU installed on your system:
 QEMU emulator version 2.1.0, Copyright (c) 2003-2008 Fabrice Bellard
 ```
 	
-## Download and build Snabb Switch
+## Download and build Snabb
 
 ```
-$ git clone https://github.com/SnabbCo/snabbswitch.git
-$ cd snabbswitch; make
+$ git clone https://github.com/SnabbCo/snabb.git
+$ cd snabb; make
 $ make -j
 ```
  
@@ -210,8 +210,8 @@ specified 10GbE ports (PCI address) from the Linux kernel, but will not
 "return" them. E.g. `ifconfig -a` will not show these ports anymore.
 
 ```
-$ cd ~/snabbswitch/src
-$ sudo SNABB_TEST_INTEL10G_PCIDEVA="0000:04:00.0" SNABB_TEST_INTEL10G_PCIDEVB="0000:04:00.1" ./snabb snsh -t apps.intel.intel_app
+$ cd ~/snabb/src
+$ sudo SNABB_PCI_INTEL0="0000:04:00.0" SNABB_PCI_INTEL1="0000:04:00.1" ./snabb snsh -t apps.intel.intel_app
 selftest: intel_app
 100 VF initializations:
 
@@ -270,7 +270,7 @@ p2p1      Link encap:Ethernet  HWaddr 0c:c4:7a:1f:7e:60
 
 ## Create and launch two VMs
 
-Now that Snabb Switch can talk to both 10GbE ports successfully, lets
+Now that Snabb can talk to both 10GbE ports successfully, lets
 build and launch 2 test VMs and connect each of them to one of the 10GbE
 port. First, we have to build an empty disk and then download and install
 Ubuntu in it.
@@ -306,11 +306,11 @@ $ cp ubuntu.qcow2 ubuntu1.qcow2
 $ cp ubuntu.qcow2 ubuntu2.qcow2
 ```
 	
-Before launching the VMs, we need to start Snabb Switch acting as a
+Before launching the VMs, we need to start Snabb acting as a
 virtio interface for the VMs. Snabb provides the `snabnfv traffic`
 program for this, which is built into the `snabb` binary that we built
 earlier. Source and documentation can be found at
-[src/program/snabbnfv](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv).
+[src/program/snabbnfv](https://github.com/SnabbCo/snabb/tree/master/src/program/snabbnfv).
 
 One `snabbnfv traffic` process is required per physical 10G port. A
 configuration file specifies which packets are forwarded to the VM. You
@@ -353,14 +353,14 @@ but for basic connectivity testing you can omit this.
 Port 1:
 
 ```
-$ sudo ./snabbswitch/src/snabb snabbnfv traffic -k 10 -D 0 \
+$ sudo ./snabb/src/snabb snabbnfv traffic -k 10 -D 0 \
   0000:04:00.0 ./port1.cfg ./vhost-sockets/vm1.socket
 ```
 
 Port 2:
 
 ```
-$ sudo ./snabbswitch/src/snabb snabbnfv traffic -k 10 -D 0 \
+$ sudo ./snabb/src/snabb snabbnfv traffic -k 10 -D 0 \
   0000:04:00.1 ./port2.cfg ./vhost-sockets/vm2.socket
 ```
 
@@ -467,12 +467,12 @@ with upstream QEMU versions.
 
 ## Next Steps
 
-Here are some suggested steps to continue learning about Snabb Switch.
+Here are some suggested steps to continue learning about Snabb.
 
 1. Read more on snabbnfv
-[README.md](https://github.com/SnabbCo/snabbswitch/blob/master/src/program/snabbnfv/README.md) and the other documents in the doc folder [https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/doc)
+[README.md](https://github.com/snabbco/snabb/blob/master/src/program/snabbnfv/README.md) and the other documents in the doc folder [https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/doc](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/doc)
 2. Before running any performance tests, familiarize yourself with
-numactl and how it affects Snabb Switch.
+numactl and how it affects Snabb.
 
 Do not hesitate to contact the Snabb community on the
 [snabb-devel@googlegroups.com](https://groups.google.com/forum/#!forum/snabb-devel)

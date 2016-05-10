@@ -57,7 +57,7 @@ function new (shmpath,  entries, size_stringtable)
    local size_entries = entries * ffi.sizeof("struct timeline_entry")
    local size = size_header + size_entries + size_stringtable
    -- Allocate one shm object with memory for all data structures
-   local memory      = shm.map(shmpath, ffi.typeof("char["..size.."]"))
+   local memory      = shm.create(shmpath, ffi.typeof("char["..size.."]"))
    local header      = ffi.cast("struct timeline_header *", memory)
    local ring        = ffi.cast("struct timeline_entry *", memory + size_header)
    local stringtable = ffi.cast("char*", memory + size_header + size_entries)

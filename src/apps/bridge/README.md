@@ -11,7 +11,16 @@ group are never forwarded to any output port belonging to the same
 split-horizon group. There are two `bridge` implementations available:
 `apps.bridge.flooding` and apps.bridge.learning`.
 
-![bridge](.images/bridge.png)
+    DIAGRAM: bridge
+               +----------+
+    port1 ---->*          *----> port1
+               |          |
+    port2 ---->*          *----> port2
+               |  bridge  |
+    ...   ---->*          *----> ...
+               |          |
+    portN ---->*          *----> portN
+               +----------+
 
 ## Configuration
 
