@@ -9,7 +9,12 @@ dispatched between apps based on destination MAC address and VLAN.
 Packets taken from the `rx` port are transmitted onto the network.
 Packets received from the network are put on the `tx` port.
 
-![Solarflare](.images/Solarflare.png)
+    DIAGRAM: Solarflare
+              +------------+
+              |            |
+      rx ---->* Solarflare *----> tx
+              |            |
+              +------------+
 
 The `Solarflare` app requires [OpenOnload](http://www.openonload.org/)
 version *201502* to be installed and the `sfc` module to be loaded.
