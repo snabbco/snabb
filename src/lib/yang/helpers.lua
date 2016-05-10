@@ -1,25 +1,6 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
-function split(delimiter, text)
-   -- This is taken from syslog.
-   if delimiter == "" then return {text} end
-   if #text == 0 then return {} end
-   local list = {}
-   local pos = 1
-   while true do
-      local first, last = text:find(delimiter, pos)
-      if first then
-         list[#list + 1] = text:sub(pos, first - 1)
-         pos = last + 1
-      else
-         list[#list + 1] = text:sub(pos)
-         break
-      end
-   end
-   return list
-end
-
 function extract_nodes(schema)
    local nodes = {}
    for _, v in pairs(schema) do
@@ -39,7 +20,6 @@ end
 Container = {}
 function Container.new(base, path)
    local ret = {root={}, base=base, path=path}
-   local meta = {}
    return setmetatable(ret, {
       __newindex = function (t, k, v)
          -- Validate the value prior to setting it.
@@ -66,14 +46,4 @@ function Container.new(base, path)
          end
       end
    })
-end
-
-function selftest()
-   local result = split("%.%.", "0..9")
-   assert(result[1] == "0")
-   assert(result[2] == "9")
-
-   local result = split("%-", "hello-lua")
-   assert(result[1] == "hello")
-   assert(result[2] == "lua")
 end

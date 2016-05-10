@@ -5,11 +5,11 @@
 -- To use this you should use the helper functions:
 --    - load_schema
 --    - load_schema_file
--- The former takes in a yang string and builds a Base table, similiaraly the
+-- The former takes in a yang string and builds a Base table, similarly the
 -- load_schema_file takes a schema file and builds a Base table from that.
 --
 -- Once you have the base file you can inspect the schema, data and set values.
--- Examaple:
+-- Example:
 --    local base = load_schema[[
 --      module example {
 --        namespace "exampleinc:example";
@@ -38,12 +38,13 @@ module(..., package.seeall)
 local schema = require("lib.yang.schema")
 local helpers = require("lib.yang.helpers")
 local parser = require("lib.yang.parser")
+local Container = helpers.Container
 
 local Base = {}
 function Base.new(filename)
-   ret = {schema={}, filename=filename}
-   self = setmetatable(ret, {__index=Base, path_cache={}})
-   self.data = helpers.Container.new(self, "")
+   local ret = {schema={}, filename=filename}
+   local self = setmetatable(ret, {__index=Base, path_cache={}})
+   self.data = Container.new(self, "")
    return self
 end
 
@@ -65,7 +66,7 @@ function Base:load(src)
 
    -- TODO: don't use rawget here.
    local data_root = rawget(self.data, "root")
-   data_root[mod.name] = helpers.Container.new(self, mod.name)
+   data_root[mod.name] = Container.new(self, mod.name)
    return self.schema
 end
 
@@ -98,7 +99,7 @@ function Base:produce_data_tree(schema_node, data_node)
    if schema_node.containers then
       for name, container in pairs(schema_node.containers) do
          local new_path = path.."."..name
-         local new_node = helpers.Container.new(self, new_path)
+         local new_node = Container.new(self, new_path)
 
          -- TODO: change me, we shouldn't be using rawget here!
          local root = rawget(data_node, "root")

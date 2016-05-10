@@ -12,27 +12,26 @@ module(..., package.seeall)
 
 local validation = require("lib.yang.validation")
 local helpers = require("lib.yang.helpers")
+local h = require("syscall.helpers")
 
 -- Use ffi types because they will validate that numeric values are being
 -- provided. The downside is that integer overflow could occur on these. This
 -- route has been selected as validation will be faster than attempting to
 -- validate in Lua.
 local ffi = require("ffi")
-ffi.cdef[[
-typedef struct { int8_t value; } int8box;
-typedef struct { int16_t value; } int16box;
-typedef struct { int32_t value; } int32box;
-typedef struct { int64_t value; } int64box;
-typedef struct { uint8_t value; } uint8box;
-typedef struct { uint16_t value; } uint16box;
-typedef struct { uint32_t value; } uint32box;
-typedef struct { uint64_t value; } uint64box;
-typedef struct { double value; } decimal64box;
-]]
+local int8box = ffi.typeof("struct { int8_t value; }")
+local int16box = ffi.typeof("struct { int16_t value; }")
+local int32box = ffi.typeof("struct { int32_t value; }")
+local int64box = ffi.typeof("struct { int64_t value; }")
+local uint8box = ffi.typeof("struct { uint8_t value; }")
+local uint16box = ffi.typeof("struct { uint16_t value; }")
+local uint32box = ffi.typeof("struct { uint32_t value; }")
+local uint64box = ffi.typeof("struct { uint64_t value; }")
+local decimal64box = ffi.typeof("struct { double value; }")
 
 local Leaf = {}
 function Leaf.new(base, path, src)
-   self = setmetatable({}, {__index=Leaf, path=path})
+   local self = setmetatable({}, {__index=Leaf, path=path})
 
    -- Parse the schema to find the metadata
    self:validate_schema(src)
@@ -42,7 +41,7 @@ function Leaf.new(base, path, src)
    if src.type[1].statements then
       local typeinfo = src.type[1].statements
       if typeinfo.range then
-         local range = helpers.split("%.%.", typeinfo.range[1].argument)
+         local range = h.split("%.%.", typeinfo.range[1].argument)
          self.range = {tonumber(range[1]), tonumber(range[2])}
       end
    end
@@ -101,23 +100,23 @@ function Leaf:provide_box()
    local box
 
    if self.type == "int8" then
-      box = ffi.new("int8box")
+      box = int8box()
    elseif self.type == "int16" then
-      box = ffi.new("int16box")
+      box = int16box()
    elseif self.type == "int32" then
-      box = ffi.new("int32box")
+      box = int32box()
    elseif self.type == "int64" then
-      box = ffi.new("int64box")
+      box = int64box()
    elseif self.type == "uint8" then
-      box = ffi.new("uint8box")
+      box = uint8box()
    elseif self.type == "uint16" then
-      box = ffi.new("uint16box")
+      box = uint16box()
    elseif self.type == "uint32" then
-      box = ffi.new("uint32box")
+      box = uint32box()
    elseif self.type == "uint64" then
-      box = ffi.new("uint64box")
+      box = uint64box()
    elseif self.type == "decimal64" then
-      box = ffi.new("decimal64box")
+      box = decimal64box()
    elseif self.type == "string" then
       box = {}
    elseif self.type == "boolean" then
@@ -262,7 +261,7 @@ function Revision.new(base, path, src)
       self.description = src.description[1].argument
    end
 
-   if src.description then
+   if src.reference then
       self.reference = src.reference[1].argument
    end
    return self
@@ -328,12 +327,6 @@ function Module.new(base, name, src)
       for _, f in pairs(src.feature) do
          local path = ret.name.."."..f.argument
          self.features[f.argument] = Feature.new(base, path, f.statements)
-      end
-   end
-
-   -- Leaf statements
-   if src.leaf then
-      for _, leaf in pairs(src.leaf) do
       end
    end
 
