@@ -68,9 +68,14 @@ The engine stops the traffic processing loop.]])
 
 -- Breath steps
 
-local event_breath_start = define_event('trace', [[start $breath
+local event_breath_start = define_event('info', [[start $breath ($freedpackets $freedbits)
 The engine starts an iteration of the packet-processing event loop (a
-"breath".)]])
+"breath".)
+
+The 'freedpackets' and 'freedbits' arguments give the total number of
+packets (and bits of packet data) that have been freed during
+processing. This is an approximation of the total amount of data that
+has been processed.]])
 
 local event_breath_pulled = define_event('trace', [[pulled input packets
 The engine has "pulled" new packets into the event loop for processing.]])
@@ -352,7 +357,7 @@ function pace_breathing ()
 end
 
 function breathe ()
-   event_breath_start(counter.read(breaths))
+   event_breath_start(counter.read(breaths), counter.read(frees), counter.read(freebits))
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
@@ -396,6 +401,14 @@ function breathe ()
    if counter.read(breaths) % 100 == 0 then
       counter.commit()
       event_commit_counters()
+   end
+   -- Sample events with dynamic priorities.
+   -- Lower priorities are enabled 1/10th as often as the one above.
+   local r = math.random()
+   if     r < 0.001 then tl.priority(timeline, 'packet')
+   elseif r < 0.010 then tl.priority(timeline, 'app')
+   elseif r < 0.100 then tl.priority(timeline, 'trace')
+   else                  tl.priority(timeline, 'info')
    end
 end
 
