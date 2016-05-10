@@ -277,6 +277,7 @@ end
 function parse_file(filename)
    local file_in = assert(io.open(filename))
    local contents = file_in:read("*a")
+   file_in:close()
    return parse_string(contents, filename)
 end
 
@@ -296,21 +297,21 @@ function selftest()
 
    local function pp(x)
       if type(x) == "table" then
-	 io.write("{")
-	 local first = true
-	 for k,v in pairs(x) do
-	    if not first then
-	       io.write(", ")
-	    end
-	    io.write(k.."=")
-	    pp(v)
-	    first = false
-	 end
-	 io.write("}")
+         io.write("{")
+         local first = true
+         for k,v in pairs(x) do
+            if not first then
+               io.write(", ")
+            end
+            io.write(k.."=")
+            pp(v)
+            first = false
+         end
+         io.write("}")
       elseif type(x) == "string" then
-	 io.write(x)
+         io.write(x)
       else
-	 error("Unsupported type")
+         error("Unsupported type")
       end
    end
 
@@ -318,9 +319,9 @@ function selftest()
    local function test_module(src, exp)
       local result = parse_string(src)
       if not lib.equal(result, exp) then
-	 pp(result)
-	 pp(exp)
-	 error("no equal")
+         pp(result)
+         pp(exp)
+         error("no equal")
       end
    end
 
