@@ -68,14 +68,14 @@ The engine stops the traffic processing loop.]])
 
 -- Breath steps
 
-local event_breath_start = define_event('info', [[start $breath ($freedpackets $freedbits)
+local event_breath_start = define_event('info', [[start $breath: total $packets $bytes $etherbits
 The engine starts an iteration of the packet-processing event loop (a
 "breath".)
 
-The 'freedpackets' and 'freedbits' arguments give the total number of
-packets (and bits of packet data) that have been freed during
-processing. This is an approximation of the total amount of data that
-has been processed.]])
+The total count of packets, bytes, and bits (including layer-1
+ethernet overhead) that the engine has processed are included. These
+can be used to track the rate of traffic processing.
+]])
 
 local event_breath_pulled = define_event('trace', [[pulled input packets
 The engine has "pulled" new packets into the event loop for processing.]])
@@ -83,8 +83,16 @@ The engine has "pulled" new packets into the event loop for processing.]])
 local event_breath_pushed = define_event('trace', [[pushed output packets
 The engine has "pushed" packets one step through the processing network.]])
 
-local event_breath_end = define_event('trace', [[end $breath
-The engine completes an iteration of the event loop (a "breath.")]])
+local event_breath_end = define_event('info', [[end $breath: processed $packets $bpp
+The engine completes an iteration of the event loop (a "breath.")
+
+'packets' gives the number of packets that were processed during the breath.
+'bpp' gives the average number of bytes per packet.
+
+Note: 'packets' is an internal measure of how many packets were
+deallocated (freed) during processing. This does not necessarily
+correspond directly to ingress or egress packets on a given interface.
+]])
 
 local event_breath_initialized = define_event('trace', [[initialized breath
 The engine has completed initialization for the breath: synchronized
@@ -357,7 +365,10 @@ function pace_breathing ()
 end
 
 function breathe ()
-   event_breath_start(counter.read(breaths), counter.read(frees), counter.read(freebits))
+   local freed_packets0 = counter.read(frees)
+   local freed_bytes0 = counter.read(freebytes)
+   event_breath_start(counter.read(breaths), freed_packets0, freed_bytes0,
+                      counter.read(freebits))
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
@@ -395,7 +406,11 @@ function breathe ()
       event_breath_pushed()
       firstloop = false
    until not progress  -- Stop after no link had new data
-   event_breath_end(counter.read(breaths))
+   local freed
+   local freed_packets = counter.read(frees) - freed_packets0
+   local freed_bytes = (counter.read(freebytes) - freed_bytes0)
+   local freed_bytes_per_packet = freed_bytes / math.max(freed_packets, 1)
+   event_breath_end(counter.read(breaths), freed_packets, freed_bytes_per_packet)
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then
@@ -405,10 +420,11 @@ function breathe ()
    -- Sample events with dynamic priorities.
    -- Lower priorities are enabled 1/10th as often as the one above.
    local r = math.random()
-   if     r < 0.001 then tl.priority(timeline, 'packet')
-   elseif r < 0.010 then tl.priority(timeline, 'app')
-   elseif r < 0.100 then tl.priority(timeline, 'trace')
-   else                  tl.priority(timeline, 'info')
+   if     r < 0.00001 then tl.priority(timeline, 'packet')
+   elseif r < 0.00010 then tl.priority(timeline, 'app')
+   elseif r < 0.00100 then tl.priority(timeline, 'trace')
+   elseif r < 0.01000 then tl.priority(timeline, 'info')
+   else                    tl.priority(timeline, 'warning')
    end
 end
 
