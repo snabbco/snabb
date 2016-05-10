@@ -1,41 +1,17 @@
--- Built in types (page 19)
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+-- This module implements the schema tree and validation for YANG. It represents
+-- the YANG statements with lua tables and provides a fast but flexible way to
+-- represent and validate statements.
+-- 
+-- Since YANG statements are encapsulated in modules at the highest level one
+-- should take their pre-parsed YANG document containing the module and load it
+-- into the Module table.
 --
---  +---------------------+-------------------------------------+
---  | Name                | Description                         |
---  +---------------------+-------------------------------------+
---  | binary              | Any binary data                     |
---  | bits                | A set of bits or flags              |
---  | boolean             | "true" or "false"                   |
---  | decimal64           | 64-bit signed decimal number        |
---  | empty               | A leaf that does not have any value |
---  | enumeration         | Enumerated strings                  |
---  | identityref         | A reference to an abstract identity |
---  | instance-identifier | References a data tree node         |
---  | int8                | 8-bit signed integer                |
---  | int16               | 16-bit signed integer               |
---  | int32               | 32-bit signed integer               |
---  | int64               | 64-bit signed integer               |
---  | leafref             | A reference to a leaf instance      |
---  | string              | Human-readable string               |
---  | uint8               | 8-bit unsigned integer              |
---  | uint16              | 16-bit unsigned integer             |
---  | uint32              | 32-bit unsigned integer             |
---  | uint64              | 64-bit unsigned integer             |
---  | union               | Choice of member types              |
---  +---------------------+-------------------------------------+
---
--- Module:
--- module <name of module> { ... }
---
--- required: namespace, prefix
--- optional: anyxml, augment, choice, contact, container, description, deviation,
---           extension, feature, grouping, identity, import, include, leaf, leaf-list
---           list, notification, organization, reference, revision, rpc, typedef, uses,
---           yang-version
---
+-- This relies on the "Base" table which can be found in the yang.lua file.
 module(..., package.seeall)
 
 local validation = require("lib.yang.validation")
+local helpers = require("lib.yang.helpers")
 
 -- Use ffi types because they will validate that numeric values are being
 -- provided. The downside is that integer overflow could occur on these. This
@@ -54,305 +30,345 @@ typedef struct { uint64_t value; } uint64box;
 typedef struct { double value; } decimal64box;
 ]]
 
-
--- This is a boxed value for datatypes which are represeted in Lua and validated
--- in Lua. This includes everything except the numeric values.
-local Box = {}
-function Box.new(validate)
-  local ret = {realroot={}}
-  local mt = {
-    __newindex = function (t, k, v)
-      if validate then validate(v) end
-        ret.realroot[k] = v
-      end,
-      __index = function(t, k)
-        local v = ret.realroot[k]
-        return v
-      end,
-  }
-  return setmetatable(ret, mt)
-end
--- Yang feature
-local Feature = {}
-function Feature.new(name)
-  local ret = {config={name=name}}
-  return setmetatable(ret, {__index = Feature})
-end
-
-function Feature:validate(statements)
-  local cardinality = {description={0,1}, status={0,1}, refernece={0,1}}
-  validation.cardinality("feature", name, cardinality, statements)
-end
-
-function Feature:consume(statements)
-  if statements.description then
-    self.config.description = statements.description[1].argument
-  end
-  if statements.reference then
-    self.config.reference = statements.reference[1].argument
-  end
-  if statements.status then
-    self.config.status = statements.reference[1].argument
-  end
-end
-
--- Yang Leaf
 local Leaf = {}
-function Leaf.new(name)
-  local ret = {config={name=name}}
-  ret.config.iffeature = {}
-  return setmetatable(ret, {__index = Leaf})
-end
+function Leaf.new(base, path, src)
+  self = setmetatable({}, {__index=Leaf, path=path})
 
-function Leaf:validate(statements)
-  local cardinality = {config={0,1}, default={0,1}, description={0,1},
-                       mandatory={0,1}, reference={0,1}, status={0,1},
-                       type={1,1}, units={0,1}, when={0,1}}
-  validation.cardinality("leaf", name, cardinality, src)
-end
+  -- Parse the schema to find the metadata
+  self:validate_schema(src)
+  base:add_cache(path, self)
 
-function Leaf:consume(statements)
-  if statements.default then self.config.default = statements.default end
-  if statements.description then
-    self.config.description = statements.description[1].argument
+  self.type = src.type[1].argument
+  if src.type[1].statements then
+    local typeinfo = src.type[1].statements
+    if typeinfo.range then
+      local range = helpers.split("%.%.", typeinfo.range[1].argument)
+      self.range = {tonumber(range[1]), tonumber(range[2])}
+    end
+  end
+  if src.description then
+    self.description = src.description[1].argument
   end
 
-  if statements["if-feature"] then
-    for _, f in pairs(statements["if-feature"]) do
-      table.insert(self.config.iffconfig["if-feature"], f.argument)
+  if src.default then
+    self.default = src.default[1].argument
+  end
+
+  if src["if-feature"] then
+    self["if-feature"] = {}
+    for _, f in pairs(src["if-feature"]) do
+      table.insert(self["if-feature"], f.argument)
     end
   end
 
-  -- Handle the type which will involve picking the correct box
-  -- to store the value with validation if needed.
-  self.config.type = statements.type[1].argument
+  if src.mandatory then
+    self.mandatory = src.mandatory[1].argument == "true"
+  end
 
-  -- First deal with built in types.
-  if self.config.type == "int8" then
-    self.box = ffi.new("int8box")
-  elseif self.config.type == "int16" then
-    self.box = ffi.new("int16box")
-  elseif self.config.type == "int32" then
-    self.box = ffi.new("int32box")
-  elseif self.config.type == "int64" then
-    self.box = ffi.new("int64box")
-  elseif self.config.type == "uint8" then
-    self.box = ffi.new("uint8box")
-  elseif self.config.type == "uint16" then
-    self.box = ffi.new("uint16box")
-  elseif self.config.type == "uint32" then
-    self.box = ffi.new("uint32box")
-  elseif self.config.type == "uint64" then
-    self.box = ffi.new("uint64box")
-  elseif self.config.type == "decimal64" then
-    self.box = ffi.new("decimal64box")
-  elseif self.config.type == "string" then
-    self.box = Box.new()
-  elseif self.config.type == "boolean" then
-    self.box = Box.new(function (value)
-      if type(value) ~= "boolean" then
-        error(
-          ("Value for '%s' must be true or false."):format(self.config.name))
+   -- Add validators if we need to.
+   if self.mandatory then
+      if not self.validation then self.validation = {} end
+      table.insert(self.validation, function (v)
+         if not v then
+            self:error("Value is mandatory")
+         end
+      end)
+   end
+   if self.range then
+      if not self.validation then self.validation = {} end
+      self.validation[#self.validation + 1] = function(v)
+         if v < self.range[1] or v > self.range[2] then
+            self:error("Value '%s' is out of range", path, value)
+         end
       end
-    end)
+   end
+   return self
+end
+
+function Leaf:error(msg, ...)
+  local path = getmetatable(self).path
+   error(("%s: %s"):format(path, msg:format(...)))
+end
+
+function Leaf:validate_schema(schema)
+  local cardinality = {config={0,1}, default={0,1}, description={0,1},
+                       mandatory={0,1}, reference={0,1}, status={0,1},
+                       type={1,1}, units={0,1}, when={0,1}}
+  validation.cardinality("leaf", getmetatable(self).path, cardinality, schema)
+end
+
+function Leaf:provide_box()
+  local box
+
+  if self.type == "int8" then
+    box = ffi.new("int8box")
+  elseif self.type == "int16" then
+    box = ffi.new("int16box")
+  elseif self.type == "int32" then
+    box = ffi.new("int32box")
+  elseif self.type == "int64" then
+    box = ffi.new("int64box")
+  elseif self.type == "uint8" then
+    box = ffi.new("uint8box")
+  elseif self.type == "uint16" then
+    box = ffi.new("uint16box")
+  elseif self.type == "uint32" then
+    box = ffi.new("uint32box")
+  elseif self.type == "uint64" then
+    box = ffi.new("uint64box")
+  elseif self.type == "decimal64" then
+    box = ffi.new("decimal64box")
+  elseif self.type == "string" then
+    box = {}
+  elseif self.type == "boolean" then
+    box = {}
+    elseif self.type == "inet:" then
+      -- TODO: provide propper type.
+      box = {}
   else
     error(("Unknown type '%s' for leaf '%s'"):format(
       leaf_type, self.config.name))
   end
+
+  return box
+end
+
+-- Yang feature
+local Feature = {}
+function Feature.new(base, path, src)
+  local self = setmetatable({}, {__index=Feature, path=path})
+
+  self:validate_schema(src)
+  base:add_cache(path, self)
+
+  if src.description then
+    self.description = src.description[1].argument
+  end
+  if src.reference then
+    self.reference = src.reference[1].argument
+  end
+  if src.status then
+    self.status = src.reference[1].argument
+  end
+
+  return self
+end
+
+function Feature:validate_schema(src)
+  local cardinality = {description={0,1}, status={0,1}, refernece={0,1}}
+  validation.cardinality("feature", getmetatable(self).path, cardinality, src)
 end
 
 -- Yang list
 local List = {}
-function List.new(name)
-  local ret = {config={name=name}}
-  return setmetatable(ret, {__index = List})
+function List.new(path, src)
+  local self = setmetatable({}, {__index=List, path=path})
+
+  self:validate_schema(src)
+  base:add_cache(path, self)
+
+  if src.key then self.key = src.key[1].argument end
+  if src.leaf then
+    for _, leaf in pairs(src.leaf) do
+      local path = self.path.."."..leaf.argument
+      self[leaf.argument] = Leaf.new(base, path, leaf.statements)
+    end
+  end
+
+  return self
 end
 
-function List:validate(statements)
+function List:validate_schema(src)
   local cardinality = {config={0,1}, description={0,1}, key={0,1},
                        reference={0,1}, status={0,1}, when={0,1}}
   cardinality["max-elements"] = {0,1}
   cardinality["min-elements"] = {0,1}
   cardinality["ordered-by"] = {0,1}
-  validation.cardinality("list", name, cardinality, statements)
-end
-
-function List:consume(statements)
-  if statements.key then
-    self.config.key = statements.key[1].argument
-  end
-  if statements.leaf then
-    for _, leaf in pairs(statements.leaf) do
-      self[leaf.argument] = Leaf.new(leaf.argument)
-      self[leaf.argument]:consume(leaf.statements)
-    end
-  end
+  validation.cardinality("list", getmetatable(self).path, cardinality, src)
 end
 
 -- Yang group
 local Grouping = {}
-function Grouping.new(name)
-  local ret = {config={name=name}}
-  return setmetatable(ret, {__index = Grouping})
+function Grouping.new(base, path, src)
+  local ret = {leaves={}}
+  local self = setmetatable(ret, {__index = Grouping, path=path})
+
+  self:validate_schema(src)
+  base:add_cache(path, self)
+
+  if src.description then
+    self.description = src.description[1].argument
+  end
+
+  if src.list then
+    for _, list in pairs(src.list) do
+      local path = path.."."..list.argument
+      self[list.argument] = List.new(base, path, list.statements)
+    end
+  end
+
+  if src.leaf then
+    for _, leaf in pairs(src.leaf) do
+      local path = path.."."..leaf.argument
+      self.leaves[leaf.argument] = Leaf.new(base, path, leaf.statements)
+    end
+  end
+
+  return self
 end
 
-function Grouping:validate(statements)
+function Grouping:validate_schema(src)
   local cardinality = {description={0,1}, reference={0,1}, status={0,1}}
-  validation.cardinality("grouping", name, cardinality, statements)
+  validation.cardinality("grouping", getmetatable(self).path, cardinality, src)
 end
 
-function Grouping:consume(statements)
-  if statements.description then
-    self.config.description = statements.description[1].argument
+local Container = {}
+function Container.new(base, path, src)
+  local ret = {leaves={}}
+  local self = setmetatable(ret, {__index=Container, path=path})
+
+  self:validate_schema(src)
+  base:add_cache(path, self)
+
+  if src.description then
+    self.description = src.description[1].argument
   end
 
-  if statements.list then
-    for _, list in pairs(statements.list) do
-      self[list.argument] = List.new(list.argument)
-      self[list.argument]:consume(list.statements)
+  -- Leaf statements
+  if src.leaf then
+    for _, leaf in pairs(src.leaf) do
+      local leaf_path = path.."."..leaf.argument
+      self.leaves[leaf.argument] = Leaf.new(base, leaf_path, leaf.statements)
     end
   end
 
-  if statements.leaf then
-    for _, leaf in pairs(statements.leaf) do
-      self[leaf.argument] = Leaf.new(leaf.argument)
-      self[leaf.argument]:consume(leaf.statements)
-    end
-  end
+  return self
+end
+
+function Container:validate_schema(src)
+  local cardinality = {config={0,1}, description={0,1}, presense={0,1},
+                       reference={0,1}, status={0,1}, when={0,1}}
+  validation.cardinality("container", getmetatable(self).path, cardinality, src)
 end
 
 -- Yang Revision
 local Revision = {}
-function Revision.new(date)
-  local ret = {config={date=date}}
-  return setmetatable(ret, {__index = Revision})
+function Revision.new(base, path, src)
+  local self = setmetatable({}, {__index=Revision, path=path})
+
+  self:validate_schema(src)
+
+  base:add_cache(path, self)
+
+  if src.description then
+    self.description = src.description[1].argument
+  end
+  if src.description then
+    self.reference = src.reference[1].argument
+  end
+
+  return self
 end
 
-function Revision:validate(statements)
+function Revision:validate_schema(src)
   local cardinality = {description={0,1}, reference={0,1}}
-  validation.cardinality("revision", self.config.date, cardinality, statements)
-end
-
-function Revision:consume(statements)
-  self:validate(statements)
-
-  if statements.description then
-    self.config.description = statements.description[1].argument
-  end
-  if statements.description then
-    self.config.reference = statements.reference.argument
-  end
+  validation.cardinality("revision", getmetatable(self).path, cardinality, src)
 end
 
 -- Yang Module
-local Module = {}
-function Module.new(name)
-  local ret = {body={}, config={name=name}, modules={}, revisions={},
-               features={}, groupings={}}
-  return setmetatable(ret, {__index = Module})
-end
+Module = {}
+function Module.new(base, name, src)
+  local ret = {body={}, name=name, modules={}, revisions={},
+               features={}, groupings={}, containers={}}
+  local self = setmetatable(ret, {__index=Module, path=name})
 
-function Module:load()
-  -- Find the file and load it.
-  print("DEBUG: loading module", self.config.name)
-end
+  -- TODO: remove me when proper loading support exists.
+  if not src then return self end
 
-function Module:consume(statements)
-  -- Validate the statements first.
-  self:validate(statements)
+  -- Add self to path cache
+  base:add_cache(name, self)
+
+    -- Validate the statements first.
+  self:validate_schema(src)
 
   -- Set the meta information about the module
-  self.config.namespace = statements.namespace[1].argument
-  self.config.prefix = statements.prefix[1].argument
+  self.namespace = src.namespace[1].argument
+  self.prefix = src.prefix[1].argument
 
-  if statements.organization then
-    self.config.organization = statements.organization[1].argument
+  if src.organization then
+    self.organization = src.organization[1].argument
   end
-  if statements.contact then
-    self.config.contact = statements.contact[1].argument
+  if src.contact then
+    self.contact = src.contact[1].argument
   end
 
-  if statements.description then
-    self.config.description = statements.description[1].argument
+  if src.description then
+    self.description = src.description[1].argument
   end
   
   -- Now handle the imports, as other things may reference them.
-  if statements.import then
-    for _, mod in pairs(statements.import) do
-      self.modules[mod.argument] = Module.new(mod.argument)
+  if src.import then
+    for _, mod in pairs(src.import) do
+      self.modules[mod.argument] = Module.new(base, mod.argument)
 
       -- Ask the module to find and load itself.
       self.modules[mod.argument]:load()
+
+      -- TODO Add module to path cache.
     end
   end
 
   -- Handle revisions
-  if statements.revision then
-    for _, revision in pairs(statements.revision) do
-      -- TODO: can or should we convert these revision date stamps.
-      self.revisions[revision.argument] = Revision.new(revision.argument)
-      self.revisions[revision.argument]:consume(revision.statements)
+  if src.revision then
+    for _, r in pairs(src.revision) do
+      local path = ret.name.."."..r.argument
+      self.revisions[r.argument] = Revision.new(base, path, r.statements)
     end
   end
 
   -- Feature statements
-  if statements.feature then
-    for _, feature in pairs(statements.feature) do
-      self.features[feature.argument] = Feature.new(feature.argument)
-      self.features[feature.argument]:consume(feature.statements)
+  if src.feature then
+    for _, f in pairs(src.feature) do
+      local path = ret.name.."."..f.argument
+      self.features[f.argument] = Feature.new(base, path, f.statements)
     end
   end
 
   -- Leaf statements
-  if statements.leaf then
-    for _, leaf in pairs(statements.revision) do
+  if src.leaf then
+    for _, leaf in pairs(src.leaf) do
     end
   end
 
   -- List statements
-  if statements.grouping then
-    for _, grouping in pairs(statements.grouping) do
-      self.groupings[grouping.argument] = Grouping.new(grouping.argument)
-      self.groupings[grouping.argument]:consume(grouping.statements)
+  if src.grouping then
+    for _, g in pairs(src.grouping) do
+      local path = ret.name.."."..g.argument
+      self.groupings[g.argument] = Grouping.new(base, path, g.statements)
     end
   end
+
+  -- Containers
+  if src.container then
+    for _, c in pairs(src.container) do
+      local path = ret.name.."."..c.argument
+      self.containers[c.argument] = Container.new(base, path, c.statements)
+    end
+  end
+
+  return self
 end
 
-function Module:validate(statements)
+function Module:load()
+  -- TODO: Find the file and load it.
+end
+
+function Module:validate_schema(src)
   local cardinality = {contact={0,1}, description={0,1}, namespace={1,1},
                        organization={0,1}, prefix={1,1}, reference={0,1}}
   cardinality["yang-version"] = {0,1}
-  validation.cardinality("module", self.name, cardinality, statements)
+  validation.cardinality("module", getmetatable(self).path, cardinality, src)
 end
-
-
-function extract_nodes(structure)
-  local nodes = {}
-  for _, v in pairs(structure) do
-    -- Recursively apply this.
-    if v.statements then v.statements = extract_nodes(v.statements) end
-
-    -- Add to the nodes table.  
-    if nodes[v.keyword] then
-      table.insert(nodes[v.keyword], v)
-    else
-      nodes[v.keyword] = {v}
-    end
-  end
-  return nodes
-end
-
-function load_schema(src)
-  -- Okay conver the schema into something more useful.
-  src = extract_nodes(src)
-
-   -- Okay we're expecting a module at the top
-  if not src.module then error("Expected 'module'") end
-  local mod = Module.new(src.module[1].argument)
-  mod:consume(src.module[1].statements)
-  return mod
-end
-
 
 function selftest()
   local test_schema = [[module ietf-softwire {
@@ -446,69 +462,104 @@ function selftest()
         "I-D.ietf-softwire-map";
     }
 
-    grouping map-rule-table {
-      description
-        "The (conceptual) table containing rule Information for
-        a specific mapping rule. It can also be used for row creation.";
-      list map-rule-entry {
-        key "id";
-        leaf id {
-          type uint8;
-        }
-
-        leaf testbool {
-          type boolean;
-        }
+ grouping port-set {
+    description
+      "Use the PSID algorithm to represent a range of transport layer
+      ports.";
+    leaf offset {
+      type uint8 {
+        range 0..16;
       }
+     mandatory true;
+     description
+       "The number of offset bits. In Lightweight 4over6, the defaul
+       value is 0 for assigning one contiguous port range. In MAP-E/T,
+       the default value is 6, which excludes system ports by default
+       and assigns distributed port ranges. If the this parameter is
+       larger than 0, the value of offset MUST be greater than 0.";
     }
+    leaf psid {
+      type uint16;
+      mandatory true;
+      description
+        "Port Set Identifier (PSID) value, which identifies a set
+        of ports algorithmically.";
+    }
+    leaf psid-len {
+      type uint8 {
+        range 0..16;
+      }
+      mandatory true;
+      description
+        "The length of PSID, representing the sharing ratio for an
+        IPv4 address.";
+    }
+  }
+
+  container softwire-config {
+    description
+      "The configuration data for Softwire instances. And the shared
+      data describes the softwire data model which is common to all of
+      the different softwire mechanisms, such as description.";
+    leaf description {
+      type string;
+      description
+        "A textual description of Softwire.";
+    }
+  }
    }]]
 
   -- Convert the schema using the already tested parser.
   local parser = require("lib.yang.parser")
   local schema = parser.parse_string(test_schema, "schema selftest")
-  local mod = load_schema(schema)
 
-  assert(mod.config.name == "ietf-softwire")
-  assert(mod.config.namespace == "urn:ietf:params:xml:ns:yang:ietf-softwire")
-  assert(mod.config.prefix == "softwire")
-  assert(mod.config.contact)
-  assert(mod.config.organization)
-  assert(mod.config.description)
+  -- Create a fake base, we're not testing this so avoidng using the real one.
+  local base = {add_cache = function() end}
+
+  -- Convert the schema into a more usable form for us.
+  schema = helpers.extract_nodes(schema)
+  
+  -- Load the module 
+  local mod = Module.new(base, schema.module[1].argument,
+    schema.module[1].statements)
+
+  print("module: ", mod.name)
+  assert(mod.name == "ietf-softwire")
+  assert(mod.namespace == "urn:ietf:params:xml:ns:yang:ietf-softwire")
+  assert(mod.prefix == "softwire")
+  assert(mod.contact)
+  assert(mod.organization)
+  assert(mod.description)
 
   -- Check both modules exist. (Also need to check they've loaded)
   assert(mod.modules["ietf-inet-types"])
   assert(mod.modules["ietf-yang-types"])
 
   -- Check all revisions are accounted for.
-  assert(mod.revisions["2015-02-02"].config.description)
-  assert(mod.revisions["2015-02-06"].config.description)
-  assert(mod.revisions["2015-02-10"].config.description)
-  assert(mod.revisions["2015-04-07"].config.description)
-  assert(mod.revisions["2015-09-30"].config.description)
+  assert(mod.revisions["2015-02-02"].description)
+  assert(mod.revisions["2015-02-06"].description)
+  assert(mod.revisions["2015-02-10"].description)
+  assert(mod.revisions["2015-04-07"].description)
+  assert(mod.revisions["2015-09-30"].description)
 
   -- Check that the feature statements are there.
-  assert(mod.features["lw4over6"].config.description)
-  assert(mod.features["lw4over6"].config.reference)
-  assert(mod.features["map-e"].config.description)
-  assert(mod.features["map-e"].config.reference)
+  assert(mod.features["lw4over6"].description)
+  assert(mod.features["lw4over6"].reference)
+  assert(mod.features["map-e"].description)
+  assert(mod.features["map-e"].reference)
 
-  -- Check the grouping exists and has everything we'd want it to.
-  assert(mod.groupings["map-rule-table"].config.description)
-  assert(mod.groupings["map-rule-table"]["map-rule-entry"])
+  -- Check the groupings
+  assert(mod.groupings["port-set"])
+  assert(mod.groupings["port-set"].description)
+  assert(mod.groupings["port-set"].leaves["offset"])
+  assert(mod.groupings["port-set"].leaves["offset"].type == "uint8")
+  assert(mod.groupings["port-set"].leaves["psid-len"].mandatory == true)
+  assert(mod.groupings["port-set"].leaves["psid-len"].range[1] == 0)
+  assert(mod.groupings["port-set"].leaves["psid-len"].range[2] == 16)
 
-  -- Check that the list was in the group was identified correctly.
-  local list = mod.groupings["map-rule-table"]["map-rule-entry"]
-  assert(list.config.key == "id")
-  assert(list.id.config.type == "uint8")
+  -- Check the containers description (NOT the leaf called "description")
+  assert(type(mod.containers["softwire-config"].description) == "string")
 
-  -- Test both setting and getting ints and bools
-  list.id.box.value = 72
-  assert(list.id.box.value == 72)
-  list.testbool.box.value = true
-  assert(list.testbool.box.value == true)
-  list.testbool.box.value = false
-  assert(list.testbool.box.value == false)
-
-  -- Should fail.
-  list.testbool.box.value = "hello"
+  -- Check the container has a leaf called "description"
+  assert(mod.containers["softwire-config"].leaves.description)
 end
