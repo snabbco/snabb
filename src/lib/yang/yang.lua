@@ -134,6 +134,7 @@ end
 function load_schema_file(filename)
    local file_in = assert(io.open(filename))
    local contents = file_in:read("*a")
+   file_in:close()
    return load_schema(contents, filename)
 end
 
