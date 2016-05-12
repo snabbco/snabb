@@ -139,17 +139,12 @@ local function is_neighbor_solicitation(pkt)
    return is_ndp(pkt) and icmpv6_type_is_ns(pkt)
 end
 
--- Check to see whether the neighbor solicitation is for
--- one of the listed addresses, rather than an arbitrary one.
-function is_neighbor_solicitation_for_ips(pkt, local_ips)
+-- Check whether NS target address matches IPv6 address.
+function is_neighbor_solicitation_for_addr(pkt, ipv6_addr)
    if not is_neighbor_solicitation(pkt) then return false end
    local target_offset = eth_ipv6_size + o_icmp_target_offset
-   for i=1,#local_ips do
-      if ipv6_equals(local_ips[i], pkt.data + target_offset) then
-         return true
-       end
-   end
-   return false
+   local target_ipv6 = pkt.data + target_offset
+   return ipv6_equals(target_ipv6, ipv6_addr)
 end
 
 local function to_ether_addr(pkt, offset)
