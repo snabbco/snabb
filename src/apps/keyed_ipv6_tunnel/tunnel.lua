@@ -243,9 +243,8 @@ prepare_header_template()
 function selftest ()
    print("Keyed IPv6 tunnel selftest")
    local ok = true
-
-   local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
-   local output_file = "apps/keyed_ipv6_tunnel/selftest.cap.output"
+   local Synth = require("apps.test.synth").Synth
+   local Match = require("apps.test.match").Match
    local tunnel_config = {
       local_address = "00::2:1",
       remote_address = "00::2:1",
@@ -255,19 +254,19 @@ function selftest ()
    } -- should be symmetric for local "loop-back" test
 
    local c = config.new()
-   config.app(c, "source", pcap.PcapReader, input_file)
    config.app(c, "tunnel", SimpleKeyedTunnel, tunnel_config)
-   config.app(c, "sink", pcap.PcapWriter, output_file)
+   config.app(c, "match", Match)
+   config.app(c, "comparator", Synth)
+   config.app(c, "source", Synth)
    config.link(c, "source.output -> tunnel.decapsulated")
+   config.link(c, "comparator.output -> match.comparator")
    config.link(c, "tunnel.encapsulated -> tunnel.encapsulated")
-   config.link(c, "tunnel.decapsulated -> sink.input")
+   config.link(c, "tunnel.decapsulated -> match.rx")
    app.configure(c)
 
-   app.main({duration = 0.25}) -- should be long enough...
+   app.main({duration = 0.0001, report = {showapps=true,showlinks=true}})
    -- Check results
-   if io.open(input_file):read('*a') ~=
-      io.open(output_file):read('*a')
-   then
+   if #engine.app_table.match:errors() ~= 0 then
       ok = false
    end
 

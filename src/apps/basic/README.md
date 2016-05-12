@@ -6,8 +6,10 @@ functionality for use in you app networks.
 ## Source
 
 The `Source` app is a synthetic packet generator. On each breath it fills
-each attached output link with new packets. The packet data is
-uninitialized garbage and each packet is 60 bytes long.
+each attached output link with new packets. It accepts a number as its
+configuration argument which is the byte size of the generated packets. By
+default, each packet is 60 bytes long. The packet data is initialized with
+zero bytes.
 
     DIAGRAM: Source
     +--------+
