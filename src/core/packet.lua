@@ -7,11 +7,9 @@ local debug = _G.developer_debug
 local ffi = require("ffi")
 local C = ffi.C
 
-local freelist = require("core.freelist")
 local lib      = require("core.lib")
 local memory   = require("core.memory")
 local counter  = require("core.counter")
-local freelist_add, freelist_remove, freelist_nfree = freelist.add, freelist.remove, freelist.nfree
 
 require("core.packet_h")
 
@@ -22,10 +20,41 @@ local header_size = 8
 local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
-local max_packets = 1e5
+
+ffi.cdef[[
+struct freelist {
+    uint64_t nfree;
+    uint64_t max;
+    struct packet *list[?];
+};
+]]
+
+local function freelist_add(freelist, element)
+   -- Safety check
+   if _G.developer_debug then
+      assert(freelist.nfree < freelist.max, "freelist overflow")
+   end
+   freelist.list[freelist.nfree] = element
+   freelist.nfree = freelist.nfree + 1
+end
+
+local function freelist_remove(freelist)
+   if freelist.nfree == 0 then
+      error("no free packets")
+   else
+      freelist.nfree = freelist.nfree - 1
+      return freelist.list[freelist.nfree]
+   end
+end
+
+local function freelist_nfree(freelist)
+   return freelist.nfree
+end
+
+local max_packets = 1e6
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = freelist.new("struct packet *", max_packets)
+local packets_fl = ffi.new("struct freelist", max_packets, 0, max_packets)
 
 -- Return an empty packet.
 function allocate ()
@@ -107,9 +136,8 @@ function data (p) return p.data end
 function length (p) return p.length end
 
 function preallocate_step()
-   if _G.developer_debug then
-      assert(packets_allocated + packet_allocation_step <= max_packets)
-   end
+   assert(packets_allocated + packet_allocation_step <= max_packets,
+          "packet allocation overflow")
 
    for i=1, packet_allocation_step do
       free_internal(new_packet(), true)

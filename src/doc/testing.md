@@ -134,8 +134,5 @@ SnabbBot is configured through the following environment variables:
 * `REPO`—Optional. Target GitHub repository. Default is
   `snabbco/snabb` (upstream).
 
-* `CURRENT`—Optional. The branch to merge pull requests with. Default is
-  `master`.
-
 * `SNABBBOTDIR`—Optional. SnabbBot cache directory. Default is
   `/tmp/snabb_bot`.
