@@ -59,10 +59,10 @@ local lwaftr_conf_spec = {
       v4_vlan_tag=Parser.parse_vlan_tag,
       v6_vlan_tag=Parser.parse_vlan_tag,
       vlan_tagging=Parser.parse_boolean,
-      ipv4_ingress_filter=Parser.parse_string,
-      ipv4_egress_filter=Parser.parse_string,
-      ipv6_ingress_filter=Parser.parse_string,
-      ipv6_egress_filter=Parser.parse_string,
+      ipv4_ingress_filter=Parser.parse_string_or_file,
+      ipv4_egress_filter=Parser.parse_string_or_file,
+      ipv6_ingress_filter=Parser.parse_string_or_file,
+      ipv6_egress_filter=Parser.parse_string_or_file,
    },
    defaults={
       aftr_ipv4_ip=required('aftr_ipv4_ip'),
@@ -96,7 +96,7 @@ end
 
 function selftest()
    print('selftest: conf')
-   local equal = require('core.lib').equal
+   local lib = require('core.lib')
    local function string_file(str)
       local pos = 1
       return {
@@ -113,7 +113,7 @@ function selftest()
       }
    end
    local function test(str, expected)
-      if not equal(expected, load_lwaftr_config(string_file(str))) then
+      if not lib.equal(expected, load_lwaftr_config(string_file(str))) then
          error('lwaftr conf parse produced unexpected result; string:\n'..str)
       end
    end
@@ -160,5 +160,29 @@ function selftest()
          vlan_tagging = true
       }
    )
+   local function test_loading_filter_conf_from_file()
+      -- Setup the filter conf file.
+      local filter_path = os.tmpname()
+      local filter_text = 'some pflang filter string'
+      assert(lib.writefile(filter_path, filter_text))
+      -- Setup the main config file.
+      local conf_text = [[
+         aftr_ipv4_ip = 1.2.3.4
+         aftr_ipv6_ip = 8:9:a:b:c:d:e:f
+         aftr_mac_b4_side = 22:22:22:22:22:22
+         aftr_mac_inet_side = 12:12:12:12:12:12
+         next_hop6_mac = 44:44:44:44:44:44
+         binding_table = "foo-table.txt"
+         inet_mac = 68:68:68:68:68:68
+         ipv4_ingress_filter = <%s
+      ]]
+      conf_text = conf_text:format(filter_path)
+      local conf_table = load_lwaftr_config(string_file(conf_text))
+      assert(os.remove(filter_path))
+      if conf_table['ipv4_ingress_filter'] ~= filter_text then
+         error('lwaftr: filter conf contents do not match; pathname:\n'..filter_path)
+      end
+   end
+   test_loading_filter_conf_from_file()
    print('ok')
 end

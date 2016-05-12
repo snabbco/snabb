@@ -169,3 +169,12 @@ character.  If uncommented, the right-hand-side should be a
 filter.  Pflang is the language of `tcpdump`, `libpcap`, and other
 tools.  If these options are given, the filters will run on the packets
 without vlan tags, if any.
+
+Filter definitions may also be stored in separate config files, one per
+filter, and their relative paths go to the right-hand side of these entries.
+The relative paths should be prefixed by `<` and are based on the directory
+where the main config file is. Example:
+
+```
+ipv4_ingress_filter = <ingress4.pf
+```
