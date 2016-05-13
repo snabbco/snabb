@@ -177,7 +177,6 @@ function NDP:new(conf)
       o.do_ns_request = true
    end
    o.dst_eth = conf.dst_eth -- Intentionally nil if to request by NS
-   o.all_local_ipv6_ips = conf.all_ipv6_addrs
    return o
 end
 
@@ -224,7 +223,7 @@ function NDP:push()
                timer.deactivate("retry_ns")
             end
             packet.free(p)
-         elseif ndp.is_neighbor_solicitation_for_ips(p, self.all_local_ipv6_ips) then
+         elseif ndp.is_neighbor_solicitation_for_addr(p, self.conf.src_ipv6) then
             local snap = ndp.form_nsolicitation_reply(self.conf.src_eth, self.conf.src_ipv6, p)
             if snap then 
                transmit(osouth, snap)

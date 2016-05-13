@@ -246,14 +246,6 @@ function BindingTable:get_br_address(i)
    return self.br_addresses[i].addr
 end
 
-function BindingTable:get_br_addresses()
-   local addrs = {}
-   for i=0,self.br_address_count-1 do
-      addrs[i+1] = self.br_addresses[i].addr
-   end
-   return addrs
-end
-
 function BindingTable:save(filename, mtime_sec, mtime_nsec)
    local out = stream.open_temporary_output_byte_stream(filename)
    out:write_ptr(binding_table_header_t(
