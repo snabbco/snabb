@@ -68,7 +68,7 @@ function parse_args(args)
          fatal('Failed to enable real-time scheduling.  Try running as root.')
       end
    end
-   function handlers.n(arg)
+   function handlers.v4(arg)
       v4 = arg
       if not arg then
          fatal("Argument '--v4' was not set")
@@ -77,7 +77,7 @@ function parse_args(args)
          fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
       end
    end
-   function handlers.m(arg)
+   function handlers.v6(arg)
       v6 = arg
       if not v6 then
          fatal("Argument '--v6' was not set")
@@ -97,8 +97,8 @@ function parse_args(args)
       end
    end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:n:m:vD:hir:",
-      { conf = "c", ["v4"] = "n", ["v6"] = "m",
+   lib.dogetopt(args, handlers, "b:c:vD:hir:",
+      { conf = "c", v4 = 1, v6 = 1,
         verbose = "v", duration = "D", help = "h",
         virtio = "i", ["ring-buffer-size"] = "r", cpu = 1,
         ["real-time"] = 0 })
