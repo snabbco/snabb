@@ -1,15 +1,19 @@
 Usage: run --help
        run --conf <conf-file> --v4 <pci-addr> --v4 <pci-addr> [OPTION...]
+       run --conf <conf-file> --on-a-stick <pci-addr> [OPTION...]
 
 Required arguments:
        --conf   <conf-file>     Sets configuration policy table
        --v4 <pci-addr>          PCI device number for the INET-side NIC
        --v6 <pci-addr>          PCI device number for the B4-side NIC
+       --on-a-stick <pci-addr>  One single NIC for INET-side and B4-side
 
 Optional arguments:
        --virtio                 Use virtio-net interfaces instead of Intel 82599
        --ring-buffer-size <size>  Set Intel 82599 receive buffer size
        --cpu    <cpu>           Bind the lwAFTR to the given CPU
        --real-time              Enable real-time SCHED_FIFO scheduler
+       --mirror <tap>           Copies matching packets to TAP interface. Matching
+                                address set by "lwaftr monitor".
        -D       <seconds>       Duration in seconds
        -v                       Verbose (repeat for more verbosity)

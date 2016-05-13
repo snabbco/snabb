@@ -3,6 +3,7 @@ module(..., package.seeall)
 local config     = require("core.config")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
+local V4V6       = require("apps.lwaftr.v4v6").v4v6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
 local lwaftr     = require("apps.lwaftr.lwaftr")
 local basic_apps = require("apps.basic.basic_apps")
@@ -138,6 +139,32 @@ function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
 
    link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
    link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
+end
+
+function load_on_a_stick(c, conf, v4v6, args)
+   local Tap = require("apps.tap.tap").Tap
+   lwaftr_app(c, conf)
+
+   config.app(c, 'nic', Intel82599, {
+      pciaddr = args.pciaddr,
+   })
+   if args.mirror then
+      local ifname = args.mirror
+      config.app(c, 'tap', Tap, ifname)
+      config.app(c, v4v6, V4V6, {
+         mirror = true
+      })
+   else
+      config.app(c, v4v6, V4V6)
+   end
+
+   config.link(c, 'nic.tx -> '..v4v6..'.input')
+   link_source(c, v4v6..'.v4_tx', v4v6..'.v6_tx')
+   link_sink(c, v4v6..'.v4_rx', v4v6..'.v6_rx')
+   config.link(c, v4v6..'.output -> nic.rx')
+   if args.mirror then
+      config.link(c, v4v6..'.mirror -> tap.input')
+   end
 end
 
 function load_virt(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
