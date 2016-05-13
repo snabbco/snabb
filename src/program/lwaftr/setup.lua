@@ -10,7 +10,7 @@ local pcap       = require("apps.pcap.pcap")
 local bt         = require("apps.lwaftr.binding_table")
 local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
 local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
-local vlan       = require("apps.lwaftr.vlan")
+local vlan       = require("apps.vlan.vlan")
 local ethernet   = require("lib.protocol.ethernet")
 
 function lwaftr_app(c, conf)

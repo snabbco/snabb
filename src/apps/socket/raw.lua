@@ -80,16 +80,20 @@ end
 function selftest ()
    -- Send a packet over the loopback device and check
    -- that it is received correctly.
-   -- XXX Beware of a race condition with unrelated traffic over the
-   -- loopback device.
    local datagram = require("lib.protocol.datagram")
    local ethernet = require("lib.protocol.ethernet")
    local ipv6 = require("lib.protocol.ipv6")
+   local Match = require("apps.test.match").Match
 
-   -- Initialize RawSocket.
-   local lo = RawSocket:new("lo")
-   lo.input, lo.output = {}, {}
-   lo.input.rx, lo.output.tx = link.new("test1"), link.new("test2")
+   -- Initialize RawSocket and Match.
+   local c = config.new()
+   config.app(c, "lo", RawSocket, "lo")
+   config.app(c, "match", Match, {fuzzy=true})
+   config.link(c, "lo.tx->match.rx")
+   engine.configure(c)
+   local link_in, link_cmp = link.new("test_in"), link.new("test_cmp")
+   engine.app_table.lo.input.rx = link_in
+   engine.app_table.match.input.comparator = link_cmp
    -- Construct packet.
    local dg_tx = datagram:new()
    local src = ethernet:pton("02:00:00:00:00:01")
@@ -99,22 +103,16 @@ function selftest ()
                         dst = localhost,
                         next_header = 59, -- No next header.
                         hop_limit = 1}))
-   dg_tx:push(ethernet:new({src = src, 
-                            dst = dst, 
+   dg_tx:push(ethernet:new({src = src,
+                            dst = dst,
                             type = 0x86dd}))
-   -- Transmit packet.
-   link.transmit(lo.input.rx, dg_tx:packet())
-   lo:push()
-   -- Receive packet.
-   lo:pull()
-   local dg_rx = datagram:new(link.receive(lo.output.tx), ethernet)
-   -- Assert packet was received OK.
-   assert(dg_rx:parse({{ethernet, function(eth)
-      return(eth:src_eq(src) and eth:dst_eq(dst) and eth:type() == 0x86dd)
-   end }, { ipv6, function(ipv6)
-      return(ipv6:src_eq(localhost) and ipv6:dst_eq(localhost))
-   end } }), "loopback test failed")
-   lo:stop()
+   -- Transmit packets.
+   link.transmit(link_in, dg_tx:packet())
+   link.transmit(link_cmp, packet.clone(dg_tx:packet()))
+   engine.app_table.lo:push()
+   -- Run engine.
+   engine.main({duration = 0.01, report = {showapps=true,showlinks=true}})
+   assert(#engine.app_table.match:errors() == 0)
    print("selftest passed")
 
    -- XXX Another useful test would be to feed a pcap file with

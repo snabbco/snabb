@@ -82,6 +82,7 @@ function build_doc1 {
 }
 
 function build_doc {
+    (cd $(repo_path) && make clean)
     out=$(build_doc1 $1 $2 2>&1)
     if [ "$?" != 0 ]; then
         echo "$out" > $2

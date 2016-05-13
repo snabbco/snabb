@@ -45,7 +45,7 @@ local numbers = {} -- name -> number
 
 function open (name, readonly)
    local qname = shm.resolve(name)
-   if numbers[qname] then error("counter already opened: " .. qname) end
+   if numbers[qname] then return private[numbers[qname]] end
    local n = #public+1
    if readonly then
       public[n] = shm.open(name, counter_t, readonly)
