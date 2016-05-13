@@ -14,7 +14,7 @@ require('apps.intel.intel10g').num_descriptors = ring_buffer_size
 config.app(c, "nic", require(device_info.driver).driver, {...})
 ```
 
-The default of 512 seems too small, based on load test at IMIX line rate tests against lwaftr, 1024 or 2048 gave equally good results. Num_descriptors controls the Receive Descriptor Length on the Intel 82599 Controller, which determines the number of bytes allocated to the circular buffer. This value must be a multiple of 128 (the maximum cache line size). Since each descriptor is 16 bytes in length, the total number of receive descriptors is always a multiple of 8. In networking terms, this defines the ingress buffer size in packets (TODO: is this correct?). Larger ingress buffer can reduce packet loss while Snabb is busy handling other packets, but it will also increase latency for packets waiting in the queue to be picked up by Snabb.
+The default of 512 seems too small, based on load test at IMIX line rate tests against lwaftr, 1024 or 2048 gave equally good results. Num_descriptors controls the Receive Descriptor Length on the Intel 82599 Controller, which determines the number of packets allocated to the circular buffer. This value must be a power of two. Larger ingress buffer can reduce packet loss while Snabb is busy handling other packets, but it will also increase latency for packets waiting in the queue to be picked up by Snabb.
 
 ### Enable engine.busywait
 Defined in src/core/app.lua and enabled before calling engine.main() via
