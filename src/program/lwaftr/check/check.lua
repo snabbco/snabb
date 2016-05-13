@@ -67,11 +67,24 @@ end
 
 function validate_diff(actual, expected)
    if not lib.equal(actual, expected) then
-      print("--- Expected")
-      for k, v in pairs(expected) do print(k, "=", v) end
-      print("--- actual")
-      for k, v in pairs(actual) do print(k, "=", v) end
-      error("counters did not match")
+      local msg
+      print('--- Expected (actual values in brackets, if any)')
+      for k, v in pairs(expected) do
+         msg = k..' = '..v
+         if actual[k] ~= nil then
+            msg = msg..' ('..actual[k]..')'
+         end
+         print(msg)
+      end
+      print('--- actual (expected values in brackets, if any)')
+      for k, v in pairs(actual) do
+         msg = k..' = '..v
+         if expected[k] ~= nil then
+            msg = msg..' ('..expected[k]..')'
+         end
+         print(msg)
+      end
+      error('counters did not match')
    end
 end
 
