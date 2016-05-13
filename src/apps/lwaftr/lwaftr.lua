@@ -16,6 +16,7 @@ local checksum = require("lib.checksum")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local ipv4 = require("lib.protocol.ipv4")
+local counter = require("core.counter")
 local packet = require("core.packet")
 local lib = require("core.lib")
 local bit = require("bit")
@@ -152,7 +153,7 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
       "Incorrect icmpv6_rate_limiter_n_packets value, must be >= 0")
    local icmpv6_rate_limiter_n_seconds = lwstate.icmpv6_rate_limiter_n_seconds
    local icmpv6_rate_limiter_n_packets = lwstate.icmpv6_rate_limiter_n_packets
-   local counter = 0
+   local num_packets = 0
    local last_time
    return function (o, pkt)
       local cur_now = tonumber(engine.now())
@@ -160,11 +161,13 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
       -- Reset if elapsed time reached.
       if cur_now - last_time >= icmpv6_rate_limiter_n_seconds then
          last_time = cur_now
-         counter = 0
+         num_packets = 0
       end
       -- Send packet if limit not reached.
-      if counter < icmpv6_rate_limiter_n_packets then
-         counter = counter + 1
+      if num_packets < icmpv6_rate_limiter_n_packets then
+         num_packets = num_packets + 1
+         counter.add(lwstate.counters.out_icmpv6_bytes, pkt.length)
+         counter.add(lwstate.counters.out_icmpv6_packets)
          return transmit(o, pkt)
       else
          return drop(pkt)
@@ -203,6 +206,37 @@ function LwAftr:new(conf)
    o.binding_table = conf.preloaded_binding_table or bt.load(o.conf.binding_table)
 
    o.control = channel.create('lwaftr/control', messages.lwaftr_message_t)
+
+   -- COUNTERS
+   -- lwAFTR counters all live in the same directory, and their filenames are
+   -- built out of ordered field values, separated by dashes.
+   -- Fields:
+   -- - direction: "in", "out", "hpin", "drop";
+   -- If "direction" is "drop":
+   --   - reason: reasons for dropping;
+   -- - protocol+version: "icmpv4", "icmpv6", "ipv4", "ipv6";
+   -- - size: "bytes", "packets".
+   -- The "size" field always comes last.
+   local counters_dir = "app/lwaftr/counters/"
+   o.counters = {}
+   -- Ingress
+   o.counters.in_ipv4_bytes = counter.open(counters_dir .. "in-ipv4-bytes")
+   o.counters.in_ipv4_packets = counter.open(counters_dir .. "in-ipv4-packets")
+   o.counters.in_ipv6_bytes = counter.open(counters_dir .. "in-ipv6-bytes")
+   o.counters.in_ipv6_packets = counter.open(counters_dir .. "in-ipv6-packets")
+   -- Egress IP
+   o.counters.out_ipv4_bytes = counter.open(counters_dir .. "out-ipv4-bytes")
+   o.counters.out_ipv4_packets = counter.open(counters_dir .. "out-ipv4-packets")
+   o.counters.out_ipv6_bytes = counter.open(counters_dir .. "out-ipv6-bytes")
+   o.counters.out_ipv6_packets = counter.open(counters_dir .. "out-ipv6-packets")
+   -- Egress ICMP
+   o.counters.out_icmpv4_bytes = counter.open(counters_dir .. "out-icmpv4-bytes")
+   o.counters.out_icmpv4_packets = counter.open(counters_dir .. "out-icmpv4-packets")
+   o.counters.out_icmpv6_bytes = counter.open(counters_dir .. "out-icmpv6-bytes")
+   o.counters.out_icmpv6_packets = counter.open(counters_dir .. "out-icmpv6-packets")
+   -- Hairpinning
+   o.counters.hpin_ipv4_bytes = counter.open(counters_dir .. "hpin-ipv4-bytes")
+   o.counters.hpin_ipv4_packets = counter.open(counters_dir .. "hpin-ipv4-packets")
 
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
    if debug then lwdebug.pp(conf) end
@@ -262,14 +296,20 @@ local function transmit_ipv4(lwstate, pkt)
       -- The destination address is managed by the lwAFTR, so we need to
       -- hairpin this packet.  Enqueue on the IPv4 interface, as if it
       -- came from the internet.
+      counter.add(lwstate.counters.hpin_ipv4_bytes, pkt.length)
+      counter.add(lwstate.counters.hpin_ipv4_packets)
       return transmit(lwstate.input.v4, pkt)
    else
+      counter.add(lwstate.counters.out_ipv4_bytes, pkt.length)
+      counter.add(lwstate.counters.out_ipv4_packets)
       return transmit(lwstate.o4, pkt)
    end
 end
 
-local function transmit_ipv4_reply(lwstate, pkt, orig_pkt)
+local function transmit_icmpv4_reply(lwstate, pkt, orig_pkt)
    drop(orig_pkt)
+   counter.add(lwstate.counters.out_icmpv4_bytes, pkt.length)
+   counter.add(lwstate.counters.out_icmpv4_packets)
    return transmit_ipv4(lwstate, pkt)
 end
 
@@ -296,7 +336,7 @@ local function drop_ipv4_packet_to_unreachable_host(lwstate, pkt, to_ip)
    local icmp_dis = icmp.new_icmpv4_packet(
       lwstate.aftr_mac_inet_side, lwstate.inet_mac, lwstate.aftr_ipv4_ip,
       to_ip, pkt, ethernet_header_size, icmp_config)
-   return transmit_ipv4_reply(lwstate, icmp_dis, pkt)
+   return transmit_icmpv4_reply(lwstate, icmp_dis, pkt)
 end
 
 -- ICMPv6 type 1 code 5, as per RFC 7596.
@@ -363,7 +403,7 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src)
       local reply = icmp.new_icmpv4_packet(
          lwstate.aftr_mac_inet_side, lwstate.inet_mac, lwstate.aftr_ipv4_ip,
          dst_ip, pkt, ethernet_header_size, icmp_config)
-      return transmit_ipv4_reply(lwstate, reply, pkt)
+      return transmit_icmpv4_reply(lwstate, reply, pkt)
    end
 
    if debug then print("ipv6", ipv6_src, ipv6_dst) end
@@ -374,7 +414,7 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src)
 
    if encapsulating_packet_with_df_flag_would_exceed_mtu(lwstate, pkt) then
       local reply = cannot_fragment_df_packet_error(lwstate, pkt)
-      return transmit_ipv4_reply(lwstate, reply, pkt)
+      return transmit_icmpv4_reply(lwstate, reply, pkt)
    end
 
    local payload_length = get_ethernet_payload_length(pkt)
@@ -393,6 +433,8 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src)
       lwdebug.print_pkt(pkt)
    end
 
+   counter.add(lwstate.counters.out_ipv6_bytes, pkt.length)
+   counter.add(lwstate.counters.out_ipv6_packets)
    return transmit(lwstate.o6, pkt)
 end
 
@@ -534,7 +576,7 @@ local function icmpv6_incoming(lwstate, pkt)
       local reply = tunnel_unreachable(lwstate, pkt,
                                        constants.icmpv4_datagram_too_big_df,
                                        mtu)
-      return transmit_ipv4_reply(lwstate, reply, pkt)
+      return transmit_icmpv4_reply(lwstate, reply, pkt)
    -- Take advantage of having already checked for 'packet too big' (2), and
    -- unreachable node/hop limit exceeded/paramater problem being 1, 3, 4 respectively
    elseif icmp_type <= constants.icmpv6_parameter_problem then
@@ -547,7 +589,7 @@ local function icmpv6_incoming(lwstate, pkt)
       -- Accept all unreachable or parameter problem codes
       local reply = tunnel_unreachable(lwstate, pkt,
                                        constants.icmpv4_host_unreachable)
-      return transmit_ipv4_reply(lwstate, reply, pkt)
+      return transmit_icmpv4_reply(lwstate, reply, pkt)
    else
       -- No other types of ICMPv6, including echo request/reply, are
       -- handled.
@@ -668,6 +710,8 @@ function LwAftr:push ()
       -- that's not IPv6.
       local pkt = receive(i6)
       if is_ipv6(pkt) then
+         counter.add(self.counters.in_ipv6_bytes, pkt.length)
+         counter.add(self.counters.in_ipv6_packets)
          from_b4(self, pkt)
       else
          drop(pkt)
@@ -680,6 +724,8 @@ function LwAftr:push ()
       -- packets.  Drop anything that's not IPv4.
       local pkt = receive(i4)
       if is_ipv4(pkt) then
+         counter.add(self.counters.in_ipv4_bytes, pkt.length)
+         counter.add(self.counters.in_ipv4_packets)
          from_inet(self, pkt)
       else
          drop(pkt)

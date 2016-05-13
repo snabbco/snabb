@@ -40,6 +40,30 @@ function snabb_run_and_cmp {
    echo "Test passed"
 }
 
+
+# Counters (temporary)
+
+echo "Testing: ingress/egress IP counters"
+${SNABB_LWAFTR} check ${TEST_BASE}/no_icmp.conf \
+   ${TEST_BASE}/tcp-frominet-bound.pcap ${TEST_BASE}/tcp-fromb4-ipv6.pcap \
+   ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap \
+   ${TEST_BASE}/counters_ip.lua && echo "Test passed"
+
+echo "Testing: egress ICMP counters"
+${SNABB_LWAFTR} check ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/tcp-frominet-bound-ttl1.pcap ${TEST_BASE}/tcp-fromb4-ipv6-unbound.pcap \
+   ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap \
+   ${TEST_BASE}/counters_icmp.lua && echo "Test passed"
+
+echo "Testing: hairpinning counters"
+${SNABB_LWAFTR} check ${TEST_BASE}/no_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6.pcap \
+   ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap \
+   ${TEST_BASE}/counters_hairpin.lua && echo "Test passed"
+
+# End counters (temporary)
+
+
 echo "Testing: from-internet IPv4 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-frominet-bound.pcap ${EMPTY} \
