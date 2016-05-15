@@ -8,8 +8,6 @@ local S = require("syscall")
 
 local lib = require("core.lib")
 
-require("lib.hardware.pci_h")
-
 --- ### Hardware device information
 
 devices = {}
@@ -113,30 +111,58 @@ function unbind_device_from_linux (pciaddress)
    end
 end
 
+-- ### Access PCI devices using Linux sysfs (`/sys`) filesystem
+-- sysfs is an interface towards the Linux kernel based on special
+-- files that are implemented as callbacks into the kernel. Here are
+-- some background links about sysfs:
+-- - High-level: <http://en.wikipedia.org/wiki/Sysfs>
+-- - Low-level:  <https://www.kernel.org/doc/Documentation/filesystems/sysfs.txt>
+
+-- PCI hardware device registers can be memory-mapped via sysfs for
+-- "Memory-Mapped I/O" by device drivers. The trick is to `mmap()` a file
+-- such as:
+--    /sys/bus/pci/devices/0000:00:04.0/resource0
+-- and then read and write that memory to access the device.
+
 -- Memory map PCI device configuration space.
 -- Return two values:
 --   Pointer for memory-mapped access.
 --   File descriptor for the open sysfs resource file.
-function map_pci_memory (device, n)
+
+
+function map_pci_memory_locked(device,n) return map_pci_memory (device, n, true) end
+function map_pci_memory_unlocked(device,n) return map_pci_memory (device, n, false) end
+
+function map_pci_memory (device, n, lock)
+   assert(lock == true or lock == false, "Explicit lock status required")
    root_check()
    local filepath = path(device).."/resource"..n
-   local fd = C.open_pci_resource(filepath)
-   assert(fd >= 0)
-   local addr = C.map_pci_resource(fd)
-   assert( addr ~= 0 )
-   return addr, fd
+   local f,err  = S.open(filepath, "rdwr, sync")
+   assert(f, "failed to open resource " .. filepath .. ": " .. tostring(err))
+   if lock then
+     assert(f:flock("ex, nb"), "failed to lock " .. filepath)
+   end
+   local st, err = f:stat()
+   assert(st, tostring(err))
+   local mem, err = f:mmap(nil, st.size, "read, write", "shared", 0)
+   assert(mem, tostring(err))
+   return ffi.cast("uint32_t *", mem), f
 end
-
--- Close a file descriptor opened by map_pci_memory().
 function close_pci_resource (fd, base)
-   C.close_pci_resource(fd, base)
+   local st, err = fd:stat()
+   assert(st, tostring(err))
+   S.munmap(base, st.size)
+   fd:close()
 end
 
 --- Enable or disable PCI bus mastering. DMA only works when bus
 --- mastering is enabled.
 function set_bus_master (device, enable)
    root_check()
-   local fd = C.open_pcie_config(path(device).."/config")
+   local f,err = S.open(path(device).."/config", "rdwr")
+   assert(f, tostring(err))
+   local fd = f:getfd()
+
    local value = ffi.new("uint16_t[1]")
    assert(C.pread(fd, value, 2, 0x4) == 2)
    if enable then
@@ -145,7 +171,7 @@ function set_bus_master (device, enable)
       value[0] = bit.band(value[0], bit.bnot(lib.bits({Master=2})))
    end
    assert(C.pwrite(fd, value, 2, 0x4) == 2)
-   C.close(fd)
+   f:close()
 end
 
 function root_check ()
