@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local ffi = require("ffi")
@@ -30,8 +32,11 @@ end
 
 PcapWriter = {}
 
-function PcapWriter:new (filename)
-   local file = io.open(filename, "w")
+function PcapWriter:new (filename, arg)
+   local conf = arg and config.parse_app_arg(arg) or {}
+   local mode = conf.overwrite and "w+" or "w"
+   local file, errno = io.open(filename, mode)
+   if errno then error(errno) end
    pcap.write_file_header(file)
    return setmetatable({file = file}, {__index = PcapWriter})
 end

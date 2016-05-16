@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This class derives from lib.bridge.base and implements a "learning
 -- bridge" using a MAC address table provided by apps.bridge.mac_table
 -- to store the set of source addresses of packets arriving on all

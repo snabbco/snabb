@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 // RX descriptor written by software.
 struct rx_desc {
    uint64_t address;    // 64-bit address of receive buffer

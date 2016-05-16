@@ -10,7 +10,18 @@ are encapsulated and put on the `uplink` output port. Packets transmitted
 on the `uplink` input port are decapsulated and put on the `customer`
 output port.
 
-![VPWS](.images/VPWS.png)
+    DIAGRAM: VPWS
+               +--------+
+    customer   |        |
+          ---->*  VPWS  *<----
+          <----*        *---->
+               |        |   uplink
+               +--------+
+    
+    customer
+          -------\   /--------
+          <------|---/ /----->
+                 \-----/    uplink
 
 ## Configuration
 

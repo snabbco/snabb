@@ -5,6 +5,7 @@ E= @echo
 #E= @:
 
 export TEST_SKIPPED=43
+CC ?= gcc
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
@@ -16,7 +17,7 @@ CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P '
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
-RMSRC  = $(shell find . -name  README.md.src -printf '%P ')
+RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
@@ -30,7 +31,7 @@ ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
 ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
-RMOBJS := $(patsubst %.src,%,$(RMSRC))
+RMOBJS := $(patsubst %,obj/%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
@@ -50,11 +51,10 @@ PATH := ../lib/luajit/usr/local/bin:$(PATH)
 
 snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	$(E) "LINK      $@"
-	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
+	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../lib/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
-	@ln -fs snabb snabbswitch
 	@ls -sh snabb
 
 all: $(EXE)
@@ -110,7 +110,7 @@ $(TESTSCRIPTS): testlog snabb
 		) \
 	)
 
-$(OBJDIR) bin testlog:
+$(OBJDIR) bin testlog $(OBJDIR/doc):
 	$(E) "DIR       $@"
 	$(Q) mkdir -p $@
 
@@ -125,15 +125,15 @@ $(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/avx2_c.o: arch/avx2.c Makefile
 	$(E) "C(AVX2)   $@"
-	$(Q) gcc -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/sse2_c.o: arch/sse2.c Makefile
 	$(E) "C(SSE2)   $@"
-	$(Q) gcc -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
@@ -151,10 +151,9 @@ $(JITOBJS): obj/jit_%.o: ../lib/luajit/src/jit/%.lua $(OBJDIR)
 	$(E) "LUA       $@"
 	$(Q) luajit -bg -n $(patsubst obj/jit_%.o, jit.%, $@) $< $@
 
-
-$(RMOBJS): %: %.src
+$(RMOBJS): obj/%: %
 	$(E) "MARKDOWN  $@"
-	$(Q) scripts/process-markdown $< > $@
+	$(Q) scripts/process-markdown $< $@
 
 $(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	$(E) "INC       $@"
@@ -180,26 +179,26 @@ obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
 
 obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
 
-book: doc/snabbswitch.pdf doc/snabbswitch.html doc/snabbswitch.epub
+book: obj/doc/snabb.pdf obj/doc/snabb.html obj/doc/snabb.epub
 
-doc/snabbswitch.md: markdown Makefile doc/genbook.sh
+obj/doc/snabb.markdown: markdown Makefile doc/genbook.sh
 	(cd doc; ./genbook.sh) > $@
 
-doc/snabbswitch.pdf: doc/snabbswitch.md
+obj/doc/snabb.pdf: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o snabbswitch.pdf snabbswitch.md)
+	$(Q) (cd obj/doc; pandoc --template=../../doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../../$@ ../../$<)
 
-doc/snabbswitch.html: doc/snabbswitch.md
+obj/doc/snabb.html: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.html snabbswitch.md)
+	$(Q) (cd obj/doc; pandoc --self-contained --css="../../doc/style.css" -S -s --toc --chapters -o ../../$@ ../../$<)
 
-doc/snabbswitch.epub: doc/snabbswitch.md
+obj/doc/snabb.epub: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --self-contained --css="style.css" -S -s --toc --chapters -o snabbswitch.epub snabbswitch.md)
+	$(Q) (cd obj/doc; pandoc --self-contained --css="../../doc/style.css" -S -s --toc --chapters -o ../../$@ ../../$<)
 
-CLEAN = snabb snabbswitch obj bin doc/snabbswitch.* doc/.images/* testlog programs.inc
+CLEAN = snabb obj bin testlog programs.inc
 
 clean:
 	$(E) "RM        $(CLEAN)"

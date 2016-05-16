@@ -1,7 +1,8 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local app = require("core.app")
-local freelist = require("core.freelist")
 local packet = require("core.packet")
 local link = require("core.link")
 local transmit, receive = link.transmit, link.receive

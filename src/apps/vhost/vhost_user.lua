@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 --
 -- See http://www.virtualopensystems.com/en/solutions/guides/snabbswitch-qemu/
 

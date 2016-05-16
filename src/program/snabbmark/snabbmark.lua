@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(..., package.seeall)
 
 local usage = require("program.snabbmark.README_inc")
@@ -5,7 +7,6 @@ local usage = require("program.snabbmark.README_inc")
 local basic_apps = require("apps.basic.basic_apps")
 local pci           = require("lib.hardware.pci")
 local ethernet      = require("lib.protocol.ethernet")
-local freelist      = require("core.freelist")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C

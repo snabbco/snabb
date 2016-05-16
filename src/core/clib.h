@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 // sleep(3) - suspend execution for second intervals
 unsigned int sleep(unsigned int seconds);
 

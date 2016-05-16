@@ -1,9 +1,10 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Implements virtio virtq
 
 
 module(...,package.seeall)
 
-local freelist  = require("core.freelist")
 local lib       = require("core.lib")
 local memory    = require("core.memory")
 local ffi       = require("ffi")

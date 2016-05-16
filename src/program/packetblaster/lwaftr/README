@@ -1,0 +1,171 @@
+Generate IPv6 B4 and IPv4 Internet traffic towards lightweight 4o6 AFTR server
+and report MPPS, Gbps and packet loss on received traffic.
+
+Usage: packetblaster lwaftr [OPTIONS]
+
+  --pci PCI             Interface PCI address, e.g. 0000:05:00.0
+
+  --tap TAP_INTERFACE   Linux tap interface name, e.g. tap0
+
+  --int                 Linux network interface, e.g. eth0
+
+  --pcap PCAP_FILE      Write packets into the pcap file. Program terminates
+                        after one cycle of packets (COUNT x SIZES per protocol)
+
+  --sock <SOCKET>       Socket name for virtio interface
+
+  --vlan VLANID         VLAN tag traffic with VLANID if set
+
+  --src_mac SOURCE
+                        Source MAC-Address
+			Default: 00:00:00:00:00:00
+  --dst_mac DESTINATION
+                        Destination MAC-Address
+			Default: 00:00:00:00:00:00
+  --size SIZES
+                        A comma separated list of numbers. Send packets of
+                        SIZES bytes. The size specifies the lenght of the IPv4 
+                        packet. The actual packet size on the wire is 14 Bytes
+                        longer (Ethernet header). Smallest allowed IPv4 packet
+                        size is 28 (20 Bytes for IPv4 header, 8 Bytes payload
+                        for packet loss detection)
+                        Default: 64,64,64,64,64,64,64,594,594,594,1500 (IMIX)
+  --b4 IPV6,IPV4,PORT
+                        First B4 Client IPv6 mapped to IPv4 and UDP Port.
+                        B4 IPv6,IPv4 and Port are incremented for every count, 
+                        then rolled over.  Port is incremented by the port number: 
+                        e.g. 1024 -> 1024, 2048, 3096 .. 64512 (63 in total)
+                        Default: 2001:db8::,10.0.0.0,1024
+  --aftr IPV6
+                        IPv6 address of lwaftr server (softwire tunnel endpoint)
+                        Default: 2001:db8:ffff::100
+  --ipv4 IPV4
+                        Public IPv4. Used as source for IPv4 traffic and
+                        as destination in IPv6 packets from B4
+                        Default: 8.8.8.8
+  --count COUNT
+                        Number of B4 clients to simulate. 
+                        Default: 1
+  --rate RATE
+                        Rate in MPPS for the generated traffic. Fractions are
+                        allowed (e.g. 3.148 for IMIX line rate). If set too high,
+                        the actual transmitted rate depends on the interfaces capacity.
+                        Setting rate to 0 turns it to listening only mode while
+                        reporting on incoming packets
+                        Default: 1 MPPS
+  --v4only, -4
+                        Generate only IPv4 packets from the Internet towards lwaftr
+  --v6only, -6
+                        Generate only IPv6 packets from B4 to lwaftr
+  --duration DURATION
+                        Run for DURATION seconds.
+			Default: unlimited
+  -V, --verbose
+                        Display verbose link information every second
+  -h, --help
+                        Print usage information.
+
+This tool generates two types of traffic according to RFC7596:
+
+ - B4 IPv4-in-IPv6 traffic towards lwAFTR (left to right)
+ - Internet IPv4 to IPv4 traffic towards lwAFTR (right to left)
+
+Topology From RFC7596, Figure 1:
+
++--------+   +---------+  IPv4-in-IPv6  +------+   +-------------+
+|IPv4 LAN|---|lwB4/NAPT|================|lwAFTR|---|IPv4 Internet|
++--------+   +---------+                +------+   +-------------+
+lw4o6 NAPT model: subscriber state in the lwAFTR, NAPT state in the lwB4
+
+Example 1: Measure performance of single stick LWAFTR (handling IPv4 and IPv6
+traffic over a single interface). Packetblaster lwaftr generates 50% IPv4 and
+50% IPv6 encapsulated traffic of IMIX line traffic:
+
+  $ sudo ./snabb packetblaster lwaftr --rate 3.2 --count 1000000000:05:00.0
+  packetblaster lwaftr: Sending 1000000 clients at 3.200 MPPS to 0000:05:00.0
+
+  IPv6: 2001:db8:: > 2001:db8:ffff::100: 10.0.0.0:1024 > 8.8.8.8:12345
+        source IPv6 and source IPv4/Port adjusted per client
+  IPv6 packet sizes: 104,104,104,104,104,104,104,634,634,634,1540
+
+  IPv4: 8.8.8.8:12345 > 10.0.0.0:1024
+        destination IPv4 and Port adjusted per client
+  IPv4 packet sizes: 64,64,64,64,64,64,64,594,594,594,1500
+
+  v6+v4: 1.416+1.416 = 2.833 MPPS, 4.445+3.983 = 8.428 Gbps, lost 190697 pkts
+  v6+v4: 1.574+1.574 = 3.148 MPPS, 4.949+4.446 = 9.395 Gbps, lost 46 pkts
+  v6+v4: 1.574+1.574 = 3.148 MPPS, 4.950+4.446 = 9.395 Gbps, lost 0 pkts
+  v6+v4: 1.574+1.574 = 3.148 MPPS, 4.950+4.446 = 9.395 Gbps, lost 0 pkts
+  v6+v4: 1.574+1.574 = 3.148 MPPS, 4.950+4.446 = 9.395 Gbps, lost 0 pkts
+  v6+v4: 1.574+1.574 = 3.148 MPPS, 4.950+4.446 = 9.395 Gbps, lost 0 pkts
+  v6+v4: 1.574+1.574 = 3.148 MPPS, 4.950+4.446 = 9.395 Gbps, lost 0 pkts
+
+Example 2: Uni-directional througput test with two instances. 
+Run one client1 with 0 MPPS and on client2 on the other end of the wire
+with the desired packet rate. The first instance will report on received
+traffic:
+
+  client1$ sudo ./snabb packetblaster lwaftr --rate 0 --pci 0000:05:00 --size 40
+  packetblaster lwaftr: Sending 1 clients at 0.000 MPPS to 0000:05:00.0
+
+  IPv6: 2001:db8:: > 2001:db8:ffff::100: 10.0.0.0:1024 > 8.8.8.8:12345
+        source IPv6 and source IPv4/Port adjusted per client
+  IPv6 packet sizes: 80
+
+  IPv4: 8.8.8.8:12345 > 10.0.0.0:1024
+        destination IPv4 and Port adjusted per client
+  IPv4 packet sizes: 40
+
+  v6+v4: 2.364+2.370 = 4.734 MPPS, 1.778+1.137 = 2.915 Gbps, lost 1513191 pkts
+  v6+v4: 2.499+2.499 = 4.999 MPPS, 1.880+1.200 = 3.079 Gbps, lost 1073 pkts
+  v6+v4: 2.500+2.500 = 5.000 MPPS, 1.880+1.200 = 3.080 Gbps, lost 0 pkts
+  v6+v4: 2.500+2.500 = 4.999 MPPS, 1.880+1.200 = 3.080 Gbps, lost 633 pkts
+  v6+v4: 2.500+2.500 = 5.000 MPPS, 1.880+1.200 = 3.080 Gbps, lost 0 pkts
+  v6+v4: 2.500+2.500 = 5.000 MPPS, 1.880+1.200 = 3.080 Gbps, lost 54 pkts
+  v6+v4: 2.500+2.500 = 5.000 MPPS, 1.880+1.200 = 3.080 Gbps, lost 0 pkts
+  v6+v4: 2.500+2.500 = 5.000 MPPS, 1.880+1.200 = 3.080 Gbps, lost 0 pkts
+  v6+v4: 2.500+2.500 = 5.000 MPPS, 1.880+1.200 = 3.080 Gbps, lost 0 pkts
+  v6+v4: 2.500+2.500 = 5.000 MPPS, 1.880+1.200 = 3.080 Gbps, lost 0 pkts
+
+  client2$ sudo ./snabb packetblaster lwaftr --rate 5 --size 40 --pci 0000:04:00.0
+  packetblaster lwaftr: Sending 1 clients at 5.000 MPPS to 0000:04:00.0
+
+  IPv6: 2001:db8:: > 2001:db8:ffff::100: 10.0.0.0:1024 > 8.8.8.8:12345
+        source IPv6 and source IPv4/Port adjusted per client
+  IPv6 packet sizes: 80
+
+  IPv4: 8.8.8.8:12345 > 10.0.0.0:1024
+        destination IPv4 and Port adjusted per client
+  IPv4 packet sizes: 40
+
+  v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
+  v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
+  v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
+  v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
+  v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
+  v6+v4: 0.000+0.000 = 0.000 MPPS, 0.000+0.000 = 0.000 Gbps, lost 0 pkts
+
+Example with Linux tap interface:
+
+  $ sudo ip tuntap add dev tap0 mode tap
+  $ sudo ifconfig tap0 mtu 9000 up
+  $ sudo tcpdump -n -i tap0 -e -s 1500 -c 12 &
+  $ sudo ./snabb packetblaster lwaftr --rate 0.001 --pci tap0 -v4only -D 1
+  packetblaster lwaftr: Sending 1 clients at 0.001 MPPS to tap0
+
+  IPv4: 8.8.8.8:12345 > 10.0.0.0:1024
+        destination IPv4 and Port adjusted per client
+  IPv4 packet sizes: 64,64,64,64,64,64,64,594,594,594,1500
+
+  14:04:43.572712 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
+  14:04:43.572733 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
+  14:04:43.572741 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
+  14:04:43.572749 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
+  14:04:43.572756 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
+  14:04:43.572780 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
+  14:04:43.572788 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
+  14:04:43.572866 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 608: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 558
+  14:04:43.573019 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 608: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 558
+14:04:43.573161 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 608: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 558
+  14:04:43.573297 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 1514: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 1464
+  14:04:43.573430 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
