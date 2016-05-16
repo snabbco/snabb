@@ -221,7 +221,7 @@ function LwAftr:new(conf)
    -- The "size" field always comes last.
    -- TODO: should the "drop_all_ipv4/6" aggregate counters be incremented all
    --   over the place, with the related runtime cost, or computed by summing
-   --   the relevant counters less frequently?
+   --   the relevant counters less frequently or upon access?
    local counters_dir = "app/lwaftr/counters/"
    o.counters = {}
 
