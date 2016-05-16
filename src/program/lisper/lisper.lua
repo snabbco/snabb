@@ -506,11 +506,7 @@ local function route_packet(p, rxname, txports)
       local spi = parse_esp(p)
       if spi then --packed is encrypted, decrypt it
          local decrypt = spis[spi]
-         if not decrypt then return end --invalid packet
-         local p0 = p
-         p = decrypt(p)
-         if not p then return end --invalid packet
-         packet.free(p0)
+         if not (decrypt and decrypt(p)) then return end --invalid packet
       end
       local src_ip, session_id, cookie
       src_ip, session_id, cookie, smac, dmac, payload_offset = parse_l2tp(p)
@@ -575,9 +571,7 @@ local function route_packet(p, rxname, txports)
          tx = txports[txname]
          log_l2tp(")))", dp, txname)
          if loc.encrypt then
-            local dp0 = dp
-            dp = loc.encrypt(dp)
-            packet.free(dp0)
+            if not loc.encrypt(dp) then return end --invalid packet
          end
       end
       if not link.full(tx) then

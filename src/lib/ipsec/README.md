@@ -1,4 +1,4 @@
-### IPsec/ESP (lib.ipsec.esp)
+### Encapsulating Security Payload (lib.ipsec.esp)
 
 The `lib.ipsec.esp` module contains two classes `esp_v6_encrypt` and
 `esp_v6_decrypt` which implement implement packet encryption and
@@ -13,6 +13,9 @@ UDP, L2TPv3) and also encrypts the contents of the inner protocol
 header. The decrypt class does the reverse: it decrypts the inner
 protocol header and removes the ESP protocol header.
 
+Anti-replay protection as well as recovery from synchronization loss due to
+excessive packet loss are *not* implemented.
+
 References:
 
 - [IPsec Wikipedia page](https://en.wikipedia.org/wiki/IPsec).
@@ -26,22 +29,22 @@ References:
 Returns a new encryption/decryption context respectively. *Config* must a
 be a table with the following keys:
 
-* `spi` - “Security Parameter Index” as specified in RFC 4303.
 * `mode` - Encryption mode (string). The only accepted value is the
   string `"aes-128-gcm"`.
 * `keymat` - Hex string containing 16 bytes of key material as specified
   in RFC 4106.
 * `salt` - Hex string containing four bytes of salt as specified in
   RFC 4106.
+* `spi` - “Security Parameter Index” as specified in RFC 4303.
+* `window_size` - *Optional*. Width of the window in which out of order packets
+  are accepted. The default is 128. (`esp_v6_decrypt` only.)
 
 — Method **esp_v6_encrypt:encapsulate** *packet*
 
-Returns a freshly allocated packet that is the encrypted and encapsulated
-version of *packet* or `nil` if header parsing failed. The contents of *packet*
-are destroyed in the process.
+Encapsulates *packet* and encrypts its payload. Returns `true` on success and
+`false` otherwise.
 
 — Method **esp_v6_decrypt:decapsulate** *packet*
 
-Returns a freshly allocated packet that is the decrypted and decapsulated
-version of *packet* or `nil` if header parsing or authentication failed. The
-contents of *packet* are destroyed in the process.
+Decapsulates *packet* and decrypts its payload. Returns `true` on success and
+`false` otherwise.
