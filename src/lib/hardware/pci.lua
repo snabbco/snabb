@@ -163,7 +163,7 @@ end
 --
 -- example: qualified("01:00.0") -> "0000:01:00.0"
 function qualified (address)
-   return address:gsub("^%d%d:%d%d[.]%d+$", "0000:%1")
+   return address:gsub("^%x%x:%x%x[.]%x+$", "0000:%1")
 end
 
 --- ### Selftest
@@ -175,6 +175,7 @@ function selftest ()
    print("selftest: pci")
    assert(qualified("0000:01:00.0") == "0000:01:00.0", "qualified 1")
    assert(qualified(     "01:00.0") == "0000:01:00.0", "qualified 2")
+   assert(qualified(     "0a:00.0") == "0000:0a:00.0", "qualified 3")
    assert(canonical("0000:01:00.0") ==      "01:00.0", "canonical 1")
    assert(canonical(     "01:00.0") ==      "01:00.0", "canonical 2")
    scan_devices()

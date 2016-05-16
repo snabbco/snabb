@@ -32,8 +32,8 @@ default_schemas = {
    ports                = {'tenant_id', 'id', 'name', 'network_id',
                            'mac_address', 'admin_state_up', 'status',
                            'device_id', 'device_owner'},
-   ml2_port_bindings    = {'port_id', 'host', 'vif_type', 'driver', 'segment',
-                           'vnic_type', 'vif_details', 'profile'},
+   ml2_port_bindings    = {'port_id', 'host', 'vif_type',
+                           'vnic_type', 'profile', 'vif_details'},
    securitygrouprules   = {'tenant_id', 'id', 'security_group_id',
                            'remote_group_id', 'direction', 'ethertype',
                            'protocol', 'port_range_min', 'port_range_max',
@@ -81,10 +81,10 @@ function create_config (input_dir, output_dir, hostname)
    for _, port in pairs(ports) do
       print("PortID: ", port.id)
       local binding = port_bindings[port.id]
-      -- If the port is a 'snabb' port, lives on our host and is online
+      -- If the port is a 'vhostuser' port, lives on our host and is online
       -- then we compile its configuration.
-      print("BindingID ", binding.id, " has driver ", binding.driver)
-      if binding.driver == "snabb" then
+      print("BindingID ", binding.id, " has vif_type ", binding.vif_type)
+      if binding.vif_type == "vhostuser" then
          local vif_details = json.decode(binding.vif_details)
          -- See https://github.com/snabbco/snabb/pull/423
          local profile = vif_details["binding:profile"]

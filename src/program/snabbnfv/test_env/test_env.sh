@@ -32,7 +32,11 @@ export qemu_smp=$QUEUES
 export qemu_vectors=$((2*$QUEUES + 1))
 
 export sockets=""
-export assets=$HOME/.test_env
+if [ -z "$SNABB_TEST_FIXTURES" ]; then
+    export assets=$HOME/.test_env
+else
+    export assets=$SNABB_TEST_FIXTURES
+fi
 export qemu=qemu/obj/x86_64-softmmu/qemu-system-x86_64
 export host_qemu=$(which qemu-system-x86_64)
 

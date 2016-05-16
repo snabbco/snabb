@@ -5,7 +5,6 @@
 
 module(...,package.seeall)
 
-local freelist  = require("core.freelist")
 local lib       = require("core.lib")
 local link      = require("core.link")
 local memory    = require("core.memory")
