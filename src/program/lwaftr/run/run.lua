@@ -77,7 +77,10 @@ function parse_args(args)
          fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
       end
    end
-   handlers["v4-pci"] = handlers.v4
+   handlers["v4-pci"] = function(arg)
+      print("WARNING: Deprecated argument '--v4-pci'. Use '--v4' instead.")
+      handlers.v4(arg)
+   end
    function handlers.v6(arg)
       v6 = arg
       if not v6 then
@@ -87,7 +90,10 @@ function parse_args(args)
          fatal(("Couldn't locate NIC with PCI address '%s'"):format(v6))
       end
    end
-   handlers["v6-pci"] = handlers.v6
+   handlers["v6-pci"] = function(arg)
+      print("WARNING: Deprecated argument '--v6-pci'. Use '--v6' instead.")
+      handlers.v6(arg)
+   end
    function handlers.r (arg)
       ring_buffer_size = tonumber(arg)
       if not ring_buffer_size then fatal("bad ring size: " .. arg) end
