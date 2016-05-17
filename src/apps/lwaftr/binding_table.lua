@@ -269,6 +269,10 @@ function BindingTable:iterate_br_addresses()
    return next_br_address
 end
 
+function BindingTable:iterate_softwires()
+   return self.softwires:iterate()
+end
+
 function BindingTable:save(filename, mtime_sec, mtime_nsec)
    local out = stream.open_temporary_output_byte_stream(filename)
    out:write_ptr(binding_table_header_t(
@@ -578,5 +582,14 @@ function selftest()
       end
       assert(i == #br_address_iter + 1)
    end
+
+   do
+      local i = 0
+      for entry in map:iterate_softwires() do i = i + 1 end
+      -- 11 softwires in above example.  Since they are hashed into an
+      -- arbitrary order, we can't assert much about the iteration.
+      assert(i == 11)
+   end
+
    print('ok')
 end
