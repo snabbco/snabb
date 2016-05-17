@@ -77,6 +77,7 @@ function parse_args(args)
          fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
       end
    end
+   handlers["v4-pci"] = handlers.v4
    function handlers.v6(arg)
       v6 = arg
       if not v6 then
@@ -86,6 +87,7 @@ function parse_args(args)
          fatal(("Couldn't locate NIC with PCI address '%s'"):format(v6))
       end
    end
+   handlers["v6-pci"] = handlers.v6
    function handlers.r (arg)
       ring_buffer_size = tonumber(arg)
       if not ring_buffer_size then fatal("bad ring size: " .. arg) end
@@ -98,7 +100,7 @@ function parse_args(args)
    end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:hir:",
-      { conf = "c", v4 = 1, v6 = 1,
+      { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
         verbose = "v", duration = "D", help = "h",
         virtio = "i", ["ring-buffer-size"] = "r", cpu = 1,
         ["real-time"] = 0 })
