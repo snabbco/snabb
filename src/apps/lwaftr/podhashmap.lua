@@ -350,6 +350,17 @@ function PodHashMap:dump()
    end
 end
 
+function PodHashMap:iterate()
+   local max_entry = self.entries + self.size + self.max_displacement
+   local function next_entry(max_entry, entry)
+      while entry < max_entry do
+         entry = entry + 1
+         if entry.hash ~= HASH_MAX then return entry end
+      end
+   end
+   return next_entry, max_entry, self.entries - 1
+end
+
 function PodHashMap:make_lookup_streamer(stride)
    -- These requires are here because they rely on dynasm, which the
    -- user might not have.  In that case, since they get no benefit from
@@ -546,7 +557,8 @@ function selftest()
    -- 32-byte entries
    local rhh = PodHashMap.new(ffi.typeof('uint32_t'), ffi.typeof('int32_t[6]'),
                               hash_i32)
-   rhh:resize(2e6 / 0.4 + 1)
+   local occupancy = 2e6
+   rhh:resize(occupancy / 0.4 + 1)
 
    local function test_insertion(count)
       local v = ffi.new('int32_t[6]');
@@ -564,7 +576,7 @@ function selftest()
       return result
    end
 
-   check_perf(test_insertion, 2e6, 400, 100, 'insertion (40% occupancy)')
+   check_perf(test_insertion, occupancy, 400, 100, 'insertion (40% occupancy)')
    print('max displacement: '..rhh.max_displacement)
    io.write('selfcheck: ')
    io.flush()
@@ -573,14 +585,21 @@ function selftest()
 
    io.write('population check: ')
    io.flush()
-   for i = 1, 2e6 do
+   for i = 1, occupancy do
       local offset = rhh:lookup(i)
       assert(rhh:val_at(offset)[0] == bnot(i))
    end
    rhh:selfcheck()
    io.write('pass\n')
 
-   check_perf(test_lookup, 2e6, 300, 100, 'lookup (40% occupancy)')
+   io.write('iteration check: ')
+   io.flush()
+   local iterated = 0
+   for entry in rhh:iterate() do iterated = iterated + 1 end
+   assert(iterated == occupancy)
+   io.write('pass\n')
+
+   check_perf(test_lookup, occupancy, 300, 100, 'lookup (40% occupancy)')
 
    local stride = 1
    repeat
@@ -600,12 +619,12 @@ function selftest()
       -- Note that "result" is part of the value, not an index into
       -- the table, and so we expect the results to be different from
       -- rhh:lookup().
-      check_perf(test_lookup_streamer, 2e6, 1000, 100,
+      check_perf(test_lookup_streamer, occupancy, 1000, 100,
                  'streaming lookup, stride='..stride)
       stride = stride * 2
    until stride > 256
 
-   check_perf(test_lookup, 2e6, 300, 100, 'lookup (40% occupancy)')
+   check_perf(test_lookup, occupancy, 300, 100, 'lookup (40% occupancy)')
 
    -- A check that our equality functions work as intended.
    local numbers_equal = make_equal_fn(ffi.typeof('int'))
