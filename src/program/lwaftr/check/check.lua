@@ -7,25 +7,25 @@ local lib = require("core.lib")
 local setup = require("program.lwaftr.setup")
 
 local counters_dir = "app/lwaftr/counters/"
-local counters_paths = {
-   -- Ingress
-   in_ipv4_bytes = counters_dir .. "in-ipv4-bytes",
-   in_ipv4_packets = counters_dir .. "in-ipv4-packets",
-   in_ipv6_bytes = counters_dir .. "in-ipv6-bytes",
-   in_ipv6_packets = counters_dir .. "in-ipv6-packets",
-   -- Egress IP
-   out_ipv4_bytes = counters_dir .. "out-ipv4-bytes",
-   out_ipv4_packets = counters_dir .. "out-ipv4-packets",
-   out_ipv6_bytes = counters_dir .. "out-ipv6-bytes",
-   out_ipv6_packets = counters_dir .. "out-ipv6-packets",
-   -- Egress ICMP
-   out_icmpv4_bytes = counters_dir .. "out-icmpv4-bytes",
-   out_icmpv4_packets = counters_dir .. "out-icmpv4-packets",
-   out_icmpv6_bytes = counters_dir .. "out-icmpv6-bytes",
-   out_icmpv6_packets = counters_dir .. "out-icmpv6-packets",
-   -- Hairpinning
-   hpin_ipv4_bytes = counters_dir .. "hpin-ipv4-bytes",
-   hpin_ipv4_packets = counters_dir .. "hpin-ipv4-packets",
+local counter_names = {
+-- Ingress.
+   "in-ipv4-bytes",
+   "in-ipv4-packets",
+   "in-ipv6-bytes",
+   "in-ipv6-packets",
+-- Egress IP.
+   "out-ipv4-bytes",
+   "out-ipv4-packets",
+   "out-ipv6-bytes",
+   "out-ipv6-packets",
+-- Egress ICMP.
+   "out-icmpv4-bytes",
+   "out-icmpv4-packets",
+   "out-icmpv6-bytes",
+   "out-icmpv6-packets",
+-- Hairpinning.
+   "hairpin-ipv4-bytes",
+   "hairpin-ipv4-packets",
 }
 
 function show_usage(code)
@@ -47,8 +47,8 @@ end
 
 function read_counters(c)
    local results = {}
-   for name, path in pairs(counters_paths) do
-      local cnt = counter.open(path, "readonly")
+   for _, name in ipairs(counter_names) do
+      local cnt = counter.open(counters_dir .. name, "readonly")
       results[name] = counter.read(cnt)
    end
    return results

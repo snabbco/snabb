@@ -1,4 +1,4 @@
 return {
-   in_ipv4_bytes = 66,
-   in_ipv4_packets = 1,
+   ["in-ipv4-bytes"] = 66,
+   ["in-ipv4-packets"] = 1,
 }

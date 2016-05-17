@@ -1,7 +1,7 @@
 return {
-   in_ipv4_bytes = 98,
-   in_ipv4_packets = 1,
+   ["in-ipv4-bytes"] = 98,
+   ["in-ipv4-packets"] = 1,
 
-   out_ipv6_bytes = 138,
-   out_ipv6_packets = 1,
+   ["out-ipv6-bytes"] = 138,
+   ["out-ipv6-packets"] = 1,
 }

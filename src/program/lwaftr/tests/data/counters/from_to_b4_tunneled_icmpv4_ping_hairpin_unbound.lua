@@ -1,9 +1,9 @@
 return {
-   in_ipv4_bytes = 98,
-   in_ipv4_packets = 1,
-   in_ipv6_bytes = 138,
-   in_ipv6_packets = 1,
+   ["in-ipv4-bytes"] = 98,
+   ["in-ipv4-packets"] = 1,
+   ["in-ipv6-bytes"] = 138,
+   ["in-ipv6-packets"] = 1,
 
-   hpin_ipv4_bytes = 98,
-   hpin_ipv4_packets = 1,
+   ["hairpin-ipv4-bytes"] = 98,
+   ["hairpin-ipv4-packets"] = 1,
 }

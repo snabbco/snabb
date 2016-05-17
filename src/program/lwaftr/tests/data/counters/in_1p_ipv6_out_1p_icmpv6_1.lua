@@ -1,7 +1,7 @@
 return {
-   in_ipv6_bytes = 106,
-   in_ipv6_packets = 1,
+   ["in-ipv6-bytes"] = 106,
+   ["in-ipv6-packets"] = 1,
 
-   out_icmpv6_bytes = 154,
-   out_icmpv6_packets = 1,
+   ["out-icmpv6-bytes"] = 154,
+   ["out-icmpv6-packets"] = 1,
 }
