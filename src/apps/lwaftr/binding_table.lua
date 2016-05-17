@@ -246,6 +246,14 @@ function BindingTable:get_br_address(i)
    return self.br_addresses[i].addr
 end
 
+-- Iterate over the set of IPv4 addresses managed by a binding
+-- table. Invoke like:
+--
+--   for ipv4_lo, ipv4_hi, psid_info in bt:iterate_psid_map() do ... end
+--
+-- The IPv4 values are host-endianness uint32 values, and are an
+-- inclusive range to which the psid_info applies.  The psid_info is a
+-- psid_map_value_t pointer, which has psid_length and shift members.
 function BindingTable:iterate_psid_map()
    local f, state, lo = self.psid_map:iterate()
    local function next_entry()
@@ -259,6 +267,11 @@ function BindingTable:iterate_psid_map()
    return next_entry
 end
 
+-- Iterate over the BR addresses in a binding table.  Invoke like:
+--
+--   for ipv6 in bt:iterate_br_addresses() do ... end
+--
+-- The IPv6 value is a uint8_t[16].
 function BindingTable:iterate_br_addresses()
    local idx = -1
    local function next_br_address()
@@ -269,6 +282,15 @@ function BindingTable:iterate_br_addresses()
    return next_br_address
 end
 
+-- Iterate over the softwires in a binding table.  Invoke like:
+--
+--   for entry in bt:iterate_softwires() do ... end
+--
+-- Each entry is a pointer with two members, "key" and "value".  They
+-- key is a softwire_key_t and has "ipv4" and "psid" members.  The value
+-- is a softwire_value_t and has "br" and "b4_ipv6" members.  The br is
+-- a zero-based index into the br_addresses array, and b4_ipv6 is a
+-- uint8_t[16].
 function BindingTable:iterate_softwires()
    return self.softwires:iterate()
 end
