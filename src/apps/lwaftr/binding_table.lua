@@ -246,6 +246,19 @@ function BindingTable:get_br_address(i)
    return self.br_addresses[i].addr
 end
 
+function BindingTable:iterate_psid_map()
+   local f, state, lo = self.psid_map:iterate()
+   local function next_entry()
+      local hi, value
+      repeat
+         lo, hi, value = f(state, lo)
+         if lo == nil then return end
+      until value.psid_length > 0 or value.shift > 0
+      return lo, hi, value
+   end
+   return next_entry
+end
+
 function BindingTable:save(filename, mtime_sec, mtime_nsec)
    local out = stream.open_temporary_output_byte_stream(filename)
    out:write_ptr(binding_table_header_t(
@@ -496,9 +509,11 @@ function selftest()
 
    local ipv4_protocol = require("lib.protocol.ipv4")
    local ipv6_protocol = require("lib.protocol.ipv6")
+   local function pton_host_uint32(ipv4)
+      return ffi.C.ntohl(ffi.cast('uint32_t*', ipv4_protocol:pton(ipv4))[0])
+   end
    local function lookup(ipv4, port)
-      local ipv4_as_uint = ffi.cast('uint32_t*', ipv4_protocol:pton(ipv4))[0]
-      return map:lookup(ffi.C.ntohl(ipv4_as_uint), port)
+      return map:lookup(pton_host_uint32(ipv4), port)
    end
    local function assert_lookup(ipv4, port, ipv6, br)
       local val = assert(lookup(ipv4, port))
@@ -519,5 +534,24 @@ function selftest()
    assert_lookup('178.79.150.3', 5119, '127:14:25:36:47:58:69:128', 2)
    assert(lookup('178.79.150.3', 5120) == nil)
    assert(lookup('178.79.150.4', 7850) == nil)
+
+   do
+      local psid_map_iter = {
+         { pton_host_uint32('178.79.150.2'), { psid_length=16, shift=0 } },
+         { pton_host_uint32('178.79.150.3'), { psid_length=6, shift=10 } },
+         { pton_host_uint32('178.79.150.15'), { psid_length=4, shift=12 } },
+         { pton_host_uint32('178.79.150.233'), { psid_length=16, shift=0 } }
+      }
+      local i = 1
+      for lo, hi, value in map:iterate_psid_map() do
+         local ipv4, expected = unpack(psid_map_iter[i])
+         assert(lo == ipv4)
+         assert(hi == ipv4)
+         assert(value.psid_length == expected.psid_length)
+         assert(value.shift == expected.shift)
+         i = i + 1
+      end
+   end
+
    print('ok')
 end
