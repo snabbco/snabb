@@ -118,25 +118,9 @@ local function copy_file (dest, src)
    fout:close()
 end
 
---[[
-A compiled binding table doesn't allow access to its internal data, so it's
-not possible to iterate through it and dump it to a text file.  The compiled
-binding table must match with the binding table in text format.  What we do is
-to check whether the compiled binding table is the result of compiling the
-text version.  The compiled binding table contains a header that can be checked
-to verify this information.  If that's the case, we copy the text version of
-the binding table to /tmp.
---]]
 function dump_binding_table (lwstate)
-   local bt_txt = lwstate.conf.binding_table
-   local bt_o = bt_txt:gsub("%.txt$", "%.o")
-   if not bt_is_fresh(bt_txt, bt_o) then
-      error("Binding table file is outdated: '%s'"):format(bt_txt)
-      main.exit(1)
-   end
-   local dest = (BINDING_TABLE_FILE_DUMP):format(os.time())
-   print(("Dump lwAFTR configuration: '%s'"):format(dest))
-   copy_file(dest, bt_txt)
+   print("Dumping lwAFTR binding table...")
+   lwstate.binding_table:dump(BINDING_TABLE_FILE_DUMP:format(os.time()))
 end
 
 function selftest ()
