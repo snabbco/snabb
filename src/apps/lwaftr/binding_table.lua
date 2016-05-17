@@ -259,6 +259,16 @@ function BindingTable:iterate_psid_map()
    return next_entry
 end
 
+function BindingTable:iterate_br_addresses()
+   local idx = -1
+   local function next_br_address()
+      idx = idx + 1
+      if idx >= self.br_address_count then return end
+      return self.br_addresses[idx].addr
+   end
+   return next_br_address
+end
+
 function BindingTable:save(filename, mtime_sec, mtime_nsec)
    local out = stream.open_temporary_output_byte_stream(filename)
    out:write_ptr(binding_table_header_t(
@@ -551,7 +561,22 @@ function selftest()
          assert(value.shift == expected.shift)
          i = i + 1
       end
+      assert(i == #psid_map_iter + 1)
    end
 
+   do
+      local br_address_iter = {
+         '8:9:a:b:c:d:e:f',
+         '1E:1:1:1:1:1:1:af',
+         '1E:2:2:2:2:2:2:af'
+      }
+      local i = 1
+      for ipv6 in map:iterate_br_addresses() do
+         local expected = ipv6_protocol:pton(br_address_iter[i])
+         assert(ffi.C.memcmp(expected, ipv6, 16) == 0)
+         i = i + 1
+      end
+      assert(i == #br_address_iter + 1)
+   end
    print('ok')
 end
