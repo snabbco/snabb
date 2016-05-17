@@ -307,6 +307,55 @@ function BindingTable:save(filename, mtime_sec, mtime_nsec)
    out:close_and_rename(filename)
 end
 
+function BindingTable:dump(filename)
+   local tmp = os.tmpname()
+   local out = io.open(tmp, 'w+')
+   local ipv4, ipv6 = require('lib.protocol.ipv4'), require('lib.protocol.ipv6')
+   local function fmt(out, template, ...) out:write(template:format(...)) end
+   local function dump(template, ...) fmt(out, template, ...) end
+
+   local function ipv4_ntop(addr)
+      return ipv4:ntop(ffi.new('uint32_t[1]', { ffi.C.htonl(addr) }))
+   end
+
+   dump("psid_map {\n")
+   for lo, hi, psid_info in self:iterate_psid_map() do
+      dump("  ")
+      if lo < hi then dump('%s-', ipv4_ntop(lo)) end
+      dump('%s { psid_length=%d', ipv4_ntop(hi), psid_info.psid_length)
+      if psid_info.shift ~= 16 - psid_info.shift then
+         dump(', shift=%d', psid_info.shift)
+      end
+      dump("  }\n")
+   end
+   dump("}\n\n")
+
+   dump("br_addresses {\n")
+   for addr in self:iterate_br_addresses() do
+      dump("  %s\n", ipv6:ntop(addr))
+   end
+   dump("}\n\n")
+
+   dump("softwires {\n")
+   for entry in self:iterate_softwires() do
+      dump("  { ipv4=%s, psid=%d, b4=%s", ipv4_ntop(entry.key.ipv4),
+           entry.key.psid, ipv6:ntop(entry.value.b4_ipv6))
+      if entry.value.br ~= 0 then dump(", aftr=%d", entry.value.br) end
+      dump(" }\n")
+   end
+   dump("}\n\n")
+
+   out:flush()
+
+   local res, err = os.rename(tmp, filename)
+   if not res then
+      io.stderr:write("Failed to rename "..tmp.." to "..filename..": ")
+      io.stderr:write(tostring(err).."\n")
+   else
+      print("Binding table dumped to "..filename..".")
+   end
+end
+
 local function load_compiled(stream)
    read_magic(stream)
    local psid_map = rangemap.load(stream, psid_map_value_t)
@@ -540,6 +589,11 @@ function selftest()
 
    local tmp = os.tmpname()
    map:save(tmp)
+   map = load(tmp)
+   os.remove(tmp)
+
+   local tmp = os.tmpname()
+   map:dump(tmp)
    map = load(tmp)
    os.remove(tmp)
 
