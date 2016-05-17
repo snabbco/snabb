@@ -15,7 +15,7 @@ In one server, start the lwAFTR:
 ```
 $ sudo taskset -c 1 ./src/snabb lwaftr run -v \
     --conf program/lwaftr/tests/data/icmp_on_fail.conf \
-    --v4-pci 0000:02:00.0 --v6-pci 0000:02:00.1
+    --v4 0000:02:00.0 --v6 0000:02:00.1
 ```
 
 The `-v` flag enables periodic printouts reporting MPPS and Gbps statistics per

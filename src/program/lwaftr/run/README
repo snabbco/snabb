@@ -1,10 +1,10 @@
 Usage: run --help
-       run --conf <conf-file> --v4-pci <pci-addr> --v6-pci <pci-addr> [OPTION...]
+       run --conf <conf-file> --v4 <pci-addr> --v4 <pci-addr> [OPTION...]
 
 Required arguments:
        --conf   <conf-file>     Sets configuration policy table
-       --v4-pci <pci-addr>      PCI device number for the INET-side NIC
-       --v6-pci <pci-addr>      PCI device number for the B4-side NIC
+       --v4 <pci-addr>          PCI device number for the INET-side NIC
+       --v6 <pci-addr>          PCI device number for the B4-side NIC
 
 Optional arguments:
        --virtio                 Use virtio-net interfaces instead of Intel 82599

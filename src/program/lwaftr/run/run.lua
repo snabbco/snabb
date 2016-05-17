@@ -35,7 +35,7 @@ end
 
 function parse_args(args)
    if #args == 0 then show_usage(1) end
-   local conf_file, v4_pci, v6_pci
+   local conf_file, v4, v6
    local ring_buffer_size
    local opts = { verbosity = 0 }
    local handlers = {}
@@ -68,23 +68,31 @@ function parse_args(args)
          fatal('Failed to enable real-time scheduling.  Try running as root.')
       end
    end
-   function handlers.n(arg)
-      v4_pci = arg
+   function handlers.v4(arg)
+      v4 = arg
       if not arg then
-         fatal("Argument '--v4-pci' was not set")
+         fatal("Argument '--v4' was not set")
       end
-      if not nic_exists(v4_pci) then
-         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4_pci))
+      if not nic_exists(v4) then
+         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
       end
    end
-   function handlers.m(arg)
-      v6_pci = arg
-      if not v6_pci then
-         fatal("Argument '--v6-pci' was not set")
+   handlers["v4-pci"] = function(arg)
+      print("WARNING: Deprecated argument '--v4-pci'. Use '--v4' instead.")
+      handlers.v4(arg)
+   end
+   function handlers.v6(arg)
+      v6 = arg
+      if not v6 then
+         fatal("Argument '--v6' was not set")
       end
-      if not nic_exists(v6_pci) then
-         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v6_pci))
+      if not nic_exists(v6) then
+         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v6))
       end
+   end
+   handlers["v6-pci"] = function(arg)
+      print("WARNING: Deprecated argument '--v6-pci'. Use '--v6' instead.")
+      handlers.v6(arg)
    end
    function handlers.r (arg)
       ring_buffer_size = tonumber(arg)
@@ -97,8 +105,8 @@ function parse_args(args)
       end
    end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:n:m:vD:hir:",
-      { conf = "c", ["v4-pci"] = "n", ["v6-pci"] = "m",
+   lib.dogetopt(args, handlers, "b:c:vD:hir:",
+      { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
         verbose = "v", duration = "D", help = "h",
         virtio = "i", ["ring-buffer-size"] = "r", cpu = 1,
         ["real-time"] = 0 })
@@ -109,20 +117,20 @@ function parse_args(args)
       require('apps.intel.intel10g').num_descriptors = ring_buffer_size
    end
    if not conf_file then fatal("Missing required --conf argument.") end
-   if not v4_pci then fatal("Missing required --v4-pci argument.") end
-   if not v6_pci then fatal("Missing required --v6-pci argument.") end
-   return opts, conf_file, v4_pci, v6_pci
+   if not v4 then fatal("Missing required --v4 argument.") end
+   if not v6 then fatal("Missing required --v6 argument.") end
+   return opts, conf_file, v4, v6
 end
 
 function run(args)
-   local opts, conf_file, v4_pci, v6_pci = parse_args(args)
+   local opts, conf_file, v4, v6 = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
    local c = config.new()
    if opts.virtio_net then
-      setup.load_virt(c, conf, 'inetNic', v4_pci, 'b4sideNic', v6_pci)
+      setup.load_virt(c, conf, 'inetNic', v4, 'b4sideNic', v6)
    else
-      setup.load_phy(c, conf, 'inetNic', v4_pci, 'b4sideNic', v6_pci)
+      setup.load_phy(c, conf, 'inetNic', v4, 'b4sideNic', v6)
    end
    engine.configure(c)
 
