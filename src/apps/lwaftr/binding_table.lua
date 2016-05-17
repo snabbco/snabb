@@ -246,6 +246,55 @@ function BindingTable:get_br_address(i)
    return self.br_addresses[i].addr
 end
 
+-- Iterate over the set of IPv4 addresses managed by a binding
+-- table. Invoke like:
+--
+--   for ipv4_lo, ipv4_hi, psid_info in bt:iterate_psid_map() do ... end
+--
+-- The IPv4 values are host-endianness uint32 values, and are an
+-- inclusive range to which the psid_info applies.  The psid_info is a
+-- psid_map_value_t pointer, which has psid_length and shift members.
+function BindingTable:iterate_psid_map()
+   local f, state, lo = self.psid_map:iterate()
+   local function next_entry()
+      local hi, value
+      repeat
+         lo, hi, value = f(state, lo)
+         if lo == nil then return end
+      until value.psid_length > 0 or value.shift > 0
+      return lo, hi, value
+   end
+   return next_entry
+end
+
+-- Iterate over the BR addresses in a binding table.  Invoke like:
+--
+--   for ipv6 in bt:iterate_br_addresses() do ... end
+--
+-- The IPv6 value is a uint8_t[16].
+function BindingTable:iterate_br_addresses()
+   local idx = -1
+   local function next_br_address()
+      idx = idx + 1
+      if idx >= self.br_address_count then return end
+      return self.br_addresses[idx].addr
+   end
+   return next_br_address
+end
+
+-- Iterate over the softwires in a binding table.  Invoke like:
+--
+--   for entry in bt:iterate_softwires() do ... end
+--
+-- Each entry is a pointer with two members, "key" and "value".  They
+-- key is a softwire_key_t and has "ipv4" and "psid" members.  The value
+-- is a softwire_value_t and has "br" and "b4_ipv6" members.  The br is
+-- a zero-based index into the br_addresses array, and b4_ipv6 is a
+-- uint8_t[16].
+function BindingTable:iterate_softwires()
+   return self.softwires:iterate()
+end
+
 function BindingTable:save(filename, mtime_sec, mtime_nsec)
    local out = stream.open_temporary_output_byte_stream(filename)
    out:write_ptr(binding_table_header_t(
@@ -256,6 +305,55 @@ function BindingTable:save(filename, mtime_sec, mtime_nsec)
    out:write_array(self.br_addresses, br_address_t, self.br_address_count)
    self.softwires:save(out)
    out:close_and_rename(filename)
+end
+
+function BindingTable:dump(filename)
+   local tmp = os.tmpname()
+   local out = io.open(tmp, 'w+')
+   local ipv4, ipv6 = require('lib.protocol.ipv4'), require('lib.protocol.ipv6')
+   local function fmt(out, template, ...) out:write(template:format(...)) end
+   local function dump(template, ...) fmt(out, template, ...) end
+
+   local function ipv4_ntop(addr)
+      return ipv4:ntop(ffi.new('uint32_t[1]', { ffi.C.htonl(addr) }))
+   end
+
+   dump("psid_map {\n")
+   for lo, hi, psid_info in self:iterate_psid_map() do
+      dump("  ")
+      if lo < hi then dump('%s-', ipv4_ntop(lo)) end
+      dump('%s { psid_length=%d', ipv4_ntop(hi), psid_info.psid_length)
+      if psid_info.shift ~= 16 - psid_info.shift then
+         dump(', shift=%d', psid_info.shift)
+      end
+      dump("  }\n")
+   end
+   dump("}\n\n")
+
+   dump("br_addresses {\n")
+   for addr in self:iterate_br_addresses() do
+      dump("  %s\n", ipv6:ntop(addr))
+   end
+   dump("}\n\n")
+
+   dump("softwires {\n")
+   for entry in self:iterate_softwires() do
+      dump("  { ipv4=%s, psid=%d, b4=%s", ipv4_ntop(entry.key.ipv4),
+           entry.key.psid, ipv6:ntop(entry.value.b4_ipv6))
+      if entry.value.br ~= 0 then dump(", aftr=%d", entry.value.br) end
+      dump(" }\n")
+   end
+   dump("}\n\n")
+
+   out:flush()
+
+   local res, err = os.rename(tmp, filename)
+   if not res then
+      io.stderr:write("Failed to rename "..tmp.." to "..filename..": ")
+      io.stderr:write(tostring(err).."\n")
+   else
+      print("Binding table dumped to "..filename..".")
+   end
 end
 
 local function load_compiled(stream)
@@ -494,11 +592,18 @@ function selftest()
    map = load(tmp)
    os.remove(tmp)
 
+   local tmp = os.tmpname()
+   map:dump(tmp)
+   map = load(tmp)
+   os.remove(tmp)
+
    local ipv4_protocol = require("lib.protocol.ipv4")
    local ipv6_protocol = require("lib.protocol.ipv6")
+   local function pton_host_uint32(ipv4)
+      return ffi.C.ntohl(ffi.cast('uint32_t*', ipv4_protocol:pton(ipv4))[0])
+   end
    local function lookup(ipv4, port)
-      local ipv4_as_uint = ffi.cast('uint32_t*', ipv4_protocol:pton(ipv4))[0]
-      return map:lookup(ffi.C.ntohl(ipv4_as_uint), port)
+      return map:lookup(pton_host_uint32(ipv4), port)
    end
    local function assert_lookup(ipv4, port, ipv6, br)
       local val = assert(lookup(ipv4, port))
@@ -519,5 +624,48 @@ function selftest()
    assert_lookup('178.79.150.3', 5119, '127:14:25:36:47:58:69:128', 2)
    assert(lookup('178.79.150.3', 5120) == nil)
    assert(lookup('178.79.150.4', 7850) == nil)
+
+   do
+      local psid_map_iter = {
+         { pton_host_uint32('178.79.150.2'), { psid_length=16, shift=0 } },
+         { pton_host_uint32('178.79.150.3'), { psid_length=6, shift=10 } },
+         { pton_host_uint32('178.79.150.15'), { psid_length=4, shift=12 } },
+         { pton_host_uint32('178.79.150.233'), { psid_length=16, shift=0 } }
+      }
+      local i = 1
+      for lo, hi, value in map:iterate_psid_map() do
+         local ipv4, expected = unpack(psid_map_iter[i])
+         assert(lo == ipv4)
+         assert(hi == ipv4)
+         assert(value.psid_length == expected.psid_length)
+         assert(value.shift == expected.shift)
+         i = i + 1
+      end
+      assert(i == #psid_map_iter + 1)
+   end
+
+   do
+      local br_address_iter = {
+         '8:9:a:b:c:d:e:f',
+         '1E:1:1:1:1:1:1:af',
+         '1E:2:2:2:2:2:2:af'
+      }
+      local i = 1
+      for ipv6 in map:iterate_br_addresses() do
+         local expected = ipv6_protocol:pton(br_address_iter[i])
+         assert(ffi.C.memcmp(expected, ipv6, 16) == 0)
+         i = i + 1
+      end
+      assert(i == #br_address_iter + 1)
+   end
+
+   do
+      local i = 0
+      for entry in map:iterate_softwires() do i = i + 1 end
+      -- 11 softwires in above example.  Since they are hashed into an
+      -- arbitrary order, we can't assert much about the iteration.
+      assert(i == 11)
+   end
+
    print('ok')
 end
