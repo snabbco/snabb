@@ -12,4 +12,7 @@ return {
 
    ["hairpin-ipv4-bytes"] = 160,
    ["hairpin-ipv4-packets"] = 2,
+
+   ["drop-ttl-zero-ipv4-bytes"] = 66,
+   ["drop-ttl-zero-ipv4-packets"] = 1,
 }

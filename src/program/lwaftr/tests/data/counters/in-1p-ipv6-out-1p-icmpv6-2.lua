@@ -4,4 +4,7 @@ return {
 
    ["out-icmpv6-bytes"] = 186,
    ["out-icmpv6-packets"] = 1,
+
+   ["drop-no-source-softwire-ipv6-bytes"] = 138,
+   ["drop-no-source-softwire-ipv6-packets"] = 1,
 }

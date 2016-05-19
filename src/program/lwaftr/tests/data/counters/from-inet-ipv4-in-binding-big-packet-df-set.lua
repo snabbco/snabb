@@ -7,4 +7,7 @@ return {
 
    ["out-icmpv4-bytes"] = 590,
    ["out-icmpv4-packets"] = 1,
+
+   ["drop-over-mtu-but-dont-fragment-ipv4-bytes"] = 1494,
+   ["drop-over-mtu-but-dont-fragment-ipv4-packets"] = 1,
 }

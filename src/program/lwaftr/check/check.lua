@@ -5,41 +5,11 @@ local config = require("core.config")
 local counter = require("core.counter")
 local lib = require("core.lib")
 local setup = require("program.lwaftr.setup")
+-- Get the counter names from the code, so that any change there
+-- has a chance to be automatically picked up by the tests.
+local counter_names = require("apps.lwaftr.lwaftr").counter_names
 
 local counters_dir = "app/lwaftr/counters/"
-local counter_names = {
-
--- Ingress.
-   "in-ipv4-bytes",
-   "in-ipv4-packets",
-   "in-ipv6-bytes",
-   "in-ipv6-packets",
-
--- Egress IP.
-   "out-ipv4-bytes",
-   "out-ipv4-packets",
-   "out-ipv6-bytes",
-   "out-ipv6-packets",
-
--- Egress ICMP.
-   "out-icmpv4-bytes",
-   "out-icmpv4-packets",
-   "out-icmpv6-bytes",
-   "out-icmpv6-packets",
-
--- Hairpinning.
-   "hairpin-ipv4-bytes",
-   "hairpin-ipv4-packets",
-
--- Drop v4.
-
--- All dropped v4. TODO: implement.
-   "drop-all-ipv4-bytes",
-   "drop-all-ipv4-packets",
--- On IPv4 link, but not IPv4.
-   "drop-misplaced-ipv4-bytes",
-   "drop-misplaced-ipv4-packets",
-}
 
 function show_usage(code)
    print(require("program.lwaftr.check.README_inc"))

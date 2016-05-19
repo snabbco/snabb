@@ -56,7 +56,8 @@ local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 --   over the place, with the related runtime cost, or computed by summing
 --   the relevant counters less frequently or upon access?
 local counters_dir = "app/lwaftr/counters/"
-local counter_names = {
+-- Referenced by program/check/check.lua
+counter_names = {
 
 -- Ingress.
    "in-ipv4-bytes",
@@ -89,23 +90,23 @@ local counter_names = {
    "drop-misplaced-ipv4-bytes",
    "drop-misplaced-ipv4-packets",
 -- No matching destination softwire.
-   "drop-no_dest_softwire-ipv4-bytes",
-   "drop-no_dest_softwire-ipv4-packets",
+   "drop-no-dest-softwire-ipv4-bytes",
+   "drop-no-dest-softwire-ipv4-packets",
 -- TTL is zero.
-   "drop-ttl_zero-ipv4-bytes",
-   "drop-ttl_zero-ipv4-packets",
+   "drop-ttl-zero-ipv4-bytes",
+   "drop-ttl-zero-ipv4-packets",
 -- Big packets exceeding MTU, but DF (Don't Fragment) flag set.
-   "drop-over_mtu_but_dont_fragment-ipv4-bytes",
-   "drop-over_mtu_but_dont_fragment-ipv4-packets",
+   "drop-over-mtu-but-dont-fragment-ipv4-bytes",
+   "drop-over-mtu-but-dont-fragment-ipv4-packets",
 -- Bad checksum.
-   "drop-bad_checksum-icmpv4-bytes",
-   "drop-bad_checksum-icmpv4-packets",
+   "drop-bad-checksum-icmpv4-bytes",
+   "drop-bad-checksum-icmpv4-packets",
 -- Policy of dropping incoming ICMPv4 packets.
-   "drop-in_by_policy-icmpv4-bytes",
-   "drop-in_by_policy-icmpv4-packets",
+   "drop-in-by-policy-icmpv4-bytes",
+   "drop-in-by-policy-icmpv4-packets",
 -- Policy of dropping outgoing ICMPv4 packets.
-   "drop-out_by_policy-icmpv4-bytes",
-   "drop-out_by_policy-icmpv4-packets",
+   "drop-out-by-policy-icmpv4-bytes",
+   "drop-out-by-policy-icmpv4-packets",
 
 -- Drop v6.
 
@@ -116,29 +117,29 @@ local counter_names = {
    "drop-misplaced-ipv6-bytes",
    "drop-misplaced-ipv6-packets",
 -- Unknown IPv6 protocol.
-   "drop-unknown_protocol-ipv6-bytes",
-   "drop-unknown_protocol-ipv6-packets",
+   "drop-unknown-protocol-ipv6-bytes",
+   "drop-unknown-protocol-ipv6-packets",
 -- No matching source softwire.
-   "drop-no_source_softwire-ipv6-bytes",
-   "drop-no_source_softwire-ipv6-packets",
+   "drop-no-source-softwire-ipv6-bytes",
+   "drop-no-source-softwire-ipv6-packets",
 -- Unknown ICMPv6 type.
-   "drop-unknown_protocol-icmpv6-bytes",
-   "drop-unknown_protocol-icmpv6-packets",
+   "drop-unknown-protocol-icmpv6-bytes",
+   "drop-unknown-protocol-icmpv6-packets",
 -- "Packet too big" ICMPv6 type but not code.
-   "drop-too_big_type_but_not_code-icmpv6-bytes",
-   "drop-too_big_type_but_not_code-icmpv6-packets",
+   "drop-too-big-type-but-not-code-icmpv6-bytes",
+   "drop-too-big-type-but-not-code-icmpv6-packets",
 -- Time-limit-exceeded, but not hop limit.
-   "drop-over_time_but_not_hop_limit-icmpv6-bytes",
-   "drop-over_time_but_not_hop_limit-icmpv6-packets",
+   "drop-over-time-but-not-hop-limit-icmpv6-bytes",
+   "drop-over-time-but-not-hop-limit-icmpv6-packets",
 -- Rate limit reached.
-   "drop-over_rate_limit-icmpv6-bytes",
-   "drop-over_rate_limit-icmpv6-packets",
+   "drop-over-rate-limit-icmpv6-bytes",
+   "drop-over-rate-limit-icmpv6-packets",
 -- Policy of dropping incoming ICMPv6 packets.
-   "drop-in_by_policy-icmpv6-bytes",
-   "drop-in_by_policy-icmpv6-packets",
+   "drop-in-by-policy-icmpv6-bytes",
+   "drop-in-by-policy-icmpv6-packets",
 -- Policy of dropping outgoing ICMPv6 packets.
-   "drop-out_by_policy-icmpv6-bytes",
-   "drop-out_by_policy-icmpv6-packets",
+   "drop-out-by-policy-icmpv6-bytes",
+   "drop-out-by-policy-icmpv6-packets",
 }
 
 local function create_counters ()
@@ -277,8 +278,8 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
          counter.add(lwstate.counters["out-icmpv6-packets"])
          return transmit(o, pkt)
       else
-         counter.add(lwstate.counters["drop-over_rate_limit-icmpv6-bytes"], pkt.length)
-         counter.add(lwstate.counters["drop-over_rate_limit-icmpv6-packets"])
+         counter.add(lwstate.counters["drop-over-rate-limit-icmpv6-bytes"], pkt.length)
+         counter.add(lwstate.counters["drop-over-rate-limit-icmpv6-packets"])
          return drop(pkt)
       end
    end
@@ -398,8 +399,8 @@ end
 local function drop_ipv4_packet_to_unreachable_host(lwstate, pkt, to_ip)
    if lwstate.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
       -- ICMP error messages off by policy; silently drop.
-      counter.add(lwstate.counters["drop-out_by_policy-icmpv4-bytes"], pkt.length)
-      counter.add(lwstate.counters["drop-out_by_policy-icmpv4-packets"])
+      counter.add(lwstate.counters["drop-out-by-policy-icmpv4-bytes"], pkt.length)
+      counter.add(lwstate.counters["drop-out-by-policy-icmpv4-packets"])
       return drop(pkt)
    end
 
@@ -407,8 +408,8 @@ local function drop_ipv4_packet_to_unreachable_host(lwstate, pkt, to_ip)
       -- RFC 7596 section 8.1 requires us to silently drop incoming
       -- ICMPv4 messages that don't match the binding table.
       -- TODO: isn't this prevented by from_inet?
-      counter.add(lwstate.counters["drop-in_by_policy-icmpv4-bytes"], pkt.length)
-      counter.add(lwstate.counters["drop-in_by_policy-icmpv4-packets"])
+      counter.add(lwstate.counters["drop-in-by-policy-icmpv4-bytes"], pkt.length)
+      counter.add(lwstate.counters["drop-in-by-policy-icmpv4-packets"])
       return drop(pkt)
    end
 
@@ -429,8 +430,8 @@ end
 local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
    if lwstate.policy_icmpv6_outgoing == lwconf.policies['DROP'] then
       -- ICMP error messages off by policy; silently drop.
-      counter.add(lwstate.counters["drop-out_by_policy-icmpv6-bytes"], pkt.length)
-      counter.add(lwstate.counters["drop-out_by_policy-icmpv6-packets"])
+      counter.add(lwstate.counters["drop-out-by-policy-icmpv6-bytes"], pkt.length)
+      counter.add(lwstate.counters["drop-out-by-policy-icmpv6-packets"])
       return drop(pkt)
    end
 
@@ -479,11 +480,11 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src)
    -- Do not encapsulate packets that now have a ttl of zero or wrapped around
    local ttl = decrement_ttl(pkt)
    if ttl == 0 then
-      counter.add(lwstate.counters["drop-ttl_zero-ipv4-bytes"], pkt.length)
-      counter.add(lwstate.counters["drop-ttl_zero-ipv4-packets"])
+      counter.add(lwstate.counters["drop-ttl-zero-ipv4-bytes"], pkt.length)
+      counter.add(lwstate.counters["drop-ttl-zero-ipv4-packets"])
       if lwstate.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
-         counter.add(lwstate.counters["drop-out_by_policy-icmpv4-bytes"], pkt.length)
-         counter.add(lwstate.counters["drop-out_by_policy-icmpv4-packets"])
+         counter.add(lwstate.counters["drop-out-by-policy-icmpv4-bytes"], pkt.length)
+         counter.add(lwstate.counters["drop-out-by-policy-icmpv4-packets"])
          return drop(pkt)
       end
       local ipv4_header = get_ethernet_payload(pkt)
@@ -504,8 +505,8 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src)
    local ether_dst = lwstate.next_hop6_mac
 
    if encapsulating_packet_with_df_flag_would_exceed_mtu(lwstate, pkt) then
-      counter.add(lwstate.counters["drop-over_mtu_but_dont_fragment-ipv4-bytes"], pkt.length)
-      counter.add(lwstate.counters["drop-over_mtu_but_dont_fragment-ipv4-packets"])
+      counter.add(lwstate.counters["drop-over-mtu-but-dont-fragment-ipv4-bytes"], pkt.length)
+      counter.add(lwstate.counters["drop-over-mtu-but-dont-fragment-ipv4-packets"])
       local reply = cannot_fragment_df_packet_error(lwstate, pkt)
       return transmit_icmpv4_reply(lwstate, reply, pkt)
    end
@@ -548,8 +549,8 @@ local function flush_encapsulation(lwstate)
       else
          -- Lookup failed.
          if debug then print("lookup failed") end
-         counter.add(lwstate.counters["drop-no_dest_softwire-ipv4-bytes"], pkt.length)
-         counter.add(lwstate.counters["drop-no_dest_softwire-ipv4-packets"])
+         counter.add(lwstate.counters["drop-no-dest-softwire-ipv4-bytes"], pkt.length)
+         counter.add(lwstate.counters["drop-no-dest-softwire-ipv4-packets"])
          drop_ipv4_packet_to_unreachable_host(lwstate, pkt)
       end
    end
@@ -575,8 +576,8 @@ local function icmpv4_incoming(lwstate, pkt)
    local icmp_bytes = get_ipv4_total_length(ipv4_header) - ipv4_header_size
    if checksum.ipsum(icmp_header, icmp_bytes, 0) ~= 0 then
       -- Silently drop the packet, as per RFC 5508
-      counter.add(lwstate.counters["drop-bad_checksum-icmpv4-bytes"], pkt.length)
-      counter.add(lwstate.counters["drop-bad_checksum-icmpv4-packets"])
+      counter.add(lwstate.counters["drop-bad-checksum-icmpv4-bytes"], pkt.length)
+      counter.add(lwstate.counters["drop-bad-checksum-icmpv4-packets"])
       return drop(pkt)
    end
 
@@ -623,8 +624,8 @@ local function from_inet(lwstate, pkt)
    local ipv4_header = get_ethernet_payload(pkt)
    if get_ipv4_proto(ipv4_header) == proto_icmp then
       if lwstate.policy_icmpv4_incoming == lwconf.policies['DROP'] then
-         counter.add(lwstate.counters["drop-in_by_policy-icmpv4-bytes"], pkt.length)
-         counter.add(lwstate.counters["drop-in_by_policy-icmpv4-packets"])
+         counter.add(lwstate.counters["drop-in-by-policy-icmpv4-bytes"], pkt.length)
+         counter.add(lwstate.counters["drop-in-by-policy-icmpv4-packets"])
          return drop(pkt)
       else
          return icmpv4_incoming(lwstate, pkt)
@@ -669,8 +670,8 @@ local function icmpv6_incoming(lwstate, pkt)
    if icmp_type == constants.icmpv6_packet_too_big then
       if icmp_code ~= constants.icmpv6_code_packet_too_big then
          -- Invalid code.
-         counter.add(lwstate.counters["drop-too_big_type_but_not_code-icmpv6-bytes"], pkt.length)
-         counter.add(lwstate.counters["drop-too_big_type_but_not_code-icmpv6-packets"])
+         counter.add(lwstate.counters["drop-too-big-type-but-not-code-icmpv6-bytes"], pkt.length)
+         counter.add(lwstate.counters["drop-too-big-type-but-not-code-icmpv6-packets"])
          return drop(pkt)
       end
       local mtu = get_icmp_mtu(icmp_header) - constants.ipv6_fixed_header_size
@@ -684,8 +685,8 @@ local function icmpv6_incoming(lwstate, pkt)
       -- If the time limit was exceeded, require it was a hop limit code
       if icmp_type == constants.icmpv6_time_limit_exceeded then
          if icmp_code ~= constants.icmpv6_hop_limit_exceeded then
-            counter.add(lwstate.counters["drop-over_time_but_not_hop_limit-icmpv6-bytes"], pkt.length)
-            counter.add(lwstate.counters["drop-over_time_but_not_hop_limit-icmpv6-packets"])
+            counter.add(lwstate.counters["drop-over-time-but-not-hop-limit-icmpv6-bytes"], pkt.length)
+            counter.add(lwstate.counters["drop-over-time-but-not-hop-limit-icmpv6-packets"])
             return drop(pkt)
          end
       end
@@ -696,8 +697,8 @@ local function icmpv6_incoming(lwstate, pkt)
    else
       -- No other types of ICMPv6, including echo request/reply, are
       -- handled.
-      counter.add(lwstate.counters["drop-unknown_protocol-icmpv6-bytes"], pkt.length)
-      counter.add(lwstate.counters["drop-unknown_protocol-icmpv6-packets"])
+      counter.add(lwstate.counters["drop-unknown-protocol-icmpv6-bytes"], pkt.length)
+      counter.add(lwstate.counters["drop-unknown-protocol-icmpv6-packets"])
       return drop(pkt)
    end
 end
@@ -719,8 +720,8 @@ local function flush_decapsulation(lwstate)
                           n_ethertype_ipv4)
          transmit_ipv4(lwstate, pkt)
       else
-         counter.add(lwstate.counters["drop-no_source_softwire-ipv6-bytes"], pkt.length)
-         counter.add(lwstate.counters["drop-no_source_softwire-ipv6-packets"])
+         counter.add(lwstate.counters["drop-no-source-softwire-ipv6-bytes"], pkt.length)
+         counter.add(lwstate.counters["drop-no-source-softwire-ipv6-packets"])
          drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
       end
    end
@@ -739,16 +740,16 @@ local function from_b4(lwstate, pkt)
    if proto ~= proto_ipv4 then
       if proto == proto_icmpv6 then
          if lwstate.policy_icmpv6_incoming == lwconf.policies['DROP'] then
-            counter.add(lwstate.counters["drop-in_by_policy-icmpv6-bytes"], pkt.length)
-            counter.add(lwstate.counters["drop-in_by_policy-icmpv6-packets"])
+            counter.add(lwstate.counters["drop-in-by-policy-icmpv6-bytes"], pkt.length)
+            counter.add(lwstate.counters["drop-in-by-policy-icmpv6-packets"])
             return drop(pkt)
          else
             return icmpv6_incoming(lwstate, pkt)
          end
       else
          -- Drop packet with unknown protocol.
-         counter.add(lwstate.counters["drop-unknown_protocol-ipv6-bytes"], pkt.length)
-         counter.add(lwstate.counters["drop-unknown_protocol-ipv6-packets"])
+         counter.add(lwstate.counters["drop-unknown-protocol-ipv6-bytes"], pkt.length)
+         counter.add(lwstate.counters["drop-unknown-protocol-ipv6-packets"])
          return drop(pkt)
       end
    end

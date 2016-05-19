@@ -118,7 +118,7 @@ echo "Testing: from-internet IPv4 packet found in the binding table, original TT
 snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
    ${TEST_DATA}/tcp-frominet-bound-ttl1.pcap ${EMPTY}\
    ${TEST_DATA}/icmpv4-time-expired.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv4-out-1p-icmpv4-1.lua
+   ${COUNTERS}/tcp-frominet-bound-ttl1.lua
 
 echo "Testing: from-B4 IPv4 fragmentation (2)"
 snabb_run_and_cmp ${TEST_CONF}/small_ipv4_mtu_icmp_vlan.conf \
@@ -172,13 +172,13 @@ echo "Testing: from-internet IPv4 packet NOT found in the binding table (ICMP-on
 snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
    ${TEST_DATA}/tcp-frominet-unbound.pcap ${EMPTY} \
    ${TEST_DATA}/icmpv4-dst-host-unreachable.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv4-out-1p-icmpv4-1.lua
+   ${COUNTERS}/in-1p-ipv4-out-1p-icmpv4.lua
 
 echo "Testing: from-internet IPv4 packet NOT found in the binding table (matches IPv4, but not port) (ICMP-on-fail)."
 snabb_run_and_cmp ${TEST_CONF}/icmp_on_fail_vlan.conf \
    ${TEST_DATA}/tcp-frominet-ip-bound-port-unbound.pcap ${EMPTY} \
    ${TEST_DATA}/icmpv4-dst-host-unreachable-ip-bound-port-unbound.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv4-out-1p-icmpv4-1.lua
+   ${COUNTERS}/in-1p-ipv4-out-1p-icmpv4.lua
 
 echo "Testing: from-to-b4 IPv6 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
@@ -333,13 +333,13 @@ echo "Testing: incoming ICMPv4 echo request, matches binding table, dropping ICM
 snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
    ${TEST_DATA}/incoming-icmpv4-echo-request.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv4-out-none-2.lua
+   ${COUNTERS}/in-1p-ipv4-out-none-3.lua
 
 echo "Testing: incoming ICMPv4 echo request, doesn't match binding table"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${TEST_DATA}/incoming-icmpv4-echo-request-unbound.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv4-out-none-2.lua
+   ${COUNTERS}/in-1p-ipv4-out-none-4.lua
 
 echo "Testing: incoming ICMPv4 echo reply, matches binding table"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
@@ -357,19 +357,19 @@ echo "Testing: incoming ICMPv6 1,3 destination/address unreachable, OPE from int
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-13dstaddressunreach-inet-OPE.pcap \
    ${TEST_DATA}/response-ipv4-icmp31-inet.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-1.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
 
 echo "Testing: incoming ICMPv6 2,0 'too big' notification, OPE from internet"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-20pkttoobig-inet-OPE.pcap \
    ${TEST_DATA}/response-ipv4-icmp34-inet.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-1.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
 
 echo "Testing: incoming ICMPv6 3,0 hop limit exceeded, OPE from internet"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-30hoplevelexceeded-inet-OPE.pcap \
    ${TEST_DATA}/response-ipv4-icmp31-inet.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-1.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
 
 echo "Testing: incoming ICMPv6 3,1 frag reasembly time exceeded, OPE from internet"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
@@ -381,7 +381,7 @@ echo "Testing: incoming ICMPv6 4,3 parameter problem, OPE from internet"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-43paramprob-inet-OPE.pcap \
    ${TEST_DATA}/response-ipv4-icmp31-inet.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-1.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
 
 echo "Testing: incoming ICMPv6 3,0 hop limit exceeded, OPE hairpinned"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
