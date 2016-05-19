@@ -1,5 +1,22 @@
 # Change Log
 
+## [2.7] - 2016-05-19
+
+A performance, feature, and bug-fix release.
+
+ * Fix a situation where the JIT self-healing behavior introduced in
+   v2.4 was not being triggered when VLANs were enabled.  Detecting when
+   to re-train the JIT depends on information from the network card, and
+   the Snabb Intel 82599 driver has two very different code paths
+   depending on whether VLAN tagging is enabled or not.  Our fix that we
+   introduced in v2.4 was only working if VLAN tagging was not enabled.
+   The end result was that performance was not as reliably good as it
+   should be.
+
+ * Add the ability for the "loadtest" command to produce different load
+   transient shapes.  See "snabb lwaftr loadtest --help" for more
+   details.
+
 ## [2.6] - 2016-05-18
 
 A bug fix release.
