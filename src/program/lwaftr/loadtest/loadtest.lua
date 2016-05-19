@@ -45,9 +45,40 @@ local function find_device(pattern)
    end
 end
 
+local programs = {}
+
+function programs.ramp_up(tester, opts)
+   local head = promise.new()
+   local tail = head
+   for step = 1, math.ceil(opts.bitrate / opts.step) do
+      tail = tail:and_then(tester.measure,
+                           math.min(opts.bitrate, opts.step * step),
+                           opts.duration)
+   end
+   head:resolve()
+   return tail
+end
+
+function programs.ramp_down(tester, opts)
+   local head = promise.new()
+   local tail = head
+   for step = math.ceil(opts.bitrate / opts.step), 1, -1 do
+      tail = tail:and_then(tester.measure,
+                           math.min(opts.bitrate, opts.step * step),
+                           opts.duration)
+   end
+   head:resolve()
+   return tail
+end
+
+function programs.ramp_up_down(tester, opts)
+   return programs.ramp_up(tester, opts)
+      :and_then(programs.ramp_down, tester, opts)
+end
+
 function parse_args(args)
    local handlers = {}
-   local opts = { bitrate = 10e9, duration = 5 }
+   local opts = { bitrate = 10e9, duration = 5, program=programs.ramp_up_down }
    function handlers.b(arg)
       opts.bitrate = assert(tonumber(arg), 'bitrate must be a number')
    end
@@ -57,9 +88,13 @@ function parse_args(args)
    function handlers.D(arg)
       opts.duration = assert(tonumber(arg), 'duration must be a number')
    end
+   function handlers.p(arg)
+      opts.program = assert(programs[arg], 'unrecognized program: '..arg)
+   end
    function handlers.h() show_usage(0) end
    args = lib.dogetopt(args, handlers, "hb:s:D:p:",
-                       { bitrate="b", step="s", duration="D", help="h" })
+                       { bitrate="b", step="s", duration="D", help="h",
+                         program="p" })
    if not opts.step then opts.step = opts.bitrate / 10 end
    assert(opts.bitrate > 0, 'bitrate must be positive')
    assert(opts.step > 0, 'step must be positive')
@@ -117,26 +152,28 @@ function run(args)
    end
    engine.configure(c)
 
-   local function adjust_rates(bit_rate)
+   local tester = {}
+
+   function tester.adjust_rates(bit_rate)
       for _,stream in ipairs(streams) do
          local app = engine.app_table[stream.repeater_id]
          app:set_rate(bit_rate)
       end
    end
 
-   local function generate_load(bitrate, duration)
-      adjust_rates(bitrate)
-      return promise.Wait(duration):and_then(adjust_rates, 0)
+   function tester.generate_load(bitrate, duration)
+      tester.adjust_rates(bitrate)
+      return promise.Wait(duration):and_then(tester.adjust_rates, 0)
    end
 
-   local function warm_up()
+   function tester.warm_up()
       print(string.format("Warming up at %f Gb/s for %s seconds.",
                           WARM_UP_BIT_RATE / 1e9, WARM_UP_TIME))
-      return generate_load(WARM_UP_BIT_RATE, WARM_UP_TIME):
+      return tester.generate_load(WARM_UP_BIT_RATE, WARM_UP_TIME):
          and_then(promise.Wait, 0.5)
    end
 
-   local function record_counters()
+   function tester.record_counters()
       local ret = {}
       for _, stream in ipairs(streams) do
          local tx_nic = assert(engine.app_table[stream.nic_tx_id],
@@ -151,11 +188,11 @@ function run(args)
       return ret
    end
 
-   local function print_counter_diff(before, after)
+   function tester.print_counter_diff(before, after, duration)
       local function bitrate(diff)
          -- 7 bytes preamble, 1 start-of-frame, 4 CRC, 12 interpacket gap.
          local overhead = 7 + 1 + 4 + 12
-         return (diff.txbytes + diff.txpackets * overhead) * 8 / opts.duration
+         return (diff.txbytes + diff.txpackets * overhead) * 8 / duration
       end
       for _, stream in ipairs(streams) do
          print(string.format('  %s:', stream.tx_name))
@@ -164,10 +201,10 @@ function run(args)
          local tx = diff_counters(nic_before.tx, nic_after.tx)
          local rx = diff_counters(nic_before.rx, nic_after.rx)
          print(string.format('    TX %d packets (%f MPPS), %d bytes (%f Gbps)',
-                             tx.txpackets, tx.txpackets / opts.duration / 1e6,
+                             tx.txpackets, tx.txpackets / duration / 1e6,
                              tx.txbytes, bitrate(tx) / 1e9))
          print(string.format('    RX %d packets (%f MPPS), %d bytes (%f Gbps)',
-                             rx.txpackets, rx.txpackets / opts.duration / 1e6,
+                             rx.txpackets, rx.txpackets / duration / 1e6,
                              rx.txbytes, bitrate(rx) / 1e9))
          print(string.format('    Loss: %d packets (%f%%)',
                              tx.txpackets - rx.txpackets,
@@ -175,38 +212,32 @@ function run(args)
       end
    end
 
-   local function measure(bitrate)
-      local start_counters = record_counters()
+   function tester.measure(bitrate, duration)
+      local start_counters = tester.record_counters()
       local function report()
-         local end_counters = record_counters()
-         print_counter_diff(start_counters, end_counters)
+         local end_counters = tester.record_counters()
+         tester.print_counter_diff(start_counters, end_counters, duration)
       end
       print(string.format('Applying %f Gbps of load.', bitrate/1e9))
-      return generate_load(bitrate, opts.duration):
+      return tester.generate_load(bitrate, duration):
          -- Wait 2ms for packets in flight to arrive
          and_then(promise.Wait, 0.002):
          and_then(report)
    end
 
-   local function run_tests()
-      local head = promise.new()
-      local tail = head
-      for step = 1, math.ceil(opts.bitrate / opts.step) do
-         tail = tail:and_then(measure, math.min(opts.bitrate, opts.step * step))
-      end
-      head:resolve()
-      return tail
-   end
-
-   local function run_engine(p)
+   local function run_engine(head, tail)
       local is_done = false
       local function mark_done() is_done = true end
-      p:and_then(mark_done)
+      tail:and_then(mark_done)
 
       local function done() return is_done end
+      head:resolve()
       engine.main({done=done})
    end
 
    engine.busywait = true
-   run_engine(warm_up():and_then(run_tests))
+   local head = promise.new()
+   run_engine(head,
+              head:and_then(tester.warm_up)
+                 :and_then(opts.program, tester, opts))
 end
