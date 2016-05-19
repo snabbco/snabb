@@ -52,9 +52,6 @@ local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 --   - reason: reasons for dropping;
 -- - protocol+version: "icmpv4", "icmpv6", "ipv4", "ipv6";
 -- - size: "bytes", "packets".
--- TODO: should the "drop-all-ipv4/6" aggregate counters be incremented all
---   over the place, with the related runtime cost, or computed by summing
---   the relevant counters less frequently or upon access?
 local counters_dir = "app/lwaftr/counters/"
 -- Referenced by program/check/check.lua
 counter_names = {
@@ -83,7 +80,7 @@ counter_names = {
 
 -- Drop v4.
 
--- All dropped v4. TODO: implement.
+-- All dropped v4.
    "drop-all-ipv4-bytes",
    "drop-all-ipv4-packets",
 -- On IPv4 link, but not IPv4.
@@ -110,7 +107,7 @@ counter_names = {
 
 -- Drop v6.
 
--- All dropped v6. TODO: implement.
+-- All dropped v6.
    "drop-all-ipv6-bytes",
    "drop-all-ipv6-packets",
 -- On IPv6 link, but not IPv6.
