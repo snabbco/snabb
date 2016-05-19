@@ -60,12 +60,6 @@ snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${EMPTY} ${TEST_BASE}/ndp_outgoing_solicited_na.pcap \
    ${COUNTERS}/empty.lua
 
-echo "Testing: NDP: incoming NDP Neighbor Solicitation, secondary IP"
-snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
-   ${EMPTY} ${TEST_BASE}/ndp_incoming_ns_secondary.pcap \
-   ${EMPTY} ${TEST_BASE}/ndp_outgoing_solicited_na_secondary.pcap \
-   ${COUNTERS}/empty.lua
-
 echo "Testing: NDP: incoming NDP Neighbor Solicitation, non-lwAFTR IP"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${EMPTY} ${TEST_BASE}/ndp_incoming_ns_nonlwaftr.pcap \
