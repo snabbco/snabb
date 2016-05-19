@@ -40,7 +40,7 @@ local helpers = require("lib.yang.helpers")
 local parser = require("lib.yang.parser")
 local Container = helpers.Container
 
-local Base = {}
+Base = {}
 function Base.new(filename)
    local ret = {schema={}, filename=filename}
    local self = setmetatable(ret, {__index=Base, path_cache={}})
@@ -85,11 +85,22 @@ function Base:add_cache(path, node)
    getmetatable(self).path_cache[path] = node
 end
 
+function Base:get_module()
+   local schema_mod
+   for _, mod in pairs(self.schema) do
+      schema_mod = mod
+   end
+
+   if not schema_mod then
+      error("Module cannot be resolved")
+   end
+
+   return schema_mod
+end
+
 function Base:produce_data_tree(schema_node, data_node)
    if not (schema_node and data_node) then
-      for _, mod in pairs(self.schema) do
-         schema_node = mod
-      end
+      schema_node = self:get_module()
 
       if not schema_node then error("Module cannot be resolved") end
       data_node = self.data[schema_node.name]
@@ -105,7 +116,26 @@ function Base:produce_data_tree(schema_node, data_node)
          local root = rawget(data_node, "root")
          root[name] = new_node
          schema_node = self:get_schema(new_path)
+         data_node = new_node
          self:produce_data_tree(schema_node, new_node)
+
+         -- If the container has a "uses" statement we must copy across the 
+         -- leaves from the container it references to this container.
+         if container.uses then
+            local root = rawget(data_node, "root")
+            local grouping = self:get_module().groupings[container.uses]
+            if not grouping then
+               self:error(path, name, "Cannot find grouping '%s'.", container.uses)
+            end
+
+            -- Copy.
+            for name, leaf in pairs(grouping.leaves) do
+               -- We also need to register the schema node at the new path
+               local grouping_path = new_path.."."..name
+               self:add_cache(grouping_path, leaf)
+               root[name] = leaf:provide_box()
+            end
+         end
       end
    end
 
@@ -116,7 +146,6 @@ function Base:produce_data_tree(schema_node, data_node)
          root[name] = leaf:provide_box()
       end
    end
-
    return self.data
 end
 
@@ -266,6 +295,62 @@ function selftest()
       }
    }
 
+   grouping binding-entry {
+      description
+         "The lwAFTR maintains an address binding table that contains
+         thebinding between the lwB4's IPv6 address, the allocated IPv4
+         address and restricted port-set.";
+
+      leaf binding-ipv6info {
+         type union {
+            type inet:ipv6-address;
+            type inet:ipv6-prefix;
+         }
+
+         mandatory true;
+         description
+            "The IPv6 information for a binding entry.
+            If it's an IPv6 prefix, it indicates that
+            the IPv6 source address of the lwB4 is constructed
+            according to the description in RFC7596;
+            if it's an IPv6 address, it means the lwB4 uses";
+      }
+
+      leaf binding-ipv4-addr {
+         type inet:ipv4-address;
+         mandatory true;
+         description
+            "The IPv4 address assigned to the lwB4, which is
+            used as the IPv4 external address
+            for lwB4 local NAPT44.";
+      }
+
+      container port-set {
+         description
+            "For Lightweight 4over6, the default value
+            of offset should be 0, to configure one contiguous
+            port range.";
+         uses port-set {
+            refine offset {
+               default "0";
+            }
+         }
+      }
+
+      leaf lwaftr-ipv6-addr {
+         type inet:ipv6-address;
+         mandatory true;
+         description "The IPv6 address for lwaftr.";
+      }
+
+      leaf lifetime {
+         type uint32;
+         units seconds;
+         description "The lifetime for the binding entry";
+      }
+   }
+
+
    container softwire-config {
       description
          "The configuration data for Softwire instances. And the shared
@@ -277,20 +362,18 @@ function selftest()
          description "A textual description of Softwire.";
       }
 
-      leaf testvalue {
-         type uint8;
-         description "Test value for unsigned 8 bit integers.";
+      container testgroup {
+         uses binding-entry;
       }
    }
 }]]
    local base = load_schema(test_yang)
    local data = base:produce_data_tree()
 
-   -- Set the description leaf
-   data["ietf-softwire"]["softwire-config"].description = "I am a description"
-   assert(data["ietf-softwire"]["softwire-config"].description == "I am a description")
+   data["ietf-softwire"]["softwire-config"].description = "hello!"
+   assert(data["ietf-softwire"]["softwire-config"].description == "hello!")
 
-   -- Set the testvalue
-   data["ietf-softwire"]["softwire-config"].testvalue = 72
-   assert(data["ietf-softwire"]["softwire-config"].testvalue == 72)
+   -- Test grouping.
+   data["ietf-softwire"]["softwire-config"].testgroup["lifetime"] = 72
+   assert(data["ietf-softwire"]["softwire-config"].testgroup["lifetime"] == 72)
 end

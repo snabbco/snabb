@@ -29,7 +29,7 @@ local uint32box = ffi.typeof("struct { uint32_t value; }")
 local uint64box = ffi.typeof("struct { uint64_t value; }")
 local decimal64box = ffi.typeof("struct { double value; }")
 
-local Leaf = {}
+Leaf = {}
 function Leaf.new(base, path, src)
    local self = setmetatable({}, {__index=Leaf, path=path})
 
@@ -43,6 +43,11 @@ function Leaf.new(base, path, src)
       if typeinfo.range then
          local range = h.split("%.%.", typeinfo.range[1].argument)
          self.range = {tonumber(range[1]), tonumber(range[2])}
+      elseif typeinfo.enum then
+         self.enums = {}
+         for _, v in pairs(typeinfo.enum) do
+            self.enums[v.argument] = v.argument
+         end
       end
    end
    if src.description then
@@ -81,6 +86,14 @@ function Leaf.new(base, path, src)
          end
       end
    end
+   if self.enums then
+      if not self.validation then self.validation = {} end
+      self.validation[#self.validation + 1] = function (v)
+         if v and not self.enums[v] then
+            self:error("Value '%s' is not one of the Enum values", v)
+         end
+      end
+   end
    return self
 end
 
@@ -96,34 +109,44 @@ function Leaf:validate_schema(schema)
    validation.cardinality("leaf", getmetatable(self).path, cardinality, schema)
 end
 
-function Leaf:provide_box()
+function Leaf:provide_box(leaf_type, statements)
    local box
 
-   if self.type == "int8" then
+   if not leaf_type then leaf_type = self.type end
+
+   if leaf_type == "int8" then
       box = int8box()
-   elseif self.type == "int16" then
+   elseif leaf_type == "int16" then
       box = int16box()
-   elseif self.type == "int32" then
+   elseif leaf_type == "int32" then
       box = int32box()
-   elseif self.type == "int64" then
+   elseif leaf_type == "int64" then
       box = int64box()
-   elseif self.type == "uint8" then
+   elseif leaf_type == "uint8" then
       box = uint8box()
-   elseif self.type == "uint16" then
+   elseif leaf_type == "uint16" then
       box = uint16box()
-   elseif self.type == "uint32" then
+   elseif leaf_type == "uint32" then
       box = uint32box()
-   elseif self.type == "uint64" then
+   elseif leaf_type == "uint64" then
       box = uint64box()
-   elseif self.type == "decimal64" then
+   elseif leaf_type == "decimal64" then
       box = decimal64box()
-   elseif self.type == "string" then
+   elseif leaf_type == "string" then
       box = {}
-   elseif self.type == "boolean" then
+   elseif leaf_type == "boolean" then
       box = {}
+   elseif leaf_type == "enumeration" then
+      box = helpers.Enum.new(self.enums)
+   elseif leaf_type == "union" then
+      box = helpers.Union.new(statements)
+   elseif leaf_type == "inet:ipv4-address" then
+      box = helpers.IPv4Box.new()
+   elseif leaf_type == "inet:ipv6-address" then
+      box = helpers.IPv6Box.new()
    else
-      error(("Unknown type '%s' for leaf '%s'"):format(
-         leaf_type, self.config.name))
+      local path = self and getmetatable(self).path or ""
+      error(("Unknown type '%s' for leaf"):format(path, leaf_type))
    end
 
    return box
@@ -159,7 +182,7 @@ end
 
 -- Yang list
 local List = {}
-function List.new(path, src)
+function List.new(base, path, src)
    local self = setmetatable({}, {__index=List, path=path})
 
    self:validate_schema(src)
@@ -222,7 +245,7 @@ end
 
 local Container = {}
 function Container.new(base, path, src)
-   local ret = {leaves={}}
+   local ret = {leaves={}, containers={}}
    local self = setmetatable(ret, {__index=Container, path=path})
 
    self:validate_schema(src)
@@ -238,6 +261,22 @@ function Container.new(base, path, src)
          local leaf_path = path.."."..leaf.argument
          self.leaves[leaf.argument] = Leaf.new(base, leaf_path, leaf.statements)
       end
+   end
+
+   -- Include other containers
+   if src.container then
+      for _, container in pairs(src.container) do
+         local container_path = path.."."..container.argument
+         self.containers[container.argument] = Container.new(
+            base,
+            container_path,
+            container.statements
+         )
+      end
+   end
+
+   if src.uses then
+      self.uses = src.uses[1].argument
    end
 
    return self
@@ -514,7 +553,6 @@ function selftest()
   local mod = Module.new(base, schema.module[1].argument,
     schema.module[1].statements)
 
-  print("module: ", mod.name)
   assert(mod.name == "ietf-softwire")
   assert(mod.namespace == "urn:ietf:params:xml:ns:yang:ietf-softwire")
   assert(mod.prefix == "softwire")
