@@ -182,7 +182,8 @@ function run(args)
                                "NIC "..stream.nic_rx_id.." not found")
          ret[stream.nic_tx_id] = {
             tx = read_counters(tx_nic.input.rx),
-            rx = read_counters(rx_nic.output.tx)
+            rx = read_counters(rx_nic.output.tx),
+	    drop = rx_nic:ingress_packet_drops()
          }
       end
       return ret
@@ -200,14 +201,15 @@ function run(args)
          local nic_before, nic_after = before[nic_id], after[nic_id]
          local tx = diff_counters(nic_before.tx, nic_after.tx)
          local rx = diff_counters(nic_before.rx, nic_after.rx)
+         local drop = tonumber(nic_after.drop - nic_before.drop)
          print(string.format('    TX %d packets (%f MPPS), %d bytes (%f Gbps)',
                              tx.txpackets, tx.txpackets / duration / 1e6,
                              tx.txbytes, bitrate(tx) / 1e9))
          print(string.format('    RX %d packets (%f MPPS), %d bytes (%f Gbps)',
                              rx.txpackets, rx.txpackets / duration / 1e6,
                              rx.txbytes, bitrate(rx) / 1e9))
-         print(string.format('    Loss: %d packets (%f%%)',
-                             tx.txpackets - rx.txpackets,
+         print(string.format('    Loss: %d ingress drop + %d packets lost (%f%%)',
+                             drop, (tx.txpackets - rx.txpackets) - drop,
                              (tx.txpackets - rx.txpackets) / tx.txpackets * 100))
       end
    end
@@ -232,7 +234,7 @@ function run(args)
 
       local function done() return is_done end
       head:resolve()
-      engine.main({done=done})
+      engine.main({done=done, ingress_drop_monitor=false})
    end
 
    engine.busywait = true
