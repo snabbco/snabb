@@ -194,6 +194,19 @@ in read-write mode.
 Clears bits of register according to *bitmask*. Only available on
 registers in read-write mode.
 
+- Method **Register:bits** *offset*, *length*, *bits*
+
+Get or set *length* bits at *offset* in register. Sets *length* bits at
+*offset* in register to *bits* if *bits* is supplied. Returns *length* bits at
+*offset* in register otherwise. Setting is only available on registers in
+read-write mode.
+
+- Method **Register:byte** *offset*, *byte*
+
+Get or set byte at *offset* in register. Sets byte at *offset* in register to
+*byte* if *byte* is supplied. Returns byte at *offset* in register otherwise.
+Setting is only available on registers in read-write mode.
+
 — Method **Register:wait**  *bitmask*, *value*
 
 Blocks until applying *bitmask* to the register equals *value*. If
