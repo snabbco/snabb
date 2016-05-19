@@ -1,5 +1,86 @@
 # Change Log
 
+## [2.6] - 2016-05-18
+
+A bug fix release.
+
+ * Fix ability to dump the running binding table to a text file.  Our
+   previous fix in 2.5 assumed that we could find the original binding
+   table on disk, but that is not always the case, for example if the
+   binding table was changed or moved.
+
+   On the bright side, the binding table dumping facility will now work
+   even if the binding table is changed at run-time, which will be
+   necessary once we start supporting incremental binding-table updates.
+
+## [2.5] - 2016-05-13
+
+A bug fix release.
+
+ * Fix bug in the NDP implementation.  Before, the lwAFTR would respond
+   to neighbor solicitations to any of the IPv6 addresses associated
+   with tunnel endpoints, but not to the IPv6 address of the interface.
+   This was exactly backwards and has been fixed.
+
+ * Fix ability to dump the running binding table to a text file.  This
+   had been fixed on the main development branch before v2.4 but we
+   missed it when selecting the features to back-port to the 2.x release
+   branch.
+
+ * Add ability to read in ingress and egress filters from files.  If the
+   filter value starts with a "<", it is interpreted as a file that
+   should be read.  For example, `ipv6_egress_filter =
+   <ipv6-egress-filter.txt"`.  See README.configuration.md.
+
+## [2.4] - 2016-05-03
+
+A bug fix, performance tuning, and documentation release.
+
+ * Fix limitations and bugs in the NDP implementation.  Before, if no
+   reply to the initial neighbor solicitation was received, neighbor
+   discovery would fail.  Now, we retry solicitation for some number of
+   seconds before giving up.  Relatedly, the NDP implementation now takes
+   the MAC address from Ethernet header if reply does not contain it in
+   the payload.
+
+ * Automatically flush JIT if there are too many ingress packet drops.
+   When the snabb breathe cycle runs, it usually doesn't drop any
+   packets: packets pulled into the network are fully pushed through,
+   with no residual data left in link buffers. However if the breathe()
+   function takes too long, it's possible for it to miss incoming
+   packets deposited in ingress ring buffers. That is usually the source
+   of packet loss in a Snabb program.
+
+   There are several things that can cause packet loss: the workload
+   taking too long on average, and needing general optimization; the
+   workload taking too long, but only during some fraction of breaths,
+   for example due to GC or other sources of jitter; or, the workload
+   was JIT-compiled with one incoming traffic pattern, but conditions
+   have changed meaning that the JIT should re-learn the new
+   patterns. The ingress drop monitor exists to counter this last
+   reason. If the ingress drop monitor detects that the program is
+   experiencing ingress drop, it will call jit.flush(), to force LuaJIT
+   to re-learn the paths that are taken at run-time. It will avoid
+   calling jit.flush() too often, in the face of sustained packet loss,
+   by default flushing the JIT only once every 20 seconds.
+
+ * Bug-fix backports from upstream Snabb: fix bugs when trying to use
+   PCI devices whose names contain hexadecimal characters (from Pete
+   Bristow), and include some documentation on performance tuning (by
+   Marcel Wiget).
+
+ * The load tester now works on line bitrates, including the ethernet
+   protocol overhead (interframe spacing, prologues, and so on).
+
+ * Add --cpu argument to "snabb lwaftr run", to set CPU affinity.  You
+   can use --cpu instead of using "taskset", if you like.
+
+ * Add --real-time argument to "snabb lwaftr run", to enable real-time
+   scheduling.  This might be useful when troubleshooting, though in
+   practice we have found that it does not have a significant effect on
+   scheduling jitter, as the CPU affinity largely prevents the kernel
+   from upsetting a Snabb process.
+
 ## [2.3] - 2016-02-17
 
 A bug fix and performance improvement release.
