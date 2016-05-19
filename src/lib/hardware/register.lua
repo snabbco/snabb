@@ -37,7 +37,7 @@ end
 function Register:set (bitmask) self(bit.bor(self(), bitmask)) end
 function Register:clr (bitmask) self(bit.band(self(), bit.bnot(bitmask))) end
 
-function ro_bits(register, start, length)
+function ro_bits (register, start, length)
     return bit.band(bit.rshift(register(), start), 2^length - 1)
 end
 
@@ -55,7 +55,7 @@ function Register:bits (start, length, bits)
     self(tmp)
   end
 end
-function ro_byte(register, start, byte)
+function ro_byte (register, start, byte)
   return register:bits(start * 8, 8)
 end
 -- Get / set a byte length bytes from an offset of start bytes
