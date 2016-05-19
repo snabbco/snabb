@@ -685,7 +685,8 @@ local function icmpv6_incoming(lwstate, pkt)
    if icmp_type == constants.icmpv6_packet_too_big then
       if icmp_code ~= constants.icmpv6_code_packet_too_big then
          -- Invalid code.
-         counter.add(lwstate.counters["drop-too-big-type-but-not-code-icmpv6-bytes"], pkt.length)
+         counter.add(lwstate.counters["drop-too-big-type-but-not-code-icmpv6-bytes"],
+            pkt.length)
          counter.add(lwstate.counters["drop-too-big-type-but-not-code-icmpv6-packets"])
          counter.add(lwstate.counters["drop-all-ipv6-bytes"], pkt.length)
          counter.add(lwstate.counters["drop-all-ipv6-packets"])
@@ -702,8 +703,10 @@ local function icmpv6_incoming(lwstate, pkt)
       -- If the time limit was exceeded, require it was a hop limit code
       if icmp_type == constants.icmpv6_time_limit_exceeded then
          if icmp_code ~= constants.icmpv6_hop_limit_exceeded then
-            counter.add(lwstate.counters["drop-over-time-but-not-hop-limit-icmpv6-bytes"], pkt.length)
-            counter.add(lwstate.counters["drop-over-time-but-not-hop-limit-icmpv6-packets"])
+            counter.add(lwstate.counters[
+               "drop-over-time-but-not-hop-limit-icmpv6-bytes"], pkt.length)
+            counter.add(
+               lwstate.counters["drop-over-time-but-not-hop-limit-icmpv6-packets"])
             counter.add(lwstate.counters["drop-all-ipv6-bytes"], pkt.length)
             counter.add(lwstate.counters["drop-all-ipv6-packets"])
             return drop(pkt)
