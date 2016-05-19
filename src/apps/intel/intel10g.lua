@@ -720,7 +720,6 @@ M_pf.set_promiscuous_mode = M_sf.set_promiscuous_mode
 M_pf.init_receive = M_sf.init_receive
 M_pf.init_transmit = M_sf.init_transmit
 M_pf.wait_linkup = M_sf.wait_linkup
-M_pf.ingress_packet_drops = M_sf.ingress_packet_drops
 
 function M_pf:set_vmdq_mode ()
    self.r.RTTDCS(bits{VMPAC=1,ARBDIS=6,BDPM=22})       -- clear TDPAC,TDRM=4, BPBFSM
