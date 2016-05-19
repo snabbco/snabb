@@ -9,4 +9,6 @@ return {
    ["drop-no-dest-softwire-ipv4-packets"] = 1,
    ["drop-out-by-policy-icmpv4-bytes"] = 66,
    ["drop-out-by-policy-icmpv4-packets"] = 1,
+   ["drop-all-ipv4-bytes"] = 132,
+   ["drop-all-ipv4-packets"] = 2,
 }
