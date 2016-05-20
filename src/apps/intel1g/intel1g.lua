@@ -72,340 +72,340 @@ SRRCTL 0xc00c +0x40*0..16 RW Split and Replication Receive Control
 ]]
 
 function Intel1g:initPHY() -- 4.3.1.4 PHY Reset, p.131
-  self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
+   self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
 
-  self:lockSwFwSemaphore()
-  self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1 }, 0)
-  self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
-  self:unlockSwFwSemaphore()
+   self:lockSwFwSemaphore()
+   self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1 }, 0)
+   self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
+   self:unlockSwFwSemaphore()
 
-  self.r.CTRL:set(bits { PHYreset = 31 })
-  C.usleep(1*100)
-  self.r.CTRL:clr(bits { PHYreset = 31 })
+   self.r.CTRL:set(bits { PHYreset = 31 })
+   C.usleep(1*100)
+   self.r.CTRL:clr(bits { PHYreset = 31 })
 
-  self:lockSwFwSemaphore()
-  self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
-  self:unlockSwFwSemaphore()
+   self:lockSwFwSemaphore()
+   self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
+   self:unlockSwFwSemaphore()
 
-  self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
+   self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
 
---[[
-  self:lockSwFwSemaphore()
-  self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1}, 0)
-  self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
-  self:unlockSwFwSemaphore()
+   --[[
+   self:lockSwFwSemaphore()
+   self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1}, 0)
+   self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
+   self:unlockSwFwSemaphore()
 
-  -- If you where going to configure the PHY to none defaults
-  -- this is where you would do it
+   -- If you where going to configure the PHY to none defaults
+   -- this is where you would do it
 
-  self:lockSwFwSemaphore()
-  self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
-  self:unlockSwFwSemaphore()
-]]
+   self:lockSwFwSemaphore()
+   self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
+   self:unlockSwFwSemaphore()
+   ]]
 end
 function Intel1g:lockSwSwSemaphore()
-  for i=1,50,1 do
-    if band(self.r.SWSM(), 0x01) == 1 then
-      C.usleep(10000)
-    else
-      return
-    end
-  end
-  error("Couldn't get lock")
+   for i=1,50,1 do
+      if band(self.r.SWSM(), 0x01) == 1 then
+         C.usleep(10000)
+      else
+         return
+      end
+   end
+   error("Couldn't get lock")
 end
 function Intel1g:unlockSwSwSemaphore()
-  self.r.SWSM:clr(bits { SMBI = 0 })
+   self.r.SWSM:clr(bits { SMBI = 0 })
 end
 function Intel1g:lockSwFwSemaphore()
-  self.r.SWSM:set(bits { SWESMBI = 1 })
-  while band(self.r.SWSM(), 0x02) == 0 do
-    self.r.SWSM:set(bits { SWESMBI = 1 })
-  end
+   self.r.SWSM:set(bits { SWESMBI = 1 })
+   while band(self.r.SWSM(), 0x02) == 0 do
+      self.r.SWSM:set(bits { SWESMBI = 1 })
+   end
 end
 function Intel1g:unlockSwFwSemaphore()
-  self.r.SWSM:clr(bits { SWESMBI = 1 })
+   self.r.SWSM:clr(bits { SWESMBI = 1 })
 end
 
 function Intel1g:disableInterrupts ()
-    self.r.EIMC(0xffffffff)
+   self.r.EIMC(0xffffffff)
 end
 function Intel1g:initRxQ()
-  if not self.rxq then return end
-  assert((self.rxq >=0) and (self.rxq < self.ringSize),
-    "rxqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
-  assert((self.ndesc %128) ==0,
-    "ndesc must be a multiple of 128 (for Rx only)")	-- see 7.1.4.5
+   if not self.rxq then return end
+   assert((self.rxq >=0) and (self.rxq < self.ringSize),
+   "rxqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
+   assert((self.ndesc %128) ==0,
+   "ndesc must be a multiple of 128 (for Rx only)")	-- see 7.1.4.5
 
-  register.define(rx_registers, self.r, self.base, self.rxq)
-  self.rxpackets = {}
-  self.rdh = 0
-  self.rdt = 0
-  -- setup 4.5.9
-  local rxdesc_t = ffi.typeof([[
-    struct {
+   register.define(rx_registers, self.r, self.base, self.rxq)
+   self.rxpackets = {}
+   self.rdh = 0
+   self.rdt = 0
+   -- setup 4.5.9
+   local rxdesc_t = ffi.typeof([[
+   struct {
       uint64_t address;
       uint16_t length, cksum;
       uint8_t status, errors;
       uint16_t vlan;
-    } __attribute__((packed))
-  ]])
-  assert(ffi.sizeof(rxdesc_t),
-    "sizeof(rxdesc_t)= ".. ffi.sizeof(rxdesc_t) .. ", but must be 16 Byte")
-  local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, self.ndesc)
-  self.rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
-                          memory.dma_alloc(ffi.sizeof(rxdesc_ring_t)))
-  -- Receive state
-  self.r.RDBAL(tophysical(self.rxdesc) % 2^32)
-  self.r.RDBAH(tophysical(self.rxdesc) / 2^32)
-  self.r.RDLEN(self.ndesc * ffi.sizeof(rxdesc_t))
+   } __attribute__((packed))
+   ]])
+   assert(ffi.sizeof(rxdesc_t),
+   "sizeof(rxdesc_t)= ".. ffi.sizeof(rxdesc_t) .. ", but must be 16 Byte")
+   local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, self.ndesc)
+   self.rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
+   memory.dma_alloc(ffi.sizeof(rxdesc_ring_t)))
+   -- Receive state
+   self.r.RDBAL(tophysical(self.rxdesc) % 2^32)
+   self.r.RDBAH(tophysical(self.rxdesc) / 2^32)
+   self.r.RDLEN(self.ndesc * ffi.sizeof(rxdesc_t))
 
-  for i = 0, self.ndesc-1 do
-    local p= packet.allocate()
-    self.rxpackets[i]= p
-    self.rxdesc[i].address= tophysical(p.data)
-    self.rxdesc[i].status= 0
-  end
-  self.r.SRRCTL(0)
-  self.r.SRRCTL:set(bits {
-    BSIZEPACKET1 = 1,   -- Set packet buff size to 0b1010 kbytes
-    BSIZEPACKET3 = 3,
-    Drop_En = 31        -- Drop packets when no descriptors
-  })
-  self:lockSwSwSemaphore()
-  self.r.RXDCTL:set( bits { Enable = 25 })
-  self.r.RXDCTL:wait( bits { Enable = 25 })
-  self.r.RDT(self.ndesc - 1)
-  -- wrap this in a swsw semaphore
-  local tab = {}
-  for i=0,self.ringSize,1 do
-    if band(self.r.ALLRXDCTL[i](), bits { Enable = 25 }) > 0 then
-      table.insert(tab, i)
-    end
-  end
-  self:redirection_table(tab)
-  self:unlockSwSwSemaphore()
+   for i = 0, self.ndesc-1 do
+      local p= packet.allocate()
+      self.rxpackets[i]= p
+      self.rxdesc[i].address= tophysical(p.data)
+      self.rxdesc[i].status= 0
+   end
+   self.r.SRRCTL(0)
+   self.r.SRRCTL:set(bits {
+      BSIZEPACKET1 = 1,   -- Set packet buff size to 0b1010 kbytes
+      BSIZEPACKET3 = 3,
+      Drop_En = 31        -- Drop packets when no descriptors
+   })
+   self:lockSwSwSemaphore()
+   self.r.RXDCTL:set( bits { Enable = 25 })
+   self.r.RXDCTL:wait( bits { Enable = 25 })
+   self.r.RDT(self.ndesc - 1)
+   -- wrap this in a swsw semaphore
+   local tab = {}
+   for i=0,self.ringSize,1 do
+      if band(self.r.ALLRXDCTL[i](), bits { Enable = 25 }) > 0 then
+         table.insert(tab, i)
+      end
+   end
+   self:redirection_table(tab)
+   self:unlockSwSwSemaphore()
 end
 
 function Intel1g:initTxQ()
-  if not self.txq then return end
-  assert((self.txq >=0) and (self.txq < self.ringSize),
-    "txqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
-  register.define(tx_registers, self.r, self.base, self.txq)
-  self.tdh = 0
-  self.tdt = 0
-  self.txpackets = {}
+   if not self.txq then return end
+   assert((self.txq >=0) and (self.txq < self.ringSize),
+   "txqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
+   register.define(tx_registers, self.r, self.base, self.txq)
+   self.tdh = 0
+   self.tdt = 0
+   self.txpackets = {}
 
-  local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
-  local txdesc_ring_t = ffi.typeof("$[$]", txdesc_t, self.ndesc)
-  self.txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
-                            memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
+   local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
+   local txdesc_ring_t = ffi.typeof("$[$]", txdesc_t, self.ndesc)
+   self.txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
+   memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
 
-  -- Transmit state variables
-  self.txdesc_flags = bits({ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24})
+   -- Transmit state variables
+   self.txdesc_flags = bits({ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24})
 
-  -- Initialize transmit queue
-  self.r.TDBAL(tophysical(self.txdesc) % 2^32)
-  self.r.TDBAH(tophysical(self.txdesc) / 2^32)
-  self.r.TDLEN(self.ndesc * ffi.sizeof(txdesc_t))
-  self.r.TCTL:set(bits { TxEnable = 1 })
-  self.r.TXDCTL:set(bits { WTHRESH = 16, ENABLE = 25 } )
-  self:disableInterrupts()
+   -- Initialize transmit queue
+   self.r.TDBAL(tophysical(self.txdesc) % 2^32)
+   self.r.TDBAH(tophysical(self.txdesc) / 2^32)
+   self.r.TDLEN(self.ndesc * ffi.sizeof(txdesc_t))
+   self.r.TCTL:set(bits { TxEnable = 1 })
+   self.r.TXDCTL:set(bits { WTHRESH = 16, ENABLE = 25 } )
+   self:disableInterrupts()
 end
 
 function Intel1g:redirection_table(newtab)
-  local current = {}
-  local pos = 0
+   local current = {}
+   local pos = 0
 
-  for i=0,31,1 do
-    for j=0,3,1 do
-      current[self.r.RETA[i]:byte(j)] = 1
-      if newtab ~= nil then
-        local new = newtab[pos%#newtab+1]
-        self.r.RETA[i]:byte(j, new)
+   for i=0,31,1 do
+      for j=0,3,1 do
+         current[self.r.RETA[i]:byte(j)] = 1
+         if newtab ~= nil then
+            local new = newtab[pos%#newtab+1]
+            self.r.RETA[i]:byte(j, new)
+         end
+         pos = pos + 1
       end
-      pos = pos + 1
-    end
-  end
-  return current
+   end
+   return current
 end
 
 function Intel1g:new(conf)
-  local self = setmetatable({
-    r = {},
-    pciaddress = conf.pciaddr,
-    ndesc = conf.ndescriptors or 256,
-    txq = conf.txq,
-    rxq = conf.rxq,
-    rssseed = conf.rssseed or 314159
-  }, {__index = Intel1g})
-  local deviceInfo = pci.device_info(self.pciaddress)
-  assert(deviceInfo.vendor == '0x8086', "unsupported nic")
-  local models = {}
-  models["0x1521"] = "i350"
-  models["0x1533"] = "i210"
-  models["0x157b"] = "i210"
-  local ringSize = {}
-  ringSize["i350"] = 8
-  ringSize["i210"] = 4
+   local self = setmetatable({
+      r = {},
+      pciaddress = conf.pciaddr,
+      ndesc = conf.ndescriptors or 256,
+      txq = conf.txq,
+      rxq = conf.rxq,
+      rssseed = conf.rssseed or 314159
+   }, {__index = Intel1g})
+   local deviceInfo = pci.device_info(self.pciaddress)
+   assert(deviceInfo.vendor == '0x8086', "unsupported nic")
+   local models = {}
+   models["0x1521"] = "i350"
+   models["0x1533"] = "i210"
+   models["0x157b"] = "i210"
+   local ringSize = {}
+   ringSize["i350"] = 8
+   ringSize["i210"] = 4
 
-  self.model    = models[deviceInfo.device]
-  self.ringSize = ringSize[self.model]
+   self.model    = models[deviceInfo.device]
+   self.ringSize = ringSize[self.model]
 
-  -- Setup device access
-  self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
-  self.master = self.fd:flock("ex, nb")
+   -- Setup device access
+   self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
+   self.master = self.fd:flock("ex, nb")
 
-  register.define(gbl_registers, self.r, self.base)
-  register.define_array(gbl_array_registers, self.r, self.base)
-  self.r["EEMNGCTL"] = self.r["EEMNGCTL_"..self.model]
+   register.define(gbl_registers, self.r, self.base)
+   register.define_array(gbl_array_registers, self.r, self.base)
+   self.r["EEMNGCTL"] = self.r["EEMNGCTL_"..self.model]
 
-  self:init()
-  self.fd:flock("sh")
-  self:initTxQ()
-  self:initRxQ()
-  return self
+   self:init()
+   self.fd:flock("sh")
+   self:initTxQ()
+   self:initRxQ()
+   return self
 end
 
 function Intel1g:init ()
-  if not self.master then return end
-  pci.unbind_device_from_linux(self.pciaddress)
-  pci.set_bus_master(self.pciaddress, true)
-  self.r.MDICNFG(0)
-  self:disableInterrupts()
-  self.r.CTRL(bits { RST = 26 })
-  C.usleep(4*1000)
-  self.r.CTRL:wait(bits { RST = 26 }, 0)
-  --TODO reread 4.3.1
-  self:disableInterrupts()
+   if not self.master then return end
+   pci.unbind_device_from_linux(self.pciaddress)
+   pci.set_bus_master(self.pciaddress, true)
+   self.r.MDICNFG(0)
+   self:disableInterrupts()
+   self.r.CTRL(bits { RST = 26 })
+   C.usleep(4*1000)
+   self.r.CTRL:wait(bits { RST = 26 }, 0)
+   --TODO reread 4.3.1
+   self:disableInterrupts()
 
-  self:initPHY()
-  C.usleep(1*1000*1000)		-- wait 1s for init to settle
-  self:redirection_table({0})
-  self.r.MRQC:set(bits { RSS = 1 })
-  self.r.MRQC:clr(bits { Def_Q0 = 3, Def_Q1 = 4, Def_Q2 = 5})
-  self.r.MRQC:set(bits {
-    RSS0 = 16, RSS1 = 17, RSS2 = 18, RSS3 = 19, RSS4 = 20,
-    RSS5 = 21, RSS6 = 22, RSS7 = 23, RSS8 = 24
-  })
-  math.randomseed(self.rssseed)
-  for i=0,9,1 do
-    self.r.RSSRK[i](math.random(2^32))
-  end
+   self:initPHY()
+   C.usleep(1*1000*1000)		-- wait 1s for init to settle
+   self:redirection_table({0})
+   self.r.MRQC:set(bits { RSS = 1 })
+   self.r.MRQC:clr(bits { Def_Q0 = 3, Def_Q1 = 4, Def_Q2 = 5})
+   self.r.MRQC:set(bits {
+      RSS0 = 16, RSS1 = 17, RSS2 = 18, RSS3 = 19, RSS4 = 20,
+      RSS5 = 21, RSS6 = 22, RSS7 = 23, RSS8 = 24
+   })
+   math.randomseed(self.rssseed)
+   for i=0,9,1 do
+      self.r.RSSRK[i](math.random(2^32))
+   end
 
-  self.r.RCTL:clr(bits { rxEnable = 1 })
-  self.r.RCTL(bits {
-    RXEN = 1,
-    SBP = 2,
-    UPE = 3,
-    MPE = 4,
-    LPE = 5,
-    BAM = 15,
-    SECRC = 26,
-  })
+   self.r.RCTL:clr(bits { rxEnable = 1 })
+   self.r.RCTL(bits {
+      RXEN = 1,
+      SBP = 2,
+      UPE = 3,
+      MPE = 4,
+      LPE = 5,
+      BAM = 15,
+      SECRC = 26,
+   })
 
-  --clear32(r.STATUS, {PHYReset=10})	-- p.373
-  self.r.CTRL:set(bits { SETLINKUP = 6 })
-  self.r.CTRL_EXT:clr( bits { LinkMode0 = 22, LinkMode1 = 23} )
-  self.r.CTRL_EXT:clr( bits { PowerDown = 20 } )
-  self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
-  self:unlockSwSwSemaphore()
+   --clear32(r.STATUS, {PHYReset=10})	-- p.373
+   self.r.CTRL:set(bits { SETLINKUP = 6 })
+   self.r.CTRL_EXT:clr( bits { LinkMode0 = 22, LinkMode1 = 23} )
+   self.r.CTRL_EXT:clr( bits { PowerDown = 20 } )
+   self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
+   self:unlockSwSwSemaphore()
 end
 
 function Intel1g:pull ()
-  if not self.rxq then return end
-  local lo = self.output["output"]
-  assert(lo, "intel1g: output link required")
+   if not self.rxq then return end
+   local lo = self.output["output"]
+   assert(lo, "intel1g: output link required")
 
-  while (self.rdt ~= self.rdh) and (band(self.rxdesc[self.rdt].status, 0x01) ~= 0) do
-    local desc = self.rxdesc[self.rdt]
-    local p = self.rxpackets[self.rdt]
-    p.length = desc.length
-    local np = packet.allocate()
-    self.rxpackets[self.rdt] = np
-    self.rxdesc[self.rdt].address = tophysical(np.data)
-    self.rxdesc[self.rdt].status = 0
-    self.rdt = self:ringnext(self.rdt)
-    if link.full(lo) then
-      packet.free(p)
-    else
-      link.transmit(lo, p)
-    end
-  end
-  self.rdh = self.r.RDH()  -- possible race condition, see 7.1.4.4, 7.2.3
-  self.r.RDT(self.rdt)
+   while (self.rdt ~= self.rdh) and (band(self.rxdesc[self.rdt].status, 0x01) ~= 0) do
+      local desc = self.rxdesc[self.rdt]
+      local p = self.rxpackets[self.rdt]
+      p.length = desc.length
+      local np = packet.allocate()
+      self.rxpackets[self.rdt] = np
+      self.rxdesc[self.rdt].address = tophysical(np.data)
+      self.rxdesc[self.rdt].status = 0
+      self.rdt = self:ringnext(self.rdt)
+      if link.full(lo) then
+         packet.free(p)
+      else
+         link.transmit(lo, p)
+      end
+   end
+   self.rdh = self.r.RDH()  -- possible race condition, see 7.1.4.4, 7.2.3
+   self.r.RDT(self.rdt)
 end
 function Intel1g:ringnext (index)
-  return band(index+1, self.ndesc-1)
+   return band(index+1, self.ndesc-1)
 end
 function Intel1g:push ()
-  if not self.txq then return end
-  local li = self.input["input"]
-  assert(li, "intel1g:push: no input link")
+   if not self.txq then return end
+   local li = self.input["input"]
+   assert(li, "intel1g:push: no input link")
 
-  while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
-    local p = link.receive(li)
-    self.txdesc[self.tdt].address = tophysical(p.data)
-    self.txdesc[self.tdt].flags = bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
-    self.txpackets[self.tdt] = p
-    self.tdt = self:ringnext(self.tdt)
-  end
-  -- Reclaim transmit contexts
-  local cursor = self.tdh
-  self.tdh = self.r.TDH()	-- possible race condition, see 7.1.4.4, 7.2.3
-  while cursor ~= self.tdh do
-    if self.txpackets[cursor] then
-      packet.free(self.txpackets[cursor])
-      self.txpackets[cursor] = nil
-    end
-    cursor = self:ringnext(cursor)
-  end
-  self.r.TDT(self.tdt)
+   while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
+      local p = link.receive(li)
+      self.txdesc[self.tdt].address = tophysical(p.data)
+      self.txdesc[self.tdt].flags = bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
+      self.txpackets[self.tdt] = p
+      self.tdt = self:ringnext(self.tdt)
+   end
+   -- Reclaim transmit contexts
+   local cursor = self.tdh
+   self.tdh = self.r.TDH()	-- possible race condition, see 7.1.4.4, 7.2.3
+   while cursor ~= self.tdh do
+      if self.txpackets[cursor] then
+         packet.free(self.txpackets[cursor])
+         self.txpackets[cursor] = nil
+      end
+      cursor = self:ringnext(cursor)
+   end
+   self.r.TDT(self.tdt)
 end
 
 function Intel1g:stop ()
-  if self.rxq then
-  -- 4.5.9
-  -- PBRWAC.PBE is mentioned in i350 only, not implemented here.
-    self.r.RXDCTL:clr(bits { ENABLE = 25 })
-    self.r.RXDCTL:wait(bits { ENABLE = 25 }, 0)
-    for i = 0, self.ndesc-1 do
-      if self.rxpackets[i] then
-        packet.free(self.rxpackets[i])
-        self.rxpackets[i] = nil
+   if self.rxq then
+      -- 4.5.9
+      -- PBRWAC.PBE is mentioned in i350 only, not implemented here.
+      self.r.RXDCTL:clr(bits { ENABLE = 25 })
+      self.r.RXDCTL:wait(bits { ENABLE = 25 }, 0)
+      for i = 0, self.ndesc-1 do
+         if self.rxpackets[i] then
+            packet.free(self.rxpackets[i])
+            self.rxpackets[i] = nil
+         end
       end
-    end
-  end
-  if self.txq then
-    self.r.TXDCTL(0)
-    self.r.TXDCTL:wait(bits { ENABLE = 25 }, 0)
-    for i = 0, self.ndesc-1 do
-      if self.txpackets[i] then
-        packet.free(self.txpackets[i])
-        self.txpackets[i] = nil
+   end
+   if self.txq then
+      self.r.TXDCTL(0)
+      self.r.TXDCTL:wait(bits { ENABLE = 25 }, 0)
+      for i = 0, self.ndesc-1 do
+         if self.txpackets[i] then
+            packet.free(self.txpackets[i])
+            self.txpackets[i] = nil
+         end
       end
-    end
-  end
-  if self.fd:flock("nb, ex") then
-    self.r.CTRL:clr( bits { SETLINKUP = 6 } )
-    self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
-    pci.set_bus_master(self.pciaddress, false)
-    pci.close_pci_resource(self.fd, self.base)
-  end
+   end
+   if self.fd:flock("nb, ex") then
+      self.r.CTRL:clr( bits { SETLINKUP = 6 } )
+      self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
+      pci.set_bus_master(self.pciaddress, false)
+      pci.close_pci_resource(self.fd, self.base)
+   end
 end
 function Intel1g:stats ()
-  local stats_registers = [[
-CRCERRS   0x04000 - RC CRC Error Count
-MPC       0x04010 - RC Missed Packet Count
-RNBC      0x040A0 - RC Receive No Buffers Count
-GPTC      0x04080 - RC Good Packets Transmitted Count
-GPRC      0x04074 - RC Good Packets Received Count
-GORC      0x04088 - RC64 Good Octets Received Count
-]]
-  local r = {}
-  register.define(stats_registers, r, self.base)
-  local ret = {}
-  for i,v in pairs(r) do
-    ret[i] = v()
-  end
-  return ret
+   local stats_registers = [[
+   CRCERRS   0x04000 - RC CRC Error Count
+   MPC       0x04010 - RC Missed Packet Count
+   RNBC      0x040A0 - RC Receive No Buffers Count
+   GPTC      0x04080 - RC Good Packets Transmitted Count
+   GPRC      0x04074 - RC Good Packets Received Count
+   GORC      0x04088 - RC64 Good Octets Received Count
+   ]]
+   local r = {}
+   register.define(stats_registers, r, self.base)
+   local ret = {}
+   for i,v in pairs(r) do
+      ret[i] = v()
+   end
+   return ret
 end
