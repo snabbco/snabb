@@ -1,6 +1,55 @@
 --go@ git up
 --- Device driver for the Mellanox ConnectX-4 series Ethernet controller.
 
+-- This driver is written using these main reference sources:
+-- 
+--   PRM: Mellanox Adapter Programmer's Reference Manual
+--        This document will be made available on Mellanox's website.
+--        Has not happened yet (as of 2016-05-24).
+--
+--   mlx5_core: Linux kernel driver for ConnectX-4. This has been
+--        developed by Mellanox.
+--
+--   Hexdumps: The Linux kernel driver has the capability to run in
+--        debug mode and to output hexdumps showing the exact
+--        interactions with the card. This driver has a similar
+--        capability. This makes it possible to directly compare
+--        driver behavior directly via hexdumps i.e. independently of
+--        the source code.
+
+-- Implementation notes:
+--
+--   RESET: This driver performs a PCIe reset of the device prior to
+--        initialization. This is instead of performing the software
+--        deinitialization procedure. The main reason for this is
+--        simplicity and keeping the code minimal.
+--
+--        Relatedly, reloading the mlx5_core driver in Linux 4.4.8
+--        does not seem to consistently succeed in reinitializing the
+--        device. This may be due to bugs in the driver and/or firmware. 
+--        Skipping the soft-reset would seem to reduce our driver's
+--        exposure to such problems.
+--
+--        In the future we could consider implementing the software
+--        reset if this is found to be important for some purpose.
+--
+--   SIGNATURE:
+--        Command signatures fields: Are they useful? Are they used?
+--
+--        Usefulness - command signature is an 8-bit value calculated
+--        with a simple xor. What does this protect and how effective
+--        is it? Curious because PCIe is already performing a more
+--        robust checksum. Perhaps the signature is designed to catch
+--        driver bugs? Or host memory corruption? Enquiring minds
+--        would like to know...
+--
+--        Used - the Linux driver has code for signatures but seems to
+--        hard-code this as disabled at least in certain instances.
+--        Likewise the card is accepting at least some commands from
+--        this driver without signatures. It seems potentially futile
+--        to calculate and include command signatures if they are not
+--        actually being verified by the device.
+
 module(...,package.seeall)
 
 local ffi      = require "ffi"
@@ -18,51 +67,47 @@ local cast = ffi.cast
 local band, bor, shl, shr, bswap, bnot =
    bit.band, bit.bor, bit.lshift, bit.rshift, bit.bswap, bit.bnot
 
+local debug = true
+
 ConnectX4 = {}
 ConnectX4.__index = ConnectX4
 
 --utils
 
---alloc DMA memory in 4K-sized chunks and return an uint32 pointer
 local function alloc_pages(pages)
    local ptr, phy = memory.dma_alloc(4096 * pages)
    assert(band(phy, 0xfff) == 0) --the phy address must be 4K-aligned
    return cast('uint32_t*', ptr), phy
 end
 
---get an big-endian uint32 value from an uint32 pointer at a byte offset
 function getint(addr, ofs)
    local ofs = ofs/4
    assert(ofs == floor(ofs))
    return bswap(addr[ofs])
 end
 
---set a big-endian uint32 value into an uint32 pointer at a byte offset
 function setint(addr, ofs, val)
    local ofs = ofs/4
    assert(ofs == floor(ofs))
    addr[ofs] = bswap(val)
 end
 
---extract a bit range from a value
 local function getbits(val, bit2, bit1)
    local mask = shl(2^(bit2-bit1+1)-1, bit1)
    return shr(band(val, mask), bit1)
 end
 
---extract a bit range from a pointer
 local function ptrbits(ptr, bit2, bit1)
    local addr = cast('uint64_t', ptr)
    return tonumber(getbits(addr, bit2, bit1))
 end
 
---fit a value into a bit range and return the resulting value
 local function setbits1(bit2, bit1, val)
    local mask = shl(2^(bit2-bit1+1)-1, bit1)
-   return band(shl(val, bit1), mask)
+   local bits = band(shl(val, bit1), mask)
+   return bits
 end
 
---set multiple bit ranges and return the resulting value
 local function setbits(...) --bit2, bit1, val, ...
    local endval = 0
    for i = 1, select('#', ...), 3 do
@@ -72,12 +117,6 @@ local function setbits(...) --bit2, bit1, val, ...
    return endval
 end
 
---get the value of a bit at a certain a bit offset from a base address
-local function getbit(addr, bit)
-   local i = math.floor(bit / 32)
-   local j = bit % 32
-   return getbits(getint(addr, i * 4), j, j)
-end
 
 --init segment (section 4.3)
 
@@ -109,6 +148,7 @@ end
 
 function init_seg:cmdq_phy_addr(addr)
    if addr then
+      print("addr", addr)
       --must write the MSB of the addr first
       self:setbits(0x10, 31, 0, ptrbits(addr, 63, 32))
       --also resets nic_interface and log_cmdq_*
@@ -174,9 +214,22 @@ local QUERY_PAGES        = 0x107
 local MANAGE_PAGES       = 0x108
 local SET_HCA_CAP        = 0x109
 local QUERY_ISSI         = 0x10A
+--local QUERY_ISSI         = 0x010A
+--local QUERY_ISSI         = 0x0A01
 local SET_ISSI           = 0x10B
 local SET_DRIVER_VERSION = 0x10D
 
+-- bytewise xor function used for signature calcuation.
+local function xor8 (ptr, len)
+   local u8 = ffi.cast("uint8_t*", ptr)
+   local acc = 0
+   for i = 0, len-1 do
+      acc = bit.bxor(acc, u8[i])
+   end
+   return acc
+end
+
+-- Create a command queue with dedicated/reusable DMA memory.
 function cmdq:new(init_seg)
    local ptr, phy = alloc_pages(1)
    local ib_ptr, ib_phy = alloc_pages(1)
@@ -185,11 +238,21 @@ function cmdq:new(init_seg)
       ptr = ptr,
       phy = phy,
       ib_ptr = ib_ptr,
+      ib_phy = ib_phy,
       ob_ptr = ob_ptr,
+      ob_phy = ob_phy,
       init_seg = init_seg,
       size = init_seg:log_cmdq_size(),
       stride = init_seg:log_cmdq_stride(),
    }, self)
+end
+
+-- Reset all data structures to zero values.
+-- This is to prevent leakage from one command to the next.
+function cmdq:reset()
+   ffi.fill(self.ptr, 4096, 0x00)
+   ffi.fill(self.ib_ptr, 4096, 0x00)
+   ffi.fill(self.ob_ptr, 4096, 0x00)
 end
 
 function cmdq:getbits(ofs, bit2, bit1)
@@ -219,55 +282,95 @@ function cmdq:getoutbits(ofs, bit2, bit1)
    end
 end
 
-function cmdq:getoutaddr(ofs)
-   local ofs = (0x20 + ofs) / 4
-   assert(ofs == math.floor(ofs))
-   return self.ptr + ofs
-end
-
-function cmdq:getbit(ofs, bit)
-   return getbit(self:getoutaddr(ofs), bit)
-end
-
-local errors = {
-   'signature error',
-   'token error',
-   'bad block number',
-   'bad output pointer. pointer not aligned to mailbox size',
-   'bad input pointer. pointer not aligned to mailbox size',
-   'internal error',
-   'input len error. input length less than 0x8',
-   'output len error. output length less than 0x8',
-   'reserved not zero',
-   'bad command type',
+-- "Command delivery status" error codes.
+local delivery_errors = {
+   [0x00] = 'no errors',
+   [0x01] = 'signature error',
+   [0x02] = 'token error',
+   [0x03] = 'bad block number',
+   [0x04] = 'bad output pointer. pointer not aligned to mailbox size',
+   [0x05] = 'bad input pointer. pointer not aligned to mailbox size',
+   [0x06] = 'internal error',
+   [0x07] = 'input len error. input length less than 0x8',
+   [0x08] = 'output len error. output length less than 0x8',
+   [0x09] = 'reserved not zero',
+   [0x10] = 'bad command type',
+   -- Note: Suspicious to jump from 0x09 to 0x10 here i.e. skipping 0x0A - 0x0F.
+   --       This is consistent with both the PRM and the Linux mlx5_core driver.
 }
+
 local function checkz(z)
    if z == 0 then return end
-   error('command error: '..(errors[z] or z))
+   error('command error: '..(delivery_errors[z] or z))
 end
+
+-- Command error code meanings.
+-- Note: This information is missing from the PRM. Can compare with Linux mlx5_core.
+local command_errors = {
+   -- General:
+   [0x01] = 'INTERNAL_ERR: internal error',
+   [0x02] = 'BAD_OP: Operation/command not supported or opcode modifier not supported',
+   [0x03] = 'BAD_PARAM: parameter not supported; parameter out of range; reserved not equal 0',
+   [0x04] = 'BAD_SYS_STATE: System was not enabled or bad system state',
+   [0x05] = 'BAD_RESOURCE: Attempt to access reserved or unallocated resource, or resource in inappropriate status. for example., not existing CQ when creating QP',
+   [0x06] = 'RESOURCE_BUSY: Requested resource is currently executing a command. No change in any resource status or state i.e. command just not executed.',
+   [0x08] = 'EXCEED_LIM: Required capability exceeds device limits',
+   [0x09] = 'BAD_RES_STATE: Resource is not in the appropriate state or ownership',
+   [0x0F] = 'NO_RESOURCES: Command was not executed because lack of resources (for example ICM pages). This is unrecoverable situation from driver point of view',
+   [0x50] = 'BAD_INPUT_LEN: Bad command input len',
+   [0x51] = 'BAD_OUTPUT_LEN: Bad command output len',
+   -- QP/RQ/SQ/TIP:
+   [0x10] = 'BAD_RESOURCE_STATE: Attempt to modify a Resource (RQ/SQ/TIP/QPs) which is not in the presumed state',
+   -- MAD:
+   [0x30] = 'BAD_PKT: Bad management packet (silently discarded)',
+   -- CQ:
+   [0x40] = 'BAD_SIZE: More outstanding CQEs in CQ than new CQ size',
+}
 
 function cmdq:post(last_in_ofs, last_out_ofs)
    local in_sz  = last_in_ofs + 4
    local out_sz = last_out_ofs + 4
+   print("in_sz", in_sz, "out_sz", out_sz)
 
    self:setbits(0x00, 31, 24, 0x7) --type
-
    self:setbits(0x04, 31, 0, in_sz) --input_length
    self:setbits(0x38, 31, 0, out_sz) --output_length
 
-   self:setbits(0x08, 31, 0, ptrbits(self.ib_addr, 63, 32))
-   self:setbits(0x0C, 31, 9, ptrbits(self.ib_addr, 31, 9))
+   self:setbits(0x08, 31, 0, ptrbits(self.ib_phy, 63, 32))
+   self:setbits(0x0C, 31, 0, ptrbits(self.ib_phy, 31, 0))
 
-   self:setbits(0x30, 31, 0, ptrbits(self.ob_addr, 63, 32))
-   self:setbits(0x34, 31, 9, ptrbits(self.ob_addr, 31, 9))
+   self:setbits(0x30, 31, 0, ptrbits(self.ob_phy, 63, 32))
+   self:setbits(0x34, 31, 0, ptrbits(self.ob_phy, 31, 0))
 
    self:setbits(0x3C, 0, 0, 1) --set ownership
+
+   if debug then
+      local dumpoffset = 0
+      print("command INPUT:")
+      dumpoffset = hexdump(self.ptr, 0, 0x40, dumpoffset)
+      if in_sz > 16 then
+         print("command block:")
+         dumpoffset = hexdump(self.ib_ptr, 0, (in_sz-16), dumpoffset)
+      end
+   end
 
    self.init_seg:ring_doorbell(0) --post command
 
    --poll for command completion
    while self:getbits(0x3C, 0, 0) == 1 do
-      C.usleep(1000)
+      C.usleep(100000)
+   end
+
+   if debug then
+      local dumpoffset = 0
+      print("command OUTPUT:")
+      dumpoffset = hexdump(self.ptr, 0, 0x40, dumpoffset)
+      print("command block:")
+      if out_sz > 16 then
+         sz = out_sz-16
+         dumpoffset = 0x10
+         dumpoffset = hexdump(self.ob_ptr, 0, sz, dumpoffset)
+      end
    end
 
    local token     = self:getbits(0x3C, 31, 24)
@@ -279,32 +382,43 @@ function cmdq:post(last_in_ofs, last_out_ofs)
    return signature, token
 end
 
---see 12.2 Return Status Summary
+-- see 12.2 Return Status Summary
 function cmdq:checkstatus()
    local status = self:getoutbits(0x00, 31, 24)
    local syndrome = self:getoutbits(0x04, 31, 0)
    if status == 0 then return end
-   error(string.format('status: 0x%x, syndrome: %d', status, syndrome))
+   error(string.format('status: 0x%x (%s), syndrome: %d',
+                       status, command_errors[status], syndrome))
+end
+
+function cmdq:prepare (command)
+   print("Execute: " .. command)
+   self:reset()
 end
 
 function cmdq:enable_hca()
+   self:prepare("ENABLE_HCA")
    self:setinbits(0x00, 31, 16, ENABLE_HCA)
    self:post(0x0C, 0x08)
 end
 
-function cmdq:disable_hca()
-   self:setinbits(0x00, 31, 16, DISABLE_HCA)
-   self:post(0x0C, 0x08)
-end
-
 function cmdq:query_issi()
+   self:prepare("QUERY_ISSI")
    self:setinbits(0x00, 31, 16, QUERY_ISSI)
    self:post(0x0C, 0x6C)
    self:checkstatus()
    local cur_issi = self:getoutbits(0x08, 15, 0)
    local t = {}
-   for i=0,80-1 do
-      t[i] = self:getbit(0x20, i) == 1 or nil
+   for i = 639, 0, -1 do
+      -- Bit N (0..639) when set means ISSI version N is enabled.
+      -- Bits are ordered from highest to lowest.
+      local byte = 0x10 + math.floor(i / 8)
+      local offset = byte - (byte % 4)
+      local bit = 31 - (i % 32)
+      if self:getoutbits(offset, bit, bit) == 1 then
+         local issi = 639 - i
+         t[issi] = true
+      end
    end
    return {
       cur_issi = cur_issi,
@@ -313,6 +427,7 @@ function cmdq:query_issi()
 end
 
 function cmdq:set_issi(issi)
+   self:reset()
    self:setinbits(0x00, 31, 16, SET_ISSI)
    self:setinbits(0x08, 15, 0, issi)
    self:post(0x0C, 0x0C)
@@ -320,8 +435,8 @@ function cmdq:set_issi(issi)
 end
 
 function cmdq:dump_issi(issi)
-   print('  cur_issi              ', issi.cur_issi)
-   print('  sup_issi              ')
+   print('  cur_issi            = ', issi.cur_issi)
+   print('  sup_issi            = ')
    for i=0,79 do
       if issi.sup_issi[i] then
    print(string.format(
@@ -336,6 +451,7 @@ local codes = {
    regular = 3,
 }
 function cmdq:query_pages(which)
+   self:prepare("QUERY_PAGES")
    self:setinbits(0x00, 31, 16, QUERY_PAGES)
    self:setinbits(0x04, 15, 0, codes[which])
    self:post(0x0C, 0x0C)
@@ -344,6 +460,7 @@ function cmdq:query_pages(which)
 end
 
 function cmdq:alloc_pages(addr, num_pages)
+   self:prepare("MANAGE_PAGES")
    self:setinbits(0x00, 31, 16, MANAGE_PAGES)
    self:setinbits(0x04, 15, 0, 1) --alloc
    self:setinbits(0x0C, 31, 0, num_pages)
@@ -366,6 +483,7 @@ local which_codes = {
    flow_table = 7,
 }
 function cmdq:query_hca_cap(what, which)
+   self:prepare("QUERY_HCA_CAP")
    self:setinbits(0x00, 31, 16, QUERY_HCA_CAP)
    self:setinbits(0x04,
       15,  1, assert(which_codes[which]),
@@ -446,6 +564,7 @@ function cmdq:query_hca_cap(what, which)
 end
 
 function cmdq:set_hca_cap(which, caps)
+   self:prepare("SET_HCA_CAP")
    self:setinbits(0x00, 31, 16, SET_HCA_CAP)
    self:setinbits(0x04, 15,  1, assert(which_codes[which]))
    if which_caps == 'general' then
@@ -576,10 +695,15 @@ function ConnectX4:new(arg)
    local conf = config.parse_app_arg(arg)
    local pciaddress = pci.qualified(conf.pciaddress)
 
+   -- Perform a hard reset of the device to bring it into a blank state.
+   -- (PRM does not suggest this but it is practical for resetting the
+   -- firmware from bad states.)
+   pci.reset_device(pciaddress)
    pci.unbind_device_from_linux(pciaddress)
    pci.set_bus_master(pciaddress, true)
    local base, fd = pci.map_pci_memory(pciaddress, 0)
 
+   trace("Read the initialization segment")
    local init_seg = init_seg:init(base)
 
    --allocate and set the command queue which also initializes the nic
@@ -587,9 +711,10 @@ function ConnectX4:new(arg)
 
    --8.2 HCA Driver Start-up
 
+   trace("Write the physical location of the command queues to the init segment.")
    init_seg:cmdq_phy_addr(cmdq.phy)
 
-   --wait until the nic is ready
+   trace("Wait for the 'initializing' field to clear")
    while not init_seg:ready() do
       C.usleep(1000)
    end
@@ -597,16 +722,17 @@ function ConnectX4:new(arg)
    init_seg:dump()
 
    cmdq:enable_hca()
-
    local issi = cmdq:query_issi()
    cmdq:dump_issi(issi)
+   --cmdq:set_issi(1)
 
-   cmdq:set_issi(0)
-
+   -- PRM: Execute QUERY_PAGES to understand the HCA need to boot pages.
    local boot_pages = cmdq:query_pages'boot'
    print("query_pages'boot'       ", boot_pages)
    assert(boot_pages > 0)
 
+   -- PRM: Execute MANAGE_PAGES to provide the HCA with all required
+   -- init-pages. This can be done by multiple MANAGE_PAGES commands.
    local bp_ptr, bp_phy = memory.dma_alloc(4096 * boot_pages)
    assert(band(bp_phy, 0xfff) == 0) --the phy address must be 4K-aligned
    cmdq:alloc_pages(bp_phy, boot_pages)
@@ -616,6 +742,7 @@ function ConnectX4:new(arg)
    for k,v in pairs(t) do
       print('', k, v)
    end
+
    --[[
    cmdq:set_hca_cap()
    cmdq:query_pages()
@@ -628,11 +755,8 @@ function ConnectX4:new(arg)
    ]]
 
    function self:stop()
-      if not base then return end
-      if cmdq then
-         cmdq:disable_hca()
-      end
       pci.set_bus_master(pciaddress, false)
+      pci.reset_device(pciaddress)
       pci.close_pci_resource(fd, base)
       base, fd = nil
    end
@@ -640,47 +764,44 @@ function ConnectX4:new(arg)
    return self
 end
 
+-- Print a hexdump in the same format as the Linux kernel.
+-- 
+-- Optionally take a 'dumpoffset' giving the logical address where the
+-- trace starts (useful when printing multiple related hexdumps i.e.
+-- for consistency with the Linux mlx5_core driver format).
+function hexdump (pointer, index, bytes,  dumpoffset)
+   local u8 = ffi.cast("uint8_t*", pointer)
+   dumpoffset = dumpoffset or 0
+   for i = 0, bytes-1 do
+      if i % 16 == 0 then
+         if i > 0 then io.stdout:write("\n") end
+         io.stdout:write(("%03x: "):format(dumpoffset+i))
+      elseif i % 4 == 0 then
+         io.stdout:write(" ")
+      end
+      io.stdout:write(bit.tohex(u8[index+i], 2))
+   end
+   io.stdout:write("\n")
+   io.flush()
+   return dumpoffset + bytes
+end
+
+function trace (...)
+   print("TRACE", ...)
+end
+
 function selftest()
    io.stdout:setvbuf'no'
 
-	local ptr, phy = alloc_pages(1)
-	ptr[4] = bswap(1234)
-	assert(getint(ptr, 16) == 1234)
-	setint(ptr, 16, 4321)
-	assert(bswap(ptr[4]) == 4321)
-	assert(getint(ptr, 16) == 4321)
-	assert(getbits(0xdeadbeef, 31, 16) == 0xdead)
-	assert(getbits(0xdeadbeef, 15,  0) == 0xbeef)
-	assert(ptrbits(ffi.cast('void*', 0xdeadbeef), 15, 0) == 0xbeef)
-	assert(setbits(0, 0, 1) == 1)
-	assert(setbits(1, 1, 1) == 2)
-	assert(setbits(1, 0, 3) == 3)
-	local x = setbits(31, 16, 0xdead, 15, 0, 0xbeef)
-	print(bit.tohex(x), type(x))
-	--assert(x == 0xdeadbeef)
-	ptr[4] = bswap(2)
-	assert(getbit(ptr, 4 * 4 * 8 + 0) == 0)
-	assert(getbit(ptr, 4 * 4 * 8 + 1) == 1)
-
-   local pcidev1 = lib.getenv("SNABB_PCI_CONNECTX40") or lib.getenv("SNABB_PCI0")
-   local pcidev2 = lib.getenv("SNABB_PCI_CONNECTX41") or lib.getenv("SNABB_PCI1")
-   if not pcidev1
-      or pci.device_info(pcidev1).driver ~= 'apps.mellanox.connectx4'
-      or not pcidev2
-      or pci.device_info(pcidev2).driver ~= 'apps.mellanox.connectx4'
-   then
-      print("SNABB_PCI_CONNECTX4[0|1]/SNABB_PCI[0|1] not set or not suitable.")
+   local pcidev = lib.getenv("SNABB_PCI_CONNECTX4_0")
+   -- XXX check PCI device type
+   if not pcidev then
+      print("SNABB_PCI_CONNECTX4_0 not set")
       os.exit(engine.test_skipped_code)
    end
 
-   local device_info_1 = pci.device_info(pcidev1)
-   local device_info_2 = pci.device_info(pcidev2)
-
-   local app1 = ConnectX4:new{pciaddress = pcidev1}
-   local app2 = ConnectX4:new{pciaddress = pcidev2}
-
-   engine.main({duration = 1, report={showlinks=true, showapps=false}})
-
-   app1:stop()
-   app2:stop()
+   local device_info = pci.device_info(pcidev)
+   local app = ConnectX4:new{pciaddress = pcidev}
+   app:stop()
 end
+
