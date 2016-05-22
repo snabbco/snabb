@@ -62,6 +62,11 @@ Returns a table containing information about the PCI device by
 Returns the module name for a suitable device driver (if available) for a
 device of *model* from *vendor*.
 
+— Function **pci.reset_device** *pciaddress*
+
+Reset a PCI device (function). Can be useful for returning the device
+to a clean initial state.
+
 — Function **pci.unbind_device_from_linux** *pciaddress*
 
 Forces Linux to unbind the device identified by *pciaddress* from any

@@ -106,6 +106,18 @@ function is_usable (info)
    return info.driver and (info.interface == nil or info.status == 'down')
 end
 
+-- Reset a PCI function.
+-- See https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-bus-pci
+function reset_device (pciaddress)
+   root_check()
+   local p = path(pciaddress).."/reset"
+   if lib.can_write(p) then
+      lib.writefile(p, "1")
+   else
+      error("Cannot write: "..p)
+   end
+end
+
 --- Force Linux to release the device with `pciaddress`.
 --- The corresponding network interface (e.g. `eth0`) will disappear.
 function unbind_device_from_linux (pciaddress)
