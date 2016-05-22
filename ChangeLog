@@ -1,7 +1,8 @@
-    unreleased
+    0.12 release
 
 + Fix seccomp on arm64
 + Linux added support for eBPF
++ bug fixes
 
     0.11 release
 
