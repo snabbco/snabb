@@ -231,16 +231,13 @@ end
 
 -- Create a command queue with dedicated/reusable DMA memory.
 function cmdq:new(init_seg)
-   local ptr, phy = alloc_pages(1)
-   local ib_ptr, ib_phy = alloc_pages(1)
-   local ob_ptr, ob_phy = alloc_pages(1)
+   local ptr = alloc_pages(1)
+   local ib_ptr = alloc_pages(1)
+   local ob_ptr = alloc_pages(1)
    return setmetatable({
       ptr = ptr,
-      phy = phy,
       ib_ptr = ib_ptr,
-      ib_phy = ib_phy,
       ob_ptr = ob_ptr,
-      ob_phy = ob_phy,
       init_seg = init_seg,
       size = init_seg:log_cmdq_size(),
       stride = init_seg:log_cmdq_stride(),
@@ -336,11 +333,13 @@ function cmdq:post(last_in_ofs, last_out_ofs)
    self:setbits(0x04, 31, 0, in_sz) --input_length
    self:setbits(0x38, 31, 0, out_sz) --output_length
 
-   self:setbits(0x08, 31, 0, ptrbits(self.ib_phy, 63, 32))
-   self:setbits(0x0C, 31, 0, ptrbits(self.ib_phy, 31, 0))
+   local inbox_phy = memory.virtual_to_physical(self.ib_ptr)
+   self:setbits(0x08, 31, 0, ptrbits(inbox_phy, 63, 32))
+   self:setbits(0x0C, 31, 0, ptrbits(inbox_phy, 31, 0))
 
-   self:setbits(0x30, 31, 0, ptrbits(self.ob_phy, 63, 32))
-   self:setbits(0x34, 31, 0, ptrbits(self.ob_phy, 31, 0))
+   local outbox_phy = memory.virtual_to_physical(self.ob_ptr)
+   self:setbits(0x30, 31, 0, ptrbits(outbox_phy, 63, 32))
+   self:setbits(0x34, 31, 0, ptrbits(outbox_phy, 31, 0))
 
    self:setbits(0x3C, 0, 0, 1) --set ownership
 
@@ -712,7 +711,7 @@ function ConnectX4:new(arg)
    --8.2 HCA Driver Start-up
 
    trace("Write the physical location of the command queues to the init segment.")
-   init_seg:cmdq_phy_addr(cmdq.phy)
+   init_seg:cmdq_phy_addr(memory.virtual_to_physical(cmdq.ptr))
 
    trace("Wait for the 'initializing' field to clear")
    while not init_seg:ready() do
