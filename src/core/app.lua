@@ -93,7 +93,7 @@ ingress_drop_monitor = {
    current_value = ffi.new('uint64_t[1]')
 }
 
-function ingress_drop_monitor:sample()
+function ingress_drop_monitor:sample ()
    local sum = self.current_value
    sum[0] = 0
    for i = 1, #app_array do
@@ -105,7 +105,7 @@ function ingress_drop_monitor:sample()
    end
 end
 
-function ingress_drop_monitor:jit_flush_if_needed()
+function ingress_drop_monitor:jit_flush_if_needed ()
    if self.current_value[0] - self.last_value[0] < self.threshold then return end
    if now() - self.last_flush < self.wait then return end
    self.last_flush = now()
@@ -283,7 +283,7 @@ function main (options)
 
    if options.ingress_drop_monitor or options.ingress_drop_monitor == nil then
       local interval = 1e8   -- Every 100 milliseconds.
-      local function fn()
+      local function fn ()
          ingress_drop_monitor:sample()
          ingress_drop_monitor:jit_flush_if_needed()
       end
