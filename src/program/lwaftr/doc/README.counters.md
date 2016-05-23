@@ -6,12 +6,12 @@ are recorded in counters, updated in real time.
 The counters are accessible as files in the runtime area of the Snabb process,
 typically under `/var/run/snabb/[PID]/app/lwaftr/counters/`.
 
-Each counter has two files, respectively ending with the `bytes` and `packets`
-suffix.
+Most counters are represented by two files, ending with the `bytes` and
+`packets` suffixes.
 
 ## Execution flow
 
-This is lwAftr's overall execution flow:
+This is the lwAftr's overall execution flow:
 
 ![main flow](images/main-flow.png)
 
@@ -21,9 +21,9 @@ sent to the Internet or dropped, as appropriate.
 On the other side, packets coming from the Internet are handled, possibly
 dropped, or encapsulated and sent to users' b4.
 
-Each direction is in turn broken in two by two queues, for implementation
-reasons. The four resulting macro blocks are described below, in clockwise
-order.
+Each direction is in turn broken in two by two queues, in order to reduce the
+cost lookups in the binding table. The four resulting macro blocks are
+described below, in clockwise order.
 
 For each macro block, the place of all counters in the execution flow is first
 shown graphically, then each counter is described in detail. Several counters
@@ -43,7 +43,7 @@ Counters:
   current policy
 - **drop-too-big-type-but-not-code-icmpv6**: the packets' ICMPv6 type is
   "Packet too big", but the ICMPv6 code is not, as it should
-- **out-icmpv4**: all valid outgoing ICMPv4 packets
+- **out-icmpv4**: internally generated ICMPv4 error packets
 - **drop-over-time-but-not-hop-limit-icmpv6**: the packets' time limit is
   exceeded, but the hop limit is not
 - **drop-unknown-protocol-icmpv6**: packets with an unknown ICMPv6 protocol
@@ -56,13 +56,13 @@ Counters:
 
 - **drop-no-source-softwire-ipv6**: no matching source softwire in the binding
   table
-- **hairpin-ipv4**: packets going to a known b4 (hairpinned)
+- **hairpin-ipv4**: IPv4 packets going to a known b4 (hairpinned)
 - **out-ipv4**: all valid outgoing IPv4 packets
-- **drop-out-by-policy-icmpv6**: outgoing ICMPv6 packets dropped because of
-  current policy
+- **drop-out-by-policy-icmpv6**: internally generated ICMPv6 error packets
+  dropped because of current policy
 - **drop-over-rate-limit-icmpv6**: packets dropped because the outgoing ICMPv6
   rate limit was reached
-- **out-icmpv6**: all valid outgoing ICMPv6 packets
+- **out-icmpv6**: internally generated ICMPv6 error packets
 
 ### Internet to encapsulation queue
 
@@ -85,19 +85,21 @@ Counters:
 
 - **drop-no-dest-softwire-ipv4**: no matching destination softwire in the
   binding table
-- **drop-out-by-policy-icmpv4**: outgoing ICMPv4 packets dropped because of
-  current policy
-- **drop-in-by-policy-icmpv4**: incoming ICMPv4 packets dropped because of
-  current policy (same as above)
-- **out-icmpv4**: all valid outgoing ICMPv4 packets (same as above)
-- **drop-ttl-zero-ipv4**: IPv4 pacjets dropped because their TTL is zero
+- **drop-out-by-policy-icmpv4**: internally generated ICMPv4 error packets
+  dropped because of current policy
+- **drop-in-by-rfc7596-icmpv4**: incoming ICMPv4 packets with no destination
+  (RFC 7596 section 8.1)
+- **out-icmpv4**: internally generated ICMPv4 error packets (same as above)
+- **drop-ttl-zero-ipv4**: IPv4 packets dropped because their TTL is zero
 - **drop-over-mtu-but-dont-fragment-ipv4**: IPv4 packets whose size exceeds the
   MTU, but the DF (Don't Fragment) flag is set
 - **out-ipv6**: all valid outgoing IPv6 packets
 
 ## Aggregation counters
 
-Several additional counters aggregate the value of a number of single ones:
+Several additional counters aggregate the value of a number of specific ones:
 
-- **drop-all-ipv4**: all dropped IPv4 packets, aggregating the counters: [TBD]
-- **drop-all-ipv6**: all dropped IPv6 packets, aggregating the counters: [TBD]
+- **drop-all-ipv4**: all dropped incoming IPv4 packets (not including the
+  internally generated ICMPv4 error ones)
+- **drop-all-ipv6**: all dropped incoming IPv6 packets (not including the
+  internally generated ICMPv6 error ones)
