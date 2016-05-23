@@ -4,8 +4,7 @@ return {
 
    ["drop-no-source-softwire-ipv6-bytes"] = 106,
    ["drop-no-source-softwire-ipv6-packets"] = 1,
-   ["drop-out-by-policy-icmpv6-bytes"] = 106,
    ["drop-out-by-policy-icmpv6-packets"] = 1,
-   ["drop-all-ipv6-bytes"] = 212,
-   ["drop-all-ipv6-packets"] = 2,
+   ["drop-all-ipv6-bytes"] = 106,
+   ["drop-all-ipv6-packets"] = 1,
 }
