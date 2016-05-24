@@ -67,7 +67,10 @@ function pci_node {
             numactl -H | grep "cpus: $cpu" | cut -d " " -f 2
             ;;
         *)
-            echo $1
+            if [ "$1" = "soft" ]
+            then echo 0
+            else echo $1
+            fi
             ;;
     esac
 }
