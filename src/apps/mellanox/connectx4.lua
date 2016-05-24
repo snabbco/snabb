@@ -75,7 +75,7 @@ ConnectX4.__index = ConnectX4
 --utils
 
 local function alloc_pages(pages)
-   local ptr, phy = memory.dma_alloc(4096 * pages)
+   local ptr, phy = memory.dma_alloc(4096 * pages, 4096)
    assert(band(phy, 0xfff) == 0) --the phy address must be 4K-aligned
    return cast('uint32_t*', ptr), phy
 end
@@ -732,7 +732,7 @@ function ConnectX4:new(arg)
 
    -- PRM: Execute MANAGE_PAGES to provide the HCA with all required
    -- init-pages. This can be done by multiple MANAGE_PAGES commands.
-   local bp_ptr, bp_phy = memory.dma_alloc(4096 * boot_pages)
+   local bp_ptr, bp_phy = memory.dma_alloc(4096 * boot_pages, 4096)
    assert(band(bp_phy, 0xfff) == 0) --the phy address must be 4K-aligned
    cmdq:alloc_pages(bp_phy, boot_pages)
 
