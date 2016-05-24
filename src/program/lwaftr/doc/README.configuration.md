@@ -25,10 +25,10 @@ policy_icmpv6_outgoing = ALLOW
 v4_vlan_tag = 1234
 v6_vlan_tag = 42
 vlan_tagging = true
-# ipv4_ingress_filter = ip
-# ipv4_egress_filter = ip
-# ipv6_ingress_filter = ip6
-# ipv6_egress_filter = ip6
+# ipv4_ingress_filter = "ip"
+# ipv4_egress_filter = "ip"
+# ipv6_ingress_filter = "ip6"
+# ipv6_egress_filter = "ip6"
 ```
 
 The lwAFTR is associated with two physical network cards. One of these cards
@@ -89,6 +89,10 @@ binding_table = path/to/binding-table.txt
 See [README.bindingtable.md](README.bindingtable.md) for binding table
 details.  Note that you can compile the binding table beforehand; again,
 see [README.bindingtable.md](README.bindingtable.md).
+
+If the path to the binding table is a relative path, it will be relative
+to the location of the configuration file.  Enclose the path in single
+or double quotes if the path contains spaces.
 
 ### Hairpinning
 
@@ -157,24 +161,64 @@ will be provided upon request.
 ### Ingress and egress filters
 
 ```
-# ipv4_ingress_filter = ip
-# ipv4_egress_filter = ip
-# ipv6_ingress_filter = ip6
-# ipv6_egress_filter = ip6
+# ipv4_ingress_filter = "ip"
+# ipv4_egress_filter = "ip"
+# ipv6_ingress_filter = "ip6"
+# ipv6_egress_filter = "ip6"
 ```
 
 In the example configuration these entries are commented out by the `#`
 character.  If uncommented, the right-hand-side should be a
 [pflang](https://github.com/Igalia/pflua/blob/master/doc/pflang.md)
 filter.  Pflang is the language of `tcpdump`, `libpcap`, and other
-tools.  If these options are given, the filters will run on the packets
-without vlan tags, if any.
+tools.
 
-Filter definitions may also be stored in separate config files, one per
-filter, and their relative paths go to the right-hand side of these entries.
-The relative paths should be prefixed by `<` and are based on the directory
-where the main config file is. Example:
+If an ingress or egress filter is specified in the configuration file,
+then only packets which match that filter will be allowed in or out of
+the lwAFTR.  It might help to think of the filter as being "whitelists"
+-- they pass only what matches and reject other things.  To make a
+"blacklist" filter, use the `not` pflang operator:
+
+```
+ipv4_ingress_filter = "not ip6"
+```
+
+You might need to use parentheses so that you are applying the `not` to
+the right subexpression.  Note also that if you have 802.1Q vlan tagging
+enabled, the ingress and egress filters run after the tags have been
+stripped.
+
+Here is a more complicated example:
+
+```
+ipv6_egress_filter = "
+  ip6 and not (
+    (icmp6 and
+     src net 3ffe:501:0:1001::2/128 and
+     dst net 3ffe:507:0:1:200:86ff:fe05:8000/116)
+    or
+    (ip6 and udp and
+     src net 3ffe:500::/28 and
+     dst net 3ffe:0501:4819::/64 and
+     src portrange 2397-2399 and
+     dst port 53)
+  )
+"
+```
+
+As filter definitions can be a bit unmanageable as part of the
+configuration, you can also load filters from a file.  To do this, start
+the filter configuration like with `<` and follow it immediately with a
+file name.
 
 ```
 ipv4_ingress_filter = <ingress4.pf
 ```
+
+As with the path to the binding table, if the path to the filter file is
+a relative path, it will be relative to the location of the
+configuration file.  If the path contains spaces, enclose the whole
+string, including the `<` character, in single or double quotes.
+
+Enabling ingress and egress filters currently has a performance cost.
+See [README.performance.md](README.performance.md).
