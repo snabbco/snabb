@@ -339,9 +339,12 @@ can be accessed directly by network cards. The important
 characteristic of DMA memory is being located in contiguous physical
 memory at a stable address.
 
-— Function **memory.dma_alloc** *bytes*
+— Function **memory.dma_alloc** *bytes*, *[alignment]*
 
 Returns a pointer to *bytes* of new DMA memory.
+
+Optionally a specific *alignment* requirement can be provided (in
+bytes). The default alignment is 128.
 
 — Function **memory.virtual_to_physical** *pointer*
 
