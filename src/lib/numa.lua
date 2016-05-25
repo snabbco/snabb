@@ -2,6 +2,19 @@ module(..., package.seeall)
 
 local S = require("syscall")
 
+function cpu_get_numa_node (cpu)
+   local node = 0
+   while true do
+      local node_dir = S.open('/sys/devices/system/node/node'..node,
+                              'rdonly, directory')
+      if not node_dir then return end
+      local found = S.readlinkat(node_dir, 'cpu'..cpu)
+      node_dir:close()
+      if found then return node end
+      node = node + 1
+   end
+end
+
 function set_cpu (cpu)
    local cpu_set = S.sched_getaffinity()
    cpu_set:zero()
@@ -18,6 +31,7 @@ function set_cpu (cpu)
 end
 
 function selftest ()
+   print(cpu_get_numa_node(0))
    print(S.sched_getaffinity())
    print(S.get_mempolicy().mask)
 end
