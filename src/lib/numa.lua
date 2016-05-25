@@ -19,6 +19,13 @@ function cpu_get_numa_node (cpu)
    end
 end
 
+function has_numa ()
+   local node1 = S.open('/sys/devices/system/node/node1', 'rdonly, directory')
+   if not node1 then return false end
+   node1:close()
+   return true
+end
+
 function pci_get_numa_node (addr)
    addr = pci.qualified(addr)
    local file = assert(io.open('/sys/bus/pci/devices/'..addr..'/numa_node'))
@@ -44,6 +51,24 @@ function choose_numa_node_for_pci_addresses (addrs, require_affinity)
       end
    end
    return chosen_node
+end
+
+function check_affinity_for_pci_addresses (addrs)
+   local policy = S.get_mempolicy()
+   if policy.mode == S.c.MPOL_MODE['default'] then
+      if has_numa() then
+         print('Warning: No NUMA memory affinity.')
+         print('Pass --cpu to bind to a CPU and its NUMA node.')
+      end
+   elseif policy.mode ~= S.c.MPOL_MODE['bind'] then
+      print("Warning: NUMA memory policy already in effect, but it's not --membind.")
+   else
+      local node = S.getcpu().node
+      local node_for_pci = choose_numa_node_for_pci_addresses(addrs)
+      if node_for_pci and node ~= node_for_pci then
+         print("Warning: Bound NUMA node does not have affinity with PCI devices.")
+      end
+   end
 end
 
 function unbind_cpu ()
