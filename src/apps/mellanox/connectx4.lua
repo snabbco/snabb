@@ -336,7 +336,7 @@ function cmdq:setinbits(ofs, ...) --bit1, bit2, val, ...
    else --input mailbox
       local mailbox = math.floor((ofs + 4 - 16) / data_per_mailbox)
       local offset = (ofs + 4 - 16) % data_per_mailbox
-      setint(self.mailboxes[mailbox], offset, setbits(...))
+      setint(self.inboxes[mailbox], offset, setbits(...))
    end
 end
 
@@ -347,7 +347,6 @@ function cmdq:getoutbits(ofs, bit2, bit1)
       local mailbox = math.floor((ofs - 16) / data_per_mailbox)
       local offset  = (ofs - 16) % data_per_mailbox
       local b = getbits(getint(self.outboxes[mailbox], offset), bit2, bit1)
-      print("cmdq:getoutbits", mailbox, bit.tohex(offset, 4), bit2, bit1, b)
       return b
    end
 end
@@ -506,7 +505,7 @@ local codes = {
    regular = 3,
 }
 function cmdq:query_pages(which)
-   self:prepare("QUERY_PAGES")
+   self:prepare("QUERY_PAGES", 0x0C, 0x0C)
    self:setinbits(0x00, 31, 16, QUERY_PAGES)
    self:setinbits(0x04, 15, 0, codes[which])
    self:post(0x0C, 0x0C)
@@ -515,7 +514,7 @@ function cmdq:query_pages(which)
 end
 
 function cmdq:alloc_pages(addr, num_pages)
-   self:prepare("MANAGE_PAGES")
+   self:prepare("MANAGE_PAGES", 0x10 + num_pages*8, 0x0C)
    self:setinbits(0x00, 31, 16, MANAGE_PAGES)
    self:setinbits(0x04, 15, 0, 1) --alloc
    self:setinbits(0x0C, 31, 0, num_pages)
@@ -538,7 +537,7 @@ local which_codes = {
    flow_table = 7,
 }
 function cmdq:query_hca_cap(what, which)
-   self:prepare("QUERY_HCA_CAP")
+   self:prepare("QUERY_HCA_CAP", 0x0C, 0x100C - 3000)
    self:setinbits(0x00, 31, 16, QUERY_HCA_CAP)
    self:setinbits(0x04,
       15,  1, assert(which_codes[which]),
@@ -546,7 +545,7 @@ function cmdq:query_hca_cap(what, which)
    self:post(0x0C, 0x100C - 3000)
    self:checkstatus()
    local caps = {}
-   if which_caps == 'general' then
+   if which == 'general' then
       caps.log_max_cq_sz            = self:getoutbits(0x18, 23, 16)
       caps.log_max_cq               = self:getoutbits(0x18,  4,  0)
       caps.log_max_eq_sz            = self:getoutbits(0x1C, 31, 24)
@@ -619,7 +618,7 @@ function cmdq:query_hca_cap(what, which)
 end
 
 function cmdq:set_hca_cap(which, caps)
-   self:prepare("SET_HCA_CAP")
+   self:prepare("SET_HCA_CAP", 0x100C, 0x0C)
    self:setinbits(0x00, 31, 16, SET_HCA_CAP)
    self:setinbits(0x04, 15,  1, assert(which_codes[which]))
    if which_caps == 'general' then
@@ -780,7 +779,7 @@ function ConnectX4:new(arg)
    local issi = cmdq:query_issi()
    cmdq:dump_issi(issi)
 
-   os.exit(0)
+   --os.exit(0)
    --cmdq:set_issi(1)
 
    -- PRM: Execute QUERY_PAGES to understand the HCA need to boot pages.
@@ -795,9 +794,15 @@ function ConnectX4:new(arg)
    cmdq:alloc_pages(bp_phy, boot_pages)
 
    local t = cmdq:query_hca_cap('cur', 'general')
-   print'query_hca_cap:'
+   print'query_hca_cap (current, general):'
    for k,v in pairs(t) do
-      print('', k, v)
+      print(("  %-24s = %s"):format(k, v))
+   end
+
+   local t = cmdq:query_hca_cap('max', 'general')
+   print'query_hca_cap (maximum, general):'
+   for k,v in pairs(t) do
+      print(("  %-24s = %s"):format(k, v))
    end
 
    --[[
