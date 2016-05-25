@@ -347,6 +347,13 @@ function C.sched_setparam(pid, param)
   return syscall(sys.sched_setparam, int(pid), void(param))
 end
 
+function C.get_mempolicy(mode, mask, maxnode, addr, flags)
+  return syscall(sys.get_mempolicy, void(mode), void(mask), ulong(maxnode), ulong(addr), ulong(flags))
+end
+function C.set_mempolicy(mode, mask, maxnode)
+  return syscall(sys.set_mempolicy, int(mode), void(mask), ulong(maxnode))
+end
+
 -- in librt for glibc but use syscalls instead of loading another library
 function C.clock_nanosleep(clk_id, flags, req, rem)
   return syscall(sys.clock_nanosleep, int(clk_id), int(flags), void(req), void(rem))

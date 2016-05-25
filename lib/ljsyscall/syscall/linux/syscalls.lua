@@ -457,6 +457,18 @@ function S.sched_setaffinity(pid, mask, len) -- note len last as rarely used
   return retbool(C.sched_setaffinity(pid or 0, len or s.cpu_set, mktype(t.cpu_set, mask)))
 end
 
+function S.get_mempolicy(mode, mask, addr, flags)
+  mode = mode or t.int1()
+  mask = mktype(t.bitmask, mask)
+  local ret, err = C.get_mempolicy(mode, mask.mask, mask.size, addr or 0, c.MPOL_FLAG[flags])
+  if ret == -1 then return nil, t.error(err or errno()) end
+  return { mode=mode[0], mask=mask }
+end
+function S.set_mempolicy(mode, mask)
+  mask = mktype(t.bitmask, mask)
+  return retbool(C.set_mempolicy(c.MPOL_MODE[mode], mask.mask, mask.size))
+end
+
 function S.sched_get_priority_max(policy) return retnum(C.sched_get_priority_max(c.SCHED[policy])) end
 function S.sched_get_priority_min(policy) return retnum(C.sched_get_priority_min(c.SCHED[policy])) end
 
