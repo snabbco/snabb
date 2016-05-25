@@ -1,5 +1,6 @@
 module(..., package.seeall)
 
+local ffi = require("ffi")
 local S = require("syscall")
 local pci = require("lib.hardware.pci")
 
@@ -17,6 +18,16 @@ function cpu_get_numa_node (cpu)
       if found then return node end
       node = node + 1
    end
+end
+
+-- Sadly, ljsyscall's `getcpu' call doesn't appear to work for some
+-- reason: https://github.com/justincormack/ljsyscall/issues/194.  Until
+-- then, here's a shim.
+ffi.cdef("int sched_getcpu(void);")
+function getcpu()
+   local ret = { cpu = ffi.C.sched_getcpu() }
+   ret.node = cpu_get_numa_node(ret.cpu)
+   return ret
 end
 
 function has_numa ()
@@ -63,7 +74,7 @@ function check_affinity_for_pci_addresses (addrs)
    elseif policy.mode ~= S.c.MPOL_MODE['bind'] then
       print("Warning: NUMA memory policy already in effect, but it's not --membind.")
    else
-      local node = S.getcpu().node
+      local node = getcpu().node
       local node_for_pci = choose_numa_node_for_pci_addresses(addrs)
       if node_for_pci and node ~= node_for_pci then
          print("Warning: Bound NUMA node does not have affinity with PCI devices.")
@@ -85,7 +96,7 @@ function bind_to_cpu (cpu)
    assert(not bound_cpu, "already bound")
 
    assert(S.sched_setaffinity(0, cpu))
-   local cpu_and_node = S.getcpu()
+   local cpu_and_node = getcpu()
    assert(cpu_and_node.cpu == cpu)
    bound_cpu = cpu
 
@@ -117,12 +128,12 @@ function selftest ()
    bind_to_cpu(0)
    assert(bound_cpu == 0)
    assert(bound_numa_node == 0)
-   assert(S.getcpu().cpu == 0)
-   assert(S.getcpu().node == 0)
+   assert(getcpu().cpu == 0)
+   assert(getcpu().node == 0)
    bind_to_cpu(nil)
    assert(bound_cpu == nil)
    assert(bound_numa_node == 0)
-   assert(S.getcpu().node == 0)
+   assert(getcpu().node == 0)
    bind_to_numa_node(nil)
    assert(bound_cpu == nil)
    assert(bound_numa_node == nil)
