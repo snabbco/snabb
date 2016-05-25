@@ -1,6 +1,7 @@
 module(..., package.seeall)
 
 local S = require("syscall")
+local pci = require("lib.hardware.pci")
 
 local bound_cpu
 local bound_numa_node
@@ -19,6 +20,7 @@ function cpu_get_numa_node (cpu)
 end
 
 function pci_get_numa_node (addr)
+   addr = pci.qualified(addr)
    local file = assert(io.open('/sys/bus/pci/devices/'..addr..'/numa_node'))
    local node = assert(tonumber(file:read()))
    -- node can be -1.
