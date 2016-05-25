@@ -4,6 +4,7 @@ local S          = require("syscall")
 local config     = require("core.config")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local lib        = require("core.lib")
+local numa       = require("lib.numa")
 local setup      = require("program.lwaftr.setup")
 
 local function show_usage(exit_code)
@@ -39,6 +40,7 @@ function parse_args(args)
    local ring_buffer_size
    local opts = { verbosity = 0 }
    local handlers = {}
+   local cpu
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.i () opts.virtio_net = true end
    function handlers.D (arg)
@@ -54,14 +56,10 @@ function parse_args(args)
       end
    end
    function handlers.cpu(arg)
-      local cpu = tonumber(arg)
+      cpu = tonumber(arg)
       if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
          fatal("Invalid cpu number: "..arg)
       end
-      local cpu_set = S.sched_getaffinity()
-      cpu_set:zero()
-      cpu_set:set(cpu)
-      S.sched_setaffinity(0, cpu_set)
    end
    handlers['real-time'] = function(arg)
       if not S.sched_setscheduler(0, "fifo", 1) then
@@ -119,6 +117,8 @@ function parse_args(args)
    if not conf_file then fatal("Missing required --conf argument.") end
    if not v4 then fatal("Missing required --v4 argument.") end
    if not v6 then fatal("Missing required --v6 argument.") end
+   if cpu then numa.bind_to_cpu(cpu) end
+   numa.check_affinity_for_pci_addresses({ v4, v6 })
    return opts, conf_file, v4, v6
 end
 
