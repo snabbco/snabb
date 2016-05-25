@@ -89,7 +89,7 @@ end
 function setint(addr, ofs, val)
    local ofs = ofs/4
    assert(ofs == floor(ofs))
-   addr[ofs] = bswap(val)
+   addr[ofs] = bswap(tonumber(val))
 end
 
 local function getbits(val, bit2, bit1)
@@ -229,44 +229,114 @@ local function xor8 (ptr, len)
    return acc
 end
 
+local cmdq_entry_t   = ffi.typeof("uint32_t[0x40/4]")
+local cmdq_mailbox_t = ffi.typeof("uint32_t[0x240/4]")
+
+-- XXX Check with maximum length of commands that we really use.
+local max_mailboxes = 10
+local data_per_mailbox = 0x230 -- Bytes of input/output data in a mailbox
+
 -- Create a command queue with dedicated/reusable DMA memory.
 function cmdq:new(init_seg)
-   local ptr = alloc_pages(1)
-   local ib_ptr = alloc_pages(1)
-   local ob_ptr = alloc_pages(1)
-   return setmetatable({
-      ptr = ptr,
-      ib_ptr = ib_ptr,
-      ob_ptr = ob_ptr,
-      init_seg = init_seg,
-      size = init_seg:log_cmdq_size(),
-      stride = init_seg:log_cmdq_stride(),
-   }, self)
+   local entry = ffi.cast("uint32_t*", memory.dma_alloc(0x40))
+   local inboxes, outboxes = {}, {}
+   for i = 0, max_mailboxes-1 do
+      -- XXX overpadding.. 0x240 alignment is not accepted?
+      inboxes[i]  = ffi.cast("uint32_t*", memory.dma_alloc(0x240, 4096))
+      outboxes[i] = ffi.cast("uint32_t*", memory.dma_alloc(0x240, 4096))
+   end
+   return setmetatable({entry = entry,
+                        inboxes = inboxes,
+                        outboxes = outboxes,
+                        init_seg = init_seg,
+                        size = init_seg:log_cmdq_size(),
+                        stride = init_seg:log_cmdq_stride()},
+      self)
 end
 
 -- Reset all data structures to zero values.
 -- This is to prevent leakage from one command to the next.
-function cmdq:reset()
-   ffi.fill(self.ptr, 4096, 0x00)
-   ffi.fill(self.ib_ptr, 4096, 0x00)
-   ffi.fill(self.ob_ptr, 4096, 0x00)
+local token = 0xAA
+function cmdq:prepare(command, last_input_offset, last_output_offset)
+   print("Command: " .. command)
+   local input_size  = last_input_offset + 4
+   local output_size = last_output_offset + 4
+
+   -- Command entry:
+
+   ffi.fill(self.entry, ffi.sizeof(self.entry), 0)
+   self:setbits(0x00, 31, 24, 0x7)        -- type
+   self:setbits(0x04, 31, 0, input_size)
+   self:setbits(0x38, 31, 0, output_size)
+   self:setbits(0x3C,
+                0, 0, 1, -- ownership = hardware
+                31, 24, token)
+
+   -- Mailboxes:
+
+   -- How many mailboxes do we need?
+   local ninboxes  = math.ceil((input_size  - 16) / data_per_mailbox)
+   local noutboxes = math.ceil((output_size - 16) / data_per_mailbox)
+   print("ninboxes", ninboxes)
+   print("noutboxes", noutboxes)
+   if ninboxes  > max_mailboxes then error("Input overflow: " ..input_size)  end
+   if noutboxes > max_mailboxes then error("Output overflow: "..output_size) end
+
+   if ninboxes > 0 then
+      local phy = memory.virtual_to_physical(self.inboxes[0])
+      setint(self.entry, 0x08, phy / 2^32)
+      setint(self.entry, 0x0C, phy % 2^32)
+   end
+   if noutboxes > 0 then
+      local phy = memory.virtual_to_physical(self.outboxes[0])
+      print("phy", phy, bit.tohex(phy / 2^32), bit.tohex(phy % 2^32))
+      setint(self.entry, 0x30, phy / 2^32)
+      setint(self.entry, 0x34, phy % 2^32)
+      print(bit.tohex(getint(self.entry, 0x30)), bit.tohex(getint(self.entry, 0x34)))
+   end
+
+   -- Initialize mailboxes
+   for i = 0, max_mailboxes-1 do
+      -- Zap old state
+      ffi.fill(self.inboxes[i],  ffi.sizeof(self.inboxes[i]),  0)
+      ffi.fill(self.outboxes[i], ffi.sizeof(self.outboxes[i]), 0)
+      -- Set mailbox block number
+      setint(self.inboxes[i],  0x238, i)
+      setint(self.outboxes[i], 0x238, i)
+      -- Tokens to match command entry
+      setint(self.inboxes[i],  0x23C, setbits(23, 16, token))
+      setint(self.outboxes[i], 0x23C, setbits(23, 16, token))
+      -- Set 'next' mailbox pointers (when used)
+      if i < ninboxes then
+         local phy = memory.virtual_to_physical(self.inboxes[i+1])
+         setint(self.inboxes[i], 0x230, phy / 2^32)
+         setint(self.inboxes[i], 0x234, phy % 2^32)
+      end
+      if i < noutboxes then
+         local phy = memory.virtual_to_physical(self.outboxes[i+1])
+         setint(self.outboxes[i], 0x230, phy / 2^32)
+         setint(self.outboxes[i], 0x234, phy % 2^32)
+      end
+   end
+   token = (token == 255) and 1 or token+1
 end
 
 function cmdq:getbits(ofs, bit2, bit1)
-   return getbits(getint(self.ptr, ofs), bit2, bit1)
+   return getbits(getint(self.entry, ofs), bit2, bit1)
 end
 
-function cmdq:setbits(ofs, bit2, bit1, val)
-   setint(self.ptr, ofs, setbits(bit2, bit1, val))
+function cmdq:setbits(ofs, ...)
+   setint(self.entry, ofs, setbits(...))
 end
 
 function cmdq:setinbits(ofs, ...) --bit1, bit2, val, ...
-   assert(band(ofs, 3) == 0) --offset must be 4-byte aligned
+   assert(ofs % 4 == 0)
    if ofs <= 16 - 4 then --inline
       self:setbits(0x10 + ofs, ...)
    else --input mailbox
-      assert(ofs <= 16 - 4 + 4096)
-      setint(self.ib_ptr, ofs, setbits(...))
+      local mailbox = math.floor((ofs + 4 - 16) / data_per_mailbox)
+      local offset = (ofs + 4 - 16) % data_per_mailbox
+      setint(self.mailboxes[mailbox], offset, setbits(...))
    end
 end
 
@@ -274,8 +344,11 @@ function cmdq:getoutbits(ofs, bit2, bit1)
    if ofs <= 16 - 4 then --inline
       return self:getbits(0x20 + ofs, bit2, bit1)
    else --output mailbox
-      assert(ofs <= 16 - 4 + 4096)
-      return getbits(getint(self.ob_ptr, ofs), bit2, bit1)
+      local mailbox = math.floor((ofs - 16) / data_per_mailbox)
+      local offset  = (ofs - 16) % data_per_mailbox
+      local b = getbits(getint(self.outboxes[mailbox], offset), bit2, bit1)
+      print("cmdq:getoutbits", mailbox, bit.tohex(offset, 4), bit2, bit1, b)
+      return b
    end
 end
 
@@ -325,31 +398,18 @@ local command_errors = {
 }
 
 function cmdq:post(last_in_ofs, last_out_ofs)
-   local in_sz  = last_in_ofs + 4
-   local out_sz = last_out_ofs + 4
-   print("in_sz", in_sz, "out_sz", out_sz)
-
-   self:setbits(0x00, 31, 24, 0x7) --type
-   self:setbits(0x04, 31, 0, in_sz) --input_length
-   self:setbits(0x38, 31, 0, out_sz) --output_length
-
-   local inbox_phy = memory.virtual_to_physical(self.ib_ptr)
-   self:setbits(0x08, 31, 0, ptrbits(inbox_phy, 63, 32))
-   self:setbits(0x0C, 31, 0, ptrbits(inbox_phy, 31, 0))
-
-   local outbox_phy = memory.virtual_to_physical(self.ob_ptr)
-   self:setbits(0x30, 31, 0, ptrbits(outbox_phy, 63, 32))
-   self:setbits(0x34, 31, 0, ptrbits(outbox_phy, 31, 0))
-
-   self:setbits(0x3C, 0, 0, 1) --set ownership
-
    if debug then
       local dumpoffset = 0
       print("command INPUT:")
-      dumpoffset = hexdump(self.ptr, 0, 0x40, dumpoffset)
-      if in_sz > 16 then
-         print("command block:")
-         dumpoffset = hexdump(self.ib_ptr, 0, (in_sz-16), dumpoffset)
+      dumpoffset = hexdump(self.entry, 0, 0x40, dumpoffset)
+      local ninboxes  = math.ceil((last_in_ofs + 4 - 16) / data_per_mailbox)
+      for i = 0, ninboxes-1 do
+         local blocknumber = getint(self.inboxes[i], 0x238, 31, 0)
+         if blocknumber ~= 0 then -- mailbox being used?
+            local address = memory.virtual_to_physical(self.inboxes[i])
+            print("Block "..blocknumber.." @ "..bit.tohex(address, 12)..":")
+            dumpoffset = hexdump(self.inboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
+         end
       end
    end
 
@@ -363,12 +423,13 @@ function cmdq:post(last_in_ofs, last_out_ofs)
    if debug then
       local dumpoffset = 0
       print("command OUTPUT:")
-      dumpoffset = hexdump(self.ptr, 0, 0x40, dumpoffset)
-      print("command block:")
-      if out_sz > 16 then
-         sz = out_sz-16
-         dumpoffset = 0x10
-         dumpoffset = hexdump(self.ob_ptr, 0, sz, dumpoffset)
+      dumpoffset = hexdump(self.entry, 0, 0x40, dumpoffset)
+      local noutboxes = math.ceil((last_out_ofs + 4 - 16) / data_per_mailbox)
+      for i = 0, noutboxes-1 do
+         local blocknumber = getint(self.outboxes[i], 0x238, 31, 0)
+         local address = memory.virtual_to_physical(self.outboxes[i])
+         print("Block "..blocknumber.." @ "..bit.tohex(address, 12)..":")
+         dumpoffset = hexdump(self.outboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
       end
    end
 
@@ -390,19 +451,14 @@ function cmdq:checkstatus()
                        status, command_errors[status], syndrome))
 end
 
-function cmdq:prepare (command)
-   print("Execute: " .. command)
-   self:reset()
-end
-
 function cmdq:enable_hca()
-   self:prepare("ENABLE_HCA")
+   self:prepare("ENABLE_HCA", 0x0C, 0x08)
    self:setinbits(0x00, 31, 16, ENABLE_HCA)
    self:post(0x0C, 0x08)
 end
 
 function cmdq:query_issi()
-   self:prepare("QUERY_ISSI")
+   self:prepare("QUERY_ISSI", 0x0C, 0x6C)
    self:setinbits(0x00, 31, 16, QUERY_ISSI)
    self:post(0x0C, 0x6C)
    self:checkstatus()
@@ -411,7 +467,7 @@ function cmdq:query_issi()
    for i = 639, 0, -1 do
       -- Bit N (0..639) when set means ISSI version N is enabled.
       -- Bits are ordered from highest to lowest.
-      local byte = 0x10 + math.floor(i / 8)
+      local byte = 0x20 + math.floor(i / 8)
       local offset = byte - (byte % 4)
       local bit = 31 - (i % 32)
       if self:getoutbits(offset, bit, bit) == 1 then
@@ -697,8 +753,8 @@ function ConnectX4:new(arg)
    -- Perform a hard reset of the device to bring it into a blank state.
    -- (PRM does not suggest this but it is practical for resetting the
    -- firmware from bad states.)
-   pci.reset_device(pciaddress)
    pci.unbind_device_from_linux(pciaddress)
+   pci.reset_device(pciaddress)
    pci.set_bus_master(pciaddress, true)
    local base, fd = pci.map_pci_memory(pciaddress, 0)
 
@@ -711,7 +767,7 @@ function ConnectX4:new(arg)
    --8.2 HCA Driver Start-up
 
    trace("Write the physical location of the command queues to the init segment.")
-   init_seg:cmdq_phy_addr(memory.virtual_to_physical(cmdq.ptr))
+   init_seg:cmdq_phy_addr(memory.virtual_to_physical(cmdq.entry))
 
    trace("Wait for the 'initializing' field to clear")
    while not init_seg:ready() do
@@ -723,6 +779,8 @@ function ConnectX4:new(arg)
    cmdq:enable_hca()
    local issi = cmdq:query_issi()
    cmdq:dump_issi(issi)
+
+   os.exit(0)
    --cmdq:set_issi(1)
 
    -- PRM: Execute QUERY_PAGES to understand the HCA need to boot pages.
