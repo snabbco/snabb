@@ -20,9 +20,28 @@ end
 
 function pci_get_numa_node (addr)
    local file = assert(io.open('/sys/bus/pci/devices/'..addr..'/numa_node'))
-   local node = tonumber(file)
+   local node = assert(tonumber(file:read()))
    -- node can be -1.
    if node >= 0 then return node end
+end
+
+function choose_numa_node_for_pci_addresses (addrs, require_affinity)
+   local chosen_node, chosen_because_of_addr
+   for _, addr in ipairs(addrs) do
+      local node = pci_get_numa_node(addr)
+      if not node or node == chosen_node then
+         -- Keep trucking.
+      elseif not chosen_node then
+         chosen_node = node
+         chosen_because_of_addr = addr
+      else
+         local msg = string.format(
+            "PCI devices %s and %s have different NUMA node affinities",
+            chosen_because_of_addr, addr)
+         if require_affinity then error(msg) else print('Warning: '..msg) end
+      end
+   end
+   return chosen_node
 end
 
 function unbind_cpu ()
