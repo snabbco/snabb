@@ -10,6 +10,7 @@ local shm      = require("core.shm")
 local counter  = require("core.counter")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
+local macaddress = require("lib.macaddress")
 local intel10g = require("apps.intel.intel10g")
 local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
 Intel82599 = {}
