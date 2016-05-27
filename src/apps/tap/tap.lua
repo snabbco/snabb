@@ -78,44 +78,27 @@ end
 
 function selftest()
    -- tapsrc and tapdst are bridged together in linux. Packets are sent out of tapsrc and they are expected
-   -- to arrive back on tapdst. Linux may create other control-plane packets so to avoid races if a packet doesn't
-   -- match the one we just sent keep looking until it does match. 
+   -- to arrive back on tapdst.
 
    -- The linux bridge does mac address learning so some care must be taken with the preparation of selftest.cap
    -- A mac address should appear only as the source address or destination address
 
    -- This test should only be run from inside apps/tap/selftest.sh
    if not os.getenv("SNABB_TAPTEST") then os.exit(engine.test_skipped_code) end
-   local pcap = require("lib.pcap.pcap")
-   local tapsrc = Tap:new("tapsrc")
-   local tapdst = Tap:new("tapdst")
-   local linksrc = link.new("linksrc")
-   local linkreturn = link.new("linkreturn")
-   tapsrc.input = { input = linksrc }
-   tapdst.output = { output = linkreturn }
-   local records = pcap.records("apps/tap/selftest.cap")
-   local i = 0
-   repeat
-         i = i + 1
-         local data, record, extra = records()
-         if data then
-            local p = packet.from_string(data)
-            link.transmit(linksrc, packet.clone(p))
-            tapsrc:push()
-            while true do
-               local ok, err = S.select({readfds = {tapdst.sock}}, 10)
-               if err then error("Select error: " .. tostring(err)) end
-               if ok.count == 0 then error("select timed out or packet " .. tostring(i) .. " didn't match") end
-
-               tapdst:pull()
-               local pret = link.receive(linkreturn)
-               if packet.length(pret) == packet.length(p) and C.memcmp(packet.data(pret), packet.data(p), packet.length(pret)) then
-                  packet.free(pret)
-                  break
-               end
-               packet.free(pret)
-            end
-            packet.free(p)
-         end
-   until not data
+   local Synth = require("apps.test.synth").Synth
+   local Match = require("apps.test.match").Match
+   local c = config.new()
+   config.app(c, "tap_in", Tap, "tapsrc")
+   config.app(c, "tap_out", Tap, "tapdst")
+   config.app(c, "match", Match, {fuzzy=true,modest=true})
+   config.app(c, "comparator", Synth, {dst="00:50:56:fd:19:ca",
+                                       src="00:0c:29:3e:ca:7d"})
+   config.app(c, "source", Synth, {dst="00:50:56:fd:19:ca",
+                                   src="00:0c:29:3e:ca:7d"})
+   config.link(c, "comparator.output->match.comparator")
+   config.link(c, "source.output->tap_in.input")
+   config.link(c, "tap_out.output->match.rx")
+   engine.configure(c)
+   engine.main({duration = 0.01, report = {showapps=true,showlinks=true}})
+   assert(#engine.app_table.match:errors() == 0)
 end
