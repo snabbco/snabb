@@ -33,7 +33,8 @@ function load (file, pciaddr, sockpath, soft_bench)
    for i,t in ipairs(ports) do
       local name = port_name(t)
       local Virtio = name.."_Virtio"
-      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
+      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id),
+                                        disable_mrg_rxbuf=t.disable_mrg_rxbuf})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
       if t.tx_police_gbps then
          local TxLimit = name.."_TxLimit"

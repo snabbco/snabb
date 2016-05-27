@@ -33,7 +33,7 @@ if [ -z "$SNABB_PACKET_DST" ]; then
 fi
 
 if [ -z "$SNABB_DPDK_BENCH_CONF" ]; then
-    export SNABB_DPDK_BENCH_CONF="program/snabbnfv/test_fixtures/nfvconfig/test_functions/snabbnfv-bench1.port"
+    export SNABB_DPDK_BENCH_CONF="program/snabbnfv/test_fixtures/nfvconfig/test_functions/snabbnfv-bench.port"
     echo "Defaulting to SNABB_DPDK_BENCH_CONF=$SNABB_DPDK_BENCH_CONF"
 fi
 
