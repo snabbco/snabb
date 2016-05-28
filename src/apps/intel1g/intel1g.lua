@@ -31,8 +31,6 @@ gbl_registers = [[
 CTRL      0x00000 -            RW Device Control
 CTRL_EXT  0x00018 -            RW Extended Device Control
 EEER      0x00E30 -            RW Energy Efficient Ethernet (EEE) Register
-EEMNGCTL_i350  0x01010 -       RW Manageability EEPROM-Mode Control Register
-EEMNGCTL_i210  0x12030 -       RW Manageability EEPROM-Mode Control Register
 EIMC      0x01528 -            RW Extended Interrupt Mask Clear
 MANC      0x05820 -            RW Management Control
 MDIC      0x00020 -            RW MDI Control
@@ -44,6 +42,15 @@ SWSM      0x05b50 -            RW Software Semaphore
 SW_FW_SYNC 0x05b5c -           RW Software Firmware Synchronization
 TCTL      0x00400 -            RW TX Control
 TCTL_EXT  0x00400 -            RW Extended TX Control
+]]
+dev_specific_registers = {}
+dev_specific_registers['i210'] = [[
+EEMNGCTL  0x12030 -            RW Manageability EEPROM-Mode Control Register
+EEC       0x12010 -            RW EEPROM-Mode Control Register
+]]
+dev_specific_registers['i350'] = [[
+EEMNGCTL  0x01010 -            RW Manageability EEPROM-Mode Control Register
+EEC       0x00010 -            RW EEPROM-Mode Control Register
 ]]
 gbl_array_registers = [[
 RETA   0x5c00 +0x04*0..31 RW Redirection Table
@@ -71,39 +78,42 @@ RXCTL  0xc014 +0x40*0..16 RW RX DCA CTRL Register Queue
 SRRCTL 0xc00c +0x40*0..16 RW Split and Replication Receive Control
 ]]
 
-function Intel1g:initPHY() -- 4.3.1.4 PHY Reset, p.131
+function Intel1g:init_phy ()
+   -- 4.3.1.4 PHY Reset
    self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
 
-   self:lockSwFwSemaphore()
+   -- 4.6.1  Acquiring Ownership Over a Shared Resource
+   self:lock_fw_sem()
    self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1 }, 0)
    self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
-   self:unlockSwFwSemaphore()
+   self:unlock_fw_sem()
 
    self.r.CTRL:set(bits { PHYreset = 31 })
    C.usleep(1*100)
    self.r.CTRL:clr(bits { PHYreset = 31 })
 
-   self:lockSwFwSemaphore()
+   -- 4.6.2 Releasing Ownership Over a Shared Resource
+   self:lock_fw_sem()
    self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
-   self:unlockSwFwSemaphore()
+   self:unlock_fw_sem()
 
    self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
 
    --[[
-   self:lockSwFwSemaphore()
+   self:lock_fw_sem()
    self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1}, 0)
    self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
-   self:unlockSwFwSemaphore()
+   self:unlock_fw_sem()
 
    -- If you where going to configure the PHY to none defaults
    -- this is where you would do it
 
-   self:lockSwFwSemaphore()
+   self:lock_fw_sem()
    self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
-   self:unlockSwFwSemaphore()
+   self:unlock_fw_sem()
    ]]
 end
-function Intel1g:lockSwSwSemaphore()
+function Intel1g:lock_sw_sem()
    for i=1,50,1 do
       if band(self.r.SWSM(), 0x01) == 1 then
          C.usleep(10000)
@@ -113,23 +123,23 @@ function Intel1g:lockSwSwSemaphore()
    end
    error("Couldn't get lock")
 end
-function Intel1g:unlockSwSwSemaphore()
+function Intel1g:unlock_sw_sem()
    self.r.SWSM:clr(bits { SMBI = 0 })
 end
-function Intel1g:lockSwFwSemaphore()
+function Intel1g:lock_fw_sem()
    self.r.SWSM:set(bits { SWESMBI = 1 })
    while band(self.r.SWSM(), 0x02) == 0 do
       self.r.SWSM:set(bits { SWESMBI = 1 })
    end
 end
-function Intel1g:unlockSwFwSemaphore()
+function Intel1g:unlock_fw_sem()
    self.r.SWSM:clr(bits { SWESMBI = 1 })
 end
 
 function Intel1g:disableInterrupts ()
    self.r.EIMC(0xffffffff)
 end
-function Intel1g:initRxQ()
+function Intel1g:init_rx_q ()
    if not self.rxq then return end
    assert((self.rxq >=0) and (self.rxq < self.ringSize),
    "rxqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
@@ -171,11 +181,11 @@ function Intel1g:initRxQ()
       BSIZEPACKET3 = 3,
       Drop_En = 31        -- Drop packets when no descriptors
    })
-   self:lockSwSwSemaphore()
+   self:lock_sw_sem()
    self.r.RXDCTL:set( bits { Enable = 25 })
    self.r.RXDCTL:wait( bits { Enable = 25 })
    self.r.RDT(self.ndesc - 1)
-   -- wrap this in a swsw semaphore
+
    local tab = {}
    for i=0,self.ringSize,1 do
       if band(self.r.ALLRXDCTL[i](), bits { Enable = 25 }) > 0 then
@@ -183,10 +193,10 @@ function Intel1g:initRxQ()
       end
    end
    self:redirection_table(tab)
-   self:unlockSwSwSemaphore()
+   self:unlock_sw_sem()
 end
 
-function Intel1g:initTxQ()
+function Intel1g:init_tx_q ()                               -- 4.5.10
    if not self.txq then return end
    assert((self.txq >=0) and (self.txq < self.ringSize),
    "txqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
@@ -195,24 +205,32 @@ function Intel1g:initTxQ()
    self.tdt = 0
    self.txpackets = {}
 
+   -- 7.2.2.3
    local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
    local txdesc_ring_t = ffi.typeof("$[$]", txdesc_t, self.ndesc)
    self.txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
    memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
 
-   -- Transmit state variables
-   self.txdesc_flags = bits({ifcs=25, dext=29, dtyp0=20, dtyp1=21, eop=24})
+   -- Transmit state variables 7.2.2.3.4 / 7.2.2.3.5
+   self.txdesc_flags = bits({
+      dtyp0=20,
+      dtyp1=21,
+      eop=24,
+      ifcs=25,
+      dext=29
+   })
 
    -- Initialize transmit queue
    self.r.TDBAL(tophysical(self.txdesc) % 2^32)
    self.r.TDBAH(tophysical(self.txdesc) / 2^32)
    self.r.TDLEN(self.ndesc * ffi.sizeof(txdesc_t))
+   self.r.TXDCTL:set(bits { WTHRESH = 16, ENABLE = 25 })
+   self.r.TXDCTL:wait(bits { ENABLE = 25 })
    self.r.TCTL:set(bits { TxEnable = 1 })
-   self.r.TXDCTL:set(bits { WTHRESH = 16, ENABLE = 25 } )
    self:disableInterrupts()
 end
 
-function Intel1g:redirection_table(newtab)
+function Intel1g:redirection_table (newtab)
    local current = {}
    local pos = 0
 
@@ -229,7 +247,7 @@ function Intel1g:redirection_table(newtab)
    return current
 end
 
-function Intel1g:new(conf)
+function Intel1g:new (conf)
    local self = setmetatable({
       r = {},
       pciaddress = conf.pciaddr,
@@ -257,12 +275,12 @@ function Intel1g:new(conf)
 
    register.define(gbl_registers, self.r, self.base)
    register.define_array(gbl_array_registers, self.r, self.base)
-   self.r["EEMNGCTL"] = self.r["EEMNGCTL_"..self.model]
+   register.define(dev_specific_registers[self.model], self.r, self.base)
 
    self:init()
    self.fd:flock("sh")
-   self:initTxQ()
-   self:initRxQ()
+   self:init_tx_q()
+   self:init_rx_q()
    return self
 end
 
@@ -270,45 +288,57 @@ function Intel1g:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
-   self.r.MDICNFG(0)
+
+   -- 4.5.3  Initialization Sequence
    self:disableInterrupts()
+   -- 4.3.1 Software Reset (RST)
    self.r.CTRL(bits { RST = 26 })
    C.usleep(4*1000)
-   self.r.CTRL:wait(bits { RST = 26 }, 0)
-   --TODO reread 4.3.1
-   self:disableInterrupts()
+   self.r.EEC:wait(bits { Auto_RD = 9 })
+   self.r.STATUS:wait(bits { PF_RST_DONE = 21 })
+   self:disableInterrupts()                        -- 4.5.4
 
-   self:initPHY()
-   C.usleep(1*1000*1000)		-- wait 1s for init to settle
+   -- use Internal PHY                             -- 8.2.5
+   self.r.MDICNFG(0)
+   self:init_phy()
+
+   -- 7.1.2.10 Receive-Side Scaling (RSS)
+   -- 8.10.22 Redirection Table
+   -- RSS redirection table is undefined on reset, 0 it
    self:redirection_table({0})
+   -- 8.10.20
+   -- enable RSS
    self.r.MRQC:set(bits { RSS = 1 })
+   -- set the RSS default queue to 0
    self.r.MRQC:clr(bits { Def_Q0 = 3, Def_Q1 = 4, Def_Q2 = 5})
+   -- Enable all RSS hash on all available input keys
    self.r.MRQC:set(bits {
       RSS0 = 16, RSS1 = 17, RSS2 = 18, RSS3 = 19, RSS4 = 20,
       RSS5 = 21, RSS6 = 22, RSS7 = 23, RSS8 = 24
    })
+   -- 8.10.21
    math.randomseed(self.rssseed)
    for i=0,9,1 do
       self.r.RSSRK[i](math.random(2^32))
    end
-
+   -- 8.10.1
    self.r.RCTL:clr(bits { rxEnable = 1 })
    self.r.RCTL(bits {
-      RXEN = 1,
-      SBP = 2,
-      UPE = 3,
-      MPE = 4,
-      LPE = 5,
-      BAM = 15,
-      SECRC = 26,
+      RXEN = 1,      -- enable receive
+      SBP = 2,       -- Store Bad Packet
+      UPE = 3,       -- Unicast Promiscuous
+      MPE = 4,       -- Mutlicast Promiscuous
+      LPE = 5,       -- Long Packet Reception / Jumbos
+      BAM = 15,      -- Broadcast Accept Mode
+      SECRC = 26,    -- Strip ethernet CRC
    })
 
-   --clear32(r.STATUS, {PHYReset=10})	-- p.373
    self.r.CTRL:set(bits { SETLINKUP = 6 })
+   -- 8.2.3
    self.r.CTRL_EXT:clr( bits { LinkMode0 = 22, LinkMode1 = 23} )
    self.r.CTRL_EXT:clr( bits { PowerDown = 20 } )
    self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
-   self:unlockSwSwSemaphore()
+   self:unlock_sw_sem()
 end
 
 function Intel1g:pull ()
@@ -316,7 +346,7 @@ function Intel1g:pull ()
    local lo = self.output["output"]
    assert(lo, "intel1g: output link required")
 
-   while (self.rdt ~= self.rdh) and (band(self.rxdesc[self.rdt].status, 0x01) ~= 0) do
+   while band(self.rxdesc[self.rdt].status, 0x01) == 1 do
       local desc = self.rxdesc[self.rdt]
       local p = self.rxpackets[self.rdt]
       p.length = desc.length
@@ -324,15 +354,12 @@ function Intel1g:pull ()
       self.rxpackets[self.rdt] = np
       self.rxdesc[self.rdt].address = tophysical(np.data)
       self.rxdesc[self.rdt].status = 0
+      link.transmit(lo, p)
+
       self.rdt = self:ringnext(self.rdt)
-      if link.full(lo) then
-         packet.free(p)
-      else
-         link.transmit(lo, p)
-      end
    end
-   self.rdh = self.r.RDH()  -- possible race condition, see 7.1.4.4, 7.2.3
-   self.r.RDT(self.rdt)
+   -- This avoids RDT == RDH when every descriptor is available.
+   self.r.RDT(band(self.rdt - 1, self.ndesc-1))
 end
 function Intel1g:ringnext (index)
    return band(index+1, self.ndesc-1)
@@ -351,7 +378,7 @@ function Intel1g:push ()
    end
    -- Reclaim transmit contexts
    local cursor = self.tdh
-   self.tdh = self.r.TDH()	-- possible race condition, see 7.1.4.4, 7.2.3
+   self.tdh = self.r.TDH()	-- possible race condition, 7.2.2.4, check DD
    while cursor ~= self.tdh do
       if self.txpackets[cursor] then
          packet.free(self.txpackets[cursor])

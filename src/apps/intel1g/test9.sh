@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 cd $(dirname $0)
-exec 2> /dev/null
-exec > /dev/null
 rm -f results.*
 ./testblast.snabb $SNABB_PCI_INTEL1G1 0 source.pcap &
 BLAST0=$!

@@ -10,7 +10,7 @@ local pci1 = os.getenv("SNABB_PCI_INTEL1G1")
 local c = config.new()
 engine.busywait = 1
 config.app(c, "source0", pcap.PcapReader, "source.pcap")
-config.app(c, "delay", delay.Delayed_start, 5)
+config.app(c, "delay", delay.Delayed_start, 9)
 config.app(c, "tee", basic.Tee)
 config.app(c, "sink", basic.Sink)
 config.app(c, "join", basic.Join)
@@ -35,13 +35,15 @@ config.link(c, "ric2.output -> join.input2")
 config.link(c, "ric3.output -> join.input3")
 config.link(c, "join.out -> sink.input")
 engine.configure(c)
+for i=1,12 do
+  engine.main({duration = 1})
+end
 
-engine.main({ duration = 10 })
 local slink = counter.read(engine.app_table.source0.output.output.stats.txpackets)
 local olink = counter.read(engine.app_table.sink.input.input.stats.txpackets)
 if 4 * slink == olink then
-  os.exit(0)
+  main.exit(0)
 else
   print("sent = " .. tostring(slink) .. ", received = " .. tostring(olink))
-  os.exit(-1)
+  main.exit(-1)
 end
