@@ -281,7 +281,7 @@ function main (options)
       breathe = latency:wrap_thunk(breathe, now)
    end
 
-   if options.ingress_drop_monitor or options.ingress_drop_monitor == nil then
+   if options.ingress_drop_monitor then
       local interval = 1e8   -- Every 100 milliseconds.
       local function fn ()
          ingress_drop_monitor:sample()
