@@ -230,7 +230,7 @@ function apply_config_actions (actions, conf)
    app_array, link_array = new_app_array, new_link_array
    -- Trigger start event for each app.
    for _, app in ipairs(app_array) do
-      app:start()
+      if app.start then app:start() end
    end
 end
 
