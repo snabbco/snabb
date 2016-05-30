@@ -178,7 +178,6 @@ function apply_config_actions (actions, conf)
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
       app.zone = zone
-      if app.start then app:start() end
    end
    function ops.restart (name)
       ops.stop(name)
@@ -226,9 +225,13 @@ function apply_config_actions (actions, conf)
    for linkspec, r in pairs(link_table) do
       if not new_link_table[linkspec] then link.free(r, linkspec) end
    end
-   -- commit changes
+   -- Commit changes.
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
+   -- Trigger start event for each app.
+   for _, app in ipairs(app_array) do
+      app:start()
+   end
 end
 
 -- Call this to "run snabb switch".
