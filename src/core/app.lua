@@ -148,8 +148,8 @@ end
 -- Update the active app network by applying the necessary actions.
 function apply_config_actions (actions, conf)
    -- The purpose of this function is to populate these tables:
-   local new_app_table,  new_app_array  = {}, {}, {}
-   local new_link_table, new_link_array = {}, {}, {}
+   local new_app_table,  new_app_array  = {}, {}
+   local new_link_table, new_link_array = {}, {}
    -- Temporary name->index table for use in link renumbering
    local app_name_to_index = {}
    -- Table of functions that execute config actions
