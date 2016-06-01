@@ -5,8 +5,6 @@ Usage:
                              Print usage information.
   -c, --counters <name>
                              Print counters of object by <name> and exit.
-  -y, --yang
-                             Print YANG model encoded in JSON and exit.
 
 Display realtime performance statistics for a running Snabb instance with
 <pid>. If <pid> is not supplied and there is only one Snabb instance, top will
