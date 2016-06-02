@@ -469,6 +469,13 @@ function S.set_mempolicy(mode, mask)
   return retbool(C.set_mempolicy(c.MPOL_MODE[mode], mask.mask, mask.size))
 end
 
+function S.migrate_pages(pid, from, to)
+  from = mktype(t.bitmask, from)
+  to = mktype(t.bitmask, to)
+  assert(from.size == to.size, "incompatible nodemask sizes")
+  return retbool(C.migrate_pages(pid or 0, from.size, from.mask, to.mask))
+end
+
 function S.sched_get_priority_max(policy) return retnum(C.sched_get_priority_max(c.SCHED[policy])) end
 function S.sched_get_priority_min(policy) return retnum(C.sched_get_priority_min(c.SCHED[policy])) end
 

@@ -354,6 +354,10 @@ function C.set_mempolicy(mode, mask, maxnode)
   return syscall(sys.set_mempolicy, int(mode), void(mask), ulong(maxnode))
 end
 
+function C.migrate_pages(pid, maxnode, from, to)
+  return syscall(sys.migrate_pages, int(pid), ulong(maxnode), void(from), void(to))
+end
+
 -- in librt for glibc but use syscalls instead of loading another library
 function C.clock_nanosleep(clk_id, flags, req, rem)
   return syscall(sys.clock_nanosleep, int(clk_id), int(flags), void(req), void(rem))
