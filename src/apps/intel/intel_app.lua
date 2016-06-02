@@ -57,28 +57,22 @@ function Intel82599:new (arg)
       self.zone = "intel"
    end
    if not self.stats.counters then
-      local counters = {}
-      local path = "/counters/"..conf.pciaddr.."/"
-      counters['type']               = counter.open(path..'type')
-      counters['discontinuity-time'] = counter.open(path..'discontinuity-time')
-      counters['in-octets']          = counter.open(path..'in-octets')
-      counters['in-multicast']       = counter.open(path..'in-multicast')
-      counters['in-broadcast']       = counter.open(path..'in-broadcast')
-      counters['in-discards']        = counter.open(path..'in-discards')
-      counters['out-octets']         = counter.open(path..'out-octets')
-      counters['out-multicast']      = counter.open(path..'out-multicast')
-      counters['out-broadcast']      = counter.open(path..'out-broadcast')
-      counters['out-discards']       = counter.open(path..'out-discards')
-      counter.set(counters['type'], 0x1000) -- Hardware interface
-      counter.set(counters['discontinuity-time'], C.get_unix_time())
+      self.stats.path = "/counters/"..conf.pciaddr.."/"
+      self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
+      self.stats.counters = {}
+      for _, name in ipairs(
+         {'type', 'dtime',
+          'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast', 'rxdrop',
+          'txbytes', 'txpackets', 'txmcast', 'txbcast', 'txdrop'}) do
+         self.stats.counters[name] = counter.open(self.stats.path..name)
+      end
+      counter.set(self.stats.counters.type, 0x1000) -- Hardware interface
+      counter.set(self.stats.counters.dtime, C.get_unix_time())
       if not conf.vmdq and conf.macaddr then
-         counters['phys-address'] = counter.open(path..'phys-address')
-         counter.set(counters['phys-address'],
+         self.stats.counters.macaddr = counter.open(self.stats.path..'macaddr')
+         counter.set(self.stats.counters.macaddr,
                      macaddress:new(conf.macaddr):int())
       end
-      self.stats.counters = counters
-      self.stats.path = path
-      self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
    end
    return setmetatable(self, Intel82599)
 end
@@ -117,7 +111,7 @@ function Intel82599:reconfig(arg)
    self.dev:reconfig(conf)
 
    if not self.dev.pf and conf.macaddr then
-      counter.set(self.stats.counters['phys-address'],
+      counter.set(self.stats.counters.macaddr,
                   macaddress:new(conf.macaddr):int())
    end
 end
@@ -151,17 +145,17 @@ end
 
 -- Synchronize self.stats.register a and self.stats.counters.
 function Intel82599:sync_stats ()
-   --- XXX - it is questionable if I choose the right register to counter
-   --- mapping
    local counters, register = self.stats.counters, self.stats.register
-   counter.set(counters['in-octets'],     register.GORC64())
-   counter.set(counters['in-multicast'],  register.MPRC())
-   counter.set(counters['in-broadcast'],  register.BPRC())
-   counter.set(counters['in-discards'],   register.TPR() - register.GPRC())
-   counter.set(counters['out-octets'],    register.GOTC64())
-   counter.set(counters['out-multicast'], register.MPTC())
-   counter.set(counters['out-broadcast'], register.BPTC())
-   counter.set(counters['out-discards'],  register.TPT() - register.GPTC())
+   counter.set(counters.rxbytes,   register.GORC64())
+   counter.set(counters.rxpackets, register.GPRC())
+   counter.set(counters.rxmcast,   register.MPRC())
+   counter.set(counters.rxbcast,   register.BPRC())
+   counter.set(counters.rxdrop,    register.TPR() - register.GPRC())
+   counter.set(counters.txbytes,   register.GOTC64())
+   counter.set(counters.txpackets, register.GPTC())
+   counter.set(counters.txmcast,   register.MPTC())
+   counter.set(counters.txbcast,   register.BPTC())
+   counter.set(counters.txdrop,    register.TPT() - register.GPTC())
 end
 
 -- Push packets from our 'rx' link onto the network.

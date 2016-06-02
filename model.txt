@@ -1,0 +1,41 @@
+RFC7223                      Snabb
+=======                      ======
+name
+description?
+type                         type (~= identity)
+enabled?
+link-up-down-trap-enable?
+admin-status
+oper-status                  status (= enum)
+last-change?
+if-index
+phys-address?                macaddr (uint64)
+higher-layer-if*
+lower-layer-if*
+speed?                       =
+discontinuity-time           dtime (seconds since epoch)
+in-octets?                   rxbytes
+in-unicast-pkts?
+in-broadcast-pkts?           rxbcast
+in-multicast-pkts?
+in-discards?
+in-errors?
+in-unknown-protos?
+out-octets?                  txbytes
+out-unicast-pkts?
+out-broadcast-pkts?          txbcast
+out-multicast-pkts?
+out-discards?
+out-errors?
+
+
+snabb/type:
+
+0x1000 Hardware interface
+0x1001 Virtual interface
+
+snabb/stats:
+
+(tx/rx) - bcast ⊆ mcast ⊆ packets
+
+(tx/rx) - drop (all dropped packets)
