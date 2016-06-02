@@ -104,6 +104,11 @@ function bind_to_numa_node (node)
    assert(not bound_numa_node, "already bound")
 
    assert(S.set_mempolicy('bind', node))
+
+   -- Migrate any pages that might have the wrong affinity.
+   local from_mask = assert(S.get_mempolicy(nil, nil, nil, 'mems_allowed')).mask
+   assert(S.migrate_pages(0, from_mask, node))
+
    bound_numa_node = node
 end
 
