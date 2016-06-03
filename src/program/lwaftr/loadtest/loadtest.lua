@@ -10,6 +10,7 @@ local loadgen = require("apps.lwaftr.loadgen")
 local main = require("core.main")
 local PcapReader = require("apps.pcap.pcap").PcapReader
 local lib = require("core.lib")
+local numa = require("lib.numa")
 local promise = require("program.lwaftr.loadtest.promise")
 
 local WARM_UP_BIT_RATE = 5e9
@@ -79,8 +80,15 @@ end
 function parse_args(args)
    local handlers = {}
    local opts = { bitrate = 10e9, duration = 5, program=programs.ramp_up_down }
+   local cpu
    function handlers.b(arg)
       opts.bitrate = assert(tonumber(arg), 'bitrate must be a number')
+   end
+   function handlers.cpu(arg)
+      cpu = tonumber(arg)
+      if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
+         fatal("Invalid cpu number: "..arg)
+      end
    end
    function handlers.s(arg)
       opts.step = assert(tonumber(arg), 'step must be a number')
@@ -94,13 +102,14 @@ function parse_args(args)
    function handlers.h() show_usage(0) end
    args = lib.dogetopt(args, handlers, "hb:s:D:p:",
                        { bitrate="b", step="s", duration="D", help="h",
-                         program="p" })
+                         program="p", cpu=1 })
    if not opts.step then opts.step = opts.bitrate / 10 end
    assert(opts.bitrate > 0, 'bitrate must be positive')
    assert(opts.step > 0, 'step must be positive')
    assert(opts.duration > 0, 'duration must be positive')
    if #args == 0 or #args % 4 ~= 0 then show_usage(1) end
    local streams = {}
+   local pci_addrs = {}
    for i=1,#args,4 do
       local capture_file, tx, rx, pattern = args[i], args[i+1], args[i+2], args[i+3]
       local nic = {
@@ -112,7 +121,10 @@ function parse_args(args)
          pci_addr = find_device(pattern)
       }
       table.insert(streams, nic)
+      table.insert(pci_addrs, nic.pci_addr)
    end
+   if cpu then numa.bind_to_cpu(cpu) end
+   numa.check_affinity_for_pci_addresses(pci_addrs)
    return opts, streams
 end
 

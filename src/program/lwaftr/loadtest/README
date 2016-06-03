@@ -8,6 +8,8 @@ Usage: loadtest [OPTIONS] <PCAP-FILE> <TX-NAME> <RX-NAME> <PCI> [<PCAP-FILE> <TX
                              Linger on each step for DURATION seconds.
   -p PROGRAM, --program PROGRAM
                              Use workload PROGRAM.
+  --cpu CPU
+                             Bind to the given CPU.
   -h, --help
                              Print usage information.
 
