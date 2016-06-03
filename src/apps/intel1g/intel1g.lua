@@ -21,7 +21,6 @@ local bits = lib.bits
 local tophysical = core.memory.virtual_to_physical
 local register = require("lib.hardware.register")
 
-Intel1g = {}
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
 -- https://sourceforge.net/p/e1000/mailman/message/34457421/
@@ -36,18 +35,71 @@ RSSRK  0x5C80 +0x04*0..9 RW RSS Random Key
    singleton = [[
 CTRL      0x00000 -            RW Device Control
 CTRL_EXT  0x00018 -            RW Extended Device Control
-EEER      0x00E30 -            RW Energy Efficient Ethernet (EEE) Register
-EIMC      0x01528 -            RW Extended Interrupt Mask Clear
-MANC      0x05820 -            RW Management Control
-MDIC      0x00020 -            RW MDI Control
-MDICNFG   0x00E04 -            RW MDI Configuration
-MRQC      0x05818 -            RW Multiple Receive Queues Command Register
-RCTL      0x00100 -            RW RX Control
 STATUS    0x00008 -            RO Device Status
-SWSM      0x05b50 -            RW Software Semaphore
-SW_FW_SYNC 0x05b5c -           RW Software Firmware Synchronization
-TCTL      0x00400 -            RW TX Control
-TCTL_EXT  0x00400 -            RW Extended TX Control
+MRQC      0x05818 -            RW Multiple Receive Queues Command Register
+]]
+}
+reg['82599ES'] = {
+   array = [[
+DAQF      0x0E200 +0x04*0..127  RW Destination Address Queue Filter
+FTQF      0x0E600 +0x04*0..127  RW Five Tuple Queue Filter
+MPSAR     0x0A600 +0x04*0..255  RW MAC Pool Select Array
+PFUTA     0X0F400 +0x04*0..127  RW PF Unicast Table Array
+PFVLVF    0x0F100 +0x04*0..63   RW PF VM VLAN Pool Filter
+PFVLVFB   0x0F200 +0x04*0..127  RW PF VM VLAN Pool Filter Bitmap
+SAQF      0x0E000 +0x04*0..127  RW Source Address Queue Filter
+SDPQF     0x0E400 +0x04*0..127  RW Source Destination Port Queue Filter
+RAH        0x0A204 +0x08*0..127  RW Receive Address High
+RAL        0x0A200 +0x08*0..127  RW Receive Address Low
+RTTDT2C   0x04910 +0x04*0..7    RW DCB Transmit Descriptor Plane T2 Config
+RTTPT2C   0x0CD20 +0x04*0..7    RW DCB Transmit Packet Plane T2 Config
+RTRPT4C   0x02140 +0x04*0..7    RW DCB Receive Packet Plane T4 Config
+RXPBSIZE  0x03C00 +0x04*0..7    RW Receive Packet Buffer Size
+TXPBSIZE  0x0CC00 +0x04*0..7    RW Transmit Packet Buffer Size
+TXPBTHRESH 0x04950 +0x04*0..7   RW Tx Packet Buffer Threshold
+VFTA      0x0A000 +0x04*0..127  RW VLAN Filter Table Array
+]],
+   inherit = "gbl",
+   rxq = [[
+DCA_RXCTRL 0x0100C +0x40*0..63   RW Rx DCA Control Register
+DCA_RXCTRL 0x0D00C +0x40*64..127 RW Rx DCA Control Register
+SRRCTL     0x01014 +0x40*0..63   RW Split Receive Control Registers
+SRRCTL     0x0D014 +0x40*64..127 RW Split Receive Control Registers
+RDBAL      0x01000 +0x40*0..63   RW Receive Descriptor Base Address Low
+RDBAL      0x0D000 +0x40*64..127 RW Receive Descriptor Base Address Low
+RDBAH      0x01004 +0x40*0..63   RW Receive Descriptor Base Address High
+RDBAH      0x0D004 +0x40*64..127 RW Receive Descriptor Base Address High
+RDLEN      0x01008 +0x40*0..63   RW Receive Descriptor Length
+RDLEN      0x0D008 +0x40*64..127 RW Receive Descriptor Length
+RDH        0x01010 +0x40*0..63   RO Receive Descriptor Head
+RDH        0x0D010 +0x40*64..127 RO Receive Descriptor Head
+RDT        0x01018 +0x40*0..63   RW Receive Descriptor Tail
+RDT        0x0D018 +0x40*64..127 RW Receive Descriptor Tail
+RXDCTL     0x01028 +0x40*0..63   RW Receive Descriptor Control
+RXDCTL     0x0D028 +0x40*64..127 RW Receive Descriptor Control
+]],
+   singleton = [[
+AUTOC     0x042A0 -            RW Auto Negotiation Control
+AUTOC2    0x042A8 -            RW Auto Negotiation Control 2
+DTXMXSZRQ 0x08100 -            RW DMA Tx Map Allow Size Requests
+EEC       0x10010 -            RW EEPROM/Flash Control Register
+EIMC      0x00888 -            RW Extended Interrupt Mask Clear
+FCCFG     0x03D00 -            RW Flow Control Configuration
+FCTRL     0x05080 -            RW Filter Control
+HLREG0    0x04240 -            RW MAC Core Control 0
+LINKS     0x042A4 -            RO Link Status Register
+MAXFRS    0x04268 -            RW Max Frame Size
+MFLCN     0x04294 -            RW MAC Flow Control Register
+MTQC      0x08120 -            RW Multiple Transmit Queues Command Register
+PFVTCTL   0x051B0 -             RW PF Virtual Control Register
+RDRXCTL   0x02F00 -            RW Receive DMA Control Register
+RTRUP2TC  0x03020 -            RW DCB Receive Use rPriority to Traffic Class
+RTTUP2TC  0x0C800 -            RW DCB Transmit User Priority to Traffic Class
+RTTBCNRC  0x04984 -            RW DCB Transmit Rate-Scheduler Config
+RXCSUM    0x05000 -             RW Receive Checksum Control
+RXCTRL    0x03000 -            RW Receive Control
+SWSM      0x10140 -            RW Software Semaphore
+VLNCTRL   0x05088 -             RW VLAN Control Register
 ]]
 }
 reg['1000BaseX'] = {
@@ -64,6 +116,18 @@ RDT    0xc018 +0x40*0..7 RW Rx Descriptor Tail
 RXDCTL 0xc028 +0x40*0..7 RW Re Descriptor Control Queue
 RXCTL  0xc014 +0x40*0..7 RW RX DCA CTRL Register Queue
 SRRCTL 0xc00c +0x40*0..7 RW Split and Replication Receive Control
+]],
+   singleton = [[
+EEER      0x00E30 -            RW Energy Efficient Ethernet (EEE) Register
+EIMC      0x01528 -            RW Extended Interrupt Mask Clear
+SWSM      0x05b50 -            RW Software Semaphore
+MANC      0x05820 -            RW Management Control
+MDIC      0x00020 -            RW MDI Control
+MDICNFG   0x00E04 -            RW MDI Configuration
+RCTL      0x00100 -            RW RX Control
+SW_FW_SYNC 0x05b5c -           RW Software Firmware Synchronization
+TCTL      0x00400 -            RW TX Control
+TCTL_EXT  0x00400 -            RW Extended TX Control
 ]],
    txq = [[
 TDBAL  0xe000 +0x40*0..7 RW Tx Descriptor Base Low
@@ -90,68 +154,50 @@ EEC       0x00010 -            RW EEPROM-Mode Control Register
 ]]
 }
 
-function Intel1g:init_phy ()
-   -- 4.3.1.4 PHY Reset
-   self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
+local Intel = { }
+function Intel:new (arg)
+   local conf = config.parse_app_arg(arg)
+   local self = setmetatable({
+      r = {},
+      pciaddress = conf.pciaddr,
+      ndesc = conf.ndescriptors or 256,
+      txq = conf.txq,
+      rxq = conf.rxq,
+      rssseed = conf.rssseed or 314159
+   }, {__index = self})
+   local deviceInfo = pci.device_info(self.pciaddress)
+   assert(deviceInfo.vendor == '0x8086', "unsupported nic")
+   local models = {}
+   models["0x1521"] = "i350"
+   models["0x1533"] = "i210"
+   models["0x157b"] = "i210"
+   models["0x10fb"] = "82599ES"
+   local ringSize = {}
+   ringSize["i350"] = 8
+   ringSize["i210"] = 4
+   ringSize["82599ES"] = 128
 
-   -- 4.6.1  Acquiring Ownership Over a Shared Resource
-   self:lock_fw_sem()
-   self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1 }, 0)
-   self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
-   self:unlock_fw_sem()
+   self.model    = models[deviceInfo.device]
+   assert(self.model, "Unsupported Intel NIC")
+   self.ringSize = ringSize[self.model]
 
-   self.r.CTRL:set(bits { PHYreset = 31 })
-   C.usleep(1*100)
-   self.r.CTRL:clr(bits { PHYreset = 31 })
+   -- Setup device access
+   self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
+   self.master = self.fd:flock("ex, nb")
 
-   -- 4.6.2 Releasing Ownership Over a Shared Resource
-   self:lock_fw_sem()
-   self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
-   self:unlock_fw_sem()
+   self:load_registers(self.model)
 
-   self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
-
-   --[[
-   self:lock_fw_sem()
-   self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1}, 0)
-   self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
-   self:unlock_fw_sem()
-
-   -- If you where going to configure the PHY to none defaults
-   -- this is where you would do it
-
-   self:lock_fw_sem()
-   self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
-   self:unlock_fw_sem()
-   ]]
-end
-function Intel1g:lock_sw_sem()
-   for i=1,50,1 do
-      if band(self.r.SWSM(), 0x01) == 1 then
-         C.usleep(10000)
-      else
-         return
-      end
-   end
-   error("Couldn't get lock")
-end
-function Intel1g:unlock_sw_sem()
-   self.r.SWSM:clr(bits { SMBI = 0 })
-end
-function Intel1g:lock_fw_sem()
-   self.r.SWSM:set(bits { SWESMBI = 1 })
-   while band(self.r.SWSM(), 0x02) == 0 do
-      self.r.SWSM:set(bits { SWESMBI = 1 })
-   end
-end
-function Intel1g:unlock_fw_sem()
-   self.r.SWSM:clr(bits { SWESMBI = 1 })
+   self:init()
+   self.fd:flock("sh")
+   self:init_tx_q()
+   self:init_rx_q()
+   return self
 end
 
-function Intel1g:disable_interrupts ()
+function Intel:disable_interrupts ()
    self.r.EIMC(0xffffffff)
 end
-function Intel1g:init_rx_q ()
+function Intel:init_rx_q ()
    if not self.rxq then return end
    assert((self.rxq >=0) and (self.rxq < self.ringSize),
    "rxqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
@@ -190,22 +236,176 @@ function Intel1g:init_rx_q ()
    self.r.SRRCTL:set(bits {
       BSIZEPACKET1 = 1,   -- Set packet buff size to 0b1010 kbytes
       BSIZEPACKET3 = 3,
-      Drop_En = 31        -- Drop packets when no descriptors
+      Drop_En = self:offset("SRRCTL", "Drop_En") -- Drop packets when no descriptors
    })
    self:lock_sw_sem()
    self.r.RXDCTL:set( bits { Enable = 25 })
    self.r.RXDCTL:wait( bits { Enable = 25 })
    self.r.RDT(self.ndesc - 1)
+   self:unlock_sw_sem()
 
+   self:rss_tab_build()
+end
+
+function Intel:load_registers(key)
+   local v = reg[key]
+   if v.inherit then self:load_registers(v.inherit) end
+   if v.singleton then register.define(v.singleton, self.r, self.base) end
+   if v.array then register.define_array(v.array, self.r, self.base) end
+   if v.txq and self.txq then
+      register.define(v.txq, self.r, self.base, self.txq)
+   end
+   if v.rxq and self.rxq then
+      register.define(v.rxq, self.r, self.base, self.rxq)
+   end
+end
+function Intel:lock_sw_sem()
+   for i=1,50,1 do
+      if band(self.r.SWSM(), 0x01) == 1 then
+         C.usleep(100000)
+      else
+         return
+      end
+   end
+   error("Couldn't get lock")
+end
+function Intel:offset(reg, key)
+   return self.offsets[reg][key]
+end
+function Intel:pull ()
+   if not self.rxq then return end
+   local lo = self.output["output"]
+   assert(lo, "intel1g: output link required")
+
+   while band(self.rxdesc[self.rdt].status, 0x01) == 1 do
+      local desc = self.rxdesc[self.rdt]
+      local p = self.rxpackets[self.rdt]
+      p.length = desc.length
+      local np = packet.allocate()
+      self.rxpackets[self.rdt] = np
+      self.rxdesc[self.rdt].address = tophysical(np.data)
+      self.rxdesc[self.rdt].status = 0
+      link.transmit(lo, p)
+
+      self.rdt = self:ringnext(self.rdt)
+   end
+   -- This avoids RDT == RDH when every descriptor is available.
+   self.r.RDT(band(self.rdt - 1, self.ndesc-1))
+end
+
+function Intel:unlock_sw_sem()
+   self.r.SWSM:clr(bits { SMBI = 0 })
+end
+
+function Intel:ringnext (index)
+   return band(index+1, self.ndesc-1)
+end
+function Intel:rss_enable ()
+   -- set default q = 0 on i350,i210 noop on 82599
+   self.r.MRQC(0)
+   self.r.MRQC:set(bits { RSS = self:offset("MRQC", "RSS") })
+   -- Enable all RSS hash on all available input keys
+   self.r.MRQC:set(bits {
+      TcpIPv4 = 16, IPv4 = 17, IPv6 = 20,
+      TcpIPv6 = 21, UdpIPv4 = 22, UdpIPv6 = 23
+   })
+   self:rss_tab({0})
+   self:rss_key()
+end
+function Intel:rss_key ()
+   math.randomseed(self.rssseed)
+   for i=0,9,1 do
+      self.r.RSSRK[i](math.random(2^32))
+   end
+end
+function Intel:rss_tab (newtab)
+   local current = {}
+   local pos = 0
+
+   for i=0,31,1 do
+      for j=0,3,1 do
+         current[self.r.RETA[i]:byte(j)] = 1
+         if newtab ~= nil then
+            local new = newtab[pos%#newtab+1]
+            self.r.RETA[i]:byte(j, new)
+         end
+         pos = pos + 1
+      end
+   end
+   return current
+end
+function Intel:rss_tab_build ()
+   -- noop is rss is not enabled
+   local b = bits { RSS = self:offset("MRQC", "RSS") }
+   if bit.band(self.r.MRQC(), b) ~= b then return end
+
+   self:lock_sw_sem()
    local tab = {}
    for i=0,self.ringSize-1,1 do
       if band(self.r.ALLRXDCTL[i](), bits { Enable = 25 }) > 0 then
          table.insert(tab, i)
       end
    end
-   self:redirection_table(tab)
+   self:rss_tab(tab)
    self:unlock_sw_sem()
 end
+
+
+Intel1g = setmetatable({
+   offsets = {
+      SRRCTL = {
+         Drop_En = 31
+      },
+      MRQC = {
+         RSS = 1
+      }
+   }
+}, {__index = Intel})
+function Intel1g:init_phy ()
+   -- 4.3.1.4 PHY Reset
+   self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
+
+   -- 4.6.1  Acquiring Ownership Over a Shared Resource
+   self:lock_fw_sem()
+   self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1 }, 0)
+   self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
+   self:unlock_fw_sem()
+
+   self.r.CTRL:set(bits { PHYreset = 31 })
+   C.usleep(1*100)
+   self.r.CTRL:clr(bits { PHYreset = 31 })
+
+   -- 4.6.2 Releasing Ownership Over a Shared Resource
+   self:lock_fw_sem()
+   self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
+   self:unlock_fw_sem()
+
+   self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
+
+   --[[
+   self:lock_fw_sem()
+   self.r.SW_FW_SYNC:wait(bits { SW_PHY_SM = 1}, 0)
+   self.r.SW_FW_SYNC:set(bits { SW_PHY_SM = 1 })
+   self:unlock_fw_sem()
+
+   -- If you where going to configure the PHY to none defaults
+   -- this is where you would do it
+
+   self:lock_fw_sem()
+   self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
+   self:unlock_fw_sem()
+   ]]
+end
+function Intel1g:lock_fw_sem()
+   self.r.SWSM:set(bits { SWESMBI = 1 })
+   while band(self.r.SWSM(), 0x02) == 0 do
+      self.r.SWSM:set(bits { SWESMBI = 1 })
+   end
+end
+function Intel1g:unlock_fw_sem()
+   self.r.SWSM:clr(bits { SWESMBI = 1 })
+end
+
 
 function Intel1g:init_tx_q ()                               -- 4.5.10
    if not self.txq then return end
@@ -237,76 +437,6 @@ function Intel1g:init_tx_q ()                               -- 4.5.10
    self.r.TXDCTL:set(bits { WTHRESH = 16, ENABLE = 25 })
    self.r.TXDCTL:wait(bits { ENABLE = 25 })
    self.r.TCTL:set(bits { TxEnable = 1 })
-   self:disable_interrupts()
-end
-
-function Intel1g:redirection_table (newtab)
-   local current = {}
-   local pos = 0
-
-   for i=0,31,1 do
-      for j=0,3,1 do
-         current[self.r.RETA[i]:byte(j)] = 1
-         if newtab ~= nil then
-            local new = newtab[pos%#newtab+1]
-            self.r.RETA[i]:byte(j, new)
-         end
-         pos = pos + 1
-      end
-   end
-   return current
-end
-
-function Intel1g:new (arg)
-   local conf = config.parse_app_arg(arg)
-   local self = setmetatable({
-      r = {},
-      pciaddress = conf.pciaddr,
-      ndesc = conf.ndescriptors or 256,
-      txq = conf.txq,
-      rxq = conf.rxq,
-      rssseed = conf.rssseed or 314159
-   }, {__index = Intel1g})
-   local deviceInfo = pci.device_info(self.pciaddress)
-   assert(deviceInfo.vendor == '0x8086', "unsupported nic")
-   local models = {}
-   models["0x1521"] = "i350"
-   models["0x1533"] = "i210"
-   models["0x157b"] = "i210"
-   models["0x10fb"] = "82599ES"
-   local ringSize = {}
-   ringSize["i350"] = 8
-   ringSize["i210"] = 4
-   ringSize["82599ES"] = 128
-
-   self.model    = models[deviceInfo.device]
-   assert(self.model, "Unsupported Intel NIC")
-   self.ringSize = ringSize[self.model]
-
-   -- Setup device access
-   self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
-   self.master = self.fd:flock("ex, nb")
-
-   self:load_registers(self.model)
-
-   self:init()
-   self.fd:flock("sh")
-   self:init_tx_q()
-   self:init_rx_q()
-   return self
-end
-
-function Intel1g:load_registers(key)
-   local v = reg[key]
-   if v.inherit then self:load_registers(v.inherit) end
-   if v.singleton then register.define(v.singleton, self.r, self.base) end
-   if v.array then register.define_array(v.array, self.r, self.base) end
-   if v.txq and self.txq then
-      register.define(v.txq, self.r, self.base, self.txq)
-   end
-   if v.rxq and self.rxq then
-      register.define(v.rxq, self.r, self.base, self.rxq)
-   end
 end
 
 function Intel1g:init ()
@@ -330,22 +460,10 @@ function Intel1g:init ()
    -- 7.1.2.10 Receive-Side Scaling (RSS)
    -- 8.10.22 Redirection Table
    -- RSS redirection table is undefined on reset, 0 it
-   self:redirection_table({0})
    -- 8.10.20
+   self:rss_enable()
    -- enable RSS
-   self.r.MRQC:set(bits { RSS = 1 })
-   -- set the RSS default queue to 0
-   self.r.MRQC:clr(bits { Def_Q0 = 3, Def_Q1 = 4, Def_Q2 = 5})
-   -- Enable all RSS hash on all available input keys
-   self.r.MRQC:set(bits {
-      RSS0 = 16, RSS1 = 17, RSS2 = 18, RSS3 = 19, RSS4 = 20,
-      RSS5 = 21, RSS6 = 22, RSS7 = 23, RSS8 = 24
-   })
-   -- 8.10.21
-   math.randomseed(self.rssseed)
-   for i=0,9,1 do
-      self.r.RSSRK[i](math.random(2^32))
-   end
+
    -- 8.10.1
    self.r.RCTL:clr(bits { rxEnable = 1 })
    self.r.RCTL(bits {
@@ -366,29 +484,6 @@ function Intel1g:init ()
    self:unlock_sw_sem()
 end
 
-function Intel1g:pull ()
-   if not self.rxq then return end
-   local lo = self.output["output"]
-   assert(lo, "intel1g: output link required")
-
-   while band(self.rxdesc[self.rdt].status, 0x01) == 1 do
-      local desc = self.rxdesc[self.rdt]
-      local p = self.rxpackets[self.rdt]
-      p.length = desc.length
-      local np = packet.allocate()
-      self.rxpackets[self.rdt] = np
-      self.rxdesc[self.rdt].address = tophysical(np.data)
-      self.rxdesc[self.rdt].status = 0
-      link.transmit(lo, p)
-
-      self.rdt = self:ringnext(self.rdt)
-   end
-   -- This avoids RDT == RDH when every descriptor is available.
-   self.r.RDT(band(self.rdt - 1, self.ndesc-1))
-end
-function Intel1g:ringnext (index)
-   return band(index+1, self.ndesc-1)
-end
 function Intel1g:push ()
    if not self.txq then return end
    local li = self.input["input"]
@@ -462,9 +557,17 @@ function Intel1g:stats ()
    return ret
 end
 
-Intel82599 = {
-}
-function Intel82599:init()
+Intel82599 = setmetatable({
+   offsets = {
+      SRRCTL = {
+         Drop_En = 31
+      },
+      MRQC = {
+         RSS = 0
+      }
+   }
+}, { __index = Intel })
+function Intel82599:init ()
    self:disable_interrupts()
 
    local reset = bits{LinkReset=3, DeviceReset=26}
@@ -480,5 +583,75 @@ function Intel82599:init()
    self.r.AUTOC2(0)
    self.r.AUTOC2:set(bits { tenG_PMA_PMD_Serial = 17 })
    self.r.AUTOC:set(bits{restart_AN=12})
-   print(self.r.LINKS())
+
+   -- 4.6.7
+   self.r.RXCTRL(0)                             -- disable receive
+   for i=0,127 do
+      self.r.RAL[i](0)
+      self.r.RAH[i](0)
+      self.r.PFUTA[i](0)
+      self.r.VFTA[i](0)
+      self.r.PFVLVFB[i](0)
+      self.r.SAQF[i](0)
+      self.r.DAQF[i](0)
+      self.r.SDPQF[i](0)
+      self.r.FTQF[i](0)
+   end
+   for i=0,63 do
+      self.r.PFVLVF[i](0)
+      self.r.MPSAR[i](0)
+   end
+   for i=0,255 do
+      self.r.MPSAR[i](0)
+   end
+
+   self.r.FCTRL:set(bits {
+      SBP = 1,
+      MPE = 8,
+      UPE = 9,
+      BAM = 10
+   })
+
+   self.r.VLNCTRL(0x8100)                    -- explicity set default
+   self.r.RXCSUM(0)                          -- turn off all checksum offload
+
+   self.r.RXPBSIZE[0]:bits(10,19, 0x200)
+   self.r.TXPBSIZE[0]:bits(10,19, 0xA0)
+   self.r.TXPBTHRESH[0](0xA0)
+   for i=1,7 do
+      self.r.RXPBSIZE[i]:bits(10,19, 0)
+      self.r.TXPBSIZE[i]:bits(10,19, 0)
+      self.r.TXPBTHRESH[i](0)
+   end
+
+   self.r.MTQC(0)
+   self.r.PFVTCTL(0)
+   self.r.RTRUP2TC(0)
+   self.r.RTTUP2TC(0)
+   self.r.DTXMXSZRQ(0xFFF)
+
+   self.r.MFLCN(bits{RFCE=3})
+   self.r.FCCFG(bits{TFCE=3})
+
+   for i=0,7 do
+      self.r.RTTDT2C[i](0)
+      self.r.RTTPT2C[i](0)
+      self.r.RTRPT4C[i](0)
+   end
+
+   self.r.HLREG0(bits{
+      TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3,
+      TXPADEN=10, rsvd3=11, rsvd4=13, MDCSPD=16
+   })
+   self.r.RDRXCTL(0)
+   self.r.RDRXCTL(bits { CRCStrip = 1 })
+
+   self.r.MAXFRS(lshift(9216, 16))
+
+   self.r.RXCTRL:set(bits{ RXEN=0 })
+   self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
+
+   self:unlock_sw_sem()
+end
+function Intel82599:init_tx_q ()
 end
