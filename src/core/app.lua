@@ -110,13 +110,19 @@ function ingress_drop_monitor:sample()
    end
 end
 
+local print_tuning_tip = true
 function ingress_drop_monitor:jit_flush_if_needed()
    if self.current_value[0] - self.last_value[0] < self.threshold then return end
    if now() - self.last_flush < self.wait then return end
    self.last_flush = now()
    self.last_value[0] = self.current_value[0]
    jit.flush()
-   print("jit.flush")
+   local now_str = tonumber(now())/1e9
+   print(now_str..": warning: Dropped more than "..self.threshold.." packets; flushing JIT to try to recover.")
+   if print_tuning_tip then
+      print("See https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.performance.md for performance tuning tips.")
+      print_tuning_tip = false
+   end
    --- TODO: Change last_flush, last_value and current_value fields to be counters.
 end
 
