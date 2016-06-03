@@ -27,7 +27,13 @@ Intel1g = {}
 -- https://sourceforge.net/p/e1000/mailman/message/34457421/
 -- http://dpdk.org/browse/dpdk/tree/drivers/net/e1000/base/e1000_regs.h
 
-gbl_registers = [[
+reg = { }
+reg.gbl = {
+   array = [[
+RETA   0x5c00 +0x04*0..31 RW Redirection Table
+RSSRK  0x5C80 +0x04*0..9 RW RSS Random Key
+]],
+   singleton = [[
 CTRL      0x00000 -            RW Device Control
 CTRL_EXT  0x00018 -            RW Extended Device Control
 EEER      0x00E30 -            RW Energy Efficient Ethernet (EEE) Register
@@ -43,40 +49,46 @@ SW_FW_SYNC 0x05b5c -           RW Software Firmware Synchronization
 TCTL      0x00400 -            RW TX Control
 TCTL_EXT  0x00400 -            RW Extended TX Control
 ]]
-dev_specific_registers = {}
-dev_specific_registers['i210'] = [[
+}
+reg['1000BaseX'] = {
+   array = [[
+ALLRXDCTL 0xc028 +0x40*0..7 RW Re Descriptor Control Queue
+]],
+   inherit = "gbl",
+   rxq = [[
+RDBAL  0xc000 +0x40*0..7 RW Rx Descriptor Base low
+RDBAH  0xc004 +0x40*0..7 RW Rx Descriptor Base High
+RDLEN  0xc008 +0x40*0..7 RW Rx Descriptor Ring Length
+RDH    0xc010 +0x40*0..7 RO Rx Descriptor Head
+RDT    0xc018 +0x40*0..7 RW Rx Descriptor Tail
+RXDCTL 0xc028 +0x40*0..7 RW Re Descriptor Control Queue
+RXCTL  0xc014 +0x40*0..7 RW RX DCA CTRL Register Queue
+SRRCTL 0xc00c +0x40*0..7 RW Split and Replication Receive Control
+]],
+   txq = [[
+TDBAL  0xe000 +0x40*0..7 RW Tx Descriptor Base Low
+TDBAH  0xe004 +0x40*0..7 RW Tx Descriptor Base High
+TDLEN  0xe008 +0x40*0..7 RW Tx Descriptor Ring Length
+TDH    0xe010 +0x40*0..7 RO Tx Descriptor Head
+TDT    0xe018 +0x40*0..7 RW Tx Descriptor Tail
+TXDCTL 0xe028 +0x40*0..7 RW Tx Descriptor Control Queue
+TXCTL  0xe014 +0x40*0..7 RW Tx DCA CTRL Register Queue
+]]
+}
+reg.i210 = {
+   inherit = "1000BaseX",
+   singleton = [[
 EEMNGCTL  0x12030 -            RW Manageability EEPROM-Mode Control Register
 EEC       0x12010 -            RW EEPROM-Mode Control Register
 ]]
-dev_specific_registers['i350'] = [[
+}
+reg.i350 = {
+   inherit = "1000BaseX",
+   singleton = [[
 EEMNGCTL  0x01010 -            RW Manageability EEPROM-Mode Control Register
 EEC       0x00010 -            RW EEPROM-Mode Control Register
 ]]
-gbl_array_registers = [[
-RETA   0x5c00 +0x04*0..31 RW Redirection Table
-RSSRK  0x5C80 +0x04*0..9 RW RSS Random Key
-ALLRXDCTL 0xc028 +0x40*0..16 RW Re Descriptor Control Queue
-]]
-
-tx_registers = [[
-TDBAL  0xe000 +0x40*0..16 RW Tx Descriptor Base Low
-TDBAH  0xe004 +0x40*0..16 RW Tx Descriptor Base High
-TDLEN  0xe008 +0x40*0..16 RW Tx Descriptor Ring Length
-TDH    0xe010 +0x40*0..16 RO Tx Descriptor Head
-TDT    0xe018 +0x40*0..16 RW Tx Descriptor Tail
-TXDCTL 0xe028 +0x40*0..16 RW Tx Descriptor Control Queue
-TXCTL  0xe014 +0x40*0..16 RW Tx DCA CTRL Register Queue
-]]
-rx_registers = [[
-RDBAL  0xc000 +0x40*0..16 RW Rx Descriptor Base low
-RDBAH  0xc004 +0x40*0..16 RW Rx Descriptor Base High
-RDLEN  0xc008 +0x40*0..16 RW Rx Descriptor Ring Length
-RDH    0xc010 +0x40*0..16 RO Rx Descriptor Head
-RDT    0xc018 +0x40*0..16 RW Rx Descriptor Tail
-RXDCTL 0xc028 +0x40*0..16 RW Re Descriptor Control Queue
-RXCTL  0xc014 +0x40*0..16 RW RX DCA CTRL Register Queue
-SRRCTL 0xc00c +0x40*0..16 RW Split and Replication Receive Control
-]]
+}
 
 function Intel1g:init_phy ()
    -- 4.3.1.4 PHY Reset
@@ -136,7 +148,7 @@ function Intel1g:unlock_fw_sem()
    self.r.SWSM:clr(bits { SWESMBI = 1 })
 end
 
-function Intel1g:disableInterrupts ()
+function Intel1g:disable_interrupts ()
    self.r.EIMC(0xffffffff)
 end
 function Intel1g:init_rx_q ()
@@ -146,7 +158,6 @@ function Intel1g:init_rx_q ()
    assert((self.ndesc %128) ==0,
    "ndesc must be a multiple of 128 (for Rx only)")	-- see 7.1.4.5
 
-   register.define(rx_registers, self.r, self.base, self.rxq)
    self.rxpackets = {}
    self.rdh = 0
    self.rdt = 0
@@ -187,7 +198,7 @@ function Intel1g:init_rx_q ()
    self.r.RDT(self.ndesc - 1)
 
    local tab = {}
-   for i=0,self.ringSize,1 do
+   for i=0,self.ringSize-1,1 do
       if band(self.r.ALLRXDCTL[i](), bits { Enable = 25 }) > 0 then
          table.insert(tab, i)
       end
@@ -200,7 +211,6 @@ function Intel1g:init_tx_q ()                               -- 4.5.10
    if not self.txq then return end
    assert((self.txq >=0) and (self.txq < self.ringSize),
    "txqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
-   register.define(tx_registers, self.r, self.base, self.txq)
    self.tdh = 0
    self.tdt = 0
    self.txpackets = {}
@@ -227,7 +237,7 @@ function Intel1g:init_tx_q ()                               -- 4.5.10
    self.r.TXDCTL:set(bits { WTHRESH = 16, ENABLE = 25 })
    self.r.TXDCTL:wait(bits { ENABLE = 25 })
    self.r.TCTL:set(bits { TxEnable = 1 })
-   self:disableInterrupts()
+   self:disable_interrupts()
 end
 
 function Intel1g:redirection_table (newtab)
@@ -247,7 +257,8 @@ function Intel1g:redirection_table (newtab)
    return current
 end
 
-function Intel1g:new (conf)
+function Intel1g:new (arg)
+   local conf = config.parse_app_arg(arg)
    local self = setmetatable({
       r = {},
       pciaddress = conf.pciaddr,
@@ -262,20 +273,21 @@ function Intel1g:new (conf)
    models["0x1521"] = "i350"
    models["0x1533"] = "i210"
    models["0x157b"] = "i210"
+   models["0x10fb"] = "82599ES"
    local ringSize = {}
    ringSize["i350"] = 8
    ringSize["i210"] = 4
+   ringSize["82599ES"] = 128
 
    self.model    = models[deviceInfo.device]
+   assert(self.model, "Unsupported Intel NIC")
    self.ringSize = ringSize[self.model]
 
    -- Setup device access
    self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
 
-   register.define(gbl_registers, self.r, self.base)
-   register.define_array(gbl_array_registers, self.r, self.base)
-   register.define(dev_specific_registers[self.model], self.r, self.base)
+   self:load_registers(self.model)
 
    self:init()
    self.fd:flock("sh")
@@ -284,19 +296,32 @@ function Intel1g:new (conf)
    return self
 end
 
+function Intel1g:load_registers(key)
+   local v = reg[key]
+   if v.inherit then self:load_registers(v.inherit) end
+   if v.singleton then register.define(v.singleton, self.r, self.base) end
+   if v.array then register.define_array(v.array, self.r, self.base) end
+   if v.txq and self.txq then
+      register.define(v.txq, self.r, self.base, self.txq)
+   end
+   if v.rxq and self.rxq then
+      register.define(v.rxq, self.r, self.base, self.rxq)
+   end
+end
+
 function Intel1g:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
 
    -- 4.5.3  Initialization Sequence
-   self:disableInterrupts()
+   self:disable_interrupts()
    -- 4.3.1 Software Reset (RST)
    self.r.CTRL(bits { RST = 26 })
    C.usleep(4*1000)
    self.r.EEC:wait(bits { Auto_RD = 9 })
    self.r.STATUS:wait(bits { PF_RST_DONE = 21 })
-   self:disableInterrupts()                        -- 4.5.4
+   self:disable_interrupts()                        -- 4.5.4
 
    -- use Internal PHY                             -- 8.2.5
    self.r.MDICNFG(0)
@@ -435,4 +460,25 @@ function Intel1g:stats ()
       ret[i] = v()
    end
    return ret
+end
+
+Intel82599 = {
+}
+function Intel82599:init()
+   self:disable_interrupts()
+
+   local reset = bits{LinkReset=3, DeviceReset=26}
+   self.r.CTRL(reset)
+   C.usleep(1000)
+   --self.r.CTRL:wait(reset, 0)
+   self.r.EEC:wait(bits{AutoreadDone=9})           -- 3.
+   self.r.RDRXCTL:wait(bits{DMAInitDone=3})        -- 4.
+
+   -- 4.6.4.2
+   -- 3.7.4.2
+   self.r.AUTOC:set(bits { LMS0 = 13, LMS1 = 14 })
+   self.r.AUTOC2(0)
+   self.r.AUTOC2:set(bits { tenG_PMA_PMD_Serial = 17 })
+   self.r.AUTOC:set(bits{restart_AN=12})
+   print(self.r.LINKS())
 end
