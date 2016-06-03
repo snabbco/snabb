@@ -10,10 +10,11 @@ local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
 local zone = require("jit.zone")
 local lib = require("core.lib")
+local shm = require("core.shm")
 local C   = ffi.C
 -- Load ljsyscall early to help detect conflicts
 -- (e.g. FFI type name conflict between Snabb and ljsyscall)
-require("syscall")
+local S = require("syscall")
 
 require("lib.lua.strict")
 require("lib.lua.class")
@@ -44,8 +45,28 @@ function main ()
       print("unsupported program: "..program:gsub("_", "-"))
       usage(1)
    else
-      require(modulename(program)).run(args)
+      -- Fork into worker process and supervisor
+      local worker_pid = S.fork()
+      if worker_pid == 0 then
+         -- Worker
+         S.prctl("set_pdeathsig", "hup")
+         require(modulename(program)).run(args)
+      else
+         -- Supervisor
+         local exit_signals = "hup, int, quit, term, chld"
+         local signalfd = S.signalfd(exit_signals)
+         S.sigprocmask("block", exit_signals)
+         local signals, err = S.util.signalfd_read(signalfd)
+         assert(signals, tostring(err))
+         if not signals[1].chld then S.kill(worker_pid, "kill") end
+         shutdown(S.getpid())
+      end
    end
+end
+
+-- Cleanup after worker process.
+function shutdown (pid)
+   shm.unlink("//"..pid)
 end
 
 -- Take the program name from the first argument, unless the first
