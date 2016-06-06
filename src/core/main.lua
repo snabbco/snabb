@@ -175,7 +175,8 @@ else
    assert(signals, tostring(err))
    local exit_status
    if signals[1].chld then
-      local _, _, worker = S.waitpid(worker_pid)
+      local status, err, worker = S.waitpid(worker_pid)
+      assert(status, tostring(err))
       if worker.WIFEXITED then exit_status = worker.EXITSTATUS
       else                     exit_status = 128 + worker.WTERMSIG end
    else
