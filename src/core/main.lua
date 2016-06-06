@@ -183,6 +183,6 @@ else
       S.kill(worker_pid, "hup")
       exit_status = 128 + signals[1].signo
    end
-   shutdown(S.getpid())
+   shutdown(worker_pid)
    os.exit(exit_status)
 end
