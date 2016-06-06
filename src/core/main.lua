@@ -58,8 +58,17 @@ function main ()
          S.sigprocmask("block", exit_signals)
          local signals, err = S.util.signalfd_read(signalfd)
          assert(signals, tostring(err))
-         if not signals[1].chld then S.kill(worker_pid, "hup") end
+         local exit_status
+         if signals[1].chld then
+            local _, _, worker = S.waitpid(worker_pid)
+            if worker.WIFEXITED then exit_status = worker.EXITSTATUS
+            else                     exit_status = 128 + worker.WTERMSIG end
+         else
+            S.kill(worker_pid, "hup")
+            exit_status = 128 + signals[1].signo
+         end
          shutdown(S.getpid())
+         os.exit(exit_status)
       end
    end
 end
