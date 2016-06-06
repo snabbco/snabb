@@ -58,7 +58,7 @@ function main ()
          S.sigprocmask("block", exit_signals)
          local signals, err = S.util.signalfd_read(signalfd)
          assert(signals, tostring(err))
-         if not signals[1].chld then S.kill(worker_pid, "kill") end
+         if not signals[1].chld then S.kill(worker_pid, "hup") end
          shutdown(S.getpid())
       end
    end
