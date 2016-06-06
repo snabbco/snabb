@@ -45,37 +45,8 @@ function main ()
       print("unsupported program: "..program:gsub("_", "-"))
       usage(1)
    else
-      -- Fork into worker process and supervisor
-      local worker_pid = S.fork()
-      if worker_pid == 0 then
-         -- Worker
-         S.prctl("set_pdeathsig", "hup")
-         require(modulename(program)).run(args)
-      else
-         -- Supervisor
-         local exit_signals = "hup, int, quit, term, chld"
-         local signalfd = S.signalfd(exit_signals)
-         S.sigprocmask("block", exit_signals)
-         local signals, err = S.util.signalfd_read(signalfd)
-         assert(signals, tostring(err))
-         local exit_status
-         if signals[1].chld then
-            local _, _, worker = S.waitpid(worker_pid)
-            if worker.WIFEXITED then exit_status = worker.EXITSTATUS
-            else                     exit_status = 128 + worker.WTERMSIG end
-         else
-            S.kill(worker_pid, "hup")
-            exit_status = 128 + signals[1].signo
-         end
-         shutdown(S.getpid())
-         os.exit(exit_status)
-      end
+      require(modulename(program)).run(args)
    end
-end
-
--- Cleanup after worker process.
-function shutdown (pid)
-   shm.unlink("//"..pid)
 end
 
 -- Take the program name from the first argument, unless the first
@@ -160,6 +131,11 @@ function handler (reason)
    os.exit(1)
 end
 
+-- Cleanup after Snabb process.
+function shutdown (pid)
+   shm.unlink("//"..pid)
+end
+
 function selftest ()
    print("selftest")
    assert(programname("/bin/snabb-1.0") == "snabb",
@@ -184,4 +160,28 @@ function selftest ()
       "Incorrect program name selected")
 end
 
-xpcall(main, handler)
+-- Fork into worker process and supervisor
+local worker_pid = S.fork()
+if worker_pid == 0 then
+   -- Worker
+   S.prctl("set_pdeathsig", "hup")
+   xpcall(main, handler)
+else
+   -- Supervisor
+   local exit_signals = "hup, int, quit, term, chld"
+   local signalfd = S.signalfd(exit_signals)
+   S.sigprocmask("block", exit_signals)
+   local signals, err = S.util.signalfd_read(signalfd)
+   assert(signals, tostring(err))
+   local exit_status
+   if signals[1].chld then
+      local _, _, worker = S.waitpid(worker_pid)
+      if worker.WIFEXITED then exit_status = worker.EXITSTATUS
+      else                     exit_status = 128 + worker.WTERMSIG end
+   else
+      S.kill(worker_pid, "hup")
+      exit_status = 128 + signals[1].signo
+   end
+   shutdown(S.getpid())
+   os.exit(exit_status)
+end
