@@ -387,14 +387,23 @@ local function transmit_ipv4(lwstate, pkt)
    end
 end
 
+-- Only locally generated error packets are handled here.  We transmit
+-- them right away, instead of calling transmit_ipv4, because they are
+-- never hairpinned and should not be counted by the "out-ipv4" counter.
+-- However, they should be tunneled if the error is to be sent to a host
+-- behind a B4, whether or not hairpinning is enabled; this is not hairpinning.
 local function transmit_icmpv4_reply(lwstate, pkt, orig_pkt)
    drop(orig_pkt)
    counter.add(lwstate.counters["out-icmpv4-bytes"], pkt.length)
    counter.add(lwstate.counters["out-icmpv4-packets"])
-   -- Only locally generated error packets are handled here.  We transmit
-   -- them right away, instead of calling transmit_ipv4, because they are
-   -- never hairpinned and should not be counted by the "out-ipv4" counter.
-   return transmit(lwstate.o4, pkt)
+
+   local ipv4_header = get_ethernet_payload(pkt)
+   local dst_ip = get_ipv4_dst_address(ipv4_header)
+   if ipv4_in_binding_table(lwstate, dst_ip) then
+      return transmit(lwstate.input.v4, pkt)
+   else
+      return transmit(lwstate.o4, pkt)
+   end
 end
 
 -- ICMPv4 type 3 code 1, as per RFC 7596.

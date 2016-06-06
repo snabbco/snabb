@@ -270,11 +270,10 @@ snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${EMPTY} ${TEST_BASE}/hairpinned-icmpv4-echo-reply-unbound-from-aftr.pcap \
    ${COUNTERS}/in-1p-ipv6-out-1p-icmpv6-2.lua
 
-# FIXME: fix and reenable this test.
-# echo "Testing: from-to-b4 TCP packet, with hairpinning, TTL 1"
-# snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
-#    ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6-ttl-1.pcap \
-#    ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6-ttl-1-reply.pcap
+echo "Testing: from-to-b4 TCP packet, with hairpinning, TTL 1"
+snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6-ttl-1.pcap \
+   ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6-ttl-1-reply.pcap
 
 echo "Testing: from-to-b4 IPv6 packet, with hairpinning, with vlan tag"
 snabb_run_and_cmp ${TEST_BASE}/vlan.conf \
