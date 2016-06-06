@@ -35,7 +35,7 @@ qemu_start_vm() {
     cd $VM_DIR
     sudo numactl -m ${NUMA_NODE} taskset -c ${QEMU_CORE} qemu-system-x86_64 \
         --enable-kvm -name ${NAME} -drive file=${DISK},if=virtio \
-        -m ${MEM} -cpu host -smp 2 \
+        -m ${MEM} -cpu host \
         -fsdev local,security_model=passthrough,id=fsdev0,path=${SHARED_LOCATION} \
             -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=share \
         -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGESTLB_FS},share=on \
@@ -57,10 +57,6 @@ vm_pid() {
 
 start_vm() {
     qemu_start_vm
-
-    pid=$(vm_pid "${NAME}")
-    for each in `ls /proc/$pid/task`; do sudo taskset -cp $QEMU_CORE $each; done
-    echo "Pinned QEMU to core $QEMU_CORE"
 }
 
 stop_vm() {
