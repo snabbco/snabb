@@ -391,7 +391,10 @@ local function transmit_icmpv4_reply(lwstate, pkt, orig_pkt)
    drop(orig_pkt)
    counter.add(lwstate.counters["out-icmpv4-bytes"], pkt.length)
    counter.add(lwstate.counters["out-icmpv4-packets"])
-   return transmit_ipv4(lwstate, pkt)
+   -- Only locally generated error packets are handled here.  We transmit
+   -- them right away, instead of calling transmit_ipv4, because they are
+   -- never hairpinned and should not be counted by the "out-ipv4" counter.
+   return transmit(lwstate.o4, pkt)
 end
 
 -- ICMPv4 type 3 code 1, as per RFC 7596.
