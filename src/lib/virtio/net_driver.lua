@@ -21,7 +21,6 @@ local bit       = require('bit')
 local virtq     = require('lib.virtio.virtq_driver')
 local VirtioPci = require('lib.virtio.virtio_pci').VirtioPci
 local checksum  = require('lib.checksum')
-require('lib.virtio.virtio_h')
 
 local band, bor, rshift, lshift = bit.band, bit.bor, bit.rshift, bit.lshift
 local prepare_packet4, prepare_packet6 = checksum.prepare_packet4, checksum.prepare_packet6
