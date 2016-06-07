@@ -13,51 +13,17 @@ local ffi    = require("ffi")
 local C      = ffi.C
 local memory = require('core.memory')
 local band   = require('bit').band
+require("lib.virtio.virtio.h")
+require("lib.virtio.virtio_vring.h")
 
 local physical = memory.virtual_to_physical
 
 local VirtioVirtq = {}
 VirtioVirtq.__index = VirtioVirtq
 
--- The Host uses this in used->flags to advise the Guest: don't kick me when you add a buffer.
-local VRING_USED_F_NO_NOTIFY = 1
--- The Guest uses this in avail->flags to advise the Host: don't interrupt me when you consume a buffer
-local VRING_AVAIL_F_NO_INTERRUPT = 1
-
--- This marks a buffer as continuing via the next field.
-local VRING_DESC_F_NEXT = 1
--- This marks a buffer as write-only (otherwise read-only).
-local VRING_DESC_F_WRITE = 2
--- This means the buffer contains a list of buffer descriptors.
-local VRING_DESC_F_INDIRECT = 4
-
-ffi.cdef([[
-struct pk_header {
-  uint8_t flags;
-  uint8_t gso_type;
-  uint16_t hdr_len;
-  uint16_t gso_size;
-  uint16_t csum_start;
-  uint16_t csum_offset;
-}  __attribute__((packed));
-]])
-local pk_header_t = ffi.typeof("struct pk_header")
+local pk_header_t = ffi.typeof("struct virtio_net_hdr")
 local pk_header_size = ffi.sizeof(pk_header_t)
-
-ffi.cdef([[
-  struct vring_desc { 
-    /* Address (guest-physical). */ 
-    uint64_t addr; 
-    /* Length. */ 
-    uint32_t len; 
-    /* The flags as indicated above. */ 
-    uint16_t flags; 
-    /* Next field if flags & NEXT */ 
-    uint16_t next;
-}  __attribute__((packed));
-]])
 local vring_desc_t = ffi.typeof("struct vring_desc")
-
 
 local ringtypes = {}
 local function vring_type(n)
@@ -88,7 +54,7 @@ local function vring_type(n)
          $ *vring;
          uint64_t vring_physaddr;
          struct packet *packets[$];
-         struct pk_header *headers[$];
+         struct virtio_net_hdr *headers[$];
          struct vring_desc *desc_tables[$];
       }
    ]], rng, n, n, n)
@@ -113,7 +79,8 @@ local function allocate_virtq(n)
 
       desc.addr = phys
       desc.len = len
-      desc.flags = VRING_DESC_F_INDIRECT
+      -- fixme
+      desc.flags = C.VIRTIO_DESC_F_INDIRECT
       desc.next = i + 1
    end
 
@@ -123,10 +90,10 @@ local function allocate_virtq(n)
       -- Packet header descriptor
       local desc = desc_table[0]
       ptr, phys = memory.dma_alloc(pk_header_size)
-      vr.headers[i] = ffi.cast("struct pk_header *", ptr)
+      vr.headers[i] = ffi.cast("struct virtio_net_hdr *", ptr)
       desc.addr = phys
       desc.len = pk_header_size
-      desc.flags = VRING_DESC_F_NEXT
+      desc.flags = C.VIRTIO_DESC_F_NEXT
       desc.next = 1
 
       -- Packet data descriptor
@@ -139,7 +106,7 @@ local function allocate_virtq(n)
    vr.num_free = n
 
    -- Disable the interrupts forever, we don't need them
-   vr.vring.avail.flags = VRING_AVAIL_F_NO_INTERRUPT
+   vr.vring.avail.flags = C.VRING_F_NO_INTERRUPT
    return vr
 end
 
@@ -237,7 +204,7 @@ end
 
 function VirtioVirtq:should_notify()
    -- Notify only if the used ring lacks the "no notify" flag
-   return band(self.vring.used.flags, VRING_USED_F_NO_NOTIFY) == 0
+   return band(self.vring.used.flags, C.VRING_F_NO_NOTIFY) == 0
 end
 
 return {
