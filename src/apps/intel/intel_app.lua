@@ -163,13 +163,13 @@ function Intel82599:sync_stats ()
    -- The RX receive drop counts are only available through the RX stats
    -- register. We only read stats register #0 here.
    counter.set(counters.rxdrop,    qs.QPRDC[0]())
-   counter.set(counters.rxerrors,  s.TPR() - s.GPRC())
+   counter.set(counters.rxerrors,  s.CRCERRS() + s.ILLERRC() + s.ERRBC() +
+                                   s.RUC() + s.RFC() + s.ROC() + s.RJC())
    counter.set(counters.txbytes,   s.GOTC64())
    counter.set(counters.txpackets, s.GPTC())
    local mptc, bptc = s.MPTC(), s.BPTC()
    counter.set(counters.txmcast,   mptc + bptc)
    counter.set(counters.txbcast,   bptc)
-   counter.set(counters.txerrors,  s.TPT() - s.GPTC())
    if bit.band(r.LINKS(), link_up_mask) == link_up_mask then
       counter.set(counters.status, 1) -- Up
    else
