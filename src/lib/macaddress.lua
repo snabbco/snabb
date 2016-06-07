@@ -42,14 +42,6 @@ function mac_mt.__eq (a, b)
    return a.bits == b.bits
 end
 
-function mac_mt:int ()
-   return self.bits
-end
-
-function mac_mt:bytes ()
-   return self.bytes
-end
-
 function mac_mt:subbits (i,j)
    local b = bit.rshift(self.bits, i)
    local mask = bit.bnot(bit.lshift(0xffffffffffffLL, j-i))

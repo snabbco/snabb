@@ -36,7 +36,7 @@ function init_snmp (name, counters, directory, interval)
    ifTable:register('ifPhysAddress', { type = 'OctetStr', length = 6 })
    if counters.macaddr then
       local mac = macaddress:new(counter.read(counters.macaddr))
-      ifTable:set('ifPhysAddress', ffi.string(mac:bytes(), 6))
+      ifTable:set('ifPhysAddress', ffi.string(mac.bytes, 6))
    end
    ifTable:register('ifAdminStatus', 'Integer32', 1) -- up
    ifTable:register('ifOperStatus', 'Integer32', 2) -- down
