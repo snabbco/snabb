@@ -85,8 +85,9 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, l2_siz
                                  protocol = constants.proto_icmp,
                                  src = from_ip, dst = to_ip})
    dgram:push(ipv4_header)
+   new_pkt = dgram:packet()
    ipv4_header:free()
-   packet.shiftright(new_pkt, l2_size)
+   new_pkt = packet.shiftright(new_pkt, l2_size)
    write_eth_header(new_pkt.data, from_eth, to_eth, constants.n_ethertype_ipv4, config.vlan_tag)
 
    -- Generate RFC 1812 ICMPv4 packets, which carry as much payload as they can,
@@ -126,7 +127,7 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, l2_siz
                                  next_header = constants.proto_icmpv6,
                                  src = from_ip, dst = to_ip})
    dgram:push(ipv6_header)
-   packet.shiftright(new_pkt, l2_size)
+   new_pkt = packet.shiftright(dgram:packet(), l2_size)
    write_eth_header(new_pkt.data, from_eth, to_eth, constants.n_ethertype_ipv6, config.vlan_tag)
 
    local max_size = constants.max_icmpv6_packet_size
