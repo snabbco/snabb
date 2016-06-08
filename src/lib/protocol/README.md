@@ -107,6 +107,15 @@ Returns a true value if *mac* address denotes a [Multicast address](https://en.w
 Returns 1 if *mac* address denotes a [Multicast address](https://en.wikipedia.org/wiki/Multicast_address#Ethernet)
 and 0 otherwise.
 
+— Function **ethernet:is_bcast** *mac*
+
+Returns a true value if *mac* address denotes a [Broadcast address](https://en.wikipedia.org/wiki/Broadcast_address#Ethernet).
+
+— Function **ethernet:n_bcast** *mac*
+
+Returns 1 if *mac* address denotes a [Broadcast address](https://en.wikipedia.org/wiki/Broadcast_address#Ethernet)
+and 0 otherwise.
+
 — Function **ethernet:ipv6_mcast** *ip*
 
 Returns the MAC address for IPv6 multicast *ip* as defined by RFC2464,
