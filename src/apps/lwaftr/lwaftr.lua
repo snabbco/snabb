@@ -370,19 +370,38 @@ local function in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, 
    return b4 and ipv6_equals(b4, ipv6_src_ip) and ipv6_equals(br, ipv6_dst_ip)
 end
 
+-- Hairpinned packets need to be handled quite carefully. We've decided they:
+-- * should increment hairpin-ipv4-bytes and hairpin-ipv4-packets
+-- * should increment [in|out]-ipv6-[bytes|packets]
+-- * should NOT increment  [in|out]-ipv4-[bytes|packets]
+-- The latter is because decapsulating and re-encapsulating them via IPv4
+-- packets is an internal implementation detail that DOES NOT go out over
+-- physical wires.
+-- Not incrementing out-ipv4-bytes and out-ipv4-packets is straightforward.
+-- Not incrementing in-ipv4-[bytes|packets] is harder. The easy way would be
+-- to add extra flags and conditionals, but it's expected that a high enough
+-- percentage of traffic might be hairpinned that this could be problematic,
+-- (and a nightmare as soon as we add any kind of parallelism)
+-- so instead we speculatively decrement the counters here.
+-- It is assumed that any packet we transmit to lwstate.input.v4 will not
+-- be dropped before the in-ipv4-[bytes|packets] counters are incremented;
+-- I *think* this approach bypasses using the physical NIC but am not
+-- absolutely certain.
 local function transmit_ipv4(lwstate, pkt)
    local ipv4_header = get_ethernet_payload(pkt)
    local dst_ip = get_ipv4_dst_address(ipv4_header)
-   counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
-   counter.add(lwstate.counters["out-ipv4-packets"])
    if lwstate.hairpinning and ipv4_in_binding_table(lwstate, dst_ip) then
       -- The destination address is managed by the lwAFTR, so we need to
       -- hairpin this packet.  Enqueue on the IPv4 interface, as if it
       -- came from the internet.
+      counter.add(lwstate.counters["in-ipv4-bytes"], 0LL - pkt.length)
+      counter.add(lwstate.counters["in-ipv4-packets"], -1LL)
       counter.add(lwstate.counters["hairpin-ipv4-bytes"], pkt.length)
       counter.add(lwstate.counters["hairpin-ipv4-packets"])
       return transmit(lwstate.input.v4, pkt)
    else
+      counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
+      counter.add(lwstate.counters["out-ipv4-packets"])
       return transmit(lwstate.o4, pkt)
    end
 end
