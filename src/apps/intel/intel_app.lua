@@ -133,7 +133,7 @@ function Intel82599:pull ()
    if l == nil then return end
    self.dev:sync_receive()
    for i=1,128 do
-      if full(l) or not self.dev:can_receive() then break end
+      if not self.dev:can_receive() then break end
       transmit(l, self.dev:receive())
    end
    self:add_receive_buffers()
