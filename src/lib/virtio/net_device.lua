@@ -392,6 +392,10 @@ function VirtioNetDevice:set_features(features)
       self.hdr_type = virtio_net_hdr_mrg_rxbuf_type
       self.hdr_size = virtio_net_hdr_mrg_rxbuf_size
       self.mrg_rxbuf = true
+   else
+      self.hdr_type = virtio_net_hdr_type
+      self.hdr_size = virtio_net_hdr_size
+      self.mrg_rxbuf = false
    end
    if band(self.features, C.VIRTIO_RING_F_INDIRECT_DESC) == C.VIRTIO_RING_F_INDIRECT_DESC then
       for i = 0, max_virtq_pairs-1 do
