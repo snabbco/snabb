@@ -74,7 +74,7 @@ end
 -- Create an exact copy of a packet.
 function clone (p)
    local p2 = allocate()
-   ffi.copy(p2, p, p.length)
+   ffi.copy(p2.data, p.data, p.length)
    p2.length = p.length
    return p2
 end
