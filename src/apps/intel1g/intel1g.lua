@@ -1,6 +1,7 @@
--- intel1g: Device driver app for Intel 1G network cards
--- This is a device driver for Intel i210, i350 families of 1G network cards.
---
+-- intel1g: Device driver app for Intel 1G and 10G network cards
+-- It supports
+--    - Intel1G i210 and i350 based 1G network cards
+--    - Intel82599 82599 based 10G network cards
 -- The driver supports multiple processes connecting to the same physical nic.
 -- Per process RX / TX queues are available via RSS. Statistics collection
 -- processes can read counter registers
@@ -8,6 +9,7 @@
 -- Data sheets (reference documentation):
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/ethernet-controller-i350-datasheet.pdf
 -- http://www.intel.com/content/dam/www/public/us/en/documents/datasheets/i210-ethernet-controller-datasheet.pdf
+-- http://www.intel.co.uk/content/dam/www/public/us/en/documents/datasheets/82599-10-gbe-controller-datasheet.pdf
 -- Note: section and page numbers in the comments below refer to the i210 data sheet
 
 module(..., package.seeall)
@@ -36,11 +38,12 @@ RSSRK  0x5C80 +0x04*0..9 RW RSS Random Key
 CTRL      0x00000 -            RW Device Control
 CTRL_EXT  0x00018 -            RW Extended Device Control
 STATUS    0x00008 -            RO Device Status
-MRQC      0x05818 -            RW Multiple Receive Queues Command Register
 ]]
 }
 reg['82599ES'] = {
    array = [[
+ALLRXDCTL     0x01028 +0x40*0..63   RW Receive Descriptor Control
+ALLRXDCTL     0x0D028 +0x40*64..127 RW Receive Descriptor Control
 DAQF      0x0E200 +0x04*0..127  RW Destination Address Queue Filter
 FTQF      0x0E600 +0x04*0..127  RW Five Tuple Queue Filter
 MPSAR     0x0A600 +0x04*0..255  RW MAC Pool Select Array
@@ -81,6 +84,7 @@ RXDCTL     0x0D028 +0x40*64..127 RW Receive Descriptor Control
    singleton = [[
 AUTOC     0x042A0 -            RW Auto Negotiation Control
 AUTOC2    0x042A8 -            RW Auto Negotiation Control 2
+DMATXCTL  0x04A80 -            RW DMA Tx Control
 DTXMXSZRQ 0x08100 -            RW DMA Tx Map Allow Size Requests
 EEC       0x10010 -            RW EEPROM/Flash Control Register
 EIMC      0x00888 -            RW Extended Interrupt Mask Clear
@@ -90,6 +94,7 @@ HLREG0    0x04240 -            RW MAC Core Control 0
 LINKS     0x042A4 -            RO Link Status Register
 MAXFRS    0x04268 -            RW Max Frame Size
 MFLCN     0x04294 -            RW MAC Flow Control Register
+MRQC      0x0EC80 -            RW Multiple Receive Queues Command Register
 MTQC      0x08120 -            RW Multiple Transmit Queues Command Register
 PFVTCTL   0x051B0 -             RW PF Virtual Control Register
 RDRXCTL   0x02F00 -            RW Receive DMA Control Register
@@ -100,6 +105,17 @@ RXCSUM    0x05000 -             RW Receive Checksum Control
 RXCTRL    0x03000 -            RW Receive Control
 SWSM      0x10140 -            RW Software Semaphore
 VLNCTRL   0x05088 -             RW VLAN Control Register
+]],
+   txq = [[
+DCA_TXCTRL 0x0600C +0x40*0..127 RW Tx DCA Control Register
+TDBAL      0x06000 +0x40*0..127 RW Transmit Descriptor Base Address Low
+TDBAH      0x06004 +0x40*0..127 RW Transmit Descriptor Base Address High
+TDH        0x06010 +0x40*0..127 RW Transmit Descriptor Head
+TDT        0x06018 +0x40*0..127 RW Transmit Descriptor Tail
+TDLEN      0x06008 +0x40*0..127 RW Transmit Descriptor Length
+TDWBAL     0x06038 +0x40*0..127 RW Tx Desc Completion Write Back Address Low
+TDWBAH     0x0603C +0x40*0..127 RW Tx Desc Completion Write Back Address High
+TXDCTL     0x06028 +0x40*0..127 RW Transmit Descriptor Control
 ]]
 }
 reg['1000BaseX'] = {
@@ -118,6 +134,7 @@ RXCTL  0xc014 +0x40*0..7 RW RX DCA CTRL Register Queue
 SRRCTL 0xc00c +0x40*0..7 RW Split and Replication Receive Control
 ]],
    singleton = [[
+MRQC      0x05818 -            RW Multiple Receive Queues Command Register
 EEER      0x00E30 -            RW Energy Efficient Ethernet (EEE) Register
 EIMC      0x01528 -            RW Extended Interrupt Mask Clear
 SWSM      0x05b50 -            RW Software Semaphore
@@ -160,7 +177,7 @@ function Intel:new (arg)
    local self = setmetatable({
       r = {},
       pciaddress = conf.pciaddr,
-      ndesc = conf.ndescriptors or 256,
+      ndesc = conf.ndescriptors or 1024,
       txq = conf.txq,
       rxq = conf.rxq,
       rssseed = conf.rssseed or 314159
@@ -204,7 +221,7 @@ function Intel:init_rx_q ()
    assert((self.ndesc %128) ==0,
    "ndesc must be a multiple of 128 (for Rx only)")	-- see 7.1.4.5
 
-   self.rxpackets = {}
+   self.rxpackets = ffi.new("struct packet *[?]", self.ndesc)
    self.rdh = 0
    self.rdt = 0
    -- setup 4.5.9
@@ -246,7 +263,46 @@ function Intel:init_rx_q ()
 
    self:rss_tab_build()
 end
+function Intel:init_tx_q ()                               -- 4.5.10
+   if not self.txq then return end
+   assert((self.txq >=0) and (self.txq < self.ringSize),
+   "txqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
+   self.tdh = 0
+   self.tdt = 0
+   self.txpackets = ffi.new("struct packet *[?]", self.ndesc)
 
+   -- 7.2.2.3
+   local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
+   local txdesc_ring_t = ffi.typeof("$[$]", txdesc_t, self.ndesc)
+   self.txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
+   memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
+
+   -- Transmit state variables 7.2.2.3.4 / 7.2.2.3.5
+   self.txdesc_flags = bits({
+      dtyp0=20,
+      dtyp1=21,
+      eop=24,
+      ifcs=25,
+      dext=29
+   })
+
+   -- Initialize transmit queue
+   self.r.TDBAL(tophysical(self.txdesc) % 2^32)
+   self.r.TDBAH(tophysical(self.txdesc) / 2^32)
+   self.r.TDLEN(self.ndesc * ffi.sizeof(txdesc_t))
+
+   if self.r.DMATXCTL then
+      self.r.DMATXCTL:set(bits { TE = 0 })
+      self.r.TXDCTL:set(bits{SWFLSH=26, hthresh=8} + 32)
+   end
+
+   self.r.TXDCTL:set(bits { WTHRESH = 16, ENABLE = 25 })
+   self.r.TXDCTL:wait(bits { ENABLE = 25 })
+
+   if self.r.TCTL then -- i210/i350
+      self.r.TCTL:set(bits { TxEnable = 1 })
+   end
+end
 function Intel:load_registers(key)
    local v = reg[key]
    if v.inherit then self:load_registers(v.inherit) end
@@ -272,22 +328,48 @@ end
 function Intel:offset(reg, key)
    return self.offsets[reg][key]
 end
+function Intel:push ()
+   if not self.txq then return end
+   local li = self.input["input"]
+   assert(li, "intel1g:push: no input link")
+
+   while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
+      local p = link.receive(li)
+      self.txdesc[self.tdt].address = tophysical(p.data)
+      self.txdesc[self.tdt].flags = bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
+      self.txpackets[self.tdt] = p
+      self.tdt = self:ringnext(self.tdt)
+   end
+   -- Reclaim transmit contexts
+   local cursor = self.tdh
+   self.tdh = self.r.TDH()	-- possible race condition, 7.2.2.4, check DD
+   --C.full_memory_barrier()
+   while cursor ~= self.tdh do
+      if self.txpackets[cursor] then
+         packet.free(self.txpackets[cursor])
+         self.txpackets[cursor] = nil
+      end
+      cursor = self:ringnext(cursor)
+   end
+   self.r.TDT(self.tdt)
+end
+
 function Intel:pull ()
    if not self.rxq then return end
    local lo = self.output["output"]
    assert(lo, "intel1g: output link required")
 
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 do
-      local desc = self.rxdesc[self.rdt]
       local p = self.rxpackets[self.rdt]
-      p.length = desc.length
+      p.length = self.rxdesc[self.rdt].length
+      link.transmit(lo, p)
+
       local np = packet.allocate()
       self.rxpackets[self.rdt] = np
       self.rxdesc[self.rdt].address = tophysical(np.data)
       self.rxdesc[self.rdt].status = 0
-      link.transmit(lo, p)
 
-      self.rdt = self:ringnext(self.rdt)
+      self.rdt = band(self.rdt + 1, self.ndesc-1)
    end
    -- This avoids RDT == RDH when every descriptor is available.
    self.r.RDT(band(self.rdt - 1, self.ndesc-1))
@@ -335,7 +417,7 @@ function Intel:rss_tab (newtab)
    return current
 end
 function Intel:rss_tab_build ()
-   -- noop is rss is not enabled
+   -- noop if rss is not enabled
    local b = bits { RSS = self:offset("MRQC", "RSS") }
    if bit.band(self.r.MRQC(), b) ~= b then return end
 
@@ -405,40 +487,6 @@ end
 function Intel1g:unlock_fw_sem()
    self.r.SWSM:clr(bits { SWESMBI = 1 })
 end
-
-
-function Intel1g:init_tx_q ()                               -- 4.5.10
-   if not self.txq then return end
-   assert((self.txq >=0) and (self.txq < self.ringSize),
-   "txqueue must be in 0.." .. self.ringSize-1 .. " for " .. self.model)
-   self.tdh = 0
-   self.tdt = 0
-   self.txpackets = {}
-
-   -- 7.2.2.3
-   local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
-   local txdesc_ring_t = ffi.typeof("$[$]", txdesc_t, self.ndesc)
-   self.txdesc = ffi.cast(ffi.typeof("$&", txdesc_ring_t),
-   memory.dma_alloc(ffi.sizeof(txdesc_ring_t)))
-
-   -- Transmit state variables 7.2.2.3.4 / 7.2.2.3.5
-   self.txdesc_flags = bits({
-      dtyp0=20,
-      dtyp1=21,
-      eop=24,
-      ifcs=25,
-      dext=29
-   })
-
-   -- Initialize transmit queue
-   self.r.TDBAL(tophysical(self.txdesc) % 2^32)
-   self.r.TDBAH(tophysical(self.txdesc) / 2^32)
-   self.r.TDLEN(self.ndesc * ffi.sizeof(txdesc_t))
-   self.r.TXDCTL:set(bits { WTHRESH = 16, ENABLE = 25 })
-   self.r.TXDCTL:wait(bits { ENABLE = 25 })
-   self.r.TCTL:set(bits { TxEnable = 1 })
-end
-
 function Intel1g:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
@@ -484,30 +532,6 @@ function Intel1g:init ()
    self:unlock_sw_sem()
 end
 
-function Intel1g:push ()
-   if not self.txq then return end
-   local li = self.input["input"]
-   assert(li, "intel1g:push: no input link")
-
-   while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
-      local p = link.receive(li)
-      self.txdesc[self.tdt].address = tophysical(p.data)
-      self.txdesc[self.tdt].flags = bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
-      self.txpackets[self.tdt] = p
-      self.tdt = self:ringnext(self.tdt)
-   end
-   -- Reclaim transmit contexts
-   local cursor = self.tdh
-   self.tdh = self.r.TDH()	-- possible race condition, 7.2.2.4, check DD
-   while cursor ~= self.tdh do
-      if self.txpackets[cursor] then
-         packet.free(self.txpackets[cursor])
-         self.txpackets[cursor] = nil
-      end
-      cursor = self:ringnext(cursor)
-   end
-   self.r.TDT(self.tdt)
-end
 
 function Intel1g:stop ()
    if self.rxq then
@@ -568,9 +592,10 @@ Intel82599 = setmetatable({
    }
 }, { __index = Intel })
 function Intel82599:init ()
+   if not self.master then return end
    self:disable_interrupts()
 
-   local reset = bits{LinkReset=3, DeviceReset=26}
+   local reset = bits{ LinkReset=3, DeviceReset=26 }
    self.r.CTRL(reset)
    C.usleep(1000)
    --self.r.CTRL:wait(reset, 0)
@@ -643,15 +668,17 @@ function Intel82599:init ()
       TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3,
       TXPADEN=10, rsvd3=11, rsvd4=13, MDCSPD=16
    })
-   self.r.RDRXCTL(0)
-   self.r.RDRXCTL(bits { CRCStrip = 1 })
-
    self.r.MAXFRS(lshift(9216, 16))
 
-   self.r.RXCTRL:set(bits{ RXEN=0 })
-   self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
+   if self.rxq then
+      self.r.RDRXCTL(0)
+      self.r.RDRXCTL(bits { CRCStrip = 1 })
+      self.r.RXCTRL:set(bits{ RXEN=0 })
+      self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
+   end
 
    self:unlock_sw_sem()
-end
-function Intel82599:init_tx_q ()
+   if self.rxq then
+      self:rss_enable()
+   end
 end
