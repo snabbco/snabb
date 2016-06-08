@@ -31,8 +31,8 @@ VhostUser = {}
 
 local provided_counters = {
    'type', 'dtime',
-   'rxbytes', 'rxpackets', 'rxmcast', 'rxdrop',
-   'txbytes', 'txpackets', 'txmcast'
+   'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast', 'rxdrop',
+   'txbytes', 'txpackets', 'txmcast', 'txbcast'
 }
 
 function VhostUser:new (args)
@@ -108,12 +108,14 @@ function VhostUser:tx_callback (p)
    counter.add(self.counters.txbytes, packet.length(p))
    counter.add(self.counters.txpackets)
    counter.add(self.counters.txmcast, ethernet:n_mcast(packet.data(p)))
+   counter.add(self.counters.txbcast, ethernet:n_bcast(packet.data(p)))
 end
 
 function VhostUser:rx_callback (p)
    counter.add(self.counters.rxbytes, packet.length(p))
    counter.add(self.counters.rxpackets)
    counter.add(self.counters.rxmcast, ethernet:n_mcast(packet.data(p)))
+   counter.add(self.counters.rxbcast, ethernet:n_bcast(packet.data(p)))
 end
 
 function VhostUser:rxdrop_callback (p)
