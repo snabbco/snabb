@@ -233,8 +233,8 @@ local cmdq_entry_t   = ffi.typeof("uint32_t[0x40/4]")
 local cmdq_mailbox_t = ffi.typeof("uint32_t[0x240/4]")
 
 -- XXX Check with maximum length of commands that we really use.
-local max_mailboxes = 10
-local data_per_mailbox = 0x230 -- Bytes of input/output data in a mailbox
+local max_mailboxes = 1000
+local data_per_mailbox = 0x200 -- Bytes of input/output data in a mailbox
 
 -- Create a command queue with dedicated/reusable DMA memory.
 function cmdq:new(init_seg)
@@ -264,7 +264,7 @@ function cmdq:prepare(command, last_input_offset, last_output_offset)
 
    -- Command entry:
 
-   ffi.fill(self.entry, ffi.sizeof(self.entry), 0)
+   ffi.fill(self.entry, ffi.sizeof(cmdq_entry_t), 0)
    self:setbits(0x00, 31, 24, 0x7)        -- type
    self:setbits(0x04, 31, 0, input_size)
    self:setbits(0x38, 31, 0, output_size)
@@ -277,8 +277,6 @@ function cmdq:prepare(command, last_input_offset, last_output_offset)
    -- How many mailboxes do we need?
    local ninboxes  = math.ceil((input_size  - 16) / data_per_mailbox)
    local noutboxes = math.ceil((output_size - 16) / data_per_mailbox)
-   print("ninboxes", ninboxes)
-   print("noutboxes", noutboxes)
    if ninboxes  > max_mailboxes then error("Input overflow: " ..input_size)  end
    if noutboxes > max_mailboxes then error("Output overflow: "..output_size) end
 
@@ -298,8 +296,8 @@ function cmdq:prepare(command, last_input_offset, last_output_offset)
    -- Initialize mailboxes
    for i = 0, max_mailboxes-1 do
       -- Zap old state
-      ffi.fill(self.inboxes[i],  ffi.sizeof(self.inboxes[i]),  0)
-      ffi.fill(self.outboxes[i], ffi.sizeof(self.outboxes[i]), 0)
+      ffi.fill(self.inboxes[i],  ffi.sizeof(cmdq_mailbox_t), 0)
+      ffi.fill(self.outboxes[i], ffi.sizeof(cmdq_mailbox_t), 0)
       -- Set mailbox block number
       setint(self.inboxes[i],  0x238, i)
       setint(self.outboxes[i], 0x238, i)
@@ -334,8 +332,8 @@ function cmdq:setinbits(ofs, ...) --bit1, bit2, val, ...
    if ofs <= 16 - 4 then --inline
       self:setbits(0x10 + ofs, ...)
    else --input mailbox
-      local mailbox = math.floor((ofs + 4 - 16) / data_per_mailbox)
-      local offset = (ofs + 4 - 16) % data_per_mailbox
+      local mailbox = math.floor((ofs - 16) / data_per_mailbox)
+      local offset = (ofs - 16) % data_per_mailbox
       setint(self.inboxes[mailbox], offset, setbits(...))
    end
 end
@@ -404,11 +402,9 @@ function cmdq:post(last_in_ofs, last_out_ofs)
       local ninboxes  = math.ceil((last_in_ofs + 4 - 16) / data_per_mailbox)
       for i = 0, ninboxes-1 do
          local blocknumber = getint(self.inboxes[i], 0x238, 31, 0)
-         if blocknumber ~= 0 then -- mailbox being used?
-            local address = memory.virtual_to_physical(self.inboxes[i])
-            print("Block "..blocknumber.." @ "..bit.tohex(address, 12)..":")
-            dumpoffset = hexdump(self.inboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
-         end
+         local address = memory.virtual_to_physical(self.inboxes[i])
+         print("Block "..blocknumber.." @ "..bit.tohex(address, 12)..":")
+         dumpoffset = hexdump(self.inboxes[i], 0, ffi.sizeof(cmdq_mailbox_t), dumpoffset)
       end
    end
 
