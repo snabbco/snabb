@@ -5,6 +5,8 @@ module(..., package.seeall)
 local S = require("syscall")
 local link = require("core.link")
 local packet = require("core.packet")
+local counter = require("core.counter")
+local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
 local const = require("syscall.linux.constants")
@@ -13,6 +15,12 @@ local os = require("os")
 local t = S.types.t
 
 Tap = { }
+
+local provided_counters = {
+   'type', 'dtime',
+   'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast',
+   'txbytes', 'txpackets', 'txmcast',  'txbcast'
+}
 
 function Tap:new (name)
    assert(name, "missing tap interface name")
@@ -27,8 +35,14 @@ function Tap:new (name)
       sock:close()
       error("Error opening /dev/net/tun: " .. tostring(err))
    end
-
-   return setmetatable({sock = sock, name = name}, {__index = Tap})
+   local counters = {}
+   for _, name in ipairs(provided_counters) do
+      counters[name] = counter.open(name)
+   end
+   counter.set(counters.type, 0x1001) -- Virtual interface
+   counter.set(counters.dtime, C.get_unix_time())
+   return setmetatable({sock = sock, name = name, counters = counters},
+                       {__index = Tap})
 end
 
 function Tap:pull ()
@@ -49,6 +63,10 @@ function Tap:pull ()
       end
       p.length = len
       link.transmit(l, p)
+      counter.add(self.counters.rxbytes, len)
+      counter.add(self.counters.rxpackets)
+      counter.add(self.counters.rxmcast, ethernet:n_mcast(p.data))
+      counter.add(self.counters.rxbcast, ethernet:n_bcast(p.data))
    end
 end
 
@@ -66,6 +84,10 @@ function Tap:push ()
       if len ~= p.length and err.errno == const.E.AGAIN then
          return
       end
+      counter.add(self.counters.txbytes, len)
+      counter.add(self.counters.txpackets)
+      counter.add(self.counters.txmcast, ethernet:n_mcast(p.data))
+      counter.add(self.counters.txbcast, ethernet:n_bcast(p.data))
       -- The write completed so dequeue it from the link and free the packet
       link.receive(l)
       packet.free(p)
@@ -74,6 +96,8 @@ end
 
 function Tap:stop()
    self.sock:close()
+   -- delete counters
+   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
 
 function selftest()
