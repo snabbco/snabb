@@ -37,10 +37,6 @@ app can optionally implement any number of these counters.
 |                              | out-multicast-pkts?          | ifOutMulticastPkts
 | txdrop                       | out-discards?                | ifOutDiscards
 | txerrors                     | out-errors?                  | ifOutErrors
-| rxpackets                    |                              |
-| txpackets                    |                              |
-| rxmcast                      |                              |
-| txmcast                      |                              |
 | mtu                          |                              | ifMtu
 | promisc                      |                              | ifPromiscuousMode
 
