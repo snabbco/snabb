@@ -504,15 +504,15 @@ function cmdq:query_pages(which)
    return self:getoutbits(0x0C, 31, 0)
 end
 
-function cmdq:alloc_pages(addr, num_pages)
+function cmdq:alloc_pages(num_pages)
    self:prepare("MANAGE_PAGES", 0x10 + num_pages*8, 0x0C)
    self:setinbits(0x00, 31, 16, MANAGE_PAGES)
    self:setinbits(0x04, 15, 0, 1) --alloc
    self:setinbits(0x0C, 31, 0, num_pages)
-   local addr = cast('char*', addr)
    for i=0, num_pages-1 do
-      self:setinbits(0x10 + i*8, 31,  0, ptrbits(addr + 4096*i, 63, 32))
-      self:setinbits(0x14 + i*8, 31, 12, ptrbits(addr + 4096*i, 31, 12))
+      local _, phy = memory.dma_alloc(4096, 4096)
+      self:setinbits(0x10 + i*8, 31,  0, ptrbits(phy, 63, 32))
+      self:setinbits(0x14 + i*8, 31, 12, ptrbits(phy, 31, 12))
    end
    self:post(0x10 + num_pages*8, 0x0C)
 end
@@ -535,69 +535,69 @@ function cmdq:query_hca_cap(what, which)
    self:post(0x0C, 0x100C - 3000)
    local caps = {}
    if which == 'general' then
-      caps.log_max_cq_sz            = self:getoutbits(0x18, 23, 16)
-      caps.log_max_cq               = self:getoutbits(0x18,  4,  0)
-      caps.log_max_eq_sz            = self:getoutbits(0x1C, 31, 24)
-      caps.log_max_mkey             = self:getoutbits(0x1C, 21, 16)
-      caps.log_max_eq               = self:getoutbits(0x1C,  3,  0)
-      caps.max_indirection          = self:getoutbits(0x20, 31, 24)
-      caps.log_max_mrw_sz           = self:getoutbits(0x20, 22, 16)
-      caps.log_max_klm_list_size    = self:getoutbits(0x20,  5,  0)
-      caps.end_pad                  = self:getoutbits(0x2C, 31, 31)
-      caps.start_pad                = self:getoutbits(0x2C, 28, 28)
-      caps.cache_line_128byte       = self:getoutbits(0x2C, 27, 27)
-      caps.vport_counters           = self:getoutbits(0x30, 30, 30)
-      caps.vport_group_manager      = self:getoutbits(0x34, 31, 31)
-      caps.nic_flow_table           = self:getoutbits(0x34, 25, 25)
-      caps.port_type                = self:getoutbits(0x34,  9,  8)
-      caps.num_ports                = self:getoutbits(0x34,  7,  0)
-      caps.log_max_msg              = self:getoutbits(0x38, 28, 24)
-      caps.max_tc                   = self:getoutbits(0x38, 19, 16)
-      caps.cqe_version              = self:getoutbits(0x3C,  3,  0)
-      caps.cmdif_checksum           = self:getoutbits(0x40, 15, 14)
-      caps.wq_signature             = self:getoutbits(0x40, 11, 11)
-      caps.sctr_data_cqe            = self:getoutbits(0x40, 10, 10)
-      caps.eth_net_offloads         = self:getoutbits(0x40,  3,  3)
-      caps.cq_oi                    = self:getoutbits(0x44, 31, 31)
-      caps.cq_resize                = self:getoutbits(0x44, 30, 30)
-      caps.cq_moderation            = self:getoutbits(0x44, 29, 29)
-      caps.cq_eq_remap              = self:getoutbits(0x44, 25, 25)
-      caps.scqe_break_moderation    = self:getoutbits(0x44, 21, 21)
-      caps.cq_period_start_from_cqe = self:getoutbits(0x44, 20, 20)
-      caps.imaicl                   = self:getoutbits(0x44, 14, 14)
-      caps.xrc                      = self:getoutbits(0x44,  3,  3)
-      caps.ud                       = self:getoutbits(0x44,  2,  2)
-      caps.uc                       = self:getoutbits(0x44,  1,  1)
-      caps.rc                       = self:getoutbits(0x44,  0,  0)
-      caps.uar_sz                   = self:getoutbits(0x48, 21, 16)
-      caps.log_pg_sz                = self:getoutbits(0x48,  7,  0)
-      caps.bf                       = self:getoutbits(0x4C, 31, 31)
-      caps.driver_version           = self:getoutbits(0x4C, 30, 30)
-      caps.pad_tx_eth_packet        = self:getoutbits(0x4C, 29, 29)
-      caps.log_bf_reg_size          = self:getoutbits(0x4C, 20, 16)
-      caps.log_max_transport_domain = self:getoutbits(0x64, 28, 24)
-      caps.log_max_pd               = self:getoutbits(0x64, 20, 16)
-      caps.max_flow_counter         = self:getoutbits(0x68, 15,  0)
-      caps.log_max_rq               = self:getoutbits(0x6C, 28, 24)
-      caps.log_max_sq               = self:getoutbits(0x6C, 20, 16)
-      caps.log_max_tir              = self:getoutbits(0x6C, 12,  8)
-      caps.log_max_tis              = self:getoutbits(0x6C,  4,  0)
-      caps.basic_cyclic_rcv_wqe     = self:getoutbits(0x70, 31, 31)
-      caps.log_max_rmp              = self:getoutbits(0x70, 28, 24)
-      caps.log_max_rqt              = self:getoutbits(0x70, 20, 16)
-      caps.log_max_rqt_size         = self:getoutbits(0x70, 12,  8)
-      caps.log_max_tis_per_sq       = self:getoutbits(0x70,  4,  0)
-      caps.log_max_stride_sz_rq     = self:getoutbits(0x74, 28, 24)
-      caps.log_min_stride_sz_rq     = self:getoutbits(0x74, 20, 16)
-      caps.log_max_stride_sz_sq     = self:getoutbits(0x74, 12,  8)
-      caps.log_min_stride_sz_sq     = self:getoutbits(0x74,  4,  0)
-      caps.log_max_wq_sz            = self:getoutbits(0x78,  4,  0)
-      caps.log_max_vlan_list        = self:getoutbits(0x7C, 20, 16)
-      caps.log_max_current_mc_list  = self:getoutbits(0x7C, 12,  8)
-      caps.log_max_current_uc_list  = self:getoutbits(0x7C,  4,  0)
-      caps.log_max_l2_table         = self:getoutbits(0x90, 28, 24)
-      caps.log_uar_page_sz          = self:getoutbits(0x90, 15,  0)
-      caps.device_frequency_mhz     = self:getoutbits(0x98, 31,  0)
+      caps.log_max_cq_sz            = self:getoutbits(0x10 + 0x18, 23, 16)
+      caps.log_max_cq               = self:getoutbits(0x10 + 0x18,  4,  0)
+      caps.log_max_eq_sz            = self:getoutbits(0x10 + 0x1C, 31, 24)
+      caps.log_max_mkey             = self:getoutbits(0x10 + 0x1C, 21, 16)
+      caps.log_max_eq               = self:getoutbits(0x10 + 0x1C,  3,  0)
+      caps.max_indirection          = self:getoutbits(0x10 + 0x20, 31, 24)
+      caps.log_max_mrw_sz           = self:getoutbits(0x10 + 0x20, 22, 16)
+      caps.log_max_klm_list_size    = self:getoutbits(0x10 + 0x20,  5,  0)
+      caps.end_pad                  = self:getoutbits(0x10 + 0x2C, 31, 31)
+      caps.start_pad                = self:getoutbits(0x10 + 0x2C, 28, 28)
+      caps.cache_line_128byte       = self:getoutbits(0x10 + 0x2C, 27, 27)
+      caps.vport_counters           = self:getoutbits(0x10 + 0x30, 30, 30)
+      caps.vport_group_manager      = self:getoutbits(0x10 + 0x34, 31, 31)
+      caps.nic_flow_table           = self:getoutbits(0x10 + 0x34, 25, 25)
+      caps.port_type                = self:getoutbits(0x10 + 0x34,  9,  8)
+      caps.num_ports                = self:getoutbits(0x10 + 0x34,  7,  0)
+      caps.log_max_msg              = self:getoutbits(0x10 + 0x38, 28, 24)
+      caps.max_tc                   = self:getoutbits(0x10 + 0x38, 19, 16)
+      caps.cqe_version              = self:getoutbits(0x10 + 0x3C,  3,  0)
+      caps.cmdif_checksum           = self:getoutbits(0x10 + 0x40, 15, 14)
+      caps.wq_signature             = self:getoutbits(0x10 + 0x40, 11, 11)
+      caps.sctr_data_cqe            = self:getoutbits(0x10 + 0x40, 10, 10)
+      caps.eth_net_offloads         = self:getoutbits(0x10 + 0x40,  3,  3)
+      caps.cq_oi                    = self:getoutbits(0x10 + 0x44, 31, 31)
+      caps.cq_resize                = self:getoutbits(0x10 + 0x44, 30, 30)
+      caps.cq_moderation            = self:getoutbits(0x10 + 0x44, 29, 29)
+      caps.cq_eq_remap              = self:getoutbits(0x10 + 0x44, 25, 25)
+      caps.scqe_break_moderation    = self:getoutbits(0x10 + 0x44, 21, 21)
+      caps.cq_period_start_from_cqe = self:getoutbits(0x10 + 0x44, 20, 20)
+      caps.imaicl                   = self:getoutbits(0x10 + 0x44, 14, 14)
+      caps.xrc                      = self:getoutbits(0x10 + 0x44,  3,  3)
+      caps.ud                       = self:getoutbits(0x10 + 0x44,  2,  2)
+      caps.uc                       = self:getoutbits(0x10 + 0x44,  1,  1)
+      caps.rc                       = self:getoutbits(0x10 + 0x44,  0,  0)
+      caps.uar_sz                   = self:getoutbits(0x10 + 0x48, 21, 16)
+      caps.log_pg_sz                = self:getoutbits(0x10 + 0x48,  7,  0)
+      caps.bf                       = self:getoutbits(0x10 + 0x4C, 31, 31)
+      caps.driver_version           = self:getoutbits(0x10 + 0x4C, 30, 30)
+      caps.pad_tx_eth_packet        = self:getoutbits(0x10 + 0x4C, 29, 29)
+      caps.log_bf_reg_size          = self:getoutbits(0x10 + 0x4C, 20, 16)
+      caps.log_max_transport_domain = self:getoutbits(0x10 + 0x64, 28, 24)
+      caps.log_max_pd               = self:getoutbits(0x10 + 0x64, 20, 16)
+      caps.max_flow_counter         = self:getoutbits(0x10 + 0x68, 15,  0)
+      caps.log_max_rq               = self:getoutbits(0x10 + 0x6C, 28, 24)
+      caps.log_max_sq               = self:getoutbits(0x10 + 0x6C, 20, 16)
+      caps.log_max_tir              = self:getoutbits(0x10 + 0x6C, 12,  8)
+      caps.log_max_tis              = self:getoutbits(0x10 + 0x6C,  4,  0)
+      caps.basic_cyclic_rcv_wqe     = self:getoutbits(0x10 + 0x70, 31, 31)
+      caps.log_max_rmp              = self:getoutbits(0x10 + 0x70, 28, 24)
+      caps.log_max_rqt              = self:getoutbits(0x10 + 0x70, 20, 16)
+      caps.log_max_rqt_size         = self:getoutbits(0x10 + 0x70, 12,  8)
+      caps.log_max_tis_per_sq       = self:getoutbits(0x10 + 0x70,  4,  0)
+      caps.log_max_stride_sz_rq     = self:getoutbits(0x10 + 0x74, 28, 24)
+      caps.log_min_stride_sz_rq     = self:getoutbits(0x10 + 0x74, 20, 16)
+      caps.log_max_stride_sz_sq     = self:getoutbits(0x10 + 0x74, 12,  8)
+      caps.log_min_stride_sz_sq     = self:getoutbits(0x10 + 0x74,  4,  0)
+      caps.log_max_wq_sz            = self:getoutbits(0x10 + 0x78,  4,  0)
+      caps.log_max_vlan_list        = self:getoutbits(0x10 + 0x7C, 20, 16)
+      caps.log_max_current_mc_list  = self:getoutbits(0x10 + 0x7C, 12,  8)
+      caps.log_max_current_uc_list  = self:getoutbits(0x10 + 0x7C,  4,  0)
+      caps.log_max_l2_table         = self:getoutbits(0x10 + 0x90, 28, 24)
+      caps.log_uar_page_sz          = self:getoutbits(0x10 + 0x90, 15,  0)
+      caps.device_frequency_mhz     = self:getoutbits(0x10 + 0x98, 31,  0)
    elseif which_caps == 'offload' then
       --TODO
    elseif which_caps == 'flow_table' then
@@ -607,43 +607,43 @@ function cmdq:query_hca_cap(what, which)
 end
 
 function cmdq:set_hca_cap(which, caps)
-   self:prepare("SET_HCA_CAP", 0x100C, 0x0C)
+   self:prepare("SET_HCA_CAP", 0x100C - 3000, 0x0C)
    self:setinbits(0x00, 31, 16, SET_HCA_CAP)
    self:setinbits(0x04, 15,  1, assert(which_codes[which]))
-   if which_caps == 'general' then
-      self:setinbits(0x18,
+   if which == 'general' then
+      self:setinbits(0x10 + 0x18,
          23, 16, caps.log_max_cq_sz,
          4,   0, caps.log_max_cq)
-      self:setinbits(0x1C,
+      self:setinbits(0x10 + 0x1C,
          31, 24, caps.log_max_eq_sz,
          21, 16, caps.log_max_mkey,
          3,   0, caps.log_max_eq)
-      self:setinbits(0x20,
+      self:setinbits(0x10 + 0x20,
          31, 24, caps.max_indirection,
          22, 16, caps.log_max_mrw_sz,
          5,   0, caps.log_max_klm_list_size)
-      self:setinbits(0x2C,
+      self:setinbits(0x10 + 0x2C,
          31, 31, caps.end_pad,
          28, 28, caps.start_pad,
          27, 27, caps.cache_line_128byte)
-      self:setinbits(0x30,
+      self:setinbits(0x10 + 0x30,
          30, 30, caps.vport_counters)
-      self:setinbits(0x34,
+      self:setinbits(0x10 + 0x34,
          31, 31, caps.vport_group_manager,
          25, 25, caps.nic_flow_table,
           9,  8, caps.port_type,
           7,  0, caps.num_ports)
-      self:setinbits(0x38,
+      self:setinbits(0x10 + 0x38,
          28, 24, caps.log_max_msg,
          19, 16, caps.max_tc)
-      self:setinbits(0x3C,
+      self:setinbits(0x10 + 0x3C,
           3,   0, caps.cqe_version)
-      self:setinbits(0x40,
+      self:setinbits(0x10 + 0x40,
          15, 14, caps.cmdif_checksum,
          11, 11, caps.wq_signature,
          10, 10, caps.sctr_data_cqe,
           3,  3, caps.eth_net_offloads)
-      self:setinbits(0x44,
+      self:setinbits(0x10 + 0x44,
          31, 31, caps.cq_oi,
          30, 30, caps.cq_resize,
          29, 29, caps.cq_moderation,
@@ -655,48 +655,48 @@ function cmdq:set_hca_cap(which, caps)
           2,  2, caps.ud,
           1,  1, caps.uc,
           0,  0, caps.rc)
-      self:setinbits(0x48,
+      self:setinbits(0x10 + 0x48,
          21, 16, caps.uar_sz,
           7,  0, caps.log_pg_sz)
-      self:setinbits(0x4C,
+      self:setinbits(0x10 + 0x4C,
          31, 31, caps.bf,
          30, 30, caps.driver_version,
          29, 29, caps.pad_tx_eth_packet,
          20, 16, caps.log_bf_reg_size)
-      self:setinbits(0x64,
+      self:setinbits(0x10 + 0x64,
          28, 24, caps.log_max_transport_domain,
          20, 16, caps.log_max_pd)
-      self:setinbits(0x68,
+      self:setinbits(0x10 + 0x68,
          15,  0, caps.max_flow_counter)
-      self:setinbits(0x6C,
+      self:setinbits(0x10 + 0x6C,
          28, 24, caps.log_max_rq,
          20, 16, caps.log_max_sq,
          12,  8, caps.log_max_tir,
           4,  0, caps.log_max_tis)
-      self:setinbits(0x70,
+      self:setinbits(0x10 + 0x70,
          31, 31, caps.basic_cyclic_rcv_wqe,
          28, 24, caps.log_max_rmp,
          20, 16, caps.log_max_rqt,
          12,  8, caps.log_max_rqt_size,
           4,  0, caps.log_max_tis_per_sq)
-      self:setinbits(0x74,
+      self:setinbits(0x10 + 0x74,
          28, 24, caps.log_max_stride_sz_rq,
          20, 16, caps.log_min_stride_sz_rq,
          12,  8, caps.log_max_stride_sz_sq,
           4,  0, caps.log_min_stride_sz_sq)
-      self:setinbits(0x78,
+      self:setinbits(0x10 + 0x78,
           4,  0, caps.log_max_wq_sz)
-      self:setinbits(0x7C,
+      self:setinbits(0x10 + 0x7C,
          20, 16, caps.log_max_vlan_list,
          12,  8, caps.log_max_current_mc_list,
           4,  0, caps.log_max_current_uc_list)
-      self:setinbits(0x90,
+      self:setinbits(0x10 + 0x90,
          28, 24, caps.log_max_l2_table,
          15,  0, caps.log_uar_page_sz)
-      self:setinbits(0x98,
+      self:setinbits(0x10 + 0x98,
          31,  0, caps.device_frequency_mhz)
-   elseif which_caps == 'offload' then
-      self:setinbits(0x00,
+   elseif which == 'offload' then
+      self:setinbits(0x10 + 0x00,
          31, 31, caps.csum_cap,
          30, 30, caps.vlan_cap,
          29, 29, caps.lro_cap,
@@ -709,12 +709,12 @@ function cmdq:set_hca_cap(which, caps)
          20, 16, caps.max_lso_cap,
          13, 12, caps.wqe_inline_mode,
          11,  8, caps.rss_ind_tbl_cap)
-      self:setinbits(0x08,
+      self:setinbits(0x10 + 0x08,
          15,  0, caps.lro_min_mss_size)
       for i = 1, 4 do
-         self:setinbits(0x30 + (i-1)*4, 31, 0, caps.lro_timer_supported_periods[i])
+         self:setinbits(0x10 + 0x30 + (i-1)*4, 31, 0, caps.lro_timer_supported_periods[i])
       end
-   elseif which_caps == 'flow_table' then
+   elseif which == 'flow_table' then
       --TODO
    end
    self:post(0x100C, 0x0C)
@@ -783,21 +783,25 @@ function ConnectX4:new(arg)
 
    -- PRM: Execute MANAGE_PAGES to provide the HCA with all required
    -- init-pages. This can be done by multiple MANAGE_PAGES commands.
-   local bp_ptr, bp_phy = memory.dma_alloc(4096 * boot_pages, 4096)
-   assert(band(bp_phy, 0xfff) == 0) --the phy address must be 4K-aligned
-   cmdq:alloc_pages(bp_phy, boot_pages)
+   cmdq:alloc_pages(boot_pages)
 
-   local t = cmdq:query_hca_cap('cur', 'general')
-   print'query_hca_cap (current, general):'
-   for k,v in pairs(t) do
-      print(("  %-24s = %s"):format(k, v))
+   local cur = cmdq:query_hca_cap('cur', 'general')
+   local max = cmdq:query_hca_cap('max', 'general')
+   print'Capabilities - current and (maximum):'
+   for k in pairs(cur) do
+      print(("  %-24s = %-3s (%s)"):format(k, cur[k], max[k]))
    end
 
-   local t = cmdq:query_hca_cap('max', 'general')
-   print'query_hca_cap (maximum, general):'
-   for k,v in pairs(t) do
-      print(("  %-24s = %s"):format(k, v))
-   end
+   cmdq:set_hca_cap('general', cur)
+
+   -- Initialization pages
+   local init_pages = cmdq:query_pages('init')
+   print("query_pages'init'       ", init_pages)
+   assert(init_pages > 0)
+
+   cmdq:alloc_pages(init_pages)
+
+   cmdq:init_hca()
 
    --[[
    cmdq:set_hca_cap()
