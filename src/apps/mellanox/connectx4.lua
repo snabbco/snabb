@@ -67,7 +67,7 @@ local cast = ffi.cast
 local band, bor, shl, shr, bswap, bnot =
    bit.band, bit.bor, bit.lshift, bit.rshift, bit.bswap, bit.bnot
 
-local debug = true
+local debug = false
 
 ConnectX4 = {}
 ConnectX4.__index = ConnectX4
