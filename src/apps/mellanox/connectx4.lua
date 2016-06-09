@@ -148,7 +148,6 @@ end
 
 function init_seg:cmdq_phy_addr(addr)
    if addr then
-      print("addr", addr)
       --must write the MSB of the addr first
       self:setbits(0x10, 31, 0, ptrbits(addr, 63, 32))
       --also resets nic_interface and log_cmdq_*
@@ -287,10 +286,8 @@ function cmdq:prepare(command, last_input_offset, last_output_offset)
    end
    if noutboxes > 0 then
       local phy = memory.virtual_to_physical(self.outboxes[0])
-      print("phy", phy, bit.tohex(phy / 2^32), bit.tohex(phy % 2^32))
       setint(self.entry, 0x30, phy / 2^32)
       setint(self.entry, 0x34, phy % 2^32)
-      print(bit.tohex(getint(self.entry, 0x30)), bit.tohex(getint(self.entry, 0x34)))
    end
 
    -- Initialize mailboxes
