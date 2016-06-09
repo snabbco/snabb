@@ -12,6 +12,7 @@ local debug = _G.developer_debug
 local ffi    = require("ffi")
 local C      = ffi.C
 local memory = require('core.memory')
+local packet = require('core.packet')
 local band   = require('bit').band
 require("lib.virtio.virtio.h")
 require("lib.virtio.virtio_vring.h")
@@ -21,13 +22,11 @@ local physical = memory.virtual_to_physical
 local VirtioVirtq = {}
 VirtioVirtq.__index = VirtioVirtq
 
-local PACKET_HEADROOM_SIZE = C.PACKET_HEADROOM_SIZE
 local VRING_F_NO_INTERRUPT = C.VRING_F_NO_INTERRUPT
 local VRING_F_NO_NOTIFY = C.VRING_F_NO_NOTIFY
 
 local pk_header_t = ffi.typeof("struct virtio_net_hdr")
 local pk_header_size = ffi.sizeof(pk_header_t)
-assert(pk_header_size < PACKET_HEADROOM_SIZE)
 local vring_desc_t = ffi.typeof("struct vring_desc")
 
 local ringtypes = {}
@@ -97,13 +96,15 @@ function VirtioVirtq:add(p, len, flags, csum_start, csum_offset)
    self.num_free = self.num_free -1
    desc.next = -1
 
-   local header_addr = p.data - pk_header_size
-   local header = ffi.cast("struct virtio_net_hdr *", header_addr)
-   ffi.fill(header_addr, pk_header_size, 0)
-   --header.flags = flags
-   --header.csum_start = csum_start
-   --header.csum_offset = csum_offset
-   desc.addr = physical(header_addr)
+   packet.shiftright(p, pk_header_size)
+   local header = ffi.cast("struct virtio_net_hdr *", p.data)
+   header.flags = flags
+   header.gso_type = 0
+   header.hdr_len = 0
+   header.gso_size = 0
+   header.csum_start = csum_start
+   header.csum_offset = csum_offset
+   desc.addr = physical(p.data)
    desc.len = len + pk_header_size
    desc.flags = 0
    desc.next = -1
@@ -144,8 +145,9 @@ function VirtioVirtq:get()
    local p = self.packets[idx]
    self.packets[idx] = nil
    if debug then assert(p ~= nil) end
-   p.length = used.len - pk_header_size
-   if debug then assert(physical(p.data) == desc.addr + pk_header_size) end
+   if debug then assert(physical(p.data) == desc.addr) end
+   p.length = used.len
+   packet.shiftleft(p, pk_header_size)
 
    self.last_used_idx = self.last_used_idx + 1
    desc.next = self.free_head
