@@ -67,6 +67,7 @@ end
 -- Create a new empty packet.
 function new_packet ()
    local p = ffi.cast(packet_ptr_t, memory.dma_alloc(packet_size))
+   p.data = p.data_
    p.length = 0
    return p
 end
@@ -90,23 +91,27 @@ end
 -- Prepend data to the start of a packet.
 function prepend (p, ptr, len)
    assert(p.length + len <= max_payload, "packet payload overflow")
-   C.memmove(p.data + len, p.data, p.length) -- Move the existing payload
+   shiftright(p, len)
    ffi.copy(p.data, ptr, len)                -- Fill the gap
-   p.length = p.length + len
    return p
 end
 
 -- Move packet data to the left. This shortens the packet by dropping
 -- the header bytes at the front.
 function shiftleft (p, bytes)
-   C.memmove(p.data, p.data+bytes, p.length-bytes)
+   p.data = p.data + bytes
    p.length = p.length - bytes
 end
 
 -- Move packet data to the right. This leaves length bytes of data
 -- at the beginning of the packet.
 function shiftright (p, bytes)
-   C.memmove(p.data + bytes, p.data, p.length)
+   if p.data - bytes >= p.data_ - C.PACKET_HEADROOM_SIZE then
+      p.data = p.data - bytes
+   else
+      C.memmove(p.data_ + bytes, p.data, p.length)
+      p.data = p.data_
+   end
    p.length = p.length + bytes
 end
 
@@ -117,6 +122,7 @@ function from_string (d)         return from_pointer(d, #d) end
 -- Free a packet that is no longer in use.
 local function free_internal (p)
    p.length = 0
+   p.data = p.data_
    freelist_add(packets_fl, p)
 end   
 
