@@ -430,6 +430,7 @@ function cmdq:post(last_in_ofs, last_out_ofs)
    local status    = self:getbits(0x3C,  7,  1)
 
    checkz(status)
+   self:checkstatus()
 
    return signature, token
 end
@@ -453,7 +454,6 @@ function cmdq:query_issi()
    self:prepare("QUERY_ISSI", 0x0C, 0x6C)
    self:setinbits(0x00, 31, 16, QUERY_ISSI)
    self:post(0x0C, 0x6C)
-   self:checkstatus()
    local cur_issi = self:getoutbits(0x08, 15, 0)
    local t = {}
    for i = 639, 0, -1 do
@@ -478,7 +478,6 @@ function cmdq:set_issi(issi)
    self:setinbits(0x00, 31, 16, SET_ISSI)
    self:setinbits(0x08, 15, 0, issi)
    self:post(0x0C, 0x0C)
-   self:checkstatus()
 end
 
 function cmdq:dump_issi(issi)
@@ -502,7 +501,6 @@ function cmdq:query_pages(which)
    self:setinbits(0x00, 31, 16, QUERY_PAGES)
    self:setinbits(0x04, 15, 0, codes[which])
    self:post(0x0C, 0x0C)
-   self:checkstatus()
    return self:getoutbits(0x0C, 31, 0)
 end
 
@@ -517,7 +515,6 @@ function cmdq:alloc_pages(addr, num_pages)
       self:setinbits(0x14 + i*8, 31, 12, ptrbits(addr + 4096*i, 31, 12))
    end
    self:post(0x10 + num_pages*8, 0x0C)
-   self:checkstatus()
 end
 
 local what_codes = {
@@ -536,7 +533,6 @@ function cmdq:query_hca_cap(what, which)
       15,  1, assert(which_codes[which]),
        0,  0, assert(what_codes[what]))
    self:post(0x0C, 0x100C - 3000)
-   self:checkstatus()
    local caps = {}
    if which == 'general' then
       caps.log_max_cq_sz            = self:getoutbits(0x18, 23, 16)
@@ -722,7 +718,12 @@ function cmdq:set_hca_cap(which, caps)
       --TODO
    end
    self:post(0x100C, 0x0C)
-   self:checkstatus()
+end
+
+function cmdq:init_hca()
+   self:prepare("INIT_HCA", 0x0c, 0x0c)
+   self:setinbits(0x00, 31, 16, INIT_HCA)
+   self:post(0x0C, 0x0C)
 end
 
 function init_seg:dump()
