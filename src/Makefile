@@ -5,6 +5,7 @@ E= @echo
 #E= @:
 
 export TEST_SKIPPED=43
+CC ?= gcc
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
@@ -50,7 +51,7 @@ PATH := ../lib/luajit/usr/local/bin:$(PATH)
 
 snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	$(E) "LINK      $@"
-	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
+	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../lib/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
@@ -124,15 +125,15 @@ $(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/avx2_c.o: arch/avx2.c Makefile
 	$(E) "C(AVX2)   $@"
-	$(Q) gcc -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/sse2_c.o: arch/sse2.c Makefile
 	$(E) "C(SSE2)   $@"
-	$(Q) gcc -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
@@ -178,7 +179,7 @@ obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
 
 obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
 
 book: obj/doc/snabb.pdf obj/doc/snabb.html obj/doc/snabb.epub
 
@@ -187,7 +188,7 @@ obj/doc/snabb.markdown: markdown Makefile doc/genbook.sh
 
 obj/doc/snabb.pdf: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd obj/doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../../$@ ../../$<)
+	$(Q) (cd obj/doc; pandoc --template=../../doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../../$@ ../../$<)
 
 obj/doc/snabb.html: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
