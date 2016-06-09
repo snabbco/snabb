@@ -1,5 +1,32 @@
 # Change Log
 
+## [2.9] - 2016-06-09
+
+A performance release, speeding up both the core lwaftr operations as
+well as the support for running Snabb on virtualized interfaces.
+
+ * Change Snabb representation of packets to have "headroom".
+   Prepending a header to a packet, as when encapsulating a packet in a
+   lightweight 4-over-6 softwire, can use this headroom instead of
+   shifting the packet's payload around in memory.  Taking off a header,
+   as in decapsulation, can likewise just adjust the amount of headroom.
+   Likewise when sending packets to a host Snabb NFV the virtio system
+   can place these headers in the headroom as well, instead of needing
+   multiple virtio scatter-gather buffers.
+
+ * Fix a bug in Snabb NFV by which it would mistakenly cache the Virtio
+   features that it used when negotiating with QEMU at startup for the
+   Snabb process.
+
+ * Remove backpressure on the intel driver.  This means that if Snabb
+   NFV is dropping packets at ingress, it is because Snabb NFV is too
+   slow.  If it is dropping them on the NIC -> Virtio link, it is
+   because the guest is too slow.
+
+Note: this version of the lwaftr *needs* a fixed version of Snabb NFV to
+run virtualized.  The patches are headed upstream, but for now, use the
+Snabb NFV from this release instead of the ones from upstream.
+
 ## [2.8] - 2016-06-03
 
 A bug-fix and documentation release.
