@@ -10,6 +10,13 @@ local packet = require("core.packet")
 local ffi = require("ffi")
 local C = ffi.C
 
+--ljsyscall returns error as a a cdata instead of a string,
+--and the standard assert() doesn't use tostring() on it.
+local function assert(v, ...)
+   if not v then error(tostring(... or 'assertion failed'), 2) end
+   return v, ...
+end
+
 local c, t = S.c, S.types.t
 
 RawSocket = {}
@@ -20,13 +27,17 @@ function RawSocket:new (ifname)
    if not index then error(err) end
 
    local tp = h.htons(c.ETH_P["ALL"])
-   local sock, err = S.socket(c.AF.PACKET, bit.bor(c.SOCK.RAW, c.SOCK.NONBLOCK), tp)
-   if not sock then error(err) end
+   local sock = assert(S.socket(c.AF.PACKET, bit.bor(c.SOCK.RAW, c.SOCK.NONBLOCK), tp))
+   local index, err = S.util.if_nametoindex(ifname)
+   if not index then
+      sock:close()
+      error(err)
+   end
 
    local addr = t.sockaddr_ll{sll_family = c.AF.PACKET, sll_ifindex = index, sll_protocol = tp}
    local ok, err = S.bind(sock, addr)
    if not ok then
-      S.close(sock)
+      sock:close()
       error(err)
    end
    return setmetatable({sock = sock}, {__index = RawSocket})
@@ -41,14 +52,18 @@ function RawSocket:pull ()
 end
 
 function RawSocket:can_receive ()
-   local ok, err = S.select({readfds = {self.sock}}, 0)
-   return not (err or ok.count == 0)
+   local t, err = S.select({readfds = {self.sock}}, 0)
+   while not t and (err.AGAIN or err.INTR) do
+      t, err = S.select({readfds = {self.sock}}, 0)
+   end
+   assert(t, err)
+   return t.count == 1
 end
 
 function RawSocket:receive ()
    local buffer = ffi.new("uint8_t[?]", C.PACKET_PAYLOAD_SIZE)
    local sz, err = S.read(self.sock, buffer, C.PACKET_PAYLOAD_SIZE)
-   if not sz then return err end
+   assert(sz, err)
    return packet.from_pointer(buffer, sz)
 end
 
@@ -63,18 +78,22 @@ function RawSocket:push ()
 end
 
 function RawSocket:can_transmit ()
-   local ok, err = S.select({writefds = {self.sock}}, 0)
-   return not (err or ok.count == 0)
+   local t, err = S.select({writefds = {self.sock}}, 0)
+   while not t and (err.AGAIN or err.INTR) do
+      t, err = S.select({writefds = {self.sock}}, 0)
+   end
+   assert(t, err)
+   return t.count == 1
 end
 
 function RawSocket:transmit (p)
-   local sz, err = S.write(self.sock, packet.data(p), packet.length(p))
-   if not sz then return err end
-   return sz
+   local sz, err = S.write(self.sock, p.data, p.length)
+   assert(sz, err)
+   assert(sz == p.length)
 end
 
 function RawSocket:stop()
-   S.close(self.sock)
+   self.sock:close()
 end
 
 function selftest ()

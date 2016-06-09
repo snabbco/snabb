@@ -10,6 +10,7 @@ local timer     = require("core.timer")
 local histogram = require('core.histogram')
 local counter   = require("core.counter")
 local zone      = require("jit.zone")
+local jit       = require("jit")
 local ffi       = require("ffi")
 local C         = ffi.C
 require("core.packet_h")
@@ -67,16 +68,19 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-local function with_restart (app, method)
+function with_restart (app, method)
    if use_restart then
       -- Run fn in protected mode using pcall.
-      local status, err = pcall(method, app)
+      local status, result_or_error = pcall(method, app)
 
       -- If pcall caught an error mark app as "dead" (record time and cause
       -- of death).
-      if not status then app.dead = { error = err, time = now() } end
+      if not status then
+         app.dead = { error = result_or_error, time = now() }
+      end
+      return status, result_or_error
    else
-      method(app)
+      return true, method(app)
    end
 end
 
