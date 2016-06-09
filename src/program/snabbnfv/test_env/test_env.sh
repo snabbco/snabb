@@ -108,18 +108,21 @@ function launch_qemu {
     if [ ! -n $QUEUES ]; then
         export mqueues=",queues=$QUEUES"
     fi
+    if [ -e $assets/initrd ]; then
+        export QEMU_ARGS="-initrd $assets/initrd $QEMU_ARGS"
+    fi
     tmux_launch \
         "qemu$qemu_n" \
         "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
-        $QEMU \
+        $QEMU $QEMU_ARGS \
         -kernel $assets/$4 \
-        -append \"earlyprintk root=/dev/vda rw console=ttyS0 ip=$(ip $qemu_n)\" \
+        -append \"earlyprintk root=/dev/vda $SNABB_KERNEL_PARAMS rw console=ttyS0 ip=$(ip $qemu_n)\" \
         -m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on \
         -netdev type=vhost-user,id=net0,chardev=char0${mqueues} -chardev socket,id=char0,path=$2,server \
         -device virtio-net-pci,netdev=net0,mac=$(mac $qemu_n),mq=$qemu_mq,vectors=$qemu_vectors \
         -M pc -smp $qemu_smp -cpu host --enable-kvm \
         -serial telnet:localhost:$3,server,nowait \
-        -drive if=virtio,file=$(qemu_image $5) \
+        -drive if=virtio,format=raw,file=$(qemu_image $5) \
         -nographic" \
         $(qemu_log)
     qemu_n=$(expr $qemu_n + 1)

@@ -21,10 +21,16 @@ function run (args)
       solarflare(unpack(args))
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
+   elseif command == 'esp' and #args >= 2 then
+      esp(unpack(args))
    else
       print(usage) 
       main.exit(1)
    end
+end
+
+function gbits (bps)
+   return (bps * 8) / (1024^3)
 end
 
 function basic1 (npackets)
@@ -222,15 +228,12 @@ function solarflare (npackets, packet_size, timeout)
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s)."):format(packets / 1e6,
                                                                                                    runtime, packets / runtime / 1e6,
-                                                                                                   ((packets * packet_size * 8) / runtime) / (1024*1024*1024)))
+                                                                                                   gbits(packets * packet_size / runtime)))
    if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
       print("Packets lost. Test failed!")
       main.exit(1)
    end
 end
-
--- ---
-
 
 function intel1g (npackets, packet_size, timeout)
    npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
@@ -325,5 +328,63 @@ receive_device.interface= "rx1GE"
    if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
       print("Packets lost. Test failed!")
       main.exit(1)
+   end
+end
+
+function esp (npackets, packet_size, mode, profile)
+   local esp = require("lib.ipsec.esp")
+   local ethernet = require("lib.protocol.ethernet")
+   local ipv6 = require("lib.protocol.ipv6")
+   local datagram = require("lib.protocol.datagram")
+   local profiler = profile and require("jit.p")
+
+   npackets = assert(tonumber(npackets), "Invalid number of packets: " .. npackets)
+   packet_size = assert(tonumber(packet_size), "Invalid packet size: " .. packet_size)
+   local payload_size = packet_size - ethernet:sizeof() - ipv6:sizeof()
+   local payload = ffi.new("uint8_t[?]", payload_size)
+   local ip = ipv6:new({})
+   ip:payload_length(payload_size)
+   local eth = ethernet:new({type=0x86dd})
+   local d = datagram:new(packet.allocate())
+   d:payload(payload, payload_size)
+   d:push(ip)
+   d:push(eth)
+   local plain = d:packet()
+   local conf = { spi = 0x0,
+                  mode = "aes-128-gcm",
+                  keymat = "00112233445566778899AABBCCDDEEFF",
+                  salt = "00112233"}
+   local enc, dec = esp.esp_v6_encrypt:new(conf), esp.esp_v6_decrypt:new(conf)
+
+   if mode == "encapsulate" then
+      if profile then profiler.start(profile) end
+      local start = C.get_monotonic_time()
+      local encapsulated
+      for i = 1, npackets do
+         encapsulated = packet.clone(plain)
+         enc:encapsulate(encapsulated)
+         packet.free(encapsulated)
+      end
+      local finish = C.get_monotonic_time()
+      if profile then profiler.stop() end
+      local bps = (packet_size * npackets) / (finish - start)
+      print(("Encapsulation (packet size = %d): %.2f Gbit/s")
+            :format(packet_size, gbits(bps)))
+   else
+      local encapsulated = packet.clone(plain)
+      enc:encapsulate(encapsulated)
+      if profile then profiler.start(profile) end
+      local start = C.get_monotonic_time()
+      local plain
+      for i = 1, npackets do
+         plain = packet.clone(encapsulated)
+         dec:decapsulate(plain)
+         packet.free(plain)
+      end
+      local finish = C.get_monotonic_time()
+      if profile then profiler.stop() end
+      local bps = (packet_size * npackets) / (finish - start)
+      print(("Decapsulation (packet size = %d): %.2f Gbit/s")
+            :format(packet_size, gbits(bps)))
    end
 end

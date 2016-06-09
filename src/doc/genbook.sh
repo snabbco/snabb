@@ -70,6 +70,10 @@ $(cat $mdroot/lib/hardware/README.md)
 
 $(cat $mdroot/lib/protocol/README.md)
 
+## IPsec
+
+$(cat ../lib/ipsec/README.md)
+
 ## Snabb NFV
 
 $(cat $mdroot/program/snabbnfv/README.md)

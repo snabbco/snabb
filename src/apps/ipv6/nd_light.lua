@@ -79,10 +79,14 @@ local function check_ip_address(ip, desc)
 end
 
 function nd_light:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+   local arg = arg and config.parse_app_arg(arg) or {}
+   --copy the args to avoid changing the arg table so that it stays reusable.
+   local conf = {}
+   for k,v in pairs(arg) do
+      conf[k] = v
+   end
    local o = nd_light:superClass().new(self)
    conf.delay = conf.delay or 1000
-   conf.retrans = conf.retrans
    assert(conf.local_mac, "nd_light: missing local MAC address")
    if type(conf.local_mac) == "string" and string.len(conf.local_mac) ~= 6 then
       conf.local_mac = ethernet:pton(conf.local_mac)
