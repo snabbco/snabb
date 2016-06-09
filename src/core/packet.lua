@@ -17,6 +17,9 @@ local packet_t = ffi.typeof("struct packet")
 local packet_ptr_t = ffi.typeof("struct packet *")
 local packet_size = ffi.sizeof(packet_t)
 local header_size = 8
+-- By default, enough headroom for an inserted IPv6 header and a
+-- virtio header.
+local default_headroom = 64
 max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
@@ -67,7 +70,7 @@ end
 -- Create a new empty packet.
 function new_packet ()
    local p = ffi.cast(packet_ptr_t, memory.dma_alloc(packet_size))
-   p.headroom = C.PACKET_HEADROOM_SIZE
+   p.headroom = default_headroom
    p.data = p.data_ + p.headroom
    p.length = 0
    return p
@@ -115,7 +118,7 @@ function shiftright (p, bytes)
    else
       -- No headroom for the shift; re-set the headroom to the default.
       assert(bytes <= max_payload - p.length)
-      p.headroom = C.PACKET_HEADROOM_SIZE
+      p.headroom = default_headroom
       -- Could be we fit in the packet, but not with headroom.
       if p.length + bytes >= max_payload - p.headroom then p.headroom = 0 end
       C.memmove(p.data_ + p.headroom + bytes, p.data, p.length)
@@ -131,7 +134,7 @@ function from_string (d)         return from_pointer(d, #d) end
 -- Free a packet that is no longer in use.
 local function free_internal (p)
    p.length = 0
-   p.headroom = C.PACKET_HEADROOM_SIZE
+   p.headroom = default_headroom
    p.data = p.data_ + p.headroom
    freelist_add(packets_fl, p)
 end   
