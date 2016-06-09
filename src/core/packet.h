@@ -3,7 +3,7 @@
 enum {
     // A few bytes of headroom if needed by a low-level transport like
     // virtio.
-    PACKET_HEADROOM_SIZE = 48,
+    PACKET_HEADROOM_SIZE = 64,
     // The maximum amount of payload in any given packet.
     PACKET_PAYLOAD_SIZE = 10*1024
 };
