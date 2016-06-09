@@ -91,7 +91,6 @@ end
 
 -- Prepend data to the start of a packet.
 function prepend (p, ptr, len)
-   assert(p.length + len <= max_payload, "packet payload overflow")
    shiftright(p, len)
    ffi.copy(p.data, ptr, len)                -- Fill the gap
    return p
@@ -100,6 +99,7 @@ end
 -- Move packet data to the left. This shortens the packet by dropping
 -- the header bytes at the front.
 function shiftleft (p, bytes)
+   assert(bytes >= 0 and bytes <= p.length)
    p.data = p.data + bytes
    p.headroom = p.headroom + bytes
    p.length = p.length - bytes
@@ -110,10 +110,14 @@ end
 function shiftright (p, bytes)
    if bytes <= p.headroom then
       -- Take from the headroom.
+      assert(bytes >= 0)
       p.headroom = p.headroom - bytes
    else
       -- No headroom for the shift; re-set the headroom to the default.
+      assert(bytes <= max_payload - p.length)
       p.headroom = C.PACKET_HEADROOM_SIZE
+      -- Could be we fit in the packet, but not with headroom.
+      if p.length + bytes >= max_payload - p.headroom then p.headroom = 0 end
       C.memmove(p.data_ + p.headroom + bytes, p.data, p.length)
    end
    p.data = p.data_ + p.headroom
