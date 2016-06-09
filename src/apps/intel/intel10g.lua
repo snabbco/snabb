@@ -720,7 +720,6 @@ M_pf.set_promiscuous_mode = M_sf.set_promiscuous_mode
 M_pf.init_receive = M_sf.init_receive
 M_pf.init_transmit = M_sf.init_transmit
 M_pf.wait_linkup = M_sf.wait_linkup
-M_pf.ingress_packet_drops = M_sf.ingress_packet_drops
 
 function M_pf:set_vmdq_mode ()
    self.r.RTTDCS(bits{VMPAC=1,ARBDIS=6,BDPM=22})       -- clear TDPAC,TDRM=4, BPBFSM
@@ -869,8 +868,8 @@ function M_vf:reconfig(opts)
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
       :set_VLAN(opts.vlan)
-      :set_rx_stats(opts.rxcounter)
-      :set_tx_stats(opts.txcounter)
+      :set_rx_stats(opts.rxcounter or 0)
+      :set_tx_stats(opts.txcounter or 0)
       :set_tx_rate(opts.rate_limit, opts.priority)
       :enable_receive()
       :enable_transmit()
@@ -884,8 +883,8 @@ function M_vf:init (opts)
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
       :set_VLAN(opts.vlan)
-      :set_rx_stats(opts.rxcounter)
-      :set_tx_stats(opts.txcounter)
+      :set_rx_stats(opts.rxcounter or 0)
+      :set_tx_stats(opts.txcounter or 0)
       :set_tx_rate(opts.rate_limit, opts.priority)
       :enable_receive()
       :enable_transmit()
@@ -1139,7 +1138,6 @@ function M_vf:set_tx_stats (counter)
 end
 
 function M_vf:get_rxstats ()
-   if not self.rxstats then return nil end
    return {
       counter_id = self.rxstats,
       packets = tonumber(self.pf.qs.QPRC[self.rxstats]()),
@@ -1150,7 +1148,6 @@ function M_vf:get_rxstats ()
 end
 
 function M_vf:get_txstats ()
-   if not self.txstats then return nil end
    return {
       counter_id = self.txstats,
       packets = tonumber(self.pf.qs.QPTC[self.txstats]()),
@@ -1176,7 +1173,7 @@ function M_vf:set_tx_rate (limit, priority)
 end
 
 function M_vf:ingress_packet_drops ()
-   return self.pf:ingress_packet_drops()
+   return self.pf.qs.QPRDC[self.rxstats]()
 end
 
 rxdesc_t = ffi.typeof [[
