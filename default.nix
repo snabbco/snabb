@@ -3,15 +3,15 @@
 # ... and the files are produced in ./result/
 
 { pkgs ? (import <nixpkgs> {})
+, src ? ./.
+, version ? builtins.replaceStrings ["\n"] [""] (builtins.readFile ./.version)
 }:
 
 with pkgs;
 
 stdenv.mkDerivation rec {
-  # TODO: get the version from somewhere?
-  name = "snabb";
-
-  src = ./.;
+  name = "snabb-${version}";
+  inherit src version;
 
   buildInputs = [ makeWrapper ];
 
