@@ -26,7 +26,7 @@ in rec {
 
     # allow sudo
     __noChroot = true;
-    requiredSystemFeatures = [ "performance" ];
+    requiredSystemFeatures = [ "lugano" ];
 
     buildInputs = [ git telnet tmux numactl bc iproute which qemu ];
 
