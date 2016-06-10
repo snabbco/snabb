@@ -206,7 +206,10 @@ function apply_config_actions (actions, conf)
       if app_table[name].reconfig then
          local arg = conf.apps[name].arg
          local app = app_table[name]
+         local shmorig = shm.path
+         shm.path = app.shmpath
          app:reconfig(arg)
+         shm.path = shmorig
          new_app_table[name] = app
          table.insert(new_app_array, app)
          app_name_to_index[name] = #new_app_array
