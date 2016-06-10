@@ -3,7 +3,7 @@
 # ... and the files are produced in ./result/
 
 { pkgs ? (import <nixpkgs> {})
-, src ? ./.
+, source ? ./.
 , version ? builtins.replaceStrings ["\n"] [""] (builtins.readFile ./.version)
 }:
 
@@ -11,7 +11,8 @@ with pkgs;
 
 stdenv.mkDerivation rec {
   name = "snabb-${version}";
-  inherit src version;
+  inherit version;
+  src = lib.cleanSource source;
 
   buildInputs = [ makeWrapper ];
 
