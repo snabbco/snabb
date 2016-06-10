@@ -86,7 +86,7 @@ function with_restart (app, method)
       status, result = true, method(app)
    end
    shm.path = oldshm
-   return status, result_or_error
+   return status, result
 end
 
 -- Restart dead apps.
