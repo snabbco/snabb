@@ -72,20 +72,21 @@ end
 function with_restart (app, method)
    local oldshm = shm.path
    shm.path = app.shmpath
+   local status, result
    if use_restart then
       -- Run fn in protected mode using pcall.
-      local status, result_or_error = pcall(method, app)
+      status, result = pcall(method, app)
 
       -- If pcall caught an error mark app as "dead" (record time and cause
       -- of death).
       if not status then
-         app.dead = { error = result_or_error, time = now() }
+         app.dead = { error = result, time = now() }
       end
-      return status, result_or_error
    else
-      return true, method(app)
+      status, result = true, method(app)
    end
    shm.path = oldshm
+   return status, result_or_error
 end
 
 -- Restart dead apps.
