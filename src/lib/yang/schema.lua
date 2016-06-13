@@ -10,7 +10,6 @@
 -- This relies on the "Base" table which can be found in the yang.lua file.
 module(..., package.seeall)
 
-local validation = require("lib.yang.validation")
 local helpers = require("lib.yang.helpers")
 local h = require("syscall.helpers")
 
@@ -28,6 +27,7 @@ local uint16box = ffi.typeof("struct { uint16_t value; }")
 local uint32box = ffi.typeof("struct { uint32_t value; }")
 local uint64box = ffi.typeof("struct { uint64_t value; }")
 local decimal64box = ffi.typeof("struct { double value; }")
+local booleanbox = ffi.typeof("struct { bool value; }")
 
 Leaf = {}
 function Leaf.new(base, path, src)
@@ -47,6 +47,11 @@ function Leaf.new(base, path, src)
          self.enums = {}
          for _, v in pairs(typeinfo.enum) do
             self.enums[v.argument] = v.argument
+         end
+      elseif self.type == "union" and typeinfo.type then
+         self.types = {}
+         for _, v in pairs(typeinfo.type) do
+            self.types[#self.types + 1] = v.argument
          end
       end
    end
@@ -97,6 +102,8 @@ function Leaf.new(base, path, src)
    return self
 end
 
+function Leaf:get_type() return "leaf" end
+
 function Leaf:error(msg, ...)
    local path = getmetatable(self).path
    error(("%s: %s"):format(path, msg:format(...)))
@@ -106,7 +113,7 @@ function Leaf:validate_schema(schema)
    local cardinality = {config={0,1}, default={0,1}, description={0,1},
                         mandatory={0,1}, reference={0,1}, status={0,1},
                         type={1,1}, units={0,1}, when={0,1}}
-   validation.cardinality("leaf", getmetatable(self).path, cardinality, schema)
+   helpers.cardinality("leaf", getmetatable(self).path, cardinality, schema)
 end
 
 function Leaf:provide_box(leaf_type, statements)
@@ -135,19 +142,31 @@ function Leaf:provide_box(leaf_type, statements)
    elseif leaf_type == "string" then
       box = {}
    elseif leaf_type == "boolean" then
-      box = {}
+      box = booleanbox()
    elseif leaf_type == "enumeration" then
       box = helpers.Enum.new(self.enums)
    elseif leaf_type == "union" then
-      box = helpers.Union.new(statements)
+      box = helpers.Union.new(self.types)
    elseif leaf_type == "inet:ipv4-address" then
       box = helpers.IPv4Box.new()
+      if self.default then box.value = self.default end
    elseif leaf_type == "inet:ipv6-address" then
       box = helpers.IPv6Box.new()
+      if self.default then box.value = self.default end
+   elseif leaf_type == "inet:ipv4-prefix" then
+      box = helpers.IPv4PrefixBox.new()
+   elseif leaf_type == "inet:ipv6-prefix" then
+      box = helpers.IPv6PrefixBox.new()
+   elseif leaf_type == "yang:zero-based-counter64" then
+      -- TODO: this can and should be done via support of typedef.
+      box = uint64box(0)
    else
       local path = self and getmetatable(self).path or ""
-      error(("Unknown type '%s' for leaf"):format(path, leaf_type))
+      error(("%s: Unknown type '%s' for leaf"):format(path, leaf_type))
    end
+
+   -- If there is default we should set it.
+   if self.default ~= nil then box.value = self.default end
 
    return box
 end
@@ -175,29 +194,34 @@ function Feature.new(base, path, src)
    return self
 end
 
+function Feature:get_type() return "feature" end
+
 function Feature:validate_schema(src)
    local cardinality = {description={0,1}, status={0,1}, refernece={0,1}}
-   validation.cardinality("feature", getmetatable(self).path, cardinality, src)
+   helpers.cardinality("feature", getmetatable(self).path, cardinality, src)
 end
 
 -- Yang list
 local List = {}
 function List.new(base, path, src)
-   local self = setmetatable({}, {__index=List, path=path})
+   local ret = {leaves={}}
+   local self = setmetatable(ret, {__index=List, path=path})
 
    self:validate_schema(src)
    base:add_cache(path, self)
 
    if src.key then self.key = src.key[1].argument end
+   if src.uses then self.uses = src.uses[1].argument end
    if src.leaf then
       for _, leaf in pairs(src.leaf) do
          local path = self.path.."."..leaf.argument
-         self[leaf.argument] = Leaf.new(base, path, leaf.statements)
+         self.leaves[leaf.argument] = Leaf.new(base, path, leaf.statements)
       end
    end
 
    return self
 end
+function List:get_type() return "list" end
 
 function List:validate_schema(src)
    local cardinality = {config={0,1}, description={0,1}, key={0,1},
@@ -205,7 +229,7 @@ function List:validate_schema(src)
    cardinality["max-elements"] = {0,1}
    cardinality["min-elements"] = {0,1}
    cardinality["ordered-by"] = {0,1}
-   validation.cardinality("list", getmetatable(self).path, cardinality, src)
+   helpers.cardinality("list", getmetatable(self).path, cardinality, src)
 end
 
 -- Yang group
@@ -237,15 +261,16 @@ function Grouping.new(base, path, src)
 
    return self
 end
+function Grouping:get_type() return "grouping" end
 
 function Grouping:validate_schema(src)
    local cardinality = {description={0,1}, reference={0,1}, status={0,1}}
-   validation.cardinality("grouping", getmetatable(self).path, cardinality, src)
+   helpers.cardinality("grouping", getmetatable(self).path, cardinality, src)
 end
 
 local Container = {}
 function Container.new(base, path, src)
-   local ret = {leaves={}, containers={}}
+   local ret = {leaves={}, containers={}, lists={}}
    local self = setmetatable(ret, {__index=Container, path=path})
 
    self:validate_schema(src)
@@ -258,19 +283,31 @@ function Container.new(base, path, src)
    -- Leaf statements
    if src.leaf then
       for _, leaf in pairs(src.leaf) do
-         local leaf_path = path.."."..leaf.argument
-         self.leaves[leaf.argument] = Leaf.new(base, leaf_path, leaf.statements)
+         self.leaves[leaf.argument] = Leaf.new(
+            base,
+            path.."."..leaf.argument,
+            leaf.statements
+         )
       end
    end
 
    -- Include other containers
    if src.container then
       for _, container in pairs(src.container) do
-         local container_path = path.."."..container.argument
          self.containers[container.argument] = Container.new(
             base,
-            container_path,
+            path.."."..container.argument,
             container.statements
+         )
+      end
+   end
+
+   if src.list then
+      for _, list in pairs(src.list) do
+         self.lists[list.argument] = List.new(
+            base,
+            path.."."..list.argument,
+            list.statements
          )
       end
    end
@@ -281,11 +318,12 @@ function Container.new(base, path, src)
 
    return self
 end
+function Container:get_type() return "container" end
 
 function Container:validate_schema(src)
    local cardinality = {config={0,1}, description={0,1}, presense={0,1},
                         reference={0,1}, status={0,1}, when={0,1}}
-   validation.cardinality("container", getmetatable(self).path, cardinality, src)
+   helpers.cardinality("container", getmetatable(self).path, cardinality, src)
 end
 
 -- Yang Revision
@@ -305,10 +343,11 @@ function Revision.new(base, path, src)
    end
    return self
 end
+function Revision:get_type() return "revision" end
 
 function Revision:validate_schema(src)
    local cardinality = {description={0,1}, reference={0,1}}
-   validation.cardinality("revision", getmetatable(self).path, cardinality, src)
+   helpers.cardinality("revision", getmetatable(self).path, cardinality, src)
 end
 
 -- Yang Module
@@ -386,6 +425,7 @@ function Module.new(base, name, src)
    end
    return self
 end
+function Module:get_type() return "module" end
 
 function Module:load()
    -- TODO: Find the file and load it.
@@ -395,146 +435,71 @@ function Module:validate_schema(src)
    local cardinality = {contact={0,1}, description={0,1}, namespace={1,1},
                         organization={0,1}, prefix={1,1}, reference={0,1}}
    cardinality["yang-version"] = {0,1}
-   validation.cardinality("module", getmetatable(self).path, cardinality, src)
+   helpers.cardinality("module", getmetatable(self).path, cardinality, src)
 end
 
 function selftest()
-   local test_schema = [[module ietf-softwire {
-      namespace "urn:ietf:params:xml:ns:yang:ietf-softwire";
-      prefix "softwire";
+   local test_schema = [[module fruit {
+      namespace "urn:testing:fruit";
+      prefix "fruit";
 
       import ietf-inet-types {prefix inet; }
       import ietf-yang-types {prefix yang; }
 
-      organization "Softwire Working Group";
+      organization "Fruit Inc.";
 
-      contact
-         "
-         Qi Sun sunqi.ietf@gmail.com
-         Hao Wang wangh13@mails.tsinghua.edu.cn
-         Yong Cui yong@csnet1.cs.tsinghua.edu.cn
-         Ian Farrer ian.farrer@telekom.de
-         Mohamed Boucadair mohamed.boucadair@orange.com
-         Rajiv Asati rajiva@cisco.com
-         ";
+      contact "John Smith fake@person.tld";
 
-      description
-         "This document defines a YANG data model for the configuration and
-         management of IPv4-in-IPv6 Softwire Border Routers and Customer
-         Premises Equipment. It covers Lightweight 4over6, MAP-E and MAP-T
-         Softwire mechanisms.
+      description "Module to test YANG schema lib";
 
-         Copyright (c) 2014 IETF Trust and the persons identified
-         as authors of the code. All rights reserved.
-         This version of this YANG module is part of RFC XXX; see the RFC
-         itself for full legal notices.";
-
-      revision 2015-09-30 {
-         description
-            "Version-04: fix YANG syntax; Add flags to map-rule; Remove
-            the map-rule-type element. ";
-
+      revision 2016-05-27 {
+         description "Revision 1";
          reference "tbc";
       }
 
-      revision 2015-04-07 {
-         description
-            "Version-03: Integrate lw4over6; Updata state nodes; Correct
-            grammar errors; Reuse groupings; Update descriptions.
-            Simplify the model.";
-
+      revision 2016-05-28 {
+         description "Revision 2";
          reference "tbc";
       }
 
-      revision 2015-02-10 {
-         description "Version-02: Add notifications.";
-         reference "tbc";
+      feature bowl {
+         description "A fruit bowl";
+         reference "fruit-bowl";
       }
 
-      revision 2015-02-06 {
-         description
-            "Version-01: Correct grammar errors; Reuse groupings; Update
-            descriptions.";
+      grouping fruit {
+         description "Represets a piece of fruit";
 
-         reference "tbc";
-      }
+         leaf name {
+            type string;
+            mandatory true;
+            description "Name of fruit.";
+         }
 
-      revision 2015-02-02 {
-         description "Initial revision.";
-         reference "tbc";
-      }
-
-      feature lw4over6 {
-         description
-            "Lightweight 4over6 moves the Network Address and Port
-            Translation (NAPT) function from the centralized DS-Lite tunnel
-            concentrator to the tunnel client located in the Customer
-            Premises Equipment (CPE).  This removes the requirement for a
-            Carrier Grade NAT function in the tunnel concentrator and
-            reduces the amount of centralized state that must be held to a
-            per-subscriber level.  In order to delegate the NAPT function
-            and make IPv4 Address sharing possible, port-restricted IPv4
-            addresses are allocated to the CPEs.";
-
-         reference "I-D.ietf-softwire-lw4over6";
-      }
-
-      feature map-e {
-         description
-            "MAP-E is a mechanism for transporting IPv4 packets across an
-            IPv6 network using IP encapsulation, and a generic mechanism
-            for mapping between IPv6 addresses and IPv4 addresses and
-            transport layer ports.";
-
-         reference "I-D.ietf-softwire-map";
-      }
-
-      grouping port-set {
-         description
-            "Use the PSID algorithm to represent a range of transport layer
-            ports.";
-
-         leaf offset {
+         leaf score {
             type uint8 {
-               range 0..16;
+               range 0..10;
             }
             mandatory true;
-            description
-               "The number of offset bits. In Lightweight 4over6, the default
-               value is 0 for assigning one contiguous port range. In MAP-E/T,
-               the default value is 6, which excludes system ports by default
-               and assigns distributed port ranges. If the this parameter is
-               larger than 0, the value of offset MUST be greater than 0.";
+            description "How nice is it out of 10";
          }
 
-         leaf psid {
-            type uint16;
-            mandatory true;
-            description
-               "Port Set Identifier (PSID) value, which identifies a set
-               of ports algorithmically.";
-         }
-
-         leaf psid-len {
-            type uint8 {
-               range 0..16;
-            }
-            mandatory true;
-            description
-               "The length of PSID, representing the sharing ratio for an
-               IPv4 address.";
+         leaf tree-grown {
+            type boolean;
+            description "Is it grown on a tree?";
          }
       }
 
-      container softwire-config {
-         description
-            "The configuration data for Softwire instances. And the shared
-            data describes the softwire data model which is common to all of
-            the different softwire mechanisms, such as description.";
+      container fruit-bowl {
+         description "Represents a fruit bowl";
 
          leaf description {
             type string;
-            description "A textual description of Softwire.";
+            description "About the bowl";
+         }
+
+         list contents {
+            uses fruit;
          }
       }
    }]]
@@ -553,42 +518,40 @@ function selftest()
   local mod = Module.new(base, schema.module[1].argument,
     schema.module[1].statements)
 
-  assert(mod.name == "ietf-softwire")
-  assert(mod.namespace == "urn:ietf:params:xml:ns:yang:ietf-softwire")
-  assert(mod.prefix == "softwire")
-  assert(mod.contact)
-  assert(mod.organization)
-  assert(mod.description)
+  assert(mod.name == "fruit")
+  assert(mod.namespace == "urn:testing:fruit")
+  assert(mod.prefix == "fruit")
+  assert(mod.contact == "John Smith fake@person.tld")
+  assert(mod.organization == "Fruit Inc.")
+  assert(mod.description == "Module to test YANG schema lib")
 
   -- Check both modules exist. (Also need to check they've loaded)
   assert(mod.modules["ietf-inet-types"])
   assert(mod.modules["ietf-yang-types"])
 
   -- Check all revisions are accounted for.
-  assert(mod.revisions["2015-02-02"].description)
-  assert(mod.revisions["2015-02-06"].description)
-  assert(mod.revisions["2015-02-10"].description)
-  assert(mod.revisions["2015-04-07"].description)
-  assert(mod.revisions["2015-09-30"].description)
+  assert(mod.revisions["2016-05-27"].description == "Revision 1")
+  assert(mod.revisions["2016-05-28"].description == "Revision 2")
 
   -- Check that the feature statements are there.
-  assert(mod.features["lw4over6"].description)
-  assert(mod.features["lw4over6"].reference)
-  assert(mod.features["map-e"].description)
-  assert(mod.features["map-e"].reference)
+  assert(mod.features["bowl"].description)
 
   -- Check the groupings
-  assert(mod.groupings["port-set"])
-  assert(mod.groupings["port-set"].description)
-  assert(mod.groupings["port-set"].leaves["offset"])
-  assert(mod.groupings["port-set"].leaves["offset"].type == "uint8")
-  assert(mod.groupings["port-set"].leaves["psid-len"].mandatory == true)
-  assert(mod.groupings["port-set"].leaves["psid-len"].range[1] == 0)
-  assert(mod.groupings["port-set"].leaves["psid-len"].range[2] == 16)
+  assert(mod.groupings["fruit"])
+  assert(mod.groupings["fruit"].description)
+  assert(mod.groupings["fruit"].leaves["name"].type == "string")
+  assert(mod.groupings["fruit"].leaves["name"].mandatory == true)
+  assert(mod.groupings["fruit"].leaves["name"].description == "Name of fruit.")
+  assert(mod.groupings["fruit"].leaves["score"].type == "uint8")
+  assert(mod.groupings["fruit"].leaves["score"].mandatory == true)
+  assert(mod.groupings["fruit"].leaves["score"].range[1] == 0)
+  assert(mod.groupings["fruit"].leaves["score"].range[2] == 10)
 
   -- Check the containers description (NOT the leaf called "description")
-  assert(type(mod.containers["softwire-config"].description) == "string")
+  assert(mod.containers["fruit-bowl"].description == "Represents a fruit bowl")
 
   -- Check the container has a leaf called "description"
-  assert(mod.containers["softwire-config"].leaves.description)
+  local desc = mod.containers["fruit-bowl"].leaves.description
+  assert(desc.type == "string")
+  assert(desc.description == "About the bowl")
 end

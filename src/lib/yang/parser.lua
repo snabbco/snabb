@@ -356,5 +356,5 @@ function selftest()
 	argument="port", statements={{keyword="type"}}}})
 
    -- Expects tests to be run from the "src" directory at the root of the repo
-   parse_file("lib/yang/example.yang")
+   parse_file("src/lib/yang/example.yang")
 end
