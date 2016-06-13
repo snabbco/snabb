@@ -316,6 +316,10 @@ not been transmitted or freed. The number of allocatable packets is
 limited by the size of the underlying "freelist", e.g. a pool of unused
 packet objects from and to which packets are allocated and freed.
 
+— Variable **packet.max_payload**
+
+Maximum payload length for packets. Read-only.
+
 — Function **packet.allocate**
 
 Returns a new empty packet. An an error is raised if there are no packets
