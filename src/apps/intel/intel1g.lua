@@ -107,7 +107,7 @@ function Intel1g:new(conf)
    -- Setup device access
    pci.unbind_device_from_linux(pciaddress)
    pci.set_bus_master(pciaddress, true)
-   local regs, mmiofd = pci.map_pci_memory(pciaddress, 0)
+   local regs, mmiofd = pci.map_pci_memory_locked(pciaddress, 0)
 
    -- Common utilities, see snabb/src/lib/hardware/register.lua
    local function bitvalue (value)
