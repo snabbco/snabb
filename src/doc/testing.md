@@ -75,6 +75,8 @@ the tests:
   `SNABB_PCI1` in Intel specific tests. Some Intel specific tests (namely
   packetblaster based benchmarks) will be skipped if these are not set.
 
+* `SNABB_PCI_INTEL1G0`—Optional PCI address for use in Intel1G selftest.
+
 * `SNABB_PCI_SOLARFLARE0`, `SNABB_PCI_SOLARFLARE1`—Optional PCI addresses
   of two wired Solarflare NICs. These are preferred over `SNABB_PCI0` and
   `SNABB_PCI1` in Solarflare specific tests.
