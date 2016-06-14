@@ -225,8 +225,7 @@ local QUERY_PAGES        = 0x107
 local MANAGE_PAGES       = 0x108
 local SET_HCA_CAP        = 0x109
 local QUERY_ISSI         = 0x10A
---local QUERY_ISSI         = 0x010A
---local QUERY_ISSI         = 0x0A01
+local CREATE_EQ          = 0x301
 local SET_ISSI           = 0x10B
 local SET_DRIVER_VERSION = 0x10D
 
@@ -527,6 +526,59 @@ function cmdq:alloc_pages(num_pages)
       self:setinbits(0x14 + i*8, 31, 12, ptrbits(phy, 31, 12))
    end
    self:post(0x10 + num_pages*8, 0x0C)
+end
+
+-- Create Event Queue (EQ)
+function cmdq:create_eq(numpages)
+   self:prepare("CREATE_EQ", 0x10C + numpages*8, 0x0C)
+   self:setinbits(0x00, 31, 16, CREATE_EQ)
+   -- Setup Event Queue Context:
+   --
+
+   -- XXX Had wanted to use log_page_size=0 for 4KB pages
+   -- (2^0*4096=4096) but get BAD_INPUT_LEN errors. Have consulted the
+   -- hexdump for the Linux mlx5 driver and seen them choose
+   -- log_page_size=2 for presumably 16KB pages (2^2*4096=16384) and
+   -- mimicking this value resolves the error.
+   --
+   -- So, it works, but questions:
+   -- 1. How come we are choosing a page size? 4KB is used elsewhere.
+   -- 2. Are we setting the value correctly or is there some silly bug?
+   -- 3. How come log_page_size 2 is okay but 0 is not?
+   --    (What is the root cause of the BAD_INPUT_LEN error, really?)
+   local status = 0             -- 0 = OK
+   local ec = 0                 -- event collapse flag
+   local oi = 0                 -- overrun ignore flag
+   local st = 0x0               -- (Card did not accept 0x0A)
+   local page_offset = 0        -- (must be 0)
+   local log_eq_size = 7        -- Log (base 2) of EQ size (in entries)
+   local uar_page = 0           -- UAR page 0 for main event queue
+   local intr = 0               -- MSI-X table entry (should not be used)
+   local log_page_size = 2      -- Log (base 2) of page size in 4KB units
+   local consumer_counter = 0   -- Software cursor (init to zero)
+   local producer_counter = 0   -- Hardware cursor (init to zero)
+   self:setinbits(0x10 + 0x00,
+                  31, 28, status,
+                  18, 18, ec,
+                  17, 17, oi,
+                  11, 8, st)
+   self:setinbits(0x10 + 0x08, 7,9, page_offset)
+   self:setinbits(0x10 + 0x0C, 28, 24, log_eq_size,  23, 0, uar_page)
+   self:setinbits(0x10 + 0x14, 7, 9, intr)
+   self:setinbits(0x10 + 0x18, 28, 24, log_page_size)
+   self:setinbits(0x10 + 0x28, 23, 0, consumer_counter)
+   self:setinbits(0x10 + 0x2C, 23, 0, producer_counter)
+   -- Set event bitmask
+   local events = bits{PageRequest=0x0A}
+   self:setinbits(0x10 + 0x5C, 31, 0, events)
+   -- Allocate pages in contiguous physical memory
+   local ptr, phy = memory.dma_alloc(4096 * numpages, 4096)
+   for i = 0, numpages-1 do
+      self:setinbits(0x110 + i*8, 31, 0, ptrbits(phy + i * 4096, 63, 32))
+      self:setinbits(0x114 + i*8, 31, 0, ptrbits(phy + i * 4096, 31, 0))
+   end
+   self:post(0x10C + numpages*8, 0x0C)
+   return self:getoutbits(0x08, 7, 0)
 end
 
 local what_codes = {
@@ -848,6 +900,9 @@ function hexdump (pointer, index, bytes,  dumpoffset)
       if i % 16 == 0 then
          if i > 0 then io.stdout:write("\n") end
          io.stdout:write(("%03x: "):format(dumpoffset+i))
+   local eq = cmdq:create_eq(1)
+   print("eq               = " .. eq)
+
       elseif i % 4 == 0 then
          io.stdout:write(" ")
       end
