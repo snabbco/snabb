@@ -784,6 +784,42 @@ function cmdq:set_hca_cap(which, caps)
    self:post(0x100C, 0x0C)
 end
 
+-- XXX VPORT commands /may/ not be needed since we are not using SR-IOV.
+--     In this case the functions below can be removed.
+
+function cmdq:query_vport_state()
+   self:prepare("QUERY_VPORT_STATE", 0x0c, 0x0c)
+   self:setinbits(0x00, 31, 16, QUERY_VPORT_STATE)
+   self:post(0x0C, 0x0C)
+   return { admin_state = self:getoutbits(0x0C, 7, 4),
+            oper_state  = self:getoutbits(0x0C, 3, 0) }
+end
+
+function cmdq:modify_vport_state(admin_state)
+   self:prepare("MODIFY_VPORT_STATE", 0x0c, 0x0c)
+   self:setinbits(0x00, 31, 16, MODIFY_VPORT_STATE)
+   self:setinbits(0x0C, 7, 4, admin_state)
+   self:post(0x0C, 0x0C)
+end
+
+function cmdq:query_nic_vport_context()
+   -- XXX This command can be used to manipulate long lists of allowed
+   -- unicast addresses, multicast addresses, and VLANs. For now we
+   -- skip that (leave the list length as zero) and access only the
+   -- global settings. Is this interaction correct ?
+   self:prepare("QUERY_NIC_VPORT_CONTEXT", 0x0c, 0x10+0xFC)
+   self:setinbits(0x00, 31, 16, 0x754) -- Command opcode
+   self:post(0x0C, 0x10+0xFC)
+   local mac_hi = self:getoutbits(0x10+0xF4, 31, 0)
+   local mac_lo = self:getoutbits(0x10+0xF8, 31, 0)
+   local mac_hex = bit.tohex(mac_hi, 4) .. bit.tohex(mac_lo, 8)
+   return { mtu = self:getoutbits(0x10+0x24, 15, 0),
+            promisc_uc  = self:getoutbits(0x10+0xf0, 31, 31),
+            promisc_mc  = self:getoutbits(0x10+0xf0, 30, 30),
+            promisc_all = self:getoutbits(0x10+0xf0, 29, 29),
+            permanent_address = mac_hex }
+end
+
 function cmdq:init_hca()
    self:prepare("INIT_HCA", 0x0c, 0x0c)
    self:setinbits(0x00, 31, 16, INIT_HCA)
@@ -867,6 +903,14 @@ function ConnectX4:new(arg)
 
    cmdq:init_hca()
 
+   local eq = cmdq:create_eq(1)
+   print("eq               = " .. eq)
+
+   local vport_ctx = cmdq:query_nic_vport_context()
+   for k,v in pairs(vport_ctx) do
+      print(k,v)
+   end
+
    --[[
    cmdq:set_hca_cap()
    cmdq:query_pages()
@@ -900,9 +944,6 @@ function hexdump (pointer, index, bytes,  dumpoffset)
       if i % 16 == 0 then
          if i > 0 then io.stdout:write("\n") end
          io.stdout:write(("%03x: "):format(dumpoffset+i))
-   local eq = cmdq:create_eq(1)
-   print("eq               = " .. eq)
-
       elseif i % 4 == 0 then
          io.stdout:write(" ")
       end
