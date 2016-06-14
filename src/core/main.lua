@@ -183,14 +183,8 @@ else
       -- and set exit status accordingly.
       local status, err, worker = S.waitpid(worker_pid)
       assert(status, tostring(err))
-      if     worker.WIFEXITED   then exit_status = worker.EXITSTATUS
-      elseif worker.WIFSIGNALED then exit_status = 128 + worker.WTERMSIG
-      else
-         -- Stopping/continuing the worker is unsupported and causes shutdown.
-         S.kill(worker_pid, "hup")
-         exit_status = 255
-         print("Error: Unsupported worker state (stopped / continued).")
-      end
+      if worker.WIFEXITED then exit_status = worker.EXITSTATUS
+      else                     exit_status = 128 + worker.WTERMSIG end
    else
       -- Supervisor received exit signal: kill worker by sending SIGHUP and
       -- and set exit status accordingly.
