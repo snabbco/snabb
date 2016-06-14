@@ -337,6 +337,12 @@ Returns the payload length of *packet*.
 
 Returns an exact copy of *packet*.
 
+— Function **packet.resize** *packet*, *length*
+
+Sets the payload length of *packet*, truncating or extending its payload. In
+the latter case the contents of the extended area at the end of the payload are
+filled with zeros.
+
 — Function **packet.append** *packet*, *pointer*, *length*
 
 Appends *length* bytes starting at *pointer* to the end of *packet*. An
