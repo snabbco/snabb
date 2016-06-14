@@ -163,31 +163,41 @@ end
 -- Fork into worker process and supervisor
 local worker_pid = S.fork()
 if worker_pid == 0 then
-   -- Worker
+   -- Worker: Use prctl to ensure we are killed (SIGHUP) when our parent quits
+   -- and run main.
    S.prctl("set_pdeathsig", "hup")
    xpcall(main, handler)
 else
-   -- Supervisor
+   -- Supervisor: Queue exit_signals using signalfd, prevent them from killing
+   -- us instantly using sigprocmask.
    local exit_signals = "hup, int, quit, term, chld"
    local signalfd = S.signalfd(exit_signals)
    S.sigprocmask("block", exit_signals)
+   -- Read signals from signalfd. Only process the first signal because any
+   -- signal causes shutdown.
    local signals, err = S.util.signalfd_read(signalfd)
    assert(signals, tostring(err))
    local exit_status
    if signals[1].chld then
+      -- SIGCHILD means worker state changed: retrieve its status using waitpid
+      -- and set exit status accordingly.
       local status, err, worker = S.waitpid(worker_pid)
       assert(status, tostring(err))
       if     worker.WIFEXITED   then exit_status = worker.EXITSTATUS
       elseif worker.WIFSIGNALED then exit_status = 128 + worker.WTERMSIG
       else
+         -- Stopping/continuing the worker is unsupported and causes shutdown.
          S.kill(worker_pid, "hup")
          exit_status = 255
          print("Error: Unsupported worker state (stopped / continued).")
       end
    else
+      -- Supervisor received exit signal: kill worker by sending SIGHUP and
+      -- and set exit status accordingly.
       S.kill(worker_pid, "hup")
       exit_status = 128 + signals[1].signo
    end
+   -- Clean up and exit.
    shutdown(worker_pid)
    os.exit(exit_status)
 end
