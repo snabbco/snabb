@@ -49,6 +49,18 @@
 --        this driver without signatures. It seems potentially futile
 --        to calculate and include command signatures if they are not
 --        actually being verified by the device.
+--
+--   DRIVER VERSION: This driver does /not/ identify itself via the
+--        command SET_DRIVER_VERSION. That interation could lead to
+--        hazards in the spirit of HTTP User-Agent where the adapter
+--        firmware would behave differently depending on how the
+--        driver identifies itself.
+--
+--        This decision could be revisited in the future when the
+--        motivation for this mechanism is better understood. (The
+--        card and firmware being used for initial development is not
+--        asking the driver to identify itself anyway.)
+
 
 module(...,package.seeall)
 
