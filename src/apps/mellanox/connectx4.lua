@@ -849,7 +849,7 @@ function ConnectX4:new(arg)
    pci.unbind_device_from_linux(pciaddress)
    pci.reset_device(pciaddress)
    pci.set_bus_master(pciaddress, true)
-   local base, fd = pci.map_pci_memory(pciaddress, 0)
+   local base, fd = pci.map_pci_memory(pciaddress, 0, true)
 
    trace("Read the initialization segment")
    local init_seg = init_seg:init(base)
