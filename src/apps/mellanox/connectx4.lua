@@ -49,6 +49,18 @@
 --        this driver without signatures. It seems potentially futile
 --        to calculate and include command signatures if they are not
 --        actually being verified by the device.
+--
+--   DRIVER VERSION: This driver does /not/ identify itself via the
+--        command SET_DRIVER_VERSION. That interation could lead to
+--        hazards in the spirit of HTTP User-Agent where the adapter
+--        firmware would behave differently depending on how the
+--        driver identifies itself.
+--
+--        This decision could be revisited in the future when the
+--        motivation for this mechanism is better understood. (The
+--        card and firmware being used for initial development is not
+--        asking the driver to identify itself anyway.)
+
 
 module(...,package.seeall)
 
@@ -213,8 +225,7 @@ local QUERY_PAGES        = 0x107
 local MANAGE_PAGES       = 0x108
 local SET_HCA_CAP        = 0x109
 local QUERY_ISSI         = 0x10A
---local QUERY_ISSI         = 0x010A
---local QUERY_ISSI         = 0x0A01
+local CREATE_EQ          = 0x301
 local SET_ISSI           = 0x10B
 local SET_DRIVER_VERSION = 0x10D
 
@@ -517,6 +528,59 @@ function cmdq:alloc_pages(num_pages)
    self:post(0x10 + num_pages*8, 0x0C)
 end
 
+-- Create Event Queue (EQ)
+function cmdq:create_eq(numpages)
+   self:prepare("CREATE_EQ", 0x10C + numpages*8, 0x0C)
+   self:setinbits(0x00, 31, 16, CREATE_EQ)
+   -- Setup Event Queue Context:
+   --
+
+   -- XXX Had wanted to use log_page_size=0 for 4KB pages
+   -- (2^0*4096=4096) but get BAD_INPUT_LEN errors. Have consulted the
+   -- hexdump for the Linux mlx5 driver and seen them choose
+   -- log_page_size=2 for presumably 16KB pages (2^2*4096=16384) and
+   -- mimicking this value resolves the error.
+   --
+   -- So, it works, but questions:
+   -- 1. How come we are choosing a page size? 4KB is used elsewhere.
+   -- 2. Are we setting the value correctly or is there some silly bug?
+   -- 3. How come log_page_size 2 is okay but 0 is not?
+   --    (What is the root cause of the BAD_INPUT_LEN error, really?)
+   local status = 0             -- 0 = OK
+   local ec = 0                 -- event collapse flag
+   local oi = 0                 -- overrun ignore flag
+   local st = 0x0               -- (Card did not accept 0x0A)
+   local page_offset = 0        -- (must be 0)
+   local log_eq_size = 7        -- Log (base 2) of EQ size (in entries)
+   local uar_page = 0           -- UAR page 0 for main event queue
+   local intr = 0               -- MSI-X table entry (should not be used)
+   local log_page_size = 2      -- Log (base 2) of page size in 4KB units
+   local consumer_counter = 0   -- Software cursor (init to zero)
+   local producer_counter = 0   -- Hardware cursor (init to zero)
+   self:setinbits(0x10 + 0x00,
+                  31, 28, status,
+                  18, 18, ec,
+                  17, 17, oi,
+                  11, 8, st)
+   self:setinbits(0x10 + 0x08, 7,9, page_offset)
+   self:setinbits(0x10 + 0x0C, 28, 24, log_eq_size,  23, 0, uar_page)
+   self:setinbits(0x10 + 0x14, 7, 9, intr)
+   self:setinbits(0x10 + 0x18, 28, 24, log_page_size)
+   self:setinbits(0x10 + 0x28, 23, 0, consumer_counter)
+   self:setinbits(0x10 + 0x2C, 23, 0, producer_counter)
+   -- Set event bitmask
+   local events = bits{PageRequest=0x0A}
+   self:setinbits(0x10 + 0x5C, 31, 0, events)
+   -- Allocate pages in contiguous physical memory
+   local ptr, phy = memory.dma_alloc(4096 * numpages, 4096)
+   for i = 0, numpages-1 do
+      self:setinbits(0x110 + i*8, 31, 0, ptrbits(phy + i * 4096, 63, 32))
+      self:setinbits(0x114 + i*8, 31, 0, ptrbits(phy + i * 4096, 31, 0))
+   end
+   self:post(0x10C + numpages*8, 0x0C)
+   return self:getoutbits(0x08, 7, 0)
+end
+
 local what_codes = {
    max = 0,
    cur = 1,
@@ -720,6 +784,42 @@ function cmdq:set_hca_cap(which, caps)
    self:post(0x100C, 0x0C)
 end
 
+-- XXX VPORT commands /may/ not be needed since we are not using SR-IOV.
+--     In this case the functions below can be removed.
+
+function cmdq:query_vport_state()
+   self:prepare("QUERY_VPORT_STATE", 0x0c, 0x0c)
+   self:setinbits(0x00, 31, 16, QUERY_VPORT_STATE)
+   self:post(0x0C, 0x0C)
+   return { admin_state = self:getoutbits(0x0C, 7, 4),
+            oper_state  = self:getoutbits(0x0C, 3, 0) }
+end
+
+function cmdq:modify_vport_state(admin_state)
+   self:prepare("MODIFY_VPORT_STATE", 0x0c, 0x0c)
+   self:setinbits(0x00, 31, 16, MODIFY_VPORT_STATE)
+   self:setinbits(0x0C, 7, 4, admin_state)
+   self:post(0x0C, 0x0C)
+end
+
+function cmdq:query_nic_vport_context()
+   -- XXX This command can be used to manipulate long lists of allowed
+   -- unicast addresses, multicast addresses, and VLANs. For now we
+   -- skip that (leave the list length as zero) and access only the
+   -- global settings. Is this interaction correct ?
+   self:prepare("QUERY_NIC_VPORT_CONTEXT", 0x0c, 0x10+0xFC)
+   self:setinbits(0x00, 31, 16, 0x754) -- Command opcode
+   self:post(0x0C, 0x10+0xFC)
+   local mac_hi = self:getoutbits(0x10+0xF4, 31, 0)
+   local mac_lo = self:getoutbits(0x10+0xF8, 31, 0)
+   local mac_hex = bit.tohex(mac_hi, 4) .. bit.tohex(mac_lo, 8)
+   return { mtu = self:getoutbits(0x10+0x24, 15, 0),
+            promisc_uc  = self:getoutbits(0x10+0xf0, 31, 31),
+            promisc_mc  = self:getoutbits(0x10+0xf0, 30, 30),
+            promisc_all = self:getoutbits(0x10+0xf0, 29, 29),
+            permanent_address = mac_hex }
+end
+
 function cmdq:init_hca()
    self:prepare("INIT_HCA", 0x0c, 0x0c)
    self:setinbits(0x00, 31, 16, INIT_HCA)
@@ -802,6 +902,14 @@ function ConnectX4:new(arg)
    cmdq:alloc_pages(init_pages)
 
    cmdq:init_hca()
+
+   local eq = cmdq:create_eq(1)
+   print("eq               = " .. eq)
+
+   local vport_ctx = cmdq:query_nic_vport_context()
+   for k,v in pairs(vport_ctx) do
+      print(k,v)
+   end
 
    --[[
    cmdq:set_hca_cap()
