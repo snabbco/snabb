@@ -339,16 +339,6 @@ is uninitialized garbage.
 
 Frees *packet* and puts in back onto the freelist.
 
-— Function **packet.data** *packet*
-
-Returns a pointer to the payload of *packet*. **Deprecated, please use the
-`data` field instead.**
-
-— Function **packet.length** *packet*
-
-Returns the payload length of *packet*. **Deprecated, please use the `length`
-field instead.**
-
 — Function **packet.clone** *packet*
 
 Returns an exact copy of *packet*.
