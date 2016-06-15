@@ -173,25 +173,33 @@ else
    local exit_signals = "hup, int, quit, term, chld"
    local signalfd = S.signalfd(exit_signals)
    S.sigprocmask("block", exit_signals)
-   -- Read signals from signalfd. Only process the first signal because any
-   -- signal causes shutdown.
-   local signals, err = S.util.signalfd_read(signalfd)
-   assert(signals, tostring(err))
-   local exit_status
-   if signals[1].chld then
-      -- SIGCHILD means worker state changed: retrieve its status using waitpid
-      -- and set exit status accordingly.
-      local status, err, worker = S.waitpid(worker_pid)
-      assert(status, tostring(err))
-      if worker.WIFEXITED then exit_status = worker.EXITSTATUS
-      else                     exit_status = 128 + worker.WTERMSIG end
-   else
-      -- Supervisor received exit signal: kill worker by sending SIGHUP and
-      -- and set exit status accordingly.
-      S.kill(worker_pid, "hup")
-      exit_status = 128 + signals[1].signo
+   while true do
+      -- Read signals from signalfd. Only process the first signal because any
+      -- signal causes shutdown.
+      local signals, err = S.util.signalfd_read(signalfd)
+      assert(signals, tostring(err))
+      for i = 1, #signals do
+         local exit_status
+         if signals[i].chld then
+            -- SIGCHILD means worker state changed: retrieve its status using
+            -- waitpid and set exit status accordingly.
+            local status, err, worker =
+               S.waitpid(worker_pid, "stopped,continued")
+            assert(status, tostring(err))
+            if     worker.WIFEXITED   then exit_status = worker.EXITSTATUS
+            elseif worker.WIFSIGNALED then exit_status = 128 + worker.WTERMSIG
+            -- WIFSTOPPED and WIFCONTINUED are ignored.
+            else goto ignore_signal end
+         else
+            -- Supervisor received exit signal: kill worker by sending SIGHUP
+            -- and and set exit status accordingly.
+            S.kill(worker_pid, "hup")
+            exit_status = 128 + signals[i].signo
+         end
+         -- Run shutdown routine and exit.
+         shutdown(worker_pid)
+         os.exit(exit_status)
+         ::ignore_signal::
+      end
    end
-   -- Clean up and exit.
-   shutdown(worker_pid)
-   os.exit(exit_status)
 end
