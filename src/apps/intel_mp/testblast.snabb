@@ -3,7 +3,7 @@
 local args = main.parameters
 -- nic queue pcap
 assert(#args == 3, "testsend.lua pciaddr queueno pcap")
-local intel = require("apps.intel1g.intel1g")
+local intel = require("apps.intel_mp.intel_mp")
 local pcap = require("apps.pcap.pcap")
 local basic = require("apps.basic.basic_apps")
 

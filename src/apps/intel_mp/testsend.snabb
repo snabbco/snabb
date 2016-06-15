@@ -3,7 +3,7 @@
 local args = main.parameters
 -- delay nic queue pcap
 assert(#args == 4, "testsend.lua delay pciaddr queueno pcap")
-local intel = require("apps.intel1g.intel1g")
+local intel = require("apps.intel_mp.intel_mp")
 local pcap = require("apps.pcap.pcap")
 local delay = require("apps.test.delayed_start")
 
