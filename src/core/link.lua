@@ -55,7 +55,7 @@ end
 
 function transmit (r, p)
 --   assert(p)
-   if full(r) then
+   if band(r.write + 1, size - 1) == r.read then
       counter.add(r.stats.txdrop)
       packet.free(p)
    else
@@ -72,11 +72,6 @@ function empty (r)
    return r.read == r.write
 end
 
--- Return true if the ring is full.
-function full (r)
-   return band(r.write + 1, size - 1) == r.read
-end
-
 -- Return the number of packets that are ready for read.
 function nreadable (r)
    if r.read > r.write then
@@ -84,10 +79,6 @@ function nreadable (r)
    else
       return r.write - r.read
    end
-end
-
-function nwritable (r)
-   return max - nreadable(r)
 end
 
 function stats (r)
