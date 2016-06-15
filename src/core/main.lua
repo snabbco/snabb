@@ -29,8 +29,8 @@ ffi.cdef[[
       extern char** argv;
 ]]
 
-_G.developer_debug = false
-debug_on_error = false
+_G.developer_debug = lib.getenv("SNABB_DEBUG") and true
+debug_on_error = _G.developer_debug
 
 function main ()
    zone("startup")
