@@ -99,6 +99,18 @@ Tables of named input and output links.  These tables are initialized by
 the engine for use in processing and are *read-only*.
 
 
+— Field **myapp.appname**
+
+Name of the app. *Read-only*.
+
+
+— Method **myapp:start**
+
+*Optional*. Start the app. At this the `input` and `output` link tables are
+populated, and `appname` is set. The app can perform additional initialization
+if required.
+
+
 — Method **myapp:pull**
 
 *Optional*. Pull packets into the network.
@@ -124,14 +136,6 @@ implemented the app instance is discarded and a new instance is created.
 — Method **myapp:report**
 
 *Optional*. Print a report of the current app status.
-
-
-— Method **myapp:start**
-
-*Optional*. Starts the app.
-
-At this point links and app name are set. The app has a chance to do
-additional initialization if needed.
 
 
 — Method **myapp:stop**
