@@ -9,6 +9,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local timer = require("core.timer")
 local pci = require("lib.hardware.pci")
+local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local counter = require("core.counter")
 
 local long_opts = {
@@ -83,6 +84,7 @@ function traffic (pciaddr, confpath, sockpath)
    if C.stat_mtime(confpath) == 0 then
       print(("WARNING: File '%s' does not exist."):format(confpath))
    end
+   timer.activate(ingress_drop_monitor.new({action='warn'}):timer())
    while true do
       local mtime2 = C.stat_mtime(confpath)
       if mtime2 ~= mtime then
