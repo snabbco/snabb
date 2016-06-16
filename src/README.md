@@ -104,9 +104,9 @@ the engine for use in processing and are *read-only*.
 Name of the app. *Read-only*.
 
 
-— Method **myapp:start**
+— Method **myapp:configure**
 
-*Optional*. Start the app. At this the `input` and `output` link tables are
+*Optional*. Configure the app. At this the `input` and `output` link tables are
 populated, and `appname` is set. The app can perform additional initialization
 if required.
 

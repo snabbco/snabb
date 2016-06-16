@@ -232,9 +232,9 @@ function apply_config_actions (actions, conf)
    -- Commit changes.
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
-   -- Trigger start event for each app.
+   -- Trigger configure event for each app.
    for _, app in ipairs(app_array) do
-      if app.start then app:start() end
+      if app.configure then app:configure() end
    end
 end
 
