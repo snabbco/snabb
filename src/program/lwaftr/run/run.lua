@@ -6,7 +6,7 @@ local csv_stats  = require("program.lwaftr.csv_stats")
 local lib        = require("core.lib")
 local numa       = require("lib.numa")
 local setup      = require("program.lwaftr.setup")
-local ingress_drop_monitor_timer = require("lib.timers.ingress_drop_monitor")
+local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 
 local function show_usage(exit_code)
    print(require("program.lwaftr.run.README_inc"))
@@ -39,7 +39,7 @@ function parse_args(args)
    if #args == 0 then show_usage(1) end
    local conf_file, v4, v6
    local ring_buffer_size
-   local opts = { verbosity = 0 }
+   local opts = { verbosity = 0, ingress_drop_monitor = 'flush' }
    local handlers = {}
    local cpu
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
@@ -104,14 +104,21 @@ function parse_args(args)
       end
    end
    handlers["no-ingress-drop-monitor"] = function (arg)
-      opts.ingress_drop_monitor = false
+      if arg == 'flush' or arg == 'warn' then
+         opts.ingress_drop_monitor = arg
+      elseif arg == 'off' then
+         opts.ingress_drop_monitor = nil
+      else
+         fatal("invalid --ingress-drop-monitor argument: " .. arg
+                  .." (valid values: flush, warn, off)")
+      end
    end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:hir:",
       { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
         verbose = "v", duration = "D", help = "h",
         virtio = "i", ["ring-buffer-size"] = "r", cpu = 1,
-        ["real-time"] = 0, ["no-ingress-drop-monitor"] = 0, })
+        ["real-time"] = 0, ["ingress-drop-monitor"] = 1, })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -151,8 +158,9 @@ function run(args)
       csv:activate()
    end
 
-   if opts.ingress_drop_monitor or opts.ingress_drop_monitor == nil then
-      timer.activate(ingress_drop_monitor_timer)
+   if opts.ingress_drop_monitor then
+      local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
+      timer.activate(mon:timer())
    end
 
    engine.busywait = true
