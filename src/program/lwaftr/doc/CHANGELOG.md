@@ -1,5 +1,21 @@
 # Change Log
 
+## [2.10] - 2016-06-17
+
+A Snabb NFV performance fix, which results in more reliable performance
+when running any virtualized workload, including the lwAFTR.
+
+ * Fix a situation in the NFV which caused runtime behavior that the JIT
+   compiler did not handle well.  This fixes the situation where
+   sometimes Snabb NFV would wedge itself into a very low-throughput
+   state.
+
+ * Disable jit.flush() mechanism in Snabb NFV, to remove a source of
+   divergence with upstream Snabb NFV.  Ingress drops in the NFV are
+   still detected and printed to the console, but as warnings.
+
+ * Remove remaining sources of backpressure in the lwAFTR.
+
 ## [2.9] - 2016-06-09
 
 A performance release, speeding up both the core lwaftr operations as
