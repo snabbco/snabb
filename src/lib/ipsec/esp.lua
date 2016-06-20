@@ -86,15 +86,16 @@ local function padding (a, l) return (a - l%a) % a end
 --   5. Write ESP header
 function esp_v6_encrypt:encapsulate (p)
    local gcm = self.aes_128_gcm
-   if p.length < PAYLOAD_OFFSET then return false end
-   local payload = p.data + PAYLOAD_OFFSET
-   local payload_length = p.length - PAYLOAD_OFFSET
+   local data, length = p.data, p.length
+   if length < PAYLOAD_OFFSET then return false end
+   local payload = data + PAYLOAD_OFFSET
+   local payload_length = length - PAYLOAD_OFFSET
    -- Padding, see https://tools.ietf.org/html/rfc4303#section-2.4
    local pad_length = padding(self.pad_to, payload_length + self.ESP_PAYLOAD_OVERHEAD)
    local overhead = self.ESP_OVERHEAD + pad_length
-   packet.resize(p, p.length + overhead)
-   self.ip:new_from_mem(p.data + ETHERNET_SIZE, IPV6_SIZE)
-   self.esp_tail:new_from_mem(p.data + p.length + pad_length, ESP_TAIL_SIZE)
+   packet.resize(p, length + overhead)
+   self.ip:new_from_mem(data + ETHERNET_SIZE, IPV6_SIZE)
+   self.esp_tail:new_from_mem(data + length + pad_length, ESP_TAIL_SIZE)
    self.esp_tail:next_header(self.ip:next_header())
    self.esp_tail:pad_length(pad_length)
    self:next_seq_no()
@@ -133,13 +134,14 @@ end
 --   5. Shrink p by ESP overhead
 function esp_v6_decrypt:decapsulate (p)
    local gcm = self.aes_128_gcm
-   if p.length - PAYLOAD_OFFSET < self.MIN_SIZE then return false end
-   self.ip:new_from_mem(p.data + ETHERNET_SIZE, IPV6_SIZE)
-   local payload = p.data + PAYLOAD_OFFSET
+   local data, length = p.data, p.length
+   if length - PAYLOAD_OFFSET < self.MIN_SIZE then return false end
+   self.ip:new_from_mem(data + ETHERNET_SIZE, IPV6_SIZE)
+   local payload = data + PAYLOAD_OFFSET
    self.esp:new_from_mem(payload, ESP_SIZE)
    local iv_start = payload + ESP_SIZE
    local ctext_start = payload + self.CTEXT_OFFSET
-   local ctext_length = p.length - self.PLAIN_OVERHEAD
+   local ctext_length = length - self.PLAIN_OVERHEAD
    local seq_low = self.esp:seq_no()
    local seq_high = C.track_seq_no(seq_low, self.seq:low(), self.seq:high(), self.window_size)
    if gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
