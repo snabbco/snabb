@@ -97,6 +97,10 @@ function Intel82599:pull ()
    self:add_receive_buffers()
 end
 
+function Intel82599:ingress_packet_drops ()
+   return self.dev:ingress_packet_drops()
+end
+
 function Intel82599:add_receive_buffers ()
    -- Generic buffers
    while self.dev:can_add_receive_buffer() do
