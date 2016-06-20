@@ -10,11 +10,19 @@
 // This makes it possible to resolve physical addresses directly from
 // virtual addresses (remove the tag bits) and to test addresses for
 // validity (check the tag bits).
+//
+// This also means that it's possible to pass pointers to objects
+// within this area between different processes.  For this, the
+// global variable map_ids must point to a shared object,  If not null,
+// it's used to store the mapping IDs of each hugepage, so that
+// allocate_on_sigsegv() can map the same pages on demand.
+
 
 #define _GNU_SOURCE 1
 
 #include <assert.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -28,6 +36,9 @@
 #include <unistd.h>
 
 #include "memory.h"
+
+#define ARRAY_SIZE(A) (sizeof(A)/sizeof(A[0]))
+
 
 // Convert from virtual addresses in our own process address space to
 // physical addresses in the RAM chips.
@@ -97,7 +108,15 @@ void *allocate_huge_page(int size)
   if (mlock(realptr, size) != 0) { goto fail; }
   memset(realptr, 0, size); // zero memory to avoid potential surprises
   shmdt(tmpptr);
-  shmctl(shmid, IPC_RMID, 0);
+  //shmctl(shmid, IPC_RMID, 0);
+
+  // write shm id to a mmap()ed structure.
+  if (map_ids) {
+    int offst = physical_address >> map_ids->huge_page_bits;
+    assert(offst < ARRAY_SIZE(map_ids->ids));
+    map_ids->ids[offst] = shmid;
+  }
+
   return realptr;
  fail:
   if (tmpptr  != MAP_FAILED) { shmdt(tmpptr); }
@@ -106,3 +125,48 @@ void *allocate_huge_page(int size)
   return NULL;
 }
 
+// SIGSEGV handler: attempts map packet memory on demand
+void allocate_on_sigsegv(int sig, siginfo_t *si, void *unused)
+{
+  uint64_t address = (uint64_t)si->si_addr;
+  if ((address & 0x500000000000ULL) != 0x500000000000ULL) {
+    // This is not DMA memory: die.
+    //exit(139);
+  } else {
+    uint64_t physaddr = address  & ~0x500000000000ULL;
+    int hugepage_mask = ~((1<<map_ids->huge_page_bits) - 1);
+    uint64_t physpage = physaddr & hugepage_mask;
+    uint64_t virtpage = address  & hugepage_mask;
+
+    int offst = physpage >> map_ids->huge_page_bits;
+    assert(offst < ARRAY_SIZE(map_ids->ids));
+    int id = map_ids->ids[offst];
+
+    shmat(id, (void*)virtpage, 0);
+  }
+}
+
+void setup_signal()
+{
+  if (map_ids) {
+    struct sigaction sa;
+    sa.sa_flags = SA_SIGINFO;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_sigaction = allocate_on_sigsegv;
+    assert(sigaction(SIGSEGV, &sa, NULL) != -1);
+  }
+}
+
+
+void cleanup_hugepage_shms()
+{
+  if (!map_ids) return;
+
+  int i = 0;
+  for (i=0; i < ARRAY_SIZE(map_ids->ids); i++) {
+    int shmid = map_ids->ids[i];
+    if (shmid != 0) {
+      shmctl(shmid, IPC_RMID, 0);
+    }
+  }
+}

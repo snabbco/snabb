@@ -1,0 +1,51 @@
+# Inter-Process Communication Apps
+
+The `inter_proc` apps makes it possible to integrate several SnabbSwitch
+processes, each with its own collection of apps, to make use of more than
+one CPU core.
+
+One Transmit and one Receive apps are paired by mapping a shared memory
+struct in `/var/run/snabb/link/<linkname>`. Note that there must be only
+one transmit and one receive app on each link in the whole system.  In other
+words, each transmit/receive pair needs its own private <linkname>.
+
+On simple networks, it might be better to set the `engine.busywait` flag
+to force it to run at 100% busy.  Since the core engine can't "see" the
+packets transmitted between processes, it might erroneously assume there's
+no useful work to do.
+
+
+## Transmit (apps.inter_proc.transmit)
+
+The `Transmit` app sends packets from an `input` link to another process.
+Before sending each packet, it checks if there's a "payback" packet to be
+disposed (and keep the local freelist well fed).
+
+![Transmit](.images/Transmit.png)
+
+### Configuration
+
+— Key **linkname**
+
+*Required*. The name of the interprocess link in the filesystem.  It's
+created if necessary.  Note that only one app can write on each link.
+
+
+## Receive (apps.inter_proc.receive)
+
+The `Receive` app gets packets from another process and sends into an
+`output` link.  After reading each packet, a new empty one is allocated
+and sent as payback.
+
+![Receive](.images/Receive.png)
+
+Like the `Transmit` app, this app only fetches packets when there are
+at least 128 packets and the `output` link has enough free space for
+all available packets.
+
+### Configuration
+
+— Key **linkname**
+
+*Required*. The name of the interprocess link in the filesystem.  It's
+created if necessary.  Note that only one app can read on each link.

@@ -11,6 +11,7 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local syscall = require("syscall")
+local shm = require("core.shm")
 
 local lib = require("core.lib")
 require("core.memory_h")
@@ -107,6 +108,13 @@ function virtual_to_physical (virt_addr)
    return bit.bxor(u64, 0x500000000000ULL)
 end
 
+
+function cleanup()
+   C.cleanup_hugepage_shms()
+   shm.unmap(C.map_ids)
+   shm.unlink('//dma_map_ids')
+end
+
 --- ### selftest
 
 function selftest (options)
@@ -125,4 +133,9 @@ function selftest (options)
    print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
    print("HugeTLB page allocation OK.")
 end
+
+C.map_ids = shm.map('//dma_map_ids', 'struct map_ids_t')
+C.map_ids.huge_page_bits =  huge_page_bits
+C.setup_signal()
+
 
