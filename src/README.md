@@ -104,11 +104,11 @@ the engine for use in processing and are *read-only*.
 Name of the app. *Read-only*.
 
 
-— Method **myapp:configure**
+— Method **myapp:link**
 
-*Optional*. Configure the app. At this the `input` and `output` link tables are
-populated, and `appname` is set. The app can perform additional initialization
-if required.
+*Optional*. Called any time the app’s links may have been changed (including on
+start-up). Guaranteed to be called before `pull` and `push` are called with new
+links.
 
 
 — Method **myapp:pull**

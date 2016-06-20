@@ -143,7 +143,7 @@ end
 -- accessible via the keys l_in and l_out, respectively.  This helps
 -- to speed up packet forwarding by eliminating a lookup in the input
 -- and output tables.
-function bridge:configure ()
+function bridge:link ()
    assert(self.input and self.output)
    for _, port in ipairs(self._ports) do
       port.l_in = self.input[port.name]
