@@ -59,7 +59,7 @@ function Intel1g:new(conf)
    local txq = conf.txqueue or 0
    local rxq = conf.rxqueue or 0
    local ndesc = conf.ndescriptors or 512
-   local rxburst = conf.rxburst or 128
+   local rxburst = conf.rxburst or engine.pull_npackets
 
    -- 8.1.3 Register Summary, p.359
    local r = {}
@@ -589,12 +589,7 @@ function Intel1g:new(conf)
          while limit > 0 and can_receive() do
           limit = limit - 1
           if lo then					-- a link connects NIC to a sink
-           if not link.full(lo) then			-- from SolarFlareNic:pull()
-            link.transmit(lo, receive())
-           else
-            counters.pullTxLinkFull= counters.pullTxLinkFull +1
-            packet.free(receive())
-           end
+           link.transmit(lo, receive())
           else
            counters.pullNoTxLink= counters.pullNoTxLink +1
            packet.free(receive())

@@ -255,7 +255,7 @@ function Lwaftrgen:new(arg)
    return setmetatable(o, {__index=Lwaftrgen})
 end
 
-function Lwaftrgen:push ()
+function Lwaftrgen:pull ()
 
    local output = self.output.output
    local input = self.input.input
@@ -330,7 +330,8 @@ function Lwaftrgen:push ()
    self.bucket_content = self.bucket_content + self.rate * 1e6 * (cur_now - last_time)
    self.last_time = cur_now
 
-   while link.nwritable(output) > self.total_packet_count and
+   while limit > self.total_packet_count and
+      limit = limit - 1
       self.total_packet_count <= self.bucket_content do
       self.bucket_content = self.bucket_content - self.total_packet_count
 
