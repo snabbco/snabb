@@ -115,3 +115,26 @@ the L2TPv3 header will be overwritten with this value.
 
 *Optional*. Destination MAC as a string. Not required if overwritten by
 an app such as `nd_light`.
+
+
+### Special Counters
+
+— Key **length_errors**
+
+Ingress packets dropped due to invalid length (packet too short).
+
+— Key **protocol_errors**
+
+Ingress packets dropped due to unrecognized IPv6 protocol ID.
+
+— Key **cookie_errors**
+
+Ingress packets dropped due to wrong cookie value.
+
+— Key **remote_address_errors**
+
+Ingress packets dropped due to wrong remote IPv6 endpoint address.
+
+— Key **local_address_errors**
+
+Ingress packets dropped due to wrong local IPv6 endpoint address.
