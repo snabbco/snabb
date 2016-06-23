@@ -1,10 +1,10 @@
 # Run like this:
 #   nix-build /path/to/this/directory
-# ... and the files are produced in ./result/
+# ... and the files are produced in ./result/bin/snabb
 
 { pkgs ? (import <nixpkgs> {})
 , source ? ./.
-, version ? builtins.replaceStrings ["\n"] [""] (builtins.readFile ./.version)
+, version ? "dev"
 }:
 
 with pkgs;
@@ -39,5 +39,4 @@ stdenv.mkDerivation rec {
   '';
 
   enableParallelBuilding = true;
-
 }
