@@ -242,7 +242,7 @@ function run (parameters)
 
    local dispatch_config = {}
    local dispatch_pws = {}
-   local vpls_bridge
+   local vpls_bridges = {}
    assert(config.vpls, "Missing vpls configuration")
    for vpls, vpls_config in pairs(config.vpls) do
       print("Creating VPLS instance "..vpls
@@ -296,7 +296,7 @@ function run (parameters)
                       { name = pw,
                         vc_id = vpls_config.vc_id,
                         mtu = vpls_config.mtu,
-			shmem_dir = vpls_config.shmem_dir or nil,
+                        shmem_dir = vpls_config.shmem_dir or nil,
                         description = vpls_config.description,
                         -- For a p2p VPN, pass the name of the AC
                         -- interface so the PW module can set up the
@@ -324,7 +324,8 @@ function run (parameters)
          c_config.link(c, pws[1]..".ac -> "..acs[1].name..".rx")
          c_config.link(c, acs[1].name..".tx -> "..pws[1]..".ac")
       else
-         vpls_bridge = vpls.."_bridge"
+         local vpls_bridge = vpls.."_bridge"
+         table.insert(vpls_bridges, vpls_bridge)
          print("\tCreating bridge "..vpls_bridge)
          c_config.app(c, vpls_bridge,
                       require("apps.bridge."..vpls_config.bridge.type).bridge,
@@ -353,8 +354,8 @@ function run (parameters)
       c_config.link(c, "dispatch.south -> uplink.rx")
    end
    engine.configure(c)
-   if vpls_bridge then
-      engine.app_table[vpls_bridge]:post_config()
+   for _, bridge in ipairs(vpls_bridges) do
+      engine.app_table[bridge]:post_config()
    end
 
    local engine_opts = {}
