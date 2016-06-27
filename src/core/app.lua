@@ -152,8 +152,8 @@ end
 -- Update the active app network by applying the necessary actions.
 function apply_config_actions (actions, conf)
    -- The purpose of this function is to populate these tables:
-   local new_app_table,  new_app_array  = {}, {}, {}
-   local new_link_table, new_link_array = {}, {}, {}
+   local new_app_table,  new_app_array  = {}, {}
+   local new_link_table, new_link_array = {}, {}
    -- Temporary name->index table for use in link renumbering
    local app_name_to_index = {}
    -- Table of functions that execute config actions
@@ -229,9 +229,13 @@ function apply_config_actions (actions, conf)
    for linkspec, r in pairs(link_table) do
       if not new_link_table[linkspec] then link.free(r, linkspec) end
    end
-   -- commit changes
+   -- Commit changes.
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
+   -- Trigger link event for each app.
+   for _, app in ipairs(app_array) do
+      if app.link then app:link() end
+   end
 end
 
 -- Call this to "run snabb switch".
