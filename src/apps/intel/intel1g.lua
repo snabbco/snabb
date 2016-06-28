@@ -50,6 +50,8 @@ local bits, bitset = lib.bits, lib.bitset
 local compiler_barrier = lib.compiler_barrier
 local tophysical = core.memory.virtual_to_physical
 local register = require("lib.hardware.register")
+local mib = require("lib.ipc.shmem.mib")
+local timer = require("core.timer")
 
 Intel1g = {}
 
@@ -89,11 +91,16 @@ local default = {
    -- The default MTU allows for an IP packet of a total size of 9000
    -- bytes without VLAN tagging.
    mtu = 9014,
+
+   snmp = {
+     status_timer = 5, -- Interval for IF status check and MIB update
+   }
 }
 
 function Intel1g:new(conf)
    local self = {
-     mtu = conf.mtu or default.mtu
+     mtu = conf.mtu or default.mtu,
+     snmp = conf.snmp
    }
    local pciaddress = conf.pciaddr
    local attach = conf.attach
@@ -132,6 +139,36 @@ function Intel1g:new(conf)
    r.SW_FW_SYNC=0x05b5c         -- Software Firmware Synchronization
    r.EEMNGCTL=  0x12030         -- Management EEPROM Control Register
 
+   s = {}
+   statistics_registers_desc = [[
+     BPRC          0x04078 -           RC Broadcast Packets Received Count
+     MPRC          0x0407C -           RC Multicast Packets Received Count
+     GPRC          0x04074 -           RC Good Packets Received Count
+     GORC64        0x04088 -           RC64 Good Octets Received Count 64-bit
+     GORCL         0x04088 -           RC Good Octets Received Count Low
+     GORCH         0x0408C -           RC Good Octets Received Count High
+
+     BPTC          0x040F4 -           RC Broadcast Packets Transmitted Count
+     MPTC          0x040F0 -           RC Multicast Packets Transmitted Count
+     GPTC          0x04080 -           RC Good Packets Transmitted Count
+     GOTC64        0x04090 -           RC64 Good Octets Transmitted Count 64-bit
+     GOTCL         0x04090 -           RC Good Octets Transmitted Count Low
+     GOTCH         0x04094 -           RC Good Octets Transmitted Count High
+
+     CRCERRS       0x04000 -           RC CRC Error Count
+     ALGNERRC      0x04004 -           RC Alignment Error Count
+     RXERRC        0x0400C -           RC RX Error Count
+     RLEC          0x04040 -           RC Receive Length Error Count
+     MPC           0x04010 -           RC Missed Packets Count
+     RNBC          0x040A0 -           RC Receive No Buffers Count
+
+     ECOL          0x04018 -           RC Excessive Collisions Count
+     LATECOL       0x04020 -           RC Late Collisions Count
+
+     RAL           0x05400 +0x08*0..15 RW Receive Address Low
+     RAH           0x05404 +0x08*0..15 RW Receive Address High
+   ]]
+
    -- checks
    local deviceInfo= pci.device_info(pciaddress)
    assert(pci.is_usable(deviceInfo), "NIC is in use")
@@ -150,6 +187,12 @@ function Intel1g:new(conf)
    pci.unbind_device_from_linux(pciaddress)
    pci.set_bus_master(pciaddress, true)
    local regs, mmiofd = pci.map_pci_memory(pciaddress, 0, true)
+   register.define(statistics_registers_desc, s, regs)
+   register.define_array(statistics_registers_desc, s, regs)
+   for _,reg in pairs(s) do
+     reg:read()
+     reg:reset()
+   end
 
    -- Common utilities, see snabb/src/lib/hardware/register.lua
    local function bitvalue (value)
@@ -185,6 +228,151 @@ function Intel1g:new(conf)
       mask = bitvalue(mask)
       value = bitvalue(value)
       repeat until band(peek32(offset), mask) == (value or mask)
+   end
+
+   if self.snmp then
+     -- Rudimentary population of a row in the ifTable MIB.  Allocation
+     -- of the ifIndex is delegated to the SNMP agent via the name of
+     -- the interface in ifDescr (currently the PCI address).
+     local ifTable = mib:new({ directory = self.snmp.directory or nil,
+                               filename = pciaddress })
+     self.snmp.ifTable = ifTable
+     -- ifTable
+     ifTable:register('ifDescr', 'OctetStr', pciaddress)
+     ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
+     ifTable:register('ifMtu', 'Integer32', conf.mtu)
+     ifTable:register('ifSpeed', 'Gauge32', 1000000)
+     -- After a reset of the NIC, the "native" MAC address is copied to
+     -- the receive address register #0 from the FLASH
+     local ral, rah = s.RAL[0](), s.RAH[0]()
+     assert(bit.band(rah, bitvalue({ AV = 31 })) == bitvalue({ AV = 31 }),
+            "MAC address on "..pciaddress.." is not valid ")
+     local mac = ffi.new("struct { uint32_t lo; uint16_t hi; }")
+     mac.lo = ral
+     mac.hi = bit.band(rah, 0xFFFF)
+     ifTable:register('ifPhysAddress', { type = 'OctetStr', length = 6 },
+                      ffi.string(mac, 6))
+     ifTable:register('ifAdminStatus', 'Integer32', 1) -- up
+     ifTable:register('ifOperStatus', 'Integer32', 2) -- down
+     ifTable:register('ifLastChange', 'TimeTicks', 0)
+     ifTable:register('_X_ifLastChange_TicksBase', 'Counter64', C.get_unix_time())
+     ifTable:register('ifInOctets', 'Counter32', 0)
+     ifTable:register('ifInUcastPkts', 'Counter32', 0)
+     ifTable:register('ifInDiscards', 'Counter32', 0)
+     ifTable:register('ifInErrors', 'Counter32', 0) -- TBD
+     ifTable:register('ifInUnknownProtos', 'Counter32', 0) -- TBD
+     ifTable:register('ifOutOctets', 'Counter32', 0)
+     ifTable:register('ifOutUcastPkts', 'Counter32', 0)
+     ifTable:register('ifOutDiscards', 'Counter32', 0)
+     ifTable:register('ifOutErrors', 'Counter32', 0) -- TBD
+     -- ifXTable
+     ifTable:register('ifName', { type = 'OctetStr', length = 255 },
+                      pciaddress)
+     ifTable:register('ifInMulticastPkts', 'Counter32', 0)
+     ifTable:register('ifInBroadcastPkts', 'Counter32', 0)
+     ifTable:register('ifOutMulticastPkts', 'Counter32', 0)
+     ifTable:register('ifOutBroadcastPkts', 'Counter32', 0)
+     ifTable:register('ifHCInOctets', 'Counter64', 0)
+     ifTable:register('ifHCInUcastPkts', 'Counter64', 0)
+     ifTable:register('ifHCInMulticastPkts', 'Counter64', 0)
+     ifTable:register('ifHCInBroadcastPkts', 'Counter64', 0)
+     ifTable:register('ifHCOutOctets', 'Counter64', 0)
+     ifTable:register('ifHCOutUcastPkts', 'Counter64', 0)
+     ifTable:register('ifHCOutMulticastPkts', 'Counter64', 0)
+     ifTable:register('ifHCOutBroadcastPkts', 'Counter64', 0)
+     ifTable:register('ifLinkUpDownTrapEnable', 'Integer32', 2) -- disabled
+     ifTable:register('ifHighSpeed', 'Gauge32', 1000)
+     ifTable:register('ifPromiscuousMode', 'Integer32', 2) -- false
+     ifTable:register('ifConnectorPresent', 'Integer32', 1) -- true
+     ifTable:register('ifAlias', { type = 'OctetStr', length = 64 },
+                      pciaddress) -- TBD add description
+     ifTable:register('ifCounterDiscontinuityTime', 'TimeTicks', 0) -- TBD
+     ifTable:register('_X_ifCounterDiscontinuityTime', 'Counter64', 0) -- TBD
+
+     --- Create a timer to periodically check the interface status.
+     --- Static variables are used in the timer function to avoid
+     --- garbage.
+     local status = { [1] = 'up', [2] = 'down' }
+     local mask = bitvalue{LinkUp=1}
+     local promisc = bitvalue({UPE = 3})
+     -- Pre-allocate storage for the results of register-reads
+     local stats = {
+        in_mcast_pkts = { r = s.MPRC },
+        in_bcast_pkts = { r = s.BPRC },
+        in_pkts       = { r = s.GPRC },
+        in_octets64   = { r = s.GORC64 },
+
+        out_mcast_pkts = { r = s.MPTC },
+        out_bcast_pkts = { r = s.BPTC },
+        out_pkts       = { r = s.GPTC },
+        out_octets64   = { r = s.GOTC64 },
+     }
+     local stats_keys = {}
+     for k, _ in pairs(stats) do
+        table.insert(stats_keys, k)
+        stats[k].v = ffi.new("uint64_t [1]")
+     end
+     local function read_stats()
+        for _, k in ipairs(stats_keys) do
+           stats[k].v[0] = stats[k].r()
+        end
+     end
+     self.logger = lib.logger_new({ module = 'intel1g' })
+     local t = timer.new("Interface "..pciaddress.." status checker",
+                         function(t)
+                            local old = ifTable:get('ifOperStatus')
+                            local new = 1
+                            if band(peek32(r.STATUS, 0), mask) ~= mask then
+                               new = 2
+                            end
+                            if old ~= new then
+                               self.logger:log("Interface "..pciaddress..
+                                               " status change: "..status[old]..
+                                               " => "..status[new])
+                               ifTable:set('ifOperStatus', new)
+                               ifTable:set('ifLastChange', 0)
+                               ifTable:set('_X_ifLastChange_TicksBase',
+                                       C.get_unix_time())
+                            end
+
+                            ifTable:set('ifPromiscuousMode',
+                                        (bit.band(peek32(r.RCTL), promisc) ~= 0ULL
+                                      and 1) or 2)
+                            -- Update counters
+                            read_stats()
+                            ifTable:set('ifHCInMulticastPkts', stats.in_mcast_pkts.v[0])
+                            ifTable:set('ifInMulticastPkts', stats.in_mcast_pkts.v[0])
+                            ifTable:set('ifHCInBroadcastPkts', stats.in_bcast_pkts.v[0])
+                            ifTable:set('ifInBroadcastPkts', stats.in_bcast_pkts.v[0])
+                            local in_ucast_pkts = stats.in_pkts.v[0] - stats.in_bcast_pkts.v[0]
+                               - stats.in_mcast_pkts.v[0]
+                            ifTable:set('ifHCInUcastPkts', in_ucast_pkts)
+                            ifTable:set('ifInUcastPkts', in_ucast_pkts)
+                            ifTable:set('ifHCInOctets', stats.in_octets64.v[0])
+                            ifTable:set('ifInOctets', stats.in_octets64.v[0])
+
+                            ifTable:set('ifHCOutMulticastPkts', stats.out_mcast_pkts.v[0])
+                            ifTable:set('ifOutMulticastPkts', stats.out_mcast_pkts.v[0])
+                            ifTable:set('ifHCOutBroadcastPkts', stats.out_bcast_pkts.v[0])
+                            ifTable:set('ifOutBroadcastPkts', stats.out_bcast_pkts.v[0])
+                            local out_ucast_pkts = stats.out_pkts.v[0] - stats.out_bcast_pkts.v[0]
+                               - stats.out_mcast_pkts.v[0]
+                            ifTable:set('ifHCOutUcastPkts', out_ucast_pkts)
+                            ifTable:set('ifOutUcastPkts', out_ucast_pkts)
+                            ifTable:set('ifHCOutOctets', stats.out_octets64.v[0])
+                            ifTable:set('ifOutOctets', stats.out_octets64.v[0])
+
+                            -- 7.9.2 table 7-74
+                            ifTable:set('ifInDiscards', s.CRCERRS() + s.RLEC() + s.RXERRC() +
+                                     s.MPC() + s.RNBC() + s.ALGNERRC())
+                            ifTable:set('ifInErrors', s.CRCERRS() +
+                                     s.RLEC() + s.RXERRC() + s.ALGNERRC())
+                            ifTable:set('ifOutDiscards', s.ECOL() + ifTable:get('ifOutDiscards'))
+                            ifTable:set('ifOutErrors', s.ECOL() + s.LATECOL())
+                         end,
+                         1e9 * (self.snmp.status_timer or
+                                default.snmp.status_timer), 'repeating')
+     timer.activate(t)
    end
 
    -- 3.7.4.4.4 Using PHY Registers, 
@@ -462,6 +650,10 @@ function Intel1g:new(conf)
       local function transmit (p)
          -- We must not send packets that are bigger than the MTU
          if p.length > self.mtu then
+           if self.snmp then
+             local errors = self.snmp.ifTable:ptr('ifOutDiscards')
+             errors[0] = errors[0] + 1
+           end
            packet.free(p)
          else
            txdesc[tdt].address = tophysical(p.data)
