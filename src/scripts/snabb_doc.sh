@@ -59,7 +59,8 @@ function fetch_pr_head {
 }
 
 function ensure_docs_cloned {
-    [ -d $docdir ] || git clone git@github.com:$DOCREPO.git $docdir
+    [ -d $docdir ] || \
+        git clone https://$GITHUB_CREDENTIALS@github.com/$DOCREPO.git $docdir
     mkdir -p $docdir/{sha1,tag}
 }
 
