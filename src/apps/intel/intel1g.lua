@@ -95,9 +95,9 @@ function Intel1g:new(conf)
    assert(pci.is_usable(deviceInfo), "NIC is in use")
    assert(deviceInfo.driver == 'apps.intel.intel1g', "intel1g does not support this NIC")
    local ringSize= 1
-   if deviceInfo.device == "0x1521" then                -- i350
+   if deviceInfo.model == "Intel 350" then
     ringSize= 8
-   elseif deviceInfo.device == "0x157b" then            -- i210
+   elseif deviceInfo.model == "Intel 210" then
     ringSize= 4
    end
    assert((txq >=0) and (txq <ringSize), "txqueue must be in 0.." .. ringSize-1 .. " for " .. deviceInfo.model)
