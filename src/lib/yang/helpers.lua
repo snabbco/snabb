@@ -2,17 +2,75 @@
 module(..., package.seeall)
 
 local h = require("syscall.helpers")
+local ffi = require("ffi")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local corelib = require("core.lib")
 
+-- Create a small wrapper around the FFI types to provde get and set
+local FFITypeWrapper = {}
+function FFITypeWrapper.new(ffibox)
+   return setmetatable({box=ffibox()}, {
+      __index=FFITypeWrapper,
+      __call=function(t, v)
+         local wrappedbox = t.new(ffibox)
+         if v ~= nil then wrappedbox:set(v) end
+         return wrappedbox
+      end,
+   })
+end
+function FFITypeWrapper:set(value)
+   self.box.value = value
+end
+function FFITypeWrapper:get()
+   return self.box.value
+end
+
+-- Use ffi types because they will validate that numeric values are being
+-- provided. The downside is that integer overflow could occur on these. This
+-- route has been selected as validation will be faster than attempting to
+-- validate in Lua.
+local box_types = {
+   int8 = FFITypeWrapper.new(ffi.typeof("struct { int8_t value; }")),
+   int16 = FFITypeWrapper.new(ffi.typeof("struct { int16_t value; }")),
+   int32 = FFITypeWrapper.new(ffi.typeof("struct { int32_t value; }")),
+   int64 = FFITypeWrapper.new(ffi.typeof("struct { int64_t value; }")),
+   uint8 = FFITypeWrapper.new(ffi.typeof("struct { uint8_t value; }")),
+   uint16 = FFITypeWrapper.new(ffi.typeof("struct { uint16_t value; }")),
+   uint32 = FFITypeWrapper.new(ffi.typeof("struct { uint32_t value; }")),
+   uint64 = FFITypeWrapper.new(ffi.typeof("struct { uint64_t value; }")),
+   decimal64 = FFITypeWrapper.new(ffi.typeof("struct { double value; }")),
+   boolean = FFITypeWrapper.new(ffi.typeof("struct { bool value; }")),
+}
+-- Add inet types, found: https://tools.ietf.org/html/rfc6021
+-- Should be done via yang module import but using ad-hoc method for now.
+box_types["inet:ipv4-address"] = ipv4.pton
+box_types["inet:ipv6-address"] = ipv6.pton
+box_types["yang:zero-based-counter64"] = function ()
+   return box_types.uint64(0)
+end
+
+function create_box(leaf_type, default)
+   local box = assert(box_types[leaf_type], "Unsupported type: "..leaf_type)
+   if box and default ~= nil then
+      box = box(default)
+   elseif box then
+      box = box()
+   end
+   return box
+end
+
 function extract_nodes(schema)
+   -- This function takes a table which is in the format:
+   -- {1={keyword="leaf", statements={...}}}
+   -- and converts this to a more useful easy to access:
+   -- {leaf={1={...}}}
+
    local nodes = {}
    for _, v in pairs(schema) do
-      -- Recursively apply this
+      -- Node has statements (children) so we should recursively apply the
+      -- `extract_nodes` function to them so the entire tree is extracted
       if v.statements then v.statements = extract_nodes(v.statements) end
-
-      -- Add to the nodes table.  
       if nodes[v.keyword] then
          table.insert(nodes[v.keyword], v)
       else
@@ -22,124 +80,123 @@ function extract_nodes(schema)
    return nodes
 end
 
-IPv4Box = {}
-function IPv4Box.new()
-   local ret = {root={}}
-   return setmetatable(ret, {
-      __index = function (t, k) return rawget(ret, "root").value end,
-      __newindex = function(t, k, v)
-         local ipv4boxed, err = ipv4:pton(v)
-         if ipv4boxed == false then error(err) end
-         rawget(ret, "root").value = ipv4boxed
-      end
-   })
+local StringBox = {}
+function StringBox.new()
+   return setmetatable({}, {__index=StringBox})
 end
 
-IPv6Box = {}
-function IPv6Box.new()
-   local ret = {root={}}
-   return setmetatable(ret, {
-      __index = function (t, k) return rawget(ret, "root").value end,
-      __newindex = function(t, k, v)
-         local ipv6boxed, err = ipv6:pton(v)
-         if ipv6boxed == false then error(err) end
-         rawget(ret, "root").value = ipv6boxed
-      end
-   })
+function StringBox:get()
+   return self.value
 end
 
-IPv4PrefixBox = {}
+function StringBox:set(value)
+   self.value = value
+end
+box_types["string"] = StringBox.new
+
+local IPv4PrefixBox = {}
 function IPv4PrefixBox.new()
    local ret = {root={}}
-   return setmetatable(ret, {
-      __newindex = function (t, k, v)
-         -- split the netmask and prefix up.
-         local raw = h.split("/", v)
-         local addr, err = ipv4:pton(raw[1])
-         if addr == false then error(err) end
-         local prefix = tonumber(raw[2])
-         if prefix > 32 or prefix < 0 then
-            error(("The prefix length is invalid. (%s)"):format(raw[2]))
-         end
-         rawget(ret, "root").value = {addr, prefix}
-      end,
-      __index = function (t, k, v) return rawget(ret, "root").value end
-   })
+   return setmetatable(ret, {__index=IPv4PrefixBox})
 end
 
-IPv6PrefixBox = {}
+function IPv4PrefixBox:get()
+   return self.value
+end
+box_types["inet:ipv4-prefix"] = IPv4PrefixBox.new
+
+function IPv4PrefixBox:set(value)
+   -- split the netmask and prefix up.
+   local raw = h.split("/", value)
+   local addr, err = ipv4:pton(raw[1])
+   if addr == false then error(err) end
+   local prefix = tonumber(raw[2])
+   if prefix > 32 or prefix < 0 then
+      error(("The prefix length is invalid. (%s)"):format(raw[2]))
+   end
+   self.value = {addr, prefix}
+end
+
+local IPv6PrefixBox = {}
 function IPv6PrefixBox.new()
    local ret = {root={}}
-   return setmetatable(ret, {
-      __newindex = function (t, k, v)
-         -- split the netmask and prefix up.
-         local raw = h.split("/", v)
-         local addr, err = ipv6:pton(raw[1])
-         if addr == false then error(err) end
-         local prefix = tonumber(raw[2])
-         if prefix > 128 or prefix < 0 then
-            error(("The prefix length is invalid. (%s)"):format(raw[2]))
-         end
-         rawget(ret, "root").value = {addr, prefix}
-      end,
-      __index = function (t, k, v) return rawget(ret, "root").value end
-   })
+   return setmetatable(ret, {__index=IPv6PrefixBox})
 end
+function IPv6PrefixBox:get()
+   return self.value
+end
+function IPv6PrefixBox:set(value)
+   -- split the netmask and prefix up.
+   local raw = h.split("/", value)
+   local addr, err = ipv6:pton(raw[1])
+   if addr == false then error(err) end
+   local prefix = tonumber(raw[2])
+   if prefix > 128 or prefix < 0 then
+      error(("The prefix length is invalid. (%s)"):format(raw[2]))
+   end
+   self.value = {addr, prefix}
+end
+box_types["inet:ipv6-prefix"] = IPv6PrefixBox.new
 
-Enum = {}
+local Enum = {}
 function Enum.new(options)
-   local ret = {root={}}
    local opts = {}
    for _, option in pairs(options) do
       opts[option] = option
    end
-   return setmetatable(ret, {
-      __index = function (t, k) return rawget(ret, "root").value end,
-      __newindex = function(t, k, v)
-         if opts[v] then rawget(ret, "root").value = v
-         else error("Value "..v.." is not a valid option for this Enum.") end
-      end
-   })
+   return setmetatable({options=opts}, {__index=Enum})
 end
 
-Union = {}
-function Union.new(types)
-   local ret = {root={}, types={}}
+function Enum:get()
+   return self.value
+end
 
-   -- Importing here to prevent cyclic imports.
-   local Leaf = require("lib.yang.schema").Leaf
+function Enum:set(value)
+   if self.options[value] then
+      self.value = value
+   else
+      error("Value "..value.." is not a valid option for this Enum.")
+   end
+end
+box_types["enumeration"] = Enum.new
+
+local Union = {}
+function Union.new(types)
+   local ret = {types={}}
+
    for _, name in pairs(types) do
       -- 9.12 specifies unions cannot contain "leafref" or "empty"
       if name == "empty" or name == "leafref" then
          error("Union type cannot contain 'empty' or 'leafref'")
       end
-      ret.types[name] = Leaf:provide_box(name)
+      ret.types[name] = create_box(name)
    end
 
-   return setmetatable(ret, {
-      __index = function (t, k)
-         return rawget(ret, "root").box.value
-      end,
-      __newindex = function(t, k, v)
-         local function setbox(dest, v) dest.value = v end
-         local root = rawget(ret, "root")
-         for name, box in pairs(rawget(ret, "types")) do
-            local valid = pcall(setbox, box, v)
-            if valid then
-               root.box = box
-               return -- don't want to continue.
-            end
-         end
-         error(("Unable to find matching type for '%s' (%s)"):format(v, type(v)))
-      end
-   })
+   return setmetatable(ret, {__index=Union})
 end
+
+function Union:get()
+   return self.value
+end
+
+function Union:set(v)
+   local function setbox(dest, val) dest.value = val end
+   for _, box in pairs(self.types) do
+      local valid = pcall(setbox, box, v)
+      if valid then
+         self.box = box
+         return -- don't want to continue.
+      end
+   end
+   error(("Unable to find matching type for '%s' (%s)"):format(v, type(v)))
+end
+box_types["union"] = Union.new
 
 Container = {}
 function Container.new(base, path)
    local ret = {root={}, base=base, path=path}
    return setmetatable(ret, {
-      __newindex = function (t, k, v)
+      __newindex = function (_, k, v)
          -- Validate the value prior to setting it.
          local node_path = ret.path.."."..k
          local schema = assert(
@@ -152,21 +209,20 @@ function Container.new(base, path)
                validation(v)
             end
          end
-
          local box = assert(ret.root[k], "Unknown leaf '"..node_path.."'")
-         box.value = v
+         box:set(v)
       end,
       __index = function(t, k)
-         local table = rawget(t, "root")
-         local prop = table[k]
+         local root = rawget(t, "root")
+         local prop = root[k]
 
          if not prop then
             -- This could be because it's a method defined on Container.
             return Container[k]
-         elseif prop.value == nil then
+         elseif prop.get == nil then
             return prop
          else
-            return prop.value
+            return prop:get()
          end
       end,
    })
@@ -175,7 +231,7 @@ end
 function Container:set_template(template)
    rawset(self, "template", template)
 end
-function Container:get_template(template)
+function Container:get_template()
    return rawget(self, "template")
 end
 
@@ -207,7 +263,7 @@ function Container:add_item(item)
    for name, leaf in pairs(leaves) do data[name] = leaf end
 
    -- Add the data to the container.
-   for name, leaf in pairs(data) do
+   for name, _ in pairs(data) do
       if leaves[name] == nil then
          error("Unknown field in list: '"..name.."'")
       elseif item[name] == nil and leaves[name].mandatory then
@@ -283,13 +339,13 @@ function selftest()
    asserterror(setvalue, con, "testbox", "should fail")
 
    -- Test the IPv4 box (both valid and invalid data).
-   root.testbox = IPv4Box.new()
+   root.testbox = box_types["inet:ipv4-address"]()
    con.testbox = "8.8.8.8"
    assert(ipv4:ntop(con.testbox) == "8.8.8.8")
    asserterror(setvalue, con, "testbox", "256.8.8.8")
 
    -- Test the IPv6 box (both valid and invalid data).
-   root.testbox = IPv6Box.new()
+   root.testbox = box_types["inet:ipv6-address"]()
    con.testbox = "::1"
    assert(ipv6:ntop(con.testbox) == "::1")
    asserterror(setvalue, con, "testbox", "not ipv6")

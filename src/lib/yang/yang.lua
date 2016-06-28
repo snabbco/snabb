@@ -127,7 +127,7 @@ function Base:produce_data_tree(schema_node, data_node)
 
    if schema_node.leaves then
       for name, leaf in pairs(schema_node.leaves) do
-         data_node:add_to_root(name, leaf:provide_box())
+         data_node:add_to_root(name, helpers.create_box(leaf.type, leaf.defalt))
       end
    end
 
@@ -167,7 +167,7 @@ function Base:handle_use(schema_node, data_node, path, name)
       -- We also need to register the schema node at the new path
       local grouping_path = path.."."..name
       self:add_cache(grouping_path, leaf)
-      data_node:add_to_root(name, leaf:provide_box())
+      data_node:add_to_root(name, helpers.create_box(leaf.type, leaf.default))
    end
 end
 

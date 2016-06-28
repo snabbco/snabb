@@ -13,22 +13,6 @@ module(..., package.seeall)
 local helpers = require("lib.yang.helpers")
 local h = require("syscall.helpers")
 
--- Use ffi types because they will validate that numeric values are being
--- provided. The downside is that integer overflow could occur on these. This
--- route has been selected as validation will be faster than attempting to
--- validate in Lua.
-local ffi = require("ffi")
-local int8box = ffi.typeof("struct { int8_t value; }")
-local int16box = ffi.typeof("struct { int16_t value; }")
-local int32box = ffi.typeof("struct { int32_t value; }")
-local int64box = ffi.typeof("struct { int64_t value; }")
-local uint8box = ffi.typeof("struct { uint8_t value; }")
-local uint16box = ffi.typeof("struct { uint16_t value; }")
-local uint32box = ffi.typeof("struct { uint32_t value; }")
-local uint64box = ffi.typeof("struct { uint64_t value; }")
-local decimal64box = ffi.typeof("struct { double value; }")
-local booleanbox = ffi.typeof("struct { bool value; }")
-
 Leaf = {}
 function Leaf.new(base, path, src)
    local self = setmetatable({}, {__index=Leaf, path=path})
@@ -87,7 +71,7 @@ function Leaf.new(base, path, src)
       if not self.validation then self.validation = {} end
       self.validation[#self.validation + 1] = function(v)
          if v < self.range[1] or v > self.range[2] then
-            self:error("Value '%s' is out of range", path, value)
+            self:error("Value '%s' is out of range", path, v)
          end
       end
    end
@@ -114,61 +98,6 @@ function Leaf:validate_schema(schema)
                         mandatory={0,1}, reference={0,1}, status={0,1},
                         type={1,1}, units={0,1}, when={0,1}}
    helpers.cardinality("leaf", getmetatable(self).path, cardinality, schema)
-end
-
-function Leaf:provide_box(leaf_type, statements)
-   local box
-
-   if not leaf_type then leaf_type = self.type end
-
-   if leaf_type == "int8" then
-      box = int8box()
-   elseif leaf_type == "int16" then
-      box = int16box()
-   elseif leaf_type == "int32" then
-      box = int32box()
-   elseif leaf_type == "int64" then
-      box = int64box()
-   elseif leaf_type == "uint8" then
-      box = uint8box()
-   elseif leaf_type == "uint16" then
-      box = uint16box()
-   elseif leaf_type == "uint32" then
-      box = uint32box()
-   elseif leaf_type == "uint64" then
-      box = uint64box()
-   elseif leaf_type == "decimal64" then
-      box = decimal64box()
-   elseif leaf_type == "string" then
-      box = {}
-   elseif leaf_type == "boolean" then
-      box = booleanbox()
-   elseif leaf_type == "enumeration" then
-      box = helpers.Enum.new(self.enums)
-   elseif leaf_type == "union" then
-      box = helpers.Union.new(self.types)
-   elseif leaf_type == "inet:ipv4-address" then
-      box = helpers.IPv4Box.new()
-      if self.default then box.value = self.default end
-   elseif leaf_type == "inet:ipv6-address" then
-      box = helpers.IPv6Box.new()
-      if self.default then box.value = self.default end
-   elseif leaf_type == "inet:ipv4-prefix" then
-      box = helpers.IPv4PrefixBox.new()
-   elseif leaf_type == "inet:ipv6-prefix" then
-      box = helpers.IPv6PrefixBox.new()
-   elseif leaf_type == "yang:zero-based-counter64" then
-      -- TODO: this can and should be done via support of typedef.
-      box = uint64box(0)
-   else
-      local path = self and getmetatable(self).path or ""
-      error(("%s: Unknown type '%s' for leaf"):format(path, leaf_type))
-   end
-
-   -- If there is default we should set it.
-   if self.default ~= nil then box.value = self.default end
-
-   return box
 end
 
 -- Yang feature
