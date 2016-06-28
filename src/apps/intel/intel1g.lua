@@ -49,11 +49,52 @@ local lib  = require("core.lib")
 local bits, bitset = lib.bits, lib.bitset
 local compiler_barrier = lib.compiler_barrier
 local tophysical = core.memory.virtual_to_physical
+local register = require("lib.hardware.register")
 
 Intel1g = {}
 
+-- Defaults for configurable items
+local default = {
+
+   -- The MRU (maximum receive unit) includes the Ethernet header and
+   -- CRC. It is limited to 9728 bytes.  We use the convention that
+   -- the configurable MTU, which sets both, the MRU as well as the
+   -- MTU, includes the Ethernet header but not the CRC.  This is
+   -- "natural" in the sense that the unit of data handed to the
+   -- driver contains a complete Ethernet packet without the CRC
+   -- (which is added by the hardware).  This causes a discrepancy of
+   -- 4 bytes between the MTU setting and the actual MRU stored in
+   -- RLPM.
+   --
+   -- The driver currently assumes that 802.1Q is handled entirely by
+   -- software, i.e. all VLAN-related features are disabled, which is
+   -- the default behaviour (i.e. *do not* change these unless the MTU
+   -- logic is adapted accordingly)
+   --
+   --   Add tag on TX (VLE in TDESC.CMD)
+   --   Strip tag on RX (CTRL.VME or DVMOLR.STRVLAN)
+   --   VLAN filtering (RCTL.VFE)
+   --   Double-tagging (CTRL_EXT.EXT_VLAN)
+   --
+   -- If Jumbo-frames are disabled (RCTL.LPE = 0), the NIC applies
+   -- size filtering according to VLAN tags present in the packet, see
+   -- 7.1.1.4.  We bypass this check by always enabling RCTL.LPE and
+   -- storing the MTU in RLPM (adjusting for the CRC).
+   --
+   -- As a consequence, the MTU passed to the driver must include all
+   -- L2 headers expected by the application.  In case of untagged
+   -- packets, the Ethernet overhead is 14 bytes.  If 802.1q tagging
+   -- is used, the Ethernet overhead is increased by 4 bytes per tag.
+   --
+   -- The default MTU allows for an IP packet of a total size of 9000
+   -- bytes without VLAN tagging.
+   mtu = 9014,
+}
+
 function Intel1g:new(conf)
-   local self = {}
+   local self = {
+     mtu = conf.mtu or default.mtu
+   }
    local pciaddress = conf.pciaddr
    local attach = conf.attach
    local txq = conf.txqueue or 0
@@ -85,6 +126,7 @@ function Intel1g:new(conf)
    r.TPR =      0x040D0         -- Total Packets Received - R/clr
    r.TPT =      0x040D4         -- Total Packets Transmitted - R/clr
    r.RPTHC =    0x04104         -- Rx Packets to Host Count - R/clr
+   r.RLPML =    0x05004         -- Reveive Long Packet Maximum Length - RW
    r.MANC =     0x05820         -- 
    r.SWSM =     0x05b50         -- 
    r.SW_FW_SYNC=0x05b5c         -- Software Firmware Synchronization
@@ -418,12 +460,17 @@ function Intel1g:new(conf)
       -- Queue a packet for transmission
       -- Precondition: can_transmit() => true
       local function transmit (p)
-         txdesc[tdt].address = tophysical(p.data)
-         txdesc[tdt].flags = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
-         txpackets[tdt] = p
-         tdt = ringnext(tdt)
-         counters.txPackets= counters.txPackets +1
-         counters.txBytes= counters.txBytes +p.length
+         -- We must not send packets that are bigger than the MTU
+         if p.length > self.mtu then
+           packet.free(p)
+         else
+           txdesc[tdt].address = tophysical(p.data)
+           txdesc[tdt].flags = bor(p.length, txdesc_flags, lshift(p.length+0ULL, 46))
+           txpackets[tdt] = p
+           tdt = ringnext(tdt)
+           counters.txPackets= counters.txPackets +1
+           counters.txBytes= counters.txBytes +p.length
+         end
       end
 
       -- Synchronize DMA ring state with hardware
@@ -513,10 +560,8 @@ function Intel1g:new(conf)
 
       local rctl= {}
       rctl.RXEN= 1                      -- enable receiver
-      rctl.SBP= 2                       -- store bad packet
       rctl.RCTL_UPE= 3                  -- unicast promiscuous enable
       rctl.RCTL_MPE= 4                  -- multicast promiscuous enable
-      rctl.LPE= 5                       -- Long Packet Enable
       rctl.BAM= 15                      -- broadcast enable
       --rctl.SZ_512= 17                 -- buffer size: use SRRCTL for larger buffer sizes
       --rctl.RCTL_RDMTS_HALF=           -- rx desc min threshold size
@@ -524,6 +569,11 @@ function Intel1g:new(conf)
 
       poke32(r.SRRCTL, 10)              -- buffer size in 1 KB increments
       set32(r.SRRCTL, {Drop_En= 31})    -- drop packets when no descriptors available
+
+      -- See discussion of MTU/MRU at the top
+      rctl.LPE = 5
+      poke32(r.RLPML, self.mtu+4)
+
       set32(r.RXDCTL, {ENABLE= 25})     -- enable the RX queue
       wait32(r.RXDCTL, {ENABLE=25})     -- wait until enabled
 
