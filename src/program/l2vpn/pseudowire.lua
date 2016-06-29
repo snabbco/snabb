@@ -680,6 +680,7 @@ function selftest()
    local config = { name          = "pw",
                     vc_id         = 1,
                     mtu           = 1500,
+                    shmem_dir     = "/tmp",
                     ethernet = { src = local_mac,
                                  dst = remote_mac },
                     transport = { type = 'ipv6',
