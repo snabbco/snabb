@@ -44,7 +44,8 @@ local private = {}
 local numbers = {} -- name -> number
 
 function open (name, readonly)
-   if numbers[name] then return private[numbers[name]] end
+   local qname = shm.resolve(name)
+   if numbers[qname] then return private[numbers[qname]] end
    local n = #public+1
    if readonly then
       public[n] = shm.open(name, counter_t, readonly)
@@ -53,13 +54,14 @@ function open (name, readonly)
       public[n] = shm.create(name, counter_t)
       private[n] = ffi.new(counter_t)
    end
-   numbers[name] = n
+   numbers[qname] = n
    return private[n]
 end
 
 function delete (name)
-   local number = numbers[name]
-   if not number then error("counter not found for deletion: " .. name) end
+   local qname = shm.resolve(name)
+   local number = numbers[qname]
+   if not number then error("counter not found for deletion: " .. qname) end
    -- Free shm object
    shm.unmap(public[number])
    -- If we "own" the counter for writing then we unlink it too.
@@ -67,7 +69,7 @@ function delete (name)
       shm.unlink(name)
    end
    -- Free local state
-   numbers[name] = false
+   numbers[qname] = false
    public[number] = false
    private[number] = false
 end

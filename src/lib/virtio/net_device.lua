@@ -162,9 +162,11 @@ function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
             rx_p.length - self.rx_hdr_csum_start,
             self.rx_hdr_csum_offset)
       end
+      self.owner:rx_callback(rx_p)
       link.transmit(l, rx_p)
    else
       debug("droprx", "len", rx_p.length)
+      self.owner:rxdrop_callback(rx_p)
       packet.free(rx_p)
    end
    self.virtq[self.ring_id]:put_buffer(header_id, total_size)
@@ -252,6 +254,7 @@ function VirtioNetDevice:tx_buffer_add(tx_p, addr, len)
 end
 
 function VirtioNetDevice:tx_packet_end(header_id, total_size, tx_p)
+   self.owner:tx_callback(tx_p)
    packet.free(tx_p)
    self.virtq[self.ring_id]:put_buffer(header_id, total_size)
 end
@@ -321,6 +324,7 @@ end
 function VirtioNetDevice:tx_packet_end_mrg_rxbuf(header_id, total_size, tx_p)
    -- free the packet only when all its data is processed
    if self.tx.finished then
+      self.owner:tx_callback(tx_p)
       packet.free(tx_p)
       self.tx.p = nil
       self.tx.data_sent = nil

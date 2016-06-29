@@ -98,6 +98,15 @@ Returns the binary representation of MAC address denoted by *string*.
 
 Returns the string representation of *mac* address.
 
+— Function **ethernet:is_mcast** *mac*
+
+Returns a true value if *mac* address denotes a [Multicast address](https://en.wikipedia.org/wiki/Multicast_address#Ethernet).
+
+— Function **ethernet:n_mcast** *mac*
+
+Returns 1 if *mac* address denotes a [Multicast address](https://en.wikipedia.org/wiki/Multicast_address#Ethernet)
+and 0 otherwise.
+
 — Function **ethernet:ipv6_mcast** *ip*
 
 Returns the MAC address for IPv6 multicast *ip* as defined by RFC2464,
