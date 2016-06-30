@@ -303,35 +303,41 @@ Returns a structure holding ring statistics for the *link*:
 
 
 ## Packet (core.packet)
-   
-A *packet* is a data structure describing one of the network packets that
-is currently being processed. The packet is used to explicitly manage the
-life cycle of the packet. Packets are explicitly allocated and freed by
-using `packet.allocate` and `packet.free`. When a packet is received
-using `link.receive` its ownership is acquired by the calling app. The
-app must then ensure to either transfer the packet ownership to another
-app by calling `link.transmit` on the packet or free the packet using
-`packet.free`. Apps may only use packets they own, e.g. packets that have
-not been transmitted or freed. The number of allocatable packets is
-limited by the size of the underlying "freelist", e.g. a pool of unused
-packet objects from and to which packets are allocated and freed.
+
+A *packet* is an FFI object of type `packet.packet_t` representing a network
+packet that is currently being processed. The packet is used to explicitly
+manage the life cycle of the packet. Packets are explicitly allocated and freed
+by using `packet.allocate` and `packet.free`. When a packet is received using
+`link.receive` its ownership is acquired by the calling app. The app must then
+ensure to either transfer the packet ownership to another app by calling
+`link.transmit` on the packet or free the packet using `packet.free`. Apps may
+only use packets they own, e.g. packets that have not been transmitted or
+freed. The number of allocatable packets is limited by the size of the
+underlying “freelist”, e.g. a pool of unused packet objects from and to which
+packets are allocated and freed.
+
+— Ctype **packet.packet_t**
+
+```
+struct packet {
+    uint8_t  data[packet.max_payload];
+    uint16_t length;
+};
+```
+
+— Constant **packet.max_payload**
+
+The maximum payload length of a packet.
 
 — Function **packet.allocate**
 
-Returns a new empty packet. An an error is raised if there are no packets
-left on the freelist.
+Returns a new empty packet. An an error is raised if there are no packets left
+on the freelist. Initially the `length` of the allocated is 0, and its `data`
+is uninitialized garbage.
 
 — Function **packet.free** *packet*
 
 Frees *packet* and puts in back onto the freelist.
-
-— Function **packet.data** *packet*
-
-Returns a pointer to the payload of *packet*.
-
-— Function **packet.length** *packet*
-
-Returns the payload length of *packet*.
 
 — Function **packet.clone** *packet*
 
@@ -357,7 +363,14 @@ accomodate *length* additional bytes.
 
 — Function **packet.shiftleft** *packet*, *length*
 
-Truncates *packet* by *length* bytes from the front.
+Truncates *packet* by *length* bytes from the front. *Length* must be less than
+or equal to `length` of *packet*.
+
+— Function **packet.shiftright** *packet*, *length*
+
+Move *packet* payload to the right by *length* bytes, growing *packet* by
+*length*. The sum of *length* and `length` of *packet* must be less than or
+equal to `packet.max_payload`.
 
 — Function **packet.from_pointer** *pointer*, *length*
 
