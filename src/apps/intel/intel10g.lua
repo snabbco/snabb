@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 --- Device driver for the Intel 82599 10-Gigabit Ethernet controller.
 --- This is one of the most popular production 10G Ethernet
 --- controllers on the market and it is readily available in
@@ -21,8 +23,7 @@ local timer = require("core.timer")
 local bits, bitset = lib.bits, lib.bitset
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
 
-num_descriptors = 512
---num_descriptors = 32
+num_descriptors = 1024
 
 -- Defaults for configurable items
 local default = {
@@ -86,7 +87,7 @@ end
 function M_sf:open ()
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
-   self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
+   self.base, self.fd = pci.map_pci_memory_locked(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
    register.define(transmit_registers_desc, self.r, self.base)
    register.define(receive_registers_desc, self.r, self.base)
@@ -183,6 +184,10 @@ do
       _tx_pool[#_tx_pool+1] = {ptr = self.txdesc, phy = self.txdesc_phy}
       return self
    end
+end
+
+function M_sf:ingress_packet_drops ()
+   return self.qs.QPRDC[0]()
 end
 
 function M_sf:init_snmp ()
@@ -548,14 +553,14 @@ end
 function M_sf:wait_linkup ()
    self.waitlu_ms = 0
    local mask = bits{Link_up=30}
-   for count = 1, 250 do
+   for count = 1, 1000 do
       if band(self.r.LINKS(), mask) == mask then
          self.waitlu_ms = count
          return self
       end
       C.usleep(1000)
    end
-   self.waitlu_ms = 250
+   self.waitlu_ms = 1000
    return self
 end
 
@@ -656,7 +661,7 @@ end
 function M_pf:open ()
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
-   self.base, self.fd = pci.map_pci_memory(self.pciaddress, 0)
+   self.base, self.fd = pci.map_pci_memory_locked(self.pciaddress, 0)
    register.define(config_registers_desc, self.r, self.base)
    register.define_array(switch_config_registers_desc, self.r, self.base)
    register.define_array(packet_filter_desc, self.r, self.base)
@@ -863,8 +868,8 @@ function M_vf:reconfig(opts)
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
       :set_VLAN(opts.vlan)
-      :set_rx_stats(opts.rxcounter)
-      :set_tx_stats(opts.txcounter)
+      :set_rx_stats(opts.rxcounter or 0)
+      :set_tx_stats(opts.txcounter or 0)
       :set_tx_rate(opts.rate_limit, opts.priority)
       :enable_receive()
       :enable_transmit()
@@ -878,8 +883,8 @@ function M_vf:init (opts)
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
       :set_VLAN(opts.vlan)
-      :set_rx_stats(opts.rxcounter)
-      :set_tx_stats(opts.txcounter)
+      :set_rx_stats(opts.rxcounter or 0)
+      :set_tx_stats(opts.txcounter or 0)
       :set_tx_rate(opts.rate_limit, opts.priority)
       :enable_receive()
       :enable_transmit()
@@ -1133,7 +1138,6 @@ function M_vf:set_tx_stats (counter)
 end
 
 function M_vf:get_rxstats ()
-   if not self.rxstats then return nil end
    return {
       counter_id = self.rxstats,
       packets = tonumber(self.pf.qs.QPRC[self.rxstats]()),
@@ -1144,7 +1148,6 @@ function M_vf:get_rxstats ()
 end
 
 function M_vf:get_txstats ()
-   if not self.txstats then return nil end
    return {
       counter_id = self.txstats,
       packets = tonumber(self.pf.qs.QPTC[self.txstats]()),
@@ -1169,6 +1172,9 @@ function M_vf:set_tx_rate (limit, priority)
    return self
 end
 
+function M_vf:ingress_packet_drops ()
+   return self.pf.qs.QPRDC[self.rxstats]()
+end
 
 rxdesc_t = ffi.typeof [[
    union {

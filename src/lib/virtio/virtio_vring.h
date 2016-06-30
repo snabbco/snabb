@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 // Size of vring structures used in Linux vhost. Max 32768.
 enum { VHOST_VRING_SIZE = 32*1024 };
 

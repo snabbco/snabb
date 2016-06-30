@@ -1,14 +1,18 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
-local packet  = require("core.packet")
-local lib     = require("core.lib")
-local link    = require("core.link")
-local config  = require("core.config")
-local timer   = require("core.timer")
-local counter = require("core.counter")
-local zone    = require("jit.zone")
-local ffi     = require("ffi")
-local C       = ffi.C
+local packet    = require("core.packet")
+local lib       = require("core.lib")
+local link      = require("core.link")
+local config    = require("core.config")
+local timer     = require("core.timer")
+local histogram = require('core.histogram')
+local counter   = require("core.counter")
+local zone      = require("jit.zone")
+local jit       = require("jit")
+local ffi       = require("ffi")
+local C         = ffi.C
 require("core.packet_h")
 
 -- Set to true to enable logging
@@ -64,16 +68,19 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-local function with_restart (app, method)
+function with_restart (app, method)
    if use_restart then
       -- Run fn in protected mode using pcall.
-      local status, err = pcall(method, app)
+      local status, result_or_error = pcall(method, app)
 
       -- If pcall caught an error mark app as "dead" (record time and cause
       -- of death).
-      if not status then app.dead = { error = err, time = now() } end
+      if not status then
+         app.dead = { error = result_or_error, time = now() }
+      end
+      return status, result_or_error
    else
-      method(app)
+      return true, method(app)
    end
 end
 
@@ -163,6 +170,10 @@ function apply_config_actions (actions, conf)
       local class = conf.apps[name].class
       local arg = conf.apps[name].arg
       local app = class:new(arg)
+      if type(app) ~= 'table' then
+         error(("bad return value from app '%s' start() method: %s"):format(
+                  name, tostring(app)))
+      end
       local zone = app.zone or getfenv(class.new)._NAME or name
       app.appname = name
       app.output = {}
@@ -232,6 +243,13 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+
+   local breathe = breathe
+   if options.measure_latency or options.measure_latency == nil then
+      local latency = histogram.create('engine/latency', 1e-6, 1e0)
+      breathe = latency:wrap_thunk(breathe, now)
+   end
+
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
@@ -387,22 +405,21 @@ function report_apps ()
          print(name, ("[dead: %s]"):format(app.dead.error))
       elseif app.report then
          print(name)
-         -- Restarts are currently disabled, still we want to not die on
-         -- errors during app reports, thus this workaround:
-         -- with_restart(app, app.report)
-         local status, err = pcall(app.report, app)
-         if not status then
-            print("Warning: "..name.." threw an error during report: "..err)
+         if use_restart then
+            with_restart(app, app.report)
+         else
+            -- Restarts are disabled, still we want to not die on
+            -- errors during app reports, thus this workaround:
+            local status, err = pcall(app.report, app)
+            if not status then
+               print("Warning: "..name.." threw an error during report: "..err)
+            end
          end
       end
    end
 end
 
 function selftest ()
-   if not use_restart then
-      print("with_restart disabled\nTest skipped")
-      os.exit(test_skipped_code)
-   end
    print("selftest: app")
    local App = {}
    function App:new () return setmetatable({}, {__index = App}) end
@@ -446,6 +463,7 @@ function selftest ()
    assert(#app_array == 0)
    assert(#link_array == 0)
    -- Test app restarts on failure.
+   use_restart = true
    print("c_fail")
    local App1 = {zone="test"}
    function App1:new () return setmetatable({}, {__index = App1}) end

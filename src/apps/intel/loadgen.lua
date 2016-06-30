@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local ffi = require("ffi")
@@ -72,7 +74,12 @@ function LoadGen:report ()
    print(self.pciaddress,
          "TXDGPC (TX packets)", lib.comma_value(tonumber(self.dev.s.TXDGPC())),
          "GOTCL (TX octets)", lib.comma_value(tonumber(self.dev.s.GOTCL())))
+   print(self.pciaddress,
+         "RXDGPC (RX packets)", lib.comma_value(tonumber(self.dev.s.RXDGPC())),
+         "GORCL (RX octets)", lib.comma_value(tonumber(self.dev.s.GORCL())))
    self.dev.s.TXDGPC:reset()
    self.dev.s.GOTCL:reset()
+   self.dev.s.RXDGPC:reset()
+   self.dev.s.GORCL:reset()
 end
 

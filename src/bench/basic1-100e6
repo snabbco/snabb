@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 out=$(./snabb snabbmark basic1 100e6)
 # Extract floating point Mpps number from output.

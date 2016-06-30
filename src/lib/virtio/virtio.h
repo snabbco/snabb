@@ -1,7 +1,6 @@
-/* virtio.h - Virtual I/O device support in Linux/KVM style
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- */
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
+/* virtio.h - Virtual I/O device support in Linux/KVM style */
 
 enum { VIO_VRING_SIZE = 512 };
 
@@ -128,7 +127,7 @@ struct vio_memory {
   struct vio_memory_region regions[VIO_MEMORY_MAX_NREGIONS];
 };
 
-// Snabb Switch data structures
+// Snabb data structures
 
 struct vio_vring {
   // eventfd(2) for notifying the kernel (kick) and being notified (call)

@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- conntrack.lua -- Connection tracking for IPv4/IPv6 TCP/UDP sessions
 --
 -- This module exposes the following API:

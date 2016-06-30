@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Neutron synchronization slave process to run on the Compute Nodes.
 
@@ -7,9 +7,9 @@ function error() {
     exit 1 
 }
 
-[ ! -z "$NEUTRON_DIR" ]      || export NEUTRON_DIR=/var/snabbswitch/neutron
-[ ! -z "$SNABB_DIR"   ]      || export SNABB_DIR=/var/snabbswitch/networks
-[ ! -z "$TMP_DIR"   ]        || export TMP_DIR=/tmp/snabbswitch
+[ ! -z "$NEUTRON_DIR" ]      || export NEUTRON_DIR=/var/snabb/neutron
+[ ! -z "$SNABB_DIR"   ]      || export SNABB_DIR=/var/snabb/networks
+[ ! -z "$TMP_DIR"   ]        || export TMP_DIR=/tmp/snabb
 [ ! -z "$NEUTRON2SNABB" ]    || export NEUTRON2SNABB="snabb snabbnfv neutron2snabb"
 [ ! -z "$SYNC_PATH" ]        || error "check_env_vars: \$SYNC_PATH not set"
 [ ! -z "$SYNC_HOST" ]        || error "check_env_vars: \$SYNC_HOST not set"
