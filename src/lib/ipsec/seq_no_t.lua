@@ -6,8 +6,6 @@ local ffi = require("ffi")
 local seq_no_t = ffi.typeof("union { uint64_t no; uint32_t no32[2]; }")
 local seq_no = {}
 
-function seq_no:full () return self.no end
-
 local low, high
 if     ffi.abi("le") then low  = 0; high = 1
 elseif ffi.abi("be") then low  = 1; high = 0 end
