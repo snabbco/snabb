@@ -37,21 +37,10 @@ local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
+
 require("lib.ipsec.track_seq_no_h")
+local window_t = ffi.typeof("uint8_t[?]")
 
-ffi.cdef[[
-struct arepl_state
-{
-	uint8_t *win;
-
-	uint32_t W;
-	uint64_t T;
-};
-
-bool arepl_pass(uint32_t seq_hi, uint32_t seq_lo, struct arepl_state *st);
-void arepl_accept(uint32_t seq_hi, uint32_t seq_lo, struct arepl_state *st);
-uint32_t arepl_infer_seq_hi(uint32_t seq_lo, struct arepl_state *st);
-]]
 local ETHERNET_SIZE = ethernet:sizeof()
 local IPV6_SIZE = ipv6:sizeof()
 local PAYLOAD_OFFSET = ETHERNET_SIZE + IPV6_SIZE
@@ -135,14 +124,8 @@ function esp_v6_decrypt:new (conf)
    o.CTEXT_OFFSET = ESP_SIZE + gcm.IV_SIZE
    o.PLAIN_OVERHEAD = PAYLOAD_OFFSET + ESP_SIZE + gcm.IV_SIZE + gcm.AUTH_SIZE
    o.window_size = conf.window_size or 128
-
-   -- XXX is this garbage collected?
-   o.arepl_state = ffi.new("struct arepl_state")
-
-   -- XXX identical to new(uint8_t[?], WINSZ)? GC?
-   o.arepl_state.win = ffi.new("uint8_t[" .. o.window_size / 8 .. "]")
-
-   o.arepl_state.W = o.window_size
+   assert(o.window_size % 8 == 0, "window_size must be a multiple of 8.")
+   o.window = ffi.new(window_t, o.window_size / 8)
    return setmetatable(o, {__index=esp_v6_decrypt})
 end
 
@@ -163,17 +146,9 @@ function esp_v6_decrypt:decapsulate (p)
    local ctext_start = payload + self.CTEXT_OFFSET
    local ctext_length = length - self.PLAIN_OVERHEAD
    local seq_low = self.esp:seq_no()
-   local seq_high = ffi.C.arepl_infer_seq_hi(seq_low, self.arepl_state)
-
-   if not ffi.C.arepl_pass(seq_high, seq_low, self.arepl_state) then
-      return false
-   end
-
-   -- XXX does decryption actually verify that seq_low was unspoofed?
-   if gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
-      self.seq:low(seq_low)
-      self.seq:high(seq_high)
-      ffi.C.arepl_accept(seq_high, seq_low, self.arepl_state)
+   local seq_high = tonumber(C.check_seq_no(seq_low, self.seq.no, self.window, self.window_size))
+   if seq_high >= 0 and gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
+      self.seq.no = C.track_seq_no(seq_high, seq_low, self.seq.no, self.window, self.window_size)
       local esp_tail_start = ctext_start + ctext_length - ESP_TAIL_SIZE
       self.esp_tail:new_from_mem(esp_tail_start, ESP_TAIL_SIZE)
       local ptext_length = ctext_length - self.esp_tail:pad_length() - ESP_TAIL_SIZE
@@ -247,7 +222,7 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    enc.seq:high(1)
    dec.seq:low(2^32 - dec.window_size)
    dec.seq:high(0)
-   ffi.C.arepl_accept(dec.seq:high(), dec.seq:low(), dec.arepl_state)
+   C.track_seq_no(dec.seq:high(), dec.seq:low(), dec.seq.no, dec.window, dec.window_size)
    local p3 = packet.clone(p)
    enc:encapsulate(p3)
    assert(dec:decapsulate(p3),
@@ -259,7 +234,7 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    enc.seq:high(1)
    dec.seq:low(dec.window_size+1)
    dec.seq:high(1)
-   ffi.C.arepl_accept(dec.seq:high(), dec.seq:low(), dec.arepl_state)
+   C.track_seq_no(dec.seq:high(), dec.seq:low(), dec.seq.no, dec.window, dec.window_size)
    local p4 = packet.clone(p)
    enc:encapsulate(p4)
    assert(not dec:decapsulate(p4),
