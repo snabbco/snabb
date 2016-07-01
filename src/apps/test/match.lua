@@ -5,7 +5,7 @@ local C = ffi.C
 local lib = require("core.lib")
 
 local function dump (p)
-   return lib.hexdump(ffi.string(packet.data(p), packet.length(p)))
+   return lib.hexdump(ffi.string(p.data, p.length))
 end
 
 Match = {}
@@ -24,8 +24,8 @@ function Match:push ()
       local p = link.receive(self.input.rx)
       local cmp = link.front(self.input.comparator)
       if not cmp then
-      elseif packet.length(cmp) ~= packet.length(p)
-         or C.memcmp(packet.data(cmp), packet.data(p), packet.length(cmp)) ~= 0 then
+      elseif cmp.length ~= p.length
+         or C.memcmp(cmp.data, p.data, cmp.length) ~= 0 then
          if not self.fuzzy then
             table.insert(self.errs, "Mismatch:\n"..dump(cmp).."\n"..dump(p))
          end
