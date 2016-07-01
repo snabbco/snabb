@@ -5,7 +5,9 @@ local basic_apps = require("apps.basic.basic_apps")
 local bit = require("bit")
 local constants = require("apps.lwaftr.constants")
 local ethernet = require("lib.protocol.ethernet")
+local ipsum = require("lib.checksum").ipsum
 local ipv4 = require("lib.protocol.ipv4")
+local ipv6 = require("lib.protocol.ipv6")
 local lib = require("core.lib")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
@@ -23,14 +25,20 @@ nh_fwd4 = {}
 nh_fwd6 = {}
 
 local ethernet_header_size = constants.ethernet_header_size
+local n_ether_hdr_size = 14
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
 local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 local n_ipencap = 4
 local n_ipfragment = 44
+local n_ipv4_hdr_size = 20
+local o_ipv4_checksum = constants.o_ipv4_checksum
 local o_ipv4_dst_addr = constants.o_ipv4_dst_addr
 local o_ipv4_src_addr = constants.o_ipv4_src_addr
+local o_ipv6_next_header = constants.o_ipv6_next_header
+local o_ipv6_src_addr = constants.o_ipv6_src_addr
 
 local n_cache_src_ipv4 = ipv4:pton("0.0.0.0")
+local n_cache_src_ipv6 = ipv6:pton("fe80::")
 local n_next_hop_mac_empty = ethernet:pton("00:00:00:00:00:00")
 
 local function get_ethertype(pkt)
@@ -39,14 +47,17 @@ end
 local function get_ethernet_payload(pkt)
    return pkt.data + ethernet_header_size
 end
-local function copy_ether(dst, src)
-   ffi.copy(dst, src, 6)
-end
 local function get_ipv4_dst_address(ptr)
    return rd32(ptr + o_ipv4_dst_addr)
 end
+local function get_ipv4_src_ptr(ptr)
+   return ptr + o_ipv4_src_addr
+end
 local function get_ipv4_src_address(ptr)
-   return rd32(ptr + o_ipv4_src_addr)
+   return rd32(get_ipv4_src_ptr(ptr))
+end
+local function get_ipv4_checksum_ptr (ptr)
+   return ptr + o_ipv4_checksum
 end
 local function get_ipv6_next_header(ptr)
    return ptr[o_ipv6_next_header]
@@ -59,6 +70,52 @@ local function ether_equals (dst, src)
 end
 local function get_ipv6_src_address(ptr)
    return ptr + o_ipv6_src_addr
+end
+local function copy_ether(dst, src)
+   ffi.copy(dst, src, 6)
+end
+local function copy_ipv4(dst, src)
+   ffi.copy(dst, src, 4)
+end
+local function copy_ipv6(dst, src)
+   ffi.copy(dst, src, 16)
+end
+
+-- Set a bogus source IP address fe80::, so we can recognize it later when
+-- it comes back from the VM.
+--
+-- Tried initially to use ::0 as source, but such packets are discarded
+-- by the VM due to RFC 4007, chapter 9, which also considers the source IPv6
+-- address.
+--
+-- Using the link local address fe80::, the packets are properly routed back
+-- thru the same interface. Not sure if its OK to use that address or if there
+-- is a better way.
+local function send_ipv6_cache_trigger (r, pkt, mac)
+   local ether_dhost = get_ether_dhost_ptr(pkt)
+   local ipv6_hdr = get_ethernet_payload(pkt)
+   local ipv6_src_ip = get_ipv6_src_address(ipv6_hdr)
+
+   -- VM will discard packets not matching its MAC address on the interface.
+   copy_ether(ether_dhost, mac)
+   copy_ipv6(ipv6_src_ip, n_cache_src_ipv6)
+   transmit(r, pkt)
+end
+
+local function send_ipv4_cache_trigger(r, pkt, mac)
+   -- Set a bogus source IP address of 0.0.0.0.
+   local ether_dhost = get_ether_dhost_ptr(pkt)
+   local ipv4_hdr = get_ethernet_payload(pkt)
+   local ipv4_src_ip = get_ipv4_src_ptr(ipv4_hdr)
+   local ipv4_checksum = get_ipv4_checksum_ptr(ipv4_hdr)
+
+   -- VM will discard packets not matching its MAC address on the interface.
+   copy_ether(ether_dhost, mac)
+   copy_ipv4(ipv4_src_ip, n_cache_src_ipv4)
+   -- Clear checksum to recalculate it with new source IPv4 address.
+   ipv4_checksum = 0
+   ipv4_checksum = htons(ipsum(pkt.data + n_ether_hdr_size, n_ipv4_hdr_size, 0))
+   transmit(r, pkt)
 end
 
 function nh_fwd4:new (conf)
@@ -170,7 +227,7 @@ function nh_fwd4:push ()
    end
 end
 
-function nh_fwd6:new (config)
+function nh_fwd6:new (conf)
    assert(conf.mac_address, "MAC address is missing")
    assert(conf.ipv6_address, "IPv6 address is missing")
 
@@ -275,7 +332,6 @@ function nh_fwd6:push ()
          end
       end
    end
-
 end
 
 -- Unit tests.
@@ -294,9 +350,8 @@ local function test_ipv4_wire_to_vm_and_service (pkts)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd4, {
       mac_address = "52:54:00:00:00:01",
-      next_hop_mac = "52:54:00:00:00:02",
-      service_mac = "52:54:00:00:00:03",
-      ipv4_address = "192.168.1.1",
+      service_mac = "02:aa:aa:aa:aa:aa",
+      ipv4_address = "10.0.1.1",
    })
    config.link(c, 'source.out -> nh_fwd.wire')
    config.link(c, 'nh_fwd.service -> sink.in1')
@@ -318,9 +373,8 @@ local function test_ipv4_vm_to_service_and_wire(pkts)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd4, {
       mac_address = "52:54:00:00:00:01",
-      next_hop_mac = "52:54:00:00:00:02",
-      service_mac = "52:54:00:00:00:01",
-      ipv4_address = "192.168.1.1",
+      service_mac = "02:aa:aa:aa:aa:aa",
+      ipv4_address = "10.0.1.1",
    })
    config.link(c, 'source.out -> nh_fwd.vm')
    config.link(c, 'nh_fwd.service -> sink.in1')
@@ -341,9 +395,9 @@ local function test_ipv4_service_to_wire (pkts)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd4, {
       mac_address = "52:54:00:00:00:01",
-      next_hop_mac = "00:00:00:00:00:00",
-      service_mac = "52:54:00:00:00:03",
-      ipv4_address = "192.168.1.1",
+      service_mac = "02:aa:aa:aa:aa:aa",
+      ipv4_address = "10.0.1.1",
+      next_hop_mac = "52:54:00:00:00:02",
    })
    config.link(c, 'source.out -> nh_fwd.service')
    config.link(c, 'nh_fwd.wire -> sink.in1')
@@ -362,9 +416,8 @@ local function test_ipv4_service_to_vm (pkts)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd4, {
       mac_address = "52:54:00:00:00:01",
-      next_hop_mac = "52:54:00:00:00:02",
-      service_mac = "52:54:00:00:00:03",
-      ipv4_address = "192.168.1.1",
+      service_mac = "02:aa:aa:aa:aa:aa",
+      ipv4_address = "10.0.1.1",
    })
    config.link(c, 'source.out -> nh_fwd.service')
    config.link(c, 'nh_fwd.vm -> sink.in1')
@@ -382,34 +435,140 @@ end
 
 local function test_ipv4_flow ()
    local pkt1 = lib.hexundump ([[
-      52:54:00:00:00:01 52:54:00:00:00:02 08 00 45 00
-      00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
-      01 01 08 00 57 ea 61 1a 00 06 5c ba 16 53 00 00
-      00 00 04 15 09 00 00 00 00 00 10 11 12 13 14 15
-      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
-      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
-      36 37
-   ]], 98)
+      02:aa:aa:aa:aa:aa 02:99:99:99:99:99 08 00 45 00
+      02 18 00 00 00 00 0f 11 d3 61 0a 0a 0a 01 c1 05
+      01 64 30 39 04 00 00 26 00 00 00 00 00 00 00 00
+      00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+      00 00 00 00 00 00 00 00
+   ]], 72)
    local pkt2 = lib.hexundump ([[
-      52:54:00:00:00:03 52:54:00:00:00:02 08 00 45 00
-      00 54 c3 cd 40 00 40 01 f3 23 c0 a8 01 66 c0 a8
-      01 02 08 00 57 ea 61 1a 00 06 5c ba 16 53 00 00
-      00 00 04 15 09 00 00 00 00 00 10 11 12 13 14 15
-      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
-      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
-      36 37
-   ]], 98)
+      ff ff ff ff ff ff a0 88 b4 2c fa ac 08 06 00 01
+      08 00 06 04 00 01 a0 88 b4 2c fa ac c0 a8 00 0a
+      00 00 00 00 00 00 0a 00 01 01
+   ]], 42)
    test_ipv4_wire_to_vm_and_service({pkt1, pkt2})
    flush()
    test_ipv4_vm_to_service_and_wire({pkt1, pkt2})
    flush()
-   test_ipv4_service_to_vm({pkt1})
-   flush()
    test_ipv4_service_to_wire({pkt1})
    flush()
+   test_ipv4_service_to_vm({pkt1})
+   flush()
+end
+
+local function test_ipv6_wire_to_vm_and_service (pkts)
+   local c = config.new()
+   config.app(c, 'source', basic_apps.Join)
+   config.app(c, 'repeater', basic_apps.Repeater)
+   config.app(c, 'sink', basic_apps.Sink)
+   config.app(c, 'nh_fwd', nh_fwd6, {
+      mac_address = "52:54:00:00:00:01",
+      service_mac = "02:aa:aa:aa:aa:aa",
+      ipv6_address = "fe80::1",
+   })
+   config.link(c, 'source.out -> nh_fwd.wire')
+   config.link(c, 'nh_fwd.service -> sink.in1')
+   config.link(c, 'nh_fwd.vm -> sink.in2')
+
+   engine.configure(c)
+   transmit_packets(engine.app_table.source.output.out, pkts)
+   engine.main({duration = 0.1, noreport = true})
+   assert(link.stats(engine.app_table.sink.input.in1).rxpackets == 1)
+   assert(link.stats(engine.app_table.sink.input.in2).rxpackets == 1)
+end
+
+-- Test VM to Service and Wire.
+local function test_ipv6_vm_to_service_and_wire(pkts)
+   engine.configure(config.new()) -- Clean up engine.
+   local c = config.new()
+   config.app(c, 'source', basic_apps.Join)
+   config.app(c, 'repeater', basic_apps.Repeater)
+   config.app(c, 'sink', basic_apps.Sink)
+   config.app(c, 'nh_fwd', nh_fwd6, {
+      mac_address = "52:54:00:00:00:01",
+      service_mac = "02:aa:aa:aa:aa:aa",
+      ipv6_address = "fe80::1",
+   })
+   config.link(c, 'source.out -> nh_fwd.vm')
+   config.link(c, 'nh_fwd.service -> sink.in1')
+   config.link(c, 'nh_fwd.wire -> sink.in2')
+
+   engine.configure(c)
+   transmit_packets(engine.app_table.source.output.out, pkts)
+   engine.main({duration = 0.1, noreport = true})
+   assert(link.stats(engine.app_table.sink.input.in1).rxpackets == 1)
+   assert(link.stats(engine.app_table.sink.input.in2).rxpackets == 1)
+end
+
+-- Test input Service -> Wire.
+local function test_ipv6_service_to_wire (pkts)
+   local c = config.new()
+   config.app(c, 'source', basic_apps.Join)
+   config.app(c, 'repeater', basic_apps.Repeater)
+   config.app(c, 'sink', basic_apps.Sink)
+   config.app(c, 'nh_fwd', nh_fwd6, {
+      mac_address = "52:54:00:00:00:01",
+      service_mac = "02:aa:aa:aa:aa:aa",
+      ipv6_address = "fe80::1",
+      next_hop_mac = "52:54:00:00:00:02",
+   })
+   config.link(c, 'source.out -> nh_fwd.service')
+   config.link(c, 'nh_fwd.wire -> sink.in1')
+
+   engine.configure(c)
+   transmit_packets(engine.app_table.source.output.out, pkts)
+   engine.main({duration = 0.1, noreport = true})
+   assert(link.stats(engine.app_table.sink.input.in1).rxpackets == 1)
+end
+
+-- Test input Service -> VM.
+local function test_ipv6_service_to_vm (pkts)
+   local c = config.new()
+   config.app(c, 'source', basic_apps.Join)
+   config.app(c, 'repeater', basic_apps.Repeater)
+   config.app(c, 'sink', basic_apps.Sink)
+   config.app(c, 'nh_fwd', nh_fwd6, {
+      mac_address = "52:54:00:00:00:01",
+      service_mac = "02:aa:aa:aa:aa:aa",
+      ipv6_address = "fe80::1",
+   })
+   config.link(c, 'source.out -> nh_fwd.service')
+   config.link(c, 'nh_fwd.vm -> sink.in1')
+
+   engine.configure(c)
+   transmit_packets(engine.app_table.source.output.out, pkts)
+   engine.main({duration = 0.1, noreport = true})
+   assert(link.stats(engine.app_table.sink.input.in1).rxpackets == 1)
+end
+
+local function test_ipv6_flow ()
+   local pkt1 = lib.hexundump ([[
+      02:aa:aa:aa:aa:aa 02:99:99:99:99:99 86 dd 60 00
+      01 f0 01 f0 04 ff fc 00 00 01 00 02 00 03 00 04
+      00 05 00 00 00 7e fc 00 00 00 00 00 00 00 00 00
+      00 00 00 00 01 00 45 00 01 f0 00 00 00 00 0f 11
+      d3 89 c1 05 01 64 0a 0a 0a 01 04 00 30 39 00 0c
+      00 00 00 00 00 00
+   ]], 86)
+   local pkt2 = lib.hexundump ([[
+      33:33:ff:00:00:01 f0:de:f1:61:b6:22 86 dd 60 00
+      00 00 00 20 3a ff fe 80 00 00 00 00 00 00 f2 de
+      f1 ff fe 61 b6 22 ff 02 00 00 00 00 00 00 00 00
+      00 01 ff 00 00 01 87 00 4a d4 00 00 00 00 fe 80
+      00 00 00 00 00 00 00 00 00 00 00 00 00 01 01 01
+      f0 de f1 61 b6 22
+   ]], 86)
+   test_ipv6_wire_to_vm_and_service({pkt1, pkt2})
+   flush()
+   test_ipv6_vm_to_service_and_wire({pkt1, pkt2})
+   flush()
+   test_ipv6_service_to_wire({pkt1})
+   flush()
+   test_ipv6_service_to_vm({pkt1})
 end
 
 function selftest ()
    print("nh_fwd: selftest")
    test_ipv4_flow()
+   test_ipv6_flow()
 end
