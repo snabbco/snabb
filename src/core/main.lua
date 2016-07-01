@@ -29,7 +29,8 @@ ffi.cdef[[
       extern char** argv;
 ]]
 
-_G.developer_debug = lib.getenv("SNABB_DEBUG") and true
+-- Enable developer-level debug if SNABB_DEBUG env variable is set.
+_G.developer_debug = lib.getenv("SNABB_DEBUG") ~= nil
 debug_on_error = _G.developer_debug
 
 function main ()
