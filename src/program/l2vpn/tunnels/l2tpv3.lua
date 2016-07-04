@@ -47,10 +47,11 @@ function tunnel:decapsulate (datagram)
          self._logger:log("session id mismatch: expected 0x"
                           ..bit.tohex(self.conf.local_session)
                        ..", received 0x"..bit.tohex(session_id))
-      elseif l2tpv3:cookie() ~= self.conf.local_cookie_baked then
-         self._logger:log("cookie mismatch, expected "
-                          ..tostring(self.conf.local_cookie_baked)
-                       ..", received "..tostring(l2tpv3:cookie()))
+      elseif l2tpv3:cookie() ~= self.conf.local_cookie_baked
+         and self._logger:can_log() then
+            self._logger:log("cookie mismatch, expected "
+                             ..tostring(self.conf.local_cookie_baked)
+                          ..", received "..tostring(l2tpv3:cookie()))
       else
          datagram:pop_raw(self._proto_size)
          return true

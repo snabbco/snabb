@@ -76,7 +76,7 @@ function tunnel:decapsulate (datagram)
             if key and tobit(key) == tobit(0xFFFFFFFE) then
                datagram:pop_raw(gre_size)
                code = 1
-            else
+            elseif self._logger:can_log() then
                self._logger:log("GRE key mismatch: local "
                                 ..key_or_none(self.conf.key)
                              ..", remote "..key_or_none(gre:key()))
