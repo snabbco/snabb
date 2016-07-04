@@ -1,27 +1,64 @@
 #!../../snabb snsh
-
 local args = main.parameters
--- time nic queue
-assert(#args == 3)
+assert(#args == 3, "testrecv.snabb [Intel1g|Intel82599] pciaddr qno")
+local driver = table.remove(args, 1)
+local pciaddr = table.remove(args, 1)
+local qno = tonumber(table.remove(args,1))
+
 local intel = require("apps.intel_mp.intel_mp")
 local basic = require("apps.basic.basic_apps")
-local counter = require("core.counter")
-local S = require("syscall")
-local lib = require("core.lib")
+local ffi = require("ffi")
+local C = ffi.C
 
 local c = config.new()
-config.app(c, "nic", intel.Intel1g, {pciaddr=args[2], rxq = tonumber(args[3])})
+config.app(c, "nic", intel[driver], { pciaddr=pciaddr, rxq = qno, ndesc = 2048, wait_for_link=true })
 config.app(c, "sink", basic.Sink)
-config.link(c, "nic.output -> sink.input")
-engine.configure(c)
-local lastpkts = 0
-local penpkts = 0
-for i=1,args[1] do
-  engine.main({duration = 1})
-  penpkts = lastpkts
-  lastpkts = counter.read(engine.app_table.sink.input.input.stats.txpackets)
+if os.getenv("SNABB_RECV_EXPENSIVE") then
+	local filter = require("apps.packet_filter.pcap_filter")
+
+	local count = 10
+	config.link(c, "nic.output -> filter0.input")
+	for i=0,count do
+		local n = tostring(i)
+		local s = "filter"..n
+		config.app(c, s, filter.PcapFilter, { filter = [[ not dst host 10.2.29.1 and not dst host 10.2.50.1 ]]})
+	end
+	for i=1,count do
+		local m = tostring(i-1)
+		local n = tostring(i)
+		local s = "filter"..m..".output -> filter"..n..".input"
+		config.link(c, s)
+	end
+	config.app(c, "sane", filter.PcapFilter, { filter = [[ src host 172.16.172.3 and dst net 1.2.0.0/16 and ip proto 0 ]] })
+	config.link(c, "filter"..tostring(count)..".output -> sane.input")
+	config.link(c, "sane.output -> sink.input")
+else
+	config.link(c, "nic.output -> sink.input")
 end
-local slink = counter.read(engine.app_table.sink.input.input.stats.txpackets)
-lib.writefile("results.pkts." .. tostring(S.getpid()), tostring(tonumber(slink)))
-lib.writefile("results.pps." .. tostring(S.getpid()), tostring(tonumber(lastpkts - penpkts)))
-os.exit(0)
+
+engine.configure(c)
+local spinup = os.getenv("SNABB_RECV_SPINUP")
+if spinup then
+	engine.main({duration = spinup})
+end
+
+local regs = {
+	Intel82599 = { GPRC = 1, RXDGPC = 1 },
+	Intel1g = { RQDPC = 1, PQGPRC = 1, GPRC = 1, RPTHC = 1 }
+}
+
+local duration = os.getenv("SNABB_RECV_DURATION") or 2
+local before = engine.app_table.nic:debug()
+local after
+for _=1,duration do
+	engine.main({duration = 1})
+	after = engine.app_table.nic:debug()
+end
+engine.app_table.nic:stop()
+for k,v in pairs(regs[driver]) do
+	if before[k] then
+		print(string.format("%s %d", k, tonumber(after[k] - before[k])/duration))
+	end
+end
+print("txpackets", tonumber(after.txpackets) - tonumber(before.txpackets)/duration)
+main.exit(0)
