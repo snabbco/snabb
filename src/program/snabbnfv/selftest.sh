@@ -288,10 +288,25 @@ function filter_tests {
     assert FILTER $?
 }
 
-# Usage: iperf_bench [<mode>]
+function crypto_tests {
+    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/crypto.ports
+
+    test_ping $SNABB_TELNET0 "$(ip 1)%eth0"
+    test_iperf $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0"
+    test_jumboping $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0"
+    # Repeat iperf test now that jumbo frames are enabled
+    test_iperf $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0"
+}
+
+# Usage: iperf_bench [<mode>] [<config>]
 # Run iperf benchmark. If <mode> is "jumbo", jumboframes will be enabled.
+# <config> defaults to same_vlan.ports.
 function iperf_bench {
-    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports    
+    if [ -z "$2" ]; then
+        load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports
+    else
+        load_config "$2"
+    fi
 
     if [ "$1" = "jumbo" ]; then
         test_jumboping $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0" \
@@ -324,7 +339,7 @@ start_test_env
 # Decide which mode to run (`test', `bench' or `fuzz').
 case $1 in
     bench)
-        iperf_bench "$2"
+        iperf_bench "$2" "$3"
         ;;
     fuzz)
         fuzz_tests "$2"
@@ -334,6 +349,7 @@ case $1 in
         rate_limited_tests
         tunnel_tests
         filter_tests
+        crypto_tests
 esac
 
 exit 0
