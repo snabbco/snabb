@@ -83,8 +83,12 @@ function RawSocket:receive ()
    p.length = sz
    counter.add(self.counters.rxbytes, sz)
    counter.add(self.counters.rxpackets)
-   counter.add(self.counters.rxmcast, ethernet:n_mcast(p.data))
-   counter.add(self.counters.rxbcast, ethernet:n_bcast(p.data))
+   if ethernet:is_mcast(p.data) then
+      counter.add(self.counters.rxmcast)
+   end
+   if ethernet:is_bcast(p.data) then
+      counter.add(self.counters.rxbcast)
+   end
    return packet.clone(p)
 end
 
@@ -96,8 +100,12 @@ function RawSocket:push ()
       self:transmit(p)
       counter.add(self.counters.txbytes, p.length)
       counter.add(self.counters.txpackets)
-      counter.add(self.counters.txmcast, ethernet:n_mcast(p.data))
-      counter.add(self.counters.txbcast, ethernet:n_bcast(p.data))
+      if ethernet:is_mcast(p.data) then
+         counter.add(self.counters.txmcast)
+      end
+      if ethernet:is_bcast(p.data) then
+         counter.add(self.counters.txbcast)
+      end
       packet.free(p)
    end
 end

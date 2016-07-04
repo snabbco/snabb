@@ -107,15 +107,23 @@ end
 function VhostUser:tx_callback (p)
    counter.add(self.counters.txbytes, packet.length(p))
    counter.add(self.counters.txpackets)
-   counter.add(self.counters.txmcast, ethernet:n_mcast(packet.data(p)))
-   counter.add(self.counters.txbcast, ethernet:n_bcast(packet.data(p)))
+   if ethernet:is_mcast(packet.data(p)) then
+      counter.add(self.counters.txmcast)
+   end
+   if ethernet:is_bcast(packet.data(p)) then
+      counter.add(self.counters.txbcast)
+   end
 end
 
 function VhostUser:rx_callback (p)
    counter.add(self.counters.rxbytes, packet.length(p))
    counter.add(self.counters.rxpackets)
-   counter.add(self.counters.rxmcast, ethernet:n_mcast(packet.data(p)))
-   counter.add(self.counters.rxbcast, ethernet:n_bcast(packet.data(p)))
+   if ethernet:is_mcast(packet.data(p)) then
+      counter.add(self.counters.rxmcast)
+   end
+   if ethernet:is_bcast(packet.data(p)) then
+      counter.add(self.counters.rxbcast)
+   end
 end
 
 function VhostUser:rxdrop_callback (p)
