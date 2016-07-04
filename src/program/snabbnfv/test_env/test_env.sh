@@ -116,14 +116,15 @@ function launch_qemu {
         "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
         $QEMU $QEMU_ARGS \
         -kernel $assets/$4 \
-        -append \"earlyprintk root=/dev/vda $SNABB_KERNEL_PARAMS rw console=ttyS0 ip=$(ip $qemu_n)\" \
+        -append \"earlyprintk root=/dev/vda $SNABB_KERNEL_PARAMS rw console=ttyS1 ip=$(ip $qemu_n)\" \
         -m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on \
         -netdev type=vhost-user,id=net0,chardev=char0${mqueues} -chardev socket,id=char0,path=$2,server \
         -device virtio-net-pci,netdev=net0,mac=$(mac $qemu_n),mq=$qemu_mq,vectors=$qemu_vectors \
         -M pc -smp $qemu_smp -cpu host --enable-kvm \
         -serial telnet:localhost:$3,server,nowait \
+        -serial stdio \
         -drive if=virtio,format=raw,file=$(qemu_image $5) \
-        -nographic" \
+        -display none" \
         $(qemu_log)
     qemu_n=$(expr $qemu_n + 1)
     sockets="$sockets $2"
