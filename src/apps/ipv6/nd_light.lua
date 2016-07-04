@@ -80,7 +80,7 @@ local function check_ip_address(ip, desc)
 end
 
 local provided_counters = {
-   'type', 'dtime', 'status', 'rxerrors', 'rxdrop',
+   'type', 'dtime', 'status', 'rxerrors', 'txerrors', 'txdrop',
    'ns_checksum_errors', 'ns_target_address_errors',
    'na_duplicate_errors', 'na_target_address_errors',
    'nd_protocol_errors'
@@ -227,8 +227,8 @@ local function ns (self, dgram, eth, ipv6, icmp)
    local mem, length = self._cache.mem
    mem[0], length = dgram:payload()
    if not icmp:checksum_check(mem[0], length, ipv6) then
-      counter.add(self.counters.rxerrors)
       counter.add(self.counters.ns_checksum_errors)
+      counter.add(self.counters.rxerrors)
       return nil
    end
    -- Parse the neighbor solicitation and check if it contains our own
@@ -341,7 +341,7 @@ function nd_light:push ()
          -- Drop packets until ND for the next-hop
          -- has completed.
          packet.free(link.receive(l_in))
-         counter.add(self.counters.rxdrop)
+         counter.add(self.counters.txdrop)
       else
          local p = cache.p
          p[0] = link.receive(l_in)
@@ -350,7 +350,7 @@ function nd_light:push ()
             link.transmit(l_out, p[0])
          else
             packet.free(p[0])
-            counter.add(self.counters.rxerrors)
+            counter.add(self.counters.txerrors)
          end
       end
    end
