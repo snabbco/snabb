@@ -76,14 +76,15 @@ function ethernet:ipv6_mcast(ip)
    return result
 end
 
--- Return 1 if MAC address has its group bit set and 0 otherwise
-function ethernet:n_mcast (addr)
-   return band(addr[0], 0x01)
-end
-
 -- Check whether a MAC address has its group bit set
 function ethernet:is_mcast (addr)
-   return ethernet:n_mcast(addr) ~= 0
+   return band(addr[0], 0x01) ~= 0
+end
+
+local bcast_address = ethernet:pton("FF:FF:FF:FF:FF:FF")
+-- Check whether a MAC address is the broadcast address
+function ethernet:is_bcast (addr)
+   return C.memcmp(addr, bcast_address, 6) == 0
 end
 
 -- Instance methods
