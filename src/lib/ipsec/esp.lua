@@ -196,6 +196,22 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    assert(not enc:encapsulate(p_invalid), "encapsulated invalid packet")
    local p_invalid = packet.from_string("invalid")
    assert(not dec:decapsulate(p_invalid), "decapsulated invalid packet")
+   -- Check minimum packet.
+   local p_min = packet.from_string("012345678901234567890123456789012345678901234567890123")
+   p_min.data[18] = 0 -- Set IPv6 payload length to zero
+   p_min.data[19] = 0 -- ...
+   assert(packet.length(p_min) == PAYLOAD_OFFSET)
+   print("original", lib.hexdump(ffi.string(packet.data(p_min), packet.length(p_min))))
+   local e_min = packet.clone(p_min)
+   assert(enc:encapsulate(e_min))
+   print("encrypted", lib.hexdump(ffi.string(packet.data(e_min), packet.length(e_min))))
+   assert(packet.length(e_min) == dec.MIN_SIZE+PAYLOAD_OFFSET)
+   assert(dec:decapsulate(e_min))
+   print("decrypted", lib.hexdump(ffi.string(packet.data(e_min), packet.length(e_min))))
+   assert(packet.length(e_min) == PAYLOAD_OFFSET)
+   assert(packet.length(p_min) == packet.length(e_min)
+          and C.memcmp(p_min, e_min, packet.length(p_min)) == 0,
+          "integrity check failed")
    -- Check transmitted Sequence Number wrap around
    enc.seq:low(0)
    enc.seq:high(1)
