@@ -241,7 +241,7 @@ function Intel1g:new(conf)
      ifTable:register('ifDescr', 'OctetStr', pciaddress)
      ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
      ifTable:register('ifMtu', 'Integer32', conf.mtu)
-     ifTable:register('ifSpeed', 'Gauge32', 1000000)
+     ifTable:register('ifSpeed', 'Gauge32', 1000000000)
      -- After a reset of the NIC, the "native" MAC address is copied to
      -- the receive address register #0 from the FLASH
      local ral, rah = s.RAL[0](), s.RAH[0]()
