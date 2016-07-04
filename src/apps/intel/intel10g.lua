@@ -201,7 +201,7 @@ function M_sf:init_snmp ()
    ifTable:register('ifDescr', 'OctetStr', self.pciaddress)
    ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
    ifTable:register('ifMtu', 'Integer32', self.mtu)
-   ifTable:register('ifSpeed', 'Gauge32', 10000000)
+   ifTable:register('ifSpeed', 'Gauge32', 4294967295) -- RFC 3635 sec. 3.2.8
 
    -- After a reset of the NIC, the "native" MAC address is copied to
    -- the receive address register #0 from the EEPROM
