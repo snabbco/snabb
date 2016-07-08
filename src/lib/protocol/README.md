@@ -804,9 +804,7 @@ If *pointer* and *length* are supplied then *length* bytes starting from
 
 — Method **datagram:data**
 
-Returns the location and size of the buffer of the underlying packet.
-This is a shortcut to *datagram:packet* followed by calls to
-*packet.data* and *pakcet.length*.
+Returns `data` and `length` of the underlying packet.
 
 - Method **datagram:commit**
 

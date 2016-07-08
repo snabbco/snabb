@@ -30,8 +30,13 @@ function init_snmp (name, counters, directory, interval)
    ifTable:register('ifSpeed', 'Gauge32')
    ifTable:register('ifHighSpeed', 'Gauge32')
    if counters.speed then
-      ifTable:set('ifSpeed', counter.read(counters.speed))
-      ifTable:set('ifHighSpeed', counter.read(counters.speed) / 1000)
+      speed = counters.read(counters.speed)
+      if speed > 1000000000 then
+         ifTable:set('ifSpeed', 4294967295) -- RFC3635 sec. 3.2.8
+      else
+         ifTable:set('ifSpeed', speed)
+      end
+      ifTable:set('ifHighSpeed', speed / 1000000)
    end
    ifTable:register('ifPhysAddress', { type = 'OctetStr', length = 6 })
    if counters.macaddr then

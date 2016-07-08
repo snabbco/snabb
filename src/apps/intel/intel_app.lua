@@ -73,7 +73,7 @@ function Intel82599:new (arg)
       counter.set(self.stats.counters.type, 0x1000) -- Hardware interface
       counter.set(self.stats.counters.dtime, C.get_unix_time())
       counter.set(self.stats.counters.mtu, self.dev.mtu)
-      counter.set(self.stats.counters.speed, 10000000) -- 10 Gbits
+      counter.set(self.stats.counters.speed, 10000000000) -- 10 Gbits
       counter.set(self.stats.counters.status, 2) -- down
       if not conf.vmdq and conf.macaddr then
          counter.set(self.stats.counters.macaddr,

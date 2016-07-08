@@ -321,7 +321,16 @@ function VirtioNetDevice:tx_buffer_add_mrg_rxbuf(tx_p, addr, len)
       self.tx.finished = true
    end
 
-   return to_copy
+   -- XXX The "adjust" is needed to counter-balance an adjustment made
+   -- in virtq_device. If we don't make this adjustment then we break
+   -- chaining together multiple buffers in that we report the size of
+   -- each buffer (except for the first) to be 12 bytes more than it
+   -- really is. This causes the VM to see an inflated ethernet packet
+   -- size which may or may not be noticed by an application.
+   --
+   -- This formulation is not optimal and it would be nice to make
+   -- this code more transparent. -luke
+   return to_copy - adjust
 end
 
 function VirtioNetDevice:tx_packet_end_mrg_rxbuf(header_id, total_size, tx_p)
@@ -400,6 +409,10 @@ function VirtioNetDevice:set_features(features)
       self.hdr_type = virtio_net_hdr_mrg_rxbuf_type
       self.hdr_size = virtio_net_hdr_mrg_rxbuf_size
       self.mrg_rxbuf = true
+   else
+      self.hdr_type = virtio_net_hdr_type
+      self.hdr_size = virtio_net_hdr_size
+      self.mrg_rxbuf = false
    end
    if band(self.features, C.VIRTIO_RING_F_INDIRECT_DESC) == C.VIRTIO_RING_F_INDIRECT_DESC then
       for i = 0, max_virtq_pairs-1 do
