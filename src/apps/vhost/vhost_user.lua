@@ -15,7 +15,6 @@ local main      = require("core.main")
 local memory    = require("core.memory")
 local counter   = require("core.counter")
 local pci       = require("lib.hardware.pci")
-local ethernet  = require("lib.protocol.ethernet")
 local net_device= require("lib.virtio.net_device")
 local timer     = require("core.timer")
 local ffi       = require("ffi")
@@ -102,26 +101,6 @@ function VhostUser:push ()
    if self.vhost_ready then
       self.dev:poll_vring_transmit()
    end
-end
-
-function VhostUser:tx_callback (p)
-   counter.add(self.counters.txbytes, packet.length(p))
-   counter.add(self.counters.txpackets)
-   if ethernet:is_mcast(packet.data(p)) then
-      counter.add(self.counters.txmcast)
-   end
-end
-
-function VhostUser:rx_callback (p)
-   counter.add(self.counters.rxbytes, packet.length(p))
-   counter.add(self.counters.rxpackets)
-   if ethernet:is_mcast(packet.data(p)) then
-      counter.add(self.counters.rxmcast)
-   end
-end
-
-function VhostUser:rxdrop_callback (p)
-   counter.add(self.counters.rxdrop)
 end
 
 -- Try to connect to QEMU.
