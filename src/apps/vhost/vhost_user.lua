@@ -30,8 +30,8 @@ VhostUser = {}
 
 local provided_counters = {
    'type', 'dtime',
-   'rxbytes', 'rxpackets', 'rxmcast', 'rxdrop',
-   'txbytes', 'txpackets', 'txmcast'
+   'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast', 'rxdrop',
+   'txbytes', 'txpackets', 'txmcast', 'txbcast'
 }
 
 function VhostUser:new (args)
