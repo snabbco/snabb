@@ -32,7 +32,7 @@ function init {
 function clean { rm -rf "$tmpdir"; }
 
 function fetch_pull_requests {
-    curl "https://api.github.com/repos/$REPO/pulls" > "$tmpdir/pulls"
+    curl -u "$GITHUB_CREDENTIALS" "https://api.github.com/repos/$REPO/pulls" > "$tmpdir/pulls"
 }
 
 function pull_request_ids { "$JQ" ".[].number" "$tmpdir/pulls"; }
@@ -69,7 +69,11 @@ function pull_request_new_p {
 }
 
 function clone_upstream {
-    git clone https://github.com/$REPO.git $(repo_path)
+    if [[ -n "$GITHUB_CREDENTIALS" ]]; then
+       git clone "https://$GITHUB_CREDENTIALS@github.com/$REPO.git" $(repo_path)
+    else
+       git clone "https://github.com/$REPO.git" $(repo_path)
+    fi
 }
 
 function dock_build { (cd src && scripts/dock.sh "(cd .. && make)"); }
