@@ -35,7 +35,7 @@
 -- Note: section and page numbers in the comments below refer to the i210 data sheet
 
 -- run selftest() on APU2's second/middle NIC:
---  sudo SNABB_SELFTEST_INTEL1G_0="0000:02:00.0" ./snabb snsh -t apps.intel.intel1g
+--  sudo SNABB_PCI_INTEL1G0="0000:02:00.0" ./snabb snsh -t apps.intel.intel1g
 
 -- Note: rxqueue >0 not working yet!
 
@@ -107,7 +107,7 @@ function Intel1g:new(conf)
    -- Setup device access
    pci.unbind_device_from_linux(pciaddress)
    pci.set_bus_master(pciaddress, true)
-   local regs, mmiofd = pci.map_pci_memory(pciaddress, 0)
+   local regs, mmiofd = pci.map_pci_memory_locked(pciaddress, 0)
 
    -- Common utilities, see snabb/src/lib/hardware/register.lua
    local function bitvalue (value)
@@ -632,9 +632,9 @@ end  -- function Intel1g:new()
 
 function selftest ()
    print("selftest: Intel1g")
-   local pciaddr = os.getenv("SNABB_SELFTEST_INTEL1G_0")
+   local pciaddr = os.getenv("SNABB_PCI_INTEL1G0")
    if not pciaddr then
-      print("SNABB_SELFTEST_INTEL1G_0 not set")
+      print("SNABB_PCI_INTEL1G0 not set")
       os.exit(engine.test_skipped_code)
    end
    
