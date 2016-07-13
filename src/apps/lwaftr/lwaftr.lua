@@ -273,9 +273,9 @@ local function drop_ipv4(lwstate, pkt, pkt_src_link)
    return drop(pkt)
 end
 
-local transmit_icmpv6_with_rate_limit
+local transmit_icmpv6_reply
 
-local function init_transmit_icmpv6_with_rate_limit(lwstate)
+local function init_transmit_icmpv6_reply(lwstate)
    assert(lwstate.icmpv6_rate_limiter_n_seconds > 0,
       "Incorrect icmpv6_rate_limiter_n_seconds value, must be > 0")
    assert(lwstate.icmpv6_rate_limiter_n_packets >= 0,
@@ -285,11 +285,11 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
    local num_packets = 0
    local last_time
    return function (o, pkt)
-      local cur_now = tonumber(engine.now())
-      last_time = last_time or cur_now
+      local now = tonumber(engine.now())
+      last_time = last_time or now
       -- Reset if elapsed time reached.
-      if cur_now - last_time >= icmpv6_rate_limiter_n_seconds then
-         last_time = cur_now
+      if now - last_time >= icmpv6_rate_limiter_n_seconds then
+         last_time = now
          num_packets = 0
       end
       -- Send packet if limit not reached.
@@ -342,7 +342,7 @@ function LwAftr:new(conf)
 
    o.counters = create_counters()
 
-   transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
+   transmit_icmpv6_reply = init_transmit_icmpv6_reply(o)
    if debug then lwdebug.pp(conf) end
    return o
 end
@@ -505,7 +505,7 @@ local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
       lwstate.aftr_mac_b4_side, lwstate.next_hop6_mac, lwstate.aftr_ipv6_ip,
       ipv6_src_addr, pkt, ethernet_header_size, icmp_config)
    drop(pkt)
-   transmit_icmpv6_with_rate_limit(lwstate.o6, b4fail_icmp)
+   transmit_icmpv6_reply(lwstate.o6, b4fail_icmp)
 end
 
 local function encapsulating_packet_with_df_flag_would_exceed_mtu(lwstate, pkt)
