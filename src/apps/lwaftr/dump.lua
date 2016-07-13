@@ -51,6 +51,8 @@ local lwaftr_conf_spec = {
    next_hop6_mac=Dumper.mac,
    binding_table=Dumper.string,
    hairpinning=Dumper.boolean,
+   icmpv4_rate_limiter_n_packets=Dumper.number,
+   icmpv4_rate_limiter_n_seconds=Dumper.number,
    icmpv6_rate_limiter_n_packets=Dumper.number,
    icmpv6_rate_limiter_n_seconds=Dumper.number,
    inet_mac=Dumper.mac,
@@ -169,6 +171,8 @@ function selftest ()
          next_hop6_mac=44:44:44:44:44:44
          binding_table="foo-table.txt"
          hairpinning=false
+         icmpv4_rate_limiter_n_packets=6e3
+         icmpv4_rate_limiter_n_seconds=2
          icmpv6_rate_limiter_n_packets=6e3
          icmpv6_rate_limiter_n_seconds=2
          inet_mac = 68:68:68:68:68:68
@@ -192,6 +196,8 @@ function selftest ()
          aftr_mac_inet_side = 12:12:12:12:12:12
          binding_table = foo-table.txt
          hairpinning = false
+         icmpv4_rate_limiter_n_packets = 6000
+         icmpv4_rate_limiter_n_seconds = 2
          icmpv6_rate_limiter_n_packets = 6000
          icmpv6_rate_limiter_n_seconds = 2
          inet_mac = 68:68:68:68:68:68
