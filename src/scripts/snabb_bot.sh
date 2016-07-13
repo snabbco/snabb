@@ -33,7 +33,11 @@ function init {
 function clean { rm -rf "$tmpdir"; }
 
 function fetch_pull_requests {
-    curl -u "$GITHUB_CREDENTIALS" "https://api.github.com/repos/$REPO/pulls" > "$tmpdir/pulls"
+    local url="https://api.github.com/repos/$REPO/pulls"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
+    curl -u "$GITHUB_CREDENTIALS" "$url" > "$tmpdir/pulls"
 }
 
 function pull_request_ids { "$JQ" ".[].number" "$tmpdir/pulls"; }
@@ -176,6 +180,10 @@ function check_test_suite {
 }
 
 function post_gist {
+    local url="https://api.github.com/gists"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
     # Create API request body for Gist API.
     cat "$1" \
         | "$JQ" -s -R "{public: true, files: {log: {content: .}}}" \
@@ -184,11 +192,15 @@ function post_gist {
     curl -X POST \
         -u "$GITHUB_CREDENTIALS" \
         -d @"$tmpdir/request" \
-        "https://api.github.com/gists" \
+        "$url" \
         | "$JQ" .html_url
 }
 
 function post_status { id=$1; status=$2; gist=$3
+    local url="https://api.github.com/repos/$REPO/statuses/$(pull_request_head $id)"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
     # Create API request body for status API.
     cat > "$tmpdir/request" \
         <<EOF
@@ -199,7 +211,7 @@ function post_status { id=$1; status=$2; gist=$3
 EOF
     # POST status.
     curl -X POST -u "$GITHUB_CREDENTIALS" -d @"$tmpdir/request" \
-        "https://api.github.com/repos/$REPO/statuses/$(pull_request_head $id)" \
+        "$url" \
         > /dev/null
 }
 
