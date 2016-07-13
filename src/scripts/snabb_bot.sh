@@ -26,6 +26,7 @@ function init {
     fi
     export logdir="$SNABBBOTDIR/log"
     export tmpdir="$SNABBBOTDIR/tmp"
+    rm -Rf "$SNABBBOTDIR" "$logdir" "$tmpdir"
     mkdir -p "$SNABBBOTDIR" "$logdir" "$tmpdir"
 }
 
