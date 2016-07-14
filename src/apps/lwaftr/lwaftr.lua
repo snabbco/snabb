@@ -314,6 +314,7 @@ function LwAftr:new(conf)
    o.policy_icmpv6_outgoing = conf.policy_icmpv6_outgoing
 
    o.binding_table = conf.preloaded_binding_table or bt.load(o.conf.binding_table)
+   o.lookup_queue = bt.BTLookupQueue.new(o.binding_table)
 
    o.control = channel.create('lwaftr/control', messages.lwaftr_message_t)
 
@@ -567,17 +568,16 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src)
 end
 
 local function enqueue_lookup(lwstate, pkt, ipv4, port, flush)
-   local bt = lwstate.binding_table
-   if bt:enqueue_lookup(pkt, ipv4, port) then
+   if lwstate.lookup_queue:enqueue_lookup(pkt, ipv4, port) then
       flush(lwstate)
    end
 end
 
 local function flush_encapsulation(lwstate)
-   local bt = lwstate.binding_table
-   bt:process_lookup_queue()
-   for n = 0, bt.lookup_queue_len - 1 do
-      local pkt, ipv6_dst, ipv6_src = bt:get_enqueued_lookup(n)
+   local lq = lwstate.lookup_queue
+   lq:process_queue()
+   for n = 0, lq.length - 1 do
+      local pkt, ipv6_dst, ipv6_src = lq:get_lookup(n)
       if ipv6_dst then
          encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src)
       else
@@ -590,7 +590,7 @@ local function flush_encapsulation(lwstate)
          drop_ipv4_packet_to_unreachable_host(lwstate, pkt)
       end
    end
-   bt:reset_lookup_queue()
+   lq:reset_queue()
 end
 
 local function enqueue_encapsulation(lwstate, pkt, ipv4, port)
@@ -753,10 +753,10 @@ local function icmpv6_incoming(lwstate, pkt)
 end
 
 local function flush_decapsulation(lwstate)
-   local bt = lwstate.binding_table
-   bt:process_lookup_queue()
-   for n = 0, bt.lookup_queue_len - 1 do
-      local pkt, b4_addr, br_addr = bt:get_enqueued_lookup(n)
+   local lq = lwstate.lookup_queue
+   lq:process_queue()
+   for n = 0, lq.length - 1 do
+      local pkt, b4_addr, br_addr = lq:get_lookup(n)
 
       local ipv6_header = get_ethernet_payload(pkt)
       if (b4_addr
@@ -776,7 +776,7 @@ local function flush_decapsulation(lwstate)
          drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
       end
    end
-   bt:reset_lookup_queue()
+   lq:reset_queue()
 end
 
 local function enqueue_decapsulation(lwstate, pkt, ipv4, port)
