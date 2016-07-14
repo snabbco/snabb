@@ -17,7 +17,7 @@ local packet_t = ffi.typeof("struct packet")
 local packet_ptr_t = ffi.typeof("struct packet *")
 local packet_size = ffi.sizeof(packet_t)
 local header_size = 8
-local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
+max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
 
