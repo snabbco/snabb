@@ -151,7 +151,6 @@ function Fragmenter:push ()
    end
 end
 
--- TODO: handle any ARP retry policy code here
 function ARP:new(conf)
    local o = setmetatable({}, {__index=ARP})
    o.conf = conf
@@ -159,21 +158,38 @@ function ARP:new(conf)
    -- have been provided, in pton format.
    if not conf.dst_eth then
       o.arp_request_pkt = arp.form_request(conf.src_eth, conf.src_ipv4, conf.dst_ipv4)
-      o.do_arp_request = true
-   else
-      o.do_arp_request = false
+      self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
+      self.arp_request_max_retries = 5 -- Max number of arp_request retries.
+      self.arp_request_retries = 0
    end
    o.dst_eth = conf.dst_eth -- intentionally nil if to request via ARP
    return o
 end
 
+function ARP:maybe_send_arp_request (output)
+   if self.dst_eth then return end
+   if self.arp_request_retries == self.arp_request_max_retries then
+      error(("Could not resolve IPv4 address: %s"):format(
+         ipv4:ntop(self.conf.dst_ipv4)))
+   end
+   self.next_arp_request_time = self.next_arp_request_time or engine.now()
+   if self.next_arp_request_time <= engine.now() then
+      self:send_arp_request(output)
+      self.next_arp_request_time = engine.now() + self.arp_request_interval
+      self.arp_request_retries = self.arp_request_retries + 1
+   end
+end
+
+function ARP:send_arp_request (output)
+   transmit(output, packet.clone(self.arp_request_pkt))
+end
+
 function ARP:push()
    local isouth, osouth = self.input.south, self.output.south
    local inorth, onorth = self.input.north, self.output.north
-   if self.do_arp_request then
-      self.do_arp_request = false -- TODO: have retries, etc
-      transmit(osouth, packet.clone(self.arp_request_pkt))
-   end
+
+   self:maybe_send_arp_request(osouth)
+
    for _=1,link.nreadable(isouth) do
       local p = receive(isouth)
       if arp.is_arp(p) then
