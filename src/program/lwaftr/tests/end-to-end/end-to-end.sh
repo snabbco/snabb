@@ -189,7 +189,7 @@ echo "Testing: from-to-b4 IPv6 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/tcp-afteraftr-ipv6.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/drop-misplaced-ipv4.lua
+   ${COUNTERS}/drop-misplaced-not-ipv4.lua
 
 echo "Testing: from-b4 to-internet IPv6 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
@@ -273,7 +273,8 @@ snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
 echo "Testing: from-to-b4 TCP packet, with hairpinning, TTL 1"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6-ttl-1.pcap \
-   ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6-ttl-1-reply.pcap
+   ${EMPTY} ${TEST_BASE}/tcp-fromb4-tob4-ipv6-ttl-1-reply.pcap \
+   ${COUNTERS}/in-ipv4-ipv6-out-icmpv4-ipv6-hairpin-1.lua
 
 echo "Testing: from-to-b4 IPv6 packet, with hairpinning, with vlan tag"
 snabb_run_and_cmp ${TEST_BASE}/vlan.conf \

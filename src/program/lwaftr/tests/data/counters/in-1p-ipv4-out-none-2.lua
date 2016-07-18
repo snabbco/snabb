@@ -4,6 +4,6 @@ return {
 
    ["drop-bad-checksum-icmpv4-bytes"] = 98,
    ["drop-bad-checksum-icmpv4-packets"] = 1,
-   ["drop-all-ipv4-bytes"] = 98,
-   ["drop-all-ipv4-packets"] = 1,
+   ["drop-all-ipv4-iface-bytes"] = 98,
+   ["drop-all-ipv4-iface-packets"] = 1,
 }

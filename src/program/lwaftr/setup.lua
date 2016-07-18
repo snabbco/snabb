@@ -57,6 +57,9 @@ function lwaftr_app(c, conf)
       prepend(postprocessing_apps_v6, "egress_filterv6")
    end
 
+   -- Add a special hairpinning queue to the lwaftr app.
+   config.link(c, "lwaftr.hairpin_out -> lwaftr.hairpin_in")
+
    append(preprocessing_apps_v4,   { name = "arp",        input = "south", output = "north" })
    append(preprocessing_apps_v4,   { name = "icmpechov4", input = "south", output = "north" })
    prepend(postprocessing_apps_v4, { name = "icmpechov4", input = "north", output = "south" })
