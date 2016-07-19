@@ -1,0 +1,18 @@
+Usage:
+    monitor [IPV4_ADDRESS] [PID]
+
+    -h, --help
+                                Print usage information.
+
+Optional arguments:
+
+    IPV4_ADDRESS                IPv4 address to mirror. Default: 0.0.0.0.
+    PID                         PID value of Snabb process.
+
+Sets the value of 'v4v6_mirror' counter to IPV4_ADDRESS.  The 'v4v6_mirror'
+counter is defined for all lwAFTR instances running in mirroring mode.
+Matching packets will be mirrored to the tap interface set by the original
+lwAFTR process.
+
+PID value is used to retrieve the lwAFTR instance.  If PID is not set, the
+most recent active lwAFTR instance for which 'v4v6_mirror' is defined is used.
