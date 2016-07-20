@@ -127,8 +127,8 @@ function check_for_performance_regressions {
     dock_make benchmarks > $(benchmark_results pr)
     for bench in $(cut -d " " -f 1 $(benchmark_results pr)); do
         if grep $bench $(benchmark_results current) >/dev/null 2>&1; then
-            echo $(grep $bench $(benchmark_results current)) \
-                 $(grep $bench $(benchmark_results pr)) \
+            echo $(grep "$bench " $(benchmark_results current)) \
+                 $(grep "$bench " $(benchmark_results pr)) \
                 | awk '
 BEGIN {
     minratio = 0.85;
