@@ -144,11 +144,17 @@ snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
    ${TEST_DATA}/tcp-ipv4-2ipv6frags-reassembled.pcap ${EMPTY} \
    ${COUNTERS}/in-1p-ipv6-out-1p-ipv4-3.lua
 
-echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation, DF set, ICMP-3,4."
+echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation, DF set, ICMP-3,4, drop policy."
 snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan.conf \
    ${TEST_DATA}/tcp-frominet-bound1494-DF.pcap  ${EMPTY} \
+   ${EMPTY} ${EMPTY} \
+   ${COUNTERS}/from-inet-ipv4-in-binding-big-packet-df-set-drop.lua
+
+echo "Testing: from-internet IPv4 packet found in the binding table, needs IPv6 fragmentation, DF set, ICMP-3,4, allow policy."
+snabb_run_and_cmp ${TEST_CONF}/small_ipv6_mtu_no_icmp_vlan_allow.conf \
+   ${TEST_DATA}/tcp-frominet-bound1494-DF.pcap  ${EMPTY} \
    ${TEST_DATA}/icmpv4-fromlwaftr-replyto-tcp-frominet-bound1494-DF.pcap ${EMPTY} \
-   ${COUNTERS}/from-inet-ipv4-in-binding-big-packet-df-set.lua
+   ${COUNTERS}/from-inet-ipv4-in-binding-big-packet-df-set-allow.lua
 
 echo "Testing: from-internet IPv4 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
@@ -258,6 +264,12 @@ snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/tcp-fromb4-tob4-ipv6-ttl-1.pcap \
    ${EMPTY} ${TEST_DATA}/tcp-fromb4-tob4-ipv6-ttl-1-reply.pcap \
    ${COUNTERS}/in-ipv4-ipv6-out-icmpv4-ipv6-hairpin-1.lua
+
+echo "Testing: from-to-b4 TCP packet, with hairpinning, TTL 1, drop policy"
+snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
+   ${EMPTY} ${TEST_DATA}/tcp-fromb4-tob4-ipv6-ttl-1.pcap \
+   ${EMPTY} ${EMPTY} \
+   ${COUNTERS}/in-ipv4-ipv6-out-icmpv4-ipv6-hairpin-1-drop.lua
 
 echo "Testing: from-b4 IPv6 packet, with hairpinning, to B4 with custom lwAFTR address"
 snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \

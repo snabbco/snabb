@@ -546,7 +546,7 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
       if lwstate.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
          -- Not counting bytes because we do not even generate the packets.
          counter.add(lwstate.counters["drop-out-by-policy-icmpv4-packets"])
-         return drop(pkt)
+         return drop_ipv4(lwstate, pkt, pkt_src_link)
       end
       local ipv4_header = get_ethernet_payload(pkt)
       local dst_ip = get_ipv4_src_address_ptr(ipv4_header)
@@ -570,6 +570,11 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
    if encapsulating_packet_with_df_flag_would_exceed_mtu(lwstate, pkt) then
       counter.add(lwstate.counters["drop-over-mtu-but-dont-fragment-ipv4-bytes"], pkt.length)
       counter.add(lwstate.counters["drop-over-mtu-but-dont-fragment-ipv4-packets"])
+      if lwstate.policy_icmpv4_outgoing == lwconf.policies['DROP'] then
+         -- Not counting bytes because we do not even generate the packets.
+         counter.add(lwstate.counters["drop-out-by-policy-icmpv4-packets"])
+         return drop_ipv4(lwstate, pkt, pkt_src_link)
+      end
       local reply = cannot_fragment_df_packet_error(lwstate, pkt)
       drop_ipv4(lwstate, pkt, pkt_src_link)
       return transmit_icmpv4_reply(lwstate, reply, pkt)
