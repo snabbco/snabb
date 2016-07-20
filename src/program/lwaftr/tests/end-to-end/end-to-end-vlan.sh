@@ -351,19 +351,19 @@ echo "Testing: incoming ICMPv6 1,3 destination/address unreachable, OPE from int
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-13dstaddressunreach-inet-OPE.pcap \
    ${TEST_DATA}/response-ipv4-icmp31-inet.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-1.lua
 
 echo "Testing: incoming ICMPv6 2,0 'too big' notification, OPE from internet"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-20pkttoobig-inet-OPE.pcap \
    ${TEST_DATA}/response-ipv4-icmp34-inet.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-1.lua
 
 echo "Testing: incoming ICMPv6 3,0 hop limit exceeded, OPE from internet"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-30hoplevelexceeded-inet-OPE.pcap \
    ${TEST_DATA}/response-ipv4-icmp31-inet.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-1.lua
 
 echo "Testing: incoming ICMPv6 3,1 frag reasembly time exceeded, OPE from internet"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
@@ -375,14 +375,13 @@ echo "Testing: incoming ICMPv6 4,3 parameter problem, OPE from internet"
 snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-43paramprob-inet-OPE.pcap \
    ${TEST_DATA}/response-ipv4-icmp31-inet.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-1.lua
 
-# FIXME: fix and reenable this test.
-# echo "Testing: incoming ICMPv6 3,0 hop limit exceeded, OPE hairpinned"
-# snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
-#    ${EMPTY} ${TEST_DATA}/incoming-icmpv6-30hoplevelexceeded-hairpinned-OPE.pcap \
-#    ${EMPTY} ${TEST_DATA}/response-ipv6-tunneled-icmpv4_31-tob4.pcap \
-#    ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4.lua
+echo "Testing: incoming ICMPv6 3,0 hop limit exceeded, OPE hairpinned"
+snabb_run_and_cmp ${TEST_CONF}/tunnel_icmp_vlan.conf \
+   ${EMPTY} ${TEST_DATA}/incoming-icmpv6-30hoplevelexceeded-hairpinned-OPE.pcap \
+   ${EMPTY} ${TEST_DATA}/response-ipv6-tunneled-icmpv4_31-tob4.pcap \
+   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-2.lua
 
 # Ingress filters
 
