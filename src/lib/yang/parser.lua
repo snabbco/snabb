@@ -282,6 +282,8 @@ function parse_file(filename)
 end
 
 function selftest()
+   local S = require("syscall")
+
    local function assert_equal(a, b)
       if not lib.equal(a, b) then
          print(a, b)
@@ -329,6 +331,11 @@ function selftest()
       return table.concat({...}, "\n")
    end
 
+   local function file_exists(path)
+      local stat = S.stat(path)
+      return stat and stat.isreg
+   end
+
    -- Test the string parser
    test_string("foo", "foo")
    test_string([["foo"]], "foo")
@@ -355,6 +362,11 @@ function selftest()
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
 	argument="port", statements={{keyword="type"}}}})
 
-   -- Expects tests to be run from the "src" directory at the root of the repo
-   parse_file("src/lib/yang/example.yang")
+   local filename = "lib/yang/example.yang"
+   local pwd = S.getcwd()
+   -- If current path is root append src/ to filename
+   if file_exists(pwd.."/src/snabb") then
+      filename = "src/"..filename
+   end
+   parse_file(filename)
 end
