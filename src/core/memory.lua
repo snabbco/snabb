@@ -23,13 +23,20 @@ chunks = {}
 
 -- Allocate DMA-friendly memory.
 -- Return virtual memory pointer, physical address, and actual size.
-function dma_alloc (bytes)
+function dma_alloc (bytes,  align)
+   align = align or 128
    assert(bytes <= huge_page_size)
-   bytes = lib.align(bytes, 128)
-   if #chunks == 0 or bytes + chunks[#chunks].used > chunks[#chunks].size then
-      allocate_next_chunk()
-   end
+   -- Get current chunk of memory to allocate from
+   if #chunks == 0 then allocate_next_chunk() end
    local chunk = chunks[#chunks]
+   -- Skip allocation forward pointer to suit alignment
+   chunk.used = lib.align(chunk.used, align)
+   -- Need a new chunk to service this allocation?
+   if chunk.used + bytes > chunk.size then
+      allocate_next_chunk()
+      chunk = chunks[#chunks]
+   end
+   -- Slice out the memory we need
    local where = chunk.used
    chunk.used = chunk.used + bytes
    return chunk.pointer + where, chunk.physical + where, bytes
@@ -50,9 +57,18 @@ end
 --- ### HugeTLB: Allocate contiguous memory in bulk from Linux
 
 function allocate_hugetlb_chunk ()
+   local fd, err = syscall.open("/proc/sys/vm/nr_hugepages","rdonly")
+   assert(fd, tostring(err))
+   fd:flock("ex")
    for i =1, 3 do
       local page = C.allocate_huge_page(huge_page_size)
-      if page ~= nil then return page else reserve_new_page() end
+      if page ~= nil then
+         fd:flock("un")
+         fd:close()
+         return page
+      else
+         reserve_new_page()
+      end
    end
 end
 
@@ -60,16 +76,15 @@ function reserve_new_page ()
    -- Check that we have permission
    lib.root_check("error: must run as root to allocate memory for DMA")
    -- Is the kernel shm limit too low for huge pages?
-   if huge_page_size > tonumber(syscall.sysctl("kernel.shmmax")) then
+   if huge_page_size > tonumber(lib.firstline("/proc/sys/kernel/shmmax")) then
       -- Yes: fix that
-      local old = syscall.sysctl("kernel.shmmax", tostring(huge_page_size))
+      local old = lib.writefile("/proc/sys/kernel/shmmax", tostring(huge_page_size))
       io.write("[memory: Enabling huge pages for shm: ",
                "sysctl kernel.shmmax ", old, " -> ", huge_page_size, "]\n")
    else
-      -- No: try provisioning an additional page
-      local have = tonumber(syscall.sysctl("vm.nr_hugepages"))
+      local have = tonumber(lib.firstline("/proc/sys/vm/nr_hugepages"))
       local want = have + 1
-      syscall.sysctl("vm.nr_hugepages", tostring(want))
+      lib.writefile("/proc/sys/vm/nr_hugepages", tostring(want))
       io.write("[memory: Provisioned a huge page: sysctl vm.nr_hugepages ", have, " -> ", want, "]\n")
    end
 end

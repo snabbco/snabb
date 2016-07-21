@@ -16,3 +16,4 @@ obj
 /deps/*.vsn
 /src/programs.inc
 .images
+/lib/luajit/usr

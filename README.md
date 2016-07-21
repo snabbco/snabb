@@ -10,10 +10,10 @@ ways to do things.
 The Snabb community are active in
 [applying modern programming techniques](http://blog.ipspace.net/2014/09/snabb-switch-deep-dive-on-software-gone.html),
 [do-it-yourself operator networking](http://blog.ipspace.net/2014/12/l2vpn-over-ipv6-with-snabb-switch-on.html),
-[high-level device drivers](https://github.com/SnabbCo/snabbswitch/blob/master/src/apps/intel/intel10g.lua),
+[high-level device drivers](https://github.com/snabbco/snabb/blob/master/src/apps/intel/intel10g.lua),
 [fast userspace virtio networking](http://www.virtualopensystems.com/en/solutions/guides/snabbswitch-qemu/),
 [universal SIMD protocol offloads](https://groups.google.com/d/msg/snabb-devel/aez4pEnd4ow/WrXi5N7nxfkJ), and
-[applying compiler technology to networking](https://fosdem.org/2015/schedule/event/packet_filtering_pflua/).
+[applying compiler technology to networking](https://archive.fosdem.org/2015/schedule/event/packet_filtering_pflua/).
 
 You are welcome to join our community. If you have an application that
 you want to build, or you want to use one that we are already
@@ -32,8 +32,9 @@ Snabb is written using these main techniques:
 
 Snabb compiles into a stand-alone executable called
 `snabb`. This single binary includes multiple applications and runs on
-any modern Linux distribution. (You could think of it as a
-[busybox](http://en.wikipedia.org/wiki/BusyBox#Single_binary) for
+any modern [Linux/x86-64](src/doc/porting.md) distribution. (You could
+think of it as a
+[busybox](https://en.wikipedia.org/wiki/BusyBox#Single_binary) for
 networking.)
 
 ## How is it being used?
@@ -67,14 +68,14 @@ documentation](src/program/lwaftr/doc/) for more details.
 ### VPWS
 
 VPWS (Virtual Private Wire Service) is a Layer-2 VPN application being
-developed by Alexander Gall at [SWITCH](http://switch.ch). His Github
+developed by Alexander Gall at [SWITCH](http://www.switch.ch/). His Github
 [`vpn` branch](https://github.com/alexandergall/snabbswitch/tree/vpn)
 is the master line of development.
 
 ### packetblaster
 
 [packetblaster](src/program/packetblaster/) generates load by
-replaying a [pcap format](http://en.wikipedia.org/wiki/Pcap) trace
+replaying a [pcap format](https://en.wikipedia.org/wiki/Pcap) trace
 file or synthesizing customizable packets onto any number of Intel 82599 10-Gigabit network
 interfaces. This is very efficient: only a small % of one core per CPU
 is required even for hundreds of Gbps of traffic. Because so little

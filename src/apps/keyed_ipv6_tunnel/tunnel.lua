@@ -16,6 +16,7 @@ local link = require("core.link")
 local lib = require("core.lib")
 local packet = require("core.packet")
 local config = require("core.config")
+local counter = require("core.counter")
 
 local macaddress = require("lib.macaddress")
 
@@ -102,6 +103,12 @@ end
 
 SimpleKeyedTunnel = {}
 
+local provided_counters = {
+   'type', 'dtime', 'rxerrors',
+   'length_errors', 'protocol_errors', 'cookie_errors',
+   'remote_address_errors', 'local_address_errors'
+}
+
 function SimpleKeyedTunnel:new (arg)
    local conf = arg and config.parse_app_arg(arg) or {}
    -- required fields:
@@ -163,12 +170,20 @@ function SimpleKeyedTunnel:new (arg)
       header[HOP_LIMIT_OFFSET] = conf.hop_limit
    end
 
+   local counters = {}
+   for _, name in ipairs(provided_counters) do
+      counters[name] = counter.open(name)
+   end
+   counter.set(counters.type, 0x1001) -- Virtual interface
+   counter.set(counters.dtime, C.get_unix_time())
+
    local o =
    {
       header = header,
       remote_address = remote_address,
       local_address = local_address,
-      remote_cookie = remote_cookie[0]
+      remote_cookie = remote_cookie[0],
+      counters = counters
    }
 
    return setmetatable(o, {__index = SimpleKeyedTunnel})
@@ -198,15 +213,18 @@ function SimpleKeyedTunnel:push()
       local drop = true
       repeat
          if p.length < HEADER_SIZE then
+            counter.add(self.counters.length_errors)
             break
          end
          local next_header = ffi.cast(next_header_ctype, p.data + NEXT_HEADER_OFFSET)
          if next_header[0] ~= L2TPV3_NEXT_HEADER then
+            counter.add(self.counters.protocol_errors)
             break
          end
 
          local cookie = ffi.cast(pcookie_ctype, p.data + COOKIE_OFFSET)
          if cookie[0] ~= self.remote_cookie then
+            counter.add(self.counters.cookie_errors)
             break
          end
 
@@ -214,6 +232,7 @@ function SimpleKeyedTunnel:push()
          if remote_address[0] ~= self.remote_address[0] or
             remote_address[1] ~= self.remote_address[1]
          then
+            counter.add(self.counters.remote_address_errors)
             break
          end
 
@@ -221,6 +240,7 @@ function SimpleKeyedTunnel:push()
          if local_address[0] ~= self.local_address[0] or
             local_address[1] ~= self.local_address[1]
          then
+            counter.add(self.counters.local_address_errors)
             break
          end
 
@@ -228,6 +248,7 @@ function SimpleKeyedTunnel:push()
       until true
 
       if drop then
+         counter.add(self.counters.rxerrors)
          -- discard packet
          packet.free(p)
       else
@@ -237,15 +258,19 @@ function SimpleKeyedTunnel:push()
    end
 end
 
+function SimpleKeyedTunnel:stop ()
+   -- delete counters
+   for name, _ in pairs(self.counters) do counter.delete(name) end
+end
+
 -- prepare header template to be used by all apps
 prepare_header_template()
 
 function selftest ()
    print("Keyed IPv6 tunnel selftest")
    local ok = true
-
-   local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
-   local output_file = "apps/keyed_ipv6_tunnel/selftest.cap.output"
+   local Synth = require("apps.test.synth").Synth
+   local Match = require("apps.test.match").Match
    local tunnel_config = {
       local_address = "00::2:1",
       remote_address = "00::2:1",
@@ -255,19 +280,19 @@ function selftest ()
    } -- should be symmetric for local "loop-back" test
 
    local c = config.new()
-   config.app(c, "source", pcap.PcapReader, input_file)
    config.app(c, "tunnel", SimpleKeyedTunnel, tunnel_config)
-   config.app(c, "sink", pcap.PcapWriter, output_file)
+   config.app(c, "match", Match)
+   config.app(c, "comparator", Synth)
+   config.app(c, "source", Synth)
    config.link(c, "source.output -> tunnel.decapsulated")
+   config.link(c, "comparator.output -> match.comparator")
    config.link(c, "tunnel.encapsulated -> tunnel.encapsulated")
-   config.link(c, "tunnel.decapsulated -> sink.input")
+   config.link(c, "tunnel.decapsulated -> match.rx")
    app.configure(c)
 
-   app.main({duration = 0.25}) -- should be long enough...
+   app.main({duration = 0.0001, report = {showapps=true,showlinks=true}})
    -- Check results
-   if io.open(input_file):read('*a') ~=
-      io.open(output_file):read('*a')
-   then
+   if #engine.app_table.match:errors() ~= 0 then
       ok = false
    end
 
