@@ -39,7 +39,7 @@ EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 #   core.memory core.lib ...
 # for each module that has a top-level selftest () function.
 TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
-             xargs grep -l '^function selftest *[[:punct:]]' | \
+             xargs grep -s -l '^function selftest *[[:punct:]]' | \
              sed -e 's_\.lua__' -e 's_/_._g')
 
 # TESTSCRIPTS expands to:

@@ -1,7 +1,0 @@
-Usage:
-  gc [OPTIONS]
-
-  -h, --help
-                             Print usage information.
-
-Remove stale runtime files created by Snabb instances.

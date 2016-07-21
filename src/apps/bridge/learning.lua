@@ -203,7 +203,7 @@ function bridge:push()
          -- packet with one of the packet forwarding tables according
          -- to the result.
          local mac = self._mac
-         mac[0] = packet.data(p)
+         mac[0] = p.data
          mac_table:lookup_pft(mac, ip, ig, p, self._pft_C, self._flood_pl[ip])
          -- Associate the source MAC address with the ingress port and
          -- group.  Multicast addresses are forbidden to occur as

@@ -86,7 +86,7 @@ local function padding (a, l) return (a - l%a) % a end
 --   5. Write ESP header
 function esp_v6_encrypt:encapsulate (p)
    local gcm = self.aes_128_gcm
-   local data, length = packet.data(p), packet.length(p)
+   local data, length = p.data, p.length
    if length < PAYLOAD_OFFSET then return false end
    local payload = data + PAYLOAD_OFFSET
    local payload_length = length - PAYLOAD_OFFSET
@@ -134,7 +134,7 @@ end
 --   5. Shrink p by ESP overhead
 function esp_v6_decrypt:decapsulate (p)
    local gcm = self.aes_128_gcm
-   local data, length = packet.data(p), packet.length(p)
+   local data, length = p.data, p.length
    if length - PAYLOAD_OFFSET < self.MIN_SIZE then return false end
    self.ip:new_from_mem(data + ETHERNET_SIZE, IPV6_SIZE)
    local payload = data + PAYLOAD_OFFSET
@@ -176,20 +176,19 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    )
    local d = datagram:new(payload)
    local ip = ipv6:new({})
-   ip:payload_length(packet.length(payload))
+   ip:payload_length(payload.length)
    d:push(ip)
    d:push(ethernet:new({type=0x86dd}))
    local p = d:packet()
    -- Check integrity
-   print("original", lib.hexdump(ffi.string(packet.data(p), packet.length(p))))
+   print("original", lib.hexdump(ffi.string(p.data, p.length)))
    local p_enc = packet.clone(p)
    assert(enc:encapsulate(p_enc), "encapsulation failed")
-   print("encrypted", lib.hexdump(ffi.string(packet.data(p_enc), packet.length(p_enc))))
+   print("encrypted", lib.hexdump(ffi.string(p_enc.data, p_enc.length)))
    local p2 = packet.clone(p_enc)
    assert(dec:decapsulate(p2), "decapsulation failed")
-   print("decrypted", lib.hexdump(ffi.string(packet.data(p2), packet.length(p2))))
-   assert(packet.length(p2) == packet.length(p)
-          and C.memcmp(p, p2, packet.length(p)) == 0,
+   print("decrypted", lib.hexdump(ffi.string(p2.data, p2.length)))
+   assert(p2.length == p.length and C.memcmp(p, p2, p.length) == 0,
           "integrity check failed")
    -- Check invalid packets.
    local p_invalid = packet.from_string("invalid")

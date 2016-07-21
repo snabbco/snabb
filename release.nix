@@ -13,9 +13,9 @@ let
     url = "http://lab1.snabb.co:2008/~max/assets/vm-ubuntu-trusty-14.04-dpdk-snabb.tar.gz";
     sha256 = "0323591i925jhd6wv8h268wc3ildjpa6j57n4p9yg9d6ikwkw06j";
   };
-  optionalGetEnv = first: default: let
-      maybeEnv = builtins.getEnv first;
-    in if (maybeEnv != "") then maybeEnv else default;
+  requiredGetEnv = var:  let
+      maybeEnv = builtins.getEnv var;
+    in if (maybeEnv != "") then maybeEnv else throw "Please export shell variable ${var}";
 in rec {
   manual = import ./src/doc {};
   snabb = import ./default.nix {};
@@ -26,7 +26,7 @@ in rec {
 
     # allow sudo
     __noChroot = true;
-    requiredSystemFeatures = [ "performance" ];
+    requiredSystemFeatures = [ "lugano" ];
 
     buildInputs = [ git telnet tmux numactl bc iproute which qemu ];
 
@@ -45,10 +45,9 @@ in rec {
 
     doCheck = true;
     checkPhase = ''
-      export SNABB_PCI0=${ optionalGetEnv "SNABB_PCI0" "0000:01:00.0"}
-      export SNABB_PCI_INTEL0=${ optionalGetEnv "SNABB_PCI_INTEL0" "0000:01:00.0"}
-      export SNABB_PCI_INTEL1=${ optionalGetEnv "SNABB_PCI_INTEL1" "0000:01:00.1"}
-      export FAIL_ON_FIRST=true
+      export SNABB_PCI0=${ requiredGetEnv "SNABB_PCI0" }
+      export SNABB_PCI_INTEL0=${ requiredGetEnv "SNABB_PCI_INTEL0" }
+      export SNABB_PCI_INTEL1=${ requiredGetEnv "SNABB_PCI_INTEL1" }
 
       # run tests
       sudo -E make test -C src/

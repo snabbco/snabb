@@ -180,8 +180,8 @@ function datagram:parse_match (class, check)
    local parse = self._parse
    local class = class or parse.ulp
    if not class then return nil end
-   local proto = class:new_from_mem(packet.data(self._packet[0]) + parse.offset,
-                                    packet.length(self._packet[0]) - parse.offset)
+   local proto = class:new_from_mem(self._packet[0].data + parse.offset,
+                                    self._packet[0].length - parse.offset)
    if proto == nil or (check and not check(proto)) then
       if proto then proto:free() end
       return nil
@@ -295,14 +295,14 @@ end
 -- appended to the packet's payload first.
 function datagram:payload (mem, size)
    if mem then packet.append(self._packet[0], mem, size) end
-   return packet.data(self._packet[0]) + self._parse.offset,
-          packet.length(self._packet[0]) - self._parse.offset
+   return self._packet[0].data + self._parse.offset,
+          self._packet[0].length - self._parse.offset
 end
 
 -- Return the location and size of the entire packet buffer
 function datagram:data ()
    local p = self._packet
-   return packet.data(p[0]), packet.length(p[0])
+   return p[0].data, p[0].length
 end
 
 -- Commit the changes induced by previous calles to the push*() and

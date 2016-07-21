@@ -48,7 +48,7 @@ end
 -- packet is carrying a VLAN tag, if it's an untagged frame these bytes will be
 -- Ethernet payload
 function extract_tci(pkt)
-   return ntohs(cast("uint16_t*", packet.data(pkt) + o_ethernet_ethertype + 2)[0])
+   return ntohs(cast("uint16_t*", pkt.data + o_ethernet_ethertype + 2)[0])
 end
 
 -- extract VLAN id from TCI
@@ -120,7 +120,7 @@ function VlanMux:push()
          if type(name) == "string" then
             for _ = 1, math.min(link.nreadable(l), maxoutput) do
                local p = receive(l)
-               local ethertype = cast("uint16_t*", packet.data(p) + o_ethernet_ethertype)[0]
+               local ethertype = cast("uint16_t*", p.data + o_ethernet_ethertype)[0]
 
                if name == "trunk" then -- trunk
                   -- check for ethertype 0x8100 (802.1q VLAN tag)
