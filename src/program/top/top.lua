@@ -29,7 +29,6 @@ function run (args)
 
    if     object then list_shm(target_pid, object)
    else               top(target_pid) end
-   ordered_exit(0)
 end
 
 function select_snabb_instance (pid)
@@ -47,12 +46,7 @@ function select_snabb_instance (pid)
       else                            return instances[1] end
    elseif #instances == 1 then print("No Snabb instance found.")
    else print("Multple Snabb instances found. Select one.") end
-   ordered_exit(1)
-end
-
-function ordered_exit (value)
-   shm.unlink("/"..S.getpid()) -- Unlink own shm tree to avoid clutter
-   os.exit(value)
+   os.exit(1)
 end
 
 function list_shm (pid, object)
