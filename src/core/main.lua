@@ -135,7 +135,7 @@ end
 -- Cleanup after Snabb process.
 function shutdown (pid)
    if not _G.developer_debug then
-      shm.unlink("//"..pid)
+      shm.unlink("/"..pid)
    end
 end
 

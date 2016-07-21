@@ -153,7 +153,7 @@ end
 
 function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
    local l = self.owner.output.tx
-   local counters = self.owner.counters
+   local counters = self.owner.shm
    if l then
       if band(self.rx_hdr_flags, C.VIO_NET_HDR_F_NEEDS_CSUM) ~= 0 and
          -- Bounds-check the checksum area
@@ -264,7 +264,7 @@ function VirtioNetDevice:tx_buffer_add(tx_p, addr, len)
 end
 
 function VirtioNetDevice:tx_packet_end(header_id, total_size, tx_p)
-   local counters = self.owner.counters
+   local counters = self.owner.shm
    counter.add(counters.txbytes, tx_p.length)
    counter.add(counters.txpackets)
    if ethernet:is_mcast(tx_p.data) then
@@ -340,7 +340,7 @@ function VirtioNetDevice:tx_buffer_add_mrg_rxbuf(tx_p, addr, len)
 end
 
 function VirtioNetDevice:tx_packet_end_mrg_rxbuf(header_id, total_size, tx_p)
-   local counters = self.owner.counters
+   local counters = self.owner.shm
    -- free the packet only when all its data is processed
    if self.tx.finished then
       counter.add(counters.txbytes, tx_p.length)

@@ -28,12 +28,6 @@ assert(ffi.sizeof("struct vhost_user_msg") == 276, "ABI error")
 
 VhostUser = {}
 
-local provided_counters = {
-   'type', 'dtime',
-   'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast', 'rxdrop',
-   'txbytes', 'txpackets', 'txmcast', 'txbcast'
-}
-
 function VhostUser:new (args)
    local o = { state = 'init',
       dev = nil,
@@ -48,7 +42,15 @@ function VhostUser:new (args)
          function () self:process_qemu_requests() end,
          5e8,-- 500 ms
          'non-repeating'
-      )
+      ),
+      -- counters
+      shm = { rxbytes   = {counter},
+              rxpackets = {counter},
+              rxmcast   = {counter},
+              rxdrop    = {counter},
+              txbytes   = {counter},
+              txpackets = {counter},
+              txmcast   = {counter} }
    }
    self = setmetatable(o, {__index = VhostUser})
    self.dev = net_device.VirtioNetDevice:new(self, args.disable_mrg_rxbuf)
@@ -59,13 +61,6 @@ function VhostUser:new (args)
    else
       self.qemu_connect = self.client_connect
    end
-   -- initialize counters
-   self.counters = {}
-   for _, name in ipairs(provided_counters) do
-      self.counters[name] = counter.open(name)
-   end
-   counter.set(self.counters.type, 0x1001) -- Virtual interface
-   counter.set(self.counters.dtime, C.get_unix_time())
    return self
 end
 
@@ -82,9 +77,6 @@ function VhostUser:stop()
    self:free_mem_table()
 
    if self.link_down_proc then self.link_down_proc() end
-
-   -- delete counters
-   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
 
 function VhostUser:pull ()
