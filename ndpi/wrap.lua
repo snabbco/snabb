@@ -10,6 +10,18 @@ local lib = require("ndpi.c")
 local ffi = require("ffi")
 local C   = ffi.C
 
+local lib_version = (function ()
+   local string = ffi.string(lib.ndpi_revision())
+   local major, minor, patch = string.match(string, "^(%d+)%.(%d+)%.(%d+)")
+   return setmetatable({
+      major = tonumber(major);
+      minor = tonumber(minor);
+      patch = tonumber(patch);
+   }, {
+      __tostring = function (self) return string end;
+   })
+end)()
+
 ---------------------------------------------------------- Identifier ------
 
 local id_struct_ptr_t = ffi.typeof("ndpi_id_t*")
@@ -98,9 +110,10 @@ local detection_module_type = ffi.metatype("ndpi_detection_module_t", {
 ------------------------------------------------------------- Exports ------
 
 return {
+   lib_version      = lib_version;
    id               = id_type;
    flow             = flow_type;
    detection_module = detection_module_type;
    protocol_bitmask = require("ndpi.protocol_bitmask").bitmask;
-   protocol         = require("ndpi.protocol_ids");
+   protocol         = require("ndpi.protocol_ids_" .. lib_version.major .. "_" .. lib_version.minor);
 }
