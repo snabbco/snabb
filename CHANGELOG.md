@@ -5,6 +5,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 * Values of type `ndpi.protocol_bitmask` now have a `__tostring` metamethod.
+* The module is now installable using [LuaRocks](https://luarocks.org).
 
 ## [v0.0.2] - 2016-02-29
 ### Fixed
