@@ -5,6 +5,8 @@ module(..., package.seeall)
 local S = require("syscall")
 local link = require("core.link")
 local packet = require("core.packet")
+local counter = require("core.counter")
+local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
 local const = require("syscall.linux.constants")
@@ -14,9 +16,15 @@ local t = S.types.t
 
 Tap = { }
 
+local provided_counters = {
+   'type', 'dtime',
+   'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast',
+   'txbytes', 'txpackets', 'txmcast',  'txbcast'
+}
+
 function Tap:new (name)
    assert(name, "missing tap interface name")
-   
+
    local sock, err = S.open("/dev/net/tun", "rdwr, nonblock");
    assert(sock, "Error opening /dev/net/tun: " .. tostring(err))
    local ifr = t.ifreq()
@@ -24,11 +32,17 @@ function Tap:new (name)
    ifr.name = name
    local ok, err = sock:ioctl("TUNSETIFF", ifr)
    if not ok then
-      S.close(sock)
+      sock:close()
       error("Error opening /dev/net/tun: " .. tostring(err))
    end
-   
-   return setmetatable({sock = sock, name = name}, {__index = Tap})
+   local counters = {}
+   for _, name in ipairs(provided_counters) do
+      counters[name] = counter.open(name)
+   end
+   counter.set(counters.type, 0x1001) -- Virtual interface
+   counter.set(counters.dtime, C.get_unix_time())
+   return setmetatable({sock = sock, name = name, counters = counters},
+                       {__index = Tap})
 end
 
 function Tap:pull ()
@@ -37,9 +51,9 @@ function Tap:pull ()
    while not link.full(l) do
       local p = packet.allocate()
       local len, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
-      -- errno == EAGAIN indicates that the read would of blocked as there is no 
+      -- errno == EAGAIN indicates that the read would of blocked as there is no
       -- packet waiting. It is not a failure.
-      if not len and err.errno == const.E.AGAIN then 
+      if not len and err.errno == const.E.AGAIN then
          packet.free(p)
          return
       end
@@ -49,6 +63,14 @@ function Tap:pull ()
       end
       p.length = len
       link.transmit(l, p)
+      counter.add(self.counters.rxbytes, len)
+      counter.add(self.counters.rxpackets)
+      if ethernet:is_mcast(p.data) then
+         counter.add(self.counters.rxmcast)
+      end
+      if ethernet:is_bcast(p.data) then
+         counter.add(self.counters.rxbcast)
+      end
    end
 end
 
@@ -66,6 +88,14 @@ function Tap:push ()
       if len ~= p.length and err.errno == const.E.AGAIN then
          return
       end
+      counter.add(self.counters.txbytes, len)
+      counter.add(self.counters.txpackets)
+      if ethernet:is_mcast(p.data) then
+         counter.add(self.counters.txmcast)
+      end
+      if ethernet:is_bcast(p.data) then
+         counter.add(self.counters.txbcast)
+      end
       -- The write completed so dequeue it from the link and free the packet
       link.receive(l)
       packet.free(p)
@@ -73,7 +103,9 @@ function Tap:push ()
 end
 
 function Tap:stop()
-   S.close(self.sock)
+   self.sock:close()
+   -- delete counters
+   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
 
 function selftest()
