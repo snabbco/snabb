@@ -25,21 +25,21 @@ function scmp {
 }
 
 function snabb_run_and_cmp {
-   rm -f ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap
    if [ -z $6 ]; then
       echo "not enough arguments to snabb_run_and_cmp"
       exit 1
    fi
+   conf=$1; v4_in=$2; v6_in=$3; v4_out=$4; v6_out=$5; counters_path=$6;
+   endoutv4="${TEST_OUT}/endoutv4.pcap"; endoutv6="${TEST_OUT}/endoutv6.pcap";
+   rm -f $endoutv4 $endoutv6
    ${SNABB_LWAFTR} check \
-      $1 $2 $3 \
-      ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap $6 || quit_with_msg \
-         "Failure: ${SNABB_LWAFTR} check \
-         $1 $2 $3 \
-         ${TEST_OUT}/endoutv4.pcap ${TEST_OUT}/endoutv6.pcap $6"
-   scmp $4 ${TEST_OUT}/endoutv4.pcap \
-      "Failure: ${SNABB_LWAFTR} check $1 $2 $3 $4 $5 $6"
-   scmp $5 ${TEST_OUT}/endoutv6.pcap \
-      "Failure: ${SNABB_LWAFTR} check $1 $2 $3 $4 $5 $6"
+      $conf $v4_in $v6_in \
+      $endoutv4 $endoutv6 $counters_path || quit_with_msg \
+         "Failure: ${SNABB_LWAFTR} check $*"
+   scmp $v4_out $endoutv4 \
+      "Failure: ${SNABB_LWAFTR} check $*"
+   scmp $v6_out $endoutv6 \
+      "Failure: ${SNABB_LWAFTR} check $*"
    echo "Test passed"
 }
 
