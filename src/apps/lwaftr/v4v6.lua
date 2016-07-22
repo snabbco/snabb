@@ -9,6 +9,7 @@ local rd16, rd32 = lwutil.rd16, lwutil.rd32
 
 local ethernet_header_size = constants.ethernet_header_size
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
+local n_ethertype_arp = constants.n_ethertype_arp
 local o_ethernet_ethertype = constants.o_ethernet_ethertype
 local o_ipv4_dst_addr = constants.o_ipv4_dst_addr
 local o_ipv4_src_addr = constants.o_ipv4_src_addr
@@ -17,7 +18,8 @@ local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
 local v4v6_mirror = shm.create("v4v6_mirror", "struct { uint32_t ipv4; }")
 
 local function is_ipv4 (pkt)
-   return rd16(pkt.data + o_ethernet_ethertype) == n_ethertype_ipv4
+   local ethertype = rd16(pkt.data + o_ethernet_ethertype)
+   return ethertype == n_ethertype_ipv4 or ethertype == n_ethertype_arp
 end
 local function get_ethernet_payload (pkt)
    return pkt.data + ethernet_header_size
@@ -70,6 +72,7 @@ function v4v6:push()
       mirror = self.output.mirror
       ipv4_num = v4v6_mirror.ipv4
    end
+
 
    -- Split input to IPv4 and IPv6 traffic.
    if input then
@@ -134,6 +137,15 @@ local function ipv6_pkt ()
    ]], 106))
 end
 
+local function arp_pkt ()
+   local lib = require("core.lib")
+   return packet.from_string(lib.hexundump([[
+      ff ff ff ff ff ff 22 22 22 22 22 22 08 06 00 01
+      08 00 06 04 00 01 22 22 22 22 22 22 0a 0a 0a 0a
+      00 00 00 00 00 00 04 05 06 07
+   ]], 42))
+end
+
 local function test_split ()
    local basic_apps = require("apps.basic.basic_apps")
    engine.configure(config.new()) -- Clean up engine.
@@ -148,11 +160,12 @@ local function test_split ()
    config.link(c, 'v4v6.v6_tx -> sink.in2')
 
    engine.configure(c)
+   link.transmit(engine.app_table.source.output.output, arp_pkt())
    link.transmit(engine.app_table.source.output.output, ipv4_pkt())
    link.transmit(engine.app_table.source.output.output, ipv6_pkt())
    engine.main({duration = 0.1, noreport = true})
 
-   assert(link.stats(engine.app_table.sink.input.in1).rxpackets == 1)
+   assert(link.stats(engine.app_table.sink.input.in1).rxpackets == 2)
    assert(link.stats(engine.app_table.sink.input.in2).rxpackets == 1)
 end
 
@@ -170,11 +183,12 @@ local function test_join ()
    config.link(c, 'v4v6.output -> sink.input')
 
    engine.configure(c)
+   link.transmit(engine.app_table.source.output.output, arp_pkt())
    link.transmit(engine.app_table.source.output.output, ipv4_pkt())
    link.transmit(engine.app_table.source.output.output, ipv6_pkt())
    engine.main({duration = 0.1, noreport = true})
 
-   assert(link.stats(engine.app_table.sink.input.input).rxpackets == 2)
+   assert(link.stats(engine.app_table.sink.input.input).rxpackets == 3)
 end
 
 function selftest ()
