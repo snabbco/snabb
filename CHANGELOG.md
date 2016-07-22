@@ -12,8 +12,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
   identifiers.
 
 ## v0.0.1 - 2016-01-24
-*:w
-irst release.
+* First release.
 
 [Unreleased]: https://github.com/aperezdc/ljndpi/compare/v0.0.2...HEAD
 [v0.0.2]: https://github.com/aperezdc/ljndpi/compare/v0.0.1...v0.0.2
