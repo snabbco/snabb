@@ -1,3 +1,5 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+
 enum {
     VHOST_USER_MEMORY_MAX_NREGIONS = 8
 };

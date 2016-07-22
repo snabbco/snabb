@@ -2,18 +2,18 @@
 
 `test_env` is an *easy to use* rewrite of `bench_env`. It handles
 resource management automatically and requires zero configuration. It is
-used as follows (must be at the top of the `snabbswitch` repository):
+used as follows (must be at the top of the `snabb` repository):
 
 ## Usage
 
 Load `test_env`:
 
 ```
-cd snabbswitch/src
+cd snabb/src
 source program/snabbnfv/test_env/test_env.sh
 ```
 
-To start a Snabb Switch instance using `<pciaddr>` or NUMA `<node>`:
+To start a Snabb instance using `<pciaddr>` or NUMA `<node>`:
 
 ```
 snabb <pciaddr|node> <args>

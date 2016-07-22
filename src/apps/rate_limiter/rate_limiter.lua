@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(..., package.seeall)
 
 local app = require("core.app")
@@ -5,6 +7,7 @@ local link = require("core.link")
 local config = require("core.config")
 local packet = require("core.packet")
 local timer = require("core.timer")
+local counter = require("core.counter")
 local basic_apps = require("apps.basic.basic_apps")
 local ffi = require("ffi")
 local C = ffi.C
@@ -20,6 +23,10 @@ local floor, min = math.floor, math.min
 
 RateLimiter = {}
 
+local provided_counters = {
+   'type', 'dtime', 'txdrop'
+}
+
 -- Source produces synthetic packets of such size
 local PACKET_SIZE = 60
 
@@ -28,11 +35,18 @@ function RateLimiter:new (arg)
    assert(conf.rate)
    assert(conf.bucket_capacity)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
+   local counters = {}
+   for _, name in ipairs(provided_counters) do
+      counters[name] = counter.open(name)
+   end
+   counter.set(counters.type, 0x1001) -- Virtual interface
+   counter.set(counters.dtime, C.get_unix_time())
    local o =
    {
       rate = conf.rate,
       bucket_capacity = conf.bucket_capacity,
-      bucket_content = conf.initial_capacity
+      bucket_content = conf.initial_capacity,
+      counters = counters
     }
    return setmetatable(o, {__index=RateLimiter})
 end
@@ -79,9 +93,15 @@ function RateLimiter:push ()
          link.transmit(o, p)
       else
          -- discard packet
+         counter.add(self.counters.txdrop)
          packet.free(p)
       end
    end
+end
+
+function RateLimiter:stop ()
+   -- delete counters
+   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
 
 local function compute_effective_rate (rl, rate, snapshot)

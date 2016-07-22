@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 echo "selftest: neutron2snabb/selftest.sh"
 

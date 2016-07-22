@@ -1,8 +1,8 @@
-/* IP checksum routine for AVX2.
- *
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING.
  * Based on original SSE2 code by Tony Rogvall that is
- * copyright 2011 Teclo Networks AG. MIT licensed by Juho Snellman.
- */
+ * copyright 2011 Teclo Networks AG. MIT licensed by Juho Snellman. */
+
+/* IP checksum routine for AVX2. */
 
 #include <stdint.h>
 #include <arpa/inet.h>

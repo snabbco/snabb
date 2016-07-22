@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Base class for an Ethernet bridge with split-horizon semantics.
 --
 -- A bridge conists of any number of ports, each of which is a member
@@ -23,12 +25,6 @@
 -- derived class.  It is ignored by the base class.  A derived class
 -- can access the configuration via self._conf.config.  If config is
 -- not set, it is initialiezed to an empty table.
---
--- Note that it is necessary to call the method post_config() after
--- the app has been configured with engine.configure() to complete the
--- initialization.  This step will add the ringbuffers associated with
--- the ports to an internal data structure to save a lookup in the
--- input and output tables during packet processing.
 --
 -- To make processing in the fast path easier, each port and group is
 -- assigned a unique integer greater than zero to serve as a "handle".
@@ -147,7 +143,7 @@ end
 -- accessible via the keys l_in and l_out, respectively.  This helps
 -- to speed up packet forwarding by eliminating a lookup in the input
 -- and output tables.
-function bridge:post_config ()
+function bridge:link ()
    assert(self.input and self.output)
    for _, port in ipairs(self._ports) do
       port.l_in = self.input[port.name]

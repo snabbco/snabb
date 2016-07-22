@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
@@ -77,6 +79,12 @@ end
 -- Check whether a MAC address has its group bit set
 function ethernet:is_mcast (addr)
    return band(addr[0], 0x01) ~= 0
+end
+
+local bcast_address = ethernet:pton("FF:FF:FF:FF:FF:FF")
+-- Check whether a MAC address is the broadcast address
+function ethernet:is_bcast (addr)
+   return C.memcmp(addr, bcast_address, 6) == 0
 end
 
 -- Instance methods

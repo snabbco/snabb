@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
@@ -76,7 +78,7 @@ function ipv4:pton (p)
    local in_addr  = ffi.new("uint8_t[4]")
    local result = C.inet_pton(AF_INET, p, in_addr)
    if result ~= 1 then
-      return false, "malformed IPv4 address: " .. address
+      return false, "malformed IPv4 address: " .. p
    end
    return in_addr
 end

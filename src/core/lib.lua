@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local ffi = require("ffi")
@@ -20,6 +22,10 @@ function equal (x, y)
          if x[k] == nil then return false end
       end
       return true
+   elseif type(x) == 'cdata' then
+      local size = ffi.sizeof(x)
+      if ffi.sizeof(y) ~= size then return false end
+      return C.memcmp(x, y, size) == 0
    else
       return x == y
    end
@@ -240,10 +246,23 @@ function bounds_checked (type, base, offset, size)
    return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
 end
 
--- Return a function that will return false until NS nanoseconds have elapsed.
-function timer (ns)
-   local deadline = C.get_time_ns() + ns
-   return function () return C.get_time_ns() >= deadline end
+-- Return a function that will return false until duration has elapsed.
+-- If mode is 'repeating' the timer will reset itself after returning true,
+-- thus implementing an interval timer. Timefun defaults to `C.get_time_ns'.
+function timer (duration, mode, timefun)
+   timefun = timefun or C.get_time_ns
+   local deadline = timefun() + duration
+   local function oneshot ()
+      return timefun() >= deadline
+   end
+   local function repeating ()
+      if timefun() >= deadline then
+         deadline = deadline + duration
+         return true
+      else return false end
+   end
+   if mode == 'repeating' then return repeating
+   else return oneshot end
 end
 
 -- Loop until the function `condition` returns true.

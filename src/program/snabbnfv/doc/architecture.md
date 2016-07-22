@@ -33,7 +33,7 @@ periodically captures a consistent snapshot of the Neutron configuration
 and makes it available for synchronization over the network.
 
 The sync master is implemented by a shell script called
-[neutron-sync-master](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/neutron_sync_master).
+[neutron-sync-master](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/neutron_sync_master).
 The database is periodically snapshotted into CSV files with `mysqldump`
 and published for synchronization using `git`. The snapshot interval is
 configurable and defaults to once per second.
@@ -50,9 +50,9 @@ changes the Sync Agent generates new configuration files for each of the
 Snabb NFV Traffic processes that are affected.
 
 The sync agent is a shell script called
-[neutron-sync-agent](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/neutron_sync_agent)
+[neutron-sync-agent](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/neutron_sync_agent)
 and uses the
-[neutron2snabb](https://github.com/SnabbCo/snabbswitch/tree/master/src/program/snabbnfv/neutron2snabb)
+[neutron2snabb](https://github.com/snabbco/snabb/tree/master/src/program/snabbnfv/neutron2snabb)
 program to translate the master Neutron configuration into individual
 configuration files for each local traffic process.
 

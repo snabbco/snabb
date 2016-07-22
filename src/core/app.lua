@@ -1,14 +1,19 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
-local packet  = require("core.packet")
-local lib     = require("core.lib")
-local link    = require("core.link")
-local config  = require("core.config")
-local timer   = require("core.timer")
-local counter = require("core.counter")
-local zone    = require("jit.zone")
-local ffi     = require("ffi")
-local C       = ffi.C
+local packet    = require("core.packet")
+local lib       = require("core.lib")
+local link      = require("core.link")
+local config    = require("core.config")
+local timer     = require("core.timer")
+local shm     = require("core.shm")
+local histogram = require('core.histogram')
+local counter   = require("core.counter")
+local zone      = require("jit.zone")
+local jit       = require("jit")
+local ffi       = require("ffi")
+local C         = ffi.C
 require("core.packet_h")
 
 -- Set to true to enable logging
@@ -64,17 +69,24 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-local function with_restart (app, method)
+function with_restart (app, method)
+   local oldshm = shm.path
+   shm.path = app.shmpath
+   local status, result
    if use_restart then
       -- Run fn in protected mode using pcall.
-      local status, err = pcall(method, app)
+      status, result = pcall(method, app)
 
       -- If pcall caught an error mark app as "dead" (record time and cause
       -- of death).
-      if not status then app.dead = { error = err, time = now() } end
+      if not status then
+         app.dead = { error = result, time = now() }
+      end
    else
-      method(app)
+      status, result = true, method(app)
    end
+   shm.path = oldshm
+   return status, result
 end
 
 -- Restart dead apps.
@@ -145,14 +157,20 @@ end
 -- Update the active app network by applying the necessary actions.
 function apply_config_actions (actions, conf)
    -- The purpose of this function is to populate these tables:
-   local new_app_table,  new_app_array  = {}, {}, {}
-   local new_link_table, new_link_array = {}, {}, {}
+   local new_app_table,  new_app_array  = {}, {}
+   local new_link_table, new_link_array = {}, {}
    -- Temporary name->index table for use in link renumbering
    local app_name_to_index = {}
    -- Table of functions that execute config actions
    local ops = {}
    function ops.stop (name)
-      if app_table[name].stop then app_table[name]:stop() end
+      if app_table[name].stop then
+         local shmorig = shm.path
+         shm.path = app_table[name].shmpath
+         app_table[name]:stop()
+         shm.path = shmorig
+         shm.unlink(app_table[name].shmpath)
+      end
    end
    function ops.keep (name)
       new_app_table[name] = app_table[name]
@@ -162,7 +180,10 @@ function apply_config_actions (actions, conf)
    function ops.start (name)
       local class = conf.apps[name].class
       local arg = conf.apps[name].arg
+      local shmpath, shmorig = "counters/"..name, shm.path
+      shm.path = shmpath
       local app = class:new(arg)
+      shm.path = shmorig
       if type(app) ~= 'table' then
          error(("bad return value from app '%s' start() method: %s"):format(
                   name, tostring(app)))
@@ -171,6 +192,7 @@ function apply_config_actions (actions, conf)
       app.appname = name
       app.output = {}
       app.input = {}
+      app.shmpath = shmpath
       new_app_table[name] = app
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
@@ -184,7 +206,10 @@ function apply_config_actions (actions, conf)
       if app_table[name].reconfig then
          local arg = conf.apps[name].arg
          local app = app_table[name]
+         local shmorig = shm.path
+         shm.path = app.shmpath
          app:reconfig(arg)
+         shm.path = shmorig
          new_app_table[name] = app
          table.insert(new_app_array, app)
          app_name_to_index[name] = #new_app_array
@@ -222,9 +247,13 @@ function apply_config_actions (actions, conf)
    for linkspec, r in pairs(link_table) do
       if not new_link_table[linkspec] then link.free(r, linkspec) end
    end
-   -- commit changes
+   -- Commit changes.
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
+   -- Trigger link event for each app.
+   for _, app in ipairs(app_array) do
+      if app.link then app:link() end
+   end
 end
 
 -- Call this to "run snabb switch".
@@ -236,6 +265,13 @@ function main (options)
       assert(not done, "You can not have both 'duration' and 'done'")
       done = lib.timer(options.duration * 1e9)
    end
+
+   local breathe = breathe
+   if options.measure_latency or options.measure_latency == nil then
+      local latency = histogram.create('engine/latency', 1e-6, 1e0)
+      breathe = latency:wrap_thunk(breathe, now)
+   end
+
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
@@ -483,6 +519,34 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
+   -- Test shm.path management
+   print("shm.path management")
+   local S = require("syscall")
+   local App4 = {zone="test"}
+   function App4:new ()
+      local c = counter.open('test')
+      counter.set(c, 42)
+      counter.commit()
+      return setmetatable({test_counter = c},
+                          {__index = App4})
+   end
+   function App4:pull ()
+      assert(counter.read(self.test_counter) == 42, "Invalid counter value")
+      counter.add(self.test_counter)
+   end
+   function App4:stop ()
+      assert(counter.read(self.test_counter) == 43, "Invalid counter value")
+      counter.delete('test')
+   end
+   local c_counter = config.new()
+   config.app(c_counter, "App4", App4)
+   configure(c_counter)
+   main({done = function () return app_table.App4.test_counter end})
+   assert(S.stat(shm.root.."/"..shm.resolve("counters/App4/test")),
+          "Missing : counters/App4/test")
+   configure(config.new())
+   assert(not S.stat(shm.root.."/"..shm.resolve("counters/App4")),
+          "Failed to unlink counters/App4")
    print("OK")
 end
 

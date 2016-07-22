@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local ffi = require("ffi")
@@ -5,7 +7,8 @@ local C = ffi.C
 
 local lib = require("core.lib")
 
-debug = _G.developer_debug
+-- Enable only when debugging this module. Can be very verbose.
+local debug = false
 
 ticks = false     -- current time, in ticks
 ns_per_tick = 1e6 -- tick resolution (millisecond)

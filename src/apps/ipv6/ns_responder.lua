@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This app acts as a responder for neighbor solicitaions for a
 -- specific target address and as a relay for all other packets.  It
 -- has two ports, north and south.  The south port attaches to a port
@@ -34,7 +36,7 @@ function ns_responder:new(config)
 end
 
 local function process (self, p)
-   if not self._filter:match(packet.data(p), packet.length(p)) then
+   if not self._filter:match(p.data, p.length) then
       return false
    end
    local dgram = self._dgram:new(p, ethernet)

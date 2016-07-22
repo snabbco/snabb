@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(..., package.seeall)
 
 local ffi = require("ffi")
@@ -6,23 +8,71 @@ local lib = require("core.lib")
 local shm = require("core.shm")
 local counter = require("core.counter")
 local S = require("syscall")
+local histogram = require("core.histogram")
 local usage = require("program.top.README_inc")
 
 local long_opts = {
-   help = "h"
+   help = "h", counters = "c"
 }
 
 function clearterm () io.write('\027[2J') end
 
 function run (args)
    local opt = {}
+   local object = nil
    function opt.h (arg) print(usage) main.exit(1) end
-   args = lib.dogetopt(args, opt, "h", long_opts)
+   function opt.c (arg) object = arg              end
+   args = lib.dogetopt(args, opt, "hc:", long_opts)
 
    if #args > 1 then print(usage) main.exit(1) end
-   local target_pid = args[1]
+   local target_pid = select_snabb_instance(args[1])
 
-   local instance_tree = "//"..(select_snabb_instance(target_pid))
+   if     object then list_counters(target_pid, object)
+   else               top(target_pid) end
+   ordered_exit(0)
+end
+
+function select_snabb_instance (pid)
+   local instances = shm.children("//")
+   if pid then
+      -- Try to use given pid
+      for _, instance in ipairs(instances) do
+         if instance == pid then return pid end
+      end
+      print("No such Snabb instance: "..pid)
+   elseif #instances == 2 then
+      -- Two means one is us, so we pick the other.
+      local own_pid = tostring(S.getpid())
+      if instances[1] == own_pid then return instances[2]
+      else                            return instances[1] end
+   elseif #instances == 1 then print("No Snabb instance found.")
+   else print("Multple Snabb instances found. Select one.") end
+   ordered_exit(1)
+end
+
+function ordered_exit (value)
+   shm.unlink("//"..S.getpid()) -- Unlink own shm tree to avoid clutter
+   os.exit(value)
+end
+
+function read_counter (name, path)
+   if path then name = path.."/"..name end
+   local value = counter.read(counter.open(name, 'readonly'))
+   counter.delete(name)
+   return value
+end
+
+function list_counters (pid, object)
+   local path = "//"..pid.."/counters/"..object
+   local cnames = shm.children(path)
+   table.sort(cnames, function (a, b) return a < b end)
+   for _, cname in ipairs(cnames) do
+      print_row({30, 30}, {cname, lib.comma_value(read_counter(cname, path))})
+   end
+end
+
+function top (instance_pid)
+   local instance_tree = "//"..instance_pid
    local counters = open_counters(instance_tree)
    local configs = 0
    local last_stats = nil
@@ -36,6 +86,7 @@ function run (args)
          clearterm()
          print_global_metrics(new_stats, last_stats)
          io.write("\n")
+         print_latency_metrics(new_stats, last_stats)
          print_link_metrics(new_stats, last_stats)
          io.flush()
       end
@@ -44,29 +95,13 @@ function run (args)
    end
 end
 
-function select_snabb_instance (pid)
-   local instances = shm.children("//")
-   if pid then
-      -- Try to use given pid
-      for _, instance in ipairs(instances) do
-         if instance == pid then return pid end
-      end
-      print("No such Snabb Switch instance: "..pid)
-   elseif #instances == 2 then
-      -- Two means one is us, so we pick the other.
-      local own_pid = tostring(S.getpid())
-      if instances[1] == own_pid then return instances[2]
-      else                            return instances[1] end
-   elseif #instances == 1 then print("No Snabb Switch instance found.")
-   else print("Multple Snabb Switch instances found. Select one.") end
-   os.exit(1)
-end
-
 function open_counters (tree)
    local counters = {}
    for _, name in ipairs({"configs", "breaths", "frees", "freebytes"}) do
       counters[name] = counter.open(tree.."/engine/"..name, 'readonly')
    end
+   local success, latency = pcall(histogram.open, tree..'/engine/latency')
+   if success then counters.latency = latency end
    counters.links = {} -- These will be populated on demand.
    return counters
 end
@@ -96,6 +131,7 @@ function get_stats (counters)
    for _, name in ipairs({"configs", "breaths", "frees", "freebytes"}) do
       new_stats[name] = counter.read(counters[name])
    end
+   if counters.latency then new_stats.latency = counters.latency:snapshot() end
    new_stats.links = {}
    for linkspec, link in pairs(counters.links) do
       new_stats.links[linkspec] = {}
@@ -115,6 +151,33 @@ function print_global_metrics (new_stats, last_stats)
    print_row(global_metrics_row, {"Kfrees/s", "freeGbytes/s", "breaths/s"})
    print_row(global_metrics_row,
              {float_s(frees / 1000), float_s(bytes / (1000^3)), tostring(breaths)})
+end
+
+function summarize_latency(histogram, prev)
+   local total = histogram.total
+   if prev then total = total - prev.total end
+   if total == 0 then return 0, 0, 0 end
+   local min, max, cumulative = nil, 0, 0
+   for count, lo, hi in histogram:iterate(prev) do
+      if count ~= 0 then
+	 if not min then min = lo end
+	 max = hi
+	 cumulative = cumulative + (lo + hi) / 2 * tonumber(count)
+      end
+   end
+   return min, cumulative / tonumber(total), max
+end
+
+function print_latency_metrics (new_stats, last_stats)
+   local cur, prev = new_stats.latency, last_stats.latency
+   if not cur then return end
+   local min, avg, max = summarize_latency(cur, prev)
+   print_row(global_metrics_row,
+             {"Min breath (us)", "Average", "Maximum"})
+   
+   print_row(global_metrics_row,
+             {float_s(min*1e6), float_s(avg*1e6), float_s(max*1e6)})
+   print("\n")
 end
 
 local link_metrics_row = {31, 7, 7, 7, 7, 7}

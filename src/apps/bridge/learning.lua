@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- This class derives from lib.bridge.base and implements a "learning
 -- bridge" using a MAC address table provided by apps.bridge.mac_table
 -- to store the set of source addresses of packets arriving on all
@@ -201,7 +203,7 @@ function bridge:push()
          -- packet with one of the packet forwarding tables according
          -- to the result.
          local mac = self._mac
-         mac[0] = packet.data(p)
+         mac[0] = p.data
          mac_table:lookup_pft(mac, ip, ig, p, self._pft_C, self._flood_pl[ip])
          -- Associate the source MAC address with the ingress port and
          -- group.  Multicast addresses are forbidden to occur as

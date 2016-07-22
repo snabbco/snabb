@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 -- Default to not using any Lua code on the filesystem.
@@ -8,10 +10,11 @@ local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
 local zone = require("jit.zone")
 local lib = require("core.lib")
+local shm = require("core.shm")
 local C   = ffi.C
 -- Load ljsyscall early to help detect conflicts
 -- (e.g. FFI type name conflict between Snabb and ljsyscall)
-require("syscall")
+local S = require("syscall")
 
 require("lib.lua.strict")
 require("lib.lua.class")
@@ -26,46 +29,46 @@ ffi.cdef[[
       extern char** argv;
 ]]
 
-_G.developer_debug = false
-debug_on_error = false
+-- Enable developer-level debug if SNABB_DEBUG env variable is set.
+_G.developer_debug = lib.getenv("SNABB_DEBUG") ~= nil
+debug_on_error = _G.developer_debug
 
 function main ()
    zone("startup")
    require "lib.lua.strict"
-   initialize()
-   local args = parse_command_line()
-   local program = programname(args[1])
-   if program == 'snabb' then
-      -- Print usage with exit status 0 if help requested
-      if args[2] == '-h' or args[2] == '--help' then
-         usage(0)
-      end
-      -- Print usage with exit status 1 if no arguments supplied
-      if #args == 1 then
-         usage(1)
-      end
-      -- Strip 'snabb' and use next argument as program name
-      table.remove(args, 1)
+   -- Warn on unsupported platforms
+   if ffi.arch ~= 'x64' or ffi.os ~= 'Linux' then
+      error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
    end
-   program = select_program(program, args)
+   initialize()
+   local program, args = select_program(parse_command_line())
    if not lib.have_module(modulename(program)) then
       print("unsupported program: "..program:gsub("_", "-"))
-      print()
-      print("Rename this executable (cp, mv, ln) to choose a supported program:")
-      print("  snabb "..(require("programs_inc"):gsub("\n", " ")))
-      os.exit(1)
+      usage(1)
    else
       require(modulename(program)).run(args)
    end
 end
 
--- If program stars with prefix 'snabb_' removes the prefix
--- If not, use the next argument as program name
-function select_program (program, args)
-   if program:match("^snabb_") then
-      return program:gsub("^snabb_", "")
+-- Take the program name from the first argument, unless the first
+-- argument is "snabb", in which case pop it off, handle any options
+-- passed to snabb itself, and use the next argument.
+function select_program (args)
+   local program = programname(table.remove(args, 1))
+   if program == 'snabb' then
+      while #args > 0 and args[1]:match('^-') do
+         local opt = table.remove(args, 1)
+         if opt == '-h' or opt == '--help' then
+            usage(0)
+         else
+            print("unrecognized option: "..opt)
+            usage(1)
+         end
+      end
+      if #args == 0 then usage(1) end
+      program = programname(table.remove(args, 1))
    end
-   return programname(table.remove(args, 1)):gsub("^snabb_", "")
+   return program, args
 end
 
 function usage (status)
@@ -86,6 +89,7 @@ function programname (name)
    return name:gsub("^.*/", "")
               :gsub("-[0-9.]+[-%w]+$", "")
               :gsub("-", "_")
+              :gsub("^snabb_", "")
 end
 
 function modulename (program)
@@ -128,28 +132,77 @@ function handler (reason)
    os.exit(1)
 end
 
+-- Cleanup after Snabb process.
+function shutdown (pid)
+   if not _G.developer_debug then
+      shm.unlink("//"..pid)
+   end
+end
+
 function selftest ()
    print("selftest")
    assert(programname("/bin/snabb-1.0") == "snabb",
       "Incorrect program name parsing")
    assert(programname("/bin/snabb-1.0-alpha2") == "snabb",
       "Incorrect program name parsing")
-   assert(programname("/bin/snabb-nfv") == "snabb_nfv",
+   assert(programname("/bin/snabb-nfv") == "nfv",
       "Incorrect program name parsing")
-   assert(programname("/bin/snabb-nfv-1.0") == "snabb_nfv",
+   assert(programname("/bin/nfv-1.0") == "nfv",
       "Incorrect program name parsing")
    assert(modulename("nfv-sync-master-2.0") == "program.nfv_sync_master.nfv_sync_master",
       "Incorrect module name parsing")
    local pn = programname
    -- snabb foo => foo
-   assert(select_program(pn'snabb', { pn'foo' }) == "foo",
+   assert(select_program({ 'foo' }) == "foo",
       "Incorrect program name selected")
    -- snabb-foo => foo
-   assert(select_program(pn'snabb-foo', { }) == "foo",
+   assert(select_program({ 'snabb-foo' }) == "foo",
       "Incorrect program name selected")
    -- snabb snabb-foo => foo
-   assert(select_program(pn'snabb', { pn'snabb-foo' }) == "foo",
+   assert(select_program({ 'snabb', 'snabb-foo' }) == "foo",
       "Incorrect program name selected")
 end
 
-xpcall(main, handler)
+-- Fork into worker process and supervisor
+local worker_pid = S.fork()
+if worker_pid == 0 then
+   -- Worker: Use prctl to ensure we are killed (SIGHUP) when our parent quits
+   -- and run main.
+   S.prctl("set_pdeathsig", "hup")
+   xpcall(main, handler)
+else
+   -- Supervisor: Queue exit_signals using signalfd, prevent them from killing
+   -- us instantly using sigprocmask.
+   local exit_signals = "hup, int, quit, term, chld"
+   local signalfd = S.signalfd(exit_signals)
+   S.sigprocmask("block", exit_signals)
+   while true do
+      -- Read signals from signalfd. Only process the first signal because any
+      -- signal causes shutdown.
+      local signals, err = S.util.signalfd_read(signalfd)
+      assert(signals, tostring(err))
+      for i = 1, #signals do
+         local exit_status
+         if signals[i].chld then
+            -- SIGCHILD means worker state changed: retrieve its status using
+            -- waitpid and set exit status accordingly.
+            local status, err, worker =
+               S.waitpid(worker_pid, "stopped,continued")
+            assert(status, tostring(err))
+            if     worker.WIFEXITED   then exit_status = worker.EXITSTATUS
+            elseif worker.WIFSIGNALED then exit_status = 128 + worker.WTERMSIG
+            -- WIFSTOPPED and WIFCONTINUED are ignored.
+            else goto ignore_signal end
+         else
+            -- Supervisor received exit signal: kill worker by sending SIGHUP
+            -- and and set exit status accordingly.
+            S.kill(worker_pid, "hup")
+            exit_status = 128 + signals[i].signo
+         end
+         -- Run shutdown routine and exit.
+         shutdown(worker_pid)
+         os.exit(exit_status)
+         ::ignore_signal::
+      end
+   end
+end

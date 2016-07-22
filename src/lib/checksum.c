@@ -1,10 +1,10 @@
+/* Use of this source code is governed by the Apache 2.0 license; see COPYING.
+ * Generic checksm routine originally taken from DPDK: 
+ *   BSD license; (C) Intel 2010-2015, 6WIND 2014. */
+
 /* IP checksum routines.
  *
- * See src/arch/ for architecture specific SIMD versions.
- *
- * Generic checksm routine taken from DPDK: 
- *   BSD license; (C) Intel 2010-2015, 6WIND 2014.
- */
+ * See src/arch/ for architecture specific SIMD versions. */
 
 #include <arpa/inet.h>
 #include <stdio.h>

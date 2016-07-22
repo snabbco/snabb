@@ -1,7 +1,8 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local lib      = require("core.lib")
-local freelist = require("core.freelist")
 local packet   = require("core.packet")
                  require("apps.solarflare.ef_vi_h")
 local pci      = require("lib.hardware.pci")

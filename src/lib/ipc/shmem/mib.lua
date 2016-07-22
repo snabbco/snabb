@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Subclass of ipc.shmem.shmem that handles data types from the SMIv2
 -- specification.
 --
