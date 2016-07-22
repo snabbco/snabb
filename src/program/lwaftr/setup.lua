@@ -224,16 +224,19 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
       config.app(c, "tagv6", vlan.Tagger, { tag=conf.v6_vlan_tag })
    end
 
+   local sources = { "capturev4.output", "capturev6.output" }
+   local sinks = { "output_filev4.input", "output_filev6.input" }
+
    if conf.vlan_tagging then
+      sources = { "untagv4.output", "untagv6.output" }
+      sinks = { "tagv4.input", "tagv6.input" }
+
       config.link(c, "capturev4.output -> untagv4.input")
       config.link(c, "capturev6.output -> untagv6.input")
-      link_source(c, 'untagv4.output', 'untagv6.output')
-
-      link_sink(c, 'tagv4.input', 'tagv6.input')
       config.link(c, "tagv4.output -> output_filev4.input")
       config.link(c, "tagv6.output -> output_filev6.input")
-   else
-      link_source(c, 'capturev4.output', 'capturev6.output')
-      link_sink(c, 'output_filev4.input', 'output_filev6.input')
    end
+
+   link_source(c, unpack(sources))
+   link_sink(c, unpack(sinks))
 end
