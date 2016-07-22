@@ -50,9 +50,21 @@ end
 
 ## Installation
 
-For the moment being, there is no automated installation: just place the
-`ndpi` subdirectory and the `ndpi.lua` file in any location where LuaJIT
-will be able to find them.
+Using [LuaRocks](https://luarocks.org) is recommended. The latest stable
+release can be installed with:
+
+```sh
+luarocks install ljndpi
+```
+
+The current development version can be installed with:
+
+```sh
+luarocks install --server=https://luarocks.org/dev ljndpi
+```
+
+Alternatively, you can just place the `ndpi` subdirectory and the `ndpi.lua`
+file in any location where LuaJIT will be able to find them.
 
 
 ## Documentation

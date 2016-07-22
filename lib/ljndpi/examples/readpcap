@@ -249,6 +249,7 @@ for header, data in input:packets() do
    end
 end
 
+print("nDPI version: " .. ndpi.lib_version.major .. "." .. ndpi.lib_version.minor)
 print("Input: " .. input_file)
 print("Flows:")
 local num_flows, detected_flows = 0, 0
