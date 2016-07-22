@@ -9,6 +9,7 @@
 local ffi = require("ffi")
 local bit = require("bit")
 local band, bor, bnot, lshift = bit.band, bit.bor, bit.bnot, bit.lshift
+local s_format = string.format
 
 ---------------------------------------------------- Protocol Bitmask ------
 --
@@ -76,6 +77,18 @@ local function bitmask_is_set(self, n)
    return band(self.fds_bits[n / NDPI_BITS], val) == val
 end
 
+local hex_format = s_format("%%0%dX", NDPI_BITS / 4)
+local function bitmask_tostring(self)
+   local r = "ndpi.protocol_bitmask<"
+   for i = 0, NUM_FDS_BITS - 1 do
+      if i ~= 0 then
+         r = r .. " "
+      end
+      r = r .. s_format(hex_format, self.fds_bits[i])
+   end
+   return r .. ">"
+end
+
 return {
    -- Naming above follows "ndpi_define.h" to make it easier to correlate
    -- with the nDPI header, but the module exports friendlier names.
@@ -101,5 +114,6 @@ return {
          set     = bitmask_set;
          is_set  = bitmask_is_set;
       };
+      __tostring = bitmask_tostring;
    });
 }
