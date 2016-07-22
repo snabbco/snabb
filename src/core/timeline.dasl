@@ -142,18 +142,22 @@ function dump (filename,  maxentries)
    local size = last + 1
    -- Print column headers.
    -- Note: "-cycles" column is time delta between entries (moving backwards in time)
-   print(("%4s %4s %12s %-16s %s"):format("numa", "core", "-cycles", "category", "message"))
-   -- "Fast-forward" to the end (when following entry has earlier timestamp)
-   local index = 0
-   while ring[index].tsc <= ring[(index+1) % size].tsc do
-      index = (index+1) % size
+   print(("%4s %4s %12s %-16s %s"):format("numa", "core", "cycles", "category", "message"))
+   -- Search for the first entry i.e. with lowest timestamp
+   local index, stamp = 0, ring[0].tsc
+   for i = 1, last do
+      if ring[i].tsc ~= 0 and ring[i].tsc < stamp then
+         stamp = ring[i].tsc
+         index = i
+      end
    end
-   -- "Rewind" printing messages
+   -- Print messages from first to last
    local ref_tsc = nil
    for i = 0, size-1 do
       local previndex = (index == 0) and last or index-1
       if maxentries and i > maxentries then break end
-      local timedelta = tonumber(ring[index].tsc - ring[previndex].tsc)
+      if ring[index].tsc == 0 then break end -- end of log
+      local timedelta = (i == 0) and '<start>' or tonumber(ring[index].tsc - ring[previndex].tsc)
       local msgid = ring[index].msg_id
       local icategory = bit.band(0xffff, bit.rshift(msgid, 40))
       local imessage = bit.band(0xffff, bit.rshift(msgid, 16))
@@ -174,7 +178,7 @@ function dump (filename,  maxentries)
       print(("%-4d %-4d %12s %-16s %s"):format(
             numa, core, timedelta, category, message))
       ref_tsc = ring[index].tsc
-      index = (index == 0) and last or index-1
+      index = (index == last) and 0 or index+1
    end
 end
 
