@@ -435,7 +435,7 @@ function breathe ()
    local freed
    local freed_packets = counter.read(frees) - freed_packets0
    local freed_bytes = (counter.read(freebytes) - freed_bytes0)
-   local freed_bytes_per_packet = freed_bytes / math.max(freed_packets, 1)
+   local freed_bytes_per_packet = freed_bytes / math.max(tonumber(freed_packets), 1)
    event_breath_end(counter.read(breaths), freed_packets, freed_bytes_per_packet)
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
