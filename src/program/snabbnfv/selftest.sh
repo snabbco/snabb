@@ -2,7 +2,9 @@
 
 SKIPPED_CODE=43
 
-if [ -z "$SNABB_PCI0" ]; then echo "Need SNABB_PCI0"; exit $SKIPPED_CODE; fi
+if [ -z "$SNABB_PCI0" ]; then
+    export SNABB_PCI0=soft
+fi
 if [ -z "$SNABB_TELNET0" ]; then
     export SNABB_TELNET0=5000
     echo "Defaulting to SNABB_TELNET0=$SNABB_TELNET0"
@@ -10,6 +12,10 @@ fi
 if [ -z "$SNABB_TELNET1" ]; then
     export SNABB_TELNET1=5001
     echo "Defaulting to SNABB_TELNET1=$SNABB_TELNET1"
+fi
+if [ -z "$SNABB_IPERF_BENCH_CONF" ]; then
+    export SNABB_IPERF_BENCH_CONF=program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports
+    echo "Defaulting to SNABB_IPERF_BENCH_CONF=$SNABB_IPERF_BENCH_CONF"
 fi
 
 TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
@@ -302,11 +308,7 @@ function crypto_tests {
 # Run iperf benchmark. If <mode> is "jumbo", jumboframes will be enabled.
 # <config> defaults to same_vlan.ports.
 function iperf_bench {
-    if [ -z "$2" ]; then
-        load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports
-    else
-        load_config "$2"
-    fi
+    load_config "$SNABB_IPERF_BENCH_CONF"
 
     if [ "$1" = "jumbo" ]; then
         test_jumboping $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0" \
