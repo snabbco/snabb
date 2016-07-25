@@ -68,7 +68,7 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-local function with_restart (app, method)
+function with_restart (app, method)
    if use_restart then
       -- Run fn in protected mode using pcall.
       local status, result_or_error = pcall(method, app)
@@ -279,16 +279,6 @@ function main (options)
    if options.measure_latency or options.measure_latency == nil then
       local latency = histogram.create('engine/latency', 1e-6, 1e0)
       breathe = latency:wrap_thunk(breathe, now)
-   end
-
-   if options.ingress_drop_monitor or options.ingress_drop_monitor == nil then
-      local interval = 1e8   -- Every 100 milliseconds.
-      local function fn()
-         ingress_drop_monitor:sample()
-         ingress_drop_monitor:jit_flush_if_needed()
-      end
-      local t = timer.new("ingress drop monitor", fn, interval, "repeating")
-      timer.activate(t)
    end
 
    monotonic_now = C.get_monotonic_time()
