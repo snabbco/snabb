@@ -269,6 +269,22 @@ Predicate used to test if a link is empty. Returns true if *link* is
 empty and false otherwise.
 
 
+— Function **link.full** *link*
+
+Predicate used to test if a link is full. Returns true if *link* is full
+and false otherwise.
+
+
+— Function **link.nreadable** *link*
+
+Returns the number of packets on *link*.
+
+
+— Function **link.nwriteable** *link*
+
+Returns the remaining number of packets that fit onto *link*.
+
+
 — Function **link.receive** *link*
 
 Returns the next available packet (and advances the read cursor) on
