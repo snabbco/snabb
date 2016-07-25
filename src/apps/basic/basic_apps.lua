@@ -5,11 +5,8 @@ module(...,package.seeall)
 local app = require("core.app")
 local packet = require("core.packet")
 local link = require("core.link")
-local transmit, receive = link.transmit, link.receive
-
-
 local ffi = require("ffi")
-local C = ffi.C
+local transmit, receive = link.transmit, link.receive
 
 --- # `Source` app: generate synthetic packets
 
@@ -147,3 +144,40 @@ function Repeater:stop ()
    end
 end
 
+--- # `Truncate` app: truncate or zero pad packet to length n
+
+Truncate = {}
+
+function Truncate:new (n)
+   return setmetatable({n = n}, {__index=Truncate})
+end
+
+function Truncate:push ()
+   for _ = 1, link.nreadable(self.input.input) do
+      local p = receive(self.input.input)
+      ffi.fill(p.data, math.min(0, self.n - p.length))
+      p.length = self.n
+      transmit(self.output.output,p)
+   end
+end
+
+--- # `Sample` app: let through every nth packet
+
+Sample = {}
+
+function Sample:new (n)
+   return setmetatable({n = n, seen = 1}, {__index=Sample})
+end
+
+function Sample:push ()
+   for _ = 1, link.nreadable(self.input.input) do
+      local p = receive(self.input.input)
+      if self.n == self.seen then
+         transmit(self.output.output, p)
+         self.seen = 1
+      else
+         self.seen = self.seen + 1
+         packet.free(p)
+      end
+   end
+end

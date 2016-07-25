@@ -7,7 +7,7 @@
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string = 
+pcall, type, table, string =
 require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
@@ -47,7 +47,7 @@ function util.if_nametoindex(name) -- standard function in some libc versions
   if not s then return nil, err end
   local i, err = if_nametoindex(name, s)
   if not i then return nil, err end
-  local ok, err = S.close(s)
+  local ok, err = s:close()
   if not ok then return nil, err end
   return i
 end
