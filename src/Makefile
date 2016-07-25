@@ -188,7 +188,7 @@ obj/doc/snabb.markdown: markdown Makefile doc/genbook.sh
 
 obj/doc/snabb.pdf: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd obj/doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../../$@ ../../$<)
+	$(Q) (cd obj/doc; pandoc --template=../../doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../../$@ ../../$<)
 
 obj/doc/snabb.html: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
