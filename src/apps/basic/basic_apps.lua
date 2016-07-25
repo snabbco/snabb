@@ -93,12 +93,11 @@ function Tee:new ()
 end
 
 function Tee:push ()
-   noutputs = #self.output
+   local noutputs = #self.output
    if noutputs > 0 then
       for _, i in ipairs(self.input) do
          for _ = 1, link.nreadable(i) do
             local p = receive(i)
-            maxoutput = maxoutput - 1
             do local output = self.output
                for k = 1, #output do
                   transmit(output[k], k == #output and p or packet.clone(p))

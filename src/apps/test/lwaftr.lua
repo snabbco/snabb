@@ -330,9 +330,10 @@ function Lwaftrgen:pull ()
    self.bucket_content = self.bucket_content + self.rate * 1e6 * (cur_now - last_time)
    self.last_time = cur_now
 
+   local limit = engine.pull_npackets
    while limit > self.total_packet_count and
-      limit = limit - 1
       self.total_packet_count <= self.bucket_content do
+      limit = limit - 1
       self.bucket_content = self.bucket_content - self.total_packet_count
 
       ipv4_hdr.dst_ip = self.b4_ipv4
