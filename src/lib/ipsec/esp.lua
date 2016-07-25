@@ -86,7 +86,7 @@ local function padding (a, l) return (a - l%a) % a end
 --   5. Write ESP header
 function esp_v6_encrypt:encapsulate (p)
    local gcm = self.aes_128_gcm
-   local data, length = packet.data(p), packet.length(p)
+   local data, length = p.data, p.length
    if length < PAYLOAD_OFFSET then return false end
    local payload = data + PAYLOAD_OFFSET
    local payload_length = length - PAYLOAD_OFFSET
@@ -134,7 +134,7 @@ end
 --   5. Shrink p by ESP overhead
 function esp_v6_decrypt:decapsulate (p)
    local gcm = self.aes_128_gcm
-   local data, length = packet.data(p), packet.length(p)
+   local data, length = p.data, p.length
    if length - PAYLOAD_OFFSET < self.MIN_SIZE then return false end
    self.ip:new_from_mem(data + ETHERNET_SIZE, IPV6_SIZE)
    local payload = data + PAYLOAD_OFFSET
@@ -176,26 +176,41 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    )
    local d = datagram:new(payload)
    local ip = ipv6:new({})
-   ip:payload_length(packet.length(payload))
+   ip:payload_length(payload.length)
    d:push(ip)
    d:push(ethernet:new({type=0x86dd}))
    local p = d:packet()
    -- Check integrity
-   print("original", lib.hexdump(ffi.string(packet.data(p), packet.length(p))))
+   print("original", lib.hexdump(ffi.string(p.data, p.length)))
    local p_enc = packet.clone(p)
    assert(enc:encapsulate(p_enc), "encapsulation failed")
-   print("encrypted", lib.hexdump(ffi.string(packet.data(p_enc), packet.length(p_enc))))
+   print("encrypted", lib.hexdump(ffi.string(p_enc.data, p_enc.length)))
    local p2 = packet.clone(p_enc)
    assert(dec:decapsulate(p2), "decapsulation failed")
-   print("decrypted", lib.hexdump(ffi.string(packet.data(p2), packet.length(p2))))
-   assert(packet.length(p2) == packet.length(p)
-          and C.memcmp(p, p2, packet.length(p)) == 0,
+   print("decrypted", lib.hexdump(ffi.string(p2.data, p2.length)))
+   assert(p2.length == p.length and C.memcmp(p, p2, p.length) == 0,
           "integrity check failed")
    -- Check invalid packets.
    local p_invalid = packet.from_string("invalid")
    assert(not enc:encapsulate(p_invalid), "encapsulated invalid packet")
    local p_invalid = packet.from_string("invalid")
    assert(not dec:decapsulate(p_invalid), "decapsulated invalid packet")
+   -- Check minimum packet.
+   local p_min = packet.from_string("012345678901234567890123456789012345678901234567890123")
+   p_min.data[18] = 0 -- Set IPv6 payload length to zero
+   p_min.data[19] = 0 -- ...
+   assert(packet.length(p_min) == PAYLOAD_OFFSET)
+   print("original", lib.hexdump(ffi.string(packet.data(p_min), packet.length(p_min))))
+   local e_min = packet.clone(p_min)
+   assert(enc:encapsulate(e_min))
+   print("encrypted", lib.hexdump(ffi.string(packet.data(e_min), packet.length(e_min))))
+   assert(packet.length(e_min) == dec.MIN_SIZE+PAYLOAD_OFFSET)
+   assert(dec:decapsulate(e_min))
+   print("decrypted", lib.hexdump(ffi.string(packet.data(e_min), packet.length(e_min))))
+   assert(packet.length(e_min) == PAYLOAD_OFFSET)
+   assert(packet.length(p_min) == packet.length(e_min)
+          and C.memcmp(p_min, e_min, packet.length(p_min)) == 0,
+          "integrity check failed")
    -- Check transmitted Sequence Number wrap around
    enc.seq:low(0)
    enc.seq:high(1)

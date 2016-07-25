@@ -21,18 +21,21 @@ local band = require("bit").band
 local size = C.LINK_RING_SIZE         -- NB: Huge slow-down if this is not local
 max        = C.LINK_MAX_PACKETS
 
-local counternames = {"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}
+local provided_counters = {
+   "dtime", "rxpackets", "rxbytes", "txpackets", "txbytes", "txdrop"
+}
 
 function new (name)
    local r = shm.create("links/"..name, "struct link")
-   for _, c in ipairs(counternames) do
+   for _, c in ipairs(provided_counters) do
       r.stats[c] = counter.open("counters/"..name.."/"..c)
    end
+   counter.set(r.stats.dtime, C.get_unix_time())
    return r
 end
 
 function free (r, name)
-   for _, c in ipairs(counternames) do
+   for _, c in ipairs(provided_counters) do
       counter.delete("counters/"..name.."/"..c)
    end
    shm.unmap(r)
@@ -92,8 +95,7 @@ end
 
 function stats (r)
    local stats = {}
-   for _, c
-   in ipairs(counternames) do
+   for _, c in ipairs(provided_counters) do
       stats[c] = tonumber(counter.read(r.stats[c]))
    end
    return stats
