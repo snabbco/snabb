@@ -7,6 +7,8 @@ local h = require("syscall.helpers")
 local bit = require("bit")
 local link = require("core.link")
 local packet = require("core.packet")
+local counter = require("core.counter")
+local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -20,6 +22,12 @@ end
 local c, t = S.c, S.types.t
 
 RawSocket = {}
+
+local provided_counters = {
+   'type', 'dtime',
+   'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast',
+   'txbytes', 'txpackets', 'txmcast', 'txbcast'
+}
 
 function RawSocket:new (ifname)
    assert(ifname)
@@ -40,7 +48,16 @@ function RawSocket:new (ifname)
       sock:close()
       error(err)
    end
-   return setmetatable({sock = sock}, {__index = RawSocket})
+   local counters = {}
+   for _, name in ipairs(provided_counters) do
+      counters[name] = counter.open(name)
+   end
+   counter.set(counters.type, 0x1001) -- Virtual interface
+   counter.set(counters.dtime, C.get_unix_time())
+   return setmetatable({sock = sock,
+                        rx_p = packet.allocate(),
+                        counters = counters},
+                       {__index = RawSocket})
 end
 
 function RawSocket:pull ()
@@ -63,10 +80,18 @@ function RawSocket:can_receive ()
 end
 
 function RawSocket:receive ()
-   local buffer = ffi.new("uint8_t[?]", C.PACKET_PAYLOAD_SIZE)
-   local sz, err = S.read(self.sock, buffer, C.PACKET_PAYLOAD_SIZE)
-   assert(sz, err)
-   return packet.from_pointer(buffer, sz)
+   local p = self.rx_p
+   local sz = assert(S.read(self.sock, p.data, packet.max_payload))
+   p.length = sz
+   counter.add(self.counters.rxbytes, sz)
+   counter.add(self.counters.rxpackets)
+   if ethernet:is_mcast(p.data) then
+      counter.add(self.counters.rxmcast)
+   end
+   if ethernet:is_bcast(p.data) then
+      counter.add(self.counters.rxbcast)
+   end
+   return packet.clone(p)
 end
 
 function RawSocket:push ()
@@ -75,6 +100,14 @@ function RawSocket:push ()
    while not link.empty(l) and self:can_transmit() do
       local p = link.receive(l)
       self:transmit(p)
+      counter.add(self.counters.txbytes, p.length)
+      counter.add(self.counters.txpackets)
+      if ethernet:is_mcast(p.data) then
+         counter.add(self.counters.txmcast)
+      end
+      if ethernet:is_bcast(p.data) then
+         counter.add(self.counters.txbcast)
+      end
       packet.free(p)
    end
 end
@@ -96,6 +129,9 @@ end
 
 function RawSocket:stop()
    self.sock:close()
+   packet.free(self.rx_p)
+   -- delete counters
+   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
 
 function selftest ()

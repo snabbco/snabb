@@ -12,20 +12,67 @@ local histogram = require("core.histogram")
 local usage = require("program.top.README_inc")
 
 local long_opts = {
-   help = "h"
+   help = "h", counters = "c"
 }
 
 function clearterm () io.write('\027[2J') end
 
 function run (args)
    local opt = {}
+   local object = nil
    function opt.h (arg) print(usage) main.exit(1) end
-   args = lib.dogetopt(args, opt, "h", long_opts)
+   function opt.c (arg) object = arg              end
+   args = lib.dogetopt(args, opt, "hc:", long_opts)
 
    if #args > 1 then print(usage) main.exit(1) end
-   local target_pid = args[1]
+   local target_pid = select_snabb_instance(args[1])
 
-   local instance_tree = "//"..(select_snabb_instance(target_pid))
+   if     object then list_counters(target_pid, object)
+   else               top(target_pid) end
+   ordered_exit(0)
+end
+
+function select_snabb_instance (pid)
+   local instances = shm.children("//")
+   if pid then
+      -- Try to use given pid
+      for _, instance in ipairs(instances) do
+         if instance == pid then return pid end
+      end
+      print("No such Snabb instance: "..pid)
+   elseif #instances == 2 then
+      -- Two means one is us, so we pick the other.
+      local own_pid = tostring(S.getpid())
+      if instances[1] == own_pid then return instances[2]
+      else                            return instances[1] end
+   elseif #instances == 1 then print("No Snabb instance found.")
+   else print("Multple Snabb instances found. Select one.") end
+   ordered_exit(1)
+end
+
+function ordered_exit (value)
+   shm.unlink("//"..S.getpid()) -- Unlink own shm tree to avoid clutter
+   os.exit(value)
+end
+
+function read_counter (name, path)
+   if path then name = path.."/"..name end
+   local value = counter.read(counter.open(name, 'readonly'))
+   counter.delete(name)
+   return value
+end
+
+function list_counters (pid, object)
+   local path = "//"..pid.."/counters/"..object
+   local cnames = shm.children(path)
+   table.sort(cnames, function (a, b) return a < b end)
+   for _, cname in ipairs(cnames) do
+      print_row({30, 30}, {cname, lib.comma_value(read_counter(cname, path))})
+   end
+end
+
+function top (instance_pid)
+   local instance_tree = "//"..instance_pid
    local counters = open_counters(instance_tree)
    local configs = 0
    local last_stats = nil
@@ -46,24 +93,6 @@ function run (args)
       last_stats = new_stats
       C.sleep(1)
    end
-end
-
-function select_snabb_instance (pid)
-   local instances = shm.children("//")
-   if pid then
-      -- Try to use given pid
-      for _, instance in ipairs(instances) do
-         if instance == pid then return pid end
-      end
-      print("No such Snabb instance: "..pid)
-   elseif #instances == 2 then
-      -- Two means one is us, so we pick the other.
-      local own_pid = tostring(S.getpid())
-      if instances[1] == own_pid then return instances[2]
-      else                            return instances[1] end
-   elseif #instances == 1 then print("No Snabb instance found.")
-   else print("Multple Snabb instances found. Select one.") end
-   os.exit(1)
 end
 
 function open_counters (tree)

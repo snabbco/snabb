@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:=eugeneia/snabb-nfv-test}
+export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:=eugeneia/snabb-nfv-test-vanilla}
 
 # Snabb Docker environment
 
@@ -9,6 +9,8 @@ docker run --rm --privileged -i -v $(dirname $PWD):/snabb $DOCKERFLAGS \
     -e SNABB_PCI1=$SNABB_PCI1 \
     -e SNABB_PCI_INTEL0=$SNABB_PCI_INTEL0 \
     -e SNABB_PCI_INTEL1=$SNABB_PCI_INTEL1 \
+    -e SNABB_PCI_INTEL1G0=$SNABB_PCI_INTEL1G0 \
+    -e SNABB_PCI_INTEL1G1=$SNABB_PCI_INTEL1G1 \
     -e SNABB_PCI_SOLARFLARE0=$SNABB_PCI_SOLARFLARE0 \
     -e SNABB_PCI_SOLARFLARE1=$SNABB_PCI_SOLARFLARE1 \
     -e SNABB_TELNET0=$SNABB_TELNET0 \

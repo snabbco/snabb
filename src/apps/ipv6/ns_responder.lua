@@ -36,7 +36,7 @@ function ns_responder:new(config)
 end
 
 local function process (self, p)
-   if not self._filter:match(packet.data(p), packet.length(p)) then
+   if not self._filter:match(p.data, p.length) then
       return false
    end
    local dgram = self._dgram:new(p, ethernet)
