@@ -210,6 +210,53 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
    link_sink(c, v4_sink..'.input', v6_sink..'.input')
 end
 
+function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
+   lwaftr_app(c, conf)
+
+   config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
+   config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
+   config.app(c, "output_filev4", pcap.PcapWriter, outv4_pcap)
+   config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
+   if conf.vlan_tagging then
+      config.app(c, "untagv4", vlan.Untagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "untagv6", vlan.Untagger, { tag=conf.v6_vlan_tag })
+      config.app(c, "tagv4", vlan.Tagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "tagv6", vlan.Tagger, { tag=conf.v6_vlan_tag })
+   end
+
+   local basic_apps = require("apps.basic.basic_apps")
+   local v4v6 = require("apps.lwaftr.v4v6").v4v6
+   config.app(c, 'v4v6', v4v6)
+   config.app(c, 'splitter', v4v6)
+   config.app(c, 'join', basic_apps.Join)
+
+   local sources = { "v4v6.v4_tx", "v4v6.v6_tx" }
+   local sinks = { "v4v6.v4_rx", "v4v6.v6_rx" }
+
+   if conf.vlan_tagging then
+      config.link(c, "capturev4.output -> untagv4.input")
+      config.link(c, "capturev6.output -> untagv6.input")
+      config.link(c, "untagv4.output -> join.in1")
+      config.link(c, "untagv6.output -> join.in2")
+      config.link(c, "join.out -> v4v6.input")
+      config.link(c, "v4v6.output -> splitter.input")
+      config.link(c, "splitter.v4_tx -> tagv4.input")
+      config.link(c, "splitter.v6_tx -> tagv6.input")
+      config.link(c, "tagv4.output -> output_filev4.input")
+      config.link(c, "tagv6.output -> output_filev6.input")
+   else
+      config.link(c, "capturev4.output -> join.in1")
+      config.link(c, "capturev6.output -> join.in2")
+      config.link(c, "join.out -> v4v6.input")
+      config.link(c, "v4v6.output -> splitter.input")
+      config.link(c, "splitter.v4_tx -> output_filev4.input")
+      config.link(c, "splitter.v6_tx -> output_filev6.input")
+   end
+
+   link_source(c, unpack(sources))
+   link_sink(c, unpack(sinks))
+end
+
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    lwaftr_app(c, conf)
 

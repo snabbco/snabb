@@ -16,12 +16,16 @@ function show_usage(code)
    main.exit(code)
 end
 
-function parse_args(args)
+function parse_args (args)
    local handlers = {}
+   local opts = {}
    function handlers.h() show_usage(0) end
-   args = lib.dogetopt(args, handlers, "h", { help="h" })
+   handlers["on-a-stick"] = function ()
+      opts["on-a-stick"] = true
+   end
+   args = lib.dogetopt(args, handlers, "h", { help="h", ["on-a-stick"] = 0 })
    if #args ~= 5 and #args ~= 6 then show_usage(1) end
-   return unpack(args)
+   return opts, args
 end
 
 function load_requested_counters(counters)
@@ -71,10 +75,36 @@ function validate_diff(actual, expected)
    end
 end
 
-function run(args)
+local function run_on_a_stick (args)
    local conf_file, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap, counters_path =
-      parse_args(args)
+      unpack(args)
+   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
+   local c = config.new()
+   setup.load_check_on_a_stick(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
+   engine.configure(c)
+   if counters_path then
+      local initial_counters = read_counters(c)
+      engine.main({duration=0.10})
+      local final_counters = read_counters(c)
+      local counters_diff = diff_counters(final_counters, initial_counters)
+      local req_counters = load_requested_counters(counters_path)
+      validate_diff(counters_diff, req_counters)
+   else
+      engine.main({duration=0.10})
+   end
+end
+
+function run(args)
+   local opts, args = parse_args(args)
+   if opts["on-a-stick"] then
+      run_on_a_stick(args)
+      print("done")
+      return
+   end
+
+   local conf_file, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap, counters_path =
+      unpack(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
    local c = config.new()
