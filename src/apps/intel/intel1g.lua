@@ -238,7 +238,7 @@ function Intel1g:new(conf)
                                filename = pciaddress })
      self.snmp.ifTable = ifTable
      -- ifTable
-     ifTable:register('ifDescr', 'OctetStr', pciaddress)
+     ifTable:register('ifDescr', 'OctetStr', self.snmp.ifDescr or pciaddress)
      ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
      ifTable:register('ifMtu', 'Integer32', conf.mtu)
      ifTable:register('ifSpeed', 'Gauge32', 1000000000)
@@ -285,7 +285,7 @@ function Intel1g:new(conf)
      ifTable:register('ifPromiscuousMode', 'Integer32', 2) -- false
      ifTable:register('ifConnectorPresent', 'Integer32', 1) -- true
      ifTable:register('ifAlias', { type = 'OctetStr', length = 64 },
-                      pciaddress) -- TBD add description
+                      self.snmp.ifAlias or '') -- TBD add description
      ifTable:register('ifCounterDiscontinuityTime', 'TimeTicks', 0) -- TBD
      ifTable:register('_X_ifCounterDiscontinuityTime', 'Counter64', 0) -- TBD
 

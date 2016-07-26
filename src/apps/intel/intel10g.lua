@@ -198,7 +198,7 @@ function M_sf:init_snmp ()
                              filename = self.pciaddress })
    self.snmp.ifTable = ifTable
    -- ifTable
-   ifTable:register('ifDescr', 'OctetStr', self.pciaddress)
+   ifTable:register('ifDescr', 'OctetStr', self.snmp.ifDescr or self.pciaddress)
    ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
    ifTable:register('ifMtu', 'Integer32', self.mtu)
    ifTable:register('ifSpeed', 'Gauge32', 4294967295) -- RFC 3635 sec. 3.2.8
@@ -246,7 +246,7 @@ function M_sf:init_snmp ()
    ifTable:register('ifPromiscuousMode', 'Integer32', 2) -- false
    ifTable:register('ifConnectorPresent', 'Integer32', 1) -- true
    ifTable:register('ifAlias', { type = 'OctetStr', length = 64 },
-                    self.pciaddress) -- TBD add description
+                    self.snmp.ifAlias or '')
    ifTable:register('ifCounterDiscontinuityTime', 'TimeTicks', 0) -- TBD
    ifTable:register('_X_ifCounterDiscontinuityTime', 'Counter64', 0) -- TBD
 
