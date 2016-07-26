@@ -132,6 +132,7 @@ function bench (pciaddr, confpath, sockpath, npackets)
    end
 
    engine.main({done = done, no_report = true})
+   require("core.timeline").save(engine.timeline, "nfv-timeline")
    local finish = C.get_monotonic_time()
 
    local runtime = finish - start

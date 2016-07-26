@@ -70,7 +70,7 @@ local S = require("syscall")
 local const = require("syscall.linux.constants")
 
 -- Root directory where the object tree is created.
-root = "/var/run/snabb"
+root = os.getenv("SNABB_SHM_ROOT") or "/var/run/snabb"
 path = ""
 
 -- Table (address->size) of all currently mapped objects.
