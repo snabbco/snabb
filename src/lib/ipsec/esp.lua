@@ -126,6 +126,7 @@ function esp_v6_decrypt:new (conf)
    o.window_size = conf.window_size or 128
    assert(o.window_size % 8 == 0, "window_size must be a multiple of 8.")
    o.window = ffi.new(window_t, o.window_size / 8)
+   o.logger = lib.logger_new({ rate = 32, module = 'esp' }); -- XXX here?
    return setmetatable(o, {__index=esp_v6_decrypt})
 end
 
@@ -158,6 +159,15 @@ function esp_v6_decrypt:decapsulate (p)
       packet.resize(p, PAYLOAD_OFFSET + ptext_length)
       return true
    else
+      local reason = seq_high == -1 and 'replayed' or 'integrity error'
+      -- This is the information RFC4303 says we SHOULD log
+      local info = "SPI=" .. tostring(self.spi) .. ", " ..
+                   "src_addr='" .. tostring(self.ip:ntop(self.ip:src())) .. "', " ..
+                   "dst_addr='" .. tostring(self.ip:ntop(self.ip:dst())) .. "', " ..
+                   "seq_low=" .. tostring(seq_low) .. ", " ..
+                   "flow_id=" .. tostring(self.ip:flow_label()) .. ", " ..
+                   "reason='" .. reason .. "'";
+      self.logger:log("Rejecting packet ("..info..")")
       return false
    end
 end
