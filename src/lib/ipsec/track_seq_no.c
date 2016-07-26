@@ -46,7 +46,7 @@ static void advance_window (uint64_t seq,
 
   /* Clear all bits corresponding to the sequence numbers that used to be ahead
      of, but are now inside our window since we haven't seen them yet */
-  while (diff--) set_bit(0, T--, window, W);
+  while (diff--) set_bit(0, seq--, window, W);
 }
 
 
