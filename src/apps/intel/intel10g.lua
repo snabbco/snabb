@@ -327,7 +327,8 @@ function M_sf:init_snmp ()
                           -- available through the RX stats register.
                           -- We only read stats register #0 here.  See comment
                           -- in init_statistics()
-                          ifTable:set('ifInDiscards', self.qs.QPRDC[0]())
+                          ifTable:set('ifInDiscards', self.qs.QPRDC[0]()
+                                         + self.s.ROC())
 
                           ifTable:set('ifInErrors', self.s.CRCERRS() +
                                    self.s.ILLERRC() + self.s.ERRBC() +
