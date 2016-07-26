@@ -17,14 +17,10 @@
 -- The app currently supports IPv6 as transport protocol and GRE or a
 -- variant of L2TPv3 known as "keyed IPv6 tunnel" as tunnel protocol.
 --
--- The app can either connect to a physical port on the uplink or
--- another app that provides an Ethernet layer for the uplink
--- connection.  For the former case, the pseudowire app must be
--- configured with static local and remote MAC addresses of the uplink
--- interface to be able to create the entire Ethernet header itself.
--- In the latter case, the pseudowire only creates the encapsulation
--- up to the IPv6 header and leaves the creation of the Ethernet
--- header to the app attached to its uplink port.
+-- The encapsulation includes a full Ethernet header with dummy values
+-- for the src/dst MAC addresses. On its "uplink" link, the app
+-- connects to a L3 interface, represented by a neiaghbor-discovery app
+-- which fills in the actual src/dst MAC addresses.
 
 module(..., package.seeall)
 local ffi = require("ffi")
@@ -210,8 +206,6 @@ end
 --    vc_id   = <vc_id>,
 --    ac = <interface>,
 --    [ shmem_dir = <shmem-dir>, ]
---    [ ethernet = { src = <local_mac>,
---                   dst = <remote_mac> }, ] -- optional
 --    transport = { type = 'ipv6',
 --                  [hop_limit = <hop_limit>],
 --                  src  = <vpn_source>,
@@ -237,29 +231,15 @@ function pseudowire:new (arg)
 
    o._logger = lib.logger_new({ module = o._name.." ("..o._conf.name..")" })
    -- Construct templates for the entire encapsulation chain
-   --
+
    -- Ethernet header
-   local c_ether = conf.ethernet
-   if c_ether then
-      assert(c_ether.src and c_ether.dst, "missing ethernet paramaters")
-      for _, key in ipairs({'src', 'dst'}) do
-         if type(c_ether[key]) == "string" then
-            c_ether[key] = ethernet:pton(c_ether[key])
-         end
-      end
-      o._ether = ethernet:new({ src = c_ether.src,
-                                dst = c_ether.dst,
-                                type = 0x86dd })
-   else
-      -- Use dummy values for the MAC addresses in case they are
-      -- omitted from the configuration.  In this case, the app needs
-      -- to be connected to something that performs address resolution
-      -- and overwrites the Ethernet header (e.g. the nd_light app)
-      -- accordinly.
-      o._ether = ethernet:new({ src = ethernet:pton('00:00:00:00:00:00'),
-                                dst = ethernet:pton('00:00:00:00:00:00'),
-                                type = 0x86dd })
-   end
+   --
+   -- Use dummy values for the MAC addresses.  The actual addresses
+   -- will be filled in by the ND-app to which the PW's uplink
+   -- connects.
+   o._ether = ethernet:new({ src = ethernet:pton('00:00:00:00:00:00'),
+                             dst = ethernet:pton('00:00:00:00:00:00'),
+                             type = 0x86dd })
 
    -- Tunnel header
    assert(conf.tunnel, "missing tunnel configuration")

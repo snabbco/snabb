@@ -584,8 +584,6 @@ function run (parameters)
                         interface = (#vpls_c.pw == 1 and
                                         #acs == 1 and
                                         acs[1].intf.config.name) or '',
-                        ethernet = { src = ether_pton("00:00:00:00:00:00"),
-                                     dst = ether_pton("00:00:00:00:00:00") },
                         transport = { type = 'ipv6',
                                       src = vpls_c.address,
                                       dst = pw_config.address },
