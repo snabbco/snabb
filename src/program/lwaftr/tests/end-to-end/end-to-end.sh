@@ -193,9 +193,9 @@ snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
 
 echo "Testing: from-to-b4 IPv6 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
-   ${TEST_BASE}/tcp-afteraftr-ipv6.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6.pcap \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/drop-misplaced-not-ipv4.lua
+   ${COUNTERS}/drop-no-source-softwire-ipv6.lua
 
 echo "Testing: from-b4 to-internet IPv6 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
