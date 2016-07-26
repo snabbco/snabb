@@ -14,6 +14,7 @@
 #define MK64(L, H) ((uint64_t)(((uint32_t)(H)) * 4294967296ull + ((uint32_t)(L))))
 
 
+/* Set/clear the bit in our window that corresponds to sequence number `seq` */
 static inline void set_bit (bool on, uint64_t seq,
                             uint8_t* window, uint32_t W) {
   uint32_t bitno = seq % W;
@@ -36,6 +37,10 @@ static inline bool get_bit (uint64_t seq,
   return window[blockno] & (1u << bitno);
 }
 
+/* Advance the window so that the "head" bit corresponds to sequence
+ * number `seq`.  Clear all bits for the new sequence numbers that are
+ * now considered in-window.
+ */
 static void advance_window (uint64_t seq,
                             uint64_t T, uint8_t* window, uint32_t W) {
   uint64_t diff = seq - T;
@@ -50,6 +55,19 @@ static void advance_window (uint64_t seq,
 }
 
 
+/* Determine whether a packet with the sequence number made from
+ * `seq_hi` and `seq_lo` (where `seq_hi` is inferred from our window
+ *  state) could be a legitimate packet.
+ *
+ * "Could", because we can't really tell if the received packet with
+ * this sequence number is in fact valid (since we haven't yet
+ * integrity-checked it - the sequence number may be spoofed), but we
+ * can give an authoritative "no" if we have already seen and accepted
+ * a packet with this number.
+ *
+ * If our answer is NOT "no", the caller will, provided the packet was
+ * valid, use track_seq_no() for us to mark the sequence number as seen.
+ */
 int64_t check_seq_no (uint32_t seq_lo,
                       uint64_t T, uint8_t *window, uint32_t W) {
   uint32_t Tl = LO32(T);
@@ -69,6 +87,10 @@ int64_t check_seq_no (uint32_t seq_lo,
   else                                     return seq_hi;
 }
 
+/* Signal that the packet received with this sequence number was
+ * in fact valid -- we record that we have seen it so as to prevent
+ * future replays of it.
+ */
 uint64_t track_seq_no (uint32_t seq_hi, uint32_t seq_lo,
                        uint64_t T, uint8_t *window, uint32_t W) {
   uint64_t seq = MK64(seq_lo, seq_hi);
