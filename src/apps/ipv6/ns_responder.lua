@@ -32,6 +32,11 @@ function ns_responder:new(config)
    o._filter = filter
    o._dgram = datagram:new()
    packet.free(o._dgram:packet())
+   if config.remote_mac then
+      o._eth = ethernet:new({ src = config.local_mac,
+                              dst = config.remote_mac })
+      o._header = o._eth:header()
+   end
    return o
 end
 
@@ -89,8 +94,12 @@ function ns_responder:push()
    local l_out = self.output.south
    if l_in and l_out then
       while not link.empty(l_in) and not link.full(l_out) do
-         -- Pass everything on north -> south
-         link.transmit(l_out, link.receive(l_in))
+         local p = link.receive(l_in)
+         if self._header then
+            -- Insert the static MAC header
+            ffi.copy(p.data, self._header, 12)
+         end
+         link.transmit(l_out, p)
       end
    end
    l_in = self.input.south
