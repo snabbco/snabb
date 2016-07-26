@@ -4,13 +4,14 @@
 
 ### General Architecture
 
-The program `program.l2vpn.l2vpn` implements a virtual multi-port
-Ethernet switch on top of a plain IPv6 packet-switched network based
-on the architecture laid out in RFC 4664.  From a customer
-perspective, the service consists of a set of physical ports attached
-to the provider's network at arbitrary locations with the semantics of
-a simple Ethernet switch, a.k.a. _learning bridge_.  Each such port is
-called an _attachment circuit_ (AC).
+The program `program.l2vpn.l2vpn` (sometimes abbreviated by `l2vpn` in
+this document) implements a virtual multi-port Ethernet switch on top
+of a plain IPv6 packet-switched network based on the architecture laid
+out in RFC 4664.  From a customer perspective, the service consists of
+a set of physical ports attached to the provider's network at
+arbitrary locations with the semantics of a simple Ethernet switch,
+a.k.a. _learning bridge_.  Each such port is called an _attachment
+circuit_ (AC).
 
 <a name="overview_MAC_learning"></a>Conceptually, the processing of an
 Ethernet frame entering the virtual switch through any of the ACs
@@ -50,9 +51,10 @@ prevents packets from entering any such loop, such as the _spanning
 tree protocol_ (SPT).  This implementation uses a full mesh of PWs
 together with _split horizon_ forwarding to avoid loops without the
 need for SPT.  In this model, each PE maintains a PW to every other PE
-with the rule that a frame received on any PW is never forwarded to
-any other PW.  The trade-off with respect to SPT is that the number of
-PWs in the system scales quadratically with the number of PE devices.
+(this is the full mesh) with the rule that a frame received on any PW
+is never forwarded to any other PW (this is the split-horizon rule).
+The trade-off with respect to SPT is that the number of PWs in the
+system scales quadratically with the number of PE devices.
 
 The following figure illustrates the model with a setup that contains
 four PEs, six ACs and six PWs.
@@ -66,29 +68,79 @@ L2 VPN.
 A setup with more than two ACs (and, in general, more than two PEs) is
 called _virtual private LAN service_ (VPLS).  This is also referred to
 as a multi-point L2 VPN.  A VPWS is a degenerate case of a VPLS.
-            
-The current implementation ignores everything but the source and
-destination MAC addresses of frames entering the system through any of
-the ACs.  Hence, it is completely transparent for any kind of payload
-(i.e. Ethertype).  In particular, VLAN tags according to IEEE 802.1q
-are ignored (passed on like untagged frames).  Such a system is
-sometimes referred to as a _port-based_ VPLS, because all frames
-entering a port are mapped to the same VPLS. A _VLAN-based_ VPLS, in
-which the outermost VLAN tag is used to map the frame to one of a set
-of VPLS instances attached to the same AC, is not yet supported.
+
+#### <a name="ac-modes">Attachment Circuit Operational Modes</a>
+
+ACs can be operated in one of two modes called _port-mode_ and
+_VLAN-mode_.  If the AC operates in port-mode, all Ethernet frames
+arriving on the port are mapped to a single VPLS instance and
+forwarded unchanged.  In particular, any VLAN tags (e.g. according to
+IEEE 802.1Q or 802.1ad) are ignored and only the source and
+destination MAC addresses are examined for the purpose of forwarding.
+
+If the AC operates in VLAN-mode it is effectively configured as a VLAN
+trunk from a customer perspective. Ethernet frames arriving on the
+port are mapped to different VPLS instances based on the outermost
+VLAN tag, which is referred to as the _service-delimiting tag_.  The
+tag is stripped from the packet by the ingress PE before it is
+forwarded into the VPLS to which the tag is mapped.  When the PE
+receives a frame from a PW, it adds the tag of the respective VPLS to
+the packet before forwarding it on the AC port.  Untagged frames
+(i.e. those that do not carry any kind of VLAN tag) can be mapped to a
+particular VPLS, if desired, to support the notion of a "native" VLAN
+on the AC trunk.  In this case, Ethernet frames belonging to this VPLS
+are forwarded unchanged between the AC and the VPLS.
+
+The service-delimiting tags are strictly local in nature: they only
+provide the mapping from VLANs transported on an AC to a particular
+VPLS instance on the PE device itself.  In particular, there is no
+correlation at all between such mappings on distinct PE devices, no
+matter which VPLS instances they serve, including the case where some
+of the ACs of a VPLS work in port-mode while others work in VLAN-mode.
+
+There exist different schemes for applying VLAN tags to an Ethernet
+frame which differ in the value used in the _type_ field of the
+Ethernet header (a.k.a. the _Ethertype_).  The following encapsulation
+modes are supported.
+
+   * `dot1q`: Ethertype `0x8100` (https://en.wikipedia.org/wiki/IEEE_802.1Q)
+   * `dot1ad`: Ethertype `0x88a8` (https://en.wikipedia.org/wiki/IEEE_802.1ad)
+   * `raw`: configurable Ethertype
+
+The `raw` mode can be used to configure a non-standard Ethertype,
+e.g. `0x9100` which is still in use by some vendors.  To be more
+precise, all encapsulation schemes must adhere to the generic layout of
+the 32-bit tag as defined by 802.1Q (the numbers refer to the number
+of bits used by the respective fields)
+
+![DOT1Q_TAG](.images/DOT1Q_TAG.png)
+
+The values above actually refer to the _tag protocol identifier_
+(TPID), which overlaps with the Ethertype in case of the outermost
+tag.  The 12-bit _VLAN identifier_ (VID) is part of the _tag control
+information_ (TCI) together with the _priority code point_ (PCP) and
+the _drop eligible indicator_ (DEI).
+
+Any subsequent tags that might exist in the packet are ignored and
+passed on unchanged.
+
+Both types of ACs are completely transparent for any kind of
+L2-protocol that might be transported over it (e.g. SPT, VTP, CDP,
+etc.).  As a consequence, no special configuration is required to
+enforce this behavior like on many conventional networking devices.
+In particular, the technique of _protocol tunneling_ is never
+required.
 
 ### VPN Termination Point
 
 In the present implementation, the role of the PE is played by one or
 more instances of the `program.l2vpn.l2vpn` module.  Each instance is
-called a _VPN termination point_ (VPNTP), which connects any number of
-ACs with exactly one physical port which is connected to the
-provider's network, called the _upstream_ port.  A VPNTP can contain
-any number of VPLS instances, each of which is comprised of the
-following elements
+called a _VPN termination point_ (VPNTP), which may contain any number
+of VPLS instances, each of which is comprised of the following
+elements
 
    * A set of pseudowire endpoints, one for each remote PE which is
-     part of the same VPLS
+     part of the VPLS
 
    * The set of attachment circuits which belong to the VPLS (there
      can be more than one local AC per VPLS, but the customer is
@@ -99,17 +151,20 @@ following elements
      instance.  The bridge implements MAC learning and split-horizon
      forwarding for the group of PWs
 
-Each VPLS is uniquely identified by the IPv6 address shared by all its
-local PW endpoints.  Ethernet frames entering the VPNTP through an AC
-are switched to one of the PWs by the bridge of the respective VPLS
-instance according to the rules laid out above.  The PW encapsulates
-the frame in an IPv6 packet, where the source IPv6 address is the
-local VPLS identifier and the destination address is the identifier of
-the VPLS instance on the remote PE, which is part of the static PW
-configuration.  The IPv6 header is responsible for delivering the
-packet to the appropriate egress PE, while an additional header
-specific to the tunnel protocol is used to identify the payload as an
-Ethernet frame.
+   * An upstream interface, which is connected to the ISPs network and
+     transports the traffic of all PWs
+
+Each VPLS instance is uniquely identified by the IPv6 address shared
+by all its local PW endpoints.  Ethernet frames entering the VPNTP
+through an AC are switched to one of the PWs by the bridge of the
+respective VPLS instance according to the rules laid out above.  The
+PW encapsulates the frame in an IPv6 packet, where the source IPv6
+address is the local VPLS identifier and the destination address is
+the identifier of the VPLS instance on the remote PE, which is part of
+the static PW configuration.  The IPv6 header is responsible for
+delivering the packet to the appropriate egress PE, while an
+additional header specific to the tunnel protocol is used to identify
+the payload as an Ethernet frame.
 
 The tunnel protocol is a property of a PW (and, consequently, each end
 of a PW must be configured to use the same protocol).  However, it is
@@ -126,12 +181,43 @@ uplink, those addresses are used to forward the packet to the
 appropriate pseudowire module by a component called the _dispatcher_.
 The PW module strips the IPv6 header from the packet, performs any
 protocol-specific processing (apart from stripping the tunnel header
-itself) and hands the original Ethernet frame to the bridge module for
-forwarding to the appropriate AC.
+itself, for example verifying the checksum of a GRE header) and hands
+the original Ethernet frame to the bridge module for forwarding to the
+appropriate AC.
 
-The entire architecture is shown in the following figure.
+The entire architecture is shown in the following figure.  In this
+case, all VPLS instances are configured to share the same uplink, but
+there is no restriction in this respect, i.e. each VPLS or groups of
+VPLS could use different uplinks.  The box labelled `ND` is a module
+that provides IPv6 neighbor discovery to determine the MAC address of
+the adjacent router in the outbound direction and let the adjacent
+router discover the local MAC address when sending packets in the
+inbound direction.  The ND module is the feature that identifies the
+uplink as a "L3-port", while the ACs are L2-ports without the need for
+neighbor discovery.
+
 
 ![VPN-TP](.images/VPN-TP.png)
+
+Any of the ACs or uplinks can be implemented either as physical
+interfaces or as VLAN-mode sub-interfaces of a physical interface
+which is configured as a VLAN trunk.  In this case, an additional
+module called a _VLAN multiplexer_ is pushed between the physical
+interface and the next module.  The following diagram shows the
+topology when two ACs share one physical interface configured as a
+VLAN trunk, where the ACs uses the VLAN IDs 100 and 200, respectively.
+
+
+![AC-VLAN-TRUNK](.images/AC-VLAN-TRUNK.png)
+
+If two uplinks share one physical interface, the topology looks as
+follows.  The ND modules now attach to the VLAN ports of the
+multiplexer and its trunk port connects to the interface.
+
+![UPLINK-VLAN-TRUNK](.images/UPLINK-VLAN-TRUNK.png)
+
+It is possible to let all ACs and uplinks share the same physical
+port, providing a "VPNTP-on-a-stick" configuration.
 
 ### <a name="tunnel_protos">Tunneling protocols</a>
 
@@ -190,60 +276,7 @@ Note that the specification implies that the payload must consist of
 an Ethernet frame, since the tunnel header does not contain any
 information about the payload (like the protocol field of GRE).
 
-### Uplink Interface
-
-#### Addressing
-
-According to the architecture laid out above, the uplink interface is
-connected to a regular IPv6-enabled interface on an adjacent router.
-Even though the Snabb Switch system does currently not have a notion
-of a traditional IP interface, the VPNTP emulates one through the use
-of the `apps.ipv6.nd_light` module, which implements just enough
-functionality to make IPv6 neighbor discovery work in both directions
-with an implied subnet mask of /64.  The VPNTP must be configured with
-the local IPv6 address as well as the MAC address to which it needs to
-be resolved.
-
-#### Routing
-
-Only static routing is supported on the uplink interface by
-configuring the next-hop address used for all outgoing packets.  This
-address must be resolvable to a MAC address through regular IPv6
-neighbor discovery by the adjacent router.  There currently is no
-concept of a routing table in the Snabb architecture, but this
-mechanism is essentially equivalent to a static default route.
-
-For the tunnels to work, all local IPv6 endpoint addresses need to be
-reachable by the remote sides of the pseudowires.  How this is
-achieved is outside the scope of the Snabb system.  There are
-basically two methods.
-
-   * The adjacent router configures static routes for each IPv6
-     address that terminates a VPLS and re-distributes the routes
-     within the routing domains in which the remote endpoints are
-     located.
-
-   * The host running the VPNTP announces the local endpoint addresses
-     with the next-hop address of the local uplink interface address
-     to the provider's routing system with BGP, from where it needs to
-     be re-distributed in such a manner that the addresses are
-     reachable by the remote endpoints.
-
-The second method requires IP connectivity between the host and a
-suitable BGP-speaking router in the network over a regular (non-Snabb
-controlled) interface.  Two typical scenarios for this method are the
-following.
-
-   * The VPNTP host is configured with a private AS number and
-     maintains a BGP session to one or more routers in its vicinity
-     (e.g. the adjacent router itself).  These routers must
-     re-distribute the advertised prefixes as appropriate.
-
-   * If the provider uses an internal BGP (iBGP) setup with
-     route-reflectors, the VPNTP host can be configured directly as
-     route-reflector client within the provider's autonomous system.
-
-### Signalling and Monitoring
+### Pseudowire Signalling and Monitoring
 
 #### <a name="control-channel">Pseudowire Control-Channel</a>
 
@@ -260,7 +293,7 @@ in-band _control channel_ (CC), which provides two types of services:
    connectivity status of the PW (see below for details).
 
 This proprietary protocol performs a subset of functions that are
-provided by distinct protocols in standardised PW implementations
+provided by distinct protocols in standardized PW implementations
 based on MPLS or L2TPv3.  Both of these provide a
 "maintenance/signalling protocol" used to signal and set up a PW.
 For MPLS, this role is played by LDP (in "targeted" mode).  For
@@ -319,45 +352,6 @@ reach the local end of the pseudowire).  To determine the
 bi-directional status of the PW, the reachability status of both
 endpoints must be obtained by the operator.
 
-#### Monitoring via SNMP
-
-The L2VPN framework supports various SNMP MIBs for monitoring:
-
-   * `interfaces` (.1.3.6.1.2.1.2)
-   * `ifMIB` (.1.3.6.1.2.1.31)
-      * `ifXTable` (.1.3.6.1.2.1.31.1.1)
-   * `cpwVcMIB` (.1.3.6.1.4.1.9.10.106)
-      * `cpwVcObjects` (.1.3.6.1.4.1.9.10.106.1)
-         * `cpwVcTable` (.1.3.6.1.4.1.9.10.106.1.2)
-   * `pwStdMIB` (.1.3.6.1.2.1.10.246): partial support
-      * `pwObjects` (.1.3.6.1.2.1.10.246.1)
-         * `pwTable` (.1.3.6.1.2.1.10.246.1.2)
-   * `cpwVcEnetMIB` (.1.3.6.1.4.1.9.10.108)
-     * `cpwVcEnetObjects` (.1.3.6.1.4.1.9.10.108.1)
-        * `cpwVcEnetTable` (.1.3.6.1.4.1.9.10.108.1.1)
-   * `pwEnetStdMIB` (1.3.6.1.2.1.180)
-      * `pwEnetObjects` (1.3.6.1.2.1.180.1)
-         * `pwEnetTable` (1.3.6.1.2.1.180.1.1)
-
-The `pw*` MIBs are part of the IETF reference architecture known as
-_Pseudo Wire Emulation Edge-to-Edge_ (PWE3, [RFC
-3985](https://www.ietf.org/rfc/rfc3985.txt "RFC 3985")).  As usual,
-vendors have implemented various pre-standard (draft) versions of
-these MIBs during the lengthy standardisation process.  Some of them
-still use those versions and didn't even bother to support the
-standardised version at all, like Cisco.  The `cpw*` MIBs are used on
-most Cisco devices and are almost but not quite identical to their
-`pw*` counterparts.
-
-The L2VPN program does not provide an actual SNMP engine itself.
-Instead, it stores the raw objects in a shared memory segment and
-relies on an external program to make them available with SNMP.  A
-[perl-based
-program](https://github.com/alexandergall/snabb-snmp-subagent.git) is
-available, which parses this data and can hook into any SNMP agent
-that supports the AgentX protocol, like
-[Net-SNMP](http://www.net-snmp.org/).
-
 ## Configuration
 
 The `program.l2vpn.l2vpn` expects a configuration file containing a
@@ -367,119 +361,21 @@ form of this expression is as follows:
 
 ```
 return {
-  uplink = <uplink_config>,
+  interfaces = <interface_config>,
   vpls = {
     <vpls1> = <vpls_config>,
     <vpls2> = <vpls_config>,
-    .
-    .
-    .
+    ...
 }
 ```
 
-Here, `<uplink_config>` and `<vpls_config>` are Lua tables as
+The `<interface_config>` will be discussed in detail
+[below](#interface-abstraction). The `<vpls_config>` are Lua tables as
 described below and the keys of the `vpls` table (`<vpls1>`,
 `<vpls2>`, etc.) represent the names of the VPLS instances contained
 in the VPNTP.
 
-### <a name="uplink_configuration">Uplink configuration</a>
-
-The uplink of the VPNTP is specified as a Lua table with the following
-contents.
-
-```
-uplink = {
-  driver = <driver>,
-  config = {
-    pciaddr = <pci_address>,
-    mtu = <mtu>,
-    -- Optional
-    snmp = {
-      directory = <shmem_directory>
-    }
-  },
-  address = <ipv6_address>,
-  mac = <mac_address>,
-  neighbor_mac = <neighbor_mac>, -- Optional
-  neighbor_nd = <true | false>,  -- Optional
-  next_hop = <ipv6_address>
-}
-```
-
-`<driver>` is a Lua module that provides a driver for the device
-associated with the PCI address `uplink.config.pciaddr`, for example
-
-```
-driver = require("apps.intel.intel_app").Intel82599
-```
-
-The table `config` represents the configuration for the driver with
-the following keys
-
-   * `pciaddr`: a string that contains the complete PCI address of the
-     network device which is to be used as upstream interface of the
-     VPNTP, for example `"0000:04:00.1"`.
-
-   * `mtu`: <a name="uplink_MTU"></a> the MTU in bytes of the device
-     including the Ethernet header (but neither the CRC, SOF nor
-     preamble).  For example, to support 1500-byte IP packets without
-     VLAN tags, the MTU needs to be set to 1514 to account for the 14
-     bytes used by the Ethernet header.  If tagging according to
-     802.1q is used, an additional 4 bytes need to be added for every
-     level of tagging.
-
-   * `snmp`: a table with a single key `directory`, which specifies
-     the directory through which the shared memory segments containing
-     the SNMP objects of all supported MIBs can be accessed.  The
-     `snmp` key is optional.  If it is absent, SNMP will be disabled
-     in the VPNTP. TODO: refer to description of SNMP subagents.
-
-The remaining keys of the `uplink` table are as follows.
-
-   * `address`: the IPv6 address of the uplink interface in any of the
-     standard notations for IPv6 addresses.  A netmask of /64 is
-     implied.  For example `address = "2001:db8:0:1::2"` would assign
-     the subnet `2001:db8:0:1::/64` to the interface and set the local
-     address to `2001:db8:0:1::2`.  If `neighbor_mac` is not
-     specified, the VPNTP instantiates the Snabb app
-     `apps.ipv6.nd_light` to provide minimalistic IPv6 neighbor
-     discovery.  This module will respond to incoming neighbor
-     solicitations for `address` with a neighbor advertisement
-     including the MAC address `mac`.  It will also perform address
-     resolution for `next_hop` by sending out neighbor solicitations
-     for that address.
-
-   * `mac`: the MAC address assigned to the interface in the standard
-     notation, for example `mac = "01:23:45:67:89:ab"`.  Note that
-     this address must correspond to the native MAC address of the
-     interface.  It cannot be used to set the MAC address to an
-     arbitrary value.  As such, it should actually be determined
-     automatically from the device itself, but the current Snabb
-     drivers do not make this available.
-
-   * `neighbor_mac`: optional MAC address of the router connected to
-     the uplink.  If this key is present, the VPNTP will not perform
-     dynamic neighbor discovery for `next_hop`.
-
-   * `neighbor_nd`: this key is ignored unless `neighbor_mac` is set.
-     In that case, it can be set to either `true` or `false` (defaults
-     to `false`).  If set to `true`, the VPNTP will respond to IPv6
-     neighbor solicitations for the address configured with `address`,
-     thus enabling dynamic address resolution for the adjacent router
-     through the app `apps.ipv6.ns_responder`.  If set to `false`, the
-     VPNTP will not respond to any kind of neighbor discovery.  In
-     that case, the adjacent router must use a statically configured
-     neighbor cache entry for `address`.
-
-   * `next_hop`: the IPv6 address of the remote end of the uplink
-     interface. It is effectively used as a static default route to
-     send out encapsulated Ethernet frames received on local ACs.  It
-     must be possible to resolve this address to a MAC address through
-     IPv6 neighbor discovery unless `neighbor_mac` is set, in which
-     case the MAC destination address of all outgoing Ethernet frames
-     will be set to that value.
-
-### VPLS instance configuration
+### <a name="vpls-instance-config">VPLS instance configuration</a>
 
 The `vpls` table in the VPNTP configuration table contains one entry
 for each VPLS that will be part of the VPNTP.  The keys of the table
@@ -487,7 +383,6 @@ provide the names of those VPLS instances, hence the fragment
 
 ```
 return {
-  upink = { ... },
   vpls = {
     foo = <vpls_config>,
     bar = <vpls_config>,
@@ -495,21 +390,25 @@ return {
 }
 ```
 
-will create two VPLS instances named `foo` and `bar`.  Each VPLS
-configuration `<vpls_config>` is a table of the following form.
+will create two VPLS instances named `foo` and `bar`.  The names don't
+have any particular significance and are only used in diagnostic
+output and to generate identifiers for the network of Snabb
+applications from the configuration.
+
+Each VPLS configuration `<vpls_config>` is a table of the following
+form.
 
 ```
 <vpls_name> = {
   description = <description>,
   mtu = <mtu>,
   vc_id = <vc_id>,
+  uplink = <uplink_interface>,
   bridge = <bridge_config>,
   ac = {
-    <ac_1> = <ac_config>,
-    <ac_2> = <ac_config>,
-    .
-    .
-    .
+    <ac_1> = <ac_interface>,
+    <ac_2> = <ac_interface>,
+    ...
   },
   address = <VPLS_address>,
   tunnel = <tunnel_config>,
@@ -518,30 +417,46 @@ configuration `<vpls_config>` is a table of the following form.
   pw = {
     <pw_1> = <pw_config>,
     <pw_2> = <pw_config>,
-    .
-    .
-    .
+   ...
   }
 }
 ```
 
 The keys define the properties of the VPLS instance.
 
-   * `description` (TODO)
+   * `description`: a human readable description of the purpose of the
+      VPLS instance as a Lua string
 
    * `mtu`: the MTU in bytes of all ACs connected to the VPLS instance
      including the Ethernet header (but neither the CRC, SOF nor
-     preamble, also see [the definition of the uplink
-     MTU](#uplink_MTU)).  As with any Ethernet bridge (and IP subnet),
-     it is mandatory that all interfaces connected to it use the same
-     MTU, i.e. it is a property of the VPLS.  To avoid
-     misconfigurations, it is configured once and propagated to the
-     configurations of the AC interfaces automatically.  It is also
+     preamble, also see [the definition of the interface MTU](#MTU)).
+     As with any Ethernet bridge (and IP subnet), it is mandatory that
+     all interfaces connected to it use the same MTU, i.e. it is a
+     property of the VPLS.  To avoid misconfigurations, it is also
      communicated to the remote endpoints of all pseudowires through
      the control channel to make the MTU coherent across the entire
-     virtual switch.
+     virtual switch.  Since the MTU of the ACs is configured
+     independently in the `interfaces` section, an error is raised
+     when the MTU setting between the VPLS and any of its ACs differs.
 
    *  `vc_id`: (TODO)
+
+   * `uplink`: a reference to an interface defined in the global
+     `interfaces` definition, for example
+     
+ ```
+  uplink = "TenGigE0/1"
+ ```
+
+ or
+
+ ```
+  uplink = "TenGigE0/1.100"  
+ ```
+
+ The referenced interface must be configured as a L3-port, i.e. it
+ must contain an `addressFamilies` section.  (see the [interface
+ abstraction](#interface-abstraction) section for details)
 
    * `bridge`: if the VPLS contains more than one pseudowire or
      connects more than one AC at any location, a bridge is needed to
@@ -589,39 +504,25 @@ The keys define the properties of the VPLS instance.
   pseudowire is "short-circuited" to the AC and a message to this
   effect is logged.
 
-   * `ac`: this table contains the configurations of the physical
-      ports that represent the attachment circuits connected to the
-      VPLS instance.  The keys in this table define the names of the
-      attachment circuits within the VPLS instance.  For example,
+   * `ac`: this table specifies the ACs that are assigned to the VPLS
+     as references to interfaces defined in the global `interfaces`
+     configuration, for example
 
  ```
   ac = {
-    primary_AC = <ac_config>,
-    backup_AC = <ac_config>,
+    AC_1 = "TenGigE0/0",
+    AC_2 = "TenGigE0/1.100",
+    AC_3 = "TenGigE0/1.200"
   }
  ```
  
- would define two ACs named `primary_AC` and `backup_AC`,
- respectively.  The `<ac_config>` tables are of the form
-
- ```
-  <ac_config> = {
-    driver = <driver>,
-    config = {
-      pciaddr = <pci_address>
-      -- Optional
-      snmp = {
-        directory = <shmem_directory>
-      }
-    }
-  }
- ```
- Please refer to the description of the [uplink interface
- configuration](#uplink_configuration) for details.  Note that the
- `mtu` key of the `config` table is not present here, because it is
- automatically derived from the `mtu` of the top-level VPLS
- configuration (any `mtu` key as part of an AC configuration is
- overwritten by that value).
+ would define three ACs named `AC_1`, `AC_2` and `AC_3`.  The first
+ one refers to a physical interface called `TenGigE0/0` while the
+ other two refer to VLAN-based sub-interfaces associated with the
+ physical interface called `TenGigE0/1`.  Interfaces configured as AC
+ must be L2-ports, i.e. they must not have an `addressFamilies`
+ configuration associated with them (see the [interface
+ abstraction](#interface-abstraction) section for details).
 
    * `address`: the IPv6 address that uniquely identifies the VPLS
      instance.  It is used as endpoint for all attached pseudowires.
@@ -691,7 +592,7 @@ The keys define the properties of the VPLS instance.
     is placed in outgoing packets, while the the session ID of
     incoming packets is compared to `<local_session>`.  If the values
     don't match, the packet is discarded and an error is logged.
-    Hence, the psuedowire endpoints must be configured with one's
+    Hence, the pseudowire endpoints must be configured with one's
     local session ID identical to that of the other's remote session
     ID.
 
@@ -721,9 +622,10 @@ The keys define the properties of the VPLS instance.
  `<heartbeat>` is the interval in seconds at which the pseudowire
  sends control messages to its peer.  This number itself is
  transmitted within the control message as the `heartbeat` parameter.
- The value of the `dead_factor`, which must be an integer, is used to
- detect when the remote endpoint can no longer reach the local
- endpoint in the following manner, see the [description of the
+ The value 0 disables the control channel.  The value of the
+ `dead_factor`, which must be an integer, is used to detect when the
+ remote endpoint can no longer reach the local endpoint in the
+ following manner, see the [description of the
  control-channel](#control_channel) for details.
 
    * `shmem_dir`: the path to a directory in the local file system
@@ -770,6 +672,18 @@ The keys define the properties of the VPLS instance.
  will be logged and the pseudowire will be marked as down, i.e. no
  packets will be forwarded in either direction.
 
+ To disable the control-channel on a per-PW basis when it is enabled
+ by default, an explicit `cc` section must be added to the PW with the
+ `heartbeat` parameter set to 0, i.e.
+
+ ```
+  <pw_config> = {
+    address = <remote_address>,
+    tunnel = <tunnel_config>, -- optional
+    cc = { heartbeat = 0}
+  }
+ ```
+
 ### Examples
 
 #### Point-to-Point VPN
@@ -793,108 +707,900 @@ flooding-bridge is optimized away.
 Endpoint `A`:
 
 ```
-local Intel82599 = require("apps.intel.intel_app").Intel82599
 local shmem_dir = '/tmp/snabb-shmem'
 local snmp = {
   directory = shmem_dir
 }
 
 return {
-   uplink = {
-      driver = Intel82599,
-      config = {
-        pciaddr = "0000:04:00.1",
-        mtu = 9206,
-        snmp = snmp,
+  interfaces = {
+    {
+      name = "TenGigE0/1",
+      description = "uplink",
+      driver = {
+        module = require("apps.intel.intel_app").Intel82599,
+        config = { pciaddr = "0000:04:00.1",
+                   snmp = snmp }
       },
-      address = "2001:db8:0:C101:0:0:0:2",
-      mac = "90:e2:ba:62:86:e5",
-      next_hop = "2001:db8:0:C101:0:0:0:1" },
-   vpls = {
-      myvpn = {
-         description = "Endpoint A of a point-to-point L2 VPN",
-         mtu = 1514,
-         vc_id = 1,
-         ac = {
-           ac_A = {
-             driver = Intel82599,
-             config = {
-               pciaddr = "0000:04:00.0",
-              snmp = snmp
-             },
-             interface = "0000:04:00.0"
-           }
-         },
-         address = "2001:db8:0:1:0:0:0:1",
-         tunnel = {
-           type = 'l2tpv3',
-           local_cookie  = '\x00\x11\x22\x33\x44\x55\x66\x77',
-           remote_cookie = '\x77\x66\x55\x44\x33\x33\x11\x00'
-         },
-         cc = {
-           heartbeat = 2,
-           dead_factor = 4
-         },
-         shmem_dir = shmem_dir,
-         pw = {
-            pw_B = { address = "2001:db8:0:1:0:0:0:2" },
-         }
+    },
+    mtu = 9206,
+    mac = "90:e2:ba:62:86:e5",
+    afs = {
+      ipv6 = {
+        address = "2001:db8:0:C101:0:0:0:2",
+        next_hop = "2001:db8:0:C101:0:0:0:1" },
       }
-   }
+    },
+    {
+      name = "TenGigE0/0",
+      description = "AC",
+      driver = {
+        module = require("apps.intel.intel_app").Intel82599,
+        config = { pciaddr = "0000:04:00.0",
+                   snmp = snmp }
+      },
+    },
+    mtu = 9206,
+  },
+  vpls = {
+    myvpn = {
+      description = "Endpoint A of a point-to-point L2 VPN",
+      uplink = "TenGigE0/1",
+      mtu = 1514,
+      vc_id = 1,
+      ac = {
+        ac_A = "TenGigE0/0",
+      },
+      address = "2001:db8:0:1:0:0:0:1",
+      tunnel = {
+        type = 'l2tpv3',
+        local_cookie  = '\x00\x11\x22\x33\x44\x55\x66\x77',
+        remote_cookie = '\x77\x66\x55\x44\x33\x33\x11\x00'
+      },
+      cc = {
+        heartbeat = 2,
+        dead_factor = 4
+      },
+      shmem_dir = shmem_dir,
+      pw = {
+         pw_B = { address = "2001:db8:0:1:0:0:0:2" },
+      }
+    }
+  }
 }
 ```
 
 Endpoint `B`:
 
 ```
-local Intel82599 = require("apps.intel.intel_app").Intel82599
 local shmem_dir = '/tmp/snabb-shmem'
 local snmp = {
   directory = shmem_dir
 }
 
 return {
-   uplink = {
-      driver = Intel82599,
-      config = {
-        pciaddr = "0000:04:00.1",
-        mtu = 9206,
-        snmp = snmp,
+  interfaces = {
+    {
+      name = "TenGigE0/1",
+      description = "uplink",
+      driver = {
+        module = require("apps.intel.intel_app").Intel82599,
+        config = { pciaddr = "0000:04:00.1",
+                   snmp = snmp }
       },
-      address = "2001:db8:0:C102:0:0:0:2",
-      mac = "90:e2:ba:62:86:e6",
-      next_hop = "2001:db8:0:C102:0:0:0:1" },
-   vpls = {
-      myvpn = {
-         description = "Endpoint B of a point-to-point L2 VPN",
-         mtu = 1514,
-         vc_id = 1,
-         ac = {
-           ac_B = {
-             driver = Intel82599,
-             config = {
-               pciaddr = "0000:04:00.0",
-               snmp = snmp
-             },
-             interface = "0000:04:00.0"
-           }
-         },
-         address = "2001:db8:0:1:0:0:0:2",
-         tunnel = {
-           type = 'l2tpv3',
-           local_cookie  = '\x77\x66\x55\x44\x33\x33\x11\x00',
-           remote_cookie = '\x00\x11\x22\x33\x44\x55\x66\x77'
-         },
-         cc = {
-           heartbeat = 2,
-           dead_factor = 4
-         },
-         shmem_dir = shmem_dir,
-         pw = {
-            pw_A = { address = "2001:db8:0:1:0:0:0:1" },
-         }
+    },
+    mtu = 9206,
+    mac = "90:e2:ba:62:86:e6",
+    afs = {
+      ipv6 = {
+        address = "2001:db8:0:C102:0:0:0:2",
+        next_hop = "2001:db8:0:C102:0:0:0:1" },
       }
-   }
+    },
+    {
+      name = "TenGigE0/0",
+      description = "AC",
+      driver = {
+        module = require("apps.intel.intel_app").Intel82599,
+        config = { pciaddr = "0000:04:00.0",
+                   snmp = snmp }
+      },
+    },
+    mtu = 9206,
+  },
+  vpls = {
+    myvpn = {
+      description = "Endpoint B of a point-to-point L2 VPN",
+      uplink = "TenGigE0/1",
+      mtu = 1514,
+      vc_id = 1,
+      ac = {
+        ac_B = "TenGigE0/0"
+        }
+      },
+      address = "2001:db8:0:1:0:0:0:2",
+      tunnel = {
+        type = 'l2tpv3',
+        local_cookie  = '\x77\x66\x55\x44\x33\x33\x11\x00',
+        remote_cookie = '\x00\x11\x22\x33\x44\x55\x66\x77'
+      },
+      cc = {
+        heartbeat = 2,
+        dead_factor = 4
+      },
+      shmem_dir = shmem_dir,
+      pw = {
+         pw_A = { address = "2001:db8:0:1:0:0:0:1" },
+      }
+    }
+  }
 }
 ```
 
+## <a name="interface-abstraction">Interface Abstraction</a>
+
+Currently, the view of an interface in the Snabb architecture is
+rather low-level since it only provides the drivers itself, which
+basically presents a raw L2 interface to Snabb applications.  In order
+to accommodate the abstractions of sub-interfaces via VLAN-trunks as
+well as L3 interfaces used for VPLS uplinks, the L2VPN system provides
+an additional layer of software on top of the drivers to provide a
+view of the interfaces which resembles that of a traditional
+networking device.
+
+### Configuration Template
+
+Each physical interface that is to be used by the `l2vpn` program is
+configured by a Lua table of the following form
+
+```
+  {
+    name = <name>,
+    [ description = <description>, ]
+    driver = {
+      module = <module>,
+      config = {
+        pciaddr = <pciaddress>,
+        [ snmp = { directory = <snmp_dir> }, ]
+      },
+    },
+    mtu = <mtu>,
+    [ mac = <mac>, ]
+    [ -- only allowed if trunk.enable == false
+      afs = {
+        ipv6 = {
+          address = <address>,
+          next_hop = <next_hop>,
+          [ neighbor_mac = <neighbor_mac>,
+            [ neighbor_nd = true | false, ] ]
+        }
+      }, ]
+    [ trunk = {
+        enable = true | false,
+        encapsulation = "dot1q" | "dot1ad" | <number>,
+        vlans = {
+          {
+            [ description = <description>, ]
+            vid = <vid>,
+            [ afs = {
+                ipv6 = {
+                  address = <address>,
+                  next_hop = <next_hop>,
+                  [ neighbor_mac = <neighbor_mac>,
+                    [ neighbor_nd = true | false, ] ]
+                }
+              } ]
+           },
+           ...
+        }
+      } ]
+  }
+```
+
+In this pseudo-code, square brackets enclose optional elements, angle
+brackets denote configurable items and the ellipsis stands for an
+arbitrary number of additional configuration elements of the previous
+type (in this case a Lua table describing a VLAN).  All elements will
+be discussed in the following sections.
+
+### Naming vs Addressing
+
+Before discussing the configuration in detail, an important
+distinction between the naming of an interface and its addressing as a
+PCI device needs to be established.
+
+In a traditional networking device, apart from supplying a unique
+identification, interface names typically contain the type of
+interface as well as its physical location in the chassis,
+e.g. `TenGigE1/5`, which would refer to the 10GE port number 5 located
+on the linecard in slot number 1.
+
+In contrast to such devices, regular server hardware, on which the
+Snabb application is expected to be used predominantly, usually
+doesn't allow for a straight-forward scheme to describe the physical
+location of an interface.  On the other hand, there already exists a
+name that uniquely identifies every interface on any given system: its
+PCI address.
+
+It is tempting to use this address as the identity of an interface
+throughout the system, but that would make it very hard to adopt a
+different convention later on.  Therefore, it is necessary to make a
+clear distinction between the name of an interface and its PCI address
+and adpot the rule that any reference to an interface must use its
+name and never its PCI address.
+
+Then, we can adopt any convention we like for the naming of
+interfaces, including using the PCI address verbatim, i.e. with a
+configuration fragment like this:
+
+```
+local address = "0000:03:00.0"
+interfaces = {
+  {
+     name = address,
+     driver = {
+        module = require("apps.intel.intel_app").Intel82599,
+        config = { pciaddr = address },
+     },
+  },
+}
+```
+
+This convention doesn't play well with the naming convention for
+sub-interfaces introduced later on (due to the dot in the PCI address)
+and doesn't appear as a particularly useful choice from an operator's
+point of view in general.
+
+It is possible to stick to the traditional convention and chose names
+of the form
+
+```
+<type><n>[/<n>]...
+```
+
+where `<type>` could be one of the following
+
+| Ethernet type  | `<type>`  |  
+| -------------- | ----------|
+| 1000BASE-*     | GigE      |
+| 10GBASE-*      | TenGigE   |
+
+The numbering scheme would then depend on the actual port layout of
+the device and should be part of the device-specific documentation.
+This is the convention we will use in the remainder of this document.
+
+For example:
+
+```
+interfaces = {
+  {
+     name = "TenGigE0/0",
+     driver = {
+        module = require("apps.intel.intel_app").Intel82599,
+        config = { pciaddr = "0000:03:00.0" },
+     },
+  },
+}
+```
+
+To assign this interface as attachment circuit of some VPLS instance,
+one would use a configuration like the following (see the complete
+[configuration of a VPLS instance](#vpls-instance-config)).
+
+```
+vpls = {
+  vpls1 = {
+    ac = {
+      ac1 = "TenGigE0/0",
+    },
+    .
+    .
+    .
+}
+```
+
+### Basic Interface Configuration
+
+The following items make up the basic configuration of an interface
+
+```
+    name = <name>,
+    [ description = <description>, ]
+    driver = {
+      module = <module>,
+      config = {
+        pciaddr = <pciaddress>,
+        [ snmp = { directory = <snmp_dir> }, ]
+      },
+    },
+```
+
+The `<name>` and `<pciaddress>` items have already been discussed in
+the previous section.  The `<description>` can be any valid Lua string
+describing the purpose of the interface in the current configuration.
+It defaults to the empty string.
+
+The `<module>` item must be a Lua expression that evaluates to an
+object that represents a valid Snabb application in the context of the
+`config.app()` API call.  The typical usage is the inclusion of a
+generic driver module via `require()` and the selection of a
+particular driver within the module.  For example
+
+```
+module = require("apps.intel.intel_app").Intel82599
+```
+
+The `config` table is passed as argument to the driver module selected
+by `<module>`.  It must contain at least the item `<pciaddress>`,
+which must be a string containing the full PCI address of the device
+for which the driver should be created.  For example
+
+```
+config = { pciaddr = "0000:03:00.0" }
+
+```
+
+Note: the device will be detached from the Linux kernel when the
+driver is configured and will not be re-attached automatically when
+the driver releases the device.  The device can be re-attached to the
+Linux kernel by executing
+
+```
+echo "<pciaddress>" > /sys/bus/pci/drivers/<driver>/bind
+```
+
+as root, where `<driver>` is the name of the Linux driver that
+controls the device (e.g. `igb` or `ixgbe`).
+
+By default, the drivers do not populate any SNMP MIBs.  If support for
+the interface MIBs is desired, a table named `snmp` needs to be added
+to the driver configuration in which `<snmp_dir>` must hold the name
+of a directory where the driver should locate a shared memory segment
+for interaction with an external SNMP agent.
+
+### L2 Configuration
+
+Every physical interface is associated with parameters that control
+its behavior at the Ethernet layer (L2) consisting of the items
+
+```
+    mtu = <mtu>,
+    [ mac = <mac>, ] 
+    [ trunk = {
+        enable = true | false,
+        encapsulation = "dot1q" | "dot1ad" | <number>, ]
+```
+
+The `vlans` section of the trunk configuration is not shown here and
+will be discussed with the concept of
+[sub-interfaces](#sub-interfaces) and the `<mac>` item is explained in
+the next section.
+
+<a name="MTU">The MTU (Maximum Transmission Unit)</a> is the maximum
+number of bytes in an entire Ethernet packet that can be transmitted
+on the link in either direction, i.e. the maximum receive unit (MRU)
+is automatically chosen to be identical to the MTU.  It includes the
+Ethernet header and payload but none of the other elements of a
+complete Ethernet frame (preamble, SOF, CRC) nor the interpacket gap.
+
+For untagged packets, the size of the Ethernet header is 14 bytes,
+which must be included in the MTU.  For example, an MTU of 1514 bytes
+is required to transport a payload of up to 1500 bytes.
+
+For every level of VLAN tagging, an additional 4 bytes need to be
+added to the MTU to accommodate the increased size of the Ethernet
+header.  E.g., if plain 802.1Q is used and the interface should still
+be able to transport 1500-byte IP packets, the MTU must be chosen as
+1518 bytes.
+
+Note that oversized packets are dropped silently but are counted in
+the `ifInDiscards` and `ifOutDiscards` objects if SNMP is enabled.
+
+The trunk configuration determines whether the link is carrying a
+service-delimiting tag.  By definition, this is a tag which is
+interpreted and removed by the `l2vpn` program itself as opposed to
+tags that only have meaning to the customer and must be ignored by the
+`l2vpn` program.
+
+If the `trunk.enable` field is set to `false` or the the entire
+`trunk` table is omitted, no service-delimiting tag is expected on
+packets received from the interface (anything beyond the source and
+destination MAC addresses is ignored) and no tag is added when packets
+are transmitted to the interface.  This configuration puts the
+physical interface into L2-mode where Ethernet frames are simply
+forwarded without any manipulations performed on them.  In
+conventional switches, this is sometimes referred to as a
+_switchport_.  The following example shows a complete interface
+configuration for this case:
+
+```
+{
+   name = "TenGigE0/0",
+   driver = {
+      module = require("apps.intel.intel_app").Intel82599,
+      config = { pciaddr = "0000:03:00.0" },
+   },
+   mtu = 1514,
+   trunk = { enable = false }
+},
+```
+
+If the `trunk.enable` field is set to `true`, a service-delimiting tag
+is expected to be present immediately following the Ethernet header on
+received packets (also referred to as the "outer" tag).  The
+`encapsulation` field determines the value of the TPID field expected
+in the tag as described [above](#ac-modes).  In this configuration,
+so-called _sub-interfaces_ need to be defined as part of the trunk
+configuration to establish which VLAN IDs are expected to be
+transported on the trunk and how they should be processed by the
+`l2vpn` application.  This is further discussed
+[below](#sub-interfaces).
+
+Packets whose Ethertype field does not match that of the configured
+encapsulation, are silently dropped unless the ["native
+VLAN"](#native-vlan) feature is enabled.
+
+Note that even though only the outermost header is interpreted by the
+`l2vpn` program when trunking is enabled for an interface, the MTU
+must still cover the entire packet.  For example, if the customer is
+carrying her own VLAN trunk on top of the service-delimiting tag, the
+packets actually contain two tags and the MTU must be set to 1522
+bytes in order for the customer to be able to transport 1500-byte IP
+packets within her VLANs.
+
+### Address-family (L3) Configuration
+
+A L2-port as discussed in the previous section can be turned into a
+L3-port by adding a section containing address-family-specific
+configurations called `afs`:
+
+```
+  {
+    name = <name>,
+    [ description = <description>, ]
+    driver = {
+      module = <module>,
+      config = {
+        pciaddr = <pciaddress>,
+        [ snmp = { directory = <snmp_dir> }, ]
+      },
+    },
+    mtu = <mtu>,
+    mac = <mac>,
+    trunk = { enable = false },
+    afs = {
+      ipv6 = {
+        address = <address>,
+        next_hop = <next_hop>,
+        [ neighbor_mac = <neighbor_mac>,
+          [ neighbor_nd = true | false, ] ]
+      }
+    }
+  }
+```
+
+Note that the `<mac>` item is now mandatory.  Its meaning will be
+explained below.
+
+The `afs` table is intended to contain separate sections for each
+supported address family.  Currently, only IPv6 is supported in a
+restricted manner where only a single address/prefix is allowed per
+interface.
+
+Like on a conventional system, the main configuration option is the
+assignment of a subnet and an address within this subnet.  The
+`<address>` item must be a string that specifies a complete IPv6
+address in any of the valid notations.  A netmask of `/64` is implied
+and currently cannot be changed.  For example,
+
+```
+afs = {
+  ipv6 = {
+    address = "2001:db8::1"
+  }
+}
+```
+
+would set the IPv6-subnet to `2001:db8::/64` and the address of the
+interface to `2001:db8::1` at the same time.
+
+The presence of any L3 interface implies that the system also provides
+
+   * Some kind of routing functionality which determines
+     the address of a directly attached system to which a given
+     packet must be handed off, a.k.a. _next-hop_
+   * An address-resolution process that finds the MAC address
+     of the interface for the next-hop, a.k.a. _neighbor discovery_
+     (ND) in the context of IPv6.  This process must also support
+     address resolution in the other direction, when the adjacent
+     system tries to discover the MAC address associated with the
+     local address
+
+Currently, the Snabb architecture has no concept of routing at all,
+let alone any kind of dynamic routing.  Within the `l2vpn`
+application, only the "uplinks" need to be L3-interfaces, because they
+transport payload encapsulated in IPv6 between the device and the ISP
+network.  Attachment circuits are, by definition, L2-ports.
+
+Because the `l2vpn` application essentially monopolizes all interfaces
+that it uses, a generic routing mechanism is not necessary.
+
+Packets arriving on an uplink are always destined for the `l2vpn`
+application itself (any other packets except control-plane traffic
+like neighbor discovery have no meaning to the system and need to be
+dropped) and are fed directly into the network of applications that
+processes them.
+
+The IPv6 packets that are generated by the `l2vpn` application itself
+by encapsulating Ethernet frames from attachment circuits are directed
+to a specific L3-port via the VPLS configuration to which the
+corresponding pseudowire belongs (via the `uplink` item in the [VPLS
+configuration](#vpls-instance-config)).  This can be viewed as a kind
+of policy-based routing decision.  Each L3-port is associated with a
+static next-hop which is essentially a interface-specific
+default-route.  This is the purpose of the `<next_hop>` configuration
+item, which must be a complete IPv6 address that belongs to the same
+subnet as the `<address>`.
+
+The difference to a L2-port is the insertion of a _neighbor discovery_
+module (ND) between the interface driver and the Snabb application
+that attaches to the port.  The ND module performs the following
+functions
+
+   * For packets coming from the driver
+     * Handle packets which are part of the ND protocol
+       (i.e. address resolution)
+     * Pass all other packets to the application or drop
+       them if the type field in the Ethernet header doesn't have
+       the proper value for the L3 protocol (e.g. `0x86dd` for IPv6)
+   * For packets coming from the application (they are expected
+     to already contain an Ethernet header)
+     * Set the type field in the Ethernet header to the proper
+       value for the L3 protocol
+     * Fill in the MAC address of the physical interface as
+       source address in the Ethernet header
+     * If the next-hop address has been resolved by ND,
+       fill in the discovered MAC address as destination
+       address in the Ethernet header
+     * If ND for the next-hop has not completed, drop
+       the packet
+
+This is where the `<mac>` configuration item comes into play.  This
+must be set to the physical MAC address of the interface.  In
+principle, it should be obtained automatically by querying the
+hardware.  However, the current Snabb driver architecture doesn't
+provide a simple mechanism for this, which is the reason for the
+existence of the `mac` configuration option.
+
+The `<mac>` address is also included in response to neighbor
+solicitation requests from adjacent systems for the interface address
+(`<address>`).
+
+For IPv6, one of three ND modules is selected based on the
+configuration.
+
+#### Full ND
+
+In this mode, dynamic ND is performed in both directions: the system
+performs address-resolution for the `<next_hop>` address and it
+responds to address-resolution requests for its own address
+`<address>`.  The `<address>` and `<next_hop>` are the only required
+configuration items
+
+```
+afs = {
+  ipv6 = {
+    address = <address>,
+    next_hop = <next_hop>
+  }
+}
+```
+
+This mode is implemented by the `apps.ipv6.nd_light` Snabb
+application.
+
+#### Partial ND
+
+In this mode, the system uses a static mapping of the `<next_hop>`
+address to its MAC address but it still responds to address-resolution
+requests from adjacent systems.  The configuration must include the
+`<neighbor_mac>` item and set the `<neighbor_nd>` item to `true`
+
+```
+afs = {
+  ipv6 = {
+    address = <address>,
+    next_hop = <next_hop>,
+    neighbor_mac = <neighbor_mac>,
+    neighbor_nd = true
+  }
+}
+```
+This mode is implemented by the `apps.ipv6.ns_responder` Snabb
+application.
+
+#### Static ND
+
+In this mode, the system uses a static mapping for the `<next_hop>`
+and does not respond to ND requests either, i.e. it requires that the
+adjacent system uses a static ND entry for `<address>` as well:
+
+```
+afs = {
+  ipv6 = {
+    address = <address>,
+    next_hop = <next_hop>,
+    neighbor_mac = <neighbor_mac>,
+    neighbor_nd = false
+  }
+}
+```
+This mode is implemented by the `apps.ipv6.nd_static` Snabb
+application.
+
+### <a name="sub-interfaces">Sub-Interfaces</a>
+
+When trunking is enabled on a physical interface, one virtual
+interface is created for every VLAN which is configured to be part of
+the trunk.
+
+Conceptually, a sub-interface represents a slice of the physical
+interface where the (service-delimiting) VLAN tag is used as a
+de-multiplexer: when a packet is received, its tag is removed and the
+remaining packet is passed to the sub-interface for further
+processing.  When a packet is transmitted by a sub-interface to the
+physical interface, the corresponding tag is added to the packet
+before transmission.
+
+The previous two sections discussed how a physical interface can be
+configured as either a L2- or L3-port in the absence of a trunk.  The
+exact same configurations are available on the sub-interface level if
+trunking is enabled.  In this case, the physical interface is not
+allowed to have a `afs` configuration section.
+
+Sub-interfaces are created by adding one table per VLAN in the `vlans`
+table of the trunk configuration:
+
+```
+trunk = {
+  enable = true,
+  encapsulation = "dot1q" | "dot1ad" | <number>,
+  vlans = {
+    {
+      [ description = <description>, ]
+      vid = <vid>,
+      [ afs = {
+          ipv6 = {
+            address = <address>,
+            next_hop = <next_hop>,
+            [ neighbor_mac = <neighbor_mac>,
+              [ neighbor_nd = true | false, ] ]
+          }
+        } ]
+     },
+     ...
+  }
+}
+```
+
+The `<vid>` selects the VLAN ID to which the sub-interface is mapped.
+It must be unique among the sub-interfaces of the same physical
+interface and must be in the range 0-4094, where the ID 0 plays a
+special role as explained below.  A sub-interface does not have a
+`name` item.  Instead, its name is automatically constructed by
+appending the `<vid>` to the name of the physical interface, separated
+by a dot.  For example,
+
+```
+{
+  name = "TenGigE0/0",
+  driver = {
+     module = require("apps.intel.intel_app").Intel82599,
+     config = { pciaddr = "0000:03:00.0" },
+  },
+  mtu = 1518,
+  trunk = {
+    enable = true,
+    encapsulation = "dot1q",
+    vlans = {
+      { vid = 1 }
+    }
+  }
+},
+```
+
+will create the sub-interface named `TenGigE0/0.1` as a L2-port.  This
+convention is chosen because it is the de-facto standard on
+traditional devices and it is one of the reasons why using the PCI
+address as an interface's name is not practical (because the PCI
+address uses a dot to separate the "function" element in the standard
+syntax).  A sub-interface is configured as a L3-port exactly like a
+physical port as explained in the previous section.
+
+#### <a name="native-vlan">Native VLAN</a>
+
+It is possible to mix tagged and untagged traffic on a VLAN trunk
+(always with respect to service-delimiting tags).  Untagged packets
+can be mapped to a dedicated sub-interface that uses the reserved VLAN
+ID 0.  For example,
+
+```
+{
+  name = "TenGigE0/0",
+  driver = {
+     module = require("apps.intel.intel_app").Intel82599,
+     config = { pciaddr = "0000:03:00.0" },
+  },
+  mtu = 1518,
+  trunk = {
+    enable = true,
+    encapsulation = "dot1q",
+    vlans = {
+      { vid = 0 },
+      { vid = 1 }
+    }
+  }
+},
+```
+
+creates the sub-interfaces `TenGigE0/0.0` and `TenGigE0/0.1`.  Packets
+that carry the 802.1Q VLAN ID 1 are assigned to `TenGigE0/0.1` while
+packets, whose Ethertype is not equal to `0x8100` are assigned to
+`TenGigE0/0.0` (packets that carry a 802.1Q VLAN ID other than 1 will
+be dropped).
+
+### SNMP
+
+The L2VPN program does not provide an actual SNMP engine itself.
+Instead, it stores the raw objects in a shared memory segment and
+relies on an external program to make them available with SNMP.  A
+[perl-based
+program](https://github.com/alexandergall/snabb-snmp-subagent.git) is
+available, which parses this data and can hook into any SNMP agent
+that supports the AgentX protocol, like
+[Net-SNMP](http://www.net-snmp.org/).
+
+It is impoprtant to note that the SNMP data generated by the `l2vpn`
+application only contains the objects themselves, not the full table
+structure.  It is up to the SNMP agent to generate the proper index
+structure from this data (e.g. `ifIndex` for the interface MIBs).
+
+The L2VPN framework supports the following SNMP MIBs for monitoring:
+
+   * `interfaces` (.1.3.6.1.2.1.2)
+   * `ifMIB` (.1.3.6.1.2.1.31)
+      * `ifXTable` (.1.3.6.1.2.1.31.1.1)
+   * `cpwVcMIB` (.1.3.6.1.4.1.9.10.106)
+      * `cpwVcObjects` (.1.3.6.1.4.1.9.10.106.1)
+         * `cpwVcTable` (.1.3.6.1.4.1.9.10.106.1.2)
+   * `pwStdMIB` (.1.3.6.1.2.1.10.246)
+      * `pwObjects` (.1.3.6.1.2.1.10.246.1)
+         * `pwTable` (.1.3.6.1.2.1.10.246.1.2)
+   * `cpwVcEnetMIB` (.1.3.6.1.4.1.9.10.108)
+     * `cpwVcEnetObjects` (.1.3.6.1.4.1.9.10.108.1)
+        * `cpwVcEnetTable` (.1.3.6.1.4.1.9.10.108.1.1)
+   * `pwEnetStdMIB` (1.3.6.1.2.1.180)
+      * `pwEnetObjects` (1.3.6.1.2.1.180.1)
+         * `pwEnetTable` (1.3.6.1.2.1.180.1.1)
+
+#### Interface MIBs
+
+If SNMP support is enabled, each physical interface creates a row in
+the `interfaces` and `ifMIB` tables.  The assignment of the `ifDescr`,
+`ifName` and `ifAlias` objects is of particular importance for network
+management purposes.  These objects have a very long history and the
+current usage is unfortunately not uniform among vendors.  The intent
+of the specification is the following:
+
+   * `ifDescr` A human readable description containing, e.g. the
+     manufacturer, product name and the hardware/software version
+
+   * `ifName` The textual name of the interface as used by the
+      user interface of the device
+
+   * `ifAlias` A description of the interface provided by the operator
+
+By this definition, it should be the `ifName` object that would be
+assigned the interface's name, e.g. `TenGigE0/0`.  Historically, only
+`ifDescr` existed at first and was used for this purpose in violation
+of the specification due to the lack of an object that was suited for
+this purpose.  When `ifName` was added, most vendors continued to
+(ab)use `ifDescr` and this is still the case at least for the industry
+standard (i.e. Cisco Systems).
+
+A common choice in practice is to set both, `ifDescr` and `ifName` to
+the interface name.  This is the convention that the `l2vpn` program
+uses as well.  usage of`ifDescr` from the interface name but it also
+sets `ifName` to the same value objects from the interface name. The
+`ifAlias` is populated from the `description` of the interface.  For
+example
+
+```
+interfaces = {
+  {
+     name = "TenGigE0/0",
+     description = "AC customer A",
+     driver = {
+        module = require("apps.intel.intel_app").Intel82599,
+        config = { pciaddr = "0000:03:00.0" },
+     },
+     mtu = 1514,
+     trunk = { enable = false }
+  },
+  {
+     name = "TenGigE0/1",
+     description = "AC customer B",
+     driver = {
+        module = require("apps.intel.intel_app").Intel82599,
+        config = { pciaddr = "0000:03:00.1" },
+     },
+     mtu = 1514,
+     trunk = { enable = false }
+  },
+```
+
+would create the objects
+
+   * `ifDescr` = "TenGigE0/0"
+   * `ifName`  = "TenGigE0/0"
+   * `ifAlias` = "AC customer A"
+
+and
+
+   * `ifDescr` = "TenGigE0/1"
+   * `ifName`  = "TenGigE0/1"
+   * `ifAlias` = "AC customer B"
+
+for those two interfaces, respectively.
+
+#### PW MIBs
+
+The `pw*` MIBs are part of the IETF reference architecture known as
+_Pseudo Wire Emulation Edge-to-Edge_ (PWE3, [RFC
+3985](https://www.ietf.org/rfc/rfc3985.txt "RFC 3985")).  As usual,
+vendors have implemented various pre-standard (draft) versions of
+these MIBs during the lengthy standardization process.  Some of them
+still use those versions and didn't even bother to support the
+standardized version at all, like Cisco.  The `cpw*` MIBs are used on
+most Cisco devices and are almost but not quite identical to their
+`pw*` counterparts.
+
+## External Routing
+
+As has already been discussed, only static routing is supported on the
+uplink interface by configuring the next-hop address used for all
+outgoing packets.  This address must be resolvable to a MAC address
+through regular IPv6 neighbor discovery by the adjacent router.  There
+currently is no concept of a routing table in the Snabb architecture,
+but this mechanism is essentially equivalent to a static default
+route.
+
+For the tunnels to work, all local IPv6 endpoint addresses need to be
+reachable by the remote sides of the pseudowires.  How this is
+achieved is outside the scope of the Snabb system.  There are
+basically two methods.
+
+   * The adjacent router configures static routes for each IPv6
+     address that terminates a VPLS and re-distributes the routes
+     within the routing domains in which the remote endpoints are
+     located.
+
+   * The host running the VPNTP announces the local endpoint addresses
+     with the next-hop address of the local uplink interface address
+     to the provider's routing system with BGP, from where it needs to
+     be re-distributed in such a manner that the addresses are
+     reachable by the remote endpoints.
+
+The second method requires IP connectivity between the host and a
+suitable BGP-speaking router in the network over a regular (non-Snabb
+controlled) interface.  Two typical scenarios for this method are the
+following.
+
+   * The VPNTP host is configured with a private AS number and
+     maintains a BGP session to one or more routers in its vicinity
+     (e.g. the adjacent router itself).  These routers must
+     re-distribute the advertised prefixes as appropriate.
+
+   * If the provider uses an internal BGP (iBGP) setup with
+     route-reflectors, the VPNTP host can be configured directly as
+     route-reflector client within the provider's autonomous system.
