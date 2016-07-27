@@ -96,6 +96,10 @@ function ipv6:ntop (n)
    return ffi.string(c_str)
 end
 
+function ipv6:get()
+   return self:ntop(self)
+end
+
 function ipv6:set(addr)
    self:pton(addr)
 end

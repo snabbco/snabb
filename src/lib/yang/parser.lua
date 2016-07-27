@@ -282,8 +282,6 @@ function parse_file(filename)
 end
 
 function selftest()
-   local S = require("syscall")
-
    local function assert_equal(a, b)
       if not lib.equal(a, b) then
          print(a, b)
@@ -331,11 +329,6 @@ function selftest()
       return table.concat({...}, "\n")
    end
 
-   local function file_exists(path)
-      local stat = S.stat(path)
-      return stat and stat.isreg
-   end
-
    -- Test the string parser
    test_string("foo", "foo")
    test_string([["foo"]], "foo")
@@ -362,11 +355,12 @@ function selftest()
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
 	argument="port", statements={{keyword="type"}}}})
 
-   local filename = "lib/yang/example.yang"
-   local pwd = S.getcwd()
-   -- If current path is root append src/ to filename
-   if file_exists(pwd.."/src/snabb") then
-      filename = "src/"..filename
-   end
-   parse_file(filename)
+   -- We need to locate the yang example code in a reliable way, we can't
+   -- give the path relative to the executable as the current working
+   -- directly could be different. To do this we find the absolute path to
+   -- the snabb executable and then build the path to the yang file from that.
+   local S = require("syscall")
+   local snabb_exe = S.readlink("/proc/self/exe"):gsub("(.-)[%w_-]*$", "%1")
+   local yang_example = snabb_exe.."lib/yang/example.yang"
+   parse_file(yang_example)
 end

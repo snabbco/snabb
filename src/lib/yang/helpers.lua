@@ -7,45 +7,44 @@ local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local corelib = require("core.lib")
 
--- Create a small wrapper around the FFI types to provde get and set
-local FFITypeWrapper = {}
-function FFITypeWrapper.new(ffibox)
-   return setmetatable({box=ffibox()}, {
-      __index=FFITypeWrapper,
-      __call=function(t, v)
-         local wrappedbox = t.new(ffibox)
-         if v ~= nil then wrappedbox:set(v) end
-         return wrappedbox
-      end,
-   })
+-- Create small getter and setter wrapper for ffi structs.
+local FFIType = {}
+
+function FFIType:set(value)
+   self.value = value
 end
-function FFITypeWrapper:set(value)
-   self.box.value = value
+
+function FFIType:get()
+   return self.value
 end
-function FFITypeWrapper:get()
-   return self.box.value
-end
+
+
+-- This wraps the FFIType to provide it with the box name, 
 
 -- Use ffi types because they will validate that numeric values are being
 -- provided. The downside is that integer overflow could occur on these. This
 -- route has been selected as validation will be faster than attempting to
 -- validate in Lua.
 local box_types = {
-   int8 = FFITypeWrapper.new(ffi.typeof("struct { int8_t value; }")),
-   int16 = FFITypeWrapper.new(ffi.typeof("struct { int16_t value; }")),
-   int32 = FFITypeWrapper.new(ffi.typeof("struct { int32_t value; }")),
-   int64 = FFITypeWrapper.new(ffi.typeof("struct { int64_t value; }")),
-   uint8 = FFITypeWrapper.new(ffi.typeof("struct { uint8_t value; }")),
-   uint16 = FFITypeWrapper.new(ffi.typeof("struct { uint16_t value; }")),
-   uint32 = FFITypeWrapper.new(ffi.typeof("struct { uint32_t value; }")),
-   uint64 = FFITypeWrapper.new(ffi.typeof("struct { uint64_t value; }")),
-   decimal64 = FFITypeWrapper.new(ffi.typeof("struct { double value; }")),
-   boolean = FFITypeWrapper.new(ffi.typeof("struct { bool value; }")),
+   int8 = ffi.typeof("struct { int8_t value; }"),
+   int16 = ffi.typeof("struct { int16_t value; }"),
+   int32 = ffi.typeof("struct { int32_t value; }"),
+   int64 = ffi.typeof("struct { int64_t value; }"),
+   uint8 = ffi.typeof("struct { uint8_t value; }"),
+   uint16 = ffi.typeof("struct { uint16_t value; }"),
+   uint32 = ffi.typeof("struct { uint32_t value; }"),
+   uint64 = ffi.typeof("struct { uint64_t value; }"),
+   decimal64 = ffi.typeof("struct { double value; }"),
+   boolean = ffi.typeof("struct { bool value; }"),
 }
+
+-- Iterate through the boxes and set the FFIType metatype
+for _, box in pairs(box_types) do
+   ffi.metatype(box, {__index=FFIType})
+end
+
 -- Add inet types, found: https://tools.ietf.org/html/rfc6021
 -- Should be done via yang module import but using ad-hoc method for now.
-box_types["inet:ipv4-address"] = ipv4.pton
-box_types["inet:ipv6-address"] = ipv6.pton
 box_types["yang:zero-based-counter64"] = function ()
    return box_types.uint64(0)
 end
@@ -93,6 +92,34 @@ function StringBox:set(value)
    self.value = value
 end
 box_types["string"] = StringBox.new
+
+local IPv4Box = {}
+function IPv4Box.new(address)
+   local ret = {root={}}
+   if address then ret.box = ipv4:pton(address) end
+   return setmetatable(ret, {__index=IPv4Box})
+end
+function IPv4Box:get()
+   return self.box
+end
+function IPv4Box:set(address)
+   self.box = assert(ipv4:pton(address))
+end
+box_types["inet:ipv4-address"] = IPv4Box.new
+
+local IPv6Box = {}
+function IPv6Box.new(address)
+   local ret = {}
+   if address then ret.box = ipv6:pton(address) end
+   return setmetatable(ret, {__index=IPv6Box})
+end
+function IPv6Box:get()
+   return self.box
+end
+function IPv6Box:set(address)
+   self.box = assert(ipv6:pton(address))
+end
+box_types["inet:ipv6-address"] = IPv6Box.new
 
 local IPv4PrefixBox = {}
 function IPv4PrefixBox.new()
@@ -163,7 +190,6 @@ box_types["enumeration"] = Enum.new
 local Union = {}
 function Union.new(types)
    local ret = {types={}}
-
    for _, name in pairs(types) do
       -- 9.12 specifies unions cannot contain "leafref" or "empty"
       if name == "empty" or name == "leafref" then
@@ -171,16 +197,17 @@ function Union.new(types)
       end
       ret.types[name] = create_box(name)
    end
-
    return setmetatable(ret, {__index=Union})
 end
 
 function Union:get()
-   return self.value
+   if self.box then
+      return self.box:get()
+   end
 end
 
 function Union:set(v)
-   local function setbox(dest, val) dest.value = val end
+   local function setbox(b, v) b:set(v) end
    for _, box in pairs(self.types) do
       local valid = pcall(setbox, box, v)
       if valid then
@@ -190,6 +217,7 @@ function Union:set(v)
    end
    error(("Unable to find matching type for '%s' (%s)"):format(v, type(v)))
 end
+
 box_types["union"] = Union.new
 
 Container = {}
@@ -337,7 +365,7 @@ function selftest()
    con.testbox = "8.8.8.8"
    assert(ipv4:ntop(con.testbox) == "8.8.8.8")
    asserterror(setvalue, con, "testbox", "should fail")
-
+   
    -- Test the IPv4 box (both valid and invalid data).
    root.testbox = box_types["inet:ipv4-address"]()
    con.testbox = "8.8.8.8"
