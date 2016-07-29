@@ -55,7 +55,6 @@ local invalid_header_id = 0xffff
 
 --]]
 local supported_features = C.VIRTIO_F_ANY_LAYOUT +
-                           C.VIRTIO_RING_F_INDIRECT_DESC +
                            C.VIRTIO_NET_F_CTRL_VQ +
                            C.VIRTIO_NET_F_MQ +
                            C.VIRTIO_NET_F_CSUM
@@ -71,7 +70,7 @@ local max_virtq_pairs = 16
 
 VirtioNetDevice = {}
 
-function VirtioNetDevice:new(owner, disable_mrg_rxbuf)
+function VirtioNetDevice:new(owner, disable_mrg_rxbuf, disable_indirect_desc)
    assert(owner)
    local o = {
       owner = owner,
@@ -102,10 +101,15 @@ function VirtioNetDevice:new(owner, disable_mrg_rxbuf)
    self.hdr_type = virtio_net_hdr_type
    self.hdr_size = virtio_net_hdr_size
 
-   if disable_mrg_rxbuf then
-      self.supported_features = supported_features
-   else
-      self.supported_features = supported_features + C.VIRTIO_NET_F_MRG_RXBUF
+   self.supported_features = supported_features
+
+   if not disable_mrg_rxbuf then
+      self.supported_features = self.supported_features
+         + C.VIRTIO_NET_F_MRG_RXBUF
+   end
+   if not disable_indirect_desc then
+      self.supported_features = self.supported_features
+         + C.VIRTIO_RING_F_INDIRECT_DESC
    end
 
    return o

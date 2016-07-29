@@ -85,11 +85,15 @@ the tests:
 * `SNABB_TELNET0`, `SNABB_TELNET1`—Optional telnet ports to use in tests
   that require them. The default is 5000 and 5001.
 
-* `SNABB_PCAP`—Optional PCAP file for use in tests that require one. The
-  default depends on the individual test.
-
 * `SNABB_PERF_SAMPLESIZE`—Optional sample size for
   `scripts/bench.sh`. The default is 1.
+
+* `SNABB_PACKET_SIZES`, `SNABB_PACKET_SRC`, `SNABB_PACKET_DST`—Optional
+  `--sizes`, `--src`, and `--dst` arguments for tests using `packetblaster
+  synth`.
+
+* `SNABB_IPERF_BENCH_CONF`, `SNABB_DPDK_BENCH_CONF`—Optional NFV configurations
+  for `program/snabbnfv/selftest.sh bench` and `program/snabbnfv/dpdk_bench.sh`.
 
 
 ## Running a SnabbBot CI Instance
