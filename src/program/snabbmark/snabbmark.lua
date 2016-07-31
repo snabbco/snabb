@@ -379,6 +379,8 @@ function esp (npackets, packet_size, mode, profile)
       for i = 1, npackets do
          plain = packet.clone(encapsulated)
          dec:decapsulate(plain)
+         dec.seq.no = 0
+         dec.window[0] = 0
          packet.free(plain)
       end
       local finish = C.get_monotonic_time()
