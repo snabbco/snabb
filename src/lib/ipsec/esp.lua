@@ -37,6 +37,7 @@ local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
+local logger = lib.logger_new({ rate = 32, module = 'esp' });
 
 require("lib.ipsec.track_seq_no_h")
 local window_t = ffi.typeof("uint8_t[?]")
@@ -126,7 +127,6 @@ function esp_v6_decrypt:new (conf)
    o.window_size = conf.window_size or 128
    assert(o.window_size % 8 == 0, "window_size must be a multiple of 8.")
    o.window = ffi.new(window_t, o.window_size / 8)
-   o.logger = lib.logger_new({ rate = 32, module = 'esp' }); -- XXX here?
    return setmetatable(o, {__index=esp_v6_decrypt})
 end
 
@@ -167,7 +167,7 @@ function esp_v6_decrypt:decapsulate (p)
                    "seq_low=" .. tostring(seq_low) .. ", " ..
                    "flow_id=" .. tostring(self.ip:flow_label()) .. ", " ..
                    "reason='" .. reason .. "'";
-      self.logger:log("Rejecting packet ("..info..")")
+      logger:log("Rejecting packet ("..info..")")
       return false
    end
 end
