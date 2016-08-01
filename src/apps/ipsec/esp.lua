@@ -28,12 +28,7 @@ function AES128gcm:new (arg)
       keymat = conf.key:sub(1, 32),
       salt = conf.key:sub(33, 40),
       window_size = conf.replay_window}
-   self.counters = {}
-   for _, name in ipairs(provided_counters) do
-      self.counters[name] = counter.open(name)
-   end
-   counter.set(self.counters.type, 0x1001) -- Virtual interface
-   counter.set(self.counters.dtime, C.get_unix_time())
+   self.shm = { txerrors = {counter}, rxerrors = {counter} }
    return setmetatable(self, {__index = AES128gcm})
 end
 
@@ -47,7 +42,7 @@ function AES128gcm:push ()
          link.transmit(output, p)
       else
          packet.free(p)
-         counter.add(self.counters.txerrors)
+         counter.add(self.shm.txerrors)
       end
    end
    -- Decapsulation path
@@ -59,12 +54,7 @@ function AES128gcm:push ()
          link.transmit(output, p)
       else
          packet.free(p)
-         counter.add(self.counters.rxerrors)
+         counter.add(self.shm.rxerrors)
       end
    end
-end
-
-function AES128gcm:stop ()
-   -- delete counters
-   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
