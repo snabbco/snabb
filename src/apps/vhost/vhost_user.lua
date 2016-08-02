@@ -13,7 +13,6 @@ local lib       = require("core.lib")
 local link      = require("core.link")
 local main      = require("core.main")
 local memory    = require("core.memory")
-local counter   = require("core.counter")
 local pci       = require("lib.hardware.pci")
 local net_device= require("lib.virtio.net_device")
 local timer     = require("core.timer")
@@ -42,15 +41,7 @@ function VhostUser:new (args)
          function () self:process_qemu_requests() end,
          5e8,-- 500 ms
          'non-repeating'
-      ),
-      -- counters
-      shm = { rxbytes   = {counter},
-              rxpackets = {counter},
-              rxmcast   = {counter},
-              rxdrop    = {counter},
-              txbytes   = {counter},
-              txpackets = {counter},
-              txmcast   = {counter} }
+      )
    }
    self = setmetatable(o, {__index = VhostUser})
    self.dev = net_device.VirtioNetDevice:new(self,

@@ -10,8 +10,6 @@ local link      = require("core.link")
 local memory    = require("core.memory")
 local packet    = require("core.packet")
 local timer     = require("core.timer")
-local counter   = require("core.counter")
-local ethernet  = require("lib.protocol.ethernet")
 local vq        = require("lib.virtio.virtq_device")
 local checksum  = require("lib.checksum")
 local ffi       = require("ffi")
@@ -157,7 +155,6 @@ end
 
 function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
    local l = self.owner.output.tx
-   local counters = self.owner.shm
    if l then
       if band(self.rx_hdr_flags, C.VIO_NET_HDR_F_NEEDS_CSUM) ~= 0 and
          -- Bounds-check the checksum area
@@ -169,18 +166,9 @@ function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
             rx_p.length - self.rx_hdr_csum_start,
             self.rx_hdr_csum_offset)
       end
-      counter.add(counters.rxbytes, rx_p.length)
-      counter.add(counters.rxpackets)
-      if ethernet:is_mcast(rx_p.data) then
-         counter.add(counters.rxmcast)
-      end
-      if ethernet:is_bcast(rx_p.data) then
-         counter.add(counters.rxbcast)
-      end
       link.transmit(l, rx_p)
    else
       debug("droprx", "len", rx_p.length)
-      counter.add(counters.rxdrop)
       packet.free(rx_p)
    end
    self.virtq[self.ring_id]:put_buffer(header_id, total_size)
@@ -268,15 +256,6 @@ function VirtioNetDevice:tx_buffer_add(tx_p, addr, len)
 end
 
 function VirtioNetDevice:tx_packet_end(header_id, total_size, tx_p)
-   local counters = self.owner.shm
-   counter.add(counters.txbytes, tx_p.length)
-   counter.add(counters.txpackets)
-   if ethernet:is_mcast(tx_p.data) then
-      counter.add(counters.txmcast)
-   end
-   if ethernet:is_bcast(tx_p.data) then
-      counter.add(counters.txbcast)
-   end
    packet.free(tx_p)
    self.virtq[self.ring_id]:put_buffer(header_id, total_size)
 end
@@ -344,17 +323,8 @@ function VirtioNetDevice:tx_buffer_add_mrg_rxbuf(tx_p, addr, len)
 end
 
 function VirtioNetDevice:tx_packet_end_mrg_rxbuf(header_id, total_size, tx_p)
-   local counters = self.owner.shm
    -- free the packet only when all its data is processed
    if self.tx.finished then
-      counter.add(counters.txbytes, tx_p.length)
-      counter.add(counters.txpackets)
-      if ethernet:is_mcast(tx_p.data) then
-         counter.add(counters.txmcast)
-      end
-      if ethernet:is_bcast(tx_p.data) then
-         counter.add(counters.txbcast)
-      end
       packet.free(tx_p)
       self.tx.p = nil
       self.tx.data_sent = nil
