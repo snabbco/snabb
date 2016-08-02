@@ -1,5 +1,31 @@
 # Change Log
 
+## [2.8] - 2016-06-03
+
+A bug-fix and documentation release.
+
+ * Fix ability to load in ingress and egress filters from a file.  This
+   feature was originally developed on our main branch and backported in
+   v2.5, but the backport was missing a necessary fix from the main
+   branch.
+
+ * Update documentation on ingress and egress filtering, giving several
+   examples.
+
+ * Added performance analysis of the overhead of ingress and egress
+   filtering.  See
+   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.filters-performance.md.
+
+ * Updated documentation for performance tuning.  See
+   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.performance.md
+
+ * Add a time-stamp for the JIT self-healing behavior, and adapt the
+   message to be more helpful.
+
+ * The "loadtest" command now separates reporting of drops that were
+   because the load generator was not able to service its receive queue
+   in time, and drops which originate in the remote tested process.
+
 ## [2.7] - 2016-05-19
 
 A performance, feature, and bug-fix release.

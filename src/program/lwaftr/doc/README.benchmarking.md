@@ -13,10 +13,13 @@ See [README.running.md](README.running.md).
 In one server, start the lwAFTR:
 
 ```
-$ sudo ./src/snabb lwaftr run --cpu 1 -v \
+$ sudo numactl -m 0 taskset -c 1 ./src/snabb lwaftr run -v \
     --conf program/lwaftr/tests/data/icmp_on_fail.conf \
     --v4 0000:02:00.0 --v6 0000:02:00.1
 ```
+
+See [README.performance.md](README.performance.md) for a discussion of `numactl`,
+`taskset`, and NUMA settings.
 
 The `-v` flag enables periodic printouts reporting MPPS and Gbps statistics per
 NIC.
@@ -24,7 +27,7 @@ NIC.
 In the other server, run the `loadtest` command:
 
 ```
-$ sudo ./snabb lwaftr loadtest --cpu 1 -D 1 -b 10e9 -s 0.2e9 \
+$ sudo numactl -m 0 taskset -c 1 ./snabb lwaftr loadtest -D 1 -b 10e9 -s 0.2e9 \
     program/lwaftr/tests/benchdata/ipv4-0550.pcap "NIC 0" "NIC 1" 02:00.0 \
     program/lwaftr/tests/benchdata/ipv6-0550.pcap "NIC 1" "NIC 0" 02:00.1
 ```

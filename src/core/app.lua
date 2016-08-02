@@ -116,7 +116,10 @@ function ingress_drop_monitor:jit_flush_if_needed()
    self.last_flush = now()
    self.last_value[0] = self.current_value[0]
    jit.flush()
-   print("jit.flush")
+   print(now()..": warning: Dropped more than "..self.threshold.." packets;"
+            .." flushing JIT to try to recover.  See"
+            .." https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.performance.md"
+            .." for performance tuning tips.")
    --- TODO: Change last_flush, last_value and current_value fields to be counters.
 end
 
