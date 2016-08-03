@@ -25,9 +25,12 @@
 
 module(..., package.seeall)
 
+local lib = require("core.lib")
 local shm = require("core.shm")
 local ffi = require("ffi")
 require("core.counter_h")
+
+type = shm.register('counter', getfenv())
 
 local counter_t = ffi.typeof("struct counter")
 
@@ -43,25 +46,28 @@ local public  = {}
 local private = {}
 local numbers = {} -- name -> number
 
-function open (name, readonly)
-   local qname = shm.resolve(name)
-   if numbers[qname] then return private[numbers[qname]] end
+function create (name, initval)
+   if numbers[name] then return private[numbers[name]] end
    local n = #public+1
-   if readonly then
-      public[n] = shm.open(name, counter_t, readonly)
-      private[n] = public[#public] -- use counter directly
-   else
-      public[n] = shm.create(name, counter_t)
-      private[n] = ffi.new(counter_t)
-   end
-   numbers[qname] = n
+   public[n] = shm.create(name, counter_t)
+   private[n] = ffi.new(counter_t)
+   numbers[name] = n
+   if initval then set(private[n], initval) end
+   return private[n]
+end
+
+function open (name)
+   if numbers[name] then return private[numbers[name]] end
+   local n = #public+1
+   public[n] = shm.open(name, counter_t, 'readonly')
+   private[n] = public[#public] -- use counter directly
+   numbers[name] = n
    return private[n]
 end
 
 function delete (name)
-   local qname = shm.resolve(name)
-   local number = numbers[qname]
-   if not number then error("counter not found for deletion: " .. qname) end
+   local number = numbers[name]
+   if not number then error("counter not found for deletion: " .. name) end
    -- Free shm object
    shm.unmap(public[number])
    -- If we "own" the counter for writing then we unlink it too.
@@ -69,7 +75,7 @@ function delete (name)
       shm.unlink(name)
    end
    -- Free local state
-   numbers[qname] = false
+   numbers[name] = false
    public[number] = false
    private[number] = false
 end
@@ -85,10 +91,14 @@ function set  (counter, value) counter.c = value                         end
 function add  (counter, value) counter.c = counter.c + (value or 1)      end
 function read (counter)        return counter.c                          end
 
+ffi.metatype( counter_t,
+              {__tostring =
+               function (counter) return lib.comma_value(counter.c) end})
+
 function selftest ()
    print("selftest: core.counter")
-   local a  = open("core.counter/counter/a")
-   local b  = open("core.counter/counter/b")
+   local a  = create("core.counter/counter/a")
+   local b  = create("core.counter/counter/b")
    local a2 = shm.create("core.counter/counter/a", counter_t, true)
    set(a, 42)
    set(b, 43)

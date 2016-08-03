@@ -67,7 +67,10 @@ function pci_node {
             numactl -H | grep "cpus: $cpu" | cut -d " " -f 2
             ;;
         *)
-            echo $1
+            if [ "$1" = "soft" ]
+            then echo 0
+            else echo $1
+            fi
             ;;
     esac
 }
@@ -134,19 +137,13 @@ function qemu {
     launch_qemu $1 $2 $3 bzImage qemu
 }
 
-function packetblaster {
-    snabb $1 "packetblaster replay program/snabbnfv/test_fixtures/pcap/$2.pcap $1"
-}
-
 function qemu_dpdk {
     launch_qemu $1 $2 $3 bzImage qemu-dpdk
 }
 
 function snabbnfv_bench {
     numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
-        ./snabb snabbnfv traffic -B $2 $1 \
-        program/snabbnfv/test_fixtures/nfvconfig/test_functions/snabbnfv-bench1.port \
-        vhost_%s.sock
+        ./snabb snabbnfv traffic -B $2 $1 $3 vhost_%s.sock
 }
 
 function on_exit {

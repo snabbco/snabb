@@ -3,8 +3,11 @@ Usage:
 
   -h, --help
                              Print usage information.
-  -c, --counters <name>
-                             Print counters of object by <name> and exit.
+  -l, --list <path>
+                             List shared memory objects in <path> and exit.
+                             Examples: snabb top -l engine
+                                       snabb top -l apps/foo
+                                       snabb top -l "links/foo.tx -> bar.rx"
 
 Display realtime performance statistics for a running Snabb instance with
 <pid>. If <pid> is not supplied and there is only one Snabb instance, top will
