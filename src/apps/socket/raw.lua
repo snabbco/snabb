@@ -7,6 +7,8 @@ local h = require("syscall.helpers")
 local bit = require("bit")
 local link = require("core.link")
 local packet = require("core.packet")
+local counter = require("core.counter")
+local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -40,7 +42,17 @@ function RawSocket:new (ifname)
       sock:close()
       error(err)
    end
-   return setmetatable({sock = sock}, {__index = RawSocket})
+   return setmetatable({sock = sock,
+                        rx_p = packet.allocate(),
+                        shm  = { rxbytes   = {counter},
+                                 rxpackets = {counter},
+                                 rxmcast   = {counter},
+                                 rxbcast   = {counter},
+                                 txbytes   = {counter},
+                                 txpackets = {counter},
+                                 txmcast   = {counter},
+                                 txbcast   = {counter} }},
+                       {__index = RawSocket})
 end
 
 function RawSocket:pull ()
@@ -61,10 +73,18 @@ function RawSocket:can_receive ()
 end
 
 function RawSocket:receive ()
-   local buffer = ffi.new("uint8_t[?]", C.PACKET_PAYLOAD_SIZE)
-   local sz, err = S.read(self.sock, buffer, C.PACKET_PAYLOAD_SIZE)
-   assert(sz, err)
-   return packet.from_pointer(buffer, sz)
+   local p = self.rx_p
+   local sz = assert(S.read(self.sock, p.data, packet.max_payload))
+   p.length = sz
+   counter.add(self.shm.rxbytes, sz)
+   counter.add(self.shm.rxpackets)
+   if ethernet:is_mcast(p.data) then
+      counter.add(self.shm.rxmcast)
+   end
+   if ethernet:is_bcast(p.data) then
+      counter.add(self.shm.rxbcast)
+   end
+   return packet.clone(p)
 end
 
 function RawSocket:push ()
@@ -73,6 +93,14 @@ function RawSocket:push ()
    while not link.empty(l) and self:can_transmit() do
       local p = link.receive(l)
       self:transmit(p)
+      counter.add(self.shm.txbytes, p.length)
+      counter.add(self.shm.txpackets)
+      if ethernet:is_mcast(p.data) then
+         counter.add(self.shm.txmcast)
+      end
+      if ethernet:is_bcast(p.data) then
+         counter.add(self.shm.txbcast)
+      end
       packet.free(p)
    end
 end
@@ -94,6 +122,7 @@ end
 
 function RawSocket:stop()
    self.sock:close()
+   packet.free(self.rx_p)
 end
 
 function selftest ()
