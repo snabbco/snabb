@@ -2081,15 +2081,20 @@ c.BPF = multiflags {
   EXIST      = 2,
 }
 
--- eBPF flags
+-- BPF map type
 c.BPF_MAP = strflag {
   UNSPEC           = 0,
   HASH             = 1,
   ARRAY            = 2,
   PROG_ARRAY       = 3,
   PERF_EVENT_ARRAY = 4,
+  PERCPU_HASH      = 5,
+  PERCPU_ARRAY     = 6,
+  STACK_TRACE      = 7,
+  CGROUP_ARRAY     = 8,
 }
 
+-- BPF syscall commands
 c.BPF_CMD = strflag {
   MAP_CREATE       = 0,
   MAP_LOOKUP_ELEM  = 1,
@@ -2101,12 +2106,15 @@ c.BPF_CMD = strflag {
   OBJ_GET          = 7,
 }
 
+-- BPF program types
 c.BPF_PROG = strflag {
   UNSPEC        = 0,
   SOCKET_FILTER = 1,
   KPROBE        = 2,
   SCHED_CLS     = 3,
   SCHED_ACT     = 4,
+  TRACEPOINT    = 5,
+  XDP           = 6,
 }
 
 -- Linux performance monitoring
