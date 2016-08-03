@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SKIPPED_CODE=43
+
 if [ -z "$MAC" ]; then
     export MAC=52:54:00:00:00:
     echo "Defaulting to MAC=$MAC"
@@ -95,7 +97,7 @@ function qemu_log {
 
 function qemu_image {
     image=$assets/$1${qemu_n}.img
-    [ -f $image ] || cp $assets/$1.img $image
+    [ -f $image ] || cp $assets/$1.img $image 2> /dev/null
     echo $image
 }
 
@@ -134,6 +136,11 @@ function launch_qemu {
 }
 
 function qemu {
+    local image=$(qemu_image "qemu")
+    if [ ! -f "$image" ]; then
+        echo "Couldn't find QEMU image: ${image}"
+        exit $SKIPPED_CODE
+    fi
     launch_qemu $1 $2 $3 bzImage qemu
 }
 
