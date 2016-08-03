@@ -7,8 +7,17 @@ local h = require("syscall.helpers")
 local bit = require("bit")
 local link = require("core.link")
 local packet = require("core.packet")
+local counter = require("core.counter")
+local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
+
+--ljsyscall returns error as a a cdata instead of a string,
+--and the standard assert() doesn't use tostring() on it.
+local function assert(v, ...)
+   if not v then error(tostring(... or 'assertion failed'), 2) end
+   return v, ...
+end
 
 local c, t = S.c, S.types.t
 
@@ -20,16 +29,30 @@ function RawSocket:new (ifname)
    if not index then error(err) end
 
    local tp = h.htons(c.ETH_P["ALL"])
-   local sock, err = S.socket(c.AF.PACKET, bit.bor(c.SOCK.RAW, c.SOCK.NONBLOCK), tp)
-   if not sock then error(err) end
+   local sock = assert(S.socket(c.AF.PACKET, bit.bor(c.SOCK.RAW, c.SOCK.NONBLOCK), tp))
+   local index, err = S.util.if_nametoindex(ifname)
+   if not index then
+      sock:close()
+      error(err)
+   end
 
    local addr = t.sockaddr_ll{sll_family = c.AF.PACKET, sll_ifindex = index, sll_protocol = tp}
    local ok, err = S.bind(sock, addr)
    if not ok then
-      S.close(sock)
+      sock:close()
       error(err)
    end
-   return setmetatable({sock = sock}, {__index = RawSocket})
+   return setmetatable({sock = sock,
+                        rx_p = packet.allocate(),
+                        shm  = { rxbytes   = {counter},
+                                 rxpackets = {counter},
+                                 rxmcast   = {counter},
+                                 rxbcast   = {counter},
+                                 txbytes   = {counter},
+                                 txpackets = {counter},
+                                 txmcast   = {counter},
+                                 txbcast   = {counter} }},
+                       {__index = RawSocket})
 end
 
 function RawSocket:pull ()
@@ -41,15 +64,27 @@ function RawSocket:pull ()
 end
 
 function RawSocket:can_receive ()
-   local ok, err = S.select({readfds = {self.sock}}, 0)
-   return not (err or ok.count == 0)
+   local t, err = S.select({readfds = {self.sock}}, 0)
+   while not t and (err.AGAIN or err.INTR) do
+      t, err = S.select({readfds = {self.sock}}, 0)
+   end
+   assert(t, err)
+   return t.count == 1
 end
 
 function RawSocket:receive ()
-   local buffer = ffi.new("uint8_t[?]", C.PACKET_PAYLOAD_SIZE)
-   local sz, err = S.read(self.sock, buffer, C.PACKET_PAYLOAD_SIZE)
-   if not sz then return err end
-   return packet.from_pointer(buffer, sz)
+   local p = self.rx_p
+   local sz = assert(S.read(self.sock, p.data, packet.max_payload))
+   p.length = sz
+   counter.add(self.shm.rxbytes, sz)
+   counter.add(self.shm.rxpackets)
+   if ethernet:is_mcast(p.data) then
+      counter.add(self.shm.rxmcast)
+   end
+   if ethernet:is_bcast(p.data) then
+      counter.add(self.shm.rxbcast)
+   end
+   return packet.clone(p)
 end
 
 function RawSocket:push ()
@@ -58,23 +93,36 @@ function RawSocket:push ()
    while not link.empty(l) and self:can_transmit() do
       local p = link.receive(l)
       self:transmit(p)
+      counter.add(self.shm.txbytes, p.length)
+      counter.add(self.shm.txpackets)
+      if ethernet:is_mcast(p.data) then
+         counter.add(self.shm.txmcast)
+      end
+      if ethernet:is_bcast(p.data) then
+         counter.add(self.shm.txbcast)
+      end
       packet.free(p)
    end
 end
 
 function RawSocket:can_transmit ()
-   local ok, err = S.select({writefds = {self.sock}}, 0)
-   return not (err or ok.count == 0)
+   local t, err = S.select({writefds = {self.sock}}, 0)
+   while not t and (err.AGAIN or err.INTR) do
+      t, err = S.select({writefds = {self.sock}}, 0)
+   end
+   assert(t, err)
+   return t.count == 1
 end
 
 function RawSocket:transmit (p)
-   local sz, err = S.write(self.sock, packet.data(p), packet.length(p))
-   if not sz then return err end
-   return sz
+   local sz, err = S.write(self.sock, p.data, p.length)
+   assert(sz, err)
+   assert(sz == p.length)
 end
 
 function RawSocket:stop()
-   S.close(self.sock)
+   self.sock:close()
+   packet.free(self.rx_p)
 end
 
 function selftest ()

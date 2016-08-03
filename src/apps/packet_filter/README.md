@@ -33,3 +33,9 @@ expression.
 *rule* will be tracked in the specified state table and any packet that
 belongs to a tracked connection in the specified state table will be let
 pass.
+
+## Special Counters
+
+— Key **sessions_established**
+
+Total number of sessions established.

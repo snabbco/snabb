@@ -1,17 +1,18 @@
 # Run like this:
 #   nix-build /path/to/this/directory
-# ... and the files are produced in ./result/
+# ... and the files are produced in ./result/bin/snabb
 
 { pkgs ? (import <nixpkgs> {})
+, source ? ./.
+, version ? "dev"
 }:
 
 with pkgs;
 
 stdenv.mkDerivation rec {
-  # TODO: get the version from somewhere?
-  name = "snabb";
-
-  src = ./.;
+  name = "snabb-${version}";
+  inherit version;
+  src = lib.cleanSource source;
 
   buildInputs = [ makeWrapper ];
 
@@ -36,4 +37,6 @@ stdenv.mkDerivation rec {
     mkdir -p $out/bin
     cp src/snabb $out/bin
   '';
+
+  enableParallelBuilding = true;
 }
