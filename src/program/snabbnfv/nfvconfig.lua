@@ -8,6 +8,7 @@ local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light").nd_light
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
 local AES128gcm = require("apps.ipsec.esp").AES128gcm
+local virtual_ether_mux = require("lib.io.virtual_ether_mux")
 local pci = require("lib.hardware.pci")
 local ffi = require("ffi")
 local C = ffi.C
@@ -18,35 +19,24 @@ function port_name (port_config)
    return port_config.port_id:gsub("-", "_")
 end
 
--- Compile app configuration from <file> for <pciaddr> and vhost_user
--- <socket>. Returns configuration.
-function load (file, pciaddr, sockpath)
-   local device_info = pci.device_info(pciaddr)
-   if not device_info then
-      print(format("could not find device information for PCI address %s", pciaddr))
-      main.exit(1)
-   end
-
+-- Compile app configuration from <file> for <pciaddr> and vhost_user <socket>.
+-- Optionally install <soft_bench> source and sink. Returns configuration.
+function load (file, pciaddr, sockpath, soft_bench)
    local ports = lib.load_conf(file)
    local c = config.new()
-   for _,t in ipairs(ports) do
-      local vlan, mac_address = t.vlan, t.mac_address
+   local io_links
+   if pciaddr then
+      io_links = virtual_ether_mux.configure(c, ports, {pci = pciaddr})
+   else
+      io_links = virtual_ether_mux.configure(c, ports, {bench = soft_bench})
+   end
+   for i,t in ipairs(ports) do
       local name = port_name(t)
-      local NIC = name.."_NIC"
       local Virtio = name.."_Virtio"
-      local vmdq = true
-      if not t.mac_address then
-         if #ports ~= 1 then
-            error("multiple ports defined but promiscuous mode requested for port: "..name)
-         end
-        vmdq = false
-      end
-      config.app(c, NIC, require(device_info.driver).driver,
-                 {pciaddr = pciaddr,
-                  vmdq = vmdq,
-                  macaddr = mac_address,
-                  vlan = vlan})
-      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
+      config.app(c, Virtio, VhostUser,
+                 {socket_path=sockpath:format(t.port_id),
+                  disable_mrg_rxbuf=t.disable_mrg_rxbuf,
+                  disable_indirect_desc=t.disable_indirect_desc})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
       if t.tx_police_gbps then
          local TxLimit = name.."_TxLimit"
@@ -84,7 +74,7 @@ function load (file, pciaddr, sockpath)
          -- This will talk to our local gateway.
          local ND = name.."_ND"
          config.app(c, ND, nd_light,
-                    {local_mac = mac_address,
+                    {local_mac = t.mac_address,
                      local_ip = t.tunnel.local_ip,
                      next_hop = t.tunnel.next_hop})
          -- VM -> Tunnel -> ND <-> Network
@@ -109,8 +99,8 @@ function load (file, pciaddr, sockpath)
          config.link(c, RxLimit..".output -> "..VM_rx)
          VM_rx = RxLimit..".input"
       end
-      config.link(c, NIC..".tx -> "..VM_rx)
-      config.link(c, VM_tx.." -> "..NIC..".rx")
+      config.link(c, io_links[i].output.." -> "..VM_rx)
+      config.link(c, VM_tx.." -> "..io_links[i].input)
    end
 
    -- Return configuration c.

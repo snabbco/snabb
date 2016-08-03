@@ -15,10 +15,6 @@ local pf = require("pf")        -- pflua
 
 PcapFilter = {}
 
-local provided_counters = {
-   'dtime', 'type', 'rxerrors', 'sessions_established'
-}
-
 -- PcapFilter is an app that drops all packets that don't match a
 -- specified filter expression.
 --
@@ -36,16 +32,10 @@ function PcapFilter:new (conf)
    local o = {
       -- XXX Investigate the latency impact of filter compilation.
       accept_fn = pf.compile_filter(conf.filter),
-      state_table = conf.state_table or false
+      state_table = conf.state_table or false,
+      shm = { rxerrors = {counter}, sessions_established = {counter} }
    }
    if conf.state_table then conntrack.define(conf.state_table) end
-   -- Create counters
-   o.counters = {}
-   for _, name in ipairs(provided_counters) do
-      o.counters[name] = counter.open(name)
-   end
-   counter.set(o.counters.type, 0x1001) -- Virtual interface
-   counter.set(o.counters.dtime, C.get_unix_time())
    return setmetatable(o, { __index = PcapFilter })
 end
 
@@ -62,19 +52,14 @@ function PcapFilter:push ()
       elseif self.accept_fn(p.data, p.length) then
          if spec then
             spec:track(self.state_table)
-            counter.add(self.counters.sessions_established)
+            counter.add(self.shm.sessions_established)
          end
          link.transmit(o, p)
       else
          packet.free(p)
-         counter.add(self.counters.rxerrors)
+         counter.add(self.shm.rxerrors)
       end
    end
-end
-
-function PcapFilter:stop ()
-   -- delete counters
-   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
 
 -- Testing

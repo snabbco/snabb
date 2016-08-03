@@ -104,6 +104,13 @@ the engine for use in processing and are *read-only*.
 Name of the app. *Read-only*.
 
 
+— Field **myapp.shm**
+
+Can be set to a specification for `core.shm.create_frame` during `new`. When
+set, this field will be initialized to a frame of shared memory objects by the
+engine.
+
+
 — Method **myapp:link**
 
 *Optional*. Called any time the app’s links may have been changed (including on
@@ -401,7 +408,7 @@ can be accessed directly by network cards. The important
 characteristic of DMA memory is being located in contiguous physical
 memory at a stable address.
 
-— Function **memory.dma_alloc** *bytes*, *[alignment]*
+— Function **memory.dma_alloc** *bytes*, [*alignment*]
 
 Returns a pointer to *bytes* of new DMA memory.
 
@@ -415,6 +422,210 @@ Returns the physical address (`uint64_t`) the DMA memory at *pointer*.
 — Variable **memory.huge_page_size**
 
 Size of a single huge page in bytes. Read-only.
+
+
+## Shared Memory (core.shm)
+
+This module facilitates creation and management of named shared memory objects.
+Objects can be created using `shm.create` similar to `ffi.new`, except that
+separate calls to `shm.open` for the same name will each return a new mapping
+of the same shared memory. Different processes can share memory by mapping an
+object with the same name (and type). Each process can map any object any
+number of times.
+
+Mappings are deleted on process termination or with an explicit `shm.unmap`.
+Names are unlinked from objects that are no longer needed using `shm.unlink`.
+Object memory is freed when the name is unlinked and all mappings have been
+deleted.
+
+Names can be fully qualified or abbreviated to be within the current process.
+Here are examples of names and how they are resolved where `<pid>` is the PID
+of this process:
+
+- Local: `foo/bar` ⇒ `/var/run/snabb/<pid>/foo/bar`
+- Fully qualified: `/1234/foo/bar` ⇒ `/var/run/snabb/1234/foo/bar`
+
+Behind the scenes the objects are backed by files on ram disk
+(`/var/run/snabb/<pid>`) and accessed with the equivalent of POSIX shared
+memory (`shm_overview(7)`).
+
+The practical limit on the number of objects that can be mapped will depend on
+the operating system limit for memory mappings. On Linux the default limit is
+65,530 mappings:
+
+```
+$ sysctl vm.max_map_count vm.max_map_count = 65530
+```
+
+— Function **shm.create** *name*, *type*
+
+Creates and maps a shared object of *type* into memory via a hierarchical
+*name*. Returns a pointer to the mapped object.
+
+— Function **shm.open** *name*, *type*, [*readonly*]
+
+Maps an existing shared object of *type* into memory via a hierarchical *name*.
+If *readonly* is non-nil the shared object is mapped in read-only mode.
+*Readonly* defaults to nil. Fails if the shared object does not already exist.
+Returns a pointer to the mapped object.
+
+— Function **shm.unmap** *pointer*
+
+Deletes the memory mapping for *pointer*.
+
+— Function **shm.unlink** *path*
+
+Unlinks the subtree of objects designated by *path* from the filesystem.
+
+— Function **shm.children** *path*
+
+Returns an array of objects in the directory designated by *path*.
+
+— Function **shm.register** *type*, *module*
+
+Registers an abstract shared memory object *type* implemented by *module* in
+`shm.types`. *Module* must provide the following functions:
+
+ - **create** *name*, ...
+ - **open**, *name*
+
+and can optionally provide the function:
+
+ - **delete**, *name*
+
+The *module*’s `type` variable must be bound to *type*. To register a new type
+a module might invoke `shm.register` like so:
+
+```
+type = shm.register('mytype', getfenv())
+-- Now the following holds true:
+--   shm.types[type] == getfenv()
+```
+
+— Variable **shm.types**
+
+A table that maps types to modules. See `shm.register`.
+
+— Function **shm.create_frame** *path*, *specification*
+
+Creates and returns a shared memory frame by *specification* under *path*. A
+frame is a table of mapped—possibly abstract‑shared memory objects.
+*Specification* must be of the form:
+
+```
+{ <name> = {<module>, ...},
+  ... }
+```
+
+*Module* must implement an abstract type registered with `shm.register`, and is
+followed by additional initialization arguments to its `create` function.
+Example usage:
+
+```
+local counter = require("core.counter")
+-- Create counters foo/bar/{dtime,rxpackets,txpackets}.counter
+local f = shm.create_frame(
+   "foo/bar",
+   {dtime     = {counter, C.get_unix_time()},
+    rxpackets = {counter},
+    txpackets = {counter}})
+counter.add(f.rxpackets)
+counter.read(f.dtime)
+```
+
+— Function **shm.open_frame** *path*
+
+Opens and returns the shared memory frame under *path* for reading.
+
+— Function **shm.delete_frame** *frame*
+
+Deletes/unmaps a shared memory *frame*. The *frame* directory is unlinked if
+*frame* was created by `shm.create_frame`.
+
+
+### Counter (core.counter)
+
+Double-buffered shared memory counters. Counters are 64-bit unsigned values.
+Registered with `core.shm` as type `counter`.
+
+— Function **counter.create** *name*, [*initval*]
+
+Creates and returns a `counter` by *name*, initialized to *initval*. *Initval*
+defaults to 0.
+
+— Function **counter.open** *name*
+
+Opens and returns the counter by *name* for reading.
+
+— Function **counter.delete** *name*
+
+Deletes and unmaps the counter by *name*.
+
+— Function **counter.commit**
+
+Commits buffered counter values to public shared memory.
+
+— Function **counter.set** *counter*, *value*
+
+Sets *counter* to *value*.
+
+— Function **counter.add** *counter*, [*value*]
+
+Increments *counter* by *value*. *Value* defaults to 1.
+
+— Function **counter.read** *counter*
+
+Returns the value of *counter*.
+
+
+### Histogram (core.histogram)
+
+Shared memory histogram with logarithmic buckets. Registered with `core.shm` as
+type `histogram`.
+
+— Function **histogram.new** *min*, *max*
+
+Returns a new `histogram`, with buckets covering the range from *min* to *max*.
+The range between *min* and *max* will be divided logarithmically.
+
+— Function **histogram.create** *name*, *min*, *max*
+
+Creates and returns a `histogram` as in `histogram.new` by *name*. If the file
+exists already, it will be cleared.
+
+— Function **histogram.open** *name*
+
+Opens and returns `histogram` by *name* for reading.
+
+— Method **histogram:add** *measurement*
+
+Adds *measurement* to *histogram*.
+
+— Method **histogram:iterate** *prev*
+
+When used as `for count, lo, hi in histogram:iterate()`, visits all buckets in
+*histogram* in order from lowest to highest. *Count* is the number of samples
+recorded in that bucket, and *lo* and *hi* are the lower and upper bounds of
+the bucket. Note that *count* is an unsigned 64-bit integer; to get it as a Lua
+number, use `tonumber`.
+
+If *prev* is given, it should be a snapshot of the previous version of the
+histogram. In that case, the *count* values will be returned as a difference
+between their values in *histogram* and their values in *prev*.
+
+— Method **histogram:snapshot** [*dest*]
+
+Copies out the contents of *histogram* into the `histogram` *dest* and returns
+*dest*. If *dest* is not given, the result will be a fresh `histogram`.
+
+— Method **histogram:clear**
+
+Clears the buckets of *histogram*.
+
+— Method **histogram:wrap_thunk* *thunk*, *now*
+
+Returns a closure that wraps *thunk*, measuring and recording the difference
+between calls to *now* before and after *thunk* into *histogram*.
 
 
 ## Lib (core.lib)
@@ -674,4 +885,4 @@ A list of command-line arguments to the running script. Read-only.
 
 — Function **main.exit** *status*
 
-Cleanly exists the process with *status*.
+Cleanly exits the process with *status*.

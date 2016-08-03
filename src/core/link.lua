@@ -15,6 +15,7 @@ local counter = require("core.counter")
 require("core.counter_h")
 
 require("core.link_h")
+local link_t = ffi.typeof("struct link")
 
 local band = require("bit").band
 
@@ -26,9 +27,9 @@ local provided_counters = {
 }
 
 function new (name)
-   local r = shm.create("links/"..name, "struct link")
+   local r = ffi.new(link_t)
    for _, c in ipairs(provided_counters) do
-      r.stats[c] = counter.open("counters/"..name.."/"..c)
+      r.stats[c] = counter.create("links/"..name.."/"..c..".counter")
    end
    counter.set(r.stats.dtime, C.get_unix_time())
    return r
@@ -36,9 +37,8 @@ end
 
 function free (r, name)
    for _, c in ipairs(provided_counters) do
-      counter.delete("counters/"..name.."/"..c)
+      counter.delete("links/"..name.."/"..c..".counter")
    end
-   shm.unmap(r)
    shm.unlink("links/"..name)
 end
 

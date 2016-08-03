@@ -16,12 +16,6 @@ local t = S.types.t
 
 Tap = { }
 
-local provided_counters = {
-   'type', 'dtime',
-   'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast',
-   'txbytes', 'txpackets', 'txmcast',  'txbcast'
-}
-
 function Tap:new (name)
    assert(name, "missing tap interface name")
 
@@ -35,13 +29,16 @@ function Tap:new (name)
       sock:close()
       error("Error opening /dev/net/tun: " .. tostring(err))
    end
-   local counters = {}
-   for _, name in ipairs(provided_counters) do
-      counters[name] = counter.open(name)
-   end
-   counter.set(counters.type, 0x1001) -- Virtual interface
-   counter.set(counters.dtime, C.get_unix_time())
-   return setmetatable({sock = sock, name = name, counters = counters},
+   return setmetatable({sock = sock,
+                        name = name,
+                        shm = { rxbytes   = {counter},
+                                rxpackets = {counter},
+                                rxmcast   = {counter},
+                                rxbcast   = {counter},
+                                txbytes   = {counter},
+                                txpackets = {counter},
+                                txmcast   = {counter},
+                                txbcast   = {counter} }},
                        {__index = Tap})
 end
 
@@ -63,13 +60,13 @@ function Tap:pull ()
       end
       p.length = len
       link.transmit(l, p)
-      counter.add(self.counters.rxbytes, len)
-      counter.add(self.counters.rxpackets)
+      counter.add(self.shm.rxbytes, len)
+      counter.add(self.shm.rxpackets)
       if ethernet:is_mcast(p.data) then
-         counter.add(self.counters.rxmcast)
+         counter.add(self.shm.rxmcast)
       end
       if ethernet:is_bcast(p.data) then
-         counter.add(self.counters.rxbcast)
+         counter.add(self.shm.rxbcast)
       end
    end
 end
@@ -88,13 +85,13 @@ function Tap:push ()
       if len ~= p.length and err.errno == const.E.AGAIN then
          return
       end
-      counter.add(self.counters.txbytes, len)
-      counter.add(self.counters.txpackets)
+      counter.add(self.shm.txbytes, len)
+      counter.add(self.shm.txpackets)
       if ethernet:is_mcast(p.data) then
-         counter.add(self.counters.txmcast)
+         counter.add(self.shm.txmcast)
       end
       if ethernet:is_bcast(p.data) then
-         counter.add(self.counters.txbcast)
+         counter.add(self.shm.txbcast)
       end
       -- The write completed so dequeue it from the link and free the packet
       link.receive(l)
@@ -104,8 +101,6 @@ end
 
 function Tap:stop()
    self.sock:close()
-   -- delete counters
-   for name, _ in pairs(self.counters) do counter.delete(name) end
 end
 
 function selftest()

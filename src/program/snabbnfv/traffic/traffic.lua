@@ -38,14 +38,17 @@ function run (args)
    args = lib.dogetopt(args, opt, "hHB:k:l:D:b", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
-      local ok, info = pcall(pci.device_info, pciaddr)
-      if not ok then
-         print("Error: device not found " .. pciaddr)
-         os.exit(1)
-      end
-      if not info.driver then
-         print("Error: no driver for device " .. pciaddr)
-         os.exit(1)
+      if pciaddr == "soft" then pciaddr = nil end
+      if pciaddr then
+         local ok, info = pcall(pci.device_info, pciaddr)
+         if not ok then
+            print("Error: device not found " .. pciaddr)
+            os.exit(1)
+         end
+         if not info.driver then
+            print("Error: no driver for device " .. pciaddr)
+            os.exit(1)
+         end
       end
       if loadreportinterval > 0 then
          local t = timer.new("nfvloadreport", engine.report_load, loadreportinterval*1e9, 'repeating')
@@ -105,12 +108,18 @@ end
 function bench (pciaddr, confpath, sockpath, npackets)
    npackets = tonumber(npackets)
    local ports = dofile(confpath)
-   local nic = (nfvconfig.port_name(ports[1])).."_NIC"
+   local nic, bench
+   if pciaddr then
+      nic = (nfvconfig.port_name(ports[1])).."_NIC"
+   else
+      nic = "BenchSink"
+      bench = { src="52:54:00:00:00:02", dst="52:54:00:00:00:01", sizes = {60}}
+   end
    engine.log = true
    engine.Hz = false
 
    print("Loading " .. confpath)
-   engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
+   engine.configure(nfvconfig.load(confpath, pciaddr, sockpath, bench))
 
    -- From designs/nfv
    local start, packets, bytes = 0, 0, 0

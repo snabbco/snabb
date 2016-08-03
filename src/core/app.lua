@@ -7,7 +7,7 @@ local lib       = require("core.lib")
 local link      = require("core.link")
 local config    = require("core.config")
 local timer     = require("core.timer")
-local shm     = require("core.shm")
+local shm       = require("core.shm")
 local histogram = require('core.histogram')
 local counter   = require("core.counter")
 local zone      = require("jit.zone")
@@ -30,11 +30,11 @@ link_table, link_array = {}, {}
 configuration = config.new()
 
 -- Counters for statistics.
-breaths   = counter.open("engine/breaths")   -- Total breaths taken
-frees     = counter.open("engine/frees")     -- Total packets freed
-freebits  = counter.open("engine/freebits")  -- Total packet bits freed (for 10GbE)
-freebytes = counter.open("engine/freebytes") -- Total packet bytes freed
-configs   = counter.open("engine/configs")   -- Total configurations loaded
+breaths   = counter.create("engine/breaths.counter")   -- Total breaths taken
+frees     = counter.create("engine/frees.counter")     -- Total packets freed
+freebits  = counter.create("engine/freebits.counter")  -- Total packet bits freed (for 10GbE)
+freebytes = counter.create("engine/freebytes.counter") -- Total packet bytes freed
+configs   = counter.create("engine/configs.counter")   -- Total configurations loaded
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
@@ -70,8 +70,6 @@ end
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
 function with_restart (app, method)
-   local oldshm = shm.path
-   shm.path = app.shmpath
    local status, result
    if use_restart then
       -- Run fn in protected mode using pcall.
@@ -85,7 +83,6 @@ function with_restart (app, method)
    else
       status, result = true, method(app)
    end
-   shm.path = oldshm
    return status, result
 end
 
@@ -199,11 +196,10 @@ function apply_config_actions (actions, conf)
    local ops = {}
    function ops.stop (name)
       if app_table[name].stop then
-         local shmorig = shm.path
-         shm.path = app_table[name].shmpath
          app_table[name]:stop()
-         shm.path = shmorig
-         shm.unlink(app_table[name].shmpath)
+      end
+      if app_table[name].shm then
+         shm.delete_frame(app_table[name].shm)
       end
    end
    function ops.keep (name)
@@ -214,10 +210,7 @@ function apply_config_actions (actions, conf)
    function ops.start (name)
       local class = conf.apps[name].class
       local arg = conf.apps[name].arg
-      local shmpath, shmorig = "counters/"..name, shm.path
-      shm.path = shmpath
       local app = class:new(arg)
-      shm.path = shmorig
       if type(app) ~= 'table' then
          error(("bad return value from app '%s' start() method: %s"):format(
                   name, tostring(app)))
@@ -226,11 +219,14 @@ function apply_config_actions (actions, conf)
       app.appname = name
       app.output = {}
       app.input = {}
-      app.shmpath = shmpath
       new_app_table[name] = app
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
       app.zone = zone
+      if app.shm then
+         app.shm.dtime = {counter, C.get_unix_time()}
+         app.shm = shm.create_frame("apps/"..name, app.shm)
+      end
    end
    function ops.restart (name)
       ops.stop(name)
@@ -240,10 +236,7 @@ function apply_config_actions (actions, conf)
       if app_table[name].reconfig then
          local arg = conf.apps[name].arg
          local app = app_table[name]
-         local shmorig = shm.path
-         shm.path = app.shmpath
          app:reconfig(arg)
-         shm.path = shmorig
          new_app_table[name] = app
          table.insert(new_app_array, app)
          app_name_to_index[name] = #new_app_array
@@ -302,7 +295,7 @@ function main (options)
 
    local breathe = breathe
    if options.measure_latency or options.measure_latency == nil then
-      local latency = histogram.create('engine/latency', 1e-6, 1e0)
+      local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
       breathe = latency:wrap_thunk(breathe, now)
    end
 
@@ -553,35 +546,6 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
-   -- Test shm.path management
-   print("shm.path management")
-   local S = require("syscall")
-   local App4 = {zone="test"}
-   function App4:new ()
-      local c = counter.open('test')
-      counter.set(c, 42)
-      counter.commit()
-      return setmetatable({test_counter = c},
-                          {__index = App4})
-   end
-   function App4:pull ()
-      assert(counter.read(self.test_counter) == 42, "Invalid counter value")
-      counter.add(self.test_counter)
-   end
-   function App4:stop ()
-      assert(counter.read(self.test_counter) == 43, "Invalid counter value")
-      counter.delete('test')
-   end
-   local c_counter = config.new()
-   config.app(c_counter, "App4", App4)
-   configure(c_counter)
-   main({done = function () return app_table.App4.test_counter end})
-   assert(S.stat(shm.root.."/"..shm.resolve("counters/App4/test")),
-          "Missing : counters/App4/test")
-   configure(config.new())
-   assert(not S.stat(shm.root.."/"..shm.resolve("counters/App4")),
-          "Failed to unlink counters/App4")
-   print("OK")
 end
 
 -- XXX add graphviz() function back.
