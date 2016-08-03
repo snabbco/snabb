@@ -34,12 +34,6 @@ local function firsthole(t)
    end
 end
 
-local provided_counters = {
-   'type', 'dtime', 'mtu', 'speed', 'status', 'promisc', 'macaddr',
-   'rxbytes', 'rxpackets', 'rxmcast', 'rxbcast', 'rxdrop', 'rxerrors',
-   'txbytes', 'txpackets', 'txmcast', 'txbcast', 'txdrop', 'txerrors'
-}
-
 -- Create an Intel82599 App for the device with 'pciaddress'.
 function Intel82599:new (arg)
    local conf = config.parse_app_arg(arg)
@@ -63,21 +57,31 @@ function Intel82599:new (arg)
       self.stats = { s = self.dev.s, r = self.dev.r, qs = self.dev.qs }
       self.zone = "intel"
    end
-   if not self.stats.counters then
-      self.stats.path = "/counters/"..conf.pciaddr.."/"
+   if not self.stats.shm then
+      self.stats.shm = shm.create_frame(
+         "pci/"..conf.pciaddr,
+         {dtime     = {counter, C.get_unix_time()},
+          mtu       = {counter, self.dev.mtu},
+          speed     = {counter, 10000000000}, -- 10 Gbits
+          status    = {counter, 2},           -- Link down
+          promisc   = {counter},
+          macaddr   = {counter},
+          rxbytes   = {counter},
+          rxpackets = {counter},
+          rxmcast   = {counter},
+          rxbcast   = {counter},
+          rxdrop    = {counter},
+          rxerrors  = {counter},
+          txbytes   = {counter},
+          txpackets = {counter},
+          txmcast   = {counter},
+          txbcast   = {counter},
+          txdrop    = {counter},
+          txerrors  = {counter}})
       self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
-      self.stats.counters = {}
-      for _, name in ipairs(provided_counters) do
-         self.stats.counters[name] = counter.open(self.stats.path..name)
-      end
-      counter.set(self.stats.counters.type, 0x1000) -- Hardware interface
-      counter.set(self.stats.counters.dtime, C.get_unix_time())
-      counter.set(self.stats.counters.mtu, self.dev.mtu)
-      counter.set(self.stats.counters.speed, 10000000000) -- 10 Gbits
-      counter.set(self.stats.counters.status, 2) -- down
+
       if not conf.vmdq and conf.macaddr then
-         counter.set(self.stats.counters.macaddr,
-                     macaddress:new(conf.macaddr).bits)
+         counter.set(self.stats.shm.macaddr, macaddress:new(conf.macaddr).bits)
       end
    end
    return setmetatable(self, Intel82599)
@@ -102,10 +106,7 @@ function Intel82599:stop()
       close_pf:close()
    end
    if not self.dev.pf or close_pf then
-      for name, _ in pairs(self.stats.counters) do
-         counter.delete(self.stats.path..name)
-      end
-      shm.unlink(self.stats.path)
+      shm.delete_frame(self.stats.shm)
    end
 end
 
@@ -117,7 +118,7 @@ function Intel82599:reconfig(arg)
    self.dev:reconfig(conf)
 
    if not self.dev.pf and conf.macaddr then
-      counter.set(self.stats.counters.macaddr,
+      counter.set(self.stats.shm.macaddr,
                   macaddress:new(conf.macaddr).bits)
    end
 end
@@ -153,11 +154,11 @@ function Intel82599:add_receive_buffers ()
    end
 end
 
--- Synchronize self.stats.s/r a and self.stats.counters.
+-- Synchronize self.stats.s/r a and self.stats.shm.
 local link_up_mask = lib.bits{Link_up=30}
 local promisc_mask = lib.bits{UPE=9}
 function Intel82599:sync_stats ()
-   local counters = self.stats.counters
+   local counters = self.stats.shm
    local s, r, qs = self.stats.s, self.stats.r, self.stats.qs
    counter.set(counters.rxbytes,   s.GORC64())
    counter.set(counters.rxpackets, s.GPRC())
@@ -195,7 +196,7 @@ function Intel82599:push ()
       -- check is currently disabled to satisfy some selftests until
       -- agreement on this strategy is reached.
       -- if p.length > self.dev.mtu then
-      --    counter.add(self.stats.counters.txdrop)
+      --    counter.add(self.stats.shm.txdrop)
       --    packet.free(p)
       -- else
       do local p = receive(l)

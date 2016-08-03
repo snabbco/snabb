@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -e
-out=$(program/snabbnfv/selftest.sh bench 1500 \
-    program/snabbnfv/test_fixtures/nfvconfig/test_functions/crypto.ports)
+export SNABB_IPERF_BENCH_CONF=program/snabbnfv/test_fixtures/nfvconfig/test_functions/crypto.ports
+out=$(program/snabbnfv/selftest.sh bench 1500)
 # Extract floating point Gbits number from output.
 echo "$out" | grep IPERF-1500 | cut -d " " -f 2

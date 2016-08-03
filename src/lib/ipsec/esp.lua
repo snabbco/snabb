@@ -199,17 +199,17 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    local p_min = packet.from_string("012345678901234567890123456789012345678901234567890123")
    p_min.data[18] = 0 -- Set IPv6 payload length to zero
    p_min.data[19] = 0 -- ...
-   assert(packet.length(p_min) == PAYLOAD_OFFSET)
-   print("original", lib.hexdump(ffi.string(packet.data(p_min), packet.length(p_min))))
+   assert(p_min.length == PAYLOAD_OFFSET)
+   print("original", lib.hexdump(ffi.string(p_min.data, p_min.length)))
    local e_min = packet.clone(p_min)
    assert(enc:encapsulate(e_min))
-   print("encrypted", lib.hexdump(ffi.string(packet.data(e_min), packet.length(e_min))))
-   assert(packet.length(e_min) == dec.MIN_SIZE+PAYLOAD_OFFSET)
+   print("encrypted", lib.hexdump(ffi.string(e_min.data, e_min.length)))
+   assert(e_min.length == dec.MIN_SIZE+PAYLOAD_OFFSET)
    assert(dec:decapsulate(e_min))
-   print("decrypted", lib.hexdump(ffi.string(packet.data(e_min), packet.length(e_min))))
-   assert(packet.length(e_min) == PAYLOAD_OFFSET)
-   assert(packet.length(p_min) == packet.length(e_min)
-          and C.memcmp(p_min, e_min, packet.length(p_min)) == 0,
+   print("decrypted", lib.hexdump(ffi.string(e_min.data, e_min.length)))
+   assert(e_min.length == PAYLOAD_OFFSET)
+   assert(p_min.length == e_min.length
+          and C.memcmp(p_min, e_min, p_min.length) == 0,
           "integrity check failed")
    -- Check transmitted Sequence Number wrap around
    enc.seq:low(0)

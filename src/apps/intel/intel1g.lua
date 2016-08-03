@@ -627,7 +627,7 @@ end  -- function Intel1g:new()
 
 function selftest ()
    print("selftest: Intel1g")
-   local pciaddr = os.getenv("SNABB_PCI_INTEL1G0")
+   local pciaddr = lib.getenv("SNABB_PCI_INTEL1G0")
    if not pciaddr then
       print("SNABB_PCI_INTEL1G0 not set")
       os.exit(engine.test_skipped_code)
