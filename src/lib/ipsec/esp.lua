@@ -275,7 +275,7 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    end
    -- Check that packets from way in the past/way in the future
    -- (further than the biggest allowable window size) are rejected
-   -- This is where we ultimately want resynchronation (wrt. future packets)
+   -- This is where we ultimately want resynchronization (wrt. future packets)
    C.memset(dec.window, 0, dec.window_size / 8); -- clear window
    dec.seq.no = 2^34 + 42;
    enc.seq.no = 2^36 + 42;
