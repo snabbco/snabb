@@ -47,8 +47,15 @@ handle-pcap () {
 	return 0
 }
 
-declare -i exitcode=0
+declare -i exitcode=0 total=0 passed=0 failed=0
 for pcapfile in "${datadir}"/*.cap "${datadir}"/*.pcap ; do
-	handle-pcap "${pcapfile}" || exitcode=1
+	if handle-pcap "${pcapfile}" ; then
+		: $(( passed++ ))
+	else
+		: $(( failed++ ))
+		exitcode=1
+	fi
+	: $(( total++ ))
 done
+echo "Total ${total}, passed ${passed}, failed ${failed}"
 exit ${exitcode}
