@@ -295,6 +295,12 @@ snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
    ${EMPTY} ${EMPTY} \
    ${COUNTERS}/empty.lua
 
+echo "Testing: sending non-IPv4 traffic to the IPv4 interface"
+snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
+   ${EMPTY} ${TEST_DATA}/tcp-frominet-bound.pcap \
+   ${EMPTY} ${EMPTY} \
+   ${COUNTERS}/empty.lua
+
 # Test UDP packets
 
 echo "Testing: from-internet bound IPv4 UDP packet"

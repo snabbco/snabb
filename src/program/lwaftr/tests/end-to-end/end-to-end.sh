@@ -318,6 +318,12 @@ snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${EMPTY} \
    ${COUNTERS}/non-ipv6-traffic-to-ipv6-interface.lua
 
+echo "Testing: sending non-IPv4 traffic to the IPv4 interface"
+snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-frominet-bound.pcap \
+   ${EMPTY} ${EMPTY} \
+   ${COUNTERS}/non-ipv4-traffic-to-ipv4-interface.lua
+
 # Test UDP packets
 
 echo "Testing: from-internet bound IPv4 UDP packet"
