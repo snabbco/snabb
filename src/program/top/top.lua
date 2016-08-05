@@ -12,7 +12,7 @@ local histogram = require("core.histogram")
 local usage = require("program.top.README_inc")
 
 local long_opts = {
-   help = "h", counters = "c"
+   help = "h", list = "l"
 }
 
 function clearterm () io.write('\027[2J') end
@@ -21,19 +21,18 @@ function run (args)
    local opt = {}
    local object = nil
    function opt.h (arg) print(usage) main.exit(1) end
-   function opt.c (arg) object = arg              end
-   args = lib.dogetopt(args, opt, "hc:", long_opts)
+   function opt.l (arg) object = arg              end
+   args = lib.dogetopt(args, opt, "hl:", long_opts)
 
    if #args > 1 then print(usage) main.exit(1) end
    local target_pid = select_snabb_instance(args[1])
 
-   if     object then list_counters(target_pid, object)
+   if     object then list_shm(target_pid, object)
    else               top(target_pid) end
-   ordered_exit(0)
 end
 
 function select_snabb_instance (pid)
-   local instances = shm.children("//")
+   local instances = shm.children("/")
    if pid then
       -- Try to use given pid
       for _, instance in ipairs(instances) do
@@ -47,37 +46,29 @@ function select_snabb_instance (pid)
       else                            return instances[1] end
    elseif #instances == 1 then print("No Snabb instance found.")
    else print("Multple Snabb instances found. Select one.") end
-   ordered_exit(1)
+   os.exit(1)
 end
 
-function ordered_exit (value)
-   shm.unlink("//"..S.getpid()) -- Unlink own shm tree to avoid clutter
-   os.exit(value)
-end
-
-function read_counter (name, path)
-   if path then name = path.."/"..name end
-   local value = counter.read(counter.open(name, 'readonly'))
-   counter.delete(name)
-   return value
-end
-
-function list_counters (pid, object)
-   local path = "//"..pid.."/counters/"..object
-   local cnames = shm.children(path)
-   table.sort(cnames, function (a, b) return a < b end)
-   for _, cname in ipairs(cnames) do
-      print_row({30, 30}, {cname, lib.comma_value(read_counter(cname, path))})
+function list_shm (pid, object)
+   local frame = shm.open_frame("/"..pid.."/"..object)
+   local sorted = {}
+   for name, _ in pairs(frame) do table.insert(sorted, name) end
+   table.sort(sorted)
+   for _, name in ipairs(sorted) do
+      if name ~= 'path' and name ~= 'specs' and  name ~= 'readonly' then
+         print_row({30, 30}, {name, tostring(frame[name])})
+      end
    end
+   shm.delete_frame(frame)
 end
 
 function top (instance_pid)
-   local instance_tree = "//"..instance_pid
+   local instance_tree = "/"..instance_pid
    local counters = open_counters(instance_tree)
    local configs = 0
    local last_stats = nil
    while (true) do
-      if configs < counter.read(counters.configs) then
+      if configs < counter.read(counters.engine.configs) then
          -- If a (new) config is loaded we (re)open the link counters.
          open_link_counters(counters, instance_tree)
       end
@@ -97,41 +88,31 @@ end
 
 function open_counters (tree)
    local counters = {}
-   for _, name in ipairs({"configs", "breaths", "frees", "freebytes"}) do
-      counters[name] = counter.open(tree.."/engine/"..name, 'readonly')
-   end
-   local success, latency = pcall(histogram.open, tree..'/engine/latency')
-   if success then counters.latency = latency end
+   counters.engine = shm.open_frame(tree.."/engine")
    counters.links = {} -- These will be populated on demand.
    return counters
 end
 
 function open_link_counters (counters, tree)
    -- Unmap and clear existing link counters.
-   for linkspec, _ in pairs(counters.links) do
-      for _, name
-      in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}) do
-         counter.delete(tree.."/counters/"..linkspec.."/"..name)
-      end
+   for _, link_frame in pairs(counters.links) do
+      shm.delete_frame(link_frame)
    end
    counters.links = {}
    -- Open current link counters.
    for _, linkspec in ipairs(shm.children(tree.."/links")) do
-      counters.links[linkspec] = {}
-      for _, name
-      in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop"}) do
-         counters.links[linkspec][name] =
-            counter.open(tree.."/counters/"..linkspec.."/"..name, 'readonly')
-      end
+      counters.links[linkspec] = shm.open_frame(tree.."/links/"..linkspec)
    end
 end
 
 function get_stats (counters)
    local new_stats = {}
    for _, name in ipairs({"configs", "breaths", "frees", "freebytes"}) do
-      new_stats[name] = counter.read(counters[name])
+      new_stats[name] = counter.read(counters.engine[name])
    end
-   if counters.latency then new_stats.latency = counters.latency:snapshot() end
+   if counters.engine.latency then
+      new_stats.latency = counters.engine.latency:snapshot()
+   end
    new_stats.links = {}
    for linkspec, link in pairs(counters.links) do
       new_stats.links[linkspec] = {}
@@ -153,7 +134,7 @@ function print_global_metrics (new_stats, last_stats)
              {float_s(frees / 1000), float_s(bytes / (1000^3)), tostring(breaths)})
 end
 
-function summarize_latency(histogram, prev)
+function summarize_latency (histogram, prev)
    local total = histogram.total
    if prev then total = total - prev.total end
    if total == 0 then return 0, 0, 0 end
@@ -174,7 +155,6 @@ function print_latency_metrics (new_stats, last_stats)
    local min, avg, max = summarize_latency(cur, prev)
    print_row(global_metrics_row,
              {"Min breath (us)", "Average", "Maximum"})
-   
    print_row(global_metrics_row,
              {float_s(min*1e6), float_s(avg*1e6), float_s(max*1e6)})
    print("\n")

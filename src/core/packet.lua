@@ -148,12 +148,6 @@ function free (p)
    free_internal(p)
 end
 
--- Return pointer to packet data.
-function data (p) return p.data end
-
--- Return packet data length.
-function length (p) return p.length end
-
 -- Set packet data length.
 function resize (p, len)
    assert(len <= max_payload, "packet payload overflow")
