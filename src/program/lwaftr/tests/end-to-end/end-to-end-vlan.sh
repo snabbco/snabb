@@ -289,6 +289,12 @@ snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
    ${EMPTY} ${TEST_DATA}/recap-customBR-IPs-ipv6.pcap \
    ${COUNTERS}/from-to-b4-ipv6-hairpin.lua
 
+echo "Testing sending non-IPv6 traffic to the IPv6 interface."
+snabb_run_and_cmp ${TEST_CONF}/no_icmp_vlan.conf \
+   ${TEST_DATA}/tcp-afteraftr-ipv6.pcap ${EMPTY} \
+   ${EMPTY} ${EMPTY} \
+   ${COUNTERS}/empty.lua
+
 # Test UDP packets
 
 echo "Testing: from-internet bound IPv4 UDP packet"
