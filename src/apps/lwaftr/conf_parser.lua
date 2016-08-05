@@ -11,7 +11,9 @@ Parser = {}
 function Parser.new(file)
    local name = file.name
    if type(file) == 'string' then
-      name, file = file, io.open(file)
+      name = file
+      file, err = io.open(file)
+      if not file then error(err) end
    end
    local ret = { column=0, line=1, name=name }
    function ret.read_char() return file:read(1) end
