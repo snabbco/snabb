@@ -1,0 +1,54 @@
+#! /bin/bash
+set -e
+shopt -s nullglob
+
+readonly mydir=${0%/*}
+readonly datadir="${mydir}/data"
+
+spy-pcap () {
+	"${mydir}/../../../snabb" wall spy -v pcap "$1"
+}
+
+filter-output () {
+	local -a line
+	while read -r -a line ; do
+		if [[ ${line[0]} = 0x* ]] ; then
+			echo "${line[5]%:*}"
+		fi
+	done | sort -u
+}
+
+list-contains () {
+	local needle=$1
+	shift
+	local item
+	for item in "$@" ; do
+		if [[ ${needle} = ${item} ]] ; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+handle-pcap () {
+	local -a expected=( $(< "${1}.spy.expect") )
+	local -a output=( $(spy-pcap "$1" | filter-output) )
+	echo "Capture: $1"
+	echo " Expect: ${expected[*]}"
+	echo " Output: ${output[*]}"
+	local item
+	for item in ${expected[@]} ; do
+		if ! list-contains ${item} "${output[@]}" ; then
+			echo " Result: FAIL"
+			return 1
+		fi
+	done
+	echo " Result: PASS"
+	return 0
+}
+
+declare -i exitcode=0
+for pcapfile in "${datadir}"/*.cap "${datadir}"/*.pcap ; do
+	handle-pcap "${pcapfile}" || exitcode=1
+done
+exit ${exitcode}
