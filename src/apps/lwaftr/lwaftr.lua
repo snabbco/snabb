@@ -16,6 +16,7 @@ local checksum = require("lib.checksum")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local ipv4 = require("lib.protocol.ipv4")
+local shm = require("core.shm")
 local counter = require("core.counter")
 local packet = require("core.packet")
 local lib = require("core.lib")
@@ -139,6 +140,14 @@ local counter_names = {
    "drop-out_by_policy-icmpv6-bytes",
    "drop-out_by_policy-icmpv6-packets",
 }
+
+local function create_counters ()
+   local counters = {}
+   for _, name in ipairs(counter_names) do
+      counters[name] = {counter}
+   end
+   return shm.create_frame(counters_dir, counters)
+end
 
 local function get_ethernet_payload(pkt)
    return pkt.data + ethernet_header_size
@@ -307,10 +316,7 @@ function LwAftr:new(conf)
 
    o.control = channel.create('lwaftr/control', messages.lwaftr_message_t)
 
-   o.counters = {}
-   for _, name in ipairs(counter_names) do
-      o.counters[name] = counter.open(counters_dir .. name)
-   end
+   o.counters = create_counters()
 
    transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
    if debug then lwdebug.pp(conf) end

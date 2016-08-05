@@ -48,7 +48,7 @@ end
 function read_counters(c)
    local results = {}
    for _, name in ipairs(counter_names) do
-      local cnt = counter.open(counters_dir .. name, "readonly")
+      local cnt = counter.open(counters_dir .. name .. ".counter", "readonly")
       results[name] = counter.read(cnt)
    end
    return results
