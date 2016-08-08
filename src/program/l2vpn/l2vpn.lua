@@ -588,8 +588,7 @@ function run (parameters)
                                       src = vpls_c.address,
                                       dst = pw_config.address },
                         tunnel = pw_config.tunnel or tunnel_config,
-                        cc = pw_config.cc or vpls_c.cc or nil
-                     })
+                        cc = pw_config.cc or vpls_c.cc or nil })
          table.insert(pws, pw)
          table.insert(bridge_config.split_horizon_groups.pw, pw)
          if not uplinks[uplink].dispatch then
