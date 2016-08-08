@@ -243,8 +243,13 @@ function pseudowire:new (arg)
 
    -- Tunnel header
    assert(conf.tunnel, "missing tunnel configuration")
+   -- The control-channel is de-activated if either no
+   -- configuration is present or if the heartbeat interval
+   -- is set to 0.
+   local have_cc = (conf.cc and not (conf.cc.heartbeat and
+                                        conf.cc.heartbeat == 0))
    o._tunnel = require("program.l2vpn.tunnels."..
-                       conf.tunnel.type):new(conf.tunnel, conf.cc, o._logger)
+                       conf.tunnel.type):new(conf.tunnel, have_cc, o._logger)
 
    -- Transport header
    assert(conf.transport, "missing transport configuration")
@@ -503,7 +508,7 @@ function pseudowire:new (arg)
    o._mib = mib
 
    -- Set up the control channel
-   if conf.cc then
+   if have_cc then
       local c = conf.cc
       for k, v in pairs(cc_defaults) do
          if c[k] == nil then
