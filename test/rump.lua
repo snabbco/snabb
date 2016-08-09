@@ -3,7 +3,7 @@
 
 local function init(S)
 
-local helpers = require "syscall.helpers"
+local helpers = require "test.helpers"
 local types = S.types
 local c = S.c
 local abi = S.abi

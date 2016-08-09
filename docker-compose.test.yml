@@ -1,3 +1,5 @@
 sut:
   build: .
-  command: test/test.lua
+  command: /test/test.lua
+  volumes:
+    - ./test:/test
