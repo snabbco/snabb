@@ -1,0 +1,12 @@
+.*
+*.md
+COPYRIGHT
+ChangeLog
+Dockerfile
+INSTALL
+doc
+*.yml
+examples
+include
+rockspec
+test
