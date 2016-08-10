@@ -39,6 +39,8 @@ $(cat README.rfccompliance.md)
 
 $(cat README.troubleshooting.md)
 
+$(cat README.counters.md)
+
 $(cat README.breaking_changes.md)
 
 EOF

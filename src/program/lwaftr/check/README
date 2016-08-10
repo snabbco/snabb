@@ -1,8 +1,9 @@
-Usage: check CONF IPV4-IN.PCAP IPV6-IN.PCAP IPV4-OUT.PCAP IPV6-OUT.PCAP
+Usage: check CONF IPV4-IN.PCAP IPV6-IN.PCAP IPV4-OUT.PCAP IPV6-OUT.PCAP [COUNTERS.LUA]
 
   -h, --help
                              Print usage information.
 
 Run the lwAFTR with input from IPV4-IN.PCAP and IPV6-IN.PCAP, and record
-output to IPV4-OUT.PCAP and IPV6-OUT.PCAP.  Exit when finished.  This
-program is used in the lwAFTR test suite.
+output to IPV4-OUT.PCAP and IPV6-OUT.PCAP. COUNTERS.LUA contains a table that
+defines the counters and by how much each should increment.
+Exit when finished.  This program is used in the lwAFTR test suite.

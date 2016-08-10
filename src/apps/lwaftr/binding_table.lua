@@ -149,6 +149,63 @@ local function hash_softwire(key)
    return hash_i32(bxor(ipv4, hash_i32(psid)))
 end
 
+
+BTLookupQueue = {}
+
+-- BTLookupQueue needs a binding table to get softwires, BR addresses
+-- and PSID lookup.
+function BTLookupQueue.new(binding_table)
+   local ret = {
+      binding_table = assert(binding_table),
+   }
+   ret.streamer = binding_table.softwires:make_lookup_streamer(32)
+   ret.packet_queue = ffi.new("struct packet * [32]")
+   ret.length = 0
+   return setmetatable(ret, {__index=BTLookupQueue})
+end
+
+function BTLookupQueue:enqueue_lookup(pkt, ipv4, port)
+   local n = self.length
+   local streamer = self.streamer
+   streamer.entries[n].key.ipv4 = ipv4
+   streamer.entries[n].key.psid = port
+   self.packet_queue[n] = pkt
+   n = n + 1
+   self.length = n
+   return n == 32
+end
+
+function BTLookupQueue:process_queue()
+   if self.length > 0 then
+      local streamer = self.streamer
+      for n = 0, self.length-1 do
+         local ipv4 = streamer.entries[n].key.ipv4
+         local port = streamer.entries[n].key.psid
+         streamer.entries[n].key.psid = self.binding_table:lookup_psid(ipv4, port)
+      end
+      streamer:stream()
+   end
+   return self.length
+end
+
+function BTLookupQueue:get_lookup(n)
+   if n < self.length then
+      local streamer = self.streamer
+      local pkt, b4_ipv6, br_ipv6
+      pkt = self.packet_queue[n]
+      self.packet_queue[n] = nil
+      if not streamer:is_empty(n) then
+         b4_ipv6 = streamer.entries[n].value.b4_ipv6
+         br_ipv6 = self.binding_table:get_br_address(streamer.entries[n].value.br)
+      end
+      return pkt, b4_ipv6, br_ipv6
+   end
+end
+
+function BTLookupQueue:reset_queue()
+   self.length = 0
+end
+
 local BindingTable = {}
 
 function BindingTable.new(psid_map, br_addresses, br_address_count,
@@ -159,9 +216,6 @@ function BindingTable.new(psid_map, br_addresses, br_address_count,
       br_address_count = assert(br_address_count),
       softwires = assert(softwires)
    }
-   ret.streamer = softwires:make_lookup_streamer(32)
-   ret.packet_queue = ffi.new("struct packet * [32]")
-   ret.lookup_queue_len = 0
    return setmetatable(ret, {__index=BindingTable})
 end
 
@@ -173,48 +227,6 @@ function BindingTable:lookup(ipv4, port)
    local res = self.softwires:lookup(lookup_key)
    if res then return self.softwires:val_at(res) end
    return nil
-end
-
-function BindingTable:enqueue_lookup(pkt, ipv4, port)
-   local n = self.lookup_queue_len
-   local streamer = self.streamer
-   streamer.entries[n].key.ipv4 = ipv4
-   streamer.entries[n].key.psid = port
-   self.packet_queue[n] = pkt
-   n = n + 1
-   self.lookup_queue_len = n
-   return n == 32
-end
-
-function BindingTable:process_lookup_queue()
-   if self.lookup_queue_len > 0 then
-      local streamer = self.streamer
-      for n = 0, self.lookup_queue_len-1 do
-         local ipv4 = streamer.entries[n].key.ipv4
-         local port = streamer.entries[n].key.psid
-         streamer.entries[n].key.psid = self:lookup_psid(ipv4, port)
-      end
-      streamer:stream()
-   end
-   return self.lookup_queue_len
-end
-
-function BindingTable:get_enqueued_lookup(n)
-   if n < self.lookup_queue_len then
-      local streamer = self.streamer
-      local pkt, b4_ipv6, br_ipv6
-      pkt = self.packet_queue[n]
-      self.packet_queue[n] = nil
-      if not streamer:is_empty(n) then
-         b4_ipv6 = streamer.entries[n].value.b4_ipv6
-         br_ipv6 = self:get_br_address(streamer.entries[n].value.br)
-      end
-      return pkt, b4_ipv6, br_ipv6
-   end
-end
-
-function BindingTable:reset_lookup_queue()
-   self.lookup_queue_len = 0
 end
 
 function BindingTable:is_managed_ipv4_address(ipv4)
