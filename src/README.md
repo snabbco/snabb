@@ -469,6 +469,10 @@ If *readonly* is non-nil the shared object is mapped in read-only mode.
 *Readonly* defaults to nil. Fails if the shared object does not already exist.
 Returns a pointer to the mapped object.
 
+— Function **shm.exists** *name*
+
+Checks whether shared object *name* exists.
+
 — Function **shm.unmap** *pointer*
 
 Deletes the memory mapping for *pointer*.
