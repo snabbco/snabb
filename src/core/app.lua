@@ -86,40 +86,6 @@ function with_restart (app, method)
    return status, result
 end
 
--- Ingress packet drop monitor.
-ingress_drop_monitor = {
-   threshold = 100000,
-   wait = 20,
-   last_flush = 0,
-   last_value = ffi.new('uint64_t[1]'),
-   current_value = ffi.new('uint64_t[1]')
-}
-
-function ingress_drop_monitor:sample()
-   local sum = self.current_value
-   sum[0] = 0
-   for i = 1, #app_array do
-      local app = app_array[i]
-      if app.ingress_packet_drops and not app.dead then
-         local status, value = with_restart(app, app.ingress_packet_drops)
-         if status then sum[0] = sum[0] + value end
-      end
-   end
-end
-
-function ingress_drop_monitor:jit_flush_if_needed()
-   if self.current_value[0] - self.last_value[0] < self.threshold then return end
-   if now() - self.last_flush < self.wait then return end
-   self.last_flush = now()
-   self.last_value[0] = self.current_value[0]
-   jit.flush()
-   print(now()..": warning: Dropped more than "..self.threshold.." packets;"
-            .." flushing JIT to try to recover.  See"
-            .." https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.performance.md"
-            .." for performance tuning tips.")
-   --- TODO: Change last_flush, last_value and current_value fields to be counters.
-end
-
 -- Restart dead apps.
 function restart_dead_apps ()
    if not use_restart then return end

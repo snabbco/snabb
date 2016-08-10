@@ -246,7 +246,7 @@ function run(args)
 
       local function done() return is_done end
       head:resolve()
-      engine.main({done=done, ingress_drop_monitor=false})
+      engine.main({done=done})
    end
 
    engine.busywait = true
