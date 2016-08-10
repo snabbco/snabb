@@ -273,9 +273,9 @@ local function drop_ipv4(lwstate, pkt, pkt_src_link)
    return drop(pkt)
 end
 
-local transmit_icmpv6_with_rate_limit
+local transmit_icmpv6_reply, transmit_icmpv4_reply
 
-local function init_transmit_icmpv6_with_rate_limit(lwstate)
+local function init_transmit_icmpv6_reply(lwstate)
    assert(lwstate.icmpv6_rate_limiter_n_seconds > 0,
       "Incorrect icmpv6_rate_limiter_n_seconds value, must be > 0")
    assert(lwstate.icmpv6_rate_limiter_n_packets >= 0,
@@ -285,11 +285,11 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
    local num_packets = 0
    local last_time
    return function (o, pkt)
-      local cur_now = tonumber(engine.now())
-      last_time = last_time or cur_now
+      local now = tonumber(engine.now())
+      last_time = last_time or now
       -- Reset if elapsed time reached.
-      if cur_now - last_time >= icmpv6_rate_limiter_n_seconds then
-         last_time = cur_now
+      if now - last_time >= icmpv6_rate_limiter_n_seconds then
+         last_time = now
          num_packets = 0
       end
       -- Send packet if limit not reached.
@@ -301,6 +301,56 @@ local function init_transmit_icmpv6_with_rate_limit(lwstate)
       else
          counter.add(lwstate.counters["drop-over-rate-limit-icmpv6-bytes"], pkt.length)
          counter.add(lwstate.counters["drop-over-rate-limit-icmpv6-packets"])
+         return drop(pkt)
+      end
+   end
+end
+
+local function ipv4_in_binding_table (lwstate, ip)
+   return lwstate.binding_table:is_managed_ipv4_address(ip)
+end
+
+local function init_transmit_icmpv4_reply (lwstate)
+   assert(lwstate.icmpv4_rate_limiter_n_seconds > 0,
+      "Incorrect icmpv4_rate_limiter_n_seconds value, must be > 0")
+   assert(lwstate.icmpv4_rate_limiter_n_packets >= 0,
+      "Incorrect icmpv4_rate_limiter_n_packets value, must be >= 0")
+   local icmpv4_rate_limiter_n_seconds = lwstate.icmpv4_rate_limiter_n_seconds
+   local icmpv4_rate_limiter_n_packets = lwstate.icmpv4_rate_limiter_n_packets
+   local num_packets = 0
+   local last_time
+   return function (o, pkt, orig_pkt)
+      local now = tonumber(engine.now())
+      last_time = last_time or now
+      -- Reset if elapsed time reached.
+      if now - last_time >= icmpv4_rate_limiter_n_seconds then
+         last_time = now
+         num_packets = 0
+      end
+      -- Send packet if limit not reached.
+      if num_packets < icmpv4_rate_limiter_n_packets then
+         num_packets = num_packets + 1
+         drop(orig_pkt)
+         counter.add(lwstate.counters["out-icmpv4-bytes"], pkt.length)
+         counter.add(lwstate.counters["out-icmpv4-packets"])
+         -- Only locally generated error packets are handled here.  We transmit
+         -- them right away, instead of calling transmit_ipv4, because they are
+         -- never hairpinned and should not be counted by the "out-ipv4" counter.
+         -- However, they should be tunneled if the error is to be sent to a host
+         -- behind a B4, whether or not hairpinning is enabled; this is not hairpinning.
+         -- ... and the tunneling should happen via the 'hairpinning' queue, to make
+         -- sure counters are handled appropriately, despite this not being hairpinning.
+         -- This avoids having phantom incoming IPv4 packets.
+         local ipv4_header = get_ethernet_payload(pkt)
+         local dst_ip = get_ipv4_dst_address(ipv4_header)
+         if ipv4_in_binding_table(lwstate, dst_ip) then
+            return transmit(lwstate.input.hairpin_in, pkt)
+         else
+            counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
+            counter.add(lwstate.counters["out-ipv4-packets"])
+            return transmit(lwstate.o4, pkt)
+         end
+      else
          return drop(pkt)
       end
    end
@@ -324,6 +374,8 @@ function LwAftr:new(conf)
    o.aftr_mac_inet_side = conf.aftr_mac_inet_side
    o.next_hop6_mac = conf.next_hop6_mac or ethernet:pton("00:00:00:00:00:00")
    o.hairpinning = conf.hairpinning
+   o.icmpv4_rate_limiter_n_packets = conf.icmpv4_rate_limiter_n_packets
+   o.icmpv4_rate_limiter_n_seconds = conf.icmpv4_rate_limiter_n_seconds
    o.icmpv6_rate_limiter_n_packets = conf.icmpv6_rate_limiter_n_packets
    o.icmpv6_rate_limiter_n_seconds = conf.icmpv6_rate_limiter_n_seconds
    o.inet_mac = conf.inet_mac or ethernet:pton("00:00:00:00:00:00")
@@ -342,7 +394,8 @@ function LwAftr:new(conf)
 
    o.counters = create_counters()
 
-   transmit_icmpv6_with_rate_limit = init_transmit_icmpv6_with_rate_limit(o)
+   transmit_icmpv6_reply = init_transmit_icmpv6_reply(o)
+   transmit_icmpv4_reply = init_transmit_icmpv4_reply(o)
    if debug then lwdebug.pp(conf) end
    return o
 end
@@ -384,10 +437,6 @@ local function binding_lookup_ipv4(lwstate, ipv4_ip, port)
    end
 end
 
-local function ipv4_in_binding_table(lwstate, ip)
-   return lwstate.binding_table:is_managed_ipv4_address(ip)
-end
-
 local function in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port)
    local b4, br = binding_lookup_ipv4(lwstate, ipv4_src_ip, ipv4_src_port)
    return b4 and ipv6_equals(b4, ipv6_src_ip) and ipv6_equals(br, ipv6_dst_ip)
@@ -419,30 +468,6 @@ local function transmit_ipv4(lwstate, pkt)
       -- came from the internet.
       counter.add(lwstate.counters["hairpin-ipv4-bytes"], pkt.length)
       counter.add(lwstate.counters["hairpin-ipv4-packets"])
-      return transmit(lwstate.input.hairpin_in, pkt)
-   else
-      counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
-      counter.add(lwstate.counters["out-ipv4-packets"])
-      return transmit(lwstate.o4, pkt)
-   end
-end
-
--- Only locally generated error packets are handled here.  We transmit
--- them right away, instead of calling transmit_ipv4, because they are
--- never hairpinned and should not be counted by the "out-ipv4" counter.
--- However, they should be tunneled if the error is to be sent to a host
--- behind a B4, whether or not hairpinning is enabled; this is not hairpinning.
--- ... and the tunneling should happen via the 'hairpinning' queue, to make
--- sure counters are handled appropriately, despite this not being hairpinning.
--- This avoids having phantom incoming IPv4 packets.
-local function transmit_icmpv4_reply(lwstate, pkt, orig_pkt)
-   drop(orig_pkt)
-   counter.add(lwstate.counters["out-icmpv4-bytes"], pkt.length)
-   counter.add(lwstate.counters["out-icmpv4-packets"])
-
-   local ipv4_header = get_ethernet_payload(pkt)
-   local dst_ip = get_ipv4_dst_address(ipv4_header)
-   if ipv4_in_binding_table(lwstate, dst_ip) then
       return transmit(lwstate.input.hairpin_in, pkt)
    else
       counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
@@ -505,7 +530,7 @@ local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
       lwstate.aftr_mac_b4_side, lwstate.next_hop6_mac, lwstate.aftr_ipv6_ip,
       ipv6_src_addr, pkt, ethernet_header_size, icmp_config)
    drop(pkt)
-   transmit_icmpv6_with_rate_limit(lwstate.o6, b4fail_icmp)
+   transmit_icmpv6_reply(lwstate.o6, b4fail_icmp)
 end
 
 local function encapsulating_packet_with_df_flag_would_exceed_mtu(lwstate, pkt)
