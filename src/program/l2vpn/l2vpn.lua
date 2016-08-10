@@ -546,14 +546,14 @@ function run (parameters)
                    .."VPLS ("..vpls_c.mtu..") and interface "
                    ..intf.." (real: "..ac_intf.mtu..", effective: "
                    ..effective_mtu..")")
-         config_if(intfs[intf], nil, c)
+         config_if(ac_intf, nil, c)
          local ac_input, ac_output
          if ac_intf.vmux then
             ac_input = ac_intf.vmux.name..".".."vlan"..vid
             ac_output = ac_intf.vmux.name..".".."vlan"..vid
          else
-            ac_input = intf..".rx"
-            ac_output = intf..".tx"
+            ac_input = ac_intf.name..".rx"
+            ac_output = ac_intf.name..".tx"
          end
          table.insert(bridge_config.ports, ac_name)
          table.insert(acs, { name = ac_name,
