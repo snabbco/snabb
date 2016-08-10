@@ -3,6 +3,7 @@ module(..., package.seeall)
 local config     = require("core.config")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
+local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
 local lwaftr     = require("apps.lwaftr.lwaftr")
 local basic_apps = require("apps.basic.basic_apps")
@@ -140,6 +141,32 @@ function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
    link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
 end
 
+function load_on_a_stick(c, conf, v4v6, args)
+   local Tap = require("apps.tap.tap").Tap
+   lwaftr_app(c, conf)
+
+   config.app(c, 'nic', Intel82599, {
+      pciaddr = args.pciaddr,
+   })
+   if args.mirror then
+      local ifname = args.mirror
+      config.app(c, 'tap', Tap, ifname)
+      config.app(c, v4v6, V4V6, {
+         mirror = true
+      })
+   else
+      config.app(c, v4v6, V4V6)
+   end
+
+   config.link(c, 'nic.tx -> '..v4v6..'.input')
+   link_source(c, v4v6..'.v4_tx', v4v6..'.v6_tx')
+   link_sink(c, v4v6..'.v4_rx', v4v6..'.v6_rx')
+   config.link(c, v4v6..'.output -> nic.rx')
+   if args.mirror then
+      config.link(c, v4v6..'.mirror -> tap.input')
+   end
+end
+
 function load_virt(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
    lwaftr_app(c, conf)
 
@@ -183,6 +210,53 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
    link_sink(c, v4_sink..'.input', v6_sink..'.input')
 end
 
+function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
+   lwaftr_app(c, conf)
+
+   config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
+   config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
+   config.app(c, "output_filev4", pcap.PcapWriter, outv4_pcap)
+   config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
+   if conf.vlan_tagging then
+      config.app(c, "untagv4", vlan.Untagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "untagv6", vlan.Untagger, { tag=conf.v6_vlan_tag })
+      config.app(c, "tagv4", vlan.Tagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "tagv6", vlan.Tagger, { tag=conf.v6_vlan_tag })
+   end
+
+   local basic_apps = require("apps.basic.basic_apps")
+   local V4V6 = require("apps.lwaftr.V4V6").V4V6
+   config.app(c, 'v4v6', V4V6)
+   config.app(c, 'splitter', V4V6)
+   config.app(c, 'join', basic_apps.Join)
+
+   local sources = { "v4v6.v4_tx", "v4v6.v6_tx" }
+   local sinks = { "v4v6.v4_rx", "v4v6.v6_rx" }
+
+   if conf.vlan_tagging then
+      config.link(c, "capturev4.output -> untagv4.input")
+      config.link(c, "capturev6.output -> untagv6.input")
+      config.link(c, "untagv4.output -> join.in1")
+      config.link(c, "untagv6.output -> join.in2")
+      config.link(c, "join.out -> v4v6.input")
+      config.link(c, "v4v6.output -> splitter.input")
+      config.link(c, "splitter.v4_tx -> tagv4.input")
+      config.link(c, "splitter.v6_tx -> tagv6.input")
+      config.link(c, "tagv4.output -> output_filev4.input")
+      config.link(c, "tagv6.output -> output_filev6.input")
+   else
+      config.link(c, "capturev4.output -> join.in1")
+      config.link(c, "capturev6.output -> join.in2")
+      config.link(c, "join.out -> v4v6.input")
+      config.link(c, "v4v6.output -> splitter.input")
+      config.link(c, "splitter.v4_tx -> output_filev4.input")
+      config.link(c, "splitter.v6_tx -> output_filev6.input")
+   end
+
+   link_source(c, unpack(sources))
+   link_sink(c, unpack(sinks))
+end
+
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    lwaftr_app(c, conf)
 
@@ -197,16 +271,19 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
       config.app(c, "tagv6", vlan.Tagger, { tag=conf.v6_vlan_tag })
    end
 
+   local sources = { "capturev4.output", "capturev6.output" }
+   local sinks = { "output_filev4.input", "output_filev6.input" }
+
    if conf.vlan_tagging then
+      sources = { "untagv4.output", "untagv6.output" }
+      sinks = { "tagv4.input", "tagv6.input" }
+
       config.link(c, "capturev4.output -> untagv4.input")
       config.link(c, "capturev6.output -> untagv6.input")
-      link_source(c, 'untagv4.output', 'untagv6.output')
-
-      link_sink(c, 'tagv4.input', 'tagv6.input')
       config.link(c, "tagv4.output -> output_filev4.input")
       config.link(c, "tagv6.output -> output_filev6.input")
-   else
-      link_source(c, 'capturev4.output', 'capturev6.output')
-      link_sink(c, 'output_filev4.input', 'output_filev6.input')
    end
+
+   link_source(c, unpack(sources))
+   link_sink(c, unpack(sinks))
 end

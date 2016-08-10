@@ -103,22 +103,22 @@ function parse_args(args)
          fatal("ring size is not a power of two: " .. arg)
       end
    end
-   handlers["no-ingress-drop-monitor"] = function (arg)
-      if arg == 'flush' or arg == 'warn' then
-         opts.ingress_drop_monitor = arg
-      elseif arg == 'off' then
-         opts.ingress_drop_monitor = nil
-      else
-         fatal("invalid --ingress-drop-monitor argument: " .. arg
-                  .." (valid values: flush, warn, off)")
+   handlers["on-a-stick"] = function(arg)
+      opts["on-a-stick"] = true
+      v4 = arg
+      if not nic_exists(v4) then
+         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
       end
+   end
+   handlers["mirror"] = function (ifname)
+      opts["mirror"] = ifname
    end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:hir:",
       { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
-        verbose = "v", duration = "D", help = "h",
-        virtio = "i", ["ring-buffer-size"] = "r", cpu = 1,
-        ["real-time"] = 0, ["ingress-drop-monitor"] = 1, })
+        verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
+        ["ring-buffer-size"] = "r", ["real-time"] = 0,
+        ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1 })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -126,11 +126,19 @@ function parse_args(args)
       require('apps.intel.intel10g').num_descriptors = ring_buffer_size
    end
    if not conf_file then fatal("Missing required --conf argument.") end
-   if not v4 then fatal("Missing required --v4 argument.") end
-   if not v6 then fatal("Missing required --v6 argument.") end
+   if opts.mirror then
+      assert(opts["on-a-stick"], "Mirror option is only valid in on-a-stick mode")
+   end
    if cpu then numa.bind_to_cpu(cpu) end
-   numa.check_affinity_for_pci_addresses({ v4, v6 })
-   return opts, conf_file, v4, v6
+   if opts["on-a-stick"] then
+      numa.check_affinity_for_pci_addresses({ v4 })
+      return opts, conf_file, v4
+   else
+      if not v4 then fatal("Missing required --v4-pci argument.") end
+      if not v6 then fatal("Missing required --v6-pci argument.") end
+      numa.check_affinity_for_pci_addresses({ v4, v6 })
+      return opts, conf_file, v4, v6
+   end
 end
 
 function run(args)
@@ -140,6 +148,11 @@ function run(args)
    local c = config.new()
    if opts.virtio_net then
       setup.load_virt(c, conf, 'inetNic', v4, 'b4sideNic', v6)
+   elseif opts["on-a-stick"] then
+      setup.load_on_a_stick(c, conf, 'v4v6', {
+         mirror = opts.mirror,
+         pciaddr = v4,
+      })
    else
       setup.load_phy(c, conf, 'inetNic', v4, 'b4sideNic', v6)
    end
@@ -153,8 +166,13 @@ function run(args)
 
    if opts.verbosity >= 1 then
       local csv = csv_stats.CSVStatsTimer.new()
-      csv:add_app('inetNic', { 'tx', 'rx' }, { tx='IPv4 RX', rx='IPv4 TX' })
-      csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx='IPv6 RX', rx='IPv6 TX' })
+      if opts["on-a-stick"] then
+         csv:add_app('v4v6', { 'v4_tx', 'v4_rx' }, { tx='IPv4 RX', rx='IPv4 TX' })
+         csv:add_app('v4v6', { 'v6_tx', 'v6_rx' }, { tx='IPv6 RX', rx='IPv6 TX' })
+      else
+         csv:add_app('inetNic', { 'tx', 'rx' }, { tx='IPv4 RX', rx='IPv4 TX' })
+         csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx='IPv6 RX', rx='IPv6 TX' })
+      end
       csv:activate()
    end
 
