@@ -3,7 +3,7 @@ module(..., package.seeall)
 local config     = require("core.config")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
-local V4V6       = require("apps.lwaftr.v4v6").v4v6
+local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
 local lwaftr     = require("apps.lwaftr.lwaftr")
 local basic_apps = require("apps.basic.basic_apps")
@@ -225,9 +225,9 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
    end
 
    local basic_apps = require("apps.basic.basic_apps")
-   local v4v6 = require("apps.lwaftr.v4v6").v4v6
-   config.app(c, 'v4v6', v4v6)
-   config.app(c, 'splitter', v4v6)
+   local V4V6 = require("apps.lwaftr.V4V6").V4V6
+   config.app(c, 'v4v6', V4V6)
+   config.app(c, 'splitter', V4V6)
    config.app(c, 'join', basic_apps.Join)
 
    local sources = { "v4v6.v4_tx", "v4v6.v6_tx" }

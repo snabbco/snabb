@@ -51,17 +51,17 @@ local function mirror_ipv6 (pkt, output, ipv4_num)
    end
 end
 
-v4v6 = {}
+V4V6 = {}
 
-function v4v6:new (conf)
+function V4V6:new (conf)
    local o = {
-      description = conf.description or "v4v6",
+      description = conf.description or "V4V6",
       mirror = conf.mirror or false,
    }
-   return setmetatable(o, {__index = v4v6})
+   return setmetatable(o, {__index = V4V6})
 end
 
-function v4v6:push()
+function V4V6:push()
    local input, output = self.input.input, self.output.output
    local v4_tx, v6_tx = self.output.v4_tx, self.output.v6_tx
    local v4_rx, v6_rx = self.input.v4_rx, self.input.v6_rx
@@ -152,7 +152,7 @@ local function test_split ()
 
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'v4v6', v4v6)
+   config.app(c, 'v4v6', V4V6)
    config.app(c, 'sink', basic_apps.Sink)
 
    config.link(c, 'source.output -> v4v6.input')
@@ -175,7 +175,7 @@ local function test_join ()
 
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'v4v6', v4v6)
+   config.app(c, 'v4v6', V4V6)
    config.app(c, 'sink', basic_apps.Sink)
 
    config.link(c, 'source.output -> v4v6.v4_rx')
@@ -192,7 +192,7 @@ local function test_join ()
 end
 
 function selftest ()
-   print("v4v6: selftest")
+   print("V4V6: selftest")
    test_split()
    test_join()
    print("OK")
