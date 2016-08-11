@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Abstract base class for hash functions.
 --
 -- A subclass must define the instance variable "_size" as the number

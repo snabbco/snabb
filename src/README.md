@@ -1,39 +1,65 @@
 # Introduction
 
-*Snabb Switch* is an extensible, virtualized, Ethernet networking
-toolkit.  With Snabb Switch you can implement networking applications
-using the *Lua language*. Snabb Switch includes all the tools you need to
+*Snabb* is an extensible, virtualized, Ethernet networking
+toolkit.  With Snabb you can implement networking applications
+using the *Lua language*. Snabb includes all the tools you need to
 quickly realize your network designs and its really fast too!
-Furthermore, Snabb Switch is extensible and encourages you to grow the
+Furthermore, Snabb is extensible and encourages you to grow the
 ecosystem to match your requirements.
 
-![Architecture](.images/Architecture.png)
+    DIAGRAM: Architecture
+            +---------------------+
+            | Your Network Design |
+            +----*-----*-----*----+
+                 |     |     |
+    
+    (Built in and custom Apps and Libraries)
+    
+                 |     |     |
+           +-----*-----*-----*-----+
+           |      Snabb Core       |
+           +-----------------------+
 
-The Snabb Switch Core forms a runtime environment (*engine*) which
+The Snabb Core forms a runtime environment (*engine*) which
 executes your *design*. A design is simply a Lua script used to drive the
-Snabb Switch stack, you can think of it as your top-level "main" routine.
+Snabb stack, you can think of it as your top-level "main" routine.
 
-In order to add functionality to the Snabb Switch stack you can load
-modules into the Snabb Switch engine. These can be Lua modules as well as
+In order to add functionality to the Snabb stack you can load
+modules into the Snabb engine. These can be Lua modules as well as
 native code objects. We differentiate between two classes of modules,
 namely libraries and *Apps*. Libraries are simple collections of program
 utilities to be used in your designs, apps or other libraries, just as
 you might expect. Apps, on the other hand, are code objects that
-implement a specific interface, which is used by the Snabb Switch engine
+implement a specific interface, which is used by the Snabb engine
 to organize an *App Network*.
 
-![Network](.images/Network.png)
+    DIAGRAM: Network
+                   +---------+
+                   |         |
+                +->* Filter0 *--+
+                |  |         |  |
+                |  +---------+  |
+    +---+----+  |               |  +----+---+
+    |        *--+               +->*        |
+    |  NIC0  |                     |  NIC1  |
+    |        *<-+               +--*        |
+    +---+----+  |               |  +----+---+
+                |  +---------+  |
+                |  |         |  |
+                +--* Filter1 *<-+
+                   |         |
+                   +---------+
 
-Usually, a Snabb Switch design will create a series of apps, interconnect
+Usually, a Snabb design will create a series of apps, interconnect
 these in a desired way using *links* and finally pass the resulting app
-network on to the Snabb Switch engine. The engine's job is to:
+network on to the Snabb engine. The engine's job is to:
 
  * Pump traffic through the app network
  * Keep the app network running (e.g. restart failed apps)
  * Report on the network status
 
 
-# Snabb Switch API
+# Snabb API
 
 The core modules defined below  can be loaded using Lua's `require`. For
 example:
@@ -184,7 +210,7 @@ network. The engine updates the app network as follows:
 
 — Function **engine.main** *options*
 
-Run the Snabb Switch engine. *Options* is a table of key/value pairs. The
+Run the Snabb engine. *Options* is a table of key/value pairs. The
 following keys are recognized:
 
  * `duration` - Duration in seconds to run the engine for (as a floating
@@ -198,6 +224,11 @@ following keys are recognized:
    set to boolean values to force or suppress link and app reporting
    individually. By default `engine.main()' will report on links but not
    on apps.
+ * `measure_latency` - By default, the `breathe()` loop is instrumented
+   to record the latency distribution of running the app graph.  This
+   information can be processed by the `snabb top` program.  Passing
+   `measure_latency=false` in the *options* will disable this
+   instrumentation.
  * `no_report` - A boolean value. If `true` no final report will be
    printed.
 
@@ -306,6 +337,12 @@ Returns the payload length of *packet*.
 
 Returns an exact copy of *packet*.
 
+— Function **packet.resize** *packet*, *length*
+
+Sets the payload length of *packet*, truncating or extending its payload. In
+the latter case the contents of the extended area at the end of the payload are
+filled with zeros.
+
 — Function **packet.append** *packet*, *pointer*, *length*
 
 Appends *length* bytes starting at *pointer* to the end of *packet*. An
@@ -333,48 +370,23 @@ Allocate packet and fill it with the contents of *string*.
 
 ## Memory (core.memory)
 
-Snabb Switch does two things specially when it comes to memory: It
-runs with a fixed physical memory map and it allocates *huge pages*
-from the operating system.
+Snabb allocates special
+[DMA](https://en.wikipedia.org/wiki/Direct_memory_access) memory that
+can be accessed directly by network cards. The important
+characteristic of DMA memory is being located in contiguous physical
+memory at a stable address.
 
-Running with a fixed memory map means that every virtual address in the
-Snabb Switch process has a fixed *physical address* in the RAM
-chips. This means that we are always able to convert from a virtual
-address in our process to a physical address that other hardware (for
-example, a network card) can use for DMA.
+— Function **memory.dma_alloc** *bytes*
 
-Huge pages (also known as *HugeTLB pages*) are how we allocate large
-amounts of contiguous memory, typically 2MB at a time. Hardware devices
-sometimes require this, for example a network card's *descriptor ring*
-may require a list of pointers to available buffers in physical memory.
+Returns a pointer to *bytes* of new DMA memory.
 
-— Variable **memory.chunks**
+— Function **memory.virtual_to_physical** *pointer*
 
-List of all allocated huge pages. Read-only. Each huge page is
-represented by a table with the following keys:
-
-* `pointer` - Virtual address
-* `physical` - Physical address
-* `size` -  Size in bytes
-* `used` - Bytes used
+Returns the physical address (`uint64_t`) the DMA memory at *pointer*.
 
 — Variable **memory.huge_page_size**
 
 Size of a single huge page in bytes. Read-only.
-
-— Variable **huge_page_bits**
-
-Number of address bits per huge page. Read-only.
-
-— Function **memory.dma_alloc** *bytes*
-
-Allocate *bytes* of DMA-friendly memory. Returns virtual memory pointer,
-physical address, and actual size.
-
-— Function **memory.virtual_to_physical** *virtual_address*
-
-Returns the physical address of memory at *virtual_address*.
-
 
 
 ## Lib (core.lib)
@@ -607,7 +619,7 @@ integers *n* respectively.
 
 ## Main
 
-Snabb Switch designs can be run either with:
+Snabb designs can be run either with:
 
     snabb <snabb-arg>* <design> <design-arg>*
 
@@ -616,7 +628,7 @@ or
     #!/usr/bin/env snabb <snabb-arg>*
     ...
 
-The *main* module provides an interface for running Snabb Switch scripts.
+The *main* module provides an interface for running Snabb scripts.
 It exposes various operating system functions to scripts.
 
 — Field **main.parameters**

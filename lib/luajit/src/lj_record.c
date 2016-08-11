@@ -719,9 +719,14 @@ void lj_record_tailcall(jit_State *J, BCReg func, ptrdiff_t nargs)
   /* Move func + args down. */
   memmove(&J->base[-1], &J->base[func], sizeof(TRef)*(J->maxslot+1));
   /* Note: the new TREF_FRAME is now at J->base[-1] (even for slot #0). */
-  /* Tailcalls can form a loop, so count towards the loop unroll limit. */
-  if (++J->tailcalled > J->loopunroll)
-    lj_trace_err(J, LJ_TRERR_LUNROLL);
+
+  J->tailcalled++;
+
+  /* Although it's true that tail calls can form a loop, the Lua programming
+  ** idiom does not encourage this.  Instead of counting tail calls towards the
+  ** unroll limit and potentially causing important traces without loops to
+  ** abort, eventually blacklist, and fall back to the interpreter, just rely on
+  ** JIT_P_maxrecord to catch runaway tail-call loops. */
 }
 
 /* Check unroll limits for down-recursion. */
@@ -1236,12 +1241,14 @@ static void rec_idx_abc(jit_State *J, TRef asizeref, TRef ikey, uint32_t asize)
 }
 
 /* Record indexed key lookup. */
-static TRef rec_idx_key(jit_State *J, RecordIndex *ix, IRRef *rbref)
+static TRef rec_idx_key(jit_State *J, RecordIndex *ix, IRRef *rbref,
+			IRType1 *rbguard)
 {
   TRef key;
   GCtab *t = tabV(&ix->tabv);
   ix->oldv = lj_tab_get(J->L, t, &ix->keyv);  /* Lookup previous value. */
   *rbref = 0;
+  rbguard->irt = 0;
 
   /* Integer keys are looked up in the array part first. */
   key = ix->key;
@@ -1293,6 +1300,7 @@ static TRef rec_idx_key(jit_State *J, RecordIndex *ix, IRRef *rbref)
 	hslot <= 65535*(MSize)sizeof(Node)) {
       TRef node, kslot, hm;
       *rbref = J->cur.nins;  /* Mark possible rollback point. */
+      *rbguard = J->guardemit;
       hm = emitir(IRTI(IR_FLOAD), ix->tab, IRFL_TAB_HMASK);
       emitir(IRTGI(IR_EQ), hm, lj_ir_kint(J, (int32_t)t->hmask));
       node = emitir(IRT(IR_FLOAD, IRT_P32), ix->tab, IRFL_TAB_NODE);
@@ -1327,6 +1335,7 @@ TRef lj_record_idx(jit_State *J, RecordIndex *ix)
   TRef xref;
   IROp xrefop, loadop;
   IRRef rbref;
+  IRType1 rbguard;
   cTValue *oldv;
 
   while (!tref_istab(ix->tab)) { /* Handle non-table lookup. */
@@ -1373,7 +1382,7 @@ TRef lj_record_idx(jit_State *J, RecordIndex *ix)
   }
 
   /* Record the key lookup. */
-  xref = rec_idx_key(J, ix, &rbref);
+  xref = rec_idx_key(J, ix, &rbref, &rbguard);
   xrefop = IR(tref_ref(xref))->o;
   loadop = xrefop == IR_AREF ? IR_ALOAD : IR_HLOAD;
   /* The lj_meta_tset() inconsistency is gone, but better play safe. */
@@ -1388,8 +1397,10 @@ TRef lj_record_idx(jit_State *J, RecordIndex *ix)
     } else {
       res = emitir(IRTG(loadop, t), xref, 0);
     }
-    if (tref_ref(res) < rbref)  /* HREFK + load forwarded? */
+    if (tref_ref(res) < rbref) {  /* HREFK + load forwarded? */
       lj_ir_rollback(J, rbref);  /* Rollback to eliminate hmask guard. */
+      J->guardemit = rbguard;
+    }
     if (t == IRT_NIL && ix->idxchain && lj_record_mm_lookup(J, ix, MM_index))
       goto handlemm;
     if (irtype_ispri(t)) res = TREF_PRI(t);  /* Canonicalize primitives. */
@@ -1397,8 +1408,10 @@ TRef lj_record_idx(jit_State *J, RecordIndex *ix)
   } else {  /* Indexed store. */
     GCtab *mt = tabref(tabV(&ix->tabv)->metatable);
     int keybarrier = tref_isgcv(ix->key) && !tref_isnil(ix->val);
-    if (tref_ref(xref) < rbref)  /* HREFK forwarded? */
+    if (tref_ref(xref) < rbref) {  /* HREFK forwarded? */
       lj_ir_rollback(J, rbref);  /* Rollback to eliminate hmask guard. */
+      J->guardemit = rbguard;
+    }
     if (tvisnil(oldv)) {  /* Previous value was nil? */
       /* Need to duplicate the hasmm check for the early guards. */
       int hasmm = 0;

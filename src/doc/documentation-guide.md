@@ -1,24 +1,24 @@
-# Contributing Documentation in SnabbSwitch
+# Contributing Documentation in Snabb
 
-## README.md, README.md.src and README(.inc)
+## README.md, README.src.md and README(.inc)
 
-The SnabbSwitch documentation is organized in README's spread across the
+The Snabb documentation is organized in README's spread across the
 code base. If you commit changes you should look for the "nearest" README
 file related to the modules you changed and update these. There are three
 different kinds of README files:
 
-* `README.md` — A portion of the SnabbSwitch manual, embedded by GitHub
+* `README.md` — A portion of the Snabb manual, embedded by GitHub
   too. These are often (but not always) artifacts built from a `.src`
   file. Edit these if no `.src` is available (see below).
-* `README.md.src` — A build recipe. If available, this is the one you
+* `README.src.md` — A build recipe. If available, this is the one you
   must edit. These are formatted in [GitHub Flavored
   Markdown](https://help.github.com/articles/github-flavored-markdown/).
 * `README(.inc)` — Plain text files included as the `--help` message of
-  SnabbSwitch programs. These should be using only the ASCII character
+  Snabb programs. These should be using only the ASCII character
   set to ensure compatibility with older terminals.
 
 For instance if you had changed the API of `lib.protocol.ethernet` you'd
-need to update the documentation in `lib/protocol/README.md.src`. It is
+need to update the documentation in `lib/protocol/README.src.md`. It is
 important that you use the correct header level (e.g. `##`, `###`,
 ...). Which level you are at can be seen in `doc/genbook.sh` (see
 *Building A Standalone Documentation*).
@@ -32,11 +32,12 @@ groups:
 * **Power users:** Public APIs like `core.packet` or
   `lib.protocol.ethernet` are there for app designers to use. These
   should be well documented but may require knowledge of Lua and other
-  parts of the Snabb Switch system.
+  parts of the Snabb system.
 * **Contributors:** Some documents (like the one you are reading now) are
-  facing towards Snabb Switch contributors. They can be frequently
+  facing towards Snabb contributors. They can be frequently
   updating and even contain open questions. We should ensure that these
-  always reflect the current state of affairs.
+  always reflect the current state of affairs. This also includes
+  implementation details which should be documented as source code comments.
 
 ### Building README.md Files
 
@@ -49,11 +50,11 @@ make lib/protocol/README.md
 
 You need to commit the resulting `README.md` (and possibly generated
 diagram images, see *Including Diagrams*) alongside the updated
-`README.md.src`.
+`README.src.md`.
 
 ### Including Diagrams
 
-The main reason for the `README.md.src` to `README.md` step is that we
+The main reason for the `README.src.md` to `README.md` step is that we
 use a custom Markdown pre-processor to be able to embed ASCII diagrams in
 our documentation. These ASCII diagrams will be rendered to pretty images
 by [ditaa](http://ditaa.sourceforge.net/). In order to build `README.md`
@@ -74,9 +75,9 @@ Normal paragraph...
 
 ## Building A Standalone Documentation
 
-In order to build a complete SnabbSwitch reference manual you can use
-`make doc/snabbswitch.html`, `make doc/snabbswitch.epub` and `make
-doc/snabbswitch.pdf` to build the HTML, ePUB and PDF versions
+In order to build a complete Snabb reference manual you can use
+`make obj/doc/snabb.html`, `make obj/doc/snabb.epub` and `make
+obj/doc/snabb.pdf` to build the HTML, ePUB and PDF versions
 respectively. Alternatively, `make book` can be used to build all three
 at once. For these tasks to work you will need a local installation of
 [Pandoc](http://johnmacfarlane.net/pandoc/).
@@ -94,9 +95,71 @@ that concatenates the various `README.md` files we have.
 
 # Stylistic Conventions
 
+## General Considerations
+
+Documentation is most effective when it is precise, concise and uniform.
+
+ - **Preciseness**. Vague descriptions do more harm than good as different
+   readers will derive different interpretations. Make sure you use the most
+   specific phrasing possible. Ideally, there should be no room for
+   interpretation. If it is difficult to come up with a precise definition of
+   an API, chances are the API needs work.
+
+ - **Conciseness**. Every sentence strains the human attention span and risks
+   contradicting others. Express everything the API user needs to know with as
+   few sentences as possible. Unless a phrase is essential in order to
+   correctly *use* an API it does not belong in the documentation.
+   Documentation should only contain information the reader can *depend on*:
+   implementation details that might change are dangerous information, and do
+   not belong in the documentation. Readers might be inclined to write programs
+   with these details in mind. If you *must* include implementation
+   details—e.g. because they are required knowledge to use a module—separate
+   API definition from implementation detail clearly so that it is obvious to
+   the reader what kind of information he is digesting.
+
+ - **Uniformity**. Irregular documentation wastes reader attention by
+   prominently featuring irrelevant quirks. Surprises are reserved for
+   important information. By using simple, unspectacular language you save
+   attention that is better applied to the implications of a description rather
+   than its interpretation. Additionally, documentation becomes more accessible
+   for non-native speakers who might have to look up rarely used words. The
+   same applies for specialized notations. If you can express a definition
+   using either a notation or a simple sentence, go for the latter. Chances are
+   the reader is unfamiliar with the notation, and notations are often very
+   hard to “google”. Ideally, a reader able to read one chapter of the
+   documentation should be able to read every other chapter without having to
+   look up new words or concepts.
+
+
+## Markup Conventions
+
+We markup source code literals in `code` font. E.g.: "The `foobar` module
+is nice" and "`mod.fun(bla)` will make your dreams come true". Parameter
+identifiers are marked up in *italic* font. E.g.: "`mod.foo` takes an
+argument *bar*".
+
+UNIX system calls should be mentioned like so: `usleep(3)`.
+
+We markup specific *concepts* we introduce in italic font the first time
+they are mentioned in order to signify to the reader that a specific
+concept has a well defined meaning.
+
+## Terminology And Normalized Language
+
+The parameter names used in method and function description do not need
+to reflect the names used in the source code. Instead use long,
+descriptive names made out of full words when sensible.
+
+Symbol definition are written in third person, e.g.: "Returns a number"
+instead of "Return a number". When describing default behavior we say
+"The default is..." instead of "Defaults to..." etc.
+
+When in doubt, turn to the [Lua Reference Manual](http://www.lua.org/manual/5.1/)
+for linguistic and stylistic reference.
+
 ## Anatomy Of A Module Section
 
-Every module has its own subsection in the SnabbSwitch manual, and all
+Every module has its own subsection in the Snabb manual, and all
 these sections start off the same way:
 
 ```
@@ -173,30 +236,3 @@ Each key's description must be preceded by either `*Required*` or
 key's description must also declare the expected type of the argument
 value. Each optional key's description must end in a sentence defining
 its default value.
-
-
-## Markup Conventions
-
-We markup source code literals in `code` font. E.g.: "The `foobar` module
-is nice" and "`mod.fun(bla)` will make your dreams come true". Parameter
-identifiers are marked up in *italic* font. E.g.: "`mod.foo` takes an
-argument *bar*".
-
-UNIX system calls should be mentioned like so: `usleep(3)`.
-
-We markup specific *concepts* we introduce in italic font the first time
-they are mentioned in order to signify to the reader that a specific
-concept has a well defined meaning.
-
-## Terminology And Normalized Language
-
-The parameter names used in method and function description do not need
-to reflect the names used in the source code. Instead use long,
-descriptive names made out of full words when sensible.
-
-Symbol definition are written in third person, e.g.: "Returns a number"
-instead of "Return a number". When describing default behavior we say
-"The default is..." instead of "Defaults to..." etc.
-
-When in doubt, turn to the [Lua Reference Manual](http://www.lua.org/manual/5.1/)
-for linguistic and stylistic reference.

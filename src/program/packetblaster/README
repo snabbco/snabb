@@ -1,14 +1,8 @@
-Usage: packetblaster replay [OPTIONS] <PCAP-FILE> <PCI>... 
+Usage:
+  packetblaster replay
+  packetblaster synth
+  packetblaster lwaftr
 
-  -D DURATION, --duration DURATION
-                             Run for DURATION seconds.
-  -h, --help
-                             Print usage information.
-
-Transmit packets from PCAP-FILE continuously to one or more network
-adapters. The PCI arguments are Lua pattern strings that are used to
-match the network adapters to use.
-
-Examples:
-  packetblaster replay myfile.cap 0000:01:00.0
-  packetblaster replay myfile.cap 01:00
+Use --help for per-command usage.
+Example:
+    packetblaster synth --help

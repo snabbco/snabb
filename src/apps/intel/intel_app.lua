@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
 local zone = require("jit.zone")
@@ -7,7 +9,6 @@ local lib      = require("core.lib")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local intel10g = require("apps.intel.intel10g")
-local freelist = require("core.freelist")
 local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
 Intel82599 = {}
 Intel82599.__index = Intel82599
@@ -96,6 +97,10 @@ function Intel82599:pull ()
    self:add_receive_buffers()
 end
 
+function Intel82599:ingress_packet_drops ()
+   return self.dev:ingress_packet_drops()
+end
+
 function Intel82599:add_receive_buffers ()
    -- Generic buffers
    while self.dev:can_add_receive_buffer() do
@@ -181,7 +186,7 @@ function selftest ()
       -- Test experience in the lab suggests that the 82599 T3 NIC
       -- requires at least two seconds before it will reliably pass
       -- traffic. The test case sleeps for this reason.
-      -- See https://github.com/SnabbCo/snabbswitch/pull/569
+      -- See https://github.com/SnabbCo/snabb/pull/569
       C.usleep(2e6)
    end
    engine.main({duration = 1, report={showlinks=true, showapps=false}})

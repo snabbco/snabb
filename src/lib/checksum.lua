@@ -1,39 +1,14 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 module(...,package.seeall)
 
--- This module exposes the interface:
---   checksum.ipsum(pointer, length, initial) => checksum
---
--- pointer is a pointer to an array of data to be checksummed. initial
--- is an unsigned 16-bit number in host byte order which is used as
--- the starting value of the accumulator.  The result is the IP
--- checksum over the data in host byte order.
---
--- The initial argument can be used to verify a checksum or to
--- calculate the checksum in an incremental manner over chunks of
--- memory.  The synopsis to check whether the checksum over a block of
--- data is equal to a given value is the following
---
---  if ipsum(pointer, length, value) == 0 then
---    -- checksum correct
---  else
---    -- checksum incorrect
---  end
---
--- To chain the calculation of checksums over multiple blocks of data
--- together to obtain the overall checksum, one needs to pass the
--- one's complement of the checksum of one block as initial value to
--- the call of ipsum() for the following block, e.g.
---
---  local sum1 = ipsum(data1, length1, 0)
---  local total_sum = ipsum(data2, length2, bit.bnot(sum1))
---
--- The actual implementation is chosen based on running CPU.
+-- See README.checksum.md for API.
 
 require("lib.checksum_h")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
-local band = bit.band
+local band, lshift = bit.band, bit.lshift
 
 -- Select ipsum(pointer, len, initial) function based on hardware
 -- capability.
@@ -66,6 +41,61 @@ function verify_packet (buf, len)
    end
 
    return ipsum(buf+headersize, len-headersize, initial) == 0
+end
+
+local function prepare_packet_l4 (buf, len, csum_start, csum_off)
+
+  local hwbuf =  ffi.cast('uint16_t*', buf)
+
+  local pheader = C.pseudo_header_initial(buf, len)
+  if band(pheader, 0xFFFF0000) == 0 then
+    hwbuf[(csum_start+csum_off)/2] = C.htons(band(pheader, 0x0000FFFF))
+  else
+    csum_start, csum_off = nil, nil
+  end
+
+  return csum_start, csum_off
+end
+
+function prepare_packet4 (buf, len)
+
+  local hwbuf =  ffi.cast('uint16_t*', buf)
+  local proto = buf[9];
+
+  local csum_start = lshift(band(buf[0], 0x0F),2)
+  local csum_off
+
+  -- Update the IPv4 checksum (use in-place pseudoheader, by setting it to 0)
+  hwbuf[5] = 0;
+  hwbuf[5] = C.htons(ipsum(buf, csum_start, 0));
+
+  -- TCP
+  if proto == 6 then
+    csum_off = 16
+  -- UDP
+  elseif proto == 17 then
+    csum_off = 6
+  end
+
+  return prepare_packet_l4( buf, len, csum_start, csum_off)
+end
+
+function prepare_packet6 (buf, len)
+  local hwbuf =  ffi.cast('uint16_t*', buf)
+  local proto = buf[6];
+
+  local csum_start = 40
+  local csum_off
+
+  -- TCP
+  if proto == 6 then
+    csum_off = 16
+  -- UDP
+  elseif proto == 17 then
+    csum_off = 6
+  end
+
+  return prepare_packet_l4( buf, len, csum_start, csum_off)
 end
 
 -- See checksum.h for more utility functions that can be added.
