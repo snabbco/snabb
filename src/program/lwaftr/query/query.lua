@@ -17,10 +17,22 @@ function show_usage (code)
    main.exit(code)
 end
 
+local function sort (t)
+   table.sort(t)
+   return t
+end
+
 function parse_args (raw_args)
    local handlers = {}
    function handlers.h() show_usage(0) end
-   local args = lib.dogetopt(raw_args, handlers, "h", { help="h" })
+   function handlers.l ()
+      for _, name in ipairs(sort(lwaftr.counter_names)) do
+         print(name)
+      end
+      main.exit(0)
+   end
+   local args = lib.dogetopt(raw_args, handlers, "hl",
+                             { help="h", ["list-all"]="l" })
    if #args > 2 then show_usage(1) end
    return args
 end
@@ -42,11 +54,6 @@ local function read_counters (tree, filter)
       end
    end
    return ret, max_width
-end
-
-local function sort (t)
-   table.sort(t)
-   return t
 end
 
 local function keys (t)

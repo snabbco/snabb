@@ -1,8 +1,10 @@
 Usage:
   query [OPTIONS] [<pid>] [<counter-name>]
 
-  -h, --help
-                             Print usage information.
+Options:
+
+  -h, --help                    Print usage information.
+  -l, --list-all                List all available counter names.
 
 Display current statistics from lwAftr counters for a running Snabb instance
 with <pid>. If <pid> is not supplied and there is only one Snabb instance,
