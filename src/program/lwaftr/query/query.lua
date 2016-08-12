@@ -21,11 +21,11 @@ function parse_args (raw_args)
    local handlers = {}
    function handlers.h() show_usage(0) end
    local args = lib.dogetopt(raw_args, handlers, "h", { help="h" })
-   if #args > 1 then show_usage(1) end
-   return args[1]
+   if #args > 2 then show_usage(1) end
+   return args
 end
 
-function print_counters (tree)
+function print_counters (tree, filter)
    local cnt, cnt_path, value
    print("lwAFTR operational counters (non-zero)")
    -- Open, read and print whatever counters are in that directory.
@@ -36,13 +36,32 @@ function print_counters (tree)
       value = tonumber(counter.read(cnt))
       if value ~= 0 then
          name = name:gsub(".counter$", "")
-         print(name..": "..lib.comma_value(value))
+         if filter then
+            if name:match(filter) then
+               print(name..": "..lib.comma_value(value))
+            end
+         else
+            print(name..": "..lib.comma_value(value))
+         end
       end
    end
 end
 
 function run (raw_args)
-   local target_pid = parse_args(raw_args)
+   local args = parse_args(raw_args) 
+
+   local target_pid, counter_name
+   if #args == 2 then
+      target_pid, counter_name = args[1], args[2]
+   elseif #args == 1 then
+      local maybe_pid = tonumber(args[1])
+      if maybe_pid then
+         target_pid = args[1]
+      else
+         counter_name = args[1]
+      end
+   end
+
    local instance_tree = select_snabb_instance(target_pid)
-   print_counters(instance_tree)
+   print_counters(instance_tree, counter_name)
 end

@@ -1,5 +1,5 @@
 Usage:
-  query [OPTIONS] [<pid>]
+  query [OPTIONS] [<pid>] [<counter-name>]
 
   -h, --help
                              Print usage information.
@@ -7,6 +7,9 @@ Usage:
 Display current statistics from lwAftr counters for a running Snabb instance
 with <pid>. If <pid> is not supplied and there is only one Snabb instance,
 "query" will connect to that instance.
+
+If <counter-name> is set, only counters partially matching <counter-name> are
+listed.
 
 The values for the counters defined in <src/apps/lwaftr/lwaftr.lua> will be
 displayed, but only the ones that are not zero.
