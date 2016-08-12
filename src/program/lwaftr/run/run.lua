@@ -167,8 +167,8 @@ function run(args)
    if opts.verbosity >= 1 then
       local csv = csv_stats.CSVStatsTimer.new()
       if opts["on-a-stick"] then
-         csv:add_app('v4v6', { 'v4_tx', 'v4_rx' }, { tx='IPv4 RX', rx='IPv4 TX' })
-         csv:add_app('v4v6', { 'v6_tx', 'v6_rx' }, { tx='IPv6 RX', rx='IPv6 TX' })
+         csv:add_app('v4v6', { 'v4', 'v4' }, { tx='IPv4 RX', rx='IPv4 TX' })
+         csv:add_app('v4v6', { 'v6', 'v6' }, { tx='IPv6 RX', rx='IPv6 TX' })
       else
          csv:add_app('inetNic', { 'tx', 'rx' }, { tx='IPv4 RX', rx='IPv4 TX' })
          csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx='IPv6 RX', rx='IPv6 TX' })

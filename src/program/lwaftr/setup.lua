@@ -161,8 +161,8 @@ function load_on_a_stick(c, conf, v4v6, args)
    end
 
    config.link(c, 'nic.tx -> '..v4v6..'.input')
-   link_source(c, v4v6..'.v4_tx', v4v6..'.v6_tx')
-   link_sink(c, v4v6..'.v4_rx', v4v6..'.v6_rx')
+   link_source(c, v4v6..'.v4', v4v6..'.v6')
+   link_sink(c, v4v6..'.v4', v4v6..'.v6')
    config.link(c, v4v6..'.output -> nic.rx')
    if args.mirror then
       config.link(c, v4v6..'.mirror -> tap.input')
@@ -232,8 +232,8 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
    config.app(c, 'splitter', V4V6)
    config.app(c, 'join', basic_apps.Join)
 
-   local sources = { "v4v6.v4_tx", "v4v6.v6_tx" }
-   local sinks = { "v4v6.v4_rx", "v4v6.v6_rx" }
+   local sources = { "v4v6.v4", "v4v6.v6" }
+   local sinks = { "v4v6.v4", "v4v6.v6" }
 
    if conf.vlan_tagging then
       config.link(c, "capturev4.output -> untagv4.input")
@@ -242,8 +242,8 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
       config.link(c, "untagv6.output -> join.in2")
       config.link(c, "join.out -> v4v6.input")
       config.link(c, "v4v6.output -> splitter.input")
-      config.link(c, "splitter.v4_tx -> tagv4.input")
-      config.link(c, "splitter.v6_tx -> tagv6.input")
+      config.link(c, "splitter.v4 -> tagv4.input")
+      config.link(c, "splitter.v6 -> tagv6.input")
       config.link(c, "tagv4.output -> output_filev4.input")
       config.link(c, "tagv6.output -> output_filev6.input")
    else
@@ -251,8 +251,8 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
       config.link(c, "capturev6.output -> join.in2")
       config.link(c, "join.out -> v4v6.input")
       config.link(c, "v4v6.output -> splitter.input")
-      config.link(c, "splitter.v4_tx -> output_filev4.input")
-      config.link(c, "splitter.v6_tx -> output_filev6.input")
+      config.link(c, "splitter.v4 -> output_filev4.input")
+      config.link(c, "splitter.v6 -> output_filev6.input")
    end
 
    link_source(c, unpack(sources))
