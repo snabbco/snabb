@@ -40,17 +40,17 @@ local function report_summary(scanner)
    end
 end
 
-local Report = setmetatable({}, util.SouthAndNorth)
-Report.__index = Report
+local LiveReporter = setmetatable({}, util.SouthAndNorth)
+LiveReporter.__index = LiveReporter
 
-function Report:new (scanner)
+function LiveReporter:new (scanner)
    return setmetatable({
       scanner = scanner,
       packets = 0,
    }, self)
 end
 
-function Report:on_northbound_packet (p)
+function LiveReporter:on_northbound_packet (p)
    self.packets = self.packets + 1
    local flow = self.scanner:get_flow(p)
    if flow and not flow.reported then
@@ -61,7 +61,7 @@ function Report:on_northbound_packet (p)
       end
    end
 end
-Report.on_southbound_packet = Report.on_northbound_packet
+LiveReporter.on_southbound_packet = LiveReporter.on_northbound_packet
 
 
 local inputs = {}
@@ -139,7 +139,7 @@ function run (args)
    config.link(c, "source." .. source_link_name .. " -> l7spy.south")
 
    if live then
-      config.app(c, "report", Report, s)
+      config.app(c, "report", LiveReporter, s)
       config.link(c, "l7spy.north -> report.south")
    end
 
