@@ -34,6 +34,12 @@ local function report_flow(scanner, flow)
       scanner:protocol_name(flow.proto_master))
 end
 
+local function report_summary(scanner)
+   for flow in scanner:flows() do
+      report_flow(scanner, flow)
+   end
+end
+
 local Report = setmetatable({}, util.SouthAndNorth)
 Report.__index = Report
 
@@ -144,4 +150,8 @@ function run (args)
          return engine.app_table.source.done
       end
    }
+
+   if verbosity == 0 then
+      report_summary(s)
+   end
 end
