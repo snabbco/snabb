@@ -36,7 +36,7 @@ function print_counters (tree)
       value = tonumber(counter.read(cnt))
       if value ~= 0 then
          name = name:gsub(".counter$", "")
-         print(name..": "..value)
+         print(name..": "..lib.comma_value(value))
       end
    end
 end
