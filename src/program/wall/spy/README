@@ -3,9 +3,11 @@ Usage:
   snabb wall spy [options] raw <device>
   snabb wall spy --help
 
-Analyzes live traffic (when using "raw" mode) or a .pcap capture file
-(in "pcap" mode) using SnabbWall's L7spy and reports statistics.
+Analyzes traffic from .pcap capture file (in "pcap" mode), or live from a
+network device using SnabbWall's L7spy and reports statistics.
 
 Options:
 
-  -v, --verbose   Enable verbose reporting.
+  -l, --live      Enable live reporting: detected flows are reported as
+                  they are detected. When not supplied, a report is done
+                  after all the input packets are processed.

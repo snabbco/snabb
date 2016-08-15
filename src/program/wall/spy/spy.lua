@@ -7,8 +7,8 @@ local util = require("apps.wall.util")
 local scan = require("apps.wall.scanner")
 
 local long_opts = {
-   help    = "h",
-   verbose = "v",
+   help = "h",
+   live = "l",
 }
 
 local function printf(fmt, ...)
@@ -102,10 +102,10 @@ end
 
 
 function run (args)
-   local verbosity = 0
+   local live = false
    local opt = {
-      v = function (arg)
-         verbosity = verbosity + 1
+      l = function (arg)
+         live = arg
       end,
       h = function (arg)
          print(require("program.wall.spy.README_inc"))
@@ -113,7 +113,7 @@ function run (args)
       end,
    }
 
-   args = lib.dogetopt(args, opt, "hv", long_opts)
+   args = lib.dogetopt(args, opt, "hl", long_opts)
    if #args ~= 2 then
       print(require("program.wall.spy.README_inc"))
       main.exit(1)
@@ -138,7 +138,7 @@ function run (args)
    config.app(c, "l7spy", require("apps.wall.l7spy").L7Spy, { scanner = s })
    config.link(c, "source." .. source_link_name .. " -> l7spy.south")
 
-   if verbosity > 0 then
+   if live then
       config.app(c, "report", Report, s)
       config.link(c, "l7spy.north -> report.south")
    end
@@ -151,7 +151,7 @@ function run (args)
       end
    }
 
-   if verbosity == 0 then
+   if not live then
       report_summary(s)
    end
 end
