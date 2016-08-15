@@ -30,7 +30,9 @@ function print_counters (tree, filter)
    print("lwAFTR operational counters (non-zero)")
    -- Open, read and print whatever counters are in that directory.
    local counters_path = "/" .. tree .. "/" .. counters_rel_dir
-   for _, name in ipairs(shm.children(counters_path)) do
+   local counters = shm.children(counters_path)
+   table.sort(counters)
+   for _, name in ipairs(counters) do
       cnt_path = counters_path .. name
       cnt = counter.open(cnt_path, 'readonly')
       value = tonumber(counter.read(cnt))
