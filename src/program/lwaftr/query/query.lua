@@ -25,26 +25,55 @@ function parse_args (raw_args)
    return args
 end
 
-function print_counters (tree, filter)
+local function read_counters (tree, filter)
+   local ret = {}
    local cnt, cnt_path, value
-   print("lwAFTR operational counters (non-zero)")
-   -- Open, read and print whatever counters are in that directory.
+   local max_width = 0
    local counters_path = "/" .. tree .. "/" .. counters_rel_dir
    local counters = shm.children(counters_path)
-   table.sort(counters)
    for _, name in ipairs(counters) do
       cnt_path = counters_path .. name
       cnt = counter.open(cnt_path, 'readonly')
       value = tonumber(counter.read(cnt))
       if value ~= 0 then
          name = name:gsub(".counter$", "")
-         if filter then
-            if name:match(filter) then
-               print(name..": "..lib.comma_value(value))
-            end
-         else
-            print(name..": "..lib.comma_value(value))
-         end
+         if #name > max_width then max_width = #name end
+         ret[name] = value
+      end
+   end
+   return ret, max_width
+end
+
+local function sort (t)
+   table.sort(t)
+   return t
+end
+
+local function keys (t)
+   local ret = {}
+   for key, _ in pairs(t) do
+      table.insert(ret, key)
+   end
+   return ret
+end
+
+local function skip_counter (name, filter)
+   return filter and not name:match(filter)
+end
+
+local function print_counter (name, value, max_width)
+   local nspaces = max_width - #name
+   print(("%s: %s%s"):format(name, (" "):rep(nspaces), lib.comma_value(value)))
+end
+
+function print_counters (tree, filter)
+   print("lwAFTR operational counters (non-zero)")
+   -- Open, read and print whatever counters are in that directory.
+   local counters, max_width = read_counters(tree, filter)
+   for _, name in ipairs(sort(keys(counters))) do
+      if not skip_counter(name, filter) then
+         local value = counters[name]
+         print_counter(name, value, max_width)
       end
    end
 end
