@@ -32,14 +32,23 @@ function NdpiScanner:new(ticks_per_second)
    local s = NdpiScanner:superClass().new(self)
    s.protocols = ndpi.protocol_bitmask():set_all()
    s._ndpi     = ndpi.detection_module(ticks_per_second or 1000):set_protocol_bitmask(s.protocols)
-   s.flows     = {}
+   s._flows    = {}
    return s
 end
 
 
 function NdpiScanner:get_flow(p)
    local key = (self:extract_packet_info(p))
-   return key and self.flows[key:hash()] or nil
+   return key and self._flows[key:hash()] or nil
+end
+
+function NdpiScanner:flows()
+   local flows = self._flows
+   return coroutine.wrap(function ()
+      for _, flow in pairs(flows) do
+         coroutine.yield(flow)
+      end
+   end)
 end
 
 function NdpiScanner:protocol_name(protocol)
@@ -60,10 +69,10 @@ function NdpiScanner:scan_packet(p, time)
 
    -- Get an existing data flow or create a new one
    local key_hash = key:hash()
-   local flow = self.flows[key_hash]
+   local flow = self._flows[key_hash]
    if not flow then
       flow = NdpiFlow:new(key)
-      self.flows[key_hash] = flow
+      self._flows[key_hash] = flow
    end
 
    flow:update_counters(time)

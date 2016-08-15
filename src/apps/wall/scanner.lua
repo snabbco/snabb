@@ -262,6 +262,10 @@ function Scanner:get_flow(p)
    error("method must be overriden in a subclass")
 end
 
+function Scanner:flows()
+   error("method must be overriden in a subclass")
+end
+
 function Scanner:scan_packet(p, time)
    error("method must be overriden in a subclass")
 end
