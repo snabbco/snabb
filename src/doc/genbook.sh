@@ -54,6 +54,8 @@ $(cat $mdroot/apps/vpn/README.md)
 
 $(cat $mdroot/apps/socket/README.md)
 
+$(cat $mdroot/apps/wall/README.md)
+
 # Libraries
 
 $(cat $mdroot/lib/README.checksum.md)
