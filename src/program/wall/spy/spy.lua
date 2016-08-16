@@ -126,7 +126,7 @@ function inputs.pcap (kind, path)
 end
 
 function inputs.raw (kind, device)
-   return "output", { require("apps.socket.raw").RawSocket, device }
+   return "tx", { require("apps.socket.raw").RawSocket, device }
 end
 
 function inputs.tap (kind, device)
