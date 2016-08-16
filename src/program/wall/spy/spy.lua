@@ -1,14 +1,17 @@
 module(..., package.seeall)
 
-local lib  = require("core.lib")
-local ipv4 = require("lib.protocol.ipv4")
-local ipv6 = require("lib.protocol.ipv6")
-local util = require("apps.wall.util")
-local scan = require("apps.wall.scanner")
+local lib   = require("core.lib")
+local now   = require("core.app").now
+local timer = require("core.timer")
+local ipv4  = require("lib.protocol.ipv4")
+local ipv6  = require("lib.protocol.ipv6")
+local util  = require("apps.wall.util")
+local scan  = require("apps.wall.scanner")
 
 local long_opts = {
    help = "h",
    live = "l",
+   stats = "s",
 }
 
 local function printf(fmt, ...)
@@ -44,14 +47,10 @@ local LiveReporter = setmetatable({}, util.SouthAndNorth)
 LiveReporter.__index = LiveReporter
 
 function LiveReporter:new (scanner)
-   return setmetatable({
-      scanner = scanner,
-      packets = 0,
-   }, self)
+   return setmetatable({ scanner = scanner }, self)
 end
 
 function LiveReporter:on_northbound_packet (p)
-   self.packets = self.packets + 1
    local flow = self.scanner:get_flow(p)
    if flow and not flow.reported then
       local proto = self.scanner:protocol_name(flow.protocol)
@@ -60,8 +59,64 @@ function LiveReporter:on_northbound_packet (p)
          flow.reported = true
       end
    end
+   return p
 end
 LiveReporter.on_southbound_packet = LiveReporter.on_northbound_packet
+
+
+local StatsReporter = setmetatable({}, util.SouthAndNorth)
+StatsReporter .__index = StatsReporter
+
+function StatsReporter:new (opts)
+   local app = setmetatable({
+      scanner = opts.scanner,
+      file = opts.output or io.stdout,
+      start_time = 0,
+      packets = 0,
+      bytes = 0,
+      timer = false,
+   }, self)
+   if opts.period then
+      app.timer = timer.new("stats_reporter",
+                            function () app:report_stats() end,
+                            opts.period * 1e9)
+      timer.activate(app.timer)
+   end
+   return app
+end
+
+function StatsReporter:stop ()
+   -- Avoid timer being re-armed in the next call to :on_timer_tick()
+   self.timer = false
+end
+
+function StatsReporter:on_northbound_packet (p)
+   self.packets = self.packets + 1
+   self.bytes = self.bytes + p.length
+   return p
+end
+StatsReporter.on_southbound_packet = StatsReporter.on_northbound_packet
+
+local stats_format = "=== %s === %d Bytes, %d packets, %.3f B/s, %.3f PPS\n"
+function StatsReporter:report_stats ()
+   local cur_time = now()
+   local elapsed = cur_time - self.start_time
+
+   self.file:write(stats_format:format(os.date("%Y-%m-%dT%H:%M:%S%z"),
+                                       self.bytes,
+                                       self.packets,
+                                       self.bytes / elapsed / 1e6,
+                                       self.packets / elapsed / 1e6))
+   self.file:flush()
+
+   -- Reset counters.
+   self.packets, self.bytes, self.start_time = 0, 0, cur_time
+
+   -- Re-arm timer.
+   if self.timer then
+      timer.activate(self.timer)
+   end
+end
 
 
 local inputs = {}
@@ -102,10 +157,13 @@ end
 
 
 function run (args)
-   local live = false
+   local live, stats = false, false
    local opt = {
       l = function (arg)
-         live = arg
+         live = true
+      end,
+      s = function (arg)
+         stats = true
       end,
       h = function (arg)
          print(require("program.wall.spy.README_inc"))
@@ -113,7 +171,7 @@ function run (args)
       end,
    }
 
-   args = lib.dogetopt(args, opt, "hl", long_opts)
+   args = lib.dogetopt(args, opt, "hls", long_opts)
    if #args ~= 2 then
       print(require("program.wall.spy.README_inc"))
       main.exit(1)
@@ -137,10 +195,19 @@ function run (args)
    config.app(c, "source", unpack(app))
    config.app(c, "l7spy", require("apps.wall.l7spy").L7Spy, { scanner = s })
    config.link(c, "source." .. source_link_name .. " -> l7spy.south")
+   local last_app_name = "l7spy"
+
+   if stats then
+      config.app(c, "stats", StatsReporter, {
+         scanner = s, period = live and 2.0 or false })
+      config.link(c, last_app_name .. ".north -> stats.south")
+      last_app_name = "stats"
+   end
 
    if live then
       config.app(c, "report", LiveReporter, s)
-      config.link(c, "l7spy.north -> report.south")
+      config.link(c, last_app_name .. ".north -> report.south")
+      last_app_name = "report"
    end
 
    engine.configure(c)
@@ -153,5 +220,8 @@ function run (args)
 
    if not live then
       report_summary(s)
+   end
+   if stats then
+      engine.app_table.stats:report_stats()
    end
 end
