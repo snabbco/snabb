@@ -105,8 +105,8 @@ function StatsReporter:report_stats ()
    self.file:write(stats_format:format(os.date("%Y-%m-%dT%H:%M:%S%z"),
                                        self.bytes,
                                        self.packets,
-                                       self.bytes / elapsed / 1e6,
-                                       self.packets / elapsed / 1e6))
+                                       self.bytes / elapsed,
+                                       self.packets / elapsed))
    self.file:flush()
 
    -- Reset counters.
