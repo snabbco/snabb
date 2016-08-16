@@ -1,9 +1,11 @@
-local link = require("core.link")
-local ffi  = require("ffi")
-local bit  = require("bit")
+local link   = require("core.link")
+local packet = require("core.packet")
+local ffi    = require("ffi")
+local bit    = require("bit")
 
 local l_receive, l_transmit = link.receive, link.transmit
 local l_nreadable, l_nwritable = link.nreadable, link.nwritable
+local p_free = packet.free
 
 local uint16_ptr_t = ffi.typeof("uint16_t*")
 local function rd16(address)
@@ -54,15 +56,29 @@ local function _pass_packets (self, ilink, olink, cb)
    if olink then
       local n = math.min(l_nreadable(ilink), l_nwritable(olink))
       for _ = 1, n do
-         local p = cb(self, l_receive(ilink))
-         if p then
+         local p = l_receive(ilink)
+         local newp = cb(self, p)
+         if newp == false then
+            -- Do not transmit
+            p_free(p)
+         else
+            if newp and p ~= newp then
+               p_free(p)
+               p = newp
+            end
             l_transmit(olink, p)
          end
       end
    elseif l_nreadable(ilink) > 0 then
       -- No output link: kitchen sink
       for _ = 1, l_nreadable(ilink) do
-         cb(self, l_receive(ilink))
+         local p = l_receive(ilink)
+         local newp = cb(self, p)
+         -- Free packets to avoid leaking them
+         if newp and p ~= newp then
+            p_free(newp)
+         end
+         p_free(p)
       end
    end
 end
