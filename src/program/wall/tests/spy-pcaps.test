@@ -6,7 +6,7 @@ readonly mydir=${0%/*}
 readonly datadir="${mydir}/data"
 
 spy-pcap () {
-	"${mydir}/../../../snabb" wall spy -v pcap "$1"
+	"${mydir}/../../../snabb" wall spy pcap "$1"
 }
 
 filter-output () {
