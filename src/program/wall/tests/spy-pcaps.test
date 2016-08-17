@@ -13,7 +13,7 @@ filter-output () {
 	local -a line
 	while read -r -a line ; do
 		if [[ ${line[0]} = 0x* ]] ; then
-			echo "${line[5]%:*}"
+			echo "${line[5]}"
 		fi
 	done | sort -u
 }
