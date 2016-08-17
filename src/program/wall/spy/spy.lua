@@ -8,6 +8,7 @@ local ipv6  = require("lib.protocol.ipv6")
 local util  = require("apps.wall.util")
 local scan  = require("apps.wall.scanner")
 local proto = require("ndpi").protocol
+local ntohs = lib.ntohs
 
 local long_opts = {
    help = "h",
@@ -33,15 +34,15 @@ local function report_flow(scanner, flow)
    if flow.proto_master ~= proto.PROTOCOL_UNKNOWN then
       printf("%#010x %4dp %15s:%-5d - %15s:%-5d  %s:%s\n",
          flow.key:hash(), flow.packets,
-         lo_addr, flow.key.lo_port,
-         hi_addr, flow.key.hi_port,
+         lo_addr, ntohs(flow.key.lo_port),
+         hi_addr, ntohs(flow.key.hi_port),
          scanner:protocol_name(flow.protocol),
          scanner:protocol_name(flow.proto_master))
    else
       printf("%#010x %4dp %15s:%-5d - %15s:%-5d  %s\n",
          flow.key:hash(), flow.packets,
-         lo_addr, flow.key.lo_port,
-         hi_addr, flow.key.hi_port,
+         lo_addr, ntohs(flow.key.lo_port),
+         hi_addr, ntohs(flow.key.hi_port),
          scanner:protocol_name(flow.protocol))
    end
 end
