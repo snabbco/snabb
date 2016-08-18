@@ -1,0 +1,14 @@
+Usage:
+  query [OPTIONS] [<pid>]
+
+  -h, --help
+                             Print usage information.
+
+Display current statistics from lwAftr counters for a running Snabb instance
+with <pid>. If <pid> is not supplied and there is only one Snabb instance,
+"query" will connect to that instance.
+
+The values for the counters defined in <src/apps/lwaftr/lwaftr.lua> will be
+displayed, but only the ones that are not zero.
+
+It needs root privileges.

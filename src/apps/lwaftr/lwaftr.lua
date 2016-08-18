@@ -58,7 +58,7 @@ local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
 --   - reason: reasons for dropping;
 -- - protocol+version: "icmpv4", "icmpv6", "ipv4", "ipv6";
 -- - size: "bytes", "packets".
-local counters_dir = "app/lwaftr/counters/"
+counters_dir = "app/lwaftr/counters/"
 -- Referenced by program/check/check.lua
 counter_names = {
 

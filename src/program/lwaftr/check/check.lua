@@ -5,11 +5,11 @@ local config = require("core.config")
 local counter = require("core.counter")
 local lib = require("core.lib")
 local setup = require("program.lwaftr.setup")
--- Get the counter names from the code, so that any change there
--- has a chance to be automatically picked up by the tests.
-local counter_names = require("apps.lwaftr.lwaftr").counter_names
-
-local counters_dir = "app/lwaftr/counters/"
+-- Get the counter directory and names from the code, so that any change
+-- in there will be automatically picked up by the tests.
+local lwaftr = require("apps.lwaftr.lwaftr")
+local counter_names = lwaftr.counter_names
+local counters_dir = lwaftr.counters_dir
 
 function show_usage(code)
    print(require("program.lwaftr.check.README_inc"))
