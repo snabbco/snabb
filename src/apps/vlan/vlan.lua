@@ -140,7 +140,7 @@ function VlanMux:push ()
    local l_in = self.input.trunk
    while not empty(l_in) do
       local p = receive(l_in)
-      local ethertype = cast("uint16_t*", packet.data(p)
+      local ethertype = cast("uint16_t*", p.data
                                 + o_ethernet_ethertype)[0]
       if ethertype == htons(tpid) then
          -- dig out TCI field

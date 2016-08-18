@@ -73,7 +73,7 @@ function dispatch:push()
       local i = 1
       while targets[i] do
          local t = targets[i]
-         if t.filter:match(packet.data(p[0]), packet.length(p[0])) then
+         if t.filter:match(p[0].data, p[0].length) then
             transmit(output[t.link], p[0])
             free = false
             break

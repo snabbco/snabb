@@ -23,7 +23,7 @@ end
 
 function transport:encapsulate (datagram, tunnel_header)
    self.header:payload_length(tunnel_header:sizeof()
-                           + packet.length(datagram:packet()))
+                                 + datagram:packet().length)
 end
 
 return transport
