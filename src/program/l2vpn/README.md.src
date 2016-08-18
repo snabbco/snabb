@@ -466,6 +466,11 @@ form of this expression is as follows:
 
 ```
 return {
+  [ shmem_dir = <shmem_dir>, ]
+  [ snmp = {
+      enable = true | false,
+      interval = <interval>
+    }, ]
   interfaces = <interface_config>,
   vpls = {
     <vpls1> = <vpls_config>,
@@ -473,6 +478,23 @@ return {
     ...
 }
 ```
+
+The `shmem_dir` and `snmp` options set global properties with respect
+to [SNMP](#SNMP).  The `shmem_dir` option sets the path to a directory
+in the local file system where the shared memory segments used to
+store raw SNMP objects are located.  It is used as a rendez-vous point
+with the external program which is used to provide access to these
+objects via an actual SNMP agent.
+
+By default, the drivers do not populate any interface-related SNMP
+MIBs.  If support for the interface MIBs is desired, the `snmp` table
+muste be supplied with `enable` set to `true`.  The `interval` option
+specifies the interval in seconds in which the shared memory segments
+used to interact with the SNMP agents are refreshed from the underlying
+data objects such as interface counters. The default value is 5 seconds.
+
+Note that SNMP support in the pseudowire module is always enabled.
+The `enable` option only affects the interface-related MIBs.
 
 The `<interface_config>` will be discussed in detail
 [below](#interface-abstraction). The `<vpls_config>` are Lua tables as
@@ -518,7 +540,6 @@ form.
   address = <VPLS_address>,
   tunnel = <tunnel_config>,
   cc = <cc_config>,
-  shmem_dir = <shmem_dir>,
   pw = {
     <pw_1> = <pw_config>,
     <pw_2> = <pw_config>,
@@ -733,12 +754,6 @@ The keys define the properties of the VPLS instance.
  following manner, see the [description of the
  control-channel](#control_channel) for details.
 
-   * `shmem_dir`: the path to a directory in the local file system
-     where the shared memory segments used to store raw SNMP objects
-     are located.  It is used as a rendez-vous point with the external
-     program which is used to provide access to these objects via an
-     actual SNMP agent.
-
    * `pw`: this table contains one key per pseudowire which is part of
      the VPLS instance.  The keys represent the (arbitrary) names of
      these pseudowires, e.g.
@@ -812,24 +827,20 @@ flooding-bridge is optimized away.
 Endpoint `A`:
 
 ```
-local shmem_dir = '/tmp/snabb-shmem'
-local snmp = {
-  directory = shmem_dir
-}
-
 return {
+  shmem_dir = '/tmp/snabb-shmem',
+  snmp = { enable = true },
   interfaces = {
     {
       name = "TenGigE0/1",
       description = "uplink",
       driver = {
-        module = require("apps.intel.intel_app").Intel82599,
-        config = { pciaddr = "0000:04:00.1",
-                   snmp = snmp }
+        path = "apps.intel.intel_app",
+        name = "Intel82599",
+        config = { pciaddr = "0000:04:00.1" },
       },
     },
     mtu = 9206,
-    mac = "90:e2:ba:62:86:e5",
     afs = {
       ipv6 = {
         address = "2001:db8:0:C101:0:0:0:2",
@@ -840,9 +851,9 @@ return {
       name = "TenGigE0/0",
       description = "AC",
       driver = {
-        module = require("apps.intel.intel_app").Intel82599,
-        config = { pciaddr = "0000:04:00.0",
-                   snmp = snmp }
+        path = "apps.intel.intel_app",
+        name = "Intel82599",
+        config = { pciaddr = "0000:04:00.0" }
       },
     },
     mtu = 9206,
@@ -866,7 +877,6 @@ return {
         heartbeat = 2,
         dead_factor = 4
       },
-      shmem_dir = shmem_dir,
       pw = {
          pw_B = { address = "2001:db8:0:1:0:0:0:2" },
       }
@@ -878,24 +888,20 @@ return {
 Endpoint `B`:
 
 ```
-local shmem_dir = '/tmp/snabb-shmem'
-local snmp = {
-  directory = shmem_dir
-}
-
 return {
+  shmem_dir = '/tmp/snabb-shmem',
+  snmp = { enable = true },
   interfaces = {
     {
       name = "TenGigE0/1",
       description = "uplink",
       driver = {
-        module = require("apps.intel.intel_app").Intel82599,
-        config = { pciaddr = "0000:04:00.1",
-                   snmp = snmp }
+        path = "apps.intel.intel_app",
+        name = "Intel82599",
+        config = { pciaddr = "0000:04:00.1" },
       },
     },
     mtu = 9206,
-    mac = "90:e2:ba:62:86:e6",
     afs = {
       ipv6 = {
         address = "2001:db8:0:C102:0:0:0:2",
@@ -906,9 +912,9 @@ return {
       name = "TenGigE0/0",
       description = "AC",
       driver = {
-        module = require("apps.intel.intel_app").Intel82599,
-        config = { pciaddr = "0000:04:00.0",
-                   snmp = snmp }
+        path = "apps.intel.intel_app",
+        name = "Intel82599",
+        config = { pciaddr = "0000:04:00.0" },
       },
     },
     mtu = 9206,
@@ -933,7 +939,6 @@ return {
         heartbeat = 2,
         dead_factor = 4
       },
-      shmem_dir = shmem_dir,
       pw = {
          pw_A = { address = "2001:db8:0:1:0:0:0:1" },
       }
@@ -963,14 +968,13 @@ configured by a Lua table of the following form
     name = <name>,
     [ description = <description>, ]
     driver = {
-      module = <module>,
+      path = <path>,
+      name = <name>,
       config = {
         pciaddr = <pciaddress>,
-        [ snmp = { directory = <snmp_dir> }, ]
       },
     },
     mtu = <mtu>,
-    [ mac = <mac>, ]
     [ -- only allowed if trunk.enable == false
       afs = {
         ipv6 = {
@@ -1044,7 +1048,8 @@ interfaces = {
   {
      name = address,
      driver = {
-        module = require("apps.intel.intel_app").Intel82599,
+        path = "apps.intel.intel_app",
+        name = "Intel82599",
         config = { pciaddr = address },
      },
   },
@@ -1081,7 +1086,8 @@ interfaces = {
   {
      name = "TenGigE0/0",
      driver = {
-        module = require("apps.intel.intel_app").Intel82599,
+        path = "apps.intel.intel_app",
+        name = "Intel82599",
         config = { pciaddr = "0000:03:00.0" },
      },
   },
@@ -1112,33 +1118,36 @@ The following items make up the basic configuration of an interface
     name = <name>,
     [ description = <description>, ]
     driver = {
-      module = <module>,
+      path = <path>,
+      name = <name>,
       config = {
         pciaddr = <pciaddress>,
-        [ snmp = { directory = <snmp_dir> }, ]
       },
     },
 ```
 
-The `<name>` and `<pciaddress>` items have already been discussed in
-the previous section.  The `<description>` can be any valid Lua string
+The `name` and `pciaddr` items have already been discussed in the
+previous section.  The `description` can be any valid Lua string
 describing the purpose of the interface in the current configuration.
 It defaults to the empty string.
 
-The `<module>` item must be a Lua expression that evaluates to an
-object that represents a valid Snabb application in the context of the
-`config.app()` API call.  The typical usage is the inclusion of a
-generic driver module via `require()` and the selection of a
-particular driver within the module.  For example
+The `path` must be a string that represents the path to the Lua module
+that implements the driver, while `name` must be a string that
+identifies the Lua table within the module.  The driver will be loaded
+by executing
 
 ```
-module = require("apps.intel.intel_app").Intel82599
+require(<path>).<name>
 ```
 
-The `config` table is passed as argument to the driver module selected
-by `<module>`.  It must contain at least the item `<pciaddress>`,
-which must be a string containing the full PCI address of the device
-for which the driver should be created.  For example
+For example, for the Intel 82599 NIC, `path` would be
+`apps.intel.intel_app` and `name` would be `Intel82599`.  The result
+of the `require` will be passed to the `confi.app()` API call to
+create an instance of the driver.
+
+The `config` table is passed as argument to the constructor of the
+driver module.  It is driver-specific.  For a physical interface, it
+will typically include at least the PCI address, for example
 
 ```
 config = { pciaddr = "0000:03:00.0" }
@@ -1157,11 +1166,27 @@ echo "<pciaddress>" > /sys/bus/pci/drivers/<driver>/bind
 as root, where `<driver>` is the name of the Linux driver that
 controls the device (e.g. `igb` or `ixgbe`).
 
-By default, the drivers do not populate any SNMP MIBs.  If support for
-the interface MIBs is desired, a table named `snmp` needs to be added
-to the driver configuration in which `<snmp_dir>` must hold the name
-of a directory where the driver should locate a shared memory segment
-for interaction with an external SNMP agent.
+The driver of a physical interface usually requires the MTU to be set
+on the link as a parameter.  However, the MTU is set as a generic
+interface property via the `mtu` option as shown in the next section.
+The MTU is automatically added to the `config` table with the key
+`mtu`.
+
+Whether `config` is a table or not depends on the requirement of the
+driver.  For example, the driver for a tap interface only accepts a
+string:
+
+```
+  name = "Tap1",
+  driver = {
+    path = "apps.tap.tap",
+    name = "Tap",
+    config = "Tap1",
+  }
+```
+
+In this case, the MTU cannot be added to `config` and is, of course,
+not needed by the driver.
 
 ### L2 Configuration
 
@@ -1170,7 +1195,6 @@ its behavior at the Ethernet layer (L2) consisting of the items
 
 ```
     mtu = <mtu>,
-    [ mac = <mac>, ] 
     [ trunk = {
         enable = true | false,
         encapsulation = "dot1q" | "dot1ad" | <number>, ]
@@ -1222,7 +1246,8 @@ configuration for this case:
 {
    name = "TenGigE0/0",
    driver = {
-      module = require("apps.intel.intel_app").Intel82599,
+      path = "apps.intel.intel_app",
+      name = "Intel82599",
       config = { pciaddr = "0000:03:00.0" },
    },
    mtu = 1514,
@@ -1264,14 +1289,13 @@ configurations called `afs`:
     name = <name>,
     [ description = <description>, ]
     driver = {
-      module = <module>,
+      path = <path>,
+      name = <name>,
       config = {
         pciaddr = <pciaddress>,
-        [ snmp = { directory = <snmp_dir> }, ]
       },
     },
     mtu = <mtu>,
-    mac = <mac>,
     trunk = { enable = false },
     afs = {
       ipv6 = {
@@ -1283,9 +1307,6 @@ configurations called `afs`:
     }
   }
 ```
-
-Note that the `<mac>` item is now mandatory.  Its meaning will be
-explained below.
 
 The `afs` table is intended to contain separate sections for each
 supported address family.  Currently, only IPv6 is supported in a
@@ -1369,17 +1390,6 @@ functions
        address in the Ethernet header
      * If ND for the next-hop has not completed, drop
        the packet
-
-This is where the `<mac>` configuration item comes into play.  This
-must be set to the physical MAC address of the interface.  In
-principle, it should be obtained automatically by querying the
-hardware.  However, the current Snabb driver architecture doesn't
-provide a simple mechanism for this, which is the reason for the
-existence of the `mac` configuration option.
-
-The `<mac>` address is also included in response to neighbor
-solicitation requests from adjacent systems for the interface address
-(`<address>`).
 
 For IPv6, one of three ND modules is selected based on the
 configuration.
@@ -1500,7 +1510,8 @@ by a dot.  For example,
 {
   name = "TenGigE0/0",
   driver = {
-     module = require("apps.intel.intel_app").Intel82599,
+     path = "apps.intel.intel_app",
+     name = "Intel82599",
      config = { pciaddr = "0000:03:00.0" },
   },
   mtu = 1518,
@@ -1533,7 +1544,8 @@ ID 0.  For example,
 {
   name = "TenGigE0/0",
   driver = {
-     module = require("apps.intel.intel_app").Intel82599,
+     path = "apps.intel.intel_app",
+     name = "Intel82599",
      config = { pciaddr = "0000:03:00.0" },
   },
   mtu = 1518,
@@ -1554,7 +1566,7 @@ packets, whose Ethertype is not equal to `0x8100` are assigned to
 `TenGigE0/0.0` (packets that carry a 802.1Q VLAN ID other than 1 will
 be dropped).
 
-### SNMP
+### <a name="SNMP">SNMP</a>
 
 The L2VPN program does not provide an actual SNMP engine itself.
 Instead, it stores the raw objects in a shared memory segment and
@@ -1626,7 +1638,8 @@ interfaces = {
      name = "TenGigE0/0",
      description = "AC customer A",
      driver = {
-        module = require("apps.intel.intel_app").Intel82599,
+        path = "apps.intel.intel_app",
+        name = "Intel82599",
         config = { pciaddr = "0000:03:00.0" },
      },
      mtu = 1514,
@@ -1636,7 +1649,8 @@ interfaces = {
      name = "TenGigE0/1",
      description = "AC customer B",
      driver = {
-        module = require("apps.intel.intel_app").Intel82599,
+        path = "apps.intel.intel_app",
+        name = "Intel82599",
         config = { pciaddr = "0000:03:00.1" },
      },
      mtu = 1514,

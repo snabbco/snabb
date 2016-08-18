@@ -74,6 +74,7 @@
 -- the two.  The VPLS thus turns into a VPWS.
 
 module(...,package.seeall)
+local ffi = require("ffi")
 local usage_msg = require("program.l2vpn.README_inc")
 local lib = require("core.lib")
 local app = require("core.app")
@@ -84,21 +85,24 @@ local pseudowire = require("program.l2vpn.pseudowire").pseudowire
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local vmux = require("apps.vlan.vlan").VlanMux
+local ifmib = require("lib.ipc.shmem.iftable_mib")
 
 -- config = {
+--   [ shmem_dir = <shmem_dir> , ]
+--   [ snmp = { enable = true | false,
+--              interval = <interval> }, ]
 --   interfaces = {
 --     {
 --       name = <name>,
 --       [ description = <description>, ]
 --       driver = {
---         module = <module>,
+--         path = <path>,
+--         name = <name>,
 --         config = {
 --           pciaddr = <pciaddress>,
---           [ snmp = { directory = <snmp_dir> }, ]
 --         },
 --       },
 --       mtu = <mtu>,
---       [ mac = <mac>, ]
 --       [ -- only allowed if trunk.enable == false
 --         afs = {
 --           ipv6 = {
@@ -142,7 +146,6 @@ local vmux = require("apps.vlan.vlan").VlanMux
 --       },
 --       [ tunnel = <tunnel-config>, ]
 --       [ cc = <cc-config>, ]
---       [ shmem_dir = <shmem_dir>, ]
 --       ac = {
 --         <ac1> = <int>
 --         <ac2> = ...
@@ -231,44 +234,48 @@ function config_if (c, afs, app_c)
 end
 
 function parse_if (if_app_name, config)
-   local result = { name = if_app_name, vlans = {} }
+   local result = { name = if_app_name,
+                    description = config.description,
+                    vlans = {} }
    print("Setting up interface "..config.name)
    print("  Description: "..(config.description or "<none>"))
 
    -- NIC driver
    assert(config.driver, "Missing driver configuration")
    local drv_c = config.driver
-   assert(drv_c.module and drv_c.config, "Incomplete driver configuration")
+   assert(drv_c.path and drv_c.name and
+             drv_c.config, "Incomplete driver configuration")
    if (drv_c.config.pciaddr) then
       print("  PCI address: "..drv_c.config.pciaddr)
    end
-   drv_c.config.mtu = config.mtu
-   if drv_c.config.snmp then
-      drv_c.config.snmp.ifAlias = config.description or nil
-      drv_c.config.snmp.ifDescr = config.name
+   if type(drv_c.config) == "table" then
+      drv_c.config.mtu = config.mtu
    end
-   result.module = drv_c.module
+   result.module = require(drv_c.path)[drv_c.name]
    result.config = drv_c.config
-   local l3_links = { input = if_app_name..".rx",
-                      output = if_app_name..".tx" }
+   -- We need to know the names of links used for input/output of the
+   -- driver.  The intel drivers all use "rx/tx", but tap uses
+   -- "input/output".  This is kind of hacky but there currently is no
+   -- convention for this.
+   if drv_c.name == "Tap" then
+      result.input = "input"
+      result.output = "output"
+   else
+      result.input = "rx"
+      result.output = "tx"
+   end
+   local l3_links = { input = if_app_name.."."..result.input,
+                      output = if_app_name.."."..result.output }
 
-   -- L2 configuration (MTU, MAC, trunk)
+   -- L2 configuration (MTU, trunk)
    print("  L2 configuration")
    assert(config.mtu, "Missing MTU")
    print("    MTU: "..config.mtu)
    result.mtu = config.mtu
-   if config.mac then
-      local mac = config.mac
-      config.mac = ether_pton(config.mac)
-      print("    MAC: "..mac)
-   end
-   if not config.trunk then
-      config.trunk = { enable = false }
-   end
-   local trunk = config.trunk
+   local trunk = config.trunk or { enable = false }
    assert(type(trunk) == "table")
 
-   local function setup_ipv6 (ipv6, nd_app_name, mac, l3_links, indent)
+   local function setup_ipv6 (ipv6, nd_app_name, l3_links, indent)
       assert(ipv6.address, "Missing address")
       local c = { address = ipv6_pton(ipv6.address),
                   next_hop = ipv6_pton(ipv6.next_hop),
@@ -280,6 +287,7 @@ function parse_if (if_app_name, config)
       print(indent.."    Address: "..ipv6.address.."/64")
       print(indent.."    Next-Hop: "..ipv6.next_hop)
       local nd_c = c.nd
+      local dummy_mac = ethernet:pton("00:00:00:00:00:00")
       if c.neighbor_mac then
          print(indent.."    Using static neighbor MAC address "
                   ..ipv6.neighbor_mac)
@@ -287,20 +295,20 @@ function parse_if (if_app_name, config)
             print(indent.."    Using dynamic outbound ND")
             nd_c.module = require("apps.ipv6.ns_responder").ns_responder
             nd_c.config = { local_ip  = c.address,
-                            local_mac = mac,
+                            local_mac = dummy_mac,
                             remote_mac = c.neighbor_mac }
          else
             print(indent.."    Dynamic outbound ND disabled")
             nd_c.module = require("apps.ipv6.nd_static").nd_static
             nd_c.config = { remote_mac  = c.neighbor_mac,
-                            local_mac = mac }
+                            local_mac = dummy_mac }
          end
       else
          assert(ipv6.next_hop, "Missing next-hop")
          print(indent.."    Using dynamic ND")
          nd_c.module = nd
          nd_c.config = { local_ip  = ipv6.address,
-                         local_mac = mac,
+                         local_mac = dummy_mac,
                          next_hop = ipv6.next_hop }
       end
       nd_c.links = { l3_links.output.." -> "..c.nd.name..".south",
@@ -308,14 +316,19 @@ function parse_if (if_app_name, config)
       return(c)
    end
 
-   function process_afs (afs_c, vid, l3_links, nd_app_name, indent)
+   function process_afs (afs_c, vid, l3_links, if_app_name,
+                         nd_app_name, indent)
       local result = {}
       print(indent.."  Address family configuration")
       local ipv6 = afs_c.ipv6
       assert(ipv6, "Missing IPv6 configuration")
       print(indent.."    IPv6")
-      assert(config.mac, "Missing MAC address in l2 configuration")
-      result.ipv6 = setup_ipv6(ipv6, nd_app_name, config.mac, l3_links, indent.."  ")
+      local ipv6 = setup_ipv6(ipv6, nd_app_name,
+                              l3_links, indent.."  ")
+      -- Make the name of the app of the physical interface known to
+      -- the ND app so we can extract the MAC address later on
+      ipv6.nd.if_app_name = if_app_name
+      result.ipv6 = ipv6
       -- Add ipv4 processing here
       return result
    end
@@ -373,16 +386,21 @@ function parse_if (if_app_name, config)
             result.vlans[vid] = process_afs(vlan_c.afs, vid,
                                            { input = vmux_app_name.."."..link,
                                              output = vmux_app_name.."."..link },
+                                           if_app_name,
                                            "nd_"..if_app_name.."_"..vid,
                                            "    ")
          else
             result.vlans[vid] = { l2 = true }
          end
+         result.vlans[vid].description = vlan_c.description
+         result.vlans[vid].vmux_app = vmux_app_name
       end
    else
       print("    Trunking mode: disabled")
       if config.afs then
-         result.afs = process_afs(config.afs, nil, l3_links, "nd_"..if_app_name, "")
+         result.afs = process_afs(config.afs, nil, l3_links,
+                                  if_app_name,
+                                  "nd_"..if_app_name, "")
       end
    end
    return config.name, result
@@ -434,6 +452,8 @@ function run (parameters)
    local config = conf_f()
 
    local c = c_config.new()
+   local shmem_dir = config.shmem_dir
+   local snmp = config.snmp or { enable = false }
    local intfs = {}
    local interfaces = config.interfaces
    assert(interfaces, "Missing interfaces configuration")
@@ -494,7 +514,7 @@ function run (parameters)
          bridge_config.config = bridge.config
       end
       assert(vpls_c.address, "Missing address")
-      vpls_c.address = ipv6_pton(vpls_c.address)
+      vpls_address = ipv6_pton(vpls_c.address)
       assert(vpls_c.ac, "Missing ac configuration")
       assert(vpls_c.pw, "Missing pseudowire configuration")
 
@@ -552,8 +572,8 @@ function run (parameters)
             ac_input = ac_intf.vmux.name..".".."vlan"..vid
             ac_output = ac_intf.vmux.name..".".."vlan"..vid
          else
-            ac_input = ac_intf.name..".rx"
-            ac_output = ac_intf.name..".tx"
+            ac_input = ac_intf.name.."."..ac_intf.input
+            ac_output = ac_intf.name.."."..ac_intf.output
          end
          table.insert(bridge_config.ports, ac_name)
          table.insert(acs, { name = ac_name,
@@ -569,14 +589,14 @@ function run (parameters)
                    .." and no default specified")
          assert(pw_config.address,
                 "Missing remote address configuration for pseudowire "..pw)
-         pw_config.address = ipv6_pton(pw_config.address)
+         pw_address = ipv6_pton(pw_config.address)
          local pw = vpls..'_pw_'..pw
          print("    "..pw)
          c_config.app(c, pw, pseudowire,
                       { name = pw,
                         vc_id = vpls_c.vc_id,
                         mtu = vpls_c.mtu,
-                        shmem_dir = vpls_c.shmem_dir or nil,
+                        shmem_dir = shmem_dir,
                         description = vpls_c.description,
                         -- For a p2p VPN, pass the name of the AC
                         -- interface so the PW module can set up the
@@ -585,8 +605,8 @@ function run (parameters)
                                         #acs == 1 and
                                         acs[1].intf.config.name) or '',
                         transport = { type = 'ipv6',
-                                      src = vpls_c.address,
-                                      dst = pw_config.address },
+                                      src = vpls_address,
+                                      dst = pw_address },
                         tunnel = pw_config.tunnel or tunnel_config,
                         cc = pw_config.cc or vpls_c.cc or nil })
          table.insert(pws, pw)
@@ -594,8 +614,8 @@ function run (parameters)
          if not uplinks[uplink].dispatch then
             uplinks[uplink].dispatch = {}
          end
-         uplinks[uplink].dispatch[pw] = { source      = pw_config.address,
-                                          destination = vpls_c.address }
+         uplinks[uplink].dispatch[pw] = { source      = pw_address,
+                                          destination = vpls_address }
       end
 
       if #pws == 1 and #acs == 1 then
@@ -638,13 +658,86 @@ function run (parameters)
       end
    end
    engine.configure(c)
-   -- Remove when the app link() method lands on the l2vpn branch
-   for _, bridge in ipairs(vpls_bridges) do
-      engine.app_table[bridge]:post_config()
+
+   -- The physical MAC addresses of the interfaces are only known
+   -- after the drivers have been configured.  We need to reconfigure
+   -- all relevant ND apps to use those MAC addresses as their "local"
+   -- MAC.
+   local function reconfig_mac(nd)
+      local app = engine.app_table[nd.name]
+      if app then
+         nd.config.local_mac =
+            engine.app_table[nd.if_app_name].dev.macaddr.bytes;
+         app:reconfig(nd.config)
+      end
    end
-   for _, intf in pairs(intfs) do
-      if intf.vmux and engine.app_table[intf.vmux.name] then
-         engine.app_table[intf.vmux.name]:link()
+   if snmp.enable then
+      for name, intf in pairs(intfs) do
+         -- Set up SNMP for physical interfaces
+         local app = engine.app_table[intf.name]
+         if app == nil then goto continue end
+         local shm = (app.stats and app.stats.shm) or app.shm
+         if shm then
+            ifmib.init_snmp( { ifDescr = name,
+                               ifName = name,
+                               ifAlias = intf.description, },
+               string.gsub(name, '/', '-'), shm,
+               shmem_dir, snmp.interval or 5)
+         end
+         if intf.afs then
+            reconfig_mac(intf.afs.ipv6.nd)
+         end
+         for vid, vlan in pairs(intf.vlans) do
+            -- Set up SNMP for sub-interfaces
+            counter_t = ffi.typeof("struct counter")
+            local counters = {}
+            local function map (c)
+               local r = ffi.cast("struct counter *", c)
+               return r
+            end
+            -- Inherit the operational status, MAC address, MTU, speed
+            -- from the physical interface
+            counters.status = map(app.stats.shm.status)
+            counters.type = counter_t()
+            if vlan.ipv6 then
+               reconfig_mac(vlan.ipv6.nd)
+               counters.type.c = 0x1003ULL -- l3ipvlan
+            end
+            counters.macaddr = map(app.stats.shm.macaddr)
+            counters.mtu = map(app.stats.shm.mtu)
+            counters.speed = map(app.stats.shm.speed)
+            -- Create mappings to the counters of the relevant VMUX link
+            local name = name.."."..vid
+            local vmux = engine.app_table[vlan.vmux_app]
+            local link = (vid == 0 and "native") or "vlan"..vid
+            local rx = vmux.input[link]
+            local tx = vmux.output[link]
+            -- A sub-interface that is defined in the interfaces config
+            -- section but not referenced by a VPLS instance does not get
+            -- instantiated, i.e. the port on the VMUX module is not
+            -- created.  Such a sub-interface will be visibled in the
+            -- interface MIB but with static counters set to zero.
+            if rx and tx then
+               local rstats = rx.stats
+               local tstats = tx.stats
+               -- The VMUX app replaces the physical network for a
+               -- sub-interface.  Hence, its output is what the
+               -- sub-interface receives and its input is what the
+               -- sub-interface transmits to the "virtual wire".
+               counters.rxpackets = map(tstats.txpackets)
+               counters.rxbytes = map(tstats.txbytes)
+               counters.rxdrop = map(tstats.txdrop)
+               counters.txpackets = map(rstats.rxpackets)
+               counters.txbytes = map(rstats.rxbytes)
+               counters.type.c = 0x1002ULL -- l2vlan
+            end
+            ifmib.init_snmp( { ifDescr = name,
+                               ifName = name,
+                               ifAlias = vlan.description, },
+               string.gsub(name, '/', '-'), counters,
+               shmem_dir, snmp.interval or 5)
+         end
+         ::continue::
       end
    end
 
