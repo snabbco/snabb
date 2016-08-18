@@ -12,13 +12,22 @@ local ethernet = require("lib.protocol.ethernet")
 nd_static = subClass(nil)
 nd_static._name = "static ND"
 
-function nd_static:new (config)
+function _new (self, config)
    assert(config and config.local_mac and config.remote_mac)
+   self._eth:src(config.local_mac)
+   self._eth:dst(config.remote_mac)
+   return self
+end
+
+function nd_static:new (config)
    local o = nd_static:superClass().new(self)
-   o._eth = ethernet:new({ src = config.local_mac,
-                           dst = config.remote_mac })
+   o._eth = ethernet:new({ type = 0x86dd })
    o._header = o._eth:header()
-   return o
+   return _new(o, config)
+end
+
+function nd_static:reconfig (config)
+   return _new(self, config)
 end
 
 local empty, receive, transmit = link.empty, link.receive, link.transmit
@@ -27,9 +36,9 @@ function nd_static:push()
    local l_out = self.output.south
    if l_in and l_out then
       while not empty(l_in) do
-         -- Insert the static MAC addresses
+         -- Insert the static Ethernet header
          local p = receive(l_in)
-         ffi.copy(p.data, self._header, 12)
+         ffi.copy(p.data, self._header, 14)
          transmit(l_out, p)
       end
    end

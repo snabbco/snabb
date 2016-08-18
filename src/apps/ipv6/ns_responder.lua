@@ -21,23 +21,30 @@ local filter = require("lib.pcap.filter")
 ns_responder = subClass(nil)
 ns_responder._name = "ipv6 neighbor solicitation responder"
 
-function ns_responder:new(config)
+function _new (self, config)
+   self._config = config
+   self._match_ns = function(ns)
+      return(ns:target_eq(config.local_ip))
+   end
+   self._eth:src(config.local_mac)
+   self._eth:dst(config.remote_mac)
+   return self
+end
+
+function ns_responder:new (config)
    local o = ns_responder:superClass().new(self)
-   o._config = config
-   o._match_ns = function(ns)
-                    return(ns:target_eq(config.local_ip))
-                 end
    local filter, errmsg = filter:new("icmp6 and ip6[40] = 135")
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
    o._dgram = datagram:new()
    packet.free(o._dgram:packet())
-   if config.remote_mac then
-      o._eth = ethernet:new({ src = config.local_mac,
-                              dst = config.remote_mac })
-      o._header = o._eth:header()
-   end
-   return o
+   o._eth = ethernet:new({ type = 0x86dd })
+   o._header = o._eth:header()
+   return _new(o, config)
+end
+
+function ns_responder:reconfig (config)
+   return _new(self, config)
 end
 
 local function process (self, p)
@@ -97,7 +104,7 @@ function ns_responder:push()
          local p = link.receive(l_in)
          if self._header then
             -- Insert the static MAC header
-            ffi.copy(p.data, self._header, 12)
+            ffi.copy(p.data, self._header, 14)
          end
          link.transmit(l_out, p)
       end
