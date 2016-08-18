@@ -217,6 +217,30 @@ function CTable:insert(hash, key, value, updates_allowed)
    return index
 end
 
+-- Choose a random index between the start of the table and its occupancy_hi
+-- value. This guarantees that there will be an entry to eject, because this
+-- is only called when the table is 'full'.
+local function random_eject(ctab)
+   local eject_index = math.random(0, ctab.occupancy_hi - 1)
+   -- Empty entries can't be ejected; find a non-empty one
+   while ctab.entries[eject_index].hash == HASH_MAX do
+      eject_index = eject_index + 1
+   end
+   assert(eject_index <= ctab.size + ctab.max_displacement,
+      "Ctab: eject_index too large!") -- This should be unreachable
+   local ptr = ctab.entries + eject_index
+   ctab:remove_ptr(ptr)
+end
+
+-- Behave exactly like insertion, except if the table is full: if it is, then
+-- eject a random entry instead of resizing.
+function CTable:add_with_random_ejection(key, value, updates_allowed)
+   if self.occupancy + 1 > self.occupancy_hi then
+      random_eject(self)
+   end
+   return self:add(key, value, updates_allowed)
+end
+
 function CTable:add(key, value, updates_allowed)
    local hash = self.hash_fn(key)
    assert(hash >= 0)
@@ -259,9 +283,11 @@ end
 function CTable:remove_ptr(entry)
    local scale = self.scale
    local index = entry - self.entries
-   assert(index >= 0)
-   assert(index <= self.size + self.max_displacement)
-   assert(entry.hash ~= HASH_MAX)
+   assert(index >= 0, "Ctab: index must be >= 0.")
+   assert(index <= self.size + self.max_displacement,
+      string.format("Ctab: bad index %s, should be at most %s.",
+         index, self.size + self.max_displacement))
+   assert(entry.hash ~= HASH_MAX, "Ctab: entry hash must not be HASH_MAX.")
 
    self.occupancy = self.occupancy - 1
    entry.hash = HASH_MAX
@@ -444,6 +470,27 @@ function selftest()
    for entry in ctab:iterate() do iterated = iterated + 1 end
    assert(iterated == occupancy)
 
+   local i = occupancy * 2
+   -- Fill table fully, until it would be resized.
+   -- This is necessary even on a 'full' table potentially,
+   -- because occupancy_hi is calculated with ceil()
+   while ctab.occupancy + 1 <= ctab.occupancy_hi do
+      for j=0,5 do v[j] = bnot(i) end
+      ctab:add_with_random_ejection(i, v)
+      i = i + 1
+      occupancy = occupancy + 1
+   end
+
+   for j=0,5 do v[j] = bnot(i) end
+   ctab:add_with_random_ejection(i, v)
+   local iterated = 0
+   for entry in ctab:iterate() do iterated = iterated + 1 end
+   assert(iterated == occupancy, "bad random ejection!")
+
+   ctab:remove(1, false)
+   local iterated = 0
+   for entry in ctab:iterate() do iterated = iterated + 1 end
+   assert(iterated == occupancy - 1)
    -- OK, all looking good with our ctab.
 
    -- A check that our equality functions work as intended.
