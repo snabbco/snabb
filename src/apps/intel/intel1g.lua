@@ -50,8 +50,9 @@ local bits, bitset = lib.bits, lib.bitset
 local compiler_barrier = lib.compiler_barrier
 local tophysical = core.memory.virtual_to_physical
 local register = require("lib.hardware.register")
-local mib = require("lib.ipc.shmem.mib")
 local timer = require("core.timer")
+local shm      = require("core.shm")
+local counter  = require("core.counter")
 
 Intel1g = {}
 
@@ -92,15 +93,12 @@ local default = {
    -- bytes without VLAN tagging.
    mtu = 9014,
 
-   snmp = {
-     status_timer = 5, -- Interval for IF status check and MIB update
-   }
 }
 
 function Intel1g:new(conf)
    local self = {
-     mtu = conf.mtu or default.mtu,
-     snmp = conf.snmp
+      mtu = conf.mtu or default.mtu,
+      stats = {},
    }
    local pciaddress = conf.pciaddr
    local attach = conf.attach
@@ -230,149 +228,46 @@ function Intel1g:new(conf)
       repeat until band(peek32(offset), mask) == (value or mask)
    end
 
-   if self.snmp then
-     -- Rudimentary population of a row in the ifTable MIB.  Allocation
-     -- of the ifIndex is delegated to the SNMP agent via the name of
-     -- the interface in ifDescr (currently the PCI address).
-     local ifTable = mib:new({ directory = self.snmp.directory or nil,
-                               filename = pciaddress })
-     self.snmp.ifTable = ifTable
-     -- ifTable
-     ifTable:register('ifDescr', 'OctetStr', self.snmp.ifDescr or pciaddress)
-     ifTable:register('ifType', 'Integer32', 6) -- ethernetCsmacd
-     ifTable:register('ifMtu', 'Integer32', conf.mtu)
-     ifTable:register('ifSpeed', 'Gauge32', 1000000000)
-     -- After a reset of the NIC, the "native" MAC address is copied to
-     -- the receive address register #0 from the FLASH
-     local ral, rah = s.RAL[0](), s.RAH[0]()
-     assert(bit.band(rah, bitvalue({ AV = 31 })) == bitvalue({ AV = 31 }),
-            "MAC address on "..pciaddress.." is not valid ")
-     local mac = ffi.new("struct { uint32_t lo; uint16_t hi; }")
-     mac.lo = ral
-     mac.hi = bit.band(rah, 0xFFFF)
-     ifTable:register('ifPhysAddress', { type = 'OctetStr', length = 6 },
-                      ffi.string(mac, 6))
-     ifTable:register('ifAdminStatus', 'Integer32', 1) -- up
-     ifTable:register('ifOperStatus', 'Integer32', 2) -- down
-     ifTable:register('ifLastChange', 'TimeTicks', 0)
-     ifTable:register('_X_ifLastChange_TicksBase', 'Counter64', C.get_unix_time())
-     ifTable:register('ifInOctets', 'Counter32', 0)
-     ifTable:register('ifInUcastPkts', 'Counter32', 0)
-     ifTable:register('ifInDiscards', 'Counter32', 0)
-     ifTable:register('ifInErrors', 'Counter32', 0) -- TBD
-     ifTable:register('ifInUnknownProtos', 'Counter32', 0) -- TBD
-     ifTable:register('ifOutOctets', 'Counter32', 0)
-     ifTable:register('ifOutUcastPkts', 'Counter32', 0)
-     ifTable:register('ifOutDiscards', 'Counter32', 0)
-     ifTable:register('ifOutErrors', 'Counter32', 0) -- TBD
-     -- ifXTable
-     ifTable:register('ifName', { type = 'OctetStr', length = 255 },
-                      pciaddress)
-     ifTable:register('ifInMulticastPkts', 'Counter32', 0)
-     ifTable:register('ifInBroadcastPkts', 'Counter32', 0)
-     ifTable:register('ifOutMulticastPkts', 'Counter32', 0)
-     ifTable:register('ifOutBroadcastPkts', 'Counter32', 0)
-     ifTable:register('ifHCInOctets', 'Counter64', 0)
-     ifTable:register('ifHCInUcastPkts', 'Counter64', 0)
-     ifTable:register('ifHCInMulticastPkts', 'Counter64', 0)
-     ifTable:register('ifHCInBroadcastPkts', 'Counter64', 0)
-     ifTable:register('ifHCOutOctets', 'Counter64', 0)
-     ifTable:register('ifHCOutUcastPkts', 'Counter64', 0)
-     ifTable:register('ifHCOutMulticastPkts', 'Counter64', 0)
-     ifTable:register('ifHCOutBroadcastPkts', 'Counter64', 0)
-     ifTable:register('ifLinkUpDownTrapEnable', 'Integer32', 2) -- disabled
-     ifTable:register('ifHighSpeed', 'Gauge32', 1000)
-     ifTable:register('ifPromiscuousMode', 'Integer32', 2) -- false
-     ifTable:register('ifConnectorPresent', 'Integer32', 1) -- true
-     ifTable:register('ifAlias', { type = 'OctetStr', length = 64 },
-                      self.snmp.ifAlias or '') -- TBD add description
-     ifTable:register('ifCounterDiscontinuityTime', 'TimeTicks', 0) -- TBD
-     ifTable:register('_X_ifCounterDiscontinuityTime', 'Counter64', 0) -- TBD
-
-     --- Create a timer to periodically check the interface status.
-     --- Static variables are used in the timer function to avoid
-     --- garbage.
-     local status = { [1] = 'up', [2] = 'down' }
-     local mask = bitvalue{LinkUp=1}
-     local promisc = bitvalue({UPE = 3})
-     -- Pre-allocate storage for the results of register-reads
-     local stats = {
-        in_mcast_pkts = { r = s.MPRC },
-        in_bcast_pkts = { r = s.BPRC },
-        in_pkts       = { r = s.GPRC },
-        in_octets64   = { r = s.GORC64 },
-
-        out_mcast_pkts = { r = s.MPTC },
-        out_bcast_pkts = { r = s.BPTC },
-        out_pkts       = { r = s.GPTC },
-        out_octets64   = { r = s.GOTC64 },
-     }
-     local stats_keys = {}
-     for k, _ in pairs(stats) do
-        table.insert(stats_keys, k)
-        stats[k].v = ffi.new("uint64_t [1]")
-     end
-     local function read_stats()
-        for _, k in ipairs(stats_keys) do
-           stats[k].v[0] = stats[k].r()
-        end
-     end
-     self.logger = lib.logger_new({ module = 'intel1g' })
-     local t = timer.new("Interface "..pciaddress.." status checker",
-                         function(t)
-                            local old = ifTable:get('ifOperStatus')
-                            local new = 1
-                            if band(peek32(r.STATUS, 0), mask) ~= mask then
-                               new = 2
-                            end
-                            if old ~= new then
-                               self.logger:log("Interface "..pciaddress..
-                                               " status change: "..status[old]..
-                                               " => "..status[new])
-                               ifTable:set('ifOperStatus', new)
-                               ifTable:set('ifLastChange', 0)
-                               ifTable:set('_X_ifLastChange_TicksBase',
-                                       C.get_unix_time())
-                            end
-
-                            ifTable:set('ifPromiscuousMode',
-                                        (bit.band(peek32(r.RCTL), promisc) ~= 0ULL
-                                      and 1) or 2)
-                            -- Update counters
-                            read_stats()
-                            ifTable:set('ifHCInMulticastPkts', stats.in_mcast_pkts.v[0])
-                            ifTable:set('ifInMulticastPkts', stats.in_mcast_pkts.v[0])
-                            ifTable:set('ifHCInBroadcastPkts', stats.in_bcast_pkts.v[0])
-                            ifTable:set('ifInBroadcastPkts', stats.in_bcast_pkts.v[0])
-                            local in_ucast_pkts = stats.in_pkts.v[0] - stats.in_bcast_pkts.v[0]
-                               - stats.in_mcast_pkts.v[0]
-                            ifTable:set('ifHCInUcastPkts', in_ucast_pkts)
-                            ifTable:set('ifInUcastPkts', in_ucast_pkts)
-                            ifTable:set('ifHCInOctets', stats.in_octets64.v[0])
-                            ifTable:set('ifInOctets', stats.in_octets64.v[0])
-
-                            ifTable:set('ifHCOutMulticastPkts', stats.out_mcast_pkts.v[0])
-                            ifTable:set('ifOutMulticastPkts', stats.out_mcast_pkts.v[0])
-                            ifTable:set('ifHCOutBroadcastPkts', stats.out_bcast_pkts.v[0])
-                            ifTable:set('ifOutBroadcastPkts', stats.out_bcast_pkts.v[0])
-                            local out_ucast_pkts = stats.out_pkts.v[0] - stats.out_bcast_pkts.v[0]
-                               - stats.out_mcast_pkts.v[0]
-                            ifTable:set('ifHCOutUcastPkts', out_ucast_pkts)
-                            ifTable:set('ifOutUcastPkts', out_ucast_pkts)
-                            ifTable:set('ifHCOutOctets', stats.out_octets64.v[0])
-                            ifTable:set('ifOutOctets', stats.out_octets64.v[0])
-
-                            -- 7.9.2 table 7-74
-                            ifTable:set('ifInDiscards', s.CRCERRS() + s.RLEC() + s.RXERRC() +
-                                     s.MPC() + s.RNBC() + s.ALGNERRC())
-                            ifTable:set('ifInErrors', s.CRCERRS() +
-                                     s.RLEC() + s.RXERRC() + s.ALGNERRC())
-                            ifTable:set('ifOutDiscards', s.ECOL() + ifTable:get('ifOutDiscards'))
-                            ifTable:set('ifOutErrors', s.ECOL() + s.LATECOL())
-                         end,
-                         1e9 * (self.snmp.status_timer or
-                                default.snmp.status_timer), 'repeating')
-     timer.activate(t)
+   if not self.stats.shm then
+      self.stats.shm = shm.create_frame(
+         "pci/"..conf.pciaddr,
+         {dtime     = {counter, C.get_unix_time()},
+          mtu       = {counter, self.mtu},
+          speed     = {counter, 1000000000},  -- 1 Gbits
+          type      = {counter, 0x1000},      -- ethernetCsmacd
+          status    = {counter, 2},           -- Link down
+          promisc   = {counter},
+          macaddr   = {counter},
+          rxbytes   = {counter},
+          rxpackets = {counter},
+          rxmcast   = {counter},
+          rxbcast   = {counter},
+          rxdrop    = {counter},
+          rxerrors  = {counter},
+          txbytes   = {counter},
+          txpackets = {counter},
+          txmcast   = {counter},
+          txbcast   = {counter},
+          txdrop    = {counter},
+          txerrors  = {counter}})
+      self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
+      -- After a reset of the NIC, the "native" MAC address is copied to
+      -- the receive address register #0 from the FLASH
+      local ral, rah = s.RAL[0](), s.RAH[0]()
+      assert(bit.band(rah, bitvalue({ AV = 31 })) == bitvalue({ AV = 31 }),
+             "MAC address on "..pciaddress.." is not valid ")
+      local mac = ffi.new[[
+         union {
+            uint64_t bits;
+            struct {
+               uint32_t lo;
+               uint16_t hi;
+            } hilo;
+            uint8_t bytes[6];
+         }]]
+      mac.hilo.lo = ral
+      mac.hilo.hi = bit.band(rah, 0xFFFF)
+      counter.set(self.stats.shm.macaddr, mac.bits)
    end
 
    -- 3.7.4.4.4 Using PHY Registers, 
@@ -650,10 +545,7 @@ function Intel1g:new(conf)
       local function transmit (p)
          -- We must not send packets that are bigger than the MTU
          if p.length > self.mtu then
-           if self.snmp then
-             local errors = self.snmp.ifTable:ptr('ifOutDiscards')
-             errors[0] = errors[0] + 1
-           end
+           counter.add(self.stats.shm.txdrop)
            packet.free(p)
          else
            txdesc[tdt].address = tophysical(p.data)
@@ -718,14 +610,14 @@ function Intel1g:new(conf)
       r.RDT    = 0xc018 + rxq*0x40      -- Rx Descriptor Tail - RW
       r.RXDCTL = 0xc028 + rxq*0x40      -- Receive Descriptor Control
 
-      local rxdesc_t = ffi.typeof([[
+      local rxdesc_t = ffi.typeof[[
         struct { 
           uint64_t address;
           uint16_t length, cksum;
           uint8_t status, errors;
           uint16_t vlan;
         } __attribute__((packed))
-      ]])
+      ]]
       assert(ffi.sizeof(rxdesc_t), "sizeof(rxdesc_t)= ".. ffi.sizeof(rxdesc_t) .. ", but must be 16 Byte")
       local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, ndesc)
       local rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
@@ -812,6 +704,47 @@ function Intel1g:new(conf)
          return p
       end
 
+      local link_up_mask = bitvalue{LinkUp=1}
+      local promisc_mask = bitvalue({UPE = 3})
+      local function sync_stats ()
+         local counters = self.stats.shm
+
+         -- RX
+         counter.set(counters.rxbytes,   s.GORC64())
+         counter.set(counters.rxpackets, s.GPRC())
+         local mprc, bprc = s.MPRC(), s.BPRC()
+         counter.set(counters.rxmcast,   mprc + bprc)
+         counter.set(counters.rxbcast,   bprc)
+
+         -- TX
+         counter.set(counters.txbytes,   s.GOTC64())
+         counter.set(counters.txpackets, s.GPTC())
+         local mptc, bptc = s.MPTC(), s.BPTC()
+         counter.set(counters.txmcast,   mptc + bptc)
+         counter.set(counters.txbcast,   bptc)
+
+         -- Errors, drops, 7.9.2 table 7-74
+         counter.set(counters.rxdrop, s.CRCERRS() + s.RLEC()
+                        + s.RXERRC() +
+                        s.MPC() + s.RNBC() + s.ALGNERRC())
+         counter.set(counters.rxerrors, s.CRCERRS() +
+                        s.RLEC() + s.RXERRC() + s.ALGNERRC())
+         counter.add(counters.txdrop, s.ECOL())
+         counter.set(counters.txerrors, s.ECOL() + s.LATECOL())
+
+         if band(peek32(r.STATUS, 0), link_up_mask) ~= link_up_mask then
+            counter.set(counters.status, 2) -- Down
+         else
+            counter.set(counters.status, 1) -- Up
+         end
+
+         if bit.band(peek32(r.RCTL), promisc_mask) ~= 0ULL then
+            counter.set(counters.promisc, 1) -- True
+         else
+            counter.set(counters.promisc, 2) -- False
+         end
+      end
+
       local function sync_receive ()                    -- Synchronize receive registers with hardware
          rdh = peek32(r.RDH)                            -- possible race condition, see 7.1.4.4, 7.2.3
          --rdh = band(peek32(r.RDH), ndesc-1)           -- from intel1g: Luke observed (RDH == ndesc) !?
@@ -843,6 +776,9 @@ function Intel1g:new(conf)
           end
          end
          sync_receive()
+         if self.stats.sync_timer() then
+            sync_stats()
+         end
       end
 
       stop_receive = function ()                        -- stop receiver, see 4.5.9.2
