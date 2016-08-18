@@ -1,27 +1,33 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
 module(...,package.seeall)
+local lib = require("core.lib")
 local mib = require("lib.ipc.shmem.mib")
 local counter = require("core.counter")
 local macaddress = require("lib.macaddress")
 local ffi = require("ffi")
+local C = ffi.C
 
 local iftypes = {
-   [0x1000] =  6, -- ethernetCsmacd
-   [0x1001] = 53, -- propVirtual
+   [0x1000] =  6,  -- ethernetCsmacd
+   [0x1001] = 53,  -- propVirtual
+   [0x1002] = 135, -- l2vlan
+   [0x1003] = 136, -- l3ipvlan
 }
 
-function init_snmp (name, counters, directory, interval)
+function init_snmp (objs, name, counters, directory, interval)
    -- Rudimentary population of a row in the ifTable MIB.  Allocation
    -- of the ifIndex is delegated to the SNMP agent via the name of
    -- the interface in ifDescr.
    local ifTable = mib:new({ directory = directory or nil,
                              filename = name })
+   local logger = lib.logger_new({ module = 'iftable_mib' })
    -- ifTable
-   ifTable:register('ifDescr', 'OctetStr', name)
+   ifTable:register('ifDescr', 'OctetStr', objs.ifDescr)
    ifTable:register('ifType', 'Integer32')
    if counters.type then
-      ifTable:set('ifType', iftypes[counter.read(counters.type)] or 1) -- other
+      ifTable:set('ifType',
+                  iftypes[tonumber(counter.read(counters.type))] or 1) -- other
    end
    ifTable:register('ifMtu', 'Integer32')
    if counters.mtu then
@@ -30,7 +36,7 @@ function init_snmp (name, counters, directory, interval)
    ifTable:register('ifSpeed', 'Gauge32')
    ifTable:register('ifHighSpeed', 'Gauge32')
    if counters.speed then
-      speed = counters.read(counters.speed)
+      speed = counter.read(counters.speed)
       if speed > 1000000000 then
          ifTable:set('ifSpeed', 4294967295) -- RFC3635 sec. 3.2.8
       else
@@ -44,7 +50,13 @@ function init_snmp (name, counters, directory, interval)
       ifTable:set('ifPhysAddress', ffi.string(mac.bytes, 6))
    end
    ifTable:register('ifAdminStatus', 'Integer32', 1) -- up
-   ifTable:register('ifOperStatus', 'Integer32', 2) -- down
+   if counters.status then
+      ifTable:register('ifOperStatus', 'Integer32', 2) -- down
+   else
+      logger:log("Operational status not available "
+                 .."for interface "..objs.ifDescr)
+      ifTable:register('ifOperStatus', 'Integer32', 1) -- up
+   end
    ifTable:register('ifLastChange', 'TimeTicks', 0)
    ifTable:register('_X_ifLastChange_TicksBase', 'Counter64',
                     C.get_unix_time())
@@ -58,7 +70,7 @@ function init_snmp (name, counters, directory, interval)
    ifTable:register('ifOutDiscards', 'Counter32', 0)
    ifTable:register('ifOutErrors', 'Counter32', 0) -- TBD
    -- ifXTable
-   ifTable:register('ifName', { type = 'OctetStr', length = 255 }, name)
+   ifTable:register('ifName', { type = 'OctetStr', length = 255 }, objs.ifName)
    ifTable:register('ifInMulticastPkts', 'Counter32', 0)
    ifTable:register('ifInBroadcastPkts', 'Counter32', 0)
    ifTable:register('ifOutMulticastPkts', 'Counter32', 0)
@@ -75,44 +87,47 @@ function init_snmp (name, counters, directory, interval)
    ifTable:register('ifPromiscuousMode', 'Integer32', 2) -- false
    ifTable:register('ifConnectorPresent', 'Integer32', 1) -- true
    ifTable:register('ifAlias', { type = 'OctetStr', length = 64 },
-                    name) -- TBD add description
+                    objs.ifAlias) -- interface description
    ifTable:register('ifCounterDiscontinuityTime', 'TimeTicks', 0)
    ifTable:register('_X_ifCounterDiscontinuityTime', 'Counter64')
    if counters.dtime then
       ifTable:set('_X_ifCounterDiscontinuityTime', counter.read(counters.dtime))
    end
 
-   local logger = lib.logger_new({ module = 'iftable_mib' })
+   local status = { [1] = 'up', [2] = 'down' }
    local function t ()
       local old, new
       if counters.status then
          old = ifTable:get('ifOperStatus')
-         new = counter.read(counters.status)
-      else
-         new = 1
-      end
-      if old ~= new then
-         logger:log("Interface "..name..
-                    " status change: "..status[old].." => "..status[new])
-         ifTable:set('ifOperStatus', new)
-         ifTable:set('ifLastChange', 0)
-         ifTable:set('_X_ifLastChange_TicksBase', C.get_unix_time())
+         new = tonumber(counter.read(counters.status))
+         if old ~= new then
+            logger:log("Interface "..objs.ifDescr..
+                          " status change: "..status[old].." => "..status[new])
+            ifTable:set('ifOperStatus', new)
+            ifTable:set('ifLastChange', 0)
+            ifTable:set('_X_ifLastChange_TicksBase', C.get_unix_time())
+         end
       end
 
       if counters.promisc then
          ifTable:set('ifPromiscuousMode', counter.read(counters.promisc))
       end
       -- Update counters
-      if counters.rxpackets and counters.rxmcast and counters.rxbcast then
-         local rxbcast = counter.read(counters.rxbcast)
-         local rxmcast = counter.read(counters.rxmcast)
-         local rxpackets = counter.read(counters.rxpackets)
-         local inMcast = rxmcast - rxbcast
-         local inUcast = rxpackets - rxmcast
-         ifTable:set('ifHCInMulticastPkts', inMcast)
-         ifTable:set('ifInMulticastPkts', inMcast)
-         ifTable:set('ifHCInBroadcastPkts', rxbcast)
-         ifTable:set('ifInBroadcastPkts', rxbcast)
+      if counters.rxpackets then
+         local inUcast
+         if counters.rxmcast and counters.rxbcast then
+            local rxbcast = counter.read(counters.rxbcast)
+            local rxmcast = counter.read(counters.rxmcast)
+            local rxpackets = counter.read(counters.rxpackets)
+            local inMcast = rxmcast - rxbcast
+            inUcast = rxpackets - rxmcast
+            ifTable:set('ifHCInMulticastPkts', inMcast)
+            ifTable:set('ifInMulticastPkts', inMcast)
+            ifTable:set('ifHCInBroadcastPkts', rxbcast)
+            ifTable:set('ifInBroadcastPkts', rxbcast)
+         else
+            inUcast = counter.read(counters.rxpackets)
+         end
          ifTable:set('ifHCInUcastPkts', inUcast)
          ifTable:set('ifInUcastPkts', inUcast)
       end
@@ -127,16 +142,21 @@ function init_snmp (name, counters, directory, interval)
       if counters.rxerrors then
          ifTable:set('ifInErrors', counter.read(counters.rxerrors))
       end
-      if counters.txpackets and counters.txmcast and counters.txbcast then
-         local txbcast = counter.read(counters.txbcast)
-         local txmcast = counter.read(counters.txmcast)
-         local txpackets = counter.read(counters.txpackets)
-         local outMcast = txmcast - txbcast
-         local outUcast = txpackets - txmcast
-         ifTable:set('ifHCOutMulticastPkts', outMcast)
-         ifTable:set('ifOutMulticastPkts', outMcast)
-         ifTable:set('ifHCOutBroadcastPkts', txbcast)
-         ifTable:set('ifOutBroadcastPkts', txbcast)
+      if counters.txpackets then
+         local outUcast
+         if counters.txmcast and counters.txbcast then
+            local txbcast = counter.read(counters.txbcast)
+            local txmcast = counter.read(counters.txmcast)
+            local txpackets = counter.read(counters.txpackets)
+            local outMcast = txmcast - txbcast
+            outUcast = txpackets - txmcast
+            ifTable:set('ifHCOutMulticastPkts', outMcast)
+            ifTable:set('ifOutMulticastPkts', outMcast)
+            ifTable:set('ifHCOutBroadcastPkts', txbcast)
+            ifTable:set('ifOutBroadcastPkts', txbcast)
+         else
+            outUcast = counter.read(counters.txpackets)
+         end
          ifTable:set('ifHCOutUcastPkts', outUcast)
          ifTable:set('ifOutUcastPkts', outUcast)
       end
