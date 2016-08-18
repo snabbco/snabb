@@ -2,66 +2,6 @@
 
 -- shm.lua -- shared memory alternative to ffi.new()
 
--- API:
---   shm.create(name, type) => ptr
---     Map a shared object into memory via a hierarchical name, creating it
---     if needed.
---   shm.open(name, type[, readonly]) => ptr
---     Map a shared object into memory via a hierarchical name.  Fail if
---     the shared object does not already exist.
---   shm.unmap(ptr)
---     Delete a memory mapping.
---   shm.unlink(path)
---     Unlink a subtree of objects from the filesystem.
---
--- (See NAME SYNTAX below for recognized name formats.)
--- 
--- Example:
---   local freelist = shm.map("engine/freelist/packet", "struct freelist")
--- 
--- This is like ffi.new() except that separate calls to map() for the
--- same name will each return a new mapping of the same shared
--- memory. Different processes can share memory by mapping an object
--- with the same name (and type). Each process can map any object any
--- number of times.
---
--- Mappings are deleted on process termination or with an explicit unmap:
---   shm.unmap(freelist)
---
--- Names are unlinked from objects that are no longer needed:
---   shm.unlink("engine/freelist/packet")
---   shm.unlink("engine")
---
--- Object memory is freed when the name is unlinked and all mappings
--- have been deleted.
---
--- Behind the scenes the objects are backed by files on ram disk:
---   /var/run/snabb/$pid/engine/freelist/packet
---
--- and accessed with the equivalent of POSIX shared memory (shm_overview(7)).
---
--- The practical limit on the number of objects that can be mapped
--- will depend on the operating system limit for memory mappings.
--- On Linux the default limit is 65,530 mappings:
---     $ sysctl vm.max_map_count
---     vm.max_map_count = 65530
-
--- NAME SYNTAX:
--- 
--- Names can be fully qualified, abbreviated to be within the current
--- process, or further abbreviated to be relative to the current value
--- of the 'path' variable. Here are examples of names and how they are
--- resolved:
---   Fully qualified:
---     //1234/foo/bar => /var/run/snabb/1234/foo/bar
---   Path qualified:
---     /foo/bar       => /var/run/snabb/$pid/foo/bar
---   Local:
---     bar            => /var/run/snabb/$pid/$path/bar
--- .. where $pid is the PID of this process and $path is the current
--- value of the 'path' variable in this module.
-
-
 module(..., package.seeall)
 
 local ffi = require("ffi")
@@ -70,8 +10,7 @@ local S = require("syscall")
 local const = require("syscall.linux.constants")
 
 -- Root directory where the object tree is created.
-root = "/var/run/snabb"
-path = ""
+root = os.getenv("SNABB_SHM_ROOT") or "/var/run/snabb"
 
 -- Table (address->size) of all currently mapped objects.
 mappings = {}
@@ -117,10 +56,9 @@ function open (name, type, readonly)
 end
 
 function resolve (name)
-   local q, p = name:match("^(/*)(.*)") -- split qualifier (/ or //)
+   local q, p = name:match("^(/*)(.*)") -- split qualifier (/)
    local result = p
-   if q == '' and path ~= '' then result = path.."/"..result end
-   if q ~= '//'              then result = tostring(S.getpid()).."/"..result end
+   if q ~= '/' then result = tostring(S.getpid()).."/"..result end
    return result
 end
 
@@ -170,53 +108,102 @@ function children (name)
    return S.util.dirtable(root.."/"..resolve(name), true) or {}
 end
 
--- Create an additional name for an existing object.
-function alias (toname, fromname)
-   assert(S.symlink(root.."/"..resolve(toname), root.."/"..resolve(fromname)),
-          "alias symlink failed")
+-- Type registry for modules that implement abstract shm objects.
+types = {}
+function register (type, module)
+   assert(module, "Must supply module")
+   assert(not types[type], "Duplicate shm type: "..type)
+   types[type] = module
+   return type
 end
+
+-- Create a directory of shm objects defined by specs under path.
+function create_frame (path, specs)
+   local frame = {}
+   frame.specs = specs
+   frame.path = path.."/"
+   for name, spec in pairs(specs) do
+      assert(frame[name] == nil, "shm: duplicate name: "..name)
+      local module = spec[1]
+      local initargs = lib.array_copy(spec)
+      table.remove(initargs, 1) -- strip type name from spec
+      frame[name] = module.create(frame.path..name.."."..module.type,
+                                  unpack(initargs))
+   end
+   return frame
+end
+
+-- Open a directory of shm objects for reading, determine their types by file
+-- extension.
+function open_frame (path)
+   local frame = {}
+   frame.specs = {}
+   frame.path = path.."/"
+   frame.readonly = true
+   for _, file in ipairs(children(path)) do
+      local name, type = file:match("(.*)[.](.*)$")
+      local module = types[type]
+      if module then
+         assert(frame[name] == nil, "shm: duplicate name: "..name)
+         frame[name] = module.open(frame.path..file)
+         frame.specs[name] = {module}
+      end
+   end
+   return frame
+end
+
+-- Delete/unmap a frame of shm objects. The frame's directory is unlinked if
+-- the frame was created by create_frame.
+function delete_frame (frame)
+   for name, spec in pairs(frame.specs) do
+      local module = spec[1]
+      if rawget(module, 'delete') then
+         module.delete(frame.path..name.."."..module.type)
+      else
+         unmap(frame[name])
+      end
+   end
+   if not frame.readonly then
+      unlink(frame.path)
+   end
+end
+
 
 function selftest ()
    print("selftest: shm")
-   print("checking paths..")
-   path = 'foo/bar'
+
+   print("checking resolve..")
    pid = tostring(S.getpid())
-   local p1 = resolve("//"..pid.."/foo/bar/baz/beer")
-   local p2 = resolve("/foo/bar/baz/beer")
-   local p3 = resolve("baz/beer")
+   local p1 = resolve("/"..pid.."/foo/bar/baz/beer")
+   local p2 = resolve("foo/bar/baz/beer")
    assert(p1 == p2, p1.." ~= "..p2)
-   assert(p1 == p3, p1.." ~= "..p3)
 
    print("checking shared memory..")
-   path = 'shm/selftest'
-   local name = "obj"
+   local name = "shm/selftest/obj"
    print("create "..name)
    local p1 = create(name, "struct { int x, y, z; }")
    local p2 = create(name, "struct { int x, y, z; }")
-   alias(name, name..".alias")
-   local p3 = create(name..".alias", "struct { int x, y, z; }")
    assert(p1 ~= p2)
    assert(p1.x == p2.x)
    p1.x = 42
    assert(p1.x == p2.x)
-   assert(p1.x == p3.x)
    assert(unlink(name))
    unmap(p1)
    unmap(p2)
 
    -- Test that we can open and cleanup many objects
    print("checking many objects..")
-   path = 'shm/selftest/manyobj'
+   local path = 'shm/selftest/manyobj'
    local n = 10000
    local objs = {}
    for i = 1, n do
-      table.insert(objs, create("obj/"..i, "uint64_t[1]"))
+      table.insert(objs, create(path.."/"..i, "uint64_t[1]"))
    end
    print(n.." objects created")
    for i = 1, n do unmap(objs[i]) end
    print(n.." objects unmapped")
-   assert((#children("/shm/selftest/manyobj/obj")) == n, "child count mismatch")
-   assert(unlink("/"))
+   assert((#children(path)) == n, "child count mismatch")
+   assert(unlink("shm"))
    print("selftest ok")
 end
 

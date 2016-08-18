@@ -50,7 +50,7 @@ end
 -- packet is carrying a VLAN tag, if it's an untagged frame these bytes will be
 -- Ethernet payload
 function extract_tci(pkt)
-   return ntohs(cast("uint16_t*", packet.data(pkt) + o_ethernet_ethertype + 2)[0])
+   return ntohs(cast("uint16_t*", pkt.data + o_ethernet_ethertype + 2)[0])
 end
 
 -- extract VLAN id from TCI

@@ -7,7 +7,9 @@ local link = require("core.link")
 local lib = require("core.lib")
 local packet = require("core.packet")
 local config = require("core.config")
+local counter = require("core.counter")
 local conntrack = require("apps.packet_filter.conntrack")
+local C = require("ffi").C
 
 local pf = require("pf")        -- pflua
 
@@ -30,7 +32,8 @@ function PcapFilter:new (conf)
    local o = {
       -- XXX Investigate the latency impact of filter compilation.
       accept_fn = pf.compile_filter(conf.filter),
-      state_table = conf.state_table or false
+      state_table = conf.state_table or false,
+      shm = { rxerrors = {counter}, sessions_established = {counter} }
    }
    if conf.state_table then conntrack.define(conf.state_table) end
    return setmetatable(o, { __index = PcapFilter })
@@ -47,10 +50,14 @@ function PcapFilter:push ()
       if spec and spec:check(self.state_table) then
          link.transmit(o, p)
       elseif self.accept_fn(p.data, p.length) then
-         if spec then spec:track(self.state_table) end
+         if spec then
+            spec:track(self.state_table)
+            counter.add(self.shm.sessions_established)
+         end
          link.transmit(o, p)
       else
          packet.free(p)
+         counter.add(self.shm.rxerrors)
       end
    end
 end

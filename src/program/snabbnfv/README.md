@@ -50,6 +50,7 @@ port := { port_id        = <id>,          -- A unique string
           ingress_filter = <filter>,       -- A pcap-filter(7) expression
           egress_filter  = <filter>,       -- ..
           tunnel         = <tunnel-conf>,
+          crypto         = <crypto-conf>,
           rx_police_gbps = <n>,           -- Allowed input rate in Gbps
           tx_police_gbps = <n> }          -- Allowed output rate in Gbps
 ```
@@ -64,8 +65,19 @@ tunnel := { type          = "L2TPv3",     -- The only type (for now)
             next_hop      = <ip-address>, -- Gateway IP
             local_ip      = <ip-address>, -- ~ `local_address'
             remote_ip     = <ip-address>, -- ~ `remote_address'
-            session       = <32bit-int>   -- ~ `session_id' }
+            session       = <32bit-int> } -- ~ `session_id'
 ```
+
+The `crypto` section allows configuration of traffic encryption based on
+`apps.esp`:
+
+```
+crypto := { type          = "esp-aes-128-gcm", -- The only type (for now)
+            spi           = <spi>,             -- Security Parameter Index
+            key           = <key>,             -- 20 bytes as a hex encoded string
+            replay_window = <n> }              -- Replay window
+```
+
 
 ### snabbnfv traffic
 

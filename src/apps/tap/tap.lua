@@ -5,6 +5,8 @@ module(..., package.seeall)
 local S = require("syscall")
 local link = require("core.link")
 local packet = require("core.packet")
+local counter = require("core.counter")
+local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
 local const = require("syscall.linux.constants")
@@ -27,8 +29,17 @@ function Tap:new (name)
       sock:close()
       error("Error opening /dev/net/tun: " .. tostring(err))
    end
-
-   return setmetatable({sock = sock, name = name}, {__index = Tap})
+   return setmetatable({sock = sock,
+                        name = name,
+                        shm = { rxbytes   = {counter},
+                                rxpackets = {counter},
+                                rxmcast   = {counter},
+                                rxbcast   = {counter},
+                                txbytes   = {counter},
+                                txpackets = {counter},
+                                txmcast   = {counter},
+                                txbcast   = {counter} }},
+                       {__index = Tap})
 end
 
 function Tap:pull ()
@@ -49,6 +60,14 @@ function Tap:pull ()
       end
       p.length = len
       link.transmit(l, p)
+      counter.add(self.shm.rxbytes, len)
+      counter.add(self.shm.rxpackets)
+      if ethernet:is_mcast(p.data) then
+         counter.add(self.shm.rxmcast)
+      end
+      if ethernet:is_bcast(p.data) then
+         counter.add(self.shm.rxbcast)
+      end
    end
 end
 
@@ -65,6 +84,14 @@ function Tap:push ()
       end
       if len ~= p.length and err.errno == const.E.AGAIN then
          return
+      end
+      counter.add(self.shm.txbytes, len)
+      counter.add(self.shm.txpackets)
+      if ethernet:is_mcast(p.data) then
+         counter.add(self.shm.txmcast)
+      end
+      if ethernet:is_bcast(p.data) then
+         counter.add(self.shm.txbcast)
       end
       -- The write completed so dequeue it from the link and free the packet
       link.receive(l)
