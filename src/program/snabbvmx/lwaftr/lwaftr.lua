@@ -1,9 +1,11 @@
 module(..., package.seeall)
 
-local S      = require("syscall")
+local S = require("syscall")
 local config = require("core.config")
-local lib    = require("core.lib")
-local setup  = require("program.snabbvmx.lwaftr.setup")
+local lib = require("core.lib")
+local lwtypes = require("apps.lwaftr.lwtypes")
+local setup = require("program.snabbvmx.lwaftr.setup")
+local shm = require("core.shm")
 
 local function show_usage (exit_code)
    print(require("program.snabbvmx.lwaftr.README_inc"))
@@ -130,6 +132,11 @@ function run(args)
    local mtu = lwconf.ipv6_mtu
    if mtu < lwconf.ipv4_mtu then
       mtu = lwconf.ipv4_mtu
+   end
+
+   if id then
+      local lwaftr_id = shm.create("nic/id", lwtypes.lwaftr_id_type)
+      lwaftr_id.value = id
    end
 
    local vlan = conf.settings.vlan
