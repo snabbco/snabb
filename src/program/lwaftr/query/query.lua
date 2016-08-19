@@ -2,12 +2,16 @@ module(..., package.seeall)
 
 local S = require("syscall")
 local counter = require("core.counter")
+local ffi = require("ffi")
 local lib = require("core.lib")
 local lwaftr = require("apps.lwaftr.lwaftr")
+local lwtypes = require("apps.lwaftr.lwtypes")
+local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
 local select_snabb_instance = top.select_snabb_instance
+local keys = lwutil.keys
 
 -- Get the counter dir from the code.
 local counters_rel_dir = lwaftr.counters_dir
@@ -24,6 +28,19 @@ end
 
 local function is_counter_name (name)
    return lwaftr.counter_names[name] ~= nil
+end
+
+local function pidof(maybe_pid)
+   if tonumber(maybe_pid) then return maybe_pid end
+   local name_id = maybe_pid
+   for _, pid in ipairs(shm.children("/")) do
+      if shm.exists(pid.."/nic/id") then
+         local lwaftr_id = shm.open("/"..pid.."/nic/id", lwtypes.lwaftr_id_type)
+         if ffi.string(lwaftr_id.value) == name_id then
+            return pid
+         end
+      end
+   end
 end
 
 function parse_args (raw_args)
@@ -46,7 +63,11 @@ function parse_args (raw_args)
       if is_counter_name(arg) then
          return nil, arg
       else
-         return arg, nil
+         local pid = pidof(arg)
+         if not pid then
+            error(("Couldn't find PID for argument '%s'"):format(arg))
+         end
+         return pid, nil
       end
    end
    return nil, nil
@@ -69,14 +90,6 @@ local function read_counters (tree, filter)
       end
    end
    return ret, max_width
-end
-
-local function keys (t)
-   local ret = {}
-   for key, _ in pairs(t) do
-      table.insert(ret, key)
-   end
-   return ret
 end
 
 local function skip_counter (name, filter)
