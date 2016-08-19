@@ -22,6 +22,10 @@ local function sort (t)
    return t
 end
 
+local function is_counter_name (name)
+   return lwaftr.counter_names[name] ~= nil
+end
+
 function parse_args (raw_args)
    local handlers = {}
    function handlers.h() show_usage(0) end
@@ -34,7 +38,18 @@ function parse_args (raw_args)
    local args = lib.dogetopt(raw_args, handlers, "hl",
                              { help="h", ["list-all"]="l" })
    if #args > 2 then show_usage(1) end
-   return args
+   if #args == 2 then
+      return args[1], args[2]
+   end
+   if #args == 1 then
+      local arg = args[1]
+      if is_counter_name(arg) then
+         return nil, arg
+      else
+         return arg, nil
+      end
+   end
+   return nil, nil
 end
 
 local function read_counters (tree, filter)
@@ -86,19 +101,7 @@ function print_counters (tree, filter)
 end
 
 function run (raw_args)
-   local args = parse_args(raw_args) 
-
-   local target_pid, counter_name
-   if #args == 2 then
-      target_pid, counter_name = args[1], args[2]
-   elseif #args == 1 then
-      local maybe_pid = tonumber(args[1])
-      if maybe_pid then
-         target_pid = args[1]
-      else
-         counter_name = args[1]
-      end
-   end
+   local target_pid, counter_name = parse_args(raw_args)
 
    local instance_tree = select_snabb_instance(target_pid)
    print_counters(instance_tree, counter_name)
