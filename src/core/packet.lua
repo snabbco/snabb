@@ -76,11 +76,19 @@ function new_packet ()
    return p
 end
 
+-- Clone srcp into pre-allocated memory for dstp, in a way compatible
+-- with the current definition of struct packet.
+function clone_to_memory(dstp, srcp)
+   dstp.length = srcp.length
+   dstp.headroom = srcp.headroom
+   dstp.data = dstp.data_ + dstp.headroom
+   ffi.copy(dstp.data, srcp.data, srcp.length)
+end
+
 -- Create an exact copy of a packet.
 function clone (p)
    local p2 = allocate()
-   ffi.copy(p2.data, p.data, p.length)
-   p2.length = p.length
+   clone_to_memory(p2, p)
    return p2
 end
 

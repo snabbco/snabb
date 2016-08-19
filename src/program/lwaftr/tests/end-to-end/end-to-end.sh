@@ -182,6 +182,24 @@ snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6-3frags.pcap \
    ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-4.lua
 
+echo "Testing: IPv6 reassembly (to one packet)."
+snabb_run_and_cmp ${TEST_BASE}/big_mtu_no_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-ipv6-2frags-bound.pcap \
+   ${TEST_BASE}/tcp-ipv4-2ipv6frags-reassembled-1p.pcap ${EMPTY} \
+   ${COUNTERS}/in-1p-ipv6-out-1p-ipv4-3.lua
+
+echo "Testing: IPv6 reassembly (out of order fragments)."
+snabb_run_and_cmp ${TEST_BASE}/big_mtu_no_icmp.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-ipv6-2frags-bound-reverse.pcap \
+   ${TEST_BASE}/tcp-ipv4-2ipv6frags-reassembled-1p.pcap ${EMPTY} \
+   ${COUNTERS}/in-1p-ipv6-out-1p-ipv4-3.lua
+
+echo "Testing: IPv6 reassembly (with max frags set to 1)."
+snabb_run_and_cmp ${TEST_BASE}/no_icmp_maxfrags1.conf \
+   ${EMPTY} ${TEST_BASE}/tcp-ipv6-2frags-bound.pcap \
+   ${EMPTY} ${EMPTY} \
+   ${COUNTERS}/in-1p-ipv6-out-0p-ipv4.lua
+
 echo "Testing: IPv6 reassembly (followed by decapsulation)."
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-ipv6-2frags-bound.pcap \

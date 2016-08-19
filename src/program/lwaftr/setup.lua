@@ -21,7 +21,7 @@ function lwaftr_app(c, conf)
    local function prepend(t, elem) table.insert(t, 1, elem) end
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {})
-   config.app(c, "reassemblerv6", ipv6_apps.Reassembler, {})
+   config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, conf)
    config.app(c, "icmpechov4", ipv4_apps.ICMPEcho, { address = conf.aftr_ipv4_ip })
    config.app(c, 'lwaftr', lwaftr.LwAftr, conf)
    config.app(c, "icmpechov6", ipv6_apps.ICMPEcho, { address = conf.aftr_ipv6_ip })
