@@ -271,7 +271,11 @@ function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
       if link.empty(l) then return end
       tx_p = link.receive(l)
 
-      tx_mrg_hdr.hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
+      if band(self.features, C.VIRTIO_NET_F_CSUM) == 0 then
+         tx_mrg_hdr.hdr.flags = 0
+      else
+         tx_mrg_hdr.hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
+      end
 
       self.tx.tx_mrg_hdr[0] = tx_mrg_hdr
       self.tx.data_sent = 0
