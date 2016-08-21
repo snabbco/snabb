@@ -1,0 +1,11 @@
+psid_map {
+  193.5.63.101 { psid_length=6, shift=10 }
+}
+br_addresses {
+  fc00::100
+}
+softwires {
+  { ipv4=193.5.1.100, psid=1, b4=fc00:1:2:3:4:5:0:7e }
+  { ipv4=193.5.1.100, psid=2, b4=fc00:1:2:3:4:5:0:7f }
+  { ipv4=193.5.1.100, psid=3, b4=fc00:1:2:3:4:5:0:80 }
+}
