@@ -7,6 +7,7 @@ local ffi = require('ffi')
 local lwutil = require("apps.lwaftr.lwutil")
 local C = ffi.C
 local packet = require("core.packet")
+local lib = require("core.lib")
 
 REASSEMBLY_OK = 1
 FRAGMENT_MISSING = 2
@@ -40,6 +41,7 @@ local rd16, rd32 = lwutil.rd16, lwutil.rd32
 local uint32_ptr_t = ffi.typeof("uint32_t*")
 local bxor, band = bit.bxor, bit.band
 local packet_payload_size = C.PACKET_PAYLOAD_SIZE
+local ntohs, ntohl = lib.ntohs, lib.ntohl
 
 local ipv6_fragment_key_t = ffi.typeof[[
    struct {
@@ -61,19 +63,19 @@ ReassembleV6 = {}
 
 local function get_frag_len(frag)
    local ipv6_payload_len = ehs + o_ipv6_payload_len
-   return C.ntohs(rd16(frag.data + ipv6_payload_len)) - ipv6_frag_header_size
+   return ntohs(rd16(frag.data + ipv6_payload_len)) - ipv6_frag_header_size
 end
 
 local function get_frag_id(frag)
    local o_id = ehs + ipv6_fixed_header_size + o_ipv6_frag_id
-   return C.ntohl(rd32(frag.data + o_id))
+   return ntohl(rd32(frag.data + o_id))
 end
 
 -- The least significant three bits are other information, but the
 -- offset is expressed in 8-octet units, so just mask them off.
 local function get_frag_start(frag)
    local o_fstart = ehs + ipv6_fixed_header_size + o_ipv6_frag_offset
-   local raw_start = C.ntohs(rd16(frag.data + o_fstart))
+   local raw_start = ntohs(rd16(frag.data + o_fstart))
    local start = band(raw_start, 0xfff8)
    return start
 end
@@ -92,7 +94,7 @@ local function get_key(fragment)
    local o_id = ehs + ipv6_fixed_header_size + o_ipv6_frag_id
    ffi.copy(key.src_addr, fragment.data + o_src, 16)
    ffi.copy(key.dst_addr, fragment.data + o_dst, 16)
-   key.fragment_id = C.ntohl(rd32(fragment.data + o_id))
+   key.fragment_id = ntohl(rd32(fragment.data + o_id))
    return key
 end
 
@@ -148,8 +150,7 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    local reassembly_pkt = reassembly_buf.reassembly_packet
    local frag_id = get_frag_id(fragment)
    if frag_id ~= reassembly_buf.fragment_id then -- unreachable
-      assert(false, "Impossible case reached in v6 reassembly")
-      return REASSEMBLY_INVALID
+      error(false, "Impossible case reached in v6 reassembly") --REASSEMBLY_INVALID
    end
 
    local frag_start = get_frag_start(fragment)
@@ -179,6 +180,7 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    end
 
    -- This is a massive layering violation. :/
+   -- Specifically, it requires this file to know the details of struct packet.
    local skip_headers = reassembly_buf.reassembly_base
    local dst_offset = skip_headers + frag_start
    local last_ok = packet_payload_size - reassembly_pkt.headroom
@@ -207,7 +209,7 @@ end
 
 local function packet_to_reassembly_buffer(pkt)
    local reassembly_buf = scratch_rbuf
-   ffi.C.memset(reassembly_buf, 0, ffi.sizeof(ipv6_reassembly_buffer_t))
+   C.memset(reassembly_buf, 0, ffi.sizeof(ipv6_reassembly_buffer_t))
    reassembly_buf.fragment_id = get_frag_id(pkt)
    reassembly_buf.reassembly_base = ehs + ipv6_fixed_header_size
 
@@ -274,11 +276,11 @@ function cache_fragment(frags_table, fragment)
       frags_table:add_with_random_ejection(key, reassembly_buf, false)
       ptr = frags_table:lookup_ptr(key)
    end
-   local s,p = attempt_reassembly(frags_table, ptr.value, fragment)
-   return s, p
+   return attempt_reassembly(frags_table, ptr.value, fragment)
 end
 
 function selftest()
+   initialize_frag_table(20, 20)
    local rbuf1 = ffi.new(ipv6_reassembly_buffer_t)
    local rbuf2 = ffi.new(ipv6_reassembly_buffer_t)
    rbuf1.fragment_starts[0] = 10
