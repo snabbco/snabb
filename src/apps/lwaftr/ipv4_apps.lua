@@ -18,6 +18,7 @@ local lib = require("core.lib")
 local receive, transmit = link.receive, link.transmit
 local rd16, wr16, rd32, wr32 = lwutil.rd16, lwutil.wr16, lwutil.rd32, lwutil.wr32
 local get_ihl_from_offset, htons = lwutil.get_ihl_from_offset, lwutil.htons
+local is_ipv4 = lwutil.is_ipv4
 local ntohs = lib.ntohs
 local band = bit.band
 
@@ -48,10 +49,6 @@ function Reassembler:new(conf)
       conf.max_fragments_per_reassembly_packet)
 
    return o
-end
-
-local function is_ipv4(pkt)
-   return rd16(pkt.data + o_ethernet_ethertype) == n_ethertype_ipv4
 end
 
 local function is_fragment(pkt)

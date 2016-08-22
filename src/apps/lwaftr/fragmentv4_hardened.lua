@@ -153,7 +153,7 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    local reassembly_pkt = reassembly_buf.reassembly_packet
    local frag_id = get_frag_id(fragment)
    if frag_id ~= reassembly_buf.fragment_id then -- unreachable
-      assert(false, "Impossible case reached in v4 reassembly") --REASSEMBLY_INVALID
+      error("Impossible case reached in v4 reassembly") --REASSEMBLY_INVALID
    end
 
    local frag_start = get_frag_start(fragment)
