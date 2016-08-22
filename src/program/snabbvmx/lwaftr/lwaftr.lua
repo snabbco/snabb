@@ -129,11 +129,6 @@ function run(args)
 
    set_ring_buffer_size(ring_buffer_size)
 
-   local mtu = lwconf.ipv6_mtu
-   if mtu < lwconf.ipv4_mtu then
-      mtu = lwconf.ipv4_mtu
-   end
-
    if id then
       local lwaftr_id = shm.create("nic/id", lwtypes.lwaftr_id_type)
       lwaftr_id.value = id
@@ -145,7 +140,7 @@ function run(args)
       mac_address = mac,
       pci = pci, 
       id = id, 
-      mtu = mtu,
+      mtu = 9500,
       vlan = vlan,
       mirror_id = mirror_id,
       discard_threshold = discard_threshold,
