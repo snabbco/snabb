@@ -228,7 +228,7 @@ local function packet_to_reassembly_buffer(pkt)
    return reassembly_buf
 end
 
--- The key is 288 bytes: source IPv6 address, destination IPv6 address, and
+-- The key is 288 bits: source IPv6 address, destination IPv6 address, and
 -- the identification field from the IPv6 fragmentation header.
 local function hash_ipv6(key)
    local hash = 0
