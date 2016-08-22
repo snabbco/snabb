@@ -140,6 +140,8 @@ function selftest()
             inet_mac = 68:68:68:68:68:68
             ipv4_mtu = 1460
             ipv6_mtu = 1500
+            max_fragments_per_reassembly_packet = 20
+            max_ipv6_reassembly_packets = 50
             policy_icmpv4_incoming = ALLOW
             policy_icmpv6_incoming = ALLOW
             policy_icmpv4_outgoing = ALLOW
@@ -163,6 +165,8 @@ function selftest()
          inet_mac = ethernet:pton("68:68:68:68:68:68"),
          ipv4_mtu = 1460,
          ipv6_mtu = 1500,
+         max_fragments_per_reassembly_packet = 20,
+         max_ipv6_reassembly_packets = 50,
          policy_icmpv4_incoming = policies['ALLOW'],
          policy_icmpv6_incoming = policies['ALLOW'],
          policy_icmpv4_outgoing = policies['ALLOW'],
