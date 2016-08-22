@@ -19,6 +19,7 @@ local transmit, receive = link.transmit, link.receive
 local htons, ntohs = lib.htons, lib.ntohs
 local htonl, ntohl = lib.htonl, lib.ntohl
 local rd16, rd32 = lwutil.rd16, lwutil.rd32
+local ipv6_equals = lwutil.ipv6_equals
 local bor, lshift = bit.bor, bit.lshift
 
 nh_fwd4 = {}
