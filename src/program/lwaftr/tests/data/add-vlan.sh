@@ -38,6 +38,7 @@ V4=(
     tcp-ipv4-2ipv6frags-reassembled.pcap
     tcp-ipv4-2ipv6frags-reassembled-1p.pcap
     tcp-ipv4-3frags-bound.pcap
+    tcp-ipv4-3frags-bound-reversed.pcap
     tcp-ipv4-toinet-2fragments.pcap
     tcp-ipv4-toinet-3fragments.pcap
     udp-afteraftr-ipv4-3frags.pcap
