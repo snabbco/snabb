@@ -59,8 +59,6 @@ local ipv6_reassembly_buffer_t
 local scratch_rbuf
 local scratch_fragkey = ipv6_fragment_key_t()
 
-ReassembleV6 = {}
-
 local function get_frag_len(frag)
    local ipv6_payload_len = ehs + o_ipv6_payload_len
    return ntohs(rd16(frag.data + ipv6_payload_len)) - ipv6_frag_header_size
