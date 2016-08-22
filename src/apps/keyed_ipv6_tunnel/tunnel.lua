@@ -16,6 +16,7 @@ local link = require("core.link")
 local lib = require("core.lib")
 local packet = require("core.packet")
 local config = require("core.config")
+local counter = require("core.counter")
 
 local macaddress = require("lib.macaddress")
 
@@ -168,7 +169,13 @@ function SimpleKeyedTunnel:new (arg)
       header = header,
       remote_address = remote_address,
       local_address = local_address,
-      remote_cookie = remote_cookie[0]
+      remote_cookie = remote_cookie[0],
+      shm = { rxerrors              = {counter},
+              length_errors         = {counter},
+              protocol_errors       = {counter},
+              cookie_errors         = {counter},
+              remote_address_errors = {counter},
+              local_address_errors  = {counter} }
    }
 
    return setmetatable(o, {__index = SimpleKeyedTunnel})
@@ -198,15 +205,18 @@ function SimpleKeyedTunnel:push()
       local drop = true
       repeat
          if p.length < HEADER_SIZE then
+            counter.add(self.shm.length_errors)
             break
          end
          local next_header = ffi.cast(next_header_ctype, p.data + NEXT_HEADER_OFFSET)
          if next_header[0] ~= L2TPV3_NEXT_HEADER then
+            counter.add(self.shm.protocol_errors)
             break
          end
 
          local cookie = ffi.cast(pcookie_ctype, p.data + COOKIE_OFFSET)
          if cookie[0] ~= self.remote_cookie then
+            counter.add(self.shm.cookie_errors)
             break
          end
 
@@ -214,6 +224,7 @@ function SimpleKeyedTunnel:push()
          if remote_address[0] ~= self.remote_address[0] or
             remote_address[1] ~= self.remote_address[1]
          then
+            counter.add(self.shm.remote_address_errors)
             break
          end
 
@@ -221,6 +232,7 @@ function SimpleKeyedTunnel:push()
          if local_address[0] ~= self.local_address[0] or
             local_address[1] ~= self.local_address[1]
          then
+            counter.add(self.shm.local_address_errors)
             break
          end
 
@@ -228,6 +240,7 @@ function SimpleKeyedTunnel:push()
       until true
 
       if drop then
+         counter.add(self.shm.rxerrors)
          -- discard packet
          packet.free(p)
       else

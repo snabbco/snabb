@@ -1,51 +1,14 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- histogram.lua -- a histogram with logarithmic buckets
---
--- API:
---   histogram.new(min, max) => histogram
---     Make a new histogram, with buckets covering the range from MIN to MAX.
---     The range between MIN and MAX will be divided logarithmically.
---
---   histogram.create(name, min, max) => histogram
---     Create a histogram as in new(), but also map it into
---     /var/run/snabb/PID/NAME, exposing it for analysis by other processes.
---     If the file exists already, it will be cleared.
---
---   histogram.open(pid, name) => histogram
---     Open a histogram mapped as /var/run/snabb/PID/NAME.
---
---   histogram.add(histogram, measurement)
---     Add a measurement to a histogram.
---
---   histogram.iterate(histogram, prev)
---     When used as "for count, lo, hi in histogram:iterate()",
---     visits all buckets in a histogram in order from lowest to
---     highest.  COUNT is the number of samples recorded in that bucket,
---     and LO and HI are the lower and upper bounds of the bucket.  Note
---     that COUNT is an unsigned 64-bit integer; to get it as a Lua
---     number, use tonumber().
---
---     If PREV is given, it should be a snapshot of the previous version
---     of the histogram.  In that case, the COUNT values will be
---     returned as a difference between their values in HISTOGRAM and
---     their values in PREV.
---
---   histogram.snapshot(a, b)
---     Copy out the contents of A into B and return B.  If B is not given,
---     the result will be a fresh histogram.
---
---   histogram.clear(a)
---     Clear the counters in A.
---
---   histogram.wrap_thunk(histogram, thunk, now)
---     Return a closure that wraps THUNK, but which measures the difference
---     between calls to NOW before and after the thunk, recording that
---     difference into HISTOGRAM.
---
+
 module(...,package.seeall)
 
 local ffi = require("ffi")
 local shm = require("core.shm")
 local log, floor, max, min = math.log, math.floor, math.max, math.min
+
+type = shm.register('histogram', getfenv())
 
 -- Fill a 4096-byte page with buckets.  4096/8 = 512, minus the three
 -- header words means 509 buckets.  The first and last buckets are catch-alls.
