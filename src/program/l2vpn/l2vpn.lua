@@ -316,7 +316,7 @@ function parse_if (if_app_name, config)
       return(c)
    end
 
-   function process_afs (afs_c, vid, l3_links, if_app_name,
+   local function process_afs (afs_c, vid, l3_links, if_app_name,
                          nd_app_name, indent)
       local result = {}
       print(indent.."  Address family configuration")
@@ -376,6 +376,10 @@ function parse_if (if_app_name, config)
          print("      L2 configuration")
          print("        VLAN ID: "..(vid > 0 and vid or "<untagged>"))
 
+         result.vlans[vid] = {
+	   description = vlan_c.description,
+	   vmux_app = vmux_app_name
+	 }
          if vlan_c.afs then
             local link
             if vid == 0 then
@@ -383,17 +387,13 @@ function parse_if (if_app_name, config)
             else
                link = "vlan"..vid
             end
-            result.vlans[vid] = process_afs(vlan_c.afs, vid,
-                                           { input = vmux_app_name.."."..link,
-                                             output = vmux_app_name.."."..link },
-                                           if_app_name,
-                                           "nd_"..if_app_name.."_"..vid,
-                                           "    ")
-         else
-            result.vlans[vid] = { l2 = true }
+            result.vlans[vid].afs = process_afs(vlan_c.afs, vid,
+                                              { input = vmux_app_name.."."..link,
+                                                output = vmux_app_name.."."..link },
+                                              if_app_name,
+                                              "nd_"..if_app_name.."_"..vid,
+                                              "    ")
          end
-         result.vlans[vid].description = vlan_c.description
-         result.vlans[vid].vmux_app = vmux_app_name
       end
    else
       print("    Trunking mode: disabled")
@@ -488,9 +488,9 @@ function run (parameters)
          local vlan = intfs[intf].vlans[vid]
          assert(vlan, "Sub-Interface "..vid.." of "..intf..
                    " referenced by uplink does not exist")
-         assert(not vlan.l2, "Sub-Interafce "..vid.." of "..intf..
+         assert(vlan.afs, "Sub-Interafce "..vid.." of "..intf..
                 " is L2 while L3 was expected")
-         afs = vlan
+         afs = vlan.afs
       else
          afs = intfs[intf].afs
          assert(afs, "Interface "..uplink.." is L2 while "..
@@ -539,7 +539,7 @@ function run (parameters)
             local vlan = ac_intf.vlans[vid]
             assert(vlan, "Sub-Interface "..vid.." of "..intf
                    .." referenced by AC "..ac.." does not exist")
-            assert(vlan.l2,
+            assert(not vlan.afs,
                    "Sub-Interface "..vid.." is L3 while "..
                       "L2 was expected")
             l2 = vlan
@@ -671,6 +671,23 @@ function run (parameters)
          app:reconfig(nd.config)
       end
    end
+   for name, intf in pairs(intfs) do
+      local afs = intf.afs
+      if afs then
+         if afs.ipv6 then
+            reconfig_mac(afs.ipv6.nd)
+	 end
+      end
+      for vid, vlan in pairs(intf.vlans) do
+         local afs = vlan.afs
+         if afs then
+	    if afs.ipv6 then
+               reconfig_mac(afs.ipv6.nd)
+	    end
+         end
+      end
+   end
+
    if snmp.enable then
       for name, intf in pairs(intfs) do
          -- Set up SNMP for physical interfaces
@@ -683,29 +700,31 @@ function run (parameters)
                                ifAlias = intf.description, },
                string.gsub(name, '/', '-'), shm,
                shmem_dir, snmp.interval or 5)
-         end
-         if intf.afs then
-            reconfig_mac(intf.afs.ipv6.nd)
+	 else
+	    print("Can't enable SNMP for interface "..name
+	           ..": no statistics counters available")
          end
          for vid, vlan in pairs(intf.vlans) do
             -- Set up SNMP for sub-interfaces
             counter_t = ffi.typeof("struct counter")
             local counters = {}
             local function map (c)
-               local r = ffi.cast("struct counter *", c)
-               return r
+               return (c and ffi.cast("struct counter *", c)) or nil
             end
-            -- Inherit the operational status, MAC address, MTU, speed
-            -- from the physical interface
-            counters.status = map(app.stats.shm.status)
             counters.type = counter_t()
-            if vlan.ipv6 then
-               reconfig_mac(vlan.ipv6.nd)
+            if vlan.afs then
                counters.type.c = 0x1003ULL -- l3ipvlan
-            end
-            counters.macaddr = map(app.stats.shm.macaddr)
-            counters.mtu = map(app.stats.shm.mtu)
-            counters.speed = map(app.stats.shm.speed)
+	    else
+               counters.type.c = 0x1002ULL -- l2vlan
+	    end
+	    if shm then
+               -- Inherit the operational status, MAC address, MTU, speed
+               -- from the physical interface
+               counters.status = map(shm.status)
+               counters.macaddr = map(shm.macaddr)
+               counters.mtu = map(shm.mtu)
+               counters.speed = map(shm.speed)
+	    end
             -- Create mappings to the counters of the relevant VMUX link
             local name = name.."."..vid
             local vmux = engine.app_table[vlan.vmux_app]
@@ -729,7 +748,6 @@ function run (parameters)
                counters.rxdrop = map(tstats.txdrop)
                counters.txpackets = map(rstats.rxpackets)
                counters.txbytes = map(rstats.rxbytes)
-               counters.type.c = 0x1002ULL -- l2vlan
             end
             ifmib.init_snmp( { ifDescr = name,
                                ifName = name,
