@@ -59,6 +59,7 @@ local lwaftr_conf_spec = {
    ipv4_mtu=Dumper.number,
    ipv6_mtu=Dumper.number,
    max_fragments_per_reassembly_packet=Dumper.number,
+   max_ipv4_reassembly_packets=Dumper.number,
    max_ipv6_reassembly_packets=Dumper.number,
    next_hop_ipv4_addr=Dumper.ipv4,
    next_hop_ipv6_addr=Dumper.ipv6,
@@ -181,6 +182,7 @@ function selftest ()
          ipv4_mtu = 1460
          ipv6_mtu = 1500
          max_fragments_per_reassembly_packet = 40
+         max_ipv4_reassembly_packets = 5
          max_ipv6_reassembly_packets = 10
          policy_icmpv4_incoming = ALLOW
          policy_icmpv6_incoming = ALLOW
@@ -212,6 +214,7 @@ function selftest ()
          ipv6_ingress_filter = ip6
          ipv6_mtu = 1500
          max_fragments_per_reassembly_packet = 40
+         max_ipv4_reassembly_packets = 5
          max_ipv6_reassembly_packets = 10
          next_hop6_mac = 44:44:44:44:44:44
          policy_icmpv4_incoming = ALLOW

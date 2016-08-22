@@ -139,6 +139,14 @@ snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${TEST_BASE}/tcp-ipv4-3frags-bound.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6-reassembled.pcap \
    ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-2.lua
+   ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-2.lua
+
+echo "Testing: from-internet IPv4 fragmented packets found in the binding table, reversed."
+snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
+   ${TEST_BASE}/tcp-ipv4-3frags-bound-reversed.pcap ${EMPTY} \
+   ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6-reassembled.pcap \
+   ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-2.lua
+   ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-2.lua
 
 echo "Testing: traffic class mapping"
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \

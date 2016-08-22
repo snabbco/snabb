@@ -6,12 +6,11 @@ local packet = require("core.packet")
 local ipsum = require("lib.checksum").ipsum
 local bit = require("bit")
 local ffi = require("ffi")
+local lib = require("core.lib")
 
-local rd16, wr16, wr32, get_ihl_from_offset = lwutil.rd16, lwutil.wr16, lwutil.wr32, lwutil.get_ihl_from_offset
-local cast = ffi.cast
-local htons, htonl = lwutil.htons, lwutil.htonl
-local ntohs, ntohl = htons, htonl
+local rd16, wr16, get_ihl_from_offset = lwutil.rd16, lwutil.wr16, lwutil.get_ihl_from_offset
 local band, bor = bit.band, bit.bor
+local ntohs, htons = lib.ntohs, lib.htons
 local ceil = math.ceil
 
 -- Constants to manipulate the flags next to the frag-offset field directly
@@ -61,7 +60,7 @@ function fragment(ipv4_pkt, l2_size, mtu)
    if ipv4_pkt.length - l2_size <= mtu then
       return FRAGMENT_UNNEEDED, ipv4_pkt
    end
-   l2_mtu = mtu + l2_size
+   local l2_mtu = mtu + l2_size
 
    local ver_and_ihl_offset = l2_size + constants.o_ipv4_ver_and_ihl
    local total_length_offset = l2_size + constants.o_ipv4_total_length
@@ -130,130 +129,4 @@ function fragment(ipv4_pkt, l2_size, mtu)
         htons(ipsum(ipv4_pkt.data + ver_and_ihl_offset, ihl, 0)))
 
    return FRAGMENT_OK, pkts
-end
-
-
-function is_fragment(pkt, l2_size)
-   -- Either the packet has the "more fragments" flag set,
-   -- or the fragment offset is non-zero, or both.
-   local flags_and_frag_offset = ntohs(rd16(pkt.data + l2_size + constants.o_ipv4_flags))
-   return band(flags_and_frag_offset, flag_more_fragments_mask) ~= 0 or
-      band(flags_and_frag_offset, frag_offset_field_mask) ~= 0
-end
-
-
-REASSEMBLE_OK = 1
-REASSEMBLE_INVALID = 2
-REASSEMBLE_MISSING_FRAGMENT = 3
-
-
-function reassemble(fragments, l2_size)
-   local flags_and_frag_offset_offset = l2_size + constants.o_ipv4_flags
-   table.sort(fragments, function (pkt1, pkt2)
-       local pkt1_offset = band(ntohs(rd16(pkt1.data + flags_and_frag_offset_offset)),
-                                frag_offset_field_mask)
-       local pkt2_offset = band(ntohs(rd16(pkt2.data + flags_and_frag_offset_offset)),
-                                frag_offset_field_mask)
-       return pkt1_offset < pkt2_offset
-   end)
-
-   -- Check that first fragment has a 0 as fragment offset.
-   if band(ntohs(rd16(fragments[1].data + flags_and_frag_offset_offset)),
-           frag_offset_field_mask) ~= 0
-   then
-      return REASSEMBLE_MISSING_FRAGMENT
-   end
-
-   -- Check that the last fragment does not have "more fragments" flag set
-   if band(ntohs(rd16(fragments[#fragments].data + flags_and_frag_offset_offset)),
-           flag_more_fragments_mask) ~= 0
-   then
-      return REASSEMBLE_MISSING_FRAGMENT
-   end
-
-   local ihl = get_ihl_from_offset(fragments[1], l2_size)
-   local header_size = l2_size + ihl
-   local frag_id_offset = l2_size + constants.o_ipv4_identification
-   local frag_id = rd16(fragments[1].data + frag_id_offset)
-   local packet_size = fragments[1].length
-   local fragment_lengths = { packet_size - header_size }
-   local fragment_offsets = { 0 }
-   local status = REASSEMBLE_OK
-
-   for i = 2, #fragments do
-      local fragment = fragments[i]
-
-      -- Check whether:
-      --   1. All fragmented packets have the same IHL
-      --   2. Fragmented packets have the same identification
-      if get_ihl_from_offset(fragment, l2_size) ~= ihl or
-         rd16(fragment.data + frag_id_offset) ~= frag_id
-      then
-         status = REASSEMBLE_INVALID
-         break
-      end
-
-      --   3. The "more fragments" flag is set (except for last fragment)
-      local flags_and_frag_offset = ntohs(rd16(fragment.data + flags_and_frag_offset_offset))
-      if band(flags_and_frag_offset, flag_more_fragments_mask) == 0 then
-         if i ~= #fragments then
-            status = REASSEMBLE_INVALID
-            break
-         end
-      end
-
-      --   4. The offset of the fragment matches the expected one
-      fragment_lengths[i] = fragment.length - header_size
-      fragment_offsets[i] = band(flags_and_frag_offset, frag_offset_field_mask) * 8
-      if fragment_offsets[i] ~= fragment_offsets[i - 1] + fragment_lengths[i - 1] then
-         if fragment_offsets[i] > fragment_offsets[i - 1] + fragment_lengths[i - 1] then
-            return REASSEMBLE_MISSING_FRAGMENT
-         end
-
-         -- TODO: Handle overlapping fragments
-         status = REASSEMBLE_INVALID
-         break
-      end
-
-      --   5. The resulting packet size does not exceed the maximum
-      packet_size = packet_size + fragment_lengths[i]
-
-      if packet_size > constants.ipv4_max_packet_size then
-         status = REASSEMBLE_INVALID
-         break
-      end
-   end
-
-   if status == REASSEMBLE_INVALID then
-      for _, fragment in ipairs(fragments) do
-         packet.free(fragment)
-      end
-      return REASSEMBLE_INVALID
-   end
-
-   -- We have all the fragments and they are valid, we can now reassemble.
-   local pkt = packet.allocate()
-   ffi.copy(pkt.data, fragments[1].data, header_size)
-   for i = 1, #fragments do
-      ffi.copy(pkt.data + header_size + fragment_offsets[i],
-               fragments[i].data + header_size,
-               fragment_lengths[i])
-   end
-   pkt.length = packet_size
-
-   -- Set the total length field
-   local total_length_offset = l2_size + constants.o_ipv4_total_length
-   wr16(pkt.data + total_length_offset, htons(packet_size - header_size + ihl))
-
-   -- Clear fragmentation flags and offset, and fragmentation id
-   wr32(pkt.data + frag_id_offset, 0)
-
-   -- Recalculate IP header checksum.
-   local ver_and_ihl_offset = l2_size + constants.o_ipv4_ver_and_ihl
-   local checksum_offset = l2_size + constants.o_ipv4_checksum
-   wr16(pkt.data + checksum_offset, 0)
-   wr16(pkt.data + checksum_offset,
-        htons(ipsum(pkt.data + ver_and_ihl_offset, ihl, 0)))
-
-   return REASSEMBLE_OK, pkt
 end
