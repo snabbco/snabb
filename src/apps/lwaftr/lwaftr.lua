@@ -381,6 +381,8 @@ function LwAftr:new(conf)
    o.inet_mac = conf.inet_mac or ethernet:pton("00:00:00:00:00:00")
    o.ipv4_mtu = conf.ipv4_mtu
    o.ipv6_mtu = conf.ipv6_mtu
+   o.max_fragments_per_reassembly_packet = conf.max_fragments_per_reassembly_packet
+   o.max_ipv6_reassembly_packets = conf.max_ipv6_reassembly_packets
    o.policy_icmpv4_incoming = conf.policy_icmpv4_incoming
    o.policy_icmpv4_outgoing = conf.policy_icmpv4_outgoing
    o.policy_icmpv6_incoming = conf.policy_icmpv6_incoming

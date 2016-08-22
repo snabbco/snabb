@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
 local fragmentv6 = require("apps.lwaftr.fragmentv6")
+local fragv6_h = require("apps.lwaftr.fragmentv6_hardened")
 local ndp = require("apps.lwaftr.ndp")
 local lwutil = require("apps.lwaftr.lwutil")
 local icmp = require("apps.lwaftr.icmp")
@@ -14,9 +15,10 @@ local bit = require("bit")
 local ffi = require("ffi")
 local C = ffi.C
 
+
+
 local receive, transmit = link.receive, link.transmit
 local rd16, wr16, htons = lwutil.rd16, lwutil.wr16, lwutil.htons
-local is_fragment = fragmentv6.is_fragment
 
 local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
 local n_ethertype_ipv6 = constants.n_ethertype_ipv6
@@ -25,89 +27,52 @@ local o_ipv6_dst_addr = constants.o_ipv6_dst_addr
 
 local proto_icmpv6 = constants.proto_icmpv6
 local ethernet_header_size = constants.ethernet_header_size
+local o_ethernet_ethertype = constants.o_ethernet_ethertype
 local o_icmpv6_header = ethernet_header_size + ipv6_fixed_header_size
 local o_icmpv6_msg_type = o_icmpv6_header + constants.o_icmpv6_msg_type
 local o_icmpv6_checksum = o_icmpv6_header + constants.o_icmpv6_checksum
 local icmpv6_echo_request = constants.icmpv6_echo_request
 local icmpv6_echo_reply = constants.icmpv6_echo_reply
 
-Reassembler = {}
+ReassembleV6 = {}
 Fragmenter = {}
 NDP = {}
 ICMPEcho = {}
 
-function Reassembler:new(conf)
-   local o = setmetatable({}, {__index=Reassembler})
+function ReassembleV6:new(conf)
+   local o = setmetatable({}, {__index = ReassembleV6})
    o.conf = conf
-
-   if conf.vlan_tagging then
-      o.l2_size = constants.ethernet_header_size + 4
-      o.ethertype_offset = constants.o_ethernet_ethertype + 4
-   else
-      o.l2_size = constants.ethernet_header_size
-      o.ethertype_offset = constants.o_ethernet_ethertype
-   end
-   o.fragment_cache = {}
+   o.ctab = fragv6_h.initialize_frag_table(conf.max_ipv6_reassembly_packets,
+      conf.max_fragments_per_reassembly_packet)
    return o
 end
 
-local function get_ipv6_src_ip(pkt, l2_size)
-   local ipv6_src = l2_size + o_ipv6_src_addr
-   return ffi.string(pkt.data + ipv6_src, 16)
+function ReassembleV6:cache_fragment(fragment)
+   return fragv6_h.cache_fragment(self.ctab, fragment)
 end
 
-local function get_ipv6_dst_ip(pkt, l2_size)
-   local ipv6_dst = l2_size + o_ipv6_dst_addr
-   return ffi.string(pkt.data + ipv6_dst, 16)
+local function is_ipv6(pkt)
+   return rd16(pkt.data + o_ethernet_ethertype) == n_ethertype_ipv6
 end
 
-function Reassembler:key_frag(frag)
-   local l2_size = self.l2_size
-   local frag_id = fragmentv6.get_frag_id(frag, l2_size)
-   local src_ip = get_ipv6_src_ip(frag, l2_size)
-   local dst_ip = get_ipv6_dst_ip(frag, l2_size)
-   return frag_id .. '|' .. src_ip .. dst_ip
+local function is_fragment(pkt)
+   return pkt.data[ethernet_header_size + constants.o_ipv6_next_header] ==
+      constants.ipv6_frag
 end
 
-function Reassembler:cache_fragment(frag)
-   local cache = self.fragment_cache
-   local key = self:key_frag(frag)
-   cache[key] = cache[key] or {}
-   table.insert(cache[key], frag)
-   return cache[key]
-end
-
-function Reassembler:clean_fragment_cache(frags)
-   local key = self:key_frag(frags[1])
-   self.fragment_cache[key] = nil
-   for _, p in ipairs(frags) do
-      packet.free(p)
-   end
-end
-
-local function is_ipv6(pkt, ethertype_offset)
-   return rd16(pkt.data + ethertype_offset) == n_ethertype_ipv6
-end
-
-function Reassembler:push ()
+function ReassembleV6:push ()
    local input, output = self.input.input, self.output.output
    local errors = self.output.errors
 
-   local l2_size = self.l2_size
-   local ethertype_offset = self.ethertype_offset
-
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if is_ipv6(pkt, ethertype_offset) and is_fragment(pkt, l2_size) then
-         local frags = self:cache_fragment(pkt)
-         local status, maybe_pkt = fragmentv6.reassemble(frags, l2_size)
-         if status == fragmentv6.REASSEMBLY_OK then
-            self:clean_fragment_cache(frags)
+      if is_ipv6(pkt) and is_fragment(pkt) then
+         local status, maybe_pkt = self:cache_fragment(pkt)
+         if status == fragv6_h.REASSEMBLY_OK then
             transmit(output, maybe_pkt)
-         elseif status == fragmentv6.FRAGMENT_MISSING then
-            -- Nothing useful to be done yet
-         elseif status == fragmentv6.REASSEMBLY_INVALID then
-            self:clean_fragment_cache(frags)
+         elseif status == fragv6_h.FRAGMENT_MISSING then
+            -- Nothing useful to be done yet, continue
+         elseif status == fragv6_h.REASSEMBLY_INVALID then
             if maybe_pkt then -- This is an ICMP packet
                transmit(errors, maybe_pkt)
             end
