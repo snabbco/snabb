@@ -471,7 +471,7 @@ Returns a pointer to the mapped object.
 
 — Function **shm.exists** *name*
 
-Checks whether shared object *name* exists.
+Returns a true value if shared object by *name* exists.
 
 — Function **shm.unmap** *pointer*
 
