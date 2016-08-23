@@ -120,7 +120,7 @@ end
 
 function Source:pull()
    for _, o in ipairs(self.output) do
-      for i = 1, link.nwritable(o) do
+      for i = 1, engine.pull_npackets do
          local p = packet.allocate()
          ffi.copy(p.data, self.to_mac_address, 6)
          ffi.copy(p.data + 6, self.from_mac_address, 6)

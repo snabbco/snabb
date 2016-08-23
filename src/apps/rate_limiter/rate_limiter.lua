@@ -74,7 +74,7 @@ function RateLimiter:push ()
    end
 
 
-   while not link.empty(i) and not link.full(o) do
+   while not link.empty(i) do
       local p = link.receive(i)
       local length = p.length
 
