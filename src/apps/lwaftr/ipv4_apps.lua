@@ -93,31 +93,19 @@ end
 function Fragmenter:new(conf)
    local o = setmetatable({}, {__index=Fragmenter})
    o.conf = conf
-
    o.mtu = assert(conf.mtu)
-
-   if conf.vlan_tagging then
-      o.l2_size = ehs + 4
-      o.ethertype_offset = constants.o_ethernet_ethertype + 4
-   else
-      o.l2_size = ehs
-      o.ethertype_offset = constants.o_ethernet_ethertype
-   end
-
    return o
 end
 
 function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
-   local errors = self.output.errors
 
-   local l2_size, mtu = self.l2_size, self.mtu
-   local ethertype_offset = self.ethertype_offset
+   local mtu = self.mtu
 
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if pkt.length > mtu + l2_size and is_ipv4(pkt, ethertype_offset) then
-         local status, frags = fragmentv4.fragment(pkt, l2_size, mtu)
+      if pkt.length > mtu + ehs and is_ipv4(pkt) then
+         local status, frags = fragmentv4.fragment(pkt, mtu)
          if status == fragmentv4.FRAGMENT_OK then
             for i=1,#frags do transmit(output, frags[i]) end
          else

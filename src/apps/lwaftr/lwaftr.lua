@@ -507,7 +507,7 @@ local function drop_ipv4_packet_to_unreachable_host(lwstate, pkt, pkt_src_link)
    }
    local icmp_dis = icmp.new_icmpv4_packet(
       lwstate.aftr_mac_inet_side, lwstate.inet_mac, lwstate.aftr_ipv4_ip,
-      to_ip, pkt, ethernet_header_size, icmp_config)
+      to_ip, pkt, icmp_config)
 
    drop_ipv4(lwstate, pkt, pkt_src_link)
    return transmit_icmpv4_reply(lwstate, icmp_dis, pkt)
@@ -530,7 +530,7 @@ local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(
       lwstate.aftr_mac_b4_side, lwstate.next_hop6_mac, lwstate.aftr_ipv6_ip,
-      ipv6_src_addr, pkt, ethernet_header_size, icmp_config)
+      ipv6_src_addr, pkt, icmp_config)
    drop(pkt)
    transmit_icmpv6_reply(lwstate.o6, b4fail_icmp)
 end
@@ -560,8 +560,7 @@ local function cannot_fragment_df_packet_error(lwstate, pkt)
       next_hop_mtu = lwstate.ipv6_mtu - constants.ipv6_fixed_header_size,
    }
    return icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
-                                 lwstate.aftr_ipv4_ip, dst_ip, pkt,
-                                 ethernet_header_size, icmp_config)
+                                 lwstate.aftr_ipv4_ip, dst_ip, pkt, icmp_config)
 end
 
 local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_src_link)
@@ -582,7 +581,7 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
                            }
       local reply = icmp.new_icmpv4_packet(
          lwstate.aftr_mac_inet_side, lwstate.inet_mac, lwstate.aftr_ipv4_ip,
-         dst_ip, pkt, ethernet_header_size, icmp_config)
+         dst_ip, pkt, icmp_config)
 
       drop_ipv4(lwstate, pkt, pkt_src_link)
       return transmit_icmpv4_reply(lwstate, reply, pkt)
@@ -777,7 +776,7 @@ local function tunnel_unreachable(lwstate, pkt, code, next_hop_mtu)
    local dst_ip = get_ipv4_src_address_ptr(embedded_ipv4_header)
    local icmp_reply = icmp.new_icmpv4_packet(lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                                              lwstate.aftr_ipv4_ip, dst_ip, pkt,
-                                             ethernet_header_size, icmp_config)
+                                             icmp_config)
    return icmp_reply
 end
 
