@@ -13,8 +13,8 @@ local counter  = require("core.counter")
 
 require("core.packet_h")
 
-local packet_t = ffi.typeof("struct packet")
-local packet_ptr_t = ffi.typeof("struct packet *")
+packet_t = ffi.typeof("struct packet")
+local packet_ptr_t = ffi.typeof("$ *", packet_t)
 local packet_size = ffi.sizeof(packet_t)
 local header_size = 8
 max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
