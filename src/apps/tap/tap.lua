@@ -11,26 +11,131 @@ local ffi = require("ffi")
 local C = ffi.C
 local const = require("syscall.linux.constants")
 local os = require("os")
+local lib = require("core.lib")
+local band = bit.band
 
 local t = S.types.t
 
 Tap = { }
 
-function Tap:new (name)
+local function _mtu (sock, ifr)
+   local ok, err = sock:ioctl("SIOCGIFMTU", ifr)
+   if not ok then
+      error("Error getting MTU for tap device "..ifr.name
+               ..": "..tostring(err))
+   end
+   return ifr.ivalue
+end
+
+local function _status (sock, ifr)
+   local ok, err = sock:ioctl("SIOCGIFFLAGS", ifr)
+   if not ok then
+      error("Error getting flags for tap device "..ifr.name
+               ..": ".. tostring(err))
+   end
+   if band(ifr.flags, const.IFF.UP) ~= 0 then
+      return 1 -- up
+   else
+      return 2 -- down
+   end
+end
+
+local macaddr_t = ffi.typeof[[
+   union {
+      uint64_t bits;
+      uint8_t bytes[6];
+   }
+]]
+local function _macaddr (sock, ifr)
+   local ok, err = sock:ioctl("SIOCGIFHWADDR", ifr)
+   if not ok then
+      error("Error getting MAC address for tap device "
+               ..ifr.name..": ".. tostring(err))
+   end
+   local sa = ifr.hwaddr
+   if sa.sa_family ~= const.ARPHRD.ETHER then
+      error("Tap interface "..ifr.name
+               .." is not of type ethernet "..sa.sa_family)
+   else
+      return ffi.cast(ffi.typeof("$*", macaddr_t), sa.sa_data).bits
+   end
+end
+
+function Tap:new (conf)
+   local name, mtu, mtu2
+   -- Backwards compatibility
+   if type(conf) == "string" then
+      name = conf
+   elseif type(conf) == "table" then
+      name = conf.name
+      -- MTU handling
+      --
+      -- For a regular networking device, we use the convention that
+      -- the MTU includes the Ethernet header including any VLAN tags.
+      -- This value is passed to us in the "mtu" configuration
+      -- variable.  However, the MTU of a TAP device does not include
+      -- any part of the Ethernet header.  Since the device doesn't
+      -- know whether there are any VLAN tags used on top of it, this
+      -- driver cannot figure out the proper MTU from that value
+      -- alone.  For that reason, another value is passed to the
+      -- driver in the variable "mtu2", which excludes all L2 headers.
+      -- Like "mtu", this value originates from the user-supplied
+      -- configuration and assumes knowledge of the L2 structure of
+      -- the TAP device.
+      --
+      -- Contrary to a physical device, whose MTU is controlled solely
+      -- by the driver, the MTU of a TAP device is controlled by the
+      -- external process that set up the device.  Hence, it would be
+      -- unexpected if the MTU were changed here.  Therefore, we
+      -- merely check whether the externally configured MTU matches
+      -- the one supplied to us by the Snabb process.  An error is
+      -- thrown in case of a mismatch to avoid MTU blackholes within
+      -- the Snabb app network.
+      --
+      -- Both values must be supplied.  "mtu2" is used for checking
+      -- but mtu is stored as the actual MTU in the driver stats for
+      -- consistency with regular devices.
+      mtu = conf.mtu
+      mtu2 = conf.mtu2
+      assert(mtu and mtu2, "missing MTU and/or MTU2 for tap interface "
+                ..(name and name or "<unknown>"))
+   end
    assert(name, "missing tap interface name")
 
-   local sock, err = S.open("/dev/net/tun", "rdwr, nonblock");
-   assert(sock, "Error opening /dev/net/tun: " .. tostring(err))
+   local fd, err = S.open("/dev/net/tun", "rdwr, nonblock");
+   assert(fd, "Error opening /dev/net/tun: " .. tostring(err))
    local ifr = t.ifreq()
    ifr.flags = "tap, no_pi"
    ifr.name = name
-   local ok, err = sock:ioctl("TUNSETIFF", ifr)
+   local ok, err = fd:ioctl("TUNSETIFF", ifr)
    if not ok then
-      sock:close()
       error("Error opening /dev/net/tun: " .. tostring(err))
    end
-   return setmetatable({sock = sock,
+
+   -- A dummy socket to perform SIOC{G,S}IF* ioctl() calls
+   local sock, err = S.socket(const.AF.INET, const.SOCK.DGRAM, 0)
+   if not sock then
+      fd:close()
+      error("Error creating query socket for tap device: " .. tostring(err))
+   end
+
+   local mtu_tap = _mtu(sock, ifr)
+   if mtu2 then
+      assert(mtu2 == mtu_tap, "MTU mismatch on "..name
+                ..": required "..mtu..", configured "..mtu_tap)
+   else
+      -- Old-style configuration without MTU: use the MTU from the TAP
+      -- device in the stats table.  This value is inconsistent with
+      -- that of other devices, because it doesn't include the L2
+      -- headers.
+      mtu = mtu_tap
+   end
+
+   return setmetatable({fd = fd,
+                        sock = sock,
+                        ifr = ifr,
                         name = name,
+                        status_timer = lib.timer(0.001, 'repeating', engine.now),
                         shm = { rxbytes   = {counter},
                                 rxpackets = {counter},
                                 rxmcast   = {counter},
@@ -38,16 +143,27 @@ function Tap:new (name)
                                 txbytes   = {counter},
                                 txpackets = {counter},
                                 txmcast   = {counter},
-                                txbcast   = {counter} }},
-                       {__index = Tap})
+                                txbcast   = {counter},
+                                type      = {counter, 0x1001}, -- propVirtual
+                                status    = {counter, _status(sock, ifr)},
+                                mtu       = {counter, mtu},
+                                macaddr   = {counter, _macaddr(sock, ifr)} }},
+      {__index = Tap})
+end
+
+function Tap:status()
+   counter.set(self.shm.status, _status(self.sock, self.ifr))
 end
 
 function Tap:pull ()
    local l = self.output.output
    if l == nil then return end
+   if self.status_timer() then
+      self:status()
+   end
    while not link.full(l) do
       local p = packet.allocate()
-      local len, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
+      local len, err = S.read(self.fd, p.data, C.PACKET_PAYLOAD_SIZE)
       -- errno == EAGAIN indicates that the read would of blocked as there is no
       -- packet waiting. It is not a failure.
       if not len and err.errno == const.E.AGAIN then
@@ -74,10 +190,10 @@ end
 function Tap:push ()
    local l = self.input.input
    while not link.empty(l) do
-      -- The socket write might of blocked so don't dequeue the packet from the link
+      -- The write might of blocked so don't dequeue the packet from the link
       -- until the write has completed.
       local p = link.front(l)
-      local len, err = S.write(self.sock, p.data, p.length)
+      local len, err = S.write(self.fd, p.data, p.length)
       -- errno == EAGAIN indicates that the write would of blocked
       if not len and err.errno ~= const.E.AGAIN or len and len ~= p.length then
          error("Failed write on " .. self.name .. tostring(err))
@@ -100,6 +216,7 @@ function Tap:push ()
 end
 
 function Tap:stop()
+   self.fd:close()
    self.sock:close()
 end
 
