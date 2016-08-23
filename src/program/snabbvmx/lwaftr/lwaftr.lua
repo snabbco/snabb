@@ -27,7 +27,7 @@ end
 
 function parse_args (args)
    if #args == 0 then show_usage(1) end
-   local conf_file, id, pci, mac, sock_path
+   local conf_file, id, pci, mac, sock_path, mirror_id
    local opts = { verbosity = 0 }
    local handlers = {}
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
@@ -67,15 +67,18 @@ function parse_args (args)
          fatal("Argument '--sock' was not set")
       end
    end
+   function handlers.mirror (arg)
+      mirror_id = arg
+   end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "c:s:i:p:m:vD:h", {
       ["conf"] = "c", ["sock"] = "s", ["id"] = "i", ["pci"] = "p", ["mac"] = "m",
-      verbose = "v", duration = "D", help = "h" })
-   return opts, conf_file, id, pci, mac, sock_path
+      ["mirror"] = 1, verbose = "v", duration = "D", help = "h" })
+   return opts, conf_file, id, pci, mac, sock_path, mirror_id
 end
 
 function run(args)
-   local opts, conf_file, id, pci, mac, sock_path = parse_args(args)
+   local opts, conf_file, id, pci, mac, sock_path, mirror_id = parse_args(args)
 
    local conf = {}
    local lwconf = {}
@@ -137,14 +140,11 @@ function run(args)
       id = id, 
       mtu = mtu,
       vlan = vlan,
+      mirror_id = mirror_id,
       discard_threshold = discard_threshold,
       discard_wait = discard_wait,
-      discard_check_timer = discard_check_timer
+      discard_check_timer = discard_check_timer,
    }
-
-   if dir_exists(("/sys/devices/virtual/net/%s"):format(id)) then
-      conf.interface.mirror_id = id
-   end
 
    local c = config.new()
    setup.lwaftr_app(c, conf, lwconf, sock_path)
