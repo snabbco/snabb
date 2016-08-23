@@ -27,14 +27,14 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	cd src && $(MAKE)
 
 install: all
-	install -D src/snabb ${DESTDIR}${PREFIX}/bin/snabb
+	install -D src/snabb ${DESTDIR}${PREFIX}/bin/snabbwall
 
 clean:
 	(cd lib/luajit && $(MAKE) clean)
 	(cd src; $(MAKE) clean; rm -rf syscall.lua syscall)
 
 PACKAGE:=snabbswitch
-DIST_BINARY:=snabb
+DIST_BINARY:=snabbwall
 BUILDDIR:=$(shell pwd)
 
 dist: DISTDIR:=$(BUILDDIR)/$(PACKAGE)-$(shell git describe --tags)
