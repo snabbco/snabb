@@ -15,8 +15,6 @@ local bit = require("bit")
 local ffi = require("ffi")
 local C = ffi.C
 
-
-
 local receive, transmit = link.receive, link.transmit
 local rd16, wr16, htons = lwutil.rd16, lwutil.wr16, lwutil.htons
 
@@ -33,6 +31,7 @@ local o_icmpv6_msg_type = o_icmpv6_header + constants.o_icmpv6_msg_type
 local o_icmpv6_checksum = o_icmpv6_header + constants.o_icmpv6_checksum
 local icmpv6_echo_request = constants.icmpv6_echo_request
 local icmpv6_echo_reply = constants.icmpv6_echo_reply
+local ehs = constants.ethernet_header_size
 
 ReassembleV6 = {}
 Fragmenter = {}
@@ -89,38 +88,25 @@ end
 function Fragmenter:new(conf)
    local o = setmetatable({}, {__index=Fragmenter})
    o.conf = conf
-
    o.mtu = assert(conf.mtu)
-
-   if conf.vlan_tagging then
-      o.l2_size = constants.ethernet_header_size + 4
-      o.ethertype_offset = constants.o_ethernet_ethertype + 4
-   else
-      o.l2_size = constants.ethernet_header_size
-      o.ethertype_offset = constants.o_ethernet_ethertype
-   end
-
    return o
 end
 
 function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
-   local errors = self.output.errors
 
-   local l2_size, mtu = self.l2_size, self.mtu
-   local ethertype_offset = self.ethertype_offset
+   local mtu = self.mtu
 
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if pkt.length > mtu + l2_size and is_ipv6(pkt, ethertype_offset) then
+      if pkt.length > mtu + ehs and is_ipv6(pkt) then
          -- It's possible that the IPv6 packet has an IPv4 packet as
          -- payload, and that payload has the Don't Fragment flag set.
          -- However ignore this; the fragmentation policy of the L3
          -- protocol (in this case, IP) doesn't affect the L2 protocol.
          -- We always fragment.
-         local unfragmentable_header_size = l2_size + ipv6_fixed_header_size
-         local pkts = fragmentv6.fragment(pkt, unfragmentable_header_size,
-                                          l2_size, mtu)
+         local unfragmentable_header_size = ehs + ipv6_fixed_header_size
+         local pkts = fragmentv6.fragment(pkt, unfragmentable_header_size, mtu)
          for i=1,#pkts do
             transmit(output, pkts[i])
          end

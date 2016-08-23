@@ -11,6 +11,7 @@ local band, bor, lshift, rshift = bit.band, bit.bor, bit.lshift, bit.rshift
 local C = ffi.C
 local wr16, wr32 = lwutil.wr16, lwutil.wr32
 local htons, htonl = lwutil.htons, lwutil.htonl
+local ehs = constants.ethernet_header_size
 
 -- IPv6 fragmentation, as per https://tools.ietf.org/html/rfc5722
 -- TODO: consider security/performance tradeoffs of randomization
@@ -21,7 +22,7 @@ local function fresh_frag_id()
 end
 
 local function write_frag_header(pkt_data, unfrag_header_size, next_header,
-                                      frag_offset, more_frags, frag_id)
+                                 frag_offset, more_frags, frag_id)
    pkt_data[unfrag_header_size] = next_header
    pkt_data[unfrag_header_size + 1] = 0 -- Reserved; 0 by specification
    -- 2 bytes: 13 bits frag_offset, 2 0 reserved bits, 'M' (more_frags)
@@ -37,11 +38,11 @@ end
 -- TODO: enforce a lower bound mtu of 1280, as per the spec?
 -- Packets have two parts: an 'unfragmentable' set of headers, and a
 -- fragmentable payload.
-function fragment(ipv6_pkt, unfrag_header_size, l2_size, mtu)
-   if ipv6_pkt.length - l2_size <= mtu then
+function fragment(ipv6_pkt, unfrag_header_size, mtu)
+   if ipv6_pkt.length - ehs <= mtu then
       return ipv6_pkt -- No fragmentation needed
    end
-   l2_mtu = mtu + l2_size
+   local l2_mtu = mtu + ehs
 
    local more = 1
    -- TODO: carefully evaluate the boundary conditions here
@@ -62,7 +63,7 @@ function fragment(ipv6_pkt, unfrag_header_size, l2_size, mtu)
    local frag_id = fresh_frag_id()
    write_frag_header(ipv6_pkt.data, unfrag_header_size, fnext_header, 0, more, frag_id)
    ipv6_pkt.data[next_header_idx] = constants.ipv6_frag
-   wr16(ipv6_pkt.data + l2_size + constants.o_ipv6_payload_len,
+   wr16(ipv6_pkt.data + ehs + constants.o_ipv6_payload_len,
         htons(payload_bytes_per_packet + constants.ipv6_frag_header_size))
    local raw_frag_offset = payload_bytes_per_packet
 
@@ -89,7 +90,7 @@ function fragment(ipv6_pkt, unfrag_header_size, l2_size, mtu)
    ffi.copy(last_pkt.data + new_header_size,
             ipv6_pkt.data + new_header_size + raw_frag_offset,
             last_payload_len)
-   wr16(last_pkt.data + l2_size + constants.o_ipv6_payload_len,
+   wr16(last_pkt.data + ehs + constants.o_ipv6_payload_len,
         htons(last_payload_len + constants.ipv6_frag_header_size))
    last_pkt.length = new_header_size + last_payload_len
    pkts[num_packets] = last_pkt
