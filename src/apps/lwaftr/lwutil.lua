@@ -73,3 +73,10 @@ end
 function set_dst_ethernet(pkt, dst_eth)
    ffi.copy(pkt.data, dst_eth, 6)
 end
+
+function write_to_file(filename, content)
+   local fd = assert(io.open(filename, "wt"),
+      ("Couldn't open file: '%s'"):format(filename))
+   fd:write(content)
+   fd:close()
+end

@@ -5,4 +5,4 @@ TEST_BASE=../data/ \
 TEST_OUT=/tmp \
 EMPTY=${TEST_BASE}/empty.pcap \
 COUNTERS=${TEST_BASE}/counters \
-./core-end-to-end.sh
+./core-end-to-end.sh $@

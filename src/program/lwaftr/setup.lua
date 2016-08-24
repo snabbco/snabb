@@ -6,6 +6,7 @@ local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
 local lwaftr     = require("apps.lwaftr.lwaftr")
+local lwcounter  = require("apps.lwaftr.lwcounter")
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
 local bt         = require("apps.lwaftr.binding_table")
@@ -19,16 +20,17 @@ function lwaftr_app(c, conf)
    conf.preloaded_binding_table = bt.load(conf.binding_table)
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
+   conf.counters = lwcounter.create_counters()
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler, conf)
    config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, conf)
    config.app(c, "icmpechov4", ipv4_apps.ICMPEcho, { address = conf.aftr_ipv4_ip })
-   config.app(c, 'lwaftr', lwaftr.LwAftr, conf)
    config.app(c, "icmpechov6", ipv6_apps.ICMPEcho, { address = conf.aftr_ipv6_ip })
+   config.app(c, 'lwaftr', lwaftr.LwAftr, conf)
    config.app(c, "fragmenterv4", ipv4_apps.Fragmenter,
-              { mtu=conf.ipv4_mtu })
+              { mtu=conf.ipv4_mtu, counters=conf.counters })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
-              { mtu=conf.ipv6_mtu })
+              { mtu=conf.ipv6_mtu, counters=conf.counters })
    config.app(c, "ndp", ipv6_apps.NDP,
               { src_ipv6 = conf.aftr_ipv6_ip, src_eth = conf.aftr_mac_b4_side,
                 dst_eth = conf.next_hop6_mac, dst_ipv6 = conf.next_hop_ipv6_addr })

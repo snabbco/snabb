@@ -244,7 +244,7 @@ local function hash_ipv4(key)
    return hash
 end
 
-function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
+function initialize_frag_table(max_fragmented_packets, max_pkt_frag, memuse_counter)
    -- Initialize module-scoped variables
    max_frags_per_packet = max_pkt_frag
    ipv4_reassembly_buffer_t = ffi.typeof([[
@@ -267,7 +267,8 @@ function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
       value_type = ffi.typeof(ipv4_reassembly_buffer_t),
       hash_fn = hash_ipv4,
       initial_size = math.ceil(max_fragmented_packets / max_occupy),
-      max_occupancy_rate = max_occupy
+      max_occupancy_rate = max_occupy,
+      memuse_counter = memuse_counter
    }
    return ctable.new(params)
 end
@@ -275,12 +276,14 @@ end
 function cache_fragment(frags_table, fragment)
    local key = get_key(fragment)
    local ptr = frags_table:lookup_ptr(key)
+   local ej = false
    if not ptr then
       local reassembly_buf = packet_to_reassembly_buffer(fragment)
-      frags_table:add_with_random_ejection(key, reassembly_buf, false)
+      _, ej = frags_table:add_with_random_ejection(key, reassembly_buf, false)
       ptr = frags_table:lookup_ptr(key)
    end
-   return attempt_reassembly(frags_table, ptr.value, fragment)
+   local status, maybe_pkt = attempt_reassembly(frags_table, ptr.value, fragment)
+   return status, maybe_pkt, ej
 end
 
 function selftest()

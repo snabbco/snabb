@@ -7,6 +7,7 @@ local bit = require("bit")
 local bxor, bnot = bit.bxor, bit.bnot
 local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
 local max, floor, ceil = math.max, math.floor, math.ceil
+local counter = require("core.counter")
 
 CTable = {}
 
@@ -95,7 +96,8 @@ local required_params = set('key_type', 'value_type', 'hash_fn')
 local optional_params = {
    initial_size = 8,
    max_occupancy_rate = 0.9,
-   min_occupancy_rate = 0.0
+   min_occupancy_rate = 0.0,
+   memuse_counter = {}
 }
 
 function new(params)
@@ -109,6 +111,7 @@ function new(params)
    ctab.occupancy = 0
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
+   ctab.memuse_counter = params.memuse_counter
    ctab = setmetatable(ctab, { __index = CTable })
    ctab:resize(params.initial_size)
    return ctab
@@ -137,7 +140,7 @@ local function calloc(t, count)
    end
    local ret = ffi.cast(ffi.typeof('$*', t), mem)
    ffi.gc(ret, function (ptr) S.munmap(ptr, byte_size) end)
-   return ret
+   return ret, byte_size
 end
 
 function CTable:resize(size)
@@ -147,7 +150,13 @@ function CTable:resize(size)
 
    -- Allocate double the requested number of entries to make sure there
    -- is sufficient displacement if all hashes map to the last bucket.
-   self.entries = calloc(self.entry_type, size * 2)
+   local byte_size
+   self.entries, byte_size = calloc(self.entry_type, size * 2)
+   if #self.memuse_counter == 2 then
+      local counters = self.memuse_counter[1]
+      local memuse_name = self.memuse_counter[2]
+      counter.set(counters[memuse_name], byte_size)
+   end
    self.size = size
    self.scale = self.size / HASH_MAX
    self.occupancy = 0

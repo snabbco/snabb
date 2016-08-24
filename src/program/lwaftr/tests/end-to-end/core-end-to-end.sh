@@ -5,6 +5,10 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+if [[ $1 == '-r' ]]; then
+   REGEN=true
+fi
+
 function quit_with_msg {
    echo $1; exit 1
 }
@@ -30,6 +34,17 @@ function snabb_run_and_cmp_two_interfaces {
    scmp $v6_out $endoutv6 \
       "Failure: ${SNABB_LWAFTR} check $*"
    echo "Test passed"
+}
+
+function snabb_run_and_regen_counters {
+   conf=$1; v4_in=$2; v6_in=$3; v4_out=$4; v6_out=$5; counters_path=$6;
+   endoutv4="${TEST_OUT}/endoutv4.pcap"; endoutv6="${TEST_OUT}/endoutv6.pcap";
+   rm -f $endoutv4 $endoutv6
+   ${SNABB_LWAFTR} check -r \
+      $conf $v4_in $v6_in \
+      $endoutv4 $endoutv6 $counters_path || quit_with_msg \
+         "Failed to regen counters:\n\t ${SNABB_LWAFTR} check $*"
+   echo "Regenerated counters"
 }
 
 function is_packet_in_wrong_interface_test {
@@ -65,8 +80,13 @@ function snabb_run_and_cmp {
       echo "not enough arguments to snabb_run_and_cmp"
       exit 1
    fi
-   snabb_run_and_cmp_two_interfaces $@
-   snabb_run_and_cmp_on_a_stick $@
+   if [ $REGEN ] ; then
+      snabb_run_and_regen_counters $@
+   else
+      snabb_run_and_cmp_two_interfaces $@
+      snabb_run_and_cmp_on_a_stick $@
+      echo "All end-to-end lwAFTR tests passed."
+   fi
 }
 
 echo "Testing: from-internet IPv4 packet found in the binding table."
@@ -85,31 +105,31 @@ echo "Testing: NDP: incoming NDP Neighbor Solicitation"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${EMPTY} ${TEST_BASE}/ndp_incoming_ns.pcap \
    ${EMPTY} ${TEST_BASE}/ndp_outgoing_solicited_na.pcap \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/nofrag6-sol.lua
 
 echo "Testing: NDP: incoming NDP Neighbor Solicitation, non-lwAFTR IP"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${EMPTY} ${TEST_BASE}/ndp_incoming_ns_nonlwaftr.pcap \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/nofrag6.lua
 
 echo "Testing: NDP: IPv6 but not eth addr of next IPv6 hop set, do Neighbor Solicitation"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_withoutmac.conf \
    ${EMPTY} ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/ndp_outgoing_ns.pcap \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/ndp-ns-for-next-hop.lua
 
 echo "Testing: ARP: incoming ARP request"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${TEST_BASE}/arp_request_recv.pcap ${EMPTY} \
    ${TEST_BASE}/arp_reply_send.pcap ${EMPTY} \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/nofrag4.lua
 
 echo "Testing: ARP: IPv4 but not eth addr of next IPv4 hop set, send an ARP request"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_without_mac4.conf \
    ${EMPTY} ${EMPTY} \
    ${TEST_BASE}/arp_request_send.pcap ${EMPTY} \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/arp-for-next-hop.lua
 
 # mergecap -F pcap -w ndp_without_dst_eth_compound.pcap tcp-fromb4-ipv6.pcap tcp-fromb4-tob4-ipv6.pcap
 # mergecap -F pcap -w ndp_ns_and_recap.pcap recap-ipv6.pcap ndp_outgoing_ns.pcap
@@ -117,7 +137,7 @@ echo "Testing: NDP: Without receiving NA, next_hop6_mac not set"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_withoutmac.conf \
    ${EMPTY} ${TEST_BASE}/ndp_without_dst_eth_compound.pcap \
    ${TEST_BASE}/decap-ipv4.pcap ${TEST_BASE}/ndp_outgoing_ns.pcap \
-   ${COUNTERS}/ndp-no-na-next-hop6-mac-not-set.lua
+   ${COUNTERS}/ndp-no-na-next-hop6-mac-not-set-2pkts.lua
 
 # mergecap -F pcap -w ndp_getna_compound.pcap tcp-fromb4-ipv6.pcap \
 # ndp_incoming_solicited_na.pcap tcp-fromb4-tob4-ipv6.pcap
@@ -126,13 +146,13 @@ echo "Testing: NDP: With receiving NA, next_hop6_mac not initially set"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_withoutmac.conf \
    ${EMPTY} ${TEST_BASE}/ndp_getna_compound.pcap \
    ${TEST_BASE}/decap-ipv4.pcap ${TEST_BASE}/ndp_ns_and_recap.pcap \
-   ${COUNTERS}/ndp-no-na-next-hop6-mac-not-set.lua
+   ${COUNTERS}/ndp-no-na-next-hop6-mac-not-set-3pkts.lua
 
 echo "Testing: IPv6 packet, next hop NA, packet, eth addr not set in configuration."
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_withoutmac.conf \
    ${EMPTY} ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/ndp_outgoing_ns.pcap \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/ndp-ns-for-next-hop.lua
 
 echo "Testing: from-internet IPv4 fragmented packets found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
@@ -248,7 +268,7 @@ echo "Testing: from-to-b4 IPv6 packet NOT found in the binding table, no ICMP."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/tcp-afteraftr-ipv6.pcap \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/drop-no-source-softwire-ipv6.lua
+   ${COUNTERS}/in-1p-ipv6-out-none-1.lua
 
 echo "Testing: from-b4 to-internet IPv6 packet found in the binding table."
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
@@ -389,13 +409,13 @@ echo "Testing: unfragmented IPv4 UDP -> outgoing IPv6 UDP fragments"
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
    ${TEST_BASE}/udp-frominet-bound.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/udp-afteraftr-ipv6-2frags.pcap \
-   ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-6.lua
+   ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-6-outfrags.lua
 
 echo "Testing: IPv6 incoming UDP fragments -> unfragmented IPv4"
 snabb_run_and_cmp ${TEST_BASE}/icmp_on_fail.conf \
    ${EMPTY} ${TEST_BASE}/udp-fromb4-2frags-bound.pcap \
    ${TEST_BASE}/udp-afteraftr-reassembled-ipv4.pcap ${EMPTY} \
-   ${COUNTERS}/in-1p-ipv6-out-1p-ipv4-5.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-ipv4-5-frags.lua
 
 echo "Testing: IPv6 incoming UDP fragments -> outgoing IPv4 UDP fragments"
 snabb_run_and_cmp ${TEST_BASE}/small_ipv4_mtu_icmp.conf \
@@ -407,7 +427,7 @@ echo "Testing: IPv4 incoming UDP fragments -> outgoing IPv6 UDP fragments"
 snabb_run_and_cmp ${TEST_BASE}/small_ipv6_mtu_no_icmp.conf \
    ${TEST_BASE}/udp-frominet-3frag-bound.pcap ${EMPTY} \
    ${EMPTY} ${TEST_BASE}/udp-afteraftr-reassembled-ipv6-2frags.pcap \
-   ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-6.lua
+   ${COUNTERS}/in-1p-ipv4-infrags-out-1p-ipv6-6-outfrags.lua
 
 # Test ICMP inputs (with and without drop policy)
 
@@ -481,7 +501,7 @@ echo "Testing: incoming ICMPv6 3,0 hop limit exceeded, OPE hairpinned"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${EMPTY} ${TEST_BASE}/incoming-icmpv6-30hoplevelexceeded-hairpinned-OPE.pcap \
    ${EMPTY} ${TEST_BASE}/response-ipv6-tunneled-icmpv4_31-tob4.pcap \
-   ${COUNTERS}/in-1p-ipv6-out-1p-icmpv4-2.lua
+   ${COUNTERS}/in-1p-ipv6-out-1p-ipv4-hoplimhair.lua
 
 # Ingress filters
 
@@ -495,7 +515,7 @@ echo "Testing: ingress-filter: from-internet (IPv4) packet found in binding tabl
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_drop.conf \
    ${TEST_BASE}/tcp-frominet-trafficclass.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/in-1p-ipv4-out-0p-drop.lua
 
 echo "Testing: ingress-filter: from-b4 (IPv6) packet found in binding table (ACCEPT)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_accept.conf \
@@ -507,7 +527,7 @@ echo "Testing: ingress-filter: from-b4 (IPv6) packet found in binding table (DRO
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_drop.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6.pcap \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/nofrag6.lua
 
 # Egress filters
 
@@ -521,7 +541,7 @@ echo "Testing: egress-filter: to-internet (IPv4) (DROP)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_drop.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6.pcap \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/nofrag6.lua
 
 echo "Testing: egress-filter: to-b4 (IPv4) (ACCEPT)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_accept.conf \
@@ -533,30 +553,28 @@ echo "Testing: egress-filter: to-b4 (IPv4) (DROP)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_drop.conf \
    ${TEST_BASE}/tcp-frominet-trafficclass.pcap ${EMPTY} \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/in-1p-ipv4-out-0p-drop.lua
 
 echo "Testing: ICMP Echo to AFTR (IPv4)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/ping-v4.pcap ${EMPTY} \
    ${TEST_BASE}/ping-v4-reply.pcap ${EMPTY} \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/nofrag4.lua
 
 echo "Testing: ICMP Echo to AFTR (IPv4) + data"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/ping-v4-and-data.pcap ${EMPTY} \
    ${TEST_BASE}/ping-v4-reply.pcap ${TEST_BASE}/tcp-afteraftr-ipv6.pcap \
-   ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-1.lua
+   ${COUNTERS}/in-1p-ipv4-out-1p-ipv6-echo.lua
 
 echo "Testing: ICMP Echo to AFTR (IPv6)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/ping-v6.pcap \
    ${EMPTY} ${TEST_BASE}/ping-v6-reply.pcap \
-   ${COUNTERS}/empty.lua
+   ${COUNTERS}/icmpv6-ping-and-reply.lua
 
 echo "Testing: ICMP Echo to AFTR (IPv6) + data"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${EMPTY} ${TEST_BASE}/ping-v6-and-data.pcap \
    ${TEST_BASE}/decap-ipv4.pcap ${TEST_BASE}/ping-v6-reply.pcap \
-   ${COUNTERS}/in-1p-ipv6-out-1p-ipv4-4.lua
-
-echo "All end-to-end lwAFTR tests passed."
+   ${COUNTERS}/in-1p-ipv6-out-1p-ipv4-4-and-echo.lua

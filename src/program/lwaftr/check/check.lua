@@ -8,8 +8,10 @@ local setup = require("program.lwaftr.setup")
 -- Get the counter directory and names from the code, so that any change
 -- in there will be automatically picked up by the tests.
 local lwaftr = require("apps.lwaftr.lwaftr")
-local counter_names = lwaftr.counter_names
-local counters_dir = lwaftr.counters_dir
+local lwcounter = require("apps.lwaftr.lwcounter")
+local counter_names = lwcounter.counter_names
+local counters_dir = lwcounter.counters_dir
+local write_to_file = require("apps.lwaftr.lwutil").write_to_file
 
 function show_usage(code)
    print(require("program.lwaftr.check.README_inc"))
@@ -20,10 +22,12 @@ function parse_args (args)
    local handlers = {}
    local opts = {}
    function handlers.h() show_usage(0) end
+   function handlers.r() opts.r = true end
    handlers["on-a-stick"] = function ()
       opts["on-a-stick"] = true
    end
-   args = lib.dogetopt(args, handlers, "h", { help="h", ["on-a-stick"] = 0 })
+   args = lib.dogetopt(args, handlers, "hr",
+      { help="h", regen="r", ["on-a-stick"] = 0 })
    if #args ~= 5 and #args ~= 6 then show_usage(1) end
    return opts, args
 end
@@ -75,6 +79,18 @@ function validate_diff(actual, expected)
    end
 end
 
+local function regen_counters(counters, outfile)
+   local cnames = {}
+   for k in pairs(counters) do table.insert(cnames, k) end
+   table.sort(cnames)
+   local out_val = {'return {'}
+   for _,k in ipairs(cnames) do
+      table.insert(out_val, string.format('   ["%s"] = %s,', k, counters[k]))
+   end
+   table.insert(out_val, '}\n')
+   write_to_file(outfile, (table.concat(out_val, '\n')))
+end
+
 local function run_on_a_stick (args)
    local conf_file, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap, counters_path =
       unpack(args)
@@ -116,7 +132,11 @@ function run(args)
       local final_counters = read_counters(c)
       local counters_diff = diff_counters(final_counters, initial_counters)
       local req_counters = load_requested_counters(counters_path)
-      validate_diff(counters_diff, req_counters)
+      if opts.r then
+         regen_counters(counters_diff, counters_path)
+      else
+         validate_diff(counters_diff, req_counters)
+      end
    else
       app.main({duration=0.10})
    end

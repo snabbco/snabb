@@ -1,12 +1,11 @@
 return {
-   ["in-ipv6-bytes"] = 154,
-   ["in-ipv6-frag-reassembly-unneeded"] = 1,
+   ["in-ipv6-bytes"] = 1514,
+   ["in-ipv6-frag-needsreassembly"] = 2,
+   ["in-ipv6-frag-reassembled"] = 1,
    ["in-ipv6-packets"] = 1,
    ["memuse-ipv4-frag-reassembly-buffer"] = 464194024,
    ["memuse-ipv6-frag-reassembly-buffer"] = 465349620,
-   ["out-icmpv4-bytes"] = 94,
-   ["out-icmpv4-packets"] = 1,
-   ["out-ipv4-bytes"] = 94,
+   ["out-ipv4-bytes"] = 1474,
    ["out-ipv4-frag-not"] = 1,
    ["out-ipv4-packets"] = 1,
 }
