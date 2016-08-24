@@ -387,7 +387,7 @@ or equal to `length` of *packet*.
 
 — Function **packet.shiftright** *packet*, *length*
 
-Move *packet* payload to the right by *length* bytes, growing *packet* by
+Moves *packet* payload to the right by *length* bytes, growing *packet* by
 *length*. The sum of *length* and `length` of *packet* must be less than or
 equal to `packet.max_payload`.
 
@@ -399,6 +399,10 @@ Allocate packet and fill it with *length* bytes from *pointer*.
 
 Allocate packet and fill it with the contents of *string*.
 
+— Function **packet.clone_to_memory* *pointer* *packet*
+
+Creates an exact copy of at memory pointed to by *pointer*. *Pointer* must
+point to a `packet.packet_t`.
 
 ## Memory (core.memory)
 
