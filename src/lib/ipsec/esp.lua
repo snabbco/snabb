@@ -48,6 +48,8 @@ local PAYLOAD_OFFSET = ETHERNET_SIZE + IPV6_SIZE
 local ESP_NH = 50 -- https://tools.ietf.org/html/rfc4303#section-2
 local ESP_SIZE = esp:sizeof()
 local ESP_TAIL_SIZE = esp_tail:sizeof()
+local ESP_RESYNC_THRESHOLD = 4 -- Resync after this many consecutive failed decaps
+local ESP_RESYNC_ATTEMPTS = 6 -- Try this many increments of seq_high
 
 function esp_v6_new (conf)
    assert(conf.mode == "aes-128-gcm", "Only supports aes-128-gcm.")
@@ -102,7 +104,7 @@ function esp_v6_encrypt:encapsulate (p)
    self.esp_tail:pad_length(pad_length)
    self:next_seq_no()
    local ptext_length = payload_length + pad_length + ESP_TAIL_SIZE
-   gcm:encrypt(payload, self.seq, self.seq, payload, ptext_length)
+   gcm:encrypt(payload, self.seq, self.seq:low(), self.seq:high(), payload, ptext_length, payload + ptext_length)
    local iv = payload + ESP_SIZE
    local ctext = iv + gcm.IV_SIZE
    C.memmove(ctext, payload, ptext_length + gcm.AUTH_SIZE)
@@ -127,6 +129,7 @@ function esp_v6_decrypt:new (conf)
    o.window_size = conf.window_size or 128
    assert(o.window_size % 8 == 0, "window_size must be a multiple of 8.")
    o.window = ffi.new(window_t, o.window_size / 8)
+   o.decap_fail = 0
    return setmetatable(o, {__index=esp_v6_decrypt})
 end
 
@@ -148,17 +151,8 @@ function esp_v6_decrypt:decapsulate (p)
    local ctext_length = length - self.PLAIN_OVERHEAD
    local seq_low = self.esp:seq_no()
    local seq_high = tonumber(C.check_seq_no(seq_low, self.seq.no, self.window, self.window_size))
-   if seq_high >= 0 and gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
-      self.seq.no = C.track_seq_no(seq_high, seq_low, self.seq.no, self.window, self.window_size)
-      local esp_tail_start = ctext_start + ctext_length - ESP_TAIL_SIZE
-      self.esp_tail:new_from_mem(esp_tail_start, ESP_TAIL_SIZE)
-      local ptext_length = ctext_length - self.esp_tail:pad_length() - ESP_TAIL_SIZE
-      self.ip:next_header(self.esp_tail:next_header())
-      self.ip:payload_length(ptext_length)
-      C.memmove(payload, ctext_start, ptext_length)
-      packet.resize(p, PAYLOAD_OFFSET + ptext_length)
-      return true
-   else
+   local proceed = true
+   if seq_high < 0 or not gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
       local reason = seq_high == -1 and 'replayed' or 'integrity error'
       -- This is the information RFC4303 says we SHOULD log
       local info = "SPI=" .. tostring(self.spi) .. ", " ..
@@ -168,10 +162,59 @@ function esp_v6_decrypt:decapsulate (p)
                    "flow_id=" .. tostring(self.ip:flow_label()) .. ", " ..
                    "reason='" .. reason .. "'";
       logger:log("Rejecting packet ("..info..")")
-      return false
+      -- RFC4303 is somewhat unclear on a) whether or not packets that look replayed are eligible to trigger
+      -- recyns, and b) what 'consecutive' means in "number of consecutive packets that fail authentication":
+      -- Consecutive in time? Consecutive in their seq_low's?
+      -- Assuming a) should be 'yes' since the to-be-resynced packets might have seq_low's that just happen
+      -- to fall inside the replay window (seq_lo-wise) and would look replayed, yet aren't.
+      -- Assuming b) means 'in time', since systematic loss could stall resync indefinitely.
+      proceed = false
+      self.decap_fail = self.decap_fail + 1
+      if self.decap_fail >= ESP_RESYNC_THRESHOLD then
+         local seq_high_tmp = seq_high
+         if seq_high >= 0 then -- We failed to decrypt in-place, undo the damage to recover the original ctext
+            gcm:encrypt(ctext_start, iv_start, seq_low, seq_high, ctext_start, ctext_length, ffi.new("uint8_t[?]", gcm.AUTH_SIZE))
+         else
+            seq_high_tmp = self:seq_high() -- use the last seq_high we saw if it looked replayed
+         end
+         self.decap_fail = 0 -- avoid immediate re-triggering if resync fails
+         seq_high_tmp = self:resync(p, seq_low, seq_high_tmp + 1, ESP_RESYNC_ATTEMPTS)
+         if seq_high_tmp >= 0 then
+            seq_high = seq_high_tmp
+            proceed = true -- resynced! the data has been decrypted in the process so we're ready to go
+         end
+      end
    end
+   if not proceed then return false end
+   self.seq.no = C.track_seq_no(seq_high, seq_low, self.seq.no, self.window, self.window_size)
+   local esp_tail_start = ctext_start + ctext_length - ESP_TAIL_SIZE
+   self.esp_tail:new_from_mem(esp_tail_start, ESP_TAIL_SIZE)
+   local ptext_length = ctext_length - self.esp_tail:pad_length() - ESP_TAIL_SIZE
+   self.ip:next_header(self.esp_tail:next_header())
+   self.ip:payload_length(ptext_length)
+   C.memmove(payload, ctext_start, ptext_length)
+   packet.resize(p, PAYLOAD_OFFSET + ptext_length)
+   self.decap_fail = 0
+   return true
 end
 
+function esp_v6_decrypt:resync(p, seq_low, seq_high, n)
+   local p_orig = packet.clone(p)
+   local gcm = self.aes_128_gcm
+   local payload = p.data + PAYLOAD_OFFSET
+   local iv_start = payload + ESP_SIZE
+   local ctext_start = payload + self.CTEXT_OFFSET
+   local ctext_length = p.length - self.PLAIN_OVERHEAD
+   for i = 1, n do
+      if gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
+         return seq_high
+      else
+         C.memmove(p.data, p_orig.data, p_orig.length)
+      end
+      seq_high = seq_high + 1
+   end
+   return -1
+end
 
 function selftest ()
    local C = require("ffi").C
@@ -278,7 +321,7 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    -- This is where we ultimately want resynchronization (wrt. future packets)
    C.memset(dec.window, 0, dec.window_size / 8); -- clear window
    dec.seq.no = 2^34 + 42;
-   enc.seq.no = 2^36 + 42;
+   enc.seq.no = 2^36 + 24;
    px = packet.clone(p)
    enc:encapsulate(px);
    assert(not dec:decapsulate(px), "accepted packet from way into the future")
@@ -286,4 +329,21 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    px = packet.clone(p)
    enc:encapsulate(px);
    assert(not dec:decapsulate(px), "accepted packet from way into the past")
+   -- Test resynchronization after having lost  >2^32 packets
+   enc.seq.no = 0
+   dec.seq.no = 0
+   C.memset(dec.window, 0, dec.window_size / 8); -- clear window
+   px = packet.clone(p) -- do an initial packet
+   enc:encapsulate(px)
+   assert(dec:decapsulate(px), "decapsulation failed")
+   enc.seq:high(3) -- pretend there has been massive packet loss
+   enc.seq:low(24)
+   for i = 1, ESP_RESYNC_THRESHOLD-1 do
+      px = packet.clone(p)
+      enc:encapsulate(px)
+      assert(not dec:decapsulate(px), "decapsulated pre-resync packet")
+   end
+   px = packet.clone(p)
+   enc:encapsulate(px)
+   assert(dec:decapsulate(px), "failed to resynchronize")
 end
