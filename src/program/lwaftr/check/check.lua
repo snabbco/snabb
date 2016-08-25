@@ -11,7 +11,8 @@ local lwaftr = require("apps.lwaftr.lwaftr")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local counter_names = lwcounter.counter_names
 local counters_dir = lwcounter.counters_dir
-local write_to_file = require("apps.lwaftr.lwutil").write_to_file
+local lwutil = require("apps.lwaftr.lwutil")
+local write_to_file = lwutil.write_to_file
 
 function show_usage(code)
    print(require("program.lwaftr.check.README_inc"))
@@ -80,8 +81,7 @@ function validate_diff(actual, expected)
 end
 
 local function regen_counters(counters, outfile)
-   local cnames = {}
-   for k in pairs(counters) do table.insert(cnames, k) end
+   local cnames = lwutil.keys(counters)
    table.sort(cnames)
    local out_val = {'return {'}
    for _,k in ipairs(cnames) do
