@@ -189,7 +189,7 @@ function nh_fwd4:push ()
                   get_ipv4_src_address(ipv4_hdr) == n_cache_src_ipv4 then
             -- Our magic cache next-hop resolution packet. Never send this out.
             copy_ether(self.next_hop_mac, ether_dhost)
-            if self.debug > 0 then
+            if self.debug then
                print(("nh_fwd4: learning next-hop '%s'"):format(ethernet:ntop(self.next_hop_mac)))
             end
             packet.free(pkt)
@@ -296,7 +296,7 @@ function nh_fwd6:push ()
          elseif self.cache_refresh_interval > 0 and
                   ipv6_equals(get_ipv6_src_address(ipv6_hdr), n_cache_src_ipv6) then
             copy_ether(self.next_hop_mac, ether_dhost)
-            if self.debug > 0 then
+            if self.debug then
                print(("nh_fwd6: learning next-hop %s"):format(ethernet:ntop(self.next_hop_mac)))
             end
             packet.free(pkt)
