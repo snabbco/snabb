@@ -16,6 +16,7 @@ local o_ipv4_src_addr = constants.o_ipv4_src_addr
 local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
 
 local v4v6_mirror = shm.create("v4v6_mirror", "struct { uint32_t ipv4; }")
+local MIRROR_EVERYTHING = 0xffffffff
 
 local function is_ipv4 (pkt)
    local ethertype = rd16(pkt.data + o_ethernet_ethertype)
@@ -35,19 +36,27 @@ local function get_ipv6_payload (ptr)
 end
 
 local function mirror_ipv4 (pkt, output, ipv4_num)
-   local ipv4_hdr = get_ethernet_payload(pkt)
-   if get_ipv4_dst_num(ipv4_hdr) == ipv4_num or
-         get_ipv4_src_num(ipv4_hdr) == ipv4_num then
+   if ipv4_num == MIRROR_EVERYTHING then
       transmit(output, packet.clone(pkt))
+   else
+      local ipv4_hdr = get_ethernet_payload(pkt)
+      if get_ipv4_dst_num(ipv4_hdr) == ipv4_num or
+         get_ipv4_src_num(ipv4_hdr) == ipv4_num then
+         transmit(output, packet.clone(pkt))
+      end
    end
 end
 
 local function mirror_ipv6 (pkt, output, ipv4_num)
-   local ipv6_hdr = get_ethernet_payload(pkt)
-   local ipv4_hdr = get_ipv6_payload(ipv6_hdr)
-   if get_ipv4_dst_num(ipv4_hdr) == ipv4_num or
-         get_ipv4_src_num(ipv4_hdr) == ipv4_num then
+   if ipv4_num == MIRROR_EVERYTHING then
       transmit(output, packet.clone(pkt))
+   else
+      local ipv6_hdr = get_ethernet_payload(pkt)
+      local ipv4_hdr = get_ipv6_payload(ipv6_hdr)
+      if get_ipv4_dst_num(ipv4_hdr) == ipv4_num or
+         get_ipv4_src_num(ipv4_hdr) == ipv4_num then
+         transmit(output, packet.clone(pkt))
+      end
    end
 end
 
