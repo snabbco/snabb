@@ -151,7 +151,6 @@ function esp_v6_decrypt:decapsulate (p)
    local ctext_length = length - self.PLAIN_OVERHEAD
    local seq_low = self.esp:seq_no()
    local seq_high = tonumber(C.check_seq_no(seq_low, self.seq.no, self.window, self.window_size))
-   local proceed = true
    if seq_high < 0 or not gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
       local reason = seq_high == -1 and 'replayed' or 'integrity error'
       -- This is the information RFC4303 says we SHOULD log
@@ -168,7 +167,6 @@ function esp_v6_decrypt:decapsulate (p)
       -- Assuming a) should be 'yes' since the to-be-resynced packets might have seq_low's that just happen
       -- to fall inside the replay window (seq_lo-wise) and would look replayed, yet aren't.
       -- Assuming b) means 'in time', since systematic loss could stall resync indefinitely.
-      proceed = false
       self.decap_fail = self.decap_fail + 1
       if self.decap_fail >= ESP_RESYNC_THRESHOLD then
          local seq_high_tmp = seq_high
@@ -181,11 +179,14 @@ function esp_v6_decrypt:decapsulate (p)
          seq_high_tmp = self:resync(p, seq_low, seq_high_tmp + 1, ESP_RESYNC_ATTEMPTS)
          if seq_high_tmp >= 0 then
             seq_high = seq_high_tmp
-            proceed = true -- resynced! the data has been decrypted in the process so we're ready to go
+            -- resynced! the data has been decrypted in the process so we're ready to go
+         else
+            return false
          end
+      else
+        return false
       end
    end
-   if not proceed then return false end
    self.seq.no = C.track_seq_no(seq_high, seq_low, self.seq.no, self.window, self.window_size)
    local esp_tail_start = ctext_start + ctext_length - ESP_TAIL_SIZE
    self.esp_tail:new_from_mem(esp_tail_start, ESP_TAIL_SIZE)
