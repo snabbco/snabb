@@ -2,11 +2,9 @@ module(..., package.seeall)
 
 local S = require("syscall")
 local ethernet = require("lib.protocol.ethernet")
+local ffi = require("ffi")
 local lib = require("core.lib")
 local shm = require("core.shm")
-
-local ffi = require("ffi")
-local C = ffi.C
 
 local macaddress_t = ffi.typeof[[
 struct { uint8_t ether[6]; }
@@ -38,7 +36,7 @@ local function is_current_process (pid)
 end
 
 function run (args)
-   args = parse_args(args)
+   parse_args(args)
    for _, pid in ipairs(shm.children("/")) do
       pid = tonumber(pid)
       if is_current_process(pid) then

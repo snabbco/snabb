@@ -2,7 +2,6 @@ module(..., package.seeall)
 
 local app = require("core.app")
 local basic_apps = require("apps.basic.basic_apps")
-local bit = require("bit")
 local constants = require("apps.lwaftr.constants")
 local ethernet = require("lib.protocol.ethernet")
 local ipsum = require("lib.checksum").ipsum
@@ -16,11 +15,9 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local transmit, receive = link.transmit, link.receive
-local htons, ntohs = lib.htons, lib.ntohs
-local htonl, ntohl = lib.htonl, lib.ntohl
+local htons = lib.htons
 local rd16, rd32 = lwutil.rd16, lwutil.rd32
 local ipv6_equals = lwutil.ipv6_equals
-local bor, lshift = bit.bor, bit.lshift
 
 nh_fwd4 = {}
 nh_fwd6 = {}
@@ -28,7 +25,6 @@ nh_fwd6 = {}
 local ethernet_header_size = constants.ethernet_header_size
 local n_ether_hdr_size = 14
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
-local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 local n_ipencap = 4
 local n_ipfragment = 44
 local n_ipv4_hdr_size = 20
@@ -113,6 +109,7 @@ local function send_ipv4_cache_trigger(r, pkt, mac)
    -- VM will discard packets not matching its MAC address on the interface.
    copy_ether(ether_dhost, mac)
    copy_ipv4(ipv4_src_ip, n_cache_src_ipv4)
+
    -- Clear checksum to recalculate it with new source IPv4 address.
    ipv4_checksum = 0
    ipv4_checksum = htons(ipsum(pkt.data + n_ether_hdr_size, n_ipv4_hdr_size, 0))
