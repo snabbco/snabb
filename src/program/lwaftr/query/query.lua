@@ -2,12 +2,16 @@ module(..., package.seeall)
 
 local S = require("syscall")
 local counter = require("core.counter")
+local ffi = require("ffi")
 local lib = require("core.lib")
 local lwaftr = require("apps.lwaftr.lwaftr")
+local lwtypes = require("apps.lwaftr.lwtypes")
+local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
 local select_snabb_instance = top.select_snabb_instance
+local keys = lwutil.keys
 
 -- Get the counter dir from the code.
 local counters_rel_dir = lwaftr.counters_dir
@@ -22,6 +26,23 @@ local function sort (t)
    return t
 end
 
+local function is_counter_name (name)
+   return lwaftr.counter_names[name] ~= nil
+end
+
+local function pidof(maybe_pid)
+   if tonumber(maybe_pid) then return maybe_pid end
+   local name_id = maybe_pid
+   for _, pid in ipairs(shm.children("/")) do
+      if shm.exists(pid.."/nic/id") then
+         local lwaftr_id = shm.open("/"..pid.."/nic/id", lwtypes.lwaftr_id_type)
+         if ffi.string(lwaftr_id.value) == name_id then
+            return pid
+         end
+      end
+   end
+end
+
 function parse_args (raw_args)
    local handlers = {}
    function handlers.h() show_usage(0) end
@@ -34,7 +55,22 @@ function parse_args (raw_args)
    local args = lib.dogetopt(raw_args, handlers, "hl",
                              { help="h", ["list-all"]="l" })
    if #args > 2 then show_usage(1) end
-   return args
+   if #args == 2 then
+      return args[1], args[2]
+   end
+   if #args == 1 then
+      local arg = args[1]
+      if is_counter_name(arg) then
+         return nil, arg
+      else
+         local pid = pidof(arg)
+         if not pid then
+            error(("Couldn't find PID for argument '%s'"):format(arg))
+         end
+         return pid, nil
+      end
+   end
+   return nil, nil
 end
 
 local function read_counters (tree, filter)
@@ -54,14 +90,6 @@ local function read_counters (tree, filter)
       end
    end
    return ret, max_width
-end
-
-local function keys (t)
-   local ret = {}
-   for key, _ in pairs(t) do
-      table.insert(ret, key)
-   end
-   return ret
 end
 
 local function skip_counter (name, filter)
@@ -86,19 +114,7 @@ function print_counters (tree, filter)
 end
 
 function run (raw_args)
-   local args = parse_args(raw_args) 
-
-   local target_pid, counter_name
-   if #args == 2 then
-      target_pid, counter_name = args[1], args[2]
-   elseif #args == 1 then
-      local maybe_pid = tonumber(args[1])
-      if maybe_pid then
-         target_pid = args[1]
-      else
-         counter_name = args[1]
-      end
-   end
+   local target_pid, counter_name = parse_args(raw_args)
 
    local instance_tree = select_snabb_instance(target_pid)
    print_counters(instance_tree, counter_name)
