@@ -15,6 +15,7 @@ local lwcounter = require("apps.lwaftr.lwcounter")
 local nh_fwd = require("apps.nh_fwd.nh_fwd")
 local pci = require("lib.hardware.pci")
 local tap = require("apps.tap.tap")
+local raw        = require("apps.socket.raw")
 
 local yesno = lib.yesno
 
@@ -29,6 +30,11 @@ local function nic_exists (pci_addr)
    local devices="/sys/bus/pci/devices"
    return dir_exists(("%s/%s"):format(devices, pci_addr)) or
       dir_exists(("%s/0000:%s"):format(devices, pci_addr))
+end
+
+local function net_exists (pci_addr)
+   local devices="/sys/class/net"
+   return dir_exists(("%s/%s"):format(devices, pci_addr))
 end
 
 local function fatal (msg)
@@ -57,6 +63,13 @@ local function load_phy (c, nic_id, interface)
                                          discard_threshold = interface.discard_threshold,
                                       },
                                       macaddr = interface.mac_address, mtu = interface.mtu })
+      chain_input, chain_output = nic_id .. ".rx", nic_id .. ".tx"
+   elseif net_exists(interface.pci) then
+      print(("%s network interface %s"):format(nic_id, interface.pci))
+      if vlan then
+         print(("WARNING: VLAN not supported over %s. %s vlan %d"):format(interface.pci, nic_id, vlan))
+      end
+      config.app(c, nic_id, raw.RawSocket, interface.pci)
       chain_input, chain_output = nic_id .. ".rx", nic_id .. ".tx"
    else
       print(("Couldn't find device info for PCI address '%s'"):format(interface.pci))
