@@ -37,6 +37,10 @@ devices in the packet flow making this unique will help packet distribution.
 - Key **wait_for_link**
 *Optional*. Bool, should :new() block until there is a link light or not.
 
+- Key **mtu**
+*Optionla* Default: 9014 the maximum packet length sent of received, excluding
+the trailing 4byte CRC
+
 ### RSS hashing methods
 RSS will distribute packets based on as many of the fields below as are present
 in the packet

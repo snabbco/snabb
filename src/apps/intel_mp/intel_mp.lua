@@ -146,6 +146,7 @@ SWSM      0x05b50 -                 RW Software Semaphore
 MANC      0x05820 -                 RW Management Control
 MDIC      0x00020 -                 RW MDI Control
 MDICNFG   0x00E04 -                 RW MDI Configuration
+RLPML     0x05004 -                 RW Receive Long packet maximal length
 RCTL      0x00100 -                 RW RX Control
 RPTHC     0x04104 -                 RC Rx Packets to host count
 SW_FW_SYNC 0x05b5c -                RW Software Firmware Synchronization
@@ -194,6 +195,7 @@ function Intel:new (arg)
       ndesc = conf.ndescriptors or 2048,
       txq = conf.txq,
       rxq = conf.rxq,
+      mtu = conf.mtu or 9014,
       rssseed = conf.rssseed or 314159,
       linkup_attempts = conf.linkup_attempts or 60,
       wait_for_link = conf.wait_for_link or false
@@ -350,11 +352,15 @@ function Intel:push ()
 
    while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
       local p = link.receive(li)
-      self.txdesc[self.tdt].address = tophysical(p.data)
-      self.txdesc[self.tdt].flags =
-         bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
-      self.txpackets[self.tdt] = p
-      self.tdt = self:ringnext(self.tdt)
+      if p.length > self.mtu then
+        packet.free(p)
+      else
+         self.txdesc[self.tdt].address = tophysical(p.data)
+         self.txdesc[self.tdt].flags =
+            bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
+         self.txpackets[self.tdt] = p
+         self.tdt = self:ringnext(self.tdt)
+      end
    end
    -- Reclaim transmit contexts
    local cursor = self.tdh
@@ -576,7 +582,6 @@ function Intel1g:init ()
 
    self.r.RCTL:clr(bits { RXEN = 1 })
    self.r.RCTL(bits {
-      SBP = 2,       -- Store Bad Packet
       UPE = 3,       -- Unicast Promiscuous
       MPE = 4,       -- Mutlicast Promiscuous
       LPE = 5,       -- Long Packet Reception / Jumbos
@@ -588,6 +593,7 @@ function Intel1g:init ()
    self.r.CTRL_EXT:clr( bits { LinkMode0 = 22, LinkMode1 = 23} )
    self.r.CTRL_EXT:clr( bits { PowerDown = 20 } )
    self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
+   self.r.RLPML(self.mtu + 4) -- mtu + crc
    self:unlock_sw_sem()
    for i=1,self.linkup_attempts do
       if self:link_status() then break end
@@ -666,7 +672,6 @@ function Intel82599:init ()
    end
 
    self.r.FCTRL:set(bits {
-      SBP = 1,
       MPE = 8,
       UPE = 9,
       BAM = 10
@@ -703,7 +708,7 @@ function Intel82599:init ()
       TXCRCEN=0, RXCRCSTRP=1, JUMBOEN=2, rsv2=3,
       TXPADEN=10, rsvd3=11, rsvd4=13, MDCSPD=16
    })
-   self.r.MAXFRS(lshift(9216, 16))
+   self.r.MAXFRS(lshift(self.mtu + 4, 16)) -- mtu + crc
 
    self.r.RDRXCTL(bits { CRCStrip = 1 })
    self.r.CTRL_EXT:set(bits {NS_DIS = 1})
