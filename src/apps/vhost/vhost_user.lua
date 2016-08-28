@@ -279,6 +279,8 @@ function VhostUser:set_vring_kick (msg, fds, nfds)
 
    -- Kick enables processing in vhost-user protocol
    self.vhost_ready = true
+   -- Compile a new optimized fast-path for the vring processing
+   self.dev:rejit()
 
    assert(idx < 42)
    if validfd then
