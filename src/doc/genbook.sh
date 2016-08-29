@@ -70,6 +70,10 @@ $(cat $mdroot/lib/hardware/README.md)
 
 $(cat $mdroot/lib/protocol/README.md)
 
+## IPsec
+
+$(cat ../lib/ipsec/README.md)
+
 ## Snabb NFV
 
 $(cat $mdroot/program/snabbnfv/README.md)
@@ -77,5 +81,9 @@ $(cat $mdroot/program/snabbnfv/README.md)
 ## Watchdog (lib.watchdog.watchdog)
 
 $(cat $mdroot/lib/watchdog/README.md)
+
+# Snabblab
+
+$(cat $mdroot/doc/snabblab.md)
 
 EOF
