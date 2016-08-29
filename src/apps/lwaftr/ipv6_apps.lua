@@ -11,6 +11,8 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local checksum = require("lib.checksum")
 local packet = require("core.packet")
+local counter = require("core.counter")
+
 local bit = require("bit")
 local ffi = require("ffi")
 local C = ffi.C
@@ -41,8 +43,11 @@ ICMPEcho = {}
 function ReassembleV6:new(conf)
    local o = setmetatable({}, {__index = ReassembleV6})
    o.conf = conf
+   o.counters = conf.counters
    o.ctab = fragv6_h.initialize_frag_table(conf.max_ipv6_reassembly_packets,
       conf.max_fragments_per_reassembly_packet)
+   counter.set(o.counters["memuse-ipv6-frag-reassembly-buffer"],
+               o.ctab:get_backing_size())
    return o
 end
 
@@ -65,13 +70,28 @@ function ReassembleV6:push ()
 
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if is_ipv6(pkt) and is_fragment(pkt) then
-         local status, maybe_pkt = self:cache_fragment(pkt)
+      if not is_ipv6(pkt) then
+         counter.add(self.counters["drop-misplaced-not-ipv6-bytes"], pkt.length)
+         counter.add(self.counters["drop-misplaced-not-ipv6-packets"])
+         counter.add(self.counters["drop-all-ipv6-iface-bytes"], pkt.length)
+         counter.add(self.counters["drop-all-ipv6-iface-packets"])
+         packet.free(pkt)
+      elseif is_fragment(pkt) then
+         counter.add(self.counters["in-ipv6-bytes"], pkt.length)
+         counter.add(self.counters["in-ipv6-packets"])
+         counter.add(self.counters["in-ipv6-frag-needsreassembly"])
+         local status, maybe_pkt, ejected = self:cache_fragment(pkt)
+         if ejected then
+            counter.add(self.counters["drop-ipv6-frag-randomevicted"])
+         end
+
          if status == fragv6_h.REASSEMBLY_OK then
+            counter.add(self.counters["in-ipv6-frag-reassembled"])
             transmit(output, maybe_pkt)
          elseif status == fragv6_h.FRAGMENT_MISSING then
             -- Nothing useful to be done yet, continue
          elseif status == fragv6_h.REASSEMBLY_INVALID then
+            counter.add(self.counters["drop-ipv6-frag-invalid-reassembly"])
             if maybe_pkt then -- This is an ICMP packet
                transmit(errors, maybe_pkt)
             end
@@ -79,7 +99,10 @@ function ReassembleV6:push ()
             packet.free(pkt)
          end
       else
-         -- Forward all packets that aren't IPv6 fragments.
+         -- Forward all IPv6 packets that aren't IPv6 fragments.
+         counter.add(self.counters["in-ipv6-bytes"], pkt.length)
+         counter.add(self.counters["in-ipv6-packets"])
+         counter.add(self.counters["in-ipv6-frag-reassembly-unneeded"])
          transmit(output, pkt)
       end
    end
@@ -88,6 +111,7 @@ end
 function Fragmenter:new(conf)
    local o = setmetatable({}, {__index=Fragmenter})
    o.conf = conf
+   o.counters = conf.counters
    o.mtu = assert(conf.mtu)
    return o
 end
@@ -108,9 +132,15 @@ function Fragmenter:push ()
          local unfragmentable_header_size = ehs + ipv6_fixed_header_size
          local pkts = fragmentv6.fragment(pkt, unfragmentable_header_size, mtu)
          for i=1,#pkts do
+            counter.add(self.counters["out-ipv6-bytes"], pkts[i].length)
+            counter.add(self.counters["out-ipv6-packets"])
+            counter.add(self.counters["out-ipv6-frag"])
             transmit(output, pkts[i])
          end
       else
+         counter.add(self.counters["out-ipv6-bytes"], pkt.length)
+         counter.add(self.counters["out-ipv6-packets"])
+         counter.add(self.counters["out-ipv6-frag-not"])
          transmit(output, pkt)
       end
    end

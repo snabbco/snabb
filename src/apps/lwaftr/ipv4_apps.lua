@@ -14,6 +14,7 @@ local packet = require("core.packet")
 local bit = require("bit")
 local ffi = require("ffi")
 local lib = require("core.lib")
+local counter = require("core.counter")
 
 local receive, transmit = link.receive, link.transmit
 local rd16, wr16, rd32, wr32 = lwutil.rd16, lwutil.wr16, lwutil.rd32, lwutil.wr32
@@ -45,9 +46,11 @@ ICMPEcho = {}
 function Reassembler:new(conf)
    local o = setmetatable({}, {__index=Reassembler})
    o.conf = conf
+   o.counters = conf.counters
    o.ctab = fragv4_h.initialize_frag_table(conf.max_ipv4_reassembly_packets,
       conf.max_fragments_per_reassembly_packet)
-
+   counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
+               o.ctab:get_backing_size())
    return o
 end
 
@@ -71,12 +74,29 @@ function Reassembler:push ()
 
    for _=1,math.min(link.nreadable(input), link.nwritable(output)) do
       local pkt = receive(input)
-      if is_ipv4(pkt) and is_fragment(pkt) then
-         local status, maybe_pkt = self:cache_fragment(pkt)
+      local v4 = is_ipv4(pkt)
+      if not v4 and not arp.is_arp(pkt) then
+         counter.add(self.counters["drop-misplaced-not-ipv4-bytes"], pkt.length)
+         counter.add(self.counters["drop-misplaced-not-ipv4-packets"])
+         -- It's guaranteed to not be hairpinned.
+         counter.add(self.counters["drop-all-ipv4-iface-bytes"], pkt.length)
+         counter.add(self.counters["drop-all-ipv4-iface-packets"])
+         packet.free(pkt)
+      elseif v4 and is_fragment(pkt) then
+         counter.add(self.counters["in-ipv4-bytes"], pkt.length)
+         counter.add(self.counters["in-ipv4-packets"])
+         counter.add(self.counters["in-ipv4-frag-needsreassembly"])
+         local status, maybe_pkt, ejected = self:cache_fragment(pkt)
+         if ejected then
+            counter.add(self.counters["drop-ipv4-frag-randomevicted"])
+         end
+
          if status == fragv4_h.REASSEMBLY_OK then -- Reassembly was successful
+            counter.add(self.counters["in-ipv4-frag-reassembled"])
             transmit(output, maybe_pkt)
          elseif status == fragv4_h.FRAGMENT_MISSING then -- Nothing to do, wait.
          elseif status == fragv4_h.REASSEMBLY_INVALID then
+            counter.add(self.counters["drop-ipv4-frag-invalid-reassembly"])
             if maybe_pkt then -- This is an ICMP packet
                transmit(errors, maybe_pkt)
             end
@@ -85,6 +105,9 @@ function Reassembler:push ()
          end
       else
          -- Forward all packets that aren't IPv4 fragments.
+         counter.add(self.counters["in-ipv4-bytes"], pkt.length)
+         counter.add(self.counters["in-ipv4-packets"])
+         counter.add(self.counters["in-ipv4-frag-reassembly-unneeded"])
          transmit(output, pkt)
       end
    end
@@ -93,6 +116,7 @@ end
 function Fragmenter:new(conf)
    local o = setmetatable({}, {__index=Fragmenter})
    o.conf = conf
+   o.counters = conf.counters
    o.mtu = assert(conf.mtu)
    return o
 end
@@ -107,12 +131,20 @@ function Fragmenter:push ()
       if pkt.length > mtu + ehs and is_ipv4(pkt) then
          local status, frags = fragmentv4.fragment(pkt, mtu)
          if status == fragmentv4.FRAGMENT_OK then
-            for i=1,#frags do transmit(output, frags[i]) end
+            for i=1,#frags do
+               counter.add(self.counters["out-ipv4-frag"])
+               counter.add(self.counters["out-ipv4-bytes"], frags[i].length)
+               counter.add(self.counters["out-ipv4-packets"])
+               transmit(output, frags[i])
+            end
          else
             -- TODO: send ICMPv4 info if allowed by policy
             packet.free(pkt)
          end
       else
+         counter.add(self.counters["out-ipv4-bytes"], pkt.length)
+         counter.add(self.counters["out-ipv4-packets"])
+         counter.add(self.counters["out-ipv4-frag-not"])
          transmit(output, pkt)
       end
    end

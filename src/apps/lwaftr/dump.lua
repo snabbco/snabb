@@ -8,6 +8,7 @@ local stream = require("apps.lwaftr.stream")
 
 local CONF_FILE_DUMP = "/tmp/lwaftr-%d.conf"
 local BINDING_TABLE_FILE_DUMP = "/tmp/binding-table-%d.txt"
+local write_to_file = require("apps.lwaftr.lwutil").write_to_file
 
 Dumper = {}
 
@@ -86,13 +87,6 @@ local function do_dump_configuration (conf)
    end
    table.sort(result)
    return table.concat(result, "\n")
-end
-
-local function write_to_file(filename, content)
-   local fd = assert(io.open(filename, "wt"),
-      ("Couldn't open file: '%s'"):format(filename))
-   fd:write(content)
-   fd:close()
 end
 
 function dump_configuration(lwstate)

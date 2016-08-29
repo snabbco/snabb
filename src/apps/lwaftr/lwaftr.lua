@@ -8,6 +8,7 @@ local lwconf = require("apps.lwaftr.conf")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
+local lwcounter = require("apps.lwaftr.lwcounter")
 
 local channel = require("apps.lwaftr.channel")
 local messages = require("apps.lwaftr.messages")
@@ -16,7 +17,6 @@ local checksum = require("lib.checksum")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local ipv4 = require("lib.protocol.ipv4")
-local shm = require("core.shm")
 local counter = require("core.counter")
 local packet = require("core.packet")
 local lib = require("core.lib")
@@ -48,113 +48,6 @@ local ethernet_header_size = constants.ethernet_header_size
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
 local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
-
--- COUNTERS
--- The lwAFTR counters all live in the same directory, and their filenames are
--- built out of ordered field values, separated by dashes.
--- Fields:
--- - direction: "in", "out", "hairpin", "drop";
--- If "direction" is "drop":
---   - reason: reasons for dropping;
--- - protocol+version: "icmpv4", "icmpv6", "ipv4", "ipv6";
--- - size: "bytes", "packets".
-counters_dir = "app/lwaftr/counters/"
--- Referenced by program/check/check.lua
-counter_names = {
-
--- All incoming traffic.
-   "in-ipv4-bytes",
-   "in-ipv4-packets",
-   "in-ipv6-bytes",
-   "in-ipv6-packets",
-
--- Outgoing traffic, not including internally generated ICMP error packets.
-   "out-ipv4-bytes",
-   "out-ipv4-packets",
-   "out-ipv6-bytes",
-   "out-ipv6-packets",
-
--- Internally generated ICMP error packets.
-   "out-icmpv4-bytes",
-   "out-icmpv4-packets",
-   "out-icmpv6-bytes",
-   "out-icmpv6-packets",
-
--- Hairpinned traffic.
-   "hairpin-ipv4-bytes",
-   "hairpin-ipv4-packets",
-
--- Dropped v4 traffic.
-
--- All dropped traffic on the IPv4 interface.
-   "drop-all-ipv4-iface-bytes",
-   "drop-all-ipv4-iface-packets",
--- On IPv4 link, but not IPv4.
-   "drop-misplaced-not-ipv4-bytes",
-   "drop-misplaced-not-ipv4-packets",
--- No matching destination softwire.
-   "drop-no-dest-softwire-ipv4-bytes",
-   "drop-no-dest-softwire-ipv4-packets",
--- TTL is zero.
-   "drop-ttl-zero-ipv4-bytes",
-   "drop-ttl-zero-ipv4-packets",
--- Big packets exceeding MTU, but DF (Don't Fragment) flag set.
-   "drop-over-mtu-but-dont-fragment-ipv4-bytes",
-   "drop-over-mtu-but-dont-fragment-ipv4-packets",
--- Bad checksum on ICMPv4 packets.
-   "drop-bad-checksum-icmpv4-bytes",
-   "drop-bad-checksum-icmpv4-packets",
--- Incoming ICMPv4 packets with no destination (RFC 7596 section 8.1)
-   "drop-in-by-rfc7596-icmpv4-bytes",
-   "drop-in-by-rfc7596-icmpv4-packets",
--- Policy of dropping incoming ICMPv4 packets.
-   "drop-in-by-policy-icmpv4-bytes",
-   "drop-in-by-policy-icmpv4-packets",
--- Policy of dropping outgoing ICMPv4 error packets.
--- Not counting bytes because we do not even generate the packets.
-   "drop-out-by-policy-icmpv4-packets",
-
--- Drop v6.
-
--- All dropped traffic on the IPv4 interface.
-   "drop-all-ipv6-iface-bytes",
-   "drop-all-ipv6-iface-packets",
--- On IPv6 link, but not IPv6.
-   "drop-misplaced-not-ipv6-bytes",
-   "drop-misplaced-not-ipv6-packets",
--- Unknown IPv6 protocol.
-   "drop-unknown-protocol-ipv6-bytes",
-   "drop-unknown-protocol-ipv6-packets",
--- No matching source softwire.
-   "drop-no-source-softwire-ipv6-bytes",
-   "drop-no-source-softwire-ipv6-packets",
--- Unknown ICMPv6 type.
-   "drop-unknown-protocol-icmpv6-bytes",
-   "drop-unknown-protocol-icmpv6-packets",
--- "Packet too big" ICMPv6 type but not code.
-   "drop-too-big-type-but-not-code-icmpv6-bytes",
-   "drop-too-big-type-but-not-code-icmpv6-packets",
--- Time-limit-exceeded, but not hop limit on ICMPv6 packet.
-   "drop-over-time-but-not-hop-limit-icmpv6-bytes",
-   "drop-over-time-but-not-hop-limit-icmpv6-packets",
--- Drop outgoing ICMPv6 error packets because of rate limit reached.
-   "drop-over-rate-limit-icmpv6-bytes",
-   "drop-over-rate-limit-icmpv6-packets",
--- Policy of dropping incoming ICMPv6 packets.
-   "drop-in-by-policy-icmpv6-bytes",
-   "drop-in-by-policy-icmpv6-packets",
--- Policy of dropping outgoing ICMPv6 error packets.
--- Not counting bytes because we do not even generate the packets.
-   "drop-out-by-policy-icmpv6-packets",
-}
-
-local function create_counters ()
-   local counters = {}
-   for _, name in ipairs(counter_names) do
-      counters[name] = {counter}
-   end
-   return shm.create_frame(counters_dir, counters)
-end
 
 local function get_ethernet_payload(pkt)
    return pkt.data + ethernet_header_size
@@ -346,8 +239,6 @@ local function init_transmit_icmpv4_reply (lwstate)
          if ipv4_in_binding_table(lwstate, dst_ip) then
             return transmit(lwstate.input.hairpin_in, pkt)
          else
-            counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
-            counter.add(lwstate.counters["out-ipv4-packets"])
             return transmit(lwstate.o4, pkt)
          end
       else
@@ -393,8 +284,7 @@ function LwAftr:new(conf)
    o.hairpin_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
 
    o.control = channel.create('lwaftr/control', messages.lwaftr_message_t)
-
-   o.counters = create_counters()
+   o.counters = conf.counters
 
    transmit_icmpv6_reply = init_transmit_icmpv6_reply(o)
    transmit_icmpv4_reply = init_transmit_icmpv4_reply(o)
@@ -452,11 +342,8 @@ end
 -- packets is an internal implementation detail that DOES NOT go out over
 -- physical wires.
 -- Not incrementing out-ipv4-bytes and out-ipv4-packets is straightforward.
--- Not incrementing in-ipv4-[bytes|packets] is harder. The easy way would be
--- to add extra flags and conditionals, but it's expected that a high enough
--- percentage of traffic might be hairpinned that this could be problematic,
--- (and a nightmare as soon as we add any kind of parallelism)
--- so instead we speculatively decrement the counters here.
+-- Not incrementing in-ipv4-[bytes|packets] is harder. This is done via
+-- an extra internal interface/queue for hairpinned packets.
 -- It is assumed that any packet we transmit to lwstate.input.v4 will not
 -- be dropped before the in-ipv4-[bytes|packets] counters are incremented;
 -- I *think* this approach bypasses using the physical NIC but am not
@@ -472,8 +359,6 @@ local function transmit_ipv4(lwstate, pkt)
       counter.add(lwstate.counters["hairpin-ipv4-packets"])
       return transmit(lwstate.input.hairpin_in, pkt)
    else
-      counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
-      counter.add(lwstate.counters["out-ipv4-packets"])
       return transmit(lwstate.o4, pkt)
    end
 end
@@ -621,9 +506,6 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
       print("encapsulated packet:")
       lwdebug.print_pkt(pkt)
    end
-
-   counter.add(lwstate.counters["out-ipv6-bytes"], pkt.length)
-   counter.add(lwstate.counters["out-ipv6-packets"])
    return transmit(lwstate.o6, pkt)
 end
 
@@ -956,14 +838,8 @@ function LwAftr:push ()
       -- Drop anything that's not IPv6.
       local pkt = receive(i6)
       if is_ipv6(pkt) then
-         counter.add(self.counters["in-ipv6-bytes"], pkt.length)
-         counter.add(self.counters["in-ipv6-packets"])
          from_b4(self, pkt)
       else
-         counter.add(self.counters["drop-misplaced-not-ipv6-bytes"], pkt.length)
-         counter.add(self.counters["drop-misplaced-not-ipv6-packets"])
-         counter.add(self.counters["drop-all-ipv6-iface-bytes"], pkt.length)
-         counter.add(self.counters["drop-all-ipv6-iface-packets"])
          drop(pkt)
       end
    end
@@ -974,15 +850,8 @@ function LwAftr:push ()
       -- packets.  Drop anything that's not IPv4.
       local pkt = receive(i4)
       if is_ipv4(pkt) then
-         counter.add(self.counters["in-ipv4-bytes"], pkt.length)
-         counter.add(self.counters["in-ipv4-packets"])
          from_inet(self, pkt, PKT_FROM_INET)
       else
-         counter.add(self.counters["drop-misplaced-not-ipv4-bytes"], pkt.length)
-         counter.add(self.counters["drop-misplaced-not-ipv4-packets"])
-         -- It's guaranteed to not be hairpinned.
-         counter.add(self.counters["drop-all-ipv4-iface-bytes"], pkt.length)
-         counter.add(self.counters["drop-all-ipv4-iface-packets"])
          drop(pkt)
       end
    end
