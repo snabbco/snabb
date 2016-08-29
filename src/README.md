@@ -397,7 +397,7 @@ or equal to `length` of *packet*.
 
 — Function **packet.shiftright** *packet*, *length*
 
-Move *packet* payload to the right by *length* bytes, growing *packet* by
+Moves *packet* payload to the right by *length* bytes, growing *packet* by
 *length*. The sum of *length* and `length` of *packet* must be less than or
 equal to `packet.max_payload`.
 
@@ -409,6 +409,10 @@ Allocate packet and fill it with *length* bytes from *pointer*.
 
 Allocate packet and fill it with the contents of *string*.
 
+— Function **packet.clone_to_memory* *pointer* *packet*
+
+Creates an exact copy of at memory pointed to by *pointer*. *Pointer* must
+point to a `packet.packet_t`.
 
 ## Memory (core.memory)
 
@@ -478,6 +482,10 @@ Maps an existing shared object of *type* into memory via a hierarchical *name*.
 If *readonly* is non-nil the shared object is mapped in read-only mode.
 *Readonly* defaults to nil. Fails if the shared object does not already exist.
 Returns a pointer to the mapped object.
+
+— Function **shm.exists** *name*
+
+Returns a true value if shared object by *name* exists.
 
 — Function **shm.unmap** *pointer*
 
