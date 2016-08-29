@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local bit = require("bit")
 local constants = require("apps.lwaftr.constants")
+local ctablew = require('apps.lwaftr.ctable_wrapper')
 local ctable = require('lib.ctable')
 local ffi = require('ffi')
 local lwutil = require("apps.lwaftr.lwutil")
@@ -262,9 +263,8 @@ function initialize_frag_table(max_fragmented_packets, max_pkt_frag, memuse_coun
       hash_fn = hash_ipv6,
       initial_size = math.ceil(max_fragmented_packets / max_occupy),
       max_occupancy_rate = max_occupy,
-      memuse_counter = memuse_counter
    }
-   return ctable.new(params)
+   return ctablew.new(params)
 end
 
 function cache_fragment(frags_table, fragment)

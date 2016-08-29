@@ -45,9 +45,9 @@ function ReassembleV6:new(conf)
    o.conf = conf
    o.counters = conf.counters
    o.ctab = fragv6_h.initialize_frag_table(conf.max_ipv6_reassembly_packets,
-      conf.max_fragments_per_reassembly_packet,
-      {o.counters, "memuse-ipv6-frag-reassembly-buffer"})
-
+      conf.max_fragments_per_reassembly_packet)
+   counter.set(o.counters["memuse-ipv6-frag-reassembly-buffer"],
+               o.ctab:get_backing_size())
    return o
 end
 

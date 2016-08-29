@@ -7,7 +7,6 @@ local bit = require("bit")
 local bxor, bnot = bit.bxor, bit.bnot
 local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
 local max, floor, ceil = math.max, math.floor, math.ceil
-local counter = require("core.counter")
 
 CTable = {}
 
@@ -96,8 +95,7 @@ local required_params = set('key_type', 'value_type', 'hash_fn')
 local optional_params = {
    initial_size = 8,
    max_occupancy_rate = 0.9,
-   min_occupancy_rate = 0.0,
-   memuse_counter = {}
+   min_occupancy_rate = 0.0
 }
 
 function new(params)
@@ -111,7 +109,6 @@ function new(params)
    ctab.occupancy = 0
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
-   ctab.memuse_counter = params.memuse_counter
    ctab = setmetatable(ctab, { __index = CTable })
    ctab:resize(params.initial_size)
    return ctab
@@ -150,13 +147,7 @@ function CTable:resize(size)
 
    -- Allocate double the requested number of entries to make sure there
    -- is sufficient displacement if all hashes map to the last bucket.
-   local byte_size
-   self.entries, byte_size = calloc(self.entry_type, size * 2)
-   if #self.memuse_counter == 2 then
-      local counters = self.memuse_counter[1]
-      local memuse_name = self.memuse_counter[2]
-      counter.set(counters[memuse_name], byte_size)
-   end
+   self.entries, self.byte_size = calloc(self.entry_type, size * 2)
    self.size = size
    self.scale = self.size / HASH_MAX
    self.occupancy = 0
@@ -170,6 +161,10 @@ function CTable:resize(size)
          self:insert(old_entries[i].hash, old_entries[i].key, old_entries[i].value)
       end
    end
+end
+
+function CTable:get_backing_size()
+   return self.byte_size
 end
 
 function CTable:insert(hash, key, value, updates_allowed)
@@ -224,30 +219,6 @@ function CTable:insert(hash, key, value, updates_allowed)
    entries[index].key = key
    entries[index].value = value
    return index
-end
-
--- Choose a random index between the start of the table and its occupancy_hi
--- value. This guarantees that there will be an entry to eject, because this
--- is only called when the table is 'full'.
-local function random_eject(ctab)
-   local eject_index = math.random(0, ctab.occupancy_hi - 1)
-   -- Empty entries can't be ejected; find a non-empty one
-   while ctab.entries[eject_index].hash == HASH_MAX do
-      eject_index = eject_index + 1
-   end
-   assert(eject_index <= ctab.size + ctab.max_displacement,
-      "Ctab: eject_index too large!") -- This should be unreachable
-   local ptr = ctab.entries + eject_index
-   ctab:remove_ptr(ptr)
-end
-
--- Behave exactly like insertion, except if the table is full: if it is, then
--- eject a random entry instead of resizing.
-function CTable:add_with_random_ejection(key, value, updates_allowed)
-   if self.occupancy + 1 > self.occupancy_hi then
-      random_eject(self)
-   end
-   return self:add(key, value, updates_allowed)
 end
 
 function CTable:add(key, value, updates_allowed)
@@ -479,27 +450,6 @@ function selftest()
    for entry in ctab:iterate() do iterated = iterated + 1 end
    assert(iterated == occupancy)
 
-   local i = occupancy * 2
-   -- Fill table fully, until it would be resized.
-   -- This is necessary even on a 'full' table potentially,
-   -- because occupancy_hi is calculated with ceil()
-   while ctab.occupancy + 1 <= ctab.occupancy_hi do
-      for j=0,5 do v[j] = bnot(i) end
-      ctab:add_with_random_ejection(i, v)
-      i = i + 1
-      occupancy = occupancy + 1
-   end
-
-   for j=0,5 do v[j] = bnot(i) end
-   ctab:add_with_random_ejection(i, v)
-   local iterated = 0
-   for entry in ctab:iterate() do iterated = iterated + 1 end
-   assert(iterated == occupancy, "bad random ejection!")
-
-   ctab:remove(1, false)
-   local iterated = 0
-   for entry in ctab:iterate() do iterated = iterated + 1 end
-   assert(iterated == occupancy - 1)
    -- OK, all looking good with our ctab.
 
    -- A check that our equality functions work as intended.

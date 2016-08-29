@@ -48,9 +48,9 @@ function Reassembler:new(conf)
    o.conf = conf
    o.counters = conf.counters
    o.ctab = fragv4_h.initialize_frag_table(conf.max_ipv4_reassembly_packets,
-      conf.max_fragments_per_reassembly_packet,
-      {o.counters, "memuse-ipv4-frag-reassembly-buffer"})
-
+      conf.max_fragments_per_reassembly_packet)
+   counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
+               o.ctab:get_backing_size())
    return o
 end
 
