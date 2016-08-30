@@ -1,0 +1,304 @@
+module snabb-softwire {
+  namespace "snabb:lwaftr";
+  prefix "softwire";
+
+  import ietf-inet-types {prefix inet; }
+
+  organization "Igalia";
+  contact "Jessica Tallon <tsyesika@igalia.com>";
+  description "";
+
+  revision 2016-08-01 {
+    description "Initial revision.";
+    reference "-00";
+  }
+
+  typedef PacketPolicy {
+    type enumeration {
+      enum allow {
+        value 0;
+        description "Allow pakcets.";
+      }
+      enum deny  {
+        value 1;
+        description "Deny packets.";
+      }
+    }
+    description "Policy for what to do with packets, either allow or deny
+                 them.";
+  }
+
+  typedef PositiveNumber {
+    type uint32 {
+      range "1.. 2147483647";
+    }
+    description "This is a non-negative integer value which is 1 or above.";
+  }
+
+  typedef VlanTag {
+    type uint16 {
+      range "0..4095";
+    }
+    description "This is a VLAN tag according to 802.1Q Ethernet tagging.";
+  }
+  
+  container softwire-config {
+    description "Configuration for Snabb lwaftr."; 
+
+    leaf ipv4-ip {
+      type inet:ipv4-address;
+      mandatory true;
+      description "Sets the IPv4 address of the internet facing NIC.";
+    }
+
+    leaf ipv6-ip {
+      type inet:ipv6-address;
+      mandatory true;
+      description "Sets the IPv6 address of the internal facing NIC.";
+    }
+
+    leaf mac-b4 {
+      type inet:mac-address;
+      mandatory true;
+      description "Sets the MAC address of the internal facing NIC.";
+    }
+
+    leaf mac-inet {
+      type inet:mac-address;
+      mandatory true;
+      description "Sets the MAC address of the internet facing NIC.";
+    }
+
+    leaf hairpinning {
+      type boolean;
+      default true;
+      description "Enables or disables hairpinning that is a requirement of
+                   RFC 7596.";
+    }
+
+
+    container mtu {
+      description "The MTU settings are used to determine whether a packet
+                   needs to be fragmented. The MTU handling is otherwise
+                   underdeveloped. It is not dynamically updated upon receiving
+                   ICMP packets too big.";
+
+      leaf ipv4-mtu {
+        type uint16;
+        default 1460;
+        description "Sets the MTU value for the IPv4 NIC.";
+      }
+
+      leaf ipv6-mtu {
+        type uint16;
+        default 1500;
+        description "Set the MTU value for the IPv6 NIC.";
+      }
+    }
+    
+    container L2-next-hop {
+      description "One might expect to set the default gateway IPv4 and IPv6
+                   addresses and have those resolved via ARP, however ARP is
+                   not yet supported via the lwAFTR. One must specify either
+                   the MAC Address of the next hop host however you could
+                   instead specify the IP addresses of the next hops and have
+                   the lwAFTR resolve the corresponding MAC addresses via NDP
+                   and ARP.";
+       
+      leaf b4-mac {
+        type inet:mac-address;
+        description "Sets the MAC address of the next hop for the internal
+                     facing NIC.";
+      }
+
+      leaf inet-mac {
+        type inet:mac-address;
+        description "Sets the MAC address of the next hop for the internet
+                     facing NIC.";
+      }
+
+      leaf inet-ipv4 {
+        type inet:ipv4-address;
+        description "Sets the IPv4 address of the next hop for the internet
+                     facing NIC that will be used to resolve the MAC address.";
+      }
+
+      leaf b4-ipv6 {
+        type inet:ipv6-address;
+        description "Sets the IPv4 address of the next hop for the internal
+                     facing NIC that will be used to resolve the MAC address.";
+      }      
+    }
+   
+  
+    container rate-limiting-icmp {
+      description "ICMP rate limiting is mandated by many RFCs. This configures
+                   the number of ICMP packets the lwAFTR can send for the given
+                   time period. Lower values are recomended for
+                   non-experimental use.";
+
+      leaf packets {
+        type uint32;
+        default 600000;
+        description "The number of packets which can be sent within the time
+                     period.";
+      }
+
+      leaf icmpv6-rate-limiter-n-seconds {
+        type PositiveNumber;
+        default 2;
+        description "The time period given in seconds.";
+      }
+    }
+
+    container icmp-handling-policies {
+      description "The lwAFTR can be configured to allow or drop incoming and
+                   outgoing ICMPv4 and ICMPv6 messages.";
+
+      leaf icmpv4-incoming {
+        type PacketPolicy;
+        default allow;
+        description "Sets the policy for incoming ICMPv4 messages.";
+      }
+
+      leaf icmpv4-outgoing {
+        type PacketPolicy;
+        default allow;
+        description "Sets the policy for outgoing ICMPv4 messages.";
+      }
+
+      leaf icmpv6-incoming {
+        type PacketPolicy;
+        default allow;
+        description "Sets the policy for incoming ICMPv6 messages.";
+      }
+
+      leaf icmpv6-outgoing {
+        type PacketPolicy;
+        default allow;
+        description "Sets the policy for outgoing ICMPv6 messages.";
+      }
+    }
+
+    container vlan-tagging {
+      description "This configures 802.1Q Ethernet tagging. If tagging is
+                   enabled the outbound and inbound tags must be specified.";
+
+      leaf vlan-tagging {
+        type boolean;
+        default true;
+        description "Enables or disables VLAN tagging.";
+      }
+
+      leaf v4-tag {
+        type VlanTag;
+        description "Sets the tag for v4";
+      }
+
+      leaf v6-vlan-tag {
+        type VlanTag;
+        description "Sets the tag for v6";
+      }
+    }
+ 
+    container filters {
+      description "This configures the ingress and egress filters for each NIC.
+                   If set, these should be a pflang filter, pflang is the
+                   language of tcpdump, libpcap and other tools. The filters
+                   will run on the packets without vlan tags, if any.";
+  
+      leaf ipv4-ingress-filter {
+        type string;
+        description "Sets the pflang filter for IPv4 ingress.";
+      }
+
+      leaf ipv4-egress-filter {
+        type string;
+        description "Sets the pflang filter for IPv4 egress.";
+      }
+
+      leaf ipv6-ingress-filter {
+        type string;
+        description "Sets the pflang filter for IPv6 ingress.";
+      }
+
+      leaf ipv6-egress-filter {
+        type string;
+        description "Sets the pflang filter for IPv6 egress.";
+      }
+    }
+  }
+
+  container binding-table {
+    description "The binding table is a collection of softwire tunnels. One
+                 endpoint of the softwire is the lwAFTR and the other is the
+                 B4. It contains information so the lwAFTR knows which IPv4
+                 (or part of an IPv4 address) is associated with which B4.";
+
+    list psid_map {
+      key "ipv4-address";
+      description "Defines the set of IPv4 addresses that are provisioned by a
+                   lwAFTR. It also defines the way in which those addresses are
+                   shared by specifying the psid_length and shift. See RFC 7597
+                   for more details on the PSID scheme for sharing IPv4
+                   addresses.";
+
+      leaf ipv4-address {
+        type inet:ipv4-address;
+        mandatory true;
+        description "The IPv4 address that is provisioned";
+      }
+
+      leaf psid_length {
+        type uint16;
+        default 0;
+      }
+
+      leaf shift {
+        type uint16;
+        default 16;
+      }
+    }
+
+    list br-addresses {
+      key "ipv6-address";
+
+      leaf ipv6-address {
+        type inet:ipv6-address;
+      }
+    }
+
+    list binding-table-entry {
+      key "ipv4-address psid";
+
+      leaf ipv4-address {
+        type inet:ipv4-address;
+        mandatory true;
+        description "Public IPv4 address of the softwire."; 
+      }
+
+      leaf psid {
+        type uint16;
+        mandatory true;
+        description "Port set ID";
+      }
+
+      leaf padding {
+        type uint16;
+        description "Zeros";
+      }
+
+      leaf br {
+        type uint32;
+        mandatory true;
+        description "Border router";
+      }
+
+      leaf ipv6-address {
+        type inet:ipv6-address;
+        mandatory true;
+        description "Address of the B4";
+      }
+    }
+  } 
+}   
