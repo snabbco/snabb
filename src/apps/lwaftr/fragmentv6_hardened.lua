@@ -245,7 +245,7 @@ local function hash_ipv6(key)
    return hash
 end
 
-function initialize_frag_table(max_fragmented_packets, max_pkt_frag, memuse_counter)
+function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
    -- Initialize module-scoped variables
    max_frags_per_packet = max_pkt_frag
    ipv6_reassembly_buffer_t = ffi.typeof([[
