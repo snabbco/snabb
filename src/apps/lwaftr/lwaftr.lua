@@ -284,7 +284,7 @@ function LwAftr:new(conf)
    o.hairpin_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
 
    o.control = channel.create('lwaftr/control', messages.lwaftr_message_t)
-   o.counters = conf.counters
+   o.counters = assert(conf.counters, "Counters not initialized")
 
    transmit_icmpv6_reply = init_transmit_icmpv6_reply(o)
    transmit_icmpv4_reply = init_transmit_icmpv4_reply(o)
