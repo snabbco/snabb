@@ -85,10 +85,10 @@ function Reassembler:push ()
       elseif v4 and is_fragment(pkt) then
          counter.add(self.counters["in-ipv4-bytes"], pkt.length)
          counter.add(self.counters["in-ipv4-packets"])
-         counter.add(self.counters["in-ipv4-frag-needsreassembly"])
+         counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then
-            counter.add(self.counters["drop-ipv4-frag-randomevicted"])
+            counter.add(self.counters["drop-ipv4-frag-random-evicted"])
          end
 
          if status == fragv4_h.REASSEMBLY_OK then -- Reassembly was successful

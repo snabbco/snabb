@@ -101,12 +101,100 @@ Counters:
 - **drop-in-by-rfc7596-icmpv4**: incoming ICMPv4 packets with no destination
   (RFC 7596 section 8.1)
 
+### Fragmentation counters
+
+All fragmentation counters have 'frag' in the name: this reflects that they
+are counters related to fragmentation. Some are counts of all the packets which
+are NOT fragments. All fragmentation counters are in terms of packets, not bytes,
+except for the ones which deal with the amount of RAM used (prefix `memuse-`).
+The memory use counters are in bytes.
+
+IPv4 fragmentation counters:
+
+- **in-ipv4-frag-needs-reassembly**: An IPv4 fragment was received.
+- **in-ipv4-frag-reassembled**: A packet was successfully reassembled from IPv4
+   fragments.
+- **in-ipv4-frag-reassembly-unneeded**: An IPv4 packet which was not a fragment
+   was received - consequently, it did not need to be reassembled. This should
+   be the usual case.
+- **drop-ipv4-frag-invalid-reassembly**: Two or more IPv4 fragments were
+   received, and reassembly was started, but was invalid and dropped. Causes
+   include multiple fragments claiming they are the last fragment,
+   overlapping fragment offsets, or the packet was being reassembled from too
+   many fragments (the setting is `max_fragments_per_reassembly_packet`, and
+   the default is that no packet should be reassembled from more than 40.)
+- **drop-ipv4-frag-random-evicted**: Reassembling an IPv4 packet from fragments
+   was in progress, but the configured amount of packets to reassemble at once
+   was exceeded, so one was dropped at random. Consider increasing the setting
+   `max_ipv4_reassembly_packets`.
+- **out-ipv4-frag**: An outgoing packet exceeded the configured IPv4 MTU, so
+   needed to be fragmented. This may happen, but should be unusual.
+- **out-ipv4-frag-not**: An outgoing packet was small enough to pass through
+  unfragmented - this should be the usual case.
+- **memuse-ipv4-frag-reassembly-buffer**: The amount of memory being used by
+  the statically sized data structure for reassembling IPv4 fragments. This is
+  directly proportional to the setting `max_ipv4_reassembly_packets`.
+
+IPv6 fragmentation counters:
+
+- **in-ipv6-frag-needs-reassembly**: An IPv6 fragment was received
+- **in-ipv6-frag-reassembled**: A packet was successfully reassembled from IPv6
+   fragments
+- **in-ipv6-frag-reassembly-unneeded**: An IPv6 packet which was not a fragment
+   was received - consequently, it did not need to be reassembled. This should
+   be the usual case.
+- **drop-ipv6-frag-invalid-reassembly**: Two or more IPv6 fragments were
+   received, and reassembly was started, but was invalid and dropped. Causes
+   include multiple fragments claiming they are the last fragment,
+   overlapping fragment offsets, or the packet was being reassembled from too
+   many fragments (the setting is `max_fragments_per_reassembly_packet`, and
+   the default is that no packet should be reassembled from more than 40.)
+- **drop-ipv6-frag-random-evicted**: Reassembling an IPv6 packet from fragments
+   was in progress, but the configured amount of packets to reassemble at once
+   was exceeded, so one was dropped at random. Consider increasing the setting
+   `max_ipv6_reassembly_packets`.
+- **out-ipv6-frag**: An outgoing packet exceeded the configured IPv6 MTU, so
+   needed to be fragmented. This may happen, but should be unusual.
+- **out-ipv6-frag-not**: An outgoing packet was small enough to pass through
+  unfragmented - this should be the usual case.
+- **memuse-ipv6-frag-reassembly-buffer**: The amount of memory being used by
+  the statically sized data structure for reassembling IPv6 fragments. This is
+  directly proportional to the setting `max_ipv6_reassembly_packets`.
+
+
+## Troubleshooting using counters
+
+- Is the lwAftr getting packets? See `in-ipv4-packets` and `in-ipv6-bytes`.
+  If those are zero, it is not: check physical cabling and VLAN settings.
+  Other troubleshooting steps may also apply, such as IOMMU settings: see
+  `src/program/lwaftr/doc/README.troubleshooting.md`.
+- Are the fragmentation counters indicating needing fragmentation and
+  reassembly large? If `in-ipv4-frag-needs-reassembly` or
+  `in-ipv6-frag-needs-reassembly` are large, ask why there are so many fragments
+  reaching the lwAftr. If `out-ipv4-frag` or `out-ipv6-frag` are large, ask
+  why the lwAftr needs to fragment so many outgoing packets, and check the
+  settings `ipv4_mtu` and `ipv6_mtu` in the settings.
+- Are `drop-ipv6-frag-random-evicted` or `drop-ipv4-frag-random-evicted` high?
+  Consider increasing the settings `max_ipv4_reassembly_packets` and/or
+  `max_ipv6_reassembly_packets`, and/or sending us a note.
+- Are `drop-no-dest-softwire-ipv4` or `drop-no-source-softwire-ipv6` high?
+  Check that the lwAftr's binding table matches your expectations.
+  (Try `snabb lwaftr control [pid] dump-configuration`, then checking /tmp).
+
 ## Notes
 
-The internally generated ICMPv4 error packets that are then dropped because
-of policy are not recorded as dropped: only incoming ICMP packets are.
+Internally generated ICMPv4 error packets that are dropped because of policy
+are not recorded as dropped: only incoming ICMP packets are. ("Policy" means
+the configuration settings on whether to allow or drop incoming and outgoing
+ICMPv4 and ICMPv6 packets, such as `policy_icmpv4_incoming = ALLOW`.)
 
-Implementation detail: rhe counters can be accessed as files in the runtime
+Implementation detail: counters can be accessed as files in the runtime
 area of the Snabb process, typically under
 `/var/run/snabb/[PID]/app/lwaftr/counters/`. Most of them are represented by
 two files, ending with the `bytes` and `packets` suffixes.
+
+Note that all counters only see packets without VLAN tags, so the total number
+of bytes will be 2 bytes smaller than expected per packet on networks with VLANs.
+
+Both 'in' and 'out' in counter names are relative to the lwAftr software, not a
+network: a packet can come in from a B4 and out to the internet, or vice versa.

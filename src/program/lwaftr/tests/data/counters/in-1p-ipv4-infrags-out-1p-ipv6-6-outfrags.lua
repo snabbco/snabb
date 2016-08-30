@@ -1,6 +1,6 @@
 return {
    ["in-ipv4-bytes"] = 1542,
-   ["in-ipv4-frag-needsreassembly"] = 3,
+   ["in-ipv4-frag-needs-reassembly"] = 3,
    ["in-ipv4-frag-reassembled"] = 1,
    ["in-ipv4-packets"] = 3,
    ["memuse-ipv4-frag-reassembly-buffer"] = 463571780,
