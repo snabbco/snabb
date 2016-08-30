@@ -102,7 +102,7 @@ counter_names = {
    "drop-out-by-policy-icmpv6-packets",
 
 -- Reassembly counters
-   "in-ipv4-frag-needsreassembly",
+   "in-ipv4-frag-needs-reassembly",
    "in-ipv4-frag-reassembled",
    "in-ipv4-frag-reassembly-unneeded",
    "drop-ipv4-frag-invalid-reassembly",
@@ -111,7 +111,7 @@ counter_names = {
    "out-ipv4-frag-not",
    "memuse-ipv4-frag-reassembly-buffer",
 
-   "in-ipv6-frag-needsreassembly",
+   "in-ipv6-frag-needs-reassembly",
    "in-ipv6-frag-reassembled",
    "in-ipv6-frag-reassembly-unneeded",
    "drop-ipv6-frag-invalid-reassembly",

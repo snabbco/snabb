@@ -111,7 +111,7 @@ The memory use counters are in bytes.
 
 IPv4 fragmentation counters:
 
-- **in-ipv4-frag-needsreassembly**: An IPv4 fragment was received.
+- **in-ipv4-frag-needs-reassembly**: An IPv4 fragment was received.
 - **in-ipv4-frag-reassembled**: A packet was successfully reassembled from IPv4
    fragments.
 - **in-ipv4-frag-reassembly-unneeded**: An IPv4 packet which was not a fragment
@@ -137,7 +137,7 @@ IPv4 fragmentation counters:
 
 IPv6 fragmentation counters:
 
-- **in-ipv6-frag-needsreassembly**: An IPv6 fragment was received
+- **in-ipv6-frag-needs-reassembly**: An IPv6 fragment was received
 - **in-ipv6-frag-reassembled**: A packet was successfully reassembled from IPv6
    fragments
 - **in-ipv6-frag-reassembly-unneeded**: An IPv6 packet which was not a fragment
@@ -169,8 +169,8 @@ IPv6 fragmentation counters:
   Other troubleshooting steps may also apply, such as IOMMU settings: see
   `src/program/lwaftr/doc/README.troubleshooting.md`.
 - Are the fragmentation counters indicating needing fragmentation and
-  reassembly large? If `in-ipv4-frag-needsreassembly` or
-  `in-ipv6-frag-needsreassembly` are large, ask why there are so many fragments
+  reassembly large? If `in-ipv4-frag-needs-reassembly` or
+  `in-ipv6-frag-needs-reassembly` are large, ask why there are so many fragments
   reaching the lwAftr. If `out-ipv4-frag` or `out-ipv6-frag` are large, ask
   why the lwAftr needs to fragment so many outgoing packets, and check the
   settings `ipv4_mtu` and `ipv6_mtu` in the settings.
