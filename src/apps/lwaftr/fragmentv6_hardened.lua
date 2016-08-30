@@ -136,7 +136,7 @@ local function reassembly_status(reassembly_buf)
    if reassembly_buf.final_start == 0 then
       return FRAGMENT_MISSING
    end
-   if reassembly_buf.running_length ~= reassembly_buf.reassembly_packet.length then
+   if reassembly_buf.running_length ~= reassembly_buf.reassembly_length then
       return FRAGMENT_MISSING
    end
    if not verify_valid_offsets(reassembly_buf) then
@@ -145,8 +145,14 @@ local function reassembly_status(reassembly_buf)
    return REASSEMBLY_OK
 end
 
+local function pseudo_clone(data, len)
+   local p = packet.allocate()
+   p.headroom = 0
+   packet.append(p, data, len)
+   return p
+end
+
 local function attempt_reassembly(frags_table, reassembly_buf, fragment)
-   local reassembly_pkt = reassembly_buf.reassembly_packet
    local frag_id = get_frag_id(fragment)
    if frag_id ~= reassembly_buf.fragment_id then -- unreachable
       error("Impossible case reached in v6 reassembly") --REASSEMBLY_INVALID
@@ -182,22 +188,24 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    -- Specifically, it requires this file to know the details of struct packet.
    local skip_headers = reassembly_buf.reassembly_base
    local dst_offset = skip_headers + frag_start
-   local last_ok = packet_payload_size - reassembly_pkt.headroom
+   local last_ok = packet_payload_size
    if dst_offset + frag_size > last_ok then
       -- Prevent a buffer overflow. The relevant RFC allows hosts to silently discard
       -- reassemblies above a certain rather small size, smaller than this.
       return REASSEMBLY_INVALID
    end
-   ffi.copy(reassembly_pkt.data + dst_offset,
+   ffi.copy(reassembly_buf.reassembly_data + dst_offset,
             fragment.data + skip_headers + ipv6_frag_header_size,
             frag_size)
    local max_data_offset = skip_headers + frag_start + frag_size
-   reassembly_pkt.length = math.max(reassembly_pkt.length, max_data_offset)
+   reassembly_buf.reassembly_length = math.max(reassembly_buf.reassembly_length,
+                                               max_data_offset)
    reassembly_buf.running_length = reassembly_buf.running_length + frag_size
 
    local restatus = reassembly_status(reassembly_buf)
    if restatus == REASSEMBLY_OK then
-      local reassembled_packet = packet.clone(reassembly_buf.reassembly_packet)
+      local reassembled_packet = pseudo_clone(reassembly_buf.reassembly_data,
+                                              reassembly_buf.reassembly_length)
       free_reassembly_buf_and_pkt(fragment, frags_table)
       return REASSEMBLY_OK, reassembled_packet
    else
@@ -212,17 +220,15 @@ local function packet_to_reassembly_buffer(pkt)
    reassembly_buf.fragment_id = get_frag_id(pkt)
    reassembly_buf.reassembly_base = ehs + ipv6_fixed_header_size
 
-   local tmplen = pkt.length
-   pkt.length = ehs + ipv6_fixed_header_size
-   local repkt = reassembly_buf.reassembly_packet
-   packet.clone_to_memory(repkt, pkt)
-   reassembly_buf.running_length = pkt.length
+   local reassembly_data = reassembly_buf.reassembly_data
+   local headers_len = ehs + ipv6_fixed_header_size
+   ffi.copy(reassembly_data, pkt.data, headers_len)
+   reassembly_buf.running_length = headers_len
 
-   pkt.length = tmplen
    --Take the next header information from the fragment
    local next_header_base_offset = ehs + o_ipv6_next_header
    local next_header_frag_offset = ehs + ipv6_fixed_header_size -- +0
-   repkt.data[next_header_base_offset] = pkt.data[next_header_frag_offset]
+   reassembly_data[next_header_base_offset] = pkt.data[next_header_frag_offset]
 
    return reassembly_buf
 end
@@ -250,10 +256,11 @@ function initialize_frag_table(max_fragmented_packets, max_pkt_frag, memuse_coun
        uint16_t final_start;
        uint16_t reassembly_base;
        uint32_t fragment_id;
-       uint32_t running_length;
-       struct packet reassembly_packet;
+       uint32_t running_length; // bytes copied so far
+       uint16_t reassembly_length; // analog to packet.length
+       uint8_t reassembly_data[$];
    } __attribute((packed))]],
-   max_frags_per_packet, max_frags_per_packet)
+   max_frags_per_packet, max_frags_per_packet, packet.max_payload)
    scratch_rbuf = ipv6_reassembly_buffer_t()
 
    local max_occupy = 0.9

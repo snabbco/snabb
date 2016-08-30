@@ -131,7 +131,7 @@ local function reassembly_status(reassembly_buf)
    if reassembly_buf.final_start == 0 then
       return FRAGMENT_MISSING
    end
-   if reassembly_buf.running_length ~= reassembly_buf.reassembly_packet.length then
+   if reassembly_buf.running_length ~= reassembly_buf.reassembly_length then
       return FRAGMENT_MISSING
    end
    if not verify_valid_offsets(reassembly_buf) then
@@ -149,9 +149,15 @@ local function fix_pkt_checksum(pkt)
         htons(ipsum(pkt.data + ehs, ihl, 0)))
 end
 
+local function pseudo_clone(data, len)
+   local p = packet.allocate()
+   p.headroom = 0
+   packet.append(p, data, len)
+   return p
+end
+
 local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    local ihl = get_ihl_from_offset(fragment, ehs)
-   local reassembly_pkt = reassembly_buf.reassembly_packet
    local frag_id = get_frag_id(fragment)
    if frag_id ~= reassembly_buf.fragment_id then -- unreachable
       error("Impossible case reached in v4 reassembly") --REASSEMBLY_INVALID
@@ -187,25 +193,29 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    -- Specifically, it requires this file to know the details of struct packet.
    local skip_headers = reassembly_buf.reassembly_base
    local dst_offset = skip_headers + frag_start
-   local last_ok = packet_payload_size - reassembly_pkt.headroom
+   local last_ok = packet_payload_size
    if dst_offset + frag_size > last_ok then
       -- Prevent a buffer overflow. The relevant RFC allows hosts to silently discard
       -- reassemblies above a certain rather small size, smaller than this.
       return REASSEMBLY_INVALID
    end
-   ffi.copy(reassembly_pkt.data + dst_offset,
+   local reassembly_data = reassembly_buf.reassembly_data
+   ffi.copy(reassembly_data + dst_offset,
             fragment.data + skip_headers,
             frag_size)
    local max_data_offset = skip_headers + frag_start + frag_size
-   reassembly_pkt.length = math.max(reassembly_pkt.length, max_data_offset)
+   reassembly_buf.reassembly_length = math.max(reassembly_buf.reassembly_length,
+                                               max_data_offset)
    reassembly_buf.running_length = reassembly_buf.running_length + frag_size
 
    local restatus = reassembly_status(reassembly_buf)
    if restatus == REASSEMBLY_OK then
+      local pkt_len = htons(reassembly_buf.reassembly_length - ehs)
       local o_len = ehs + o_ipv4_total_length
-      wr16(reassembly_pkt.data + o_len, htons(reassembly_pkt.length - ehs))
-      fix_pkt_checksum(reassembly_pkt)
-      local reassembled_packet = packet.clone(reassembly_buf.reassembly_packet)
+      wr16(reassembly_data + o_len, pkt_len)
+      local reassembled_packet = pseudo_clone(reassembly_buf.reassembly_data,
+                                              reassembly_buf.reassembly_length)
+      fix_pkt_checksum(reassembled_packet)
       free_reassembly_buf_and_pkt(fragment, frags_table)
       return REASSEMBLY_OK, reassembled_packet
    else
@@ -221,13 +231,11 @@ local function packet_to_reassembly_buffer(pkt)
    reassembly_buf.fragment_id = get_frag_id(pkt)
    reassembly_buf.reassembly_base = ehs + ihl
 
-   local tmplen = pkt.length
-   pkt.length = ehs + ihl
-   local repkt = reassembly_buf.reassembly_packet
-   packet.clone_to_memory(repkt, pkt)
-   wr32(repkt.data + ehs + o_ipv4_identification, 0) -- Clear fragmentation data
-   reassembly_buf.running_length = pkt.length
-   pkt.length = tmplen
+   local headers_len = ehs + ihl
+   local re_data = reassembly_buf.reassembly_data
+   ffi.copy(re_data, pkt.data, headers_len)
+   wr32(re_data + ehs + o_ipv4_identification, 0) -- Clear fragmentation data
+   reassembly_buf.running_length = headers_len
    return reassembly_buf
 end
 
@@ -256,10 +264,11 @@ function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
        uint16_t final_start;
        uint16_t reassembly_base;
        uint16_t fragment_id;
-       uint32_t running_length;
-       struct packet reassembly_packet;
+       uint32_t running_length; // bytes copied so far
+       uint16_t reassembly_length; // analog to packet.length
+       uint8_t reassembly_data[$];
    } __attribute((packed))]],
-   max_frags_per_packet, max_frags_per_packet)
+   max_frags_per_packet, max_frags_per_packet, packet.max_payload)
    scratch_rbuf = ipv4_reassembly_buffer_t()
 
    local max_occupy = 0.9
