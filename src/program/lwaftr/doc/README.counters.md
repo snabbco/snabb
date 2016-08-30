@@ -123,7 +123,7 @@ IPv4 fragmentation counters:
    overlapping fragment offsets, or the packet was being reassembled from too
    many fragments (the setting is `max_fragments_per_reassembly_packet`, and
    the default is that no packet should be reassembled from more than 40.)
-- **drop-ipv4-frag-randomevicted**: Reassembling an IPv4 packet from fragments
+- **drop-ipv4-frag-random-evicted**: Reassembling an IPv4 packet from fragments
    was in progress, but the configured amount of packets to reassemble at once
    was exceeded, so one was dropped at random. Consider increasing the setting
    `max_ipv4_reassembly_packets`.
@@ -149,7 +149,7 @@ IPv6 fragmentation counters:
    overlapping fragment offsets, or the packet was being reassembled from too
    many fragments (the setting is `max_fragments_per_reassembly_packet`, and
    the default is that no packet should be reassembled from more than 40.)
-- **drop-ipv6-frag-randomevicted**: Reassembling an IPv6 packet from fragments
+- **drop-ipv6-frag-random-evicted**: Reassembling an IPv6 packet from fragments
    was in progress, but the configured amount of packets to reassemble at once
    was exceeded, so one was dropped at random. Consider increasing the setting
    `max_ipv6_reassembly_packets`.
@@ -174,7 +174,7 @@ IPv6 fragmentation counters:
   reaching the lwAftr. If `out-ipv4-frag` or `out-ipv6-frag` are large, ask
   why the lwAftr needs to fragment so many outgoing packets, and check the
   settings `ipv4_mtu` and `ipv6_mtu` in the settings.
-- Are `drop-ipv6-frag-randomevicted` or `drop-ipv4-frag-randomevicted` high?
+- Are `drop-ipv6-frag-random-evicted` or `drop-ipv4-frag-random-evicted` high?
   Consider increasing the settings `max_ipv4_reassembly_packets` and/or
   `max_ipv6_reassembly_packets`, and/or sending us a note.
 - Are `drop-no-dest-softwire-ipv4` or `drop-no-source-softwire-ipv6` high?

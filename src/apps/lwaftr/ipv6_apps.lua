@@ -82,7 +82,7 @@ function ReassembleV6:push ()
          counter.add(self.counters["in-ipv6-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then
-            counter.add(self.counters["drop-ipv6-frag-randomevicted"])
+            counter.add(self.counters["drop-ipv6-frag-random-evicted"])
          end
 
          if status == fragv6_h.REASSEMBLY_OK then
