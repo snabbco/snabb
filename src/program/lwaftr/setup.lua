@@ -20,7 +20,7 @@ function lwaftr_app(c, conf)
    conf.preloaded_binding_table = bt.load(conf.binding_table)
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
-   conf.counters = lwcounter.create_counters()
+   conf.counters = lwcounter.init_counters()
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler, conf)
    config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, conf)

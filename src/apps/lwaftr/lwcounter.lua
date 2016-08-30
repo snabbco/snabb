@@ -121,7 +121,7 @@ counter_names = {
    "memuse-ipv6-frag-reassembly-buffer",
 }
 
-function create_counters ()
+function init_counters ()
    local counters = {}
    for _, name in ipairs(counter_names) do
       counters[name] = {counter}
