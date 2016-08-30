@@ -4,7 +4,7 @@ local S = require("syscall")
 local counter = require("core.counter")
 local ffi = require("ffi")
 local lib = require("core.lib")
-local lwaftr = require("apps.lwaftr.lwaftr")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
@@ -14,7 +14,7 @@ local select_snabb_instance = top.select_snabb_instance
 local keys = lwutil.keys
 
 -- Get the counter dir from the code.
-local counters_rel_dir = lwaftr.counters_dir
+local counters_dir = lwcounter.counters_dir
 
 function show_usage (code)
    print(require("program.lwaftr.query.README_inc"))
@@ -27,7 +27,7 @@ local function sort (t)
 end
 
 local function is_counter_name (name)
-   return lwaftr.counter_names[name] ~= nil
+   return lwcounter.counter_names[name] ~= nil
 end
 
 local function pidof(maybe_pid)
@@ -47,7 +47,7 @@ function parse_args (raw_args)
    local handlers = {}
    function handlers.h() show_usage(0) end
    function handlers.l ()
-      for _, name in ipairs(sort(lwaftr.counter_names)) do
+      for _, name in ipairs(sort(lwcounter.counter_names)) do
          print(name)
       end
       main.exit(0)
@@ -77,7 +77,7 @@ local function read_counters (tree, filter)
    local ret = {}
    local cnt, cnt_path, value
    local max_width = 0
-   local counters_path = "/" .. tree .. "/" .. counters_rel_dir
+   local counters_path = "/" .. tree .. "/" .. counters_dir
    local counters = shm.children(counters_path)
    for _, name in ipairs(counters) do
       cnt_path = counters_path .. name
