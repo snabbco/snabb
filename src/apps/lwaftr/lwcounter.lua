@@ -12,7 +12,7 @@ local shm = require("core.shm")
 --   - reason: reasons for dropping;
 -- - protocol+version: "icmpv4", "icmpv6", "ipv4", "ipv6";
 -- - size: "bytes", "packets".
-counters_dir = "app/lwaftr/counters/"
+counters_dir = "apps/lwaftr/"
 -- Referenced by program/check/check.lua
 counter_names = {
 
