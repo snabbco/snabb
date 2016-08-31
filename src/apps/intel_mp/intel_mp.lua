@@ -23,6 +23,21 @@ local bits = lib.bits
 local tophysical = core.memory.virtual_to_physical
 local register = require("lib.hardware.register")
 
+-- The `driver' variable is used as a reference to the driver class in
+-- order to interchangably use NIC drivers.
+driver = {}
+
+function driver:new (arg)
+   local conf = config.parse_app_arg(arg)
+   local info = pci.device_info(conf.pciaddr)
+   assert(info.vendor == '0x8086', "unsupported nic")
+   if model == 'Intel 350' or model == 'Intel 210' then
+      return Intel1g:new(conf)
+   else
+      return Intel82599:new(conf)
+   end
+end
+
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
 -- https://sourceforge.net/p/e1000/mailman/message/34457421/
