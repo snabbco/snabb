@@ -44,14 +44,16 @@ ARP = {}
 ICMPEcho = {}
 
 function Reassembler:new(conf)
-   local o = setmetatable({}, {__index=Reassembler})
-   o.conf = conf
-   o.counters = assert(conf.counters, "Counters not initialized")
-   o.ctab = fragv4_h.initialize_frag_table(conf.max_ipv4_reassembly_packets,
-      conf.max_fragments_per_reassembly_packet)
+   local max_ipv4_reassembly_packets = assert(conf.max_ipv4_reassembly_packets)
+   local max_fragments_per_reassembly_packet = assert(conf.max_fragments_per_reassembly_packet)
+   local o = {
+      counters = assert(conf.counters, "Counters not initialized"),
+      ctab = fragv4_h.initialize_frag_table(max_ipv4_reassembly_packets,
+         max_fragments_per_reassembly_packet),
+   }
    counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
                o.ctab:get_backing_size())
-   return o
+   return setmetatable(o, {__index=Reassembler})
 end
 
 local function is_fragment(pkt)
@@ -114,11 +116,11 @@ function Reassembler:push ()
 end
 
 function Fragmenter:new(conf)
-   local o = setmetatable({}, {__index=Fragmenter})
-   o.conf = conf
-   o.counters = assert(conf.counters, "Counters not initialized")
-   o.mtu = assert(conf.mtu)
-   return o
+   local o = {
+      counters = assert(conf.counters, "Counters not initialized"),
+      mtu = assert(conf.mtu),
+   }
+   return setmetatable(o, {__index=Fragmenter})
 end
 
 function Fragmenter:push ()

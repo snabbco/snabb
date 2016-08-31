@@ -41,14 +41,16 @@ NDP = {}
 ICMPEcho = {}
 
 function ReassembleV6:new(conf)
-   local o = setmetatable({}, {__index = ReassembleV6})
-   o.conf = conf
-   o.counters = assert(conf.counters, "Counters not initialized")
-   o.ctab = fragv6_h.initialize_frag_table(conf.max_ipv6_reassembly_packets,
-      conf.max_fragments_per_reassembly_packet)
+   local max_ipv6_reassembly_packets = conf.max_ipv6_reassembly_packets
+   local max_fragments_per_reassembly_packet = conf.max_fragments_per_reassembly_packet
+   local o = {
+      counters = assert(conf.counters, "Counters not initialized"),
+      ctab = fragv6_h.initialize_frag_table(max_ipv6_reassembly_packets,
+         max_fragments_per_reassembly_packet),
+   }
    counter.set(o.counters["memuse-ipv6-frag-reassembly-buffer"],
                o.ctab:get_backing_size())
-   return o
+   return setmetatable(o, {__index = ReassembleV6})
 end
 
 function ReassembleV6:cache_fragment(fragment)
@@ -109,11 +111,11 @@ function ReassembleV6:push ()
 end
 
 function Fragmenter:new(conf)
-   local o = setmetatable({}, {__index=Fragmenter})
-   o.conf = conf
-   o.counters = assert(conf.counters, "Counters not initialized")
-   o.mtu = assert(conf.mtu)
-   return o
+   local o = {
+      counters = assert(conf.counters, "Counters not initialized"),
+      mtu = assert(conf.mtu),
+   }
+   return setmetatable(o, {__index=Fragmenter})
 end
 
 function Fragmenter:push ()
