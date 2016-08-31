@@ -239,6 +239,8 @@ local function init_transmit_icmpv4_reply (lwstate)
          if ipv4_in_binding_table(lwstate, dst_ip) then
             return transmit(lwstate.input.hairpin_in, pkt)
          else
+            counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
+            counter.add(lwstate.counters["out-ipv4-packets"])
             return transmit(lwstate.o4, pkt)
          end
       else
@@ -342,8 +344,11 @@ end
 -- packets is an internal implementation detail that DOES NOT go out over
 -- physical wires.
 -- Not incrementing out-ipv4-bytes and out-ipv4-packets is straightforward.
--- Not incrementing in-ipv4-[bytes|packets] is harder. This is done via
--- an extra internal interface/queue for hairpinned packets.
+-- Not incrementing in-ipv4-[bytes|packets] is harder. The easy way would be
+-- to add extra flags and conditionals, but it's expected that a high enough
+-- percentage of traffic might be hairpinned that this could be problematic,
+-- (and a nightmare as soon as we add any kind of parallelism)
+-- so instead we speculatively decrement the counters here.
 -- It is assumed that any packet we transmit to lwstate.input.v4 will not
 -- be dropped before the in-ipv4-[bytes|packets] counters are incremented;
 -- I *think* this approach bypasses using the physical NIC but am not
@@ -359,6 +364,8 @@ local function transmit_ipv4(lwstate, pkt)
       counter.add(lwstate.counters["hairpin-ipv4-packets"])
       return transmit(lwstate.input.hairpin_in, pkt)
    else
+      counter.add(lwstate.counters["out-ipv4-bytes"], pkt.length)
+      counter.add(lwstate.counters["out-ipv4-packets"])
       return transmit(lwstate.o4, pkt)
    end
 end
@@ -506,6 +513,9 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
       print("encapsulated packet:")
       lwdebug.print_pkt(pkt)
    end
+
+   counter.add(lwstate.counters["out-ipv6-bytes"], pkt.length)
+   counter.add(lwstate.counters["out-ipv6-packets"])
    return transmit(lwstate.o6, pkt)
 end
 
@@ -838,8 +848,14 @@ function LwAftr:push ()
       -- Drop anything that's not IPv6.
       local pkt = receive(i6)
       if is_ipv6(pkt) then
+         counter.add(self.counters["in-ipv6-bytes"], pkt.length)
+         counter.add(self.counters["in-ipv6-packets"])
          from_b4(self, pkt)
       else
+         counter.add(self.counters["drop-misplaced-not-ipv6-bytes"], pkt.length)
+         counter.add(self.counters["drop-misplaced-not-ipv6-packets"])
+         counter.add(self.counters["drop-all-ipv6-iface-bytes"], pkt.length)
+         counter.add(self.counters["drop-all-ipv6-iface-packets"])
          drop(pkt)
       end
    end
@@ -850,8 +866,15 @@ function LwAftr:push ()
       -- packets.  Drop anything that's not IPv4.
       local pkt = receive(i4)
       if is_ipv4(pkt) then
+         counter.add(self.counters["in-ipv4-bytes"], pkt.length)
+         counter.add(self.counters["in-ipv4-packets"])
          from_inet(self, pkt, PKT_FROM_INET)
       else
+         counter.add(self.counters["drop-misplaced-not-ipv4-bytes"], pkt.length)
+         counter.add(self.counters["drop-misplaced-not-ipv4-packets"])
+         -- It's guaranteed to not be hairpinned.
+         counter.add(self.counters["drop-all-ipv4-iface-bytes"], pkt.length)
+         counter.add(self.counters["drop-all-ipv4-iface-packets"])
          drop(pkt)
       end
    end

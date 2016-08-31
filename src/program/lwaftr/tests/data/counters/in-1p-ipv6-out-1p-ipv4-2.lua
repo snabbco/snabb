@@ -4,7 +4,7 @@ return {
    ["in-ipv6-packets"] = 1,
    ["memuse-ipv4-frag-reassembly-buffer"] = 463571780,
    ["memuse-ipv6-frag-reassembly-buffer"] = 464727376,
-   ["out-ipv4-bytes"] = 1528,
+   ["out-ipv4-bytes"] = 1460,
    ["out-ipv4-frag"] = 3,
-   ["out-ipv4-packets"] = 3,
+   ["out-ipv4-packets"] = 1,
 }
