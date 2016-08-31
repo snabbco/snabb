@@ -11,6 +11,7 @@ local ipv4_apps = require("apps.lwaftr.ipv4_apps")
 local ipv6_apps = require("apps.lwaftr.ipv6_apps")
 local lib = require("core.lib")
 local lwaftr = require("apps.lwaftr.lwaftr")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local nh_fwd = require("apps.nh_fwd.nh_fwd")
 local pci = require("lib.hardware.pci")
 local tap = require("apps.tap.tap")
@@ -86,6 +87,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
    local v4_input, v4_output, v6_input, v6_output
 
    print(("Hairpinning: %s"):format(yesno(lwconf.hairpinning)))
+   local counters = lwcounter.init_counters()
 
    if conf.ipv4_interface or conf.ipv6_interface then
       local mirror = false
@@ -112,8 +114,15 @@ function lwaftr_app(c, conf, lwconf, sock_path)
              conf.ipv6_interface.fragmentation)))
       if conf.ipv6_interface.fragmentation then
          local mtu = conf.ipv6_interface.mtu or lwconf.ipv6_mtu
-         config.app(c, "reassemblerv6", ipv6_apps.Reassembler)
-         config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, { mtu = mtu })
+         config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, {
+            counters = counters,
+            max_ipv6_reassembly_packets = lwconf.max_ipv6_reassembly_packets,
+            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+         })
+         config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
+            counters = counters,
+            mtu = mtu,
+         })
          config.link(c, v6_output .. " -> reassemblerv6.input")
          config.link(c, "fragmenterv6.output -> " .. v6_input)
          v6_input, v6_output  = "fragmenterv6.input", "reassemblerv6.output"
@@ -140,8 +149,15 @@ function lwaftr_app(c, conf, lwconf, sock_path)
              conf.ipv4_interface.fragmentation)))
       if conf.ipv4_interface.fragmentation then
          local mtu = conf.ipv4_interface.mtu or lwconf.ipv4_mtu
-         config.app(c, "reassemblerv4", ipv4_apps.Reassembler)
-         config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, { mtu = mtu })
+         config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
+            counters = counters,
+            max_ipv4_reassembly_packets = lwconf.max_ipv4_reassembly_packets,
+            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+         })
+         config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
+            counters = counters,
+            mtu = mtu
+         })
          config.link(c, v4_output .. " -> reassemblerv4.input")
          config.link(c, "fragmenterv4.output -> " .. v4_input)
          v4_input, v4_output  = "fragmenterv4.input", "reassemblerv4.output"
@@ -174,6 +190,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       config.link(c, "nh_fwd4.wire -> " .. v4_input)
       v4_input, v4_output = "nh_fwd4.vm", "nh_fwd4.vm"
 
+      lwconf.counters = counters
       config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
       config.link(c, "nh_fwd6.service -> lwaftr.v6")
       config.link(c, "lwaftr.v6 -> nh_fwd6.service")
