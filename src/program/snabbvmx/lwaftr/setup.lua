@@ -196,6 +196,9 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       config.link(c, "lwaftr.v6 -> nh_fwd6.service")
       config.link(c, "nh_fwd4.service -> lwaftr.v4")
       config.link(c, "lwaftr.v4 -> nh_fwd4.service")
+
+      -- Add a special hairpinning queue to the lwaftr app.
+      config.link(c, "lwaftr.hairpin_out -> lwaftr.hairpin_in")
    else
       io.write("lwAFTR service: disabled ")
       print("(either empty binding_table or v6 or v4 interface config missing)")
