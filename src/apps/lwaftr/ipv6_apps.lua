@@ -71,7 +71,7 @@ function ReassembleV6:push ()
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
       if is_ipv6(pkt) and is_fragment(pkt) then
-         counter.add(self.counters["in-ipv6-frag-needsreassembly"])
+         counter.add(self.counters["in-ipv6-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then
             counter.add(self.counters["drop-ipv6-frag-random-evicted"])

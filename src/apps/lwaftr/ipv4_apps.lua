@@ -75,7 +75,7 @@ function Reassembler:push ()
    for _=1,math.min(link.nreadable(input), link.nwritable(output)) do
       local pkt = receive(input)
       if is_ipv4(pkt) and is_fragment(pkt) then
-         counter.add(self.counters["in-ipv4-frag-needsreassembly"])
+         counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then
             counter.add(self.counters["drop-ipv4-frag-random-evicted"])
