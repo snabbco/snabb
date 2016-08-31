@@ -9,7 +9,7 @@ return {
    ["out-ipv4-bytes"] = 66,
    ["out-ipv4-frag-not"] = 1,
    ["out-ipv4-packets"] = 1,
-   ["out-ipv6-bytes"] = 86,
+   ["out-ipv6-bytes"] = 106,
    ["out-ipv6-frag-not"] = 1,
    ["out-ipv6-packets"] = 1,
 }

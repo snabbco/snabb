@@ -70,15 +70,7 @@ function ReassembleV6:push ()
 
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if not is_ipv6(pkt) then
-         counter.add(self.counters["drop-misplaced-not-ipv6-bytes"], pkt.length)
-         counter.add(self.counters["drop-misplaced-not-ipv6-packets"])
-         counter.add(self.counters["drop-all-ipv6-iface-bytes"], pkt.length)
-         counter.add(self.counters["drop-all-ipv6-iface-packets"])
-         packet.free(pkt)
-      elseif is_fragment(pkt) then
-         counter.add(self.counters["in-ipv6-bytes"], pkt.length)
-         counter.add(self.counters["in-ipv6-packets"])
+      if is_ipv6(pkt) and is_fragment(pkt) then
          counter.add(self.counters["in-ipv6-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then
@@ -99,9 +91,7 @@ function ReassembleV6:push ()
             packet.free(pkt)
          end
       else
-         -- Forward all IPv6 packets that aren't IPv6 fragments.
-         counter.add(self.counters["in-ipv6-bytes"], pkt.length)
-         counter.add(self.counters["in-ipv6-packets"])
+         -- Forward all packets that aren't IPv6 fragments.
          counter.add(self.counters["in-ipv6-frag-reassembly-unneeded"])
          transmit(output, pkt)
       end
@@ -132,14 +122,10 @@ function Fragmenter:push ()
          local unfragmentable_header_size = ehs + ipv6_fixed_header_size
          local pkts = fragmentv6.fragment(pkt, unfragmentable_header_size, mtu)
          for i=1,#pkts do
-            counter.add(self.counters["out-ipv6-bytes"], pkts[i].length)
-            counter.add(self.counters["out-ipv6-packets"])
             counter.add(self.counters["out-ipv6-frag"])
             transmit(output, pkts[i])
          end
       else
-         counter.add(self.counters["out-ipv6-bytes"], pkt.length)
-         counter.add(self.counters["out-ipv6-packets"])
          counter.add(self.counters["out-ipv6-frag-not"])
          transmit(output, pkt)
       end

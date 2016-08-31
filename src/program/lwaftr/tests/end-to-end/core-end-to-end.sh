@@ -111,7 +111,7 @@ echo "Testing: NDP: incoming NDP Neighbor Solicitation, non-lwAFTR IP"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${EMPTY} ${TEST_BASE}/ndp_incoming_ns_nonlwaftr.pcap \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/nofrag6-ns-badip.lua
+   ${COUNTERS}/nofrag6.lua
 
 echo "Testing: NDP: IPv6 but not eth addr of next IPv6 hop set, do Neighbor Solicitation"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_withoutmac.conf \
@@ -123,7 +123,7 @@ echo "Testing: ARP: incoming ARP request"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp.conf \
    ${TEST_BASE}/arp_request_recv.pcap ${EMPTY} \
    ${TEST_BASE}/arp_reply_send.pcap ${EMPTY} \
-   ${COUNTERS}/nofrag4-arp.lua
+   ${COUNTERS}/nofrag4.lua
 
 echo "Testing: ARP: IPv4 but not eth addr of next IPv4 hop set, send an ARP request"
 snabb_run_and_cmp ${TEST_BASE}/tunnel_icmp_without_mac4.conf \
@@ -527,7 +527,7 @@ echo "Testing: ingress-filter: from-b4 (IPv6) packet found in binding table (DRO
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_drop.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6.pcap \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/nofrag6-filterdrop.lua
+   ${COUNTERS}/nofrag6.lua
 
 # Egress filters
 
@@ -541,7 +541,7 @@ echo "Testing: egress-filter: to-internet (IPv4) (DROP)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_drop.conf \
    ${EMPTY} ${TEST_BASE}/tcp-fromb4-ipv6.pcap \
    ${EMPTY} ${EMPTY} \
-   ${COUNTERS}/nofrag6-filterdrop.lua
+   ${COUNTERS}/nofrag6.lua
 
 echo "Testing: egress-filter: to-b4 (IPv4) (ACCEPT)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp_with_filters_accept.conf \
@@ -559,7 +559,7 @@ echo "Testing: ICMP Echo to AFTR (IPv4)"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \
    ${TEST_BASE}/ping-v4.pcap ${EMPTY} \
    ${TEST_BASE}/ping-v4-reply.pcap ${EMPTY} \
-   ${COUNTERS}/nofrag4-ping.lua
+   ${COUNTERS}/nofrag4.lua
 
 echo "Testing: ICMP Echo to AFTR (IPv4) + data"
 snabb_run_and_cmp ${TEST_BASE}/no_icmp.conf \

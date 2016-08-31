@@ -198,3 +198,8 @@ of bytes will be 2 bytes smaller than expected per packet on networks with VLANs
 
 Both 'in' and 'out' in counter names are relative to the lwAftr software, not a
 network: a packet can come in from a B4 and out to the internet, or vice versa.
+The overall counters on incoming and outgoing packets, such as `in-ipv6-bytes`,
+are relative to the core lwAftr functionality, not the wire: things like ARP
+and NDP that aren't handled by the core lwAftr logic are excluded, and it deals
+with logical packets that have already been reassembled (if incoming) or have
+not yet been fragmented (if outgoing).

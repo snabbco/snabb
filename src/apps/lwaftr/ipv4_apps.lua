@@ -74,17 +74,7 @@ function Reassembler:push ()
 
    for _=1,math.min(link.nreadable(input), link.nwritable(output)) do
       local pkt = receive(input)
-      local v4 = is_ipv4(pkt)
-      if not v4 and not arp.is_arp(pkt) then
-         counter.add(self.counters["drop-misplaced-not-ipv4-bytes"], pkt.length)
-         counter.add(self.counters["drop-misplaced-not-ipv4-packets"])
-         -- It's guaranteed to not be hairpinned.
-         counter.add(self.counters["drop-all-ipv4-iface-bytes"], pkt.length)
-         counter.add(self.counters["drop-all-ipv4-iface-packets"])
-         packet.free(pkt)
-      elseif v4 and is_fragment(pkt) then
-         counter.add(self.counters["in-ipv4-bytes"], pkt.length)
-         counter.add(self.counters["in-ipv4-packets"])
+      if is_ipv4(pkt) and is_fragment(pkt) then
          counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then
@@ -105,8 +95,6 @@ function Reassembler:push ()
          end
       else
          -- Forward all packets that aren't IPv4 fragments.
-         counter.add(self.counters["in-ipv4-bytes"], pkt.length)
-         counter.add(self.counters["in-ipv4-packets"])
          counter.add(self.counters["in-ipv4-frag-reassembly-unneeded"])
          transmit(output, pkt)
       end
@@ -133,8 +121,6 @@ function Fragmenter:push ()
          if status == fragmentv4.FRAGMENT_OK then
             for i=1,#frags do
                counter.add(self.counters["out-ipv4-frag"])
-               counter.add(self.counters["out-ipv4-bytes"], frags[i].length)
-               counter.add(self.counters["out-ipv4-packets"])
                transmit(output, frags[i])
             end
          else
@@ -142,8 +128,6 @@ function Fragmenter:push ()
             packet.free(pkt)
          end
       else
-         counter.add(self.counters["out-ipv4-bytes"], pkt.length)
-         counter.add(self.counters["out-ipv4-packets"])
          counter.add(self.counters["out-ipv4-frag-not"])
          transmit(output, pkt)
       end

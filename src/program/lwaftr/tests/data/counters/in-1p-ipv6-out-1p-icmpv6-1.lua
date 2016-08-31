@@ -10,7 +10,5 @@ return {
    ["memuse-ipv6-frag-reassembly-buffer"] = 464727376,
    ["out-icmpv6-bytes"] = 154,
    ["out-icmpv6-packets"] = 1,
-   ["out-ipv6-bytes"] = 154,
    ["out-ipv6-frag-not"] = 1,
-   ["out-ipv6-packets"] = 1,
 }
