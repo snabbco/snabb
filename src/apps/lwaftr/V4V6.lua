@@ -72,8 +72,8 @@ end
 
 function V4V6:push()
    local input, output = self.input.input, self.output.output
-   local v4_tx, v6_tx = self.output.v4_tx, self.output.v6_tx
-   local v4_rx, v6_rx = self.input.v4_rx, self.input.v6_rx
+   local v4_tx, v6_tx = self.output.v4, self.output.v6
+   local v4_rx, v6_rx = self.input.v4, self.input.v6
    local mirror = self.output.mirror
 
    local ipv4_num
@@ -81,7 +81,6 @@ function V4V6:push()
       mirror = self.output.mirror
       ipv4_num = v4v6_mirror.ipv4
    end
-
 
    -- Split input to IPv4 and IPv6 traffic.
    if input then
@@ -165,8 +164,8 @@ local function test_split ()
    config.app(c, 'sink', basic_apps.Sink)
 
    config.link(c, 'source.output -> v4v6.input')
-   config.link(c, 'v4v6.v4_tx -> sink.in1')
-   config.link(c, 'v4v6.v6_tx -> sink.in2')
+   config.link(c, 'v4v6.v4 -> sink.in1')
+   config.link(c, 'v4v6.v6 -> sink.in2')
 
    engine.configure(c)
    link.transmit(engine.app_table.source.output.output, arp_pkt())
@@ -187,8 +186,8 @@ local function test_join ()
    config.app(c, 'v4v6', V4V6)
    config.app(c, 'sink', basic_apps.Sink)
 
-   config.link(c, 'source.output -> v4v6.v4_rx')
-   config.link(c, 'source.output -> v4v6.v6_rx')
+   config.link(c, 'source.output -> v4v6.v4')
+   config.link(c, 'source.output -> v4v6.v6')
    config.link(c, 'v4v6.output -> sink.input')
 
    engine.configure(c)
