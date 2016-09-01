@@ -18,12 +18,13 @@ local tap = require("apps.tap.tap")
 
 local yesno = lib.yesno
 
--- TODO redundant function dir_exists also in lwaftr.lua
+-- TODO: Duplicated in other source files. Move to a common place.
 local function dir_exists (path)
    local stat = S.stat(path)
    return stat and stat.isdir
 end
 
+-- TODO: Duplicated in other source files. Move to a common place.
 local function nic_exists (pci_addr)
    local devices="/sys/bus/pci/devices"
    return dir_exists(("%s/%s"):format(devices, pci_addr)) or

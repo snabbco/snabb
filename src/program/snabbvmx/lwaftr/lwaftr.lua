@@ -7,11 +7,14 @@ local lwtypes = require("apps.lwaftr.lwtypes")
 local setup = require("program.snabbvmx.lwaftr.setup")
 local shm = require("core.shm")
 
+local DEFAULT_MTU = 9500
+
 local function show_usage (exit_code)
    print(require("program.snabbvmx.lwaftr.README_inc"))
    main.exit(exit_code)
 end
 
+-- TODO: Duplicated in other source files. Move to a common place.
 local function fatal (msg)
    print(msg)
    main.exit(1)
@@ -140,7 +143,7 @@ function run(args)
       mac_address = mac,
       pci = pci, 
       id = id, 
-      mtu = 9500,
+      mtu = DEFAULT_MTU,
       vlan = vlan,
       mirror_id = mirror_id,
       discard_threshold = discard_threshold,
