@@ -34,8 +34,9 @@ local function pidof(maybe_pid)
    if tonumber(maybe_pid) then return maybe_pid end
    local name_id = maybe_pid
    for _, pid in ipairs(shm.children("/")) do
-      if shm.exists(pid.."/nic/id") then
-         local lwaftr_id = shm.open("/"..pid.."/nic/id", lwtypes.lwaftr_id_type)
+      local path = "/"..pid.."/nic/id"
+      if shm.exists(path) then
+         local lwaftr_id = shm.open(path, lwtypes.lwaftr_id_type)
          if ffi.string(lwaftr_id.value) == name_id then
             return pid
          end
