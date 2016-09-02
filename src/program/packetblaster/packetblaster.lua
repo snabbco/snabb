@@ -24,7 +24,7 @@ local function is_device_suitable (pcidev, patterns)
 end
 
 function run_loadgen (c, patterns, opts)
-   if opts.loop == nil then opts.loop = true end
+   assert(type(opts) == "table")
    local nics = 0
    pci.scan_devices()
    for _,device in ipairs(pci.devices) do

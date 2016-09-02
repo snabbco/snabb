@@ -23,9 +23,9 @@ local function show_usage (code)
 end
 
 function run (args)
-   local handlers = {}
-   local opts = {}
    local c = config.new()
+   local handlers = {}
+   local opts = {loop = true}
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration is not a number!")
    end
