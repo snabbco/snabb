@@ -21,17 +21,18 @@ local function show_usage (code)
 end
 
 function run (args)
-   local opt = {}
+   local handlers = {}
+   local opts = {}
    local duration
    local c = config.new()
-   function opt.D (arg)
-      duration = assert(tonumber(arg), "duration is not a number!")
+   function handlers.D (arg)
+      opts.duration = assert(tonumber(arg), "duration is not a number!")
    end
-   function opt.h ()
+   function handlers.h ()
       show_usage(0)
    end
 
-   args = lib.dogetopt(args, opt, "hD:", long_opts)
+   args = lib.dogetopt(args, handlers, "hD:", long_opts)
    if #args < 2 then show_usage(1) end
    local filename = table.remove(args, 1)
    print (string.format("filename=%s", filename))
@@ -40,5 +41,5 @@ function run (args)
    config.app(c, "source", basic_apps.Tee)
    config.link(c, "pcap.output -> loop.input")
    config.link(c, "loop.output -> source.input")
-   packetblaster.run_loadgen(c, args, duration)
+   packetblaster.run_loadgen(c, args, opts)
 end

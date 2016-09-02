@@ -22,7 +22,7 @@ local function is_device_suitable (pcidev, patterns)
    end
 end
 
-function run_loadgen (c, patterns, duration)
+function run_loadgen (c, patterns, opts)
    local nics = 0
    pci.scan_devices()
    for _,device in ipairs(pci.devices) do
@@ -42,7 +42,7 @@ function run_loadgen (c, patterns, duration)
    end
    local t = timer.new("report", fn, 1e9, 'repeating')
    timer.activate(t)
-   if duration then engine.main({duration=duration})
+   if opts.duration then engine.main({duration=opts.duration})
    else             engine.main() end
 end
 local function show_usage(exit_code)
