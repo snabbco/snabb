@@ -81,15 +81,6 @@ local function print_counter (name, value)
    print(("      <%s>%d</%s>"):format(name, value, name))
 end
 
-function print_lwaftr_counters (tree)
-   -- Open, read and print whatever counters are in that directory.
-   local counters = read_lwaftr_counters(tree)
-   for _, name in ipairs(sort(keys(counters))) do
-     local value = counters[name]
-     print_counter(name, value)
-   end
-end
-
 -- TODO: Refactor to a general common purpose library.
 local function file_exists(path)
   local stat = S.stat(path)
@@ -142,10 +133,6 @@ function run (raw_args)
            print_next_hop(pid, "next_hop_mac_v6")
            print_monitor(pid)
            print_apps_counters(pid)
-           print("    <lwaftr>")
-           local instance_tree = select_snabb_instance(pid)
-           print_lwaftr_counters(instance_tree)
-           print("    </lwaftr>")
            print("  </instance>")
          end
       end
