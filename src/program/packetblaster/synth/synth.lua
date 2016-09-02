@@ -14,7 +14,8 @@ local long_opts = {
    help         = "h",
    src          = "s",
    dst          = "d",
-   sizes        = "S"
+   sizes        = "S",
+   ["no-loop"]  = 0,
 }
 
 local function show_usage (code)
@@ -31,6 +32,9 @@ function run (args)
    end
    function handlers.h ()
       show_usage(0)
+   end
+   handlers["no-loop"] = function ()
+      opts.loop = false
    end
 
    local source
