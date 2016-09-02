@@ -2,7 +2,9 @@ module(..., package.seeall)
 
 local S = require("syscall")
 local config = require("core.config")
+local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local lib = require("core.lib")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local setup = require("program.snabbvmx.lwaftr.setup")
 local shm = require("core.shm")
@@ -33,7 +35,7 @@ end
 function parse_args (args)
    if #args == 0 then show_usage(1) end
    local conf_file, id, pci, mac, sock_path, mirror_id
-   local opts = { verbosity = 0 }
+   local opts = { verbosity = 0, ingress_drop_monitor = 'flush' }
    local handlers = {}
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.D (arg)
@@ -161,6 +163,13 @@ function run(args)
       end
       local t = timer.new("report", lnicui_info, 1e9, 'repeating')
       timer.activate(t)
+   end
+
+   if opts.ingress_drop_monitor then
+      local counter_path = lwcounter.counters_dir.."/ingress-packet-drops"
+      local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor,
+                                            counter=counter_path})
+      timer.activate(mon:timer())
    end
 
    engine.busywait = true
