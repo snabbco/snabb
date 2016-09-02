@@ -9,26 +9,30 @@ local PcapReader = require("apps.pcap.pcap").PcapReader
 local lib        = require("core.lib")
 
 local packetblaster = require("program.packetblaster.packetblaster")
-local usage = require("program.packetblaster.replay.README_inc")
 
 local long_opts = {
    duration     = "D",
    help         = "h"
 }
 
+local function show_usage (code)
+   print(require("program.packetblaster.replay.README_inc"))
+   main.exit(code)
+end
+
 function run (args)
    local opt = {}
    local duration
    local c = config.new()
-   function opt.D (arg) 
-      duration = assert(tonumber(arg), "duration is not a number!")  
+   function opt.D (arg)
+      duration = assert(tonumber(arg), "duration is not a number!")
    end
-   function opt.h (arg)
-      print(usage)
-      main.exit(1)
+   function opt.h ()
+      show_usage(0)
    end
 
    args = lib.dogetopt(args, opt, "hD:", long_opts)
+   if #args < 2 then show_usage(1) end
    local filename = table.remove(args, 1)
    print (string.format("filename=%s", filename))
    config.app(c, "pcap", PcapReader, filename)
