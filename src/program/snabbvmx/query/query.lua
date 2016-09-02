@@ -9,7 +9,6 @@ local ethernet = require("lib.protocol.ethernet")
 local lwaftr = require("apps.lwaftr.lwaftr")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
-local lwcounter = require("apps.lwaftr.lwcounter")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
@@ -19,9 +18,6 @@ local keys = lwutil.keys
 local macaddress_t = ffi.typeof[[
 struct { uint8_t ether[6]; }
 ]]
-
--- Get the counter dir from the code.
-local lwaftr_counters_rel_dir = lwcounter.counters_dir
 
 function show_usage (code)
    print(require("program.lwaftr.query.README_inc"))
