@@ -47,21 +47,6 @@ function parse_args (raw_args)
    return nil
 end
 
-local function read_lwaftr_counters (tree)
-   local ret = {}
-   local cnt, cnt_path, value
-   local counters_path = "/" .. tree .. "/" .. lwaftr_counters_rel_dir
-   local counters = shm.children(counters_path)
-   for _, name in ipairs(counters) do
-      cnt_path = counters_path .. name
-      cnt = counter.open(cnt_path, 'readonly')
-      value = tonumber(counter.read(cnt))
-      name = name:gsub(".counter$", "")
-      ret[name] = value
-    end
-   return ret
-end
-
 local function read_apps_counters (tree, app_name)
    local ret = {}
    local cnt, cnt_path, value
