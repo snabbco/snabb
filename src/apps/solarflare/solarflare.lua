@@ -242,19 +242,19 @@ function SolarFlareNic:pull()
    self.stats.pull = (self.stats.pull or 0) + 1
    repeat
       local n_ev = self.poll_structure.n_ev
+      local pull_npackets = engine.pull_npackets
       if n_ev > 0 then
          for i = 0, n_ev - 1 do
             local event_type = self.poll_structure.events[i].generic.type
-            if event_type == C.EF_EVENT_TYPE_RX then
+            if event_type == C.EF_EVENT_TYPE_RX and pull_npackets > 0 then
+               pull_npackets = pull_npackets - 1
                local rxpacket = self.rxpackets[self.poll_structure.events[i].rx.rq_id]
                rxpacket.length = self.poll_structure.events[i].rx.len
                self.stats.rx = (self.stats.rx or 0) + 1
-               if not link.full(self.output.tx) then
-                  link.transmit(self.output.tx, rxpacket)
-               else
-                  self.stats.link_full = (self.stats.link_full or 0) + 1
-                  packet.free(rxpacket)
-               end
+               link.transmit(self.output.tx, rxpacket)
+               self.enqueue_receive(self, self.poll_structure.events[i].rx.rq_id)
+            elseif event_type == C.EF_EVENT_TYPE_RX and pull_npackets == 0 then
+               self.stats.rxdrop = (self.stats.rxdrop or 0) + 1
                self.enqueue_receive(self, self.poll_structure.events[i].rx.rq_id)
             elseif event_type == C.EF_EVENT_TYPE_TX then
                local n_tx_done = self.poll_structure.unbundled_tx_request_ids[i].n_tx_done

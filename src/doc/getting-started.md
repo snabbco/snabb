@@ -239,18 +239,17 @@ actually exists in order to raise an exception immediately if the app was
 not properly connected.
 
 ```
-   while not link.empty(i) and not link.full(o) do
+   while not link.empty(i) do
       self:process_packet(i, o)
       self.packet_counter = self.packet_counter + 1
    end
 end
 ```
 
-Now we loop over the available packets on `i` or until `o` is full and
-process each individually. This is a common Snabb idiom. The
-actual logic of our app is performed by a call to the `process_packet`
-method which is defined below. Note that we increment the
-`packet_counter` of our instance for every packet processed.
+Now we loop over the available packets on `i`and process each individually.
+This is a common Snabb idiom. The actual logic of our app is performed by a
+call to the `process_packet` method which is defined below. Note that we
+increment the `packet_counter` of our instance for every packet processed.
 
 ```
 function Sprayer:process_packet(i, o)

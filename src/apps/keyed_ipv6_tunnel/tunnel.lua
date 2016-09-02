@@ -187,7 +187,7 @@ function SimpleKeyedTunnel:push()
    local l_out = self.output.encapsulated
    assert(l_in and l_out)
 
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       local p = link.receive(l_in)
       packet.prepend(p, self.header, HEADER_SIZE)
       local plength = ffi.cast(plength_ctype, p.data + LENGTH_OFFSET)
@@ -199,7 +199,7 @@ function SimpleKeyedTunnel:push()
    l_in = self.input.encapsulated
    l_out = self.output.decapsulated
    assert(l_in and l_out)
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       local p = link.receive(l_in)
       -- match next header, cookie, src/dst addresses
       local drop = true

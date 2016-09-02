@@ -19,7 +19,9 @@ end
 
 function PcapReader:pull ()
    assert(self.output.output)
-   while not self.done and not link.full(self.output.output) do
+   local limit = engine.pull_npackets
+   while limit > 0 and not self.done do
+      limit = limit - 1
       local data, record, extra = self.iterator()
       if data then
          local p = packet.from_string(data)

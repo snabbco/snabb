@@ -32,7 +32,11 @@ function init {
 function clean { rm -rf "$tmpdir"; }
 
 function fetch_pull_requests {
-    curl "https://api.github.com/repos/$REPO/pulls" > "$tmpdir/pulls"
+    local url="https://api.github.com/repos/$REPO/pulls?per_page=100"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
+    curl -u "$GITHUB_CREDENTIALS" "$url" > "$tmpdir/pulls"
 }
 
 function pull_request_ids { "$JQ" ".[].number" "$tmpdir/pulls"; }
@@ -69,7 +73,11 @@ function pull_request_new_p {
 }
 
 function clone_upstream {
-    git clone https://github.com/$REPO.git $(repo_path)
+    if [[ -n "$GITHUB_CREDENTIALS" ]]; then
+       git clone "https://$GITHUB_CREDENTIALS@github.com/$REPO.git" $(repo_path)
+    else
+       git clone "https://github.com/$REPO.git" $(repo_path)
+    fi
 }
 
 function dock_build { (cd src && scripts/dock.sh "(cd .. && make)"); }
@@ -131,13 +139,11 @@ function dock_make { (cd src/; scripts/dock.sh make $1); }
 
 function check_for_performance_regressions {
     echo "Checking for performance regressions:"
-    local head=$(pull_request_head $1)
-    local target=$(pull_request_target $1)
-    dock_make benchmarks > $(benchmark_results $head)
-    for bench in $(cut -d " " -f 1 $(benchmark_results $head)); do
-        if grep $bench $(benchmark_results $target) >/dev/null 2>&1; then
-            echo $(grep $bench $(benchmark_results $target)) \
-                 $(grep $bench $(benchmark_results $head)) \
+    dock_make benchmarks > $(benchmark_results pr)
+    for bench in $(cut -d " " -f 1 $(benchmark_results pr)); do
+        if grep $bench $(benchmark_results current) >/dev/null 2>&1; then
+            echo $(grep "$bench " $(benchmark_results current)) \
+                 $(grep "$bench " $(benchmark_results pr)) \
                 | awk '
 BEGIN {
     minratio = 0.85;
@@ -171,6 +177,10 @@ function check_test_suite {
 }
 
 function post_gist {
+    local url="https://api.github.com/gists"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
     # Create API request body for Gist API.
     cat "$1" \
         | "$JQ" -s -R "{public: true, files: {log: {content: .}}}" \
@@ -179,11 +189,15 @@ function post_gist {
     curl -X POST \
         -u "$GITHUB_CREDENTIALS" \
         -d @"$tmpdir/request" \
-        "https://api.github.com/gists" \
+        "$url" \
         | "$JQ" .html_url
 }
 
 function post_status { id=$1; status=$2; gist=$3
+    local url="https://api.github.com/repos/$REPO/statuses/$(pull_request_head $id)"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
     # Create API request body for status API.
     cat > "$tmpdir/request" \
         <<EOF
@@ -194,7 +208,7 @@ function post_status { id=$1; status=$2; gist=$3
 EOF
     # POST status.
     curl -X POST -u "$GITHUB_CREDENTIALS" -d @"$tmpdir/request" \
-        "https://api.github.com/repos/$REPO/statuses/$(pull_request_head $id)" \
+        "$url" \
         > /dev/null
 }
 

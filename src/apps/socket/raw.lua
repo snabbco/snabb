@@ -58,7 +58,9 @@ end
 function RawSocket:pull ()
    local l = self.output.tx
    if l == nil then return end
-   while not link.full(l) and self:can_receive() do
+   local limit = engine.pull_npackets
+   while limit > 0 and self:can_receive() do
+      limit = limit - 1
       link.transmit(l, self:receive())
    end
 end
