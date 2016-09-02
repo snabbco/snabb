@@ -12,7 +12,6 @@ local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
-local select_snabb_instance = top.select_snabb_instance
 local keys = lwutil.keys
 
 local macaddress_t = ffi.typeof[[
@@ -28,11 +27,6 @@ local function sort (t)
    table.sort(t)
    return t
 end
-
-local function is_counter_name (name)
-   return lwaftr.counter_names[name] ~= nil
-end
-
 
 function parse_args (raw_args)
    local handlers = {}
