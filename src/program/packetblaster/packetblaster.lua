@@ -4,7 +4,6 @@ module(..., package.seeall)
 
 local engine    = require("core.app")
 local timer     = require("core.timer")
-local intel10g  = require("apps.intel.intel10g")
 local lib       = require("core.lib")
 local pci       = require("lib.hardware.pci")
 local LoadGen   = require("apps.intel.loadgen").LoadGen
@@ -24,39 +23,39 @@ local function is_device_suitable (pcidev, patterns)
 end
 
 function run_loadgen (c, patterns, duration)
-  local nics = 0
-  pci.scan_devices()
-  for _,device in ipairs(pci.devices) do
-    if is_device_suitable(device, patterns) then
-      nics = nics + 1
-      local name = "nic"..nics
-      config.app(c, name, LoadGen, device.pciaddress)
-      config.link(c, "source."..tostring(nics).."->"..name..".input")
-    end
-  end
-  assert(nics > 0, "<PCI> matches no suitable devices.")
-  engine.busywait = true
-  engine.configure(c)
-  local fn = function ()
-                print("Transmissions (last 1 sec):")
-                engine.report_apps()
-             end
-  local t = timer.new("report", fn, 1e9, 'repeating')
-  timer.activate(t)
-  if duration then engine.main({duration=duration})
-  else             engine.main() end
+   local nics = 0
+   pci.scan_devices()
+   for _,device in ipairs(pci.devices) do
+      if is_device_suitable(device, patterns) then
+         nics = nics + 1
+         local name = "nic"..nics
+         config.app(c, name, LoadGen, device.pciaddress)
+         config.link(c, "source."..tostring(nics).."->"..name..".input")
+      end
+   end
+   assert(nics > 0, "<PCI> matches no suitable devices.")
+   engine.busywait = true
+   engine.configure(c)
+   local fn = function ()
+      print("Transmissions (last 1 sec):")
+      engine.report_apps()
+   end
+   local t = timer.new("report", fn, 1e9, 'repeating')
+   timer.activate(t)
+   if duration then engine.main({duration=duration})
+   else             engine.main() end
 end
 local function show_usage(exit_code)
-  print(require("program.packetblaster.README_inc"))
-  main.exit(exit_code)
+   print(require("program.packetblaster.README_inc"))
+   main.exit(exit_code)
 end
 
 function run(args)
-  if #args == 0 then show_usage(1) end
-  local command = string.gsub(table.remove(args, 1), "-", "_")
-  local modname = ("program.packetblaster.%s.%s"):format(command, command)
-  if not lib.have_module(modname) then
-    show_usage(1)
-  end
-  require(modname).run(args)
+   if #args == 0 then show_usage(1) end
+   local command = string.gsub(table.remove(args, 1), "-", "_")
+   local modname = ("program.packetblaster.%s.%s"):format(command, command)
+   if not lib.have_module(modname) then
+      show_usage(1)
+   end
+   require(modname).run(args)
 end
