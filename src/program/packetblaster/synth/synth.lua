@@ -15,7 +15,6 @@ local long_opts = {
    src          = "s",
    dst          = "d",
    sizes        = "S",
-   ["no-loop"]  = 0,
 }
 
 local function show_usage (code)
@@ -26,15 +25,12 @@ end
 function run (args)
    local c = config.new()
    local handlers = {}
-   local opts = {loop = true}
+   local opts = {}
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration is not a number!")
    end
    function handlers.h ()
       show_usage(0)
-   end
-   handlers["no-loop"] = function ()
-      opts.loop = false
    end
 
    local source
@@ -50,7 +46,6 @@ function run (args)
    end
 
    args = lib.dogetopt(args, handlers, "hD:s:d:S:", long_opts)
-   if not (sizes or source or destination) then show_usage(1) end
    config.app(c, "source", Synth, { sizes = sizes,
       src = source, dst = destination })
    packetblaster.run_loadgen(c, args, opts)

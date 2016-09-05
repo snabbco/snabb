@@ -25,13 +25,14 @@ end
 
 function run_loadgen (c, patterns, opts)
    assert(type(opts) == "table")
+   local use_loadgen = opts.loop == nil or opts.loop
    local nics = 0
    pci.scan_devices()
    for _,device in ipairs(pci.devices) do
       if is_device_suitable(device, patterns) then
          nics = nics + 1
          local name = "nic"..nics
-         if opts.loop then
+         if use_loadgen then
             config.app(c, name, LoadGen, device.pciaddress)
          else
             config.app(c, name, Intel82599, {pciaddr = device.pciaddress})
