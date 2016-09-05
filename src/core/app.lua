@@ -16,6 +16,9 @@ local ffi       = require("ffi")
 local C         = ffi.C
 require("core.packet_h")
 
+-- Packet per pull
+pull_npackets = math.floor(link.max / 10)
+
 -- Set to true to enable logging
 log = false
 local use_restart = false

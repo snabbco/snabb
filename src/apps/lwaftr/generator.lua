@@ -138,7 +138,7 @@ end
 function from_inet:pull()
    local o = assert(self.output.output)
 
-   while not link.full(o) do
+   for i=1,engine.pull_npackets do
       if self.max_packets then
          if self.tx_packets == self.max_packets then break end
          self.tx_packets = self.tx_packets + 1
@@ -312,7 +312,7 @@ end
 function from_b4:pull()
    local o = assert(self.output.output)
 
-   while not link.full(o) do
+   for i=1,engine.pull_npackets do
       if self.max_packets then
          if self.tx_packets == self.max_packets then break end
          self.tx_packets = self.tx_packets + 1

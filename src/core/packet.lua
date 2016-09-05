@@ -71,17 +71,12 @@ function new_packet ()
    return p
 end
 
--- Create an exact copy of srcp at memory pointed to by dstp.
-function clone_to_memory(dstp, srcp)
-   ffi.copy(dstp, srcp, srcp.length)
-   dstp.length = srcp.length
-   return dstp
-end
-
 -- Create an exact copy of a packet.
 function clone (p)
    local p2 = allocate()
-   return clone_to_memory(p2, p)
+   ffi.copy(p2, p, p.length)
+   p2.length = p.length
+   return p2
 end
 
 -- Append data to the end of a packet.
