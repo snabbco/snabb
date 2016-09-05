@@ -107,18 +107,8 @@ function VlanMux:push()
    local noutputs = #self.output
    if noutputs > 0 then
       for name, l in pairs(self.input) do
-         local maxoutput = link.max
-         -- find out max number of packets we can put out an interface
-         -- this is kind of bad because we limit ourselves by the interface with
-         -- the fullest queue, yet packets might go out a different interface. We
-         -- don't know until we've looked in the packet and parsed the VLAN id. I
-         -- suppose we kind of get some HOLB with this :(
-         for _, o in ipairs(self.output) do
-            maxoutput = math.min(maxoutput, link.nwritable(o))
-         end
-
          if type(name) == "string" then
-            for _ = 1, math.min(link.nreadable(l), maxoutput) do
+            for _ = 1, link.nreadable(l) do
                local p = receive(l)
                local ethertype = cast("uint16_t*", p.data + o_ethernet_ethertype)[0]
 

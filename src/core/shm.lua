@@ -55,6 +55,12 @@ function open (name, type, readonly)
    return map(name, type, readonly, false)
 end
 
+function exists (name)
+   local path = resolve(name)
+   local fd = S.open(root..'/'..path, "rdonly")
+   return fd and fd:close()
+end
+
 function resolve (name)
    local q, p = name:match("^(/*)(.*)") -- split qualifier (/)
    local result = p
@@ -190,6 +196,14 @@ function selftest ()
    assert(unlink(name))
    unmap(p1)
    unmap(p2)
+
+   print("checking exists..")
+   assert(not exists(name))
+   local p1 = create(name, "struct { int x, y, z; }")
+   assert(exists(name))
+   assert(unlink(name))
+   unmap(p1)
+   assert(not exists(name))
 
    -- Test that we can open and cleanup many objects
    print("checking many objects..")

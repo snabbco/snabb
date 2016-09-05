@@ -308,7 +308,7 @@ function nd_light:push ()
    local l_in = self.input.south
    local l_out = self.output.north
    local l_reply = self.output.south
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       local p = cache.p
       p[0] = link.receive(l_in)
       local status = from_south(self, p)
@@ -327,7 +327,7 @@ function nd_light:push ()
 
    l_in = self.input.north
    l_out = self.output.south
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       if not self._eth_header then
          -- Drop packets until ND for the next-hop
          -- has completed.

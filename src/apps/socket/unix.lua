@@ -148,7 +148,9 @@ function UnixSocket:new (arg)
    function self:pull()
       local l = self.output.tx
       if l == nil then return end
-      while not link.full(l) and can_receive() do
+      local limit = engine.pull_npackets
+      while limit > 0 and can_receive() do
+         limit = limit - 1
          local p = receive()
          if p then
             link.transmit(l, p) --link owns p now so we mustn't free it
@@ -197,7 +199,7 @@ function selftest ()
          pull = function(self)
             local l = self.output.tx
             if l == nil then return end
-            while not link.full(l) do
+            for i=1,engine.pull_npackets do
                local p = packet.allocate()
                ffi.copy(p.data, text)
                p.length = #text
