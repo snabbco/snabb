@@ -143,29 +143,45 @@ function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
    link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
 end
 
-function load_on_a_stick(c, conf, v4v6, args)
-   local Tap = require("apps.tap.tap").Tap
+function load_on_a_stick(c, conf, v4_nic_name, v6_nic_name, v4v6, pciaddr, mirror)
    lwaftr_app(c, conf)
 
-   config.app(c, 'nic', Intel82599, {
-      pciaddr = args.pciaddr,
-   })
-   if args.mirror then
-      local ifname = args.mirror
-      config.app(c, 'tap', Tap, ifname)
-      config.app(c, v4v6, V4V6, {
-         mirror = true
-      })
-   else
-      config.app(c, v4v6, V4V6)
-   end
+   if v4v6 then
+      config.app(c, 'nic', Intel82599, {
+         pciaddr = pciaddr,
+         vmdq = conf.vlan_tagging,
+         vlan = conf.vlan_tagging and conf.v4_vlan_tag,
+         macaddr = ethernet:ntop(conf.aftr_mac_inet_side)})
+      if mirror then
+         local Tap = require("apps.tap.tap").Tap
+         local ifname = mirror
+         config.app(c, 'tap', Tap, ifname)
+         config.app(c, v4v6, V4V6, {
+            mirror = true
+         })
+         config.link(c, v4v6..'.mirror -> tap.input')
+      else
+         config.app(c, v4v6, V4V6)
+      end
+      config.link(c, 'nic.tx -> '..v4v6..'.input')
+      config.link(c, v4v6..'.output -> nic.rx')
 
-   config.link(c, 'nic.tx -> '..v4v6..'.input')
-   link_source(c, v4v6..'.v4', v4v6..'.v6')
-   link_sink(c, v4v6..'.v4', v4v6..'.v6')
-   config.link(c, v4v6..'.output -> nic.rx')
-   if args.mirror then
-      config.link(c, v4v6..'.mirror -> tap.input')
+      link_source(c, v4v6..'.v4', v4v6..'.v6')
+      link_sink(c, v4v6..'.v4', v4v6..'.v6')
+   else
+      config.app(c, v4_nic_name, Intel82599, {
+         pciaddr = pciaddr,
+         vmdq = conf.vlan_tagging,
+         vlan = conf.vlan_tagging and conf.v4_vlan_tag,
+         macaddr = ethernet:ntop(conf.aftr_mac_inet_side)})
+      config.app(c, v6_nic_name, Intel82599, {
+         pciaddr = pciaddr,
+         vmdq = conf.vlan_tagging,
+         vlan = conf.vlan_tagging and conf.v6_vlan_tag,
+         macaddr = ethernet:ntop(conf.aftr_mac_b4_side)})
+
+      link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
+      link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
    end
 end
 
