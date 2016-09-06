@@ -148,9 +148,6 @@ function run(args)
       mtu = DEFAULT_MTU,
       vlan = vlan,
       mirror_id = mirror_id,
-      discard_threshold = discard_threshold,
-      discard_wait = discard_wait,
-      discard_check_timer = discard_check_timer,
    }
 
    local c = config.new()
@@ -165,11 +162,15 @@ function run(args)
       timer.activate(t)
    end
 
-   if opts.ingress_drop_monitor then
+   if interface.discard_threshold then
       local counter_path = lwcounter.counters_dir.."/ingress-packet-drops"
-      local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor,
-                                            counter=counter_path})
-      timer.activate(mon:timer())
+      local mon = ingress_drop_monitor.new({
+         action = interface.discard_action or opts.ingress_drop_monitor,
+         counter = counter_path,
+         threshold = interface.discard_threshold,
+         wait = interface.discard_wait,
+      })
+      timer.activate(mon:timer(discard_check_timer))
    end
 
    engine.busywait = true
