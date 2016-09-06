@@ -7,6 +7,7 @@ local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local basic_apps = require("apps.basic.basic_apps")
 local bt = require("apps.lwaftr.binding_table")
 local config = require("core.config")
+local ethernet = require("lib.protocol.ethernet")
 local ipv4_apps = require("apps.lwaftr.ipv4_apps")
 local ipv6_apps = require("apps.lwaftr.ipv6_apps")
 local lib = require("core.lib")
@@ -14,8 +15,8 @@ local lwaftr = require("apps.lwaftr.lwaftr")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local nh_fwd = require("apps.nh_fwd.nh_fwd")
 local pci = require("lib.hardware.pci")
+local raw = require("apps.socket.raw")
 local tap = require("apps.tap.tap")
-local raw        = require("apps.socket.raw")
 
 local yesno = lib.yesno
 
@@ -42,27 +43,67 @@ local function fatal (msg)
    main.exit(1)
 end
 
+local function load_driver (pciaddr)
+   local device_info = pci.device_info(pciaddr)
+   return require(device_info.driver).driver
+end
+
+local function load_virt (c, nic_id, lwconf, interface)
+   assert(type(interface) == 'table')
+   assert(nic_exists(interface.pci), "Couldn't find NIC: "..interface.pci)
+   local driver = assert(load_driver(interface.pci))
+
+   print("Different VLAN tags: load two virtual interfaces")
+   print(("%s ether %s"):format(nic_id, interface.mac_address))
+
+   local qprdc = {
+      discard_check_timer = interface.discard_check_timer,
+      discard_wait = interface.discard_wait,
+      discard_threshold = interface.discard_threshold,
+   }
+
+   local v4_nic_name, v6_nic_name = nic_id..'_v4', nic_id..'v6'
+   config.app(c, v4_nic_name, driver, {
+      pciaddr = interface.pci,
+      vmdq = lwconf.vlan_tagging,
+      vlan = lwconf.vlan_tagging and lwconf.v4_vlan_tag,
+      qprdc = qprdc,
+      macaddr = ethernet:ntop(lwconf.aftr_mac_inet_side),
+      mtu = interface.mtu})
+   config.app(c, v6_nic_name, driver, {
+      pciaddr = interface.pci,
+      vmdq = lwconf.vlan_tagging,
+      vlan = lwconf.vlan_tagging and lwconf.v6_vlan_tag,
+      qprdc = qprdc,
+      macaddr = ethernet:ntop(lwconf.aftr_mac_b4_side),
+      mtu = interface.mtu})
+
+   return v4_nic_name, v6_nic_name
+end
+
 local function load_phy (c, nic_id, interface)
    assert(type(interface) == 'table')
    local vlan = interface.vlan and tonumber(interface.vlan)
    local chain_input, chain_output
 
    if nic_exists(interface.pci) then
-      local device_info = pci.device_info(interface.pci)
+      local driver = load_driver(interface.pci)
+      local vlan = interface.vlan and tonumber(interface.vlan)
       print(("%s ether %s"):format(nic_id, interface.mac_address))
       if vlan then
          print(("%s vlan %d"):format(nic_id, vlan))
       end
-      local driver = require(device_info.driver).driver
-      config.app(c, nic_id, driver, { pciaddr = interface.pci,
-                                      vmdq = true,
-                                      vlan = vlan,
-                                      qprdc = {
-                                         discard_check_timer = interface.discard_check_timer,
-                                         discard_wait = interface.discard_wait,
-                                         discard_threshold = interface.discard_threshold,
-                                      },
-                                      macaddr = interface.mac_address, mtu = interface.mtu })
+      config.app(c, nic_id, driver, {
+         pciaddr = interface.pci,
+         vmdq = true,
+         vlan = vlan,
+         qprdc = {
+            discard_check_timer = interface.discard_check_timer,
+            discard_wait = interface.discard_wait,
+            discard_threshold = interface.discard_threshold,
+         },
+         macaddr = interface.mac_address,
+         mtu = interface.mtu})
       chain_input, chain_output = nic_id .. ".rx", nic_id .. ".tx"
    elseif net_exists(interface.pci) then
       print(("%s network interface %s"):format(nic_id, interface.pci))
@@ -80,10 +121,15 @@ local function load_phy (c, nic_id, interface)
       config.app(c, nic_id, tap.Tap, interface.mirror_id)
       print(("Running VM via tap interface '%s'"):format(interface.mirror_id))
       interface.mirror_id = nil   -- Hack to avoid opening again as mirror port.
-      chain_input, chain_output = nic_id .. ".input", nic_id .. ".output"
       print(("SUCCESS %s"):format(chain_input))
+      chain_input, chain_output = nic_id .. ".input", nic_id .. ".output"
    end
    return chain_input, chain_output
+end
+
+local function requires_splitter (lwconf)
+   if not lwconf.vlan_tagging then return true end
+   return lwconf.v4_vlan_tag == lwconf.v6_vlan_tag
 end
 
 function lwaftr_app(c, conf, lwconf, sock_path)
@@ -94,33 +140,44 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       conf.preloaded_binding_table = bt.load(lwconf.binding_table)
    end
 
-   local virt_id = "vm_" .. conf.interface.id
-   local phy_id = "nic_" .. conf.interface.id
-
-   local chain_input, chain_output = load_phy(c, phy_id, conf.interface)
-   local v4_input, v4_output, v6_input, v6_output
-
    print(("Hairpinning: %s"):format(yesno(lwconf.hairpinning)))
    local counters = lwcounter.init_counters()
 
-   if conf.ipv4_interface or conf.ipv6_interface then
-      local mirror = false
-      local mirror_id = conf.interface.mirror_id
-      if mirror_id then
-         mirror = true
-         config.app(c, "Mirror", tap.Tap, mirror_id)
-         config.app(c, "Sink", basic_apps.Sink)
-         config.link(c, "Mirror.output -> Sink.input")
-         config.link(c, "nic_v4v6.mirror -> Mirror.input")
-         print(("Mirror port %s found"):format(mirror_id))
-      end
-      config.app(c, "nic_v4v6", V4V6, { description = "nic_v4v6",
-                                        mirror = mirror })
-      config.link(c, chain_output .. " -> nic_v4v6.input")
-      config.link(c, "nic_v4v6.output -> " .. chain_input)
-      v4_output, v6_output = "nic_v4v6.v4", "nic_v4v6.v6"
-      v4_input, v6_input   = "nic_v4v6.v4", "nic_v4v6.v6"
+   local virt_id = "vm_" .. conf.interface.id
+   local phy_id = "nic_" .. conf.interface.id
+
+   local chain_input, chain_output
+   local v4_input, v4_output, v6_input, v6_output
+
+   local use_splitter = requires_splitter(lwconf)
+   if not use_splitter then
+      local v4, v6 = load_virt(c, phy_id, lwconf, conf.interface)
+      v4_output, v6_output = v4..".tx", v6..".tx"
+      v4_input, v6_input   = v4..".rx", v6..".rx"
+   else
+      chain_input, chain_output = load_phy(c, phy_id, conf.interface)
    end
+
+   if conf.ipv4_interface or conf.ipv6_interface then
+      if use_splitter then
+         local mirror_id = conf.interface.mirror_id
+         if mirror_id then
+            print(("Mirror port %s found"):format(mirror_id))
+            config.app(c, "Mirror", tap.Tap, mirror_id)
+            config.app(c, "Sink", basic_apps.Sink)
+            config.link(c, "nic_v4v6.mirror -> Mirror.input")
+            config.link(c, "Mirror.output -> Sink.input")
+         end
+         config.app(c, "nic_v4v6", V4V6, { description = "nic_v4v6",
+                                           mirror = mirror_id and true or false})
+         config.link(c, chain_output .. " -> nic_v4v6.input")
+         config.link(c, "nic_v4v6.output -> " .. chain_input)
+
+         v4_output, v6_output = "nic_v4v6.v4", "nic_v4v6.v6"
+         v4_input, v6_input   = "nic_v4v6.v4", "nic_v4v6.v6"
+      end
+   end
+   assert(v4_input and v6_input and v4_output and v6_output)
 
    if conf.ipv6_interface then
       conf.ipv6_interface.mac_address = conf.interface.mac_address
