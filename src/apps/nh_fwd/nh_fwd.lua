@@ -16,7 +16,7 @@ local C = ffi.C
 
 local transmit, receive = link.transmit, link.receive
 local htons = lib.htons
-local rd16, rd32 = lwutil.rd16, lwutil.rd32
+local rd16, rd32, wr16  = lwutil.rd16, lwutil.rd32, lwutil.wr16
 local ipv6_equals = lwutil.ipv6_equals
 
 nh_fwd4 = {}
@@ -34,7 +34,8 @@ local o_ipv4_src_addr = constants.o_ipv4_src_addr
 local o_ipv6_next_header = constants.o_ipv6_next_header
 local o_ipv6_src_addr = constants.o_ipv6_src_addr
 
-local n_cache_src_ipv4 = ipv4:pton("0.0.0.0")
+local n_cache_src_ipv4 = ipv4:pton("169.254.254.254")
+local val_cache_src_ipv4 = rd32(n_cache_src_ipv4)
 local n_cache_src_ipv6 = ipv6:pton("fe80::")
 local n_next_hop_mac_empty = ethernet:pton("00:00:00:00:00:00")
 
@@ -111,8 +112,8 @@ local function send_ipv4_cache_trigger(r, pkt, mac)
    copy_ipv4(ipv4_src_ip, n_cache_src_ipv4)
 
    -- Clear checksum to recalculate it with new source IPv4 address.
-   ipv4_checksum = 0
-   ipv4_checksum = htons(ipsum(pkt.data + n_ether_hdr_size, n_ipv4_hdr_size, 0))
+   wr16(ipv4_checksum, 0)
+   wr16(ipv4_checksum, htons(ipsum(pkt.data + n_ether_hdr_size, n_ipv4_hdr_size, 0)))
    transmit(r, pkt)
 end
 
@@ -179,15 +180,16 @@ function nh_fwd4:push ()
          local pkt = receive(input_vm)
          local ether_dhost = get_ether_dhost_ptr(pkt)
          local ipv4_hdr = get_ethernet_payload(pkt)
-
+        
          if service_mac and ether_equals(ether_dhost, service_mac) then
             transmit(output_service, pkt)
          elseif self.cache_refresh_interval > 0 and
-                  get_ipv4_src_address(ipv4_hdr) == n_cache_src_ipv4 then
+                  get_ipv4_src_address(ipv4_hdr) == val_cache_src_ipv4 then
             -- Our magic cache next-hop resolution packet. Never send this out.
+            
             copy_ether(self.next_hop_mac, ether_dhost)
             if self.debug then
-               print(("nh_fwd4: learning next-hop '%s'"):format(ethernet:ntop(self.next_hop_mac)))
+               print(("nh_fwd4: learning next-hop '%s'"):format(ethernet:ntop(ether_dhost)))
             end
             packet.free(pkt)
          else
