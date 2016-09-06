@@ -45,16 +45,18 @@ function run_loadgen (c, patterns, opts)
    engine.busywait = true
    engine.configure(c)
 
-   if opts.loop then
+   local report = {}
+   if use_loadgen then
       local fn = function ()
          print("Transmissions (last 1 sec):")
          engine.report_apps()
       end
       local t = timer.new("report", fn, 1e9, 'repeating')
       timer.activate(t)
+   else
+      report = {showlinks = true}
    end
 
-   local report = not opts.loop and {showlinks = true} or {}
    if opts.duration then engine.main({duration=opts.duration, report=report})
    else             engine.main() end
 end
