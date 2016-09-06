@@ -380,30 +380,28 @@ function Lwaftrgen:push ()
             transmit(output, ipv6_pkt)
          end
 
-         self.current_count = self.current_count + 1
-         self.current_port = self.current_port + self.b4_port
+       end 
 
-         self.b4_ipv6 = inc_ipv6(self.b4_ipv6)
+       self.b4_ipv6 = inc_ipv6(self.b4_ipv6)
+       self.current_port = self.current_port + self.b4_port
+       if self.current_port > 65535 then
+         self.current_port = self.b4_port
+         self.b4_ipv4_offset = self.b4_ipv4_offset + 1
+       end
 
-         if self.current_port > 65535 then
-            self.current_port = self.b4_port
-            self.b4_ipv4_offset = self.b4_ipv4_offset + 1
+       self.current_count = self.current_count + 1
+       if self.current_count >= self.count then
+         if self.single_pass then
+           print(string.format("generated %d packets", self.current_count))
+           -- make sure we won't generate more packets in the same breath, then exit
+           self.current = 0
+           self.bucket_content = 0 
          end
-
-         if self.current_count >= self.count * self.total_packet_count then
-            if self.single_pass then
-               print(string.format("generated %d packets", self.current_count))
-               -- make sure we won't generate more packets in the same breath, then exit
-               self.current = 0
-               self.bucket_content = 0 
-            end
-            self.current_count = 0
-            self.current_port = self.b4_port
-            self.b4_ipv4_offset = 0
-            copy(self.b4_ipv6, self.ipv6_address, 16)
-         end
-
-      end 
-   end
+         self.current_count = 0
+         self.current_port = self.b4_port
+         self.b4_ipv4_offset = 0
+         copy(self.b4_ipv6, self.ipv6_address, 16)
+       end
+     end
 end
 
