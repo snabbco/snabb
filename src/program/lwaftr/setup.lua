@@ -143,8 +143,10 @@ function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
    link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
 end
 
-function load_on_a_stick(c, conf, v4_nic_name, v6_nic_name, v4v6, pciaddr, mirror)
+function load_on_a_stick(c, conf, args)
    lwaftr_app(c, conf)
+   local v4_nic_name, v6_nic_name, v4v6, pciaddr, mirror = args.v4_nic_name,
+      args.v6_nic_name, args.v4v6, args.pciaddr, args.mirror
 
    if v4v6 then
       config.app(c, 'nic', Intel82599, {

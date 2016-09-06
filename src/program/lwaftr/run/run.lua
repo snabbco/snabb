@@ -158,8 +158,11 @@ function run(args)
    if opts.virtio_net then
       setup.load_virt(c, conf, 'inetNic', v4, 'b4sideNic', v6)
    elseif opts["on-a-stick"] then
-      setup.load_on_a_stick(c, conf, 'inetNic', 'b4sideNic',
-                            use_splitter and 'v4v6', v4, opts.mirror)
+      setup.load_on_a_stick(c, conf, { v4_nic_name = 'inetNic',
+                                       v6_nic_name = 'b4sideNic',
+                                       v4v6 = use_splitter and 'v4v6',
+                                       pciaddr = v4,
+                                       mirror = opts.mirror})
    else
       setup.load_phy(c, conf, 'inetNic', v4, 'b4sideNic', v6)
    end
