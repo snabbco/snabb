@@ -141,18 +141,28 @@ function parse_args(args)
    end
 end
 
+-- Requires a V4V6 splitter iff:
+--   Always when running in on-a-stick mode, except if v4_vlan_tag != v6_vlan_tag.
+local function requires_splitter (opts, conf)
+   if not opts["on-a-stick"] then return false end
+   if not conf.vlan_tagging then return true end
+   return conf.v4_vlan_tag == conf.v6_vlan_tag
+end
+
 function run(args)
    local opts, conf_file, v4, v6 = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
+   local use_splitter = requires_splitter(opts, conf)
 
    local c = config.new()
    if opts.virtio_net then
       setup.load_virt(c, conf, 'inetNic', v4, 'b4sideNic', v6)
    elseif opts["on-a-stick"] then
-      setup.load_on_a_stick(c, conf, 'v4v6', {
-         mirror = opts.mirror,
-         pciaddr = v4,
-      })
+      setup.load_on_a_stick(c, conf, { v4_nic_name = 'inetNic',
+                                       v6_nic_name = 'b4sideNic',
+                                       v4v6 = use_splitter and 'v4v6',
+                                       pciaddr = v4,
+                                       mirror = opts.mirror})
    else
       setup.load_phy(c, conf, 'inetNic', v4, 'b4sideNic', v6)
    end
@@ -166,7 +176,7 @@ function run(args)
 
    if opts.verbosity >= 1 then
       local csv = csv_stats.CSVStatsTimer.new()
-      if opts["on-a-stick"] then
+      if use_splitter then
          csv:add_app('v4v6', { 'v4', 'v4' }, { tx='IPv4 RX', rx='IPv4 TX' })
          csv:add_app('v4v6', { 'v6', 'v6' }, { tx='IPv6 RX', rx='IPv6 TX' })
       else
