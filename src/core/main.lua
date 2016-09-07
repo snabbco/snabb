@@ -164,7 +164,8 @@ function selftest ()
 end
 
 -- Fork into worker process and supervisor
-local worker_pid = S.fork()
+local worker_pid, err = S.fork()
+assert(worker_pid, tostring(err))
 if worker_pid == 0 then
    -- Worker: Use prctl to ensure we are killed (SIGHUP) when our parent quits
    -- and run main.
