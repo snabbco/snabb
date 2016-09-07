@@ -2,7 +2,10 @@ module(...,package.seeall)
 
 -- Ingress packet drop monitor timer.
 
+local S = require("syscall")
+local counter = require("core.counter")
 local ffi = require("ffi")
+local shm = require("core.shm")
 
 -- Every 100 milliseconds.
 local default_interval = 1e8
@@ -20,6 +23,13 @@ function new(args)
       last_value = ffi.new('uint64_t[1]'),
       current_value = ffi.new('uint64_t[1]')
    }
+   if args.counter then
+      if not shm.exists("/"..S.getpid().."/"..args.counter) then
+         ret.counter = counter.create(args.counter, 0)
+      else
+         ret.counter = counter.open(args.counter)
+      end
+   end
    return setmetatable(ret, {__index=IngressDropMonitor})
 end
 
@@ -32,6 +42,9 @@ function IngressDropMonitor:sample ()
       if app.ingress_packet_drops and not app.dead then
          sum[0] = sum[0] + app:ingress_packet_drops()
       end
+   end
+   if self.counter then
+      counter.add(self.counter, sum[0])
    end
 end
 

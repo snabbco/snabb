@@ -97,11 +97,6 @@ local function load_phy (c, nic_id, interface)
          pciaddr = interface.pci,
          vmdq = true,
          vlan = vlan,
-         qprdc = {
-            discard_check_timer = interface.discard_check_timer,
-            discard_wait = interface.discard_wait,
-            discard_threshold = interface.discard_threshold,
-         },
          macaddr = interface.mac_address,
          mtu = interface.mtu})
       chain_input, chain_output = nic_id .. ".rx", nic_id .. ".tx"

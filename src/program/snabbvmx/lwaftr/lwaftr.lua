@@ -2,7 +2,9 @@ module(..., package.seeall)
 
 local S = require("syscall")
 local config = require("core.config")
+local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local lib = require("core.lib")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local setup = require("program.snabbvmx.lwaftr.setup")
 local shm = require("core.shm")
@@ -88,9 +90,11 @@ function run(args)
    local conf = {}
    local lwconf = {}
    local ring_buffer_size = 2048
-   local discard_threshold = 100000
-   local discard_check_timer = 1
-   local discard_wait = 20
+
+   local ingress_drop_action = "flush"
+   local ingress_drop_threshold = 100000
+   local ingress_drop_interval = 1e6
+   local ingress_drop_wait = 20
 
    if file_exists(conf_file) then
       conf = lib.load_conf(conf_file)
@@ -107,14 +111,17 @@ function run(args)
    end
 
    if conf.settings then
-      if conf.settings.discard_threshold then
-         discard_threshold = conf.settings.discard_threshold
+      if conf.settings.ingress_drop_monitor then
+         ingress_drop_action = conf.settings.ingress_drop_monitor
       end
-      if conf.settings.discard_check_timer then
-         discard_check_timer = conf.settings.discard_check_timer
+      if conf.settings.ingress_drop_threshold then
+         ingress_drop_threshold = conf.settings.ingress_drop_threshold
       end
-      if conf.settings.discard_wait then
-         discard_wait = conf.settings.discard_wait
+      if conf.settings.ingress_drop_interval then
+         ingress_drop_interval = conf.settings.ingress_drop_interval
+      end
+      if conf.settings.ingress_drop_wait then
+         ingress_drop_wait = conf.settings.ingress_drop_wait
       end
       if conf.settings.ring_buffer_size then
          ring_buffer_size = tonumber(conf.settings.ring_buffer_size)
@@ -137,18 +144,15 @@ function run(args)
       lwaftr_id.value = id
    end
 
-   local vlan = conf.settings.vlan
+   local vlan = conf.settings and conf.settings.vlan
 
-   conf.interface = { 
+   conf.interface = {
       mac_address = mac,
-      pci = pci, 
-      id = id, 
+      pci = pci,
+      id = id,
       mtu = DEFAULT_MTU,
       vlan = vlan,
       mirror_id = mirror_id,
-      discard_threshold = discard_threshold,
-      discard_wait = discard_wait,
-      discard_check_timer = discard_check_timer,
    }
 
    local c = config.new()
@@ -161,6 +165,21 @@ function run(args)
       end
       local t = timer.new("report", lnicui_info, 1e9, 'repeating')
       timer.activate(t)
+   end
+
+   if ingress_drop_action then
+      assert(ingress_drop_action == "flush" or ingress_drop_action == "warn",
+             "Not valid ingress-drop-monitor action")
+      print(("Ingress drop monitor: %s (threshold: %d packets; wait: %d seconds; interval: %.2f seconds)"):format(
+             ingress_drop_action, ingress_drop_threshold, ingress_drop_wait, 1e6/ingress_drop_interval))
+      local counter_path = lwcounter.counters_dir.."/ingress-packet-drops"
+      local mon = ingress_drop_monitor.new({
+         action = ingress_drop_action,
+         threshold = ingress_drop_threshold,
+         wait = ingress_drop_wait,
+         counter = counter_path,
+      })
+      timer.activate(mon:timer(ingress_drop_interval))
    end
 
    engine.busywait = true

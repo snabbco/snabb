@@ -119,6 +119,9 @@ counter_names = {
    "out-ipv6-frag",
    "out-ipv6-frag-not",
    "memuse-ipv6-frag-reassembly-buffer",
+
+-- Ingress packet drops
+   "ingress-packet-drops",
 }
 
 function init_counters ()
