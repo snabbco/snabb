@@ -31,6 +31,7 @@ function Tap:new (name)
    end
    return setmetatable({sock = sock,
                         name = name,
+                        pkt = packet.allocate(),
                         shm = { rxbytes   = {counter},
                                 rxpackets = {counter},
                                 rxmcast   = {counter},
@@ -45,17 +46,15 @@ end
 function Tap:pull ()
    local l = self.output.output
    if l == nil then return end
+   local p = self.pkt
    for i=1,engine.pull_npackets do
-      local p = packet.allocate()
       local len, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
       -- errno == EAGAIN indicates that the read would of blocked as there is no
       -- packet waiting. It is not a failure.
       if not len and err.errno == const.E.AGAIN then
-         packet.free(p)
          return
       end
       if not len then
-         packet.free(p)
          error("Failed read on " .. self.name .. ": " .. tostring(err))
       end
       p.length = len
@@ -68,7 +67,9 @@ function Tap:pull ()
       if ethernet:is_bcast(p.data) then
          counter.add(self.shm.rxbcast)
       end
+      p = packet.allocate()
    end
+   self.pkt = p
 end
 
 function Tap:push ()
