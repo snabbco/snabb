@@ -12,13 +12,6 @@ local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
 
---ljsyscall returns error as a a cdata instead of a string,
---and the standard assert() doesn't use tostring() on it.
-local function assert(v, ...)
-   if not v then error(tostring(... or 'assertion failed'), 2) end
-   return v, ...
-end
-
 local c, t = S.c, S.types.t
 
 RawSocket = {}

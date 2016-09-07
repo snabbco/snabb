@@ -112,10 +112,11 @@ end
 
 --- Globally initialize some things. Module can depend on this being done.
 function initialize ()
-   require("core.lib")
+   -- Global API
+   _G.lib    = require("core.lib")
+   _G.assert = _G.lib.assert
    require("core.clib_h")
    require("core.lib_h")
-   -- Global API
    _G.config = require("core.config")
    _G.engine = require("core.app")
    _G.memory = require("core.memory")
