@@ -165,8 +165,7 @@ function selftest ()
 end
 
 -- Fork into worker process and supervisor
-local worker_pid, err = S.fork()
-assert(worker_pid, tostring(err))
+local worker_pid = assert(S.fork())
 if worker_pid == 0 then
    -- Worker: Use prctl to ensure we are killed (SIGHUP) when our parent quits
    -- and run main.
@@ -181,16 +180,14 @@ else
    while true do
       -- Read signals from signalfd. Only process the first signal because any
       -- signal causes shutdown.
-      local signals, err = S.util.signalfd_read(signalfd)
-      assert(signals, tostring(err))
+      local signals = assert(S.util.signalfd_read(signalfd))
       for i = 1, #signals do
          local exit_status
          if signals[i].chld then
             -- SIGCHILD means worker state changed: retrieve its status using
             -- waitpid and set exit status accordingly.
-            local status, err, worker =
-               S.waitpid(worker_pid, "stopped,continued")
-            assert(status, tostring(err))
+            local status, _, worker =
+               assert(S.waitpid(worker_pid, "stopped,continued"))
             if     worker.WIFEXITED   then exit_status = worker.EXITSTATUS
             elseif worker.WIFSIGNALED then exit_status = 128 + worker.WTERMSIG
             -- WIFSTOPPED and WIFCONTINUED are ignored.
