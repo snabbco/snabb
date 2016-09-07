@@ -231,7 +231,7 @@ function test_ping_to_lwaftr_inet {
     # Capture IPv4 icmp echo-reply.
     capture_mirror_tap_to_file $output "icmp[icmptype] == 0"
     tcpreplay $input $SNABB_PCI1
-    sleep 2
+    sleep 5
 
     local ret=$(ping4_cmp $output $expected)
     rm -f $output
@@ -281,7 +281,7 @@ function run_test { testname=$1; input=$2; expected=$3; filter=$4
     local output="/tmp/output.pcap"
     capture_mirror_tap_to_file $output "$filter"
     tcpreplay $input $SNABB_PCI1
-    sleep 3
+    sleep 5
     check_pcap_equals "$testname" $output $expected
 }
 
