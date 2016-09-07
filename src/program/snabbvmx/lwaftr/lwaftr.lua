@@ -144,7 +144,7 @@ function run(args)
       lwaftr_id.value = id
    end
 
-   local vlan = conf.settings and conf.settings.vlan
+   local vlan = conf.settings and conf.settings.vlan or false
 
    conf.interface = {
       mac_address = mac,

@@ -205,10 +205,17 @@ function zero_checksum { file=$1; row=$2; column=$3
 }
 
 function pcap2text { pcap=$1; txt=$2
-    od -Ax -tx1 -j 40 $pcap > $txt
+    filesize=$(ls -l $pcap | awk '{ print $5 }')
+    if [[ $filesize < 40 ]]; then
+        # Empty file.
+        rm -f $txt
+        touch $txt
+    else
+        od -Ax -tx1 -j 40 $pcap > $txt
+    fi
 }
 
-function ping4_cmp { pcap1=$1; pcap2=$2
+function icmpv4_cmp { pcap1=$1; pcap2=$2
     local actual=/tmp/actual.txt
     local expected=/tmp/expected.txt
 
@@ -222,26 +229,24 @@ function ping4_cmp { pcap1=$1; pcap2=$2
     echo ${#out}
 }
 
-# Test ping to lwAFTR inet interface.
-function test_ping_to_lwaftr_inet {
-    local input="$PCAP_INPUT/ping-request-to-lwAFTR-inet.pcap"
-    local expected="$PCAP_OUTPUT/ping-reply-from-lwAFTR-inet.pcap"
-    local output="/tmp/output.pcap"
-
-    # Capture IPv4 icmp echo-reply.
-    capture_mirror_tap_to_file $output "icmp[icmptype] == 0"
-    tcpreplay $input $SNABB_PCI1
-    sleep 5
-
-    local ret=$(ping4_cmp $output $expected)
+function check_icmpv4_equals { testname=$1; output=$2; expected=$3
+    local ret=$(icmpv4_cmp $output $expected)
     rm -f $output
     if [[ $ret == 0 ]]; then
-        echo "Ping to lwAFTR inet interface: OK"
+        echo "$testname: OK"
     else
-        echo "Error: ping-to-lwAFTR-inet test failed"
+        echo "Error: '$testname' failed"
         echo -e $ret
         exit 1
     fi
+}
+
+function run_icmpv4_test { testname=$1; input=$2; expected=$3; filter=$4
+    local output="/tmp/output.pcap"
+    capture_mirror_tap_to_file $output "$filter"
+    tcpreplay $input $SNABB_PCI1
+    sleep 5
+    check_icmpv4_equals "$testname" $output $expected
 }
 
 function pcap_cmp { pcap1=$1; pcap2=$2
@@ -257,7 +262,7 @@ function pcap_cmp { pcap1=$1; pcap2=$2
 
 function check_pcap_equals { testname=$1; output=$2; expected=$3
     local ret=$(pcap_cmp $output $expected)
-    # rm -f $output
+    rm -f $output
     if [[ $ret == 0 ]]; then
         echo "$testname: OK"
     else
@@ -277,7 +282,7 @@ function cleanup {
     exit 0
 }
 
-function run_test { testname=$1; input=$2; expected=$3; filter=$4
+function run_pcap_test { testname=$1; input=$2; expected=$3; filter=$4
     local output="/tmp/output.pcap"
     capture_mirror_tap_to_file $output "$filter"
     tcpreplay $input $SNABB_PCI1
@@ -285,25 +290,68 @@ function run_test { testname=$1; input=$2; expected=$3; filter=$4
     check_pcap_equals "$testname" $output $expected
 }
 
+function test_ping_to_lwaftr_inet {
+    run_icmpv4_test "Ping to lwAFTR inet side"                      \
+                    "$PCAP_INPUT/ping-request-to-lwAFTR-inet.pcap"  \
+                    "$PCAP_OUTPUT/ping-reply-from-lwAFTR-inet.pcap" \
+                    "icmp[icmptype] == 0"
+
+    run_icmpv4_test "Ping to lwAFTR inet side (Good VLAN)"              \
+                    "$PCAP_INPUT/vlan/ping-request-to-lwAFTR-inet.pcap" \
+                    "$PCAP_OUTPUT/ping-reply-from-lwAFTR-inet.pcap"     \
+                    "icmp[icmptype] == 0"
+
+    run_pcap_test   "Ping to lwAFTR inet side (Bad VLAN)"                   \
+                    "$PCAP_INPUT/vlan-bad/ping-request-to-lwAFTR-inet.pcap" \
+                    "$PCAP_OUTPUT/empty.pcap"
+}
+
 function test_ping_to_lwaftr_b4 {
-    run_test "Ping to lwAFTR B4 side"                      \
-             "$PCAP_INPUT/ping-request-to-lwAFTR-b4.pcap"  \
-             "$PCAP_OUTPUT/ping-reply-from-lwAFTR-b4.pcap" \
-             "icmp6 and ip6[40]==129"
+    run_pcap_test "Ping to lwAFTR B4 side"                      \
+                  "$PCAP_INPUT/ping-request-to-lwAFTR-b4.pcap"  \
+                  "$PCAP_OUTPUT/ping-reply-from-lwAFTR-b4.pcap" \
+                  "icmp6 and ip6[40]==129"
+
+    run_pcap_test "Ping to lwAFTR B4 side (Good VLAN)"              \
+                  "$PCAP_INPUT/vlan/ping-request-to-lwAFTR-b4.pcap" \
+                  "$PCAP_OUTPUT/ping-reply-from-lwAFTR-b4.pcap"     \
+                  "icmp6 and ip6[40]==129"
+
+    run_pcap_test "Ping to lwAFTR B4 side (Bad VLAN)"                   \
+                  "$PCAP_INPUT/vlan-bad/ping-request-to-lwAFTR-b4.pcap" \
+                  "$PCAP_OUTPUT/empty.pcap"
 }
 
 function test_arp_request_to_lwaftr {
-    run_test "ARP request to lwAFTR"                   \
-             "$PCAP_INPUT/arp-request-to-lwAFTR.pcap"  \
-             "$PCAP_OUTPUT/arp-reply-from-lwAFTR.pcap" \
-             "arp[6:2] == 2"
+    run_pcap_test "ARP request to lwAFTR"                   \
+                  "$PCAP_INPUT/arp-request-to-lwAFTR.pcap"  \
+                  "$PCAP_OUTPUT/arp-reply-from-lwAFTR.pcap" \
+                  "arp[6:2] == 2"
+
+    run_pcap_test "ARP request to lwAFTR (Good VLAN)"           \
+                  "$PCAP_INPUT/vlan/arp-request-to-lwAFTR.pcap" \
+                  "$PCAP_OUTPUT/arp-reply-from-lwAFTR.pcap"     \
+                  "arp[6:2] == 2"
+
+    run_pcap_test "ARP request to lwAFTR (Bad VLAN)"                \
+                  "$PCAP_INPUT/vlan-bad/arp-request-to-lwAFTR.pcap" \
+                  "$PCAP_OUTPUT/empty.pcap"
 }
 
 function test_ndp_request_to_lwaftr {
-    run_test "NDP request to lwAFTR"                   \
-             "$PCAP_INPUT/ndp-request-to-lwAFTR.pcap"  \
-             "$PCAP_OUTPUT/ndp-reply-from-lwAFTR.pcap" \
-             "icmp6 && ip6[40] == 136"
+    run_pcap_test "NDP request to lwAFTR"                   \
+                  "$PCAP_INPUT/ndp-request-to-lwAFTR.pcap"  \
+                  "$PCAP_OUTPUT/ndp-reply-from-lwAFTR.pcap" \
+                  "icmp6 && ip6[40] == 136"
+
+    run_pcap_test "NDP request to lwAFTR (Good VLAN)"           \
+                  "$PCAP_INPUT/vlan/ndp-request-to-lwAFTR.pcap" \
+                  "$PCAP_OUTPUT/ndp-reply-from-lwAFTR.pcap"     \
+                  "icmp6 && ip6[40] == 136"
+
+    run_pcap_test "NDP request to lwAFTR (Bad VLAN)"                \
+                  "$PCAP_INPUT/vlan-bad/ndp-request-to-lwAFTR.pcap" \
+                  "$PCAP_OUTPUT/empty.pcap"
 }
 
 # Set up graceful `exit'.
