@@ -208,7 +208,7 @@ function pcap2text { pcap=$1; txt=$2
     od -Ax -tx1 -j 40 $pcap > $txt
 }
 
-function ping4_cmp { pcap1=$1; pcap2=$2
+function icmpv4_cmp { pcap1=$1; pcap2=$2
     local actual=/tmp/actual.txt
     local expected=/tmp/expected.txt
 
@@ -222,26 +222,32 @@ function ping4_cmp { pcap1=$1; pcap2=$2
     echo ${#out}
 }
 
-# Test ping to lwAFTR inet interface.
-function test_ping_to_lwaftr_inet {
-    local input="$PCAP_INPUT/ping-request-to-lwAFTR-inet.pcap"
-    local expected="$PCAP_OUTPUT/ping-reply-from-lwAFTR-inet.pcap"
-    local output="/tmp/output.pcap"
-
-    # Capture IPv4 icmp echo-reply.
-    capture_mirror_tap_to_file $output "icmp[icmptype] == 0"
-    tcpreplay $input $SNABB_PCI1
-    sleep 5
-
-    local ret=$(ping4_cmp $output $expected)
-    rm -f $output
+function check_icmpv4_equals { testname=$1; output=$2; expected=$3
+    local ret=$(icmpv4_cmp $output $expected)
+    # rm -f $output
     if [[ $ret == 0 ]]; then
-        echo "Ping to lwAFTR inet interface: OK"
+        echo "$testname: OK"
     else
-        echo "Error: ping-to-lwAFTR-inet test failed"
+        echo "Error: '$testname' failed"
         echo -e $ret
         exit 1
     fi
+}
+
+function run_icmpv4_test { testname=$1; input=$2; expected=$3; filter=$4
+    local output="/tmp/output.pcap"
+    capture_mirror_tap_to_file $output "$filter"
+    tcpreplay $input $SNABB_PCI1
+    sleep 5
+    check_icmpv4_equals "$testname" $output $expected
+}
+
+# Test ping to lwAFTR inet interface.
+function test_ping_to_lwaftr_inet {
+    run_icmpv4_test "Ping to lwAFTR inet interface"                 \
+                    "$PCAP_INPUT/ping-request-to-lwAFTR-inet.pcap"  \
+                    "$PCAP_OUTPUT/ping-reply-from-lwAFTR-inet.pcap" \
+                    "icmp[icmptype] == 0"
 }
 
 function pcap_cmp { pcap1=$1; pcap2=$2
@@ -257,7 +263,7 @@ function pcap_cmp { pcap1=$1; pcap2=$2
 
 function check_pcap_equals { testname=$1; output=$2; expected=$3
     local ret=$(pcap_cmp $output $expected)
-    # rm -f $output
+    rm -f $output
     if [[ $ret == 0 ]]; then
         echo "$testname: OK"
     else
