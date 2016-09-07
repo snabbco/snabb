@@ -382,7 +382,7 @@ function Intel:pull ()
    assert(lo, "intel1g: output link required")
 
    local pkts = 0
-   while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < 128 do
+   while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
       local p = self.rxpackets[self.rdt]
       p.length = self.rxdesc[self.rdt].length
       link.transmit(lo, p)
