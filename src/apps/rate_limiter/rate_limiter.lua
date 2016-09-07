@@ -7,6 +7,7 @@ local link = require("core.link")
 local config = require("core.config")
 local packet = require("core.packet")
 local timer = require("core.timer")
+local counter = require("core.counter")
 local basic_apps = require("apps.basic.basic_apps")
 local ffi = require("ffi")
 local C = ffi.C
@@ -34,7 +35,8 @@ function RateLimiter:new (arg)
    {
       rate = conf.rate,
       bucket_capacity = conf.bucket_capacity,
-      bucket_content = conf.initial_capacity
+      bucket_content = conf.initial_capacity,
+      shm = { txdrop = {counter} }
     }
    return setmetatable(o, {__index=RateLimiter})
 end
@@ -72,7 +74,7 @@ function RateLimiter:push ()
    end
 
 
-   while not link.empty(i) and not link.full(o) do
+   while not link.empty(i) do
       local p = link.receive(i)
       local length = p.length
 
@@ -81,6 +83,7 @@ function RateLimiter:push ()
          link.transmit(o, p)
       else
          -- discard packet
+         counter.add(self.shm.txdrop)
          packet.free(p)
       end
    end

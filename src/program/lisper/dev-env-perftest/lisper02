@@ -1,0 +1,1 @@
+LISP_N=02 ./lisper "$@"

@@ -5,6 +5,7 @@ local config     = require("core.config")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local lib        = require("core.lib")
 local setup      = require("program.lwaftr.setup")
+local ingress_drop_monitor_timer = require("lib.timers.ingress_drop_monitor")
 
 local function show_usage(exit_code)
    print(require("program.lwaftr.run.README_inc"))
@@ -96,12 +97,15 @@ function parse_args(args)
          fatal("ring size is not a power of two: " .. arg)
       end
    end
+   handlers["no-ingress-drop-monitor"] = function (arg)
+      opts.ingress_drop_monitor = false
+   end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:n:m:vD:hir:",
       { conf = "c", ["v4-pci"] = "n", ["v6-pci"] = "m",
         verbose = "v", duration = "D", help = "h",
         virtio = "i", ["ring-buffer-size"] = "r", cpu = 1,
-        ["real-time"] = 0 })
+        ["real-time"] = 0, ["no-ingress-drop-monitor"] = 0, })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -137,6 +141,10 @@ function run(args)
       csv:add_app('inetNic', { 'tx', 'rx' }, { tx='IPv4 RX', rx='IPv4 TX' })
       csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx='IPv6 RX', rx='IPv6 TX' })
       csv:activate()
+   end
+
+   if opts.ingress_drop_monitor or opts.ingress_drop_monitor == nil then
+      timer.activate(ingress_drop_monitor_timer)
    end
 
    engine.busywait = true
