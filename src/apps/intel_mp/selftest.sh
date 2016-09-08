@@ -8,7 +8,7 @@ FILTER=${1:-.*}
 TESTS=$(find . -executable | grep -e 'test[0-9]' -e 'test_' | grep -e "$FILTER" | sort)
 ESTATUS=0
 for i in $TESTS; do
-   pkill -f snabb
+   pkill -P $$ -f snabb
    sleep 1
    rm -f /var/run/snabb/intel_mp*
    rm -f results.*
