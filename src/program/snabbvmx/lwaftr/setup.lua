@@ -172,7 +172,6 @@ function lwaftr_app(c, conf, lwconf, sock_path)
          v4_input, v6_input   = "nic_v4v6.v4", "nic_v4v6.v6"
       end
    end
-   assert(v4_input and v6_input and v4_output and v6_output)
 
    if conf.ipv6_interface then
       conf.ipv6_interface.mac_address = conf.interface.mac_address
