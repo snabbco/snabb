@@ -346,7 +346,6 @@ end
 local function test_ipv4_wire_to_vm_and_service (pkts)
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'repeater', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd4, {
       mac_address = "52:54:00:00:00:01",
@@ -369,7 +368,6 @@ local function test_ipv4_vm_to_service_and_wire(pkts)
    engine.configure(config.new()) -- Clean up engine.
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'repeater', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd4, {
       mac_address = "52:54:00:00:00:01",
@@ -391,7 +389,6 @@ end
 local function test_ipv4_service_to_wire (pkts)
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'repeater', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd4, {
       mac_address = "52:54:00:00:00:01",
@@ -412,7 +409,6 @@ end
 local function test_ipv4_service_to_vm (pkts)
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'repeater', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd4, {
       mac_address = "52:54:00:00:00:01",
@@ -459,7 +455,6 @@ end
 local function test_ipv6_wire_to_vm_and_service (pkts)
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'repeater', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd6, {
       mac_address = "52:54:00:00:00:01",
@@ -482,7 +477,6 @@ local function test_ipv6_vm_to_service_and_wire(pkts)
    engine.configure(config.new()) -- Clean up engine.
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'repeater', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd6, {
       mac_address = "52:54:00:00:00:01",
@@ -504,7 +498,6 @@ end
 local function test_ipv6_service_to_wire (pkts)
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'repeater', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd6, {
       mac_address = "52:54:00:00:00:01",
@@ -525,7 +518,6 @@ end
 local function test_ipv6_service_to_vm (pkts)
    local c = config.new()
    config.app(c, 'source', basic_apps.Join)
-   config.app(c, 'repeater', basic_apps.Repeater)
    config.app(c, 'sink', basic_apps.Sink)
    config.app(c, 'nh_fwd', nh_fwd6, {
       mac_address = "52:54:00:00:00:01",
