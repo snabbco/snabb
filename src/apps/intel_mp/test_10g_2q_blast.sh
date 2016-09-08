@@ -7,5 +7,5 @@ SNABB_RECV_SPINUP=2 SNABB_RECV_DURATION=5 taskset -c 3 ./testrecv.snabb Intel825
 
 sleep 1
 kill -9 $BLAST
-test `cat results.0 | grep "^RXDGPC" | awk '{print $2}'` -gt 14000000
+test `cat results.* | grep "^RXDGPC" | awk '{print $2}'` -gt 14000000
 exit $?
