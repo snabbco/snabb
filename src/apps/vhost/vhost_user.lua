@@ -277,6 +277,11 @@ function VhostUser:set_vring_kick (msg, fds, nfds)
    local idx = tonumber(bit.band(msg.u64, C.VHOST_USER_VRING_IDX_MASK))
    local validfd = bit.band(msg.u64, C.VHOST_USER_VRING_NOFD_MASK) == 0
 
+   -- Kick enables processing in vhost-user protocol
+   self.vhost_ready = true
+   -- Compile a new optimized fast-path for the vring processing
+   self.dev:rejit()
+
    assert(idx < 42)
    if validfd then
       assert(nfds == 1)
@@ -312,6 +317,10 @@ end
 function VhostUser:get_vring_base (msg)
    msg.state.num = self.dev:get_vring_base(msg.state.index)
    msg.size = ffi.sizeof("struct vhost_vring_state")
+
+   -- get_vring_base disables vring processing in vhost-user protocol
+   self.vhost_ready = false
+
    self:reply(msg)
 end
 

@@ -72,7 +72,7 @@ function vpws:push()
       local l_in  = self.input[port_in]
       local l_out = self.output[in_to_out[port_in]]
       assert(l_out)
-      while not link.full(l_out) and not link.empty(l_in) do
+      while not link.empty(l_in) do
          local p = link.receive(l_in)
          local datagram = self._dgram:new(p, ethernet)
          if port_in == 'customer' then

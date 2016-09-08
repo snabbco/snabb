@@ -1,6 +1,6 @@
 /* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
 
-enum { LINK_RING_SIZE    = 256,
+enum { LINK_RING_SIZE    = 1024,
        LINK_MAX_PACKETS  = LINK_RING_SIZE - 1
 };
 

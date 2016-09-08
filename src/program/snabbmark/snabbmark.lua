@@ -120,7 +120,7 @@ end
 
 function Source:pull()
    for _, o in ipairs(self.output) do
-      for i = 1, link.nwritable(o) do
+      for i = 1, engine.pull_npackets do
          local p = packet.allocate()
          ffi.copy(p.data, self.to_mac_address, 6)
          ffi.copy(p.data + 6, self.from_mac_address, 6)
@@ -379,6 +379,8 @@ function esp (npackets, packet_size, mode, profile)
       for i = 1, npackets do
          plain = packet.clone(encapsulated)
          dec:decapsulate(plain)
+         dec.seq.no = 0
+         dec.window[0] = 0
          packet.free(plain)
       end
       local finish = C.get_monotonic_time()

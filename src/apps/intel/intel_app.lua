@@ -12,7 +12,7 @@ local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
 local macaddress = require("lib.macaddress")
 local intel10g = require("apps.intel.intel10g")
-local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
+local receive, transmit, empty = link.receive, link.transmit, link.empty
 Intel82599 = {}
 Intel82599.__index = Intel82599
 
@@ -133,7 +133,7 @@ function Intel82599:pull ()
    local l = self.output.tx
    if l == nil then return end
    self.dev:sync_receive()
-   for i=1,128 do
+   for i = 1, engine.pull_npackets do
       if not self.dev:can_receive() then break end
       transmit(l, self.dev:receive())
    end

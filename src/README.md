@@ -294,6 +294,16 @@ Predicate used to test if a link is full. Returns true if *link* is full
 and false otherwise.
 
 
+— Function **link.nreadable** *link*
+
+Returns the number of packets on *link*.
+
+
+— Function **link.nwriteable** *link*
+
+Returns the remaining number of packets that fit onto *link*.
+
+
 — Function **link.receive** *link*
 
 Returns the next available packet (and advances the read cursor) on
@@ -323,7 +333,7 @@ Returns a structure holding ring statistics for the *link*:
 
 ## Packet (core.packet)
 
-A *packet* is an FFI object of type `packet.packet_t` representing a network
+A *packet* is an FFI object of type `struct packet` representing a network
 packet that is currently being processed. The packet is used to explicitly
 manage the life cycle of the packet. Packets are explicitly allocated and freed
 by using `packet.allocate` and `packet.free`. When a packet is received using
@@ -335,7 +345,7 @@ freed. The number of allocatable packets is limited by the size of the
 underlying “freelist”, e.g. a pool of unused packet objects from and to which
 packets are allocated and freed.
 
-— Ctype **packet.packet_t**
+— Type **struct packet**
 
 ```
 struct packet {
@@ -387,7 +397,7 @@ or equal to `length` of *packet*.
 
 — Function **packet.shiftright** *packet*, *length*
 
-Move *packet* payload to the right by *length* bytes, growing *packet* by
+Moves *packet* payload to the right by *length* bytes, growing *packet* by
 *length*. The sum of *length* and `length` of *packet* must be less than or
 equal to `packet.max_payload`.
 
@@ -399,6 +409,10 @@ Allocate packet and fill it with *length* bytes from *pointer*.
 
 Allocate packet and fill it with the contents of *string*.
 
+— Function **packet.clone_to_memory* *pointer* *packet*
+
+Creates an exact copy of at memory pointed to by *pointer*. *Pointer* must
+point to a `packet.packet_t`.
 
 ## Memory (core.memory)
 
@@ -471,7 +485,7 @@ Returns a pointer to the mapped object.
 
 — Function **shm.exists** *name*
 
-Checks whether shared object *name* exists.
+Returns a true value if shared object by *name* exists.
 
 — Function **shm.unmap** *pointer*
 

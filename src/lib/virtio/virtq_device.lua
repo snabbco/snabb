@@ -3,8 +3,6 @@
 -- Implements virtio virtq
 
 
-module(...,package.seeall)
-
 local lib       = require("core.lib")
 local memory    = require("core.memory")
 local ffi       = require("ffi")
@@ -111,3 +109,5 @@ function VirtioVirtq:signal_used ()
       end
    end
 end
+
+return VirtioVirtq
