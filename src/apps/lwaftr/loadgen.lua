@@ -31,7 +31,7 @@ function RateLimitedRepeater:set_rate (bit_rate)
    self.rate = math.max(bit_rate, 0)
 end
 
-function RateLimitedRepeater:push ()
+function RateLimitedRepeater:pull ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
       local p = receive(i)
@@ -53,7 +53,7 @@ function RateLimitedRepeater:push ()
 
    local npackets = #self.packets
    if npackets > 0 and self.rate > 0 then
-      for _ = 1, link.nwritable(o) do
+      for _ = 1, engine.pull_npackets do
          local p = self.packets[self.index]
          local bits = (p.length + overhead) * 8
          if bits > self.bucket_content then break end

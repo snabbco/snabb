@@ -74,6 +74,9 @@ function Reassembler:push ()
    local input, output = self.input.input, self.output.output
    local errors = self.output.errors
 
+   local l2_size = self.l2_size
+   local ethertype_offset = self.ethertype_offset
+
    for _=1,math.min(link.nreadable(input), link.nwritable(output)) do
       local pkt = receive(input)
       if is_ipv4(pkt) and is_fragment(pkt) then
@@ -226,7 +229,7 @@ end
 function ICMPEcho:push()
    local l_in, l_out, l_reply = self.input.south, self.output.north, self.output.south
 
-   for _ = 1, math.min(link.nreadable(l_in), link.nwritable(l_out)) do
+   for _ = 1, link.nreadable(l_in) do
       local out, pkt = l_out, receive(l_in)
 
       if icmp.is_icmpv4_message(pkt, icmpv4_echo_request, 0) then
@@ -263,7 +266,7 @@ function ICMPEcho:push()
    end
 
    l_in, l_out = self.input.north, self.output.south
-   for _ = 1, math.min(link.nreadable(l_in), link.nwritable(l_out)) do
+   for _ = 1, link.nreadable(l_in) do
       transmit(l_out, receive(l_in))
    end
 end
