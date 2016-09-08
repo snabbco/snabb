@@ -34,11 +34,8 @@ end
 
 PcapWriter = {}
 
-function PcapWriter:new (filename, arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   local mode = conf.overwrite and "w+" or "w"
-   local file, errno = io.open(filename, mode)
-   if errno then error(errno) end
+function PcapWriter:new (filename)
+   local file = assert(io.open(filename, "w"))
    pcap.write_file_header(file)
    return setmetatable({file = file}, {__index = PcapWriter})
 end
