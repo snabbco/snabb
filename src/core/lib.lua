@@ -11,13 +11,6 @@ local bit = require("bit")
 local band, bor, bnot, lshift, rshift, bswap =
    bit.band, bit.bor, bit.bnot, bit.lshift, bit.rshift, bit.bswap
 
--- Alternate version of assert that calls tostring on it second argument. Very
--- useful for working with ljsyscall.
-function assert (v, ...)
-   if v then return v, ... end
-   error(tostring(... or "assertion failed!"))
-end
-
 -- Returns true if x and y are structurally similar (isomorphic).
 function equal (x, y)
    if type(x) ~= type(y) then return false end

@@ -19,6 +19,13 @@ local S = require("syscall")
 require("lib.lua.strict")
 require("lib.lua.class")
 
+-- ljsyscall returns error as a cdata instead of a string, and the standard
+-- assert doesn't use tostring on it.
+_G.assert = function (v, ...)
+   if v then return v, ... end
+   error(tostring(... or "assertion failed!"))
+end
+
 -- Reserve names that we want to use for global module.
 -- (This way we avoid errors from the 'strict' module.)
 _G.config, _G.engine, _G.memory, _G.link, _G.packet, _G.timer,
@@ -112,11 +119,10 @@ end
 
 --- Globally initialize some things. Module can depend on this being done.
 function initialize ()
-   -- Global API
-   _G.lib    = require("core.lib")
-   _G.assert = _G.lib.assert
+   require("core.lib")
    require("core.clib_h")
    require("core.lib_h")
+   -- Global API
    _G.config = require("core.config")
    _G.engine = require("core.app")
    _G.memory = require("core.memory")
