@@ -130,7 +130,9 @@ Lwaftrgen = {
       ipv6_only = {},
       ipv4_only = {},
       b4_port = {},
-      protocol = {}
+      protocol = {},
+      count = {},
+      single_pass = {}
    }
 }
 
