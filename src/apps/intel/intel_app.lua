@@ -124,8 +124,7 @@ function Intel82599:stop()
 end
 
 
-function Intel82599:reconfig(arg)
-   local conf = config.parse_app_arg(arg)
+function Intel82599:reconfig (conf)
    assert((not not self.dev.pf) == (not not conf.vmdq), "Can't reconfig from VMDQ to single-port or viceversa")
 
    self.dev:reconfig(conf)
