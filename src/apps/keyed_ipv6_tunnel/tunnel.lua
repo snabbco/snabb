@@ -108,7 +108,7 @@ SimpleKeyedTunnel = {
       remote_address = {required=true},
       -- 8 bytes hex string
       local_cookie = {required=true},
-      return_cookie = {required=true},
+      remote_cookie = {required=true},
       -- unsigned number, must fit to uint32_t
       local_session = {},
       -- string, MAC address (for testing)
