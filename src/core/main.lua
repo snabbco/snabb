@@ -126,6 +126,7 @@ function initialize ()
 end
 
 function handler (reason)
+   print("Error in zone: "..zone:get())
    print(reason)
    print(debug.traceback())
    if debug_on_error then debug.debug() end

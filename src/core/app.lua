@@ -219,7 +219,9 @@ function apply_config_actions (actions, conf)
          if log and action ~= 'keep' then
             io.write("engine: ", action, " app ", name, "\n")
          end
+         zone(name)
          ops[action](name)
+         zone()
       end
    end
    -- Setup links: create (or reuse) and renumber.

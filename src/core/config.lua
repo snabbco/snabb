@@ -4,6 +4,7 @@
 
 module(..., package.seeall)
 
+local zone = require("jit.zone")
 local lib = require("core.lib")
 
 -- API: Create a new configuration.
@@ -27,8 +28,10 @@ end
 function app (config, name, class, arg)
    assert(type(name) == "string", "name must be a string")
    assert(type(class) == "table", "class must be a table")
+   zone(class.zone or getfenv(class.new)._NAME or name)
    if class.config then arg = parse_app_arg(arg, class.config) end
    config.apps[name] = { class = class, arg = arg}
+   zone()
 end
 
 -- API: Add a link to the configuration.
