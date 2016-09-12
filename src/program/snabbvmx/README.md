@@ -53,7 +53,6 @@ source, destination or within an IPv4-in-IPv6 packet.
 return {
    lwaftr = "snabbvmx-lwaftr.conf",
    ipv6_interface = {
-      ipv6_address = "fc00::100",
       mtu = 9500,
    },
    ipv4_interface = {
