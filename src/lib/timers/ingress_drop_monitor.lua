@@ -24,6 +24,9 @@ function new(args)
       current_value = ffi.new('uint64_t[1]')
    }
    if args.counter then
+      if not args.counter:match(".counter$") then
+         args.counter = args.counter..".counter"
+      end
       if not shm.exists("/"..S.getpid().."/"..args.counter) then
          ret.counter = counter.create(args.counter, 0)
       else
