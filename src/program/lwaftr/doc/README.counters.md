@@ -190,7 +190,7 @@ ICMPv4 and ICMPv6 packets, such as `policy_icmpv4_incoming = ALLOW`.)
 
 Implementation detail: counters can be accessed as files in the runtime
 area of the Snabb process, typically under
-`/var/run/snabb/[PID]/app/lwaftr/counters/`. Most of them are represented by
+`/var/run/snabb/[PID]/app/lwaftr/`. Most of them are represented by
 two files, ending with the `bytes` and `packets` suffixes.
 
 Note that all counters only see packets without VLAN tags, so the total number
