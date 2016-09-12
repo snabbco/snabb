@@ -723,10 +723,10 @@ function parse (arg, config)
    local ret = {}
    if arg == nil then arg = {} end
    for k, o in pairs(config) do
-      assert(arg[k] ~= nil or not o.required, 'missing required option ' .. k)
+      assert(arg[k] ~= nil or not o.required, "missing required parameter '"..k.."'")
    end
    for k, v in pairs(arg) do
-      assert(config[k], 'unrecognized option ' .. k)
+      assert(config[k], "unrecognized parameter '"..k.."'")
       ret[k] = v
    end
    for k, o in pairs(config) do
