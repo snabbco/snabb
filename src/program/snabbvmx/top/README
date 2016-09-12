@@ -11,31 +11,31 @@ Switch instance, top will connect to that instance.
 Example output:
 
 
- lwaftr (rx/tx/txdrop in Mpps)   rx      tx      rxGb    txGb    txdrop
- lwaftr_v6                       1.09    1.09    4.79    5.13    0.000000
- lwaftr_v4                       1.09    1.09    4.78    4.44    0.000000
+ lwaftr (rx/tx/txdrop in Mpps)                       rx      tx      rxGb    txGb    txdrop
+ lwaftr_v6                                           1.31    0.87    5.75    4.11    0.000000
+ lwaftr_v4                                           0.87    1.31    3.83    5.33    0.000000
 
-                                               Total           per second
- lwaftr_v6 in-ipv6-packets               723,127,736            1,090,272
- lwaftr_v6 in-ipv6-bytes             397,720,254,800          599,649,600
- lwaftr_v6 out-ipv6-packets              721,715,215            1,088,159
- lwaftr_v6 out-ipv6-bytes            425,811,976,850          642,013,810
- lwaftr_v6 drop-all-ipv6-iface-                    0                    0
- lwaftr_v6 in-ipv6-frag-reassem                    0                    0
- lwaftr_v6 drop-ipv6-frag-inval                    0                    0
- lwaftr_v6 out-ipv6-frag                           0                    0
- lwaftr_v6 out-ipv6-frag-not                       0                    0
+                                                                   Total           per second
+ lwaftr_v6 in-ipv6-packets                                    14,477,294            1,307,128
+ lwaftr_v6 in-ipv6-bytes                                   7,962,511,700          718,920,400
+ lwaftr_v6 out-ipv6-packets                                    9,643,500              870,695
+ lwaftr_v6 out-ipv6-bytes                                  5,689,665,000          513,710,050
+ lwaftr_v6 drop-all-ipv6-iface-packets                                 0                    0
+ lwaftr_v6 in-ipv6-frag-reassembled                                    0                    0
+ lwaftr_v6 drop-ipv6-frag-invalid-reassembly                           0                    0
+ lwaftr_v6 out-ipv6-frag                                               0                    0
+ lwaftr_v6 out-ipv6-frag-not                                           0                    0
 
-                                               Total           per second
- nic ifInDiscards                                  0                    0
+                                                                   Total           per second
+ nic ifInDiscards                                                      0                    0
 
-                                               Total           per second
- lwaftr_v4 in-ipv4-packets               721,715,215            1,088,159
- lwaftr_v4 in-ipv4-bytes             396,943,368,250          598,487,450
- lwaftr_v4 out-ipv4-packets              723,127,736            1,090,272
- lwaftr_v4 out-ipv4-bytes            368,795,145,360          556,038,720
- lwaftr_v4 drop-all-ipv4-iface-                    0                    0
- lwaftr_v4 in-ipv4-frag-reassem                    0                    0
- lwaftr_v4 drop-ipv4-frag-inval                    0                    0
- lwaftr_v4 out-ipv4-frag                           0                    0
- lwaftr_v4 out-ipv4-frag-not                       0                    0
+                                                                   Total           per second
+ lwaftr_v4 in-ipv4-packets                                     9,643,500              870,695
+ lwaftr_v4 in-ipv4-bytes                                   5,303,925,000          478,882,250
+ lwaftr_v4 out-ipv4-packets                                   14,477,294            1,307,128
+ lwaftr_v4 out-ipv4-bytes                                  7,383,419,940          666,635,280
+ lwaftr_v4 drop-all-ipv4-iface-packets                                 0                    0
+ lwaftr_v4 in-ipv4-frag-reassembled                                    0                    0
+ lwaftr_v4 drop-ipv4-frag-invalid-reassembly                           0                    0
+ lwaftr_v4 out-ipv4-frag                                               0                    0
+ lwaftr_v4 out-ipv4-frag-not                                           0                    0
