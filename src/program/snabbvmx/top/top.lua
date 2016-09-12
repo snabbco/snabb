@@ -1,6 +1,5 @@
 module(..., package.seeall)
 
-local S = require("syscall")
 local counter = require("core.counter")
 local ffi = require("ffi")
 local lib = require("core.lib")
@@ -66,43 +65,7 @@ local counter_names = (function ()
    end
 end)()
 
-local function show_usage (code)
-   print(require("program.snabbvmx.top.README_inc"))
-   main.exit(1)
-end
-
-local function parse_args (args)
-   local handlers = {}
-   function handlers.h ()
-      show_usage(0)
-   end
-   args = lib.dogetopt(args, handlers, "h", long_opts)
-   if #args > 1 then show_usage(1) end
-   return args[1]
-end
-
-function run (args)
-   local target_pid = parse_args(args)
-   local instance_tree = "/"..select_snabb_instance(target_pid)
-   local counters = open_counters(instance_tree)
-   local configs = 0
-   local last_stats = nil
-   local last_time = nil
-   while true do
-      local new_stats = get_stats(counters)
-      local time = tonumber(C.get_time_ns())
-      if last_stats then
-         clearterm()
-         print_lwaftr_metrics(new_stats, last_stats, (time - last_time)/1000)
-         io.flush()
-      end
-      last_stats = new_stats
-      last_time = time
-      C.sleep(1)
-   end
-end
-
-function open_counters (tree)
+local function open_counters (tree)
    local function open_counter (name)
       return counter.open(tree.."/"..lwcounter.counters_dir..name..".counter", 'readonly')
    end
@@ -121,7 +84,7 @@ function open_counters (tree)
    return counters
 end
 
-function get_stats (counters)
+local function get_stats (counters)
    local function read_counters (t)
       local ret = {}
       for k, v in pairs(t) do
@@ -137,8 +100,33 @@ function get_stats (counters)
    return stats
 end
 
+local function pad_str (s, n)
+   local padding = math.max(n - s:len(), 0)
+   return ("%s%s"):format(s:sub(1, n), (" "):rep(padding))
+end
+
+local function print_row (spec, args)
+   for i, s in ipairs(args) do
+      io.write((" %s"):format(pad_str(s, spec[i])))
+   end
+   io.write("\n")
+end
+
+local function int_s (n)
+   local val = lib.comma_value(n)
+   return (" "):rep(20 - #val)..val
+end
+
+local function float_s (n)
+   return ("%.2f"):format(n)
+end
+
+local function float_l (n)
+   return ("%.6f"):format(n)
+end
+
 local lwaftr_metrics_row = {51, 7, 7, 7, 7, 11}
-function print_lwaftr_metrics (new_stats, last_stats, time_delta)
+local function print_lwaftr_metrics (new_stats, last_stats, time_delta)
    local function delta(t, s, name)
       assert(t[name] and s[name])
       return tonumber(t[name] - s[name])
@@ -162,8 +150,7 @@ function print_lwaftr_metrics (new_stats, last_stats, time_delta)
    print_row(lwaftr_metrics_row, {
       "lwaftr (rx/tx/txdrop in Mpps)", "rx", "tx", "rxGb", "txGb", "txdrop"
    })
-   local rx, tx, rxbytes, txbytes, drop
-   for lwaftrspec, lwaftr in pairs(new_stats.lwaftr) do
+   for lwaftrspec, _ in pairs(new_stats.lwaftr) do
       if lwaftrspec == "nic" then goto continue end
       if last_stats.lwaftr[lwaftrspec] then
          local t = new_stats.lwaftr[lwaftrspec]
@@ -186,7 +173,7 @@ function print_lwaftr_metrics (new_stats, last_stats, time_delta)
    end
 
    local metrics_row = {50, 20, 20}
-   for lwaftrspec, lwaftr in pairs(new_stats.lwaftr) do
+   for lwaftrspec, _ in pairs(new_stats.lwaftr) do
       if last_stats.lwaftr[lwaftrspec] then
          io.write(("\n%50s  %20s %20s\n"):format("", "Total", "per second"))
          local t = new_stats.lwaftr[lwaftrspec]
@@ -207,27 +194,37 @@ function print_lwaftr_metrics (new_stats, last_stats, time_delta)
    end
 end
 
-function pad_str (s, n)
-   local padding = math.max(n - s:len(), 0)
-   return ("%s%s"):format(s:sub(1, n), (" "):rep(padding))
+local function show_usage (code)
+   print(require("program.snabbvmx.top.README_inc"))
+   main.exit(code)
 end
 
-function print_row (spec, args)
-   for i, s in ipairs(args) do
-      io.write((" %s"):format(pad_str(s, spec[i])))
+local function parse_args (args)
+   local handlers = {}
+   function handlers.h ()
+      show_usage(0)
    end
-   io.write("\n")
+   args = lib.dogetopt(args, handlers, "h", long_opts)
+   if #args > 1 then show_usage(1) end
+   return args[1]
 end
 
-function int_s (n)
-   local val = lib.comma_value(n)
-   return (" "):rep(20 - #val)..val
-end
-
-function float_s (n)
-   return ("%.2f"):format(n)
-end
-
-function float_l (n)
-   return ("%.6f"):format(n)
+function run (args)
+   local target_pid = parse_args(args)
+   local instance_tree = "/"..select_snabb_instance(target_pid)
+   local counters = open_counters(instance_tree)
+   local last_stats = nil
+   local last_time = nil
+   while true do
+      local new_stats = get_stats(counters)
+      local time = tonumber(C.get_time_ns())
+      if last_stats then
+         clearterm()
+         print_lwaftr_metrics(new_stats, last_stats, (time - last_time)/1000)
+         io.flush()
+      end
+      last_stats = new_stats
+      last_time = time
+      C.sleep(1)
+   end
 end
