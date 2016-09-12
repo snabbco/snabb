@@ -229,10 +229,8 @@ end
 
 function nh_fwd6:new (conf)
    assert(conf.mac_address, "MAC address is missing")
-   assert(conf.ipv6_address, "IPv6 address is missing")
 
    local mac_address = ethernet:pton(conf.mac_address)
-   local ipv6_address = ipv6:pton(conf.ipv6_address)
    local service_mac = conf.service_mac and ethernet:pton(conf.service_mac)
    local debug = conf.debug or false
    local cache_refresh_interval = conf.cache_refresh_interval or 0
@@ -247,7 +245,6 @@ function nh_fwd6:new (conf)
    local o = {
       mac_address = mac_address,
       next_hop_mac = next_hop_mac,
-      ipv6_address = ipv6_address,
       service_mac = service_mac,
       debug = debug,
       cache_refresh_time = 0,
@@ -459,7 +456,6 @@ local function test_ipv6_wire_to_vm_and_service (pkts)
    config.app(c, 'nh_fwd', nh_fwd6, {
       mac_address = "52:54:00:00:00:01",
       service_mac = "02:aa:aa:aa:aa:aa",
-      ipv6_address = "fe80::1",
    })
    config.link(c, 'source.out -> nh_fwd.wire')
    config.link(c, 'nh_fwd.service -> sink.in1')
@@ -481,7 +477,6 @@ local function test_ipv6_vm_to_service_and_wire(pkts)
    config.app(c, 'nh_fwd', nh_fwd6, {
       mac_address = "52:54:00:00:00:01",
       service_mac = "02:aa:aa:aa:aa:aa",
-      ipv6_address = "fe80::1",
    })
    config.link(c, 'source.out -> nh_fwd.vm')
    config.link(c, 'nh_fwd.service -> sink.in1')
@@ -502,7 +497,6 @@ local function test_ipv6_service_to_wire (pkts)
    config.app(c, 'nh_fwd', nh_fwd6, {
       mac_address = "52:54:00:00:00:01",
       service_mac = "02:aa:aa:aa:aa:aa",
-      ipv6_address = "fe80::1",
       next_hop_mac = "52:54:00:00:00:02",
    })
    config.link(c, 'source.out -> nh_fwd.service')
@@ -522,7 +516,6 @@ local function test_ipv6_service_to_vm (pkts)
    config.app(c, 'nh_fwd', nh_fwd6, {
       mac_address = "52:54:00:00:00:01",
       service_mac = "02:aa:aa:aa:aa:aa",
-      ipv6_address = "fe80::1",
    })
    config.link(c, 'source.out -> nh_fwd.service')
    config.link(c, 'nh_fwd.vm -> sink.in1')
