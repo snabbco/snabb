@@ -5,9 +5,10 @@ local counter = require("core.counter")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
+local lwtypes = require("apps.lwaftr.lwtypes")
+local shm = require("core.shm")
 local top = require("program.top.top")
 
-local select_snabb_instance = top.select_snabb_instance
 local C = ffi.C
 
 local long_opts = {
@@ -15,6 +16,29 @@ local long_opts = {
 }
 
 local function clearterm () io.write('\027[2J') end
+
+local function select_snabb_instance_by_id (target_id)
+   local pids = shm.children("/")
+   for _, pid in ipairs(pids) do
+      local path = "/"..pid.."/nic/id"
+      if shm.exists(path) then
+         local lwaftr_id = shm.open(path, lwtypes.lwaftr_id_type)
+         if ffi.string(lwaftr_id.value) == target_id then
+            return pid
+         end
+      end
+   end
+   print("Couldn't find instance with id '%s'"):format(target_id)
+   main.exit(1)
+end
+
+local function select_snabb_instance (id)
+   if tonumber(id) then
+      return top.select_snabb_instance(id)
+   else
+      return select_snabb_instance_by_id(id)
+   end
+end
 
 local counter_names = (function ()
    local counters = {
