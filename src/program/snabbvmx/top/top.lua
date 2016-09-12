@@ -137,7 +137,7 @@ function get_stats (counters)
    return stats
 end
 
-local lwaftr_metrics_row = {31, 7, 7, 7, 7, 11}
+local lwaftr_metrics_row = {51, 7, 7, 7, 7, 11}
 function print_lwaftr_metrics (new_stats, last_stats, time_delta)
    local function delta(t, s, name)
       assert(t[name] and s[name])
@@ -185,10 +185,10 @@ function print_lwaftr_metrics (new_stats, last_stats, time_delta)
       ::continue::
    end
 
-   local metrics_row = {30, 20, 20}
+   local metrics_row = {50, 20, 20}
    for lwaftrspec, lwaftr in pairs(new_stats.lwaftr) do
       if last_stats.lwaftr[lwaftrspec] then
-         io.write(("\n%30s  %20s %20s\n"):format("", "Total", "per second"))
+         io.write(("\n%50s  %20s %20s\n"):format("", "Total", "per second"))
          local t = new_stats.lwaftr[lwaftrspec]
          local s = last_stats.lwaftr[lwaftrspec]
          if lwaftrspec == "nic" then
