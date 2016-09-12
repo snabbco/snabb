@@ -27,7 +27,11 @@ end
 function app (config, name, class, arg)
    assert(type(name) == "string", "name must be a string")
    assert(type(class) == "table", "class must be a table")
-   if class.config then arg = parse_app_arg(arg, class.config) end
+   if class.config then
+      local status, result = pcall(parse_app_arg, arg, class.config)
+      if status then arg = result
+      else error("failed to configure '"..name.."': "..result) end
+   end
    config.apps[name] = { class = class, arg = arg}
 end
 
