@@ -40,7 +40,7 @@ local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.
 PKT_FROM_INET = 1
 PKT_HAIRPINNED = 2
 
-local debug = false
+local debug = lib.getenv("LWAFTR_DEBUG")
 
 -- Local bindings for constants that are used in the hot path of the
 -- data plane.  Not having them here is a 1-2% performance penalty.
