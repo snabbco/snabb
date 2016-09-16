@@ -244,8 +244,6 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
       config.app(c, "tagv6", vlan.Tagger, { tag=conf.v6_vlan_tag })
    end
 
-   local basic_apps = require("apps.basic.basic_apps")
-   local V4V6 = require("apps.lwaftr.V4V6").V4V6
    config.app(c, 'v4v6', V4V6)
    config.app(c, 'splitter', V4V6)
    config.app(c, 'join', basic_apps.Join)
@@ -302,6 +300,90 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
       config.link(c, "capturev6.output -> untagv6.input")
       config.link(c, "tagv4.output -> output_filev4.input")
       config.link(c, "tagv6.output -> output_filev6.input")
+   end
+
+   link_source(c, unpack(sources))
+   link_sink(c, unpack(sinks))
+end
+
+function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
+   lwaftr_app(c, conf)
+
+   config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
+   config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
+   config.app(c, "loop_v4", basic_apps.Repeater)
+   config.app(c, "loop_v6", basic_apps.Repeater)
+   config.app(c, "sink", basic_apps.Sink)
+   if conf.vlan_tagging then
+      config.app(c, "untagv4", vlan.Untagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "untagv6", vlan.Untagger, { tag=conf.v6_vlan_tag })
+      config.app(c, "tagv4", vlan.Tagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "tagv6", vlan.Tagger, { tag=conf.v6_vlan_tag })
+   end
+
+   local sources = { "loop_v4.output", "loop_v6.output" }
+   local sinks = { "sink.v4", "sink.v6" }
+
+   config.link(c, "capturev4.output -> loop_v4.input")
+   config.link(c, "capturev6.output -> loop_v6.input")
+
+   if conf.vlan_tagging then
+      sources = { "untagv4.output", "untagv6.output" }
+      sinks = { "tagv4.input", "tagv6.input" }
+
+      config.link(c, "loop_v4.output -> untagv4.input")
+      config.link(c, "loop_v6.output -> untagv6.input")
+      config.link(c, "tagv4.output -> sink.v4")
+      config.link(c, "tagv6.output -> sink.v6")
+   end
+
+   link_source(c, unpack(sources))
+   link_sink(c, unpack(sinks))
+end
+
+function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
+   lwaftr_app(c, conf)
+
+   config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
+   config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
+   config.app(c, "loop_v4", basic_apps.Repeater)
+   config.app(c, "loop_v6", basic_apps.Repeater)
+   config.app(c, "sink", basic_apps.Sink)
+   if conf.vlan_tagging then
+      config.app(c, "untagv4", vlan.Untagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "untagv6", vlan.Untagger, { tag=conf.v6_vlan_tag })
+      config.app(c, "tagv4", vlan.Tagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "tagv6", vlan.Tagger, { tag=conf.v6_vlan_tag })
+   end
+
+   config.app(c, 'v4v6', V4V6)
+   config.app(c, 'splitter', V4V6)
+   config.app(c, 'join', basic_apps.Join)
+
+   local sources = { "v4v6.v4", "v4v6.v6" }
+   local sinks = { "v4v6.v4", "v4v6.v6" }
+
+   config.link(c, "capturev4.output -> loop_v4.input")
+   config.link(c, "capturev6.output -> loop_v6.input")
+
+   if conf.vlan_tagging then
+      config.link(c, "loop_v4.output -> untagv4.input")
+      config.link(c, "loop_v6.output -> untagv6.input")
+      config.link(c, "untagv4.output -> join.in1")
+      config.link(c, "untagv6.output -> join.in2")
+      config.link(c, "join.out -> v4v6.input")
+      config.link(c, "v4v6.output -> splitter.input")
+      config.link(c, "splitter.v4 -> tagv4.input")
+      config.link(c, "splitter.v6 -> tagv6.input")
+      config.link(c, "tagv4.output -> sink.in1")
+      config.link(c, "tagv6.output -> sink.in2")
+   else
+      config.link(c, "loop_v4.output -> join.in1")
+      config.link(c, "loop_v6.output -> join.in2")
+      config.link(c, "join.out -> v4v6.input")
+      config.link(c, "v4v6.output -> splitter.input")
+      config.link(c, "splitter.v4 -> sink.in1")
+      config.link(c, "splitter.v6 -> sink.in2")
    end
 
    link_source(c, unpack(sources))
