@@ -45,7 +45,7 @@ end
 function Tap:pull ()
    local l = self.output.output
    if l == nil then return end
-   while not link.full(l) do
+   for i=1,engine.pull_npackets do
       local p = packet.allocate()
       local len, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
       -- errno == EAGAIN indicates that the read would of blocked as there is no
