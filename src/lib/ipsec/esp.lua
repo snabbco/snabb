@@ -169,16 +169,17 @@ function esp_v6_decrypt:decapsulate (p)
       -- Assuming b) means 'in time', since systematic loss could stall resync indefinitely.
       self.decap_fail = self.decap_fail + 1
       if self.decap_fail >= ESP_RESYNC_THRESHOLD then
-         local seq_high_tmp = seq_high
+         local resync_start
          if seq_high >= 0 then -- We failed to decrypt in-place, undo the damage to recover the original ctext
             gcm:encrypt(ctext_start, iv_start, seq_low, seq_high, ctext_start, ctext_length, ffi.new("uint8_t[?]", gcm.AUTH_SIZE))
+            resync_start = seq_high + 1
          else
-            seq_high_tmp = self:seq_high() -- use the last seq_high we saw if it looked replayed
+            resync_start = self:seq_high() + 1 -- use the last seq_high we saw if it looked replayed
          end
          self.decap_fail = 0 -- avoid immediate re-triggering if resync fails
-         seq_high_tmp = self:resync(p, seq_low, seq_high_tmp + 1, ESP_RESYNC_ATTEMPTS)
-         if seq_high_tmp >= 0 then
-            seq_high = seq_high_tmp
+         local seq_high_resynced = self:resync(p, seq_low, resync_start, ESP_RESYNC_ATTEMPTS)
+         if seq_high_resynced >= 0 then
+            seq_high = seq_high_resynced
             -- resynced! the data has been decrypted in the process so we're ready to go
          else
             return false
