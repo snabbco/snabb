@@ -48,8 +48,6 @@ local PAYLOAD_OFFSET = ETHERNET_SIZE + IPV6_SIZE
 local ESP_NH = 50 -- https://tools.ietf.org/html/rfc4303#section-2
 local ESP_SIZE = esp:sizeof()
 local ESP_TAIL_SIZE = esp_tail:sizeof()
-local ESP_RESYNC_THRESHOLD = 4 -- Resync after this many consecutive failed decaps
-local ESP_RESYNC_ATTEMPTS = 6 -- Try this many increments of seq_high
 
 function esp_v6_new (conf)
    assert(conf.mode == "aes-128-gcm", "Only supports aes-128-gcm.")
@@ -127,6 +125,8 @@ function esp_v6_decrypt:new (conf)
    o.CTEXT_OFFSET = ESP_SIZE + gcm.IV_SIZE
    o.PLAIN_OVERHEAD = PAYLOAD_OFFSET + ESP_SIZE + gcm.IV_SIZE + gcm.AUTH_SIZE
    o.window_size = conf.window_size or 128
+   o.resync_threshold = conf.resync_threshold or 1024
+   o.resync_attempts = conf.resync_attempts or 8
    assert(o.window_size % 8 == 0, "window_size must be a multiple of 8.")
    o.window = ffi.new(window_t, o.window_size / 8)
    o.decap_fail = 0
@@ -168,7 +168,7 @@ function esp_v6_decrypt:decapsulate (p)
       -- to fall inside the replay window (seq_lo-wise) and would look replayed, yet aren't.
       -- Assuming b) means 'in time', since systematic loss could stall resync indefinitely.
       self.decap_fail = self.decap_fail + 1
-      if self.decap_fail >= ESP_RESYNC_THRESHOLD then
+      if self.decap_fail >= self.resync_threshold then
          local resync_start
          if seq_high >= 0 then -- We failed to decrypt in-place, undo the damage to recover the original ctext
             gcm:encrypt(ctext_start, iv_start, seq_low, seq_high, ctext_start, ctext_length, ffi.new("uint8_t[?]", gcm.AUTH_SIZE))
@@ -177,7 +177,7 @@ function esp_v6_decrypt:decapsulate (p)
             resync_start = self:seq_high() + 1 -- use the last seq_high we saw if it looked replayed
          end
          self.decap_fail = 0 -- avoid immediate re-triggering if resync fails
-         local seq_high_resynced = self:resync(p, seq_low, resync_start, ESP_RESYNC_ATTEMPTS)
+         local seq_high_resynced = self:resync(p, seq_low, resync_start, self.resync_attempts)
          if seq_high_resynced >= 0 then
             seq_high = seq_high_resynced
             -- resynced! the data has been decrypted in the process so we're ready to go
@@ -224,7 +224,9 @@ function selftest ()
    local conf = { spi = 0x0,
                   mode = "aes-128-gcm",
                   keymat = "00112233445566778899AABBCCDDEEFF",
-                  salt = "00112233"}
+                  salt = "00112233",
+                  resync_threshold = 16,
+                  resync_attempts = 8}
    local enc, dec = esp_v6_encrypt:new(conf), esp_v6_decrypt:new(conf)
    local payload = packet.from_string(
 [[abcdefghijklmnopqrstuvwxyz
@@ -340,7 +342,7 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    assert(dec:decapsulate(px), "decapsulation failed")
    enc.seq:high(3) -- pretend there has been massive packet loss
    enc.seq:low(24)
-   for i = 1, ESP_RESYNC_THRESHOLD-1 do
+   for i = 1, dec.resync_threshold-1 do
       px = packet.clone(p)
       enc:encapsulate(px)
       assert(not dec:decapsulate(px), "decapsulated pre-resync packet")
@@ -350,7 +352,7 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    assert(dec:decapsulate(px), "failed to resynchronize")
    -- Make sure we don't accidentally resynchronize with very old replayed traffic
    enc.seq.no = 42
-   for i = 1, ESP_RESYNC_THRESHOLD-1 do
+   for i = 1, dec.resync_threshold-1 do
       px = packet.clone(p)
       enc:encapsulate(px)
       assert(not dec:decapsulate(px), "decapsulated very old packet")

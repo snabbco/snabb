@@ -38,6 +38,11 @@ be a table with the following keys:
 * `spi` - “Security Parameter Index” as specified in RFC 4303.
 * `window_size` - *Optional*. Width of the window in which out of order packets
   are accepted. The default is 128. (`esp_v6_decrypt` only.)
+* `resync_threshold` - *Optional*. Number of consecutive packets that failed
+  authentication before triggering RFC4303 App. A3 resynchronization.
+  The default is 1024.
+* `resync_attempts` - *Optional*. Number of attempts to resynchronize
+  a packet that triggered the resync process (see above). The default is 8.
 
 — Method **esp_v6_encrypt:encapsulate** *packet*
 
