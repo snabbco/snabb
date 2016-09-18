@@ -348,4 +348,14 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    px = packet.clone(p)
    enc:encapsulate(px)
    assert(dec:decapsulate(px), "failed to resynchronize")
+   -- Make sure we don't accidentally resynchronize with very old replayed traffic
+   enc.seq.no = 42
+   for i = 1, ESP_RESYNC_THRESHOLD-1 do
+      px = packet.clone(p)
+      enc:encapsulate(px)
+      assert(not dec:decapsulate(px), "decapsulated very old packet")
+   end
+   px = packet.clone(p)
+   enc:encapsulate(px)
+   assert(not dec:decapsulate(px), "resynchronized with the past!")
 end
