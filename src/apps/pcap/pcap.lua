@@ -35,6 +35,11 @@ end
 PcapWriter = {}
 
 function PcapWriter:new (filename)
+   local mode = "w"
+   if type(filename) == "table" then
+      mode = filename[2] or mode
+      filename = filename[1]
+   end
    local file = assert(io.open(filename, "w"))
    pcap.write_file_header(file)
    return setmetatable({file = file}, {__index = PcapWriter})
