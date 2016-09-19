@@ -165,6 +165,10 @@ TEST_DATA=(
 "no_icmp.conf" "" "tcp-fromb4-tob4-ipv6.pcap" "" "recap-ipv6.pcap"
 "from-to-b4-ipv6-hairpin.lua"
 
+"from-to-b4 IPv6 packet, with hairpinning, number of packets 64"
+"no_icmp.conf" "" "tcp-fromb4-tob4-ipv6-n64.pcap" "" "recap-ipv6-n64.pcap"
+"from-to-b4-ipv6-hairpin-n64.lua"
+
 # Ping from 127:11:12:13:14:15:16:128 / 178.79.150.233+7850 to
 # 178.79.150.1, which has b4 address 127:22:33:44:55:66:77:127 and is
 # not port-restricted.
