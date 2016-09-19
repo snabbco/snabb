@@ -520,15 +520,16 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
    return transmit(lwstate.o6, pkt)
 end
 
-local function enqueue_lookup(lwstate, pkt, ipv4, port, flush, pkt_src_link)
-   local lq
-   if pkt_src_link == PKT_FROM_INET then
-      lq = lwstate.inet_lookup_queue
-   elseif pkt_src_link == PKT_HAIRPINNED then
-      lq = lwstate.hairpin_lookup_queue
-   else
-      assert(false, "Programming error, bad pkt_src_link: " .. pkt_src_link)
+local function select_lookup_queue (lwstate, link)
+   if link == PKT_FROM_INET then
+      return lwstate.inet_lookup_queue
+   elseif link == PKT_HAIRPINNED then
+      return lwstate.hairpin_lookup_queue
    end
+   assert(false, "Programming error, bad link: " .. link)
+end
+
+local function enqueue_lookup(lwstate, pkt, ipv4, port, flush, lq)
    if lq:enqueue_lookup(pkt, ipv4, port) then
       -- Flush the queue right away if enough packets are queued up already.
       flush(lwstate)
@@ -570,7 +571,9 @@ local function flush_encapsulation(lwstate)
 end
 
 local function enqueue_encapsulation(lwstate, pkt, ipv4, port, pkt_src_link)
-   enqueue_lookup(lwstate, pkt, ipv4, port, flush_encapsulation, pkt_src_link)
+   local lq = select_lookup_queue(lwstate, pkt_src_link)
+   local flush = lq == lwstate.inet_lookup_queue and flush_encapsulation or flush_hairpin
+   enqueue_lookup(lwstate, pkt, ipv4, port, flush, lq)
 end
 
 local function icmpv4_incoming(lwstate, pkt, pkt_src_link)
@@ -752,7 +755,7 @@ local function flush_decapsulation(lwstate)
 end
 
 local function enqueue_decapsulation(lwstate, pkt, ipv4, port)
-   enqueue_lookup(lwstate, pkt, ipv4, port, flush_decapsulation, PKT_FROM_INET)
+   enqueue_lookup(lwstate, pkt, ipv4, port, flush_decapsulation, lwstate.inet_lookup_queue)
 end
 
 -- FIXME: Verify that the packet length is big enough?

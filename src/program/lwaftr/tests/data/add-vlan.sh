@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # https://en.wikipedia.org/wiki/IEEE_802.1Q 
 # 802.1q payload:
@@ -77,6 +77,7 @@ V6=(
     recap-customBR-IPs-ipv6.pcap
     recap-fromcustom-BRIP-ipv6.pcap
     recap-ipv6.pcap
+    recap-ipv6-n64.pcap
     recap-tocustom-BRIP-ipv6.pcap
     response-ipv6-tunneled-icmpv4_31-tob4.pcap
     tcp-afteraftr-ipv6-2frags.pcap
@@ -92,6 +93,7 @@ V6=(
     tcp-fromb4-ipv6.pcap
     tcp-fromb4-tob4-customBRIP-ipv6.pcap
     tcp-fromb4-tob4-ipv6.pcap
+    tcp-fromb4-tob4-ipv6-n64.pcap
     tcp-ipv6-2frags-bound.pcap
     tcp-ipv6-2frags-bound-reverse.pcap
     tcp-fromb4-tob4-ipv6-ttl-1.pcap
