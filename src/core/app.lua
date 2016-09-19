@@ -14,6 +14,7 @@ local zone      = require("jit.zone")
 local jit       = require("jit")
 local ffi       = require("ffi")
 local C         = ffi.C
+local S         = require("syscall")
 require("core.packet_h")
 
 -- Packet per pull
@@ -249,6 +250,42 @@ function apply_config_actions (actions, conf)
    -- Trigger link event for each app.
    for _, app in ipairs(app_array) do
       if app.link then app:link() end
+   end
+end
+
+-- Child process support
+
+local child
+
+-- Start an asynchronous child process to execute the engine configuration.
+-- Options are passed to engine.main() in the child.
+function start (options)
+   local pid = S.fork()
+   if pid == 0 then
+      -- This is the child worker process
+      main(options)
+      print("terminated")
+      os.exit(0)
+   else
+      -- This is the parent supervisor process
+      child = pid
+      print("child", child)
+   end
+end
+
+-- Stop the child process.
+function stop ()
+   if child then S.kill(child, "term") end
+end
+
+-- Return status of child process: 'unstarted' | 'running' | 'stopped'.
+function status ()
+   if child == nil then
+      return 'unstarted'
+   elseif S.waitid("pid", child, "exited, nohang") then
+      return 'running'
+   else
+      return 'stopped'
    end
 end
 
