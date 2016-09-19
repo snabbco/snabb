@@ -2,8 +2,12 @@
 
 # Contains an array of test cases.
 #
-# A test case is a group of 7 data fields (test name, lwaftr conf, v4_in, etc),
-# structured as 3 rows. Spaces and new lines are not taken into account.
+# A test case is a group of 7 data fields, structured as 3 rows:
+#  - "test_name"
+#  - "lwaftr_conf" "in_v4" "in_v6" "out_v4" "out_v6"
+#  - "counters"
+#
+# Notice spaces and new lines are not taken into account.
 TEST_DATA=(
 "from-internet IPv4 packet found in the binding table."
 "icmp_on_fail.conf" "tcp-frominet-bound.pcap" "" "" "tcp-afteraftr-ipv6.pcap"
