@@ -346,3 +346,17 @@ TEST_DATA=(
 "in-1p-ipv6-out-1p-ipv4-4-and-echo.lua"
 )
 TEST_SIZE=${#TEST_DATA[@]}
+
+function read_column {
+    echo "${TEST_DATA[$1]}"
+}
+
+function read_column_pcap {
+    index=$1
+    column="${TEST_DATA[$index]}"
+    if [[ ${#column} == 0 ]];  then
+        echo "${EMPTY}"
+    else
+        echo "${TEST_BASE}/$column"
+    fi
+}
