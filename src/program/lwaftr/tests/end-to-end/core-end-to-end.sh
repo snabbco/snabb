@@ -95,20 +95,6 @@ export COUNTERS="../data/counters"
 
 source "test-data.sh"
 
-function read_column {
-    echo "${TEST_DATA[$1]}"
-}
-
-function read_column_pcap {
-    index=$1
-    column="${TEST_DATA[$index]}"
-    if [[ ${#column} == 0 ]];  then
-        echo "${EMPTY}"
-    else
-        echo "${TEST_BASE}/$column"
-    fi
-}
-
 function run_test {
     index=$1
     test_name="$(read_column $index)"
