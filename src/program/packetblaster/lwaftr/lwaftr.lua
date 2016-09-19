@@ -38,8 +38,8 @@ local long_opts = {
    ipv4         = "I",    -- fix public IPv4 address
    count        = "c",    -- how many b4 clients to simulate
    rate         = "r",    -- rate in MPPS (0 => listen only)
-   v4only       = "P",    -- generate only public IPv4 traffic
-   v6only       = "E",    -- generate only public IPv6 encapsulated traffic
+   v4only       = "4",    -- generate only public IPv4 traffic
+   v6only       = "6",    -- generate only public IPv6 encapsulated traffic
    pcap         = "o"     -- output packet to the pcap file
 }
 

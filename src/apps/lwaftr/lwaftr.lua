@@ -40,7 +40,7 @@ local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.
 PKT_FROM_INET = 1
 PKT_HAIRPINNED = 2
 
-local debug = false
+local debug = lib.getenv("LWAFTR_DEBUG")
 
 -- Local bindings for constants that are used in the hot path of the
 -- data plane.  Not having them here is a 1-2% performance penalty.
@@ -212,7 +212,7 @@ local function init_transmit_icmpv4_reply (lwstate)
    local icmpv4_rate_limiter_n_packets = lwstate.icmpv4_rate_limiter_n_packets
    local num_packets = 0
    local last_time
-   return function (o, pkt, orig_pkt)
+   return function (o, pkt, orig_pkt, orig_pkt_link)
       local now = tonumber(engine.now())
       last_time = last_time or now
       -- Reset if elapsed time reached.
@@ -223,7 +223,11 @@ local function init_transmit_icmpv4_reply (lwstate)
       -- Send packet if limit not reached.
       if num_packets < icmpv4_rate_limiter_n_packets then
          num_packets = num_packets + 1
-         drop(orig_pkt)
+         if orig_pkt_link then
+            drop_ipv4(lwstate, orig_pkt, orig_pkt_link)
+         else
+            drop(orig_pkt)
+         end
          counter.add(lwstate.counters["out-icmpv4-bytes"], pkt.length)
          counter.add(lwstate.counters["out-icmpv4-packets"])
          -- Only locally generated error packets are handled here.  We transmit
@@ -401,8 +405,7 @@ local function drop_ipv4_packet_to_unreachable_host(lwstate, pkt, pkt_src_link)
       lwstate.aftr_mac_inet_side, lwstate.inet_mac, lwstate.aftr_ipv4_ip,
       to_ip, pkt, icmp_config)
 
-   drop_ipv4(lwstate, pkt, pkt_src_link)
-   return transmit_icmpv4_reply(lwstate, icmp_dis, pkt)
+   return transmit_icmpv4_reply(lwstate, icmp_dis, pkt, pkt_src_link)
 end
 
 -- ICMPv6 type 1 code 5, as per RFC 7596.
@@ -475,8 +478,7 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
          lwstate.aftr_mac_inet_side, lwstate.inet_mac, lwstate.aftr_ipv4_ip,
          dst_ip, pkt, icmp_config)
 
-      drop_ipv4(lwstate, pkt, pkt_src_link)
-      return transmit_icmpv4_reply(lwstate, reply, pkt)
+      return transmit_icmpv4_reply(lwstate, reply, pkt, pkt_src_link)
    end
 
    if debug then print("ipv6", ipv6_src, ipv6_dst) end
@@ -494,8 +496,7 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
          return drop_ipv4(lwstate, pkt, pkt_src_link)
       end
       local reply = cannot_fragment_df_packet_error(lwstate, pkt)
-      drop_ipv4(lwstate, pkt, pkt_src_link)
-      return transmit_icmpv4_reply(lwstate, reply, pkt)
+      return transmit_icmpv4_reply(lwstate, reply, pkt, pkt_src_link)
    end
 
    local payload_length = get_ethernet_payload_length(pkt)
