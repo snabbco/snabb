@@ -99,6 +99,10 @@ function run(args)
    if file_exists(conf_file) then
       conf = lib.load_conf(conf_file)
       if not file_exists(conf.lwaftr) then
+         -- Search in main config file.
+         conf.lwaftr = lib.dirname(conf_file).."/"..conf.lwaftr
+      end
+      if not file_exists(conf.lwaftr) then
          fatal(("lwAFTR conf file '%s' not found"):format(conf.lwaftr))
       end
       lwconf = require('apps.lwaftr.conf').load_lwaftr_config(conf.lwaftr)
