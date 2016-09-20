@@ -75,8 +75,8 @@ function set_dst_ethernet(pkt, dst_eth)
 end
 
 function write_to_file(filename, content)
-   local fd = assert(io.open(filename, "wt"),
-      ("Couldn't open file: '%s'"):format(filename))
+   local fd, err = io.open(filename, "wt+")
+   if not fd then error(err) end
    fd:write(content)
    fd:close()
 end

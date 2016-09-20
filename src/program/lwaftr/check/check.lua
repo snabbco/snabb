@@ -108,10 +108,10 @@ function run(args)
       engine.main({duration=0.10})
       local final_counters = read_counters(c)
       local counters_diff = diff_counters(final_counters, initial_counters)
-      local req_counters = load_requested_counters(counters_path)
       if opts.r then
          regen_counters(counters_diff, counters_path)
       else
+         local req_counters = load_requested_counters(counters_path)
          validate_diff(counters_diff, req_counters)
       end
    else
