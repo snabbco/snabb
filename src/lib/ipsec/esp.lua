@@ -161,26 +161,32 @@ function esp_v6_decrypt:decapsulate (p)
                    "flow_id=" .. tostring(self.ip:flow_label()) .. ", " ..
                    "reason='" .. reason .. "'";
       logger:log("Rejecting packet ("..info..")")
-      -- RFC4303 is somewhat unclear on a) whether or not packets that look replayed are eligible to trigger
-      -- recyns, and b) what 'consecutive' means in "number of consecutive packets that fail authentication":
+      -- RFC4303 is somewhat unclear on a) whether or not packets that look
+      -- replayed are eligible to trigger recyns, and b) what 'consecutive'
+      -- means in "number of consecutive packets that fail authentication":
       -- Consecutive in time? Consecutive in their seq_low's?
-      -- Assuming a) should be 'yes' since the to-be-resynced packets might have seq_low's that just happen
-      -- to fall inside the replay window (seq_lo-wise) and would look replayed, yet aren't.
-      -- Assuming b) means 'in time', since systematic loss could stall resync indefinitely.
+      -- Assuming a) should be 'yes' since the to-be-resynced packets might
+      -- have seq_low's that just happen to fall inside the replay window
+      -- (seq_lo-wise) and would look replayed, yet aren't. Assuming b) means
+      -- 'in time', since systematic loss could stall resync indefinitely.
       self.decap_fail = self.decap_fail + 1
       if self.decap_fail >= self.resync_threshold then
          local resync_start
-         if seq_high >= 0 then -- We failed to decrypt in-place, undo the damage to recover the original ctext
+         if seq_high >= 0 then
+            -- We failed to decrypt in-place, undo the damage to recover the
+            -- original ctext
             gcm:encrypt(ctext_start, iv_start, seq_low, seq_high, ctext_start, ctext_length, ffi.new("uint8_t[?]", gcm.AUTH_SIZE))
             resync_start = seq_high + 1
          else
-            resync_start = self:seq_high() + 1 -- use the last seq_high we saw if it looked replayed
+            -- use the last seq_high we saw if it looked replayed
+            resync_start = self:seq_high() + 1
          end
          self.decap_fail = 0 -- avoid immediate re-triggering if resync fails
          local seq_high_resynced = self:resync(p, seq_low, resync_start, self.resync_attempts)
-         if seq_high_resynced >= 0 then
+         if seq_high_resynced then
             seq_high = seq_high_resynced
-            -- resynced! the data has been decrypted in the process so we're ready to go
+            -- resynced! the data has been decrypted in the process so we're
+            -- ready to go
          else
             return false
          end
@@ -211,11 +217,10 @@ function esp_v6_decrypt:resync(p, seq_low, seq_high, n)
       if gcm:decrypt(ctext_start, seq_low, seq_high, iv_start, ctext_start, ctext_length) then
          return seq_high
       else
-         C.memmove(p.data, p_orig.data, p_orig.length)
+         ffi.copy(p.data, p_orig.data, p_orig.length)
       end
       seq_high = seq_high + 1
    end
-   return -1
 end
 
 function selftest ()
@@ -350,7 +355,8 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    px = packet.clone(p)
    enc:encapsulate(px)
    assert(dec:decapsulate(px), "failed to resynchronize")
-   -- Make sure we don't accidentally resynchronize with very old replayed traffic
+   -- Make sure we don't accidentally resynchronize with very old replayed
+   -- traffic
    enc.seq.no = 42
    for i = 1, dec.resync_threshold-1 do
       px = packet.clone(p)
