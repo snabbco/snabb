@@ -88,36 +88,14 @@ function snabb_run_and_cmp {
    fi
 }
 
-export SNABB_LWAFTR="../../../../snabb lwaftr"
-export TEST_OUT="/tmp"
-export EMPTY="../data/empty.pcap"
-export COUNTERS="../data/counters"
+source "test_env.sh"
 
-source "test-data.sh"
+TEST_OUT="/tmp"
+SNABB_LWAFTR="../../../../snabb lwaftr"
 
-function run_test {
-    index=$1
-    test_name="$(read_column $index)"
-    conf="${TEST_BASE}/$(read_column $((index + 1)))"
-    in_v4=$(read_column_pcap $(($index + 2)))
-    in_v6=$(read_column_pcap $(($index + 3)))
-    out_v4=$(read_column_pcap $(($index + 4)))
-    out_v6=$(read_column_pcap $(($index + 5)))
-    counters="${COUNTERS}/$(read_column $(($index + 6)))"
-    echo "Testing: $test_name"
-    snabb_run_and_cmp "$conf" "$in_v4" "$in_v6" "$out_v4" "$out_v6" "$counters"
-}
-
-function next_test {
-    ROW_INDEX=$(($ROW_INDEX + 7))
-    if [[ $ROW_INDEX -ge $TEST_SIZE ]]; then
-        echo "All end-to-end lwAFTR tests passed."
-        exit 0
-    fi
-}
-
-ROW_INDEX=0
 while true; do
-    run_test $ROW_INDEX
-    next_test
+    print_test_name
+    snabb_run_and_cmp $(read_test_data)
+    next_test || break
 done
+echo "All end-to-end lwAFTR tests passed."
