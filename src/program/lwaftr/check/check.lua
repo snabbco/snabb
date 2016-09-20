@@ -1,17 +1,18 @@
 module(..., package.seeall)
 
-local app = require("core.app")
 local config = require("core.config")
 local counter = require("core.counter")
 local lib = require("core.lib")
+local lwconf = require('apps.lwaftr.conf')
+local lwcounter = require("apps.lwaftr.lwcounter")
+local lwutil = require("apps.lwaftr.lwutil")
 local setup = require("program.lwaftr.setup")
+
 -- Get the counter directory and names from the code, so that any change
 -- in there will be automatically picked up by the tests.
-local lwaftr = require("apps.lwaftr.lwaftr")
-local lwcounter = require("apps.lwaftr.lwcounter")
 local counter_names = lwcounter.counter_names
 local counters_dir = lwcounter.counters_dir
-local lwutil = require("apps.lwaftr.lwutil")
+
 local write_to_file = lwutil.write_to_file
 
 function show_usage(code)
@@ -91,44 +92,20 @@ local function regen_counters(counters, outfile)
    write_to_file(outfile, (table.concat(out_val, '\n')))
 end
 
-local function run_on_a_stick (args)
+function run(args)
+   local opts, args = parse_args(args)
+   local load_check = opts["on-a-stick"] and setup.load_check_on_a_stick
+                                         or  setup.load_check
    local conf_file, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap, counters_path =
       unpack(args)
-   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
+   local conf = lwconf.load_lwaftr_config(conf_file)
 
    local c = config.new()
-   setup.load_check_on_a_stick(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
+   setup.load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    engine.configure(c)
    if counters_path then
       local initial_counters = read_counters(c)
       engine.main({duration=0.10})
-      local final_counters = read_counters(c)
-      local counters_diff = diff_counters(final_counters, initial_counters)
-      local req_counters = load_requested_counters(counters_path)
-      validate_diff(counters_diff, req_counters)
-   else
-      engine.main({duration=0.10})
-   end
-end
-
-function run(args)
-   local opts, args = parse_args(args)
-   if opts["on-a-stick"] then
-      run_on_a_stick(args)
-      print("done")
-      return
-   end
-
-   local conf_file, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap, counters_path =
-      unpack(args)
-   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
-
-   local c = config.new()
-   setup.load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   app.configure(c)
-   if counters_path then
-      local initial_counters = read_counters(c)
-      app.main({duration=0.10})
       local final_counters = read_counters(c)
       local counters_diff = diff_counters(final_counters, initial_counters)
       local req_counters = load_requested_counters(counters_path)
@@ -138,7 +115,7 @@ function run(args)
          validate_diff(counters_diff, req_counters)
       end
    else
-      app.main({duration=0.10})
+      engine.main({duration=0.10})
    end
    print("done")
 end
