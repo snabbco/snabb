@@ -29,7 +29,7 @@ function quit_screens {
 
 function cleanup {
     quit_screens
-    kill $snabbvmx_pid $packetblaster_pid
+    kill $packetblaster_pid
     exit 0
 }
 
@@ -44,15 +44,14 @@ TARGET_MAC_B4=02:99:99:99:99:99
 rm -f $SNABBVMX_LOG
 
 # Run SnabbVMX.
-./snabb snabbvmx lwaftr --conf $SNABBVMX_CONF --id $SNABBVMX_ID \
-    --pci $SNABB_PCI0 --mac $MAC_ADDRESS_NET0 --sock $VHU_SOCK0 &>> $SNABBVMX_LOG &
-snabbvmx_pid=$!
+cmd="./snabb snabbvmx lwaftr --conf $SNABBVMX_CONF --id $SNABBVMX_ID --pci $SNABB_PCI0 --mac $MAC_ADDRESS_NET0 --sock $VHU_SOCK0"
+run_cmd_in_screen "snabbvmx" "$cmd"
 
 # Run QEMU.
-start_test_env &>> $SNABBVMX_LOG
+start_test_env
 
 # Flush lwAFTR packets to SnabbVMX.
-./snabb packetblaster replay -D 10 $PCAP_INPUT/v4v6-256.pcap $SNABB_PCI1 &>> $SNABBVMX_LOG &
+./snabb packetblaster replay -D 10 $PCAP_INPUT/v4v6-256.pcap $SNABB_PCI1 &
 packetblaster_pid=$!
 
 # Query nexthop for 10 seconds.
