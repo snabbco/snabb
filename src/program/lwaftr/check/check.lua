@@ -35,7 +35,9 @@ function parse_args (args)
 end
 
 function load_requested_counters(counters)
-   return dofile(counters)
+   local result = dofile(counters)
+   assert(type(result) == "table", "Not a valid counters file: "..counters)
+   return result
 end
 
 function read_counters(c)
