@@ -47,7 +47,7 @@ function IngressDropMonitor:sample ()
       end
    end
    if self.counter then
-      counter.add(self.counter, sum[0])
+      counter.set(self.counter, sum[0])
    end
 end
 
