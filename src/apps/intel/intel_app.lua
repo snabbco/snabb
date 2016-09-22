@@ -13,7 +13,21 @@ local register = require("lib.hardware.register")
 local macaddress = require("lib.macaddress")
 local intel10g = require("apps.intel.intel10g")
 local receive, transmit, empty = link.receive, link.transmit, link.empty
-Intel82599 = {}
+
+Intel82599 = {
+   config = {
+      pciaddr = {required=true},
+      mtu = {},
+      macaddr = {},
+      vlan = {},
+      vmdq = {},
+      mirror = {},
+      rxcounter  = {default=0},
+      txcounter  = {default=0},
+      rate_limit = {default=0},
+      priority   = {default=1.0}
+   }
+}
 Intel82599.__index = Intel82599
 
 local C = ffi.C
@@ -35,8 +49,7 @@ local function firsthole(t)
 end
 
 -- Create an Intel82599 App for the device with 'pciaddress'.
-function Intel82599:new (arg)
-   local conf = config.parse_app_arg(arg)
+function Intel82599:new (conf)
    local self = {}
 
    if conf.vmdq then
@@ -111,8 +124,7 @@ function Intel82599:stop()
 end
 
 
-function Intel82599:reconfig(arg)
-   local conf = config.parse_app_arg(arg)
+function Intel82599:reconfig (conf)
    assert((not not self.dev.pf) == (not not conf.vmdq), "Can't reconfig from VMDQ to single-port or viceversa")
 
    self.dev:reconfig(conf)

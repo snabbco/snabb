@@ -7,14 +7,16 @@ local ethernet = require("lib.protocol.ethernet")
 local datagram = require("lib.protocol.datagram")
 local transmit, receive = link.transmit, link.receive
 
-Synth = {}
+Synth = {
+   config = {
+      sizes = {default={64}},
+      src = {default='00:00:00:00:00:00'},
+      dst = {default='00:00:00:00:00:00'},
+   }
+}
 
-function Synth:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   conf.sizes = conf.sizes or {64}
+function Synth:new (conf)
    assert(#conf.sizes >= 1, "Needs at least one size.")
-   conf.src = conf.src or '00:00:00:00:00:00'
-   conf.dst = conf.dst or '00:00:00:00:00:00'
    local packets = {}
    for i, size in ipairs(conf.sizes) do
       local payload_size = size - ethernet:sizeof()

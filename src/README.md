@@ -106,9 +106,15 @@ Name of the app. *Read-only*.
 
 — Field **myapp.shm**
 
-Can be set to a specification for `core.shm.create_frame` during `new`. When
-set, this field will be initialized to a frame of shared memory objects by the
-engine.
+Can be set to a specification for `core.shm.create_frame`. When set, this field
+will be initialized to a frame of shared memory objects by the engine.
+
+
+— Field **myapp.config**
+
+Can be set to a specification for `core.lib.parse`. When set, the specification
+will be used to validate the app’s arg when it is configured using
+`config.app`.
 
 
 — Method **myapp:link**
@@ -333,7 +339,7 @@ Returns a structure holding ring statistics for the *link*:
 
 ## Packet (core.packet)
 
-A *packet* is an FFI object of type `packet.packet_t` representing a network
+A *packet* is an FFI object of type `struct packet` representing a network
 packet that is currently being processed. The packet is used to explicitly
 manage the life cycle of the packet. Packets are explicitly allocated and freed
 by using `packet.allocate` and `packet.free`. When a packet is received using
@@ -345,7 +351,7 @@ freed. The number of allocatable packets is limited by the size of the
 underlying “freelist”, e.g. a pool of unused packet objects from and to which
 packets are allocated and freed.
 
-— Ctype **packet.packet_t**
+— Type **struct packet**
 
 ```
 struct packet {
@@ -397,7 +403,7 @@ or equal to `length` of *packet*.
 
 — Function **packet.shiftright** *packet*, *length*
 
-Move *packet* payload to the right by *length* bytes, growing *packet* by
+Moves *packet* payload to the right by *length* bytes, growing *packet* by
 *length*. The sum of *length* and `length` of *packet* must be less than or
 equal to `packet.max_payload`.
 
@@ -409,6 +415,10 @@ Allocate packet and fill it with *length* bytes from *pointer*.
 
 Allocate packet and fill it with the contents of *string*.
 
+— Function **packet.clone_to_memory* *pointer* *packet*
+
+Creates an exact copy of at memory pointed to by *pointer*. *Pointer* must
+point to a `packet.packet_t`.
 
 ## Memory (core.memory)
 
@@ -478,6 +488,10 @@ Maps an existing shared object of *type* into memory via a hierarchical *name*.
 If *readonly* is non-nil the shared object is mapped in read-only mode.
 *Readonly* defaults to nil. Fails if the shared object does not already exist.
 Returns a pointer to the mapped object.
+
+— Function **shm.exists** *name*
+
+Returns a true value if shared object by *name* exists.
 
 — Function **shm.unmap** *pointer*
 
@@ -872,6 +886,28 @@ integers *n* respectively.
 Network to host byte order conversion functions for 32 and 16 bit
 integers *n* respectively.
 
+— Function **lib.parse** *arg*, *config*
+
+Validates *arg* against the specification in *config*, and returns a fresh
+table containing the parameters in *arg* and any omitted optional parameters
+with their default values. Given *arg*, a table of parameters or `nil`, assert
+that from *config* all of the required keys are present, fill in any missing
+values for optional keys, and error if any unknown keys are found. *Config* has
+the following format:
+
+```
+config := { key = {[required=boolean], [default=value]}, ... }
+```
+
+Each key is optional unless `required` is set to a true value, and its default
+value defaults to `nil`.
+
+Example:
+
+```
+lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
+  => {foo=42, bar=43, baz=44}
+```
 
 
 ## Main
