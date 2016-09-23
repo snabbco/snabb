@@ -430,7 +430,6 @@ local function parse_br_addresses(parser)
       parser:skip_whitespace()
       if parser:check(',') then parser:skip_whitespace() end
    end
-   if #addresses == 0 then parser:error('no lwaftr addresses specified') end
    local ret = ffi.new(ffi.typeof('$[?]', br_address_t), #addresses)
    for i, addr in ipairs(addresses) do ret[i-1].addr = addr end
    return ret, #addresses

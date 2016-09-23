@@ -93,7 +93,7 @@ function RangeMapBuilder:build(default_value)
    -- contiguous entries with the highest K having a value V, starting
    -- with UINT32_MAX and working our way down.
    local ranges = {}
-   if self.entries[#self.entries].max.key < UINT32_MAX then
+   if #self.entries == 0 or self.entries[#self.entries].max.key < UINT32_MAX then
       table.insert(self.entries,
                    { min=self.entry_type(UINT32_MAX, default_value),
                      max=self.entry_type(UINT32_MAX, default_value) })
