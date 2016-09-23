@@ -591,7 +591,7 @@ function Ctl:new()
 end
 
 function Ctl:push()
-   local rx = self.input.rx
+   local rx = self.input.input
    if rx == nil then return end
    while not link.empty(rx) do
       local p = link.receive(rx)
@@ -607,7 +607,7 @@ function Punt:new()
 end
 
 function Punt:pull()
-   local tx = self.output.tx
+   local tx = self.output.output
    if tx == nil then return end
    for i=1,engine.pull_npackets do
       local s = get_punt_message()
@@ -652,8 +652,8 @@ function Dumper:new(text)
 end
 
 function Dumper:push()
-   local rx = self.input.rx
-   local tx = self.output.tx
+   local rx = self.input.input
+   local tx = self.output.output
    if rx == nil or tx == nil then return end
    while not link.empty(rx) do
       local p = link.receive(rx)
@@ -703,7 +703,7 @@ function run(args)
          listen = true,
          mode = "packet",
       })
-      config.link(c, "ctl_sock.tx -> ctl.rx")
+      config.link(c, "ctl_sock.output -> ctl.input")
    end
 
    if conf.punt_sock then
@@ -713,7 +713,7 @@ function run(args)
          listen = false,
          mode = "packet",
       })
-      config.link(c, "punt.tx -> punt_sock.rx")
+      config.link(c, "punt.output -> punt_sock.input")
    end
 
    --data plane
@@ -749,16 +749,16 @@ function run(args)
             next_hop = ip6str(exit.next_hop),
          })
 
-         config.link(c, _("nd_%s.south -> if_%s.rx", ifname, ifname))
-         config.link(c, _("if_%s.tx -> nd_%s.south", ifname, ifname))
+         config.link(c, _("nd_%s.south -> if_%s.input", ifname, ifname))
+         config.link(c, _("if_%s.output -> nd_%s.south", ifname, ifname))
 
          config.link(c, _("lisper.%s -> nd_%s.north", ifname, ifname))
          config.link(c, _("nd_%s.north -> lisper.%s", ifname, ifname))
 
       else -- phy -> lisper
 
-         config.link(c, _("lisper.%s -> if_%s.rx", ifname, ifname))
-         config.link(c, _("if_%s.tx -> lisper.%s", ifname, ifname))
+         config.link(c, _("lisper.%s -> if_%s.input", ifname, ifname))
+         config.link(c, _("if_%s.output -> lisper.%s", ifname, ifname))
 
       end
 

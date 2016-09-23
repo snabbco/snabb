@@ -153,7 +153,7 @@ function VirtioNetDevice:rx_buffer_add(rx_p, addr, len)
 end
 
 function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
-   local l = self.owner.output.tx
+   local l = self.owner.output.output
    if l then
       if band(self.rx_hdr_flags, C.VIO_NET_HDR_F_NEEDS_CSUM) ~= 0 and
          -- Bounds-check the checksum area
@@ -225,7 +225,7 @@ end
 
 
 function VirtioNetDevice:tx_packet_start(addr, len)
-   local l = self.owner.input.rx
+   local l = self.owner.input.input
    if link.empty(l) then return nil, nil end
    local tx_p = link.receive(l)
 
@@ -261,7 +261,7 @@ end
 
 function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
    local tx_mrg_hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, self:map_from_guest(addr))
-   local l = self.owner.input.rx
+   local l = self.owner.input.input
    local tx_p = self.tx.p
    ffi.fill(tx_mrg_hdr, virtio_net_hdr_mrg_rxbuf_size)
 

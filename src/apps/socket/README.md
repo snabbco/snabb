@@ -1,16 +1,16 @@
 # RawSocket App (apps.socket.raw)
 
 The `RawSocket` app is a bridge between Linux network interfaces (`eth0`,
-`lo`, etc.) and a Snabb app network. Packets taken from the `rx` port are
+`lo`, etc.) and a Snabb app network. Packets taken from the `input` port are
 transmitted over the selected interface. Packets received on the
-interface are put on the `tx` port.
+interface are put on the `output` port.
 
     DIAGRAM: RawSocket
-              +-----------+
-              |           |
-      rx ---->* RawSocket *----> tx
-              |           |
-              +-----------+
+               +-----------+
+               |           |
+    input ---->* RawSocket *----> output
+               |           |
+               +-----------+
 
 ## Configuration
 

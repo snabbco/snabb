@@ -129,8 +129,8 @@ function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
       rxcounter=1,
       macaddr = ethernet:ntop(conf.aftr_mac_b4_side)})
 
-   link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
-   link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
+   link_source(c, v4_nic_name..'.output', v6_nic_name..'.output')
+   link_sink(c, v4_nic_name..'.input', v6_nic_name..'.input')
 end
 
 function load_virt(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
@@ -145,8 +145,8 @@ function load_virt(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
       vlan=conf.vlan_tagging and conf.v6_vlan_tag,
       macaddr = ethernet:ntop(conf.aftr_mac_b4_side)})
 
-   link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
-   link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
+   link_source(c, v4_nic_name..'.output', v6_nic_name..'.output')
+   link_sink(c, v4_nic_name..'.input', v6_nic_name..'.input')
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)

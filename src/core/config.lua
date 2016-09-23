@@ -37,7 +37,7 @@ end
 
 -- API: Add a link to the configuration.
 --
--- Example: config.link(c, "nic.tx -> vm.rx")
+-- Example: config.link(c, "nic.output -> vm.input")
 function link (config, spec)
    config.links[canonical_link(spec)] = true
 end

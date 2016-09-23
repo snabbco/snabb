@@ -3,15 +3,15 @@
 ## Intel10G (apps.intel.intel_app)
 
 The `Intel10G` drives one port of an Intel 82599 Ethernet controller.
-Packets taken from the `rx` port are transmitted onto the network.
-Packets received from the network are put on the `tx` port.
+Packets taken from the `input` port are transmitted onto the network.
+Packets received from the network are put on the `output` port.
 
     DIAGRAM: Intel10G
-              +----------+
-              |          |
-      rx ---->* Intel10G *----> tx
-              |          |
-              +----------+
+               +----------+
+               |          |
+    input ---->* Intel10G *----> output
+               |          |
+               +----------+
 
 — Method **Intel10G.dev:get_rxstats**
 
