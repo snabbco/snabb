@@ -35,7 +35,7 @@ function lwaftr_app(c, conf)
               { src_ipv6 = conf.aftr_ipv6_ip, src_eth = conf.aftr_mac_b4_side,
                 dst_eth = conf.next_hop6_mac, dst_ipv6 = conf.next_hop_ipv6_addr })
    config.app(c, "arp", ipv4_apps.ARP,
-              { src_ipv4 = conf.aftr_ipv4_ip, src_eth = conf.aftr_mac_b4_side,
+              { src_ipv4 = conf.aftr_ipv4_ip, src_eth = conf.aftr_mac_inet_side,
                 dst_eth = conf.inet_mac, dst_ipv4 = conf.next_hop_ipv4_addr})
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
