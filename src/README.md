@@ -871,14 +871,14 @@ Returns a copy of *array*. *Array* must not be a "sparse array".
 — Function **lib.htons** *n*
 
 Host to network byte order conversion functions for 32 and 16 bit
-integers *n* respectively.
+integers *n* respectively. Unsigned.
 
 — Function **lib.ntohl** *n*
 
 — Function **lib.ntohs** *n*
 
 Network to host byte order conversion functions for 32 and 16 bit
-integers *n* respectively.
+integers *n* respectively. Unsigned.
 
 
 
