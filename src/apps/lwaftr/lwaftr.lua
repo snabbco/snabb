@@ -266,7 +266,6 @@ function LwAftr:new(conf)
    -- FIXME: Access these from the conf instead of splatting them onto
    -- the lwaftr app, if there is no performance impact.
    o.aftr_ipv4_ip = conf.aftr_ipv4_ip
-   o.aftr_ipv6_ip = conf.aftr_ipv6_ip
    o.aftr_mac_b4_side = conf.aftr_mac_b4_side
    o.aftr_mac_inet_side = conf.aftr_mac_inet_side
    o.next_hop6_mac = conf.next_hop6_mac or ethernet:pton("00:00:00:00:00:00")
@@ -410,7 +409,7 @@ end
 
 -- ICMPv6 type 1 code 5, as per RFC 7596.
 -- The source (ipv6, ipv4, port) tuple is not in the table.
-local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
+local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt, br_addr)
    if lwstate.policy_icmpv6_outgoing == lwconf.policies['DROP'] then
       -- ICMP error messages off by policy; silently drop.
       -- Not counting bytes because we do not even generate the packets.
@@ -419,13 +418,16 @@ local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
    end
 
    local ipv6_header = get_ethernet_payload(pkt)
-   local ipv6_src_addr = get_ipv6_src_address(ipv6_header)
+   local orig_src_addr = get_ipv6_src_address(ipv6_header)
+   -- If br_addr is specified, use that as the source addr. Otherwise, send it
+   -- back from the IPv6 address it was sent to.
+   local icmpv6_src_addr = br_addr or get_ipv6_dst_address(ipv6_header)
    local icmp_config = {type = constants.icmpv6_dst_unreachable,
                         code = constants.icmpv6_failed_ingress_egress_policy,
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(
-      lwstate.aftr_mac_b4_side, lwstate.next_hop6_mac, lwstate.aftr_ipv6_ip,
-      ipv6_src_addr, pkt, icmp_config)
+      lwstate.aftr_mac_b4_side, lwstate.next_hop6_mac, icmpv6_src_addr,
+      orig_src_addr --[[now dest--]], pkt, icmp_config)
    drop(pkt)
    transmit_icmpv6_reply(lwstate.o6, b4fail_icmp)
 end
@@ -748,7 +750,7 @@ local function flush_decapsulation(lwstate)
          counter.add(lwstate.counters["drop-no-source-softwire-ipv6-packets"])
          counter.add(lwstate.counters["drop-all-ipv6-iface-bytes"], pkt.length)
          counter.add(lwstate.counters["drop-all-ipv6-iface-packets"])
-         drop_ipv6_packet_from_bad_softwire(lwstate, pkt)
+         drop_ipv6_packet_from_bad_softwire(lwstate, pkt, br_addr)
       end
    end
    lq:reset_queue()
