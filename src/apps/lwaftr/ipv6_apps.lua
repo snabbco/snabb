@@ -12,13 +12,16 @@ local ipv6 = require("lib.protocol.ipv6")
 local checksum = require("lib.checksum")
 local packet = require("core.packet")
 local counter = require("core.counter")
+local lib = require("core.lib")
 
 local bit = require("bit")
 local ffi = require("ffi")
 local C = ffi.C
 
 local receive, transmit = link.receive, link.transmit
-local rd16, wr16, htons = lwutil.rd16, lwutil.wr16, lwutil.htons
+local rd16, wr16 = lwutil.rd16, lwutil.wr16
+local is_ipv6, is_ipv6_fragment = lwutil.is_ipv6, lwutil.is_ipv6_fragment
+local htons = lib.htons
 
 local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
 local n_ethertype_ipv6 = constants.n_ethertype_ipv6
@@ -57,22 +60,13 @@ function ReassembleV6:cache_fragment(fragment)
    return fragv6_h.cache_fragment(self.ctab, fragment)
 end
 
-local function is_ipv6(pkt)
-   return rd16(pkt.data + o_ethernet_ethertype) == n_ethertype_ipv6
-end
-
-local function is_fragment(pkt)
-   return pkt.data[ethernet_header_size + constants.o_ipv6_next_header] ==
-      constants.ipv6_frag
-end
-
 function ReassembleV6:push ()
    local input, output = self.input.input, self.output.output
    local errors = self.output.errors
 
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if is_ipv6(pkt) and is_fragment(pkt) then
+      if is_ipv6_fragment(pkt) then
          counter.add(self.counters["in-ipv6-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then

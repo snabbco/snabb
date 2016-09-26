@@ -30,8 +30,7 @@ local receive, transmit = link.receive, link.transmit
 local rd16, wr16, rd32, ipv6_equals = lwutil.rd16, lwutil.wr16, lwutil.rd32, lwutil.ipv6_equals
 local is_ipv4, is_ipv6 = lwutil.is_ipv4, lwutil.is_ipv6
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local htons, htonl = lwutil.htons, lwutil.htonl
-local ntohs, ntohl = htons, htonl
+local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
 local keys = lwutil.keys
 local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.write_ipv6_header
 

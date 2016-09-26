@@ -18,9 +18,9 @@ local counter = require("core.counter")
 
 local receive, transmit = link.receive, link.transmit
 local rd16, wr16, rd32, wr32 = lwutil.rd16, lwutil.wr16, lwutil.rd32, lwutil.wr32
-local get_ihl_from_offset, htons = lwutil.get_ihl_from_offset, lwutil.htons
-local is_ipv4 = lwutil.is_ipv4
-local ntohs = lib.ntohs
+local get_ihl_from_offset = lwutil.get_ihl_from_offset
+local is_ipv4, is_ipv4_fragment = lwutil.is_ipv4, lwutil.is_ipv4_fragment
+local ntohs, htons = lib.ntohs, lib.htons
 local band = bit.band
 
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
@@ -56,16 +56,6 @@ function Reassembler:new(conf)
    return setmetatable(o, {__index=Reassembler})
 end
 
-local function is_fragment(pkt)
-   -- Either the packet has the "more fragments" flag set,
-   -- or the fragment offset is non-zero, or both.
-   local flag_more_fragments_mask = 0x2000
-   local non_zero_offset = 0x1FFF
-   local flags_and_frag_offset = ntohs(rd16(pkt.data + ehs + o_ipv4_flags))
-   return band(flags_and_frag_offset, flag_more_fragments_mask) ~= 0 or
-      band(flags_and_frag_offset, non_zero_offset) ~= 0
-end
-
 function Reassembler:cache_fragment(fragment)
    return fragv4_h.cache_fragment(self.ctab, fragment)
 end
@@ -79,7 +69,7 @@ function Reassembler:push ()
 
    for _=1,math.min(link.nreadable(input), link.nwritable(output)) do
       local pkt = receive(input)
-      if is_ipv4(pkt) and is_fragment(pkt) then
+      if is_ipv4_fragment(pkt) then
          counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then

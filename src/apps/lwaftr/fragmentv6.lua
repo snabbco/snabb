@@ -6,11 +6,12 @@ local lwutil = require("apps.lwaftr.lwutil")
 local packet = require("core.packet")
 local bit = require("bit")
 local ffi = require("ffi")
+local lib = require("core.lib")
 
 local band, bor, lshift, rshift = bit.band, bit.bor, bit.lshift, bit.rshift
 local C = ffi.C
 local wr16, wr32 = lwutil.wr16, lwutil.wr32
-local htons, htonl = lwutil.htons, lwutil.htonl
+local htons, htonl = lib.htons, lib.htonl
 local ehs = constants.ethernet_header_size
 
 -- IPv6 fragmentation, as per https://tools.ietf.org/html/rfc5722
