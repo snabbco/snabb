@@ -418,7 +418,7 @@ local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt, br_addr)
    end
 
    local ipv6_header = get_ethernet_payload(pkt)
-   local orig_src_addr = get_ipv6_src_address(ipv6_header)
+   local orig_src_addr_icmp_dst = get_ipv6_src_address(ipv6_header)
    -- If br_addr is specified, use that as the source addr. Otherwise, send it
    -- back from the IPv6 address it was sent to.
    local icmpv6_src_addr = br_addr or get_ipv6_dst_address(ipv6_header)
@@ -427,7 +427,7 @@ local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt, br_addr)
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(
       lwstate.aftr_mac_b4_side, lwstate.next_hop6_mac, icmpv6_src_addr,
-      orig_src_addr --[[now dest--]], pkt, icmp_config)
+      orig_src_addr_icmp_dst, pkt, icmp_config)
    drop(pkt)
    transmit_icmpv6_reply(lwstate.o6, b4fail_icmp)
 end
