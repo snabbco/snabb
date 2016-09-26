@@ -1,5 +1,11 @@
 # Change Log
 
+## Pre-release changes
+
+ * Send ICMPv6 unreachable messages from the most appropriate source address
+   available (the one associated with a B4 if possible, or else the one the
+   packet one is in reply to had as a destination.) 
+
 ## [2.10] - 2016-06-17
 
 A Snabb NFV performance fix, which results in more reliable performance
