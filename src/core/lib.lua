@@ -10,6 +10,8 @@ require("core.clib_h")
 local bit = require("bit")
 local band, bor, bnot, lshift, rshift, bswap =
    bit.band, bit.bor, bit.bnot, bit.lshift, bit.rshift, bit.bswap
+local tonumber = tonumber -- Yes, this makes a performance difference.
+local cast = ffi.cast
 
 -- Returns true if x and y are structurally similar (isomorphic).
 function equal (x, y)
@@ -373,7 +375,8 @@ if ffi.abi("be") then
    function htonl(b) return b end
    function htons(b) return b end
 else
-   function htonl(b) return bswap(b) end
+  -- htonl is unsigned, matching the C version and expectations.
+   function htonl(b) return tonumber(cast('uint32_t', bswap(b))) end
    function htons(b) return rshift(bswap(b), 16) end
 end
 ntohl = htonl
