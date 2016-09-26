@@ -17,7 +17,7 @@ Untagger = {}
 -- 802.1q
 local dot1q_tpid = 0x8100
 local o_ethernet_ethertype = 12
-local int32_ptr_t = ffi.typeof('int32_t*')
+local uint32_ptr_t = ffi.typeof('uint32_t*')
 
 
 -- build a VLAN tag consisting of 2 bytes of TPID set to 0x8100 followed by the
@@ -41,7 +41,7 @@ function push_tag(pkt, tag)
    local length = pkt.length
    pkt.length = length + 4
    C.memmove(payload + 4, payload, length - o_ethernet_ethertype)
-   cast(int32_ptr_t, payload)[0] = tag
+   cast(uint32_ptr_t, payload)[0] = tag
 end
 
 -- extract TCI (2 bytes) from packet, no check is performed to verify that the
@@ -85,7 +85,7 @@ function Untagger:push ()
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
       local payload = pkt.data + o_ethernet_ethertype
-      if cast(int32_ptr_t, payload)[0] ~= tag then
+      if cast(uint32_ptr_t, payload)[0] ~= tag then
          -- Incorrect VLAN tag; drop.
          packet.free(pkt)
       else
@@ -163,7 +163,7 @@ function test_tag_untag ()
       for j=0,255 do
          local tag = build_tag(vid)
          push_tag(pkt, tag)
-         assert(cast(int32_ptr_t, payload)[0] == tag)
+         assert(cast(uint32_ptr_t, payload)[0] == tag)
          vid = vid + 1
       end
    end
