@@ -79,6 +79,8 @@ V6=(
     recap-ipv6.pcap
     recap-ipv6-n64.pcap
     recap-tocustom-BRIP-ipv6.pcap
+    regressiontest-signedntohl-frags.pcap
+    regressiontest-signedntohl-frags-output.pcap
     response-ipv6-tunneled-icmpv4_31-tob4.pcap
     tcp-afteraftr-ipv6-2frags.pcap
     tcp-afteraftr-ipv6-3frags.pcap
