@@ -33,6 +33,7 @@ local get_ihl_from_offset = lwutil.get_ihl_from_offset
 local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
 local keys = lwutil.keys
 local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.write_ipv6_header
+local is_ipv4_fragment, is_ipv6_fragment = lwutil.is_ipv4_fragment, lwutil.is_ipv6_fragment
 
 -- Note whether an IPv4 packet is actually coming from the internet, or from
 -- a b4 and hairpinned to be re-encapsulated in another IPv6 packet.
@@ -648,6 +649,12 @@ local function from_inet(lwstate, pkt, pkt_src_link)
       end
    end
 
+   -- If fragmentation support is enabled, the lwAFTR never receives fragments.
+   -- If it does, fragment support is disabled and it should drop them.
+   if is_ipv4_fragment(pkt) then
+      counter.add(self.counters["drop-ipv4-frag-disabled"])
+      return drop_ipv4(lwstate, pkt, pkt_src_link)
+   end
    -- It's not incoming ICMP.  Assume we can find ports in the IPv4
    -- payload, as in TCP and UDP.  We could check strictly for TCP/UDP,
    -- but that would filter out similarly-shaped protocols like SCTP, so
@@ -761,6 +768,14 @@ end
 
 -- FIXME: Verify that the packet length is big enough?
 local function from_b4(lwstate, pkt)
+   -- If fragmentation support is enabled, the lwAFTR never receives fragments.
+   -- If it does, fragment support is disabled and it should drop them.
+   if is_ipv6_fragment(pkt) then
+      counter.add(self.counters["drop-ipv6-frag-disabled"])
+      counter.add(self.counters["drop-all-ipv6-iface-bytes"], pkt.length)
+      counter.add(self.counters["drop-all-ipv6-iface-packets"])
+      return drop(pkt)
+   end
    local ipv6_header = get_ethernet_payload(pkt)
    local proto = get_ipv6_next_header(ipv6_header)
 
