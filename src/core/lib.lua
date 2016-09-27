@@ -742,4 +742,9 @@ function selftest ()
          :match('^45.00.B6.7D.00.FA.40.00.40.11$'), "wrong hex dump")
    assert(hexundump('4500 B67D 00FA400040 11', 10)
          =='\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11', "wrong hex undump")
+   print("Testing ntohl")
+   local raw_val = 0xf0d0b0f0
+   assert(ntohl(raw_val) > 0, "ntohl must be unsigned")
+   assert(ntohl(ntohl(raw_val)) == raw_val, 
+      "calling ntohl twice must return the original value")
 end
