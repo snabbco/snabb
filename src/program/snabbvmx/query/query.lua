@@ -17,7 +17,7 @@ struct { uint8_t ether[6]; }
 ]]
 
 local function show_usage (code)
-   print(require("program.lwaftr.query.README_inc"))
+   print(require("program.snabbvmx.query.README_inc"))
    main.exit(code)
 end
 
