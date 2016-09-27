@@ -13,8 +13,7 @@ local bitfield = lib.bitfield
 local wr16, wr32 = lwutil.wr16, lwutil.wr32
 local ethernet_header_ptr_type = lwtypes.ethernet_header_ptr_type
 local ipv6_header_ptr_type = lwtypes.ipv6_header_ptr_type
-local htons, htonl = lwutil.htons, lwutil.htonl
-local ntohs, ntohl = htons, htonl
+local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
 
 -- Transitional header handling library.
 -- Over the longer term, something more lib.protocol-like has some nice advantages.

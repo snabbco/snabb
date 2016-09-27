@@ -12,14 +12,14 @@ local ipv6 = require("lib.protocol.ipv6")
 
 local bit = require("bit")
 local ffi = require("ffi")
+local lib = require("core.lib")
 
 local band, bnot = bit.band, bit.bnot
 local C = ffi.C
 local rd16, wr16, wr32 = lwutil.rd16, lwutil.wr16, lwutil.wr32
 local is_ipv4, is_ipv6 = lwutil.is_ipv4, lwutil.is_ipv6
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local htons, htonl = lwutil.htons, lwutil.htonl
-local ntohs, ntohl = htons, htonl
+local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
 local write_eth_header = lwheader.write_eth_header
 
 local proto_icmp = constants.proto_icmp

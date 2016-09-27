@@ -111,6 +111,9 @@ The memory use counters are in bytes.
 
 IPv4 fragmentation counters:
 
+- If fragmentation is disabled, the only potentially non-zero IPv4 fragmentation
+  counter is **drop-ipv4-frag-disabled**. If fragmentation is enabled, it
+  will always be zero.
 - **in-ipv4-frag-needs-reassembly**: An IPv4 fragment was received.
 - **in-ipv4-frag-reassembled**: A packet was successfully reassembled from IPv4
    fragments.
@@ -137,6 +140,9 @@ IPv4 fragmentation counters:
 
 IPv6 fragmentation counters:
 
+- If fragmentation is disabled, the only potentially non-zero IPv6 fragmentation
+  counter is **drop-ipv6-frag-disabled**. If fragmentation is enabled, it
+  will always be zero.
 - **in-ipv6-frag-needs-reassembly**: An IPv6 fragment was received
 - **in-ipv6-frag-reassembled**: A packet was successfully reassembled from IPv6
    fragments
