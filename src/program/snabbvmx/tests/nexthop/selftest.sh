@@ -58,7 +58,7 @@ packetblaster_pid=$!
 TIMEOUT=10
 count=0
 while true; do
-    output=`./snabb lwaftr nexthop | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+"`
+    output=`./snabb snabbvmx nexthop | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+"`
     mac_v4=`echo "$output" | head -1`
     # FIXME: returned next_hop_v6_mac value includes some garbage on the first two bytes.
     mac_v6=`echo "$output" | tail -1`
