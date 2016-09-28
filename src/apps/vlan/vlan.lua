@@ -147,6 +147,29 @@ function VlanMux:transmit(o, pkt)
    end
 end
 
+function test_tag_untag ()
+   local pkt = packet.from_string(lib.hexundump([[
+      02:aa:aa:aa:aa:aa 02:99:99:99:99:99 08 00 45 00
+      00 54 43 58 40 00 40 01 7c 5c c0 a8 0d 28 ac 14
+      01 10 08 00 9c d4 07 c0 00 01 bc fa e3 57 00 00
+      00 00 f3 44 01 00 00 00 00 00 10 11 12 13 14 15
+      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
+      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
+      36 37
+   ]], 82))
+   local payload = pkt.data + o_ethernet_ethertype
+   local vid = 0
+   for i=0,15 do
+      for j=0,255 do
+         local tag = build_tag(vid)
+         push_tag(pkt, tag)
+         assert(cast(uint32_ptr_t, payload)[0] == tag)
+         vid = vid + 1
+      end
+   end
+   assert(vid == 4096)
+   print("Sucessfully tagged/untagged all potential VLAN tags (0-4095)")
+end
 
 function selftest()
    local app = require("core.app")
@@ -164,4 +187,6 @@ function selftest()
 
    print("source sent: " .. link.stats(app.app_table.source.output.output).txpackets)
    print("sink received: " .. link.stats(app.app_table.sink.input.input).rxpackets)
+
+   test_tag_untag()
 end
