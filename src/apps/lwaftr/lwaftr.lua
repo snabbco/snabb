@@ -652,7 +652,7 @@ local function from_inet(lwstate, pkt, pkt_src_link)
    -- If fragmentation support is enabled, the lwAFTR never receives fragments.
    -- If it does, fragment support is disabled and it should drop them.
    if is_ipv4_fragment(pkt) then
-      counter.add(self.counters["drop-ipv4-frag-disabled"])
+      counter.add(lwstate.counters["drop-ipv4-frag-disabled"])
       return drop_ipv4(lwstate, pkt, pkt_src_link)
    end
    -- It's not incoming ICMP.  Assume we can find ports in the IPv4
@@ -771,9 +771,9 @@ local function from_b4(lwstate, pkt)
    -- If fragmentation support is enabled, the lwAFTR never receives fragments.
    -- If it does, fragment support is disabled and it should drop them.
    if is_ipv6_fragment(pkt) then
-      counter.add(self.counters["drop-ipv6-frag-disabled"])
-      counter.add(self.counters["drop-all-ipv6-iface-bytes"], pkt.length)
-      counter.add(self.counters["drop-all-ipv6-iface-packets"])
+      counter.add(lwstate.counters["drop-ipv6-frag-disabled"])
+      counter.add(lwstate.counters["drop-all-ipv6-iface-bytes"], pkt.length)
+      counter.add(lwstate.counters["drop-all-ipv6-iface-packets"])
       return drop(pkt)
    end
    local ipv6_header = get_ethernet_payload(pkt)
