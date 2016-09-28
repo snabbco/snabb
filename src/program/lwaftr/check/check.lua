@@ -28,8 +28,11 @@ function parse_args (args)
    handlers["on-a-stick"] = function ()
       opts["on-a-stick"] = true
    end
-   args = lib.dogetopt(args, handlers, "hr",
-      { help="h", regen="r", ["on-a-stick"] = 0 })
+   handlers.D = function(dur)
+      opts["duration"] = tonumber(dur)
+   end
+   args = lib.dogetopt(args, handlers, "hrD:",
+      { help="h", regen="r", duration="D", ["on-a-stick"] = 0 })
    if #args ~= 5 and #args ~= 6 then show_usage(1) end
    return opts, args
 end
@@ -117,7 +120,7 @@ function run(args)
          validate_diff(counters_diff, req_counters)
       end
    else
-      engine.main({duration=0.10})
+      engine.main({duration=opts.duration or 0.10})
    end
    print("done")
 end
