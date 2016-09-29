@@ -61,6 +61,11 @@ function exists (name)
    return fd and fd:close()
 end
 
+function alias (name, target)
+   assert(S.symlink(root.."/"..resolve(target), root.."/"..resolve(name)),
+          "shm alias failed")
+end
+
 function resolve (name)
    local q, p = name:match("^(/*)(.*)") -- split qualifier (/)
    local result = p
