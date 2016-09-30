@@ -114,7 +114,7 @@ function run (raw_args)
      if shm.exists("/"..pid.."/nic/id") then
        local lwaftr_id = shm.open("/"..pid.."/nic/id", lwtypes.lwaftr_id_type)
        local instance_id_name = ffi.string(lwaftr_id.value)
-       local _, _, instance_id = string.find(instance_id_name, "(%d+)")
+       local instance_id = instance_id_name and instance_id_name:match("(%d+)")
        if instance_id then
          pids[instance_id] = pid
          pids_name[instance_id] = instance_id_name
