@@ -109,19 +109,23 @@ function run (raw_args)
    parse_args(raw_args)
    print("<snabb>")
    local pids = {}
+   local pids_name = {}
    for _, pid in ipairs(shm.children("/")) do
      if shm.exists("/"..pid.."/nic/id") then
        local lwaftr_id = shm.open("/"..pid.."/nic/id", lwtypes.lwaftr_id_type)
-       local instance_id = ffi.string(lwaftr_id.value)
+       local instance_id_name = ffi.string(lwaftr_id.value)
+       local instance_id = instance_id_name and instance_id_name:match("(%d+)")
        if instance_id then
          pids[instance_id] = pid
+         pids_name[instance_id] = instance_id_name
        end
      end
    end
    for _, instance_id in ipairs(sort(keys(pids))) do
      local pid = pids[instance_id]
      print("  <instance>")
-     print(("   <id>%s</id>"):format(instance_id))
+     print(("   <id>%d</id>"):format(instance_id))
+     print(("   <name>%s</name>"):format(pids_name[instance_id]))
      print(("   <pid>%d</pid>"):format(pid))
      print_next_hop(pid, "next_hop_mac_v4")
      print_next_hop(pid, "next_hop_mac_v6")
