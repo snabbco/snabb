@@ -1,6 +1,7 @@
 <snabb>
   <instance>
-   <id>xe0</id>
+   <id>0</id>
+   <name>xe0</name>
    <pid>471</pid>
    <next_hop_mac_v4>00:00:00:00:00:00</next_hop_mac_v4>
    <next_hop_mac_v6>00:00:00:00:00:00</next_hop_mac_v6>
@@ -236,7 +237,8 @@
    </links>
   </instance>
   <instance>
-   <id>xe1</id>
+   <id>1</id>
+   <name>xe1</name>
    <pid>476</pid>
    <next_hop_mac_v4>00:00:00:00:00:00</next_hop_mac_v4>
    <next_hop_mac_v6>00:00:00:00:00:00</next_hop_mac_v6>
