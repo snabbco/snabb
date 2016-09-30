@@ -5,7 +5,7 @@ Usage: check [-r] CONF V4-IN.PCAP V6-IN.PCAP V4-OUT.PCAP V6-OUT.PCAP [COUNTERS.L
                              Print usage information.
   -r, --regen
                              Regenerate counter files, instead of checking.
-  --on-a-stickef
+  --on-a-stick
                              Run in on-a-stick mode.
   -D, --duration
                              Time to run Snabb for (default 0.10 seconds)
