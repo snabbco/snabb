@@ -11,6 +11,7 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local syscall = require("syscall")
+local shm = require("core.shm")
 
 local lib = require("core.lib")
 
@@ -60,7 +61,7 @@ function allocate_hugetlb_chunk ()
    assert(fd, tostring(err))
    fd:flock("ex")
    for i =1, 3 do
-      local page = allocate_huge_page(huge_page_size)
+      local page = allocate_huge_page(huge_page_size, true)
       if page ~= nil then
          fd:flock("un")
          fd:close()
@@ -152,13 +153,20 @@ function allocate_huge_page (size,  persistent)
    local phys = resolve_physical(tmpptr)
    local virt = bit.bor(phys, tag)
    local ptr = syscall.mmap(virt, size, "read, write", "shared, hugetlb, fixed", fd, 0)
+   local filename = ("/var/run/snabb/hugetlbfs/%012x.dma"):format(tonumber(phys))
    if persistent then
-      assert(syscall.rename(tmpfile, "/var/run/snabb/hugetlbfs/dma.%012x", phys))
+      assert(syscall.rename(tmpfile, filename))
+      shm.mkdir(shm.resolve("group/dma"))
+      syscall.symlink(filename, shm.root..'/'..shm.resolve("group/dma/"..lib.basename(filename)))
    else
       assert(syscall.unlink(tmpfile))
    end
    syscall.close(fd)
-   return ptr
+   return ptr, filename
+end
+
+function hugetlb_filename (address)
+   return ("%012x.dma"):format(virtual_to_physical(address))
 end
 
 -- resolve_physical(ptr) => uint64_t
@@ -183,6 +191,20 @@ function ensure_hugetlbfs ()
       io.write("[mounting /var/run/snabb/hugetlbfs]\n")
       assert(syscall.mount("none", "/var/run/snabb/hugetlbfs", "hugetlbfs", "rw,nosuid,nodev,noexec,relatime"),
              "failed to (re)mount /var/run/snabb/hugetlbfs")
+   end
+end
+
+-- Deallocate all file-backed shared memory allocated by pid (or other
+-- processes in its process group).
+--
+-- This is an internal API function provided for cleanup during
+-- process termination.
+function shutdown (pid)
+   local dma = shm.children("/"..pid.."/group/dma")
+   for _, file in ipairs(dma) do
+      local symlink = shm.root.."/"..pid.."/group/dma/"..file
+      local realfile = syscall.readlink(symlink)
+      syscall.unlink(realfile)
    end
 end
 
