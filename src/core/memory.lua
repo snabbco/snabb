@@ -12,8 +12,8 @@ local ffi = require("ffi")
 local C = ffi.C
 local syscall = require("syscall")
 local shm = require("core.shm")
-
 local lib = require("core.lib")
+require("core.memory_h")
 
 --- ### Serve small allocations from hugepage "chunks"
 
@@ -208,12 +208,17 @@ function shutdown (pid)
    end
 end
 
+-- Setup SIGSEGV handler to automatically map memory from other processes
+C.memory_sigsegv_setup(huge_page_size,
+                       shm.root..'/'..shm.resolve("group/dma/%012lx.dma"))
+
 --- ### selftest
 
 function selftest (options)
    print("selftest: memory")
    print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
    ensure_hugetlbfs() -- can print a message, let that go first
+   local dmapointers = {}
    for i = 1, 4 do
       io.write("  Allocating a "..(huge_page_size/1024/1024).."MB HugeTLB:")
       io.flush()
@@ -223,8 +228,26 @@ function selftest (options)
       print("    Virtual address:  0x" .. bit.tohex(ffi.cast(uint64_t, dmaptr), 12))
       ffi.cast("uint32_t*", dmaptr)[0] = 0xdeadbeef -- try a write
       assert(dmaptr ~= nil and dmalen == huge_page_size)
+      table.insert(dmapointers, dmaptr)
    end
    print("Kernel vm.nr_hugepages: " .. syscall.sysctl("vm.nr_hugepages"))
+   print("Testing automatic remapping of DMA memory")
+   local orig_demand_mappings = C.memory_demand_mappings
+   -- First unmap all of the DMA memory
+   for _, dmaptr in ipairs(dmapointers) do
+      print("    Unmapping " .. tostring(dmaptr))
+      assert(syscall.munmap(dmaptr, huge_page_size))
+   end
+   -- Now touch them all
+   for _, dmaptr in ipairs(dmapointers) do
+      print("    Writing   ".. tostring(dmaptr))
+      dmaptr[0] = 42
+   end
+   local new_demand_mappings = C.memory_demand_mappings - orig_demand_mappings
+   print(("Created %d on-demand memory mappings with SIGSEGV handler."):format(
+         new_demand_mappings))
+   assert(new_demand_mappings >= #dmapointers)
+   -- Now access it and rely on the SIGSEGV handler to 
    print("HugeTLB page allocation OK.")
 end
 
