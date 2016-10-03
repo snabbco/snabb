@@ -107,7 +107,7 @@ function run(args)
    local conf = lwconf.load_lwaftr_config(conf_file)
 
    local c = config.new()
-   setup.load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
+   load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    engine.configure(c)
    if counters_path then
       local initial_counters = read_counters(c)
