@@ -41,12 +41,19 @@ function main ()
       error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
    end
    initialize()
-   local program, args = select_program(parse_command_line())
-   if not lib.have_module(modulename(program)) then
-      print("unsupported program: "..program:gsub("_", "-"))
-      usage(1)
+   if lib.getenv("SNABB_PROGRAM_LUACODE") then
+      -- Run the given Lua code instead of the command-line
+      local expr = lib.getenv("SNABB_PROGRAM_LUACODE")
+      loadstring(expr)()
    else
-      require(modulename(program)).run(args)
+      -- Choose a program based on the command line
+      local program, args = select_program(parse_command_line())
+      if not lib.have_module(modulename(program)) then
+         print("unsupported program: "..program:gsub("_", "-"))
+         usage(1)
+      else
+         require(modulename(program)).run(args)
+      end
    end
 end
 
