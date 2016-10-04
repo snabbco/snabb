@@ -28,3 +28,15 @@ do --- rechain
 
   assert(t[k] == 4)
 end
+
+do --- TSETM gc
+  local function f()
+    collectgarbage()
+    return "a", "b"
+  end
+  for i = 1, 10 do
+    local t = {f()}
+    assert(t[1] == "a")
+    assert(t[2] == "b")
+  end
+end
