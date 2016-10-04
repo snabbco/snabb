@@ -1,11 +1,17 @@
 -- worker.lua - Execute "worker" child processes to execute app networks
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
+module(..., package.seeall)
+
 -- API:
 -- start(name, core)
 -- stop(name)
 -- status() -> table of { name = <info> }
 -- configure(name, config)
+
+local lib = require("core.lib")
+local shm = require("core.shm")
+local S = require("syscall")
 
 --------------------------------------------------------------
 -- Master (parent) process code
@@ -21,9 +27,14 @@ end
 -- The child will execute an app network when provided with configure().
 function start (name, core)
    local pid = S.fork()
-   if pid ~= 0 then
-      -- Child (worker) process
-      init(name, core, S.getppid())
+   if pid == 0 then
+      -- Lock affinity for this child
+      S.sched_setaffinity(0, {core})
+      local env = { "SNABB_PROGRAM_LUACODE=require('core.worker').init()",
+                    "SNABB_WORKER_NAME="..name,
+                    "SNABB_WORKER_PARENT="..S.getppid() }
+      -- /proc/$$/exe is a link to the same Snabb executable that we are running
+      S.execve(("/proc/%d/exe"):format(S.getpid()), {}, env)
    else
       -- Parent process
       children[name] = { pid = pid, core = core }
@@ -32,16 +43,18 @@ end
 
 -- Terminate a child process
 function stop (name)
-   S.kill(child(name), 'kill')
+   S.kill(child(name).pid, 'kill')
 end
 
 -- Return information about all worker processes in a table.
 function status ()
    local status = {}
    for name, info in pairs(children) do
+      local infop = S.waitid("pid", info.pid, "nohang, exited")
       status[name] = {
          pid = info.pid,
-         alive = (S.kill(info.pid, 0) == 0)
+         core = info.core,
+         alive = infop.code == 0
       }
    end
    return status
@@ -65,14 +78,10 @@ end
 
 -- Initialize the worker by attaching to relevant shared memory
 -- objects and entering the main engine loop.
-function init (name, core, parentpid)
-   local name = parameters[1]
-   local parent = num(parameters[2])
-   local core = num(parameters[3])
-   print(("Starting worker %s on core %d for parent %d"):format(name, core, parent))
-
-   -- Setup affinity
-   if core then S.sched_setaffinity(0, {core}) end
+function init (name, parentpid)
+   local name = assert(lib.getenv("SNABB_WORKER_NAME"))
+   local parent = assert(lib.getenv("SNABB_WORKER_PARENT"))
+   print(("Starting worker %s for parent %d"):format(name, parent))
 
    -- Create "group" alias to the shared group folder in the parent process
    shm.alias("group", "/"..parent.."/group")
@@ -83,7 +92,7 @@ function init (name, core, parentpid)
       if not warned then
          print("waiting for configuration...")
          warned = true
-         C.usleep(1000)
+         S.nanosleep(0.001)
       end
    end
 
