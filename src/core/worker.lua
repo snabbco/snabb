@@ -116,4 +116,30 @@ function init (name, parentpid)
    end
 end
 
+function selftest ()
+   print("selftest: worker")
+   -- XXX This selftest function is very basic. Should be expanded to
+   --     run app networks in child processes and ensure that they work.
+   local workers = { "w1", "w2", "w3" }
+   print("Starting children")
+   for _, w in ipairs(workers) do
+      start(w, 0)
+   end
+   print("Worker status:")
+   for w, s in pairs(status()) do
+      print(("  worker %s: pid=%s core=%s alive=%s"):format(
+            w, s.pid, s.core, s.alive))
+   end
+   print("Stopping children")
+   for _, w in ipairs(workers) do
+      stop(w)
+   end
+   S.nanosleep(1)
+   print("Worker status:")
+   for w, s in pairs(status()) do
+      print(("  worker %s: pid=%s core=%s alive=%s"):format(
+            w, s.pid, s.core, s.alive))
+   end
+   print("selftest: done")
+end
 
