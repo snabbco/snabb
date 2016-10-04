@@ -15,7 +15,7 @@ local long_opts = {
 }
 
 local function usage (code)
-   print(require("program.lwaftr.nexthop.README_inc"))
+   print(require("program.snabbvmx.nexthop.README_inc"))
    main.exit(code)
 end
 

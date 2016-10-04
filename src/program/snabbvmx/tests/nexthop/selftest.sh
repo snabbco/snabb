@@ -29,7 +29,6 @@ function quit_screens {
 
 function cleanup {
     quit_screens
-    kill $packetblaster_pid
     exit 0
 }
 
@@ -51,20 +50,27 @@ run_cmd_in_screen "snabbvmx" "$cmd"
 start_test_env
 
 # Flush lwAFTR packets to SnabbVMX.
-./snabb packetblaster replay -D 10 $PCAP_INPUT/v4v6-256.pcap $SNABB_PCI1 &
-packetblaster_pid=$!
+cmd="./snabb packetblaster replay -D 10 $PCAP_INPUT/v4v6-256.pcap $SNABB_PCI1"
+run_cmd_in_screen "packetblaster" "$cmd"
+
+function last_32bit {
+    mac=$1
+    echo `echo $mac | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+$"`
+}
 
 # Query nexthop for 10 seconds.
 TIMEOUT=10
 count=0
 while true; do
-    output=`./snabb lwaftr nexthop | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+"`
+    output=`./snabb snabbvmx nexthop | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+"`
     mac_v4=`echo "$output" | head -1`
-    # FIXME: returned next_hop_v6_mac value includes some garbage on the first two bytes.
     mac_v6=`echo "$output" | tail -1`
 
-    if [[ "$mac_v4" == "02:99:99:99:99:99" ]]; then
+    # Somehow the first 16-bit of nexhop come from the VM corrupted, compare only last 32-bit.
+    if [[ $(last_32bit "$mac_v4") == "99:99:99:99" &&
+          $(last_32bit "$mac_v6") == "99:99:99:99" ]]; then
         echo "Resolved MAC inet side: $mac_v4 [OK]"
+        echo "Resolved MAC inet side: $mac_v6 [OK]"
         break
     fi
 
