@@ -6,18 +6,32 @@ local ffi = require("ffi")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local corelib = require("core.lib")
+local ethernet = require("lib.protocol.ethernet")
 
 -- Create small getter and setter wrapper for ffi structs.
 local FFIType = {}
 
 function FFIType:set(value)
-   self.value = value
+   self.value = convert(value)
 end
 
 function FFIType:get()
    return self.value
 end
 
+
+-- Converts a type to a native lua type, this will only work for things we've coded
+-- to convert (i.e. it's not general purpose).
+function convert(value)
+   -- First try boolean.
+   if value == "true" then
+      return true
+   elseif value == "false" then
+      return false
+   else
+      return tonumber(value) -- returns nil if no number is found
+   end
+end
 
 -- This wraps the FFIType to provide it with the box name, 
 
@@ -35,24 +49,42 @@ local box_types = {
    uint32 = ffi.typeof("struct { uint32_t value; }"),
    uint64 = ffi.typeof("struct { uint64_t value; }"),
    decimal64 = ffi.typeof("struct { double value; }"),
-   boolean = ffi.typeof("struct { bool value; }"),
+   boolean = ffi.typeof("struct { bool value; }")
 }
 
 -- Iterate through the boxes and set the FFIType metatype
-for _, box in pairs(box_types) do
-   ffi.metatype(box, {__index=FFIType})
+for n, box in pairs(box_types) do
+   ffi.metatype(box, {__index=FFIType,})
 end
 
 -- Add inet types, found: https://tools.ietf.org/html/rfc6021
 -- Should be done via yang module import but using ad-hoc method for now.
-box_types["yang:zero-based-counter64"] = function ()
+box_types["yang:zero-based-counter64"] = function()
    return box_types.uint64(0)
 end
 
-function create_box(leaf_type, default)
+-- Add the types defined in the snabb-softwire yang module. This should be
+-- handled by consumption of the 'typedef' statements in the future, however
+-- for now, hard code them in.
+box_types["PacketPolicy"] = function()
+   local enum_opts = {"allow", "deny"}
+   return box_types.enumeration(enum_opts)
+end
+
+-- WARNING: This doesn't check the range as defined in the config
+box_types["PositiveNumber"] = function(...)
+   return box_types.uint32()
+end
+
+-- WARNING: This doesn't check the range as defined in the config
+box_types["VlanTag"] = function(...)
+   return box_types.uint16()
+end
+
+function create_box(leaf_type, arguments)
    local box = assert(box_types[leaf_type], "Unsupported type: "..leaf_type)
-   if box and default ~= nil then
-      box = box(default)
+   if box and arguments ~= nil then
+      box = box(arguments)
    elseif box then
       box = box()
    end
@@ -72,7 +104,7 @@ function extract_nodes(schema)
       if v.statements then v.statements = extract_nodes(v.statements) end
       if nodes[v.keyword] then
          table.insert(nodes[v.keyword], v)
-      else
+      elseif v.keyword then
          nodes[v.keyword] = {v}
       end
    end
@@ -80,8 +112,12 @@ function extract_nodes(schema)
 end
 
 local StringBox = {}
-function StringBox.new()
-   return setmetatable({}, {__index=StringBox})
+function StringBox.new(options, default)
+   local strbox = setmetatable({}, {__index=StringBox})
+   if default ~= nil then
+      strbox:set(default)
+   end
+   return strbox
 end
 
 function StringBox:get()
@@ -91,13 +127,33 @@ end
 function StringBox:set(value)
    self.value = value
 end
+function StringBox.get_type() return "box-string" end
 box_types["string"] = StringBox.new
 
+local MacAddress = {}
+function MacAddress.new(options, default)
+   local mac =  setmetatable({}, {__index=MacAddress})
+   if default ~= nil then
+      mac:set(default)
+   end
+   return mac
+end
+function MacAddress:get()
+   return self.box
+end
+function MacAddress:set(address)
+   self.box = assert(ethernet:pton(address))
+end
+function MacAddress.get_type() return "box-inet:mac-address" end
+box_types["inet:mac-address"] = MacAddress.new
+
 local IPv4Box = {}
-function IPv4Box.new(address)
-   local ret = {root={}}
-   if address then ret.box = ipv4:pton(address) end
-   return setmetatable(ret, {__index=IPv4Box})
+function IPv4Box.new(options, default)
+   local ipv4 = setmetatable({}, {__index=IPv4Box})
+   if default ~= nil then
+      ipv4:set(default)
+   end
+   return ipv4
 end
 function IPv4Box:get()
    return self.box
@@ -105,13 +161,16 @@ end
 function IPv4Box:set(address)
    self.box = assert(ipv4:pton(address))
 end
+function IPv4Box.get_type() return "box-inet:ipv4-address" end
 box_types["inet:ipv4-address"] = IPv4Box.new
 
 local IPv6Box = {}
-function IPv6Box.new(address)
-   local ret = {}
-   if address then ret.box = ipv6:pton(address) end
-   return setmetatable(ret, {__index=IPv6Box})
+function IPv6Box.new(options, default)
+   local ipv6 = setmetatable({}, {__index=IPv6Box})
+   if default ~= nil then
+      ipv6:set(default)
+   end
+   return ipv6
 end
 function IPv6Box:get()
    return self.box
@@ -119,12 +178,17 @@ end
 function IPv6Box:set(address)
    self.box = assert(ipv6:pton(address))
 end
+function IPv6Box.get_type() return "box-inet:ipv6-address" end
 box_types["inet:ipv6-address"] = IPv6Box.new
 
 local IPv4PrefixBox = {}
-function IPv4PrefixBox.new()
+function IPv4PrefixBox.new(options, default)
    local ret = {root={}}
-   return setmetatable(ret, {__index=IPv4PrefixBox})
+   local ipv4_prefix =  setmetatable(ret, {__index=IPv4PrefixBox})
+   if default ~= nil then
+      ipv4_prefix:set(default)
+   end
+   return ipv4_prefix
 end
 
 function IPv4PrefixBox:get()
@@ -143,11 +207,16 @@ function IPv4PrefixBox:set(value)
    end
    self.value = {addr, prefix}
 end
+function IPv4PrefixBox.get_type() return "box-inet:ipv4-prefix" end
 
 local IPv6PrefixBox = {}
-function IPv6PrefixBox.new()
+function IPv6PrefixBox.new(options, default)
    local ret = {root={}}
-   return setmetatable(ret, {__index=IPv6PrefixBox})
+   local ipv6_prefix = setmetatable(ret, {__index=IPv6PrefixBox})
+   if default ~= nil then
+      ipv6_prefix:set(default)
+   end
+   return ipv6_prefix
 end
 function IPv6PrefixBox:get()
    return self.value
@@ -163,15 +232,21 @@ function IPv6PrefixBox:set(value)
    end
    self.value = {addr, prefix}
 end
+function IPv6PrefixBox.get_type() return "box-inet:ipv6-prefix" end
 box_types["inet:ipv6-prefix"] = IPv6PrefixBox.new
 
 local Enum = {}
-function Enum.new(options)
+function Enum.new(options, default)
    local opts = {}
    for _, option in pairs(options) do
       opts[option] = option
    end
-   return setmetatable({options=opts}, {__index=Enum})
+   local mt = {__index=Enum, options=options, default=default}
+   local initialized_enum = setmetatable({options=opts}, mt)
+   if default ~= nil then
+      initialized_enum:set(default)
+   end
+   return initialized_enum
 end
 
 function Enum:get()
@@ -185,19 +260,20 @@ function Enum:set(value)
       error("Value "..value.." is not a valid option for this Enum.")
    end
 end
+function Enum.get_type() return "box-enumeration" end
 box_types["enumeration"] = Enum.new
 
 local Union = {}
-function Union.new(types)
+function Union.new(types, default)
    local ret = {types={}}
    for _, name in pairs(types) do
       -- 9.12 specifies unions cannot contain "leafref" or "empty"
       if name == "empty" or name == "leafref" then
          error("Union type cannot contain 'empty' or 'leafref'")
       end
-      ret.types[name] = create_box(name)
+      ret.types[name] = create_box(name, nil, default)
    end
-   return setmetatable(ret, {__index=Union})
+   return setmetatable(ret, {__index=Union, options=types, default=default})
 end
 
 function Union:get()
@@ -217,6 +293,7 @@ function Union:set(v)
    end
    error(("Unable to find matching type for '%s' (%s)"):format(v, type(v)))
 end
+function Union.get_type() return "box-union" end
 
 box_types["union"] = Union.new
 
@@ -246,7 +323,7 @@ function Container.new(base, path)
 
          if not prop then
             -- This could be because it's a method defined on Container.
-            return Container[k]
+            return rawget(Container, k)
          elseif prop.get == nil then
             return prop
          else
@@ -256,6 +333,8 @@ function Container.new(base, path)
    })
 end
 
+function Container.get_type() return "container" end
+
 function Container:set_template(template)
    rawset(self, "template", template)
 end
@@ -263,11 +342,33 @@ function Container:get_template()
    return rawget(self, "template")
 end
 
+local function pp(x)
+   if type(x) == "table" then
+      io.write("{")
+      local first = true
+      for k,v in pairs(x) do
+         if not first then
+            io.write(", ")
+         end
+         io.write(k.."=")
+         pp(v)
+         first = false
+      end
+      io.write("}")
+   elseif type(x) == "string" then
+      io.write(x)
+   else
+      error("Unsupported type")
+   end
+end
+
+
+
 function Container:add_item(item)
    local root = rawget(self, "root")
    local base = rawget(self, "base")
    local path = rawget(self, "path")
-   
+
    -- Verify that the item is being added to a list type.
    local schema = base:get_schema(path)
    if schema:get_type() ~= "list" then
@@ -288,7 +389,9 @@ function Container:add_item(item)
 
    -- Create a new table of item + leavesf
    local data = corelib.deepcopy(item)
-   for name, leaf in pairs(leaves) do data[name] = leaf end
+   for name, leaf in pairs(leaves) do
+      data[name] = leaf
+   end
 
    -- Add the data to the container.
    for name, _ in pairs(data) do
@@ -301,12 +404,22 @@ function Container:add_item(item)
       end
    end
 
+   -- Create the key
+   local key = item[schema.key]
+
+   if key == nil then
+      error("List item's key ("..schema.key..") cannot be null")
+   end
+
    -- Add the container entry to container.
-   table.insert(root, con)
+   root[key] = con
 end
 
-function Container:add_container(name)
-   self:add_to_root(name, Container.new(self, name))
+function Container:add_container(name, container)
+   if container == nil then
+      container = Container.new(self, name)
+   end
+   self:add_to_root(name, container)
 end
 
 function Container:add_to_root(key, value)
@@ -315,12 +428,37 @@ function Container:add_to_root(key, value)
 end
 
 function Container:duplicate()
-   -- Produces and returns a duplicate of the container
-   local root = corelib.deepcopy(rawget(self, "root"))
-   local copy = Container.new(rawget(self, "base"), rawget(self, "path"))
-   rawset(copy, "root", root)
-   return copy
+   local root = rawget(self, "root")
+   local dup = {}
+
+   for k, v in pairs(root) do
+      -- If "v" is a table with the method .get_type it retrives the type
+      local table_type
+      if type(v) == "table" and v.get_type ~= nil then table_type = v.get_type() end
+      if table_type == "container" then
+         dup[k] = v:duplicate()
+      elseif table_type and table_type:sub(1, 4) == "box-" then
+         local box_type = table_type:sub(5, table_type:len())
+         local options = getmetatable(v).options
+         local defaults = getmetatable(v).defaults
+         local dup_box = create_box(box_type, options, defaults)
+         dup[k] = dup_box
+      elseif type(v) == "cdata" then
+         local dup_ctype = ffi.new(ffi.typeof(v))
+         ffi.copy(dup_ctype, v, ffi.sizeof(v))
+         dup[k] = dup_ctype
+      end
+   end
+
+   local duplicate_container = Container.new(
+      rawget(self, "base"),
+      rawget(self, "path")
+   )
+   rawset(duplicate_container, "root", dup)
+   return duplicate_container
 end
+
+function Container:get_type() return "container" end
 
 -- Functions to help testing.
 function asserterror(func, ...)
@@ -365,7 +503,7 @@ function selftest()
    con.testbox = "8.8.8.8"
    assert(ipv4:ntop(con.testbox) == "8.8.8.8")
    asserterror(setvalue, con, "testbox", "should fail")
-   
+
    -- Test the IPv4 box (both valid and invalid data).
    root.testbox = box_types["inet:ipv4-address"]()
    con.testbox = "8.8.8.8"
@@ -407,4 +545,14 @@ function selftest()
    asserterror(setvalue, con, "testbox", "2001:db8::/129")
    asserterror(setvalue, con, "testbox", "2001:db8::/-1")
    asserterror(setvalue, con, "testbox", "FFFFF:db8::/32")
+
+   -- Remove following when typedef is supported.
+   -- Test the PacketPolicy enum
+   root.testbox = create_box("PacketPolicy")
+   con.testbox = "allow"
+   assert(con.testbox == "allow")
+   con.testbox = "deny"
+   assert(con.testbox == "deny")
+   asserterror(setvalue, con, "testbox", "not allow or deny")
+   asserterror(setvalue, con, "testbox", "alow")
 end

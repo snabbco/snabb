@@ -13,7 +13,15 @@ module(..., package.seeall)
 local helpers = require("lib.yang.helpers")
 local h = require("syscall.helpers")
 
-Leaf = {}
+local Leaf = {}
+local List = {}
+local Feature = {}
+local Grouping = {}
+local Container = {}
+local Revision = {}
+local List = {}
+Module = {}
+
 function Leaf.new(base, path, src)
    local self = setmetatable({}, {__index=Leaf, path=path})
 
@@ -70,6 +78,7 @@ function Leaf.new(base, path, src)
    if self.range then
       if not self.validation then self.validation = {} end
       self.validation[#self.validation + 1] = function(v)
+         v = tonumber(v)
          if v < self.range[1] or v > self.range[2] then
             self:error("Value '%s' is out of range", path, v)
          end
@@ -101,7 +110,6 @@ function Leaf:validate_schema(schema)
 end
 
 -- Yang feature
-local Feature = {}
 function Feature.new(base, path, src)
    local self = setmetatable({}, {__index=Feature, path=path})
 
@@ -131,9 +139,8 @@ function Feature:validate_schema(src)
 end
 
 -- Yang list
-local List = {}
 function List.new(base, path, src)
-   local ret = {leaves={}}
+   local ret = {leaves={}, containers={}}
    local self = setmetatable(ret, {__index=List, path=path})
 
    self:validate_schema(src)
@@ -143,8 +150,14 @@ function List.new(base, path, src)
    if src.uses then self.uses = src.uses[1].argument end
    if src.leaf then
       for _, leaf in pairs(src.leaf) do
-         local path = self.path.."."..leaf.argument
+         local path = path.."."..leaf.argument
          self.leaves[leaf.argument] = Leaf.new(base, path, leaf.statements)
+      end
+   end
+   if src.container then
+      for _, container in pairs(src.container) do
+         local path = path.."."..container.argument
+         self.containers[container.argument] = Container.new(base, path, container.statements)
       end
    end
 
@@ -162,7 +175,6 @@ function List:validate_schema(src)
 end
 
 -- Yang group
-local Grouping = {}
 function Grouping.new(base, path, src)
    local ret = {leaves={}}
    local self = setmetatable(ret, {__index = Grouping, path=path})
@@ -197,7 +209,6 @@ function Grouping:validate_schema(src)
    helpers.cardinality("grouping", getmetatable(self).path, cardinality, src)
 end
 
-local Container = {}
 function Container.new(base, path, src)
    local ret = {leaves={}, containers={}, lists={}}
    local self = setmetatable(ret, {__index=Container, path=path})
@@ -256,7 +267,6 @@ function Container:validate_schema(src)
 end
 
 -- Yang Revision
-local Revision = {}
 function Revision.new(base, path, src)
    local self = setmetatable({}, {__index=Revision, path=path})
 
@@ -280,7 +290,6 @@ function Revision:validate_schema(src)
 end
 
 -- Yang Module
-Module = {}
 function Module.new(base, name, src)
    local ret = {body={}, name=name, modules={}, revisions={},
                features={}, groupings={}, containers={}}

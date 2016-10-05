@@ -6,7 +6,7 @@ module snabb-softwire {
 
   organization "Igalia";
   contact "Jessica Tallon <tsyesika@igalia.com>";
-  description "";
+  description "Configuration for the Snabb Switch lwAFTR.";
 
   revision 2016-08-01 {
     description "Initial revision.";
@@ -41,9 +41,9 @@ module snabb-softwire {
     }
     description "This is a VLAN tag according to 802.1Q Ethernet tagging.";
   }
-  
+
   container softwire-config {
-    description "Configuration for Snabb lwaftr."; 
+    description "Configuration for Snabb lwaftr.";
 
     leaf ipv4-ip {
       type inet:ipv4-address;
@@ -95,7 +95,7 @@ module snabb-softwire {
         description "Set the MTU value for the IPv6 NIC.";
       }
     }
-    
+
     container L2-next-hop {
       description "One might expect to set the default gateway IPv4 and IPv6
                    addresses and have those resolved via ARP, however ARP is
@@ -104,7 +104,7 @@ module snabb-softwire {
                    instead specify the IP addresses of the next hops and have
                    the lwAFTR resolve the corresponding MAC addresses via NDP
                    and ARP.";
-       
+
       leaf b4-mac {
         type inet:mac-address;
         description "Sets the MAC address of the next hop for the internal
@@ -127,10 +127,10 @@ module snabb-softwire {
         type inet:ipv6-address;
         description "Sets the IPv4 address of the next hop for the internal
                      facing NIC that will be used to resolve the MAC address.";
-      }      
+      }
     }
-   
-  
+
+
     container rate-limiting-icmp {
       description "ICMP rate limiting is mandated by many RFCs. This configures
                    the number of ICMP packets the lwAFTR can send for the given
@@ -144,7 +144,7 @@ module snabb-softwire {
                      period.";
       }
 
-      leaf icmpv6-rate-limiter-n-seconds {
+      leaf seconds {
         type PositiveNumber;
         default 2;
         description "The time period given in seconds.";
@@ -195,18 +195,18 @@ module snabb-softwire {
         description "Sets the tag for v4";
       }
 
-      leaf v6-vlan-tag {
+      leaf v6-tag {
         type VlanTag;
         description "Sets the tag for v6";
       }
     }
- 
+
     container filters {
       description "This configures the ingress and egress filters for each NIC.
                    If set, these should be a pflang filter, pflang is the
                    language of tcpdump, libpcap and other tools. The filters
                    will run on the packets without vlan tags, if any.";
-  
+
       leaf ipv4-ingress-filter {
         type string;
         description "Sets the pflang filter for IPv4 ingress.";
@@ -235,70 +235,98 @@ module snabb-softwire {
                  B4. It contains information so the lwAFTR knows which IPv4
                  (or part of an IPv4 address) is associated with which B4.";
 
-    list psid_map {
-      key "ipv4-address";
+    list binding-entry {
+      key "binding-ipv6info";
       description "Defines the set of IPv4 addresses that are provisioned by a
                    lwAFTR. It also defines the way in which those addresses are
                    shared by specifying the psid_length and shift. See RFC 7597
                    for more details on the PSID scheme for sharing IPv4
                    addresses.";
 
-      leaf ipv4-address {
-        type inet:ipv4-address;
-        mandatory true;
-        description "The IPv4 address that is provisioned";
+      leaf binding-ipv6info {
+         type union {
+            type inet:ipv6-address;
+            type inet:ipv6-prefix;
+         }
+         mandatory false;
       }
 
-      leaf psid_length {
-        type uint16;
-        default 0;
+      leaf binding-ipv4-addr {
+         type inet:ipv4-address;
+         mandatory true;
       }
 
-      leaf shift {
-        type uint16;
-        default 16;
-      }
-    }
+      container port-set {
+         leaf psid-offset {
+            type uint8 {
+               range 0..16;
+            }
+            mandatory true;
+         }
 
-    list br-addresses {
+         leaf psid-len {
+            type uint8 {
+               range 0..15;
+            }
+            mandatory true;
+         }
+
+         leaf psid {
+            type uint16;
+            mandatory true;
+         }
+      }
+
+      leaf br-ipv6-addr {
+         type inet:ipv6-address;
+         mandatory true;
+      }
+
+      leaf lifetime {
+         type uint32;
+         units seconds;
+      }
+   }
+
+   list br-addresses {
       key "ipv6-address";
 
       leaf ipv6-address {
         type inet:ipv6-address;
       }
-    }
+   }
 
-    list binding-table-entry {
+   list binding-table-entry {
       key "ipv4-address psid";
 
       leaf ipv4-address {
-        type inet:ipv4-address;
-        mandatory true;
-        description "Public IPv4 address of the softwire."; 
+         type inet:ipv4-address;
+         mandatory true;
+         description "Public IPv4 address of the softwire.";
       }
 
       leaf psid {
-        type uint16;
-        mandatory true;
-        description "Port set ID";
+         type uint16;
+         mandatory true;
+         description "Port set ID";
       }
 
       leaf padding {
-        type uint16;
-        description "Zeros";
+         type uint16;
+         description "Zeros";
       }
 
       leaf br {
-        type uint32;
-        mandatory true;
-        description "Border router";
+         type uint32;
+         mandatory true;
+         description "Border router";
       }
 
       leaf ipv6-address {
-        type inet:ipv6-address;
-        mandatory true;
-        description "Address of the B4";
+         type inet:ipv6-address;
+         mandatory true;
+         description "Address of the B4";
       }
     }
-  } 
-}   
+  }
+}

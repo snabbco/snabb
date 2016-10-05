@@ -28,7 +28,7 @@
 --      }]]
 --    base["example"].organization == "YANG IPv4 over IPv6"
 --    base["example"].containers["conf"].leaves["description"].type == "string"
---    
+--
 --    -- Setting data
 --    base.data["example"]["conf"].description = "hello!"
 --    base.data["example"]["conf"].testvalue = "error" -- This errors.
@@ -105,19 +105,19 @@ function Base:produce_data_tree(schema_node, data_node)
       if not schema_node then error("Module cannot be resolved") end
       data_node = self.data[schema_node.name]
    end
-   path = getmetatable(schema_node).path
+   local path = getmetatable(schema_node).path
 
    if schema_node.containers then
       for name, container in pairs(schema_node.containers) do
          local new_path = path.."."..name
          local new_node = Container.new(self, new_path)
 
-         data_node:add_to_root(name, new_node)
-         schema_node = self:get_schema(new_path)
-         data_node = new_node
-         self:produce_data_tree(schema_node, new_node)
+         local current_schema = assert(self:get_schema(new_path), "No schema at path:"..new_path)
 
-         -- If the container has a "uses" statement we must copy across the 
+         data_node:add_to_root(name, new_node)
+         self:produce_data_tree(current_schema, new_node)
+
+         -- If the container has a "uses" statement we must copy across the
          -- leaves from the container it references to this container.
          if container.uses then
             self:handle_use(container, data_node, path, name)
@@ -127,7 +127,15 @@ function Base:produce_data_tree(schema_node, data_node)
 
    if schema_node.leaves then
       for name, leaf in pairs(schema_node.leaves) do
-         data_node:add_to_root(name, helpers.create_box(leaf.type, leaf.defalt))
+         -- Certain types need extra options passing in, depending on the type those
+         -- need to be passed in when creating the type.
+         local options = nil
+         if leaf.type == "enumeration" then
+            options = leaf.enums
+         elseif leaf.type == "union" then
+            options = leaf.types
+         end
+         data_node:add_to_root(name, helpers.create_box(leaf.type, options, leaf.defalt))
       end
    end
 
@@ -135,17 +143,27 @@ function Base:produce_data_tree(schema_node, data_node)
       for name, list in pairs(schema_node.lists) do
          local list_path = path.."."..name
          local container = Container.new(self, list_path)
+         local current_schema = assert(self:get_schema(list_path), "No schema at path:"..list_path)
          data_node:add_to_root(name, container)
 
          if list.uses then
             local template = Container.new(self, list_path)
             self:handle_use(list, template, list_path, name)
             container:set_template(template)
+         else
+            -- Make a data container for the template
+            local template_container = Container.new(self, list_path)
+            local data_template = self:produce_data_tree(
+               current_schema,
+               template_container
+            )
+
+            container:set_template(template_container)
          end
       end
    end
 
-   return self.data
+   return data_node
 end
 
 function Base:schema_for_uses(schema)
@@ -173,6 +191,120 @@ end
 
 function Base:add(key, node)
    self.data[key] = node
+end
+
+function Base:load_data(data, filename)
+   local parsed_data = parser.parse_string(data, filename)
+   local data = self:produce_data_tree()
+
+   -- Function which can take a node, set any leaf values and recursively call
+   -- over collections, etc.
+   function recursively_add(node, path, parent, data_node)
+      for _, n in pairs(node) do
+         -- Create a path for the keyword argument pair.
+         local new_path = ""
+         if path == nil then
+            new_path = n.keyword
+         else
+            new_path = path.."."..n.keyword
+         end
+
+         local schema = self:get_schema(new_path)
+
+         if n.statements then
+            if schema.get_type() == "list" then
+               -- Lists are a special case, first we need to conver them from their
+               -- current format to a more useful {leafname: value, leafname: value}
+               -- type table. Then we want to add the item to the list parent.
+               local converted = {}
+               for _, leaf in pairs(n.statements) do
+                  converted[leaf.keyword] = leaf.argument
+               end
+
+               -- Extract key and add it to the converted.
+               converted[schema.key] = n.argument
+
+               local data_node = self:find_data_node(new_path, nil, nil, true)
+               data_node:add_item(converted)
+
+               recursively_add(n.statements, new_path, data_node)
+            else
+               if parent ~= nil then
+                  local new_dn = self:find_data_node(new_path)
+                  parent:add_container(n.keyword, new_dn)
+                  recursively_add(n.statements, new_path, parent, new_dn)
+               else
+                  recursively_add(n.statements, new_path)
+               end
+            end
+         else
+            if data_node == nil then
+               data_node = self:find_data_node(path)
+            end
+            data_node[n.keyword] = n.argument
+         end
+      end
+   end
+
+   -- Recursively add the data
+   recursively_add(parsed_data)
+   return self.data
+end
+
+function Base:find_data_node(schema, data_node, current_schema, raw)
+   -- If no data node has been provided assume we're starting from Base.data
+   if data_node == nil then
+      data_node = self.data
+   end
+
+   -- If there is no current_schema we must be in our first iteration (or
+   -- someone has called this function incorrectly).
+   if current_schema == nil then
+      current_schema = schema
+   end
+
+   -- First find the first node in the schema
+   local head = current_schema:match("[%w-_]*")
+   local tail = current_schema:sub(head:len() + 2)
+
+   -- If it's a list we want to access the list's version as that's where all
+   -- the values are, the non-templated version is just the raw data.
+   local node   
+   if data_node:get_template() ~= nil then
+      node = data_node:get_template()[head]
+   else
+      node = data_node[head]
+   end
+
+   -- If the node doesn't exist, we should display a useful error.
+   if node == nil then
+      local current = nil
+      if current_schema then
+         current = current_schema
+      else
+         current = schema
+      end
+      self:error(current, head, "Can't find data node")
+   end
+
+   -- Otherwise we need to check if we're at the end of the schema, if we are
+   -- we should return what we've found, otherwise continue to recursively call.
+   if tail == "" then
+      if raw ~= true and node:get_template() ~= nil then
+         return node:get_template()
+      else
+         return node
+      end
+   else
+      return self:find_data_node(schema, node, tail, raw)
+   end
+end
+
+function Base:load_data_file(filename)
+   local file_in = assert(io.open(filename))
+   local contents = file_in:read("*a")
+   file_in:close()
+   return self:load_data(contents, filename)
 end
 
 function load_schema(schema, filename)
