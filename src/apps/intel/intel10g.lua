@@ -23,7 +23,18 @@ local timer = require("core.timer")
 local bits, bitset = lib.bits, lib.bitset
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
 
-num_descriptors = 1024
+local num_descriptors = 1024
+function ring_buffer_size (arg)
+   if not arg then return num_descriptors end
+   local ring_size = assert(tonumber(arg), "bad ring size: " .. arg)
+   if ring_size > 32*1024 then
+      error("ring size too large for hardware: " .. ring_size)
+   end
+   if math.log(ring_size)/math.log(2) % 1 ~= 0 then
+      error("ring size is not a power of two: " .. arg)
+   end
+   num_descriptors = assert(tonumber(arg))
+end
 
 -- Defaults for configurable items
 local default = {
@@ -692,8 +703,8 @@ function M_vf:reconfig(opts)
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
       :set_VLAN(opts.vlan)
-      :set_rx_stats(opts.rxcounter or 0)
-      :set_tx_stats(opts.txcounter or 0)
+      :set_rx_stats(opts.rxcounter)
+      :set_tx_stats(opts.txcounter)
       :set_tx_rate(opts.rate_limit, opts.priority)
       :enable_receive()
       :enable_transmit()
@@ -707,8 +718,8 @@ function M_vf:init (opts)
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
       :set_VLAN(opts.vlan)
-      :set_rx_stats(opts.rxcounter or 0)
-      :set_tx_stats(opts.txcounter or 0)
+      :set_rx_stats(opts.rxcounter)
+      :set_tx_stats(opts.txcounter)
       :set_tx_rate(opts.rate_limit, opts.priority)
       :enable_receive()
       :enable_transmit()
@@ -981,7 +992,6 @@ function M_vf:get_txstats ()
 end
 
 function M_vf:set_tx_rate (limit, priority)
-   limit = tonumber(limit) or 0
    self.pf.r.RTTDQSEL(self.poolnum)
    if limit >= 10 then
       local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
@@ -990,8 +1000,6 @@ function M_vf:set_tx_rate (limit, priority)
    else
       self.pf.r.RTTBCNRC(0x00)
    end
-
-   priority = tonumber(priority) or 1.0
    self.pf.r.RTTDT1C(bit.band(math.floor(priority * 0x80), 0x3FF))
    return self
 end

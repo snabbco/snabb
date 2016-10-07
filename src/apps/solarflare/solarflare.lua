@@ -39,19 +39,22 @@ local function try (rc, message)
    return rc
 end
 
-SolarFlareNic = {}
+SolarFlareNic = {
+   config = {
+      pciaddr = {required=true},
+      macaddr = {},
+      vlan = {},
+      ifname = {}
+   },
+   version = ef_vi_version
+}
 SolarFlareNic.__index = SolarFlareNic
-SolarFlareNic.version = ef_vi_version
 
 -- The `driver' variable is used as a reference to the driver class in
 -- order to interchangably use NIC drivers.
 driver = SolarFlareNic
 
-function SolarFlareNic:new(args)
-   if type(args) == "string" then
-      args = config.parse_app_arg(args)
-   end
-
+function SolarFlareNic:new (args)
    if not args.ifname then
       local device_info = pci.device_info(args.pciaddr)
       assert(device_info.interface,

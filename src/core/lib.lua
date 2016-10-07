@@ -10,6 +10,8 @@ require("core.clib_h")
 local bit = require("bit")
 local band, bor, bnot, lshift, rshift, bswap =
    bit.band, bit.bor, bit.bnot, bit.lshift, bit.rshift, bit.bswap
+local tonumber = tonumber -- Yes, this makes a performance difference.
+local cast = ffi.cast
 
 -- Returns true if x and y are structurally similar (isomorphic).
 function equal (x, y)
@@ -373,7 +375,8 @@ if ffi.abi("be") then
    function htonl(b) return b end
    function htons(b) return b end
 else
-   function htonl(b) return bswap(b) end
+  -- htonl is unsigned, matching the C version and expectations.
+   function htonl(b) return tonumber(cast('uint32_t', bswap(b))) end
    function htons(b) return rshift(bswap(b), 16) end
 end
 ntohl = htonl
@@ -713,6 +716,28 @@ function compiler_barrier ()
    C.nop()
 end
 
+-- parse: Given ARG, a table of parameters or nil, assert that from
+-- CONFIG all of the required keys are present, fill in any missing values for
+-- optional keys, and error if any unknown keys are found.
+--
+-- ARG := { key=vaue, ... }
+-- CONFIG := { key = {[required=boolean], [default=value]}, ... }
+function parse (arg, config)
+   local ret = {}
+   if arg == nil then arg = {} end
+   for k, o in pairs(config) do
+      assert(arg[k] ~= nil or not o.required, "missing required parameter '"..k.."'")
+   end
+   for k, v in pairs(arg) do
+      assert(config[k], "unrecognized parameter '"..k.."'")
+      ret[k] = v
+   end
+   for k, o in pairs(config) do
+      if ret[k] == nil then ret[k] = o.default end
+   end
+   return ret
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")
@@ -739,4 +764,43 @@ function selftest ()
          :match('^45.00.B6.7D.00.FA.40.00.40.11$'), "wrong hex dump")
    assert(hexundump('4500 B67D 00FA400040 11', 10)
          =='\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11', "wrong hex undump")
+   print("Testing ntohl")
+   local raw_val = 0xf0d0b0f0
+   assert(ntohl(raw_val) > 0, "ntohl must be unsigned")
+   assert(ntohl(ntohl(raw_val)) == raw_val, 
+      "calling ntohl twice must return the original value")
+
+   -- test parse
+   print("Testing parse")
+   local function assert_parse_equal (arg, config, expected)
+      assert(equal(parse(arg, config), expected))
+   end
+   local function assert_parse_error (arg, config)
+      assert(not pcall(parse, arg, config))
+   end
+
+   local req = {required=true}
+   local opt = {default=42}
+
+   assert_parse_equal({a=1, b=2}, {a=req, b=req, c=opt}, {a=1, b=2, c=42})
+   assert_parse_equal({a=1, b=2}, {a=req, b=req}, {a=1, b=2})
+   assert_parse_equal({a=1, b=2, c=30}, {a=req, b=req, c=opt, d=opt}, {a=1, b=2, c=30, d=42})
+   assert_parse_equal({a=1, b=2, d=10}, {a=req, b=req, c=opt, d=opt}, {a=1, b=2, c=42, d=10})
+   assert_parse_equal({d=10}, {c=opt, d=opt}, {c=42, d=10})
+   assert_parse_equal({}, {c=opt}, {c=42})
+   assert_parse_equal({d=false}, {d=opt}, {d=false})
+   assert_parse_equal({d=nil}, {d=opt}, {d=42})
+   assert_parse_equal({a=false, b=2}, {a=req, b=req}, {a=false, b=2})
+   assert_parse_equal(nil, {}, {})
+
+   assert_parse_error({}, {a=req, b=req, c=opt})
+   assert_parse_error({d=30}, {a=req, b=req, d=opt})
+   assert_parse_error({a=1}, {a=req, b=req})
+   assert_parse_error({b=1}, {a=req, b=req})
+   assert_parse_error({a=nil, b=2}, {a=req, b=req})
+   assert_parse_error({a=1, b=nil}, {a=req, b=req})
+   assert_parse_error({a=1, b=2, d=10, e=100}, {a=req, b=req, d=opt})
+   assert_parse_error({a=1, b=2, c=4}, {a=req, b=req})
+   assert_parse_error({a=1, b=2}, {})
+   assert_parse_error(nil, {a=req})
 end
