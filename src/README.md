@@ -106,9 +106,15 @@ Name of the app. *Read-only*.
 
 — Field **myapp.shm**
 
-Can be set to a specification for `core.shm.create_frame` during `new`. When
-set, this field will be initialized to a frame of shared memory objects by the
-engine.
+Can be set to a specification for `core.shm.create_frame`. When set, this field
+will be initialized to a frame of shared memory objects by the engine.
+
+
+— Field **myapp.config**
+
+Can be set to a specification for `core.lib.parse`. When set, the specification
+will be used to validate the app’s arg when it is configured using
+`config.app`.
 
 
 — Method **myapp:link**
@@ -871,15 +877,37 @@ Returns a copy of *array*. *Array* must not be a "sparse array".
 — Function **lib.htons** *n*
 
 Host to network byte order conversion functions for 32 and 16 bit
-integers *n* respectively.
+integers *n* respectively. Unsigned.
 
 — Function **lib.ntohl** *n*
 
 — Function **lib.ntohs** *n*
 
 Network to host byte order conversion functions for 32 and 16 bit
-integers *n* respectively.
+integers *n* respectively. Unsigned.
 
+— Function **lib.parse** *arg*, *config*
+
+Validates *arg* against the specification in *config*, and returns a fresh
+table containing the parameters in *arg* and any omitted optional parameters
+with their default values. Given *arg*, a table of parameters or `nil`, assert
+that from *config* all of the required keys are present, fill in any missing
+values for optional keys, and error if any unknown keys are found. *Config* has
+the following format:
+
+```
+config := { key = {[required=boolean], [default=value]}, ... }
+```
+
+Each key is optional unless `required` is set to a true value, and its default
+value defaults to `nil`.
+
+Example:
+
+```
+lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
+  => {foo=42, bar=43, baz=44}
+```
 
 
 ## Main

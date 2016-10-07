@@ -8,14 +8,19 @@ local clone = packet.clone
 
 --- ### `RateLimitedRepeater` app: A repeater that can limit flow rate
 
-RateLimitedRepeater = {}
 
-function RateLimitedRepeater:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   --- By default, limit to 10 Mbps, just to have a default.
-   conf.rate = conf.rate or (10e6 / 8)
-   -- By default, allow for 255 standard packets in the queue.
-   conf.bucket_capacity = conf.bucket_capacity or (255 * 1500)
+RateLimitedRepeater = {
+   config = {
+      -- rate: by default, limit to 10 Mbps, just to have a default.
+      rate = {default=10e6/8},
+      -- bucket_capacity: by default, allow for 255 standard packets in the
+      -- queue.
+      bucket_capacity = {default=255*1500},
+      initial_capacity = {}
+   }
+}
+
+function RateLimitedRepeater:new (conf)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o = {
       index = 1,

@@ -39,13 +39,6 @@ function run (args)
    end
    function opt.r (arg)
       ring_size = tonumber(arg)
-      if type(ring_size) ~= 'number' then fatal("bad ring size: " .. arg) end
-      if ring_size > 32*1024 then
-         fatal("ring size too large for hardware: " .. ring_size)
-      end
-      if math.log(ring_size)/math.log(2) % 1 ~= 0 then
-         fatal("ring size is not a power of two: " .. arg)
-      end
    end
    args = lib.dogetopt(args, opt, "hHet:i:r:", long_opts)
    if #pciaddresses == 0 then
@@ -79,7 +72,7 @@ int firehose_callback_v1(const char *pciaddr, char **packets, void *rxring,
 
       local intel10g = require("apps.intel.intel10g")
       -- Maximum buffers to avoid packet drops
-      intel10g.num_descriptors = ring_size
+      intel10g.ring_buffer_size(ring_size)
       local nic = intel10g.new_sf({pciaddr=pciaddr})
       nic:open()
 
