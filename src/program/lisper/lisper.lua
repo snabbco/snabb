@@ -28,11 +28,6 @@ local ntohl = lib.ntohl
 local getenv = lib.getenv
 local hexdump = lib.hexdump
 
-local function assert(v, ...) --assert overload because
-   if v then return v, ... end
-   error(tostring((...) or "Assertion failed"), 2)
-end
-
 local function parsehex(s)
    return (s:gsub("[0-9a-fA-F][0-9a-fA-F]", function(cc)
      return string.char(tonumber(cc, 16))
@@ -574,12 +569,9 @@ local function route_packet(p, rxname, txports)
             if not loc.encrypt(dp) then return end --invalid packet
          end
       end
-      if not link.full(tx) then
-         link.transmit(tx, dp)
-         stats.tx = stats.tx + 1
-      else
-         packet.free(dp)
-      end
+      link.transmit(tx, dp)
+      stats.tx = stats.tx + 1
+      packet.free(dp)
    end
 
    return p
@@ -612,7 +604,7 @@ end
 function Punt:pull()
    local tx = self.output.tx
    if tx == nil then return end
-   while not link.full(tx) do
+   for i=1,engine.pull_npackets do
       local s = get_punt_message()
       if not s then break end
       local p = packet.allocate()

@@ -13,7 +13,7 @@ function Sprayer:push()
    local i = assert(self.input.input, "input port not found")
    local o = assert(self.output.output, "output port not found")
 
-   while not link.empty(i) and not link.full(o) do
+   while not link.empty(i) do
       self:process_packet(i, o)
       self.packet_counter = self.packet_counter + 1
    end

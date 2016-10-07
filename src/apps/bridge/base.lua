@@ -62,20 +62,19 @@
 -- ports to limit the scope of flooding.
 
 module(..., package.seeall)
-local config = require("core.config")
 
 bridge = subClass(nil)
 bridge._name = "base bridge"
+bridge.config = {
+   ports = {required=true},
+   split_horizon_groups = {},
+   config = {default={}}
+}
 
-function bridge:new (arg)
+function bridge:new (conf)
    assert(self ~= bridge, "Can't instantiate abstract class "..self:name())
    local o = bridge:superClass().new(self)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   assert(conf.ports, self._name..": invalid configuration")
    o._conf = conf
-   if not o._conf.config then
-      o._conf.config = {}
-   end
 
    -- Create a list of forwarding ports for all ports connected to the
    -- bridge, taking split horizon groups into account

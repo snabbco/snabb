@@ -8,10 +8,13 @@ local function dump (p)
    return lib.hexdump(ffi.string(p.data, p.length))
 end
 
-Match = {}
+Match = {
+   config = {
+      fuzzy = {}, modest = {}
+   }
+}
 
-function Match:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+function Match:new (conf)
    return setmetatable({ fuzzy = conf.fuzzy,
                          modest = conf.modest,
                          seen = 0,
@@ -88,7 +91,7 @@ function selftest()
    config.app(c, "join", basic_apps.Join)
    config.link(c, "src.output -> join.src")
    config.link(c, "garbage.output -> join.garbage")
-   config.link(c, "join.out -> sink.rx")
+   config.link(c, "join.output -> sink.rx")
    engine.configure(c)
    engine.main({duration=0.0001})
    assert(#engine.app_table.sink:errors() == 0)
