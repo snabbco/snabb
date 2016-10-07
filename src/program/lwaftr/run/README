@@ -17,3 +17,21 @@ Optional arguments:
                                 address set by "lwaftr monitor".
        -D       <seconds>       Duration in seconds
        -v                       Verbose (repeat for more verbosity)
+       -y HYDRA, --hydra
+                                Hydra mode: emit CSV data in the format expected
+                                by the Hydra reports. For instance:
+
+                                  benchmark,snabb,id,score,unit
+
+                                rather than the default:
+
+                                  Time (s),Decap. MPPS,Decap. Gbps,Encap. MPPS,Encap. Gbps
+       --bench-file FILENAME
+                                The file or path name to which benchmark data is
+                                written. A simple filename or relative pathname
+                                will be based on the current directory. Default
+                                is "bench.csv".
+
+When the -v option is used at least once, packets on the network interfaces are
+counted and recorded, and the corresponding incoming and outgoing packet rates
+are written to a file in CSV format, suitable for passing to a graphing program.

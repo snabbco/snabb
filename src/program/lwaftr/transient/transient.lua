@@ -46,7 +46,8 @@ end
 
 function parse_args(args)
    local handlers = {}
-   local opts = { bitrate = 10e9, duration = 5, period = 1 }
+   local opts = {
+      bitrate = 10e9, duration = 5, period = 1, bench_file = 'bench.csv' }
    function handlers.b(arg)
       opts.bitrate = assert(tonumber(arg), 'bitrate must be a number')
    end
@@ -59,10 +60,13 @@ function parse_args(args)
    function handlers.p(arg)
       opts.period = assert(tonumber(arg), 'period must be a number')
    end
+   handlers["bench-file"] = function(bench_file)
+      opts.bench_file = bench_file
+   end
    function handlers.h() show_usage(0) end
    args = lib.dogetopt(args, handlers, "hb:s:D:p:",
                        { bitrate="b", step="s", duration="D", period="p",
-                         help="h" })
+                         ["bench-file"]=0, help="h" })
    if not opts.step then opts.step = opts.bitrate / 10 end
    assert(opts.bitrate > 0, 'bitrate must be positive')
    assert(opts.step > 0, 'step must be positive')
@@ -124,7 +128,7 @@ function run(args)
    rate_adjuster()
    timer.activate(timer.new("adjust_rate", rate_adjuster,
                             opts.duration * 1e9, 'repeating'))
-   local csv = csv_stats.CSVStatsTimer.new()
+   local csv = csv_stats.CSVStatsTimer.new(opts.csv_file)
    for _,stream in ipairs(streams) do
       csv:add_app(stream.nic_id, { 'rx', 'tx' },
                   { rx=stream.name..' TX', tx=stream.name..' RX' })
