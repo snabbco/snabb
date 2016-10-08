@@ -19,8 +19,6 @@ or a defect in LuaJIT.
 
 Example of excluded test:
 ```
-if not jit then
-  -- FIXME tests fail in LuaJIT
-  dofile('main.lua')
-end
+-- FIXME tests fail in LuaJIT
+-- dofile('main.lua')
 ```
