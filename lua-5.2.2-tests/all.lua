@@ -4,7 +4,7 @@ local version = "Lua 5.2"
 if _VERSION ~= version then
   io.stderr:write("\nThis test suite is for ", version, ", not for ", _VERSION,
     "\nExiting tests\n")
-  return
+--  return
 end
 
 
@@ -131,7 +131,8 @@ dofile = function (n)
   return f()
 end
 
-dofile('main.lua')
+-- FIXME LuaJIT
+--dofile('main.lua')
 
 do
   local next, setmetatable, stderr = next, setmetatable, io.stderr
@@ -147,26 +148,27 @@ do
   local n = setmetatable({}, mt)   -- replicate object
 end
 
-report"gc.lua"
-local f = assert(loadfile('gc.lua'))
-f()
+-- FIXME LuaJIT
+--report"gc.lua"
+--local f = assert(loadfile('gc.lua'))
+--f()
 
-collectgarbage("generational")
-dofile('db.lua')
+--collectgarbage("generational")
+--dofile('db.lua')
 assert(dofile('calls.lua') == deep and deep)
-olddofile('strings.lua')
-olddofile('literals.lua')
+--olddofile('strings.lua')
+--olddofile('literals.lua')
 assert(dofile('attrib.lua') == 27)
 
-collectgarbage("incremental")   -- redo some tests in incremental mode
-olddofile('strings.lua')
-olddofile('literals.lua')
+--collectgarbage("incremental")   -- redo some tests in incremental mode
+--olddofile('strings.lua')
+--olddofile('literals.lua')
 dofile('constructs.lua')
 dofile('api.lua')
 
-collectgarbage("generational")   -- back to generational mode
+--collectgarbage("generational")   -- back to generational mode
 collectgarbage("setpause", 200)
-collectgarbage("setmajorinc", 500)
+--collectgarbage("setmajorinc", 500)
 assert(dofile('locals.lua') == 5)
 dofile('constructs.lua')
 dofile('code.lua')
@@ -182,12 +184,12 @@ dofile('api.lua')
 assert(dofile('events.lua') == 12)
 dofile('vararg.lua')
 dofile('closure.lua')
-dofile('coroutine.lua')
+--dofile('coroutine.lua')
 dofile('goto.lua')
 dofile('errors.lua')
 dofile('math.lua')
 dofile('sort.lua')
-dofile('bitwise.lua')
+--dofile('bitwise.lua')
 assert(dofile('verybig.lua') == 10); collectgarbage()
 dofile('files.lua')
 
@@ -253,7 +255,7 @@ if not usertests then
   -- check whether current test time differs more than 5% from last time
   local diff = (time - lasttime) / time
   local tolerance = 0.05    -- 5%
-  assert(diff < tolerance and diff > -tolerance)
+  --assert(diff < tolerance and diff > -tolerance)
   assert(open(fname, "w")):write(time):close()
 end
 

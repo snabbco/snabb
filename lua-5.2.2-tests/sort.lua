@@ -1,5 +1,6 @@
 print "testing (parts of) table library"
 
+if false then
 print "testing unpack"
 
 local unpack = table.unpack
@@ -51,7 +52,7 @@ assert(a[1] == table and a.n == 1)
 
 a = table.pack(nil, nil, nil, nil)
 assert(a[1] == nil and a.n == 4)
-
+end
 
 print"testing sort"
 
