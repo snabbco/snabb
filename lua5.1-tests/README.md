@@ -15,4 +15,12 @@ On UNIX systems just execute:
 ## Tests disabled or ignored
 Wherever tests have been switched off or ignored a comment has been added and the code has been made conditional. These failures will
 be investigated and either the tests will be modified or permanently disabled depending upon whether the issue is one of compatibility 
-or a defect in LuaJIT.
+or a defect in LuaJIT. 
+
+Example of excluded test:
+```
+if not jit then
+  -- FIXME tests fail in LuaJIT
+  dofile('main.lua')
+end
+```
