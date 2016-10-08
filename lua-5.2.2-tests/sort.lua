@@ -1,5 +1,6 @@
 print "testing (parts of) table library"
 
+-- FIXME LuaJIT pack/unpack tests disabled
 if false then
 print "testing unpack"
 

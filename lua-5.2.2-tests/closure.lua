@@ -42,6 +42,7 @@ assert(B.g == 19)
 -- testing equality
 a = {}
 for i = 1, 5 do  a[i] = function (x) return x + a + _ENV end  end
+-- FIXME LuaJIT
 --assert(a[3] == a[4] and a[4] == a[5])
 
 for i = 1, 5 do  a[i] = function (x) return i + a + _ENV end  end
@@ -50,6 +51,7 @@ assert(a[3] ~= a[4] and a[4] ~= a[5])
 local function f()
   return function (x)  return math.sin(_ENV[x])  end
 end
+-- FIXME LuaJIT
 --assert(f() == f())
 
 
@@ -227,6 +229,7 @@ assert(debug.upvalueid(string.gmatch("x", "x"), 1) ~= nil)
 
 assert(foo1() == 3 + 5 and foo2() == 5 + 3)
 debug.upvaluejoin(foo1, 2, foo2, 2)
+-- FIXME LuaJIT
 --assert(foo1() == 3 + 3 and foo2() == 5 + 3)
 assert(foo3() == 10 + 5)
 debug.upvaluejoin(foo3, 2, foo2, 1)

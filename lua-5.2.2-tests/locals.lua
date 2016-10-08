@@ -72,8 +72,10 @@ local function getenv (f)
 end
 
 -- test for global table of loaded chunks
+-- FIXME LuaJIT
 --assert(getenv(load"a=3") == _G)
 local c = {}; local f = load("a = 3", nil, nil, c)
+-- FIXME LuaJIT
 --assert(getenv(f) == c)
 assert(c.a == nil)
 f()
@@ -136,16 +138,20 @@ do local _ENV = mt
     return function (x) return A .. x end
   end
 end
+-- FIXME LuaJIT
 --assert(getenv(foo) == mt)
 --x = foo('hi'); assert(mt.A == 'hi' and A == 1000)
 --assert(x('*') == mt.A .. '*')
 
 do local _ENV = {assert=assert, A=10};
   do local _ENV = {assert=assert, A=20};
+    -- FIXME LuaJIT
     --assert(A==20);x=A
   end
+  -- FIXME LuaJIT
   --assert(A==10 and x==20)
 end
+-- FIXME LuaJIT
 --assert(x==20)
 
 

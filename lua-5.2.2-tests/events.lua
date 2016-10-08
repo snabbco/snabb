@@ -7,10 +7,12 @@ _ENV = setmetatable({}, {__index=_G})
 collectgarbage()
 
 X = X+10
+-- FIXME LuaJIT
 --assert(X == 30 and _G.X == 20)
 B = false
 assert(B == false)
 B = nil
+-- FIXME LuaJIT
 --assert(B == 30)
 
 assert(getmetatable{} == nil)
@@ -317,7 +319,7 @@ i = 0
 x = c(3,4,5)
 assert(i == 3 and x[1] == 3 and x[3] == 5)
 
-
+-- FIXME LuaJIT
 -- assert(_G.X == 20)
 
 print'+'

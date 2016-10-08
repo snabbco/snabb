@@ -323,18 +323,22 @@ local function test (a)
 end
 
 a = {n=0, [-7] = "ban"}
+-- FIXME LuaJIT
 --test(a)
 assert(a.n == 0 and a[-7] == "ban")
 
 a = {[-7] = "ban"};
+-- FIXME LuaJIT
 --test(a)
 assert(a.n == nil and #a == 0 and a[-7] == "ban")
 
 a = {[-1] = "ban"}
+-- FIXME LuaJIT
 --test(a)
 assert(#a == 0 and table.remove(a) == nil and a[-1] == "ban")
 
 a = {[0] = "ban"}
+-- FIXME LuaJIT
 --assert(#a == 0 and table.remove(a) == "ban" and a[0] == nil)
 
 table.insert(a, 1, 10); table.insert(a, 1, 20); table.insert(a, 1, -1)
@@ -355,6 +359,7 @@ assert(#a == 0 and a.n == nil)
 
 a = {10,20,30,40}
 assert(table.remove(a, #a + 1) == nil)
+-- FIXME LuaJIT
 --assert(not pcall(table.remove, a, 0))
 assert(a[#a] == 40)
 assert(table.remove(a, #a) == 40)

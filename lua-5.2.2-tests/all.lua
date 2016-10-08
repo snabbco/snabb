@@ -1,11 +1,11 @@
-#!../lua
+--#!../lua
 
-local version = "Lua 5.2"
-if _VERSION ~= version then
-  io.stderr:write("\nThis test suite is for ", version, ", not for ", _VERSION,
-    "\nExiting tests\n")
+--local version = "Lua 5.2"
+--if _VERSION ~= version then
+--  io.stderr:write("\nThis test suite is for ", version, ", not for ", _VERSION,
+--    "\nExiting tests\n")
 --  return
-end
+--end
 
 
 -- next variables control the execution of some tests
@@ -153,21 +153,26 @@ end
 --local f = assert(loadfile('gc.lua'))
 --f()
 
+-- FIXMELuaJIT
 --collectgarbage("generational")
 --dofile('db.lua')
 assert(dofile('calls.lua') == deep and deep)
+-- FIXME LuaJIT
 --olddofile('strings.lua')
 --olddofile('literals.lua')
 assert(dofile('attrib.lua') == 27)
 
+-- FIXME LuaJIT
 --collectgarbage("incremental")   -- redo some tests in incremental mode
 --olddofile('strings.lua')
 --olddofile('literals.lua')
 dofile('constructs.lua')
 dofile('api.lua')
 
+-- FIXME LuaJIT
 --collectgarbage("generational")   -- back to generational mode
 collectgarbage("setpause", 200)
+-- FIXME LuaJIT
 --collectgarbage("setmajorinc", 500)
 assert(dofile('locals.lua') == 5)
 dofile('constructs.lua')
@@ -184,11 +189,13 @@ dofile('api.lua')
 assert(dofile('events.lua') == 12)
 dofile('vararg.lua')
 dofile('closure.lua')
+-- FIXME LuaJIT
 --dofile('coroutine.lua')
 dofile('goto.lua')
 dofile('errors.lua')
 dofile('math.lua')
 dofile('sort.lua')
+-- FIXME LuaJIT
 --dofile('bitwise.lua')
 assert(dofile('verybig.lua') == 10); collectgarbage()
 dofile('files.lua')
@@ -255,6 +262,7 @@ if not usertests then
   -- check whether current test time differs more than 5% from last time
   local diff = (time - lasttime) / time
   local tolerance = 0.05    -- 5%
+  -- FIXME LuaJIT
   --assert(diff < tolerance and diff > -tolerance)
   assert(open(fname, "w")):write(time):close()
 end

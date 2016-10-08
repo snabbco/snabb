@@ -36,6 +36,7 @@ print('testing i/o')
 
 local otherfile = os.tmpname()
 
+-- FIXME LuaJIT
 --assert(not pcall(io.open, file, "rw"))     -- invalid mode
 --assert(not pcall(io.open, file, "rb+"))    -- invalid mode
 --assert(not pcall(io.open, file, "r+bk"))   -- invalid mode
@@ -361,12 +362,14 @@ io.output(io.open(file, "wb"))
 assert(io.write("#this is a comment for a binary file\0\n",
                 string.dump(function () return 20, '\0\0\0' end)))
 io.close()
+-- FIXME LuaJIT
 --a, b, c = assert(loadfile(file))()
 --assert(a == 20 and b == "\0\0\0" and c == nil)
 --assert(os.remove(file))
 
 
 -- 'loadfile' with 'env'
+-- FIXME LuaJIT test disabled
 if false then
 do
   local f = io.open(file, 'w')
@@ -391,6 +394,7 @@ end
 
 
 -- 'loadfile' x modes
+-- FIXME LuaJIT test disabled
 if false then
 do
   io.open(file, 'w'):write("return 10"):close()
@@ -526,8 +530,10 @@ if not _noposix then
     if v[2] == "ok" then
       assert(x == true and y == 'exit' and z == 0)
     else
+      -- FIXME LuaJIT
       -- assert(x == nil and y == v[2])   -- correct status and 'what'
       -- correct code if known (but always different from 0)
+      -- FIXME LuaJIT
       --assert((v[3] == nil and z > 0) or v[3] == z)
     end
   end
@@ -562,6 +568,7 @@ load(os.date([[assert(D.year==%Y and D.month==%m and D.day==%d and
   D.hour==%H and D.min==%M and D.sec==%S and
   D.wday==%w+1 and D.yday==%j and type(D.isdst) == 'boolean')]], t))()
 
+-- FIXME LuaJIT
 --assert(not pcall(os.date, "%9"))   -- invalid conversion specifier
 --assert(not pcall(os.date, "%"))   -- invalid conversion specifier
 --assert(not pcall(os.date, "%O"))   -- invalid conversion specifier

@@ -322,12 +322,14 @@ malform("[]")
 malform("[^]")
 malform("[a%]")
 malform("[a%")
+-- FIXME LuaJIT
 --malform("%b")
 --malform("%ba")
 malform("%")
 malform("%f", "missing")
 
 -- \0 in patterns
+-- FIXME LuaJIT
 --assert(string.match("ab\0\1\2c", "[\0-\2]+") == "\0\1\2")
 --assert(string.match("ab\0\1\2c", "[\0-\0]+") == "\0")
 --assert(string.find("b$a", "$\0?") == 2)
@@ -337,6 +339,7 @@ malform("%f", "missing")
 --assert(string.match("abc\0\0\0", "%\0%\0?") == "\0\0")
 
 -- magic char after \0
+-- FIXME LuaJIT
 --assert(string.find("abc\0\0","\0.") == 4)
 --assert(string.find("abcx\0\0abc\0abc","x\0\0abc\0a.") == 4)
 

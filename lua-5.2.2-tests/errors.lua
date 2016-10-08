@@ -54,6 +54,7 @@ assert(doit("function a (... , ...) end"))
 assert(doit("function a (, ...) end"))
 assert(doit("local t={}; t = t[#t] + 1"))
 
+-- FIXME LuaJIT
 --checksyntax([[
 --  local a = {4
 --
@@ -84,6 +85,7 @@ checkmessage("b=1; local aaa='a'; x=aaa+b", "local 'aaa'")
 checkmessage("aaa={}; x=3/aaa", "global 'aaa'")
 checkmessage("aaa='2'; b=nil;x=aaa*b", "global 'b'")
 checkmessage("aaa={}; x=-aaa", "global 'aaa'")
+-- FIXME LuaJIT
 --assert(not string.find(doit"aaa={}; x=(aaa or aaa)+(aaa and aaa)", "'aaa'"))
 --assert(not string.find(doit"aaa={}; (aaa or aaa)()", "'aaa'"))
 
@@ -93,6 +95,7 @@ checkmessage("print(print < print)", "two function")
 
 -- passing light userdata instead of full userdata
 _G.D = debug
+-- FIXME LuaJIT
 --checkmessage([[
 --  -- create light udata
 --  local x = D.upvalueid(function () return debug end, 1)
@@ -114,6 +117,7 @@ local s = table.concat(t, "; ")
 t = nil
 checkmessage(s.."; a = bbb + 1", "global 'bbb'")
 checkmessage("local _ENV=_ENV;"..s.."; a = bbb + 1", "global 'bbb'")
+-- FIXME LuaJIT
 --checkmessage(s.."; local t = {}; a = t.bbb + 1", "field 'bbb'")
 --checkmessage(s.."; local t = {}; t:bbb()", "method 'bbb'")
 
@@ -142,6 +146,7 @@ while 1 do
   insert(prefix, a)
 end]], "global 'insert'")
 
+-- FIXME LuaJIT
 --checkmessage([[  -- tail call
 --  return math.sin("a")
 --]], "'sin'")
@@ -166,12 +171,15 @@ checkmessage("a:sub()", "bad self")
 checkmessage("string.sub('a', {})", "#2")
 checkmessage("('a'):sub{}", "#1")
 
+-- FIXME LuaJIT
 --checkmessage("table.sort({1,2,3}, table.sort)", "'table.sort'")
 -- next message may be 'setmetatable' or '_G.setmetatable'
+-- FIXME LuaJIT
 --checkmessage("string.gsub('s', 's', setmetatable)", "setmetatable'")
 
 -- tests for errors in coroutines
 
+-- FIXME LuaJIT
 --function f (n)
 --  local c = coroutine.create(f)
 --  local a,b = coroutine.resume(c)
@@ -179,6 +187,7 @@ checkmessage("('a'):sub{}", "#1")
 --end
 --assert(string.find(f(), "C stack overflow"))
 
+-- FIXME LuaJIT
 --checkmessage("coroutine.yield()", "outside a coroutine")
 
 f1 = function () table.sort({1,2,3}, coroutine.yield) end
@@ -216,18 +225,22 @@ lineerror("\n local a \n for k,v in 3 \n do \n print(k) \n end", 3)
 lineerror("\n\n for k,v in \n 3 \n do \n print(k) \n end", 4)
 lineerror("function a.x.y ()\na=a+1\nend", 1)
 
+-- FIXME LuaJIT
 --lineerror("a = \na\n+\n{}", 3)
 --lineerror("a = \n3\n+\n(\n4\n/\nprint)", 6)
 --lineerror("a = \nprint\n+\n(\n4\n/\n7)", 3)
 
+-- FIXME LuaJIT
 --lineerror("a\n=\n-\n\nprint\n;", 3)
 
+-- FIXME LuaJIT
 --lineerror([[
 --a
 --(
 --23)
 --]], 1)
 
+-- FIXME LuaJIT
 --lineerror([[
 --local a = {x = 13}
 --a
@@ -321,6 +334,7 @@ if not _soft then
     assert(math.sin(0) == 0)
     return 15
   end)
+  -- FIXME LuaJIT
   --assert(msg == 15)
 
   res, msg = pcall(function ()
@@ -349,6 +363,7 @@ checksyntax("[[a]]", "", "[[a]]", 1)
 checksyntax("'aa'", "", "'aa'", 1)
 
 -- test 255 as first char in a chunk
+-- FIXME LuaJIT
 --checksyntax("\255a = 1", "", "char(255)", 1)
 
 doit('I = load("a=9+"); a=3')
@@ -381,6 +396,7 @@ testrep("a=", "a^")
 
 local s = ("a,"):rep(200).."a=nil"
 local a,b = load(s)
+-- FIXME LuaJIT
 --assert(not a and string.find(b, "levels"))
 
 
@@ -405,6 +421,7 @@ for j = 1,lim do
 end
 s = s.."\nend  end end"
 local a,b = load(s)
+-- FIXME LuaJIT
 --assert(c > 255 and string.find(b, "too many upvalues") and
 --       string.find(b, "line 5"))
 

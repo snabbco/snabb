@@ -218,6 +218,7 @@ a = assert(load(read1(x), "modname", "t", _G))
 assert(a() == "\0" and _G.x == 33)
 assert(debug.getinfo(a).source == "modname")
 -- cannot read text in binary mode
+-- FIXME LuaJIT
 --cannotload("attempt to load a text chunk", load(read1(x), "modname", "b", {}))
 --cannotload("attempt to load a text chunk", load(x, "modname", "b"))
 
@@ -240,6 +241,7 @@ assert(type(f) == "function" and f() == 1)
 x = string.dump(load("x = 1; return x"))
 a = assert(load(read1(x), nil, "b"))
 assert(a() == 1 and _G.x == 1)
+-- FIXME LuaJIT
 --cannotload("attempt to load a binary chunk", load(read1(x), nil, "t"))
 --cannotload("attempt to load a binary chunk", load(x, nil, "t"))
 
@@ -250,6 +252,7 @@ cannotload("unexpected symbol", load("*a = 123"))
 cannotload("hhi", load(function () error("hhi") end))
 
 -- any value is valid for _ENV
+-- FIXME LuaJIT
 --assert(load("return _ENV", nil, nil, 123)() == 123)
 
 
@@ -261,6 +264,7 @@ local function h ()
 end
 local d = string.dump(h)
 x = load(d, "", "b")
+-- FIXME LuaJIT
 --assert(debug.getupvalue(x, 2) == '_ENV')
 debug.setupvalue(x, 2, _G)
 assert(x() == 123)

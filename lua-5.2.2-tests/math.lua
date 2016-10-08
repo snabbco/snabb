@@ -64,16 +64,20 @@ assert(tonumber('0x0.' .. string.rep('0', 150).."1") == 2^(-4*151))
 -- testing 'tonumber' with base
 assert(tonumber('  001010  ', 2) == 10)
 assert(tonumber('  001010  ', 10) == 001010)
+-- FIXME LuaJIT
 --assert(tonumber('  -1010  ', 2) == -10)
 assert(tonumber('10', 36) == 36)
+-- FIXME LuaJIT
 --assert(tonumber('  -10  ', 36) == -36)
 assert(tonumber('  +1Z  ', 36) == 36 + 35)
+-- FIXME LuaJIT
 --assert(tonumber('  -1z  ', 36) == -36 + -35)
 --assert(tonumber('-fFfa', 16) == -(10+(16*(15+(16*(15+(16*15)))))))
 assert(tonumber(string.rep('1', 42), 2) + 1 == 2^42)
 assert(tonumber(string.rep('1', 34), 2) + 1 == 2^34)
 assert(tonumber('ffffFFFF', 16)+1 == 2^32)
 assert(tonumber('0ffffFFFF', 16)+1 == 2^32)
+-- FIXME LuaJIT
 --assert(tonumber('-0ffffffFFFF', 16) - 1 == -2^40)
 for i = 2,36 do
   assert(tonumber('\t10000000000\t', i) == i^10)
@@ -82,12 +86,15 @@ end
 -- testing 'tonumber' fo invalid formats
 assert(f(tonumber('fFfa', 15)) == nil)
 assert(f(tonumber('099', 8)) == nil)
+-- FIXME LuaJIT
 --assert(f(tonumber('1\0', 2)) == nil)
 assert(f(tonumber('', 8)) == nil)
 assert(f(tonumber('  ', 9)) == nil)
 assert(f(tonumber('  ', 9)) == nil)
+-- FIXME LuaJIT
 --assert(f(tonumber('0xf', 10)) == nil)
 
+-- FIXME LuaJIT
 --assert(f(tonumber('inf')) == nil)
 --assert(f(tonumber(' INF ')) == nil)
 --assert(f(tonumber('Nan')) == nil)
@@ -96,6 +103,7 @@ assert(f(tonumber('  ', 9)) == nil)
 assert(f(tonumber('  ')) == nil)
 assert(f(tonumber('')) == nil)
 assert(f(tonumber('1  a')) == nil)
+-- FIXME LuaJIT
 --assert(f(tonumber('1\0')) == nil)
 --assert(f(tonumber('1 \0')) == nil)
 --assert(f(tonumber('1\0 ')) == nil)
