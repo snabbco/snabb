@@ -3,13 +3,17 @@
 This directory contains a modified version of the Lua 5.1 test suite. The modifications are primarily to disable or amend some tests 
 so that the test suite can be run. 
 
+## LuaJIT build options
+
+Some tests will fail if LUA 5.2 compatibility is turned on.
+
 ## Running the test suite
 
 You need to have `luajit` on your path.
 
 On UNIX systems just execute:
 ```
-./run.sh
+sh run.sh
 ```
 
 ## Tests disabled or ignored
