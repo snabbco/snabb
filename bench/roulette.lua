@@ -3,7 +3,8 @@
 -- produce non-deterministic performance.
 -- See https://github.com/LuaJIT/LuaJIT/issues/218
 
-math.randomseed(os.time())
+-- (Let the test harness determine the random seed)
+-- math.randomseed(os.time())
 
 local population = 100e6
 local live = 0
