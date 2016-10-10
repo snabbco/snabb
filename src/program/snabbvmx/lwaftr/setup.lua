@@ -17,6 +17,7 @@ local nh_fwd = require("apps.lwaftr.nh_fwd")
 local pci = require("lib.hardware.pci")
 local raw = require("apps.socket.raw")
 local tap = require("apps.tap.tap")
+local pcap = require("apps.pcap.pcap")
 
 local yesno = lib.yesno
 
@@ -290,4 +291,150 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       config.link(c, chain_output .. " -> " .. "DummyVhost"  .. ".rx")
       print("Running without VM (no vHostUser sock_path set)")
    end
+end
+
+local function file_exists (path)
+   local stat = S.stat(path)
+   return stat and stat.isreg
+end
+
+local function load_conf (conf_filename)
+   local function load_lwaftr_config (conf, conf_filename)
+      local filename = conf.lwaftr
+      if not file_exists(filename) then
+         filename = lib.dirname(conf_filename).."/"..filename
+      end
+      return require("apps.lwaftr.conf").load_lwaftr_config(filename)
+   end
+   local conf = dofile(conf_filename)
+   return conf, load_lwaftr_config(conf, conf_filename)
+end
+
+local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
+   assert(type(conf) == "table")
+   assert(type(lwconf) == "table")
+
+   v4_input, v6_input = unpack(sources)
+   v4_output, v6_output = unpack(sinks)
+
+   if conf.ipv6_interface then
+      if conf.ipv6_interface.fragmentation then
+         local mtu = conf.ipv6_interface.mtu or lwconf.ipv6_mtu
+         config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, {
+            counters = counters,
+            max_ipv6_reassembly_packets = lwconf.max_ipv6_reassembly_packets,
+            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+         })
+         config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
+            counters = counters,
+            mtu = mtu,
+         })
+         config.link(c, v6_output .. " -> reassemblerv6.input")
+         config.link(c, "fragmenterv6.output -> " .. v6_input)
+         v6_input, v6_output  = "fragmenterv6.input", "reassemblerv6.output"
+      end
+      if conf.ipv6_interface.ipv6_ingress_filter then
+         local filter = conf.ipv6_interface.ipv6_ingress_filter
+         config.app(c, "ingress_filterv6", PcapFilter, { filter = filter })
+         config.link(c, v6_output .. " -> ingress_filterv6.input")
+         v6_output = "ingress_filterv6.output"
+      end
+      if conf.ipv6_interface.ipv6_egress_filter then
+         local filter = conf.ipv6_interface.ipv6_egress_filter
+         config.app(c, "egress_filterv6", PcapFilter, { filter = filter })
+         config.link(c, "egress_filterv6.output -> " .. v6_input)
+         v6_input = "egress_filterv6.input"
+      end
+   end
+
+   if conf.ipv4_interface then
+      if conf.ipv4_interface.fragmentation then
+         local mtu = conf.ipv4_interface.mtu or lwconf.ipv4_mtu
+         config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
+            counters = counters,
+            max_ipv4_reassembly_packets = lwconf.max_ipv4_reassembly_packets,
+            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+         })
+         config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
+            counters = counters,
+            mtu = mtu
+         })
+         config.link(c, v4_output .. " -> reassemblerv4.input")
+         config.link(c, "fragmenterv4.output -> " .. v4_input)
+         v4_input, v4_output  = "fragmenterv4.input", "reassemblerv4.output"
+      end
+      if conf.ipv4_interface.ipv4_ingress_filter then
+         local filter = conf.ipv4_interface.ipv4_ingress_filter
+         config.app(c, "ingress_filterv4", PcapFilter, { filter = filter })
+         config.link(c, v4_output .. " -> ingress_filterv4.input")
+         v4_output = "ingress_filterv4.output"
+      end
+      if conf.ipv4_interface.ipv4_egress_filter then
+         local filter = conf.ipv4_interface.ipv4_egress_filter
+         config.app(c, "egress_filterv4", PcapFilter, { filter = filter })
+         config.link(c, "egress_filterv4.output -> " .. v4_input)
+         v4_input = "egress_filterv4.input"
+      end
+   end
+
+   if conf.ipv4_interface and conf.ipv6_interface then
+      config.app(c, "nh_fwd6", nh_fwd.nh_fwd6, conf.ipv6_interface)
+      config.link(c, v6_input.." -> nh_fwd6.wire")
+      config.link(c, "nh_fwd6.wire -> "..v6_output)
+
+      config.app(c, "nh_fwd4", nh_fwd.nh_fwd4, conf.ipv4_interface)
+      config.link(c, v4_input.."-> nh_fwd4.wire")
+      config.link(c, "nh_fwd4.wire -> "..v6_output)
+
+      lwconf.counters = lwcounter.init_counters()
+      config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
+      config.link(c, "nh_fwd6.service -> lwaftr.v6")
+      config.link(c, "lwaftr.v6 -> nh_fwd6.service")
+      config.link(c, "nh_fwd4.service -> lwaftr.v4")
+      config.link(c, "lwaftr.v4 -> nh_fwd4.service")
+
+      -- Add a special hairpinning queue to the lwaftr app.
+      config.link(c, "lwaftr.hairpin_out -> lwaftr.hairpin_in")
+
+      config.app(c, "vm_v4v6", V4V6, { description = "vm_v4v6",
+                                       mirror = false })
+      config.link(c, "nh_fwd6.vm -> vm_v4v6.v6")
+      config.link(c, "vm_v4v6.v6 -> nh_fwd6.vm")
+      config.link(c, "nh_fwd4.vm -> vm_v4v6.v4")
+      config.link(c, "vm_v4v6.v4 -> nh_fwd6.vm")
+
+      config.app(c, "DummyVhost", basic_apps.Sink)
+      config.link(c, "DummyVhost.tx -> vm_v4v6.input")
+      config.link(c, "vm_v4v6.output -> DummyVhost.rx")
+   end
+end
+
+function load_check(c, conf_filename, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
+   local conf, lwconf = load_conf(conf_filename)
+
+   config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
+   config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
+   config.app(c, "output_filev4", pcap.PcapWriter, outv4_pcap)
+   config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
+   if conf.vlan_tagging then
+      config.app(c, "untagv4", vlan.Untagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "untagv6", vlan.Untagger, { tag=conf.v6_vlan_tag })
+      config.app(c, "tagv4", vlan.Tagger, { tag=conf.v4_vlan_tag })
+      config.app(c, "tagv6", vlan.Tagger, { tag=conf.v6_vlan_tag })
+   end
+
+   local sources = { "capturev4.output", "capturev6.output" }
+   local sinks = { "output_filev4.input", "output_filev6.input" }
+
+   if conf.vlan_tagging then
+      sources = { "untagv4.output", "untagv6.output" }
+      sinks = { "tagv4.input", "tagv6.input" }
+
+      config.link(c, "capturev4.output -> untagv4.input")
+      config.link(c, "capturev6.output -> untagv6.input")
+      config.link(c, "tagv4.output -> output_filev4.input")
+      config.link(c, "tagv6.output -> output_filev6.input")
+   end
+
+   lwaftr_app_check(c, conf, lwconf, sources, sinks)
 end

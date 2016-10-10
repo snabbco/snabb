@@ -1,5 +1,8 @@
 Usage:
-  snabbvmx lwaftr
+    snabbvmx check
+    snabbvmx lwaftr
+    snabbvmx query
+    snabbvmx top
 
 Use --help for per-command usage.
 
