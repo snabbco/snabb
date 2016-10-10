@@ -6,8 +6,9 @@ local C = ffi.C
 local lib = require("core.lib")
 local header = require("lib.protocol.header")
 local ipv6 = require("lib.protocol.ipv6")
-local band = require("bit").band
 local ntohs, htons = lib.ntohs, lib.htons
+local abs, min = math.abs, math.min
+local band, bxor = bit.band, bit.bxor
 
 local mac_addr_t = ffi.typeof("uint8_t[6]")
 local ethernet = subClass(header)
@@ -76,15 +77,26 @@ function ethernet:ipv6_mcast(ip)
    return result
 end
 
--- Check whether a MAC address has its group bit set
-function ethernet:is_mcast (addr)
-   return band(addr[0], 0x01) ~= 0
+-- Return 1 if MAC address has its group bit set and 0 otherwise
+function ethernet:n_mcast (addr)
+   return band(addr[0], 0x01)
 end
 
-local bcast_address = ethernet:pton("FF:FF:FF:FF:FF:FF")
+-- Check whether a MAC address has its group bit set
+function ethernet:is_mcast (addr)
+   return ethernet:n_mcast(addr) == 1
+end
+
+-- Return 1 if MAC address is the broadcast address and 0 otherwise
+function ethernet:n_bcast (addr)
+   local bcast = abs(bxor(0xFFFFFFFF, ffi.cast("uint32_t*", addr)[0]))
+   bcast = bcast + abs(bxor(0xFFFF, ffi.cast("uint16_t*", addr)[2]))
+   return 1 - min(bcast, 1)
+end
+
 -- Check whether a MAC address is the broadcast address
 function ethernet:is_bcast (addr)
-   return C.memcmp(addr, bcast_address, 6) == 0
+   return ethernet:n_bcast(addr) == 1
 end
 
 -- Instance methods
