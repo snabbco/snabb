@@ -62,12 +62,8 @@ function Tap:pull ()
       link.transmit(l, p)
       counter.add(self.shm.rxbytes, len)
       counter.add(self.shm.rxpackets)
-      if ethernet:is_mcast(p.data) then
-         counter.add(self.shm.rxmcast)
-      end
-      if ethernet:is_bcast(p.data) then
-         counter.add(self.shm.rxbcast)
-      end
+      counter.add(self.shm.rxmcast, ethernet:n_mcast(p.data))
+      counter.add(self.shm.rxbcast, ethernet:n_bcast(p.data))
    end
 end
 
@@ -87,12 +83,8 @@ function Tap:push ()
       end
       counter.add(self.shm.txbytes, len)
       counter.add(self.shm.txpackets)
-      if ethernet:is_mcast(p.data) then
-         counter.add(self.shm.txmcast)
-      end
-      if ethernet:is_bcast(p.data) then
-         counter.add(self.shm.txbcast)
-      end
+      counter.add(self.shm.txmcast, ethernet:n_mcast(p.data))
+      counter.add(self.shm.txbcast, ethernet:n_bcast(p.data))
       -- The write completed so dequeue it from the link and free the packet
       link.receive(l)
       packet.free(p)

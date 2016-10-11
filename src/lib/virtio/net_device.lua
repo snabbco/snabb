@@ -170,12 +170,8 @@ function VirtioNetDevice:rx_packet_end(header_id, total_size, rx_p)
       end
       counter.add(counters.rxbytes, rx_p.length)
       counter.add(counters.rxpackets)
-      if ethernet:is_mcast(rx_p.data) then
-         counter.add(counters.rxmcast)
-      end
-      if ethernet:is_bcast(rx_p.data) then
-         counter.add(counters.rxbcast)
-      end
+      counter.add(counters.rxmcast, ethernet:n_mcast(rx_p.data))
+      counter.add(counters.rxbcast, ethernet:n_bcast(rx_p.data))
       link.transmit(l, rx_p)
    else
       debug("droprx", "len", rx_p.length)
@@ -270,12 +266,8 @@ function VirtioNetDevice:tx_packet_end(header_id, total_size, tx_p)
    local counters = self.owner.shm
    counter.add(counters.txbytes, tx_p.length)
    counter.add(counters.txpackets)
-   if ethernet:is_mcast(tx_p.data) then
-      counter.add(counters.txmcast)
-   end
-   if ethernet:is_bcast(tx_p.data) then
-      counter.add(counters.txbcast)
-   end
+   counter.add(counters.txmcast, ethernet:n_mcast(tx_p.data))
+   counter.add(counters.txbcast, ethernet:n_bcast(tx_p.data))
    packet.free(tx_p)
    self.virtq[self.ring_id]:put_buffer(header_id, total_size)
 end
@@ -352,12 +344,8 @@ function VirtioNetDevice:tx_packet_end_mrg_rxbuf(header_id, total_size, tx_p)
    if self.tx.finished then
       counter.add(counters.txbytes, tx_p.length)
       counter.add(counters.txpackets)
-      if ethernet:is_mcast(tx_p.data) then
-         counter.add(counters.txmcast)
-      end
-      if ethernet:is_bcast(tx_p.data) then
-         counter.add(counters.txbcast)
-      end
+      counter.add(counters.txmcast, ethernet:n_mcast(tx_p.data))
+      counter.add(counters.txbcast, ethernet:n_bcast(tx_p.data))
       packet.free(tx_p)
       self.tx.p = nil
       self.tx.data_sent = nil
