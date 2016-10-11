@@ -158,8 +158,8 @@ end
 --dofile('db.lua')
 assert(dofile('calls.lua') == deep and deep)
 -- FIXME LuaJIT
---olddofile('strings.lua')
---olddofile('literals.lua')
+olddofile('strings.lua')
+olddofile('literals.lua')
 assert(dofile('attrib.lua') == 27)
 
 -- FIXME LuaJIT
