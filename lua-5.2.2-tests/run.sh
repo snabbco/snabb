@@ -1,7 +1,7 @@
 export LUA_PATH="?;./?.lua"
 export LUA_INIT="package.path = '?;'..package.path"
 
-luajit -joff all.lua
+luajit -joff -e"_port=1" all.lua
 if [ $? != 0 ] 
 then
   echo "all.lua tests failed with JIT off"
@@ -9,7 +9,7 @@ then
 fi
 
 
-luajit -jon all.lua
+luajit -jon -e"_port=1" all.lua
 if [ $? != 0 ] 
 then
   echo "all.lua tests failed with JIT on"
