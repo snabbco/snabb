@@ -29,15 +29,15 @@ function configure (c, ports, io)
       if io and io.iface then
          config.app(c, "TrunkIface", RawSocket, io.iface)
          Trunk = {port = "TrunkIface",
-                  input = "TrunkIface.rx",
-                  output = "TrunkIface.tx"}
+                  input = "TrunkIface.input",
+                  output = "TrunkIface.output"}
       end
       if io and io.bench then
          config.app(c, "BenchSource", Synth, io.bench)
          config.app(c, "BenchSink", basic_apps.Sink)
          Trunk = {port = "TrunkBench",
-                  input = "BenchSink.rx",
-                  output = "BenchSource.tx"}
+                  input = "BenchSink.input",
+                  output = "BenchSource.output"}
       end
       if Trunk then switch_ports[#switch_ports+1] = Trunk.port end
       if #ports <= 2 then
@@ -53,17 +53,17 @@ function configure (c, ports, io)
       for i, port in ipairs(ports) do
          local name = port_name(port)
          local Switch_link = Switch.."."..name
-         local Port_tx, Port_rx = Switch_link, Switch_link
+         local Port_output, Port_input = Switch_link, Switch_link
          if port.vlan then
             local VlanTag, VlanUntag = name.."_VlanTag", name.."_VlanUntag"
             config.app(c, VlanTag, vlan.Tagger, {tag = port.vlan})
-            config.link(c, VlanTag..".output -> "..Port_rx)
-            Port_rx = VlanTag..".input"
+            config.link(c, VlanTag..".output -> "..Port_input)
+            Port_input = VlanTag..".input"
             config.app(c, VlanUntag, vlan.Untagger, {tag = port.vlan})
-            config.link(c, Port_tx.." -> "..VlanUntag..".input")
-            Port_tx = VlanUntag..".output"
+            config.link(c, Port_output.." -> "..VlanUntag..".input")
+            Port_output = VlanUntag..".output"
          end
-         links[i] = {input = Port_rx, output = Port_tx}
+         links[i] = {input = Port_input, output = Port_output}
       end
    end
    return links
@@ -91,7 +91,7 @@ function configureVMDq (c, device, ports)
                   vmdq = vmdq,
                   macaddr = port.mac_address,
                   vlan = port.vlan})
-      links[i] = {input = NIC..".rx", output = NIC..".tx"}
+      links[i] = {input = NIC..".input", output = NIC..".output"}
    end
    return links
 end

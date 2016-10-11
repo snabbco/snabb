@@ -37,7 +37,7 @@ function run_loadgen (c, patterns, opts)
             config.link(c, "source."..tostring(nics).."->"..name..".input")
          else
             config.app(c, name, Intel82599, {pciaddr = device.pciaddress})
-            config.link(c, "source."..tostring(nics).."->"..name..".rx")
+            config.link(c, "source."..tostring(nics).."->"..name..".output")
          end
       end
    end

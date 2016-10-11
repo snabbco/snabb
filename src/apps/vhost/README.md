@@ -10,15 +10,15 @@ devices.
 
 With `VhostUser` SnabbSwitch can be used as a virtual ethernet interface
 by *QEMU virtual machines*. When connected via a UNIX socket, packets can
-be sent to the virtual machine by transmitting them on the `rx` port and
-packets send by the virtual machine will arrive on the `tx` port.
+be sent to the virtual machine by transmitting them on the `input` port and
+packets send by the virtual machine will arrive on the `output` port.
 
     DIAGRAM: VhostUser
-           +-----------+
-           |           |
-    rx --->* VhostUser *----> tx
-           |           |
-           +-----------+
+              +-----------+
+              |           |
+    input --->* VhostUser *----> output
+              |           |
+              +-----------+
 
 ## Configuration
 

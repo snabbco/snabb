@@ -32,7 +32,7 @@ end
 
 function VirtioNet:push()
    local dev = self.device
-   local l = self.input.rx
+   local l = self.input.input
 
    dev:recycle_transmit_buffers()
 
@@ -49,7 +49,7 @@ end
 
 function VirtioNet:pull()
    local dev = self.device
-   local l = self.output.tx
+   local l = self.output.output
    if not l then return end
    local to_receive = math.min(engine.pull_npackets, dev:can_receive())
 
@@ -72,8 +72,8 @@ function selftest()
    config.app(c, 'source', pcap.PcapReader, input_file)
    config.app(c, 'VirtioNet', VirtioNet, {pciaddr=pcidev})
    config.app(c, 'sink', basic_apps.Sink)
-   config.link(c, 'source.output -> VirtioNet.rx')
-   config.link(c, 'VirtioNet.tx -> sink.input')
+   config.link(c, 'source.output -> VirtioNet.input')
+   config.link(c, 'VirtioNet.output -> sink.input')
    engine.configure(c)
    engine.main({duration = 1, report={showlinks=true, showapps=true}})
 end

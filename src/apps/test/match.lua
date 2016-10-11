@@ -23,8 +23,8 @@ function Match:new (conf)
 end
 
 function Match:push ()
-   while not link.empty(self.input.rx) do
-      local p = link.receive(self.input.rx)
+   while not link.empty(self.input.input) do
+      local p = link.receive(self.input.input)
       local cmp = link.front(self.input.comparator)
       if not cmp then
       elseif cmp.length ~= p.length
@@ -65,7 +65,7 @@ function selftest()
    config.app(c, "comparator", basic_apps.Source, 8)
    config.link(c, "comparator.output -> sink.comparator")
    engine.configure(c)
-   engine.app_table.sink.input.rx = link.new("null")
+   engine.app_table.sink.input.input = link.new("null")
    engine.app_table.sink.seen = 1
    engine.main({duration=0.0001})
    assert(#engine.app_table.sink:errors() == 0)
@@ -73,7 +73,7 @@ function selftest()
    engine.configure(config.new())
    config.app(c, "sink", Match)
    config.app(c, "src", basic_apps.Source, 8)
-   config.link(c, "src.output -> sink.rx")
+   config.link(c, "src.output -> sink.input")
    engine.configure(c)
    engine.main({duration=0.0001})
    assert(#engine.app_table.sink:errors() == 0)
@@ -91,7 +91,7 @@ function selftest()
    config.app(c, "join", basic_apps.Join)
    config.link(c, "src.output -> join.src")
    config.link(c, "garbage.output -> join.garbage")
-   config.link(c, "join.output -> sink.rx")
+   config.link(c, "join.output -> sink.input")
    engine.configure(c)
    engine.main({duration=0.0001})
    assert(#engine.app_table.sink:errors() == 0)

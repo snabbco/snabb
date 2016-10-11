@@ -414,12 +414,12 @@ function selftest ()
    config.app(c, "source", basic_apps.Source, "250")
    config.app(c, "source_tee", basic_apps.Tee)
 
-   config.link(c, "vhost_user.tx -> vhost_tee.input")
+   config.link(c, "vhost_user.output -> vhost_tee.input")
    --config.link(c, "vhost_tee.dump -> vhost_dump.input")
    config.link(c, "vhost_tee.traffic -> sink.in")
 
-   config.link(c, "source.tx -> source_tee.input")
-   config.link(c, "source_tee.traffic -> vhost_user.rx")
+   config.link(c, "source.output -> source_tee.input")
+   config.link(c, "source_tee.traffic -> vhost_user.input")
 
    app.configure(c)
    local vhost_user = app.app_table.vhost_user

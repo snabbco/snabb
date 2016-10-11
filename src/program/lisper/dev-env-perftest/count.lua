@@ -24,7 +24,7 @@ function Counter:new()
 end
 
 function Counter:push()
-	local rx = self.input.rx
+	local rx = self.input.input
 	if rx == nil then return end
 	while not link.empty(rx) do 
 		local p = link.receive(rx)
@@ -42,7 +42,7 @@ config.app(c, "eth", intel.Intel82599, {
 	macaddr = "00:00:00:00:02:02",
 })
 
-config.link(c, "eth.tx -> count.rx")
+config.link(c, "eth.output -> count.input")
 
 engine.configure(c)
 engine.main({report = {showlinks=true}})

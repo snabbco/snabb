@@ -73,24 +73,24 @@ function Intel82599:new (conf)
    if not self.stats.shm then
       self.stats.shm = shm.create_frame(
          "pci/"..conf.pciaddr,
-         {dtime     = {counter, C.get_unix_time()},
-          mtu       = {counter, self.dev.mtu},
-          speed     = {counter, 10000000000}, -- 10 Gbits
-          status    = {counter, 2},           -- Link down
-          promisc   = {counter},
-          macaddr   = {counter},
-          rxbytes   = {counter},
-          rxpackets = {counter},
-          rxmcast   = {counter},
-          rxbcast   = {counter},
-          rxdrop    = {counter},
-          rxerrors  = {counter},
-          txbytes   = {counter},
-          txpackets = {counter},
-          txmcast   = {counter},
-          txbcast   = {counter},
-          txdrop    = {counter},
-          txerrors  = {counter}})
+         {dtime          = {counter, C.get_unix_time()},
+          mtu            = {counter, self.dev.mtu},
+          speed          = {counter, 10000000000}, -- 10 Gbits
+          status         = {counter, 2},           -- Link down
+          promisc        = {counter},
+          macaddr        = {counter},
+          input_bytes    = {counter},
+          input_packets  = {counter},
+          input_mcast    = {counter},
+          input_bcast    = {counter},
+          input_drop     = {counter},
+          input_errors   = {counter},
+          output_bytes   = {counter},
+          output_packets = {counter},
+          output_mcast   = {counter},
+          output_bcast   = {counter},
+          output_drop    = {counter},
+          output_errors  = {counter}})
       self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
 
       if not conf.vmdq and conf.macaddr then
@@ -140,9 +140,9 @@ function Intel82599:set_rx_buffer_freelist (fl)
    self.rx_buffer_freelist = fl
 end
 
--- Pull in packets from the network and queue them on our 'tx' link.
+-- Pull in packets from the network and queue them on our 'output' link.
 function Intel82599:pull ()
-   local l = self.output.tx
+   local l = self.output.output
    if l == nil then return end
    self.dev:sync_receive()
    for i = 1, engine.pull_npackets do
@@ -172,21 +172,21 @@ local promisc_mask = lib.bits{UPE=9}
 function Intel82599:sync_stats ()
    local counters = self.stats.shm
    local s, r, qs = self.stats.s, self.stats.r, self.stats.qs
-   counter.set(counters.rxbytes,   s.GORC64())
-   counter.set(counters.rxpackets, s.GPRC())
+   counter.set(counters.input_bytes,   s.GORC64())
+   counter.set(counters.input_packets, s.GPRC())
    local mprc, bprc = s.MPRC(), s.BPRC()
-   counter.set(counters.rxmcast,   mprc + bprc)
-   counter.set(counters.rxbcast,   bprc)
+   counter.set(counters.input_mcast,   mprc + bprc)
+   counter.set(counters.input_bcast,   bprc)
    -- The RX receive drop counts are only available through the RX stats
    -- register. We only read stats register #0 here.
-   counter.set(counters.rxdrop,    qs.QPRDC[0]())
-   counter.set(counters.rxerrors,  s.CRCERRS() + s.ILLERRC() + s.ERRBC() +
-                                   s.RUC() + s.RFC() + s.ROC() + s.RJC())
-   counter.set(counters.txbytes,   s.GOTC64())
-   counter.set(counters.txpackets, s.GPTC())
+   counter.set(counters.input_drop,    qs.QPRDC[0]())
+   counter.set(counters.input_errors,  s.CRCERRS() + s.ILLERRC() + s.ERRBC() +
+                                       s.RUC() + s.RFC() + s.ROC() + s.RJC())
+   counter.set(counters.output_bytes,   s.GOTC64())
+   counter.set(counters.output_packets, s.GPTC())
    local mptc, bptc = s.MPTC(), s.BPTC()
-   counter.set(counters.txmcast,   mptc + bptc)
-   counter.set(counters.txbcast,   bptc)
+   counter.set(counters.output_mcast,   mptc + bptc)
+   counter.set(counters.output_bcast,   bptc)
    if bit.band(r.LINKS(), link_up_mask) == link_up_mask then
       counter.set(counters.status, 1) -- Up
    else
@@ -199,16 +199,16 @@ function Intel82599:sync_stats ()
    end
 end
 
--- Push packets from our 'rx' link onto the network.
+-- Push packets from our 'input' link onto the network.
 function Intel82599:push ()
-   local l = self.input.rx
+   local l = self.input.input
    if l == nil then return end
    while not empty(l) and self.dev:can_transmit() do
       -- We must not send packets that are bigger than the MTU.  This
       -- check is currently disabled to satisfy some selftests until
       -- agreement on this strategy is reached.
       -- if p.length > self.dev.mtu then
-      --    counter.add(self.stats.shm.txdrop)
+      --    counter.add(self.stats.shm.output_drop)
       --    packet.free(p)
       -- else
       do local p = receive(l)
@@ -266,8 +266,8 @@ function selftest ()
    mq_sw(pcideva)
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
    do
-      local a0Sends = link.stats(engine.app_table.nicAm0.input.rx).txpackets
-      local a1Gets = link.stats(engine.app_table.nicAm1.output.tx).rxpackets
+      local a0Sends = link.stats(engine.app_table.nicAm0.input.input).input_packets
+      local a1Gets = link.stats(engine.app_table.nicAm1.output.output).output_packets
       -- Check propertions with some modest margin for error
       if a1Gets < a0Sends * 0.45 or a1Gets > a0Sends * 0.55 then
          print("mq_sw: wrong proportion of packets passed/discarded")
@@ -290,10 +290,10 @@ function selftest ()
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
-      local aSends = link.stats(engine.app_table.nicA.input.rx).txpackets
-      local aGets = link.stats(engine.app_table.nicA.output.tx).rxpackets
-      local bSends = link.stats(engine.app_table.nicB.input.rx).txpackets
-      local bGets = link.stats(engine.app_table.nicB.output.tx).rxpackets
+      local aSends = link.stats(engine.app_table.nicA.input.input).input_packets
+      local aGets = link.stats(engine.app_table.nicA.output.output).output_packets
+      local bSends = link.stats(engine.app_table.nicB.input.input).input_packets
+      local bGets = link.stats(engine.app_table.nicB.output.output).output_packets
 
       if bGets < aSends/2
          or aGets < bSends/2
@@ -313,9 +313,9 @@ function selftest ()
    engine.main({duration = 1, report={showlinks=true, showapps=false}})
 
    do
-      local aSends = link.stats(engine.app_table.nicAs.input.rx).txpackets
-      local b0Gets = link.stats(engine.app_table.nicBm0.output.tx).rxpackets
-      local b1Gets = link.stats(engine.app_table.nicBm1.output.tx).rxpackets
+      local aSends = link.stats(engine.app_table.nicAs.input.input).input_packets
+      local b0Gets = link.stats(engine.app_table.nicBm0.output.output).output_packets
+      local b1Gets = link.stats(engine.app_table.nicBm1.output.output).output_packets
 
       if b0Gets < b1Gets/2 or
          b1Gets < b0Gets/2 or
@@ -339,10 +339,10 @@ function sq_sq(pcidevA, pcidevB)
    config.app(c, 'nicA', Intel82599, {pciaddr=pcidevA})
    config.app(c, 'nicB', Intel82599, {pciaddr=pcidevB})
    config.app(c, 'sink', basic_apps.Sink)
-   config.link(c, 'source1.out -> nicA.rx')
-   config.link(c, 'source2.out -> nicB.rx')
-   config.link(c, 'nicA.tx -> sink.in1')
-   config.link(c, 'nicB.tx -> sink.in2')
+   config.link(c, 'source1.out -> nicA.input')
+   config.link(c, 'source2.out -> nicB.input')
+   config.link(c, 'nicA.output -> sink.in1')
+   config.link(c, 'nicB.output -> sink.in2')
    engine.configure(c)
 end
 
@@ -389,10 +389,10 @@ function mq_sq(pcidevA, pcidevB)
    print("The packets should arrive evenly split between the VFs")
    config.app(c, 'sink_ms', basic_apps.Sink)
    config.link(c, 'source_ms.output -> repeater_ms.input')
-   config.link(c, 'repeater_ms.output -> nicAs.rx')
-   config.link(c, 'nicAs.tx -> sink_ms.in1')
-   config.link(c, 'nicBm0.tx -> sink_ms.in2')
-   config.link(c, 'nicBm1.tx -> sink_ms.in3')
+   config.link(c, 'repeater_ms.output -> nicAs.input')
+   config.link(c, 'nicAs.output -> sink_ms.in1')
+   config.link(c, 'nicBm0.output -> sink_ms.in2')
+   config.link(c, 'nicBm1.output -> sink_ms.in3')
    engine.configure(c)
    link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
    link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d2))
@@ -437,9 +437,9 @@ function mq_sw(pcidevA)
    print ("half of them go to nicAm1 and half go nowhere")
    config.app(c, 'sink_ms', basic_apps.Sink)
    config.link(c, 'source_ms.output -> repeater_ms.input')
-   config.link(c, 'repeater_ms.output -> nicAm0.rx')
-   config.link(c, 'nicAm0.tx -> sink_ms.in1')
-   config.link(c, 'nicAm1.tx -> sink_ms.in2')
+   config.link(c, 'repeater_ms.output -> nicAm0.input')
+   config.link(c, 'nicAm0.output -> sink_ms.in1')
+   config.link(c, 'nicAm1.output -> sink_ms.in2')
    engine.configure(c)
    link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
    link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d2))
@@ -489,9 +489,9 @@ function manyreconf(pcidevA, pcidevB, n, do_pf)
       })
       config.app(c, 'sink_ms', basic_apps.Sink)
       config.link(c, 'source_ms.output -> repeater_ms.input')
-      config.link(c, 'repeater_ms.output -> nicAm0.rx')
-      config.link(c, 'nicAm0.tx -> sink_ms.in1')
-      config.link(c, 'nicAm1.tx -> sink_ms.in2')
+      config.link(c, 'repeater_ms.output -> nicAm0.input')
+      config.link(c, 'nicAm0.output -> sink_ms.in1')
+      config.link(c, 'nicAm1.output -> sink_ms.in2')
       if do_pf then engine.configure(config.new()) end
       engine.configure(c)
       link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
@@ -501,7 +501,7 @@ function manyreconf(pcidevA, pcidevB, n, do_pf)
       redos = redos + engine.app_table.nicAm1.dev.pf.redos
       maxredos = math.max(maxredos, engine.app_table.nicAm1.dev.pf.redos)
       waits = waits + engine.app_table.nicAm1.dev.pf.waitlu_ms
-      local sent = link.stats(engine.app_table.nicAm0.input.rx).txpackets
+      local sent = link.stats(engine.app_table.nicAm0.input.input).input_packets
       io.write (('test #%3d: VMDq VLAN=%d; 100ms burst. packet sent: %s\n'):format(i, 100+i, lib.comma_value(sent-prevsent)))
       if sent == prevsent then
          io.write("error: NIC transmit counter did not increase\n")

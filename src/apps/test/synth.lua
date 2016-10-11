@@ -59,7 +59,7 @@ function selftest ()
 				   src = "11:11:11:11:11:11",
 				   dst = "22:22:22:22:22:22" })
    config.link(c, "reader.output->match.comparator")
-   config.link(c, "synth.output->match.rx")
+   config.link(c, "synth.output->match.input")
    engine.configure(c)
    engine.main({ duration = 0.0001, report = {showapps=true,showlinks=true}})
    assert(#engine.app_table.match:errors() == 0)

@@ -39,7 +39,7 @@ function RateLimiter:new (conf)
       rate = conf.rate,
       bucket_capacity = conf.bucket_capacity,
       bucket_content = conf.initial_capacity,
-      shm = { txdrop = {counter} }
+      shm = { output_drop = {counter} }
     }
    return setmetatable(o, {__index=RateLimiter})
 end
@@ -56,8 +56,8 @@ end
 function RateLimiter:get_stat_snapshot ()
    return
    {
-      rx = link.stats(self.input.input).txpackets,
-      tx = link.stats(self.output.output).txpackets,
+      input = link.stats(self.input.input).output_packets,
+      output = link.stats(self.output.output).output_packets,
       time = tonumber(C.get_time_ns()),
    }
 end
@@ -86,7 +86,7 @@ function RateLimiter:push ()
          link.transmit(o, p)
       else
          -- discard packet
-         counter.add(self.shm.txdrop)
+         counter.add(self.shm.output_drop)
          packet.free(p)
       end
    end
@@ -95,8 +95,8 @@ end
 local function compute_effective_rate (rl, rate, snapshot)
    local elapsed_time =
       (tonumber(C.get_time_ns()) - snapshot.time) / 1e9
-   local tx = link.stats(rl.output.output).txpackets - snapshot.tx
-   return floor(tx * PACKET_SIZE / elapsed_time)
+   local output = link.stats(rl.output.output).output_packets - snapshot.output
+   return floor(output * PACKET_SIZE / elapsed_time)
 end
 
 function selftest ()
@@ -202,8 +202,8 @@ function selftest ()
          (tonumber(C.get_time_ns()) - snapshot.time) / 1e9
       print("elapsed time ", elapsed_time, "seconds")
 
-      local rx = link.stats(rl.input.input).txpackets - snapshot.rx
-      print("packets received", rx, floor(rx / elapsed_time / 1e6), "Mpps")
+      local input = link.stats(rl.input.input).output_packets - snapshot.input
+      print("packets received", input, floor(input / elapsed_time / 1e6), "Mpps")
 
       effective_rate_busy_loop = compute_effective_rate(
             rl,

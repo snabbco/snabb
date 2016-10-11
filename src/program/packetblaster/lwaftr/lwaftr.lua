@@ -216,16 +216,16 @@ function run (args)
       if device_info then
          config.app(c, "nic", require(device_info.driver).driver,
          {pciaddr = pciaddr, vmdq = false, macaddr = src_mac, mtu = 9500})
-         input, output = "nic.rx", "nic.tx"
+         input, output = "nic.input", "nic.output"
       else
          fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))
       end
    elseif int_interface then
       config.app(c, "int", raw.RawSocket, int_interface)
-      input, output = "int.rx", "int.tx"
+      input, output = "int.input", "int.output"
    elseif sock_interface then
       config.app(c, "virtio", VhostUser, { socket_path=sock_interface } )
-      input, output = "virtio.rx", "virtio.tx"
+      input, output = "virtio.input", "virtio.output"
    else
       config.app(c, "pcap", pcap.PcapWriter, pcap_file)
       input, output = "pcap.input", "pcap.output"

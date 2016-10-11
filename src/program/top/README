@@ -7,7 +7,7 @@ Usage:
                              List shared memory objects in <path> and exit.
                              Examples: snabb top -l engine
                                        snabb top -l apps/foo
-                                       snabb top -l "links/foo.tx -> bar.rx"
+                                       snabb top -l "links/foo.output -> bar.input"
 
 Display realtime performance statistics for a running Snabb instance with
 <pid>. If <pid> is not supplied and there is only one Snabb instance, top will
@@ -24,15 +24,13 @@ The following global metrics will be displayed:
 
 The following metrics will be displayed per link:
 
-  rx
-                             Millions of packets received per second.
-  tx
-                             Millions of packets transmitted per second.
-  rxGb
-                             Gigabytes of packet data received per
-                             second.
-  txGb
-                             Gigabytes of packet data transmitted per
-                             second.
-  txdrop
+  input
+                             Millions of packets enqueued per second.
+  output
+                             Millions of packets dequeued per second.
+  inputGb
+                             Gigabytes of packet data enqueued per second.
+  outputGb
+                             Gigabytes of packet data dequeued per second.
+  drop
                              Millions of packets dropped per second.

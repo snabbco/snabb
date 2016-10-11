@@ -441,10 +441,10 @@ function Intel1g:new(conf)
          poke32(r.TDT, tdt)
       end
 
-      function self:push ()				-- move frames from link.rx to NIC.txQueue for transmission
+      function self:push ()				-- move frames from link.input to NIC.txQueue for transmission
          counters.push= counters.push +1
          --local li = self.input[1]
-         local li = self.input["rx"]			-- same-same as [1]
+         local li = self.input.input			-- same-same as [1]
          assert(li, "intel1g:push: no input link")
          if link.empty(li) then				-- from SolarFlareNic:push()
           counters.pushRxLinkEmpty= counters.pushRxLinkEmpty +1
@@ -580,10 +580,10 @@ function Intel1g:new(conf)
 	 --print("sync_receive():  rdh=",rdh, "  rdt=",rdt)
       end
       
-      function self:pull ()				-- move received frames from NIC.rxQueue to link.tx
+      function self:pull ()				-- move received frames from NIC.rxQueue to link.output
          counters.pull= counters.pull +1
          --local lo = self.output[1]
-         local lo = self.output["tx"]			-- same-same as [1]
+         local lo = self.output.output			-- same-same as [1]
          --assert(lo, "intel1g: no output link")
          local limit = rxburst
          while limit > 0 and can_receive() do
@@ -642,12 +642,12 @@ function selftest ()
     config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="PHY", rxburst=512})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="MAC", txqueue=1})
     --config.app(c, "nic", Intel1g, {pciaddr=pciaddr, loopback="MAC", txqueue=1, rxqueue=1})
-    config.link(c, "source.tx -> nic.rx")
-    config.link(c, "nic.tx -> sink.rx")
+    config.link(c, "source.output -> nic.input")
+    config.link(c, "nic.output -> sink.input")
    -- replace intel1g by Repeater
     --config.app(c, "repeater", basic.Repeater)
-    --config.link(c, "source.tx -> repeater.input")
-    --config.link(c, "repeater.output -> sink.rx")
+    --config.link(c, "source.output -> repeater.input")
+    --config.link(c, "repeater.output -> sink.input")
    engine.configure(c)
 
    -- showlinks: src/core/app.lua calls report_links()
@@ -659,35 +659,35 @@ function selftest ()
    local runtime = endTime - startTime
    engine.app_table.nic.stop()				-- outputs :report()
 
-   local source= engine.app_table.source.output.tx
+   local source= engine.app_table.source.output.output
    assert(source, "Intel1g: no source?")
    local s= link.stats(source)
-   print("source:      txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
-   local txpackets= s.txpackets
+   print("source:      input_packets= ", s.input_packets, "  output_packets= ", s.output_packets, "  input_drop= ", s.input_drop)
+   local input_packets= s.input_packets
 
    --local li = engine.app_table.nic.input[1]
-   local li = engine.app_table.nic.input["rx"]		-- same-same as [1]
+   local li = engine.app_table.nic.input["input"]	-- same-same as [1]
    assert(li, "Intel1g: no input link?")
    local s= link.stats(li)
-   print("input link:  txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+   print("input link:  input_packets= ", s.input_packets, "  output_packets= ", s.output_packets, "  input_drop= ", s.input_drop)
 
    --local lo = engine.app_table.nic.output[1]
-   local lo = engine.app_table.nic.output["tx"]		-- same-same as [1]
+   local lo = engine.app_table.nic.output["output"]	-- same-same as [1]
    assert(lo, "Intel1g: no output link?")
    local s= link.stats(lo)
-   print("output link: txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
+   print("output link: input_packets= ", s.input_packets, "  output_packets= ", s.output_packets, "  input_drop= ", s.input_drop)
 
-   local sink= engine.app_table.sink.input.rx
+   local sink= engine.app_table.sink.input.input
    assert(sink, "Intel1g: no sink?")
    local s= link.stats(sink)
-   print("sink:        txpackets= ", s.txpackets, "  rxpackets= ", s.rxpackets, "  txdrop= ", s.txdrop)
-   local rxpackets= s.rxpackets
+   print("sink:        input_packets= ", s.input_packets, "  output_packets= ", s.output_packets, "  input_drop= ", s.input_drop)
+   local output_packets= s.output_packets
 
    print(("Processed %.1f M 60 Byte packets in %.2f s (rate: %.1f Mpps, %.2f Gbit/s, %.2f %% packet loss).")
     :format(
-     txpackets / 1e6, runtime,
-     txpackets / runtime / 1e6,
-     ((txpackets * 60 * 8) / runtime) / (1024*1024*1024),
-     (txpackets - rxpackets) *100 / txpackets
+     input_packets / 1e6, runtime,
+     input_packets / runtime / 1e6,
+     ((input_packets * 60 * 8) / runtime) / (1024*1024*1024),
+     (input_packets - output_packets) *100 / input_packets
    ))
 end

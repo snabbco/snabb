@@ -11,10 +11,10 @@ local lwaftr     = require("apps.lwaftr.lwaftr")
 local C = ffi.C
 
 local paths = {
-   ["nicv4-in"]     = "nicv4.input.rx",
-   ["nicv6-in"]     = "nicv6.input.rx",
-   ["nicv4-out"]    = "nicv4.output.tx",
-   ["nicv6-out"]    = "nicv6.output.tx",
+   ["nicv4-in"]     = "nicv4.input.input",
+   ["nicv6-in"]     = "nicv6.input.input",
+   ["nicv4-out"]    = "nicv4.output.output",
+   ["nicv6-out"]    = "nicv6.output.output",
    ["lwaftrv4-out"] = "lwaftr.output.v4",
    ["lwaftrv6-out"] = "lwaftr.output.v6",
    ["lwaftrv4-in"]  = "lwaftr.input.v4",
@@ -56,10 +56,10 @@ Rate(Mpps): {rate_mpps}
    end
    local function report_bench(input, name, engine, finish, start)
       local breaths = tonumber(counter.read(engine.breaths))
-      local bytes = input.txbytes
+      local bytes = input.input_bytes
       -- Don't bother to report on interfaces that were boring
       if bytes == 0 then return end
-      local packets = input.txpackets
+      local packets = input.input_packets
       local runtime = finish - start
       report(name, breaths, bytes, packets, runtime)
    end
@@ -117,13 +117,13 @@ local function testInternalLoopbackFromPcapFile (params)
 
    config.link(c, 'pcapv4.output      -> repeater_v4.input')
    config.link(c, 'repeater_v4.output -> lwaftr.v4')
-   config.link(c, 'lwaftr.v4          -> nicv4.rx')
-   config.link(c, 'nicv4.tx           -> sink.in1')
+   config.link(c, 'lwaftr.v4          -> nicv4.input')
+   config.link(c, 'nicv4.output       -> sink.in1')
 
    config.link(c, 'pcapv6.output      -> repeater_v6.input')
    config.link(c, 'repeater_v6.output -> lwaftr.v6')
-   config.link(c, 'lwaftr.v6          -> nicv6.rx')
-   config.link(c, 'nicv6.tx           -> sink.in1')
+   config.link(c, 'lwaftr.v6          -> nicv6.input')
+   config.link(c, 'nicv6.output       -> sink.in1')
 
    engine.configure(c)
 

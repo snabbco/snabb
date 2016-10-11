@@ -103,53 +103,57 @@ function init_snmp (name, counters, directory, interval)
          ifTable:set('ifPromiscuousMode', counter.read(counters.promisc))
       end
       -- Update counters
-      if counters.rxpackets and counters.rxmcast and counters.rxbcast then
-         local rxbcast = counter.read(counters.rxbcast)
-         local rxmcast = counter.read(counters.rxmcast)
-         local rxpackets = counter.read(counters.rxpackets)
-         local inMcast = rxmcast - rxbcast
-         local inUcast = rxpackets - rxmcast
+      if counters.input_packets and
+         counters.input_mcast and
+         counters.input_bcast then
+         local input_bcast = counter.read(counters.input_bcast)
+         local input_mcast = counter.read(counters.input_mcast)
+         local input_packets = counter.read(counters.input_packets)
+         local inMcast = input_mcast - input_bcast
+         local inUcast = input_packets - input_mcast
          ifTable:set('ifHCInMulticastPkts', inMcast)
          ifTable:set('ifInMulticastPkts', inMcast)
-         ifTable:set('ifHCInBroadcastPkts', rxbcast)
-         ifTable:set('ifInBroadcastPkts', rxbcast)
+         ifTable:set('ifHCInBroadcastPkts', input_bcast)
+         ifTable:set('ifInBroadcastPkts', input_bcast)
          ifTable:set('ifHCInUcastPkts', inUcast)
          ifTable:set('ifInUcastPkts', inUcast)
       end
-      if counters.rxbytes then
-         local rxbytes = counter.read(counters.rxbytes)
-         ifTable:set('ifHCInOctets', rxbytes)
-         ifTable:set('ifInOctets', rxbytes)
+      if counters.input_bytes then
+         local input_bytes = counter.read(counters.input_bytes)
+         ifTable:set('ifHCInOctets', input_bytes)
+         ifTable:set('ifInOctets', input_bytes)
       end
-      if counters.rxdrop then
-         ifTable:set('ifInDiscards', counter.read(counters.rxdrop))
+      if counters.input_drop then
+         ifTable:set('ifInDiscards', counter.read(counters.input_drop))
       end
-      if counters.rxerrors then
-         ifTable:set('ifInErrors', counter.read(counters.rxerrors))
+      if counters.input_errors then
+         ifTable:set('ifInErrors', counter.read(counters.input_errors))
       end
-      if counters.txpackets and counters.txmcast and counters.txbcast then
-         local txbcast = counter.read(counters.txbcast)
-         local txmcast = counter.read(counters.txmcast)
-         local txpackets = counter.read(counters.txpackets)
-         local outMcast = txmcast - txbcast
-         local outUcast = txpackets - txmcast
+      if counters.output_packets and
+         counters.output_mcast and
+         counters.output_bcast then
+         local output_bcast = counter.read(counters.output_bcast)
+         local output_mcast = counter.read(counters.output_mcast)
+         local output_packets = counter.read(counters.output_packets)
+         local outMcast = output_mcast - output_bcast
+         local outUcast = output_packets - output_mcast
          ifTable:set('ifHCOutMulticastPkts', outMcast)
          ifTable:set('ifOutMulticastPkts', outMcast)
-         ifTable:set('ifHCOutBroadcastPkts', txbcast)
-         ifTable:set('ifOutBroadcastPkts', txbcast)
+         ifTable:set('ifHCOutBroadcastPkts', output_bcast)
+         ifTable:set('ifOutBroadcastPkts', output_bcast)
          ifTable:set('ifHCOutUcastPkts', outUcast)
          ifTable:set('ifOutUcastPkts', outUcast)
       end
-      if counters.txbytes then
-         local txbytes = counter.read(counters.txbytes)
-         ifTable:set('ifHCOutOctets', txbytes)
-         ifTable:set('ifOutOctets', txbytes)
+      if counters.output_bytes then
+         local output_bytes = counter.read(counters.output_bytes)
+         ifTable:set('ifHCOutOctets', output_bytes)
+         ifTable:set('ifOutOctets', output_bytes)
       end
-      if counters.txdrop then
-         ifTable:set('ifOutDiscards', counter.read(counters.txdrop))
+      if counters.output_drop then
+         ifTable:set('ifOutDiscards', counter.read(counters.output_drop))
       end
-      if counters.txerrors then
-         ifTable:set('ifOutErrors', counter.read(counters.txerrors))
+      if counters.output_errors then
+         ifTable:set('ifOutErrors', counter.read(counters.output_errors))
       end
    end
    local t = timer.new("Interface "..name.." status checker",
