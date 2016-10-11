@@ -28,11 +28,6 @@ local ntohl = lib.ntohl
 local getenv = lib.getenv
 local hexdump = lib.hexdump
 
-local function assert(v, ...) --assert overload because
-   if v then return v, ... end
-   error(tostring((...) or "Assertion failed"), 2)
-end
-
 local function parsehex(s)
    return (s:gsub("[0-9a-fA-F][0-9a-fA-F]", function(cc)
      return string.char(tonumber(cc, 16))

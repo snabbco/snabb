@@ -9,13 +9,6 @@ local link   = require("core.link")
 local packet = require("core.packet")
 local S      = require("syscall")
 
---ljsyscall returns error as a a cdata instead of a string,
---and the standard assert() doesn't use tostring() on it.
-local function assert(v, ...)
-   if not v then error(tostring(... or 'assertion failed'), 2) end
-   return v, ...
-end
-
 UnixSocket = {}
 UnixSocket.__index = UnixSocket
 

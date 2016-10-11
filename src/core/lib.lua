@@ -10,6 +10,8 @@ require("core.clib_h")
 local bit = require("bit")
 local band, bor, bnot, lshift, rshift, bswap =
    bit.band, bit.bor, bit.bnot, bit.lshift, bit.rshift, bit.bswap
+local tonumber = tonumber -- Yes, this makes a performance difference.
+local cast = ffi.cast
 
 -- Returns true if x and y are structurally similar (isomorphic).
 function equal (x, y)
@@ -373,7 +375,8 @@ if ffi.abi("be") then
    function htonl(b) return b end
    function htons(b) return b end
 else
-   function htonl(b) return bswap(b) end
+  -- htonl is unsigned, matching the C version and expectations.
+   function htonl(b) return tonumber(cast('uint32_t', bswap(b))) end
    function htons(b) return rshift(bswap(b), 16) end
 end
 ntohl = htonl
@@ -760,7 +763,12 @@ function selftest ()
    assert(hexdump('\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11'):upper()
          :match('^45.00.B6.7D.00.FA.40.00.40.11$'), "wrong hex dump")
    assert(hexundump('4500 B67D 00FA400040 11', 10)
-          =='\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11', "wrong hex undump")
+         =='\x45\x00\xb6\x7d\x00\xFA\x40\x00\x40\x11', "wrong hex undump")
+   print("Testing ntohl")
+   local raw_val = 0xf0d0b0f0
+   assert(ntohl(raw_val) > 0, "ntohl must be unsigned")
+   assert(ntohl(ntohl(raw_val)) == raw_val, 
+      "calling ntohl twice must return the original value")
 
    -- test parse
    print("Testing parse")

@@ -23,7 +23,18 @@ local timer = require("core.timer")
 local bits, bitset = lib.bits, lib.bitset
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
 
-num_descriptors = 1024
+local num_descriptors = 1024
+function ring_buffer_size (arg)
+   if not arg then return num_descriptors end
+   local ring_size = assert(tonumber(arg), "bad ring size: " .. arg)
+   if ring_size > 32*1024 then
+      error("ring size too large for hardware: " .. ring_size)
+   end
+   if math.log(ring_size)/math.log(2) % 1 ~= 0 then
+      error("ring size is not a power of two: " .. arg)
+   end
+   num_descriptors = assert(tonumber(arg))
+end
 
 -- Defaults for configurable items
 local default = {
