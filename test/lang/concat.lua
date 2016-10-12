@@ -99,3 +99,14 @@ do --- Sink into side-exit
   end
   assert(z == "ab200")
 end
+
+do --- Very long strings
+  for i, s in ipairs{"a", "bc", "def"} do
+    for n = 1, 20 do
+      s = s .. s
+    end
+    assert(#s == 2^20*i)
+    assert(s:sub(1, 6) == s:sub(7, 12))
+    assert(s:sub(1, 6) == s:sub(-6, -1))
+  end
+end
