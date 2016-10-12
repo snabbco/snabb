@@ -1,4 +1,5 @@
 bit64.lua +luajit>=2.1
+cdata_var.lua
 copy_fill.lua
 err.lua
 istype.lua
