@@ -2,8 +2,8 @@ local ffi = require("ffi")
 
 do --- byte array allocations
   local typ = ffi.typeof"uint8_t[?]"
-  for i = 4, 20 do
-    for d = -3, 3 do
+  for i = 4, 24 do
+    for d = -5, 5 do
       local sz = 2^i + d
       assert(ffi.sizeof(typ, sz) == sz)
       local mem = ffi.new(typ, sz)
@@ -17,6 +17,8 @@ do --- byte array allocations
       assert(mem[0] == 0x21)
       assert(mem[1] == 0x32)
       assert(mem[2] == 0x43)
+      assert(mem[3] == 0)
+      assert(mem[sz-4] == 0)
       assert(mem[sz-3] == 0x54)
       assert(mem[sz-2] == 0x65)
       assert(mem[sz-1] == 0x76)
@@ -35,6 +37,10 @@ do --- int array allocations
       mem[0] = -3
       mem[sz-1] = -4
       assert(mem[0] == -3)
+      if sz ~= 2 then
+        assert(mem[1] == 0)
+        assert(mem[sz-2] == 0)
+      end
       assert(mem[sz-1] == -4)
     end
   end
