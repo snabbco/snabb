@@ -9,7 +9,10 @@ struct link {
   //   http://en.wikipedia.org/wiki/Circular_buffer
   struct packet *packets[LINK_RING_SIZE];
   struct {
-    struct counter *dtime, *txbytes, *rxbytes, *txpackets, *rxpackets, *txdrop;
+    struct counter *dtime,
+                   *input_bytes, *output_bytes,
+                   *input_packets, *output_packets,
+                   *input_drop;
   } stats;
   // Two cursors:
   //   read:  the next element to be read

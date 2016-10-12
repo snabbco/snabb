@@ -69,15 +69,15 @@ function run(parameters)
    config.app(c, "inet", RawSocket, inet_if)
 
    -- Connect apps
-   config.link(c, "inet.tx -> aftr.v4")
-   config.link(c, "b4if.tx -> aftr.v6")
-   config.link(c, "aftr.v4 -> inet.rx")
-   config.link(c, "aftr.v6 -> b4if.rx")
+   config.link(c, "inet.output -> aftr.v4")
+   config.link(c, "b4if.output -> aftr.v6")
+   config.link(c, "aftr.v4 -> inet.input")
+   config.link(c, "aftr.v6 -> b4if.input")
 
    if verbosity >= 1 then
       local csv = CSVStatsTimer.new()
-      csv:add_app("inet", {"tx", "rx"}, { tx = "IPv4 TX", rx = "IPv4 RX" })
-      csv:add_app("tob4", {"tx", "rx"}, { tx = "IPv6 TX", rx = "IPv6 RX" })
+      csv:add_app("inet", {"output", "input"}, { output = "IPv4 OUTPUT", input = "IPv4 INPUT" })
+      csv:add_app("tob4", {"output", "input"}, { output = "IPv6 OUTPUT", input = "IPv6 INPUT" })
       csv:activate()
 
       if verbosity >= 2 then

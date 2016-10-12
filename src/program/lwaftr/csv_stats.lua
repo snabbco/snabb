@@ -24,8 +24,8 @@ function CSVStatsTimer:add_app(id, links, link_names)
       local h = (',%s MPPS,%s Gbps'):format(pretty_name, pretty_name)
       self.header = self.header..h
       local data = {
-         txpackets = link.stats.txpackets,
-         txbytes = link.stats.txbytes,
+         txpackets = link.stats.input_packets,
+         txbytes = link.stats.input_bytes,
       }
       table.insert(self.link_data, data)
    end
@@ -52,8 +52,8 @@ function CSVStatsTimer:activate()
    self.start = engine.now()
    self.prev_elapsed = 0
    for _,data in ipairs(self.link_data) do
-      data.prev_txpackets = counter.read(data.txpackets)
-      data.prev_txbytes = counter.read(data.txbytes)
+      data.prev_txpackets = counter.read(data.input_packets)
+      data.prev_txbytes = counter.read(data.input_bytes)
    end
    local function tick() return self:tick() end
    local t = timer.new('csv_stats', tick, self.period*1e9, 'repeating')
@@ -67,8 +67,8 @@ function CSVStatsTimer:tick()
    self.prev_elapsed = elapsed
    self.file:write(('%f'):format(elapsed))
    for _,data in ipairs(self.link_data) do
-      local txpackets = counter.read(data.txpackets)
-      local txbytes = counter.read(data.txbytes)
+      local txpackets = counter.read(data.input_packets)
+      local txbytes = counter.read(data.input_bytes)
       local diff_txpackets = tonumber(txpackets - data.prev_txpackets)
       local diff_txbytes = tonumber(txbytes - data.prev_txbytes)
       data.prev_txpackets = txpackets

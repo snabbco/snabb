@@ -2,14 +2,14 @@
 
 ## Match (apps.test.match)
 
-The `Match` app compares packets received on its input port `rx` with those
-received on the reference input port `comparator`, and reports mismatches as
-well as packets from `comparator` that were not matched.
+The `Match` app compares packets received on its `input` port with those
+received on the `comparator` port, and reports mismatches as well as packets
+from `comparator` that were not matched.
 
     DIAGRAM: Match
                   +----------+
                   |          |
-           rx ----*          |
+        input ----*          |
                   |   Match  |
     comparator ---*          |
                   |          |
@@ -26,14 +26,14 @@ keys are defined:
 
 — Key **fuzzy**
 
-*Optional.* If this key is `true` packets from `rx` that do not match the next
-packet from `comparator` are ignored. The default is `false`.
+*Optional.* If this key is `true` packets from `input` that do not match the
+next packet from `comparator` are ignored. The default is `false`.
 
 — Key **modest**
 
 *Optional.* If this key is `true` unmatched packets from `comparator` are
-ignored if at least one packet from ´rx´ was successfully matched. The default
-is `false`.
+ignored if at least one packet from `input` was successfully matched. The
+default is `false`.
 
 
 ## Synth (apps.test.synth)

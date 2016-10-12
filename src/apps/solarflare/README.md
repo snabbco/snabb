@@ -6,15 +6,15 @@ The `Solarflare` app drives one port of a Solarflare SFN7 Ethernet
 controller. Multiple instances of the Solarflare app can be instantiated
 on the same PCI device. Packets received from the network will be
 dispatched between apps based on destination MAC address and VLAN.
-Packets taken from the `rx` port are transmitted onto the network.
-Packets received from the network are put on the `tx` port.
+Packets taken from the `input` port are transmitted onto the network.
+Packets received from the network are put on the `output` port.
 
     DIAGRAM: Solarflare
-              +------------+
-              |            |
-      rx ---->* Solarflare *----> tx
-              |            |
-              +------------+
+               +------------+
+               |            |
+    input ---->* Solarflare *----> output
+               |            |
+               +------------+
 
 The `Solarflare` app requires [OpenOnload](http://www.openonload.org/)
 version *201502* to be installed and the `sfc` module to be loaded.

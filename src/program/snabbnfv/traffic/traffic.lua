@@ -119,11 +119,11 @@ function bench (pciaddr, confpath, sockpath, npackets)
    -- From designs/nfv
    local start, packets, bytes = 0, 0, 0
    local done = function ()
-      local input = link.stats(engine.app_table[nic].input.rx)
-      if start == 0 and input.rxpackets > 0 then
+      local input = link.stats(engine.app_table[nic].input.input)
+      if start == 0 and input.output_packets > 0 then
          -- started receiving, record time and packet count
-         packets = input.rxpackets
-         bytes = input.rxbytes
+         packets = input.output_packets
+         bytes = input.output_bytes
          start = C.get_monotonic_time()
          if os.getenv("NFV_PROF") then
             require("jit.p").start(os.getenv("NFV_PROF"), os.getenv("NFV_PROF_FILE"))
@@ -137,7 +137,7 @@ function bench (pciaddr, confpath, sockpath, npackets)
             print("No LuaJIT dump enabled ($NFV_DUMP unset).")
          end
       end
-      return input.rxpackets - packets >= npackets
+      return input.output_packets - packets >= npackets
    end
 
    engine.main({done = done, no_report = true})
@@ -145,9 +145,9 @@ function bench (pciaddr, confpath, sockpath, npackets)
 
    local runtime = finish - start
    local breaths = tonumber(counter.read(engine.breaths))
-   local input = link.stats(engine.app_table[nic].input.rx)
-   packets = input.rxpackets - packets
-   bytes = input.rxbytes - bytes
+   local input = link.stats(engine.app_table[nic].input.input)
+   packets = input.output_packets - packets
+   bytes = input.output_bytes - bytes
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (%d bytes; %.2f Gbps)"):format(packets / 1e6, runtime, bytes, bytes * 8.0 / 1e9 / runtime))

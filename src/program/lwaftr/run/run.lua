@@ -138,8 +138,8 @@ function run(args)
 
    if opts.verbosity >= 1 then
       local csv = csv_stats.CSVStatsTimer.new()
-      csv:add_app('inetNic', { 'tx', 'rx' }, { tx='IPv4 RX', rx='IPv4 TX' })
-      csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx='IPv6 RX', rx='IPv6 TX' })
+      csv:add_app('inetNic', { 'output', 'input' }, { output='IPv4 INPUT', input='IPv4 OUTPUT' })
+      csv:add_app('b4sideNic', { 'output', 'input' }, { output='IPv6 INPUT', input='IPv6 OUTPUT' })
       csv:activate()
    end
 

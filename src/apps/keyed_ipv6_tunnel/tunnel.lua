@@ -116,7 +116,7 @@ SimpleKeyedTunnel = {
       -- unsigned integer <= 255
       hop_limit = {}
    },
-   shm = { rxerrors              = {counter},
+   shm = { input_errors          = {counter},
            length_errors         = {counter},
            protocol_errors       = {counter},
            cookie_errors         = {counter},
@@ -245,7 +245,7 @@ function SimpleKeyedTunnel:push()
       until true
 
       if drop then
-         counter.add(self.shm.rxerrors)
+         counter.add(self.shm.input_errors)
          -- discard packet
          packet.free(p)
       else
@@ -279,7 +279,7 @@ function selftest ()
    config.link(c, "source.output -> tunnel.decapsulated")
    config.link(c, "comparator.output -> match.comparator")
    config.link(c, "tunnel.encapsulated -> tunnel.encapsulated")
-   config.link(c, "tunnel.decapsulated -> match.rx")
+   config.link(c, "tunnel.decapsulated -> match.input")
    app.configure(c)
 
    app.main({duration = 0.0001, report = {showapps=true,showlinks=true}})

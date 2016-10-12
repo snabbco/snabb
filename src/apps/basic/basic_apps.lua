@@ -42,7 +42,7 @@ end
 function Join:push ()
    for _, inport in ipairs(self.input) do
       while not link.empty(inport) do
-         transmit(self.output.out, receive(inport))
+         transmit(self.output.output, receive(inport))
       end
    end
 end

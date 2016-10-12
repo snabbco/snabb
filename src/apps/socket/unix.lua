@@ -139,7 +139,7 @@ function UnixSocket:new (arg)
    local self = setmetatable({}, self)
 
    function self:pull()
-      local l = self.output.tx
+      local l = self.output.output
       if l == nil then return end
       local limit = engine.pull_npackets
       while limit > 0 and can_receive() do
@@ -152,7 +152,7 @@ function UnixSocket:new (arg)
    end
 
    function self:push()
-      local l = self.input.rx
+      local l = self.input.input
       if l == nil then return end
       while not link.empty(l) and can_send() do
          local p = link.receive(l) --we own p now so we must free it
@@ -175,7 +175,7 @@ function selftest ()
    function printapp:new (name)
       return {
          push = function(self)
-            local l = self.input.rx
+            local l = self.input.input
             if l == nil then return end
             while not link.empty(l) do
                local p = link.receive(l)
@@ -190,7 +190,7 @@ function selftest ()
    function echoapp:new (text)
       return {
          pull = function(self)
-            local l = self.output.tx
+            local l = self.output.output
             if l == nil then return end
             for i=1,engine.pull_npackets do
                local p = packet.allocate()
@@ -206,11 +206,11 @@ function selftest ()
    local c = config.new()
    config.app(c,  "server", UnixSocket, {filename = file, listen = true})
    config.app(c,  "client", UnixSocket, file)
-   config.app(c,  "print_client_tx", printapp, "client tx")
+   config.app(c,  "print_client_output", printapp, "client output")
    config.app(c,  "say_hello", echoapp, "hello ")
-   config.link(c, "client.tx -> print_client_tx.rx")
-   config.link(c, "say_hello.tx -> client.rx")
-   config.link(c, "server.tx -> server.rx")
+   config.link(c, "client.output -> print_client_output.input")
+   config.link(c, "say_hello.output -> client.input")
+   config.link(c, "server.output -> server.input")
 
    engine.configure(c)
    engine.main({duration=0.1, report = {showlinks=true}})

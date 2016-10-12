@@ -14,7 +14,18 @@ local os = require("os")
 
 local t = S.types.t
 
-Tap = { }
+Tap = {
+   shm = {
+      input_bytes    = {counter},
+      input_packets  = {counter},
+      input_mcast    = {counter},
+      input_bcast    = {counter},
+      output_bytes   = {counter},
+      output_packets = {counter},
+      output_mcast   = {counter},
+      output_bcast   = {counter}
+   }
+}
 
 function Tap:new (name)
    assert(name, "missing tap interface name")
@@ -29,16 +40,7 @@ function Tap:new (name)
       sock:close()
       error("Error opening /dev/net/tun: " .. tostring(err))
    end
-   return setmetatable({sock = sock,
-                        name = name,
-                        shm = { rxbytes   = {counter},
-                                rxpackets = {counter},
-                                rxmcast   = {counter},
-                                rxbcast   = {counter},
-                                txbytes   = {counter},
-                                txpackets = {counter},
-                                txmcast   = {counter},
-                                txbcast   = {counter} }},
+   return setmetatable({sock = sock, name = name, pkt = packet.allocate()},
                        {__index = Tap})
 end
 
@@ -46,28 +48,26 @@ function Tap:pull ()
    local l = self.output.output
    if l == nil then return end
    for i=1,engine.pull_npackets do
-      local p = packet.allocate()
-      local len, err = S.read(self.sock, p.data, C.PACKET_PAYLOAD_SIZE)
+      local len, err = S.read(self.sock, self.pkt.data, C.PACKET_PAYLOAD_SIZE)
       -- errno == EAGAIN indicates that the read would of blocked as there is no
       -- packet waiting. It is not a failure.
       if not len and err.errno == const.E.AGAIN then
-         packet.free(p)
          return
       end
       if not len then
-         packet.free(p)
          error("Failed read on " .. self.name .. ": " .. tostring(err))
       end
-      p.length = len
-      link.transmit(l, p)
-      counter.add(self.shm.rxbytes, len)
-      counter.add(self.shm.rxpackets)
-      if ethernet:is_mcast(p.data) then
-         counter.add(self.shm.rxmcast)
+      self.pkt.length = len
+      link.transmit(l, self.pkt)
+      counter.add(self.shm.input_bytes, len)
+      counter.add(self.shm.input_packets)
+      if ethernet:is_mcast(self.pkt.data) then
+         counter.add(self.shm.input_mcast)
       end
-      if ethernet:is_bcast(p.data) then
-         counter.add(self.shm.rxbcast)
+      if ethernet:is_bcast(self.pkt.data) then
+         counter.add(self.shm.input_bcast)
       end
+      self.pkt = packet.allocate()
    end
 end
 
@@ -85,13 +85,13 @@ function Tap:push ()
       if len ~= p.length and err.errno == const.E.AGAIN then
          return
       end
-      counter.add(self.shm.txbytes, len)
-      counter.add(self.shm.txpackets)
+      counter.add(self.shm.output_bytes, len)
+      counter.add(self.shm.output_packets)
       if ethernet:is_mcast(p.data) then
-         counter.add(self.shm.txmcast)
+         counter.add(self.shm.output_mcast)
       end
       if ethernet:is_bcast(p.data) then
-         counter.add(self.shm.txbcast)
+         counter.add(self.shm.output_bcast)
       end
       -- The write completed so dequeue it from the link and free the packet
       link.receive(l)
@@ -124,7 +124,7 @@ function selftest()
                                    src="00:0c:29:3e:ca:7d"})
    config.link(c, "comparator.output->match.comparator")
    config.link(c, "source.output->tap_in.input")
-   config.link(c, "tap_out.output->match.rx")
+   config.link(c, "tap_out.output->match.input")
    engine.configure(c)
    engine.main({duration = 0.01, report = {showapps=true,showlinks=true}})
    assert(#engine.app_table.match:errors() == 0)

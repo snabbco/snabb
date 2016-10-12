@@ -83,8 +83,8 @@ end
 
 local function read_counters(link)
    return {
-      txpackets = counter.read(link.stats.txpackets),
-      txbytes = counter.read(link.stats.txbytes)
+      txpackets = counter.read(link.stats.input_packets),
+      txbytes = counter.read(link.stats.input_bytes)
    }
 end
 
@@ -111,9 +111,9 @@ function run(args)
       config.app(c, stream.rx_sink_id, basic_apps.Sink)
 
       config.link(c, stream.pcap_id..".output -> "..stream.repeater_id..".input")
-      config.link(c, stream.repeater_id..".output -> "..stream.nic_tx_id..".rx")
+      config.link(c, stream.repeater_id..".output -> "..stream.nic_tx_id..".input")
 
-      config.link(c, stream.nic_rx_id..".tx -> "..stream.rx_sink_id..".input")
+      config.link(c, stream.nic_rx_id..".output -> "..stream.rx_sink_id..".input")
    end
    engine.configure(c)
 
@@ -145,8 +145,8 @@ function run(args)
          local rx_nic = assert(engine.app_table[stream.nic_rx_id],
                                "NIC "..stream.nic_rx_id.." not found")
          ret[stream.nic_tx_id] = {
-            tx = read_counters(tx_nic.input.rx),
-            rx = read_counters(rx_nic.output.tx)
+            tx = read_counters(tx_nic.input.input),
+            rx = read_counters(rx_nic.output.output)
          }
       end
       return ret

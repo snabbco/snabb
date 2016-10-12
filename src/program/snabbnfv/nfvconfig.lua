@@ -37,13 +37,13 @@ function load (file, pciaddr, sockpath, soft_bench)
                  {socket_path=sockpath:format(t.port_id),
                   disable_mrg_rxbuf=t.disable_mrg_rxbuf,
                   disable_indirect_desc=t.disable_indirect_desc})
-      local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
+      local VM_input, VM_output = Virtio..".input", Virtio..".output"
       if t.tx_police_gbps then
          local TxLimit = name.."_TxLimit"
          local rate = t.tx_police_gbps * 1e9 / 8
          config.app(c, TxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
-         config.link(c, VM_tx.." -> "..TxLimit..".input")
-         VM_tx = TxLimit..".output"
+         config.link(c, VM_output.." -> "..TxLimit..".input")
+         VM_output = TxLimit..".output"
       end
       -- If enabled, track allowed connections statefully on a per-port basis.
       -- (The table tracking connection state is named after the port ID.)
@@ -52,15 +52,15 @@ function load (file, pciaddr, sockpath, soft_bench)
          local Filter = name.."_Filter_in"
          config.app(c, Filter, PcapFilter, { filter = t.ingress_filter,
                                              state_table = pf_state_table })
-         config.link(c, Filter..".tx -> " .. VM_rx)
-         VM_rx = Filter..".rx"
+         config.link(c, Filter..".output -> " .. VM_input)
+         VM_input = Filter..".input"
       end
       if t.egress_filter then
          local Filter = name..'_Filter_out'
          config.app(c, Filter, PcapFilter, { filter = t.egress_filter,
                                              state_table = pf_state_table })
-         config.link(c, VM_tx..' -> '..Filter..'.rx')
-         VM_tx = Filter..'.tx'
+         config.link(c, VM_output..' -> '..Filter..'.input')
+         VM_output = Filter..'.output'
       end
       if t.tunnel and t.tunnel.type == "L2TPv3" then
          local Tunnel = name.."_Tunnel"
@@ -78,12 +78,12 @@ function load (file, pciaddr, sockpath, soft_bench)
                      local_ip = t.tunnel.local_ip,
                      next_hop = t.tunnel.next_hop})
          -- VM -> Tunnel -> ND <-> Network
-         config.link(c, VM_tx.." -> "..Tunnel..".decapsulated")
+         config.link(c, VM_output.." -> "..Tunnel..".decapsulated")
          config.link(c, Tunnel..".encapsulated -> "..ND..".north")
          -- Network <-> ND -> Tunnel -> VM
          config.link(c, ND..".north -> "..Tunnel..".encapsulated")
-         config.link(c, Tunnel..".decapsulated -> "..VM_rx)
-         VM_rx, VM_tx = ND..".south", ND..".south"
+         config.link(c, Tunnel..".decapsulated -> "..VM_input)
+         VM_input, VM_output = ND..".south", ND..".south"
       end
       if t.crypto and t.crypto.type == "esp-aes-128-gcm" then
          local Crypto = name.."_Crypto"
@@ -91,19 +91,19 @@ function load (file, pciaddr, sockpath, soft_bench)
                     {spi = t.crypto.spi,
                      key = t.crypto.key,
                      replay_window = t.crypto.replay_window})
-         config.link(c, VM_tx.." -> "..Crypto..".decapsulated")
-         config.link(c, Crypto..".decapsulated -> "..VM_rx)
-         VM_rx, VM_tx = Crypto..".encapsulated", Crypto..".encapsulated"
+         config.link(c, VM_output.." -> "..Crypto..".decapsulated")
+         config.link(c, Crypto..".decapsulated -> "..VM_input)
+         VM_input, VM_output = Crypto..".encapsulated", Crypto..".encapsulated"
       end
       if t.rx_police_gbps then
          local RxLimit = name.."_RxLimit"
          local rate = t.rx_police_gbps * 1e9 / 8
          config.app(c, RxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
-         config.link(c, RxLimit..".output -> "..VM_rx)
-         VM_rx = RxLimit..".input"
+         config.link(c, RxLimit..".output -> "..VM_input)
+         VM_input = RxLimit..".input"
       end
-      config.link(c, io_links[i].output.." -> "..VM_rx)
-      config.link(c, VM_tx.." -> "..io_links[i].input)
+      config.link(c, io_links[i].output.." -> "..VM_input)
+      config.link(c, VM_output.." -> "..io_links[i].input)
    end
 
    -- Return configuration c.

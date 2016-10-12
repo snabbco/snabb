@@ -17,8 +17,8 @@ the `input` port and transmits conforming packets to the `output` port.
 Returns throughput statistics in form of a table with the following
 fields:
 
-* `rx` - Number of packets received
-* `tx` - Number of packets transmitted
+* `input` - Number of packets received
+* `output` - Number of packets transmitted
 * `time` - Current time in nanoseconds
 
 

@@ -13,8 +13,8 @@ stdenv.mkDerivation rec {
 
   buildInputs = [ ditaa pandoc git
    (texlive.combine {
-      inherit (texlive) scheme-small luatex luatexbase sectsty titlesec cprotect bigfoot titling droid;
-    })
+      inherit (texlive) scheme-small luatex luatexbase sectsty titlesec cprotect bigfoot titling droid collection-luatex;
+   })
   ];
 
   patchPhase = ''
