@@ -1,4 +1,4 @@
-# VLAN
+# VLAN Apps
 
 There are three VLAN related apps, `Tagger`, `Untagger` and `VlanMux`. The
 `Tagger` and `Untagger` apps add or remove a VLAN tag whereas the `VlanMux` app
