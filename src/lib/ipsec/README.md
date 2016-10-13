@@ -40,7 +40,7 @@ be a table with the following keys:
   are accepted. The default is 128. (`esp_v6_decrypt` only.)
 * `resync_threshold` - *Optional*. Number of consecutive packets allowed to
   fail decapsulation before attempting re-synchronization. The default is
-  10000. (`esp_v6_decrypt` only.)
+  10,000. (`esp_v6_decrypt` only.)
 * `resync_attempts` - *Optional*. Number of attempts to re-synchronize
   a packet that triggered re-synchronization. The default is 10.
   (`esp_v6_decrypt` only.)
