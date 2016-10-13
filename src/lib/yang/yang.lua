@@ -110,7 +110,7 @@ function Base:produce_data_tree(schema_node, data_node)
    if schema_node.containers then
       for name, container in pairs(schema_node.containers) do
          local new_path = path.."."..name
-         local new_node = Container.new(self, new_path)
+         local new_node = Container.new(self, new_path, data_node)
 
          local current_schema = assert(self:get_schema(new_path), "No schema at path:"..new_path)
 
@@ -142,12 +142,12 @@ function Base:produce_data_tree(schema_node, data_node)
    if schema_node.lists then
       for name, list in pairs(schema_node.lists) do
          local list_path = path.."."..name
-         local container = Container.new(self, list_path)
+         local container = Container.new(self, list_path, data_node)
          local current_schema = assert(self:get_schema(list_path), "No schema at path:"..list_path)
          data_node:add_to_root(name, container)
 
          if list.uses then
-            local template = Container.new(self, list_path)
+            local template = Container.new(self, list_path, data_node)
             self:handle_use(list, template, list_path, name)
             container:set_template(template)
          else
@@ -210,7 +210,6 @@ function Base:load_data(data, filename)
          end
 
          local schema = self:get_schema(new_path)
-
          if n.statements then
             if schema.get_type() == "list" then
                -- Lists are a special case, first we need to conver them from their
@@ -227,12 +226,11 @@ function Base:load_data(data, filename)
                local data_node = self:find_data_node(new_path, nil, nil, true)
                data_node:add_item(converted)
 
-               recursively_add(n.statements, new_path, data_node)
+               recursively_add(n.statements, new_path, data_node[n.argument])
             else
                if parent ~= nil then
-                  local new_dn = self:find_data_node(new_path)
-                  parent:add_container(n.keyword, new_dn)
-                  recursively_add(n.statements, new_path, parent, new_dn)
+                  local dn = parent[n.keyword]
+                  recursively_add(n.statements, new_path, parent, dn)
                else
                   recursively_add(n.statements, new_path)
                end
@@ -269,7 +267,7 @@ function Base:find_data_node(schema, data_node, current_schema, raw)
 
    -- If it's a list we want to access the list's version as that's where all
    -- the values are, the non-templated version is just the raw data.
-   local node   
+   local node
    if data_node:get_template() ~= nil then
       node = data_node:get_template()[head]
    else

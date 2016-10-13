@@ -298,8 +298,8 @@ function Union.get_type() return "box-union" end
 box_types["union"] = Union.new
 
 Container = {}
-function Container.new(base, path)
-   local ret = {root={}, base=base, path=path}
+function Container.new(base, path, parent)
+   local ret = {root={}, base=base, path=path, parent=parent}
    return setmetatable(ret, {
       __newindex = function (_, k, v)
          -- Validate the value prior to setting it.
@@ -334,6 +334,8 @@ function Container.new(base, path)
 end
 
 function Container.get_type() return "container" end
+
+function Container:get_parent() return rawget(self, "parent") end
 
 function Container:set_template(template)
    rawset(self, "template", template)
