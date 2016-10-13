@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
-local S = require("syscall")
 local V4V6 = require("apps.lwaftr.V4V6").V4V6
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local basic_apps = require("apps.basic.basic_apps")
@@ -13,35 +12,20 @@ local ipv6_apps = require("apps.lwaftr.ipv6_apps")
 local lib = require("core.lib")
 local lwaftr = require("apps.lwaftr.lwaftr")
 local lwcounter = require("apps.lwaftr.lwcounter")
+local lwutil = require("apps.lwaftr.lwutil")
 local nh_fwd = require("apps.lwaftr.nh_fwd")
 local pci = require("lib.hardware.pci")
 local raw = require("apps.socket.raw")
 local tap = require("apps.tap.tap")
 local pcap = require("apps.pcap.pcap")
 
+local fatal, file_exists = lwutil.fatal, lwutil.file_exists
+local dir_exists, nic_exists = lwutil.dir_exists, lwutil.nic_exists
 local yesno = lib.yesno
-
--- TODO: Duplicated in other source files. Move to a common place.
-local function dir_exists (path)
-   local stat = S.stat(path)
-   return stat and stat.isdir
-end
-
--- TODO: Duplicated in other source files. Move to a common place.
-local function nic_exists (pci_addr)
-   local devices="/sys/bus/pci/devices"
-   return dir_exists(("%s/%s"):format(devices, pci_addr)) or
-      dir_exists(("%s/0000:%s"):format(devices, pci_addr))
-end
 
 local function net_exists (pci_addr)
    local devices="/sys/class/net"
    return dir_exists(("%s/%s"):format(devices, pci_addr))
-end
-
-local function fatal (msg)
-   print(msg)
-   main.exit(1)
 end
 
 local function load_driver (pciaddr)
@@ -291,11 +275,6 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       config.link(c, chain_output .. " -> " .. "DummyVhost"  .. ".rx")
       print("Running without VM (no vHostUser sock_path set)")
    end
-end
-
-local function file_exists (path)
-   local stat = S.stat(path)
-   return stat and stat.isreg
 end
 
 local function load_conf (conf_filename)

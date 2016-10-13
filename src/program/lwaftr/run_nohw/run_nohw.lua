@@ -6,17 +6,15 @@ local RawSocket = require("apps.socket.raw").RawSocket
 local LwAftr = require("apps.lwaftr.lwaftr").LwAftr
 local lib = require("core.lib")
 local S = require("syscall")
+local lwutil = require("apps.lwaftr.lwutil")
+
+local file_exists = lwutil.file_exists
 
 local function check(flag, fmt, ...)
    if not flag then
       io.stderr:write(fmt:format(...), "\n")
       main.exit(1)
    end
-end
-
-local function file_exists(path)
-   local stat = S.stat(path)
-   return stat and stat.isreg
 end
 
 local function parse_args(args)

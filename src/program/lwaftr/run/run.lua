@@ -7,32 +7,14 @@ local lib        = require("core.lib")
 local numa       = require("lib.numa")
 local setup      = require("program.lwaftr.setup")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
+local lwutil = require("apps.lwaftr.lwutil")
+
+local fatal, file_exists = lwutil.fatal, lwutil.file_exists
+local nic_exists = lwutil.nic_exists
 
 local function show_usage(exit_code)
    print(require("program.lwaftr.run.README_inc"))
    if exit_code then main.exit(exit_code) end
-end
-
-local function fatal(msg)
-   show_usage()
-   print('error: '..msg)
-   main.exit(1)
-end
-
-local function file_exists(path)
-   local stat = S.stat(path)
-   return stat and stat.isreg
-end
-
-local function dir_exists(path)
-   local stat = S.stat(path)
-   return stat and stat.isdir
-end
-
-local function nic_exists(pci_addr)
-   local devices="/sys/bus/pci/devices"
-   return dir_exists(("%s/%s"):format(devices, pci_addr)) or
-      dir_exists(("%s/0000:%s"):format(devices, pci_addr))
 end
 
 function parse_args(args)

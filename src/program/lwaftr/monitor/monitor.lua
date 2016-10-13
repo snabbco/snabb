@@ -1,11 +1,12 @@
 module(..., package.seeall)
 
-local S = require("syscall")
 local ffi = require("ffi")
 local ipv4 = require("lib.protocol.ipv4")
 local lib = require("core.lib")
+local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 
+local fatal, file_exists = lwutil.fatal, lwutil.file_exists
 local uint32_ptr_t = ffi.typeof('uint32_t*')
 
 local long_opts = {
@@ -14,11 +15,6 @@ local long_opts = {
 
 local MIRROR_NOTHING = "0.0.0.0"
 local MIRROR_EVERYTHING = "255.255.255.255"
-
-local function fatal (msg)
-   print(msg)
-   main.exit(1)
-end
 
 local function usage (code)
    print(require("program.lwaftr.monitor.README_inc"))
@@ -45,12 +41,6 @@ end
 local function ipv4_to_num (addr)
    local arr = ipv4:pton(addr)
    return arr[3] * 2^24 + arr[2] * 2^16 + arr[1] * 2^8 + arr[0]
-end
-
--- TODO: Refactor to a common library.
-local function file_exists(path)
-   local stat = S.stat(path)
-   return stat and stat.isreg
 end
 
 local function find_lwaftr_process (pid)
