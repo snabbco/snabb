@@ -703,8 +703,8 @@ function M_vf:reconfig(opts)
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
       :set_VLAN(opts.vlan)
-      :set_rx_stats(opts.rxcounter or 0)
-      :set_tx_stats(opts.txcounter or 0)
+      :set_rx_stats(opts.rxcounter)
+      :set_tx_stats(opts.txcounter)
       :set_tx_rate(opts.rate_limit, opts.priority)
       :enable_receive()
       :enable_transmit()
@@ -718,8 +718,8 @@ function M_vf:init (opts)
       :set_MAC(opts.macaddr)
       :set_mirror(opts.mirror)
       :set_VLAN(opts.vlan)
-      :set_rx_stats(opts.rxcounter or 0)
-      :set_tx_stats(opts.txcounter or 0)
+      :set_rx_stats(opts.rxcounter)
+      :set_tx_stats(opts.txcounter)
       :set_tx_rate(opts.rate_limit, opts.priority)
       :enable_receive()
       :enable_transmit()
@@ -992,7 +992,6 @@ function M_vf:get_txstats ()
 end
 
 function M_vf:set_tx_rate (limit, priority)
-   limit = tonumber(limit) or 0
    self.pf.r.RTTDQSEL(self.poolnum)
    if limit >= 10 then
       local factor = 10000 / tonumber(limit)       -- line rate = 10,000 Mb/s
@@ -1001,8 +1000,6 @@ function M_vf:set_tx_rate (limit, priority)
    else
       self.pf.r.RTTBCNRC(0x00)
    end
-
-   priority = tonumber(priority) or 1.0
    self.pf.r.RTTDT1C(bit.band(math.floor(priority * 0x80), 0x3FF))
    return self
 end

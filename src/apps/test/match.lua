@@ -8,10 +8,13 @@ local function dump (p)
    return lib.hexdump(ffi.string(p.data, p.length))
 end
 
-Match = {}
+Match = {
+   config = {
+      fuzzy = {}, modest = {}
+   }
+}
 
-function Match:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+function Match:new (conf)
    return setmetatable({ fuzzy = conf.fuzzy,
                          modest = conf.modest,
                          seen = 0,
