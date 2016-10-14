@@ -73,12 +73,12 @@ function selftest()
    for j=0,5 do v[j] = bnot(i) end
    local newest_index = ctab:add_with_random_ejection(i, v)
    local iterated = 0
-   for _ in ctab:iterate() do iterated = iterated + 1 end
+   for entry in ctab:iterate() do iterated = iterated + 1 end
    assert(old_occupancy == ctab.occupancy, "bad random ejection!")
  
    ctab:remove_ptr(ctab.entries + newest_index, false)
-   iterated = 0
-   for _ in ctab:iterate() do iterated = iterated + 1 end
+   local iterated = 0
+   for entry in ctab:iterate() do iterated = iterated + 1 end
    assert(iterated == ctab.occupancy)
    assert(iterated == old_occupancy - 1)
    -- OK, all looking good with our ctab.

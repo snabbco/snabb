@@ -595,7 +595,7 @@ function selftest()
    io.write('iteration check: ')
    io.flush()
    local iterated = 0
-   for _ in rhh:iterate() do iterated = iterated + 1 end
+   for entry in rhh:iterate() do iterated = iterated + 1 end
    assert(iterated == occupancy)
    io.write('pass\n')
 

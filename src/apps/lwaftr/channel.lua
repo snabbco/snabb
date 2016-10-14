@@ -51,8 +51,7 @@ local function create_ring_buffer (name, size)
    end
    local len = ffi.sizeof(ring_buffer_t, size)
    assert(fd:ftruncate(len), "ring buffer: ftruncate failed")
-   local mem
-   mem, err = S.mmap(nil, len, "read, write", "shared", fd, 0)
+   local mem, err = S.mmap(nil, len, "read, write", "shared", fd, 0)
    fd:close()
    if mem == nil then error("mmap failed: " .. tostring(err)) end
    mem = ffi.cast(ffi.typeof("$*", ring_buffer_t), mem)
@@ -73,8 +72,7 @@ local function open_ring_buffer (pid, name)
    if len < ffi.sizeof(ring_buffer_t, 0) then
       error("unexpected size for ring buffer")
    end
-   local mem
-   mem, err = S.mmap(nil, len, "read, write", "shared", fd, 0)
+   local mem, err = S.mmap(nil, len, "read, write", "shared", fd, 0)
    fd:close()
    if mem == nil then error("mmap failed: " .. tostring(err)) end
    mem = ffi.cast(ffi.typeof("$*", ring_buffer_t), mem)
