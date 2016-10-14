@@ -1,6 +1,5 @@
 module(..., package.seeall)
 
-local S = require("syscall")
 local counter = require("core.counter")
 local ffi = require("ffi")
 local lib = require("core.lib")
@@ -10,7 +9,7 @@ local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 
-local keys = lwutil.keys
+local keys, file_exists = lwutil.keys, lwutil.file_exists
 
 local macaddress_t = ffi.typeof[[
 struct { uint8_t ether[6]; }
@@ -50,12 +49,6 @@ local function read_counters (tree, app_name)
       end
     end
    return ret
-end
-
--- TODO: Refactor to a general common purpose library.
-local function file_exists(path)
-  local stat = S.stat(path)
-  return stat and stat.isreg
 end
 
 local function print_next_hop (pid, name)

@@ -1,30 +1,21 @@
 module(..., package.seeall)
 
-local S = require("syscall")
 local config = require("core.config")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local lwtypes = require("apps.lwaftr.lwtypes")
+local lwutil = require("apps.lwaftr.lwutil")
 local setup = require("program.snabbvmx.lwaftr.setup")
 local shm = require("core.shm")
+
+local fatal, file_exists = lwutil.fatal, lwutil.file_exists
 
 local DEFAULT_MTU = 9500
 
 local function show_usage (exit_code)
    print(require("program.snabbvmx.lwaftr.README_inc"))
    main.exit(exit_code)
-end
-
--- TODO: Duplicated in other source files. Move to a common place.
-local function fatal (msg)
-   print(msg)
-   main.exit(1)
-end
-
-local function file_exists (path)
-   local stat = S.stat(path)
-   return stat and stat.isreg
 end
 
 local function set_ring_buffer_size(ring_buffer_size)

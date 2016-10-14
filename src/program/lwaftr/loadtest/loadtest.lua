@@ -12,6 +12,9 @@ local PcapReader = require("apps.pcap.pcap").PcapReader
 local lib = require("core.lib")
 local numa = require("lib.numa")
 local promise = require("program.lwaftr.loadtest.promise")
+local lwutil = require("apps.lwaftr.lwutil")
+
+local fatal = lwutil.fatal
 
 local WARM_UP_BIT_RATE = 5e9
 local WARM_UP_TIME = 2

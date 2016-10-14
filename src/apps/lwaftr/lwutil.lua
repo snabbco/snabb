@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
 
+local S = require("syscall")
 local bit = require("bit")
 local ffi = require("ffi")
 local lib = require("core.lib")
@@ -93,4 +94,25 @@ function write_to_file(filename, content)
    if not fd then error(err) end
    fd:write(content)
    fd:close()
+end
+
+function fatal (msg)
+   print(msg)
+   main.exit(1)
+end
+
+function file_exists(path)
+   local stat = S.stat(path)
+   return stat and stat.isreg
+end
+
+function dir_exists(path)
+   local stat = S.stat(path)
+   return stat and stat.isdir
+end
+
+function nic_exists(pci_addr)
+   local devices="/sys/bus/pci/devices"
+   return dir_exists(("%s/%s"):format(devices, pci_addr)) or
+      dir_exists(("%s/0000:%s"):format(devices, pci_addr))
 end
