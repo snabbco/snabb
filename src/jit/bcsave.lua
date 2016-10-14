@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------
 -- LuaJIT module to save/list bytecode.
 --
--- Copyright (C) 2005-2015 Mike Pall. All rights reserved.
+-- Copyright (C) 2005-2016 Mike Pall. All rights reserved.
 -- Released under the MIT license. See Copyright Notice in luajit.h
 ----------------------------------------------------------------------------
 --
@@ -125,12 +125,12 @@ extern "C"
 #ifdef _WIN32
 __declspec(dllexport)
 #endif
-const char %s%s[] = {
+const unsigned char %s%s[] = {
 ]], LJBC_PREFIX, ctx.modname))
   else
     fp:write(string.format([[
 #define %s%s_SIZE %d
-static const char %s%s[] = {
+static const unsigned char %s%s[] = {
 ]], LJBC_PREFIX, ctx.modname, #s, LJBC_PREFIX, ctx.modname))
   end
   local t, n, m = {}, 0, 0
