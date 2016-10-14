@@ -158,7 +158,7 @@ function nh_fwd4:push ()
 
    -- IPv4 from Wire.
    if input_wire then
-      for _=1,link.nreadable(input_wire) do
+      for _ = 1, link.nreadable(input_wire) do
          local pkt = receive(input_wire)
          local ipv4_address = self.ipv4_address
          local ipv4_hdr = get_ethernet_payload(pkt)
@@ -176,7 +176,7 @@ function nh_fwd4:push ()
 
    -- IPv4 from VM.
    if input_vm then
-      for _=1,link.nreadable(input_vm) do
+      for _ = 1, link.nreadable(input_vm) do
          local pkt = receive(input_vm)
          local ether_dhost = get_ether_dhost_ptr(pkt)
          local ipv4_hdr = get_ethernet_payload(pkt)
@@ -200,7 +200,7 @@ function nh_fwd4:push ()
 
    -- IPv4 from Service.
    if input_service then
-      for _=1,link.nreadable(input_service) do
+      for _ = 1, link.nreadable(input_service) do
          local pkt = receive(input_service)
          local ether_dhost = get_ether_dhost_ptr(pkt)
 
@@ -265,7 +265,7 @@ function nh_fwd6:push ()
 
    -- IPv6 from Wire.
    if input_wire then
-      for _=1,link.nreadable(input_wire) do
+      for _ = 1, link.nreadable(input_wire) do
          local pkt = receive(input_wire)
          local ipv6_header = get_ethernet_payload(pkt)
          local proto = get_ipv6_next_header(ipv6_header)
@@ -282,7 +282,7 @@ function nh_fwd6:push ()
 
    -- IPv6 from VM.
    if input_vm then
-      for _=1,link.nreadable(input_vm) do
+      for _ = 1, link.nreadable(input_vm) do
          local pkt = receive(input_vm)
          local ether_dhost = get_ether_dhost_ptr(pkt)
          local ipv6_hdr = get_ethernet_payload(pkt)
@@ -304,7 +304,7 @@ function nh_fwd6:push ()
 
    -- IPv6 from Service.
    if input_service then
-      for _=1,link.nreadable(input_service) do
+      for _ = 1, link.nreadable(input_service) do
          local pkt = receive(input_service)
          local ether_dhost = get_ether_dhost_ptr(pkt)
 

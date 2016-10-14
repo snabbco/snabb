@@ -65,7 +65,7 @@ module(..., package.seeall)
 
 local bit = require('bit')
 local ffi = require("ffi")
-local stream = require("apps.lwaftr.stream")
+local lwstream = require("apps.lwaftr.stream")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local Parser = require("apps.lwaftr.conf_parser").Parser
 local rangemap = require("apps.lwaftr.rangemap")
@@ -308,7 +308,7 @@ function BindingTable:iterate_softwires()
 end
 
 function BindingTable:save(filename, mtime_sec, mtime_nsec)
-   local out = stream.open_temporary_output_byte_stream(filename)
+   local out = lwstream.open_temporary_output_byte_stream(filename)
    out:write_ptr(binding_table_header_t(
                     BINDING_TABLE_MAGIC, BINDING_TABLE_VERSION,
                     mtime_sec or 0, mtime_nsec or 0))
@@ -508,7 +508,7 @@ local function log(msg, ...)
 end
 
 function load(file)
-   local source = stream.open_input_byte_stream(file)
+   local source = lwstream.open_input_byte_stream(file)
    if has_magic(source) then
       log('loading compiled binding table from %s', file)
       return load_compiled(source)
@@ -519,7 +519,7 @@ function load(file)
    -- in a well-known place.
    local compiled_file = file:gsub("%.txt$", "")..'.o'
 
-   local compiled_stream = maybe(stream.open_input_byte_stream,
+   local compiled_stream = maybe(lwstream.open_input_byte_stream,
                                  compiled_file)
    if compiled_stream then
       if has_magic(compiled_stream) then
@@ -598,12 +598,12 @@ function selftest()
    map = load(tmp)
    os.remove(tmp)
 
-   local tmp = os.tmpname()
+   tmp = os.tmpname()
    map:save(tmp)
    map = load(tmp)
    os.remove(tmp)
 
-   local tmp = os.tmpname()
+   tmp = os.tmpname()
    map:dump(tmp)
    map = load(tmp)
    os.remove(tmp)
@@ -672,7 +672,7 @@ function selftest()
 
    do
       local i = 0
-      for entry in map:iterate_softwires() do i = i + 1 end
+      for _ in map:iterate_softwires() do i = i + 1 end
       -- 11 softwires in above example.  Since they are hashed into an
       -- arbitrary order, we can't assert much about the iteration.
       assert(i == 11)

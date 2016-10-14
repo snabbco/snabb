@@ -11,24 +11,14 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
 local checksum = require("lib.checksum")
 local packet = require("core.packet")
-local bit = require("bit")
-local ffi = require("ffi")
 local lib = require("core.lib")
 local counter = require("core.counter")
 
 local receive, transmit = link.receive, link.transmit
-local rd16, wr16, rd32, wr32 = lwutil.rd16, lwutil.wr16, lwutil.rd32, lwutil.wr32
+local wr16, rd32, wr32 = lwutil.wr16, lwutil.rd32, lwutil.wr32
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
 local is_ipv4, is_ipv4_fragment = lwutil.is_ipv4, lwutil.is_ipv4_fragment
-local ntohs, htons = lib.ntohs, lib.htons
-local band = bit.band
-
-local n_ethertype_ipv4 = constants.n_ethertype_ipv4
-local o_ipv4_identification = constants.o_ipv4_identification
-local o_ipv4_src_addr = constants.o_ipv4_src_addr
-local o_ipv4_dst_addr = constants.o_ipv4_dst_addr
-local o_ethernet_ethertype = constants.o_ethernet_ethertype
-local o_ipv4_flags = constants.o_ipv4_flags
+local htons = lib.htons
 
 local ehs = constants.ethernet_header_size
 local o_ipv4_ver_and_ihl = ehs + constants.o_ipv4_ver_and_ihl
@@ -64,10 +54,7 @@ function Reassembler:push ()
    local input, output = self.input.input, self.output.output
    local errors = self.output.errors
 
-   local l2_size = self.l2_size
-   local ethertype_offset = self.ethertype_offset
-
-   for _=1,math.min(link.nreadable(input), link.nwritable(output)) do
+   for _ = 1, math.min(link.nreadable(input), link.nwritable(output)) do
       local pkt = receive(input)
       if is_ipv4_fragment(pkt) then
          counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
@@ -109,7 +96,7 @@ function Fragmenter:push ()
 
    local mtu = self.mtu
 
-   for _=1,link.nreadable(input) do
+   for _ = 1, link.nreadable(input) do
       local pkt = receive(input)
       if pkt.length > mtu + ehs and is_ipv4(pkt) then
          local status, frags = fragmentv4.fragment(pkt, mtu)
@@ -168,11 +155,11 @@ function ARP:push()
 
    self:maybe_send_arp_request(osouth)
 
-   for _=1,link.nreadable(isouth) do
+   for _ = 1, link.nreadable(isouth) do
       local p = receive(isouth)
       if arp.is_arp(p) then
          if not self.dst_eth and arp.is_arp_reply(p) then
-            local dst_ethernet = arp.get_isat_ethernet(p, self.conf.dst_ipv4)
+            local dst_ethernet = arp.get_isat_ethernet(p)
             if dst_ethernet then
                self.dst_eth = dst_ethernet
             end
@@ -191,7 +178,7 @@ function ARP:push()
       end
    end
 
-   for _=1,link.nreadable(inorth) do
+   for _ = 1, link.nreadable(inorth) do
       local p = receive(inorth)
       if not self.dst_eth then
          -- drop all southbound packets until the next hop's ethernet address is known

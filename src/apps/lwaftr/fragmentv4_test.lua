@@ -244,7 +244,6 @@ function test_reassemble_pattern_fragments()
    local pkt = make_ipv4_packet(1046 - ip4_proto:sizeof() - eth_proto:sizeof())
    pattern_fill(pkt.data + ip4_proto:sizeof() + eth_proto:sizeof(),
                 pkt.length - ip4_proto:sizeof() - eth_proto:sizeof())
-   local orig_packet = packet.clone(pkt)
 
    local code, result = fragmentv4.fragment(pkt, 520)
    assert(code == fragmentv4.FRAGMENT_OK)
@@ -269,7 +268,6 @@ end
 function test_reassemble_two_missing_fragments(vlan_id)
    print("test:   two fragments (one missing)")
    local pkt = assert(make_ipv4_packet(1200), vlan_id)
-   local eth_size = eth_header_size(pkt)
    local code, fragments = fragmentv4.fragment(pkt, 1000)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#fragments == 2)
@@ -286,7 +284,6 @@ end
 function test_reassemble_three_missing_fragments(vlan_id)
    print("test:   three fragments (one/two missing)")
    local pkt = assert(make_ipv4_packet(1000))
-   local eth_size = eth_header_size(pkt)
    local code, fragments = fragmentv4.fragment(packet.clone(pkt), 400)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#fragments == 3)
@@ -347,7 +344,6 @@ function test_reassemble_two(vlan_id)
    print("test:   payload=1200 mtu=1000")
    local pkt = assert(make_ipv4_packet(1200), vlan_id)
    assert(pkt.length > 1200, "packet shorter than payload size")
-   local eth_size = eth_header_size(pkt)
 
    -- Keep a copy of the packet, for comparisons
    local orig_pkt = packet.clone(pkt)
@@ -388,7 +384,6 @@ end
 function test_reassemble_three(vlan_id)
    print("test:   payload=1000 mtu=400")
    local pkt = assert(make_ipv4_packet(1000), vlan_id)
-   local eth_size = eth_header_size(pkt)
 
    -- Keep a copy of the packet, for comparisons
    local orig_pkt = packet.clone(pkt)

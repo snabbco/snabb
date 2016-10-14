@@ -16,21 +16,16 @@ local lib = require("core.lib")
 
 local bit = require("bit")
 local ffi = require("ffi")
-local C = ffi.C
 
 local receive, transmit = link.receive, link.transmit
-local rd16, wr16 = lwutil.rd16, lwutil.wr16
+local wr16 = lwutil.wr16
 local is_ipv6, is_ipv6_fragment = lwutil.is_ipv6, lwutil.is_ipv6_fragment
 local htons = lib.htons
 
 local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
-local n_ethertype_ipv6 = constants.n_ethertype_ipv6
-local o_ipv6_src_addr = constants.o_ipv6_src_addr
-local o_ipv6_dst_addr = constants.o_ipv6_dst_addr
 
 local proto_icmpv6 = constants.proto_icmpv6
 local ethernet_header_size = constants.ethernet_header_size
-local o_ethernet_ethertype = constants.o_ethernet_ethertype
 local o_icmpv6_header = ethernet_header_size + ipv6_fixed_header_size
 local o_icmpv6_msg_type = o_icmpv6_header + constants.o_icmpv6_msg_type
 local o_icmpv6_checksum = o_icmpv6_header + constants.o_icmpv6_checksum
@@ -64,7 +59,7 @@ function ReassembleV6:push ()
    local input, output = self.input.input, self.output.output
    local errors = self.output.errors
 
-   for _=1,link.nreadable(input) do
+   for _ = 1, link.nreadable(input) do
       local pkt = receive(input)
       if is_ipv6_fragment(pkt) then
          counter.add(self.counters["in-ipv6-frag-needs-reassembly"])
@@ -107,7 +102,7 @@ function Fragmenter:push ()
 
    local mtu = self.mtu
 
-   for _=1,link.nreadable(input) do
+   for _ = 1, link.nreadable(input) do
       local pkt = receive(input)
       if pkt.length > mtu + ehs and is_ipv6(pkt) then
          -- It's possible that the IPv6 packet has an IPv4 packet as
@@ -170,7 +165,7 @@ function NDP:push()
    -- This would be an optimization, not a correctness issue
    self:maybe_send_ns_request(osouth)
 
-   for _=1,link.nreadable(isouth) do
+   for _ = 1, link.nreadable(isouth) do
       local p = receive(isouth)
       if ndp.is_ndp(p) then
          if not self.dst_eth and ndp.is_solicited_neighbor_advertisement(p) then
@@ -193,7 +188,7 @@ function NDP:push()
       end
    end
 
-   for _=1,link.nreadable(inorth) do
+   for _ = 1, link.nreadable(inorth) do
       local p = receive(inorth)
       if not self.dst_eth then
          -- drop all southbound packets until the next hop's ethernet address is known

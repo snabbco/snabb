@@ -125,7 +125,6 @@ end
 function selftest ()
    print("selftest: dump")
    local lwconf = require("apps.lwaftr.conf")
-   local policies = lwconf.policies
    local equal = require('core.lib').equal
    local function string_file(str)
       local pos = 1
