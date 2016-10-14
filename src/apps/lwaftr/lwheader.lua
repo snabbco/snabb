@@ -13,8 +13,7 @@ local bitfield = lib.bitfield
 local wr16, wr32 = lwutil.wr16, lwutil.wr32
 local ethernet_header_ptr_type = lwtypes.ethernet_header_ptr_type
 local ipv6_header_ptr_type = lwtypes.ipv6_header_ptr_type
-local htons, htonl = lwutil.htons, lwutil.htonl
-local ntohs, ntohl = htons, htonl
+local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
 
 -- Transitional header handling library.
 -- Over the longer term, something more lib.protocol-like has some nice advantages.
@@ -23,16 +22,11 @@ local ntohs, ntohl = htons, htonl
 -- payload lengths should be in host byte order.
 -- next_hdr_type and dscp_and_ecn are <= 1 byte, so byte order is irrelevant.
 
-function write_eth_header(dst_ptr, ether_src, ether_dst, eth_type, vlan_tag)
+function write_eth_header(dst_ptr, ether_src, ether_dst, eth_type)
    local eth_hdr = cast(ethernet_header_ptr_type, dst_ptr)
    eth_hdr.ether_shost = ether_src
    eth_hdr.ether_dhost = ether_dst
-   if vlan_tag then -- TODO: don't have bare constant offsets here
-      wr32(dst_ptr + 12, vlan_tag)
-      wr16(dst_ptr + 16, eth_type)
-   else
-      eth_hdr.ether_type = eth_type
-   end
+   eth_hdr.ether_type = eth_type
 end
 
 function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_type, payload_length)

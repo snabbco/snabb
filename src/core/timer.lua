@@ -61,6 +61,21 @@ function activate (t)
    end
 end
 
+local function find_timer (name)
+   for tick, set in pairs(timers) do
+      for i, t in ipairs(set) do
+         if t.name == name then
+            return tick, i
+         end
+      end
+   end
+   return nil
+end
+
+local function is_timer (t)
+   return type(t) == "table" and (t.name and t.fn and t.ticks)
+end
+
 function new (name, fn, nanos, mode)
    return { name = name,
             fn = fn,
@@ -70,6 +85,7 @@ end
 
 function selftest ()
    print("selftest: timer")
+
    ticks = 0
    local ntimers, runtime = 10000, 100000
    local count, expected_count = 0, 0

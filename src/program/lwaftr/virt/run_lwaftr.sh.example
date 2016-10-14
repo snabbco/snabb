@@ -6,4 +6,4 @@ V6_PCI=0000:00:09.0
 LWAFTR_CONF=program/lwaftr/tests/data/icmp_on_fail.conf
 OUTPUT=/tmp/lwaftr.csv
 
-screen -dmS lwaftr bash -c "cd ${SNABB_GUEST};sudo taskset -c 1 ./snabb snsh -p lwaftr run -v -i --conf $LWAFTR_CONF --v4-pci ${V4_PCI} --v6-pci ${V6_PCI} | tee $OUTPUT"
+screen -dmS lwaftr bash -c "cd ${SNABB_GUEST};sudo taskset -c 1 ./snabb snsh -p lwaftr run -v -i --conf $LWAFTR_CONF --v4 ${V4_PCI} --v6 ${V6_PCI} | tee $OUTPUT"

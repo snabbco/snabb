@@ -137,7 +137,7 @@ local function calloc(t, count)
    end
    local ret = ffi.cast(ffi.typeof('$*', t), mem)
    ffi.gc(ret, function (ptr) S.munmap(ptr, byte_size) end)
-   return ret
+   return ret, byte_size
 end
 
 function CTable:resize(size)
@@ -147,7 +147,7 @@ function CTable:resize(size)
 
    -- Allocate double the requested number of entries to make sure there
    -- is sufficient displacement if all hashes map to the last bucket.
-   self.entries = calloc(self.entry_type, size * 2)
+   self.entries, self.byte_size = calloc(self.entry_type, size * 2)
    self.size = size
    self.scale = self.size / HASH_MAX
    self.occupancy = 0
@@ -161,6 +161,10 @@ function CTable:resize(size)
          self:insert(old_entries[i].hash, old_entries[i].key, old_entries[i].value)
       end
    end
+end
+
+function CTable:get_backing_size()
+   return self.byte_size
 end
 
 function CTable:insert(hash, key, value, updates_allowed)
@@ -259,9 +263,11 @@ end
 function CTable:remove_ptr(entry)
    local scale = self.scale
    local index = entry - self.entries
-   assert(index >= 0)
-   assert(index <= self.size + self.max_displacement)
-   assert(entry.hash ~= HASH_MAX)
+   assert(index >= 0, "Ctab: index must be >= 0.")
+   assert(index <= self.size + self.max_displacement,
+      string.format("Ctab: bad index %s, should be at most %s.",
+         index, self.size + self.max_displacement))
+   assert(entry.hash ~= HASH_MAX, "Ctab: entry hash must not be HASH_MAX.")
 
    self.occupancy = self.occupancy - 1
    entry.hash = HASH_MAX

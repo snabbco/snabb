@@ -112,6 +112,8 @@ get the lwAFTR working on virtualized network interfaces.
 
 [Troubleshooting](./README.troubleshooting.md)
 
+[Counters](./README.counters.md)
+
 ## Performance
 
 [Benchmarking](./README.benchmarking.md)
@@ -125,4 +127,3 @@ get the lwAFTR working on virtualized network interfaces.
 [Discovery of next-hop L2 addresses via NDP](./README.ndp.md)
 
 [Change Log](./CHANGELOG.md)
-
