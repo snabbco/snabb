@@ -60,12 +60,17 @@ local function mirror_ipv6 (pkt, output, ipv4_num)
    end
 end
 
-V4V6 = {}
+V4V6 = {
+   config = {
+      description = {default="V4V6"},
+      mirror = {default=false},
+   }
+}
 
 function V4V6:new (conf)
    local o = {
-      description = conf.description or "V4V6",
-      mirror = conf.mirror or false,
+      description = conf.description,
+      mirror = conf.mirror,
    }
    return setmetatable(o, {__index = V4V6})
 end

@@ -47,27 +47,38 @@ local PROTO_IPV4_ENCAPSULATION = 0x4
 local PROTO_IPV6 = C.htons(0x86DD)
 local PROTO_UDP = 17
 
-from_inet = {}
+from_inet = {
+   config = {
+      psid_len = {required=true},
+      shift = {},
+      start_inet = {required=true},
+      max_packets = {},
+      max_packets_per_iter = {},
+      num_ips = {},
+      packet_size = {default=550},
+      src_mac = {required=true},
+      dst_mac = {required=true},
+      vlan_tag = {}
+   }
+}
 
 function from_inet:new(conf)
-   if not conf.shift then conf.shift = 16 - conf.psid_len end
-   assert(conf.psid_len + conf.shift == 16)
-   local psid_len, shift = conf.psid_len, conf.shift
+   local psid_len = conf.psid_len
+   local shift = conf.shift or 16 - conf.psid_len
+   assert(psid_len + shift == 16)
    local start_inet = ipv4:pton(conf.start_inet)
    local start_port = 2^shift
-   if conf.max_packets then
-      conf.max_packets_per_iter = conf.max_packets
-   end
+   local max_packets_per_iter = conf.max_packets or conf.max_packets_per_iter
    local o = {
       dst_ip = start_inet,
       dst_port = start_port,
       inc_port = 2^shift,
-      max_packets_per_iter = conf.max_packets_per_iter or 10,
+      max_packets_per_iter = max_packets_per_iter or 10,
       iter_count = 1, -- Iteration counter. Reset when overpasses max_packet_per_iter.
-      num_ips = conf.num_ips or 10,
+      num_ips = conf.num_ips,
       ip_count = 1,   -- IPv4 counter. Reset when overpasses num_ips.
       max_packets = conf.max_packets,
-      packet_size = conf.packet_size or 550,
+      packet_size = conf.packet_size,
       psid_count = 1,
       psid_max = 2^psid_len,
       start_inet = start_inet,
@@ -205,28 +216,40 @@ function inc_ipv4(ipv4)
 end
 
 
-from_b4 = {}
+from_b4 = {
+   config = {
+      psid_len = {required=true},
+      shift = {},
+      start_inet = {required=true},
+      start_b4 = {required=true},
+      br = {required=true},
+      max_packets = {},
+      max_packets_per_iter = {},
+      num_ips = {},
+      packet_size = {default=550},
+      src_mac = {required=true},
+      dst_mac = {required=true},
+      vlan_tag = {}
+   }
+}
 
 function from_b4:new(conf)
-   if not conf.shift then conf.shift = 16 - conf.psid_len end
-   assert(conf.psid_len + conf.shift == 16)
-   local psid_len, shift = conf.psid_len, conf.shift
+   local psid_len = conf.psid_len
+   local shift = conf.shift or 16 - conf.psid_len
+   assert(psid_len + shift == 16)
    local start_inet = ipv4:pton(conf.start_inet)
    local start_b4 = ipv6:pton(conf.start_b4)
    local start_port = 2^shift
-   local packet_size = conf.packet_size or 550
    packet_size = packet_size - ipv6_header_size
-   if conf.max_packets then
-      conf.max_packets_per_iter = conf.max_packets
-   end
+   local max_packets_per_iter = conf.max_packets or conf.max_packets_per_iter
    local o = {
       br = ipv6:pton(conf.br),
       inc_port = 2^shift,
       ip_count = 1,
       iter_count = 1,
-      max_packets_per_iter = conf.max_packets_per_iter or 10,
+      max_packets_per_iter = max_packets_per_iter or 10,
       max_packets = conf.max_packets,
-      num_ips = conf.num_ips or 10,
+      num_ips = conf.num_ips,
       packet_size = packet_size,
       psid_count = 1,
       psid_max = 2^psid_len,
