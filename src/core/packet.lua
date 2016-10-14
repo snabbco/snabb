@@ -24,6 +24,9 @@ max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 -- packet structure as a whole around.
 local packet_alignment = 512
 local default_headroom = 256
+-- The Intel82599 driver requires even-byte alignment, so let's keep
+-- things aligned at least this much.
+local minimum_alignment = 2
 
 -- Freelist containing empty packets ready for use.
 
@@ -110,7 +113,8 @@ function shiftleft (p, bytes)
    -- p.data will point out of our allocation.  If we're withing the
    -- alignment wiggle room, just move the packet around.  Otherwise
    -- copy the payload, but also reset the headroom at the same time.
-   if bytes + headroom < packet_alignment then
+   if bytes + headroom < packet_alignment
+      and bit.band(bytes, minimum_alignment - 1) == 0 then
       p = ffi.cast(packet_ptr_t, ptr + bytes)
       p.length = len - bytes
       return p
@@ -129,7 +133,7 @@ function shiftright (p, bytes)
    local ptr = ffi.cast("char*", p)
    local len = p.length
    local headroom = bit.band(ffi.cast("uint64_t", ptr), packet_alignment - 1)
-   if bytes <= headroom then
+   if bytes <= headroom and bit.band(bytes, minimum_alignment - 1) == 0 then
       -- Take from the headroom.
       p = ffi.cast(packet_ptr_t, ptr - bytes)
       p.length = len + bytes
