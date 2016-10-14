@@ -1,5 +1,5 @@
 @rem Script to build LuaJIT with MSVC.
-@rem Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+@rem Copyright (C) 2005-2016 Mike Pall. See Copyright Notice in luajit.h
 @rem
 @rem Either open a "Visual Studio .NET Command Prompt"
 @rem (Note that the Express Edition does not contain an x64 compiler)
@@ -67,7 +67,7 @@ buildvm -m folddef -o lj_folddef.h lj_opt_fold.c
 @if "%1" neq "debug" goto :NODEBUG
 @shift
 @set LJCOMPILE=%LJCOMPILE% /Zi
-@set LJLINK=%LJLINK% /debug
+@set LJLINK=%LJLINK% /debug /opt:ref /opt:icf /incremental:no
 :NODEBUG
 @if "%1"=="amalg" goto :AMALGDLL
 @if "%1"=="static" goto :STATIC
@@ -99,6 +99,8 @@ if exist luajit.exe.manifest^
   %LJMT% -manifest luajit.exe.manifest -outputresource:luajit.exe
 
 @del *.obj *.manifest minilua.exe buildvm.exe
+@del host\buildvm_arch.h
+@del lj_bcdef.h lj_ffdef.h lj_libdef.h lj_recdef.h lj_folddef.h
 @echo.
 @echo === Successfully built LuaJIT for Windows/%LJARCH% ===
 
