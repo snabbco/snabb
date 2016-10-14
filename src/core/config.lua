@@ -25,9 +25,13 @@ end
 --
 -- Example: config.app(c, "nic", Intel82599, {pciaddr = "0000:00:01.00"})
 function app (config, name, class, arg)
-   arg = arg or "nil"
    assert(type(name) == "string", "name must be a string")
    assert(type(class) == "table", "class must be a table")
+   if class.config then
+      local status, result = pcall(parse_app_arg, arg, class.config)
+      if status then arg = result
+      else error("failed to configure '"..name.."': "..result) end
+   end
    config.apps[name] = { class = class, arg = arg}
 end
 
@@ -58,15 +62,11 @@ function canonical_link (spec)
    return format_link(parse_link(spec))
 end
 
--- Return a Lua object for the arg to an app. Arg may be a table or a
--- string encoded Lua object.
--- Example:
---   parse_app_arg('{ timeout= 5*10 }') => { timeout = 50 }
---   parse_app_arg(<table>) => <table> (NOOP)
-function parse_app_arg (arg)
-   if     type(arg) == 'string' then return lib.load_string(arg)
-   elseif type(arg) == 'table'  then return arg
-   else   error("<arg> is not a string or table.") end
+-- Parse Lua object for the arg to an app based on config. Arg may be a table
+-- or a string encoded Lua object.
+function parse_app_arg (arg, config)
+   if type(arg) == 'string' then arg = lib.load_string(arg) end
+   return lib.parse(arg, config)
 end
 
 function graphviz (c)

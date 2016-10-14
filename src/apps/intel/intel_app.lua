@@ -13,7 +13,21 @@ local register = require("lib.hardware.register")
 local macaddress = require("lib.macaddress")
 local intel10g = require("apps.intel.intel10g")
 local receive, transmit, empty = link.receive, link.transmit, link.empty
-Intel82599 = {}
+
+Intel82599 = {
+   config = {
+      pciaddr = {required=true},
+      mtu = {},
+      macaddr = {},
+      vlan = {},
+      vmdq = {},
+      mirror = {},
+      rxcounter  = {default=0},
+      txcounter  = {default=0},
+      rate_limit = {default=0},
+      priority   = {default=1.0}
+   }
+}
 Intel82599.__index = Intel82599
 
 local C = ffi.C
@@ -35,8 +49,7 @@ local function firsthole(t)
 end
 
 -- Create an Intel82599 App for the device with 'pciaddress'.
-function Intel82599:new (arg)
-   local conf = config.parse_app_arg(arg)
+function Intel82599:new (conf)
    local self = {}
 
    if conf.vmdq then
@@ -111,8 +124,7 @@ function Intel82599:stop()
 end
 
 
-function Intel82599:reconfig(arg)
-   local conf = config.parse_app_arg(arg)
+function Intel82599:reconfig (conf)
    assert((not not self.dev.pf) == (not not conf.vmdq), "Can't reconfig from VMDQ to single-port or viceversa")
 
    self.dev:reconfig(conf)
@@ -376,14 +388,14 @@ function mq_sq(pcidevA, pcidevB)
    print("Send traffic from a nicA (SF) to nicB (two VFs)")
    print("The packets should arrive evenly split between the VFs")
    config.app(c, 'sink_ms', basic_apps.Sink)
-   config.link(c, 'source_ms.out -> repeater_ms.input')
+   config.link(c, 'source_ms.output -> repeater_ms.input')
    config.link(c, 'repeater_ms.output -> nicAs.rx')
    config.link(c, 'nicAs.tx -> sink_ms.in1')
    config.link(c, 'nicBm0.tx -> sink_ms.in2')
    config.link(c, 'nicBm1.tx -> sink_ms.in3')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+   link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d2))
 end
 
 -- one multiqueue driver with two apps and do switch stuff
@@ -424,13 +436,13 @@ function mq_sw(pcidevA)
    print ("Send a bunch of packets from Am0")
    print ("half of them go to nicAm1 and half go nowhere")
    config.app(c, 'sink_ms', basic_apps.Sink)
-   config.link(c, 'source_ms.out -> repeater_ms.input')
+   config.link(c, 'source_ms.output -> repeater_ms.input')
    config.link(c, 'repeater_ms.output -> nicAm0.rx')
    config.link(c, 'nicAm0.tx -> sink_ms.in1')
    config.link(c, 'nicAm1.tx -> sink_ms.in2')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+   link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d2))
 end
 
 function manyreconf(pcidevA, pcidevB, n, do_pf)
@@ -476,14 +488,14 @@ function manyreconf(pcidevA, pcidevB, n, do_pf)
          vlan = 100+i,
       })
       config.app(c, 'sink_ms', basic_apps.Sink)
-      config.link(c, 'source_ms.out -> repeater_ms.input')
+      config.link(c, 'source_ms.output -> repeater_ms.input')
       config.link(c, 'repeater_ms.output -> nicAm0.rx')
       config.link(c, 'nicAm0.tx -> sink_ms.in1')
       config.link(c, 'nicAm1.tx -> sink_ms.in2')
       if do_pf then engine.configure(config.new()) end
       engine.configure(c)
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+      link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
+      link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d2))
       engine.main({duration = 0.1, no_report=true})
       cycles = cycles + 1
       redos = redos + engine.app_table.nicAm1.dev.pf.redos

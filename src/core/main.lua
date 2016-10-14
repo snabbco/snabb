@@ -19,6 +19,13 @@ local S = require("syscall")
 require("lib.lua.strict")
 require("lib.lua.class")
 
+-- ljsyscall returns error as a cdata instead of a string, and the standard
+-- assert doesn't use tostring on it.
+_G.assert = function (v, ...)
+   if v then return v, ... end
+   error(tostring(... or "assertion failed!"))
+end
+
 -- Reserve names that we want to use for global module.
 -- (This way we avoid errors from the 'strict' module.)
 _G.config, _G.engine, _G.memory, _G.link, _G.packet, _G.timer,
@@ -164,7 +171,7 @@ function selftest ()
 end
 
 -- Fork into worker process and supervisor
-local worker_pid = S.fork()
+local worker_pid = assert(S.fork())
 if worker_pid == 0 then
    -- Worker: Use prctl to ensure we are killed (SIGHUP) when our parent quits
    -- and run main.
@@ -179,16 +186,14 @@ else
    while true do
       -- Read signals from signalfd. Only process the first signal because any
       -- signal causes shutdown.
-      local signals, err = S.util.signalfd_read(signalfd)
-      assert(signals, tostring(err))
+      local signals = assert(S.util.signalfd_read(signalfd))
       for i = 1, #signals do
          local exit_status
          if signals[i].chld then
             -- SIGCHILD means worker state changed: retrieve its status using
             -- waitpid and set exit status accordingly.
-            local status, err, worker =
-               S.waitpid(worker_pid, "stopped,continued")
-            assert(status, tostring(err))
+            local status, _, worker =
+               assert(S.waitpid(worker_pid, "stopped,continued"))
             if     worker.WIFEXITED   then exit_status = worker.EXITSTATUS
             elseif worker.WIFSIGNALED then exit_status = 128 + worker.WTERMSIG
             -- WIFSTOPPED and WIFCONTINUED are ignored.

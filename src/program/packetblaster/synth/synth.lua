@@ -8,42 +8,45 @@ local Synth     = require("apps.test.synth").Synth
 local lib       = require("core.lib")
 
 local packetblaster = require("program.packetblaster.packetblaster")
-local usage = require("program.packetblaster.synth.README_inc")
 
 local long_opts = {
    duration     = "D",
    help         = "h",
    src          = "s",
    dst          = "d",
-   sizes        = "S"
+   sizes        = "S",
 }
 
+local function show_usage (code)
+   print(require("program.packetblaster.synth.README_inc"))
+   main.exit(code)
+end
+
 function run (args)
-   local opt = {}
-   local duration
    local c = config.new()
-   function opt.D (arg) 
-      duration = assert(tonumber(arg), "duration is not a number!")  
+   local handlers = {}
+   local opts = {}
+   function handlers.D (arg)
+      opts.duration = assert(tonumber(arg), "duration is not a number!")
    end
-   function opt.h (arg)
-      print(usage)
-      main.exit(1)
+   function handlers.h ()
+      show_usage(0)
    end
 
    local source
    local destination
    local sizes
-   function opt.s (arg) source = arg end
-   function opt.d (arg) destination = arg end
-   function opt.S (arg)
-     sizes = {}
-     for size in string.gmatch(arg, "%d+") do
-       sizes[#sizes+1] = tonumber(size)
-     end
+   function handlers.s (arg) source = arg end
+   function handlers.d (arg) destination = arg end
+   function handlers.S (arg)
+      sizes = {}
+      for size in string.gmatch(arg, "%d+") do
+         sizes[#sizes+1] = tonumber(size)
+      end
    end
 
-   args = lib.dogetopt(args, opt, "hD:s:d:S:", long_opts)
+   args = lib.dogetopt(args, handlers, "hD:s:d:S:", long_opts)
    config.app(c, "source", Synth, { sizes = sizes,
-     src = source, dst = destination })
-   packetblaster.run_loadgen(c, args, duration)
+      src = source, dst = destination })
+   packetblaster.run_loadgen(c, args, opts)
 end
