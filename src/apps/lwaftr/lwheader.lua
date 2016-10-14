@@ -1,19 +1,15 @@
 module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
-local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
-local ipv6 = require("lib.protocol.ipv6")
 local lib = require("core.lib")
-local lwutil = require("apps.lwaftr.lwutil")
 local lwtypes = require("apps.lwaftr.lwtypes")
 
 local cast = ffi.cast
 local bitfield = lib.bitfield
-local wr16, wr32 = lwutil.wr16, lwutil.wr32
 local ethernet_header_ptr_type = lwtypes.ethernet_header_ptr_type
 local ipv6_header_ptr_type = lwtypes.ipv6_header_ptr_type
-local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
+local htons = lib.htons
 
 -- Transitional header handling library.
 -- Over the longer term, something more lib.protocol-like has some nice advantages.

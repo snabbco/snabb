@@ -1,12 +1,12 @@
 module(..., package.seeall)
 
 local bit = require("bit")
-local band, bor, rshift = bit.band, bit.bor, bit.rshift
+local band, rshift = bit.band, bit.rshift
 
 function pp(t) for k,v in pairs(t) do print(k,v) end end
 
 function print_ethernet(addr)
-   chunks = {}
+   local chunks = {}
    for i = 0,5 do
       table.insert(chunks, string.format("%x", addr[i]))
    end
@@ -14,7 +14,7 @@ function print_ethernet(addr)
 end
 
 function print_ipv6(addr)
-   chunks = {}
+   local chunks = {}
    for i = 0,7 do
       table.insert(chunks, string.format("%x%x", addr[2*i], addr[2*i+1]))
    end

@@ -54,7 +54,7 @@ Made {breaths} breaths: {packets_per_breath} packets per breath; {breath_in_nano
 Rate(Mpps): {rate_mpps}
       ]], values))
    end
-   local function report_bench(input, name, engine, finish, start)
+   local function report_bench(input, name, finish, start)
       local breaths = tonumber(counter.read(engine.breaths))
       local bytes = input.txbytes
       -- Don't bother to report on interfaces that were boring
@@ -63,19 +63,19 @@ Rate(Mpps): {rate_mpps}
       local runtime = finish - start
       report(name, breaths, bytes, packets, runtime)
    end
-   local function reports(names, engine, finish, start)
+   local function reports(names, finish, start)
       for _, name in ipairs(names) do
          local parts = split(paths[name], ".")
          assert(#parts == 3, "Wrong path")
          local app_name, channel, direction = unpack(parts)
          local stats = link.stats(engine.app_table[app_name][channel][direction])
-         report_bench(stats, name, engine, finish, start)
+         report_bench(stats, name, finish, start)
       end
    end
    local start = C.get_monotonic_time()
    engine.main(params)
    local finish = C.get_monotonic_time()
-   reports({"nicv4-in","nicv6-in"}, engine, finish, start)
+   reports({"nicv4-in","nicv6-in"}, finish, start)
 end
 
 local function usage ()

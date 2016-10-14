@@ -1,5 +1,4 @@
 local ffi = require('ffi')
-local bit = require('bit')
 local phm = require("apps.lwaftr.podhashmap")
 local stream = require("apps.lwaftr.stream")
 

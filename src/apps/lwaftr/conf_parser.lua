@@ -10,6 +10,7 @@ Parser = {}
 
 function Parser.new(file)
    local name = file.name
+   local err
    if type(file) == 'string' then
       name = file
       file, err = io.open(file)
@@ -253,7 +254,7 @@ function Parser:parse_string_or_file()
       return str
    end
    -- Remove the angle bracket.
-   path = self:make_path(str:sub(2))
+   local path = self:make_path(str:sub(2))
    local filter, err = lib.readfile(path, "*a")
    if filter == nil then
       self:error('cannot read filter conf file "%s": %s', path, err)

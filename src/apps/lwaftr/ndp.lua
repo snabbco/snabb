@@ -199,7 +199,7 @@ local function write_sna(pkt, local_eth, is_router, soliciting_pkt, base_checksu
    local flags = 0x40 -- solicited
    -- don't support the override flag for now; TODO?
    if is_router then flags = flags + 0x80 end
-   option_type = option_target_link_layer_address
+   local option_type = option_target_link_layer_address
    write_ndp(pkt, local_eth, target_addr, i_type, flags, option_type)
 end
 
@@ -207,7 +207,7 @@ end
 -- Target address must be in the format that results from pton.
 local function write_ns(pkt, local_eth, target_addr)
    local i_type = icmpv6_ns -- RFC 4861 neighbor solicitation
-   option_type = option_source_link_layer_address
+   local option_type = option_source_link_layer_address
    write_ndp(pkt, local_eth, target_addr, i_type, 0, option_type)
 end
 
@@ -225,7 +225,7 @@ function form_ns(local_eth, local_ipv6, dst_ipv6)
    i:payload_length(ns_pkt.length)
    
    local ph = i:pseudo_header(ns_pkt.length, proto_icmpv6)
-   ph_len = ipv6_pseudoheader_size
+   local ph_len = ipv6_pseudoheader_size
    local base_checksum = checksum.ipsum(ffi.cast("uint8_t*", ph), ph_len, 0)
    local csum = checksum.ipsum(ns_pkt.data, ns_pkt.length, bit.bnot(base_checksum))
    wr16(ns_pkt.data + 2, C.htons(csum))
@@ -268,7 +268,7 @@ local function form_sna(local_eth, local_ipv6, is_router, soliciting_pkt)
    i:payload_length(na_pkt.length)
    
    local ph = i:pseudo_header(na_pkt.length, proto_icmpv6)
-   ph_len = ipv6_pseudoheader_size
+   local ph_len = ipv6_pseudoheader_size
    local base_checksum = checksum.ipsum(ffi.cast("uint8_t*", ph), ph_len, 0)
    local csum = checksum.ipsum(na_pkt.data, na_pkt.length, bit.bnot(base_checksum))
    wr16(na_pkt.data + 2, C.htons(csum))
@@ -283,9 +283,10 @@ end
 local function verify_icmp_checksum(pkt)
    local offset = ethernet_header_size + o_ipv6_payload_len
    local icmp_length = C.ntohs(rd16(pkt.data + offset))
-   ph_csum = checksum_pseudoheader_from_header(pkt.data + ethernet_header_size)
-   local a = checksum.ipsum(pkt.data + eth_ipv6_size, icmp_length, bit.bnot(ph_csum))
-   local raw_without_pseudo = checksum.ipsum(pkt.data + eth_ipv6_size, icmp_length, 0)
+   local ph_csum = checksum_pseudoheader_from_header(
+      pkt.data + ethernet_header_size)
+   local a = checksum.ipsum(pkt.data + eth_ipv6_size, icmp_length, bit.bnot(
+      ph_csum))
    return a == 0
 end
 
