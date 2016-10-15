@@ -141,11 +141,18 @@ function run(args)
 
    local vlan = conf.settings and conf.settings.vlan or false
 
+   local mtu = DEFAULT_MTU
+   if lwconf.ipv6_mtu then
+     mtu = lwconf.ipv6_mtu + 14
+   end
+   if lwconf.ipv4_mtu and lwconf.ipv4_mtu > lwconf.ipv6_mtu then
+     mtu = lwconf.ipv4_mtu + 14
+   end
    conf.interface = {
       mac_address = mac,
       pci = pci,
       id = id,
-      mtu = DEFAULT_MTU,
+      mtu = mtu,
       vlan = vlan,
       mirror_id = mirror_id,
    }

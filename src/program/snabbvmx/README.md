@@ -53,11 +53,11 @@ source, destination or within an IPv4-in-IPv6 packet.
 return {
    lwaftr = "snabbvmx-lwaftr.conf",
    ipv6_interface = {
-      mtu = 9500,
+     cache_refresh_interval = 1,
    },
    ipv4_interface = {
-      ipv4_address = "10.0.1.1",
-      mtu = 1460,
+     ipv4_address = "10.0.1.1",
+     cache_refresh_interval = 1,
    },
    settings = {
       vlan = false,
@@ -68,8 +68,9 @@ return {
 lwaftr points to Snabb's lwAFTR configuration file.
 
 Othe attributes are further refined by SnabbVMX.  Attributes `ipv6_interface`
-and `ipv4_interface` are mandatory and they should include the IP addresses
-of the correspondent lwAFTR IPv4 and IPv6 interfaces.
+and `ipv4_interface` are mandatory and ipv4_interface must include the IP addresses
+of the correspondent lwAFTR IPv4 interfaces. The IPv4 address is used to send matching
+packets to the VMX instead of trying to find a match in the binding table for encap.
 
 Attribute `settings` may include a `vlan` tag attribute, which can be either
 false in case VLAN tagging is not enabled or a VLAN tag number (0-4095).

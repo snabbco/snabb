@@ -22,11 +22,11 @@ Example config file:
 return {
    lwaftr = "snabbvmx-lwaftr-xe0.conf",
    ipv6_interface = {
-      mtu = 9500,
+     cache_refresh_interval = 1,
    },
    ipv4_interface = {
-      ipv4_address = "10.0.1.1",
-      mtu = 1460,
+     ipv4_address = "10.0.1.1",
+     cache_refresh_interval = 1,
    },
    settings = {},
 }
