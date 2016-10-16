@@ -14,6 +14,8 @@ local zone      = require("jit.zone")
 local jit       = require("jit")
 local ffi       = require("ffi")
 local C         = ffi.C
+local jitutil   = require("jit.util")
+local traceprofile = require("jit.traceprofile")
 require("core.packet_h")
 
 -- Packet per pull
@@ -268,6 +270,7 @@ function main (options)
       breathe = latency:wrap_thunk(breathe, now)
    end
 
+   traceprofile.start(1)
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
@@ -275,6 +278,7 @@ function main (options)
       if not busywait then pace_breathing() end
    until done and done()
    counter.commit()
+   traceprofile.stop()
    if not options.no_report then report(options.report) end
 end
 
@@ -306,6 +310,9 @@ function pace_breathing ()
 end
 
 function breathe ()
+   if math.random() < 0.0001 then
+      introspective_optimize()
+   end
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
@@ -432,6 +439,27 @@ function report_apps ()
             if not status then
                print("Warning: "..name.." threw an error during report: "..err)
             end
+         end
+      end
+   end
+end
+
+local maxtraces = 100000 -- XXX informal upper bound
+
+-- Check all LuaJIT traces for potential inefficiencies.
+--
+-- Heuristic: If a trace has a loop but spends less than 1/3 of its
+-- time in the looping part then it should be flushed and re-recorded.
+function introspective_optimize ()
+   for tr = 1, maxtraces do
+      local info = jitutil.traceinfo(tr)
+      -- Just consider looping root traces
+      if info and info.mcloop ~= 0 then
+         local nonloop, loop = traceprofile.tracestats(tr)
+         if nonloop > loop*2 then
+            print("flushing "..tr)
+            -- More than twice as much time in the non-loop? Suspicious.
+            jit.flush(tr)
          end
       end
    end
