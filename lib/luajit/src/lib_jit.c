@@ -635,6 +635,47 @@ static int luaopen_jit_profile(lua_State *L)
 
 #endif
 
+/* -- Trace profiling ----------------------------------------------------- */
+
+#ifdef LUAJIT_TRACEPROFILE
+
+#define LJLIB_MODULE_jit_traceprofile
+
+LJLIB_CF(jit_traceprofile_tracestats)
+{
+  GCtrace *T = jit_checktrace(L);
+  if (T) {
+    setint64V(L->top-1, T->prof.nonloop);
+    setint64V(L->top++, T->prof.loop);
+    setint64V(L->top++, T->prof.other);
+    return 3;
+  }
+  return 0;
+}
+
+LJLIB_CF(jit_traceprofile_start)
+{
+  int interval = lj_lib_checkint(L, 1);
+  luaJIT_traceprofile_start(L, interval);
+  return 0;
+}
+
+LJLIB_CF(jit_traceprofile_stop)
+{
+  luaJIT_traceprofile_stop(L);
+  return 0;
+}
+
+#include "lj_libdef.h"
+
+static int luaopen_jit_traceprofile(lua_State *L)
+{
+  LJ_LIB_REG(L, NULL, jit_traceprofile);
+  return 1;
+}
+
+#endif
+
 /* -- JIT compiler initialization ----------------------------------------- */
 
 #if LJ_HASJIT
@@ -769,6 +810,10 @@ LUALIB_API int luaopen_jit(lua_State *L)
 #if LJ_HASPROFILE
   lj_lib_prereg(L, LUA_JITLIBNAME ".profile", luaopen_jit_profile,
 		tabref(L->env));
+#endif
+#ifdef LUAJIT_TRACEPROFILE
+  lj_lib_prereg(L, LUA_JITLIBNAME ".traceprofile", luaopen_jit_traceprofile,
+  		tabref(L->env));
 #endif
 #ifndef LUAJIT_DISABLE_JITUTIL
   lj_lib_prereg(L, LUA_JITLIBNAME ".util", luaopen_jit_util, tabref(L->env));
