@@ -87,7 +87,10 @@ function load (file, pciaddr, sockpath, soft_bench)
       end
       if t.crypto and t.crypto.type == "esp-aes-128-gcm" then
          local Crypto = name.."_Crypto"
-         config.app(c, Crypto, AES128gcm, t.crypto)
+         config.app(c, Crypto, AES128gcm,
+                    {spi = t.crypto.spi,
+                     key = t.crypto.key,
+                     replay_window = t.crypto.replay_window})
          config.link(c, VM_tx.." -> "..Crypto..".decapsulated")
          config.link(c, Crypto..".decapsulated -> "..VM_rx)
          VM_rx, VM_tx = Crypto..".encapsulated", Crypto..".encapsulated"

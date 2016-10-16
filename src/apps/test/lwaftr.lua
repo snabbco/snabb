@@ -116,12 +116,29 @@ local function inc_ipv6(ipv6)
    return ipv6
 end
 
-Lwaftrgen = {}
+Lwaftrgen = {
+   config = {
+      sizes = {required=true},
+      dst_mac = {required=true},
+      src_mac = {required=true},
+      rate = {required=true},
+      vlan = {},
+      b4_ipv6 = {},
+      b4_ipv4 = {},
+      public_ipv4 = {},
+      aftr_ipv6 = {},
+      ipv6_only = {},
+      ipv4_only = {},
+      b4_port = {},
+      protocol = {},
+      count = {},
+      single_pass = {}
+   }
+}
 
 local receive, transmit = link.receive, link.transmit
 
-function Lwaftrgen:new(arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+function Lwaftrgen:new(conf)
    local dst_mac = ethernet:pton(conf.dst_mac)
    local src_mac = ethernet:pton(conf.src_mac)
    local vlan = conf.vlan
@@ -255,7 +272,7 @@ function Lwaftrgen:new(arg)
    return setmetatable(o, {__index=Lwaftrgen})
 end
 
-function Lwaftrgen:push ()
+function Lwaftrgen:pull ()
 
    local output = self.output.output
    local input = self.input.input
@@ -330,8 +347,10 @@ function Lwaftrgen:push ()
    self.bucket_content = self.bucket_content + self.rate * 1e6 * (cur_now - last_time)
    self.last_time = cur_now
 
-   while link.nwritable(output) > self.total_packet_count and
+   local limit = engine.pull_npackets
+   while limit > self.total_packet_count and
       self.total_packet_count <= self.bucket_content do
+      limit = limit - 1
       self.bucket_content = self.bucket_content - self.total_packet_count
 
       ipv4_hdr.dst_ip = self.b4_ipv4

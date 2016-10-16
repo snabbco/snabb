@@ -8,14 +8,16 @@ local esp = require("lib.ipsec.esp")
 local counter = require("core.counter")
 local C = require("ffi").C
 
-AES128gcm = {}
-
-local provided_counters = {
-   'type', 'dtime', 'txerrors', 'rxerrors'
+AES128gcm = {
+   config = {
+      spi = {required=true}, key = {required=true}, window_size = {}
+   },
+   shm = {
+      txerrors = {counter}, rxerrors = {counter}
+   }
 }
 
-function AES128gcm:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+function AES128gcm:new (conf)
    local self = {}
    self.encrypt = esp.esp_v6_encrypt:new{
       mode = "aes-128-gcm",
@@ -28,7 +30,6 @@ function AES128gcm:new (arg)
       keymat = conf.key:sub(1, 32),
       salt = conf.key:sub(33, 40),
       window_size = conf.replay_window}
-   self.shm = { txerrors = {counter}, rxerrors = {counter} }
    return setmetatable(self, {__index = AES128gcm})
 end
 

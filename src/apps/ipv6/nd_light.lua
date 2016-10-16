@@ -50,6 +50,24 @@ local lib = require("core.lib")
 
 nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
+nd_light.config = {
+   local_mac = {required=true},
+   local_ip = {required=true},
+   next_hop =  {required=true},
+   delay = {default=1000},
+   retrans = {}
+}
+nd_light.shm = {
+   status                   = {counter, 2}, -- Link down
+   rxerrors                 = {counter},
+   txerrors                 = {counter},
+   txdrop                   = {counter},
+   ns_checksum_errors       = {counter},
+   ns_target_address_errors = {counter},
+   na_duplicate_errors      = {counter},
+   na_target_address_errors = {counter},
+   nd_protocol_errors       = {counter}
+}
 
 -- config:
 --   local_mac  MAC address of the interface attached to "south".
@@ -79,12 +97,8 @@ local function check_ip_address(ip, desc)
    return ip
 end
 
-function nd_light:new (arg)
-   --copy the args to avoid changing the arg table so that it stays reusable.
-   local conf = arg and lib.deepcopy(config.parse_app_arg(arg)) or {}
+function nd_light:new (conf)
    local o = nd_light:superClass().new(self)
-   conf.delay = conf.delay or 1000
-   assert(conf.local_mac, "nd_light: missing local MAC address")
    if type(conf.local_mac) == "string" and string.len(conf.local_mac) ~= 6 then
       conf.local_mac = ethernet:pton(conf.local_mac)
    else
@@ -199,17 +213,6 @@ function nd_light:new (arg)
    }
    o._logger = lib.logger_new({ module = 'nd_light' })
 
-   -- Create counters
-   o.shm = { status                   = {counter, 2}, -- Link down
-             rxerrors                 = {counter},
-             txerrors                 = {counter},
-             txdrop                   = {counter},
-             ns_checksum_errors       = {counter},
-             ns_target_address_errors = {counter},
-             na_duplicate_errors      = {counter},
-             na_target_address_errors = {counter},
-             nd_protocol_errors       = {counter} }
-
    return o
 end
 
@@ -308,7 +311,7 @@ function nd_light:push ()
    local l_in = self.input.south
    local l_out = self.output.north
    local l_reply = self.output.south
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       local p = cache.p
       p[0] = link.receive(l_in)
       local status = from_south(self, p)
@@ -327,7 +330,7 @@ function nd_light:push ()
 
    l_in = self.input.north
    l_out = self.output.south
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       if not self._eth_header then
          -- Drop packets until ND for the next-hop
          -- has completed.

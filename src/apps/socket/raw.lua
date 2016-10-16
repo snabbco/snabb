@@ -12,13 +12,6 @@ local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local C = ffi.C
 
---ljsyscall returns error as a a cdata instead of a string,
---and the standard assert() doesn't use tostring() on it.
-local function assert(v, ...)
-   if not v then error(tostring(... or 'assertion failed'), 2) end
-   return v, ...
-end
-
 local c, t = S.c, S.types.t
 
 RawSocket = {}
@@ -58,7 +51,9 @@ end
 function RawSocket:pull ()
    local l = self.output.tx
    if l == nil then return end
-   while not link.full(l) and self:can_receive() do
+   local limit = engine.pull_npackets
+   while limit > 0 and self:can_receive() do
+      limit = limit - 1
       link.transmit(l, self:receive())
    end
 end
