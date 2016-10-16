@@ -3,7 +3,7 @@
 ** AA: Alias Analysis using high-level semantic disambiguation.
 ** FWD: Load Forwarding (L2L) + Store Forwarding (S2L).
 ** DSE: Dead-Store Elimination.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2016 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_opt_mem_c
@@ -22,8 +22,8 @@
 /* Some local macros to save typing. Undef'd at the end. */
 #define IR(ref)		(&J->cur.ir[(ref)])
 #define fins		(&J->fold.ins)
-#define fleft		(&J->fold.left)
-#define fright		(&J->fold.right)
+#define fleft		(J->fold.left)
+#define fright		(J->fold.right)
 
 /*
 ** Caveat #1: return value is not always a TRef -- only use with tref_ref().

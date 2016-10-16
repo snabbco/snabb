@@ -1,6 +1,6 @@
 /*
 ** Garbage collector.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2016 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2008 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -238,6 +238,8 @@ static void gc_traverse_trace(global_State *g, GCtrace *T)
     IRIns *ir = &T->ir[ref];
     if (ir->o == IR_KGC)
       gc_markobj(g, ir_kgc(ir));
+    if (irt_is64(ir->t) && ir->o != IR_KNULL)
+      ref++;
   }
   if (T->link) gc_marktrace(g, T->link);
   if (T->nextroot) gc_marktrace(g, T->nextroot);
@@ -308,7 +310,7 @@ static size_t propagatemark(global_State *g)
     if (gc_traverse_tab(g, t) > 0)
       black2gray(o);  /* Keep weak tables gray. */
     return sizeof(GCtab) + sizeof(TValue) * t->asize +
-			   sizeof(Node) * (t->hmask + 1);
+			   (t->hmask ? sizeof(Node) * (t->hmask + 1) : 0);
   } else if (LJ_LIKELY(gct == ~LJ_TFUNC)) {
     GCfunc *fn = gco2func(o);
     gc_traverse_func(g, fn);

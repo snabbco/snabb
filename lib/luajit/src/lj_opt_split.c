@@ -1,6 +1,6 @@
 /*
 ** SPLIT: Split 64 bit IR instructions into 32 bit IR instructions.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2016 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_opt_split_c
@@ -16,6 +16,7 @@
 #include "lj_jit.h"
 #include "lj_ircall.h"
 #include "lj_iropt.h"
+#include "lj_dispatch.h"
 #include "lj_vm.h"
 
 /* SPLIT pass:
@@ -192,7 +193,7 @@ static IRRef split_ptr(jit_State *J, IRIns *oir, IRRef ref)
     nref = ir->op1;
     if (ofs == 0) return nref;
   }
-  return split_emit(J, IRTI(IR_ADD), nref, lj_ir_kint(J, ofs));
+  return split_emit(J, IRT(IR_ADD, IRT_PTR), nref, lj_ir_kint(J, ofs));
 }
 
 #if LJ_HASFFI
@@ -353,6 +354,8 @@ static void split_ir(jit_State *J)
       ir->prev = ref;  /* Identity substitution for loword. */
       hisubst[ref] = 0;
     }
+    if (irt_is64(ir->t) && ir->o != IR_KNULL)
+      ref++;
   }
 
   /* Process old IR instructions. */
@@ -448,15 +451,24 @@ static void split_ir(jit_State *J)
       case IR_STRTO:
 	hi = split_emit(J, IRT(IR_HIOP, IRT_SOFTFP), nref, nref);
 	break;
+      case IR_FLOAD:
+	lua_assert(ir->op1 == REF_NIL);
+	hi = lj_ir_kint(J, *(int32_t*)((char*)J2GG(J) + ir->op2 + LJ_LE*4));
+	nir->op2 += LJ_BE*4;
+	break;
       case IR_XLOAD: {
 	IRIns inslo = *nir;  /* Save/undo the emit of the lo XLOAD. */
 	J->cur.nins--;
 	hi = split_ptr(J, oir, ir->op1);  /* Insert the hiref ADD. */
+#if LJ_BE
+	hi = split_emit(J, IRT(IR_XLOAD, IRT_INT), hi, ir->op2);
+	inslo.t.irt = IRT_SOFTFP | (inslo.t.irt & IRT_GUARD);
+#endif
 	nref = lj_ir_nextins(J);
 	nir = IR(nref);
-	*nir = inslo;  /* Re-emit lo XLOAD immediately before hi XLOAD. */
-	hi = split_emit(J, IRT(IR_XLOAD, IRT_SOFTFP), hi, ir->op2);
+	*nir = inslo;  /* Re-emit lo XLOAD. */
 #if LJ_LE
+	hi = split_emit(J, IRT(IR_XLOAD, IRT_SOFTFP), hi, ir->op2);
 	ir->prev = nref;
 #else
 	ir->prev = hi; hi = nref;
