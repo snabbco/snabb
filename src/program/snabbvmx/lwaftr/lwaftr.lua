@@ -6,6 +6,7 @@ local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
+local constants = require("apps.lwaftr.constants")
 local setup = require("program.snabbvmx.lwaftr.setup")
 local shm = require("core.shm")
 
@@ -143,10 +144,14 @@ function run(args)
 
    local mtu = DEFAULT_MTU
    if lwconf.ipv6_mtu then
-     mtu = lwconf.ipv6_mtu + 14
+     mtu = lwconf.ipv6_mtu 
    end
    if lwconf.ipv4_mtu and lwconf.ipv4_mtu > lwconf.ipv6_mtu then
-     mtu = lwconf.ipv4_mtu + 14
+     mtu = lwconf.ipv4_mtu
+   end
+   mtu = mtu + constants.ethernet_header_size
+   if lwconf.vlan_tagging then
+     mtu = mtu + 4
    end
    conf.interface = {
       mac_address = mac,
