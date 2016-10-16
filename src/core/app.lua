@@ -310,9 +310,6 @@ function pace_breathing ()
 end
 
 function breathe ()
-   if math.random() < 0.0001 then
-      introspective_optimize()
-   end
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
@@ -350,6 +347,7 @@ function breathe ()
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
+   introspective_optimize()
 end
 
 function report (options)
@@ -444,6 +442,7 @@ function report_apps ()
    end
 end
 
+local next_optimize
 local maxtraces = 100000 -- XXX informal upper bound
 
 -- Check all LuaJIT traces for potential inefficiencies.
@@ -451,17 +450,37 @@ local maxtraces = 100000 -- XXX informal upper bound
 -- Heuristic: If a trace has a loop but spends less than 1/3 of its
 -- time in the looping part then it should be flushed and re-recorded.
 function introspective_optimize ()
+   if next_optimize == nil then
+      next_optimize = monotonic_now
+   elseif monotonic_now >= next_optimize then
+      audit_traceprofile()
+      next_optimize = monotonic_now + 1.0
+   end
+end
+   
+function audit_traceprofile ()
+   local nonloop_total = 0
+   local loop_total = 0
+   local ffi_total = 0
    for tr = 1, maxtraces do
       local info = jitutil.traceinfo(tr)
       -- Just consider looping root traces
       if info and info.mcloop ~= 0 then
-         local nonloop, loop = traceprofile.tracestats(tr)
-         if nonloop > loop*2 then
-            print("flushing "..tr)
-            -- More than twice as much time in the non-loop? Suspicious.
-            jit.flush(tr)
+         local nonloop, loop, ffi = traceprofile.tracestats(tr)
+         if (loop+nonloop > 100) and (nonloop > loop*2) then
+            -- Suspicious trace: has used a significant amount of CPU
+            -- and less than a third of its time spent in the loop.
+            print(("[flushing trace %d: low loop intensity (%d%%)]"):format(
+                  tr, 100*loop/(loop+nonloop)))
          end
+         nonloop_total = nonloop_total + nonloop
+         loop_total = loop_total + loop
       end
+   end
+   if loop_total > 0 and nonloop_total > 0 then
+      local total = nonloop_total + loop_total + ffi_total
+      print(("[trace profile: %5.1f%% loop; %5.1f%% head; %5.1f%% foreign]"):format(
+            100*loop_total/total, 100*nonloop_total/total, 100*ffi_total/total))
    end
 end
 
