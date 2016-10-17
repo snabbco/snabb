@@ -127,7 +127,7 @@ function is_arp_request(p)
 end
 
 -- ARP does a 'who has' request, and the reply is in the *source* fields
-function get_isat_ethernet(arp_p, dst_ipv4)
+function get_isat_ethernet(arp_p)
    if not is_arp_reply(arp_p) then return nil end
    local eth_addr = ffi.new("uint8_t[?]", 6)
    ffi.copy(eth_addr, arp_p.data + ethernet_header_size + o_sha, 6)

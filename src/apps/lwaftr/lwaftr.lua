@@ -8,30 +8,23 @@ local lwconf = require("apps.lwaftr.conf")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
-local lwcounter = require("apps.lwaftr.lwcounter")
 
 local channel = require("apps.lwaftr.channel")
 local messages = require("apps.lwaftr.messages")
 
 local checksum = require("lib.checksum")
 local ethernet = require("lib.protocol.ethernet")
-local ipv6 = require("lib.protocol.ipv6")
-local ipv4 = require("lib.protocol.ipv4")
 local counter = require("core.counter")
 local packet = require("core.packet")
 local lib = require("core.lib")
 local bit = require("bit")
-local ffi = require("ffi")
 
-local band, bor, bnot = bit.band, bit.bor, bit.bnot
+local band, bnot = bit.band, bit.bnot
 local rshift, lshift = bit.rshift, bit.lshift
-local cast = ffi.cast
 local receive, transmit = link.receive, link.transmit
 local rd16, wr16, rd32, ipv6_equals = lwutil.rd16, lwutil.wr16, lwutil.rd32, lwutil.ipv6_equals
 local is_ipv4, is_ipv6 = lwutil.is_ipv4, lwutil.is_ipv6
-local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
-local keys = lwutil.keys
+local htons, ntohs, ntohl = lib.htons, lib.ntohs, lib.ntohl
 local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.write_ipv6_header
 local is_ipv4_fragment, is_ipv6_fragment = lwutil.is_ipv4_fragment, lwutil.is_ipv6_fragment
 
@@ -47,7 +40,6 @@ local debug = lib.getenv("LWAFTR_DEBUG")
 local ethernet_header_size = constants.ethernet_header_size
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
 local n_ethertype_ipv6 = constants.n_ethertype_ipv6
-local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
 
 local function get_ethernet_payload(pkt)
    return pkt.data + ethernet_header_size
@@ -60,12 +52,10 @@ local o_ipv4_checksum = constants.o_ipv4_checksum
 local o_ipv4_dscp_and_ecn = constants.o_ipv4_dscp_and_ecn
 local o_ipv4_dst_addr = constants.o_ipv4_dst_addr
 local o_ipv4_flags = constants.o_ipv4_flags
-local o_ipv4_identification = constants.o_ipv4_identification
 local o_ipv4_proto = constants.o_ipv4_proto
 local o_ipv4_src_addr = constants.o_ipv4_src_addr
 local o_ipv4_total_length = constants.o_ipv4_total_length
 local o_ipv4_ttl = constants.o_ipv4_ttl
-local o_ipv4_ver_and_ihl = constants.o_ipv4_ver_and_ihl
 
 local function get_ipv4_header_length(ptr)
    local ver_and_ihl = ptr[0]
@@ -299,7 +289,7 @@ end
 
 local function decrement_ttl(pkt)
    local ipv4_header = get_ethernet_payload(pkt)
-   local checksum = bnot(ntohs(rd16(ipv4_header + o_ipv4_checksum)))
+   local chksum = bnot(ntohs(rd16(ipv4_header + o_ipv4_checksum)))
    local old_ttl = ipv4_header[o_ipv4_ttl]
    if old_ttl == 0 then return 0 end
    local new_ttl = band(old_ttl - 1, 0xff)
@@ -307,13 +297,13 @@ local function decrement_ttl(pkt)
    -- Now fix up the checksum.  o_ipv4_ttl is the first byte in the
    -- 16-bit big-endian word, so the difference to the overall sum is
    -- multiplied by 0xff.
-   checksum = checksum + lshift(new_ttl - old_ttl, 8)
+   chksum = chksum + lshift(new_ttl - old_ttl, 8)
    -- Now do the one's complement 16-bit addition of the 16-bit words of
    -- the checksum, which necessarily is a 32-bit value.  Two carry
    -- iterations will suffice.
-   checksum = band(checksum, 0xffff) + rshift(checksum, 16)
-   checksum = band(checksum, 0xffff) + rshift(checksum, 16)
-   wr16(ipv4_header + o_ipv4_checksum, htons(bnot(checksum)))
+   chksum = band(chksum, 0xffff) + rshift(chksum, 16)
+   chksum = band(chksum, 0xffff) + rshift(chksum, 16)
+   wr16(ipv4_header + o_ipv4_checksum, htons(bnot(chksum)))
    return new_ttl
 end
 
@@ -332,11 +322,6 @@ local function binding_lookup_ipv4(lwstate, ipv4_ip, port)
       print("Nothing found for ipv4:port", lwdebug.format_ipv4(ipv4_ip),
       string.format("%i (0x%x)", port, port))
    end
-end
-
-local function in_binding_table(lwstate, ipv6_src_ip, ipv6_dst_ip, ipv4_src_ip, ipv4_src_port)
-   local b4, br = binding_lookup_ipv4(lwstate, ipv4_src_ip, ipv4_src_port)
-   return b4 and ipv6_equals(b4, ipv6_src_ip) and ipv6_equals(br, ipv6_dst_ip)
 end
 
 -- Hairpinned packets need to be handled quite carefully. We've decided they:
@@ -861,7 +846,7 @@ function LwAftr:push ()
       end
    end
 
-   for _=1,link.nreadable(i6) do
+   for _ = 1, link.nreadable(i6) do
       -- Decapsulate incoming IPv6 packets from the B4 interface and
       -- push them out the V4 link, unless they need hairpinning, in
       -- which case enqueue them on the hairpinning incoming link.
@@ -881,7 +866,7 @@ function LwAftr:push ()
    end
    flush_decapsulation(self)
 
-   for _=1,link.nreadable(i4) do
+   for _ = 1, link.nreadable(i4) do
       -- Encapsulate incoming IPv4 packets, excluding hairpinned
       -- packets.  Drop anything that's not IPv4.
       local pkt = receive(i4)
@@ -900,7 +885,7 @@ function LwAftr:push ()
    end
    flush_encapsulation(self)
 
-   for _=1,link.nreadable(ih) do
+   for _ = 1, link.nreadable(ih) do
       -- Encapsulate hairpinned packet.
       local pkt = receive(ih)
       -- To reach this link, it has to have come through the lwaftr, so it

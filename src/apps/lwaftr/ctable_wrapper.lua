@@ -45,7 +45,7 @@ function new(params)
    return ctab
 end
 
-function selftest(params)
+function selftest()
    local ffi = require("ffi")
    local hash_32 = ctable.hash_32
 

@@ -6,7 +6,6 @@ local lwutil = require("apps.lwaftr.lwutil")
 
 local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
-local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 
@@ -16,10 +15,10 @@ local lib = require("core.lib")
 
 local band, bnot = bit.band, bit.bnot
 local C = ffi.C
-local rd16, wr16, wr32 = lwutil.rd16, lwutil.wr16, lwutil.wr32
+local wr16, wr32 = lwutil.wr16, lwutil.wr32
 local is_ipv4, is_ipv6 = lwutil.is_ipv4, lwutil.is_ipv6
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local htons, htonl, ntohs, ntohl = lib.htons, lib.htonl, lib.ntohs, lib.ntohl
+local htons, ntohs = lib.htons, lib.ntohs
 local write_eth_header = lwheader.write_eth_header
 
 local proto_icmp = constants.proto_icmp
@@ -134,7 +133,7 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config
    local ph_len = calculate_payload_size(new_pkt, initial_pkt, max_size, config) + constants.icmp_base_size
    local ph = ipv6_header:pseudo_header(ph_len, constants.proto_icmpv6)
    local ph_csum = checksum.ipsum(ffi.cast("uint8_t*", ph), ffi.sizeof(ph), 0)
-   local ph_csum = band(bnot(ph_csum), 0xffff)
+   ph_csum = band(bnot(ph_csum), 0xffff)
    write_icmp(new_pkt, initial_pkt, max_size, ph_csum, config)
 
    local new_ipv6_len = new_pkt.length - (constants.ipv6_fixed_header_size + ehs)

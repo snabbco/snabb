@@ -39,7 +39,6 @@ local udp_header_ptr_type = lwtypes.udp_header_ptr_type
 
 local ipv4_header_size = lwtypes.ipv4_header_size
 local ipv6_header_size = lwtypes.ipv6_header_size
-local udp_header_size = lwtypes.udp_header_size
 
 local IPV4_DSCP_AND_ECN_OFFSET = 1
 local PROTO_IPV4 = C.htons(0x0800)
@@ -109,8 +108,7 @@ end
 function ipv4_packet(params)
    local p = packet.allocate()
 
-   local ether_hdr = cast(ethernet_header_ptr_type, p.data)
-   local ethernet_header_size
+   local ether_hdr, ethernet_header_size
    if params.vlan_tag then
       ether_hdr = cast(ethernet_vlan_header_ptr_type, p.data)
       ether_hdr.vlan.tpid = VLAN_TPID
@@ -149,7 +147,7 @@ end
 function from_inet:pull()
    local o = assert(self.output.output)
 
-   for i=1,engine.pull_npackets do
+   for _ = 1, engine.pull_npackets do
       if self.max_packets then
          if self.tx_packets == self.max_packets then break end
          self.tx_packets = self.tx_packets + 1
@@ -305,6 +303,7 @@ function ipv6_encapsulate(ipv4_pkt, params)
    packet.shiftright(p, ipv6_header_size)
 
    -- IPv6 packet is tagged
+   local eth_hdr
    if params.vlan_tag then
       eth_hdr = cast(ethernet_vlan_header_ptr_type, p.data)
       eth_hdr.vlan.tag = params.vlan_tag
@@ -335,7 +334,7 @@ end
 function from_b4:pull()
    local o = assert(self.output.output)
 
-   for i=1,engine.pull_npackets do
+   for _ = 1, engine.pull_npackets do
       if self.max_packets then
          if self.tx_packets == self.max_packets then break end
          self.tx_packets = self.tx_packets + 1
@@ -360,12 +359,14 @@ function from_b4:new_packet()
    ipv6_hdr.src_ip = self.src_ipv6
    -- Set tunneled IPv4 source address
    local ipv6_payload = ethernet_header_size + ipv6_header_size
+   local ipv4_hdr
    ipv4_hdr = cast(ipv4_header_ptr_type, ipv6.data + ipv6_payload)
    ipv4_hdr.src_ip = self.src_ipv4
    ipv4_hdr.checksum =  0
    ipv4_hdr.checksum = C.htons(ipsum(ipv6.data + ipv6_payload,
       ipv4_header_size, 0))
    -- Set tunneled IPv4 source port
+   local udp_hdr
    udp_hdr = cast(udp_header_ptr_type, ipv6.data + (ipv6_payload + ipv4_header_size))
    udp_hdr.src_port = C.htons(self.src_portv4)
 

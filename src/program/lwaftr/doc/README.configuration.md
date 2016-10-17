@@ -1,6 +1,9 @@
 # Configuration
 
-The lwAFTR is configured by a text file.  Here's an example:
+The lwAFTR is configured by a text file. Where applicable, default values can
+be found in [the code](../../../../apps/lwaftr/conf.lua#L72).
+
+Here's an example:
 
 ```
 aftr_ipv4_ip = 10.10.10.10
@@ -18,6 +21,9 @@ icmpv6_rate_limiter_n_seconds=4
 inet_mac = 68:68:68:68:68:68
 ipv4_mtu = 1460
 ipv6_mtu = 1500
+max_fragments_per_reassembly_packet = 1,
+max_ipv6_reassembly_packets = 10,
+max_ipv4_reassembly_packets = 10,
 policy_icmpv4_incoming = ALLOW
 policy_icmpv6_incoming = ALLOW
 policy_icmpv4_outgoing = ALLOW
@@ -124,6 +130,19 @@ ipv6_mtu = 1500
 The MTU settings are used to determine whether a packet needs to be
 fragmented.  The current MTU handling is otherwise underdeveloped.  It
 is not dynamically updated on receiving ICMP packet too big messages.
+
+### Packet reassembly
+
+```
+max_fragments_per_reassembly_packet = 1,
+max_ipv6_reassembly_packets = 10,
+max_ipv4_reassembly_packets = 10,
+```
+
+A packet might be split into several fragments, from which it will be
+reassembled. The maximum allowed number of fragments per packet can be set.
+The maximum simultaneous number of packets undergoing reassembly can also be
+set separately for IPv4 and IPv6.
 
 ### ICMP handling policies
 

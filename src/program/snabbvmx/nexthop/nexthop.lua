@@ -4,7 +4,10 @@ local S = require("syscall")
 local ethernet = require("lib.protocol.ethernet")
 local ffi = require("ffi")
 local lib = require("core.lib")
+local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
+
+local file_exists = lwutil.file_exists
 
 local macaddress_t = ffi.typeof[[
 struct { uint8_t ether[6]; }
@@ -17,12 +20,6 @@ local long_opts = {
 local function usage (code)
    print(require("program.snabbvmx.nexthop.README_inc"))
    main.exit(code)
-end
-
--- TODO: Refactor to a general common purpose library.
-local function file_exists(path)
-   local stat = S.stat(path)
-   return stat and stat.isreg
 end
 
 local function parse_args (args)
