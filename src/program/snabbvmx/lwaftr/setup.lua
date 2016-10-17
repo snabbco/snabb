@@ -13,6 +13,7 @@ local lib = require("core.lib")
 local lwaftr = require("apps.lwaftr.lwaftr")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local lwutil = require("apps.lwaftr.lwutil")
+local constants = require("apps.lwaftr.constants")
 local nh_fwd = require("apps.lwaftr.nh_fwd")
 local pci = require("lib.hardware.pci")
 local raw = require("apps.socket.raw")
@@ -48,20 +49,30 @@ local function load_virt (c, nic_id, lwconf, interface)
    }
 
    local v4_nic_name, v6_nic_name = nic_id..'_v4', nic_id..'v6'
+   local v4_mtu = lwconf.ipv4_mtu + constants.ethernet_header_size
+   if lwconf.vlan_tagging and lwconf.v4_vlan_tag then
+     v4_mtu = v4_mtu + 4
+   end
+   print(("Setting %s interface MTU to %d"):format(v4_nic_name, v4_mtu))
    config.app(c, v4_nic_name, driver, {
       pciaddr = interface.pci,
       vmdq = lwconf.vlan_tagging,
       vlan = lwconf.vlan_tagging and lwconf.v4_vlan_tag,
       qprdc = qprdc,
       macaddr = ethernet:ntop(lwconf.aftr_mac_inet_side),
-      mtu = interface.mtu})
+      mtu = v4_mtu })
+   local v6_mtu = lwconf.ipv6_mtu + constants.ethernet_header_size
+   if lwconf.vlan_tagging and lwconf.v6_vlan_tag then
+     v6_mtu = v6_mtu + 4
+   end
+   print(("Setting %s interface MTU to %d"):format(v6_nic_name, v6_mtu))
    config.app(c, v6_nic_name, driver, {
       pciaddr = interface.pci,
       vmdq = lwconf.vlan_tagging,
       vlan = lwconf.vlan_tagging and lwconf.v6_vlan_tag,
       qprdc = qprdc,
       macaddr = ethernet:ntop(lwconf.aftr_mac_b4_side),
-      mtu = interface.mtu})
+      mtu = v6_mtu})
 
    return v4_nic_name, v6_nic_name
 end
@@ -74,7 +85,7 @@ local function load_phy (c, nic_id, interface)
    if nic_exists(interface.pci) then
       local driver = load_driver(interface.pci)
       local vlan = interface.vlan and tonumber(interface.vlan)
-      print(("%s ether %s"):format(nic_id, interface.mac_address))
+      print(("%s network ether %s mtu %d"):format(nic_id, interface.mac_address, interface.mtu))
       if vlan then
          print(("%s vlan %d"):format(nic_id, vlan))
       end
@@ -86,7 +97,7 @@ local function load_phy (c, nic_id, interface)
          mtu = interface.mtu})
       chain_input, chain_output = nic_id .. ".rx", nic_id .. ".tx"
    elseif net_exists(interface.pci) then
-      print(("%s network interface %s"):format(nic_id, interface.pci))
+      print(("%s network interface %s mtu %d"):format(nic_id, interface.pci, interface.mtu))
       if vlan then
          print(("WARNING: VLAN not supported over %s. %s vlan %d"):format(interface.pci, nic_id, vlan))
       end
