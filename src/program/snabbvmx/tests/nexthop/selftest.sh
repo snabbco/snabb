@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+SKIPPED_CODE=43
+
 if [[ $EUID != 0 ]]; then
     echo "This script must be run as root"
     exit 1
