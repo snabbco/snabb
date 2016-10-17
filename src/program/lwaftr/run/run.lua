@@ -70,13 +70,6 @@ function parse_args(args)
    end
    function handlers.r (arg)
       ring_buffer_size = tonumber(arg)
-      if not ring_buffer_size then fatal("bad ring size: " .. arg) end
-      if ring_buffer_size > 32*1024 then
-         fatal("ring size too large for hardware: " .. ring_buffer_size)
-      end
-      if math.log(ring_buffer_size)/math.log(2) % 1 ~= 0 then
-         fatal("ring size is not a power of two: " .. arg)
-      end
    end
    handlers["on-a-stick"] = function(arg)
       opts["on-a-stick"] = true
@@ -102,7 +95,7 @@ function parse_args(args)
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
       end
-      require('apps.intel.intel10g').num_descriptors = ring_buffer_size
+      require("apps.intel.intel10g").ring_buffer_size(ring_buffer_size)
    end
    if not conf_file then fatal("Missing required --conf argument.") end
    if opts.mirror then
