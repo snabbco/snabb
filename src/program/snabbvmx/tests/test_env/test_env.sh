@@ -19,7 +19,6 @@ export SNABBVMX_DIR=program/snabbvmx
 export PCAP_INPUT=$SNABBVMX_DIR/tests/pcap/input
 export PCAP_OUTPUT=$SNABBVMX_DIR/tests/pcap/output
 export SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr-vlan.cfg
-export TCPREPLAY_SCRIPT=$SNABBVMX_DIR/tests/scripts/tcpreplay.lua
 export SNABBVMX_ID=xe1
 export SNABB_TELNET0=5000
 export VHU_SOCK0=/tmp/vh1a.sock
