@@ -1,12 +1,13 @@
 module(..., package.seeall)
 
 local config = require("core.config")
+local constants = require("apps.lwaftr.constants")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
+local intel10g = require("apps.intel.intel10g")
 local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
-local constants = require("apps.lwaftr.constants")
 local setup = require("program.snabbvmx.lwaftr.setup")
 local shm = require("core.shm")
 
@@ -17,11 +18,6 @@ local DEFAULT_MTU = 9500
 local function show_usage (exit_code)
    print(require("program.snabbvmx.lwaftr.README_inc"))
    main.exit(exit_code)
-end
-
-local function set_ring_buffer_size(ring_buffer_size)
-   print(("Ring buffer size set to %d"):format(ring_buffer_size))
-   require('apps.intel.intel10g').num_descriptors = ring_buffer_size
 end
 
 function parse_args (args)
@@ -119,21 +115,9 @@ function run(args)
       if conf.settings.ingress_drop_wait then
          ingress_drop_wait = conf.settings.ingress_drop_wait
       end
-      if conf.settings.ring_buffer_size then
-         ring_buffer_size = tonumber(conf.settings.ring_buffer_size)
-         if not ring_buffer_size then
-            fatal("Bad ring size: " .. conf.settings.ring_buffer_size)
-         end
-         if ring_buffer_size > 32*1024 then
-            fatal("Ring size too large for hardware: " .. ring_buffer_size)
-         end
-         if math.log(ring_buffer_size)/math.log(2) % 1 ~= 0 then
-            fatal("Ring size is not a power of two: " .. ring_buffer_size)
-         end
-      end
    end
 
-   set_ring_buffer_size(ring_buffer_size)
+   intel10g.ring_buffer_size(ring_buffer_size)
 
    if id then
       local lwaftr_id = shm.create("nic/id", lwtypes.lwaftr_id_type)
