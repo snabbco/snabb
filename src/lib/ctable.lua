@@ -263,11 +263,9 @@ end
 function CTable:remove_ptr(entry)
    local scale = self.scale
    local index = entry - self.entries
-   assert(index >= 0, "Ctab: index must be >= 0.")
-   assert(index <= self.size + self.max_displacement,
-      string.format("Ctab: bad index %s, should be at most %s.",
-         index, self.size + self.max_displacement))
-   assert(entry.hash ~= HASH_MAX, "Ctab: entry hash must not be HASH_MAX.")
+   assert(index >= 0)
+   assert(index <= self.size + self.max_displacement)
+   assert(entry.hash ~= HASH_MAX)
 
    self.occupancy = self.occupancy - 1
    entry.hash = HASH_MAX
