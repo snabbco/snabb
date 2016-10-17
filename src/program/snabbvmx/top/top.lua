@@ -27,12 +27,12 @@ local function select_snabb_instance_by_id (target_id)
          end
       end
    end
-   print("Couldn't find instance with id '%s'"):format(target_id)
+   print(("Couldn't find instance with id '%s'"):format(target_id))
    main.exit(1)
 end
 
 local function select_snabb_instance (id)
-   if tonumber(id) then
+   if not id or tonumber(id) then
       return top.select_snabb_instance(id)
    else
       return select_snabb_instance_by_id(id)
