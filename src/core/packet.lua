@@ -169,6 +169,7 @@ function from_string (d)         return from_pointer(d, #d) end
 local function free_internal (p)
    local ptr = ffi.cast("char*", p)
    p = ffi.cast(packet_ptr_t, ptr - get_headroom(ptr) + default_headroom)
+   p.length = 0
    freelist_add(packets_fl, p)
 end   
 
@@ -228,13 +229,13 @@ function selftest ()
       free(p)
       -- Check that the last packet added to the free list has the
       -- default headroom.
-      local p = new_packet()
+      local p = allocate()
       assert(get_headroom(p) == default_headroom)
       free(p)
    end
 
    local function check_shift(init_len, shift, amount, len, headroom)
-      local p = new_packet()
+      local p = allocate()
       p.length = init_len
       p = shift(p, amount)
       assert(p.length == len)
