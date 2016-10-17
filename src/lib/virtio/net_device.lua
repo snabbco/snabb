@@ -10,12 +10,11 @@ local link      = require("core.link")
 local memory    = require("core.memory")
 local packet    = require("core.packet")
 local timer     = require("core.timer")
-local vq        = require("lib.virtio.virtq_device")
+local VirtioVirtq = require("lib.virtio.virtq_device")
 local checksum  = require("lib.checksum")
 local ffi       = require("ffi")
 local C         = ffi.C
 local band      = bit.band
-local get_buffers = vq.VirtioVirtq.get_buffers
 
 require("lib.virtio.virtio.h")
 require("lib.virtio.virtio_vring_h")
@@ -53,7 +52,6 @@ local invalid_header_id = 0xffff
 
 --]]
 local supported_features = C.VIRTIO_F_ANY_LAYOUT +
-                           C.VIRTIO_RING_F_INDIRECT_DESC +
                            C.VIRTIO_NET_F_CTRL_VQ +
                            C.VIRTIO_NET_F_MQ +
                            C.VIRTIO_NET_F_CSUM
@@ -69,7 +67,7 @@ local max_virtq_pairs = 16
 
 VirtioNetDevice = {}
 
-function VirtioNetDevice:new(owner, disable_mrg_rxbuf)
+function VirtioNetDevice:new(owner, disable_mrg_rxbuf, disable_indirect_desc)
    assert(owner)
    local o = {
       owner = owner,
@@ -89,10 +87,10 @@ function VirtioNetDevice:new(owner, disable_mrg_rxbuf)
 
    for i = 0, max_virtq_pairs-1 do
       -- TXQ
-      o.virtq[2*i] = vq.VirtioVirtq:new()
+      o.virtq[2*i] = VirtioVirtq:new()
       o.virtq[2*i].device = o
       -- RXQ
-      o.virtq[2*i+1] = vq.VirtioVirtq:new()
+      o.virtq[2*i+1] = VirtioVirtq:new()
       o.virtq[2*i+1].device = o
    end
 
@@ -100,10 +98,15 @@ function VirtioNetDevice:new(owner, disable_mrg_rxbuf)
    self.hdr_type = virtio_net_hdr_type
    self.hdr_size = virtio_net_hdr_size
 
-   if disable_mrg_rxbuf then
-      self.supported_features = supported_features
-   else
-      self.supported_features = supported_features + C.VIRTIO_NET_F_MRG_RXBUF
+   self.supported_features = supported_features
+
+   if not disable_mrg_rxbuf then
+      self.supported_features = self.supported_features
+         + C.VIRTIO_NET_F_MRG_RXBUF
+   end
+   if not disable_indirect_desc then
+      self.supported_features = self.supported_features
+         + C.VIRTIO_RING_F_INDIRECT_DESC
    end
 
    return o
@@ -125,7 +128,7 @@ function VirtioNetDevice:receive_packets_from_vm ()
    for i = 0, self.virtq_pairs-1 do
       self.ring_id = 2*i+1
       local virtq = self.virtq[self.ring_id]
-      get_buffers(virtq, 'rx', ops, self.hdr_size)
+      virtq:get_buffers('rx', ops, self.hdr_size)
    end
 end
 
@@ -202,7 +205,7 @@ function VirtioNetDevice:transmit_packets_to_vm ()
    for i = 0, self.virtq_pairs-1 do
       self.ring_id = 2*i
       local virtq = self.virtq[self.ring_id]
-      get_buffers(virtq, 'tx', ops, self.hdr_size)
+      virtq:get_buffers('tx', ops, self.hdr_size)
    end
 end
 
@@ -267,7 +270,11 @@ function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
       if link.empty(l) then return end
       tx_p = link.receive(l)
 
-      tx_mrg_hdr.hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
+      if band(self.features, C.VIRTIO_NET_F_CSUM) == 0 then
+         tx_mrg_hdr.hdr.flags = 0
+      else
+         tx_mrg_hdr.hdr.flags = validflags(tx_p.data+14, tx_p.length-14)
+      end
 
       self.tx.tx_mrg_hdr[0] = tx_mrg_hdr
       self.tx.data_sent = 0
@@ -306,7 +313,16 @@ function VirtioNetDevice:tx_buffer_add_mrg_rxbuf(tx_p, addr, len)
       self.tx.finished = true
    end
 
-   return to_copy
+   -- XXX The "adjust" is needed to counter-balance an adjustment made
+   -- in virtq_device. If we don't make this adjustment then we break
+   -- chaining together multiple buffers in that we report the size of
+   -- each buffer (except for the first) to be 12 bytes more than it
+   -- really is. This causes the VM to see an inflated ethernet packet
+   -- size which may or may not be noticed by an application.
+   --
+   -- This formulation is not optimal and it would be nice to make
+   -- this code more transparent. -luke
+   return to_copy - adjust
 end
 
 function VirtioNetDevice:tx_packet_end_mrg_rxbuf(header_id, total_size, tx_p)
@@ -379,6 +395,10 @@ function VirtioNetDevice:set_features(features)
       self.hdr_type = virtio_net_hdr_mrg_rxbuf_type
       self.hdr_size = virtio_net_hdr_mrg_rxbuf_size
       self.mrg_rxbuf = true
+   else
+      self.hdr_type = virtio_net_hdr_type
+      self.hdr_size = virtio_net_hdr_size
+      self.mrg_rxbuf = false
    end
    if band(self.features, C.VIRTIO_RING_F_INDIRECT_DESC) == C.VIRTIO_RING_F_INDIRECT_DESC then
       for i = 0, max_virtq_pairs-1 do
@@ -473,6 +493,28 @@ feature_names = {
 
    [C.VIRTIO_NET_F_MQ]                          = "VIRTIO_NET_F_MQ"
 }
+
+-- Request fresh Just-In-Time compilation of the vring processing code.
+-- 
+-- This should be called when the expected workload has changed
+-- significantly, for example when a virtual machine loads a new
+-- device driver or renegotiates features. This will cause LuaJIT to
+-- generate fresh machine code for the traffic processing fast-path.
+--
+-- See background motivation here:
+--   https://github.com/LuaJIT/LuaJIT/issues/208#issuecomment-236423732
+function VirtioNetDevice:rejit ()
+   local mod = "lib.virtio.virtq_device"
+   -- Load fresh copies of the virtq module: one for tx, one for rx.
+   local txvirtq = package.loaders[1](mod)(mod)
+   local rxvirtq = package.loaders[1](mod)(mod)
+   local tx_mt = {__index = txvirtq}
+   local rx_mt = {__index = rxvirtq}
+   for i = 0, max_virtq_pairs-1 do
+      setmetatable(self.virtq[2*i],   tx_mt)
+      setmetatable(self.virtq[2*i+1], rx_mt)
+   end
+end
 
 function get_feature_names(bits)
 local string = ""

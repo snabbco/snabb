@@ -1,5 +1,7 @@
 #!/bin/bash
 
+SKIPPED_CODE=43
+
 if [ -z "$MAC" ]; then
     export MAC=52:54:00:00:00:
     echo "Defaulting to MAC=$MAC"
@@ -67,7 +69,10 @@ function pci_node {
             numactl -H | grep "cpus: $cpu" | cut -d " " -f 2
             ;;
         *)
-            echo $1
+            if [ "$1" = "soft" ]
+            then echo 0
+            else echo $1
+            fi
             ;;
     esac
 }
@@ -92,7 +97,7 @@ function qemu_log {
 
 function qemu_image {
     image=$assets/$1${qemu_n}.img
-    [ -f $image ] || cp $assets/$1.img $image
+    [ -f $image ] || cp $assets/$1.img $image 2> /dev/null
     echo $image
 }
 
@@ -108,30 +113,35 @@ function launch_qemu {
     if [ ! -n $QUEUES ]; then
         export mqueues=",queues=$QUEUES"
     fi
+    if [ -e $assets/initrd ]; then
+        export QEMU_ARGS="-initrd $assets/initrd $QEMU_ARGS"
+    fi
     tmux_launch \
         "qemu$qemu_n" \
         "numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
-        $QEMU \
+        $QEMU $QEMU_ARGS \
         -kernel $assets/$4 \
-        -append \"earlyprintk root=/dev/vda rw console=ttyS0 ip=$(ip $qemu_n)\" \
+        -append \"earlyprintk root=/dev/vda $SNABB_KERNEL_PARAMS rw console=ttyS1 ip=$(ip $qemu_n)\" \
         -m $GUEST_MEM -numa node,memdev=mem -object memory-backend-file,id=mem,size=${GUEST_MEM}M,mem-path=$HUGETLBFS,share=on \
         -netdev type=vhost-user,id=net0,chardev=char0${mqueues} -chardev socket,id=char0,path=$2,server \
         -device virtio-net-pci,netdev=net0,mac=$(mac $qemu_n),mq=$qemu_mq,vectors=$qemu_vectors \
         -M pc -smp $qemu_smp -cpu host --enable-kvm \
         -serial telnet:localhost:$3,server,nowait \
-        -drive if=virtio,file=$(qemu_image $5) \
-        -nographic" \
+        -serial stdio \
+        -drive if=virtio,format=raw,file=$(qemu_image $5) \
+        -display none" \
         $(qemu_log)
     qemu_n=$(expr $qemu_n + 1)
     sockets="$sockets $2"
 }
 
 function qemu {
+    local image=$(qemu_image "qemu")
+    if [ ! -f "$image" ]; then
+        echo "Couldn't find QEMU image: ${image}"
+        exit $SKIPPED_CODE
+    fi
     launch_qemu $1 $2 $3 bzImage qemu
-}
-
-function packetblaster {
-    snabb $1 "packetblaster replay program/snabbnfv/test_fixtures/pcap/$2.pcap $1"
 }
 
 function qemu_dpdk {
@@ -140,9 +150,7 @@ function qemu_dpdk {
 
 function snabbnfv_bench {
     numactl --cpunodebind=$(pci_node $1) --membind=$(pci_node $1) \
-        ./snabb snabbnfv traffic -B $2 $1 \
-        program/snabbnfv/test_fixtures/nfvconfig/test_functions/snabbnfv-bench1.port \
-        vhost_%s.sock
+        ./snabb snabbnfv traffic -B $2 $1 $3 vhost_%s.sock
 }
 
 function on_exit {

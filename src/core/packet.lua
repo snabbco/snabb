@@ -17,7 +17,7 @@ local packet_t = ffi.typeof("struct packet")
 local packet_ptr_t = ffi.typeof("struct packet *")
 local packet_size = ffi.sizeof(packet_t)
 local header_size = 8
-local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
+max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
 
@@ -129,11 +129,12 @@ function free (p)
    free_internal(p)
 end
 
--- Return pointer to packet data.
-function data (p) return p.data end
-
--- Return packet data length.
-function length (p) return p.length end
+-- Set packet data length.
+function resize (p, len)
+   assert(len <= max_payload, "packet payload overflow")
+   ffi.fill(p.data + p.length, math.max(0, len - p.length))
+   p.length = len
+end
 
 function preallocate_step()
    assert(packets_allocated + packet_allocation_step <= max_packets,
