@@ -76,6 +76,19 @@ function parse_args (args)
    return opts, conf_file, id, pci, mac, sock_path, mirror_id
 end
 
+local function effective_vlan (conf, lwconf)
+   if conf.settings and conf.settings.vlan then
+      return conf.settings.vlan
+   end
+   if lwconf.vlan_tagging then
+      if lwconf.v4_vlan_tag == lwconf.v6_vlan_tag then
+         return lwconf.v4_vlan_tag
+      end
+      return {v4_vlan_tag = lwconf.v4_vlan_tag, v6_vlan_tag = lwconf.v6_vlan_tag}
+   end
+   return false
+end
+
 function run(args)
    local opts, conf_file, id, pci, mac, sock_path, mirror_id = parse_args(args)
 
@@ -140,7 +153,7 @@ function run(args)
       lwaftr_id.value = id
    end
 
-   local vlan = conf.settings and conf.settings.vlan or false
+   local vlan = effective_vlan(conf, lwconf)
 
    local mtu = DEFAULT_MTU
    if lwconf.ipv6_mtu then

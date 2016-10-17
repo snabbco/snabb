@@ -48,12 +48,6 @@ local function load_virt (c, nic_id, lwconf, interface)
    print("Different VLAN tags: load two virtual interfaces")
    print(("%s ether %s"):format(nic_id, interface.mac_address))
 
-   local qprdc = {
-      discard_check_timer = interface.discard_check_timer,
-      discard_wait = interface.discard_wait,
-      discard_threshold = interface.discard_threshold,
-   }
-
    local v4_nic_name, v6_nic_name = nic_id..'_v4', nic_id..'v6'
    local v4_mtu = lwconf.ipv4_mtu + constants.ethernet_header_size
    if lwconf.vlan_tagging and lwconf.v4_vlan_tag then
@@ -62,9 +56,8 @@ local function load_virt (c, nic_id, lwconf, interface)
    print(("Setting %s interface MTU to %d"):format(v4_nic_name, v4_mtu))
    config.app(c, v4_nic_name, driver, {
       pciaddr = interface.pci,
-      vmdq = lwconf.vlan_tagging,
-      vlan = lwconf.vlan_tagging and lwconf.v4_vlan_tag,
-      qprdc = qprdc,
+      vmdq = interface.vlan and true,
+      vlan = interface.vlan and interface.vlan.v4_vlan_tag,
       macaddr = ethernet:ntop(lwconf.aftr_mac_inet_side),
       mtu = v4_mtu })
    local v6_mtu = lwconf.ipv6_mtu + constants.ethernet_header_size
@@ -74,9 +67,8 @@ local function load_virt (c, nic_id, lwconf, interface)
    print(("Setting %s interface MTU to %d"):format(v6_nic_name, v6_mtu))
    config.app(c, v6_nic_name, driver, {
       pciaddr = interface.pci,
-      vmdq = lwconf.vlan_tagging,
-      vlan = lwconf.vlan_tagging and lwconf.v6_vlan_tag,
-      qprdc = qprdc,
+      vmdq = interface.vlan and true,
+      vlan = interface.vlan and interface.vlan.v6_vlan_tag,
       macaddr = ethernet:ntop(lwconf.aftr_mac_b4_side),
       mtu = v6_mtu})
 
