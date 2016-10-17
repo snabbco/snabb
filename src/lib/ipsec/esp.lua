@@ -238,7 +238,7 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    local p2 = packet.clone(p_enc)
    assert(dec:decapsulate(p2), "decapsulation failed")
    print("decrypted", lib.hexdump(ffi.string(p2.data, p2.length)))
-   assert(p2.length == p.length and C.memcmp(p, p2, p.length) == 0,
+   assert(p2.length == p.length and C.memcmp(p.data, p2.data, p.length) == 0,
           "integrity check failed")
    -- Check invalid packets.
    local p_invalid = packet.from_string("invalid")
@@ -259,7 +259,7 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
    print("decrypted", lib.hexdump(ffi.string(e_min.data, e_min.length)))
    assert(e_min.length == PAYLOAD_OFFSET)
    assert(p_min.length == e_min.length
-          and C.memcmp(p_min, e_min, p_min.length) == 0,
+          and C.memcmp(p_min.data, e_min.data, p_min.length) == 0,
           "integrity check failed")
    -- Check transmitted Sequence Number wrap around
    C.memset(dec.window, 0, dec.window_size / 8); -- clear window

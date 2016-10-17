@@ -73,7 +73,7 @@ local function _reassemble_validated(fragments, fragment_offsets, fragment_lengt
  
    -- Copy the original headers; this automatically does the right thing in the face of vlans.
    local fixed_headers_size = l2_size + constants.ipv6_fixed_header_size
-   ffi.copy(repkt.data, first_fragment, l2_size + constants.ipv6_fixed_header_size)
+   ffi.copy(repkt.data, first_fragment.data, l2_size + constants.ipv6_fixed_header_size)
    -- Update the next header; it's not a fragment anymore
    repkt.data[l2_size + constants.o_ipv6_next_header] = ipv6_next_header
 
