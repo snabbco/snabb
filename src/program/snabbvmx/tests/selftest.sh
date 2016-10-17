@@ -28,7 +28,6 @@ SNABBVMX_DIR=program/snabbvmx
 PCAP_INPUT=$SNABBVMX_DIR/tests/pcap/input
 PCAP_OUTPUT=$SNABBVMX_DIR/tests/pcap/output
 SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr.cfg
-TCPREPLAY_SCRIPT=$SNABBVMX_DIR/tests/scripts/tcpreplay.lua
 SNABBVMX_ID=xe1
 SNABB_TELNET0=5000
 VHU_SOCK0=/tmp/vh1a.sock
@@ -100,7 +99,7 @@ function monitor { action=$1
 }
 
 function tcpreplay { pcap=$1; pci=$2
-    local cmd="sudo ./snabb snsh $TCPREPLAY_SCRIPT $pcap $pci"
+    local cmd="sudo ./snabb packetblaster replay --no-loop $pcap $pci"
     run_cmd_in_screen "tcpreplay" "$cmd"
 }
 
