@@ -4,11 +4,13 @@ local counter = require("core.counter")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
+local lwutil = require("apps.lwaftr.lwutil")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
 local C = ffi.C
+local fatal = lwutil.fatal
 
 local long_opts = {
    help = "h"
@@ -64,6 +66,10 @@ local counter_names = (function ()
       return key == "lwaftr_v4" and ipv4_counters or ipv6_counters
    end
 end)()
+
+local function has_lwaftr_app (tree)
+   return shm.exists(tree.."/"..lwcounter.counters_dir)
+end
 
 local function open_counters (tree)
    local function open_counter (name)
@@ -212,6 +218,9 @@ end
 function run (args)
    local target_pid = parse_args(args)
    local instance_tree = "/"..select_snabb_instance(target_pid)
+   if not has_lwaftr_app(instance_tree) then
+      fatal("Selected instance doesn't include lwaftr app")
+   end
    local counters = open_counters(instance_tree)
    local last_stats = nil
    local last_time = nil
