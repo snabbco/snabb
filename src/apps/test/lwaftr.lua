@@ -116,12 +116,29 @@ local function inc_ipv6(ipv6)
    return ipv6
 end
 
-Lwaftrgen = {}
+Lwaftrgen = {
+   config = {
+      sizes = {required=true},
+      dst_mac = {required=true},
+      src_mac = {required=true},
+      rate = {required=true},
+      vlan = {},
+      b4_ipv6 = {},
+      b4_ipv4 = {},
+      public_ipv4 = {},
+      aftr_ipv6 = {},
+      ipv6_only = {},
+      ipv4_only = {},
+      b4_port = {},
+      protocol = {},
+      count = {},
+      single_pass = {}
+   }
+}
 
 local receive, transmit = link.receive, link.transmit
 
-function Lwaftrgen:new(arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+function Lwaftrgen:new(conf)
    local dst_mac = ethernet:pton(conf.dst_mac)
    local src_mac = ethernet:pton(conf.src_mac)
    local vlan = conf.vlan

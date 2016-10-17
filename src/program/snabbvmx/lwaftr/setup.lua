@@ -29,6 +29,12 @@ local function net_exists (pci_addr)
    return dir_exists(("%s/%s"):format(devices, pci_addr))
 end
 
+local function subset (keys, conf)
+   local ret = {}
+   for k,_ in pairs(keys) do ret[k] = conf[k] end
+   return ret
+end
+
 local function load_driver (pciaddr)
    local device_info = pci.device_info(pciaddr)
    return require(device_info.driver).driver
@@ -241,12 +247,14 @@ function lwaftr_app(c, conf, lwconf, sock_path)
 
    if conf.ipv4_interface and conf.ipv6_interface and conf.preloaded_binding_table then
       print("lwAFTR service: enabled")
-      config.app(c, "nh_fwd6", nh_fwd.nh_fwd6, conf.ipv6_interface)
+      config.app(c, "nh_fwd6", nh_fwd.nh_fwd6,
+                 subset(nh_fwd.nh_fwd6.config, conf.ipv6_interface))
       config.link(c, v6_output .. " -> nh_fwd6.wire")
       config.link(c, "nh_fwd6.wire -> " .. v6_input)
       v6_input, v6_output = "nh_fwd6.vm", "nh_fwd6.vm"
 
-      config.app(c, "nh_fwd4", nh_fwd.nh_fwd4, conf.ipv4_interface)
+      config.app(c, "nh_fwd4", nh_fwd.nh_fwd4,
+                 subset(nh_fwd.nh_fwd4.config, conf.ipv4_interface))
       config.link(c, v4_output .. " -> nh_fwd4.wire")
       config.link(c, "nh_fwd4.wire -> " .. v4_input)
       v4_input, v4_output = "nh_fwd4.vm", "nh_fwd4.vm"
@@ -368,11 +376,13 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
    end
 
    if conf.ipv4_interface and conf.ipv6_interface then
-      config.app(c, "nh_fwd6", nh_fwd.nh_fwd6, conf.ipv6_interface)
+      config.app(c, "nh_fwd6", nh_fwd.nh_fwd6,
+                 subset(nh_fwd.nh_fwd6.config, conf.ipv6_interface))
       config.link(c, v6_input.." -> nh_fwd6.wire")
       config.link(c, "nh_fwd6.wire -> "..v6_output)
 
-      config.app(c, "nh_fwd4", nh_fwd.nh_fwd4, conf.ipv4_interface)
+      config.app(c, "nh_fwd4", nh_fwd.nh_fwd4,
+                 subset(nh_fwd.nh_fwd4.config, conf.ipv4_interface))
       config.link(c, v4_input.."-> nh_fwd4.wire")
       config.link(c, "nh_fwd4.wire -> "..v6_output)
 

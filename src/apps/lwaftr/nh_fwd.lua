@@ -19,8 +19,25 @@ local htons = lib.htons
 local rd16, rd32, wr16  = lwutil.rd16, lwutil.rd32, lwutil.wr16
 local ipv6_equals = lwutil.ipv6_equals
 
-nh_fwd4 = {}
-nh_fwd6 = {}
+nh_fwd4 = {
+   config = {
+      mac_address = {required=true},
+      service_mac = {required=false, default=nil},
+      ipv4_address = {required=true},
+      debug = {default=false},
+      cache_refresh_interval = {default=0},
+      next_hop_mac = {required=false, default=nil}
+   }
+}
+nh_fwd6 = {
+   config = {
+      mac_address = {required=true},
+      service_mac = {required=false, default=nil},
+      debug = {default=false},
+      cache_refresh_interval = {default=0},
+      next_hop_mac = {required=false, default=nil}
+   }
+}
 
 local ethernet_header_size = constants.ethernet_header_size
 local n_ether_hdr_size = 14
@@ -118,15 +135,12 @@ local function send_ipv4_cache_trigger(r, pkt, mac)
 end
 
 function nh_fwd4:new (conf)
-   assert(conf.mac_address, "MAC address is missing")
-   assert(conf.ipv4_address, "IPv4 address is missing")
-
    local mac_address = ethernet:pton(conf.mac_address)
    local ipv4_address = rd32(ipv4:pton(conf.ipv4_address))
    local service_mac = conf.service_mac and ethernet:pton(conf.service_mac)
-   local debug = conf.debug or false
-   local cache_refresh_interval = conf.cache_refresh_interval or 0
-   print(("nh_fwd4: cache_refresh_interval set to %d seconds"):format(cache_refresh_interval))
+   local debug = conf.debug
+   print(string.format("nh_fwd4: cache_refresh_interval set to %d seconds",
+                      conf.cache_refresh_interval))
 
    local next_hop_mac = shm.create("next_hop_mac_v4", "struct { uint8_t ether[6]; }")
    if conf.next_hop_mac then
@@ -139,9 +153,9 @@ function nh_fwd4:new (conf)
       next_hop_mac = next_hop_mac,
       ipv4_address = ipv4_address,
       service_mac = service_mac,
-      debug = debug,
+      debug = conf.debug,
       cache_refresh_time = 0,
-      cache_refresh_interval = cache_refresh_interval
+      cache_refresh_interval = conf.cache_refresh_interval
    }
    return setmetatable(o, {__index = nh_fwd4})
 end
@@ -228,13 +242,10 @@ function nh_fwd4:push ()
 end
 
 function nh_fwd6:new (conf)
-   assert(conf.mac_address, "MAC address is missing")
-
    local mac_address = ethernet:pton(conf.mac_address)
    local service_mac = conf.service_mac and ethernet:pton(conf.service_mac)
-   local debug = conf.debug or false
-   local cache_refresh_interval = conf.cache_refresh_interval or 0
-   print(("nh_fwd6: cache_refresh_interval set to %d seconds"):format(cache_refresh_interval))
+   print(string.format("nh_fwd6: cache_refresh_interval set to %d seconds",
+                      conf.cache_refresh_interval))
 
    local next_hop_mac = shm.create("next_hop_mac_v6", "struct { uint8_t ether[6]; }")
    if conf.next_hop_mac then
@@ -246,9 +257,9 @@ function nh_fwd6:new (conf)
       mac_address = mac_address,
       next_hop_mac = next_hop_mac,
       service_mac = service_mac,
-      debug = debug,
+      debug = conf.debug,
       cache_refresh_time = 0,
-      cache_refresh_interval = cache_refresh_interval
+      cache_refresh_interval = conf.cache_refresh_interval
    }
    return setmetatable(o, {__index = nh_fwd6})
 end
