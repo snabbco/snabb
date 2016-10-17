@@ -1,24 +1,18 @@
 module(..., package.seeall)
 
+local ethernet = require("lib.protocol.ethernet")
+local ipv6 = require("lib.protocol.ipv6")
 local bit = require("bit")
 local band, rshift = bit.band, bit.rshift
 
 function pp(t) for k,v in pairs(t) do print(k,v) end end
 
-function print_ethernet(addr)
-   local chunks = {}
-   for i = 0,5 do
-      table.insert(chunks, string.format("%x", addr[i]))
-   end
-   print(table.concat(chunks, ':'))
+function print_ethernet (addr)
+   print(ethernet:ntop(addr))
 end
 
-function print_ipv6(addr)
-   local chunks = {}
-   for i = 0,7 do
-      table.insert(chunks, string.format("%x%x", addr[2*i], addr[2*i+1]))
-   end
-   print(table.concat(chunks, ':'))
+function print_ipv6 (addr)
+   print(ipv6:ntop(addr))
 end
 
 local function gen_hex_bytes(data, len)
