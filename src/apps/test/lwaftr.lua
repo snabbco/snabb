@@ -282,6 +282,7 @@ function Lwaftrgen:pull ()
    local ipv4_bytes = self.ipv4_bytes
    local lost_packets = self.lost_packets
    local udp_offset = self.udp_offset
+   local o_ethertype = self.vlan and OFFSET_ETHERTYPE_VLAN or OFFSET_ETHERTYPE
 
    if self.current == 0 then
       main.exit(0)
@@ -290,7 +291,7 @@ function Lwaftrgen:pull ()
    -- count and trash incoming packets
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if cast(uint16_ptr_t, pkt.data + OFFSET_ETHERTYPE)[0] == PROTO_IPV6 then
+      if cast(uint16_ptr_t, pkt.data + o_ethertype)[0] == PROTO_IPV6 then
          ipv6_bytes = ipv6_bytes + pkt.length
          ipv6_packets = ipv6_packets + 1
          local payload = cast(payload_ptr_type, pkt.data + udp_offset + ipv6_header_size + udp_header_size)
