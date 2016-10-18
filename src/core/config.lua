@@ -28,7 +28,11 @@ function app (config, name, class, arg)
    arg = arg or "nil"
    assert(type(name) == "string", "name must be a string")
    assert(type(class) == "table", "class must be a table")
-   config.apps[name] = { class = class, arg = arg}
+   if class.configure then
+      class:configure(config, name, arg)
+   else
+      config.apps[name] = { class = class, arg = arg}
+   end
 end
 
 -- API: Add a link to the configuration.

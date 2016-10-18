@@ -8,7 +8,7 @@ local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light").nd_light
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
 local AES128gcm = require("apps.ipsec.esp").AES128gcm
-local virtual_ether_mux = require("program.snabbnfv.io.virtual_ether_mux")
+local IO = require("program.snabbnfv.apps.io").IO
 local pci = require("lib.hardware.pci")
 local ffi = require("ffi")
 local C = ffi.C
@@ -24,14 +24,13 @@ end
 function load (file, pciaddr, sockpath, soft_bench)
    local ports = lib.load_conf(file)
    local c = config.new()
-   local io_links
-   if pciaddr then
-      io_links = virtual_ether_mux.configure(c, ports, {pci = pciaddr})
-   else
-      io_links = virtual_ether_mux.configure(c, ports, {bench = soft_bench})
-   end
    for i,t in ipairs(ports) do
       local name = port_name(t)
+      local IF = name.."_IF"
+      config.app(c, IF, IO, { pciaddr = pciaddr,
+                              vmdq = (t.macaddress and pciaddr) or nil,
+                              vlan = t.vlan,
+                              macaddr = t.mac_address })
       local Virtio = name.."_Virtio"
       config.app(c, Virtio, VhostUser,
                  {socket_path=sockpath:format(t.port_id),
@@ -99,8 +98,12 @@ function load (file, pciaddr, sockpath, soft_bench)
          config.link(c, RxLimit..".output -> "..VM_rx)
          VM_rx = RxLimit..".input"
       end
-      config.link(c, io_links[i].output.." -> "..VM_rx)
-      config.link(c, VM_tx.." -> "..io_links[i].input)
+      config.link(c, IF..".tx -> "..VM_rx)
+      config.link(c, VM_tx.." -> "..IF..".rx")
+   end
+
+   if soft_bench then
+      config.app(c, "SoftBench", IO, {bench=soft_bench})
    end
 
    -- Return configuration c.
