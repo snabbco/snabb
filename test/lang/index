@@ -8,6 +8,7 @@ length.lua
 modulo.lua
 concat.lua
 self.lua
+table.lua
 upvalue
 coroutine.lua
 tail_recursion.lua
