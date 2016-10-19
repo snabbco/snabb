@@ -98,15 +98,15 @@ function aes_128_gcm:new (spi, keymat, salt)
    return setmetatable(o, {__index=aes_128_gcm})
 end
 
-function aes_128_gcm:encrypt (out_ptr, iv, seq_no, payload, length)
+function aes_128_gcm:encrypt (out_ptr, iv, seq_low, seq_high, payload, length, auth_dest)
    self.iv:iv(iv)
-   self.aad:seq_no(seq_no:low(), seq_no:high())
+   self.aad:seq_no(seq_low, seq_high)
    ASM.aesni_gcm_enc_avx_gen4(self.gcm_data,
                               out_ptr,
                               payload, length,
                               u8_ptr(self.iv:header_ptr()),
                               u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
-                              out_ptr + length, self.AUTH_SIZE)
+                              auth_dest, self.AUTH_SIZE)
 end
 
 function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length)
@@ -244,7 +244,7 @@ function selftest ()
       local o = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
       ffi.copy(p, lib.hexundump(t.plain, length), length)
       ffi.copy(c, lib.hexundump(t.ctag, length + gcm.AUTH_SIZE), length + gcm.AUTH_SIZE)
-      gcm:encrypt(o, iv, seq, p, length)
+      gcm:encrypt(o, iv, seq:low(), seq:high(), p, length, o + length)
       print("ctext+tag", lib.hexdump(ffi.string(c, length + gcm.AUTH_SIZE)))
       print("is       ", lib.hexdump(ffi.string(o, length + gcm.AUTH_SIZE)))
       assert(C.memcmp(c, o, length + gcm.AUTH_SIZE) == 0)

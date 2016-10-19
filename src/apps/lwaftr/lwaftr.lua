@@ -490,7 +490,7 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
    local l3_header = get_ethernet_payload(pkt)
    local dscp_and_ecn = get_ipv4_dscp_and_ecn(l3_header)
    -- Note that this may invalidate any pointer into pkt.data.  Be warned!
-   packet.shiftright(pkt, ipv6_fixed_header_size)
+   pkt = packet.shiftright(pkt, ipv6_fixed_header_size)
    -- Fetch possibly-moved L3 header location.
    l3_header = get_ethernet_payload(pkt)
    write_eth_header(pkt.data, ether_src, ether_dst, n_ethertype_ipv6)
@@ -732,7 +732,7 @@ local function flush_decapsulation(lwstate)
           and ipv6_equals(get_ipv6_dst_address(ipv6_header), br_addr)) then
          -- Source softwire is valid; decapsulate and forward.
          -- Note that this may invalidate any pointer into pkt.data.  Be warned!
-         packet.shiftleft(pkt, ipv6_fixed_header_size)
+         pkt = packet.shiftleft(pkt, ipv6_fixed_header_size)
          write_eth_header(pkt.data, lwstate.aftr_mac_inet_side, lwstate.inet_mac,
                           n_ethertype_ipv4)
          transmit_ipv4(lwstate, pkt)

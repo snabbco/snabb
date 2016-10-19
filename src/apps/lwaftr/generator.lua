@@ -300,7 +300,7 @@ function ipv6_encapsulate(ipv4_pkt, params)
 
    local payload_length = p.length - ethernet_header_size
    local dscp_and_ecn = p.data[ethernet_header_size + IPV4_DSCP_AND_ECN_OFFSET]
-   packet.shiftright(p, ipv6_header_size)
+   p = packet.shiftright(p, ipv6_header_size)
 
    -- IPv6 packet is tagged
    local eth_hdr
