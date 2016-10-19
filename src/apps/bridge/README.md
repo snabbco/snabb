@@ -41,18 +41,18 @@ names. The default is no split-horizon groups.
 *Optional*. The configuration of the actual bridge implementation.
 
 
-# Flooding bridge (apps.bridge.flooding)
+## Flooding bridge (apps.bridge.flooding)
 
 The flooding `bridge` app implements the simplest possible bridge, which
 floods a packet arriving on an input port to all output ports within its
 scope according to the split-horizon topology.
 
-## Configuration
+### Configuration
 
 The flooding `bridge` app ignores the *config* key of its configuration.
 
 
-# Learning bridge (apps.bridge.learning)
+## Learning bridge (apps.bridge.learning)
 
 The learning `bridge` app implements a *learning bridge* using a
 custom hash table to store the set of MAC source addresses of packets
@@ -63,7 +63,7 @@ flooded to all output ports.  Multicast MAC addresses are always
 flooded to all output ports associated with the input port. The
 scoping rules according to the split-horizon topology apply unchanged.
 
-## Configuration
+### Configuration
 
 The learning `bridge` app accepts a table as the value of the *config*
 key of its configuration. The following keys are defined:

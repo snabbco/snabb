@@ -149,13 +149,6 @@ local function fix_pkt_checksum(pkt)
         htons(ipsum(pkt.data + ehs, ihl, 0)))
 end
 
-local function pseudo_clone(data, len)
-   local p = packet.allocate()
-   p.headroom = 0
-   packet.append(p, data, len)
-   return p
-end
-
 local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    local ihl = get_ihl_from_offset(fragment, ehs)
    local frag_id = get_frag_id(fragment)
@@ -213,8 +206,8 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
       local pkt_len = htons(reassembly_buf.reassembly_length - ehs)
       local o_len = ehs + o_ipv4_total_length
       wr16(reassembly_data + o_len, pkt_len)
-      local reassembled_packet = pseudo_clone(reassembly_buf.reassembly_data,
-                                              reassembly_buf.reassembly_length)
+      local reassembled_packet = packet.from_pointer(
+	 reassembly_buf.reassembly_data, reassembly_buf.reassembly_length)
       fix_pkt_checksum(reassembled_packet)
       free_reassembly_buf_and_pkt(fragment, frags_table)
       return REASSEMBLY_OK, reassembled_packet

@@ -94,6 +94,7 @@ function form_request(src_eth, src_ipv4, dst_ipv4)
    local dgram = datagram:new(req_pkt)
    dgram:push(ethernet:new({ src = src_eth, dst = ethernet_broadcast,
                              type = ethertype_arp }))
+   req_pkt = dgram:packet()
    dgram:free()
    return req_pkt
 end
@@ -107,6 +108,7 @@ function form_reply(local_eth, local_ipv4, arp_request_pkt)
    local dgram = datagram:new(reply_pkt)
    dgram:push(ethernet:new({ src = local_eth, dst = dst_eth,
                              type = ethertype_arp }))
+   reply_pkt = dgram:packet()
    dgram:free()
    return reply_pkt
 end

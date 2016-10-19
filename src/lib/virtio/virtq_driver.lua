@@ -96,7 +96,7 @@ function VirtioVirtq:add(p, len, flags, csum_start, csum_offset)
    self.num_free = self.num_free -1
    desc.next = -1
 
-   packet.shiftright(p, pk_header_size)
+   p = packet.shiftright(p, pk_header_size)
    local header = ffi.cast("struct virtio_net_hdr *", p.data)
    header.flags = flags
    header.gso_type = 0
@@ -147,7 +147,7 @@ function VirtioVirtq:get()
    if debug then assert(p ~= nil) end
    if debug then assert(physical(p.data) == desc.addr) end
    p.length = used.len
-   packet.shiftleft(p, pk_header_size)
+   p = packet.shiftleft(p, pk_header_size)
 
    self.last_used_idx = self.last_used_idx + 1
    desc.next = self.free_head

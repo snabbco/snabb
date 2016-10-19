@@ -145,13 +145,6 @@ local function reassembly_status(reassembly_buf)
    return REASSEMBLY_OK
 end
 
-local function pseudo_clone(data, len)
-   local p = packet.allocate()
-   p.headroom = 0
-   packet.append(p, data, len)
-   return p
-end
-
 local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    local frag_id = get_frag_id(fragment)
    if frag_id ~= reassembly_buf.fragment_id then -- unreachable
@@ -204,8 +197,8 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
 
    local restatus = reassembly_status(reassembly_buf)
    if restatus == REASSEMBLY_OK then
-      local reassembled_packet = pseudo_clone(reassembly_buf.reassembly_data,
-                                              reassembly_buf.reassembly_length)
+      local reassembled_packet = packet.from_pointer(
+	 reassembly_buf.reassembly_data, reassembly_buf.reassembly_length)
       free_reassembly_buf_and_pkt(fragment, frags_table)
       return REASSEMBLY_OK, reassembled_packet
    else

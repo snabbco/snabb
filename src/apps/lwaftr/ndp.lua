@@ -222,17 +222,18 @@ function form_ns(local_eth, local_ipv6, dst_ipv6)
    local i = ipv6:new({ hop_limit = hop_limit, 
                         next_header = proto_icmpv6,
                         src = local_ipv6, dst = dst_ipv6 })
-   i:payload_length(ns_pkt.length)
+   i:payload_length(dgram:packet().length)
    
-   local ph = i:pseudo_header(ns_pkt.length, proto_icmpv6)
+   local ph = i:pseudo_header(dgram:packet().length, proto_icmpv6)
    local ph_len = ipv6_pseudoheader_size
    local base_checksum = checksum.ipsum(ffi.cast("uint8_t*", ph), ph_len, 0)
-   local csum = checksum.ipsum(ns_pkt.data, ns_pkt.length, bit.bnot(base_checksum))
-   wr16(ns_pkt.data + 2, C.htons(csum))
+   local csum = checksum.ipsum(dgram:packet().data, dgram:packet().length, bit.bnot(base_checksum))
+   wr16(dgram:packet().data + 2, C.htons(csum))
    
    dgram:push(i)
    dgram:push(ethernet:new({ src = local_eth, dst = ethernet_broadcast,
                              type = ethertype_ipv6 }))
+   ns_pkt = dgram:packet()
    dgram:free()
    return ns_pkt
 end
@@ -265,17 +266,19 @@ local function form_sna(local_eth, local_ipv6, is_router, soliciting_pkt)
    local i = ipv6:new({ hop_limit = hop_limit,
                         next_header = proto_icmpv6,
                         src = local_ipv6, dst = dst_ipv6 })
-   i:payload_length(na_pkt.length)
+   i:payload_length(dgram:packet().length)
    
-   local ph = i:pseudo_header(na_pkt.length, proto_icmpv6)
+   local ph = i:pseudo_header(dgram:packet().length, proto_icmpv6)
    local ph_len = ipv6_pseudoheader_size
    local base_checksum = checksum.ipsum(ffi.cast("uint8_t*", ph), ph_len, 0)
-   local csum = checksum.ipsum(na_pkt.data, na_pkt.length, bit.bnot(base_checksum))
-   wr16(na_pkt.data + 2, C.htons(csum))
+   local csum = checksum.ipsum(dgram:packet().data, dgram:packet().length,
+                               bit.bnot(base_checksum))
+   wr16(dgram:packet().data + 2, C.htons(csum))
    
    dgram:push(i)
    dgram:push(ethernet:new({ src = local_eth, dst = dst_eth,
                              type = ethertype_ipv6 }))
+   na_pkt = dgram:packet()
    dgram:free()
    return na_pkt
 end
