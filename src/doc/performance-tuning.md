@@ -21,7 +21,7 @@ disable energy efficiency settings or profiles, typically named "Max
 performance", "Energy Efficiency" and "Custom".  Select "Max
 performance" for latency sensitive Snabb use.
 
-### Hyperthreads
+### Disable hyperthreads
 
 Hyperthreads are a way of maximizing resource utilization on a CPU core,
 driven by the observation that a CPU is often waiting on memory or some
@@ -32,7 +32,7 @@ want.  We do not want another thread competing for compute and cache
 resources on our CPU and increasing our latency.  For best results and
 lowest latency, disable hyperthreading via the BIOS settings.
 
-### Tune Turbo Boost
+### Consider disabling Turbo Boost
 
 Intel Turbo Boost Technology allows processor cores to run faster than
 the rated operating frequency if they're operating below power,
@@ -55,7 +55,7 @@ for CPUFREQ in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
 done
 ```
 
-### Isolate CPUs
+### Reserve CPUs for data plane usage
 
 When running a Snabb data plane, we don't want interference from the
 Linux kernel.  In normal operation, a Snabb data plane won't even make
@@ -85,7 +85,7 @@ For a standard Ubuntu or other system, edit `/etc/default/grub` to add the appro
 GRUB_CMDLINE_LINUX_DEFAULT="... isolcpus=1-5,7-11 ..."
 ```
 
-### Avoid interrupts
+### Avoid interrupts on data-plane CPUs
 
 Normally Linux will handle hardware interrupts on the first core on a
 socket.  In our case above, that would be cores 0 and 6.  That works
@@ -445,8 +445,8 @@ pid 1's current affinity list: 0-15
 
 #### Avoid fragmentation
 
-Fragment reassembly in particular is a costly operation.  Make sure
-that MTUs are set such that fragmentation is rare.
+Fragment reassembly is a costly operation.  Make sure that network
+MTUs are set such that fragmentation is rare.
 
 #### Ingress and egress filtering
 
@@ -497,7 +497,7 @@ caches.  The actions of one processor causing the TLBs to be flushed
 on other processors is what is called a TLB shootdown.
 
 Occasional packet loss at ingress has been observed while TLB
-shootdowns happened on the system. There are per cpu counters of TLB
+shootdowns happened on the system.  There are per-CPU counters of TLB
 shootdowns available in the output of 'cat /proc/interrupts':
 
 ```
@@ -505,8 +505,5 @@ $ cat /proc/interrupts |grep TLB
  TLB:       2012       2141       1778       1942       2357       2076       2041       2129       2209       1960        486          0          0          0          0          0          0        145          0          0   TLB shootdowns
 ```
 
-They must remain 0 for the CPU serving Snabb (pinned via taskset or
-numactl). One possible source of such TLB shootdowns can be the use of
-SHM between processes on different nodes or pinning Snabb to a list of
-CPUs instead a single one (TODO: needs confirmation. Have seen
-periodic TLB shootdowns before optimization based on this doc);
+They should remain 0 for the CPU serving Snabb (pinned via taskset or
+numactl).
