@@ -113,12 +113,12 @@ function set_postprocessors(c, src, apps)
    link_apps(c, apps)
 end
 
-function link_source(c, v4_in, v6_in)
+local function link_source(c, v4_in, v6_in)
    config.link(c, v4_in..' -> reassemblerv4.input')
    config.link(c, v6_in..' -> reassemblerv6.input')
 end
 
-function link_sink(c, v4_out, v6_out)
+local function link_sink(c, v4_out, v6_out)
    config.link(c, 'fragmenterv4.output -> '..v4_out)
    config.link(c, 'fragmenterv6.output -> '..v6_out)
 end

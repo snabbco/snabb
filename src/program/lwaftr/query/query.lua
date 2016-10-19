@@ -1,6 +1,5 @@
 module(..., package.seeall)
 
-local S = require("syscall")
 local counter = require("core.counter")
 local ffi = require("ffi")
 local lib = require("core.lib")
@@ -74,7 +73,7 @@ function parse_args (raw_args)
    return nil, nil
 end
 
-local function read_counters (tree, filter)
+local function read_counters (tree)
    local ret = {}
    local cnt, cnt_path, value
    local max_width = 0
@@ -102,10 +101,10 @@ local function print_counter (name, value, max_width)
    print(("%s: %s%s"):format(name, (" "):rep(nspaces), lib.comma_value(value)))
 end
 
-function print_counters (tree, filter)
+local function print_counters (tree, filter)
    print("lwAFTR operational counters (non-zero)")
    -- Open, read and print whatever counters are in that directory.
-   local counters, max_width = read_counters(tree, filter)
+   local counters, max_width = read_counters(tree)
    for _, name in ipairs(sort(keys(counters))) do
       if not skip_counter(name, filter) then
          local value = counters[name]
@@ -116,7 +115,6 @@ end
 
 function run (raw_args)
    local target_pid, counter_name = parse_args(raw_args)
-
    local instance_tree = select_snabb_instance(target_pid)
    print_counters(instance_tree, counter_name)
 end

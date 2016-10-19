@@ -6,8 +6,6 @@ local engine    = require("core.app")
 local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
-local intel10g  = require("apps.intel.intel10g")
-local intel_app = require("apps.intel.intel_app")
 local main      = require("core.main")
 local S         = require("syscall")
 local Lwaftrgen = require("apps.test.lwaftr").Lwaftrgen
@@ -17,7 +15,6 @@ local pcap      = require("apps.pcap.pcap")
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local lib       = require("core.lib")
 local ffi       = require("ffi")
-local C         = ffi.C
 
 local usage = require("program.packetblaster.lwaftr.README_inc")
 

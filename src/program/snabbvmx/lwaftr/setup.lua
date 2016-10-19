@@ -82,7 +82,7 @@ local function load_phy (c, nic_id, interface)
 
    if nic_exists(interface.pci) then
       local driver = load_driver(interface.pci)
-      local vlan = interface.vlan and tonumber(interface.vlan)
+      vlan = interface.vlan and tonumber(interface.vlan)
       print(("%s network ether %s mtu %d"):format(nic_id, interface.mac_address, interface.mtu))
       if vlan then
          print(("%s vlan %d"):format(nic_id, vlan))
@@ -304,8 +304,8 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
    assert(type(conf) == "table")
    assert(type(lwconf) == "table")
 
-   v4_input, v6_input = unpack(sources)
-   v4_output, v6_output = unpack(sinks)
+   local v4_input, v6_input = unpack(sources)
+   local v4_output, v6_output = unpack(sinks)
 
    if conf.ipv6_interface then
       if conf.ipv6_interface.fragmentation then

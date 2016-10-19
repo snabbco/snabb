@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local engine = require("core.app")
-local counter = require("core.counter")
 local config = require("core.config")
 local timer = require("core.timer")
 local csv_stats = require("program.lwaftr.csv_stats")
@@ -12,14 +11,13 @@ local loadgen = require("apps.lwaftr.loadgen")
 local main = require("core.main")
 local PcapReader = require("apps.pcap.pcap").PcapReader
 local lib = require("core.lib")
-local ffi = require("ffi")
 
 function show_usage(code)
    print(require("program.lwaftr.transient.README_inc"))
    main.exit(code)
 end
 
-function find_devices(pattern)
+local function find_devices(pattern)
    if #pci.devices == 0 then pci.scan_devices() end
    pattern = pci.qualified(pattern)
    local ret = {}
@@ -32,7 +30,7 @@ function find_devices(pattern)
    return ret
 end
 
-function find_device(pattern)
+local function find_device(pattern)
    local devices = find_devices(pattern)
    if #devices == 0 then
       error('no devices matched pattern "'..pattern..'"')
@@ -90,7 +88,7 @@ end
 -- This ramps the repeater up from 0 Gbps to the max bitrate, lingering
 -- at the top only for one period, then comes back down in the same way.
 -- We can add more of these for different workloads.
-function adjust_rate(opts, streams)
+local function adjust_rate(opts, streams)
    local count = math.ceil(opts.bitrate / opts.step)
    return function()
       local bitrate = opts.bitrate - math.abs(count) * opts.step

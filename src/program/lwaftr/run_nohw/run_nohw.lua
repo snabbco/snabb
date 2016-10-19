@@ -1,11 +1,9 @@
 module(..., package.seeall)
 
 local CSVStatsTimer = require("program.lwaftr.csv_stats").CSVStatsTimer
-local ethernet = require("lib.protocol.ethernet")
 local RawSocket = require("apps.socket.raw").RawSocket
 local LwAftr = require("apps.lwaftr.lwaftr").LwAftr
 local lib = require("core.lib")
-local S = require("syscall")
 local lwutil = require("apps.lwaftr.lwutil")
 
 local file_exists = lwutil.file_exists
@@ -75,7 +73,7 @@ function run(parameters)
    config.link(c, "aftr.v6 -> b4if.rx")
 
    if verbosity >= 1 then
-      local csv = CSVStatsTimer.new(csv_file)
+      local csv = CSVStatsTimer.new(bench_file)
       csv:add_app("inet", {"tx", "rx"}, { tx = "IPv4 TX", rx = "IPv4 RX" })
       csv:add_app("tob4", {"tx", "rx"}, { tx = "IPv6 TX", rx = "IPv6 RX" })
       csv:activate()
