@@ -27,10 +27,13 @@ Hyperthreads are a way of maximizing resource utilization on a CPU core,
 driven by the observation that a CPU is often waiting on memory or some
 external event, and might as well be doing something else while it's
 waiting.  In such a situation, it can be advantageous to run a second
-thread on that CPU.  However for Snabb that's exactly what we don't
-want.  We do not want another thread competing for compute and cache
-resources on our CPU and increasing our latency.  For best results and
-lowest latency, disable hyperthreading via the BIOS settings.
+thread on that CPU.
+
+However for Snabb that's exactly what we don't want.  We do not want
+another thread competing for compute and cache resources on our CPU
+and increasing our latency.  For best results, lowest latency, and to
+avoid a source of packet loss, disable hyperthreading via the BIOS
+settings.
 
 ### Consider disabling Turbo Boost
 
