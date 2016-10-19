@@ -6,7 +6,7 @@ system-oriented tips and move towards application configuration.
 
 ## BIOS settings
 
-### Prioritize performance over efficiency
+### Prioritize performance over energy efficiency
 
 Go into your BIOS and verify that you or your hardware vendor have not
 enabled aggressive power-saving modes that could downclock your
@@ -123,10 +123,11 @@ $ cat /proc/interrupts
 ### Disable IOMMU
 
 The oldest CPU supported by Snabb is the Sandy Bridge series, and this
-series happens to have a bug in their IOMMU support that cripples
-snabb performance.  As a result, we never test Snabb data planes with
-the IOMMU on, so in production it should also be disabled via a kernel
-boot parameter:
+series happens to have a bug in their IOMMU support that can manifest
+itself either as total packet loss or severe performance penalties.
+As a result of this bug, we never test Snabb data planes with the
+IOMMU on even on later CPU models, so in production you should also
+disable the IOMMU via a kernel boot parameter:
 
 ```
 # Ubuntu
@@ -330,9 +331,14 @@ So, a bigger ring buffer insulates packet processing from breath
 jitter.  You want your ring buffer to be big enough to not drop
 packets due to jitter during normal operation, but not bigger than
 that.  In our testing we usually use the default ring buffer size.  In
-your operations you might want to increase this up to 2048 entries.
-We have not found that bigger ring buffer sizes are beneficial, but it
-depends very much on the environment.
+your operations you might want to increase this up to 1024 or 2048
+entries.  We have not found that bigger ring buffer sizes are
+beneficial, but it depends very much on the environment.
+
+Remember that buffers are fundamentally mechanisms for smoothing over
+variations in latency.  The real problem is the latency variation --
+focus your effort on getting that right and you won't have to fiddle
+much with ring buffer sizes.
 
 ## Virtualization
 
