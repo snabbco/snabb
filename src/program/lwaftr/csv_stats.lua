@@ -30,7 +30,7 @@ CSVStatsTimer = {}
 function CSVStatsTimer:new(filename, hydra_mode)
    local file = filename and io.open(filename, "w") or io.stdout
    local o = { hydra_mode=hydra_mode, link_data={}, file=file, period=1,
-      header = hydra_mode and "benchmark,snabb,id,score,unit" or "Time (s)" }
+      header = hydra_mode and "benchmark,id,score,unit" or "Time (s)" }
    return setmetatable(o, {__index = CSVStatsTimer})
 end
 
@@ -99,11 +99,10 @@ function CSVStatsTimer:tick()
       data.prev_txpackets = txpackets
       data.prev_txbytes = txbytes
       if self.hydra_mode then
-         -- TODO: put the actual branch name in place of "master".
          -- Hydra reports seem to prefer integers for the X (time) axis.
-         self.file:write(('%s_mpps,master,%.f,%f,mpps\n'):format(
+         self.file:write(('%s_mpps,%.f,%f,mpps\n'):format(
             data.link_name,elapsed,diff_txpackets))
-         self.file:write(('%s_gbps,master,%.f,%f,gbps\n'):format(
+         self.file:write(('%s_gbps,%.f,%f,gbps\n'):format(
             data.link_name,elapsed,diff_txbytes))
       else
          self.file:write((',%f'):format(diff_txpackets))
