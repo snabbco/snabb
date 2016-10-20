@@ -180,9 +180,9 @@ boot.kernelParams = [ "default_hugepagesz=2048K" "hugepagesz=2048K"
 
 For Ubuntu, edit the Grub configuration as described above.
 
-To use one-gigabyte huge pages, replace `2048K` above with `1G1 and
+To use one-gigabyte huge pages, replace `2048K` above with `1G` and
 reduce the `hugepages` count down to something more reasonable,
-perhaps 64.  ```
+perhaps 64.
 
 Actual use of hugepages can be monitored with 
 
@@ -288,7 +288,7 @@ NIC to receive incoming packets into a /ring buffer/.  This ring buffer
 is allocated by Snabb (incidentally, to a huge page; see above) and will
 be filled by the NIC.  It has to be a power of 2 in size: so it can hold
 space for 64 packets, 128 packets, 256 packets, and so on.  The default
-size is 512 packets and the maximum is 65536.  The NIC will fill this
+size is 1024 packets and the maximum is 65536.  The NIC will fill this
 buffer with packets as it receives them: first to slot 0, then to slot
 1, all the way up to slot 511 (for a ring buffer of the default size),
 then back to slot 0, then slot 1, and so on.  Snabb will periodically
@@ -334,9 +334,9 @@ So, a bigger ring buffer insulates packet processing from breath
 jitter.  You want your ring buffer to be big enough to not drop
 packets due to jitter during normal operation, but not bigger than
 that.  In our testing we usually use the default ring buffer size.  In
-your operations you might want to increase this up to 1024 or 2048
-entries.  We have not found that bigger ring buffer sizes are
-beneficial, but it depends very much on the environment.
+your operations you might want to increase this up to 2048 entries.
+We have not found that bigger ring buffer sizes are beneficial, but it
+depends very much on the environment.
 
 Remember that buffers are fundamentally mechanisms for smoothing over
 variations in latency.  The real problem is the latency variation --
