@@ -1,6 +1,5 @@
 module(..., package.seeall)
 
-local ffi = require("ffi")
 local S = require("syscall")
 local pci = require("lib.hardware.pci")
 
