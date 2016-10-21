@@ -85,6 +85,16 @@ function parse_args(args)
    handlers["bench-file"] = function (bench_file)
       opts.bench_file = bench_file
    end
+   handlers["ingress-drop-monitor"] = function (arg)
+      if arg == 'flush' or arg == 'warn' then
+         opts.ingress_drop_monitor = arg
+      elseif arg == 'off' then
+         opts.ingress_drop_monitor = nil
+      else
+         fatal("invalid --ingress-drop-monitor argument: " .. arg
+                  .." (valid values: flush, warn, off)")
+      end
+   end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:yhir:",
       { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,

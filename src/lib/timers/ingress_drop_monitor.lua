@@ -10,6 +10,9 @@ local shm = require("core.shm")
 -- Every 100 milliseconds.
 local default_interval = 1e8
 
+local default_tips_url =
+   "https://github.com/snabbco/snabb/blob/master/src/doc/performance-tuning.md"
+
 local now = core.app.now
 
 local IngressDropMonitor = {}
@@ -19,6 +22,7 @@ function new(args)
       threshold = args.threshold or 100000,
       wait = args.wait or 20,
       action = args.action or 'flush',
+      tips_url = args.tips_url or default_tips_url,
       last_flush = 0,
       last_value = ffi.new('uint64_t[1]'),
       current_value = ffi.new('uint64_t[1]')
@@ -51,8 +55,6 @@ function IngressDropMonitor:sample ()
    end
 end
 
-local tips_url = "https://github.com/Igalia/snabb/blob/lwaftr/src/program/lwaftr/doc/README.performance.md"
-
 function IngressDropMonitor:jit_flush_if_needed ()
    if self.current_value[0] - self.last_value[0] < self.threshold then return end
    if now() - self.last_flush < self.wait then return end
@@ -63,7 +65,7 @@ function IngressDropMonitor:jit_flush_if_needed ()
    if self.action == 'flush' then
       msg = msg.."; flushing JIT to try to recover"
    end
-   msg = msg..". See "..tips_url.." for performance tuning tips."
+   msg = msg..". See "..self.tips_url.." for performance tuning tips."
    print(msg)
    if self.action == 'flush' then jit.flush() end
 end

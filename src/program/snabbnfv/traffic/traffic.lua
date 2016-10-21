@@ -9,6 +9,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local timer = require("core.timer")
 local pci = require("lib.hardware.pci")
+local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local counter = require("core.counter")
 
 local long_opts = {
@@ -90,6 +91,7 @@ function traffic (pciaddr, confpath, sockpath)
    timer.activate(timer.new("reconf", check_for_reconfigure, 1e9, 'repeating'))
    -- Flush logs every second.
    timer.activate(timer.new("flush", io.flush, 1e9, 'repeating'))
+   timer.activate(ingress_drop_monitor.new({action='warn'}):timer())
    while true do
       needs_reconfigure = false
       print("Loading " .. confpath)
