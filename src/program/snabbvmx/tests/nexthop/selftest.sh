@@ -17,6 +17,22 @@ if [[ -z "$SNABB_PCI1" ]]; then
     exit $SKIPPED_CODE
 fi
 
+LWAFTR_IPV4_ADDRESS=10.0.1.1
+LWAFTR_IPV6_ADDRESS=fc00::100
+MAC_ADDRESS_NET0=02:AA:AA:AA:AA:AA
+MIRROR_TAP=tap0
+NEXT_HOP_MAC=02:99:99:99:99:99
+NEXT_HOP_V4=10.0.1.100
+NEXT_HOP_V6=fc00::1
+SNABBVMX_DIR=program/snabbvmx
+PCAP_INPUT=$SNABBVMX_DIR/tests/pcap/input
+PCAP_OUTPUT=$SNABBVMX_DIR/tests/pcap/output
+SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr.cfg
+SNABBVMX_ID=xe1
+SNABBVMX_LOG=snabbvmx.log
+SNABB_TELNET0=5000
+VHU_SOCK0=/tmp/vh1a.sock
+
 # Load environment settings.
 source program/snabbvmx/tests/test_env/test_env.sh
 
