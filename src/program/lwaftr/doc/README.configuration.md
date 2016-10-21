@@ -1,7 +1,7 @@
 # Configuration
 
 The lwAFTR is configured by a text file. Where applicable, default values can
-be found in [the code](../../../../apps/lwaftr/conf.lua#L72).
+be found in [the code](../../../apps/lwaftr/conf.lua#L72).
 
 Here's an example:
 
