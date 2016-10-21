@@ -96,6 +96,14 @@ function ipv6:ntop (n)
    return ffi.string(c_str)
 end
 
+function ipv6:get()
+   return self:ntop(self)
+end
+
+function ipv6:set(addr)
+   self:pton(addr)
+end
+
 -- Construct the solicited-node multicast address from the given
 -- unicast address by appending the last 24 bits to ff02::1:ff00:0/104
 function ipv6:solicited_node_mcast (n)
