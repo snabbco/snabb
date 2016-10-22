@@ -8,7 +8,8 @@ Usage:
   snabb lwaftr control
   snabb lwaftr loadtest
   snabb lwaftr generator
+  snabb lwaftr query
 
 Use --help for per-command usage.
 Example:
-    snabb-lwaftr run --help
+    snabb lwaftr run --help

@@ -1,4 +1,12 @@
-module(..., package.seeall)
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(...,package.seeall)
+
+-- Call bind_to_cpu(1) to bind the current Snabb process to CPU 1 (for
+-- example), to bind its memory to the corresponding NUMA node, to
+-- migrate mapped pages to that NUMA node, and to arrange to warn if
+-- you use a PCI device from a remote NUMA node.  See README.numa.md
+-- for full API documentation.
 
 local S = require("syscall")
 local pci = require("lib.hardware.pci")
