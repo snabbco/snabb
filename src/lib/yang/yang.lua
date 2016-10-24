@@ -135,7 +135,7 @@ function Base:produce_data_tree(schema_node, data_node)
          elseif leaf.type == "union" then
             options = leaf.types
          end
-         data_node:add_to_root(name, helpers.create_box(leaf.type, options, leaf.defalt))
+         data_node:add_to_root(name, helpers.create_box(leaf.type, options, leaf.default))
       end
    end
 
