@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local app = require("core.app")
 local basic_apps = require("apps.basic.basic_apps")
+local bit = require("bit")
 local constants = require("apps.lwaftr.constants")
 local ethernet = require("lib.protocol.ethernet")
 local ipsum = require("lib.checksum").ipsum
@@ -18,6 +19,7 @@ local transmit, receive = link.transmit, link.receive
 local htons = lib.htons
 local rd16, rd32, wr16  = lwutil.rd16, lwutil.rd32, lwutil.wr16
 local ipv6_equals = lwutil.ipv6_equals
+local lshift, band = bit.lshift, bit.band
 
 nh_fwd4 = {
    config = {
@@ -119,22 +121,28 @@ local function send_ipv6_cache_trigger (r, pkt, mac)
    transmit(r, pkt)
 end
 
-local function send_ipv4_cache_trigger(r, pkt, mac)
-   -- Set a bogus source IP address of 0.0.0.0.
+local function ipv4_cache_trigger (pkt, mac)
    local ether_dhost = get_ether_dhost_ptr(pkt)
    local ipv4_hdr = get_ethernet_payload(pkt)
-   local ipv4_hdr_size = get_ipv4_header_length(ipv4_header)
+   local ipv4_hdr_size = get_ipv4_header_length(ipv4_hdr)
    local ipv4_src_ip = get_ipv4_src_ptr(ipv4_hdr)
    local ipv4_checksum = get_ipv4_checksum_ptr(ipv4_hdr)
 
    -- VM will discard packets not matching its MAC address on the interface.
    copy_ether(ether_dhost, mac)
+
+   -- Set a bogus source IP address.
    copy_ipv4(ipv4_src_ip, n_cache_src_ipv4)
 
    -- Clear checksum to recalculate it with new source IPv4 address.
    wr16(ipv4_checksum, 0)
    wr16(ipv4_checksum, htons(ipsum(pkt.data + ethernet_header_size, ipv4_hdr_size, 0)))
-   transmit(r, pkt)
+
+   return pkt
+end
+
+local function send_ipv4_cache_trigger (r, pkt, mac)
+   transmit(r, ipv4_cache_trigger(pkt, mac))
 end
 
 function nh_fwd4:new (conf)
@@ -566,8 +574,23 @@ local function test_ipv6_flow ()
    test_ipv6_service_to_vm({pkt1})
 end
 
+local function test_ipv4_cache_trigger ()
+   local pkt = packet.from_string(lib.hexundump([[
+      02:aa:aa:aa:aa:aa 02:99:99:99:99:99 08 00 45 00
+      02 18 00 00 00 00 0f 11 d3 61 0a 0a 0a 01 c1 05
+      01 64 30 39 04 00 00 26 00 00 00 00 00 00 00 00
+      00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+      00 00 00 00 00 00 00 00
+   ]], 72))
+   local ether_dhost = "52:54:00:00:00:01"
+   local refresh_packet = ipv4_cache_trigger(pkt, ethernet:pton(ether_dhost))
+   local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
+   assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
+end
+
 function selftest ()
    print("nh_fwd: selftest")
    test_ipv4_flow()
    test_ipv6_flow()
+   test_ipv4_cache_trigger()
 end
