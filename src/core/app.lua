@@ -196,6 +196,7 @@ function apply_config_actions (actions, conf)
          app.shm.dtime = {counter, C.get_unix_time()}
          app.shm = shm.create_frame("apps/"..name, app.shm)
       end
+      specialize(app)
    end
    function ops.restart (name)
       ops.stop(name)
@@ -209,6 +210,7 @@ function apply_config_actions (actions, conf)
          new_app_table[name] = app
          table.insert(new_app_array, app)
          app_name_to_index[name] = #new_app_array
+         specialize(app)
       else
          ops.restart(name)
       end
@@ -250,6 +252,13 @@ function apply_config_actions (actions, conf)
    for _, app in ipairs(app_array) do
       if app.link then app:link() end
    end
+end
+
+-- Specialize an app so that its pull and push methods can be JITed
+-- into instance-specific machine code.
+function specialize (app)
+   if app.pull then app.pull = lib.specialize(app.pull) end
+   if app.push then app.push = lib.specialize(app.push) end
 end
 
 -- Call this to "run snabb switch".
