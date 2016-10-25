@@ -642,7 +642,9 @@ function resolve(schema, features)
          end
       end
       for _,feature in ipairs(pop_prop(node, 'if_features') or {}) do
-         if not has_feature(env, feature) then return nil, env end
+         if not pcall(lookup, env, 'features', feature) then
+            return nil, env
+         end
       end
       for k,v in pairs(node.body or {}) do
          if v.kind == 'uses' then
@@ -845,4 +847,5 @@ function selftest()
    parse_schema(require('lib.yang.ietf_inet_types_yang'))
 
    load_schema_by_name('ietf-yang-types')
+   load_schema_by_name('ietf-softwire')
 end
