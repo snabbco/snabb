@@ -909,6 +909,19 @@ lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
   => {foo=42, bar=43, baz=44}
 ```
 
+— Function **lib.specialize** *function*
+
+Returns a clone of the given function with a shallow copy of its
+function definition. The clone function has a separate bytecode
+definition and any JIT traces that start in the clone will be
+aggressively specialized by LuaJIT for the environment of the clone.
+
+This can lead to especially efficient machine code when:
+- The function being specialized contains a loop (`for` or `while` or `repeat`) directly in its source code (not in a subroutine because the bytecode cloning is shallow).
+- The function will benefit from being compiled separately from other uses, for example because the way the clone will be called is expected to lead to a peculiar flow of control.
+- The function refers to values in its closure environment, which the JIT will treat more like constants than variables.
+
+See background information at [LuaJIT/LuaJIT#208](https://github.com/LuaJIT/LuaJIT/issues/208).
 
 ## Main
 
