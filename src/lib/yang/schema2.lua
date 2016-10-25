@@ -117,14 +117,6 @@ end
 local function collect_body_children(node)
    return collect_children_by_id(
       node,
-      {'extension', 'feature', 'identity', 'typedef', 'grouping',
-       'container', 'leaf', 'list', 'leaf-list', 'uses', 'choice',
-       'anyxml', 'rpc', 'notification', 'deviation'})
-end
-
-local function collect_data_children(node)
-   return collect_children_by_id(
-      node,
       {'container', 'leaf', 'list', 'leaf-list', 'uses', 'choice', 'anyxml'})
 end
 
@@ -133,8 +125,8 @@ local function at_least_one(tab)
    return false
 end
 
-local function collect_data_children_at_least_1(node)
-   local ret = collect_data_children(node)
+local function collect_body_children_at_least_1(node)
+   local ret = collect_body_children(node)
    if not at_least_one(ret) then
       error_with_path(node.path, "missing data statements")
    end
@@ -209,7 +201,7 @@ end
 local function init_anyxml(node)
    node.id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.must = collect_child_properties(node, 'must', 'value')
    node.config = maybe_child_property(node, 'config', 'value')
    node.mandatory = maybe_child_property(node, 'mandatory', 'value')
@@ -224,7 +216,7 @@ end
 local function init_augment(node)
    node.node_id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
@@ -237,16 +229,16 @@ end
 local function init_case(node)
    node.id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
-   node.body = collect_data_children(node)
+   node.body = collect_body_children(node)
 end
 local function init_choice(node)
    node.id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.default = maybe_child_property(node, 'default', 'value')
    node.config = maybe_child_property(node, 'config', 'value')
    node.mandatory = maybe_child_property(node, 'mandatory', 'value')
@@ -262,7 +254,7 @@ end
 local function init_container(node)
    node.id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.must = collect_child_properties(node, 'must', 'value')
    node.presence = maybe_child_property(node, 'presence', 'value')
    node.config = maybe_child_property(node, 'config', 'value')
@@ -271,7 +263,7 @@ local function init_container(node)
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.typedefs = collect_children_by_id(node, 'typedef')
    node.groupings = collect_children_by_id(node, 'grouping')
-   node.body = collect_data_children(node)
+   node.body = collect_body_children(node)
 end
 local function init_extension(node)
    node.id = require_argument(node)
@@ -282,7 +274,7 @@ local function init_extension(node)
 end
 local function init_feature(node)
    node.id = require_argument(node)
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
@@ -294,7 +286,7 @@ local function init_grouping(node)
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.typedefs = collect_children_by_id(node, 'typedef')
    node.groupings = collect_children_by_id(node, 'grouping')
-   node.body = collect_data_children(node)
+   node.body = collect_body_children(node)
 end
 local function init_identity(node)
    node.id = require_argument(node)
@@ -306,6 +298,7 @@ end
 local function init_import(node)
    node.id = require_argument(node)
    node.prefix = require_child_property(node, 'prefix', 'value')
+   node.revision_date = maybe_child_property(node, 'revision-date', 'value')
 end
 local function init_include(node)
    node.id = require_argument(node)
@@ -314,12 +307,12 @@ end
 local function init_input(node)
    node.typedefs = collect_children_by_id(node, 'typedef')
    node.groupings = collect_children_by_id(node, 'grouping')
-   node.body = collect_data_children_at_least_1(node)
+   node.body = collect_body_children_at_least_1(node)
 end
 local function init_leaf(node)
    node.id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.type = require_child(node, 'type')
    node.units = maybe_child_property(node, 'units', 'value')
    node.must = collect_child_properties(node, 'must', 'value')
@@ -333,7 +326,7 @@ end
 local function init_leaf_list(node)
    node.id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.type = require_child(node, 'type')
    node.units = maybe_child_property(node, 'units', 'value')
    node.must = collect_child_properties(node, 'must', 'value')
@@ -354,7 +347,7 @@ end
 local function init_list(node)
    node.id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.must = collect_child_properties(node, 'must', 'value')
    node.key = maybe_child_property(node, 'key', 'value')
    node.unique = collect_child_properties(node, 'unique', 'value')
@@ -365,7 +358,7 @@ local function init_list(node)
    node.status = maybe_child_property(node, 'status', 'value')
    node.typedefs = collect_children_by_id(node, 'typedef')
    node.groupings = collect_children_by_id(node, 'grouping')
-   node.body = collect_data_children_at_least_1(node)
+   node.body = collect_body_children_at_least_1(node)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
@@ -374,15 +367,22 @@ local function init_module(node)
    node.yang_version = maybe_child_property(node, 'yang-version', 'value')
    node.namespace = require_child_property(node, 'namespace', 'value')
    node.prefix = require_child_property(node, 'prefix', 'value')
-   node.submodules = collect_children_by_id(node, 'submodule')
    node.imports = collect_children_by_prop(node, 'import', 'prefix')
-   node.includes = collect_children(node, 'include')
+   node.includes = collect_children_by_id(node, 'include')
    node.organization = maybe_child_property(node, 'organization', 'value')
    node.contact = maybe_child_property(node, 'contact', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.revisions = collect_children(node, 'revision')
    node.augments = collect_children(node, 'augment')
+   node.typedefs = collect_children_by_id(node, 'typedef')
+   node.groupings = collect_children_by_id(node, 'grouping')
+   node.features = collect_children_by_id(node, 'feature')
+   node.extensions = collect_children_by_id(node, 'extension')
+   node.identities = collect_children_by_id(node, 'identity')
+   node.rpcs = collect_children_by_id(node, 'rpc')
+   node.notifications = collect_children_by_id(node, 'notification')
+   node.deviations = collect_children_by_id(node, 'deviation')
    node.body = collect_body_children(node)
 end
 local function init_namespace(node)
@@ -391,18 +391,18 @@ local function init_namespace(node)
 end
 local function init_notification(node)
    node.id = require_argument(node)
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.typedefs = collect_children_by_id(node, 'typedef')
    node.groupings = collect_children_by_id(node, 'grouping')
-   node.body = collect_data_children(node)
+   node.body = collect_body_children(node)
 end
 local function init_output(node)
    node.typedefs = collect_children_by_id(node, 'typedef')
    node.groupings = collect_children_by_id(node, 'grouping')
-   node.body = collect_data_children_at_least_1(node)
+   node.body = collect_body_children_at_least_1(node)
 end
 local function init_path(node)
    -- TODO: parse path string
@@ -443,7 +443,7 @@ local function init_revision(node)
 end
 local function init_rpc(node)
    node.id = require_argument(node)
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
@@ -478,6 +478,14 @@ local function init_submodule(node)
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.revisions = collect_children(node, 'revision')
    node.augments = collect_children(node, 'augment')
+   node.typedefs = collect_children_by_id(node, 'typedef')
+   node.groupings = collect_children_by_id(node, 'grouping')
+   node.features = collect_children_by_id(node, 'feature')
+   node.extensions = collect_children_by_id(node, 'extension')
+   node.identities = collect_children_by_id(node, 'identity')
+   node.rpcs = collect_children_by_id(node, 'rpc')
+   node.notifications = collect_children_by_id(node, 'notification')
+   node.deviations = collect_children_by_id(node, 'deviation')
    node.body = collect_body_children(node)
 end
 local function init_typedef(node)
@@ -492,7 +500,7 @@ end
 local function init_uses(node)
    node.id = require_argument(node)
    node.when = maybe_child_property(node, 'when', 'value')
-   node.if_feature = collect_child_properties(node, 'if-feature', 'value')
+   node.if_features = collect_child_properties(node, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
@@ -554,18 +562,174 @@ declare_initializer(init_uses, 'uses')
 declare_initializer(init_value, 'value')
 
 local function schema_from_ast(ast)
-   assert(#ast == 1, 'expected a single module form')
-   local parsed = parse_node(ast[1])
-   assert(parsed.kind == 'module', 'not a yang module')
-   return parsed
+   local ret
+   local submodules = {}
+   for _,node in ipairs(ast) do
+      if node.keyword == 'module' then
+         assert(not ret, 'expected only one module form')
+         ret = parse_node(node)
+      elseif node.keyword == 'submodule' then
+         assert(not submodules[node.id], 'duplicate submodule name: '..node.id)
+         submodules[node.id] = parse_node(node)
+      else
+         error('expected only module and submodule statements, got: '..node.keyword)
+      end
+   end
+   assert(ret, 'missing module form')
+   ret.submodules = submodules
+   return ret
+end
+
+-- Strip properties pertaining to original source representation.
+local function strip(exp)
+   if type(exp) ~= 'table' then return exp end
+   local ret = {}
+   for k, v in pairs(exp) do
+      if k ~= 'children' and k ~= 'argument_string' and k ~= 'order' and k ~= 'path' then
+         ret[k] = strip(v)
+      end
+   end
+   return ret
+end
+
+-- Inline "grouping" into "uses".
+-- Inline "submodule" into "include".
+-- Inline "imports" into "module".
+-- Inline "typedef" into "type". (TODO)
+-- Resolve if-feature.
+-- Warn on any "when", resolving them as being true.
+-- Resolve all augment and refine nodes. (TODO)
+function resolve(schema, features)
+   local function shallow_copy(node)
+      local out = {}
+      for k,v in pairs(node) do out[k] = v end
+      return out
+   end
+   local function pop_prop(node, prop)
+      local val = node[prop]
+      node[prop] = nil
+      return val
+   end
+   local function push_env(node, env)
+      node = shallow_copy(node)
+      return node, {env=env,
+                    groupings=pop_prop(node, 'groupings'),
+                    typedefs=pop_prop(node, 'typedefs')}
+   end
+   local function lookup(env, prop, name)
+      if not env then error(prop..' not found: '..name) end
+      if not env[prop] or not env[prop][name] then
+         return lookup(env.env, prop, name)
+      end
+      return env[prop][name], env
+   end
+   local visit
+   local function instantiate_grouping(env, name)
+      local grouping, grouping_env = lookup(env, 'groupings', name)
+      return visit(grouping, grouping_env)
+   end
+   function visit(node, env)
+      node, env = push_env(node, env)
+      local when = pop_prop(node, 'when')
+      if when then
+         print('warning: assuming "when" condition to be true: '..when.value)
+      end
+      for k,v in pairs(pop_prop(node, 'features') or {}) do
+         v = visit(v, env)
+         if v then
+            if not env.features then env.features = {} end
+            env.features[k] = v
+         end
+      end
+      for _,feature in ipairs(pop_prop(node, 'if_features') or {}) do
+         if not has_feature(env, feature) then return nil, env end
+      end
+      for k,v in pairs(node.body or {}) do
+         if v.kind == 'uses' then
+            -- Inline "grouping" into "uses".
+            local grouping = instantiate_grouping(env, v.id)
+            node.body[k] = nil
+            for k,v in pairs(grouping.body) do
+               assert(not node.body[k], 'duplicate identifier: '..k)
+               node.body[k] = v
+            end
+            -- TODO: Handle refine and augment statements.
+         else
+            node.body[k] = visit(v, env)
+         end
+      end
+      return node, env
+   end
+   local function merge_tables(dst, src)
+      for k,v in pairs(src) do
+         assert(dst[k] == nil or dst[k] == v, 'incompatible definitions: '..k)
+         dst[k] = v
+      end
+   end
+   local linked = {}
+   local function link(node, env)
+      if linked[node.id] then
+         assert(linked[node.id] ~= 'pending', 'recursive import of '..node.id)
+         local node, env = unpack(linked[node.id])
+         return node, env
+      end
+      linked[node.id] = 'pending'
+      node = shallow_copy(node)
+      local module_env = {env=env, prefixes={}, extensions={}, features={},
+                          identities={}, typedefs={}, groupings={}}
+      local module_body = shallow_copy(node.body)
+      for k,v in pairs(pop_prop(node, 'includes')) do
+         local submodule = lookup(env, 'submodules', k)
+         assert(submodule.belongs_to.id == node.id)
+         submodule = link(submodule, env)
+         merge_tables(module_env.extensions, submodule.env.extensions)
+         merge_tables(module_env.features, submodule.env.features)
+         merge_tables(module_env.identities, submodule.env.identities)
+         merge_tables(module_env.typedefs, submodule.env.typedefs)
+         merge_tables(module_env.groupings, submodule.env.groupings)
+         merge_tables(module_body, submodule.body)
+      end
+      if node.prefix then
+         assert(node.kind == 'module', node.kind)
+         module_env.prefixes[node.prefix] = module_env
+      end
+      for k,v in pairs(pop_prop(node, 'imports')) do
+         assert(not module_env.prefixes[v.prefix], 'duplicate prefix')
+         -- CHECKME: Discarding body from import, just importing env.
+         -- Is this OK?
+         local schema, env = load_schema_by_name(v.id, v.revision_date)
+         module_env.prefixes[v.prefix] = env
+      end
+      node, env = visit(node, module_env)
+      -- The typedefs, groupings, identities, and so on of this module
+      -- are externally visible for other modules that may import this
+      -- one; save them and their environment.
+      linked[node.id] = {node, env}
+      return node, env
+   end
+   schema = shallow_copy(schema)
+   return link(schema, {features=(features or {}),
+                        submodules=pop_prop(schema, 'submodules')})
 end
 
 function parse_schema(src, filename)
    return schema_from_ast(parser.parse_string(src, filename))
 end
-
 function parse_schema_file(filename)
    return schema_from_ast(parser.parse_file(filename))
+end
+
+function load_schema(src, filename)
+   return resolve(strip(parse_schema(src, filename)))
+end
+function load_schema_file(filename)
+   return resolve(strip(parse_schema_file(filename)))
+end
+function load_schema_by_name(name, revision)
+   -- FIXME: @ is not valid in a Lua module name.
+   -- if revision then name = name .. '@' .. revision end
+   name = name:gsub('-', '_')
+   return load_schema(require('lib.yang.'..name..'_yang'), name)
 end
 
 function selftest()
@@ -598,7 +762,7 @@ function selftest()
       }
 
       grouping fruit {
-         description "Represets a piece of fruit";
+         description "Represents a piece of fruit";
 
          leaf name {
             type string;
@@ -634,50 +798,51 @@ function selftest()
       }
    }]]
 
-  -- Convert the schema using the already tested parser.
-  local schema = parse_schema(test_schema, "schema selftest")
+   local schema, env = load_schema(test_schema)
+   assert(schema.id == "fruit")
+   assert(schema.namespace == "urn:testing:fruit")
+   assert(schema.prefix == "fruit")
+   assert(schema.contact == "John Smith fake@person.tld")
+   assert(schema.organization == "Fruit Inc.")
+   assert(schema.description == "Module to test YANG schema lib")
 
-  assert(schema.id == "fruit")
-  assert(schema.namespace == "urn:testing:fruit")
-  assert(schema.prefix == "fruit")
-  assert(schema.contact == "John Smith fake@person.tld")
-  assert(schema.organization == "Fruit Inc.")
-  assert(schema.description == "Module to test YANG schema lib")
+   -- Check all revisions are accounted for.
+   assert(schema.revisions[1].description == "Revision 1")
+   assert(schema.revisions[1].value == "2016-05-27")
+   assert(schema.revisions[2].description == "Revision 2")
+   assert(schema.revisions[2].value == "2016-05-28")
 
-  -- Check both modules exist. (Also need to check they've loaded)
-  assert(schema.imports["inet"].id == "ietf-inet-types")
-  assert(schema.imports["yang"].id == "ietf-yang-types")
+   -- Check that the feature statements are in the exports interface
+   -- but not the schema itself.
+   assert(not schema.features)
+   assert(env.features["bowl"])
+   assert(env.features["bowl"].description == 'A fruit bowl')
 
-  -- Check all revisions are accounted for.
-  assert(schema.revisions[1].description == "Revision 1")
-  assert(schema.revisions[1].value == "2016-05-27")
-  assert(schema.revisions[2].description == "Revision 2")
-  assert(schema.revisions[2].value == "2016-05-28")
+   -- Check that groupings get inlined into their uses.
+   assert(schema.body['fruit-bowl'])
+   assert(schema.body['fruit-bowl'].description == 'Represents a fruit bowl')
+   local contents = schema.body['fruit-bowl'].body['contents']
+   assert(contents)
+   assert(contents.kind == 'list')
+   -- TODO: Copy description over?  Probably not given that one node
+   -- can use multiple groupings.
+   -- assert(contents.description == 'Represents a piece of fruit')
+   assert(contents.body['name'].kind == 'leaf')
+   assert(contents.body['name'].type.id == 'string')
+   assert(contents.body["name"].mandatory == true)
+   assert(contents.body["name"].description == "Name of fruit.")
+   assert(contents.body["score"].type.id == "uint8")
+   assert(contents.body["score"].mandatory == true)
+   assert(contents.body["score"].type.range.value[1] == 0)
+   assert(contents.body["score"].type.range.value[2] == 10)
 
-  -- Check that the feature statements are there.
-  assert(schema.body["bowl"])
-  assert(schema.body["bowl"].kind == 'feature')
+   -- Check the container has a leaf called "description"
+   local desc = schema.body["fruit-bowl"].body['description']
+   assert(desc.type.id == "string")
+   assert(desc.description == "About the bowl")
 
-  -- Check the groupings
-  assert(schema.body["fruit"])
-  assert(schema.body["fruit"].description)
-  assert(schema.body["fruit"].body["name"])
-  assert(schema.body["fruit"].body["name"].kind == "leaf")
-  assert(schema.body["fruit"].body["name"].type.id == "string")
-  assert(schema.body["fruit"].body["name"].mandatory == true)
-  assert(schema.body["fruit"].body["name"].description == "Name of fruit.")
-  assert(schema.body["fruit"].body["score"].type.id == "uint8")
-  assert(schema.body["fruit"].body["score"].mandatory == true)
-  assert(schema.body["fruit"].body["score"].type.range.value[1] == 0)
-  assert(schema.body["fruit"].body["score"].type.range.value[2] == 10)
+   parse_schema(require('lib.yang.ietf_yang_types_yang'))
+   parse_schema(require('lib.yang.ietf_inet_types_yang'))
 
-  -- Check the containers description (NOT the leaf called "description")
-  assert(schema.body["fruit-bowl"].description == "Represents a fruit bowl")
-
-  -- Check the container has a leaf called "description"
-  local desc = schema.body["fruit-bowl"].body['description']
-  assert(desc.type.id == "string")
-  assert(desc.description == "About the bowl")
-
-  parse_schema(require('lib.yang.example_yang'))
+   load_schema_by_name('ietf-yang-types')
 end
