@@ -414,7 +414,6 @@ local function init_pattern(node)
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
 local function init_range(node)
-   -- TODO: parse range string
    node.value = parse_range(node, require_argument(node))
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
@@ -628,18 +627,23 @@ function resolve(schema, features)
       local grouping, grouping_env = lookup(env, 'groupings', name)
       return visit(grouping, grouping_env)
    end
+   local function visit_top_level(node, env, prop)
+      assert(not env[prop])
+      env[prop] = {}
+      for k,v in pairs(pop_prop(node, prop) or {}) do
+         env[prop][k] = visit(v, env)
+      end
+   end
    function visit(node, env)
       node, env = push_env(node, env)
       local when = pop_prop(node, 'when')
       if when then
          print('warning: assuming "when" condition to be true: '..when.value)
       end
-      for k,v in pairs(pop_prop(node, 'features') or {}) do
-         v = visit(v, env)
-         if v then
-            if not env.features then env.features = {} end
-            env.features[k] = v
-         end
+      if node.kind == 'module' or node.kind == 'submodule' then
+         visit_top_level(node, env, 'extensions')
+         visit_top_level(node, env, 'features')
+         visit_top_level(node, env, 'identities')
       end
       for _,feature in ipairs(pop_prop(node, 'if_features') or {}) do
          if not pcall(lookup, env, 'features', feature) then
@@ -683,24 +687,31 @@ function resolve(schema, features)
       for k,v in pairs(pop_prop(node, 'includes')) do
          local submodule = lookup(env, 'submodules', k)
          assert(submodule.belongs_to.id == node.id)
-         submodule = link(submodule, env)
-         merge_tables(module_env.extensions, submodule.env.extensions)
-         merge_tables(module_env.features, submodule.env.features)
-         merge_tables(module_env.identities, submodule.env.identities)
-         merge_tables(module_env.typedefs, submodule.env.typedefs)
-         merge_tables(module_env.groupings, submodule.env.groupings)
+         submodule, submodule_env = link(submodule, env)
+         merge_tables(module_env.extensions, submodule_env.extensions)
+         merge_tables(module_env.features, submodule_env.features)
+         merge_tables(module_env.identities, submodule_env.identities)
+         merge_tables(module_env.typedefs, submodule_env.typedefs)
+         merge_tables(module_env.groupings, submodule_env.groupings)
          merge_tables(module_body, submodule.body)
       end
       if node.prefix then
          assert(node.kind == 'module', node.kind)
-         module_env.prefixes[node.prefix] = module_env
+         module_env.prefixes[node.prefix] = node.namespace
       end
       for k,v in pairs(pop_prop(node, 'imports')) do
          assert(not module_env.prefixes[v.prefix], 'duplicate prefix')
          -- CHECKME: Discarding body from import, just importing env.
          -- Is this OK?
          local schema, env = load_schema_by_name(v.id, v.revision_date)
-         module_env.prefixes[v.prefix] = env
+         local prefix = v.prefix
+         module_env.prefixes[prefix] = schema.namespace
+         for _,prop in ipairs({'extensions', 'features', 'identities',
+                               'typedefs', 'groupings'}) do
+            for k,v in pairs(env[prop]) do
+               module_env[prop][prefix..':'..k] = v
+            end
+         end
       end
       node, env = visit(node, module_env)
       -- The typedefs, groupings, identities, and so on of this module
