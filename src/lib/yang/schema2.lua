@@ -591,6 +591,41 @@ local function strip(exp)
    return ret
 end
 
+local function integer_type(min, max) return function(node) return node end end
+local function binary_type(node) return node end
+local function bits_type(node) return node end
+local function boolean_type(node) return node end
+local function decimal64_type(node) return node end
+local function empty_type(node) return node end
+local function enumeration_type(node) return node end
+local function identityref_type(node) return node end
+local function instance_identifier_type(node) return node end
+local function leafref_type(node) return node end
+local function string_type(node) return node end
+local function union_type(node) return node end
+
+local primitive_type_constructors = {
+   int8 = integer_type(-0xf0, 0x7f),
+   int16 = integer_type(-0xf000, 0x7fff),
+   int32 = integer_type(-0xf000000, 0x7fffffff),
+   int64 = integer_type(-0xf00000000000000LL, 0x7fffffffffffffffLL),
+   uint8 = integer_type(0, 0xff),
+   uint16 = integer_type(0, 0xffff),
+   uint32 = integer_type(0, 0xffffffff),
+   uint64 = integer_type(0, 0xffffffffffffffffULL),
+   binary = binary_type,
+   bits = bits_type,
+   boolean = boolean_type,
+   decimal64 = decimal64_type,
+   empty = empty_type,
+   enumeration = enumeration_type,
+   identityref = identityref_type,
+   ['instance-identifier'] = instance_identifier_type,
+   leafref = leafref_type,
+   string = string_type,
+   union = union_type
+}
+
 -- Inline "grouping" into "uses".
 -- Inline "submodule" into "include".
 -- Inline "imports" into "module".
@@ -609,33 +644,80 @@ function resolve(schema, features)
       node[prop] = nil
       return val
    end
-   local function push_env(node, env)
-      node = shallow_copy(node)
-      return node, {env=env,
-                    groupings=pop_prop(node, 'groupings'),
-                    typedefs=pop_prop(node, 'typedefs')}
-   end
    local function lookup(env, prop, name)
       if not env then error(prop..' not found: '..name) end
       if not env[prop] or not env[prop][name] then
          return lookup(env.env, prop, name)
       end
-      return env[prop][name], env
+      return env[prop][name]
+   end
+   local function lookup_lazy(env, prop, name)
+      local val = lookup(env, prop, name)
+      if type(val) == 'table' then return val end
+      -- Force lazy expansion and memoize result.
+      return val()
    end
    local visit
-   local function instantiate_grouping(env, name)
-      local grouping, grouping_env = lookup(env, 'groupings', name)
-      return visit(grouping, grouping_env)
-   end
    local function visit_top_level(node, env, prop)
       assert(not env[prop])
       env[prop] = {}
+      local p = lookup(env, 'prefix', '_')
       for k,v in pairs(pop_prop(node, prop) or {}) do
          env[prop][k] = visit(v, env)
+         env[prop][p..':'..k] = env[prop][k]
       end
    end
+   local function visit_lazy(tab, env)
+      local ret = {}
+      local prefix = lookup(env, 'prefix', '_')
+      local function error_recursion()
+         error('mutually recursive typedefs or groupings')
+      end
+      for k,v in pairs(tab) do
+         -- FIXME: Only add prefix:k if at top level.
+         local function lazy()
+            ret[k] = error_recursion
+            ret[prefix..':'..k] = ret[k]
+            ret[k] = visit(v, env)
+            ret[prefix..':'..k] = ret[k]
+            return ret[k]
+         end
+         ret[k] = lazy
+         ret[prefix..':'..k] = ret[k]
+      end
+      return ret
+   end
+   function visit_type(node, env)
+      node = shallow_copy(node)
+      local success, typedef = pcall(lookup, env, 'typedefs', node.id)
+      if success then
+         -- Could be that typedef is still lazy.  We didn't use
+         -- lookup_lazy because we don't want the pcall to hide errors
+         -- from the lazy expansion.
+         if type(typedef) == 'function' then typedef = typedef() end
+         node.base_type = typedef
+      else
+         -- If the type name wasn't bound, it must be primitive.
+         local make_primitive = assert(primitive_type_constructors[node.id],
+                                       'unknown type: '..node.id)
+         node.primitive_type = make_primitive(node)
+      end
+      return node
+   end
    function visit(node, env)
-      node, env = push_env(node, env)
+      node = shallow_copy(node)
+      env = {env=env}
+      if node.typedefs then
+         -- Populate node.typedefs as a table of thunks that will
+         -- lazily expand and memoize their result when called.  This
+         -- is not only a performance optimization but also allows the
+         -- typedefs to be mutually visible.
+         env.typedefs = visit_lazy(pop_prop(node, 'typedefs'), env)
+      end
+      if node.groupings then
+         -- Likewise expand groupings at their point of definition.
+         env.groupings = visit_lazy(pop_prop(node, 'groupings'), env)
+      end
       local when = pop_prop(node, 'when')
       if when then
          print('warning: assuming "when" condition to be true: '..when.value)
@@ -650,10 +732,11 @@ function resolve(schema, features)
             return nil, env
          end
       end
+      if node.type then node.type = visit_type(node.type, env) end
       for k,v in pairs(node.body or {}) do
          if v.kind == 'uses' then
             -- Inline "grouping" into "uses".
-            local grouping = instantiate_grouping(env, v.id)
+            local grouping = lookup_lazy(env, 'groupings', v.id)
             node.body[k] = nil
             for k,v in pairs(grouping.body) do
                assert(not node.body[k], 'duplicate identifier: '..k)
@@ -666,10 +749,10 @@ function resolve(schema, features)
       end
       return node, env
    end
-   local function merge_tables(dst, src)
+   local function include(dst, src)
       for k,v in pairs(src) do
          assert(dst[k] == nil or dst[k] == v, 'incompatible definitions: '..k)
-         dst[k] = v
+         if not k:match(':') then dst[k] = v end
       end
    end
    local linked = {}
@@ -688,16 +771,17 @@ function resolve(schema, features)
          local submodule = lookup(env, 'submodules', k)
          assert(submodule.belongs_to.id == node.id)
          submodule, submodule_env = link(submodule, env)
-         merge_tables(module_env.extensions, submodule_env.extensions)
-         merge_tables(module_env.features, submodule_env.features)
-         merge_tables(module_env.identities, submodule_env.identities)
-         merge_tables(module_env.typedefs, submodule_env.typedefs)
-         merge_tables(module_env.groupings, submodule_env.groupings)
-         merge_tables(module_body, submodule.body)
+         include(module_env.extensions, submodule_env.extensions)
+         include(module_env.features, submodule_env.features)
+         include(module_env.identities, submodule_env.identities)
+         include(module_env.typedefs, submodule_env.typedefs)
+         include(module_env.groupings, submodule_env.groupings)
+         include(module_body, submodule.body)
       end
       if node.prefix then
          assert(node.kind == 'module', node.kind)
          module_env.prefixes[node.prefix] = node.namespace
+         module_env.prefix = {_=node.prefix}
       end
       for k,v in pairs(pop_prop(node, 'imports')) do
          assert(not module_env.prefixes[v.prefix], 'duplicate prefix')
@@ -709,7 +793,9 @@ function resolve(schema, features)
          for _,prop in ipairs({'extensions', 'features', 'identities',
                                'typedefs', 'groupings'}) do
             for k,v in pairs(env[prop]) do
-               module_env[prop][prefix..':'..k] = v
+               if not k:match(':') then
+                  module_env[prop][prefix..':'..k] = v
+               end
             end
          end
       end
