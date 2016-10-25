@@ -191,13 +191,14 @@ function check_pcap_equals { testname=$1; output=$2; expected=$3
 }
 
 function cleanup {
+    local exit_code=$1
     screens=$(screen -ls | egrep -o "[0-9]+\." | sed 's/\.//')
     for each in $screens; do
         if [[ "$each" > 0 ]]; then
             screen -S $each -X quit
         fi
     done
-    exit 0
+    echo $exit_code
 }
 
 function run_pcap_test { testname=$1; input=$2; expected=$3; filter=$4
