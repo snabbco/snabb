@@ -21,20 +21,18 @@ function bridge:new (arg)
 end
 
 function bridge:push()
-   local src_ports = self._src_ports
+   local ports = self._ports
    local dst_ports = self._dst_ports
-   local output = self.output
    local i = 1
-   while src_ports[i] do
-      local src_port = src_ports[i]
-      local l_in = self.input[src_port]
+   while ports[i] do
+      local l_in = ports[i].l_in
       while not empty(l_in) do
-         local ports = dst_ports[src_port]
+         local dst = dst_ports[i]
          local p = receive(l_in)
-         transmit(output[ports[1]], p)
+         transmit(ports[dst[1]].l_out, p)
          local j = 2
-         while ports[j] do
-            transmit(output[ports[j]], clone(p))
+         while dst[j] do
+            transmit(ports[dst[j]].l_out, clone(p))
             j = j + 1
          end
       end

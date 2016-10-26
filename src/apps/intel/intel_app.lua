@@ -6,12 +6,28 @@ local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
 local ffi      = require("ffi")
 local lib      = require("core.lib")
+local shm      = require("core.shm")
+local counter  = require("core.counter")
 local pci      = require("lib.hardware.pci")
 local register = require("lib.hardware.register")
+local macaddress = require("lib.macaddress")
 local intel10g = require("apps.intel.intel10g")
-local freelist = require("core.freelist")
-local receive, transmit, full, empty = link.receive, link.transmit, link.full, link.empty
-Intel82599 = {}
+local receive, transmit, empty = link.receive, link.transmit, link.empty
+
+Intel82599 = {
+   config = {
+      pciaddr = {required=true},
+      mtu = {},
+      macaddr = {},
+      vlan = {},
+      vmdq = {},
+      mirror = {},
+      rxcounter  = {default=0},
+      txcounter  = {default=0},
+      rate_limit = {default=0},
+      priority   = {default=1.0}
+   }
+}
 Intel82599.__index = Intel82599
 
 local C = ffi.C
@@ -32,25 +48,56 @@ local function firsthole(t)
    end
 end
 
-
 -- Create an Intel82599 App for the device with 'pciaddress'.
-function Intel82599:new (arg)
-   local conf = config.parse_app_arg(arg)
+function Intel82599:new (conf)
+   local self = {}
 
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
-         devices[conf.pciaddr] = {pf=intel10g.new_pf(conf):open(), vflist={}}
+         local pf = intel10g.new_pf(conf):open()
+         devices[conf.pciaddr] = { pf = pf,
+                                   vflist = {},
+                                   stats = { s = pf.s, r = pf.r, qs = pf.qs } }
       end
       local dev = devices[conf.pciaddr]
       local poolnum = firsthole(dev.vflist)-1
       local vf = dev.pf:new_vf(poolnum)
       dev.vflist[poolnum+1] = vf
-      return setmetatable({dev=vf:open(conf)}, Intel82599)
+      self.dev = vf:open(conf)
+      self.stats = devices[conf.pciaddr].stats
    else
-      local dev = intel10g.new_sf(conf):open()
-      if not dev then return null end
-      return setmetatable({dev=dev, zone="intel"}, Intel82599)
+      self.dev = assert(intel10g.new_sf(conf):open(), "Can not open device.")
+      self.stats = { s = self.dev.s, r = self.dev.r, qs = self.dev.qs }
+      self.zone = "intel"
    end
+   if not self.stats.shm then
+      self.stats.shm = shm.create_frame(
+         "pci/"..conf.pciaddr,
+         {dtime     = {counter, C.get_unix_time()},
+          mtu       = {counter, self.dev.mtu},
+          speed     = {counter, 10000000000}, -- 10 Gbits
+          status    = {counter, 2},           -- Link down
+          promisc   = {counter},
+          macaddr   = {counter},
+          rxbytes   = {counter},
+          rxpackets = {counter},
+          rxmcast   = {counter},
+          rxbcast   = {counter},
+          rxdrop    = {counter},
+          rxerrors  = {counter},
+          txbytes   = {counter},
+          txpackets = {counter},
+          txmcast   = {counter},
+          txbcast   = {counter},
+          txdrop    = {counter},
+          txerrors  = {counter}})
+      self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
+
+      if not conf.vmdq and conf.macaddr then
+         counter.set(self.stats.shm.macaddr, macaddress:new(conf.macaddr).bits)
+      end
+   end
+   return setmetatable(self, Intel82599)
 end
 
 function Intel82599:stop()
@@ -71,14 +118,21 @@ function Intel82599:stop()
    if close_pf then
       close_pf:close()
    end
+   if not self.dev.pf or close_pf then
+      shm.delete_frame(self.stats.shm)
+   end
 end
 
 
-function Intel82599:reconfig(arg)
-   local conf = config.parse_app_arg(arg)
+function Intel82599:reconfig (conf)
    assert((not not self.dev.pf) == (not not conf.vmdq), "Can't reconfig from VMDQ to single-port or viceversa")
 
    self.dev:reconfig(conf)
+
+   if not self.dev.pf and conf.macaddr then
+      counter.set(self.stats.shm.macaddr,
+                  macaddress:new(conf.macaddr).bits)
+   end
 end
 
 -- Allocate receive buffers from the given freelist.
@@ -91,11 +145,18 @@ function Intel82599:pull ()
    local l = self.output.tx
    if l == nil then return end
    self.dev:sync_receive()
-   for i=1,128 do
-      if full(l) or not self.dev:can_receive() then break end
+   for i = 1, engine.pull_npackets do
+      if not self.dev:can_receive() then break end
       transmit(l, self.dev:receive())
    end
    self:add_receive_buffers()
+   if self.stats.sync_timer() then
+      self:sync_stats()
+   end
+end
+
+function Intel82599:ingress_packet_drops ()
+   return self.dev:ingress_packet_drops()
 end
 
 function Intel82599:add_receive_buffers ()
@@ -105,11 +166,51 @@ function Intel82599:add_receive_buffers ()
    end
 end
 
+-- Synchronize self.stats.s/r a and self.stats.shm.
+local link_up_mask = lib.bits{Link_up=30}
+local promisc_mask = lib.bits{UPE=9}
+function Intel82599:sync_stats ()
+   local counters = self.stats.shm
+   local s, r, qs = self.stats.s, self.stats.r, self.stats.qs
+   counter.set(counters.rxbytes,   s.GORC64())
+   counter.set(counters.rxpackets, s.GPRC())
+   local mprc, bprc = s.MPRC(), s.BPRC()
+   counter.set(counters.rxmcast,   mprc + bprc)
+   counter.set(counters.rxbcast,   bprc)
+   -- The RX receive drop counts are only available through the RX stats
+   -- register. We only read stats register #0 here.
+   counter.set(counters.rxdrop,    qs.QPRDC[0]())
+   counter.set(counters.rxerrors,  s.CRCERRS() + s.ILLERRC() + s.ERRBC() +
+                                   s.RUC() + s.RFC() + s.ROC() + s.RJC())
+   counter.set(counters.txbytes,   s.GOTC64())
+   counter.set(counters.txpackets, s.GPTC())
+   local mptc, bptc = s.MPTC(), s.BPTC()
+   counter.set(counters.txmcast,   mptc + bptc)
+   counter.set(counters.txbcast,   bptc)
+   if bit.band(r.LINKS(), link_up_mask) == link_up_mask then
+      counter.set(counters.status, 1) -- Up
+   else
+      counter.set(counters.status, 2) -- Down
+   end
+   if bit.band(r.FCTRL(), promisc_mask) ~= 0ULL then
+      counter.set(counters.promisc, 1) -- True
+   else
+      counter.set(counters.promisc, 2) -- False
+   end
+end
+
 -- Push packets from our 'rx' link onto the network.
 function Intel82599:push ()
    local l = self.input.rx
    if l == nil then return end
    while not empty(l) and self.dev:can_transmit() do
+      -- We must not send packets that are bigger than the MTU.  This
+      -- check is currently disabled to satisfy some selftests until
+      -- agreement on this strategy is reached.
+      -- if p.length > self.dev.mtu then
+      --    counter.add(self.stats.shm.txdrop)
+      --    packet.free(p)
+      -- else
       do local p = receive(l)
          self.dev:transmit(p)
          --packet.deref(p)
@@ -287,14 +388,14 @@ function mq_sq(pcidevA, pcidevB)
    print("Send traffic from a nicA (SF) to nicB (two VFs)")
    print("The packets should arrive evenly split between the VFs")
    config.app(c, 'sink_ms', basic_apps.Sink)
-   config.link(c, 'source_ms.out -> repeater_ms.input')
+   config.link(c, 'source_ms.output -> repeater_ms.input')
    config.link(c, 'repeater_ms.output -> nicAs.rx')
    config.link(c, 'nicAs.tx -> sink_ms.in1')
    config.link(c, 'nicBm0.tx -> sink_ms.in2')
    config.link(c, 'nicBm1.tx -> sink_ms.in3')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+   link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d2))
 end
 
 -- one multiqueue driver with two apps and do switch stuff
@@ -335,13 +436,13 @@ function mq_sw(pcidevA)
    print ("Send a bunch of packets from Am0")
    print ("half of them go to nicAm1 and half go nowhere")
    config.app(c, 'sink_ms', basic_apps.Sink)
-   config.link(c, 'source_ms.out -> repeater_ms.input')
+   config.link(c, 'source_ms.output -> repeater_ms.input')
    config.link(c, 'repeater_ms.output -> nicAm0.rx')
    config.link(c, 'nicAm0.tx -> sink_ms.in1')
    config.link(c, 'nicAm1.tx -> sink_ms.in2')
    engine.configure(c)
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
-   link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+   link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
+   link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d2))
 end
 
 function manyreconf(pcidevA, pcidevB, n, do_pf)
@@ -387,14 +488,14 @@ function manyreconf(pcidevA, pcidevB, n, do_pf)
          vlan = 100+i,
       })
       config.app(c, 'sink_ms', basic_apps.Sink)
-      config.link(c, 'source_ms.out -> repeater_ms.input')
+      config.link(c, 'source_ms.output -> repeater_ms.input')
       config.link(c, 'repeater_ms.output -> nicAm0.rx')
       config.link(c, 'nicAm0.tx -> sink_ms.in1')
       config.link(c, 'nicAm1.tx -> sink_ms.in2')
       if do_pf then engine.configure(config.new()) end
       engine.configure(c)
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d1))
-      link.transmit(engine.app_table.source_ms.output.out, packet.from_string(d2))
+      link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d1))
+      link.transmit(engine.app_table.source_ms.output.output, packet.from_string(d2))
       engine.main({duration = 0.1, no_report=true})
       cycles = cycles + 1
       redos = redos + engine.app_table.nicAm1.dev.pf.redos

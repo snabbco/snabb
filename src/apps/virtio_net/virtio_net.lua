@@ -18,7 +18,7 @@ local main       = require("core.main")
 VirtioNet = {}
 VirtioNet.__index = VirtioNet
 
-local receive, transmit, full, nreadable, nwritable = link.receive, link.transmit, link.full, link.nreadable, link.nwritable
+local receive, transmit, nreadable = link.receive, link.transmit, link.nreadable
 
 function VirtioNet:new(args)
    return setmetatable({
@@ -51,7 +51,7 @@ function VirtioNet:pull()
    local dev = self.device
    local l = self.output.tx
    if not l then return end
-   local to_receive = math.min(nwritable(l), dev:can_receive())
+   local to_receive = math.min(engine.pull_npackets, dev:can_receive())
 
    for i=0, to_receive - 1 do
       transmit(l, dev:receive())

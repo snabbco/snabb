@@ -7,12 +7,17 @@ local lib       = require("core.lib")
 local link      = require("core.link")
 local config    = require("core.config")
 local timer     = require("core.timer")
+local shm       = require("core.shm")
 local histogram = require('core.histogram')
 local counter   = require("core.counter")
 local zone      = require("jit.zone")
+local jit       = require("jit")
 local ffi       = require("ffi")
 local C         = ffi.C
 require("core.packet_h")
+
+-- Packet per pull
+pull_npackets = math.floor(link.max / 10)
 
 -- Set to true to enable logging
 log = false
@@ -28,11 +33,11 @@ link_table, link_array = {}, {}
 configuration = config.new()
 
 -- Counters for statistics.
-breaths   = counter.open("engine/breaths")   -- Total breaths taken
-frees     = counter.open("engine/frees")     -- Total packets freed
-freebits  = counter.open("engine/freebits")  -- Total packet bits freed (for 10GbE)
-freebytes = counter.open("engine/freebytes") -- Total packet bytes freed
-configs   = counter.open("engine/configs")   -- Total configurations loaded
+breaths   = counter.create("engine/breaths.counter")   -- Total breaths taken
+frees     = counter.create("engine/frees.counter")     -- Total packets freed
+freebits  = counter.create("engine/freebits.counter")  -- Total packet bits freed (for 10GbE)
+freebytes = counter.create("engine/freebytes.counter") -- Total packet bytes freed
+configs   = counter.create("engine/configs.counter")   -- Total configurations loaded
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
@@ -67,17 +72,21 @@ end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
 -- error app will be marked as dead and restarted eventually.
-local function with_restart (app, method)
+function with_restart (app, method)
+   local status, result
    if use_restart then
       -- Run fn in protected mode using pcall.
-      local status, err = pcall(method, app)
+      status, result = pcall(method, app)
 
       -- If pcall caught an error mark app as "dead" (record time and cause
       -- of death).
-      if not status then app.dead = { error = err, time = now() } end
+      if not status then
+         app.dead = { error = result, time = now() }
+      end
    else
-      method(app)
+      status, result = true, method(app)
    end
+   return status, result
 end
 
 -- Restart dead apps.
@@ -148,14 +157,19 @@ end
 -- Update the active app network by applying the necessary actions.
 function apply_config_actions (actions, conf)
    -- The purpose of this function is to populate these tables:
-   local new_app_table,  new_app_array  = {}, {}, {}
-   local new_link_table, new_link_array = {}, {}, {}
+   local new_app_table,  new_app_array  = {}, {}
+   local new_link_table, new_link_array = {}, {}
    -- Temporary name->index table for use in link renumbering
    local app_name_to_index = {}
    -- Table of functions that execute config actions
    local ops = {}
    function ops.stop (name)
-      if app_table[name].stop then app_table[name]:stop() end
+      if app_table[name].stop then
+         app_table[name]:stop()
+      end
+      if app_table[name].shm then
+         shm.delete_frame(app_table[name].shm)
+      end
    end
    function ops.keep (name)
       new_app_table[name] = app_table[name]
@@ -178,6 +192,10 @@ function apply_config_actions (actions, conf)
       table.insert(new_app_array, app)
       app_name_to_index[name] = #new_app_array
       app.zone = zone
+      if app.shm then
+         app.shm.dtime = {counter, C.get_unix_time()}
+         app.shm = shm.create_frame("apps/"..name, app.shm)
+      end
    end
    function ops.restart (name)
       ops.stop(name)
@@ -225,9 +243,13 @@ function apply_config_actions (actions, conf)
    for linkspec, r in pairs(link_table) do
       if not new_link_table[linkspec] then link.free(r, linkspec) end
    end
-   -- commit changes
+   -- Commit changes.
    app_table, link_table = new_app_table, new_link_table
    app_array, link_array = new_app_array, new_link_array
+   -- Trigger link event for each app.
+   for _, app in ipairs(app_array) do
+      if app.link then app:link() end
+   end
 end
 
 -- Call this to "run snabb switch".
@@ -242,7 +264,7 @@ function main (options)
 
    local breathe = breathe
    if options.measure_latency or options.measure_latency == nil then
-      local latency = histogram.create('engine/latency', 1e-6, 1e0)
+      local latency = histogram.create('engine/latency.histogram', 1e-6, 1e0)
       breathe = latency:wrap_thunk(breathe, now)
    end
 
@@ -458,7 +480,18 @@ function selftest ()
    configure(config.new())
    assert(#app_array == 0)
    assert(#link_array == 0)
-   -- Test app restarts on failure.
+   -- Test app arg validation
+   local AppC = {
+      config = {
+         a = {required=true}, b = {default="foo"}
+      }
+   }
+   local c3 = config.new()
+   config.app(c3, "app_valid", AppC, {a="bar"})
+   assert(not pcall(config.app, c3, "app_invalid", AppC))
+   assert(not pcall(config.app, c3, "app_invalid", AppC, {b="bar"}))
+   assert(not pcall(config.app, c3, "app_invalid", AppC, {a="bar", c="foo"}))
+-- Test app restarts on failure.
    use_restart = true
    print("c_fail")
    local App1 = {zone="test"}
@@ -493,8 +526,4 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
-   print("OK")
 end
-
--- XXX add graphviz() function back.
-

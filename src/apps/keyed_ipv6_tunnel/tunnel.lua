@@ -16,6 +16,7 @@ local link = require("core.link")
 local lib = require("core.lib")
 local packet = require("core.packet")
 local config = require("core.config")
+local counter = require("core.counter")
 
 local macaddress = require("lib.macaddress")
 
@@ -100,19 +101,30 @@ local function prepare_header_template ()
    header_template[SESSION_ID_OFFSET + 3] = 0xFF
 end
 
-SimpleKeyedTunnel = {}
+SimpleKeyedTunnel = {
+   config = {
+      -- string, ipv6 address
+      local_address = {required=true},
+      remote_address = {required=true},
+      -- 8 bytes hex string
+      local_cookie = {required=true},
+      remote_cookie = {required=true},
+      -- unsigned number, must fit to uint32_t
+      local_session = {},
+      -- string, MAC address (for testing)
+      default_gateway_MAC = {},
+      -- unsigned integer <= 255
+      hop_limit = {}
+   },
+   shm = { rxerrors              = {counter},
+           length_errors         = {counter},
+           protocol_errors       = {counter},
+           cookie_errors         = {counter},
+           remote_address_errors = {counter},
+           local_address_errors  = {counter} }
+}
 
-function SimpleKeyedTunnel:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   -- required fields:
-   --   local_address, string, ipv6 address
-   --   remote_address, string, ipv6 address
-   --   local_cookie, 8 bytes hex string
-   --   remote_cookie, 8 bytes hex string
-   -- optional fields:
-   --   local_session, unsigned number, must fit to uint32_t
-   --   default_gateway_MAC, useful for testing
-   --   hop_limit, override default hop limit 64
+function SimpleKeyedTunnel:new (conf)
    assert(
          type(conf.local_cookie) == "string"
          and #conf.local_cookie <= 16,
@@ -180,7 +192,7 @@ function SimpleKeyedTunnel:push()
    local l_out = self.output.encapsulated
    assert(l_in and l_out)
 
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       local p = link.receive(l_in)
       packet.prepend(p, self.header, HEADER_SIZE)
       local plength = ffi.cast(plength_ctype, p.data + LENGTH_OFFSET)
@@ -192,21 +204,24 @@ function SimpleKeyedTunnel:push()
    l_in = self.input.encapsulated
    l_out = self.output.decapsulated
    assert(l_in and l_out)
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       local p = link.receive(l_in)
       -- match next header, cookie, src/dst addresses
       local drop = true
       repeat
          if p.length < HEADER_SIZE then
+            counter.add(self.shm.length_errors)
             break
          end
          local next_header = ffi.cast(next_header_ctype, p.data + NEXT_HEADER_OFFSET)
          if next_header[0] ~= L2TPV3_NEXT_HEADER then
+            counter.add(self.shm.protocol_errors)
             break
          end
 
          local cookie = ffi.cast(pcookie_ctype, p.data + COOKIE_OFFSET)
          if cookie[0] ~= self.remote_cookie then
+            counter.add(self.shm.cookie_errors)
             break
          end
 
@@ -214,6 +229,7 @@ function SimpleKeyedTunnel:push()
          if remote_address[0] ~= self.remote_address[0] or
             remote_address[1] ~= self.remote_address[1]
          then
+            counter.add(self.shm.remote_address_errors)
             break
          end
 
@@ -221,6 +237,7 @@ function SimpleKeyedTunnel:push()
          if local_address[0] ~= self.local_address[0] or
             local_address[1] ~= self.local_address[1]
          then
+            counter.add(self.shm.local_address_errors)
             break
          end
 
@@ -228,6 +245,7 @@ function SimpleKeyedTunnel:push()
       until true
 
       if drop then
+         counter.add(self.shm.rxerrors)
          -- discard packet
          packet.free(p)
       else
@@ -243,9 +261,8 @@ prepare_header_template()
 function selftest ()
    print("Keyed IPv6 tunnel selftest")
    local ok = true
-
-   local input_file = "apps/keyed_ipv6_tunnel/selftest.cap.input"
-   local output_file = "apps/keyed_ipv6_tunnel/selftest.cap.output"
+   local Synth = require("apps.test.synth").Synth
+   local Match = require("apps.test.match").Match
    local tunnel_config = {
       local_address = "00::2:1",
       remote_address = "00::2:1",
@@ -255,19 +272,19 @@ function selftest ()
    } -- should be symmetric for local "loop-back" test
 
    local c = config.new()
-   config.app(c, "source", pcap.PcapReader, input_file)
    config.app(c, "tunnel", SimpleKeyedTunnel, tunnel_config)
-   config.app(c, "sink", pcap.PcapWriter, output_file)
+   config.app(c, "match", Match)
+   config.app(c, "comparator", Synth)
+   config.app(c, "source", Synth)
    config.link(c, "source.output -> tunnel.decapsulated")
+   config.link(c, "comparator.output -> match.comparator")
    config.link(c, "tunnel.encapsulated -> tunnel.encapsulated")
-   config.link(c, "tunnel.decapsulated -> sink.input")
+   config.link(c, "tunnel.decapsulated -> match.rx")
    app.configure(c)
 
-   app.main({duration = 0.25}) -- should be long enough...
+   app.main({duration = 0.0001, report = {showapps=true,showlinks=true}})
    -- Check results
-   if io.open(input_file):read('*a') ~=
-      io.open(output_file):read('*a')
-   then
+   if #engine.app_table.match:errors() ~= 0 then
       ok = false
    end
 
