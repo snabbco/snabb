@@ -127,12 +127,12 @@ module snabb-nfvconfig {
       }
     }
 
-    leaf rx_police_gbps {
+    leaf rx_police {
       type gbps;
       description "Allowed input rate in Gigabits per second.";
     }
 
-    leaf tx_police_gbps {
+    leaf tx_police {
       type gbps;
       description "Allowed output rate in Gigabits per second.";
     }
