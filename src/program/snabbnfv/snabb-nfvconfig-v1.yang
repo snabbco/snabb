@@ -1,6 +1,6 @@
-module snabb-nfvconfig {
-  namespace "http://snabb.co/nfvconfig";
-  prefix snabb-nfvconfig;
+module snabb-nfvconfig-v1 {
+  namespace "http://snabb.co/nfvconfig-v1";
+  prefix snabb-nfvconfig-v1;
 
   import ietf-yang-types { prefix yang; }
   import ietf-inet-types { prefix inet; }
