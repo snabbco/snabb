@@ -46,7 +46,7 @@ outgoing packets.
 
 *Required*. Hexadecimal string of eight digits (two digits for each byte) that
 denotes four bytes of salt as specified in RFC 4106 used for the encryption of
-outgoing packets..
+outgoing packets.
 
 — Key **receive_key**
 
@@ -67,7 +67,7 @@ accepted as specified in RFC 4303. The default is 128.
 
 — Key **resync_threshold**
 
-Optional*. Number of consecutive packets allowed to fail decapsulation before
+*Optional*. Number of consecutive packets allowed to fail decapsulation before
 attempting “Re-synchronization” as specified in RFC 4303. The default is 1024.
 
 — Key **resync_attempts**
