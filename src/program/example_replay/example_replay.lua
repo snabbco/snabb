@@ -13,8 +13,6 @@ function run (parameters)
    local pcap_file = parameters[1]
    local interface = parameters[2]
 
-   engine.claim_name("Billybob")
-
    local c = config.new()
    config.app(c, "capture", pcap.PcapReader, pcap_file)
    config.app(c, "playback", raw.RawSocket, interface)
