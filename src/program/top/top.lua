@@ -32,7 +32,9 @@ function run (args)
 end
 
 function select_snabb_instance (pid)
-   local instances = shm.children("/")
+   local instances = {}
+   -- For named programs there is a "by-name" directory which isn't a process, remove it.
+   for k,v in pairs(shm.children("/")) do if v ~= "by-name" then instances[k] = v end end
    if pid then
       -- Try to use given pid
       for _, instance in ipairs(instances) do
