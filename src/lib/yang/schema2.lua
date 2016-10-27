@@ -591,40 +591,16 @@ local function strip(exp)
    return ret
 end
 
-local function integer_type(min, max) return function(node) return node end end
-local function binary_type(node) return node end
-local function bits_type(node) return node end
-local function boolean_type(node) return node end
-local function decimal64_type(node) return node end
-local function empty_type(node) return node end
-local function enumeration_type(node) return node end
-local function identityref_type(node) return node end
-local function instance_identifier_type(node) return node end
-local function leafref_type(node) return node end
-local function string_type(node) return node end
-local function union_type(node) return node end
+local function set(...)
+   local ret = {}
+   for k, v in pairs({...}) do ret[v] = true end
+   return ret
+end
 
-local primitive_type_constructors = {
-   int8 = integer_type(-0xf0, 0x7f),
-   int16 = integer_type(-0xf000, 0x7fff),
-   int32 = integer_type(-0xf000000, 0x7fffffff),
-   int64 = integer_type(-0xf00000000000000LL, 0x7fffffffffffffffLL),
-   uint8 = integer_type(0, 0xff),
-   uint16 = integer_type(0, 0xffff),
-   uint32 = integer_type(0, 0xffffffff),
-   uint64 = integer_type(0, 0xffffffffffffffffULL),
-   binary = binary_type,
-   bits = bits_type,
-   boolean = boolean_type,
-   decimal64 = decimal64_type,
-   empty = empty_type,
-   enumeration = enumeration_type,
-   identityref = identityref_type,
-   ['instance-identifier'] = instance_identifier_type,
-   leafref = leafref_type,
-   string = string_type,
-   union = union_type
-}
+local primitive_types = set(
+   'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64',
+   'binary', 'bits', 'boolean', 'decimal64', 'empty', 'enumeration',
+   'identityref', 'instance-identifier', 'leafref', 'string', 'union')
 
 -- Inline "grouping" into "uses".
 -- Inline "submodule" into "include".
@@ -671,16 +647,20 @@ function resolve(schema, features)
       local ret = {}
       local prefix = lookup(env, 'prefix', '_')
       local function error_recursion()
-         error('mutually recursive typedefs or groupings')
       end
       for k,v in pairs(tab) do
          -- FIXME: Only add prefix:k if at top level.
+         local state
          local function lazy()
-            ret[k] = error_recursion
-            ret[prefix..':'..k] = ret[k]
-            ret[k] = visit(v, env)
-            ret[prefix..':'..k] = ret[k]
-            return ret[k]
+            if state == 'visiting' then
+               error('mutually recursive definitions: '..k)
+            elseif state then
+               return state
+            else
+               state = 'visiting'
+            end
+            state = visit(v, env)
+            return state
          end
          ret[k] = lazy
          ret[prefix..':'..k] = ret[k]
@@ -698,9 +678,8 @@ function resolve(schema, features)
          node.base_type = typedef
       else
          -- If the type name wasn't bound, it must be primitive.
-         local make_primitive = assert(primitive_type_constructors[node.id],
-                                       'unknown type: '..node.id)
-         node.primitive_type = make_primitive(node)
+         assert(primitive_types[node.id], 'unknown type: '..node.id)
+         node.base_type = node.id
       end
       return node
    end
