@@ -12,6 +12,7 @@ local histogram = require('core.histogram')
 local counter   = require("core.counter")
 local zone      = require("jit.zone")
 local jit       = require("jit")
+local S         = require("syscall")
 local ffi       = require("ffi")
 local C         = ffi.C
 require("core.packet_h")
@@ -24,6 +25,9 @@ log = false
 local use_restart = false
 
 test_skipped_code = 43
+
+-- Set the directories for the named programs.
+named_program_root = shm.root .. "/" .. "by-name"
 
 -- The set of all active apps and links in the system.
 -- Indexed both by name (in a table) and by number (in an array).
@@ -122,6 +126,65 @@ function configure (new_config)
    apply_config_actions(actions, new_config)
    configuration = new_config
    counter.add(configs)
+end
+
+-- Claims a name for a program so it can be identified by name by other processes.
+--
+-- The name given to the function must be unique, if a name has been used before by
+-- an active process the function will error displaying an appropriate error message.
+-- Any other process can enumerate programs by their name and PID using enumerate_named_programs.
+function claim_name(name)
+   configuration[name] = name
+   local namedir = "by-name/" .. name
+   local namedirqualified = named_program_root .. "/" .. name
+   local piddir = shm.root .. "/" .. S.getpid()
+
+   -- Verify that the by-name directory exists.
+   shm.mkdir(namedir)
+   
+   -- Check if a symlink to a named program with the same name exists, if not, unlink it.
+   if S.lstat(namedirqualified) then
+      -- It exists, lets check what the PID is.
+      local piddir = S.readlink(namedirqualified)
+      local ps, pe = string.find(piddir, "/[^/]*$")
+      local pid = tonumber(string.sub(piddir, ps+1, pe))
+      if S.kill(pid, 0) then
+         -- It's a running process, we should display an error message.
+         error("Name has been claimed by a currently running process: "..namedirqualified)
+      else
+         -- It's dead, we should be able to remove the symlink and relink.
+         S.unlink(namedirqualified)
+      end
+   end
+   
+   -- Create the new symlink.
+   local rtn, err = S.symlink(piddir, namedirqualified)
+   if rtn == -1 then
+      error("Error creating program name symlink in: "..namedirqualified)
+   end
+end
+
+-- Enumerates all the named programs with their PID
+--
+-- This returns a table programs with the key being the name of the program
+-- and the value being the PID of the program. Each program is checked that
+-- it's still alive. Any dead program or program without a name is not listed.
+function enumerate_named_programs()
+   local progs = {}
+   local dirs = S.util.dirtable(named_program_root, true)
+   if dirs == nil then return progs end
+   for _, program in pairs(dirs) do
+      local fq = named_program_root .. "/" .. program
+      local piddir = S.readlink(fq)
+      local s, e = string.find(piddir, "/[^/]*$")
+      local pid = tonumber(string.sub(piddir, s+1, e))
+      if S.kill(pid, 0) then
+         local ps, pe = string.find(fq, "/[^/]*$")
+         local program_name = string.sub(fq, ps+1, pe)
+         progs[program_name] = pid
+      end
+   end
+   return progs
 end
 
 -- Return the configuration actions needed to migrate from old config to new.
@@ -526,4 +589,18 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
+
+   -- Test claiming and enumerating app names
+   local basename = "testapp"
+   claim_name(basename.."1")
+   claim_name(basename.."2")
+
+   -- Lets check if they can be enumerated.
+   local progs = enumerate_named_programs()
+   assert(progs)
+   assert(progs["testapp1"])
+   assert(progs["testapp2"])
+
+   -- Ensure that trying to take the same name fails
+   assert(not pcall(claim_name, basename.."1"))
 end

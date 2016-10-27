@@ -11,6 +11,7 @@ local ffi = require("ffi")
 local zone = require("jit.zone")
 local lib = require("core.lib")
 local shm = require("core.shm")
+local app = require("core.app")
 local C   = ffi.C
 -- Load ljsyscall early to help detect conflicts
 -- (e.g. FFI type name conflict between Snabb and ljsyscall)
@@ -143,6 +144,14 @@ end
 function shutdown (pid)
    if not _G.developer_debug and not lib.getenv("SNABB_SHM_KEEP") then
       shm.unlink("/"..pid)
+
+      -- Look through the named apps and unlink any which are for this process.
+      local progs = app.enumerate_named_programs()
+      for name, p in pairs(progs) do
+         if p == pid then
+            S.unlink(app.named_program_root .. "/" .. name)
+         end
+      end
    end
 end
 
