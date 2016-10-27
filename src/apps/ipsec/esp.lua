@@ -27,6 +27,8 @@ AES128gcm = {
 
 function AES128gcm:new (conf)
    local self = {}
+   assert(conf.transmit_salt ~= conf.receive_salt,
+          "Refusing to operate with transmit_salt == receive_salt")
    self.encrypt = esp.esp_v6_encrypt:new{
       mode = "aes-128-gcm",
       spi = conf.spi,
