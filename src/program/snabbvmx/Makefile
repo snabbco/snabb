@@ -1,24 +1,24 @@
 Q= @
 E= @echo
 
-snabb-lwaftr-doc: doc/snabb-lwaftr.pdf doc/snabb-lwaftr.html doc/snabb-lwaftr.epub
+snabbvmx-doc: doc/snabbvmx.pdf doc/snabbvmx.html doc/snabbvmx.epub
 
-doc/snabb-lwaftr.md:
+doc/snabbvmx.md:
 	(cd doc; ./genbook.sh) > $@
 
-doc/snabb-lwaftr.pdf: doc/snabb-lwaftr.md
+doc/snabbvmx.pdf: doc/snabbvmx.md
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc -S --toc --chapters -o snabb-lwaftr.pdf snabb-lwaftr.md)
+	$(Q) (cd doc; pandoc -S --toc --chapters -o snabbvmx.pdf snabbvmx.md)
 
-doc/snabb-lwaftr.html: doc/snabb-lwaftr.md
+doc/snabbvmx.html: doc/snabbvmx.md
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --self-contained --css="../../../doc/style.css" -S -s --toc --chapters -o snabb-lwaftr.html snabb-lwaftr.md)
+	$(Q) (cd doc; pandoc --self-contained --css="../../../doc/style.css" -S -s --toc --chapters -o snabbvmx.html snabbvmx.md)
 
-doc/snabb-lwaftr.epub: doc/snabb-lwaftr.md
+doc/snabbvmx.epub: doc/snabbvmx.md
 	$(E) "PANDOC    $@"
-	$(Q) (cd doc; pandoc --self-contained --css="../../../doc/style.css" -S -s --toc --chapters -o snabb-lwaftr.epub snabb-lwaftr.md)
+	$(Q) (cd doc; pandoc --self-contained --css="../../../doc/style.css" -S -s --toc --chapters -o snabbvmx.epub snabbvmx.md)
 
-CLEAN = doc/snabb-lwaftr.*
+CLEAN = doc/snabbvmx.*
 
 clean:
 	$(E) "RM        $(CLEAN)"
