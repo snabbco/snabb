@@ -110,15 +110,23 @@ end
 -- Using the link local address fe80::, the packets are properly routed back
 -- thru the same interface. Not sure if its OK to use that address or if there
 -- is a better way.
-local function send_ipv6_cache_trigger (r, pkt, mac)
+--
+local function ipv6_cache_trigger (pkt, mac)
    local ether_dhost = get_ether_dhost_ptr(pkt)
    local ipv6_hdr = get_ethernet_payload(pkt)
    local ipv6_src_ip = get_ipv6_src_address(ipv6_hdr)
 
    -- VM will discard packets not matching its MAC address on the interface.
    copy_ether(ether_dhost, mac)
+
+   -- Set a bogus source IP address.
    copy_ipv6(ipv6_src_ip, n_cache_src_ipv6)
-   transmit(r, pkt)
+
+   return pkt
+end
+
+local function send_ipv6_cache_trigger (r, pkt, mac)
+   transmit(r, ipv6_cache_trigger(pkt, mac))
 end
 
 local function ipv4_cache_trigger (pkt, mac)
@@ -588,9 +596,25 @@ local function test_ipv4_cache_trigger ()
    assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
 end
 
+local function test_ipv6_cache_trigger ()
+   local pkt = packet.from_string(lib.hexundump([[
+      02:aa:aa:aa:aa:aa 02:99:99:99:99:99 86 dd 60 00
+      01 f0 01 f0 04 ff fc 00 00 01 00 02 00 03 00 04
+      00 05 00 00 00 7e fc 00 00 00 00 00 00 00 00 00
+      00 00 00 00 01 00 45 00 01 f0 00 00 00 00 0f 11
+      d3 89 c1 05 01 64 0a 0a 0a 01 04 00 30 39 00 0c
+      00 00 00 00 00 00
+   ]], 86))
+   local ether_dhost = "52:54:00:00:00:01"
+   local refresh_packet = ipv6_cache_trigger(pkt, ethernet:pton(ether_dhost))
+   local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
+   assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
+end
+
 function selftest ()
    print("nh_fwd: selftest")
    test_ipv4_flow()
    test_ipv6_flow()
    test_ipv4_cache_trigger()
+   test_ipv6_cache_trigger()
 end
