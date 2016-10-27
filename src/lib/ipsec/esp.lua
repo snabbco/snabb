@@ -115,9 +115,9 @@ function esp_v6_decrypt:new (conf)
    o.CTEXT_OFFSET = ESP_SIZE + gcm.IV_SIZE
    o.PLAIN_OVERHEAD = PAYLOAD_OFFSET + ESP_SIZE + gcm.IV_SIZE + gcm.AUTH_SIZE
    o.window_size = conf.window_size or 128
+   o.window_size = o.window_size + padding(8, o.window_size)
    o.resync_threshold = conf.resync_threshold or 1024
    o.resync_attempts = conf.resync_attempts or 8
-   assert(o.window_size % 8 == 0, "window_size must be a multiple of 8.")
    o.window = ffi.new(window_t, o.window_size / 8)
    o.decap_fail = 0
    o.auditing = conf.auditing
