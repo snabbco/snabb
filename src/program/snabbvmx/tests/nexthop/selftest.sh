@@ -46,8 +46,9 @@ function quit_screens {
 }
 
 function cleanup {
+    local exit_code=$1
     quit_screens
-    exit 0
+    exit $exit_code
 }
 
 trap cleanup EXIT HUP INT QUIT TERM
@@ -89,17 +90,12 @@ while true; do
           $(last_32bit "$mac_v6") == "99:99:99:99" ]]; then
         echo "Resolved MAC inet side: $mac_v4 [OK]"
         echo "Resolved MAC inet side: $mac_v6 [OK]"
-        break
+        exit 0
     fi
 
     if [[ $count == $TIMEOUT ]]; then
-        break
+        exit 1
     fi
     count=$((count + 1))
     sleep 1
 done
-
-if [[ $count == $TIMEOUT ]]; then
-    echo "Couldn't resolve nexthop"
-    exit 1
-fi
