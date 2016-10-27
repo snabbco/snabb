@@ -54,6 +54,8 @@ $(cat $mdroot/apps/vpn/README.md)
 
 $(cat $mdroot/apps/socket/README.md)
 
+$(cat $mdroot/apps/ipsec/README.md)
+
 # Libraries
 
 $(cat $mdroot/lib/README.checksum.md)
@@ -72,7 +74,7 @@ $(cat $mdroot/lib/protocol/README.md)
 
 ## IPsec
 
-$(cat ../lib/ipsec/README.md)
+$(cat $mdroot/lib/ipsec/README.md)
 
 ## Snabb NFV
 
