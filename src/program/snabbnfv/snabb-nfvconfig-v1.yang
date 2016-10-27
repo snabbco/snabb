@@ -5,12 +5,17 @@ module snabb-nfvconfig-v1 {
   import ietf-yang-types { prefix yang; }
   import ietf-inet-types { prefix inet; }
 
+  organization "Snabb";
+  contact "snabb-devel@googlegroups.com";
+
   description
     "This module describes the configuration of SnabbNFV.";
 
-  revision "2016-05-04" {
+  revision "2016-10-27" {
     description
-     "Initial version that reflects Snabb Switch 2016.04 “Uvilla”.";
+     "Initial version that reflects Snabb Switch 2016.11 “Babaco”.";
+    reference
+      "https://github.com/snabbco/snabb/releases/tag/v2016.11";
   }
 
   typedef pcap-filter {
@@ -36,11 +41,36 @@ module snabb-nfvconfig-v1 {
     description "Layer 2 Tunneling Protocol Version 3";
   }
 
+  identity crypto-type {
+    description
+      "Base identity from which all transport cryptography types are derived.";
+  }
+
+  identity esp-aes-128-gcm {
+    base "crypto-type";
+    description
+      "Encapsulating Security Payload using AES 128 in Galois Counter Mode";
+  }
+
+  typedef hexstring4 {
+    type "string" {
+      pattern "[0-9a-fA-F]{8}";
+    }
+    description "Four bytes encoded as a hexadecimal string.";
+  }
+
   typedef hexstring8 {
     type "string" {
       pattern "[0-9a-fA-F]{16}";
     }
     description "Eight bytes encoded as a hexadecimal string.";
+  }
+
+  typedef hexstring16 {
+    type "string" {
+      pattern "[0-9a-fA-F]{32}";
+    }
+    description "Sixteen bytes encoded as a hexadecimal string.";
   }
 
   list port {
@@ -50,14 +80,14 @@ module snabb-nfvconfig-v1 {
     virtual port.";
 
     leaf port_id {
-      mandatory true;
       type string;
+      mandatory true;
       description "The unique identifier of the port.";
     }
 
     leaf mac_address {
-      mandatory true;
       type yang:mac-address;
+      mandatory true;
       description "MAC address of the port.";
     }
 
@@ -65,7 +95,7 @@ module snabb-nfvconfig-v1 {
       type uint16 {
         range "0..4095";
       }
-      description "";
+      description "Vlan tag.";
     }
 
     leaf ingress_filter {
@@ -82,23 +112,23 @@ module snabb-nfvconfig-v1 {
       description "L2TPv3 tunnel configuration.";
 
       leaf type {
-        mandatory true;
         type identityref {
           base "tunnel-type";
         }
+        mandatory true;
         description
           "Tunnel type identifier.";
       }
 
       leaf local_cookie {
-        mandatory true;
         type hexstring8;
+        mandatory true;
         description "Local cookie";
       }
 
       leaf remote_cookie {
-        mandatory true;
         type hexstring8;
+        mandatory true;
         description "Remote cookie";
       }
 
@@ -108,14 +138,14 @@ module snabb-nfvconfig-v1 {
       }
 
       leaf local_ip {
-        mandatory true;
         type inet:ipv6-address-no-zone;
+        mandatory true;
         description "Local IPv6 address.";
       }
 
       leaf remote_ip {
-        mandatory true;
         type inet:ipv6-address-no-zone;
+        mandatory true;
         description "Remote IPv6 address.";
       }
 
@@ -135,6 +165,68 @@ module snabb-nfvconfig-v1 {
     leaf tx_police {
       type gbps;
       description "Allowed output rate in Gigabits per second.";
+    }
+
+    container crypto {
+      description "Transport cryptography configuration.";
+
+      leaf type {
+        type identityref {
+          base "crypto-type";
+        }
+        mandatory true;
+        description
+          "Cryptography type identifier.";
+      }
+
+      leaf spi {
+        type uint32 {
+          range "256..max";
+        }
+        mandatory true;
+        description
+          "“Security Parameters Index” as specified in RFC 4303.";
+      }
+
+      leaf transmit_key {
+        type hexstring16;
+        mandatory true;
+        description
+          "128-bit AES key as specified in RFC 4106 used for the encryption of
+        outgoing packets.";
+      }
+
+      leaf transmit_salt {
+        type hexstring4;
+        mandatory true;
+        description
+          "Salt as specified in RFC 4106 used for the encryption of outgoing
+        packets.";
+      }
+
+      leaf receive_key {
+        type hexstring16;
+        mandatory true;
+        description
+          "128-bit AES key as specified in RFC 4106 used for the decryption of
+        incoming packets.";
+      }
+
+      leaf receive_salt {
+        type hexstring4;
+        mandatory true;
+        description
+          "Salt as specified in RFC 4106 used for the decryption of incoming
+        packets.";
+      }
+
+      leaf auditing {
+        type boolean;
+        default false;
+        description
+          "Indicates whether to enable or disable “Auditing” as specified in
+        RFC 4303. The default is no auditing.";
+      }
     }
   }
 }

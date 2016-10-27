@@ -60,7 +60,6 @@ CONFIG FILE FORMAT:
   The crypto section allows configuration of traffic encryption based on
   apps.ipsec.esp:
 
-
       crypto := { type          = "esp-aes-128-gcm", -- The only type (for now)
                   spi           = <spi>,             -- As for AES128gcm
                   transmit_key  = <key>,
