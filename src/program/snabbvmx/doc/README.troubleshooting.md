@@ -2,31 +2,31 @@
 
 ## Troubleshooting
 
-### Troubleshooting in the lwAFTR
+### Troubleshooting lwAFTR
 
 If traffic managed by the lwAFTR component is not responding as expected: packets
 that should get decapsulate don't match a softwire, some packets are dropped,
-traffic don't get in, etc, the most convenient is to inspect lwAFTR counters
-to diagnose the problem.  Snabb's `lwaftr query` tool can be used to obtain
+traffic don't get in, etc, it's convenient to inspect lwAFTR counters to
+diagnose the problem.  The Snabb's `lwaftr query` tool can be used to obtain
 the counter values of a lwAFTR instance.
 
-Snabb's lwAFTR manual includes a chapter covering troubleshooting and counters,
+The Snabb's lwAFTR manual includes a chapter covering troubleshooting and counters,
 with charts about the most common lwAFTR paths (encapsulation, decapsulation,
-hairpinning, etc).  Please refer to that guide for troubleshooting in the
-lwAFTR logic (Chapter 8 - Counters).
+hairpinning, etc).  Please refer to that guide for troubleshooting the
+lwAFTR logic (chapter 8 - Counters).
 
 The manual also includes a section covering troubleshooting related with running
 a lwAFTR instance.  This information can be useful in case of running the lwAFTR
 as a standalone application and not via SnabbVMX.
 
-### Troubleshooting in SnabbVMX
+### Troubleshooting SnabbVMX
 
-This section covers most common problems when running a SnabbVMX instance.
+This section covers the most common problems when running a SnabbVMX instance.
 
-#### Cannot start SnabbVMX instance
+#### Cannot start the SnabbVMX instance
 
-`Description`: When running a snabbvmx instance an error reporting `failed to lock
-<NIC`.
+`Description`: When running a snabbvmx instance, an error reports `failed to lock
+<NIC>`.
 
 ```bash
 $ sudo ./snabb snabbvmx lwaftr --conf snabbvmx-lwaftr.cfg --id xe1 \
@@ -45,25 +45,25 @@ Snabb instance running on the same NIC (in this example, `0000:81:00.0`).
 
 #### SnabbVMX running but not receiving traffic
 
-`Description`: `snabbvmx lwaftr` instance is running on a NIC but `snabbvmx top`
-reports the SnabbVMX instance is receiving no traffic.
+`Description`: a `snabbvmx lwaftr` instance is running on a NIC, but `snabbvmx
+top` reports that the SnabbVMX instance is receiving no traffic.
 
 `Solution`: This is a common problem which might be originated by various causes.
 
 1. If no traffic is received at all, the most likely cause is that the selected
-lwAFTR binding table doesn't contain any valid softwire for incoming traffic.
+lwAFTR binding table contains no valid softwires for incoming traffic.
 
 2. Another possible cause is that SnabbVMX is running with dynamic nexthop
 resolution, but dynamic nexthop resolution is not working.
 
 #### Dynamic nexthop resolution is not working
 
-`Description`: SnabbVMX is running with dynamic nexthop resolution but no traffic
+`Description`: SnabbVMX is running with dynamic nexthop resolution, but no traffic
 is leaving the lwAFTR.
 
-`Solution`: Check SnabbVMX is indeed running with dynamic nexthop resolution.
-SnabbVMX's configuration file should have attribute `cache_refresh_interval` set to a
-value higher than 0.
+`Solution`: Check that SnabbVMX is indeed running with dynamic nexthop resolution.
+SnabbVMX's configuration file should have a `cache_refresh_interval` attribute
+set to a value higher than 0.
 
 ```bash
 ipv6_interface = {
@@ -75,7 +75,7 @@ ipv4_interface = {
 },
 ```
 
-If that's correct, the likely caused is that refreshment packets are not arriving
+If that's correct, the likely cause is that refreshment packets are not arriving
 to the VM.  A refreshment packet is a packet that is sent periodically to the VM
 to trigger nexthop cache resolution.
 
@@ -88,24 +88,24 @@ sudo ./snabb snabbvmx lwaftr --id xe0 --conf snabbvmx-lwaftr-xe0.cfg
 ```
 
 If that's correct, another cause is that the selected MAC address (02:aa:aa:
-aa:aa:aa, in the example above), doesn't match the lwAFTR's configuration
-attributes `aftr_mac_inet_side` and `aftr_mac_b4_side`.  Check next section at
-the bottom for more details about that.
+aa:aa:aa in the example above) doesn't match the lwAFTR's configuration
+attributes `aftr_mac_inet_side` and `aftr_mac_b4_side`.  Check the bottom of
+the next section for more details.
 
 #### SnabbVMX doesn't respond to IPv4 or IPV6 pings
 
 `Description`: Trying to ping SnabbVMX on one of its IPv4 or IPv6 interfaces gets
 no response.
 
-`Solution`: Double-check the target address is indeed lwAFTR IPV4 or IPv6
-addresses. Steps:
+`Solution`: Check that the target address is indeed the lwAFTR IPV4 and IPv6
+address. Steps:
 
 1. Open the selected SnabbVMX configuration file and go to its lwAFTR
 configuration.
-2. Check the values of attributes `aftr_ipv6_ip` and `aftr_ipv4_ip` are
+2. Check that the values of attributes `aftr_ipv6_ip` and `aftr_ipv4_ip` are
 equals to the target address.
 
-In case the address is correct, double-check SnabbVMX MAC address is the same
+In case the address is correct, check that the SnabbVMX MAC address is the same
 as `aftr_mac_inet_side` and `aftr_mac_b4_side`.  In SnabbVMX these values must
 be the same, as there's a single NIC for both interfaces.
 
@@ -121,16 +121,18 @@ root     16115  0.0  0.0 133856  2936 pts/2    S+   22:39   0:00
 
 #### SnabbVMX decapsulation path works but not encapsulation
 
-`Description`: `snabbvmx top` reports running SnabbVMX instance is able to
-decapsulate packets but not to encapsulate.
+`Description`: `snabbvmx top` reports that the running SnabbVMX instance is able
+to decapsulate packets, but not to encapsulate them.
 
+```
 lwaftr (rx/tx/txdrop in Mpps)            rx      tx    rxGb    txGb    txdrop
 lwaftr_v6                              1.53       0    4.80       0    0.000022
 lwaftr_v4                                 0    1.53       0    4.31    0
+```
 
-`Solution`: If the decapsulation path works that means lwAFTR is able to
-decapsulate IPv6 packets coming from the B4. That means the IPv4 source address
-and source port of the IPv6 encapsulated packet matches a softwire in the
+`Solution`: If the decapsulation path works, then the lwAFTR is able to
+decapsulate IPv6 packets coming from the B4: therefore the IPv4 source address
+and source port of the IPv6 encapsulated packet match a softwire in the
 binding table. However, when a packet arrives to the lwAFTR from the Internet
 the packet is dropped, thus RX is 0 in lwaftr_v4.
 
@@ -138,12 +140,12 @@ The destination address and port of an incoming IPv4 packet should match a
 softwire in the binding table.  What's the destination address and port of
 incoming packets? Is the lwAFTR using a VLAN tag for its IPv4 interface? Most
 likely incoming packets are not VLAN tagged.  Check if SnabbVMX's config file
-has a VLAN tag set.  Check also if the referred lwAFTR config file has a VLAN
+has a VLAN tag set.  Also check if the referred lwAFTR config file has a VLAN
 tag set.
 
 What's the MTU size of the IPv4 interface?  Check that value in SnabbVMX and
 lwAFTR configuration file.  If the MTU size is too small, packets will be
-fragmented.  A extremely small MTU size and fragmentation disable will cause
+fragmented.  A extremely small MTU size and disabled fragmentation will cause
 most of the packets to be dropped.
 
 #### Packets don't get mirrored
@@ -153,35 +155,35 @@ nothing gets in.
 
 `Solution`:
 
-1. Check you're running SnabbVMX with mirroring enabled.
-2. Check you're running `lwaftr monitor` pointing to the IPv4 address you would
-like to monitor.  For testing purposes, set `lwaftr monitor` to `all`.
-3. Check your tap interface is up.
+1. Check that you're running SnabbVMX with mirroring enabled.
+2. Check that you're running `lwaftr monitor` pointing to the IPv4 address you
+would like to monitor.  For testing purposes, set `lwaftr monitor` to `all`.
+3. Check that your tap interface is up.
 
 ---
 
 ## Tests overview
 
-Test are useful to detect bugs in the `snabbvmx` and double-check everything
-is working as expected.
+Tests are useful to detect bugs in the `snabbvmx` and double-check that
+everything is working as expected.
 
 SnabbVMX features three types of tests:
 
 * Lua selftests: Unit tests for several modules
 (**apps/lwaftr/V4V6.lua** and **apps/lwaftr/nh_fwd.lua**).
-* Bash selftest: Complex setups to test certain functionality (**program/
+* Bash selftests: Complex setups to test certain functionality (**program/
 snabbvmx/tests/selftest.sh** and **program/snabbvmx/tests/nexthop/
 selftest.sh**).
-* End-to-end tests: Particular end-to-end test cases for SnabbVMX
+* End-to-end tests: Specific end-to-end test cases for SnabbVMX
 (**program/snabbvmx/tests/end-to-end/selftest.sh**).
 
-Usually Lua selftests and Bash selftest won't fail as these test must successfully
-pass on every Snabb deliverable.  End-to-end tests won't fail either, but it is
-interesting to learn how to add new SnabbVMX's end-to-end tests to diagnose
-potential bugs.
+Usually Lua selftests and Bash selftests won't fail, as these tests must
+successfully pass on every Snabb deliverable.  End-to-end tests won't fail
+either, but it's interesting to learn how to add new SnabbVMX's end-to-end
+tests to diagnose potential bugs.
 
 All these tests are run by Snabb's Continuous Integration subsystem (snabb-bot).
-The test can also be run when executing **make test** (only if Snabb's source
+The tests can also be run when executing **make test** (only if the Snabb source
 is available).
 
 ```bash
@@ -202,13 +204,13 @@ TEST      program/lwaftr/tests/soaktest/selftest.sh
 Execution of a test can return 3 values:
 
 * **TEST**: The test run successfully (exit code 0)
-* **SKIPPED**: The test was skipped, usually because it needs to access to
-a physical NIC and its PCI address was not setup (exit code 43).
-* **ERROR**: Test test finished unexpectedly (exit code > 0 and != 43).
+* **SKIPPED**: The test was skipped, usually because it needs access to
+a physical NIC and its PCI address was not set up (exit code 43).
+* **ERROR**: The test finished unexpectedly (exit code > 0 and != 43).
 
 ### Lua selftests
 
-* **apps/lwaftr/V4V6.lua**: Builds customized IPv4 and IPv4-in-IPv6 packets
+* **apps/lwaftr/V4V6.lua**: Builds customized IPv4 and IPv4-in-IPv6 packets,
 and joins the packets to a single link (*test_join*) or splits the packets
 to two different links (*test_split*).
 * **apps/lwaftr/nh_fwd.lua**: Builds customized packets and test the 3 code
@@ -253,23 +255,23 @@ NDP request to lwAFTR (Good VLAN): OK
 NDP request to lwAFTR (Bad VLAN): OK
 ```
 
-NOTE: To successfully run the test `SNABB_PCI0` and `SNABB_PCI1` cards must
-be wired together.
+NOTE: To successfully run the test, the `SNABB_PCI0` and `SNABB_PCI1` cards must
+be wired to each other.
 
 The test goes through several steps:
 
 1. Run **SnabbVMX** on NIC **SNABB_PCI0**.
 2. Run **QEMU**.
 3. Configure VM eth0 interface with MAC, IPv4/IPv6 address, ARP & NDP cache table.
-4. Runs **tcpreplay** on NIC SNABB_PCI1. Sample packets reach the VM.
+4. Run **tcpreplay** on NIC SNABB_PCI1. Sample packets reach the VM.
 5. Outgoing packets from the VM are mirrored to a tap interface (tap0).
-6. Captures **responses on tap0** and compares them with expected results.
+6. Capture **responses on tap0** and compare them with the expected results.
 
-The input data as well as the expected output is at `program/snabbvmx/tests/pcap`.
+The input data, as well as the expected output, is at `program/snabbvmx/tests/pcap`.
 
-The test validated VLAN packets too.  However, there are not VLAN tagged versions
+The test validates VLAN packets too.  However, there are no VLAN tagged versions
 of the expected output.  The reason is that it is the NIC which tags and untags
-a packet.  Since the packet have not leave the NIC yet, they come out from the VM
+a packet.  Since the packet did not leave the NIC yet, they come out from the VM
 untagged.
 
 ```bash
@@ -279,7 +281,7 @@ reading from file arp-request-to-lwAFTR.pcap, link-type EN10MB (Ethernet)
 ethertype ARP, Request who-has 10.0.1.1 tell 10.0.1.100, length 28
 ```
 
-The other bash selftest, validates correct resolution of the nexthop by the VM.
+The other bash selftest validates correct resolution of the nexthop by the VM.
 
 ```bash
 $ sudo SNABB_PCI0=03:00.0 SNABB_PCI1=83:00.0 \
@@ -293,17 +295,17 @@ The test goes through several steps:
 
 1. Run SnabbVMX on SNABB_PCI0.
 2. Run VM.
-3. Send packets in loop to SNABB_PCI1 during 10 seconds. Packets reach the VM.
+3. Send packets in loop to SNABB_PCI1 for 10 seconds. Packets reach the VM.
 
 ```bash
 $ packetblaster replay -D 10 $PCAP_INPUT/v4v6-256.pcap $SNABB_PCI1
 ```
 
-4. Retrieve out nexthop values (snabbvmx nexthop).
+4. Retrieve nexthop values (snabbvmx nexthop).
 5. Compare to expected values.
 6. Timeout if 10 seconds elapsed.
 
-NOTE: Currently the test is not working correctly.  The returned MAC should be
+NOTE: Currently the test is not working correctly: the returned MAC should be
 `02:99:99:99:99:99`.
 
 ### End-to-end tests
@@ -311,18 +313,18 @@ NOTE: Currently the test is not working correctly.  The returned MAC should be
 **program/snabbvmx/tests/end-to-end/selftest.sh**: Runs end-to-end tests
 (normal and VLAN).
 
-The end-to-end tests is a test suite that tests the correctness of the lwAFTR
+The end-to-end tests are a test suite that tests the correctness of the lwAFTR
 logic.
 
 Files in **program/snabbvmx/tests/end-to-end/**:
 
 * **test_env.sh**: Contains the test cases.
-* **core-end-to-end.sh**: Actually runs the test cases using **snabbvmx check**.
+* **core-end-to-end.sh**: Runs the test cases using **snabbvmx check**.
 * **data/**: Directory containing sample pcap input, expected pcap output,
 configuration files and binding tables.
-* **end-to-end.sh**: Runs core-end-to-end.sh on normal packets.
-* **end-to-end-vlan.sh**: Runs core-end-to-end.sh on VLAN packets.
-* **selftest.sh**: Runs both end-to-end.sh and end-to-end-vlan.sh
+* **end-to-end.sh**: Runs **core-end-to-end.sh** on normal packets.
+* **end-to-end-vlan.sh**: Runs **core-end-to-end.sh** on VLAN packets.
+* **selftest.sh**: Runs both **end-to-end.sh** and **end-to-end-vlan.sh**
 
 To run SnabbVMX's end-to-end test suite:
 
@@ -334,7 +336,7 @@ Test passed
 All end-to-end lwAFTR tests passed.
 ```
 
-The end-to-end test suite relies on `snabbvmx check` to run each test.
+The end-to-end test suite relies on `snabbvmx check` to run each test:
 
 
 ```bash
@@ -346,38 +348,38 @@ Usage: check [-r] CONF V4-IN.PCAP V6-IN.PCAP V4-OUT.PCAP V6-OUT.PCAP
 Parameters:
 
 - **CONF**: SnabbVMX configuration file.
-- **V4-IN.PCAP**: Incoming IPv4 packets (from inet).
+- **V4-IN.PCAP**: Incoming IPv4 packets (from Internet).
 - **V6-IN.PCAP**: Incoming IPv6 packets (from b4).
-- **V4-OUT.PCAP**: Outgoing IPv4 packets (to inet, decapsulate).
+- **V4-OUT.PCAP**: Outgoing IPv4 packets (to Internet, decapsulated).
 - **V6-OUT.PCAP**: Outgoing IPv6 packets (to b4, encapsulated)
 - **[COUNTERS.LUA]**: Lua file with counter values.
 
-Although SnabbVMX works in one single interface, snabbvmx check requires that
-the packet split is already done and provides an split output too.
+Although SnabbVMX works on a single interface, `snabbvmx check` requires that
+the packet split is already done and provides a split output too.
 
 Snabb's lwAFTR includes an end-to-end test suite counterpart.  In most cases,
-the lwAFTR's correctness will be test via Snabb's lwAFTR end-to-end tests.
+the lwAFTR's correctness will be tested via Snabb's lwAFTR end-to-end tests.
 However, since SnabbVMX uses a different configuration file, the network design
 that it brings up might be slightly different than Snabb's lwAFTR. For instance,
-Snabb's lwAFTR fragmentation is always activated while in SnabbVMX is an optional
+Snabb's lwAFTR fragmentation is always active, while in SnabbVMX it is an optional
 argument, either for IPV4 and IPv6 interfaces.
 
-Modifications in the app chain might run executed lwAFTR's data plane in a different
-way, bringing up conditions that were not covered by lwAFTR's data-plane.  For
-this reason, a specific end-to-end test suite was added to SnabbVMX.  A brand-new
-test set that covers specifics needs of SnabbVMX.  If a bug is found most likely
-its resolution will happen in Snabb's lwAFTR code, resulting into the addition of
-a new test in lwAFTR's test-suite.
+Modifications in the app chain might execute the lwAFTR's data plane in a different
+way, bringing up conditions that were not covered by the lwAFTR's data-plane.
+For this reason a specific end-to-end test suite was added, covering specifics
+needs of SnabbVMX.  If a bug is found, its resolution will most likely happen
+in Snabb's lwAFTR code, resulting in the addition of a new test to the lwAFTR's
+test suite.
 
 ## How to write a SnabbVMX end-to-end test
 
-Imagine you have detected an error in the lwAFTR. The first step is to obtain
-the configuration file that SnabbVMX was using, as well as a copy of lwAFTR's
+If you detected an error in the lwAFTR, the first step is to obtain the
+configuration file that SnabbVMX was using, as well as a copy of lwAFTR's
 configuration and binding table.  With that information and knowing the error
 report (ping to lwAFTR but it doesn't reply, valid softwire packet doesn't get
- decapsulate, etc), you craft a hand-made packet that meets the testing case.
+decapsulated, etc), you craft a hand-made packet that meets the testing case.
 
-Now we can check what the lwAFTR would produce:
+Now we can check what the lwAFTR produces:
 
 ```bash
 sudo ./snabb snabbvmx -r snabbvmx-lwaftr-xe0.cfg ipv4-pkt.pcap empty.pcap \
@@ -386,7 +388,7 @@ sudo ./snabb snabbvmx -r snabbvmx-lwaftr-xe0.cfg ipv4-pkt.pcap empty.pcap \
 
 The flag `-r` generates a counters file.
 
-Check your output matches what you expected:
+Check that your output matches what you expect:
 
 ```bash
 $ tcpdump -qns 0 -ter empty.pcap
@@ -396,5 +398,5 @@ reading from file empty.pcap, link-type EN10MB (Ethernet)
 Checking what values are in the counters can give you a hint about whether
 things are working correctly or not.
 
-Tip: Packets always arrive only in one interface, but the output might be
-empty for both interfaces, non-empty and empty or non-empty for both cases.
+Tip: packets always arrive only in one interface, but the output might be
+empty for both interfaces, non-empty, and empty or non-empty for both cases.

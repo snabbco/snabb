@@ -2,12 +2,12 @@
 
 ## SnabbVMX's configuration file
 
-SnabbVMX has its own configuration file (Example: **snabbvmx-lwaftr-xe0.cfg**).
-Configuration file is actually a Lua file, that is processed by `snabbvmx lwaftr`
-command.
+SnabbVMX has its own configuration file (example: **snabbvmx-lwaftr-xe0.cfg**).
+The configuration file is actually a Lua file, that is processed by the
+`snabbvmx lwaftr` command.
 
 It contains a reference to a Snabb's **lwAFTR** configuration file (which
-contains a reference to a binding-table).
+contains a reference to a binding table).
 
 **snabbvmx-lwaftr-xe0.cfg**
 
@@ -35,9 +35,9 @@ In addition, it also allows a `settings` option for extra configuration.
 
 ## Snabb's lwAFTR configuration files
 
-SnabbVMX's configuration file `lwaftr` attribute points out to a Snabb's lwAFTR
+SnabbVMX's configuration file `lwaftr` attribute points to a Snabb's lwAFTR
 configuration file.  This configuration file keeps a reference to a
-binding-table, among other information, which is an important piece of a
+binding table, among other information, which is an important piece of a
 lwAFTR deployment.
 
 Here is how a lwAFTR configuration file looks like:
@@ -61,7 +61,7 @@ policy_icmpv4_incoming = DROP,
 policy_icmpv4_outgoing = DROP,
 ```
 
-And here is its referred binding-table:
+And here is its referred binding table:
 
 ```
 psid_map {
@@ -83,11 +83,11 @@ softwires {
 
 Some of the lwAFTR's configuration fields are of special relevance for
 SnabbVMX.  Although SnabbVMX can specify its own MTU and VLAN values, if those
-attributes are defined in a lwAFTR configuration file they always take
-precedence.
+attributes are also defined in a lwAFTR configuration file, the latter always
+take precedence.
 
 Please refer to Snabb's lwAFTR documentation for a detailed description about
-lwAFTR's configuration file and binding-table (Chapters 3 and 4).
+lwAFTR's configuration file and binding table (Chapters 3 and 4).
 
 ## Configuration examples
 
@@ -138,7 +138,7 @@ Parameters:
 
 - `next_hop_mac`: MAC address of the nexthop.  Outgoing IPv4 or IPv6 packets
 will use this MAC address as Ethernet destination address.
-- `fragmentation`: Boolean field. Indicated whether IPv4 or IPv6 packets get
+- `fragmentation`: Boolean field. Selects whether IPv4 or IPv6 packets get
 fragmented by the lwAFTR in case packets are too big (larger than MTU size).
 
 ### Additional setup
@@ -159,14 +159,14 @@ return {
 Parameters:
 
 * `vlan`: Sets the same VLAN tag for IPv4 and IPv6.  If lwAFTR's configuration
-defines VLAN tags, they take prevalence.
+defines VLAN tags, they take precedence.
 * If `vlan_tag_v4` and `vlan_tag_v6` are defined in lwAFTR configuration, they
-take prevalence. In that case, **SplitV4V6** app is not needed and two virtual
-interfaces are initialized instead, one for IPv4 and another one for IPv6.
-Each of them with its own VLAN tag.
-* Ingress packet drop parameters initializes several features of the Snabb's
-lwAFTR `ingress_drop_monitor` timer.  A timer that periodically reports about
-the NIC ingress packet drops. By default, ingress drop monitor is always run.
+take precedence. In that case, **SplitV4V6** app is not needed and two virtual
+interfaces are initialized instead, one for IPv4 and another one for IPv6,
+each of them with its own VLAN tag.
+* Ingress packet drop parameters initialize several features of the Snabb's
+lwAFTR `ingress_drop_monitor` timer.  Periodically reports about the NIC
+ingress packet drops. By default, ingress drop monitor is always run.
 If not set, it takes the following default values:
     * `ingress_drop_monitor`: *flush*. Other possible values are *warn* for
 warning and *off* for deactivating ingress drop monitoring.

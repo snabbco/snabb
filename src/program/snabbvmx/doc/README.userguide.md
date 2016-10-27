@@ -1,13 +1,13 @@
 # User guide
 
-The following chapter teaches you how to get SnabbVMX up-and-running.  This
-chapter includes references to concepts and terms not covered yet.  Please
-refer to other sections in this manual in case of doubt.
+This guide teaches you how to get SnabbVMX up-and-running, including references
+to concepts and terms not covered yet.  Please refer to other sections in this
+manual in case of doubt.
 
 ## SnabbVMX lwaftr
 
-`snabbvmx lwaftr` is the main program. It setups the app network design and pass
- it to Snabb's engine to run it.
+`snabbvmx lwaftr` is the main program. It sets up the app network design, and
+passes it to the Snabb's engine to run it.
 
 ```bash
 $ sudo ./snabb snabbvmx lwaftr
@@ -26,7 +26,7 @@ Arguments:
   --sock    <socket-path>   Socket path for virtio-user interfaces
 ```
 
-The example below use static next-hop resolution so a VM is not needed.  This
+The example below uses static next-hop resolution, so a VM is not needed.  This
 setup is useful to test a lwAFTR data-plane.
 
 **snabbvmx-lwaftr-xe0.cfg**
@@ -110,8 +110,8 @@ Ingress drop monitor: flush (threshold: 100000 packets;
 ```
 
 Now we should send valid lwAFTR traffic to SnabbVMX. One way of doing it is
-using a Snabb tool called **packetblaster**. Packetblaster has a lwaftr mode
-that generates valid lwAFTR packets for a given binding-table configuration.
+using a Snabb tool called **packetblaster**. Packetblaster has a *lwaftr* mode
+that generates valid lwAFTR packets for a given binding table configuration.
 
 ```bash
 $ sudo ./snabb packetblaster lwaftr --src_mac 02:02:02:02:02:02 \
@@ -122,8 +122,8 @@ $ sudo ./snabb packetblaster lwaftr --src_mac 02:02:02:02:02:02 \
 
 ## SnabbVMX top
 
-`snabbvmx top` prints out information of a running SnabbVMX instance. There might
-be more than one Snabb process running:
+`snabbvmx top` prints out information about a running SnabbVMX instance. There
+might be more than one Snabb process running:
 
 ```bash
 $ sudo ./snabb top
@@ -132,7 +132,7 @@ Multiple Snabb instances found. Select one:
 11958
 ```
 
-Which one is my SnabbVMX process? Luckily, SnabbVMX top allows to query per 'id':
+Which one is my SnabbVMX process? Luckily, SnabbVMX top allows to query by "id":
 
 ```bash
 $ sudo ./snabb snabbvmx top xe0
@@ -154,8 +154,8 @@ lwaftr_v6 out-ipv6-frag-not                              0                    0
 nic ifInDiscards                                 1,547,333               47,449
 ```
 
-1.53 MPPS in both interfaces rx/tx. We are running at line-rate, although there
- are packet drops.
+1.53 MPPS in both rx/tx interfaces. We are running at line-rate, although there
+are packet drops.
 
 ## SnabbVMX query
 
@@ -205,14 +205,14 @@ SnabbVMX query prints out all the counters of a SnabbVMX instance in XML format:
 </snabb>
 ```
 
-Useful for interacting with other systems in the network.
+It's useful for interacting with other systems in the network.
 
-Snabb's lwAFTR features a query tool too. This tool is aimed to query lwAFTR's
-counters.  Snabb's `lwaftr query` is covered in the last section of this chapter.
+Snabb's lwAFTR also features a tool that queries lwAFTR's counters: Snabb's
+`lwaftr query` is covered in the last section of this chapter.
 
 ## SnabbVMX check
 
-`snabbvmx check` is an utility tool use to validate lwAFTR correctnes.
+`snabbvmx check` is a utility that validates lwAFTR correctness.
 SnabbVMX has its own version of it.
 
 ```bash
@@ -221,52 +221,53 @@ Usage: check [-r] CONF V4-IN.PCAP V6-IN.PCAP V4-OUT.PCAP V6-OUT.PCAP
 [COUNTERS.LUA]
 ```
 
-Using check is the step prior to add a new test in the end-to-end test suite.
+Using `check` is the step prior to adding a new test to the end-to-end test suite.
 
-**CONF** is a SnabbVMX configuration file and **V4-IN** and **V6-IN** are the
-incoming V4 and V6 interfaces. The tools reads packets from a pcap file. **V4-OUT**
+**CONF** is a SnabbVMX configuration file, and **V4-IN** and **V6-IN** are the
+incoming V4 and V6 interfaces. The tool reads packets from a pcap file. **V4-OUT**
 and **V6-OUT** are the resulting packets after the lwAFTR processing. How the
 packets are processed depends on the configuration file and the binding table.
 
-Although SnabbVMX works in one single interface, snabbvmx check requires that
-the packet split is already done and provides an split output too.
+Although SnabbVMX works on a single interface, `snabbvmx check` requires that
+the packet split is already done and provides a split output too.
 
-Imagine you have detected an error in the lwAFTR. First step is to obtain the
-configuration that SnabbVMX was using, as well as a copy of lwAFTR's
-configuration and binding table. With that information and knowing the error
+If you detected an error in the lwAFTR, the first step is to obtain the
+configuration file that SnabbVMX was using, as well as a copy of lwAFTR's
+configuration and binding table.  With that information and knowing the error
 report (ping to lwAFTR but it doesn't reply, valid softwire packet doesn't get
-decapsulate), you hand-made a packet that meets the testing case. Now we can
-check what the lwAFTR will produce:
+decapsulated, etc), you craft a hand-made packet that meets the testing case.
+
+Now we can check what the lwAFTR produces:
 
 ```bash
 sudo ./snabb snabbvmx -r snabbvmx-lwaftr-xe0.cfg ipv4-pkt.pcap empty.pcap \
     /tmp/outv4.pcap /tmp/outv6.pcap counters.lua
 ```
 
-The flag -r generates a counters file.
+The flag `-r` generates a counters file.
 
-Check your output matches what you expected:
+Check that your output matches what you expect:
 
 ```bash
 $ tcpdump -qns 0 -ter empty.pcap
 reading from file empty.pcap, link-type EN10MB (Ethernet)
 ```
 
-Checking what values are in counters can tell you if things are working
-correctly or not.
+Checking what values are in the counters can give you a hint about whether
+things are working correctly or not.
 
-Tip: Packets always arrive only in one interface, but the output might be
-empty for both interfaces, non-empty and empty or non-empty for both cases.
+Tip: packets always arrive only in one interface, but the output might be
+empty for both interfaces, non-empty, and empty or non-empty for both cases.
 
 ## Other related tools
 
 ### Snabb's lwaftr query
 
 Snabb's `lwaftr query` command can be used to print out counter's values of
-a running lwAFTR instance (that also includes a SnabbVMX instance).  In case of
-query a SnabbVMX instance, the instance can be referred by its `id`.
+a running lwAFTR instance (that also includes a SnabbVMX instance).  When
+querying a SnabbVMX instance, the instance can be referred to by its `id`.
 
-Counters are useful to debug and understand what data-paths are being taken.
+Counters are useful to debug and understand what data paths are being taken.
 Running `snabb lwaftr query <pid>` lists all non-zero counters of a lwAFTR's
 instance:
 
@@ -296,8 +297,8 @@ out-ipv6-bytes:                       509,917,643,140
 out-ipv6-packets:                     1,297,268,099
 ```
 
-It is possible to pass a filter expression to query only matching counters.
-The example below prints out only outgoing related counters.
+It is possible to pass a filter expression to query only the matching counters.
+The example below prints out only the outgoing related counters.
 
 ```bash
 $ sudo ./snabb lwaftr query 11958 out
@@ -314,8 +315,8 @@ out-ipv6-packets:                     1,583,770,321
 
 ### Snabb's lwaftr monitor
 
-`lwaftr monitor` is a tool that helps monitorizing incoming and outgoing packets
-in a lwAFTR.  This feature must be combined with running SnabbVMX with mirroring
+`lwaftr monitor` is a tool that helps monitoring incoming and outgoing packets
+to a lwAFTR.  This feature must be combined with running SnabbVMX with mirroring
 enabled.
 
 ```bash
@@ -323,16 +324,16 @@ $ sudo ./snabb snabbvmx lwaftr --id xe0 --conf snabbvmx-lwaftr-xe0.cfg \
     --pci 82:00.0 --mac 02:42:df:27:05:00 --mirror tap0
 ```
 
-`mirror` parameter expects to find a tap interface.  The interface must be up
+The `mirror` parameter expects a tap interface.  The interface must be up
 in order to receive packets:
 
 ```bash
 $ sudo ip link set dev tap0 up
 ```
 
-`lwaftr monitor` is set with a target IPv4 address.  All lwAFTR packets which
-IPv4 source match the target address will be mirrored in the tap interface.
-In addition, monitor can be set with two special values:
+`lwaftr monitor` is set with a target IPv4 address.  All lwAFTR packets whose
+IPv4 source matches the target address will be mirrored to the tap interface.
+In addition, monitoring can be set with two special values:
 
 - `all`: mirrors all packets to the tap interface.
 - `none`: mirrors nothing to the tap interface.
@@ -340,9 +341,9 @@ In addition, monitor can be set with two special values:
 ### Snabb's packetblaster lwaftr
 
 `snabb packetblaster` is a built-in Snabb utility which can blast packets to a
-NIC very fast.  It features several modes: `synth`, `replay` and `lwaftr`.
+NIC very quickly.  It features several modes: `synth`, `replay` and `lwaftr`.
 
-The `lwaftr` mode is specially suited to generate IPv4 and IPv6 packets that
+The `lwaftr` mode is especially suited to generating IPv4 and IPv6 packets that
 match a binding table. Example:
 
 ```bash
@@ -356,13 +357,14 @@ Parameters:
 
 - `src_mac`: Source MAC-Address.
 - `dst_mac`: Destination MAC-Address.  Must match a lwAFTR configuration file
-MAC addresses.
-- `b4`: IPV6,IPV4,PORT. IPV6, IPV4 and PORT values of the first softwire.
-- `aftr`: IPv6 address of lwaftr server.  Only one value can be specified.
+MAC address.
+- `b4`: IPV6, IPV4 and PORT values of the first softwire.
+- `aftr`: IPv6 address of the lwaftr server.  Only one value can be specified.
 - `count`: Number of B4 clients to simulate.
 - `rate`: Rate in MPPS for the generated traffic.
 - `pci`: Interface PCI address.
 
-These are the most essential parameters to generate valid lwAFTR traffic to
-a SnabbVMX instance.  `packetblaster lwaftr` features much more flags and
-options.  Please refer to its Snabb's manual for a more detailed description.
+These are the main parameters to generate valid lwAFTR traffic to a SnabbVMX
+instance.  `packetblaster lwaftr` features additional flags and options:
+please refer to its section in the Snabb's manual for a more detailed
+description.

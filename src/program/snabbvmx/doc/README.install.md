@@ -1,9 +1,9 @@
-# Instalation
+# Installation
 
 ## How to install it
 
-Snabb is a programming network toolkit as well as ready-to-use network
-utilities suite.  Every Snabb executable features several Snabb programs:
+Snabb is a programming network toolkit as well as a ready-to-use network
+utilities suite.  The Snabb executable features several Snabb programs:
 
 ```bash
 $ sudo ./snabb
@@ -45,7 +45,8 @@ Example:
 There is no specific script to install a snabb executable.  Once it's built,
 a snabb executable includes all its dependencies, including a LuaJIT interpreter,
 in a single binary.  Thus, it's possible to relocate a snabb executable to any
-folder in the system.  Move it to folder in PATH, so the system can alway locate it:
+folder in the system.  Move it to a folder in PATH, so the system can always
+locate it:
 
 ```bash
 $ echo $PATH
@@ -55,9 +56,9 @@ $ echo $PATH
 $ cp snabb /opt/local/bin
 ```
 
-When snabb executable is renamed to one of its featured programs, it will always
-the program is named after.  For instance, to always run snabbvmx simply rename
-snabb to snabbvmx.
+When the snabb executable is renamed to one of its featured programs, it will
+run the program it's named after.  For instance, to always run snabbvmx simply
+rename snabb to snabbvmx.
 
 ```bash
 $ mv snabb snabbvmx
@@ -71,14 +72,15 @@ Usage:
 
 ## SnabbVMX tools
 
-SnabbVMX program (**program/snabbvmx/**) features a series of subcommands or tools:
+The SnabbVMX program (**program/snabbvmx/**) features a series of subcommands
+or tools:
 
-- **check**: Used to verify the correctness of the lwAFTR logic.
-- **nexthop**: Used to retrieve the nexthop cached values (available in shared memory).
-- **query**: Used to check out the counter values of a running SnabbVMX instance.
-- **lwaftr**: Main program. Set ups SnabbVMX network design and runs it.
-- **top**: Similar to Snabb's top. Prints out Gb and Mpps in IPv4 and IPv6 interfaces.
-Includes reports about counters and ingress-packet-drops.
+- **check**: Verifies the correctness of the lwAFTR logic.
+- **nexthop**: Retrieves the nexthop cached values (available in shared memory).
+- **query**: Checks out the counter values of a running SnabbVMX instance.
+- **lwaftr**: Main program. Sets up the SnabbVMX network design and runs it.
+- **top**: Similar to Snabb's top. Prints out Gb and Mpps in IPv4 and IPv6
+  interfaces.  Includes reports about counters and ingress-packet-drops.
 
 There is an additional program in snabb called **packetblaster**.  Packetblaster
 includes a *lwaftr* mode. This mode is very useful to generate live traffic matching
@@ -93,4 +95,4 @@ a binding-table.
 ```
 
 Please check the [How to use it?](README.userguide.md) chapter for a more
-detailed view on each tool.
+detailed view of each tool.
