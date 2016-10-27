@@ -23,7 +23,7 @@ return {
       cache_refresh_interval = 1,
       mtu = 1460,
    },
-   setup {
+   settings = {
       vlan = 421,
    }
 }
@@ -31,7 +31,7 @@ return {
 
 SnabbVMX defines extra configuration parameters for `ipv4_interface`/`ipv6_interface`
 (deactivate/activate fragmentation, dynamic/static next-hop resolution, MTU).
-In addition, it also allows a `setup` option for extra configuration.
+In addition, it also allows a `settings` option for extra configuration.
 
 ## Snabb's lwAFTR configuration files
 
@@ -158,12 +158,17 @@ return {
 
 Parameters:
 
-- `vlan`: Sets the same VLAN tag for IPv4 and IPv6.  If lwAFTR's configuration
+* `vlan`: Sets the same VLAN tag for IPv4 and IPv6.  If lwAFTR's configuration
 defines VLAN tags, they take prevalence.
-- If `vlan_tag_v4` and `vlan_tag_v6` are defined in lwAFTR configuration, they
+* If `vlan_tag_v4` and `vlan_tag_v6` are defined in lwAFTR configuration, they
 take prevalence. In that case, **SplitV4V6** app is not needed and two virtual
 interfaces are initialized instead, one for IPv4 and another one for IPv6.
 Each of them with its own VLAN tag.
-- Ingress packet drop parameters initializes several features of the Snabb's
+* Ingress packet drop parameters initializes several features of the Snabb's
 lwAFTR `ingress_drop_monitor` timer.  A timer that periodically reports about
-the NIC ingress packet drops.
+the NIC ingress packet drops. By default, ingress drop monitor is always run.
+If not set, it takes the following default values:
+    * `ingress_drop_monitor`: *flush*.
+    * `ingress_drop_threshold`: 100000 (packets).
+    * `ingress_drop_interval`: 1e6 (1 second).
+    * `ingress_drop_wait`: 20 (seconds).
