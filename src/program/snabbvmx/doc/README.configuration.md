@@ -168,7 +168,8 @@ Each of them with its own VLAN tag.
 lwAFTR `ingress_drop_monitor` timer.  A timer that periodically reports about
 the NIC ingress packet drops. By default, ingress drop monitor is always run.
 If not set, it takes the following default values:
-    * `ingress_drop_monitor`: *flush*.
+    * `ingress_drop_monitor`: *flush*. Other possible values are *warn* for
+warning and *off* for deactivating ingress drop monitoring.
     * `ingress_drop_threshold`: 100000 (packets).
     * `ingress_drop_interval`: 1e6 (1 second).
     * `ingress_drop_wait`: 20 (seconds).
