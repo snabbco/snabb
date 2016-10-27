@@ -50,7 +50,13 @@ function ip {
 }
 
 function start_test_env {
+    local mirror=$1
+
     local cmd="snabbvmx lwaftr --conf $SNABBVMX_CONF --id $SNABBVMX_ID --pci $SNABB_PCI0 --mac $MAC_ADDRESS_NET0 --sock $VHU_SOCK0"
+    if [ -n "$mirror" ]; then
+        cmd="$cmd --mirror $mirror"
+    fi
+
     if ! snabb $SNABB_PCI0 "$cmd"; then
         echo "Could not start snabbvmx."; exit 1
     fi
