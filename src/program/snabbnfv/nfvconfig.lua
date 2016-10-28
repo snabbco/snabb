@@ -38,9 +38,9 @@ function load (file, pciaddr, sockpath, soft_bench)
                   disable_mrg_rxbuf=t.disable_mrg_rxbuf,
                   disable_indirect_desc=t.disable_indirect_desc})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
-      if t.tx_police_gbps then
+      if t.tx_police then
          local TxLimit = name.."_TxLimit"
-         local rate = t.tx_police_gbps * 1e9 / 8
+         local rate = t.tx_police * 1e9 / 8
          config.app(c, TxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, VM_tx.." -> "..TxLimit..".input")
          VM_tx = TxLimit..".output"
@@ -98,9 +98,9 @@ function load (file, pciaddr, sockpath, soft_bench)
          config.link(c, Crypto..".decapsulated -> "..VM_rx)
          VM_rx, VM_tx = Crypto..".encapsulated", Crypto..".encapsulated"
       end
-      if t.rx_police_gbps then
+      if t.rx_police then
          local RxLimit = name.."_RxLimit"
-         local rate = t.rx_police_gbps * 1e9 / 8
+         local rate = t.rx_police * 1e9 / 8
          config.app(c, RxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, RxLimit..".output -> "..VM_rx)
          VM_rx = RxLimit..".input"
