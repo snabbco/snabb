@@ -38,15 +38,21 @@ local index_set = require("lib.index_set")
 local macaddress = require("lib.macaddress")
 local mib = require("lib.ipc.shmem.mib")
 local timer = require("core.timer")
+local shm = require("core.shm")
+local counter = require("core.counter")
 local bits, bitset = lib.bits, lib.bitset
 local floor = math.floor
 local cast = ffi.cast
 local band, bor, shl, shr, bswap, bnot =
    bit.band, bit.bor, bit.lshift, bit.rshift, bit.bswap, bit.bnot
 
-local debug_trace   = true      -- Print trace messages
+local debug_trace   = false     -- Print trace messages
 local debug_hexdump = false     -- Print hexdumps (in Linux mlx5 format)
 
+-- Maximum size of a receive queue table.
+-- XXX This is hard-coded in the Linux mlx5 driver too. Could
+-- alternatively detect from query_hca_cap.
+local rqt_max_size = 128
 
 ---------------------------------------------------------------
 -- ConnectX4 Snabb app.
@@ -58,9 +64,8 @@ local debug_hexdump = false     -- Print hexdumps (in Linux mlx5 format)
 ConnectX4 = {}
 ConnectX4.__index = ConnectX4
 
-function ConnectX4:new (arg)
+function ConnectX4:new (conf)
    local self = setmetatable({}, self)
-   local conf = config.parse_app_arg(arg)
    local pciaddress = pci.qualified(conf.pciaddress)
 
    local sendq_size = conf.sendq_size or 1024
@@ -76,14 +81,12 @@ function ConnectX4:new (arg)
 
    -- Setup the command channel
    --
-   local base, fd = pci.map_pci_memory(pciaddress, 0, true)
-   local init_seg = InitializationSegment:new(base)
+   local mmio, fd = pci.map_pci_memory(pciaddress, 0, true)
+   local init_seg = InitializationSegment:new(mmio)
    local hca = HCA:new(init_seg)
 
-   trace("Write the physical location of the command queues to the init segment.")
    init_seg:cmdq_phy_addr(memory.virtual_to_physical(hca.entry))
    if debug_trace then init_seg:dump() end
-   trace("Wait for the 'initializing' field to clear")
    while not init_seg:ready() do
       C.usleep(1000)
    end
@@ -93,7 +96,7 @@ function ConnectX4:new (arg)
    hca:enable_hca()
    hca:set_issi(1)
    hca:alloc_pages(hca:query_pages("boot"))
-   if debug_trace then self:dump_capabilities() end
+   if debug_trace then self:dump_capabilities(hca) end
 
    -- Initialize the card
    --
@@ -114,21 +117,64 @@ function ConnectX4:new (arg)
    -- Create send and receive queues & associated objects
    --
    local tis = hca:create_tis(0, tdomain)
-   local send_cq = hca:create_cq(1024, uar, eq.eqn)
-   local recv_cq = hca:create_cq(1024, uar, eq.eqn)
+   -- List of all receive queues for hashing traffic across
+   local rqlist = {}
 
-   -- Allocate work queue memory (receive & send contiguous in memory)
-   local wq_doorbell = memory.dma_alloc(16)
-   local sendq_size = 1024
-   local recvq_size = 1024
-   local workqueues = memory.dma_alloc(64 * (sendq_size + recvq_size), 4096)
-   local rwq = workqueues                   -- receive work queue
-   local swq = workqueues + 64 * recvq_size -- send work queue
+   for _, queuename in ipairs(conf.queues) do
+      
+      local send_cq = hca:create_cq(1,    uar, eq.eqn, true)
+      local recv_cq = hca:create_cq(recvq_size, uar, eq.eqn, false)
 
-   -- Create the queue objects
-   local sq = hca:create_sq(send_cq.cqn, pd, sendq_size, wq_doorbell, swq, tis)
-   local rq = hca:create_rq(recv_cq.cqn, pd, recvq_size, wq_doorbell, rwq)
-   local tir = hca:create_tir_direct(rq.rqn, tdomain)
+      -- Allocate work queue memory (receive & send contiguous in memory)
+      local wq_doorbell = memory.dma_alloc(16)
+      local sendq_size = 1024
+      local recvq_size = 1024
+      local workqueues = memory.dma_alloc(64 * (sendq_size + recvq_size), 4096)
+      local rwq = workqueues                   -- receive work queue
+      local swq = workqueues + 64 * recvq_size -- send work queue
+      
+      -- Create the queue objects
+      local sqn = hca:create_sq(send_cq, pd, sendq_size, wq_doorbell, swq, uar, tis)
+      hca:modify_sq(sqn, 0, 1) -- RESET -> READY
+      local rqn = hca:create_rq(recv_cq, pd, recvq_size, wq_doorbell, rwq)
+      hca:modify_rq(rqn, 0, 1) -- RESET -> READY
+
+      table.insert(rqlist, rqn)
+
+      -- Create shared memory objects containing all of the
+      -- information needed to access the send and receive queues.
+      --
+      -- Snabb processes will use this information to take ownership
+      -- of the queue to send and receive packets.
+      local basepath = "/pci/"..pciaddress.."/"..queuename
+      local sendpath = basepath.."/send"
+      local recvpath = basepath.."/recv"
+      local u64 = function (x) return ffi.cast("uint64_t", x) end
+      shm.create_frame(sendpath,
+                       {lock     = {counter},
+                        sqn      = {counter, sqn},
+                        wq       = {counter, u64(swq)},
+                        wqsize   = {counter, sendq_size},
+                        cqn      = {counter, send_cq.cqn},
+                        cqe      = {counter, u64(send_cq.cqe)},
+                        doorbell = {counter, u64(wq_doorbell)},
+                        uar_page = {counter, uar},
+                        rlkey    = {counter, rlkey}})
+      shm.create_frame(recvpath,
+                       {lock     = {counter},
+                        rqn      = {counter, rqn},
+                        wq       = {counter, u64(rwq)},
+                        wqsize   = {counter, recvq_size},
+                        cqn      = {counter, recv_cq.cqn},
+                        cqe      = {counter, u64(recv_cq.cqe)},
+                        doorbell = {counter, u64(wq_doorbell)},
+                        uar_page = {counter, uar},
+                        rlkey    = {counter, rlkey}})
+   end
+
+   --local tir = hca:create_tir_direct(rqlist[1], tdomain)
+   local rqt = hca:create_rqt(rqlist)
+   local tir = hca:create_tir_indirect(rqt, tdomain)
 
    -- Setup packet dispatching.
    -- Just a "wildcard" flow group to send RX packets to the receive queue.
@@ -138,23 +184,26 @@ function ConnectX4:new (arg)
    hca:set_flow_table_entry_wildcard(rx_flow_table_id, NIC_RX, flow_group_id, 0, tir)
    hca:set_flow_table_root(rx_flow_table_id, NIC_RX)
 
-   function self:stop()
+   function self:stop ()
       pci.set_bus_master(pciaddress, false)
       pci.reset_device(pciaddress)
-      pci.close_pci_resource(fd, base)
-      base, fd = nil
+      pci.close_pci_resource(fd, mmio)
+      mmio, fd = nil
    end
+
+   -- Save "instance variable" values.
+   self.hca = hca
 
    return self
 end
 
-function ConnectX4:dump_capabilities ()
-   if true then return end
+function ConnectX4:dump_capabilities (hca)
+   --if true then return end
    -- Print current and maximum card capabilities.
    -- XXX Check if we have any specific requirements that we need to
    --     set and/or assert on.
-   local cur = self.hca:query_hca_general_cap('current')
-   local max = self.hca:query_hca_general_cap('max')
+   local cur = hca:query_hca_general_cap('current')
+   local max = hca:query_hca_general_cap('max')
    print'Capabilities - current and (maximum):'
    for k in pairs(cur) do
       print(("  %-24s = %-3s (%s)"):format(k, cur[k], max[k]))
@@ -173,6 +222,16 @@ function ConnectX4:check_vport ()
    end
 end
 
+function ConnectX4:print_vport_counter ()
+   local c = self.hca:query_vport_counter()
+   local t = {}
+   -- Sort into key order
+   for k in pairs(c) do table.insert(t, k) end
+   table.sort(t)
+   for _, k in pairs(t) do
+      print(("%12s %s"):format(lib.comma_value(c[k]), k))
+   end
+end
 
 ---------------------------------------------------------------
 -- Firmware commands.
@@ -260,14 +319,14 @@ end
 
 -- Provide the NIC with freshly allocated memory.
 function HCA:alloc_pages (num_pages)
-   self:command("MANAGE_PAGES", 0x10 + num_pages*8, 0x0C)
+   self:command("MANAGE_PAGES", 0x14 + num_pages*8, 0x0C)
       :input("opcode",            0x00, 31, 16, 0x108)
       :input("opmod",             0x04, 15, 0, 1) -- allocate mode
       :input("input_num_entries", 0x0C, 31, 0, num_pages, "input_num_entries")
-   for i=0, num_pages do
+   for i=0, num_pages-1 do
       local _, phy = memory.dma_alloc(4096, 4096)
       self:input(nil, 0x10 + i*8, 31,  0, ptrbits(phy, 63, 32))
-      self:input(nil,  0x14 + i*8, 31, 12, ptrbits(phy, 31, 12))
+      self:input(nil, 0x14 + i*8, 31, 12, ptrbits(phy, 31, 12))
    end
    self:execute()
 end
@@ -394,7 +453,7 @@ local eqe_t = ffi.typeof[[
     uint8_t signature;
     uint8_t owner;
   }
-]]
+ ]]
 
 eq = {}
 eq.__index = eq
@@ -453,12 +512,29 @@ function HCA:query_vport_counter ()
    self:command("QUERY_VPORT_COUNTER", 0x1c, 0x20c)
       :input("opcode", 0x00, 31, 16, 0x770)
       :execute()
-   -- XXX return in a table
-   print("vport counters")
-   for i = 0x10, 0x200, 4 do
-      local n = self:output(i, 31, 0)
-      if n > 0 then print(bit.tohex(i), n) end
+   local function get64 (offset)
+      local hi = self:output(offset, 31, 0)
+      local lo = self:output(offset + 4, 31, 0)
+      return lo + (hi * 2^32)
    end
+   return {
+      rx_error_packets = get64(0x10),
+      rx_error_octets  = get64(0x18),
+      tx_error_packets = get64(0x20),
+      tx_error_octets  = get64(0x28),
+      rx_bcast_packets = get64(0x70),
+      rx_bcast_octets  = get64(0x78),
+      tx_bcast_packets = get64(0x80),
+      tx_bcast_octets  = get64(0x88),
+      rx_ucast_packets = get64(0x90),
+      rx_ucast_octets  = get64(0x98),
+      tx_ucast_packets = get64(0xA0),
+      tx_ucast_octets  = get64(0xA8),
+      rx_mcast_packets = get64(0xB0),
+      rx_mcast_octets  = get64(0xB8),
+      tx_mcast_packets = get64(0xC0),
+      tx_mcast_octets  = get64(0xC8)
+   }
 end
 
 function HCA:query_nic_vport_context ()
@@ -497,7 +573,38 @@ function HCA:create_tir_direct (rqn, transport_domain)
       :execute()
    return self:output(0x08, 23, 0)
 end
-   
+
+-- Create a TIR with indirect dispatching (hashing)
+function HCA:create_tir_indirect (rqt, transport_domain)
+   self:command("CREATE_TIR", 0x10C, 0x0C)
+      :input("opcode",           0x00,        31, 16, 0x900)
+      :input("disp_type",        0x20 + 0x04, 31, 28, 1) -- indirect
+      :input("rx_hash_symmetric",0x20 + 0x20, 31, 31, 1) -- hash symmetrically
+      :input("indirect_table",   0x20 + 0x20, 23,  0, rqt)
+      :input("rx_hash_fn",       0x20 + 0x24, 31, 28, 2) -- toeplitz
+      :input("transport_domain", 0x20 + 0x24, 23,  0, transport_domain)
+   -- XXX Is random hash key a good solution?
+   for i = 0x28, 0x4C, 4 do
+      self:input("toeplitz_key["..((i-0x28)/4).."]", 0x20 + i, 31,  0, math.random(2^32))
+   end
+   self:execute()
+   return self:output(0x08, 23, 0)
+end
+
+function HCA:create_rqt (rqlist)
+   -- Problem: Hardware requires number of hash buckets to be a power of 2.
+   -- Workaround: Setup max # hash buckets and fill with queues in a loop.
+   self:command("CREATE_RQT", 0x20 + 0xF0 + 4*rqt_max_size, 0x0C)
+      :input("opcode",          0x00,        31, 16, 0x916)
+      :input("rqt_max_size",    0x20 + 0x14, 15,  0, rqt_max_size)
+      :input("rqt_actual_size", 0x20 + 0x18, 15,  0, rqt_max_size)
+   for i = 0, rqt_max_size-1 do
+      self:input("rq_num["..i.."]", 0x20 + 0xF0 + i*4, 23, 0, rqlist[1 + (i % #rqlist)])
+   end
+   self:execute()
+   return self:output(0x08, 23, 0)
+end
+
 -- Create TIS (Transport Interface Send)
 function HCA:create_tis (prio, transport_domain)
    self:command("CREATE_TIS", 0x20 + 0x9C, 0x0C)
@@ -525,13 +632,16 @@ function HCA:alloc_protection_domain ()
 end
 
 -- Create a completion queue and return a completion queue object.
-function HCA:create_cq (entries, uar_page, eqn, db_phy)
+function HCA:create_cq (entries, uar_page, eqn, collapsed)
    local doorbell, doorbell_phy = memory.dma_alloc(16)
    -- Memory for completion queue entries
    local cqe, cqe_phy = memory.dma_alloc(entries * 64, 4096)
+   ffi.fill(cqe, entries * 64, 0xFF)
    self:command("CREATE_CQ", 0x114, 0x0C)
       :input("opcode",        0x00,        31, 16, 0x400)
-      :input("log_cq_size",   0x10 + 0x0C, 28, 24, 10)
+      :input("cc",            0x10 + 0x00, 20, 20, collapsed and 1 or 0)
+      :input("oi",            0x10 + 0x00, 17, 17, collapsed and 1 or 0)
+      :input("log_cq_size",   0x10 + 0x0C, 28, 24, log2size(entries))
       :input("uar_page",      0x10 + 0x0C, 23,  0, uar_page)
       :input("c_eqn",         0x10 + 0x14,  7,  0, eqn)
       :input("log_page_size", 0x10 + 0x18, 28, 24, 4)
@@ -546,7 +656,7 @@ end
 
 -- Create a receive queue and return a receive queue object.
 -- Return the receive queue number and a pointer to the WQEs.
-function HCA:create_rq (cqn, pd, size, doorbell, rwq)
+function HCA:create_rq (cq, pd, size, doorbell, rwq)
    local log_wq_size = log2size(size)
    local db_phy = memory.virtual_to_physical(doorbell)
    local rwq_phy = memory.virtual_to_physical(rwq)
@@ -554,7 +664,7 @@ function HCA:create_rq (cqn, pd, size, doorbell, rwq)
       :input("opcode",        0x00, 31, 16, 0x908)
       :input("rlkey",         0x20 + 0x00, 31, 31, 1)
       :input("vlan_strip_disable", 0x20 + 0x00, 28, 28, 1)
-      :input("cqn",           0x20 + 0x08, 23, 0, cqn)
+      :input("cqn",           0x20 + 0x08, 23, 0, cq.cqn)
       :input("wq_type",       0x20 + 0x30 + 0x00, 31, 28, 1) -- cyclic
       :input("pd",            0x20 + 0x30 + 0x08, 23,  0, pd)
       :input("dbr_addr high", 0x20 + 0x30 + 0x10, 31,  0, ptrbits(db_phy, 63, 32))
@@ -565,15 +675,7 @@ function HCA:create_rq (cqn, pd, size, doorbell, rwq)
       :input("pas[0] high",   0x20 + 0x30 + 0xC0, 63, 32, ptrbits(rwq_phy, 63, 32))
       :input("pas[0] low",    0x20 + 0x30 + 0xC4, 31,  0, ptrbits(rwq_phy, 31, 0))
       :execute()
-   local rqn = self:output(0x08, 23, 0)
-   return RQ:new(rqn, rwq, doorbell)
-end
-
-RQ = {}
-
-function RQ:new (rqn, rwq, doorbell)
-   return setmetatable({rqn = rqn, rwq = rwq, doorbell = doorbell},
-      {__index = RQ})
+   return self:output(0x08, 23, 0)
 end
 
 -- Modify a Receive Queue by making a state transition.
@@ -598,7 +700,7 @@ end
 
 -- Create a Send Queue.
 -- Return the send queue number and a pointer to the WQEs.
-function HCA:create_sq (cqn, pd, size, doorbell, swq, tis)
+function HCA:create_sq (cq, pd, size, doorbell, swq, uar, tis)
    local log_wq_size = log2size(size)
    local db_phy = memory.virtual_to_physical(doorbell)
    local swq_phy = memory.virtual_to_physical(swq)
@@ -608,11 +710,12 @@ function HCA:create_sq (cqn, pd, size, doorbell, swq, tis)
       :input("fre",            0x20 + 0x00,        29, 29, 1)
       :input("flush_in_error_en",   0x20 + 0x00,   28, 28, 1)
       :input("min_wqe_inline_mode", 0x20 + 0x00,   26, 24, 1)
-      :input("cqn",            0x20 + 0x08,        23, 0, cqn)
+      :input("cqn",            0x20 + 0x08,        23, 0, cq.cqn)
       :input("tis_lst_sz",     0x20 + 0x20,        31, 16, 1)
       :input("tis",            0x20 + 0x2C,        23, 0, tis)
       :input("wq_type",        0x20 + 0x30 + 0x00, 31, 28, 1) -- cyclic
       :input("pd",             0x20 + 0x30 + 0x08, 23, 0, pd)
+      :input("uar_page",       0x20 + 0x30 + 0x0C, 23, 0, uar)
       :input("pas[0] high",    0x20 + 0x30 + 0x10, 31, 0, ptrbits(db_phy, 63, 32))
       :input("pas[0] low",     0x20 + 0x30 + 0x14, 31, 0, ptrbits(db_phy, 31, 0))
       :input("log_wq_stride",  0x20 + 0x30 + 0x20, 19, 16, 6)
@@ -620,16 +723,269 @@ function HCA:create_sq (cqn, pd, size, doorbell, swq, tis)
       :input("log_wq_size",    0x20 + 0x30 + 0x20, 4,  0,  log_wq_size)
       :input("pas[0] high",    0x20 + 0x30 + 0xC0, 31, 0, ptrbits(swq_phy, 63, 32))
       :input("pas[0] low",     0x20 + 0x30 + 0xC4, 31, 0, ptrbits(swq_phy, 31, 0))
+
       :execute()
-   local sqn = self:output(0x08, 23, 0)
-   return SQ:new(sqn, swq, doorbell)
+   return self:output(0x08, 23, 0)
 end
+
+---------------------------------------------------------------
+-- IO app: attach to transmit and receive queues.
+---------------------------------------------------------------
+
+IO = {}
+IO.__index = IO
+
+function IO:new (conf)
+   local self = setmetatable({}, self)
+   local pciaddress = pci.qualified(conf.pciaddress)
+   local mmio, fd = pci.map_pci_memory(pciaddress, 0, false)
+
+   self.sqlist = {}
+   self.rqlist = {}
+
+   for _, queuename in ipairs(conf.queues) do
+      
+      local basepath = "/pci/"..pciaddress.."/"..queuename
+      local sendpath = basepath.."/send"
+      local recvpath = basepath.."/recv"
+      
+      local send = shm.open_frame(sendpath)
+      local recv = shm.open_frame(recvpath)
+
+      local sq = SQ:new(tonumber(counter.read(send.sqn)),
+                        counter.read(send.wq),
+                        tonumber(counter.read(send.wqsize)),
+                        counter.read(send.doorbell),
+                        mmio,
+                        tonumber(counter.read(send.uar_page)),
+                        tonumber(counter.read(send.rlkey)),
+                        counter.read(send.cqe))
+      local rq = RQ:new(counter.read(recv.rqn),
+                        counter.read(recv.wq),
+                        tonumber(counter.read(recv.wqsize)),
+                        counter.read(recv.doorbell),
+                        tonumber(counter.read(recv.rlkey)),
+                        counter.read(recv.cqe))
+      rq:refill()
+      table.insert(self.sqlist, sq)
+      table.insert(self.rqlist, rq)
+   end
+   return self
+end
+
+function IO:push ()
+   local l = self.input.input
+   if l == nil then return end
+   while l and not link.empty(l) do
+      local sq = self.sqlist[1]
+      sq:transmit(l)
+      sq:reclaim()
+   end
+end
+
+function IO:pull ()
+   -- Free transmitted packets
+   for q = 1, #self.sqlist do
+      self.sqlist[q]:reclaim()
+   end
+   -- Input received packets
+   local l = self.output.output
+   if l == nil then return end
+   for q = 1, #self.rqlist do
+      --self.rqlist[q]:enqueue(packet.allocate())
+      self.rqlist[q]:ring_doorbell()
+      self.rqlist[q]:receive(l)
+   end
+end
+
+---------------------------------------------------------------
+-- Receive queue
+
+-- Work queue entries have irregular shapes and sizes.
+-- We operate on them simply as 64-byte chunks.
+local wqe_t = ffi.typeof[[
+  union {
+    uint8_t  u8[64];
+    uint32_t u32[0];
+    uint64_t u64[0];
+  } *
+]]
+
+-- CQEs are similar to WQEs.
+local cqe_t = wqe_t
+
+local doorbell_t = ffi.typeof[[
+  struct {
+    uint32_t receive;
+    uint32_t send;
+  }*
+]]
+
+RQ = {}
+
+local rwqe_t = ffi.typeof[[
+  struct {
+    uint32_t length, lkey, address_high, address_low;
+  } *
+]]
+
+function RQ:new (rqn, rwq, wqsize, doorbell, rlkey, cq)
+   local self = {}
+   -- Convert arguments to internal types
+   doorbell = ffi.cast(doorbell_t, doorbell)
+   rwq = ffi.cast(rwqe_t, rwq)
+   cqe = ffi.cast(cqe_t, cq)
+   -- Additional state
+   local packets = ffi.new("struct packet *[?]", wqsize)
+   local next_buffer = 0        -- next position for a buffer in wqe
+   local next_completion = 0    -- next completion queue position to process
+   local mine = 0               -- cqe ownership bit meaning software-owned
+
+   -- Refill with buffers
+   function self:refill ()
+      while packets[next_buffer % wqsize] == nil do
+         local p = packet.allocate()
+         packets[next_buffer % wqsize] = p
+         local rwqe = rwq[next_buffer % wqsize]
+         local phy = memory.virtual_to_physical(p.data)
+         rwqe.length = bswap(packet.max_payload)
+         rwqe.lkey = bswap(rlkey)
+         rwqe.address_high = bswap(tonumber(shr(phy, 32)))
+         rwqe.address_low  = bswap(tonumber(band(phy, 0xFFFFFFFF)))
+         next_buffer = (next_buffer + 1) % 65536
+      end
+   end
+
+   function self:receive (l)
+      while not link.full(l) do
+         -- Find the next completion entry.
+         local c = cqe[next_completion]
+         local owner = bit.band(1, c.u8[0x3F])
+         if owner ~= mine then
+            -- Completion entry is not available yet.
+            break
+         end
+         -- Advance to next completion.
+         next_completion = (next_completion + 1) % wqsize -- XXX cqsize
+         -- Toggle the ownership value if the CQ wraps around.
+         if next_completion == 0 then
+            mine = (mine + 1) % 2
+         end
+         -- Decode the completion entry.
+         local opcode = shr(c.u8[0x3F], 4)
+         local len = bswap(c.u32[0x2C/4])
+         local wqe = shr(bswap(c.u32[0x3C/4]), 16)
+         local idx = wqe % wqsize
+         if opcode == 0 or opcode == 2 then
+            -- Successful transmission.
+            assert(packets[idx] ~= nil)
+            link.transmit(l, packets[idx])
+            packets[idx] = nil
+         elseif opcode == 13 or opcode == 14 then
+            local syndromes = {
+               [0x1] = "Local_Length_Error",
+               [0x4] = "Local_Protection_Error",
+               [0x5] = "Work_Request_Flushed_Error",
+               [0x6] = "Memory_Window_Bind_Error",
+               [0x10] = "Bad_Response_Error",
+               [0x11] = "Local_Access_Error",
+               [0x12] = "Remote_Invalid_Request_Error",
+               [0x13] = "Remote_Access_Error",
+               [0x14] = "Remote_Operation_Error"
+            }
+            local syndrome = c.u8[0x37]
+            print(("Got error. opcode=%d syndrome=0x%x message=%s"):format(
+                  opcode, syndrome, syndromes[syndromes])) -- XXX
+            -- Error on transmission.
+            assert(packets[idx] ~= nil)
+            packet.free(packets[idx])
+            packets[idx] = nil
+         else
+            error(("Unexpected CQE opcode: %d (0x%x)"):format(opcode, opcode))
+         end
+      end
+   end
+
+   function self:ring_doorbell ()
+      doorbell[0].receive = bswap(next_buffer)
+   end
+
+   return self
+end
+
+---------------------------------------------------------------
+-- Send queue
 
 SQ = {}
 
-function SQ:new (sqn, swq, doorbell)
-   return setmetatable({sqn = sqn, swq = swq, doorbell = doorbell},
-      {__index = SQ})
+function SQ:new (sqn, swq, wqsize, doorbell, mmio, uar, rlkey, cq)
+   local self = {}
+   -- Cast pointers to expected types
+   mmio = ffi.cast("uint8_t*", mmio)
+   swq = ffi.cast(wqe_t, swq)
+   doorbell = ffi.cast(doorbell_t, doorbell)
+   -- Additional state
+   local packets = ffi.new("struct packet *[?]", wqsize)
+   local next_packet = 0
+   local next_wqeid  = 0
+   -- Locate "blue flame" register areas for the UAR page
+   local bf_next = ffi.cast("uint64_t*", mmio + (uar * 4096) + 0x800)
+   local bf_alt  = ffi.cast("uint64_t*", mmio + (uar * 4096) + 0x900)
+   local cqe = ffi.cast(cqe_t, cq)
+
+   -- Transmit packets from the link onto the send queue.
+   function self:transmit (l)
+      local start_wqeid = next_wqeid
+      while not link.empty(l) and packets[next_packet] == nil do
+         local p = link.receive(l)
+         local wqe = swq[next_packet]
+         packets[next_packet] = p
+         -- Control segment
+         wqe.u32[0] = bswap(shl(next_wqeid, 8) + 0x0A)
+         wqe.u32[1] = bswap(shl(sqn, 8) + 4)
+         wqe.u32[2] = bswap(shl(2, 2)) -- completion always
+         -- Ethernet segment
+         local ninline = 16
+         wqe.u32[7] = bswap(shl(ninline, 16))
+         ffi.copy(wqe.u8 + 0x1E, p.data, ninline)
+         -- Send Data Segment (inline data)
+         wqe.u32[12] = bswap(p.length - ninline)
+         wqe.u32[13] = bswap(rlkey)
+         local phy = memory.virtual_to_physical(p.data + ninline)
+         wqe.u32[14] = bswap(tonumber(phy) / 2^32)
+         wqe.u32[15] = bswap(tonumber(phy) % 2^32)
+         -- Advance counters
+         next_wqeid = (next_wqeid + 1) % 65536
+         next_packet = next_wqeid % wqsize
+      end
+      -- Ring the doorbell if we enqueued new packets.
+      if next_wqeid ~= start_wqeid then
+         local current_packet = (next_packet + wqsize-1) % wqsize
+         doorbell.send = bswap(next_wqeid)
+         bf_next[0] = swq[current_packet].u64[0]
+         -- Switch next/alternate blue flame register for next time
+         bf_next, bf_alt = bf_alt, bf_next
+         
+      end
+   end
+
+   local next_reclaim = 0
+   -- Free packets when their transmission is complete.
+   function self:reclaim ()
+      local c = cqe[0]
+      local opcode = cqe.u8[0x38]
+      local wqeid = shr(bswap(cqe.u32[0x3C/4]), 16)
+      if opcode == 0x0A then
+         while next_reclaim ~= wqeid % wqsize do
+            assert(packets[next_reclaim] ~= nil)
+            packet.free(packets[next_reclaim])
+            packets[next_reclaim] = nil
+            next_reclaim = (next_reclaim + 1) % wqsize
+         end
+      end
+   end
+
+   return self
 end
 
 NIC_RX = 0 -- Flow table type code for incoming packets
@@ -849,6 +1205,10 @@ function HCA:input (name, offset, hi, lo, value)
    if debug_trace and name then
       print(("input @ %4xh (%2d:%2d) %-20s = %10xh (%d)"):format(offset, hi, lo, name, value, value))
    end
+   if offset > self.input_size-4 then
+      error(("input offset out of bounds: %sh > %sh"):format(
+            bit.tohex(offset, 4), bit.tohex(self.input_size-4, 4)))
+   end
    if offset <= 16 - 4 then -- inline
       self:setbits(0x10 + offset, hi, lo, value)
    else
@@ -959,7 +1319,7 @@ function HCA:execute ()
 
    assert(self:getbits(0x3C, 0, 0) == 1)
    self.init_seg:ring_doorbell(0) --post command
-
+   
    --poll for command completion
    while self:getbits(0x3C, 0, 0) == 1 do
       if self.init_seg:getbits(0x1010, 31, 24) ~= 0 then
@@ -1026,8 +1386,7 @@ function InitializationSegment:getbits (offset, hi, lo)
 end
 
 function InitializationSegment:setbits (offset, hi, lo, value)
-   local base = getint(self.ptr, offset)
-   setint(self.ptr, offset, setbits(hi, lo, value, base))
+   setint(self.ptr, offset, setbits(hi, lo, value, 0))
 end
 
 function InitializationSegment:fw_rev () --maj, min, subminor
@@ -1131,10 +1490,6 @@ function hexdump (pointer, index, bytes,  dumpoffset)
    return dumpoffset + bytes
 end
 
-function trace (...)
-   print("TRACE", ...)
-end
-
 -- Utilities for peeking and poking bitfields of 32-bit big-endian integers.
 -- Pointers are uint32_t* and offsets are in bytes.
 
@@ -1142,7 +1497,6 @@ end
 function getint (pointer, offset)
    assert(offset % 4 == 0, "offset not dword-aligned")
    local r = bswap(pointer[offset/4])
-   --print("getint", pointer, offset, r, bit.tohex(r))
    return r
 end
 
@@ -1185,15 +1539,61 @@ end
 function selftest ()
    io.stdout:setvbuf'no'
 
-   local pcidev = lib.getenv("SNABB_PCI_CONNECTX4_0")
+   local pcidev0 = lib.getenv("SNABB_PCI_CONNECTX4_0")
+   local pcidev1 = lib.getenv("SNABB_PCI_CONNECTX4_1")
    -- XXX check PCI device type
-   if not pcidev then
+   if not pcidev0 then
       print("SNABB_PCI_CONNECTX4_0 not set")
       os.exit(engine.test_skipped_code)
    end
+   if not pcidev1 then
+      print("SNABB_PCI_CONNECTX4_1 not set")
+      os.exit(engine.test_skipped_code)
+   end
 
-   local device_info = pci.device_info(pcidev)
-   local app = ConnectX4:new{pciaddress = pcidev}
-   app:stop()
+   local nic0 = ConnectX4:new{pciaddress = pcidev0, queues = {'a'}}
+   local nic1 = ConnectX4:new{pciaddress = pcidev1, queues = {'b'}}
+   local io0 = IO:new({pciaddress = pcidev0, queues = {'a'}})
+   local io1 = IO:new({pciaddress = pcidev1, queues = {'b'}})
+   io0.input  = { input = link.new('input0') }
+   io0.output = { output = link.new('output0') }
+   io1.input  = { input = link.new('input1') }
+   io1.output = { output = link.new('output1') }
+
+   print("selftest: waiting for both links up")
+   while (nic0.hca:query_vport_state().oper_state ~= 1) or
+         (nic1.hca:query_vport_state().oper_state ~= 1) do
+      C.usleep(1e6)
+   end
+
+   local bursts = 100000
+   local each   = 100
+   print(("Links up. Sending %s packets."):format(lib.comma_value(each*bursts)))
+
+   for i = 1, bursts do
+      for _, app in ipairs({io0, io1}) do
+         for i = 1, each do
+            local p = packet.allocate()
+            ffi.fill(p.data, 16, 0xff)
+            p.length = 100
+            link.transmit(app.input.input, p)
+         end
+         app:pull()
+         app:push()
+      end
+   end
+
+   print()
+   print("NIC0")
+   nic0:print_vport_counter()
+
+   print()
+   print("NIC1")
+   nic1:print_vport_counter()
+
+   nic0:stop()
+   nic1:stop()
+
+   print("selftest: complete")
 end
 
