@@ -146,9 +146,10 @@ function shutdown (pid)
       shm.unlink("/"..pid)
 
       -- Look through the named apps and unlink any which are for this process.
-      local progs = app.enumerate_named_programs()
+      local npid = tonumber(pid)
+      local progs = app.enumerate_named_programs(true)
       for name, p in pairs(progs) do
-         if p == pid then
+         if p == npid then
             S.unlink(app.named_program_root .. "/" .. name)
          end
       end

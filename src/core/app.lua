@@ -169,16 +169,18 @@ end
 -- This returns a table programs with the key being the name of the program
 -- and the value being the PID of the program. Each program is checked that
 -- it's still alive. Any dead program or program without a name is not listed.
-function enumerate_named_programs()
+--
+-- The inc_dead argument is to disable the alive check (default: false)
+function enumerate_named_programs(inc_dead)
    local progs = {}
-   local dirs = S.util.dirtable(named_program_root, true)
+   local dirs = shm.children("/by-name")
    if dirs == nil then return progs end
    for _, program in pairs(dirs) do
       local fq = named_program_root .. "/" .. program
       local piddir = S.readlink(fq)
       local s, e = string.find(piddir, "/[^/]*$")
       local pid = tonumber(string.sub(piddir, s+1, e))
-      if S.kill(pid, 0) then
+      if inc_dead == true or S.kill(pid, 0) then
          local ps, pe = string.find(fq, "/[^/]*$")
          local program_name = string.sub(fq, ps+1, pe)
          progs[program_name] = pid
