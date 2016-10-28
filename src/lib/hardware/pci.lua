@@ -157,15 +157,12 @@ function map_pci_memory (device, n, lock)
    if lock then
      assert(f:flock("ex, nb"), "failed to lock " .. filepath)
    end
-   local st, err = f:stat()
-   assert(st, tostring(err))
-   local mem, err = f:mmap(nil, st.size, "read, write", "shared", 0)
-   assert(mem, tostring(err))
+   local st = assert(f:stat())
+   local mem = assert(f:mmap(nil, st.size, "read, write", "shared", 0))
    return ffi.cast("uint32_t *", mem), f
 end
 function close_pci_resource (fd, base)
-   local st, err = fd:stat()
-   assert(st, tostring(err))
+   local st = assert(fd:stat())
    S.munmap(base, st.size)
    fd:close()
 end
@@ -174,8 +171,7 @@ end
 --- mastering is enabled.
 function set_bus_master (device, enable)
    root_check()
-   local f,err = S.open(path(device).."/config", "rdwr")
-   assert(f, tostring(err))
+   local f = assert(S.open(path(device).."/config", "rdwr"))
    local fd = f:getfd()
 
    local value = ffi.new("uint16_t[1]")
@@ -217,6 +213,7 @@ function selftest ()
    assert(qualified("0000:01:00.0") == "0000:01:00.0", "qualified 1")
    assert(qualified(     "01:00.0") == "0000:01:00.0", "qualified 2")
    assert(qualified(     "0a:00.0") == "0000:0a:00.0", "qualified 3")
+   assert(qualified(     "0A:00.0") == "0000:0A:00.0", "qualified 4")
    assert(canonical("0000:01:00.0") ==      "01:00.0", "canonical 1")
    assert(canonical(     "01:00.0") ==      "01:00.0", "canonical 2")
    scan_devices()

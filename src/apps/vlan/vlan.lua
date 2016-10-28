@@ -48,7 +48,7 @@ end
 -- packet is carrying a VLAN tag, if it's an untagged frame these bytes will be
 -- Ethernet payload
 function extract_tci(pkt)
-   return ntohs(cast("uint16_t*", packet.data(pkt) + o_ethernet_ethertype + 2)[0])
+   return ntohs(cast("uint16_t*", pkt.data + o_ethernet_ethertype + 2)[0])
 end
 
 -- extract VLAN id from TCI
@@ -107,20 +107,10 @@ function VlanMux:push()
    local noutputs = #self.output
    if noutputs > 0 then
       for name, l in pairs(self.input) do
-         local maxoutput = link.max
-         -- find out max number of packets we can put out an interface
-         -- this is kind of bad because we limit ourselves by the interface with
-         -- the fullest queue, yet packets might go out a different interface. We
-         -- don't know until we've looked in the packet and parsed the VLAN id. I
-         -- suppose we kind of get some HOLB with this :(
-         for _, o in ipairs(self.output) do
-            maxoutput = math.min(maxoutput, link.nwritable(o))
-         end
-
          if type(name) == "string" then
-            for _ = 1, math.min(link.nreadable(l), maxoutput) do
+            for _ = 1, link.nreadable(l) do
                local p = receive(l)
-               local ethertype = cast("uint16_t*", packet.data(p) + o_ethernet_ethertype)[0]
+               local ethertype = cast("uint16_t*", p.data + o_ethernet_ethertype)[0]
 
                if name == "trunk" then -- trunk
                   -- check for ethertype 0x8100 (802.1q VLAN tag)
@@ -157,6 +147,29 @@ function VlanMux:transmit(o, pkt)
    end
 end
 
+function test_tag_untag ()
+   local pkt = packet.from_string(lib.hexundump([[
+      02:aa:aa:aa:aa:aa 02:99:99:99:99:99 08 00 45 00
+      00 54 43 58 40 00 40 01 7c 5c c0 a8 0d 28 ac 14
+      01 10 08 00 9c d4 07 c0 00 01 bc fa e3 57 00 00
+      00 00 f3 44 01 00 00 00 00 00 10 11 12 13 14 15
+      16 17 18 19 1a 1b 1c 1d 1e 1f 20 21 22 23 24 25
+      26 27 28 29 2a 2b 2c 2d 2e 2f 30 31 32 33 34 35
+      36 37
+   ]], 82))
+   local payload = pkt.data + o_ethernet_ethertype
+   local vid = 0
+   for i=0,15 do
+      for j=0,255 do
+         local tag = build_tag(vid)
+         push_tag(pkt, tag)
+         assert(cast(uint32_ptr_t, payload)[0] == tag)
+         vid = vid + 1
+      end
+   end
+   assert(vid == 4096)
+   print("Sucessfully tagged/untagged all potential VLAN tags (0-4095)")
+end
 
 function selftest()
    local app = require("core.app")
@@ -174,4 +187,6 @@ function selftest()
 
    print("source sent: " .. link.stats(app.app_table.source.output.output).txpackets)
    print("sink received: " .. link.stats(app.app_table.sink.input.input).rxpackets)
+
+   test_tag_untag()
 end

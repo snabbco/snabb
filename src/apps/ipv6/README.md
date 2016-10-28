@@ -56,6 +56,30 @@ milliseconds. Default is 1,000ms.
 *Optional*. Number of neighbor solicitation retransmissions. Default is
 unlimited retransmissions.
 
+### Special Counters
+
+— Key **ns_checksum_errors**
+
+Neighbor solicitation requests dropped due to invalid ICMP checksum.
+
+— Key **ns_target_address_errors**
+
+Neighbor solicitation requests dropped due to invalid target address.
+
+— Key **na_duplicate_errors**
+
+Neighbor advertisement requests dropped because next-hop is already resolved.
+
+— Key **na_target_address_errors**
+
+Neighbor advertisement requests dropped due to invalid target address.
+
+— Key **nd_protocol_errors**
+
+Neighbor discovery requests dropped due to protocol errors (invalid IPv6
+hop-limit or invalid neighbor solicitation request options).
+
+
 ## SimpleKeyedTunnel (apps.keyed_ipv6_tunnel.tunnel)
 
 The `SimpleKeyedTunnel` app implements "a simple L2 Ethernet over IPv6
@@ -115,3 +139,26 @@ the L2TPv3 header will be overwritten with this value.
 
 *Optional*. Destination MAC as a string. Not required if overwritten by
 an app such as `nd_light`.
+
+
+### Special Counters
+
+— Key **length_errors**
+
+Ingress packets dropped due to invalid length (packet too short).
+
+— Key **protocol_errors**
+
+Ingress packets dropped due to unrecognized IPv6 protocol ID.
+
+— Key **cookie_errors**
+
+Ingress packets dropped due to wrong cookie value.
+
+— Key **remote_address_errors**
+
+Ingress packets dropped due to wrong remote IPv6 endpoint address.
+
+— Key **local_address_errors**
+
+Ingress packets dropped due to wrong local IPv6 endpoint address.

@@ -5,13 +5,16 @@ local C = ffi.C
 local lib = require("core.lib")
 
 local function dump (p)
-   return lib.hexdump(ffi.string(packet.data(p), packet.length(p)))
+   return lib.hexdump(ffi.string(p.data, p.length))
 end
 
-Match = {}
+Match = {
+   config = {
+      fuzzy = {}, modest = {}
+   }
+}
 
-function Match:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+function Match:new (conf)
    return setmetatable({ fuzzy = conf.fuzzy,
                          modest = conf.modest,
                          seen = 0,
@@ -24,8 +27,8 @@ function Match:push ()
       local p = link.receive(self.input.rx)
       local cmp = link.front(self.input.comparator)
       if not cmp then
-      elseif packet.length(cmp) ~= packet.length(p)
-         or C.memcmp(packet.data(cmp), packet.data(p), packet.length(cmp)) ~= 0 then
+      elseif cmp.length ~= p.length
+         or C.memcmp(cmp.data, p.data, cmp.length) ~= 0 then
          if not self.fuzzy then
             table.insert(self.errs, "Mismatch:\n"..dump(cmp).."\n"..dump(p))
          end
@@ -88,7 +91,7 @@ function selftest()
    config.app(c, "join", basic_apps.Join)
    config.link(c, "src.output -> join.src")
    config.link(c, "garbage.output -> join.garbage")
-   config.link(c, "join.out -> sink.rx")
+   config.link(c, "join.output -> sink.rx")
    engine.configure(c)
    engine.main({duration=0.0001})
    assert(#engine.app_table.sink:errors() == 0)

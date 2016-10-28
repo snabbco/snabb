@@ -30,7 +30,8 @@ function init {
 function clean { rm -rf "$tmpdir"; }
 
 function fetch_pull_requests {
-    curl "https://api.github.com/repos/$REPO/pulls" > "$tmpdir/pulls"
+    curl "https://api.github.com/repos/$REPO/pulls?per_page=100" \
+        > "$tmpdir/pulls"
 }
 
 function pull_request_ids { "$JQ" ".[].number" "$tmpdir/pulls"; }
@@ -58,7 +59,8 @@ function fetch_pr_head {
 }
 
 function ensure_docs_cloned {
-    [ -d $docdir ] || git clone git@github.com:$DOCREPO.git $docdir
+    [ -d $docdir ] || \
+        git clone https://$GITHUB_CREDENTIALS@github.com/$DOCREPO.git $docdir
     mkdir -p $docdir/{sha1,tag}
 }
 

@@ -17,7 +17,7 @@ local packet_t = ffi.typeof("struct packet")
 local packet_ptr_t = ffi.typeof("struct packet *")
 local packet_size = ffi.sizeof(packet_t)
 local header_size = 8
-local max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
+max_payload = tonumber(C.PACKET_PAYLOAD_SIZE)
 
 -- Freelist containing empty packets ready for use.
 
@@ -128,12 +128,6 @@ function free (p)
    counter.add(engine.freebits, (math.max(p.length, 46) + 4 + 5) * 8)
    free_internal(p)
 end
-
--- Return pointer to packet data.
-function data (p) return p.data end
-
--- Return packet data length.
-function length (p) return p.length end
 
 -- Set packet data length.
 function resize (p, len)
