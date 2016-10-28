@@ -7,11 +7,6 @@ if [[ $EUID != 0 ]]; then
     exit 1
 fi
 
-BZ_IMAGE="$HOME/.test_env/bzImage"
-HUGEPAGES_FS=/dev/hugepages
-IMAGE="$HOME/.test_env/qemu.img"
-MEM=1024M
-
 function run_telnet {
     (echo "$2"; sleep ${3:-2}) \
         | telnet localhost $1 2>&1
@@ -36,47 +31,46 @@ function wait_vm_up {
     echo " [OK]"
 }
 
-function qemu_cmd {
-    echo "qemu-system-x86_64 \
-         -kernel ${BZ_IMAGE} -append \"earlyprintk root=/dev/vda rw console=tty0\" \
-         -enable-kvm -drive format=raw,if=virtio,file=${IMAGE} \
-         -M pc -smp 1 -cpu host -m ${MEM} \
-         -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGES_FS},share=on \
-         -numa node,memdev=mem \
-         -chardev socket,id=char1,path=${VHU_SOCK0},server \
-             -netdev type=vhost-user,id=net0,chardev=char1 \
-             -device virtio-net-pci,netdev=net0,addr=0x8,mac=${MAC_ADDRESS_NET0} \
-         -serial telnet:localhost:${SNABB_TELNET0},server,nowait \
-         -display none"
+# Define vars before importing SnabbNFV test_env to default initialization.
+MAC=$MAC_ADDRESS_NET0
+IP=$LWAFTR_IPV6_ADDRESS
+
+if ! source program/snabbnfv/test_env/test_env.sh; then
+    echo "Could not load snabbnfv test_env."; exit 1
+fi
+
+# Overwrite mac function to always return $MAC.
+function mac {
+    echo $MAC
 }
 
-function quit_screen { screen_id=$1
-    screen -X -S "$screen_id" quit &> /dev/null
-}
-
-function run_cmd_in_screen { screen_id=$1; cmd=$2
-    screen_id="${screen_id}-$$"
-    quit_screen "$screen_id"
-    screen -dmS "$screen_id" bash -c "$cmd >> $SNABBVMX_LOG"
-}
-
-function qemu {
-    run_cmd_in_screen "qemu" "`qemu_cmd`"
+# Overwrite ip function to always return $IP.
+function ip {
+    echo $IP
 }
 
 function start_test_env {
-    if [[ ! -f "$IMAGE" ]]; then
-       echo "Couldn't find QEMU image: $IMAGE"
-       exit $SKIPPED_CODE
+    local mirror=$1
+
+    local cmd="snabbvmx lwaftr --conf $SNABBVMX_CONF --id $SNABBVMX_ID --pci $SNABB_PCI0 --mac $MAC_ADDRESS_NET0 --sock $VHU_SOCK0"
+    if [ -n "$mirror" ]; then
+        cmd="$cmd --mirror $mirror"
     fi
 
-    # Run qemu.
-    qemu
+    if ! snabb $SNABB_PCI0 "$cmd"; then
+        echo "Could not start snabbvmx."; exit 1
+    fi
+
+    if ! qemu $SNABB_PCI0 $VHU_SOCK0 $SNABB_TELNET0 $MAC_ADDRESS_NET0; then
+        echo "Could not start qemu 0."; exit 1
+    fi
 
     # Wait until VMs are ready.
     wait_vm_up $SNABB_TELNET0
 
-    # Manually set ip addresses.
+    # Configure eth0 interface in the VM.
+
+    # Bring up interface.
     run_telnet $SNABB_TELNET0 "ifconfig eth0 up" >/dev/null
 
     # Assign lwAFTR's IPV4 and IPV6 addresses to eth0.
