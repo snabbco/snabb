@@ -157,7 +157,7 @@ function run(args)
    end
 
    if opts.verbosity >= 1 then
-      local csv = csv_stats.CSVStatsTimer.new(opts.csv_file, opts.hydra)
+      local csv = csv_stats.CSVStatsTimer.new(opts.bench_file, opts.hydra)
       -- Why are the names cross-referenced like this?
       local ipv4_tx = opts.hydra and 'ipv4rx' or 'IPv4 RX'
       local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
