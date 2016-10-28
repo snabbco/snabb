@@ -89,8 +89,11 @@ function load (file, pciaddr, sockpath, soft_bench)
          local Crypto = name.."_Crypto"
          config.app(c, Crypto, AES128gcm,
                     {spi = t.crypto.spi,
-                     key = t.crypto.key,
-                     replay_window = t.crypto.replay_window})
+                     transmit_key = t.crypto.transmit_key,
+                     transmit_salt = t.crypto.transmit_salt,
+                     receive_key = t.crypto.receive_key,
+                     receive_salt = t.crypto.receive_salt,
+                     auditing = t.crypto.auditing})
          config.link(c, VM_tx.." -> "..Crypto..".decapsulated")
          config.link(c, Crypto..".decapsulated -> "..VM_rx)
          VM_rx, VM_tx = Crypto..".encapsulated", Crypto..".encapsulated"
