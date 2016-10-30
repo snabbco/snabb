@@ -5,6 +5,8 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+DURATION=${1:-"0.10"}
+
 function quit_with_msg {
     errno=$1; msg="$2"
     echo "Test failed: $msg"
@@ -13,10 +15,10 @@ function quit_with_msg {
 
 function soaktest {
     conf="$1"; in_v4="$2"; in_v6="$3"
-    $SNABB_LWAFTR soaktest "$conf" "$in_v4" "$in_v6" ||
-        quit_with_msg $? "Test failed: $SNABB_LWAFTR soaktest $@"
-    $SNABB_LWAFTR soaktest --on-a-stick "$conf" "$in_v4" "$in_v6" ||
-        quit_with_msg $? "Test failed: $SNABB_LWAFTR soaktest --on-a-stick $@"
+    $SNABB_LWAFTR soaktest -D $DURATION "$conf" "$in_v4" "$in_v6" ||
+        quit_with_msg $? "$SNABB_LWAFTR soaktest -D $DURATION $conf $in_v4 $in_v6"
+    $SNABB_LWAFTR soaktest -D $DURATION --on-a-stick "$conf" "$in_v4" "$in_v6" ||
+        quit_with_msg $? "$SNABB_LWAFTR soaktest -D $DURATION --on-a-stick $conf $in_v4 $in_v6"
 }
 
 source "../end-to-end/test_env.sh"
