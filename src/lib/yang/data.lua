@@ -4,7 +4,7 @@ module(..., package.seeall)
 
 local ffi = require("ffi")
 local parse_string = require("lib.yang.parser").parse_string
-local schema = require("lib.yang.schema2")
+local schema = require("lib.yang.schema")
 
 function data_grammar_from_schema(schema)
    local handlers = {}
