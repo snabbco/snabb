@@ -6,6 +6,42 @@ local ffi = require("ffi")
 local parser = require("lib.yang.parser")
 local schema = require("lib.yang.schema2")
 
+function data_grammar_from_schema(schema)
+   local handlers = {}
+   local function visit(node)
+      local handler = handlers[node.kind]
+      if handler then return handler(node) end
+      return {}
+   end
+   local function visit_body(node)
+      local ret = {}
+      for id,node in pairs(node.body) do
+         for keyword,node in pairs(visit(node)) do
+            assert(not ret[keyword], 'duplicate identifier: '..keyword)
+            ret[keyword] = node
+         end
+      end
+      return ret
+   end
+   function handlers.container(node)
+      if not node.presence then return visit_body(node) end
+      return {[node.id]={type='struct', members=visit_body(node)}}
+   end
+   handlers['leaf-list'] = function(node)
+      return {[node.id]={type='array', element_type=node.type}}
+   end
+   function handlers.list(node)
+      local keys = {}
+      for key in node.key:split(' +') do table.insert(keys, key) end
+      return {[node.id]={type='table', keys=keys, members=visit_body(node)}}
+   end
+   function handlers.leaf(node)
+      return {[node.id]={type='scalar', argument_type=node.type,
+                         default=node.default, mandatory=node.mandatory}}
+   end
+   return {type="struct", members=visit_body(schema)}
+end
+
 ffi.cdef([[
 unsigned long long strtoull (const char *nptr, const char **endptr, int base);
 ]])
@@ -112,23 +148,38 @@ local function value_parser(typ)
    end
 end
 
-local function struct_parser(members, k)
+local function assert_scalar(node, keyword, opts)
+   assert(node.argument or (opts and opts.allow_empty_argument),
+          'missing argument for "'..keyword..'"')
+   assert(not node.statements, 'unexpected sub-parameters for "'..keyword..'"')
+end
+
+local function assert_compound(node, keyword)
+   assert(not node.argument, 'argument unexpected for "'..keyword..'"')
+   assert(node.statements,
+          'missing brace-delimited sub-parameters for "'..keyword..'"')
+end
+
+local function assert_not_duplicate(out, keyword)
+   assert(not out, 'duplicate parameter: '..keyword)
+end
+
+local function struct_parser(keyword, members)
    local function init() return nil end
    local function parse1(node)
-      assert(not node.argument, 'argument unexpected for struct type: '..k)
-      assert(node.statements, 'missing statements for struct type: '..k)
+      assert_compound(node, keyword)
       local ret = {}
       for k,sub in pairs(members) do ret[k] = sub.init() end
       for _,node in ipairs(node.statements) do
          local sub = assert(members[node.keyword],
-                            'unrecognized keyword: '..node.keyword)
+                            'unrecognized parameter: '..node.keyword)
          ret[node.keyword] = sub.parse(node, ret[node.keyword])
       end
       for k,sub in pairs(members) do ret[k] = sub.finish(ret[k]) end
       return ret
    end
    local function parse(node, out)
-      if out then error('duplicate struct: '..k) end
+      assert_not_duplicate(out, keyword)
       return parse1(node)
    end
    local function finish(out)
@@ -138,12 +189,11 @@ local function struct_parser(members, k)
    return {init=init, parse=parse, finish=finish}
 end
 
-local function array_parser(typ, k)
+local function array_parser(keyword, element_type)
    local function init() return {} end
-   local parsev = value_parser(typ)
+   local parsev = value_parser(element_type)
    local function parse1(node)
-      assert(node.argument, 'argument expected for array type: '..k)
-      assert(not node.statements, 'unexpected statements for array type: '..k)
+      assert_scalar(node, keyword)
       return parsev(node.argument, k)
    end
    local function parse(node, out)
@@ -157,15 +207,15 @@ local function array_parser(typ, k)
    return {init=init, parse=parse, finish=finish}
 end
 
-local function scalar_parser(typ, default, mandatory, k)
+local function scalar_parser(keyword, argument_type, default, mandatory)
    local function init() return nil end
-   local parsev = value_parser(typ)
+   local parsev = value_parser(argument_type)
    local function parse1(node)
-      assert(not node.statements, 'unexpected statements for scalar type: '..k)
-      return parsev(node.argument, k)
+      assert_scalar(node, keyword, {allow_empty_argument=true})
+      return parsev(node.argument, keyword)
    end
    local function parse(node, out)
-      assert(not out, 'duplicate scalar config value: '..k)
+      assert_not_duplicate(out, keyword)
       return parse1(node)
    end
    local function finish(out)
@@ -176,20 +226,21 @@ local function scalar_parser(typ, default, mandatory, k)
    return {init=init, parse=parse, finish=finish}
 end
 
-local function table_parser(keystr, members, k)
+local function table_parser(keyword, keys, members)
    -- This is a temporary lookup until we get the various Table kinds
    -- working.
    local function lookup(out, k)
       for _,v in ipairs(out) do
-         if v[keystr] == k then return v end
+         if #keys == 1 then
+            if v[keys[1]] == k then return v end
+         end
       end
       error('not found: '..k)
    end
    local function init() return {lookup=lookup} end
-   local parser = struct_parser(members, k)
+   local parser = struct_parser(keyword, members)
    local function parse1(node)
-      assert(not node.argument, 'argument unexpected for table type: '..k)
-      assert(node.statements, 'expected statements for table type: '..k)
+      assert_compound(node, keyword)
       return parser.finish(parser.parse(node, parser.init()))
    end
    local function parse(node, out)
@@ -205,42 +256,39 @@ local function table_parser(keystr, members, k)
 end
 
 function data_parser_from_schema(schema)
+   return data_parser_from_grammar(data_grammar_from_schema(schema))
+end
+
+function data_parser_from_grammar(production)
    local handlers = {}
-   local function visit(node)
-      local handler = handlers[node.kind]
-      if handler then return handler(node) end
-      return {}
+   local function visit1(keyword, production)
+      return assert(handlers[production.type])(keyword, production)
    end
-   local function visit_body(node)
+   local function visitn(productions)
       local ret = {}
-      for id,node in pairs(node.body) do
-         for keyword,node in pairs(visit(node)) do
-            assert(not ret[keyword], 'duplicate identifier: '..keyword)
-            ret[keyword] = node
-         end
+      for keyword,production in pairs(productions) do
+         ret[keyword] = visit1(keyword, production)
       end
       return ret
    end
-   function handlers.module(node)
+   function handlers.struct(keyword, production)
+      return struct_parser(keyword, visitn(production.members))
    end
-   function handlers.container(node)
-      if not node.presence then return visit_body(node) end
-      return {[node.id]=struct_parser(visit_body(node), node.id)}
+   function handlers.array(keyword, production)
+      return array_parser(keyword, production.element_type)
    end
-   handlers['leaf-list'] = function(node)
-      return {[node.id]=array_parser(node.type, node.id)}
+   function handlers.table(keyword, production)
+      return table_parser(keyword, production.keys, visitn(production.members))
    end
-   function handlers.list(node)
-      return {[node.id]=table_parser(node.key, visit_body(node), node.id)}
-   end
-   function handlers.leaf(node)
-      return {[node.id]=scalar_parser(node.type, node.default, node.mandatory,
-node.id)}
+   function handlers.scalar(keyword, production)
+      return scalar_parser(keyword, production.argument_type,
+                           production.default, production.mandatory)
    end
 
-   local parser = struct_parser(visit_body(schema), '(top level)')
-   return function(stmtlist)
-      return parser.finish(parser.parse({statements=stmtlist}, parser.init()))
+   local parser = visit1('(top level)', production)
+   return function(statement_list)
+      local node = {statements=statement_list}
+      return parser.finish(parser.parse(node, parser.init()))
    end
 end
 
