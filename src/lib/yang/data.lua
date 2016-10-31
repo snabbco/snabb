@@ -112,9 +112,7 @@ local function bit_validator(range, f) return f end
 local function enum_validator(range, f) return f end
 
 local function value_parser(typ)
-   local prim = typ.base_type
-   -- FIXME: perhaps cache the primitive type on all type nodes.
-   while type(prim) ~= 'string' do prim = prim.base_type end
+   local prim = typ.primitive_type
    local parse = assert(primitive_parsers[prim], prim)
    local function validate(val) end
    validate = range_validator(typ.range, validate)

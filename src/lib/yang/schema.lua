@@ -653,15 +653,18 @@ function resolve(schema, features)
       node = shallow_copy(node)
       local success, typedef = pcall(lookup, env, 'typedefs', node.id)
       if success then
-         -- Could be that typedef is still lazy.  We didn't use
+         -- Typedefs are lazy, so force their value.  We didn't use
          -- lookup_lazy because we don't want the pcall to hide errors
          -- from the lazy expansion.
-         if type(typedef) == 'function' then typedef = typedef() end
+         typedef = typedef()
          node.base_type = typedef
+         if not node.primitive_type then
+            node.primitive_type = assert(typedef.type.primitive_type)
+         end
       else
          -- If the type name wasn't bound, it must be primitive.
          assert(primitive_types[node.id], 'unknown type: '..node.id)
-         node.base_type = node.id
+         node.primitive_type = node.id
       end
       return node
    end
@@ -772,6 +775,20 @@ function resolve(schema, features)
                         submodules=pop_prop(schema, 'submodules')})
 end
 
+local primitive_types = {
+   ['ietf-inet-types']=set('ipv4-address', 'ipv6-address',
+                           'ipv4-prefix', 'ipv6-prefix'),
+   ['ietf-yang-types']=set('mac-address')
+}
+
+-- NB: mutates schema in place!
+local function primitivize(schema)
+   for k, _ in pairs(primitive_types[schema.id] or {}) do
+      assert(schema.typedefs[k]).primitive_type = k
+   end
+   return schema
+end
+
 function parse_schema(src, filename)
    return schema_from_ast(parser.parse_string(src, filename))
 end
@@ -780,10 +797,10 @@ function parse_schema_file(filename)
 end
 
 function load_schema(src, filename)
-   return resolve(strip(parse_schema(src, filename)))
+   return resolve(primitivize(strip(parse_schema(src, filename))))
 end
 function load_schema_file(filename)
-   return resolve(strip(parse_schema_file(filename)))
+   return resolve(primitivize(strip(parse_schema_file(filename))))
 end
 function load_schema_by_name(name, revision)
    -- FIXME: @ is not valid in a Lua module name.
