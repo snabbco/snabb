@@ -3,7 +3,7 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
-local parser = require("lib.yang.parser")
+local parse_string = require("lib.yang.parser").parse_string
 local schema = require("lib.yang.schema2")
 
 function data_grammar_from_schema(schema)
@@ -286,14 +286,23 @@ function data_parser_from_grammar(production)
    end
 
    local parser = visit1('(top level)', production)
-   return function(statement_list)
-      local node = {statements=statement_list}
+   return function(str, filename)
+      local node = {statements=parse_string(str, filename)}
       return parser.finish(parser.parse(node, parser.init()))
    end
 end
 
+function load_data_for_schema(schema, str, filename)
+   return data_parser_from_schema(schema)(str, filename)
+end
+
+function load_data_for_schema_by_name(schema_name, str, filename)
+   local schema = schema.load_schema_by_name(schema_name)
+   return load_data_for_schema(schema, str, filename)
+end
+
 function selftest()
-   local test_schema = [[module fruit {
+   local test_schema = schema.load_schema([[module fruit {
       namespace "urn:testing:fruit";
       prefix "fruit";
       grouping fruit {
@@ -313,18 +322,16 @@ function selftest()
          leaf description { type string; }
          list contents { uses fruit; key name; }
       }
-   }]]
+   }]])
 
-   local schema = schema.load_schema(test_schema)
-   local parse = data_parser_from_schema(schema)
-   local data = parse(parser.parse_string([[
+   local data = load_data_for_schema(test_schema, [[
      fruit-bowl {
        description 'ohai';
        contents { name foo; score 7; }
        contents { name bar; score 8; }
        contents { name baz; score 9; tree-grown true; }
      }
-   ]]))
+   ]])
    assert(data['fruit-bowl'].description == 'ohai')
    assert(data['fruit-bowl'].contents:lookup('foo').name == 'foo')
    assert(data['fruit-bowl'].contents:lookup('foo').score == 7)
