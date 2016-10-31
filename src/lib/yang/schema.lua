@@ -1,22 +1,8 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
--- This module implements the schema tree and validation for YANG. It represents
--- the YANG statements with lua tables and provides a fast but flexible way to
--- represent and validate statements.
--- 
--- Since YANG statements are encapsulated in modules at the highest level one
--- should take their pre-parsed YANG document containing the module and load it
--- into the Module table.
 module(..., package.seeall)
-local parser = require("lib.yang.parser")
 
-local ffi = require("ffi")
-ffi.cdef("long long atoll(const char *nptr);")
-local function tointeger(str)
-   local i = ffi.C.atoll(str)
-   if tostring(i) == str.."LL" then
-      if i == tonumber(i) then return tonumber(i) else return i end
-   end
-end
+local parser = require("lib.yang.parser")
+local util = require("lib.yang.util")
 
 local function error_with_path(path, msg, ...)
    error(string.format("%s: "..msg, path, ...))
@@ -69,12 +55,8 @@ local function parse_range(node, range)
    local function parse_part(part)
       local l, r = part:match("^%s*([^%.]*)%s*%.%.%s*([^%s]*)%s*$")
       assert_with_path(l, node.path, 'bad range component: %s', part)
-      if l ~= 'min' then
-         l = assert_with_path(tointeger(l), node.path, "bad integer: %s", l)
-      end
-      if r ~= 'max' then
-         r = assert_with_path(tointeger(r), node.path, "bad integer: %s", r)
-      end
+      if l ~= 'min' then l = util.tointeger(l) end
+      if r ~= 'max' then r = util.tointeger(r) end
       return { l, r }
    end
    local parts = range:split("|")

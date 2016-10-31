@@ -2,9 +2,16 @@
 -- COPYING.
 module(..., package.seeall)
 
-local ffi = require("ffi")
 local parse_string = require("lib.yang.parser").parse_string
 local schema = require("lib.yang.schema")
+local util = require("lib.yang.util")
+
+-- FIXME:
+-- Parse inet:mac-address using ethernet:pton
+-- Parse inet:ipv4-address using ipv4:pton
+-- Parse inet:ipv6-address using ipv6:pton
+-- Parse inet:ipv4-prefix?
+-- Parse inet:ipv6-prefix?
 
 function data_grammar_from_schema(schema)
    local handlers = {}
@@ -42,34 +49,9 @@ function data_grammar_from_schema(schema)
    return {type="struct", members=visit_body(schema)}
 end
 
-ffi.cdef([[
-unsigned long long strtoull (const char *nptr, const char **endptr, int base);
-]])
-
 local function integer_type(min, max)
    return function(str, k)
-      local str = assert(str, 'missing value for '..k)
-      local start = 1
-      local is_negative
-      local base = 10
-      if str:match('^-') then start, is_negative = 2, true
-      elseif str:match('^+') then start = 2 end
-      if str:match('^0x', start) then base, start = 16, start + 2
-      elseif str:match('^0', start) then base = 8 end
-      str = str:lower()
-      local function check(test)
-         return assert(test, 'invalid numeric value for '..k..': '..str)
-      end
-      check(start <= str:len())
-      -- FIXME: check that res did not overflow the 64-bit number
-      local res = ffi.C.strtoull(str:sub(start), nil, base)
-      if is_negative then
-         res = ffi.new('int64_t[1]', -1*res)[0]
-         check(res <= 0)
-      end
-      check(min <= res and res <= max)
-      if tonumber(res) == res then return tonumber(res) end
-      return res
+      return util.tointeger(str, k, min, max)
    end
 end
 
