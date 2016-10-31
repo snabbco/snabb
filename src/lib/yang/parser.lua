@@ -355,5 +355,7 @@ function selftest()
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
 	argument="port", statements={{keyword="type"}}}})
 
-   parse_file(require('lib.yang.example_yang'))
+   parse_string(require('lib.yang.ietf_inet_types_yang'))
+   parse_string(require('lib.yang.ietf_yang_types_yang'))
+   parse_string(require('lib.yang.ietf_softwire_yang'))
 end
