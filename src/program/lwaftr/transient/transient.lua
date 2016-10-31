@@ -126,7 +126,7 @@ function run(args)
    rate_adjuster()
    timer.activate(timer.new("adjust_rate", rate_adjuster,
                             opts.duration * 1e9, 'repeating'))
-   local csv = csv_stats.CSVStatsTimer.new(opts.bench_file)
+   local csv = csv_stats.CSVStatsTimer:new(opts.bench_file)
    for _,stream in ipairs(streams) do
       csv:add_app(stream.nic_id, { 'rx', 'tx' },
                   { rx=stream.name..' TX', tx=stream.name..' RX' })

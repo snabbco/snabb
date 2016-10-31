@@ -2,7 +2,7 @@ Usage: bench CONF IPV4-IN.PCAP IPV6-IN.PCAP
 
   -h, --help
                              Print usage information.
-  -y HYDRA, --hydra
+  -y, --hydra
                              Hydra mode: emit CSV data in the format expected
                              by the Hydra reports. For instance:
 

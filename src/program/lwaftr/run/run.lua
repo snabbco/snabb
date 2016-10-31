@@ -82,9 +82,7 @@ function parse_args(args)
       opts["mirror"] = ifname
    end
    function handlers.y() opts.hydra = true end
-   handlers["bench-file"] = function (bench_file)
-      opts.bench_file = bench_file
-   end
+   function handlers.b(arg) opts.bench_file = arg end
    handlers["ingress-drop-monitor"] = function (arg)
       if arg == 'flush' or arg == 'warn' then
          opts.ingress_drop_monitor = arg
@@ -99,7 +97,7 @@ function parse_args(args)
    lib.dogetopt(args, handlers, "b:c:vD:yhir:",
       { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
         verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
-        ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = 0,
+        ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
         ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1, hydra = "y" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
@@ -157,7 +155,7 @@ function run(args)
    end
 
    if opts.verbosity >= 1 then
-      local csv = csv_stats.CSVStatsTimer.new(opts.bench_file, opts.hydra)
+      local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra)
       -- Why are the names cross-referenced like this?
       local ipv4_tx = opts.hydra and 'ipv4rx' or 'IPv4 RX'
       local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
