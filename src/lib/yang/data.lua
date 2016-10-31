@@ -5,6 +5,7 @@ module(..., package.seeall)
 local parse_string = require("lib.yang.parser").parse_string
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
+local value = require("lib.yang.value")
 
 -- FIXME:
 -- Parse inet:mac-address using ethernet:pton
@@ -55,55 +56,6 @@ local function integer_type(min, max)
    end
 end
 
-local primitive_parsers = {}
-
-primitive_parsers.int8 = integer_type(-0xf0, 0x7f)
-primitive_parsers.int16 = integer_type(-0xf000, 0x7fff)
-primitive_parsers.int32 = integer_type(-0xf000000, 0x7fffffff)
-primitive_parsers.int64 = integer_type(-0xf00000000000000LL, 0x7fffffffffffffffLL)
-primitive_parsers.uint8 = integer_type(0, 0xff)
-primitive_parsers.uint16 = integer_type(0, 0xffff)
-primitive_parsers.uint32 = integer_type(0, 0xffffffff)
-primitive_parsers.uint64 = integer_type(0, 0xffffffffffffffffULL)
-function primitive_parsers.binary(str, k)
-   error('unimplemented: binary')
-   return str
-end
-function primitive_parsers.bits(str, k)
-   error('unimplemented: bits')
-end
-function primitive_parsers.boolean(str, k)
-   local str = assert(str, 'missing value for '..k)
-   if str == 'true' then return true end
-   if str == 'false' then return false end
-   error('bad boolean value: '..str)
-end
-function primitive_parsers.decimal64(str, k)
-   error('unimplemented: decimal64')
-end
-function primitive_parsers.empty(str, k)
-   assert(not str, 'unexpected value for '..k)
-   return true
-end
-function primitive_parsers.enumeration(str, k)
-   return assert(str, 'missing value for '..k)
-end
-function primitive_parsers.identityref(str, k)
-   error('unimplemented: identityref')
-end
-primitive_parsers['instance-identifier'] = function(str, k)
-   error('unimplemented: instance-identifier')
-end
-function primitive_parsers.leafref(str, k)
-   error('unimplemented: leafref')
-end
-function primitive_parsers.string(str, k)
-   return assert(str, 'missing value for '..k)
-end
-function primitive_parsers.union(str, k)
-   error('unimplemented: union')
-end
-
 -- FIXME :)
 local function range_validator(range, f) return f end
 local function length_validator(range, f) return f end
@@ -113,7 +65,7 @@ local function enum_validator(range, f) return f end
 
 local function value_parser(typ)
    local prim = typ.primitive_type
-   local parse = assert(primitive_parsers[prim], prim)
+   local parse = assert(value.types[prim], prim).parse
    local function validate(val) end
    validate = range_validator(typ.range, validate)
    validate = length_validator(typ.length, validate)
@@ -285,6 +237,7 @@ function selftest()
    local test_schema = schema.load_schema([[module fruit {
       namespace "urn:testing:fruit";
       prefix "fruit";
+      import ietf-inet-types {prefix inet; }
       grouping fruit {
          leaf name {
             type string;
@@ -302,6 +255,10 @@ function selftest()
          leaf description { type string; }
          list contents { uses fruit; key name; }
       }
+      leaf addr {
+         description "internet of fruit";
+         type inet:ipv4-address;
+      }
    }]])
 
    local data = load_data_for_schema(test_schema, [[
@@ -311,6 +268,7 @@ function selftest()
        contents { name bar; score 8; }
        contents { name baz; score 9; tree-grown true; }
      }
+     addr 1.2.3.4;
    ]])
    assert(data['fruit-bowl'].description == 'ohai')
    assert(data['fruit-bowl'].contents:lookup('foo').name == 'foo')
@@ -322,4 +280,5 @@ function selftest()
    assert(data['fruit-bowl'].contents:lookup('baz').name == 'baz')
    assert(data['fruit-bowl'].contents:lookup('baz').score == 9)
    assert(data['fruit-bowl'].contents:lookup('baz')['tree-grown'] == true)
+   assert(require('lib.protocol.ipv4'):ntop(data.addr) == '1.2.3.4')
 end

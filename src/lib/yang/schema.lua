@@ -658,9 +658,7 @@ function resolve(schema, features)
          -- from the lazy expansion.
          typedef = typedef()
          node.base_type = typedef
-         if not node.primitive_type then
-            node.primitive_type = assert(typedef.type.primitive_type)
-         end
+         node.primitive_type = assert(typedef.primitive_type)
       else
          -- If the type name wasn't bound, it must be primitive.
          assert(primitive_types[node.id], 'unknown type: '..node.id)
@@ -696,7 +694,12 @@ function resolve(schema, features)
             return nil, env
          end
       end
-      if node.type then node.type = visit_type(node.type, env) end
+      if node.type then
+         node.type = visit_type(node.type, env)
+         if not node.primitive_type then
+            node.primitive_type = node.type.primitive_type
+         end
+      end
       for k,v in pairs(node.body or {}) do
          if v.kind == 'uses' then
             -- Inline "grouping" into "uses".
