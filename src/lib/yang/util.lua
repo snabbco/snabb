@@ -34,8 +34,13 @@ function tointeger(str, what, min, max)
    if is_negative then
       res = ffi.new('int64_t[1]', -1*res)[0]
       check(res <= 0)
+      if min then check(min <= 0 and min <= res) end
+   else
+      -- Only compare min and res if both are positive, otherwise if min
+      -- is a negative int64_t then the comparison will treat it as a
+      -- large uint64_t.
+      if min then check(min <= 0 or min <= res) end
    end
-   if min then check(min <= res) end
    if max then check(res <= max) end
    -- Only return Lua numbers for values within int32 + uint32 range.
    if -0x8000000 <= res and res <= 0xffffffff then return tonumber(res) end
