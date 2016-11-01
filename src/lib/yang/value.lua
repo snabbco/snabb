@@ -62,7 +62,7 @@ end
 types.binary = unimplemented('binary')
 types.bits = unimplemented('bits')
 
-types.boolean = {}
+types.boolean = {ctype='bool'}
 function types.boolean.parse(str, what)
    local str = assert(str, 'missing value for '..what)
    if str == 'true' then return true end
