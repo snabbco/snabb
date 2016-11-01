@@ -39,9 +39,13 @@ function data_grammar_from_schema(schema)
       return {[node.id]={type='array', element_type=node.type}}
    end
    function handlers.list(node)
-      local keys = {}
-      for key in node.key:split(' +') do table.insert(keys, key) end
-      return {[node.id]={type='table', keys=keys, members=visit_body(node)}}
+      local members=visit_body(node)
+      local keys, values = {}, {}
+      for k in node.key:split(' +') do keys[k] = assert(members[k]) end
+      for k,v in pairs(members) do
+         if not keys[k] then values[k] = v end
+      end
+      return {[node.id]={type='table', keys=keys, values=values}}
    end
    function handlers.leaf(node)
       return {[node.id]={type='scalar', argument_type=node.type,
@@ -158,31 +162,50 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    return {init=init, parse=parse, finish=finish}
 end
 
-local function table_parser(keyword, keys, members)
-   -- This is a temporary lookup until we get the various Table kinds
-   -- working.
-   local function lookup(out, k)
-      for _,v in ipairs(out) do
-         if #keys == 1 then
-            if v[keys[1]] == k then return v end
+-- Simple temporary associative array until we get the various Table
+-- kinds working.
+local function make_assoc()
+   local assoc = {}
+   function assoc:get_entry(k)
+      assert(type(k) ~= 'table', 'multi-key lookup unimplemented')
+      for _,entry in ipairs(self) do
+         for _,v in pairs(entry.key) do
+            if v == k then return entry end
          end
       end
       error('not found: '..k)
    end
-   local function init() return {lookup=lookup} end
+   function assoc:get_key(k) return self:get_entry(k).key end
+   function assoc:get_value(k) return self:get_entry(k).value end
+   function assoc:add(k, v, check)
+      if check then assert(not self:get_entry(k)) end
+      table.insert(self, {key=k, value=v})
+   end
+   return assoc
+end
+
+local function table_parser(keyword, keys, values)
+   local members = {}
+   for k,v in pairs(keys) do members[k] = v end
+   for k,v in pairs(values) do members[k] = v end
    local parser = struct_parser(keyword, members)
+
+   local function init() return make_assoc() end
    local function parse1(node)
       assert_compound(node, keyword)
       return parser.finish(parser.parse(node, parser.init()))
    end
-   local function parse(node, out)
-      -- TODO: tease out key from value, add to associative array
-      table.insert(out, parse1(node))
-      return out
+   local function parse(node, assoc)
+      local struct = parse1(node)
+      local key, value = {}, {}
+      for k,v in pairs(struct) do
+         if keys[k] then key[k] = v else value[k] = v end
+      end
+      assoc:add(key, value)
+      return assoc
    end
-   local function finish(out)
-      -- FIXME check min-elements
-      return out
+   local function finish(assoc)
+      return assoc
    end
    return {init=init, parse=parse, finish=finish}
 end
@@ -210,7 +233,8 @@ function data_parser_from_grammar(production)
       return array_parser(keyword, production.element_type)
    end
    function handlers.table(keyword, production)
-      return table_parser(keyword, production.keys, visitn(production.members))
+      return table_parser(keyword, visitn(production.keys),
+                          visitn(production.values))
    end
    function handlers.scalar(keyword, production)
       return scalar_parser(keyword, production.argument_type,
@@ -271,14 +295,17 @@ function selftest()
      addr 1.2.3.4;
    ]])
    assert(data['fruit-bowl'].description == 'ohai')
-   assert(data['fruit-bowl'].contents:lookup('foo').name == 'foo')
-   assert(data['fruit-bowl'].contents:lookup('foo').score == 7)
-   assert(data['fruit-bowl'].contents:lookup('foo')['tree-grown'] == nil)
-   assert(data['fruit-bowl'].contents:lookup('bar').name == 'bar')
-   assert(data['fruit-bowl'].contents:lookup('bar').score == 8)
-   assert(data['fruit-bowl'].contents:lookup('bar')['tree-grown'] == nil)
-   assert(data['fruit-bowl'].contents:lookup('baz').name == 'baz')
-   assert(data['fruit-bowl'].contents:lookup('baz').score == 9)
-   assert(data['fruit-bowl'].contents:lookup('baz')['tree-grown'] == true)
+   local contents = data['fruit-bowl'].contents
+   assert(contents:get_entry('foo').key.name == 'foo')
+   assert(contents:get_entry('foo').value.score == 7)
+   assert(contents:get_key('foo').name == 'foo')
+   assert(contents:get_value('foo').score == 7)
+   assert(contents:get_value('foo')['tree-grown'] == nil)
+   assert(contents:get_key('bar').name == 'bar')
+   assert(contents:get_value('bar').score == 8)
+   assert(contents:get_value('bar')['tree-grown'] == nil)
+   assert(contents:get_key('baz').name == 'baz')
+   assert(contents:get_value('baz').score == 9)
+   assert(contents:get_value('baz')['tree-grown'] == true)
    assert(require('lib.protocol.ipv4'):ntop(data.addr) == '1.2.3.4')
 end
