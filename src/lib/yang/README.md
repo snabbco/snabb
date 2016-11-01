@@ -144,19 +144,129 @@ hand.
 
 #### Compiled configurations
 
+[TODO] We will support compiling configurations to an efficient binary
+representation that can be loaded without validation.
+
 #### Querying and updating configurations
+
+[TODO] We will need to be able to serialize a configuration back to
+source, for when a user asks what the configuration of a device is.  We
+will also need to serialize partial configurations, for when the user
+asks for just a part of the configuration.
+
+[TODO] We will need to support updating the configuration of a running
+snabb application.  We plan to compile the candidate configuration in a
+non-worker process, then signal the worker to reload its configuration.
+
+[TODO] We will need to support incremental configuration updates, for
+example to add or remove a binding table entry for the lwAFTR.  In this
+way we can avoid a full reload of the configuration, minimizing packet
+loss.
 
 #### State data
 
-#### Function reference
+[TODO] We need to map the state data exported by a Snabb process
+(counters, etc) to YANG-format data.  Perhaps this can be done in a
+similar way as configuration compilation: the configuration facility in
+the Snabb binary compiles a YANG state data file and periodically
+updates it by sampling the data plane, and then we re-use the
+configuration serialization facilities to serialize (potentially
+partial) state data.
 
-All of these functions are on modules in the `lib.yang` path.  For
-example, to have access to:
+#### API reference
 
-— Function **schema.load_schema_by_name** *name*
+The public entry point to the YANG library is the `lib.yang.yang`
+module, which exports the following bindings:
 
-Then do `local schema = require('lib.yang.schema')`.
+— Function **load_schema** *src* *filename*
 
-— Function **schema.load_schema_by_name** *name*
+Load a YANG schema from the string *src*.  *filename* is an optional
+file name for use in error messages.  Returns a YANG schema object.
 
-Load up schema by name.  [TODO write more here.]
+Schema objects do have useful internal structure but they are not part
+of the documented interface.
+
+— Function **load_schema_file** *filename*
+
+Load a YANG schema from the file named *filename*.  Returns a YANG
+schema object.
+
+— Function **load_schema_by_name** *name* *revision*
+
+Load the given named YANG schema.  The *name* indicates the canonical
+name of the schema, which appears as `module *name* { ... }` in the YANG
+schema itself, or as `import *name* { ... }` in other YANG modules that
+import this module.  *revision* optionally indicates that a certain
+revision data should be required.
+
+— Function **load_data_for_schema** *schema* *src* *filename*
+
+Given the schema object *schema*, load the configuration from the string
+*src*.  Returns a parsed configuration as a plain old Lua value that
+tries to represent configuration values using appropriate Lua types.
+
+The top-level result from parsing will be a table whose keys are the
+top-level configuration options.  For example in the above example:
+
+```
+active true;
+routes {
+  route { addr 1.2.3.4; port 1; }
+  route { addr 2.3.4.5; port 10; }
+  route { addr 3.4.5.6; port 2; }
+}
+```
+
+In this case, the result would be a table with two keys, `active` and
+`routes`.  The value of the `active` key would be Lua boolean `true`.
+
+The `routes` container is just another table of the same kind.
+(Remember however that only containers with `presence true;` have
+corresponding nodes in the configuration syntax, and corresponding
+sub-tables in the result configuration objects.)
+
+Inside the `routes` container is the `route` list, which is also
+represented as a table.  Recall that in YANG, `list` types are really
+key-value associations, so the `route` table has a `:lookup` method to
+get its sub-items.  Therefore to get the port for address 1.2.3.4, you
+would do:
+
+```lua
+local yang = require('lib.yang.yang')
+local ipv4 = require('lib.protocol.ipv4)
+local data = yang.load_data_for_schema(router_schema, conf_str)
+local port = data.routes.route:lookup(ipv4:pton('1.2.3.4')).port
+assert(port == 1)
+```
+
+Here we see that integer values like the `port` leaves are represented
+directly as Lua numbers, if they fit within the `uint32` or `int32`
+range.  Integers outside that range are represented as `uint64_t` if
+they are positive, or `int64_t` otherwise.
+
+Boolean values are represented using normal Lua booleans, of course.
+
+String values are just parsed to Lua strings, with the normal Lua
+limitation that UTF-8 data is not decoded.  Lua strings look like
+strings but really they are byte arrays.
+
+There is special support for the `ipv4-address`, `ipv4-prefix`,
+`ipv6-address`, and `ipv6-address` types from `ietf-inet-types`, and
+`mac-address` from `ietf-yang-types`.  Values of these types are instead
+parsed to raw binary data that is compatible with the relevant parts of
+Snabb's `lib.protocol` facility.
+
+Returning to compound configuration data types, configuration for
+`leaf-list` schema nodes are represented as normal arrays, whose values
+are instances of the leaf types.
+
+Note that there are a number of value types that are not implemented,
+including some important ones like `union`, and the `list` type
+representation needs further optimization.  We aim to compile `list`
+values directly to `ctable` instances where possible.  Patches are
+welcome :)
+
+— Function **load_data_for_schema_by_name** *schema_name* *name* *filename*
+
+Like `load_data_for_schema`, but identifying the schema by name instead
+of by value, as in `load_schema_by_name`.
