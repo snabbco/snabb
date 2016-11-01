@@ -143,16 +143,15 @@ end
 -- Cleanup after Snabb process.
 function shutdown (pid)
    if not _G.developer_debug and not lib.getenv("SNABB_SHM_KEEP") then
-      shm.unlink("/"..pid)
-
-      -- Look through the named apps and unlink any which are for this process.
-      local npid = tonumber(pid)
-      local progs = app.enumerate_named_programs(true)
-      for name, p in pairs(progs) do
-         if p == npid then
-            S.unlink(app.named_program_root .. "/" .. name)
-         end
+      -- Check if there is a backlink to the named app, if so cleanup that.
+      local backlink = shm.root.."/"..pid.."/name-backref"
+      if S.lstat(backlink) then
+         local name_link = S.readlink(backlink)
+         S.unlink(name_link)
+         S.unlink(backlink)
       end
+
+      shm.unlink("/"..pid)
    end
 end
 

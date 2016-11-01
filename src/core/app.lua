@@ -134,20 +134,35 @@ end
 -- an active process the function will error displaying an appropriate error message.
 -- Any other process can enumerate programs by their name and PID using enumerate_named_programs.
 function claim_name(name)
+   function name_from_path(dir)
+      -- Extracts last file/folder name from path
+      -- e.g. "/var/run/snabb/hello" -> "hello"
+      local ds, de = string.find(dir, "/[^/]*$")
+      return string.sub(dir, ds+1, de)
+   end
+
    configuration[name] = name
    local namedir = "by-name/" .. name
    local namedirqualified = named_program_root .. "/" .. name
    local piddir = shm.root .. "/" .. S.getpid()
+   local backlinkdir = piddir.."/name-backref"
 
    -- Verify that the by-name directory exists.
    shm.mkdir(namedir)
-   
+
+   -- Verify that we've not already claimed a name
+   if S.lstat(backlinkdir) then
+      -- Read name of program for error message.
+      local fnamedir = S.readlink(backlinkdir)
+      local fname = name_from_path(fnamedir)
+      error("Program already claimed name '"..fname.."', cannot claim name '"..name.."'")
+   end
+
    -- Check if a symlink to a named program with the same name exists, if not, unlink it.
    if S.lstat(namedirqualified) then
       -- It exists, lets check what the PID is.
       local piddir = S.readlink(namedirqualified)
-      local ps, pe = string.find(piddir, "/[^/]*$")
-      local pid = tonumber(string.sub(piddir, ps+1, pe))
+      local pid = tonumber(name_from_path(piddir))
       if S.kill(pid, 0) then
          -- It's a running process, we should display an error message.
          error("Name has been claimed by a currently running process: "..namedirqualified)
@@ -161,6 +176,12 @@ function claim_name(name)
    local rtn, err = S.symlink(piddir, namedirqualified)
    if rtn == -1 then
       error("Error creating program name symlink in: "..namedirqualified)
+   end
+
+   -- Create a backlink so to the symlink so we can easily cleanup
+   local rtn, err = S.symlink(namedirqualified, backlinkdir)
+   if rtn == -1 then
+      error("Error creating backlink for: "..namedirqualified)
    end
 end
 
@@ -595,13 +616,14 @@ function selftest ()
    -- Test claiming and enumerating app names
    local basename = "testapp"
    claim_name(basename.."1")
-   claim_name(basename.."2")
+   
+   -- Ensure to claim two names fails
+   assert(not pcall(claim_name, basename.."2"))
 
    -- Lets check if they can be enumerated.
    local progs = enumerate_named_programs()
    assert(progs)
    assert(progs["testapp1"])
-   assert(progs["testapp2"])
 
    -- Ensure that trying to take the same name fails
    assert(not pcall(claim_name, basename.."1"))
