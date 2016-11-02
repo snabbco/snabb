@@ -7,14 +7,9 @@ local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
 
--- FIXME:
--- Parse inet:mac-address using ethernet:pton
--- Parse inet:ipv4-address using ipv4:pton
--- Parse inet:ipv6-address using ipv6:pton
--- Parse inet:ipv4-prefix?
--- Parse inet:ipv6-prefix?
-
 function data_grammar_from_schema(schema)
+   local function struct_ctype(members) end
+   local function value_ctype(type) end
    local handlers = {}
    local function visit(node)
       local handler = handlers[node.kind]
@@ -32,11 +27,14 @@ function data_grammar_from_schema(schema)
       return ret
    end
    function handlers.container(node)
-      if not node.presence then return visit_body(node) end
-      return {[node.id]={type='struct', members=visit_body(node)}}
+      local members = visit_body(node)
+      if not node.presence then return members end
+      return {[node.id]={type='struct', members=members,
+                         ctype=struct_ctype(members)}}
    end
    handlers['leaf-list'] = function(node)
-      return {[node.id]={type='array', element_type=node.type}}
+      return {[node.id]={type='array', element_type=node.type,
+                         ctype=value_ctype(node.type)}}
    end
    function handlers.list(node)
       local members=visit_body(node)
@@ -45,13 +43,17 @@ function data_grammar_from_schema(schema)
       for k,v in pairs(members) do
          if not keys[k] then values[k] = v end
       end
-      return {[node.id]={type='table', keys=keys, values=values}}
+      return {[node.id]={type='table', keys=keys, values=values,
+                         key_ctype=struct_ctype(keys),
+                         value_ctype=struct_ctype(values)}}
    end
    function handlers.leaf(node)
       return {[node.id]={type='scalar', argument_type=node.type,
-                         default=node.default, mandatory=node.mandatory}}
+                         default=node.default, mandatory=node.mandatory,
+                         ctype=value_ctype(node.type)}}
    end
-   return {type="struct", members=visit_body(schema)}
+   local members = visit_body(schema)
+   return {type="struct", members=members, ctype=struct_ctype(members)}
 end
 
 local function integer_type(min, max)
@@ -100,7 +102,7 @@ local function assert_not_duplicate(out, keyword)
    assert(not out, 'duplicate parameter: '..keyword)
 end
 
-local function tagged_struct_parser(keyword, members)
+local function struct_parser(keyword, members, ctype)
    local function init() return nil end
    local function parse1(node)
       assert_compound(node, keyword)
@@ -118,14 +120,15 @@ local function tagged_struct_parser(keyword, members)
       assert_not_duplicate(out, keyword)
       return parse1(node)
    end
+   local struct_t = ctype and ffi.typeof(ctype)
    local function finish(out)
-      -- FIXME check mandatory
-      return out
+      -- FIXME check mandatory values.
+      if struct_t then return struct_t(out) else return out end
    end
    return {init=init, parse=parse, finish=finish}
 end
 
-local function tagged_array_parser(keyword, element_type)
+local function array_parser(keyword, element_type, ctype)
    local function init() return {} end
    local parsev = value_parser(element_type)
    local function parse1(node)
@@ -136,9 +139,10 @@ local function tagged_array_parser(keyword, element_type)
       table.insert(out, parse1(node))
       return out
    end
+   local array_t = ctype and ffi.typeof('$[?]', ffi.typeof(ctype))
    local function finish(out)
       -- FIXME check min-elements
-      return out
+      if array_t then return array_t(out) else return out end
    end
    return {init=init, parse=parse, finish=finish}
 end
@@ -184,12 +188,23 @@ function make_assoc()
    return assoc
 end
 
-local function tagged_tagged_table_parser(keyword, keys, values)
+local function table_parser(keyword, keys, values, key_ctype, value_ctype)
    local members = {}
    for k,v in pairs(keys) do members[k] = v end
    for k,v in pairs(values) do members[k] = v end
-   local parser = tagged_struct_parser(keyword, members)
-   local function init() return make_assoc() end
+   local parser = struct_parser(keyword, members)
+   local key_t = key_ctype and ffi.typeof(key_ctype)
+   local value_t = value_ctype and ffi.typeof(value_ctype)
+   local init
+   if key_t and value_t then
+      function init()
+         return ctable.new({ key_type=key_t, value_type=value_t })
+      end
+   elseif key_t or value_t then
+      error('mixed table types currently unimplemented')
+   else
+      function init() return make_assoc() end
+   end
    local function parse1(node)
       assert_compound(node, keyword)
       return parser.finish(parser.parse(node, parser.init()))
@@ -197,6 +212,8 @@ local function tagged_tagged_table_parser(keyword, keys, values)
    local function parse(node, assoc)
       local struct = parse1(node)
       local key, value = {}, {}
+      if key_t then key = key_t() end
+      if value_t then value = value_t() end
       for k,v in pairs(struct) do
          if keys[k] then key[k] = v else value[k] = v end
       end
@@ -213,35 +230,6 @@ function data_parser_from_schema(schema)
    return data_parser_from_grammar(data_grammar_from_schema(schema))
 end
 
-function choose_representations(production)
-   local handlers = {}
-   local function visit1(production)
-      return assert(handlers[production.type])(production)
-   end
-   local function visitn(productions)
-      local ret = {}
-      for keyword,production in pairs(productions) do
-         ret[keyword] = visit1(production)
-      end
-      return ret
-   end
-   function handlers.struct(production)
-      return {type='tagged_struct', members=visitn(production.members)}
-   end
-   function handlers.array(production)
-      return {type='tagged_array', element_type=production.element_type}
-   end
-   function handlers.table(production)
-      return {type='tagged_tagged_table',keys=visitn(production.keys),
-              values = visitn(production.values)}
-   end
-   function handlers.scalar(production)
-      return {type='scalar', argument_type=production.argument_type,
-              default=production.default, mandatory=production.mandatory}
-   end
-   return visit1(production)
-end
-
 function data_parser_from_grammar(production)
    local handlers = {}
    local function visit1(keyword, production)
@@ -254,22 +242,24 @@ function data_parser_from_grammar(production)
       end
       return ret
    end
-   function handlers.tagged_struct(keyword, production)
-      return tagged_struct_parser(keyword, visitn(production.members))
+   function handlers.struct(keyword, production)
+      local members = visitn(production.members)
+      return struct_parser(keyword, members, production.ctype)
    end
-   function handlers.tagged_array(keyword, production)
-      return tagged_array_parser(keyword, production.element_type)
+   function handlers.array(keyword, production)
+      return array_parser(keyword, production.element_type, production.ctype)
    end
-   function handlers.tagged_tagged_table(keyword, production)
-      return tagged_tagged_table_parser(keyword, visitn(production.keys),
-                                        visitn(production.values))
+   function handlers.table(keyword, production)
+      local keys, values = visitn(production.keys), visitn(production.values)
+      return table_parser(keyword, keys, values, production.key_ctype,
+                          production.value_ctype)
    end
    function handlers.scalar(keyword, production)
       return scalar_parser(keyword, production.argument_type,
                            production.default, production.mandatory)
    end
 
-   local parser = visit1('(top level)', choose_representations(production))
+   local parser = visit1('(top level)', production)
    return function(str, filename)
       local node = {statements=parse_string(str, filename)}
       return parser.finish(parser.parse(node, parser.init()))
