@@ -8,6 +8,7 @@ local util = require("lib.yang.util")
 local value = require("lib.yang.value")
 local stream = require("lib.yang.stream")
 local data = require('lib.yang.data')
+local ctable = require('lib.ctable')
 
 local MAGIC = "yangconf"
 local VERSION = 0x00001000
@@ -194,12 +195,19 @@ local function data_emitter(production)
    end
    function handlers.table(production)
       if production.key_ctype and production.value_ctype then
-         error('unimplemented')
-      elseif production.key_ctype then
-         error('unimplemented')
-      elseif  production.value_ctype then
-         error('unimplemented')
+         return function(data, stream)
+            stream:write_stringref('ctable')
+            stream:write_stringref(production.key_ctype)
+            stream:write_stringref(production.value_ctype)
+            data:save(stream)
+         end
       else
+         -- TODO: here we should implement mixed table types if key_t or
+         -- value_t is non-nil, or string-keyed tables if the key is a
+         -- string.  For the moment, fall back to the old assoc
+         -- implementation.
+         -- if production.key_ctype then error('unimplemented') end
+         -- if production.value_ctype then error('unimplemented') end
          local emit_key = visit1({type='struct', members=production.keys})
          local emit_value = visit1({type='struct', members=production.values})
          return function(data, stream)
@@ -308,6 +316,12 @@ local function read_compiled_data(stream, strtab)
       end
       return ret
    end
+   readers['ctable'] = function ()
+      local key_ctype = read_string()
+      local value_ctype = read_string()
+      local key_t, value_t = ffi.typeof(key_ctype), ffi.typeof(value_ctype)
+      return ctable.load(stream, {key_type=key_t, value_type=value_t})
+   end
    readers['tagged-string'] = function ()
       return read_string()
    end
@@ -377,18 +391,25 @@ function selftest()
       }
    ]])
 
+   local ipv4 = require('lib.protocol.ipv4')
+
+   assert(data.is_active == true)
+   local routing_table = data.routes.route
+   assert(routing_table:lookup_ptr(ipv4:pton('1.2.3.4')).value.port == 1)
+   assert(routing_table:lookup_ptr(ipv4:pton('2.3.4.5')).value.port == 10)
+   assert(routing_table:lookup_ptr(ipv4:pton('3.4.5.6')).value.port == 2)
+
    local tmp = os.tmpname()
    compile_data_for_schema(test_schema, data, tmp)
    local data2 = load_compiled_data_file(tmp)
-   os.remove(tmp)
-
-   local ipv4 = require('lib.protocol.ipv4')
    assert(data2.schema_name == 'snabb-simple-router')
    assert(data2.revision_date == '')
-   assert(data2.data.is_active == true)
-   -- These tests don't work yet because we need to fix our
-   -- associative data structure to usefully allow cdata keys.
-   -- assert(data2.data.routes.route:get_value(ipv4:pton('1.2.3.4')).port == 1)
-   -- assert(data2.data.routes.route:get_value(ipv4:pton('2.3.4.5')).port == 10)
-   -- assert(data2.data.routes.route:get_value(ipv4:pton('3.4.5.6')).port == 2)
+   data = data2.data
+   os.remove(tmp)
+
+   assert(data.is_active == true)
+   local routing_table = data.routes.route
+   assert(routing_table:lookup_ptr(ipv4:pton('1.2.3.4')).value.port == 1)
+   assert(routing_table:lookup_ptr(ipv4:pton('2.3.4.5')).value.port == 10)
+   assert(routing_table:lookup_ptr(ipv4:pton('3.4.5.6')).value.port == 2)
 end

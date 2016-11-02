@@ -6,14 +6,34 @@ local parse_string = require("lib.yang.parser").parse_string
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
+local ffi = require("ffi")
+local ctable = require('lib.ctable')
 
 function normalize_id(id)
    return id:gsub('[^%w_]', '_')
 end
 
 function data_grammar_from_schema(schema)
-   local function struct_ctype(members) end
-   local function value_ctype(type) end
+   local function struct_ctype(members)
+      local member_names = {}
+      for k,v in pairs(members) do
+         if not v.ctype then return nil end
+         table.insert(member_names, k)
+      end
+      table.sort(member_names)
+      local ctype = 'struct { '
+      for _,k in ipairs(member_names) do
+         -- Separate the array suffix off of things like "uint8_t[4]".
+         local head, tail = members[k].ctype:match('^([^%[]*)(.*)$')
+         ctype = ctype..head..' '..normalize_id(k)..tail..'; '
+      end
+      ctype = ctype..'}'
+      return ctype
+   end
+   local function value_ctype(type)
+      -- Note that not all primitive types have ctypes.
+      return assert(value.types[assert(type.primitive_type)]).ctype
+   end
    local handlers = {}
    local function visit(node)
       local handler = handlers[node.kind]
@@ -54,9 +74,11 @@ function data_grammar_from_schema(schema)
                          value_ctype=struct_ctype(values)}}
    end
    function handlers.leaf(node)
+      local ctype
+      if node.default or node.mandatory then ctype=value_ctype(node.type) end
       return {[node.id]={type='scalar', argument_type=node.type,
                          default=node.default, mandatory=node.mandatory,
-                         ctype=value_ctype(node.type)}}
+                         ctype=ctype}}
    end
    local members = visit_body(schema)
    return {type="struct", members=members, ctype=struct_ctype(members)}
@@ -210,9 +232,11 @@ local function table_parser(keyword, keys, values, key_ctype, value_ctype)
       function init()
          return ctable.new({ key_type=key_t, value_type=value_t })
       end
-   elseif key_t or value_t then
-      error('mixed table types currently unimplemented')
    else
+      -- TODO: here we should implement mixed table types if key_t or
+      -- value_t is non-nil, or string-keyed tables if the key is a
+      -- string.  For the moment, fall back to the old assoc
+      -- implementation.
       function init() return make_assoc() end
    end
    local function parse1(node)
