@@ -233,7 +233,7 @@ would do:
 
 ```lua
 local yang = require('lib.yang.yang')
-local ipv4 = require('lib.protocol.ipv4)
+local ipv4 = require('lib.protocol.ipv4')
 local data = yang.load_data_for_schema(router_schema, conf_str)
 local port = data.routes.route:lookup(ipv4:pton('1.2.3.4')).port
 assert(port == 1)
@@ -251,7 +251,7 @@ limitation that UTF-8 data is not decoded.  Lua strings look like
 strings but really they are byte arrays.
 
 There is special support for the `ipv4-address`, `ipv4-prefix`,
-`ipv6-address`, and `ipv6-address` types from `ietf-inet-types`, and
+`ipv6-address`, and `ipv6-prefix` types from `ietf-inet-types`, and
 `mac-address` from `ietf-yang-types`.  Values of these types are instead
 parsed to raw binary data that is compatible with the relevant parts of
 Snabb's `lib.protocol` facility.
