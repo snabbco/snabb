@@ -157,7 +157,7 @@ local function data_emitter(production)
       end
       return ret
    end
-   function handlers.struct(production)
+   function handlers.tagged_struct(production)
       local member_names = {}
       for k,_ in pairs(production.members) do table.insert(member_names, k) end
       table.sort(member_names)
@@ -173,7 +173,7 @@ local function data_emitter(production)
          end
       end
    end
-   function handlers.array(production)
+   function handlers.tagged_array(production)
       local emit_tagged_value = visit1(
          {type='scalar', argument_type=production.element_type})
       return function(data, stream)
@@ -182,9 +182,9 @@ local function data_emitter(production)
          for i=1,#data do emit_tagged_value(data[i], stream) end
       end
    end
-   function handlers.table(production)
-      local emit_key = visit1({type='struct', members=production.keys})
-      local emit_value = visit1({type='struct', members=production.values})
+   function handlers.tagged_tagged_table(production)
+      local emit_key = visit1({type='tagged_struct', members=production.keys})
+      local emit_value = visit1({type='tagged_struct', members=production.values})
       return function(data, stream)
          stream:write_stringref('tagged-table')
          stream:write_uint32(#data)
@@ -214,7 +214,7 @@ local function data_emitter(production)
       end
    end
 
-   return visit1(production)
+   return visit1(data.choose_representations(production))
 end
 
 function data_compiler_from_grammar(emit_data, schema_name, schema_revision)

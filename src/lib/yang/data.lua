@@ -100,7 +100,7 @@ local function assert_not_duplicate(out, keyword)
    assert(not out, 'duplicate parameter: '..keyword)
 end
 
-local function struct_parser(keyword, members)
+local function tagged_struct_parser(keyword, members)
    local function init() return nil end
    local function parse1(node)
       assert_compound(node, keyword)
@@ -125,7 +125,7 @@ local function struct_parser(keyword, members)
    return {init=init, parse=parse, finish=finish}
 end
 
-local function array_parser(keyword, element_type)
+local function tagged_array_parser(keyword, element_type)
    local function init() return {} end
    local parsev = value_parser(element_type)
    local function parse1(node)
@@ -184,12 +184,11 @@ function make_assoc()
    return assoc
 end
 
-local function table_parser(keyword, keys, values)
+local function tagged_tagged_table_parser(keyword, keys, values)
    local members = {}
    for k,v in pairs(keys) do members[k] = v end
    for k,v in pairs(values) do members[k] = v end
-   local parser = struct_parser(keyword, members)
-
+   local parser = tagged_struct_parser(keyword, members)
    local function init() return make_assoc() end
    local function parse1(node)
       assert_compound(node, keyword)
@@ -214,6 +213,35 @@ function data_parser_from_schema(schema)
    return data_parser_from_grammar(data_grammar_from_schema(schema))
 end
 
+function choose_representations(production)
+   local handlers = {}
+   local function visit1(production)
+      return assert(handlers[production.type])(production)
+   end
+   local function visitn(productions)
+      local ret = {}
+      for keyword,production in pairs(productions) do
+         ret[keyword] = visit1(production)
+      end
+      return ret
+   end
+   function handlers.struct(production)
+      return {type='tagged_struct', members=visitn(production.members)}
+   end
+   function handlers.array(production)
+      return {type='tagged_array', element_type=production.element_type}
+   end
+   function handlers.table(production)
+      return {type='tagged_tagged_table',keys=visitn(production.keys),
+              values = visitn(production.values)}
+   end
+   function handlers.scalar(production)
+      return {type='scalar', argument_type=production.argument_type,
+              default=production.default, mandatory=production.mandatory}
+   end
+   return visit1(production)
+end
+
 function data_parser_from_grammar(production)
    local handlers = {}
    local function visit1(keyword, production)
@@ -226,22 +254,22 @@ function data_parser_from_grammar(production)
       end
       return ret
    end
-   function handlers.struct(keyword, production)
-      return struct_parser(keyword, visitn(production.members))
+   function handlers.tagged_struct(keyword, production)
+      return tagged_struct_parser(keyword, visitn(production.members))
    end
-   function handlers.array(keyword, production)
-      return array_parser(keyword, production.element_type)
+   function handlers.tagged_array(keyword, production)
+      return tagged_array_parser(keyword, production.element_type)
    end
-   function handlers.table(keyword, production)
-      return table_parser(keyword, visitn(production.keys),
-                          visitn(production.values))
+   function handlers.tagged_tagged_table(keyword, production)
+      return tagged_tagged_table_parser(keyword, visitn(production.keys),
+                                        visitn(production.values))
    end
    function handlers.scalar(keyword, production)
       return scalar_parser(keyword, production.argument_type,
                            production.default, production.mandatory)
    end
 
-   local parser = visit1('(top level)', production)
+   local parser = visit1('(top level)', choose_representations(production))
    return function(str, filename)
       local node = {statements=parse_string(str, filename)}
       return parser.finish(parser.parse(node, parser.init()))
