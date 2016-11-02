@@ -355,12 +355,7 @@ function selftest()
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
 	argument="port", statements={{keyword="type"}}}})
 
-   -- We need to locate the yang example code in a reliable way, we can't
-   -- give the path relative to the executable as the current working
-   -- directly could be different. To do this we find the absolute path to
-   -- the snabb executable and then build the path to the yang file from that.
-   local S = require("syscall")
-   local snabb_exe = S.readlink("/proc/self/exe"):gsub("(.-)[%w_-]*$", "%1")
-   local yang_example = snabb_exe.."lib/yang/example.yang"
-   parse_file(yang_example)
+   parse_string(require('lib.yang.ietf_inet_types_yang'))
+   parse_string(require('lib.yang.ietf_yang_types_yang'))
+   parse_string(require('lib.yang.ietf_softwire_yang'))
 end
