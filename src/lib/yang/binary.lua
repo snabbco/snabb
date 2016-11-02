@@ -165,13 +165,15 @@ local function data_emitter(production)
          error('unimplemented')
       else
          local emit_member = visitn(production.members)
+         local normalize_id = data.normalize_id
          return function(data, stream)
             stream:write_stringref('tagged-struct')
             stream:write_uint32(table_size(data))
             for _,k in ipairs(member_names) do
-               if data[k] ~= nil then
-                  stream:write_stringref(k)
-                  emit_member[k](data[k], stream)
+               local id = normalize_id(k)
+               if data[id] ~= nil then
+                  stream:write_stringref(id)
+                  emit_member[k](data[id], stream)
                end
             end
          end
@@ -355,7 +357,7 @@ function selftest()
 
       import ietf-inet-types {prefix inet;}
 
-      leaf active { type boolean; default true; }
+      leaf is-active { type boolean; default true; }
 
       container routes {
          presence true;
@@ -367,7 +369,7 @@ function selftest()
       }
    }]])
    local data = data.load_data_for_schema(test_schema, [[
-      active true;
+      is-active true;
       routes {
         route { addr 1.2.3.4; port 1; }
         route { addr 2.3.4.5; port 10; }
@@ -383,7 +385,7 @@ function selftest()
    local ipv4 = require('lib.protocol.ipv4')
    assert(data2.schema_name == 'snabb-simple-router')
    assert(data2.revision_date == '')
-   assert(data2.data.active == true)
+   assert(data2.data.is_active == true)
    -- These tests don't work yet because we need to fix our
    -- associative data structure to usefully allow cdata keys.
    -- assert(data2.data.routes.route:get_value(ipv4:pton('1.2.3.4')).port == 1)

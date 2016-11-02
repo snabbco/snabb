@@ -7,6 +7,10 @@ local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
 
+function normalize_id(id)
+   return id:gsub('[^%w_]', '_')
+end
+
 function data_grammar_from_schema(schema)
    local function struct_ctype(members) end
    local function value_ctype(type) end
@@ -21,6 +25,8 @@ function data_grammar_from_schema(schema)
       for id,node in pairs(node.body) do
          for keyword,node in pairs(visit(node)) do
             assert(not ret[keyword], 'duplicate identifier: '..keyword)
+            assert(not ret[normalize_id(keyword)],
+                   'duplicate identifier: '..normalize_id(keyword))
             ret[keyword] = node
          end
       end
@@ -107,13 +113,17 @@ local function struct_parser(keyword, members, ctype)
    local function parse1(node)
       assert_compound(node, keyword)
       local ret = {}
-      for k,sub in pairs(members) do ret[k] = sub.init() end
+      for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
       for _,node in ipairs(node.statements) do
          local sub = assert(members[node.keyword],
                             'unrecognized parameter: '..node.keyword)
-         ret[node.keyword] = sub.parse(node, ret[node.keyword])
+         local id = normalize_id(node.keyword)
+         ret[id] = sub.parse(node, ret[id])
       end
-      for k,sub in pairs(members) do ret[k] = sub.finish(ret[k]) end
+      for k,sub in pairs(members) do
+         local id = normalize_id(k)
+         ret[id] = sub.finish(ret[id])
+      end
       return ret
    end
    local function parse(node, out)
@@ -215,7 +225,8 @@ local function table_parser(keyword, keys, values, key_ctype, value_ctype)
       if key_t then key = key_t() end
       if value_t then value = value_t() end
       for k,v in pairs(struct) do
-         if keys[k] then key[k] = v else value[k] = v end
+         local id = normalize_id(k)
+         if keys[k] then key[id] = v else value[id] = v end
       end
       assoc:add(key, value)
       return assoc
@@ -312,18 +323,18 @@ function selftest()
      }
      addr 1.2.3.4;
    ]])
-   assert(data['fruit-bowl'].description == 'ohai')
-   local contents = data['fruit-bowl'].contents
+   assert(data.fruit_bowl.description == 'ohai')
+   local contents = data.fruit_bowl.contents
    assert(contents:get_entry('foo').key.name == 'foo')
    assert(contents:get_entry('foo').value.score == 7)
    assert(contents:get_key('foo').name == 'foo')
    assert(contents:get_value('foo').score == 7)
-   assert(contents:get_value('foo')['tree-grown'] == nil)
+   assert(contents:get_value('foo').tree_grown == nil)
    assert(contents:get_key('bar').name == 'bar')
    assert(contents:get_value('bar').score == 8)
-   assert(contents:get_value('bar')['tree-grown'] == nil)
+   assert(contents:get_value('bar').tree_grown == nil)
    assert(contents:get_key('baz').name == 'baz')
    assert(contents:get_value('baz').score == 9)
-   assert(contents:get_value('baz')['tree-grown'] == true)
+   assert(contents:get_value('baz').tree_grown == true)
    assert(require('lib.protocol.ipv4'):ntop(data.addr) == '1.2.3.4')
 end
