@@ -83,6 +83,15 @@ Optional entries that may be present in the *parameters* table include:
  * `min_occupancy_rate`: Minimum ratio of `occupancy/size`.  Removing an
    entry from an "empty" table will shrink the table.
 
+— Function **ctable.load** *stream* *parameters*
+
+Load a ctable that was previously saved out to a binary format.
+*parameters* are as for `ctable.new`.  *stream* should be an object
+that has a **:read_ptr**(*ctype*) method, which returns a pointer to
+an embedded instances of *ctype* in the stream, advancing the stream
+over the object; and **:read_array**(*ctype*, *count*) which is the
+same but reading *count* instances of *ctype* instead of just one.
+
 #### Methods
 
 Users interact with a ctable through methods.  In these method
@@ -155,6 +164,13 @@ Remove an entry from a ctable, keyed by *key*.
 Return true if we actually do find a value and remove it.  Otherwise if
 no entry is found in the table and *missing_allowed* is true, then
 return false.  Otherwise raise an error.
+
+— Method **:save** *stream*
+
+Save a ctable to a byte sink.  *stream* should be an object that has a
+**:write_ptr**(*ctype*) method, which writes an instance of a struct
+type out to a stream, and **:write_array**(*ctype*, *count*) which is
+the same but writing *count* instances of *ctype* instead of just one.
 
 — Method **:selfcheck**
 

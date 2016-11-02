@@ -171,6 +171,45 @@ function CTable:get_backing_size()
    return self.byte_size
 end
 
+local header_t = ffi.typeof[[
+struct {
+   uint32_t size;
+   uint32_t occupancy;
+   uint32_t max_displacement;
+   double max_occupancy_rate;
+   double min_occupancy_rate;
+}
+]]
+
+function load(stream, params)
+   local header = stream:read_ptr(header_t)
+   local params_copy = {}
+   for k,v in pairs(params) do params_copy[k] = v end
+   params_copy.initial_size = header.size
+   params_copy.min_occupancy_rate = header.min_occupancy_rate
+   params_copy.max_occupancy_rate = header.max_occupancy_rate
+   local ctab = new(params_copy)
+   ctab.occupancy = header.occupancy
+   ctab.max_displacement = header.max_displacement
+   local entry_count = ctab.size + ctab.max_displacement + 1
+
+   -- Slurp the entries directly into the ctable's backing store.
+   -- This ensures that the ctable is in hugepages.
+   C.memcpy(ctab.entries,
+            stream:read_array(ctab.entry_type, entry_count),
+            ffi.sizeof(ctab.entry_type) * entry_count)
+
+   return ctab
+end
+
+function CTable:save(stream)
+   stream:write_ptr(header_t(self.size, self.occupancy, self.max_displacement,
+                             self.max_occupancy_rate, self.min_occupancy_rate))
+   stream:write_array(self.entries,
+                      self.entry_type,
+                      self.size + self.max_displacement + 1)
+end
+
 function CTable:insert(hash, key, value, updates_allowed)
    if self.occupancy + 1 > self.occupancy_hi then
       self:resize(self.size * 2)
@@ -550,21 +589,60 @@ function selftest()
       ctab:add(i, v)
    end
 
-   -- In this case we know max_displacement is 8.  Assert here so that
-   -- we can detect any future deviation or regression.
-   assert(ctab.max_displacement == 8)
+   for i=1,2 do
+      -- In this case we know max_displacement is 8.  Assert here so that
+      -- we can detect any future deviation or regression.
+      assert(ctab.max_displacement == 8)
 
-   ctab:selfcheck()
+      ctab:selfcheck()
 
-   for i = 1, occupancy do
-      local value = ctab:lookup_ptr(i).value[0]
-      assert(value == bnot(i))
+      for i = 1, occupancy do
+         local value = ctab:lookup_ptr(i).value[0]
+         assert(value == bnot(i))
+      end
+      ctab:selfcheck()
+
+      local iterated = 0
+      for entry in ctab:iterate() do iterated = iterated + 1 end
+      assert(iterated == occupancy)
+
+      -- Save the table out to disk, reload it, and run the same
+      -- checks.
+      local tmp = os.tmpname()
+      do
+         local file = io.open(tmp, 'wb')
+         local function write(ptr, size)
+
+            file:write(ffi.string(ptr, size))
+         end
+         local stream = {}
+         function stream:write_ptr(ptr)
+            write(ptr, ffi.sizeof(ptr))
+         end
+         function stream:write_array(ptr, type, count)
+            write(ptr, ffi.sizeof(type) * count)
+         end
+         ctab:save(stream)
+         file:close()
+      end
+      do
+         local file = io.open(tmp, 'rb')
+         local function read(size)
+            return ffi.new('uint8_t[?]', size, file:read(size))
+         end
+         local stream = {}
+         function stream:read_ptr(type)
+            return ffi.cast(ffi.typeof('$*', type), read(ffi.sizeof(type)))
+         end
+         function stream:read_array(type, count)
+            return ffi.cast(ffi.typeof('$*', type),
+                            read(ffi.sizeof(type) * count))
+         end
+         ctab = load(stream, params)
+         file:close()
+      end         
+      os.remove(tmp)
    end
-   ctab:selfcheck()
-
-   local iterated = 0
-   for entry in ctab:iterate() do iterated = iterated + 1 end
-   assert(iterated == occupancy)
 
    -- OK, all looking good with the normal interfaces; let's check out
    -- streaming lookup.
