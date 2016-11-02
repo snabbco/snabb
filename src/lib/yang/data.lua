@@ -164,7 +164,7 @@ end
 
 -- Simple temporary associative array until we get the various Table
 -- kinds working.
-local function make_assoc()
+function make_assoc()
    local assoc = {}
    function assoc:get_entry(k)
       assert(type(k) ~= 'table', 'multi-key lookup unimplemented')

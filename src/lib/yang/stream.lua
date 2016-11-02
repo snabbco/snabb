@@ -125,6 +125,7 @@ function open_input_byte_stream(filename)
       self:read(round_up(pos, alignment) - pos)
    end
    function ret:seek(new_pos)
+      if new_pos == nil then return pos end
       assert(new_pos >= 0)
       assert(new_pos <= size)
       pos = new_pos

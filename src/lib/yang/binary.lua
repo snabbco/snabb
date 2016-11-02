@@ -61,7 +61,6 @@ local function string_table_builder()
 end
 
 local function read_string_table(stream, strtab_len)
-   stream:align(4)
    assert(strtab_len >= 4)
    local count = stream:read_uint32()
    assert(strtab_len >= (4 * (count + 1)))
@@ -72,7 +71,7 @@ local function read_string_table(stream, strtab_len)
    for i=0,count-1 do
       local len = offsets[i] - offset
       assert(len >= 0)
-      strings[i] = stream:read_string(len)
+      strings[i] = ffi.string(stream:read(len), len)
       offset = offset + len
    end
    return strings
@@ -126,9 +125,7 @@ end
 -- -- code that uses the compiled table.
 
 local value_emitters = {}
-local function value_emitter(primitive_type)
-   print(primitive_type)
-   local ctype = assert(assert(value.types[primitive_type]).ctype)
+local function value_emitter(ctype)
    if value_emitters[ctype] then return value_emitters[ctype] end
    local type = ffi.typeof(ctype)
    local align = ffi.alignof(type)
@@ -142,13 +139,13 @@ local function value_emitter(primitive_type)
    return emit
 end
 
-function table_size(tab)
+local function table_size(tab)
    local size = 0
    for k,v in pairs(tab) do size = size + 1 end
    return size
 end
 
-function data_emitter(production)
+local function data_emitter(production)
    local handlers = {}
    local function visit1(production)
       return assert(handlers[production.type])(production)
@@ -194,7 +191,7 @@ function data_emitter(production)
          -- FIXME: relies on data being an assoc
          for _,v in ipairs(data) do
             emit_key(v.key, stream)
-            emit_value(v.key, stream)
+            emit_value(v.value, stream)
          end
       end
    end
@@ -207,10 +204,11 @@ function data_emitter(production)
             stream:write_stringref(data)
          end
       else
-         local emit_value = value_emitter(primitive_type)
+         local ctype = assert(assert(value.types[primitive_type]).ctype)
+         local emit_value = value_emitter(ctype)
          return function(data, stream)
             stream:write_stringref('cdata')
-            stream:write_stringref(primitive_type)
+            stream:write_stringref(ctype)
             emit_value(data, stream)
          end
       end
@@ -228,7 +226,6 @@ function data_compiler_from_grammar(emit_data, schema_name, schema_revision)
          MAGIC, VERSION, source_mtime.sec, source_mtime.nsec,
          strtab:intern(schema_name), strtab:intern(schema_revision or ''))
       stream:write_ptr(header) -- Write with empty data_len etc, fix it later.
-      stream:align(4)
       header.data_start = stream.written
       local u32buf = ffi.new('uint32_t[1]')
       function stream:write_uint32(val)
@@ -263,6 +260,78 @@ function compile_data_for_schema_by_name(schema_name, data, filename, source_mti
                                   data, filename, source_mtime)
 end
 
+local function read_compiled_data(stream, strtab)
+   local function read_string()
+      return assert(strtab[stream:read_uint32()])
+   end
+   local readers = {}
+   local function read1()
+      local tag = read_string()
+      return assert(readers[tag], tag)()
+   end
+   readers['tagged-struct'] = function ()
+      local ret = {}
+      for i=1,stream:read_uint32() do
+         local k = read_string()
+         ret[k] = read1()
+      end
+      return ret
+   end
+   readers['tagged-array'] = function ()
+      local ret = {}
+      for i=1,stream:read_uint32() do table.insert(ret, read1()) end
+      return ret
+   end
+   readers['tagged-table'] = function ()
+      local ret = data.make_assoc()
+      for i=1,stream:read_uint32() do
+         local k = read1()
+         ret:add(k, read1())
+      end
+      return ret
+   end
+   readers['tagged-string'] = function ()
+      return read_string()
+   end
+   local ctypes = {}
+   local function scalar_type(ctype)
+      if not ctypes[ctype] then ctypes[ctype] = ffi.typeof(ctype) end
+      return ctypes[ctype]
+   end
+   readers['cdata'] = function ()
+      local ctype = scalar_type(read_string())
+      return stream:read_ptr(ctype)[0]
+   end
+   return read1()
+end
+
+function load_compiled_data(stream)
+   local uint32_t = ffi.typeof('uint32_t')
+   function stream:read_uint32()
+      return stream:read_ptr(uint32_t)[0]
+   end
+   local header = stream:read_ptr(header_t)
+   assert(ffi.string(header.magic, ffi.sizeof(header.magic)) == MAGIC,
+          "expected file to begin with "..MAGIC)
+   assert(header.version == VERSION,
+          "incompatible version: "..header.version)
+   stream:seek(header.strtab_start)
+   local strtab = read_string_table(stream, header.strtab_len)
+   local ret = {}
+   ret.schema_name = strtab[header.schema_name]
+   ret.revision_date = strtab[header.revision_date]
+   ret.source_mtime = {sec=header.source_mtime_sec,
+                       nsec=header.source_mtime_nsec}
+   stream:seek(header.data_start)
+   ret.data = read_compiled_data(stream, strtab)
+   assert(stream:seek() == header.data_start + header.data_len)
+   return ret
+end
+
+function load_compiled_data_file(filename)
+   return load_compiled_data(stream.open_input_byte_stream(filename))
+end
+
 function selftest()
    local test_schema = schema.load_schema([[module snabb-simple-router {
       namespace snabb:simple-router;
@@ -292,5 +361,16 @@ function selftest()
 
    local tmp = os.tmpname()
    compile_data_for_schema(test_schema, data, tmp)
+   local data2 = load_compiled_data_file(tmp)
    os.remove(tmp)
+
+   local ipv4 = require('lib.protocol.ipv4')
+   assert(data2.schema_name == 'snabb-simple-router')
+   assert(data2.revision_date == '')
+   assert(data2.data.active == true)
+   -- These tests don't work yet because we need to fix our
+   -- associative data structure to usefully allow cdata keys.
+   -- assert(data2.data.routes.route:get_value(ipv4:pton('1.2.3.4')).port == 1)
+   -- assert(data2.data.routes.route:get_value(ipv4:pton('2.3.4.5')).port == 10)
+   -- assert(data2.data.routes.route:get_value(ipv4:pton('3.4.5.6')).port == 2)
 end
