@@ -31,6 +31,15 @@ function load (file, pciaddr, sockpath, soft_bench)
       io_links = virtual_ether_mux.configure(c, ports, {bench = soft_bench})
    end
    for i,t in ipairs(ports) do
+      -- Backwards compatibity / deprecated fields
+      for deprecated, current in pairs({tx_police_gbps = "tx_police",
+                                        rx_police_gbps = "rx_police"}) do
+         if t[deprecated] and not t[current] then
+            print("Warning: "..deprecated.." is deprecated, use "..current.." instead.")
+            t[current] = t[deprecated]
+         end
+      end
+      -- Backwards compatability end
       local name = port_name(t)
       local Virtio = name.."_Virtio"
       config.app(c, Virtio, VhostUser,
@@ -134,4 +143,7 @@ function selftest ()
       engine.configure(load(confpath, pcideva, "/dev/null"))
       engine.main({duration = 0.25})
    end
+   local c = load("program/snabbnfv/test_fixtures/nfvconfig/test_functions/deprecated.port", pcideva, "/dev/null")
+   assert(c.apps["Test_TxLimit"])
+   assert(c.apps["Test_RxLimit"])
 end
