@@ -91,8 +91,9 @@ end
 -- FIXME: For now the value_type option is required, but in the future
 -- we should allow for a nil value type to create a set instead of a
 -- map.
-local required_params = set('key_type', 'value_type', 'hash_fn')
+local required_params = set('key_type', 'value_type')
 local optional_params = {
+   hash_fn = false,
    initial_size = 8,
    max_occupancy_rate = 0.9,
    min_occupancy_rate = 0.0
@@ -103,7 +104,7 @@ function new(params)
    local params = parse_params(params, required_params, optional_params)
    ctab.entry_type = make_entry_type(params.key_type, params.value_type)
    ctab.type = make_entries_type(ctab.entry_type)
-   ctab.hash_fn = params.hash_fn
+   ctab.hash_fn = params.hash_fn or compute_hash_fn(params.key_type)
    ctab.equal_fn = make_equal_fn(params.key_type)
    ctab.size = 0
    ctab.occupancy = 0
@@ -387,6 +388,7 @@ function hash_32(i32)
    return uint32_cast[0]
 end
 
+local cast = ffi.cast
 function hashv_32(key)
    return hash_32(cast(uint32_ptr_t, key)[0])
 end
@@ -404,6 +406,22 @@ function hashv_64(key)
    local hi = cast(uint32_ptr_t, key)[0]
    local lo = cast(uint32_ptr_t, key)[1]
    return hash_32(bxor(hi, hash_32(lo)))
+end
+
+local hash_fns_by_size = { [4]=hashv_32, [8]=hashv_64 }
+function compute_hash_fn(ctype)
+   local size = ffi.sizeof(ctype)
+   if not hash_fns_by_size[size] then
+      hash_fns_by_size[size] = function(key)
+         local h = 0
+         local words = cast(uint32_ptr_t, key)
+         local bytes = cast('uint8_t*', key)
+         for i=0,size/4 do h = hash_32(bxor(h, words[i])) end
+         for i=1,size%4 do h = hash_32(bxor(h, bytes[size-i])) end
+         return h
+      end
+   end
+   return hash_fns_by_size[size]
 end
 
 function selftest()
@@ -453,8 +471,11 @@ function selftest()
 
    local function check_bytes_equal(type, a, b)
       local equal_fn = make_equal_fn(type)
+      local hash_fn = compute_hash_fn(type)
       assert(equal_fn(ffi.new(type, a), ffi.new(type, a)))
       assert(not equal_fn(ffi.new(type, a), ffi.new(type, b)))
+      assert(hash_fn(ffi.new(type, a)) == hash_fn(ffi.new(type, a)))
+      assert(hash_fn(ffi.new(type, a)) ~= hash_fn(ffi.new(type, b)))
    end
    check_bytes_equal(ffi.typeof('uint16_t[1]'), {1}, {2})         -- 2 byte
    check_bytes_equal(ffi.typeof('uint32_t[1]'), {1}, {2})         -- 4 byte
