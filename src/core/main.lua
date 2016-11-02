@@ -11,7 +11,6 @@ local ffi = require("ffi")
 local zone = require("jit.zone")
 local lib = require("core.lib")
 local shm = require("core.shm")
-local app = require("core.app")
 local C   = ffi.C
 -- Load ljsyscall early to help detect conflicts
 -- (e.g. FFI type name conflict between Snabb and ljsyscall)
@@ -144,7 +143,7 @@ end
 function shutdown (pid)
    if not _G.developer_debug and not lib.getenv("SNABB_SHM_KEEP") then
       -- Check if there is a backlink to the named app, if so cleanup that.
-      local backlink = shm.root.."/"..pid.."/name-backref"
+      local backlink = shm.root.."/"..pid.."/name"
       if S.lstat(backlink) then
          local name_link = S.readlink(backlink)
          S.unlink(name_link)

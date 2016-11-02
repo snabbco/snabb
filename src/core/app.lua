@@ -128,84 +128,46 @@ function configure (new_config)
    counter.add(configs)
 end
 
--- Claims a name for a program so it can be identified by name by other processes.
+-- Claims a name for a program so it's identified by name by other processes.
 --
--- The name given to the function must be unique, if a name has been used before by
--- an active process the function will error displaying an appropriate error message.
--- Any other process can enumerate programs by their name and PID using enumerate_named_programs.
+-- The name given to the function must be unique; if a name has been used before
+-- by an active process the function will error displaying an appropriate error
+-- message. The program can only claim one name, successive calls will produce
+-- an error.
 function claim_name(name)
-   function name_from_path(dir)
-      -- Extracts last file/folder name from path
-      -- e.g. "/var/run/snabb/hello" -> "hello"
-      local ds, de = string.find(dir, "/[^/]*$")
-      return string.sub(dir, ds+1, de)
-   end
-
    configuration[name] = name
    local namedir = "by-name/" .. name
-   local namedirqualified = named_program_root .. "/" .. name
+   local namedir_fq = named_program_root .. "/" .. name
    local piddir = shm.root .. "/" .. S.getpid()
-   local backlinkdir = piddir.."/name-backref"
+   local backlinkdir = piddir.."/name"
 
    -- Verify that the by-name directory exists.
    shm.mkdir(namedir)
 
    -- Verify that we've not already claimed a name
-   if S.lstat(backlinkdir) then
-      -- Read name of program for error message.
-      local fnamedir = S.readlink(backlinkdir)
-      local fname = name_from_path(fnamedir)
-      error("Program already claimed name '"..fname.."', cannot claim name '"..name.."'")
-   end
-
-   -- Check if a symlink to a named program with the same name exists, if not, unlink it.
-   if S.lstat(namedirqualified) then
-      -- It exists, lets check what the PID is.
-      local piddir = S.readlink(namedirqualified)
-      local pid = tonumber(name_from_path(piddir))
-      if S.kill(pid, 0) then
-         -- It's a running process, we should display an error message.
-         error("Name has been claimed by a currently running process: "..namedirqualified)
-      else
-         -- It's dead, we should be able to remove the symlink and relink.
-         S.unlink(namedirqualified)
-      end
-   end
+   assert(configuration.name, "Name already claimed, cannot claim: "..name)
    
    -- Create the new symlink.
-   local rtn, err = S.symlink(piddir, namedirqualified)
-   if rtn == -1 then
-      error("Error creating program name symlink in: "..namedirqualified)
-   end
+   assert(S.symlink(piddir, namedir_fq))
 
    -- Create a backlink so to the symlink so we can easily cleanup
-   local rtn, err = S.symlink(namedirqualified, backlinkdir)
-   if rtn == -1 then
-      error("Error creating backlink for: "..namedirqualified)
-   end
+   assert(S.symlink(namedir_fq, backlinkdir))
 end
 
--- Enumerates all the named programs with their PID
+-- Enumerates the named programs with their PID
 --
 -- This returns a table programs with the key being the name of the program
 -- and the value being the PID of the program. Each program is checked that
 -- it's still alive. Any dead program or program without a name is not listed.
---
--- The inc_dead argument is to disable the alive check (default: false)
-function enumerate_named_programs(inc_dead)
+function enumerate_named_programs()
    local progs = {}
    local dirs = shm.children("/by-name")
    if dirs == nil then return progs end
    for _, program in pairs(dirs) do
       local fq = named_program_root .. "/" .. program
       local piddir = S.readlink(fq)
-      local s, e = string.find(piddir, "/[^/]*$")
-      local pid = tonumber(string.sub(piddir, s+1, e))
-      if inc_dead == true or S.kill(pid, 0) then
-         local ps, pe = string.find(fq, "/[^/]*$")
-         local program_name = string.sub(fq, ps+1, pe)
-         progs[program_name] = pid
-      end
+      local pid = tonumber(lib.basename(piddir))
+      if S.kill(pid, 0) then progs[lib.basename(fq)] = pid end
    end
    return progs
 end
@@ -620,7 +582,7 @@ function selftest ()
    -- Ensure to claim two names fails
    assert(not pcall(claim_name, basename.."2"))
 
-   -- Lets check if they can be enumerated.
+   -- Check if it can be enumerated.
    local progs = enumerate_named_programs()
    assert(progs)
    assert(progs["testapp1"])
