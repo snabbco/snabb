@@ -145,7 +145,7 @@ function claim_name(name)
    shm.mkdir(namedir)
 
    -- Verify that we've not already claimed a name
-   assert(configuration.name, "Name already claimed, cannot claim: "..name)
+   assert(configuration.name == nil, "Name already claimed, cannot claim: "..name)
    
    -- Create the new symlink.
    assert(S.symlink(piddir, namedir_fq))
