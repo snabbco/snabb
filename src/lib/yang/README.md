@@ -144,8 +144,19 @@ hand.
 
 #### Compiled configurations
 
-[TODO] We will support compiling configurations to an efficient binary
-representation that can be loaded without validation.
+Loading a schema and using it to parse a data file can be a bit
+expensive, especially if the data file includes a large routing table or
+other big structure.  It can be useful to pay for this this parsing and
+validation cost "offline", without interrupting a running data plane.
+
+For this reason, Snabb support compiling configurations to binary data.
+A data plane can load a compiled configuration without any validation,
+very cheaply.  Users can explicitly call the `compile_data_for_schema`
+or `compile_data_for_schema_by_name` functions.  Support is planned also
+for automatic compilation and of source configuration files as well, so
+that the user can just edit configurations as text and still take
+advantage of the speedy binary configuration loads when nothing has
+changed.
 
 #### Querying and updating configurations
 
@@ -305,3 +316,33 @@ including some important ones like `union`.
 
 Like `load_data_for_schema`, but identifying the schema by name instead
 of by value, as in `load_schema_by_name`.
+
+— Function **compile_data_for_schema** *schema* *data* *filename* *mtime*
+
+Compile *data*, using a compiler generated for *schema*, and write out
+the result to the file named *filename*.  *mtime*, if given, should be a
+table with `secs` and `nsecs` keys indicating the modification time of
+the source file.  This information will be serialized in the compiled
+file, and may be used when loading the file to determine whether the
+configuration is up to date.
+
+— Function **compile_data_for_schema_by_name** *schema_name* *data* *filename* *mtime*
+
+Like `compile_data_for_schema_by_name`, but identifying the schema by
+name instead of by value, as in `load_schema_by_name`.
+
+— Function **load_compiled_data_file** *filename*
+
+Load the compiled data file at *filename*.  If the file is not a
+compiled YANG configuration, an error will be signalled.  The return
+value will be table containing four keys:
+
+ * `schema_name`: The name of the schema for which this file was
+    compiled.
+ * `revision_date`: The revision date  of the schema for which this file
+    was compiled, or the empty string (`''`) if unknown.
+ * `source_mtime`: An `mtime` table, as for `compile_data_for_schema`.
+    If no mtime was written into the file, both `secs` and `nsecs` will
+    be zero.
+ * `data`: The configuration data, in the same format as returned by
+    `load_data_for_schema`.
