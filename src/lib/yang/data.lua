@@ -181,16 +181,20 @@ local function array_parser(keyword, element_type, ctype)
    local parsev = value_parser(element_type)
    local function parse1(node)
       assert_scalar(node, keyword)
-      return parsev(node.argument, k)
+      return parsev(node.argument, keyword)
    end
    local function parse(node, out)
       table.insert(out, parse1(node))
       return out
    end
-   local array_t = ctype and ffi.typeof('$[?]', ffi.typeof(ctype))
+   local elt_t = ctype and ffi.typeof(ctype)
+   local array_t = ctype and ffi.typeof('$[?]', ffi.typeof(elt_t))
    local function finish(out)
       -- FIXME check min-elements
-      if array_t then return array_t(out) else return out end
+      if array_t then
+         out = util.ffi_array(array_t(#out, out), elt_t)
+      end
+      return out
    end
    return {init=init, parse=parse, finish=finish}
 end

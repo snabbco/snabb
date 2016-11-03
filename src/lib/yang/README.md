@@ -225,17 +225,18 @@ The `routes` container is just another table of the same kind.
 corresponding nodes in the configuration syntax, and corresponding
 sub-tables in the result configuration objects.)
 
-Inside the `routes` container is the `route` list, which is also
-represented as a table.  Recall that in YANG, `list` types are really
-key-value associations, so the `route` table has a `:lookup` method to
-get its sub-items.  Therefore to get the port for address 1.2.3.4, you
-would do:
+Inside the `routes` container is the `route` list, which is represented
+as an associative array.  The particular representation for the
+associative array depends on characteristics of the `list` type; see
+below for details.  In this case the `route` list compiles to a
+[`ctable`](../README.ctable.md).  Therefore to get the port for address
+1.2.3.4, you would do:
 
 ```lua
 local yang = require('lib.yang.yang')
 local ipv4 = require('lib.protocol.ipv4')
 local data = yang.load_data_for_schema(router_schema, conf_str)
-local port = data.routes.route:lookup(ipv4:pton('1.2.3.4')).port
+local port = data.routes.route:lookup_ptr(ipv4:pton('1.2.3.4')).value.port
 assert(port == 1)
 ```
 
@@ -256,15 +257,49 @@ There is special support for the `ipv4-address`, `ipv4-prefix`,
 parsed to raw binary data that is compatible with the relevant parts of
 Snabb's `lib.protocol` facility.
 
-Returning to compound configuration data types, configuration for
-`leaf-list` schema nodes are represented as normal arrays, whose values
-are instances of the leaf types.
+Let us return to the representation of compound configurations, like
+`list` instances.  A compound configuration whose shape is *fixed* is
+compiled to raw FFI data.  A configuration's shape is determined by its
+schema.  A schema node whose data will be fixed is either a leaf whose
+type is numeric or boolean and which is either mandatory or has a
+default value, or a container (`leaf-list`, `container` with presence,
+or `list`) whose elements are all themselves fixed.
+
+In practice this means that a fixed `container` with presence will be
+compiled to an FFI `struct` type.  This is mostly transparent from the
+user perspective, as in LuaJIT you access struct members by name in the
+same way as for normal Lua tables.
+
+A fixed `leaf-list` will be compiled to an FFI array of its element
+type, but on the Lua side is given the normal 1-based indexing and
+support for the `#len` length operator via a wrapper.  A non-fixed
+`leaf-list` is just a Lua array (a table with indexes starting from 1).
+
+Instances of `list` nodes can have one of several representations.
+(Recall that in YANG, `list` is not a list in the sense that we normally
+think of it in programming languages, but rather is a kind of hash map.)
+
+If there is only one key leaf, and that leaf has a string type, then a
+configuration list is represented as a normal Lua table whose keys are
+the key strings, and whose values are Lua structures holding the leaf
+values, as in containers.  (In fact, it could be that the value of a
+string-key struct is represented as a C struct, as in raw containers.)
+
+If all key and value types are fixed, then a `list` configuration
+compiles to an efficient [`ctable`](../README.ctable.md).
+
+If all keys are fixed but values are not, then a `list` configuration
+compiles to a [`cltable`](../README.cltable.md).
+
+Otherwise, a `list` configuration compiles to a Lua table whose keys are
+Lua tables containing the keys.  This sounds good on the surface but
+really it's a pain, because you can't simply look up a value in the
+table like `foo[{key1=42,key2=50}]`, because lookup in such a table is
+by identity and not be value.  Oh well.  You can still do `for k,v in
+pairs(foo)`, which is often good enough in this case.
 
 Note that there are a number of value types that are not implemented,
-including some important ones like `union`, and the `list` type
-representation needs further optimization.  We aim to compile `list`
-values directly to `ctable` instances where possible.  Patches are
-welcome :)
+including some important ones like `union`.
 
 — Function **load_data_for_schema_by_name** *schema_name* *name* *filename*
 

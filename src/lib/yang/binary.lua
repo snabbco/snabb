@@ -144,7 +144,7 @@ local function data_emitter(production)
             stream:write_stringref('carray')
             stream:write_stringref(production.ctype)
             stream:write_uint32(#data)
-            stream:write_array(data, ffi.typeof(production.ctype), #data)
+            stream:write_array(data.ptr, ffi.typeof(production.ctype), #data)
          end
       else
          local emit_tagged_value = visit1(
@@ -293,7 +293,8 @@ local function read_compiled_data(stream, strtab)
    end
    function readers.carray()
       local ctype = scalar_type(read_string())
-      return stream:read_array(ctype, stream:read_uint32())
+      local count = stream:read_uint32()
+      return util.ffi_array(stream:read_array(ctype, count), ctype, count)
    end
    function readers.larray()
       local ret = {}
@@ -367,6 +368,7 @@ function selftest()
 
       leaf is-active { type boolean; default true; }
 
+      leaf-list integers { type uint32; }
       container routes {
          presence true;
          list route {
@@ -378,6 +380,9 @@ function selftest()
    }]])
    local data = data.load_data_for_schema(test_schema, [[
       is-active true;
+      integers 1;
+      integers 2;
+      integers 0xffffffff;
       routes {
         route { addr 1.2.3.4; port 1; }
         route { addr 2.3.4.5; port 10; }
@@ -389,6 +394,10 @@ function selftest()
 
    for i=1,3 do
       assert(data.is_active == true)
+      assert(#data.integers == 3)
+      assert(data.integers[1] == 1)
+      assert(data.integers[2] == 2)
+      assert(data.integers[3] == 0xffffffff)
       local routing_table = data.routes.route
       assert(routing_table:lookup_ptr(ipv4:pton('1.2.3.4')).value.port == 1)
       assert(routing_table:lookup_ptr(ipv4:pton('2.3.4.5')).value.port == 10)

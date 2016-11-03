@@ -47,6 +47,29 @@ function tointeger(str, what, min, max)
    return res
 end
 
+function ffi_array(ptr, elt_t, count)
+   local mt = {}
+   local size = count or ffi.sizeof(ptr)/ffi.sizeof(elt_t)
+   function mt:__len() return size end
+   function mt:__index(idx)
+      assert(1 <= idx and idx <= size)
+      return ptr[idx-1]
+   end
+   function mt:__setindex(idx, val)
+      assert(1 <= idx and idx <= size)
+      ptr[idx-1] = val
+   end
+   function mt:__ipairs()
+      local idx = -1
+      return function()
+         idx = idx + 1
+         if idx >= size then return end
+         return idx+1, ptr[idx]
+      end
+   end
+   return ffi.metatype(ffi.typeof('struct { $* ptr; }', elt_t), mt)(ptr)
+end
+
 function selftest()
    assert(tointeger('0') == 0)
    assert(tointeger('-0') == 0)
