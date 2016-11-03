@@ -26,7 +26,7 @@ local use_restart = false
 
 test_skipped_code = 43
 
--- Set the directories for the named programs.
+-- Set the directory for the named programs.
 named_program_root = shm.root .. "/" .. "by-name"
 
 -- The set of all active apps and links in the system.
