@@ -28,7 +28,7 @@ module snabb-simple-router {
     list route {
       key addr;
       leaf addr { type inet:ipv4-address; mandatory true; }
-      leaf port { type uint8 { range 0..11; }; mandatory true; }
+      leaf port { type uint8 { range 0..11; } mandatory true; }
     }
   }
 }

@@ -8,9 +8,24 @@ local util = require("lib.yang.util")
 local value = require("lib.yang.value")
 local ffi = require("ffi")
 local ctable = require('lib.ctable')
+local cltable = require('lib.cltable')
 
 function normalize_id(id)
    return id:gsub('[^%w_]', '_')
+end
+
+-- If a "list" node has one key that is string-valued, we will represent
+-- instances of that node as normal Lua tables where the key is the
+-- table key and the value does not contain the key.
+local function table_string_key(keys)
+   local string_key = nil
+   for k,v in pairs(keys) do
+      if v.type ~= 'scalar' then return nil end
+      if v.argument_type.primitive_type ~= 'string' then return nil end
+      if string_key ~= nil then return nil end
+      string_key = k
+   end
+   return string_key
 end
 
 function data_grammar_from_schema(schema)
@@ -70,6 +85,7 @@ function data_grammar_from_schema(schema)
          if not keys[k] then values[k] = v end
       end
       return {[node.id]={type='table', keys=keys, values=values,
+                         string_key=table_string_key(keys),
                          key_ctype=struct_ctype(keys),
                          value_ctype=struct_ctype(values)}}
    end
@@ -198,29 +214,28 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    return {init=init, parse=parse, finish=finish}
 end
 
--- Simple temporary associative array until we get the various Table
--- kinds working.
-function make_assoc()
-   local assoc = {}
-   function assoc:get_entry(k)
-      assert(type(k) ~= 'table', 'multi-key lookup unimplemented')
-      for _,entry in ipairs(self) do
-         for _,v in pairs(entry.key) do
-            if v == k then return entry end
-         end
-      end
-      error('not found: '..k)
-   end
-   function assoc:get_key(k) return self:get_entry(k).key end
-   function assoc:get_value(k) return self:get_entry(k).value end
-   function assoc:add(k, v, check)
-      if check then assert(not self:get_entry(k)) end
-      table.insert(self, {key=k, value=v})
-   end
-   return assoc
+local function ctable_builder(key_t, value_t)
+   local res = ctable.new({ key_type=key_t, value_type=value_t })
+   local builder = {}
+   function builder:add(key, value) res:add(key, value) end
+   function builder:finish() return res end
+   return builder
 end
 
-local function table_parser(keyword, keys, values, key_ctype, value_ctype)
+local function string_keyed_table_builder(string_key)
+   local res = {}
+   local builder = {}
+   function builder:add(key, value)
+      local str = assert(key[string_key])
+      assert(res[str] == nil, 'duplicate key: '..str)
+      res[str] = value
+   end
+   function builder:finish() return res end
+   return builder
+end
+
+local function table_parser(keyword, keys, values, string_key, key_ctype,
+                            value_ctype)
    local members = {}
    for k,v in pairs(keys) do members[k] = v end
    for k,v in pairs(values) do members[k] = v end
@@ -229,15 +244,16 @@ local function table_parser(keyword, keys, values, key_ctype, value_ctype)
    local value_t = value_ctype and ffi.typeof(value_ctype)
    local init
    if key_t and value_t then
-      function init()
-         return ctable.new({ key_type=key_t, value_type=value_t })
-      end
+      function init() return ctable_builder(key_t, value_t) end
+   elseif string_key then
+      function init() return string_keyed_table_builder(string_key) end
    else
-      -- TODO: here we should implement mixed table types if key_t or
-      -- value_t is non-nil, or string-keyed tables if the key is a
-      -- string.  For the moment, fall back to the old assoc
-      -- implementation.
-      function init() return make_assoc() end
+      -- TODO: here we should implement a cktable if key_t is non-nil.
+      -- Probably we should error if the key is a generic Lua table
+      -- though, as we don't have a good data structure to map generic
+      -- Lua tables to Lua tables.  For the moment, fall back to the old
+      -- assoc implementation.
+      error('List with non-FFI, non-string key unimplemented')
    end
    local function parse1(node)
       assert_compound(node, keyword)
@@ -256,7 +272,7 @@ local function table_parser(keyword, keys, values, key_ctype, value_ctype)
       return assoc
    end
    local function finish(assoc)
-      return assoc
+      return assoc:finish()
    end
    return {init=init, parse=parse, finish=finish}
 end
@@ -286,8 +302,8 @@ function data_parser_from_grammar(production)
    end
    function handlers.table(keyword, production)
       local keys, values = visitn(production.keys), visitn(production.values)
-      return table_parser(keyword, keys, values, production.key_ctype,
-                          production.value_ctype)
+      return table_parser(keyword, keys, values, production.string_key,
+                          production.key_ctype, production.value_ctype)
    end
    function handlers.scalar(keyword, production)
       return scalar_parser(keyword, production.argument_type,
@@ -311,6 +327,7 @@ function load_data_for_schema_by_name(schema_name, str, filename)
 end
 
 function selftest()
+   print('selfcheck: lib.yang.data')
    local test_schema = schema.load_schema([[module fruit {
       namespace "urn:testing:fruit";
       prefix "fruit";
@@ -349,16 +366,12 @@ function selftest()
    ]])
    assert(data.fruit_bowl.description == 'ohai')
    local contents = data.fruit_bowl.contents
-   assert(contents:get_entry('foo').key.name == 'foo')
-   assert(contents:get_entry('foo').value.score == 7)
-   assert(contents:get_key('foo').name == 'foo')
-   assert(contents:get_value('foo').score == 7)
-   assert(contents:get_value('foo').tree_grown == nil)
-   assert(contents:get_key('bar').name == 'bar')
-   assert(contents:get_value('bar').score == 8)
-   assert(contents:get_value('bar').tree_grown == nil)
-   assert(contents:get_key('baz').name == 'baz')
-   assert(contents:get_value('baz').score == 9)
-   assert(contents:get_value('baz').tree_grown == true)
+   assert(contents.foo.score == 7)
+   assert(contents.foo.tree_grown == nil)
+   assert(contents.bar.score == 8)
+   assert(contents.bar.tree_grown == nil)
+   assert(contents.baz.score == 9)
+   assert(contents.baz.tree_grown == true)
    assert(require('lib.protocol.ipv4'):ntop(data.addr) == '1.2.3.4')
+   print('selfcheck: ok')
 end
