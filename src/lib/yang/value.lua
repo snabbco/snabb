@@ -87,6 +87,14 @@ function types.string.tostring(val)
    return val
 end
 
+types.enumeration = {}
+function types.enumeration.parse(str, what)
+   return assert(str, 'missing value for '..what)
+end
+function types.enumeration.tostring(val)
+   return val
+end
+
 types.union = unimplemented('union')
 
 types['ipv4-address'] = {

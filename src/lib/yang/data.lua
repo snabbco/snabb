@@ -121,7 +121,7 @@ local function value_parser(typ)
    validate = length_validator(typ.length, validate)
    validate = pattern_validator(typ.pattern, validate)
    validate = bit_validator(typ.bit, validate)
-   validate = enum_validator(typ.enum, validate)
+   validate = enum_validator(typ.enums, validate)
    -- TODO: union, require-instance.
    return function(str, k)
       local val = parse(str, k)
