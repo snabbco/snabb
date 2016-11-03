@@ -51,8 +51,8 @@ port := { port_id        = <id>,          -- A unique string
           egress_filter  = <filter>,       -- ..
           tunnel         = <tunnel-conf>,
           crypto         = <crypto-conf>,
-          rx_police_gbps = <n>,           -- Allowed input rate in Gbps
-          tx_police_gbps = <n> }          -- Allowed output rate in Gbps
+          rx_police      = <n>,           -- Allowed input rate in Gbps
+          tx_police      = <n> }          -- Allowed output rate in Gbps
 ```
 
 The `tunnel` section deviates a little from `SimpleKeyedTunnel`'s
@@ -69,13 +69,16 @@ tunnel := { type          = "L2TPv3",     -- The only type (for now)
 ```
 
 The `crypto` section allows configuration of traffic encryption based on
-`apps.esp`:
+`apps.ipsec.esp`:
 
 ```
 crypto := { type          = "esp-aes-128-gcm", -- The only type (for now)
-            spi           = <spi>,             -- Security Parameter Index
-            key           = <key>,             -- 20 bytes as a hex encoded string
-            replay_window = <n> }              -- Replay window
+            spi           = <spi>,             -- As for AES128gcm
+            transmit_key  = <key>,
+            transmit_salt = <salt>,
+            receive_key   = <key>,
+            receive_salt  = <salt>,
+            auditing      = <boolean> }
 ```
 
 

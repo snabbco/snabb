@@ -10,7 +10,15 @@ local C = require("ffi").C
 
 AES128gcm = {
    config = {
-      spi = {required=true}, key = {required=true}, window_size = {}
+      spi = {required=true},
+      transmit_key = {required=true},
+      transmit_salt =  {required=true},
+      receive_key = {required=true},
+      receive_salt =  {required=true},
+      receive_window = {},
+      resync_threshold = {},
+      resync_attempts = {},
+      auditing = {}
    },
    shm = {
       txerrors = {counter}, rxerrors = {counter}
@@ -19,17 +27,22 @@ AES128gcm = {
 
 function AES128gcm:new (conf)
    local self = {}
+   assert(conf.transmit_salt ~= conf.receive_salt,
+          "Refusing to operate with transmit_salt == receive_salt")
    self.encrypt = esp.esp_v6_encrypt:new{
       mode = "aes-128-gcm",
       spi = conf.spi,
-      keymat = conf.key:sub(1, 32),
-      salt = conf.key:sub(33, 40)}
+      key = conf.transmit_key,
+      salt = conf.transmit_salt}
    self.decrypt = esp.esp_v6_decrypt:new{
       mode = "aes-128-gcm",
       spi = conf.spi,
-      keymat = conf.key:sub(1, 32),
-      salt = conf.key:sub(33, 40),
-      window_size = conf.replay_window}
+      key = conf.receive_key,
+      salt = conf.receive_salt,
+      window_size = conf.receive_window,
+      resync_threshold = conf.resync_threshold,
+      resync_attempts = conf.resync_attempts,
+      auditing = conf.auditing}
    return setmetatable(self, {__index = AES128gcm})
 end
 
