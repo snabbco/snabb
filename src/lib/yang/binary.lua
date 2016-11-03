@@ -331,6 +331,12 @@ local function read_compiled_data(stream, strtab)
    return read1()
 end
 
+function has_magic(stream)
+   local success, header = pcall(stream.read_ptr, stream, header_t)
+   stream:seek(0)
+   return success and ffi.string(header.magic, ffi.sizeof(header.magic)) == MAGIC
+end
+
 function load_compiled_data(stream)
    local uint32_t = ffi.typeof('uint32_t')
    function stream:read_uint32()

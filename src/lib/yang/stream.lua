@@ -142,6 +142,9 @@ function open_input_byte_stream(filename)
    function ret:read_char()
       return ffi.string(ret:read(1), 1)
    end
+   function ret:read_string()
+      return ffi.string(ret:read(size - pos), size - pos)
+   end
    function ret:as_text_stream(len)
       local end_pos = size
       if len then end_pos = pos + len end

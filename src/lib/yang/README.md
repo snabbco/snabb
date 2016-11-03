@@ -187,7 +187,35 @@ partial) state data.
 #### API reference
 
 The public entry point to the YANG library is the `lib.yang.yang`
-module, which exports the following bindings:
+module, which exports the following bindings.  Note that unless you have
+special needs, probably the only one you want to use is
+`load_configuration`.
+
+— Function **load_configuration** *filename* *parameters*
+
+Load a configuration from disk.  If *filename* is a compiled
+configuration, load it directly.  Otherwise it must be a source file.
+In that case, try to load a corresponding compiled file instead if
+possible.  If all that fails, actually parse the source configuration,
+and try to residualize a corresponding compiled file so that we won't
+have to go through the whole thing next time.
+
+*parameters* is a table of key/value pairs.  The following key is
+required:
+
+ * `schema_name`: The name of the YANG schema that describes the
+   configuration.   This is the name that appears as the *id* in `module
+   id { ... }` in the schema.
+
+Optional entries that may be present in the *parameters* table include:
+
+ * `verbose`: Set to true to print verbose information about which files
+   are being loaded and compiled.
+ * `revision_date`: If set, assert that the loaded configuration was
+   built against this particular schema revision date.
+
+For more information on the format of the returned value, see the
+documentation below for `load_data_for_schema`.
 
 — Function **load_schema** *src* *filename*
 
