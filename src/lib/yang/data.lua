@@ -213,7 +213,7 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    local function finish(out)
       if out ~= nil then return out end
       if default then return parse1(default) end
-      if mandatory then error('missing scalar value: '..k) end
+      if mandatory then error('missing scalar value: '..keyword) end
    end
    return {init=init, parse=parse, finish=finish}
 end
@@ -330,6 +330,142 @@ function load_data_for_schema_by_name(schema_name, str, filename)
    return load_data_for_schema(schema, str, filename)
 end
 
+local function encode_yang_string(str)
+   if str:match("^[^%s;{}\"'/]*$") then return str end
+   error('yang string escaping unimplemented: '..str)
+end
+
+local value_printers = {}
+local function value_printer(typ)
+   local prim = typ.primitive_type
+   if value_printers[prim] then return value_printers[prim] end
+   local tostring = assert(value.types[prim], prim).tostring
+   local function print(val, file)
+      file:write(encode_yang_string(tostring(val)))
+   end
+   value_printers[prim] = print
+   return print
+end
+
+local function data_printer_from_grammar(production)
+   local handlers = {}
+   local function printer(keyword, production)
+      return assert(handlers[production.type])(keyword, production)
+   end
+   local function print_string(str, file)
+      file:write(encode_yang_string(str))
+   end
+   local function print_keyword(k, file, indent)
+      file:write(indent)
+      print_string(k, file)
+      file:write(' ')
+   end
+   local function body_printer(productions, order)
+      if not order then
+         order = {}
+         for k,_ in pairs(productions) do table.insert(order, k) end
+         table.sort(order)
+      end
+      local printers = {}
+      for keyword,production in pairs(productions) do
+         printers[keyword] = printer(keyword, production)
+      end
+      return function(data, file, indent)
+         for _,k in ipairs(order) do
+            local v = data[normalize_id(k)]
+            if v ~= nil then printers[k](v, file, indent) end
+         end
+      end
+   end
+   function handlers.struct(keyword, production)
+      local print_body = body_printer(production.members)
+      return function(data, file, indent)
+         print_keyword(keyword, file, indent)
+         file:write('{\n')
+         print_body(data, file, indent..'  ')
+         file:write(indent..'}\n')
+      end
+   end
+   function handlers.array(keyword, production)
+      local print_value = value_printer(production.element_type)
+      return function(data, file, indent)
+         for _,v in ipairs(data) do
+            print_keyword(keyword, file, indent)
+            print_value(v, file)
+            file:write(';\n')
+         end
+      end
+   end
+   function handlers.table(keyword, production)
+      local key_order, value_order = {}, {}
+      for k,_ in pairs(production.keys) do table.insert(key_order, k) end
+      for k,_ in pairs(production.values) do table.insert(value_order, k) end
+      table.sort(key_order)
+      table.sort(value_order)
+      local print_key = body_printer(production.keys, key_order)
+      local print_value = body_printer(production.values, value_order)
+      if production.key_ctype and production.value_ctype then
+         return function(data, file, indent)
+            for entry in data:iterate() do
+               print_keyword(keyword, file, indent)
+               file:write('{\n')
+               print_key(entry.key, file, indent..'  ')
+               print_value(entry.value, file, indent..'  ')
+               file:write(indent..'}\n')
+            end
+         end
+      elseif production.string_key then
+         local id = normalize_id(production.string_key)
+         return function(data, file, indent)
+            for key, value in pairs(data) do
+               print_keyword(keyword, file, indent)
+               file:write('{\n')
+               print_key({[id]=key}, file, indent..'  ')
+               print_value(value, file, indent..'  ')
+               file:write(indent..'}\n')
+            end
+         end
+      else
+         return function(data, file, indent)
+            for key, value in pairs(data) do
+               print_keyword(keyword, file, indent)
+               file:write('{\n')
+               print_key(key, file, indent..'  ')
+               print_value(value, file, indent..'  ')
+               file:write(indent..'}\n')
+            end
+         end
+      end
+   end
+   function handlers.scalar(keyword, production)
+      local print_value = value_printer(production.argument_type)
+      return function(data, file, indent)
+         print_keyword(keyword, file, indent)
+         print_value(data, file)
+         file:write(';\n')
+      end
+   end
+
+   local top_printer = body_printer(production.members)
+   return function(data, file)
+      top_printer(data, file, '')
+      file:flush()
+   end
+end
+
+function data_printer_from_schema(schema)
+   return data_printer_from_grammar(data_grammar_from_schema(schema))
+end
+
+function print_data_for_schema(schema, data, file)
+   return data_printer_from_schema(schema)(data, file)
+end
+
+function print_data_for_schema_by_name(schema_name, data, file)
+   local schema = schema.load_schema_by_name(schema_name)
+   return print_data_for_schema(schema, data, file)
+end
+
 function selftest()
    print('selfcheck: lib.yang.data')
    local test_schema = schema.load_schema([[module fruit {
@@ -368,14 +504,25 @@ function selftest()
      }
      addr 1.2.3.4;
    ]])
-   assert(data.fruit_bowl.description == 'ohai')
-   local contents = data.fruit_bowl.contents
-   assert(contents.foo.score == 7)
-   assert(contents.foo.tree_grown == nil)
-   assert(contents.bar.score == 8)
-   assert(contents.bar.tree_grown == nil)
-   assert(contents.baz.score == 9)
-   assert(contents.baz.tree_grown == true)
-   assert(require('lib.protocol.ipv4'):ntop(data.addr) == '1.2.3.4')
+   for i =1,2 do
+      assert(data.fruit_bowl.description == 'ohai')
+      local contents = data.fruit_bowl.contents
+      assert(contents.foo.score == 7)
+      assert(contents.foo.tree_grown == nil)
+      assert(contents.bar.score == 8)
+      assert(contents.bar.tree_grown == nil)
+      assert(contents.baz.score == 9)
+      assert(contents.baz.tree_grown == true)
+      assert(require('lib.protocol.ipv4'):ntop(data.addr) == '1.2.3.4')
+
+      local tmp = os.tmpname()
+      local file = io.open(tmp, 'w')
+      print_data_for_schema(test_schema, data, file)
+      file:close()
+      local file = io.open(tmp, 'r')
+      local data = load_data_for_schema(test_schema, file:read('*a'), tmp)
+      file:close()
+      os.remove(tmp)
+   end
    print('selfcheck: ok')
 end

@@ -14,6 +14,9 @@ load_schema_by_name = schema.load_schema_by_name
 load_data_for_schema = data.load_data_for_schema
 load_data_for_schema_by_name = data.load_data_for_schema_by_name
 
+print_data_for_schema = data.print_data_for_schema
+print_data_for_schema_by_name = data.print_data_for_schema_by_name
+
 compile_data_for_schema = binary.compile_data_for_schema
 compile_data_for_schema_by_name = binary.compile_data_for_schema_by_name
 

@@ -345,6 +345,17 @@ including some important ones like `union`.
 Like `load_data_for_schema`, but identifying the schema by name instead
 of by value, as in `load_schema_by_name`.
 
+— Function **print_data_for_schema** *schema* *data* *file*
+
+Serialize the configuration *data* as text via repeated calls to the
+`write` method of *file*.  At the end, the `flush` method is called on
+*file*.  *schema* is the schema that describes *data*.
+
+— Function **print_data_for_schema_by_name** *schema_name* *name* *filename*
+
+Like `print_data_for_schema`, but identifying the schema by name instead
+of by value, as in `load_schema_by_name`.
+
 — Function **compile_data_for_schema** *schema* *data* *filename* *mtime*
 
 Compile *data*, using a compiler generated for *schema*, and write out
