@@ -22,112 +22,111 @@ module snabb-softwire-v1 {
       type inet:ipv4-address;
       mandatory true;
       description
-       "Sets the IPv4 address of the internet facing NIC.";
+       "IPv4 address of the internet facing NIC.";
     }
 
     leaf ipv6-ip {
       type inet:ipv6-address;
       mandatory true;
       description
-       "Sets the IPv6 address of the internal facing NIC.";
+       "IPv6 address of the internal facing NIC.";
     }
 
     leaf mac-b4 {
       type inet:mac-address;
       mandatory true;
       description
-       "Sets the MAC address of the internal facing NIC.";
+       "MAC address of the internal facing NIC.";
     }
 
     leaf mac-inet {
       type inet:mac-address;
       mandatory true;
       description
-       "Sets the MAC address of the internet facing NIC.";
+       "MAC address of the internet facing NIC.";
     }
 
     leaf hairpinning {
       type boolean;
       default true;
       description
-       "Enables or disables hairpinning that is a requirement of RFC
-        7596.";
+       "Indicates whether to support hairpinning of traffic between
+        two B4s.";
     }
 
     container mtu {
       description
        "The MTU settings are used to determine whether a packet
-        needs to be fragmented.  The MTU handling is otherwise
-        underdeveloped.  It is not dynamically updated upon
-        receiving ICMP packets too big.";
+        needs to be fragmented.  Note that the MTU settings are
+        static; they do not update if a peer sends an ICMP
+        packet-too-big message.";
 
       leaf ipv4-mtu {
         type uint16;
         default 1460;
         description
-         "Sets the MTU value for the IPv4 NIC.";
+         "Maximum packet size to send on the IPv4 interface.";
       }
 
       leaf ipv6-mtu {
         type uint16;
         default 1500;
         description
-         "Set the MTU value for the IPv6 NIC.";
+         "Maximum packet size to sent on the IPv6 interface.";
       }
     }
 
     container L2-next-hop {
       description
-       "One might expect to set the default gateway IPv4 and
-        IPv6 addresses and have those resolved via ARP, however ARP
-        is not yet supported via the lwAFTR.  One must specify
-        either the MAC Address of the next hop host however you
-        could instead specify the IP addresses of the next hops and
-        have the lwAFTR resolve the corresponding MAC addresses via
-        NDP and ARP.";
+       "The next-hop settings are used to indicate the next hops on
+        the internet-facing and internal-facing interfaces.
+
+        One can specify a next-hop as either layer 3 or a layer 2
+        address.  In the former case, the lwAFTR will use ARP or NDP
+        (as appropriate) to resolve the L2 addresses.  In the latter
+        case, the L2 next-hop addresses instead are statically
+        configured by the administrator."
 
       leaf b4-mac {
         type inet:mac-address;
         description
-         "Sets the MAC address of the next hop for the internal
-          facing NIC.";
+         "Statically configured MAC address of the next hop for the
+          internal-facing NIC.";
       }
 
       leaf inet-mac {
         type inet:mac-address;
         description
-         "Sets the MAC address of the next hop for the internet
-          facing NIC.";
+         "Statically configured MAC address of the next hop for the
+          internet-facing NIC.";
       }
 
       leaf inet-ipv4 {
         type inet:ipv4-address;
         description
-         "Sets the IPv4 address of the next hop for the internet
-          facing NIC that will be used to resolve the MAC address.";
+         "IPv4 address of the next hop for the internet-facing NIC.
+          The lwAFTR will resolve this to a MAC address using ARP.";
       }
 
       leaf b4-ipv6 {
         type inet:ipv6-address;
         description
-         "Sets the IPv4 address of the next hop for the internal
-          facing NIC that will be used to resolve the MAC address.";
+         "IPv6 address of the next hop for the internal-facing NIC.
+          The lwAFTR will resolve this to a MAC address using NDP.";
       }
     }
 
     container rate-limiting-icmp {
       description
-       "ICMP rate limiting is mandated by many RFCs.  This
-        configures the number of ICMP packets the lwAFTR can send
-        for the given time period.  Lower values are recomended for
-        non-experimental use."; 
+       "These settings limit the rate of ICMP error message
+        transmission.";
 
       leaf packets {
         type uint32;
         default 600000;
         description
-         "The number of packets which can be sent within the time
-          period.";
+         "The number of ICMP error messages which can be sent within
+          the time period.";
       }
 
       leaf seconds {
@@ -165,28 +164,28 @@ module snabb-softwire-v1 {
         type packet-policy;
         default allow;
         description
-         "Sets the policy for incoming ICMPv4 messages.";
+         "Whether to allow incoming ICMPv4 messages.";
       }
 
       leaf icmpv4-outgoing {
         type packet-policy;
         default allow;
         description
-         "Sets the policy for outgoing ICMPv4 messages.";
+         "Whether to generate outgoing ICMPv4 error amessages.";
       }
 
       leaf icmpv6-incoming {
         type packet-policy;
         default allow;
         description
-         "Sets the policy for incoming ICMPv6 messages.";
+         "Whether to allow incoming ICMPv6 messages.";
       }
 
       leaf icmpv6-outgoing {
         type packet-policy;
         default allow;
         description
-         "Sets the policy for outgoing ICMPv6 messages.";
+         "Whether to generate outgoing ICMPv6 error messages.";
       }
     }
 
@@ -200,7 +199,7 @@ module snabb-softwire-v1 {
           range 0..4095;
         }
         description
-         "This is a VLAN tag according to 802.1Q Ethernet tagging.";
+         "An 802.1Q Ethernet VLAN tag.";
       }
 
       leaf vlan-tagging {
@@ -213,45 +212,46 @@ module snabb-softwire-v1 {
       leaf v4-tag {
         type vlan-tag;
         description
-         "Sets the tag for v4";
+         "VLAN tag for IPv4 interface.";
       }
 
       leaf v6-tag {
         type vlan-tag;
         description
-         "Sets the tag for v6";
+         "VLAN tag for IPv6 interface.";
       }
     }
 
     container filters {
       description
        "This configures the ingress and egress filters for each
-        NIC.  If set, these should be a pflang filter, pflang is the
-        language of tcpdump, libpcap and other tools.  The filters
-        will run on the packets without vlan tags, if any.";
+        NIC.  If set, these should be a pflang filter.  pflang is
+        the language of tcpdump, libpcap and other tools.  Note that
+        if VLAN tagging is enabled, the the filters will run on the
+        packets after VLAN tags have been stripped off.";
 
       leaf ipv4-ingress-filter {
         type string;
         description
-         "Sets the pflang filter for IPv4 ingress.";
+         "IPv4 ingress filter.";
       }
 
       leaf ipv4-egress-filter {
         type string;
         description
-         "Sets the pflang filter for IPv4 egress.";
+         "IPv4 egress filter.";
       }
 
       leaf ipv6-ingress-filter {
         type string;
         description
-         "Sets the pflang filter for IPv6 ingress.";
+         "IPv6 ingress filter.";
       }
 
       leaf ipv6-egress-filter {
         type string;
         description
-         "Sets the pflang filter for IPv6 egress.";
+         "IPv6 egress filter.";
       }
     }
   }
