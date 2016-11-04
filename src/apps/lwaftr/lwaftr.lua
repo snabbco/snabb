@@ -210,14 +210,15 @@ local function init_transmit_icmpv4_reply (lwstate)
          last_time = now
          num_packets = 0
       end
+      -- Origin packet is always dropped.
+      if orig_pkt_link then
+         drop_ipv4(lwstate, orig_pkt, orig_pkt_link)
+      else
+         drop(orig_pkt)
+      end
       -- Send packet if limit not reached.
       if num_packets < icmpv4_rate_limiter_n_packets then
          num_packets = num_packets + 1
-         if orig_pkt_link then
-            drop_ipv4(lwstate, orig_pkt, orig_pkt_link)
-         else
-            drop(orig_pkt)
-         end
          counter.add(lwstate.counters["out-icmpv4-bytes"], pkt.length)
          counter.add(lwstate.counters["out-icmpv4-packets"])
          -- Only locally generated error packets are handled here.  We transmit
