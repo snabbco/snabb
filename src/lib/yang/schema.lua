@@ -813,6 +813,7 @@ function load_schema_by_name(name, revision)
 end
 
 function selftest()
+   print('selftest: lib.yang.schema')
    local test_schema = [[module fruit {
       namespace "urn:testing:fruit";
       prefix "fruit";
@@ -926,4 +927,6 @@ function selftest()
 
    load_schema_by_name('ietf-yang-types')
    load_schema_by_name('ietf-softwire')
+   load_schema_by_name('snabb-softwire-v1')
+   print('selftest: ok')
 end

@@ -139,7 +139,7 @@ module snabb-softwire-v1 {
           requests.";
       }
       leaf mac {
-        type inet:mac-address;
+        type yang:mac-address;
         mandatory true;
         description
          "MAC address of the internal-facing NIC.";
@@ -164,7 +164,7 @@ module snabb-softwire-v1 {
             The lwAFTR will resolve this to a MAC address using NDP.";
         }
         leaf mac {
-          type inet:mac-address;
+          type yang:mac-address;
           description
            "Statically configured MAC address of the next hop for the
             internal-facing NIC.";
@@ -195,7 +195,7 @@ module snabb-softwire-v1 {
       }
 
       leaf period {
-        type uint32 { range 1..max }
+        type uint32 { range 1..max; }
         default 2;
         description
          "The time period given in seconds.";
@@ -249,17 +249,17 @@ module snabb-softwire-v1 {
       key addr;
 
       leaf addr {
-        type ipv4-address;
+        type inet:ipv4-address;
         mandatory true;
         description
-         "Public IPv4 address managed by the lwAFTR."
+         "Public IPv4 address managed by the lwAFTR.";
       }
 
       leaf end-addr {
-        type ipv4-address;
+        type inet:ipv4-address;
         description
          "If present, this PSID map entry applies to all addresses
-          between 'addr' and this address, inclusive."
+          between 'addr' and this address, inclusive.";
       }
 
       leaf psid-length {
@@ -269,7 +269,7 @@ module snabb-softwire-v1 {
          "The number of bits devoted to the PSID in the port map.
           If the psid-length is N, then the IPv4 address will be
           shared 2^N ways.  Note that psid-length, shift, and
-          reserved-ports-bit-count must add up to 16."
+          reserved-ports-bit-count must add up to 16.";
       }
 
       leaf shift {
@@ -279,7 +279,7 @@ module snabb-softwire-v1 {
           shifting the port right by 'shift' bits and then masking
           off the lowest 'psid-length' bits.  Defaults to 16 -
           psid-length.  Note that psid-length, shift, and
-          reserved-ports-bit-count must add up to 16."
+          reserved-ports-bit-count must add up to 16.";
       }
 
       leaf reserved-ports-bit-count {
@@ -290,14 +290,14 @@ module snabb-softwire-v1 {
           softwire.  This can be useful to prevent the low 1024
           ports (for example) from being mapped to customers.  Note
           that psid-length and shift must add up to less than or
-          equal to 16."
+          equal to 16.";
       }
     }
 
     leaf-list br-address {
-      type ipv6-address;
+      type inet:ipv6-address;
       description
-       "B4-facing address of an lwAFTR."
+       "B4-facing address of an lwAFTR.";
     }
 
     list softwire {
@@ -318,7 +318,7 @@ module snabb-softwire-v1 {
       }
 
       leaf padding {
-        type uint16 { range 0..0 };
+        type uint16 { range 0..0; }
         default 0;
         description
          "Reserved bytes.";
