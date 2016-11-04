@@ -19,7 +19,7 @@ module snabb-softwire-v1 {
       enum allow {
         value 0;
         description
-         "Allow pakcets.";
+         "Allow packets.";
       }
       enum deny {
         value 1;
@@ -91,9 +91,9 @@ module snabb-softwire-v1 {
     container mtu {
       description
        "The MTU settings are used to determine whether a packet
-        needs to be fragmented. The MTU handling is otherwise
-        underdeveloped. It is not dynamically updated upon receiving
-        ICMP packets too big.";
+        needs to be fragmented.  The MTU handling is otherwise
+        underdeveloped.  It is not dynamically updated upon
+        receiving ICMP packets too big.";
 
       leaf ipv4-mtu {
         type uint16;
@@ -114,11 +114,11 @@ module snabb-softwire-v1 {
       description
        "One might expect to set the default gateway IPv4 and
         IPv6 addresses and have those resolved via ARP, however ARP
-        is not yet supported via the lwAFTR. One must specify either
-        the MAC Address of the next hop host however you could
-        instead specify the IP addresses of the next hops and have
-        the lwAFTR resolve the corresponding MAC addresses via NDP
-        and ARP.";
+        is not yet supported via the lwAFTR.  One must specify
+        either the MAC Address of the next hop host however you
+        could instead specify the IP addresses of the next hops and
+        have the lwAFTR resolve the corresponding MAC addresses via
+        NDP and ARP.";
 
       leaf b4-mac {
         type inet:mac-address;
@@ -151,9 +151,9 @@ module snabb-softwire-v1 {
 
     container rate-limiting-icmp {
       description
-       "ICMP rate limiting is mandated by many RFCs. This configures
-        the number of ICMP packets the lwAFTR can send for the given
-        time period. Lower values are recomended for
+       "ICMP rate limiting is mandated by many RFCs.  This
+        configures the number of ICMP packets the lwAFTR can send
+        for the given time period.  Lower values are recomended for
         non-experimental use."; 
 
       leaf packets {
@@ -208,7 +208,7 @@ module snabb-softwire-v1 {
 
     container vlan-tagging {
       description
-       "This configures 802.1Q Ethernet tagging. If tagging is
+       "This configures 802.1Q Ethernet tagging.  If tagging is
         enabled the outbound and inbound tags must be specified.";
 
       leaf vlan-tagging {
@@ -234,8 +234,8 @@ module snabb-softwire-v1 {
     container filters {
       description
        "This configures the ingress and egress filters for each
-        NIC. If set, these should be a pflang filter, pflang is the
-        language of tcpdump, libpcap and other tools. The filters
+        NIC.  If set, these should be a pflang filter, pflang is the
+        language of tcpdump, libpcap and other tools.  The filters
         will run on the packets without vlan tags, if any.";
 
       leaf ipv4-ingress-filter {
@@ -266,18 +266,18 @@ module snabb-softwire-v1 {
 
   container binding-table {
     description
-     "The binding table is a collection of softwire tunnels. One
+     "The binding table is a collection of softwire tunnels.  One
       endpoint of the softwire is the lwAFTR and the other is the
-      B4. It contains information so the lwAFTR knows which IPv4 (or
-      part of an IPv4 address) is associated with which B4.";
+      B4.  It contains information so the lwAFTR knows which IPv4
+      (or part of an IPv4 address) is associated with which B4.";
 
     list binding-entry {
       key "binding-ipv6info";
       description
        "Defines the set of IPv4 addresses that are provisioned by a
-        lwAFTR. It also defines the way in which those addresses are
-        shared by specifying the psid_length and shift. See RFC 7597
-        for more details on the PSID scheme for sharing IPv4
+        lwAFTR.  It also defines the way in which those addresses
+        are shared by specifying the psid_length and shift.  See RFC
+        7597 for more details on the PSID scheme for sharing IPv4
         addresses.";
 
       leaf binding-ipv6info {
