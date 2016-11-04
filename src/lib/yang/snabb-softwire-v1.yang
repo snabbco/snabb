@@ -2,9 +2,9 @@ module snabb-softwire-v1 {
   namespace snabb:lwaftr;
   prefix softwire;
 
-  import ietf-inet-types {prefix inet; }
+  import ietf-inet-types { prefix inet; }
 
-  organization "Igalia";
+  organization "Igalia, S.L.";
   contact "Jessica Tallon <tsyesika@igalia.com>";
   description "Configuration for the Snabb Switch lwAFTR.";
 
@@ -19,7 +19,7 @@ module snabb-softwire-v1 {
         value 0;
         description "Allow pakcets.";
       }
-      enum deny  {
+      enum deny {
         value 1;
         description "Deny packets.";
       }
@@ -30,14 +30,14 @@ module snabb-softwire-v1 {
 
   typedef positive-uint32 {
     type uint32 {
-      range "1.. 2147483647";
+      range 1..2147483647;
     }
     description "This is a non-negative integer value which is 1 or above.";
   }
 
   typedef vlan-tag {
     type uint16 {
-      range "0..4095";
+      range 0..4095;
     }
     description "This is a VLAN tag according to 802.1Q Ethernet tagging.";
   }
@@ -75,7 +75,6 @@ module snabb-softwire-v1 {
       description "Enables or disables hairpinning that is a requirement of
                    RFC 7596.";
     }
-
 
     container mtu {
       description "The MTU settings are used to determine whether a packet
@@ -129,7 +128,6 @@ module snabb-softwire-v1 {
                      facing NIC that will be used to resolve the MAC address.";
       }
     }
-
 
     container rate-limiting-icmp {
       description "ICMP rate limiting is mandated by many RFCs. This configures
@@ -289,7 +287,7 @@ module snabb-softwire-v1 {
    }
 
    list br-addresses {
-      key "ipv6-address";
+      key ipv6-address;
 
       leaf ipv6-address {
         type inet:ipv6-address;
