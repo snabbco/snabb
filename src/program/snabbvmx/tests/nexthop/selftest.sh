@@ -30,6 +30,7 @@ SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr.cfg
 SNABBVMX_ID=xe1
 SNABB_TELNET0=5000
 VHU_SOCK0=/tmp/vh1a.sock
+GUEST_MEM=1024
 
 function last_32bit {
     mac=$1
