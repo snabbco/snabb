@@ -13,7 +13,7 @@ module snabb-softwire-v1 {
     reference "-00";
   }
 
-  typedef PacketPolicy {
+  typedef packet-policy {
     type enumeration {
       enum allow {
         value 0;
@@ -28,14 +28,14 @@ module snabb-softwire-v1 {
                  them.";
   }
 
-  typedef PositiveNumber {
+  typedef positive-uint32 {
     type uint32 {
       range "1.. 2147483647";
     }
     description "This is a non-negative integer value which is 1 or above.";
   }
 
-  typedef VlanTag {
+  typedef vlan-tag {
     type uint16 {
       range "0..4095";
     }
@@ -145,7 +145,7 @@ module snabb-softwire-v1 {
       }
 
       leaf seconds {
-        type PositiveNumber;
+        type positive-uint32;
         default 2;
         description "The time period given in seconds.";
       }
@@ -156,25 +156,25 @@ module snabb-softwire-v1 {
                    outgoing ICMPv4 and ICMPv6 messages.";
 
       leaf icmpv4-incoming {
-        type PacketPolicy;
+        type packet-policy;
         default allow;
         description "Sets the policy for incoming ICMPv4 messages.";
       }
 
       leaf icmpv4-outgoing {
-        type PacketPolicy;
+        type packet-policy;
         default allow;
         description "Sets the policy for outgoing ICMPv4 messages.";
       }
 
       leaf icmpv6-incoming {
-        type PacketPolicy;
+        type packet-policy;
         default allow;
         description "Sets the policy for incoming ICMPv6 messages.";
       }
 
       leaf icmpv6-outgoing {
-        type PacketPolicy;
+        type packet-policy;
         default allow;
         description "Sets the policy for outgoing ICMPv6 messages.";
       }
@@ -191,12 +191,12 @@ module snabb-softwire-v1 {
       }
 
       leaf v4-tag {
-        type VlanTag;
+        type vlan-tag;
         description "Sets the tag for v4";
       }
 
       leaf v6-tag {
-        type VlanTag;
+        type vlan-tag;
         description "Sets the tag for v6";
       }
     }
