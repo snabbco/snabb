@@ -1,6 +1,6 @@
-module snabb-softwire {
-  namespace "snabb:lwaftr";
-  prefix "softwire";
+module snabb-softwire-v1 {
+  namespace snabb:lwaftr;
+  prefix softwire;
 
   import ietf-inet-types {prefix inet; }
 
@@ -8,7 +8,7 @@ module snabb-softwire {
   contact "Jessica Tallon <tsyesika@igalia.com>";
   description "Configuration for the Snabb Switch lwAFTR.";
 
-  revision 2016-08-01 {
+  revision 2016-11-04 {
     description "Initial revision.";
     reference "-00";
   }
