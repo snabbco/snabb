@@ -14,40 +14,6 @@ module snabb-softwire-v1 {
      "Initial revision.";
   }
 
-  typedef packet-policy {
-    type enumeration {
-      enum allow {
-        value 0;
-        description
-         "Allow packets.";
-      }
-      enum deny {
-        value 1;
-        description
-         "Deny packets.";
-      }
-    }
-    description
-     "Policy for what to do with packets, either allow or deny
-      them.";
-  }
-
-  typedef positive-uint32 {
-    type uint32 {
-      range 1..2147483647;
-    }
-    description
-     "This is a non-negative integer value which is 1 or above.";
-  }
-
-  typedef vlan-tag {
-    type uint16 {
-      range 0..4095;
-    }
-    description
-     "This is a VLAN tag according to 802.1Q Ethernet tagging.";
-  }
-
   container softwire-config {
     description
      "Configuration for Snabb lwaftr.";
@@ -165,7 +131,7 @@ module snabb-softwire-v1 {
       }
 
       leaf seconds {
-        type positive-uint32;
+        type uint32 { range 1..max }
         default 2;
         description
          "The time period given in seconds.";
@@ -176,6 +142,24 @@ module snabb-softwire-v1 {
       description
        "The lwAFTR can be configured to allow or drop incoming and
         outgoing ICMPv4 and ICMPv6 messages.";
+
+      typedef packet-policy {
+        type enumeration {
+          enum allow {
+            value 0;
+            description
+             "Allow packets.";
+          }
+          enum deny {
+            value 1;
+            description
+             "Deny packets.";
+          }
+        }
+        description
+         "Policy for what to do with packets, either allow or deny
+          them.";
+      }
 
       leaf icmpv4-incoming {
         type packet-policy;
@@ -210,6 +194,14 @@ module snabb-softwire-v1 {
       description
        "This configures 802.1Q Ethernet tagging.  If tagging is
         enabled the outbound and inbound tags must be specified.";
+
+      typedef vlan-tag {
+        type uint16 {
+          range 0..4095;
+        }
+        description
+         "This is a VLAN tag according to 802.1Q Ethernet tagging.";
+      }
 
       leaf vlan-tagging {
         type boolean;
