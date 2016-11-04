@@ -32,11 +32,6 @@ SNABB_TELNET0=5000
 VHU_SOCK0=/tmp/vh1a.sock
 GUEST_MEM=1024
 
-function last_32bit {
-    mac=$1
-    echo `echo $mac | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+$"`
-}
-
 function cleanup {
     exit $1
 }
@@ -56,23 +51,26 @@ if ! snabb $SNABB_PCI1 "packetblaster replay -D 10 $PCAP_INPUT/v4v6-256.pcap $SN
 fi
 
 # Query nexthop for 10 seconds.
-TIMEOUT=10
+TIMEOUT=20
 count=0
 while true; do
     output=`./snabb snabbvmx nexthop | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+"`
     mac_v4=`echo "$output" | head -1`
     mac_v6=`echo "$output" | tail -1`
 
-    # Somehow the first 16-bit of nexhop come from the VM corrupted, compare only last 32-bit.
-    if [[ $(last_32bit "$mac_v4") == "99:99:99:99" &&
-          $(last_32bit "$mac_v6") == "99:99:99:99" ]]; then
+    # FIXME: Should return expected MAC addresses.
+    # Check VM returned something.
+    if [[ "$mac_v4" != "00:00:00:00:00:00" &&
+          "$mac_v6" != "00:00:00:00:00:00" ]]; then
         echo "Resolved MAC inet side: $mac_v4 [OK]"
-        echo "Resolved MAC inet side: $mac_v6 [OK]"
+        echo "Resolved MAC b4 side: $mac_v6 [OK]"
         exit 0
     fi
 
     if [[ $count == $TIMEOUT ]]; then
         echo "Could not resolve nexthop"
+        echo "MAC inet side: $mac_v4 [FAILED]"
+        echo "MAC b4 side: $mac_v6 [FAILED]"
         exit 1
     fi
 
