@@ -376,7 +376,7 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
       config.app(c, "nh_fwd4", nh_fwd.nh_fwd4,
                  subset(nh_fwd.nh_fwd4.config, conf.ipv4_interface))
       config.link(c, v4_input.."-> nh_fwd4.wire")
-      config.link(c, "nh_fwd4.wire -> "..v6_output)
+      config.link(c, "nh_fwd4.wire -> "..v4_output)
 
       lwconf.counters = lwcounter.init_counters()
       config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
