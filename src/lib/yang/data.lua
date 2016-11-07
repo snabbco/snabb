@@ -520,7 +520,7 @@ function selftest()
       print_data_for_schema(test_schema, data, file)
       file:close()
       local file = io.open(tmp, 'r')
-      local data = load_data_for_schema(test_schema, file:read('*a'), tmp)
+      data = load_data_for_schema(test_schema, file:read('*a'), tmp)
       file:close()
       os.remove(tmp)
    end
