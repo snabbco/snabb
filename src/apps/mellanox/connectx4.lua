@@ -740,62 +740,47 @@ function IO:new (conf)
    local pciaddress = pci.qualified(conf.pciaddress)
    local mmio, fd = pci.map_pci_memory(pciaddress, 0, false)
 
-   self.sqlist = {}
-   self.rqlist = {}
+   local queue = conf.queue
 
-   for _, queuename in ipairs(conf.queues) do
+   local basepath = "/pci/"..pciaddress.."/"..queue
+   local sendpath = basepath.."/send"
+   local recvpath = basepath.."/recv"
       
-      local basepath = "/pci/"..pciaddress.."/"..queuename
-      local sendpath = basepath.."/send"
-      local recvpath = basepath.."/recv"
-      
-      local send = shm.open_frame(sendpath)
-      local recv = shm.open_frame(recvpath)
+   local send = shm.open_frame(sendpath)
+   local recv = shm.open_frame(recvpath)
 
-      local sq = SQ:new(tonumber(counter.read(send.sqn)),
-                        counter.read(send.wq),
-                        tonumber(counter.read(send.wqsize)),
-                        counter.read(send.doorbell),
-                        mmio,
-                        tonumber(counter.read(send.uar_page)),
-                        tonumber(counter.read(send.rlkey)),
-                        counter.read(send.cqe))
-      local rq = RQ:new(counter.read(recv.rqn),
-                        counter.read(recv.wq),
-                        tonumber(counter.read(recv.wqsize)),
-                        counter.read(recv.doorbell),
-                        tonumber(counter.read(recv.rlkey)),
-                        counter.read(recv.cqe))
-      rq:refill()
-      table.insert(self.sqlist, sq)
-      table.insert(self.rqlist, rq)
-   end
+   self.sq = SQ:new(tonumber(counter.read(send.sqn)),
+                    counter.read(send.wq),
+                    tonumber(counter.read(send.wqsize)),
+                    counter.read(send.doorbell),
+                    mmio,
+                    tonumber(counter.read(send.uar_page)),
+                    tonumber(counter.read(send.rlkey)),
+                    counter.read(send.cqe))
+   self.rq = RQ:new(counter.read(recv.rqn),
+                    counter.read(recv.wq),
+                    tonumber(counter.read(recv.wqsize)),
+                    counter.read(recv.doorbell),
+                    tonumber(counter.read(recv.rlkey)),
+                    counter.read(recv.cqe))
    return self
 end
 
 function IO:push ()
    local l = self.input.input
    if l == nil then return end
-   while l and not link.empty(l) do
-      local sq = self.sqlist[1]
-      sq:transmit(l)
-      sq:reclaim()
-   end
+   self.sq:transmit(l)
+   self.sq:reclaim()
 end
 
 function IO:pull ()
    -- Free transmitted packets
-   for q = 1, #self.sqlist do
-      self.sqlist[q]:reclaim()
-   end
+   self.sq:reclaim()
    -- Input received packets
    local l = self.output.output
    if l == nil then return end
-   for q = 1, #self.rqlist do
-      --self.rqlist[q]:enqueue(packet.allocate())
-      self.rqlist[q]:ring_doorbell()
-      self.rqlist[q]:receive(l)
-   end
+   self.rq:ring_doorbell()
+   self.rq:receive(l)
 end
 
 ---------------------------------------------------------------
@@ -1553,8 +1538,8 @@ function selftest ()
 
    local nic0 = ConnectX4:new{pciaddress = pcidev0, queues = {'a'}}
    local nic1 = ConnectX4:new{pciaddress = pcidev1, queues = {'b'}}
-   local io0 = IO:new({pciaddress = pcidev0, queues = {'a'}})
-   local io1 = IO:new({pciaddress = pcidev1, queues = {'b'}})
+   local io0 = IO:new({pciaddress = pcidev0, queue = 'a'})
+   local io1 = IO:new({pciaddress = pcidev1, queue = 'b'})
    io0.input  = { input = link.new('input0') }
    io0.output = { output = link.new('output0') }
    io1.input  = { input = link.new('input1') }
