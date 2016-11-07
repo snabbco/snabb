@@ -3,8 +3,6 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local ctable = require("lib.ctable")
 
-CLTable = {}
-
 function build(keys, values)
    return setmetatable({ keys = keys, values = values },
                        {__index=get, __newindex=set})
