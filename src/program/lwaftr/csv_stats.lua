@@ -8,9 +8,29 @@ CSVStatsTimer = {}
 
 -- A timer that monitors packet rate and bit rate on a set of links,
 -- printing the data out to a CSV file.
-function CSVStatsTimer:new(filename)
+--
+-- Standard mode example (default):
+--
+-- Time (s),decap MPPS,decap Gbps,encap MPPS,encap Gbps
+-- 0.999197,3.362784,13.720160,3.362886,15.872824
+-- 1.999181,3.407569,13.902880,3.407569,16.083724
+--
+-- Hydra mode example:
+--
+-- benchmark,snabb,id,score,unit
+-- decap_mpps,master,1,3.362784,mpps
+-- decap_gbps,master,1,13.720160,gbps
+-- encap_mpps,master,1,3.362886,mpps
+-- encap_gbps,master,1,15.872824,gbps
+-- decap_mpps,master,2,3.407569,mpps
+-- decap_gbps,master,2,13.902880,gbps
+-- encap_mpps,master,2,3.407569,mpps
+-- encap_gbps,master,2,16.083724,gbps
+--
+function CSVStatsTimer:new(filename, hydra_mode)
    local file = filename and io.open(filename, "w") or io.stdout
-   local o = { header='Time (s)', link_data={}, file=file, period=1 }
+   local o = { hydra_mode=hydra_mode, link_data={}, file=file, period=1,
+      header = hydra_mode and "benchmark,id,score,unit" or "Time (s)" }
    return setmetatable(o, {__index = CSVStatsTimer})
 end
 
@@ -20,10 +40,13 @@ end
 -- human-readable names, for the column headers.
 function CSVStatsTimer:add_app(id, links, link_names)
    local function add_link_data(name, link)
-      local pretty_name = (link_names and link_names[name]) or name
-      local h = (',%s MPPS,%s Gbps'):format(pretty_name, pretty_name)
-      self.header = self.header..h
+      local link_name = link_names and link_names[name] or name
+      if not self.hydra_mode then
+         local h = (',%s MPPS,%s Gbps'):format(link_name, link_name)
+         self.header = self.header..h
+      end
       local data = {
+         link_name = link_name,
          txpackets = link.stats.txpackets,
          txbytes = link.stats.txbytes,
       }
@@ -65,17 +88,29 @@ function CSVStatsTimer:tick()
    local elapsed = engine.now() - self.start
    local dt = elapsed - self.prev_elapsed
    self.prev_elapsed = elapsed
-   self.file:write(('%f'):format(elapsed))
+   if not self.hydra_mode then
+      self.file:write(('%f'):format(elapsed))
+   end
    for _,data in ipairs(self.link_data) do
       local txpackets = counter.read(data.txpackets)
       local txbytes = counter.read(data.txbytes)
-      local diff_txpackets = tonumber(txpackets - data.prev_txpackets)
-      local diff_txbytes = tonumber(txbytes - data.prev_txbytes)
+      local diff_txpackets = tonumber(txpackets - data.prev_txpackets) / dt / 1e6
+      local diff_txbytes = tonumber(txbytes - data.prev_txbytes) * 8 / dt / 1e9
       data.prev_txpackets = txpackets
       data.prev_txbytes = txbytes
-      self.file:write((',%f'):format(diff_txpackets / dt / 1e6))
-      self.file:write((',%f'):format(diff_txbytes * 8 / dt / 1e9))
+      if self.hydra_mode then
+         -- Hydra reports seem to prefer integers for the X (time) axis.
+         self.file:write(('%s_mpps,%.f,%f,mpps\n'):format(
+            data.link_name,elapsed,diff_txpackets))
+         self.file:write(('%s_gbps,%.f,%f,gbps\n'):format(
+            data.link_name,elapsed,diff_txbytes))
+      else
+         self.file:write((',%f'):format(diff_txpackets))
+         self.file:write((',%f'):format(diff_txbytes))
+      end
    end
-   self.file:write('\n')
+   if not self.hydra_mode then
+      self.file:write('\n')
+   end
    self.file:flush()
 end

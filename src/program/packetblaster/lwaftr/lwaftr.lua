@@ -6,18 +6,14 @@ local engine    = require("core.app")
 local config    = require("core.config")
 local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
-local intel10g  = require("apps.intel.intel10g")
-local intel_app = require("apps.intel.intel_app")
 local main      = require("core.main")
 local S         = require("syscall")
-local Lwaftrgen = require("apps.test.lwaftr").Lwaftrgen
+local Lwaftrgen = require("program.packetblaster.lwaftr.lib").Lwaftrgen
 local Tap       = require("apps.tap.tap").Tap
 local raw       = require("apps.socket.raw")
 local pcap      = require("apps.pcap.pcap")
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local lib       = require("core.lib")
-local ffi       = require("ffi")
-local C         = ffi.C
 
 local usage = require("program.packetblaster.lwaftr.README_inc")
 
@@ -38,8 +34,8 @@ local long_opts = {
    ipv4         = "I",    -- fix public IPv4 address
    count        = "c",    -- how many b4 clients to simulate
    rate         = "r",    -- rate in MPPS (0 => listen only)
-   v4only       = "P",    -- generate only public IPv4 traffic
-   v6only       = "E",    -- generate only public IPv6 encapsulated traffic
+   v4only       = "4",    -- generate only public IPv4 traffic
+   v6only       = "6",    -- generate only public IPv6 encapsulated traffic
    pcap         = "o"     -- output packet to the pcap file
 }
 
