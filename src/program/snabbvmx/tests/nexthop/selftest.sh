@@ -17,73 +17,64 @@ if [[ -z "$SNABB_PCI1" ]]; then
     exit $SKIPPED_CODE
 fi
 
-# Load environment settings.
-source program/snabbvmx/tests/test_env/test_env.sh
-
-function quit_screens {
-    screens=$(screen -ls | egrep -o "[0-9]+\." | sed 's/\.//')
-    for each in $screens; do
-        if [[ "$each" > 0 ]]; then
-            screen -S $each -X quit
-        fi
-    done
-}
+LWAFTR_IPV4_ADDRESS=10.0.1.1
+LWAFTR_IPV6_ADDRESS=fc00::100
+MAC_ADDRESS_NET0=02:AA:AA:AA:AA:AA
+NEXT_HOP_MAC=02:99:99:99:99:99
+NEXT_HOP_V4=10.0.1.100
+NEXT_HOP_V6=fc00::1
+SNABBVMX_DIR=program/snabbvmx
+PCAP_INPUT=$SNABBVMX_DIR/tests/pcap/input
+PCAP_OUTPUT=$SNABBVMX_DIR/tests/pcap/output
+SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr.cfg
+SNABBVMX_ID=xe1
+SNABB_TELNET0=5000
+VHU_SOCK0=/tmp/vh1a.sock
+GUEST_MEM=1024
 
 function cleanup {
-    quit_screens
-    exit 0
+    exit $1
 }
 
 trap cleanup EXIT HUP INT QUIT TERM
 
-# Override settings.
-SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr-xe0.cfg
-TARGET_MAC_INET=02:99:99:99:99:99
-TARGET_MAC_B4=02:99:99:99:99:99
+# Import SnabbVMX test_env.
+if ! source program/snabbvmx/tests/test_env/test_env.sh; then
+    echo "Could not load snabbvmx test_env."; exit 1
+fi
 
-# Clean up log file.
-rm -f $SNABBVMX_LOG
-
-# Run SnabbVMX.
-cmd="./snabb snabbvmx lwaftr --conf $SNABBVMX_CONF --id $SNABBVMX_ID --pci $SNABB_PCI0 --mac $MAC_ADDRESS_NET0 --sock $VHU_SOCK0"
-run_cmd_in_screen "snabbvmx" "$cmd"
-
-# Run QEMU.
+# Main.
 start_test_env
 
-# Flush lwAFTR packets to SnabbVMX.
-cmd="./snabb packetblaster replay -D 10 $PCAP_INPUT/v4v6-256.pcap $SNABB_PCI1"
-run_cmd_in_screen "packetblaster" "$cmd"
-
-function last_32bit {
-    mac=$1
-    echo `echo $mac | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+$"`
-}
+if ! snabb $SNABB_PCI1 "packetblaster replay -D 10 $PCAP_INPUT/v4v6-256.pcap $SNABB_PCI1"; then
+    echo "Could not run packetblaster"
+fi
 
 # Query nexthop for 10 seconds.
-TIMEOUT=10
+TIMEOUT=20
 count=0
 while true; do
     output=`./snabb snabbvmx nexthop | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+"`
     mac_v4=`echo "$output" | head -1`
     mac_v6=`echo "$output" | tail -1`
 
-    # Somehow the first 16-bit of nexhop come from the VM corrupted, compare only last 32-bit.
-    if [[ $(last_32bit "$mac_v4") == "99:99:99:99" &&
-          $(last_32bit "$mac_v6") == "99:99:99:99" ]]; then
+    # FIXME: Should return expected MAC addresses.
+    # Check VM returned something.
+    if [[ "$mac_v4" != "00:00:00:00:00:00" &&
+          "$mac_v6" != "00:00:00:00:00:00" ]]; then
         echo "Resolved MAC inet side: $mac_v4 [OK]"
-        echo "Resolved MAC inet side: $mac_v6 [OK]"
-        break
+        echo "Resolved MAC b4 side: $mac_v6 [OK]"
+        exit 0
     fi
 
     if [[ $count == $TIMEOUT ]]; then
-        break
+        echo "Could not resolve nexthop"
+        echo "MAC inet side: $mac_v4 [FAILED]"
+        echo "MAC b4 side: $mac_v6 [FAILED]"
+        exit 1
     fi
+
+    # Try again until TIMEOUT.
     count=$((count + 1))
     sleep 1
 done
-
-if [[ $count == $TIMEOUT ]]; then
-    echo "Couldn't resolve nexthop"
-    exit 1
-fi

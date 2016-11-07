@@ -37,7 +37,7 @@ function run_and_cmp {
 }
 
 function run_and_regen_counters {
-   conf=$1; v4_in=$2; v6_in=$3; v4_out=$4; v6_out=$5; counters=$6
+   conf=$1; v4_in=$2; v6_in=$3; v4_out=$4; v6_out=$5; counters_path=$6
    endoutv4="${TEST_OUT}/endoutv4.pcap"; endoutv6="${TEST_OUT}/endoutv6.pcap";
    rm -f $endoutv4 $endoutv6
    ${SNABB_LWAFTR} check -r \

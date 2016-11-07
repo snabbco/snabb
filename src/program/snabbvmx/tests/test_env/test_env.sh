@@ -7,26 +7,6 @@ if [[ $EUID != 0 ]]; then
     exit 1
 fi
 
-export LWAFTR_IPV6_ADDRESS=fc00::100/64
-export LWAFTR_IPV4_ADDRESS=10.0.1.1/24
-export BZ_IMAGE="$HOME/.test_env/bzImage"
-export HUGEPAGES_FS=/dev/hugepages
-export IMAGE="$HOME/.test_env/qemu.img"
-export MAC_ADDRESS_NET0="02:AA:AA:AA:AA:AA"
-export MEM=1024M
-export MIRROR_TAP=tap0
-export SNABBVMX_DIR=program/snabbvmx
-export PCAP_INPUT=$SNABBVMX_DIR/tests/pcap/input
-export PCAP_OUTPUT=$SNABBVMX_DIR/tests/pcap/output
-export SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr-vlan.cfg
-export SNABBVMX_ID=xe1
-export SNABB_TELNET0=5000
-export VHU_SOCK0=/tmp/vh1a.sock
-export SNABBVMX_LOG=snabbvmx.log
-
-# Usage: run_telnet <port> <command> [<sleep>]
-# Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
-# for before closing connection. The default of <sleep> is 2.
 function run_telnet {
     (echo "$2"; sleep ${3:-2}) \
         | telnet localhost $1 2>&1
@@ -51,50 +31,61 @@ function wait_vm_up {
     echo " [OK]"
 }
 
-# TODO: Use standard launch_qemu command.
-function qemu_cmd {
-    echo "qemu-system-x86_64 \
-         -kernel ${BZ_IMAGE} -append \"earlyprintk root=/dev/vda rw console=tty0\" \
-         -enable-kvm -drive format=raw,if=virtio,file=${IMAGE} \
-         -M pc -smp 1 -cpu host -m ${MEM} \
-         -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGES_FS},share=on \
-         -numa node,memdev=mem \
-         -chardev socket,id=char1,path=${VHU_SOCK0},server \
-             -netdev type=vhost-user,id=net0,chardev=char1 \
-             -device virtio-net-pci,netdev=net0,addr=0x8,mac=${MAC_ADDRESS_NET0} \
-         -serial telnet:localhost:${SNABB_TELNET0},server,nowait \
-         -display none"
+# Define vars before importing SnabbNFV test_env to default initialization.
+MAC=$MAC_ADDRESS_NET0
+IP=$LWAFTR_IPV6_ADDRESS
+
+if ! source program/snabbnfv/test_env/test_env.sh; then
+    echo "Could not load snabbnfv test_env."; exit 1
+fi
+
+# Overwrite mac function to always return $MAC.
+function mac {
+    echo $MAC
 }
 
-function run_cmd_in_screen { screen_id=$1; cmd=$2
-    screen_id="${screen_id}-$$"
-    screen -dmS "$screen_id" bash -c "$cmd >> $SNABBVMX_LOG"
-}
-
-function qemu {
-    run_cmd_in_screen "qemu" "`qemu_cmd`"
+# Overwrite ip function to always return $IP.
+function ip {
+    echo $IP
 }
 
 function start_test_env {
-    if [[ ! -f "$IMAGE" ]]; then
-       echo "Couldn't find QEMU image: $IMAGE"
-       exit $SKIPPED_CODE
+    local mirror=$1
+
+    local cmd="snabbvmx lwaftr --conf $SNABBVMX_CONF --id $SNABBVMX_ID --pci $SNABB_PCI0 --mac $MAC_ADDRESS_NET0 --sock $VHU_SOCK0"
+    if [ -n "$mirror" ]; then
+        cmd="$cmd --mirror $mirror"
     fi
 
-    # Run qemu.
-    qemu
+    if ! snabb $SNABB_PCI0 "$cmd"; then
+        echo "Could not start snabbvmx."; exit 1
+    fi
+
+    if ! qemu $SNABB_PCI0 $VHU_SOCK0 $SNABB_TELNET0 $MAC_ADDRESS_NET0; then
+        echo "Could not start qemu 0."; exit 1
+    fi
 
     # Wait until VMs are ready.
     wait_vm_up $SNABB_TELNET0
 
-    # Manually set ip addresses.
+    # Configure eth0 interface in the VM.
+
+    # Bring up interface.
     run_telnet $SNABB_TELNET0 "ifconfig eth0 up" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip -6 addr add $LWAFTR_IPV6_ADDRESS dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip addr add $LWAFTR_IPV4_ADDRESS dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip neigh add 10.0.1.100 lladdr 02:99:99:99:99:99 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip -6 neigh add fc00::1 lladdr 02:99:99:99:99:99 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "route add default gw 10.0.1.100 eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "route -6 add default gw fc00::1 eth0" >/dev/null
+
+    # Assign lwAFTR's IPV4 and IPV6 addresses to eth0.
+    run_telnet $SNABB_TELNET0 "ip -6 addr add ${LWAFTR_IPV6_ADDRESS}/64 dev eth0" >/dev/null
+    run_telnet $SNABB_TELNET0 "ip addr add ${LWAFTR_IPV4_ADDRESS}/24 dev eth0" >/dev/null
+
+    # Add IPv4 and IPv6 nexthop address resolution to MAC.
+    run_telnet $SNABB_TELNET0 "ip neigh add ${NEXT_HOP_V4} lladdr ${NEXT_HOP_MAC} dev eth0" >/dev/null
+    run_telnet $SNABB_TELNET0 "ip -6 neigh add ${NEXT_HOP_V6} lladdr ${NEXT_HOP_MAC} dev eth0" >/dev/null
+
+    # Set nexthop as default gateway, both in IPv4 and IPv6.
+    run_telnet $SNABB_TELNET0 "route add default gw ${NEXT_HOP_V4} eth0" >/dev/null
+    run_telnet $SNABB_TELNET0 "route -6 add default gw ${NEXT_HOP_V6} eth0" >/dev/null
+
+    # Activate IPv4 and IPv6 forwarding.
     run_telnet $SNABB_TELNET0 "sysctl -w net.ipv4.conf.all.forwarding=1" >/dev/null
     run_telnet $SNABB_TELNET0 "sysctl -w net.ipv6.conf.all.forwarding=1" >/dev/null
 }
