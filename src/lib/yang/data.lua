@@ -513,7 +513,7 @@ function selftest()
       assert(contents.bar.tree_grown == nil)
       assert(contents.baz.score == 9)
       assert(contents.baz.tree_grown == true)
-      assert(require('lib.protocol.ipv4'):ntop(data.addr) == '1.2.3.4')
+      assert(data.addr == util.ipv4_pton('1.2.3.4'))
 
       local tmp = os.tmpname()
       local file = io.open(tmp, 'w')

@@ -401,9 +401,6 @@ function selftest()
 
    local ipv4 = require('lib.protocol.ipv4')
 
-   local function uint32_ptr(addr)
-      return ffi.cast('uint32_t*', addr)
-   end
    for i=1,3 do
       assert(data.is_active == true)
       assert(#data.integers == 3)
@@ -411,12 +408,16 @@ function selftest()
       assert(data.integers[2] == 2)
       assert(data.integers[3] == 0xffffffff)
       assert(#data.addrs == 2)
-      assert(uint32_ptr(data.addrs[1])[0]==uint32_ptr(ipv4:pton('4.3.2.1'))[0])
-      assert(uint32_ptr(data.addrs[2])[0]==uint32_ptr(ipv4:pton('5.4.3.2'))[0])
+      assert(data.addrs[1]==util.ipv4_pton('4.3.2.1'))
+      assert(data.addrs[2]==util.ipv4_pton('5.4.3.2'))
       local routing_table = data.routes.route
-      assert(routing_table:lookup_ptr(ipv4:pton('1.2.3.4')).value.port == 1)
-      assert(routing_table:lookup_ptr(ipv4:pton('2.3.4.5')).value.port == 10)
-      assert(routing_table:lookup_ptr(ipv4:pton('3.4.5.6')).value.port == 2)
+      local key = ffi.new('struct { uint32_t addr; }')
+      key.addr = util.ipv4_pton('1.2.3.4')
+      assert(routing_table:lookup_ptr(key).value.port == 1)
+      key.addr = util.ipv4_pton('2.3.4.5')
+      assert(routing_table:lookup_ptr(key).value.port == 10)
+      key.addr = util.ipv4_pton('3.4.5.6')
+      assert(routing_table:lookup_ptr(key).value.port == 2)
 
       local tmp = os.tmpname()
       compile_data_for_schema(test_schema, data, tmp)

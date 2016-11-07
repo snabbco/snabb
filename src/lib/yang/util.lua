@@ -1,14 +1,9 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
+local lib = require("core.lib")
 local ffi = require("ffi")
-
--- Parse inet:mac-address using ethernet:pton
--- Parse inet:ipv4-address using ipv4:pton
--- Parse inet:ipv6-address using ipv6:pton
-
--- Parse inet:ipv4-prefix?
--- Parse inet:ipv6-prefix?
+local ipv4 = require("lib.protocol.ipv4")
 
 ffi.cdef([[
 unsigned long long strtoull (const char *nptr, const char **endptr, int base);
@@ -70,7 +65,18 @@ function ffi_array(ptr, elt_t, count)
    return ffi.metatype(ffi.typeof('struct { $* ptr; }', elt_t), mt)(ptr)
 end
 
+-- The yang modules represent IPv4 addresses as host-endian uint32
+-- values in Lua.  See https://github.com/snabbco/snabb/issues/1063.
+function ipv4_pton(str)
+   return lib.ntohl(ffi.cast('uint32_t*', assert(ipv4:pton(str)))[0])
+end
+
+function ipv4_ntop(addr)
+   return ipv4:ntop(ffi.new('uint32_t[1]', lib.htonl(addr)))
+end
+
 function selftest()
+   print('selftest: lib.yang.util')
    assert(tointeger('0') == 0)
    assert(tointeger('-0') == 0)
    assert(tointeger('10') == 10)
@@ -83,4 +89,7 @@ function selftest()
    assert(tointeger('0xffffffffffffffff') == 0xffffffffffffffffULL)
    assert(tointeger('-0x7fffffffffffffff') == -0x7fffffffffffffffLL)
    assert(tointeger('-0x8000000000000000') == -0x8000000000000000LL)
+   assert(ipv4_pton('255.0.0.1') == 255 * 2^24 + 1)
+   assert(ipv4_ntop(ipv4_pton('255.0.0.1')) == '255.0.0.1')
+   print('selftest: ok')
 end
