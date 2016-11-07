@@ -339,9 +339,9 @@ module snabb-softwire-v1 {
     }
 
     list softwire {
-      key "ipv4-address psid padding";
+      key "ipv4 psid padding";
 
-      leaf ipv4-address {
+      leaf ipv4 {
         type inet:ipv4-address;
         mandatory true;
         description
@@ -370,7 +370,7 @@ module snabb-softwire-v1 {
           a zero-based index into br-addresses.";
       }
 
-      leaf ipv6-address {
+      leaf b4-ipv6 {
         type inet:ipv6-address;
         mandatory true;
         description
