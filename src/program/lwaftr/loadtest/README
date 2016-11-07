@@ -6,22 +6,40 @@ Usage: loadtest [OPTIONS] <PCAP-FILE> <TX-NAME> <RX-NAME> <PCI> [<PCAP-FILE> <TX
                              Increase bitrate in increments of STEP bits/second.
   -D DURATION, --duration DURATION
                              Linger on each step for DURATION seconds.
+  -p PROGRAM, --program PROGRAM
+                             Use workload PROGRAM.
+  --cpu CPU
+                             Bind to the given CPU.
   -h, --help
                              Print usage information.
 
 Transmit packets from the PCAP-FILE packet captures to the corresponding
-PCI network adaptors.  Start at zero bits per second, ramping up to
-BITRATE bits per second in increments of STEP bits per second, lingering
-at each step for DURATION seconds.  The default is to ramp to 10 Gbps in
-increments of 1 Gbps, lingering for 5 seconds at each step.  Once the
-peak bitrate is reached, back down the same way until 0 is reached, and
-end the test.
+PCI network adaptors.
 
-Packets received on the network interfaces are counted and recorded, and
-the corresponding incoming and outgoing packet rates are written to
-standard output in CSV format, suitable for passing to a graphing
-program.  The TX-NAME values are used to label the columns.  The RX-NAME
-values indicate interfaces on which we should be looking for a
+The available workload programs are:
+
+  --program ramp_up
+
+    Start at zero bits per second, ramping up to BITRATE bits per
+    second in increments of STEP bits per second, lingering at each
+    step for DURATION seconds.  The default is to ramp to 10 Gbps in
+    increments of 1 Gbps, lingering for 5 seconds at each step.
+
+  --program ramp_down
+
+    The same as ramp_up, but in the opposite direction.
+
+  --program ramp_up_down
+
+    A ramp_up followed by a ramp_down.
+
+The default workload program is ramp_up_down.
+
+Packets received on the network interfaces are counted and recorded,
+and the corresponding incoming and outgoing packet rates are written
+to standard output in CSV format, suitable for passing to a graphing
+program.  The TX-NAME values are used to label the columns.  The
+RX-NAME values indicate interfaces on which we should be looking for a
 response.  Packets sent but not received will be counted as loss.
 
 Examples:

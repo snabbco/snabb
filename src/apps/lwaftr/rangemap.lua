@@ -93,7 +93,7 @@ function RangeMapBuilder:build(default_value)
    -- contiguous entries with the highest K having a value V, starting
    -- with UINT32_MAX and working our way down.
    local ranges = {}
-   if self.entries[#self.entries].max.key < UINT32_MAX then
+   if #self.entries == 0 or self.entries[#self.entries].max.key < UINT32_MAX then
       table.insert(self.entries,
                    { min=self.entry_type(UINT32_MAX, default_value),
                      max=self.entry_type(UINT32_MAX, default_value) })
@@ -138,6 +138,19 @@ end
 
 function RangeMap:lookup(k)
    return self.binary_search(self.entries, k)
+end
+
+function RangeMap:iterate()
+   local entry = -1
+   local function next_entry()
+      entry = entry + 1
+      if entry >= self.size then return end
+      local hi, val = self.entries[entry].key, self.entries[entry].value
+      local lo = 0
+      if entry > 0 then lo = self.entries[entry - 1].key + 1 end
+      return lo, hi, val
+   end
+   return next_entry
 end
 
 local range_map_header_t = ffi.typeof[[
@@ -186,7 +199,53 @@ function selftest()
    builder:add(UINT32_MAX, 100)
    local map = builder:build(0)
 
-   assert(map.size == 21)
+   -- The ranges that we expect this map to compile to.
+   local ranges = {
+      { 0, 1},
+      { 1, 2},
+      { 99, 0 },
+      { 100, 10 },
+      { 101, 20 },
+      { 199, 0 },
+      { 200, 30 },
+      { 299, 0 },
+      { 300, 40 },
+      { 301, 50 },
+      { 302, 60 },
+      { 349, 0 },
+      { 351, 70 },
+      { 369, 0 },
+      { 370, 70 },
+      { 399, 0 },
+      { 400, 70 },
+      { 401, 80 },
+      { UINT32_MAX-2, 0 },
+      { UINT32_MAX-1, 99 },
+      { UINT32_MAX, 100 },
+   }
+
+   assert(map.size == #ranges)
+   for i, v in ipairs(ranges) do
+      local key, value = unpack(v)
+      assert(map.entries[i-1].key == key)
+      assert(map.entries[i-1].value == value)
+   end
+
+   do
+      local i = 1
+      local expected_lo = 0
+      for lo, hi, value in map:iterate() do
+         local expected_hi, expected_value = unpack(ranges[i])
+         assert(lo == expected_lo)
+         assert(hi == expected_hi)
+         assert(value == expected_value)
+         i = i + 1
+         expected_lo = hi + 1
+      end
+      assert(i == #ranges + 1)
+      assert(expected_lo == UINT32_MAX + 1)
+   end
+
    assert(map:lookup(0).value == 1)
    assert(map:lookup(1).value == 2)
    assert(map:lookup(2).value == 0)

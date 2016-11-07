@@ -13,12 +13,25 @@ UDP, L2TPv3) and also encrypts the contents of the inner protocol
 header. The decrypt class does the reverse: it decrypts the inner
 protocol header and removes the ESP protocol header.
 
-Anti-replay protection as well as recovery from synchronization loss due to
-excessive packet loss are *not* implemented.
+    DIAGRAM: ESP-Transport
+         BEFORE ENCAPSULATION
+    +-----------+-------------+------------+
+    |orig Ether‑| orig IP Hdr |            |
+    |net Hdr    |(any options)|  Payload   |
+    +-----------+-------------+------------+
+    
+         AFTER ENCAPSULATION
+    +-----------+-------------+-----+------------+---------+----+
+    |orig Ether‑| orig IP Hd  | ESP |            |   ESP   | ESP|
+    |net Hdr    |(any options)| Hdr |  Payload   | Trailer | ICV|
+    +-----------+-------------+-----+------------+---------+----+
+                                     <-----encryption----->
+                               <---------integrity-------->
 
 References:
 
 - [IPsec Wikipedia page](https://en.wikipedia.org/wiki/IPsec).
+- [RFC 4303](https://tools.ietf.org/html/rfc4303) on IPsec ESP.
 - [RFC 4106](https://tools.ietf.org/html/rfc4106) on using AES-GCM with IPsec ESP.
 - [LISP Data-Plane Confidentiality](https://tools.ietf.org/html/draft-ietf-lisp-crypto-02) example of a software layer above these apps that includes key exchange.
 
@@ -31,13 +44,24 @@ be a table with the following keys:
 
 * `mode` - Encryption mode (string). The only accepted value is the
   string `"aes-128-gcm"`.
-* `keymat` - Hex string containing 16 bytes of key material as specified
-  in RFC 4106.
-* `salt` - Hex string containing four bytes of salt as specified in
-  RFC 4106.
-* `spi` - “Security Parameter Index” as specified in RFC 4303.
-* `window_size` - *Optional*. Width of the window in which out of order packets
-  are accepted. The default is 128. (`esp_v6_decrypt` only.)
+* `spi` - A 32 bit integer denoting the “Security Parameters Index” as
+  specified in RFC 4303.
+* `key` - Hexadecimal string of 32 digits (two digits for each byte) that
+  denotes a 128-bit AES key as specified in RFC 4106.
+* `salt` - Hexadecimal string of eight digits (two digits for each byte) that
+  denotes four bytes of salt as specified in RFC 4106.
+* `window_size` - *Optional*. Minimum width of the window in which out of order
+  packets are accepted as specified in RFC 4303. The default is 128.
+  (`esp_v6_decrypt` only.)
+* `resync_threshold` - *Optional*. Number of consecutive packets allowed to
+  fail decapsulation before attempting “Re-synchronization” as specified in
+  RFC 4303. The default is 1024. (`esp_v6_decrypt` only.)
+* `resync_attempts` - *Optional*. Number of attempts to re-synchronize
+  a packet that triggered “Re-synchronization” as specified in RFC 4303. The
+  default is 8. (`esp_v6_decrypt` only.)
+* `auditing` - *Optional.* A boolean value indicating whether to enable or
+  disable “Auditing” as specified in RFC 4303. The default is `nil` (no
+  auditing). (`esp_v6_decrypt` only.)
 
 — Method **esp_v6_encrypt:encapsulate** *packet*
 
