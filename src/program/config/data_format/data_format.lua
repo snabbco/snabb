@@ -76,10 +76,6 @@ function options.key(keys)
    end
 end
 
-function options.mandatory(name, node)
-   if node.mandatory then return node.mandatory end
-end
-
 function options.range(name, node)
    if node.argument_type.range then
       return node.argument_type.range.argument_string
@@ -105,18 +101,13 @@ end
 function describers.scalar(level, name, node, is_key)
    local opts = {}
    if is_key then opts.key = is_key(name, node) end
-   opts.mandatory = options.mandatory(name, node)
+   opts.mandatory = node.mandatory
    opts.range = options.range(name, node)
    display_leaf(level, name, node.argument_type.argument_string, opts)
 end
 
 function describers.table(level, name, node)
-   if node.keys then
-      print_level(
-	 level,
-	 "// List: this nested structure is repeated with (a) unique key(s)"
-      )
-   end
+   print_level(level, "// List, key(s) must be unique.")
    print_level(level, name.." {")
    describe_members(node, level + 1, options.key(node.keys))
    print_level(level, "}")
@@ -129,10 +120,7 @@ function describers.struct(level, name, node)
 end
 
 function describers.array(level, name, node)
-   print_level(
-      level,
-      "// Array: made by repeating the keyword followed by each element"
-   )
+   print_level(level, "// Array, multiple elements by repeating the statement.")
    display_leaf(level, name, node.element_type.argument_string)
 end
 
@@ -140,7 +128,7 @@ local function parse_args(args)
    local handlers = {}
    handlers.h = function() show_usage(0) end
    args = lib.dogetopt(args, handlers, "h", {help="h"})
-   if #args <= 0 then show_usage(1) end
+   if #args ~= 0 then show_usage(1) end
    return unpack(args)
 end
 
