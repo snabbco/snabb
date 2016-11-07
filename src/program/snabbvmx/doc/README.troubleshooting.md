@@ -382,8 +382,8 @@ decapsulated, etc), you craft a hand-made packet that meets the testing case.
 Now we can check what the lwAFTR produces:
 
 ```bash
-sudo ./snabb snabbvmx -r snabbvmx-lwaftr-xe0.cfg ipv4-pkt.pcap empty.pcap \
-    /tmp/outv4.pcap /tmp/outv6.pcap counters.lua
+sudo ./snabb snabbvmx check -r snabbvmx-lwaftr-xe0.cfg ipv4-pkt.pcap \
+     empty.pcap /tmp/outv4.pcap /tmp/outv6.pcap counters.lua
 ```
 
 The flag `-r` generates a counters file.
@@ -391,7 +391,7 @@ The flag `-r` generates a counters file.
 Check that your output matches what you expect:
 
 ```bash
-$ tcpdump -qns 0 -ter empty.pcap
+$ tcpdump -qns 0 -ter /tmp/outv4.pcap
 reading from file empty.pcap, link-type EN10MB (Ethernet)
 ```
 
