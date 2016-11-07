@@ -183,8 +183,6 @@ There is a screen on:
 
 Attach to this screen to see the RX/TX statistics of the runnign lwAFTR process.
 
-```
-
 # Stop lwAFTR in a guest
 
 All the listed command so far can take a `stop` action that will stop them running.
