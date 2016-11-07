@@ -108,6 +108,7 @@ local function migrate_conf(old)
 end
 
 function run(args)
+   binding_table.verbose = false
    local conf_file = parse_args(args)
    local old_conf = load_lwaftr_config(conf_file)
    local new_conf = migrate_conf(old_conf)
