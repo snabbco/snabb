@@ -75,6 +75,30 @@ module snabb-softwire-v1 {
       }
     }
 
+    grouping error-rate-limiting {
+      description
+       "These settings limit the rate of ICMP error message
+        transmission.";
+
+      container error-rate-limiting {
+        presence true;
+
+        leaf packets {
+          type uint32;
+          description
+           "The number of ICMP error messages which can be sent within
+            the specified time period.";
+        }
+
+        leaf period {
+          type uint32 { range 1..max; }
+          default 2;
+          description
+           "The time period given in seconds.";
+        }
+      }
+    }
+
     container external-interface {
       description
        "Configuration for the external, internet-facing IPv4
@@ -106,6 +130,7 @@ module snabb-softwire-v1 {
       using traffic-filters;
       using icmp-policy;
       using vlan-tagging;
+      using error-rate-limiting;
 
       container next-hop {
         presence true;
@@ -154,6 +179,7 @@ module snabb-softwire-v1 {
       using traffic-filters;
       using icmp-policy;
       using vlan-tagging;
+      using error-rate-limiting;
 
       container next-hop {
         presence true;
@@ -177,28 +203,6 @@ module snabb-softwire-v1 {
         description
          "Indicates whether to support hairpinning of traffic between
           two B4s.";
-      }
-    }
-
-    container error-rate-limiting {
-      description
-       "These settings limit the rate of ICMP error message
-        transmission.";
-
-      presence true;
-
-      leaf packets {
-        type uint32;
-        description
-         "The number of ICMP error messages which can be sent within
-          the specified time period.";
-      }
-
-      leaf period {
-        type uint32 { range 1..max; }
-        default 2;
-        description
-         "The time period given in seconds.";
       }
     }
   }
