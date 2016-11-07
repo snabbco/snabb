@@ -76,7 +76,7 @@ restart_vm() {
 start_lwaftr() {
     echo "Start lwAFTR"
 
-    ssh $SSH_OPTS${VM_USER}@${VM_IP} "~/run_lwaftr.sh"
+    ssh $SSH_OPTS ${VM_USER}@${VM_IP} "~/run_lwaftr.sh"
 }
 
 stop_lwaftr() {
