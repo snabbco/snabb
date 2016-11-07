@@ -66,7 +66,7 @@ start_vm() {
 
 stop_vm() {
     echo "Switching off VM. Please wait..."
-    ssh ${VM_USER}@${VM_IP} 'sudo halt'
+    ssh $SSH_OPTS ${VM_USER}@${VM_IP} 'sudo halt'
     sleep 10
     pid=`pidof qemu-system-x86_64`
     sudo kill ${pid} 2>/dev/null
@@ -81,13 +81,13 @@ restart_vm() {
 start_lwaftr() {
     echo "Start lwAFTR"
 
-    ssh ${VM_USER}@${VM_IP} "~/run_lwaftr.sh"
+    ssh $SSH_OPTS${VM_USER}@${VM_IP} "~/run_lwaftr.sh"
 }
 
 stop_lwaftr() {
     echo "Stop lwAFTR"
 
-    ssh ${VM_USER}@${VM_IP} 'sudo killall snabb 2>/dev/null'
+    ssh $SSH_OPTS ${VM_USER}@${VM_IP} 'sudo killall snabb 2>/dev/null'
 }
 
 restart_lwaftr() {
