@@ -110,14 +110,14 @@ start_snabbnfv_process() {
     # Run snabbnfv inside screen.
     screen -L -dmS $screen bash -c \
         "cd ${SNABB_HOST_PATH}/src; \
-         sudo numactl -m ${NUMA_NODE} taskset -c ${core} sudo ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock};"
+         sudo numactl -m ${NUMA_NODE} taskset -c ${core} ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock};"
     sleep 0.5
     status=$(screen -ls | grep ${screen})
 
     # Check exit status.
     if [[ -z ${status} ]]; then
         echo "Start of snabbnfv failed: "
-        echo -e "\tsudo numactl -m ${NUMA_NODE} taskset -c ${core} sudo ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock}"
+        echo -e "\tsudo numactl -m ${NUMA_NODE} taskset -c ${core} ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock}"
         exit 1
     fi
 
