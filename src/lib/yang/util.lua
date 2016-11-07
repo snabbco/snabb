@@ -34,12 +34,40 @@ function tointeger(str, what, min, max)
    if is_negative then
       res = ffi.new('int64_t[1]', -1*res)[0]
       check(res <= 0)
+      if min then check(min <= 0 and min <= res) end
+   else
+      -- Only compare min and res if both are positive, otherwise if min
+      -- is a negative int64_t then the comparison will treat it as a
+      -- large uint64_t.
+      if min then check(min <= 0 or min <= res) end
    end
-   if min then check(min <= res) end
    if max then check(res <= max) end
    -- Only return Lua numbers for values within int32 + uint32 range.
    if -0x8000000 <= res and res <= 0xffffffff then return tonumber(res) end
    return res
+end
+
+function ffi_array(ptr, elt_t, count)
+   local mt = {}
+   local size = count or ffi.sizeof(ptr)/ffi.sizeof(elt_t)
+   function mt:__len() return size end
+   function mt:__index(idx)
+      assert(1 <= idx and idx <= size)
+      return ptr[idx-1]
+   end
+   function mt:__setindex(idx, val)
+      assert(1 <= idx and idx <= size)
+      ptr[idx-1] = val
+   end
+   function mt:__ipairs()
+      local idx = -1
+      return function()
+         idx = idx + 1
+         if idx >= size then return end
+         return idx+1, ptr[idx]
+      end
+   end
+   return ffi.metatype(ffi.typeof('struct { $* ptr; }', elt_t), mt)(ptr)
 end
 
 function selftest()

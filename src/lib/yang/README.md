@@ -28,7 +28,7 @@ module snabb-simple-router {
     list route {
       key addr;
       leaf addr { type inet:ipv4-address; mandatory true; }
-      leaf port { type uint8 { range 0..11; }; mandatory true; }
+      leaf port { type uint8 { range 0..11; } mandatory true; }
     }
   }
 }
@@ -144,8 +144,19 @@ hand.
 
 #### Compiled configurations
 
-[TODO] We will support compiling configurations to an efficient binary
-representation that can be loaded without validation.
+Loading a schema and using it to parse a data file can be a bit
+expensive, especially if the data file includes a large routing table or
+other big structure.  It can be useful to pay for this this parsing and
+validation cost "offline", without interrupting a running data plane.
+
+For this reason, Snabb support compiling configurations to binary data.
+A data plane can load a compiled configuration without any validation,
+very cheaply.  Users can explicitly call the `compile_data_for_schema`
+or `compile_data_for_schema_by_name` functions.  Support is planned also
+for automatic compilation and of source configuration files as well, so
+that the user can just edit configurations as text and still take
+advantage of the speedy binary configuration loads when nothing has
+changed.
 
 #### Querying and updating configurations
 
@@ -176,7 +187,35 @@ partial) state data.
 #### API reference
 
 The public entry point to the YANG library is the `lib.yang.yang`
-module, which exports the following bindings:
+module, which exports the following bindings.  Note that unless you have
+special needs, probably the only one you want to use is
+`load_configuration`.
+
+— Function **load_configuration** *filename* *parameters*
+
+Load a configuration from disk.  If *filename* is a compiled
+configuration, load it directly.  Otherwise it must be a source file.
+In that case, try to load a corresponding compiled file instead if
+possible.  If all that fails, actually parse the source configuration,
+and try to residualize a corresponding compiled file so that we won't
+have to go through the whole thing next time.
+
+*parameters* is a table of key/value pairs.  The following key is
+required:
+
+ * `schema_name`: The name of the YANG schema that describes the
+   configuration.   This is the name that appears as the *id* in `module
+   id { ... }` in the schema.
+
+Optional entries that may be present in the *parameters* table include:
+
+ * `verbose`: Set to true to print verbose information about which files
+   are being loaded and compiled.
+ * `revision_date`: If set, assert that the loaded configuration was
+   built against this particular schema revision date.
+
+For more information on the format of the returned value, see the
+documentation below for `load_data_for_schema`.
 
 — Function **load_schema** *src* *filename*
 
@@ -225,17 +264,18 @@ The `routes` container is just another table of the same kind.
 corresponding nodes in the configuration syntax, and corresponding
 sub-tables in the result configuration objects.)
 
-Inside the `routes` container is the `route` list, which is also
-represented as a table.  Recall that in YANG, `list` types are really
-key-value associations, so the `route` table has a `:lookup` method to
-get its sub-items.  Therefore to get the port for address 1.2.3.4, you
-would do:
+Inside the `routes` container is the `route` list, which is represented
+as an associative array.  The particular representation for the
+associative array depends on characteristics of the `list` type; see
+below for details.  In this case the `route` list compiles to a
+[`ctable`](../README.ctable.md).  Therefore to get the port for address
+1.2.3.4, you would do:
 
 ```lua
 local yang = require('lib.yang.yang')
 local ipv4 = require('lib.protocol.ipv4')
 local data = yang.load_data_for_schema(router_schema, conf_str)
-local port = data.routes.route:lookup(ipv4:pton('1.2.3.4')).port
+local port = data.routes.route:lookup_ptr(ipv4:pton('1.2.3.4')).value.port
 assert(port == 1)
 ```
 
@@ -256,17 +296,81 @@ There is special support for the `ipv4-address`, `ipv4-prefix`,
 parsed to raw binary data that is compatible with the relevant parts of
 Snabb's `lib.protocol` facility.
 
-Returning to compound configuration data types, configuration for
-`leaf-list` schema nodes are represented as normal arrays, whose values
-are instances of the leaf types.
+Let us return to the representation of compound configurations, like
+`list` instances.  A compound configuration whose shape is *fixed* is
+compiled to raw FFI data.  A configuration's shape is determined by its
+schema.  A schema node whose data will be fixed is either a leaf whose
+type is numeric or boolean and which is either mandatory or has a
+default value, or a container (`leaf-list`, `container` with presence,
+or `list`) whose elements are all themselves fixed.
+
+In practice this means that a fixed `container` with presence will be
+compiled to an FFI `struct` type.  This is mostly transparent from the
+user perspective, as in LuaJIT you access struct members by name in the
+same way as for normal Lua tables.
+
+A fixed `leaf-list` will be compiled to an FFI array of its element
+type, but on the Lua side is given the normal 1-based indexing and
+support for the `#len` length operator via a wrapper.  A non-fixed
+`leaf-list` is just a Lua array (a table with indexes starting from 1).
+
+Instances of `list` nodes can have one of several representations.
+(Recall that in YANG, `list` is not a list in the sense that we normally
+think of it in programming languages, but rather is a kind of hash map.)
+
+If there is only one key leaf, and that leaf has a string type, then a
+configuration list is represented as a normal Lua table whose keys are
+the key strings, and whose values are Lua structures holding the leaf
+values, as in containers.  (In fact, it could be that the value of a
+string-key struct is represented as a C struct, as in raw containers.)
+
+If all key and value types are fixed, then a `list` configuration
+compiles to an efficient [`ctable`](../README.ctable.md).
+
+If all keys are fixed but values are not, then a `list` configuration
+compiles to a [`cltable`](../README.cltable.md).
+
+Otherwise, a `list` configuration compiles to a Lua table whose keys are
+Lua tables containing the keys.  This sounds good on the surface but
+really it's a pain, because you can't simply look up a value in the
+table like `foo[{key1=42,key2=50}]`, because lookup in such a table is
+by identity and not be value.  Oh well.  You can still do `for k,v in
+pairs(foo)`, which is often good enough in this case.
 
 Note that there are a number of value types that are not implemented,
-including some important ones like `union`, and the `list` type
-representation needs further optimization.  We aim to compile `list`
-values directly to `ctable` instances where possible.  Patches are
-welcome :)
+including some important ones like `union`.
 
 — Function **load_data_for_schema_by_name** *schema_name* *name* *filename*
 
 Like `load_data_for_schema`, but identifying the schema by name instead
 of by value, as in `load_schema_by_name`.
+
+— Function **compile_data_for_schema** *schema* *data* *filename* *mtime*
+
+Compile *data*, using a compiler generated for *schema*, and write out
+the result to the file named *filename*.  *mtime*, if given, should be a
+table with `secs` and `nsecs` keys indicating the modification time of
+the source file.  This information will be serialized in the compiled
+file, and may be used when loading the file to determine whether the
+configuration is up to date.
+
+— Function **compile_data_for_schema_by_name** *schema_name* *data* *filename* *mtime*
+
+Like `compile_data_for_schema_by_name`, but identifying the schema by
+name instead of by value, as in `load_schema_by_name`.
+
+— Function **load_compiled_data_file** *filename*
+
+Load the compiled data file at *filename*.  If the file is not a
+compiled YANG configuration, an error will be signalled.  The return
+value will be table containing four keys:
+
+ * `schema_name`: The name of the schema for which this file was
+    compiled.
+ * `revision_date`: The revision date  of the schema for which this file
+    was compiled, or the empty string (`''`) if unknown.
+ * `source_mtime`: An `mtime` table, as for `compile_data_for_schema`.
+    If no mtime was written into the file, both `secs` and `nsecs` will
+    be zero.
+ * `data`: The configuration data, in the same format as returned by
+    `load_data_for_schema`.

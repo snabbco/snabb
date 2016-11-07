@@ -62,7 +62,6 @@ following keys are required:
 
  * `key_type`: An FFI type (LuaJIT "ctype") for keys in this table.
  * `value_type`: An FFI type (LuaJT "ctype") for values in this table.
- * `hash_fn`: A function that takes a key and returns a hash value.
 
 Hash values are unsigned 32-bit integers in the range `[0,
 0xFFFFFFFF)`.  That is to say, `0xFFFFFFFF` is the only unsigned 32-bit
@@ -71,6 +70,9 @@ hash value in the correct range.
 
 Optional entries that may be present in the *parameters* table include:
 
+ * `hash_fn`: A function that takes a key and returns a hash value.
+   If not given, defaults to the result of calling `compute_hash_fn`
+   on the key type.
  * `initial_size`: The initial size of the hash table, including free
    space.  Defaults to 8 slots.
  * `max_occupancy_rate`: The maximum ratio of `occupancy/size`, where
@@ -80,6 +82,15 @@ Optional entries that may be present in the *parameters* table include:
    2.  Defaults to 0.9, for a 90% maximum occupancy ratio.
  * `min_occupancy_rate`: Minimum ratio of `occupancy/size`.  Removing an
    entry from an "empty" table will shrink the table.
+
+— Function **ctable.load** *stream* *parameters*
+
+Load a ctable that was previously saved out to a binary format.
+*parameters* are as for `ctable.new`.  *stream* should be an object
+that has a **:read_ptr**(*ctype*) method, which returns a pointer to
+an embedded instances of *ctype* in the stream, advancing the stream
+over the object; and **:read_array**(*ctype*, *count*) which is the
+same but reading *count* instances of *ctype* instead of just one.
 
 #### Methods
 
@@ -154,6 +165,13 @@ Return true if we actually do find a value and remove it.  Otherwise if
 no entry is found in the table and *missing_allowed* is true, then
 return false.  Otherwise raise an error.
 
+— Method **:save** *stream*
+
+Save a ctable to a byte sink.  *stream* should be an object that has a
+**:write_ptr**(*ctype*) method, which writes an instance of a struct
+type out to a stream, and **:write_array**(*ctype*, *count*) which is
+the same but writing *count* instances of *ctype* instead of just one.
+
 — Method **:selfcheck**
 
 Run an expensive internal diagnostic to verify that the table's internal
@@ -198,3 +216,9 @@ Hash the first 48 bits of a byte sequence.
 — Function **ctable.hashv_64** *ptr*
 
 Hash the first 64 bits of a byte sequence.
+
+— Function **ctable.compute_hash_fn** *ctype*
+
+Return a `hashv_`-like hash function over the bytes in instances of
+*ctype*.  Note that the same reservations apply as for `hash_32`
+above.

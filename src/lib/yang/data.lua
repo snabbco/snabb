@@ -6,15 +6,49 @@ local parse_string = require("lib.yang.parser").parse_string
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
+local ffi = require("ffi")
+local ctable = require('lib.ctable')
+local cltable = require('lib.cltable')
 
--- FIXME:
--- Parse inet:mac-address using ethernet:pton
--- Parse inet:ipv4-address using ipv4:pton
--- Parse inet:ipv6-address using ipv6:pton
--- Parse inet:ipv4-prefix?
--- Parse inet:ipv6-prefix?
+function normalize_id(id)
+   return id:gsub('[^%w_]', '_')
+end
+
+-- If a "list" node has one key that is string-valued, we will represent
+-- instances of that node as normal Lua tables where the key is the
+-- table key and the value does not contain the key.
+local function table_string_key(keys)
+   local string_key = nil
+   for k,v in pairs(keys) do
+      if v.type ~= 'scalar' then return nil end
+      if v.argument_type.primitive_type ~= 'string' then return nil end
+      if string_key ~= nil then return nil end
+      string_key = k
+   end
+   return string_key
+end
 
 function data_grammar_from_schema(schema)
+   local function struct_ctype(members)
+      local member_names = {}
+      for k,v in pairs(members) do
+         if not v.ctype then return nil end
+         table.insert(member_names, k)
+      end
+      table.sort(member_names)
+      local ctype = 'struct { '
+      for _,k in ipairs(member_names) do
+         -- Separate the array suffix off of things like "uint8_t[4]".
+         local head, tail = members[k].ctype:match('^([^%[]*)(.*)$')
+         ctype = ctype..head..' '..normalize_id(k)..tail..'; '
+      end
+      ctype = ctype..'}'
+      return ctype
+   end
+   local function value_ctype(type)
+      -- Note that not all primitive types have ctypes.
+      return assert(value.types[assert(type.primitive_type)]).ctype
+   end
    local handlers = {}
    local function visit(node)
       local handler = handlers[node.kind]
@@ -26,28 +60,44 @@ function data_grammar_from_schema(schema)
       for id,node in pairs(node.body) do
          for keyword,node in pairs(visit(node)) do
             assert(not ret[keyword], 'duplicate identifier: '..keyword)
+            assert(not ret[normalize_id(keyword)],
+                   'duplicate identifier: '..normalize_id(keyword))
             ret[keyword] = node
          end
       end
       return ret
    end
    function handlers.container(node)
-      if not node.presence then return visit_body(node) end
-      return {[node.id]={type='struct', members=visit_body(node)}}
+      local members = visit_body(node)
+      if not node.presence then return members end
+      return {[node.id]={type='struct', members=members,
+                         ctype=struct_ctype(members)}}
    end
    handlers['leaf-list'] = function(node)
-      return {[node.id]={type='array', element_type=node.type}}
+      return {[node.id]={type='array', element_type=node.type,
+                         ctype=value_ctype(node.type)}}
    end
    function handlers.list(node)
-      local keys = {}
-      for key in node.key:split(' +') do table.insert(keys, key) end
-      return {[node.id]={type='table', keys=keys, members=visit_body(node)}}
+      local members=visit_body(node)
+      local keys, values = {}, {}
+      for k in node.key:split(' +') do keys[k] = assert(members[k]) end
+      for k,v in pairs(members) do
+         if not keys[k] then values[k] = v end
+      end
+      return {[node.id]={type='table', keys=keys, values=values,
+                         string_key=table_string_key(keys),
+                         key_ctype=struct_ctype(keys),
+                         value_ctype=struct_ctype(values)}}
    end
    function handlers.leaf(node)
+      local ctype
+      if node.default or node.mandatory then ctype=value_ctype(node.type) end
       return {[node.id]={type='scalar', argument_type=node.type,
-                         default=node.default, mandatory=node.mandatory}}
+                         default=node.default, mandatory=node.mandatory,
+                         ctype=ctype}}
    end
-   return {type="struct", members=visit_body(schema)}
+   local members = visit_body(schema)
+   return {type="struct", members=members, ctype=struct_ctype(members)}
 end
 
 local function integer_type(min, max)
@@ -96,44 +146,54 @@ local function assert_not_duplicate(out, keyword)
    assert(not out, 'duplicate parameter: '..keyword)
 end
 
-local function struct_parser(keyword, members)
+local function struct_parser(keyword, members, ctype)
    local function init() return nil end
    local function parse1(node)
       assert_compound(node, keyword)
       local ret = {}
-      for k,sub in pairs(members) do ret[k] = sub.init() end
+      for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
       for _,node in ipairs(node.statements) do
          local sub = assert(members[node.keyword],
                             'unrecognized parameter: '..node.keyword)
-         ret[node.keyword] = sub.parse(node, ret[node.keyword])
+         local id = normalize_id(node.keyword)
+         ret[id] = sub.parse(node, ret[id])
       end
-      for k,sub in pairs(members) do ret[k] = sub.finish(ret[k]) end
+      for k,sub in pairs(members) do
+         local id = normalize_id(k)
+         ret[id] = sub.finish(ret[id])
+      end
       return ret
    end
    local function parse(node, out)
       assert_not_duplicate(out, keyword)
       return parse1(node)
    end
+   local struct_t = ctype and ffi.typeof(ctype)
    local function finish(out)
-      -- FIXME check mandatory
-      return out
+      -- FIXME check mandatory values.
+      if struct_t then return struct_t(out) else return out end
    end
    return {init=init, parse=parse, finish=finish}
 end
 
-local function array_parser(keyword, element_type)
+local function array_parser(keyword, element_type, ctype)
    local function init() return {} end
    local parsev = value_parser(element_type)
    local function parse1(node)
       assert_scalar(node, keyword)
-      return parsev(node.argument, k)
+      return parsev(node.argument, keyword)
    end
    local function parse(node, out)
       table.insert(out, parse1(node))
       return out
    end
+   local elt_t = ctype and ffi.typeof(ctype)
+   local array_t = ctype and ffi.typeof('$[?]', ffi.typeof(elt_t))
    local function finish(out)
       -- FIXME check min-elements
+      if array_t then
+         out = util.ffi_array(array_t(#out, out), elt_t)
+      end
       return out
    end
    return {init=init, parse=parse, finish=finish}
@@ -158,31 +218,65 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    return {init=init, parse=parse, finish=finish}
 end
 
-local function table_parser(keyword, keys, members)
-   -- This is a temporary lookup until we get the various Table kinds
-   -- working.
-   local function lookup(out, k)
-      for _,v in ipairs(out) do
-         if #keys == 1 then
-            if v[keys[1]] == k then return v end
-         end
-      end
-      error('not found: '..k)
+local function ctable_builder(key_t, value_t)
+   local res = ctable.new({ key_type=key_t, value_type=value_t })
+   local builder = {}
+   function builder:add(key, value) res:add(key, value) end
+   function builder:finish() return res end
+   return builder
+end
+
+local function string_keyed_table_builder(string_key)
+   local res = {}
+   local builder = {}
+   function builder:add(key, value)
+      local str = assert(key[string_key])
+      assert(res[str] == nil, 'duplicate key: '..str)
+      res[str] = value
    end
-   local function init() return {lookup=lookup} end
+   function builder:finish() return res end
+   return builder
+end
+
+local function table_parser(keyword, keys, values, string_key, key_ctype,
+                            value_ctype)
+   local members = {}
+   for k,v in pairs(keys) do members[k] = v end
+   for k,v in pairs(values) do members[k] = v end
    local parser = struct_parser(keyword, members)
+   local key_t = key_ctype and ffi.typeof(key_ctype)
+   local value_t = value_ctype and ffi.typeof(value_ctype)
+   local init
+   if key_t and value_t then
+      function init() return ctable_builder(key_t, value_t) end
+   elseif string_key then
+      function init() return string_keyed_table_builder(string_key) end
+   else
+      -- TODO: here we should implement a cktable if key_t is non-nil.
+      -- Probably we should error if the key is a generic Lua table
+      -- though, as we don't have a good data structure to map generic
+      -- Lua tables to Lua tables.  For the moment, fall back to the old
+      -- assoc implementation.
+      error('List with non-FFI, non-string key unimplemented')
+   end
    local function parse1(node)
       assert_compound(node, keyword)
       return parser.finish(parser.parse(node, parser.init()))
    end
-   local function parse(node, out)
-      -- TODO: tease out key from value, add to associative array
-      table.insert(out, parse1(node))
-      return out
+   local function parse(node, assoc)
+      local struct = parse1(node)
+      local key, value = {}, {}
+      if key_t then key = key_t() end
+      if value_t then value = value_t() end
+      for k,v in pairs(struct) do
+         local id = normalize_id(k)
+         if keys[k] then key[id] = v else value[id] = v end
+      end
+      assoc:add(key, value)
+      return assoc
    end
-   local function finish(out)
-      -- FIXME check min-elements
-      return out
+   local function finish(assoc)
+      return assoc:finish()
    end
    return {init=init, parse=parse, finish=finish}
 end
@@ -204,13 +298,16 @@ function data_parser_from_grammar(production)
       return ret
    end
    function handlers.struct(keyword, production)
-      return struct_parser(keyword, visitn(production.members))
+      local members = visitn(production.members)
+      return struct_parser(keyword, members, production.ctype)
    end
    function handlers.array(keyword, production)
-      return array_parser(keyword, production.element_type)
+      return array_parser(keyword, production.element_type, production.ctype)
    end
    function handlers.table(keyword, production)
-      return table_parser(keyword, production.keys, visitn(production.members))
+      local keys, values = visitn(production.keys), visitn(production.values)
+      return table_parser(keyword, keys, values, production.string_key,
+                          production.key_ctype, production.value_ctype)
    end
    function handlers.scalar(keyword, production)
       return scalar_parser(keyword, production.argument_type,
@@ -234,6 +331,7 @@ function load_data_for_schema_by_name(schema_name, str, filename)
 end
 
 function selftest()
+   print('selfcheck: lib.yang.data')
    local test_schema = schema.load_schema([[module fruit {
       namespace "urn:testing:fruit";
       prefix "fruit";
@@ -270,15 +368,14 @@ function selftest()
      }
      addr 1.2.3.4;
    ]])
-   assert(data['fruit-bowl'].description == 'ohai')
-   assert(data['fruit-bowl'].contents:lookup('foo').name == 'foo')
-   assert(data['fruit-bowl'].contents:lookup('foo').score == 7)
-   assert(data['fruit-bowl'].contents:lookup('foo')['tree-grown'] == nil)
-   assert(data['fruit-bowl'].contents:lookup('bar').name == 'bar')
-   assert(data['fruit-bowl'].contents:lookup('bar').score == 8)
-   assert(data['fruit-bowl'].contents:lookup('bar')['tree-grown'] == nil)
-   assert(data['fruit-bowl'].contents:lookup('baz').name == 'baz')
-   assert(data['fruit-bowl'].contents:lookup('baz').score == 9)
-   assert(data['fruit-bowl'].contents:lookup('baz')['tree-grown'] == true)
+   assert(data.fruit_bowl.description == 'ohai')
+   local contents = data.fruit_bowl.contents
+   assert(contents.foo.score == 7)
+   assert(contents.foo.tree_grown == nil)
+   assert(contents.bar.score == 8)
+   assert(contents.bar.tree_grown == nil)
+   assert(contents.baz.score == 9)
+   assert(contents.baz.tree_grown == true)
    assert(require('lib.protocol.ipv4'):ntop(data.addr) == '1.2.3.4')
+   print('selfcheck: ok')
 end
