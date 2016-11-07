@@ -51,10 +51,6 @@ local function migrate_conf(old)
       }
    }
 
-   local function pk(...)
-      print(...)
-      return ...
-   end
    local internal = {
       ip = old.aftr_ipv6_ip,
       mac = old.aftr_mac_b4_side,
@@ -65,7 +61,7 @@ local function migrate_conf(old)
       generate_icmp_errors = old.policy_icmpv6_outgoing == conf.policies.ALLOW,
       vlan_tag = old.v6_vlan_tag,
       error_rate_limiting = {
-         packets = pk(old.icmpv6_rate_limiter_n_packets),
+         packets = old.icmpv6_rate_limiter_n_packets,
          seconds = old.icmpv6_rate_limiter_n_seconds
       },
       reassembly = {

@@ -159,11 +159,11 @@ module snabb-softwire-v1 {
          "Maximum packet size to send on the IPv4 interface.";
       }
 
-      using traffic-filters;
-      using icmp-policy;
-      using vlan-tagging;
-      using error-rate-limiting;
-      using reassembly;
+      uses traffic-filters;
+      uses icmp-policy;
+      uses vlan-tagging;
+      uses error-rate-limiting;
+      uses reassembly;
 
       container next-hop {
         presence true;
@@ -209,11 +209,11 @@ module snabb-softwire-v1 {
          "Maximum packet size to sent on the IPv6 interface.";
       }
 
-      using traffic-filters;
-      using icmp-policy;
-      using vlan-tagging;
-      using error-rate-limiting;
-      using reassembly;
+      uses traffic-filters;
+      uses icmp-policy;
+      uses vlan-tagging;
+      uses error-rate-limiting;
+      uses reassembly;
 
       container next-hop {
         presence true;
