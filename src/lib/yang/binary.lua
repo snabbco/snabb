@@ -375,6 +375,7 @@ function selftest()
       leaf is-active { type boolean; default true; }
 
       leaf-list integers { type uint32; }
+      leaf-list addrs { type inet:ipv4-address; }
       container routes {
          presence true;
          list route {
@@ -389,6 +390,8 @@ function selftest()
       integers 1;
       integers 2;
       integers 0xffffffff;
+      addrs 4.3.2.1;
+      addrs 5.4.3.2;
       routes {
         route { addr 1.2.3.4; port 1; }
         route { addr 2.3.4.5; port 10; }
@@ -398,12 +401,18 @@ function selftest()
 
    local ipv4 = require('lib.protocol.ipv4')
 
+   local function uint32_ptr(addr)
+      return ffi.cast('uint32_t*', addr)
+   end
    for i=1,3 do
       assert(data.is_active == true)
       assert(#data.integers == 3)
       assert(data.integers[1] == 1)
       assert(data.integers[2] == 2)
       assert(data.integers[3] == 0xffffffff)
+      assert(#data.addrs == 2)
+      assert(uint32_ptr(data.addrs[1])[0]==uint32_ptr(ipv4:pton('4.3.2.1'))[0])
+      assert(uint32_ptr(data.addrs[2])[0]==uint32_ptr(ipv4:pton('5.4.3.2'))[0])
       local routing_table = data.routes.route
       assert(routing_table:lookup_ptr(ipv4:pton('1.2.3.4')).value.port == 1)
       assert(routing_table:lookup_ptr(ipv4:pton('2.3.4.5')).value.port == 10)
