@@ -108,7 +108,7 @@ start_snabbnfv_process() {
     fi
 
     # Run snabbnfv inside screen.
-    screen -dmS $screen bash -c \
+    screen -L -dmS $screen bash -c \
         "cd ${SNABB_HOST_PATH}/src; \
          sudo numactl -m ${NUMA_NODE} taskset -c ${core} sudo ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock};"
     sleep 0.5
