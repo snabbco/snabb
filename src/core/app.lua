@@ -12,6 +12,7 @@ local histogram = require('core.histogram')
 local counter   = require("core.counter")
 local zone      = require("jit.zone")
 local jit       = require("jit")
+local S         = require("syscall")
 local ffi       = require("ffi")
 local C         = ffi.C
 require("core.packet_h")
@@ -24,6 +25,9 @@ log = false
 local use_restart = false
 
 test_skipped_code = 43
+
+-- Set the directories for the named programs.
+named_program_root = shm.root .. "/" .. "by-name"
 
 -- The set of all active apps and links in the system.
 -- Indexed both by name (in a table) and by number (in an array).
@@ -122,6 +126,50 @@ function configure (new_config)
    apply_config_actions(actions, new_config)
    configuration = new_config
    counter.add(configs)
+end
+
+-- Claims a name for a program so it's identified by name by other processes.
+--
+-- The name given to the function must be unique; if a name has been used before
+-- by an active process the function will error displaying an appropriate error
+-- message. The program can only claim one name, successive calls will produce
+-- an error.
+function claim_name(name)
+   configuration[name] = name
+   local namedir = "by-name/" .. name
+   local namedir_fq = named_program_root .. "/" .. name
+   local piddir = shm.root .. "/" .. S.getpid()
+   local backlinkdir = piddir.."/name"
+
+   -- Verify that the by-name directory exists.
+   shm.mkdir(namedir)
+
+   -- Verify that we've not already claimed a name
+   assert(configuration.name == nil, "Name already claimed, cannot claim: "..name)
+   
+   -- Create the new symlink.
+   assert(S.symlink(piddir, namedir_fq))
+
+   -- Create a backlink so to the symlink so we can easily cleanup
+   assert(S.symlink(namedir_fq, backlinkdir))
+end
+
+-- Enumerates the named programs with their PID
+--
+-- This returns a table programs with the key being the name of the program
+-- and the value being the PID of the program. Each program is checked that
+-- it's still alive. Any dead program or program without a name is not listed.
+function enumerate_named_programs()
+   local progs = {}
+   local dirs = shm.children("/by-name")
+   if dirs == nil then return progs end
+   for _, program in pairs(dirs) do
+      local fq = named_program_root .. "/" .. program
+      local piddir = S.readlink(fq)
+      local pid = tonumber(lib.basename(piddir))
+      if S.kill(pid, 0) then progs[lib.basename(fq)] = pid end
+   end
+   return progs
 end
 
 -- Return the configuration actions needed to migrate from old config to new.
@@ -526,4 +574,19 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
+
+   -- Test claiming and enumerating app names
+   local basename = "testapp"
+   claim_name(basename.."1")
+   
+   -- Ensure to claim two names fails
+   assert(not pcall(claim_name, basename.."2"))
+
+   -- Check if it can be enumerated.
+   local progs = enumerate_named_programs()
+   assert(progs)
+   assert(progs["testapp1"])
+
+   -- Ensure that trying to take the same name fails
+   assert(not pcall(claim_name, basename.."1"))
 end
