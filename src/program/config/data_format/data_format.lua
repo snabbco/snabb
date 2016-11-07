@@ -1,11 +1,26 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
+local lib = require("core.lib")
 local schema = require("lib.yang.schema")
 local yang_data = require("lib.yang.data")
 local usage = require("program.config.data_format.README_inc")
 
 -- Number of spaces a tab should consist of when indenting config.
 local tab_spaces = 4
+
+local function show_usage(status)
+   print(require("program.config.data_format.README_inc"))
+   main.exit(status)
+end
+
+local function parse_args(args)
+   local handlers = {}
+   handlers.h = function() show_usage(0) end
+   args = lib.dogetopt(args, handlers, "h", {help="h"})
+   if #args <= 0 then show_usage(1) end
+   return unpack(args)
+end
 
 function run(args)
    function print_level(level, ...)
@@ -104,15 +119,11 @@ function run(args)
       end
    end
 
-   if #args <= 0 then
-      print(usage)
-      main.exit(1)
-   end
 
-   local yangmod = args[1]
+   local yang_module = parse_args(args)
 
    -- Fetch and parse the schema module.
-   local s = schema.parse_schema_file(yangmod)
+   local s = schema.parse_schema_file(yang_module)
    local grammar = yang_data.data_grammar_from_schema(s)
 
    display_data_format(grammar, 0)
