@@ -108,7 +108,7 @@ start_snabbnfv_process() {
     local sock=$5
 
     echo "Start snabbnfv (screen: '$screen') at core $core (pci: $pci; conf: $conf}; socket: $sock)"
-    screen -dmS $screen bash -c "cd ${SNABB_HOST_PATH}/src; sudo taskset -c ${core} sudo ./snabb snabbnfv traffic ${pci} ${conf} ${sock}"
+    screen -L -dmS $screen bash -c "cd ${SNABB_HOST_PATH}/src; sudo taskset -c ${core} sudo ./snabb snabbnfv traffic ${pci} ${conf} ${sock}"
 }
 
 restart_snabbnfv() {
