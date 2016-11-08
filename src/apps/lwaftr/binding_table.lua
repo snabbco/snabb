@@ -69,7 +69,7 @@ local stream = require("apps.lwaftr.stream")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local Parser = require("apps.lwaftr.conf_parser").Parser
 local rangemap = require("apps.lwaftr.rangemap")
-local phm = require("apps.lwaftr.podhashmap")
+local ctable = require("lib.ctable")
 
 local band, bor, bxor, lshift, rshift = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift
 
@@ -138,15 +138,6 @@ function is_fresh(stream, mtime_sec, mtime_nsec)
    local res = header.mtime_sec == mtime_sec and header.mtime_nsec == mtime_nsec
    stream:seek(0)
    return res
-end
-
-local hash_i32 = phm.hash_i32
-local function hash_softwire(key)
-   local ipv4, psid = key.ipv4, key.psid
-   -- PSID is only 16 bits.  Duplicate the bits into the upper half so
-   -- that the hash function isn't spreading around needless zeroes.
-   psid = bor(psid, lshift(psid, 16))
-   return hash_i32(bxor(ipv4, hash_i32(psid)))
 end
 
 
@@ -224,8 +215,8 @@ function BindingTable:lookup(ipv4, port)
    local psid = self:lookup_psid(ipv4, port)
    lookup_key.ipv4 = ipv4
    lookup_key.psid = psid
-   local res = self.softwires:lookup(lookup_key)
-   if res then return self.softwires:val_at(res) end
+   local entry = self.softwires:lookup_ptr(lookup_key)
+   if entry then return entry.value end
    return nil
 end
 
@@ -373,8 +364,8 @@ local function load_compiled(stream)
    local psid_map = rangemap.load(stream, psid_map_value_t)
    local br_address_count = stream:read_ptr(br_addresses_header_t).count
    local br_addresses = stream:read_array(br_address_t, br_address_count)
-   local softwires = phm.load(stream, softwire_key_t, softwire_value_t,
-                              hash_softwire)
+   local softwires = ctable.load(
+      stream, { key_type = softwire_key_t, value_type = softwire_value_t })
    return BindingTable.new(psid_map, br_addresses, br_address_count, softwires)
 end
 
@@ -465,8 +456,8 @@ local function parse_softwires(parser, psid_map, br_address_count)
       end
    }
 
-   local map = phm.PodHashMap.new(softwire_key_t, softwire_value_t,
-                                  hash_softwire)
+   local map = ctable.new(
+      { key_type = softwire_key_t, value_type = softwire_value_t })
    local key, value = softwire_key_t(), softwire_value_t()
    parser:skip_whitespace()
    parser:consume_token('[%a_]', 'softwires')
