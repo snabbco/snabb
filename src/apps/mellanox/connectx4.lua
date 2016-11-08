@@ -71,6 +71,8 @@ function ConnectX4:new (conf)
    local sendq_size = conf.sendq_size or 1024
    local recvq_size = conf.recvq_size or 1024
 
+   local mtu = conf.mtu or 9500
+
    -- Perform a hard reset of the device to bring it into a blank state.
    --
    -- Reset is performed at PCI level instead of via firmware command.
@@ -105,6 +107,8 @@ function ConnectX4:new (conf)
    hca:alloc_pages(hca:query_pages("regular"))
 
    if debug_trace then self:check_vport() end
+
+   hca:modify_nic_vport_context(mtu, true, true, true)
 
    -- Create basic objects that we need
    --
@@ -550,6 +554,17 @@ function HCA:query_nic_vport_context ()
             promisc_mc  = self:output(0x10+0xf0, 30, 30) == 1,
             promisc_all = self:output(0x10+0xf0, 29, 29) == 1,
             permanent_address = mac_hex }
+end
+
+function HCA:modify_nic_vport_context (mtu, promisc_uc, promisc_mc, promisc_all)
+   self:command("MODIFY_NIC_VPORT_CONTEXT", 0x1FC, 0x0C)
+      :input("opcode",       0x00, 31, 16, 0x755)
+      :input("field_select", 0x0C, 31, 0, 0x50) -- MTU + promisc
+      :input("mtu",          0x100 + 0x24, 15,  0, mtu)
+      :input("promisc_uc",   0x100 + 0xF0, 31, 31, promisc_uc and 1 or 0)
+      :input("promisc_mc",   0x100 + 0xF0, 30, 30, promisc_mc and 1 or 0)
+      :input("promisc_all",  0x100 + 0xF0, 29, 29, promisc_all and 1 or 0)
+      :execute()
 end
 
 ---------------------------------------------------------------
