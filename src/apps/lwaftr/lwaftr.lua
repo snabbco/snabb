@@ -180,6 +180,8 @@ local function init_transmit_icmpv6_reply(lwstate)
          num_packets = num_packets + 1
          counter.add(lwstate.counters["out-icmpv6-bytes"], pkt.length)
          counter.add(lwstate.counters["out-icmpv6-packets"])
+         counter.add(lwstate.counters["out-ipv6-bytes"], pkt.length)
+         counter.add(lwstate.counters["out-ipv6-packets"])
          return transmit(o, pkt)
       else
          counter.add(lwstate.counters["drop-over-rate-limit-icmpv6-bytes"], pkt.length)
