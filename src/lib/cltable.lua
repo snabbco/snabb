@@ -66,5 +66,7 @@ function selftest()
       cltab[ipv4:pton('2.3.4.'..i)] = nil
    end
 
+   for k,v in pairs(cltab) do error('not reachable') end
+
    print("selftest: ok")
 end
