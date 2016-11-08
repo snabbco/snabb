@@ -5,7 +5,7 @@ Usage: run-nohw --help
        --b4-if, -B NAME     Name of the B4-side network interface.
        --inet-if, -I NAME   Name of the Internet-side network interface.
        --verbose, -v        Be verbose. Can be used multiple times.
-       --bench-file FILENAME
+       --bench-file, -b FILENAME
                             The file or path name to which benchmark data is
                             written. A simple filename or relative pathname
                             will be based on the current directory. Default
