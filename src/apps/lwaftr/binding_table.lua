@@ -70,26 +70,16 @@ local lwdebug = require("apps.lwaftr.lwdebug")
 local Parser = require("apps.lwaftr.conf_parser").Parser
 local rangemap = require("apps.lwaftr.rangemap")
 local ctable = require("lib.ctable")
+local cltable = require("lib.cltable")
+local util = require("lib.yang.util")
 
 local band, bor, bxor, lshift, rshift = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift
-
-local BINDING_TABLE_MAGIC = "\0bindingtabl"
-local BINDING_TABLE_VERSION = 0x00003000
-local binding_table_header_t = ffi.typeof[[
-   struct {
-      uint8_t magic[12];
-      uint32_t version;
-      uint64_t mtime_sec;
-      uint32_t mtime_nsec;
-   }
-]]
 
 local psid_map_value_t = ffi.typeof[[
    struct { uint16_t psid_length; uint16_t shift; }
 ]]
 
-local br_addresses_header_t = ffi.typeof('struct { uint32_t count; }')
-local br_address_t = ffi.typeof('struct { uint8_t addr[16]; }')
+local br_address_t = ffi.typeof('uint8_t[16]')
 
 -- Total softwire entry size is 32 bytes (with the 4 byte hash), which
 -- has nice cache alignment properties.
@@ -108,38 +98,6 @@ local softwire_value_t = ffi.typeof[[
 ]]
 
 local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
-
-function maybe(f, ...)
-   local function catch(success, ...)
-      if success then return ... end
-   end
-   return catch(pcall(f, ...))
-end
-
-local function read_magic(stream)
-   local header = stream:read_ptr(binding_table_header_t)
-   local magic = ffi.string(header.magic, ffi.sizeof(header.magic))
-   if magic ~= BINDING_TABLE_MAGIC then
-      stream:error('bad magic')
-   end
-   if header.version ~= BINDING_TABLE_VERSION then
-      stream:error('bad version')
-   end
-end
-
-function has_magic(stream)
-   local res = pcall(read_magic, stream)
-   stream:seek(0)
-   return res
-end
-
-function is_fresh(stream, mtime_sec, mtime_nsec)
-   local header = stream:read_ptr(binding_table_header_t)
-   local res = header.mtime_sec == mtime_sec and header.mtime_nsec == mtime_nsec
-   stream:seek(0)
-   return res
-end
-
 
 BTLookupQueue = {}
 
@@ -199,12 +157,10 @@ end
 
 local BindingTable = {}
 
-function BindingTable.new(psid_map, br_addresses, br_address_count,
-                          softwires)
+function BindingTable.new(psid_map, br_addresses, softwires)
    local ret = {
       psid_map = assert(psid_map),
       br_addresses = assert(br_addresses),
-      br_address_count = assert(br_address_count),
       softwires = assert(softwires)
    }
    return setmetatable(ret, {__index=BindingTable})
@@ -245,8 +201,7 @@ function BindingTable:lookup_psid(ipv4, port)
 end
 
 function BindingTable:get_br_address(i)
-   assert(i<self.br_address_count)
-   return self.br_addresses[i].addr
+   return self.br_addresses[i+1]
 end
 
 -- Iterate over the set of IPv4 addresses managed by a binding
@@ -276,11 +231,11 @@ end
 --
 -- The IPv6 value is a uint8_t[16].
 function BindingTable:iterate_br_addresses()
-   local idx = -1
+   local idx = 0
    local function next_br_address()
       idx = idx + 1
-      if idx >= self.br_address_count then return end
-      return self.br_addresses[idx].addr
+      if idx > #self.br_addresses then return end
+      return self.br_addresses[idx]
    end
    return next_br_address
 end
@@ -296,77 +251,6 @@ end
 -- uint8_t[16].
 function BindingTable:iterate_softwires()
    return self.softwires:iterate()
-end
-
-function BindingTable:save(filename, mtime_sec, mtime_nsec)
-   local out = stream.open_temporary_output_byte_stream(filename)
-   out:write_ptr(binding_table_header_t(
-                    BINDING_TABLE_MAGIC, BINDING_TABLE_VERSION,
-                    mtime_sec or 0, mtime_nsec or 0))
-   self.psid_map:save(out)
-   out:write_ptr(br_addresses_header_t(self.br_address_count))
-   out:write_array(self.br_addresses, br_address_t, self.br_address_count)
-   self.softwires:save(out)
-   out:close_and_rename(filename)
-end
-
-function BindingTable:dump(filename)
-   local tmp = os.tmpname()
-   local out = io.open(tmp, 'w+')
-   local ipv4, ipv6 = require('lib.protocol.ipv4'), require('lib.protocol.ipv6')
-   local function fmt(out, template, ...) out:write(template:format(...)) end
-   local function dump(template, ...) fmt(out, template, ...) end
-
-   local function ipv4_ntop(addr)
-      return ipv4:ntop(ffi.new('uint32_t[1]', { ffi.C.htonl(addr) }))
-   end
-
-   dump("psid_map {\n")
-   for lo, hi, psid_info in self:iterate_psid_map() do
-      dump("  ")
-      if lo < hi then dump('%s-', ipv4_ntop(lo)) end
-      dump('%s { psid_length=%d', ipv4_ntop(hi), psid_info.psid_length)
-      if psid_info.shift ~= 16 - psid_info.shift then
-         dump(', shift=%d', psid_info.shift)
-      end
-      dump("  }\n")
-   end
-   dump("}\n\n")
-
-   dump("br_addresses {\n")
-   for addr in self:iterate_br_addresses() do
-      dump("  %s\n", ipv6:ntop(addr))
-   end
-   dump("}\n\n")
-
-   dump("softwires {\n")
-   for entry in self:iterate_softwires() do
-      dump("  { ipv4=%s, psid=%d, b4=%s", ipv4_ntop(entry.key.ipv4),
-           entry.key.psid, ipv6:ntop(entry.value.b4_ipv6))
-      if entry.value.br ~= 0 then dump(", aftr=%d", entry.value.br) end
-      dump(" }\n")
-   end
-   dump("}\n\n")
-
-   out:flush()
-
-   local res, err = os.rename(tmp, filename)
-   if not res then
-      io.stderr:write("Failed to rename "..tmp.." to "..filename..": ")
-      io.stderr:write(tostring(err).."\n")
-   else
-      print("Binding table dumped to "..filename..".")
-   end
-end
-
-local function load_compiled(stream)
-   read_magic(stream)
-   local psid_map = rangemap.load(stream, psid_map_value_t)
-   local br_address_count = stream:read_ptr(br_addresses_header_t).count
-   local br_addresses = stream:read_array(br_address_t, br_address_count)
-   local softwires = ctable.load(
-      stream, { key_type = softwire_key_t, value_type = softwire_value_t })
-   return BindingTable.new(psid_map, br_addresses, br_address_count, softwires)
 end
 
 local function parse_psid_map(parser)
@@ -421,9 +305,12 @@ local function parse_br_addresses(parser)
       parser:skip_whitespace()
       if parser:check(',') then parser:skip_whitespace() end
    end
-   local ret = ffi.new(ffi.typeof('$[?]', br_address_t), #addresses)
-   for i, addr in ipairs(addresses) do ret[i-1].addr = addr end
-   return ret, #addresses
+   local ptr = ffi.new(ffi.typeof('$[?]', br_address_t), #addresses)
+   local ret = util.ffi_array(ffi.new(ffi.typeof('$[?]', br_address_t),
+                                      #addresses),
+                              br_address_t, #addresses)
+   for i, addr in ipairs(addresses) do ret[i] = addr end
+   return ret
 end
 
 local function parse_softwires(parser, psid_map, br_address_count)
@@ -482,11 +369,11 @@ end
 
 local function parse_binding_table(parser)
    local psid_map = parse_psid_map(parser)
-   local br_addresses, br_address_count = parse_br_addresses(parser)
-   local softwires = parse_softwires(parser, psid_map, br_address_count)
+   local br_addresses = parse_br_addresses(parser)
+   local softwires = parse_softwires(parser, psid_map, #br_addresses)
    parser:skip_whitespace()
    parser:consume(nil)
-   return BindingTable.new(psid_map, br_addresses, br_address_count, softwires)
+   return BindingTable.new(psid_map, br_addresses, softwires)
 end
 
 function load_source(text_stream)
@@ -498,46 +385,25 @@ local function log(msg, ...)
    if verbose then print(msg:format(...)) end
 end
 
-function load(file)
+function load_legacy(file)
    local source = stream.open_input_byte_stream(file)
-   if has_magic(source) then
-      log('loading compiled binding table from %s', file)
-      return load_compiled(source)
+   return load_source(source:as_text_stream())
+end
+
+function load(conf)
+   local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
+   local psid_value = psid_map_value_t()
+   for k, v in cltable.pairs(conf.psid_map) do
+      local psid_length, shift = v.psid_length, v.shift
+      shift = shift or 16 - psid_length - (v.reserved_ports_bit_count or 0)
+      assert(psid_length + shift <= 16,
+             'psid_length '..psid_length..' + shift '..shift..
+             ' should not exceed 16')
+      psid_value.psid_length, psid_value.shift = psid_length, shift
+      psid_builder:add_range(k.addr, v.end_addr or k.addr, psid_value)
    end
-
-   -- If the file doesn't have the magic, assume it's a source file.
-   -- First, see if we compiled it previously and saved a compiled file
-   -- in a well-known place.
-   local compiled_file = file:gsub("%.txt$", "")..'.o'
-
-   local compiled_stream = maybe(stream.open_input_byte_stream,
-                                 compiled_file)
-   if compiled_stream then
-      if has_magic(compiled_stream) then
-         log('loading compiled binding table from %s', compiled_file)
-         if is_fresh(compiled_stream, source.mtime_sec, source.mtime_nsec) then
-            log('compiled binding table %s is up to date.', compiled_file)
-            return load_compiled(compiled_stream)
-         end
-         log('compiled binding table %s is out of date; recompiling.',
-             compiled_file)
-      end
-      compiled_stream:close()
-   end
-      
-   -- Load and compile it.
-   log('loading source binding table from %s', file)
-   local bt = load_source(source:as_text_stream())
-
-   -- Save it, if we can.
-   local success, err = pcall(bt.save, bt, compiled_file,
-                              source.mtime_sec, source.mtime_nsec)
-   if not success then
-      log('error saving compiled binding table %s: %s', compiled_file, err)
-   end
-
-   -- Done.
-   return bt
+   local psid_map = psid_builder:build(psid_map_value_t())
+   return BindingTable.new(psid_map, conf.br_address, conf.softwire)
 end
 
 function selftest()
@@ -583,21 +449,6 @@ function selftest()
         { ipv4=178.79.150.3, psid=4, b4=127:14:25:36:47:58:69:128, aftr=2 }
       }
                            ]]))
-
-   local tmp = os.tmpname()
-   map:save(tmp)
-   map = load(tmp)
-   os.remove(tmp)
-
-   local tmp = os.tmpname()
-   map:save(tmp)
-   map = load(tmp)
-   os.remove(tmp)
-
-   local tmp = os.tmpname()
-   map:dump(tmp)
-   map = load(tmp)
-   os.remove(tmp)
 
    local ipv4_protocol = require("lib.protocol.ipv4")
    local ipv6_protocol = require("lib.protocol.ipv6")

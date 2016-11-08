@@ -1,8 +1,12 @@
 module(..., package.seeall)
 
 local ethernet = require("lib.protocol.ethernet")
+local ffi = require("ffi")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
+local util = require("lib.yang.util")
+local yang = require('lib.yang.yang')
+local cltable = require('lib.cltable')
 local Parser = require("apps.lwaftr.conf_parser").Parser
 
 policies = {
@@ -100,114 +104,96 @@ local lwaftr_conf_spec = {
    validate=function(parser, config) end
 }
 
-function load_legacy_lwaftr_config(stream)
-   return Parser.new(stream):parse_property_list(lwaftr_conf_spec)
+function migrate_conf(old)
+   function convert_ipv4(addr)
+      if addr then return util.ipv4_pton(ipv4:ntop(addr)) end
+   end
+   local external = {
+      ip = convert_ipv4(old.aftr_ipv4_ip),
+      mac = old.aftr_mac_inet_side,
+      mtu = old.ipv4_mtu,
+      ingress_filter = old.ipv4_ingress_filter,
+      egress_filter = old.ipv4_egress_filter,
+      allow_incoming_icmp = old.policy_icmpv4_incoming == policies.ALLOW,
+      generate_icmp_errors = old.policy_icmpv4_outgoing == policies.ALLOW,
+      vlan_tag = old.v4_vlan_tag,
+      error_rate_limiting = {
+         packets = old.icmpv4_rate_limiter_n_packets,
+         period = old.icmpv4_rate_limiter_n_seconds
+      },
+      reassembly = {
+         max_fragments_per_packet = old.max_fragments_per_reassembly_packet,
+         max_packets = old.max_ipv4_reassembly_packets
+      },
+      next_hop = {
+         ip = convert_ipv4(old.next_hop_ipv4_addr),
+         mac = old.inet_mac
+      }
+   }
+
+   local internal = {
+      ip = old.aftr_ipv6_ip,
+      mac = old.aftr_mac_b4_side,
+      mtu = old.ipv6_mtu,
+      ingress_filter = old.ipv6_ingress_filter,
+      egress_filter = old.ipv6_egress_filter,
+      allow_incoming_icmp = old.policy_icmpv6_incoming == policies.ALLOW,
+      generate_icmp_errors = old.policy_icmpv6_outgoing == policies.ALLOW,
+      vlan_tag = old.v6_vlan_tag,
+      error_rate_limiting = {
+         packets = old.icmpv6_rate_limiter_n_packets,
+         period = old.icmpv6_rate_limiter_n_seconds
+      },
+      reassembly = {
+         max_fragments_per_packet = old.max_fragments_per_reassembly_packet,
+         max_packets = old.max_ipv6_reassembly_packets
+      },
+      next_hop = {
+         ip = old.next_hop_ipv6_addr,
+         mac = old.next_hop6_mac
+      },
+      hairpinning = old.hairpinning
+   }
+
+   local binding_table = require("apps.lwaftr.binding_table")
+   local old_bt = binding_table.load_legacy(old.binding_table)
+   local psid_key_t = ffi.typeof('struct { uint32_t addr; }')
+   local psid_map = cltable.new({ key_type = psid_key_t })
+   for addr, end_addr, params in old_bt.psid_map:iterate() do
+      local reserved_ports_bit_count = 16 - params.psid_length - params.shift
+      if end_addr == addr then end_addr = nil end
+      if reserved_ports_bit_count ~= 16 then
+         psid_map[psid_key_t(addr)] = {
+            end_addr = end_addr,
+            psid_length = params.psid_length,
+            shift = params.shift,
+            reserved_ports_bit_count = reserved_ports_bit_count
+         }
+      end
+   end
+
+   return {
+      external_interface = external,
+      internal_interface = internal,
+      binding_table = {
+        psid_map = psid_map,
+        br_address = old_bt.br_addresses,
+        softwire = old_bt.softwires
+      }
+   }
 end
 
-function load_lwaftr_config(stream)
-   error('not yet implemented')
+function load_legacy_lwaftr_config(stream)
+   local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
+   return migrate_conf(conf)
+end
+
+function load_lwaftr_config(filename)
+   return yang.load_configuration(filename,
+                                  {schema_name='snabb-softwire-v1'})
 end
 
 function selftest()
    print('selftest: conf')
-   local lib = require('core.lib')
-   local function string_file(str)
-      local pos = 1
-      return {
-         read = function(self, n)
-            assert(n==1)
-            local ret
-            if pos <= #str then
-               ret = str:sub(pos,pos)
-               pos = pos + 1
-            end
-            return ret
-         end,
-         close = function(self) str = nil end
-      }
-   end
-   local function test(str, expected)
-      if not lib.equal(expected,
-                       load_legacy_lwaftr_config(string_file(str))) then
-         error('lwaftr conf parse produced unexpected result; string:\n'..str)
-      end
-   end
-   test([[
-            aftr_ipv4_ip = 1.2.3.4
-            aftr_ipv6_ip = 8:9:a:b:c:d:e:f
-            aftr_mac_b4_side = 22:22:22:22:22:22
-            aftr_mac_inet_side = 12:12:12:12:12:12
-            next_hop6_mac = 44:44:44:44:44:44
-            binding_table = "foo-table.txt"
-            hairpinning = false
-            icmpv4_rate_limiter_n_packets=6e3
-            icmpv4_rate_limiter_n_seconds=2
-            icmpv6_rate_limiter_n_packets=6e3
-            icmpv6_rate_limiter_n_seconds=2
-            inet_mac = 68:68:68:68:68:68
-            ipv4_mtu = 1460
-            ipv6_mtu = 1500
-            max_fragments_per_reassembly_packet = 20
-            max_ipv4_reassembly_packets = 100
-            max_ipv6_reassembly_packets = 50
-            policy_icmpv4_incoming = ALLOW
-            policy_icmpv6_incoming = ALLOW
-            policy_icmpv4_outgoing = ALLOW
-            policy_icmpv6_outgoing = ALLOW
-            v4_vlan_tag = 1092 # 0x444
-            v6_vlan_tag = 1638 # 0x666
-            vlan_tagging = true
-        ]],
-      {
-         aftr_ipv4_ip = ipv4:pton('1.2.3.4'),
-         aftr_ipv6_ip = ipv6:pton('8:9:a:b:c:d:e:f'),
-         aftr_mac_b4_side = ethernet:pton("22:22:22:22:22:22"),
-         aftr_mac_inet_side = ethernet:pton("12:12:12:12:12:12"),
-         next_hop6_mac = ethernet:pton("44:44:44:44:44:44"),
-         binding_table = "foo-table.txt",
-         hairpinning = false,
-         icmpv4_rate_limiter_n_packets=6e3,
-         icmpv4_rate_limiter_n_seconds=2,
-         icmpv6_rate_limiter_n_packets=6e3,
-         icmpv6_rate_limiter_n_seconds=2,
-         inet_mac = ethernet:pton("68:68:68:68:68:68"),
-         ipv4_mtu = 1460,
-         ipv6_mtu = 1500,
-         max_fragments_per_reassembly_packet = 20,
-         max_ipv4_reassembly_packets = 100,
-         max_ipv6_reassembly_packets = 50,
-         policy_icmpv4_incoming = policies['ALLOW'],
-         policy_icmpv6_incoming = policies['ALLOW'],
-         policy_icmpv4_outgoing = policies['ALLOW'],
-         policy_icmpv6_outgoing = policies['ALLOW'],
-         v4_vlan_tag = 0x444,
-         v6_vlan_tag = 0x666,
-         vlan_tagging = true
-      }
-   )
-   local function test_loading_filter_conf_from_file()
-      -- Setup the filter conf file.
-      local filter_path = os.tmpname()
-      local filter_text = 'some pflang filter string'
-      assert(lib.writefile(filter_path, filter_text))
-      -- Setup the main config file.
-      local conf_text = [[
-         aftr_ipv4_ip = 1.2.3.4
-         aftr_ipv6_ip = 8:9:a:b:c:d:e:f
-         aftr_mac_b4_side = 22:22:22:22:22:22
-         aftr_mac_inet_side = 12:12:12:12:12:12
-         next_hop6_mac = 44:44:44:44:44:44
-         binding_table = "foo-table.txt"
-         inet_mac = 68:68:68:68:68:68
-         ipv4_ingress_filter = <%s
-      ]]
-      conf_text = conf_text:format(filter_path)
-      local conf_table = load_legacy_lwaftr_config(string_file(conf_text))
-      assert(os.remove(filter_path))
-      if conf_table['ipv4_ingress_filter'] ~= filter_text then
-         error('lwaftr: filter conf contents do not match; pathname:\n'..filter_path)
-      end
-   end
-   test_loading_filter_conf_from_file()
    print('ok')
 end
