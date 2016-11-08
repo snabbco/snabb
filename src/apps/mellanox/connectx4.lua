@@ -965,7 +965,6 @@ function SQ:new (sqn, swq, wqsize, doorbell, mmio, uar, rlkey, cq)
          bf_next[0] = swq[current_packet].u64[0]
          -- Switch next/alternate blue flame register for next time
          bf_next, bf_alt = bf_alt, bf_next
-         
       end
    end
 
@@ -1566,16 +1565,18 @@ function selftest ()
       C.usleep(1e6)
    end
 
-   local bursts = 100000
-   local each   = 100
+   local bursts = 10000
+   local each   = 1000
+   local octets = 100
    print(("Links up. Sending %s packets."):format(lib.comma_value(each*bursts)))
 
    for i = 1, bursts do
       for _, app in ipairs({io0, io1}) do
          for i = 1, each do
             local p = packet.allocate()
-            ffi.fill(p.data, 16, 0xff)
-            p.length = 100
+            ffi.fill(p.data, octets, 0)  -- zero packet
+            p.data[12] = 0x08 -- ethertype = 0x0800
+            p.length = octets
             link.transmit(app.input.input, p)
          end
          app:pull()
@@ -1584,16 +1585,28 @@ function selftest ()
    end
 
    print()
-   print("NIC0")
-   nic0:print_vport_counter()
+   print(("%-16s  %20s  %20s"):format("hardware counter", pcidev0, pcidev1))
+   print("----------------  --------------------  --------------------")
 
-   print()
-   print("NIC1")
-   nic1:print_vport_counter()
+   local stat0 = nic0.hca:query_vport_counter()
+   local stat1 = nic1.hca:query_vport_counter()
+
+   -- Sort into key order
+   local t = {}
+   for k in pairs(stat0) do table.insert(t, k) end
+   table.sort(t)
+   for _, k in pairs(t) do
+      print(("%-16s  %20s  %20s"):format(k, lib.comma_value(stat0[k]), lib.comma_value(stat1[k])))
+   end
 
    nic0:stop()
    nic1:stop()
 
-   print("selftest: complete")
+   if (stat0.tx_ucast_packets == bursts*each and stat0.tx_ucast_octets == bursts*each*octets and
+       stat1.tx_ucast_packets == bursts*each and stat1.tx_ucast_octets == bursts*each*octets) then
+      print("selftest: ok")
+   else
+      error("selftest failed: unexpected counter values")
+   end
 end
 
