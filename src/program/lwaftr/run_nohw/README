@@ -1,0 +1,17 @@
+Usage: run-nohw --help
+       run-nohw --conf PATH --b4-if NAME --inet-if NAME [--verbose]
+
+       --conf, -c PATH      Path to the lwAFTR configuration file.
+       --b4-if, -B NAME     Name of the B4-side network interface.
+       --inet-if, -I NAME   Name of the Internet-side network interface.
+       --verbose, -v        Be verbose. Can be used multiple times.
+       --bench-file FILENAME
+                            The file or path name to which benchmark data is
+                            written. A simple filename or relative pathname
+                            will be based on the current directory. Default
+                            is "bench.csv".
+       --help, -h           Show this help message.
+
+When the -v option is used at least once, packets on the network interfaces are
+counted and recorded, and the corresponding incoming and outgoing packet rates
+are written to a file in CSV format, suitable for passing to a graphing program.

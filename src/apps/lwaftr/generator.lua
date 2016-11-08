@@ -39,7 +39,6 @@ local udp_header_ptr_type = lwtypes.udp_header_ptr_type
 
 local ipv4_header_size = lwtypes.ipv4_header_size
 local ipv6_header_size = lwtypes.ipv6_header_size
-local udp_header_size = lwtypes.udp_header_size
 
 local IPV4_DSCP_AND_ECN_OFFSET = 1
 local PROTO_IPV4 = C.htons(0x0800)
@@ -47,27 +46,38 @@ local PROTO_IPV4_ENCAPSULATION = 0x4
 local PROTO_IPV6 = C.htons(0x86DD)
 local PROTO_UDP = 17
 
-from_inet = {}
+from_inet = {
+   config = {
+      psid_len = {required=true},
+      shift = {},
+      start_inet = {required=true},
+      max_packets = {},
+      max_packets_per_iter = {},
+      num_ips = {},
+      packet_size = {default=550},
+      src_mac = {required=true},
+      dst_mac = {required=true},
+      vlan_tag = {}
+   }
+}
 
 function from_inet:new(conf)
-   if not conf.shift then conf.shift = 16 - conf.psid_len end
-   assert(conf.psid_len + conf.shift == 16)
-   local psid_len, shift = conf.psid_len, conf.shift
+   local psid_len = conf.psid_len
+   local shift = conf.shift or 16 - conf.psid_len
+   assert(psid_len + shift == 16)
    local start_inet = ipv4:pton(conf.start_inet)
    local start_port = 2^shift
-   if conf.max_packets then
-      conf.max_packets_per_iter = conf.max_packets
-   end
+   local max_packets_per_iter = conf.max_packets or conf.max_packets_per_iter
    local o = {
       dst_ip = start_inet,
       dst_port = start_port,
       inc_port = 2^shift,
-      max_packets_per_iter = conf.max_packets_per_iter or 10,
+      max_packets_per_iter = max_packets_per_iter or 10,
       iter_count = 1, -- Iteration counter. Reset when overpasses max_packet_per_iter.
-      num_ips = conf.num_ips or 10,
+      num_ips = conf.num_ips,
       ip_count = 1,   -- IPv4 counter. Reset when overpasses num_ips.
       max_packets = conf.max_packets,
-      packet_size = conf.packet_size or 550,
+      packet_size = conf.packet_size,
       psid_count = 1,
       psid_max = 2^psid_len,
       start_inet = start_inet,
@@ -98,8 +108,7 @@ end
 function ipv4_packet(params)
    local p = packet.allocate()
 
-   local ether_hdr = cast(ethernet_header_ptr_type, p.data)
-   local ethernet_header_size
+   local ether_hdr, ethernet_header_size
    if params.vlan_tag then
       ether_hdr = cast(ethernet_vlan_header_ptr_type, p.data)
       ether_hdr.vlan.tpid = VLAN_TPID
@@ -138,7 +147,7 @@ end
 function from_inet:pull()
    local o = assert(self.output.output)
 
-   for i=1,engine.pull_npackets do
+   for _ = 1, engine.pull_npackets do
       if self.max_packets then
          if self.tx_packets == self.max_packets then break end
          self.tx_packets = self.tx_packets + 1
@@ -205,28 +214,40 @@ function inc_ipv4(ipv4)
 end
 
 
-from_b4 = {}
+from_b4 = {
+   config = {
+      psid_len = {required=true},
+      shift = {},
+      start_inet = {required=true},
+      start_b4 = {required=true},
+      br = {required=true},
+      max_packets = {},
+      max_packets_per_iter = {},
+      num_ips = {},
+      packet_size = {default=550},
+      src_mac = {required=true},
+      dst_mac = {required=true},
+      vlan_tag = {}
+   }
+}
 
 function from_b4:new(conf)
-   if not conf.shift then conf.shift = 16 - conf.psid_len end
-   assert(conf.psid_len + conf.shift == 16)
-   local psid_len, shift = conf.psid_len, conf.shift
+   local psid_len = conf.psid_len
+   local shift = conf.shift or 16 - conf.psid_len
+   assert(psid_len + shift == 16)
    local start_inet = ipv4:pton(conf.start_inet)
    local start_b4 = ipv6:pton(conf.start_b4)
    local start_port = 2^shift
-   local packet_size = conf.packet_size or 550
    packet_size = packet_size - ipv6_header_size
-   if conf.max_packets then
-      conf.max_packets_per_iter = conf.max_packets
-   end
+   local max_packets_per_iter = conf.max_packets or conf.max_packets_per_iter
    local o = {
       br = ipv6:pton(conf.br),
       inc_port = 2^shift,
       ip_count = 1,
       iter_count = 1,
-      max_packets_per_iter = conf.max_packets_per_iter or 10,
+      max_packets_per_iter = max_packets_per_iter or 10,
       max_packets = conf.max_packets,
-      num_ips = conf.num_ips or 10,
+      num_ips = conf.num_ips,
       packet_size = packet_size,
       psid_count = 1,
       psid_max = 2^psid_len,
@@ -279,9 +300,10 @@ function ipv6_encapsulate(ipv4_pkt, params)
 
    local payload_length = p.length - ethernet_header_size
    local dscp_and_ecn = p.data[ethernet_header_size + IPV4_DSCP_AND_ECN_OFFSET]
-   packet.shiftright(p, ipv6_header_size)
+   p = packet.shiftright(p, ipv6_header_size)
 
    -- IPv6 packet is tagged
+   local eth_hdr
    if params.vlan_tag then
       eth_hdr = cast(ethernet_vlan_header_ptr_type, p.data)
       eth_hdr.vlan.tag = params.vlan_tag
@@ -312,7 +334,7 @@ end
 function from_b4:pull()
    local o = assert(self.output.output)
 
-   for i=1,engine.pull_npackets do
+   for _ = 1, engine.pull_npackets do
       if self.max_packets then
          if self.tx_packets == self.max_packets then break end
          self.tx_packets = self.tx_packets + 1
@@ -337,12 +359,14 @@ function from_b4:new_packet()
    ipv6_hdr.src_ip = self.src_ipv6
    -- Set tunneled IPv4 source address
    local ipv6_payload = ethernet_header_size + ipv6_header_size
+   local ipv4_hdr
    ipv4_hdr = cast(ipv4_header_ptr_type, ipv6.data + ipv6_payload)
    ipv4_hdr.src_ip = self.src_ipv4
    ipv4_hdr.checksum =  0
    ipv4_hdr.checksum = C.htons(ipsum(ipv6.data + ipv6_payload,
       ipv4_header_size, 0))
    -- Set tunneled IPv4 source port
+   local udp_hdr
    udp_hdr = cast(udp_header_ptr_type, ipv6.data + (ipv6_payload + ipv4_header_size))
    udp_hdr.src_port = C.htons(self.src_portv4)
 

@@ -12,7 +12,7 @@ local function curry(f, ...)
    if #curried_args == 0 then return f end
    return function(...)
       local args = { ... }
-      for i=#curried_args, 1 do
+      for i=#curried_args, 1, -1 do
          table.insert(args, 1, curried_args[i])
       end
       return f(unpack(args))
