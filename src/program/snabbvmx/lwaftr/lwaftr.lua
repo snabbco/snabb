@@ -118,6 +118,9 @@ function run(args)
    if conf.settings then
       if conf.settings.ingress_drop_monitor then
          ingress_drop_action = conf.settings.ingress_drop_monitor
+         if ingress_drop_action == 'off' then
+            ingress_drop_action = nil
+         end
       end
       if conf.settings.ingress_drop_threshold then
          ingress_drop_threshold = conf.settings.ingress_drop_threshold

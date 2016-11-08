@@ -365,8 +365,8 @@ function PodHashMap:make_lookup_streamer(stride)
    -- These requires are here because they rely on dynasm, which the
    -- user might not have.  In that case, since they get no benefit from
    -- streaming lookup, restrict them to the scalar lookup.
-   local binary_search = require('apps.lwaftr.binary_search')
-   local multi_copy = require('apps.lwaftr.multi_copy')
+   local binary_search = require('lib.binary_search')
+   local multi_copy = require('lib.multi_copy')
 
    local res = {
       all_entries = self.entries,
