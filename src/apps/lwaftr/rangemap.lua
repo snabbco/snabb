@@ -12,7 +12,7 @@ module(..., package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-local binary_search = require('apps.lwaftr.binary_search')
+local binary_search = require('lib.binary_search')
 
 local UINT32_MAX = 0xFFFFFFFF
 
