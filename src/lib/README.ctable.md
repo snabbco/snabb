@@ -174,6 +174,66 @@ for entry in ctab:iterate() do
 end
 ```
 
+#### Streaming interface
+
+As mentioned earlier, batching multiple lookups can amortize the cost
+of a round-trip to RAM.  To do this, first prepare a `LookupStreamer`
+for the batch size that you need.  You will have to experiment to find
+the batch size that works best for your table's entry sizes; for
+reference, for 32-byte entries a 32-wide lookup seems to be optimum.
+
+```lua
+-- Stream in 32 lookups at once.
+local stride = 32
+local streamer = ctab:make_lookup_streamer(stride)
+```
+
+Wiring up streaming lookup in a packet-processing network is a bit of
+a chore currently, as you have to maintain separate queues of lookup
+keys and packets, assuming that each lookup maps to a packet.  Let's
+make a little helper:
+
+```lua
+local lookups = {
+   queue = ffi.new("struct packet * [?]", stride),
+   queue_len = 0,
+   streamer = streamer
+}
+
+local function flush(lookups)
+   if lookups.queue_len > 0 then
+      -- Here is the magic!
+      lookups.streamer:stream()
+      for i = 0, lookups.queue_len - 1 do
+         local pkt = lookups.queue[i]
+         if lookups.streamer:is_found(i)
+            local val = lookups.streamer.entries[i].value
+            --- Do something cool here!
+         end
+      end
+      lookups.queue_len = 0
+   end
+end
+
+local function enqueue(lookups, pkt, key)
+   local n = lookups.queue_len
+   lookups.streamer.entries[n].key = key
+   lookups.queue[n] = pkt
+   n = n + 1
+   if n == stride then
+      flush(lookups)
+   else
+      lookups.queue_len = n
+   end
+end
+```
+
+Then as you see packets, you enqueue them via `enqueue`, extracting
+out the key from the packet in some way and passing that value as the
+argument.  When `enqueue` detects that the queue is full, it will
+flush it, performing the lookups in parallel and processing the
+results.
+
 #### Hash functions
 
 Any hash function will do, as long as it produces values in the `[0,
