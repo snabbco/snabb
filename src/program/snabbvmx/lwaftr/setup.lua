@@ -320,7 +320,7 @@ local function load_conf (conf_filename)
       return require("apps.lwaftr.conf").load_legacy_lwaftr_config(filename)
    end
    local conf = dofile(conf_filename)
-   return conf, load_legacy_lwaftr_config(conf, conf_filename)
+   return conf, load_lwaftr_config(conf, conf_filename)
 end
 
 local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
