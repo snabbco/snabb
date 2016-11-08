@@ -20,7 +20,6 @@ module snabb-softwire-v1 {
      "Configuration for Snabb lwaftr.";
 
     grouping traffic-filters {
-      type string;
       description
        "Ingress and egress filters describing the set of packets
         that should be allowed to pass, as pflang filters.  pflang
