@@ -74,7 +74,7 @@ local ctable = require("lib.ctable")
 local band, bor, bxor, lshift, rshift = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift
 
 local BINDING_TABLE_MAGIC = "\0bindingtabl"
-local BINDING_TABLE_VERSION = 0x00002000
+local BINDING_TABLE_VERSION = 0x00003000
 local binding_table_header_t = ffi.typeof[[
    struct {
       uint8_t magic[12];
