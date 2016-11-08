@@ -248,7 +248,7 @@ LwAftr = {}
 
 function LwAftr:new(conf)
    if type(conf) == 'string' then
-      conf = lwconf.load_lwaftr_config(conf)
+      conf = lwconf.load_legacy_lwaftr_config(conf)
    end
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})

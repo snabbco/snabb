@@ -100,8 +100,12 @@ local lwaftr_conf_spec = {
    validate=function(parser, config) end
 }
 
-function load_lwaftr_config(stream)
+function load_legacy_lwaftr_config(stream)
    return Parser.new(stream):parse_property_list(lwaftr_conf_spec)
+end
+
+function load_lwaftr_config(stream)
+   error('not yet implemented')
 end
 
 function selftest()
@@ -123,7 +127,8 @@ function selftest()
       }
    end
    local function test(str, expected)
-      if not lib.equal(expected, load_lwaftr_config(string_file(str))) then
+      if not lib.equal(expected,
+                       load_legacy_lwaftr_config(string_file(str))) then
          error('lwaftr conf parse produced unexpected result; string:\n'..str)
       end
    end
@@ -197,7 +202,7 @@ function selftest()
          ipv4_ingress_filter = <%s
       ]]
       conf_text = conf_text:format(filter_path)
-      local conf_table = load_lwaftr_config(string_file(conf_text))
+      local conf_table = load_legacy_lwaftr_config(string_file(conf_text))
       assert(os.remove(filter_path))
       if conf_table['ipv4_ingress_filter'] ~= filter_text then
          error('lwaftr: filter conf contents do not match; pathname:\n'..filter_path)

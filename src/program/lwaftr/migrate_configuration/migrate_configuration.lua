@@ -7,7 +7,7 @@ local ipv4 = require('lib.protocol.ipv4')
 local ctable = require('lib.ctable')
 local binding_table = require("apps.lwaftr.binding_table")
 local conf = require('apps.lwaftr.conf')
-local load_lwaftr_config = conf.load_lwaftr_config
+local load_legacy_lwaftr_config = conf.load_legacy_lwaftr_config
 local ffi_array = require('lib.yang.util').ffi_array
 local yang = require('lib.yang.yang')
 
@@ -110,7 +110,7 @@ end
 function run(args)
    binding_table.verbose = false
    local conf_file = parse_args(args)
-   local old_conf = load_lwaftr_config(conf_file)
+   local old_conf = load_legacy_lwaftr_config(conf_file)
    local new_conf = migrate_conf(old_conf)
    yang.print_data_for_schema_by_name('snabb-softwire-v1', new_conf, io.stdout)
    main.exit(0)

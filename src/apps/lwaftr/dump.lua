@@ -152,7 +152,7 @@ function selftest ()
       return table.concat(lines, "\n")
    end
    local function test(conf, expected)
-      local conf_table = lwconf.load_lwaftr_config(string_file(conf))
+      local conf_table = lwconf.load_legacy_lwaftr_config(string_file(conf))
       conf = do_dump_configuration(conf_table)
       expected = remove_leading_spaces(expected)
       if not equal(conf, expected) then

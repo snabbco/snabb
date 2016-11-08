@@ -39,7 +39,7 @@ function run (args)
    local load_soak_test = opts["on-a-stick"] and setup.load_soak_test_on_a_stick
                                              or  setup.load_soak_test
    local c = config.new()
-   local conf = lwconf.load_lwaftr_config(conf_file)
+   local conf = lwconf.load_legacy_lwaftr_config(conf_file)
    load_soak_test(c, conf, inv4_pcap, inv6_pcap)
 
    engine.configure(c)

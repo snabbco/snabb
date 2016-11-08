@@ -106,7 +106,7 @@ function run(args)
       if not file_exists(conf.lwaftr) then
          fatal(("lwAFTR conf file '%s' not found"):format(conf.lwaftr))
       end
-      lwconf = require('apps.lwaftr.conf').load_lwaftr_config(conf.lwaftr)
+      lwconf = require('apps.lwaftr.conf').load_legacy_lwaftr_config(conf.lwaftr)
       lwconf.ipv6_mtu = lwconf.ipv6_mtu or 1500
       lwconf.ipv4_mtu = lwconf.ipv4_mtu or 1460
    else
