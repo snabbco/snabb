@@ -493,7 +493,7 @@ function load_source(text_stream)
    return parse_binding_table(Parser.new(text_stream))
 end
 
-local verbose = os.getenv('SNABB_LWAFTR_VERBOSE') or true
+verbose = os.getenv('SNABB_LWAFTR_VERBOSE') or true
 local function log(msg, ...)
    if verbose then print(msg:format(...)) end
 end

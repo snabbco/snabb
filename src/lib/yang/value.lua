@@ -9,13 +9,6 @@ local ffi = require("ffi")
 local bit = require("bit")
 local ethernet = require("lib.protocol.ethernet")
 
--- FIXME:
--- Parse inet:mac-address using ethernet:pton
--- Parse inet:ipv4-address using ipv4:pton
--- Parse inet:ipv6-address using ipv6:pton
--- Parse inet:ipv4-prefix?
--- Parse inet:ipv6-prefix?
-
 types = {}
 
 local function integer_type(ctype)
@@ -98,9 +91,9 @@ end
 types.union = unimplemented('union')
 
 types['ipv4-address'] = {
-   ctype = 'uint8_t[4]',
-   parse = function(str, what) return assert(ipv4:pton(str)) end,
-   tostring = function(val) return ipv4:ntop(val) end
+   ctype = 'uint32_t',
+   parse = function(str, what) return util.ipv4_pton(str) end,
+   tostring = function(val) return util.ipv4_ntop(val) end
 }
 
 types['ipv6-address'] = {
@@ -119,9 +112,9 @@ types['ipv4-prefix'] = {
    ctype = 'struct { uint8_t[4] prefix; uint8_t len; }',
    parse = function(str, what)
       local prefix, len = str:match('^([^/]+)/(.*)$')
-      return { assert(ipv4:pton(prefix)), util.tointeger(len, 1, 32) }
+      return { ipv4_pton(prefix), util.tointeger(len, 1, 32) }
    end,
-   tostring = function(val) return ipv4:ntop(val[1])..'/'..tostring(val[2]) end
+   tostring = function(val) return ipv4_ntop(val[1])..'/'..tostring(val[2]) end
 }
 
 types['ipv6-prefix'] = {

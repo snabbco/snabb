@@ -375,6 +375,7 @@ function selftest()
       leaf is-active { type boolean; default true; }
 
       leaf-list integers { type uint32; }
+      leaf-list addrs { type inet:ipv4-address; }
       container routes {
          presence true;
          list route {
@@ -389,6 +390,8 @@ function selftest()
       integers 1;
       integers 2;
       integers 0xffffffff;
+      addrs 4.3.2.1;
+      addrs 5.4.3.2;
       routes {
         route { addr 1.2.3.4; port 1; }
         route { addr 2.3.4.5; port 10; }
@@ -404,10 +407,17 @@ function selftest()
       assert(data.integers[1] == 1)
       assert(data.integers[2] == 2)
       assert(data.integers[3] == 0xffffffff)
+      assert(#data.addrs == 2)
+      assert(data.addrs[1]==util.ipv4_pton('4.3.2.1'))
+      assert(data.addrs[2]==util.ipv4_pton('5.4.3.2'))
       local routing_table = data.routes.route
-      assert(routing_table:lookup_ptr(ipv4:pton('1.2.3.4')).value.port == 1)
-      assert(routing_table:lookup_ptr(ipv4:pton('2.3.4.5')).value.port == 10)
-      assert(routing_table:lookup_ptr(ipv4:pton('3.4.5.6')).value.port == 2)
+      local key = ffi.new('struct { uint32_t addr; }')
+      key.addr = util.ipv4_pton('1.2.3.4')
+      assert(routing_table:lookup_ptr(key).value.port == 1)
+      key.addr = util.ipv4_pton('2.3.4.5')
+      assert(routing_table:lookup_ptr(key).value.port == 10)
+      key.addr = util.ipv4_pton('3.4.5.6')
+      assert(routing_table:lookup_ptr(key).value.port == 2)
 
       local tmp = os.tmpname()
       compile_data_for_schema(test_schema, data, tmp)
