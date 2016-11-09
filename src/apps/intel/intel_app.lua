@@ -32,9 +32,18 @@ Intel82599.__index = Intel82599
 
 local C = ffi.C
 
--- The `driver' variable is used as a reference to the driver class in
--- order to interchangably use NIC drivers.
+-- The `driver' and `control' variables are used as a reference to the driver
+-- classes in order to interchangably use NIC drivers.
 driver = Intel82599
+control = {}
+function control:configure (c, name, conf)
+   -- Ensure correct `vmdq' settings in conf
+   if #conf.queues > 1 then
+      for _, queue in ipairs(conf.queues) do
+         queue.vmdq = true
+      end
+   end
+end
 
 -- table pciaddr => {pf, vflist}
 local devices = {}
