@@ -65,39 +65,22 @@ module(..., package.seeall)
 
 local bit = require('bit')
 local ffi = require("ffi")
-local stream = require("apps.lwaftr.stream")
-local lwdebug = require("apps.lwaftr.lwdebug")
-local Parser = require("apps.lwaftr.conf_parser").Parser
 local rangemap = require("apps.lwaftr.rangemap")
-local ctable = require("lib.ctable")
 local cltable = require("lib.cltable")
-local util = require("lib.yang.util")
 
 local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
 
-local psid_map_value_t = ffi.typeof[[
+-- FIXME: Pull these types from the yang model, not out of thin air.
+psid_map_value_t = ffi.typeof[[
    struct { uint16_t psid_length; uint16_t shift; }
 ]]
-
-local br_address_t = ffi.typeof('uint8_t[16]')
-
--- Total softwire entry size is 32 bytes (with the 4 byte hash), which
--- has nice cache alignment properties.
-local softwire_key_t = ffi.typeof[[
+softwire_key_t = ffi.typeof[[
    struct {
       uint32_t ipv4;       // Public IPv4 address of this softwire (host-endian).
-      uint16_t psid;       // Port set ID.
       uint16_t padding;    // Zeroes.
+      uint16_t psid;       // Port set ID.
    } __attribute__((packed))
 ]]
-local softwire_value_t = ffi.typeof[[
-   struct {
-      uint32_t br;         // Which border router (lwAFTR IPv6 address)?
-      uint8_t b4_ipv6[16]; // Address of B4.
-   } __attribute__((packed))
-]]
-
-local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
 
 BTLookupQueue = {}
 
@@ -253,137 +236,6 @@ function BindingTable:iterate_softwires()
    return self.softwires:iterate()
 end
 
-local function parse_psid_map(parser)
-   local psid_info_spec = {
-      parse={
-         psid_length=Parser.parse_psid_param,
-         shift=Parser.parse_psid_param
-      },
-      defaults={
-         psid_length=function(config) return 16 - (config.shift or 16) end,
-         shift=function(config) return 16 - (config.psid_length or 0) end
-      },
-      validate=function(parser, config)
-         if config.psid_length + config.shift ~= 16 then
-            parser:error('psid_length %d + shift %d should add up to 16',
-                         config.psid_length, config.shift)
-         end
-      end
-   }
-
-   local builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
-   local value = psid_map_value_t()
-   parser:skip_whitespace()
-   parser:consume_token('[%a_]', 'psid_map')
-   parser:skip_whitespace()
-   parser:consume('{')
-   parser:skip_whitespace()
-   while not parser:check('}') do
-      local range_list = parser:parse_ipv4_range_list()
-      local info = parser:parse_property_list(psid_info_spec, '{', '}')
-      value.psid_length, value.shift = info.psid_length, info.shift
-      for _, range in ipairs(range_list) do
-         builder:add_range(range.min, range.max, value)
-      end
-      parser:skip_whitespace()
-      if parser:check(',') or parser:check(';') then
-         parser:skip_whitespace()
-      end
-   end
-   return builder:build(psid_map_value_t())
-end
-
-local function parse_br_addresses(parser)
-   local addresses = {}
-   parser:skip_whitespace()
-   parser:consume_token('[%a_]', 'br_addresses')
-   parser:skip_whitespace()
-   parser:consume('{')
-   parser:skip_whitespace()
-   while not parser:check('}') do
-      table.insert(addresses, parser:parse_ipv6())
-      parser:skip_whitespace()
-      if parser:check(',') then parser:skip_whitespace() end
-   end
-   local ret = util.ffi_array(ffi.new(ffi.typeof('$[?]', br_address_t),
-                                      #addresses),
-                              br_address_t, #addresses)
-   for i, addr in ipairs(addresses) do ret[i] = addr end
-   return ret
-end
-
-local function parse_softwires(parser, psid_map, br_address_count)
-   local function required(key)
-      return function(config)
-         error('missing required configuration key "'..key..'"')
-      end
-   end
-   local softwire_spec = {
-      parse={
-         ipv4=Parser.parse_ipv4_as_uint32,
-         psid=Parser.parse_psid,
-         b4=Parser.parse_ipv6,
-         aftr=Parser.parse_non_negative_number
-      },
-      defaults={
-         ipv4=required('ipv4'),
-         psid=function(config) return 0 end,
-         b4=required('b4'),
-         aftr=function(config) return 0 end
-      },
-      validate=function(parser, config)
-         local psid_length = psid_map:lookup(config.ipv4).value.psid_length
-         if config.psid >= 2^psid_length then
-            parser:error('psid %d out of range for IP', config.psid)
-         end
-         if config.aftr >= br_address_count then
-            parser:error('only %d br addresses are defined', br_address_count)
-         end
-      end
-   }
-
-   local map = ctable.new(
-      { key_type = softwire_key_t, value_type = softwire_value_t })
-   local key, value = softwire_key_t(), softwire_value_t()
-   parser:skip_whitespace()
-   parser:consume_token('[%a_]', 'softwires')
-   parser:skip_whitespace()
-   parser:consume('{')
-   parser:skip_whitespace()
-   while not parser:check('}') do
-      local entry = parser:parse_property_list(softwire_spec, '{', '}')
-      key.ipv4, key.psid = entry.ipv4, entry.psid
-      value.br, value.b4_ipv6 = entry.aftr, entry.b4
-      local success = pcall(map.add, map, key, value)
-      if not success then
-         parser:error('duplicate softwire for ipv4=%s, psid=%d',
-                      lwdebug.format_ipv4(key.ipv4), key.psid)
-      end
-      parser:skip_whitespace()
-      if parser:check(',') then parser:skip_whitespace() end
-   end
-   map:resize(map.size / SOFTWIRE_TABLE_LOAD_FACTOR)
-   return map
-end
-
-local function parse_binding_table(parser)
-   local psid_map = parse_psid_map(parser)
-   local br_addresses = parse_br_addresses(parser)
-   local softwires = parse_softwires(parser, psid_map, #br_addresses)
-   parser:skip_whitespace()
-   parser:consume(nil)
-   return BindingTable.new(psid_map, br_addresses, softwires)
-end
-
-function load_source(text_stream)
-   return parse_binding_table(Parser.new(text_stream))
-end
-
-function load_legacy(file)
-   local source = stream.open_input_byte_stream(file)
-   return load_source(source:as_text_stream())
-end
-
 function load(conf)
    local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
    local psid_value = psid_map_value_t()
@@ -402,55 +254,40 @@ end
 
 function selftest()
    print('selftest: binding_table')
-   local function string_file(str)
-      local pos = 1
-      return {
-         read = function(self, n)
-            assert(n==1)
-            local ret
-            if pos <= #str then
-               ret = str:sub(pos,pos)
-               pos = pos + 1
-            end
-            return ret
-         end,
-         close = function(self) str = nil end
-      }
+   local function load_str(str)
+      local yang = require('lib.yang.yang')
+      local data = require('lib.yang.data')
+      local schema = yang.load_schema_by_name('snabb-softwire-v1')
+      local grammar = data.data_grammar_from_schema(schema)
+      local subgrammar = assert(grammar.members['binding-table'])
+      local parse = data.data_parser_from_grammar(subgrammar)
+      return load(parse(str, '[test suite]'))
    end
-   local map = load_source(string_file([[
-      psid_map {
-        178.79.150.233 {psid_length=16}
-        178.79.150.15 {psid_length=4, shift=12}
-        178.79.150.2 {psid_length=16}
-        178.79.150.3 {psid_length=6}
-      }
-      br_addresses {
-        8:9:a:b:c:d:e:f,
-        1E:1:1:1:1:1:1:af,
-        1E:2:2:2:2:2:2:af
-      }
-      softwires {
-        { ipv4=178.79.150.233, psid=80, b4=127:2:3:4:5:6:7:128, aftr=0 }
-        { ipv4=178.79.150.233, psid=2300, b4=127:11:12:13:14:15:16:128 }
-        { ipv4=178.79.150.233, psid=2700, b4=127:11:12:13:14:15:16:128 }
-        { ipv4=178.79.150.233, psid=4660, b4=127:11:12:13:14:15:16:128 }
-        { ipv4=178.79.150.233, psid=7850, b4=127:11:12:13:14:15:16:128 }
-        { ipv4=178.79.150.233, psid=22788, b4=127:11:12:13:14:15:16:128 }
-        { ipv4=178.79.150.233, psid=54192, b4=127:11:12:13:14:15:16:128 }
-        { ipv4=178.79.150.15, psid=0, b4=127:22:33:44:55:66:77:128 }
-        { ipv4=178.79.150.15, psid=1, b4=127:22:33:44:55:66:77:128 }
-        { ipv4=178.79.150.2, psid=7850, b4=127:24:35:46:57:68:79:128, aftr=1 }
-        { ipv4=178.79.150.3, psid=4, b4=127:14:25:36:47:58:69:128, aftr=2 }
-      }
-                           ]]))
+   local map = load_str([[
+      psid-map { addr 178.79.150.233; psid-length 16; }
+      psid-map { addr 178.79.150.15; psid-length 4; shift 12; }
+      psid-map { addr 178.79.150.2; psid-length 16; }
+      psid-map { addr 178.79.150.3; psid-length 6; }
+      br-address 8:9:a:b:c:d:e:f;
+      br-address 1E:1:1:1:1:1:1:af;
+      br-address 1E:2:2:2:2:2:2:af;
+      softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; br 0; }
+      softwire { ipv4 178.79.150.233; psid 2300; b4-ipv6 127:11:12:13:14:15:16:128; }
+      softwire { ipv4 178.79.150.233; psid 2700; b4-ipv6 127:11:12:13:14:15:16:128; }
+      softwire { ipv4 178.79.150.233; psid 4660; b4-ipv6 127:11:12:13:14:15:16:128; }
+      softwire { ipv4 178.79.150.233; psid 7850; b4-ipv6 127:11:12:13:14:15:16:128; }
+      softwire { ipv4 178.79.150.233; psid 22788; b4-ipv6 127:11:12:13:14:15:16:128; }
+      softwire { ipv4 178.79.150.233; psid 54192; b4-ipv6 127:11:12:13:14:15:16:128; }
+      softwire { ipv4 178.79.150.15; psid 0; b4-ipv6 127:22:33:44:55:66:77:128; }
+      softwire { ipv4 178.79.150.15; psid 1; b4-ipv6 127:22:33:44:55:66:77:128;}
+      softwire { ipv4 178.79.150.2; psid 7850; b4-ipv6 127:24:35:46:57:68:79:128; br 1; }
+      softwire { ipv4 178.79.150.3; psid 4; b4-ipv6 127:14:25:36:47:58:69:128; br 2; }
+   ]])
 
-   local ipv4_protocol = require("lib.protocol.ipv4")
+   local ipv4_pton = require('lib.yang.util').ipv4_pton
    local ipv6_protocol = require("lib.protocol.ipv6")
-   local function pton_host_uint32(ipv4)
-      return ffi.C.ntohl(ffi.cast('uint32_t*', ipv4_protocol:pton(ipv4))[0])
-   end
    local function lookup(ipv4, port)
-      return map:lookup(pton_host_uint32(ipv4), port)
+      return map:lookup(ipv4_pton(ipv4), port)
    end
    local function assert_lookup(ipv4, port, ipv6, br)
       local val = assert(lookup(ipv4, port))
@@ -474,10 +311,10 @@ function selftest()
 
    do
       local psid_map_iter = {
-         { pton_host_uint32('178.79.150.2'), { psid_length=16, shift=0 } },
-         { pton_host_uint32('178.79.150.3'), { psid_length=6, shift=10 } },
-         { pton_host_uint32('178.79.150.15'), { psid_length=4, shift=12 } },
-         { pton_host_uint32('178.79.150.233'), { psid_length=16, shift=0 } }
+         { ipv4_pton('178.79.150.2'), { psid_length=16, shift=0 } },
+         { ipv4_pton('178.79.150.3'), { psid_length=6, shift=10 } },
+         { ipv4_pton('178.79.150.15'), { psid_length=4, shift=12 } },
+         { ipv4_pton('178.79.150.233'), { psid_length=16, shift=0 } }
       }
       local i = 1
       for lo, hi, value in map:iterate_psid_map() do
