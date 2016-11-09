@@ -5,8 +5,9 @@ The lwAFTR's configuration is modelled by a
 [snabb-softwire-v1](../../../lib/yang/snabb-softwire-v1.yang).
 
 The lwAFTR takes its configuration from the user in the form of a text
-file.  That file's grammar is derived from the YANG schema (see the
-[Snabb YANG README](../../../lib/yang/README.md).  Here's an example:
+file.  That file's grammar is derived from the YANG schema; see the
+[Snabb YANG README](../../../lib/yang/README.md) for full details.
+Here's an example:
 
 ```
 // IPv4 interface.
