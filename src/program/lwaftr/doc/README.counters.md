@@ -44,7 +44,6 @@ Counters:
 - **drop-in-by-policy-icmpv6**: incoming ICMPv6 packets dropped because of
   current policy
 - **out-icmpv4**: internally generated ICMPv4 error packets
-- **out-ipv4**: all valid outgoing IPv4 packets
 - **drop-too-big-type-but-not-code-icmpv6**: the packet's ICMP type was
   "Packet too big", but its ICMP code was not an acceptable one for this type
 - **drop-over-time-but-not-hop-limit-icmpv6**: the packet's time limit was
