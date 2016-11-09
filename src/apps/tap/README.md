@@ -1,13 +1,23 @@
-# Linux tap app (apps.tap.tap)
+# Tap app (apps.tap.tap)
 
-The `Tap` app is used to interact with a linux tap device. 
+The `Tap` app is used to interact with a Linux [tap](https://www.kernel.org/doc/Documentation/networking/tuntap.txt)
+device. Packets transmitted on the `input` port will be sent over the tap
+device, and packets that arrive on the tap device can be received on the
+`output` port.
 
-```
-config.app(c, "tap", tap.Tap, "Tap345")
---- tap.input and tap.output are the associated links
-```
+    DIAGRAM: Tap
+              +-------+
+              |       |
+    input --->*  Tap  *----> output
+              |       |
+              +-------+
 
-The Tap device should exist with any customisation already applied.
+## Configuration
+
+The `Tap` app accepts a string that identifies an existing tap interface.
+
+The Tap device can be configured using standard Linux tools:
+
 ```
 ip tuntap add Tap345 mode tap
 ip link set up dev Tap345

@@ -1,20 +1,20 @@
-# Testing Snabb Switch
+# Testing Snabb
 
 
 ## Running the Test Suite with Docker
 
-The easiest way to setup a Snabb Switch test environment is to use a
+The easiest way to setup a Snabb test environment is to use a
 Docker image that already contains everything needed, such as
 `eugeneia/snabb-nfv-test`:
 
 ```
 docker pull eugeneia/snabb-nfv-test
-cd snabbswitch/src
+cd snabb/src
 scripts/dock.sh "(cd .. && make)" # Build within container
 scripts/dock.sh make test
 ```
 
-You can also test Snabb Switch in an alternative Docker image by
+You can also test Snabb in an alternative Docker image by
 exporting `SNABB_TEST_IMAGE`.
 
 
@@ -36,17 +36,17 @@ Once you have installed QEMU and populated `~/test_env` you can run the
 test suite:
 
 ```
-cd snabbswitch/src
+cd snabb/src
 sudo make test
 ```
 
 
 ## Running Benchmarks
 
-Benchmarking Snabb Switch is just one command away:
+Benchmarking Snabb is just one command away:
 
 ```
-cd snabbswitch/src
+cd snabb/src
 make benchmarks # Prefix with “scripts/dock.sh ” to run in container.
 ```
 
@@ -63,7 +63,7 @@ inspect the individual benchmarks and/or run them individually, too.
 
 ## Environment Variables
 
-Some Snabb Switch tests require configuration through environment
+Some Snabb tests require configuration through environment
 variables. Described below are the environment variables used throughout
 the tests:
 
@@ -75,6 +75,9 @@ the tests:
   `SNABB_PCI1` in Intel specific tests. Some Intel specific tests (namely
   packetblaster based benchmarks) will be skipped if these are not set.
 
+* `SNABB_PCI_INTEL1G0`, `SNABB_PCI_INTEL1G1`—Optional PCI addresses for use in
+  Intel1G selftest.
+
 * `SNABB_PCI_SOLARFLARE0`, `SNABB_PCI_SOLARFLARE1`—Optional PCI addresses
   of two wired Solarflare NICs. These are preferred over `SNABB_PCI0` and
   `SNABB_PCI1` in Solarflare specific tests.
@@ -82,20 +85,24 @@ the tests:
 * `SNABB_TELNET0`, `SNABB_TELNET1`—Optional telnet ports to use in tests
   that require them. The default is 5000 and 5001.
 
-* `SNABB_PCAP`—Optional PCAP file for use in tests that require one. The
-  default depends on the individual test.
-
 * `SNABB_PERF_SAMPLESIZE`—Optional sample size for
   `scripts/bench.sh`. The default is 1.
+
+* `SNABB_PACKET_SIZES`, `SNABB_PACKET_SRC`, `SNABB_PACKET_DST`—Optional
+  `--sizes`, `--src`, and `--dst` arguments for tests using `packetblaster
+  synth`.
+
+* `SNABB_IPERF_BENCH_CONF`, `SNABB_DPDK_BENCH_CONF`—Optional NFV configurations
+  for `program/snabbnfv/selftest.sh bench` and `program/snabbnfv/dpdk_bench.sh`.
 
 
 ## Running a SnabbBot CI Instance
 
 SnabbBot (`src/scripts/snabb_bot.sh`) is a shell script that acts as a
-continuous integration service for Snabb Switch repositories hosted on
+continuous integration service for Snabb repositories hosted on
 GitHub. The You can run it on your own test hardware to provide unit and
 performance regression testing for the upstream repository or even your
-own Snabb Switch fork.
+own Snabb fork.
 
 
 ### System Requirements
@@ -132,10 +139,7 @@ SnabbBot is configured through the following environment variables:
   `username:password` used to post statuses.
 
 * `REPO`—Optional. Target GitHub repository. Default is
-  `SnabbCo/snabbswitch` (upstream).
-
-* `CURRENT`—Optional. The branch to merge pull requests with. Default is
-  `master`.
+  `snabbco/snabb` (upstream).
 
 * `SNABBBOTDIR`—Optional. SnabbBot cache directory. Default is
   `/tmp/snabb_bot`.

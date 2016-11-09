@@ -58,11 +58,11 @@ configure it all at the command like with little text files :)
 ### Building the lwAFTR
 
 Building the lwAFTR is pretty simple.  At a shell, just check out the
-right branch of Snabb Switch, type make, and you're done!
+right branch of Snabb, type make, and you're done!
 
 ```bash
-git clone https://github.com/Igalia/snabbswitch.git
-cd snabbswitch
+git clone https://github.com/Igalia/snabb.git
+cd snabb
 git checkout lwaftr_starfruit
 make
 ```
@@ -70,7 +70,7 @@ make
 That's all!  You'll find a self-contained `snabb` binary in your current
 directory that you can copy whereever you like.
 
-We're working on merging to upstream snabb; follow the progress in [this GitHub issue](https://github.com/Igalia/snabbswitch/issues/215).
+We're working on merging to upstream snabb; follow the progress in [this GitHub issue](https://github.com/Igalia/snabb/issues/215).
 
 ### Run the end-to-end tests
 
@@ -112,6 +112,8 @@ get the lwAFTR working on virtualized network interfaces.
 
 [Troubleshooting](./README.troubleshooting.md)
 
+[Counters](./README.counters.md)
+
 ## Performance
 
 [Benchmarking](./README.benchmarking.md)
@@ -125,4 +127,3 @@ get the lwAFTR working on virtualized network interfaces.
 [Discovery of next-hop L2 addresses via NDP](./README.ndp.md)
 
 [Change Log](./CHANGELOG.md)
-

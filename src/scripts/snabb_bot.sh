@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 
-# Snabb Switch CI for GitHub Pull Requests. Depends on `jq'
+# Snabb CI for GitHub Pull Requests. Depends on `jq'
 # (http://stedolan.github.io/jq/).
 
 export SNABBBOTDIR=${SNABBBOTDIR:-"/tmp/snabb_bot"}
-export REPO=${REPO:-"SnabbCo/snabbswitch"}
-export CURRENT=${CURRENT:-"master"}
+export REPO=${REPO:-"snabbco/snabb"}
 export JQ=${JQ:-$(which jq)}
 export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:-eugeneia/snabb-nfv-test}
 export CONTEXT=${CONTEXT:-"$(hostname)-$SNABB_TEST_IMAGE"}
@@ -33,7 +32,11 @@ function init {
 function clean { rm -rf "$tmpdir"; }
 
 function fetch_pull_requests {
-    curl "https://api.github.com/repos/$REPO/pulls" > "$tmpdir/pulls"
+    local url="https://api.github.com/repos/$REPO/pulls?per_page=100"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
+    curl -u "$GITHUB_CREDENTIALS" "$url" > "$tmpdir/pulls"
 }
 
 function pull_request_ids { "$JQ" ".[].number" "$tmpdir/pulls"; }
@@ -46,14 +49,23 @@ function pull_request_head {
     echo "$(pull_request_by_id $1)" | "$JQ" -r ".head.sha"
 }
 
+function pull_request_target {
+    echo "$(pull_request_by_id $1)" | "$JQ" -r ".base.ref"
+}
+
 function repo_path { echo "$tmpdir/repo"; }
 
-function current_head {
-    (cd $(repo_path) && git log --format=%H -n1 $CURRENT)
+function target_head {
+    (cd $(repo_path) && git rev-parse --verify $(pull_request_target $1))
+}
+
+function ensure_target_fetched {
+    (cd $(repo_path) && \
+        (git rev-parse --verify $1 >/dev/null 2>&1 || git fetch origin $1:$1))
 }
 
 function pull_request_log {
-    echo "$logdir/$(current_head)+$(pull_request_head $id)"
+    echo "$logdir/$(target_head $1)+$(pull_request_head $1)"
 }
 
 function pull_request_new_p {
@@ -61,7 +73,11 @@ function pull_request_new_p {
 }
 
 function clone_upstream {
-    git clone https://github.com/$REPO.git $(repo_path)
+    if [[ -n "$GITHUB_CREDENTIALS" ]]; then
+       git clone "https://$GITHUB_CREDENTIALS@github.com/$REPO.git" $(repo_path)
+    else
+       git clone "https://github.com/$REPO.git" $(repo_path)
+    fi
 }
 
 function dock_build { (cd src && scripts/dock.sh "(cd .. && make)"); }
@@ -83,7 +99,7 @@ function log_header {
     echo Host: $machine
     echo Image: $SNABB_TEST_IMAGE
     echo Pull Request: \#$1
-    echo Current Head: $(current_head)
+    echo Target Head: $(target_head $1)
     echo Pull Request Head: $(pull_request_head $1)
     pci_info SNABB_PCI0 $SNABB_PCI0
     pci_info SNABB_PCI1 $SNABB_PCI1
@@ -96,21 +112,21 @@ function log_header {
 
 function benchmark_results { echo $tmpdir/$1_benchmarks; }
 
-function benchmark_current1 {
-    git checkout --force $CURRENT \
+function benchmark_target1 {
+    git checkout --force $(target_head $1) \
         && build \
-        && dock_make benchmarks > $(benchmark_results current)
+        && dock_make benchmarks > $(benchmark_results $1)
 }
-function benchmark_current { benchmark_current1 >/dev/null 2>&1; }
+function benchmark_target { benchmark_target1 $1 >/dev/null 2>&1; }
 
-function merge_pr_with_current1 {
+function merge_pr_with_target1 {
     git fetch origin pull/$1/head:pr$1 \
         && git checkout --force pr$1 \
-        && git merge $CURRENT \
+        && git merge $(target_head $1) \
         && build
 }
-function merge_pr_with_current {
-    out=$(merge_pr_with_current1 $1 2>&1)
+function merge_pr_with_target {
+    out=$(merge_pr_with_target1 $1 2>&1)
     if [ "$?" != 0 ]; then
         echo "ERROR: Failed to build $1"
         echo "$out"
@@ -126,8 +142,8 @@ function check_for_performance_regressions {
     dock_make benchmarks > $(benchmark_results pr)
     for bench in $(cut -d " " -f 1 $(benchmark_results pr)); do
         if grep $bench $(benchmark_results current) >/dev/null 2>&1; then
-            echo $(grep $bench $(benchmark_results current)) \
-                 $(grep $bench $(benchmark_results pr)) \
+            echo $(grep "$bench " $(benchmark_results current)) \
+                 $(grep "$bench " $(benchmark_results pr)) \
                 | awk '
 BEGIN {
     minratio = 0.85;
@@ -161,6 +177,10 @@ function check_test_suite {
 }
 
 function post_gist {
+    local url="https://api.github.com/gists"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
     # Create API request body for Gist API.
     cat "$1" \
         | "$JQ" -s -R "{public: true, files: {log: {content: .}}}" \
@@ -169,11 +189,15 @@ function post_gist {
     curl -X POST \
         -u "$GITHUB_CREDENTIALS" \
         -d @"$tmpdir/request" \
-        "https://api.github.com/gists" \
+        "$url" \
         | "$JQ" .html_url
 }
 
 function post_status { id=$1; status=$2; gist=$3
+    local url="https://api.github.com/repos/$REPO/statuses/$(pull_request_head $id)"
+    if [[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]]; then
+        url="$url?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}"
+    fi
     # Create API request body for status API.
     cat > "$tmpdir/request" \
         <<EOF
@@ -184,7 +208,7 @@ function post_status { id=$1; status=$2; gist=$3
 EOF
     # POST status.
     curl -X POST -u "$GITHUB_CREDENTIALS" -d @"$tmpdir/request" \
-        "https://api.github.com/repos/$REPO/statuses/$(pull_request_head $id)" \
+        "$url" \
         > /dev/null
 }
 
@@ -192,12 +216,15 @@ EOF
 init
 fetch_pull_requests && clone_upstream || exit 1
 for id in $(pull_request_ids); do
-    pull_request_new_p $id || continue
+    ensure_target_fetched $(pull_request_target $id) \
+        && pull_request_new_p $id \
+        || continue
     (cd $(repo_path)
-        [ -f $(benchmark_results current) ] || benchmark_current
+        [ -f $(benchmark_results $(pull_request_target $id)) ] \
+            || benchmark_target $id
         log_header $id
-        if merge_pr_with_current $id; then
-            check_for_performance_regressions
+        if merge_pr_with_target $id; then
+            check_for_performance_regressions $id
             check_test_suite
         fi) 2>&1 > $(pull_request_log $id)
     [ ! -z "$GITHUB_CREDENTIALS" ] || continue

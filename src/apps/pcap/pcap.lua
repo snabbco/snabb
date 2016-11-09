@@ -19,7 +19,9 @@ end
 
 function PcapReader:pull ()
    assert(self.output.output)
-   while not self.done and not link.full(self.output.output) do
+   local limit = engine.pull_npackets
+   while limit > 0 and not self.done do
+      limit = limit - 1
       local data, record, extra = self.iterator()
       if data then
          local p = packet.from_string(data)
@@ -33,7 +35,12 @@ end
 PcapWriter = {}
 
 function PcapWriter:new (filename)
-   local file = io.open(filename, "w")
+   local mode = "w"
+   if type(filename) == "table" then
+      mode = filename[2] or mode
+      filename = filename[1]
+   end
+   local file = assert(io.open(filename, "w"))
    pcap.write_file_header(file)
    return setmetatable({file = file}, {__index = PcapWriter})
 end

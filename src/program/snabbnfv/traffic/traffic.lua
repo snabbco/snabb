@@ -9,6 +9,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local timer = require("core.timer")
 local pci = require("lib.hardware.pci")
+local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local counter = require("core.counter")
 
 local long_opts = {
@@ -37,14 +38,17 @@ function run (args)
    args = lib.dogetopt(args, opt, "hHB:k:l:D:b", long_opts)
    if #args == 3 then
       local pciaddr, confpath, sockpath = unpack(args)
-      local ok, info = pcall(pci.device_info, pciaddr)
-      if not ok then
-         print("Error: device not found " .. pciaddr)
-         os.exit(1)
-      end
-      if not info.driver then
-         print("Error: no driver for device " .. pciaddr)
-         os.exit(1)
+      if pciaddr == "soft" then pciaddr = nil end
+      if pciaddr then
+         local ok, info = pcall(pci.device_info, pciaddr)
+         if not ok then
+            print("Error: device not found " .. pciaddr)
+            os.exit(1)
+         end
+         if not info.driver then
+            print("Error: no driver for device " .. pciaddr)
+            os.exit(1)
+         end
       end
       if loadreportinterval > 0 then
          local t = timer.new("nfvloadreport", engine.report_load, loadreportinterval*1e9, 'repeating')
@@ -80,19 +84,23 @@ function long_usage () return usage end
 function traffic (pciaddr, confpath, sockpath)
    engine.log = true
    local mtime = 0
-   if C.stat_mtime(confpath) == 0 then
-      print(("WARNING: File '%s' does not exist."):format(confpath))
+   local needs_reconfigure = true
+   function check_for_reconfigure()
+      needs_reconfigure = C.stat_mtime(confpath) ~= mtime
    end
+   timer.activate(timer.new("reconf", check_for_reconfigure, 1e9, 'repeating'))
+   -- Flush logs every second.
+   timer.activate(timer.new("flush", io.flush, 1e9, 'repeating'))
+   timer.activate(ingress_drop_monitor.new({action='warn'}):timer())
    while true do
-      local mtime2 = C.stat_mtime(confpath)
-      if mtime2 ~= mtime then
-         print("Loading " .. confpath)
-         engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
-         mtime = mtime2
+      needs_reconfigure = false
+      print("Loading " .. confpath)
+      mtime = C.stat_mtime(confpath)
+      if mtime == 0 then
+         print(("WARNING: File '%s' does not exist."):format(confpath))
       end
-      engine.main({duration=1, no_report=true})
-      -- Flush buffered log messages every 1s
-      io.flush()
+      engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
+      engine.main({done=function() return needs_reconfigure end})
    end
 end
 
@@ -100,12 +108,18 @@ end
 function bench (pciaddr, confpath, sockpath, npackets)
    npackets = tonumber(npackets)
    local ports = dofile(confpath)
-   local nic = (nfvconfig.port_name(ports[1])).."_NIC"
+   local nic, bench
+   if pciaddr then
+      nic = (nfvconfig.port_name(ports[1])).."_NIC"
+   else
+      nic = "BenchSink"
+      bench = { src="52:54:00:00:00:02", dst="52:54:00:00:00:01", sizes = {60}}
+   end
    engine.log = true
    engine.Hz = false
 
    print("Loading " .. confpath)
-   engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
+   engine.configure(nfvconfig.load(confpath, pciaddr, sockpath, bench))
 
    -- From designs/nfv
    local start, packets, bytes = 0, 0, 0

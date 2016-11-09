@@ -2,10 +2,11 @@ module(..., package.seeall)
 
 -- NDP address resolution.
 -- Given a remote IPv6 address, try to find out its MAC address.
--- Exit if this fails.
 -- If resolution succeeds:
 -- All packets coming through the 'south' interface (ie, via the network card)
 -- are silently forwarded.
+-- Note that the network card can drop packets; if it does, they will not get
+-- to this app.
 -- All packets coming through the 'north' interface (the lwaftr) will have
 -- their Ethernet headers rewritten.
 
@@ -138,17 +139,12 @@ local function is_neighbor_solicitation(pkt)
    return is_ndp(pkt) and icmpv6_type_is_ns(pkt)
 end
 
--- Check to see whether the neighbor solicitation is for
--- one of the listed addresses, rather than an arbitrary one.
-function is_neighbor_solicitation_for_ips(pkt, local_ips)
+-- Check whether NS target address matches IPv6 address.
+function is_neighbor_solicitation_for_addr(pkt, ipv6_addr)
    if not is_neighbor_solicitation(pkt) then return false end
    local target_offset = eth_ipv6_size + o_icmp_target_offset
-   for i=1,#local_ips do
-      if ipv6_equals(local_ips[i], pkt.data + target_offset) then
-         return true
-       end
-   end
-   return false
+   local target_ipv6 = pkt.data + target_offset
+   return ipv6_equals(target_ipv6, ipv6_addr)
 end
 
 local function to_ether_addr(pkt, offset)
@@ -203,7 +199,7 @@ local function write_sna(pkt, local_eth, is_router, soliciting_pkt, base_checksu
    local flags = 0x40 -- solicited
    -- don't support the override flag for now; TODO?
    if is_router then flags = flags + 0x80 end
-   option_type = option_target_link_layer_address
+   local option_type = option_target_link_layer_address
    write_ndp(pkt, local_eth, target_addr, i_type, flags, option_type)
 end
 
@@ -211,7 +207,7 @@ end
 -- Target address must be in the format that results from pton.
 local function write_ns(pkt, local_eth, target_addr)
    local i_type = icmpv6_ns -- RFC 4861 neighbor solicitation
-   option_type = option_source_link_layer_address
+   local option_type = option_source_link_layer_address
    write_ndp(pkt, local_eth, target_addr, i_type, 0, option_type)
 end
 
@@ -226,17 +222,18 @@ function form_ns(local_eth, local_ipv6, dst_ipv6)
    local i = ipv6:new({ hop_limit = hop_limit, 
                         next_header = proto_icmpv6,
                         src = local_ipv6, dst = dst_ipv6 })
-   i:payload_length(ns_pkt.length)
+   i:payload_length(dgram:packet().length)
    
-   local ph = i:pseudo_header(ns_pkt.length, proto_icmpv6)
-   ph_len = ipv6_pseudoheader_size
+   local ph = i:pseudo_header(dgram:packet().length, proto_icmpv6)
+   local ph_len = ipv6_pseudoheader_size
    local base_checksum = checksum.ipsum(ffi.cast("uint8_t*", ph), ph_len, 0)
-   local csum = checksum.ipsum(ns_pkt.data, ns_pkt.length, bit.bnot(base_checksum))
-   wr16(ns_pkt.data + 2, C.htons(csum))
+   local csum = checksum.ipsum(dgram:packet().data, dgram:packet().length, bit.bnot(base_checksum))
+   wr16(dgram:packet().data + 2, C.htons(csum))
    
    dgram:push(i)
    dgram:push(ethernet:new({ src = local_eth, dst = ethernet_broadcast,
                              type = ethertype_ipv6 }))
+   ns_pkt = dgram:packet()
    dgram:free()
    return ns_pkt
 end
@@ -269,32 +266,30 @@ local function form_sna(local_eth, local_ipv6, is_router, soliciting_pkt)
    local i = ipv6:new({ hop_limit = hop_limit,
                         next_header = proto_icmpv6,
                         src = local_ipv6, dst = dst_ipv6 })
-   i:payload_length(na_pkt.length)
+   i:payload_length(dgram:packet().length)
    
-   local ph = i:pseudo_header(na_pkt.length, proto_icmpv6)
-   ph_len = ipv6_pseudoheader_size
+   local ph = i:pseudo_header(dgram:packet().length, proto_icmpv6)
+   local ph_len = ipv6_pseudoheader_size
    local base_checksum = checksum.ipsum(ffi.cast("uint8_t*", ph), ph_len, 0)
-   local csum = checksum.ipsum(na_pkt.data, na_pkt.length, bit.bnot(base_checksum))
-   wr16(na_pkt.data + 2, C.htons(csum))
+   local csum = checksum.ipsum(dgram:packet().data, dgram:packet().length,
+                               bit.bnot(base_checksum))
+   wr16(dgram:packet().data + 2, C.htons(csum))
    
    dgram:push(i)
    dgram:push(ethernet:new({ src = local_eth, dst = dst_eth,
                              type = ethertype_ipv6 }))
+   na_pkt = dgram:packet()
    dgram:free()
    return na_pkt
-end
-
--- This does not deal with vlans
-function set_dst_ethernet(pkt, dst_eth)
-   ffi.copy(pkt.data, dst_eth, 6)
 end
 
 local function verify_icmp_checksum(pkt)
    local offset = ethernet_header_size + o_ipv6_payload_len
    local icmp_length = C.ntohs(rd16(pkt.data + offset))
-   ph_csum = checksum_pseudoheader_from_header(pkt.data + ethernet_header_size)
-   local a = checksum.ipsum(pkt.data + eth_ipv6_size, icmp_length, bit.bnot(ph_csum))
-   local raw_without_pseudo = checksum.ipsum(pkt.data + eth_ipv6_size, icmp_length, 0)
+   local ph_csum = checksum_pseudoheader_from_header(
+      pkt.data + ethernet_header_size)
+   local a = checksum.ipsum(pkt.data + eth_ipv6_size, icmp_length, bit.bnot(
+      ph_csum))
    return a == 0
 end
 
@@ -415,7 +410,7 @@ function selftest()
    local nsp = form_ns(lmac, lip, rip)
    assert(is_ndp(nsp))
    assert(is_solicited_neighbor_advertisement(nsp) == false)
-   set_dst_ethernet(nsp, lmac) -- Not a meaningful thing to do, just a test
+   lwutil.set_dst_ethernet(nsp, lmac) -- Not a meaningful thing to do, just a test
    
    local sol_na = form_nsolicitation_reply(lmac, lip, nsp)
    local dst_eth = get_dst_ethernet(sol_na, {rip})

@@ -10,7 +10,12 @@ connection*. For a connection to be sanctioned it must be tracked in a
 Multiple `PcapFilter` apps—e.g. for inbound and outbound traffic—can
 refer to the same connection by sharing a state table identifer.
 
-![PcapFilter](.images/PcapFilter.png)
+    DIAGRAM: PcapFilter
+               +------------+
+               |            |
+    input ---->* PcapFilter *----> output
+               |            |
+               +------------+
 
 ## Configuration
 
@@ -28,3 +33,9 @@ expression.
 *rule* will be tracked in the specified state table and any packet that
 belongs to a tracked connection in the specified state table will be let
 pass.
+
+## Special Counters
+
+— Key **sessions_established**
+
+Total number of sessions established.

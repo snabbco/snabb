@@ -98,6 +98,14 @@ Returns the binary representation of MAC address denoted by *string*.
 
 Returns the string representation of *mac* address.
 
+— Function **ethernet:is_mcast** *mac*
+
+Returns a true value if *mac* address denotes a [Multicast address](https://en.wikipedia.org/wiki/Multicast_address#Ethernet).
+
+— Function **ethernet:is_bcast** *mac*
+
+Returns a true value if *mac* address denotes a [Broadcast address](https://en.wikipedia.org/wiki/Broadcast_address#Ethernet).
+
 — Function **ethernet:ipv6_mcast** *ip*
 
 Returns the MAC address for IPv6 multicast *ip* as defined by RFC2464,
@@ -631,7 +639,20 @@ payload by the header. Finally, synthetic headers can be prepended to the
 datagram using `datagram:push`.  To get the whole datagram as a packet
 use `datagram:packet`.
 
-![Datagram](.images/Datagram.png)
+    DIAGRAM: Datagram
+    datagram packet
+    +------------------+
+    |packet            |
+    |                  |
+    |+------=---------+|
+    || Pushed headers ||
+    |+----------------+|
+    |+------=---------+|<---Beginning of initial packet
+    || Parsed headers ||
+    ||------=---------||
+    ||    Payload     ||
+    |+----------------+|
+    +------------------+
 
 A datagram can be used in two modes of operation, called "immediate
 commit" and "delayed commit".  In immediate commit mode, the `push`
@@ -791,9 +812,7 @@ If *pointer* and *length* are supplied then *length* bytes starting from
 
 — Method **datagram:data**
 
-Returns the location and size of the buffer of the underlying packet.
-This is a shortcut to *datagram:packet* followed by calls to
-*packet.data* and *pakcet.length*.
+Returns `data` and `length` of the underlying packet.
 
 - Method **datagram:commit**
 
