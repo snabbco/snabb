@@ -15,6 +15,7 @@ local C = ffi.C
 local c, t = S.c, S.types.t
 
 RawSocket = {}
+driver = RawSocket
 
 function RawSocket:new (ifname)
    assert(ifname)
