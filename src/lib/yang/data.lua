@@ -238,6 +238,22 @@ local function string_keyed_table_builder(string_key)
    return builder
 end
 
+local function cltable_builder(key_t)
+   local res = cltable.new({ key_type=key_t })
+   local builder = {}
+   function builder:add(key, value) res[key] = value end
+   function builder:finish() return res end
+   return builder
+end
+
+local function ltable_builder()
+   local res = {}
+   local builder = {}
+   function builder:add(key, value) res[key] = value end
+   function builder:finish() return res end
+   return builder
+end
+
 local function table_parser(keyword, keys, values, string_key, key_ctype,
                             value_ctype)
    local members = {}
@@ -251,13 +267,10 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
       function init() return ctable_builder(key_t, value_t) end
    elseif string_key then
       function init() return string_keyed_table_builder(string_key) end
+   elseif key_t then
+      function init() return cltable_builder(key_t) end
    else
-      -- TODO: here we should implement a cktable if key_t is non-nil.
-      -- Probably we should error if the key is a generic Lua table
-      -- though, as we don't have a good data structure to map generic
-      -- Lua tables to Lua tables.  For the moment, fall back to the old
-      -- assoc implementation.
-      error('List with non-FFI, non-string key unimplemented')
+      function init() return ltable_builder() end
    end
    local function parse1(node)
       assert_compound(node, keyword)
