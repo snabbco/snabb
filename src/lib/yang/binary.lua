@@ -9,6 +9,7 @@ local value = require("lib.yang.value")
 local stream = require("lib.yang.stream")
 local data = require('lib.yang.data')
 local ctable = require('lib.ctable')
+local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
 local VERSION = 0x00001000
