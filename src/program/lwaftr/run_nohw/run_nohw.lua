@@ -55,10 +55,11 @@ end
 
 function run(parameters)
    local verbosity, conf_file, b4_if, inet_if, bench_file = parse_args(parameters)
+   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local c = config.new()
 
    -- AFTR
-   config.app(c, "aftr", LwAftr, conf_file)
+   config.app(c, "aftr", LwAftr, conf)
 
    -- B4 side interface
    config.app(c, "b4if", RawSocket, b4_if)

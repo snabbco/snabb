@@ -4,7 +4,6 @@ local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
 local dump = require('apps.lwaftr.dump')
 local icmp = require("apps.lwaftr.icmp")
-local lwconf = require("apps.lwaftr.conf")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
@@ -241,9 +240,6 @@ end
 LwAftr = {}
 
 function LwAftr:new(conf)
-   if type(conf) == 'string' then
-      conf = lwconf.load_legacy_lwaftr_config(conf)
-   end
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
    o.conf = conf
