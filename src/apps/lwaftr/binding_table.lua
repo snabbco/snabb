@@ -73,7 +73,7 @@ local ctable = require("lib.ctable")
 local cltable = require("lib.cltable")
 local util = require("lib.yang.util")
 
-local band, bor, bxor, lshift, rshift = bit.band, bit.bor, bit.bxor, bit.lshift, bit.rshift
+local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
 
 local psid_map_value_t = ffi.typeof[[
    struct { uint16_t psid_length; uint16_t shift; }
@@ -305,7 +305,6 @@ local function parse_br_addresses(parser)
       parser:skip_whitespace()
       if parser:check(',') then parser:skip_whitespace() end
    end
-   local ptr = ffi.new(ffi.typeof('$[?]', br_address_t), #addresses)
    local ret = util.ffi_array(ffi.new(ffi.typeof('$[?]', br_address_t),
                                       #addresses),
                               br_address_t, #addresses)
@@ -378,11 +377,6 @@ end
 
 function load_source(text_stream)
    return parse_binding_table(Parser.new(text_stream))
-end
-
-verbose = os.getenv('SNABB_LWAFTR_VERBOSE') or true
-local function log(msg, ...)
-   if verbose then print(msg:format(...)) end
 end
 
 function load_legacy(file)
