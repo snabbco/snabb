@@ -143,7 +143,8 @@ function open_input_byte_stream(filename)
       return ffi.string(ret:read(1), 1)
    end
    function ret:read_string()
-      return ffi.string(ret:read(size - pos), size - pos)
+      local count = size - pos
+      return ffi.string(ret:read(count), count)
    end
    function ret:as_text_stream(len)
       local end_pos = size

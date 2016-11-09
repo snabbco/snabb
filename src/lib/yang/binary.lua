@@ -9,6 +9,7 @@ local value = require("lib.yang.value")
 local stream = require("lib.yang.stream")
 local data = require('lib.yang.data')
 local ctable = require('lib.ctable')
+local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
 local VERSION = 0x00001000
@@ -139,7 +140,6 @@ local function data_emitter(production)
    end
    function handlers.array(production)
       if production.ctype then
-         local emit_value = value_emitter(production.ctype)
          return function(data, stream)
             stream:write_stringref('carray')
             stream:write_stringref(production.ctype)
@@ -183,7 +183,7 @@ local function data_emitter(production)
          local emit_value = visit1({type='struct', members=production.values})
          return function(data, stream)
             stream:write_stringref('cltable')
-            emit_keys(data.keys)
+            emit_keys(data.keys, stream)
             stream:write_uint32(#data.values)
             for i=1,#data.values do emit_value(data.values[i], stream) end
          end
