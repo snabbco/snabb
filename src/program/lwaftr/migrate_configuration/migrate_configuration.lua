@@ -11,8 +11,8 @@ local cltable = require('lib.cltable')
 local util = require('lib.yang.util')
 local yang = require('lib.yang.yang')
 local stream = require('lib.yang.stream')
-local Parser = require("apps.lwaftr.conf_parser").Parser
 local binding_table = require("apps.lwaftr.binding_table")
+local Parser = require("program.lwaftr.migrate_configuration.conf_parser").Parser
 
 local br_address_t = ffi.typeof('uint8_t[16]')
 local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
