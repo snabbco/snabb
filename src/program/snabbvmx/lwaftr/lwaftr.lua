@@ -106,7 +106,7 @@ function run(args)
       if not file_exists(conf.lwaftr) then
          fatal(("lwAFTR conf file '%s' not found"):format(conf.lwaftr))
       end
-      lwconf = require('apps.lwaftr.conf').load_legacy_lwaftr_config(conf.lwaftr)
+      lwconf = require('apps.lwaftr.conf').load_lwaftr_config(conf.lwaftr)
       -- If one interface has vlan tags, the other one should as well.
       assert((not lwconf.external_interface.vlan_tag) ==
             (not lwconf.internal_interface.vlan_tag))
