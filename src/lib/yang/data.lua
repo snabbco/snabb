@@ -345,7 +345,23 @@ end
 
 local function encode_yang_string(str)
    if str:match("^[^%s;{}\"'/]*$") then return str end
-   error('yang string escaping unimplemented: '..str)
+   local out = {}
+   table.insert(out, '"')
+   for i=1,#str do
+      local chr = str:sub(i,i)
+      if chr == '\n' then
+         table.insert(out, '\\n')
+      elseif chr == '\t' then
+         table.insert(out, '\\t')
+      elseif chr == '"' or chr == '\\' then
+         table.insert(out, '\\')
+         table.insert(out, chr)
+      else
+         table.insert(out, chr)
+      end
+   end
+   table.insert(out, '"')
+   return table.concat(out)
 end
 
 local value_printers = {}
