@@ -188,7 +188,7 @@ local function array_parser(keyword, element_type, ctype)
       return out
    end
    local elt_t = ctype and ffi.typeof(ctype)
-   local array_t = ctype and ffi.typeof('$[?]', ffi.typeof(elt_t))
+   local array_t = ctype and ffi.typeof('$[?]', elt_t)
    local function finish(out)
       -- FIXME check min-elements
       if array_t then
@@ -212,7 +212,7 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    end
    local function finish(out)
       if out ~= nil then return out end
-      if default then return parsev(default) end
+      if default then return parsev(default, keyword) end
       if mandatory then error('missing scalar value: '..keyword) end
    end
    return {init=init, parse=parse, finish=finish}
@@ -420,7 +420,7 @@ local function data_printer_from_grammar(production)
       return function(data, file, indent)
          for _,v in ipairs(data) do
             print_keyword(keyword, file, indent)
-            file:write(serialize(data))
+            file:write(serialize(v))
             file:write(';\n')
          end
       end
