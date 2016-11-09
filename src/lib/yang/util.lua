@@ -50,7 +50,7 @@ function ffi_array(ptr, elt_t, count)
       assert(1 <= idx and idx <= size)
       return ptr[idx-1]
    end
-   function mt:__setindex(idx, val)
+   function mt:__newindex(idx, val)
       assert(1 <= idx and idx <= size)
       ptr[idx-1] = val
    end

@@ -425,6 +425,16 @@ local function data_printer_from_grammar(production)
                file:write(indent..'}\n')
             end
          end
+      elseif production.key_ctype then
+         return function(data, file, indent)
+            for key, value in cltable.pairs(data) do
+               print_keyword(keyword, file, indent)
+               file:write('{\n')
+               print_key(key, file, indent..'  ')
+               print_value(value, file, indent..'  ')
+               file:write(indent..'}\n')
+            end
+         end
       else
          return function(data, file, indent)
             for key, value in pairs(data) do

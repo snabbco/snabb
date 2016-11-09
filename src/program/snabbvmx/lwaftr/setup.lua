@@ -49,8 +49,8 @@ local function load_virt (c, nic_id, lwconf, interface)
    print(("%s ether %s"):format(nic_id, interface.mac_address))
 
    local v4_nic_name, v6_nic_name = nic_id..'_v4', nic_id..'v6'
-   local v4_mtu = lwconf.ipv4_mtu + constants.ethernet_header_size
-   if lwconf.vlan_tagging and lwconf.v4_vlan_tag then
+   local v4_mtu = lwconf.external_interface.mtu + constants.ethernet_header_size
+   if lwconf.external_interface.vlan_tag then
      v4_mtu = v4_mtu + 4
    end
    print(("Setting %s interface MTU to %d"):format(v4_nic_name, v4_mtu))
@@ -58,10 +58,10 @@ local function load_virt (c, nic_id, lwconf, interface)
       pciaddr = interface.pci,
       vmdq = interface.vlan and true,
       vlan = interface.vlan and interface.vlan.v4_vlan_tag,
-      macaddr = ethernet:ntop(lwconf.aftr_mac_inet_side),
+      macaddr = ethernet:ntop(lwconf.external_interface.mac),
       mtu = v4_mtu })
-   local v6_mtu = lwconf.ipv6_mtu + constants.ethernet_header_size
-   if lwconf.vlan_tagging and lwconf.v6_vlan_tag then
+   local v6_mtu = lwconf.internal_interface.mtu + constants.ethernet_header_size
+   if lwconf.internal_interface.vlan_tag then
      v6_mtu = v6_mtu + 4
    end
    print(("Setting %s interface MTU to %d"):format(v6_nic_name, v6_mtu))
@@ -69,7 +69,7 @@ local function load_virt (c, nic_id, lwconf, interface)
       pciaddr = interface.pci,
       vmdq = interface.vlan and true,
       vlan = interface.vlan and interface.vlan.v6_vlan_tag,
-      macaddr = ethernet:ntop(lwconf.aftr_mac_b4_side),
+      macaddr = ethernet:ntop(lwconf.internal_interface.mac),
       mtu = v6_mtu})
 
    return v4_nic_name, v6_nic_name
@@ -117,19 +117,15 @@ local function load_phy (c, nic_id, interface)
 end
 
 local function requires_splitter (lwconf)
-   if not lwconf.vlan_tagging then return true end
-   return lwconf.v4_vlan_tag == lwconf.v6_vlan_tag
+   if not lwconf.internal_interface.vlan_tag then return true end
+   return lwconf.internal_interface.vlan_tag == lwconf.external_interface.vlan_tag
 end
 
 function lwaftr_app(c, conf, lwconf, sock_path)
    assert(type(conf) == 'table')
    assert(type(lwconf) == 'table')
 
-   if lwconf.binding_table then
-      conf.preloaded_binding_table = bt.load(lwconf.binding_table)
-   end
-
-   print(("Hairpinning: %s"):format(yesno(lwconf.hairpinning)))
+   print(("Hairpinning: %s"):format(yesno(lwconf.internal_interface.hairpinning)))
    local counters = lwcounter.init_counters()
 
    local virt_id = "vm_" .. conf.interface.id
@@ -172,11 +168,13 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       print(("IPv6 fragmentation and reassembly: %s"):format(yesno(
              conf.ipv6_interface.fragmentation)))
       if conf.ipv6_interface.fragmentation then
-         local mtu = conf.ipv6_interface.mtu or lwconf.ipv6_mtu
+         local mtu = conf.ipv6_interface.mtu or lwconf.internal_interface.mtu
          config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, {
             counters = counters,
-            max_ipv6_reassembly_packets = lwconf.max_ipv6_reassembly_packets,
-            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+            max_ipv6_reassembly_packets =
+               lwconf.internal_interface.reassembly.max_packets,
+            max_fragments_per_reassembly_packet =
+               lwconf.internal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
             counters = counters,
@@ -207,11 +205,13 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       print(("IPv4 fragmentation and reassembly: %s"):format(yesno(
              conf.ipv4_interface.fragmentation)))
       if conf.ipv4_interface.fragmentation then
-         local mtu = conf.ipv4_interface.mtu or lwconf.ipv4_mtu
+         local mtu = conf.ipv4_interface.mtu or lwconf.external_interface.mtu
          config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
             counters = counters,
-            max_ipv4_reassembly_packets = lwconf.max_ipv4_reassembly_packets,
-            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+            max_ipv4_reassembly_packets =
+               lwconf.external_interface.reassembly.max_packets,
+            max_fragments_per_reassembly_packet =
+               lwconf.external_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
             counters = counters,
@@ -288,13 +288,36 @@ function lwaftr_app(c, conf, lwconf, sock_path)
    end
 end
 
+function passthrough(c, conf, sock_path)
+   assert(type(conf) == 'table')
+
+   io.write("lwAFTR service: disabled ")
+   print("(either empty binding_table or v6 or v4 interface config missing)")
+
+   local virt_id = "vm_" .. conf.interface.id
+   local phy_id = "nic_" .. conf.interface.id
+   local chain_input, chain_output = load_phy(c, phy_id, conf.interface)
+
+   if sock_path then
+      local socket_path = sock_path:format(conf.interface.id)
+      config.app(c, virt_id, VhostUser, { socket_path = socket_path })
+      config.link(c, virt_id .. ".tx -> " .. chain_input)
+      config.link(c, chain_output .. " -> " .. virt_id  .. ".rx")
+   else
+      config.app(c, "DummyVhost", basic_apps.Sink)
+      config.link(c, "DummyVhost" .. ".tx -> " .. chain_input)
+      config.link(c, chain_output .. " -> " .. "DummyVhost"  .. ".rx")
+      print("Running without VM (no vHostUser sock_path set)")
+   end
+end
+
 local function load_conf (conf_filename)
    local function load_lwaftr_config (conf, conf_filename)
       local filename = conf.lwaftr
       if not file_exists(filename) then
          filename = lib.dirname(conf_filename).."/"..filename
       end
-      return require("apps.lwaftr.conf").load_lwaftr_config(filename)
+      return require("apps.lwaftr.conf").load_legacy_lwaftr_config(filename)
    end
    local conf = dofile(conf_filename)
    return conf, load_lwaftr_config(conf, conf_filename)
@@ -309,11 +332,13 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
 
    if conf.ipv6_interface then
       if conf.ipv6_interface.fragmentation then
-         local mtu = conf.ipv6_interface.mtu or lwconf.ipv6_mtu
+         local mtu = conf.ipv6_interface.mtu or lwconf.internal_interface.mtu
          config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, {
             counters = counters,
-            max_ipv6_reassembly_packets = lwconf.max_ipv6_reassembly_packets,
-            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+            max_ipv6_reassembly_packets =
+               lwconf.internal_interface.reassembly.max_packets,
+            max_fragments_per_reassembly_packet =
+               lwconf.internal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
             counters = counters,
@@ -339,11 +364,13 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
 
    if conf.ipv4_interface then
       if conf.ipv4_interface.fragmentation then
-         local mtu = conf.ipv4_interface.mtu or lwconf.ipv4_mtu
+         local mtu = conf.ipv4_interface.mtu or lwconf.external_interface.mtu
          config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
             counters = counters,
-            max_ipv4_reassembly_packets = lwconf.max_ipv4_reassembly_packets,
-            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+            max_ipv4_reassembly_packets =
+               lwconf.external_interface.reassembly.max_packets,
+            max_fragments_per_reassembly_packet =
+               lwconf.external_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
             counters = counters,
