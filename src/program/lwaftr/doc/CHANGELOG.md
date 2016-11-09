@@ -1,10 +1,28 @@
 # Change Log
 
-## Pre-release changes
+## [3.0] - 2016-11-09
+
+A change to migrate the lwAFTR to use a new YANG-based configuration.
+
+ * New configuration format based on YANG.  To migrate old
+   configurations, run "snabb lwaftr migrate-configation old.conf" on
+   the old configuration.  See the snabb-softwire-v1.yang schema or
+   README.configuration.md for full details on the new configuration
+   format.
 
  * Send ICMPv6 unreachable messages from the most appropriate source address
    available (the one associated with a B4 if possible, or else the one the
-   packet one is in reply to had as a destination.) 
+   packet one is in reply to had as a destination.)
+
+ * Add support for ARP resolution of the next hop on the external
+   interface.
+
+ * Add support for virtualized control planes via Snabb vMX.
+
+ * Add many more counters, used to diagnose the path that packets take
+   in the lwAFTR.  See README.counters.md for more.
+
+ * Many updates from upstream Snabb.
 
 ## [2.10] - 2016-06-17
 
