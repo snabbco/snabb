@@ -29,7 +29,7 @@ end
 
 function run(args)
    local opts, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
-   local conf = require('apps.lwaftr.conf').load_config(conf_file)
+   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
    local c = config.new()
    setup.load_bench(c, conf, inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')

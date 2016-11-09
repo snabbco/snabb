@@ -298,7 +298,7 @@ end
 
 function CTable:lookup_and_copy(key, entry)
    local entry_ptr = self:lookup_ptr(key)
-   if not ptr then return false end
+   if not entry_ptr then return false end
    entry = entry_ptr
    return true
 end

@@ -212,7 +212,7 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    end
    local function finish(out)
       if out ~= nil then return out end
-      if default then return parse1(default) end
+      if default then return parsev(default) end
       if mandatory then error('missing scalar value: '..keyword) end
    end
    return {init=init, parse=parse, finish=finish}
@@ -364,16 +364,16 @@ local function encode_yang_string(str)
    return table.concat(out)
 end
 
-local value_printers = {}
-local function value_printer(typ)
+local value_serializers = {}
+local function value_serializer(typ)
    local prim = typ.primitive_type
-   if value_printers[prim] then return value_printers[prim] end
+   if value_serializers[prim] then return value_serializers[prim] end
    local tostring = assert(value.types[prim], prim).tostring
-   local function print(val, file)
-      file:write(encode_yang_string(tostring(val)))
+   local function serializer(val)
+      return encode_yang_string(tostring(val))
    end
-   value_printers[prim] = print
-   return print
+   value_serializers[prim] = serializer
+   return serializer
 end
 
 local function data_printer_from_grammar(production)
@@ -416,11 +416,11 @@ local function data_printer_from_grammar(production)
       end
    end
    function handlers.array(keyword, production)
-      local print_value = value_printer(production.element_type)
+      local serialize = value_serializer(production.element_type)
       return function(data, file, indent)
          for _,v in ipairs(data) do
             print_keyword(keyword, file, indent)
-            print_value(v, file)
+            file:write(serialize(data))
             file:write(';\n')
          end
       end
@@ -477,11 +477,14 @@ local function data_printer_from_grammar(production)
       end
    end
    function handlers.scalar(keyword, production)
-      local print_value = value_printer(production.argument_type)
+      local serialize = value_serializer(production.argument_type)
       return function(data, file, indent)
-         print_keyword(keyword, file, indent)
-         print_value(data, file)
-         file:write(';\n')
+         local str = serialize(data)
+         if str ~= production.default then
+            print_keyword(keyword, file, indent)
+            file:write(str)
+            file:write(';\n')
+         end
       end
    end
 
