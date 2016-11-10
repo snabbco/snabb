@@ -185,8 +185,8 @@ function selftest()
    app.configure(c)
    app.main({duration = 1})
 
-   print("source sent: " .. link.stats(app.app_table.source.output.output).txpackets)
-   print("sink received: " .. link.stats(app.app_table.sink.input.input).rxpackets)
+   print("source sent: " .. link.stats(app.app_table.source.output.output).input_packets)
+   print("sink received: " .. link.stats(app.app_table.sink.input.input).output_packets)
 
    test_tag_untag()
 end

@@ -123,7 +123,8 @@ function get_stats (counters)
    for linkspec, link in pairs(counters.links) do
       new_stats.links[linkspec] = {}
       for _, name
-      in ipairs({"rxpackets", "txpackets", "rxbytes", "txbytes", "txdrop" }) do
+      in ipairs({"output_packets", "input_packets",
+                 "output_bytes", "input_bytes", "input_drop" }) do
          new_stats.links[linkspec][name] = counter.read(link[name])
       end
    end
@@ -169,18 +170,18 @@ end
 local link_metrics_row = {31, 7, 7, 7, 7, 7}
 function print_link_metrics (new_stats, last_stats)
    print_row(link_metrics_row,
-             {"Links (rx/tx/txdrop in Mpps)", "rx", "tx", "rxGb", "txGb", "txdrop"})
+             {"Links (input/output/drop in Mpps)", "input", "output", "inputGb", "outputGb", "drop"})
    for linkspec, link in pairs(new_stats.links) do
       if last_stats.links[linkspec] then
-         local rx = tonumber(new_stats.links[linkspec].rxpackets - last_stats.links[linkspec].rxpackets)
-         local tx = tonumber(new_stats.links[linkspec].txpackets - last_stats.links[linkspec].txpackets)
-         local rxbytes = tonumber(new_stats.links[linkspec].rxbytes - last_stats.links[linkspec].rxbytes)
-         local txbytes = tonumber(new_stats.links[linkspec].txbytes - last_stats.links[linkspec].txbytes)
-         local drop = tonumber(new_stats.links[linkspec].txdrop - last_stats.links[linkspec].txdrop)
+         local input = tonumber(new_stats.links[linkspec].input_packets - last_stats.links[linkspec].input_packets)
+         local output = tonumber(new_stats.links[linkspec].output_packets - last_stats.links[linkspec].output_packets)
+         local input_bytes = tonumber(new_stats.links[linkspec].input_bytes - last_stats.links[linkspec].input_bytes)
+         local output_bytes = tonumber(new_stats.links[linkspec].output_bytes - last_stats.links[linkspec].output_bytes)
+         local drop = tonumber(new_stats.links[linkspec].input_drop - last_stats.links[linkspec].input_drop)
          print_row(link_metrics_row,
                    {linkspec,
-                    float_s(rx / 1e6), float_s(tx / 1e6),
-                    float_s(rxbytes / (1000^3)), float_s(txbytes / (1000^3)),
+                    float_s(input / 1e6), float_s(output / 1e6),
+                    float_s(input_bytes / (1000^3)), float_s(output_bytes / (1000^3)),
                     float_s(drop / 1e6)})
       end
    end

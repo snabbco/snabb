@@ -45,18 +45,18 @@ function basic1 (npackets)
    config.app(c, "Source", basic_apps.Source)
    config.app(c, "Tee", basic_apps.Tee)
    config.app(c, "Sink", basic_apps.Sink)
-   config.link(c, "Source.tx -> Tee.rx")
-   config.link(c, "Tee.tx1 -> Sink.rx1")
-   config.link(c, "Tee.tx2 -> Sink.rx2")
+   config.link(c, "Source.output -> Tee.input")
+   config.link(c, "Tee.output1 -> Sink.input1")
+   config.link(c, "Tee.output2 -> Sink.input2")
    engine.configure(c)
    local start = C.get_monotonic_time()
    timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
-   while link.stats(engine.app_table.Source.output.tx).txpackets < npackets do
+   while link.stats(engine.app_table.Source.output.output).output_packets < npackets do
       engine.main({duration = 0.01, no_report = true})
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
-   local packets = link.stats(engine.app_table.Source.output.tx).txpackets
+   local packets = link.stats(engine.app_table.Source.output.output).output_packets
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
@@ -195,8 +195,8 @@ function solarflare (npackets, packet_size, timeout)
    config.app(c, receive_device.interface, SolarFlareNic, {ifname=receive_device.interface, mac_address = ethernet:pton("02:00:00:00:00:02")})
    config.app(c, "sink", basic_apps.Sink)
 
-   config.link(c, "source.tx -> " .. send_device.interface .. ".rx")
-   config.link(c, receive_device.interface .. ".tx -> sink.rx")
+   config.link(c, "source.output -> " .. send_device.interface .. ".input")
+   config.link(c, receive_device.interface .. ".output -> sink.input")
 
    engine.configure(c)
 
@@ -213,7 +213,7 @@ function solarflare (npackets, packet_size, timeout)
    if timeout then
       n_max = timeout * 100
    end
-   while link.stats(engine.app_table.source.output.tx).txpackets < npackets
+   while link.stats(engine.app_table.source.output.output).output_packets < npackets
       and (not timeout or n < n_max)
    do
       engine.main({duration = 0.01, no_report = true})
@@ -221,7 +221,7 @@ function solarflare (npackets, packet_size, timeout)
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
-   local packets = link.stats(engine.app_table.source.output.tx).txpackets
+   local packets = link.stats(engine.app_table.source.output.output).output_packets
    engine.report()
    engine.app_table[send_device.interface]:report()
    engine.app_table[receive_device.interface]:report()
@@ -229,7 +229,7 @@ function solarflare (npackets, packet_size, timeout)
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s)."):format(packets / 1e6,
                                                                                                    runtime, packets / runtime / 1e6,
                                                                                                    gbits(packets * packet_size / runtime)))
-   if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
+   if link.stats(engine.app_table.source.output.output).output_packets < npackets then
       print("Packets lost. Test failed!")
       main.exit(1)
    end
@@ -285,8 +285,8 @@ receive_device.interface= "rx1GE"
    config.app(c, receive_device.interface, Intel1gNic, {pciaddr=pciaddr1, rxburst=512})
    config.app(c, "sink", basic_apps.Sink)
 
-   config.link(c, "source.tx -> " .. send_device.interface .. ".rx")
-   config.link(c, receive_device.interface .. ".tx -> sink.rx")
+   config.link(c, "source.output -> " .. send_device.interface .. ".input")
+   config.link(c, receive_device.interface .. ".output -> sink.input")
 
    engine.configure(c)
 
@@ -305,7 +305,7 @@ receive_device.interface= "rx1GE"
    if timeout then
       n_max = timeout * 100
    end
-   while link.stats(engine.app_table.source.output.tx).txpackets < npackets
+   while link.stats(engine.app_table.source.output.output).output_packets < npackets
       and (not timeout or n < n_max)
    do
       engine.main({duration = 0.01, no_report = true})
@@ -313,19 +313,19 @@ receive_device.interface= "rx1GE"
    end
    local finish = C.get_monotonic_time()
    local runtime = finish - start
-   local txpackets = link.stats(engine.app_table.source.output.tx).txpackets
-   local rxpackets = link.stats(engine.app_table.sink.input.rx).rxpackets
+   local output_packets = link.stats(engine.app_table.source.output.output).output_packets
+   local input_packets = link.stats(engine.app_table.sink.input.input).input_packets
    engine.report()
    engine.app_table[send_device.interface]:report()
    engine.app_table[receive_device.interface]:report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s, %.2f %% packet loss)."):format(
-    txpackets / 1e6, runtime, 
-    txpackets / runtime / 1e6,
-    ((txpackets * packet_size * 8) / runtime) / (1024*1024*1024),
-    (txpackets - rxpackets) *100 / txpackets
+    output_packets / 1e6, runtime, 
+    output_packets / runtime / 1e6,
+    ((output_packets * packet_size * 8) / runtime) / (1024*1024*1024),
+    (output_packets - input_packets) *100 / output_packets
    ))
-   if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
+   if link.stats(engine.app_table.source.output.output).output_packets < npackets then
       print("Packets lost. Test failed!")
       main.exit(1)
    end

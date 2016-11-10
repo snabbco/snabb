@@ -133,8 +133,8 @@ end
 
 local function read_counters(link)
    return {
-      txpackets = counter.read(link.stats.txpackets),
-      txbytes = counter.read(link.stats.txbytes)
+      txpackets = counter.read(link.stats.input_packets),
+      txbytes = counter.read(link.stats.input_bytes)
    }
 end
 
@@ -161,9 +161,9 @@ function run(args)
       config.app(c, stream.rx_sink_id, basic_apps.Sink)
 
       config.link(c, stream.pcap_id..".output -> "..stream.repeater_id..".input")
-      config.link(c, stream.repeater_id..".output -> "..stream.nic_tx_id..".rx")
+      config.link(c, stream.repeater_id..".output -> "..stream.nic_tx_id..".input")
 
-      config.link(c, stream.nic_rx_id..".tx -> "..stream.rx_sink_id..".input")
+      config.link(c, stream.nic_rx_id..".output -> "..stream.rx_sink_id..".input")
    end
    engine.configure(c)
 

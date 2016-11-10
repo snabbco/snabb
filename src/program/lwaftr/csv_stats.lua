@@ -75,8 +75,8 @@ function CSVStatsTimer:activate()
    self.start = engine.now()
    self.prev_elapsed = 0
    for _,data in ipairs(self.link_data) do
-      data.prev_txpackets = counter.read(data.txpackets)
-      data.prev_txbytes = counter.read(data.txbytes)
+      data.prev_txpackets = counter.read(data.input_packets)
+      data.prev_txbytes = counter.read(data.input_bytes)
    end
    local function tick() return self:tick() end
    local t = timer.new('csv_stats', tick, self.period*1e9, 'repeating')

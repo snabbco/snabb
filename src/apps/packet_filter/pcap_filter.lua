@@ -33,15 +33,15 @@ function PcapFilter:new (conf)
       -- XXX Investigate the latency impact of filter compilation.
       accept_fn = pf.compile_filter(conf.filter),
       state_table = conf.state_table or false,
-      shm = { rxerrors = {counter}, sessions_established = {counter} }
+      shm = { input_errors = {counter}, sessions_established = {counter} }
    }
    if conf.state_table then conntrack.define(conf.state_table) end
    return setmetatable(o, { __index = PcapFilter })
 end
 
 function PcapFilter:push ()
-   local i = assert(self.input.input or self.input.rx, "input port not found")
-   local o = assert(self.output.output or self.output.tx, "output port not found")
+   local i = assert(self.input.input or self.input.input, "input port not found")
+   local o = assert(self.output.output or self.output.output, "output port not found")
 
    while not link.empty(i) do
       local p = link.receive(i)
@@ -57,7 +57,7 @@ function PcapFilter:push ()
          link.transmit(o, p)
       else
          packet.free(p)
-         counter.add(self.shm.rxerrors)
+         counter.add(self.shm.input_errors)
       end
    end
 end
@@ -117,8 +117,8 @@ function selftest_run (stateful, expected, tolerance)
    repeat app.breathe() until deadline()
 
    app.report({showlinks=true})
-   local sent     = link.stats(app.app_table.pcap_filter.input.input).rxpackets
-   local accepted = link.stats(app.app_table.pcap_filter.output.output).txpackets
+   local sent     = link.stats(app.app_table.pcap_filter.input.input).output_packets
+   local accepted = link.stats(app.app_table.pcap_filter.output.output).input_packets
    local acceptrate = accepted * 100 / sent
    if acceptrate >= expected and acceptrate <= expected+tolerance then
       print(("ok: accepted %.4f%% of inputs (within tolerance)"):format(acceptrate))

@@ -21,7 +21,7 @@ AES128gcm = {
       auditing = {}
    },
    shm = {
-      txerrors = {counter}, rxerrors = {counter}
+      output_errors = {counter}, input_errors = {counter}
    }
 }
 
@@ -56,7 +56,7 @@ function AES128gcm:push ()
          link.transmit(output, p)
       else
          packet.free(p)
-         counter.add(self.shm.txerrors)
+         counter.add(self.shm.output_errors)
       end
    end
    -- Decapsulation path
@@ -68,7 +68,7 @@ function AES128gcm:push ()
          link.transmit(output, p)
       else
          packet.free(p)
-         counter.add(self.shm.rxerrors)
+         counter.add(self.shm.input_errors)
       end
    end
 end

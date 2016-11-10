@@ -115,9 +115,9 @@ function run(args)
       config.app(c, stream.rx_sink_id, basic_apps.Sink)
 
       config.link(c, stream.pcap_id..".output -> "..stream.repeater_id..".input")
-      config.link(c, stream.repeater_id..".output -> "..stream.nic_id..".rx")
+      config.link(c, stream.repeater_id..".output -> "..stream.nic_id..".input")
 
-      config.link(c, stream.nic_id..".tx -> "..stream.rx_sink_id..".input")
+      config.link(c, stream.nic_id..".output -> "..stream.rx_sink_id..".input")
    end
    engine.configure(c)
 
@@ -128,8 +128,8 @@ function run(args)
                             opts.duration * 1e9, 'repeating'))
    local csv = csv_stats.CSVStatsTimer.new(opts.csv_file)
    for _,stream in ipairs(streams) do
-      csv:add_app(stream.nic_id, { 'rx', 'tx' },
-                  { rx=stream.name..' TX', tx=stream.name..' RX' })
+      csv:add_app(stream.nic_id, { 'input', 'output' },
+                  { input=stream.name..' OUTPUT', output=stream.name..' INPUT' })
    end
    csv:activate()
    engine.busywait = true

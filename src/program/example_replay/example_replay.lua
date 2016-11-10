@@ -17,7 +17,7 @@ function run (parameters)
    config.app(c, "capture", pcap.PcapReader, pcap_file)
    config.app(c, "playback", raw.RawSocket, interface)
 
-   config.link(c, "capture.output -> playback.rx")
+   config.link(c, "capture.output -> playback.input")
 
    engine.configure(c)
    engine.main({duration=1, report = {showlinks=true}})

@@ -4,15 +4,15 @@ The `VirtioNet` app implements a subset of the driver part of the
 [virtio-net](http://docs.oasis-open.org/virtio/virtio/v1.0/csprd04/virtio-v1.0-csprd04.html)
 specification. It can connect to a virtio-net device from within a QEMU virtual
 machine. Packets can be sent out of the virtual machine by transmitting them on
-the `rx` port, and packets sent to the virtual machine will arrive on the `tx`
-port.
+the `input` port, and packets sent to the virtual machine will arrive on the
+`output` port.
 
     DIAGRAM: VirtioNet
-           +-----------+
-           |           |
-    rx --->* VirtioNet *----> tx
-           |           |
-           +-----------+
+              +-----------+
+              |           |
+    input --->* VirtioNet *----> output
+              |           |
+              +-----------+
 
 ## Configuration
 

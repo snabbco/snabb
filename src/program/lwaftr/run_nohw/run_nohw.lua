@@ -67,10 +67,10 @@ function run(parameters)
    config.app(c, "inet", RawSocket, inet_if)
 
    -- Connect apps
-   config.link(c, "inet.tx -> aftr.v4")
-   config.link(c, "b4if.tx -> aftr.v6")
-   config.link(c, "aftr.v4 -> inet.rx")
-   config.link(c, "aftr.v6 -> b4if.rx")
+   config.link(c, "inet.output -> aftr.v4")
+   config.link(c, "b4if.output -> aftr.v6")
+   config.link(c, "aftr.v4 -> inet.input")
+   config.link(c, "aftr.v6 -> b4if.input")
 
    if verbosity >= 1 then
       local csv = CSVStatsTimer.new(bench_file)
