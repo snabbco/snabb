@@ -253,8 +253,8 @@ function apply_config_actions (actions, conf)
    compute_breathe_order ()
 end
 
--- Sort the NODES that are reachable from ENTRIES topologically
--- according to SUCCESSORS via reverse-post-order numbering.  This
+-- Sort the NODES topologically according to SUCCESSORS via
+-- reverse-post-order numbering.  The sort starts with ENTRIES.  This
 -- implementation is recursive; we should change it to be iterative
 -- instead.
 function tsort (nodes, entries, successors)
@@ -268,6 +268,9 @@ function tsort (nodes, entries, successors)
       table.insert(post_order, node)
    end
    for _,node in ipairs(entries) do
+      if not visited[node] then visit(node) end
+   end
+   for _,node in ipairs(nodes) do
       if not visited[node] then visit(node) end
    end
    local ret = {}
@@ -294,6 +297,14 @@ function compute_breathe_order ()
       successors[app] = succs
    end
    breathe_push_order = tsort(app_array, breathe_pull_order, successors)
+   local i = 1
+   while i <= #breathe_push_order do
+      if breathe_push_order[i].push then
+         i = i + 1
+      else
+         table.remove(breathe_push_order, i)
+      end
+   end
 end
 
 -- Call this to "run snabb switch".
