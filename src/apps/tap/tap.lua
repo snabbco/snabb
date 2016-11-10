@@ -45,7 +45,7 @@ function Tap:new (name)
 end
 
 function Tap:pull ()
-   local l = self.output.output
+   local l = self.output.output or self.output.tx
    if l == nil then return end
    for i=1,engine.pull_npackets do
       local len, err = S.read(self.sock, self.pkt.data, C.PACKET_PAYLOAD_SIZE)
@@ -72,7 +72,7 @@ function Tap:pull ()
 end
 
 function Tap:push ()
-   local l = self.input.input
+   local l = self.input.input or self.input.rx
    while not link.empty(l) do
       -- The socket write might of blocked so don't dequeue the packet from the link
       -- until the write has completed.
