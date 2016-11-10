@@ -250,6 +250,50 @@ function apply_config_actions (actions, conf)
    for _, app in ipairs(app_array) do
       if app.link then app:link() end
    end
+   compute_breathe_order ()
+end
+
+-- Sort the NODES that are reachable from ENTRIES topologically
+-- according to SUCCESSORS via reverse-post-order numbering.  This
+-- implementation is recursive; we should change it to be iterative
+-- instead.
+function tsort (nodes, entries, successors)
+   local visited = {}
+   local post_order = {}
+   local function visit(node)
+      visited[node] = true
+      for _,succ in ipairs(successors[node]) do
+         if not visited[succ] then visit(succ) end
+      end
+      table.insert(post_order, node)
+   end
+   for _,node in ipairs(entries) do
+      if not visited[node] then visit(node) end
+   end
+   local ret = {}
+   while #post_order > 0 do
+      table.insert(ret, table.remove(post_order))
+   end
+   return ret
+end
+
+breathe_pull_order = {}
+breathe_push_order = {}
+
+function compute_breathe_order ()
+   breathe_pull_order = {}
+   local inputs = {}
+   for i, app in ipairs(app_array) do
+      if app.pull then table.insert(breathe_pull_order, app) end
+      for _,link in pairs(app.input) do inputs[link] = app  end
+   end
+   local successors = {}
+   for i, app in ipairs(app_array) do
+      local succs = {}
+      for _,link in pairs(app.output) do table.insert(succs, inputs[link]) end
+      successors[app] = succs
+   end
+   breathe_push_order = tsort(app_array, breathe_pull_order, successors)
 end
 
 -- Call this to "run snabb switch".
@@ -310,10 +354,8 @@ function breathe ()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
-   for i = 1, #app_array do
-      local app = app_array[i]
---      if app.pull then
---         zone(app.zone) app:pull() zone()
+   for i = 1, #breathe_pull_order do
+      local app = breathe_pull_order[i]
       if app.pull and not app.dead then
          zone(app.zone)
          with_restart(app, app.pull)
@@ -321,25 +363,14 @@ function breathe ()
       end
    end
    -- Exhale: push work out through the app network
-   local firstloop = true
-   repeat
-      local progress = false
-      -- For each link that has new data, run the receiving app
-      for i = 1, #link_array do
-         local link = link_array[i]
-         if firstloop or link.has_new_data then
-            link.has_new_data = false
-            local receiver = app_array[link.receiving_app]
-            if receiver.push and not receiver.dead then
-               zone(receiver.zone)
-               with_restart(receiver, receiver.push)
-               zone()
-               progress = true
-            end
-         end
+   for i = 1, #breathe_push_order do
+      local app = breathe_push_order[i]
+      if app.push and not app.dead then
+         zone(app.zone)
+         with_restart(app, app.push)
+         zone()
       end
-      firstloop = false
-   until not progress  -- Stop after no link had new data
+   end
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
