@@ -31,16 +31,25 @@ function load (file, pciaddr, sockpath, soft_bench)
       io_links = virtual_ether_mux.configure(c, ports, {bench = soft_bench})
    end
    for i,t in ipairs(ports) do
+      -- Backwards compatibity / deprecated fields
+      for deprecated, current in pairs({tx_police_gbps = "tx_police",
+                                        rx_police_gbps = "rx_police"}) do
+         if t[deprecated] and not t[current] then
+            print("Warning: "..deprecated.." is deprecated, use "..current.." instead.")
+            t[current] = t[deprecated]
+         end
+      end
+      -- Backwards compatability end
       local name = port_name(t)
       local Virtio = name.."_Virtio"
       config.app(c, Virtio, VhostUser,
                  {socket_path=sockpath:format(t.port_id),
                   disable_mrg_rxbuf=t.disable_mrg_rxbuf,
                   disable_indirect_desc=t.disable_indirect_desc})
-      local VM_input, VM_output = Virtio..".input", Virtio..".output"
-      if t.tx_police_gbps then
+      local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
+      if t.tx_police then
          local TxLimit = name.."_TxLimit"
-         local rate = t.tx_police_gbps * 1e9 / 8
+         local rate = t.tx_police * 1e9 / 8
          config.app(c, TxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, VM_output.." -> "..TxLimit..".input")
          VM_output = TxLimit..".output"
@@ -89,15 +98,18 @@ function load (file, pciaddr, sockpath, soft_bench)
          local Crypto = name.."_Crypto"
          config.app(c, Crypto, AES128gcm,
                     {spi = t.crypto.spi,
-                     key = t.crypto.key,
-                     replay_window = t.crypto.replay_window})
-         config.link(c, VM_output.." -> "..Crypto..".decapsulated")
-         config.link(c, Crypto..".decapsulated -> "..VM_input)
-         VM_input, VM_output = Crypto..".encapsulated", Crypto..".encapsulated"
+                     transmit_key = t.crypto.transmit_key,
+                     transmit_salt = t.crypto.transmit_salt,
+                     receive_key = t.crypto.receive_key,
+                     receive_salt = t.crypto.receive_salt,
+                     auditing = t.crypto.auditing})
+         config.link(c, VM_tx.." -> "..Crypto..".decapsulated")
+         config.link(c, Crypto..".decapsulated -> "..VM_rx)
+         VM_rx, VM_tx = Crypto..".encapsulated", Crypto..".encapsulated"
       end
-      if t.rx_police_gbps then
+      if t.rx_police then
          local RxLimit = name.."_RxLimit"
-         local rate = t.rx_police_gbps * 1e9 / 8
+         local rate = t.rx_police * 1e9 / 8
          config.app(c, RxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, RxLimit..".output -> "..VM_input)
          VM_input = RxLimit..".input"
@@ -131,4 +143,7 @@ function selftest ()
       engine.configure(load(confpath, pcideva, "/dev/null"))
       engine.main({duration = 0.25})
    end
+   local c = load("program/snabbnfv/test_fixtures/nfvconfig/test_functions/deprecated.port", pcideva, "/dev/null")
+   assert(c.apps["Test_TxLimit"])
+   assert(c.apps["Test_RxLimit"])
 end

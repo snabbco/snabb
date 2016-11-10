@@ -27,10 +27,6 @@ local function make_entry_type(key_type, value_type)
       value_type)
 end
 
-local function make_entries_type(entry_type)
-   return ffi.typeof('$[?]', entry_type)
-end
-
 -- hash := [0,HASH_MAX); scale := size/HASH_MAX
 local function hash_to_index(hash, scale)
    return floor(hash*scale + 0.5)
@@ -63,7 +59,6 @@ end
 function PodHashMap.new(key_type, value_type, hash_fn)
    local phm = {}   
    phm.entry_type = make_entry_type(key_type, value_type)
-   phm.type = make_entries_type(phm.entry_type)
    phm.hash_fn = hash_fn
    phm.equal_fn = make_equal_fn(key_type)
    phm.size = 0
@@ -73,6 +68,32 @@ function PodHashMap.new(key_type, value_type, hash_fn)
    phm = setmetatable(phm, { __index = PodHashMap })
    phm:resize(INITIAL_SIZE)
    return phm
+end
+
+-- FIXME: There should be a library to help allocate anonymous
+-- hugepages, not this code.
+local try_huge_pages = true
+local huge_page_threshold = 1e6
+local function calloc(t, count)
+   local byte_size = ffi.sizeof(t) * count
+   local mem, err
+   if try_huge_pages and byte_size > huge_page_threshold then
+      mem, err = S.mmap(nil, byte_size, 'read, write',
+                        'private, anonymous, hugetlb')
+      if not mem then
+         print("hugetlb mmap failed ("..tostring(err)..'), falling back.')
+         -- FIXME: Increase vm.nr_hugepages.  See
+         -- core.memory.reserve_new_page().
+      end
+   end
+   if not mem then
+      mem, err = S.mmap(nil, byte_size, 'read, write',
+                        'private, anonymous')
+      if not mem then error("mmap failed: " .. tostring(err)) end
+   end
+   local ret = ffi.cast(ffi.typeof('$*', t), mem)
+   ffi.gc(ret, function (ptr) S.munmap(ptr, byte_size) end)
+   return ret
 end
 
 local header_t = ffi.typeof[[
@@ -99,60 +120,42 @@ function load(stream, key_t, value_t, hash_fn)
    local map = PodHashMap.new(key_t, value_t, hash_fn)
    local header = stream:read_ptr(header_t)
    assert(header.entry_size == header.entry_size)
+
    map.size = header.size
    map.scale = map.size / HASH_MAX
    map.occupancy = header.occupancy
    map.max_displacement = header.max_displacement
-   map.entries = stream:read_array(map.entry_type,
-                                   map.size + map.max_displacement + 1)
    map.min_occupancy_rate = header.min_occupancy_rate
    map.max_occupancy_rate = header.max_occupancy_rate
    map.occupancy_hi = ceil(map.size * map.max_occupancy_rate)
    map.occupancy_lo = floor(map.size * map.min_occupancy_rate)
+   local entry_count = map.size + map.max_displacement + 1
+   map.entries = calloc(map.entry_type, entry_count)
 
-   -- Try to copy entries into a huge page.
-   local byte_size = ffi.sizeof(map.type, map.size + map.max_displacement + 1)
-   local mem, err = S.mmap(nil, byte_size, 'read, write', 'private, anonymous, hugetlb')
-   if mem then
-      C.memcpy(mem, map.entries, byte_size)
-      map.entries = ffi.cast(ffi.typeof('$*', map.entry_type), mem)
-   end
+   -- Copy the entries from disk into hugepages.
+   C.memcpy(map.entries,
+            stream:read_array(map.entry_type, entry_count),
+            ffi.sizeof(map.entry_type) * entry_count)
 
    return map
 end
 
-local try_huge_pages = true
 function PodHashMap:resize(size)
    assert(size >= (self.occupancy / self.max_occupancy_rate))
    local old_entries = self.entries
    local old_size = self.size
 
-   local byte_size = size * 2 * ffi.sizeof(self.type, 1)
-   local mem, err
-   if try_huge_pages and byte_size > 1e6 then
-      mem, err = S.mmap(nil, byte_size, 'read, write',
-                        'private, anonymous, hugetlb')
-      if not mem then
-         print("hugetlb mmap failed ("..tostring(err)..'), falling back.')
-         try_use_huge_pages = false
-      end
-   end
-   if not mem then
-      mem, err = S.mmap(nil, byte_size, 'read, write',
-                        'private, anonymous')
-      if not mem then error("mmap failed: " .. tostring(err)) end
-   end
-
    self.size = size
    self.scale = self.size / HASH_MAX
    self.occupancy = 0
    self.max_displacement = 0
-   self.entries = ffi.cast(ffi.typeof('$*', self.entry_type), mem)
    self.occupancy_hi = ceil(self.size * self.max_occupancy_rate)
    self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
-   for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
+   -- Allocate double the requested number of entries to make sure there
+   -- is sufficient displacement if all hashes map to the last bucket.
+   self.entries = calloc(self.entry_type, size * 2)
 
-   ffi.gc(self.entries, function (ptr) S.munmap(ptr, byte_size) end)
+   for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
 
    for i=0,old_size*2-1 do
       if old_entries[i].hash ~= HASH_MAX then
@@ -347,6 +350,17 @@ function PodHashMap:dump()
    end
 end
 
+function PodHashMap:iterate()
+   local max_entry = self.entries + self.size + self.max_displacement
+   local function next_entry(max_entry, entry)
+      while entry < max_entry do
+         entry = entry + 1
+         if entry.hash ~= HASH_MAX then return entry end
+      end
+   end
+   return next_entry, max_entry, self.entries - 1
+end
+
 function PodHashMap:make_lookup_streamer(stride)
    -- These requires are here because they rely on dynasm, which the
    -- user might not have.  In that case, since they get no benefit from
@@ -362,13 +376,14 @@ function PodHashMap:make_lookup_streamer(stride)
       entries_per_lookup = self.max_displacement + 1,
       scale = self.scale,
       pointers = ffi.new('void*['..stride..']'),
-      entries = self.type(stride),
+      entries = calloc(self.entry_type, stride),
       -- Binary search over N elements can return N if no entry was
       -- found that was greater than or equal to the key.  We would
       -- have to check the result of binary search to ensure that we
       -- are reading a value in bounds.  To avoid this, allocate one
       -- more entry.
-      stream_entries = self.type(stride * (self.max_displacement + 1) + 1)
+      stream_entries = calloc(self.entry_type,
+                              stride * (self.max_displacement + 1) + 1)
    }
    -- Give res.pointers sensible default values in case the first lookup
    -- doesn't fill the pointers vector.
@@ -542,7 +557,8 @@ function selftest()
    -- 32-byte entries
    local rhh = PodHashMap.new(ffi.typeof('uint32_t'), ffi.typeof('int32_t[6]'),
                               hash_i32)
-   rhh:resize(2e6 / 0.4 + 1)
+   local occupancy = 2e6
+   rhh:resize(occupancy / 0.4 + 1)
 
    local function test_insertion(count)
       local v = ffi.new('int32_t[6]');
@@ -560,7 +576,7 @@ function selftest()
       return result
    end
 
-   check_perf(test_insertion, 2e6, 400, 100, 'insertion (40% occupancy)')
+   check_perf(test_insertion, occupancy, 400, 100, 'insertion (40% occupancy)')
    print('max displacement: '..rhh.max_displacement)
    io.write('selfcheck: ')
    io.flush()
@@ -569,14 +585,21 @@ function selftest()
 
    io.write('population check: ')
    io.flush()
-   for i = 1, 2e6 do
+   for i = 1, occupancy do
       local offset = rhh:lookup(i)
       assert(rhh:val_at(offset)[0] == bnot(i))
    end
    rhh:selfcheck()
    io.write('pass\n')
 
-   check_perf(test_lookup, 2e6, 300, 100, 'lookup (40% occupancy)')
+   io.write('iteration check: ')
+   io.flush()
+   local iterated = 0
+   for entry in rhh:iterate() do iterated = iterated + 1 end
+   assert(iterated == occupancy)
+   io.write('pass\n')
+
+   check_perf(test_lookup, occupancy, 300, 100, 'lookup (40% occupancy)')
 
    local stride = 1
    repeat
@@ -596,12 +619,12 @@ function selftest()
       -- Note that "result" is part of the value, not an index into
       -- the table, and so we expect the results to be different from
       -- rhh:lookup().
-      check_perf(test_lookup_streamer, 2e6, 1000, 100,
+      check_perf(test_lookup_streamer, occupancy, 1000, 100,
                  'streaming lookup, stride='..stride)
       stride = stride * 2
    until stride > 256
 
-   check_perf(test_lookup, 2e6, 300, 100, 'lookup (40% occupancy)')
+   check_perf(test_lookup, occupancy, 300, 100, 'lookup (40% occupancy)')
 
    -- A check that our equality functions work as intended.
    local numbers_equal = make_equal_fn(ffi.typeof('int'))

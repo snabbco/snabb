@@ -16,7 +16,7 @@ Time (s),IPv4 RX MPPS,IPv4 RX Gbps,IPv4 TX MPPS,IPv4 TX Gbps,IPv6 RX MPPS,IPv6 R
 The lwaftr is running, but not receiving packets from the load generator.
 Check that the load generator is running, and that the physical wiring is
 between the interfaces the load generator is running on and the interfaces
-that the lwaftr is running on, and that the `--v4-pci` and `--v6-pci` arguments
+that the lwaftr is running on, and that the `--v4` and `--v6` arguments
 reflect the physical wiring, rather than being swapped.  If you have VLANs configured
 and you are using Intel NICs, make sure the VLAN IDs are correct.
 

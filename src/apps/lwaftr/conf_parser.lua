@@ -10,8 +10,11 @@ Parser = {}
 
 function Parser.new(file)
    local name = file.name
+   local err
    if type(file) == 'string' then
-      name, file = file, io.open(file)
+      name = file
+      file, err = io.open(file)
+      if not file then error(err) end
    end
    local ret = { column=0, line=1, name=name }
    function ret.read_char() return file:read(1) end
@@ -231,15 +234,32 @@ function Parser:parse_string()
    return str
 end
 
-function Parser:parse_file_name()
-   local str = self:parse_string()
-   if str == '' then self:error('file name is empty') end
-   -- Relative paths in conf files are relative to the location of the
-   -- conf file, not the current working directory.
-   if not str:match('^/') and self.name then
-      str = lib.dirname(self.name)..'/'..str
+function Parser:make_path(orig_path)
+   if orig_path == '' then self:error('file name is empty') end
+   if not orig_path:match('^/') and self.name then
+      -- Relative paths in conf files are relative to the location of the
+      -- conf file, not the current working directory.
+      return lib.dirname(self.name)..'/'..orig_path
    end
-   return str
+   return orig_path
+end
+
+function Parser:parse_file_name()
+   return self:make_path(self:parse_string())
+end
+
+function Parser:parse_string_or_file()
+   local str = self:parse_string()
+   if not str:match('^<') then
+      return str
+   end
+   -- Remove the angle bracket.
+   local path = self:make_path(str:sub(2))
+   local filter, err = lib.readfile(path, "*a")
+   if filter == nil then
+      self:error('cannot read filter conf file "%s": %s', path, err)
+   end
+   return filter
 end
 
 function Parser:parse_boolean()

@@ -123,7 +123,6 @@ function nd_light:new (conf)
    -- Prepare packet for solicitation of next hop
    local nh = { nsent = 0 }
    local dgram = datagram:new()
-   nh.packet = dgram:packet()
    local sol_node_mcast = ipv6:solicited_node_mcast(conf.next_hop)
    local ipv6 = ipv6:new({ next_header = 58, -- ICMP6
          hop_limit = 255,
@@ -148,6 +147,7 @@ function nd_light:new (conf)
    dgram:push(ethernet:new({ src = conf.local_mac,
                              dst = ethernet:ipv6_mcast(sol_node_mcast),
                              type = 0x86dd }))
+   nh.packet = dgram:packet()
    dgram:free()
 
    -- Timer for retransmits of neighbor solicitations
@@ -176,7 +176,6 @@ function nd_light:new (conf)
    -- Prepare packet for solicited neighbor advertisement
    local sna = {}
    dgram = datagram:new()
-   sna.packet = dgram:packet()
    -- Leave dst address unspecified.  It will be set to the source of
    -- the incoming solicitation
    ipv6 = ipv6:new({ next_header = 58, -- ICMP6
@@ -197,6 +196,8 @@ function nd_light:new (conf)
    -- Leave dst address unspecified.
    dgram:push(ethernet:new({ src = conf.local_mac,
                              type = 0x86dd }))
+   sna.packet = dgram:packet()
+
    -- Parse the headers we want to modify later on from our template
    -- packet.
    dgram = dgram:new(sna.packet, ethernet)

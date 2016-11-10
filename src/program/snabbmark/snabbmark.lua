@@ -352,7 +352,7 @@ function esp (npackets, packet_size, mode, profile)
    local plain = d:packet()
    local conf = { spi = 0x0,
                   mode = "aes-128-gcm",
-                  keymat = "00112233445566778899AABBCCDDEEFF",
+                  key = "00112233445566778899AABBCCDDEEFF",
                   salt = "00112233"}
    local enc, dec = esp.esp_v6_encrypt:new(conf), esp.esp_v6_decrypt:new(conf)
 

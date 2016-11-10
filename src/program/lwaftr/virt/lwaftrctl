@@ -33,19 +33,19 @@
 qemu_start_vm() {
     echo "Starting QEMU. Please wait..."
     cd $VM_DIR
-    sudo qemu-system-x86_64 \
+    sudo numactl -m ${NUMA_NODE} taskset -c ${QEMU_CORE} qemu-system-x86_64 \
         --enable-kvm -name ${NAME} -drive file=${DISK},if=virtio \
-        -m ${MEM} -cpu host -smp 2 \
+        -m ${MEM} -cpu host \
         -fsdev local,security_model=passthrough,id=fsdev0,path=${SHARED_LOCATION} \
             -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=share \
-        -object memory-backend-file,id=mem,size=${MEM},mem-path=/dev/hugepages,share=on \
+        -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGESTLB_FS},share=on \
         -numa node,memdev=mem \
         -chardev socket,id=char1,path=${VHU_SOCK1},server \
             -netdev type=vhost-user,id=net0,chardev=char1 \
-            -device virtio-net-pci,netdev=net0,addr=0x8,mac=52:54:00:00:00:01 \
+            -device virtio-net-pci,netdev=net0,addr=0x8,mac=${SNABBNFV_MAC1} \
         -chardev socket,id=char2,path=${VHU_SOCK2},server \
             -netdev type=vhost-user,id=net1,chardev=char2 \
-            -device virtio-net-pci,netdev=net1,addr=0x9,mac=52:54:00:00:00:02 \
+            -device virtio-net-pci,netdev=net1,addr=0x9,mac=${SNABBNFV_MAC2} \
         -netdev type=tap,id=net2,ifname=${IFACE},vhost=on,script=${NETSCRIPT} \
             -device virtio-net-pci,netdev=net2,addr=0xa,mac=52:54:00:00:00:03 \
         -vnc :${VNC_DISPLAY} -daemonize &
@@ -57,11 +57,6 @@ vm_pid() {
 
 start_vm() {
     qemu_start_vm
-    sleep 30
-
-    pid=$(vm_pid "${NAME}")
-    for each in `ls /proc/$pid/task`; do sudo taskset -cp $QEMU_CORE $each; done
-    echo "Pinned QEMU to core $QEMU_CORE"
 }
 
 stop_vm() {
@@ -107,8 +102,27 @@ start_snabbnfv_process() {
     local conf=$4
     local sock=$5
 
-    echo "Start snabbnfv (screen: '$screen') at core $core (pci: $pci; conf: $conf}; socket: $sock)"
-    screen -dmS $screen bash -c "cd ${SNABB_HOST_PATH}/src; sudo taskset -c ${core} sudo ./snabb snabbnfv traffic ${pci} ${conf} ${sock}"
+    # Check configuration file exists.
+    if [[ ! -f ${conf} ]]; then
+        echo "WARNING: File '${conf}' does not exist."
+    fi
+
+    # Run snabbnfv inside screen.
+    screen -dmS $screen bash -c \
+        "cd ${SNABB_HOST_PATH}/src; \
+         sudo numactl -m ${NUMA_NODE} taskset -c ${core} sudo ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock};"
+    sleep 0.5
+    status=$(screen -ls | grep ${screen})
+
+    # Check exit status.
+    if [[ -z ${status} ]]; then
+        echo "Start of snabbnfv failed: "
+        echo -e "\tsudo numactl -m ${NUMA_NODE} taskset -c ${core} sudo ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock}"
+        exit 1
+    fi
+
+    echo "Started snabbnfv on core ${core} (screen: '$screen')"
+    echo -e "\t{PCI: ${pci}, conf: ${conf}, sock: ${sock}}"
 }
 
 restart_snabbnfv() {
@@ -222,7 +236,7 @@ help() {
     usage 0
 }
 
-AFTRCTL_CONF=confs/lwaftrctl1.conf
+AFTRCTL_CONF=lwaftrctl.conf
 ARGS=()
 while [[ $# > 0 ]]; do
     key="$1"

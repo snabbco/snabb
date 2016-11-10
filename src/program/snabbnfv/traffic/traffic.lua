@@ -9,6 +9,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local timer = require("core.timer")
 local pci = require("lib.hardware.pci")
+local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local counter = require("core.counter")
 
 local long_opts = {
@@ -83,19 +84,23 @@ function long_usage () return usage end
 function traffic (pciaddr, confpath, sockpath)
    engine.log = true
    local mtime = 0
-   if C.stat_mtime(confpath) == 0 then
-      print(("WARNING: File '%s' does not exist."):format(confpath))
+   local needs_reconfigure = true
+   function check_for_reconfigure()
+      needs_reconfigure = C.stat_mtime(confpath) ~= mtime
    end
+   timer.activate(timer.new("reconf", check_for_reconfigure, 1e9, 'repeating'))
+   -- Flush logs every second.
+   timer.activate(timer.new("flush", io.flush, 1e9, 'repeating'))
+   timer.activate(ingress_drop_monitor.new({action='warn'}):timer())
    while true do
-      local mtime2 = C.stat_mtime(confpath)
-      if mtime2 ~= mtime then
-         print("Loading " .. confpath)
-         engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
-         mtime = mtime2
+      needs_reconfigure = false
+      print("Loading " .. confpath)
+      mtime = C.stat_mtime(confpath)
+      if mtime == 0 then
+         print(("WARNING: File '%s' does not exist."):format(confpath))
       end
-      engine.main({duration=1, no_report=true})
-      -- Flush buffered log messages every 1s
-      io.flush()
+      engine.configure(nfvconfig.load(confpath, pciaddr, sockpath))
+      engine.main({done=function() return needs_reconfigure end})
    end
 end
 
