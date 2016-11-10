@@ -48,6 +48,7 @@ local pci = require("lib.hardware.pci")
 
 virtual_module = {}
 formula = {}
+local fallback = 'emu'
 
 IOControl = {
    config = {
@@ -65,13 +66,13 @@ function IOControl:configure (c, name, conf)
    elseif conf.virtual then
       module = require(virtual_module[conf.virtual])
    else
-      error("Must supply one of: pciaddr, virtual")
+      module = require(virtual_module[fallback])
    end
    if module.control then
       config.app(c, name, module.control, conf)
    end
    queues[c] = queues[c] or {}
-   queues[c][conf.pciaddr or conf.virtual] = conf.queues
+   queues[c][conf.pciaddr or conf.virtual or fallback] = conf.queues
 end
 
 
@@ -108,7 +109,7 @@ function IO:configure (c, name, conf)
    elseif conf.virtual then
       modulepath = virtual_module[conf.virtual]
    else
-      error("Must supply one of: pciaddr, virtual")
+      modulepath = virtual_module[fallback]
    end
    formula[modulepath](c, name, require(modulepath).driver,
                        conf.queue, conf.bucket, make_queueconf(c, conf))
