@@ -577,11 +577,16 @@ function run (parameters)
          end
          table.insert(bridge_config.ports, ac_name)
          table.insert(acs, { name = ac_name,
+                             intf_name = ac_config,
                              intf = ac_intf,
                              input = ac_input,
                              output = ac_output })
       end
 
+      local npws = 0
+      for _, _ in pairs(vpls_c.pw) do
+        npws = npws + 1
+      end
       print("  Creating pseudowire instances")
       for pw, pw_config in pairs(vpls_c.pw) do
          assert(tunnel_config or pw_config.tunnel,
@@ -601,9 +606,8 @@ function run (parameters)
                         -- For a p2p VPN, pass the name of the AC
                         -- interface so the PW module can set up the
                         -- proper service-specific MIB
-                        interface = (#vpls_c.pw == 1 and
-                                        #acs == 1 and
-                                        acs[1].intf.config.name) or '',
+                        interface = (npws == 1 and #acs == 1 and
+                                       acs[1].intf_name) or '',
                         transport = { type = 'ipv6',
                                       src = vpls_address,
                                       dst = pw_address },
