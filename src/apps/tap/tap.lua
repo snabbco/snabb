@@ -15,7 +15,6 @@ local os = require("os")
 local t = S.types.t
 
 Tap = { }
-driver = Tap
 
 function Tap:new (name)
    assert(name, "missing tap interface name")

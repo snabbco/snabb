@@ -26,7 +26,6 @@ require("apps.vhost.vhost_user_h")
 assert(ffi.sizeof("struct vhost_user_msg") == 276, "ABI error")
 
 VhostUser = {}
-driver = VhostUser
 
 function VhostUser:new (args)
    local o = { state = 'init',
