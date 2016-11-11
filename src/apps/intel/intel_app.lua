@@ -35,6 +35,21 @@ local C = ffi.C
 -- The `driver' variable is used as a reference to the driver class in
 -- order to interchangably use NIC drivers.
 driver = Intel82599
+-- The `io' variable is used by lib.hardware.pci to forward queue configuration
+-- to NIC drivers.
+io = {}
+function io:configure (c, _, conf)
+   local nqueues, vmdq = 0, false
+   for _ in pairs(conf.queues) do
+      nqueues = nqueues + 1
+      if nqueues > 1 then vmdq = true; break end
+   end
+   for name, qconf in pairs(conf.queues) do
+      qconf.pciaddr = conf.device
+      qconf.vmdq = vmdq
+      config.app(c, name, Intel82599, qconf)
+   end
+end
 
 -- table pciaddr => {pf, vflist}
 local devices = {}
