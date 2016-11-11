@@ -267,7 +267,7 @@ function apply_config_actions (actions)
       end
       configuration.apps[name] = { class = class, arg = arg }
    end
-   function ops.reconfig (name, arg)
+   function ops.reconfig_app (name, arg)
       local app = app_table[name]
       app:reconfig(arg)
       configuration.apps[name].arg = arg
