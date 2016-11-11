@@ -15,6 +15,7 @@ Leader = {
 
 function Leader:new (conf)
    -- open socket
+   S.signal('pipe', 'ign')
    self.conf = conf
    local socket = assert(S.socket("unix", "stream, nonblock"))
    S.unlink(conf.socket_file_name) --unlink to avoid EINVAL on bind()
@@ -22,6 +23,11 @@ function Leader:new (conf)
    assert(socket:bind(sa))
    assert(socket:listen())
    return setmetatable({socket=socket, peers={}}, {__index=Leader})
+end
+
+function Leader:handle(payload)
+   print('got a payload!', payload)
+   return payload
 end
 
 function Leader:pull ()
@@ -33,24 +39,94 @@ function Leader:pull ()
          if err.AGAIN then break end
          assert(nil, err)
       end
-      table.insert(peers, { state='length', read=0, accum='', fd=fd })
+      fd:nonblock()
+      table.insert(peers, { state='length', len=0, fd=fd })
    end
    local i = 1
    while i <= #peers do
       local peer = peers[i]
-      if peer.state == 'length' then
-         ---
+      while peer.state == 'length' do
+         local ch, err = peer.fd:read(nil, 1)
+         if not ch then
+            if err.AGAIN then break end
+            peer.state = 'error'
+            peer.msg = tostring(err)
+         elseif ch == '\n' then
+            peer.pos = 0
+            peer.buf = ffi.new('uint8_t[?]', peer.len)
+            peer.state = 'payload'
+         elseif tonumber(ch) then
+            peer.len = peer.len * 10 + tonumber(ch)
+            if peer.len > 1e8 then
+               peer.state = 'error'
+               peer.msg = 'length too long: '..peer.len
+            end
+         else
+            peer.state = 'error'
+            peer.msg = 'unexpected character: '..ch
+         end
       end
-      if peer.state == 'payload' then
-         ---
+      while peer.state == 'payload' do
+         if peer.pos == peer.len then
+            peer.state = 'ready'
+            peer.payload = ffi.string(peer.buf, peer.len)
+            peer.buf, peer.len = nil, nil
+         else
+            local count, err = peer.fd:read(peer.buf + peer.pos,
+                                            peer.len - peer.pos)
+            if not count then
+               if err.AGAIN then break end
+               peer.state = 'error'
+               peer.msg = tostring(err)
+            elseif count == 0 then
+               peer.state = 'error'
+               peer.msg = 'short read'
+            else
+               peer.pos = peer.pos + count
+               assert(peer.pos <= peer.len)
+            end
+         end
       end
-      if peer.state == 'ready' then
-         ---
+      while peer.state == 'ready' do
+         local success, reply = pcall(self.handle, self, peer.payload)
+         peer.payload = nil
+         if success then
+            assert(type(reply) == 'string')
+            reply = #reply..'\n'..reply
+            peer.state = 'reply'
+            peer.buf = ffi.new('uint8_t[?]', #reply, reply)
+            peer.pos = 0
+            peer.len = #reply
+         else
+            peer.state = 'error'
+            peer.msg = reply
+         end
       end
-      if peer.state == 'reply' then
-         ---
+      while peer.state == 'reply' do
+         if peer.pos == peer.len then
+            peer.state = 'done'
+            peer.buf, peer.len = nil, nil
+         else
+            local count, err = peer.fd:write(peer.buf + peer.pos,
+                                             peer.len - peer.pos)
+            if not count then
+               if err.AGAIN then break end
+               peer.state = 'error'
+               peer.msg = tostring(err)
+            elseif count == 0 then
+               peer.state = 'error'
+               peer.msg = 'short write'
+            else
+               peer.pos = peer.pos + count
+               assert(peer.pos <= peer.len)
+            end
+         end
       end
       if peer.state == 'done' then
+         peer.fd:close()
+         table.remove(peers, i)
+      elseif peer.state == 'error' then
+         print('error: '..peer.msg)
          peer.fd:close()
          table.remove(peers, i)
       else
@@ -74,7 +150,8 @@ function selftest ()
    local tmp = os.tmpname()
    config.app(c, "leader", Leader, {socket_file_name=tmp})
    engine.configure(c)
-   engine.main({ duration = 0.0001, report = {showapps=true,showlinks=true}})
+   print(tmp)
+   engine.main({ duration = 100, report = {showapps=true,showlinks=true}})
    os.remove(tmp)
    print('selftest: ok')
 end
