@@ -1,70 +1,54 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
 module(..., package.seeall)
+local io = require("apps.io.io")
 local FloodingBridge = require("apps.bridge.flooding").bridge
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local murmur = require("lib.hash.murmur")
 local C = require("ffi").C
 
-
-control = {
-   config = {
-      virtual = {},
-      queues = {required=true}
-   }
+Emu = io.register('emu', {})
+Emu.config = {
+   device = {},
+   queues = {required=true}
 }
 
-local bridge = {}; setmetatable(bridge, {__mode="k"}) -- Weak keys
-
-function control:configure (c, name, conf)
-   bridge[c] = name
-   local ports = {}
-   for _, queuespec in ipairs(conf.queues) do
-      if not queuespec.buckets or queuespec.buckets == 1 then
-         table.insert(ports, queuespec.id)
-      else
-         for bucket = 1, queuespec.buckets do
-            table.insert(ports, queuespec.id.."_"..bucket)
-         end
+function Emu:configure (c, name, conf)
+   local bridge = conf.device or name
+   local ports, mod = {}, 1
+   for name, qconf in pairs(conf.queues) do
+      table.insert(ports, name)
+      if qconf.hash then
+         mod = math.max(qconf.hash, mod)
       end
    end
    config.app(c, name, FloodingBridge, {ports=ports})
+   for name, qconf in pairs(conf.queues) do
+      config.app(c, name, Emu, qconf)
+      config.link(c, name..".trunk -> "..bridge.."."..name)
+      config.link(c, bridge.."."..name.." -> "..name..".trunk")
+   end
 end
 
 
-driver = {
+Emu = {
    config = {
-      queue = {required=true},
-      bucket = {default=1},
-      buckets = {default=1},
-      queueconf = {required=true}
+      macaddr = {},
+      hash = {default=1},
+      mod = {default=1},
    }
 }
-
-Emu = {config = driver.config}
-
-function driver:configure (c, name, conf)
-   config.app(c, name, Emu, conf)
-   local port
-   if conf.buckets == 1 then
-      port = conf.queue
-   else
-      port = conf.queue.."_"..conf.bucket
-   end
-   config.link(c, name..".trunk -> "..bridge[c].."."..port)
-   config.link(c, bridge[c].."."..port.." -> "..name..".trunk")
-end
 
 function Emu:new (conf)
    local o = {}
    if conf.macaddr then
       o.mac = ethernet:pton(conf.macaddr)
    end
-   if conf.buckets > 1 then
+   if conf.mod > 1 then
       o.murmur = murmur.MurmurHash3_x86_32:new()
-      o.buckets = conf.buckets
-      o.bucket = conf.bucket
+      o.mod = conf.mod
+      o.hash = conf.hash
    end
    return setmetatable(o, {__index=Emu})
 end
@@ -80,14 +64,14 @@ function Emu:hash (p)
 end
 
 function Emu:push ()
-   local mac, bucket, buckets = self.max, self.bucket, self.buckets
+   local mac, hash, mod = self.max, self.hash, self.mod
    local l_in  = assert(self.input.trunk,  "No input link on trunk.")
    local l_out = assert(self.output.tx, "No output link on tx.")
    for i = 1, link.nreadable(l_in) do
       local p = link.receive(l_in)
       if p.length < MIN_SIZE
          or (mac and C.memcmp(mac, p.data, ADDRESS_SIZE) ~= 0)
-         or (bucket and 1 + (self:hash(p) % buckets) ~= bucket)
+         or (hash and 1 + (self:hash(p) % mod) ~= hash)
       then
          packet.free(p)
       else

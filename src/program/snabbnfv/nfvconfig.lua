@@ -2,7 +2,6 @@
 
 module(...,package.seeall)
 
-local IOControl = require("apps.io.io").IOControl
 local IO = require("apps.io.io").IO
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
@@ -22,26 +21,27 @@ function port_name (port_config)
    return port_config.port_id:gsub("-", "_")
 end
 
-function nic_queues (ports, soft_bench)
-   local queues = {}
-   for i, port in ipairs(ports) do
-      table.insert(queues, {id = port_name(port),
-                            macaddr = port.mac_address,
-                            vlan = port.vlan})
-   end
-   if soft_bench then
-      table.insert(queues, {id = "__SoftBench",
-                            macaddr = soft_bench.src})
-   end
-   return queues
-end
-
 -- Compile app configuration from <file> for <pciaddr> and vhost_user <socket>.
 -- Optionally install <soft_bench> source and sink. Returns configuration.
 function load (file, pciaddr, sockpath, soft_bench)
    local ports = lib.load_conf(file)
    local c = config.new()
-   config.app(c, "NIC", IOControl, {pciaddr=pciaddr, queues=nic_queues(ports, soft_bench)})
+   local NIC_suffix = "_NIC"
+   local queues = {}
+   for _, port in ipairs(ports) do
+      local NIC = port_name(port)..NIC_suffix
+      queues[NIC] = {macaddr = port.mac_address, vlan = port.vlan}
+   end
+   -- Set up virtual packet generator if requested.
+   if soft_bench then
+      assert(not queues["__SoftBench"])
+      queues["__SoftBench"] {macaddr = soft_bench.src}
+      config.app(c, "BenchSource", Synth, io.bench)
+      config.app(c, "BenchSink", Sink)
+      config.link(c, "BenchSource.output -> __SoftBench.rx")
+      config.link(c, "__SoftBench.tx -> BenchSink.input")
+   end
+   config.app(c, "IO", IO, {type=(pciaddr and 'pci'), device=pciaddr, queues=queues})
    for i,t in ipairs(ports) do
       -- Backwards compatibity / deprecated fields
       for deprecated, current in pairs({tx_police_gbps = "tx_police",
@@ -126,20 +126,10 @@ function load (file, pciaddr, sockpath, soft_bench)
          config.link(c, RxLimit..".output -> "..VM_rx)
          VM_rx = RxLimit..".input"
       end
-      -- Finally, configure NIC queue and connect ends
-      local NIC = name.."_NIC"
-      config.app(c, NIC, IO, {pciaddr = pciaddr, queue=name})
+      -- Finally, connect ends to I/O port
+      local NIC = name..NIC_suffix
       config.link(c, NIC..".tx".." -> "..VM_rx)
       config.link(c, VM_tx.." -> "..NIC..".rx")
-   end
-
-   -- Set up virtual packet generator if requested.
-   if soft_bench then
-      config.app(c, "BenchIO", IO, {pciaddr=pciaddr, queue="__SoftBench"})
-      config.app(c, "BenchSource", Synth, io.bench)
-      config.app(c, "BenchSink", Sink)
-      config.link(c, "BenchSource.output -> BenchIO.rx")
-      config.link(c, "BenchIO.tx -> BenchSink.input")
    end
 
    -- Return configuration c.
