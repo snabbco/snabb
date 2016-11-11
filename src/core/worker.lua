@@ -23,13 +23,10 @@ local function child (name)
    return children[name] or error("no such child: " .. name)
 end
 
--- Start a worker process with affinity to a specific CPU core.
--- The child will execute an app network when provided with configure().
-function start (name, core)
+-- Start a worker to execute an app network when provided with configure().
+function start (name)
    local pid = S.fork()
    if pid == 0 then
-      -- Lock affinity for this child
-      S.sched_setaffinity(0, {core})
       local env = { "SNABB_PROGRAM_LUACODE=require('core.worker').init()",
                     "SNABB_WORKER_NAME="..name,
                     "SNABB_WORKER_PARENT="..S.getppid() }
@@ -37,7 +34,7 @@ function start (name, core)
       S.execve(("/proc/%d/exe"):format(S.getpid()), {}, env)
    else
       -- Parent process
-      children[name] = { pid = pid, core = core }
+      children[name] = { pid = pid }
    end
 end
 
@@ -53,7 +50,6 @@ function status ()
       local infop = S.waitid("pid", info.pid, "nohang, exited")
       status[name] = {
          pid = info.pid,
-         core = info.core,
          alive = infop.code == 0
       }
    end
@@ -127,8 +123,8 @@ function selftest ()
    end
    print("Worker status:")
    for w, s in pairs(status()) do
-      print(("  worker %s: pid=%s core=%s alive=%s"):format(
-            w, s.pid, s.core, s.alive))
+      print(("  worker %s: pid=%s alive=%s"):format(
+            w, s.pid, s.alive))
    end
    print("Stopping children")
    for _, w in ipairs(workers) do
@@ -137,8 +133,8 @@ function selftest ()
    S.nanosleep(1)
    print("Worker status:")
    for w, s in pairs(status()) do
-      print(("  worker %s: pid=%s core=%s alive=%s"):format(
-            w, s.pid, s.core, s.alive))
+      print(("  worker %s: pid=%s alive=%s"):format(
+            w, s.pid, s.alive))
    end
    print("selftest: done")
 end
