@@ -327,8 +327,8 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
    assert(type(conf) == "table")
    assert(type(lwconf) == "table")
 
-   local v4_input, v6_input = unpack(sources)
-   local v4_output, v6_output = unpack(sinks)
+   local v4_src, v6_src = unpack(sources)
+   local v4_sink, v6_sink = unpack(sinks)
 
    if conf.ipv6_interface then
       if conf.ipv6_interface.fragmentation then
@@ -344,21 +344,21 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
             counters = counters,
             mtu = mtu,
          })
-         config.link(c, v6_output .. " -> reassemblerv6.input")
-         config.link(c, "fragmenterv6.output -> " .. v6_input)
-         v6_input, v6_output  = "fragmenterv6.input", "reassemblerv6.output"
+         config.link(c, v6_src .. " -> reassemblerv6.input")
+         config.link(c, "fragmenterv6.output -> " .. v6_sink)
+         v6_src, v6_sink  = "reassemblerv6.output", "fragmenterv6.input"
       end
       if conf.ipv6_interface.ipv6_ingress_filter then
          local filter = conf.ipv6_interface.ipv6_ingress_filter
          config.app(c, "ingress_filterv6", PcapFilter, { filter = filter })
-         config.link(c, v6_output .. " -> ingress_filterv6.input")
-         v6_output = "ingress_filterv6.output"
+         config.link(c, v6_src .. " -> ingress_filterv6.input")
+         v6_src = "ingress_filterv6.output"
       end
       if conf.ipv6_interface.ipv6_egress_filter then
          local filter = conf.ipv6_interface.ipv6_egress_filter
          config.app(c, "egress_filterv6", PcapFilter, { filter = filter })
-         config.link(c, "egress_filterv6.output -> " .. v6_input)
-         v6_input = "egress_filterv6.input"
+         config.link(c, "egress_filterv6.output -> " .. v6_sink)
+         v6_sink = "egress_filterv6.input"
       end
    end
 
@@ -376,34 +376,34 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
             counters = counters,
             mtu = mtu
          })
-         config.link(c, v4_output .. " -> reassemblerv4.input")
-         config.link(c, "fragmenterv4.output -> " .. v4_input)
-         v4_input, v4_output  = "fragmenterv4.input", "reassemblerv4.output"
+         config.link(c, v4_src .. " -> reassemblerv4.input")
+         config.link(c, "fragmenterv4.output -> " .. v4_sink)
+         v4_src, v4_sink  = "reassemblerv4.output", "fragmenterv4.input"
       end
       if conf.ipv4_interface.ipv4_ingress_filter then
          local filter = conf.ipv4_interface.ipv4_ingress_filter
          config.app(c, "ingress_filterv4", PcapFilter, { filter = filter })
-         config.link(c, v4_output .. " -> ingress_filterv4.input")
-         v4_output = "ingress_filterv4.output"
+         config.link(c, v4_src .. " -> ingress_filterv4.input")
+         v4_src = "ingress_filterv4.output"
       end
       if conf.ipv4_interface.ipv4_egress_filter then
          local filter = conf.ipv4_interface.ipv4_egress_filter
          config.app(c, "egress_filterv4", PcapFilter, { filter = filter })
-         config.link(c, "egress_filterv4.output -> " .. v4_input)
-         v4_input = "egress_filterv4.input"
+         config.link(c, "egress_filterv4.output -> " .. v4_sink)
+         v4_sink = "egress_filterv4.input"
       end
    end
 
    if conf.ipv4_interface and conf.ipv6_interface then
       config.app(c, "nh_fwd6", nh_fwd.nh_fwd6,
                  subset(nh_fwd.nh_fwd6.config, conf.ipv6_interface))
-      config.link(c, v6_input.." -> nh_fwd6.wire")
-      config.link(c, "nh_fwd6.wire -> "..v6_output)
+      config.link(c, v6_src.." -> nh_fwd6.wire")
+      config.link(c, "nh_fwd6.wire -> "..v6_sink)
 
       config.app(c, "nh_fwd4", nh_fwd.nh_fwd4,
                  subset(nh_fwd.nh_fwd4.config, conf.ipv4_interface))
-      config.link(c, v4_input.."-> nh_fwd4.wire")
-      config.link(c, "nh_fwd4.wire -> "..v4_output)
+      config.link(c, v4_src.."-> nh_fwd4.wire")
+      config.link(c, "nh_fwd4.wire -> "..v4_sink)
 
       lwconf.counters = lwcounter.init_counters()
       config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
