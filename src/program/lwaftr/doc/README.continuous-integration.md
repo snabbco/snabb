@@ -32,24 +32,35 @@ instance hosts the lwAftr CI benchmarks. Three jobsets are currently defined:
 
 ## Jobset parameters
 
-(The following uses the `lwaftr-nic` jobset as an example.)
+(The following uses the temporary `zzz-lwaftr-nic-dev` jobset as an example.)
 
 The parameters of each jobset are defined on its [configuration tab]
-(https://hydra.snabb.co/jobset/igalia/lwaftr-nic#tabs-configuration). Each
-lwAftr branch under test is pointed to a pair of parameters, named `snabbXname`
-and `snabbXsrc`, where `X` is an uppercase letter.
+(https://hydra.snabb.co/jobset/igalia/zzz-lwaftr-nic-dev#tabs-configuration).
 
-A curve is drawn on each report graph for each `snabbXname/snabbXsrc` pair,
-labeled with the `snabbXname` value, and showing benchmarks of the `snabbXsrc`
-branch.
+Each lwAftr branch under test is pointed to by a pair of parameters, named
+`snabbXname` and `snabbXsrc`, where `X` is an uppercase letter. A curve is
+drawn on each report graph for each `snabbXname/snabbXsrc` pair, labeled with
+the `snabbXname` value, and showing benchmarks of the `snabbXsrc` branch.
+
+The `conf` parameter selects a configuration file from within the
+`src/program/lwaftr/tests/data/` directory.
+
+The `ipv4PCap` and `ipv6PCap` parameters select data files from within the
+`src/program/lwaftr/tests/data/` directory.
+
+The `duration` parameter states the amount of time, in seconds, that each test
+will be run.
+
+The `times` parameter states how many times each test will be run.
 
 ## Reports
 
 Jobsets list executed jobs on the [Jobs tab]
-(https://hydra.snabb.co/jobset/igalia/lwaftr-nic#tabs-jobs). Click on the
-[reports.lwaftr](https://hydra.snabb.co/job/igalia/lwaftr-nic/reports.lwaftr)
-job, and then on a successful build (indicated by a green mark). In the "Build
-products" section, click on "report.html".
+(https://hydra.snabb.co/jobset/igalia/zzz-lwaftr-nic-dev#tabs-jobs). Click on
+the [reports.lwaftr]
+(https://hydra.snabb.co/job/igalia/zzz-lwaftr-nic-dev/reports.lwaftr) job, and
+then on a successful build (indicated by a green mark). In the "Build products"
+section, click on "report.html".
 
 The report has three sections:
 
