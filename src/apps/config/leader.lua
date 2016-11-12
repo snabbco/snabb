@@ -5,6 +5,7 @@ module(...,package.seeall)
 local S = require("syscall")
 local ffi = require("ffi")
 local yang = require("lib.yang.yang")
+local rpc = require("lib.yang.rpc")
 
 Leader = {
    config = {
@@ -13,21 +14,32 @@ Leader = {
    }
 }
 
-function Leader:new (conf)
-   -- open socket
+local function open_socket(file)
    S.signal('pipe', 'ign')
-   self.conf = conf
    local socket = assert(S.socket("unix", "stream, nonblock"))
-   S.unlink(conf.socket_file_name) --unlink to avoid EINVAL on bind()
-   local sa = S.t.sockaddr_un(conf.socket_file_name)
+   S.unlink(file) --unlink to avoid EINVAL on bind()
+   local sa = S.t.sockaddr_un(file)
    assert(socket:bind(sa))
    assert(socket:listen())
-   return setmetatable({socket=socket, peers={}}, {__index=Leader})
+   return socket
+end
+
+function Leader:new (conf)
+   local ret = {}
+   ret.conf = conf
+   ret.socket = open_socket(conf.socket_file_name)
+   ret.peers = {}
+   ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
+   ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
+   return setmetatable(ret, {__index=Leader})
+end
+
+function Leader:rpc_get_config(data)
+   return { config = "hey!" }
 end
 
 function Leader:handle(payload)
-   print('got a payload!', payload)
-   return payload
+   return rpc.handle_calls(self.rpc_callee, payload, self.rpc_handler)
 end
 
 function Leader:pull ()
@@ -150,8 +162,7 @@ function selftest ()
    local tmp = os.tmpname()
    config.app(c, "leader", Leader, {socket_file_name=tmp})
    engine.configure(c)
-   print(tmp)
-   engine.main({ duration = 100, report = {showapps=true,showlinks=true}})
-   os.remove(tmp)
+   engine.main({ duration = 0.0001, report = {showapps=true,showlinks=true}})
+   engine.configure(config.new())
    print('selftest: ok')
 end
