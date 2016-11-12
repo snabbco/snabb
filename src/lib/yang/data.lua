@@ -242,11 +242,13 @@ local function sequence_parser(keyword, members)
    local function parse1(node)
       local sub = assert(members[node.keyword],
                          'unrecognized rpc: '..node.keyword)
-      local id = normalize_id(node.keyword)
-      return {id=id, data=sub.finish(sub.parse(node, sub.init()))}
+      return {id=node.keyword, data=sub.finish(sub.parse(node, sub.init()))}
    end
    local function parse(node, out)
-      table.insert(out, parse1(node))
+      assert(not node.keyword) -- ?
+      for _,node in ipairs(node.statements) do
+         table.insert(out, parse1(node))
+      end
       return out
    end
    local function finish(out)
@@ -537,10 +539,13 @@ local function data_printer_from_grammar(production)
    end
    function handlers.sequence(keyword, production)
       local printers = {}
-      for k,v in pairs(production.members) do printers[k] = printer(k, v) end
+      for k,v in pairs(production.members) do
+         printers[k] = printer(k, v)
+      end
       return function(data, file, indent)
          for _,elt in ipairs(data) do
-            assert(printers[assert(elt.id)])(elt.data, file, indent)
+            local id = assert(elt.id)
+            assert(printers[id])(elt.data, file, indent)
          end
       end
    end
