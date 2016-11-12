@@ -1,4 +1,15 @@
-Data Format Usage:
-  snabb config get-config SOCKET MSG
+Usage:
+  snabb config get-config [OPTIONS] ID PATH
 
-foo
+Available options:
+  -s SCHEMA
+  --schema SCHEMA
+  --schema-name SCHEMA
+
+  -r REVISION
+  --revision REVISION
+  --revision-date REVISION
+
+  -h
+  --help
+

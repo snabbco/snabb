@@ -1,0 +1,25 @@
+module snabb-config-leader-v1 {
+  namespace snabb:config-leader;
+  prefix config-leader;
+
+  organization "Igalia, S.L.";
+  contact "Andy Wingo <wingo@igalia.com>";
+  description
+   "RPC interface for ConfigLeader Snabb app.";
+
+  revision 2016-11-12 {
+    description
+     "Initial revision.";
+  }
+
+  rpc get-config {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf path { type string; default "/"; }
+    }
+    output {
+      leaf config { type string; }
+    }
+  }
+}
