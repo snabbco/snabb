@@ -688,6 +688,14 @@ function resolve(schema, features)
          visit_top_level(node, env, 'extensions')
          visit_top_level(node, env, 'features')
          visit_top_level(node, env, 'identities')
+         for _,prop in ipairs({'rpcs', 'notifications'}) do
+            node[prop] = shallow_copy(node[prop])
+            for k,v in pairs(node[prop]) do node[prop][k] = visit(v, env) end
+         end
+      end
+      if node.kind == 'rpc' then
+         if node.input then node.input = visit(node.input, env) end
+         if node.output then node.output = visit(node.output, env) end
       end
       for _,feature in ipairs(pop_prop(node, 'if_features') or {}) do
          if not pcall(lookup, env, 'features', feature) then
@@ -700,18 +708,21 @@ function resolve(schema, features)
             node.primitive_type = node.type.primitive_type
          end
       end
-      for k,v in pairs(node.body or {}) do
-         if v.kind == 'uses' then
-            -- Inline "grouping" into "uses".
-            local grouping = lookup_lazy(env, 'groupings', v.id)
-            node.body[k] = nil
-            for k,v in pairs(grouping.body) do
-               assert(not node.body[k], 'duplicate identifier: '..k)
-               node.body[k] = v
+      if node.body then
+         node.body = shallow_copy(node.body)
+         for k,v in pairs(node.body or {}) do
+            if v.kind == 'uses' then
+               -- Inline "grouping" into "uses".
+               local grouping = lookup_lazy(env, 'groupings', v.id)
+               node.body[k] = nil
+               for k,v in pairs(grouping.body) do
+                  assert(not node.body[k], 'duplicate identifier: '..k)
+                  node.body[k] = v
+               end
+               -- TODO: Handle refine and augment statements.
+            else
+               node.body[k] = visit(v, env)
             end
-            -- TODO: Handle refine and augment statements.
-         else
-            node.body[k] = visit(v, env)
          end
       end
       return node, env
@@ -733,7 +744,9 @@ function resolve(schema, features)
       node = shallow_copy(node)
       local module_env = {env=env, prefixes={}, extensions={}, features={},
                           identities={}, typedefs={}, groupings={}}
-      local module_body = shallow_copy(node.body)
+      node.body = shallow_copy(node.body)
+      node.rpcs = shallow_copy(node.rpcs)
+      node.notifications = shallow_copy(node.notifications)
       for k,v in pairs(pop_prop(node, 'includes')) do
          local submodule = lookup(env, 'submodules', k)
          assert(submodule.belongs_to.id == node.id)
@@ -743,7 +756,9 @@ function resolve(schema, features)
          include(module_env.identities, submodule_env.identities)
          include(module_env.typedefs, submodule_env.typedefs)
          include(module_env.groupings, submodule_env.groupings)
-         include(module_body, submodule.body)
+         include(node.body, submodule.body)
+         include(node.rpcs, submodule.rpcs)
+         include(node.notifications, submodule.notifications)
       end
       if node.prefix then
          assert(node.kind == 'module', node.kind)
