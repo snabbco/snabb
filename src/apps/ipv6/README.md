@@ -56,6 +56,11 @@ milliseconds. Default is 1,000ms.
 *Optional*. Number of neighbor solicitation retransmissions. Default is
 unlimited retransmissions.
 
+— Key **quiet**
+
+*Optional*. If set to **true**, suppress log messages about ND
+activity. Default is **false**.
+
 ### Special Counters
 
 — Key **ns_checksum_errors**
