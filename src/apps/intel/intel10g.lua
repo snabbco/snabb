@@ -121,6 +121,7 @@ function M_sf:init ()
       self
          :disable_interrupts()
          :global_reset()
+         :disable_interrupts()
       if i%5 == 0 then self:autonegotiate_sfi() end
       self
          :wait_eeprom_autoread()
@@ -190,7 +191,11 @@ function M_sf:global_reset ()
    return self
 end
 
-function M_sf:disable_interrupts () return self end --- XXX do this
+function M_sf:disable_interrupts ()
+   self.r.EIMC:write(0xFFFFFFFF)
+   return self
+end
+
 function M_sf:wait_eeprom_autoread ()
    self.r.EEC:wait(bits{AutoreadDone=9})
    return self
@@ -1057,6 +1062,7 @@ DTXMXSZRQ 0x08100 -            RW DMA Tx Map Allow Size Requests
 DTXTCPFLGL 0x04A88 -           RW DMA Tx TCP Flags Control Low
 DTXTCPFLGH 0x04A88 -           RW DMA Tx TCP Flags Control High
 EEC       0x10010 -            RW EEPROM/Flash Control
+EIMC      0x00888 -            RW Extended Interrupt Clear Register (should be WO)
 FCTRL     0x05080 -            RW Filter Control
 FCCFG     0x03D00 -            RW Flow Control Configuration
 HLREG0    0x04240 -            RW MAC Core Control 0
