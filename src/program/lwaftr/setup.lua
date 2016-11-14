@@ -1,6 +1,7 @@
 module(..., package.seeall)
 
 local config     = require("core.config")
+local leader     = require("apps.config.leader")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
@@ -443,4 +444,15 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
 
    link_source(c, unpack(sources))
    link_sink(c, unpack(sinks))
+end
+
+function with_leader(f, graph, conf, ...)
+   local args = {...}
+   local function setup_fn(conf)
+      local graph = config.new()
+      f(graph, conf, unpack(args))
+      return graph
+   end
+   config.app(graph, 'leader', leader.Leader,
+              { setup_fn = setup_fn, initial_configuration = conf })
 end
