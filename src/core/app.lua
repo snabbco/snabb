@@ -210,7 +210,7 @@ function compute_config_actions (old, new)
          fresh_apps[appname] = true
       elseif not lib.equal(old.apps[appname].arg, arg) then
          if class.reconfig then
-            add_action('reconfig_app', appname, info.arg)
+            add_action('reconfig_app', appname, info.class, info.arg)
          else
             add_action('stop_app', appname)
             add_action('start_app', appname, info.class, info.arg)
@@ -315,7 +315,7 @@ function apply_config_actions (actions)
       end
       configuration.apps[name] = { class = class, arg = arg }
    end
-   function ops.reconfig_app (name, arg)
+   function ops.reconfig_app (name, class, arg)
       local app = app_table[name]
       app:reconfig(arg)
       configuration.apps[name].arg = arg
