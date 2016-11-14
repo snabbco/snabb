@@ -128,10 +128,8 @@ function selftest()
          }
       }}]]
 
-   local schemalib = require("lib.yang.schema")
-   local datalib = require("lib.yang.data")
-   local schema = schemalib.load_schema(schema_src, "xpath-test")
-   local grammar = datalib.data_grammar_from_schema(schema)
+   local scm = schema.load_schema(schema_src, "xpath-test")
+   local grammar = data.data_grammar_from_schema(scm)
 
    -- Test path to lua path.
    local path = convert_path("/routes/route[addr=1.2.3.4]/port", grammar.members)
