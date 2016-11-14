@@ -268,6 +268,56 @@ function compile_data_for_schema_by_name(schema_name, data, filename, source_mti
                                   data, filename, source_mtime)
 end
 
+-- Hackily re-use the YANG serializer for Lua data consisting of tables,
+-- ffi data, numbers, and strings.  Truly a hack; to be removed in the
+-- all-singing YANG future that we deserve where all data has an
+-- associated schema.
+local function ad_hoc_grammar_from_data(data)
+   if type(data) == 'table' then
+      local members = {}
+      for k,v in pairs(data) do
+         assert(type(k) == 'string')
+         members[k] = ad_hoc_grammar_from_data(v)
+      end
+      return {type='struct', members=members}
+   elseif type(data) == 'cdata' then
+      -- Hackety hack.
+      local ctype = tostring(ffi.typeof(data)):match('^ctype<(.*)>$')
+      if ctype:match('%*') then
+         error('pointer in ffi cdata cannot be serialized: '..ctype)
+      elseif ctype:match('%[') or ctype:match('^struct ') then
+         return {type='struct', members={}, ctype=ctype}
+      elseif ctype == 'uint64_t' then
+         return {type='scalar', argument_type={primitive_type='uint64'}}
+      elseif ctype == 'int64_t' then
+         return {type='scalar', argument_type={primitive_type='int64'}}
+      elseif ctype == 'double' or ctype == 'float' then
+         return {type='scalar', argument_type={primitive_type='decimal64'}}
+      elseif pcall(tonumber, data) then
+         local primitive_type = assert(ctype:match('^(.*)_t$'))
+         return {type='scalar', argument_type={primitive_type=primitive_type}}
+      else
+         error('unhandled ffi ctype: '..ctype)
+      end
+   elseif type(data) == 'number' then
+      return {type='scalar', argument_type={primitive_type='decimal64'}}
+   elseif type(data) == 'string' then
+      return {type='scalar', argument_type={primitive_type='string'}}
+   elseif type(data) == 'boolean' then
+      return {type='scalar', argument_type={primitive_type='boolean'}}
+   else
+      error('unhandled data type: '..type(data))
+   end
+end
+
+function compile_ad_hoc_lua_data_to_file(file_name, data)
+   local grammar = ad_hoc_grammar_from_data(data)
+   local emitter = data_emitter(grammar)
+   -- Empty string as schema name; a hack.
+   local compiler = data_compiler_from_grammar(emitter, '')
+   return compiler(data, file_name)
+end
+
 local function read_compiled_data(stream, strtab)
    local function read_string()
       return assert(strtab[stream:read_uint32()])
