@@ -18,40 +18,50 @@ for i, name in ipairs(action_names) do action_codes[name] = i end
 local actions = {}
 
 function actions.unlink_output (codec, appname, linkname)
-   codec:string(appname)
-   codec:string(linkname)
+   local appname = codec:string(appname)
+   local linkname = codec:string(linkname)
+   return codec:finish(appname, linkname)
 end
 function actions.unlink_input (codec, appname, linkname)
-   codec:string(appname)
-   codec:string(linkname)
+   local appname = codec:string(appname)
+   local linkname = codec:string(linkname)
+   return codec:finish(appname, linkname)
 end
 function actions.free_link (codec, linkspec)
-   codec:string(linkspec)
+   local linkspec = codec:string(linkspec)
+   return codec:finish(linkspec)
 end
 function actions.new_link (codec, linkspec)
-   codec:string(linkspec)
+   local linkspec = codec:string(linkspec)
+   return codec:finish(linkspec)
 end
 function actions.link_output (codec, appname, linkname, linkspec)
-   codec:string(appname)
-   codec:string(linkname)
-   codec:string(linkspec)
+   local appname = codec:string(appname)
+   local linkname = codec:string(linkname)
+   local linkspec = codec:string(linkspec)
+   return codec:finish(appname, linkname, linkspec)
 end
 function actions.link_input (codec, appname, linkname, linkspec)
-   codec:string(appname)
-   codec:string(linkname)
-   codec:string(linkspec)
+   local appname = codec:string(appname)
+   local linkname = codec:string(linkname)
+   local linkspec = codec:string(linkspec)
+   return codec:finish(appname, linkname, linkspec)
 end
-function actions.stop_app (codec, name)
-   codec:string(name)
+function actions.stop_app (codec, appname)
+   local appname = codec:string(appname)
+   return codec:finish(appname)
 end
-function actions.start_app (codec, name, class, arg)
-   codec:string(name)
-   codec:class(class)
-   codec:config(class, arg)
+function actions.start_app (codec, appname, class, arg)
+   local appname = codec:string(appname)
+   local _class = codec:class(class)
+   local config = codec:config(class, arg)
+   return codec:finish(appname, _class, config)
 end
-function actions.reconfig_app (codec, name, class, arg)
-   codec:string(name)
-   codec:config(class, arg)
+function actions.reconfig_app (codec, appname, class, arg)
+   local appname = codec:string(appname)
+   local _class = codec:class(class)
+   local config = codec:config(class, arg)
+   return codec:finish(appname, _class, config)
 end
 
 local public_names = {}
@@ -101,8 +111,8 @@ local function encoder()
    end
    function encoder:class(class)
       local require_path, name = find_public_name(class)
-      encoder:string(require_path)
-      encoder:string(name)
+      self:string(require_path)
+      self:string(name)
    end
    function encoder:config(class, arg)
       local file_name = random_file_name()
@@ -112,7 +122,7 @@ local function encoder()
       else
          binary.compile_ad_hoc_lua_data_to_file(file_name, arg)
       end
-      encoder:string(file_name)
+      self:string(file_name)
    end
    function encoder:finish()
       local size = 0
@@ -132,8 +142,42 @@ local function encode_action(action)
    local name, args = unpack(action)
    local codec = encoder()
    codec:uint32(assert(action_codes[name], name))
-   assert(actions[name], name)(codec, unpack(args))
-   return codec:finish()
+   return assert(actions[name], name)(codec, unpack(args))
+end
+
+local uint32_ptr_t = ffi.typeof('uint32_t*')
+local function decoder(buf, len)
+   local decoder = { buf=buf, len=len, pos=0 }
+   function decoder:read(count)
+      local ret = self.buf + self.pos
+      self.pos = self.pos + count
+      assert(self.pos <= self.len)
+      return ret
+   end
+   function decoder:uint32()
+      return ffi.cast(uint32_ptr_t, self:read(4))[0]
+   end
+   function decoder:string()
+      local len = self:uint32()
+      return ffi.string(self:read(len), len)
+   end
+   function decoder:class()
+      local require_path, name = self:string(), self:string()
+      return assert(require(require_path)[name])
+   end
+   function decoder:config()
+      return binary.load_compiled_data_file(self:string()).data
+   end
+   function decoder:finish(...)
+      return { ... }
+   end
+   return decoder
+end
+
+local function decode_action(buf, len)
+   local codec = decoder(buf, len)
+   local name = assert(action_names[codec:uint32()])
+   return { name, assert(actions[name], name)(codec) }
 end
 
 function selftest ()
@@ -152,16 +196,21 @@ function selftest ()
    serialize({foo={qux='baz'}})
    serialize(1)
    serialize(1LL)
+   local function test_action(action)
+      local encoded = encode_action(action)
+      local decoded = decode_action(encoded, ffi.sizeof(encoded))
+      assert(lib.equal(action, decoded))
+   end
    local appname, linkname, linkspec = 'foo', 'bar', 'foo.a -> bar.q'
    local class, arg = require('apps.basic.basic_apps').Tee, {}
-   encode_action({'unlink_output', {appname, linkname}})
-   encode_action({'unlink_input', {appname, linkname}})
-   encode_action({'free_link', {linkspec}})
-   encode_action({'new_link', {linkspec}})
-   encode_action({'link_output', {appname, linkname, linkspec}})
-   encode_action({'link_input', {appname, linkname, linkspec}})
-   encode_action({'stop_app', {appname}})
-   encode_action({'start_app', {appname, class, arg}})
-   encode_action({'reconfig_app', {appname, class, arg}})
+   test_action({'unlink_output', {appname, linkname}})
+   test_action({'unlink_input', {appname, linkname}})
+   test_action({'free_link', {linkspec}})
+   test_action({'new_link', {linkspec}})
+   test_action({'link_output', {appname, linkname, linkspec}})
+   test_action({'link_input', {appname, linkname, linkspec}})
+   test_action({'stop_app', {appname}})
+   test_action({'start_app', {appname, class, arg}})
+   test_action({'reconfig_app', {appname, class, arg}})
    print('selftest: ok')
 end
