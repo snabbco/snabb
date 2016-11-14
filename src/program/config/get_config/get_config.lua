@@ -4,6 +4,7 @@ module(..., package.seeall)
 local S = require("syscall")
 local ffi = require("ffi")
 local lib = require("core.lib")
+local shm = require("core.shm")
 local rpc = require("lib.yang.rpc")
 
 -- Number of spaces a tab should consist of when indenting config.
@@ -58,8 +59,15 @@ function run(args)
    local data = { schema = schema_name, revision = revision_date, path = path }
    local msg, parse = rpc.prepare_call(caller, 'get-config', data)
    local socket = assert(S.socket("unix", "stream"))
-   local sa = S.t.sockaddr_un(instance_id)
-   assert(socket:connect(sa))
+   local tail = instance_id..'/config-leader-socket'
+   local by_name = S.t.sockaddr_un(shm.root..'/by-name/'..tail)
+   local by_pid = S.t.sockaddr_un(shm.root..'/'..tail)
+   if not socket:connect(by_name) and not socket:connect(by_pid) then
+      io.stderr:write(
+         "Could not connect to config leader socket on Snabb instance '"..
+            instance_id.."'.\n")
+      main.exit(1)
+   end
    socket:write(tostring(#msg)..'\n'..msg)
    local len = read_length(socket)
    msg = read_msg(socket, len)

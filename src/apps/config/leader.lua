@@ -7,11 +7,12 @@ local ffi = require("ffi")
 local yang = require("lib.yang.yang")
 local rpc = require("lib.yang.rpc")
 local app = require("core.app")
+local shm = require("core.shm")
 local app_graph = require("core.config")
 
 Leader = {
    config = {
-      socket_file_name = {required=true},
+      socket_file_name = {default='config-leader-socket'},
       setup_fn = {required=true},
       initial_configuration = {},
       -- worker_app_name = {required=true}
@@ -31,7 +32,11 @@ end
 function Leader:new (conf)
    local ret = setmetatable({}, {__index=Leader})
    ret.socket_file_name = conf.socket_file_name
-   ret.socket = open_socket(conf.socket_file_name)
+   if not ret.socket_file_name:match('^/') then
+      local instance_dir = shm.root..'/'..tostring(S.getpid())
+      ret.socket_file_name = instance_dir..'/'..ret.socket_file_name
+   end
+   ret.socket = open_socket(ret.socket_file_name)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
    ret.current_app_graph = app_graph.new()
@@ -186,9 +191,8 @@ function selftest ()
    local pcap = require("apps.pcap.pcap")
    local Match = require("apps.test.match").Match
    local c = config.new()
-   local tmp = os.tmpname()
    local function setup_fn(cfg) return app_graph.new() end
-   config.app(c, "leader", Leader, {socket_file_name=tmp, setup_fn=setup_fn})
+   config.app(c, "leader", Leader, {setup_fn=setup_fn})
    engine.configure(c)
    engine.main({ duration = 0.0001, report = {showapps=true,showlinks=true}})
    engine.configure(config.new())
