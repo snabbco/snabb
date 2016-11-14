@@ -250,6 +250,10 @@ function parse_if (if_app_name, config)
    end
    if type(drv_c.config) == "table" then
       drv_c.config.mtu = config.mtu
+      -- Don't wait for hardware links to come up.  This
+      -- is currently supported by the intel{1,10}g drivers
+      -- and (hopefully) ignored by all other drivers
+      drv_c.config.wait_link_up = false
    end
    result.module = require(drv_c.path)[drv_c.name]
    result.config = drv_c.config

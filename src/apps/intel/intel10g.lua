@@ -58,7 +58,12 @@ local function pass (...) return ... end
 local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (conf)
+   local wait_link_up = true
+   if conf.wait_link_up ~= nil then
+      wait_link_up = conf.wait_link_up
+   end
    local dev = { pciaddress = conf.pciaddr, -- PCI device address
+                 wait_link_up = wait_link_up,
                  mtu = (conf.mtu or default.mtu),
                  fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
@@ -115,15 +120,38 @@ end
 function M_sf:init ()
    self:init_dma_memory()
 
-   self.redos = 0
-   local mask = bits{Link_up=30}
-   for i = 1, 100 do
+   if self.wait_link_up then
+      self.redos = 0
+      local mask = bits{Link_up=30}
+      for i = 1, 100 do
+         self
+            :disable_interrupts()
+            :global_reset()
+            :disable_interrupts()
+         if i%5 == 0 then self:autonegotiate_sfi() end
+         self
+            :wait_eeprom_autoread()
+            :wait_dma()
+            :init_statistics()
+            :init_receive()
+            :init_transmit()
+            :init_txdesc_prefetch()
+            :wait_enable()
+            :wait_linkup()
+
+         if band(self.r.LINKS(), mask) == mask then
+            self.redos = i
+            return self
+         end
+      end
+      io.write ('never got link up: ', self.pciaddress, '\n')
+      os.exit(2)
+   else
       self
          :disable_interrupts()
          :global_reset()
          :disable_interrupts()
-      if i%5 == 0 then self:autonegotiate_sfi() end
-      self
+         :autonegotiate_sfi()
          :wait_eeprom_autoread()
          :wait_dma()
          :init_statistics()
@@ -131,15 +159,7 @@ function M_sf:init ()
          :init_transmit()
          :init_txdesc_prefetch()
          :wait_enable()
-         :wait_linkup()
-
-      if band(self.r.LINKS(), mask) == mask then
-         self.redos = i
-         return self
-      end
    end
-   io.write ('never got link up: ', self.pciaddress, '\n')
-   os.exit(2)
    return self
 end
 

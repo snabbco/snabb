@@ -106,6 +106,10 @@ function Intel1g:new(conf)
    local rxq = conf.rxqueue or 0
    local ndesc = conf.ndescriptors or 512
    local rxburst = conf.rxburst or 128
+   local wait_link_up = true
+   if conf.wait_link_up ~= nil then
+      wait_link_up = conf.wait_link_up
+   end
 
    -- 8.1.3 Register Summary, p.359
    local r = {}
@@ -481,10 +485,12 @@ function Intel1g:new(conf)
          set32(r.CTRL_EXT, {AutoSpeedDetect = 12})              -- p.373
          --set32(r.CTRL_EXT, {DriverLoaded = 28})               -- signal Device Driver Loaded
 
-         io.write("Waiting for link...")
-         io.flush()
-         wait32(r.STATUS, {LinkUp=1})                           -- wait for auto-neg. to complete
-         print(" We have link-up!")
+         if wait_link_up then
+            io.write("Waiting for link...")
+            io.flush()
+            wait32(r.STATUS, {LinkUp=1})                           -- wait for auto-neg. to complete
+            print(" We have link-up!")
+         end
          --printMACstatus()
       end
 
