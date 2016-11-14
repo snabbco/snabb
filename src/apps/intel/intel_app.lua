@@ -38,15 +38,19 @@ driver = Intel82599
 -- The `io' variable is used by lib.hardware.pci to forward queue configuration
 -- to NIC drivers.
 io = {}
-function io:configure (c, _, conf)
+function io:configure (c, io, conf)
    local nqueues, vmdq = 0, false
    for _ in pairs(conf.queues) do
       nqueues = nqueues + 1
       if nqueues > 1 then vmdq = true; break end
    end
    for name, qconf in pairs(conf.queues) do
+      if not qconf.macaddr and vmdq then
+         error(io..": multiple ports defined, "..
+               "but promiscuous mode requested for queue: "..name)
+      end
       qconf.pciaddr = conf.device
-      qconf.vmdq = vmdq
+      qconf.vmdq = vmdq or (not not qconf.macaddr)
       config.app(c, name, Intel82599, qconf)
    end
 end
