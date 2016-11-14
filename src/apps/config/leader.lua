@@ -6,15 +6,19 @@ local S = require("syscall")
 local ffi = require("ffi")
 local yang = require("lib.yang.yang")
 local rpc = require("lib.yang.rpc")
+local app = require("core.app")
+local app_graph = require("core.config")
 
 Leader = {
    config = {
       socket_file_name = {required=true},
+      setup_fn = {required=true},
+      initial_configuration = {},
       -- worker_app_name = {required=true}
    }
 }
 
-local function open_socket(file)
+local function open_socket (file)
    S.signal('pipe', 'ign')
    local socket = assert(S.socket("unix", "stream, nonblock"))
    S.unlink(file) --unlink to avoid EINVAL on bind()
@@ -25,24 +29,47 @@ local function open_socket(file)
 end
 
 function Leader:new (conf)
-   local ret = {}
-   ret.conf = conf
+   local ret = setmetatable({}, {__index=Leader})
+   ret.socket_file_name = conf.socket_file_name
    ret.socket = open_socket(conf.socket_file_name)
    ret.peers = {}
+   ret.setup_fn = conf.setup_fn
+   ret.current_app_graph = app_graph.new()
+   ret:reset_configuration(conf.initial_configuration)
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
-   return setmetatable(ret, {__index=Leader})
+   return ret
 end
 
-function Leader:rpc_get_config(data)
+function Leader:reset_configuration (configuration)
+   self:flush_config_action_queue()
+   local new_app_graph = self.setup_fn(configuration)
+   self.config_action_queue = app.compute_config_actions(self.current_app_graph,
+                                                         new_app_graph)
+   self.current_app_graph = new_app_graph
+   self.current_configuration = configuration
+end
+
+function Leader:flush_config_action_queue (configuration)
+   -- Once we switch to multiple processes, this will wait until all
+   -- followers have processed the actions.  For now it just runs all
+   -- the actions.
+   if self.config_action_queue then
+      app.apply_config_actions(self.config_action_queue)
+      self.config_action_queue = nil
+   end
+end
+
+function Leader:rpc_get_config (data)
    return { config = "hey!" }
 end
 
-function Leader:handle(payload)
+function Leader:handle (payload)
    return rpc.handle_calls(self.rpc_callee, payload, self.rpc_handler)
 end
 
 function Leader:pull ()
+   self:flush_config_action_queue()
    local peers = self.peers
    while true do
       local sa = S.t.sockaddr_un()
@@ -151,7 +178,7 @@ function Leader:stop ()
    for _,peer in ipairs(self.peers) do peer.fd:close() end
    self.peers = {}
    self.socket:close()
-   S.unlink(self.conf.socket_file_name)
+   S.unlink(self.socket_file_name)
 end
 
 function selftest ()
@@ -160,7 +187,8 @@ function selftest ()
    local Match = require("apps.test.match").Match
    local c = config.new()
    local tmp = os.tmpname()
-   config.app(c, "leader", Leader, {socket_file_name=tmp})
+   local function setup_fn(cfg) return app_graph.new() end
+   config.app(c, "leader", Leader, {socket_file_name=tmp, setup_fn=setup_fn})
    engine.configure(c)
    engine.main({ duration = 0.0001, report = {showapps=true,showlinks=true}})
    engine.configure(config.new())
