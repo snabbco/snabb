@@ -133,12 +133,12 @@ local function encoder()
          ffi.copy(dst + pos, src, ffi.sizeof(src))
          pos = pos + ffi.sizeof(src)
       end
-      return dst
+      return dst, size
    end
    return encoder
 end
 
-local function encode_action(action)
+function encode_action(action)
    local name, args = unpack(action)
    local codec = encoder()
    codec:uint32(assert(action_codes[name], name))
@@ -174,7 +174,7 @@ local function decoder(buf, len)
    return decoder
 end
 
-local function decode_action(buf, len)
+function decode_action(buf, len)
    local codec = decoder(buf, len)
    local name = assert(action_names[codec:uint32()])
    return { name, assert(actions[name], name)(codec) }
@@ -197,8 +197,8 @@ function selftest ()
    serialize(1)
    serialize(1LL)
    local function test_action(action)
-      local encoded = encode_action(action)
-      local decoded = decode_action(encoded, ffi.sizeof(encoded))
+      local encoded, len = encode_action(action)
+      local decoded = decode_action(encoded, len)
       assert(lib.equal(action, decoded))
    end
    local appname, linkname, linkspec = 'foo', 'bar', 'foo.a -> bar.q'
