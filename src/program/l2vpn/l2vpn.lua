@@ -313,7 +313,8 @@ function parse_if (if_app_name, config)
          nd_c.module = nd
          nd_c.config = { local_ip  = ipv6.address,
                          local_mac = dummy_mac,
-                         next_hop = ipv6.next_hop }
+                         next_hop = ipv6.next_hop,
+                         quiet = true }
       end
       nd_c.links = { l3_links.output.." -> "..c.nd.name..".south",
                      c.nd.name..".south -> "..l3_links.input }
