@@ -66,7 +66,18 @@ function types.boolean.tostring(val)
    return tostring(val)
 end
 
-types.decimal64 = unimplemented('decimal64')
+-- FIXME: We lose precision by representing a decimal64 as a double.
+types.decimal64 = {ctype='double'}
+function types.decimal64.parse(str, what)
+   local str = assert(str, 'missing value for '..what)
+   return assert(tonumber(str), 'not a number: '..str)
+end
+function types.decimal64.tostring(val)
+   -- FIXME: Make sure we are not given too many digits after the
+   -- decimal point.
+   return tostring(val)
+end
+
 types.empty = unimplemented('empty')
 types.identityref = unimplemented('identityref')
 types['instance-identifier'] = unimplemented('instance-identifier')
