@@ -15,6 +15,7 @@ Leader = {
       socket_file_name = {default='config-leader-socket'},
       setup_fn = {required=true},
       initial_configuration = {},
+      Hz = {default=100},
       -- worker_app_name = {required=true}
    }
 }
@@ -40,6 +41,8 @@ function Leader:new (conf)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
    ret.current_app_graph = app_graph.new()
+   ret.period = 1/conf.Hz
+   ret.next_time = app.now()
    ret:reset_configuration(conf.initial_configuration)
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
@@ -74,6 +77,8 @@ function Leader:handle (payload)
 end
 
 function Leader:pull ()
+   if app.now() < self.next_time then return end
+   self.next_time = app.now() + self.period
    self:flush_config_action_queue()
    local peers = self.peers
    while true do
