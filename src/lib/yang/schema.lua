@@ -11,13 +11,6 @@ local function assert_with_loc(expr, loc, msg, ...)
    if not expr then error_with_path(loc, msg, ...) end
    return expr
 end
-local function error_with_path(path, msg, ...)
-   error(string.format("%s: "..msg, path, ...))
-end
-local function assert_with_path(expr, path, msg, ...)
-   if not expr then error_with_path(path, msg, ...) end
-   return expr
-end
 
 -- (kind -> (function(Node) -> value))
 local initializers = {}
@@ -25,29 +18,19 @@ local function declare_initializer(init, ...)
    for _, keyword in ipairs({...}) do initializers[keyword] = init end
 end
    
-local Node = {}
-local function parse_node(src, parent_path, order)
+local function parse_node(src)
    local ret = {}
    ret.kind = assert(src.keyword, 'missing keyword')
-   if parent_path then
-      ret.path = parent_path..'.'..ret.kind
-   else
-      ret.path = ret.kind
-   end
-   local children = parse_children(src, ret.path)
-   ret.children = children
-   ret = setmetatable(ret, {__index=Node})
+   local children = parse_children(src)
    local initialize = initializers[ret.kind]
    if initialize then initialize(ret, src.loc, src.argument, children) end
-   -- Strip annotations.
-   ret.path, ret.children = nil
    return ret
 end
 
-function parse_children(src, parent_path)
+function parse_children(src)
    local ret = {}
    for i, statement in ipairs(src.statements or {}) do
-      local child = parse_node(statement, parent_path, i)
+      local child = parse_node(statement)
       if not ret[child.kind] then ret[child.kind] = {} end
       table.insert(ret[child.kind], child)
    end
@@ -175,8 +158,8 @@ end
 local function init_natural(node, loc, argument, children)
    local arg = require_argument(loc, argument)
    local as_num = tonumber(arg)
-   assert_with_path(as_num and math.floor(as_num) == as_num and as_num >= 0,
-                    node.path, 'not a natural number: %s', arg)
+   assert_with_loc(as_num and math.floor(as_num) == as_num and as_num >= 0,
+                   loc, 'not a natural number: %s', arg)
    node.value = as_num
 end
 local function init_boolean(node, loc, argument, children)
@@ -501,8 +484,8 @@ end
 local function init_value(node, loc, argument, children)
    local arg = require_argument(loc, argument)
    local as_num = tonumber(arg)
-   assert_with_path(as_num and math.floor(as_num) == as_num,
-                    node.path, 'not an integer: %s', arg)
+   assert_with_loc(as_num and math.floor(as_num) == as_num,
+                   loc, 'not an integer: %s', arg)
    node.value = as_num
 end
 
