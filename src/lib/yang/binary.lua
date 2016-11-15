@@ -88,7 +88,7 @@ local function value_emitter(ctype)
    local buf = ffi.typeof('$[1]', type)()
    local function emit(val, stream)
       buf[0] = val
-      stream:write_ptr(buf)
+      stream:write_ptr(buf, type)
    end
    value_emitters[ctype] = emit
    return emit
@@ -120,7 +120,7 @@ local function data_emitter(production)
          return function(data, stream)
             stream:write_stringref('cdata')
             stream:write_stringref(production.ctype)
-            stream:write_ptr(data)
+            stream:write_ptr(data, ffi.typeof(production.ctype))
          end
       else
          local emit_member = visitn(production.members)
@@ -233,12 +233,13 @@ function data_compiler_from_grammar(emit_data, schema_name, schema_revision)
       local header = header_t(
          MAGIC, VERSION, source_mtime.sec, source_mtime.nsec,
          strtab:intern(schema_name), strtab:intern(schema_revision or ''))
-      stream:write_ptr(header) -- Write with empty data_len etc, fix it later.
+      -- Write with empty data_len etc, fix it later.
+      stream:write_ptr(header, header_t)
       header.data_start = stream.written
       local u32buf = ffi.new('uint32_t[1]')
       function stream:write_uint32(val)
          u32buf[0] = val
-         return self:write_ptr(u32buf)
+         return self:write_ptr(u32buf, 'uint32_t')
       end
       function stream:write_stringref(str)
          return self:write_uint32(strtab:intern(str))
@@ -248,7 +249,7 @@ function data_compiler_from_grammar(emit_data, schema_name, schema_revision)
       header.strtab_start, header.strtab_len = strtab:emit(stream)
       stream:rewind()
       -- Fix up header.
-      stream:write_ptr(header)
+      stream:write_ptr(header, header_t)
       stream:close_and_rename()
    end
 end
