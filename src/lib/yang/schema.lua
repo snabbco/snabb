@@ -8,7 +8,7 @@ local function error_with_loc(loc, msg, ...)
    error(string.format("%s: "..msg, loc, ...))
 end
 local function assert_with_loc(expr, loc, msg, ...)
-   if not expr then error_with_path(loc, msg, ...) end
+   if not expr then error_with_loc(loc, msg, ...) end
    return expr
 end
 
