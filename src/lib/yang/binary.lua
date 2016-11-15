@@ -289,22 +289,22 @@ local function ad_hoc_grammar_from_data(data)
    elseif type(data) == 'cdata' then
       -- Hackety hack.
       local ctype = tostring(ffi.typeof(data)):match('^ctype<(.*)>$')
-      if ctype:match('%*') then
-         error('pointer in ffi cdata cannot be serialized: '..ctype)
-      elseif ctype:match('%[') or ctype:match('^struct ') then
-         return {type='struct', members={}, ctype=ctype}
-      elseif ctype == 'uint64_t' then
-         return {type='scalar', argument_type={primitive_type='uint64'}}
-      elseif ctype == 'int64_t' then
-         return {type='scalar', argument_type={primitive_type='int64'}}
-      elseif ctype == 'double' or ctype == 'float' then
-         return {type='scalar', argument_type={primitive_type='decimal64'}}
-      elseif pcall(tonumber, data) then
-         local primitive_type = assert(ctype:match('^(.*)_t$'))
-         return {type='scalar', argument_type={primitive_type=primitive_type}}
-      else
-         error('unhandled ffi ctype: '..ctype)
-      end
+      local primitive_types = {
+         ['unsigned char [4]']     = 'legacy-ipv4-address',
+         ['unsigned char (&)[4]']  = 'legacy-ipv4-address',
+         ['unsigned char [6]']     = 'mac-address',
+         ['unsigned char (&)[6]']  = 'mac-address',
+         ['unsigned char [16]']    = 'ipv6-address',
+         ['unsigned char (&)[16]'] = 'ipv6-address',
+         ['uint8_t']  = 'uint8',  ['int8_t']  = 'int8',
+         ['uint16_t'] = 'uint16', ['int16_t'] = 'int16',
+         ['uint32_t'] = 'uint32', ['int32_t'] = 'int32',
+         ['uint64_t'] = 'uint64', ['int64_t'] = 'int64',
+         ['double'] = 'decimal64' -- ['float'] = 'decimal64',
+      }
+      local prim = primitive_types[ctype]
+      if not prim then error('unhandled ffi ctype: '..ctype) end
+      return {type='scalar', argument_type={primitive_type=prim}}
    elseif type(data) == 'number' then
       return {type='scalar', argument_type={primitive_type='decimal64'}}
    elseif type(data) == 'string' then

@@ -107,6 +107,12 @@ types['ipv4-address'] = {
    tostring = function(val) return util.ipv4_ntop(val) end
 }
 
+types['legacy-ipv4-address'] = {
+   ctype = 'uint8_t[4]',
+   parse = function(str, what) return assert(ipv4:pton(str)) end,
+   tostring = function(val) return ipv4:ntop(val) end
+}
+
 types['ipv6-address'] = {
    ctype = 'uint8_t[16]',
    parse = function(str, what) return assert(ipv6:pton(str)) end,
