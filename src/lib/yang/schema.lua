@@ -33,6 +33,8 @@ local function parse_node(src, parent_path, order)
    ret = setmetatable(ret, {__index=Node})
    local initialize = initializers[ret.kind]
    if initialize then initialize(ret) end
+   -- Strip annotations.
+   ret.path, ret.order, ret.argument_string, ret.children = nil
    return ret
 end
 
@@ -561,18 +563,6 @@ local function schema_from_ast(ast)
    return ret
 end
 
--- Strip properties pertaining to original source representation.
-local function strip(exp)
-   if type(exp) ~= 'table' then return exp end
-   local ret = {}
-   for k, v in pairs(exp) do
-      if k ~= 'children' and k ~= 'argument_string' and k ~= 'order' and k ~= 'path' then
-         ret[k] = strip(v)
-      end
-   end
-   return ret
-end
-
 local function set(...)
    local ret = {}
    for k, v in pairs({...}) do ret[v] = true end
@@ -815,10 +805,10 @@ function parse_schema_file(filename)
 end
 
 function load_schema(src, filename)
-   return resolve(primitivize(strip(parse_schema(src, filename))))
+   return resolve(primitivize(parse_schema(src, filename)))
 end
 function load_schema_file(filename)
-   return resolve(primitivize(strip(parse_schema_file(filename))))
+   return resolve(primitivize(parse_schema_file(filename)))
 end
 function load_schema_by_name(name, revision)
    -- FIXME: @ is not valid in a Lua module name.
