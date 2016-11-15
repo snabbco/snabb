@@ -44,7 +44,12 @@ function main ()
    if lib.getenv("SNABB_PROGRAM_LUACODE") then
       -- Run the given Lua code instead of the command-line
       local expr = lib.getenv("SNABB_PROGRAM_LUACODE")
-      loadstring(expr)()
+      local f = loadstring(expr)
+      if f == nil then
+         error(("Failed to load $SNABB_PROGRAM_LUACODE: %q"):format(expr))
+      else
+         f()
+      end
    else
       -- Choose a program based on the command line
       local program, args = select_program(parse_command_line())
