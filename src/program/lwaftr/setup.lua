@@ -26,29 +26,26 @@ function lwaftr_app(c, conf)
    assert(type(conf) == 'table')
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
-   conf.counters = lwcounter.init_counters()
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler,
               { max_ipv4_reassembly_packets =
                    conf.external_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =
-                   conf.external_interface.reassembly.max_fragments_per_packet,
-                counters = conf.counters })
+                   conf.external_interface.reassembly.max_fragments_per_packet })
    config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6,
               { max_ipv6_reassembly_packets =
                    conf.internal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =
-                   conf.internal_interface.reassembly.max_fragments_per_packet,
-                counters = conf.counters })
+                   conf.internal_interface.reassembly.max_fragments_per_packet })
    config.app(c, "icmpechov4", ipv4_apps.ICMPEcho,
               { address = convert_ipv4(conf.external_interface.ip) })
    config.app(c, "icmpechov6", ipv6_apps.ICMPEcho,
               { address = conf.internal_interface.ip })
    config.app(c, 'lwaftr', lwaftr.LwAftr, conf)
    config.app(c, "fragmenterv4", ipv4_apps.Fragmenter,
-              { mtu=conf.external_interface.mtu, counters=conf.counters })
+              { mtu=conf.external_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
-              { mtu=conf.internal_interface.mtu, counters=conf.counters })
+              { mtu=conf.internal_interface.mtu })
    config.app(c, "ndp", ipv6_apps.NDP,
               { src_ipv6 = conf.internal_interface.ip,
                 src_eth = conf.internal_interface.mac,

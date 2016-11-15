@@ -126,8 +126,6 @@ function lwaftr_app(c, conf, lwconf, sock_path)
    assert(type(lwconf) == 'table')
 
    print(("Hairpinning: %s"):format(yesno(lwconf.internal_interface.hairpinning)))
-   local counters = lwcounter.init_counters()
-
    local virt_id = "vm_" .. conf.interface.id
    local phy_id = "nic_" .. conf.interface.id
 
@@ -170,14 +168,12 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       if conf.ipv6_interface.fragmentation then
          local mtu = conf.ipv6_interface.mtu or lwconf.internal_interface.mtu
          config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, {
-            counters = counters,
             max_ipv6_reassembly_packets =
                lwconf.internal_interface.reassembly.max_packets,
             max_fragments_per_reassembly_packet =
                lwconf.internal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
-            counters = counters,
             mtu = mtu,
          })
          config.link(c, v6_output .. " -> reassemblerv6.input")
@@ -207,14 +203,12 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       if conf.ipv4_interface.fragmentation then
          local mtu = conf.ipv4_interface.mtu or lwconf.external_interface.mtu
          config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
-            counters = counters,
             max_ipv4_reassembly_packets =
                lwconf.external_interface.reassembly.max_packets,
             max_fragments_per_reassembly_packet =
                lwconf.external_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
-            counters = counters,
             mtu = mtu
          })
          config.link(c, v4_output .. " -> reassemblerv4.input")
@@ -251,7 +245,6 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       config.link(c, "nh_fwd4.wire -> " .. v4_input)
       v4_input, v4_output = "nh_fwd4.vm", "nh_fwd4.vm"
 
-      lwconf.counters = counters
       config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
       config.link(c, "nh_fwd6.service -> lwaftr.v6")
       config.link(c, "lwaftr.v6 -> nh_fwd6.service")
@@ -334,14 +327,12 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
       if conf.ipv6_interface.fragmentation then
          local mtu = conf.ipv6_interface.mtu or lwconf.internal_interface.mtu
          config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, {
-            counters = counters,
             max_ipv6_reassembly_packets =
                lwconf.internal_interface.reassembly.max_packets,
             max_fragments_per_reassembly_packet =
                lwconf.internal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
-            counters = counters,
             mtu = mtu,
          })
          config.link(c, v6_src .. " -> reassemblerv6.input")
@@ -366,14 +357,12 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
       if conf.ipv4_interface.fragmentation then
          local mtu = conf.ipv4_interface.mtu or lwconf.external_interface.mtu
          config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
-            counters = counters,
             max_ipv4_reassembly_packets =
                lwconf.external_interface.reassembly.max_packets,
             max_fragments_per_reassembly_packet =
                lwconf.external_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
-            counters = counters,
             mtu = mtu
          })
          config.link(c, v4_src .. " -> reassemblerv4.input")
@@ -405,7 +394,6 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
       config.link(c, v4_src.."-> nh_fwd4.wire")
       config.link(c, "nh_fwd4.wire -> "..v4_sink)
 
-      lwconf.counters = lwcounter.init_counters()
       config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
       config.link(c, "nh_fwd6.service -> lwaftr.v6")
       config.link(c, "lwaftr.v6 -> nh_fwd6.service")

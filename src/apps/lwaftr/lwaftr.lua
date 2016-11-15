@@ -4,6 +4,7 @@ local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
 local dump = require('apps.lwaftr.dump')
 local icmp = require("apps.lwaftr.icmp")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
@@ -258,7 +259,7 @@ function LwAftr:new(conf)
    end
 
    o.control = channel.create('lwaftr/control', messages.lwaftr_message_t)
-   o.counters = assert(conf.counters, "Counters not initialized")
+   o.counters = lwcounter.init_counters()
 
    o.transmit_icmpv6_reply = init_transmit_icmpv6_reply(
       conf.internal_interface.error_rate_limiting)
