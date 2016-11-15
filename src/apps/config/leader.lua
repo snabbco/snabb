@@ -91,6 +91,7 @@ end
 
 function Leader:rpc_get_config (args)
    -- FIXME: Push more of this to a lib.
+   assert(args.path == '/')
    local schema = yang.load_schema_by_name(self.schema_name)
    local grammar = data.data_grammar_from_schema(schema)
    local printer = data.data_string_printer_from_grammar(grammar)
