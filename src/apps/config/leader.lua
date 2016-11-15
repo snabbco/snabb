@@ -91,12 +91,20 @@ end
 
 function Leader:rpc_get_config (args)
    -- FIXME: Push more of this to a lib.
+   assert(args.schema == self.schema_name)
    assert(args.path == '/')
    local schema = yang.load_schema_by_name(self.schema_name)
    local grammar = data.data_grammar_from_schema(schema)
    local printer = data.data_string_printer_from_grammar(grammar)
    local config_str = printer(self.current_configuration)
    return { config = config_str }
+end
+
+function Leader:rpc_load_config (args)
+   assert(args.schema == self.schema_name)
+   local config = yang.load_data_for_schema_by_name(args.schema, args.config)
+   self:reset_configuration(config)
+   return {}
 end
 
 function Leader:handle (payload)

@@ -114,7 +114,12 @@ function rpc_grammar_from_schema(schema)
    for _,prop in ipairs({'input', 'output'}) do
       grammar[prop] = { type="sequence", members={} }
       for k,rpc in pairs(schema.rpcs) do
-         grammar[prop].members[k] = data_grammar_from_schema(rpc[prop])
+         local node = rpc[prop]
+         if node then
+            grammar[prop].members[k] = data_grammar_from_schema(node)
+         else
+            grammar[prop].members[k] = {type="struct", members={}}
+         end
       end
    end
    return grammar

@@ -22,4 +22,12 @@ module snabb-config-leader-v1 {
       leaf config { type string; }
     }
   }
+
+  rpc load-config {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf config { type string; mandatory true; }
+    }
+  }
 }
