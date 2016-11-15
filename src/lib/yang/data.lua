@@ -14,6 +14,15 @@ function normalize_id(id)
    return id:gsub('[^%w_]', '_')
 end
 
+-- Avoid generating lots of struct types.  Note that this function is
+-- only for string type names without parameters.
+local type_cache = {}
+function typeof(name)
+   assert(type(name) == 'string')
+   if not type_cache[name] then type_cache[name] = ffi.typeof(name) end
+   return type_cache[name]
+end
+
 -- If a "list" node has one key that is string-valued, we will represent
 -- instances of that node as normal Lua tables where the key is the
 -- table key and the value does not contain the key.
@@ -187,7 +196,7 @@ local function struct_parser(keyword, members, ctype)
       assert_not_duplicate(out, keyword)
       return parse1(node)
    end
-   local struct_t = ctype and ffi.typeof(ctype)
+   local struct_t = ctype and typeof(ctype)
    local function finish(out)
       -- FIXME check mandatory values.
       if struct_t then return struct_t(out) else return out end
@@ -206,7 +215,7 @@ local function array_parser(keyword, element_type, ctype)
       table.insert(out, parse1(node))
       return out
    end
-   local elt_t = ctype and ffi.typeof(ctype)
+   local elt_t = ctype and typeof(ctype)
    local array_t = ctype and ffi.typeof('$[?]', elt_t)
    local function finish(out)
       -- FIXME check min-elements
@@ -299,8 +308,8 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
    for k,v in pairs(keys) do members[k] = v end
    for k,v in pairs(values) do members[k] = v end
    local parser = struct_parser(keyword, members)
-   local key_t = key_ctype and ffi.typeof(key_ctype)
-   local value_t = value_ctype and ffi.typeof(value_ctype)
+   local key_t = key_ctype and typeof(key_ctype)
+   local value_t = value_ctype and typeof(value_ctype)
    local init
    if key_t and value_t then
       function init() return ctable_builder(key_t, value_t) end

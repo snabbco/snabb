@@ -82,7 +82,7 @@ end
 local value_emitters = {}
 local function value_emitter(ctype)
    if value_emitters[ctype] then return value_emitters[ctype] end
-   local type = ffi.typeof(ctype)
+   local type = data.typeof(ctype)
    local align = ffi.alignof(type)
    local size = ffi.sizeof(type)
    local buf = ffi.typeof('$[1]', type)()
@@ -117,10 +117,11 @@ local function data_emitter(production)
       for k,_ in pairs(production.members) do table.insert(member_names, k) end
       table.sort(member_names)
       if production.ctype then
+         local typeof = data.typeof
          return function(data, stream)
             stream:write_stringref('cdata')
             stream:write_stringref(production.ctype)
-            stream:write_ptr(data, ffi.typeof(production.ctype))
+            stream:write_ptr(data, typeof(production.ctype))
          end
       else
          local emit_member = visitn(production.members)
@@ -145,11 +146,12 @@ local function data_emitter(production)
    end
    function handlers.array(production)
       if production.ctype then
+         local typeof = data.typeof
          return function(data, stream)
             stream:write_stringref('carray')
             stream:write_stringref(production.ctype)
             stream:write_uint32(#data)
-            stream:write_array(data.ptr, ffi.typeof(production.ctype), #data)
+            stream:write_array(data.ptr, typeof(production.ctype), #data)
          end
       else
          local emit_tagged_value = visit1(
@@ -330,7 +332,7 @@ local function read_compiled_data(stream, strtab)
    end
    local ctypes = {}
    local function scalar_type(ctype)
-      if not ctypes[ctype] then ctypes[ctype] = ffi.typeof(ctype) end
+      if not ctypes[ctype] then ctypes[ctype] = data.typeof(ctype) end
       return ctypes[ctype]
    end
 
@@ -360,7 +362,7 @@ local function read_compiled_data(stream, strtab)
    function readers.ctable()
       local key_ctype = read_string()
       local value_ctype = read_string()
-      local key_t, value_t = ffi.typeof(key_ctype), ffi.typeof(value_ctype)
+      local key_t, value_t = data.typeof(key_ctype), data.typeof(value_ctype)
       return ctable.load(stream, {key_type=key_t, value_type=value_t})
    end
    function readers.cltable()
