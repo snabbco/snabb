@@ -370,10 +370,10 @@ local function read_compiled_data(stream, strtab)
       return cltable.build(keys, values)
    end
    function readers.lltable()
-      local ret = data.make_assoc()
+      local ret = {}
       for i=1,stream:read_uint32() do
          local k = read1()
-         ret:add(k, read1())
+         ret[k] = read1()
       end
       return ret
    end
