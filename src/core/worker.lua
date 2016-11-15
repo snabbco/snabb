@@ -4,10 +4,9 @@
 module(..., package.seeall)
 
 -- API:
--- start(name, core)
+-- start(name, luacode)
 -- stop(name)
 -- status() -> table of { name = <info> }
--- configure(name, config)
 
 local lib = require("core.lib")
 local shm = require("core.shm")
@@ -70,18 +69,6 @@ function status ()
       }
    end
    return status
-end
-
--- Configure a worker process with a new app network.
-function configure (name, c)
-   -- Ensure "configs" shm counter exists for child to poll
-   local child = children[name]
-   local child_path = "group/child/"..name
-   if not child.configs then
-      child.configs = shm.map(child_path.."/configs", {"counter"}, false, true)
-   end
-   config.save(shm.path(child_path.."/config"), c)
-   counter.add(child.configs, 1)
 end
 
 --------------------------------------------------------------
