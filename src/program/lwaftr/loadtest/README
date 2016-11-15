@@ -8,6 +8,11 @@ Usage: loadtest [OPTIONS] <PCAP-FILE> <TX-NAME> <RX-NAME> <PCI> [<PCAP-FILE> <TX
                              Linger on each step for DURATION seconds.
   -p PROGRAM, --program PROGRAM
                              Use workload PROGRAM.
+  --bench-file FILENAME
+                             The file or path name to which benchmark data is
+                             written. A simple filename or relative pathname
+                             will be based on the current directory. Default
+                             is "bench.csv".
   --cpu CPU
                              Bind to the given CPU.
   -h, --help
@@ -37,10 +42,11 @@ The default workload program is ramp_up_down.
 
 Packets received on the network interfaces are counted and recorded,
 and the corresponding incoming and outgoing packet rates are written
-to standard output in CSV format, suitable for passing to a graphing
-program.  The TX-NAME values are used to label the columns.  The
-RX-NAME values indicate interfaces on which we should be looking for a
-response.  Packets sent but not received will be counted as loss.
+to standard output in human-readable format, and also to a file in CSV
+format, suitable for passing to a graphing program.  The TX-NAME values
+are used to label the columns.  The RX-NAME values indicate interfaces
+on which we should be looking for a response.  Packets sent but not
+received will be counted as loss.
 
 Examples:
   loadtest cap1.pcap tx tx 01:00.0
