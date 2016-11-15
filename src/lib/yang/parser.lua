@@ -38,11 +38,15 @@ function Parser.new(str, filename)
    return ret
 end
 
+function Parser:loc()
+   return string.format('%s:%d:%d', self.name or '<unknown>', self.line,
+                        self.column)
+end
+
 function Parser:error(msg, ...)
    print(self.str:match("[^\n]*", self.line_pos))
    print(string.rep(" ", self.column).."^")
-   error(('%s:%d:%d: error: '..msg):format(
-         self.name or '<unknown>', self.line, self.column, ...))
+   error(('%s: error: '..msg):format(self:loc(), ...))
 end
 
 function Parser:read_char()
@@ -237,7 +241,7 @@ end
 function Parser:parse_statement()
    self:skip_whitespace()
 
-   local returnval = {}
+   local returnval = { loc = self:loc() }
 
    -- Then must be a string that is the statement's identifier
    local keyword = self:parse_keyword()
@@ -289,10 +293,19 @@ function selftest()
       end
    end
 
+   local function strip_locs(exp)
+      if type(exp) ~= 'table' then return exp end
+      local ret = {}
+      for k, v in pairs(exp) do
+         if k ~= 'loc' then ret[k] = strip_locs(v) end
+      end
+      return ret
+   end
+
    local function test_string(src, exp)
       local parser = Parser.new(src)
       parser:skip_whitespace()
-      assert_equal(parser:parse_string(), exp)
+      assert_equal(strip_locs(parser:parse_string()), exp)
    end
 
    local function pp(x)
@@ -317,7 +330,7 @@ function selftest()
 
 
    local function test_module(src, exp)
-      local result = parse_string(src)
+      local result = strip_locs(parse_string(src))
       if not lib.equal(result, exp) then
          pp(result)
          pp(exp)
