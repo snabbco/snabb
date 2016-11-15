@@ -40,7 +40,7 @@ local function parse_node(src, parent_path, order)
    ret.children = children
    ret = setmetatable(ret, {__index=Node})
    local initialize = initializers[ret.kind]
-   if initialize then initialize(ret, src, children) end
+   if initialize then initialize(ret, src.loc, src.argument, children) end
    -- Strip annotations.
    ret.path, ret.order, ret.argument_string, ret.children = nil
    return ret
@@ -56,14 +56,14 @@ function parse_children(src, parent_path)
    return ret
 end
 
-local function require_argument(src)
-   return assert_with_loc(src.argument, src.loc, 'missing argument')
+local function require_argument(argument, loc)
+   return assert_with_loc(argument, loc, 'missing argument')
 end
 
-local function parse_range(node, range)
+local function parse_range(loc, range)
    local function parse_part(part)
       local l, r = part:match("^%s*([^%.]*)%s*%.%.%s*([^%s]*)%s*$")
-      assert_with_path(l, node.path, 'bad range component: %s', part)
+      assert_with_loc(l, loc, 'bad range component: %s', part)
       if l ~= 'min' then l = util.tointeger(l) end
       if r ~= 'max' then r = util.tointeger(r) end
       return { l, r }
@@ -71,7 +71,7 @@ local function parse_range(node, range)
    local parts = range:split("|")
    local res = {'or'}
    for part in range:split("|") do table.insert(res, parse_part(part)) end
-   if #res == 1 then error_with_path(node.path, "empty range", range)
+   if #res == 1 then error_with_loc(loc, "empty range", range)
    elseif #res == 2 then return res[2]
    else return res end
 end
@@ -91,25 +91,25 @@ local function collect_children(children, kinds)
    return ret
 end
 
-local function collect_children_by_prop(node, kinds, prop)
+local function collect_children_by_prop(loc, children, kinds, prop)
    local ret = {}
-   for _, child in ipairs(collect_children(node.children, kinds)) do
-      assert_with_path(child[prop], node.path,
-                       'child of kind %s missing prop %s', child.kind, prop)
-      assert_with_path(not ret[child[prop]], node.path,
-                       'duplicate %s: %s', prop, child[prop])
+   for _, child in ipairs(collect_children(children, kinds)) do
+      assert_with_loc(child[prop], loc, 'child of kind %s missing prop %s',
+                      child.kind, prop)
+      assert_with_loc(not ret[child[prop]], loc, 'duplicate %s: %s',
+                      prop, child[prop])
       ret[child[prop]] = child
    end
    return ret
 end
 
-local function collect_children_by_id(node, kinds)
-   return collect_children_by_prop(node, kinds, 'id')
+local function collect_children_by_id(loc, children, kinds)
+   return collect_children_by_prop(loc, children, kinds, 'id')
 end
 
 local function collect_body_children(node)
    return collect_children_by_id(
-      node,
+      node.loc, node.children,
       {'container', 'leaf', 'list', 'leaf-list', 'uses', 'choice', 'anyxml'})
 end
 
@@ -128,7 +128,7 @@ end
 
 local function collect_data_or_case_children_at_least_1(node)
    local ret = collect_children_by_id(
-      node,
+      node.loc, node.children,
       {'container', 'leaf', 'list', 'leaf-list', 'uses', 'choice',
        'anyxml', 'case'})
    if not at_least_one(ret) then
@@ -171,18 +171,18 @@ end
 -- Simple statement kinds with string, natural, or boolean values all
 -- just initialize by parsing their argument and storing it as the
 -- "value" property in the schema node.
-local function init_string(node, src, children)
-   node.value = require_argument(src)
+local function init_string(node, loc, argument, children)
+   node.value = require_argument(argument, loc)
 end
-local function init_natural(node, src, children)
-   local arg = require_argument(src)
+local function init_natural(node, loc, argument, children)
+   local arg = require_argument(argument, loc)
    local as_num = tonumber(arg)
    assert_with_path(as_num and math.floor(as_num) == as_num and as_num >= 0,
                     node.path, 'not a natural number: %s', arg)
    node.value = as_num
 end
-local function init_boolean(node, src, children)
-   local arg = require_argument(src)
+local function init_boolean(node, loc, argument, children)
+   local arg = require_argument(argument, loc)
    if arg == 'true' then node.value = true
    elseif arg == 'false' then node.value = false
    else error_with_path(node.path, 'not a valid boolean: %s', arg) end
@@ -191,8 +191,8 @@ end
 -- For all other statement kinds, we have custom initializers that
 -- parse out relevant sub-components and store them as named
 -- properties on the schema node.
-local function init_anyxml(node, src, children)
-   node.id = require_argument(src)
+local function init_anyxml(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.must = collect_child_properties(children, 'must', 'value')
@@ -202,12 +202,12 @@ local function init_anyxml(node, src, children)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_argument(node, src, children)
-   node.id = require_argument(src)
+local function init_argument(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.yin_element = maybe_child_property(node, 'yin-element', 'value')
 end
-local function init_augment(node, src, children)
-   node.node_id = require_argument(src)
+local function init_augment(node, loc, argument, children)
+   node.node_id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
@@ -215,12 +215,12 @@ local function init_augment(node, src, children)
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.body = collect_data_or_case_children_at_least_1(node)
 end
-local function init_belongs_to(node, src, children)
-   node.id = require_argument(src)
+local function init_belongs_to(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.prefix = require_child(node, 'prefix').value
 end
-local function init_case(node, src, children)
-   node.id = require_argument(src)
+local function init_case(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
@@ -228,8 +228,8 @@ local function init_case(node, src, children)
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.body = collect_body_children(node)
 end
-local function init_choice(node, src, children)
-   node.id = require_argument(src)
+local function init_choice(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.default = maybe_child_property(node, 'default', 'value')
@@ -238,14 +238,14 @@ local function init_choice(node, src, children)
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_children_by_id(
-      node,
+      loc, children,
       {'container', 'leaf', 'leaf-list', 'list', 'anyxml', 'case'})
 end
-local function init_container(node, src, children)
-   node.id = require_argument(src)
+local function init_container(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.must = collect_child_properties(children, 'must', 'value')
@@ -254,56 +254,56 @@ local function init_container(node, src, children)
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_body_children(node)
 end
-local function init_extension(node, src, children)
-   node.id = require_argument(src)
+local function init_extension(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.argument = maybe_child_property(node, 'argument', 'id')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_feature(node, src, children)
-   node.id = require_argument(src)
+local function init_feature(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_grouping(node, src, children)
-   node.id = require_argument(src)
+local function init_grouping(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_body_children(node)
 end
-local function init_identity(node, src, children)
-   node.id = require_argument(src)
+local function init_identity(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.base = maybe_child_property(node, 'base', 'id')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_import(node, src, children)
-   node.id = require_argument(src)
+local function init_import(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.prefix = require_child_property(node, 'prefix', 'value')
    node.revision_date = maybe_child_property(node, 'revision-date', 'value')
 end
-local function init_include(node, src, children)
-   node.id = require_argument(src)
+local function init_include(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.revision_date = maybe_child_property(node, 'revision-date', 'value')
 end
-local function init_input(node, src, children)
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
+local function init_input(node, loc, argument, children)
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_body_children_at_least_1(node)
 end
-local function init_leaf(node, src, children)
-   node.id = require_argument(src)
+local function init_leaf(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.type = require_child(node, 'type')
@@ -316,8 +316,8 @@ local function init_leaf(node, src, children)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_leaf_list(node, src, children)
-   node.id = require_argument(src)
+local function init_leaf_list(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.type = require_child(node, 'type')
@@ -331,14 +331,14 @@ local function init_leaf_list(node, src, children)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_length(node, src, children)
+local function init_length(node, loc, argument, children)
    -- TODO: parse length arg str
-   node.value = require_argument(src)
+   node.value = require_argument(argument, loc)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_list(node, src, children)
-   node.id = require_argument(src)
+local function init_list(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.must = collect_child_properties(children, 'must', 'value')
@@ -349,70 +349,70 @@ local function init_list(node, src, children)
    node.max_elements = maybe_child_property(node, 'max-elements', 'value')
    node.ordered_by = maybe_child_property(node, 'ordered-by', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_body_children_at_least_1(node)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_module(node, src, children)
-   node.id = require_argument(src)
+local function init_module(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.yang_version = maybe_child_property(node, 'yang-version', 'value')
    node.namespace = require_child_property(node, 'namespace', 'value')
    node.prefix = require_child_property(node, 'prefix', 'value')
-   node.imports = collect_children_by_prop(node, 'import', 'prefix')
-   node.includes = collect_children_by_id(node, 'include')
+   node.imports = collect_children_by_prop(loc, children, 'import', 'prefix')
+   node.includes = collect_children_by_id(loc, children, 'include')
    node.organization = maybe_child_property(node, 'organization', 'value')
    node.contact = maybe_child_property(node, 'contact', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.revisions = collect_children(children, 'revision')
    node.augments = collect_children(children, 'augment')
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
-   node.features = collect_children_by_id(node, 'feature')
-   node.extensions = collect_children_by_id(node, 'extension')
-   node.identities = collect_children_by_id(node, 'identity')
-   node.rpcs = collect_children_by_id(node, 'rpc')
-   node.notifications = collect_children_by_id(node, 'notification')
-   node.deviations = collect_children_by_id(node, 'deviation')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
+   node.features = collect_children_by_id(loc, children, 'feature')
+   node.extensions = collect_children_by_id(loc, children, 'extension')
+   node.identities = collect_children_by_id(loc, children, 'identity')
+   node.rpcs = collect_children_by_id(loc, children, 'rpc')
+   node.notifications = collect_children_by_id(loc, children, 'notification')
+   node.deviations = collect_children_by_id(loc, children, 'deviation')
    node.body = collect_body_children(node)
 end
-local function init_namespace(node, src, children)
+local function init_namespace(node, loc, argument, children)
    -- TODO: parse uri?
-   node.value = require_argument(src)
+   node.value = require_argument(argument, loc)
 end
-local function init_notification(node, src, children)
-   node.id = require_argument(src)
+local function init_notification(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_body_children(node)
 end
-local function init_output(node, src, children)
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
+local function init_output(node, loc, argument, children)
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_body_children_at_least_1(node)
 end
-local function init_path(node, src, children)
+local function init_path(node, loc, argument, children)
    -- TODO: parse path string
-   node.value = require_argument(src)
+   node.value = require_argument(argument, loc)
 end
-local function init_pattern(node, src, children)
-   node.value = require_argument(src)
+local function init_pattern(node, loc, argument, children)
+   node.value = require_argument(argument, loc)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_range(node, src, children)
-   node.value = parse_range(node, require_argument(src))
+local function init_range(node, loc, argument, children)
+   node.value = parse_range(node.loc, require_argument(argument, loc))
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_refine(node, src, children)
-   node.node_id = require_argument(src)
+local function init_refine(node, loc, argument, children)
+   node.node_id = require_argument(argument, loc)
    -- All subnode kinds.
    node.must = collect_child_properties(children, 'must', 'value')
    node.config = maybe_child_property(node, 'config', 'value')
@@ -427,25 +427,25 @@ local function init_refine(node, src, children)
    node.min_elements = maybe_child_property(node, 'min-elements', 'value')
    node.max_elements = maybe_child_property(node, 'max-elements', 'value')
 end
-local function init_revision(node, src, children)
+local function init_revision(node, loc, argument, children)
    -- TODO: parse date
-   node.value = require_argument(src)
+   node.value = require_argument(argument, loc)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_rpc(node, src, children)
-   node.id = require_argument(src)
+local function init_rpc(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.input = maybe_child(node, 'input')
    node.output = maybe_child(node, 'output')
 end
-local function init_type(node, src, children)
-   node.id = require_argument(src)
+local function init_type(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.range = maybe_child(node, 'range')
    node.fraction_digits = maybe_child_property(node, 'fraction-digits', 'value')
    node.length = maybe_child_property(node, 'length', 'value')
@@ -458,30 +458,30 @@ local function init_type(node, src, children)
    node.union = collect_children(children, 'type')
    node.bits = collect_children(children, 'bit')
 end
-local function init_submodule(node, src, children)
-   node.id = require_argument(src)
+local function init_submodule(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.yang_version = maybe_child_property(node, 'yang-version', 'value')
    node.belongs_to = require_child(node, 'belongs-to')
-   node.imports = collect_children_by_id(node, 'import')
-   node.includes = collect_children_by_id(node, 'include')
+   node.imports = collect_children_by_id(loc, children, 'import')
+   node.includes = collect_children_by_id(loc, children, 'include')
    node.organization = maybe_child_property(node, 'organization', 'value')
    node.contact = maybe_child_property(node, 'contact', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
    node.revisions = collect_children(children, 'revision')
    node.augments = collect_children(children, 'augment')
-   node.typedefs = collect_children_by_id(node, 'typedef')
-   node.groupings = collect_children_by_id(node, 'grouping')
-   node.features = collect_children_by_id(node, 'feature')
-   node.extensions = collect_children_by_id(node, 'extension')
-   node.identities = collect_children_by_id(node, 'identity')
-   node.rpcs = collect_children_by_id(node, 'rpc')
-   node.notifications = collect_children_by_id(node, 'notification')
-   node.deviations = collect_children_by_id(node, 'deviation')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
+   node.groupings = collect_children_by_id(loc, children, 'grouping')
+   node.features = collect_children_by_id(loc, children, 'feature')
+   node.extensions = collect_children_by_id(loc, children, 'extension')
+   node.identities = collect_children_by_id(loc, children, 'identity')
+   node.rpcs = collect_children_by_id(loc, children, 'rpc')
+   node.notifications = collect_children_by_id(loc, children, 'notification')
+   node.deviations = collect_children_by_id(loc, children, 'deviation')
    node.body = collect_body_children(node)
 end
-local function init_typedef(node, src, children)
-   node.id = require_argument(src)
+local function init_typedef(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.type = require_child(node, 'type')
    node.units = maybe_child_property(node, 'units', 'value')
    node.default = maybe_child_property(node, 'default', 'value')
@@ -489,19 +489,19 @@ local function init_typedef(node, src, children)
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
 end
-local function init_uses(node, src, children)
-   node.id = require_argument(src)
+local function init_uses(node, loc, argument, children)
+   node.id = require_argument(argument, loc)
    node.when = maybe_child_property(node, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.status = maybe_child_property(node, 'status', 'value')
    node.description = maybe_child_property(node, 'description', 'value')
    node.reference = maybe_child_property(node, 'reference', 'value')
-   node.typedefs = collect_children_by_id(node, 'typedef')
+   node.typedefs = collect_children_by_id(loc, children, 'typedef')
    node.refines = collect_children(children, 'refine')
    node.augments = collect_children(children, 'augment')
 end
-local function init_value(node, src, children)
-   local arg = require_argument(src)
+local function init_value(node, loc, argument, children)
+   local arg = require_argument(argument, loc)
    local as_num = tonumber(arg)
    assert_with_path(as_num and math.floor(as_num) == as_num,
                     node.path, 'not an integer: %s', arg)
