@@ -28,13 +28,18 @@ end
 
 function Follower:handle_actions_from_leader()
    local channel = self.channel
+   local should_flush = false
    while true do
       local buf, len = channel:peek_message()
       if not buf then break end
       local action = action_queue.decode_action(buf, len)
       app.apply_config_actions({action})
       channel:discard_message(len)
+      if action[1] == 'start_app' or action[1] == 'reconfig_app' then
+         should_flush = true
+      end
    end
+   if should_flush then require('jit').flush() end
 end
 
 function Follower:pull ()

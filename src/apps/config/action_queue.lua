@@ -113,7 +113,6 @@ local function encoder()
    end
    function encoder:class(class)
       local require_path, name = find_public_name(class)
-      print('encoding', require_path, name)
       self:string(require_path)
       self:string(name)
    end
