@@ -30,6 +30,13 @@ function start (name, luacode)
       -- First we perform some initialization functions and then we
       -- restart the process with execv().
       
+      -- Terminate automatically when the parent dies.
+      --
+      -- XXX This prctl setting needs to survive execve(). The Linux
+      -- execve(2) page seems to say that it will provided that the
+      -- binary being executed is not setuid or setgid. This may or
+      -- may not be adequate.
+      S.prctl("set_pdeathsig", "hup")
       -- Symlink the shm "group" folder to be shared via the parent process.
       shm.alias("group", "/"..S.getppid().."/group")
       -- Save the code we want to run in the environment.
