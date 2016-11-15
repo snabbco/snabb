@@ -23,14 +23,23 @@ local function child (name)
    return children[name] or error("no such child: " .. name)
 end
 
--- Start a worker to execute an app network when provided with configure().
-function start (name)
+-- Start a named worker to execute the given Lua code (a string).
+function start (name, luacode)
    local pid = S.fork()
    if pid == 0 then
-      local env = { "SNABB_PROGRAM_LUACODE=require('core.worker').init()",
-                    "SNABB_WORKER_NAME="..name,
-                    "SNABB_WORKER_PARENT="..S.getppid() }
+      -- First we perform some initialization functions and then we
+      -- restart the process with execv().
+      
+      -- Symlink the shm "group" folder to be shared via the parent process.
+      shm.alias("group", "/"..S.getppid().."/group")
+      -- Save the code we want to run in the environment.
+      S.setenv("SNABB_PROGRAM_LUACODE", luacode, true)
+      -- Restart the process with execve().
       -- /proc/$$/exe is a link to the same Snabb executable that we are running
+      local env = {}
+      for key, value in pairs(S.environ()) do
+         table.insert(env, key.."="..value)
+      end
       S.execve(("/proc/%d/exe"):format(S.getpid()), {}, env)
    else
       -- Parent process
@@ -50,7 +59,7 @@ function status ()
       local infop = S.waitid("pid", info.pid, "nohang, exited")
       status[name] = {
          pid = info.pid,
-         alive = infop.code == 0
+         alive = infop and infop.code == 0 or false
       }
    end
    return status
@@ -74,27 +83,13 @@ end
 
 -- Initialize the worker by attaching to relevant shared memory
 -- objects and entering the main engine loop.
-function init (name, parentpid)
+function init ()
    local name = assert(lib.getenv("SNABB_WORKER_NAME"))
    local parent = assert(lib.getenv("SNABB_WORKER_PARENT"))
    print(("Starting worker %s for parent %d"):format(name, parent))
 
    -- Create "group" alias to the shared group folder in the parent process
    shm.alias("group", "/"..parent.."/group")
-
-   -- Wait for parent to provide an initial configuration
-   local warned
-   while not shm.exists("group/"..name.."/configs.counter") do
-      if not warned then
-         print("waiting for configuration...")
-         warned = true
-         S.nanosleep(0.001)
-      end
-   end
-
-   -- Map the counter for how many times our configuration has been updated.
-   -- This provides an efficient way to poll for updates.
-   local configs = shm.map("group/"..name.."/configs", "counter")
 
    -- Run the engine with continuous configuration updates
    local current_config
@@ -119,18 +114,20 @@ function selftest ()
    local workers = { "w1", "w2", "w3" }
    print("Starting children")
    for _, w in ipairs(workers) do
-      start(w, 0)
+      start(w, ([[ print("  (hello world from worker %s. entering infinite loop...)")
+                   while true do end -- infinite loop ]]):format(w))
    end
    print("Worker status:")
    for w, s in pairs(status()) do
       print(("  worker %s: pid=%s alive=%s"):format(
             w, s.pid, s.alive))
    end
+   S.nanosleep(0.1)
    print("Stopping children")
    for _, w in ipairs(workers) do
       stop(w)
    end
-   S.nanosleep(1)
+   S.nanosleep(0.1)
    print("Worker status:")
    for w, s in pairs(status()) do
       print(("  worker %s: pid=%s alive=%s"):format(
