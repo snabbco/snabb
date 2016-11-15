@@ -47,6 +47,7 @@ end
 
 local function open_ring_buffer (name)
    local path = shm.resolve(name)
+   path = shm.root..'/'..path
    local fd, err = S.open(path, "rdwr")
    if not fd then
       err = tostring(err or "unknown error")

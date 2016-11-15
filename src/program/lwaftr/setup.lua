@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local config     = require("core.config")
 local leader     = require("apps.config.leader")
+local follower   = require("apps.config.follower")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
@@ -454,5 +455,7 @@ function with_leader(f, graph, conf, ...)
       return graph
    end
    config.app(graph, 'leader', leader.Leader,
-              { setup_fn = setup_fn, initial_configuration = conf })
+              { setup_fn = setup_fn, initial_configuration = conf,
+                follower_pids = { require('syscall').getpid() }})
+   config.app(graph, "follower", follower.Follower, {})
 end

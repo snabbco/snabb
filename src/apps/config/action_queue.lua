@@ -68,11 +68,13 @@ local public_names = {}
 local function find_public_name(obj)
    if public_names[obj] then return unpack(public_names[obj]) end
    for modname, mod in pairs(package.loaded) do
-      for name, val in pairs(mod) do
-         if val == obj then
-            if type(val) == 'table' and type(val.new) == 'function' then
-               public_names[obj] = { modname, name }
-               return modname, name
+      if type(mod) == 'table' then
+         for name, val in pairs(mod) do
+            if val == obj then
+               if type(val) == 'table' and type(val.new) == 'function' then
+                  public_names[obj] = { modname, name }
+                  return modname, name
+               end
             end
          end
       end
@@ -111,6 +113,7 @@ local function encoder()
    end
    function encoder:class(class)
       local require_path, name = find_public_name(class)
+      print('encoding', require_path, name)
       self:string(require_path)
       self:string(name)
    end
