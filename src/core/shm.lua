@@ -62,6 +62,7 @@ function exists (name)
 end
 
 function alias (name, target)
+   mkdir(lib.dirname(resolve(name)))
    assert(S.symlink(root.."/"..resolve(target), root.."/"..resolve(name)),
           "shm alias failed")
 end
