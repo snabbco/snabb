@@ -123,6 +123,7 @@ local function encoder()
          yang.compile_data_for_schema_by_name(class.yang_schema, arg,
                                               file_name)
       else
+         if arg == nil then arg = {} end
          binary.compile_ad_hoc_lua_data_to_file(file_name, arg)
       end
       self:string(file_name)
