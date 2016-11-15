@@ -127,13 +127,18 @@ local function data_emitter(production)
          local normalize_id = data.normalize_id
          return function(data, stream)
             stream:write_stringref('lstruct')
-            stream:write_uint32(table_size(data))
+            local out = {}
             for _,k in ipairs(member_names) do
                local id = normalize_id(k)
                if data[id] ~= nil then
-                  stream:write_stringref(id)
-                  emit_member[k](data[id], stream)
+                  table.insert(out, {id, emit_member[k], data[id]})
                end
+            end
+            stream:write_uint32(#out)
+            for _,elt in ipairs(out) do
+               local id, emit, data = unpack(elt)
+               stream:write_stringref(id)
+               emit(data, stream)
             end
          end
       end
