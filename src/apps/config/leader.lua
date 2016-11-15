@@ -5,6 +5,7 @@ module(...,package.seeall)
 local S = require("syscall")
 local ffi = require("ffi")
 local yang = require("lib.yang.yang")
+local data = require("lib.yang.data")
 local rpc = require("lib.yang.rpc")
 local app = require("core.app")
 local shm = require("core.shm")
@@ -16,7 +17,9 @@ Leader = {
    config = {
       socket_file_name = {default='config-leader-socket'},
       setup_fn = {required=true},
-      initial_configuration = {},
+      -- Could relax this requirement.
+      initial_configuration = {required=true},
+      schema_name = {required=true},
       follower_pids = {required=true},
       Hz = {default=100},
    }
@@ -39,6 +42,7 @@ function Leader:new (conf)
       local instance_dir = shm.root..'/'..tostring(S.getpid())
       ret.socket_file_name = instance_dir..'/'..ret.socket_file_name
    end
+   ret.schema_name = conf.schema_name
    ret.socket = open_socket(ret.socket_file_name)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
@@ -85,8 +89,13 @@ function Leader:enqueue_config_actions (actions)
    end
 end
 
-function Leader:rpc_get_config (data)
-   return { config = "hey!" }
+function Leader:rpc_get_config (args)
+   -- FIXME: Push more of this to a lib.
+   local schema = yang.load_schema_by_name(self.schema_name)
+   local grammar = data.data_grammar_from_schema(schema)
+   local printer = data.data_string_printer_from_grammar(grammar)
+   local config_str = printer(self.current_configuration)
+   return { config = config_str }
 end
 
 function Leader:handle (payload)
@@ -247,7 +256,10 @@ function selftest ()
       return graph
    end
    app_graph.app(graph, "leader", Leader,
-                 {setup_fn=setup_fn, follower_pids={S.getpid()}})
+                 {setup_fn=setup_fn, follower_pids={S.getpid()},
+                  -- Use a schema with no data nodes, just for
+                  -- testing.
+                  schema_name='ietf-inet-types', initial_configuration={}})
    app_graph.app(graph, "follower", require('apps.config.follower').Follower,
                  {})
    engine.configure(graph)

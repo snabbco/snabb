@@ -453,6 +453,7 @@ function with_leader(f, graph, conf, ...)
    end
    config.app(graph, 'leader', leader.Leader,
               { setup_fn = setup_fn, initial_configuration = conf,
-                follower_pids = { require('syscall').getpid() }})
+                follower_pids = { require('syscall').getpid() },
+                schema_name = 'snabb-softwire-v1'})
    config.app(graph, "follower", follower.Follower, {})
 end
