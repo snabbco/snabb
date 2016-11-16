@@ -29,10 +29,8 @@ test_skipped_code = 43
 -- Set the directory for the named programs.
 named_program_root = shm.root .. "/" .. "by-name"
 
--- The set of all active apps and links in the system.
--- Indexed both by name (in a table) and by number (in an array).
-app_table,  app_array  = {}, {}
-link_table, link_array = {}, {}
+-- The set of all active apps and links in the system, indexed by name.
+app_table, link_table = {}, {}
 
 configuration = config.new()
 
@@ -97,24 +95,29 @@ end
 function restart_dead_apps ()
    if not use_restart then return end
    local restart_delay = 2 -- seconds
-   local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
-   local restart = false
+   local actions = {}
 
-   -- Collect 'restart' actions for dead apps and log their errors.
-   for i = 1, #app_array do
-      local app = app_array[i]
+   for name, app in pairs(app_table) do
       if app.dead and (now() - app.dead.time) >= restart_delay then
-         restart = true
+         local function add_action(action, ...)
+            table.insert(actions, { action, { ... } })
+         end
          io.stderr:write(("Restarting %s (died at %f: %s)\n")
-                         :format(app.appname, app.dead.time, app.dead.error))
-         table.insert(actions.restart, app.appname)
-      else
-         table.insert(actions.keep, app.appname)
+                         :format(name, app.dead.time, app.dead.error))
+         add_action('stop_app', name)
+         add_action('start_app', name,
+                    configuration.apps[name].class,
+                    configuration.apps[name].arg)
+         for linkspec in pairs(configuration.links) do
+            local fa, fl, ta, tl = config.parse_link(linkspec)
+            if fa == name then add_action('link_output', fa, fl, linkspec) end
+            if ta == name then add_action('link_input', ta, tl, linkspec) end
+         end
       end
    end
 
    -- Restart dead apps if necessary.
-   if restart then apply_config_actions(actions, configuration) end
+   if #actions > 0 then apply_config_actions(actions) end
 end
 
 -- Configure the running app network to match new_configuration.
@@ -123,8 +126,7 @@ end
 -- new app network by making the changes needed.
 function configure (new_config)
    local actions = compute_config_actions(configuration, new_config)
-   apply_config_actions(actions, new_config)
-   configuration = new_config
+   apply_config_actions(actions)
    counter.add(configs)
 end
 
@@ -173,60 +175,129 @@ function enumerate_named_programs()
 end
 
 -- Return the configuration actions needed to migrate from old config to new.
---
--- Here is an example return value for a case where two apps must
--- start, one must stop, and one is kept as it is:
---   { start = {'newapp1', 'newapp2'},
---     stop  = {'deadapp1'},
---     keep  = {'oldapp1'},
---     restart = {},
---     reconfig = {}
---   }
 function compute_config_actions (old, new)
-   local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
-   for appname, info in pairs(new.apps) do
-      local class, arg = info.class, info.arg
-      local action = nil
-      if not old.apps[appname]                then action = 'start'
-      elseif old.apps[appname].class ~= class then action = 'restart'
-      elseif not lib.equal(old.apps[appname].arg, arg)
-                                              then action = 'reconfig'
-      else                                         action = 'keep'  end
-      table.insert(actions[action], appname)
+   local actions = {}
+   local function add_action(action, ...)
+      table.insert(actions, { action, { ... } })
    end
-   for appname in pairs(old.apps) do
-      if not new.apps[appname] then
-         table.insert(actions['stop'], appname)
+
+   -- First determine the links that are going away and remove them.
+   for linkspec in pairs(old.links) do
+      if not new.links[linkspec] then
+         local fa, fl, ta, tl = config.parse_link(linkspec)
+         if old.apps[fa] then add_action('unlink_output', fa, fl) end
+         if old.apps[ta] then add_action('unlink_input', ta, tl) end
+         if not new[linkspec] then add_action('free_link', linkspec) end
       end
    end
+
+   -- Do the same for apps.
+   for appname, info in pairs(old.apps) do
+      if not new.apps[appname] then add_action('stop_app', appname) end
+   end
+
+   -- Start new apps, restart reclassed apps, or reconfigure apps with
+   -- changed configuration.
+   local fresh_apps = {}
+   for appname, info in pairs(new.apps) do
+      local class, arg = info.class, info.arg
+      if not old.apps[appname] then
+         add_action('start_app', appname, info.class, info.arg)
+         fresh_apps[appname] = true
+      elseif old.apps[appname].class ~= class then
+         add_action('stop_app', appname)
+         add_action('start_app', appname, info.class, info.arg)
+         fresh_apps[appname] = true
+      elseif not lib.equal(old.apps[appname].arg, arg) then
+         if class.reconfig then
+            add_action('reconfig_app', appname, info.class, info.arg)
+         else
+            add_action('stop_app', appname)
+            add_action('start_app', appname, info.class, info.arg)
+            fresh_apps[appname] = true
+         end
+      else
+         -- Otherwise if nothing changed, then nothing to do; we keep
+         -- the app around.
+      end
+   end
+
+   -- Now rebuild links.
+   for linkspec in pairs(new.links) do
+      local fa, fl, ta, tl = config.parse_link(linkspec)
+      local fresh_link = not old.links[linkspec]
+      if fresh_link then add_action('new_link', linkspec) end
+      if not new.apps[fa] then error("no such app: " .. fa) end
+      if not new.apps[ta] then error("no such app: " .. ta) end
+      if fresh_link or fresh_apps[fa] then
+         add_action('link_output', fa, fl, linkspec)
+      end
+      if fresh_link or fresh_apps[ta] then
+         add_action('link_input', ta, tl, linkspec)
+      end
+   end
+
    return actions
 end
 
 -- Update the active app network by applying the necessary actions.
-function apply_config_actions (actions, conf)
-   -- The purpose of this function is to populate these tables:
-   local new_app_table,  new_app_array  = {}, {}
-   local new_link_table, new_link_array = {}, {}
-   -- Temporary name->index table for use in link renumbering
-   local app_name_to_index = {}
+function apply_config_actions (actions)
    -- Table of functions that execute config actions
    local ops = {}
-   function ops.stop (name)
-      if app_table[name].stop then
-         app_table[name]:stop()
-      end
-      if app_table[name].shm then
-         shm.delete_frame(app_table[name].shm)
+   -- As an efficiency hack, some apps rely on the fact that we add
+   -- links both by name and by index to the "input" and "output"
+   -- objects.  Probably they should be changed to just collect their
+   -- inputs and outputs in their :link() functions.  Until then, call
+   -- this function when removing links from app input/output objects.
+   local function remove_link_from_array(array, link)
+      for i=1,#array do
+         if array[i] == link then
+            table.remove(array, i)
+            return
+         end
       end
    end
-   function ops.keep (name)
-      new_app_table[name] = app_table[name]
-      table.insert(new_app_array, app_table[name])
-      app_name_to_index[name] = #new_app_array
+   function ops.unlink_output (appname, linkname)
+      local app = app_table[appname]
+      local link = app.output[linkname]
+      app.output[linkname] = nil
+      remove_link_from_array(app.output, link)
    end
-   function ops.start (name)
-      local class = conf.apps[name].class
-      local arg = conf.apps[name].arg
+   function ops.unlink_input (appname, linkname)
+      local app = app_table[appname]
+      local link = app.input[linkname]
+      app.input[linkname] = nil
+      remove_link_from_array(app.input, link)
+   end
+   function ops.free_link (linkspec)
+      link.free(link_table[linkspec], linkspec)
+      link_table[linkspec] = nil
+      configuration.links[linkspec] = nil
+   end
+   function ops.new_link (linkspec)
+      link_table[linkspec] = link.new(linkspec)
+      configuration.links[linkspec] = true
+   end
+   function ops.link_output (appname, linkname, linkspec)
+      local app = app_table[appname]
+      local link = assert(link_table[linkspec])
+      app.output[linkname] = link
+      table.insert(app.output, link)
+   end
+   function ops.link_input (appname, linkname, linkspec)
+      local app = app_table[appname]
+      local link = assert(link_table[linkspec])
+      app.input[linkname] = link
+      table.insert(app.input, link)
+   end
+   function ops.stop_app (name)
+      local app = app_table[name]
+      if app.stop then app:stop() end
+      if app.shm then shm.delete_frame(app.shm) end
+      app_table[name] = nil
+      configuration.apps[name] = nil
+   end
+   function ops.start_app (name, class, arg)
       local app = class:new(arg)
       if type(app) ~= 'table' then
          error(("bad return value from app '%s' start() method: %s"):format(
@@ -236,67 +307,81 @@ function apply_config_actions (actions, conf)
       app.appname = name
       app.output = {}
       app.input = {}
-      new_app_table[name] = app
-      table.insert(new_app_array, app)
-      app_name_to_index[name] = #new_app_array
+      app_table[name] = app
       app.zone = zone
       if app.shm then
          app.shm.dtime = {counter, C.get_unix_time()}
          app.shm = shm.create_frame("apps/"..name, app.shm)
       end
+      configuration.apps[name] = { class = class, arg = arg }
    end
-   function ops.restart (name)
-      ops.stop(name)
-      ops.start(name)
+   function ops.reconfig_app (name, class, arg)
+      local app = app_table[name]
+      app:reconfig(arg)
+      configuration.apps[name].arg = arg
    end
-   function ops.reconfig (name)
-      if app_table[name].reconfig then
-         local arg = conf.apps[name].arg
-         local app = app_table[name]
-         app:reconfig(arg)
-         new_app_table[name] = app
-         table.insert(new_app_array, app)
-         app_name_to_index[name] = #new_app_array
+
+   -- Dispatch actions.
+   for _, action in ipairs(actions) do
+      local name, args = unpack(action)
+      if log then io.write("engine: ", name, " ", args[1], "\n") end
+      assert(ops[name], name)(unpack(args))
+   end
+
+   compute_breathe_order ()
+end
+
+-- Sort the NODES topologically according to SUCCESSORS via
+-- reverse-post-order numbering.  The sort starts with ENTRIES.  This
+-- implementation is recursive; we should change it to be iterative
+-- instead.
+function tsort (nodes, entries, successors)
+   local visited = {}
+   local post_order = {}
+   local function visit(node)
+      visited[node] = true
+      for _,succ in ipairs(successors[node]) do
+         if not visited[succ] then visit(succ) end
+      end
+      table.insert(post_order, node)
+   end
+   for _,node in ipairs(entries) do
+      if not visited[node] then visit(node) end
+   end
+   for name,node in pairs(nodes) do
+      if not visited[node] then visit(node) end
+   end
+   local ret = {}
+   while #post_order > 0 do
+      table.insert(ret, table.remove(post_order))
+   end
+   return ret
+end
+
+breathe_pull_order = {}
+breathe_push_order = {}
+
+function compute_breathe_order ()
+   breathe_pull_order = {}
+   local inputs = {}
+   for name, app in pairs(app_table) do
+      if app.pull then table.insert(breathe_pull_order, app) end
+      for _,link in pairs(app.input) do inputs[link] = app  end
+   end
+   local successors = {}
+   for name, app in pairs(app_table) do
+      local succs = {}
+      for _,link in pairs(app.output) do table.insert(succs, inputs[link]) end
+      successors[app] = succs
+   end
+   breathe_push_order = tsort(app_table, breathe_pull_order, successors)
+   local i = 1
+   while i <= #breathe_push_order do
+      if breathe_push_order[i].push then
+         i = i + 1
       else
-         ops.restart(name)
+         table.remove(breathe_push_order, i)
       end
-   end
-   -- Dispatch actions in a suitable sequence.
-   for _, action in ipairs({'stop', 'restart', 'keep', 'reconfig', 'start'}) do
-      for _, name in ipairs(actions[action]) do
-         if log and action ~= 'keep' then
-            io.write("engine: ", action, " app ", name, "\n")
-         end
-         ops[action](name)
-      end
-   end
-   -- Setup links: create (or reuse) and renumber.
-   for linkspec in pairs(conf.links) do
-      local fa, fl, ta, tl = config.parse_link(linkspec)
-      if not new_app_table[fa] then error("no such app: " .. fa) end
-      if not new_app_table[ta] then error("no such app: " .. ta) end
-      -- Create or reuse a link and assign/update receiving app index
-      local link = link_table[linkspec] or link.new(linkspec)
-      link.receiving_app = app_name_to_index[ta]
-      -- Add link to apps
-      new_app_table[fa].output[fl] = link
-      table.insert(new_app_table[fa].output, link)
-      new_app_table[ta].input[tl] = link
-      table.insert(new_app_table[ta].input, link)
-      -- Remember link
-      new_link_table[linkspec] = link
-      table.insert(new_link_array, link)
-   end
-   -- Free obsolete links.
-   for linkspec, r in pairs(link_table) do
-      if not new_link_table[linkspec] then link.free(r, linkspec) end
-   end
-   -- Commit changes.
-   app_table, link_table = new_app_table, new_link_table
-   app_array, link_array = new_app_array, new_link_array
-   -- Trigger link event for each app.
-   for _, app in ipairs(app_array) do
-      if app.link then app:link() end
    end
 end
 
@@ -358,10 +443,8 @@ function breathe ()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
-   for i = 1, #app_array do
-      local app = app_array[i]
---      if app.pull then
---         zone(app.zone) app:pull() zone()
+   for i = 1, #breathe_pull_order do
+      local app = breathe_pull_order[i]
       if app.pull and not app.dead then
          zone(app.zone)
          with_restart(app, app.pull)
@@ -369,25 +452,14 @@ function breathe ()
       end
    end
    -- Exhale: push work out through the app network
-   local firstloop = true
-   repeat
-      local progress = false
-      -- For each link that has new data, run the receiving app
-      for i = 1, #link_array do
-         local link = link_array[i]
-         if firstloop or link.has_new_data then
-            link.has_new_data = false
-            local receiver = app_array[link.receiving_app]
-            if receiver.push and not receiver.dead then
-               zone(receiver.zone)
-               with_restart(receiver, receiver.push)
-               zone()
-               progress = true
-            end
-         end
+   for i = 1, #breathe_push_order do
+      local app = breathe_push_order[i]
+      if app.push and not app.dead then
+         zone(app.zone)
+         with_restart(app, app.push)
+         zone()
       end
-      firstloop = false
-   until not progress  -- Stop after no link had new data
+   end
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
@@ -487,7 +559,7 @@ end
 
 function selftest ()
    print("selftest: app")
-   local App = {}
+   local App = { push = true }
    function App:new () return setmetatable({}, {__index = App}) end
    local c1 = config.new()
    config.app(c1, "app1", App)
@@ -495,16 +567,17 @@ function selftest ()
    config.link(c1, "app1.x -> app2.x")
    print("empty -> c1")
    configure(c1)
-   assert(#app_array == 2)
-   assert(#link_array == 1)
+   assert(#breathe_pull_order == 0)
+   assert(#breathe_push_order == 2)
    assert(app_table.app1 and app_table.app2)
    local orig_app1 = app_table.app1
    local orig_app2 = app_table.app2
-   local orig_link = link_array[1]
+   local orig_link = link_table['app1.x -> app2.x']
    print("c1 -> c1")
    configure(c1)
    assert(app_table.app1 == orig_app1)
    assert(app_table.app2 == orig_app2)
+   assert(tostring(orig_link) == tostring(link_table['app1.x -> app2.x']))
    local c2 = config.new()
    config.app(c2, "app1", App, "config")
    config.app(c2, "app2", App)
@@ -512,8 +585,8 @@ function selftest ()
    config.link(c2, "app2.x -> app1.x")
    print("c1 -> c2")
    configure(c2)
-   assert(#app_array == 2)
-   assert(#link_array == 2)
+   assert(#breathe_pull_order == 0)
+   assert(#breathe_push_order == 2)
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
    -- tostring() because == does not work on FFI structs?
@@ -522,12 +595,12 @@ function selftest ()
    configure(c1) -- c2 -> c1
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
-   assert(#app_array == 2)
-   assert(#link_array == 1)
+   assert(#breathe_pull_order == 0)
+   assert(#breathe_push_order == 2)
    print("c1 -> empty")
    configure(config.new())
-   assert(#app_array == 0)
-   assert(#link_array == 0)
+   assert(#breathe_pull_order == 0)
+   assert(#breathe_push_order == 0)
    -- Test app arg validation
    local AppC = {
       config = {
@@ -566,8 +639,6 @@ function selftest ()
    local orig_app1 = app_table.app1
    local orig_app2 = app_table.app2
    local orig_app3 = app_table.app3
-   local orig_link1 = link_array[1]
-   local orig_link2 = link_array[2]
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 ~= orig_app2) -- should be restarted

@@ -4,12 +4,10 @@ local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
 local dump = require('apps.lwaftr.dump')
 local icmp = require("apps.lwaftr.icmp")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
-
-local channel = require("apps.lwaftr.channel")
-local messages = require("apps.lwaftr.messages")
 
 local checksum = require("lib.checksum")
 local ethernet = require("lib.protocol.ethernet")
@@ -239,7 +237,7 @@ local function init_transmit_icmpv4_reply (rate_limiting)
    end
 end
 
-LwAftr = {}
+LwAftr = { yang_schema = 'snabb-softwire-v1' }
 
 function LwAftr:new(conf)
    if conf.debug then debug = true end
@@ -257,8 +255,7 @@ function LwAftr:new(conf)
       conf.external_interface.next_hop.mac = ethernet:pton('00:00:00:00:00:00')
    end
 
-   o.control = channel.create('lwaftr/control', messages.lwaftr_message_t)
-   o.counters = assert(conf.counters, "Counters not initialized")
+   o.counters = lwcounter.init_counters()
 
    o.transmit_icmpv6_reply = init_transmit_icmpv6_reply(
       conf.internal_interface.error_rate_limiting)
@@ -805,28 +802,6 @@ function LwAftr:push ()
    local i4, i6, ih = self.input.v4, self.input.v6, self.input.hairpin_in
    local o4, o6 = self.output.v4, self.output.v6
    self.o4, self.o6 = o4, o6
-
-   do
-      local msg = self.control:pop()
-      if msg then
-         if msg.kind == messages.lwaftr_message_reload then
-            print('Reloading binding table.')
-            print('FIXME: Out to lunch, back shortly')
-            if false then
-               self.binding_table = bt.load(self.conf.binding_table)
-            end
-            -- We don't know why yet, but something about reloading a
-            -- binding table makes LuaJIT switch to side traces instead
-            -- of main traces.  Very weird.  Flushing the JIT state
-            -- fixes it, but it's quite a big hammer!
-            require('jit').flush()
-         elseif msg.kind == messages.lwaftr_message_dump_config then
-            dump.dump_configuration(self)
-         else
-            print('Unhandled message: '..tostring(msg))
-         end
-      end
-   end
 
    for _ = 1, link.nreadable(i6) do
       -- Decapsulate incoming IPv6 packets from the B4 interface and

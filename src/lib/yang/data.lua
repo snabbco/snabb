@@ -14,6 +14,15 @@ function normalize_id(id)
    return id:gsub('[^%w_]', '_')
 end
 
+-- Avoid generating lots of struct types.  Note that this function is
+-- only for string type names without parameters.
+local type_cache = {}
+function typeof(name)
+   assert(type(name) == 'string')
+   if not type_cache[name] then type_cache[name] = ffi.typeof(name) end
+   return type_cache[name]
+end
+
 -- If a "list" node has one key that is string-valued, we will represent
 -- instances of that node as normal Lua tables where the key is the
 -- table key and the value does not contain the key.
@@ -100,6 +109,30 @@ function data_grammar_from_schema(schema)
    return {type="struct", members=members, ctype=struct_ctype(members)}
 end
 
+function rpc_grammar_from_schema(schema)
+   local grammar = {}
+   for _,prop in ipairs({'input', 'output'}) do
+      grammar[prop] = { type="sequence", members={} }
+      for k,rpc in pairs(schema.rpcs) do
+         local node = rpc[prop]
+         if node then
+            grammar[prop].members[k] = data_grammar_from_schema(node)
+         else
+            grammar[prop].members[k] = {type="struct", members={}}
+         end
+      end
+   end
+   return grammar
+end
+
+function rpc_input_grammar_from_schema(schema)
+   return rpc_grammar_from_schema(schema).input
+end
+
+function rpc_output_grammar_from_schema(schema)
+   return rpc_grammar_from_schema(schema).output
+end
+
 local function integer_type(min, max)
    return function(str, k)
       return util.tointeger(str, k, min, max)
@@ -168,7 +201,7 @@ local function struct_parser(keyword, members, ctype)
       assert_not_duplicate(out, keyword)
       return parse1(node)
    end
-   local struct_t = ctype and ffi.typeof(ctype)
+   local struct_t = ctype and typeof(ctype)
    local function finish(out)
       -- FIXME check mandatory values.
       if struct_t then return struct_t(out) else return out end
@@ -187,7 +220,7 @@ local function array_parser(keyword, element_type, ctype)
       table.insert(out, parse1(node))
       return out
    end
-   local elt_t = ctype and ffi.typeof(ctype)
+   local elt_t = ctype and typeof(ctype)
    local array_t = ctype and ffi.typeof('$[?]', elt_t)
    local function finish(out)
       -- FIXME check min-elements
@@ -214,6 +247,26 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
       if out ~= nil then return out end
       if default then return parsev(default, keyword) end
       if mandatory then error('missing scalar value: '..keyword) end
+   end
+   return {init=init, parse=parse, finish=finish}
+end
+
+local function sequence_parser(keyword, members)
+   local function init() return {} end
+   local function parse1(node)
+      local sub = assert(members[node.keyword],
+                         'unrecognized rpc: '..node.keyword)
+      return {id=node.keyword, data=sub.finish(sub.parse(node, sub.init()))}
+   end
+   local function parse(node, out)
+      assert(not node.keyword) -- ?
+      for _,node in ipairs(node.statements) do
+         table.insert(out, parse1(node))
+      end
+      return out
+   end
+   local function finish(out)
+      return out
    end
    return {init=init, parse=parse, finish=finish}
 end
@@ -260,8 +313,8 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
    for k,v in pairs(keys) do members[k] = v end
    for k,v in pairs(values) do members[k] = v end
    local parser = struct_parser(keyword, members)
-   local key_t = key_ctype and ffi.typeof(key_ctype)
-   local value_t = value_ctype and ffi.typeof(value_ctype)
+   local key_t = key_ctype and typeof(key_ctype)
+   local value_t = value_ctype and typeof(value_ctype)
    local init
    if key_t and value_t then
       function init() return ctable_builder(key_t, value_t) end
@@ -326,6 +379,9 @@ function data_parser_from_grammar(production)
       return scalar_parser(keyword, production.argument_type,
                            production.default, production.mandatory)
    end
+   function handlers.sequence(keyword, production)
+      return sequence_parser(keyword, visitn(production.members))
+   end
 
    local parser = visit1('(top level)', production)
    return function(str, filename)
@@ -341,6 +397,14 @@ end
 function load_data_for_schema_by_name(schema_name, str, filename)
    local schema = schema.load_schema_by_name(schema_name)
    return load_data_for_schema(schema, str, filename)
+end
+
+function rpc_input_parser_from_schema(schema)
+   return data_parser_from_grammar(rpc_grammar_from_schema(schema).input)
+end
+
+function rpc_output_parser_from_schema(schema)
+   return data_parser_from_grammar(rpc_grammar_from_schema(schema).output)
 end
 
 local function encode_yang_string(str)
@@ -487,11 +551,35 @@ local function data_printer_from_grammar(production)
          end
       end
    end
+   function handlers.sequence(keyword, production)
+      local printers = {}
+      for k,v in pairs(production.members) do
+         printers[k] = printer(k, v)
+      end
+      return function(data, file, indent)
+         for _,elt in ipairs(data) do
+            local id = assert(elt.id)
+            assert(printers[id])(elt.data, file, indent)
+         end
+      end
+   end
 
    local top_printer = body_printer(production.members)
    return function(data, file)
       top_printer(data, file, '')
       file:flush()
+   end
+end
+
+function data_string_printer_from_grammar(production)
+   local printer = data_printer_from_grammar(production)
+   return function(data)
+      local file = {}
+      local out = {}
+      function file:write(str) table.insert(out, str) end
+      function file:flush(str) end
+      printer(data, file)
+      return table.concat(out)
    end
 end
 
@@ -506,6 +594,20 @@ end
 function print_data_for_schema_by_name(schema_name, data, file)
    local schema = schema.load_schema_by_name(schema_name)
    return print_data_for_schema(schema, data, file)
+end
+
+function rpc_printer_from_grammar(production)
+   local printer = data_string_printer_from_grammar(
+      { type='struct', members = { rpcs=production } })
+   return function(rpcs) return printer({rpcs=rpcs}) end
+end
+
+function rpc_input_printer_from_schema(schema)
+   return rpc_printer_from_grammar(rpc_grammar_from_schema(schema).input)
+end
+
+function rpc_output_printer_from_schema(schema)
+   return rpc_printer_from_grammar(rpc_grammar_from_schema(schema).output)
 end
 
 function selftest()

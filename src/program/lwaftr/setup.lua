@@ -1,6 +1,8 @@
 module(..., package.seeall)
 
 local config     = require("core.config")
+local leader     = require("apps.config.leader")
+local follower   = require("apps.config.follower")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
@@ -24,29 +26,26 @@ function lwaftr_app(c, conf)
    assert(type(conf) == 'table')
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
-   conf.counters = lwcounter.init_counters()
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler,
               { max_ipv4_reassembly_packets =
                    conf.external_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =
-                   conf.external_interface.reassembly.max_fragments_per_packet,
-                counters = conf.counters })
+                   conf.external_interface.reassembly.max_fragments_per_packet })
    config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6,
               { max_ipv6_reassembly_packets =
                    conf.internal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =
-                   conf.internal_interface.reassembly.max_fragments_per_packet,
-                counters = conf.counters })
+                   conf.internal_interface.reassembly.max_fragments_per_packet })
    config.app(c, "icmpechov4", ipv4_apps.ICMPEcho,
               { address = convert_ipv4(conf.external_interface.ip) })
    config.app(c, "icmpechov6", ipv6_apps.ICMPEcho,
               { address = conf.internal_interface.ip })
    config.app(c, 'lwaftr', lwaftr.LwAftr, conf)
    config.app(c, "fragmenterv4", ipv4_apps.Fragmenter,
-              { mtu=conf.external_interface.mtu, counters=conf.counters })
+              { mtu=conf.external_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
-              { mtu=conf.internal_interface.mtu, counters=conf.counters })
+              { mtu=conf.internal_interface.mtu })
    config.app(c, "ndp", ipv6_apps.NDP,
               { src_ipv6 = conf.internal_interface.ip,
                 src_eth = conf.internal_interface.mac,
@@ -443,4 +442,18 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
 
    link_source(c, unpack(sources))
    link_sink(c, unpack(sinks))
+end
+
+function with_leader(f, graph, conf, ...)
+   local args = {...}
+   local function setup_fn(conf)
+      local graph = config.new()
+      f(graph, conf, unpack(args))
+      return graph
+   end
+   config.app(graph, 'leader', leader.Leader,
+              { setup_fn = setup_fn, initial_configuration = conf,
+                follower_pids = { require('syscall').getpid() },
+                schema_name = 'snabb-softwire-v1'})
+   config.app(graph, "follower", follower.Follower, {})
 end

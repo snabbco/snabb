@@ -6,6 +6,7 @@ local fragmentv4 = require("apps.lwaftr.fragmentv4")
 local fragv4_h = require("apps.lwaftr.fragmentv4_hardened")
 local lwutil = require("apps.lwaftr.lwutil")
 local icmp = require("apps.lwaftr.icmp")
+local lwcounter = require("apps.lwaftr.lwcounter")
 
 local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
@@ -37,7 +38,7 @@ function Reassembler:new(conf)
    local max_ipv4_reassembly_packets = assert(conf.max_ipv4_reassembly_packets)
    local max_fragments_per_reassembly_packet = assert(conf.max_fragments_per_reassembly_packet)
    local o = {
-      counters = assert(conf.counters, "Counters not initialized"),
+      counters = lwcounter.init_counters(),
       ctab = fragv4_h.initialize_frag_table(max_ipv4_reassembly_packets,
          max_fragments_per_reassembly_packet),
    }
@@ -85,7 +86,7 @@ end
 
 function Fragmenter:new(conf)
    local o = {
-      counters = assert(conf.counters, "Counters not initialized"),
+      counters = lwcounter.init_counters(),
       mtu = assert(conf.mtu),
    }
    return setmetatable(o, {__index=Fragmenter})

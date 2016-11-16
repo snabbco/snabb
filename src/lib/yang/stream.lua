@@ -32,9 +32,10 @@ function open_output_byte_stream(filename)
          to_write = to_write - written
       end
    end
-   function ret:write_ptr(ptr)
-      self:align(ffi.alignof(ptr))
-      self:write(ptr, ffi.sizeof(ptr))
+   function ret:write_ptr(ptr, type)
+      assert(ffi.sizeof(ptr) == ffi.sizeof(type))
+      self:align(ffi.alignof(type))
+      self:write(ptr, ffi.sizeof(type))
    end
    function ret:rewind()
       fd:seek(0, 'set')

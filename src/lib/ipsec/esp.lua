@@ -42,7 +42,7 @@ local ESP_TAIL_SIZE = esp_tail:sizeof()
 function esp_v6_new (conf)
    assert(conf.mode == "aes-128-gcm", "Only supports aes-128-gcm.")
    assert(conf.spi, "Need SPI.")
-   local gcm = aes_128_gcm:new(conf.spi, conf.keymat, conf.salt)
+   local gcm = aes_128_gcm:new(conf.spi, conf.key, conf.salt)
    local o = {}
    o.ESP_OVERHEAD = ESP_SIZE + ESP_TAIL_SIZE + gcm.IV_SIZE + gcm.AUTH_SIZE
    o.aes_128_gcm = gcm
@@ -115,9 +115,9 @@ function esp_v6_decrypt:new (conf)
    o.CTEXT_OFFSET = ESP_SIZE + gcm.IV_SIZE
    o.PLAIN_OVERHEAD = PAYLOAD_OFFSET + ESP_SIZE + gcm.IV_SIZE + gcm.AUTH_SIZE
    o.window_size = conf.window_size or 128
+   o.window_size = o.window_size + padding(8, o.window_size)
    o.resync_threshold = conf.resync_threshold or 1024
    o.resync_attempts = conf.resync_attempts or 8
-   assert(o.window_size % 8 == 0, "window_size must be a multiple of 8.")
    o.window = ffi.new(window_t, o.window_size / 8)
    o.decap_fail = 0
    o.auditing = conf.auditing
@@ -214,7 +214,7 @@ function selftest ()
    local ipv6 = require("lib.protocol.ipv6")
    local conf = { spi = 0x0,
                   mode = "aes-128-gcm",
-                  keymat = "00112233445566778899AABBCCDDEEFF",
+                  key = "00112233445566778899AABBCCDDEEFF",
                   salt = "00112233",
                   resync_threshold = 16,
                   resync_attempts = 8}

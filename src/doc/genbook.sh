@@ -62,6 +62,8 @@ $(cat $mdroot/apps/vlan/README.md)
 
 $(cat $mdroot/apps/bridge/README.md)
 
+$(cat $mdroot/apps/ipsec/README.md)
+
 $(cat $mdroot/apps/test/README.md)
 
 # Libraries
@@ -82,7 +84,7 @@ $(cat $mdroot/lib/protocol/README.md)
 
 ## IPsec
 
-$(cat ../lib/ipsec/README.md)
+$(cat $mdroot/lib/ipsec/README.md)
 
 ## Snabb NFV
 

@@ -25,6 +25,8 @@ function equal (x, y)
       end
       return true
    elseif type(x) == 'cdata' then
+      if x == y then return true end
+      if ffi.typeof(x) ~= ffi.typeof(y) then return false end
       local size = ffi.sizeof(x)
       if ffi.sizeof(y) ~= size then return false end
       return C.memcmp(x, y, size) == 0
