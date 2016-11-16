@@ -137,9 +137,9 @@ function compute_config_actions (old, new)
    for linkspec in pairs(old.links) do
       if not new.links[linkspec] then
          local fa, fl, ta, tl = config.parse_link(linkspec)
-         if old.apps[fa] then add_action('unlink_output', fa, fl) end
-         if old.apps[ta] then add_action('unlink_input', ta, tl) end
-         if not new[linkspec] then add_action('free_link', linkspec) end
+         add_action('unlink_output', fa, fl)
+         add_action('unlink_input', ta, tl)
+         add_action('free_link', linkspec)
       end
    end
 
