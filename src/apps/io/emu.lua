@@ -1,14 +1,14 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
 module(..., package.seeall)
-local io = require("apps.io.io")
+local common_io = require("apps.io.common")
 local FloodingBridge = require("apps.bridge.flooding").bridge
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local murmur = require("lib.hash.murmur")
 local C = require("ffi").C
 
-Emu = io.register('emu', {})
+Emu = common_io.register('emu', {})
 Emu.config = {
    device = {},
    queues = {required=true}

@@ -2,7 +2,7 @@
 
 module(...,package.seeall)
 
-local IO = require("apps.io.io").IO
+local IO = require("apps.io.common").IO
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
