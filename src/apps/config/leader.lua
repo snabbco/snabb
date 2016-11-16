@@ -10,7 +10,7 @@ local rpc = require("lib.yang.rpc")
 local app = require("core.app")
 local shm = require("core.shm")
 local app_graph = require("core.config")
-local action_queue = require("apps.config.action_queue")
+local action_codec = require("apps.config.action_codec")
 local channel = require("apps.config.channel")
 
 Leader = {
@@ -79,7 +79,7 @@ end
 function Leader:enqueue_config_actions (actions)
    local messages = {}
    for _,action in ipairs(actions) do
-      local buf, len = action_queue.encode_action(action)
+      local buf, len = action_codec.encode(action)
       table.insert(messages, { buf=buf, len=len })
    end
    for _,follower in ipairs(self.followers) do

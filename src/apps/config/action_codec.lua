@@ -141,7 +141,7 @@ local function encoder()
    return encoder
 end
 
-function encode_action(action)
+function encode(action)
    local name, args = unpack(action)
    local codec = encoder()
    codec:uint32(assert(action_codes[name], name))
@@ -177,14 +177,14 @@ local function decoder(buf, len)
    return decoder
 end
 
-function decode_action(buf, len)
+function decode(buf, len)
    local codec = decoder(buf, len)
    local name = assert(action_names[codec:uint32()])
    return { name, assert(actions[name], name)(codec) }
 end
 
 function selftest ()
-   print('selftest: apps.config.action_queue')
+   print('selftest: apps.config.action_codec')
    local function serialize(data)
       local tmp = random_file_name()
       print('serializing to:', tmp)
@@ -200,8 +200,8 @@ function selftest ()
    serialize(1)
    serialize(1LL)
    local function test_action(action)
-      local encoded, len = encode_action(action)
-      local decoded = decode_action(encoded, len)
+      local encoded, len = encode(action)
+      local decoded = decode(encoded, len)
       assert(lib.equal(action, decoded))
    end
    local appname, linkname, linkspec = 'foo', 'bar', 'foo.a -> bar.q'

@@ -10,7 +10,7 @@ local app = require("core.app")
 local shm = require("core.shm")
 local app_graph = require("core.config")
 local channel = require("apps.config.channel")
-local action_queue = require("apps.config.action_queue")
+local action_codec = require("apps.config.action_codec")
 
 Follower = {
    config = {
@@ -32,7 +32,7 @@ function Follower:handle_actions_from_leader()
    while true do
       local buf, len = channel:peek_message()
       if not buf then break end
-      local action = action_queue.decode_action(buf, len)
+      local action = action_codec.decode(buf, len)
       app.apply_config_actions({action})
       channel:discard_message(len)
       if action[1] == 'start_app' or action[1] == 'reconfig_app' then
