@@ -214,12 +214,14 @@ function apply_config_actions (actions)
       local link = app.output[linkname]
       app.output[linkname] = nil
       remove_link_from_array(app.output, link)
+      if app.link then app:link() end
    end
    function ops.unlink_input (appname, linkname)
       local app = app_table[appname]
       local link = app.input[linkname]
       app.input[linkname] = nil
       remove_link_from_array(app.input, link)
+      if app.link then app:link() end
    end
    function ops.free_link (linkspec)
       link.free(link_table[linkspec], linkspec)
@@ -235,12 +237,14 @@ function apply_config_actions (actions)
       local link = assert(link_table[linkspec])
       app.output[linkname] = link
       table.insert(app.output, link)
+      if app.link then app:link() end
    end
    function ops.link_input (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
       app.input[linkname] = link
       table.insert(app.input, link)
+      if app.link then app:link() end
    end
    function ops.stop_app (name)
       local app = app_table[name]
