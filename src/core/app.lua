@@ -95,19 +95,19 @@ function restart_dead_apps ()
 
    for name, app in pairs(app_table) do
       if app.dead and (now() - app.dead.time) >= restart_delay then
-         local function add_action(action, ...)
-            table.insert(actions, { action, { ... } })
-         end
          io.stderr:write(("Restarting %s (died at %f: %s)\n")
                          :format(name, app.dead.time, app.dead.error))
-         add_action('stop_app', name)
-         add_action('start_app', name,
-                    configuration.apps[name].class,
-                    configuration.apps[name].arg)
+         local info = configuration.apps[name]
+         table.insert(actions, {'stop_app', {name}})
+         table.insert(actions, {'start_app', {name, info.class, info.arg}})
          for linkspec in pairs(configuration.links) do
             local fa, fl, ta, tl = config.parse_link(linkspec)
-            if fa == name then add_action('link_output', fa, fl, linkspec) end
-            if ta == name then add_action('link_input', ta, tl, linkspec) end
+            if fa == name then
+               table.insert(actions, {'link_output', {fa, fl, linkspec}})
+            end
+            if ta == name then
+               table.insert(actions, {'link_input', {ta, tl, linkspec}})
+            end
          end
       end
    end
