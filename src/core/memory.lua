@@ -60,9 +60,9 @@ function allocate_hugetlb_chunk ()
    local fd, err = syscall.open("/proc/sys/vm/nr_hugepages","rdonly")
    assert(fd, tostring(err))
    fd:flock("ex")
-   for i =1, 3 do
-      local page = allocate_huge_page(huge_page_size, true)
-      if page ~= nil then
+   for i = 1, 3 do
+      local ok, page = pcall(allocate_huge_page, huge_page_size, true)
+      if ok then
          fd:flock("un")
          fd:close()
          return page
