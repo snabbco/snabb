@@ -4,14 +4,12 @@ module(..., package.seeall)
 local common = require("program.config.common")
 
 function run(args)
-   local schema_name, revision_date, instance_id, config =
-      common.parse_command_line(args,
-                                { command='load', with_config_file=true })
-   local config_str = common.serialize_config(config, schema_name)
+   args = common.parse_command_line(args,
+                                    { command='load', with_config_file=true })
    local response = common.call_leader(
-      instance_id, 'load-config',
-      { schema = schema_name, revision = revision_date,
-        config = config_str })
+      args.instance_id, 'load-config',
+      { schema = args.schema_name, revision = args.revision_date,
+        config = common.serialize_config(args.config, args.schema_name) })
    -- The reply is empty.
    main.exit(0)
 end

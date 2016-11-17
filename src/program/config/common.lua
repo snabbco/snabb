@@ -36,30 +36,33 @@ function parse_command_line(args, opts)
    if not schema_name then err("missing --schema arg") end
    if #args == 0 then err() end
    local instance_id = table.remove(args, 1)
-   local ret = { schema_name, revision_date, instance_id }
+   local ret = { schema_name=schema_name, revision_date=revision_date,
+                 instance_id=instance_id }
    if opts.with_config_file then
       if #args == 0 then err("missing config file argument") end
       local file = table.remove(args, 1)
       local opts = {schema_name=schema_name, revision_date=revision_date}
-      table.insert(ret, yang.load_configuration(file, opts))
+      ret.config_file = file
+      ret.config = yang.load_configuration(file, opts)
    end
    if opts.with_path then
       if #args == 0 then err("missing path argument") end
       local path = table.remove(args, 1)
       -- Waiting on our XPath parsing library :)
       if path ~= '/' then err("paths other than / currently unimplemented") end
-      table.insert(ret, path)
+      ret.path = path
    end
    if opts.with_value then
       local parser = data_parser(schema_name, path)
       if #args == 0 then
-         table.insert(ret, parser(io.stdin:read('*a')))
+         ret.value_str = io.stdin:read('*a')
       else
-         table.insert(ret, parser(table.remove(args, 1)))
+         ret.value_str = table.remove(args, 1)
       end
+      ret.value = parser(ret.value_str)
    end
    if #args ~= 0 then err("too many arguments") end
-   return unpack(ret)
+   return ret
 end
 
 function open_socket_or_die(instance_id)
