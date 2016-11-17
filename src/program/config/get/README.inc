@@ -1,5 +1,5 @@
 Usage:
-  snabb config get-config [OPTIONS] ID PATH
+  snabb config get [OPTIONS] ID PATH
 
 Available options:
   -s SCHEMA

@@ -11,7 +11,7 @@ local rpc = require("lib.yang.rpc")
 local tab_spaces = 2
 
 local function show_usage(status)
-   print(require("program.config.get_config.README_inc"))
+   print(require("program.config.get.README_inc"))
    main.exit(status)
 end
 
@@ -21,7 +21,7 @@ local function parse_args(args)
    function handlers.h() show_usage(0) end
    function handlers.s(arg) schema_name = arg end
    function handlers.r(arg) revision_date = arg end
-   args = lib.dogetopt(args, handlers, "h:s:r",
+   args = lib.dogetopt(args, handlers, "hs:r:",
                        {help="h", ['schema-name']="s", schema="s",
                         ['revision-date']="r", revision="r"})
    if not schema_name then show_usage(1) end
