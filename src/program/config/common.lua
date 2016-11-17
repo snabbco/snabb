@@ -23,6 +23,14 @@ local parse_command_line_opts = {
    require_schema = { default=false }
 }
 
+local function data_parser(schema_name, path)
+   -- Waiting on XPath library.
+   assert(path == "/")
+   return function (str)
+      return data.load_data_for_schema_by_name(schema_name, str)
+   end
+end
+
 function parse_command_line(args, opts)
    opts = lib.parse(opts, parse_command_line_opts)
    local function err(msg) show_usage(opts.command, 1, msg) end
@@ -57,7 +65,7 @@ function parse_command_line(args, opts)
       ret.path = path
    end
    if opts.with_value then
-      local parser = data_parser(ret.schema_name, path)
+      local parser = data_parser(ret.schema_name, ret.path)
       if #args == 0 then
          ret.value_str = io.stdin:read('*a')
       else

@@ -104,8 +104,9 @@ function Leader:rpc_get_config (args)
    return { config = config_str }
 end
 
-function Leader:rpc_load_config (args)
+function Leader:rpc_set_config (args)
    assert(args.schema == self.schema_name)
+   assert(args.path == "/")
    local config = yang.load_data_for_schema_by_name(args.schema, args.config)
    self:reset_configuration(config)
    return {}

@@ -30,10 +30,11 @@ module snabb-config-leader-v1 {
     }
   }
 
-  rpc load-config {
+  rpc set-config {
     input {
       leaf schema { type string; mandatory true; }
       leaf revision { type string; }
+      leaf path { type string; default "/"; }
       leaf config { type string; mandatory true; }
     }
   }
