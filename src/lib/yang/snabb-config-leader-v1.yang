@@ -12,6 +12,13 @@ module snabb-config-leader-v1 {
      "Initial revision.";
   }
 
+  rpc describe {
+    output {
+      leaf native-schema { type string; mandatory true; }
+      // leaf-list alternate-schema { type string; }
+    }
+  }
+
   rpc get-config {
     input {
       leaf schema { type string; mandatory true; }

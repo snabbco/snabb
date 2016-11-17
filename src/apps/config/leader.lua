@@ -89,6 +89,10 @@ function Leader:enqueue_config_actions (actions)
    end
 end
 
+function Leader:rpc_describe (args)
+   return { native_schema = self.schema_name }
+end
+
 function Leader:rpc_get_config (args)
    -- FIXME: Push more of this to a lib.
    assert(args.schema == self.schema_name)

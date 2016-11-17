@@ -19,29 +19,33 @@ local parse_command_line_opts = {
    command = { required=true },
    with_config_file = { default=false },
    with_path = { default=false },
-   with_value = { default=false }
+   with_value = { default=false },
+   require_schema = { default=false }
 }
 
 function parse_command_line(args, opts)
    opts = lib.parse(opts, parse_command_line_opts)
    local function err(msg) show_usage(opts.command, 1, msg) end
-   local schema_name, revision_date
+   local ret = {}
    local handlers = {}
    function handlers.h() show_usage(opts.command, 0) end
-   function handlers.s(arg) schema_name = arg end
-   function handlers.r(arg) revision_date = arg end
+   function handlers.s(arg) ret.schema_name = arg end
+   function handlers.r(arg) ret.revision_date = arg end
    args = lib.dogetopt(args, handlers, "hs:r:",
                        {help="h", ['schema-name']="s", schema="s",
                         ['revision-date']="r", revision="r"})
-   if not schema_name then err("missing --schema arg") end
    if #args == 0 then err() end
-   local instance_id = table.remove(args, 1)
-   local ret = { schema_name=schema_name, revision_date=revision_date,
-                 instance_id=instance_id }
+   ret.instance_id = table.remove(args, 1)
+   if not ret.schema_name then
+      if opts.require_schema then err("missing --schema arg") end
+      ret.schema_name =
+         call_leader(ret.instance_id, 'describe', {}).native_schema
+   end
    if opts.with_config_file then
       if #args == 0 then err("missing config file argument") end
       local file = table.remove(args, 1)
-      local opts = {schema_name=schema_name, revision_date=revision_date}
+      local opts = {schema_name=ret.schema_name,
+                    revision_date=ret.revision_date}
       ret.config_file = file
       ret.config = yang.load_configuration(file, opts)
    end
@@ -53,7 +57,7 @@ function parse_command_line(args, opts)
       ret.path = path
    end
    if opts.with_value then
-      local parser = data_parser(schema_name, path)
+      local parser = data_parser(ret.schema_name, path)
       if #args == 0 then
          ret.value_str = io.stdin:read('*a')
       else
