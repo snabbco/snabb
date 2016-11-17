@@ -99,19 +99,19 @@ function restart_dead_apps ()
 
    for name, app in pairs(app_table) do
       if app.dead and (now() - app.dead.time) >= restart_delay then
-         local function add_action(action, ...)
-            table.insert(actions, { action, { ... } })
-         end
          io.stderr:write(("Restarting %s (died at %f: %s)\n")
                          :format(name, app.dead.time, app.dead.error))
-         add_action('stop_app', name)
-         add_action('start_app', name,
-                    configuration.apps[name].class,
-                    configuration.apps[name].arg)
+         local info = configuration.apps[name]
+         table.insert(actions, {'stop_app', {name}})
+         table.insert(actions, {'start_app', {name, info.class, info.arg}})
          for linkspec in pairs(configuration.links) do
             local fa, fl, ta, tl = config.parse_link(linkspec)
-            if fa == name then add_action('link_output', fa, fl, linkspec) end
-            if ta == name then add_action('link_input', ta, tl, linkspec) end
+            if fa == name then
+               table.insert(actions, {'link_output', {fa, fl, linkspec}})
+            end
+            if ta == name then
+               table.insert(actions, {'link_input', {ta, tl, linkspec}})
+            end
          end
       end
    end
@@ -177,23 +177,22 @@ end
 -- Return the configuration actions needed to migrate from old config to new.
 function compute_config_actions (old, new)
    local actions = {}
-   local function add_action(action, ...)
-      table.insert(actions, { action, { ... } })
-   end
 
    -- First determine the links that are going away and remove them.
    for linkspec in pairs(old.links) do
       if not new.links[linkspec] then
          local fa, fl, ta, tl = config.parse_link(linkspec)
-         if old.apps[fa] then add_action('unlink_output', fa, fl) end
-         if old.apps[ta] then add_action('unlink_input', ta, tl) end
-         if not new[linkspec] then add_action('free_link', linkspec) end
+         table.insert(actions, {'unlink_output', {fa, fl}})
+         table.insert(actions, {'unlink_input', {ta, tl}})
+         table.insert(actions, {'free_link', {linkspec}})
       end
    end
 
    -- Do the same for apps.
    for appname, info in pairs(old.apps) do
-      if not new.apps[appname] then add_action('stop_app', appname) end
+      if not new.apps[appname] then
+         table.insert(actions, {'stop_app', {appname}})
+      end
    end
 
    -- Start new apps, restart reclassed apps, or reconfigure apps with
@@ -202,18 +201,18 @@ function compute_config_actions (old, new)
    for appname, info in pairs(new.apps) do
       local class, arg = info.class, info.arg
       if not old.apps[appname] then
-         add_action('start_app', appname, info.class, info.arg)
+         table.insert(actions, {'start_app', {appname, class, arg}})
          fresh_apps[appname] = true
       elseif old.apps[appname].class ~= class then
-         add_action('stop_app', appname)
-         add_action('start_app', appname, info.class, info.arg)
+         table.insert(actions, {'stop_app', {appname}})
+         table.insert(actions, {'start_app', {appname, class, arg}})
          fresh_apps[appname] = true
       elseif not lib.equal(old.apps[appname].arg, arg) then
          if class.reconfig then
-            add_action('reconfig_app', appname, info.class, info.arg)
+            table.insert(actions, {'reconfig_app', {appname, class, arg}})
          else
-            add_action('stop_app', appname)
-            add_action('start_app', appname, info.class, info.arg)
+            table.insert(actions, {'stop_app', {appname}})
+            table.insert(actions, {'start_app', {appname, class, arg}})
             fresh_apps[appname] = true
          end
       else
@@ -223,17 +222,17 @@ function compute_config_actions (old, new)
    end
 
    -- Now rebuild links.
-   for linkspec in pairs(new.links) do
+   for linkspec,_ in pairs(new.links) do
       local fa, fl, ta, tl = config.parse_link(linkspec)
       local fresh_link = not old.links[linkspec]
-      if fresh_link then add_action('new_link', linkspec) end
+      if fresh_link then table.insert(actions, {'new_link', {linkspec}}) end
       if not new.apps[fa] then error("no such app: " .. fa) end
       if not new.apps[ta] then error("no such app: " .. ta) end
       if fresh_link or fresh_apps[fa] then
-         add_action('link_output', fa, fl, linkspec)
+         table.insert(actions, {'link_output', {fa, fl, linkspec}})
       end
       if fresh_link or fresh_apps[ta] then
-         add_action('link_input', ta, tl, linkspec)
+         table.insert(actions, {'link_input', {ta, tl, linkspec}})
       end
    end
 
@@ -262,12 +261,14 @@ function apply_config_actions (actions)
       local link = app.output[linkname]
       app.output[linkname] = nil
       remove_link_from_array(app.output, link)
+      if app.link then app:link() end
    end
    function ops.unlink_input (appname, linkname)
       local app = app_table[appname]
       local link = app.input[linkname]
       app.input[linkname] = nil
       remove_link_from_array(app.input, link)
+      if app.link then app:link() end
    end
    function ops.free_link (linkspec)
       link.free(link_table[linkspec], linkspec)
@@ -283,12 +284,14 @@ function apply_config_actions (actions)
       local link = assert(link_table[linkspec])
       app.output[linkname] = link
       table.insert(app.output, link)
+      if app.link then app:link() end
    end
    function ops.link_input (appname, linkname, linkspec)
       local app = app_table[appname]
       local link = assert(link_table[linkspec])
       app.input[linkname] = link
       table.insert(app.input, link)
+      if app.link then app:link() end
    end
    function ops.stop_app (name)
       local app = app_table[name]
