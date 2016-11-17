@@ -1,9 +1,6 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
-local S = require("syscall")
-local ffi = require("ffi")
-local shm = require("core.shm")
 local rpc = require("lib.yang.rpc")
 local common = require("program.config.common")
 

@@ -6,6 +6,8 @@ local ffi = require("ffi")
 local lib = require("core.lib")
 local shm = require("core.shm")
 local rpc = require("lib.yang.rpc")
+local yang = require("lib.yang.yang")
+local data = require("lib.yang.data")
 
 function show_usage(command, status, err_msg)
    if err_msg then print('error: '..err_msg) end
@@ -38,7 +40,8 @@ function parse_command_line(args, opts)
    if opts.with_config_file then
       if #args == 0 then err("missing config file argument") end
       local file = table.remove(args, 1)
-      table.insert(ret, yang.load_configuration(file, schema_name))
+      local opts = {schema_name=schema_name, revision_date=revision_date}
+      table.insert(ret, yang.load_configuration(file, opts))
    end
    if opts.with_path then
       if #args == 0 then err("missing path argument") end
@@ -72,6 +75,15 @@ function open_socket_or_die(instance_id)
       main.exit(1)
    end
    return socket
+end
+
+function serialize_config(config, schema_name, path)
+   assert(path == nil or path == "/")
+   -- FFS
+   local schema = yang.load_schema_by_name(schema_name)
+   local grammar = data.data_grammar_from_schema(schema)
+   local printer = data.data_string_printer_from_grammar(grammar)
+   return printer(config)
 end
 
 function send_message(socket, msg_str)
