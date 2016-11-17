@@ -1,36 +1,10 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
 module(..., package.seeall)
-local common_io = require("apps.io.common")
-local FloodingBridge = require("apps.bridge.flooding").bridge
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local murmur = require("lib.hash.murmur")
 local C = require("ffi").C
-
-Emu = common_io.register('emu', {})
-Emu.config = {
-   device = {},
-   queues = {required=true}
-}
-
-function Emu:configure (c, name, conf)
-   local bridge = conf.device or name
-   local ports, mod = {}, 1
-   for name, qconf in pairs(conf.queues) do
-      table.insert(ports, name)
-      if qconf.hash then
-         mod = math.max(qconf.hash, mod)
-      end
-   end
-   config.app(c, name, FloodingBridge, {ports=ports})
-   for name, qconf in pairs(conf.queues) do
-      config.app(c, name, Emu, qconf)
-      config.link(c, name..".trunk -> "..bridge.."."..name)
-      config.link(c, bridge.."."..name.." -> "..name..".trunk")
-   end
-end
-
 
 Emu = {
    config = {

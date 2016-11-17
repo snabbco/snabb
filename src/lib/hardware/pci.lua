@@ -2,7 +2,6 @@
 
 module(...,package.seeall)
 
-local common_io = require("apps.io.common")
 local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
@@ -218,10 +217,4 @@ function print_device_summary ()
       end
       print(fmt:format(unpack(values)))
    end
-end
-
-
-PCIDriver = common_io.register('pci', {})
-function PCIDriver:configure (c, name, conf)
-   require(device_info(conf.device).driver).control:configure(c, name, conf)
 end
