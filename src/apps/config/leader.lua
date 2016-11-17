@@ -111,11 +111,12 @@ function Leader:handle (payload)
    return rpc.handle_calls(self.rpc_callee, payload, self.rpc_handler)
 end
 
+local dummy_unix_sockaddr = S.t.sockaddr_un()
+
 function Leader:handle_calls_from_peers()
    local peers = self.peers
    while true do
-      local sa = S.t.sockaddr_un()
-      local fd, err = self.socket:accept(sa)
+      local fd, err = self.socket:accept(dummy_unix_sockaddr)
       if not fd then
          if err.AGAIN then break end
          assert(nil, err)
