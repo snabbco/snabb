@@ -40,13 +40,13 @@ like Sysrepo interacts with a Snabb network function.
 Most `snabb config` commands are invoked in a uniform way:
 
 ```
-snabb config SUBCOMMAND -m MODULE ID PATH [VALUE]
+snabb config SUBCOMMAND [-s SCHEMA-NAME] ID PATH [VALUE]
 ```
 
 `snabb config` speaks a data model that is based on YANG, for minimum
 impedance mismatch between NETCONF agents and Snabb applications.  The
-`-m MODULE` option allows the caller to indicate the YANG module that
-they want to use, and for the purposes of the lwAFTR might be `-m
+`-s SCHEMA-NAME` option allows the caller to indicate the YANG schema
+that they want to use, and for the purposes of the lwAFTR might be `-s
 ietf-softwire`.
 
 `ID` identifies the particular Snabb instance to talk to, and can be a
@@ -79,8 +79,10 @@ module snabb-simple-router {
 }
 ```
 
-In this case then, we would pass `-m snabb-simple-router` to all of
-our `snabb config` invocations that talk to this router.
+In this case then, we would pass `-s snabb-simple-router` to all of
+our `snabb config` invocations that talk to this router.  Snabb data
+planes also declare their "native schema", so if you leave off the
+`-s` option, `snabb config` will ask the data plane what schema it uses.
 
 The configuration for a Snabb instance can be expressed in a text
 format that is derived from the schema.  In this case it could look
@@ -101,7 +103,7 @@ and the YANG schema quoting rules for strings apply.
 Note that containers like `route {}` only appear in the data syntax if
 they are marked as `presence true;` in the schema.
 
-So indeed, `snabb config get -m snabb-simple-router ID /`
+So indeed, `snabb config get ID /`
 might print out just the output given above.
 
 Users can limit their query to a particular subtree via passing a
@@ -109,7 +111,7 @@ different `PATH`.  For example, with the same configuration, we can
 query just the `active` value:
 
 ```
-$ snabb config get -m snabb-simple-router ID /active
+$ snabb config get ID /active
 true
 ```
 
@@ -122,7 +124,7 @@ To query an element of a `list` item, use an XPath selector; for
 example, to get the entry for IPv4 `1.2.3.4`, do:
 
 ```
-$ snabb config get -m snabb-simple-router ID /routes/route[addr=1.2.3.4]
+$ snabb config get ID /routes/route[addr=1.2.3.4]
 route {
   addr 1.2.3.4;
   port 1;
@@ -132,28 +134,28 @@ route {
 Or to just get the port:
 
 ```
-$ snabb config get -m snabb-simple-router ID /routes/route[addr=1.2.3.4]/port
+$ snabb config get ID /routes/route[addr=1.2.3.4]/port
 1
 ```
 
 Likewise, to change the port for `1.2.3.4`, do:
 
 ```
-$ snabb config set -m snabb-simple-router ID /routes/route[addr=1.2.3.4]/port 7
+$ snabb config set ID /routes/route[addr=1.2.3.4]/port 7
 ```
 
 Values can be large, so it's also possible to take them from `stdin`.
 Do this by omitting the value:
 
 ```
-$ cat /tmp/my-configuration | snabb config set -m snabb-simple-router ID /
+$ cat /tmp/my-configuration | snabb config set ID /
 ```
 
 Resetting the whole configuration is such a common operation that it
 has a special command that takes a file name instead of a path:
 
 ```
-$ snabb config load -m snabb-simple-router ID /tmp/my-configuration
+$ snabb config load ID /tmp/my-configuration
 ```
 
 Using `snabb config load` has the advantage that any configuration
@@ -164,13 +166,13 @@ configuration that corresponds to YANG schema `leaf` or `leaf-list`
 nodes:
 
 ```
-$ snabb config delete -m snabb-simple-router ID /routes/route[addr=1.2.3.4]
+$ snabb config delete ID /routes/route[addr=1.2.3.4]
 ```
 
 One can of course augment a configuration as well:
 
 ```
-$ snabb config add -m snabb-simple-router ID /routes
+$ snabb config add ID /routes
 route {
   addr 4.5.6.7;
   port 11;
@@ -212,7 +214,7 @@ the reason for the error. These properties will be defined in the
 future.
 
 ```
-$ snabb config listen -m snabb-simple-router ID
+$ snabb config listen -s snabb-simple-router ID
 { "id": "0", "verb": "get", "path": "/routes/route[addr=1.2.3.4]/port" }
 { "id": "1", "verb": "get", "path": "/routes/route[addr=2.3.4.5]/port" }
 { "id": "0", "status": "ok", "value: "1" }
