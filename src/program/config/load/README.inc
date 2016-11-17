@@ -1,5 +1,5 @@
 Usage:
-  snabb config load-config [OPTIONS] ID FILE
+  snabb config load [OPTIONS] ID FILE
 
 Available options:
   -s SCHEMA

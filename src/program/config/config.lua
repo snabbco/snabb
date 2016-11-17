@@ -12,7 +12,7 @@ local function parse_args(args)
    local handlers = {}
    handlers.h = function() show_usage(0) end
    args = lib.dogetopt(args, handlers, "h", {help="h"})
-   if #args <= 1 then show_usage(1) end
+   if #args < 1 then show_usage(1) end
    return args
 end
 
