@@ -116,3 +116,13 @@ end
 function recv_message(socket)
    return read_msg(socket, read_length(socket))
 end
+
+function call_leader(instance_id, method, args)
+   local caller = rpc.prepare_caller('snabb-config-leader-v1')
+   local socket = open_socket_or_die(instance_id)
+   local msg, parse_reply = rpc.prepare_call(caller, method, args)
+   send_message(socket, msg)
+   local reply = recv_message(socket)
+   socket:close()
+   return parse_reply(reply)
+end
