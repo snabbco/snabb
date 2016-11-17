@@ -444,7 +444,7 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
    link_sink(c, unpack(sinks))
 end
 
-function with_leader(f, graph, conf, ...)
+function reconfigurable(f, graph, conf, ...)
    local args = {...}
    local function setup_fn(conf)
       local graph = config.new()

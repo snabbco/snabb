@@ -32,8 +32,8 @@ function run(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
    local graph = config.new()
-   setup.with_leader(setup.load_bench, graph, conf,
-                     inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
+   setup.reconfigurable(setup.load_bench, graph, conf,
+                        inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
    app.configure(graph)
 
    local function start_sampling()
