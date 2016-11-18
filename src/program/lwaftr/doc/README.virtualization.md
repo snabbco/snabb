@@ -8,7 +8,7 @@ typical linux bridge used in VMs, the tun/tap device, the QEMU device emulator
 and the host kernel vhost-net handler.  That way, the SnabbSwitch process gets
 access to the very same memory pages presented to the virtio device in the VM.
 
-However the implementation of Snabb Switch running within a VM can be still
+However the implementation of Snabb running within a VM can be still
 further improved.  The current approach assumes the VM would run third-party
 applications that use TCP/UDP endpoints given by a stock OS, and with a
 virtio-net driver that interacts with the virtio device by attaching buffers to
@@ -31,7 +31,7 @@ userspace both virtio-net and virtio-pci.  For that, it handles the emulated
 PCI bus device to get hold of the virtqueues, that allow communication with
 the outer world.
 
-# How to run lwAFTR inside a VM
+## How to run lwAFTR inside a VM
 
 The script `program/lwaftr/virt/lwaftrctl` eases the process of launching a 
 virtualized lwAFTR.  The script provides a series of commands and actions to start
@@ -135,7 +135,7 @@ iface eth2 inet static
 The `lwaftrctl vm` commands makes a pause of 30 seconds, after that it pins QEMU
 and all its child process to a core.
 
-# Start lwAFTR in a guest
+## Start lwAFTR in a guest
 
 It is possible to automatically start the lwAFTR inside the guest from the host:
 
@@ -183,8 +183,6 @@ There is a screen on:
 
 Attach to this screen to see the RX/TX statistics of the runnign lwAFTR process.
 
-```
-
 # Stop lwAFTR in a guest
 
 All the listed command so far can take a `stop` action that will stop them running.
@@ -192,6 +190,5 @@ There is also a `restart` action that will stop a command and start it again.
 
 As the lwAFTR is started running `snabbnfv`, `vm` and `lwaftr` commands one after
 another, the whole process should be stopped in inverse order, that is:  `lwaftr`,
-`vm` and `snabbnfv`.
-
-There is a special command, called `all` that will do the whole process in one step.
+`vm` and `snabbnfv`
+.

@@ -7,7 +7,8 @@ local C = ffi.C
 
 local lib = require("core.lib")
 
-debug = _G.developer_debug
+-- Enable only when debugging this module. Can be very verbose.
+local debug = false
 
 ticks = false     -- current time, in ticks
 ns_per_tick = 1e6 -- tick resolution (millisecond)
@@ -69,6 +70,7 @@ end
 
 function selftest ()
    print("selftest: timer")
+
    ticks = 0
    local ntimers, runtime = 10000, 100000
    local count, expected_count = 0, 0

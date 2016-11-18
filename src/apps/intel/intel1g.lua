@@ -35,7 +35,7 @@
 -- Note: section and page numbers in the comments below refer to the i210 data sheet
 
 -- run selftest() on APU2's second/middle NIC:
---  sudo SNABB_SELFTEST_INTEL1G_0="0000:02:00.0" ./snabb snsh -t apps.intel.intel1g
+--  sudo SNABB_PCI_INTEL1G0="0000:02:00.0" ./snabb snsh -t apps.intel.intel1g
 
 -- Note: rxqueue >0 not working yet!
 
@@ -59,7 +59,7 @@ function Intel1g:new(conf)
    local txq = conf.txqueue or 0
    local rxq = conf.rxqueue or 0
    local ndesc = conf.ndescriptors or 512
-   local rxburst = conf.rxburst or 128
+   local rxburst = conf.rxburst or engine.pull_npackets
 
    -- 8.1.3 Register Summary, p.359
    local r = {}
@@ -107,9 +107,9 @@ function Intel1g:new(conf)
    -- Setup device access
    pci.unbind_device_from_linux(pciaddress)
    pci.set_bus_master(pciaddress, true)
-   local regs, mmiofd = pci.map_pci_memory(pciaddress, 0)
+   local regs, mmiofd = pci.map_pci_memory_locked(pciaddress, 0)
 
-   -- Common utilities, see snabbswitch/src/lib/hardware/register.lua
+   -- Common utilities, see snabb/src/lib/hardware/register.lua
    local function bitvalue (value)
       -- bitvalue(0x42)      => 0x42
       -- bitvalue({a=7,b=2}) => 0x42
@@ -589,12 +589,7 @@ function Intel1g:new(conf)
          while limit > 0 and can_receive() do
           limit = limit - 1
           if lo then					-- a link connects NIC to a sink
-           if not link.full(lo) then			-- from SolarFlareNic:pull()
-            link.transmit(lo, receive())
-           else
-            counters.pullTxLinkFull= counters.pullTxLinkFull +1
-            packet.free(receive())
-           end
+           link.transmit(lo, receive())
           else
            counters.pullNoTxLink= counters.pullNoTxLink +1
            packet.free(receive())
@@ -632,9 +627,9 @@ end  -- function Intel1g:new()
 
 function selftest ()
    print("selftest: Intel1g")
-   local pciaddr = os.getenv("SNABB_SELFTEST_INTEL1G_0")
+   local pciaddr = lib.getenv("SNABB_PCI_INTEL1G0")
    if not pciaddr then
-      print("SNABB_SELFTEST_INTEL1G_0 not set")
+      print("SNABB_PCI_INTEL1G0 not set")
       os.exit(engine.test_skipped_code)
    end
    

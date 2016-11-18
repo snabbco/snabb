@@ -7,7 +7,6 @@ local usage = require("program.snabbmark.README_inc")
 local basic_apps = require("apps.basic.basic_apps")
 local pci           = require("lib.hardware.pci")
 local ethernet      = require("lib.protocol.ethernet")
-local freelist      = require("core.freelist")
 local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
@@ -22,10 +21,20 @@ function run (args)
       solarflare(unpack(args))
    elseif command == 'intel1g' and #args >= 2 and #args <= 3 then
       intel1g(unpack(args))
+   elseif command == 'esp' and #args >= 2 then
+      esp(unpack(args))
+   elseif command == 'hash' and #args == 0 then
+      hash(unpack(args))
+   elseif command == 'ctable' and #args == 0 then
+      ctable(unpack(args))
    else
       print(usage) 
       main.exit(1)
    end
+end
+
+function gbits (bps)
+   return (bps * 8) / (1024^3)
 end
 
 function basic1 (npackets)
@@ -115,7 +124,7 @@ end
 
 function Source:pull()
    for _, o in ipairs(self.output) do
-      for i = 1, link.nwritable(o) do
+      for i = 1, engine.pull_npackets do
          local p = packet.allocate()
          ffi.copy(p.data, self.to_mac_address, 6)
          ffi.copy(p.data + 6, self.from_mac_address, 6)
@@ -223,15 +232,12 @@ function solarflare (npackets, packet_size, timeout)
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps, %.2f Gbit/s)."):format(packets / 1e6,
                                                                                                    runtime, packets / runtime / 1e6,
-                                                                                                   ((packets * packet_size * 8) / runtime) / (1024*1024*1024)))
+                                                                                                   gbits(packets * packet_size / runtime)))
    if link.stats(engine.app_table.source.output.tx).txpackets < npackets then
       print("Packets lost. Test failed!")
       main.exit(1)
    end
 end
-
--- ---
-
 
 function intel1g (npackets, packet_size, timeout)
    npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
@@ -327,4 +333,191 @@ receive_device.interface= "rx1GE"
       print("Packets lost. Test failed!")
       main.exit(1)
    end
+end
+
+function esp (npackets, packet_size, mode, profile)
+   local esp = require("lib.ipsec.esp")
+   local ethernet = require("lib.protocol.ethernet")
+   local ipv6 = require("lib.protocol.ipv6")
+   local datagram = require("lib.protocol.datagram")
+   local profiler = profile and require("jit.p")
+
+   npackets = assert(tonumber(npackets), "Invalid number of packets: " .. npackets)
+   packet_size = assert(tonumber(packet_size), "Invalid packet size: " .. packet_size)
+   local payload_size = packet_size - ethernet:sizeof() - ipv6:sizeof()
+   local payload = ffi.new("uint8_t[?]", payload_size)
+   local ip = ipv6:new({})
+   ip:payload_length(payload_size)
+   local eth = ethernet:new({type=0x86dd})
+   local d = datagram:new(packet.allocate())
+   d:payload(payload, payload_size)
+   d:push(ip)
+   d:push(eth)
+   local plain = d:packet()
+   local conf = { spi = 0x0,
+                  mode = "aes-128-gcm",
+                  key = "00112233445566778899AABBCCDDEEFF",
+                  salt = "00112233"}
+   local enc, dec = esp.esp_v6_encrypt:new(conf), esp.esp_v6_decrypt:new(conf)
+
+   if mode == "encapsulate" then
+      if profile then profiler.start(profile) end
+      local start = C.get_monotonic_time()
+      local encapsulated
+      for i = 1, npackets do
+         encapsulated = packet.clone(plain)
+         enc:encapsulate(encapsulated)
+         packet.free(encapsulated)
+      end
+      local finish = C.get_monotonic_time()
+      if profile then profiler.stop() end
+      local bps = (packet_size * npackets) / (finish - start)
+      print(("Encapsulation (packet size = %d): %.2f Gbit/s")
+            :format(packet_size, gbits(bps)))
+   else
+      local encapsulated = packet.clone(plain)
+      enc:encapsulate(encapsulated)
+      if profile then profiler.start(profile) end
+      local start = C.get_monotonic_time()
+      local plain
+      for i = 1, npackets do
+         plain = packet.clone(encapsulated)
+         dec:decapsulate(plain)
+         dec.seq.no = 0
+         dec.window[0] = 0
+         packet.free(plain)
+      end
+      local finish = C.get_monotonic_time()
+      if profile then profiler.stop() end
+      local bps = (packet_size * npackets) / (finish - start)
+      print(("Decapsulation (packet size = %d): %.2f Gbit/s")
+            :format(packet_size, gbits(bps)))
+   end
+end
+
+local pmu = require('lib.pmu')
+local has_pmu_counters, err = pmu.is_available()
+if not has_pmu_counters then
+   io.stderr:write('No PMU available: '..err..'\n')
+end
+
+if has_pmu_counters then pmu.setup() end
+
+local function measure(f, iterations)
+   local set
+   if has_pmu_counters then set = pmu.new_counter_set() end
+   local start = C.get_time_ns()
+   if has_pmu_counters then pmu.switch_to(set) end
+   local res = f(iterations)
+   if has_pmu_counters then pmu.switch_to(nil) end
+   local stop = C.get_time_ns()
+   local ns = tonumber(stop-start)
+   local cycles = nil
+   if has_pmu_counters then cycles = pmu.to_table(set).cycles end
+   return cycles, ns, res
+end
+
+local function test_perf(f, iterations, what)
+   require('jit').flush()
+   io.write(tostring(what or f)..': ')
+   io.flush()
+   local cycles, ns, res = measure(f, iterations)
+   if cycles then
+      cycles = cycles/iterations
+      io.write(('%.2f cycles, '):format(cycles))
+   end
+   ns = ns/iterations
+   io.write(('%.2f ns per iteration (result: %s)\n'):format(
+         ns, tostring(res)))
+   return res
+end
+
+function hash ()
+   local murmur = require('lib.hash.murmur').MurmurHash3_x86_32:new()
+   local vptr = ffi.new("uint8_t [4]")
+   local uint32_ptr_t = ffi.typeof('uint32_t*')
+   local lshift = require('bit').lshift
+   local INT32_MIN = -0x80000000
+   function murmur_hash_32(u32)
+      ffi.cast(uint32_ptr_t, vptr)[0] = u32
+      return murmur:hash(vptr, 4, 0ULL).u32[0]
+   end
+
+   local jenkins_hash_32 = require('lib.ctable').hash_32
+   local function test_jenkins(iterations)
+      local result
+      for i=1,iterations do result=jenkins_hash_32(i) end
+      return result
+   end
+
+   local function test_murmur(iterations)
+      local result
+      for i=1,iterations do result=murmur_hash_32(i) end
+      return result
+   end
+
+   test_perf(test_jenkins, 1e8, 'jenkins hash')
+   test_perf(test_murmur, 1e8, 'murmur hash (32 bit)')
+end
+
+function ctable ()
+   local ctable = require('lib.ctable')
+   local bnot = require('bit').bnot
+   local ctab = ctable.new(
+      { key_type = ffi.typeof('uint32_t'),
+        value_type = ffi.typeof('int32_t[6]'),
+        hash_fn = ctable.hash_32 })
+   local occupancy = 2e6
+   ctab:resize(occupancy / 0.4 + 1)
+
+   local function test_insertion(count)
+      local v = ffi.new('int32_t[6]');
+      for i = 1,count do
+         for j=0,5 do v[j] = bnot(i) end
+         ctab:add(i, v)
+      end
+   end
+
+   local function test_lookup_ptr(count)
+      local result = ctab.entry_type()
+      for i = 1, count do
+         result = ctab:lookup_ptr(i)
+      end
+      return result
+   end
+
+   local function test_lookup_and_copy(count)
+      local result = ctab.entry_type()
+      for i = 1, count do
+         ctab:lookup_and_copy(i, result)
+      end
+      return result
+   end
+
+   test_perf(test_insertion, occupancy, 'insertion (40% occupancy)')
+   test_perf(test_lookup_ptr, occupancy, 'lookup_ptr (40% occupancy)')
+   test_perf(test_lookup_and_copy, occupancy, 'lookup_and_copy (40% occupancy)')
+
+   local stride = 1
+   repeat
+      local streamer = ctab:make_lookup_streamer(stride)
+      local function test_lookup_streamer(count)
+         local result
+         for i = 1, count, stride do
+            local n = math.min(stride, count-i+1)
+            for j = 0, n-1 do
+               streamer.entries[j].key = i + j
+            end
+            streamer:stream()
+            result = streamer.entries[n-1].value[0]
+         end
+         return result
+      end
+      -- Note that "result" is part of the value, not an index into
+      -- the table, and so we expect the results to be different from
+      -- ctab:lookup().
+      test_perf(test_lookup_streamer, occupancy,
+                'streaming lookup, stride='..stride)
+      stride = stride * 2
+   until stride > 256
 end

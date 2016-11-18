@@ -25,9 +25,12 @@
 
 module(..., package.seeall)
 
+local lib = require("core.lib")
 local shm = require("core.shm")
 local ffi = require("ffi")
 require("core.counter_h")
+
+type = shm.register('counter', getfenv())
 
 local counter_t = ffi.typeof("struct counter")
 
@@ -38,21 +41,26 @@ local counter_t = ffi.typeof("struct counter")
 -- This is important for a subtle performance reason: the shared
 -- memory counters all have page-aligned addresses (thanks to mmap)
 -- and accessing many of them can lead to expensive cache misses (due
--- to set-associative CPU cache). See SnabbCo/snabbswitch#558.
+-- to set-associative CPU cache). See snabbco/snabb#558.
 local public  = {}
 local private = {}
 local numbers = {} -- name -> number
 
-function open (name, readonly)
-   if numbers[name] then error("counter already opened: " .. name) end
+function create (name, initval)
+   if numbers[name] then return private[numbers[name]] end
    local n = #public+1
-   if readonly then
-      public[n] = shm.open(name, counter_t, readonly)
-      private[n] = public[#public] -- use counter directly
-   else
-      public[n] = shm.create(name, counter_t)
-      private[n] = ffi.new(counter_t)
-   end
+   public[n] = shm.create(name, counter_t)
+   private[n] = ffi.new(counter_t)
+   numbers[name] = n
+   if initval then set(private[n], initval) end
+   return private[n]
+end
+
+function open (name)
+   if numbers[name] then return private[numbers[name]] end
+   local n = #public+1
+   public[n] = shm.open(name, counter_t, 'readonly')
+   private[n] = public[#public] -- use counter directly
    numbers[name] = n
    return private[n]
 end
@@ -83,10 +91,14 @@ function set  (counter, value) counter.c = value                         end
 function add  (counter, value) counter.c = counter.c + (value or 1)      end
 function read (counter)        return counter.c                          end
 
+ffi.metatype( counter_t,
+              {__tostring =
+               function (counter) return lib.comma_value(counter.c) end})
+
 function selftest ()
    print("selftest: core.counter")
-   local a  = open("core.counter/counter/a")
-   local b  = open("core.counter/counter/b")
+   local a  = create("core.counter/counter/a")
+   local b  = create("core.counter/counter/b")
    local a2 = shm.create("core.counter/counter/a", counter_t, true)
    set(a, 42)
    set(b, 43)

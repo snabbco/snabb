@@ -58,11 +58,11 @@ configure it all at the command like with little text files :)
 ### Building the lwAFTR
 
 Building the lwAFTR is pretty simple.  At a shell, just check out the
-right branch of Snabb Switch, type make, and you're done!
+right branch of Snabb, type make, and you're done!
 
 ```bash
-git clone https://github.com/Igalia/snabbswitch.git
-cd snabbswitch
+git clone https://github.com/Igalia/snabb.git
+cd snabb
 git checkout lwaftr_starfruit
 make
 ```
@@ -70,7 +70,7 @@ make
 That's all!  You'll find a self-contained `snabb` binary in your current
 directory that you can copy whereever you like.
 
-We're working on merging to upstream snabb; follow the progress in [this GitHub issue](https://github.com/Igalia/snabbswitch/issues/215).
+We're working on merging to upstream snabb; follow the progress in [this GitHub issue](https://github.com/Igalia/snabb/issues/215).
 
 ### Run the end-to-end tests
 
@@ -91,16 +91,15 @@ access to a NIC.
 ### Configuration
 
 There are a lot of configuration knobs!  See the
-[Configuration](./README.configuration.md) page, for general configuration, and 
-[Binding table](./README.bindingtable.md) page, for more on binding tables.
+[Configuration](./README.configuration.md) page.
 
 ### Running the lwAFTR
 
-You have a binding table and a configuration: great, you're finally
-ready to run the lwAFTR!  The only tricky part is making sure you're
-using the right network interfaces.  See [Running](./README.running.md),
-and be sure to check [Performance](./README.performance.md) to make sure
-you're getting all the lwAFTR can give.
+You have a configuration: great, you're finally ready to run the lwAFTR!
+The only tricky part is making sure you're using the right network
+interfaces.  See [Running](./README.running.md), and be sure to check
+[Performance](./README.performance.md) to make sure you're getting all
+the lwAFTR can give.
 
 The lwAFTR processes traffic between any NIC supported by Snabb, which
 mainly means Intel 82599 10 Gb adapters.  It's also possible to run on
@@ -111,6 +110,8 @@ get the lwAFTR working on virtualized network interfaces.
 ## Troubleshooting
 
 [Troubleshooting](./README.troubleshooting.md)
+
+[Counters](./README.counters.md)
 
 ## Performance
 
@@ -125,4 +126,3 @@ get the lwAFTR working on virtualized network interfaces.
 [Discovery of next-hop L2 addresses via NDP](./README.ndp.md)
 
 [Change Log](./CHANGELOG.md)
-

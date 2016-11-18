@@ -21,7 +21,6 @@ local bit       = require('bit')
 local virtq     = require('lib.virtio.virtq_driver')
 local VirtioPci = require('lib.virtio.virtio_pci').VirtioPci
 local checksum  = require('lib.checksum')
-require('lib.virtio.virtio_h')
 
 local band, bor, rshift, lshift = bit.band, bit.bor, bit.rshift, bit.lshift
 local prepare_packet4, prepare_packet6 = checksum.prepare_packet4, checksum.prepare_packet6
@@ -34,10 +33,10 @@ local ETHERTYPE_OFF = 12
 local ETHERLEN = 14 -- DST MAC | SRC MAC | ethertype
 local VIRTIO_NET_HDR_F_NEEDS_CSUM = 1
 
-local min_features =   C.VIRTIO_RING_F_INDIRECT_DESC + C.VIRTIO_NET_F_CSUM
-local want_features =  C.VIRTIO_F_ANY_LAYOUT +
-                       C.VIRTIO_RING_F_INDIRECT_DESC +
-                       C.VIRTIO_NET_F_MAC
+local min_features = C.VIRTIO_NET_F_CSUM +
+   C.VIRTIO_F_ANY_LAYOUT +
+   C.VIRTIO_NET_F_CTRL_VQ
+local want_features =  min_features
 
 local RXQ = 0
 local TXQ = 1
@@ -54,7 +53,6 @@ function VirtioNetDriver:new(args)
 
    if args.use_checksum then
       self.transmit = self._transmit_checksum
-      self.want_features = self.want_features + C.VIRTIO_NET_F_CSUM
    else
       self.transmit = self._transmit
    end

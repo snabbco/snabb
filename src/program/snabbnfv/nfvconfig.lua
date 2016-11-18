@@ -7,6 +7,8 @@ local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light").nd_light
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
+local AES128gcm = require("apps.ipsec.esp").AES128gcm
+local virtual_ether_mux = require("lib.io.virtual_ether_mux")
 local pci = require("lib.hardware.pci")
 local ffi = require("ffi")
 local C = ffi.C
@@ -17,39 +19,37 @@ function port_name (port_config)
    return port_config.port_id:gsub("-", "_")
 end
 
--- Compile app configuration from <file> for <pciaddr> and vhost_user
--- <socket>. Returns configuration.
-function load (file, pciaddr, sockpath)
-   local device_info = pci.device_info(pciaddr)
-   if not device_info then
-      print(format("could not find device information for PCI address %s", pciaddr))
-      main.exit(1)
-   end
-
+-- Compile app configuration from <file> for <pciaddr> and vhost_user <socket>.
+-- Optionally install <soft_bench> source and sink. Returns configuration.
+function load (file, pciaddr, sockpath, soft_bench)
    local ports = lib.load_conf(file)
    local c = config.new()
-   for _,t in ipairs(ports) do
-      local vlan, mac_address = t.vlan, t.mac_address
-      local name = port_name(t)
-      local NIC = name.."_NIC"
-      local Virtio = name.."_Virtio"
-      local vmdq = true
-      if not t.mac_address then
-         if #ports ~= 1 then
-            error("multiple ports defined but promiscuous mode requested for port: "..name)
+   local io_links
+   if pciaddr then
+      io_links = virtual_ether_mux.configure(c, ports, {pci = pciaddr})
+   else
+      io_links = virtual_ether_mux.configure(c, ports, {bench = soft_bench})
+   end
+   for i,t in ipairs(ports) do
+      -- Backwards compatibity / deprecated fields
+      for deprecated, current in pairs({tx_police_gbps = "tx_police",
+                                        rx_police_gbps = "rx_police"}) do
+         if t[deprecated] and not t[current] then
+            print("Warning: "..deprecated.." is deprecated, use "..current.." instead.")
+            t[current] = t[deprecated]
          end
-        vmdq = false
       end
-      config.app(c, NIC, require(device_info.driver).driver,
-                 {pciaddr = pciaddr,
-                  vmdq = vmdq,
-                  macaddr = mac_address,
-                  vlan = vlan})
-      config.app(c, Virtio, VhostUser, {socket_path=sockpath:format(t.port_id)})
+      -- Backwards compatability end
+      local name = port_name(t)
+      local Virtio = name.."_Virtio"
+      config.app(c, Virtio, VhostUser,
+                 {socket_path=sockpath:format(t.port_id),
+                  disable_mrg_rxbuf=t.disable_mrg_rxbuf,
+                  disable_indirect_desc=t.disable_indirect_desc})
       local VM_rx, VM_tx = Virtio..".rx", Virtio..".tx"
-      if t.tx_police_gbps then
+      if t.tx_police then
          local TxLimit = name.."_TxLimit"
-         local rate = t.tx_police_gbps * 1e9 / 8
+         local rate = t.tx_police * 1e9 / 8
          config.app(c, TxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, VM_tx.." -> "..TxLimit..".input")
          VM_tx = TxLimit..".output"
@@ -83,7 +83,7 @@ function load (file, pciaddr, sockpath)
          -- This will talk to our local gateway.
          local ND = name.."_ND"
          config.app(c, ND, nd_light,
-                    {local_mac = mac_address,
+                    {local_mac = t.mac_address,
                      local_ip = t.tunnel.local_ip,
                      next_hop = t.tunnel.next_hop})
          -- VM -> Tunnel -> ND <-> Network
@@ -94,15 +94,28 @@ function load (file, pciaddr, sockpath)
          config.link(c, Tunnel..".decapsulated -> "..VM_rx)
          VM_rx, VM_tx = ND..".south", ND..".south"
       end
-      if t.rx_police_gbps then
+      if t.crypto and t.crypto.type == "esp-aes-128-gcm" then
+         local Crypto = name.."_Crypto"
+         config.app(c, Crypto, AES128gcm,
+                    {spi = t.crypto.spi,
+                     transmit_key = t.crypto.transmit_key,
+                     transmit_salt = t.crypto.transmit_salt,
+                     receive_key = t.crypto.receive_key,
+                     receive_salt = t.crypto.receive_salt,
+                     auditing = t.crypto.auditing})
+         config.link(c, VM_tx.." -> "..Crypto..".decapsulated")
+         config.link(c, Crypto..".decapsulated -> "..VM_rx)
+         VM_rx, VM_tx = Crypto..".encapsulated", Crypto..".encapsulated"
+      end
+      if t.rx_police then
          local RxLimit = name.."_RxLimit"
-         local rate = t.rx_police_gbps * 1e9 / 8
+         local rate = t.rx_police * 1e9 / 8
          config.app(c, RxLimit, RateLimiter, {rate = rate, bucket_capacity = rate})
          config.link(c, RxLimit..".output -> "..VM_rx)
          VM_rx = RxLimit..".input"
       end
-      config.link(c, NIC..".tx -> "..VM_rx)
-      config.link(c, VM_tx.." -> "..NIC..".rx")
+      config.link(c, io_links[i].output.." -> "..VM_rx)
+      config.link(c, VM_tx.." -> "..io_links[i].input)
    end
 
    -- Return configuration c.
@@ -130,4 +143,7 @@ function selftest ()
       engine.configure(load(confpath, pcideva, "/dev/null"))
       engine.main({duration = 0.25})
    end
+   local c = load("program/snabbnfv/test_fixtures/nfvconfig/test_functions/deprecated.port", pcideva, "/dev/null")
+   assert(c.apps["Test_TxLimit"])
+   assert(c.apps["Test_RxLimit"])
 end
