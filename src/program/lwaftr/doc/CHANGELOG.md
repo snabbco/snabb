@@ -1,6 +1,6 @@
 # Change Log
 
-## [3.0] - 2016-11-18
+## [3.0.0] - 2016-11-18
 
 A change to migrate the lwAFTR to use a new YANG-based configuration.
 
