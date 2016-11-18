@@ -143,7 +143,7 @@ address.  See RFC 7597 for more details on the PSID scheme for how to
 share IPv4 addresses.  IPv4 addresses are added to the `psid-map` with
 statements like this:
 
-``
+```
   psid-map {
     addr 178.79.150.3;
     end-addr 178.100.150.3;
@@ -151,7 +151,7 @@ statements like this:
     reserved-ports-bit-count 0;
     shift 10;
   }
-``
+```
 
 `end-addr`, `reserved-ports-bit-count`, and `shift` are all optional.  
 
