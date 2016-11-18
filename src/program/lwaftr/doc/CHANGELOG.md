@@ -26,7 +26,7 @@ A change to migrate the lwAFTR to use a new YANG-based configuration.
    more.
 
  * Add "snabb config" set of commands, to replace "snabb lwaftr control".
-   See (the `snabb config` documentation)[../../config/README.md) for
+   See [the `snabb config` documentation](../../config/README.md) for
    full details.
 
  * Add initial support for being able to reconfigure an entire lwAFTR
