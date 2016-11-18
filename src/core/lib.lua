@@ -740,6 +740,20 @@ function parse (arg, config)
    return ret
 end
 
+-- Flattens a multi-dimentional table
+function flatten (val)
+    local rtn = {}
+    for k, v in pairs(val) do
+        if type(v) == "table" then
+            v = flatten(v)
+            for k1, v1 in pairs(v) do rtn[k1] = v1 end
+        else
+            rtn[k] = v
+        end
+    end
+    return rtn
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")

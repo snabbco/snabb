@@ -10,6 +10,7 @@ local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local util = require("lib.yang.util")
 local rpc = require("lib.yang.rpc")
+local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
 local app = require("core.app")
 local shm = require("core.shm")
@@ -426,6 +427,10 @@ function Leader:rpc_attach_listener (args)
    if self.listen_peer ~= nil then error('Listener already attached') end
    self.listen_peer = self.rpc_peer
    return {}
+end
+
+function Leader:rpc_get_state (args)
+    return {state=state.show_state(S.getpid(), args.path)}
 end
 
 function Leader:handle (payload)
