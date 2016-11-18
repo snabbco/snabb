@@ -89,7 +89,15 @@ function ipv4:ntop (n)
    return ffi.string(c_str)
 end
 
+function ipv4:set(addr)
+   return ipv4:pton(addr)
+end
+
 -- Instance methods
+
+function ipv4:get()
+   return ipv4:ntop(self)
+end
 
 function ipv4:version (v)
    return lib.bitfield(16, self:header(), 'ihl_v_tos', 0, 4, v)
@@ -148,6 +156,7 @@ function ipv4:protocol (protocol)
 end
 
 function ipv4:checksum ()
+   self:header().checksum = 0
    self:header().checksum = htons(ipsum(ffi.cast("uint8_t *", self:header()),
                                         self:sizeof(), 0))
    return ntohs(self:header().checksum)
@@ -206,7 +215,7 @@ local function test_ipv4_checksum ()
 
    local p = packet.from_string(lib.hexundump([[
       52:54:00:02:02:02 52:54:00:01:01:01 08 00 45 00
-      00 34 59 1a 40 00 40 06 00 00 c0 a8 14 a9 6b 15
+      00 34 59 1a 40 00 40 06 b0 8e c0 a8 14 a9 6b 15
       f0 b4 de 0b 01 bb e7 db 57 bc 91 cd 18 32 80 10
       05 9f 00 00 00 00 01 01 08 0a 06 0c 5c bd fa 4a
       e1 65

@@ -1,0 +1,11 @@
+Usage: migrate-configuration LWAFTR.CONF
+
+Options:
+  -h, --help                 Print usage information.
+
+Migrate an old-style configuration and binding table to the new YANG
+configuration.  LWAFTR.CONF should be the name of an old lwAFTR
+configuration.
+
+The resulting new-style configuration will be printed on standard
+output, ready to be saved to a new file.

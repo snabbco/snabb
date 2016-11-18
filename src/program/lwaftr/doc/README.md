@@ -91,16 +91,15 @@ access to a NIC.
 ### Configuration
 
 There are a lot of configuration knobs!  See the
-[Configuration](./README.configuration.md) page, for general configuration, and 
-[Binding table](./README.bindingtable.md) page, for more on binding tables.
+[Configuration](./README.configuration.md) page.
 
 ### Running the lwAFTR
 
-You have a binding table and a configuration: great, you're finally
-ready to run the lwAFTR!  The only tricky part is making sure you're
-using the right network interfaces.  See [Running](./README.running.md),
-and be sure to check [Performance](./README.performance.md) to make sure
-you're getting all the lwAFTR can give.
+You have a configuration: great, you're finally ready to run the lwAFTR!
+The only tricky part is making sure you're using the right network
+interfaces.  See [Running](./README.running.md), and be sure to check
+[Performance](./README.performance.md) to make sure you're getting all
+the lwAFTR can give.
 
 The lwAFTR processes traffic between any NIC supported by Snabb, which
 mainly means Intel 82599 10 Gb adapters.  It's also possible to run on

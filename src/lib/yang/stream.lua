@@ -32,9 +32,14 @@ function open_output_byte_stream(filename)
          to_write = to_write - written
       end
    end
-   function ret:write_ptr(ptr)
-      self:align(ffi.alignof(ptr))
-      self:write(ptr, ffi.sizeof(ptr))
+   function ret:write_ptr(ptr, type)
+      assert(ffi.sizeof(ptr) == ffi.sizeof(type))
+      self:align(ffi.alignof(type))
+      self:write(ptr, ffi.sizeof(type))
+   end
+   function ret:rewind()
+      fd:seek(0, 'set')
+      ret.written = 0 -- more of a position at this point
    end
    function ret:write_array(ptr, type, count)
       self:align(ffi.alignof(type))
@@ -121,6 +126,7 @@ function open_input_byte_stream(filename)
       self:read(round_up(pos, alignment) - pos)
    end
    function ret:seek(new_pos)
+      if new_pos == nil then return pos end
       assert(new_pos >= 0)
       assert(new_pos <= size)
       pos = new_pos
@@ -136,6 +142,10 @@ function open_input_byte_stream(filename)
    end
    function ret:read_char()
       return ffi.string(ret:read(1), 1)
+   end
+   function ret:read_string()
+      local count = size - pos
+      return ffi.string(ret:read(count), count)
    end
    function ret:as_text_stream(len)
       local end_pos = size
