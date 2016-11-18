@@ -1,26 +1,42 @@
 # Change Log
 
-## [3.0] - 2016-11-09
+## [3.0] - 2016-11-18
 
 A change to migrate the lwAFTR to use a new YANG-based configuration.
 
  * New configuration format based on YANG.  To migrate old
    configurations, run "snabb lwaftr migrate-configation old.conf" on
-   the old configuration.  See the snabb-softwire-v1.yang schema or
-   README.configuration.md for full details on the new configuration
-   format.
+   the old configuration.  See the [snabb-softwire-v1.yang
+   schema](../../../lib/yang/snabb-softwire-v1.yang) or
+   [README.configuration.md](./README.configuration.md) for full details
+   on the new configuration format.
 
  * Send ICMPv6 unreachable messages from the most appropriate source address
    available (the one associated with a B4 if possible, or else the one the
    packet one is in reply to had as a destination.)
 
- * Add support for ARP resolution of the next hop on the external
+ * Add support for ARP resolution of the next hop on the external (IPv4)
    interface.
 
- * Add support for virtualized control planes via Snabb vMX.
+ * Add support for virtualized control planes via Snabb vMX.  See [the
+   `snabbvmx` documentation](../../snabbvmx/doc/README.md) for more.
 
  * Add many more counters, used to diagnose the path that packets take
-   in the lwAFTR.  See README.counters.md for more.
+   in the lwAFTR.  See [README.counters.md](./README.counters.md) for
+   more.
+
+ * Add "snabb config" set of commands, to replace "snabb lwaftr control".
+   See (the `snabb config` documentation)[../../config/README.md) for
+   full details.
+
+ * Add initial support for being able to reconfigure an entire lwAFTR
+   process while it is running, including changes that can add or remove
+   ingresss or egress filters, change NIC settings, or the like.  Pass
+   the `--reconfigurable` argument to `snabb lwaftr run`, then interact
+   with the lwAFTR instance via `snabb config`.  Enabling this option
+   currently has a small performance impact; this will go away in the
+   next release.  A future release will also support efficient
+   incremental binding-table updates.
 
  * Many updates from upstream Snabb.
 
