@@ -173,8 +173,8 @@ end
 function load_from_path(path)
    -- First extract and load the module name then load it.
    local module_name, path = next_element(path)
-   local scm = schema.load_schema_by_name(module_name)
-   local grammar = data.data_grammar_from_schema(scm)
+   local scm = schemalib.load_schema_by_name(module_name)
+   local grammar = datalib.data_grammar_from_schema(scm)
    return module_name, convert_path(path, grammar.members)
 end
 
