@@ -6,7 +6,7 @@ Usage: bench CONF IPV4-IN.PCAP IPV6-IN.PCAP
                              Hydra mode: emit CSV data in the format expected
                              by the Hydra reports. For instance:
 
-                               benchmark,snabb,id,score,unit
+                               benchmark,id,score,unit
 
                              rather than the default:
 

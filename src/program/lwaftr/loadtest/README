@@ -13,6 +13,17 @@ Usage: loadtest [OPTIONS] <PCAP-FILE> <TX-NAME> <RX-NAME> <PCI> [<PCAP-FILE> <TX
                              written. A simple filename or relative pathname
                              will be based on the current directory. Default
                              is "bench.csv".
+  -y, --hydra
+                             Hydra mode: emit CSV data in the format expected
+                             by the Hydra reports. For instance:
+
+                               benchmark,id,score,unit
+
+                             rather than the default:
+
+                               load_gbps,stream,tx_packets,tx_mpps,tx_bytes,
+                                 tx_gbps,rx_packets,rx_mpps,rx_bytes,rx_gbps,
+                                 ingress_drop,lost_packets,lost_percent
   --cpu CPU
                              Bind to the given CPU.
   -h, --help

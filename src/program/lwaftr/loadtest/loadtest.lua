@@ -58,7 +58,8 @@ function programs.ramp_up(tester, opts)
       tail = tail:and_then(tester.measure,
                            math.min(opts.bitrate, opts.step * step),
                            opts.duration,
-                           opts.bench_file)
+                           opts.bench_file,
+                           opts.hydra)
    end
    head:resolve()
    return tail
@@ -71,7 +72,8 @@ function programs.ramp_down(tester, opts)
       tail = tail:and_then(tester.measure,
                            math.min(opts.bitrate, opts.step * step),
                            opts.duration,
-                           opts.bench_file)
+                           opts.bench_file,
+                           opts.hydra)
    end
    head:resolve()
    return tail
@@ -105,13 +107,14 @@ function parse_args(args)
    function handlers.p(arg)
       opts.program = assert(programs[arg], 'unrecognized program: '..arg)
    end
+   function handlers.y() opts.hydra = true end
    handlers["bench-file"] = function(arg)
       opts.bench_file = arg
    end
    function handlers.h() show_usage(0) end
-   args = lib.dogetopt(args, handlers, "hb:s:D:p:",
+   args = lib.dogetopt(args, handlers, "yhb:s:D:p:",
                        { bitrate="b", step="s", duration="D", help="h",
-                         program="p", cpu=1, ["bench-file"]=1 })
+                         program="p", cpu=1, ["bench-file"]=1, hydra="y" })
    if not opts.step then opts.step = opts.bitrate / 10 end
    assert(opts.bitrate > 0, 'bitrate must be positive')
    assert(opts.step > 0, 'step must be positive')
@@ -211,14 +214,13 @@ function run(args)
    end
 
    function tester.print_counter_diff(
-         before, after, duration, bench_file, gbps_bitrate)
+         before, after, duration, gbps_bitrate, bench_file, hydra_mode)
       local function bitrate(diff)
          -- 7 bytes preamble, 1 start-of-frame, 4 CRC, 12 interpacket gap.
          local overhead = 7 + 1 + 4 + 12
          return (diff.txbytes + diff.txpackets * overhead) * 8 / duration
       end
       for _, stream in ipairs(streams) do
-         bench_file:write(('%f,%s'):format(gbps_bitrate, stream.tx_name))
          print(string.format('  %s:', stream.tx_name))
          local nic_id = stream.nic_tx_id
          local nic_before, nic_after = before[nic_id], after[nic_id]
@@ -233,27 +235,55 @@ function run(args)
          local lost_percent = (tx.txpackets - rx.txpackets) / tx.txpackets * 100
          print(string.format('    TX %d packets (%f MPPS), %d bytes (%f Gbps)',
             tx.txpackets, tx_mpps, tx.txbytes, tx_gbps))
-         bench_file:write((',%d,%f,%d,%f'):format(
-            tx.txpackets, tx_mpps, tx.txbytes, tx_gbps))
          print(string.format('    RX %d packets (%f MPPS), %d bytes (%f Gbps)',
-            rx.txpackets, rx_mpps, rx.txbytes, rx_gbps))
-         bench_file:write((',%d,%f,%d,%f'):format(
             rx.txpackets, rx_mpps, rx.txbytes, rx_gbps))
          print(string.format('    Loss: %d ingress drop + %d packets lost (%f%%)',
             drop, lost_packets, lost_percent))
-         bench_file:write((',%d,%d,%f\n'):format(
-            drop, lost_packets, lost_percent))
+         if hydra_mode then
+            -- Hydra reports prefer integers for the X (time) axis.
+            -- TX
+            -- bench_file:write(('%s_tx_packets,%.f,%f,packets\n'):format(
+            --    stream.tx_name,gbps_bitrate,tx.txpackets))
+            -- bench_file:write(('%s_tx_mpps,%.f,%f,mpps\n'):format(
+            --    stream.tx_name,gbps_bitrate,tx_mpps))
+            -- bench_file:write(('%s_tx_bytes,%.f,%f,bytes\n'):format(
+            --    stream.tx_name,gbps_bitrate,tx.txbytes))
+            -- bench_file:write(('%s_tx_gbps,%.f,%f,gbps\n'):format(
+            --    stream.tx_name,gbps_bitrate,tx_gbps))
+            -- RX
+            -- bench_file:write(('%s_rx_packets,%.f,%f,packets\n'):format(
+            --    stream.tx_name,gbps_bitrate,rx.txpackets))
+            bench_file:write(('%s_rx_mpps,%.f,%f,mpps\n'):format(
+               stream.tx_name,gbps_bitrate,rx_mpps))
+            -- bench_file:write(('%s_rx_bytes,%.f,%f,bytes\n'):format(
+            --    stream.tx_name,gbps_bitrate,rx.txbytes))
+            bench_file:write(('%s_rx_gbps,%.f,%f,gbps\n'):format(
+               stream.tx_name,gbps_bitrate,rx_gbps))
+            -- Loss
+            bench_file:write(('%s_ingress_drop,%.f,%f,packets\n'):format(
+               stream.tx_name,gbps_bitrate,drop))
+            -- bench_file:write(('%s_lost_packets,%.f,%f,packets\n'):format(
+            --    stream.tx_name,gbps_bitrate,lost_packets))
+            bench_file:write(('%s_lost_percent,%.f,%f,percentage\n'):format(
+               stream.tx_name,gbps_bitrate,lost_percent))
+         else
+            bench_file:write(('%f,%s,%d,%f,%d,%f,%d,%f,%d,%f,%d,%d,%f\n'):format(
+               gbps_bitrate, stream.tx_name,
+               tx.txpackets, tx_mpps, tx.txbytes, tx_gbps,
+               rx.txpackets, rx_mpps, rx.txbytes, rx_gbps,
+               drop, lost_packets, lost_percent))
+         end
       end
       bench_file:flush()
    end
 
-   function tester.measure(bitrate, duration, bench_file)
+   function tester.measure(bitrate, duration, bench_file, hydra_mode)
       local gbps_bitrate = bitrate/1e9
       local start_counters = tester.record_counters()
       local function report()
          local end_counters = tester.record_counters()
-         tester.print_counter_diff(
-            start_counters, end_counters, duration, bench_file, gbps_bitrate)
+         tester.print_counter_diff(start_counters, end_counters, duration,
+            gbps_bitrate, bench_file, hydra_mode)
       end
       print(string.format('Applying %f Gbps of load.', gbps_bitrate))
       return tester.generate_load(bitrate, duration):
@@ -262,10 +292,12 @@ function run(args)
          and_then(report)
    end
 
-   local function create_bench_file(filename)
+   local function create_bench_file(filename, hydra_mode)
       local bench_file = io.open(filename, "w")
-      bench_file:write("load_gbps,stream,tx_packets,tx_mpps,tx_bytes,tx_gbps"..
-         ",rx_packets,rx_mpps,rx_bytes,rx_gbps,ingress_drop,lost_packets,lost_percent\n")
+      local header = hydra_mode and "benchmark,id,score,unit\n" or
+         "load_gbps,stream,tx_packets,tx_mpps,tx_bytes,tx_gbps,rx_packets"..
+         ",rx_mpps,rx_bytes,rx_gbps,ingress_drop,lost_packets,lost_percent\n"
+      bench_file:write(header)
       bench_file:flush()
       return bench_file
    end
@@ -280,7 +312,7 @@ function run(args)
       engine.main({done=done})
    end
 
-   opts.bench_file = create_bench_file(opts.bench_file)
+   opts.bench_file = create_bench_file(opts.bench_file, opts.hydra)
    engine.busywait = true
    local head = promise.new()
    run_engine(head,

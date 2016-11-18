@@ -18,10 +18,10 @@ Usage: packetblaster lwaftr [OPTIONS]
 
   --src_mac SOURCE
                         Source MAC-Address
-			Default: 00:00:00:00:00:00
+                        Default: 00:00:00:00:00:00
   --dst_mac DESTINATION
                         Destination MAC-Address
-			Default: 00:00:00:00:00:00
+                        Default: 00:00:00:00:00:00
   --size SIZES
                         A comma separated list of numbers. Send packets of
                         SIZES bytes. The size specifies the lenght of the IPv4 
@@ -83,7 +83,7 @@ Example 1: Measure performance of single stick LWAFTR (handling IPv4 and IPv6
 traffic over a single interface). Packetblaster lwaftr generates 50% IPv4 and
 50% IPv6 encapsulated traffic of IMIX line traffic:
 
-  $ sudo ./snabb packetblaster lwaftr --rate 3.2 --count 1000000000:05:00.0
+  $ sudo ./snabb packetblaster lwaftr --rate 3.2 --count 100000 --pci 0000:05:00.0
   packetblaster lwaftr: Sending 1000000 clients at 3.200 MPPS to 0000:05:00.0
 
   IPv6: 2001:db8:: > 2001:db8:ffff::100: 10.0.0.0:1024 > 8.8.8.8:12345
