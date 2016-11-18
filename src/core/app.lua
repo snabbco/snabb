@@ -532,5 +532,5 @@ function selftest ()
       got.configuration, got.name, got.arg = c, name, arg
    end
    config.app(c_macro, args.name, MacroApp, args.arg)
-   assert(lib.equeal(args, got), "configure callback broken")
+   assert(lib.equal(args, got), "configure callback broken")
 end
