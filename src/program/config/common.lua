@@ -94,11 +94,8 @@ end
 
 function serialize_config(config, schema_name, path)
    assert(path == nil or path == "/")
-   -- FFS
-   local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.data_grammar_from_schema(schema)
-   local printer = data.data_string_printer_from_grammar(grammar)
-   return printer(config)
+   return yang.print_data_for_schema_by_name(config, schema_name,
+                                             yang.string_output_file())
 end
 
 function send_message(socket, msg_str)

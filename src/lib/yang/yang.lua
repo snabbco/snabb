@@ -6,6 +6,7 @@ local schema = require("lib.yang.schema")
 local data = require("lib.yang.data")
 local binary = require("lib.yang.binary")
 local stream = require("lib.yang.stream")
+local util = require("lib.yang.util")
 
 load_schema = schema.load_schema
 load_schema_file = schema.load_schema_file
@@ -16,6 +17,7 @@ load_data_for_schema_by_name = data.load_data_for_schema_by_name
 
 print_data_for_schema = data.print_data_for_schema
 print_data_for_schema_by_name = data.print_data_for_schema_by_name
+string_output_file = util.string_output_file
 
 compile_data_for_schema = binary.compile_data_for_schema
 compile_data_for_schema_by_name = binary.compile_data_for_schema_by_name

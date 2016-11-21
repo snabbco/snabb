@@ -410,11 +410,11 @@ function load_data_for_schema_by_name(schema_name, str, filename)
 end
 
 function rpc_input_parser_from_schema(schema)
-   return data_parser_from_grammar(rpc_grammar_from_schema(schema).input)
+   return data_parser_from_grammar(rpc_input_grammar_from_schema(schema))
 end
 
 function rpc_output_parser_from_schema(schema)
-   return data_parser_from_grammar(rpc_grammar_from_schema(schema).output)
+   return data_parser_from_grammar(rpc_output_grammar_from_schema(schema))
 end
 
 local function encode_yang_string(str)
@@ -610,13 +610,6 @@ local function string_output_file()
    return file
 end
 
-function data_string_printer_from_grammar(production)
-   local printer = data_printer_from_grammar(production)
-   return function(data)
-      return printer(data, string_output_file())
-   end
-end
-
 function data_printer_from_schema(schema)
    return data_printer_from_grammar(data_grammar_from_schema(schema))
 end
@@ -630,18 +623,12 @@ function print_data_for_schema_by_name(schema_name, data, file)
    return print_data_for_schema(schema, data, file)
 end
 
-function rpc_printer_from_grammar(production)
-   local printer = data_string_printer_from_grammar(
-      { type='struct', members = { rpcs=production } })
-   return function(rpcs) return printer({rpcs=rpcs}) end
-end
-
 function rpc_input_printer_from_schema(schema)
-   return rpc_printer_from_grammar(rpc_grammar_from_schema(schema).input)
+   return data_printer_from_grammar(rpc_input_grammar_from_schema(schema))
 end
 
 function rpc_output_printer_from_schema(schema)
-   return rpc_printer_from_grammar(rpc_grammar_from_schema(schema).output)
+   return data_printer_from_grammar(rpc_output_grammar_from_schema(schema))
 end
 
 function selftest()

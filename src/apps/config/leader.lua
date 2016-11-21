@@ -99,8 +99,9 @@ function Leader:rpc_get_config (args)
    assert(args.path == '/')
    local schema = yang.load_schema_by_name(self.schema_name)
    local grammar = data.data_grammar_from_schema(schema)
-   local printer = data.data_string_printer_from_grammar(grammar)
-   local config_str = printer(self.current_configuration)
+   local printer = data.data_printer_from_grammar(grammar)
+   local config_str = printer(self.current_configuration,
+                              yang.string_output_file())
    return { config = config_str }
 end
 
