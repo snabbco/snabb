@@ -26,7 +26,6 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
-local lib = require("core.lib")
 local schemalib = require("lib.yang.schema")
 local datalib = require("lib.yang.data")
 local valuelib = require("lib.yang.value")
@@ -43,21 +42,21 @@ local function extract_parts(fragment)
 end
 
 local handlers = {}
-function handlers.scalar(fragment, tree)
-   return {name=fragment.name}, tree
+function handlers.scalar(grammar, fragment)
+   return {name=fragment.name, grammar=grammar}
 end
-function handlers.struct(fragment, tree)
-   return {name=fragment.name}, tree.members
+function handlers.struct(grammar, fragment)
+   return {name=fragment.name, grammar=grammar}
 end
-function handlers.table(fragment, tree)
-   return {name=fragment.name, keys=fragment.query}, tree
+function handlers.table(grammar, fragment)
+   return {name=fragment.name, keys=fragment.query, grammar=grammar}
 end
-function handlers.array(fragment, tree)
+function handlers.array(grammar, fragment)
    local position = fragment.query["position()"]
-   return {name=fragment.name, key=tonumber(position)}
+   return {name=fragment.name, key=tonumber(position), grammar=grammar}
 end
-function handle(node_type, fragment, tree)
-   return assert(handlers[node_type], node_type)(fragment, tree)
+function handle(grammar, fragment)
+   return assert(handlers[grammar.type], grammar.type)(grammar, fragment)
 end
 
 -- Gets the next item in the path returning the element and the remaining
@@ -78,17 +77,17 @@ end
 
 -- Finds the grammar node for a fragment in a given grammar.
 local function extract_grammar_node(grammar, fragment)
-   assert(grammar.type ~= "scalar")
-   local errmsg = "Invalid path: "..fragment.name
-   if grammar.type == "table" then
+   local handlers = {}
+   function handlers.struct () return grammar.members[fragment.name] end
+   function handlers.table ()
       if grammar.keys[fragment.name] == nil then
-         return assert(grammar.values[fragment.name], errmsg)
+         return grammar.values[fragment.name]
       else
          return grammar.keys[fragment.name]
       end
-   else
-      return assert(grammar[fragment.name], errmsg)
    end
+   local errmsg = "Invalid path:"..fragment.name
+   return assert(assert(handlers[grammar.type](), errmsg), errmsg)
 end
 
 -- Converts an XPath path to a lua array consisting of path componants.
@@ -98,75 +97,59 @@ function convert_path(grammar, path)
    local node = grammar
    for element in split_path(path) do
       node = extract_grammar_node(node, element)
-      local luapath, next_node = handle(node.type, element, node)
-      luapath.grammar = node
+      local luapath = handle(node, element)
       table.insert(ret, luapath)
-      node = next_node
+      --node = next_node
    end
    return ret
 end
 
 -- Returns a resolver for a paticular schema and *lua* path.
-function resolver(schema, path)
-   local grammar = datalib.data_grammar_from_schema(schema)
+function resolver(path)
    local handlers = {}
-   local function handle(scm, prod, data, path)
+   local function handle(data, path)
       if #path == 0 then return data end
-      return assert(handlers[scm.kind], scm.kind)(scm, prod, data, path)
-   end
-   function handlers.list(scm, prod, data, path)
       local head = table.remove(path, 1)
+      local handler = assert(handlers[head.grammar.type], head.grammar.type)
+      return handler(head, data, path)
+   end
+   function handlers.table(head, data, path)
       -- The list can either be a ctable or a plain old lua table, if it's the
       -- ctable then it requires some more work to retrive the data.
-      local prod = prod.members[head.name]
       local data = data[normalize_id(head.name)]
-      if #prod.keys > 1 then error("Multiple key values are not supported!") end
-      if prod.key_ctype then
+      if #head.grammar.keys > 1 then
+         error("Multiple key values are not supported!")
+      end
+      if head.grammar.key_ctype then
          -- It's a ctable and we need to prepare the key so we can lookup the
          -- pointer to the entry and then convert the values back to lua.
-         local kparser = valuelib.types[scm.body[scm.key].primitive_type].parse
-         local key = kparser(head.keys[scm.key])
-         local ckey = ffi.new(prod.key_ctype)
-         ckey[scm.key] = key
+         local keyname = next(head.keys)
+         local ptype = head.grammar.keys[keyname].argument_type.primitive_type
+         local kparser = valuelib.types[ptype].parse
+         local key = kparser(head.keys[keyname])
+         local ckey = ffi.new(head.grammar.key_ctype)
+         ckey[keyname] = key
 
          data = data:lookup_ptr(ckey).value
       else
-         data = data[normalize_id(head.keys[scm.key])]
+         data = data[normalize_id(head.keys[next(head.keys)])]
       end
-
-      if #path == 0 then return data end
-      local peek = path[1]
-      scm = scm.body[peek.name]
-      prod = prod.values[peek.name]
-      return handle(scm, prod, data, path)
+      return handle(data, path)
    end
-   function handlers.container(scm, prod, data, path)
-      local head = table.remove(path, 1)
-      prod = prod.members[head.name]
+   function handlers.struct(head, data, path)
       data = data[normalize_id(head.name)]
-      if #path == 0 then return data end
-      local peek = path[1]
-      scm = scm.body[peek.name]
-      return handle(scm, prod, data, path)
+      return handle(data, path)
    end
-   handlers["leaf-list"] = function (scm, prod, data, path)
-      local head = table.remove(path, 1)
-      if #path ~= 0 then error("Paths can't go beyond leaf-lists.") end
-      return data[normalize_id(head.name)][head.key]
+   function handlers.array(head, data, path)
+      data = data[normalize_id(head.name)][head.key]
+      return handle(data, path)
    end
-   function handlers.leaf(scm, prod, data, path)
-      local head = table.remove(path, 1)
+   function handlers.scalar(head, data, path)
       if #path ~= 0 then error("Paths can't go beyond leaves.") end
       return data[normalize_id(head.name)]
    end
-   function handlers.module(scm, prod, data, path)
-      local peek = path[1]
-      scm = scm.body[peek.name]
-      return handle(scm, prod, data, path)
-   end
    return function (data)
-      local data = lib.deepcopy(data)
-      return handle(schema, grammar, data, path)
+      return handle(data, path)
    end
 end
 
@@ -203,7 +186,7 @@ function selftest()
    local grammar = datalib.data_grammar_from_schema(scm)
 
    -- Test path to lua path.
-   local path = convert_path(grammar.members,"/routes/route[addr=1.2.3.4]/port")
+   local path = convert_path(grammar,"/routes/route[addr=1.2.3.4]/port")
 
    assert(path[1].name == "routes")
    assert(path[2].name == "route")
@@ -211,7 +194,7 @@ function selftest()
    assert(path[2].keys["addr"] == "1.2.3.4")
    assert(path[3].name == "port")
 
-   local path = convert_path(grammar.members, "/blocked-ips[position()=4]/")
+   local path = convert_path(grammar, "/blocked-ips[position()=4]/")
    assert(path[1].name == "blocked-ips")
    assert(path[1].key == 4)
 
@@ -232,15 +215,14 @@ function selftest()
    local data = datalib.load_data_for_schema(scm, data_src)
 
    -- Try resolving a path in a list (ctable).
-   local path = convert_path(grammar.members,"/routes/route[addr=1.2.3.4]/port")
+   local path = convert_path(grammar,"/routes/route[addr=1.2.3.4]/port")
    assert(resolver(scm, path)(data) == 2)
 
-   local path = convert_path(grammar.members,
-      "/routes/route[addr=255.255.255.255]/port")
+   local path = convert_path(grammar,"/routes/route[addr=255.255.255.255]/port")
    assert(resolver(scm, path)(data) == 7)
 
    -- Try resolving a leaf-list
-   local path = convert_path(grammar.members,"/blocked-ips[position()=1]")
+   local path = convert_path(grammar,"/blocked-ips[position()=1]")
    assert(resolver(scm, path)(data) == util.ipv4_pton("8.8.8.8"))
 
    -- Try resolving a path for a list (non-ctable)
@@ -270,11 +252,9 @@ function selftest()
    local fruit_prod = datalib.data_grammar_from_schema(fruit_scm)
    local fruit_data = datalib.load_data_for_schema(fruit_scm, fruit_data_src)
 
-   local path = convert_path(fruit_prod.members,
-      "/bowl/fruit[name=banana]/rating")
+   local path = convert_path(fruit_prod, "/bowl/fruit[name=banana]/rating")
    assert(resolver(fruit_scm, path)(fruit_data) == 10)
 
-   local path = convert_path(fruit_prod.members,
-      "/bowl/fruit[name=apple]/rating")
+   local path = convert_path(fruit_prod, "/bowl/fruit[name=apple]/rating")
    assert(resolver(fruit_scm, path)(fruit_data) == 6)
 end
