@@ -480,7 +480,18 @@ function selftest ()
    configure(config.new())
    assert(#app_array == 0)
    assert(#link_array == 0)
-   -- Test app restarts on failure.
+   -- Test app arg validation
+   local AppC = {
+      config = {
+         a = {required=true}, b = {default="foo"}
+      }
+   }
+   local c3 = config.new()
+   config.app(c3, "app_valid", AppC, {a="bar"})
+   assert(not pcall(config.app, c3, "app_invalid", AppC))
+   assert(not pcall(config.app, c3, "app_invalid", AppC, {b="bar"}))
+   assert(not pcall(config.app, c3, "app_invalid", AppC, {a="bar", c="foo"}))
+-- Test app restarts on failure.
    use_restart = true
    print("c_fail")
    local App1 = {zone="test"}
@@ -516,6 +527,3 @@ function selftest ()
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
 end
-
--- XXX add graphviz() function back.
-

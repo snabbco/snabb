@@ -106,9 +106,15 @@ Name of the app. *Read-only*.
 
 — Field **myapp.shm**
 
-Can be set to a specification for `core.shm.create_frame` during `new`. When
-set, this field will be initialized to a frame of shared memory objects by the
-engine.
+Can be set to a specification for `core.shm.create_frame`. When set, this field
+will be initialized to a frame of shared memory objects by the engine.
+
+
+— Field **myapp.config**
+
+Can be set to a specification for `core.lib.parse`. When set, the specification
+will be used to validate the app’s arg when it is configured using
+`config.app`.
 
 
 — Method **myapp:link**
@@ -349,8 +355,8 @@ packets are allocated and freed.
 
 ```
 struct packet {
-    uint8_t  data[packet.max_payload];
     uint16_t length;
+    uint8_t  data[packet.max_payload];
 };
 ```
 
@@ -387,18 +393,21 @@ error is raised if there is not enough space in *packet* to accomodate
 — Function **packet.prepend** *packet*, *pointer*, *length*
 
 Prepends *length* bytes starting at *pointer* to the front of
-*packet*. An error is raised if there is not enough space in *packet* to
+*packet*, taking ownership of the packet and returning a new packet.
+An error is raised if there is not enough space in *packet* to
 accomodate *length* additional bytes.
 
 — Function **packet.shiftleft** *packet*, *length*
 
-Truncates *packet* by *length* bytes from the front. *Length* must be less than
-or equal to `length` of *packet*.
+Take ownership of *packet*, truncate it by *length* bytes from the
+front, and return a new packet. *Length* must be less than or equal to
+`length` of *packet*.
 
 — Function **packet.shiftright** *packet*, *length*
 
-Moves *packet* payload to the right by *length* bytes, growing *packet* by
-*length*. The sum of *length* and `length` of *packet* must be less than or
+Take ownership of *packet*, moves *packet* payload to the right by
+*length* bytes, growing *packet* by *length*. Returns a new packet.
+The sum of *length* and `length` of *packet* must be less than or
 equal to `packet.max_payload`.
 
 — Function **packet.from_pointer** *pointer*, *length*
@@ -871,15 +880,37 @@ Returns a copy of *array*. *Array* must not be a "sparse array".
 — Function **lib.htons** *n*
 
 Host to network byte order conversion functions for 32 and 16 bit
-integers *n* respectively.
+integers *n* respectively. Unsigned.
 
 — Function **lib.ntohl** *n*
 
 — Function **lib.ntohs** *n*
 
 Network to host byte order conversion functions for 32 and 16 bit
-integers *n* respectively.
+integers *n* respectively. Unsigned.
 
+— Function **lib.parse** *arg*, *config*
+
+Validates *arg* against the specification in *config*, and returns a fresh
+table containing the parameters in *arg* and any omitted optional parameters
+with their default values. Given *arg*, a table of parameters or `nil`, assert
+that from *config* all of the required keys are present, fill in any missing
+values for optional keys, and error if any unknown keys are found. *Config* has
+the following format:
+
+```
+config := { key = {[required=boolean], [default=value]}, ... }
+```
+
+Each key is optional unless `required` is set to a true value, and its default
+value defaults to `nil`.
+
+Example:
+
+```
+lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
+  => {foo=42, bar=43, baz=44}
+```
 
 
 ## Main

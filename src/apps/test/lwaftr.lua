@@ -116,12 +116,29 @@ local function inc_ipv6(ipv6)
    return ipv6
 end
 
-Lwaftrgen = {}
+Lwaftrgen = {
+   config = {
+      sizes = {required=true},
+      dst_mac = {required=true},
+      src_mac = {required=true},
+      rate = {required=true},
+      vlan = {},
+      b4_ipv6 = {},
+      b4_ipv4 = {},
+      public_ipv4 = {},
+      aftr_ipv6 = {},
+      ipv6_only = {},
+      ipv4_only = {},
+      b4_port = {},
+      protocol = {},
+      count = {},
+      single_pass = {}
+   }
+}
 
 local receive, transmit = link.receive, link.transmit
 
-function Lwaftrgen:new(arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+function Lwaftrgen:new(conf)
    local dst_mac = ethernet:pton(conf.dst_mac)
    local src_mac = ethernet:pton(conf.src_mac)
    local vlan = conf.vlan
@@ -265,6 +282,7 @@ function Lwaftrgen:pull ()
    local ipv4_bytes = self.ipv4_bytes
    local lost_packets = self.lost_packets
    local udp_offset = self.udp_offset
+   local o_ethertype = self.vlan and OFFSET_ETHERTYPE_VLAN or OFFSET_ETHERTYPE
 
    if self.current == 0 then
       main.exit(0)
@@ -273,7 +291,7 @@ function Lwaftrgen:pull ()
    -- count and trash incoming packets
    for _=1,link.nreadable(input) do
       local pkt = receive(input)
-      if cast(uint16_ptr_t, pkt.data + OFFSET_ETHERTYPE)[0] == PROTO_IPV6 then
+      if cast(uint16_ptr_t, pkt.data + o_ethertype)[0] == PROTO_IPV6 then
          ipv6_bytes = ipv6_bytes + pkt.length
          ipv6_packets = ipv6_packets + 1
          local payload = cast(payload_ptr_type, pkt.data + udp_offset + ipv6_header_size + udp_header_size)
@@ -382,30 +400,28 @@ function Lwaftrgen:pull ()
             transmit(output, ipv6_pkt)
          end
 
-         self.current_count = self.current_count + 1
-         self.current_port = self.current_port + self.b4_port
+       end 
 
-         self.b4_ipv6 = inc_ipv6(self.b4_ipv6)
+       self.b4_ipv6 = inc_ipv6(self.b4_ipv6)
+       self.current_port = self.current_port + self.b4_port
+       if self.current_port > 65535 then
+         self.current_port = self.b4_port
+         self.b4_ipv4_offset = self.b4_ipv4_offset + 1
+       end
 
-         if self.current_port > 65535 then
-            self.current_port = self.b4_port
-            self.b4_ipv4_offset = self.b4_ipv4_offset + 1
+       self.current_count = self.current_count + 1
+       if self.current_count >= self.count then
+         if self.single_pass then
+           print(string.format("generated %d packets", self.current_count))
+           -- make sure we won't generate more packets in the same breath, then exit
+           self.current = 0
+           self.bucket_content = 0 
          end
-
-         if self.current_count >= self.count * self.total_packet_count then
-            if self.single_pass then
-               print(string.format("generated %d packets", self.current_count))
-               -- make sure we won't generate more packets in the same breath, then exit
-               self.current = 0
-               self.bucket_content = 0 
-            end
-            self.current_count = 0
-            self.current_port = self.b4_port
-            self.b4_ipv4_offset = 0
-            copy(self.b4_ipv6, self.ipv6_address, 16)
-         end
-
-      end 
-   end
+         self.current_count = 0
+         self.current_port = self.b4_port
+         self.b4_ipv4_offset = 0
+         copy(self.b4_ipv6, self.ipv6_address, 16)
+       end
+     end
 end
 

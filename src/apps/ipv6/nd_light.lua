@@ -50,6 +50,24 @@ local lib = require("core.lib")
 
 nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
+nd_light.config = {
+   local_mac = {required=true},
+   local_ip = {required=true},
+   next_hop =  {required=true},
+   delay = {default=1000},
+   retrans = {}
+}
+nd_light.shm = {
+   status                   = {counter, 2}, -- Link down
+   rxerrors                 = {counter},
+   txerrors                 = {counter},
+   txdrop                   = {counter},
+   ns_checksum_errors       = {counter},
+   ns_target_address_errors = {counter},
+   na_duplicate_errors      = {counter},
+   na_target_address_errors = {counter},
+   nd_protocol_errors       = {counter}
+}
 
 -- config:
 --   local_mac  MAC address of the interface attached to "south".
@@ -79,12 +97,8 @@ local function check_ip_address(ip, desc)
    return ip
 end
 
-function nd_light:new (arg)
-   --copy the args to avoid changing the arg table so that it stays reusable.
-   local conf = arg and lib.deepcopy(config.parse_app_arg(arg)) or {}
+function nd_light:new (conf)
    local o = nd_light:superClass().new(self)
-   conf.delay = conf.delay or 1000
-   assert(conf.local_mac, "nd_light: missing local MAC address")
    if type(conf.local_mac) == "string" and string.len(conf.local_mac) ~= 6 then
       conf.local_mac = ethernet:pton(conf.local_mac)
    else
@@ -109,7 +123,6 @@ function nd_light:new (arg)
    -- Prepare packet for solicitation of next hop
    local nh = { nsent = 0 }
    local dgram = datagram:new()
-   nh.packet = dgram:packet()
    local sol_node_mcast = ipv6:solicited_node_mcast(conf.next_hop)
    local ipv6 = ipv6:new({ next_header = 58, -- ICMP6
          hop_limit = 255,
@@ -134,6 +147,7 @@ function nd_light:new (arg)
    dgram:push(ethernet:new({ src = conf.local_mac,
                              dst = ethernet:ipv6_mcast(sol_node_mcast),
                              type = 0x86dd }))
+   nh.packet = dgram:packet()
    dgram:free()
 
    -- Timer for retransmits of neighbor solicitations
@@ -162,7 +176,6 @@ function nd_light:new (arg)
    -- Prepare packet for solicited neighbor advertisement
    local sna = {}
    dgram = datagram:new()
-   sna.packet = dgram:packet()
    -- Leave dst address unspecified.  It will be set to the source of
    -- the incoming solicitation
    ipv6 = ipv6:new({ next_header = 58, -- ICMP6
@@ -183,6 +196,8 @@ function nd_light:new (arg)
    -- Leave dst address unspecified.
    dgram:push(ethernet:new({ src = conf.local_mac,
                              type = 0x86dd }))
+   sna.packet = dgram:packet()
+
    -- Parse the headers we want to modify later on from our template
    -- packet.
    dgram = dgram:new(sna.packet, ethernet)
@@ -198,17 +213,6 @@ function nd_light:new (arg)
       mem = ffi.new("uint8_t *[1]")
    }
    o._logger = lib.logger_new({ module = 'nd_light' })
-
-   -- Create counters
-   o.shm = { status                   = {counter, 2}, -- Link down
-             rxerrors                 = {counter},
-             txerrors                 = {counter},
-             txdrop                   = {counter},
-             ns_checksum_errors       = {counter},
-             ns_target_address_errors = {counter},
-             na_duplicate_errors      = {counter},
-             na_target_address_errors = {counter},
-             nd_protocol_errors       = {counter} }
 
    return o
 end

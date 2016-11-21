@@ -60,13 +60,13 @@ function fuzz_connective_ports (spec)
    if spec.tunnel then
       ports[1].tunnel, ports[2].tunnel = fuzz_tunnel()
    end
-   if spec.rx_police_gbps then
-      ports[1].rx_police_gbps = random_gbps(spec.rx_police_gbps)
-      ports[2].rx_police_gbps = random_gbps(spec.rx_police_gbps)
+   if spec.rx_police then
+      ports[1].rx_police = random_gbps(spec.rx_police)
+      ports[2].rx_police = random_gbps(spec.rx_police)
    end
-   if spec.tx_police_gbps then
-      ports[1].tx_police_gbps = random_gbps(spec.tx_police_gbps)
-      ports[2].tx_police_gbps = random_gbps(spec.tx_police_gbps)
+   if spec.tx_police then
+      ports[1].tx_police = random_gbps(spec.tx_police)
+      ports[2].tx_police = random_gbps(spec.tx_police)
    end
    return ports
 end

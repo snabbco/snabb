@@ -31,7 +31,7 @@ function disable_tx_descriptor_writeback (dev)
    -- Disable writeback of transmit descriptors.
    -- That way our transmit descriptors stay fresh and reusable.
    -- Tell hardware write them to this other memory instead.
-   local bytes = intel10g.num_descriptors * ffi.sizeof(intel10g.rxdesc_t)
+   local bytes = intel10g.ring_buffer_size() * ffi.sizeof(intel10g.rxdesc_t)
    local ptr, phy = memory.dma_alloc(bytes)
    dev.r.TDWBAL(phy % 2^32)
    dev.r.TDWBAH(phy / 2^32)
@@ -40,7 +40,7 @@ end
 function zero_descriptors (dev)
    -- Clear unused descriptors
    local b = memory.dma_alloc(4096)
-   for i = 0, intel10g.num_descriptors-1 do
+   for i = 0, intel10g.ring_buffer_size()-1 do
       -- Make each descriptors point to valid DMA memory but be 0 bytes long.
       dev.txdesc[i].address = memory.virtual_to_physical(b)
       dev.txdesc[i].options = bit.lshift(1, 24) -- End of Packet flag
@@ -64,7 +64,7 @@ function LoadGen:pull ()
    if dev.tdt == 0 then return end
    C.full_memory_barrier()
    if tdh == 0 then
-      dev.r.TDT(intel10g.num_descriptors)
+      dev.r.TDT(intel10g.ring_buffer_size())
    else
       dev.r.TDT(tdh - 1)
    end

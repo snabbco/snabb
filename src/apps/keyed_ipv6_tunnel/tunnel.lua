@@ -101,19 +101,30 @@ local function prepare_header_template ()
    header_template[SESSION_ID_OFFSET + 3] = 0xFF
 end
 
-SimpleKeyedTunnel = {}
+SimpleKeyedTunnel = {
+   config = {
+      -- string, ipv6 address
+      local_address = {required=true},
+      remote_address = {required=true},
+      -- 8 bytes hex string
+      local_cookie = {required=true},
+      remote_cookie = {required=true},
+      -- unsigned number, must fit to uint32_t
+      local_session = {},
+      -- string, MAC address (for testing)
+      default_gateway_MAC = {},
+      -- unsigned integer <= 255
+      hop_limit = {}
+   },
+   shm = { rxerrors              = {counter},
+           length_errors         = {counter},
+           protocol_errors       = {counter},
+           cookie_errors         = {counter},
+           remote_address_errors = {counter},
+           local_address_errors  = {counter} }
+}
 
-function SimpleKeyedTunnel:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   -- required fields:
-   --   local_address, string, ipv6 address
-   --   remote_address, string, ipv6 address
-   --   local_cookie, 8 bytes hex string
-   --   remote_cookie, 8 bytes hex string
-   -- optional fields:
-   --   local_session, unsigned number, must fit to uint32_t
-   --   default_gateway_MAC, useful for testing
-   --   hop_limit, override default hop limit 64
+function SimpleKeyedTunnel:new (conf)
    assert(
          type(conf.local_cookie) == "string"
          and #conf.local_cookie <= 16,
@@ -169,13 +180,7 @@ function SimpleKeyedTunnel:new (arg)
       header = header,
       remote_address = remote_address,
       local_address = local_address,
-      remote_cookie = remote_cookie[0],
-      shm = { rxerrors              = {counter},
-              length_errors         = {counter},
-              protocol_errors       = {counter},
-              cookie_errors         = {counter},
-              remote_address_errors = {counter},
-              local_address_errors  = {counter} }
+      remote_cookie = remote_cookie[0]
    }
 
    return setmetatable(o, {__index = SimpleKeyedTunnel})
@@ -189,7 +194,7 @@ function SimpleKeyedTunnel:push()
 
    while not link.empty(l_in) do
       local p = link.receive(l_in)
-      packet.prepend(p, self.header, HEADER_SIZE)
+      p = packet.prepend(p, self.header, HEADER_SIZE)
       local plength = ffi.cast(plength_ctype, p.data + LENGTH_OFFSET)
       plength[0] = lib.htons(SESSION_COOKIE_SIZE + p.length - HEADER_SIZE)
       link.transmit(l_out, p)
@@ -244,7 +249,7 @@ function SimpleKeyedTunnel:push()
          -- discard packet
          packet.free(p)
       else
-         packet.shiftleft(p, HEADER_SIZE)
+         p = packet.shiftleft(p, HEADER_SIZE)
          link.transmit(l_out, p)
       end
    end

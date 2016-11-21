@@ -8,14 +8,19 @@ local clone = packet.clone
 
 --- ### `RateLimitedRepeater` app: A repeater that can limit flow rate
 
-RateLimitedRepeater = {}
 
-function RateLimitedRepeater:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   --- By default, limit to 10 Mbps, just to have a default.
-   conf.rate = conf.rate or (10e6 / 8)
-   -- By default, allow for 255 standard packets in the queue.
-   conf.bucket_capacity = conf.bucket_capacity or (255 * 1500)
+RateLimitedRepeater = {
+   config = {
+      -- rate: by default, limit to 10 Mbps, just to have a default.
+      rate = {default=10e6},
+      -- bucket_capacity: by default, allow for 255 standard packets in the
+      -- queue.
+      bucket_capacity = {default=255*1500*8},
+      initial_capacity = {}
+   }
+}
+
+function RateLimitedRepeater:new (conf)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o = {
       index = 1,
@@ -27,8 +32,8 @@ function RateLimitedRepeater:new (arg)
    return setmetatable(o, {__index=RateLimitedRepeater})
 end
 
-function RateLimitedRepeater:set_rate (byte_rate)
-   self.rate = math.max(byte_rate, 0)
+function RateLimitedRepeater:set_rate (bit_rate)
+   self.rate = math.max(bit_rate, 0)
 end
 
 function RateLimitedRepeater:pull ()
@@ -48,12 +53,16 @@ function RateLimitedRepeater:pull ()
       self.last_time = cur_now
    end
 
+   -- 7 bytes preamble, 1 start-of-frame, 4 CRC, 12 interpacket gap.
+   local overhead = 7 + 1 + 4 + 12
+
    local npackets = #self.packets
    if npackets > 0 and self.rate > 0 then
       for _ = 1, engine.pull_npackets do
          local p = self.packets[self.index]
-         if p.length > self.bucket_content then break end
-         self.bucket_content = self.bucket_content - p.length
+         local bits = (p.length + overhead) * 8
+         if bits > self.bucket_content then break end
+         self.bucket_content = self.bucket_content - bits
          transmit(o, clone(p))
          self.index = (self.index % npackets) + 1
       end

@@ -21,15 +21,18 @@ local floor, min = math.floor, math.min
 -- bucket capacity and content - bytes
 -- rate - bytes per second
 
-RateLimiter = {}
+RateLimiter = {
+   config = {
+      rate             = {required=true},
+      bucket_capacity  = {required=true},
+      initial_capacity = {required=false}
+   }
+}
 
 -- Source produces synthetic packets of such size
 local PACKET_SIZE = 60
 
-function RateLimiter:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
-   assert(conf.rate)
-   assert(conf.bucket_capacity)
+function RateLimiter:new (conf)
    conf.initial_capacity = conf.initial_capacity or conf.bucket_capacity
    local o =
    {
