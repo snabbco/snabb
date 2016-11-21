@@ -23,9 +23,10 @@ local parse_command_line_opts = {
    require_schema = { default=false }
 }
 
-local function data_parser(schema_name, path)
+local function data_parser(schema_name, path, command)
    -- Waiting on XPath library.
    assert(path == "/")
+   assert(command ~= 'add')
    return function (str)
       return data.load_data_for_schema_by_name(schema_name, str)
    end
@@ -65,7 +66,7 @@ function parse_command_line(args, opts)
       ret.path = path
    end
    if opts.with_value then
-      local parser = data_parser(ret.schema_name, ret.path)
+      local parser = data_parser(ret.schema_name, ret.path, opts.command)
       if #args == 0 then
          ret.value_str = io.stdin:read('*a')
       else
@@ -92,8 +93,9 @@ function open_socket_or_die(instance_id)
    return socket
 end
 
-function serialize_config(config, schema_name, path)
+function serialize_config(config, schema_name, path, command)
    assert(path == nil or path == "/")
+   assert(command ~= 'add')
    return yang.print_data_for_schema_by_name(schema_name, config,
                                              yang.string_output_file())
 end

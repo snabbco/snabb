@@ -38,4 +38,21 @@ module snabb-config-leader-v1 {
       leaf config { type string; mandatory true; }
     }
   }
+
+  rpc add-config {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf path { type string; mandatory true; }
+      leaf config { type string; mandatory true; }
+    }
+  }
+
+  rpc remove-config {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf path { type string; mandatory true; }
+    }
+  }
 }
