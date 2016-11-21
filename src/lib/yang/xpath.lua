@@ -50,14 +50,7 @@ function handlers.struct(fragment, tree)
    return fragment.name, tree.members
 end
 function handlers.table(fragment, tree)
-   if #tree.keys == 1 then
-      -- Check if the key is a string based key
-      if tree.string_key then
-         return {name=fragment.name, key=tree.string_key}, tree
-      end
-   else
-      return {name=fragment.name, keys=fragment.query}, tree
-   end
+   return {name=fragment.name, keys=fragment.query}, tree
 end
 function handlers.array(fragment, tree)
    local position = fragment.query["position()"]
@@ -84,7 +77,7 @@ local function split_path(path)
 end
 
 -- Finds the grammar node for a fragment in a given grammar.
-function extract_grammar_node(grammar, fragment)
+local function extract_grammar_node(grammar, fragment)
    local errmsg = "Invalid path: "..fragment.name
    if grammar.type == "table" then
       if grammar.keys[fragment.name] == nil then
