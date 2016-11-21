@@ -94,7 +94,7 @@ end
 
 function serialize_config(config, schema_name, path)
    assert(path == nil or path == "/")
-   return yang.print_data_for_schema_by_name(config, schema_name,
+   return yang.print_data_for_schema_by_name(schema_name, config,
                                              yang.string_output_file())
 end
 
