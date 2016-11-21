@@ -70,39 +70,52 @@ end
 -- Gets the next item in the path returning the element and the remaining
 -- path fragment. For example "router.routes.route" will return "router"
 -- and "routes.route". If the end is reached it'll return nil.
-function next_element(path)
+local function next_element(path)
    return string.match(path, "([^/]+)/?(.*)")
+end
+
+local function split_path(path)
+   local tail = path
+   return function ()
+      local head
+      head, tail = next_element(tail)
+      if head == nil then return head else return extract_parts(head) end
+   end
+end
+
+-- Finds the grammar node for a fragment in a given grammar.
+function extract_grammar_node(grammar, fragment)
+   local errmsg = "Invalid path: "..fragment.name
+   if grammar.type == "table" then
+      if grammar.keys[fragment.name] == nil then
+         return assert(grammar.values[fragment.name], errmsg)
+      else
+         return grammar.keys[fragment.name]
+      end
+   else
+      return assert(grammar[fragment.name], errmsg)
+   end
 end
 
 -- Converts an XPath path to a lua array consisting of path componants.
 -- A path component can then be resolved on a yang data tree:
-
-local function convert_path(path, grammar)
-   -- Extract head, check type and dispatch to handler.
-   local head, tail = next_element(path)
-   local parts = extract_parts(head)
-   local err = "Invalid path: "..parts.name
-   local node
-   if grammar.type == "table" then
-      if grammar.keys[head] == nil then
-         node = assert(grammar.values[parts.name], err)
-      else
-         node = grammar.keys[head]
-      end
-   else
-      node = assert(grammar[parts.name], err)
+function convert_path(grammar, path)
+   local ret = {}
+   local node = grammar
+   for element in split_path(path) do
+      node = extract_grammar_node(node, element)
+      local luapath, next_node = handle(node.type, element, node)
+      table.insert(ret, luapath)
+      node = next_node
    end
-   local element, node = handle(node.type, parts, node)
-   if tail ~= "" then
-      local rtn = convert_path(tail, node)
-      table.insert(rtn, 1, element)
-      return rtn
-   else
-      return {element}
-   end
+   return ret
 end
 
-function resolve(schema, data, path)
+-- Returns a resolver for a paticular schema and *lua* path.
+function resolve(schema, path)
+   local schema = lib.deepcopy(schema)
+   local path = lib.deepcopy(path)
+   local grammar = datalib.data_grammar_from_schema(schema)
    local handlers = {}
    local function handle(scm, prod, data, path)
       if #path == 0 then return data end
@@ -161,12 +174,10 @@ function resolve(schema, data, path)
       scm = scm.body[peek]
       return handle(scm, prod, data, path)
    end
-
-   local schema = lib.deepcopy(schema)
-   local path = lib.deepcopy(path)
-   local data = lib.deepcopy(data)
-   local grammar = datalib.data_grammar_from_schema(schema)
-   return handle(schema, grammar, data, path)
+   return function (data)
+      local data = lib.deepcopy(data)
+      return handle(schema, grammar, data, path)
+   end
 end
 
 -- Loads a module and converts the rest of the path.
@@ -175,7 +186,7 @@ function load_from_path(path)
    local module_name, path = next_element(path)
    local scm = schemalib.load_schema_by_name(module_name)
    local grammar = datalib.data_grammar_from_schema(scm)
-   return module_name, convert_path(path, grammar.members)
+   return module_name, convert_path(grammar.members, path)
 end
 
 function selftest()
@@ -202,7 +213,7 @@ function selftest()
    local grammar = datalib.data_grammar_from_schema(scm)
 
    -- Test path to lua path.
-   local path = convert_path("/routes/route[addr=1.2.3.4]/port", grammar.members)
+   local path = convert_path(grammar.members,"/routes/route[addr=1.2.3.4]/port")
 
    assert(path[1] == "routes")
    assert(path[2].name == "route")
@@ -210,7 +221,7 @@ function selftest()
    assert(path[2].keys["addr"] == "1.2.3.4")
    assert(path[3] == "port")
 
-   local path = convert_path("/blocked-ips[position()=4]/", grammar.members)
+   local path = convert_path(grammar.members, "/blocked-ips[position()=4]/")
    assert(path[1].name == "blocked-ips")
    assert(path[1].key == 4)
 
@@ -231,18 +242,16 @@ function selftest()
    local data = datalib.load_data_for_schema(scm, data_src)
 
    -- Try resolving a path in a list (ctable).
-   local path = convert_path("/routes/route[addr=1.2.3.4]/port",
-      grammar.members)
-   assert(resolve(scm, data, path) == 2)
+   local path = convert_path(grammar.members,"/routes/route[addr=1.2.3.4]/port")
+   assert(resolve(scm, path)(data) == 2)
 
-   local path = convert_path("/routes/route[addr=255.255.255.255]/port",
-      grammar.members)
-   assert(resolve(scm, data, path) == 7)
+   local path = convert_path(grammar.members,
+      "/routes/route[addr=255.255.255.255]/port")
+   assert(resolve(scm, path)(data) == 7)
 
    -- Try resolving a leaf-list
-   local path = convert_path("/blocked-ips[position()=1]",
-      grammar.members)
-   assert(resolve(scm, data, path) == util.ipv4_pton("8.8.8.8"))
+   local path = convert_path(grammar.members,"/blocked-ips[position()=1]")
+   assert(resolve(scm, path)(data) == util.ipv4_pton("8.8.8.8"))
 
    -- Try resolving a path for a list (non-ctable)
    local fruit_schema_src = [[module fruit-bowl {
@@ -271,11 +280,11 @@ function selftest()
    local fruit_prod = datalib.data_grammar_from_schema(fruit_scm)
    local fruit_data = datalib.load_data_for_schema(fruit_scm, fruit_data_src)
 
-   local path = convert_path("/bowl/fruit[name=banana]/rating",
-      fruit_prod.members)
-   assert(resolve(fruit_scm, fruit_data, path) == 10)
+   local path = convert_path(fruit_prod.members,
+      "/bowl/fruit[name=banana]/rating")
+   assert(resolve(fruit_scm, path)(fruit_data) == 10)
 
-   local path = convert_path("/bowl/fruit[name=apple]/rating",
-      fruit_prod.members)
-   assert(resolve(fruit_scm, fruit_data, path) == 6)
+   local path = convert_path(fruit_prod.members,
+      "/bowl/fruit[name=apple]/rating")
+   assert(resolve(fruit_scm, path)(fruit_data) == 6)
 end
