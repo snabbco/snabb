@@ -3,6 +3,7 @@
 module(..., package.seeall)
 
 local parse_string = require("lib.yang.parser").parse_string
+local decode_string = require("lib.yang.parser").decode_string
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
@@ -251,26 +252,6 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    return {init=init, parse=parse, finish=finish}
 end
 
-local function sequence_parser(keyword, members)
-   local function init() return {} end
-   local function parse1(node)
-      local sub = assert(members[node.keyword],
-                         'unrecognized rpc: '..node.keyword)
-      return {id=node.keyword, data=sub.finish(sub.parse(node, sub.init()))}
-   end
-   local function parse(node, out)
-      assert(not node.keyword) -- ?
-      for _,node in ipairs(node.statements) do
-         table.insert(out, parse1(node))
-      end
-      return out
-   end
-   local function finish(out)
-      return out
-   end
-   return {init=init, parse=parse, finish=finish}
-end
-
 local function ctable_builder(key_t, value_t)
    local res = ctable.new({ key_type=key_t, value_type=value_t })
    local builder = {}
@@ -379,15 +360,44 @@ function data_parser_from_grammar(production)
       return scalar_parser(keyword, production.argument_type,
                            production.default, production.mandatory)
    end
-   function handlers.sequence(keyword, production)
-      return sequence_parser(keyword, visitn(production.members))
-   end
 
-   local parser = visit1('(top level)', production)
-   return function(str, filename)
-      local node = {statements=parse_string(str, filename)}
-      return parser.finish(parser.parse(node, parser.init()))
+   local top_parsers = {}
+   function top_parsers.struct(production)
+      local parser = visit1('(top level)', production)
+      return function(str, filename)
+         local node = {statements=parse_string(str, filename)}
+         return parser.finish(parser.parse(node, parser.init()))
+      end
    end
+   function top_parsers.sequence(production)
+      local members = visitn(production.members)
+      return function(str, filename)
+         local ret = {}
+         for _, node in ipairs(parse_string(str, filename)) do
+            local sub = assert(members[node.keyword],
+                               'unrecognized rpc: '..node.keyword)
+            local data = sub.finish(sub.parse(node, sub.init()))
+            table.insert(ret, {id=node.keyword, data=data})
+         end
+         return ret
+      end
+   end
+   local function generic_top_parser(production)
+      local parser = top_parsers.struct({
+            type=struct, members={[production.keyword] = production}})
+      return function(str, filename)
+         return parser(str, filename)[production.keyword]
+      end
+   end
+   top_parsers.array = generic_top_parser
+   top_parsers.table = generic_top_parser
+   function top_parsers.scalar(production)
+      local parse = value_parser(production.argument_type)
+      return function(str, filename)
+         return parse(decode_string(str, filename))
+      end
+   end
+   return assert(top_parsers[production.type])(production)
 end
 
 function load_data_for_schema(schema, str, filename)
@@ -551,35 +561,59 @@ local function data_printer_from_grammar(production)
          end
       end
    end
-   function handlers.sequence(keyword, production)
+
+   local top_printers = {}
+   function top_printers.struct(production)
+      local printer = body_printer(production.members)
+      return function(data, file)
+         printer(data, file, '')
+         return file:flush()
+      end
+   end
+   function top_printers.sequence(production)
       local printers = {}
       for k,v in pairs(production.members) do
          printers[k] = printer(k, v)
       end
-      return function(data, file, indent)
+      return function(data, file)
          for _,elt in ipairs(data) do
             local id = assert(elt.id)
-            assert(printers[id])(elt.data, file, indent)
+            assert(printers[id])(elt.data, file, '')
          end
+         return file:flush()
       end
    end
-
-   local top_printer = body_printer(production.members)
-   return function(data, file)
-      top_printer(data, file, '')
-      file:flush()
+   local function generic_top_printer(production)
+      local printer = body_printer({[production.keyword] = production})
+      return function(data, file)
+         printer(data, file, '')
+         return file:flush()
+      end
    end
+   top_printers.array = generic_top_printer
+   top_printers.table = generic_top_printer
+   function top_printers.scalar(production)
+      local serialize = value_serializer(production.argument_type)
+      return function(data, file)
+         file:write(serialize(data))
+         return file:flush()
+      end
+   end
+   return assert(top_printers[production.type])(production)
+end
+
+local function string_output_file()
+   local file = {}
+   local out = {}
+   function file:write(str) table.insert(out, str) end
+   function file:flush(str) return table.concat(out) end
+   return file
 end
 
 function data_string_printer_from_grammar(production)
    local printer = data_printer_from_grammar(production)
    return function(data)
-      local file = {}
-      local out = {}
-      function file:write(str) table.insert(out, str) end
-      function file:flush(str) end
-      printer(data, file)
-      return table.concat(out)
+      return printer(data, string_output_file())
    end
 end
 
@@ -668,5 +702,13 @@ function selftest()
       file:close()
       os.remove(tmp)
    end
+   local scalar_uint32 =
+      { type='scalar', argument_type={primitive_type='uint32'} }
+   local parse_uint32 = data_parser_from_grammar(scalar_uint32)
+   local print_uint32 = data_printer_from_grammar(scalar_uint32)
+   assert(parse_uint32('1') == 1)
+   assert(parse_uint32('"1"') == 1)
+   assert(parse_uint32('    "1"   \n  ') == 1)
+   assert(print_uint32(1, string_output_file()) == '1')
    print('selfcheck: ok')
 end
