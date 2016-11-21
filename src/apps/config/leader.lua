@@ -93,16 +93,33 @@ function Leader:rpc_describe (args)
    return { native_schema = self.schema_name }
 end
 
+local function path_getter_for_grammar(grammar, path)
+   -- Implement me :)
+   assert(path == '/')
+   return function(data) return data end, grammar
+end
+
+local function path_printer_for_grammar(grammar, path)
+   local getter, subgrammar = path_getter_for_grammar(grammar, path)
+   local printer = data.data_printer_from_grammar(subgrammar)
+   return function(data, file)
+      return printer(getter(data), file)
+   end
+end
+
+local function path_printer_for_schema(schema, path)
+   return path_printer_for_grammar(data.data_grammar_from_schema(schema), path)
+end
+
+local function path_printer_for_schema_by_name(schema_name, path)
+   return path_printer_for_schema(yang.load_schema_by_name(schema_name), path)
+end
+
 function Leader:rpc_get_config (args)
-   -- FIXME: Push more of this to a lib.
    assert(args.schema == self.schema_name)
-   assert(args.path == '/')
-   local schema = yang.load_schema_by_name(self.schema_name)
-   local grammar = data.data_grammar_from_schema(schema)
-   local printer = data.data_printer_from_grammar(grammar)
-   local config_str = printer(self.current_configuration,
-                              yang.string_output_file())
-   return { config = config_str }
+   local printer = path_printer_for_schema_by_name(args.schema, args.path)
+   local config = printer(self.current_configuration, yang.string_output_file())
+   return { config = config }
 end
 
 function Leader:rpc_set_config (args)

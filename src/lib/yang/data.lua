@@ -450,7 +450,7 @@ local function value_serializer(typ)
    return serializer
 end
 
-local function data_printer_from_grammar(production)
+function data_printer_from_grammar(production)
    local handlers = {}
    local function printer(keyword, production)
       return assert(handlers[production.type])(keyword, production)
