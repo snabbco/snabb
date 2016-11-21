@@ -44,10 +44,10 @@ end
 
 local handlers = {}
 function handlers.scalar(fragment, tree)
-   return fragment.name, tree
+   return {name=fragment.name}, tree
 end
 function handlers.struct(fragment, tree)
-   return fragment.name, tree.members
+   return {name=fragment.name}, tree.members
 end
 function handlers.table(fragment, tree)
    return {name=fragment.name, keys=fragment.query}, tree
@@ -78,6 +78,7 @@ end
 
 -- Finds the grammar node for a fragment in a given grammar.
 local function extract_grammar_node(grammar, fragment)
+   assert(grammar.type ~= "scalar")
    local errmsg = "Invalid path: "..fragment.name
    if grammar.type == "table" then
       if grammar.keys[fragment.name] == nil then
@@ -98,6 +99,7 @@ function convert_path(grammar, path)
    for element in split_path(path) do
       node = extract_grammar_node(node, element)
       local luapath, next_node = handle(node.type, element, node)
+      luapath.grammar = node
       table.insert(ret, luapath)
       node = next_node
    end
@@ -105,9 +107,7 @@ function convert_path(grammar, path)
 end
 
 -- Returns a resolver for a paticular schema and *lua* path.
-function resolve(schema, path)
-   local schema = lib.deepcopy(schema)
-   local path = lib.deepcopy(path)
+function resolver(schema, path)
    local grammar = datalib.data_grammar_from_schema(schema)
    local handlers = {}
    local function handle(scm, prod, data, path)
@@ -136,19 +136,17 @@ function resolve(schema, path)
 
       if #path == 0 then return data end
       local peek = path[1]
-      if type(peek) == "table" then peek = peek.name end
-      scm = scm.body[peek]
-      prod = prod.values[peek]
+      scm = scm.body[peek.name]
+      prod = prod.values[peek.name]
       return handle(scm, prod, data, path)
    end
    function handlers.container(scm, prod, data, path)
       local head = table.remove(path, 1)
-      prod = prod.members[head]
-      data = data[normalize_id(head)]
+      prod = prod.members[head.name]
+      data = data[normalize_id(head.name)]
       if #path == 0 then return data end
       local peek = path[1]
-      if type(peek) == "string" then scm = scm.body[peek]
-      else scm = scm.body[peek.name] end
+      scm = scm.body[peek.name]
       return handle(scm, prod, data, path)
    end
    handlers["leaf-list"] = function (scm, prod, data, path)
@@ -159,12 +157,11 @@ function resolve(schema, path)
    function handlers.leaf(scm, prod, data, path)
       local head = table.remove(path, 1)
       if #path ~= 0 then error("Paths can't go beyond leaves.") end
-      return data[normalize_id(head)]
+      return data[normalize_id(head.name)]
    end
    function handlers.module(scm, prod, data, path)
       local peek = path[1]
-      if type(peek) == "table" then peek = peek.name end
-      scm = scm.body[peek]
+      scm = scm.body[peek.name]
       return handle(scm, prod, data, path)
    end
    return function (data)
@@ -208,11 +205,11 @@ function selftest()
    -- Test path to lua path.
    local path = convert_path(grammar.members,"/routes/route[addr=1.2.3.4]/port")
 
-   assert(path[1] == "routes")
+   assert(path[1].name == "routes")
    assert(path[2].name == "route")
    assert(path[2].keys)
    assert(path[2].keys["addr"] == "1.2.3.4")
-   assert(path[3] == "port")
+   assert(path[3].name == "port")
 
    local path = convert_path(grammar.members, "/blocked-ips[position()=4]/")
    assert(path[1].name == "blocked-ips")
@@ -236,15 +233,15 @@ function selftest()
 
    -- Try resolving a path in a list (ctable).
    local path = convert_path(grammar.members,"/routes/route[addr=1.2.3.4]/port")
-   assert(resolve(scm, path)(data) == 2)
+   assert(resolver(scm, path)(data) == 2)
 
    local path = convert_path(grammar.members,
       "/routes/route[addr=255.255.255.255]/port")
-   assert(resolve(scm, path)(data) == 7)
+   assert(resolver(scm, path)(data) == 7)
 
    -- Try resolving a leaf-list
    local path = convert_path(grammar.members,"/blocked-ips[position()=1]")
-   assert(resolve(scm, path)(data) == util.ipv4_pton("8.8.8.8"))
+   assert(resolver(scm, path)(data) == util.ipv4_pton("8.8.8.8"))
 
    -- Try resolving a path for a list (non-ctable)
    local fruit_schema_src = [[module fruit-bowl {
@@ -275,9 +272,9 @@ function selftest()
 
    local path = convert_path(fruit_prod.members,
       "/bowl/fruit[name=banana]/rating")
-   assert(resolve(fruit_scm, path)(fruit_data) == 10)
+   assert(resolver(fruit_scm, path)(fruit_data) == 10)
 
    local path = convert_path(fruit_prod.members,
       "/bowl/fruit[name=apple]/rating")
-   assert(resolve(fruit_scm, path)(fruit_data) == 6)
+   assert(resolver(fruit_scm, path)(fruit_data) == 6)
 end
