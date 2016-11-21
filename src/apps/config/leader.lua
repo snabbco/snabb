@@ -122,11 +122,59 @@ function Leader:rpc_get_config (args)
    return { config = config }
 end
 
+local generic_schema_support = {
+   compute_config_actions = function(old_graph, new_graph, verb, path, subconf)
+      return app.compute_config_actions(old_graph, new_graph)
+   end
+}
+
+local function load_schema_support(schema_name)
+   return generic_schema_support
+end
+
+local function path_parser_for_grammar(grammar, path)
+   local getter, subgrammar = path_getter_for_grammar(grammar, path)
+   return data.data_parser_from_grammar(subgrammar)
+end
+
+local function path_parser_for_schema(schema, path)
+   return path_parser_for_grammar(data.data_grammar_from_schema(schema), path)
+end
+
+local function path_parser_for_schema_by_name(schema_name, path)
+   return path_parser_for_schema(yang.load_schema_by_name(schema_name), path)
+end
+
+local function path_setter_for_grammar(grammar, path)
+   -- Implement me :)
+   assert(path == "/")
+   return function(config, subconfig)
+      return subconfig
+   end
+end
+
+local function path_setter_for_schema(schema, path)
+   return path_setter_for_grammar(data.data_grammar_from_schema(schema), path)
+end
+
+local function path_setter_for_schema_by_name(schema_name, path)
+   return path_setter_for_schema(yang.load_schema_by_name(schema_name), path)
+end
+
 function Leader:rpc_set_config (args)
    assert(args.schema == self.schema_name)
-   assert(args.path == "/")
-   local config = yang.load_data_for_schema_by_name(args.schema, args.config)
-   self:reset_configuration(config)
+   local parser = path_parser_for_schema_by_name(args.schema, args.path)
+   local setter = path_setter_for_schema_by_name(args.schema, args.path)
+   local subconfig = parser(args.config)
+   local new_config = setter(self.configuration, subconfig)
+   local new_app_graph = self.setup_fn(new_config)
+   local support = load_schema_support(args.schema)
+   local actions = support.compute_config_actions(self.current_app_graph,
+                                                  new_app_graph, 'set',
+                                                  args.path, subconfig)
+   self:enqueue_config_actions(actions)
+   self.current_app_graph = new_app_graph
+   self.current_configuration = new_config
    return {}
 end
 
