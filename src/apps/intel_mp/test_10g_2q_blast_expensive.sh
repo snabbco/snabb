@@ -9,5 +9,5 @@ SNABB_RECV_SPINUP=2 taskset -c 2 ./testrecv.snabb Intel82599 $SNABB_PCI_INTEL0 0
 SNABB_RECV_SPINUP=2 taskset -c 3 ./testrecv.snabb Intel82599 $SNABB_PCI_INTEL0 1 > results.1
 kill -9 $BLAST0
 sleep 1
-test `cat results.* | grep "^RXDGPC" | awk '{print $2}'` -gt 400000
+test `cat results.* | grep "^RXDGPC" | awk '{print $2}'` -gt 10000
 exit $?

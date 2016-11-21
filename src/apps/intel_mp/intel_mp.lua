@@ -186,8 +186,7 @@ reg["0x157b"] = { inherit = "i210" }
 reg["0x10fb"] = { inherit = "82599ES" }
 
 local Intel = { }
-function Intel:new (arg)
-   local conf = config.parse_app_arg(arg)
+function Intel:new (conf)
    local self = setmetatable({
       r = {},
       pciaddress = conf.pciaddr,
