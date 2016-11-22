@@ -2,8 +2,7 @@
 -- COPYING.
 module(..., package.seeall)
 
-local parse_string = require("lib.yang.parser").parse_string
-local decode_string = require("lib.yang.parser").decode_string
+local parser_mod = require("lib.yang.parser")
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
@@ -365,7 +364,7 @@ function data_parser_from_grammar(production)
    function top_parsers.struct(production)
       local parser = visit1('(top level)', production)
       return function(str, filename)
-         local node = {statements=parse_string(str, filename)}
+         local node = {statements=parser_mod.parse(str, filename)}
          return parser.finish(parser.parse(node, parser.init()))
       end
    end
@@ -373,7 +372,7 @@ function data_parser_from_grammar(production)
       local members = visitn(production.members)
       return function(str, filename)
          local ret = {}
-         for _, node in ipairs(parse_string(str, filename)) do
+         for _, node in ipairs(parser_mod.parse(str, filename)) do
             local sub = assert(members[node.keyword],
                                'unrecognized rpc: '..node.keyword)
             local data = sub.finish(sub.parse(node, sub.init()))
@@ -394,7 +393,7 @@ function data_parser_from_grammar(production)
    function top_parsers.scalar(production)
       local parse = value_parser(production.argument_type)
       return function(str, filename)
-         return parse(decode_string(str, filename))
+         return parse(parser_mod.parse_string(str, filename))
       end
    end
    return assert(top_parsers[production.type])(production)

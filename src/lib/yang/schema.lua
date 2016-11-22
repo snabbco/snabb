@@ -788,7 +788,7 @@ local function primitivize(schema)
 end
 
 function parse_schema(src, filename)
-   return schema_from_ast(parser.parse_string(src, filename))
+   return schema_from_ast(parser.parse(src, filename))
 end
 function parse_schema_file(filename)
    return schema_from_ast(parser.parse_file(filename))
