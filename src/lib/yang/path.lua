@@ -148,7 +148,7 @@ function load_from_path(path)
 end
 
 function selftest()
-   print("selftest: lib.yang.xpath")
+   print("selftest: lib.yang.path")
    local schema_src = [[module snabb-simple-router {
       namespace snabb:simple-router;
       prefix simple-router;
@@ -242,4 +242,5 @@ function selftest()
 
    local path = convert_path(fruit_prod, "/bowl/fruit[name=apple]/rating")
    assert(resolver(path)(fruit_data) == 6)
+   print("selftest: ok")
 end
