@@ -273,6 +273,15 @@ function Parser:parse_statement()
    self:error("Unexpected character found")
 end
 
+function decode_string(str, filename)
+   local parser = Parser.new(str, filename)
+   parser:skip_whitespace()
+   local str = parser:parse_string()
+   parser:skip_whitespace()
+   if not parser:is_eof() then parser:error("Not end of file") end
+   return str
+end
+
 function parse_string(str, filename)
    local parser = Parser.new(str, filename)
    return parser:parse_module()

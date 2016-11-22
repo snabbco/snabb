@@ -12,28 +12,28 @@ the existing configuration of a Snabb instance.
 `snabb config` is a family of Snabb commands.  Its sub-commands
 include:
 
-* [`snabb config get`](./get/README.md): read configuration data
+* [`snabb config get`](./get/README_inc): read configuration data
 
-* [`snabb config get-state`](./get_state/README.md): read state data
+* [`snabb config get-state`](./get_state/README_inc): read state data
 
-* [`snabb config load`](./load/README.md): load a new configuration
+* [`snabb config load`](./load/README_inc): load a new configuration
 
-* [`snabb config set`](./set/README.md): incrementally update configuration
+* [`snabb config set`](./set/README_inc): incrementally update configuration
 
-* [`snabb config add`](./add/README.md): augment configuration, for
+* [`snabb config add`](./add/README_inc): augment configuration, for
   example by adding a routing table entry
 
-* [`snabb config delete`](./delete/README.md): remove a component from
+* [`snabb config remove`](./delete/README_inc): remove a component from
   a configuration, for example removing a routing table entry
 
-* [`snabb config listen`](./listen/README.md): provide an interface to
-  the `snabb config` functionality over a persistent socket, to
-  minimize per-operation cost
+* [`snabb config listen`](./listen/README_inc): provide an interface to
+  the `snabb config` functionality over a persistent socket, to minimize
+  per-operation cost
 
-The `snabb config get` commands are the normal way that Snabb users
-interact with Snabb applications in an ad-hoc fashion via the command
-line.  `snabb config listen` is the standard way that a NETCONF agent
-like Sysrepo interacts with a Snabb network function.
+The `snabb config get` et al commands are the normal way that Snabb
+users interact with Snabb applications in an ad-hoc fashion via the
+command line.  `snabb config listen` is the standard way that a NETCONF
+agent like Sysrepo interacts with a Snabb network function.
 
 ### Configuration model
 
@@ -161,12 +161,12 @@ $ snabb config load ID /tmp/my-configuration
 Using `snabb config load` has the advantage that any configuration
 error has a corresponding source location.
 
-`snabb config` can also delete part of a configuration, but only on
+`snabb config` can also remove part of a configuration, but only on
 configuration that corresponds to YANG schema `leaf` or `leaf-list`
 nodes:
 
 ```
-$ snabb config delete ID /routes/route[addr=1.2.3.4]
+$ snabb config remove ID /routes/route[addr=1.2.3.4]
 ```
 
 One can of course augment a configuration as well:
@@ -189,7 +189,7 @@ following properties:
   listen`; just a convenience for the other side.
 
 - `verb`: The action to perform; one of `get-state`, `get`, `set`,
-  `add`, or `delete`. A string.
+  `add`, or `remove`. A string.
 
 - `path`: A path identifying the configuration or state data on which
   to operate.  A string.
@@ -255,6 +255,6 @@ updates to the data plane in an efficient way.  See the [`apps.config`
 documentation](../../apps/config/README.md) for full details.
 
 Some data planes, like the lwAFTR, add hooks to the `set`, `add`, and
-`delete` subcommands of `snabb config` to allow even more efficient
-incremental updates, for example updating the binding table in place
-via a custom protocol.
+`remove` subcommands of `snabb config` to allow even more efficient
+incremental updates, for example updating the binding table in place via
+a custom protocol.
