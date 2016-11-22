@@ -43,10 +43,9 @@ end
 
 local handlers = {}
 function handlers.scalar(grammar, fragment)
-   return {name=fragment.name, grammar=grammar}
-end
+   return {name=fragment.name, grammar=grammar} end
 function handlers.struct(grammar, fragment)
-   return {name=fragment.name, grammar=grammar}
+   return {name=fragment.name, keys=fragment.query, grammar=grammar}
 end
 function handlers.table(grammar, fragment)
    return {name=fragment.name, keys=fragment.query, grammar=grammar}
@@ -59,35 +58,18 @@ function handle(grammar, fragment)
    return assert(handlers[grammar.type], grammar.type)(grammar, fragment)
 end
 
--- Gets the next item in the path returning the element and the remaining
--- path fragment. For example "router.routes.route" will return "router"
--- and "routes.route". If the end is reached it'll return nil.
-local function next_element(path)
-   return string.match(path, "([^/]+)/?(.*)")
-end
-
-local function split_path(path)
-   local tail = path
-   return function ()
-      local head
-      head, tail = next_element(tail)
-      if head == nil then return head else return extract_parts(head) end
-   end
-end
-
 -- Finds the grammar node for a fragment in a given grammar.
-local function extract_grammar_node(grammar, fragment)
+local function extract_grammar_node(grammar, name)
    local handlers = {}
-   function handlers.struct () return grammar.members[fragment.name] end
+   function handlers.struct () return grammar.members[name] end
    function handlers.table ()
-      if grammar.keys[fragment.name] == nil then
-         return grammar.values[fragment.name]
+      if grammar.keys[name] == nil then
+         return grammar.values[name]
       else
-         return grammar.keys[fragment.name]
+         return grammar.keys[name]
       end
    end
-   local errmsg = "Invalid path:"..fragment.name
-   return assert(assert(handlers[grammar.type](), errmsg), errmsg)
+   return assert(assert(handlers[grammar.type], grammar.type)(), name)
 end
 
 -- Converts an XPath path to a lua array consisting of path componants.
@@ -95,11 +77,13 @@ end
 function convert_path(grammar, path)
    local ret = {}
    local node = grammar
-   for element in split_path(path) do
-      node = extract_grammar_node(node, element)
-      local luapath = handle(node, element)
+   if path:sub(1, 1) == "/" then path = path:sub(2) end -- remove leading /
+   if path:sub(-1) == "/" then path = path:sub(1, -2) end -- remove trailing /
+   for element in path:split("/") do
+      local parts = extract_parts(element)
+      node = extract_grammar_node(node, parts.name)
+      local luapath = handle(node, parts)
       table.insert(ret, luapath)
-      --node = next_node
    end
    return ret
 end
@@ -216,14 +200,14 @@ function selftest()
 
    -- Try resolving a path in a list (ctable).
    local path = convert_path(grammar,"/routes/route[addr=1.2.3.4]/port")
-   assert(resolver(scm, path)(data) == 2)
+   assert(resolver(path)(data) == 2)
 
    local path = convert_path(grammar,"/routes/route[addr=255.255.255.255]/port")
-   assert(resolver(scm, path)(data) == 7)
+   assert(resolver(path)(data) == 7)
 
    -- Try resolving a leaf-list
    local path = convert_path(grammar,"/blocked-ips[position()=1]")
-   assert(resolver(scm, path)(data) == util.ipv4_pton("8.8.8.8"))
+   assert(resolver(path)(data) == util.ipv4_pton("8.8.8.8"))
 
    -- Try resolving a path for a list (non-ctable)
    local fruit_schema_src = [[module fruit-bowl {
@@ -253,8 +237,8 @@ function selftest()
    local fruit_data = datalib.load_data_for_schema(fruit_scm, fruit_data_src)
 
    local path = convert_path(fruit_prod, "/bowl/fruit[name=banana]/rating")
-   assert(resolver(fruit_scm, path)(fruit_data) == 10)
+   assert(resolver(path)(fruit_data) == 10)
 
    local path = convert_path(fruit_prod, "/bowl/fruit[name=apple]/rating")
-   assert(resolver(fruit_scm, path)(fruit_data) == 6)
+   assert(resolver(path)(fruit_data) == 6)
 end
