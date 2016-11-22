@@ -23,9 +23,10 @@ local parse_command_line_opts = {
    require_schema = { default=false }
 }
 
-local function data_parser(schema_name, path)
+local function data_parser(schema_name, path, command)
    -- Waiting on XPath library.
    assert(path == "/")
+   assert(command ~= 'add')
    return function (str)
       return data.load_data_for_schema_by_name(schema_name, str)
    end
@@ -59,13 +60,11 @@ function parse_command_line(args, opts)
    end
    if opts.with_path then
       if #args == 0 then err("missing path argument") end
-      local path = table.remove(args, 1)
-      -- Waiting on our XPath parsing library :)
-      if path ~= '/' then err("paths other than / currently unimplemented") end
-      ret.path = path
+      -- FIXME: Validate path?
+      ret.path = table.remove(args, 1)
    end
    if opts.with_value then
-      local parser = data_parser(ret.schema_name, ret.path)
+      local parser = data_parser(ret.schema_name, ret.path, opts.command)
       if #args == 0 then
          ret.value_str = io.stdin:read('*a')
       else
@@ -92,13 +91,11 @@ function open_socket_or_die(instance_id)
    return socket
 end
 
-function serialize_config(config, schema_name, path)
+function serialize_config(config, schema_name, path, command)
    assert(path == nil or path == "/")
-   -- FFS
-   local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.data_grammar_from_schema(schema)
-   local printer = data.data_string_printer_from_grammar(grammar)
-   return printer(config)
+   assert(command ~= 'add')
+   return yang.print_data_for_schema_by_name(schema_name, config,
+                                             yang.string_output_file())
 end
 
 function send_message(socket, msg_str)

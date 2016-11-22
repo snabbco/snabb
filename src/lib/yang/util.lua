@@ -80,6 +80,14 @@ function ipv4_ntop(addr)
    return ipv4:ntop(ffi.new('uint32_t[1]', lib.htonl(addr)))
 end
 
+function string_output_file()
+   local file = {}
+   local out = {}
+   function file:write(str) table.insert(out, str) end
+   function file:flush(str) return table.concat(out) end
+   return file
+end
+
 function selftest()
    print('selftest: lib.yang.util')
    assert(tointeger('0') == 0)
