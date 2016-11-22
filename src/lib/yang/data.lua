@@ -381,15 +381,24 @@ function data_parser_from_grammar(production)
          return ret
       end
    end
-   local function generic_top_parser(production)
-      local parser = top_parsers.struct({
-            type=struct, members={[production.keyword] = production}})
+   function top_parsers.array(production)
+      local parser = visit1('[bare array]', production)
       return function(str, filename)
-         return parser(str, filename)[production.keyword]
+         local out = parser.init()
+         for _,v in ipairs(parser_mod.parse_strings(str, filename)) do
+            out = parser.parse({keyword='[bare array]', argument=v}, out)
+         end
       end
    end
-   top_parsers.array = generic_top_parser
-   top_parsers.table = generic_top_parser
+   function top_parsers.table(production)
+      local parser = visit1('[bare table]', production)
+      return function(str, filename)
+         local out = parser.init()
+         for _,v in ipairs(parser_mod.parse_statement_lists(str, filename)) do
+            out = parser.parse({keyword='[bare table]', statements=v}, out)
+         end
+      end
+   end
    function top_parsers.scalar(production)
       local parse = value_parser(production.argument_type)
       return function(str, filename)
@@ -498,6 +507,8 @@ function data_printer_from_grammar(production)
          end
       end
    end
+   -- As a special case, the table handler allows the keyword to be nil,
+   -- for printing tables at the top level without keywords.
    function handlers.table(keyword, production)
       local key_order, value_order = {}, {}
       for k,_ in pairs(production.keys) do table.insert(key_order, k) end
@@ -509,7 +520,7 @@ function data_printer_from_grammar(production)
       if production.key_ctype and production.value_ctype then
          return function(data, file, indent)
             for entry in data:iterate() do
-               print_keyword(keyword, file, indent)
+               if keyword then print_keyword(keyword, file, indent) end
                file:write('{\n')
                print_key(entry.key, file, indent..'  ')
                print_value(entry.value, file, indent..'  ')
@@ -520,7 +531,7 @@ function data_printer_from_grammar(production)
          local id = normalize_id(production.string_key)
          return function(data, file, indent)
             for key, value in pairs(data) do
-               print_keyword(keyword, file, indent)
+               if keyword then print_keyword(keyword, file, indent) end
                file:write('{\n')
                print_key({[id]=key}, file, indent..'  ')
                print_value(value, file, indent..'  ')
@@ -530,7 +541,7 @@ function data_printer_from_grammar(production)
       elseif production.key_ctype then
          return function(data, file, indent)
             for key, value in cltable.pairs(data) do
-               print_keyword(keyword, file, indent)
+               if keyword then print_keyword(keyword, file, indent) end
                file:write('{\n')
                print_key(key, file, indent..'  ')
                print_value(value, file, indent..'  ')
@@ -540,7 +551,7 @@ function data_printer_from_grammar(production)
       else
          return function(data, file, indent)
             for key, value in pairs(data) do
-               print_keyword(keyword, file, indent)
+               if keyword then print_keyword(keyword, file, indent) end
                file:write('{\n')
                print_key(key, file, indent..'  ')
                print_value(value, file, indent..'  ')
@@ -582,15 +593,23 @@ function data_printer_from_grammar(production)
          return file:flush()
       end
    end
-   local function generic_top_printer(production)
-      local printer = body_printer({[production.keyword] = production})
+   function top_printers.table(production)
+      local printer = handlers.table(nil, production)
       return function(data, file)
          printer(data, file, '')
          return file:flush()
       end
    end
-   top_printers.array = generic_top_printer
-   top_printers.table = generic_top_printer
+   function top_printers.array(production)
+      local serialize = value_serializer(production.element_type)
+      return function(data, file, indent)
+         for _,v in ipairs(data) do
+            file:write(serialize(v))
+            file:write('\n')
+         end
+         return file:flush()
+      end
+   end
    function top_printers.scalar(production)
       local serialize = value_serializer(production.argument_type)
       return function(data, file)

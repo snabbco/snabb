@@ -282,6 +282,30 @@ function parse_string(str, filename)
    return str
 end
 
+function parse_strings(str, filename)
+   local parser = Parser.new(str, filename)
+   local ret = {}
+   parser:skip_whitespace()
+   while not parser:is_eof() do
+      table.insert(ret, parser:parse_string())
+      parser:skip_whitespace()
+   end
+   return ret
+end
+
+function parse_statement_lists(str, filename)
+   local parser = Parser.new(str, filename)
+   local ret = {}
+   parser:skip_whitespace()
+   while not parser:is_eof() do
+      parser:consume("{")
+      table.insert(ret, self:parse_statement_list())
+      parser:consume("}")
+      parser:skip_whitespace()
+   end
+   return ret
+end
+
 function parse(str, filename)
    local parser = Parser.new(str, filename)
    return parser:parse_module()
