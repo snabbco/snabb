@@ -4,10 +4,11 @@ module(...,package.seeall)
 
 local S = require("syscall")
 local ffi = require("ffi")
+local lib = require("core.lib")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local rpc = require("lib.yang.rpc")
-local path_resolver = require("lib.yang.path").resolver
+local path_mod = require("lib.yang.path")
 local app = require("core.app")
 local shm = require("core.shm")
 local app_graph = require("core.config")
@@ -95,7 +96,7 @@ function Leader:rpc_describe (args)
 end
 
 local function path_getter_for_grammar(grammar, path)
-   return path_resolver(grammar, path)
+   return path_mod.resolver(grammar, path)
 end
 
 local function path_printer_for_grammar(grammar, path)
@@ -145,10 +146,22 @@ local function path_parser_for_schema_by_name(schema_name, path)
 end
 
 local function path_setter_for_grammar(grammar, path)
-   -- Implement me :)
-   assert(path == "/")
-   return function(config, subconfig)
-      return subconfig
+   path = path_mod.normalize_path(path)
+   if path == "/" then
+      return function(config, subconfig) return subconfig end
+   elseif path:sub(#path) == ']' then
+      -- Path ends in a query; it must denote an array or table item.
+      error('Unimplemented')
+   else
+      local head, tail = lib.dirname(path), lib.basename(path)
+      local getter, grammar = path_mod.resolver(grammar, head)
+      assert(grammar.type == 'struct')
+      assert(grammar.members[tail])
+      local tail_id = data.normalize_id(tail)
+      return function(config, subconfig)
+         getter(config)[tail_id] = subconfig
+         return config
+      end
    end
 end
 
@@ -165,7 +178,7 @@ function Leader:rpc_set_config (args)
    local parser = path_parser_for_schema_by_name(args.schema, args.path)
    local setter = path_setter_for_schema_by_name(args.schema, args.path)
    local subconfig = parser(args.config)
-   local new_config = setter(self.configuration, subconfig)
+   local new_config = setter(self.current_configuration, subconfig)
    local new_app_graph = self.setup_fn(new_config)
    local support = load_schema_support(args.schema)
    local actions = support.compute_config_actions(self.current_app_graph,

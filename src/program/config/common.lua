@@ -8,6 +8,7 @@ local shm = require("core.shm")
 local rpc = require("lib.yang.rpc")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
+local path_resolver = require("lib.yang.path").resolver
 
 function show_usage(command, status, err_msg)
    if err_msg then print('error: '..err_msg) end
@@ -23,13 +24,16 @@ local parse_command_line_opts = {
    require_schema = { default=false }
 }
 
+local function path_grammar(schema_name, path)
+   local schema = yang.load_schema_by_name(schema_name)
+   local grammar = data.data_grammar_from_schema(schema)
+   local getter, subgrammar = path_resolver(grammar, path)
+   return subgrammar
+end
+
 local function data_parser(schema_name, path, command)
-   -- Waiting on XPath library.
-   assert(path == "/")
    assert(command ~= 'add')
-   return function (str)
-      return data.load_data_for_schema_by_name(schema_name, str)
-   end
+   return data.data_parser_from_grammar(path_grammar(schema_name, path))
 end
 
 function parse_command_line(args, opts)
@@ -92,10 +96,10 @@ function open_socket_or_die(instance_id)
 end
 
 function serialize_config(config, schema_name, path, command)
-   assert(path == nil or path == "/")
    assert(command ~= 'add')
-   return yang.print_data_for_schema_by_name(schema_name, config,
-                                             yang.string_output_file())
+   local grammar = path_grammar(schema_name, path)
+   local printer = data.data_printer_from_grammar(grammar)
+   return printer(config, yang.string_output_file())
 end
 
 function send_message(socket, msg_str)
