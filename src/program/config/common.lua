@@ -60,10 +60,8 @@ function parse_command_line(args, opts)
    end
    if opts.with_path then
       if #args == 0 then err("missing path argument") end
-      local path = table.remove(args, 1)
-      -- Waiting on our XPath parsing library :)
-      if path ~= '/' then err("paths other than / currently unimplemented") end
-      ret.path = path
+      -- FIXME: Validate path?
+      ret.path = table.remove(args, 1)
    end
    if opts.with_value then
       local parser = data_parser(ret.schema_name, ret.path, opts.command)

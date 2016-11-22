@@ -105,7 +105,7 @@ function parse_path(path)
 end
 
 -- Returns a resolver for a paticular schema and *lua* path.
-function resolver(grammar, path)
+function resolver(grammar, path_string)
    local function prepare_table_key(keys, ctype, query)
       local static_key = ctype and datalib.typeof(ctype)() or {}
       for k,_ in pairs(query) do
@@ -207,7 +207,7 @@ function resolver(grammar, path)
       return handle_query(child_grammar, query, child_getter)
    end
    local getter, grammar = function(data) return data end, grammar
-   for _, elt in ipairs(path) do
+   for _, elt in ipairs(parse_path(path_string)) do
       -- All non-leaves of the path tree must be structs.
       if grammar.type ~= 'struct' then error("Invalid path.") end
       getter, grammar = compute_getter(grammar, elt.name, elt.query, getter)
@@ -277,15 +277,15 @@ function selftest()
    local data = datalib.load_data_for_schema(scm, data_src)
 
    -- Try resolving a path in a list (ctable).
-   local path = parse_path("/routes/route[addr=1.2.3.4]/port")
-   assert(resolver(grammar, path)(data) == 2)
+   local getter = resolver(grammar, "/routes/route[addr=1.2.3.4]/port")
+   assert(getter(data) == 2)
 
-   local path = parse_path("/routes/route[addr=255.255.255.255]/port")
-   assert(resolver(grammar, path)(data) == 7)
+   local getter = resolver(grammar, "/routes/route[addr=255.255.255.255]/port")
+   assert(getter(data) == 7)
 
    -- Try resolving a leaf-list
-   local path = parse_path("/blocked-ips[position()=1]")
-   assert(resolver(grammar, path)(data) == util.ipv4_pton("8.8.8.8"))
+   local getter = resolver(grammar, "/blocked-ips[position()=1]")
+   assert(getter(data) == util.ipv4_pton("8.8.8.8"))
 
    -- Try resolving a path for a list (non-ctable)
    local fruit_schema_src = [[module fruit-bowl {
@@ -314,10 +314,10 @@ function selftest()
    local fruit_prod = datalib.data_grammar_from_schema(fruit_scm)
    local fruit_data = datalib.load_data_for_schema(fruit_scm, fruit_data_src)
 
-   local path = parse_path("/bowl/fruit[name=banana]/rating")
-   assert(resolver(fruit_prod, path)(fruit_data) == 10)
+   local getter = resolver(fruit_prod, "/bowl/fruit[name=banana]/rating")
+   assert(getter(fruit_data) == 10)
 
-   local path = parse_path("/bowl/fruit[name=apple]/rating")
-   assert(resolver(fruit_prod, path)(fruit_data) == 6)
+   local getter = resolver(fruit_prod, "/bowl/fruit[name=apple]/rating")
+   assert(getter(fruit_data) == 6)
    print("selftest: ok")
 end

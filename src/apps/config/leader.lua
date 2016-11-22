@@ -7,6 +7,7 @@ local ffi = require("ffi")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local rpc = require("lib.yang.rpc")
+local path_resolver = require("lib.yang.path").resolver
 local app = require("core.app")
 local shm = require("core.shm")
 local app_graph = require("core.config")
@@ -94,9 +95,7 @@ function Leader:rpc_describe (args)
 end
 
 local function path_getter_for_grammar(grammar, path)
-   -- Implement me :)
-   assert(path == '/')
-   return function(data) return data end, grammar
+   return path_resolver(grammar, path)
 end
 
 local function path_printer_for_grammar(grammar, path)
