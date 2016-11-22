@@ -94,12 +94,8 @@ function Leader:rpc_describe (args)
    return { native_schema = self.schema_name }
 end
 
-local function path_getter_for_grammar(grammar, path)
-   return path_resolver(grammar, path)
-end
-
 local function path_printer_for_grammar(grammar, path)
-   local getter, subgrammar = path_getter_for_grammar(grammar, path)
+   local getter, subgrammar = path_resolver(grammar, path)
    local printer = data.data_printer_from_grammar(subgrammar)
    return function(data, file)
       return printer(getter(data), file)
@@ -132,7 +128,7 @@ local function load_schema_support(schema_name)
 end
 
 local function path_parser_for_grammar(grammar, path)
-   local getter, subgrammar = path_getter_for_grammar(grammar, path)
+   local getter, subgrammar = path_resolver(grammar, path)
    return data.data_parser_from_grammar(subgrammar)
 end
 

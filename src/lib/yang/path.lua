@@ -25,7 +25,6 @@
 --         value as the value.
 module(..., package.seeall)
 
-local ffi = require("ffi")
 local equal = require("core.lib").equal
 local schemalib = require("lib.yang.schema")
 local datalib = require("lib.yang.data")
