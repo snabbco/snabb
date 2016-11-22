@@ -26,11 +26,18 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
+local equal = require("core.lib").equal
 local schemalib = require("lib.yang.schema")
 local datalib = require("lib.yang.data")
 local valuelib = require("lib.yang.value")
 local util = require("lib.yang.util")
 local normalize_id = datalib.normalize_id
+
+local function table_keys(t)
+   local ret = {}
+   for k, v in pairs(t) do table.insert(ret, k) end
+   return ret
+end
 
 local function extract_parts(fragment)
    local rtn = {query={}}
@@ -89,53 +96,123 @@ function convert_path(grammar, path)
    return ret
 end
 
--- Returns a resolver for a paticular schema and *lua* path.
-function resolver(path)
-   local handlers = {}
-   local function handle(data, path)
-      if #path == 0 then return data end
-      local head = table.remove(path, 1)
-      local handler = assert(handlers[head.grammar.type], head.grammar.type)
-      return handler(head, data, path)
+function parse_path(path)
+   local ret = {}
+   for element in path:split("/") do
+      if element ~= '' then table.insert(ret, extract_parts(element)) end
    end
-   function handlers.table(head, data, path)
-      -- The list can either be a ctable or a plain old lua table, if it's the
-      -- ctable then it requires some more work to retrive the data.
-      local data = data[normalize_id(head.name)]
-      if #head.grammar.keys > 1 then
-         error("Multiple key values are not supported!")
-      end
-      if head.grammar.key_ctype then
-         -- It's a ctable and we need to prepare the key so we can lookup the
-         -- pointer to the entry and then convert the values back to lua.
-         local keyname = next(head.keys)
-         local ptype = head.grammar.keys[keyname].argument_type.primitive_type
-         local kparser = valuelib.types[ptype].parse
-         local key = kparser(head.keys[keyname])
-         local ckey = ffi.new(head.grammar.key_ctype)
-         ckey[keyname] = key
+   return ret
+end
 
-         data = data:lookup_ptr(ckey).value
-      else
-         data = data[normalize_id(head.keys[next(head.keys)])]
+-- Returns a resolver for a paticular schema and *lua* path.
+function resolver(grammar, path)
+   local function prepare_table_key(keys, ctype, query)
+      local static_key = ctype and datalib.typeof(ctype)() or {}
+      for k,_ in pairs(query) do
+         if not keys[k] then error("'"..key_name.."' is not a table key") end
       end
-      return handle(data, path)
+      for k,grammar in pairs(keys) do
+         local v = query[k] or grammar.default
+         if v == nil then
+            error("Table query missing required key '"..k.."'")
+         end
+         local key_primitive_type = grammar.argument_type.primitive_type
+         local parser = valuelib.types[key_primitive_type].parse
+         static_key[normalize_id(k)] = parser(v, 'path query value')
+      end
+      return static_key
    end
-   function handlers.struct(head, data, path)
-      data = data[normalize_id(head.name)]
-      return handle(data, path)
+   local function ctable_getter(key, getter)
+      return function(data)
+         local data = getter(data):lookup_ptr(key)
+         if data == nil then error("Not found") end
+         return data.value
+      end
    end
-   function handlers.array(head, data, path)
-      data = data[normalize_id(head.name)][head.key]
-      return handle(data, path)
+   local function table_getter(key, getter)
+      return function(data)
+         local data = getter(data)[key]
+         if data == nil then error("Not found") end
+         return data
+      end
    end
-   function handlers.scalar(head, data, path)
-      if #path ~= 0 then error("Paths can't go beyond leaves.") end
-      return data[normalize_id(head.name)]
+   local function slow_table_getter(key, getter)
+      return function(data)
+         for k,v in pairs(getter(data)) do
+            if equal(k, key) then return v end
+         end
+         error("Not found")
+      end
    end
-   return function (data)
-      return handle(data, path)
+   local function compute_table_getter(grammar, key, getter)
+      if grammar.string_key then
+         return table_getter(key[normalize_id(grammar.string_key)], getter)
+      elseif grammar.key_ctype and grammar.value_ctype then
+         return ctable_getter(key, getter)
+      elseif grammar.key_ctype then
+         return table_getter(key, getter)
+      else
+         return slow_table_getter(key, getter)
+      end
    end
+   local function handle_table_query(grammar, query, getter)
+      local key = prepare_table_key(grammar.keys, grammar.key_ctype, query)
+      local child_grammar = {type="struct", members=grammar.values,
+                             ctype=grammar.value_ctype}
+      local child_getter = compute_table_getter(grammar, key, getter)
+      return child_getter, child_grammar
+   end
+   local function handle_array_query(grammar, query, getter)
+      if not equal(table_keys(query), {"position()"}) then
+         error("Arrays can only be indexed by position.")
+      end
+      local idx = tonumber(query["position()"])
+      if idx < 1 or idx ~= math.floor(idx) then
+         error("Arrays can only be indexed by positive integers.")
+      end
+      -- Pretend that array elements are scalars.
+      local child_grammar = {type="scalar", argument_type=grammar.element_type,
+                             ctype=grammar.ctype}
+      local function child_getter(data)
+         local array = getter(data)
+         if idx > #array then error("Index out of bounds") end
+         return array[idx]
+      end
+      return child_getter, child_grammar
+   end
+   local function handle_query(grammar, query, getter)
+      if equal(table_keys(query), {}) then return getter, grammar end
+      if grammar.type == 'array' then
+         return handle_array_query(grammar, query, getter)
+      elseif grammar.type == 'table' then
+         return handle_table_query(grammar, query, getter)
+      else
+         error("Path query parameters only supported for structs and tables.")
+      end
+   end
+   local function compute_getter(grammar, name, query, getter)
+      local child_grammar = grammar.members[name]
+      if not child_grammar then
+         error("Struct has no field named '"..name.."'.")
+      end
+      local id = normalize_id(name)
+      local function child_getter(data)
+         local struct = getter(data)
+         local child = struct[id]
+         if child == nil then
+            error("Struct instance has no field named '"..name.."'.")
+         end
+         return child
+      end
+      return handle_query(child_grammar, query, child_getter)
+   end
+   local getter, grammar = function(data) return data end, grammar
+   for _, elt in ipairs(path) do
+      -- All non-leaves of the path tree must be structs.
+      if grammar.type ~= 'struct' then error("Invalid path.") end
+      getter, grammar = compute_getter(grammar, elt.name, elt.query, getter)
+   end
+   return getter, grammar
 end
 
 -- Loads a module and converts the rest of the path.
@@ -200,15 +277,15 @@ function selftest()
    local data = datalib.load_data_for_schema(scm, data_src)
 
    -- Try resolving a path in a list (ctable).
-   local path = convert_path(grammar,"/routes/route[addr=1.2.3.4]/port")
-   assert(resolver(path)(data) == 2)
+   local path = parse_path("/routes/route[addr=1.2.3.4]/port")
+   assert(resolver(grammar, path)(data) == 2)
 
-   local path = convert_path(grammar,"/routes/route[addr=255.255.255.255]/port")
-   assert(resolver(path)(data) == 7)
+   local path = parse_path("/routes/route[addr=255.255.255.255]/port")
+   assert(resolver(grammar, path)(data) == 7)
 
    -- Try resolving a leaf-list
-   local path = convert_path(grammar,"/blocked-ips[position()=1]")
-   assert(resolver(path)(data) == util.ipv4_pton("8.8.8.8"))
+   local path = parse_path("/blocked-ips[position()=1]")
+   assert(resolver(grammar, path)(data) == util.ipv4_pton("8.8.8.8"))
 
    -- Try resolving a path for a list (non-ctable)
    local fruit_schema_src = [[module fruit-bowl {
@@ -237,10 +314,10 @@ function selftest()
    local fruit_prod = datalib.data_grammar_from_schema(fruit_scm)
    local fruit_data = datalib.load_data_for_schema(fruit_scm, fruit_data_src)
 
-   local path = convert_path(fruit_prod, "/bowl/fruit[name=banana]/rating")
-   assert(resolver(path)(fruit_data) == 10)
+   local path = parse_path("/bowl/fruit[name=banana]/rating")
+   assert(resolver(fruit_prod, path)(fruit_data) == 10)
 
-   local path = convert_path(fruit_prod, "/bowl/fruit[name=apple]/rating")
-   assert(resolver(path)(fruit_data) == 6)
+   local path = parse_path("/bowl/fruit[name=apple]/rating")
+   assert(resolver(fruit_prod, path)(fruit_data) == 6)
    print("selftest: ok")
 end
