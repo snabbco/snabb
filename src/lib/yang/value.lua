@@ -66,7 +66,18 @@ function types.boolean.tostring(val)
    return tostring(val)
 end
 
-types.decimal64 = unimplemented('decimal64')
+-- FIXME: We lose precision by representing a decimal64 as a double.
+types.decimal64 = {ctype='double'}
+function types.decimal64.parse(str, what)
+   local str = assert(str, 'missing value for '..what)
+   return assert(tonumber(str), 'not a number: '..str)
+end
+function types.decimal64.tostring(val)
+   -- FIXME: Make sure we are not given too many digits after the
+   -- decimal point.
+   return tostring(val)
+end
+
 types.empty = unimplemented('empty')
 types.identityref = unimplemented('identityref')
 types['instance-identifier'] = unimplemented('instance-identifier')
@@ -94,6 +105,12 @@ types['ipv4-address'] = {
    ctype = 'uint32_t',
    parse = function(str, what) return util.ipv4_pton(str) end,
    tostring = function(val) return util.ipv4_ntop(val) end
+}
+
+types['legacy-ipv4-address'] = {
+   ctype = 'uint8_t[4]',
+   parse = function(str, what) return assert(ipv4:pton(str)) end,
+   tostring = function(val) return ipv4:ntop(val) end
 }
 
 types['ipv6-address'] = {

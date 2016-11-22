@@ -64,7 +64,7 @@ function parse_args(args)
    function handlers.h() show_usage(0) end
    args = lib.dogetopt(args, handlers, "hb:s:D:p:",
                        { bitrate="b", step="s", duration="D", period="p",
-                         ["bench-file"]=0, help="h" })
+                         ["bench-file"]=1, help="h" })
    if not opts.step then opts.step = opts.bitrate / 10 end
    assert(opts.bitrate > 0, 'bitrate must be positive')
    assert(opts.step > 0, 'step must be positive')

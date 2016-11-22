@@ -68,21 +68,21 @@ end
 local function u8_ptr (ptr) return ffi.cast("uint8_t *", ptr) end
 
 -- Encrypt a single 128-bit block with the basic AES block cipher.
-local function aes_128_block (block, keymat)
+local function aes_128_block (block, key)
    local gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
-   ASM.aes_keyexp_128_enc_avx(keymat, gcm_data)
+   ASM.aes_keyexp_128_enc_avx(key, gcm_data)
    ASM.aesni_encrypt_single_block(gcm_data, block)
 end
 
 local aes_128_gcm = {}
 
-function aes_128_gcm:new (spi, keymat, salt)
+function aes_128_gcm:new (spi, key, salt)
    assert(spi, "Need SPI.")
-   assert(keymat and #keymat == 32, "Need 16 bytes of key material.")
+   assert(key and #key == 32, "Need 16 bytes of key material.")
    assert(salt and #salt == 8, "Need 4 bytes of salt.")
    local o = {}
-   o.keymat = ffi.new("uint8_t[16]")
-   ffi.copy(o.keymat, lib.hexundump(keymat, 16), 16)
+   o.key = ffi.new("uint8_t[16]")
+   ffi.copy(o.key, lib.hexundump(key, 16), 16)
    o.IV_SIZE = 8
    o.iv = iv:new(lib.hexundump(salt, 4))
    o.AUTH_SIZE = 16
@@ -91,9 +91,9 @@ function aes_128_gcm:new (spi, keymat, salt)
    o.aad = aad:new(spi)
    -- Compute subkey (H)
    o.hash_subkey = ffi.new("uint8_t[?] __attribute__((aligned(16)))", 16)
-   aes_128_block(o.hash_subkey, o.keymat)
+   aes_128_block(o.hash_subkey, o.key)
    o.gcm_data = ffi.new("gcm_data __attribute__((aligned(16)))")
-   ASM.aes_keyexp_128_enc_avx(o.keymat, o.gcm_data)
+   ASM.aes_keyexp_128_enc_avx(o.key, o.gcm_data)
    ASM.aesni_gcm_precomp_avx_gen4(o.gcm_data, o.hash_subkey)
    return setmetatable(o, {__index=aes_128_gcm})
 end

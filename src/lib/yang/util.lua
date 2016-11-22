@@ -38,7 +38,12 @@ function tointeger(str, what, min, max)
    end
    if max then check(res <= max) end
    -- Only return Lua numbers for values within int32 + uint32 range.
-   if -0x8000000 <= res and res <= 0xffffffff then return tonumber(res) end
+   -- The 0 <= res check is needed because res might be a uint64, in
+   -- which case comparing to a negative Lua number will cast that Lua
+   -- number to a uint64 :-((
+   if (0 <= res or -0x8000000 <= res) and res <= 0xffffffff then
+      return tonumber(res)
+   end
    return res
 end
 
@@ -50,7 +55,7 @@ function ffi_array(ptr, elt_t, count)
       assert(1 <= idx and idx <= size)
       return ptr[idx-1]
    end
-   function mt:__setindex(idx, val)
+   function mt:__newindex(idx, val)
       assert(1 <= idx and idx <= size)
       ptr[idx-1] = val
    end
@@ -80,6 +85,7 @@ function selftest()
    assert(tointeger('0') == 0)
    assert(tointeger('-0') == 0)
    assert(tointeger('10') == 10)
+   assert(tostring(tointeger('10')) == '10')
    assert(tointeger('-10') == -10)
    assert(tointeger('010') == 8)
    assert(tointeger('-010') == -8)

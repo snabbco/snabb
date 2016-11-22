@@ -204,7 +204,8 @@ end
 
 function CTable:save(stream)
    stream:write_ptr(header_t(self.size, self.occupancy, self.max_displacement,
-                             self.max_occupancy_rate, self.min_occupancy_rate))
+                             self.max_occupancy_rate, self.min_occupancy_rate),
+                    header_t)
    stream:write_array(self.entries,
                       self.entry_type,
                       self.size + self.max_displacement + 1)
@@ -298,7 +299,7 @@ end
 
 function CTable:lookup_and_copy(key, entry)
    local entry_ptr = self:lookup_ptr(key)
-   if not ptr then return false end
+   if not entry_ptr then return false end
    entry = entry_ptr
    return true
 end
@@ -615,8 +616,9 @@ function selftest()
             file:write(ffi.string(ptr, size))
          end
          local stream = {}
-         function stream:write_ptr(ptr)
-            write(ptr, ffi.sizeof(ptr))
+         function stream:write_ptr(ptr, type)
+            assert(ffi.sizeof(ptr) == ffi.sizeof(type))
+            write(ptr, ffi.sizeof(type))
          end
          function stream:write_array(ptr, type, count)
             write(ptr, ffi.sizeof(type) * count)

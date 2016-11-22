@@ -82,7 +82,7 @@ function load_configuration(filename, opts)
    -- If the file doesn't have the magic, assume it's a source file.
    -- First, see if we compiled it previously and saved a compiled file
    -- in a well-known place.
-   local compiled_filename = filename:gsub("%.txt$", "")..'.o'
+   local compiled_filename = filename:gsub("%.conf$", "")..'.o'
    local source_mtime = {sec=source.mtime_sec, nsec=source.mtime_nsec}
    local compiled_stream = maybe(stream.open_input_byte_stream,
                                  compiled_filename)

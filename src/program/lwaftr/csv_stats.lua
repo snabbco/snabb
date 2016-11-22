@@ -17,15 +17,15 @@ CSVStatsTimer = {}
 --
 -- Hydra mode example:
 --
--- benchmark,snabb,id,score,unit
--- decap_mpps,master,1,3.362784,mpps
--- decap_gbps,master,1,13.720160,gbps
--- encap_mpps,master,1,3.362886,mpps
--- encap_gbps,master,1,15.872824,gbps
--- decap_mpps,master,2,3.407569,mpps
--- decap_gbps,master,2,13.902880,gbps
--- encap_mpps,master,2,3.407569,mpps
--- encap_gbps,master,2,16.083724,gbps
+-- benchmark,id,score,unit
+-- decap_mpps,1,3.362784,mpps
+-- decap_gbps,1,13.720160,gbps
+-- encap_mpps,1,3.362886,mpps
+-- encap_gbps,1,15.872824,gbps
+-- decap_mpps,2,3.407569,mpps
+-- decap_gbps,2,13.902880,gbps
+-- encap_mpps,2,3.407569,mpps
+-- encap_gbps,2,16.083724,gbps
 --
 function CSVStatsTimer:new(filename, hydra_mode)
    local file = filename and io.open(filename, "w") or io.stdout
