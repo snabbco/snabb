@@ -41,23 +41,6 @@ local function extract_parts(fragment)
    return rtn
 end
 
-local handlers = {}
-function handlers.scalar(grammar, fragment)
-   return {name=fragment.name, grammar=grammar} end
-function handlers.struct(grammar, fragment)
-   return {name=fragment.name, keys=fragment.query, grammar=grammar}
-end
-function handlers.table(grammar, fragment)
-   return {name=fragment.name, keys=fragment.query, grammar=grammar}
-end
-function handlers.array(grammar, fragment)
-   local position = fragment.query["position()"]
-   return {name=fragment.name, key=tonumber(position), grammar=grammar}
-end
-function handle(grammar, fragment)
-   return assert(handlers[grammar.type], grammar.type)(grammar, fragment)
-end
-
 -- Finds the grammar node for a fragment in a given grammar.
 local function extract_grammar_node(grammar, name)
    local handlers = {}
@@ -75,6 +58,24 @@ end
 -- Converts an XPath path to a lua array consisting of path componants.
 -- A path component can then be resolved on a yang data tree:
 function convert_path(grammar, path)
+   local handlers = {}
+   function handlers.scalar(grammar, fragment)
+      return {name=fragment.name, grammar=grammar}
+   end
+   function handlers.struct(grammar, fragment)
+      return {name=fragment.name, grammar=grammar}
+   end
+   function handlers.table(grammar, fragment)
+      return {name=fragment.name, keys=fragment.query, grammar=grammar}
+   end
+   function handlers.array(grammar, fragment)
+      local position = fragment.query["position()"]
+      return {name=fragment.name, key=tonumber(position), grammar=grammar}
+   end
+   local function handle(grammar, fragment)
+      return assert(handlers[grammar.type], grammar.type)(grammar, fragment)
+   end
+
    local ret = {}
    local node = grammar
    if path:sub(1, 1) == "/" then path = path:sub(2) end -- remove leading /
