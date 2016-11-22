@@ -104,6 +104,18 @@ function parse_path(path)
    return ret
 end
 
+function normalize_path(path)
+   local ret = {}
+   for _,part in ipairs(parse_path(path)) do
+      local str = part.name
+      local keys = table_keys(part.query)
+      table.sort(keys)
+      for _,k in ipairs(keys) do str = str..'['..k..'='..part.query[k]..']' end
+      table.insert(ret, str)
+   end
+   return '/'..table.concat(ret, '/')
+end
+
 -- Returns a resolver for a paticular schema and *lua* path.
 function resolver(grammar, path_string)
    local function prepare_table_key(keys, ctype, query)
@@ -319,5 +331,13 @@ function selftest()
 
    local getter = resolver(fruit_prod, "/bowl/fruit[name=apple]/rating")
    assert(getter(fruit_data) == 6)
+
+   assert(normalize_path('') == '/')
+   assert(normalize_path('//') == '/')
+   assert(normalize_path('/') == '/')
+   assert(normalize_path('//foo//bar//') == '/foo/bar')
+   assert(normalize_path('//foo[b=1][c=2]//bar//') == '/foo[b=1][c=2]/bar')
+   assert(normalize_path('//foo[c=1][b=2]//bar//') == '/foo[b=2][c=1]/bar')
+
    print("selftest: ok")
 end
