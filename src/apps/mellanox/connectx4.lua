@@ -655,7 +655,7 @@ function HCA:create_cq (entries, uar_page, eqn, collapsed)
    self:command("CREATE_CQ", 0x114, 0x0C)
       :input("opcode",        0x00,        31, 16, 0x400)
       :input("cc",            0x10 + 0x00, 20, 20, collapsed and 1 or 0)
-      :input("oi",            0x10 + 0x00, 17, 17, collapsed and 1 or 0)
+      :input("oi",            0x10 + 0x00, 17, 17, 1)
       :input("log_cq_size",   0x10 + 0x0C, 28, 24, log2size(entries))
       :input("uar_page",      0x10 + 0x0C, 23,  0, uar_page)
       :input("c_eqn",         0x10 + 0x14,  7,  0, eqn)
@@ -794,6 +794,7 @@ function IO:pull ()
    -- Input received packets
    local l = self.output.output
    if l == nil then return end
+   self.rq:refill()
    self.rq:ring_doorbell()
    self.rq:receive(l)
 end
@@ -857,7 +858,7 @@ function RQ:new (rqn, rwq, wqsize, doorbell, rlkey, cq)
    end
 
    function self:receive (l)
-      while not link.full(l) do
+      while true do
          -- Find the next completion entry.
          local c = cqe[next_completion]
          local owner = bit.band(1, c.u8[0x3F])
@@ -866,7 +867,8 @@ function RQ:new (rqn, rwq, wqsize, doorbell, rlkey, cq)
             break
          end
          -- Advance to next completion.
-         next_completion = (next_completion + 1) % wqsize -- XXX cqsize
+         -- Note: assumes sqsize == cqsize
+         next_completion = (next_completion + 1) % wqsize
          -- Toggle the ownership value if the CQ wraps around.
          if next_completion == 0 then
             mine = (mine + 1) % 2
