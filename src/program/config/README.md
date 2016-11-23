@@ -12,21 +12,21 @@ the existing configuration of a Snabb instance.
 `snabb config` is a family of Snabb commands.  Its sub-commands
 include:
 
-* [`snabb config get`](./get/README_inc): read configuration data
+* [`snabb config get`](./get/README): read configuration data
 
-* [`snabb config get-state`](./get_state/README_inc): read state data
+* [`snabb config get-state`](./get_state/README): read state data
 
-* [`snabb config load`](./load/README_inc): load a new configuration
+* [`snabb config load`](./load/README): load a new configuration
 
-* [`snabb config set`](./set/README_inc): incrementally update configuration
+* [`snabb config set`](./set/README): incrementally update configuration
 
-* [`snabb config add`](./add/README_inc): augment configuration, for
+* [`snabb config add`](./add/README): augment configuration, for
   example by adding a routing table entry
 
-* [`snabb config remove`](./remove/README_inc): remove a component from
+* [`snabb config remove`](./remove/README): remove a component from
   a configuration, for example removing a routing table entry
 
-* [`snabb config listen`](./listen/README_inc): provide an interface to
+* [`snabb config listen`](./listen/README): provide an interface to
   the `snabb config` functionality over a persistent socket, to minimize
   per-operation cost
 
