@@ -23,7 +23,7 @@ include:
 * [`snabb config add`](./add/README_inc): augment configuration, for
   example by adding a routing table entry
 
-* [`snabb config remove`](./delete/README_inc): remove a component from
+* [`snabb config remove`](./remove/README_inc): remove a component from
   a configuration, for example removing a routing table entry
 
 * [`snabb config listen`](./listen/README_inc): provide an interface to
