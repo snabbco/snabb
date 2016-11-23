@@ -299,7 +299,7 @@ function parse_statement_lists(str, filename)
    parser:skip_whitespace()
    while not parser:is_eof() do
       parser:consume("{")
-      table.insert(ret, self:parse_statement_list())
+      table.insert(ret, parser:parse_statement_list())
       parser:consume("}")
       parser:skip_whitespace()
    end
