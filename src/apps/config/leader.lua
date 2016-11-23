@@ -482,8 +482,8 @@ function Leader:handle_calls_from_peers()
       end
       while peer.state == 'ready' do
          -- Uncomment to get backtraces.
-         local success, reply = true, self:handle(peer.payload)
-         -- local success, reply = pcall(self.handle, self, peer.payload)
+         -- local success, reply = true, self:handle(peer.payload)
+         local success, reply = pcall(self.handle, self, peer.payload)
          peer.payload = nil
          if success then
             assert(type(reply) == 'string')
