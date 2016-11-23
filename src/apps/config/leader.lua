@@ -145,19 +145,69 @@ local function path_setter_for_grammar(grammar, path)
    path = path_mod.normalize_path(path)
    if path == "/" then
       return function(config, subconfig) return subconfig end
-   elseif path:sub(#path) == ']' then
-      -- Path ends in a query; it must denote an array or table item.
-      error('Unimplemented')
-   else
-      local head, tail = lib.dirname(path), lib.basename(path)
+   end
+   local head, tail = lib.dirname(path), lib.basename(path)
+   local tail_path = path_mod.parse_path(tail)
+   local tail_name, query = tail_path[1].name, tail_path[1].query
+   if lib.equal(query, {}) then
+      -- No query; the simple case.
       local getter, grammar = path_mod.resolver(grammar, head)
       assert(grammar.type == 'struct')
-      assert(grammar.members[tail])
-      local tail_id = data.normalize_id(tail)
+      local tail_id = data.normalize_id(tail_name)
       return function(config, subconfig)
          getter(config)[tail_id] = subconfig
          return config
       end
+   end
+
+   -- Otherwise the path ends in a query; it must denote an array or
+   -- table item.
+   local getter, grammar = path_mod.resolver(grammar, head..'/'..tail_name)
+   if grammar.type == 'array' then
+      local idx = path_mod.prepare_array_lookup(query)
+      return function(config, subconfig)
+         local array = getter(config)
+         assert(idx <= #array)
+         array[idx] = subconfig
+         return config
+      end
+   elseif grammar.type == 'table' then
+      local key = path_mod.prepare_table_lookup(grammar.keys,
+                                                grammar.key_ctype, query)
+      if grammar.string_key then
+         key = key[normalize_id(grammar.string_key)]
+         return function(config, subconfig)
+            local tab = getter(config)
+            assert(tab[key] ~= nil)
+            tab[key] = subconfig
+            return config
+         end
+      elseif grammar.key_ctype and grammar.value_ctype then
+         return function(config, subconfig)
+            getter(config):update(key, subconfig)
+            return config
+         end
+      elseif grammar.key_ctype then
+         return function(config, subconfig)
+            local tab = getter(config)
+            assert(tab[key] ~= nil)
+            tab[key] = subconfig
+            return config
+         end
+      else
+         return function(config, subconfig)
+            local tab = getter(config)
+            for k,v in pairs(tab) do
+               if lib.equal(k, key) then
+                  tab[k] = subconfig
+                  return conig
+               end
+            end
+            error("Not found")
+         end
+      end
+   else
+      error('Query parameters only allowed on arrays and tables')
    end
 end
 
