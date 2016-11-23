@@ -5,8 +5,10 @@ module(...,package.seeall)
 local S = require("syscall")
 local ffi = require("ffi")
 local lib = require("core.lib")
+local cltable = require("lib.cltable")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
+local util = require("lib.yang.util")
 local rpc = require("lib.yang.rpc")
 local path_mod = require("lib.yang.path")
 local app = require("core.app")
@@ -218,6 +220,86 @@ function compute_set_config_fn (schema_name, path)
    return path_setter_for_schema(yang.load_schema_by_name(schema_name), path)
 end
 
+local function path_adder_for_grammar(grammar, path)
+   local top_grammar = grammar
+   local getter, grammar = path_mod.resolver(grammar, path)
+   if grammar.type == 'array' then
+      if grammar.ctype then
+         -- It's an FFI array; have to create a fresh one, sadly.
+         local setter = path_setter_for_grammar(top_grammar, path)
+         local elt_t = data.typeof(grammar.ctype)
+         local array_t = ffi.typeof('$[?]', elt_t)
+         return function(config, subconfig)
+            local cur = getter(config)
+            local new = array_t(#cur + #subconfig)
+            local i = 1
+            for _,elt in ipairs(cur) do new[i-1] = elt; i = i + 1 end
+            for _,elt in ipairs(subconfig) do new[i-1] = elt; i = i + 1 end
+            return setter(config, util.ffi_array(new, elt_t))
+         end
+      end
+      -- Otherwise we can add entries in place.
+      return function(config, subconfig)
+         local cur = getter(config)
+         for _,elt in ipairs(subconfig) do table.insert(cur, elt) end
+         return config
+      end
+   elseif grammar.type == 'table' then
+      -- Invariant: either all entries in the new subconfig are added,
+      -- or none are.
+      if grammar.key_ctype and grammar.value_ctype then
+         -- ctable.
+         return function(config, subconfig)
+            local ctab = getter(config)
+            for entry in subconfig:iterate() do
+               if ctab:lookup_ptr(entry.key) ~= nil then
+                  error('already-existing entry', entry.key)
+               end
+            end
+            for entry in subconfig:iterate() do
+               ctab:add(entry.key, entry.value)
+            end
+            return config
+         end
+      elseif grammar.string_key or grammar.key_ctype then
+         -- cltable or string-keyed table.
+         local pairs = grammar.key_ctype and cltable.pairs or pairs
+         return function(config, subconfig)
+            local tab = getter(config)
+            for k,_ in pairs(subconfig) do
+               if tab[k] ~= nil then error('already-existing entry', k) end
+            end
+            for k,v in pairs(subconfig) do tab[k] = v end
+            return config
+         end
+      else
+         -- Sad quadratic loop.
+         return function(config, subconfig)
+            local tab = getter(config)
+            for key,val in pairs(tab) do
+               for k,_ in pairs(subconfig) do
+                  if lib.equal(key, k) then
+                     error('already-existing entry', key)
+                  end
+               end
+            end
+            for k,v in pairs(subconfig) do tab[k] = v end
+            return config
+         end
+      end
+   else
+      error('Add only allowed on arrays and tables')
+   end
+end
+
+local function path_adder_for_schema(schema, path)
+   return path_adder_for_grammar(data.data_grammar_from_schema(schema), path)
+end
+
+function compute_add_config_fn (schema_name, path)
+   return path_adder_for_schema(yang.load_schema_by_name(schema_name), path)
+end
+
 function Leader:update_configuration (schema_name, update_fn, verb, path, arg)
    assert(schema_name == self.schema_name)
    local new_config = update_fn(self.current_configuration, arg)
@@ -315,6 +397,8 @@ function Leader:handle_calls_from_peers()
          end
       end
       while peer.state == 'ready' do
+         -- Uncomment to get backtraces.
+         -- local success, reply = true, self:handle(peer.payload)
          local success, reply = pcall(self.handle, self, peer.payload)
          peer.payload = nil
          if success then
