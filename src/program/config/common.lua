@@ -32,7 +32,6 @@ local function path_grammar(schema_name, path)
 end
 
 local function data_parser(schema_name, path, command)
-   assert(command ~= 'add')
    return data.data_parser_from_grammar(path_grammar(schema_name, path))
 end
 
@@ -96,7 +95,6 @@ function open_socket_or_die(instance_id)
 end
 
 function serialize_config(config, schema_name, path, command)
-   assert(command ~= 'add')
    local grammar = path_grammar(schema_name, path)
    local printer = data.data_printer_from_grammar(grammar)
    return printer(config, yang.string_output_file())

@@ -142,7 +142,6 @@ local function path_parser_for_schema_by_name(schema_name, path)
 end
 
 local function path_setter_for_grammar(grammar, path)
-   path = path_mod.normalize_path(path)
    if path == "/" then
       return function(config, subconfig) return subconfig end
    end
@@ -215,25 +214,42 @@ local function path_setter_for_schema(schema, path)
    return path_setter_for_grammar(data.data_grammar_from_schema(schema), path)
 end
 
-local function path_setter_for_schema_by_name(schema_name, path)
+function compute_set_config_fn (schema_name, path)
    return path_setter_for_schema(yang.load_schema_by_name(schema_name), path)
 end
 
-function Leader:rpc_set_config (args)
-   assert(args.schema == self.schema_name)
-   local parser = path_parser_for_schema_by_name(args.schema, args.path)
-   local setter = path_setter_for_schema_by_name(args.schema, args.path)
-   local subconfig = parser(args.config)
-   local new_config = setter(self.current_configuration, subconfig)
+function Leader:update_configuration (schema_name, update_fn, verb, path, arg)
+   assert(schema_name == self.schema_name)
+   local new_config = update_fn(self.current_configuration, arg)
    local new_app_graph = self.setup_fn(new_config)
-   local support = load_schema_support(args.schema)
-   local actions = support.compute_config_actions(self.current_app_graph,
-                                                  new_app_graph, 'set',
-                                                  args.path, subconfig)
+   local support = load_schema_support(schema_name)
+   local actions = support.compute_config_actions(
+      self.current_app_graph, new_app_graph, verb, path, arg)
    self:enqueue_config_actions(actions)
    self.current_app_graph = new_app_graph
    self.current_configuration = new_config
+end
+
+function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
+   assert(args.schema == self.schema_name)
+   local path = path_mod.normalize_path(args.path)
+   local parser = path_parser_for_schema_by_name(args.schema, path)
+   self:update_configuration(args.schema,
+                             compute_update_fn(args.schema, path),
+                             'set', path, parser(args.config))
    return {}
+end
+
+function Leader:rpc_set_config (args)
+   return self:handle_rpc_update_config(args, 'set', compute_set_config_fn)
+end
+
+function Leader:rpc_add_config (args)
+   return self:handle_rpc_update_config(args, 'add', compute_add_config_fn)
+end
+
+function Leader:rpc_remove_config (args)
+   return self:handle_rpc_update_config(args, 'remove', compute_remove_config_fn)
 end
 
 function Leader:handle (payload)
