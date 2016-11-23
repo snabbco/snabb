@@ -388,6 +388,7 @@ function data_parser_from_grammar(production)
          for _,v in ipairs(parser_mod.parse_strings(str, filename)) do
             out = parser.parse({keyword='[bare array]', argument=v}, out)
          end
+         return parser.finish(out)
       end
    end
    function top_parsers.table(production)
@@ -397,6 +398,7 @@ function data_parser_from_grammar(production)
          for _,v in ipairs(parser_mod.parse_statement_lists(str, filename)) do
             out = parser.parse({keyword='[bare table]', statements=v}, out)
          end
+         return parser.finish(out)
       end
    end
    function top_parsers.scalar(production)
