@@ -26,10 +26,7 @@ function set(cltable, key, value)
    local entry = cltable.keys:lookup_ptr(key)
    if entry then
       cltable.values[entry.value] = value
-      if value ~= nil then
-         cltable.keys:remove_ptr(entry)
-         -- FIXME: Leaking the slot in the values array.
-      end
+      if value == nil then cltable.keys:remove_ptr(entry) end
    elseif value ~= nil then
       table.insert(cltable.values, value)
       cltable.keys:add(key, #cltable.values)
@@ -61,6 +58,15 @@ function selftest()
       local addr = ipv4:pton('1.2.3.'..i)
       assert(cltab[addr] == 'hello, '..i)
    end
+
+   for i=0,255 do
+      -- Remove value that is present.
+      cltab[ipv4:pton('1.2.3.'..i)] = nil
+      -- Remove value that is not present.
+      cltab[ipv4:pton('2.3.4.'..i)] = nil
+   end
+
+   for k,v in pairs(cltab) do error('not reachable') end
 
    print("selftest: ok")
 end

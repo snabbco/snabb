@@ -103,24 +103,48 @@ function parse_path(path)
    return ret
 end
 
+function normalize_path(path)
+   local ret = {}
+   for _,part in ipairs(parse_path(path)) do
+      local str = part.name
+      local keys = table_keys(part.query)
+      table.sort(keys)
+      for _,k in ipairs(keys) do str = str..'['..k..'='..part.query[k]..']' end
+      table.insert(ret, str)
+   end
+   return '/'..table.concat(ret, '/')
+end
+
+function prepare_array_lookup(query)
+   if not equal(table_keys(query), {"position()"}) then
+      error("Arrays can only be indexed by position.")
+   end
+   local idx = tonumber(query["position()"])
+   if idx < 1 or idx ~= math.floor(idx) then
+      error("Arrays can only be indexed by positive integers.")
+   end
+   return idx
+end
+
+function prepare_table_lookup(keys, ctype, query)
+   local static_key = ctype and datalib.typeof(ctype)() or {}
+   for k,_ in pairs(query) do
+      if not keys[k] then error("'"..key_name.."' is not a table key") end
+   end
+   for k,grammar in pairs(keys) do
+      local v = query[k] or grammar.default
+      if v == nil then
+         error("Table query missing required key '"..k.."'")
+      end
+      local key_primitive_type = grammar.argument_type.primitive_type
+      local parser = valuelib.types[key_primitive_type].parse
+      static_key[normalize_id(k)] = parser(v, 'path query value')
+   end
+   return static_key
+end
+
 -- Returns a resolver for a paticular schema and *lua* path.
 function resolver(grammar, path_string)
-   local function prepare_table_key(keys, ctype, query)
-      local static_key = ctype and datalib.typeof(ctype)() or {}
-      for k,_ in pairs(query) do
-         if not keys[k] then error("'"..key_name.."' is not a table key") end
-      end
-      for k,grammar in pairs(keys) do
-         local v = query[k] or grammar.default
-         if v == nil then
-            error("Table query missing required key '"..k.."'")
-         end
-         local key_primitive_type = grammar.argument_type.primitive_type
-         local parser = valuelib.types[key_primitive_type].parse
-         static_key[normalize_id(k)] = parser(v, 'path query value')
-      end
-      return static_key
-   end
    local function ctable_getter(key, getter)
       return function(data)
          local data = getter(data):lookup_ptr(key)
@@ -155,20 +179,14 @@ function resolver(grammar, path_string)
       end
    end
    local function handle_table_query(grammar, query, getter)
-      local key = prepare_table_key(grammar.keys, grammar.key_ctype, query)
+      local key = prepare_table_lookup(grammar.keys, grammar.key_ctype, query)
       local child_grammar = {type="struct", members=grammar.values,
                              ctype=grammar.value_ctype}
       local child_getter = compute_table_getter(grammar, key, getter)
       return child_getter, child_grammar
    end
    local function handle_array_query(grammar, query, getter)
-      if not equal(table_keys(query), {"position()"}) then
-         error("Arrays can only be indexed by position.")
-      end
-      local idx = tonumber(query["position()"])
-      if idx < 1 or idx ~= math.floor(idx) then
-         error("Arrays can only be indexed by positive integers.")
-      end
+      local idx = prepare_array_lookup(query)
       -- Pretend that array elements are scalars.
       local child_grammar = {type="scalar", argument_type=grammar.element_type,
                              ctype=grammar.ctype}
@@ -318,5 +336,13 @@ function selftest()
 
    local getter = resolver(fruit_prod, "/bowl/fruit[name=apple]/rating")
    assert(getter(fruit_data) == 6)
+
+   assert(normalize_path('') == '/')
+   assert(normalize_path('//') == '/')
+   assert(normalize_path('/') == '/')
+   assert(normalize_path('//foo//bar//') == '/foo/bar')
+   assert(normalize_path('//foo[b=1][c=2]//bar//') == '/foo[b=1][c=2]/bar')
+   assert(normalize_path('//foo[c=1][b=2]//bar//') == '/foo[b=2][c=1]/bar')
+
    print("selftest: ok")
 end

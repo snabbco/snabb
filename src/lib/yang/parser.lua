@@ -273,7 +273,7 @@ function Parser:parse_statement()
    self:error("Unexpected character found")
 end
 
-function decode_string(str, filename)
+function parse_string(str, filename)
    local parser = Parser.new(str, filename)
    parser:skip_whitespace()
    local str = parser:parse_string()
@@ -282,7 +282,31 @@ function decode_string(str, filename)
    return str
 end
 
-function parse_string(str, filename)
+function parse_strings(str, filename)
+   local parser = Parser.new(str, filename)
+   local ret = {}
+   parser:skip_whitespace()
+   while not parser:is_eof() do
+      table.insert(ret, parser:parse_string())
+      parser:skip_whitespace()
+   end
+   return ret
+end
+
+function parse_statement_lists(str, filename)
+   local parser = Parser.new(str, filename)
+   local ret = {}
+   parser:skip_whitespace()
+   while not parser:is_eof() do
+      parser:consume("{")
+      table.insert(ret, parser:parse_statement_list())
+      parser:consume("}")
+      parser:skip_whitespace()
+   end
+   return ret
+end
+
+function parse(str, filename)
    local parser = Parser.new(str, filename)
    return parser:parse_module()
 end
@@ -291,7 +315,7 @@ function parse_file(filename)
    local file_in = assert(io.open(filename))
    local contents = file_in:read("*a")
    file_in:close()
-   return parse_string(contents, filename)
+   return parse(contents, filename)
 end
 
 function selftest()
@@ -339,7 +363,7 @@ function selftest()
 
 
    local function test_module(src, exp)
-      local result = strip_locs(parse_string(src))
+      local result = strip_locs(parse(src))
       if not lib.equal(result, exp) then
          pp(result)
          pp(exp)
@@ -377,7 +401,7 @@ function selftest()
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
 	argument="port", statements={{keyword="type"}}}})
 
-   parse_string(require('lib.yang.ietf_inet_types_yang'))
-   parse_string(require('lib.yang.ietf_yang_types_yang'))
-   parse_string(require('lib.yang.ietf_softwire_yang'))
+   parse(require('lib.yang.ietf_inet_types_yang'))
+   parse(require('lib.yang.ietf_yang_types_yang'))
+   parse(require('lib.yang.ietf_softwire_yang'))
 end

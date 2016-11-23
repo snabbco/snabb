@@ -4,10 +4,13 @@ module(...,package.seeall)
 
 local S = require("syscall")
 local ffi = require("ffi")
+local lib = require("core.lib")
+local cltable = require("lib.cltable")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
+local util = require("lib.yang.util")
 local rpc = require("lib.yang.rpc")
-local path_resolver = require("lib.yang.path").resolver
+local path_mod = require("lib.yang.path")
 local app = require("core.app")
 local shm = require("core.shm")
 local app_graph = require("core.config")
@@ -95,7 +98,7 @@ function Leader:rpc_describe (args)
 end
 
 local function path_printer_for_grammar(grammar, path)
-   local getter, subgrammar = path_resolver(grammar, path)
+   local getter, subgrammar = path_mod.resolver(grammar, path)
    local printer = data.data_printer_from_grammar(subgrammar)
    return function(data, file)
       return printer(getter(data), file)
@@ -118,7 +121,7 @@ function Leader:rpc_get_config (args)
 end
 
 local generic_schema_support = {
-   compute_config_actions = function(old_graph, new_graph, verb, path, subconf)
+   compute_config_actions = function(old_graph, new_graph, verb, path, ...)
       return app.compute_config_actions(old_graph, new_graph)
    end
 }
@@ -128,7 +131,7 @@ local function load_schema_support(schema_name)
 end
 
 local function path_parser_for_grammar(grammar, path)
-   local getter, subgrammar = path_resolver(grammar, path)
+   local getter, subgrammar = path_mod.resolver(grammar, path)
    return data.data_parser_from_grammar(subgrammar)
 end
 
@@ -141,10 +144,71 @@ local function path_parser_for_schema_by_name(schema_name, path)
 end
 
 local function path_setter_for_grammar(grammar, path)
-   -- Implement me :)
-   assert(path == "/")
-   return function(config, subconfig)
-      return subconfig
+   if path == "/" then
+      return function(config, subconfig) return subconfig end
+   end
+   local head, tail = lib.dirname(path), lib.basename(path)
+   local tail_path = path_mod.parse_path(tail)
+   local tail_name, query = tail_path[1].name, tail_path[1].query
+   if lib.equal(query, {}) then
+      -- No query; the simple case.
+      local getter, grammar = path_mod.resolver(grammar, head)
+      assert(grammar.type == 'struct')
+      local tail_id = data.normalize_id(tail_name)
+      return function(config, subconfig)
+         getter(config)[tail_id] = subconfig
+         return config
+      end
+   end
+
+   -- Otherwise the path ends in a query; it must denote an array or
+   -- table item.
+   local getter, grammar = path_mod.resolver(grammar, head..'/'..tail_name)
+   if grammar.type == 'array' then
+      local idx = path_mod.prepare_array_lookup(query)
+      return function(config, subconfig)
+         local array = getter(config)
+         assert(idx <= #array)
+         array[idx] = subconfig
+         return config
+      end
+   elseif grammar.type == 'table' then
+      local key = path_mod.prepare_table_lookup(grammar.keys,
+                                                grammar.key_ctype, query)
+      if grammar.string_key then
+         key = key[normalize_id(grammar.string_key)]
+         return function(config, subconfig)
+            local tab = getter(config)
+            assert(tab[key] ~= nil)
+            tab[key] = subconfig
+            return config
+         end
+      elseif grammar.key_ctype and grammar.value_ctype then
+         return function(config, subconfig)
+            getter(config):update(key, subconfig)
+            return config
+         end
+      elseif grammar.key_ctype then
+         return function(config, subconfig)
+            local tab = getter(config)
+            assert(tab[key] ~= nil)
+            tab[key] = subconfig
+            return config
+         end
+      else
+         return function(config, subconfig)
+            local tab = getter(config)
+            for k,v in pairs(tab) do
+               if lib.equal(k, key) then
+                  tab[k] = subconfig
+                  return config
+               end
+            end
+            error("Not found")
+         end
+      end
+   else
+      error('Query parameters only allowed on arrays and tables')
    end
 end
 
@@ -152,24 +216,205 @@ local function path_setter_for_schema(schema, path)
    return path_setter_for_grammar(data.data_grammar_from_schema(schema), path)
 end
 
-local function path_setter_for_schema_by_name(schema_name, path)
+function compute_set_config_fn (schema_name, path)
    return path_setter_for_schema(yang.load_schema_by_name(schema_name), path)
 end
 
-function Leader:rpc_set_config (args)
-   assert(args.schema == self.schema_name)
-   local parser = path_parser_for_schema_by_name(args.schema, args.path)
-   local setter = path_setter_for_schema_by_name(args.schema, args.path)
-   local subconfig = parser(args.config)
-   local new_config = setter(self.configuration, subconfig)
+local function path_adder_for_grammar(grammar, path)
+   local top_grammar = grammar
+   local getter, grammar = path_mod.resolver(grammar, path)
+   if grammar.type == 'array' then
+      if grammar.ctype then
+         -- It's an FFI array; have to create a fresh one, sadly.
+         local setter = path_setter_for_grammar(top_grammar, path)
+         local elt_t = data.typeof(grammar.ctype)
+         local array_t = ffi.typeof('$[?]', elt_t)
+         return function(config, subconfig)
+            local cur = getter(config)
+            local new = array_t(#cur + #subconfig)
+            local i = 1
+            for _,elt in ipairs(cur) do new[i-1] = elt; i = i + 1 end
+            for _,elt in ipairs(subconfig) do new[i-1] = elt; i = i + 1 end
+            return setter(config, util.ffi_array(new, elt_t))
+         end
+      end
+      -- Otherwise we can add entries in place.
+      return function(config, subconfig)
+         local cur = getter(config)
+         for _,elt in ipairs(subconfig) do table.insert(cur, elt) end
+         return config
+      end
+   elseif grammar.type == 'table' then
+      -- Invariant: either all entries in the new subconfig are added,
+      -- or none are.
+      if grammar.key_ctype and grammar.value_ctype then
+         -- ctable.
+         return function(config, subconfig)
+            local ctab = getter(config)
+            for entry in subconfig:iterate() do
+               if ctab:lookup_ptr(entry.key) ~= nil then
+                  error('already-existing entry', entry.key)
+               end
+            end
+            for entry in subconfig:iterate() do
+               ctab:add(entry.key, entry.value)
+            end
+            return config
+         end
+      elseif grammar.string_key or grammar.key_ctype then
+         -- cltable or string-keyed table.
+         local pairs = grammar.key_ctype and cltable.pairs or pairs
+         return function(config, subconfig)
+            local tab = getter(config)
+            for k,_ in pairs(subconfig) do
+               if tab[k] ~= nil then error('already-existing entry', k) end
+            end
+            for k,v in pairs(subconfig) do tab[k] = v end
+            return config
+         end
+      else
+         -- Sad quadratic loop.
+         return function(config, subconfig)
+            local tab = getter(config)
+            for key,val in pairs(tab) do
+               for k,_ in pairs(subconfig) do
+                  if lib.equal(key, k) then
+                     error('already-existing entry', key)
+                  end
+               end
+            end
+            for k,v in pairs(subconfig) do tab[k] = v end
+            return config
+         end
+      end
+   else
+      error('Add only allowed on arrays and tables')
+   end
+end
+
+local function path_adder_for_schema(schema, path)
+   return path_adder_for_grammar(data.data_grammar_from_schema(schema), path)
+end
+
+function compute_add_config_fn (schema_name, path)
+   return path_adder_for_schema(yang.load_schema_by_name(schema_name), path)
+end
+
+local function path_remover_for_grammar(grammar, path)
+   local top_grammar = grammar
+   local head, tail = lib.dirname(path), lib.basename(path)
+   local tail_path = path_mod.parse_path(tail)
+   local tail_name, query = tail_path[1].name, tail_path[1].query
+   local getter, grammar = path_mod.resolver(grammar, head..'/'..tail_name)
+   if grammar.type == 'array' then
+      if grammar.ctype then
+         -- It's an FFI array; have to create a fresh one, sadly.
+         local idx = path_mod.prepare_array_lookup(query)
+         local setter = path_setter_for_grammar(top_grammar, head)
+         local elt_t = data.typeof(grammar.ctype)
+         local array_t = ffi.typeof('$[?]', elt_t)
+         return function(config)
+            local cur = getter(config)
+            assert(i <= #cur)
+            local new = array_t(#cur - 1)
+            for i,elt in ipairs(cur) do
+               if i < idx then new[i-1] = elt end
+               if i > idx then new[i-2] = elt end
+            end
+            return setter(config, util.ffi_array(new, elt_t))
+         end
+      end
+      -- Otherwise we can remove the entry in place.
+      return function(config)
+         local cur = getter(config)
+         assert(i <= #cur)
+         table.remove(cur, i)
+         return config
+      end
+   elseif grammar.type == 'table' then
+      local key = path_mod.prepare_table_lookup(grammar.keys,
+                                                grammar.key_ctype, query)
+      if grammar.string_key then
+         key = key[normalize_id(grammar.string_key)]
+         return function(config)
+            local tab = getter(config)
+            assert(tab[key] ~= nil)
+            tab[key] = nil
+            return config
+         end
+      elseif grammar.key_ctype and grammar.value_ctype then
+         return function(config)
+            getter(config):remove(key)
+            return config
+         end
+      elseif grammar.key_ctype then
+         return function(config)
+            local tab = getter(config)
+            assert(tab[key] ~= nil)
+            tab[key] = nil
+            return config
+         end
+      else
+         return function(config)
+            local tab = getter(config)
+            for k,v in pairs(tab) do
+               if lib.equal(k, key) then
+                  tab[k] = nil
+                  return config
+               end
+            end
+            error("Not found")
+         end
+      end
+   else
+      error('Remove only allowed on arrays and tables')
+   end
+end
+
+local function path_remover_for_schema(schema, path)
+   return path_remover_for_grammar(data.data_grammar_from_schema(schema), path)
+end
+
+function compute_remove_config_fn (schema_name, path)
+   return path_remover_for_schema(yang.load_schema_by_name(schema_name), path)
+end
+
+function Leader:update_configuration (schema_name, update_fn, verb, path, ...)
+   assert(schema_name == self.schema_name)
+   local new_config = update_fn(self.current_configuration, ...)
    local new_app_graph = self.setup_fn(new_config)
-   local support = load_schema_support(args.schema)
-   local actions = support.compute_config_actions(self.current_app_graph,
-                                                  new_app_graph, 'set',
-                                                  args.path, subconfig)
+   local support = load_schema_support(schema_name)
+   local actions = support.compute_config_actions(
+      self.current_app_graph, new_app_graph, verb, path, ...)
    self:enqueue_config_actions(actions)
    self.current_app_graph = new_app_graph
    self.current_configuration = new_config
+end
+
+function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
+   assert(args.schema == self.schema_name)
+   local path = path_mod.normalize_path(args.path)
+   local parser = path_parser_for_schema_by_name(args.schema, path)
+   self:update_configuration(args.schema,
+                             compute_update_fn(args.schema, path),
+                             verb, path, parser(args.config))
+   return {}
+end
+
+function Leader:rpc_set_config (args)
+   return self:handle_rpc_update_config(args, 'set', compute_set_config_fn)
+end
+
+function Leader:rpc_add_config (args)
+   return self:handle_rpc_update_config(args, 'add', compute_add_config_fn)
+end
+
+function Leader:rpc_remove_config (args)
+   assert(args.schema == self.schema_name)
+   local path = path_mod.normalize_path(args.path)
+   self:update_configuration(args.schema,
+                             compute_remove_config_fn(args.schema, path),
+                             'remove', path)
    return {}
 end
 
@@ -236,6 +481,8 @@ function Leader:handle_calls_from_peers()
          end
       end
       while peer.state == 'ready' do
+         -- Uncomment to get backtraces.
+         -- local success, reply = true, self:handle(peer.payload)
          local success, reply = pcall(self.handle, self, peer.payload)
          peer.payload = nil
          if success then
