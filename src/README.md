@@ -827,6 +827,15 @@ result of calling *timefun*, and is saved in the resulting closure. A
 *duration* has elapsed when its deadline is less than or equal the value
 obtained using *timefun* when calling the closure.
 
+— Function **lib.throttle** *seconds*
+
+Return a closure that returns `true` at most once during any *seconds*
+(a floating point value) time interval, otherwise false.
+
+— Function **lib.timeout** *seconds*
+
+Returns a closure that returns `true` if *seconds* (a floating point
+value) have elapsed since it was created, otherwise false.
 
 — Function **lib.waitfor** *condition*
 

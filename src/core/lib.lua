@@ -267,6 +267,30 @@ function timer (duration, mode, timefun)
    else return oneshot end
 end
 
+-- Return a throttle function.
+--
+-- The throttle returns true at most once in any <seconds> time interval.
+function throttle (seconds)
+   local deadline = engine.now()
+   return function ()
+      if engine.now() > deadline then
+         deadline = engine.now() + seconds
+         return true
+      else
+         return false
+      end
+   end
+end
+
+-- Return a timeout function.
+--
+-- The timeout function returns true only if <seconds> have elapsed
+-- since it was created.
+function timeout (seconds)
+   local deadline = engine.now() + seconds
+   return function () return engine.now() > deadline end
+end
+
 -- Loop until the function `condition` returns true.
 function waitfor (condition)
    while not condition() do C.usleep(100) end
