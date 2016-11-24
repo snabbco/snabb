@@ -63,11 +63,15 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
+-- True when the engine is running the breathe loop.
+local running = false
+
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
 monotonic_now = false
 function now ()
-   return monotonic_now or C.get_monotonic_time()
+   -- Return cached time only if it is fresh
+   return (running and monotonic_now) or C.get_monotonic_time()
 end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
@@ -259,7 +263,7 @@ function main (options)
    local no_timers = options.no_timers
    if options.duration then
       assert(not done, "You can not have both 'duration' and 'done'")
-      done = lib.timer(options.duration * 1e9)
+      done = lib.timeout(options.duration)
    end
 
    local breathe = breathe
@@ -306,6 +310,7 @@ function pace_breathing ()
 end
 
 function breathe ()
+   running = true
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
@@ -343,6 +348,7 @@ function breathe ()
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
+   running = false
 end
 
 function report (options)
