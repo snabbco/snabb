@@ -82,6 +82,8 @@ function convert_path(grammar, path)
       return assert(handlers[grammar.type], grammar.type)(grammar, fragment)
    end
 
+   if path == "/" then return {} end
+
    local ret = {}
    local node = grammar
    if path:sub(1, 1) == "/" then path = path:sub(2) end -- remove leading /

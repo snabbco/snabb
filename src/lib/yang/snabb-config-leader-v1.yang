@@ -53,6 +53,9 @@ module snabb-config-leader-v1 {
       leaf schema { type string; mandatory true; }
       leaf revision { type string; }
       leaf path { type string; mandatory true; }
+    }
+  }
+
   rpc get-state {
     input {
       leaf schema { type string; mandatory true; }

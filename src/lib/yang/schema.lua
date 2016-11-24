@@ -571,6 +571,7 @@ local primitive_types = set(
 -- Resolve if-feature.
 -- Warn on any "when", resolving them as being true.
 -- Resolve all augment and refine nodes. (TODO)
+-- Inherits config attributes from parents
 function resolve(schema, features)
    local function shallow_copy(node)
       local out = {}
@@ -682,6 +683,12 @@ function resolve(schema, features)
             return nil, env
          end
       end
+      -- Inherit config attribute from parent unless we have it set.
+      if node.config == nil then
+         node.config = env.env.config
+      end
+      env.config = node.config
+
       if node.type then
          node.type = visit_type(node.type, env)
          if not node.primitive_type then
@@ -700,7 +707,10 @@ function resolve(schema, features)
                   node.body[k] = v
                end
                -- TODO: Handle refine and augment statements.
-            else
+            end
+         end
+         for k,v in pairs(node.body or {}) do
+            if v.kind ~= "uses" then
                node.body[k] = visit(v, env)
             end
          end

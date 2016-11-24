@@ -430,7 +430,10 @@ function Leader:rpc_attach_listener (args)
 end
 
 function Leader:rpc_get_state (args)
-    return {state=state.show_state(S.getpid(), args.path)}
+   assert(args.schema == self.schema_name)
+   local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
+   local state = state.show_state(self.schema_name, S.getpid(), args.path)
+   return {state=printer(state, yang.string_output_file())}
 end
 
 function Leader:handle (payload)
