@@ -259,7 +259,7 @@ function timer (duration, mode, timefun)
    end
    local function repeating ()
       if timefun() >= deadline then
-         deadline = deadline + duration
+         deadline = timefun() + duration
          return true
       else return false end
    end
