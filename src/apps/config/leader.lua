@@ -176,7 +176,7 @@ local function path_setter_for_grammar(grammar, path)
       local key = path_mod.prepare_table_lookup(grammar.keys,
                                                 grammar.key_ctype, query)
       if grammar.string_key then
-         key = key[normalize_id(grammar.string_key)]
+         key = key[data.normalize_id(grammar.string_key)]
          return function(config, subconfig)
             local tab = getter(config)
             assert(tab[key] ~= nil)
@@ -335,7 +335,7 @@ local function path_remover_for_grammar(grammar, path)
       local key = path_mod.prepare_table_lookup(grammar.keys,
                                                 grammar.key_ctype, query)
       if grammar.string_key then
-         key = key[normalize_id(grammar.string_key)]
+         key = key[data.normalize_id(grammar.string_key)]
          return function(config)
             local tab = getter(config)
             assert(tab[key] ~= nil)
@@ -392,6 +392,9 @@ function Leader:update_configuration (schema_name, update_fn, verb, path, ...)
 end
 
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
+   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
+      error('Attempt to modify configuration while listener attached')
+   end
    assert(args.schema == self.schema_name)
    local path = path_mod.normalize_path(args.path)
    local parser = path_parser_for_schema_by_name(args.schema, path)
@@ -415,6 +418,13 @@ function Leader:rpc_remove_config (args)
    self:update_configuration(args.schema,
                              compute_remove_config_fn(args.schema, path),
                              'remove', path)
+   return {}
+end
+
+function Leader:rpc_attach_listener (args)
+   assert(args.schema == self.schema_name)
+   if self.listen_peer ~= nil then error('Listener already attached') end
+   self.listen_peer = self.rpc_peer
    return {}
 end
 
@@ -454,6 +464,13 @@ function Leader:handle_calls_from_peers()
                peer.state = 'error'
                peer.msg = 'length too long: '..peer.len
             end
+         elseif ch == '' then
+            if peer.len == 0 then
+               peer.state = 'done'
+            else
+               peer.state = 'error'
+               peer.msg = 'unexpected EOF'
+            end
          else
             peer.state = 'error'
             peer.msg = 'unexpected character: '..ch
@@ -482,8 +499,10 @@ function Leader:handle_calls_from_peers()
       end
       while peer.state == 'ready' do
          -- Uncomment to get backtraces.
+         self.rpc_peer = peer
          -- local success, reply = true, self:handle(peer.payload)
          local success, reply = pcall(self.handle, self, peer.payload)
+         self.rpc_peer = nil
          peer.payload = nil
          if success then
             assert(type(reply) == 'string')
@@ -499,8 +518,9 @@ function Leader:handle_calls_from_peers()
       end
       while peer.state == 'reply' do
          if peer.pos == peer.len then
-            peer.state = 'done'
-            peer.buf, peer.len = nil, nil
+            peer.state = 'length'
+            peer.buf, peer.pos = nil, nil
+            peer.len = 0
          else
             local count, err = peer.fd:write(peer.buf + peer.pos,
                                              peer.len - peer.pos)
@@ -517,13 +537,11 @@ function Leader:handle_calls_from_peers()
             end
          end
       end
-      if peer.state == 'done' then
+      if peer.state == 'done' or peer.state == 'error' then
+         if peer.state == 'error' then print('error: '..peer.msg) end
          peer.fd:close()
          table.remove(peers, i)
-      elseif peer.state == 'error' then
-         print('error: '..peer.msg)
-         peer.fd:close()
-         table.remove(peers, i)
+         if self.listen_peer == peer then self.listen_peer = nil end
       else
          i = i + 1
       end

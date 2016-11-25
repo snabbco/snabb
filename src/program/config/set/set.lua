@@ -11,7 +11,7 @@ function run(args)
       { schema = args.schema_name, revision = args.revision_date,
         path = args.path,
         config = common.serialize_config(
-           args.value, args.schema_name, args.path, 'set') })
+           args.value, args.schema_name, args.path) })
    -- The reply is empty.
    main.exit(0)
 end

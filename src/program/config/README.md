@@ -1,11 +1,11 @@
 # Data-plane configuration
 
-Would be nice if you could update a Snabb program's configuration
-while it's running, wouldn't it?  Well never fear, `snabb config` is
-here.  Provided the data-plane author enabled this feature on their
-side, users can run `snabb config` commands to query state or
-configuration, provide a new configuration, or incrementally update
-the existing configuration of a Snabb instance.
+Wouldn't it be nice if you could update a Snabb program's configuration
+while it's running?  Well never fear, `snabb config` is here.  Provided
+the data-plane author enabled this feature on their side, users can run
+`snabb config` commands to query state or configuration, provide a new
+configuration, or incrementally update the existing configuration of a
+Snabb instance.
 
 ## `snabb config`
 
@@ -59,7 +59,7 @@ PIDs.
 Let's imagine that the configuration for the Snabb instance in
 question is modelled by the following YANG schema:
 
-```
+```yang
 module snabb-simple-router {
   namespace snabb:simple-router;
   prefix simple-router;
@@ -67,6 +67,8 @@ module snabb-simple-router {
   import ietf-inet-types {prefix inet;}
 
   leaf active { type boolean; default true; }
+
+  leaf-list public-ip { type inet:ipv4-address; }
 
   container routes {
     presence true;
@@ -88,12 +90,14 @@ The configuration for a Snabb instance can be expressed in a text
 format that is derived from the schema.  In this case it could look
 like:
 
-```
+```yang
 active true;
 routes {
   route { addr 1.2.3.4; port 1; }
   route { addr 2.3.4.5; port 2; }
 }
+public-ip 10.10.10.10;
+public-ip 10.10.10.11;
 ```
 
 The surface syntax of data is the same as for YANG schemas; you can
@@ -103,8 +107,8 @@ and the YANG schema quoting rules for strings apply.
 Note that containers like `route {}` only appear in the data syntax if
 they are marked as `presence true;` in the schema.
 
-So indeed, `snabb config get ID /`
-might print out just the output given above.
+So indeed, `snabb config get ID /` might print out just the output given
+above.
 
 Users can limit their query to a particular subtree via passing a
 different `PATH`.  For example, with the same configuration, we can
@@ -121,14 +125,11 @@ the schema, so the path components should reflect the data.
 
 A `list` is how YANG represents associations between keys and values.
 To query an element of a `list` item, use an XPath selector; for
-example, to get the entry for IPv4 `1.2.3.4`, do:
+example, to get the value associated with the key `1.2.3.4`, do:
 
 ```
 $ snabb config get ID /routes/route[addr=1.2.3.4]
-route {
-  addr 1.2.3.4;
-  port 1;
-}
+port 1;
 ```
 
 Or to just get the port:
@@ -142,6 +143,70 @@ Likewise, to change the port for `1.2.3.4`, do:
 
 ```
 $ snabb config set ID /routes/route[addr=1.2.3.4]/port 7
+```
+
+The general rule for paths and value syntax is that if a name appears in
+the path, it won't appear in the value.  Mostly this works as you would
+expect, but there are a couple of edge cases for instances of `list` and
+`leaf-list` nodes.  For example:
+
+```
+$ snabb config get ID /routes/route[addr=1.2.3.4]/port
+1
+$ snabb config get ID /routes/route[addr=1.2.3.4]
+port 1;
+$ snabb config get ID /routes/route
+{
+  addr 1.2.3.4;
+  port 1;
+}
+{
+  addr 2.3.4.5;
+  port 2;
+}
+$ snabb config get ID /routes
+route {
+  addr 1.2.3.4;
+  port 1;
+}
+route {
+  addr 2.3.4.5;
+  port 2;
+}
+```
+
+Note the case when getting the `list` `/routes/route`:  the syntax is a
+sequence of brace-delimited entries.
+
+To select an entry from a `leaf-list`, use the `position()` selector:
+
+```
+$ snabb config get ID /public-ip[position()=1]
+10.10.10.10
+$ snabb config get ID /public-ip[position()=2]
+10.10.10.11
+```
+
+As you can see, the indexes are 1-based.  The syntax when getting or
+setting a `leaf-list` directly by path is similar to the `list` case:  a
+sequence of whitespace-delimited bare values.
+
+```
+$ snabb config get ID /public-ip
+10.10.10.10
+10.10.10.11
+$ snabb config set ID /public-ip "12.12.12.12 13.13.13.13"
+$ snabb config get ID /public-ip
+12.12.12.12
+13.13.13.13
+$ snabb config get ID /
+active true;
+routes {
+  route { addr 1.2.3.4; port 1; }
+  route { addr 2.3.4.5; port 2; }
+}
+public-ip 12.12.12.12;
+public-ip 13.13.13.13;
 ```
 
 Values can be large, so it's also possible to take them from `stdin`.
@@ -172,8 +237,8 @@ $ snabb config remove ID /routes/route[addr=1.2.3.4]
 One can of course augment a configuration as well:
 
 ```
-$ snabb config add ID /routes
-route {
+$ snabb config add ID /routes/route
+{
   addr 4.5.6.7;
   port 11;
 }
@@ -181,9 +246,15 @@ route {
 
 ### Machine interface
 
-The `listen` interface will support all of these operations with a
-simple JSON protocol. Each request will be one JSON object with the
-following properties:
+The `listen` interface supports all of these operations with a simple
+JSON protocol.  `snabb config listen` reads JSON objects from `stdin`,
+parses them, relays their action to the data plane, and writes responses
+out to `stdout`.  The requests are be processed in order, but
+asynchronously; `snabb config listen` doesn't wait for a response from
+the data plane before processing the next request.  In this way, a
+NETCONF agent can pipeline a number of requests.
+
+Each request is a JSON object with the following properties:
 
 - `id`: A request identifier; a string.  Not used by `snabb config
   listen`; just a convenience for the other side.
@@ -199,7 +270,8 @@ following properties:
   encoded as a string in the same syntax that the `snabb config set`
   accepts.
 
-Each response from the server will also be one JSON object, with the following properties:
+Each response from the server is also one JSON object, with the
+following properties:
 
 - `id`: The identifier corresponding to the request.  A string.
 
@@ -218,7 +290,7 @@ $ snabb config listen -s snabb-simple-router ID
 { "id": "0", "verb": "get", "path": "/routes/route[addr=1.2.3.4]/port" }
 { "id": "1", "verb": "get", "path": "/routes/route[addr=2.3.4.5]/port" }
 { "id": "0", "status": "ok", "value: "1" }
-{ "id": "1}, "status": "ok", "value: "2" }
+{ "id": "1", "status": "ok", "value: "2" }
 ```
 
 The above transcript indicates that requests may be pipelined: the
@@ -227,10 +299,10 @@ waiting for responses. (For clarity, the first two JSON objects in the
 above transcript were entered by the user, in the console in this
 case; the second two are printed out by `snabb config` in response.)
 
-The `snabb config listen` program will acquire exclusive write access
-to the data plane, preventing other `snabb config` invocations from
-modifying the configuration.  In this way there is no need to provide
-for notifications of changes made by other configuration clients.
+The `snabb config listen` program acquires exclusive write access to the
+data plane, preventing other `snabb config` invocations from modifying
+the configuration.  In this way there is no need to provide for
+notifications of changes made by other configuration clients.
 
 ### Multiple schemas
 

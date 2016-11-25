@@ -9,8 +9,7 @@ function run(args)
    local response = common.call_leader(
       args.instance_id, 'set-config',
       { schema = args.schema_name, revision = args.revision_date,
-        config = common.serialize_config(args.config, args.schema_name,
-                                         'load') })
+        config = common.serialize_config(args.config, args.schema_name) })
    -- The reply is empty.
    main.exit(0)
 end

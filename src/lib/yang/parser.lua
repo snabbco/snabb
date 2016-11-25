@@ -119,12 +119,13 @@ function Parser:skip_whitespace()
    -- Skip comments, which start with # and continue to the end of line.
    while self:check('/') do
       result = true
-      if self:check("*") then self:skip_c_comment()
+      if self:check("*") then
+         self:skip_c_comment()
       else
 	 self:consume("/")
 	 self:take_while('[^\n]')
-	 self:take_while('%s')
       end
+      self:take_while('%s')
    end
    return result
 end
@@ -392,6 +393,7 @@ function selftest()
    test_module("type;", {{keyword="type"}})
    test_module("type string;", {{keyword="type", argument="string"}})
    test_module("/** **/", {})
+   test_module("  /** **/  ", {})
    test_module("// foo bar;", {})
    test_module("// foo bar;\nleaf port;", {{keyword="leaf", argument="port"}})
    test_module("type/** hellooo */string;", {{keyword="type", argument="string"}})

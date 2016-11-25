@@ -55,4 +55,11 @@ module snabb-config-leader-v1 {
       leaf path { type string; mandatory true; }
     }
   }
+
+  rpc attach-listener {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+    }
+  }
 }
