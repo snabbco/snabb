@@ -31,7 +31,7 @@ local function path_grammar(schema_name, path)
    return subgrammar
 end
 
-local function data_parser(schema_name, path, command)
+function data_parser(schema_name, path)
    return data.data_parser_from_grammar(path_grammar(schema_name, path))
 end
 
@@ -67,7 +67,7 @@ function parse_command_line(args, opts)
       ret.path = table.remove(args, 1)
    end
    if opts.with_value then
-      local parser = data_parser(ret.schema_name, ret.path, opts.command)
+      local parser = data_parser(ret.schema_name, ret.path)
       if #args == 0 then
          ret.value_str = io.stdin:read('*a')
       else
@@ -94,7 +94,7 @@ function open_socket_or_die(instance_id)
    return socket
 end
 
-function serialize_config(config, schema_name, path, command)
+function serialize_config(config, schema_name, path)
    local grammar = path_grammar(schema_name, path)
    local printer = data.data_printer_from_grammar(grammar)
    return printer(config, yang.string_output_file())

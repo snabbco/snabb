@@ -198,6 +198,12 @@ local function write_json_object(output, obj)
    output:write('}')
 end
 
+local function validate_value(schema_name, revision_date, path, value_str)
+   local parser = common.data_parser(schema_name, path)
+   local value = parser(value_str)
+   return common.serialize_config(value, schema_name, path)
+end
+
 local request_handlers = {}
 function request_handlers.get(schema_name, revision_date, path)
    return {method='get-config',
@@ -208,16 +214,20 @@ function request_handlers.get_state(schema_name, revision_date, path)
            args={schema=schema_name, revision=revision_date, path=path}}
 end
 function request_handlers.set(schema_name, revision_date, path, value)
+   assert(value ~= nil)
+   local config = validate_value(schema_name, revision_date, path, value)
    return {method='set-config',
            args={schema=schema_name, revision=revision_date, path=path,
-                 config=value}}
+                 config=config}}
 end
 function request_handlers.add(schema_name, revision_date, path, value)
+   assert(value ~= nil)
+   local config = validate_value(schema_name, revision_date, path, value)
    return {method='add-config',
            args={schema=schema_name, revision=revision_date, path=path,
-                 config=value}}
+                 config=config}}
 end
-function request_handlers.remove(schema_name, revision_date, path, value)
+function request_handlers.remove(schema_name, revision_date, path)
    return {method='remove-config',
            args={schema=schema_name, revision=revision_date, path=path}}
 end
