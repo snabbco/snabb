@@ -138,13 +138,13 @@ end
 -- an error.
 function claim_name(name)
    configuration[name] = name
-   local bynameidr = "by-name/"
+   local bynamedir = "by-name/"
    local namedir_fq = named_program_root .. "/" .. name
    local piddir = shm.root .. "/" .. S.getpid()
    local backlinkdir = piddir.."/name"
 
    -- Verify that the by-name directory exists.
-   shm.mkdir(bynameidr)
+   shm.mkdir(bynamedir)
 
    -- Verify that we've not already claimed a name
    assert(configuration.name == nil, "Name already claimed, cannot claim: "..name)
