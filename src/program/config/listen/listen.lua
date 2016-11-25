@@ -246,11 +246,18 @@ local function read_request(client, schema_name, revision_date)
    return req, print_reply
 end
 
+local function attach_listener(leader, caller, schema_name, revision_date)
+   local msg, parse_reply = rpc.prepare_call(
+      caller, 'attach-listener', {schema=schema_name, revision=revision_date})
+   common.send_message(leader, msg)
+   return parse_reply(common.recv_message(leader))
+end
+
 function run(args)
    args = common.parse_command_line(args, { command='listen' })
    local caller = rpc.prepare_caller('snabb-config-leader-v1')
    local leader = common.open_socket_or_die(args.instance_id)
-   -- acquire leadership
+   attach_listener(leader, caller, args.schema_name, args.revision_date)
    local client = buffered_input_from_fd(0) -- stdin
    local pollfds = S.types.t.pollfds({
          {fd=leader, events="in"},

@@ -392,6 +392,9 @@ function Leader:update_configuration (schema_name, update_fn, verb, path, ...)
 end
 
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
+   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
+      error('Attempt to modify configuration while listener attached')
+   end
    assert(args.schema == self.schema_name)
    local path = path_mod.normalize_path(args.path)
    local parser = path_parser_for_schema_by_name(args.schema, path)
@@ -415,6 +418,13 @@ function Leader:rpc_remove_config (args)
    self:update_configuration(args.schema,
                              compute_remove_config_fn(args.schema, path),
                              'remove', path)
+   return {}
+end
+
+function Leader:rpc_attach_listener (args)
+   assert(args.schema == self.schema_name)
+   if self.listen_peer ~= nil then error('Listener already attached') end
+   self.listen_peer = self.rpc_peer
    return {}
 end
 
@@ -489,8 +499,10 @@ function Leader:handle_calls_from_peers()
       end
       while peer.state == 'ready' do
          -- Uncomment to get backtraces.
+         self.rpc_peer = peer
          -- local success, reply = true, self:handle(peer.payload)
          local success, reply = pcall(self.handle, self, peer.payload)
+         self.rpc_peer = nil
          peer.payload = nil
          if success then
             assert(type(reply) == 'string')
@@ -525,13 +537,11 @@ function Leader:handle_calls_from_peers()
             end
          end
       end
-      if peer.state == 'done' then
+      if peer.state == 'done' or peer.state == 'error' then
+         if peer.state == 'error' then print('error: '..peer.msg) end
          peer.fd:close()
          table.remove(peers, i)
-      elseif peer.state == 'error' then
-         print('error: '..peer.msg)
-         peer.fd:close()
-         table.remove(peers, i)
+         if self.listen_peer == peer then self.listen_peer = nil end
       else
          i = i + 1
       end
