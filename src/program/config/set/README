@@ -1,15 +1,16 @@
-Usage:
-  snabb config set [OPTIONS] ID PATH [VALUE]
+Usage: snabb config set [OPTION]... ID PATH [VALUE]
+Update the configuration for a Snabb network function.
 
 Available options:
-  -s SCHEMA
-  --schema SCHEMA
-  --schema-name SCHEMA
+  -s, --schema SCHEMA        YANG data interface to request.
+  -r, --revision REVISION    Require a specific revision of the YANG module.
+  -h, --help                 Display this message.
 
-  -r REVISION
-  --revision REVISION
-  --revision-date REVISION
+If the --schema argument is not provided, "snabb config" will ask the
+data plane for its native schema.
 
-  -h
-  --help
+If VALUE is not given on the command line, it will be read from standard
+input.
 
+See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
+for full documentation.
