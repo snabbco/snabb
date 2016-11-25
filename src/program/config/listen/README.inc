@@ -1,15 +1,1 @@
-Usage:
-  snabb config listen [OPTIONS] ID
-
-Available options:
-  -s SCHEMA
-  --schema SCHEMA
-  --schema-name SCHEMA
-
-  -r REVISION
-  --revision REVISION
-  --revision-date REVISION
-
-  -h
-  --help
-
+README
