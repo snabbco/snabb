@@ -241,7 +241,7 @@ local function read_request(client, schema_name, revision_date)
    local function print_reply(reply)
       local output = buffered_output()
       write_json_object(output, {id=id, status='ok', value=reply.config})
-      output:flush_to_fd(client:getfd())
+      output:flush_to_fd(1) -- stdout
    end
    return req, print_reply
 end
