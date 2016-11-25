@@ -4,7 +4,6 @@ module(..., package.seeall)
 local S = require("syscall")
 local ffi = require("ffi")
 local rpc = require("lib.yang.rpc")
-local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local path_lib = require("lib.yang.path")
 local common = require("program.config.common")
@@ -50,7 +49,7 @@ end
 local function take_while(input, pat)
    local out = {}
    while input:peek() and input:peek():match(pat) do
-      table.insert(out, input.peek())
+      table.insert(out, input:peek())
       input:discard()
    end
    return table.concat(out)
@@ -315,4 +314,43 @@ function run(args)
          end
       end
    end
+end
+
+function selftest ()
+   print('selftest: program.config.listen.listen')
+   local equal = require('core.lib').equal
+   local function test_json(str, obj)
+      local tmp = os.tmpname()
+      local f = io.open(tmp, 'w')
+      f:write(str)
+      f:write(" ") -- whitespace sentinel on the end.
+      f:close()
+      for i = 1,2 do
+         local fd = S.open(tmp, 'rdonly')
+         local input = buffered_input_from_fd(fd)
+         local parsed = read_json_object(input)
+         assert(equal(parsed, obj))
+         assert(not input:eof())
+         assert(check(input, " "))
+         assert(not input:peek())
+         assert(input:eof())
+         fd:close()
+
+         local fd = assert(S.open(tmp, 'wronly, trunc'))
+         local output = buffered_output()
+         write_json_object(output, parsed)
+         output:write(' ') -- sentinel
+         output:flush_to_fd(fd)
+         fd:close()
+      end
+      os.remove(tmp)
+   end
+   test_json('{}', {})
+   test_json('{"foo":"bar"}', {foo='bar'})
+   test_json('{"foo":"bar","baz":"qux"}', {foo='bar', baz='qux'})
+   test_json('{ "foo" : "bar" , "baz" : "qux" }',
+             {foo='bar', baz='qux'})
+   test_json('{ "fo\\u000ao" : "ba\\r " , "baz" : "qux" }',
+             {['fo\no']='ba\r ', baz='qux'})
+   print('selftest: ok')
 end
