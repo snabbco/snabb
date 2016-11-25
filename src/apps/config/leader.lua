@@ -454,6 +454,13 @@ function Leader:handle_calls_from_peers()
                peer.state = 'error'
                peer.msg = 'length too long: '..peer.len
             end
+         elseif ch == '' then
+            if peer.len == 0 then
+               peer.state = 'done'
+            else
+               peer.state = 'error'
+               peer.msg = 'unexpected EOF'
+            end
          else
             peer.state = 'error'
             peer.msg = 'unexpected character: '..ch
@@ -499,8 +506,9 @@ function Leader:handle_calls_from_peers()
       end
       while peer.state == 'reply' do
          if peer.pos == peer.len then
-            peer.state = 'done'
-            peer.buf, peer.len = nil, nil
+            peer.state = 'length'
+            peer.buf, peer.pos = nil, nil
+            peer.len = 0
          else
             local count, err = peer.fd:write(peer.buf + peer.pos,
                                              peer.len - peer.pos)
