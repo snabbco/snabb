@@ -67,7 +67,7 @@ Snabb [textual data format for YANG data](../../lib/yang/README.md).
 For example the `snabb-config-leader-v1` schema supports a
 `get-config` RPC defined like this in the schema:
 
-```
+```yang
 rpc get-config {
   input {
     leaf schema { type string; mandatory true; }
@@ -82,7 +82,7 @@ rpc get-config {
 
 A request to this RPC might look like:
 
-```
+```yang
 get-config {
   schema snabb-softwire-v1;
   path "/foo";
@@ -92,7 +92,7 @@ get-config {
 As you can see, non-mandatory inputs can be left out.  A response
 might look like:
 
-```
+```yang
 get-config {
   config "blah blah blah";
 }

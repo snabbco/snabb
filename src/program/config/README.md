@@ -59,7 +59,7 @@ PIDs.
 Let's imagine that the configuration for the Snabb instance in
 question is modelled by the following YANG schema:
 
-```
+```yang
 module snabb-simple-router {
   namespace snabb:simple-router;
   prefix simple-router;
@@ -90,7 +90,7 @@ The configuration for a Snabb instance can be expressed in a text
 format that is derived from the schema.  In this case it could look
 like:
 
-```
+```yang
 active true;
 routes {
   route { addr 1.2.3.4; port 1; }
