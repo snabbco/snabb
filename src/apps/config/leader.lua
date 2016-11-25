@@ -176,7 +176,7 @@ local function path_setter_for_grammar(grammar, path)
       local key = path_mod.prepare_table_lookup(grammar.keys,
                                                 grammar.key_ctype, query)
       if grammar.string_key then
-         key = key[normalize_id(grammar.string_key)]
+         key = key[data.normalize_id(grammar.string_key)]
          return function(config, subconfig)
             local tab = getter(config)
             assert(tab[key] ~= nil)
@@ -335,7 +335,7 @@ local function path_remover_for_grammar(grammar, path)
       local key = path_mod.prepare_table_lookup(grammar.keys,
                                                 grammar.key_ctype, query)
       if grammar.string_key then
-         key = key[normalize_id(grammar.string_key)]
+         key = key[data.normalize_id(grammar.string_key)]
          return function(config)
             local tab = getter(config)
             assert(tab[key] ~= nil)
