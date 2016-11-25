@@ -710,9 +710,7 @@ function resolve(schema, features)
             end
          end
          for k,v in pairs(node.body or {}) do
-            if v.kind ~= "uses" then
-               node.body[k] = visit(v, env)
-            end
+            node.body[k] = visit(v, env)
          end
       end
       return node, env
