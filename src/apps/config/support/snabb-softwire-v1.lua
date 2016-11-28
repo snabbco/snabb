@@ -2,7 +2,6 @@
 module(..., package.seeall)
 local ffi = require('ffi')
 local app = require('core.app')
-local lib = require('core.lib')
 local data = require('lib.yang.data')
 local yang = require('lib.yang.yang')
 local path_mod = require('lib.yang.path')
