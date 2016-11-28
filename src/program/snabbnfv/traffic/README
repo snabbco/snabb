@@ -43,8 +43,8 @@ CONFIG FILE FORMAT:
                 egress_filter  = <rules>,       -- ..
                 tunnel         = <tunnel-conf>,
                 crypto         = <crypto-conf>,
-                rx_police_gbps = <n>,           -- Allowed input rate in Gbps
-                tx_police_gbps = <n> }          -- Allowed output rate in Gbps
+                rx_police      = <n>,           -- Allowed input rate in Gbps
+                tx_police      = <n> }          -- Allowed output rate in Gbps
 
   The tunnel section deviates a little from SimpleKeyedTunnel's
   terminology:
@@ -59,7 +59,6 @@ CONFIG FILE FORMAT:
 
   The crypto section allows configuration of traffic encryption based on
   apps.ipsec.esp:
-
 
       crypto := { type          = "esp-aes-128-gcm", -- The only type (for now)
                   spi           = <spi>,             -- As for AES128gcm

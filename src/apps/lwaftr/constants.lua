@@ -18,6 +18,7 @@ ethertype_ipv6 = 0x86DD
 
 n_ethertype_ipv4 = C.htons(0x0800)
 n_ethertype_ipv6 = C.htons(0x86DD)
+n_ethertype_arp = C.htons(0x0806)
 
 -- ICMPv4 types
 icmpv4_echo_reply = 0

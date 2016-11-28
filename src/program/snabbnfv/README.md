@@ -51,8 +51,8 @@ port := { port_id        = <id>,          -- A unique string
           egress_filter  = <filter>,       -- ..
           tunnel         = <tunnel-conf>,
           crypto         = <crypto-conf>,
-          rx_police_gbps = <n>,           -- Allowed input rate in Gbps
-          tx_police_gbps = <n> }          -- Allowed output rate in Gbps
+          rx_police      = <n>,           -- Allowed input rate in Gbps
+          tx_police      = <n> }          -- Allowed output rate in Gbps
 ```
 
 The `tunnel` section deviates a little from `SimpleKeyedTunnel`'s

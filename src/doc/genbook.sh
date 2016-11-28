@@ -48,13 +48,23 @@ $(cat $mdroot/apps/ipv6/README.md)
 
 $(cat $mdroot/apps/vhost/README.md)
 
+$(cat $mdroot/apps/virtio_net/README.md)
+
 $(cat $mdroot/apps/pcap/README.md)
 
 $(cat $mdroot/apps/vpn/README.md)
 
 $(cat $mdroot/apps/socket/README.md)
 
+$(cat $mdroot/apps/tap/README.md)
+
+$(cat $mdroot/apps/vlan/README.md)
+
+$(cat $mdroot/apps/bridge/README.md)
+
 $(cat $mdroot/apps/ipsec/README.md)
+
+$(cat $mdroot/apps/test/README.md)
 
 # Libraries
 

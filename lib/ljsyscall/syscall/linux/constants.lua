@@ -3149,6 +3149,23 @@ c.IPT_SO_GET = strflag {
   REVISION_TARGET      = IPT_BASE_CTL + 3,
 }
 
+c.MPOL_MODE = multiflags {
+  DEFAULT = 0,
+  PREFERRED = 1,
+  BIND = 2,
+  INTERLEAVE = 3,
+  LOCAL = 4,
+  -- TODO: Only the following two flags can be ORed.
+  STATIC_NODES     = 0x80000000,
+  RELATIVE_NODES   = 0x40000000,
+}
+
+c.MPOL_FLAG = multiflags {
+  NODE	           = 1,
+  ADDR	           = 2,
+  MEMS_ALLOWED     = 4
+}
+
 c.SCHED = multiflags {
   NORMAL           = 0,
   OTHER            = 0,

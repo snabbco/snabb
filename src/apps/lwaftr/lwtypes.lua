@@ -65,3 +65,9 @@ struct {
 ]]
 udp_header_ptr_type = ffi.typeof("$*", udp_header_t)
 udp_header_size = ffi.sizeof(udp_header_t)
+
+lwaftr_id_type = ffi.typeof[[
+struct {
+  char value[256];
+}
+]]
