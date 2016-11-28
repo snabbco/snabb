@@ -4,7 +4,7 @@
 
 A release to finish "snabb config" features.
 
- * New "snabb config" commands "get-stat", "add", "remove", and
+ * New "snabb config" commands "get-state", "add", "remove", and
    "listen".  See [the `snabb config` documentation](../../config/README.md)
    for full details.
 
