@@ -576,13 +576,12 @@ local function inherit_config(schema, config)
       assert(not config or schema.config == false)
       config = schema.config
    elseif config ~= nil then
-      schema = shallow_copy(schema)
       schema.config = config
    end
 
    if schema.body then
       for name, node in pairs(schema.body) do
-         schema.body[name] = inherit_config(node, config)
+         schema.body[name] = inherit_config(shallow_copy(node), config)
       end
    end
 
