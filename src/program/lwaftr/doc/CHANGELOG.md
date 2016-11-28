@@ -4,13 +4,13 @@
 
 A release to finish "snabb config" features.
 
- * New "snabb config" commands "add", "remove", and "listen".  See [the
-   `snabb config` documentation](../../config/README.md) for full
-   details.
+ * New "snabb config" commands "get-stat", "add", "remove", and
+   "listen".  See [the `snabb config` documentation](../../config/README.md)
+   for full details.
 
- * The "get", "set", "add", and "remove" "snabb config" commands can now
-   take paths to indicate sub-configurations on which to operate.  This
-   was documented before but not yet implemented.
+ * The "get-state", "get", "set", "add", and "remove" "snabb config"
+   commands can now take paths to indicate sub-configurations on which
+   to operate.  This was documented before but not yet implemented.
 
 ## [3.0.0] - 2016-11-18
 
