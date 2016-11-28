@@ -40,6 +40,19 @@ local function open_socket (file)
    return socket
 end
 
+local generic_schema_config_support = {
+   compute_config_actions = function(old_graph, new_graph, verb, path, ...)
+      return app.compute_config_actions(old_graph, new_graph)
+   end
+}
+
+local function load_schema_config_support(schema_name)
+   local mod_name = 'apps.config.support.'..schema_name:gsub('-', '_')
+   local success, support_mod = pcall(require, mod_name)
+   if success then return support_mod.get_config_support() end
+   return generic_schema_config_support
+end
+
 function Leader:new (conf)
    local ret = setmetatable({}, {__index=Leader})
    ret.socket_file_name = conf.socket_file_name
@@ -48,6 +61,7 @@ function Leader:new (conf)
       ret.socket_file_name = instance_dir..'/'..ret.socket_file_name
    end
    ret.schema_name = conf.schema_name
+   ret.support = load_schema_config_support(conf.schema_name)
    ret.socket = open_socket(ret.socket_file_name)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
@@ -68,8 +82,8 @@ end
 
 function Leader:reset_configuration (configuration)
    local new_app_graph = self.setup_fn(configuration)
-   local actions = app.compute_config_actions(self.current_app_graph,
-                                              new_app_graph)
+   local actions = self.support.compute_config_actions(
+      self.current_app_graph, new_app_graph, 'load')
    self:enqueue_config_actions(actions)
    self.current_app_graph = new_app_graph
    self.current_configuration = configuration
@@ -119,16 +133,6 @@ function Leader:rpc_get_config (args)
    local printer = path_printer_for_schema_by_name(args.schema, args.path)
    local config = printer(self.current_configuration, yang.string_output_file())
    return { config = config }
-end
-
-local generic_schema_support = {
-   compute_config_actions = function(old_graph, new_graph, verb, path, ...)
-      return app.compute_config_actions(old_graph, new_graph)
-   end
-}
-
-local function load_schema_support(schema_name)
-   return generic_schema_support
 end
 
 local function path_parser_for_grammar(grammar, path)
@@ -254,7 +258,7 @@ local function path_adder_for_grammar(grammar, path)
             local ctab = getter(config)
             for entry in subconfig:iterate() do
                if ctab:lookup_ptr(entry.key) ~= nil then
-                  error('already-existing entry', entry.key)
+                  error('already-existing entry')
                end
             end
             for entry in subconfig:iterate() do
@@ -384,8 +388,7 @@ function Leader:update_configuration (schema_name, update_fn, verb, path, ...)
    assert(schema_name == self.schema_name)
    local new_config = update_fn(self.current_configuration, ...)
    local new_app_graph = self.setup_fn(new_config)
-   local support = load_schema_support(schema_name)
-   local actions = support.compute_config_actions(
+   local actions = self.support.compute_config_actions(
       self.current_app_graph, new_app_graph, verb, path, ...)
    self:enqueue_config_actions(actions)
    self.current_app_graph = new_app_graph

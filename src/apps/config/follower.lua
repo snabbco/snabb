@@ -33,7 +33,14 @@ function Follower:handle_actions_from_leader()
       local buf, len = channel:peek_message()
       if not buf then break end
       local action = action_codec.decode(buf, len)
-      app.apply_config_actions({action})
+      local name, args = unpack(action)
+      if name == 'call_app_method_with_blob' then
+         local callee, method, blob = unpack(args)
+         local obj = assert(app.app_table[callee])
+         assert(obj[method])(obj, blob)
+      else
+         app.apply_config_actions({action})
+      end
       channel:discard_message(len)
       if action[1] == 'start_app' or action[1] == 'reconfig_app' then
          should_flush = true
