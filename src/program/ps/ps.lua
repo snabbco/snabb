@@ -8,7 +8,7 @@ local shm = require("core.shm")
 
 local function usage (code)
    local f = code == 0 and io.stdout or io.stderr
-   f:write(require("program.top.README_inc"))
+   f:write(require("program.ps.README_inc"))
    main.exit(code)
 end
 
@@ -32,6 +32,7 @@ local function compute_snabb_instances()
 end
 
 function run (args)
+   parse_args (args)
    local instances = compute_snabb_instances()
    for _, instance in ipairs(instances) do print(instance) end
    main.exit(0)
