@@ -7,7 +7,6 @@ Usage:
   snabb lwaftr generate-binding-table
   snabb lwaftr control
   snabb lwaftr loadtest
-  snabb lwaftr generator
   snabb lwaftr query
 
 Use --help for per-command usage.
