@@ -257,7 +257,7 @@ local function path_adder_for_grammar(grammar, path)
             local ctab = getter(config)
             for entry in subconfig:iterate() do
                if ctab:lookup_ptr(entry.key) ~= nil then
-                  error('already-existing entry', entry.key)
+                  error('already-existing entry')
                end
             end
             for entry in subconfig:iterate() do

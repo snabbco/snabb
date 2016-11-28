@@ -149,6 +149,20 @@ function BindingTable.new(psid_map, br_addresses, softwires)
    return setmetatable(ret, {__index=BindingTable})
 end
 
+function BindingTable:add_softwire_entry(entry_blob)
+   local entry = self.softwires.entry_type()
+   assert(ffi.sizeof(entry) == ffi.sizeof(entry_blob))
+   ffi.copy(entry, entry_blob, ffi.sizeof(entry_blob))
+   self.softwires:add(entry.key, entry.value)
+end
+
+function BindingTable:remove_softwire_entry(entry_key_blob)
+   local entry = self.softwires.entry_type()
+   assert(ffi.sizeof(entry.key) == ffi.sizeof(entry_key_blob))
+   ffi.copy(entry.key, entry_key_blob, ffi.sizeof(entry_key_blob))
+   self.softwires:remove(entry.key)
+end
+
 local lookup_key = softwire_key_t()
 function BindingTable:lookup(ipv4, port)
    local psid = self:lookup_psid(ipv4, port)

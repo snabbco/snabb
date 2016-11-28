@@ -11,7 +11,8 @@ local shm = require("core.shm")
 
 local action_names = { 'unlink_output', 'unlink_input', 'free_link',
                        'new_link', 'link_output', 'link_input', 'stop_app',
-                       'start_app', 'reconfig_app' }
+                       'start_app', 'reconfig_app',
+                       'call_app_method_with_blob' }
 local action_codes = {}
 for i, name in ipairs(action_names) do action_codes[name] = i end
 
@@ -63,6 +64,12 @@ function actions.reconfig_app (codec, appname, class, arg)
    local config = codec:config(class, arg)
    return codec:finish(appname, _class, config)
 end
+function actions.call_app_method_with_blob (codec, appname, methodname, blob)
+   local appname = codec:string(appname)
+   local methodname = codec:string(methodname)
+   local blob = codec:blob(blob)
+   return codec:finish(appname, methodname, blob)
+end
 
 local public_names = {}
 local function find_public_name(obj)
@@ -110,6 +117,10 @@ local function encoder()
    function encoder:string(str)
       self:uint32(#str)
       table.insert(self.out, ffi.new('uint8_t[?]', #str, str))
+   end
+   function encoder:blob(blob)
+      self:uint32(ffi.sizeof(blob))
+      table.insert(self.out, blob)
    end
    function encoder:class(class)
       local require_path, name = find_public_name(class)
@@ -164,6 +175,12 @@ local function decoder(buf, len)
       local len = self:uint32()
       return ffi.string(self:read(len), len)
    end
+   function decoder:blob()
+      local len = self:uint32()
+      local blob = ffi.new('uint8_t[?]', len)
+      ffi.copy(blob, self:read(len), len)
+      return blob
+   end
    function decoder:class()
       local require_path, name = self:string(), self:string()
       return assert(require(require_path)[name])
@@ -206,6 +223,9 @@ function selftest ()
    end
    local appname, linkname, linkspec = 'foo', 'bar', 'foo.a -> bar.q'
    local class, arg = require('apps.basic.basic_apps').Tee, {}
+   -- Because lib.equal only returns true when comparing cdata of
+   -- exactly the same type, here we have to use uint8_t[?].
+   local methodname, blob = 'zog', ffi.new('uint8_t[?]', 3, 1, 2, 3)
    test_action({'unlink_output', {appname, linkname}})
    test_action({'unlink_input', {appname, linkname}})
    test_action({'free_link', {linkspec}})
@@ -215,5 +235,6 @@ function selftest ()
    test_action({'stop_app', {appname}})
    test_action({'start_app', {appname, class, arg}})
    test_action({'reconfig_app', {appname, class, arg}})
+   test_action({'call_app_method_with_blob', {appname, methodname, blob}})
    print('selftest: ok')
 end

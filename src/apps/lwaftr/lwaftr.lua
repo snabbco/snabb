@@ -265,6 +265,16 @@ function LwAftr:new(conf)
    return o
 end
 
+-- The following two methods are called by apps.config.follower in
+-- reaction to binding table changes, via
+-- apps/config/support/snabb-softwire-v1.lua.
+function LwAftr:add_softwire_entry(entry_blob)
+   self.binding_table:add_softwire_entry(entry_blob)
+end
+function LwAftr:remove_softwire_entry(entry_key_blob)
+   self.binding_table:remove_softwire_entry(entry_key_blob)
+end
+
 local function decrement_ttl(pkt)
    local ipv4_header = get_ethernet_payload(pkt)
    local chksum = bnot(ntohs(rd16(ipv4_header + o_ipv4_checksum)))
