@@ -571,19 +571,18 @@ local primitive_types = set(
    'identityref', 'instance-identifier', 'leafref', 'string', 'union')
 
 -- Inherits config attributes from parents
-local function inherit_config(schema, env)
-   if env == nil then env = {env={}} end
+local function inherit_config(schema, config)
 
    if schema.config ~= nil then
-      env.config = schema.config
-   elseif env.env.config ~= nil then
+      config = schema.config
+   elseif config ~= nil then
       schema = shallow_copy(schema)
-      schema.config = env.env.config
+      schema.config = config
    end
 
    if schema.body then
       for name, node in pairs(schema.body) do
-         schema.body[name] = inherit_config(node, {env=env})
+         schema.body[name] = inherit_config(node, config)
       end
    end
 
