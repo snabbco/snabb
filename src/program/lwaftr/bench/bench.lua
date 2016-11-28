@@ -45,7 +45,7 @@ function run(args)
       csv:add_app('sinkv6', { 'input' }, { input=opts.hydra and 'encap' or 'Encap.' })
       csv:activate()
    end
-   timer.activate(timer.new('spawn_csv_stats', start_sampling, 1e6))
+   --timer.activate(timer.new('spawn_csv_stats', start_sampling, 1e6))
 
    app.busywait = true
    app.main({duration=opts.duration})

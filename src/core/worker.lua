@@ -50,6 +50,7 @@ function start (name, luacode)
    else
       -- Parent process
       children[name] = { pid = pid }
+      return pid
    end
 end
 
