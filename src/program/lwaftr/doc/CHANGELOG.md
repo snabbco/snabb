@@ -1,5 +1,17 @@
 # Change Log
 
+## [3.0.1] - 2016-11-28
+
+A release to finish "snabb config" features.
+
+ * New "snabb config" commands "get-state", "add", "remove", and
+   "listen".  See [the `snabb config` documentation](../../config/README.md)
+   for full details.
+
+ * The "get-state", "get", "set", "add", and "remove" "snabb config"
+   commands can now take paths to indicate sub-configurations on which
+   to operate.  This was documented before but not yet implemented.
+
 ## [3.0.0] - 2016-11-18
 
 A change to migrate the lwAFTR to use a new YANG-based configuration.
