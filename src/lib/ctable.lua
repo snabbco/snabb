@@ -300,7 +300,7 @@ end
 function CTable:lookup_and_copy(key, entry)
    local entry_ptr = self:lookup_ptr(key)
    if not entry_ptr then return false end
-   entry = entry_ptr
+   ffi.copy(entry, entry_ptr, ffi.sizeof(entry))
    return true
 end
 
@@ -602,6 +602,20 @@ function selftest()
          assert(value == bnot(i))
       end
       ctab:selfcheck()
+
+      -- Incrementing by 31 instead of 1 just to save test time.
+      do
+         local entry = ctab.entry_type()
+         for i = 1, occupancy, 31 do
+            assert(ctab:lookup_and_copy(i, entry))
+            assert(entry.key == i)
+            assert(entry.value[0] == bnot(i))
+            ctab:remove(entry.key)
+            assert(ctab:lookup_ptr(i) == nil)
+            ctab:add(entry.key, entry.value)
+            assert(ctab:lookup_ptr(i).value[0] == bnot(i))
+         end
+      end
 
       local iterated = 0
       for entry in ctab:iterate() do iterated = iterated + 1 end
