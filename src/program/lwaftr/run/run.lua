@@ -82,9 +82,7 @@ function parse_args(args)
       opts["mirror"] = ifname
    end
    function handlers.y() opts.hydra = true end
-   handlers["bench-file"] = function (bench_file)
-      opts.bench_file = bench_file
-   end
+   function handlers.b(arg) opts.bench_file = arg end
    handlers["ingress-drop-monitor"] = function (arg)
       if arg == 'flush' or arg == 'warn' then
          opts.ingress_drop_monitor = arg
@@ -95,12 +93,14 @@ function parse_args(args)
                   .." (valid values: flush, warn, off)")
       end
    end
+   function handlers.reconfigurable() opts.reconfigurable = true end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:yhir:",
       { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
         verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
-        ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = 0,
-        ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1, hydra = "y" })
+        ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
+        ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
+        hydra = "y", reconfigurable = 0 })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -137,16 +137,22 @@ function run(args)
    local use_splitter = requires_splitter(opts, conf)
 
    local c = config.new()
+   local setup_fn, setup_args
    if opts.virtio_net then
-      setup.load_virt(c, conf, 'inetNic', v4, 'b4sideNic', v6)
+      setup_fn, setup_args = setup.load_virt, { 'inetNic', v4, 'b4sideNic', v6 }
    elseif opts["on-a-stick"] then
-      setup.load_on_a_stick(c, conf, { v4_nic_name = 'inetNic',
-                                       v6_nic_name = 'b4sideNic',
-                                       v4v6 = use_splitter and 'v4v6',
-                                       pciaddr = v4,
-                                       mirror = opts.mirror})
+      setup_fn = setup.load_on_a_stick
+      setup_args =
+         { { v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
+             v4v6 = use_splitter and 'v4v6', pciaddr = v4,
+             mirror = opts.mirror } }
    else
-      setup.load_phy(c, conf, 'inetNic', v4, 'b4sideNic', v6)
+      setup_fn, setup_args = setup.load_phy, { 'inetNic', v4, 'b4sideNic', v6 }
+   end
+   if opts.reconfigurable then
+      setup.reconfigurable(setup_fn, c, conf, unpack(setup_args))
+   else
+      setup_fn(c, conf, unpack(setup_args))
    end
    engine.configure(c)
 
@@ -156,26 +162,40 @@ function run(args)
       timer.activate(t)
    end
 
+   -- In reconfigurable mode, the app graph only gets populated later,
+   -- so we have to defer our timer creation.
+   local function later(f, when)
+      timer.activate(timer.new("later", f, when or 30e6))
+   end
+
    if opts.verbosity >= 1 then
-      local csv = csv_stats.CSVStatsTimer.new(opts.csv_file, opts.hydra)
-      -- Why are the names cross-referenced like this?
-      local ipv4_tx = opts.hydra and 'ipv4rx' or 'IPv4 RX'
-      local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
-      local ipv6_tx = opts.hydra and 'ipv6rx' or 'IPv6 RX'
-      local ipv6_rx = opts.hydra and 'ipv6tx' or 'IPv6 TX'
-      if use_splitter then
-         csv:add_app('v4v6', { 'v4', 'v4' }, { tx=ipv4_tx, rx=ipv4_rx })
-         csv:add_app('v4v6', { 'v6', 'v6' }, { tx=ipv6_tx, rx=ipv6_rx })
-      else
-         csv:add_app('inetNic', { 'tx', 'rx' }, { tx=ipv4_tx, rx=ipv4_rx })
-         csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx=ipv6_tx, rx=ipv6_rx })
+      function add_csv_stats()
+         local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra)
+         -- Link names like "tx" are from the app's perspective, but
+         -- these labels are from the perspective of the lwAFTR as a
+         -- whole so they are reversed.
+         local ipv4_tx = opts.hydra and 'ipv4rx' or 'IPv4 RX'
+         local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
+         local ipv6_tx = opts.hydra and 'ipv6rx' or 'IPv6 RX'
+         local ipv6_rx = opts.hydra and 'ipv6tx' or 'IPv6 TX'
+         if use_splitter then
+            csv:add_app('v4v6', { 'v4', 'v4' }, { tx=ipv4_tx, rx=ipv4_rx })
+            csv:add_app('v4v6', { 'v6', 'v6' }, { tx=ipv6_tx, rx=ipv6_rx })
+         else
+            csv:add_app('inetNic', { 'tx', 'rx' }, { tx=ipv4_tx, rx=ipv4_rx })
+            csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx=ipv6_tx, rx=ipv6_rx })
+         end
+         csv:activate()
       end
-      csv:activate()
+      later(add_csv_stats)
    end
 
    if opts.ingress_drop_monitor then
-      local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
-      timer.activate(mon:timer())
+      function add_ingress_drop_monitor()
+         local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
+         timer.activate(mon:timer())
+      end
+      later(add_ingress_drop_monitor)
    end
 
    engine.busywait = true

@@ -9,6 +9,7 @@ Required arguments:
        --on-a-stick <pci-addr>  One single NIC for INET-side and B4-side
 
 Optional arguments:
+       --reconfigurable         Allow run-time configuration query and update.
        --virtio                 Use virtio-net interfaces instead of Intel 82599
        --ring-buffer-size <size>  Set Intel 82599 receive buffer size
        --cpu    <cpu>           Bind the lwAFTR to the given CPU
@@ -17,16 +18,16 @@ Optional arguments:
                                 address set by "lwaftr monitor".
        -D       <seconds>       Duration in seconds
        -v                       Verbose (repeat for more verbosity)
-       -y HYDRA, --hydra
+       -y, --hydra
                                 Hydra mode: emit CSV data in the format expected
                                 by the Hydra reports. For instance:
 
-                                  benchmark,snabb,id,score,unit
+                                  benchmark,id,score,unit
 
                                 rather than the default:
 
                                   Time (s),Decap. MPPS,Decap. Gbps,Encap. MPPS,Encap. Gbps
-       --bench-file FILENAME
+       -b FILENAME, --bench-file FILENAME
                                 The file or path name to which benchmark data is
                                 written. A simple filename or relative pathname
                                 will be based on the current directory. Default

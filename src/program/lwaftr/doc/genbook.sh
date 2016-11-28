@@ -31,7 +31,11 @@ $(cat README.configuration.md)
 
 $(cat README.benchmarking.md)
 
+$(cat README.continuous-integration.md)
+
 $(cat README.performance.md)
+
+$(cat README.filters-performance.md)
 
 $(cat README.virtualization.md)
 
@@ -42,5 +46,7 @@ $(cat README.troubleshooting.md)
 $(cat README.counters.md)
 
 $(cat README.breaking_changes.md)
+
+$(cat README.ndp.md)
 
 EOF

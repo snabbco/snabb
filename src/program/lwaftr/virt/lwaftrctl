@@ -61,7 +61,7 @@ start_vm() {
 
 stop_vm() {
     echo "Switching off VM. Please wait..."
-    ssh ${VM_USER}@${VM_IP} 'sudo halt'
+    ssh $SSH_OPTS ${VM_USER}@${VM_IP} 'sudo halt'
     sleep 10
     pid=`pidof qemu-system-x86_64`
     sudo kill ${pid} 2>/dev/null
@@ -76,13 +76,13 @@ restart_vm() {
 start_lwaftr() {
     echo "Start lwAFTR"
 
-    ssh ${VM_USER}@${VM_IP} "~/run_lwaftr.sh"
+    ssh $SSH_OPTS ${VM_USER}@${VM_IP} "~/run_lwaftr.sh"
 }
 
 stop_lwaftr() {
     echo "Stop lwAFTR"
 
-    ssh ${VM_USER}@${VM_IP} 'sudo killall snabb 2>/dev/null'
+    ssh $SSH_OPTS ${VM_USER}@${VM_IP} 'sudo killall snabb 2>/dev/null'
 }
 
 restart_lwaftr() {
@@ -108,16 +108,16 @@ start_snabbnfv_process() {
     fi
 
     # Run snabbnfv inside screen.
-    screen -dmS $screen bash -c \
+    screen -L -dmS $screen bash -c \
         "cd ${SNABB_HOST_PATH}/src; \
-         sudo numactl -m ${NUMA_NODE} taskset -c ${core} sudo ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock};"
+         sudo numactl -m ${NUMA_NODE} taskset -c ${core} ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock};"
     sleep 0.5
     status=$(screen -ls | grep ${screen})
 
     # Check exit status.
     if [[ -z ${status} ]]; then
         echo "Start of snabbnfv failed: "
-        echo -e "\tsudo numactl -m ${NUMA_NODE} taskset -c ${core} sudo ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock}"
+        echo -e "\tsudo numactl -m ${NUMA_NODE} taskset -c ${core} ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock}"
         exit 1
     fi
 

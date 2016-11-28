@@ -27,7 +27,7 @@ with the appropriate prefix (`0000:`, in this example).
 Note: Compile Snabb (see [README.build.md](README.build.md)) before attempting
 the following.
 
-## Running a load generator and the lwaftr
+## Running a load generator and the lwaftr (2 lwaftr NICs)
 
 To run a load generator and an `lwaftr`, you will need four
 interfaces. The following example assumes that `01:00.0` is cabled to
@@ -61,3 +61,33 @@ The load generator will push packets on the IPv4 and IPv6 interfaces,
 ramping up from 0 Gbps to 10 Gbps (by default).  At each step it measures
 the return traffic from the lwAFTR, and prints out all this information
 to the console.  The load generator stops when the test is done.
+
+## Running the lwaftr on one NIC ('on a stick')
+
+To more efficiently use network bandwidth, it makes sense to run the lwaftr on
+just one NIC, because traffic is not symmetric. To do this, use --on-a-stick,
+and specify only one PCI address:
+
+```
+$ sudo ./snabb lwaftr run \
+    --conf program/lwaftr/tests/data/icmp_on_fail.conf \
+    --on-a-stick 0000:02:00.1
+```
+
+You can run a load generator:
+
+```
+$ sudo ./snabb lwaftr loadtest \
+    program/lwaftr/tests/benchdata/ipv4-0550.pcap IPv4 IPv6 0000:82:00.0 \
+    program/lwaftr/tests/benchdata/ipv6-0550.pcap IPv6 IPv4 0000:82:00.1
+```
+
+For the main lwaftr instance to receive any traffic, either 82:00.0 or 82:00.1
+should be wired to 02:00.1 . Since `lwaftr loadtest` does not currently have
+an on-a-stick mode, the main lwaftr instance will only see half the loadtest
+traffic.
+
+## The packetblaster
+
+Another way of generating load is via the `packetblaster lwaftr` command,
+see [its documentation](../../packetblaster/lwaftr/README).

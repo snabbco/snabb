@@ -76,11 +76,12 @@ local function effective_vlan (conf, lwconf)
    if conf.settings and conf.settings.vlan then
       return conf.settings.vlan
    end
-   if lwconf.vlan_tagging then
-      if lwconf.v4_vlan_tag == lwconf.v6_vlan_tag then
-         return lwconf.v4_vlan_tag
+   if lwconf.external_interface.vlan_tag then
+      if lwconf.external_interface.vlan_tag == lwconf.internal_interface.vlan_tag then
+         return lwconf.external_interface.vlan_tag
       end
-      return {v4_vlan_tag = lwconf.v4_vlan_tag, v6_vlan_tag = lwconf.v6_vlan_tag}
+      return {v4_vlan_tag = lwconf.external_interface.vlan_tag,
+              v6_vlan_tag = lwconf.internal_interface.vlan_tag}
    end
    return false
 end
@@ -88,8 +89,7 @@ end
 function run(args)
    local opts, conf_file, id, pci, mac, sock_path, mirror_id = parse_args(args)
 
-   local conf = {}
-   local lwconf = {}
+   local conf, lwconf
    local ring_buffer_size = 2048
 
    local ingress_drop_action = "flush"
@@ -107,17 +107,21 @@ function run(args)
          fatal(("lwAFTR conf file '%s' not found"):format(conf.lwaftr))
       end
       lwconf = require('apps.lwaftr.conf').load_lwaftr_config(conf.lwaftr)
-      lwconf.ipv6_mtu = lwconf.ipv6_mtu or 1500
-      lwconf.ipv4_mtu = lwconf.ipv4_mtu or 1460
+      -- If one interface has vlan tags, the other one should as well.
+      assert((not lwconf.external_interface.vlan_tag) ==
+            (not lwconf.internal_interface.vlan_tag))
    else
-      print(("Interface '%s' set to passthru mode"):format(id))
+      print(("Interface '%s' set to passthrough mode."):format(id))
       ring_buffer_size = 1024
-      conf.settings = {}
+      conf = {settings = {}}
    end
 
    if conf.settings then
       if conf.settings.ingress_drop_monitor then
          ingress_drop_action = conf.settings.ingress_drop_monitor
+         if ingress_drop_action == 'off' then
+            ingress_drop_action = nil
+         end
       end
       if conf.settings.ingress_drop_threshold then
          ingress_drop_threshold = conf.settings.ingress_drop_threshold
@@ -137,19 +141,20 @@ function run(args)
       lwaftr_id.value = id
    end
 
-   local vlan = effective_vlan(conf, lwconf)
-
+   local vlan = false
    local mtu = DEFAULT_MTU
-   if lwconf.ipv6_mtu then
-     mtu = lwconf.ipv6_mtu 
+   if lwconf then
+      vlan = effective_vlan(conf, lwconf)
+      mtu = lwconf.internal_interface.mtu
+      if lwconf.external_interface.mtu > mtu then
+         mtu = lwconf.external_interface.mtu
+      end
+      mtu = mtu + constants.ethernet_header_size
+      if lwconf.external_interface.vlan_tag then
+         mtu = mtu + 4
+      end
    end
-   if lwconf.ipv4_mtu and lwconf.ipv4_mtu > lwconf.ipv6_mtu then
-     mtu = lwconf.ipv4_mtu
-   end
-   mtu = mtu + constants.ethernet_header_size
-   if lwconf.vlan_tagging then
-     mtu = mtu + 4
-   end
+
    conf.interface = {
       mac_address = mac,
       pci = pci,
@@ -160,7 +165,11 @@ function run(args)
    }
 
    local c = config.new()
-   setup.lwaftr_app(c, conf, lwconf, sock_path)
+   if lwconf then
+      setup.lwaftr_app(c, conf, lwconf, sock_path)
+   else
+      setup.passthrough(c, conf, sock_path)
+   end
    engine.configure(c)
 
    if opts.verbosity >= 2 then

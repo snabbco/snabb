@@ -1,193 +1,209 @@
 # Configuration
 
-The lwAFTR is configured by a text file. Where applicable, default values can
-be found in [the code](../../../../apps/lwaftr/conf.lua#L72).
+The lwAFTR's configuration is modelled by a
+[YANG](https://tools.ietf.org/html/rfc6020) schema,
+[snabb-softwire-v1](../../../lib/yang/snabb-softwire-v1.yang).
 
+The lwAFTR takes its configuration from the user in the form of a text
+file.  That file's grammar is derived from the YANG schema; see the
+[Snabb YANG README](../../../lib/yang/README.md) for full details.
 Here's an example:
 
 ```
-aftr_ipv4_ip = 10.10.10.10
-aftr_ipv6_ip = 8:9:a:b:c:d:e:f
-aftr_mac_b4_side = 22:22:22:22:22:22
-aftr_mac_inet_side = 12:12:12:12:12:12
-next_hop6_mac = 44:44:44:44:44:44
-# next_hop_ipv6_addr = fd00::1
-inet_mac = 52:54:00:00:00:01
-# next_hop_ipv4_addr = 192.168.0.1
-binding_table = path/to/binding-table.txt
-hairpinning = true
-icmpv6_rate_limiter_n_packets=3e5
-icmpv6_rate_limiter_n_seconds=4
-inet_mac = 68:68:68:68:68:68
-ipv4_mtu = 1460
-ipv6_mtu = 1500
-max_fragments_per_reassembly_packet = 1,
-max_ipv6_reassembly_packets = 10,
-max_ipv4_reassembly_packets = 10,
-policy_icmpv4_incoming = ALLOW
-policy_icmpv6_incoming = ALLOW
-policy_icmpv4_outgoing = ALLOW
-policy_icmpv6_outgoing = ALLOW
-v4_vlan_tag = 1234
-v6_vlan_tag = 42
-vlan_tagging = true
-# ipv4_ingress_filter = "ip"
-# ipv4_egress_filter = "ip"
-# ipv6_ingress_filter = "ip6"
-# ipv6_egress_filter = "ip6"
+// IPv4 interface.
+external-interface {
+  allow-incoming-icmp true;
+  // Limit ICMP error transmit rate to PACKETS/PERIOD.
+  error-rate-limiting {
+    packets 600000;
+    period 2;
+  }
+  // Generate ICMP errors at all?
+  generate-icmp-errors true;
+  // Basic parameters.
+  ip 10.10.10.10;
+  mac 12:12:12:12:12:12;
+  mtu 1460;
+  // vlan-tag 42;
+  // Where to go next.  Either one will suffice; if you specify the IP,
+  // the next-hop MAC will be determined by ARP.
+  next-hop {
+    mac 68:68:68:68:68:68;
+    ip 1.2.3.4;
+  }
+  // Control the size of the fragment reassembly buffer.
+  reassembly {
+    max-fragments-per-packet 40;
+    max-packets 20000;
+  }
+}
+// The same thing as for the external interface, but on the IPv6 side
+// and with IPv6 addresses.
+internal-interface {
+  allow-incoming-icmp true;
+  error-rate-limiting {
+    packets 600000;
+    period 2;
+  }
+  generate-icmp-errors true;
+  // One more interesting thing -- here we control whether to support
+  // routing traffic between two B4s.
+  hairpinning true;
+  ip 8:9:a:b:c:d:e:f;
+  mac 22:22:22:22:22:22;
+  mtu 1500;
+  // vlan-tag 64;
+  next-hop {
+    mac 44:44:44:44:44:44;
+    // NDP instead of ARP of course.
+    ip 7:8:9:a:b:c:d:e;
+  }
+  reassembly {
+    max-fragments-per-packet 40;
+    max-packets 20000;
+  }
+}
+// Now the binding table!  3 parts: PSID map, BR address table, and
+// softwire set.  See description below for details.
+binding-table {
+  psid-map { addr 178.79.150.15; psid-length 4; }
+  psid-map { addr 178.79.150.233; psid-length 16; }
+  psid-map { addr 178.79.150.2; psid-length 16; }
+  br-address 8:9:a:b:c:d:e:f;
+  br-address 1e:1:1:1:1:1:1:af;
+  br-address 1e:2:2:2:2:2:2:af;
+  softwire {
+    ipv4 178.79.150.233;
+    psid 22788;
+    b4-ipv6 127:11:12:13:14:15:16:128;
+  }
+  softwire {
+    ipv4 178.79.150.233;
+    psid 2700;
+    b4-ipv6 127:11:12:13:14:15:16:128;
+  }
+  softwire {
+    ipv4 178.79.150.15;
+    psid 1;
+    b4-ipv6 127:22:33:44:55:66:77:128;
+  }
+  softwire {
+    ipv4 178.79.150.2;
+    psid 7850;
+    b4-ipv6 127:24:35:46:57:68:79:128;
+    br 1;
+  }
+}
 ```
 
-The lwAFTR is associated with two physical network cards. One of these cards
-faces the internet; traffic over it is IPv4. The other faces the IPv6-only
-internal network, and communicates primarily with B4s.
+Basically there's an `external-interface` section defining the
+parameters around the IPv4 interface that communicates with the
+internet, an `internal-interface` section doing the same for the IPv6
+side that communicates with the B4s, and then the `binding-table` that
+declares the set of softwires.
 
-## Line-by-line explanation
+## Compiling conigurations
 
-### L2 and L3 addresses of the lwAFTR
+When a lwAFTR is started, it will automatically compile its
+configuration if it does not find a compiled configuration that's fresh.
+However for large configurations with millions of binding table entries,
+this can take a second or two, so it can still be useful to compile the
+configuration ahead of time.
 
-First, we set the IP and MAC addresses for both interfaces:
+Use the `snabb lwaftr compile-configuration` command to compile a
+configuration ahead of time.  If you do this, you can use the `snabb
+lwaftr control PID reload` command to tell the Snabb process with the
+given *PID* to reload the table.
 
-```
-aftr_ipv4_ip = 10.10.10.10
-aftr_ipv6_ip = 8:9:a:b:c:d:e:f
-aftr_mac_b4_side = 22:22:22:22:22:22
-aftr_mac_inet_side = 12:12:12:12:12:12
-```
+## In-depth configuration explanation
 
-This associates **12:12:12:12:12:12** and **10.10.10.10** with the
-internet-facing NIC, and **8:9:a:b:c:d:e:f** and **22:22:22:22:22:22** with the
-NIC facing the internal network.
+See the embedded descriptions in the
+[snabb-softwire-v1](../../../lib/yang/snabb-softwire-v1.yang) schema
+file.
 
-### L2 next hops
+## Binding tables
 
-Normally you might expect to just set a default IPv4 and IPv6 gateway
-and have the lwAFTR figure out the next hop ethernet addresses on its
-own.  However the lwAFTR doesn't support
-[ARP](https://en.wikipedia.org/wiki/Address_Resolution_Protocol) yet.
+A binding table is a collection of softwires (tunnels).  One endpoint
+of the softwire is in the AFTR and the other is in the B4.  A
+softwire provisions an IPv4 address (or a part of an IPv4 address) to
+a customer behind a B4.  The B4 arranges for all IPv4 traffic to be
+encapsulated in IPv6 and sent to the AFTR; the AFTR does the reverse.
+The binding table is how the AFTR knows which B4 is associated with
+an incoming packet.
 
-The lwAFTR assumes that it will talk directly to only one host on each
-side, and provides these configuration options to specify the L2
-addresses of those hosts.
+In the Snabb lwAFTR there are three parts of a binding table: the PSID
+info map, the border router (BR) address table, and the softwire map.
 
-```
-next_hop6_mac = 44:44:44:44:44:44
-inet_mac = 68:68:68:68:68:68
-```
+### PSID info map
 
-The lwAFTR can talk to any host, but assumes that the above ones are the
-next hop.
-
-Alternatively, it is possible to use IP addresses for the next hops. The lwAFTR
-will resolve the IP addresses to their correspondent MAC addresses, using
-the NDP and ARP protocols.
-
-```
-next_hop_ipv6_addr = fd00::1
-next_hop_ipv4_addr = 192.168.0.1
-```
-
-### The binding table
+The PSID info map defines the set of IPv4 addresses that are provisioned
+by an lwAFTR.  It also defines the way in which those addresses are
+shared, by specifying the "psid-length" and "shift" parameters for each
+address.  See RFC 7597 for more details on the PSID scheme for how to
+share IPv4 addresses.  IPv4 addresses are added to the `psid-map` with
+statements like this:
 
 ```
-binding_table = path/to/binding-table.txt
+  psid-map {
+    addr 178.79.150.3;
+    end-addr 178.100.150.3;
+    psid-length 6;
+    reserved-ports-bit-count 0;
+    shift 10;
+  }
 ```
 
-See [README.bindingtable.md](README.bindingtable.md) for binding table
-details.  Note that you can compile the binding table beforehand; again,
-see [README.bindingtable.md](README.bindingtable.md).
+`end-addr`, `reserved-ports-bit-count`, and `shift` are all optional.  
 
-If the path to the binding table is a relative path, it will be relative
-to the location of the configuration file.  Enclose the path in single
-or double quotes if the path contains spaces.
+An entry's `psid-length`, `shift` and `reserved-ports-bit-count`
+parameters must necessarily add up to 16, so it is sufficient to specify
+just two of them.  Actually it's sufficient to just specify the
+`psid-length`, which is the only required one.
+`reserved-ports-bit-count` defaults to 0, and `shift` defaults to `16 -
+psid-length`.
 
-### Hairpinning
+### Border router addresses
 
-```
-hairpinning = true
-```
-
-Configurable hairpinning is a requirement of [RFC
-7596](https://tools.ietf.org/html/rfc7596); it can be true or false.
-
-### Rate-limiting of ICMP error messages
+Next, the `br-address` clauses define the set of IPv6 addresses to
+associate with the lwAFTR.  These are the "border router" addresses.
+For a usual deployment there will be one main address and possibly some
+additional ones.  For example:
 
 ```
-icmpv6_rate_limiter_n_packets=3e5
-icmpv6_rate_limiter_n_seconds=4
+  br-address 8:9:a:b:c:d:e:f;
+  br-address 1E:1:1:1:1:1:1:af;
+  ...
 ```
 
-ICMPv6 rate limiting is mandated by several RFCs. This example says that the
-lwAFTR can send at most 300,000 (3 * 10^5) ICMPv6 packets per 4 seconds.
-Lower values are recommended for non-experimental use.
+### Softwires
 
-### MTU
-
-```
-ipv4_mtu = 1460
-ipv6_mtu = 1500
-```
-
-The MTU settings are used to determine whether a packet needs to be
-fragmented.  The current MTU handling is otherwise underdeveloped.  It
-is not dynamically updated on receiving ICMP packet too big messages.
-
-### Packet reassembly
+Finally, the `softwire` clauses define the set of softwires to
+provision.  Each softwire associates an IPv4 address, a PSID, and a B4
+address.  For example:
 
 ```
-max_fragments_per_reassembly_packet = 1,
-max_ipv6_reassembly_packets = 10,
-max_ipv4_reassembly_packets = 10,
+  softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; }
 ```
 
-A packet might be split into several fragments, from which it will be
-reassembled. The maximum allowed number of fragments per packet can be set.
-The maximum simultaneous number of packets undergoing reassembly can also be
-set separately for IPv4 and IPv6.
-
-### ICMP handling policies
+By default, a softwire is associated with the first `br-address`
+(`br 0;`).  To associate the tunnel with a different border router,
+specify it by index:
 
 ```
-policy_icmpv4_incoming = ALLOW
-policy_icmpv6_incoming = ALLOW
-policy_icmpv4_outgoing = ALLOW
-policy_icmpv6_outgoing = ALLOW
+  softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; aftr 0; }
 ```
 
-The lwAFTR can be configured to `ALLOW` or `DROP` incoming and outgoing
-ICMPv4 and ICMPv6 messages. If a finer granularity of control is
-desired, contact the development team via github or email.
+## Ingress and egress filters
 
-### VLAN tagging
-
+Both the `internal-interface` and `external-interface` configuration
+blocks support `ingress-filter` and `egress-filter` options.
 ```
-v4_vlan_tag = 1234
-v6_vlan_tag = 42
-vlan_tagging = tru
+...
+ingress-filter "ip";
+egress-filter "ip";
 ```
 
-Enable/disable 802.1Q Ethernet tagging with 'vlan_tagging'.
-
-If it is enabled, set one tag per interface to tag outgoing packets with, and
-assume that incoming packets are tagged. If it is 'false', v4_vlan_tag and
-v6_vlan_tag are currently optional (and unused).
-
-Values of `v4_vlan_tag` and `v6_vlan_tag` represent the identifier value in a
-VLAN tag. It must be a value between 0 and 4095.
-
-More sophisticated support, including for mixes of tagged/untagged packets,
-will be provided upon request.
-
-### Ingress and egress filters
-
-```
-# ipv4_ingress_filter = "ip"
-# ipv4_egress_filter = "ip"
-# ipv6_ingress_filter = "ip6"
-# ipv6_egress_filter = "ip6"
-```
-
-In the example configuration these entries are commented out by the `#`
-character.  If uncommented, the right-hand-side should be a
+If given these filters should be a
 [pflang](https://github.com/Igalia/pflua/blob/master/doc/pflang.md)
 filter.  Pflang is the language of `tcpdump`, `libpcap`, and other
 tools.
@@ -199,7 +215,8 @@ the lwAFTR.  It might help to think of the filter as being "whitelists"
 "blacklist" filter, use the `not` pflang operator:
 
 ```
-ipv4_ingress_filter = "not ip6"
+// Reject IPv6.
+ingress-filter "not ip6";
 ```
 
 You might need to use parentheses so that you are applying the `not` to
@@ -210,7 +227,7 @@ stripped.
 Here is a more complicated example:
 
 ```
-ipv6_egress_filter = "
+egress-filter "
   ip6 and not (
     (icmp6 and
      src net 3ffe:501:0:1001::2/128 and
@@ -222,22 +239,8 @@ ipv6_egress_filter = "
      src portrange 2397-2399 and
      dst port 53)
   )
-"
+";
 ```
-
-As filter definitions can be a bit unmanageable as part of the
-configuration, you can also load filters from a file.  To do this, start
-the filter configuration like with `<` and follow it immediately with a
-file name.
-
-```
-ipv4_ingress_filter = <ingress4.pf
-```
-
-As with the path to the binding table, if the path to the filter file is
-a relative path, it will be relative to the location of the
-configuration file.  If the path contains spaces, enclose the whole
-string, including the `<` character, in single or double quotes.
 
 Enabling ingress and egress filters currently has a performance cost.
 See [README.performance.md](README.performance.md).

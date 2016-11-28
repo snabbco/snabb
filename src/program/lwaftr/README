@@ -5,9 +5,9 @@ Usage:
   snabb lwaftr transient
   snabb lwaftr compile-binding-table
   snabb lwaftr generate-binding-table
+  snabb lwaftr migrate-configuration
   snabb lwaftr control
   snabb lwaftr loadtest
-  snabb lwaftr generator
   snabb lwaftr query
 
 Use --help for per-command usage.
