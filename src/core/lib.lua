@@ -109,7 +109,7 @@ function firstline (filename) return readfile(filename, "*l") end
 
 function files_in_directory (dir)
    local files = {}
-   for line in io.popen('ls -1 "'..dir..'" 2>/dev/null'):lines() do
+   for line in assert(io.popen('ls -1 "'..dir..'" 2>/dev/null')):lines() do
       table.insert(files, line)
    end
    return files

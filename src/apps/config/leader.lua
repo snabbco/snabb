@@ -10,6 +10,7 @@ local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local util = require("lib.yang.util")
 local rpc = require("lib.yang.rpc")
+local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
 local app = require("core.app")
 local shm = require("core.shm")
@@ -426,6 +427,13 @@ function Leader:rpc_attach_listener (args)
    if self.listen_peer ~= nil then error('Listener already attached') end
    self.listen_peer = self.rpc_peer
    return {}
+end
+
+function Leader:rpc_get_state (args)
+   assert(args.schema == self.schema_name)
+   local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
+   local state = state.show_state(self.schema_name, S.getpid(), args.path)
+   return {state=printer(state, yang.string_output_file())}
 end
 
 function Leader:handle (payload)

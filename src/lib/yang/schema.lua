@@ -12,12 +12,18 @@ local function assert_with_loc(expr, loc, msg, ...)
    return expr
 end
 
+local function shallow_copy(node)
+   local out = {}
+   for k,v in pairs(node) do out[k] = v end
+   return out
+end
+
 -- (kind -> (function(Node) -> value))
 local initializers = {}
 local function declare_initializer(init, ...)
    for _, keyword in ipairs({...}) do initializers[keyword] = init end
 end
-   
+
 local function parse_node(src)
    local ret = {}
    ret.kind = assert(src.keyword, 'missing keyword')
@@ -564,6 +570,26 @@ local primitive_types = set(
    'binary', 'bits', 'boolean', 'decimal64', 'empty', 'enumeration',
    'identityref', 'instance-identifier', 'leafref', 'string', 'union')
 
+-- Inherits config attributes from parents
+local function inherit_config(schema, config)
+   if schema.config ~= nil then
+      assert(not config or schema.config == false)
+      config = schema.config
+   elseif config ~= nil then
+      schema = shallow_copy(schema)
+      schema.config = config
+   end
+
+   if schema.body then
+      schema.body = shallow_copy(schema.body)
+      for name, node in pairs(schema.body) do
+         schema.body[name] = inherit_config(node, config)
+      end
+   end
+
+   return schema
+end
+
 -- Inline "grouping" into "uses".
 -- Inline "submodule" into "include".
 -- Inline "imports" into "module".
@@ -572,11 +598,6 @@ local primitive_types = set(
 -- Warn on any "when", resolving them as being true.
 -- Resolve all augment and refine nodes. (TODO)
 function resolve(schema, features)
-   local function shallow_copy(node)
-      local out = {}
-      for k,v in pairs(node) do out[k] = v end
-      return out
-   end
    local function pop_prop(node, prop)
       local val = node[prop]
       node[prop] = nil
@@ -682,6 +703,7 @@ function resolve(schema, features)
             return nil, env
          end
       end
+
       if node.type then
          node.type = visit_type(node.type, env)
          if not node.primitive_type then
@@ -795,10 +817,12 @@ function parse_schema_file(filename)
 end
 
 function load_schema(src, filename)
-   return resolve(primitivize(parse_schema(src, filename)))
+   local s, e = resolve(primitivize(parse_schema(src, filename)))
+   return inherit_config(s), e
 end
 function load_schema_file(filename)
-   return resolve(primitivize(parse_schema_file(filename)))
+   local s, e = resolve(primitivize(parse_schema_file(filename)))
+   return inherit_config(s), e
 end
 function load_schema_by_name(name, revision)
    -- FIXME: @ is not valid in a Lua module name.
@@ -923,5 +947,48 @@ function selftest()
    load_schema_by_name('ietf-yang-types')
    load_schema_by_name('ietf-softwire')
    load_schema_by_name('snabb-softwire-v1')
+
+   local inherit_config_schema = [[module config-inheritance {
+      namespace cs;
+      prefix cs;
+
+      container foo {
+         container bar {
+            config false;
+
+            leaf baz {
+               type uint8;
+            }
+         }
+      }
+
+      grouping quux {
+         leaf quuz {
+            type uint8;
+         }
+      }
+
+      container corge { uses quux; }
+      container grault { config true; uses quux; }
+      container garply { config false; uses quux; }
+   }]]
+
+   local icschema = load_schema(inherit_config_schema)
+
+   -- Test things that should be null, still are.
+   assert(icschema.config == nil)
+   assert(icschema.body.foo.config == nil)
+
+   -- Assert the regular config is propergated through container.
+   assert(icschema.body.foo.body.bar.config == false)
+   assert(icschema.body.foo.body.bar.body.baz.config == false)
+
+   -- Now test the grouping, we need to ensure copying is done correctly.
+   assert(icschema.body.corge.config == nil)
+   assert(icschema.body.corge.body.quuz.config == nil)
+   assert(icschema.body.grault.config == true)
+   assert(icschema.body.grault.body.quuz.config == true)
+   assert(icschema.body.garply.config == false)
+   assert(icschema.body.garply.body.quuz.config == false)
    print('selftest: ok')
 end

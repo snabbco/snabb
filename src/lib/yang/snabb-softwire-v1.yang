@@ -130,6 +130,8 @@ module snabb-softwire-v1 {
       }
     }
 
+
+
     container external-interface {
       description
        "Configuration for the external, internet-facing IPv4
@@ -375,6 +377,300 @@ module snabb-softwire-v1 {
         description
          "B4 address.";
       }
+    }
+  }
+  
+  container softwire-state {
+    description "State data about lwaftr.";
+    presence true;
+    config false;
+    
+    /* Decapsulation B4 queue */
+    leaf in-ipv6-packets {
+      type yang:zero-based-counter64;
+      description "All valid outgoing IPv4 packets.";
+    }
+
+    leaf drop-misplaced-not-ipv6-bytes {
+      type yang:zero-based-counter64;
+      description "Non-IPv6 packets incoming on IPv6 link.";
+    }
+
+    leaf drop-unknown-protocol-ipv6-bytes {
+      type yang:zero-based-counter64;
+      description "Packets with an unknown IPv6 protocol.";
+    }
+
+    leaf drop-in-by-policy-icmpv6-bytes {
+      type yang:zero-based-counter64;
+      description "Incoming ICMPv6 packets dropped because of current policy.";
+    }
+
+    leaf out-icmpv4-packets {
+      type yang:zero-based-counter64;
+      description "Internally generated ICMPv4 packets.";
+    }
+
+    leaf drop-too-big-type-but-not-code-icmpv6-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "Packet's ICMP type was 'Packet too big' but its ICMP code was not an
+         acceptable one for this type.";
+    }
+
+    leaf drop-over-time-but-not-hop-limit-icmpv6-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "Packet's time limit was exceeded, but the hop limit was not.";
+    }
+
+    /* Decapsulation internet queue */
+    leaf drop-no-source-softwire-ipv6-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "No matching source softwire in the binding table; incremented whether
+         or not the reason was RFC7596.";
+    }
+
+    leaf out-ipv4-packets {
+      type yang:zero-based-counter64;
+      description "Valid outgoing IPv4 packets.";
+    }
+
+    leaf hairpin-ipv4-packets {
+      type yang:zero-based-counter64;
+      description "IPv4 packets going to a known b4 (hairpinned).";
+    }
+
+    leaf drop-out-by-policy-icmpv6-bytes {
+      type yang:zero-based-counter64;
+      description
+        "Internally generated ICMPv6 packets dropped because of current
+         policy.";
+    }
+
+    leaf drop-over-rate-limit-icmpv6-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "Packets dropped because the outgoing ICMPv6 rate limit was reached.";
+    }
+
+    leaf out-icmpv6-packets {
+      type yang:zero-based-counter64;
+      description "Internally generted ICMPv6 error packets.";
+    }
+
+    /* Encapsulation internet queue */
+    leaf in-ipv4-packets {
+      type yang:zero-based-counter64;
+      description "All valid outgoing IPv4 packets.";
+    }
+
+    leaf drop-in-by-policy-icmpv4-bytes {
+      type yang:zero-based-counter64;
+      description "Incoming ICMPv4 packets dropped because of current policy.";
+    }
+
+    leaf drop-misplaced-not-ipv4-bytes {
+      type yang:zero-based-counter64;
+      description "Non-IPv4 packets incoming on the IPv4 link.";
+    }
+
+    leaf drop-bad-checksum-icmpv4-bytes {
+      type yang:zero-based-counter64;
+      description "ICMPv4 packets dropped because of a bad checksum.";
+    }
+
+    leaf drop-all-ipv4-iface-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "All dropped packets and bytes that came in over IPv4 interfaces,
+         whether or not they actually IPv4 (they only include data about
+         packets that go in/out over the wires, excluding internally generated
+         ICMP packets).";
+    }
+    
+    leaf drop-all-ipv6-iface-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "All dropped packets and bytes that came in over IPv6 interfaces,
+         whether or not they actually IPv6 (they only include data about packets
+         that go in/out over the wires, excluding internally generated ICMP
+         packets).";
+    }
+
+    /* Encapsulation B4 queue */
+    leaf out-ipv6-packets {
+      type yang:zero-based-counter64;
+      description "All valid outgoing IPv6 packets.";
+    }
+
+    leaf drop-over-mtu-but-dont-fragment-ipv4-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "IPv4 packets whose size exceeded the MTU, but the DF (Don't Fragment)
+         flag was set.";
+    }
+
+    leaf drop-ttl-zero-ipv4-bytes {
+      type yang:zero-based-counter64;
+      description "IPv4 packets dropped because their TTL was zero.";
+    }
+
+    leaf drop-out-by-policy-icmpv4-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "Internally generated ICMPv4 error packets dropped because of current
+         policy.";
+    }
+
+    leaf drop-no-dest-softwire-ipv4-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "No matching destination softwire in the binding table; incremented
+         whether or not the reason was RFC7596.";
+    }
+
+    leaf drop-in-by-rfc7596-icmpv4-bytes {
+      type yang:zero-based-counter64;
+      description 
+        "Incoming ICMPv4 packets with no destination (RFC 7596 section 8.1).";
+    }
+
+    /* Fragmentation counters IPv4 */
+    leaf drop-ipv4-frag-disabled {
+      type yang:zero-based-counter64;
+      description 
+        "If fragmentation is disabled, the only potentially non-zero IPv4
+         fragmentation counter is drop-ipv4-frag-disabled. If fragmentation is
+         enabled, it will always be zero.";
+    }
+
+    leaf in-ipv4-frag-needs-reassembly {
+      type yang:zero-based-counter64;
+      description "An IPv4 fragment was received.";
+    }
+
+    leaf in-ipv4-frag-reassembled {
+      type yang:zero-based-counter64;
+      description "A packet was successfully reassembled from IPv4 fragments.";
+    }
+
+    leaf in-ipv4-frag-reassembly-unneeded {
+      type yang:zero-based-counter64;
+      description 
+        "An IPv4 packet which was not a fragment was received - consequently,
+         it did not need to be reassembled. This should be the usual case.";
+    }
+
+    leaf drop-ipv4-frag-invalid-reassembly {
+      type yang:zero-based-counter64;
+      description 
+        "Two or more IPv4 fragments were received, and reassembly was started,
+         but was invalid and dropped. Causes include multiple fragments claiming
+         they are the last fragment, overlapping fragment offsets, or the packet
+         was being reassembled from too many fragments (the setting is
+         max_fragments_per_reassembly_packet, and the default is that no packet
+         should be reassembled from more than 40).";
+    }
+
+    leaf drop-ipv4-frag-random-evicted {
+      type yang:zero-based-counter64;
+      description 
+        "Reassembling an IPv4 packet from fragments was in progress, but the
+         configured amount of packets to reassemble at once was exceeded, so one
+         was dropped at random. Consider increasing the setting
+         max_ipv4_reassembly_packets.";
+    }
+
+    leaf out-ipv4-frag {
+      type yang:zero-based-counter64;
+      description 
+        "An outgoing packet exceeded the configured IPv4 MTU, so needed to be
+         fragmented. This may happen, but should be unusual.";
+    }
+
+    leaf out-ipv4-frag-not {
+      type yang:zero-based-counter64;
+      description 
+        "An outgoing packet was small enough to pass through unfragmented - this
+         should be the usual case.";
+    }
+
+    leaf memuse-ipv4-frag-reassembly-buffer {
+      type yang:zero-based-counter64;
+      description 
+        "The amount of memory being used by the statically sized data structure
+         for reassembling IPv4 fragments. This is directly proportional to the
+        setting max_ipv4_reassembly_packets.";
+    }
+
+    /* Fragmentation counters IPv6 */
+    leaf drop-ipv6-frag-disabled {
+      type yang:zero-based-counter64;
+      description 
+        "If fragmentation is disabled, the only potentially non-zero IPv6
+         fragmentation counter is drop-ipv6-frag-disabled. If fragmentation is
+         enabled, it will always be zero.";
+    }
+
+    leaf in-ipv6-frag-needs-reassembly {
+      type yang:zero-based-counter64;
+      description "An IPv6 fragment was received.";
+    }
+
+    leaf in-ipv6-frag-reassembled {
+      type yang:zero-based-counter64;
+      description "A packet was successfully reassembled from IPv6 fragments.";
+    }
+
+    leaf in-ipv6-frag-reassembly-unneeded {
+      type yang:zero-based-counter64;
+      description 
+        "An IPv6 packet which was not a fragment was received - consequently, it
+         did not need to be reassembled. This should be the usual case.";
+    }
+
+    leaf drop-ipv6-frag-invalid-reassembly {
+      type yang:zero-based-counter64;
+      description 
+        "Two or more IPv6 fragments were received, and reassembly was started,
+         but was invalid and dropped. Causes include multiple fragments claiming
+         they are the last fragment, overlapping fragment offsets, or the packet
+         was being reassembled from too many fragments (the setting is
+         max_fragments_per_reassembly_packet, and the default is that no packet
+         should be reassembled from more than 40).";
+    }
+
+    leaf drop-ipv6-frag-random-evicted {
+      type yang:zero-based-counter64;
+      description 
+        "Reassembling an IPv6 packet from fragments was in progress, but the
+        configured amount of packets to reassemble at once was exceeded, so one
+        was dropped at random. Consider increasing the setting
+        max_ipv6_reassembly_packets.";
+    }
+
+    leaf out-ipv6-frag {
+      type yang:zero-based-counter64;
+      description 
+        "An outgoing packet exceeded the configured IPv6 MTU, so needed to be
+        fragmented. This may happen, but should be unusual.";
+    }
+
+    leaf out-ipv6-frag-not {
+      type yang:zero-based-counter64;
+      description 
+        "An outgoing packet was small enough to pass through unfragmented - this
+         should be the usual case.";
+    }
+
+    leaf memuse-ipv6-frag-reassembly-buffer {
+      type yang:zero-based-counter64;
+      description
+        "The amount of memory being used by the statically sized data structure
+         for reassembling IPv6 fragments. This is directly proportional to the
+         setting max_ipv6_reassembly_packets.";
     }
   }
 }

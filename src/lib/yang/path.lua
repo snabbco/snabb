@@ -64,6 +64,7 @@ end
 -- Converts an XPath path to a lua array consisting of path componants.
 -- A path component can then be resolved on a yang data tree:
 function convert_path(grammar, path)
+   local path = normalize_path(path)
    local handlers = {}
    function handlers.scalar(grammar, fragment)
       return {name=fragment.name, grammar=grammar}
@@ -81,6 +82,8 @@ function convert_path(grammar, path)
    local function handle(grammar, fragment)
       return assert(handlers[grammar.type], grammar.type)(grammar, fragment)
    end
+
+   if path == "/" then return {} end
 
    local ret = {}
    local node = grammar

@@ -56,6 +56,17 @@ module snabb-config-leader-v1 {
     }
   }
 
+  rpc get-state {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf path { type string; default "/"; }
+    }
+    output {
+      leaf state { type string; }
+    }
+  }
+
   rpc attach-listener {
     input {
       leaf schema { type string; mandatory true; }
