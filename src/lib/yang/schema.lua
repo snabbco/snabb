@@ -572,8 +572,8 @@ local primitive_types = set(
 
 -- Inherits config attributes from parents
 local function inherit_config(schema, config)
-
    if schema.config ~= nil then
+      assert(not config or schema.config == false)
       config = schema.config
    elseif config ~= nil then
       schema = shallow_copy(schema)
@@ -958,11 +958,6 @@ function selftest()
             leaf baz {
                type uint8;
             }
-
-            leaf qux {
-               config true;
-               type uint8;
-            }
          }
       }
 
@@ -986,7 +981,6 @@ function selftest()
    -- Assert the regular config is propergated through container.
    assert(icschema.body.foo.body.bar.config == false)
    assert(icschema.body.foo.body.bar.body.baz.config == false)
-   assert(icschema.body.foo.body.bar.body.qux.config == true)
 
    -- Now test the grouping, we need to ensure copying is done correctly.
    assert(icschema.body.corge.config == nil)
