@@ -27,7 +27,7 @@ local ring_buffer_t = ffi.typeof([[struct {
 -- A: We need a variable-sized mapping.
 local function create_ring_buffer (name, size)
    local path = shm.resolve(name)
-   shm.mkdir(path)
+   shm.mkdir(lib.dirname(path))
    path = shm.root..'/'..path
    local fd, err = S.open(path, "creat, rdwr, excl", '0664')
    if not fd then
