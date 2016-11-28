@@ -1,0 +1,8 @@
+Usage: snabb ps [OPTION]...
+Print a list of running Snabb instances.
+
+Available options:
+  -h, --help                 Display this message.
+
+The default output format is one PID per line.  More options can be
+added in the future.
