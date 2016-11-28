@@ -1,7 +1,7 @@
 /*
 ** LuaJIT -- a Just-In-Time Compiler for Lua. http://luajit.org/
 **
-** Copyright (C) 2005-2015 Mike Pall. All rights reserved.
+** Copyright (C) 2005-2016 Mike Pall. All rights reserved.
 **
 ** Permission is hereby granted, free of charge, to any person obtaining
 ** a copy of this software and associated documentation files (the
@@ -30,10 +30,10 @@
 
 #include "lua.h"
 
-#define LUAJIT_VERSION		"LuaJIT 2.1.0-beta1"
+#define LUAJIT_VERSION		"LuaJIT 2.1.0-beta2"
 #define LUAJIT_VERSION_NUM	20100  /* Version 2.1.0 = 02.01.00. */
-#define LUAJIT_VERSION_SYM	luaJIT_version_2_1_0_beta1
-#define LUAJIT_COPYRIGHT	"Copyright (C) 2005-2015 Mike Pall"
+#define LUAJIT_VERSION_SYM	luaJIT_version_2_1_0_beta2
+#define LUAJIT_COPYRIGHT	"Copyright (C) 2005-2016 Mike Pall"
 #define LUAJIT_URL		"http://luajit.org/"
 
 /* Modes for luaJIT_setmode. */
@@ -72,6 +72,11 @@ LUA_API void luaJIT_profile_start(lua_State *L, const char *mode,
 LUA_API void luaJIT_profile_stop(lua_State *L);
 LUA_API const char *luaJIT_profile_dumpstack(lua_State *L, const char *fmt,
 					     int depth, size_t *len);
+
+/* Trace profiling API. */
+LUA_API void luaJIT_traceprofile_start(lua_State *L, int interval);
+LUA_API void luaJIT_traceprofile_stop(lua_State *L);
+
 
 /* Enforce (dynamic) linker error for version mismatches. Call from main. */
 LUA_API void LUAJIT_VERSION_SYM(void);

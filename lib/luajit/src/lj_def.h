@@ -1,6 +1,6 @@
 /*
 ** LuaJIT common internal definitions.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2016 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_DEF_H
@@ -95,6 +95,8 @@ typedef unsigned int uintptr_t;
 #define U64x(hi, lo)	(((uint64_t)0x##hi << 32) + (uint64_t)0x##lo)
 #define i32ptr(p)	((int32_t)(intptr_t)(void *)(p))
 #define u32ptr(p)	((uint32_t)(intptr_t)(void *)(p))
+#define i64ptr(p)	((int64_t)(intptr_t)(void *)(p))
+#define u64ptr(p)	((uint64_t)(intptr_t)(void *)(p))
 
 #define checki8(x)	((x) == (int32_t)(int8_t)(x))
 #define checku8(x)	((x) == (int32_t)(uint8_t)(x))

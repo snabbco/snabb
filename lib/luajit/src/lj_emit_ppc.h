@@ -1,6 +1,6 @@
 /*
 ** PPC instruction emitter.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2016 Mike Pall. See Copyright Notice in luajit.h
 */
 
 /* -- Emit basic instructions --------------------------------------------- */
@@ -115,8 +115,8 @@ static void emit_lsptr(ASMState *as, PPCIns pi, Reg r, void *p, RegSet allow)
   emit_tai(as, pi, r, base, i);
 }
 
-#define emit_loadn(as, r, tv) \
-  emit_lsptr(as, PPCI_LFD, ((r) & 31), (void *)(tv), RSET_GPR)
+#define emit_loadk64(as, r, ir) \
+  emit_lsptr(as, PPCI_LFD, ((r) & 31), (void *)&ir_knum((ir))->u64, RSET_GPR)
 
 /* Get/set global_State fields. */
 static void emit_lsglptr(ASMState *as, PPCIns pi, Reg r, int32_t ofs)
