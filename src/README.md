@@ -492,6 +492,10 @@ If *readonly* is non-nil the shared object is mapped in read-only mode.
 *Readonly* defaults to nil. Fails if the shared object does not already exist.
 Returns a pointer to the mapped object.
 
+— Function **shm.alias** *new-path* *existing-path*
+
+Create an alias (symbolic link) for an object.
+
 — Function **shm.exists** *name*
 
 Returns a true value if shared object by *name* exists.
