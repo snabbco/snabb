@@ -19,14 +19,6 @@ module snabb-softwire-v1 {
     description
      "Configuration for Snabb lwaftr.";
 
-     leaf name {
-       description
-        "Name of lwAFTR. This will be used as an identifier with programs within
-         snabb. This must be unique amongst other programs running on the
-         system.";
-       type string;
-     }
-
     grouping traffic-filters {
       description
        "Ingress and egress filters describing the set of packets
