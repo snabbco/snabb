@@ -1,5 +1,6 @@
 module(..., package.seeall)
 
+local engine     = require("core.app")
 local config     = require("core.config")
 local leader     = require("apps.config.leader")
 local follower   = require("apps.config.follower")
@@ -100,6 +101,10 @@ function lwaftr_app(c, conf)
    set_preprocessors(c, preprocessing_apps_v6, "lwaftr.v6")
    set_postprocessors(c, "lwaftr.v6", postprocessing_apps_v6)
    set_postprocessors(c, "lwaftr.v4", postprocessing_apps_v4)
+
+   if conf.name then
+      engine.claim_name(conf.name)
+   end
 end
 
 local function link_apps(c, apps)
