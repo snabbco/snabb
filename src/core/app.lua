@@ -161,7 +161,8 @@ end
 -- This returns a table programs with the key being the name of the program
 -- and the value being the PID of the program. Each program is checked that
 -- it's still alive. Any dead program or program without a name is not listed.
-function enumerate_named_programs()
+-- If the "pidkey" is true, it will have the PID as the key instead of the name.
+function enumerate_named_programs(pidkey)
    local progs = {}
    local dirs = shm.children("/by-name")
    if dirs == nil then return progs end

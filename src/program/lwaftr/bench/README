@@ -18,6 +18,9 @@ Usage: bench CONF IPV4-IN.PCAP IPV6-IN.PCAP
                               is "bench.csv".
   -D DURATION, --duration DURATION
                              Duration in seconds.
+  -n NAME, --name NAME       Sets the name for this program, which will be used
+                             as the identifier. This must be unique amongst
+                             other snabb processes.
 
 Run the lwAFTR with input from IPV4-IN.PCAP and IPV6-IN.PCAP. The bench
 command is used to get an idea of the raw speed of the lwaftr without

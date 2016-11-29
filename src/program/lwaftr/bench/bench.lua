@@ -18,11 +18,12 @@ function parse_args(args)
       opts.duration = assert(tonumber(arg), "duration must be a number")
       assert(opts.duration >= 0, "duration can't be negative")
    end
+   function handlers.n(arg) opts.name = assert(arg) end
    function handlers.b(arg) opts.bench_file = arg end
    function handlers.y() opts.hydra = true end
    function handlers.h() show_usage(0) end
-   args = lib.dogetopt(args, handlers, "hyb:D:", {
-      help="h", hydra="y", ["bench-file"]="b", duration="D" })
+   args = lib.dogetopt(args, handlers, "n:hyb:D", {
+      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n"})
    if #args ~= 3 then show_usage(1) end
    return opts, unpack(args)
 end
@@ -30,6 +31,8 @@ end
 function run(args)
    local opts, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
+
+   if opts.name then engine.claim_name(opts.name) end
 
    local graph = config.new()
    setup.reconfigurable(setup.load_bench, graph, conf,

@@ -25,6 +25,7 @@ function parse_args(args)
       verbosity = 0, ingress_drop_monitor = 'flush', bench_file = 'bench.csv' }
    local handlers = {}
    local cpu
+   function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.i () opts.virtio_net = true end
    function handlers.D (arg)
@@ -95,12 +96,12 @@ function parse_args(args)
    end
    function handlers.reconfigurable() opts.reconfigurable = true end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:vD:yhir:",
+   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:",
       { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
         verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
         ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
         ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
-        hydra = "y", reconfigurable = 0 })
+        hydra = "y", reconfigurable = 0, name="n" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -135,6 +136,8 @@ function run(args)
    local opts, conf_file, v4, v6 = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local use_splitter = requires_splitter(opts, conf)
+
+   if opts.name then engine.claim_name(otps.name) end
 
    local c = config.new()
    local setup_fn, setup_args
