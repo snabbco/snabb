@@ -24,11 +24,11 @@ local function parse_args (args)
 end
 
 local function appname_resolver()
-    local apps = {}
+    local instances = {}
     for name, pid in pairs(app.enumerate_named_programs()) do
-        apps[pid] = name
+        instances[pid] = name
     end
-    return function (pid) return apps[pid] end
+    return function (pid) return instances[pid] end
 end
 
 local function compute_snabb_instances()

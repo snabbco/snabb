@@ -32,6 +32,8 @@ Optional arguments:
                                 written. A simple filename or relative pathname
                                 will be based on the current directory. Default
                                 is "bench.csv".
+       -n NAME, --name NAME     Sets the name as the identifier of this program.
+                                This must be unique amongst other snab programs.
 
 When the -v option is used at least once, packets on the network interfaces are
 counted and recorded, and the corresponding incoming and outgoing packet rates
