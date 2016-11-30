@@ -1,11 +1,13 @@
-Data Format Usage:
-  snabb config get-state <instance identifier> <path>
+Usage: snabb config get-state [OPTION]... ID PATH
+Get the state for a Snabb network function.
 
-This command takes in a instance identifier (a name or a PID) and a path to
-inside the schema and will display the statistics at that path. The program
-will find the conters specified under the path and match those to counters
-defined in the apps.
+Available options:
+  -s, --schema SCHEMA        YANG data interface to request.
+  -r, --revision REVISION    Require a specific revision of the YANG module.
+  -h, --help                 Displays this message.
 
-Example usage:
+If the --schema argument is not provided, "snabb config" will ask the data
+plane for its native schema. The result will be printed on standard output.
 
-  $ snabb config get-state lwaftr1 /softwire-state/
+See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
+for full documentation.
