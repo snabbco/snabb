@@ -580,6 +580,28 @@ registered with `core.shm`:
 - `float` `double`
 - `bool`
 
+The above types can be read and written using `cdata.read` and `cdata.set`.
+
+Additionally, types for fixed length strings for a handful of lengths are
+registered:
+
+- `string64`, `string512`, `string8192`
+
+These can be read and written using `ffi.string` and `ffi.copy`. For safety
+reasons it is advised to use the provided copy functions `cdata.string64.copy`,
+`cdata.string512.copy`, and `cdata.string8192.copy` for writing these types.
+
+**Example:**
+
+```
+myframe = shm.create_frame("myframe",
+                           {pi = {cdata.double, math.pi},
+                            info = {cdata.string512, "placeholder"}})
+cdata.read(myframe.pi) * 2 => 6.2831853071796
+ffi.string(myframe.info) => "placeholder"
+cdata.string512.copy(myframe.info, "Mathematical constant π")
+```
+
 — Function **cdata.create** *name*, [*initval*]
 
 Creates and returns a shared memory cdata object by *name*. The type of the
@@ -604,6 +626,15 @@ Sets the value of shared memory *cdata* object to *value*.
 — Function **cdata.read** *cdata*
 
 Returns the value of shared memory *cdata* object.
+
+— Function **cdata.string64.copy** *cdata*, *string*
+
+— Function **cdata.string512.copy** *cdata*, *string*
+
+— Function **cdata.string8192.copy** *cdata*, *string*
+
+Copies *string* into shared memory *cdata* object. Throws an error if *string*
+does not fit the respective string type.
 
 
 ### Counter (core.counter)
