@@ -6,69 +6,65 @@
 --
 -- Example:
 --
---  local n = create("num", 'double', math.pi)
---  set(n, 2*math.pi)
---  read(n) => number
+--  local cdata = require("core.cdata")
+--  local n = cdata.create("num.double", math.pi)
+--  local n2 = cdata.open("num.double")
+--  cdata.set(n, 2*math.pi)
+--  cdata.read(n2) => 6.2831853071796
+--
+--  local shm = require("core.shm")
+--  local frame = shm.create_frame("myframe", {pi = {cdata.double, math.pi}})
 
 module(..., package.seeall)
 
 local shm = require("core.shm")
 local ffi = require("ffi")
-local C = ffi.C
-require("core.cdata_h")
+local cdata = getfenv()
 
-type = shm.register('cdata', getfenv())
 
-local cdata_t = ffi.typeof("struct cdata")
-
-local ctypes = {
-   int8_t  = C.I8,    uint8_t  = C.U8,
-   int16_t = C.I16,   uint16_t = C.U16,
-   int32_t = C.I32,   uint32_t = C.U32,
-   int64_t = C.I64,   uint64_t = C.U64,
-   float   = C.FLOAT, double   = C.DOUBLE,
-   bool    = C.BOOL
-}
-
-local union = {
-   [C.I8]    = 'i8',    [C.U8]     = 'u8',
-   [C.I16]   = 'i16',   [C.U16]    = 'u16',
-   [C.I32]   = 'i32',   [C.U32]    = 'u32',
-   [C.I64]   = 'i64',   [C.U64]    = 'u64',
-   [C.FLOAT] = 'f',     [C.DOUBLE] = 'd',
-   [C.BOOL]  = 'b'
-}
-
-local function slot (type) return union[tonumber(type)] end
-
-function create (name, type, initval)
-   local type = assert(ctypes[type], "Unsupported type: "..type)
-   local cdata = shm.create(name, cdata_t)
-   cdata.type = type
-   if initval then
-      cdata[slot(type)] = initval
+for _, ctype in ipairs({ 'int8_t', 'uint8_t', 'int16_t', 'uint16_t',
+                         'int32_t', 'uint32_t', 'int64_t', 'uint64_t',
+                         'float', 'double', 'bool' }) do
+   cdata[ctype] = {}
+   cdata[ctype].type = shm.register(ctype, cdata[ctype])
+   cdata[ctype].create = function (name, initval)
+      local cdata = shm.create(name, ctype.."[1]")
+      if initval then cdata[0] = initval end
+      return cdata
    end
-   return cdata
+   cdata[ctype].open = function (name)
+      return shm.open(name, ctype.."[1]", 'readonly')
+   end
 end
 
+function set  (cdata, value) cdata[0] = value end
+function read (cdata) return cdata[0] end
+
+
+function create (name, initval)
+   local _, type = name:match("(.*)[.](.*)$")
+   return assert(cdata[type], "Unsupported type: "..type).create(name, initval)
+end
 
 function open (name)
-   return shm.open(name, cdata_t, 'readonly')
+   local _, type = name:match("(.*)[.](.*)$")
+   return assert(cdata[type], "Unsupported type: "..type).open(name)
 end
 
-function set  (cdata, value) cdata[slot(cdata.type)] = value end
-function read (cdata) return cdata[slot(cdata.type)] end
 
 function selftest ()
-   local d = create("d", "double")
+   local d = create("d.double")
    set(d, math.pi)
-   local d2 = open("d")
+   local d2 = open("d.double")
    assert(math.pi == read(d2))
    local i64 = 10000000ULL
-   local i = create("i", "int64_t", i64)
+   local i = create("i.int64_t", i64)
    assert(read(i) == i64)
-   local b = create("b", "bool", true)
+   local b = create("b.bool", true)
    assert(read(b) == true)
    set(b, false)
    assert(read(b) == false)
+   local f = shm.create_frame("test", {pi = {cdata.double, math.pi}})
+   local f2 = shm.open_frame("test")
+   assert(read(f2.pi) == math.pi)
 end

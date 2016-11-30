@@ -570,6 +570,42 @@ Deletes/unmaps a shared memory *frame*. The *frame* directory is unlinked if
 *frame* was created by `shm.create_frame`.
 
 
+### Cdata (core.cdata)
+
+Shared memory siblings of common Cdata types. The following types are
+registered with `core.shm`:
+
+- `int8_t` `int16_t` `int32_t` `int64_t`
+- `uint8_t` `uint16_t` `uint32_t` `uint64_t`
+- `float` `double`
+- `bool`
+
+— Function **cdata.create** *name*, [*initval*]
+
+Creates and returns a shared memory cdata object by *name*. The type of the
+created cdata object is derived from the type suffix in *name*. If *initval* is
+supplied the object is initialized to *initval*.
+
+**Example:**
+
+```
+cdata.create("pi.double", math.pi)
+```
+
+— Function **cdata.open** *name*
+
+Opens and returns the shared memory cdata object by *name* for reading. The
+type of the created cdata object is derived from the type suffix in *name*.
+
+— Function **cdata.set** *cdata* *value*
+
+Sets the value of shared memory *cdata* object to *value*.
+
+— Function **cdata.read** *cdata*
+
+Returns the value of shared memory *cdata* object.
+
+
 ### Counter (core.counter)
 
 Double-buffered shared memory counters. Counters are 64-bit unsigned values.
