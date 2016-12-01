@@ -16,6 +16,7 @@ local app = require("core.app")
 local shm = require("core.shm")
 local app_graph = require("core.config")
 local action_codec = require("apps.config.action_codec")
+local support = require("apps.config.support")
 local channel = require("apps.config.channel")
 
 Leader = {
@@ -40,19 +41,6 @@ local function open_socket (file)
    return socket
 end
 
-local generic_schema_config_support = {
-   compute_config_actions = function(old_graph, new_graph, verb, path, ...)
-      return app.compute_config_actions(old_graph, new_graph)
-   end
-}
-
-local function load_schema_config_support(schema_name)
-   local mod_name = 'apps.config.support.'..schema_name:gsub('-', '_')
-   local success, support_mod = pcall(require, mod_name)
-   if success then return support_mod.get_config_support() end
-   return generic_schema_config_support
-end
-
 function Leader:new (conf)
    local ret = setmetatable({}, {__index=Leader})
    ret.socket_file_name = conf.socket_file_name
@@ -61,11 +49,10 @@ function Leader:new (conf)
       ret.socket_file_name = instance_dir..'/'..ret.socket_file_name
    end
    ret.schema_name = conf.schema_name
-   ret.support = load_schema_config_support(conf.schema_name)
+   ret.support = support.load_schema_config_support(conf.schema_name)
    ret.socket = open_socket(ret.socket_file_name)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
-   ret.current_app_graph = app_graph.new()
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
    ret.followers = {}
@@ -75,18 +62,23 @@ function Leader:new (conf)
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
 
-   ret:reset_configuration(conf.initial_configuration)
+   ret:set_initial_configuration(conf.initial_configuration)
 
    return ret
 end
 
-function Leader:reset_configuration (configuration)
-   local new_app_graph = self.setup_fn(configuration)
-   local actions = self.support.compute_config_actions(
-      self.current_app_graph, new_app_graph, 'load')
-   self:enqueue_config_actions(actions)
-   self.current_app_graph = new_app_graph
+function Leader:set_initial_configuration (configuration)
    self.current_configuration = configuration
+   self.current_app_graph = self.setup_fn(configuration)
+   self.current_in_place_dependencies = {}
+   self.current_in_place_dependencies =
+      self.support.update_mutable_objects_embedded_in_app_initargs (
+         {}, self.current_app_graph, self.schema_name, 'load', '/',
+         self.current_configuration)
+   local initial_app_graph = app_graph.new() -- Empty.
+   local actions = self.support.compute_config_actions(
+      initial_app_graph, self.current_app_graph, {}, 'load')
+   self:enqueue_config_actions(actions)
 end
 
 function Leader:take_follower_message_queue ()
@@ -95,9 +87,12 @@ function Leader:take_follower_message_queue ()
    return actions
 end
 
+local verbose = os.getenv('SNABB_LEADER_VERBOSE') and true
+
 function Leader:enqueue_config_actions (actions)
    local messages = {}
    for _,action in ipairs(actions) do
+      if verbose then print('encode', action[1], unpack(action[2])) end
       local buf, len = action_codec.encode(action)
       table.insert(messages, { buf=buf, len=len })
    end
@@ -386,13 +381,21 @@ end
 
 function Leader:update_configuration (schema_name, update_fn, verb, path, ...)
    assert(schema_name == self.schema_name)
+   local to_restart =
+      self.support.compute_apps_to_restart_after_configuration_update (
+         self.schema_name, self.current_configuration, verb, path,
+         self.current_in_place_dependencies)
    local new_config = update_fn(self.current_configuration, ...)
    local new_app_graph = self.setup_fn(new_config)
    local actions = self.support.compute_config_actions(
-      self.current_app_graph, new_app_graph, verb, path, ...)
+      self.current_app_graph, new_app_graph, to_restart, verb, path, ...)
    self:enqueue_config_actions(actions)
    self.current_app_graph = new_app_graph
    self.current_configuration = new_config
+   self.current_in_place_dependencies =
+      self.support.update_mutable_objects_embedded_in_app_initargs (
+         self.current_in_place_dependencies, self.current_app_graph,
+         verb, path, ...)
 end
 
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)

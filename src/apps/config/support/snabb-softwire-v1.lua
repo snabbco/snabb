@@ -5,6 +5,7 @@ local app = require('core.app')
 local data = require('lib.yang.data')
 local yang = require('lib.yang.yang')
 local path_mod = require('lib.yang.path')
+local generic = require('apps.config.support').generic_schema_config_support
 
 local function add_softwire_entry_actions(app_graph, entries)
    assert(app_graph.apps['lwaftr'])
@@ -39,16 +40,48 @@ local function remove_softwire_entry_actions(app_graph, path)
    return {{'call_app_method_with_blob', args}}
 end
 
-local function compute_config_actions(old_graph, new_graph, verb, path, arg)
+local function compute_config_actions(old_graph, new_graph, to_restart,
+                                      verb, path, arg)
    if verb == 'add' and path == '/binding-table/softwire' then
       return add_softwire_entry_actions(new_graph, arg)
    elseif verb == 'remove' and path:match('^/binding%-table/softwire') then
       return remove_softwire_entry_actions(new_graph, path)
    else
-      return app.compute_config_actions(old_graph, new_graph)
+      return generic.compute_config_actions(
+         old_graph, new_graph, to_restart, verb, path, arg)
+   end
+end
+
+local function update_mutable_objects_embedded_in_app_initargs(
+      in_place_dependencies, app_graph, schema_name, verb, path, arg)
+   if verb == 'add' and path == '/binding-table/softwire' then
+      return in_place_dependencies
+   elseif verb == 'remove' and path:match('^/binding%-table/softwire') then
+      return in_place_dependencies
+   else
+      return generic.update_mutable_objects_embedded_in_app_initargs(
+         in_place_dependencies, app_graph, schema_name, verb, path, arg)
+   end
+end
+
+local function compute_apps_to_restart_after_configuration_update(
+      schema_name, configuration, verb, path, in_place_dependencies)
+   if verb == 'add' and path == '/binding-table/softwire' then
+      return {}
+   elseif verb == 'remove' and path:match('^/binding%-table/softwire') then
+      return {}
+   else
+      return generic.compute_apps_to_restart_after_configuration_update(
+         schema_name, configuration, verb, path, in_place_dependencies)
    end
 end
 
 function get_config_support()
-   return { compute_config_actions = compute_config_actions }
+   return {
+      compute_config_actions = compute_config_actions,
+      update_mutable_objects_embedded_in_app_initargs =
+         update_mutable_objects_embedded_in_app_initargs,
+      compute_apps_to_restart_after_configuration_update =
+         compute_apps_to_restart_after_configuration_update
+   }
 end
