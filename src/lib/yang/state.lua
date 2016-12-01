@@ -23,14 +23,20 @@ local function flatten(val)
     return rtn
 end
 
-local function find_counters(pid)
+function find_counters(pid)
     local path = shm.root.."/"..pid..counter_directory
-    local counters = {}
+    local apps = {}
     for _, c in pairs(lib.files_in_directory(path)) do
+        local counters = {}
         local counterdir = "/"..pid..counter_directory.."/"..c
-        counters[c] = shm.open_frame(counterdir)
+        for k,v in pairs(shm.open_frame(counterdir)) do
+            if type(v) == "cdata" then
+                counters[k] = v.c
+            end
+        end
+        apps[c] = counters
     end
-    return counters
+    return apps
 end
 
 function collect_state_leaves(schema)
