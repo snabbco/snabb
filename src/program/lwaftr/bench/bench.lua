@@ -3,8 +3,10 @@ module(..., package.seeall)
 local app = require("core.app")
 local config = require("core.config")
 local lib = require("core.lib")
+local numa = require("lib.numa")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local setup = require("program.lwaftr.setup")
+local S = require("syscall")
 
 function show_usage(code)
    print(require("program.lwaftr.bench.README_inc"))
@@ -18,12 +20,22 @@ function parse_args(args)
       opts.duration = assert(tonumber(arg), "duration must be a number")
       assert(opts.duration >= 0, "duration can't be negative")
    end
+   function handlers.cpu(arg)
+      cpu = tonumber(arg)
+      if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
+         fatal("Invalid cpu number: "..arg)
+      end
+      S.setenv("SNABB_TARGET_CPU", tostring(cpu), true)
+      local wanted_node = numa.cpu_get_numa_node(cpu)
+      numa.bind_to_numa_node(wanted_node)
+      print("Bound to numa node: ", wanted_node)
+   end
    function handlers.n(arg) opts.name = assert(arg) end
    function handlers.b(arg) opts.bench_file = arg end
    function handlers.y() opts.hydra = true end
    function handlers.h() show_usage(0) end
-   args = lib.dogetopt(args, handlers, "n:hyb:D", {
-      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n"})
+   args = lib.dogetopt(args, handlers, "n:hyb:D:", {
+      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1 })
    if #args ~= 3 then show_usage(1) end
    return opts, unpack(args)
 end

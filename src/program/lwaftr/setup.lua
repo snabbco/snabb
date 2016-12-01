@@ -18,6 +18,7 @@ local vlan       = require("apps.vlan.vlan")
 local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
+local S          = require("syscall")
 
 local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
@@ -453,15 +454,23 @@ function reconfigurable(f, graph, conf, ...)
       return graph
    end
 
-   local worker_code = [[
+   local worker_code = string.format([[
       local follower = require("apps.config.follower")
       local app = require("core.app")
+      local numa = require("lib.numa")
+
+      local target_cpu = tonumber(%s)
+      if target_cpu then
+         numa.bind_to_cpu(target_cpu)
+         print("Bound worker to CPU: ", target_cpu)
+      end
       local myconf = config.new()
       config.app(myconf, "follower", follower.Follower, {})
       app.configure(myconf)
       app.busywait = true
       app.main({})
-   ]]
+   ]],
+      S.getenv("SNABB_TARGET_CPU"))
    local follower_pid = worker.start("follower", worker_code)
 
    config.app(graph, 'leader', leader.Leader,
