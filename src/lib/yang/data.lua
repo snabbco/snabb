@@ -404,7 +404,7 @@ function data_parser_from_grammar(production)
    function top_parsers.scalar(production)
       local parse = value_parser(production.argument_type)
       return function(str, filename)
-         return parse(parser_mod.parse_string(str, filename))
+         return parse(parser_mod.parse_string(str, filename), '[bare scalar]')
       end
    end
    return assert(top_parsers[production.type])(production)
