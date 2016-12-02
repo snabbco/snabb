@@ -80,8 +80,6 @@ module snabb-softwire-v1 {
         transmission.";
 
       container error-rate-limiting {
-        presence true;
-
         leaf packets {
           type uint32;
           description
@@ -104,8 +102,6 @@ module snabb-softwire-v1 {
         fragmented packets.";
 
       container reassembly {
-        presence true;
-
         leaf max-fragments-per-packet {
           type uint32 { range 1..max; }
           default 20;
@@ -137,8 +133,6 @@ module snabb-softwire-v1 {
        "Configuration for the external, internet-facing IPv4
         interface.";
 
-      presence true;
-
       leaf ip {
         type inet:ipv4-address;
         mandatory true;
@@ -167,7 +161,6 @@ module snabb-softwire-v1 {
       uses reassembly;
 
       container next-hop {
-        presence true;
         leaf ip {
           type inet:ipv4-address;
           description
@@ -186,8 +179,6 @@ module snabb-softwire-v1 {
     container internal-interface {
       description
        "Configuration for the internal IPv6 interface.";
-
-      presence true;
 
       leaf ip {
         type inet:ipv6-address;
@@ -217,7 +208,6 @@ module snabb-softwire-v1 {
       uses reassembly;
 
       container next-hop {
-        presence true;
         leaf ip {
           type inet:ipv6-address;
           description
@@ -240,149 +230,146 @@ module snabb-softwire-v1 {
           two B4s.";
       }
     }
-  }
 
-  container binding-table {
-    description
-     "A collection of softwires (tunnels), along with a description
-      of the IPv4 and IPv6 addresses handled by the lwAFTR.";
-
-    presence true;
-
-    list psid-map {
+    container binding-table {
       description
-       "The set of IPv4 addresses managed by the lwAFTR, along with
-        the way in which those IPv4 addresses share ports.  A PSID map
-        entry associates a PSID length, shift, and
-        reserved-ports-bit-count with each IPv4 address served by
-        the lwAFTR.
+       "A collection of softwires (tunnels), along with a description
+        of the IPv4 and IPv6 addresses handled by the lwAFTR.";
 
-        The lightweight 4-over-6 architecture supports sharing of
-        IPv4 addresses by partitioning the space of TCP/UDP/ICMP
-        ports into disjoint \"port sets\".  Each softwire associated
-        with an IPv4 address corresponds to a different set of ports
-        on that address.  The way that the ports are partitioned is
-        specified in RFC 7597:  each address has an associated set
-        of parameters that specifies how to compute a \"port set
-        identifier\" (PSID) from a given port.
-
-                             0                   1
-                             0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
-                            +-----------+-----------+-------+
-              Ports in      |     A     |    PSID   |   j   |
-           the CE port set  |    > 0    |           |       |
-                            +-----------+-----------+-------+
-                            |  a bits   |  k bits   |m bits |
-
-             Figure 2: Structure of a Port-Restricted Port Field
-
-          Source: http://tools.ietf.org/html/rfc7597#section-5.1
-
-        We find the specification's names to be a bit obtuse, so we
-        refer to them using the following names:
-
-          a bits = reserved-ports-bit-count.
-          k bits = psid-length.
-          m bits = shift.";
-
-      key addr;
-
-      leaf addr {
-        type inet:ipv4-address;
-        mandatory true;
+      list psid-map {
         description
-         "Public IPv4 address managed by the lwAFTR.";
+         "The set of IPv4 addresses managed by the lwAFTR, along with
+          the way in which those IPv4 addresses share ports.  A PSID map
+          entry associates a PSID length, shift, and
+          reserved-ports-bit-count with each IPv4 address served by
+          the lwAFTR.
+
+          The lightweight 4-over-6 architecture supports sharing of
+          IPv4 addresses by partitioning the space of TCP/UDP/ICMP
+          ports into disjoint \"port sets\".  Each softwire associated
+          with an IPv4 address corresponds to a different set of ports
+          on that address.  The way that the ports are partitioned is
+          specified in RFC 7597:  each address has an associated set
+          of parameters that specifies how to compute a \"port set
+          identifier\" (PSID) from a given port.
+
+                               0                   1
+                               0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5
+                              +-----------+-----------+-------+
+                Ports in      |     A     |    PSID   |   j   |
+             the CE port set  |    > 0    |           |       |
+                              +-----------+-----------+-------+
+                              |  a bits   |  k bits   |m bits |
+
+               Figure 2: Structure of a Port-Restricted Port Field
+
+            Source: http://tools.ietf.org/html/rfc7597#section-5.1
+
+          We find the specification's names to be a bit obtuse, so we
+          refer to them using the following names:
+
+            a bits = reserved-ports-bit-count.
+            k bits = psid-length.
+            m bits = shift.";
+
+        key addr;
+
+        leaf addr {
+          type inet:ipv4-address;
+          mandatory true;
+          description
+           "Public IPv4 address managed by the lwAFTR.";
+        }
+
+        leaf end-addr {
+          type inet:ipv4-address;
+          description
+           "If present, this PSID map entry applies to all addresses
+            between 'addr' and this address, inclusive.";
+        }
+
+        leaf psid-length {
+          type uint8 { range 0..16; }
+          mandatory true;
+          description
+           "The number of bits devoted to the PSID in the port map.
+            If the psid-length is N, then the IPv4 address will be
+            shared 2^N ways.  Note that psid-length, shift, and
+            reserved-ports-bit-count must add up to 16.";
+        }
+
+        leaf shift {
+          type uint8 { range 0..16; }
+          description
+           "Given an incoming port, one can obtain the PSID by
+            shifting the port right by 'shift' bits and then masking
+            off the lowest 'psid-length' bits.  Defaults to 16 -
+            psid-length.  Note that psid-length, shift, and
+            reserved-ports-bit-count must add up to 16.";
+        }
+
+        leaf reserved-ports-bit-count {
+          type uint8 { range 0..16; }
+          default 0;
+          description
+           "Reserve the lowest 2^N ports so that they map to no
+            softwire.  This can be useful to prevent the low 1024
+            ports (for example) from being mapped to customers.  Note
+            that psid-length and shift must add up to less than or
+            equal to 16.";
+        }
       }
 
-      leaf end-addr {
-        type inet:ipv4-address;
-        description
-         "If present, this PSID map entry applies to all addresses
-          between 'addr' and this address, inclusive.";
-      }
-
-      leaf psid-length {
-        type uint8 { range 0..16; }
-        mandatory true;
-        description
-         "The number of bits devoted to the PSID in the port map.
-          If the psid-length is N, then the IPv4 address will be
-          shared 2^N ways.  Note that psid-length, shift, and
-          reserved-ports-bit-count must add up to 16.";
-      }
-
-      leaf shift {
-        type uint8 { range 0..16; }
-        description
-         "Given an incoming port, one can obtain the PSID by
-          shifting the port right by 'shift' bits and then masking
-          off the lowest 'psid-length' bits.  Defaults to 16 -
-          psid-length.  Note that psid-length, shift, and
-          reserved-ports-bit-count must add up to 16.";
-      }
-
-      leaf reserved-ports-bit-count {
-        type uint8 { range 0..16; }
-        default 0;
-        description
-         "Reserve the lowest 2^N ports so that they map to no
-          softwire.  This can be useful to prevent the low 1024
-          ports (for example) from being mapped to customers.  Note
-          that psid-length and shift must add up to less than or
-          equal to 16.";
-      }
-    }
-
-    leaf-list br-address {
-      type inet:ipv6-address;
-      description
-       "B4-facing address of an lwAFTR.";
-    }
-
-    list softwire {
-      key "ipv4 psid padding";
-
-      leaf ipv4 {
-        type inet:ipv4-address;
-        mandatory true;
-        description
-         "Public IPv4 address of the softwire.";
-      }
-
-      leaf psid {
-        type uint16;
-        mandatory true;
-        description
-         "Port set ID.";
-      }
-
-      leaf padding {
-        type uint16 { range 0..0; }
-        default 0;
-        description
-         "Reserved bytes.";
-      }
-
-      leaf br {
-        type uint32;
-        default 0;
-        description
-         "The B4-facing address of the lwAFTR for this softwire, as
-          a zero-based index into br-addresses.";
-      }
-
-      leaf b4-ipv6 {
+      leaf-list br-address {
         type inet:ipv6-address;
-        mandatory true;
         description
-         "B4 address.";
+         "B4-facing address of an lwAFTR.";
+      }
+
+      list softwire {
+        key "ipv4 psid padding";
+
+        leaf ipv4 {
+          type inet:ipv4-address;
+          mandatory true;
+          description
+           "Public IPv4 address of the softwire.";
+        }
+
+        leaf psid {
+          type uint16;
+          mandatory true;
+          description
+           "Port set ID.";
+        }
+
+        leaf padding {
+          type uint16 { range 0..0; }
+          default 0;
+          description
+           "Reserved bytes.";
+        }
+
+        leaf br {
+          type uint32;
+          default 0;
+          description
+           "The B4-facing address of the lwAFTR for this softwire, as
+            a zero-based index into br-addresses.";
+        }
+
+        leaf b4-ipv6 {
+          type inet:ipv6-address;
+          mandatory true;
+          description
+           "B4 address.";
+        }
       }
     }
   }
   
   container softwire-state {
     description "State data about lwaftr.";
-    presence true;
     config false;
     
     /* Decapsulation B4 queue */

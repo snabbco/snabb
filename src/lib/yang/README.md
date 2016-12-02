@@ -24,7 +24,6 @@ module snabb-simple-router {
   leaf active { type boolean; default true; }
 
   container routes {
-    presence true;
     list route {
       key addr;
       leaf addr { type inet:ipv4-address; mandatory true; }
@@ -81,13 +80,9 @@ syntax from the schema, in the following way:
   is the name of the leaf, and the value is in the right syntax for
   the leaf's type.  (More on value types below.)
 
-- A `container`'s configuration can be one of two ways.  Firstly, if
-  its `presence` attribute is `true`, then the container's
-  configuration is the container's keyword followed by the
-  configuration of its data node children, like `keyword {
-  configuration... }`.  Otherwise if its `presence` is `false`, then a
-  container's configuration is just its data node children's
-  configuration, in any order.
+- A `container`'s configuration is the container's keyword followed by
+  the configuration of its data node children, like `keyword {
+  configuration... }`.
 
 - A `leaf-list`'s configuration is a sequence of 0 or more instances
   of `keyword value;`, as in `leaf`.
@@ -125,10 +120,7 @@ routes {
 Except in special cases as described in RFC 6020, order is
 insignificant.  You could have `active false;` at the end, for
 example, and `route { addr 1.2.3.4; port 1; }` is the same as `route {
-port 1; addr 1.2.3.4; }`.  Note that if `presence` is false (the
-default), the grammar is the same except there's no outer `routes { }`
-wrapper; the `route` statements would be at the same level as
-`active`.
+port 1; addr 1.2.3.4; }`.
 
 The surface syntax of our configuration format is the same as for YANG
 schemas; `"1.2.3.4"` is the same as `1.2.3.4`.  Snabb follows the XML
@@ -260,9 +252,6 @@ In this case, the result would be a table with two keys, `active` and
 `routes`.  The value of the `active` key would be Lua boolean `true`.
 
 The `routes` container is just another table of the same kind.
-(Remember however that only containers with `presence true;` have
-corresponding nodes in the configuration syntax, and corresponding
-sub-tables in the result configuration objects.)
 
 Inside the `routes` container is the `route` list, which is represented
 as an associative array.  The particular representation for the
@@ -301,13 +290,13 @@ Let us return to the representation of compound configurations, like
 compiled to raw FFI data.  A configuration's shape is determined by its
 schema.  A schema node whose data will be fixed is either a leaf whose
 type is numeric or boolean and which is either mandatory or has a
-default value, or a container (`leaf-list`, `container` with presence,
-or `list`) whose elements are all themselves fixed.
+default value, or a container (`leaf-list`, `container`, or `list`)
+whose elements are all themselves fixed.
 
-In practice this means that a fixed `container` with presence will be
-compiled to an FFI `struct` type.  This is mostly transparent from the
-user perspective, as in LuaJIT you access struct members by name in the
-same way as for normal Lua tables.
+In practice this means that a fixed `container` will be compiled to an
+FFI `struct` type.  This is mostly transparent from the user
+perspective, as in LuaJIT you access struct members by name in the same
+way as for normal Lua tables.
 
 A fixed `leaf-list` will be compiled to an FFI array of its element
 type, but on the Lua side is given the normal 1-based indexing and

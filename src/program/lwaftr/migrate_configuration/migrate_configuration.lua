@@ -24,10 +24,12 @@ end
 
 local function parse_args(args)
    local handlers = {}
+   local version = 'legacy'
    function handlers.h() show_usage(0) end
-   args = lib.dogetopt(args, handlers, "h", { help="h" })
+   function handlers.f(v) version = string.lower(v) end
+   args = lib.dogetopt(args, handlers, "hf:", { help="h", from="f" })
    if #args ~= 1 then show_usage(1) end
-   return unpack(args)
+   return args[1], version
 end
 
 local policies = {
@@ -340,14 +342,26 @@ local function migrate_conf(old)
    }
 end
 
-local function load_legacy_lwaftr_config(stream)
+local function migrate_legacy(stream)
    local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
    return migrate_conf(conf)
 end
 
+local function migrate_3_0_1(conf_file)
+   local data = require('lib.yang.data')
+   local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
+   return data.load_data_for_schema_by_name('snabb-softwire-v1', str, conf_file)
+end
+
+local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1 }
 function run(args)
-   local conf_file = parse_args(args)
-   local conf = load_legacy_lwaftr_config(conf_file)
+   local conf_file, version = parse_args(args)
+   local migrate = migrators[version]
+   if not migrate then
+      io.stderr:write("error: unknown version: "..version.."\n")
+      show_usage(1)
+   end
+   local conf = migrate(conf_file)
    yang.print_data_for_schema_by_name('snabb-softwire-v1', conf, io.stdout)
    main.exit(0)
 end

@@ -71,7 +71,6 @@ module snabb-simple-router {
   leaf-list public-ip { type inet:ipv4-address; }
 
   container routes {
-    presence true;
     list route {
       key addr;
       leaf addr { type inet:ipv4-address; mandatory true; }
@@ -103,9 +102,6 @@ public-ip 10.10.10.11;
 The surface syntax of data is the same as for YANG schemas; you can
 have end-of-line comments with `//`, larger comments with `/* ... */`,
 and the YANG schema quoting rules for strings apply.
-
-Note that containers like `route {}` only appear in the data syntax if
-they are marked as `presence true;` in the schema.
 
 So indeed, `snabb config get ID /` might print out just the output given
 above.
