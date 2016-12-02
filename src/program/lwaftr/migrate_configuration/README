@@ -2,10 +2,20 @@ Usage: migrate-configuration LWAFTR.CONF
 
 Options:
   -h, --help                 Print usage information.
+  -f, --from=VERSION         Specify version from which to migrate.
 
 Migrate an old-style configuration and binding table to the new YANG
 configuration.  LWAFTR.CONF should be the name of an old lwAFTR
-configuration.
+configuration.  Available VERSION values are:
 
-The resulting new-style configuration will be printed on standard
+  legacy
+    Configuration from pre-v3.0.0 lwAFTR.
+  3.0.1
+    lwAFTR versions where "container" nodes in schemas are missing
+    corresponding nodes in the data unless "presence true" is
+    specified.
+
+The default version is "legacy".
+
+The resulting up-to-date configuration will be printed on standard
 output, ready to be saved to a new file.

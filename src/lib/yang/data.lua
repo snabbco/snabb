@@ -78,7 +78,6 @@ function data_grammar_from_schema(schema)
    end
    function handlers.container(node)
       local members = visit_body(node)
-      if not node.presence then return members end
       return {[node.id]={type='struct', members=members,
                          ctype=struct_ctype(members)}}
    end
@@ -670,7 +669,6 @@ function selftest()
       }
 
       container fruit-bowl {
-         presence true;
          leaf description { type string; }
          list contents { uses fruit; key name; }
       }

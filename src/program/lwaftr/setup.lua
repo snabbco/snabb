@@ -24,62 +24,64 @@ end
 
 function lwaftr_app(c, conf)
    assert(type(conf) == 'table')
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler,
               { max_ipv4_reassembly_packets =
-                   conf.external_interface.reassembly.max_packets,
+                   external_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =
-                   conf.external_interface.reassembly.max_fragments_per_packet })
+                   external_interface.reassembly.max_fragments_per_packet })
    config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6,
               { max_ipv6_reassembly_packets =
-                   conf.internal_interface.reassembly.max_packets,
+                   internal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =
-                   conf.internal_interface.reassembly.max_fragments_per_packet })
+                   internal_interface.reassembly.max_fragments_per_packet })
    config.app(c, "icmpechov4", ipv4_apps.ICMPEcho,
-              { address = convert_ipv4(conf.external_interface.ip) })
+              { address = convert_ipv4(external_interface.ip) })
    config.app(c, "icmpechov6", ipv6_apps.ICMPEcho,
-              { address = conf.internal_interface.ip })
+              { address = internal_interface.ip })
    config.app(c, 'lwaftr', lwaftr.LwAftr, conf)
    config.app(c, "fragmenterv4", ipv4_apps.Fragmenter,
-              { mtu=conf.external_interface.mtu })
+              { mtu=external_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
-              { mtu=conf.internal_interface.mtu })
+              { mtu=internal_interface.mtu })
    config.app(c, "ndp", ipv6_apps.NDP,
-              { src_ipv6 = conf.internal_interface.ip,
-                src_eth = conf.internal_interface.mac,
-                dst_eth = conf.internal_interface.next_hop.mac,
-                dst_ipv6 = conf.internal_interface.next_hop.ip })
+              { src_ipv6 = internal_interface.ip,
+                src_eth = internal_interface.mac,
+                dst_eth = internal_interface.next_hop.mac,
+                dst_ipv6 = internal_interface.next_hop.ip })
    config.app(c, "arp", ipv4_apps.ARP,
-              { src_ipv4 = convert_ipv4(conf.external_interface.ip),
-                src_eth = conf.external_interface.mac,
-                dst_eth = conf.external_interface.next_hop.mac,
-                dst_ipv4 = convert_ipv4(conf.external_interface.next_hop.ip) })
+              { src_ipv4 = convert_ipv4(external_interface.ip),
+                src_eth = external_interface.mac,
+                dst_eth = external_interface.next_hop.mac,
+                dst_ipv4 = convert_ipv4(external_interface.next_hop.ip) })
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
    local preprocessing_apps_v6  = { "reassemblerv6" }
    local postprocessing_apps_v4  = { "fragmenterv4" }
    local postprocessing_apps_v6  = { "fragmenterv6" }
 
-   if conf.external_interface.ingress_filter then
+   if external_interface.ingress_filter then
       config.app(c, "ingress_filterv4", PcapFilter,
-                 { filter = conf.external_interface.ingress_filter })
+                 { filter = external_interface.ingress_filter })
       append(preprocessing_apps_v4, "ingress_filterv4")
    end
-   if conf.internal_interface.ingress_filter then
+   if internal_interface.ingress_filter then
       config.app(c, "ingress_filterv6", PcapFilter,
-                 { filter = conf.internal_interface.ingress_filter })
+                 { filter = internal_interface.ingress_filter })
       append(preprocessing_apps_v6, "ingress_filterv6")
    end
-   if conf.external_interface.egress_filter then
+   if external_interface.egress_filter then
       config.app(c, "egress_filterv4", PcapFilter,
-                 { filter = conf.external_interface.egress_filter })
+                 { filter = external_interface.egress_filter })
       prepend(postprocessing_apps_v4, "egress_filterv4")
    end
-   if conf.internal_interface.egress_filter then
+   if internal_interface.egress_filter then
       config.app(c, "egress_filterv6", PcapFilter,
-                 { filter = conf.internal_interface.egress_filter })
+                 { filter = internal_interface.egress_filter })
       prepend(postprocessing_apps_v6, "egress_filterv6")
    end
 
@@ -148,19 +150,21 @@ end
 
 function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
    lwaftr_app(c, conf)
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
 
    config.app(c, v4_nic_name, Intel82599, {
       pciaddr=v4_nic_pci,
-      vmdq=conf.external_interface.vlan_tag,
-      vlan=conf.external_interface.vlan_tag,
+      vmdq=external_interface.vlan_tag,
+      vlan=external_interface.vlan_tag,
       rxcounter=1,
-      macaddr=ethernet:ntop(conf.external_interface.mac)})
+      macaddr=ethernet:ntop(external_interface.mac)})
    config.app(c, v6_nic_name, Intel82599, {
       pciaddr=v6_nic_pci,
-      vmdq=conf.internal_interface.vlan_tag,
-      vlan=conf.internal_interface.vlan_tag,
+      vmdq=internal_interface.vlan_tag,
+      vlan=internal_interface.vlan_tag,
       rxcounter=1,
-      macaddr = ethernet:ntop(conf.internal_interface.mac)})
+      macaddr = ethernet:ntop(internal_interface.mac)})
 
    link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
    link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
@@ -170,13 +174,15 @@ function load_on_a_stick(c, conf, args)
    lwaftr_app(c, conf)
    local v4_nic_name, v6_nic_name, v4v6, pciaddr, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.pciaddr, args.mirror
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
 
    if v4v6 then
       config.app(c, 'nic', Intel82599, {
          pciaddr = pciaddr,
-         vmdq=conf.external_interface.vlan_tag,
-         vlan=conf.external_interface.vlan_tag,
-         macaddr = ethernet:ntop(conf.external_interface.mac)})
+         vmdq=external_interface.vlan_tag,
+         vlan=external_interface.vlan_tag,
+         macaddr = ethernet:ntop(external_interface.mac)})
       if mirror then
          local Tap = require("apps.tap.tap").Tap
          local ifname = mirror
@@ -196,13 +202,13 @@ function load_on_a_stick(c, conf, args)
    else
       config.app(c, v4_nic_name, Intel82599, {
          pciaddr = pciaddr,
-         vmdq=conf.external_interface.vlan_tag,
-         vlan=conf.external_interface.vlan_tag,
-         macaddr = ethernet:ntop(conf.external_interface.mac)})
+         vmdq=external_interface.vlan_tag,
+         vlan=external_interface.vlan_tag,
+         macaddr = ethernet:ntop(external_interface.mac)})
       config.app(c, v6_nic_name, Intel82599, {
          pciaddr = pciaddr,
-         vmdq=conf.internal_interface.vlan_tag,
-         vlan=conf.internal_interface.vlan_tag,
+         vmdq=internal_interface.vlan_tag,
+         vlan=internal_interface.vlan_tag,
          macaddr = ethernet:ntop(conf.internal_interface.mac)})
 
       link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
@@ -212,15 +218,17 @@ end
 
 function load_virt(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
    lwaftr_app(c, conf)
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
 
    config.app(c, v4_nic_name, VirtioNet, {
       pciaddr=v4_nic_pci,
-      vlan=conf.external_interface.vlan_tag,
-      macaddr=ethernet:ntop(conf.external_interface.mac)})
+      vlan=external_interface.vlan_tag,
+      macaddr=ethernet:ntop(external_interface.mac)})
    config.app(c, v6_nic_name, VirtioNet, {
       pciaddr=v6_nic_pci,
-      vlan=conf.internal_interface.vlan_tag,
-      macaddr = ethernet:ntop(conf.internal_interface.mac)})
+      vlan=internal_interface.vlan_tag,
+      macaddr = ethernet:ntop(internal_interface.mac)})
 
    link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
    link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
@@ -228,18 +236,20 @@ end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
    lwaftr_app(c, conf)
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
 
    config.app(c, "capturev4", pcap.PcapReader, v4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, v6_pcap)
    config.app(c, "repeaterv4", basic_apps.Repeater)
    config.app(c, "repeaterv6", basic_apps.Repeater)
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
    end
-   if conf.internal_interface.vlan_tag then
+   if internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
    end
    config.app(c, v4_sink, basic_apps.Sink)
    config.app(c, v6_sink, basic_apps.Sink)
@@ -248,11 +258,11 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
    config.link(c, "capturev6.output -> repeaterv6.input")
 
    local v4_src, v6_src = 'repeaterv4.output', 'repeaterv6.output'
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       config.link(c, v4_src.." -> untagv4.input")
       v4_src = "untagv4.output"
    end
-   if conf.internal_interface.vlan_tag then
+   if internal_interface.vlan_tag then
       config.link(c, v6_src.." -> untagv6.input")
       v6_src = "untagv6.output"
    end
@@ -262,22 +272,24 @@ end
 
 function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    lwaftr_app(c, conf)
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "output_filev4", pcap.PcapWriter, outv4_pcap)
    config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
    end
-   if conf.internal_interface.vlan_tag then
+   if internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
    end
 
    config.app(c, 'v4v6', V4V6)
@@ -287,7 +299,7 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
    local sources = { "v4v6.v4", "v4v6.v6" }
    local sinks = { "v4v6.v4", "v4v6.v6" }
 
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       config.link(c, "capturev4.output -> untagv4.input")
       config.link(c, "capturev6.output -> untagv6.input")
       config.link(c, "untagv4.output -> join.in1")
@@ -313,28 +325,30 @@ end
 
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    lwaftr_app(c, conf)
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "output_filev4", pcap.PcapWriter, outv4_pcap)
    config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
    end
-   if conf.internal_interface.vlan_tag then
+   if internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
    end
 
    local sources = { "capturev4.output", "capturev6.output" }
    local sinks = { "output_filev4.input", "output_filev6.input" }
 
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       sources = { "untagv4.output", "untagv6.output" }
       sinks = { "tagv4.input", "tagv6.input" }
 
@@ -350,23 +364,25 @@ end
 
 function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
    lwaftr_app(c, conf)
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "loop_v4", basic_apps.Repeater)
    config.app(c, "loop_v6", basic_apps.Repeater)
    config.app(c, "sink", basic_apps.Sink)
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
    end
-   if conf.internal_interface.vlan_tag then
+   if internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
    end
 
    local sources = { "loop_v4.output", "loop_v6.output" }
@@ -375,7 +391,7 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
    config.link(c, "capturev4.output -> loop_v4.input")
    config.link(c, "capturev6.output -> loop_v6.input")
 
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       sources = { "untagv4.output", "untagv6.output" }
       sinks = { "tagv4.input", "tagv6.input" }
 
@@ -391,23 +407,25 @@ end
 
 function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
    lwaftr_app(c, conf)
+   local external_interface = conf.softwire_config.external_interface
+   local internal_interface = conf.softwire_config.internal_interface
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "loop_v4", basic_apps.Repeater)
    config.app(c, "loop_v6", basic_apps.Repeater)
    config.app(c, "sink", basic_apps.Sink)
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=conf.external_interface.vlan_tag })
+                 { tag=external_interface.vlan_tag })
    end
-   if conf.internal_interface.vlan_tag then
+   if internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=conf.internal_interface.vlan_tag })
+                 { tag=internal_interface.vlan_tag })
    end
 
    config.app(c, 'v4v6', V4V6)
@@ -420,7 +438,7 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
    config.link(c, "capturev4.output -> loop_v4.input")
    config.link(c, "capturev6.output -> loop_v6.input")
 
-   if conf.external_interface.vlan_tag then
+   if external_interface.vlan_tag then
       config.link(c, "loop_v4.output -> untagv4.input")
       config.link(c, "loop_v6.output -> untagv6.input")
       config.link(c, "untagv4.output -> join.in1")

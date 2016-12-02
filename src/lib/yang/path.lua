@@ -256,7 +256,6 @@ function selftest()
       leaf-list blocked-ips { type inet:ipv4-address; }
 
       container routes {
-         presence true;
          list route {
             key addr;
             leaf addr { type inet:ipv4-address; mandatory true; }
@@ -315,7 +314,6 @@ function selftest()
       import ietf-inet-types {prefix inet;}
 
       container bowl {
-         presence true;
          list fruit {
             key name;
             leaf name { type string; mandatory true; }

@@ -115,19 +115,14 @@ function selftest ()
       leaf-list blocked-ips { type inet:ipv4-address; }
 
       container routes {
-         presence true;
          list route {
             key addr;
             leaf addr { type inet:ipv4-address; mandatory true; }
             leaf port { type uint8 { range 0..11; } mandatory true; }
          }
-
       }
 
-
-
       container state {
-         presence true;
          config false;
 
          leaf total-packets {
@@ -153,7 +148,6 @@ function selftest ()
       }
 
       container detailed-state {
-         presence true;
          config false;
          uses "detailed-counters";
       }

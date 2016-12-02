@@ -72,16 +72,16 @@ function parse_args (args)
    return opts, conf_file, id, pci, mac, sock_path, mirror_id
 end
 
-local function effective_vlan (conf, lwconf)
+local function effective_vlan (conf, external_interface, internal_interface)
    if conf.settings and conf.settings.vlan then
       return conf.settings.vlan
    end
-   if lwconf.external_interface.vlan_tag then
-      if lwconf.external_interface.vlan_tag == lwconf.internal_interface.vlan_tag then
-         return lwconf.external_interface.vlan_tag
+   if external_interface.vlan_tag then
+      if external_interface.vlan_tag == internal_interface.vlan_tag then
+         return external_interface.vlan_tag
       end
-      return {v4_vlan_tag = lwconf.external_interface.vlan_tag,
-              v6_vlan_tag = lwconf.internal_interface.vlan_tag}
+      return {v4_vlan_tag = external_interface.vlan_tag,
+              v6_vlan_tag = internal_interface.vlan_tag}
    end
    return false
 end
@@ -90,6 +90,7 @@ function run(args)
    local opts, conf_file, id, pci, mac, sock_path, mirror_id = parse_args(args)
 
    local conf, lwconf
+   local external_interface, internal_interface
    local ring_buffer_size = 2048
 
    local ingress_drop_action = "flush"
@@ -107,9 +108,10 @@ function run(args)
          fatal(("lwAFTR conf file '%s' not found"):format(conf.lwaftr))
       end
       lwconf = require('apps.lwaftr.conf').load_lwaftr_config(conf.lwaftr)
+      external_interface = lwconf.softwire_config.external_interface
+      internal_interface = lwconf.softwire_config.internal_interface
       -- If one interface has vlan tags, the other one should as well.
-      assert((not lwconf.external_interface.vlan_tag) ==
-            (not lwconf.internal_interface.vlan_tag))
+      assert((not external_interface.vlan_tag) == (not internal_interface.vlan_tag))
    else
       print(("Interface '%s' set to passthrough mode."):format(id))
       ring_buffer_size = 1024
@@ -144,15 +146,11 @@ function run(args)
    local vlan = false
    local mtu = DEFAULT_MTU
    if lwconf then
-      vlan = effective_vlan(conf, lwconf)
-      mtu = lwconf.internal_interface.mtu
-      if lwconf.external_interface.mtu > mtu then
-         mtu = lwconf.external_interface.mtu
-      end
+      vlan = effective_vlan(conf, external_interface, internal_interface)
+      mtu = internal_interface.mtu
+      if external_interface.mtu > mtu then mtu = external_interface.mtu end
       mtu = mtu + constants.ethernet_header_size
-      if lwconf.external_interface.vlan_tag then
-         mtu = mtu + 4
-      end
+      if external_interface.vlan_tag then mtu = mtu + 4 end
    end
 
    conf.interface = {

@@ -10,88 +10,90 @@ file.  That file's grammar is derived from the YANG schema; see the
 Here's an example:
 
 ```
-// IPv4 interface.
-external-interface {
-  allow-incoming-icmp true;
-  // Limit ICMP error transmit rate to PACKETS/PERIOD.
-  error-rate-limiting {
-    packets 600000;
-    period 2;
+softwire-config {
+  // IPv4 interface.
+  external-interface {
+    allow-incoming-icmp true;
+    // Limit ICMP error transmit rate to PACKETS/PERIOD.
+    error-rate-limiting {
+      packets 600000;
+      period 2;
+    }
+    // Generate ICMP errors at all?
+    generate-icmp-errors true;
+    // Basic parameters.
+    ip 10.10.10.10;
+    mac 12:12:12:12:12:12;
+    mtu 1460;
+    // vlan-tag 42;
+    // Where to go next.  Either one will suffice; if you specify the IP,
+    // the next-hop MAC will be determined by ARP.
+    next-hop {
+      mac 68:68:68:68:68:68;
+      ip 1.2.3.4;
+    }
+    // Control the size of the fragment reassembly buffer.
+    reassembly {
+      max-fragments-per-packet 40;
+      max-packets 20000;
+    }
   }
-  // Generate ICMP errors at all?
-  generate-icmp-errors true;
-  // Basic parameters.
-  ip 10.10.10.10;
-  mac 12:12:12:12:12:12;
-  mtu 1460;
-  // vlan-tag 42;
-  // Where to go next.  Either one will suffice; if you specify the IP,
-  // the next-hop MAC will be determined by ARP.
-  next-hop {
-    mac 68:68:68:68:68:68;
-    ip 1.2.3.4;
+  // The same thing as for the external interface, but on the IPv6 side
+  // and with IPv6 addresses.
+  internal-interface {
+    allow-incoming-icmp true;
+    error-rate-limiting {
+      packets 600000;
+      period 2;
+    }
+    generate-icmp-errors true;
+    // One more interesting thing -- here we control whether to support
+    // routing traffic between two B4s.
+    hairpinning true;
+    ip 8:9:a:b:c:d:e:f;
+    mac 22:22:22:22:22:22;
+    mtu 1500;
+    // vlan-tag 64;
+    next-hop {
+      mac 44:44:44:44:44:44;
+      // NDP instead of ARP of course.
+      ip 7:8:9:a:b:c:d:e;
+    }
+    reassembly {
+      max-fragments-per-packet 40;
+      max-packets 20000;
+    }
   }
-  // Control the size of the fragment reassembly buffer.
-  reassembly {
-    max-fragments-per-packet 40;
-    max-packets 20000;
-  }
-}
-// The same thing as for the external interface, but on the IPv6 side
-// and with IPv6 addresses.
-internal-interface {
-  allow-incoming-icmp true;
-  error-rate-limiting {
-    packets 600000;
-    period 2;
-  }
-  generate-icmp-errors true;
-  // One more interesting thing -- here we control whether to support
-  // routing traffic between two B4s.
-  hairpinning true;
-  ip 8:9:a:b:c:d:e:f;
-  mac 22:22:22:22:22:22;
-  mtu 1500;
-  // vlan-tag 64;
-  next-hop {
-    mac 44:44:44:44:44:44;
-    // NDP instead of ARP of course.
-    ip 7:8:9:a:b:c:d:e;
-  }
-  reassembly {
-    max-fragments-per-packet 40;
-    max-packets 20000;
-  }
-}
-// Now the binding table!  3 parts: PSID map, BR address table, and
-// softwire set.  See description below for details.
-binding-table {
-  psid-map { addr 178.79.150.15; psid-length 4; }
-  psid-map { addr 178.79.150.233; psid-length 16; }
-  psid-map { addr 178.79.150.2; psid-length 16; }
-  br-address 8:9:a:b:c:d:e:f;
-  br-address 1e:1:1:1:1:1:1:af;
-  br-address 1e:2:2:2:2:2:2:af;
-  softwire {
-    ipv4 178.79.150.233;
-    psid 22788;
-    b4-ipv6 127:11:12:13:14:15:16:128;
-  }
-  softwire {
-    ipv4 178.79.150.233;
-    psid 2700;
-    b4-ipv6 127:11:12:13:14:15:16:128;
-  }
-  softwire {
-    ipv4 178.79.150.15;
-    psid 1;
-    b4-ipv6 127:22:33:44:55:66:77:128;
-  }
-  softwire {
-    ipv4 178.79.150.2;
-    psid 7850;
-    b4-ipv6 127:24:35:46:57:68:79:128;
-    br 1;
+  // Now the binding table!  3 parts: PSID map, BR address table, and
+  // softwire set.  See description below for details.
+  binding-table {
+    psid-map { addr 178.79.150.15; psid-length 4; }
+    psid-map { addr 178.79.150.233; psid-length 16; }
+    psid-map { addr 178.79.150.2; psid-length 16; }
+    br-address 8:9:a:b:c:d:e:f;
+    br-address 1e:1:1:1:1:1:1:af;
+    br-address 1e:2:2:2:2:2:2:af;
+    softwire {
+      ipv4 178.79.150.233;
+      psid 22788;
+      b4-ipv6 127:11:12:13:14:15:16:128;
+    }
+    softwire {
+      ipv4 178.79.150.233;
+      psid 2700;
+      b4-ipv6 127:11:12:13:14:15:16:128;
+    }
+    softwire {
+      ipv4 178.79.150.15;
+      psid 1;
+      b4-ipv6 127:22:33:44:55:66:77:128;
+    }
+    softwire {
+      ipv4 178.79.150.2;
+      psid 7850;
+      b4-ipv6 127:24:35:46:57:68:79:128;
+      br 1;
+    }
   }
 }
 ```
@@ -100,7 +102,8 @@ Basically there's an `external-interface` section defining the
 parameters around the IPv4 interface that communicates with the
 internet, an `internal-interface` section doing the same for the IPv6
 side that communicates with the B4s, and then the `binding-table` that
-declares the set of softwires.
+declares the set of softwires.  The whole thing is surrounded in a
+`softwire-config { ... }` block.
 
 ## Compiling conigurations
 
