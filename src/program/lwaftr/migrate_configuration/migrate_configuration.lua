@@ -332,12 +332,14 @@ local function migrate_conf(old)
    end
 
    return {
-      external_interface = external,
-      internal_interface = internal,
-      binding_table = {
-        psid_map = psid_map,
-        br_address = old_bt.br_addresses,
-        softwire = old_bt.softwires
+      softwire_config = {
+         external_interface = external,
+         internal_interface = internal,
+         binding_table = {
+            psid_map = psid_map,
+            br_address = old_bt.br_addresses,
+            softwire = old_bt.softwires
+         }
       }
    }
 end
