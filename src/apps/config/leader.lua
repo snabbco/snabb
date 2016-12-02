@@ -104,7 +104,12 @@ function Leader:enqueue_config_actions (actions)
 end
 
 function Leader:rpc_describe (args)
-   return { native_schema = self.schema_name }
+   local alternate_schemas = {}
+   for schema_name, translator in pairs(self.support.translators) do
+      table.insert(alternate_schemas, schema_name)
+   end
+   return { native_schema = self.schema_name,
+            alternate_schema = alternate_schemas }
 end
 
 local function path_printer_for_grammar(grammar, path)
@@ -124,7 +129,9 @@ local function path_printer_for_schema_by_name(schema_name, path)
 end
 
 function Leader:rpc_get_config (args)
-   assert(args.schema == self.schema_name)
+   if args.schema ~= self.schema_name then
+      return self:foreign_rpc_get_config(args.schema, args.path)
+   end
    local printer = path_printer_for_schema_by_name(args.schema, args.path)
    local config = printer(self.current_configuration, yang.string_output_file())
    return { config = config }
@@ -380,7 +387,6 @@ function compute_remove_config_fn (schema_name, path)
 end
 
 function Leader:update_configuration (schema_name, update_fn, verb, path, ...)
-   assert(schema_name == self.schema_name)
    local to_restart =
       self.support.compute_apps_to_restart_after_configuration_update (
          self.schema_name, self.current_configuration, verb, path,
@@ -399,10 +405,6 @@ function Leader:update_configuration (schema_name, update_fn, verb, path, ...)
 end
 
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
-   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
-      error('Attempt to modify configuration while listener attached')
-   end
-   assert(args.schema == self.schema_name)
    local path = path_mod.normalize_path(args.path)
    local parser = path_parser_for_schema_by_name(args.schema, path)
    self:update_configuration(args.schema,
@@ -411,16 +413,86 @@ function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
    return {}
 end
 
+function Leader:get_translator (schema_name)
+   local translator = self.support.translators[schema_name]
+   if translator then return translator end
+   error('unsupported schema: '..schema_name)
+end
+function Leader:apply_translated_rpc_updates (updates)
+   for _,update in ipairs(updates) do
+      local verb, args = unpack(update)
+      local method = assert(self['rpc_'..verb..'_config'])
+      method(self, args)
+   end
+   return {}
+end
+function Leader:foreign_rpc_get_config (schema_name, path)
+   path = path_mod.normalize_path(path)
+   local translate = self:get_translator(schema_name)
+   local foreign_config = translate.get_config(self.current_configuration)
+   local printer = path_printer_for_schema_by_name(schema_name, path)
+   local config = printer(foreign_config, yang.string_output_file())
+   return { config = config }
+end
+function Leader:foreign_rpc_get_state (schema_name, path)
+   path = path_mod.normalize_path(path)
+   local translate = self:get_translator(schema_name)
+   local native_state = state.show_state(self.schema_name, S.getpid(), "/")
+   local foreign_state = translate.get_state(native_state)
+   local printer = path_printer_for_schema_by_name(schema_name, path)
+   local config = printer(foreign_state, yang.string_output_file())
+   return { state = config }
+end
+function Leader:foreign_rpc_set_config (schema_name, path, config_str)
+   path = path_mod.normalize_path(path)
+   local translate = self:get_translator(schema_name)
+   local parser = path_parser_for_schema_by_name(schema_name, path)
+   local updates = translate.set_config(self.current_configuration, path,
+                                        parser(config_str))
+   return self:apply_translated_rpc_updates(updates)
+end
+function Leader:foreign_rpc_add_config (schema_name, path, config_str)
+   path = path_mod.normalize_path(path)
+   local translate = self:get_translator(schema_name)
+   local parser = path_parser_for_schema_by_name(schema_name, path)
+   local updates = translate.add_config(self.current_configuration, path,
+                                        parser(config_str))
+   return self:apply_translated_rpc_updates(updates)
+end
+function Leader:foreign_rpc_remove_config (schema_name, path)
+   path = path_mod.normalize_path(path)
+   local translate = self:get_translator(schema_name)
+   local updates = translate.remove_config(self.current_configuration, path)
+   return self:apply_translated_rpc_updates(updates)
+end
+
 function Leader:rpc_set_config (args)
+   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
+      error('Attempt to modify configuration while listener attached')
+   end
+   if args.schema ~= self.schema_name then
+      return self:foreign_rpc_set_config(args.schema, args.path, args.config)
+   end
    return self:handle_rpc_update_config(args, 'set', compute_set_config_fn)
 end
 
 function Leader:rpc_add_config (args)
+   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
+      error('Attempt to modify configuration while listener attached')
+   end
+   if args.schema ~= self.schema_name then
+      return self:foreign_rpc_add_config(args.schema, args.path, args.config)
+   end
    return self:handle_rpc_update_config(args, 'add', compute_add_config_fn)
 end
 
 function Leader:rpc_remove_config (args)
-   assert(args.schema == self.schema_name)
+   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
+      error('Attempt to modify configuration while listener attached')
+   end
+   if args.schema ~= self.schema_name then
+      return self:foreign_rpc_remove_config(args.schema, args.path)
+   end
    local path = path_mod.normalize_path(args.path)
    self:update_configuration(args.schema,
                              compute_remove_config_fn(args.schema, path),
@@ -429,14 +501,15 @@ function Leader:rpc_remove_config (args)
 end
 
 function Leader:rpc_attach_listener (args)
-   assert(args.schema == self.schema_name)
    if self.listen_peer ~= nil then error('Listener already attached') end
    self.listen_peer = self.rpc_peer
    return {}
 end
 
 function Leader:rpc_get_state (args)
-   assert(args.schema == self.schema_name)
+   if args.schema ~= self.schema_name then
+      return self:foreign_rpc_get_state(args.schema, args.path)
+   end
    local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
    local state = state.show_state(self.schema_name, S.getpid(), args.path)
    return {state=printer(state, yang.string_output_file())}

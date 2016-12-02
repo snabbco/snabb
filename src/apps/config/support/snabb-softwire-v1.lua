@@ -76,12 +76,33 @@ local function compute_apps_to_restart_after_configuration_update(
    end
 end
 
+local function ietf_softwire_translator ()
+   local ret = {}
+   function ret.get_config(native_config)
+      error('unimplemented')
+   end
+   function ret.get_state(native_state)
+      error('unimplemented')
+   end
+   function ret.set_config(native_config, path, data)
+      error('unimplemented')
+   end
+   function ret.add_config(native_config, path, data)
+      error('unimplemented')
+   end
+   function ret.remove_config(native_config, path)
+      error('unimplemented')
+   end
+   return ret
+end
+
 function get_config_support()
    return {
       compute_config_actions = compute_config_actions,
       update_mutable_objects_embedded_in_app_initargs =
          update_mutable_objects_embedded_in_app_initargs,
       compute_apps_to_restart_after_configuration_update =
-         compute_apps_to_restart_after_configuration_update
+         compute_apps_to_restart_after_configuration_update,
+      translators = { ['ietf-softwire'] = ietf_softwire_translator () }
    }
 end
