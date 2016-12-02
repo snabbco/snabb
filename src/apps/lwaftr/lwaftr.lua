@@ -242,6 +242,7 @@ LwAftr = { yang_schema = 'snabb-softwire-v1' }
 function LwAftr:new(conf)
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
+   conf = conf.softwire_config
    o.conf = conf
 
    o.binding_table = bt.load(conf.binding_table)
