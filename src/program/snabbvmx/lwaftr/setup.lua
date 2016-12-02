@@ -235,7 +235,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       end
    end
 
-   if conf.ipv4_interface and conf.ipv6_interface and conf.preloaded_binding_table then
+   if conf.ipv4_interface and conf.ipv6_interface and lwconf then
       print("lwAFTR service: enabled")
       config.app(c, "nh_fwd6", nh_fwd.nh_fwd6,
                  subset(nh_fwd.nh_fwd6.config, conf.ipv6_interface))
