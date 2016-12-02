@@ -435,7 +435,6 @@ function selftest()
       leaf-list integers { type uint32; }
       leaf-list addrs { type inet:ipv4-address; }
       container routes {
-         presence true;
          list route {
             key addr;
             leaf addr { type inet:ipv4-address; mandatory true; }
