@@ -25,7 +25,8 @@ local function get_softwire_grammar()
       local schema = yang.load_schema_by_name('snabb-softwire-v1')
       local grammar = data.data_grammar_from_schema(schema)
       softwire_grammar =
-         assert(grammar.members['binding-table'].members['softwire'])
+         assert(grammar.members['softwire-config'].
+                   members['binding-table'].members['softwire'])
    end
    return softwire_grammar
 end
@@ -42,9 +43,10 @@ end
 
 local function compute_config_actions(old_graph, new_graph, to_restart,
                                       verb, path, arg)
-   if verb == 'add' and path == '/binding-table/softwire' then
+   if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       return add_softwire_entry_actions(new_graph, arg)
-   elseif verb == 'remove' and path:match('^/binding%-table/softwire') then
+   elseif (verb == 'remove' and
+           path:match('^/softwire%-config/binding%-table/softwire')) then
       return remove_softwire_entry_actions(new_graph, path)
    else
       return generic.compute_config_actions(
@@ -54,9 +56,10 @@ end
 
 local function update_mutable_objects_embedded_in_app_initargs(
       in_place_dependencies, app_graph, schema_name, verb, path, arg)
-   if verb == 'add' and path == '/binding-table/softwire' then
+   if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       return in_place_dependencies
-   elseif verb == 'remove' and path:match('^/binding%-table/softwire') then
+   elseif (verb == 'remove' and
+           path:match('^/softwire%-config/binding%-table/softwire')) then
       return in_place_dependencies
    else
       return generic.update_mutable_objects_embedded_in_app_initargs(
@@ -66,9 +69,10 @@ end
 
 local function compute_apps_to_restart_after_configuration_update(
       schema_name, configuration, verb, path, in_place_dependencies)
-   if verb == 'add' and path == '/binding-table/softwire' then
+   if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       return {}
-   elseif verb == 'remove' and path:match('^/binding%-table/softwire') then
+   elseif (verb == 'remove' and
+           path:match('^/softwire%-config/binding%-table/softwire')) then
       return {}
    else
       return generic.compute_apps_to_restart_after_configuration_update(
