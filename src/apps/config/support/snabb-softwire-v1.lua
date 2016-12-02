@@ -4,6 +4,7 @@ local ffi = require('ffi')
 local app = require('core.app')
 local data = require('lib.yang.data')
 local yang = require('lib.yang.yang')
+local cltable = require('lib.cltable')
 local path_mod = require('lib.yang.path')
 local generic = require('apps.config.support').generic_schema_config_support
 
@@ -80,14 +81,101 @@ local function compute_apps_to_restart_after_configuration_update(
    end
 end
 
+local function memoize1(f)
+   local memoized_arg, memoized_result
+   return function(arg)
+      if arg == memoized_arg then return memoized_result end
+      memoized_result = f(arg)
+      memoized_arg = arg
+      return memoized_result
+   end
+end
+
+local ietf_br_instance_grammar
+local function get_ietf_br_instance_grammar()
+   if not ietf_br_instance_grammar then
+      local schema = yang.load_schema_by_name('ietf-softwire')
+      local grammar = data.data_grammar_from_schema(schema)
+      grammar = assert(grammar.members['softwire-config'])
+      grammar = assert(grammar.members['binding'])
+      grammar = assert(grammar.members['br'])
+      grammar = assert(grammar.members['br-instances'])
+      grammar = assert(grammar.members['br-instance'])
+      ietf_br_instance_grammar = grammar
+   end
+   return ietf_br_instance_grammar
+end
+
+local ietf_softwire_grammar
+local function get_ietf_softwire_grammar()
+   if not ietf_softwire_grammar then
+      local grammar = get_ietf_br_instance_grammar()
+      grammar = assert(grammar.values['binding-table'])
+      grammar = assert(grammar.members['binding-entry'])
+      ietf_softwire_grammar = grammar
+   end
+   return ietf_softwire_grammar
+end
+
+local function cltable_for_grammar(grammar)
+   assert(grammar.key_ctype)
+   assert(not grammar.value_ctype)
+   local key_t = data.typeof(grammar.key_ctype)
+   return cltable.new({key_type=key_t}), key_t
+end
+
+local function ietf_binding_table_from_native(bt)
+   local ret, key_t = cltable_for_grammar(get_ietf_softwire_grammar())
+   local psid_key_t = data.typeof('struct { uint32_t ipv4; }')
+   for entry in bt.softwire:iterate() do
+      local psid_map = bt.psid_map[psid_key_t({ipv4=entry.key.ipv4})]
+      if psid_map then
+         local k = key_t({ binding_ipv6info = entry.value.b4_ipv6 })
+         local v = {
+            binding_ipv4_addr = entry.key.ipv4,
+            port_set = {
+               psid_offset = psid_map.psid_offset,
+               psid_len = psid_map.psid_len,
+               psid = entry.key.psid
+            },
+            br_ipv6_addr = bt.br_address[entry.value.br+1],
+         }
+         ret[k] = v
+      end
+   end
+   return ret
+end
+
 local function ietf_softwire_translator ()
    local ret = {}
    function ret.get_config(native_config)
-      error('unimplemented')
+      -- Such nesting, very standard, wow
+      local br_instance, br_instance_key_t =
+         cltable_for_grammar(get_ietf_br_instance_grammar())
+      br_instance[br_instance_key_t({id=1})] = {
+         -- FIXME
+         tunnel_payload_mtu = 0,
+         tunnel_path_mru = 0,
+         binding_table = {
+            binding_entry = ietf_binding_table_from_native(
+               native_config.softwire_config.binding_table)
+         }
+      }
+      return {
+         softwire_config = {
+            binding = {
+               br = {
+                  br_instances = { br_instance = br_instance }
+               }
+            }
+         }
+      }
    end
+   ret.get_config = memoize1(ret.get_config)
    function ret.get_state(native_state)
       error('unimplemented')
    end
+   ret.get_state = memoize1(ret.get_state)
    function ret.set_config(native_config, path, data)
       error('unimplemented')
    end
