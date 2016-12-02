@@ -25,17 +25,25 @@ function parse_args(args)
       if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
          fatal("Invalid cpu number: "..arg)
       end
-      S.setenv("SNABB_TARGET_CPU", tostring(cpu), true)
-      local wanted_node = numa.cpu_get_numa_node(cpu)
-      numa.bind_to_numa_node(wanted_node)
-      print("Bound to numa node: ", wanted_node)
+
+      if opts.reconfigurable then
+         S.setenv("SNABB_TARGET_CPU", tostring(cpu), true)
+         local wanted_node = numa.cpu_get_numa_node(cpu)
+         numa.bind_to_numa_node(wanted_node)
+         print("Bound to numa node:", wanted_node)
+      else
+         print("Bound to CPU:", cpu)
+         numa.bind_to_cpu(cpu)
+      end
    end
    function handlers.n(arg) opts.name = assert(arg) end
    function handlers.b(arg) opts.bench_file = arg end
    function handlers.y() opts.hydra = true end
    function handlers.h() show_usage(0) end
+   function handlers.reconfigurable() opts.reconfigurable = true end
    args = lib.dogetopt(args, handlers, "n:hyb:D:", {
-      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1 })
+      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1,
+      reconfigurable = 0 })
    if #args ~= 3 then show_usage(1) end
    return opts, unpack(args)
 end
@@ -47,8 +55,12 @@ function run(args)
    if opts.name then engine.claim_name(opts.name) end
 
    local graph = config.new()
-   setup.reconfigurable(setup.load_bench, graph, conf,
-                        inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
+   if opts.reconfigurable then
+      setup.reconfigurable(setup.load_bench, graph, conf,
+                           inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
+   else
+      setup.load_bench(graph, conf, inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
+   end
    app.configure(graph)
 
    local function start_sampling()
