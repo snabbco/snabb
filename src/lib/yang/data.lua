@@ -37,6 +37,13 @@ local function table_string_key(keys)
    return string_key
 end
 
+-- We need to properly support unions.  It's a big FIXME!  As an
+-- intermediate step, we pick the first type in the union.  Terrible.
+local function elide_unions(t)
+   while t.primitive_type == 'union' do t = t.union[1] end
+   return t
+end
+
 function data_grammar_from_schema(schema)
    local function struct_ctype(members)
       local member_names = {}
@@ -82,8 +89,9 @@ function data_grammar_from_schema(schema)
                          ctype=struct_ctype(members)}}
    end
    handlers['leaf-list'] = function(node)
-      return {[node.id]={type='array', element_type=node.type,
-                         ctype=value_ctype(node.type)}}
+      local t = elide_unions(node.type)
+      return {[node.id]={type='array', element_type=t,
+                         ctype=value_ctype(t)}}
    end
    function handlers.list(node)
       local members=visit_body(node)
@@ -99,8 +107,9 @@ function data_grammar_from_schema(schema)
    end
    function handlers.leaf(node)
       local ctype
-      if node.default or node.mandatory then ctype=value_ctype(node.type) end
-      return {[node.id]={type='scalar', argument_type=node.type,
+      local t = elide_unions(node.type)
+      if node.default or node.mandatory then ctype=value_ctype(t) end
+      return {[node.id]={type='scalar', argument_type=t,
                          default=node.default, mandatory=node.mandatory,
                          ctype=ctype}}
    end
