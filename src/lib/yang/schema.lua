@@ -671,6 +671,13 @@ function resolve(schema, features)
       else
          -- If the type name wasn't bound, it must be primitive.
          assert(primitive_types[node.id], 'unknown type: '..node.id)
+         if node.id == 'union' then
+            local union = {}
+            for _,type in ipairs(node.union) do
+               table.insert(union, visit_type(type, env))
+            end
+            node.union = union
+         end
          node.primitive_type = node.id
       end
       return node
