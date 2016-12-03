@@ -1,13 +1,12 @@
 #!../../snabb snsh
 local args = main.parameters
-assert(#args == 3, "testrecv.snabb [Intel1g|Intel82599] pciaddr qno")
-local driver = table.remove(args, 1)
+assert(#args == 2, "testrecv.snabb pciaddr qno")
 local pciaddr = table.remove(args, 1)
 local qno = tonumber(table.remove(args,1))
 
 local intel = require("apps.intel_mp.intel_mp")
 local C = require("ffi").C
 
-local nic = intel[driver]:new({ pciaddr=pciaddr, rxq = qno, ndesc = 2048, wait_for_link = true })
+local nic = intel.Intel:new({ pciaddr=pciaddr, rxq = qno, ndesc = 2048, wait_for_link = true })
 print(nic:link_status())
 main.exit(0)

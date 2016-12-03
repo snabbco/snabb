@@ -7,6 +7,8 @@ cd $(dirname $0)
 FILTER=${1:-.*}
 TESTS=$(find . -executable | grep -e 'test[0-9]' -e 'test_' | grep -e "$FILTER" | sort)
 ESTATUS=0
+export SNABB_RECV_DEBUG=true
+export SNABB_RECV_MASTER_STATS=true
 for i in $TESTS; do
    pkill -P $$ -f snabb
    sleep 1

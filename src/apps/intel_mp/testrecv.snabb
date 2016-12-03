@@ -1,7 +1,6 @@
 #!../../snabb snsh
 local args = main.parameters
-assert(#args == 3, "testrecv.snabb [Intel1g|Intel82599] pciaddr qno")
-local driver = table.remove(args, 1)
+assert(#args == 2, "testrecv.snabb pciaddr qno")
 local pciaddr = table.remove(args, 1)
 local qno = tonumber(table.remove(args,1))
 
@@ -11,7 +10,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local c = config.new()
-config.app(c, "nic", intel[driver], { pciaddr=pciaddr, rxq = qno, ndesc = 2048, wait_for_link=true })
+config.app(c, "nic", intel.Intel, { pciaddr=pciaddr, rxq = qno, ndesc = 2048, wait_for_link=true, master_stats = (os.getenv("SNABB_RECV_MASTER_STATS") == "true") })
 config.app(c, "sink", basic.Sink)
 if os.getenv("SNABB_RECV_EXPENSIVE") then
 	local filter = require("apps.packet_filter.pcap_filter")
@@ -42,23 +41,34 @@ if spinup then
 	engine.main({duration = spinup})
 end
 
-local regs = {
-	Intel82599 = { GPRC = 1, RXDGPC = 1 },
-	Intel1g = { RQDPC = 1, PQGPRC = 1, GPRC = 1, RPTHC = 1 }
+local counters = {
+	Intel82599 = { "GPRC", "RXDGPC" },
+	Intel1g = { "GPRC", "RPTHC" }
 }
 
 local duration = os.getenv("SNABB_RECV_DURATION") or 2
-local before = engine.app_table.nic:debug()
-local after
-for _=1,duration do
-	engine.main({duration = 1})
-	after = engine.app_table.nic:debug()
-end
-engine.app_table.nic:stop()
-for k,v in pairs(regs[driver]) do
-	if before[k] then
-		print(string.format("%s %d", k, tonumber(after[k] - before[k])/duration))
+local before = {}
+local nic = engine.app_table.nic
+local master = nic.master
+
+if master then
+	for _,v in pairs(counters[nic.driver]) do
+		before[v] = nic.r[v]()
 	end
 end
-print("txpackets", tonumber(after.txpackets) - tonumber(before.txpackets)/duration)
+
+if os.getenv("SNABB_RECV_DEBUG") then
+	for _=1,duration do
+		engine.main({duration = 1})
+		nic:debug()
+	end
+else
+	engine.main({duration = duration})
+end
+
+if master then
+	for _,v in pairs(counters[nic.driver]) do
+                print(string.format("%s %d", v, tonumber(nic.r[v]() - before[v])/duration))
+	end
+end
 main.exit(0)

@@ -1,7 +1,6 @@
 #!../../snabb snsh
 local args = main.parameters
-assert(#args == 4, "testsend.snabb [Intel1g|Intel82599] pciaddr qno pcapfile")
-local driver = table.remove(args, 1)
+assert(#args == 3, "testsend.snabb pciaddr qno pcapfile")
 local pciaddr = table.remove(args, 1)
 local qno = tonumber(table.remove(args,1))
 local pcapfile = table.remove(args,1)
@@ -12,7 +11,7 @@ local C = require("ffi").C
 
 local c = config.new()
 config.app(c, "pcap", pcap.PcapReader, pcapfile)
-config.app(c, "nic", intel[driver], {pciaddr=pciaddr, txq = qno, txdescriptors=2048, wait_for_link = true})
+config.app(c, "nic", intel.Intel, {pciaddr=pciaddr, txq = qno, txdescriptors=2048, wait_for_link = true, master_stats = true})
 
 if os.getenv("SNABB_SEND_BLAST") then
 	local basic = require("apps.basic.basic_apps")

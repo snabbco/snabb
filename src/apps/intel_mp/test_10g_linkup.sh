@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 cd $(dirname $0)
 
-./testup.snabb Intel82599 $SNABB_PCI_INTEL0 0 > results.0 &
-./testup.snabb Intel82599 $SNABB_PCI_INTEL0 1 > results.1 &
-./testup.snabb Intel82599 $SNABB_PCI_INTEL0 2 > results.2 &
-./testup.snabb Intel82599 $SNABB_PCI_INTEL0 3 > results.3 &
-./testup.snabb Intel82599 $SNABB_PCI_INTEL0 4 > results.4 &
+./testup.snabb $SNABB_PCI_INTEL0 0 > results.0 &
+./testup.snabb $SNABB_PCI_INTEL0 1 > results.1 &
+./testup.snabb $SNABB_PCI_INTEL0 2 > results.2 &
+./testup.snabb $SNABB_PCI_INTEL0 3 > results.3 &
+./testup.snabb $SNABB_PCI_INTEL0 4 > results.4 &
 
-./testup.snabb Intel82599 $SNABB_PCI_INTEL1 0 > results.5 &
-./testup.snabb Intel82599 $SNABB_PCI_INTEL1 1 > results.6 &
-./testup.snabb Intel82599 $SNABB_PCI_INTEL1 2 > results.7 &
-./testup.snabb Intel82599 $SNABB_PCI_INTEL1 3 > results.8 &
-./testup.snabb Intel82599 $SNABB_PCI_INTEL1 4 > results.9
+./testup.snabb $SNABB_PCI_INTEL1 0 > results.5 &
+./testup.snabb $SNABB_PCI_INTEL1 1 > results.6 &
+./testup.snabb $SNABB_PCI_INTEL1 2 > results.7 &
+./testup.snabb $SNABB_PCI_INTEL1 3 > results.8 &
+./testup.snabb $SNABB_PCI_INTEL1 4 > results.9
 
 sleep 2
 

@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 cd $(dirname $0)
 
-./testup.snabb Intel1g $SNABB_PCI_INTEL1G0 0 > results.0 &
-./testup.snabb Intel1g $SNABB_PCI_INTEL1G0 1 > results.1 &
-./testup.snabb Intel1g $SNABB_PCI_INTEL1G0 2 > results.2 &
-./testup.snabb Intel1g $SNABB_PCI_INTEL1G0 3 > results.3 &
+./testup.snabb $SNABB_PCI_INTEL1G0 0 > results.0 &
+./testup.snabb $SNABB_PCI_INTEL1G0 1 > results.1 &
+./testup.snabb $SNABB_PCI_INTEL1G0 2 > results.2 &
+./testup.snabb $SNABB_PCI_INTEL1G0 3 > results.3 &
 
-./testup.snabb Intel1g $SNABB_PCI_INTEL1G1 0 > results.4 &
-./testup.snabb Intel1g $SNABB_PCI_INTEL1G1 1 > results.5 &
-./testup.snabb Intel1g $SNABB_PCI_INTEL1G1 2 > results.6 &
-./testup.snabb Intel1g $SNABB_PCI_INTEL1G1 3 > results.7
+./testup.snabb $SNABB_PCI_INTEL1G1 0 > results.4 &
+./testup.snabb $SNABB_PCI_INTEL1G1 1 > results.5 &
+./testup.snabb $SNABB_PCI_INTEL1G1 2 > results.6 &
+./testup.snabb $SNABB_PCI_INTEL1G1 3 > results.7
 
 sleep 2
 

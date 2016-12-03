@@ -14,14 +14,17 @@
 
 module(..., package.seeall)
 
-local ffi = require("ffi")
-local C   = ffi.C
-local pci = require("lib.hardware.pci")
+local ffi         = require("ffi")
+local C           = ffi.C
+local pci         = require("lib.hardware.pci")
 local band, bor, lshift = bit.band, bit.bor, bit.lshift
-local lib  = require("core.lib")
-local bits = lib.bits
-local tophysical = core.memory.virtual_to_physical
-local register = require("lib.hardware.register")
+local lib         = require("core.lib")
+local bits        = lib.bits
+local tophysical  = core.memory.virtual_to_physical
+local register    = require("lib.hardware.register")
+local counter     = require("core.counter")
+local macaddress  = require("lib.macaddress")
+local shm         = require("core.shm")
 
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
@@ -35,11 +38,18 @@ RETA        0x5c00 +0x04*0..31      RW Redirection Table
 RSSRK       0x5C80 +0x04*0..9       RW RSS Random Key
 ]],
    singleton = [[
+BPRC        0x04078 -               RC Broadcast Packets Received Count
+BPTC        0x040F4 -               RC Broadcast Packets Transmitted Count
 CTRL        0x00000 -               RW Device Control
 CTRL_EXT    0x00018 -               RW Extended Device Control
 STATUS      0x00008 -               RO Device Status
 CRCERRS     0x04000 -               RC CRC Error Count
 GPRC        0x04074 -               RC Good Packets Received Count
+GPTC        0x04080 -               RC Good Packets Transmitted Count
+GORC64      0x04088 -               RC64 Good Octets Received Count 64-bit
+GOTC64      0x04090 -               RC64 Good Octets Transmitted Count 64-bit
+MPRC        0x0407C -               RC Multicast Packets Received Count
+MPTC        0x040F0 -               RC Multicast Packets Transmitted Count
 ]]
 }
 reg['82599ES'] = {
@@ -52,14 +62,22 @@ MPSAR       0x0A600 +0x04*0..255    RW MAC Pool Select Array
 PFUTA       0X0F400 +0x04*0..127    RW PF Unicast Table Array
 PFVLVF      0x0F100 +0x04*0..63     RW PF VM VLAN Pool Filter
 PFVLVFB     0x0F200 +0x04*0..127    RW PF VM VLAN Pool Filter Bitmap
+QPRC        0x01030 +0x40*0..15     RC Queue Packets Received Count
+QPRDC       0x01430 +0x40*0..15     RC Queue Packets Received Drop Count
+QBRC64      0x01034 +0x40*0..15     RC64 Queue Bytes Received Count
+QPTC        0x08680 +0x40*0..15     RC Queue Packets Transmitted Count
+QBTC64      0x08700 +0x40*0..15     RC64 Queue Bytes Transmitted Count Low
 SAQF        0x0E000 +0x04*0..127    RW Source Address Queue Filter
 SDPQF       0x0E400 +0x04*0..127    RW Source Destination Port Queue Filter
 RAH         0x0A204 +0x08*0..127    RW Receive Address High
 RAL         0x0A200 +0x08*0..127    RW Receive Address Low
+RAL64       0x0A200 +0x08*0..127    RW64 Receive Address Low and High
+RQSM        0x02300 +0x04*0..31     RW Receive Queue Statistic Mapping Registers
 RTTDT2C     0x04910 +0x04*0..7      RW DCB Transmit Descriptor Plane T2 Config
 RTTPT2C     0x0CD20 +0x04*0..7      RW DCB Transmit Packet Plane T2 Config
 RTRPT4C     0x02140 +0x04*0..7      RW DCB Receive Packet Plane T4 Config
 RXPBSIZE    0x03C00 +0x04*0..7      RW Receive Packet Buffer Size
+TQSM        0x08600 +0x04*0..31     RW Transmit Queue Statistic Mapping Registers
 TXPBSIZE    0x0CC00 +0x04*0..7      RW Transmit Packet Buffer Size
 TXPBTHRESH  0x04950 +0x04*0..7      RW Tx Packet Buffer Threshold
 VFTA        0x0A000 +0x04*0..127    RW VLAN Filter Table Array
@@ -90,9 +108,11 @@ DMATXCTL    0x04A80 -               RW DMA Tx Control
 DTXMXSZRQ   0x08100 -               RW DMA Tx Map Allow Size Requests
 EEC         0x10010 -               RW EEPROM/Flash Control Register
 EIMC        0x00888 -               RW Extended Interrupt Mask Clear
+ERRBC       0x04008 -               RC Error Byte Count
 FCCFG       0x03D00 -               RW Flow Control Configuration
 FCTRL       0x05080 -               RW Filter Control
 HLREG0      0x04240 -               RW MAC Core Control 0
+ILLERRC     0x04004 -               RC Illegal Byte Error Count
 LINKS       0x042A4 -               RO Link Status Register
 MAXFRS      0x04268 -               RW Max Frame Size
 MFLCN       0x04294 -               RW MAC Flow Control Register
@@ -106,6 +126,11 @@ RTTBCNRC    0x04984 -            RW DCB Transmit Rate-Scheduler Config
 RXCSUM      0x05000 -               RW Receive Checksum Control
 RXCTRL      0x03000 -               RW Receive Control
 RXDGPC      0x02F50 -               RC DMA Good Rx Packet Counter
+RXDSTATCTRL 0x02F40 -               RW Rx DMA Statistic Counter Control
+RUC         0x040A4 -               RC Receive Undersize Count
+RFC         0x040A8 -               RC Receive Fragment Count
+ROC         0x040AC -               RC Receive Oversize Count
+RJC         0x040B0 -               RC Receive Jabber Count
 SWSM        0x10140 -               RW Software Semaphore
 VLNCTRL     0x05088 -               RW VLAN Control Register
 ]],
@@ -122,8 +147,9 @@ TXDCTL      0x06028 +0x40*0..127    RW Transmit Descriptor Control
 reg['1000BaseX'] = {
    array = [[
 ALLRXDCTL   0x0c028 +0x40*0..7      RW Re Descriptor Control Queue
-ALLRQDPC    0x0C030 +0x40*0..3      RW Receive Queue drop packet count Register
-ALLPQGPRC   0x10010 +0x100*0..7     RW Per Queue Good Packets Received Count
+RAL64       0x05400 +0x08*0..15     RW64 Receive Address Low
+RAL         0x05400 +0x08*0..15     RW Receive Address Low
+RAH         0x05404 +0x08*0..15     RW Receive Address High
 ]],
    inherit = "gbl",
    rxq = [[
@@ -135,10 +161,13 @@ RDT         0x0c018 +0x40*0..7      RW Rx Descriptor Tail
 RXDCTL      0x0c028 +0x40*0..7      RW Re Descriptor Control Queue
 RXCTL       0x0c014 +0x40*0..7      RW RX DCA CTRL Register Queue
 SRRCTL      0x0c00c +0x40*0..7      RW Split and Replication Receive Control
-RQDPC       0x0C030 +0x40*0..3      RW Receive Queue drop packet count Register
-PQGPRC      0x10010 +0x100*0..7     RW Per Queue Good Packets Received Count
 ]],
    singleton = [[
+ALGNERRC  0x04004 -                 RC Alignment Error Count
+RXERRC    0x0400C -                 RC RX Error Count
+RLEC      0x04040 -                 RC Receive Length Error Count
+CRCERRS   0x04000 -                 RC CRC Error Count
+MPC       0x04010 -                 RC Missed Packets Count
 MRQC      0x05818 -                 RW Multiple Receive Queues Command Register
 EEER      0x00E30 -                 RW Energy Efficient Ethernet (EEE) Register
 EIMC      0x01528 -                 RW Extended Interrupt Mask Clear
@@ -164,6 +193,15 @@ TXCTL  0xe014 +0x40*0..7            RW Tx DCA CTRL Register Queue
 ]]
 }
 reg.i210 = {
+   array = [[
+RQDPC       0x0C030 +0x40*0..4      RC Receive Queue Drop Packet Count
+TQDPC       0x0E030 +0x40*0..4      RC Transmit Queue Drop Packet Count
+PQGPRC      0x10010 +0x100*0..4     RC Per Queue Good Packets Received Count
+PQGPTC      0x10014 +0x100*0..4     RC Per Queue Good Packets Transmitted Count
+PQGORC      0x10018 +0x100*0..4     RC Per Queue Good Octets Received Count
+PQGOTC      0x10034 +0x100*0..4     RC Per Queue Octets Transmitted Count
+PQMPRC      0x10038 +0x100*0..4     RC Per Queue Multicast Packets Received
+]],
    inherit = "1000BaseX",
    singleton = [[
 EEMNGCTL  0x12030 -            RW Manageability EEPROM-Mode Control Register
@@ -172,7 +210,13 @@ EEC       0x12010 -            RW EEPROM-Mode Control Register
 }
 reg.i350 = {
    array = [[
-ALLRQDPC  0xC130 +0x40*4..7         RW Receive Queue drop packet count Register
+RQDPC       0x0C030 +0x40*0..7      RCR Receive Queue Drop Packet Count
+TQDPC       0x0E030 +0x40*0..7      RCR Transmit Queue Drop Packet Count
+PQGPRC      0x10010 +0x100*0..7     RCR Per Queue Good Packets Received Count
+PQGPTC      0x10014 +0x100*0..7     RCR Per Queue Good Packets Transmitted Count
+PQGORC      0x10018 +0x100*0..7     RCR Per Queue Good Octets Received Count
+PQGOTC      0x10034 +0x100*0..7     RCR Per Queue Octets Transmitted Count
+PQMPRC      0x10038 +0x100*0..7     RCR Per Queue Multicast Packets Received
 ]],
    inherit = "1000BaseX",
    singleton = [[
@@ -180,14 +224,19 @@ EEMNGCTL  0x01010 -            RW Manageability EEPROM-Mode Control Register
 EEC       0x00010 -            RW EEPROM-Mode Control Register
 ]]
 }
-reg["0x1521"] = { inherit = "i350" }
-reg["0x1533"] = { inherit = "i210" }
-reg["0x157b"] = { inherit = "i210" }
-reg["0x10fb"] = { inherit = "82599ES" }
 
-local Intel = { }
+Intel = { }
+Intel1g = setmetatable({}, {__index = Intel })
+Intel82599 = setmetatable({}, {__index = Intel})
+byPciID = {
+  [0x1521] = { registers = "i350", driver = Intel1g, max_q = 8 },
+  [0x1533] = { registers = "i210", driver = Intel1g, max_q = 4 },
+  [0x157b] = { registers = "i210", driver = Intel1g, max_q = 4 },
+  [0x10fb] = { registers = "82599ES", driver = Intel82599, max_q = 16 }
+}
+
 function Intel:new (conf)
-   local self = setmetatable({
+   local self = {
       r = {},
       pciaddress = conf.pciaddr,
       path = pci.path(conf.pciaddr),
@@ -195,29 +244,95 @@ function Intel:new (conf)
       txq = conf.txq,
       rxq = conf.rxq,
       mtu = conf.mtu or 9014,
+      master_stats = conf.master_stats or false,
+      run_stats = conf.run_stats or false,
       rssseed = conf.rssseed or 314159,
       linkup_attempts = conf.linkup_attempts or 60,
       wait_for_link = conf.wait_for_link or false
-   }, {__index = self})
+   }
 
    local vendor = lib.firstline(self.path .. "/vendor")
    local device = lib.firstline(self.path .. "/device")
+   local byid = byPciID[tonumber(device)]
    assert(vendor == '0x8086', "unsupported nic")
-   self.max_q = self.max_q_by_dev[device]
+   assert(byid, "unsupported intel nic")
+   self = setmetatable(self, { __index = byid.driver})
 
-   assert(self.max_q, "Unsupported Intel NIC")
+   self.max_q = byid.max_q
 
    -- Setup device access
    self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
 
-   self:load_registers(device)
+   self:load_registers(byid.registers)
 
    self:init()
    self.fd:flock("sh")
    self:init_tx_q()
    self:init_rx_q()
+   self:init_stats()
    return self
+end
+
+function Intel:init_stats()
+   if self.master then
+      counter.create("/pci/"..self.pciaddress .."/macaddr", self.nic_mac.bits)
+      if self.master_stats then
+         self.runstats = true
+      end
+   end
+   if not self.runstats then return end
+   self.stats = {}
+   local tab = {
+      dtime     = {counter, C.get_unix_time()},
+      mtu       = {counter, self.mtu},
+      promisc   = {counter, 1},
+      status    = {counter, 2},
+
+      rxbytes   = {counter, 0},
+      rxpackets = {counter, 0},
+      rxmcast   = {counter, 0},
+      rxbcast   = {counter, 0},
+      rxdrop    = {counter, 0},
+      rxerrors  = {counter, 0},
+
+      txbytes   = {counter, 0},
+      txpackets = {counter, 0},
+      txmcast   = {counter, 0},
+      txbcast   = {counter, 0},
+      txdrop    = {counter, 0},
+      txerrors  = {counter, 0}
+   }
+   for k,v in pairs(self:drv_stats()) do
+      tab[k] = v.type
+   end
+   self.stats.shm = shm.create_frame("/pci/"..self.pciaddress, tab)
+   self.sync_timer = lib.throttle(0.01)
+end
+
+function Intel:sync_stats ()
+   local set = counter.set
+   local r = self.r
+   local c = self.stats.shm
+
+   if self:link_status() then set(c.status, 1) else set(c.status, 2) end
+
+   local c = self.stats.shm
+   set(c.rxbytes, r.GORC64())
+   set(c.rxpackets, r.GPRC())
+
+   local mprc, bprc = r.MPRC(), r.BPRC()
+   set(c.rxmcast,   mprc + bprc)
+   set(c.rxbcast,   bprc)
+
+   set(c.txbytes, r.GOTC64())
+   set(c.txpackets, r.GPTC())
+   local mptc, bptc = r.MPTC(), r.BPTC()
+   set(c.txmcast, mptc + bptc)
+   set(c.txbcast, bptc)
+   for k,v in pairs(self:drv_stats()) do
+      set(c[k], v.register())
+   end
 end
 
 function Intel:disable_interrupts ()
@@ -376,6 +491,7 @@ function Intel:push ()
 end
 
 function Intel:pull ()
+   if self.sync_timer and self.sync_timer() then self:sync_stats() end
    if not self.rxq then return end
    local lo = self.output["output"]
    assert(lo, "intel1g: output link required")
@@ -460,9 +576,9 @@ function Intel:stop ()
       self.r.RXDCTL:wait(bits { ENABLE = 25 }, 0)
       -- removing the queue from rss first would be better but this
       -- is easier :(, we are going to throw the packets away anyway
-   self:lock_sw_sem()
+      self:lock_sw_sem()
       self:rss_tab_build()
-   self:unlock_sw_sem()
+      self:unlock_sw_sem()
       C.usleep(100)
       -- TODO
       -- zero rxd.status, set rdt = rdh - 1
@@ -499,22 +615,43 @@ function Intel:stop ()
       pci.close_pci_resource(self.fd, self.base)
    end
 end
-Intel1g = setmetatable({
-   driver = "Intel1g",
-   max_q_by_dev = {
-      ["0x1521"] = 8,      -- i350
-      ["0x1533"] = 4,      -- i210
-      ["0x157b"] = 4       -- i210
-   },
-   offsets = {
-      SRRCTL = {
-         Drop_En = 31
-      },
-      MRQC = {
-         RSS = 1
+Intel1g.driver = "Intel1g"
+Intel1g.offsets = {
+    SRRCTL = {
+       Drop_En = 31
+    },
+    MRQC = {
+       RSS = 1
+    }
+}
+function Intel1g:drv_stats ()
+   local r = self.r
+   local tab = {
+      rxdmapackets = { type = {counter}, register = r.RPTHC },
+      rxerrors = {
+         type = {counter},
+         register = function()
+            return r.CRCERRS() + r.RLEC() + r.RXERRC() + r.ALGNERRC()
+         end
       }
    }
-}, {__index = Intel})
+   local perqregs = {
+      rxdrops = "RQDPC",
+      txdrops = "TQDPC",
+      rxpackets = "PQGPRC",
+      txpackets = "PQGPTC",
+      rxbytes = "PQGORC",
+      txbytes = "PQGOTC",
+      rxmcast = "PQMPRC"
+   }
+   for i=0,self.max_q-1 do
+      for k,v in pairs(perqregs) do
+         tab["q" .. i .. "_" .. k] = {type={counter}, register = r[v][i] }
+      end
+   end
+   return tab
+end
+function Intel1g:init_q_stats () return end
 function Intel1g:init_phy ()
    -- 4.3.1.4 PHY Reset
    self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
@@ -576,6 +713,7 @@ function Intel1g:init ()
    -- use Internal PHY                             -- 8.2.5
    self.r.MDICNFG(0)
    self:init_phy()
+   self.nic_mac = macaddress:new(self.r.RAL64[0]:bits(0,48))
 
    self:rss_enable()
 
@@ -606,20 +744,50 @@ function Intel1g:link_status ()
    return bit.band(self.r.STATUS(), mask) == mask
 end
 
-Intel82599 = setmetatable({
-   driver = "Intel82599",
-   max_q_by_dev = {
-      ["0x10fb"] = 128   -- 82599ES
+Intel82599.driver = "Intel82599"
+Intel82599.offsets = {
+   SRRCTL = {
+      Drop_En = 28
    },
-   offsets = {
-      SRRCTL = {
-         Drop_En = 28
-      },
-      MRQC = {
-         RSS = 0
+   MRQC = {
+       RSS = 0
+   }
+}
+function Intel82599:drv_stats ()
+   local r = self.r
+   local tab = {
+      rxdmapackets = { type = {counter}, register = r.RXDGPC },
+      rxerrors = { type = {counter},
+         register = function()
+            return r.CRCERRS() + r.ILLERRC() + r.ERRBC() + r.RUC() + r.RFC() +
+               r.ROC() + r.RJC()
+         end
       }
    }
-}, { __index = Intel })
+   local perqregs = {
+      rxdrops = "QPRDC",
+      rxpackets = "QPRC",
+      txpackets = "QPTC",
+      rxbytes = "QBRC64",
+      txbytes = "QBTC64",
+   }
+   for i=0,15 do
+      for k,v in pairs(perqregs) do
+         tab["q" .. i .. "_" .. k] = {type={counter}, register = r[v][i] }
+      end
+   end
+   return tab
+end
+
+function Intel82599:init_q_stats ()
+  if self.rxq then
+     self.r.RQSM[math.floor(self.rxq/4)]:byte(self.rxq % 4, self.rxq)
+  end
+  if self.txq then
+     self.r.TQSM[math.floor(self.txq/4)]:byte(self.txq % 4, self.txq)
+  end
+end
+
 function Intel82599:link_status ()
    local mask = bits { Link_up = 30 }
    return bit.band(self.r.LINKS(), mask) == mask
@@ -651,6 +819,8 @@ function Intel82599:init ()
 
    -- 4.6.7
    self.r.RXCTRL(0)                             -- disable receive
+   self.nic_mac = macaddress:new(self.r.RAL64[0]:bits(0,48))
+   self.r.RXDSTATCTRL(0x10) -- map all queues to RXDGPC
    for i=0,127 do
       self.r.RAL[i](0)
       self.r.RAH[i](0)
@@ -721,7 +891,6 @@ function Intel:debug (args)
    local pfx = args.prefix or "DEBUG_"
    local prnt = args.print or true
    local r = { rss = "", rxds = 0 }
-   local counter = require("core.counter")
    r.LINK_STATUS = self:link_status()
    r.rdt = self.rdt
    if self.output.output then
@@ -754,16 +923,19 @@ function Intel:debug (args)
       r[k] = tonumber(self.r[k]())
    end
 
-   local master_regs
+   local master_regs = {}
+   local master_counters = { "rxdmapackets", "rxpackets" }
    if self.driver == "Intel82599" then
       r.rxdctrl =
          band(self.r.RXDCTL(), bits{enabled = 25}) == bits{enabled = 25}
-      master_regs = {"GPRC", "RXDGPC", "RXCTRL"}
+      master_regs = {"RXCTRL"}
    elseif self.driver == "Intel1g" then
       r.rxen = band(self.r.RCTL(), bits{ RXEN = 1 }) == bits{ RXEN = 1 }
-      master_regs = {"GPRC", "RPTHC"}
    end
-   if self.master then
+   if self.runstats then
+      for k,v in pairs(master_counters) do
+         r[v] = counter.read(self.stats.shm[v])
+      end
       for _,k in pairs(master_regs) do
          r[k] = tonumber(self.r[k]())
       end
