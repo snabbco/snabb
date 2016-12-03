@@ -26,12 +26,13 @@ PcapFilter = {}
 --   filter      = string expression specifying which packets to accept
 --                 syntax: http://www.tcpdump.org/manpages/pcap-filter.7.html
 --   state_table = optional string name to use for stateful-tracking table
+--   native      = optional boolean argument that enables dynasm compilation
 function PcapFilter:new (conf)
    assert(conf.filter, "PcapFilter conf.filter parameter missing")
 
    local o = {
       -- XXX Investigate the latency impact of filter compilation.
-      accept_fn = pf.compile_filter(conf.filter),
+      accept_fn = pf.compile_filter(conf.filter, { native = conf.native or false }),
       state_table = conf.state_table or false,
       shm = { rxerrors = {counter}, sessions_established = {counter} }
    }
