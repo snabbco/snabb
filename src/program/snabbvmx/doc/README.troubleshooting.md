@@ -169,7 +169,7 @@ everything is working as expected.
 
 **preparation**
 - have tcpdump, snabb or vmxlwaftr installed.
-- should work on xeon or i7; will fail on Celeron chips 
+- should work on xeon or i7; will fail on Celeron chips
 - hugepages : Ensure hugepages is set in sysctl
 "vm.nr_hugepages = 5" in sysctl.conf
 If using vmxlwaftr, then this is done by the scripts automatically
@@ -195,7 +195,7 @@ The tests can also be run when executing **make test** (only if the Snabb source
 is available).
 
 
-### make tests
+### Make tests
 
 ```bash
 $ sudo make test
@@ -320,15 +320,15 @@ NOTE: Currently the test is not working correctly: the returned MAC should be
 `02:99:99:99:99:99`.
 
 
-## crafting and running end-to-end tests
+## Crafting and running end-to-end tests
 
-### brief steps 
+### Brief steps
 
-(1) run the interactive check with "-r" parm to derive the counters and out.pcaps
+(1) run the interactive check with "-r" param to derive the counters and out.pcaps
 
-`snabb/src/snabb snabbvmx check -r  ./CONF.cfg "./V4-IN.PCAP" "./V6-IN.PCAP" "./outv4.pcap" "./outv6.pcap" COUNTERS.lua`
+`snabb snabbvmx check -r  ./CONF.cfg "./V4-IN.PCAP" "./V6-IN.PCAP" "./outv4.pcap" "./outv6.pcap" COUNTERS.lua`
 
-(2) place derived counters.lua in "snabb/src/program/snabbvmx/tests/end-to-end/data/counters"  
+(2) place derived counters.lua in "snabb/src/program/snabbvmx/tests/end-to-end/data/counters"
 
 (3) place derived and expected out.pcaps in "snabb/src/program/snabbvmx/tests/end-to-end/data"
 
@@ -341,7 +341,7 @@ NOTE: Currently the test is not working correctly: the returned MAC should be
 
 ### How the system test works in detail
 
-The way the test system works is by passing the input IPv4/IPv6 packets (via pre-recorded pcap-files) to the lwAFTR and comparing the expected packet output (pcap-file) to the packet output that the lwAFTR has generated. 
+The way the test system works is by passing the input IPv4/IPv6 packets (via pre-recorded pcap-files) to the lwAFTR and comparing the expected packet output (pcap-file) to the packet output that the lwAFTR has generated.
 The optional counters file is compared too to the actual counters file obtained after running the test. This is beeing reflected in snabbvmx check syntax:
 
 `CONF V4-IN.PCAP V6-IN.PCAP V4-OUT.PCAP V6-OUT.PCAP [COUNTERS.LUA]`
@@ -350,7 +350,7 @@ V4-OUT.PCAP, V6-OUT.PCAP and COUNTERS.LUA are expected output. These output is c
 
 
 **lwaftr vs snabbvmx**
-As both lwaftr and snabbvmx provide a different functionality and use different config-files, both the lwaftr and snabbvmx have their dedicated end-to-end tests. 
+As both lwaftr and snabbvmx provide a different functionality and use different config-files, both the lwaftr and snabbvmx have their dedicated end-to-end tests.
 
 Although SnabbVMX works on a single interface, `snabbvmx check` requires that
 the packet split (IPv4 / IPv6) is already done and provides a split output too.
@@ -370,13 +370,13 @@ in Snabb's lwAFTR code, resulting in the addition of a new test to the lwAFTR's
 test suite.
 
 
-**lwaftr**  
+**lwaftr**
 
 ```
 cd src/program/lwaftr/tests/end-to-end
 ```
 
-**snabbvmx**  
+**snabbvmx**
 
 ```
 cd src/program/snabbvmx/tests/end-to-end
@@ -400,12 +400,12 @@ Usage: check [-r] CONF V4-IN.PCAP V6-IN.PCAP V4-OUT.PCAP V6-OUT.PCAP
 
 Parameters:
 
-- CONF: SnabbVMX (icmp_snabbvmx-lwaftr-xe.cfg) or lwaftr (icmp_snabbvmx-lwaftr-xe1.conf) configuration file.
-- V4-IN.PCAP : Incoming IPv4 packets (from Internet).
-- V6-IN.PCAP : Incoming IPv6 packets (from b4).
-- V4-OUT.PCAP : Outgoing IPv4 packets (to Internet, decapsulated).
-- V6-OUT.PCAP : Outgoing IPv6 packets (to b4, encapsulated)
-- [COUNTERS.LUA] : Lua file with counter values. Will be regenerated via [-r] parm
+- **CONF** : SnabbVMX (icmp_snabbvmx-lwaftr-xe.cfg) or lwaftr (icmp_snabbvmx-lwaftr-xe1.conf) configuration file.
+- **V4-IN.PCAP** : Incoming IPv4 packets (from Internet).
+- **V6-IN.PCAP** : Incoming IPv6 packets (from b4).
+- **V4-OUT.PCAP** : Outgoing IPv4 packets (to Internet, decapsulated).
+- **V6-OUT.PCAP** : Outgoing IPv6 packets (to b4, encapsulated)
+- **[COUNTERS.LUA]** : Lua file with counter values. Will be regenerated via [-r] param
 
 
 ## How to run SnabbVMX interactive end-to-end test
@@ -416,9 +416,9 @@ configuration and binding table.  With that information and knowing the error
 report (ping to lwAFTR but it doesn't reply, valid softwire packet doesn't get
 decapsulated, etc), you craft a hand-made packet that meets the testing case.
 
-**obtaining the config-files**  
-  
-To run a test, the following config-files are required:  
+**obtaining the config-files**
+
+To run a test, the following config-files are required:
 
 - the binding-table : binding_table.txt.s
 - lwaftr conf       : snabbvmx-lwaftr-xe[0-9].conf
@@ -427,13 +427,13 @@ To run a test, the following config-files are required:
 If you are running lwaftr check, then snabbvmx config-file (snabbvmx-lwaftr-xe[0-9].cfg) is not required
 
 It is fine to copy or manually craft the config-files.
-A running snabbvmx can be used as well to copy the config-files from the running container 
+A running snabbvmx can be used as well to copy the config-files from the running container
 To gain the used config-files from the running container, either run the collect-support-infos.sh (https://github.com/mwiget/vmxlwaftr/blob/igalia/SUPPORT-INFO.md)
 or execute a shell within the dockers container and copy configs and binding-table from the /tmp directory.
 
 Note: the check application is just using a single interface. If the running container consists of two or more snabb-instances, then just take one of them for when running the check.
- 
-**collect-support-infos.sh**  
+
+**collect-support-infos.sh**
 
 ```
 lab@ubuntu1:~/vmxlwaftr/tests$ ./collect-support-infos.sh lwaftr3-16.2R3
@@ -474,7 +474,7 @@ lab@ubuntu1:~/vmxlwaftr/tests/t1$ tar -tvzf support-info-20161108-1335.tgz
 -rwxr-xr-x root/root   2707019 2016-10-31 14:06 usr/local/bin/snabb
 ```
 
-**config-files within /tmp inside docker container**  
+**config-files within /tmp inside docker container**
 
 The snabbvmx config-files can be derived from the container's shell as well directly within the /tmp directory
 
@@ -491,11 +491,11 @@ binding_table.txt.s.o    junos-vmx-x86-64-16.1-20160926.0.qcow2  pci_xe1  snabbv
 Note: press ctrl p ctrl q to exit the containers shell
 
 
-**some adoption of config-files is required**  
+**some adoption of config-files is required**
 
 The advantage of snabbvmx is the dynamic next-hop resolution via Junos. When running the the lwaftr or snabbvmx app standalone, then the next-hop resolution via Junos is missing. The config-files are required to get modified for static next-hop configuration.
 
-**config as derived from a running vmxlwaftr container**  
+**config as derived from a running vmxlwaftr container**
 
 ```
 lab@ubuntu1:~/vmxlwaftr/tests/t1$ cat snabbvmx-lwaftr-xe1.cfg
@@ -516,19 +516,20 @@ return {
 }
 ```
 
-**Adopted static next-hop configuration to use with vmxlwaftr**  
+**Adopted static next-hop configuration to use with vmxlwaftr**
 
 To change configuration for static next-hop, below changes are required:
-  
+
 
 - cache_refresh_interval = 0 (turns off next-hop learning via Junos)
 - mac_address (thats the own/self mac-address fo lwaftr)
 - next_hop_mac (next-hop mac to send the packets to)
 
-Note: The snabbvmx config icmp_snabbvmx-lwaftr-xe1.cfg references the snabb-configuration file icmp_snabbvmx-lwaftr-xe1.conf via the "lwaftr" directive.
+Note: The snabbvmx config icmp_snabbvmx-lwaftr-xe1.cfg references the snabb-configuration file icmp_snabbvmx-lwaftr-xe1.conf via the "lwaftr" directive. When running "snabbvmx check" then both the lwaftr and the snabbvmx config-files must be provided.
 
 ```
-lab@ubuntu1:~/latest-snabb-binary/snabb/src/program/snabbvmx/tests/end-to-end/data$ cat icmp_snabbvmx-lwaftr-xe1.cfg
+cd snabb/src/program/snabbvmx/tests/end-to-end/data$
+cat icmp_snabbvmx-lwaftr-xe1.cfg
 return {
   lwaftr = "icmp_snabbvmx-lwaftr-xe1.conf",
   settings = {
@@ -548,37 +549,37 @@ return {
     next_hop_mac = "90:e2:ba:94:2a:bc",  <<< the next-hop mac to use for outgoing packets
   },
 }
-```  
+```
 
-**The input pcaps**  
+**The input pcaps**
 
 The snabb "check" app requires one or two input pcaps.
-It is ok to:  
+It is ok to:
 
 - only feed V4-IN.PCAP
 - only feed the V6-IN.PCAP
 - or feed both V4-IN.PCAP and V6-IN.PCAP
 
-Note for interactive tests: 
-When only feeding one pcap, then the other empty pcap must be the "empty.pcap" in 
+Note for interactive tests:<br>
+When only feeding one pcap as input, then the other empty pcap must be the "empty.pcap" in
 "src/program/snabbvmx/tests/end-to-end/data/empty.pcap" and not an empty string like ""
 
 ```
-lab@ubuntu1:~/latest-snabb-binary/snabb/src/program/snabbvmx/tests/end-to-end/data$ ls empty.pcap
-empty.pcap
-lab@ubuntu1:~/latest-snabb-binary/snabb/src/program/snabbvmx/tests/end-to-end/data$ file empty.pcap
+cd snabb/src/program/snabbvmx/tests/end-to-end/data$
+$ file empty.pcap
 empty.pcap: tcpdump capture file (little-endian) - version 2.4 (Ethernet, capture length 65535)
-lab@ubuntu1:~/latest-snabb-binary/snabb/src/program/snabbvmx/tests/end-to-end/data$ tcpdump -r empty.pcap
+$ tcpdump -r empty.pcap
 reading from file empty.pcap, link-type EN10MB (Ethernet)
 ```
 
-**sample icmp-ipv4-in.pcap**  
+**sample icmp-ipv4-in.pcap**
 
 For any input pcap it makes sense to keep it short - ideally a single packet to check correctness of the lwaftr.
 The input packet "11:26:07.168372 IP 10.0.1.100.53 > 10.10.0.0.1024: [|domain]" is matching the binding-table for PSID=1.
 
 ```
-lab@ubuntu1:~/latest-snabb-binary/snabb/src/program/snabbvmx/tests/end-to-end/data$ cat cg-binding_table.txt.s
+cd snabb/src/program/snabbvmx/tests/end-to-end/data$
+$ cat cg-binding_table.txt.s
 psid_map {
   10.10.0.0  {psid_length=6, shift=10}
   10.10.0.1  {psid_length=6, shift=10}
@@ -599,13 +600,11 @@ reading from file ipv4-in.pcap, link-type EN10MB (Ethernet)
 11:26:07.168372 IP 10.0.1.100.53 > 10.10.0.0.1024: [|domain]
 ```
 
+**running the interactive check**
 
-
-**running the interactive check**  
-
-The interactive check is performed via `snabb snabbvmx check -r`. Using the "-r" parm instructs the check to generate the counters and out.pcap files.
+The interactive check is performed via `snabb snabbvmx check -r`. Using the "-r" param instructs the check to generate the counters and out.pcap files.
 As there is no IPv6 input, the "empty.pcap" is configured.
- 
+
 ```
 sudo ~/vmx-docker-lwaftr/snabb/src/snabb snabbvmx check -r ./snabbvmx-lwaftr-xe1.cfg "./ipv4-in.pcap" "./empty.pcap" "./outv4.pcap" "./outv6.pcap" test.lua
 loading compiled binding table from ./binding_table.txt.s.o
@@ -620,34 +619,35 @@ done
 **results**
 
 The -r flag is set, as such the resulting counters file test.lua and the out.pcap files are  generated freshly.
-The results below show a correct processing of the lwatr:  
+The results below show a correct processing of the lwatr:
 
 - the counters-file lists one IPv4 packet as input
 - as the input-packet matches the binding-table, one IPv6 packet output
 - outv4.pcap is empty
-- outv6.pcap shows the resulting encapsulated lw4o6 packet 
+- outv6.pcap shows the resulting encapsulated lw4o6 packet
 
 ```
-lab@ubuntu1:~/vmx-docker-lwaftr/snabb/src/program/snabbvmx/tests/end-to-end/data$ cat test.lua
+$ cd snabb/src/program/snabbvmx/tests/end-to-end/data
+$ cat test.lua
 return {
    ["in-ipv4-bytes"] = 42,
    ["in-ipv4-packets"] = 1,
    ["out-ipv6-bytes"] = 82,
    ["out-ipv6-packets"] = 1,
 }
-lab@ubuntu1:~/vmx-docker-lwaftr/snabb/src/program/snabbvmx/tests/end-to-end/data$ tcpdump -n -r outv4.pcap
+$ tcpdump -n -r outv4.pcap
 reading from file outv4.pcap, link-type EN10MB (Ethernet)
 
-lab@ubuntu1:~/vmx-docker-lwaftr/snabb/src/program/snabbvmx/tests/end-to-end/data$ tcpdump -n -r outv6.pcap
+$ tcpdump -n -r outv6.pcap
 reading from file outv6.pcap, link-type EN10MB (Ethernet)
 01:00:00.000000 IP6 2a02:587:f700::100 > 2a02:587:f710::400: IP 10.0.1.100.53 > 10.10.0.0.1024: [|domain]
 
 ```
 
-**summary interactive check**  
+**summary interactive check**
 
 At this stage the interactive test is finished.
-The following is defined:  
+The following is defined:
 
 - lwaftr and  snabbvmx configs
 - binding-table
@@ -662,15 +662,15 @@ Tip: packets always arrive only in one interface, but the output might be
 empty or non-empty for both IPv4 and IPv6.
 
 
-## adding the sample-test towards the scripted end-to-end tests
+## Adding the sample-test towards the scripted end-to-end tests
 
-**in short**  
+### In short
 
 - place counter file and out.pcaps into correct directory
 - edit "test_env.sh" and add the test
 - run the test
 
-**details**
+### Detailed steps
 
 **directory-structure**
 place out.pcap into the data-drectory
@@ -695,17 +695,17 @@ configuration files and binding tables.
 * **end-to-end-vlan.sh**: Runs **core-end-to-end.sh** on VLAN packets.
 * **selftest.sh**: Runs both **end-to-end.sh** and **end-to-end-vlan.sh**
 
-`
 
 **adding the sample test**:
 
 All tests are defined in the "test_env.sh" file.
-This file has to be edited to include the sample test 
-The check app always checks the provided data to decide if the test is successful or not:
+This "test_env.sh" file has to be edited to include the sample test.
+The check app always checks the provided data to decide if the test is successful or not: <br>
+
 - if the optional counters-file is provided, then it must match
 - the resulting out.pcap files must always match
 
-**pass-criteria without the optional counters.lua file**  
+**pass-criteria without the optional counters.lua file**
 
 ```
 src/program/snabbvmx/tests/end-to-end$ vi test_env.sh
@@ -754,7 +754,8 @@ All end-to-end lwAFTR tests passed.
 If the counters file shall be taken into consideration as well (e.g. to count dropped frames), then just one line needs to be changed from "" to the counters file "test.lua"
 
 ```
-lab@ubuntu1:~/latest-snabb-binary/snabb/src/program/snabbvmx/tests/end-to-end$ vi test_env.sh
+$ cd snabb/src/program/snabbvmx/tests/end-to-end
+$ vi test_env.sh
 ...
     "sample test"
     "snabbvmx-lwaftr-xe1.cfg" "ipv4-in.pcap" "" "" "outv6.pcap"
