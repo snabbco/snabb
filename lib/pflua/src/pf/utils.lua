@@ -114,11 +114,26 @@ function pp(expr, indent, suffix)
          pp(expr[#expr], indent, ' }'..suffix)
       end
    elseif type(expr) == 'table' then
-      if #expr == 0 then
-         print(indent .. '{}')
-      else
-         error('unimplemented')
-      end
+     if not next(expr) then
+        print(indent .. '{}' .. suffix)
+     else
+       print(indent..'{')
+       local new_indent = indent..'  '
+       for k, v in pairs(expr) do
+          if type(k) == "string" then
+             if type(v) == "table" then
+                print(new_indent..k..' = ')
+                pp(v, new_indent..string.rep(" ", string.len(k))..'   ', ',')
+             else
+                pp(v, new_indent..k..' = ', ',')
+             end
+          else
+             pp(k, new_indent..'[', '] = ')
+             pp(v, new_indent, ',')
+          end
+       end
+       print(indent..'}'..suffix)
+     end
    else
       error("unsupported type "..type(expr))
    end

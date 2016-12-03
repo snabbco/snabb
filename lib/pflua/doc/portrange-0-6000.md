@@ -150,6 +150,91 @@ return function(P,length)
       return rshift(bswap(cast("uint16_t*", P+56)[0]), 16) <= 6000
    end
 end
+```
 
+## Native pflang compilation
+
+```
+7f438f8d6000  4883FE22          cmp rsi, +0x22
+7f438f8d6004  0F8C3B010000      jl 0x7f438f8d6145
+7f438f8d600a  0FB7470C          movzx eax, word [rdi+0xc]
+7f438f8d600e  4883F808          cmp rax, +0x08
+7f438f8d6012  0F859A000000      jnz 0x7f438f8d60b2
+7f438f8d6018  0FB64F17          movzx ecx, byte [rdi+0x17]
+7f438f8d601c  4883F906          cmp rcx, +0x06
+7f438f8d6020  7413              jz 0x7f438f8d6035
+7f438f8d6022  4883F911          cmp rcx, +0x11
+7f438f8d6026  740D              jz 0x7f438f8d6035
+7f438f8d6028  4881F984000000    cmp rcx, 0x84
+7f438f8d602f  0F8510010000      jnz 0x7f438f8d6145
+7f438f8d6035  0FB74F14          movzx ecx, word [rdi+0x14]
+7f438f8d6039  4881E11FFF0000    and rcx, 0xff1f
+7f438f8d6040  4883F900          cmp rcx, +0x00
+7f438f8d6044  0F85FB000000      jnz 0x7f438f8d6145
+7f438f8d604a  0FB64F0E          movzx ecx, byte [rdi+0xe]
+7f438f8d604e  4883E10F          and rcx, +0x0f
+7f438f8d6052  48C1E102          shl rcx, 0x02
+7f438f8d6056  89CA              mov edx, ecx
+7f438f8d6058  4883C210          add rdx, +0x10
+7f438f8d605c  4839F2            cmp rdx, rsi
+7f438f8d605f  0F8FE0000000      jg 0x7f438f8d6145
+7f438f8d6065  4189C8            mov r8d, ecx
+7f438f8d6068  4983C00E          add r8, +0x0e
+7f438f8d606c  460FB70407        movzx r8d, word [rdi+r8]
+7f438f8d6071  6641C1C808        ror r8w, 0x08
+7f438f8d6076  4D0FB7C0          movzx r8, r8w
+7f438f8d607a  4981F870170000    cmp r8, 0x1770
+7f438f8d6081  0F8EC1000000      jle 0x7f438f8d6148
+7f438f8d6087  4883C112          add rcx, +0x12
+7f438f8d608b  4839F1            cmp rcx, rsi
+7f438f8d608e  0F8FB1000000      jg 0x7f438f8d6145
+7f438f8d6094  0FB71417          movzx edx, word [rdi+rdx]
+7f438f8d6098  66C1CA08          ror dx, 0x08
+7f438f8d609c  480FB7D2          movzx rdx, dx
+7f438f8d60a0  4881FA70170000    cmp rdx, 0x1770
+7f438f8d60a7  0F8E9B000000      jle 0x7f438f8d6148
+7f438f8d60ad  E993000000        jmp 0x7f438f8d6145
+7f438f8d60b2  4883FE38          cmp rsi, +0x38
+7f438f8d60b6  0F8C89000000      jl 0x7f438f8d6145
+7f438f8d60bc  4881F886DD0000    cmp rax, 0xdd86
+7f438f8d60c3  0F857C000000      jnz 0x7f438f8d6145
+7f438f8d60c9  0FB64714          movzx eax, byte [rdi+0x14]
+7f438f8d60cd  4883F806          cmp rax, +0x06
+7f438f8d60d1  7442              jz 0x7f438f8d6115
+7f438f8d60d3  4883F82C          cmp rax, +0x2c
+7f438f8d60d7  750A              jnz 0x7f438f8d60e3
+7f438f8d60d9  0FB65736          movzx edx, byte [rdi+0x36]
+7f438f8d60dd  4883FA06          cmp rdx, +0x06
+7f438f8d60e1  7432              jz 0x7f438f8d6115
+7f438f8d60e3  4883F811          cmp rax, +0x11
+7f438f8d60e7  742C              jz 0x7f438f8d6115
+7f438f8d60e9  4883F82C          cmp rax, +0x2c
+7f438f8d60ed  750A              jnz 0x7f438f8d60f9
+7f438f8d60ef  0FB65736          movzx edx, byte [rdi+0x36]
+7f438f8d60f3  4883FA11          cmp rdx, +0x11
+7f438f8d60f7  741C              jz 0x7f438f8d6115
+7f438f8d60f9  4881F884000000    cmp rax, 0x84
+7f438f8d6100  7413              jz 0x7f438f8d6115
+7f438f8d6102  4883F82C          cmp rax, +0x2c
+7f438f8d6106  753D              jnz 0x7f438f8d6145
+7f438f8d6108  0FB64736          movzx eax, byte [rdi+0x36]
+7f438f8d610c  4881F884000000    cmp rax, 0x84
+7f438f8d6113  7530              jnz 0x7f438f8d6145
+7f438f8d6115  0FB74736          movzx eax, word [rdi+0x36]
+7f438f8d6119  66C1C808          ror ax, 0x08
+7f438f8d611d  480FB7C0          movzx rax, ax
+7f438f8d6121  4881F870170000    cmp rax, 0x1770
+7f438f8d6128  7E1E              jle 0x7f438f8d6148
+7f438f8d612a  4883FE3A          cmp rsi, +0x3a
+7f438f8d612e  7C15              jl 0x7f438f8d6145
+7f438f8d6130  0FB77738          movzx esi, word [rdi+0x38]
+7f438f8d6134  66C1CE08          ror si, 0x08
+7f438f8d6138  480FB7F6          movzx rsi, si
+7f438f8d613c  4881FE70170000    cmp rsi, 0x1770
+7f438f8d6143  7E03              jle 0x7f438f8d6148
+7f438f8d6145  B000              mov al, 0x0
+7f438f8d6147  C3                ret
+7f438f8d6148  B001              mov al, 0x1
+7f438f8d614a  C3                ret
 ```
 
