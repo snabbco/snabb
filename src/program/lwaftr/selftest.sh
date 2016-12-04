@@ -17,8 +17,13 @@ echo "Testing snabb lwaftr bench"
     ${TDIR}/tcp-frominet-bound.pcap ${TDIR}/tcp-fromb4-ipv6.pcap
 
 echo "Testing snabb lwaftr bench --reconfigurable"
-./snabb lwaftr bench --reconfigurable -D 0.1 ${TDIR}/icmp_on_fail.conf \
-    ${TDIR}/tcp-frominet-bound.pcap ${TDIR}/tcp-fromb4-ipv6.pcap
+./snabb lwaftr bench --reconfigurable -D 1 ${TDIR}/icmp_on_fail.conf \
+    ${TDIR}/tcp-frominet-bound.pcap ${TDIR}/tcp-fromb4-ipv6.pcap &
+
+LEADER_PID=$!
+
+./snabb config get $LEADER_PID /
+
 
 # The rest of the tests require real hardware
 
