@@ -96,7 +96,7 @@ function open_socket_or_die(instance_id)
 end
 
 function serialize_config(config, schema_name, path)
-   local grammar = path_grammar(schema_name, path)
+   local grammar = path_grammar(schema_name, path or '/')
    local printer = data.data_printer_from_grammar(grammar)
    return printer(config, yang.string_output_file())
 end
