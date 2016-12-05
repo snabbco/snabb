@@ -282,7 +282,10 @@ end
 local function cltable_builder(key_t)
    local res = cltable.new({ key_type=key_t })
    local builder = {}
-   function builder:add(key, value) res[key] = value end
+   function builder:add(key, value)
+      assert(res[key] == nil, 'duplicate key')
+      res[key] = value
+   end
    function builder:finish() return res end
    return builder
 end
@@ -322,9 +325,13 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
       local key, value = {}, {}
       if key_t then key = key_t() end
       if value_t then value = value_t() end
-      for k,v in pairs(struct) do
+      for k,_ in pairs(keys) do
          local id = normalize_id(k)
-         if keys[k] then key[id] = v else value[id] = v end
+         key[id] = struct[id]
+      end
+      for k,_ in pairs(values) do
+         local id = normalize_id(k)
+         value[id] = struct[id]
       end
       assoc:add(key, value)
       return assoc
