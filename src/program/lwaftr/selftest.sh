@@ -22,6 +22,7 @@ echo "Testing snabb lwaftr bench --reconfigurable"
 
 LEADER_PID=$!
 
+sleep 0.1
 ./snabb config get $LEADER_PID /
 
 
