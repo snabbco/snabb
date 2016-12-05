@@ -2,6 +2,7 @@
 module(..., package.seeall)
 local ffi = require('ffi')
 local app = require('core.app')
+local equal = require('core.lib').equal
 local data = require('lib.yang.data')
 local ipv4_ntop = require('lib.yang.util').ipv4_ntop
 local ipv6 = require('lib.protocol.ipv6')
@@ -338,7 +339,7 @@ local function ietf_softwire_translator ()
          local new_br
          local bt = native_config.softwire_config.binding_table
          for i,br in ipairs(bt.br_address) do
-            if lib.equal(br, new.br_ipv6_addr) then
+            if equal(br, new.br_ipv6_addr) then
                new_br = i - 1; break
             end
          end
@@ -399,19 +400,23 @@ local function ietf_softwire_translator ()
       end
    end
    function ret.add_config(native_config, path, data)
-      if path ~= ('/softwire-config/binding/br-instances'..
+      if path ~= ('/softwire-config/binding/br/br-instances'..
                      '/br-instance[id=1]/binding-table/binding-entry') then
          error('unsupported path: '..path)
       end
       local config = ret.get_config(native_config)
       local ietf_bt = ietf_softwire_getter(path)(config)
       local old_bt = native_config.softwire_config.binding_table
-      local new_bt = native_binding_table_from_ietf(ietf_bt)
+      local new_bt = native_binding_table_from_ietf(data)
+      local updates = {}
+      local softwire_path = '/softwire-config/binding-table/softwire'
+      local psid_map_path = '/softwire-config/binding-table/psid-map'
+      local br_address_path = '/softwire-config/binding-table/br-address'
       -- Add new psid_map entries.
       for k,v in cltable.pairs(new_bt.psid_map) do
          if old_bt.psid_map[k] then
-            if not lib.equal(old_bt.psid_map[k], v) then
-               error('changing psid params unimplemented')
+            if not equal(old_bt.psid_map[k], v) then
+               error('changing psid params unimplemented: '..k.addr)
             end
          else
             local config_str = string.format(
@@ -425,11 +430,11 @@ local function ietf_softwire_translator ()
       end
       -- Remap br-address entries.
       local br_address_map = {}
-      local br_address_count = #br_addresses
-      for _,new_br_address in ipairs(new_bt.br_addresses) do
+      local br_address_count = #old_bt.br_address
+      for _,new_br_address in ipairs(new_bt.br_address) do
          local idx
-         for i,old_br_address in ipairs(old_bt.br_addresses) do
-            if lib.equal(old_br_address, new_br_address) then
+         for i,old_br_address in ipairs(old_bt.br_address) do
+            if equal(old_br_address, new_br_address) then
                idx = i - 1 -- zero-based indexes, fml
                break
             end
@@ -446,7 +451,7 @@ local function ietf_softwire_translator ()
       -- Add softwires.
       local additions = {}
       for entry in new_bt.softwire:iterate() do
-         if old_bt.softwire.lookup_ptr(entry) then
+         if old_bt.softwire:lookup_ptr(entry) then
             error('softwire already present in table: '..
                      inet_ntop(entry.key.ipv4)..'/'..entry.key.psid)
          end
