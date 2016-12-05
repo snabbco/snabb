@@ -173,7 +173,28 @@ local function ietf_softwire_translator ()
    end
    ret.get_config = memoize1(ret.get_config)
    function ret.get_state(native_state)
-      error('unimplemented')
+      -- Even though this is a different br-instance node, it is a
+      -- cltable with the same key type, so just re-use the key here.
+      local br_instance, br_instance_key_t =
+         cltable_for_grammar(get_ietf_br_instance_grammar())
+      br_instance[br_instance_key_t({id=1})] = {
+         -- FIXME!
+         sentPacket = 0,
+         sentByte = 0,
+         rcvdPacket = 0,
+         rcvdByte = 0,
+         droppedPacket = 0,
+         droppedByte = 0
+      }
+      return {
+         softwire_state = {
+            binding = {
+               br = {
+                  br_instances = { br_instance = br_instance }
+               }
+            }
+         }
+      }
    end
    ret.get_state = memoize1(ret.get_state)
    function ret.set_config(native_config, path, data)
