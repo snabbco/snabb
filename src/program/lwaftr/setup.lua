@@ -18,8 +18,8 @@ local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 
-local lwaftr_yang_features = {['ietf-softwire']={binding=true, br=true}}
-require('lib.yang.schema').set_default_features(lwaftr_yang_features)
+local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
+require('lib.yang.schema').set_default_capabilities(capabilities)
 
 local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end

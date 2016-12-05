@@ -16,6 +16,11 @@ module snabb-config-leader-v1 {
     output {
       leaf native-schema { type string; mandatory true; }
       leaf-list alternate-schema { type string; }
+      list capability {
+        key module;
+        leaf module { type string; }
+        leaf-list feature { type string; }
+      }
     }
   }
 

@@ -591,10 +591,25 @@ local function inherit_config(schema, config)
 end
 
 local default_features = {}
--- Features should be a table whose keys are module names and whose
--- values are feature name -> boolean tables.
-function set_default_features(features)
-   default_features = features
+function get_default_capabilities()
+   local ret = {}
+   for mod,features in pairs(default_features) do
+      local feature_names = {}
+      for feature,_ in pairs(features) do
+         table.insert(feature_names, feature)
+      end
+      ret[mod] = { feature = feature_names }
+   end
+   return ret
+end
+function set_default_capabilities(capabilities)
+   default_features = {}
+   for mod,caps in pairs(capabilities) do
+      default_features[mod] = {}
+      for _,feature in ipairs(caps.feature) do
+         default_features[mod][feature] = true
+      end
+   end
 end
 
 -- Inline "grouping" into "uses".

@@ -9,6 +9,7 @@ local cltable = require("lib.cltable")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local util = require("lib.yang.util")
+local schema = require("lib.yang.schema")
 local rpc = require("lib.yang.rpc")
 local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
@@ -109,7 +110,8 @@ function Leader:rpc_describe (args)
       table.insert(alternate_schemas, schema_name)
    end
    return { native_schema = self.schema_name,
-            alternate_schema = alternate_schemas }
+            alternate_schema = alternate_schemas,
+            capability = schema.get_default_capabilities() }
 end
 
 local function path_printer_for_grammar(grammar, path)
