@@ -177,7 +177,7 @@ local function native_binding_table_from_ietf(ietf)
    local softwire = ctable.new({key_type=softwire_key_t,
                                 value_type=softwire_value_t})
    for k,v in cltable.pairs(ietf) do
-      local br_address_key = ipv6:ntop(k.binding_ipv6info)
+      local br_address_key = ipv6:ntop(v.br_ipv6_addr)
       local br = br_address_by_ipv6[br_address_key]
       if not br then
          br = #br_address
@@ -191,7 +191,7 @@ local function native_binding_table_from_ietf(ietf)
       end
       softwire:add(softwire_key_t({ipv4=v.binding_ipv4_addr,
                                    psid=v.port_set.psid}),
-                   softwire_value_t({br=br, b4_ipv6=v.binding_ipv6info}))
+                   softwire_value_t({br=br, b4_ipv6=k.binding_ipv6info}))
    end
    return {psid_map=psid_map, br_address=br_address, softwire=softwire}
 end
