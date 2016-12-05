@@ -388,7 +388,14 @@ function compute_remove_config_fn (schema_name, path)
    return path_remover_for_schema(yang.load_schema_by_name(schema_name), path)
 end
 
-function Leader:update_configuration (schema_name, update_fn, verb, path, ...)
+function Leader:notify_pre_update (config, verb, path, ...)
+   for _,translator in pairs(self.support.translators) do
+      translator.pre_update(config, verb, path, ...)
+   end
+end
+
+function Leader:update_configuration (update_fn, verb, path, ...)
+   self:notify_pre_update(self.current_configuration, verb, path, ...)
    local to_restart =
       self.support.compute_apps_to_restart_after_configuration_update (
          self.schema_name, self.current_configuration, verb, path,
@@ -409,8 +416,7 @@ end
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
    local path = path_mod.normalize_path(args.path)
    local parser = path_parser_for_schema_by_name(args.schema, path)
-   self:update_configuration(args.schema,
-                             compute_update_fn(args.schema, path),
+   self:update_configuration(compute_update_fn(args.schema, path),
                              verb, path, parser(args.config))
    return {}
 end
@@ -496,8 +502,7 @@ function Leader:rpc_remove_config (args)
       return self:foreign_rpc_remove_config(args.schema, args.path)
    end
    local path = path_mod.normalize_path(args.path)
-   self:update_configuration(args.schema,
-                             compute_remove_config_fn(args.schema, path),
+   self:update_configuration(compute_remove_config_fn(args.schema, path),
                              'remove', path)
    return {}
 end
