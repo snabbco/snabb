@@ -302,7 +302,7 @@ local function ietf_softwire_translator ()
          -- An update to an existing entry.  First, get the existing entry.
          local config = ret.get_config(native_config)
          local entry_path = path_str
-         local entry_path_len = #br_instance_paths + #br_paths
+         local entry_path_len = #br_instance_paths + #bt_paths
          for i=entry_path_len+1, #path do
             entry_path = dirname(entry_path)
          end
@@ -314,26 +314,26 @@ local function ietf_softwire_translator ()
          else
             new = {
                port_set = {
-                  psid_offset = entry.port_set.psid_offset,
-                  psid_len = entry.port_set.psid_len,
-                  psid = entry.port_set.psid
+                  psid_offset = old.port_set.psid_offset,
+                  psid_len = old.port_set.psid_len,
+                  psid = old.port_set.psid
                },
-               binding_ipv4_addr = entry.binding_ipv4_addr,
-               br_ipv6_addr = entry.br_ipv6_addr
+               binding_ipv4_addr = old.binding_ipv4_addr,
+               br_ipv6_addr = old.br_ipv6_addr
             }
-            if path[#entry_path_len + 1] == 'port-set' then
-               if #path == #entry_path_len + 1 then
+            if path[entry_path_len + 1].name == 'port-set' then
+               if #path == entry_path_len + 1 then
                   new.port_set = arg
                else
-                  local k = data.normalize_id(path[#path])
+                  local k = data.normalize_id(path[#path].name)
                   new.port_set[k] = arg
                end
-            elseif path[#path] == 'binding-ipv4-addr' then
+            elseif path[#path].name == 'binding-ipv4-addr' then
                new.binding_ipv4_addr = arg
-            elseif path[#path] == 'br-ipv6-addr' then
+            elseif path[#path].name == 'br-ipv6-addr' then
                new.br_ipv6_addr = arg
             else
-               error('bad path element: '..path[#path])
+               error('bad path element: '..path[#path].name)
             end
          end
          -- Apply changes.  Start by ensuring that there's a br-address
@@ -392,13 +392,17 @@ local function ietf_softwire_translator ()
             return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
          end
          local old_query = q(old.binding_ipv4_addr, old.port_set.psid)
+         -- FIXME: This remove will succeed but the add could fail if
+         -- there's already a softwire with this IPv4 and PSID.  We need
+         -- to add a check here that the IPv4/PSID is not present in the
+         -- binding table.
          table.insert(updates,
                       {'remove', {schema='snabb-softwire-v1',
                                   path=softwire_path..old_query}})
          local config_str = string.format(
             '{ ipv4 %s; psid %s; br %s; b4-ipv6 %s; }',
             ipv4_ntop(new.binding_ipv4_addr), new.port_set.psid,
-            new_br, path[#entry_path_len].query['binding-ipv6info'])
+            new_br, path[entry_path_len].query['binding-ipv6info'])
          table.insert(updates,
                       {'add', {schema='snabb-softwire-v1',
                                path=softwire_path,
