@@ -198,7 +198,7 @@ function BindingTable:lookup_psid(ipv4, port)
 end
 
 function BindingTable:get_br_address(i)
-   return self.br_addresses[i+1]
+   return self.br_addresses[i]
 end
 
 -- Iterate over the set of IPv4 addresses managed by a binding
@@ -244,7 +244,7 @@ end
 -- Each entry is a pointer with two members, "key" and "value".  They
 -- key is a softwire_key_t and has "ipv4" and "psid" members.  The value
 -- is a softwire_value_t and has "br" and "b4_ipv6" members.  The br is
--- a zero-based index into the br_addresses array, and b4_ipv6 is a
+-- a one-based index into the br_addresses array, and b4_ipv6 is a
 -- uint8_t[16].
 function BindingTable:iterate_softwires()
    return self.softwires:iterate()
@@ -286,7 +286,7 @@ function selftest()
       br-address 8:9:a:b:c:d:e:f;
       br-address 1E:1:1:1:1:1:1:af;
       br-address 1E:2:2:2:2:2:2:af;
-      softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; br 0; }
+      softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; br 1; }
       softwire { ipv4 178.79.150.233; psid 2300; b4-ipv6 127:11:12:13:14:15:16:128; }
       softwire { ipv4 178.79.150.233; psid 2700; b4-ipv6 127:11:12:13:14:15:16:128; }
       softwire { ipv4 178.79.150.233; psid 4660; b4-ipv6 127:11:12:13:14:15:16:128; }
@@ -295,8 +295,8 @@ function selftest()
       softwire { ipv4 178.79.150.233; psid 54192; b4-ipv6 127:11:12:13:14:15:16:128; }
       softwire { ipv4 178.79.150.15; psid 0; b4-ipv6 127:22:33:44:55:66:77:128; }
       softwire { ipv4 178.79.150.15; psid 1; b4-ipv6 127:22:33:44:55:66:77:128;}
-      softwire { ipv4 178.79.150.2; psid 7850; b4-ipv6 127:24:35:46:57:68:79:128; br 1; }
-      softwire { ipv4 178.79.150.3; psid 4; b4-ipv6 127:14:25:36:47:58:69:128; br 2; }
+      softwire { ipv4 178.79.150.2; psid 7850; b4-ipv6 127:24:35:46:57:68:79:128; br 2; }
+      softwire { ipv4 178.79.150.3; psid 4; b4-ipv6 127:14:25:36:47:58:69:128; br 3; }
    ]])
 
    local ipv4_pton = require('lib.yang.util').ipv4_pton
@@ -309,18 +309,18 @@ function selftest()
       assert(ffi.C.memcmp(ipv6_protocol:pton(ipv6), val.b4_ipv6, 16) == 0)
       assert(val.br == br)
    end
-   assert_lookup('178.79.150.233', 80, '127:2:3:4:5:6:7:128', 0)
+   assert_lookup('178.79.150.233', 80, '127:2:3:4:5:6:7:128', 1)
    assert(lookup('178.79.150.233', 79) == nil)
    assert(lookup('178.79.150.233', 81) == nil)
-   assert_lookup('178.79.150.15', 80, '127:22:33:44:55:66:77:128', 0)
-   assert_lookup('178.79.150.15', 4095, '127:22:33:44:55:66:77:128', 0)
-   assert_lookup('178.79.150.15', 4096, '127:22:33:44:55:66:77:128', 0)
-   assert_lookup('178.79.150.15', 8191, '127:22:33:44:55:66:77:128', 0)
+   assert_lookup('178.79.150.15', 80, '127:22:33:44:55:66:77:128', 1)
+   assert_lookup('178.79.150.15', 4095, '127:22:33:44:55:66:77:128', 1)
+   assert_lookup('178.79.150.15', 4096, '127:22:33:44:55:66:77:128', 1)
+   assert_lookup('178.79.150.15', 8191, '127:22:33:44:55:66:77:128', 1)
    assert(lookup('178.79.150.15', 8192) == nil)
-   assert_lookup('178.79.150.2', 7850, '127:24:35:46:57:68:79:128', 1)
+   assert_lookup('178.79.150.2', 7850, '127:24:35:46:57:68:79:128', 2)
    assert(lookup('178.79.150.3', 4095) == nil)
-   assert_lookup('178.79.150.3', 4096, '127:14:25:36:47:58:69:128', 2)
-   assert_lookup('178.79.150.3', 5119, '127:14:25:36:47:58:69:128', 2)
+   assert_lookup('178.79.150.3', 4096, '127:14:25:36:47:58:69:128', 3)
+   assert_lookup('178.79.150.3', 5119, '127:14:25:36:47:58:69:128', 3)
    assert(lookup('178.79.150.3', 5120) == nil)
    assert(lookup('178.79.150.4', 7850) == nil)
 

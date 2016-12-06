@@ -143,7 +143,7 @@ local function ietf_binding_table_from_native(bt)
                psid_len = psid_map.psid_length,
                psid = entry.key.psid
             },
-            br_ipv6_addr = bt.br_address[entry.value.br+1],
+            br_ipv6_addr = bt.br_address[entry.value.br],
          }
          ret[k] = v
       end
@@ -182,8 +182,8 @@ local function native_binding_table_from_ietf(ietf)
       local br_address_key = ipv6:ntop(v.br_ipv6_addr)
       local br = br_address_by_ipv6[br_address_key]
       if not br then
-         br = #br_address
          table.insert(br_address, v.br_ipv6_addr)
+         br = #br_address
          br_address_by_ipv6[br_address_key] = br
       end
       local psid_key = psid_map_key_t({addr=v.binding_ipv4_addr})
@@ -347,11 +347,11 @@ local function ietf_softwire_translator ()
          local bt = native_config.softwire_config.binding_table
          for i,br in ipairs(bt.br_address) do
             if ipv6_equals(br, new.br_ipv6_addr) then
-               new_br = i - 1; break
+               new_br = i; break
             end
          end
          if new_br == nil then
-            new_br = #bt.br_address
+            new_br = #bt.br_address + 1
             table.insert(updates,
                          {'add', {schema='snabb-softwire-v1',
                                   path=br_address_path,
@@ -446,12 +446,13 @@ local function ietf_softwire_translator ()
          local idx
          for i,old_br_address in ipairs(old_bt.br_address) do
             if ipv6_equals(old_br_address, new_br_address) then
-               idx = i - 1 -- zero-based indexes, fml
+               idx = i
                break
             end
          end
          if not idx then
-            idx, br_address_count = br_address_count, br_address_count + 1
+            br_address_count = br_address_count + 1
+            idx = br_address_count
             table.insert(updates,
                          {'add', {schema='snabb-softwire-v1',
                                   path=br_address_path,
@@ -469,7 +470,7 @@ local function ietf_softwire_translator ()
          local config_str = string.format(
             '{ ipv4 %s; psid %s; br %s; b4-ipv6 %s; }',
             ipv4_ntop(entry.key.ipv4), entry.key.psid,
-            br_address_map[entry.value.br + 1], ipv6:ntop(entry.value.b4_ipv6))
+            br_address_map[entry.value.br], ipv6:ntop(entry.value.b4_ipv6))
          table.insert(additions, config_str)
       end
       table.insert(updates,

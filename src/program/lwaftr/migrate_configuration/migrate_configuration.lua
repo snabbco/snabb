@@ -235,7 +235,7 @@ local function parse_softwires(parser, psid_map, br_address_count)
    while not parser:check('}') do
       local entry = parser:parse_property_list(softwire_spec, '{', '}')
       key.ipv4, key.psid = entry.ipv4, entry.psid
-      value.br, value.b4_ipv6 = entry.aftr, entry.b4
+      value.br, value.b4_ipv6 = entry.aftr + 1, entry.b4
       local success = pcall(map.add, map, key, value)
       if not success then
          parser:error('duplicate softwire for ipv4=%s, psid=%d',
@@ -349,13 +349,39 @@ local function migrate_legacy(stream)
    return migrate_conf(conf)
 end
 
+local function increment_br(conf)
+   for entry in conf.softwire_config.binding_table.softwire:iterate() do
+      -- Sadly it's not easy to make an updater that always works for
+      -- the indexing change, because changing the default from 0 to 1
+      -- makes it ambiguous whether a "br" value of 1 comes from the new
+      -- default, or was present as such in the old configuration.  Sad.
+      if entry.value.br ~= 1 then
+         entry.value.br = entry.value.br + 1
+      end
+   end
+   if #conf.softwire_config.binding_table.br_address > 1 then
+      io.stderr:write('Migrator unable to tell whether br=1 entries are '..
+                         'due to new default or old setting; manual '..
+                         'verification needed.\n')
+      io.stderr:flush()
+   end
+   return conf
+end
+
 local function migrate_3_0_1(conf_file)
    local data = require('lib.yang.data')
    local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   return data.load_data_for_schema_by_name('snabb-softwire-v1', str, conf_file)
+   return increment_br(data.load_data_for_schema_by_name(
+                          'snabb-softwire-v1', str, conf_file))
 end
 
-local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1 }
+local function migrate_3_0_1bis(conf_file)
+   return increment_br(yang.load_configuration(
+                          conf_file, {schema_name='snabb-softwire-v1'}))
+end
+
+local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
+                    ['3.0.1.1'] = migrate_3_0_1bis }
 function run(args)
    local conf_file, version = parse_args(args)
    local migrate = migrators[version]

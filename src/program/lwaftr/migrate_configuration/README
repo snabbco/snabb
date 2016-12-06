@@ -14,6 +14,9 @@ configuration.  Available VERSION values are:
     lwAFTR versions where "container" nodes in schemas are missing
     corresponding nodes in the data unless "presence true" is
     specified.
+  3.0.1.1
+    lwAFTR development snapshot where "br" fields of softwires were
+    0-based instead of 1-based.
 
 The default version is "legacy".
 
