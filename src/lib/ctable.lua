@@ -14,6 +14,7 @@ CTable = {}
 LookupStreamer = {}
 
 local HASH_MAX = 0xFFFFFFFF
+local uint8_ptr_t = ffi.typeof('uint8_t*')
 local uint16_ptr_t = ffi.typeof('uint16_t*')
 local uint32_ptr_t = ffi.typeof('uint32_t*')
 local uint64_ptr_t = ffi.typeof('uint64_t*')
@@ -559,8 +560,8 @@ function compute_hash_fn(ctype)
       hash_fns_by_size[size] = function(key)
          local h = 0
          local words = cast(uint32_ptr_t, key)
-         local bytes = cast('uint8_t*', key)
-         for i=0,size/4 do h = hash_32(bxor(h, words[i])) end
+         local bytes = cast(uint8_ptr_t, key)
+         for i=1,size/4 do h = hash_32(bxor(h, words[i-1])) end
          for i=1,size%4 do h = hash_32(bxor(h, bytes[size-i])) end
          return h
       end
