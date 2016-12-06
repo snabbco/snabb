@@ -352,10 +352,10 @@ module snabb-softwire-v1 {
 
         leaf br {
           type uint32;
-          default 0;
+          default 1;
           description
            "The B4-facing address of the lwAFTR for this softwire, as
-            a zero-based index into br-addresses.";
+            a one-based index into br-addresses.";
         }
 
         leaf b4-ipv6 {
