@@ -1,5 +1,16 @@
 # Change Log
 
+## [3.1.1] - 2016-12-06
+
+A hotfix to work around bugs in multiprocess support when using Intel
+NICs.
+
+ * Passing --reconfigurable to "snabb lwaftr run" now just uses a single
+   process while we sort out multiprocess issues.
+
+ * Fixed "snabb lwaftr query" and "snabb top", broken during
+   refactoring.
+
 ## [3.1.0] - 2016-12-06
 
 Adding "ietf-softwire" support, process separation between control and
@@ -33,7 +44,7 @@ the data plane, and some configuration file changes.
    new mapping where every container node from the YANG schema appears
    in the data more closely follows the YANG standard XML mapping that
    the XPath expressions are designed to operate over.
-   
+
    Additionally, the "br" leaf inside "snabb-softwire-v1" lists is now a
    1-based index into the "br-address" leaf-list instead of a zero-based
    index.
