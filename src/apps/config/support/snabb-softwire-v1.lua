@@ -3,6 +3,7 @@ module(..., package.seeall)
 local ffi = require('ffi')
 local app = require('core.app')
 local equal = require('core.lib').equal
+local dirname = require('core.lib').dirname
 local data = require('lib.yang.data')
 local ipv4_ntop = require('lib.yang.util').ipv4_ntop
 local ipv6 = require('lib.protocol.ipv6')
@@ -182,7 +183,7 @@ local function native_binding_table_from_ietf(ietf)
       local br = br_address_by_ipv6[br_address_key]
       if not br then
          br = #br_address
-         table.insert(br_address, k.binding_ipv6info)
+         table.insert(br_address, v.br_ipv6_addr)
          br_address_by_ipv6[br_address_key] = br
       end
       local psid_key = psid_map_key_t({addr=v.binding_ipv4_addr})
@@ -297,7 +298,7 @@ local function ietf_softwire_translator ()
          local entry_path = path_str
          local entry_path_len = #br_instance_paths + #br_paths
          for i=entry_path_len+1, #path do
-            entry_path = lib.dirname(entry_path)
+            entry_path = dirname(entry_path)
          end
          local old = ietf_softwire_getter(entry_path)(config)
          -- Now figure out what the new entry should look like.
@@ -469,8 +470,8 @@ local function ietf_softwire_translator ()
    end
    function ret.remove_config(native_config, path)
       local ietf_binding_table_path =
-         '/softwire-config/binding/br-instances/br-instance[id=1]/binding-table'
-      if (lib.dirname(path) ~= ietf_binding_table_path or
+         '/softwire-config/binding/br/br-instances/br-instance[id=1]/binding-table'
+      if (dirname(path) ~= ietf_binding_table_path or
           path:sub(-1) ~= ']') then
          error('unsupported path: '..path)
       end
@@ -492,7 +493,7 @@ local function ietf_softwire_translator ()
       if (verb == 'remove' and
           path:match('^/softwire%-config/binding%-table/softwire')) then
          -- Remove a softwire.
-         local value = snabb_softwire_getter(path)(config)
+         local value = snabb_softwire_getter(path)(native_config)
          local br = cached_config.softwire_config.binding.br
          for _,instance in cltable.pairs(br.br_instances.br_instance) do
             local grammar = get_softwire_grammar()
