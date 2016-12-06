@@ -471,6 +471,7 @@ local function ietf_softwire_translator ()
    function ret.remove_config(native_config, path)
       local ietf_binding_table_path =
          '/softwire-config/binding/br/br-instances/br-instance[id=1]/binding-table'
+      local softwire_path = '/softwire-config/binding-table/softwire'
       if (dirname(path) ~= ietf_binding_table_path or
           path:sub(-1) ~= ']') then
          error('unsupported path: '..path)
