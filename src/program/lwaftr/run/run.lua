@@ -147,7 +147,7 @@ function run(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local use_splitter = requires_splitter(opts, conf)
 
-   if opts.name then engine.claim_name(otps.name) end
+   if opts.name then engine.claim_name(opts.name) end
 
    local c = config.new()
    local setup_fn, setup_args
