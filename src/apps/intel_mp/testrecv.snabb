@@ -10,7 +10,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local c = config.new()
-config.app(c, "nic", intel.Intel, { pciaddr=pciaddr, rxq = qno, ndesc = 2048, wait_for_link=true, master_stats = (os.getenv("SNABB_RECV_MASTER_STATS") == "true") })
+config.app(c, "nic", intel.Intel, { pciaddr=pciaddr, rxq = qno, ndescriptors = 2048, wait_for_link=true })
 config.app(c, "sink", basic.Sink)
 if os.getenv("SNABB_RECV_EXPENSIVE") then
 	local filter = require("apps.packet_filter.pcap_filter")

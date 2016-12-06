@@ -15,55 +15,56 @@ The `intel_mp.Intel` app can drive an Intel 82599 NIC at 14 million pps.
 
 ## Configuration
 
-- Key **pciaddr**
+— Key **pciaddr**
 
 *Required*. The PCI address of the NIC as a string.
 
-- Key **ndesc**
+— Key **ndesc**
 
 *Optional*. Number of DMA descriptors to use i.e. size of the DMA
 transmit and receive queues. Must be a multiple of 128. Default is not
 specified but assumed to be broadly applicable.
 
-- Key **rxq**
+— Key **rxq**
 
-*Optional*. The receive queue to attach to, numbered from 0
+*Optional*. The receive queue to attach to, numbered from 0.
 
-- Key **txq**
+— Key **txq**
 
-*Optional*. The transmit queue to attach to, numbered from 0
+*Optional*. The transmit queue to attach to, numbered from 0.
 
-- Key **rsskey**
+— Key **rsskey**
 
-*Optional*. The rsskey is a 32bit integer that seeds the hash used to
+*Optional*. The rsskey is a 32 bit integer that seeds the hash used to
 distribute packets across queues. If there are multiple levels of RSS snabb
 devices in the packet flow making this unique will help packet distribution.
 
-- Key **wait_for_link**
+— Key **wait_for_link**
 
-*Optional*. Boolean, false, should :new() block until there is a link light or
-not.
+*Optional*. Boolean that indicates if `new` should block until there is a link
+light or not. The default is `false`.
 
-- Key **link_up_attempts**
+— Key **linkup_wait**
 
-*Optional* Number, 60, how many 2s attempts **wait_for_linkup** should make
-before new() returns an app with a down link.
+*Optional* Number of seconds `new` waits for the device to come up. The default
+is 120.
 
-- Key **mtu**
+— Key **mtu**
 
-*Optional* Default: 9014 the maximum packet length sent of received, excluding
-the trailing 4 byte CRC.
+*Optional* The maximum packet length sent or received, excluding the trailing
+ 4 byte CRC. The default is 9014.
 
-- Key **run_stats**
+— Key **master_stats**
 
-*Optional* Boolean, false, should this app export stats registers as counters.
-One per physical NIC. There is a small but detectable run time performance hit
-incurred.
+*Optional* Boolean indicating whether to elect an arbitrary app (the master)
+to collect device statistics. The default is true.
 
-- Key **master_stats**
+— Key **run_stats**
 
-*Optional* Boolean, false, elect an arbitrary app, the master to `run_stats ==
-true`.
+*Optional* Boolean indicating if this app instance should collect device
+statistics. One per physical NIC (conflicts with `master_stats`). There is a
+small but detectable run time performance hit incurred. The default is false.
+
 
 ### RSS hashing methods
 

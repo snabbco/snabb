@@ -25,6 +25,7 @@ local register    = require("lib.hardware.register")
 local counter     = require("core.counter")
 local macaddress  = require("lib.macaddress")
 local shm         = require("core.shm")
+local counter = require("core.counter")
 
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
@@ -43,6 +44,7 @@ BPTC        0x040F4 -               RC Broadcast Packets Transmitted Count
 CTRL        0x00000 -               RW Device Control
 CTRL_EXT    0x00018 -               RW Extended Device Control
 STATUS      0x00008 -               RO Device Status
+RCTL        0x00100 -               RW RX Control
 CRCERRS     0x04000 -               RC CRC Error Count
 GPRC        0x04074 -               RC Good Packets Received Count
 GPTC        0x04080 -               RC Good Packets Transmitted Count
@@ -50,6 +52,8 @@ GORC64      0x04088 -               RC64 Good Octets Received Count 64-bit
 GOTC64      0x04090 -               RC64 Good Octets Transmitted Count 64-bit
 MPRC        0x0407C -               RC Multicast Packets Received Count
 MPTC        0x040F0 -               RC Multicast Packets Transmitted Count
+BPRC        0x04078 -               RC Broadcast Packets Received Count
+BPTC        0x040F4 -               RC Broadcast Packets Transmitted
 ]]
 }
 reg['82599ES'] = {
@@ -81,6 +85,7 @@ TQSM        0x08600 +0x04*0..31     RW Transmit Queue Statistic Mapping Register
 TXPBSIZE    0x0CC00 +0x04*0..7      RW Transmit Packet Buffer Size
 TXPBTHRESH  0x04950 +0x04*0..7      RW Tx Packet Buffer Threshold
 VFTA        0x0A000 +0x04*0..127    RW VLAN Filter Table Array
+QPRDC       0x01430 +0x40*0..15     RC Queue Packets Received Drop Count
 ]],
    inherit = "gbl",
    rxq = [[
@@ -133,6 +138,14 @@ ROC         0x040AC -               RC Receive Oversize Count
 RJC         0x040B0 -               RC Receive Jabber Count
 SWSM        0x10140 -               RW Software Semaphore
 VLNCTRL     0x05088 -               RW VLAN Control Register
+ILLERRC     0x04004 -               RC Illegal Byte Error Count
+ERRBC       0x04008 -               RC Error Byte Count
+GORC64      0x04088 -               RC64 Good Octets Received Count 64-bit
+GOTC64      0x04090 -               RC64 Good Octets Transmitted Count 64-bit
+RUC         0x040A4 -               RC Receive Undersize Count
+RFC         0x040A8 -               RC Receive Fragment Count
+ROC         0x040AC -               RC Receive Oversize Count
+RJC         0x040B0 -               RC Receive Jabber Count
 ]],
    txq = [[
 DCA_TXCTRL  0x0600C +0x40*0..127    RW Tx DCA Control Register
@@ -176,11 +189,21 @@ MANC      0x05820 -                 RW Management Control
 MDIC      0x00020 -                 RW MDI Control
 MDICNFG   0x00E04 -                 RW MDI Configuration
 RLPML     0x05004 -                 RW Receive Long packet maximal length
-RCTL      0x00100 -                 RW RX Control
 RPTHC     0x04104 -                 RC Rx Packets to host count
 SW_FW_SYNC 0x05b5c -                RW Software Firmware Synchronization
 TCTL      0x00400 -                 RW TX Control
 TCTL_EXT  0x00400 -                 RW Extended TX Control
+ALGNERRC  0x04004 -                 RC Alignment Error - R/clr
+RXERRC    0x0400C -                 RC RX Error - R/clr
+MPC       0x04010 -                 RC Missed Packets - R/clr
+ECOL      0x04018 -                 RC Excessive Collisions - R/clr
+LATECOL   0x0401C -                 RC Late Collisions - R/clr
+RLEC      0x04040 -                 RC Receive Length Error - R/clr
+GORCL     0x04088 -                 RC Good Octets Received - R/clr
+GORCH     0x0408C -                 RC Good Octets Received - R/clr
+GOTCL     0x04090 -                 RC Good Octets Transmitted - R/clr
+GOTCH     0x04094 -                 RC Good Octets Transmitted - R/clr
+RNBC      0x040A0 -                 RC Receive No Buffers Count - R/clr
 ]],
    txq = [[
 TDBAL  0xe000 +0x40*0..7            RW Tx Descriptor Base Low
@@ -225,7 +248,24 @@ EEC       0x00010 -            RW EEPROM-Mode Control Register
 ]]
 }
 
-Intel = { }
+Intel = {
+   config = {
+      pciaddr = {required=true},
+      ndescriptors = {default=2048},
+      txq = {},
+      rxq = {},
+      mtu = {default=9014},
+      rssseed = {default=314159},
+      linkup_wait = {default=120},
+      wait_for_link = {default=false},
+      master_stats = {default=true},
+      run_stats = {default=false}
+   },
+   shm = {
+      mtu    = {counter},
+      txdrop = {counter}
+   }
+}
 Intel1g = setmetatable({}, {__index = Intel })
 Intel82599 = setmetatable({}, {__index = Intel})
 byPciID = {
@@ -235,20 +275,23 @@ byPciID = {
   [0x10fb] = { registers = "82599ES", driver = Intel82599, max_q = 16 }
 }
 
+-- The `driver' variable is used as a reference to the driver class in
+-- order to interchangably use NIC drivers.
+driver = Intel
+
 function Intel:new (conf)
    local self = {
       r = {},
       pciaddress = conf.pciaddr,
       path = pci.path(conf.pciaddr),
-      ndesc = conf.ndescriptors or 2048,
+      -- falling back to defaults for selftest bypassing config.app
+      ndesc = conf.ndescriptors or self.config.ndescriptors.default,
       txq = conf.txq,
       rxq = conf.rxq,
-      mtu = conf.mtu or 9014,
-      master_stats = conf.master_stats or false,
-      run_stats = conf.run_stats or false,
-      rssseed = conf.rssseed or 314159,
-      linkup_attempts = conf.linkup_attempts or 60,
-      wait_for_link = conf.wait_for_link or false
+      mtu = conf.mtu or self.config.mtu.default,
+      rssseed = conf.rssseed or self.config.mtu.default,
+      linkup_wait = conf.linkup_wait or self.config.linkup_wait.default,
+      wait_for_link = conf.wait_for_link
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -270,69 +313,41 @@ function Intel:new (conf)
    self.fd:flock("sh")
    self:init_tx_q()
    self:init_rx_q()
-   self:init_stats()
+
+   -- Initialize per app statistics
+   counter.set(self.shm.mtu, self.mtu)
+
+   -- Figure out if we are supposed to collect device statistics
+   self.run_stats = conf.run_stats or (self.master and conf.master_stats)
+
+   -- Expose per-device statistics from master
+   if self.run_stats then
+      local frame = {
+         dtime     = {counter, C.get_unix_time()},
+         speed     = {counter},
+         status    = {counter, 2}, -- Link down
+         promisc   = {counter},
+         macaddr   = {counter, self.nic_mac.bits},
+         rxbytes   = {counter},
+         rxpackets = {counter},
+         rxmcast   = {counter},
+         rxbcast   = {counter},
+         rxdrop    = {counter},
+         rxerrors  = {counter},
+         txbytes   = {counter},
+         txpackets = {counter},
+         txmcast   = {counter},
+         txbcast   = {counter},
+         txdrop    = {counter},
+         txerrors  = {counter},
+         rxdmapackets = {counter}
+      }
+      self:init_queue_stats(frame)
+      self.stats = shm.create_frame("pci/"..self.pciaddress, frame)
+      self.sync_timer = lib.throttle(0.01)
+   end
+
    return self
-end
-
-function Intel:init_stats()
-   if self.master then
-      counter.create("/pci/"..self.pciaddress .."/macaddr", self.nic_mac.bits)
-      if self.master_stats then
-         self.runstats = true
-      end
-   end
-   if not self.runstats then return end
-   self.stats = {}
-   local tab = {
-      dtime     = {counter, C.get_unix_time()},
-      mtu       = {counter, self.mtu},
-      promisc   = {counter, 1},
-      status    = {counter, 2},
-
-      rxbytes   = {counter, 0},
-      rxpackets = {counter, 0},
-      rxmcast   = {counter, 0},
-      rxbcast   = {counter, 0},
-      rxdrop    = {counter, 0},
-      rxerrors  = {counter, 0},
-
-      txbytes   = {counter, 0},
-      txpackets = {counter, 0},
-      txmcast   = {counter, 0},
-      txbcast   = {counter, 0},
-      txdrop    = {counter, 0},
-      txerrors  = {counter, 0}
-   }
-   for k,v in pairs(self:drv_stats()) do
-      tab[k] = v.type
-   end
-   self.stats.shm = shm.create_frame("/pci/"..self.pciaddress, tab)
-   self.sync_timer = lib.throttle(0.01)
-end
-
-function Intel:sync_stats ()
-   local set = counter.set
-   local r = self.r
-   local c = self.stats.shm
-
-   if self:link_status() then set(c.status, 1) else set(c.status, 2) end
-
-   local c = self.stats.shm
-   set(c.rxbytes, r.GORC64())
-   set(c.rxpackets, r.GPRC())
-
-   local mprc, bprc = r.MPRC(), r.BPRC()
-   set(c.rxmcast,   mprc + bprc)
-   set(c.rxbcast,   bprc)
-
-   set(c.txbytes, r.GOTC64())
-   set(c.txpackets, r.GPTC())
-   local mptc, bptc = r.MPTC(), r.BPTC()
-   set(c.txmcast, mptc + bptc)
-   set(c.txbcast, bptc)
-   for k,v in pairs(self:drv_stats()) do
-      set(c[k], v.register())
-   end
 end
 
 function Intel:disable_interrupts ()
@@ -345,7 +360,7 @@ function Intel:init_rx_q ()
    assert((self.ndesc %128) ==0,
    "ndesc must be a multiple of 128 (for Rx only)")	-- see 7.1.4.5
 
-   self.rxpackets = ffi.new("struct packet *[?]", self.ndesc)
+   self.rxqueue = ffi.new("struct packet *[?]", self.ndesc)
    self.rdh = 0
    self.rdt = 0
    -- setup 4.5.9
@@ -367,7 +382,7 @@ function Intel:init_rx_q ()
 
    for i = 0, self.ndesc-1 do
       local p= packet.allocate()
-      self.rxpackets[i]= p
+      self.rxqueue[i]= p
       self.rxdesc[i].address= tophysical(p.data)
       self.rxdesc[i].status= 0
    end
@@ -400,7 +415,7 @@ function Intel:init_tx_q ()                               -- 4.5.10
    "txqueue must be in 0.." .. self.max_q-1)
    self.tdh = 0
    self.tdt = 0
-   self.txpackets = ffi.new("struct packet *[?]", self.ndesc)
+   self.txqueue = ffi.new("struct packet *[?]", self.ndesc)
 
    -- 7.2.2.3
    local txdesc_t = ffi.typeof("struct { uint64_t address, flags; }")
@@ -467,12 +482,13 @@ function Intel:push ()
    while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
       local p = link.receive(li)
       if p.length > self.mtu then
-        packet.free(p)
+         packet.free(p)
+         counter.add(self.shm.txdrop)
       else
          self.txdesc[self.tdt].address = tophysical(p.data)
          self.txdesc[self.tdt].flags =
             bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
-         self.txpackets[self.tdt] = p
+         self.txqueue[self.tdt] = p
          self.tdt = self:ringnext(self.tdt)
       end
    end
@@ -481,9 +497,9 @@ function Intel:push ()
    self.tdh = self.r.TDH()	-- possible race condition, 7.2.2.4, check DD
    --C.full_memory_barrier()
    while cursor ~= self.tdh do
-      if self.txpackets[cursor] then
-         packet.free(self.txpackets[cursor])
-         self.txpackets[cursor] = nil
+      if self.txqueue[cursor] then
+         packet.free(self.txqueue[cursor])
+         self.txqueue[cursor] = nil
       end
       cursor = self:ringnext(cursor)
    end
@@ -491,19 +507,18 @@ function Intel:push ()
 end
 
 function Intel:pull ()
-   if self.sync_timer and self.sync_timer() then self:sync_stats() end
    if not self.rxq then return end
    local lo = self.output["output"]
    assert(lo, "intel1g: output link required")
 
    local pkts = 0
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
-      local p = self.rxpackets[self.rdt]
+      local p = self.rxqueue[self.rdt]
       p.length = self.rxdesc[self.rdt].length
       link.transmit(lo, p)
 
       local np = packet.allocate()
-      self.rxpackets[self.rdt] = np
+      self.rxqueue[self.rdt] = np
       self.rxdesc[self.rdt].address = tophysical(np.data)
       self.rxdesc[self.rdt].status = 0
 
@@ -512,6 +527,11 @@ function Intel:pull ()
    end
    -- This avoids RDT == RDH when every descriptor is available.
    self.r.RDT(band(self.rdt - 1, self.ndesc-1))
+
+   -- Sync device statistics if we are master.
+   if self.run_stats and self.sync_timer() then
+      self:sync_stats()
+   end
 end
 
 function Intel:unlock_sw_sem()
@@ -588,9 +608,9 @@ function Intel:stop ()
       self.r.RDBAL(0)
       self.r.RDBAH(0)
       for i = 0, self.ndesc-1 do
-         if self.rxpackets[i] then
-            packet.free(self.rxpackets[i])
-            self.rxpackets[i] = nil
+         if self.rxqueue[i] then
+            packet.free(self.rxqueue[i])
+            self.rxqueue[i] = nil
          end
       end
    end
@@ -602,9 +622,9 @@ function Intel:stop ()
       self.r.TXDCTL(0)
       self.r.TXDCTL:wait(bits { ENABLE = 25 }, 0)
       for i = 0, self.ndesc-1 do
-         if self.txpackets[i] then
-            packet.free(self.txpackets[i])
-            self.txpackets[i] = nil
+         if self.txqueue[i] then
+            packet.free(self.txqueue[i])
+            self.txqueue[i] = nil
          end
       end
    end
@@ -614,7 +634,41 @@ function Intel:stop ()
       pci.set_bus_master(self.pciaddress, false)
       pci.close_pci_resource(self.fd, self.base)
    end
+   if self.run_stats then
+      shm.delete_frame(self.stats)
+   end
 end
+
+function Intel:sync_stats ()
+   local set, stats = counter.set, self.stats
+   set(stats.speed, self:link_speed())
+   set(stats.status, self:link_status() and 1 or 2)
+   set(stats.promisc, self:promisc() and 1 or 2)
+   set(stats.rxbytes, self:rxbytes())
+   set(stats.rxpackets, self:rxpackets())
+   set(stats.rxmcast, self:rxmcast())
+   set(stats.rxbcast, self:rxbcast())
+   set(stats.rxdrop, self:rxdrop())
+   set(stats.rxerrors, self:rxerrors())
+   set(stats.txbytes, self:txbytes())
+   set(stats.txpackets, self:txpackets())
+   set(stats.txmcast, self:txmcast())
+   set(stats.txbcast, self:txbcast())
+   set(stats.txdrop, self:txdrop())
+   set(stats.txerrors, self:txerrors())
+   set(stats.rxdmapackets, self:rxdmapackets())
+   for name, register in pairs(self.queue_stats) do
+      set(stats[name], register())
+   end
+end
+
+function Intel:rxpackets () return self.r.GPRC()                 end
+function Intel:txpackets () return self.r.GPTC()                 end
+function Intel:rxmcast   () return self.r.MPRC() + self.r.BPRC() end
+function Intel:rxbcast   () return self.r.BPRC()                 end
+function Intel:txmcast   () return self.r.MPTC() + self.r.BPTC() end
+function Intel:txbcast   () return self.r.BPTC()                 end
+
 Intel1g.driver = "Intel1g"
 Intel1g.offsets = {
     SRRCTL = {
@@ -624,34 +678,6 @@ Intel1g.offsets = {
        RSS = 1
     }
 }
-function Intel1g:drv_stats ()
-   local r = self.r
-   local tab = {
-      rxdmapackets = { type = {counter}, register = r.RPTHC },
-      rxerrors = {
-         type = {counter},
-         register = function()
-            return r.CRCERRS() + r.RLEC() + r.RXERRC() + r.ALGNERRC()
-         end
-      }
-   }
-   local perqregs = {
-      rxdrops = "RQDPC",
-      txdrops = "TQDPC",
-      rxpackets = "PQGPRC",
-      txpackets = "PQGPTC",
-      rxbytes = "PQGORC",
-      txbytes = "PQGOTC",
-      rxmcast = "PQMPRC"
-   }
-   for i=0,self.max_q-1 do
-      for k,v in pairs(perqregs) do
-         tab["q" .. i .. "_" .. k] = {type={counter}, register = r[v][i] }
-      end
-   end
-   return tab
-end
-function Intel1g:init_q_stats () return end
 function Intel1g:init_phy ()
    -- 4.3.1.4 PHY Reset
    self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
@@ -732,7 +758,7 @@ function Intel1g:init ()
    self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
    self.r.RLPML(self.mtu + 4) -- mtu + crc
    self:unlock_sw_sem()
-   for i=1,self.linkup_attempts do
+   for i=1, math.floor(self.linkup_wait/2) do
       if self:link_status() then break end
       if not self.wait_for_link then break end
       C.usleep(2000000)
@@ -742,6 +768,44 @@ end
 function Intel1g:link_status ()
    local mask = bits { Link_up = 1 }
    return bit.band(self.r.STATUS(), mask) == mask
+end
+function Intel1g:link_speed ()
+   return ({10000,100000,1000000,1000000})[1+bit.band(bit.rshift(self.r.STATUS(), 6),3)]
+end
+function Intel1g:promisc ()
+   return band(self.r.RCTL(), bits{UPE=3}) ~= 0ULL
+end
+function Intel1g:rxbytes   () return self.r.GORCH()*2^32 + self.r.GORCL() end
+function Intel1g:rxdrop    () return self.r.MPC() + self.r.RNBC()         end
+function Intel1g:rxerrors  ()
+   return self.r.CRCERRS() + self.r.RLEC()
+      + self.r.RXERRC() + self.r.ALGNERRC()
+end
+function Intel1g:txbytes   () return self.r.GOTCH()*2^32 + self.r.GOTCL() end
+function Intel1g:txdrop    () return self.r.ECOL()                        end
+function Intel1g:txerrors  () return self.r.LATECOL()                     end
+function Intel1g:rxdmapackets ()
+   return self.r.RPTHC()
+end
+
+function Intel1g:init_queue_stats (frame)
+   local perqregs = {
+      rxdrops = "RQDPC",
+      txdrops = "TQDPC",
+      rxpackets = "PQGPRC",
+      txpackets = "PQGPTC",
+      rxbytes = "PQGORC",
+      txbytes = "PQGOTC",
+      rxmcast = "PQMPRC"
+   }
+   self.queue_stats = {}
+   for i=0,self.max_q-1 do
+      for k,v in pairs(perqregs) do
+         local name = "q" .. i .. "_" .. k
+         self.queue_stats[name] = self.r[v][i]
+         frame[name] = {counter}
+      end
+   end
 end
 
 Intel82599.driver = "Intel82599"
@@ -753,17 +817,34 @@ Intel82599.offsets = {
        RSS = 0
    }
 }
-function Intel82599:drv_stats ()
-   local r = self.r
-   local tab = {
-      rxdmapackets = { type = {counter}, register = r.RXDGPC },
-      rxerrors = { type = {counter},
-         register = function()
-            return r.CRCERRS() + r.ILLERRC() + r.ERRBC() + r.RUC() + r.RFC() +
-               r.ROC() + r.RJC()
-         end
-      }
-   }
+function Intel82599:link_status ()
+   local mask = bits { Link_up = 30 }
+   return bit.band(self.r.LINKS(), mask) == mask
+end
+function Intel82599:link_speed ()
+   local links = self.r.LINKS()
+   local speed1, speed2 = lib.bitset(links, 29), lib.bitset(links, 28)
+   return (speed1 and speed2 and 10000000000)    --  10 GbE
+      or  (speed1 and not speed2 and 1000000000) --   1 GbE
+      or  1000000                                -- 100 Mb/s
+end
+function Intel82599:promisc ()
+   return band(self.r.FCTRL(), bits{UPE=9}) ~= 0ULL
+end
+function Intel82599:rxbytes  () return self.r.GORC64()   end
+function Intel82599:rxdrop   () return self.r.QPRDC[0]() end
+function Intel82599:rxerrors ()
+   return self.r.CRCERRS() + self.r.ILLERRC() + self.r.ERRBC() +
+      self.r.RUC() + self.r.RFC() + self.r.ROC() + self.r.RJC()
+end
+function Intel82599:txbytes   () return self.r.GOTC64() end
+function Intel82599:txdrop    () return 0               end
+function Intel82599:txerrors  () return 0               end
+function Intel82599:rxdmapackets ()
+   return self.r.RXDGPC()
+end
+
+function Intel82599:init_queue_stats (frame)
    local perqregs = {
       rxdrops = "QPRDC",
       rxpackets = "QPRC",
@@ -771,33 +852,22 @@ function Intel82599:drv_stats ()
       rxbytes = "QBRC64",
       txbytes = "QBTC64",
    }
+   self.queue_stats = {}
    for i=0,15 do
       for k,v in pairs(perqregs) do
-         tab["q" .. i .. "_" .. k] = {type={counter}, register = r[v][i] }
+         local name = "q" .. i .. "_" .. k
+         self.queue_stats[name] = self.r[v][i]
+         frame[name] = {counter}
       end
    end
-   return tab
 end
 
-function Intel82599:init_q_stats ()
-  if self.rxq then
-     self.r.RQSM[math.floor(self.rxq/4)]:byte(self.rxq % 4, self.rxq)
-  end
-  if self.txq then
-     self.r.TQSM[math.floor(self.txq/4)]:byte(self.txq % 4, self.txq)
-  end
-end
-
-function Intel82599:link_status ()
-   local mask = bits { Link_up = 30 }
-   return bit.band(self.r.LINKS(), mask) == mask
-end
 function Intel82599:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
 
-   for i=1,self.linkup_attempts do
+   for i=1,math.floor(self.linkup_wait/2) do
       self:disable_interrupts()
       local reset = bits{ LinkReset=3, DeviceReset=26 }
       self.r.CTRL(reset)
@@ -924,7 +994,6 @@ function Intel:debug (args)
    end
 
    local master_regs = {}
-   local master_counters = { "rxdmapackets", "rxpackets" }
    if self.driver == "Intel82599" then
       r.rxdctrl =
          band(self.r.RXDCTL(), bits{enabled = 25}) == bits{enabled = 25}
@@ -932,10 +1001,12 @@ function Intel:debug (args)
    elseif self.driver == "Intel1g" then
       r.rxen = band(self.r.RCTL(), bits{ RXEN = 1 }) == bits{ RXEN = 1 }
    end
-   if self.runstats then
-      for k,v in pairs(master_counters) do
-         r[v] = counter.read(self.stats.shm[v])
+   if self.run_stats then
+      for k,v in pairs(self.stats) do
+         r[k] = counter.read(v)
       end
+   end
+   if r.master then
       for _,k in pairs(master_regs) do
          r[k] = tonumber(self.r[k]())
       end
