@@ -204,6 +204,12 @@ local function serialize_binding_table(bt)
    return printer(bt, yang.string_output_file())
 end
 
+local uint64_ptr_t = ffi.typeof('uint64_t*')
+function ipv6_equals(a, b)
+   local x, y = ffi.cast(uint64_ptr_t, a), ffi.cast(uint64_ptr_t, b)
+   return x[0] == y[0] and x[1] == y[1]
+end
+
 local function ietf_softwire_translator ()
    local ret = {}
    local cached_config
@@ -340,7 +346,7 @@ local function ietf_softwire_translator ()
          local new_br
          local bt = native_config.softwire_config.binding_table
          for i,br in ipairs(bt.br_address) do
-            if equal(br, new.br_ipv6_addr) then
+            if ipv6_equals(br, new.br_ipv6_addr) then
                new_br = i - 1; break
             end
          end
@@ -435,7 +441,7 @@ local function ietf_softwire_translator ()
       for _,new_br_address in ipairs(new_bt.br_address) do
          local idx
          for i,old_br_address in ipairs(old_bt.br_address) do
-            if equal(old_br_address, new_br_address) then
+            if ipv6_equals(old_br_address, new_br_address) then
                idx = i - 1 -- zero-based indexes, fml
                break
             end
@@ -485,7 +491,7 @@ local function ietf_softwire_translator ()
       return {{'remove', {schema='snabb-softwire-v1',
                           path=softwire_path..query}}}
    end
-   function ret.pre_update(native_config, path, verb, data)
+   function ret.pre_update(native_config, verb, path, data)
       -- Given the notification that the native config is about to be
       -- updated, make our cached config follow along if possible (and
       -- if we have one).  Otherwise throw away our cached config; we'll
@@ -497,10 +503,10 @@ local function ietf_softwire_translator ()
          local value = snabb_softwire_getter(path)(native_config)
          local br = cached_config.softwire_config.binding.br
          for _,instance in cltable.pairs(br.br_instances.br_instance) do
-            local grammar = get_softwire_grammar()
+            local grammar = get_ietf_softwire_grammar()
             local key = path_mod.prepare_table_lookup(
-               grammar.keys, grammar.key_ctype,
-               {['binding-ipv6info']=value.b4_ipv6})
+               grammar.keys, grammar.key_ctype, {['binding-ipv6info']='::'})
+            key.binding_ipv6info = value.b4_ipv6
             assert(instance.binding_table.binding_entry[key] ~= nil)
             instance.binding_table.binding_entry[key] = nil
          end
