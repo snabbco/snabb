@@ -48,11 +48,12 @@ function parse_command_line(args, opts)
                         ['revision-date']="r", revision="r"})
    if #args == 0 then err() end
    ret.instance_id = table.remove(args, 1)
+   local descr = call_leader(ret.instance_id, 'describe', {})
    if not ret.schema_name then
       if opts.require_schema then err("missing --schema arg") end
-      ret.schema_name =
-         call_leader(ret.instance_id, 'describe', {}).native_schema
+      ret.schema_name = descr.native_schema
    end
+   require('lib.yang.schema').set_default_capabilities(descr.capability)
    if opts.with_config_file then
       if #args == 0 then err("missing config file argument") end
       local file = table.remove(args, 1)
@@ -95,7 +96,7 @@ function open_socket_or_die(instance_id)
 end
 
 function serialize_config(config, schema_name, path)
-   local grammar = path_grammar(schema_name, path)
+   local grammar = path_grammar(schema_name, path or '/')
    local printer = data.data_printer_from_grammar(grammar)
    return printer(config, yang.string_output_file())
 end

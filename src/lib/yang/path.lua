@@ -132,7 +132,7 @@ end
 function prepare_table_lookup(keys, ctype, query)
    local static_key = ctype and datalib.typeof(ctype)() or {}
    for k,_ in pairs(query) do
-      if not keys[k] then error("'"..key_name.."' is not a table key") end
+      if not keys[k] then error("'"..k.."' is not a table key") end
    end
    for k,grammar in pairs(keys) do
       local v = query[k] or grammar.default

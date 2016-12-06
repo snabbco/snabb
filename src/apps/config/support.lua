@@ -186,7 +186,8 @@ generic_schema_config_support = {
       return compute_mutable_objects_embedded_in_app_initargs(app_graph)
    end,
    compute_apps_to_restart_after_configuration_update =
-      compute_apps_to_restart_after_configuration_update
+      compute_apps_to_restart_after_configuration_update,
+   translators = {}
 }
 
 function load_schema_config_support(schema_name)

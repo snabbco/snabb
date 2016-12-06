@@ -590,14 +590,37 @@ local function inherit_config(schema, config)
    return schema
 end
 
+local default_features = {}
+function get_default_capabilities()
+   local ret = {}
+   for mod,features in pairs(default_features) do
+      local feature_names = {}
+      for feature,_ in pairs(features) do
+         table.insert(feature_names, feature)
+      end
+      ret[mod] = { feature = feature_names }
+   end
+   return ret
+end
+function set_default_capabilities(capabilities)
+   default_features = {}
+   for mod,caps in pairs(capabilities) do
+      default_features[mod] = {}
+      for _,feature in ipairs(caps.feature) do
+         default_features[mod][feature] = true
+      end
+   end
+end
+
 -- Inline "grouping" into "uses".
 -- Inline "submodule" into "include".
 -- Inline "imports" into "module".
--- Inline "typedef" into "type". (TODO)
+-- Inline "typedef" into "type".
 -- Resolve if-feature.
 -- Warn on any "when", resolving them as being true.
 -- Resolve all augment and refine nodes. (TODO)
 function resolve(schema, features)
+   if features == nil then features = default_features end
    local function pop_prop(node, prop)
       local val = node[prop]
       node[prop] = nil
@@ -663,6 +686,13 @@ function resolve(schema, features)
       else
          -- If the type name wasn't bound, it must be primitive.
          assert(primitive_types[node.id], 'unknown type: '..node.id)
+         if node.id == 'union' then
+            local union = {}
+            for _,type in ipairs(node.union) do
+               table.insert(union, visit_type(type, env))
+            end
+            node.union = union
+         end
          node.primitive_type = node.id
       end
       return node
@@ -687,7 +717,9 @@ function resolve(schema, features)
       end
       if node.kind == 'module' or node.kind == 'submodule' then
          visit_top_level(node, env, 'extensions')
-         visit_top_level(node, env, 'features')
+         -- Because features can themselves have if-feature, expand them
+         -- lazily.
+         env.features = visit_lazy(pop_prop(node, 'features'), env)
          visit_top_level(node, env, 'identities')
          for _,prop in ipairs({'rpcs', 'notifications'}) do
             node[prop] = shallow_copy(node[prop])
@@ -698,12 +730,24 @@ function resolve(schema, features)
          if node.input then node.input = visit(node.input, env) end
          if node.output then node.output = visit(node.output, env) end
       end
+      if node.kind == 'feature' then
+         node.module_id = lookup(env, 'module_id', '_')
+         if not (features[node.module_id] or {})[node.id] then
+            node.unavailable = true
+         end
+      end
       for _,feature in ipairs(pop_prop(node, 'if_features') or {}) do
-         if not pcall(lookup, env, 'features', feature) then
+         local feature_node = lookup_lazy(env, 'features', feature)
+         if node.kind == 'feature' then
+            -- This is a feature that depends on a feature.  These we
+            -- keep in the environment but if the feature is
+            -- unavailable, we mark it as such.
+            local mod, id = feature_node.module_id, feature_node.id
+            if not (features[mod] or {})[id] then node.unavailable = true end
+         elseif feature_node.unavailable then
             return nil, env
          end
       end
-
       if node.type then
          node.type = visit_type(node.type, env)
          if not node.primitive_type then
@@ -745,7 +789,8 @@ function resolve(schema, features)
       linked[node.id] = 'pending'
       node = shallow_copy(node)
       local module_env = {env=env, prefixes={}, extensions={}, features={},
-                          identities={}, typedefs={}, groupings={}}
+                          identities={}, typedefs={}, groupings={},
+                          module_id={_=node.id}}
       node.body = shallow_copy(node.body)
       node.rpcs = shallow_copy(node.rpcs)
       node.notifications = shallow_copy(node.notifications)
@@ -764,7 +809,7 @@ function resolve(schema, features)
       end
       if node.prefix then
          assert(node.kind == 'module', node.kind)
-         module_env.prefixes[node.prefix] = node.namespace
+         module_env.prefixes[node.prefix] = node.id
          module_env.prefix = {_=node.prefix}
       end
       for k,v in pairs(pop_prop(node, 'imports')) do
@@ -773,7 +818,7 @@ function resolve(schema, features)
          -- Is this OK?
          local schema, env = load_schema_by_name(v.id, v.revision_date)
          local prefix = v.prefix
-         module_env.prefixes[prefix] = schema.namespace
+         module_env.prefixes[prefix] = schema.id
          for _,prop in ipairs({'extensions', 'features', 'identities',
                                'typedefs', 'groupings'}) do
             for k,v in pairs(env[prop]) do
@@ -791,8 +836,7 @@ function resolve(schema, features)
       return node, env
    end
    schema = shallow_copy(schema)
-   return link(schema, {features=(features or {}),
-                        submodules=pop_prop(schema, 'submodules')})
+   return link(schema, {submodules=pop_prop(schema, 'submodules')})
 end
 
 local primitive_types = {
@@ -916,7 +960,8 @@ function selftest()
    -- but not the schema itself.
    assert(not schema.features)
    assert(env.features["bowl"])
-   assert(env.features["bowl"].description == 'A fruit bowl')
+   -- Poke through lazy features abstraction by invoking thunk.
+   assert(env.features["bowl"]().description == 'A fruit bowl')
 
    -- Check that groupings get inlined into their uses.
    assert(schema.body['fruit-bowl'])
