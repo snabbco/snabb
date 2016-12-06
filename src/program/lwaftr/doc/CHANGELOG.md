@@ -1,5 +1,48 @@
 # Change Log
 
+## [3.1.0] - 2016-12-06
+
+Adding "ietf-softwire" support, process separation between control and
+the data plane, and some configuration file changes.
+
+ * Passing --reconfigurable to "snabb lwaftr run" now forks off a
+   dedicated data plane child process.  This removes the overhead of
+   --reconfigurable that was present in previous releases.
+
+ * Add support for ietf-softwire.  Pass the "-s ietf-softwire" to "snabb
+   config" invocations to use this schema.
+
+ * Add support for fast binding-table updates.  This is the first
+   version since the YANG migration that can make fast updates to
+   individual binding-table entries without causing the whole table to
+   reload, via "snabb config add
+   /softwire-config/binding-table/softwire".  See "snabb config"
+   documentation for more on how to use "snabb config add" and "snabb
+   config remove".
+
+ * Add support for named lwAFTR instances.  Pass "--name foo" to the
+   "snabb lwaftr run" command to have it claim a name on a machine.
+   "snabb config" can identify the remote Snabb instance by name, which
+   is often much more convenient than using the instance's PID.
+
+ * Final tweaks to the YANG schema before deployment -- now the
+   binding-table section is inside softwire-config, and the
+   configuration file format is now enclosed in "softwire-config {...}".
+   It used to be that only YANG "container" nodes which had "presence
+   true;" would have corresponding data nodes; this was a mistake.  The
+   new mapping where every container node from the YANG schema appears
+   in the data more closely follows the YANG standard XML mapping that
+   the XPath expressions are designed to operate over.
+   
+   Additionally, the "br" leaf inside "snabb-softwire-v1" lists is now a
+   1-based index into the "br-address" leaf-list instead of a zero-based
+   index.
+
+   The "snabb lwaftr migrate-configation --from=3.0.1" command can
+   migrate your 3.0.1 configuration files to the new format.  See "snabb
+   lwaftr migrate-configuration --help" for more details.  The default
+   "--from" version is "legacy", meaning pre-3.0 lwAFTR configurations.
+
 ## [3.0.1] - 2016-11-28
 
 A release to finish "snabb config" features.
