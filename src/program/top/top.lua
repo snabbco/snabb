@@ -39,7 +39,7 @@ function select_snabb_instance (pid)
       for _, name in ipairs(shm.children("/")) do
          -- This could fail as the name could be for example "by-name"
          local p = tonumber(name)
-         if p and p ~= my_pid then table.insert(pids, p) end
+         if p and p ~= my_pid then table.insert(pids, name) end
       end
       return pids
    end
