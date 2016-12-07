@@ -30,7 +30,7 @@ module(..., package.seeall)
 
 local lib = require('core.lib')
 
-local Parser = {}
+Parser = {}
 function Parser.new(str, filename)
    local ret = {pos=1, str=str, filename=filename, line=1, column=0, line_pos=1}
    ret = setmetatable(ret, {__index = Parser})

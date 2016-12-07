@@ -35,7 +35,7 @@ end
 
 -- hash := [0,HASH_MAX); scale := size/HASH_MAX
 local function hash_to_index(hash, scale)
-   return floor(hash*scale + 0.5)
+   return floor(hash*scale)
 end
 
 local function make_equal_fn(key_type)
@@ -111,6 +111,7 @@ function new(params)
    ctab.hash_fn = params.hash_fn or compute_hash_fn(params.key_type)
    ctab.equal_fn = make_equal_fn(params.key_type)
    ctab.size = 0
+   ctab.max_displacement = 0
    ctab.occupancy = 0
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
@@ -149,6 +150,7 @@ function CTable:resize(size)
    assert(size >= (self.occupancy / self.max_occupancy_rate))
    local old_entries = self.entries
    local old_size = self.size
+   local old_max_displacement = self.max_displacement
 
    -- Allocate double the requested number of entries to make sure there
    -- is sufficient displacement if all hashes map to the last bucket.
@@ -161,7 +163,7 @@ function CTable:resize(size)
    self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
    for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
 
-   for i=0,old_size*2-1 do
+   for i=0,old_size+old_max_displacement-1 do
       if old_entries[i].hash ~= HASH_MAX then
          self:insert(old_entries[i].hash, old_entries[i].key, old_entries[i].value)
       end
@@ -219,8 +221,18 @@ function CTable:insert(hash, key, value, updates_allowed)
 
    local entries = self.entries
    local scale = self.scale
-   local start_index = hash_to_index(hash, self.scale)
+   -- local start_index = hash_to_index(hash, self.scale)
+   local start_index = floor(hash*self.scale)
    local index = start_index
+
+   -- Fast path.
+   if entries[index].hash == HASH_MAX and updates_allowed ~= 'required' then
+      self.occupancy = self.occupancy + 1
+      entries[index].hash = hash
+      entries[index].key = key
+      entries[index].value = value
+      return index
+   end
 
    while entries[index].hash < hash do
       index = index + 1
