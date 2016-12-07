@@ -206,11 +206,13 @@ function run(args)
    end
 
    if opts.ingress_drop_monitor then
-      function add_ingress_drop_monitor()
+      if opts.reconfigurable then
+         io.stderr:write("Warning: Ingress drop monitor not yet supported "..
+                            "in multiprocess mode.\n")
+      else
          local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
          timer.activate(mon:timer())
       end
-      later(add_ingress_drop_monitor)
    end
 
    engine.busywait = true
