@@ -56,8 +56,8 @@ function run(args)
 
    local graph = config.new()
    if opts.reconfigurable then
-      setup.reconfigurable_multi(setup.load_bench, graph, conf,
-                                 inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
+      setup.reconfigurable(setup.load_bench, graph, conf,
+                           inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
    else
       setup.load_bench(graph, conf, inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
    end
