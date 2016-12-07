@@ -98,15 +98,22 @@ local function print_counters (pid, dir)
   print(("   </%s>"):format(dir))
 end
 
+local named_program_root = engine.named_program_root
+
+function get_name_by_pid (pid)
+   local fq = named_program_root .. "/" .. pid
+   local namedir = S.readlink(fq)
+   return lib.basename(namedir)
+end
+
 function run (raw_args)
    parse_args(raw_args)
    print("<snabb>")
    local pids = {}
    local pids_name = {}
    for _, pid in ipairs(shm.children("/")) do
-     if shm.exists("/"..pid.."/nic/id") then
-       local lwaftr_id = shm.open("/"..pid.."/nic/id", lwtypes.lwaftr_id_type)
-       local instance_id_name = ffi.string(lwaftr_id.value)
+     if shm.exists("/"..pid.."/name") then
+       local instance_id_name = get_name_by_pid(pid)
        local instance_id = instance_id_name and instance_id_name:match("(%d+)")
        if instance_id then
          pids[instance_id] = pid
