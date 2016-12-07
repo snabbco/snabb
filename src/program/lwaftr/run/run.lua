@@ -43,7 +43,16 @@ function parse_args(args)
       if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
          fatal("Invalid cpu number: "..arg)
       end
-      numa.bind_to_cpu(cpu)
+
+      if opts.reconfigurable then
+         S.setenv("SNABB_TARGET_CPU", tostring(cpu), true)
+         local wanted_node = numa.cpu_get_numa_node(cpu)
+         numa.bind_to_numa_node(wanted_node)
+         print("Bound to numa node:", wanted_node)
+      else
+         print("Bound to CPU:", cpu)
+         numa.bind_to_cpu(cpu)
+      end
    end
    handlers['real-time'] = function(arg)
       if not S.sched_setscheduler(0, "fifo", 1) then
@@ -154,7 +163,7 @@ function run(args)
       setup_fn, setup_args = setup.load_phy, { 'inetNic', v4, 'b4sideNic', v6 }
    end
    if opts.reconfigurable then
-      setup.reconfigurable_uni(setup_fn, c, conf, unpack(setup_args))
+      setup.reconfigurable(setup_fn, c, conf, unpack(setup_args))
    else
       setup_fn(c, conf, unpack(setup_args))
    end
