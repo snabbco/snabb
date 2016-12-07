@@ -1,5 +1,19 @@
 # Change Log
 
+## [3.1.2] - 2016-12-07
+
+ * Re-enabled multi-process mode for --reconfigurable "snabb lwaftr
+   run", including support for "snabb config get-state".
+
+ * Improve memory consumption when parsing big configurations, such as a
+   binding table with a million entries.
+
+ * Re-enable CSV-format statistics for "snabb lwaftr bench" and "snabb
+   lwaftr run", which were disabled while we landed multiprocess
+   support.
+
+ * Fix "snabb ps --help".
+
 ## [3.1.1] - 2016-12-06
 
 A hotfix to work around bugs in multiprocess support when using Intel
