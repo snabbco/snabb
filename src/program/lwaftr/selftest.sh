@@ -37,6 +37,7 @@ echo "Testing snabb lwaftr run"
 sudo ./snabb lwaftr run -D 0.1 --conf ${TDIR}/icmp_on_fail.conf \
     --on-a-stick "$SNABB_PCI0"
 
+# This needs to be 1 second, not 0.1 second, or it can mask DMA/setup problems
 echo "Testing snabb lwaftr run --reconfigurable"
-sudo ./snabb lwaftr run -D 0.1 --reconfigurable \
+sudo ./snabb lwaftr run -D 1 --reconfigurable \
     --conf ${TDIR}/icmp_on_fail.conf --on-a-stick "$SNABB_PCI0"
