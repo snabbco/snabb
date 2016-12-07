@@ -8,7 +8,7 @@ local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
-local fatal, get_pid_by_name = lwutil.fatal, lwutil.get_pid_by_name
+local fatal = lwutil.fatal
 local select_snabb_instance = top.select_snabb_instance
 
 local long_opts = {
@@ -75,7 +75,8 @@ end
 function run (args)
    local opts, address, pid = parse_args(args)
    if opts.name then
-      pid = get_pid_by_name(opts.name)
+      local programs = engine.enumerate_named_programs(opts.name)
+      pid = programs[opts.name]
       if not pid then
          fatal(("Couldn't find process with name '%s'"):format(opts.name))
       end

@@ -31,7 +31,6 @@ local function parse_args (raw_args)
    local args = lib.dogetopt(raw_args, handlers, "h",
                              { help="h" })
    if #args > 0 then show_usage(1) end
-   return nil
 end
 
 local function read_counters (tree, app_name)
@@ -98,12 +97,10 @@ local function print_counters (pid, dir)
   print(("   </%s>"):format(dir))
 end
 
-local named_program_root = engine.named_program_root
-
-function get_name_by_pid (pid)
-   local fq = named_program_root .. "/" .. pid
-   local namedir = S.readlink(fq)
-   return lib.basename(namedir)
+local function transpose (t)
+   local ret = {}
+   for k, v in pairs(t) do ret[v] = k end
+   return ret
 end
 
 function run (raw_args)
@@ -111,9 +108,11 @@ function run (raw_args)
    print("<snabb>")
    local pids = {}
    local pids_name = {}
+   local named_programs = transpose(engine.enumerate_named_programs())
+
    for _, pid in ipairs(shm.children("/")) do
      if shm.exists("/"..pid.."/name") then
-       local instance_id_name = get_name_by_pid(pid)
+       local instance_id_name = named_programs[tonumber(pid)]
        local instance_id = instance_id_name and instance_id_name:match("(%d+)")
        if instance_id then
          pids[instance_id] = pid

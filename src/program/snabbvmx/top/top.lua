@@ -10,7 +10,7 @@ local shm = require("core.shm")
 local top = require("program.top.top")
 
 local C = ffi.C
-local fatal, get_pid_by_name = lwutil.fatal, lwutil.get_pid_by_name
+local fatal = lwutil.fatal
 
 local long_opts = {
    help = "h",
@@ -200,7 +200,8 @@ end
 function run (args)
    local opts, target_pid = parse_args(args)
    if opts.name then
-      target_pid = get_pid_by_name(opts.name)
+      local programs = engine.enumerate_named_programs(opts.name)
+      target_pid = programs[opts.name]
       if not target_pid then
          fatal(("Couldn't find process with name '%s'"):format(opts.name))
       end

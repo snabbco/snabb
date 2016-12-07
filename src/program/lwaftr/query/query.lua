@@ -8,9 +8,7 @@ local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
-local select_snabb_instance = top.select_snabb_instance
 local keys, fatal = lwutil.keys, lwutil.fatal
-local get_pid_by_name = lwutil.get_pid_by_name
 
 -- Get the counter dir from the code.
 local counters_dir = lwcounter.counters_dir
@@ -45,31 +43,8 @@ function parse_args (raw_args)
    end
    local args = lib.dogetopt(raw_args, handlers, "hln:",
                              { help="h", ["list-all"]="l", name="n" })
-   if opts.name then
-      if #args > 1 then
-         print("Too many arguments.")
-         show_usage(1)
-      end
-      local pid = get_pid_by_name(opts.name)
-      if not pid then
-         fatal(("Couldn't find process with name '%s'"):format(opts.name))
-      end
-      local counter_name = args and args[1]
-      return pid, counter_name
-   else
-      if #args == 2 then
-         return unpack(args)
-      elseif #args == 1 then
-         if is_counter_name(args[1]) then
-            return nil, args[1]
-         else
-            return args[1]
-         end
-      elseif #args > 2 then
-         print("Too many arguments.")
-         show_usage(1)
-      end
-   end
+   if #args > 2 then show_usage(1) end
+   return opts, unpack(args)
 end
 
 local function read_counters (tree)
@@ -113,7 +88,17 @@ local function print_counters (tree, filter)
 end
 
 function run (raw_args)
-   local target_pid, counter_name = parse_args(raw_args)
-   local instance_tree = select_snabb_instance(target_pid)
+   local opts, pid, counter_name = parse_args(raw_args)
+   if tostring(pid) and not counter_name then
+      counter_name, pid = pid, nil
+   end
+   if opts.name then
+      local programs = engine.enumerate_named_programs(opts.name)
+      pid = programs[opts.name]
+      if not pid then
+         fatal(("Couldn't find process with name '%s'"):format(opts.name))
+      end
+   end
+   local instance_tree = top.select_snabb_instance(pid)
    print_counters(instance_tree, counter_name)
 end
