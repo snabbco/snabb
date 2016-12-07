@@ -171,33 +171,24 @@ local function value_parser(typ)
    end
 end
 
-local function assert_scalar(node, keyword, opts)
-   assert(node.argument or (opts and opts.allow_empty_argument),
-          'missing argument for "'..keyword..'"')
-   assert(not node.statements, 'unexpected sub-parameters for "'..keyword..'"')
-end
-
-local function assert_compound(node, keyword)
-   assert(not node.argument, 'argument unexpected for "'..keyword..'"')
-   assert(node.statements,
-          'missing brace-delimited sub-parameters for "'..keyword..'"')
-end
-
-local function assert_not_duplicate(out, keyword)
-   assert(not out, 'duplicate parameter: '..keyword)
-end
-
 local function struct_parser(keyword, members, ctype)
    local function init() return nil end
-   local function parse1(node)
-      assert_compound(node, keyword)
+   local function parse1(P)
       local ret = {}
       for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
-      for _,node in ipairs(node.statements) do
-         local sub = assert(members[node.keyword],
-                            'unrecognized parameter: '..node.keyword)
-         local id = normalize_id(node.keyword)
-         ret[id] = sub.parse(node, ret[id])
+      P:skip_whitespace()
+      P:consume("{")
+      P:skip_whitespace()
+      while not P:check("}") do
+         local k = P:parse_identifier()
+         if k == '' then P:error("Expected a keyword") end
+         -- Scalar/array parser responsible for requiring whitespace
+         -- after keyword.  Struct/table don't need it as they have
+         -- braces.
+         local sub = assert(members[k], 'unrecognized parameter: '..k)
+         local id = normalize_id(k)
+         ret[id] = sub.parse(P, ret[id])
+         P:skip_whitespace()
       end
       for k,sub in pairs(members) do
          local id = normalize_id(k)
@@ -205,9 +196,9 @@ local function struct_parser(keyword, members, ctype)
       end
       return ret
    end
-   local function parse(node, out)
-      assert_not_duplicate(out, keyword)
-      return parse1(node)
+   local function parse(P, out)
+      if out ~= nil then P:error('duplicate parameter: '..keyword) end
+      return parse1(P)
    end
    local struct_t = ctype and typeof(ctype)
    local function finish(out)
@@ -220,12 +211,15 @@ end
 local function array_parser(keyword, element_type, ctype)
    local function init() return {} end
    local parsev = value_parser(element_type)
-   local function parse1(node)
-      assert_scalar(node, keyword)
-      return parsev(node.argument, keyword)
+   local function parse1(P)
+      P:consume_whitespace()
+      local str = P:parse_string()
+      P:skip_whitespace()
+      P:consume(";")
+      return parsev(str, keyword)
    end
-   local function parse(node, out)
-      table.insert(out, parse1(node))
+   local function parse(P, out)
+      table.insert(out, parse1(P))
       return out
    end
    local elt_t = ctype and typeof(ctype)
@@ -243,13 +237,19 @@ end
 local function scalar_parser(keyword, argument_type, default, mandatory)
    local function init() return nil end
    local parsev = value_parser(argument_type)
-   local function parse1(node)
-      assert_scalar(node, keyword, {allow_empty_argument=true})
-      return parsev(node.argument, keyword)
+   local function parse1(P)
+      local maybe_str
+      if argument_type.primitive_type ~= 'empty' then
+         P:consume_whitespace()
+         maybe_str = P:parse_string()
+      end
+      P:skip_whitespace()
+      P:consume(";")
+      return parsev(maybe_str, keyword)
    end
-   local function parse(node, out)
-      assert_not_duplicate(out, keyword)
-      return parse1(node)
+   local function parse(P, out)
+      if out ~= nil then P:error('duplicate parameter: '..keyword) end
+      return parse1(P)
    end
    local function finish(out)
       if out ~= nil then return out end
@@ -316,12 +316,11 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
    else
       function init() return ltable_builder() end
    end
-   local function parse1(node)
-      assert_compound(node, keyword)
-      return parser.finish(parser.parse(node, parser.init()))
+   local function parse1(P)
+      return parser.finish(parser.parse(P, parser.init()))
    end
-   local function parse(node, assoc)
-      local struct = parse1(node)
+   local function parse(P, assoc)
+      local struct = parse1(P)
       local key, value = {}, {}
       if key_t then key = key_t() end
       if value_t then value = value_t() end
@@ -377,21 +376,41 @@ function data_parser_from_grammar(production)
 
    local top_parsers = {}
    function top_parsers.struct(production)
-      local parser = visit1('(top level)', production)
+      local struct_t = production.ctype and typeof(production.ctype)
+      local members = visitn(production.members)
       return function(str, filename)
-         local node = {statements=parser_mod.parse(str, filename)}
-         return parser.finish(parser.parse(node, parser.init()))
+         local P = parser_mod.Parser.new(str, filename)
+         local ret = {}
+         for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
+         while true do
+            P:skip_whitespace()
+            if P:is_eof() then break end
+            local k = P:parse_identifier()
+            if k == '' then P:error("Expected a keyword") end
+            local sub = assert(members[k], 'unrecognized parameter: '..k)
+            local id = normalize_id(k)
+            ret[id] = sub.parse(P, ret[id])
+         end
+         for k,sub in pairs(members) do
+            local id = normalize_id(k)
+            ret[id] = sub.finish(ret[id])
+         end
+         if struct_t then return struct_t(ret) else return ret end
       end
    end
    function top_parsers.sequence(production)
       local members = visitn(production.members)
       return function(str, filename)
+         local P = parser_mod.Parser.new(str, filename)
          local ret = {}
-         for _, node in ipairs(parser_mod.parse(str, filename)) do
-            local sub = assert(members[node.keyword],
-                               'unrecognized rpc: '..node.keyword)
-            local data = sub.finish(sub.parse(node, sub.init()))
-            table.insert(ret, {id=node.keyword, data=data})
+         while true do
+            P:skip_whitespace()
+            if P:is_eof() then break end
+            local k = P:parse_identifier()
+            P:consume_whitespace()
+            local sub = assert(members[k], 'unrecognized rpc: '..k)
+            local data = sub.finish(sub.parse(P, sub.init()))
+            table.insert(ret, {id=k, data=data})
          end
          return ret
       end
@@ -399,9 +418,12 @@ function data_parser_from_grammar(production)
    function top_parsers.array(production)
       local parser = visit1('[bare array]', production)
       return function(str, filename)
+         local P = parser_mod.Parser.new(str, filename)
          local out = parser.init()
-         for _,v in ipairs(parser_mod.parse_strings(str, filename)) do
-            out = parser.parse({keyword='[bare array]', argument=v}, out)
+         while true do
+            P:skip_whitespace()
+            if P:is_eof() then break end
+            out = parser.parse(P, out)
          end
          return parser.finish(out)
       end
@@ -409,9 +431,12 @@ function data_parser_from_grammar(production)
    function top_parsers.table(production)
       local parser = visit1('[bare table]', production)
       return function(str, filename)
+         local P = parser_mod.Parser.new(str, filename)
          local out = parser.init()
-         for _,v in ipairs(parser_mod.parse_statement_lists(str, filename)) do
-            out = parser.parse({keyword='[bare table]', statements=v}, out)
+         while true do
+            P:skip_whitespace()
+            if P:is_eof() then break end
+            out = parser.parse(P, out)
          end
          return parser.finish(out)
       end
