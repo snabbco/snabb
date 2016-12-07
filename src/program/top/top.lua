@@ -47,6 +47,7 @@ function select_snabb_instance (pid)
    local instances = compute_snabb_instances()
 
    if pid then
+      pid = tostring(pid)
       -- Try to use given pid
       for _, instance in ipairs(instances) do
          if instance == pid then return pid end
