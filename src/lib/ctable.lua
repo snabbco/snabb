@@ -219,7 +219,8 @@ function CTable:insert(hash, key, value, updates_allowed)
 
    local entries = self.entries
    local scale = self.scale
-   local start_index = hash_to_index(hash, self.scale)
+   -- local start_index = hash_to_index(hash, self.scale)
+   local start_index = floor(hash*self.scale + 0.5)
    local index = start_index
 
    while entries[index].hash < hash do

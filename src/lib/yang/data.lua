@@ -157,7 +157,7 @@ local function enum_validator(range, f) return f end
 local function value_parser(typ)
    local prim = typ.primitive_type
    local parse = assert(value.types[prim], prim).parse
-   local function validate(val) end
+   local validate
    validate = range_validator(typ.range, validate)
    validate = length_validator(typ.length, validate)
    validate = pattern_validator(typ.pattern, validate)
@@ -166,16 +166,18 @@ local function value_parser(typ)
    -- TODO: union, require-instance.
    return function(str, k)
       local val = parse(str, k)
-      validate(val)
+      if validate then validate(val) end
       return val
    end
 end
 
 local function struct_parser(keyword, members, ctype)
+   local keys = {}
+   for k,v in pairs(members) do table.insert(keys, k) end
    local function init() return nil end
    local function parse1(P)
       local ret = {}
-      for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
+      for _,k in ipairs(keys) do ret[normalize_id(k)] = members[k].init() end
       P:skip_whitespace()
       P:consume("{")
       P:skip_whitespace()
@@ -190,9 +192,9 @@ local function struct_parser(keyword, members, ctype)
          ret[id] = sub.parse(P, ret[id])
          P:skip_whitespace()
       end
-      for k,sub in pairs(members) do
+      for _,k in ipairs(keys) do
          local id = normalize_id(k)
-         ret[id] = sub.finish(ret[id])
+         ret[id] = members[k].finish(ret[id])
       end
       return ret
    end
@@ -262,7 +264,12 @@ end
 local function ctable_builder(key_t, value_t)
    local res = ctable.new({ key_type=key_t, value_type=value_t })
    local builder = {}
-   function builder:add(key, value) res:add(key, value) end
+   local counter = 0
+   function builder:add(key, value)
+      counter = counter + 1
+      if counter % 1000 == 0 then print('ctable add', counter) end
+      res:add(key, value)
+   end
    function builder:finish() return res end
    return builder
 end
