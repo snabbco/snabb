@@ -35,7 +35,7 @@ end
 
 -- hash := [0,HASH_MAX); scale := size/HASH_MAX
 local function hash_to_index(hash, scale)
-   return floor(hash*scale + 0.5)
+   return floor(hash*scale)
 end
 
 local function make_equal_fn(key_type)
@@ -222,7 +222,7 @@ function CTable:insert(hash, key, value, updates_allowed)
    local entries = self.entries
    local scale = self.scale
    -- local start_index = hash_to_index(hash, self.scale)
-   local start_index = floor(hash*self.scale + 0.5)
+   local start_index = floor(hash*self.scale)
    local index = start_index
 
    -- Fast path.
