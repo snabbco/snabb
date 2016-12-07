@@ -197,8 +197,17 @@ function run(args)
       if opts.reconfigurable then
          local pids = engine.configuration.apps['leader'].arg.follower_pids
          for _,pid in ipairs(pids) do
-            local function start_sampling() add_csv_stats_for_pid(pid) end
-            timer.activate(timer.new('spawn_csv_stats', start_sampling, 100e6))
+            local function start_sampling()
+               -- The worker will be fed its configuration by the
+               -- leader, but we don't know when that will all be ready.
+               -- Just retry if this doesn't succeed.
+               if not pcall(add_csv_stats_for_pid, pid) then
+                  io.stderr:write("Waiting on follower "..pid.." to start "..
+                                     "before recording statistics...\n")
+                  timer.activate(timer.new('retry_csv', start_sampling, 2e9))
+               end
+            end
+            timer.activate(timer.new('spawn_csv_stats', start_sampling, 50e6))
          end
       else
          add_csv_stats_for_pid(S.getpid())
