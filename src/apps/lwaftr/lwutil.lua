@@ -6,6 +6,7 @@ local S = require("syscall")
 local bit = require("bit")
 local ffi = require("ffi")
 local lib = require("core.lib")
+local shm = require("core.shm")
 
 local band = bit.band
 local cast = ffi.cast
@@ -115,4 +116,14 @@ function nic_exists(pci_addr)
    local devices="/sys/bus/pci/devices"
    return dir_exists(("%s/%s"):format(devices, pci_addr)) or
       dir_exists(("%s/0000:%s"):format(devices, pci_addr))
+end
+
+function get_pid_by_name (name)
+   for _, program in pairs(shm.children("/by-name")) do
+      if name == program then
+         local fq = engine.named_program_root .. "/" .. program
+         local piddir = S.readlink(fq)
+         return lib.basename(piddir)
+      end
+   end
 end

@@ -10,7 +10,7 @@ local top = require("program.top.top")
 
 local select_snabb_instance = top.select_snabb_instance
 local keys, fatal = lwutil.keys, lwutil.fatal
-local named_program_root = engine.named_program_root
+local get_pid_by_name = lwutil.get_pid_by_name
 
 -- Get the counter dir from the code.
 local counters_dir = lwcounter.counters_dir
@@ -27,16 +27,6 @@ end
 
 local function is_counter_name (name)
    return lwcounter.counter_names[name] ~= nil
-end
-
-local function get_pid_by_name (name)
-   for _, program in pairs(shm.children("/by-name")) do
-      if name == program then
-         local fq = named_program_root .. "/" .. program
-         local piddir = S.readlink(fq)
-         return lib.basename(piddir)
-      end
-   end
 end
 
 function parse_args (raw_args)
