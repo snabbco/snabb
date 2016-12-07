@@ -175,15 +175,9 @@ function run(args)
       timer.activate(t)
    end
 
-   -- In reconfigurable mode, the app graph only gets populated later,
-   -- so we have to defer our timer creation.
-   local function later(f, when)
-      timer.activate(timer.new("later", f, when or 30e6))
-   end
-
    if opts.verbosity >= 1 then
-      function add_csv_stats()
-         local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra)
+      function add_csv_stats_for_pid(pid)
+         local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra, pid)
          -- Link names like "tx" are from the app's perspective, but
          -- these labels are from the perspective of the lwAFTR as a
          -- whole so they are reversed.
@@ -200,15 +194,25 @@ function run(args)
          end
          csv:activate()
       end
-      later(add_csv_stats)
+      if opts.reconfigurable then
+         local pids = engine.configuration.apps['leader'].arg.follower_pids
+         for _,pid in ipairs(pids) do
+            local function start_sampling() add_csv_stats_for_pid(pid) end
+            timer.activate(timer.new('spawn_csv_stats', start_sampling, 100e6))
+         end
+      else
+         add_csv_stats_for_pid(S.getpid())
+      end
    end
 
    if opts.ingress_drop_monitor then
-      function add_ingress_drop_monitor()
+      if opts.reconfigurable then
+         io.stderr:write("Warning: Ingress drop monitor not yet supported "..
+                            "in multiprocess mode.\n")
+      else
          local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
          timer.activate(mon:timer())
       end
-      later(add_ingress_drop_monitor)
    end
 
    engine.busywait = true
