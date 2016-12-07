@@ -30,7 +30,9 @@ function tointeger(str, what, min, max)
       if res > 0 then
          error('invalid numeric value for '..what..': '..str)
       end
-      if min then check(min <= 0 and min <= res) end
+      if min and not (min <= 0 and min <= res) then
+         error('invalid numeric value for '..what..': '..str)
+      end
    else
       -- Only compare min and res if both are positive, otherwise if min
       -- is a negative int64_t then the comparison will treat it as a
