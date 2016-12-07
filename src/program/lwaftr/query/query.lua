@@ -1,16 +1,16 @@
 module(..., package.seeall)
 
+local S = require("syscall")
 local counter = require("core.counter")
-local ffi = require("ffi")
 local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
-local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
 local select_snabb_instance = top.select_snabb_instance
-local keys = lwutil.keys
+local keys, fatal = lwutil.keys, lwutil.fatal
+local named_program_root = engine.named_program_root
 
 -- Get the counter dir from the code.
 local counters_dir = lwcounter.counters_dir
@@ -29,22 +29,20 @@ local function is_counter_name (name)
    return lwcounter.counter_names[name] ~= nil
 end
 
-local function pidof(maybe_pid)
-   if tonumber(maybe_pid) then return maybe_pid end
-   local name_id = maybe_pid
-   for _, pid in ipairs(shm.children("/")) do
-      local path = "/"..pid.."/nic/id"
-      if shm.exists(path) then
-         local lwaftr_id = shm.open(path, lwtypes.lwaftr_id_type)
-         if ffi.string(lwaftr_id.value) == name_id then
-            return pid
-         end
+local function get_pid_by_name (name)
+   for _, program in pairs(shm.children("/by-name")) do
+      if name == program then
+         local fq = named_program_root .. "/" .. program
+         local piddir = S.readlink(fq)
+         return lib.basename(piddir)
       end
    end
 end
 
 function parse_args (raw_args)
    local handlers = {}
+   local opts = {}
+   local name
    function handlers.h() show_usage(0) end
    function handlers.l ()
       for _, name in ipairs(sort(lwcounter.counter_names)) do
@@ -52,25 +50,36 @@ function parse_args (raw_args)
       end
       main.exit(0)
    end
-   local args = lib.dogetopt(raw_args, handlers, "hl",
-                             { help="h", ["list-all"]="l" })
-   if #args > 2 then show_usage(1) end
-   if #args == 2 then
-      return args[1], args[2]
+   function handlers.n (arg)
+      opts.name = assert(arg)
    end
-   if #args == 1 then
-      local arg = args[1]
-      if is_counter_name(arg) then
-         return nil, arg
-      else
-         local pid = pidof(arg)
-         if not pid then
-            error(("Couldn't find PID for argument '%s'"):format(arg))
+   local args = lib.dogetopt(raw_args, handlers, "hln:",
+                             { help="h", ["list-all"]="l", name="n" })
+   if opts.name then
+      if #args > 1 then
+         print("Too many arguments.")
+         show_usage(1)
+      end
+      local pid = get_pid_by_name(opts.name)
+      if not pid then
+         fatal(("Couldn't find process with name '%s'"):format(opts.name))
+      end
+      local counter_name = args and args[1]
+      return pid, counter_name
+   else
+      if #args == 2 then
+         return unpack(args)
+      elseif #args == 1 then
+         if is_counter_name(args[1]) then
+            return nil, args[1]
+         else
+            return args[1]
          end
-         return pid, nil
+      elseif #args > 2 then
+         print("Too many arguments.")
+         show_usage(1)
       end
    end
-   return nil, nil
 end
 
 local function read_counters (tree)
