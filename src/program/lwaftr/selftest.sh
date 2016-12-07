@@ -37,7 +37,6 @@ echo "Testing snabb lwaftr run"
 sudo ./snabb lwaftr run -D 0.1 --conf ${TDIR}/icmp_on_fail.conf \
     --on-a-stick "$SNABB_PCI0"
 
-# Keep the following test at 1 second; 0.1 can hide problems, empirically
 echo "Testing snabb lwaftr run --reconfigurable"
-sudo ./snabb lwaftr run -D 1 --reconfigurable \
+sudo ./snabb lwaftr run -D 0.1 --reconfigurable \
     --conf ${TDIR}/icmp_on_fail.conf --on-a-stick "$SNABB_PCI0"

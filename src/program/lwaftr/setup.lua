@@ -467,7 +467,7 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
    link_sink(c, unpack(sinks))
 end
 
-function reconfigurable_multi(f, graph, conf, ...)
+function reconfigurable(f, graph, conf, ...)
    local args = {...}
    local function setup_fn(conf)
       local graph = config.new()
@@ -498,19 +498,4 @@ function reconfigurable_multi(f, graph, conf, ...)
               { setup_fn = setup_fn, initial_configuration = conf,
                 follower_pids = { follower_pid },
                 schema_name = 'snabb-softwire-v1'})
-end
-
-function reconfigurable_uni(f, graph, conf, ...)
-   local args = {...}
-   local function setup_fn(conf)
-      local graph = config.new()
-      f(graph, conf, unpack(args))
-      return graph
-   end
-
-   config.app(graph, 'leader', leader.Leader,
-              { setup_fn = setup_fn, initial_configuration = conf,
-                follower_pids = { S.getpid() },
-                schema_name = 'snabb-softwire-v1'})
-   config.app(graph, "follower", follower.Follower, {})
 end
