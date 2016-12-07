@@ -518,8 +518,13 @@ function Leader:rpc_get_state (args)
       return self:foreign_rpc_get_state(args.schema, args.path)
    end
    local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
-   local state = state.show_state(self.schema_name, S.getpid(), args.path)
-   return {state=printer(state, yang.string_output_file())}
+   local s = {}
+   for _, follower in pairs(self.followers) do
+      for k,v in pairs(state.show_state(self.schema_name, follower.pid, args.path)) do
+	 s[k] = v
+      end
+   end
+   return {state=printer(s, yang.string_output_file())}
 end
 
 function Leader:handle (payload)
