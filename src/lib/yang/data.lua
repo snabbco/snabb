@@ -262,12 +262,14 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
 end
 
 local function ctable_builder(key_t, value_t)
-   local res = ctable.new({ key_type=key_t, value_type=value_t })
+   local res = ctable.new({ key_type=key_t, value_type=value_t,
+                            max_occupancy_rate = 0.4 })
    local builder = {}
-   local counter = 0
+   -- Uncomment for progress counters.
+   -- local counter = 0
    function builder:add(key, value)
-      counter = counter + 1
-      if counter % 1000 == 0 then print('ctable add', counter) end
+      -- counter = counter + 1
+      -- if counter % 1000 == 0 then print('ctable add', counter) end
       res:add(key, value)
    end
    function builder:finish() return res end
