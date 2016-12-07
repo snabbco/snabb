@@ -223,6 +223,15 @@ function CTable:insert(hash, key, value, updates_allowed)
    local start_index = floor(hash*self.scale + 0.5)
    local index = start_index
 
+   -- Fast path.
+   if entries[index].hash == HASH_MAX and updates_allowed ~= 'required' then
+      self.occupancy = self.occupancy + 1
+      entries[index].hash = hash
+      entries[index].key = key
+      entries[index].value = value
+      return index
+   end
+
    while entries[index].hash < hash do
       index = index + 1
    end
