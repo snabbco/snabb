@@ -63,13 +63,20 @@ function run(args)
    end
    app.configure(graph)
 
-   local function start_sampling()
-      local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra)
+   local function start_sampling_for_pid(pid)
+      local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra, pid)
       csv:add_app('sinkv4', { 'input' }, { input=opts.hydra and 'decap' or 'Decap.' })
       csv:add_app('sinkv6', { 'input' }, { input=opts.hydra and 'encap' or 'Encap.' })
       csv:activate()
    end
-   --timer.activate(timer.new('spawn_csv_stats', start_sampling, 1e6))
+   if opts.reconfigurable then
+      for _,pid in ipairs(app.configuration.apps['leader'].arg.follower_pids) do
+         local function start_sampling() start_sampling_for_pid(pid) end
+         timer.activate(timer.new('spawn_csv_stats', start_sampling, 100e6))
+      end
+   else
+      start_sampling_for_pid(S.getpid())
+   end
 
    app.busywait = true
    app.main({duration=opts.duration})
