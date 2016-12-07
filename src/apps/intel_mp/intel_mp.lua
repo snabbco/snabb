@@ -327,7 +327,7 @@ function Intel:new (conf)
          speed     = {counter},
          status    = {counter, 2}, -- Link down
          promisc   = {counter},
-         macaddr   = {counter, self.nic_mac.bits},
+         macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
          rxbytes   = {counter},
          rxpackets = {counter},
          rxmcast   = {counter},
@@ -739,7 +739,6 @@ function Intel1g:init ()
    -- use Internal PHY                             -- 8.2.5
    self.r.MDICNFG(0)
    self:init_phy()
-   self.nic_mac = macaddress:new(self.r.RAL64[0]:bits(0,48))
 
    self:rss_enable()
 
@@ -889,11 +888,12 @@ function Intel82599:init ()
 
    -- 4.6.7
    self.r.RXCTRL(0)                             -- disable receive
-   self.nic_mac = macaddress:new(self.r.RAL64[0]:bits(0,48))
    self.r.RXDSTATCTRL(0x10) -- map all queues to RXDGPC
-   for i=0,127 do
+   for i=1,127 do -- preserve device MAC
       self.r.RAL[i](0)
       self.r.RAH[i](0)
+   end
+   for i=0,127 do
       self.r.PFUTA[i](0)
       self.r.VFTA[i](0)
       self.r.PFVLVFB[i](0)
