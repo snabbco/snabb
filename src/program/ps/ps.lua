@@ -18,7 +18,7 @@ local function parse_args (args)
    local preferpid = false
    function opt.h (arg) usage(0) end
    function opt.p (arg) preferpid = true end
-   args = lib.dogetopt(args, opt, "h:p", {help='h', pid='p'})
+   args = lib.dogetopt(args, opt, "hp", {help='h', pid='p'})
    if #args ~= 0 then usage(1) end
    return preferpid
 end
