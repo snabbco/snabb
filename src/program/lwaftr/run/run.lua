@@ -21,10 +21,9 @@ function parse_args(args)
    if #args == 0 then show_usage(1) end
    local conf_file, v4, v6
    local ring_buffer_size
-   local opts = {
-      verbosity = 0, ingress_drop_monitor = 'flush', bench_file = 'bench.csv' }
+   local opts = { verbosity = 0, bench_file = 'bench.csv' }
+   local scheduling = { ingress_drop_monitor = 'flush' }
    local handlers = {}
-   local cpu
    function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.i () opts.virtio_net = true end
@@ -39,25 +38,14 @@ function parse_args(args)
       end
    end
    function handlers.cpu(arg)
-      cpu = tonumber(arg)
+      local cpu = tonumber(arg)
       if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
          fatal("Invalid cpu number: "..arg)
       end
-
-      if opts.reconfigurable then
-         S.setenv("SNABB_TARGET_CPU", tostring(cpu), true)
-         local wanted_node = numa.cpu_get_numa_node(cpu)
-         numa.bind_to_numa_node(wanted_node)
-         print("Bound to numa node:", wanted_node)
-      else
-         print("Bound to CPU:", cpu)
-         numa.bind_to_cpu(cpu)
-      end
+      scheduling.cpu = cpu
    end
    handlers['real-time'] = function(arg)
-      if not S.sched_setscheduler(0, "fifo", 1) then
-         fatal('Failed to enable real-time scheduling.  Try running as root.')
-      end
+      scheduling.real_time = true
    end
    function handlers.v4(arg)
       v4 = arg
@@ -96,9 +84,9 @@ function parse_args(args)
    function handlers.b(arg) opts.bench_file = arg end
    handlers["ingress-drop-monitor"] = function (arg)
       if arg == 'flush' or arg == 'warn' then
-         opts.ingress_drop_monitor = arg
+         scheduling.ingress_drop_monitor = arg
       elseif arg == 'off' then
-         opts.ingress_drop_monitor = nil
+         scheduling.ingress_drop_monitor = false
       else
          fatal("invalid --ingress-drop-monitor argument: " .. arg
                   .." (valid values: flush, warn, off)")
@@ -122,15 +110,14 @@ function parse_args(args)
    if opts.mirror then
       assert(opts["on-a-stick"], "Mirror option is only valid in on-a-stick mode")
    end
-   if cpu then numa.bind_to_cpu(cpu) end
    if opts["on-a-stick"] then
-      numa.check_affinity_for_pci_addresses({ v4 })
-      return opts, conf_file, v4
+      scheduling.pci_addrs = { v4 }
+      return opts, scheduling, conf_file, v4
    else
-      if not v4 then fatal("Missing required --v4-pci argument.") end
-      if not v6 then fatal("Missing required --v6-pci argument.") end
-      numa.check_affinity_for_pci_addresses({ v4, v6 })
-      return opts, conf_file, v4, v6
+      if not v4 then fatal("Missing required --v4 argument.") end
+      if not v6 then fatal("Missing required --v6 argument.") end
+      scheduling.pci_addrs = { v4, v6 }
+      return opts, scheduling, conf_file, v4, v6
    end
 end
 
@@ -143,7 +130,7 @@ local function requires_splitter (opts, conf)
 end
 
 function run(args)
-   local opts, conf_file, v4, v6 = parse_args(args)
+   local opts, scheduling, conf_file, v4, v6 = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local use_splitter = requires_splitter(opts, conf)
 
@@ -162,11 +149,14 @@ function run(args)
    else
       setup_fn, setup_args = setup.load_phy, { 'inetNic', v4, 'b4sideNic', v6 }
    end
+
    if opts.reconfigurable then
-      setup.reconfigurable(setup_fn, c, conf, unpack(setup_args))
+      setup.reconfigurable(scheduling, setup_fn, c, conf, unpack(setup_args))
    else
+      setup.apply_scheduling(scheduling)
       setup_fn(c, conf, unpack(setup_args))
    end
+
    engine.configure(c)
 
    if opts.verbosity >= 2 then
