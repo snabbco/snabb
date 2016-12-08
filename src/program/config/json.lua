@@ -75,7 +75,7 @@ local function consume_pat(input, pat)
    return ch
 end
 
-local function skip_whitespace(input) take_while(input, whitespace_pat) end
+function skip_whitespace(input) take_while(input, whitespace_pat) end
 
 -- Pattern describing characters that can appear literally in a JSON
 -- string.

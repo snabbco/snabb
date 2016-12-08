@@ -21,6 +21,7 @@ local parse_command_line_opts = {
    with_config_file = { default=false },
    with_path = { default=false },
    with_value = { default=false },
+   with_extra_args = { default=0 },
    require_schema = { default=false }
 }
 
@@ -76,8 +77,9 @@ function parse_command_line(args, opts)
       end
       ret.value = parser(ret.value_str)
    end
-   if #args ~= 0 then err("too many arguments") end
-   return ret
+   if #args < opts.with_extra_args then err("too few arguments") end
+   if #args ~= opts.with_extra_args then err("too many arguments") end
+   return ret, unpack(args)
 end
 
 function open_socket_or_die(instance_id)
