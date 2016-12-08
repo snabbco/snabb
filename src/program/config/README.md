@@ -141,6 +141,14 @@ Likewise, to change the port for `1.2.3.4`, do:
 $ snabb config set ID /routes/route[addr=1.2.3.4]/port 7
 ```
 
+If the element has a multiple-value key, you can use multiple XPath
+selectors. For instance, if route elements had "addr port" as key,
+you'd do:
+
+```
+$ snabb config get ID /routes/route[addr=1.2.3.4][port=1]
+```
+
 The general rule for paths and value syntax is that if a name appears in
 the path, it won't appear in the value.  Mostly this works as you would
 expect, but there are a couple of edge cases for instances of `list` and
@@ -213,7 +221,8 @@ $ cat /tmp/my-configuration | snabb config set ID /
 ```
 
 Resetting the whole configuration is such a common operation that it
-has a special command that takes a file name instead of a path:
+has a special command that takes a filesystem path instead of a schema
+path:
 
 ```
 $ snabb config load ID /tmp/my-configuration
@@ -245,7 +254,7 @@ $ snabb config add ID /routes/route
 The `listen` interface supports all of these operations with a simple
 JSON protocol.  `snabb config listen` reads JSON objects from `stdin`,
 parses them, relays their action to the data plane, and writes responses
-out to `stdout`.  The requests are be processed in order, but
+out to `stdout`.  The requests are processed in order, but
 asynchronously; `snabb config listen` doesn't wait for a response from
 the data plane before processing the next request.  In this way, a
 NETCONF agent can pipeline a number of requests.
