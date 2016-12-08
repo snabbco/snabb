@@ -1,5 +1,17 @@
 # Change Log
 
+## [3.1.3] - 2016-12-08
+
+ * Fix performance problem for --reconfigurable "snabb lwaftr run"
+   wherein the main coordination process would also get scheduled on the
+   data plane CPU.  Also re-enable ingress drop monitor and --real-time
+   support for multiprocess lwaftr.
+
+ * "snabb config --help" fixes.
+
+ * Allow "snabb lwaftr query", "snabb lwaftr monitor", "snabbvmx query",
+   and "snabbvmx top" to locate Snabb instances by name.
+
 ## [3.1.2] - 2016-12-07
 
  * Re-enabled multi-process mode for --reconfigurable "snabb lwaftr
