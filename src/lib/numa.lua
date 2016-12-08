@@ -92,7 +92,8 @@ function bind_to_cpu (cpu)
    if not cpu then return unbind_cpu() end
    assert(not bound_cpu, "already bound")
 
-   assert(S.sched_setaffinity(0, cpu))
+   assert(S.sched_setaffinity(0, cpu),
+      ("Couldn't set affinity for cpu %s"):format(cpu))
    local cpu_and_node = S.getcpu()
    assert(cpu_and_node.cpu == cpu)
    bound_cpu = cpu
@@ -120,9 +121,8 @@ function bind_to_numa_node (node)
 end
 
 function prevent_preemption(priority)
-   if not S.sched_setscheduler(0, "fifo", priority or 1) then
-      fatal('Failed to enable real-time scheduling.  Try running as root.')
-   end
+   assert(S.sched_setscheduler(0, "fifo", priority or 1),
+      'Failed to enable real-time scheduling.  Try running as root.')
 end
 
 function selftest ()
