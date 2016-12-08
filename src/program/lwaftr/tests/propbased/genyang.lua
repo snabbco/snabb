@@ -8,5 +8,8 @@ function generate_yang(pid)
 end
 
 function run_yang(yang_cmd)
-   return io.popen(yang_cmd):read("*a")
+   local f = io.popen(yang_cmd)
+   local result = f:read("*a")
+   f:close()
+   return result
 end
