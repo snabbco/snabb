@@ -138,10 +138,7 @@ function run(args)
 
    intel10g.ring_buffer_size(ring_buffer_size)
 
-   if id then
-      local lwaftr_id = shm.create("nic/id", lwtypes.lwaftr_id_type)
-      lwaftr_id.value = id
-   end
+   if id then engine.claim_name(id) end
 
    local vlan = false
    local mtu = DEFAULT_MTU

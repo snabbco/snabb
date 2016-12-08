@@ -1,16 +1,14 @@
 module(..., package.seeall)
 
+local S = require("syscall")
 local counter = require("core.counter")
-local ffi = require("ffi")
 local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
-local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
-local select_snabb_instance = top.select_snabb_instance
-local keys = lwutil.keys
+local keys, fatal = lwutil.keys, lwutil.fatal
 
 -- Get the counter dir from the code.
 local counters_dir = lwcounter.counters_dir
@@ -29,22 +27,10 @@ local function is_counter_name (name)
    return lwcounter.counter_names[name] ~= nil
 end
 
-local function pidof(maybe_pid)
-   if tonumber(maybe_pid) then return maybe_pid end
-   local name_id = maybe_pid
-   for _, pid in ipairs(shm.children("/")) do
-      local path = "/"..pid.."/nic/id"
-      if shm.exists(path) then
-         local lwaftr_id = shm.open(path, lwtypes.lwaftr_id_type)
-         if ffi.string(lwaftr_id.value) == name_id then
-            return pid
-         end
-      end
-   end
-end
-
 function parse_args (raw_args)
    local handlers = {}
+   local opts = {}
+   local name
    function handlers.h() show_usage(0) end
    function handlers.l ()
       for _, name in ipairs(sort(lwcounter.counter_names)) do
@@ -52,25 +38,13 @@ function parse_args (raw_args)
       end
       main.exit(0)
    end
-   local args = lib.dogetopt(raw_args, handlers, "hl",
-                             { help="h", ["list-all"]="l" })
+   function handlers.n (arg)
+      opts.name = assert(arg)
+   end
+   local args = lib.dogetopt(raw_args, handlers, "hln:",
+                             { help="h", ["list-all"]="l", name="n" })
    if #args > 2 then show_usage(1) end
-   if #args == 2 then
-      return args[1], args[2]
-   end
-   if #args == 1 then
-      local arg = args[1]
-      if is_counter_name(arg) then
-         return nil, arg
-      else
-         local pid = pidof(arg)
-         if not pid then
-            error(("Couldn't find PID for argument '%s'"):format(arg))
-         end
-         return pid, nil
-      end
-   end
-   return nil, nil
+   return opts, unpack(args)
 end
 
 local function read_counters (tree)
@@ -114,7 +88,17 @@ local function print_counters (tree, filter)
 end
 
 function run (raw_args)
-   local target_pid, counter_name = parse_args(raw_args)
-   local instance_tree = select_snabb_instance(target_pid)
+   local opts, pid, counter_name = parse_args(raw_args)
+   if tostring(pid) and not counter_name then
+      counter_name, pid = pid, nil
+   end
+   if opts.name then
+      local programs = engine.enumerate_named_programs(opts.name)
+      pid = programs[opts.name]
+      if not pid then
+         fatal(("Couldn't find process with name '%s'"):format(opts.name))
+      end
+   end
+   local instance_tree = top.select_snabb_instance(pid)
    print_counters(instance_tree, counter_name)
 end
