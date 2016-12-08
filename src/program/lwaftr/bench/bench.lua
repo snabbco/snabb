@@ -16,25 +16,17 @@ end
 function parse_args(args)
    local handlers = {}
    local opts = { bench_file = 'bench.csv' }
+   local scheduling = {}
    function handlers.D(arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
       assert(opts.duration >= 0, "duration can't be negative")
    end
    function handlers.cpu(arg)
-      cpu = tonumber(arg)
+      local cpu = tonumber(arg)
       if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
          fatal("Invalid cpu number: "..arg)
       end
-
-      if opts.reconfigurable then
-         S.setenv("SNABB_TARGET_CPU", tostring(cpu), true)
-         local wanted_node = numa.cpu_get_numa_node(cpu)
-         numa.bind_to_numa_node(wanted_node)
-         print("Bound to numa node:", wanted_node)
-      else
-         print("Bound to CPU:", cpu)
-         numa.bind_to_cpu(cpu)
-      end
+      scheduling.cpu = cpu
    end
    function handlers.n(arg) opts.name = assert(arg) end
    function handlers.b(arg) opts.bench_file = arg end
@@ -45,20 +37,21 @@ function parse_args(args)
       help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1,
       reconfigurable = 0 })
    if #args ~= 3 then show_usage(1) end
-   return opts, unpack(args)
+   return opts, scheduling, unpack(args)
 end
 
 function run(args)
-   local opts, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
+   local opts, scheduling, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
    if opts.name then engine.claim_name(opts.name) end
 
    local graph = config.new()
    if opts.reconfigurable then
-      setup.reconfigurable(setup.load_bench, graph, conf,
+      setup.reconfigurable(scheduling, setup.load_bench, graph, conf,
                            inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
    else
+      setup.apply_scheduling(scheduling)
       setup.load_bench(graph, conf, inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
    end
    app.configure(graph)

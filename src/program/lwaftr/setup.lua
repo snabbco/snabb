@@ -15,6 +15,7 @@ local pcap       = require("apps.pcap.pcap")
 local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
 local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
 local vlan       = require("apps.vlan.vlan")
+local numa       = require("lib.numa")
 local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
@@ -467,7 +468,60 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
    link_sink(c, unpack(sinks))
 end
 
-function reconfigurable(f, graph, conf, ...)
+local apply_scheduling_opts = {
+   cpu = { required=false },
+   pci_addrs = { default={} },
+   real_time = { default=false },
+   ingress_drop_monitor = { default='flush' }
+}
+function apply_scheduling(opts)
+   local lib = require("core.lib")
+   local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
+   local fatal = require("apps.lwaftr.lwutil").fatal
+
+   opts = lib.parse(opts, apply_scheduling_opts)
+   if opts.cpu then
+      numa.bind_to_cpu(opts.cpu)
+      print("Bound data plane to CPU:", opts.cpu)
+   end
+   numa.check_affinity_for_pci_addresses(opts.pci_addrs)
+   if opts.ingress_drop_monitor then
+      local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
+      timer.activate(mon:timer())
+   end
+   if opts.real_time then
+      if not S.sched_setscheduler(0, "fifo", 1) then
+         fatal('Failed to enable real-time scheduling.  Try running as root.')
+      end
+   end
+end
+
+function run_worker(scheduling)
+   local app = require("core.app")
+   apply_scheduling(scheduling)
+   local myconf = config.new()
+   config.app(myconf, "follower", follower.Follower, {})
+   app.configure(myconf)
+   app.busywait = true
+   app.main({})
+end
+
+local function stringify(x)
+   if type(x) == 'string' then return string.format('%q', x) end
+   if type(x) == 'number' then return tostring(x) end
+   if type(x) == 'boolean' then return x and 'true' or 'false' end
+   assert(type(x) == 'table')
+   local ret = {"{"}
+   local first = true
+   for k,v in pairs(x) do
+      if first then first = false else table.insert(ret, ",") end
+      table.insert(ret, string.format('[%s]=%s', stringify(k), stringify(v)))
+   end
+   table.insert(ret, "}")
+   return table.concat(ret)
+end
+
+function reconfigurable(scheduling, f, graph, conf, ...)
    local args = {...}
    local function setup_fn(conf)
       local graph = config.new()
@@ -475,23 +529,15 @@ function reconfigurable(f, graph, conf, ...)
       return graph
    end
 
-   local worker_code = string.format([[
-      local follower = require("apps.config.follower")
-      local app = require("core.app")
-      local numa = require("lib.numa")
+   if scheduling.cpu then
+      local wanted_node = numa.cpu_get_numa_node(scheduling.cpu)
+      numa.bind_to_numa_node(wanted_node)
+      print("Bound main process to NUMA node: ", wanted_node)
+   end
 
-      local target_cpu = tonumber(%s)
-      if target_cpu then
-         numa.bind_to_cpu(target_cpu)
-         print("Bound worker to CPU: ", target_cpu)
-      end
-      local myconf = config.new()
-      config.app(myconf, "follower", follower.Follower, {})
-      app.configure(myconf)
-      app.busywait = true
-      app.main({})
-   ]],
-      S.getenv("SNABB_TARGET_CPU"))
+   local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
+   worker_code = worker_code:format(stringify(scheduling))
+
    local follower_pid = worker.start("follower", worker_code)
 
    config.app(graph, 'leader', leader.Leader,
