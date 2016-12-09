@@ -7,6 +7,8 @@ local lib = require("core.lib")
 local shm = require("core.shm")
 local app = require("core.app")
 
+local basename, dirname = lib.basename, lib.dirname
+
 local function usage (code)
    local f = code == 0 and io.stdout or io.stderr
    f:write(require("program.ps.README_inc"))
@@ -31,6 +33,16 @@ local function appname_resolver()
     return function (pid) return instances[pid] end
 end
 
+local function is_worker (pid)
+   return shm.exists("/"..pid.."/group")
+end
+
+local function get_leader_pid (pid)
+   local fq = shm.root.."/"..pid.."/group"
+   local path = S.readlink(fq)
+   return basename(dirname(path))
+end
+
 local function compute_snabb_instances()
    -- Produces set of snabb instances, excluding this one.
    local whichname = appname_resolver()
@@ -40,7 +52,13 @@ local function compute_snabb_instances()
       -- This could fail as the name could be for example "by-name"
       local p = tonumber(name)
       local name = whichname(p)
-      if p and p ~= my_pid then table.insert(pids, {pid=p, name=name}) end
+      if p and p ~= my_pid then
+         local instance = {pid=p, name=name}
+         if is_worker(p) then
+            instance.leader = get_leader_pid(p)
+         end
+         table.insert(pids, instance)
+      end
    end
    return pids
 end
@@ -53,10 +71,15 @@ function run (args)
          print(instance.pid)
       else
          if instance.name then
-            print(instance.name)
+            io.write(instance.name)
          else
-            print(instance.pid)
+            io.write(instance.pid)
          end
+         -- Check instance is a worker.
+         if instance.leader then
+            io.write(("\tWorker for PID %s"):format(instance.leader))
+         end
+         io.write("\n")
       end
    end
    main.exit(0)
