@@ -15,6 +15,15 @@ with what is expected. Both the implementation and the testing were done with
 careful attention paid to RFC 826 throughout, as well as to dumps of ARP packets
 from the live network the developer was on.
 
+ARP has two main parts: resolving a remote address, and providing the address of
+the lwAFTR on request. The first one can be tested in a network by specifying
+only the remote IP of the next IPv4 hop (not the ethernet address), then sending
+packets through the lwAFTR and confirming on the remote host that they are
+arriving. The latter can be tested by issuing an ARP request to the lwaftr from
+another machine; if the other machine runs Linux, `arp -n` should then show a
+new entry corresponding to the lwAFTR.  The end to end tests simulate both of
+these cases, but with captured packets rather than a live network.
+
 There are a hierarchy of tests. Unit tests are internally orientedf, and make
 sure that basic functionality and some edge cases are tested. By convention,
 they are found in functions called selftest().
