@@ -607,7 +607,7 @@ function Leader:handle_calls_from_peers()
             assert(type(reply) == 'string')
             reply = #reply..'\n'..reply
             peer.state = 'reply'
-            peer.buf = ffi.new('uint8_t[?]', #reply, reply)
+            peer.buf = ffi.new('uint8_t[?]', #reply+1, reply)
             peer.pos = 0
             peer.len = #reply
          else

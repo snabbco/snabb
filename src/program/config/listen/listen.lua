@@ -151,7 +151,7 @@ local function buffered_output()
    function ret:write(str) table.insert(self.buf, str) end
    function ret:flush_to_fd(fd)
       local str = table.concat(self.buf)
-      local bytes = ffi.new('uint8_t[?]', #str, str)
+      local bytes = ffi.cast('const char*', str)
       local written = 0
       while written < #str do
          local wrote = assert(S.write(fd, bytes + written, #str - written))
