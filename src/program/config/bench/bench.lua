@@ -2,8 +2,30 @@
 module(..., package.seeall)
 
 local S = require("syscall")
-local common = require("program.config.common")
+local lib = require("core.lib")
 local json_lib = require("program.config.json")
+
+function show_usage(command, status, err_msg)
+   if err_msg then print('error: '..err_msg) end
+   print(require("program.config.bench.README_inc"))
+   main.exit(status)
+end
+
+function parse_command_line(args)
+   local function err(msg) show_usage(1, msg) end
+   local listen_params = {}
+   local handlers = {}
+   function handlers.h() show_usage(0) end
+   function handlers.s(arg) listen_params.schema_name = arg end
+   function handlers.r(arg) listen_params.revision_date = arg end
+   args = lib.dogetopt(args, handlers, "hs:r:",
+                       {help="h", ['schema-name']="s", schema="s",
+                        ['revision-date']="r", revision="r"})
+   if #args ~= 2 then err() end
+   local commands_file
+   listen_params.instance_id, commands_file = unpack(args)
+   return listen_params, commands_file
+end
 
 local function read_reply(fd)
    local json = read_json_object(client)
@@ -37,15 +59,22 @@ function die(input)
 end
 
 function run(args)
-   args, file = common.parse_command_line(args, { command='bench',
-                                                  with_extra_args=1 })
+   listen_params, file = parse_command_line(args)
    local commands = read_commands(file)
    local ok, err, input_read, input_write = assert(S.pipe())
    local ok, err, output_read, output_write = assert(S.pipe())
    local pid = S.fork()
    if pid == 0 then
-      local argv = {"snabb", "config", "listen",
-                    "-s", args.schema_name, args.instance_id}
+      local argv = {"snabb", "config", "listen"}
+      if listen_params.schema_name then
+         table.insert(argv, "-s")
+         table.insert(argv, listen_params.schema_name)
+      end
+      if listen_params.revision_date then
+         table.insert(argv, "-r")
+         table.insert(argv, listen_params.revision_date)
+      end
+      table.insert(argv, listen_params.instance_id)
       S.prctl("set_pdeathsig", "hup")
       input_write:close()
       output_read:close()
