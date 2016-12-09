@@ -34,6 +34,18 @@ local function is_worker (pid)
    return shm.exists("/"..pid.."/group")
 end
 
+local function is_addressable (pid)
+   local socket = assert(S.socket("unix", "stream"))
+   local tail = pid.."/config-leader-socket"
+   local by_name = S.t.sockaddr_un(shm.root..'/by-name/'..tail)
+   local by_pid = S.t.sockaddr_un(shm.root..'/'..tail)
+   if socket:connect(by_name) or socket:connect(by_pid) then
+      socket:close()
+      return true
+   end
+   return false
+end
+
 local function get_leader_pid (pid)
    local fq = shm.root.."/"..pid.."/group"
    local path = S.readlink(fq)
@@ -54,6 +66,9 @@ local function compute_snabb_instances()
          if is_worker(p) then
             instance.leader = get_leader_pid(p)
          end
+         if is_addressable(p) then
+            instance.addressable = true
+         end
          table.insert(pids, instance)
       end
    end
@@ -69,14 +84,17 @@ function run (args)
    for _, instance in ipairs(instances) do
       -- Check instance is a worker.
       if instance.leader then
-         print("  \\- "..instance.pid.."   worker for "..instance.leader)
+         io.write("  \\- "..instance.pid.."   worker for "..instance.leader)
       else
          io.write(instance.pid)
          if instance.name then
             io.write("\t["..instance.name.."]")
          end
-         io.write("\n")
       end
+      if instance.addressable then
+         io.write(" *")
+      end
+      io.write("\n")
    end
    main.exit(0)
 end
