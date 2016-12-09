@@ -91,38 +91,38 @@ access to a NIC.
 ### Configuration
 
 There are a lot of configuration knobs!  See the
-[Configuration](./README.configuration.md) page.
+[Configuration](./configuration.md) page.
 
 ### Running the lwAFTR
 
 You have a configuration: great, you're finally ready to run the lwAFTR!
 The only tricky part is making sure you're using the right network
-interfaces.  See [Running](./README.running.md), and be sure to check
-[Performance](./README.performance.md) to make sure you're getting all
+interfaces.  See [Running](./running.md), and be sure to check
+[Performance](./performance.md) to make sure you're getting all
 the lwAFTR can give.
 
 The lwAFTR processes traffic between any NIC supported by Snabb, which
 mainly means Intel 82599 10 Gb adapters.  It's also possible to run on
 virtualized adapters using the `virtio-net` support that just landed in
-Snabb.  See [Virtualization](./README.virtualization.md), for more on how to
+Snabb.  See [Virtualization](./virtualization.md), for more on how to
 get the lwAFTR working on virtualized network interfaces.
 
 ## Troubleshooting
 
-[Troubleshooting](./README.troubleshooting.md)
+[Troubleshooting](./troubleshooting.md)
 
-[Counters](./README.counters.md)
+[Counters](./counters.md)
 
 ## Performance
 
-[Benchmarking](./README.benchmarking.md)
+[Benchmarking](./benchmarking.md)
 
-[Performance](./README.performance.md)
+[Performance](./performance.md)
 
 ## Compatibility and interoperability
 
-[RFC Compliance](./README.rfccompliance.md)
+[RFC Compliance](./rfccompliance.md)
 
-[Discovery of next-hop L2 addresses via NDP](./README.ndp.md)
+[Discovery of next-hop L2 addresses via NDP](./ndp.md)
 
 [Change Log](./CHANGELOG.md)

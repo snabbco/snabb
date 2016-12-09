@@ -1,6 +1,6 @@
 # Benchmarking
 
-The instructions in [README.running.md](README.running.md) for running the lwaftr
+The instructions in [running.md](running.md) for running the lwaftr
  with a load generator are the instructions for the primary way to benchmark the lwaftr.
 
 To run a load generator and a lwAFTR, you will need 4 NICs. The following 
@@ -8,7 +8,7 @@ example assumes NICs `02:00.0` and `02:00.1` and wired to NICs `02:00.0` and
 `02:00.1` in a different server.
 
 Please, change the PCI addresses to match the settings in your current system; 
-See [README.running.md](README.running.md).
+See [running.md](running.md).
 
 In one server, start the lwAFTR:
 
@@ -18,7 +18,7 @@ $ sudo numactl -m 0 taskset -c 1 ./src/snabb lwaftr run -v \
     --v4 0000:02:00.0 --v6 0000:02:00.1
 ```
 
-See [README.performance.md](README.performance.md) for a discussion of `numactl`,
+See [performance.md](performance.md) for a discussion of `numactl`,
 `taskset`, and NUMA settings.
 
 The `-v` flag enables periodic printouts reporting MPPS and Gbps statistics per

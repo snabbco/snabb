@@ -246,4 +246,4 @@ egress-filter "
 ```
 
 Enabling ingress and egress filters currently has a performance cost.
-See [README.performance.md](README.performance.md).
+See [performance.md](performance.md).

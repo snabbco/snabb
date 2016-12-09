@@ -105,7 +105,7 @@ A change to migrate the lwAFTR to use a new YANG-based configuration.
    configurations, run "snabb lwaftr migrate-configation old.conf" on
    the old configuration.  See the [snabb-softwire-v1.yang
    schema](../../../lib/yang/snabb-softwire-v1.yang) or
-   [README.configuration.md](./README.configuration.md) for full details
+   [configuration.md](./configuration.md) for full details
    on the new configuration format.
 
  * Send ICMPv6 unreachable messages from the most appropriate source address
@@ -119,7 +119,7 @@ A change to migrate the lwAFTR to use a new YANG-based configuration.
    `snabbvmx` documentation](../../snabbvmx/doc/README.md) for more.
 
  * Add many more counters, used to diagnose the path that packets take
-   in the lwAFTR.  See [README.counters.md](./README.counters.md) for
+   in the lwAFTR.  See [counters.md](./counters.md) for
    more.
 
  * Add "snabb config" set of commands, to replace "snabb lwaftr control".
@@ -194,10 +194,10 @@ A bug-fix and documentation release.
 
  * Added performance analysis of the overhead of ingress and egress
    filtering.  See
-   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.filters-performance.md.
+   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/filters-performance.md.
 
  * Updated documentation for performance tuning.  See
-   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.performance.md
+   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/performance.md
 
  * Add a time-stamp for the JIT self-healing behavior, and adapt the
    message to be more helpful.
@@ -253,7 +253,7 @@ A bug fix release.
  * Add ability to read in ingress and egress filters from files.  If the
    filter value starts with a "<", it is interpreted as a file that
    should be read.  For example, `ipv6_egress_filter =
-   <ipv6-egress-filter.txt"`.  See README.configuration.md.
+   <ipv6-egress-filter.txt"`.  See configuration.md.
 
 ## [2.4] - 2016-05-03
 
