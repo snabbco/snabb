@@ -1,5 +1,10 @@
 # Change Log
 
+## [3.1.4] - 2016-12-09
+
+ * Fix memory corruption bug in main process of --reconfigurable "snabb
+   lwaftr run" that would cause the dataplane to prematurely exit.
+
 ## [3.1.3] - 2016-12-08
 
  * Fix performance problem for --reconfigurable "snabb lwaftr run"
