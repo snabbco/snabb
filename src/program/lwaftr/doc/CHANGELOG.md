@@ -2,6 +2,9 @@
 
 ## [3.1.5] - 2016-12-09
 
+ * Improve "snabb ps" output.  Processes with a "*" by them are
+   listening for "snabb config" connections.
+
  * Fix race condition in multiprocess --reconfigurable mode.
 
  * Improve configuration change throughput.
