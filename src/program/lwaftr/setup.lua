@@ -481,7 +481,8 @@ function apply_scheduling(opts)
 
    opts = lib.parse(opts, apply_scheduling_opts)
    if opts.cpu then
-      numa.bind_to_cpu(opts.cpu)
+      local success, err = pcall(numa.bind_to_cpu, opts.cpu)
+      if not success then fatal(err) end
       print("Bound data plane to CPU:", opts.cpu)
    end
    numa.check_affinity_for_pci_addresses(opts.pci_addrs)
