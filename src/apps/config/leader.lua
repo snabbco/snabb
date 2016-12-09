@@ -308,6 +308,7 @@ end
 function compute_add_config_fn (schema_name, path)
    return path_adder_for_schema(yang.load_schema_by_name(schema_name), path)
 end
+compute_add_config_fn = util.memoize(compute_add_config_fn)
 
 local function path_remover_for_grammar(grammar, path)
    local top_grammar = grammar

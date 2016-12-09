@@ -234,6 +234,7 @@ function resolver(grammar, path_string)
    end
    return getter, grammar
 end
+resolver = util.memoize(resolver)
 
 -- Loads a module and converts the rest of the path.
 function load_from_path(path)
