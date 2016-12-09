@@ -93,6 +93,8 @@ function run(args)
       output_read:close()
       assert(S.dup2(input_read, 0))
       assert(S.dup2(output_write, 1))
+      input_read:close()
+      output_write:close()
       S.execve(("/proc/%d/exe"):format(S.getpid()), argv, {})
    end
    input_read:close()

@@ -51,8 +51,11 @@ local function read_request(client, schema_name, revision_date)
    local req = handler(schema_name, revision_date, path, json.value)
    local function print_reply(reply)
       local output = json_lib.buffered_output()
-      json_lib.write_json_object(output,
-                                 {id=id, status='ok', value=reply.config})
+      local value
+      if verb == 'get' then value = reply.config
+      elseif verb == 'get-state' then value = reply.state
+      end
+      json_lib.write_json_object(output, {id=id, status='ok', value=value})
       output:flush(S.stdout)
    end
    return req, print_reply
