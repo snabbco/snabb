@@ -38,6 +38,6 @@ function handle_prop_args(prop_args)
       S.execve(("/proc/%d/exe"):format(S.getpid()), cmdline, {})
    else
       run_pid = pid
-      S.sleep(0.1)
+      S.sleep(1)
    end
 end
