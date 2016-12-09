@@ -116,6 +116,7 @@ function data_grammar_from_schema(schema)
    local members = visit_body(schema)
    return {type="struct", members=members, ctype=struct_ctype(members)}
 end
+data_grammar_from_schema = util.memoize(data_grammar_from_schema)
 
 function rpc_grammar_from_schema(schema)
    local grammar = {}
@@ -458,6 +459,7 @@ function data_parser_from_grammar(production)
    end
    return assert(top_parsers[production.type])(production)
 end
+data_parser_from_grammar = util.memoize(data_parser_from_grammar)
 
 function load_data_for_schema(schema, str, filename)
    return data_parser_from_schema(schema)(str, filename)
@@ -670,6 +672,7 @@ function data_printer_from_grammar(production)
    end
    return assert(top_printers[production.type])(production)
 end
+data_printer_from_grammar = util.memoize(data_printer_from_grammar)
 
 local function string_output_file()
    local file = {}
