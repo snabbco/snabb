@@ -24,7 +24,7 @@ require them to match the filenames in `/sys/bus/pci/devices/`, such as
 `/sys/bus/pci/devices/0000:04:00.1`: in such cases, you must write `0000:01:00.0`,
 with the appropriate prefix (`0000:`, in this example).
 
-Note: Compile Snabb (see [README.build.md](README.build.md)) before attempting
+Note: Compile Snabb (see [build.md](build.md)) before attempting
 the following.
 
 ## Running a load generator and the lwaftr (2 lwaftr NICs)
@@ -37,8 +37,8 @@ concrete PCI devices specified to match the current system; See [Section
 
 Note that unless the load generator and the lwaftr are running on the
 same NUMA nodes that their NICs are connected to, performance will be
-terrible.  See [README.benchmarking.md](README.benchmarking.md) and
-[README.performance.md](README.performance.md) for more.
+terrible.  See [benchmarking.md](benchmarking.md) and
+[performance.md](performance.md) for more.
 
 First, start the lwAFTR:
 

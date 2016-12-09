@@ -172,7 +172,7 @@ IPv6 fragmentation counters:
 - Is the lwAftr getting packets? See `in-ipv4-packets` and `in-ipv6-bytes`.
   If those are zero, it is not: check physical cabling and VLAN settings.
   Other troubleshooting steps may also apply, such as IOMMU settings: see
-  `src/program/lwaftr/doc/README.troubleshooting.md`.
+  `src/program/lwaftr/doc/troubleshooting.md`.
 - Are the fragmentation counters indicating needing fragmentation and
   reassembly large? If `in-ipv4-frag-needs-reassembly` or
   `in-ipv6-frag-needs-reassembly` are large, ask why there are so many fragments
