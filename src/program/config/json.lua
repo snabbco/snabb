@@ -221,7 +221,7 @@ function selftest ()
          local output = buffered_output()
          write_json_object(output, parsed)
          output:write(' ') -- sentinel
-         output:flush_to_fd(fd)
+         output:flush(fd)
          fd:close()
       end
       os.remove(tmp)
