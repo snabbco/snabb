@@ -42,7 +42,6 @@ function start_lwaftr_bench {
                          program/lwaftr/tests/benchdata/ipv{4,6}-0550.pcap &> /dev/null &
 
     # This isn't ideal but it takes a little time for the lwaftr to properly start
-    # TODO: make this better?
     sleep 2
 }
 
