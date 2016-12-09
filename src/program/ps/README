@@ -3,11 +3,8 @@ Print a list of running Snabb instances.
 
 Available options:
   -h, --help                 Display this message.
-  -p, --PID                  Display processes by their PID instead of name.
 
-The default output format is one identifier by line. If the --p or --pid flag is
-used then the it will ignore any name defined and list just the PID.  More
-options can be added in the future.
+The default output format is one identifier by line.
 
-The identifier is either the name (preferentially) or, if one is not defined,
-the PID of the process is used.
+An identifier is a Snabb instance PID. If a name is defined for the PID,
+its value is printed on a second column.
