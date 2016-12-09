@@ -33,3 +33,5 @@ fi
 
 ./snabb config get-state "$SNABB_NAME" /
 assert_equal "$?" "0"
+
+stop_lwaftr_bench
