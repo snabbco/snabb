@@ -41,7 +41,6 @@ function run(args)
    local conf_file, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap, counters_path =
       unpack(args)
    local conf = lwconf.load_lwaftr_config(conf_file)
-
    local c = config.new()
    load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    engine.configure(c)

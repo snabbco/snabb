@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# set -x
+
 SKIPPED_CODE=43
 
 if [[ $EUID != 0 ]]; then
@@ -8,22 +10,22 @@ if [[ $EUID != 0 ]]; then
 fi
 
 if [[ -z "$SNABB_PCI0" ]]; then
+    echo "Skip test: SNABB_PCI0 not defined"
     exit $SKIPPED_CODE
 fi
 
 if [[ -z "$SNABB_PCI1" ]]; then
+    echo "Skip test: SNABB_PCI1 not defined"
     exit $SKIPPED_CODE
 fi
 
-LWAFTR_IPV6_ADDRESS=fc00::100
 LWAFTR_IPV4_ADDRESS=10.0.1.1
-
-BZ_IMAGE="$HOME/.test_env/bzImage"
-HUGEPAGES_FS=/dev/hugepages
-IMAGE="$HOME/.test_env/qemu.img"
-MAC_ADDRESS_NET0="02:AA:AA:AA:AA:AA"
-MEM=1024M
+LWAFTR_IPV6_ADDRESS=fc00::100
+MAC_ADDRESS_NET0=02:AA:AA:AA:AA:AA
 MIRROR_TAP=tap0
+NEXT_HOP_MAC=02:99:99:99:99:99
+NEXT_HOP_V4=10.0.1.100
+NEXT_HOP_V6=fc00::1
 SNABBVMX_DIR=program/snabbvmx
 PCAP_INPUT=$SNABBVMX_DIR/tests/pcap/input
 PCAP_OUTPUT=$SNABBVMX_DIR/tests/pcap/output
@@ -32,127 +34,33 @@ SNABBVMX_ID=xe1
 SNABB_TELNET0=5000
 VHU_SOCK0=/tmp/vh1a.sock
 
-SNABBVMX_LOG=snabbvmx.log
-rm -f $SNABBVMX_LOG
-
-# Some of these functions are from program/snabbfv/selftest.sh.
-# TODO: Refactor code to a common library.
-
-# Usage: run_telnet <port> <command> [<sleep>]
-# Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
-# for before closing connection. The default of <sleep> is 2.
-function run_telnet {
-    (echo "$2"; sleep ${3:-2}) \
-        | telnet localhost $1 2>&1
-}
-
-# Usage: wait_vm_up <port>
-# Blocks until ping to 0::0 suceeds.
-function wait_vm_up {
-    local timeout_counter=0
-    local timeout_max=50
-    echo -n "Waiting for VM listening on telnet port $1 to get ready..."
-    while ( ! (run_telnet $1 "ping6 -c 1 0::0" | grep "1 received" \
-        >/dev/null) ); do
-        # Time out eventually.
-        if [ $timeout_counter -gt $timeout_max ]; then
-            echo " [TIMEOUT]"
-            exit 1
-        fi
-        timeout_counter=$(expr $timeout_counter + 1)
-        sleep 2
-    done
-    echo " [OK]"
-}
-
-function qemu_cmd {
-    echo "qemu-system-x86_64 \
-         -kernel ${BZ_IMAGE} -append \"earlyprintk root=/dev/vda rw console=tty0\" \
-         -enable-kvm -drive format=raw,if=virtio,file=${IMAGE} \
-         -M pc -smp 1 -cpu host -m ${MEM} \
-         -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGES_FS},share=on \
-         -numa node,memdev=mem \
-         -chardev socket,id=char1,path=${VHU_SOCK0},server \
-             -netdev type=vhost-user,id=net0,chardev=char1 \
-             -device virtio-net-pci,netdev=net0,addr=0x8,mac=${MAC_ADDRESS_NET0} \
-         -serial telnet:localhost:${SNABB_TELNET0},server,nowait \
-         -display none"
-}
-
-function quit_screen { screen_id=$1
-    screen -X -S "$screen_id" quit &> /dev/null
-}
-
-function run_cmd_in_screen { screen_id=$1; cmd=$2
-    screen_id="${screen_id}-$$"
-    quit_screen "$screen_id"
-    screen -dmS "$screen_id" bash -c "$cmd >> $SNABBVMX_LOG"
-}
-
-function qemu {
-    run_cmd_in_screen "qemu" "`qemu_cmd`"
-}
-
 function monitor { action=$1
-    local cmd="sudo ./snabb lwaftr monitor $action"
-    run_cmd_in_screen "lwaftr-monitor" "$cmd"
+    ./snabb lwaftr monitor $action &> /dev/null
 }
 
-function tcpreplay { pcap=$1; pci=$2
-    local cmd="sudo ./snabb packetblaster replay --no-loop $pcap $pci"
-    run_cmd_in_screen "tcpreplay" "$cmd"
-}
-
-function start_test_env {
-    if [[ ! -f "$IMAGE" ]]; then
-       echo "Couldn't find QEMU image: $IMAGE"
-       exit $SKIPPED_CODE
-    fi
-
-    # Run qemu.
-    qemu
-
-    # Wait until VMs are ready.
-    wait_vm_up $SNABB_TELNET0
-
-    # Manually set ip addresses.
-    run_telnet $SNABB_TELNET0 "ifconfig eth0 up" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip -6 addr add $LWAFTR_IPV6_ADDRESS/64 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip addr add $LWAFTR_IPV4_ADDRESS/24 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip neigh add 10.0.1.100 lladdr 02:99:99:99:99:99 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip -6 neigh add fc00::1 lladdr 02:99:99:99:99:99 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "route add default gw 10.0.1.100 eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "route -6 add default gw fc00::1 eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "sysctl -w net.ipv4.conf.all.forwarding=1" >/dev/null
-    run_telnet $SNABB_TELNET0 "sysctl -w net.ipv6.conf.all.forwarding=1" >/dev/null
+function tcpreplay {
+    pcap=$1; pci=$2
+    snabb $pci "packetblaster replay --no-loop $pcap $pci"
 }
 
 function create_mirror_tap_if_needed {
-    ip tuntap add $MIRROR_TAP mode tap 2>/dev/null
-    ip li set dev $MIRROR_TAP up 2>/dev/null
-    ip li sh $MIRROR_TAP &>/dev/null
+    sudo ip tuntap add $MIRROR_TAP mode tap &>/dev/null
+    sudo ip li set dev $MIRROR_TAP up &>/dev/null
+    sudo ip li sh $MIRROR_TAP &>/dev/null
     if [[ $? -ne 0 ]]; then
         echo "Couldn't create mirror tap: $MIRROR_TAP"
         exit 1
     fi
 }
 
-function run_snabbvmx {
-    echo "Launch Snabbvmx"
-    local cmd="./snabb snabbvmx lwaftr --conf $SNABBVMX_CONF --id $SNABBVMX_ID \
-        --pci $SNABB_PCI0 --mac $MAC_ADDRESS_NET0 --sock $VHU_SOCK0 \
-        --mirror $MIRROR_TAP "
-    run_cmd_in_screen "snabbvmx" "$cmd"
-}
-
-function capture_mirror_tap_to_file { fileout=$1; filter=$2
-    local cmd=""
+function capture_mirror_tap_to_file {
+    fileout=$1; filter=$2
     if [[ -n $filter ]]; then
-        cmd="sudo tcpdump \"${filter}\" -U -c 1 -i $MIRROR_TAP -w $fileout"
+        tmux_launch "tcpdump" "tcpdump \"${filter}\" -U -c 1 -i $MIRROR_TAP -w $fileout"
     else
-        cmd="sudo tcpdump -U -c 1 -i $MIRROR_TAP -w $fileout"
+        tmux_launch "tcpdump" "tcpdump -U -c 1 -i $MIRROR_TAP -w $fileout"
     fi
-    run_cmd_in_screen "tcpdump" "$cmd"
+    count=$((count + 1))
 }
 
 function myseq { from=$1; to=$2
@@ -203,9 +111,12 @@ function zero_checksum { file=$1; row=$2; column=$3
     done
 }
 
+function filesize { filename=$1
+    echo $(ls -l $filename | awk '{ print $5 }')
+}
+
 function pcap2text { pcap=$1; txt=$2
-    filesize=$(ls -l $pcap | awk '{ print $5 }')
-    if [[ $filesize < 40 ]]; then
+    if [[ $(filesize $pcap) < 40 ]]; then
         # Empty file.
         rm -f $txt
         touch $txt
@@ -215,17 +126,25 @@ function pcap2text { pcap=$1; txt=$2
 }
 
 function icmpv4_cmp { pcap1=$1; pcap2=$2
-    local actual=/tmp/actual.txt
-    local expected=/tmp/expected.txt
+    local ret=0
 
-    pcap2text $pcap1 $actual
-    pcap2text $pcap2 $expected
+    # Compare filesize.
+    if [[ $(filesize $pcap1) != $(filesize $pcap2) ]]; then
+        ret=1
+    else
+        local actual=/tmp/actual.txt
+        local expected=/tmp/expected.txt
 
-    zero_identifier $actual $expected
-    zero_checksum $actual $expected
+        pcap2text $pcap1 $actual
+        pcap2text $pcap2 $expected
 
-    local out=$(diff $actual $expected)
-    echo ${#out}
+        zero_identifier $actual $expected
+        zero_checksum $actual $expected
+
+        local out=$(diff $actual $expected)
+        ret=${#out}
+    fi
+    echo $ret
 }
 
 function check_icmpv4_equals { testname=$1; output=$2; expected=$3
@@ -249,14 +168,20 @@ function run_icmpv4_test { testname=$1; input=$2; expected=$3; filter=$4
 }
 
 function pcap_cmp { pcap1=$1; pcap2=$2
-    local actual=/tmp/actual.txt
-    local expected=/tmp/expected.txt
+    local ret=0
+    if [[ $(filesize $pcap1) != $(filesize $pcap2) ]]; then
+        ret=1
+    else
+        local actual=/tmp/actual.txt
+        local expected=/tmp/expected.txt
 
-    pcap2text $pcap1 $actual
-    pcap2text $pcap2 $expected
+        pcap2text $pcap1 $actual
+        pcap2text $pcap2 $expected
 
-    local out=$(diff $actual $expected)
-    echo ${#out}
+        local out=$(diff $actual $expected)
+        ret=${#out}
+    fi
+    echo $ret
 }
 
 function check_pcap_equals { testname=$1; output=$2; expected=$3
@@ -269,16 +194,6 @@ function check_pcap_equals { testname=$1; output=$2; expected=$3
         echo -e $ret
         exit 1
     fi
-}
-
-function cleanup {
-    screens=$(screen -ls | egrep -o "[0-9]+\." | sed 's/\.//')
-    for each in $screens; do
-        if [[ "$each" > 0 ]]; then
-            screen -S $each -X quit
-        fi
-    done
-    exit 0
 }
 
 function run_pcap_test { testname=$1; input=$2; expected=$3; filter=$4
@@ -353,17 +268,27 @@ function test_ndp_request_to_lwaftr {
                   "$PCAP_OUTPUT/empty.pcap"
 }
 
-# Set up graceful `exit'.
+function cleanup {
+    exit $1
+}
+
 trap cleanup EXIT HUP INT QUIT TERM
 
-# Run snabbvmx with VM.
+# Import SnabbVMX test_env.
+if ! source program/snabbvmx/tests/test_env/test_env.sh; then
+    echo "Could not load snabbvmx test_env."; exit 1
+fi
+
+# Main.
+
+# Run SnabbVMX with VM.
 create_mirror_tap_if_needed
-run_snabbvmx
-start_test_env
+start_test_env $MIRROR_TAP
 
 # Mirror all packets to tap0.
 monitor all
 
+# Run tests.
 test_ping_to_lwaftr_inet
 test_ping_to_lwaftr_b4
 test_arp_request_to_lwaftr

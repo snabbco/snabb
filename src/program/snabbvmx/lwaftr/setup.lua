@@ -41,6 +41,8 @@ local function load_driver (pciaddr)
 end
 
 local function load_virt (c, nic_id, lwconf, interface)
+   local external_interface = lwconf.softwire_config.external_interface
+   local internal_interface = lwconf.softwire_config.internal_interface
    assert(type(interface) == 'table')
    assert(nic_exists(interface.pci), "Couldn't find NIC: "..interface.pci)
    local driver = assert(load_driver(interface.pci))
@@ -49,8 +51,8 @@ local function load_virt (c, nic_id, lwconf, interface)
    print(("%s ether %s"):format(nic_id, interface.mac_address))
 
    local v4_nic_name, v6_nic_name = nic_id..'_v4', nic_id..'v6'
-   local v4_mtu = lwconf.ipv4_mtu + constants.ethernet_header_size
-   if lwconf.vlan_tagging and lwconf.v4_vlan_tag then
+   local v4_mtu = external_interface.mtu + constants.ethernet_header_size
+   if external_interface.vlan_tag then
      v4_mtu = v4_mtu + 4
    end
    print(("Setting %s interface MTU to %d"):format(v4_nic_name, v4_mtu))
@@ -58,10 +60,10 @@ local function load_virt (c, nic_id, lwconf, interface)
       pciaddr = interface.pci,
       vmdq = interface.vlan and true,
       vlan = interface.vlan and interface.vlan.v4_vlan_tag,
-      macaddr = ethernet:ntop(lwconf.aftr_mac_inet_side),
+      macaddr = ethernet:ntop(external_interface.mac),
       mtu = v4_mtu })
-   local v6_mtu = lwconf.ipv6_mtu + constants.ethernet_header_size
-   if lwconf.vlan_tagging and lwconf.v6_vlan_tag then
+   local v6_mtu = internal_interface.mtu + constants.ethernet_header_size
+   if internal_interface.vlan_tag then
      v6_mtu = v6_mtu + 4
    end
    print(("Setting %s interface MTU to %d"):format(v6_nic_name, v6_mtu))
@@ -69,7 +71,7 @@ local function load_virt (c, nic_id, lwconf, interface)
       pciaddr = interface.pci,
       vmdq = interface.vlan and true,
       vlan = interface.vlan and interface.vlan.v6_vlan_tag,
-      macaddr = ethernet:ntop(lwconf.aftr_mac_b4_side),
+      macaddr = ethernet:ntop(internal_interface.mac),
       mtu = v6_mtu})
 
    return v4_nic_name, v6_nic_name
@@ -116,29 +118,25 @@ local function load_phy (c, nic_id, interface)
    return chain_input, chain_output
 end
 
-local function requires_splitter (lwconf)
-   if not lwconf.vlan_tagging then return true end
-   return lwconf.v4_vlan_tag == lwconf.v6_vlan_tag
+local function requires_splitter (internal_interface, external_interface)
+   if not internal_interface.vlan_tag then return true end
+   return internal_interface.vlan_tag == external_interface.vlan_tag
 end
 
 function lwaftr_app(c, conf, lwconf, sock_path)
    assert(type(conf) == 'table')
    assert(type(lwconf) == 'table')
+   local external_interface = lwconf.softwire_config.external_interface
+   local internal_interface = lwconf.softwire_config.internal_interface
 
-   if lwconf.binding_table then
-      conf.preloaded_binding_table = bt.load(lwconf.binding_table)
-   end
-
-   print(("Hairpinning: %s"):format(yesno(lwconf.hairpinning)))
-   local counters = lwcounter.init_counters()
-
+   print(("Hairpinning: %s"):format(yesno(internal_interface.hairpinning)))
    local virt_id = "vm_" .. conf.interface.id
    local phy_id = "nic_" .. conf.interface.id
 
    local chain_input, chain_output
    local v4_input, v4_output, v6_input, v6_output
 
-   local use_splitter = requires_splitter(lwconf)
+   local use_splitter = requires_splitter(internal_interface, external_interface)
    if not use_splitter then
       local v4, v6 = load_virt(c, phy_id, lwconf, conf.interface)
       v4_output, v6_output = v4..".tx", v6..".tx"
@@ -172,14 +170,14 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       print(("IPv6 fragmentation and reassembly: %s"):format(yesno(
              conf.ipv6_interface.fragmentation)))
       if conf.ipv6_interface.fragmentation then
-         local mtu = conf.ipv6_interface.mtu or lwconf.ipv6_mtu
+         local mtu = conf.ipv6_interface.mtu or internal_interface.mtu
          config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, {
-            counters = counters,
-            max_ipv6_reassembly_packets = lwconf.max_ipv6_reassembly_packets,
-            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+            max_ipv6_reassembly_packets =
+               internal_interface.reassembly.max_packets,
+            max_fragments_per_reassembly_packet =
+               internal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
-            counters = counters,
             mtu = mtu,
          })
          config.link(c, v6_output .. " -> reassemblerv6.input")
@@ -207,14 +205,14 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       print(("IPv4 fragmentation and reassembly: %s"):format(yesno(
              conf.ipv4_interface.fragmentation)))
       if conf.ipv4_interface.fragmentation then
-         local mtu = conf.ipv4_interface.mtu or lwconf.ipv4_mtu
+         local mtu = conf.ipv4_interface.mtu or external_interface.mtu
          config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
-            counters = counters,
-            max_ipv4_reassembly_packets = lwconf.max_ipv4_reassembly_packets,
-            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+            max_ipv4_reassembly_packets =
+               external_interface.reassembly.max_packets,
+            max_fragments_per_reassembly_packet =
+               external_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
-            counters = counters,
             mtu = mtu
          })
          config.link(c, v4_output .. " -> reassemblerv4.input")
@@ -237,7 +235,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       end
    end
 
-   if conf.ipv4_interface and conf.ipv6_interface and conf.preloaded_binding_table then
+   if conf.ipv4_interface and conf.ipv6_interface then
       print("lwAFTR service: enabled")
       config.app(c, "nh_fwd6", nh_fwd.nh_fwd6,
                  subset(nh_fwd.nh_fwd6.config, conf.ipv6_interface))
@@ -251,7 +249,6 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       config.link(c, "nh_fwd4.wire -> " .. v4_input)
       v4_input, v4_output = "nh_fwd4.vm", "nh_fwd4.vm"
 
-      lwconf.counters = counters
       config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
       config.link(c, "nh_fwd6.service -> lwaftr.v6")
       config.link(c, "lwaftr.v6 -> nh_fwd6.service")
@@ -261,8 +258,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       -- Add a special hairpinning queue to the lwaftr app.
       config.link(c, "lwaftr.hairpin_out -> lwaftr.hairpin_in")
    else
-      io.write("lwAFTR service: disabled ")
-      print("(either empty binding_table or v6 or v4 interface config missing)")
+      print("lwAFTR service: disabled (v6 or v4 interface config missing)")
    end
 
    if conf.ipv4_interface or conf.ipv6_interface then
@@ -274,6 +270,29 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       config.link(c, "vm_v4v6.v4 -> " .. v4_input)
       chain_input, chain_output = "vm_v4v6.input", "vm_v4v6.output"
    end
+
+   if sock_path then
+      local socket_path = sock_path:format(conf.interface.id)
+      config.app(c, virt_id, VhostUser, { socket_path = socket_path })
+      config.link(c, virt_id .. ".tx -> " .. chain_input)
+      config.link(c, chain_output .. " -> " .. virt_id  .. ".rx")
+   else
+      config.app(c, "DummyVhost", basic_apps.Sink)
+      config.link(c, "DummyVhost" .. ".tx -> " .. chain_input)
+      config.link(c, chain_output .. " -> " .. "DummyVhost"  .. ".rx")
+      print("Running without VM (no vHostUser sock_path set)")
+   end
+end
+
+function passthrough(c, conf, sock_path)
+   assert(type(conf) == 'table')
+
+   io.write("lwAFTR service: disabled ")
+   print("(either empty binding_table or v6 or v4 interface config missing)")
+
+   local virt_id = "vm_" .. conf.interface.id
+   local phy_id = "nic_" .. conf.interface.id
+   local chain_input, chain_output = load_phy(c, phy_id, conf.interface)
 
    if sock_path then
       local socket_path = sock_path:format(conf.interface.id)
@@ -303,82 +322,83 @@ end
 local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
    assert(type(conf) == "table")
    assert(type(lwconf) == "table")
+   local external_interface = lwconf.softwire_config.external_interface
+   local internal_interface = lwconf.softwire_config.internal_interface
 
-   local v4_input, v6_input = unpack(sources)
-   local v4_output, v6_output = unpack(sinks)
+   local v4_src, v6_src = unpack(sources)
+   local v4_sink, v6_sink = unpack(sinks)
 
    if conf.ipv6_interface then
       if conf.ipv6_interface.fragmentation then
-         local mtu = conf.ipv6_interface.mtu or lwconf.ipv6_mtu
+         local mtu = conf.ipv6_interface.mtu or internal_interface.mtu
          config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6, {
-            counters = counters,
-            max_ipv6_reassembly_packets = lwconf.max_ipv6_reassembly_packets,
-            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+            max_ipv6_reassembly_packets =
+               internal_interface.reassembly.max_packets,
+            max_fragments_per_reassembly_packet =
+               internal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
-            counters = counters,
             mtu = mtu,
          })
-         config.link(c, v6_output .. " -> reassemblerv6.input")
-         config.link(c, "fragmenterv6.output -> " .. v6_input)
-         v6_input, v6_output  = "fragmenterv6.input", "reassemblerv6.output"
+         config.link(c, v6_src .. " -> reassemblerv6.input")
+         config.link(c, "fragmenterv6.output -> " .. v6_sink)
+         v6_src, v6_sink  = "reassemblerv6.output", "fragmenterv6.input"
       end
       if conf.ipv6_interface.ipv6_ingress_filter then
          local filter = conf.ipv6_interface.ipv6_ingress_filter
          config.app(c, "ingress_filterv6", PcapFilter, { filter = filter })
-         config.link(c, v6_output .. " -> ingress_filterv6.input")
-         v6_output = "ingress_filterv6.output"
+         config.link(c, v6_src .. " -> ingress_filterv6.input")
+         v6_src = "ingress_filterv6.output"
       end
       if conf.ipv6_interface.ipv6_egress_filter then
          local filter = conf.ipv6_interface.ipv6_egress_filter
          config.app(c, "egress_filterv6", PcapFilter, { filter = filter })
-         config.link(c, "egress_filterv6.output -> " .. v6_input)
-         v6_input = "egress_filterv6.input"
+         config.link(c, "egress_filterv6.output -> " .. v6_sink)
+         v6_sink = "egress_filterv6.input"
       end
    end
 
    if conf.ipv4_interface then
       if conf.ipv4_interface.fragmentation then
-         local mtu = conf.ipv4_interface.mtu or lwconf.ipv4_mtu
+         local mtu = conf.ipv4_interface.mtu or external_interface.mtu
          config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
-            counters = counters,
-            max_ipv4_reassembly_packets = lwconf.max_ipv4_reassembly_packets,
-            max_fragments_per_reassembly_packet = lwconf.max_fragments_per_reassembly_packet,
+            max_ipv4_reassembly_packets =
+               external_interface.reassembly.max_packets,
+            max_fragments_per_reassembly_packet =
+               external_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
-            counters = counters,
             mtu = mtu
          })
-         config.link(c, v4_output .. " -> reassemblerv4.input")
-         config.link(c, "fragmenterv4.output -> " .. v4_input)
-         v4_input, v4_output  = "fragmenterv4.input", "reassemblerv4.output"
+         config.link(c, v4_src .. " -> reassemblerv4.input")
+         config.link(c, "fragmenterv4.output -> " .. v4_sink)
+         v4_src, v4_sink  = "reassemblerv4.output", "fragmenterv4.input"
       end
       if conf.ipv4_interface.ipv4_ingress_filter then
          local filter = conf.ipv4_interface.ipv4_ingress_filter
          config.app(c, "ingress_filterv4", PcapFilter, { filter = filter })
-         config.link(c, v4_output .. " -> ingress_filterv4.input")
-         v4_output = "ingress_filterv4.output"
+         config.link(c, v4_src .. " -> ingress_filterv4.input")
+         v4_src = "ingress_filterv4.output"
       end
       if conf.ipv4_interface.ipv4_egress_filter then
          local filter = conf.ipv4_interface.ipv4_egress_filter
          config.app(c, "egress_filterv4", PcapFilter, { filter = filter })
-         config.link(c, "egress_filterv4.output -> " .. v4_input)
-         v4_input = "egress_filterv4.input"
+         config.link(c, "egress_filterv4.output -> " .. v4_sink)
+         v4_sink = "egress_filterv4.input"
       end
    end
 
    if conf.ipv4_interface and conf.ipv6_interface then
       config.app(c, "nh_fwd6", nh_fwd.nh_fwd6,
                  subset(nh_fwd.nh_fwd6.config, conf.ipv6_interface))
-      config.link(c, v6_input.." -> nh_fwd6.wire")
-      config.link(c, "nh_fwd6.wire -> "..v6_output)
+      config.link(c, v6_src.." -> nh_fwd6.wire")
+      config.link(c, "nh_fwd6.wire -> "..v6_sink)
 
       config.app(c, "nh_fwd4", nh_fwd.nh_fwd4,
                  subset(nh_fwd.nh_fwd4.config, conf.ipv4_interface))
-      config.link(c, v4_input.."-> nh_fwd4.wire")
-      config.link(c, "nh_fwd4.wire -> "..v6_output)
+      config.link(c, v4_src.."-> nh_fwd4.wire")
+      config.link(c, "nh_fwd4.wire -> "..v4_sink)
 
-      lwconf.counters = lwcounter.init_counters()
       config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
       config.link(c, "nh_fwd6.service -> lwaftr.v6")
       config.link(c, "lwaftr.v6 -> nh_fwd6.service")

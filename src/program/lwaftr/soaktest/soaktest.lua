@@ -21,7 +21,7 @@ function parse_args (args)
    local opts = {}
    function handlers.h() show_usage(0) end
    function handlers.D (arg)
-      opts.duration = tonumber(arg, "Duration must be a number")
+      opts.duration = assert(tonumber(arg), "Duration must be a number")
    end
    handlers["on-a-stick"] = function ()
       opts["on-a-stick"] = true
