@@ -1,5 +1,21 @@
 # Change Log
 
+## [3.1.5] - 2016-12-09
+
+ * Improve "snabb ps" output.  Processes with a "*" by them are
+   listening for "snabb config" connections.
+
+ * Fix race condition in multiprocess --reconfigurable mode.
+
+ * Improve configuration change throughput.
+
+ * Add "snabb config bench" utility for benchmarking configuration
+   throughput.
+
+ * Add automated "snabb config" tests.
+
+ * Improve error message when --cpu setting was not possible.
+
 ## [3.1.4] - 2016-12-09
 
  * Fix memory corruption bug in main process of --reconfigurable "snabb
