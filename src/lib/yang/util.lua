@@ -95,6 +95,39 @@ function string_output_file()
    return file
 end
 
+function memoize(f, max_occupancy)
+   local cache = {}
+   local occupancy = 0
+   local argc = 0
+   max_occupancy = max_occupancy or 10
+   return function(...)
+      local args = {...}
+      if #args == argc then
+         local walk = cache
+         for i=1,#args do
+            if walk == nil then break end
+            walk = walk[args[i]]
+         end
+         if walk ~= nil then return unpack(walk) end
+      else
+         cache, occupancy, argc = {}, 0, #args
+      end
+      local ret = {f(...)}
+      if occupancy >= max_occupancy then
+         cache = {}
+         occupancy = 0
+      end
+      local walk = cache
+      for i=1,#args-1 do
+         if not walk[args[i]] then walk[args[i]] = {} end
+         walk = walk[args[i]]
+      end
+      walk[args[#args]] = ret
+      occupancy = occupancy + 1
+      return unpack(ret)
+   end
+end
+
 function selftest()
    print('selftest: lib.yang.util')
    assert(tointeger('0') == 0)

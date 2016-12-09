@@ -194,7 +194,7 @@ function load(stream, params)
    local ctab = new(params_copy)
    ctab.occupancy = header.occupancy
    ctab.max_displacement = header.max_displacement
-   local entry_count = ctab.size + ctab.max_displacement + 1
+   local entry_count = ctab.size + ctab.max_displacement
 
    -- Slurp the entries directly into the ctable's backing store.
    -- This ensures that the ctable is in hugepages.
@@ -211,7 +211,7 @@ function CTable:save(stream)
                     header_t)
    stream:write_array(self.entries,
                       self.entry_type,
-                      self.size + self.max_displacement + 1)
+                      self.size + self.max_displacement)
 end
 
 function CTable:insert(hash, key, value, updates_allowed)
@@ -321,7 +321,7 @@ function CTable:remove_ptr(entry)
    local scale = self.scale
    local index = entry - self.entries
    assert(index >= 0)
-   assert(index <= self.size + self.max_displacement)
+   assert(index < self.size + self.max_displacement)
    assert(entry.hash ~= HASH_MAX)
 
    self.occupancy = self.occupancy - 1
@@ -466,7 +466,7 @@ function CTable:selfcheck()
    end
 
    local prev = 0
-   for i = 0,self.size*2-1 do
+   for i = 0,self.size+self.max_displacement-1 do
       local entry = self.entries[i]
       local hash = entry.hash
       if hash ~= 0xffffffff then
@@ -501,18 +501,15 @@ function CTable:dump()
          io.write('  value: '..tostring(entry.value)..'\n')
       end
    end
-   for index=0,self.size-1 do dump_one(index) end
-   for index=self.size,self.size*2-1 do
-      if self.entries[index].hash == HASH_MAX then break end
-      dump_one(index)
-   end
+   for index=0,self.size-1+self.max_displacement do dump_one(index) end
 end
 
 function CTable:iterate()
    local max_entry = self.entries + self.size + self.max_displacement
    local function next_entry(max_entry, entry)
-      while entry <= max_entry do
+      while true do
          entry = entry + 1
+         if entry >= max_entry then return nil end
          if entry.hash ~= HASH_MAX then return entry end
       end
    end
