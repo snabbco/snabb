@@ -240,8 +240,11 @@ function run(args)
          print(string.format('    Loss: %d ingress drop + %d packets lost (%f%%)',
             drop, lost_packets, lost_percent))
          if hydra_mode then
-            -- Hydra reports prefer integers for the X (time) axis.
+            -- NOTE: all the stats below are available: the commented out ones
+            --   will not show in Hydra reports. They are too many, making the
+            --   graphs unreadable, and most are redundant anyway.
             -- TX
+            --   (Hydra reports prefer integers for the X (time) axis.)
             -- bench_file:write(('%s_tx_packets,%.f,%f,packets\n'):format(
             --    stream.tx_name,gbps_bitrate,tx.txpackets))
             -- bench_file:write(('%s_tx_mpps,%.f,%f,mpps\n'):format(

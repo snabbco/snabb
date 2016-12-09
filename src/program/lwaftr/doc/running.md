@@ -74,18 +74,16 @@ $ sudo ./snabb lwaftr run \
     --on-a-stick 0000:02:00.1
 ```
 
-You can run a load generator:
+You can run a load generator in on-a-stick mode:
 
 ```
 $ sudo ./snabb lwaftr loadtest \
-    program/lwaftr/tests/benchdata/ipv4-0550.pcap IPv4 IPv6 0000:82:00.0 \
-    program/lwaftr/tests/benchdata/ipv6-0550.pcap IPv6 IPv4 0000:82:00.1
+    program/lwaftr/tests/benchdata/ipv4_and_ipv6_stick_imix.pcap ALL ALL \
+    0000:82:00.1
 ```
 
-For the main lwaftr instance to receive any traffic, either 82:00.0 or 82:00.1
-should be wired to 02:00.1 . Since `lwaftr loadtest` does not currently have
-an on-a-stick mode, the main lwaftr instance will only see half the loadtest
-traffic.
+For the main lwaftr instance to receive any traffic, the 82:00.1 port should be
+wired to the 02:00.1 one.
 
 ## The packetblaster
 
