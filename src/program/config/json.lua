@@ -7,7 +7,7 @@ local ffi = require("ffi")
 -- A very limited json library that only does objects of strings,
 -- designed to integrate well with poll(2) loops.
 
-function buffered_input_from_fd(fd)
+function buffered_input(fd)
    local buf_size = 4096
    local buf = ffi.new('uint8_t[?]', buf_size)
    local buf_end = 0
@@ -18,13 +18,13 @@ function buffered_input_from_fd(fd)
       assert(pos == buf_end)
       if eof then return 0 end
       pos = 0
-      buf_end = assert(S.read(fd, buf, buf_size))
+      buf_end = assert(fd:read(buf, buf_size))
       assert(0 <= buf_end and buf_end <= buf_size)
       if buf_end == 0 then eof = true end
       return buf_end
    end
    function ret:avail() return buf_end - pos end
-   function ret:getfd() return fd end
+   function ret:getfd() return fd:getfd() end
    function ret:eof() return eof end
    function ret:peek()
       if pos == buf_end and fill() == 0 then return nil end
@@ -148,12 +148,13 @@ end
 function buffered_output()
    local ret = { buf = {} }
    function ret:write(str) table.insert(self.buf, str) end
-   function ret:flush_to_fd(fd)
+   function ret:flush(fd)
       local str = table.concat(self.buf)
+      if fd == nil then return str end
       local bytes = ffi.cast('const char*', str)
       local written = 0
       while written < #str do
-         local wrote = assert(S.write(fd, bytes + written, #str - written))
+         local wrote = assert(fd:write(bytes + written, #str - written))
          written = written + wrote
       end
    end
@@ -207,7 +208,7 @@ function selftest ()
       f:close()
       for i = 1,2 do
          local fd = S.open(tmp, 'rdonly')
-         local input = buffered_input_from_fd(fd)
+         local input = buffered_input(fd)
          local parsed = read_json_object(input)
          assert(equal(parsed, obj))
          assert(not input:eof())

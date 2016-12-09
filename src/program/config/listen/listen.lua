@@ -53,7 +53,7 @@ local function read_request(client, schema_name, revision_date)
       local output = json_lib.buffered_output()
       json_lib.write_json_object(output,
                                  {id=id, status='ok', value=reply.config})
-      output:flush_to_fd(1) -- stdout
+      output:flush(S.stdout)
    end
    return req, print_reply
 end
@@ -70,7 +70,7 @@ function run(args)
    local caller = rpc.prepare_caller('snabb-config-leader-v1')
    local leader = common.open_socket_or_die(args.instance_id)
    attach_listener(leader, caller, args.schema_name, args.revision_date)
-   local client = json_lib.buffered_input_from_fd(0) -- stdin
+   local client = json_lib.buffered_input(S.stdin)
    local pollfds = S.types.t.pollfds({
          {fd=leader, events="in"},
          {fd=client, events="in"}})

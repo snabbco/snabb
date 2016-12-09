@@ -3,6 +3,7 @@ module(..., package.seeall)
 
 local S = require("syscall")
 local lib = require("core.lib")
+local ffi = require("ffi")
 local json_lib = require("program.config.json")
 
 function show_usage(command, status, err_msg)
@@ -31,17 +32,20 @@ local function read_reply(fd)
    local json = read_json_object(client)
    local output = buffered_output()
    write_json_object(output, json)
-   output:flush_to_fd(1) -- stdout
+   output:flush(S.stdout)
 end
 
 local function read_commands(file)
    local fd = assert(S.open(file, "rdonly"))
-   local input = json_lib.buffered_input_from_fd(fd:getfd())
-   local ret = {}
+   local input = json_lib.buffered_input(fd)
    json_lib.skip_whitespace(input)
+   local ret = {}
    while not input:eof() do
-      table.insert(ret, json_lib.read_json_object(input))
+      local json = json_lib.read_json_object(input)
       json_lib.skip_whitespace(input)
+      local out = json_lib.buffered_output()
+      json_lib.write_json_object(out, json)
+      table.insert(ret, out:flush())
    end
    fd:close()
    return ret
@@ -56,6 +60,15 @@ function die(input)
    local str = table.concat(chars)
    io.stderr:write("Error detected reading response:\n"..str)
    main.exit(1)
+end
+
+function full_write(fd, str)
+   local ptr = ffi.cast("const char*", str)
+   local written = 0
+   while written < #str do
+      local count = assert(fd:write(ptr + written, #str - written))
+      written = written + count
+   end
 end
 
 function run(args)
@@ -85,19 +98,32 @@ function run(args)
    input_read:close()
    output_write:close()
 
-   local input = json_lib.buffered_input_from_fd(output_read:getfd())
+   local write_buffering = assert(input_write:fcntl(S.c.F.GETPIPE_SZ))
+
+   local input = json_lib.buffered_input(output_read)
    local start = engine.now()
-   for _,json in ipairs(commands) do
-      local out = json_lib.buffered_output()
-      json_lib.write_json_object(out, json)
-      out:flush_to_fd(input_write)
-      json_lib.skip_whitespace(input)
-      local ok, response = pcall(json_lib.read_json_object, input)
-      if ok then
-         io.stdout:write(".")
-         io.stdout:flush()
-      else
-         die(input)
+   local next_write, next_read = 1, 1
+   local buffered_bytes = 0
+   io.stdout:setvbuf("no")
+   while next_read <= #commands do
+      while next_write <= #commands do
+         local str = commands[next_write]
+         if buffered_bytes + #str > write_buffering then break end
+         full_write(input_write, str)
+         io.stdout:write("w")
+         buffered_bytes = buffered_bytes + #str
+         next_write = next_write + 1
+      end
+      while next_read < next_write do
+         json_lib.skip_whitespace(input)
+         local ok, response = pcall(json_lib.read_json_object, input)
+         if ok then
+            buffered_bytes = buffered_bytes - #commands[next_read]
+            next_read = next_read + 1
+            io.stdout:write("r")
+         else
+            die(input)
+         end
       end
    end
    local elapsed = engine.now() - start
