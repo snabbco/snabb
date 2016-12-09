@@ -2,26 +2,42 @@
 
 ## Summarized results
 
-Having filters, even if they are empty, has a significant negative impact on performance. 
+Having filters, even if they are empty, has a significant negative impact on
+performance.
 
 Here are the results for three runs with empty filters:
 
-* No packet loss below 7 Gbps
-* Packet loss at 8 Gbps on cooldown on two of the three runs (4.3% and 3.9%).
-* Packet loss at 9 Gbps on all three runs (warmup: 0.13%, 14.6%, 14.2%; cooldowns marginally worse)
-* Heavy packet loss at 10 Gbps: (10.4-10.6%, 23.2-23.6%, 22.9-23.2%)
+* No packet loss below 7 Gbps Packet loss at 8 Gbps on cooldown on two of the
+* three runs (4.3% and 3.9%).  Packet loss at 9 Gbps on all three runs (warmup:
+* 0.13%, 14.6%, 14.2%; cooldowns marginally worse) Heavy packet loss at 10 Gbps:
+* (10.4-10.6%, 23.2-23.6%, 22.9-23.2%)
 
-Results appear to be approximately the same with one filter. Scaling it up to 800 filters, results are a bit worse; packet loss starts at 7 Gbps, and peak packet loss at 10 Gbps is around 34%.
+Results appear to be approximately the same with one filter. Scaling it up to
+800 filters, results are a bit worse; packet loss starts at 7 Gbps, and peak
+packet loss at 10 Gbps is around 34%.
 
-The load that was applied was 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1 Gbps, on each of two interfaces at the same time; the total traffic going into the lwaftr was twice as high, due to their being two (equally loaded) interfaces. The latter half of the load, after it peaks at 10 Gbps per card, is referred to as "cooldown".
+The load that was applied was 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 9, 8, 7, 6, 5,
+4, 3, 2, 1 Gbps, on each of two interfaces at the same time; the total traffic
+going into the lwaftr was twice as high, due to their being two (equally loaded)
+interfaces. The latter half of the load, after it peaks at 10 Gbps per card, is
+referred to as "cooldown".
 
 ## Future improvements
 
-The nature of packet loss with empty filters suggests that the overhead of adding four extra apps to the Snabb app network (one per filter option in the config file) is the critical problem. We could integrate the filters into the lwaftr app itself to side-step this. Alternatively, on an "on-a-stick" configuration that only uses one rather than two cards, the overhead might be small enough to still not matter, even with 800 filters; there was no packet loss (except on cooldown) even with 800 filters at 5 Gbps or 6 Gbps per interface with two interfaces.
+The nature of packet loss with empty filters suggests that the overhead of
+adding four extra apps to the Snabb app network (one per filter option in the
+config file) is the critical problem. We could integrate the filters into the
+lwaftr app itself to side-step this. Alternatively, on an "on-a-stick"
+configuration that only uses one rather than two cards, the overhead might be
+small enough to still not matter, even with 800 filters; there was no packet
+loss (except on cooldown) even with 800 filters at 5 Gbps or 6 Gbps per
+interface with two interfaces.
 
 # Details of the results and configuration
 
-Setup: bidirectional lwaftr on snabb1, load generation on snabb2. Using Snabb revision 79504183e1acb5673f7eda9d788885ff8c076f39 (lwaftr_starfruit branch, Igalia fork)
+Setup: bidirectional lwaftr on snabb1, load generation on snabb2. Using Snabb
+revision 79504183e1acb5673f7eda9d788885ff8c076f39 (lwaftr_starfruit branch,
+Igalia fork)
 
 ## Running the lwaftr (with taskset and numactl)
 
@@ -31,7 +47,8 @@ $ cat ~/bin/run-lwaftr
 #!/bin/sh
 BASEDIR=/home/kbarone/snabbswitch/src/
 CONF="`realpath $1`"
-cd ${BASEDIR} && sudo numactl -m 0 taskset -c 1 ./snabb lwaftr run --conf ${CONF} --v4-pci 0000:02:00.0 --v6-pci 0000:02:00.1
+cd ${BASEDIR} && sudo numactl -m 0 taskset -c 1 \
+ ./snabb lwaftr run --conf ${CONF} --v4-pci 0000:02:00.0 --v6-pci 0000:02:00.1
 ```
 
 ## Load generation
@@ -85,9 +102,12 @@ softwires {
 
 ## Baseline (no filters), _run-lwaftr no_filters.conf_
 
-There is only loss at 10 Gbps, and it is only what is logically expected when packets from a saturated link are made larger; with 550 byte packets, it is 6.5%.
+There is only loss at 10 Gbps, and it is only what is logically expected when
+packets from a saturated link are made larger; with 550 byte packets, it is
+6.5%.
 
-This was run three times to verify consistency. All the results were essentially the same; a snippet of the first is below.
+This was run three times to verify consistency. All the results were essentially
+the same; a snippet of the first is below.
 
 ```
 Applying 9.000000 Gbps of load.
@@ -141,12 +161,13 @@ ipv6_egress_filter = "" ,
 
 ### Results with empty filters
 
-* No packet loss below 7 Gbps
-* Packet loss at 8 Gbps on cooldown on two of the three runs (4.3% and 3.9%).
-* Packet loss at 9 Gbps on all three runs (warmup: 0.13%,  14.6%, 14.2%; cooldowns marginally worse)
-* Heavy packet loss at 10 Gbps: (10.4-10.6%, 23.2-23.6%, 22.9-23.2%)
+* No packet loss below 7 Gbps Packet loss at 8 Gbps on cooldown on two of the
+* three runs (4.3% and 3.9%).  Packet loss at 9 Gbps on all three runs (warmup:
+* 0.13%,  14.6%, 14.2%; cooldowns marginally worse) Heavy packet loss at 10
+* Gbps: (10.4-10.6%, 23.2-23.6%, 22.9-23.2%)
 
-Results tentatively appear similar whether the empty filters are specified directly or in a file.
+Results tentatively appear similar whether the empty filters are specified
+directly or in a file.
 
 ### Empty filters, Run 1
 
@@ -424,10 +445,13 @@ Applying 7.000000 Gbps of load.
 
 ### One filter per option (4 total), _run-lwaftr single_filters.conf_
 
-The results on one run were similar to with empty filters - actually, slightly better than the best empty filter run, though that is almost certainly noise.
+The results on one run were similar to with empty filters - actually, slightly
+better than the best empty filter run, though that is almost certainly noise.
 
-Summary: ramp-up 9 Gbps had 0.6% packet loss, 10 Gpbs had 9.4-9.5% packet loss, cooldown 9 Gbps had 0.03% packet loss, cooldown 8 Gbps had 0.2% packet loss.
-That is not a typo; there was ~10 times as much packet loss at 8 Gbps than at 9 Gbps on the cooldown.
+Summary: ramp-up 9 Gbps had 0.6% packet loss, 10 Gpbs had 9.4-9.5% packet loss,
+cooldown 9 Gbps had 0.03% packet loss, cooldown 8 Gbps had 0.2% packet loss.
+That is not a typo; there was ~10 times as much packet loss at 8 Gbps than at 9
+Gbps on the cooldown.
 
 Changes to the configuration file:
 ```
@@ -510,8 +534,10 @@ This has 200 filters per ingress/egress option, or 800 total.
 
 The filters were generated with the following bash script:
 ```
-for x in {0..99}; do echo "not src host 192.168.255.${x}" >> 00200v4.pf; echo "not ether host 1:2:3:4:5:${x}" >> 00200v4.pf; done
-for x in {0..99}; do echo "not src host 1::${x}" >> 00200v6.pf; echo "not ether host 1:2:3:4:5:${x}" >> 00200v6.pf; done
+for x in {0..99}; do echo "not src host 192.168.255.${x}" >> 00200v4.pf; 
+echo "not ether host 1:2:3:4:5:${x}" >> 00200v4.pf; done
+for x in {0..99}; do echo "not src host 1::${x}" >> 00200v6.pf; 
+echo "not ether host 1:2:3:4:5:${x}" >> 00200v6.pf; done
 ```
 
 The configuration file changes: 
@@ -522,7 +548,9 @@ ipv6_ingress_filter = <00200v6.pf,
 ipv6_egress_filter = <00200v6.pf,
 ```
 
-Results: packet loss starts at 7 Gbps, peaking around 33-34% at 10 Gbps, and reaching 0 again at 4-6 Gbps during the cooldown, depending on the run. Note that this is made noisier by the jit.flush() overhead.
+Results: packet loss starts at 7 Gbps, peaking around 33-34% at 10 Gbps, and
+reaching 0 again at 4-6 Gbps during the cooldown, depending on the run. Note
+that this is made noisier by the jit.flush() overhead.
 
 ### Run 1, 800 filters
 
