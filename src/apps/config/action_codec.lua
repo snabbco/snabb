@@ -116,7 +116,9 @@ local function encoder()
    end
    function encoder:string(str)
       self:uint32(#str)
-      table.insert(self.out, ffi.new('uint8_t[?]', #str, str))
+      local buf = ffi.new('uint8_t[?]', #str)
+      ffi.copy(buf, str, #str)
+      table.insert(self.out, buf)
    end
    function encoder:blob(blob)
       self:uint32(ffi.sizeof(blob))
