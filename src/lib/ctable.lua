@@ -19,14 +19,24 @@ local uint16_ptr_t = ffi.typeof('uint16_t*')
 local uint32_ptr_t = ffi.typeof('uint32_t*')
 local uint64_ptr_t = ffi.typeof('uint64_t*')
 
+local entry_types = {}
 local function make_entry_type(key_type, value_type)
-   return ffi.typeof([[struct {
+   local cache = entry_types[key_type]
+   if cache then
+      cache = cache[value_type]
+      if cache then return cache end
+   else
+      entry_types[key_type] = {}
+   end
+   local ret = ffi.typeof([[struct {
          uint32_t hash;
          $ key;
          $ value;
       } __attribute__((packed))]],
       key_type,
       value_type)
+   entry_types[key_type][value_type] = ret
+   return ret
 end
 
 local function make_entries_type(entry_type)

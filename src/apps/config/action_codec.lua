@@ -12,7 +12,7 @@ local shm = require("core.shm")
 local action_names = { 'unlink_output', 'unlink_input', 'free_link',
                        'new_link', 'link_output', 'link_input', 'stop_app',
                        'start_app', 'reconfig_app',
-                       'call_app_method_with_blob' }
+                       'call_app_method_with_blob', 'commit' }
 local action_codes = {}
 for i, name in ipairs(action_names) do action_codes[name] = i end
 
@@ -69,6 +69,9 @@ function actions.call_app_method_with_blob (codec, appname, methodname, blob)
    local methodname = codec:string(methodname)
    local blob = codec:blob(blob)
    return codec:finish(appname, methodname, blob)
+end
+function actions.commit (codec)
+   return codec:finish()
 end
 
 local public_names = {}
@@ -238,5 +241,6 @@ function selftest ()
    test_action({'start_app', {appname, class, arg}})
    test_action({'reconfig_app', {appname, class, arg}})
    test_action({'call_app_method_with_blob', {appname, methodname, blob}})
+   test_action({'commit', {}})
    print('selftest: ok')
 end
