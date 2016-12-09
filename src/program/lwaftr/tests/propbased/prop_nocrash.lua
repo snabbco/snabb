@@ -31,7 +31,7 @@ function handle_prop_args(prop_args)
 
    local pid = S.fork()
    if pid == 0 then
-      local cmdline = {"snabb", "lwaftr", "run", "-D", "2", "--conf",
+      local cmdline = {"snabb", "lwaftr", "run", "-D", "20", "--conf",
           "program/lwaftr/tests/data/icmp_on_fail.conf", "--reconfigurable", 
           "--on-a-stick", pci_addr}
       -- FIXME: preserve the environment
