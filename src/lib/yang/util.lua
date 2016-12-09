@@ -95,6 +95,19 @@ function string_output_file()
    return file
 end
 
+function memoize(f)
+   local cache = {}
+   return function(...)
+      local args = {...}
+      for k,v in pairs(cache) do
+         if lib.equal(k, args) then return unpack(v) end
+      end
+      local ret = {f(...)}
+      cache[args] = ret
+      return unpack(ret)
+   end
+end
+
 function selftest()
    print('selftest: lib.yang.util')
    assert(tointeger('0') == 0)

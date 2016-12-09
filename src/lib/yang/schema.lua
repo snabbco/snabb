@@ -868,12 +868,14 @@ function load_schema_file(filename)
    local s, e = resolve(primitivize(parse_schema_file(filename)))
    return inherit_config(s), e
 end
+load_schema_file = util.memoize(load_schema_file)
 function load_schema_by_name(name, revision)
    -- FIXME: @ is not valid in a Lua module name.
    -- if revision then name = name .. '@' .. revision end
    name = name:gsub('-', '_')
    return load_schema(require('lib.yang.'..name..'_yang'), name)
 end
+load_schema_by_name = util.memoize(load_schema_by_name)
 
 function selftest()
    print('selftest: lib.yang.schema')
