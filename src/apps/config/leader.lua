@@ -548,6 +548,7 @@ function Leader:handle_calls_from_peers()
    local i = 1
    while i <= #peers do
       local peer = peers[i]
+      local visit_peer_again = false
       while peer.state == 'length' do
          local ch, err = peer.fd:read(nil, 1)
          if not ch then
@@ -618,6 +619,7 @@ function Leader:handle_calls_from_peers()
       end
       while peer.state == 'reply' do
          if peer.pos == peer.len then
+            visit_peer_again = true
             peer.state = 'length'
             peer.buf, peer.pos = nil, nil
             peer.len = 0
@@ -642,7 +644,7 @@ function Leader:handle_calls_from_peers()
          peer.fd:close()
          table.remove(peers, i)
          if self.listen_peer == peer then self.listen_peer = nil end
-      else
+      elseif not visit_peer_again then
          i = i + 1
       end
    end
