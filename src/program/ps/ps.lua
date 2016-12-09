@@ -17,12 +17,9 @@ end
 
 local function parse_args (args)
    local opt = {}
-   local preferpid = false
    function opt.h (arg) usage(0) end
-   function opt.p (arg) preferpid = true end
-   args = lib.dogetopt(args, opt, "hp", {help='h', pid='p'})
+   args = lib.dogetopt(args, opt, "h", {help='h'})
    if #args ~= 0 then usage(1) end
-   return preferpid
 end
 
 local function appname_resolver()
@@ -67,20 +64,16 @@ local function compute_snabb_instances()
 end
 
 function run (args)
-   local preferpid = parse_args (args)
+   parse_args(args)
    local instances = compute_snabb_instances()
    for _, instance in ipairs(instances) do
-      if preferpid then
-         print(instance.pid)
+      -- Check instance is a worker.
+      if instance.leader then
+         print("  \\- "..instance.pid.."   worker for "..instance.leader)
       else
+         io.write(instance.pid)
          if instance.name then
-            io.write(instance.name)
-         else
-            io.write(instance.pid)
-         end
-         -- Check instance is a worker.
-         if instance.leader then
-            io.write(("\tWorker for PID %s"):format(instance.leader))
+            io.write("\t["..instance.name.."]")
          end
          io.write("\n")
       end
