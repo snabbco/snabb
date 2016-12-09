@@ -54,7 +54,7 @@ end
 
 function Follower:handle_actions_from_leader()
    local channel = self.channel
-   for i=1,10 do
+   for i=1,4 do
       local buf, len = channel:peek_message()
       if not buf then break end
       local action = action_codec.decode(buf, len)
