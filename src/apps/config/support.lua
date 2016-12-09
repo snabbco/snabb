@@ -171,6 +171,7 @@ local function add_restarts(actions, app_graph, to_restart)
          table.insert(actions, {'link_input', {ta, tl, linkspec}})
       end
    end
+   table.insert(actions, {'commit', {}})
    return actions
 end
 

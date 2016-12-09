@@ -23,30 +23,48 @@ function Follower:new (conf)
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
    ret.channel = channel.create('config-follower-channel', 1e6)
+   ret.pending_actions = {}
    return ret
 end
 
-function Follower:handle_actions_from_leader()
-   local channel = self.channel
+function Follower:commit_pending_actions()
+   local to_apply = {}
    local should_flush = false
-   while true do
-      local buf, len = channel:peek_message()
-      if not buf then break end
-      local action = action_codec.decode(buf, len)
+   for _,action in ipairs(self.pending_actions) do
       local name, args = unpack(action)
       if name == 'call_app_method_with_blob' then
+         if #to_apply > 0 then
+            app.apply_config_actions(to_apply)
+            to_apply = {}
+         end
          local callee, method, blob = unpack(args)
          local obj = assert(app.app_table[callee])
          assert(obj[method])(obj, blob)
       else
-         app.apply_config_actions({action})
-      end
-      channel:discard_message(len)
-      if action[1] == 'start_app' or action[1] == 'reconfig_app' then
-         should_flush = true
+         if name == 'start_app' or name == 'reconfig_app' then
+            should_flush = true
+         end
+         table.insert(to_apply, action)
       end
    end
+   if #to_apply > 0 then app.apply_config_actions(to_apply) end
+   self.pending_actions = {}
    if should_flush then require('jit').flush() end
+end
+
+function Follower:handle_actions_from_leader()
+   local channel = self.channel
+   for i=1,10 do
+      local buf, len = channel:peek_message()
+      if not buf then break end
+      local action = action_codec.decode(buf, len)
+      if action[1] == 'commit' then
+         self:commit_pending_actions()
+      else
+         table.insert(self.pending_actions, action)
+      end
+      channel:discard_message(len)
+   end
 end
 
 function Follower:pull ()

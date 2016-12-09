@@ -22,6 +22,7 @@ local function add_softwire_entry_actions(app_graph, entries)
       local args = {'lwaftr', 'add_softwire_entry', blob}
       table.insert(ret, {'call_app_method_with_blob', args})
    end
+   table.insert(ret, {'commit', {}})
    return ret
 end
 
@@ -44,7 +45,7 @@ local function remove_softwire_entry_actions(app_graph, path)
    local key = path_mod.prepare_table_lookup(
       grammar.keys, grammar.key_ctype, path[#path].query)
    local args = {'lwaftr', 'remove_softwire_entry', key}
-   return {{'call_app_method_with_blob', args}}
+   return {{'call_app_method_with_blob', args}, {'commit', {}}}
 end
 
 local function compute_config_actions(old_graph, new_graph, to_restart,
