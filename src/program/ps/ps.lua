@@ -60,6 +60,9 @@ local function compute_snabb_instances()
          table.insert(pids, instance)
       end
    end
+   table.sort(pids, function(a, b)
+      return tonumber(a.pid) < tonumber(b.pid)
+   end)
    return pids
 end
 
