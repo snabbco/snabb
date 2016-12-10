@@ -2,12 +2,12 @@
 module(..., package.seeall)
 
 local genyang = require("program.lwaftr.tests.propbased.genyang")
-local S = require("syscall")
-local run_pid
+local common  = require("program.lwaftr.tests.propbased.common")
+local run_pid = {}
 local current_cmd
 
 function property()
-   current_cmd = genyang.generate_yang(run_pid)
+   current_cmd = genyang.generate_get(run_pid[1])
    local results = (genyang.run_yang(current_cmd))
    if string.match("Could not connect to config leader socket on Snabb instance",
                    results) then
@@ -20,28 +20,7 @@ function print_extra_information()
    print("The command was:", current_cmd)
 end
 
-function handle_prop_args(prop_args)
-   if #prop_args ~= 1 then
-      print("Usage: snabb quickcheck prop_nocrash PCI_ADDR")
-      os.exit(1)
-   end
+handle_prop_args =
+   common.make_handle_prop_args("prop_nocrash", 10, run_pid)
 
-   -- TODO: validate the address
-   local pci_addr = prop_args[1]
-
-   local pid = S.fork()
-   if pid == 0 then
-      local cmdline = {"snabb", "lwaftr", "run", "-D", "20", "--conf",
-          "program/lwaftr/tests/data/icmp_on_fail.conf", "--reconfigurable", 
-          "--on-a-stick", pci_addr}
-      -- FIXME: preserve the environment
-      S.execve(("/proc/%d/exe"):format(S.getpid()), cmdline, {})
-   else
-      run_pid = pid
-      S.sleep(1)
-   end
-end
-
-function cleanup()
-   S.kill(run_pid, "TERM")
-end
+cleanup = common.make_cleanup(run_pid)
