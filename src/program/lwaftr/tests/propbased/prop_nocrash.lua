@@ -41,3 +41,7 @@ function handle_prop_args(prop_args)
       S.sleep(1)
    end
 end
+
+function cleanup()
+   S.kill(run_pid, "TERM")
+end

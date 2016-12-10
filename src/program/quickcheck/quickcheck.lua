@@ -120,4 +120,6 @@ function run(args)
       end
    end
    print(iterations.." iterations succeeded.")
+
+   if prop.cleanup then prop.cleanup() end
 end
