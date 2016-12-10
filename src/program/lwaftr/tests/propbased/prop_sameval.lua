@@ -10,12 +10,20 @@ local run_pid = {}
 local current_cmd
 
 function property()
-   current_cmd = genyang.generate_yang(run_pid[1])
-   local results  = (genyang.run_yang(current_cmd))
-   local results2 = (genyang.run_yang(current_cmd))
+   local get = genyang.generate_get(run_pid[1])
+   local results  = (genyang.run_yang(get))
+
    if string.match("Could not connect to config leader socket on Snabb instance",
-                   results) or
-      string.match("Could not connect to config leader socket on Snabb instance",
+                   results) then
+      print("Launching snabb run failed, or we've crashed it!")
+      return false
+   end
+
+   local set = genyang.generate_set(run_pid[1], results)
+   genyang.run_yang(set)
+   local results2 = (genyang.run_yang(get))
+
+   if string.match("Could not connect to config leader socket on Snabb instance",
                    results2) then
       print("Launching snabb run failed, or we've crashed it!")
       return false
@@ -32,6 +40,6 @@ function print_extra_information()
 end
 
 handle_prop_args =
-   common.make_handle_prop_args("prop_sameval", 20, run_pid)
+   common.make_handle_prop_args("prop_sameval", 40, run_pid)
 
 cleanup = common.make_cleanup(run_pid)

@@ -6,9 +6,14 @@ module(..., package.seeall)
 local schema = require("lib.yang.schema")
 local softwire_schema = schema.load_schema_by_name("snabb-softwire-v1")
 
-function generate_yang(pid)
+function generate_get(pid)
    local query = generate_xpath(softwire_schema)
    return string.format("./snabb config get %s \"%s\"", pid, query)
+end
+
+function generate_set(pid, val)
+   local query = generate_xpath(softwire_schema)
+   return string.format("./snabb config set %s \"%s\" \"%s\"", pid, query, val)
 end
 
 function run_yang(yang_cmd)
