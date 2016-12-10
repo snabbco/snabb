@@ -92,7 +92,10 @@ function generate_xpath(schema)
       path = path .. "/" .. node.id
    end
 
-   visit_body(schema)
+   -- just produce "/" on rare occasions
+   if math.random() > 0.01 then
+      visit_body(schema)
+   end
 
    return path
 end
