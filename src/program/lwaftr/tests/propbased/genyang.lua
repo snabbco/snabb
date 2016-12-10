@@ -11,6 +11,10 @@ function generate_get(pid)
    return string.format("./snabb config get %s \"%s\"", pid, query)
 end
 
+function generate_get_state(pid)
+   return string.format("./snabb config get-state %s", pid)
+end
+
 function generate_set(pid, val)
    local query = generate_xpath(softwire_schema)
    return string.format("./snabb config set %s \"%s\" \"%s\"", pid, query, val)
