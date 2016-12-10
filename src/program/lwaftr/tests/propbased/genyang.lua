@@ -12,7 +12,8 @@ function generate_get(pid)
 end
 
 function generate_get_state(pid)
-   return string.format("./snabb config get-state %s", pid)
+   local query = generate_xpath_state(softwire_schema, true)
+   return string.format("./snabb config get-state %s \"%s\"", pid, query)
 end
 
 function generate_set(pid, val)
@@ -52,6 +53,10 @@ local function choose_pos()
    else
       return flip(6)
    end
+end
+
+function generate_xpath_state()
+   return generate_xpath(softwire_schema.body["softwire-state"])
 end
 
 -- from a config schema, generate an xpath query string
