@@ -10,7 +10,8 @@ local run_pid = {}
 local current_cmd
 
 function property()
-   local get = genyang.generate_get(run_pid[1])
+   local xpath = genyang.generate_config_xpath()
+   local get = genyang.generate_get(run_pid[1], xpath)
    local results  = (genyang.run_yang(get))
 
    if string.match("Could not connect to config leader socket on Snabb instance",
@@ -19,7 +20,7 @@ function property()
       return false
    end
 
-   local set = genyang.generate_set(run_pid[1], results)
+   local set = genyang.generate_set(run_pid[1], xpath, results)
    genyang.run_yang(set)
    local results2 = (genyang.run_yang(get))
 

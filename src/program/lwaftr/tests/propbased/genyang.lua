@@ -6,18 +6,21 @@ module(..., package.seeall)
 local schema = require("lib.yang.schema")
 local softwire_schema = schema.load_schema_by_name("snabb-softwire-v1")
 
-function generate_get(pid)
-   local query = generate_xpath(softwire_schema)
+function generate_get(pid, query)
+   if not query then
+      query = generate_config_xpath()
+   end
    return string.format("./snabb config get %s \"%s\"", pid, query)
 end
 
-function generate_get_state(pid)
-   local query = generate_xpath_state(softwire_schema, true)
+function generate_get_state(pid, query)
+   if not query then
+      query = generate_config_xpath_state()
+   end
    return string.format("./snabb config get-state %s \"%s\"", pid, query)
 end
 
-function generate_set(pid, val)
-   local query = generate_xpath(softwire_schema)
+function generate_set(pid, query, val)
    return string.format("./snabb config set %s \"%s\" \"%s\"", pid, query, val)
 end
 
@@ -55,14 +58,9 @@ local function choose_pos()
    end
 end
 
-function generate_xpath_state()
-   local path = generate_xpath(softwire_schema.body["softwire-state"], true)
-   return "/softwire-state" .. path
-end
-
 -- from a config schema, generate an xpath query string
 -- this code is patterned off of the visitor used in lib.yang.data
-function generate_xpath(schema, for_state)
+local function generate_xpath(schema, for_state)
    local path = ""
    local handlers = {}
 
@@ -114,6 +112,15 @@ function generate_xpath(schema, for_state)
    end
 
    return path
+end
+
+function generate_config_xpath()
+   return generate_xpath(softwire_schema, false)
+end
+
+function generate_config_xpath_state()
+   local path = generate_xpath(softwire_schema.body["softwire-state"], true)
+   return "/softwire-state" .. path
 end
 
 function selftest()
