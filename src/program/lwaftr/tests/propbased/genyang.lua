@@ -56,12 +56,13 @@ local function choose_pos()
 end
 
 function generate_xpath_state()
-   return generate_xpath(softwire_schema.body["softwire-state"])
+   local path = generate_xpath(softwire_schema.body["softwire-state"], true)
+   return "/softwire-state" .. path
 end
 
 -- from a config schema, generate an xpath query string
 -- this code is patterned off of the visitor used in lib.yang.data
-function generate_xpath(schema)
+function generate_xpath(schema, for_state)
    local path = ""
    local handlers = {}
 
@@ -72,8 +73,9 @@ function generate_xpath(schema)
    local function visit_body(node)
       local ids = {}
       for id, node in pairs(node.body) do
-         -- only choose nodes that are used in configs
-         if node.config ~= false then
+         -- only choose nodes that are used in configs unless
+         -- for_state is passed
+         if for_state or node.config ~= false then
             table.insert(ids, id)
          end
       end

@@ -19,8 +19,11 @@ function make_handle_prop_args(name, duration, pidbox)
         local cmdline = {"snabb", "lwaftr", "run", "-D", tostring(duration),
             "--conf", "program/lwaftr/tests/data/icmp_on_fail.conf",
             "--reconfigurable", "--on-a-stick", pci_addr}
-        -- FIXME: preserve the environment
-        S.execve(("/proc/%d/exe"):format(S.getpid()), cmdline, {})
+        -- preserve PATH variable because the get-state test relies on
+        -- this variable being set to print useful results
+        local pth = os.getenv("PATH")
+        local env = { ("PATH=%s"):format(pth) }
+        S.execve(("/proc/%d/exe"):format(S.getpid()), cmdline, env)
      else
         pidbox[1] = pid
         S.sleep(0.1)
