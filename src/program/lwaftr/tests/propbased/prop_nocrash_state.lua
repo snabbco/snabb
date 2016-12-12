@@ -22,6 +22,6 @@ function print_extra_information()
 end
 
 handle_prop_args =
-   common.make_handle_prop_args("prop_nocrash_state", 10, run_pid)
+   common.make_handle_prop_args("prop_nocrash_state", 20, run_pid)
 
 cleanup = common.make_cleanup(run_pid)
