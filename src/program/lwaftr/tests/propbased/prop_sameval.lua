@@ -9,24 +9,43 @@ local common  = require("program.lwaftr.tests.propbased.common")
 local run_pid = {}
 local current_cmd
 
+local function check_crashed(results)
+   if results:match("Could not connect to config leader socket on Snabb instance") then
+      print("Launching snabb run failed, or we've crashed it!")
+      return true
+   end
+   return false
+end
+
 function property()
    local xpath = genyang.generate_config_xpath()
    local get = genyang.generate_get(run_pid[1], xpath)
+   current_cmd = get
+
    local results  = (genyang.run_yang(get))
 
-   if string.match("Could not connect to config leader socket on Snabb instance",
-                   results) then
-      print("Launching snabb run failed, or we've crashed it!")
+   if check_crashed(results) then
       return false
    end
 
-   local set = genyang.generate_set(run_pid[1], xpath, results)
-   genyang.run_yang(set)
-   local results2 = (genyang.run_yang(get))
+   -- queried data doesn't exist most likely (or some other non-fatal error)
+   if results:match("short read") then
+      -- just continue because it's not worth trying to set this property
+      return
+   end
 
-   if string.match("Could not connect to config leader socket on Snabb instance",
-                   results2) then
-      print("Launching snabb run failed, or we've crashed it!")
+   local set = genyang.generate_set(run_pid[1], xpath, results)
+   results_set = genyang.run_yang(set)
+   current_cmd = set
+
+   if check_crashed(results_set) then
+      return false
+   end
+
+   local results2 = (genyang.run_yang(get))
+   current_cmd = get
+
+   if check_crashed(results2) then
       return false
    end
 
