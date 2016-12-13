@@ -9,14 +9,6 @@ local common  = require("program.lwaftr.tests.propbased.common")
 local run_pid = {}
 local current_cmd
 
-local function check_crashed(results)
-   if results:match("Could not connect to config leader socket on Snabb instance") then
-      print("Launching snabb run failed, or we've crashed it!")
-      return true
-   end
-   return false
-end
-
 function property()
    local xpath = genyang.generate_config_xpath()
    local get = genyang.generate_get(run_pid[1], xpath)
@@ -24,7 +16,7 @@ function property()
 
    local results  = (genyang.run_yang(get))
 
-   if check_crashed(results) then
+   if common.check_crashed(results) then
       return false
    end
 
@@ -38,14 +30,14 @@ function property()
    results_set = genyang.run_yang(set)
    current_cmd = set
 
-   if check_crashed(results_set) then
+   if common.check_crashed(results_set) then
       return false
    end
 
    local results2 = (genyang.run_yang(get))
    current_cmd = get
 
-   if check_crashed(results2) then
+   if common.check_crashed(results2) then
       return false
    end
 

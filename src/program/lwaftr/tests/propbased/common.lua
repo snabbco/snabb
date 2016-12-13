@@ -38,3 +38,12 @@ function make_cleanup(pidbox)
    end
    return cleanup
 end
+
+-- return true if the result from the query indicates a crash/disconnect
+function check_crashed(results)
+   if results:match("Could not connect to config leader socket on Snabb instance") then
+      print("Launching snabb run failed, or we've crashed it!")
+      return true
+   end
+   return false
+end

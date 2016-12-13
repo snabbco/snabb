@@ -9,9 +9,7 @@ local current_cmd
 function property()
    current_cmd = genyang.generate_get(run_pid[1])
    local results = (genyang.run_yang(current_cmd))
-   if string.match("Could not connect to config leader socket on Snabb instance",
-                   results) then
-      print("Launching snabb run failed, or we've crashed it!")
+   if common.check_crashed(results) then
       return false
    end
 end
