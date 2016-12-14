@@ -4,24 +4,29 @@ module(..., package.seeall)
 --local snabb_cmd = ("/proc/%d/exe"):format(S.getpid())
 
 local schema = require("lib.yang.schema")
-local softwire_schema = schema.load_schema_by_name("snabb-softwire-v1")
 
-function generate_get(pid, query)
+local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
+require('lib.yang.schema').set_default_capabilities(capabilities)
+
+local schemas = { "ietf-softwire", "snabb-softwire-v1" }
+
+function generate_get(pid, schema, query)
    if not query then
-      query = generate_config_xpath()
+      query, schema = generate_config_xpath(schema)
    end
-   return string.format("./snabb config get %s \"%s\"", pid, query)
+   return string.format("./snabb config get -s %s %s \"%s\"", schema, pid, query)
 end
 
-function generate_get_state(pid, query)
+function generate_get_state(pid, schema, query)
    if not query then
-      query = generate_config_xpath_state()
+      query, schema = generate_config_xpath_state(schema)
    end
-   return string.format("./snabb config get-state %s \"%s\"", pid, query)
+   return string.format("./snabb config get-state -s %s %s \"%s\"", schema, pid, query)
 end
 
-function generate_set(pid, query, val)
-   return string.format("./snabb config set %s \"%s\" \"%s\"", pid, query, val)
+function generate_set(pid, schema, query, val)
+   return string.format("./snabb config set -s %s %s \"%s\" \"%s\"",
+                        schema, pid, query, val)
 end
 
 function run_yang(yang_cmd)
@@ -171,19 +176,28 @@ local function generate_xpath(schema, for_state)
    return path
 end
 
-function generate_config_xpath()
-   return generate_xpath(softwire_schema, false)
+function generate_config_xpath(schema_name)
+   if not schema_name then
+      schema_name = choose(schemas)
+   end
+   local schema      = schema.load_schema_by_name(schema_name)
+   return generate_xpath(schema, false), schema_name
 end
 
-function generate_config_xpath_state()
-   local path = generate_xpath(softwire_schema.body["softwire-state"], true)
-   return "/softwire-state" .. path
+function generate_config_xpath_state(schema_name)
+   if not schema_name then
+      schema_name = choose(schemas)
+   end
+   local schema      = schema.load_schema_by_name(schema_name)
+   local path = generate_xpath(schema.body["softwire-state"], true)
+   return "/softwire-state" .. path, schema_name
 end
 
 function selftest()
    local data = require("lib.yang.data")
    local path = require("lib.yang.path")
-   local grammar = data.data_grammar_from_schema(softwire_schema)
+   local schema = schema.load_schema_by_name("snabb-softwire-v1")
+   local grammar = data.data_grammar_from_schema(schema)
 
-   path.convert_path(grammar, generate_xpath(softwire_schema))
+   path.convert_path(grammar, generate_xpath(schema))
 end

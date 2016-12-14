@@ -10,8 +10,8 @@ local run_pid = {}
 local current_cmd
 
 function property()
-   local xpath = genyang.generate_config_xpath()
-   local get = genyang.generate_get(run_pid[1], xpath)
+   local xpath, schema_name = genyang.generate_config_xpath()
+   local get = genyang.generate_get(run_pid[1], schema_name, xpath)
    current_cmd = get
 
    local results  = (genyang.run_yang(get))
@@ -26,7 +26,7 @@ function property()
       return
    end
 
-   local set = genyang.generate_set(run_pid[1], xpath, results)
+   local set = genyang.generate_set(run_pid[1], schema_name, xpath, results)
    results_set = genyang.run_yang(set)
    current_cmd = set
 
