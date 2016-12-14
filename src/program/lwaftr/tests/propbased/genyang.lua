@@ -58,6 +58,51 @@ local function choose_pos()
    end
 end
 
+local function value_from_type(a_type)
+   local prim = a_type.primitive_type
+
+   if prim == "int8" then
+      return math.random(-128, 127)
+   elseif prim == "int16" then
+      return math.random(-32768, 32767)
+   elseif prim == "int32" then
+      return math.random(-2147483648, 2147483647)
+   elseif prim == "int64" then
+      return math.random(-9223372036854775808, 9223372036854775807)
+   elseif prim == "uint8" then
+      return math.random(0, 255)
+   elseif prim == "uint16" then
+      return math.random(0, 65535)
+   elseif prim == "uint32" then
+      return math.random(0, 4294967295)
+   elseif prim == "uint64" then
+      return math.random(0, 18446744073709551615)
+   --elseif prim == "decimal64" then
+   --   local int64 = value_from_type("int64")
+   --   local exp   = math.random(1, 18)
+   --   return int64 * (10 ^ -exp)
+   elseif prim == "boolean" then
+      return choose({ true, false })
+   elseif prim == "ipv4-address" then
+      return math.random(0, 255) .. "." .. math.random(0, 255) .. "." ..
+             math.random(0, 255) .. "." .. math.random(0, 255)
+   end
+
+   -- TODO: generate these:
+   -- string
+   -- binary
+   -- bits
+   -- empty
+   -- enumeration
+   -- identityref
+   -- instance-identifier
+   -- leafref
+   -- union
+
+   -- unknown type
+   return nil
+end
+
 -- from a config schema, generate an xpath query string
 -- this code is patterned off of the visitor used in lib.yang.data
 local function generate_xpath(schema, for_state)
@@ -97,10 +142,22 @@ local function generate_xpath(schema, for_state)
       path = path .. "/" .. node.id .. selector
    end
    function handlers.list(node)
-      -- TODO: this should generate selector-based lookups by using
-      --       the key type as a generation source, but for now do
-      --       the simple thing
+      local key_types = {}
+      local r = math.random()
+
       path = path .. "/" .. node.id
+
+      -- occasionally drop the selectors
+      if r < 0.9 then
+         for key in (node.key):split(" +") do
+            key_types[key] =  node.body[key].type
+         end
+
+         for key, type in pairs(key_types) do
+            local val = assert(value_from_type(type), type)
+            path = path .. string.format("[%s=%s]", key, val)
+         end
+      end
    end
    function handlers.leaf(node)
       path = path .. "/" .. node.id
