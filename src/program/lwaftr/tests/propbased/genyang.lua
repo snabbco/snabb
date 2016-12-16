@@ -63,6 +63,14 @@ local function choose_pos()
    end
 end
 
+local function random_hexes()
+   local str = ""
+   for i=1, 4 do
+      str = str .. string.format("%x", math.random(0, 15))
+   end
+   return str
+end
+
 local function value_from_type(a_type)
    local prim = a_type.primitive_type
 
@@ -91,6 +99,17 @@ local function value_from_type(a_type)
    elseif prim == "ipv4-address" then
       return math.random(0, 255) .. "." .. math.random(0, 255) .. "." ..
              math.random(0, 255) .. "." .. math.random(0, 255)
+   elseif prim == "ipv6-address" then
+      local addr = random_hexes()
+      for i=1, 7 do
+          addr = addr .. ":" .. random_hexes()
+      end
+      return addr
+   elseif prim == "ipv6-prefix" then
+      local addr = value_from_type({ primitive_type = "ipv6-address" })
+      return addr .. "/" .. math.random(0, 128)
+   elseif prim == "union" then
+      return value_from_type(choose(a_type.union))
    end
 
    -- TODO: generate these:
@@ -102,7 +121,6 @@ local function value_from_type(a_type)
    -- identityref
    -- instance-identifier
    -- leafref
-   -- union
 
    -- unknown type
    return nil
@@ -159,9 +177,13 @@ local function generate_xpath(schema, for_state)
          end
 
          for key, type in pairs(key_types) do
-            local val = assert(value_from_type(type), type)
+            local val = assert(value_from_type(type), type.primitive_type)
             path = path .. string.format("[%s=%s]", key, val)
          end
+      end
+
+      if math.random() < 0.9 then
+         visit_body(node)
       end
    end
    function handlers.leaf(node)
