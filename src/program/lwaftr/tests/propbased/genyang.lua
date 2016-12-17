@@ -71,25 +71,36 @@ local function random_hexes()
    return str
 end
 
+-- return a random number, preferring boundary values
+local function choose_range(lo, hi)
+   local r = math.random()
+   if r < 0.5 then
+      local mid = math.ceil((hi + lo) / 2)
+      return choose({ lo, lo + 1, mid, mid +  1,  hi - 1, hi })
+   else
+      return math.random(lo, hi)
+   end
+end
+
 local function value_from_type(a_type)
    local prim = a_type.primitive_type
 
    if prim == "int8" then
-      return math.random(-128, 127)
+      return choose_range(-128, 127)
    elseif prim == "int16" then
-      return math.random(-32768, 32767)
+      return choose_range(-32768, 32767)
    elseif prim == "int32" then
-      return math.random(-2147483648, 2147483647)
+      return choose_range(-2147483648, 2147483647)
    elseif prim == "int64" then
-      return math.random(-9223372036854775808, 9223372036854775807)
+      return choose_range(-9223372036854775809, 9223372036854775807)
    elseif prim == "uint8" then
-      return math.random(0, 255)
+      return choose_range(0, 255)
    elseif prim == "uint16" then
-      return math.random(0, 65535)
+      return choose_range(0, 65535)
    elseif prim == "uint32" then
-      return math.random(0, 4294967295)
+      return choose_range(0, 4294967295)
    elseif prim == "uint64" then
-      return math.random(0, 18446744073709551615)
+      return choose_range(0, 18446744073709551615)
    --elseif prim == "decimal64" then
    --   local int64 = value_from_type("int64")
    --   local exp   = math.random(1, 18)
