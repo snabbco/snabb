@@ -7,9 +7,18 @@ module snabb-config-leader-v1 {
   description
    "RPC interface for ConfigLeader Snabb app.";
 
+  revision 2016-12-20 {
+    description "Add basic error reporting.";
+  }
+
   revision 2016-11-12 {
     description
      "Initial revision.";
+  }
+
+  grouping error-reporting {
+    leaf status { type uint8; default 0; }
+    leaf error { type string; }
   }
 
   rpc describe {
@@ -31,6 +40,7 @@ module snabb-config-leader-v1 {
       leaf path { type string; default "/"; }
     }
     output {
+      uses error-reporting;
       leaf config { type string; }
     }
   }
@@ -42,6 +52,9 @@ module snabb-config-leader-v1 {
       leaf path { type string; default "/"; }
       leaf config { type string; mandatory true; }
     }
+    output {
+      uses error-reporting;
+    }
   }
 
   rpc add-config {
@@ -51,6 +64,9 @@ module snabb-config-leader-v1 {
       leaf path { type string; mandatory true; }
       leaf config { type string; mandatory true; }
     }
+    output {
+      uses error-reporting;
+    }
   }
 
   rpc remove-config {
@@ -58,6 +74,9 @@ module snabb-config-leader-v1 {
       leaf schema { type string; mandatory true; }
       leaf revision { type string; }
       leaf path { type string; mandatory true; }
+    }
+    output {
+      uses error-reporting;
     }
   }
 
@@ -68,6 +87,7 @@ module snabb-config-leader-v1 {
       leaf path { type string; default "/"; }
     }
     output {
+      uses error-reporting;
       leaf state { type string; }
     }
   }
@@ -76,6 +96,9 @@ module snabb-config-leader-v1 {
     input {
       leaf schema { type string; mandatory true; }
       leaf revision { type string; }
+    }
+    output {
+      uses error-reporting;
     }
   }
 }

@@ -11,5 +11,5 @@ function run(args)
       { schema = args.schema_name, revision = args.revision_date,
         path = args.path })
    -- The reply is empty.
-   main.exit(0)
+   common.print_and_exit(response)
 end

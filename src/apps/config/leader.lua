@@ -131,12 +131,16 @@ local function path_printer_for_schema_by_name(schema_name, path)
 end
 
 function Leader:rpc_get_config (args)
-   if args.schema ~= self.schema_name then
-      return self:foreign_rpc_get_config(args.schema, args.path)
+   local function getter()
+      if args.schema ~= self.schema_name then
+         return self:foreign_rpc_get_config(args.schema, args.path)
+      end
+      local printer = path_printer_for_schema_by_name(args.schema, args.path)
+      local config = printer(self.current_configuration, yang.string_output_file())
+      return { config = config }
    end
-   local printer = path_printer_for_schema_by_name(args.schema, args.path)
-   local config = printer(self.current_configuration, yang.string_output_file())
-   return { config = config }
+   local success, response = pcall(getter)
+   if success then return response else return {status=1, error=response} end
 end
 
 local function path_parser_for_grammar(grammar, path)
@@ -476,58 +480,77 @@ function Leader:foreign_rpc_remove_config (schema_name, path)
 end
 
 function Leader:rpc_set_config (args)
-   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
-      error('Attempt to modify configuration while listener attached')
+   local function setter()
+      if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
+         error('Attempt to modify configuration while listener attached')
+      end
+      if args.schema ~= self.schema_name then
+         return self:foreign_rpc_set_config(args.schema, args.path, args.config)
+      end
+      return self:handle_rpc_update_config(args, 'set', compute_set_config_fn)
    end
-   if args.schema ~= self.schema_name then
-      return self:foreign_rpc_set_config(args.schema, args.path, args.config)
-   end
-   return self:handle_rpc_update_config(args, 'set', compute_set_config_fn)
+   local success, response = pcall(setter)
+   if success then return response else  return {status=1, error=response} end
 end
 
 function Leader:rpc_add_config (args)
-   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
-      error('Attempt to modify configuration while listener attached')
+   local function adder()
+      if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
+         error('Attempt to modify configuration while listener attached')
+      end
+      if args.schema ~= self.schema_name then
+         return self:foreign_rpc_add_config(args.schema, args.path, args.config)
+      end
+      return self:handle_rpc_update_config(args, 'add', compute_add_config_fn)
    end
-   if args.schema ~= self.schema_name then
-      return self:foreign_rpc_add_config(args.schema, args.path, args.config)
-   end
-   return self:handle_rpc_update_config(args, 'add', compute_add_config_fn)
+   local success, response = pcall(adder)
+   if success then return response else return {status=1, error=response} end
 end
 
 function Leader:rpc_remove_config (args)
-   if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
-      error('Attempt to modify configuration while listener attached')
+   local function remover()
+      if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
+         error('Attempt to modify configuration while listener attached')
+      end
+      if args.schema ~= self.schema_name then
+         return self:foreign_rpc_remove_config(args.schema, args.path)
+      end
+      local path = path_mod.normalize_path(args.path)
+      self:update_configuration(compute_remove_config_fn(args.schema, path),
+                              'remove', path)
+      return {}
    end
-   if args.schema ~= self.schema_name then
-      return self:foreign_rpc_remove_config(args.schema, args.path)
-   end
-   local path = path_mod.normalize_path(args.path)
-   self:update_configuration(compute_remove_config_fn(args.schema, path),
-                             'remove', path)
-   return {}
+   local success, response = pcall(remover)
+   if success then return response else return {status=1, error=response} end
 end
 
 function Leader:rpc_attach_listener (args)
-   if self.listen_peer ~= nil then error('Listener already attached') end
-   self.listen_peer = self.rpc_peer
-   return {}
+   local function attacher()
+      if self.listen_peer ~= nil then error('Listener already attached') end
+      self.listen_peer = self.rpc_peer
+      return {}
+   end
+   local success, response = pcall(attacher)
+   if success then return response else return {status=1, error=response} end
 end
 
 function Leader:rpc_get_state (args)
-   if args.schema ~= self.schema_name then
-      return self:foreign_rpc_get_state(args.schema, args.path)
-   end
-   local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
-   local s = {}
-   for _, follower in pairs(self.followers) do
-      for k,v in pairs(state.show_state(self.schema_name, follower.pid, args.path)) do
-	 s[k] = v
+   local function getter()
+      if args.schema ~= self.schema_name then
+            return self:foreign_rpc_get_state(args.schema, args.path)
       end
+      local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
+      local s = {}
+      for _, follower in pairs(self.followers) do
+            for k,v in pairs(state.show_state(self.schema_name, follower.pid, args.path)) do
+            s[k] = v
+            end
+      end
+      return {state=printer(s, yang.string_output_file())}
    end
-   return {state=printer(s, yang.string_output_file())}
+   local success, response = pcall(getter)
+   if success then return response else return {status=1, error=response} end
 end
-
 function Leader:handle (payload)
    return rpc.handle_calls(self.rpc_callee, payload, self.rpc_handler)
 end

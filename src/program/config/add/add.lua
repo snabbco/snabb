@@ -13,5 +13,5 @@ function run(args)
         config = common.serialize_config(
            args.value, args.schema_name, args.path) })
    -- The reply is empty.
-   main.exit(0)
+   common.print_and_exit(response)
 end
