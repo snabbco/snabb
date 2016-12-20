@@ -141,3 +141,12 @@ function call_leader(instance_id, method, args)
    socket:close()
    return parse_reply(reply)
 end
+
+function print_and_exit(response, response_prop)
+   if response.error then
+      print(response.error)
+   elseif response_prop then
+      print(response[response_prop])
+   end
+   main.exit(response.status)
+end

@@ -9,6 +9,5 @@ function run(args)
       args.instance_id, 'get-config',
       { schema = args.schema_name, revision = args.revision_date,
         path = args.path })
-   print(response.config)
-   main.exit(0)
+   common.print_and_exit(response, "config")
 end

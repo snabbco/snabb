@@ -11,5 +11,5 @@ function run(args)
       { schema = args.schema_name, revision = args.revision_date,
         config = common.serialize_config(args.config, args.schema_name) })
    -- The reply is empty.
-   main.exit(0)
+   common.print_and_exit(response)
 end
