@@ -55,11 +55,11 @@ local function choose_pos()
       end
    end
 
-   -- evenly weight first five indices
+   -- evenly weight first two
    if r < 0.5 then
-      return choose({1, 2, 3, 4, 5})
+      return choose({1, 2})
    else
-      return flip(6)
+      return flip(3)
    end
 end
 
