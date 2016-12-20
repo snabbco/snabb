@@ -490,7 +490,7 @@ function Leader:rpc_set_config (args)
       return self:handle_rpc_update_config(args, 'set', compute_set_config_fn)
    end
    local success, response = pcall(setter)
-   if success then return response else  return {status=1, error=response} end
+   if success then return response else return {status=1, error=response} end
 end
 
 function Leader:rpc_add_config (args)
@@ -542,9 +542,9 @@ function Leader:rpc_get_state (args)
       local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
       local s = {}
       for _, follower in pairs(self.followers) do
-            for k,v in pairs(state.show_state(self.schema_name, follower.pid, args.path)) do
+         for k,v in pairs(state.show_state(self.schema_name, follower.pid, args.path)) do
             s[k] = v
-            end
+         end
       end
       return {state=printer(s, yang.string_output_file())}
    end
