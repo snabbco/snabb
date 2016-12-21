@@ -10,6 +10,18 @@ require('lib.yang.schema').set_default_capabilities(capabilities)
 
 local schemas = { "ietf-softwire", "snabb-softwire-v1" }
 
+function generate_get_or_set(pid, schema)
+   local r = math.random()
+   if r > 0.5 then
+      local query, schema = generate_config_xpath(schema)
+      return string.format("./snabb config get -s %s %s \"%s\"", schema, pid, query)
+   else
+      local query, val, schema = generate_config_xpath_and_val(schema)
+      return string.format("./snabb config set -s %s %s \"%s\" \"%s\"",
+                           schema, pid, query, val)
+   end
+end
+
 function generate_get(pid, schema, query)
    if not query then
       query, schema = generate_config_xpath(schema)
@@ -139,9 +151,10 @@ end
 
 -- from a config schema, generate an xpath query string
 -- this code is patterned off of the visitor used in lib.yang.data
-local function generate_xpath(schema, for_state)
+local function generate_xpath_and_last_node(schema, for_state)
    local path = ""
    local handlers = {}
+   local last_node
 
    local function visit(node)
       local handler = handlers[node.kind]
@@ -160,6 +173,8 @@ local function generate_xpath(schema, for_state)
       local id = choose(ids)
       if id then
          visit(node.body[id])
+      else
+         last_node = node
       end
    end
    function handlers.container(node)
@@ -169,11 +184,14 @@ local function generate_xpath(schema, for_state)
       -- fetching all sub-items too
       if math.random() < 0.9 then
          visit_body(node)
+      else
+         last_node = node
       end
    end
    handlers['leaf-list'] = function(node)
       local selector = string.format("[position()=%d]", choose_pos())
       path = path .. "/" .. node.id .. selector
+      last_node = node
    end
    function handlers.list(node)
       local key_types = {}
@@ -195,10 +213,14 @@ local function generate_xpath(schema, for_state)
 
       if math.random() < 0.9 then
          visit_body(node)
+      else
+         last_node = node
       end
    end
    function handlers.leaf(node)
       path = path .. "/" .. node.id
+      val  = value_from_type(node.type)
+      last_node = node
    end
 
    -- just produce "/" on rare occasions
@@ -206,7 +228,26 @@ local function generate_xpath(schema, for_state)
       visit_body(schema)
    end
 
+   return path, last_node
+end
+
+local function generate_xpath(schema, for_state)
+   local path = generate_xpath_and_last_node(schema, for_state)
    return path
+end
+
+local function generate_xpath_and_val(schema)
+   local val, path, last
+
+   while not val do
+      path, last = generate_xpath_and_last_node(schema)
+
+      if last and last.kind == "leaf" then
+         val = value_from_type(last.type)
+      end
+   end
+
+   return path, val
 end
 
 function generate_config_xpath(schema_name)
@@ -215,6 +256,15 @@ function generate_config_xpath(schema_name)
    end
    local schema      = schema.load_schema_by_name(schema_name)
    return generate_xpath(schema, false), schema_name
+end
+
+function generate_config_xpath_and_val(schema_name)
+   if not schema_name then
+      schema_name = choose(schemas)
+   end
+   local schema = schema.load_schema_by_name(schema_name)
+   local path, val = generate_xpath_and_val(schema)
+   return path, val, schema_name
 end
 
 function generate_config_xpath_state(schema_name)
