@@ -4,9 +4,8 @@
 #
 # The scripts enables several commands:
 #
-# * lwaftrctl snabbnfv start|stop. Starts or stops snabbnfv.
-# * lwaftrctl vm       start|stop. Starts or stops virtual machine
-# * lwaftrctl lwaftr   start|stop. Starts or stops lwaftr inside virtual machine.
+# * lwaftrctl start|stop snabbnfv   Starts or stops snabbnfv.
+# * lwaftrctl start|stop vm         Starts or stops virtual machine
 #
 # A configuration file named 'lwaftrctl.conf' must exist in the current
 # directory. This file contains all the variable definitions needed to run the
@@ -14,89 +13,81 @@
 #
 # The usual workflow to run the script would be the following:
 #
-# * lwaftrctl snabbnfv start.
+# * lwaftrctl start snabbnfv.
 #       Brings up NICs in host that will be used by virtual machine.
 #
-# * lwaftrctl vm start.
+# * lwaftrctl start vm.
 #       Brings up VM. After this step it should be possible to log into
-#       the VM: ssh igalia@10.21.21.2.
-#
-# * lwaftrctl lwaftr start.
-#       Starts lwaftr inside VM. This commands logs into VM and runs file
-#       "~/run_lwaftr.sh". See run_lwaftr.sh.example.
-#
-# Once the lwaftr is running within the VM, run 'lwaftr transient' from
-# host to check everything is working fine.
+#       the VM: telnet localhost 5001.
 #
 # The command 'lwaftrctl all start', run all the steps above.
 
-qemu_start_vm() {
-    echo "Starting QEMU. Please wait..."
+QEMU=qemu-system-x86_64
+QEMU_ARGS=""
+
+tmux_session=""
+snabb_n=0
+
+function run_telnet {
+    (echo "$2"; sleep ${3:-2}) \
+        | telnet localhost $1 2>&1
+}
+
+function tmux_launch {
+    local id=$1
+    local command="$2 2>&1 | tee $3"
+    tmux_session="$id-$$"
+    tmux new-session -d -n "$id" -s $tmux_session "$command"
+}
+
+function qemu_start_vm {
+    echo "Starting QEMU"
     cd $VM_DIR
-    sudo numactl -m ${NUMA_NODE} taskset -c ${QEMU_CORE} qemu-system-x86_64 \
-        --enable-kvm -name ${NAME} -drive file=${DISK},if=virtio \
-        -m ${MEM} -cpu host \
-        -fsdev local,security_model=passthrough,id=fsdev0,path=${SHARED_LOCATION} \
-            -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=share \
-        -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGESTLB_FS},share=on \
-        -numa node,memdev=mem \
-        -chardev socket,id=char1,path=${VHU_SOCK1},server \
-            -netdev type=vhost-user,id=net0,chardev=char1 \
-            -device virtio-net-pci,netdev=net0,addr=0x8,mac=${SNABBNFV_MAC1} \
-        -chardev socket,id=char2,path=${VHU_SOCK2},server \
-            -netdev type=vhost-user,id=net1,chardev=char2 \
-            -device virtio-net-pci,netdev=net1,addr=0x9,mac=${SNABBNFV_MAC2} \
-        -netdev type=tap,id=net2,ifname=${IFACE},vhost=on,script=${NETSCRIPT} \
-            -device virtio-net-pci,netdev=net2,addr=0xa,mac=52:54:00:00:00:03 \
-        -vnc :${VNC_DISPLAY} -daemonize &
+    tmux_launch \
+        "qemu0" \
+        "sudo numactl -m ${NUMA_NODE} taskset -c ${QEMU_CORE} \
+            $QEMU $QEMU_ARGS \
+            -kernel ${BZ_IMAGE} \
+                -append \"earlyprintk root=/dev/vda rw console=tty0 ip=${VM_IP} hugepages=256\" \
+            -M pc -smp 1 -cpu host -m ${MEM} -enable-kvm \
+            -numa node,memdev=mem -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGES_FS},share=on \
+            -netdev type=vhost-user,id=net0,chardev=char0 -chardev socket,id=char0,path=${SNABBNFV_SOCK1},server \
+                -device virtio-net-pci,netdev=net0,addr=0x8,mac=${SNABBNFV_MAC1} \
+            -netdev type=vhost-user,id=net1,chardev=char1 -chardev socket,id=char1,path=${SNABBNFV_SOCK2},server \
+                -device virtio-net-pci,netdev=net1,addr=0x9,mac=${SNABBNFV_MAC2} \
+            -netdev type=tap,id=net2,ifname=${IFACE},vhost=on,script=${NETSCRIPT} \
+                -device virtio-net-pci,netdev=net2,addr=0xa,mac=52:54:00:00:00:03 \
+            -serial telnet:localhost:${VM_PORT},server,nowait \
+            -display none \
+            -drive if=virtio,format=${VM_FORMAT},file=${VM_IMAGE} " \
+        "qemu0.log"
+    echo "Connect via 'telnet localhost ${VM_PORT}'"
 }
 
-vm_pid() {
-    echo `ps aux | grep -i "name $1" | grep -v "grep" | awk '{ print $2 }'`
-}
-
-start_vm() {
+function start_vm {
     qemu_start_vm
 }
 
-stop_vm() {
-    echo "Switching off VM. Please wait..."
-    ssh $SSH_OPTS ${VM_USER}@${VM_IP} 'sudo halt'
-    sleep 10
-    pid=`pidof qemu-system-x86_64`
+function stop_vm {
+    echo "Stopping VM"
+    run_telnet ${VM_PORT} "sudo poweroff" >/dev/null
+    pid=$(pidof $QEMU)
     sudo kill ${pid} 2>/dev/null
-    echo "VM switched off"
+    echo "Done"
 }
 
-restart_vm() {
+function restart_vm {
     stop_vm
     start_vm
 }
 
-start_lwaftr() {
-    echo "Start lwAFTR"
-
-    ssh $SSH_OPTS ${VM_USER}@${VM_IP} "~/run_lwaftr.sh"
+function start_snabbnfv {
+    start_snabbnfv_process "snabbnfv-1" $SNABBNFV_CORE1 $SNABBNFV_PCI1 $SNABBNFV_CONF1 $SNABBNFV_SOCK1
+    start_snabbnfv_process "snabbnfv-2" $SNABBNFV_CORE2 $SNABBNFV_PCI2 $SNABBNFV_CONF2 $SNABBNFV_SOCK2
 }
 
-stop_lwaftr() {
-    echo "Stop lwAFTR"
-
-    ssh $SSH_OPTS ${VM_USER}@${VM_IP} 'sudo killall snabb 2>/dev/null'
-}
-
-restart_lwaftr() {
-    stop_lwaftr
-    start_lwaftr
-}
-
-start_snabbnfv() {
-    start_snabbnfv_process "snabbnfv-1" $SNABBNFV_CORE1 $SNABBNFV_PCI1 $SNABBNFV_CONF1 $VHU_SOCK1
-    start_snabbnfv_process "snabbnfv-2" $SNABBNFV_CORE2 $SNABBNFV_PCI2 $SNABBNFV_CONF2 $VHU_SOCK2
-}
-
-start_snabbnfv_process() {
-    local screen=$1
+function start_snabbnfv_process {
+    local id=$1
     local core=$2
     local pci=$3
     local conf=$4
@@ -107,64 +98,65 @@ start_snabbnfv_process() {
         echo "WARNING: File '${conf}' does not exist."
     fi
 
-    # Run snabbnfv inside screen.
-    screen -L -dmS $screen bash -c \
-        "cd ${SNABB_HOST_PATH}/src; \
-         sudo numactl -m ${NUMA_NODE} taskset -c ${core} ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock};"
+    # Run snabbnfv inside tmux session.
+    tmux_launch "$id" \
+        "cd ${SNABB_PATH}/src; sudo numactl -m ${NUMA_NODE} taskset -c ${core} ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock}" \
+        $(snabb_log)
+    status=$(tmux ls | grep -c "$id")
     sleep 0.5
-    status=$(screen -ls | grep ${screen})
 
     # Check exit status.
-    if [[ -z ${status} ]]; then
+    if [[ ${status} -eq 0 ]]; then
         echo "Start of snabbnfv failed: "
         echo -e "\tsudo numactl -m ${NUMA_NODE} taskset -c ${core} ./snabb snabbnfv traffic -b ${pci} ${conf} ${sock}"
         exit 1
     fi
 
-    echo "Started snabbnfv on core ${core} (screen: '$screen')"
+    echo "Started snabbnfv on core ${core} (tmux: '$id')"
     echo -e "\t{PCI: ${pci}, conf: ${conf}, sock: ${sock}}"
 }
 
-restart_snabbnfv() {
-    stop_snabbnfv
-    start_snabbnfv
+function snabb_log {
+    echo "snabb${snabb_n}.log"
 }
 
-kill_all() {
+function stop_snabbnfv {
+    echo "Stopping snabbnfv"
+    kill_all "snabbnfv traffic"
+    remove_file $SNABBNFV_SOCK1
+    remove_file $SNABBNFV_SOCK2
+    echo "Done"
+}
+
+function kill_all {
     local name=$1
     pids=`ps aux | grep "$name" | awk '{ print $2 }'`
     for pid in ${pids[@]}; do
         sudo kill $pid 2>/dev/null
     done
     sleep 1
-    screen -wipe
 }
 
-remove_file() {
+function remove_file {
     sudo rm -f $1
 }
 
-stop_snabbnfv() {
-    echo "Stop snabbnfv"
-
-    kill_all "snabbnfv traffic"
-    remove_file $VHU_SOCK1
-    remove_file $VHU_SOCK2
+function restart_snabbnfv {
+    stop_snabbnfv
+    start_snabbnfv
 }
 
-start_command() {
+# Actions.
+
+function start_command {
     COMMAND=$1
     case $COMMAND in
         "all")
             start_snabbnfv
             start_vm
-            start_lwaftr
             ;;
         "snabbnfv")
             start_snabbnfv
-            ;;
-        "lwaftr")
-            start_lwaftr
             ;;
         "vm")
             start_vm
@@ -175,44 +167,37 @@ start_command() {
     esac
 }
 
-restart_command() {
+function stop_command {
     COMMAND=$1
     case $COMMAND in
         "all")
+            stop_vm
+            stop_snabbnfv
+            ;;
+        "snabbnfv")
+            stop_snabbnfv
+            ;;
+        "vm")
+            stop_vm
+            ;;
+        *)
+            bad_usage
+            ;;
+    esac
+}
+
+function restart_command {
+    COMMAND=$1
+    case $COMMAND in
+        "all")
+            restart_snabbnfv
             restart_vm
-            restart_lwaftr
             ;;
         "snabbnfv")
             restart_snabbnfv
             ;;
-        "lwaftr")
-            restart_lwaftr
-            ;;
         "vm")
             restart_vm
-            ;;
-        *)
-            bad_usage
-            ;;
-    esac
-}
-
-stop_command() {
-    COMMAND=$1
-    case $COMMAND in
-        "all")
-            stop_lwaftr
-            stop_vm
-            stop_snabbnfv
-            ;;
-        "snabbnfv")
-            stop_snabbnfv
-            ;;
-        "lwaftr")
-            stop_lwaftr
-            ;;
-        "vm")
-            stop_vm
             ;;
         *)
             bad_usage
@@ -222,17 +207,17 @@ stop_command() {
 
 # Main
 
-usage() {
+function usage {
     local exit_code=$1
-    echo "Usage: lwaftrctl -f lwaftrctl.conf [all|snabbnfv|vm|lwaftr] [start|stop|restart]"
+    echo "Usage: lwaftrctl -f lwaftrctl.conf [start|stop|restart] [all|snabbnfv|vm]"
     exit $exit_code
 }
 
-bad_usage() {
+function bad_usage {
     usage -1
 }
 
-help() {
+function help {
     usage 0
 }
 
@@ -265,8 +250,8 @@ fi
 source $AFTRCTL_CONF
 
 PROGRAM_NAME=$0
-COMMAND=${ARGS[0]}
-ACTION=${ARGS[1]}
+ACTION=${ARGS[0]}
+COMMAND=${ARGS[1]}
 
 case $ACTION in
     "start")
