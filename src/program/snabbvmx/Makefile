@@ -20,9 +20,11 @@ doc/snabbvmx.epub: doc/snabbvmx.md
 
 CLEAN = doc/snabbvmx.*
 
-clean:
+clean_object_files:
+	@(find . -name "*.o" -exec echo "RM        {}" \; -exec rm -f {} \;)
+
+clean: clean_object_files
 	$(E) "RM        $(CLEAN)"
 	$(Q)-rm -rf $(CLEAN)
-	$(Q) (cd ../../; make clean)
 
-.PHONY: clean
+.PHONY: clean_object_files clean

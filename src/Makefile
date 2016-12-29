@@ -209,7 +209,15 @@ obj/doc/snabb.epub: obj/doc/snabb.markdown
 
 CLEAN = snabb obj bin testlog programs.inc
 
-clean:
+clean_programs:
+	@(for d in program/*/; do \
+		if [ -f "$$d/Makefile" ]; then \
+			echo "CLEAN     $$d"; \
+			make -s -C $$d clean; \
+		fi \
+	  done)
+
+clean: clean_programs
 	$(E) "RM        $(CLEAN)"
 	$(Q)-rm -rf $(CLEAN)
 
@@ -220,5 +228,4 @@ mrproper: clean
 benchmarks:
 	$(Q) (scripts/bench.sh)
 
-.PHONY: clean $(TESTMODS) $(TESTSCRIPTS) benchmarks
-
+.PHONY: clean_programs clean $(TESTMODS) $(TESTSCRIPTS) benchmarks
