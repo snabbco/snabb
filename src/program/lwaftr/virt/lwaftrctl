@@ -24,6 +24,7 @@
 
 QEMU=qemu-system-x86_64
 QEMU_ARGS=""
+LWAFTR_DELAY=${LWAFTR_DELAY:-"20"}
 
 tmux_session=""
 snabb_n=0
@@ -41,7 +42,7 @@ function tmux_launch {
 }
 
 function qemu_start_vm {
-    echo "Starting QEMU"
+    echo "Started QEMU"
     cd $VM_DIR
     tmux_launch \
         "qemu0" \
@@ -61,7 +62,6 @@ function qemu_start_vm {
             -display none \
             -drive if=virtio,format=${VM_FORMAT},file=${VM_IMAGE} " \
         "qemu0.log"
-    echo "Connect via 'telnet localhost ${VM_PORT}'"
 }
 
 function start_vm {
@@ -146,6 +146,22 @@ function restart_snabbnfv {
     start_snabbnfv
 }
 
+function start_lwaftr {
+    echo "Started lwaftr"
+    run_telnet ${VM_PORT} "sudo ~/start-lwaftr.sh" >/dev/null
+}
+
+function stop_lwaftr {
+    echo "Stopping lwaftr"
+    run_telnet ${VM_PORT} "sudo ~/stop-lwaftr.sh" >/dev/null
+    echo "Done"
+}
+
+function restart_lwaftr {
+    stop_lwaftr
+    start_lwaftr
+}
+
 # Actions.
 
 function start_command {
@@ -154,12 +170,19 @@ function start_command {
         "all")
             start_snabbnfv
             start_vm
+            echo "Waiting ${LWAFTR_DELAY} seconds"
+            sleep $LWAFTR_DELAY
+            start_lwaftr
             ;;
         "snabbnfv")
             start_snabbnfv
             ;;
         "vm")
             start_vm
+            echo "Connect via 'telnet localhost ${VM_PORT}'"
+            ;;
+        "lwaftr")
+            start_lwaftr
             ;;
         *)
             bad_usage
@@ -171,6 +194,7 @@ function stop_command {
     COMMAND=$1
     case $COMMAND in
         "all")
+            stop_lwaftr
             stop_vm
             stop_snabbnfv
             ;;
@@ -179,6 +203,9 @@ function stop_command {
             ;;
         "vm")
             stop_vm
+            ;;
+        "lwaftr")
+            stop_lwaftr
             ;;
         *)
             bad_usage
@@ -198,6 +225,9 @@ function restart_command {
             ;;
         "vm")
             restart_vm
+            ;;
+        "lwaftr")
+            restart_lwaftr
             ;;
         *)
             bad_usage
