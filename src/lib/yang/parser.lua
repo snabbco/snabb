@@ -145,7 +145,6 @@ end
 
 function Parser:parse_qstring(quote)
    local start_column = self.column
-   self:check(quote)
    local terminators = "\n"..quote
    if quote == '"' then terminators = terminators.."\\" end
 
@@ -398,6 +397,7 @@ function selftest()
    test_module("// foo bar;\nleaf port;", {{keyword="leaf", argument="port"}})
    test_module("type/** hellooo */string;", {{keyword="type", argument="string"}})
    test_module('type "hello\\pq";', {{keyword="type", argument="hello\\pq"}})
+   test_module('description "";', {{keyword="description"}})
    test_module(lines("leaf port {", "type number;", "}"), {{keyword="leaf",
    argument="port", statements={{keyword="type", argument="number"}}}})
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
