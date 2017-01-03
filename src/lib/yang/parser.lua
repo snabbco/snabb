@@ -168,7 +168,6 @@ function Parser:parse_qstring(quote)
          else
             result = result.."\\"
          end
-
       end
    end
    self:check(quote)
@@ -177,7 +176,7 @@ function Parser:parse_qstring(quote)
    if not self:check("+") then return result end
    self:skip_whitespace()
 
-   -- Strings can be concaternated together with a +
+   -- Strings can be concatenated together with a +
    if self:check("'") then
       return result..self:parse_qstring("'")
    elseif self:check('"') then
