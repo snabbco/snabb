@@ -247,7 +247,10 @@ local function renumber(expr)
    end
    local function lookup(var)
       if var == 'len' then return var end
-      return assert(substs[var], "unbound variable: "..var)
+      -- NB: assert returns all its arguments on success, and we only
+      --     want to return the looked up variable here
+      local subst = assert(substs[var], "unbound variable: "..var)
+      return subst
    end
    local function visit(expr)
       if type(expr) == 'number' then return expr end

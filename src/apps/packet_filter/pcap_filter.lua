@@ -26,12 +26,13 @@ PcapFilter = {}
 --   filter      = string expression specifying which packets to accept
 --                 syntax: http://www.tcpdump.org/manpages/pcap-filter.7.html
 --   state_table = optional string name to use for stateful-tracking table
+--   native      = optional boolean argument that enables dynasm compilation
 function PcapFilter:new (conf)
    assert(conf.filter, "PcapFilter conf.filter parameter missing")
 
    local o = {
       -- XXX Investigate the latency impact of filter compilation.
-      accept_fn = pf.compile_filter(conf.filter),
+      accept_fn = pf.compile_filter(conf.filter, { native = conf.native or false }),
       state_table = conf.state_table or false,
       shm = { rxerrors = {counter}, sessions_established = {counter} }
    }
@@ -76,12 +77,15 @@ function selftest ()
    print("selftest: pcap_filter")
    selftest_run(false, 3.726, 0.0009)
    selftest_run(true,  7.453, 0.001)
+   -- test dynasm mode too
+   selftest_run(false, 3.726, 0.0009, true)
+   selftest_run(true,  7.453, 0.001, true)
    print("selftest: ok")
 end
 
 -- Run a selftest in stateful or non-stateful mode and expect a
 -- specific rate of acceptance from the test trace file.
-function selftest_run (stateful, expected, tolerance)
+function selftest_run (stateful, expected, tolerance, native)
    app.configure(config.new())
    conntrack.clear()
    local pcap_filter = require("apps.packet_filter.pcap_filter")
@@ -103,7 +107,7 @@ function selftest_run (stateful, expected, tolerance)
    config.app(c, "source", pcap.PcapReader, "apps/packet_filter/samples/v6.pcap")
    config.app(c, "repeater", basic_apps.Repeater )
    config.app(c,"pcap_filter", pcap_filter.PcapFilter,
-              {filter=v6_rules, state_table = state_table})
+              {filter=v6_rules, state_table = state_table, native = native})
    config.app(c, "sink", basic_apps.Sink )
 
    config.link(c, "source.output -> repeater.input")
