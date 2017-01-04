@@ -320,10 +320,8 @@ local function migrate_conf(old)
    local psid_map = cltable.new({ key_type = psid_key_t })
    for addr, end_addr, params in old_bt.psid_map:iterate() do
       local reserved_ports_bit_count = 16 - params.psid_length - params.shift
-      if end_addr == addr then end_addr = nil end
       if reserved_ports_bit_count ~= 16 then
          psid_map[psid_key_t(addr)] = {
-            end_addr = end_addr,
             psid_length = params.psid_length,
             shift = params.shift,
             reserved_ports_bit_count = reserved_ports_bit_count
