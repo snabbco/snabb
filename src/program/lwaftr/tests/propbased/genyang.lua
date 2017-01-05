@@ -75,10 +75,14 @@ local function choose_pos()
    end
 end
 
+local function random_hex()
+  return string.format("%x", math.random(0, 15))
+end
+
 local function random_hexes()
    local str = ""
    for i=1, 4 do
-      str = str .. string.format("%x", math.random(0, 15))
+      str = str .. random_hex()
    end
    return str
 end
@@ -131,8 +135,22 @@ local function value_from_type(a_type)
    elseif prim == "ipv6-prefix" then
       local addr = value_from_type({ primitive_type = "ipv6-address" })
       return addr .. "/" .. math.random(0, 128)
+   elseif prim == "mac-address" then
+      local addr = random_hex() .. random_hex()
+      for i=1,5 do
+         addr = addr .. ":" .. random_hex() .. random_hex()
+      end
+      return addr
    elseif prim == "union" then
       return value_from_type(choose(a_type.union))
+   elseif prim == "string" then
+      local len = choose_pos()
+      -- just ascii for now
+      local str = ""
+      for i=0, len do
+         str = str .. string.char(math.random(97, 122))
+      end
+      return str
    end
 
    -- TODO: generate these:
