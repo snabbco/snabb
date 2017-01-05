@@ -540,6 +540,40 @@ declare_initializer(init_typedef, 'typedef')
 declare_initializer(init_uses, 'uses')
 declare_initializer(init_value, 'value')
 
+
+-- 7.8.2.  The list's key Statement
+
+-- The "key" statement, which MUST be present if the list represents
+-- configuration, and MAY be present otherwise, takes as an argument a
+-- string that specifies a space-separated list of leaf identifiers of
+-- this list.  A leaf identifier MUST NOT appear more than once in the
+-- key.  Each such leaf identifier MUST refer to a child leaf of the
+-- list.  The leafs can be defined directly in substatements to the
+-- list, or in groupings used in the list.
+local function sanitize_lists (node)
+   if node.kind == "list" and node.key then
+      assert(node.body)
+      local keys = {}
+      for each in node.key:gmatch("([^%s]+)") do
+         if keys[each] then
+            error('duplicated leaf identifier in list '..node.id..' '..node.key)
+         end
+         keys[each] = true
+      end
+      for each in pairs(keys) do
+         -- TODO: Should check leaf is defined, but it might not be found because
+         -- was defined via uses.
+         local leaf = node.body[each]
+         if leaf then leaf.mandatory = true end
+      end
+   end
+   for _, v in pairs(node) do
+      if type(v) == "table" then
+         sanitize_lists(v)
+      end
+   end
+end
+
 local function schema_from_ast(ast)
    local ret
    local submodules = {}
@@ -556,6 +590,7 @@ local function schema_from_ast(ast)
    end
    assert(ret, 'missing module form')
    ret.submodules = submodules
+   sanitize_lists(ret)
    return ret
 end
 
