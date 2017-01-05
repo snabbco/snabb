@@ -231,6 +231,62 @@ local function generate_xpath_and_last_node(schema, for_state)
    return path, last_node
 end
 
+local function generate_value_for_node(node)
+   local handlers = {}
+
+   local function visit(node)
+      local handler = handlers[node.kind]
+      if handler then return handler(node) end
+   end
+   local function visit_body(node)
+      local ids = {}
+      for id, node in pairs(node.body) do
+         -- only choose nodes that are used in configs
+         if node.config ~= false then
+            table.insert(ids, id)
+         end
+      end
+
+      local val = ""
+      for _, id in ipairs(ids) do
+         local subnode = node.body[id]
+         local r = math.random()
+         if subnode.mandatory or r > 0.5 then
+
+            if subnode.kind == "leaf-list" then
+               local count = choose_pos() -- how many to generate
+               for i=0, count do
+                  local subval = visit(subnode)
+                  val = val .. string.format("%s %s; ", id, subval)
+               end
+            elseif subnode.kind == "container" or subnode.kind == "list" then
+               local subval = visit(subnode)
+               val = val .. string.format("%s {%s} ", id, subval)
+            else
+               local subval = visit(subnode)
+               val = val .. string.format("%s %s; ", id, subval)
+            end
+         end
+      end
+
+      return val
+   end
+   function handlers.container(node)
+      return visit_body(node)
+   end
+   handlers['leaf-list'] = function(node)
+      return value_from_type(node.type)
+   end
+   function handlers.list(node)
+      return visit_body(node)
+   end
+   function handlers.leaf(node)
+      return value_from_type(node.type)
+   end
+
+   return visit(node)
+end
+
 local function generate_xpath(schema, for_state)
    local path = generate_xpath_and_last_node(schema, for_state)
    return path
@@ -242,8 +298,8 @@ local function generate_xpath_and_val(schema)
    while not val do
       path, last = generate_xpath_and_last_node(schema)
 
-      if last and last.kind == "leaf" then
-         val = value_from_type(last.type)
+      if last then
+         val = generate_value_for_node(last)
       end
    end
 
