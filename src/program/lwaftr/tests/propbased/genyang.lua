@@ -249,6 +249,9 @@ local function generate_xpath_and_last_node(schema, for_state)
    return path, last_node
 end
 
+-- similar to generating a query path like the function above, but
+-- generates a compound value for `snabb config set` at some schema
+-- node
 local function generate_value_for_node(node)
    local handlers = {}
 
@@ -296,6 +299,8 @@ local function generate_value_for_node(node)
       return value_from_type(node.type)
    end
    function handlers.list(node)
+      -- FIXME: this will sometimes include a value for the list keys
+      --        which isn't valid when the query path sets the keys
       return visit_body(node)
    end
    function handlers.leaf(node)
