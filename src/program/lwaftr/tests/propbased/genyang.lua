@@ -1,7 +1,7 @@
 module(..., package.seeall)
 
---local S = require("syscall")
---local snabb_cmd = ("/proc/%d/exe"):format(S.getpid())
+-- This module provides functions for generating snabb config
+-- commands with random path queries and values
 
 local schema = require("lib.yang.schema")
 
@@ -10,6 +10,7 @@ require('lib.yang.schema').set_default_capabilities(capabilities)
 
 local schemas = { "ietf-softwire", "snabb-softwire-v1" }
 
+-- Generate a get/set command string given a pid string and optional schema
 function generate_get_or_set(pid, schema)
    local r = math.random()
    if r > 0.5 then
@@ -22,6 +23,7 @@ function generate_get_or_set(pid, schema)
    end
 end
 
+-- Generate a get command string given a pid string and optional schema/query
 function generate_get(pid, schema, query)
    if not query then
       query, schema = generate_config_xpath(schema)
@@ -29,6 +31,7 @@ function generate_get(pid, schema, query)
    return string.format("./snabb config get -s %s %s \"%s\"", schema, pid, query)
 end
 
+-- Like generate_get but for state queries
 function generate_get_state(pid, schema, query)
    if not query then
       query, schema = generate_config_xpath_state(schema)
@@ -36,6 +39,7 @@ function generate_get_state(pid, schema, query)
    return string.format("./snabb config get-state -s %s %s \"%s\"", schema, pid, query)
 end
 
+-- Used primarily for repeating a set with a value seen before from a get
 function generate_set(pid, schema, query, val)
    return string.format("./snabb config set -s %s %s \"%s\" \"%s\"",
                         schema, pid, query, val)
@@ -54,8 +58,9 @@ local function choose(choices)
    return choices[idx]
 end
 
--- choose from unbounded array indices, decreasing likelihood
-local function choose_pos()
+-- choose a natural number (e.g., index or length of array) by
+-- repeating a cointoss
+local function choose_nat()
    local r = math.random()
 
    local function flip(next)
@@ -144,7 +149,7 @@ local function value_from_type(a_type)
    elseif prim == "union" then
       return value_from_type(choose(a_type.union))
    elseif prim == "string" then
-      local len = choose_pos()
+      local len = choose_nat()
       -- just ascii for now
       local str = ""
       for i=0, len do
@@ -154,7 +159,6 @@ local function value_from_type(a_type)
    end
 
    -- TODO: generate these:
-   -- string
    -- binary
    -- bits
    -- empty
@@ -207,7 +211,7 @@ local function generate_xpath_and_last_node(schema, for_state)
       end
    end
    handlers['leaf-list'] = function(node)
-      local selector = string.format("[position()=%d]", choose_pos())
+      local selector = string.format("[position()=%d]", choose_nat())
       path = path .. "/" .. node.id .. selector
       last_node = node
    end
@@ -275,7 +279,7 @@ local function generate_value_for_node(node)
          if subnode.mandatory or r > 0.5 then
 
             if subnode.kind == "leaf-list" then
-               local count = choose_pos() -- how many to generate
+               local count = choose_nat()
                for i=0, count do
                   local subval = visit(subnode)
                   val = val .. string.format("%s %s; ", id, subval)
