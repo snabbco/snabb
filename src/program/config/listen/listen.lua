@@ -9,6 +9,16 @@ local path_lib = require("lib.yang.path")
 local common = require("program.config.common")
 local json_lib = require("program.config.json")
 
+local function open_socket(file)
+   S.signal('pipe', 'ign')
+   local socket = assert(S.socket("unix", "stream"))
+   S.unlink(file)
+   local sa = S.t.sockaddr_un(file)
+   assert(socket:bind(sa))
+   assert(socket:listen())
+   return socket
+end
+
 local function validate_value(schema_name, revision_date, path, value_str)
    local parser = common.data_parser(schema_name, path)
    local value = parser(value_str)
@@ -49,14 +59,14 @@ local function read_request(client, schema_name, revision_date)
    path = path_lib.normalize_path(path)
    local handler = assert(request_handlers[data.normalize_id(verb)])
    local req = handler(schema_name, revision_date, path, json.value)
-   local function print_reply(reply)
+   local function print_reply(reply, fd)
       local output = json_lib.buffered_output()
       local value
       if verb == 'get' then value = reply.config
       elseif verb == 'get-state' then value = reply.state
       end
       json_lib.write_json_object(output, {id=id, status='ok', value=value})
-      output:flush(S.stdout)
+      output:flush(fd or S.stdout)
    end
    return req, print_reply
 end
@@ -73,7 +83,26 @@ function run(args)
    local caller = rpc.prepare_caller('snabb-config-leader-v1')
    local leader = common.open_socket_or_die(args.instance_id)
    attach_listener(leader, caller, args.schema_name, args.revision_date)
-   local client = json_lib.buffered_input(S.stdin)
+   
+   -- Check if there is a socket path specified, if so use that as method
+   -- to communicate, otherwise use stdin and stdout.
+   local fd = nil
+   if args.socket then
+      local sockfd = open_socket(args.socket)
+      local addr = S.t.sockaddr_un()
+      -- Wait for a connection
+      local err
+      print("Listening for clients on socket: "..args.socket)
+      fd, err = sockfd:accept(addr)
+      if fd == nil then
+         sockfd:close()
+         error(err)
+      end
+   else
+      fd = S.stdin
+   end
+      
+   local client = json_lib.buffered_input(fd)
    local pollfds = S.types.t.pollfds({
          {fd=leader, events="in"},
          {fd=client, events="in"}})
@@ -119,7 +148,7 @@ function run(args)
                local msg, parse_reply = rpc.prepare_call(
                   caller, request.method, request.args)
                local function have_reply(msg)
-                  return print_reply(parse_reply(msg))
+                  return print_reply(parse_reply(msg), fd)
                end
                common.send_message(leader, msg)
                table.insert(pending_replies, 1, have_reply)
