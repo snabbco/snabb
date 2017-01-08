@@ -71,9 +71,6 @@ end
 local function get_ipv4_src_address(ptr)
    return rd32(get_ipv4_src_ptr(ptr))
 end
-local function get_ipv4_checksum_ptr (ptr)
-   return ptr + o_ipv4_checksum
-end
 local function get_ipv6_next_header(ptr)
    return ptr[o_ipv6_next_header]
 end
@@ -89,16 +86,6 @@ end
 local function copy_ether(dst, src)
    ffi.copy(dst, src, 6)
 end
-local function copy_ipv4(dst, src)
-   ffi.copy(dst, src, 4)
-end
-local function copy_ipv6(dst, src)
-   ffi.copy(dst, src, 16)
-end
-local function get_ipv4_header_length(ptr)
-   local ver_and_ihl = ptr[0]
-   return lshift(band(ver_and_ihl, 0xf), 2)
-end
 
 -- Set a bogus source IP address fe80::, so we can recognize it later when
 -- it comes back from the VM.
@@ -112,15 +99,13 @@ end
 -- is a better way.
 --
 local function ipv6_cache_trigger (pkt, mac)
-   local ether_dhost = get_ether_dhost_ptr(pkt)
-   local ipv6_hdr = get_ethernet_payload(pkt)
-   local ipv6_src_ip = get_ipv6_src_address(ipv6_hdr)
+   local ether_hdr = ethernet:new_from_mem(pkt.data, ethernet_header_size)
+   local ip_hdr = ipv6:new_from_mem(pkt.data + ethernet_header_size, pkt.length - ethernet_header_size)
 
    -- VM will discard packets not matching its MAC address on the interface.
-   copy_ether(ether_dhost, mac)
-
+   ether_hdr:dst(mac)
    -- Set a bogus source IP address.
-   copy_ipv6(ipv6_src_ip, n_cache_src_ipv6)
+   ip_hdr:src(n_cache_src_ipv6)
 
    return pkt
 end
@@ -130,21 +115,15 @@ local function send_ipv6_cache_trigger (r, pkt, mac)
 end
 
 local function ipv4_cache_trigger (pkt, mac)
-   local ether_dhost = get_ether_dhost_ptr(pkt)
-   local ipv4_hdr = get_ethernet_payload(pkt)
-   local ipv4_hdr_size = get_ipv4_header_length(ipv4_hdr)
-   local ipv4_src_ip = get_ipv4_src_ptr(ipv4_hdr)
-   local ipv4_checksum = get_ipv4_checksum_ptr(ipv4_hdr)
+   local ether_hdr = ethernet:new_from_mem(pkt.data, ethernet_header_size)
+   local ip_hdr = ipv4:new_from_mem(pkt.data + ethernet_header_size, pkt.length - ethernet_header_size)
 
    -- VM will discard packets not matching its MAC address on the interface.
-   copy_ether(ether_dhost, mac)
-
+   ether_hdr:dst(mac)
    -- Set a bogus source IP address.
-   copy_ipv4(ipv4_src_ip, n_cache_src_ipv4)
-
-   -- Clear checksum to recalculate it with new source IPv4 address.
-   wr16(ipv4_checksum, 0)
-   wr16(ipv4_checksum, htons(ipsum(pkt.data + ethernet_header_size, ipv4_hdr_size, 0)))
+   ip_hdr:src(n_cache_src_ipv4)
+   -- Recalculate checksum.
+   ip_hdr:checksum()
 
    return pkt
 end
@@ -582,22 +561,46 @@ local function test_ipv6_flow ()
    test_ipv6_service_to_vm({pkt1})
 end
 
-local function test_ipv4_cache_trigger ()
-   local pkt = packet.from_string(lib.hexundump([[
+local function test_ipv4_cache_trigger (pkt)
+   local ether_dhost = "52:54:00:00:00:01"
+   local refresh_packet = ipv4_cache_trigger(pkt, ethernet:pton(ether_dhost))
+   local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
+   local ip_hdr = ipv4:new_from_mem(refresh_packet.data + ethernet_header_size, pkt.length - ethernet_header_size)
+   assert(ip_hdr:src_eq(n_cache_src_ipv4))
+   assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
+end
+
+local function test_ipv6_cache_trigger (pkt)
+   local ether_dhost = "52:54:00:00:00:01"
+   local refresh_packet = ipv6_cache_trigger(pkt, ethernet:pton(ether_dhost))
+   local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
+   local ip_hdr = ipv6:new_from_mem(refresh_packet.data + ethernet_header_size, pkt.length - ethernet_header_size)
+   assert(ip_hdr:src_eq(n_cache_src_ipv6))
+   assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
+end
+
+local function ipv4_udp_pkt ()
+   return packet.from_string(lib.hexundump([[
       02:aa:aa:aa:aa:aa 02:99:99:99:99:99 08 00 45 00
       02 18 00 00 00 00 0f 11 d3 61 0a 0a 0a 01 c1 05
       01 64 30 39 04 00 00 26 00 00 00 00 00 00 00 00
       00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
       00 00 00 00 00 00 00 00
    ]], 72))
-   local ether_dhost = "52:54:00:00:00:01"
-   local refresh_packet = ipv4_cache_trigger(pkt, ethernet:pton(ether_dhost))
-   local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
-   assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
 end
 
-local function test_ipv6_cache_trigger ()
-   local pkt = packet.from_string(lib.hexundump([[
+local function ipv4_tcp_pkt ()
+   return packet.from_string(lib.hexundump([[
+      18 55 0f ae d0 1d a0 88 b4 2c fa ac 08 00 45 00
+      00 34 b8 a0 40 00 40 06 69 55 c0 a8 00 11 97 65
+      c0 af e5 97 00 50 15 91 83 d6 5d 31 61 91 80 10
+      02 a9 ff 98 00 00 01 01 08 0a 07 c3 3c f9 47 c4
+      91 1a
+   ]], 66))
+end
+
+local function ipv6_udp_pkt ()
+   return packet.from_string(lib.hexundump([[
       02:aa:aa:aa:aa:aa 02:99:99:99:99:99 86 dd 60 00
       01 f0 01 f0 04 ff fc 00 00 01 00 02 00 03 00 04
       00 05 00 00 00 7e fc 00 00 00 00 00 00 00 00 00
@@ -605,16 +608,26 @@ local function test_ipv6_cache_trigger ()
       d3 89 c1 05 01 64 0a 0a 0a 01 04 00 30 39 00 0c
       00 00 00 00 00 00
    ]], 86))
-   local ether_dhost = "52:54:00:00:00:01"
-   local refresh_packet = ipv6_cache_trigger(pkt, ethernet:pton(ether_dhost))
-   local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
-   assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
+end
+
+local function ipv6_tcp_pkt ()
+   return packet.from_string(lib.hexundump([[
+      02 aa aa aa aa aa 02 99 99 99 99 99 86 dd 60 00
+      01 f0 01 f0 04 ff fc 00 00 01 00 02 00 03 00 04
+      00 05 00 00 00 7e fc 00 00 00 00 00 00 00 00 00
+      00 00 00 00 01 00 45 00 00 34 b8 a0 40 00 40 06
+      69 55 c0 a8 00 11 97 65 c0 af e5 97 00 50 15 91
+      83 d6 5d 31 61 91 80 10 02 a9 ff 98 00 00 01 01
+      08 0a 07 c3 3c f9 47 c4 91 1a
+   ]], 106))
 end
 
 function selftest ()
    print("nh_fwd: selftest")
    test_ipv4_flow()
    test_ipv6_flow()
-   test_ipv4_cache_trigger()
-   test_ipv6_cache_trigger()
+   test_ipv4_cache_trigger(ipv4_udp_pkt())
+   test_ipv4_cache_trigger(ipv4_tcp_pkt())
+   test_ipv6_cache_trigger(ipv6_udp_pkt())
+   test_ipv6_cache_trigger(ipv6_tcp_pkt())
 end
