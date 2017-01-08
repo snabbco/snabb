@@ -1,11 +1,14 @@
 module(..., package.seeall)
 
+local lwdebug = require("apps.lwaftr.lwdebug")
 local app = require("core.app")
 local basic_apps = require("apps.basic.basic_apps")
 local bit = require("bit")
 local constants = require("apps.lwaftr.constants")
 local ethernet = require("lib.protocol.ethernet")
 local ipsum = require("lib.checksum").ipsum
+local tcp = require("lib.protocol.tcp")
+local udp = require("lib.protocol.udp")
 local ipv4 = require("lib.protocol.ipv4")
 local ipv6 = require("lib.protocol.ipv6")
 local lib = require("core.lib")
@@ -40,6 +43,9 @@ nh_fwd6 = {
       next_hop_mac = {required=false, default=nil}
    }
 }
+
+local proto_tcp = constants.proto_tcp
+local proto_udp = constants.proto_udp
 
 local ethernet_header_size = constants.ethernet_header_size
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
@@ -114,6 +120,10 @@ local function send_ipv6_cache_trigger (r, pkt, mac)
    transmit(r, ipv6_cache_trigger(pkt, mac))
 end
 
+local function random_port ()
+   return math.random(65535)
+end
+
 local function ipv4_cache_trigger (pkt, mac)
    local ether_hdr = ethernet:new_from_mem(pkt.data, ethernet_header_size)
    local ip_hdr = ipv4:new_from_mem(pkt.data + ethernet_header_size, pkt.length - ethernet_header_size)
@@ -122,8 +132,21 @@ local function ipv4_cache_trigger (pkt, mac)
    ether_hdr:dst(mac)
    -- Set a bogus source IP address.
    ip_hdr:src(n_cache_src_ipv4)
+   -- Set random port.
+   local tcp_hdr
+   local tcp_offset = ethernet_header_size + (ip_hdr:ihl() * 4)
+   local proto = ip_hdr:protocol()
+   if proto == proto_tcp then
+      tcp_hdr = tcp:new_from_mem(pkt.data + tcp_offset, pkt.length - tcp_offset)
+      payload_offset = tcp_offset + tcp_hdr:sizeof()
+   elseif proto == proto_udp then
+      tcp_hdr = udp:new_from_mem(pkt.data + tcp_offset, pkt.length - tcp_offset)
+      payload_offset = tcp_offset + tcp_hdr:sizeof()
+   end
+   tcp_hdr:dst_port(random_port())
    -- Recalculate checksum.
    ip_hdr:checksum()
+   tcp_hdr:checksum(pkt.data + payload_offset, pkt.length - payload_offset, ip_hdr)
 
    return pkt
 end
@@ -192,13 +215,13 @@ function nh_fwd4:push ()
          local pkt = receive(input_vm)
          local ether_dhost = get_ether_dhost_ptr(pkt)
          local ipv4_hdr = get_ethernet_payload(pkt)
-        
+
          if service_mac and ether_equals(ether_dhost, service_mac) then
             transmit(output_service, pkt)
          elseif self.cache_refresh_interval > 0 and
                   get_ipv4_src_address(ipv4_hdr) == val_cache_src_ipv4 then
             -- Our magic cache next-hop resolution packet. Never send this out.
-            
+
             copy_ether(self.next_hop_mac, ether_dhost)
             if self.debug then
                print(("nh_fwd4: learning next-hop '%s'"):format(ethernet:ntop(ether_dhost)))
@@ -568,6 +591,7 @@ local function test_ipv4_cache_trigger (pkt)
    local ip_hdr = ipv4:new_from_mem(refresh_packet.data + ethernet_header_size, pkt.length - ethernet_header_size)
    assert(ip_hdr:src_eq(n_cache_src_ipv4))
    assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
+   lwdebug.print_pkt(refresh_packet)
 end
 
 local function test_ipv6_cache_trigger (pkt)
