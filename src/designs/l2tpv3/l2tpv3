@@ -1,0 +1,37 @@
+#!/usr/bin/env snabb
+
+local RawSocket = require("apps.socket.raw")
+local L2TPv3 = require("apps.l2tpv3.l2tpv3").L2TPv3
+local ns_responder = require("apps.ipv6.ns_responder")
+
+if #main.parameters ~= 7 then
+   print("Usage: l2tpv3 <lo-if> <rem-if> <my-ip> <my-mac> <remote-ip> <remote-mac> <session> <cookie>")
+end
+
+function start (lif, srcip, srcmac, rif, dstip, dstmac, session, cookie)
+   local c = config.new()
+   config.app(c, "Tun", L2TPv3, {eth_src = srcmac,
+				 ipv6_src = srcip,
+				 eth_dst = dstmac,
+				 ipv6_dst = dstip,
+				 session = session,
+				 cookie = cookie})
+   config.app(c, "ns", ns_responder, {local_ip = "\x20\x03\x1f\x39\x02\x20\x00\x10\x50\x54\x00\xff\xfe\x12\x34\x56", local_mac = "\x33\x33\xff\x12\x34\x56"})
+   config.app(c, "Local", RawSocket, lif)
+   config.app(c, "Remote", RawSocket, rif)
+   config.link(c, "Local.tx -> Tun.decap")
+   config.link(c, "Tun.encap -> ns.north")
+   config.link(c, "ns.south -> Remote.rx")
+   --
+   config.link(c, "Remote.tx -> ns.south")
+   config.link(c, "ns.north -> Tun.encap")
+   config.link(c, "Tun.decap -> Local.rx")
+   engine.configure(c)
+   while true do
+      engine.main({duration = 5})
+      engine.report()
+   end
+end
+
+start(unpack(main.parameters))
+
