@@ -66,8 +66,12 @@ local function read_counters (tree)
    return ret, max_width
 end
 
+-- Filters often contain '-', which is a special character for match.
+-- Escape it.
 local function skip_counter (name, filter)
-   return filter and not name:match(filter)
+   local escaped_filter = filter
+   if escaped_filter then escaped_filter = filter:gsub("-", "%%-") end
+   return filter and not name:match(escaped_filter)
 end
 
 local function print_counter (name, value, max_width)
@@ -90,7 +94,7 @@ end
 function run (raw_args)
    local opts, pid, counter_name = parse_args(raw_args)
    if tostring(pid) and not counter_name then
-      counter_name, pid = pid, nil
+      counter_name, pid = nil, pid
    end
    if opts.name then
       local programs = engine.enumerate_named_programs(opts.name)
