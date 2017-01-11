@@ -95,9 +95,9 @@ end
 -- return a random number, preferring boundary values
 local function choose_range(lo, hi)
    local r = math.random()
-   if r < 0.5 then
+   if r < 0.1 then
       local mid = math.ceil((hi + lo) / 2)
-      return choose({ lo, lo + 1, mid, mid +  1,  hi - 1, hi })
+      return choose({ 0, lo, lo + 1, mid, mid +  1,  hi - 1, hi })
    else
       return math.random(lo, hi)
    end
