@@ -73,12 +73,14 @@ function test_lwaftr_query_filter {
 }
 
 # Run lwAFTR.
-tmux_launch "lwaftr" "./snabb lwaftr run --conf $LWAFTR_CONF --v4 $SNABB_PCI0 --v6 $SNABB_PCI1"
+tmux_launch "lwaftr" "./snabb lwaftr run --reconfigurable --conf $LWAFTR_CONF --v4 $SNABB_PCI0 --v6 $SNABB_PCI1"
 sleep 2
 
 # Run tests.
 pid=$(get_lwaftr_instance)
 if [[ -n "$pid" ]]; then
     test_lwaftr_query $pid
+    test_lwaftr_query $pid -l
     test_lwaftr_query_filter $pid "memuse"
+    test_lwaftr_query_filter $pid "in-ipv4"
 fi

@@ -97,12 +97,14 @@ function run (raw_args)
       counter_name, pid = nil, pid
    end
    if opts.name then
+      -- without --reconfigurable
       local programs = engine.enumerate_named_programs(opts.name)
       pid = programs[opts.name]
       if not pid then
          fatal(("Couldn't find process with name '%s'"):format(opts.name))
       end
    end
+   if not pid then fatal("No pid or name specified") end
    local instance_tree = top.select_snabb_instance(pid)
    print_counters(instance_tree, counter_name)
 end

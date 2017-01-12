@@ -1,5 +1,5 @@
 Usage:
-  query [OPTIONS] [<pid>] [<counter-name>]
+  query [OPTIONS] <pid/name> [<counter-name>]
 
 Options:
 
@@ -21,3 +21,8 @@ The values for the counters defined in <src/apps/lwaftr/lwaftr.lua> will be
 displayed, but only the ones that are not zero.
 
 It needs root privileges.
+
+Examples:
+snabb lwaftr query -l
+snabb lwaftr query 1111 in-ipv4
+snabb lwaftr query -n mysnabbprocess
