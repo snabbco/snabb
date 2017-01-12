@@ -81,6 +81,5 @@ pid=$(get_lwaftr_instance)
 if [[ -n "$pid" ]]; then
     test_lwaftr_query $pid
     test_lwaftr_query $pid -l
-    test_lwaftr_query_filter $pid "memuse"
-    test_lwaftr_query_filter $pid "in-ipv4"
+    test_lwaftr_query_filter $pid "memuse-ipv"
 fi
