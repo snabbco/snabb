@@ -93,10 +93,26 @@ local function print_counters (tree, filter)
    end
 end
 
+-- Return the pid that was specified, unless it was a leader process,
+-- in which case, return the follower pid that actually has useful counters.
+local function pid_to_parent(pid)
+   local pid = tonumber(pid)
+   for _, name in ipairs(shm.children("/")) do
+      local p = tonumber(name)
+      if p and ps.is_worker(p) then
+         local leader_pid = tonumber(ps.get_leader_pid(p))
+         -- If the precomputed by-name pid is the leader pid, set the pid
+         -- to be the follower's pid instead to get meaningful counters.
+      if leader_pid == pid then pid = p end
+      end
+   end
+   return pid
+end
+
 function run (raw_args)
    local opts, pid, counter_name = parse_args(raw_args)
    if tostring(pid) and not counter_name then
-      counter_name, pid = nil, pid
+      counter_name, pid = nil, pid_to_parent(pid)
    end
    if opts.name then
    end
@@ -115,7 +131,6 @@ function run (raw_args)
       -- only print the statistics for one child, not for all of them.
       for _, name in ipairs(shm.children("/")) do
          local p = tonumber(name)
-         local name = ps.appname_resolver(p)
          if p and ps.is_worker(p) then
             local leader_pid = tonumber(ps.get_leader_pid(p))
             -- If the precomputed by-name pid is the leader pid, set the pid
@@ -124,7 +139,9 @@ function run (raw_args)
          end
       end
    end
-   if not pid then fatal("No pid or name specified") end
+   if not pid then
+      top.select_snabb_instance(pid)
+   end
    local instance_tree = top.select_snabb_instance(pid)
    print_counters(instance_tree, counter_name)
 end
