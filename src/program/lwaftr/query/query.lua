@@ -7,6 +7,8 @@ local lwcounter = require("apps.lwaftr.lwcounter")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
+local app = require("core.app")
+local ps = require("program.ps.ps")
 
 local keys, fatal = lwutil.keys, lwutil.fatal
 
@@ -97,11 +99,29 @@ function run (raw_args)
       counter_name, pid = nil, pid
    end
    if opts.name then
-      -- without --reconfigurable
+   end
+   if opts.name then
+      -- Start by assuming it was run without --reconfigurable
       local programs = engine.enumerate_named_programs(opts.name)
       pid = programs[opts.name]
       if not pid then
          fatal(("Couldn't find process with name '%s'"):format(opts.name))
+      end
+
+      -- Check if it was run with --reconfigurable
+      -- If it was, find the children, then find the pid of their parent.
+      -- Note that this approach will break as soon as there can be multiple
+      -- followers which need to have their statistics aggregated, as it will
+      -- only print the statistics for one child, not for all of them.
+      for _, name in ipairs(shm.children("/")) do
+         local p = tonumber(name)
+         local name = ps.appname_resolver(p)
+         if p and ps.is_worker(p) then
+            local leader_pid = tonumber(ps.get_leader_pid(p))
+            -- If the precomputed by-name pid is the leader pid, set the pid
+            -- to be the follower's pid instead to get meaningful counters.
+            if leader_pid == pid then pid = p end
+         end
       end
    end
    if not pid then fatal("No pid or name specified") end
