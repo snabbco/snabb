@@ -122,8 +122,8 @@ function Parser:skip_whitespace()
       if self:check("*") then
          self:skip_c_comment()
       else
-	 self:consume("/")
-	 self:take_while('[^\n]')
+         self:consume("/")
+         self:take_while('[^\n]')
       end
       self:take_while('%s')
    end
@@ -145,7 +145,6 @@ end
 
 function Parser:parse_qstring(quote)
    local start_column = self.column
-   self:check(quote)
    local terminators = "\n"..quote
    if quote == '"' then terminators = terminators.."\\" end
 
@@ -154,22 +153,21 @@ function Parser:parse_qstring(quote)
       result = result..self:take_while("[^"..terminators.."]")
       if self:check(quote) then break end
       if self:check("\n") then
-	 while self.column < start_column do
-	    if not self:check(" ") and not self:check("\t") then break end
-	 end
-	 result = result.."\n"
-	 if self.column > start_column then
-	    result = result..string.rep(" ", self.column-start_column)
-	 end
+         while self.column < start_column do
+            if not self:check(" ") and not self:check("\t") then break end
+         end
+         result = result.."\n"
+         if self.column > start_column then
+            result = result..string.rep(" ", self.column-start_column)
+         end
       elseif self:check("\\") then
-	 if self:check("n") then result = result.."\n"
-	 elseif self:check("t") then result = result.."\t"
-	 elseif self:check('"') then result = result..'"'
-	 elseif self:check("\\") then result = result.."\\"
-	 else
-	    result = result.."\\"
-	 end
-
+         if self:check("n") then result = result.."\n"
+         elseif self:check("t") then result = result.."\t"
+         elseif self:check('"') then result = result..'"'
+         elseif self:check("\\") then result = result.."\\"
+         else
+            result = result.."\\"
+         end
       end
    end
    self:check(quote)
@@ -178,7 +176,7 @@ function Parser:parse_qstring(quote)
    if not self:check("+") then return result end
    self:skip_whitespace()
 
-   -- Strings can be concaternated together with a +
+   -- Strings can be concatenated together with a +
    if self:check("'") then
       return result..self:parse_qstring("'")
    elseif self:check('"') then
@@ -232,7 +230,7 @@ function Parser:parse_statement_list()
    while true do
       self:skip_whitespace()
       if self:is_eof() or self:peek() == "}" then
-	 break
+         break
       end
       table.insert(statements, self:parse_statement())
    end
@@ -398,10 +396,11 @@ function selftest()
    test_module("// foo bar;\nleaf port;", {{keyword="leaf", argument="port"}})
    test_module("type/** hellooo */string;", {{keyword="type", argument="string"}})
    test_module('type "hello\\pq";', {{keyword="type", argument="hello\\pq"}})
+   test_module('description "";', {{keyword="description"}})
    test_module(lines("leaf port {", "type number;", "}"), {{keyword="leaf",
-	argument="port", statements={{keyword="type", argument="number"}}}})
+   argument="port", statements={{keyword="type", argument="number"}}}})
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
-	argument="port", statements={{keyword="type"}}}})
+   argument="port", statements={{keyword="type"}}}})
 
    parse(require('lib.yang.ietf_inet_types_yang'))
    parse(require('lib.yang.ietf_yang_types_yang'))
