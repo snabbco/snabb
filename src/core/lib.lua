@@ -13,6 +13,19 @@ local band, bor, bnot, lshift, rshift, bswap =
 local tonumber = tonumber -- Yes, this makes a performance difference.
 local cast = ffi.cast
 
+ffi.cdef[[
+  /* Execute a full CPU hardware memory barrier.
+   See: http://en.wikipedia.org/wiki/Memory_barrier */
+  void full_memory_barrier() __mcode("0FAEF0S");
+  //TODO: should this be NTA
+  /* Prefetch memory at address into CPU cache. */
+  void prefetch_for_read(const void *address) __mcode("0F181mIs");
+  /* Prefetch memory at address into CPU cache. */
+  void prefetch_for_write(const void *address) __mcode("0F0D1mIs");
+  /* Software memory barrier */
+  void nop() __mcode("90S");
+]]
+
 -- Returns true if x and y are structurally similar (isomorphic).
 function equal (x, y)
    if type(x) ~= type(y) then return false end

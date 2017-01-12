@@ -2342,6 +2342,8 @@ LJFOLD(TDUP any)
 LJFOLD(CNEW any any)
 LJFOLD(XSNEW any any)
 LJFOLD(BUFHDR any any)
+LJFOLD(INTRN any any)
+LJFOLD(ASMRET any any)
 LJFOLDX(lj_ir_emit)
 
 /* ------------------------------------------------------------------------ */
