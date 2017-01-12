@@ -122,10 +122,11 @@ local function value_from_type(a_type)
       return choose_range(0, 4294967295)
    elseif prim == "uint64" then
       return choose_range(0, 18446744073709551615)
-   --elseif prim == "decimal64" then
-   --   local int64 = value_from_type("int64")
-   --   local exp   = math.random(1, 18)
-   --   return int64 * (10 ^ -exp)
+   elseif prim == "decimal64" then
+      local int64 = value_from_type({ primitive_type="int64" })
+      local exp   = math.random(1, 18)
+      -- see RFC 6020 sec 9.3.1 for lexical representation
+      return string.format("%f", int64 * (10 ^ -exp))
    elseif prim == "boolean" then
       return choose({ true, false })
    elseif prim == "ipv4-address" then
@@ -156,10 +157,36 @@ local function value_from_type(a_type)
          str = str .. string.char(math.random(97, 122))
       end
       return str
+   elseif prim == "binary" then
+      -- TODO: if restricted with length statement this should pick based
+      --       on the octet length instead and introduce padding chars
+      --       if necessary
+      local encoded = ""
+      local encoded_len = choose_nat() * 4
+
+      for i=1, encoded_len do
+         local r = math.random(0, 63)
+         local byte
+
+         if r <= 25 then
+            byte = string.byte("A") + r
+         elseif r > 25 and r <= 51 then
+            byte = string.byte("a") + r-26
+         elseif r > 51 and r <= 61 then
+            byte = string.byte("0") + r-52
+         elseif r == 63 then
+            byte = string.byte("+")
+         else
+            byte = string.byte("/")
+         end
+
+         encoded = encoded .. string.char(byte)
+      end
+
+      return encoded
    end
 
    -- TODO: generate these:
-   -- binary
    -- bits
    -- empty
    -- enumeration
@@ -366,4 +393,17 @@ function selftest()
    local grammar = data.data_grammar_from_schema(schema)
 
    path.convert_path(grammar, generate_xpath(schema))
+
+   -- ensure decimal64 values match the right regexp
+   for i=1, 100 do
+      local val = value_from_type({ primitive_type="decimal64" })
+      assert(string.match(val, "^-?%d+[.]%d+$"), string.format("test value: %s", val))
+   end
+
+   -- ensure generated base64 values are decodeable
+   for i=1, 100 do
+      local val = value_from_type({ primitive_type="binary" })
+      local cmd = string.format("echo \"%s\" | base64 -d > /dev/null", val)
+      assert(os.execute(cmd) == 0, string.format("test value: %s", val))
+   end
 end
