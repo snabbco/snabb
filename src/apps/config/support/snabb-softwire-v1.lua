@@ -219,9 +219,9 @@ local function ietf_softwire_translator ()
       local br_instance, br_instance_key_t =
          cltable_for_grammar(get_ietf_br_instance_grammar())
       br_instance[br_instance_key_t({id=1})] = {
+         tunnel_payload_mtu = native_config.softwire_config.internal_interface.mtu,
+         tunnel_path_mru = native_config.softwire_config.external_interface.mtu,
          -- FIXME
-         tunnel_payload_mtu = 0,
-         tunnel_path_mru = 0,
          softwire_num_threshold = 0xffffffff,
          binding_table = {
             binding_entry = ietf_binding_table_from_native(
@@ -275,6 +275,21 @@ local function ietf_softwire_translator ()
       local br_instance_paths = {'softwire-config', 'binding', 'br',
                                  'br-instances', 'br-instance'}
       local bt_paths = {'binding-table', 'binding-entry'}
+
+      -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru)
+      if #path > #br_instance_paths then
+         if path[#path].name == 'tunnel-payload-mtu' then
+            return {{'set', {schema='snabb-softwire-v1',
+                     path="/softwire-config/internal-interface/mtu",
+                     config=tostring(arg)}}}
+         end
+         if path[#path].name == 'tunnel-path-mru' then
+            return {{'set', {schema='snabb-softwire-v1',
+                     path="/softwire-config/external-interface/mtu",
+                     config=tostring(arg)}}}
+         end
+      end
+
       -- Two kinds of updates: setting the whole binding table, or
       -- updating one entry.
       if sets_whole_table(path, #br_instance_paths + #bt_paths) then
