@@ -12,38 +12,52 @@ local current_cmd
 function property()
    local xpath, schema_name = genyang.generate_config_xpath()
    local get = genyang.generate_get(run_pid[1], schema_name, xpath)
+   local iters = 1
+   local results, results2
    current_cmd = get
 
-   local results  = (genyang.run_yang(get))
-
-   if common.check_crashed(results) then
-      return false
+   -- occasionally do a bunch of gets/sets at once
+   if math.random() < 0.01 then
+      iters = math.random(100, 1000)
    end
 
-   -- queried data doesn't exist most likely (or some other non-fatal error)
-   if results:match("short read") then
-      -- just continue because it's not worth trying to set this property
-      return
+   for i=1, iters do
+      results = (genyang.run_yang(get))
+
+      if common.check_crashed(results) then
+         return false
+      end
+
+      -- queried data doesn't exist most likely (or some other non-fatal error)
+      if results:match("short read") then
+         -- just continue because it's not worth trying to set this property
+         return
+      end
    end
 
    local set = genyang.generate_set(run_pid[1], schema_name, xpath, results)
-   results_set = genyang.run_yang(set)
    current_cmd = set
 
-   if common.check_crashed(results_set) then
-      return false
+   for i=1, iters do
+      results_set = genyang.run_yang(set)
+
+      if common.check_crashed(results_set) then
+         return false
+      end
    end
 
-   local results2 = (genyang.run_yang(get))
    current_cmd = get
+   for i=1, iters do
+      results2 = (genyang.run_yang(get))
 
-   if common.check_crashed(results2) then
-      return false
-   end
+      if common.check_crashed(results2) then
+         return false
+      end
 
-   if results ~= results2 then
-      print("Running the same config command twice produced different outputs")
-      return false
+      if results ~= results2 then
+         print("Running the same config command twice produced different outputs")
+         return false
+      end
    end
 end
 
@@ -52,6 +66,6 @@ function print_extra_information()
 end
 
 handle_prop_args =
-   common.make_handle_prop_args("prop_sameval", 40, run_pid)
+   common.make_handle_prop_args("prop_sameval", 60, run_pid)
 
 cleanup = common.make_cleanup(run_pid)
