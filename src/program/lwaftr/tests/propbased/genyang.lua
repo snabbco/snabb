@@ -93,37 +93,66 @@ local function random_hexes()
 end
 
 -- return a random number, preferring boundary values
-local function choose_range(lo, hi)
+local function choose_bounded(lo, hi)
    local r = math.random()
    if r < 0.1 then
       local mid = math.ceil((hi + lo) / 2)
-      return choose({ 0, lo, lo + 1, mid, mid +  1,  hi - 1, hi })
+      return choose({ lo, lo + 1, mid, mid +  1,  hi - 1, hi })
    else
       return math.random(lo, hi)
    end
 end
 
+-- choose a random number, taking range statements into account
+local function choose_range(rng, lo, hi)
+   if #rng == 0 then
+      return choose_bounded(lo, hi)
+   elseif rng[1] == "or" then
+      local intervals = {}
+      local num_intervals = (#rng - 1) / 2
+
+      for i=1, num_intervals do
+         intervals[i] = { rng[2*i], rng[2*i+1] }
+      end
+
+      return choose_range(choose(intervals), lo, hi)
+   else
+      local lo_rng, hi_rng = rng[1], rng[2]
+
+      if lo_rng == "min" then
+         lo_rng = lo
+      end
+      if hi_rng == "max" then
+         hi_rng = hi
+      end
+
+      return choose_bounded(math.max(lo_rng, lo), math.min(hi_rng, hi))
+   end
+end
+
 local function value_from_type(a_type)
    local prim = a_type.primitive_type
+   local rng  = a_type.range.value
 
    if prim == "int8" then
-      return choose_range(-128, 127)
+      return choose_range(rng, -128, 127)
    elseif prim == "int16" then
-      return choose_range(-32768, 32767)
+      return choose_range(rng, -32768, 32767)
    elseif prim == "int32" then
-      return choose_range(-2147483648, 2147483647)
+      return choose_range(rng, -2147483648, 2147483647)
    elseif prim == "int64" then
-      return choose_range(-9223372036854775809, 9223372036854775807)
+      return choose_range(rng, -9223372036854775809, 9223372036854775807)
    elseif prim == "uint8" then
-      return choose_range(0, 255)
+      return choose_range(rng, 0, 255)
    elseif prim == "uint16" then
-      return choose_range(0, 65535)
+      return choose_range(rng, 0, 65535)
    elseif prim == "uint32" then
-      return choose_range(0, 4294967295)
+      return choose_range(rng, 0, 4294967295)
    elseif prim == "uint64" then
-      return choose_range(0, 18446744073709551615)
+      return choose_range(rng, 0, 18446744073709551615)
+   -- TODO: account for fraction-digits and range
    elseif prim == "decimal64" then
-      local int64 = value_from_type({ primitive_type="int64" })
+      local int64 = math.random(-9223372036854775809, 9223372036854775807)
       local exp   = math.random(1, 18)
       -- see RFC 6020 sec 9.3.1 for lexical representation
       return string.format("%f", int64 * (10 ^ -exp))
@@ -132,15 +161,17 @@ local function value_from_type(a_type)
    elseif prim == "ipv4-address" then
       return math.random(0, 255) .. "." .. math.random(0, 255) .. "." ..
              math.random(0, 255) .. "." .. math.random(0, 255)
-   elseif prim == "ipv6-address" then
+   elseif prim == "ipv6-address" or prim == "ipv6-prefix" then
       local addr = random_hexes()
       for i=1, 7 do
           addr = addr .. ":" .. random_hexes()
       end
+
+      if prim == "ipv6-prefix" then
+         return addr .. "/" .. math.random(0, 128)
+      end
+
       return addr
-   elseif prim == "ipv6-prefix" then
-      local addr = value_from_type({ primitive_type = "ipv6-address" })
-      return addr .. "/" .. math.random(0, 128)
    elseif prim == "mac-address" then
       local addr = random_hex() .. random_hex()
       for i=1,5 do
@@ -398,15 +429,32 @@ function selftest()
 
    path.convert_path(grammar, generate_xpath(schema))
 
+   -- check some int types with range statements
+   for i=1, 100 do
+      local val1 = value_from_type({ primitive_type="uint8",
+                                     range={ value = {1, 16} } })
+      local val2 = value_from_type({ primitive_type="uint8",
+                                     range={ value = {"or", 1, 16, 18, 32} } })
+      local val3 = value_from_type({ primitive_type="uint8",
+                                     range={ value = {"or", "min", 10, 250, "max"} } })
+      assert(val1 >= 1 and val1 <= 16, string.format("test value: %d", val1))
+      assert(val2 >= 1 and val2 <= 32 and val2 ~= 17,
+             string.format("test value: %d", val2))
+      assert(val3 >= 0 and val3 <= 255 and not (val3 > 10 and val3 < 250),
+             string.format("test value: %d", val3))
+   end
+
    -- ensure decimal64 values match the right regexp
    for i=1, 100 do
-      local val = value_from_type({ primitive_type="decimal64" })
+      local val = value_from_type({ primitive_type="decimal64",
+                                    range={ value={} } })
       assert(string.match(val, "^-?%d+[.]%d+$"), string.format("test value: %s", val))
    end
 
    -- ensure generated base64 values are decodeable
    for i=1, 100 do
-      local val = value_from_type({ primitive_type="binary" })
+      local val = value_from_type({ primitive_type="binary",
+                                    range={ value={} }})
       local cmd = string.format("echo \"%s\" | base64 -d > /dev/null", val)
       assert(os.execute(cmd) == 0, string.format("test value: %s", val))
    end
