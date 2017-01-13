@@ -112,14 +112,13 @@ local function pid_to_parent(pid)
 end
 
 function run (raw_args)
-   local opts, pid, counter_name = parse_args(raw_args)
+   local opts, arg1, arg2 = parse_args(raw_args)
+   local pid, counter_name
    if not opts.name then
-      if tostring(pid) then pid = pid_to_parent(pid) end
-   end
-
-   if opts.name then
-      -- by-name: arguments are shifted by 1 and no pid is specified
-      counter_name = pid
+      if arg1 then pid = pid_to_parent(arg1) end
+      counter_name = arg2 -- This may be nil
+   else -- by-name: arguments are shifted by 1 and no pid is specified
+      counter_name = arg1
       -- Start by assuming it was run without --reconfigurable
       local programs = engine.enumerate_named_programs(opts.name)
       pid = programs[opts.name]
@@ -143,8 +142,10 @@ function run (raw_args)
       end
    end
    if not pid then
+      print("pid, arg1, arg2", pid, arg1, arg2)
       top.select_snabb_instance(pid)
+      -- The following is not reached when there are multiple instances.
+      fatal("Please manually specify a pid, or a name with -n name")
    end
-   local instance_tree = top.select_snabb_instance(pid)
-   print_counters(instance_tree, counter_name)
+   print_counters(pid, counter_name)
 end
