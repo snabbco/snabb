@@ -96,6 +96,8 @@ end
 -- Return the pid that was specified, unless it was a leader process,
 -- in which case, return the follower pid that actually has useful counters.
 local function pid_to_parent(pid)
+   -- It's meaningless to get the parent of a nil 'pid'.
+   if not pid then return pid end
    local pid = tonumber(pid)
    for _, name in ipairs(shm.children("/")) do
       local p = tonumber(name)
@@ -113,8 +115,6 @@ function run (raw_args)
    local opts, pid, counter_name = parse_args(raw_args)
    if tostring(pid) and not counter_name then
       counter_name, pid = nil, pid_to_parent(pid)
-   end
-   if opts.name then
    end
    if opts.name then
       -- Start by assuming it was run without --reconfigurable
