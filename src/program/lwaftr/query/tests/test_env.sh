@@ -69,3 +69,13 @@ function test_lwaftr_query {
         fatal "lwaftr query $*"
     fi
 }
+
+function test_lwaftr_query_no_counters {
+    ./snabb lwaftr query $@ > $TEMP_FILE
+    local lineno=`cat $TEMP_FILE | wc -l`
+    if [[ $lineno -eq 1 ]]; then
+        echo "Success: lwaftr query $*"
+    else
+        fatal "lwaftr query $*"
+    fi
+}

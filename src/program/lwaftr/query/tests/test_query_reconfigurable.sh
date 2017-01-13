@@ -31,6 +31,7 @@ pid=$(get_lwaftr_leader)
 if [[ -n "$pid" ]]; then
     test_lwaftr_query $pid
     test_lwaftr_query $pid "memuse-ipv"
+    test_lwaftr_query_no_counters $pid counter-never-exists-123
 fi
 
 # Test query by follower pid.
@@ -38,8 +39,10 @@ pid=$(get_lwaftr_follower)
 if [[ -n "$pid" ]]; then
     test_lwaftr_query $pid
     test_lwaftr_query $pid "memuse-ipv"
+    test_lwaftr_query_no_counters $pid counter-never-exists-123
 fi
 
 # Test query by name.
 test_lwaftr_query "--name $LWAFTR_NAME"
 test_lwaftr_query "--name $LWAFTR_NAME memuse-ipv"
+test_lwaftr_query_no_counters "--name $LWAFTR_NAME counter-never-exists-123"
