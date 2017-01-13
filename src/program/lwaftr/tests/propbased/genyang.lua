@@ -149,6 +149,7 @@ local function value_from_type(a_type)
       return addr
    elseif prim == "union" then
       return value_from_type(choose(a_type.union))
+   -- TODO: follow pattern statement
    elseif prim == "string" then
       local len = choose_nat()
       -- just ascii for now
@@ -184,18 +185,21 @@ local function value_from_type(a_type)
       end
 
       return encoded
+   elseif prim == "empty" then
+      return ""
+   elseif prim == "enumeration" then
+      local enum = choose(a_type.enums)
+      return enum.value
    end
 
-   -- TODO: generate these:
+   -- TODO: these appear unused in the current YANG schemas so
+   --       they're left out for now
    -- bits
-   -- empty
-   -- enumeration
    -- identityref
    -- instance-identifier
    -- leafref
 
-   -- unknown type
-   return nil
+   error("NYI or unknown type")
 end
 
 -- from a config schema, generate an xpath query string
