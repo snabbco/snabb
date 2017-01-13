@@ -7,6 +7,8 @@ local lwcounter = require("apps.lwaftr.lwcounter")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
+local app = require("core.app")
+local ps = require("program.ps.ps")
 
 local keys, fatal = lwutil.keys, lwutil.fatal
 
@@ -66,8 +68,12 @@ local function read_counters (tree)
    return ret, max_width
 end
 
+-- Filters often contain '-', which is a special character for match.
+-- Escape it.
 local function skip_counter (name, filter)
-   return filter and not name:match(filter)
+   local escaped_filter = filter
+   if escaped_filter then escaped_filter = filter:gsub("-", "%%-") end
+   return filter and not name:match(escaped_filter)
 end
 
 local function print_counter (name, value, max_width)
@@ -87,18 +93,58 @@ local function print_counters (tree, filter)
    end
 end
 
-function run (raw_args)
-   local opts, pid, counter_name = parse_args(raw_args)
-   if tostring(pid) and not counter_name then
-      counter_name, pid = pid, nil
+-- Return the pid that was specified, unless it was a leader process,
+-- in which case, return the follower pid that actually has useful counters.
+local function pid_to_parent(pid)
+   -- It's meaningless to get the parent of a nil 'pid'.
+   if not pid then return pid end
+   local pid = tonumber(pid)
+   for _, name in ipairs(shm.children("/")) do
+      local p = tonumber(name)
+      if p and ps.is_worker(p) then
+         local leader_pid = tonumber(ps.get_leader_pid(p))
+         -- If the precomputed by-name pid is the leader pid, set the pid
+         -- to be the follower's pid instead to get meaningful counters.
+      if leader_pid == pid then pid = p end
+      end
    end
-   if opts.name then
+   return pid
+end
+
+function run (raw_args)
+   local opts, arg1, arg2 = parse_args(raw_args)
+   local pid, counter_name
+   if not opts.name then
+      if arg1 then pid = pid_to_parent(arg1) end
+      counter_name = arg2 -- This may be nil
+   else -- by-name: arguments are shifted by 1 and no pid is specified
+      counter_name = arg1
+      -- Start by assuming it was run without --reconfigurable
       local programs = engine.enumerate_named_programs(opts.name)
       pid = programs[opts.name]
       if not pid then
          fatal(("Couldn't find process with name '%s'"):format(opts.name))
       end
+
+      -- Check if it was run with --reconfigurable
+      -- If it was, find the children, then find the pid of their parent.
+      -- Note that this approach will break as soon as there can be multiple
+      -- followers which need to have their statistics aggregated, as it will
+      -- only print the statistics for one child, not for all of them.
+      for _, name in ipairs(shm.children("/")) do
+         local p = tonumber(name)
+         if p and ps.is_worker(p) then
+            local leader_pid = tonumber(ps.get_leader_pid(p))
+            -- If the precomputed by-name pid is the leader pid, set the pid
+            -- to be the follower's pid instead to get meaningful counters.
+            if leader_pid == pid then pid = p end
+         end
+      end
    end
-   local instance_tree = top.select_snabb_instance(pid)
-   print_counters(instance_tree, counter_name)
+   if not pid then
+      top.select_snabb_instance(pid)
+      -- The following is not reached when there are multiple instances.
+      fatal("Please manually specify a pid, or a name with -n name")
+   end
+   print_counters(pid, counter_name)
 end
