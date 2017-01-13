@@ -3,6 +3,7 @@ module(..., package.seeall)
 -- common definitions for property-based tests for snabb config
 
 local S = require("syscall")
+local pci = require("lib.hardware.pci")
 
 function make_handle_prop_args(name, duration, pidbox)
   local handler = function(prop_args)
@@ -13,6 +14,8 @@ function make_handle_prop_args(name, duration, pidbox)
   
      -- TODO: validate the address
      local pci_addr = prop_args[1]
+     assert(S.stat(pci.path(pci_addr)),
+            string.format("Invalid PCI address: %s", pci_addr))
   
      local pid = S.fork()
      if pid == 0 then
