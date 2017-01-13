@@ -221,7 +221,7 @@ local function ietf_softwire_translator ()
       br_instance[br_instance_key_t({id=1})] = {
          tunnel_payload_mtu = native_config.softwire_config.internal_interface.mtu,
          tunnel_path_mru = native_config.softwire_config.external_interface.mtu,
-         -- FIXME: What it should map to?
+         -- FIXME: There's no equivalent of softwire-num-threshold in snabb-softwire-v1.
          softwire_num_threshold = 0xffffffff,
          binding_table = {
             binding_entry = ietf_binding_table_from_native(
@@ -276,7 +276,7 @@ local function ietf_softwire_translator ()
                                  'br-instances', 'br-instance'}
       local bt_paths = {'binding-table', 'binding-entry'}
 
-      -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-threshold)
+      -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-threshold).
       if #path > #br_instance_paths then
          if path[#path].name == 'tunnel-payload-mtu' then
             return {{'set', {schema='snabb-softwire-v1',
@@ -289,8 +289,7 @@ local function ietf_softwire_translator ()
                      config=tostring(arg)}}}
          end
          if path[#path].name == 'softwire-num-threshold' then
-            -- FIXME: Do nothing.
-            return {}
+            error('not yet implemented: softwire-num-threshold')
          end
          error('unrecognized leaf: '..path[#path].name)
       end
