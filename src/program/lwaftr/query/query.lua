@@ -113,9 +113,7 @@ end
 
 function run (raw_args)
    local opts, pid, counter_name = parse_args(raw_args)
-   if tostring(pid) and not counter_name then
-      counter_name, pid = nil, pid_to_parent(pid)
-   end
+   if tostring(pid) then pid = pid_to_parent(pid) end
    if opts.name then
       -- Start by assuming it was run without --reconfigurable
       local programs = engine.enumerate_named_programs(opts.name)
