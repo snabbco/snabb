@@ -132,7 +132,13 @@ end
 
 local function value_from_type(a_type)
    local prim = a_type.primitive_type
-   local rng  = a_type.range.value
+   local rng
+
+   if a_type.range then
+      rng = a_type.range.value
+   else
+      rng = {}
+   end
 
    if prim == "int8" then
       return choose_range(rng, -128, 127)
