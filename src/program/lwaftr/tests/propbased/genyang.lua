@@ -92,10 +92,16 @@ local function random_hexes()
    return str
 end
 
--- return a random number, preferring boundary values
+-- return a random number, preferring boundary values and
+-- sometimes returning results out of range
 local function choose_bounded(lo, hi)
    local r = math.random()
-   if r < 0.1 then
+   -- occasionally return values that are invalid for type
+   -- to provoke crashes
+   if r < 0.05 then
+      local off = math.random(1, 100)
+      return choose({ lo - off, hi + off })
+   elseif r < 0.15 then
       local mid = math.ceil((hi + lo) / 2)
       return choose({ lo, lo + 1, mid, mid +  1,  hi - 1, hi })
    else
@@ -105,7 +111,9 @@ end
 
 -- choose a random number, taking range statements into account
 local function choose_range(rng, lo, hi)
-   if #rng == 0 then
+   local r = math.random()
+
+   if #rng == 0 or r < 0.1 then
       return choose_bounded(lo, hi)
    elseif rng[1] == "or" then
       local intervals = {}
