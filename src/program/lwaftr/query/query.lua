@@ -142,7 +142,6 @@ function run (raw_args)
       end
    end
    if not pid then
-      print("pid, arg1, arg2", pid, arg1, arg2)
       top.select_snabb_instance(pid)
       -- The following is not reached when there are multiple instances.
       fatal("Please manually specify a pid, or a name with -n name")
