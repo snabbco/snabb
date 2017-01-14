@@ -1,12 +1,9 @@
 module(..., package.seeall)
 
-local lwdebug = require("apps.lwaftr.lwdebug")
 local app = require("core.app")
 local basic_apps = require("apps.basic.basic_apps")
-local bit = require("bit")
 local constants = require("apps.lwaftr.constants")
 local ethernet = require("lib.protocol.ethernet")
-local ipsum = require("lib.checksum").ipsum
 local tcp = require("lib.protocol.tcp")
 local udp = require("lib.protocol.udp")
 local ipv4 = require("lib.protocol.ipv4")
@@ -19,10 +16,8 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local transmit, receive = link.transmit, link.receive
-local htons = lib.htons
-local rd16, rd32, wr16  = lwutil.rd16, lwutil.rd32, lwutil.wr16
+local rd16, rd32 = lwutil.rd16, lwutil.rd32
 local ipv6_equals = lwutil.ipv6_equals
-local lshift, band = bit.lshift, bit.band
 
 nh_fwd4 = {
    config = {
@@ -51,7 +46,6 @@ local ethernet_header_size = constants.ethernet_header_size
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
 local proto_ipv4 = constants.proto_ipv4
 local ipv6_frag = constants.ipv6_frag
-local o_ipv4_checksum = constants.o_ipv4_checksum
 local o_ipv4_dst_addr = constants.o_ipv4_dst_addr
 local o_ipv4_src_addr = constants.o_ipv4_src_addr
 local o_ipv6_next_header = constants.o_ipv6_next_header
@@ -612,7 +606,6 @@ local function test_ipv4_cache_trigger (pkt)
    local ip_hdr = ipv4:new_from_mem(refresh_packet.data + ethernet_header_size, pkt.length - ethernet_header_size)
    assert(ip_hdr:src_eq(n_cache_src_ipv4))
    assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
-   lwdebug.print_pkt(refresh_packet)
 end
 
 local function test_ipv6_cache_trigger (pkt)
