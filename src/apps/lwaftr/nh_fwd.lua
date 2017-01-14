@@ -600,21 +600,31 @@ local function test_ipv6_flow ()
 end
 
 local function test_ipv4_cache_trigger (pkt)
+   local checksum = require("lib.checksum")
    local ether_dhost = "52:54:00:00:00:01"
    local refresh_packet = ipv4_cache_trigger(pkt, ethernet:pton(ether_dhost))
    local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
-   local ip_hdr = ipv4:new_from_mem(refresh_packet.data + ethernet_header_size, pkt.length - ethernet_header_size)
+   local ip_hdr = ipv4:new_from_mem(refresh_packet.data + ethernet_header_size,
+      refresh_packet.length - ethernet_header_size)
    assert(ip_hdr:src_eq(n_cache_src_ipv4))
    assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
+   assert(checksum.verify_packet(refresh_packet.data + ethernet_header_size,
+      refresh_packet.length - ethernet_header_size))
 end
 
 local function test_ipv6_cache_trigger (pkt)
+   local checksum = require("lib.checksum")
    local ether_dhost = "52:54:00:00:00:01"
    local refresh_packet = ipv6_cache_trigger(pkt, ethernet:pton(ether_dhost))
    local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
-   local ip_hdr = ipv6:new_from_mem(refresh_packet.data + ethernet_header_size, pkt.length - ethernet_header_size)
+   local ip_hdr = ipv6:new_from_mem(refresh_packet.data + ethernet_header_size,
+      refresh_packet.length - ethernet_header_size)
    assert(ip_hdr:src_eq(n_cache_src_ipv6))
    assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
+   local payload_offset = ethernet_header_size + ipv6_fixed_header_size
+   local ipv4_pkt = refresh_packet.data + payload_offset
+   local ipv4_pkt_length = refresh_packet.length - payload_offset
+   assert(checksum.verify_packet(ipv4_pkt, ipv4_pkt_length))
 end
 
 local function ipv4_udp_pkt ()
