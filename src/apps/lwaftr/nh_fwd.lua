@@ -56,6 +56,7 @@ local o_ipv4_dst_addr = constants.o_ipv4_dst_addr
 local o_ipv4_src_addr = constants.o_ipv4_src_addr
 local o_ipv6_next_header = constants.o_ipv6_next_header
 local o_ipv6_src_addr = constants.o_ipv6_src_addr
+local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
 
 local n_cache_src_ipv4 = ipv4:pton("169.254.254.254")
 local val_cache_src_ipv4 = rd32(n_cache_src_ipv4)
@@ -93,6 +94,10 @@ local function copy_ether(dst, src)
    ffi.copy(dst, src, 6)
 end
 
+local function random_port ()
+   return math.random(65535)
+end
+
 -- Set a bogus source IP address fe80::, so we can recognize it later when
 -- it comes back from the VM.
 --
@@ -106,22 +111,37 @@ end
 --
 local function ipv6_cache_trigger (pkt, mac)
    local ether_hdr = ethernet:new_from_mem(pkt.data, ethernet_header_size)
-   local ip_hdr = ipv6:new_from_mem(pkt.data + ethernet_header_size, pkt.length - ethernet_header_size)
+   local ipv6_hdr = ipv6:new_from_mem(pkt.data + ethernet_header_size, pkt.length - ethernet_header_size)
+   local ipv6_payload_offset = ethernet_header_size + ipv6_fixed_header_size
+   local ipv4_hdr = ipv4:new_from_mem(pkt.data + ipv6_payload_offset, pkt.length - ipv6_payload_offset)
 
    -- VM will discard packets not matching its MAC address on the interface.
    ether_hdr:dst(mac)
    -- Set a bogus source IP address.
-   ip_hdr:src(n_cache_src_ipv6)
+   ipv6_hdr:src(n_cache_src_ipv6)
+
+   -- Set random port.
+   local tcp_hdr
+   local tcp_offset = ipv6_payload_offset + ipv4_hdr:ihl() * 4
+   local proto = ipv4_hdr:protocol()
+   local payload_offset
+   if proto == proto_tcp then
+      tcp_hdr = tcp:new_from_mem(pkt.data + tcp_offset, pkt.length - tcp_offset)
+      payload_offset = tcp_offset + tcp_hdr:sizeof()
+   elseif proto == proto_udp then
+      tcp_hdr = udp:new_from_mem(pkt.data + tcp_offset, pkt.length - tcp_offset)
+      payload_offset = tcp_offset + tcp_hdr:sizeof()
+   end
+   tcp_hdr:src_port(random_port())
+   -- Recalculate checksum.
+   ipv4_hdr:checksum()
+   tcp_hdr:checksum(pkt.data + payload_offset, pkt.length - payload_offset, ipv4_hdr)
 
    return pkt
 end
 
 local function send_ipv6_cache_trigger (r, pkt, mac)
    transmit(r, ipv6_cache_trigger(pkt, mac))
-end
-
-local function random_port ()
-   return math.random(65535)
 end
 
 local function ipv4_cache_trigger (pkt, mac)
@@ -136,6 +156,7 @@ local function ipv4_cache_trigger (pkt, mac)
    local tcp_hdr
    local tcp_offset = ethernet_header_size + (ip_hdr:ihl() * 4)
    local proto = ip_hdr:protocol()
+   local payload_offset
    if proto == proto_tcp then
       tcp_hdr = tcp:new_from_mem(pkt.data + tcp_offset, pkt.length - tcp_offset)
       payload_offset = tcp_offset + tcp_hdr:sizeof()
