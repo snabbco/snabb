@@ -417,12 +417,28 @@ function generate_config_xpath(schema_name)
    return generate_xpath(schema, false), schema_name
 end
 
+-- types that may be randomly picked for a fuzzed test case
+local types = { "int8", "int16", "int32", "int64", "uint8", "uint16",
+                "uint32", "uint64", "decimal64", "boolean", "ipv4-address",
+                "ipv6-address", "ipv6-prefix", "mac-address", "string",
+                "binary" }
+
 function generate_config_xpath_and_val(schema_name)
    if not schema_name then
       schema_name = choose(schemas)
    end
    local schema = schema.load_schema_by_name(schema_name)
-   local path, val = generate_xpath_and_val(schema)
+   local r = math.random()
+   local path, val
+
+   -- once in a while, generate a nonsense value
+   if r < 0.05 then
+     path = generate_xpath(schema, false)
+     val = value_from_type({ primitive_type=choose(types) })
+   else
+     path, val = generate_xpath_and_val(schema)
+   end
+
    return path, val, schema_name
 end
 
