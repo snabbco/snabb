@@ -10,15 +10,19 @@ require('lib.yang.schema').set_default_capabilities(capabilities)
 
 local schemas = { "ietf-softwire", "snabb-softwire-v1" }
 
--- Generate a get/set command string given a pid string and optional schema
-function generate_get_or_set(pid, schema)
+-- Generate a get/set/add command string given a pid string and optional schema
+function generate_get_set_add(pid, schema)
    local r = math.random()
-   if r > 0.5 then
+   if r <= 0.33 then
       local query, schema = generate_config_xpath(schema)
       return string.format("./snabb config get -s %s %s \"%s\"", schema, pid, query)
-   else
+   elseif r > 0.33 and r <= 0.66 then
       local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config set -s %s %s \"%s\" \"%s\"",
+                           schema, pid, query, val)
+   else
+      local query, val, schema = generate_config_xpath_and_val(schema)
+      return string.format("./snabb config add -s %s %s \"%s\" \"%s\"",
                            schema, pid, query, val)
    end
 end
