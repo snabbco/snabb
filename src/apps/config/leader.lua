@@ -319,17 +319,18 @@ local function path_remover_for_grammar(grammar, path)
    local head, tail = lib.dirname(path), lib.basename(path)
    local tail_path = path_mod.parse_path(tail)
    local tail_name, query = tail_path[1].name, tail_path[1].query
-   local getter, grammar = path_mod.resolver(grammar, head..'/'..tail_name)
+   local head_and_tail_name = head..'/'..tail_name
+   local getter, grammar = path_mod.resolver(grammar, head_and_tail_name)
    if grammar.type == 'array' then
       if grammar.ctype then
          -- It's an FFI array; have to create a fresh one, sadly.
          local idx = path_mod.prepare_array_lookup(query)
-         local setter = path_setter_for_grammar(top_grammar, head)
+         local setter = path_setter_for_grammar(top_grammar, head_and_tail_name)
          local elt_t = data.typeof(grammar.ctype)
          local array_t = ffi.typeof('$[?]', elt_t)
          return function(config)
             local cur = getter(config)
-            assert(i <= #cur)
+            assert(idx <= #cur)
             local new = array_t(#cur - 1)
             for i,elt in ipairs(cur) do
                if i < idx then new[i-1] = elt end
