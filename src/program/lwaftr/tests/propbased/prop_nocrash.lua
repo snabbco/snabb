@@ -7,7 +7,7 @@ local run_pid = {}
 local current_cmd
 
 function property()
-   current_cmd = genyang.generate_get_set_add(run_pid[1])
+   current_cmd = genyang.generate_any(run_pid[1])
    local results = (genyang.run_yang(current_cmd))
    if common.check_crashed(results) then
       return false

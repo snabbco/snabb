@@ -10,20 +10,31 @@ require('lib.yang.schema').set_default_capabilities(capabilities)
 
 local schemas = { "ietf-softwire", "snabb-softwire-v1" }
 
--- Generate a get/set/add command string given a pid string and optional schema
-function generate_get_set_add(pid, schema)
-   local r = math.random()
-   if r <= 0.33 then
+-- choose an element of an array randomly
+local function choose(choices)
+   local idx = math.random(#choices)
+   return choices[idx]
+end
+
+-- Generate a get/set/add/remove string given a pid string and optional schema
+function generate_any(pid, schema)
+   local cmd = choose({ "get", "add", "remove", "set" })
+
+   if cmd == "get" then
       local query, schema = generate_config_xpath(schema)
       return string.format("./snabb config get -s %s %s \"%s\"", schema, pid, query)
-   elseif r > 0.33 and r <= 0.66 then
+   elseif cmd == "set" then
       local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config set -s %s %s \"%s\" \"%s\"",
                            schema, pid, query, val)
-   else
+   elseif cmd == "add" then
       local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config add -s %s %s \"%s\" \"%s\"",
                            schema, pid, query, val)
+   else
+      local query, schema = generate_config_xpath(schema)
+      return string.format("./snabb config remove -s %s %s \"%s\"",
+                           schema, pid, query)
    end
 end
 
@@ -54,12 +65,6 @@ function run_yang(yang_cmd)
    local result = f:read("*a")
    f:close()
    return result
-end
-
--- choose an element of an array randomly
-local function choose(choices)
-   local idx = math.random(#choices)
-   return choices[idx]
 end
 
 -- choose a natural number (e.g., index or length of array) by
