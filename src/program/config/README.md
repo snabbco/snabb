@@ -232,7 +232,7 @@ Using `snabb config load` has the advantage that any configuration
 error has a corresponding source location.
 
 `snabb config` can also remove part of a configuration, but only on
-configuration that corresponds to YANG schema `leaf` or `leaf-list`
+configuration that corresponds to YANG schema `list` or `leaf-list`
 nodes:
 
 ```
