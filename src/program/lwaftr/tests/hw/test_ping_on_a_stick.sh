@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+# set -x
+
 SKIPPED_CODE=43
 
 if [[ $EUID -ne 0 ]]; then
@@ -75,7 +77,7 @@ function cleanup {
 
 trap cleanup EXIT HUP INT QUIT TERM
 
-LWAFTR_CONF=lwaftr-migrated.conf
+LWAFTR_CONF=program/lwaftr/tests/data/lwaftr-vlan.conf
 EXTERNAL_IP=10.0.1.1
 INTERNAL_IP=fe80::100
 IPV4_ADDRESS=10.0.1.2/24
