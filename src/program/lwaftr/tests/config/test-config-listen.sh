@@ -3,6 +3,7 @@
 ## response. It only tests the socket method of communicating
 ## with the listen command due to the difficulties of testing
 ## interactive scripts.
+SKIPPED_CODE=43
 
 if [[ $EUID -ne 0 ]]; then
    echo "This script must be run as root" 1>&2
@@ -14,7 +15,7 @@ fi
 which nc &> /dev/null
 if [[ $? -ne 0 ]]; then
    echo "No 'nc' tool present, unable to run test." 1&>2
-   exit 1
+   exit $SKIPPED_CODE
 fi
 
 # Load the tools to be able to test stuff.
