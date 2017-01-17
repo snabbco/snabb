@@ -215,7 +215,7 @@ function load_on_a_stick(c, conf, args)
          pciaddr = pciaddr,
          vmdq=internal_interface.vlan_tag,
          vlan=internal_interface.vlan_tag,
-         macaddr = ethernet:ntop(conf.internal_interface.mac)})
+         macaddr = ethernet:ntop(internal_interface.mac)})
 
       link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
       link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')

@@ -121,12 +121,15 @@ function parse_args(args)
    end
 end
 
--- Requires a V4V6 splitter iff:
---   Always when running in on-a-stick mode, except if v4_vlan_tag != v6_vlan_tag.
+-- Requires a V4V6 splitter if running in on-a-stick mode and VLAN tag values
+-- are the same for the internal and external interfaces.
 local function requires_splitter (opts, conf)
-   if not opts["on-a-stick"] then return false end
-   if not conf.vlan_tagging then return true end
-   return conf.v4_vlan_tag == conf.v6_vlan_tag
+   if opts["on-a-stick"] then
+      local internal_interface = conf.softwire_config.internal_interface
+      local external_interface = conf.softwire_config.external_interface
+      return internal_interface.vlan_tag == external_interface.vlan_tag
+   end
+   return false
 end
 
 function run(args)
