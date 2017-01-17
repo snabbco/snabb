@@ -37,7 +37,7 @@ function assert_equal {
 # duration is set to prevent it running indefinitely.
 function start_lwaftr_bench {
     ./snabb lwaftr bench --reconfigurable --bench-file /dev/null --name "$1" \
-	                 --duration 20 \
+	                 --duration 30 \
                          program/lwaftr/tests/data/icmp_on_fail.conf \
                          program/lwaftr/tests/benchdata/ipv{4,6}-0550.pcap &> /dev/null &
 
@@ -51,4 +51,16 @@ function stop_lwaftr_bench {
     kill -15 "%$jobid"
     # Wait until it's shutdown.
     wait &> /dev/null
+}
+
+function stop_if_running {
+   # Check if it's running, if not, job done.
+   kill -0 "$1" &> /dev/null
+   if [[ "$?" -ne 0 ]]; then
+      return
+   fi
+
+   # It's running, lets try and close it nicely
+   kill -15 "$1"
+   wait &> /dev/null
 }
