@@ -31,12 +31,30 @@ function generate_any(pid, schema)
       local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config set -s %s %s \"%s\" \"%s\"",
                            schema, pid, query, val)
+   -- use rejection sampling for add and remove commands to restrict to list or
+   -- leaf-list cases (for remove, we need a case with a selector too)
+   -- Note: this assumes a list or leaf-list case exists in the schema at all
    elseif cmd == "add" then
-      local query, val, schema = generate_config_xpath_and_val(schema)
+      local query, val, schema
+      local ok = false
+      while not ok do
+         query, val, schema = generate_config_xpath_and_val(schema)
+         if string.match(tostring(val), "^{.*}$") then
+            ok = true
+         end
+      end
+      --local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config add -s %s %s \"%s\" \"%s\"",
                            schema, pid, query, val)
    else
-      local query, schema = generate_config_xpath(schema)
+      local query, val, schema
+      local ok = false
+      while not ok do
+         query, val, schema = generate_config_xpath_and_val(schema)
+         if string.match(query, "[]]$") then
+            ok = true
+         end
+      end
       return string.format("./snabb config remove -s %s %s \"%s\"",
                            schema, pid, query)
    end
@@ -262,10 +280,13 @@ end
 
 -- from a config schema, generate an xpath query string
 -- this code is patterned off of the visitor used in lib.yang.data
-local function generate_xpath_and_last_node(schema, for_state)
+local function generate_xpath_and_node_info(schema, for_state)
    local path = ""
    local handlers = {}
-   local last_node
+
+   -- data describing how to generate a value for the chosen path
+   -- it's a table with `node` and possibly-nil `selector` keys
+   local gen_info
 
    local function visit(node)
       local handler = handlers[node.kind]
@@ -285,7 +306,7 @@ local function generate_xpath_and_last_node(schema, for_state)
       if id then
          visit(node.body[id])
       else
-         last_node = node
+         gen_info = { node = node }
       end
    end
    function handlers.container(node)
@@ -296,13 +317,17 @@ local function generate_xpath_and_last_node(schema, for_state)
       if math.random() < 0.9 then
          visit_body(node)
       else
-         last_node = node
+         gen_info = { node = node }
       end
    end
    handlers['leaf-list'] = function(node)
-      local selector = string.format("[position()=%d]", choose_nat())
+      local idx      = choose_nat()
+      local selector = string.format("[position()=%d]", idx)
       path = path .. "/" .. node.id .. selector
-      last_node = node
+
+      -- TODO: this case should sometimes return the whole list instead of
+      --       just a single position in it
+      gen_info = { node = node, selector = idx }
    end
    function handlers.list(node)
       local key_types = {}
@@ -311,7 +336,7 @@ local function generate_xpath_and_last_node(schema, for_state)
       path = path .. "/" .. node.id
 
       -- occasionally drop the selectors
-      if r < 0.9 then
+      if r < 0.7 then
          for key in (node.key):split(" +") do
             key_types[key] =  node.body[key].type
          end
@@ -320,18 +345,21 @@ local function generate_xpath_and_last_node(schema, for_state)
             local val = assert(value_from_type(type), type.primitive_type)
             path = path .. string.format("[%s=%s]", key, val)
          end
-      end
 
-      if math.random() < 0.9 then
-         visit_body(node)
+         -- continue path for child nodes
+         if math.random() < 0.5 then
+            visit_body(node)
+         else
+            gen_info = { node = node, selector = key_types }
+         end
       else
-         last_node = node
+         gen_info = { node = node }
       end
    end
    function handlers.leaf(node)
       path = path .. "/" .. node.id
       val  = value_from_type(node.type)
-      last_node = node
+      gen_info = { node = node }
    end
 
    -- just produce "/" on rare occasions
@@ -339,20 +367,27 @@ local function generate_xpath_and_last_node(schema, for_state)
       visit_body(schema)
    end
 
-   return path, last_node
+   return path, gen_info
 end
 
 -- similar to generating a query path like the function above, but
 -- generates a compound value for `snabb config set` at some schema
 -- node
-local function generate_value_for_node(node)
-   local handlers = {}
+local function generate_value_for_node(gen_info)
+   -- hack for mutual recursion
+   local generate_compound
 
-   local function visit(node)
-      local handler = handlers[node.kind]
-      if handler then return handler(node) end
+   local function generate(node)
+      if node.kind == "container" or node.kind == "list" then
+         return generate_compound(node)
+      elseif node.kind == "leaf-list" or node.kind == "leaf" then
+         return value_from_type(node.type)
+      end
    end
-   local function visit_body(node)
+
+   -- take a node and (optional) keys and generate a compound value
+   -- the keys are only provided for a list node
+   generate_compound = function(node, keys)
       local ids = {}
       for id, node in pairs(node.body) do
          -- only choose nodes that are used in configs
@@ -362,22 +397,24 @@ local function generate_value_for_node(node)
       end
 
       local val = ""
+
       for _, id in ipairs(ids) do
          local subnode = node.body[id]
          local r = math.random()
-         if subnode.mandatory or r > 0.5 then
+         if (subnode.mandatory or r > 0.5) and
+            (not keys or not keys[id]) then
 
             if subnode.kind == "leaf-list" then
                local count = choose_nat()
                for i=0, count do
-                  local subval = visit(subnode)
+                  local subval = generate(subnode)
                   val = val .. string.format("%s %s; ", id, subval)
                end
             elseif subnode.kind == "container" or subnode.kind == "list" then
-               local subval = visit(subnode)
+               local subval = generate(subnode)
                val = val .. string.format("%s {%s} ", id, subval)
             else
-               local subval = visit(subnode)
+               local subval = generate(subnode)
                val = val .. string.format("%s %s; ", id, subval)
             end
          end
@@ -385,37 +422,34 @@ local function generate_value_for_node(node)
 
       return val
    end
-   function handlers.container(node)
-      return visit_body(node)
-   end
-   handlers['leaf-list'] = function(node)
-      return value_from_type(node.type)
-   end
-   function handlers.list(node)
-      -- FIXME: this will sometimes include a value for the list keys
-      --        which isn't valid when the query path sets the keys
-      return visit_body(node)
-   end
-   function handlers.leaf(node)
-      return value_from_type(node.type)
-   end
 
-   return visit(node)
+   local node = gen_info.node
+   if node.kind == "list" and gen_info.selector then
+      generate_compound(node, gen_info.selector)
+   else
+      -- a top-level list needs the brackets, e.g., as in
+      -- snabb config add /routes/route { addr 1.2.3.4; port 1; }
+      if node.kind == "list" then
+         return "{" .. generate(node) .. "}"
+      else
+         return generate(node)
+      end
+   end
 end
 
 local function generate_xpath(schema, for_state)
-   local path = generate_xpath_and_last_node(schema, for_state)
+   local path = generate_xpath_and_node_info(schema, for_state)
    return path
 end
 
 local function generate_xpath_and_val(schema)
-   local val, path, last
+   local val, path, gen_info
 
    while not val do
-      path, last = generate_xpath_and_last_node(schema)
+      path, gen_info = generate_xpath_and_node_info(schema)
 
-      if last then
-         val = generate_value_for_node(last)
+      if gen_info then
+         val = generate_value_for_node(gen_info)
       end
    end
 
