@@ -368,20 +368,53 @@ local function increment_br(conf)
    return conf
 end
 
+local function remove_address_list(conf)
+   local bt = conf.softwire_config.binding_table
+   local k, e
+   for key, entry in cltable.pairs(bt.softwire) do
+      entry.br_address = bt.br_address[entry.br]
+      entry.br = nil
+   end
+   return conf
+end
+
 local function migrate_3_0_1(conf_file)
    local data = require('lib.yang.data')
    local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   return increment_br(data.load_data_for_schema_by_name(
-                          'snabb-softwire-v1', str, conf_file))
+   return remove_address_list(increment_br(data.load_data_for_schema_by_name(
+                          'snabb-softwire-v1', str, conf_file)))
 end
 
 local function migrate_3_0_1bis(conf_file)
-   return increment_br(yang.load_configuration(
-                          conf_file, {schema_name='snabb-softwire-v1'}))
+   return remove_address_list(increment_br(yang.load_configuration(
+                          conf_file, {schema_name='snabb-softwire-v1'})))
+end
+
+local function migrate_3_1_0(conf_file)
+   -- Lets create a custom schema programatically as an intermediatory so we can
+   -- switch over to v2 of snabb-softwire config.
+   local schema = yang.load_schema_by_name("snabb-softwire-v1")
+   local binding_table = schema.body["softwire-config"].body["binding-table"]
+
+   -- Add the new field programatically (TODO: Make a function to take a
+   -- fragment of yang and convert add it to a schema). Not robust.
+   binding_table.body.softwire.body["br-address"] = {
+      id = "br-address",
+      kind = "leaf",
+      type = binding_table.body.softwire.body["b4-ipv6"].type,
+      primitive_type="ipv6-address",
+      must={}
+   }
+
+   -- Load the config file with our new intermediatory config
+   local src = io.open(conf_file, "r"):read("*a")
+   local data = yang.load_data_for_schema(schema, src, conf_file)
+   return remove_address_list(data)
 end
 
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
-                    ['3.0.1.1'] = migrate_3_0_1bis }
+                    ['3.0.1.1'] = migrate_3_0_1bis,
+                    ['3.1.0'] = migrate_3_1_0 }
 function run(args)
    local conf_file, version = parse_args(args)
    local migrate = migrators[version]
@@ -390,6 +423,6 @@ function run(args)
       show_usage(1)
    end
    local conf = migrate(conf_file)
-   yang.print_data_for_schema_by_name('snabb-softwire-v1', conf, io.stdout)
+   yang.print_data_for_schema_by_name('snabb-softwire-v2', conf, io.stdout)
    main.exit(0)
 end
