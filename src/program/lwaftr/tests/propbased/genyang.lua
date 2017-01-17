@@ -10,6 +10,10 @@ require('lib.yang.schema').set_default_capabilities(capabilities)
 
 local schemas = { "ietf-softwire", "snabb-softwire-v1" }
 
+-- toggles whether functions should intentionally generate invalid
+-- values for fuzzing purposes
+local generate_invalid = true
+
 -- choose an element of an array randomly
 local function choose(choices)
    local idx = math.random(#choices)
@@ -107,7 +111,7 @@ local function choose_bounded(lo, hi)
    local r = math.random()
    -- occasionally return values that are invalid for type
    -- to provoke crashes
-   if r < 0.05 then
+   if generate_invalid and r < 0.05 then
       local off = math.random(1, 100)
       return choose({ lo - off, hi + off })
    elseif r < 0.15 then
@@ -122,7 +126,7 @@ end
 local function choose_range(rng, lo, hi)
    local r = math.random()
 
-   if #rng == 0 or r < 0.1 then
+   if #rng == 0 or (generate_invalid and r < 0.1) then
       return choose_bounded(lo, hi)
    elseif rng[1] == "or" then
       local intervals = {}
@@ -441,7 +445,7 @@ function generate_config_xpath_and_val(schema_name)
    local path, val
 
    -- once in a while, generate a nonsense value
-   if r < 0.05 then
+   if generate_invalid and r < 0.05 then
      path = generate_xpath(schema, false)
      val = value_from_type({ primitive_type=choose(types) })
    else
@@ -467,6 +471,9 @@ function selftest()
    local grammar = data.data_grammar_from_schema(schema)
 
    path.convert_path(grammar, generate_xpath(schema))
+
+   -- set flag to false to make tests predictable
+   generate_invalid = false
 
    -- check some int types with range statements
    for i=1, 100 do
