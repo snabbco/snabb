@@ -8,6 +8,11 @@ local ffi    = require("ffi")
 local link   = require("core.link")
 local packet = require("core.packet")
 local S      = require("syscall")
+local udp  = require("lib.protocol.udp")
+local bit = require("bit")
+
+local C      = ffi.C
+local ECONNRESET = 73
 
 EPollSocket = {}
 EPollSocket.__index = EPollSocket
@@ -45,7 +50,8 @@ function EPollSocket:new (arg)
    end
    local function nilf() return nil end
 
-   local maxevents = 1024;
+   local EP_MAX_EVENTS = 512
+   local UDP_HDR_SIZE = 8
    local mode = "stream"
    --[[
    mode = assert(modes[mode or "stream"], "invalid mode")
@@ -65,7 +71,7 @@ function EPollSocket:new (arg)
          event = t.epoll_event(),
          add = function(this, s)
             local event = this.event
-            event.events = c.EPOLL.IN
+            event.events = bit.bor( c.EPOLL.IN, c.EPOLL.ERR, c.EPOLL.HUP, c.EPOLL.RDHUP)
             event.data.fd = s:getfd()
             assert(this.fd:epoll_ctl("add", s, event))
          end,
@@ -73,7 +79,7 @@ function EPollSocket:new (arg)
             -- will not running on linux 2.6.9 or lower
             assert(this.fd:epoll_ctl("del", s, nil))
          end,
-         events = t.epoll_events(maxevents),
+         events = t.epoll_events(EP_MAX_EVENTS),
          get = function(this)
             local f, a, r = this.fd:epoll_wait(this.events)
             if not f then
@@ -83,7 +89,7 @@ function EPollSocket:new (arg)
                return f, a, r
             end
          end,
-         eof = function(ev) return ev.HUP or ev.ERR or ev.RDHUP end,
+         eof = function(ev) return (ev.HUP or ev.ERR or ev.RDHUP) end,
       }
    end
 
@@ -135,6 +141,7 @@ function EPollSocket:new (arg)
 
    --send/receive packets
    local w = {}
+   w[s:getfd()] = s
 
    local sock
    local function connect()
@@ -167,13 +174,15 @@ function EPollSocket:new (arg)
    function self:pull()
       local l = self.output.tx
       if l == nil then return end
+
       local limit = engine.pull_npackets
       for i, ev in ep:get() do
          if ep.eof(ev) then
-            ev.fd:close()
+            -- closing include two part, 1st, remove fd from epoll; 2nd, close the fd at the end of the loop
+            -- use fd as src | dst port might mix data, one connection rdhup, another reuse it's fd, will recieved pkt processed for prev...
             ep:del(w[ev.fd])
-            w[ev.fd] = nil
          end
+         -- BUG: when client
 
          if limit == 0 then break end
          limit = limit - 1
@@ -191,44 +200,76 @@ function EPollSocket:new (arg)
             local fd = w[ev.fd]
             -- do data receive, make packet
             local p = packet.allocate()
-            local maxsz = ffi.sizeof(p.data)
-            local len, err = fd:read(p.data, maxsz)
-            if len == 0 then return end
-            if not len then
-               assert(nil, err)
-            end
-            p.length = len
+            -- reuse udp header as data package proto
+            local udp_header = udp:new_from_mem(p.data, UDP_HDR_SIZE)
+            local maxsz = ffi.sizeof(p.data) - UDP_HDR_SIZE
+            local len = fd:read(p.data + UDP_HDR_SIZE, maxsz)
+            if len == 0 then
+               -- check the errorno
+               --[[ if C.errno() == then
+                  -- client reset close fd
+                  ev.fd:close()
+                  ep:del(w[ev.fd])
+                  w[ev.fd] = nil
+               end ]]
+               -- EAGAIN ? but when i use ab, at this time , connection broken
+               print(ffi.errno()..'..null read...'..ev.fd.." status "..tostring(ev.events))
+               packet.free(p)
+               -- do other fd
+               -- return
+            else
+               -- try find an error when fd:read return 0
+               if not len then
+                  print(ffi.errno()..'..null read...'..ev.fd.." status "..tostring(ev.events))
+                  assert(nil, "ep:fd:read")
+               end
 
-            -- debug only, make a response
-            local msg = [[
-               <html>
-                  <head>
-                     <title>performance test</title>
-                  </head>
-                  <body>
-                     test
-                  </body>
-               </html>
-            ]]
+               -- use ev.fd, also the index in clients-array as the src_port
+               -- in sending packet, use dst_port
+               udp_header:src_port(ev.fd)
+               udp_header:length(len)
+               -- no dst_port, checksum here, for we do NOT real transport the packet to network.
+               p.length = len
 
-            local reply = table.concat({
-               "HTTP/1.0 200 OK",
-               "Content-type: text/html",
-               "Connection: close",
-               "Content-Length: " .. #msg,
-               "",
-               "",
-            }, "\r\n") .. msg
+               -- debug only, make a response
+               local msg = [[
+                  <html>
+                     <head>
+                        <title>performance test</title>
+                     </head>
+                     <body>
+                        test
+                     </body>
+                  </html>
+               ]]
 
-            local n = fd:write(reply)
-            assert(fd:close())
-            w[ev.fd] = nil
-            -- debug end.
+               local reply = table.concat({
+                  "HTTP/1.0 200 OK",
+                  "Content-type: text/html",
+                  "Connection: close",
+                  "Content-Length: " .. #msg,
+                  "",
+                  "",
+               }, "\r\n") .. msg
 
-            if p then
-               link.transmit(l, p) --link owns p now so we mustn't free it
-            end
+               local n = fd:write(reply)
+               ep:del(w[ev.fd])
+               assert(fd:close())
+               w[ev.fd] = nil
+               -- debug end.
+
+               if p then
+                  link.transmit(l, p) --link owns p now so we mustn't free it
+               end
+            end -- end read length is 0
          end   -- end if s:getfd
+
+         if ep.eof(ev) then
+            -- do real closing
+            w[ev.fd]:close()
+            w[ev.fd] = nil
+         end
+
       end   --end for
    end
 
@@ -246,7 +287,7 @@ function EPollSocket:new (arg)
       local function close_w(i, ev)
          ev.fd:close()
          ep:del(w[ev.fd])
-         -- w[ev.fd] = nil    -- no needs manual free ?
+         w[ev.fd] = nil
       end
       table.foreach(w, close_w)
       w = {}
