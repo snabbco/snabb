@@ -3,6 +3,7 @@ module(..., package.seeall)
 -- This module provides functions for generating snabb config
 -- commands with random path queries and values
 
+local ffi    = require("ffi")
 local schema = require("lib.yang.schema")
 
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
@@ -123,6 +124,19 @@ local function random_hexes()
    return str
 end
 
+-- generate a random 64-bit integer
+local function random64()
+   local result = 0
+   local r1 = ffi.cast("uint64_t", math.random(0, 2 ^ 32 - 1))
+   local r2 = ffi.cast("uint64_t", math.random(0, 2 ^ 32 - 1))
+
+   for i=1, 32 do
+      r1 = r1 * 2ULL
+   end
+
+   return r1 + r2
+end
+
 -- return a random number, preferring boundary values and
 -- sometimes returning results out of range
 local function choose_bounded(lo, hi)
@@ -186,7 +200,7 @@ local function value_from_type(a_type)
    elseif prim == "int32" then
       return choose_range(rng, -2147483648, 2147483647)
    elseif prim == "int64" then
-      return choose_range(rng, -9223372036854775809, 9223372036854775807)
+      return ffi.cast("int64_t", random64())
    elseif prim == "uint8" then
       return choose_range(rng, 0, 255)
    elseif prim == "uint16" then
@@ -194,13 +208,13 @@ local function value_from_type(a_type)
    elseif prim == "uint32" then
       return choose_range(rng, 0, 4294967295)
    elseif prim == "uint64" then
-      return choose_range(rng, 0, 18446744073709551615)
+      return random64()
    -- TODO: account for fraction-digits and range
    elseif prim == "decimal64" then
-      local int64 = math.random(-9223372036854775809, 9223372036854775807)
+      local int64 = ffi.cast("int64_t", random64())
       local exp   = math.random(1, 18)
       -- see RFC 6020 sec 9.3.1 for lexical representation
-      return string.format("%f", int64 * (10 ^ -exp))
+      return string.format("%f", tonumber(int64 * (10 ^ -exp)))
    elseif prim == "boolean" then
       return choose({ true, false })
    elseif prim == "ipv4-address" then
