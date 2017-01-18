@@ -2,8 +2,10 @@
 
 module(..., package.seeall)
 
+local basic = require("apps.basic.basic_apps")
 local pcap = require("apps.pcap.pcap")
 local raw = require("apps.socket.raw")
+local ep = require("apps.socket.epoll")
 local pcap_filter = require("apps.packet_filter.pcap_filter")
 
 
@@ -17,12 +19,12 @@ function run (parameters)
    -- local pcap_file = parameters[1]
    local interface = parameters[1]
    local c = config.new()
-
+   --[[
    config.app(c, "capture", raw.RawSocket, interface)
    local v4_rules =
    [[
       (udp and (dst port 5005))
-   ]]
+   ] ]
    config.app(c,"pcap_filter", pcap_filter.PcapFilter,
       {filter=v4_rules})
 
@@ -32,6 +34,10 @@ function run (parameters)
    config.link(c, "capture.tx -> pcap_filter.input")
    config.link(c, "pcap_filter.output -> dump.input")
    -- config.link(c, "capture.tx -> dump.input")
+   ]]--
+   config.app(c, "capture", ep.EPollSocket, 8080)
+   config.app(c, "sink", basic.Sink)
+   config.link(c, "capture.tx -> sink.input")
 
    engine.configure(c)
    engine.main({report = {showlinks=true}})

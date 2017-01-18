@@ -46,33 +46,6 @@ if S.epoll_create then
     end,
     eof = function(ev) return ev.HUP or ev.ERR or ev.RDHUP end,
   }
-elseif S.kqueue then
-  poll = {
-    init = function(this)
-      return setmetatable({fd = assert(S.kqueue())}, {__index = this})
-    end,
-    event = t.kevents(1),
-    add = function(this, s)
-      local event = this.event[1]
-      event.fd = s
-      event.setfilter = "read"
-      event.setflags = "add"
-      assert(this.fd:kevent(this.event, nil, 0))
-    end,
-    events = t.kevents(maxevents),
-    get = function(this)
-      local f, a, r = this.fd:kevent(nil, this.events)
-      if not f then
-        print("error on fd", a)
-        return nilf
-      else
-        return f, a, r
-      end
-    end,
-    eof = function(ev) return ev.EOF or ev.ERROR end,
-  }
-else
-  error("no epoll or kqueue support")
 end
 
 local s = assert(S.socket("inet", "stream, nonblock"))
