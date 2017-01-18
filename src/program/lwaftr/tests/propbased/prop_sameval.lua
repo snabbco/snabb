@@ -18,7 +18,7 @@ function property()
 
    -- occasionally do a bunch of gets/sets at once
    if math.random() < 0.01 then
-      iters = math.random(100, 1000)
+      iters = math.random(100, 150)
    end
 
    for i=1, iters do
@@ -66,6 +66,6 @@ function print_extra_information()
 end
 
 handle_prop_args =
-   common.make_handle_prop_args("prop_sameval", 60, run_pid)
+   common.make_handle_prop_args("prop_sameval", 90, run_pid)
 
 cleanup = common.make_cleanup(run_pid)
