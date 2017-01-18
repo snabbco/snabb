@@ -130,11 +130,7 @@ local function random64()
    local r1 = ffi.cast("uint64_t", math.random(0, 2 ^ 32 - 1))
    local r2 = ffi.cast("uint64_t", math.random(0, 2 ^ 32 - 1))
 
-   for i=1, 32 do
-      r1 = r1 * 2ULL
-   end
-
-   return r1 + r2
+   return r1 * 4294967296ULL + r2
 end
 
 -- return a random number, preferring boundary values and
