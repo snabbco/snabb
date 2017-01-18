@@ -12,7 +12,6 @@ function make_handle_prop_args(name, duration, pidbox)
         os.exit(1)
      end
   
-     -- TODO: validate the address
      local pci_addr = prop_args[1]
      assert(S.stat(pci.path(pci_addr)),
             string.format("Invalid PCI address: %s", pci_addr))
