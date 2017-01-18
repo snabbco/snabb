@@ -35,7 +35,7 @@ function run (parameters)
    config.link(c, "pcap_filter.output -> dump.input")
    -- config.link(c, "capture.tx -> dump.input")
    ]]--
-   config.app(c, "capture", ep.EPollSocket, 8080)
+   config.app(c, "capture", ep.EPollSocket, 8888)
    config.app(c, "sink", basic.Sink)
    config.link(c, "capture.tx -> sink.input")
 

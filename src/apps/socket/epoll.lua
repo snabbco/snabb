@@ -38,6 +38,14 @@ function EPollSocket:new (arg)
    end
 
    local t, c = S.t, S.c
+
+   local function assert(cond, s, ...)
+      if cond == nil then error(tostring(s)) end -- annoyingly, assert does not call tostring!
+      return cond, s, ...
+   end
+   local function nilf() return nil end
+
+   local maxevents = 1024;
    local mode = "stream"
    --[[
    mode = assert(modes[mode or "stream"], "invalid mode")
@@ -192,6 +200,26 @@ function EPollSocket:new (arg)
             p.length = len
 
             -- debug only, make a response
+            local msg = [[
+               <html>
+                  <head>
+                     <title>performance test</title>
+                  </head>
+                  <body>
+                     test
+                  </body>
+               </html>
+            ]]
+
+            local reply = table.concat({
+               "HTTP/1.0 200 OK",
+               "Content-type: text/html",
+               "Connection: close",
+               "Content-Length: " .. #msg,
+               "",
+               "",
+            }, "\r\n") .. msg
+
             local n = fd:write(reply)
             assert(fd:close())
             w[ev.fd] = nil
