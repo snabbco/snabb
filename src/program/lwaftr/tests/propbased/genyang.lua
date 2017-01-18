@@ -321,13 +321,17 @@ local function generate_xpath_and_node_info(schema, for_state)
       end
    end
    handlers['leaf-list'] = function(node)
-      local idx      = choose_nat()
-      local selector = string.format("[position()=%d]", idx)
-      path = path .. "/" .. node.id .. selector
-
-      -- TODO: this case should sometimes return the whole list instead of
-      --       just a single position in it
-      gen_info = { node = node, selector = idx }
+      if math.random() < 0.7 then
+         local idx      = choose_nat()
+         local selector = string.format("[position()=%d]", idx)
+         path = path .. "/" .. node.id .. selector
+         gen_info = { node = node, selector = idx }
+      -- sometimes omit the selector, for the benefit of commands
+      -- like add where a selector is not useful
+      else
+         path = path .. "/" .. node.id
+         gen_info = { node = node }
+      end
    end
    function handlers.list(node)
       local key_types = {}
