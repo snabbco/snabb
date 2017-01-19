@@ -421,14 +421,14 @@ local function migrate_3_0_1bis(conf_file)
                        conf_file)
 end
 
-local function migrate_3_1_0(conf_file)
+local function migrate_3_2_0(conf_file)
    local src = io.open(conf_file, "r"):read("*a")
    return v2_migration(src, conf_file)
 end
 
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
                     ['3.0.1.1'] = migrate_3_0_1bis,
-                    ['3.1.0'] = migrate_3_1_0 }
+                    ['3.2.0'] = migrate_3_2_0 }
 function run(args)
    local conf_file, version = parse_args(args)
    local migrate = migrators[version]
