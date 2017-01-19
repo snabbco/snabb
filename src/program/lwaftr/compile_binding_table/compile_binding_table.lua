@@ -21,8 +21,8 @@ function run(args)
    local in_file, out_file = parse_args(args)
    if not out_file then out_file = in_file:gsub("%.txt$", "")..'.o' end
    -- We use the stream module because it gives us the mtime.
-   local stream = stream.open_input_text_stream(in_file)
-   local success, bt_or_err = pcall(binding_table.load_source, stream)
+   local input_stream = stream.open_input_text_stream(in_file)
+   local success, bt_or_err = pcall(binding_table.load_source, input_stream)
    if not success then
       io.stderr:write(tostring(bt_or_err)..'\n')
       main.exit(1)

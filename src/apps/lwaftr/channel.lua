@@ -9,7 +9,6 @@
 module(..., package.seeall)
 
 local ffi = require('ffi')
-local bit = require('bit')
 local S = require("syscall")
 local lib = require('core.lib')
 
@@ -47,7 +46,7 @@ local function create_ring_buffer (name, size)
    mkdir_p(tail)
    local fd, err = S.open(path, "creat, rdwr, excl", '0664')
    if not fd then
-      local err = tostring(err or "unknown error")
+      err = tostring(err or "unknown error")
       error('error creating file "'..path..'": '..err)
    end
    local len = ffi.sizeof(ring_buffer_t, size)
@@ -65,7 +64,7 @@ local function open_ring_buffer (pid, name)
    local path = root..'/'..tostring(pid)..'/channels/'..name
    local fd, err = S.open(path, "rdwr")
    if not fd then
-      local err = tostring(err or "unknown error")
+      err = tostring(err or "unknown error")
       error('error opening file "'..path..'": '..err)
    end
    local stat = S.fstat(fd)

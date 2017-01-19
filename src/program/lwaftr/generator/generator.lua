@@ -2,11 +2,9 @@ module(..., package.seeall)
 
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapWriter = require("apps.pcap.pcap").PcapWriter
-local binding_table = require("apps.lwaftr.binding_table")
 local config = require("core.config")
 local generator = require("apps.lwaftr.generator")
 local lib = require("core.lib")
-local stream = require("apps.lwaftr.stream")
 local lwconf = require("apps.lwaftr.conf")
 
 local DEFAUL_MAX_PACKETS = 10

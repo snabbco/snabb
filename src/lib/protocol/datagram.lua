@@ -147,7 +147,7 @@ function datagram:push_raw (data, length)
       -- The memmove() would invalidate the data pointer of headers
       -- that have already been parsed.
       assert(self._parse.index == 0, "parse stack not empty")
-      packet.prepend(self._packet[0], data, length)
+      self._packet[0] = packet.prepend(self._packet[0], data, length)
       self._parse.offset = self._parse.offset + length
    end
 end
@@ -277,7 +277,7 @@ function datagram:pop_raw (length, ulp)
       -- The memmove() would invalidate the data pointer of headers
       -- that have already been parsed.
       assert(self._parse.index == 0, "parse stack not empty")
-      packet.shiftleft(self._packet[0], length)
+      self._packet[0] = packet.shiftleft(self._packet[0], length)
    end
    if ulp then self._parse.ulp = ulp end
 end
@@ -347,6 +347,7 @@ function selftest ()
    dgram:push(l2tp)
    dgram:push(ip)
    dgram:push(ether)
+   p = dgram:packet()
    local _, p_size = dgram:payload(data, data_size)
    assert(p_size == data_size)
    local _, d_size = dgram:data()
@@ -379,7 +380,7 @@ function selftest ()
    dgram:commit()
    _, d_size = dgram:data()
    assert(d_size == ether2:sizeof() + ip2:sizeof() + l2tp:sizeof() + data_size)
-   dgram:new(p, ethernet, { delayed_commit = true })
+   dgram:new(dgram:packet(), ethernet, { delayed_commit = true })
    assert(ether2:eq(dgram:parse()))
    assert(ip2:eq(dgram:parse()))
    assert(l2tp:eq(dgram:parse()))
