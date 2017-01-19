@@ -1,5 +1,29 @@
 # Change Log
 
+## [3.1.6] - 2017-01-19
+
+* Add basic error reporting to snabb-softwire-v1.
+
+* Add property-based testing for snabb config.
+
+* Add socket support for "snabb config listen".
+
+* Clean stale object files in program/lwaftr and program/snabbvmx.
+
+* Fix "lwaftr query". Added selftest.
+
+* Fix "snabb config remove" on arrays.
+
+* Fix bug parsing empty strings in YANG parser.
+
+* Fix tunnel-path-mtu and tunnel-payload-mtu in ietf-softwire.
+
+* Respond to ping packets to internal and external interfaces when
+  running in on-a-stick mode. Added test.
+
+* Several improvements in lwaftrctl script (no screen command, connect
+  via telnet, internet access in VM).
+
 ## [3.1.5] - 2016-12-09
 
  * Improve "snabb ps" output.  Processes with a "*" by them are
