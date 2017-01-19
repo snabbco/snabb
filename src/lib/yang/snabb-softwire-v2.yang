@@ -355,6 +355,7 @@ module snabb-softwire-v2 {
 
         leaf br-address {
           type inet:ipv6-address;
+          mandatory true;
           description
            "The B4-facing address of the lwAFTR for this softwire.";
         }
