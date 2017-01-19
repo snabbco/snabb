@@ -1028,7 +1028,7 @@ function selftest()
 
    load_schema_by_name('ietf-yang-types')
    load_schema_by_name('ietf-softwire')
-   load_schema_by_name('snabb-softwire-v1')
+   load_schema_by_name('snabb-softwire-v2')
 
    local inherit_config_schema = [[module config-inheritance {
       namespace cs;

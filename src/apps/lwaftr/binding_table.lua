@@ -273,7 +273,7 @@ function selftest()
    local function load_str(str)
       local yang = require('lib.yang.yang')
       local data = require('lib.yang.data')
-      local schema = yang.load_schema_by_name('snabb-softwire-v1')
+      local schema = yang.load_schema_by_name('snabb-softwire-v2')
       local grammar = data.data_grammar_from_schema(schema)
       local subgrammar = assert(grammar.members['softwire-config'])
       local subgrammar = assert(subgrammar.members['binding-table'])
@@ -288,17 +288,17 @@ function selftest()
       br-address 8:9:a:b:c:d:e:f;
       br-address 1E:1:1:1:1:1:1:af;
       br-address 1E:2:2:2:2:2:2:af;
-      softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; br 1; }
-      softwire { ipv4 178.79.150.233; psid 2300; b4-ipv6 127:11:12:13:14:15:16:128; }
-      softwire { ipv4 178.79.150.233; psid 2700; b4-ipv6 127:11:12:13:14:15:16:128; }
-      softwire { ipv4 178.79.150.233; psid 4660; b4-ipv6 127:11:12:13:14:15:16:128; }
-      softwire { ipv4 178.79.150.233; psid 7850; b4-ipv6 127:11:12:13:14:15:16:128; }
-      softwire { ipv4 178.79.150.233; psid 22788; b4-ipv6 127:11:12:13:14:15:16:128; }
-      softwire { ipv4 178.79.150.233; psid 54192; b4-ipv6 127:11:12:13:14:15:16:128; }
-      softwire { ipv4 178.79.150.15; psid 0; b4-ipv6 127:22:33:44:55:66:77:128; }
-      softwire { ipv4 178.79.150.15; psid 1; b4-ipv6 127:22:33:44:55:66:77:128;}
-      softwire { ipv4 178.79.150.2; psid 7850; b4-ipv6 127:24:35:46:57:68:79:128; br 2; }
-      softwire { ipv4 178.79.150.3; psid 4; b4-ipv6 127:14:25:36:47:58:69:128; br 3; }
+      softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.233; psid 2300; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.233; psid 2700; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.233; psid 4660; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.233; psid 7850; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.233; psid 22788; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.233; psid 54192; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.15; psid 0; b4-ipv6 127:22:33:44:55:66:77:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.15; psid 1; b4-ipv6 127:22:33:44:55:66:77:128; br-address 8:9:a:b:c:d:e:f; }
+      softwire { ipv4 178.79.150.2; psid 7850; b4-ipv6 127:24:35:46:57:68:79:128; br-address 1E:1:1:1:1:1:1:af; }
+      softwire { ipv4 178.79.150.3; psid 4; b4-ipv6 127:14:25:36:47:58:69:128; br-address 1E:2:2:2:2:2:2:af; }
    ]])
 
    local ipv4_pton = require('lib.yang.util').ipv4_pton
