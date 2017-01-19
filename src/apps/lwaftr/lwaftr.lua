@@ -268,7 +268,7 @@ end
 
 -- The following two methods are called by apps.config.follower in
 -- reaction to binding table changes, via
--- apps/config/support/snabb-softwire-v1.lua.
+-- apps/config/support/snabb-softwire-v2.lua.
 function LwAftr:add_softwire_entry(entry_blob)
    self.binding_table:add_softwire_entry(entry_blob)
 end
