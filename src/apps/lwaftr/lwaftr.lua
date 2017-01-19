@@ -237,7 +237,7 @@ local function init_transmit_icmpv4_reply (rate_limiting)
    end
 end
 
-LwAftr = { yang_schema = 'snabb-softwire-v1' }
+LwAftr = { yang_schema = 'snabb-softwire-v2' }
 
 function LwAftr:new(conf)
    if conf.debug then debug = true end

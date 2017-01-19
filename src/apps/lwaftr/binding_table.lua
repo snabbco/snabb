@@ -128,7 +128,7 @@ function BTLookupQueue:get_lookup(n)
       self.packet_queue[n] = nil
       if not streamer:is_empty(n) then
          b4_ipv6 = streamer.entries[n].value.b4_ipv6
-         br_ipv6 = self.binding_table:get_br_address(streamer.entries[n].value.br)
+         br_ipv6 = streamer.entries[n].value.br_address
       end
       return pkt, b4_ipv6, br_ipv6
    end
@@ -143,10 +143,31 @@ local BindingTable = {}
 function BindingTable.new(psid_map, br_addresses, softwires)
    local ret = {
       psid_map = assert(psid_map),
-      br_addresses = assert(br_addresses),
-      softwires = assert(softwires)
+      softwires = assert(softwires),
+      br_addresses = cltable.new({key_type = ffi.typeof('uint8_t[16]')})
    }
-   return setmetatable(ret, {__index=BindingTable})
+   local self = setmetatable(ret, {__index=BindingTable})
+   for softwire in self.softwires:iterate() do
+      self:add_br_address(softwire.value.br_address)
+   end
+   return self
+end
+
+function BindingTable:add_br_address(address)
+   if self.br_addresses[address] == nil then
+      self.br_addresses[address] = 1
+   else
+      self.br_addresses[address] = self.br_addresses[address] + 1
+   end
+end
+
+function BindingTable:remove_br_address(address)
+   assert(self.br_addresses[address])
+   if self.br_addresses[address] == 1 then
+      self.br_addresses[address] = nil
+   else
+      self.br_addresses[address] = self.br_addresses[address] - 1
+   end
 end
 
 function BindingTable:add_softwire_entry(entry_blob)
@@ -197,10 +218,6 @@ function BindingTable:lookup_psid(ipv4, port)
    return psid
 end
 
-function BindingTable:get_br_address(i)
-   return self.br_addresses[i]
-end
-
 -- Iterate over the set of IPv4 addresses managed by a binding
 -- table. Invoke like:
 --
@@ -220,21 +237,6 @@ function BindingTable:iterate_psid_map()
       return lo, hi, value
    end
    return next_entry
-end
-
--- Iterate over the BR addresses in a binding table.  Invoke like:
---
---   for ipv6 in bt:iterate_br_addresses() do ... end
---
--- The IPv6 value is a uint8_t[16].
-function BindingTable:iterate_br_addresses()
-   local idx = 0
-   local function next_br_address()
-      idx = idx + 1
-      if idx > #self.br_addresses then return end
-      return self.br_addresses[idx]
-   end
-   return next_br_address
 end
 
 -- Iterate over the softwires in a binding table.  Invoke like:
@@ -356,14 +358,6 @@ function selftest()
          i = i + 1
       end
       assert(i == #br_address_iter + 1)
-   end
-
-   do
-      local i = 0
-      for entry in map:iterate_softwires() do i = i + 1 end
-      -- 11 softwires in above example.  Since they are hashed into an
-      -- arbitrary order, we can't assert much about the iteration.
-      assert(i == 11)
    end
 
    print('ok')

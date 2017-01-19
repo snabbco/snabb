@@ -544,5 +544,5 @@ function reconfigurable(scheduling, f, graph, conf, ...)
    config.app(graph, 'leader', leader.Leader,
               { setup_fn = setup_fn, initial_configuration = conf,
                 follower_pids = { follower_pid },
-                schema_name = 'snabb-softwire-v1'})
+                schema_name = 'snabb-softwire-v2'})
 end

@@ -11,7 +11,7 @@ function load_lwaftr_config(filename)
    -- v4_vlan_tag=required_if('v4_vlan_tag', 'vlan_tagging'),
    -- v6_vlan_tag=required_if('v6_vlan_tag', 'vlan_tagging'),
    return yang.load_configuration(filename,
-                                  {schema_name='snabb-softwire-v1'})
+                                  {schema_name='snabb-softwire-v2'})
 end
 
 function selftest()
