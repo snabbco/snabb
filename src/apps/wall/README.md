@@ -18,6 +18,51 @@ L7Spy (apps.wall.l7spy)
 Scanner (apps.wall.scanner)
 ---------------------------
 
+`Scanner` objects are responsible for:
+
+- Identifying traffic flows.
+- Analyzing the contents of packet to determine which application they belong
+  to.
+- Keeping enough state to be able to enumerate the identified traffic flows,
+  and identify the application they belong to.
+
+The class is not meant to be instantiated directly, but to be used as the basis
+for concrete implementations (e.g. `NdpiScanner`). It provides one function
+that subclasses can use:
+
+- Method **Scanner:extract_packet_info** *packet*
+
+Extracts fields from the headers of an IPv4 or IPv6 *packet*. The returned
+values are:
+
+1. A *key* object (more on this below) which uniquely identifies a traffic
+   flow.
+2. The *offset* to the packet payload content.
+3. The *source_address* of the packet, as an array of bytes.
+4. The *source_port*, for UDP and TCP packets.
+5. The *destination_address* of the packet, as an array of bytes.
+6. The *destination_port*, for UDP and TCP packets.
+
+Key objects contain some of the returned information in a compact FFI
+representation, and can be used as an aid to uniquely identify a flow of
+packets. The provide the following attributes:
+
+- `:eth_type()`: Method which returns the type of the Ethernet frame payload,
+  either `ETH_TYPE_IPv4` or `ETH_TYPE_IPv6`.
+- `:hash()`: Method which returns an integer calculated by hashing all the
+  other values in the key object.
+- `.vlan_id`: VLAN identifier. Zero for no VLAN tags.
+- `.ip_proto`: The IP protocol.
+- `.lo_addr` and `.hi_addr`: IP addresses (either v4 or v6).
+- `.lo_port` and `.hi_port`: For TCP and UDP, the ports as big-endian (network)
+  integers.
+
+This method can be very useful to implement scanners using backends which do
+not implement their own flow classification.
+
+
+### Subclassing
+
 All the `Scanner` implementations conform to the `Scanner` base API.
 
 — Method **Scanner:scan_packet** *packet*, *time*
