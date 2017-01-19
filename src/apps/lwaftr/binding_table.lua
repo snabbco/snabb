@@ -285,9 +285,6 @@ function selftest()
       psid-map { addr 178.79.150.15; psid-length 4; shift 12; }
       psid-map { addr 178.79.150.2; psid-length 16; }
       psid-map { addr 178.79.150.3; psid-length 6; }
-      br-address 8:9:a:b:c:d:e:f;
-      br-address 1E:1:1:1:1:1:1:af;
-      br-address 1E:2:2:2:2:2:2:af;
       softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; br-address 8:9:a:b:c:d:e:f; }
       softwire { ipv4 178.79.150.233; psid 2300; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; }
       softwire { ipv4 178.79.150.233; psid 2700; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; }
@@ -309,20 +306,20 @@ function selftest()
    local function assert_lookup(ipv4, port, ipv6, br)
       local val = assert(lookup(ipv4, port))
       assert(ffi.C.memcmp(ipv6_protocol:pton(ipv6), val.b4_ipv6, 16) == 0)
-      assert(val.br == br)
+      assert(ffi.C.memcmp(ipv6_protocol:pton(br), val.br_address, 16) == 0)
    end
-   assert_lookup('178.79.150.233', 80, '127:2:3:4:5:6:7:128', 1)
+   assert_lookup('178.79.150.233', 80, '127:2:3:4:5:6:7:128', '8:9:a:b:c:d:e:f')
    assert(lookup('178.79.150.233', 79) == nil)
    assert(lookup('178.79.150.233', 81) == nil)
-   assert_lookup('178.79.150.15', 80, '127:22:33:44:55:66:77:128', 1)
-   assert_lookup('178.79.150.15', 4095, '127:22:33:44:55:66:77:128', 1)
-   assert_lookup('178.79.150.15', 4096, '127:22:33:44:55:66:77:128', 1)
-   assert_lookup('178.79.150.15', 8191, '127:22:33:44:55:66:77:128', 1)
+   assert_lookup('178.79.150.15', 80, '127:22:33:44:55:66:77:128', '8:9:a:b:c:d:e:f')
+   assert_lookup('178.79.150.15', 4095, '127:22:33:44:55:66:77:128', '8:9:a:b:c:d:e:f')
+   assert_lookup('178.79.150.15', 4096, '127:22:33:44:55:66:77:128', '8:9:a:b:c:d:e:f')
+   assert_lookup('178.79.150.15', 8191, '127:22:33:44:55:66:77:128', '8:9:a:b:c:d:e:f')
    assert(lookup('178.79.150.15', 8192) == nil)
-   assert_lookup('178.79.150.2', 7850, '127:24:35:46:57:68:79:128', 2)
+   assert_lookup('178.79.150.2', 7850, '127:24:35:46:57:68:79:128', '1E:1:1:1:1:1:1:af')
    assert(lookup('178.79.150.3', 4095) == nil)
-   assert_lookup('178.79.150.3', 4096, '127:14:25:36:47:58:69:128', 3)
-   assert_lookup('178.79.150.3', 5119, '127:14:25:36:47:58:69:128', 3)
+   assert_lookup('178.79.150.3', 4096, '127:14:25:36:47:58:69:128', '1E:2:2:2:2:2:2:af')
+   assert_lookup('178.79.150.3', 5119, '127:14:25:36:47:58:69:128', '1E:2:2:2:2:2:2:af')
    assert(lookup('178.79.150.3', 5120) == nil)
    assert(lookup('178.79.150.4', 7850) == nil)
 
@@ -343,21 +340,6 @@ function selftest()
          i = i + 1
       end
       assert(i == #psid_map_iter + 1)
-   end
-
-   do
-      local br_address_iter = {
-         '8:9:a:b:c:d:e:f',
-         '1E:1:1:1:1:1:1:af',
-         '1E:2:2:2:2:2:2:af'
-      }
-      local i = 1
-      for ipv6 in map:iterate_br_addresses() do
-         local expected = ipv6_protocol:pton(br_address_iter[i])
-         assert(ffi.C.memcmp(expected, ipv6, 16) == 0)
-         i = i + 1
-      end
-      assert(i == #br_address_iter + 1)
    end
 
    print('ok')
