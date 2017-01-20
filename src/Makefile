@@ -116,6 +116,7 @@ $(OBJDIR) bin testlog $(OBJDIR/doc):
 
 $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 	$(E) "LUA       $@"
+#	$(E)  "luajit -bg -n $(subst /,.,$*) $< $@"
 	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
 
 $(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile
@@ -144,6 +145,8 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 
 $(ASMOBJ): obj/%_dasl.o: %.dasl $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
+#	$(E) "luajit dynasm.lua -o $@.gen $<"
+#	$(E) "luajit -bg -n $(subst /,.,$*) $@.gen $@"
 	$(Q) luajit dynasm.lua -o $@.gen $<
 	$(Q) luajit -bg -n $(subst /,.,$*) $@.gen $@
 

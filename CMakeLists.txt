@@ -1,6 +1,8 @@
 cmake_minimum_required (VERSION 2.8.11)
 project (snabb)
 
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+
 set(MAKE make)
 set(LUAJIT_CFLAGS ${CMAKE_SOURCE_DIR}/gcc-preinclude.h)
 

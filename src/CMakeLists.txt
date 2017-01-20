@@ -1,3 +1,17 @@
+set(CMAKE_LUA_OUTPUT_EXTENSION ".o")
+set(CMAKE_LUA_OUTPUT_EXTENSION_REPLACE 1)
+
+set(CMAKE_LUA_FLAGS " -bg")
+set(CMAKE_LUA_COMPILER ${CMAKE_SOURCE_DIR}/lib/luajit/usr/local/bin/luajit CACHE FILEPATH "The LuaJIT compiler")
+
+set(CMAKE_LUA_COMPILE_OBJECT  "<CMAKE_LUA_COMPILER> <FLAGS> <SOURCE> <OBJECT>")
+set(CMAKE_LUA_SOURCE_FILE_EXTENSIONS lua)
+
+message("CMAKE_LUA_COMPILE_OBJECT is ${CMAKE_LUA_COMPILE_OBJECT}")
+
+
+enable_language(LUA OPTIONAL)
+
 include_directories(
     ${CMAKE_SOURCE_DIR}/lib/luajit/usr/local/include/luajit-2.1
     )
@@ -9,7 +23,21 @@ set(CMAKE_C_FLAGS "-Wl,--no-as-needed -Wl,-E -Werror -Wall ${CMAKE_C_FLAGS}")
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${CMAKE_SOURCE_DIR}/lib/luajit/usr/local/lib -lrt -lc -ldl -lm -lpthread -lluajit-5.1")
 
-add_executable (snabb core/snabbswitch.c)
+set(LUA_SRCS
+    core/startup.lua
+    core/main.lua
+    )
+
+foreach(lua_source ${LUA_SRCS})
+    STRING(REPLACE "/" "." lua_source_module_name ${lua_source})
+    STRING(REGEX REPLACE "\\.lua$" "" lua_source_module_name ${lua_source_module_name})
+    # MESSAGE( STATUS "Including dir " ${lua_source} ${lua_source_module_name} )
+    set_source_files_properties(${lua_source}
+                                PROPERTIES COMPILE_FLAGS "-n ${lua_source_module_name}")
+endforeach()
+
+
+add_executable (snabb core/snabbswitch.c core/startup.lua)
 
 # Link the executable to the Hello library. Since the Hello library has
 # public include directories we will use those link directories when building
