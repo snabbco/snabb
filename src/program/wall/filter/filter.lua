@@ -20,7 +20,7 @@ function run (args)
    config.app(c, "l7spy", require("apps.wall.l7spy").L7Spy, { scanner = scanner })
    config.app(c, "sink", pcap.PcapWriter, out_file)
    -- TODO: hardcoded some rules here for this experiment
-   local rules = { RTP = "drop", default = "accept" }
+   local rules = { RTP = [[match { udp => accept; otherwise => drop }]], default = "drop" }
    config.app(c, "l7fw", require("apps.wall.l7fw").L7Fw, { scanner = scanner, rules = rules })
    config.link(c, "source.output -> l7spy.south")
    config.link(c, "l7spy.north -> l7fw.input")
