@@ -17,11 +17,16 @@ char** argv;
 
 int main(int snabb_argc, char **snabb_argv)
 {
+  int n = 0;
   /* Store for use by LuaJIT code via FFI. */
   argc = snabb_argc;
   argv = snabb_argv;
   lua_State* L = luaL_newstate();
   luaL_openlibs(L);
-  return luaL_dostring(L, "require \"core.startup\"");
+  n = luaL_dostring(L, "require \"core.startup\"");
+  if(n) {
+     printf("%s\n", lua_tostring(L, -1));
+  }
+  return n;
 }
 

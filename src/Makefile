@@ -116,7 +116,7 @@ $(OBJDIR) bin testlog $(OBJDIR/doc):
 
 $(LUAOBJ): obj/%_lua.o: %.lua Makefile | $(OBJDIR)
 	$(E) "LUA       $@"
-#	$(E)  "luajit -bg -n $(subst /,.,$*) $< $@"
+	$(E)  "luajit -bg -n $(subst /,.,$*) $< $@"
 	$(Q) luajit -bg -n $(subst /,.,$*) $< $@
 
 $(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile

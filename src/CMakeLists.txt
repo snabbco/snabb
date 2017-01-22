@@ -13,7 +13,7 @@ message("CMAKE_LUA_COMPILE_OBJECT is ${CMAKE_LUA_COMPILE_OBJECT}")
 enable_language(LUA OPTIONAL)
 
 include_directories(
-    ${CMAKE_SOURCE_DIR}/lib/luajit/usr/local/include/luajit-2.1
+    ${CMAKE_SOURCE_DIR}/lib/luajit/src/
     )
 
 #	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
@@ -21,7 +21,7 @@ include_directories(
 #
 set(CMAKE_C_FLAGS "-Wl,--no-as-needed -Wl,-E -Werror -Wall ${CMAKE_C_FLAGS}")
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -L${CMAKE_SOURCE_DIR}/lib/luajit/usr/local/lib -lrt -lc -ldl -lm -lpthread -lluajit-5.1")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lrt -lc -ldl -lm -lpthread ")
 
 set(LUA_SRCS
     core/startup.lua
@@ -44,5 +44,6 @@ add_executable (snabb core/snabbswitch.c core/startup.lua)
 # helloDemo
 
 add_dependencies(snabb luajit copy_ljsyscall)
+target_link_libraries(snabb ${CMAKE_SOURCE_DIR}/lib/luajit/src/libluajit.a)
 
 # target_link_libraries (snabb LINK_PUBLIC luajit)
