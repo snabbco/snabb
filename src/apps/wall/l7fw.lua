@@ -17,21 +17,11 @@ L7Fw.__index = L7Fw
 -- create a new firewall app object given an instance of Scanner
 -- and firewall rules
 function L7Fw:new(config)
-   local obj = { scanner = config.scanner }
-   local rules = {}
-
-   for protocol, action in pairs(config.rules) do
-      if action == "accept" or action == "drop" or action == "reject" then
-         rules[protocol] = action
-      else
-         rules[protocol] = "pfmatch"
-         -- TODO: this may be compiling too early for this to work
-         self["handle_" .. protocol] = match.compile(action)
-      end
-   end
-
-   obj.rules = rules
-
+   local obj = { scanner = config.scanner,
+                 rules = config.rules,
+                 -- this map tracks flows to compiled pfmatch functions
+                 -- so that we only compile them once per flow
+                 handler_map = {} }
    return setmetatable(obj, self)
 end
 
@@ -70,12 +60,21 @@ function L7Fw:push()
          local name   = scanner:protocol_name(flow.protocol)
          local policy = rules[name] or rules["default"]
 
-         if policy == "pfmatch" then
-            self["handle_" .. name](self, pkt.data, pkt.length)
-         elseif policy == "accept" then
+         if policy == "accept" then
             self:accept(pkt.data, pkt.length)
          elseif policy == "drop" then
             self:drop(pkt.data, pkt.length)
+         -- handle a pfmatch string case
+         elseif type(policy) == "string" then
+            if self.handler_map[flow] then
+               -- we've already compiled a matcher for this flow
+               self.handler_map[flow](self, pkt.data, pkt.length)
+            else
+               local opts    = { subst = { flow_count = flow.packets } }
+               local handler = match.compile(policy, opts)
+               self.handler_map[flow] = handler
+               handler(self, pkt.data, pkt.length)
+            end
          -- TODO: what should the default policy be if there is none specified?
          else
             self:accept(pkt.data, pkt.length)
