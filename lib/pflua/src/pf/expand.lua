@@ -1116,7 +1116,9 @@ end
 -- or { 'fail' }.
 function expand_arith(expr, dlt)
    assert(expr)
-   if type(expr) == 'number' or expr == 'len' then return expr, {} end
+   if type(expr) == 'number' or expr == 'len' or utils.extra_args[expr] then
+      return expr, {}
+   end
 
    local op = expr[1]
    if binops[op] then

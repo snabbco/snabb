@@ -160,6 +160,7 @@ local function inline_single_use_variables(expr)
    local counts, substs = {}, {}
    local function count(expr)
       if expr == 'len' then return
+      elseif utils.extra_args[expr] then return
       elseif type(expr) == 'number' then return
       elseif type(expr) == 'string' then counts[expr] = counts[expr] + 1 
       else
@@ -246,7 +247,7 @@ local function renumber(expr)
       return fresh
    end
    local function lookup(var)
-      if var == 'len' then return var end
+      if var == 'len' or utils.extra_args[var] then return var end
       return assert(substs[var], "unbound variable: "..var)
    end
    local function visit(expr)

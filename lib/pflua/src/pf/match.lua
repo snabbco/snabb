@@ -292,18 +292,26 @@ local function expand(expr, dlt)
 end
 
 local compile_defaults = {
-   dlt='EN10MB', optimize=true, source=false, subst=false
+   dlt='EN10MB', optimize=true, source=false, subst=false, extra_args={}
 }
 
 function compile(str, opts)
    opts = utils.parse_opts(opts or {}, compile_defaults)
    if opts.subst then str = subst(str, opts.subst) end
+
+   -- if the compiled function should have extra formal parameters, then
+   -- pass them to expand so that it can pass them through
+   local extra_args = {}
+   for _,v in ipairs(opts.extra_args) do
+      utils.extra_args[v] = true
+   end
+
    local expr = expand(parse(str), opts.dlt)
    if opts.optimize then expr = optimize.optimize(expr) end
    expr = anf.convert_anf(expr)
    expr = ssa.convert_ssa(expr)
-   if opts.source then return backend.emit_match_lua(expr) end
-   return backend.emit_and_load_match(expr, filter_str)
+   if opts.source then return backend.emit_match_lua(expr, unpack(opts.extra_args)) end
+   return backend.emit_and_load_match(expr, str, unpack(opts.extra_args))
 end
 
 function selftest()

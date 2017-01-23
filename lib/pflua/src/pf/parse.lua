@@ -257,6 +257,14 @@ local function lex(str, pos, opts)
       end
    end
 
+   if opts.maybe_arithmetic then
+      for arg, _ in pairs(utils.extra_args) do
+         if str:match(string.format("^%s", arg), pos) then
+            return arg, pos+#arg
+         end
+      end
+   end
+
    return lex_host_or_keyword(str, pos)
 end
 
@@ -731,7 +739,7 @@ local function parse_primary_arithmetic(lexer, tok)
       local expr = parse_arithmetic(lexer)
       lexer.consume(')')
       return expr
-   elseif tok == 'len' or type(tok) == 'number' then
+   elseif tok == 'len' or utils.extra_args[tok] or type(tok) == 'number' then
       return tok
    elseif allow_address_of and tok == '&' then
       return { 'addr', parse_addressable(lexer) }
@@ -859,7 +867,7 @@ local primitives = {
 
 local function parse_primitive_or_arithmetic(lexer)
    local tok = lexer.next({maybe_arithmetic=true})
-   if (type(tok) == 'number' or tok == 'len' or
+   if (type(tok) == 'number' or tok == 'len' or utils.extra_args[tok] or
        addressables[tok] and lexer.peek() == '[') then
       return parse_arithmetic(lexer, tok)
    end
@@ -887,7 +895,7 @@ end
 local logical_ops = set('&&', 'and', '||', 'or')
 
 local function is_arithmetic(exp)
-   return (exp == 'len' or type(exp) == 'number' or
+   return (exp == 'len' or type(exp) == 'number' or utils.extra_args[exp] or
               exp[1]:match("^%[") or arithmetic_precedence[exp[1]])
 end
 

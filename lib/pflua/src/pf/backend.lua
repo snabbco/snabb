@@ -364,8 +364,8 @@ function emit_lua(ssa)
    return str
 end
 
-function emit_match_lua(ssa)
-   local builder = filter_builder('self', 'P', 'length')
+function emit_match_lua(ssa, ...)
+   local builder = filter_builder('self', 'P', 'length', ...)
    serialize(builder, cleanup(residualize_lua(ssa), true))
    local str = builder.finish()
    if verbose then pp(str) end
@@ -376,8 +376,8 @@ function emit_and_load(ssa, name)
    return assert(loadstring(emit_lua(ssa), name))()
 end
 
-function emit_and_load_match(ssa, name)
-   return assert(loadstring(emit_match_lua(ssa), name))()
+function emit_and_load_match(ssa, name, ...)
+   return assert(loadstring(emit_match_lua(ssa, ...), name))()
 end
 
 function selftest()
