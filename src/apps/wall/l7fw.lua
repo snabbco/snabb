@@ -66,7 +66,16 @@ function L7Fw:push()
             self:drop(pkt.data, pkt.length)
          -- handle a pfmatch string case
          elseif type(policy) == "string" then
-            local key = name .. flow.packets
+            local key
+
+            -- if the pfmatch expression depends on the packet count, then
+            -- we need to compile differently (for each diff. flow count)
+            if string.match(policy, "[$]flow_count") then
+               key = name .. flow.packets
+            else
+               key = flow
+            end
+
             if self.handler_map[key] then
                -- we've already compiled a matcher for this flow
                self.handler_map[key](self, pkt.data, pkt.length)
