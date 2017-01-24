@@ -8,6 +8,7 @@ local ipv6  = require("lib.protocol.ipv6")
 local util  = require("apps.wall.util")
 local scan  = require("apps.wall.scanner")
 local proto = require("ndpi").protocol
+local comm  = require("program.wall.common")
 local ntohs = lib.ntohs
 
 local long_opts = {
@@ -129,40 +130,15 @@ function StatsReporter:report_stats ()
 end
 
 
-local inputs = {}
-
-function inputs.pcap (kind, path)
-   return "output", { require("apps.pcap.pcap").PcapReader, path }
-end
-
-function inputs.raw (kind, device)
-   return "tx", { require("apps.socket.raw").RawSocket, device }
-end
-
-function inputs.tap (kind, device)
-   return "output", { require("apps.tap.tap").Tap, device }
-end
-
-function inputs.intel10g (kind, device)
-   local conf = { pciaddr = device }
-   return "rx", { require("apps.intel.intel_app").Intel82599, conf }
-end
-
-function inputs.intel1g (kind, device)
-   local conf = { pciaddr = device }
-   return "rx", { require("apps.intel.intel1g").Intel1g, conf }
-end
-
-
 local function setup_input(c, input_spec)
    local kind, arg = input_spec_pattern:match(input_spec)
    if not kind then
       kind, arg = "pcap", input_spec
    end
-   if not inputs[kind] then
+   if not comm.inputs[kind] then
       return nil, "No such input kind: " .. kind
    end
-   return inputs[kind](kind, arg)
+   return comm.inputs[kind](kind, arg)
 end
 
 
@@ -187,12 +163,12 @@ function run (args)
       main.exit(1)
    end
 
-   if not inputs[args[1]] then
+   if not comm.inputs[args[1]] then
       io.stderr:write("No such input available: ", args[1], "\n")
       main.exit(1)
    end
 
-   local source_link_name, app = inputs[args[1]](args[1], args[2])
+   local source_link_name, app = comm.inputs[args[1]](args[1], args[2])
    if not source_link_name then
       io.stderr:write(app, "\n")
       main.exit(1)
