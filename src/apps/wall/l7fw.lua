@@ -66,13 +66,14 @@ function L7Fw:push()
             self:drop(pkt.data, pkt.length)
          -- handle a pfmatch string case
          elseif type(policy) == "string" then
-            if self.handler_map[flow] then
+            local key = name .. flow.packets
+            if self.handler_map[key] then
                -- we've already compiled a matcher for this flow
-               self.handler_map[flow](self, pkt.data, pkt.length)
+               self.handler_map[key](self, pkt.data, pkt.length)
             else
                local opts    = { subst = { flow_count = flow.packets } }
                local handler = match.compile(policy, opts)
-               self.handler_map[flow] = handler
+               self.handler_map[key] = handler
                handler(self, pkt.data, pkt.length)
             end
          -- TODO: what should the default policy be if there is none specified?
