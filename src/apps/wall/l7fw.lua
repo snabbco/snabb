@@ -40,7 +40,9 @@ end
 
 -- called by pfmatch handler, handle rejection response
 function L7Fw:reject(pkt, len)
-   link.transmit(self.output.output, self:make_icmpv4_packet(self.current_packet))
+   if self.local_ip and self.local_macaddr then
+      link.transmit(self.output.output, self:make_icmpv4_packet(self.current_packet))
+   end
    packet.free(self.current_packet)
 end
 
