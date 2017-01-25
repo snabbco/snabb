@@ -260,7 +260,7 @@ function load(conf)
              'psid_length '..psid_length..' + shift '..shift..
              ' should not exceed 16')
       psid_value.psid_length, psid_value.shift = psid_length, shift
-      psid_builder:add_range(k.addr, k.addr, psid_value)
+      psid_builder:add_range(k.addr, v.end_addr or k.addr, psid_value)
    end
    local psid_map = psid_builder:build(psid_map_value_t())
    return BindingTable.new(psid_map, conf.br_address, conf.softwire)

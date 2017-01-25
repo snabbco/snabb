@@ -1,5 +1,11 @@
 # Change Log
 
+## [3.1.6] - 2017-01-20
+
+* Reverts commit 86b9835 ("Remove end-addr in psid-map"), which 
+  introduced a severe regression that caused high packet loss due
+  to not maching softwires.
+
 ## [3.1.6] - 2017-01-19
 
 * Add basic error reporting to snabb-softwire-v1.
