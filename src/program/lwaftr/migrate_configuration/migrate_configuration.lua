@@ -396,16 +396,28 @@ local function v2_migration(src, conf_file)
    }
 
    local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
-   local v2migrated = remove_address_list(conf)
-   v2migrated.softwire_config.binding_table.br_address = nil
+   conf = remove_address_list(conf)
+   conf.softwire_config.binding_table.br_address = nil
 
    -- Now we have to convert from the migration hybrid schema back to vanila v2
    -- so that the printers work correctly (or future migrations do).
-   local memoryio = util.string_output_file()
-   yang.print_data_for_schema(hybridscm, v2migrated, memoryio)
+   local tempfile_name = "/tmp/snabb-softwire-v2_conversion_" .. os.time()
+   local tempfile = io.open(tempfile_name, "w")
+   yang.print_data_for_schema(hybridscm, conf, tempfile)
+   tempfile:close()
 
-   return data.load_data_for_schema_by_name("snabb-softwire-v2",
-                                            memoryio:flush(), conf_file)
+   -- Tell the GC that we don't need to keep this version in memory, we can't
+   -- keep large configuration files in memory twice.
+   conf = nil
+
+   -- Load the configuration from temp file and remove from file system.
+   tempfile = io.open(tempfile_name, "r")
+   local conf = assert(tempfile:read("*a"))
+   tempfile:close()
+   os.remove(tempfile_name)
+
+   -- Finally load it and return the config file
+   return data.load_data_for_schema_by_name("snabb-softwire-v2", conf, conf_file)
 end
 
 local function migrate_3_0_1(conf_file)
