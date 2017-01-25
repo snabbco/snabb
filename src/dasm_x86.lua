@@ -77,19 +77,36 @@ local map_action = {}
 local actfirst = 256-#action_names
 
 -- Action list buffer and string (only used to remove dupes).
-local actlist, actstr
+local actlist
+local actstr
 
--- Argument list for next dasm_put().
+-- Argument list for next dasm_put(). Start with offset 0 into action list.
 local actargs
 
 -- Current number of section buffer positions for dasm_put().
 local secpos
+
+-- VREG kind encodings, pre-shifted by 5 bits.
+local map_vreg = {
+  ["modrm.rm.m"] = 0x00,
+  ["modrm.rm.r"] = 0x20,
+  ["opcode"] =     0x20,
+  ["sib.base"] =   0x20,
+  ["sib.index"] =  0x40,
+  ["modrm.reg"] =  0x80,
+  ["vex.v"] =      0xa0,
+  ["imm.hi"] =     0xc0,
+}
+
+-- Current number of VREG actions contributing to REX/VEX shrinkage.
+local vreg_shrink_count
 
 local function init_actionlist()
   actlist = {}
   actstr = ""
   actargs = { 0 } -- Start with offset 0 into the action list.
   secpos = 1
+  vreg_shrink_count = 0
 end
 
 -- VREG kind encodings, pre-shifted by 5 bits.
