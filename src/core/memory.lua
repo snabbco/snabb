@@ -95,7 +95,7 @@ function get_huge_page_size ()
    return tonumber(hugesize) * 1024
 end
 
-base_page_size = 4096
+base_page_size = syscall.getpagesize()
 -- Huge page size in bytes
 huge_page_size = get_huge_page_size()
 -- Address bits per huge page (2MB = 21 bits; 1GB = 30 bits)

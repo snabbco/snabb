@@ -35,7 +35,8 @@ uint64_t virtual_to_physical(uintptr_t *ptr)
 {
   uintptr_t virt_page;
   static int pagemap_fd;
-  virt_page = ((uintptr_t)ptr) / 4096;
+  int page_size = getpagesize();
+  virt_page = ((uintptr_t)ptr) / page_size;
   if (pagemap_fd == 0) {
     if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY)) <= 0) {
       perror("open pagemap");
@@ -53,7 +54,7 @@ uint64_t virtual_to_physical(uintptr_t *ptr)
     fprintf(stderr, "page %lx not present: %lx", virt_page, data);
     return 0;
   }
-  return (data & ((1ULL << 55) - 1)) * 4096;
+  return (data & ((1ULL << 55) - 1)) * page_size;
 }
 
 // Map a new HugeTLB page to an appropriate virtual address.
