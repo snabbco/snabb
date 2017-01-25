@@ -14,6 +14,7 @@ local datagram = require("lib.protocol.datagram")
 local ether    = require("lib.protocol.ethernet")
 local icmp     = require("lib.protocol.icmp.header")
 local ipv4     = require("lib.protocol.ipv4")
+local tcp      = require("lib.protocol.tcp")
 local match    = require("pf.match")
 
 L7Fw = {}
@@ -41,7 +42,7 @@ end
 -- called by pfmatch handler, handle rejection response
 function L7Fw:reject(pkt, len)
    if self.local_ip and self.local_macaddr then
-      link.transmit(self.output.output, self:make_icmpv4_packet(self.current_packet))
+      link.transmit(self.output.output, self:make_reject_response())
    end
    packet.free(self.current_packet)
 end
@@ -97,11 +98,23 @@ function L7Fw:push()
    end
 end
 
--- create an ICMPv4 port unreachable packet
-function L7Fw:make_icmpv4_packet(pkt)
+-- create either an ICMP port unreachable packet or a TCP RST to
+-- send in case of a reject policy
+function L7Fw:make_reject_response()
+   local pkt        = self.current_packet
    local ether_orig = ether:new_from_mem(pkt.data, pkt.length)
    local ipv4_orig  = ipv4:new_from_mem(pkt.data + ether_orig:sizeof(),
                                         pkt.length - ether_orig:sizeof())
+
+   local is_tcp = false
+   local ip_protocol
+
+   if ipv4_orig:protocol() == 6 then
+      is_tcp = true
+      ip_protocol = 6
+   else
+      ip_protocol = 1 -- ICMPv4
+   end
 
    local dgram   = datagram:new()
    local ether_h = ether:new({ dst = ether_orig:src(),
@@ -109,19 +122,42 @@ function L7Fw:make_icmpv4_packet(pkt)
                                type = 0x0800 })
    local ipv4_h  = ipv4:new({ dst = ipv4_orig:src(),
                               src = ipv4:pton(self.local_ip),
-                              protocol = 1,
+                              protocol = ip_protocol,
                               ttl = 64 })
-   local icmp_h  = icmp:new(3, 3)
 
-   dgram:payload(ffi.new("uint8_t [4]"), 4)
-   dgram:payload(ipv4_orig:header(), ipv4_orig:sizeof())
-   dgram:payload(pkt.data + ether_orig:sizeof() + ipv4_orig:sizeof(), 8)
+   if is_tcp then
+      local tcp_orig = tcp:new_from_mem(pkt.data + ether_orig:sizeof() +
+                                        ipv4_orig:sizeof(),
+                                        pkt.length - ether_orig:sizeof() -
+                                        ipv4_orig:sizeof())
+      local tcp_h    = tcp:new({src_port = tcp_orig:dst_port(),
+                                dst_port = tcp_orig:src_port(),
+                                seq_num  = tcp_orig:seq_num() + 1,
+                                ack_num  = tcp_orig:ack_num() + 1,
+                                ack      = 1,
+                                rst      = 1,
+                                -- minimum TCP header size is 5 words
+                                offset   = 5 })
 
-   icmp_h:checksum(dgram:payload())
-   dgram:push(icmp_h)
-   ipv4_h:total_length(ipv4_h:sizeof() + icmp_h:sizeof() +
-                       4 + -- extra zero bytes
-                       ipv4_orig:sizeof() + 8)
+      -- checksum needs a non-nil first argument, but we have zero payload bytes
+      -- so give a bogus value
+      tcp_h:checksum(ffi.new("uint8_t[0]"), 0)
+      dgram:push(tcp_h)
+      ipv4_h:total_length(ipv4_h:sizeof() + tcp_h:sizeof())
+   else
+      local icmp_h  = icmp:new(3, 3)
+
+      dgram:payload(ffi.new("uint8_t [4]"), 4)
+      dgram:payload(ipv4_orig:header(), ipv4_orig:sizeof())
+      dgram:payload(pkt.data + ether_orig:sizeof() + ipv4_orig:sizeof(), 8)
+
+      icmp_h:checksum(dgram:payload())
+      dgram:push(icmp_h)
+      ipv4_h:total_length(ipv4_h:sizeof() + icmp_h:sizeof() +
+                          4 + -- extra zero bytes
+                          ipv4_orig:sizeof() + 8)
+   end
+
    dgram:push(ipv4_h)
    dgram:push(ether_h)
 
