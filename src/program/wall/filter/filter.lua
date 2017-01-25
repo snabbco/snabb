@@ -9,13 +9,18 @@ local long_opts = {
    help = "h",
    links = "l",
    output = "o",
+   reject = "r"
 }
 
 function run (args)
    local output_file, showlinks = nil, false
+   local reject_file = nil
    local opt = {
       o = function (arg)
          output_file = arg
+      end,
+      r = function (arg)
+         reject_file = arg
       end,
       h = function (arg)
          print(require("program.wall.filter.README_inc"))
@@ -26,7 +31,7 @@ function run (args)
       end
    }
 
-   args = lib.dogetopt(args, opt, "hlo:", long_opts)
+   args = lib.dogetopt(args, opt, "hlo:r:", long_opts)
    if #args ~= 3 then
       print("TODO instructions")
       main.exit(1)
@@ -56,15 +61,24 @@ function run (args)
    local c = config.new()
    config.app(c, "source", unpack(app))
    config.app(c, "l7spy", require("apps.wall.l7spy").L7Spy, { scanner = scanner })
+
    if not output_file then
       config.app(c, "sink", require("apps.basic.basic_apps").Sink)
    else
       config.app(c, "sink", pcap.PcapWriter, output_file)
    end
+
+   if not reject_file then
+      config.app(c, "reject", require("apps.basic.basic_apps").Sink)
+   else
+      config.app(c, "reject", pcap.PcapWriter, reject_file)
+   end
+
    config.app(c, "l7fw", require("apps.wall.l7fw").L7Fw, { scanner = scanner, rules = rules })
    config.link(c, "source." .. source_link_name .. " -> l7spy.south")
    config.link(c, "l7spy.north -> l7fw.input")
    config.link(c, "l7fw.output -> sink.input")
+   config.link(c, "l7fw.reject -> reject.input")
 
    engine.configure(c)
    engine.busywait = true

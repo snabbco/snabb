@@ -42,7 +42,9 @@ end
 -- called by pfmatch handler, handle rejection response
 function L7Fw:reject(pkt, len)
    if self.local_ip and self.local_macaddr then
-      link.transmit(self.output.output, self:make_reject_response())
+      link.transmit(assert(self.output.reject,
+                           "output port for reject policy not found"),
+                    self:make_reject_response())
    end
    packet.free(self.current_packet)
 end
