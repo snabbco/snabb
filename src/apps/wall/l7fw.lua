@@ -14,6 +14,7 @@ local datagram = require("lib.protocol.datagram")
 local ether    = require("lib.protocol.ethernet")
 local icmp     = require("lib.protocol.icmp.header")
 local ipv4     = require("lib.protocol.ipv4")
+local ipv6     = require("lib.protocol.ipv6")
 local tcp      = require("lib.protocol.tcp")
 local match    = require("pf.match")
 
@@ -23,7 +24,8 @@ L7Fw.__index = L7Fw
 -- create a new firewall app object given an instance of Scanner
 -- and firewall rules
 function L7Fw:new(config)
-   local obj = { local_ip = config.local_ip,
+   local obj = { local_ipv4 = config.local_ipv4,
+                 local_ipv6 = config.local_ipv6,
                  local_macaddr = config.local_macaddr,
                  scanner = config.scanner,
                  rules = config.rules,
@@ -41,11 +43,9 @@ end
 
 -- called by pfmatch handler, handle rejection response
 function L7Fw:reject(pkt, len)
-   if self.local_ip and self.local_macaddr then
-      link.transmit(assert(self.output.reject,
-                           "output port for reject policy not found"),
-                    self:make_reject_response())
-   end
+   link.transmit(assert(self.output.reject,
+                        "output port for reject policy not found"),
+                 self:make_reject_response())
    packet.free(self.current_packet)
 end
 
@@ -105,33 +105,63 @@ end
 function L7Fw:make_reject_response()
    local pkt        = self.current_packet
    local ether_orig = ether:new_from_mem(pkt.data, pkt.length)
-   local ipv4_orig  = ipv4:new_from_mem(pkt.data + ether_orig:sizeof(),
-                                        pkt.length - ether_orig:sizeof())
+   local ip_orig
 
-   local is_tcp = false
+   if ether_orig:type() == 0x0800 then
+      ip_orig = ipv4:new_from_mem(pkt.data + ether_orig:sizeof(),
+                                  pkt.length - ether_orig:sizeof())
+   elseif ether_orig:type() == 0x86dd then
+      ip_orig = ipv6:new_from_mem(pkt.data + ether_orig:sizeof(),
+                                  pkt.length - ether_orig:sizeof())
+   else
+      -- no responses to non-IP packes
+      return
+   end
+
+   local is_tcp  = false
    local ip_protocol
 
-   if ipv4_orig:protocol() == 6 then
-      is_tcp = true
-      ip_protocol = 6
+   if ip_orig:version() == 4 then
+      if ip_orig:protocol() == 6 then
+         is_tcp = true
+         ip_protocol = 6
+      else
+         ip_protocol = 1  -- ICMPv4
+      end
    else
-      ip_protocol = 1 -- ICMPv4
+      if ip_orig:next_header() == 6 then
+         is_tcp = true
+         ip_protocol = 6
+      else
+         ip_protocol = 58 -- ICMPv6
+      end
    end
 
    local dgram   = datagram:new()
    local ether_h = ether:new({ dst = ether_orig:src(),
                                src = self.local_macaddr,
                                type = 0x0800 })
-   local ipv4_h  = ipv4:new({ dst = ipv4_orig:src(),
-                              src = ipv4:pton(self.local_ip),
-                              protocol = ip_protocol,
-                              ttl = 64 })
+   local ip_h
+
+   if ip_orig:version() == 4 then
+      assert(self.local_ipv4, "config is missing local_ipv4")
+      ip_h = ipv4:new({ dst = ip_orig:src(),
+                        src = ipv4:pton(self.local_ipv4),
+                        protocol = ip_protocol,
+                        ttl = 64 })
+   else
+      assert(self.local_ipv6, "config is missing local_ipv6")
+      ip_h = ipv6:new({ dst = ip_orig:src(),
+                        src = ipv6:pton(self.local_ipv6),
+                        next_header = ip_protocol,
+                        ttl = 64 })
+   end
 
    if is_tcp then
       local tcp_orig = tcp:new_from_mem(pkt.data + ether_orig:sizeof() +
-                                        ipv4_orig:sizeof(),
+                                        ip_orig:sizeof(),
                                         pkt.length - ether_orig:sizeof() -
-                                        ipv4_orig:sizeof())
+                                        ip_orig:sizeof())
       local tcp_h    = tcp:new({src_port = tcp_orig:dst_port(),
                                 dst_port = tcp_orig:src_port(),
                                 seq_num  = tcp_orig:seq_num() + 1,
@@ -145,22 +175,55 @@ function L7Fw:make_reject_response()
       -- so give a bogus value
       tcp_h:checksum(ffi.new("uint8_t[0]"), 0)
       dgram:push(tcp_h)
-      ipv4_h:total_length(ipv4_h:sizeof() + tcp_h:sizeof())
+      if ip_h:version() == 4 then
+         ip_h:total_length(ip_h:sizeof() + tcp_h:sizeof())
+      else
+         ip_h:payload_length(ip_h:sizeof() + tcp_h:sizeof())
+      end
    else
-      local icmp_h  = icmp:new(3, 3)
+      local icmp_h
+
+      if ip_h:version() == 4 then
+         -- ICMPv4 code for "port unreachable"
+         icmp_h = icmp:new(3, 3)
+      else
+         -- ICMPv6 code for "administratively prohibited"
+         icmp_h = icmp:new(1, 1)
+      end
 
       dgram:payload(ffi.new("uint8_t [4]"), 4)
-      dgram:payload(ipv4_orig:header(), ipv4_orig:sizeof())
-      dgram:payload(pkt.data + ether_orig:sizeof() + ipv4_orig:sizeof(), 8)
 
-      icmp_h:checksum(dgram:payload())
-      dgram:push(icmp_h)
-      ipv4_h:total_length(ipv4_h:sizeof() + icmp_h:sizeof() +
-                          4 + -- extra zero bytes
-                          ipv4_orig:sizeof() + 8)
+      if ip_h:version() == 4 then
+         dgram:payload(ip_orig:header(), ip_orig:sizeof())
+         dgram:payload(pkt.data + ether_orig:sizeof() + ip_orig:sizeof(), 8)
+
+         icmp_h:checksum(dgram:payload())
+         dgram:push(icmp_h)
+
+         ip_h:total_length(ip_h:sizeof() + icmp_h:sizeof() +
+                           4 + -- extra zero bytes
+                           ip_orig:sizeof() + 8)
+      else
+         -- ICMPv6 destination unreachable packets contain up to 1232 bytes
+         -- of the original packet
+         -- (the minimum MTU 1280 - IPv6 header length - ICMPv6 header)
+         local payload_len =
+            math.min(1232, pkt.length - ether_orig:sizeof() - ip_orig:sizeof())
+         dgram:payload(ip_orig:header(), ip_orig:sizeof())
+         dgram:payload(pkt.data + ether_orig:sizeof() + ip_orig:sizeof(),
+                       payload_len)
+
+         local mem, len = dgram:payload()
+         icmp_h:checksum(mem, len, ip_h)
+         dgram:push(icmp_h)
+
+         ip_h:payload_length(ip_h:sizeof() + icmp_h:sizeof() +
+                             4 + -- extra zero bytes
+                             ip_orig:sizeof() + payload_len)
+      end
    end
 
-   dgram:push(ipv4_h)
+   dgram:push(ip_h)
    dgram:push(ether_h)
 
    return dgram:packet()
