@@ -1,0 +1,15 @@
+Usage:
+  snabb wall filter [options] <rule-file> pcap <input.pcap>
+  snabb wall filter [options] <rule-file> raw <device>
+  snabb wall filter [options] <rule-file> tap <device>
+  snabb wall filter [options] <rule-file> intel10g <pci-address>
+  snabb wall filter [options] <rule-file> intel1g <pci-address>
+  snabb wall filter --help
+
+Filters packets from the given source (e.g., a .pcap file) using the
+firewall rules read in from the given file path.
+
+Options:
+
+  -l, --links           Output a snabb links report when the program terminates.
+  -o, --output <file>   Output the accepted packets to the given file.
