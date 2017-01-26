@@ -132,8 +132,6 @@ function NDP:new(conf)
    if not conf.dst_eth then
       self.ns_pkt = ndp.form_ns(conf.src_eth, conf.src_ipv6, conf.dst_ipv6)
       self.ns_interval = 3 -- Send a new NS every three seconds.
-      self.ns_max_retries = 5 -- Max number of NS retries.
-      self.ns_retries = 0
    end
    o.dst_eth = conf.dst_eth -- Intentionally nil if to request by NS
    return o
@@ -141,15 +139,11 @@ end
 
 function NDP:maybe_send_ns_request (output)
    if self.dst_eth then return end
-   if self.ns_retries == self.ns_max_retries then
-      error(("Could not resolve IPv6 address: %s"):format(
-         ipv6:ntop(self.conf.dst_ipv6)))
-   end
    self.next_ns_time = self.next_ns_time or engine.now()
    if self.next_ns_time <= engine.now() then
+      print(("NDP: Resolving '%s'"):format(ipv6:ntop(self.conf.dst_ipv6)))
       self:send_ns(output)
       self.next_ns_time = engine.now() + self.ns_interval
-      self.ns_retries = self.ns_retries + 1
    end
 end
 
@@ -172,6 +166,8 @@ function NDP:push()
          if not self.dst_eth and ndp.is_solicited_neighbor_advertisement(p) then
             local dst_ethernet = ndp.get_dst_ethernet(p, {self.conf.dst_ipv6})
             if dst_ethernet then
+               print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.conf.dst_ipv6),
+                                                        ethernet:ntop(dst_ethernet)))
                self.dst_eth = dst_ethernet
             end
             packet.free(p)
