@@ -12,13 +12,17 @@ local long_opts = {
    reject = "r",
    mac = "m",
    ipv4 = "4",
-   ipv6 = "6"
+   ipv6 = "6",
+   rules_exp = "e",
+   rule_file = "f"
 }
 
 function run (args)
    local showlinks = false
    local output_file, reject_file
    local local_macaddr, local_ipv4, local_ipv6
+   local rule_str
+
    local opt = {
       o = function (arg)
          output_file = arg
@@ -41,16 +45,22 @@ function run (args)
       end,
       ["6"] = function (arg)
          local_ipv6 = arg
-      end
+      end,
+      e = function (arg)
+         rule_str = arg
+      end,
+      f = function (arg)
+         rule_str = io.open(arg):read("*a")
+      end,
    }
 
-   args = lib.dogetopt(args, opt, "hlo:r:m:4:6:", long_opts)
-   if #args ~= 3 then
-      print("TODO instructions")
+   args = lib.dogetopt(args, opt, "hlo:r:m:4:6:e:f:", long_opts)
+   if #args ~= 2 then
+      print(require("program.wall.filter.README_inc"))
       main.exit(1)
    end
 
-   local rule_str = io.open(args[1]):read("*a")
+   assert(rule_str, "Must supply either -e or -f option")
    local rules = assert(load("return " .. rule_str))()
 
    if type(rules) ~= "table" then
@@ -58,12 +68,12 @@ function run (args)
       main.exit(1)
    end
 
-   if not common.inputs[args[2]] then
+   if not common.inputs[args[1]] then
       io.stderr:write("No such input available: ", args[1], "\n")
       main.exit(1)
    end
 
-   local source_link_name, app = common.inputs[args[2]](args[2], args[3])
+   local source_link_name, app = common.inputs[args[1]](args[1], args[2])
    if not source_link_name then
       io.stderr:write(app, "\n")
       main.exit(1)
