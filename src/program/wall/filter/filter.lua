@@ -9,12 +9,16 @@ local long_opts = {
    help = "h",
    links = "l",
    output = "o",
-   reject = "r"
+   reject = "r",
+   mac = "m",
+   ipv4 = "4",
+   ipv6 = "6"
 }
 
 function run (args)
-   local output_file, showlinks = nil, false
-   local reject_file = nil
+   local showlinks = false
+   local output_file, reject_file
+   local local_macaddr, local_ipv4, local_ipv6
    local opt = {
       o = function (arg)
          output_file = arg
@@ -28,10 +32,19 @@ function run (args)
       end,
       l = function (arg)
          showlinks = true
+      end,
+      m = function (arg)
+         local_macaddr = arg
+      end,
+      ["4"] = function (arg)
+         local_ipv4 = arg
+      end,
+      ["6"] = function (arg)
+         local_ipv6 = arg
       end
    }
 
-   args = lib.dogetopt(args, opt, "hlo:r:", long_opts)
+   args = lib.dogetopt(args, opt, "hlo:r:m:4:6:", long_opts)
    if #args ~= 3 then
       print("TODO instructions")
       main.exit(1)
@@ -74,7 +87,12 @@ function run (args)
       config.app(c, "reject", pcap.PcapWriter, reject_file)
    end
 
-   config.app(c, "l7fw", require("apps.wall.l7fw").L7Fw, { scanner = scanner, rules = rules })
+   local fw_config = { scanner = scanner,
+                       rules = rules,
+                       local_macaddr = local_macaddr,
+                       local_ipv4 = local_ipv4,
+                       local_ipv6 = local_ipv6 }
+   config.app(c, "l7fw", require("apps.wall.l7fw").L7Fw, fw_config)
    config.link(c, "source." .. source_link_name .. " -> l7spy.south")
    config.link(c, "l7spy.north -> l7fw.input")
    config.link(c, "l7fw.output -> sink.input")
