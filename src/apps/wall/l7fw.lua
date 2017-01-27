@@ -137,19 +137,22 @@ function L7Fw:make_reject_response()
       end
    end
 
-   local dgram   = datagram:new()
-   local ether_h = ether:new({ dst = ether_orig:src(),
-                               src = self.local_macaddr,
-                               type = 0x0800 })
-   local ip_h
+   local dgram = datagram:new()
+   local ether_h, ip_h
 
    if ip_orig:version() == 4 then
+      ether_h = ether:new({ dst = ether_orig:src(),
+                            src = self.local_macaddr,
+                            type = 0x0800 })
       assert(self.local_ipv4, "config is missing local_ipv4")
       ip_h = ipv4:new({ dst = ip_orig:src(),
                         src = ipv4:pton(self.local_ipv4),
                         protocol = ip_protocol,
                         ttl = 64 })
    else
+      ether_h = ether:new({ dst = ether_orig:src(),
+                            src = self.local_macaddr,
+                            type = 0x86dd })
       assert(self.local_ipv6, "config is missing local_ipv6")
       ip_h = ipv6:new({ dst = ip_orig:src(),
                         src = ipv6:pton(self.local_ipv6),
