@@ -231,3 +231,45 @@ function L7Fw:make_reject_response()
 
    return dgram:packet()
 end
+
+function selftest()
+   local savefile = require("pf.savefile")
+   local pflua    = require("pf")
+
+   local function test(name, packet, pflang)
+      local fake_self = { local_ipv4 = "192.168.42.42",
+                          local_ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+                          local_macaddr = "01:23:45:67:89:ab",
+                          current_packet = { data = packet.packet,
+                                             length = packet.len } }
+      local response  = L7Fw.make_reject_response(fake_self)
+      local pred      = pf.compile_filter(pflang)
+
+      assert(pred(response.data, response.length),
+             string.format("test %s failed", name))
+   end
+
+   local base_dir = "./program/wall/tests/data/"
+   local dhcp     = savefile.load_packets(base_dir .. "dhcp.pcap")
+   local dhcpv6   = savefile.load_packets(base_dir .. "dhcpv6.pcap")
+   local v4http   = savefile.load_packets(base_dir .. "http.cap")
+   local v6http   = savefile.load_packets(base_dir .. "v6-http.cap")
+
+   test("icmpv4-1", dhcp[2], [[ether proto ip]])
+   test("icmpv4-2", dhcp[2], [[ip proto icmp]])
+   test("icmpv4-3", dhcp[2], [[icmp and dst net 192.168.0.1]])
+   test("icmpv4-3", dhcp[2], [[icmp[icmptype] = 3 and icmp[icmpcode] = 3]])
+
+   test("icmpv6-1", dhcpv6[1], [[ether proto ip6]])
+   -- TODO: ip6 protochain is not implemented in pflang
+   --test("icmpv6-2", dhcpv6[1], [[ip6 protochain 58]])
+   -- it would be nice to test the icmp type & code here, but pflang
+   -- does not have good support for dereferencing ip6 protocols
+   test("icmpv6-3", dhcpv6[1], [[icmp6 and dst net fe80::a00:27ff:fefe:8f95]])
+
+   test("tcpv4-1", v4http[5], [[ether proto ip]])
+   test("tcpv4-2", v4http[5], [[tcp and tcp[tcpflags] & (tcp-rst|tcp-ack) != 0]])
+
+   test("tcpv6-1", v6http[50], [[ether proto ip6]])
+   test("tcpv6-2", v6http[50], [[tcp]])
+end
