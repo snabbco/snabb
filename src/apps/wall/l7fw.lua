@@ -220,7 +220,7 @@ function L7Fw:make_reject_response()
          icmp_h:checksum(mem, len, ip_h)
          dgram:push(icmp_h)
 
-         ip_h:payload_length(ip_h:sizeof() + icmp_h:sizeof() +
+         ip_h:payload_length(icmp_h:sizeof() +
                              4 + -- extra zero bytes
                              ip_orig:sizeof() + payload_len)
       end
