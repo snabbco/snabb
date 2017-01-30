@@ -13,8 +13,8 @@ local long_opts = {
    mac = "m",
    ipv4 = "4",
    ipv6 = "6",
-   rules_exp = "e",
-   rule_file = "f"
+   ["rules-exp"] = "e",
+   ["rule-file"] = "f"
 }
 
 function run (args)

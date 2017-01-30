@@ -1,9 +1,9 @@
 Usage:
-  snabb wall filter [options] <rule-file> pcap <input.pcap>
-  snabb wall filter [options] <rule-file> raw <device>
-  snabb wall filter [options] <rule-file> tap <device>
-  snabb wall filter [options] <rule-file> intel10g <pci-address>
-  snabb wall filter [options] <rule-file> intel1g <pci-address>
+  snabb wall filter [options] pcap <input.pcap>
+  snabb wall filter [options] raw <device>
+  snabb wall filter [options] tap <device>
+  snabb wall filter [options] intel10g <pci-address>
+  snabb wall filter [options] intel1g <pci-address>
   snabb wall filter --help
 
 Filters packets from the given source (e.g., a .pcap file) using the
@@ -11,11 +11,14 @@ firewall rules read in from the given file path.
 
 Options:
 
-  -l, --links           Output a snabb links report when the program terminates.
-  -o, --output <file>   Output the accepted packets to the given file.
-  -r, --reject <file>   Output reject policy response packets (ICMP or TCP RST)
-                        to the given file. Requires -m and one of -4 or -6 to
-                        be set to work properly.
-  -m, --mac <mac_addr>  Set the MAC address of this firewall host
-  -4, --ipv4 <ip_addr>  Set the IPv4 address of this firewall host
-  -6, --ipv6 <ip_addr>  Set the IPv6 address of this firewall host
+  -l, --links             Output a snabb links report when the program terminates.
+  -o, --output <file>     Output the accepted packets to the given file.
+  -r, --reject <file>     Output reject policy response packets (ICMP or TCP RST)
+                          to the given file. Requires -m and one of -4 or -6 to
+                          be set to work properly.
+  -e, --rules-exp <rules> Set the firewall rules from the given expression. One of
+                          -e or -f must be provided.
+  -f, --rules-file <path> Read the firewall rules in from the given file path.
+  -m, --mac <mac_addr>    Set the MAC address of this firewall host
+  -4, --ipv4 <ip_addr>    Set the IPv4 address of this firewall host
+  -6, --ipv6 <ip_addr>    Set the IPv6 address of this firewall host
