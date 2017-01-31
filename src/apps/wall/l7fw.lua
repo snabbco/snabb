@@ -31,13 +31,19 @@ function L7Fw:new(config)
                  rules = config.rules,
                  -- this map tracks flows to compiled pfmatch functions
                  -- so that we only compile them once per flow
-                 handler_map = {} }
+                 handler_map = {},
+                 -- for stats
+                 accepted = 0,
+                 rejected = 0,
+                 dropped = 0,
+                 total = 0 }
    return setmetatable(obj, self)
 end
 
 -- called by pfmatch handlers, just drop the packet on the floor
 function L7Fw:drop(pkt, len)
    packet.free(self.current_packet)
+   self.dropped = self.dropped + 1
    return
 end
 
@@ -46,12 +52,14 @@ function L7Fw:reject(pkt, len)
    link.transmit(assert(self.output.reject,
                         "output port for reject policy not found"),
                  self:make_reject_response())
+   self.rejected = self.rejected + 1
    packet.free(self.current_packet)
 end
 
 -- called by pfmatch handler, forward packet
 function L7Fw:accept(pkt, len)
    link.transmit(self.output.output, self.current_packet)
+   self.accepted = self.accepted + 1
 end
 
 function L7Fw:push()
@@ -66,6 +74,8 @@ function L7Fw:push()
 
       -- so that pfmatch handler methods can access the original packet
       self.current_packet = pkt
+
+      self.total = self.total + 1
 
       if flow then
          local name   = scanner:protocol_name(flow.protocol)
@@ -95,9 +105,21 @@ function L7Fw:push()
       else
          -- TODO: we may wish to have a default policy for packets
          --       without detected flows instead of just forwarding
-         link.transmit(o, pkt)
+         self:accept(pkt.data, pkt.length)
       end
    end
+end
+
+function L7Fw:report()
+   local accepted, rejected, dropped =
+      self.accepted, self.rejected, self.dropped
+   local total = self.total
+   local a_pct = math.ceil((accepted / total) * 100)
+   local r_pct = math.ceil((rejected / total) * 100)
+   local d_pct = math.ceil((dropped / total) * 100)
+   print(("Accepted packets: %d (%d%%)"):format(accepted, a_pct))
+   print(("Rejected packets: %d (%d%%)"):format(rejected, r_pct))
+   print(("Dropped packets:  %d (%d%%)"):format(dropped, d_pct))
 end
 
 -- create either an ICMP port unreachable packet or a TCP RST to

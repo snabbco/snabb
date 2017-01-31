@@ -7,18 +7,18 @@ local common = require("program.wall.common")
 
 local long_opts = {
    help = "h",
-   links = "l",
    output = "o",
    reject = "r",
    mac = "m",
    ipv4 = "4",
    ipv6 = "6",
+   ["print-report"] = "p",
    ["rules-exp"] = "e",
    ["rule-file"] = "f"
 }
 
 function run (args)
-   local showlinks = false
+   local report = false
    local output_file, reject_file
    local local_macaddr, local_ipv4, local_ipv6
    local rule_str
@@ -34,8 +34,8 @@ function run (args)
          print(require("program.wall.filter.README_inc"))
          main.exit(0)
       end,
-      l = function (arg)
-         showlinks = true
+      p = function (arg)
+         report = true
       end,
       m = function (arg)
          local_macaddr = arg
@@ -54,7 +54,7 @@ function run (args)
       end,
    }
 
-   args = lib.dogetopt(args, opt, "hlo:r:m:4:6:e:f:", long_opts)
+   args = lib.dogetopt(args, opt, "hpo:r:m:4:6:e:f:", long_opts)
    if #args ~= 2 then
       print(require("program.wall.filter.README_inc"))
       main.exit(1)
@@ -111,7 +111,7 @@ function run (args)
    engine.configure(c)
    engine.busywait = true
    engine.main({
-      report = { showlinks = showlinks },
+      report = { showapps = report },
       done = function ()
          return engine.app_table.source.done
       end
