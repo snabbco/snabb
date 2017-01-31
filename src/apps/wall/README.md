@@ -62,6 +62,9 @@ The table may contain the following keys:
 * `local_macaddr` (optional): A MAC address that identifies the host running
   the firewall. This is used for the source address in ethernet frames for
   reject responses.
+* `logging` (optional): A log level parameter that can be set to "on" or
+  "off". When set to "on", it will report dropped/rejected packets to the
+  system log.
 
 
 Scanner (apps.wall.scanner)

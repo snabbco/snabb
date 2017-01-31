@@ -11,7 +11,9 @@ firewall rules read in from the given file path.
 
 Options:
 
-  -l, --links             Output a snabb links report when the program terminates.
+  -p, --print-report      Print a report of packet statistics at the end
+  -l, --log <level>       Log packet information to the system log. The
+                          currently accepted log levels are "on" and "off".
   -o, --output <file>     Output the accepted packets to the given file.
   -r, --reject <file>     Output reject policy response packets (ICMP or TCP RST)
                           to the given file. Requires -m and one of -4 or -6 to

@@ -12,6 +12,7 @@ local long_opts = {
    mac = "m",
    ipv4 = "4",
    ipv6 = "6",
+   log = "l",
    ["print-report"] = "p",
    ["rules-exp"] = "e",
    ["rule-file"] = "f"
@@ -19,6 +20,7 @@ local long_opts = {
 
 function run (args)
    local report = false
+   local logging = "off"
    local output_file, reject_file
    local local_macaddr, local_ipv4, local_ipv6
    local rule_str
@@ -40,6 +42,9 @@ function run (args)
       m = function (arg)
          local_macaddr = arg
       end,
+      l = function (arg)
+         logging = arg
+      end,
       ["4"] = function (arg)
          local_ipv4 = arg
       end,
@@ -54,7 +59,7 @@ function run (args)
       end,
    }
 
-   args = lib.dogetopt(args, opt, "hpo:r:m:4:6:e:f:", long_opts)
+   args = lib.dogetopt(args, opt, "hpl:o:r:m:4:6:e:f:", long_opts)
    if #args ~= 2 then
       print(require("program.wall.filter.README_inc"))
       main.exit(1)
@@ -101,7 +106,8 @@ function run (args)
                        rules = rules,
                        local_macaddr = local_macaddr,
                        local_ipv4 = local_ipv4,
-                       local_ipv6 = local_ipv6 }
+                       local_ipv6 = local_ipv6,
+                       logging = logging }
    config.app(c, "l7fw", require("apps.wall.l7fw").L7Fw, fw_config)
    config.link(c, "source." .. source_link_name .. " -> l7spy.south")
    config.link(c, "l7spy.north -> l7fw.input")

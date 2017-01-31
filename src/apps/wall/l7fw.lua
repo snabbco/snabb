@@ -18,6 +18,10 @@ local ipv6     = require("lib.protocol.ipv6")
 local tcp      = require("lib.protocol.tcp")
 local match    = require("pf.match")
 
+ffi.cdef[[
+  void syslog(int priority, const char*format, ...);
+]]
+
 L7Fw = {}
 L7Fw.__index = L7Fw
 
@@ -32,19 +36,26 @@ function L7Fw:new(config)
                  -- this map tracks flows to compiled pfmatch functions
                  -- so that we only compile them once per flow
                  handler_map = {},
+                 -- log level for logging filtered packets
+                 logging = config.logging or "off",
                  -- for stats
                  accepted = 0,
                  rejected = 0,
                  dropped = 0,
                  total = 0 }
+   assert(obj.logging == "on" or obj.logging == "off",
+          ("invalid log level: %s"):format(obj.logging))
    return setmetatable(obj, self)
 end
 
 -- called by pfmatch handlers, just drop the packet on the floor
 function L7Fw:drop(pkt, len)
+   if self.logging == "on" then
+      self:log_packet("DROP")
+   end
+
    packet.free(self.current_packet)
    self.dropped = self.dropped + 1
-   return
 end
 
 -- called by pfmatch handler, handle rejection response
@@ -53,6 +64,11 @@ function L7Fw:reject(pkt, len)
                         "output port for reject policy not found"),
                  self:make_reject_response())
    self.rejected = self.rejected + 1
+
+   if self.logging == "on" then
+      self:log_packet("REJECT")
+   end
+
    packet.free(self.current_packet)
 end
 
@@ -80,6 +96,8 @@ function L7Fw:push()
       if flow then
          local name   = scanner:protocol_name(flow.protocol)
          local policy = rules[name] or rules["default"]
+
+         self.current_protocol = name
 
          if policy == "accept" then
             self:accept(pkt.data, pkt.length)
@@ -120,6 +138,32 @@ function L7Fw:report()
    print(("Accepted packets: %d (%d%%)"):format(accepted, a_pct))
    print(("Rejected packets: %d (%d%%)"):format(rejected, r_pct))
    print(("Dropped packets:  %d (%d%%)"):format(dropped, d_pct))
+end
+
+-- constants from <syslog.h> for syslog priority argument
+local LOG_USER = 8
+local LOG_INFO = 6
+
+function L7Fw:log_packet(type)
+   local pkt      = self.current_packet
+   local protocol = self.current_protocol
+   local eth_h    = ether:new_from_mem(pkt.data, pkt.length)
+   local ip_h
+
+   if eth_h:type() == 0x0800 then
+      ip_h = ipv4:new_from_mem(pkt.data + eth_h:sizeof(),
+                               pkt.length - eth_h:sizeof())
+   elseif eth_h:type() == 0x86dd then
+      ip_h = ipv6:new_from_mem(pkt.data + eth_h:sizeof(),
+                               pkt.length - eth_h:sizeof())
+   end
+
+   local msg = string.format("[Snabbwall %s] PROTOCOL=%s MAC=%s SRC=%s DST=%s",
+                             type, protocol,
+                             ether:ntop(eth_h:src()),
+                             ip_h:ntop(ip_h:src()),
+                             ip_h:ntop(ip_h:dst()))
+   ffi.C.syslog(bit.bor(LOG_USER, LOG_INFO), msg)
 end
 
 -- create either an ICMP port unreachable packet or a TCP RST to
