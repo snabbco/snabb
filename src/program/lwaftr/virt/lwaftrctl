@@ -238,7 +238,7 @@ function restart_command {
 
 function usage {
     local exit_code=$1
-    echo "Usage: lwaftrctl -f lwaftrctl.conf [start|stop|restart] [all|snabbnfv|vm]"
+    echo "Usage: lwaftrctl -f lwaftrctl.conf [start|stop|restart] [all|snabbnfv|vm|lwaftr]"
     exit $exit_code
 }
 
