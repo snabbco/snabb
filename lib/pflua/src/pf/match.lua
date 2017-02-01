@@ -300,10 +300,10 @@ function compile(str, opts)
    if opts.subst then str = subst(str, opts.subst) end
 
    -- if the compiled function should have extra formal parameters, then
-   -- pass them to expand so that it can pass them through
+   -- pass them to the various passes through filter_args
    local extra_args = {}
    for _,v in ipairs(opts.extra_args) do
-      utils.extra_args[v] = true
+      utils.filter_args[v] = true
    end
 
    local expr = expand(parse(str), opts.dlt)

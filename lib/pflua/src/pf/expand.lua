@@ -9,6 +9,7 @@ local expand_arith, expand_relop, expand_bool
 local set, concat, pp = utils.set, utils.concat, utils.pp
 local uint16, uint32 = utils.uint16, utils.uint32
 local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
+local filter_args = utils.filter_args
 
 local llc_types = set(
    'i', 's', 'u', 'rr', 'rnr', 'rej', 'ui', 'ua',
@@ -1116,7 +1117,7 @@ end
 -- or { 'fail' }.
 function expand_arith(expr, dlt)
    assert(expr)
-   if type(expr) == 'number' or expr == 'len' or utils.extra_args[expr] then
+   if type(expr) == 'number' or filter_args[expr] then
       return expr, {}
    end
 
