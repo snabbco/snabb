@@ -60,9 +60,7 @@ end
 
 -- called by pfmatch handler, handle rejection response
 function L7Fw:reject(pkt, len)
-   link.transmit(assert(self.output.reject,
-                        "output port for reject policy not found"),
-                 self:make_reject_response())
+   link.transmit(self.output.reject, self:make_reject_response())
    self.rejected = self.rejected + 1
 
    if self.logging == "on" then
@@ -83,6 +81,8 @@ function L7Fw:push()
    local o       = assert(self.output.output, "output port not found")
    local rules   = self.rules
    local scanner = self.scanner
+
+   assert(self.output.reject, "output port for reject policy not found")
 
    while not link.empty(i) do
       local pkt  = link.receive(i)
