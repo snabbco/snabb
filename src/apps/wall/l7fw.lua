@@ -22,6 +22,18 @@ ffi.cdef[[
   void syslog(int priority, const char*format, ...);
 ]]
 
+-- constants from <syslog.h> for syslog priority argument
+local LOG_USER = 8
+local LOG_INFO = 6
+
+-- network constants
+local ETHER_PROTO_IPV4 = 0x0800
+local ETHER_PROTO_IPV6 = 0x86dd
+
+local IP_PROTO_ICMPV4 = 1
+local IP_PROTO_TCP    = 6
+local IP_PROTO_ICMPV6 = 58
+
 L7Fw = {}
 L7Fw.__index = L7Fw
 
@@ -140,9 +152,7 @@ function L7Fw:report()
    print(("Dropped packets:  %d (%d%%)"):format(dropped, d_pct))
 end
 
--- constants from <syslog.h> for syslog priority argument
-local LOG_USER = 8
-local LOG_INFO = 6
+local logging_priority = bit.bor(LOG_USER, LOG_INFO)
 
 function L7Fw:log_packet(type)
    local pkt      = self.current_packet
@@ -150,10 +160,10 @@ function L7Fw:log_packet(type)
    local eth_h    = ether:new_from_mem(pkt.data, pkt.length)
    local ip_h
 
-   if eth_h:type() == 0x0800 then
+   if eth_h:type() == ETHER_PROTO_IPV4 then
       ip_h = ipv4:new_from_mem(pkt.data + eth_h:sizeof(),
                                pkt.length - eth_h:sizeof())
-   elseif eth_h:type() == 0x86dd then
+   elseif eth_h:type() == ETHER_PROTO_IPV6 then
       ip_h = ipv6:new_from_mem(pkt.data + eth_h:sizeof(),
                                pkt.length - eth_h:sizeof())
    end
@@ -163,7 +173,7 @@ function L7Fw:log_packet(type)
                              ether:ntop(eth_h:src()),
                              ip_h:ntop(ip_h:src()),
                              ip_h:ntop(ip_h:dst()))
-   ffi.C.syslog(bit.bor(LOG_USER, LOG_INFO), msg)
+   ffi.C.syslog(logging_priority, msg)
 end
 
 -- create either an ICMP port unreachable packet or a TCP RST to
@@ -173,10 +183,10 @@ function L7Fw:make_reject_response()
    local ether_orig = ether:new_from_mem(pkt.data, pkt.length)
    local ip_orig
 
-   if ether_orig:type() == 0x0800 then
+   if ether_orig:type() == ETHER_PROTO_IPV4 then
       ip_orig = ipv4:new_from_mem(pkt.data + ether_orig:sizeof(),
                                   pkt.length - ether_orig:sizeof())
-   elseif ether_orig:type() == 0x86dd then
+   elseif ether_orig:type() == ETHER_PROTO_IPV6 then
       ip_orig = ipv6:new_from_mem(pkt.data + ether_orig:sizeof(),
                                   pkt.length - ether_orig:sizeof())
    else
@@ -190,16 +200,16 @@ function L7Fw:make_reject_response()
    if ip_orig:version() == 4 then
       if ip_orig:protocol() == 6 then
          is_tcp = true
-         ip_protocol = 6
+         ip_protocol = IP_PROTO_TCP
       else
-         ip_protocol = 1  -- ICMPv4
+         ip_protocol = IP_PROTO_ICMPV4
       end
    else
       if ip_orig:next_header() == 6 then
          is_tcp = true
-         ip_protocol = 6
+         ip_protocol = IP_PROTO_TCP
       else
-         ip_protocol = 58 -- ICMPv6
+         ip_protocol = IP_PROTO_ICMPV6
       end
    end
 
@@ -209,7 +219,7 @@ function L7Fw:make_reject_response()
    if ip_orig:version() == 4 then
       ether_h = ether:new({ dst = ether_orig:src(),
                             src = self.local_macaddr,
-                            type = 0x0800 })
+                            type = ETHER_PROTO_IPV4 })
       assert(self.local_ipv4, "config is missing local_ipv4")
       ip_h = ipv4:new({ dst = ip_orig:src(),
                         src = ipv4:pton(self.local_ipv4),
@@ -218,7 +228,7 @@ function L7Fw:make_reject_response()
    else
       ether_h = ether:new({ dst = ether_orig:src(),
                             src = self.local_macaddr,
-                            type = 0x86dd })
+                            type = ETHER_PROTO_IPV6 })
       assert(self.local_ipv6, "config is missing local_ipv6")
       ip_h = ipv6:new({ dst = ip_orig:src(),
                         src = ipv6:pton(self.local_ipv6),
@@ -253,10 +263,10 @@ function L7Fw:make_reject_response()
       local icmp_h
 
       if ip_h:version() == 4 then
-         -- ICMPv4 code for "port unreachable"
+         -- ICMPv4 code & type for "port unreachable"
          icmp_h = icmp:new(3, 3)
       else
-         -- ICMPv6 code for "administratively prohibited"
+         -- ICMPv6 code & type for "administratively prohibited"
          icmp_h = icmp:new(1, 1)
       end
 
@@ -264,6 +274,8 @@ function L7Fw:make_reject_response()
 
       if ip_h:version() == 4 then
          dgram:payload(ip_orig:header(), ip_orig:sizeof())
+         -- ICMPv4 port unreachable errors come with the original IPv4
+         -- header and 8 bytes of the original payload
          dgram:payload(pkt.data + ether_orig:sizeof() + ip_orig:sizeof(), 8)
 
          icmp_h:checksum(dgram:payload())
