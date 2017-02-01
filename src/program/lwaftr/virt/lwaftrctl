@@ -23,7 +23,6 @@
 # The command 'lwaftrctl all start', run all the steps above.
 
 QEMU=qemu-system-x86_64
-QEMU_ARGS=""
 LWAFTR_DELAY=${LWAFTR_DELAY:-"20"}
 
 tmux_session=""
