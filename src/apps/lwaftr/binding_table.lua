@@ -30,7 +30,7 @@
 --
 --             Figure 2: Structure of a Port-Restricted Port Field
 --
---   Source: http://tools.ietf.org/html/rfc7597#section-5.1 
+--   Source: http://tools.ietf.org/html/rfc7597#section-5.1
 --
 -- We find the specification's names to be a bit obtuse, so we refer to
 -- them using the following names:
@@ -48,10 +48,7 @@
 -- A successful lookup into the softwire table will also indicate the
 -- IPv6 address of the AFTR itself.  As described in
 -- https://www.ietf.org/id/draft-farrer-softwire-br-multiendpoints-01.txt,
--- an AFTR may have multiple configured addresses.  The address is
--- actually stored as an index into the BR address table, because we
--- have space in the softwire table for a 4-byte index but not a 16-byte
--- IPv6 value.
+-- an AFTR may have multiple configured addresses.
 --
 -- Note that if reserved_ports_bit_count is nonzero, the lwAFTR must
 -- drop a packet whose port is less than 2^reserved_ports_bit_count.  In
@@ -60,7 +57,7 @@
 -- fail.  Likewise if we get a packet to an IPv4 address that's not
 -- under our control, we return 0 for the PSID, knowing that the
 -- subsequent softwire lookup will fail.
--- 
+--
 module(..., package.seeall)
 
 local bit = require('bit')
@@ -84,8 +81,7 @@ softwire_key_t = ffi.typeof[[
 
 BTLookupQueue = {}
 
--- BTLookupQueue needs a binding table to get softwires, BR addresses
--- and PSID lookup.
+-- BTLookupQueue needs a binding table to get softwires and PSID lookup.
 function BTLookupQueue.new(binding_table)
    local ret = {
       binding_table = assert(binding_table),
@@ -140,34 +136,12 @@ end
 
 local BindingTable = {}
 
-function BindingTable.new(psid_map, br_addresses, softwires)
+function BindingTable.new(psid_map, softwires)
    local ret = {
       psid_map = assert(psid_map),
       softwires = assert(softwires),
-      br_addresses = cltable.new({key_type = ffi.typeof('uint8_t[16]')})
    }
-   local self = setmetatable(ret, {__index=BindingTable})
-   for softwire in self.softwires:iterate() do
-      self:add_br_address(softwire.value.br_address)
-   end
-   return self
-end
-
-function BindingTable:add_br_address(address)
-   if self.br_addresses[address] == nil then
-      self.br_addresses[address] = 1
-   else
-      self.br_addresses[address] = self.br_addresses[address] + 1
-   end
-end
-
-function BindingTable:remove_br_address(address)
-   assert(self.br_addresses[address])
-   if self.br_addresses[address] == 1 then
-      self.br_addresses[address] = nil
-   else
-      self.br_addresses[address] = self.br_addresses[address] - 1
-   end
+   return setmetatable(ret, {__index=BindingTable})
 end
 
 function BindingTable:add_softwire_entry(entry_blob)
@@ -245,9 +219,8 @@ end
 --
 -- Each entry is a pointer with two members, "key" and "value".  They
 -- key is a softwire_key_t and has "ipv4" and "psid" members.  The value
--- is a softwire_value_t and has "br" and "b4_ipv6" members.  The br is
--- a one-based index into the br_addresses array, and b4_ipv6 is a
--- uint8_t[16].
+-- is a softwire_value_t and has "br_address" and "b4_ipv6" members. Both
+-- members are a uint8_t[16].
 function BindingTable:iterate_softwires()
    return self.softwires:iterate()
 end
@@ -265,7 +238,7 @@ function load(conf)
       psid_builder:add_range(k.addr, v.end_addr or k.addr, psid_value)
    end
    local psid_map = psid_builder:build(psid_map_value_t())
-   return BindingTable.new(psid_map, conf.br_address, conf.softwire)
+   return BindingTable.new(psid_map, conf.softwire)
 end
 
 function selftest()
