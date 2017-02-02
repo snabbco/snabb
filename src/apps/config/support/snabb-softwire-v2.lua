@@ -29,7 +29,7 @@ end
 local softwire_grammar
 local function get_softwire_grammar()
    if not softwire_grammar then
-      local schema = yang.load_schema_by_name('snabb-softwire-v1')
+      local schema = yang.load_schema_by_name('snabb-softwire-v2')
       local grammar = data.data_grammar_from_schema(schema)
       softwire_grammar =
          assert(grammar.members['softwire-config'].
@@ -144,7 +144,7 @@ local function ietf_binding_table_from_native(bt)
                psid_len = psid_map.psid_length,
                psid = entry.key.psid
             },
-            br_ipv6_addr = bt.br_address[entry.value.br],
+            br_ipv6_addr = entry.value.br_address,
          }
          ret[k] = v
       end
@@ -159,7 +159,7 @@ local function schema_getter(schema_name, path)
 end
 
 local function snabb_softwire_getter(path)
-   return schema_getter('snabb-softwire-v1', path)
+   return schema_getter('snabb-softwire-v2', path)
 end
 
 local function ietf_softwire_getter(path)
@@ -180,13 +180,6 @@ local function native_binding_table_from_ietf(ietf)
    local softwire = ctable.new({key_type=softwire_key_t,
                                 value_type=softwire_value_t})
    for k,v in cltable.pairs(ietf) do
-      local br_address_key = ipv6:ntop(v.br_ipv6_addr)
-      local br = br_address_by_ipv6[br_address_key]
-      if not br then
-         table.insert(br_address, v.br_ipv6_addr)
-         br = #br_address
-         br_address_by_ipv6[br_address_key] = br
-      end
       local psid_key = psid_map_key_t({addr=v.binding_ipv4_addr})
       if not psid_map[psid_key] then
          psid_map[psid_key] = {psid_length=v.port_set.psid_len,
@@ -194,9 +187,9 @@ local function native_binding_table_from_ietf(ietf)
       end
       softwire:add(softwire_key_t({ipv4=v.binding_ipv4_addr,
                                    psid=v.port_set.psid}),
-                   softwire_value_t({br=br, b4_ipv6=k.binding_ipv6info}))
+                   softwire_value_t({br_address=v.br_ipv6_addr, b4_ipv6=k.binding_ipv6info}))
    end
-   return {psid_map=psid_map, br_address=br_address, softwire=softwire}
+   return {psid_map=psid_map, softwire=softwire}
 end
 
 local function serialize_binding_table(bt)
@@ -279,12 +272,12 @@ local function ietf_softwire_translator ()
       -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-threshold).
       if #path > #br_instance_paths then
          if path[#path].name == 'tunnel-payload-mtu' then
-            return {{'set', {schema='snabb-softwire-v1',
+            return {{'set', {schema='snabb-softwire-v2',
                      path="/softwire-config/internal-interface/mtu",
                      config=tostring(arg)}}}
          end
          if path[#path].name == 'tunnel-path-mru' then
-            return {{'set', {schema='snabb-softwire-v1',
+            return {{'set', {schema='snabb-softwire-v2',
                      path="/softwire-config/external-interface/mtu",
                      config=tostring(arg)}}}
          end
@@ -315,7 +308,7 @@ local function ietf_softwire_translator ()
             arg = arg[data.normalize_id(bt_paths[i])]
          end
          local bt = native_binding_table_from_ietf(arg)
-         return {{'set', {schema='snabb-softwire-v1',
+         return {{'set', {schema='snabb-softwire-v2',
                           path='/softwire-config/binding-table', 
                           config=serialize_binding_table(bt)}}}
       else
@@ -356,27 +349,12 @@ local function ietf_softwire_translator ()
                error('bad path element: '..path[#path].name)
             end
          end
-         -- Apply changes.  Start by ensuring that there's a br-address
-         -- entry for this softwire, and ensuring that the port-set
+         -- Apply changes.  Ensure  that the port-set
          -- changes are compatible with the existing configuration.
          local updates = {}
          local softwire_path = '/softwire-config/binding-table/softwire'
          local psid_map_path = '/softwire-config/binding-table/psid-map'
-         local br_address_path = '/softwire-config/binding-table/br-address'
-         local new_br
          local bt = native_config.softwire_config.binding_table
-         for i,br in ipairs(bt.br_address) do
-            if ipv6_equals(br, new.br_ipv6_addr) then
-               new_br = i; break
-            end
-         end
-         if new_br == nil then
-            new_br = #bt.br_address + 1
-            table.insert(updates,
-                         {'add', {schema='snabb-softwire-v1',
-                                  path=br_address_path,
-                                  config=ipv6:ntop(new.br_ipv6_addr)}})
-         end
          if new.binding_ipv4_addr ~= old.binding_ipv4_addr then
             local psid_key_t = data.typeof('struct { uint32_t ipv4; }')
             local psid_map_entry =
@@ -387,7 +365,7 @@ local function ietf_softwire_translator ()
                   ipv4_ntop(new.binding_ipv4_addr), new.port_set.psid_len,
                   new.port_set.psid_offset)
                table.insert(updates,
-                            {'add', {schema='snabb-softwire-v1',
+                            {'add', {schema='snabb-softwire-v2',
                                      path=psid_map_path,
                                      config=config_str}})
             elseif (psid_map_entry.psid_length ~= new.port_set.psid_len or
@@ -406,7 +384,7 @@ local function ietf_softwire_translator ()
             -- See comment above.
             error('changing psid params unimplemented')
          end
-         -- OK, psid_map and br_address taken care of, let's just remove
+         -- OK, psid_map taken care of, let's just remove
          -- this softwire entry and add a new one.
          local function q(ipv4, psid)
             return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
@@ -417,14 +395,16 @@ local function ietf_softwire_translator ()
          -- to add a check here that the IPv4/PSID is not present in the
          -- binding table.
          table.insert(updates,
-                      {'remove', {schema='snabb-softwire-v1',
+                      {'remove', {schema='snabb-softwire-v2',
                                   path=softwire_path..old_query}})
          local config_str = string.format(
-            '{ ipv4 %s; psid %s; br %s; b4-ipv6 %s; }',
+            '{ ipv4 %s; psid %s; br-address %s; b4-ipv6 %s; }',
             ipv4_ntop(new.binding_ipv4_addr), new.port_set.psid,
-            new_br, path[entry_path_len].query['binding-ipv6info'])
+            ipv6:ntop(new.br_ipv6_addr),
+            path[entry_path_len].query['binding-ipv6info'])
+         require("debugger.debugger")()
          table.insert(updates,
-                      {'add', {schema='snabb-softwire-v1',
+                      {'add', {schema='snabb-softwire-v2',
                                path=softwire_path,
                                config=config_str}})
          return updates
@@ -442,7 +422,6 @@ local function ietf_softwire_translator ()
       local updates = {}
       local softwire_path = '/softwire-config/binding-table/softwire'
       local psid_map_path = '/softwire-config/binding-table/psid-map'
-      local br_address_path = '/softwire-config/binding-table/br-address'
       -- Add new psid_map entries.
       for k,v in cltable.pairs(new_bt.psid_map) do
          if old_bt.psid_map[k] then
@@ -454,31 +433,10 @@ local function ietf_softwire_translator ()
                "{ addr %s; psid-length %s; reserved-ports-bit-count %s; }",
                ipv4_ntop(k.addr), v.psid_length, v.reserved_ports_bit_count)
             table.insert(updates,
-                         {'add', {schema='snabb-softwire-v1',
+                         {'add', {schema='snabb-softwire-v2',
                                   path=psid_map_path,
                                   config=config_str}})
          end
-      end
-      -- Remap br-address entries.
-      local br_address_map = {}
-      local br_address_count = #old_bt.br_address
-      for _,new_br_address in ipairs(new_bt.br_address) do
-         local idx
-         for i,old_br_address in ipairs(old_bt.br_address) do
-            if ipv6_equals(old_br_address, new_br_address) then
-               idx = i
-               break
-            end
-         end
-         if not idx then
-            br_address_count = br_address_count + 1
-            idx = br_address_count
-            table.insert(updates,
-                         {'add', {schema='snabb-softwire-v1',
-                                  path=br_address_path,
-                                  config=ipv6:ntop(new_br_address)}})
-         end
-         table.insert(br_address_map, idx)
       end
       -- Add softwires.
       local additions = {}
@@ -488,13 +446,14 @@ local function ietf_softwire_translator ()
                      inet_ntop(entry.key.ipv4)..'/'..entry.key.psid)
          end
          local config_str = string.format(
-            '{ ipv4 %s; psid %s; br %s; b4-ipv6 %s; }',
+            '{ ipv4 %s; psid %s; br-address %s; b4-ipv6 %s; }',
             ipv4_ntop(entry.key.ipv4), entry.key.psid,
-            br_address_map[entry.value.br], ipv6:ntop(entry.value.b4_ipv6))
+            ipv6:ntop(entry.value.br_address), ipv6:ntop(entry.value.b4_ipv6))
+         require("debugger.debugger")()
          table.insert(additions, config_str)
       end
       table.insert(updates,
-                   {'add', {schema='snabb-softwire-v1',
+                   {'add', {schema='snabb-softwire-v2',
                             path=softwire_path,
                             config=table.concat(additions, '\n')}})
       return updates
@@ -513,7 +472,7 @@ local function ietf_softwire_translator ()
          return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
       end
       local query = q(entry.binding_ipv4_addr, entry.port_set.psid)
-      return {{'remove', {schema='snabb-softwire-v1',
+      return {{'remove', {schema='snabb-softwire-v2',
                           path=softwire_path..query}}}
    end
    function ret.pre_update(native_config, verb, path, data)
@@ -526,7 +485,6 @@ local function ietf_softwire_translator ()
           path:match('^/softwire%-config/binding%-table/softwire')) then
          -- Remove a softwire.
          local value = snabb_softwire_getter(path)(native_config)
-         local br = cached_config.softwire_config.binding.br
          for _,instance in cltable.pairs(br.br_instances.br_instance) do
             local grammar = get_ietf_softwire_grammar()
             local key = path_mod.prepare_table_lookup(
@@ -540,9 +498,7 @@ local function ietf_softwire_translator ()
          local bt = native_config.softwire_config.binding_table
          for k,v in cltable.pairs(
             ietf_binding_table_from_native(
-               { psid_map = bt.psid_map, br_address = bt.br_address,
-                 softwire = data })) do
-            local br = cached_config.softwire_config.binding.br
+               { psid_map = bt.psid_map, softwire = data })) do
             for _,instance in cltable.pairs(br.br_instances.br_instance) do
                instance.binding_table.binding_entry[k] = v
             end

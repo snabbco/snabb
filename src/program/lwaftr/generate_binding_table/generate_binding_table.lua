@@ -41,10 +41,10 @@ local function psid_map(w, params)
    end
 end
 
-local function softwire_entry(v4addr, psid_len, b4)
+local function softwire_entry(v4addr, psid_len, b4, br_address)
    if tonumber(v4addr) then v4addr = to_ipv4_string(v4addr) end
-   return ("  softwire { ipv4 %s; psid %d; b4-ipv6 %s; }"):format(
-      v4addr, psid_len, b4)
+   return ("  softwire { ipv4 %s; psid %d; b4-ipv6 %s; br-address %s; }"):format(
+      v4addr, psid_len, b4, br_address)
 end
 
 local function inc_ipv6(ipv6)
@@ -77,10 +77,12 @@ end
 local function softwires(w, params)
    local v4addr = to_ipv4_u32(params.from_ipv4)
    local b4 = ipv6:pton(params.from_b4)
+   local br_address = ipv6:pton(params.br_address)
    local n = 2^params.psid_len
    for _ = 1, params.num_ips do
       for psid = 1, n-1 do
-         w:ln(softwire_entry(v4addr, psid, ipv6:ntop(b4)))
+         w:ln(softwire_entry(v4addr, psid, ipv6:ntop(b4),
+              ipv6:ntop(br_address)))
          b4 = inc_ipv6(b4)
       end
       v4addr = inc_ipv4(v4addr)
@@ -131,12 +133,12 @@ function run(args)
       psid_len = psid_len,
       shift = shift,
    })
-   w:ln("  br-address "..br_address..";")
    softwires(w, {
       from_ipv4 = from_ipv4,
       num_ips = num_ips,
       from_b4 = from_b4,
       psid_len = psid_len,
+      br_address = br_address,
    })
    w:ln("}")
    w:close()

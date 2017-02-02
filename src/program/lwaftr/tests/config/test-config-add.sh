@@ -20,7 +20,7 @@ SNABB_NAME="`random_name`"
 start_lwaftr_bench $SNABB_NAME
 
 # IP to test with.
-TEST_SOFTWIRE="{ ipv4 1.2.3.4; psid 72; b4-ipv6 ::1; br 1; }"
+TEST_SOFTWIRE="{ ipv4 1.2.3.4; psid 72; b4-ipv6 ::1; br-address 5:9:a:b:c:d:e:f; }"
 ./snabb config add "$SNABB_NAME" "/softwire-config/binding-table/softwire" "$TEST_SOFTWIRE"
 
 # Check it can get this just fine

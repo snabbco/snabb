@@ -368,20 +368,78 @@ local function increment_br(conf)
    return conf
 end
 
+local function remove_address_list(conf)
+   local bt = conf.softwire_config.binding_table
+   for key, entry in cltable.pairs(bt.softwire) do
+      entry.br_address = assert(bt.br_address[entry.br])
+      entry.br = nil
+   end
+   return conf
+end
+
+local function v2_migration(src, conf_file)
+   local data = require('lib.yang.data')
+   -- Lets create a custom schema programatically as an intermediatory so we can
+   -- switch over to v2 of snabb-softwire config.
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v1")
+   local binding_table = hybridscm.body["softwire-config"].body["binding-table"]
+
+   -- Add the new field programatically (TODO: Make a function to take a
+   -- fragment of yang and convert add it to a schema). Not robust.
+   binding_table.body.softwire.body["br-address"] = {
+      id = "br-address",
+      kind = "leaf",
+      type = binding_table.body.softwire.body["b4-ipv6"].type,
+      primitive_type="ipv6-address",
+      must={}
+   }
+
+   local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
+   conf = remove_address_list(conf)
+   conf.softwire_config.binding_table.br_address = nil
+
+   -- Now we have to convert from the migration hybrid schema back to vanila v2
+   -- so that the printers work correctly (or future migrations do).
+   local tempfile_name = "/tmp/snabb-softwire-v2_conversion_" .. os.time()
+   local tempfile = io.open(tempfile_name, "w")
+   yang.print_data_for_schema(hybridscm, conf, tempfile)
+   tempfile:close()
+
+   -- Tell the GC that we don't need to keep this version in memory, we can't
+   -- keep large configuration files in memory twice.
+   conf = nil
+
+   -- Load the configuration from temp file and remove from file system.
+   tempfile = io.open(tempfile_name, "r")
+   local conf = assert(tempfile:read("*a"))
+   tempfile:close()
+   os.remove(tempfile_name)
+
+   -- Finally load it and return the config file
+   return data.load_data_for_schema_by_name("snabb-softwire-v2", conf, conf_file)
+end
+
 local function migrate_3_0_1(conf_file)
    local data = require('lib.yang.data')
    local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   return increment_br(data.load_data_for_schema_by_name(
-                          'snabb-softwire-v1', str, conf_file))
+   return v2_migration(increment_br(data.load_data_for_schema_by_name(
+                          'snabb-softwire-v1', str, conf_file)), conf_file)
 end
 
 local function migrate_3_0_1bis(conf_file)
-   return increment_br(yang.load_configuration(
-                          conf_file, {schema_name='snabb-softwire-v1'}))
+   return v2_migration(increment_br(yang.load_configuration(
+                       conf_file, {schema_name='snabb-softwire-v1'})),
+                       conf_file)
+end
+
+local function migrate_3_2_0(conf_file)
+   local src = io.open(conf_file, "r"):read("*a")
+   return v2_migration(src, conf_file)
 end
 
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
-                    ['3.0.1.1'] = migrate_3_0_1bis }
+                    ['3.0.1.1'] = migrate_3_0_1bis,
+                    ['3.2.0'] = migrate_3_2_0 }
 function run(args)
    local conf_file, version = parse_args(args)
    local migrate = migrators[version]
@@ -390,6 +448,6 @@ function run(args)
       show_usage(1)
    end
    local conf = migrate(conf_file)
-   yang.print_data_for_schema_by_name('snabb-softwire-v1', conf, io.stdout)
+   yang.print_data_for_schema_by_name('snabb-softwire-v2', conf, io.stdout)
    main.exit(0)
 end

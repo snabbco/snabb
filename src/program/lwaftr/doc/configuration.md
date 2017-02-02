@@ -2,7 +2,7 @@
 
 The lwAFTR's configuration is modelled by a
 [YANG](https://tools.ietf.org/html/rfc6020) schema,
-[snabb-softwire-v1](../../../lib/yang/snabb-softwire-v1.yang).
+[snabb-softwire-v2](../../../lib/yang/snabb-softwire-v2.yang).
 
 The lwAFTR takes its configuration from the user in the form of a text
 file.  That file's grammar is derived from the YANG schema; see the
@@ -64,35 +64,35 @@ softwire-config {
       max-packets 20000;
     }
   }
-  // Now the binding table!  3 parts: PSID map, BR address table, and
+  // Now the binding table!  3 parts: PSID map, , and
   // softwire set.  See description below for details.
   binding-table {
     psid-map { addr 178.79.150.15; psid-length 4; }
     psid-map { addr 178.79.150.233; psid-length 16; }
     psid-map { addr 178.79.150.2; psid-length 16; }
-    br-address 8:9:a:b:c:d:e:f;
-    br-address 1e:1:1:1:1:1:1:af;
-    br-address 1e:2:2:2:2:2:2:af;
     softwire {
       ipv4 178.79.150.233;
       psid 22788;
       b4-ipv6 127:11:12:13:14:15:16:128;
+      br-address 8:9:a:b:c:d:e:f;
     }
     softwire {
       ipv4 178.79.150.233;
       psid 2700;
       b4-ipv6 127:11:12:13:14:15:16:128;
+      br-address 8:9:a:b:c:d:e:f;
     }
     softwire {
       ipv4 178.79.150.15;
       psid 1;
       b4-ipv6 127:22:33:44:55:66:77:128;
+      br-address 8:9:a:b:c:d:e:f;
     }
     softwire {
       ipv4 178.79.150.2;
       psid 7850;
       b4-ipv6 127:24:35:46:57:68:79:128;
-      br 1;
+      br-address 1e:1:1:1:1:1:1:af;
     }
   }
 }
@@ -121,7 +121,7 @@ given *PID* to reload the table.
 ## In-depth configuration explanation
 
 See the embedded descriptions in the
-[snabb-softwire-v1](../../../lib/yang/snabb-softwire-v1.yang) schema
+[snabb-softwire-v2](../../../lib/yang/snabb-softwire-v2.yang) schema
 file.
 
 ## Binding tables
@@ -134,8 +134,8 @@ encapsulated in IPv6 and sent to the AFTR; the AFTR does the reverse.
 The binding table is how the AFTR knows which B4 is associated with
 an incoming packet.
 
-In the Snabb lwAFTR there are three parts of a binding table: the PSID
-info map, the border router (BR) address table, and the softwire map.
+In the Snabb lwAFTR there are two parts of a binding table: the PSID
+info map and the softwire map.
 
 ### PSID info map
 
@@ -165,18 +165,6 @@ just two of them.  Actually it's sufficient to just specify the
 `reserved-ports-bit-count` defaults to 0, and `shift` defaults to `16 -
 psid-length`.
 
-### Border router addresses
-
-Next, the `br-address` clauses define the set of IPv6 addresses to
-associate with the lwAFTR.  These are the "border router" addresses.
-For a usual deployment there will be one main address and possibly some
-additional ones.  For example:
-
-```
-  br-address 8:9:a:b:c:d:e:f;
-  br-address 1E:1:1:1:1:1:1:af;
-  ...
-```
 
 ### Softwires
 
@@ -185,16 +173,9 @@ provision.  Each softwire associates an IPv4 address, a PSID, and a B4
 address.  For example:
 
 ```
-  softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; }
+  softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; br-address 8:9:a:b:c:d:e:f }
 ```
 
-By default, a softwire is associated with the first `br-address`
-(`br 0;`).  To associate the tunnel with a different border router,
-specify it by index:
-
-```
-  softwire { ipv4 178.79.150.233; psid 80; b4-ipv6 127:2:3:4:5:6:7:128; aftr 0; }
-```
 
 ## Ingress and egress filters
 
