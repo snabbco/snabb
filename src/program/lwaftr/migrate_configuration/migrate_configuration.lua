@@ -370,7 +370,6 @@ end
 
 local function remove_address_list(conf)
    local bt = conf.softwire_config.binding_table
-   local k, e
    for key, entry in cltable.pairs(bt.softwire) do
       entry.br_address = assert(bt.br_address[entry.br])
       entry.br = nil
