@@ -16,7 +16,7 @@ The `L7Spy` app is a Snabb app that scans packets passing through it using
 an instance of the `Scanner` class. The scanner instance may be shared among
 several `L7Spy` instances or with a `L7Fw` app for filtering.
 
-— Method **L7Fw:new** *config*
+— Method **L7Spy:new** *config*
 
 Construct a new `L7Spy` app instance based on a given configuration table.
 The table may contain the following key:
