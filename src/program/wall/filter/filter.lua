@@ -55,7 +55,9 @@ function run (args)
          rule_str = arg
       end,
       f = function (arg)
-         rule_str = io.open(arg):read("*a")
+         local file = io.open(arg)
+         assert(file, "could not open rules file")
+         rule_str = file:read("*a")
       end,
    }
 
