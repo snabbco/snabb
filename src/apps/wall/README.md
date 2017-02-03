@@ -12,7 +12,59 @@ L7Spy (apps.wall.l7spy)
              |           |  south
              +-----------+
 
-**(TODO)**
+The `L7Spy` app is a Snabb app that scans packets passing through it using
+an instance of the `Scanner` class. The scanner instance may be shared among
+several `L7Spy` instances or with a `L7Fw` app for filtering.
+
+— Method **L7Spy:new** *config*
+
+Construct a new `L7Spy` app instance based on a given configuration table.
+The table may contain the following key:
+
+* `scanner` (optional): Either a string identifying the kind of scanner to
+  construct (currently only `"ndpi"` is accepted) or an existing scanner
+  instance.
+
+
+Filter (apps.wall.filter)
+-------------------------
+
+    DIAGRAM: L7Fw
+             +-----------+
+      input  |           | output
+        ---->*   L7Fw    *--->
+             |           *--->
+             |           | reject
+             +-----------+
+
+The `L7Fw` app implements a stateful firewall by querying the scanner
+state collected by a `L7Spy` app. It then filters packets based on a
+given set of rules.
+
+— Method **L7Fw:new** *config*
+
+Construct a new `L7Fw` app instance based on a given configuration table.
+The table may contain the following keys:
+
+* `scanner`: A `Scanner` instance shared with an `L7Spy` instance. The metadata
+  in this scanner is used for packet filtering.
+* `rules`: A table mapping protocol names (as strings) to firewall actions.
+  The accepted actions are `"accept"`, `"reject"`, `"drop"`, or a pfmatch
+  expression. The pfmatch expression may use the variable `flow_count`
+  (as an arithmetic expression) to refer to the number of packets in a
+  given protocol flow, and may call the `accept`, `reject`, or `drop` methods.
+* `local_ipv4` (optional): An IPv4 address that identifies the host running
+  the firewall. This is used as the source address in ICMPv4 or TCP reject
+  responses.
+* `local_ipv6` (optional): An IPv6 address that identifies the host running
+  the firewall. This is used as the source address in ICMPv6 or TCP reject
+  responses.
+* `local_macaddr` (optional): A MAC address that identifies the host running
+  the firewall. This is used for the source address in ethernet frames for
+  reject responses.
+* `logging` (optional): A log level parameter that can be set to "on" or
+  "off". When set to "on", it will report dropped/rejected packets to the
+  system log.
 
 
 Scanner (apps.wall.scanner)

@@ -3,6 +3,7 @@ module(...,package.seeall)
 local utils = require('pf.utils')
 
 local set, pp, dup = utils.set, utils.pp, utils.dup
+local filter_args = utils.filter_args
 
 local relops = set('<', '<=', '=', '!=', '>=', '>')
 
@@ -159,7 +160,7 @@ end
 local function inline_single_use_variables(expr)
    local counts, substs = {}, {}
    local function count(expr)
-      if expr == 'len' then return
+      if filter_args[expr] then return
       elseif type(expr) == 'number' then return
       elseif type(expr) == 'string' then counts[expr] = counts[expr] + 1 
       else
@@ -246,7 +247,7 @@ local function renumber(expr)
       return fresh
    end
    local function lookup(var)
-      if var == 'len' then return var end
+      if filter_args[var] then return var end
       return assert(substs[var], "unbound variable: "..var)
    end
    local function visit(expr)
