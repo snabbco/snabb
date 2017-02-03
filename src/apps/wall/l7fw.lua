@@ -7,6 +7,7 @@ module(..., package.seeall)
 --   * a simple action ("drop", "reject", "accept")
 --   * a pfmatch expression
 
+local bit      = require("bit")
 local ffi      = require("ffi")
 local link     = require("core.link")
 local packet   = require("core.packet")
