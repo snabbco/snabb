@@ -57,6 +57,10 @@ TEST_DATA=(
 "no_icmp.conf" "" "regressiontest-signedntohl-frags.pcap" "" "regressiontest-signedntohl-frags-output.pcap"
 "regressiontest-signedntohl-frags-counters.lua"
 
+"Regression test: make sure end-addr works"
+"icmp_endaddr.conf" "regressiontest-endaddr-v4-input.pcap" "" "" "regressiontest-endaddr-v6-output.pcap"
+"regressiontest-endaddr.lua"
+
 "from-internet IPv4 packet found in the binding table."
 "icmp_on_fail.conf" "tcp-frominet-bound.pcap" "" "" "tcp-afteraftr-ipv6.pcap"
 "in-1p-ipv4-out-1p-ipv6-1.lua"
