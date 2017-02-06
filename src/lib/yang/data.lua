@@ -204,9 +204,16 @@ local function struct_parser(keyword, members, ctype)
       return parse1(P)
    end
    local struct_t = ctype and typeof(ctype)
-   local function finish(out)
-      -- FIXME check mandatory values.
-      if struct_t then return struct_t(out) else return out end
+   local function finish(out, leaf)
+     -- FIXME check mandatory values.
+      if struct_t then
+        local ret
+        if out == nil then ret = struct_t()
+        else ret = struct_t(out) end
+        return ret
+      else
+        return out
+      end
    end
    return {init=init, parse=parse, finish=finish}
 end
