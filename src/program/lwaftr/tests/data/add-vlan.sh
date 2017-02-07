@@ -24,6 +24,7 @@ V4=(
     incoming-icmpv4-echo-request-invalid-icmp-checksum.pcap
     incoming-icmpv4-echo-request-unbound.pcap
     incoming-icmpv4-echo-request.pcap
+    regressiontest-endaddr-v4-input.pcap
     response-ipv4-icmp31-inet.pcap
     response-ipv4-icmp34-inet.pcap
     tcp-afteraftr-ipv6-wrongiface.pcap  
@@ -79,6 +80,7 @@ V6=(
     recap-ipv6.pcap
     recap-ipv6-n64.pcap
     recap-tocustom-BRIP-ipv6.pcap
+    regressiontest-endaddr-v6-output.pcap
     regressiontest-signedntohl-frags.pcap
     regressiontest-signedntohl-frags-output.pcap
     response-ipv6-tunneled-icmpv4_31-tob4.pcap
