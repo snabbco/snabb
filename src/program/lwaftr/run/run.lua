@@ -217,7 +217,10 @@ function run(args)
       end
    end
 
-   engine.busywait = true
+   if not opts.reconfigurable then
+      -- The leader does not need all the CPU, only the followers do.
+      engine.busywait = true
+   end
    if opts.duration then
       engine.main({duration=opts.duration, report={showlinks=true}})
    else
