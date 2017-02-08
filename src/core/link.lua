@@ -23,7 +23,7 @@ local size = C.LINK_RING_SIZE         -- NB: Huge slow-down if this is not local
 max        = C.LINK_MAX_PACKETS
 
 local provided_counters = {
-   "dtime", "rxpackets", "rxbytes", "txpackets", "txbytes", "txdrop"
+   "dtime", "rxpackets", "rxbytes", "txpackets", "txbytes", "txdrop", "txdropbytes"
 }
 
 function new (name)
@@ -60,6 +60,7 @@ function transmit (r, p)
 --   assert(p)
    if full(r) then
       counter.add(r.stats.txdrop)
+      counter.add(r.stats.txdropbytes, p.length)
       packet.free(p)
    else
       r.packets[r.write] = p
