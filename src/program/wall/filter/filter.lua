@@ -13,6 +13,7 @@ local long_opts = {
    ipv4 = "4",
    ipv6 = "6",
    log = "l",
+   duration = "D",
    ["print-report"] = "p",
    ["rules-exp"] = "e",
    ["rule-file"] = "f"
@@ -21,6 +22,7 @@ local long_opts = {
 function run (args)
    local report = false
    local logging = "off"
+   local duration
    local output_file, reject_file
    local local_macaddr, local_ipv4, local_ipv6
    local rule_str
@@ -45,6 +47,9 @@ function run (args)
       l = function (arg)
          logging = arg
       end,
+      D = function (arg)
+         duration = tonumber(arg)
+      end,
       ["4"] = function (arg)
          local_ipv4 = arg
       end,
@@ -61,7 +66,7 @@ function run (args)
       end,
    }
 
-   args = lib.dogetopt(args, opt, "hpl:o:r:m:4:6:e:f:", long_opts)
+   args = lib.dogetopt(args, opt, "hpl:D:o:r:m:4:6:e:f:", long_opts)
    if #args ~= 2 then
       print(require("program.wall.filter.README_inc"))
       main.exit(1)
@@ -116,12 +121,18 @@ function run (args)
    config.link(c, "l7fw.output -> sink.input")
    config.link(c, "l7fw.reject -> reject.input")
 
+   local done
+   if not duration then
+      done = function ()
+         return engine.app_table.source.done
+      end
+   end
+
    engine.configure(c)
    engine.busywait = true
    engine.main({
       report = { showapps = report },
-      done = function ()
-         return engine.app_table.source.done
-      end
+      duration = duration,
+      done = done
    })
 end

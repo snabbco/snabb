@@ -15,6 +15,7 @@ local long_opts = {
    help = "h",
    live = "l",
    stats = "s",
+   duration = "D",
 }
 
 local function printf(fmt, ...)
@@ -144,6 +145,7 @@ end
 
 function run (args)
    local live, stats = false, false
+   local duration
    local opt = {
       l = function (arg)
          live = true
@@ -155,9 +157,12 @@ function run (args)
          print(require("program.wall.spy.README_inc"))
          main.exit(0)
       end,
+      D = function (arg)
+         duration = tonumber(arg)
+      end
    }
 
-   args = lib.dogetopt(args, opt, "hls", long_opts)
+   args = lib.dogetopt(args, opt, "hlsD:", long_opts)
    if #args ~= 2 then
       print(require("program.wall.spy.README_inc"))
       main.exit(1)
@@ -196,12 +201,18 @@ function run (args)
       last_app_name = "report"
    end
 
-   engine.configure(c)
-   engine.busywait = true
-   engine.main {
+   local done
+   if not duration then
       done = function ()
          return engine.app_table.source.done
       end
+   end
+
+   engine.configure(c)
+   engine.busywait = true
+   engine.main {
+      duration = duration,
+      done = done
    }
 
    if not live then

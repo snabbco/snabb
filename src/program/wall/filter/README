@@ -24,3 +24,4 @@ Options:
   -m, --mac <mac_addr>    Set the MAC address of this firewall host
   -4, --ipv4 <ip_addr>    Set the IPv4 address of this firewall host
   -6, --ipv6 <ip_addr>    Set the IPv6 address of this firewall host
+  -D, --duration <secs>   Set the duration to run the program (in seconds).
