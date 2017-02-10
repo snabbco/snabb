@@ -83,7 +83,7 @@ function StatsReporter:new (opts)
    local app = setmetatable({
       scanner = opts.scanner,
       file = opts.output or io.stdout,
-      start_time = 0,
+      start_time = now(),
       packets = 0,
       bytes = 0,
       timer = false,
