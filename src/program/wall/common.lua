@@ -18,10 +18,10 @@ end
 
 function inputs.intel10g (kind, device)
    local conf = { pciaddr = device }
-   return "rx", { require("apps.intel.intel_app").Intel82599, conf }
+   return "tx", { require("apps.intel.intel_app").Intel82599, conf }
 end
 
 function inputs.intel1g (kind, device)
    local conf = { pciaddr = device }
-   return "rx", { require("apps.intel.intel1g").Intel1g, conf }
+   return "tx", { require("apps.intel.intel1g").Intel1g, conf }
 end
