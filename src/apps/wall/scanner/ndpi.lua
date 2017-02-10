@@ -1,8 +1,13 @@
 local scanner = require("apps.wall.scanner")
+local const   = require("apps.wall.constants")
 local util    = require("apps.wall.util")
 local ndpi    = require("ndpi")
 
 local rd32, ipv4_addr_cmp, ipv6_addr_cmp = util.rd32, util.ipv4_addr_cmp, util.ipv6_addr_cmp
+local ETH_TYPE_IPv4  = const.ETH_TYPE_IPv4
+local ETH_TYPE_IPv6  = const.ETH_TYPE_IPv6
+local IPv4_PROTO_UDP = const.IPv4_PROTO_UDP
+local IPv4_PROTO_TCP = const.IPv4_PROTO_TCP
 
 local NdpiFlow = subClass()
 NdpiFlow._name = "SnabbWall nDPI Flow"
@@ -81,14 +86,14 @@ function NdpiScanner:scan_packet(p, time)
    end
 
    local src_id, dst_id = flow._ndpi_src_id, flow._ndpi_dst_id
-   if key:eth_type() == scanner.ETH_TYPE_IPv4 then
+   if key:eth_type() == ETH_TYPE_IPv4 then
       if ipv4_addr_cmp(src_addr, key.lo_addr) ~= 0 or
          ipv4_addr_cmp(dst_addr, key.hi_addr) ~= 0 or
          src_port ~= key.lo_port or dst_port ~= key.hi_port
       then
          src_id, dst_id = dst_id, src_id
       end
-   elseif key:eth_type() == scanner.ETH_TYPE_IPv6 then
+   elseif key:eth_type() == ETH_TYPE_IPv6 then
       if ipv6_addr_cmp(src_addr, key.lo_addr) ~= 0 or
          ipv6_addr_cmp(dst_addr, key.hi_addr) ~= 0 or
          src_port ~= key.lo_port or dst_port ~= key.hi_port
@@ -112,8 +117,8 @@ function NdpiScanner:scan_packet(p, time)
    -- TODO: Check and tune-up the constants for number of packets
    -- TODO: Do similarly for IPv6 packets once nDPI supports using IPv6
    --       addresses here (see https://github.com/ntop/nDPI/issues/183)
-   if (flow.key.ip_proto == scanner.IPv4_PROTO_UDP and flow.packets > 8) or
-      (flow.key.ip_proto == scanner.IPv4_PROTO_TCP and flow.packets > 10)
+   if (flow.key.ip_proto == IPv4_PROTO_UDP and flow.packets > 8) or
+      (flow.key.ip_proto == IPv4_PROTO_TCP and flow.packets > 10)
    then
       flow.proto_master, flow.protocol =
             self._ndpi:guess_undetected_protocol(flow.key.ip_proto,

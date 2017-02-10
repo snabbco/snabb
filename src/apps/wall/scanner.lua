@@ -1,66 +1,40 @@
 module(..., package.seeall)
 
-local util = require("apps.wall.util")
-local lib  = require("core.lib")
-local bit  = require("bit")
-local ffi  = require("ffi")
+local util  = require("apps.wall.util")
+local const = require("apps.wall.constants")
+local lib   = require("core.lib")
+local bit   = require("bit")
+local ffi   = require("ffi")
 
 local rd16, rd32 = util.rd16, util.rd32
 local ipv4_addr_cmp, ipv6_addr_cmp = util.ipv4_addr_cmp, util.ipv6_addr_cmp
 local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
 local band, bxor, bnot = bit.band, bit.bxor, bit.bnot
-
--- Constants: Ethernet
-ETH_TYPE_IPv4        = lib.htons(0x0800)
-ETH_TYPE_IPv6        = lib.htons(0x86DD)
-ETH_TYPE_VLAN        = lib.htons(0x8100)
-ETH_TYPE_OFFSET      = 12
-ETH_HEADER_SIZE      = 14
-
--- Constants: IPv4
-IPv4_VER_IHL_OFFSET  = 0
-IPv4_DSCP_ECN_OFFSET = 1
-IPv4_LEN_OFFSET      = 2
-IPv4_FRAG_ID_OFFSET  = 4
-IPv4_FLAGS_OFFSET    = 6
-IPv4_TTL_OFFSET      = 8
-IPv4_PROTO_OFFSET    = 9
-IPv4_CHECKSUM_OFFSET = 10
-IPv4_SRC_ADDR_OFFSET = 12
-IPv4_DST_ADDR_OFFSET = 16
-
-IPv4_PROTO_TCP       = 6   -- uint8_t
-IPv4_PROTO_UDP       = 17  -- uint8_t
-
--- Constants: IPv6
-IPv6_MIN_HEADER_SIZE = 40
-IPv6_PLOADLEN_OFFSET = 4
-IPv6_NEXTHDR_OFFSET  = 6
-IPv6_HOPLIMIT_OFFSET = 7
-IPv6_SRC_ADDR_OFFSET = 8
-IPv6_DST_ADDR_OFFSET = 24
-
-IPv6_NEXTHDR_HOPBYHOP= 0
-IPv6_NEXTHDR_TCP     = 6
-IPv6_NEXTHDR_UDP     = 17
-IPv6_NEXTHDR_ROUTING = 43
-IPv6_NEXTHDR_FRAGMENT= 44
-IPv6_NEXTHDR_ESP     = 50
-IPv6_NEXTHDR_AH      = 51
-IPv6_NEXTHDR_ICMPv6  = 58
-IPv6_NEXTHDR_NONE    = 59
-IPv6_NEXTHDR_DSTOPTS = 60
-
--- Constants: TCP
-TCP_HEADER_SIZE      = 20
-TCP_SRC_PORT_OFFSET  = 0
-TCP_DST_PORT_OFFSET  = 2
-
--- Constants: UDP
-UDP_HEADER_SIZE      = 8
-UDP_SRC_PORT_OFFSET  = 0
-UDP_DST_PORT_OFFSET  = 2
-
+local ETH_TYPE_IPv4         = const.ETH_TYPE_IPv4
+local ETH_TYPE_IPv6         = const.ETH_TYPE_IPv6
+local ETH_TYPE_VLAN         = const.ETH_TYPE_VLAN
+local ETH_TYPE_OFFSET       = const.ETH_TYPE_OFFSET
+local ETH_HEADER_SIZE       = const.ETH_HEADER_SIZE
+local IPv4_PROTO_OFFSET     = const.IPv4_PROTO_OFFSET
+local IPv4_SRC_ADDR_OFFSET  = const.IPv4_SRC_ADDR_OFFSET
+local IPv4_DST_ADDR_OFFSET  = const.IPv4_DST_ADDR_OFFSET
+local IPv4_PROTO_TCP        = const.IPv4_PROTO_TCP
+local IPv4_PROTO_UDP        = const.IPv4_PROTO_UDP
+local IPv6_NEXTHDR_OFFSET   = const.IPv6_NEXTHDR_OFFSET
+local IPv6_SRC_ADDR_OFFSET  = const.IPv6_SRC_ADDR_OFFSET
+local IPv6_DST_ADDR_OFFSET  = const.IPv6_DST_ADDR_OFFSET
+local IPv6_NEXTHDR_HOPBYHOP = const.IPv6_NEXTHDR_HOPBYHOP
+local IPv6_NEXTHDR_TCP      = const.IPv6_NEXTHDR_TCP
+local IPv6_NEXTHDR_UDP      = const.IPv6_NEXTHDR_UDP
+local IPv6_NEXTHDR_ROUTING  = const.IPv6_NEXTHDR_ROUTING
+local IPv6_NEXTHDR_FRAGMENT = const.IPv6_NEXTHDR_FRAGMENT
+local IPv6_NEXTHDR_AH       = const.IPv6_NEXTHDR_AH
+local IPv6_NEXTHDR_NONE     = const.IPv6_NEXTHDR_NONE
+local IPv6_NEXTHDR_DSTOPTS  = const.IPv6_NEXTHDR_DSTOPTS
+local TCP_SRC_PORT_OFFSET   = const.TCP_SRC_PORT_OFFSET
+local TCP_DST_PORT_OFFSET   = const.TCP_DST_PORT_OFFSET
+local UDP_SRC_PORT_OFFSET   = const.UDP_SRC_PORT_OFFSET
+local UDP_DST_PORT_OFFSET   = const.UDP_DST_PORT_OFFSET
 
 ffi.cdef [[
    struct swall_flow_key_ipv4 {

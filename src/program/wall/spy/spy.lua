@@ -7,6 +7,7 @@ local ipv4  = require("lib.protocol.ipv4")
 local ipv6  = require("lib.protocol.ipv6")
 local util  = require("apps.wall.util")
 local scan  = require("apps.wall.scanner")
+local const = require("apps.wall.constants")
 local proto = require("ndpi").protocol
 local comm  = require("program.wall.common")
 local ntohs = lib.ntohs
@@ -25,10 +26,10 @@ end
 local function report_flow(scanner, flow)
    local lo_addr, hi_addr = "<unknown>", "<unknown>"
    local eth_type = flow.key:eth_type()
-   if eth_type == scan.ETH_TYPE_IPv4 then
+   if eth_type == const.ETH_TYPE_IPv4 then
       lo_addr = ipv4:ntop(flow.key.lo_addr)
       hi_addr = ipv4:ntop(flow.key.hi_addr)
-   elseif eth_type == scan.ETH_TYPE_IPv6 then
+   elseif eth_type == const.ETH_TYPE_IPv6 then
       lo_addr = ipv6:ntop(flow.key.lo_addr)
       hi_addr = ipv6:ntop(flow.key.hi_addr)
    end
