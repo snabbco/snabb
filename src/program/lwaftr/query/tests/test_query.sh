@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 
-SKIPPED_CODE=43
+TEST_NAME="query"
 
-if [[ -z "$SNABB_PCI0" ]]; then
-    echo "SNABB_PCI0 not set"
-    exit $SKIPPED_CODE
-fi
+# TEST_DIR is set by the caller, and passed onward.
+export TEST_DIR
+source ${TEST_DIR}/common.sh
 
-if [[ -z "$SNABB_PCI1" ]]; then
-    echo "SNABB_PCI1 not set"
-    exit $SKIPPED_CODE
-fi
+check_for_root
+check_nics_available $TEST_NAME
 
-source ./program/lwaftr/query/tests/test_env.sh
+# QUERY_TEST_DIR is also set by the caller.
+source ${QUERY_TEST_DIR}/test_env.sh
+
+echo "Testing ${TEST_NAME}"
 
 trap cleanup EXIT HUP INT QUIT TERM
 
-LWAFTR_CONF=./program/lwaftr/tests/data/no_icmp.conf
 LWAFTR_NAME=lwaftr-$$
+LWAFTR_CONF=${TEST_DIR}/data/no_icmp.conf
 
 # Run lwAFTR.
 tmux_launch "lwaftr" "./snabb lwaftr run --name $LWAFTR_NAME --conf $LWAFTR_CONF --v4 $SNABB_PCI0 --v6 $SNABB_PCI1" "lwaftr.log"
