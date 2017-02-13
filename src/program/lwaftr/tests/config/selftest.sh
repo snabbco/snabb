@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 
-set -o errexit
+# Pass TEST_DIR and CONFIG_TEST_DIR to the invoked scripts.
+export TEST_DIR="./program/lwaftr/tests"
+export CONFIG_TEST_DIR=${TEST_DIR}/config
 
-./program/lwaftr/tests/config/test-config-get.sh
-./program/lwaftr/tests/config/test-config-set.sh
-./program/lwaftr/tests/config/test-config-add.sh
-./program/lwaftr/tests/config/test-config-remove.sh
-./program/lwaftr/tests/config/test-config-get-state.sh
-./program/lwaftr/tests/config/test-config-listen.sh
+${CONFIG_TEST_DIR}/test-config-get.sh
+${CONFIG_TEST_DIR}/test-config-set.sh
+${CONFIG_TEST_DIR}/test-config-add.sh
+${CONFIG_TEST_DIR}/test-config-remove.sh
+${CONFIG_TEST_DIR}/test-config-get-state.sh
+${CONFIG_TEST_DIR}/test-config-listen.sh

@@ -2,32 +2,32 @@
 ## This adds a softwire section and then checks it can be got
 ## back and that all the values are as they should be.
 
-if [[ $EUID -ne 0 ]]; then
-   echo "This script must be run as root" 1>&2
-   exit 1
-fi
+# TEST_DIR is set by the caller, and passed onward.
+export TEST_DIR
+source ${TEST_DIR}/common.sh
 
-# Load the tools to be able to test stuff.
-BASEDIR="`pwd`"
-cd "`dirname \"$0\"`"
-source tools.sh
-cd $BASEDIR
+check_for_root
 
-# Come up with a name for the lwaftr
+# CONFIG_TEST_DIR is also set by the caller.
+source ${CONFIG_TEST_DIR}/test_env.sh
+
+echo "Testing config remove"
+
+# Come up with a name for the lwaftr.
 SNABB_NAME="`random_name`"
 
 # Start the bench command.
 start_lwaftr_bench $SNABB_NAME
 
-# Firstly lets verify that the thing we want to remove actually exists
+# Verify that the thing we want to remove actually exists.
 ./snabb config get "$SNABB_NAME" /softwire-config/binding-table/softwire[ipv4=178.79.150.2][psid=7850]/ &> /dev/null
 assert_equal "$?" "0"
 
-# Then lets remove it
+# Remove it.
 ./snabb config remove "$SNABB_NAME" /softwire-config/binding-table/softwire[ipv4=178.79.150.2][psid=7850]/ &> /dev/null
 assert_equal "$?" "0"
 
-# Then lets verify we can't find it
+# Verify we can't find it.
 ./snabb config get "$SNABB_NAME" /softwire-config/binding-table/softwire[ipv4=178.79.150.2][psid=7850]/ &> /dev/null || true
 assert_equal "$?" "0"
 
