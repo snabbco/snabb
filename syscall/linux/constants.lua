@@ -213,10 +213,10 @@ c.LOCK = multiflags {
 
 -- for memfd
 c.F_SEAL = multiflags {
-  SEAL     0x0001,
-  SHRINK   0x0002,
-  GROW     0x0004,
-  WRITE    0x0008,
+  SEAL     = 0x0001,
+  SHRINK   = 0x0002,
+  GROW     = 0x0004,
+  WRITE    = 0x0008,
 }
 
 --mmap
