@@ -161,9 +161,12 @@ c.F = strflag(arch.F or {
   SETLEASE    = 1024,
   GETLEASE    = 1025,
   NOTIFY      = 1026,
+  CANCELLK    = 1029,
+  DUPFD_CLOEXEC = 1030,
   SETPIPE_SZ  = 1031,
   GETPIPE_SZ  = 1032,
-  DUPFD_CLOEXEC = 1030,
+  ADD_SEALS   = 1033,
+  GET_SEALS   = 1034,
 })
 
 -- messy
@@ -206,6 +209,14 @@ c.LOCK = multiflags {
   READ      = 64,
   WRITE     = 128,
   RW        = 192,
+}
+
+-- for memfd
+c.F_SEAL = multiflags {
+  SEAL     0x0001,
+  SHRINK   0x0002,
+  GROW     0x0004,
+  WRITE    0x0008,
 }
 
 --mmap
