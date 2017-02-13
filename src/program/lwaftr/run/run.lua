@@ -137,7 +137,15 @@ function run(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local use_splitter = requires_splitter(opts, conf)
 
-   if opts.name then engine.claim_name(opts.name) end
+   -- If there is a name defined on the command line, it should override
+   -- anything defined in the config.
+   if opts.name then
+      conf.softwire_config.name = opts.name
+   end
+
+   if conf.softwire_config.name ~= nil then
+      engine.claim_name(opts.name)
+   end
 
    local c = config.new()
    local setup_fn, setup_args
