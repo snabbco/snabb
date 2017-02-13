@@ -167,6 +167,9 @@ local function fixup_constants(abi, c)
   c.SO.DETACH_BPF = nil
   c.SO.ATTACH_REUSEPORT_CBPF = nil
   c.SO.ATTACH_REUSEPORT_EBPF = nil
+  c.F_SEAL = nil
+  c.F.ADD_SEALS = nil
+  c.F.GET_SEALS = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil
