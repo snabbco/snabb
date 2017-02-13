@@ -343,6 +343,12 @@ c.SO.DETACH_BPF = nil
 c.SO.ATTACH_REUSEPORT_CBPF = nil
 c.SO.ATTACH_REUSEPORT_EBPF = nil
 
+-- new fcntl
+c.F.CANCELLK == nil
+c.F.ADD_SEALS=nil
+c.F.GET_SEALS=nil
+c.F_SEAL=nil
+
 -- Musl changes some of the syscall constants in its 32/64 bit handling
 c.SYS.getdents = nil
 
