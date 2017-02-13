@@ -126,7 +126,10 @@ module snabb-softwire-v1 {
       }
     }
 
-
+    leaf name {
+      type string;
+      description "Name of lwAFTR instance.";
+    }
 
     container external-interface {
       description
