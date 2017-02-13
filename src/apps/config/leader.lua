@@ -169,8 +169,9 @@ local function path_setter_for_grammar(grammar, path)
       assert(grammar.type == 'struct')
       local tail_id = data.normalize_id(tail_name)
       return function(config, subconfig)
-         getter(config)[tail_id] = subconfig
-         return config
+	 local newconfig = lib.deepcopy(config)
+         getter(newconfig)[tail_id] = subconfig
+         return newconfig
       end
    end
 
@@ -409,7 +410,8 @@ function Leader:update_configuration (update_fn, verb, path, ...)
    local new_config = update_fn(self.current_configuration, ...)
    local new_app_graph = self.setup_fn(new_config)
    local actions = self.support.compute_config_actions(
-      self.current_app_graph, new_app_graph, to_restart, verb, path, ...)
+      self.current_app_graph, new_app_graph, to_restart, verb, path,
+      self.followers, ...)
    self:enqueue_config_actions(actions)
    self.current_app_graph = new_app_graph
    self.current_configuration = new_config
