@@ -135,25 +135,61 @@ end
 -- The name given to the function must be unique; if a name has been used before
 -- by an active process the function will error displaying an appropriate error
 -- message. The program can only claim one name, successive calls will produce
--- an error.
-function claim_name(name)
-   configuration[name] = name
+-- an error.If the `pid` parameter is provided it will claim the name for that
+-- process rather than the current process.
+--
+-- NB: To change the name of a program please see rename_program
+function claim_name(name, pid)
+   local procpid = pid or S.getpid()
    local bynamedir = "by-name/"
    local namedir_fq = named_program_root .. "/" .. name
-   local piddir = shm.root .. "/" .. S.getpid()
+   local piddir = shm.root .. "/" .. procpid
    local backlinkdir = piddir.."/name"
+
+   -- Lookup if a name exists already - we must do this as it can be changed
+   -- elsewhere, including other processes.
+   local currentname = S.readlink(backlinkdir)
 
    -- Verify that the by-name directory exists.
    shm.mkdir(bynamedir)
 
    -- Verify that we've not already claimed a name
-   assert(configuration.name == nil, "Name already claimed, cannot claim: "..name)
+   assert(currentname == nil, "Name already claimed, cannot claim: "..name)
 
    -- Create the new symlink.
    assert(S.symlink(piddir, namedir_fq))
 
    -- Create a backlink so to the symlink so we can easily cleanup
    assert(S.symlink(namedir_fq, backlinkdir))
+end
+
+-- Renames a program to a new name
+--
+-- This renames an existing named app with a new name. If the app has not
+-- claimed a name, it will display an error. The name must be unique with
+-- other snabb programs running on the system.
+--
+-- NB: To claim a name for the first time please see claim_name
+function rename_program(old, new)
+   local old_fq = named_program_root .. "/" .. old
+   local new_fq = named_program_root .. "/" .. new
+   local backlink = shm.root .. "/" .. S.getpid() .. "/name"
+   
+   -- Get the PID for the old name.
+   local piddir = assert(S.readlink(old_fq), "No program with name '"..old.."'")
+
+   -- Now secure the new name
+   assert(S.symlink(piddir, new_fq))
+
+   -- Remove the previous symlink
+   assert(S.unlink(old_fq))
+
+   -- Replace the backlink.
+   assert(S.unlink(backlink))
+   assert(S.symlink(new_fq, backlink))
+
+   -- Change the name in configuration
+   configuration.name = new
 end
 
 -- Enumerates the named programs with their PID
@@ -652,16 +688,24 @@ function selftest ()
 
    -- Test claiming and enumerating app names
    local basename = "testapp"
-   claim_name(basename.."1")
+   local progname = basename.."1"
+   claim_name(progname)
    
    -- Ensure to claim two names fails
    assert(not pcall(claim_name, basename.."2"))
 
    -- Check if it can be enumerated.
-   local progs = enumerate_named_programs()
-   assert(progs)
-   assert(progs["testapp1"])
+   local progs = assert(enumerate_named_programs())
+   assert(progs[progname])
 
    -- Ensure that trying to take the same name fails
-   assert(not pcall(claim_name, basename.."1"))
+   assert(not pcall(claim_name, progname))
+
+   -- Ensure changing the name succeeds
+   local newname = basename.."2"
+   rename_program(progname, newname)
+   local progs = assert(enumerate_named_programs())
+   assert(progs[progname] == nil)
+   assert(progs[newname])
+   
 end
