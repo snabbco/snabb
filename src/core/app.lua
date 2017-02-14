@@ -695,9 +695,6 @@ function selftest ()
    local progs = assert(enumerate_named_programs())
    assert(progs[progname])
 
-   -- Ensure that trying to take the same name fails
-   assert(not pcall(claim_name, progname))
-
    -- Ensure changing the name succeeds
    local newname = basename.."2"
    claim_name(newname)
