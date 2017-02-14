@@ -524,9 +524,26 @@ end
 
 function reconfigurable(scheduling, f, graph, conf, ...)
    local args = {...}
+   local function switch_names(conf)
+      local currentname = engine.program_name
+      local name = conf.apps.lwaftr.arg.softwire_config.name
+      -- Don't do anything if the name isn't set.
+      if name == nil then
+	 return
+      end
+
+      local success, err = pcall(engine.claim_name, name)
+      if success == false then
+	 -- Restore the previous name.
+	 conf.apps.lwaftr.arg.softwire_config.name = currentname
+	 assert(success, err)
+      end
+   end
+
    local function setup_fn(conf)
       local graph = config.new()
       f(graph, conf, unpack(args))
+      switch_names(graph)
       return graph
    end
 

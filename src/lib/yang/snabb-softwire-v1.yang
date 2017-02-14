@@ -126,7 +126,22 @@ module snabb-softwire-v1 {
       }
     }
 
+    leaf name {
+      type string;
+      description
+        "Name of lwAFTR instance. This must be unique amongst the Snabb
+         processes on the system. This may be specified either here, in the
+         YANG configuration or via the command line when the lwAFTR is started.
 
+         The order of presidence for this leaf is as followers:
+         1. The name set on an already running lwAFTR instance via snabb set.
+         2. A command line option to specify the name upon starting the lwAFTR
+            instance (i.e. overriding this value).
+         3. The value here in the configuration when starting a lwaftr instance.
+
+         If no name is specified the lwaftr can be referred to using the PID of
+         the lwAFTR process on the system.";
+    }
 
     container external-interface {
       description

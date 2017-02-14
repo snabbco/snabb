@@ -55,6 +55,8 @@ local function compute_config_actions(old_graph, new_graph, to_restart,
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
       return remove_softwire_entry_actions(new_graph, path)
+   elseif (verb == 'set' and path == '/softwire-config/name') then
+      return {}
    else
       return generic.compute_config_actions(
          old_graph, new_graph, to_restart, verb, path, arg)
@@ -80,6 +82,8 @@ local function compute_apps_to_restart_after_configuration_update(
       return {}
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
+      return {}
+   elseif (verb == 'set' and path == '/softwire-config/name') then
       return {}
    else
       return generic.compute_apps_to_restart_after_configuration_update(
@@ -219,6 +223,7 @@ local function ietf_softwire_translator ()
       local br_instance, br_instance_key_t =
          cltable_for_grammar(get_ietf_br_instance_grammar())
       br_instance[br_instance_key_t({id=1})] = {
+         name = native_config.softwire_config.name,
          tunnel_payload_mtu = native_config.softwire_config.internal_interface.mtu,
          tunnel_path_mru = native_config.softwire_config.external_interface.mtu,
          -- FIXME: There's no equivalent of softwire-num-threshold in snabb-softwire-v1.
@@ -291,6 +296,11 @@ local function ietf_softwire_translator ()
          if path[#path].name == 'softwire-num-threshold' then
             error('not yet implemented: softwire-num-threshold')
          end
+	 if path[#path].name == 'name' then
+	    return {{'set', {schema='snabb-softwire-v1',
+			    path="/softwire-config/name",
+			    config=arg}}}
+	 end
          error('unrecognized leaf: '..path[#path].name)
       end
 
@@ -547,6 +557,11 @@ local function ietf_softwire_translator ()
                instance.binding_table.binding_entry[k] = v
             end
          end
+      elseif (verb == 'set' and path == "/softwire-config/name") then
+	 local br = cached_config.softwire_config.binding.br
+	 for _, instance in cltable.pairs(br.br_instances.br_instance) do
+	    instance.name = data
+	 end
       else
          cached_config = nil
       end

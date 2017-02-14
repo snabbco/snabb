@@ -44,7 +44,11 @@ function run(args)
    local opts, scheduling, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
-   if opts.name then engine.claim_name(opts.name) end
+   -- If there is a name defined on the command line, it should override
+   -- anything defined in the config.
+   if opts.name then
+      conf.softwire_config.name = opts.name
+   end
 
    local graph = config.new()
    if opts.reconfigurable then
