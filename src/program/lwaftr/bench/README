@@ -12,16 +12,19 @@ Usage: bench CONF IPV4-IN.PCAP IPV6-IN.PCAP
 
                                Time (s),Decap. MPPS,Decap. Gbps,Encap. MPPS,Encap. Gbps
   -b FILENAME, --bench-file FILENAME
-                              The file or path name to which benchmark data is
-                              written. A simple filename or relative pathname
-                              will be based on the current directory. Default
-                              is "bench.csv".
+                             The file or path name to which benchmark data is
+                             written. A simple filename or relative pathname
+                             will be based on the current directory. Default
+                             is "bench.csv".
   -D DURATION, --duration DURATION
                              Duration in seconds.
   -n NAME, --name NAME       Sets the name for this program, which will be used
                              as the identifier. This must be unique amongst
                              other snabb processes.
   --cpu    <cpu>             Bind lwAFTR bench to the given CPU
+  --reconfigurable           Allow run-time configuration query and update.
+                             This runs as two processes, a leader and a
+                             follower, rather than just one.
 
 Run the lwAFTR with input from IPV4-IN.PCAP and IPV6-IN.PCAP. The bench
 command is used to get an idea of the raw speed of the lwaftr without

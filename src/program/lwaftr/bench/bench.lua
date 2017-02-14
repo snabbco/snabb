@@ -80,6 +80,9 @@ function run(args)
       start_sampling_for_pid(S.getpid())
    end
 
-   app.busywait = true
+   if not opts.reconfigurable then
+      -- The leader does not need all the CPU, only the followers do.
+      app.busywait = true
+   end
    app.main({duration=opts.duration})
 end

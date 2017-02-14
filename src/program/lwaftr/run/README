@@ -10,6 +10,8 @@ Required arguments:
 
 Optional arguments:
        --reconfigurable         Allow run-time configuration query and update.
+                                This runs as two processes, a leader and a
+                                follower, rather than just one.
        --virtio                 Use virtio-net interfaces instead of Intel 82599
        --ring-buffer-size <size>  Set Intel 82599 receive buffer size
        --cpu    <cpu>           Bind the lwAFTR to the given CPU
