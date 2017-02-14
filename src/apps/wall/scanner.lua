@@ -93,12 +93,16 @@ local flow_key_ipv4 = ffi.metatype("struct swall_flow_key_ipv4", {
    }
 })
 
+local the_flow_key_ipv4 = flow_key_ipv4()
+
 local flow_key_ipv6 = ffi.metatype("struct swall_flow_key_ipv6", {
    __index = {
       hash = make_cdata_hash_function(ffi.sizeof("struct swall_flow_key_ipv6")),
       eth_type = function (self) return ETH_TYPE_IPv6 end,
    }
 })
+
+local the_flow_key_ipv6 = flow_key_ipv6()
 
 -- Helper functions
 
@@ -173,7 +177,7 @@ function Scanner:extract_packet_info(p)
 
    local key, src_addr, src_port, dst_addr, dst_port, ip_proto
    if eth_type == ETH_TYPE_IPv4 then
-      key = flow_key_ipv4()
+      key = the_flow_key_ipv4
       src_addr = p.data + ip_offset + IPv4_SRC_ADDR_OFFSET
       dst_addr = p.data + ip_offset + IPv4_DST_ADDR_OFFSET
       if ipv4_addr_cmp(src_addr, dst_addr) <= 0 then
@@ -194,7 +198,7 @@ function Scanner:extract_packet_info(p)
          dst_port = rd16(p.data + ip_payload_offset + UDP_DST_PORT_OFFSET)
       end
    elseif eth_type == ETH_TYPE_IPv6 then
-      key = flow_key_ipv6()
+      key = the_flow_key_ipv6
       src_addr = p.data + ip_offset + IPv6_SRC_ADDR_OFFSET
       dst_addr = p.data + ip_offset + IPv6_DST_ADDR_OFFSET
       if ipv6_addr_cmp(src_addr, dst_addr) <= 0 then
