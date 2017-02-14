@@ -223,7 +223,7 @@ local function ietf_softwire_translator ()
       local br_instance, br_instance_key_t =
          cltable_for_grammar(get_ietf_br_instance_grammar())
       br_instance[br_instance_key_t({id=1})] = {
-	 name = native_config.softwire_config.name,
+         name = native_config.softwire_config.name,
          tunnel_payload_mtu = native_config.softwire_config.internal_interface.mtu,
          tunnel_path_mru = native_config.softwire_config.external_interface.mtu,
          -- FIXME: There's no equivalent of softwire-num-threshold in snabb-softwire-v1.

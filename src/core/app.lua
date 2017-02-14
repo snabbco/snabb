@@ -27,7 +27,10 @@ local use_restart = false
 test_skipped_code = 43
 
 -- Set the directory for the named programs.
-named_program_root = shm.root .. "/" .. "by-name"
+local named_program_root = shm.root .. "/" .. "by-name"
+
+-- The currently claimed name (think false = nil but nil makes strict.lua unhappy).
+program_name = false
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
@@ -135,7 +138,7 @@ end
 -- This relinquish a claim on a name if one exists. if the name does not
 -- exist it will raise an error with an error message.
 function unclaim_name(claimed_name)
-   local name = assert(claimed_name or configuration.name, "No claim to name.")
+   local name = assert(claimed_name or program_name, "No claim to name.")
    local name_fq = named_program_root .. "/" .. name
    local piddir = assert(S.readlink(name_fq))
    local backlink = piddir .. "/name"
@@ -147,7 +150,7 @@ function unclaim_name(claimed_name)
    assert(S.unlink(name_fq))
 
    -- Remove from the name from the configuration
-   configuration.name = nil
+   program_name = false
 end
 
 -- Claims a name for a program so it's identified by name by other processes.
@@ -165,15 +168,9 @@ function claim_name(name)
    local piddir = shm.root .. "/" .. procpid
    local backlinkdir = piddir.."/name"
 
-   
    -- If we're being asked to claim the name we already have, return false.
-   if configuration.name == name then
+   if program_name == name then
       return
-   end
-
-   -- If we have an name already, we need to keep it around to unclaim it later.
-   if configuration.name ~= nil then
-      oldname = configuration.name
    end
 
    -- Verify that the by-name directory exists.
@@ -183,10 +180,10 @@ function claim_name(name)
    assert(S.symlink(piddir, namedir_fq), "Name already taken.")
 
    -- We've successfully secured the new name, so we can unclaim the old now.
-   if configuration.name ~= nil then unclaim_name(configuration.name) end
+   if program_name ~= false then unclaim_name(program_name) end
 
    -- Save our current name so we know what it is later.
-   configuration.name = name
+   program_name = name
 
    -- Create a backlink so to the symlink so we can easily cleanup
    assert(S.symlink(namedir_fq, backlinkdir))
@@ -686,6 +683,9 @@ function selftest ()
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
 
+   -- Check one can't unclaim a name if no name is claimed.
+   assert(not pcall(unclaim_name))
+   
    -- Test claiming and enumerating app names
    local basename = "testapp"
    local progname = basename.."1"
@@ -706,6 +706,6 @@ function selftest ()
    unclaim_name()
    local progs = enumerate_named_programs()
    assert(progs[newname] == nil)
-   assert(configuration.name == nil)
+   assert(not program_name)
    
 end
