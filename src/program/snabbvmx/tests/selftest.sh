@@ -34,8 +34,9 @@ SNABBVMX_ID=xe1
 SNABB_TELNET0=5000
 VHU_SOCK0=/tmp/vh1a.sock
 
-function monitor { action=$1
-    ./snabb lwaftr monitor $action &> /dev/null
+function monitor {
+    local action=$1 pid=$2
+    ./snabb lwaftr monitor $action $pid &> monitor.log
 }
 
 function tcpreplay {
@@ -269,7 +270,17 @@ function test_ndp_request_to_lwaftr {
 }
 
 function cleanup {
+    rm -f $VHU_SOCK0
     exit $1
+}
+
+function snabbvmx_pid {
+    pids=$(ps aux | grep snabbvmx | awk '{print $2;}')
+    for pid in ${pids[@]}; do
+        if [[ -d "/var/run/snabb/$pid" ]]; then
+            echo $pid
+        fi
+    done
 }
 
 trap cleanup EXIT HUP INT QUIT TERM
@@ -286,7 +297,9 @@ create_mirror_tap_if_needed
 start_test_env $MIRROR_TAP
 
 # Mirror all packets to tap0.
-monitor all
+
+SNABBVMX_PID=$(snabbvmx_pid)
+monitor all $SNABBVMX_PID
 
 # Run tests.
 test_ping_to_lwaftr_inet
