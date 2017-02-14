@@ -143,10 +143,6 @@ function run(args)
       conf.softwire_config.name = opts.name
    end
 
-   if conf.softwire_config.name ~= nil then
-      engine.claim_name(opts.name)
-   end
-
    local c = config.new()
    local setup_fn, setup_args
    if opts.virtio_net then

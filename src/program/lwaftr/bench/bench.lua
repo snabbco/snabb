@@ -50,10 +50,6 @@ function run(args)
       conf.softwire_config.name = opts.name
    end
 
-   if conf.softwire_config.name ~= nil then
-      engine.claim_name(opts.name)
-   end
-
    local graph = config.new()
    if opts.reconfigurable then
       setup.reconfigurable(scheduling, setup.load_bench, graph, conf,

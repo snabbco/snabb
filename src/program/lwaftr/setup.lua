@@ -527,6 +527,15 @@ function reconfigurable(scheduling, f, graph, conf, ...)
    local function setup_fn(conf)
       local graph = config.new()
       f(graph, conf, unpack(args))
+      local name = graph.apps.lwaftr.arg.softwire_config.name
+      if name then
+	 local succ, err = pcall(engine.claim_name, name)
+	 if succ == false then
+	    local oldname = engine.configuration.name
+	    graph.apps.lwaftr.arg.softwire_config.name = oldname
+	 end
+	 assert(succ, err)
+      end
       return graph
    end
 

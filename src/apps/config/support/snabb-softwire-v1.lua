@@ -1,9 +1,6 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
-local S = require("syscall")
 local ffi = require('ffi')
-local shm = require('core.shm')
-local lib = require('core.lib')
 local app = require('core.app')
 local equal = require('core.lib').equal
 local dirname = require('core.lib').dirname
@@ -41,34 +38,6 @@ local function get_softwire_grammar()
    return softwire_grammar
 end
 
-local function change_lwaftr_name_actions(old_graph, new_graph, followers)
-   -- We should perform the name change (rename) of the lwaftr instance here
-   -- as it involves making syscalls and isn't paticually performant. It
-   -- shouldn't matter if it's done in another process from the lwaftr as it's
-   -- mainly used externally.
-   assert(old_graph.apps.lwaftr)
-   assert(new_graph.apps.lwaftr)
-
-   local function lwaftr_pid_by_follower_pid(follower_pid)
-      assert(follower_pid)
-      local lwaftrdir = assert(S.readlink(shm.root .. "/" .. follower_pid .. "/group"))
-      return tonumber(lib.basename(lwaftrdir))
-   end
-
-   local oldname = old_graph.apps.lwaftr.arg.softwire_config.name
-   local newname = new_graph.apps.lwaftr.arg.softwire_config.name
-
-   if oldname == nil then
-      for _, follower in pairs(followers) do
-	 app.claim_name(newname, lwaftr_pid_by_follower_pid(follower.pid))
-      end
-   else
-      app.rename_program(oldname, newname)
-   end
-
-   return {}
-end
-
 local function remove_softwire_entry_actions(app_graph, path)
    assert(app_graph.apps['lwaftr'])
    path = path_mod.parse_path(path)
@@ -80,14 +49,14 @@ local function remove_softwire_entry_actions(app_graph, path)
 end
 
 local function compute_config_actions(old_graph, new_graph, to_restart,
-                                      verb, path, followers, arg)
+                                      verb, path, arg)
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       return add_softwire_entry_actions(new_graph, arg)
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
       return remove_softwire_entry_actions(new_graph, path)
    elseif (verb == 'set' and path == '/softwire-config/name') then
-      return change_lwaftr_name_actions(old_graph, new_graph, followers)
+      return {}
    else
       return generic.compute_config_actions(
          old_graph, new_graph, to_restart, verb, path, arg)
