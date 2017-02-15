@@ -1,5 +1,6 @@
 local scanner = require("apps.wall.scanner")
 local const   = require("apps.wall.constants")
+local opt     = require("apps.wall.scanner.ndpi_opt")
 local util    = require("apps.wall.util")
 local ndpi    = require("ndpi")
 
@@ -103,12 +104,13 @@ function NdpiScanner:scan_packet(p, time)
    end
 
    flow.proto_master, flow.protocol =
-         self._ndpi:process_packet(flow._ndpi_flow,
-                                   p.data + ip_offset,
-                                   p.length - ip_offset,
-                                   time,
-                                   src_id,
-                                   dst_id)
+         opt.process_packet(self._ndpi,
+                            flow._ndpi_flow,
+                            p.data + ip_offset,
+                            p.length - ip_offset,
+                            time,
+                            src_id,
+                            dst_id)
 
    if flow.protocol ~= ndpi.protocol.PROTOCOL_UNKNOWN then
       return true, flow
@@ -121,9 +123,10 @@ function NdpiScanner:scan_packet(p, time)
       (flow.key.ip_proto == IPv4_PROTO_TCP and flow.packets > 10)
    then
       flow.proto_master, flow.protocol =
-            self._ndpi:guess_undetected_protocol(flow.key.ip_proto,
-                                                 rd32(src_addr), src_port,
-                                                 rd32(dst_addr), dst_port)
+            opt.guess_undetected_protocol(self._ndpi,
+                                          flow.key.ip_proto,
+                                          rd32(src_addr), src_port,
+                                          rd32(dst_addr), dst_port)
       -- TODO: Check whether we should check again for PROTOCOL_UNKNOWN
       return true, flow
    end
