@@ -348,9 +348,12 @@ test.misc_linux = {
   end,
   test_memfd = function()
     if not S.memfd_create then error "skipped" end
-    local fd, err = S.memfd_create("", "cloexec")
+    local fd, err = S.memfd_create("", "cloexec, allow_sealing")
     if not fd and err.NOSYS then error "skipped" end
     assert(fd, err)
+    local seals = assert(fd:fcntl("get_seals"))
+    assert(seals == 0)
+    assert(fd:fcntl("add_seals", "shrink, grow, write, seal"))
     assert(fd:close())
   end,
 }
