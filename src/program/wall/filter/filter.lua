@@ -2,7 +2,9 @@ module(..., package.seeall)
 
 local fw     = require("apps.wall.l7fw")
 local pcap   = require("apps.pcap.pcap")
+local now    = require("core.app").now
 local lib    = require("core.lib")
+local link   = require("core.link")
 local numa   = require("lib.numa")
 local common = require("program.wall.common")
 
@@ -135,6 +137,8 @@ function run (args)
 
    if cpu then numa.bind_to_cpu(cpu) end
 
+   local start_time = now()
+
    engine.configure(c)
    engine.busywait = true
    engine.main({
@@ -142,4 +146,16 @@ function run (args)
       duration = duration,
       done = done
    })
+
+   if report then
+      local end_time = now()
+      local fw = engine.app_table.l7fw
+      local input_link = fw.input.input
+      local stats = link.stats(input_link)
+      print("Firewall stats:")
+      print(string.format("bytes: %s packets: %s bps: %s",
+                          lib.comma_value(stats.rxbytes),
+                          lib.comma_value(stats.rxpackets),
+                          lib.comma_value((stats.rxbytes * 8) / (end_time - start_time))))
+   end
 end
