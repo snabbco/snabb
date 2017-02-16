@@ -3,6 +3,7 @@ module(..., package.seeall)
 local fw     = require("apps.wall.l7fw")
 local pcap   = require("apps.pcap.pcap")
 local lib    = require("core.lib")
+local numa   = require("lib.numa")
 local common = require("program.wall.common")
 
 local long_opts = {
@@ -14,6 +15,7 @@ local long_opts = {
    ipv6 = "6",
    log = "l",
    duration = "D",
+   cpu = 1,
    ["print-report"] = "p",
    ["rules-exp"] = "e",
    ["rule-file"] = "f"
@@ -22,7 +24,7 @@ local long_opts = {
 function run (args)
    local report = false
    local logging = "off"
-   local duration
+   local cpu, duration
    local output_file, reject_file
    local local_macaddr, local_ipv4, local_ipv6
    local rule_str
@@ -50,6 +52,9 @@ function run (args)
       D = function (arg)
          duration = tonumber(arg)
       end,
+      ["cpu"] = function (arg)
+         cpu = assert(tonumber(arg), "--cpu expects a number")
+      end,
       ["4"] = function (arg)
          local_ipv4 = arg
       end,
@@ -63,7 +68,7 @@ function run (args)
          local file = io.open(arg)
          assert(file, "could not open rules file")
          rule_str = file:read("*a")
-      end,
+      end
    }
 
    args = lib.dogetopt(args, opt, "hpl:D:o:r:m:4:6:e:f:", long_opts)
@@ -127,6 +132,8 @@ function run (args)
          return engine.app_table.source.done
       end
    end
+
+   if cpu then numa.bind_to_cpu(cpu) end
 
    engine.configure(c)
    engine.busywait = true
