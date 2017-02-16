@@ -311,6 +311,8 @@ c.SEEK = strflag {
   SET = 0,
   CUR = 1,
   END = 2,
+  DATA = 3,
+  HOLE = 4,
 }
 
 -- exit
