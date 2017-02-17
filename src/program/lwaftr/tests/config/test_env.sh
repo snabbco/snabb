@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
 
-function random_name {
-    cat /dev/urandom | tr -dc 'a-z' | fold -w 20 | head -n 1
-}
-
 # TEST_DIR is set by the caller.
+source ${TEST_DIR}/common.sh || exit $?
+
 DATA_DIR="${TEST_DIR}/data"
 BENCHDATA_DIR="${TEST_DIR}/benchdata"
 
-# Start the lwaftr process. The process should end when the script ends;
-# however, if something goes wrong and it doesn't end correctly,
-# a duration is set to prevent it running indefinitely.
+# Start the "lwaftr bench" process. The first parameter is the command name.
+# The process should end when the script ends; however, if something goes wrong
+# and it doesn't end correctly, a duration is set to prevent it running indefinitely.
 function start_lwaftr_bench {
     ./snabb lwaftr bench --reconfigurable --bench-file /dev/null --name "$1" \
                          --duration 30 \
                          program/lwaftr/tests/data/icmp_on_fail.conf \
                          program/lwaftr/tests/benchdata/ipv{4,6}-0550.pcap &> /dev/null &
 
-    # Not ideal, but it takes a little time for the lwaftr to properly start.
+    # It takes a little time for lwaftr to properly start.
     sleep 2
 }
 

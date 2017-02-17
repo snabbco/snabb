@@ -6,5 +6,5 @@ LWAFTR_DIR="./program/lwaftr"
 export TEST_DIR="${LWAFTR_DIR}/tests"
 export QUERY_TEST_DIR="${LWAFTR_DIR}/query/tests"
 
-${QUERY_TEST_DIR}/test_query.sh
-${QUERY_TEST_DIR}/test_query_reconfigurable.sh
+${QUERY_TEST_DIR}/test_query.sh || exit $?
+${QUERY_TEST_DIR}/test_query_reconfigurable.sh || exit $?

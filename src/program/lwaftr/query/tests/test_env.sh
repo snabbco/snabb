@@ -1,31 +1,16 @@
 #!/usr/bin/env bash
 
-TEMP_FILE=$(mktemp)
+# TEST_DIR is set by the caller.
+source ${TEST_DIR}/common.sh || exit $?
 
-function tmux_launch {
-    command="$2 2>&1 | tee $3"
-    if [ -z "$tmux_session" ]; then
-        tmux_session=test_env-$$
-        tmux new-session -d -n "$1" -s $tmux_session "$command"
-    else
-        tmux new-window -a -d -n "$1" -t $tmux_session "$command"
-    fi
-}
+TEST_OUTPUT_FNAME=$(mktemp)
 
-function kill_lwaftr {
-    ps aux | grep $SNABB_PCI0 | awk '{print $2}' | xargs kill 2>/dev/null
-}
-
-function cleanup {
-    kill_lwaftr
-    rm -f $TEMP_FILE
+# Terminate the "lwaftr run" command, remove the output file, and exit.
+function query_cleanup {
+    ps aux | grep $SNABB_PCI0 | grep -v "grep" | awk '{print $2}' | xargs kill 2> /dev/null
+    ps aux | grep "snabb lwaftr query" | grep -v "grep" | awk '{print $2}' | xargs kill 2> /dev/null
+    rm -f $TEST_OUTPUT_FNAME
     exit
-}
-
-function fatal {
-    local msg=$1
-    echo "Error: $msg"
-    exit 1
 }
 
 function get_lwaftr_leader {
@@ -61,21 +46,23 @@ function get_lwaftr_instance {
 }
 
 function test_lwaftr_query {
-    ./snabb lwaftr query $@ > $TEMP_FILE
-    local lineno=`cat $TEMP_FILE | wc -l`
+    ./snabb lwaftr query $@ > $TEST_OUTPUT_FNAME
+    local lineno=`cat $TEST_OUTPUT_FNAME | wc -l`
     if [[ $lineno -gt 1 ]]; then
         echo "Success: lwaftr query $*"
     else
-        fatal "lwaftr query $*"
+        cat $TEST_OUTPUT_FNAME
+        exit_on_error "Error: lwaftr query $*"
     fi
 }
 
 function test_lwaftr_query_no_counters {
-    ./snabb lwaftr query $@ > $TEMP_FILE
-    local lineno=`cat $TEMP_FILE | wc -l`
+    ./snabb lwaftr query $@ > $TEST_OUTPUT_FNAME
+    local lineno=`cat $TEST_OUTPUT_FNAME | wc -l`
     if [[ $lineno -eq 1 ]]; then
-        echo "Success: lwaftr query $*"
+        echo "Success: lwaftr query no counters $*"
     else
-        fatal "lwaftr query $*"
+        cat $TEST_OUTPUT_FNAME
+        exit_on_error "Error: lwaftr query no counters $*"
     fi
 }

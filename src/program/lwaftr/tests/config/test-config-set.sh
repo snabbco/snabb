@@ -2,19 +2,19 @@
 ## This checks you can set values, it'll then perform a get to
 ## verify the value set is the value that is got too.
 
+TEST_NAME="config set"
+
 # TEST_DIR is set by the caller, and passed onward.
 export TEST_DIR
-source ${TEST_DIR}/common.sh
-
-check_for_root
+source ${TEST_DIR}/common.sh || exit $?
 
 # CONFIG_TEST_DIR is also set by the caller.
-source ${CONFIG_TEST_DIR}/test_env.sh
+source ${CONFIG_TEST_DIR}/test_env.sh || exit $?
 
-echo "Testing config set"
+echo "Testing ${TEST_NAME}"
 
 # Come up with a name for the lwaftr.
-SNABB_NAME="`random_name`"
+SNABB_NAME=lwaftr-$$
 
 # Start the bench command.
 start_lwaftr_bench $SNABB_NAME
@@ -45,5 +45,4 @@ IETF_PATH="/softwire-config/binding/br/br-instances/br-instance[id=1]/binding-ta
 PSID="`./snabb config get --schema=ietf-softwire $SNABB_NAME $IETF_PATH`"
 assert_equal "$PSID" "$TEST_PSID"
 
-# Stop the lwaftr process.
 stop_lwaftr_bench
