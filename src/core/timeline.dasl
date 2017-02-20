@@ -51,17 +51,16 @@ ffi.cdef[[
     uint16_t minor_version;
     uint32_t log_bytes;
     uint32_t strings_bytes;
-    uint16_t priority_mask;
-    uint8_t reserved[42];
+    uint8_t reserved[44];
   };
 
   // 64B log entry
   struct timeline_entry {
-    uint64_t tsc;       // CPU timestamp (note: assumed to be first elem below)
+    double tsc;       // CPU timestamp (note: assumed to be first elem below)
     uint16_t msgid;     // msgid*16 is index into string table
     uint16_t core_numa; // TSC_AUX: core (bits 0-7) + numa (12-15)
     uint32_t reserved;  // (available for future use)
-    uint64_t arg0, arg1, arg2, arg3, arg4, arg5; // message arguments
+    double arg0, arg1, arg2, arg3, arg4, arg5; // message arguments
   };
 
   // Private local state for updating the log
@@ -100,7 +99,7 @@ function new (shmpath,  num_entries, size_stringtable)
    local stringtable = ffi.cast("char*", memory + size_header + size_entries)
    -- Fill in header values
    header.magic = 0xa3ff7223441d0001ULL
-   header.major_version = 2
+   header.major_version = 3
    header.minor_version = 0
    header.log_bytes = size_entries
    header.strings_bytes = size_stringtable
@@ -223,22 +222,21 @@ local function asmlog (Dst)
    | mov r10, log:p0->entries
    | add r10, r11
    -- Log the arguments from register parameters
-   | mov msg:r10->msgid, dx     -- 16-bit value from p2
-   | mov msg:r10->arg0, p3
-   | mov msg:r10->arg1, p4
-   | mov msg:r10->arg2, p5
-   -- Log the arguments from stack parameters
-   | mov rax, [rsp+16]
-   | mov msg:r10->arg3, rax
-   | mov rax, [rsp+24]
-   | mov msg:r10->arg4, rax
-   | mov rax, [rsp+32]
-   | mov msg:r10->arg5, rax
+   | mov msg:r10->msgid, dx
+   | movsd qword msg:r10->arg0, xmm0
+   | movsd qword msg:r10->arg1, xmm1
+   | movsd qword msg:r10->arg2, xmm2
+   | movsd qword msg:r10->arg3, xmm3
+   | movsd qword msg:r10->arg4, xmm4
+   | movsd qword msg:r10->arg5, xmm5
    -- Log the timestamp and core/numa aux info
    | rdtscp
-   | mov msg:r10->tsc, eax
-   | mov [r10+4], edx  -- assumes tsc is first field of struct timeline_entry
    | mov msg:r10->core_numa, cx
+   -- Convert TSC in EAX:EDX to double
+   | shl rdx, 32
+   | or rax, rdx
+   | cvtsi2sd xmm0, rax
+   | movsd qword msg:r10->tsc, xmm0
 
    | ret
 end
@@ -248,7 +246,7 @@ asmlog(Dst)
 local mcode, size = Dst:build()
 local entry = dasm.globals(globals, globalnames)
 
-event = ffi.cast("uint64_t(*)(struct timeline_state *, int, int, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t)", entry.log)
+event = ffi.cast("void(*)(struct timeline_state *, int, int, double, double, double, double, double, double)", entry.log)
 
 _anchor = mcode
 
