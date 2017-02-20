@@ -72,16 +72,3 @@ function assert_equal {
         fi
     fi
 }
-
-# Launch a command in a new window of an existing session, or in a new session.
-# First parameter: the command as one string;
-# second parameter: the log file name.
-function tmux_launch {
-    local command="$1 2>&1 | tee $2"
-    if [ -z "$tmux_session" ]; then
-        tmux_session=test_env-$$
-        tmux new-session -d -n "lwaftr" -s $tmux_session "$command"
-    else
-        tmux new-window -a -d -n "lwaftr" -t $tmux_session "$command"
-    fi
-}

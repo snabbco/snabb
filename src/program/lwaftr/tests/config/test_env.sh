@@ -21,20 +21,20 @@ function start_lwaftr_bench {
 
 function stop_lwaftr_bench {
     # Get the job number for lwaftr bench.
-    local jobid="`jobs | grep -i \"lwaftr bench\" | awk '{print $1}' | tr -d '[]+'`"
-    kill -15 "%$jobid"
+    local jobid=`jobs | grep -i "lwaftr bench" | awk '{print $1}' | tr -d '[]+'`
+    kill "%$jobid"
     # Wait until it's shutdown.
     wait &> /dev/null
 }
 
 function stop_if_running {
     # Check if it's running, if not, job done.
-    kill -0 "$1" &> /dev/null
+    kill -0 $1 &> /dev/null
     if [[ $? -ne 0 ]]; then
         return
     fi
 
     # It's running, try and close it nicely.
-    kill -15 "$1"
+    kill $1
     wait &> /dev/null
 }
