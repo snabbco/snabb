@@ -62,7 +62,6 @@ following keys are required:
 
  * `key_type`: An FFI type (LuaJIT "ctype") for keys in this table.
  * `value_type`: An FFI type (LuaJT "ctype") for values in this table.
- * `hash_fn`: A function that takes a key and returns a hash value.
 
 Hash values are unsigned 32-bit integers in the range `[0,
 0xFFFFFFFF)`.  That is to say, `0xFFFFFFFF` is the only unsigned 32-bit
@@ -71,6 +70,9 @@ hash value in the correct range.
 
 Optional entries that may be present in the *parameters* table include:
 
+ * `hash_fn`: A function that takes a key and returns a hash value.
+   If not given, defaults to the result of calling `compute_hash_fn`
+   on the key type.
  * `initial_size`: The initial size of the hash table, including free
    space.  Defaults to 8 slots.
  * `max_occupancy_rate`: The maximum ratio of `occupancy/size`, where
@@ -198,3 +200,9 @@ Hash the first 48 bits of a byte sequence.
 — Function **ctable.hashv_64** *ptr*
 
 Hash the first 64 bits of a byte sequence.
+
+— Function **ctable.compute_hash_fn** *ctype*
+
+Return a `hashv_`-like hash function over the bytes in instances of
+*ctype*.  Note that the same reservations apply as for `hash_32`
+above.

@@ -67,7 +67,6 @@ function transmit (r, p)
       r.write = band(r.write + 1, size - 1)
       counter.add(r.stats.txpackets)
       counter.add(r.stats.txbytes, p.length)
-      r.has_new_data = true
    end
 end
 

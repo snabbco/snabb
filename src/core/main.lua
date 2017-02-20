@@ -171,44 +171,26 @@ function selftest ()
       "Incorrect program name selected")
 end
 
--- Fork into worker process and supervisor
-local worker_pid = assert(S.fork())
-if worker_pid == 0 then
-   -- Worker: Use prctl to ensure we are killed (SIGHUP) when our parent quits
-   -- and run main.
-   S.prctl("set_pdeathsig", "hup")
+-- Fork a child process that monitors us and performs cleanup actions
+-- when we terminate.
+local snabbpid = S.getpid()
+if assert(S.fork()) ~= 0 then
+   -- parent process: run snabb
    xpcall(main, handler)
 else
-   -- Supervisor: Queue exit_signals using signalfd, prevent them from killing
-   -- us instantly using sigprocmask.
-   local exit_signals = "hup, int, quit, term, chld"
+   -- child process: supervise parent & perform cleanup
+   -- Subscribe to SIGHUP on parent death
+   S.prctl("set_name", "[snabb sup]")
+   S.prctl("set_pdeathsig", "hup")
+   -- Trap relevant signals to a file descriptor
+   local exit_signals = "hup, int, quit, term"
    local signalfd = S.signalfd(exit_signals)
    S.sigprocmask("block", exit_signals)
-   while true do
-      -- Read signals from signalfd. Only process the first signal because any
-      -- signal causes shutdown.
-      local signals = assert(S.util.signalfd_read(signalfd))
-      for i = 1, #signals do
-         local exit_status
-         if signals[i].chld then
-            -- SIGCHILD means worker state changed: retrieve its status using
-            -- waitpid and set exit status accordingly.
-            local status, _, worker =
-               assert(S.waitpid(worker_pid, "stopped,continued"))
-            if     worker.WIFEXITED   then exit_status = worker.EXITSTATUS
-            elseif worker.WIFSIGNALED then exit_status = 128 + worker.WTERMSIG
-            -- WIFSTOPPED and WIFCONTINUED are ignored.
-            else goto ignore_signal end
-         else
-            -- Supervisor received exit signal: kill worker by sending SIGHUP
-            -- and and set exit status accordingly.
-            S.kill(worker_pid, "hup")
-            exit_status = 128 + signals[i].signo
-         end
-         -- Run shutdown routine and exit.
-         shutdown(worker_pid)
-         os.exit(exit_status)
-         ::ignore_signal::
-      end
-   end
+   -- wait until we receive a signal
+   local signals
+   repeat signals = assert(S.util.signalfd_read(signalfd)) until #signals > 0
+   -- cleanup after parent process
+   shutdown(snabbpid)
+   -- exit with signal-appropriate status
+   os.exit(128 + signals[1].signo)
 end

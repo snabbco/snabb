@@ -113,7 +113,7 @@ function selftest_run (stateful, expected, tolerance)
 
    print(("Run for 1 second (stateful = %s)..."):format(stateful))
 
-   local deadline = lib.timer(1e9)
+   local deadline = lib.timeout(1.0)
    repeat app.breathe() until deadline()
 
    app.report({showlinks=true})
