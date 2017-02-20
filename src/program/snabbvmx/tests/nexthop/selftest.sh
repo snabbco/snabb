@@ -52,22 +52,25 @@ fi
 
 # Query nexthop for 10 seconds.
 TIMEOUT=20
-count=0
+COUNT=0
 while true; do
-    output=`./snabb snabbvmx nexthop | egrep -o "[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+:[[:xdigit:]]+"`
-    mac_v4=`echo "$output" | head -1`
-    mac_v6=`echo "$output" | tail -1`
+    output=$(./snabb snabbvmx query | grep "next_hop_mac")
+
+    mac_v4=$(echo $output | sed "s/.*<next_hop_mac_v4>\([^<]\+\)<\/next_hop_mac_v4>.*/\1/")
+    mac_v6=$(echo $output | sed "s/.*<next_hop_mac_v6>\([^<]\+\)<\/next_hop_mac_v6>.*/\1/")
 
     # FIXME: Should return expected MAC addresses.
-    # Check VM returned something.
-    if [[ "$mac_v4" != "00:00:00:00:00:00" &&
-          "$mac_v6" != "00:00:00:00:00:00" ]]; then
-        echo "Resolved MAC inet side: $mac_v4 [OK]"
-        echo "Resolved MAC b4 side: $mac_v6 [OK]"
-        exit 0
+    # Check VM returned something and it's different than 00:00:00:00:00:00.
+    if [[ -n "$mac_v4" && -n "$mac_v6" ]]; then
+       if [[ "$mac_v4" != "00:00:00:00:00:00" &&
+             "$mac_v6" != "00:00:00:00:00:00" ]]; then
+           echo "Resolved MAC inet side: $mac_v4 [OK]"
+           echo "Resolved MAC b4 side: $mac_v6 [OK]"
+           exit 0
+       fi
     fi
 
-    if [[ $count == $TIMEOUT ]]; then
+    if [[ $COUNT == $TIMEOUT ]]; then
         echo "Could not resolve nexthop"
         echo "MAC inet side: $mac_v4 [FAILED]"
         echo "MAC b4 side: $mac_v6 [FAILED]"
@@ -75,6 +78,6 @@ while true; do
     fi
 
     # Try again until TIMEOUT.
-    count=$((count + 1))
+    COUNT=$((COUNT + 1))
     sleep 1
 done
