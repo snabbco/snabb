@@ -267,49 +267,63 @@ end
 function tsort (nodes, entries, successors)
    local visited = {}
    local post_order = {}
+   local maybe_visit
    local function visit(node)
       visited[node] = true
-      for _,succ in ipairs(successors[node]) do
-         if not visited[succ] then visit(succ) end
-      end
+      for succ,_ in pairs(successors[node]) do maybe_visit(succ) end
       table.insert(post_order, node)
    end
-   for _,node in ipairs(entries) do
+   function maybe_visit(node)
       if not visited[node] then visit(node) end
    end
-   for name,node in pairs(nodes) do
-      if not visited[node] then visit(node) end
-   end
+   for node,_ in pairs(entries) do maybe_visit(node) end
+   for node,_ in pairs(nodes) do maybe_visit(node) end
    local ret = {}
-   while #post_order > 0 do
-      table.insert(ret, table.remove(post_order))
-   end
+   while #post_order > 0 do table.insert(ret, table.remove(post_order)) end
    return ret
 end
 
 breathe_pull_order = {}
 breathe_push_order = {}
 
+-- Sort the links in the app graph, and arrange to run push() on the
+-- apps on the receiving ends of those links.  This will run app:push()
+-- once for each link, which for apps with multiple links may cause the
+-- app's push function to run multiple times in a breath.
 function compute_breathe_order ()
-   breathe_pull_order = {}
+   breathe_pull_order, breathe_push_order = {}, {}
+   local entries = {}
    local inputs = {}
-   for name, app in pairs(app_table) do
-      if app.pull then table.insert(breathe_pull_order, app) end
-      for _,link in pairs(app.input) do inputs[link] = app  end
-   end
    local successors = {}
-   for name, app in pairs(app_table) do
-      local succs = {}
-      for _,link in pairs(app.output) do table.insert(succs, inputs[link]) end
-      successors[app] = succs
+   for _,app in pairs(app_table) do
+      if app.pull then
+         table.insert(breathe_pull_order, app)
+         for _,link in pairs(app.output) do
+            entries[link] = true;
+            successors[link] = {}
+         end
+      end
+      for _,link in pairs(app.input) do inputs[link] = app end
    end
-   breathe_push_order = tsort(app_table, breathe_pull_order, successors)
+   for link,app in pairs(inputs) do
+      successors[link] = {}
+      if not app.pull then
+         for _,succ in pairs(app.output) do
+            successors[link][succ] = true
+            if not successors[succ] then successors[succ] = {}; end
+         end
+      end
+   end
+   for link,succs in pairs(successors) do
+      for succ,_ in pairs(succs) do
+         if not successors[succ] then successors[succ] = {}; end
+      end
+   end
+   local link_order = tsort(inputs, entries, successors)
    local i = 1
-   while i <= #breathe_push_order do
-      if breathe_push_order[i].push then
-         i = i + 1
-      else
-         table.remove(breathe_push_order, i)
+   for _,link in ipairs(link_order) do
+      if breathe_push_order[#breathe_push_order] ~= inputs[link] then
+         table.insert(breathe_push_order, inputs[link])
       end
    end
 end
