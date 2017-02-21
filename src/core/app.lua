@@ -444,17 +444,14 @@ function breathe ()
       counter.commit()
       events.commited_counters()
    end
-   -- Sample events with dynamic priorities.
-   -- Lower priorities are enabled 1/10th as often as the one above.
-   local r = math.random()
-   if     r < 0.000001 then timeline_mod.level(timeline_log, 1)
-   elseif r < 0.000010 then timeline_mod.level(timeline_log, 2)
-   elseif r < 0.000100 then timeline_mod.level(timeline_log, 3)
-   elseif r < 0.001000 then timeline_mod.level(timeline_log, 4)
-   elseif r < 0.010000 then timeline_mod.level(timeline_log, 5)
-   elseif r < 0.100000 then timeline_mod.level(timeline_log, 6)
-   else                     timeline_mod.level(timeline_log, 7)
-   end
+   -- Randomize the log level. Enable each level in 5x more breaths
+   -- than the level below by randomly picking from log5() distribution.
+   -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
+   --
+   -- Could be better to reduce the log level over time to "stretch"
+   -- logs for long running processes? Improvements possible :-).
+   local level = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
+   timeline_mod.level(timeline_log, level)
    running = false
 end
 
