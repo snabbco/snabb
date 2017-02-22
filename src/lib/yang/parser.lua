@@ -92,7 +92,7 @@ function Parser:check(expected)
    return false
 end
 
-function Parser:check_patten(patten)
+function Parser:check_pattern(patten)
    if not self:is_eof() then
       return self:peek():match(patten)
    end
@@ -210,11 +210,10 @@ function Parser:parse_string()
          ret = ret .. self:take_while("[^%s;{}\"'/]")
          if self:is_eof() then break end
          if self:peek_n(2) == "/*" then break end
-         if self:peek() == "/" then
+         if self:check("/") then
             ret = ret .. "/"
-            self:consume("/")
          end
-      until not self:check_patten("[^%s;{}\"'/]")
+      until not self:check_pattern("[^%s;{}\"'/]")
       return ret
    end
 end
