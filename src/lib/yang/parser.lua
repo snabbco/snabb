@@ -210,6 +210,7 @@ function Parser:parse_string()
          table.insert(ret, self:take_while("[^%s;{}\"'/]"))
          if self:is_eof() then break end
          if self:peek_n(2) == "/*" then break end
+         if self:peek_n(2) == "//" then break end
          if self:check("/") then
             table.insert(ret, "/")
          end
@@ -410,6 +411,7 @@ function selftest()
    test_string('"// foo bar;"', '// foo bar;')
    test_string('"/* foo bar */"', '/* foo bar */')
    test_string([["foo \"bar\""]], 'foo "bar"')
+   test_string("hello//world", "hello")
    test_string(lines("  'foo", "    bar'"), lines("foo", " bar"))
    test_string(lines("  'foo", "  bar'"), lines("foo", "bar"))
    test_string(lines("   'foo", "\tbar'"), lines("foo", "    bar"))
