@@ -92,9 +92,9 @@ function Parser:check(expected)
    return false
 end
 
-function Parser:check_pattern(patten)
+function Parser:check_pattern(pattern)
    if not self:is_eof() then
-      return self:peek():match(patten)
+      return self:peek():match(pattern)
    end
    return false
 end
@@ -205,16 +205,16 @@ function Parser:parse_string()
    if self:check("'") then return self:parse_qstring("'")
    elseif self:check('"') then return self:parse_qstring('"')
    else
-      local ret = ""
+      local ret = {}
       repeat
-         ret = ret .. self:take_while("[^%s;{}\"'/]")
+         table.insert(ret, self:take_while("[^%s;{}\"'/]"))
          if self:is_eof() then break end
          if self:peek_n(2) == "/*" then break end
          if self:check("/") then
-            ret = ret .. "/"
+            table.insert(ret, "/")
          end
       until not self:check_pattern("[^%s;{}\"'/]")
-      return ret
+      return table.concat(ret)
    end
 end
 
