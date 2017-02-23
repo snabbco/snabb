@@ -2,7 +2,10 @@ module(..., package.seeall)
 
 local fw     = require("apps.wall.l7fw")
 local pcap   = require("apps.pcap.pcap")
+local now    = require("core.app").now
 local lib    = require("core.lib")
+local link   = require("core.link")
+local numa   = require("lib.numa")
 local common = require("program.wall.common")
 
 local long_opts = {
@@ -14,6 +17,7 @@ local long_opts = {
    ipv6 = "6",
    log = "l",
    duration = "D",
+   cpu = 1,
    ["print-report"] = "p",
    ["rules-exp"] = "e",
    ["rule-file"] = "f"
@@ -22,7 +26,7 @@ local long_opts = {
 function run (args)
    local report = false
    local logging = "off"
-   local duration
+   local cpu, duration
    local output_file, reject_file
    local local_macaddr, local_ipv4, local_ipv6
    local rule_str
@@ -50,6 +54,9 @@ function run (args)
       D = function (arg)
          duration = tonumber(arg)
       end,
+      ["cpu"] = function (arg)
+         cpu = assert(tonumber(arg), "--cpu expects a number")
+      end,
       ["4"] = function (arg)
          local_ipv4 = arg
       end,
@@ -63,7 +70,7 @@ function run (args)
          local file = io.open(arg)
          assert(file, "could not open rules file")
          rule_str = file:read("*a")
-      end,
+      end
    }
 
    args = lib.dogetopt(args, opt, "hpl:D:o:r:m:4:6:e:f:", long_opts)
@@ -128,6 +135,10 @@ function run (args)
       end
    end
 
+   if cpu then numa.bind_to_cpu(cpu) end
+
+   local start_time = now()
+
    engine.configure(c)
    engine.busywait = true
    engine.main({
@@ -135,4 +146,16 @@ function run (args)
       duration = duration,
       done = done
    })
+
+   if report then
+      local end_time = now()
+      local fw = engine.app_table.l7fw
+      local input_link = fw.input.input
+      local stats = link.stats(input_link)
+      print("Firewall stats:")
+      print(string.format("bytes: %s packets: %s bps: %s",
+                          lib.comma_value(stats.rxbytes),
+                          lib.comma_value(stats.rxpackets),
+                          lib.comma_value((stats.rxbytes * 8) / (end_time - start_time))))
+   end
 end
