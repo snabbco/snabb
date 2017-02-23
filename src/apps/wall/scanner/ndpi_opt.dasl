@@ -32,7 +32,7 @@ local function assemble (name, prototype, generator)
    return ffi.cast(prototype, mcode)
 end
 
-local function gen_nddpw(orig_f)
+local function gen_ndppw(orig_f)
    local function gen(Dst)
       -- pass the first stack argument onto the original function
       | mov rax, [rsp+8]
@@ -77,10 +77,10 @@ end
 
 -- see ljndpi/ndpi/c.lua for the corresponding headers for these functions
 -- these have an extra void* argument at the end for the struct pointer
-local function make_nddp_wrapper(f)
+local function make_ndpp_wrapper(f)
    local wrap = assemble("ndpi_detection_process_packet_wrapper",
                          ffi.typeof("void (*)(void*, void*, void*, unsigned short, uint64_t, void*, void*, void*)"),
-                         gen_nddpw(f))
+                         gen_ndppw(f))
    return function(self, flow, data, len, tick, src, dst)
              local proto = ffi.new("ndpi_protocol_t")
              wrap(self, flow, data, len, tick, src, dst, proto)
@@ -99,5 +99,5 @@ local function make_ngup_wrapper(f)
           end
 end
 
-process_packet = make_nddp_wrapper(ndpi.ndpi_detection_process_packet)
+process_packet = make_ndpp_wrapper(ndpi.ndpi_detection_process_packet)
 guess_undetected_protocol = make_ngup_wrapper(ndpi.ndpi_guess_undetected_protocol)
