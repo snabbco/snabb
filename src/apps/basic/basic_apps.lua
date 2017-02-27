@@ -10,7 +10,7 @@ local transmit, receive = link.transmit, link.receive
 
 --- # `Source` app: generate synthetic packets
 
-Source = {}
+Source = {name = 'Source'}
 
 function Source:new(size)
    size = tonumber(size) or 60
@@ -33,7 +33,7 @@ end
 
 --- # `Join` app: Merge multiple inputs onto one output
 
-Join = {}
+Join = {name = 'Join'}
 
 function Join:new()
    return setmetatable({}, {__index=Join})
@@ -51,7 +51,7 @@ end
 
 -- For each input port, push packets onto outputs. When one output
 -- becomes full then continue with the next.
-Split = {}
+Split = {name = 'Split'}
 
 function Split:new ()
    return setmetatable({}, {__index=Split})
@@ -69,7 +69,7 @@ end
 
 --- ### `Sink` app: Receive and discard packets
 
-Sink = {}
+Sink = {name = 'Sink'}
 
 function Sink:new ()
    return setmetatable({}, {__index=Sink})
@@ -86,7 +86,7 @@ end
 
 --- ### `Tee` app: Send inputs to all outputs
 
-Tee = {}
+Tee = {name = 'Tee'}
 
 function Tee:new ()
    return setmetatable({}, {__index=Tee})
@@ -110,7 +110,7 @@ end
 
 --- ### `Repeater` app: Send all received packets in a loop
 
-Repeater = {}
+Repeater = {name = 'Repeater'}
 
 function Repeater:new ()
    return setmetatable({index = 1, packets = {}},
@@ -141,7 +141,7 @@ end
 
 --- # `Truncate` app: truncate or zero pad packet to length n
 
-Truncate = {}
+Truncate = {name = 'Truncate'}
 
 function Truncate:new (n)
    return setmetatable({n = n}, {__index=Truncate})
@@ -158,7 +158,7 @@ end
 
 --- # `Sample` app: let through every nth packet
 
-Sample = {}
+Sample = {name = 'Sample'}
 
 function Sample:new (n)
    return setmetatable({n = n, seen = 1}, {__index=Sample})
