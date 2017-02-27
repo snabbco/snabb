@@ -35,7 +35,7 @@ clean:
 	(cd src; $(MAKE) clean; rm -rf syscall.lua syscall)
 
 PACKAGE:=snabbswitch
-DIST_BINARY:=snabbwall
+DIST_BINARY:=snabb-wall
 BUILDDIR:=$(shell pwd)
 
 dist: DISTDIR:=$(BUILDDIR)/$(PACKAGE)-$(shell git describe --tags)
