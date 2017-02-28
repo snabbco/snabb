@@ -11,6 +11,7 @@ from lib.test_env import DATA_DIR, SNABB_CMD, nic_names
 SNABB_PCI0, SNABB_PCI1 = nic_names()
 
 
+@unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
 class TestRun(unittest.TestCase):
 
     cmd_args = (
@@ -25,13 +26,11 @@ class TestRun(unittest.TestCase):
     def execute_run_test(self, cmd_args):
         output = sh.sudo(*cmd_args)
         self.assertEqual(output.exit_code, 0)
-        self.assert_(len(output.splitlines()) > 1)
+        self.assertTrue(len(output.splitlines()) > 1)
 
-    @unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
     def test_run_standard(self):
         self.execute_run_test(self.cmd_args)
 
-    @unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
     def test_run_reconfigurable(self):
         reconf_cmd_args = list(self.cmd_args)
         reconf_cmd_args.insert(3, '--reconfigurable')
