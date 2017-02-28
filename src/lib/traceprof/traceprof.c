@@ -24,7 +24,11 @@ void traceprof_cb(int sig, siginfo_t *info, void *data)
   (void)sig;
   (void)data;
   if (samples < logsize) {
+#ifdef __aarch64__
+    uint64_t ip = (uint64_t)((ucontext_t*)data)->uc_mcontext.pc;
+#else
     uint64_t ip = (uint64_t)((ucontext_t*)data)->uc_mcontext.gregs[REG_RIP];
+#endif
     log[samples] = ip;
   }
   samples++;

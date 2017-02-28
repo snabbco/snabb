@@ -16,7 +16,7 @@ PFLUASRC = $(shell cd ../lib/pflua/src && \
 CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
-ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
+ARCHSRC= $(shell find . -regex '^./arch/$(ARCH)/[^\#]*\.c' -printf '%P ')
 RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
@@ -127,11 +127,11 @@ $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
 	$(Q) $(CC) $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
-obj/arch/avx2_c.o: arch/avx2.c Makefile
+obj/arch/x64/avx2_c.o: arch/x64/avx2.c Makefile
 	$(E) "C(AVX2)   $@"
 	$(Q) $(CC) -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
-obj/arch/sse2_c.o: arch/sse2.c Makefile
+obj/arch/x64/sse2_c.o: arch/x64/sse2.c Makefile
 	$(E) "C(SSE2)   $@"
 	$(Q) $(CC) -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 

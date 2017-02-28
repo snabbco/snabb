@@ -4,6 +4,14 @@ CSRC   = $(wildcard src/c/*.c)
 COBJ   = $(CSRC:.c=.o)
 PREFIX = /usr/local
 
+ifeq ($(ARCH),)
+ifeq ($(shell uname -m),aarch64)
+ARCH   = arm64
+else
+ARCH   = x64
+endif
+endif
+
 LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h
 
 all: $(LUAJIT) $(SYSCALL) $(PFLUA)
@@ -18,9 +26,9 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	@cp -p lib/ljsyscall/syscall.lua   src/
 	@cp -p lib/ljsyscall/syscall/*.lua src/syscall/
 	@cp -p  lib/ljsyscall/syscall/linux/*.lua src/syscall/linux/
-	@cp -pr lib/ljsyscall/syscall/linux/x64   src/syscall/linux/
+	@cp -pr lib/ljsyscall/syscall/linux/$(ARCH)   src/syscall/linux/
 	@cp -pr lib/ljsyscall/syscall/shared      src/syscall/
-	cd src && $(MAKE)
+	cd src && $(MAKE) ARCH=$(ARCH)
 
 install: all
 	install -D src/snabb ${DESTDIR}${PREFIX}/bin/snabb
