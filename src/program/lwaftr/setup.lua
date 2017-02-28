@@ -35,8 +35,8 @@ function lwaftr_app(c, conf)
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
 
-	-- Claim the name if one is defined.
-	local function switch_names(config)
+   -- Claim the name if one is defined.
+   local function switch_names(config)
       local currentname = engine.program_name
       local name = config.softwire_config.name
       -- Don't do anything if the name isn't set.
