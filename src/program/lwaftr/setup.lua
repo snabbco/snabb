@@ -53,6 +53,11 @@ function lwaftr_app(c, conf)
    end
    switch_names(conf)
 
+   -- Verify either or both of next-hop value's are specified (can't be done in YANG)
+   if internal_interface.next_hop == nil then
+      error("One or both of the 'next_hop' values must be specified")
+   end
+
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler,
               { max_ipv4_reassembly_packets =
                    external_interface.reassembly.max_packets,
