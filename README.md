@@ -102,10 +102,10 @@ Setting up a Snabb development environment takes around one
 minute:
 
 ```
-$ git clone https://github.com/SnabbCo/snabbswitch
-$ cd snabbswitch
+$ git clone https://github.com/SnabbCo/snabb
+$ cd snabb
 $ make -j
-$ src/snabb --help
+$ sudo src/snabb --help
 ```
 
 The `snabb` binary is stand-alone, includes all of the applications,
