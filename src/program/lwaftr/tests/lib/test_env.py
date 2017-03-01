@@ -13,6 +13,7 @@ from pathlib import Path
 # Therefore we make all paths absolute.
 TESTS_DIR = Path(os.environ['TESTS_DIR']).resolve()
 DATA_DIR = TESTS_DIR / 'data'
+COUNTERS_DIR = DATA_DIR / 'counters'
 BENCHDATA_DIR = TESTS_DIR / 'benchdata'
 SNABB_CMD = TESTS_DIR.parents[2] / 'snabb'
 BENCHMARK_FILENAME = 'benchtest.csv'
