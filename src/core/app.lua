@@ -494,7 +494,7 @@ function selftest ()
    print("empty -> c1")
    configure(c1)
    assert(#breathe_pull_order == 0)
-   assert(#breathe_push_order == 2)
+   assert(#breathe_push_order == 1)
    assert(app_table.app1 and app_table.app2)
    local orig_app1 = app_table.app1
    local orig_app2 = app_table.app2
@@ -521,7 +521,7 @@ function selftest ()
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
    assert(#breathe_pull_order == 0)
-   assert(#breathe_push_order == 2)
+   assert(#breathe_push_order == 1)
    print("c1 -> empty")
    configure(config.new())
    assert(#breathe_pull_order == 0)
