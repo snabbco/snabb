@@ -251,6 +251,20 @@ class TestConfigMisc(BaseTestCase):
         self.assertEqual(output.strip(), bytes(test_psid, ENC),
             '\n'.join(('OUTPUT', str(output, ENC))))
 
+    def test_softwire_not_in_psidmap(self):
+        """
+        Tests that softwire with a PSID out of PSID map errors
+        """
+        # Create a softwire which won't have an IPv4 address in the PSID map.
+        test_softwire = "{ ipv4 192.168.1.23; psid 72; b4-ipv6 ::1; } "
+
+        add_args = self.get_cmd_args('add')
+        add_args.extend((
+            "/softwire-config/binding-table/softwire",
+            test_softwire,
+        ))
+        self.assertRaises(AssertionError, self.run_cmd, add_args)
+
 
 if __name__ == '__main__':
     unittest.main()

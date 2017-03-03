@@ -33,6 +33,16 @@ class TestBench(BaseTestCase):
         reconf_args.insert(3, '--reconfigurable')
         self.execute_bench_test(reconf_args)
 
+    def test_config_with_invalid_softwire(self):
+        config_file = str(DATA_DIR / "missing_softwire_psidmap.conf")
+        invalid_softwire_args = list(self.cmd_args)
+        invalid_softwire_args[-3] = config_file
+        # Verify it errors when there is a softwire lacking a PSID mapping entry
+        self.assertRaises(
+            AssertionError,
+            self.execute_bench_test,
+            invalid_softwire_args
+        )
 
 if __name__ == '__main__':
     unittest.main()
