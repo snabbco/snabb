@@ -2,21 +2,39 @@
 module(..., package.seeall)
 local ffi = require('ffi')
 local app = require('core.app')
+local corelib = require('core.lib')
 local equal = require('core.lib').equal
 local dirname = require('core.lib').dirname
 local data = require('lib.yang.data')
 local ipv4_ntop = require('lib.yang.util').ipv4_ntop
+local ipv4 = require('lib.protocol.ipv4')
 local ipv6 = require('lib.protocol.ipv6')
 local yang = require('lib.yang.yang')
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 local path_mod = require('lib.yang.path')
+local util = require("lib.yang.util")
 local generic = require('apps.config.support').generic_schema_config_support
+
+-- Validates that the softwire is in the PSID mapping, returns true if the
+-- softwire is valid (i.e. has a corresponding PSID mapping), false if invalid.
+local function validate_softwire_psid_mapping(graph, softwire)
+   local function convert_ipv4_to_key(val)
+      local key = corelib.htonl(val) -- Convert endianness
+      return ipv4:pton(ipv4_ntop(key))
+   end
+   local bt = graph.apps.lwaftr.arg.softwire_config.binding_table
+   local psidmap_key = convert_ipv4_to_key(softwire.key.ipv4)
+   local psidmap_entry = cltable.get(bt.psid_map, psidmap_key)
+   local ip = ipv4_ntop(softwire.key.ipv4)
+   assert(psidmap_entry,  "No PSID map for softwire '"..ip.."'")
+end
 
 local function add_softwire_entry_actions(app_graph, entries)
    assert(app_graph.apps['lwaftr'])
    local ret = {}
    for entry in entries:iterate() do
+      validate_softwire_psid_mapping(app_graph, entry)
       local blob = entries.entry_type()
       ffi.copy(blob, entry, ffi.sizeof(blob))
       local args = {'lwaftr', 'add_softwire_entry', blob}
