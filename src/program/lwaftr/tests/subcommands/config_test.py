@@ -137,6 +137,14 @@ class TestConfigMisc(BaseTestCase):
         """
         Add a softwire section, get it back and check all the values.
         """
+        # Add a PSID map for the IP we're going to use.
+        psidmap_add_args = self.get_cmd_args('add')
+        psidmap_add_args.extend((
+            '/softwire-config/binding-table/psid-map',
+            '{ addr 1.2.3.4; psid-length 16; }'
+        ))
+        self.run_cmd(psidmap_add_args)
+
         # External IPv4.
         add_args = self.get_cmd_args('add')
         add_args.extend((
