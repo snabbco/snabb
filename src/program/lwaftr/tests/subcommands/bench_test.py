@@ -38,11 +38,9 @@ class TestBench(BaseTestCase):
         invalid_softwire_args = list(self.cmd_args)
         invalid_softwire_args[-3] = config_file
         # Verify it errors when there is a softwire lacking a PSID mapping entry
-        self.assertRaises(
-            AssertionError,
-            self.execute_bench_test,
-            invalid_softwire_args
-        )
+        err = "Started with config file that has softwire without PSID mapping"
+        with self.assertRaises(AssertionError, msg=err):
+            self.execute_bench_test(invalid_softwire_args)
 
 if __name__ == '__main__':
     unittest.main()

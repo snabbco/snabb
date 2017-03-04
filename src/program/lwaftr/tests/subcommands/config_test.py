@@ -271,8 +271,18 @@ class TestConfigMisc(BaseTestCase):
             "/softwire-config/binding-table/softwire",
             test_softwire,
         ))
-        self.assertRaises(AssertionError, self.run_cmd, add_args)
+        add_error = "Able to add softwire with without PSID mapping"
+        with self.assertRaises(AssertionError, msg=add_error):
+            self.run_cmd(add_args)
 
+        # Then try and get the softwire added to ensure it's not been added
+        get_args = self.get_cmd_args('get')
+        get_args.append(
+            "/softwire-config/binding-table/softwire[ipv4=192.168.1.23][psid=72]"
+        )
+        get_error = "Softwire was added with an invalid PSID mapping."
+        with self.assertRaises(AssertionError, msg=get_error):
+            self.run_cmd(get_args)
 
 if __name__ == '__main__':
     unittest.main()
