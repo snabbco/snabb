@@ -25,17 +25,16 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	@cp -p lib/ljndpi/ndpi.lua src/
 	@cp -p lib/ljndpi/ndpi/*.lua src/ndpi/
 	cd src && $(MAKE)
-	ln -sf src/snabb snabb-wall
 
 install: all
-	install -D src/snabb ${DESTDIR}${PREFIX}/bin/snabb-wall
+	install -D src/snabb ${DESTDIR}${PREFIX}/bin/snabb
 
 clean:
 	(cd lib/luajit && $(MAKE) clean)
 	(cd src; $(MAKE) clean; rm -rf syscall.lua syscall)
 
 PACKAGE:=snabbswitch
-DIST_BINARY:=snabb-wall
+DIST_BINARY:=snabb
 BUILDDIR:=$(shell pwd)
 
 dist: DISTDIR:=$(BUILDDIR)/$(PACKAGE)-$(shell git describe --tags)
