@@ -5,15 +5,25 @@
 module(..., package.seeall)
 
 local ffi    = require("ffi")
+local lib    = require("core.lib")
 local link   = require("core.link")
 local ctable = require("lib.ctable")
 local ether  = require("lib.protocol.ethernet")
 local ipv4   = require("lib.protocol.ipv4")
 local ipv6   = require("lib.protocol.ipv6")
+local tcp    = require("lib.protocol.tcp")
 local C      = ffi.C
+
+local htonl, htons = lib.htonl, lib.htons
 
 local ETHER_PROTO_IPV4 = 0x0800
 local ETHER_PROTO_IPV6 = 0x86dd
+
+local IP_PROTO_TCP  = 6
+local IP_PROTO_UDP  = 17
+local IP_PROTO_SCTP = 132
+
+local TCP_CONTROL_BITS_OFFSET = 11
 
 -- see https://www.iana.org/assignments/ipfix/ipfix.xhtml for
 -- information on the IEs for the flow key and record
@@ -91,13 +101,13 @@ function NetflowExporter:process_packet(pkt)
    local ip_header
 
    if eth_type == ETHER_PROTO_IPV4 then
-      ip_header = ipv4:new_from_mem(pkt.data, pkt.length - eth_size)
+      ip_header = ipv4:new_from_mem(pkt.data + eth_size, pkt.length - eth_size)
       flow_key.is_ipv6  = false
       flow_key.protocol = ip_header:protocol()
       ffi.copy(flow_key.src_ip, ip_header:src(), 4)
       ffi.copy(flow_key.dst_ip, ip_header:dst(), 4)
    elseif eth_type == ETHER_PROTO_IPV6 then
-      ip_header = ipv6:new_from_mem(pkt.data, pkt.length - eth_size)
+      ip_header = ipv6:new_from_mem(pkt.data + eth_size, pkt.length - eth_size)
       flow_key.is_ipv6  = true
       flow_key.protocol = ip_header:next_header()
       flow_key.src_ip   = ip_header:src()
@@ -105,6 +115,18 @@ function NetflowExporter:process_packet(pkt)
    else
       -- ignore non-IP packets
       return
+   end
+
+   local ip_size = ip_header:sizeof()
+
+   -- TCP, UDP, SCTP all have the ports in the same header location
+   if (flow_key.protocol == IP_PROTO_TCP
+       or flow_key.protocol == IP_PROTO_UDP
+       or flow_key.protocol == IP_PROTO_SCTP) then
+      flow_key.src_port =
+         ffi.cast("uint16_t*", pkt.data + eth_size + ip_size)[0]
+      flow_key.dst_port =
+         ffi.cast("uint16_t*", pkt.data + eth_size + ip_size + 2)[0]
    end
 
    local lookup_result = self.flows:lookup_ptr(flow_key)
@@ -125,9 +147,10 @@ function NetflowExporter:process_packet(pkt)
          flow_record.tos   = ip_header:traffic_class()
       end
 
-      --if flow_key.protocol == IP_PROTO_TCP then
-      --   flow_key.tcp_control = ...
-      --end
+      if flow_key.protocol == IP_PROTO_TCP then
+         local ptr = pkt.data + eth_size + ip_size + TCP_CONTROL_BITS_OFFSET
+         flow_record.tcp_control = ffi.cast("uint16_t*", ptr)[0]
+      end
 
       self.flows:add(flow_key, flow_record)
    else
@@ -147,4 +170,43 @@ function NetflowExporter:push()
       local pkt = link.receive(input)
       self:process_packet(pkt)
    end
+end
+
+function selftest()
+   local datagram = require("lib.protocol.datagram")
+
+   local nf = NetflowExporter:new()
+   local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
+                           dst = ether:pton("55:44:33:22:11:00"),
+                           type = ETHER_PROTO_IPV4 })
+   local ip = ipv4:new({ src = ipv4:pton("192.168.1.1"),
+                         dst = ipv4:pton("192.168.1.25"),
+                         protocol = IP_PROTO_TCP,
+                         ttl = 64 })
+   local tcp = tcp:new({ src_port = 9999,
+                         dst_port = 80 })
+   local dg = datagram:new()
+
+   dg:push(tcp)
+   dg:push(ip)
+   dg:push(eth)
+
+   local pkt = dg:packet()
+
+   nf:process_packet(pkt)
+
+   local key = ffi.new("struct flow_key")
+   key.is_ipv6  = false
+   ffi.copy(key.src_ip, ipv4:pton("192.168.1.1"), 4)
+   ffi.copy(key.dst_ip, ipv4:pton("192.168.1.25"), 4)
+   key.protocol = IP_PROTO_TCP
+   key.src_port = htons(9999)
+   key.dst_port = htons(80)
+
+   local result = nf.flows:lookup_ptr(key)
+   assert(result, "key not found")
+   assert(result.value.pkt_count == 1)
+
+   nf:process_packet(pkt)
+   assert(result.value.pkt_count == 2)
 end
