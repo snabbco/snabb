@@ -1,6 +1,6 @@
 /*
 ** ARM instruction emitter.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
 */
 
 /* -- Constant encoding --------------------------------------------------- */
@@ -207,7 +207,7 @@ static void emit_loadi(ASMState *as, Reg r, int32_t i)
 
 #define emit_loada(as, r, addr)		emit_loadi(as, (r), i32ptr((addr)))
 
-static Reg ra_allock(ASMState *as, int32_t k, RegSet allow);
+static Reg ra_allock(ASMState *as, intptr_t k, RegSet allow);
 
 /* Get/set from constant pointer. */
 static void emit_lsptr(ASMState *as, ARMIns ai, Reg r, void *p)
@@ -219,8 +219,9 @@ static void emit_lsptr(ASMState *as, ARMIns ai, Reg r, void *p)
 
 #if !LJ_SOFTFP
 /* Load a number constant into an FPR. */
-static void emit_loadn(ASMState *as, Reg r, cTValue *tv)
+static void emit_loadk64(ASMState *as, Reg r, IRIns *ir)
 {
+  cTValue *tv = ir_knum(ir);
   int32_t i;
   if ((as->flags & JIT_F_VFPV3) && !tv->u32.lo) {
     uint32_t hi = tv->u32.hi;
@@ -273,7 +274,7 @@ static void emit_call(ASMState *as, void *target)
   ptrdiff_t delta = ((char *)target - (char *)p) - 8;
   if ((((delta>>2) + 0x00800000) >> 24) == 0) {
     if ((delta & 1))
-      *p = ARMI_BLX | ((uint32_t)(delta>>2) & 0x00ffffffu) | ((delta&2) << 27);
+      *p = ARMI_BLX | ((uint32_t)(delta>>2) & 0x00ffffffu) | ((delta&2) << 23);
     else
       *p = ARMI_BL | ((uint32_t)(delta>>2) & 0x00ffffffu);
   } else {  /* Target out of range: need indirect call. But don't use R0-R3. */
