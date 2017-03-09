@@ -4,25 +4,23 @@ Test the "snabb lwaftr bench" subcommand. Does not need NIC cards.
 
 import unittest
 
-from lib import sh
-from lib.test_env import (
-    BENCHMARK_FILENAME, BENCHMARK_PATH, DATA_DIR, BENCHDATA_DIR, SNABB_CMD)
+from lib.test_env import (BENCHMARK_FILENAME, BENCHMARK_PATH, DATA_DIR,
+    BENCHDATA_DIR, SNABB_CMD, BaseTestCase)
 
 
-class TestBench(unittest.TestCase):
+class TestBench(BaseTestCase):
 
     cmd_args = (
-        SNABB_CMD, 'lwaftr', 'bench',
+        str(SNABB_CMD), 'lwaftr', 'bench',
         '--duration', '0.1',
         '--bench-file', BENCHMARK_FILENAME,
-        DATA_DIR / 'icmp_on_fail.conf',
-        BENCHDATA_DIR / 'ipv4-0550.pcap',
-        BENCHDATA_DIR / 'ipv6-0550.pcap',
+        str(DATA_DIR / 'icmp_on_fail.conf'),
+        str(BENCHDATA_DIR / 'ipv4-0550.pcap'),
+        str(BENCHDATA_DIR / 'ipv6-0550.pcap'),
     )
 
     def execute_bench_test(self, cmd_args):
-        output = sh.sudo(*cmd_args)
-        self.assertEqual(output.exit_code, 0)
+        self.run_cmd(cmd_args)
         self.assertTrue(BENCHMARK_PATH.is_file(),
             'Cannot find {}'.format(BENCHMARK_PATH))
         BENCHMARK_PATH.unlink()
@@ -31,9 +29,9 @@ class TestBench(unittest.TestCase):
         self.execute_bench_test(self.cmd_args)
 
     def test_bench_reconfigurable(self):
-        reconf_cmd_args = list(self.cmd_args)
-        reconf_cmd_args.insert(3, '--reconfigurable')
-        self.execute_bench_test(reconf_cmd_args)
+        reconf_args = list(self.cmd_args)
+        reconf_args.insert(3, '--reconfigurable')
+        self.execute_bench_test(reconf_args)
 
 
 if __name__ == '__main__':
