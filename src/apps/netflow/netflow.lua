@@ -5,6 +5,7 @@
 module(..., package.seeall)
 
 local ffi    = require("ffi")
+local v9     = require("apps.netflow.v9")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local ctable = require("lib.ctable")
@@ -14,7 +15,7 @@ local ipv6   = require("lib.protocol.ipv6")
 local tcp    = require("lib.protocol.tcp")
 local C      = ffi.C
 
-local htonl, htons = lib.htonl, lib.htons
+local htonl, htons, timeout = lib.htonl, lib.htons, lib.timeout
 
 local ETHER_PROTO_IPV4 = 0x0800
 local ETHER_PROTO_IPV6 = 0x86dd
@@ -66,10 +67,17 @@ NetflowExporter = {}
 
 -- TODO: should be configurable
 --       these numbers are placeholders for more realistic ones
+--       (and timeouts should perhaps be more fine-grained)
 local cache_size = 20000
 local idle_timeout = 120
 local active_timeout = 300
-local export_interval = 300
+local export_interval = 60
+local template_interval = 60
+
+-- produce a timestamp in milliseconds
+local function get_timestamp()
+   return math.floor(tonumber(C.get_time_ns()) / 1000000)
+end
 
 function NetflowExporter:new()
    local params = {
@@ -78,7 +86,10 @@ function NetflowExporter:new()
       max_occupancy_rate = 0.4,
       initial_size = math.ceil(cache_size / 0.4)
    }
-   local o = { flows = ctable.new(params) }
+   local o = { flows = ctable.new(params),
+               export_timer = nil,
+               template_timer = nil,
+               boot_time = get_timestamp() }
 
    return setmetatable(o, { __index = self })
 end
@@ -86,11 +97,6 @@ end
 -- allocate a single flow key that we will re-use
 -- (for performance reasons)
 local flow_key = ffi.new("struct flow_key")
-
--- produce a timestamp in milliseconds
-local function get_timestamp()
-   return math.floor(tonumber(C.get_time_ns()) / 1000000)
-end
 
 function NetflowExporter:process_packet(pkt)
    -- TODO: using the header libraries for now, but can rewrite this
@@ -163,12 +169,60 @@ function NetflowExporter:process_packet(pkt)
    end
 end
 
+-- Walk through flow cache to see if flow records need to be expired.
+-- Collect expired records and export them to the collector.
+function NetflowExporter:expire_records()
+   local now = get_timestamp()
+   local keys_to_remove = {}
+   local to_export = {}
+
+   -- TODO: Walking the table here is done in serial with flow record
+   --       updates, but in the future this should be done concurrently
+   --       in a separate process. i.e., locking required here
+   for entry in self.flows:iterate() do
+      local record = entry.value
+
+      if now - record.end_time > idle_timeout then
+         table.insert(keys_to_remove, entry.key)
+         table.insert(to_export, record)
+      elseif now - record.end_time > active_timeout then
+         -- TODO: what should timers reset to?
+         record.start_time = now
+         record.end_time = now
+         record.pkt_count = 0
+         record.octet_count = 0
+         table.insert(to_export, record)
+      end
+   end
+
+   export_records(to_export)
+end
+
 function NetflowExporter:push()
    local input  = assert(self.input.input)
 
    while not link.empty(input) do
       local pkt = link.receive(input)
       self:process_packet(pkt)
+   end
+
+   if self.template_timer then
+      if self.template_timer() then
+         v9.send_template_record(self)
+         self.template_timer = timeout(template_interval)
+      end
+   else
+      v9.send_template_record(self)
+      self.template_timer = timeout(template_interval)
+   end
+
+   if self.export_timer then
+      if self.export_timer() then
+         self:expire_records()
+         self.export_timer = timeout(export_interval)
+      end
+   else
+      self.export_timer = timeout(export_interval)
    end
 end
 
