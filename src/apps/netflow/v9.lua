@@ -5,6 +5,7 @@
 
 module(..., package.seeall)
 
+local bit    = require("bit")
 local ffi    = require("ffi")
 local lib    = require("core.lib")
 local link   = require("core.link")
@@ -117,6 +118,10 @@ local function construct_packet(exporter, ptr, len)
    return dgram:packet()
 end
 
+local function get_timestamp()
+   return C.get_time_ns() / 1000000ULL
+end
+
 -- Write an IPFIX header into the given buffer
 --
 -- v9 header is 20 bytes, consisting of
@@ -129,7 +134,7 @@ end
 local function write_header(ptr, count, boot_time)
    ffi.cast("uint16_t*", ptr)[0]      = htons(9)
    ffi.cast("uint16_t*", ptr + 2)[0]  = htons(count)
-   ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(boot_time)
+   ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(get_timestamp() - boot_time)
    ffi.cast("uint32_t*", ptr + 8)[0]  = htonl(math.floor(C.get_unix_time()))
    ffi.cast("uint32_t*", ptr + 12)[0] = htonl(sequence_number)
    -- TODO: make source ID configurable
@@ -194,11 +199,56 @@ function send_template_record(exporter)
    link.transmit(exporter.output.output, pkt)
 end
 
--- Given a flow exporter & an array of records, construct Netflow v9
--- packets and transmit them
-function export_records(exporter, records)
-   local data = ffi.new("uint8_t[20]")
-   write_header(data, 20, #records, exporter.boot_time)
+-- Helper function to write a 64-bit record field in network-order
+-- TODO: don't just assume host is little-endian
+local function write64(record, field, ptr, idx)
+   local off = ffi.offsetof(record, field)
+   local rp  = ffi.cast("uint8_t*", record)
+   local fp  = ffi.cast("uint32_t*", rp + off)
+   local dst = ffi.cast("uint32_t*", ptr + idx)
 
-   --for _, record in ipairs(records) do end
+   dst[0] = htonl(fp[1])
+   dst[1] = htonl(fp[0])
+end
+
+-- Given a flow exporter & an array of records, construct Netflow v9
+-- packet(s) and transmit them
+-- TODO: account for the MTU and divide up records
+function export_records(exporter, records)
+   local data_len = 24 + (63 * #records)
+   local padding  = 4 - (data_len % 4)
+   local length   = data_len + padding
+   local buffer   = ffi.new("uint8_t[?]", length)
+   write_header(buffer, #records, exporter.boot_time)
+
+   -- flow set ID and length
+   ffi.cast("uint16_t*", buffer + 20)[0] = htons(256)
+   ffi.cast("uint16_t*", buffer + 22)[0] = htons(length - 20)
+
+   for idx, record in ipairs(records) do
+      local ptr = buffer + 24 + (63 * (idx - 1))
+
+      ffi.copy(ptr, record.key.src_ip, 4)
+      ffi.copy(ptr + 4, record.key.dst_ip, 4)
+      ffi.cast("uint16_t*", ptr + 8)[0]  = record.key.src_port
+      ffi.cast("uint16_t*", ptr + 10)[0] = record.key.dst_port
+      ffi.cast("uint8_t*", ptr + 12)[0]  = record.key.protocol
+
+      write64(record, "start_time", ptr, 13)
+      write64(record, "end_time", ptr, 21)
+      write64(record, "pkt_count", ptr, 29)
+      write64(record, "octet_count", ptr, 37)
+
+      ffi.cast("uint8_t*", ptr + 45)[0]  = record.tos
+      -- in V9 this is 1 octet, in IPFIX it's 2 octets
+      ffi.cast("uint8_t*", ptr + 46)[0]  = record.tcp_control
+      ffi.cast("uint32_t*", ptr + 47)[0] = record.ingress
+      ffi.cast("uint32_t*", ptr + 51)[0] = record.egress
+      ffi.cast("uint32_t*", ptr + 55)[0] = record.src_peer_as
+      ffi.cast("uint32_t*", ptr + 59)[0] = record.dst_peer_as
+   end
+
+   local pkt = construct_packet(exporter, buffer, length)
+
+   link.transmit(exporter.output.output, pkt)
 end

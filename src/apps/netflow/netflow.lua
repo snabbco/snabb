@@ -76,7 +76,7 @@ local template_interval = 60
 
 -- produce a timestamp in milliseconds
 local function get_timestamp()
-   return math.floor(tonumber(C.get_time_ns()) / 1000000)
+   return C.get_time_ns() / 1000000ULL
 end
 
 function NetflowExporter:new()
@@ -143,7 +143,7 @@ function NetflowExporter:process_packet(pkt)
       flow_record.key         = flow_key
       flow_record.start_time  = get_timestamp()
       flow_record.end_time    = flow_record.start_time
-      flow_record.pkt_count   = 1
+      flow_record.pkt_count   = 1ULL
       flow_record.octet_count = pkt.length
 
       if eth_type == ETHER_PROTO_IPV4 then
@@ -164,7 +164,7 @@ function NetflowExporter:process_packet(pkt)
 
       -- otherwise just update the counters and timestamps
       flow_record.end_time    = get_timestamp()
-      flow_record.pkt_count   = flow_record.pkt_count + 1
+      flow_record.pkt_count   = flow_record.pkt_count + 1ULL
       flow_record.octet_count = flow_record.octet_count + pkt.length
    end
 end
@@ -174,6 +174,7 @@ end
 function NetflowExporter:expire_records()
    local now = get_timestamp()
    local keys_to_remove = {}
+   local timeout_records = {}
    local to_export = {}
 
    -- TODO: Walking the table here is done in serial with flow record
@@ -186,16 +187,26 @@ function NetflowExporter:expire_records()
          table.insert(keys_to_remove, entry.key)
          table.insert(to_export, record)
       elseif now - record.end_time > active_timeout then
-         -- TODO: what should timers reset to?
-         record.start_time = now
-         record.end_time = now
-         record.pkt_count = 0
-         record.octet_count = 0
+         table.insert(timeout_records, record)
          table.insert(to_export, record)
       end
    end
 
-   export_records(to_export)
+   v9.export_records(self, to_export)
+
+   -- TODO: Due to the key optimization above this doesn't work, fix
+   --       it by changing the flow key representation
+   --for _, key in ipairs(keys_to_remove) do
+   --   self.flows:remove(key)
+   --end
+
+   for _, record in ipairs(timeout_records) do
+      -- TODO: what should timers reset to?
+      record.start_time = now
+      record.end_time = now
+      record.pkt_count = 0
+      record.octet_count = 0
+   end
 end
 
 function NetflowExporter:push()
