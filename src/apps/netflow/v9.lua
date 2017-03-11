@@ -132,9 +132,11 @@ end
 --   * sequence number
 --   * source ID
 local function write_header(ptr, count, boot_time)
+   local uptime = tonumber(get_timestamp() - boot_time)
+
    ffi.cast("uint16_t*", ptr)[0]      = htons(9)
    ffi.cast("uint16_t*", ptr + 2)[0]  = htons(count)
-   ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(get_timestamp() - boot_time)
+   ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(uptime)
    ffi.cast("uint32_t*", ptr + 8)[0]  = htonl(math.floor(C.get_unix_time()))
    ffi.cast("uint32_t*", ptr + 12)[0] = htonl(sequence_number)
    -- TODO: make source ID configurable
