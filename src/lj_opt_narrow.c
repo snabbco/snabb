@@ -9,7 +9,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_bc.h"
 #include "lj_ir.h"
@@ -495,7 +494,6 @@ TRef LJ_FASTCALL lj_opt_narrow_tobit(jit_State *J, TRef tr)
   return narrow_stripov(J, tr, IR_SUBOV, (IRT_INT<<5)|IRT_INT|IRCONV_TOBIT);
 }
 
-#if LJ_HASFFI
 /* Narrow C array index (overflow undefined). */
 TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef tr)
 {
@@ -507,7 +505,6 @@ TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef tr)
 			LJ_64 ? ((IRT_INTP<<5)|IRT_INT|IRCONV_SEXT) :
 				((IRT_INTP<<5)|IRT_INT|IRCONV_TOBIT));
 }
-#endif
 
 /* -- Narrowing of arithmetic operators ----------------------------------- */
 
@@ -651,4 +648,3 @@ IRType lj_opt_narrow_forl(jit_State *J, cTValue *tv)
 #undef emitir
 #undef emitir_raw
 
-#endif

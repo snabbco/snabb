@@ -114,12 +114,8 @@ SBuf * LJ_FASTCALL lj_buf_putstr_lower(SBuf *sb, GCstr *s)
   const char *q = strdata(s);
   for (; p < e; p++, q++) {
     uint32_t c = *(unsigned char *)q;
-#if LJ_TARGET_PPC
-    *p = c + ((c >= 'A' && c <= 'Z') << 5);
-#else
     if (c >= 'A' && c <= 'Z') c += 0x20;
     *p = c;
-#endif
   }
   setsbufP(sb, p);
   return sb;
@@ -132,12 +128,8 @@ SBuf * LJ_FASTCALL lj_buf_putstr_upper(SBuf *sb, GCstr *s)
   const char *q = strdata(s);
   for (; p < e; p++, q++) {
     uint32_t c = *(unsigned char *)q;
-#if LJ_TARGET_PPC
-    *p = c - ((c >= 'a' && c <= 'z') << 5);
-#else
     if (c >= 'a' && c <= 'z') c -= 0x20;
     *p = c;
-#endif
   }
   setsbufP(sb, p);
   return sb;

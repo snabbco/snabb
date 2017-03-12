@@ -9,7 +9,6 @@
 #include "lj_obj.h"
 #include "lj_ctype.h"
 
-#if LJ_HASFFI
 
 /* Really belongs to lj_vm.h. */
 LJ_ASMF void lj_vm_ffi_callback(void);
@@ -20,6 +19,5 @@ LJ_FUNCA void LJ_FASTCALL lj_ccallback_leave(CTState *cts, TValue *o);
 LJ_FUNC void *lj_ccallback_new(CTState *cts, CType *ct, GCfunc *fn);
 LJ_FUNC void lj_ccallback_mcode_free(CTState *cts);
 
-#endif
 
 #endif

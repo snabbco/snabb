@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -82,41 +81,6 @@ static TraceNo trace_findfree(jit_State *J)
   memcpy(p, J->cur.field, J->cur.szfield*sizeof(tp)); \
   p += J->cur.szfield*sizeof(tp);
 
-#ifdef LUAJIT_USE_PERFTOOLS
-/*
-** Create symbol table of JIT-compiled code. For use with Linux perf tools.
-** Example usage:
-**   perf record -f -e cycles luajit test.lua
-**   perf report -s symbol
-**   rm perf.data /tmp/perf-*.map
-*/
-#include <stdio.h>
-#include <unistd.h>
-
-static void perftools_addtrace(GCtrace *T)
-{
-  static FILE *fp;
-  GCproto *pt = &gcref(T->startpt)->pt;
-  const BCIns *startpc = mref(T->startpc, const BCIns);
-  const char *name = proto_chunknamestr(pt);
-  BCLine lineno;
-  if (name[0] == '@' || name[0] == '=')
-    name++;
-  else
-    name = "(string)";
-  lua_assert(startpc >= proto_bc(pt) && startpc < proto_bc(pt) + pt->sizebc);
-  lineno = lj_debug_line(pt, proto_bcpos(pt, startpc));
-  if (!fp) {
-    char fname[40];
-    sprintf(fname, "/tmp/perf-%d.map", getpid());
-    if (!(fp = fopen(fname, "w"))) return;
-    setlinebuf(fp);
-  }
-  fprintf(fp, "%lx %x TRACE_%d::%s:%u\n",
-	  (long)T->mcode, T->szmcode, T->traceno, name, lineno);
-}
-#endif
-
 /* Allocate space for copy of T. */
 GCtrace * LJ_FASTCALL lj_trace_alloc(lua_State *L, GCtrace *T)
 {
@@ -159,9 +123,6 @@ static void trace_save(jit_State *J, GCtrace *T)
   setgcrefp(J->trace[T->traceno], T);
   lj_gc_barriertrace(J2G(J), T->traceno);
   lj_gdbjit_addtrace(J, T);
-#ifdef LUAJIT_USE_PERFTOOLS
-  perftools_addtrace(T);
-#endif
 }
 
 void LJ_FASTCALL lj_trace_free(global_State *g, GCtrace *T)
@@ -317,32 +278,10 @@ void lj_trace_initstate(global_State *g)
   tv[1].u64 = U64x(80000000,00000000);
 
   /* Initialize 32/64 bit constants. */
-#if LJ_TARGET_X86ORX64
   J->k64[LJ_K64_TOBIT].u64 = U64x(43380000,00000000);
-#if LJ_32
-  J->k64[LJ_K64_M2P64_31].u64 = U64x(c1e00000,00000000);
-#endif
   J->k64[LJ_K64_2P64].u64 = U64x(43f00000,00000000);
   J->k32[LJ_K32_M2P64_31] = LJ_64 ? 0xdf800000 : 0xcf000000;
-#endif
-#if LJ_TARGET_X86ORX64 || LJ_TARGET_MIPS64
   J->k64[LJ_K64_M2P64].u64 = U64x(c3f00000,00000000);
-#endif
-#if LJ_TARGET_PPC
-  J->k32[LJ_K32_2P52_2P31] = 0x59800004;
-  J->k32[LJ_K32_2P52] = 0x59800000;
-#endif
-#if LJ_TARGET_PPC || LJ_TARGET_MIPS
-  J->k32[LJ_K32_2P31] = 0x4f000000;
-#endif
-#if LJ_TARGET_MIPS
-  J->k64[LJ_K64_2P31].u64 = U64x(41e00000,00000000);
-#if LJ_64
-  J->k64[LJ_K64_2P63].u64 = U64x(43e00000,00000000);
-  J->k32[LJ_K32_2P63] = 0x5f000000;
-  J->k32[LJ_K32_M2P64] = 0xdf800000;
-#endif
-#endif
 }
 
 /* Free everything associated with the JIT compiler state. */
@@ -788,29 +727,6 @@ static TValue *trace_exit_cp(lua_State *L, lua_CFunction dummy, void *ud)
   return NULL;
 }
 
-#ifndef LUAJIT_DISABLE_VMEVENT
-/* Push all registers from exit state. */
-static void trace_exit_regs(lua_State *L, ExitState *ex)
-{
-  int32_t i;
-  setintV(L->top++, RID_NUM_GPR);
-  setintV(L->top++, RID_NUM_FPR);
-  for (i = 0; i < RID_NUM_GPR; i++) {
-    if (sizeof(ex->gpr[i]) == sizeof(int32_t))
-      setintV(L->top++, (int32_t)ex->gpr[i]);
-    else
-      setnumV(L->top++, (lua_Number)ex->gpr[i]);
-  }
-#if !LJ_SOFTFP
-  for (i = 0; i < RID_NUM_FPR; i++) {
-    setnumV(L->top, ex->fpr[i]);
-    if (LJ_UNLIKELY(tvisnan(L->top)))
-      setnanV(L->top);
-    L->top++;
-  }
-#endif
-}
-#endif
 
 #ifdef EXITSTATE_PCREG
 /* Determine trace number from pc of exit instruction. */
@@ -906,4 +822,3 @@ int LJ_FASTCALL lj_trace_exit(jit_State *J, void *exptr)
   }
 }
 
-#endif

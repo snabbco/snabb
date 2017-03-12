@@ -112,13 +112,8 @@ static char *lj_strfmt_wuint9(char *p, uint32_t u)
 ** enough digits to make both %.99e and %.99f do the right thing.
 */
 
-#if LJ_64
 #define ND_MUL2K_MAX_SHIFT	29
 #define ND_MUL2K_DIV1E9(val)	((uint32_t)((val) / 1000000000))
-#else
-#define ND_MUL2K_MAX_SHIFT	11
-#define ND_MUL2K_DIV1E9(val)	((uint32_t)((val) >> 9) / 1953125)
-#endif
 
 /* Multiply nd by 2^k and add carry_in (ndlo is assumed to be zero). */
 static uint32_t nd_mul2k(uint32_t* nd, uint32_t ndhi, uint32_t k,

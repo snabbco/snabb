@@ -8,21 +8,15 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_err.h"
 #include "lj_str.h"
 #include "lj_tab.h"
 #include "lj_meta.h"
 #include "lj_frame.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
-#endif
 #include "lj_bc.h"
 #include "lj_ff.h"
-#if LJ_HASPROFILE
-#include "lj_debug.h"
-#endif
 #include "lj_ir.h"
 #include "lj_jit.h"
 #include "lj_ircall.h"
@@ -103,31 +97,23 @@ static void rec_check_slots(jit_State *J)
       }
       if (s == 0) {
 	lua_assert(tref_isfunc(tr));
-#if LJ_FR2
       } else if (s == 1) {
 	lua_assert((tr & ~TREF_FRAME) == 0);
-#endif
       } else if ((tr & TREF_FRAME)) {
 	GCfunc *fn = gco2func(frame_gc(tv));
 	BCReg delta = (BCReg)(tv - frame_prev(tv));
-#if LJ_FR2
 	if (ref)
 	  lua_assert(ir_knum(ir)->u64 == tv->u64);
 	tr = J->slot[s-1];
 	ir = IR(tref_ref(tr));
-#endif
 	lua_assert(tref_isfunc(tr));
 	if (tref_isk(tr)) lua_assert(fn == ir_kfunc(ir));
 	lua_assert(s > delta + LJ_FR2 ? (J->slot[s-delta] & TREF_FRAME)
 				      : (s == delta + LJ_FR2));
 	depth++;
       } else if ((tr & TREF_CONT)) {
-#if LJ_FR2
 	if (ref)
 	  lua_assert(ir_knum(ir)->u64 == tv->u64);
-#else
-	lua_assert(ir_kptr(ir) == gcrefp(tv->gcr, void));
-#endif
 	lua_assert((J->slot[s+1+LJ_FR2] & TREF_FRAME));
 	depth++;
       } else {
@@ -609,49 +595,6 @@ static void rec_loop_jit(jit_State *J, TraceNo lnk, LoopEvent ev)
 
 /* -- Record profiler hook checks ----------------------------------------- */
 
-#if LJ_HASPROFILE
-
-/* Need to insert profiler hook check? */
-static int rec_profile_need(jit_State *J, GCproto *pt, const BCIns *pc)
-{
-  GCproto *ppt;
-  lua_assert(J->prof_mode == 'f' || J->prof_mode == 'l');
-  if (!pt)
-    return 0;
-  ppt = J->prev_pt;
-  J->prev_pt = pt;
-  if (pt != ppt && ppt) {
-    J->prev_line = -1;
-    return 1;
-  }
-  if (J->prof_mode == 'l') {
-    BCLine line = lj_debug_line(pt, proto_bcpos(pt, pc));
-    BCLine pline = J->prev_line;
-    J->prev_line = line;
-    if (pline != line)
-      return 1;
-  }
-  return 0;
-}
-
-static void rec_profile_ins(jit_State *J, const BCIns *pc)
-{
-  if (J->prof_mode && rec_profile_need(J, J->pt, pc)) {
-    emitir(IRTG(IR_PROF, IRT_NIL), 0, 0);
-    lj_snap_add(J);
-  }
-}
-
-static void rec_profile_ret(jit_State *J)
-{
-  if (J->prof_mode == 'f') {
-    emitir(IRTG(IR_PROF, IRT_NIL), 0, 0);
-    J->prev_pt = NULL;
-    lj_snap_add(J);
-  }
-}
-
-#endif
 
 /* -- Record calls and returns -------------------------------------------- */
 
@@ -707,19 +650,13 @@ static void rec_call_setup(jit_State *J, BCReg func, ptrdiff_t nargs)
       lj_trace_err(J, LJ_TRERR_NOMM);
     for (i = ++nargs; i > LJ_FR2; i--)  /* Shift arguments up. */
       fbase[i+LJ_FR2] = fbase[i+LJ_FR2-1];
-#if LJ_FR2
     fbase[2] = fbase[0];
-#endif
     fbase[0] = ix.mobj;  /* Replace function. */
     functv = &ix.mobjv;
   }
   kfunc = rec_call_specialize(J, funcV(functv), fbase[0]);
-#if LJ_FR2
   fbase[0] = kfunc;
   fbase[1] = TREF_FRAME;
-#else
-  fbase[0] = kfunc | TREF_FRAME;
-#endif
   J->maxslot = (BCReg)nargs;
 }
 
@@ -919,12 +856,8 @@ void lj_record_ret(jit_State *J, BCReg rbase, ptrdiff_t gotresults)
 static BCReg rec_mm_prep(jit_State *J, ASMFunction cont)
 {
   BCReg s, top = cont == lj_cont_cat ? J->maxslot : curr_proto(J->L)->framesize;
-#if LJ_FR2
   J->base[top] = lj_ir_k64(J, IR_KNUM, u64ptr(contptr(cont)));
   J->base[top+1] = TREF_CONT;
-#else
-  J->base[top] = lj_ir_kptr(J, contptr(cont)) | TREF_CONT;
-#endif
   J->framedepth++;
   for (s = J->maxslot; s < top; s++)
     J->base[s] = 0;  /* Clear frame gap to avoid resurrecting previous refs. */
@@ -976,13 +909,9 @@ int lj_record_mm_lookup(jit_State *J, RecordIndex *ix, MMS mm)
     }
     /* The cdata metatable is treated as immutable. */
     if (LJ_HASFFI && tref_iscdata(ix->tab)) goto immutable_mt;
-#if LJ_GC64
     /* TODO: fix ARM32 asm_fload(), so we can use this for all archs. */
     ix->mt = mix.tab = lj_ir_ggfload(J, IRT_TAB,
       GG_OFS(g.gcroot[GCROOT_BASEMT+itypemap(&ix->tabv)]));
-#else
-    ix->mt = mix.tab = lj_ir_ktab(J, mt);
-#endif
     goto nocheck;
   }
   ix->mt = mt ? mix.tab : TREF_NIL;
@@ -1026,9 +955,7 @@ static TRef rec_mm_arith(jit_State *J, RecordIndex *ix, MMS mm)
   }
 ok:
   base[0] = ix->mobj;
-#if LJ_FR2
   base[1] = 0;
-#endif
   copyTV(J->L, basev+0, &ix->mobjv);
   lj_record_call(J, func, 2);
   return 0;  /* No result yet. */
@@ -1156,7 +1083,6 @@ static void rec_mm_comp(jit_State *J, RecordIndex *ix, int op)
   }
 }
 
-#if LJ_HASFFI
 /* Setup call to cdata comparison metamethod. */
 static void rec_mm_comp_cdata(jit_State *J, RecordIndex *ix, int op, MMS mm)
 {
@@ -1172,7 +1098,6 @@ static void rec_mm_comp_cdata(jit_State *J, RecordIndex *ix, int op, MMS mm)
   lj_record_mm_lookup(J, ix, mm);
   rec_mm_callcomp(J, ix, op);
 }
-#endif
 
 /* -- Indexed access ------------------------------------------------------ */
 
@@ -1545,7 +1470,6 @@ static int rec_upvalue_constify(jit_State *J, GCupval *uvp)
   if (uvp->immutable) {
     cTValue *o = uvval(uvp);
     /* Don't constify objects that may retain large amounts of memory. */
-#if LJ_HASFFI
     if (tviscdata(o)) {
       GCcdata *cd = cdataV(o);
       if (!cdataisv(cd) && !(cd->marked & LJ_GC_CDATA_FIN)) {
@@ -1555,9 +1479,6 @@ static int rec_upvalue_constify(jit_State *J, GCupval *uvp)
       }
       return 0;
     }
-#else
-    UNUSED(J);
-#endif
     if (!(tvistab(o) || tvisudata(o) || tvisthread(o)))
       return 1;
   }
@@ -1579,11 +1500,7 @@ static TRef rec_upvalue(jit_State *J, uint32_t uv, TRef val)
 	goto noconstify;
       kfunc = lj_ir_kfunc(J, J->fn);
       emitir(IRTG(IR_EQ, IRT_FUNC), fn, kfunc);
-#if LJ_FR2
       J->base[-2] = kfunc;
-#else
-      J->base[-1] = kfunc | TREF_FRAME;
-#endif
       fn = kfunc;
     }
     tr = lj_record_constify(J, uvval(uvp));
@@ -1699,9 +1616,7 @@ static void rec_func_vararg(jit_State *J)
   if (J->baseslot + vframe + pt->framesize >= LJ_MAX_JSLOTS)
     lj_trace_err(J, LJ_TRERR_STACKOV);
   J->base[vframe-1-LJ_FR2] = J->base[-1-LJ_FR2];  /* Copy function up. */
-#if LJ_FR2
   J->base[vframe-1] = TREF_FRAME;
-#endif
   /* Copy fixarg slots up and set their original slots to nil. */
   fixargs = pt->numparams < J->maxslot ? pt->numparams : J->maxslot;
   for (s = 0; s < fixargs; s++) {
@@ -1943,15 +1858,11 @@ static void rec_comp_fixup(jit_State *J, const BCIns *pc, int cond)
   const BCIns *npc = pc + 2 + (cond ? bc_j(jmpins) : 0);
   SnapShot *snap = &J->cur.snap[J->cur.nsnap-1];
   /* Set PC to opposite target to avoid re-recording the comp. in side trace. */
-#if LJ_FR2
   SnapEntry *flink = &J->cur.snapmap[snap->mapofs + snap->nent];
   uint64_t pcbase;
   memcpy(&pcbase, flink, sizeof(uint64_t));
   pcbase = (pcbase & 0xff) | (u64ptr(npc) << 8);
   memcpy(flink, &pcbase, sizeof(uint64_t));
-#else
-  J->cur.snapmap[snap->mapofs + snap->nent] = SNAP_MKPC(npc);
-#endif
   J->needsnap = 1;
   if (bc_a(jmpins) < J->maxslot) J->maxslot = bc_a(jmpins);
   lj_snap_shrink(J);  /* Shrink last snapshot if possible. */
@@ -2039,9 +1950,6 @@ void lj_record_ins(jit_State *J)
   rec_check_ir(J);
 #endif
 
-#if LJ_HASPROFILE
-  rec_profile_ins(J, pc);
-#endif
 
   /* Keep a copy of the runtime values of var/num/str operands. */
 #define rav	(&ix.valv)
@@ -2083,12 +1991,10 @@ void lj_record_ins(jit_State *J)
   /* -- Comparison ops ---------------------------------------------------- */
 
   case BC_ISLT: case BC_ISGE: case BC_ISLE: case BC_ISGT:
-#if LJ_HASFFI
     if (tref_iscdata(ra) || tref_iscdata(rc)) {
       rec_mm_comp_cdata(J, &ix, op, ((int)op & 2) ? MM_le : MM_lt);
       break;
     }
-#endif
     /* Emit nothing for two numeric or string consts. */
     if (!(tref_isk2(ra,rc) && tref_isnumber_str(ra) && tref_isnumber_str(rc))) {
       IRType ta = tref_isinteger(ra) ? IRT_INT : tref_type(ra);
@@ -2135,12 +2041,10 @@ void lj_record_ins(jit_State *J)
   case BC_ISEQS: case BC_ISNES:
   case BC_ISEQN: case BC_ISNEN:
   case BC_ISEQP: case BC_ISNEP:
-#if LJ_HASFFI
     if (tref_iscdata(ra) || tref_iscdata(rc)) {
       rec_mm_comp_cdata(J, &ix, op, MM_eq);
       break;
     }
-#endif
     /* Emit nothing for two non-table, non-udata consts. */
     if (!(tref_isk2(ra, rc) && !(tref_istab(ra) || tref_isudata(ra)))) {
       int diff;
@@ -2250,11 +2154,7 @@ void lj_record_ins(jit_State *J)
   case BC_MOV:
     /* Clear gap of method call to avoid resurrecting previous refs. */
     if (ra > J->maxslot) {
-#if LJ_FR2
       memset(J->base + J->maxslot, 0, (ra - J->maxslot) * sizeof(TRef));
-#else
-      J->base[ra-1] = 0;
-#endif
     }
     break;
   case BC_KSTR: case BC_KNUM: case BC_KPRI:
@@ -2269,11 +2169,9 @@ void lj_record_ins(jit_State *J)
       J->base[ra++] = TREF_NIL;
     if (rc >= J->maxslot) J->maxslot = rc+1;
     break;
-#if LJ_HASFFI
   case BC_KCDATA:
     rc = lj_ir_kgc(J, proto_kgc(J->pt, ~(ptrdiff_t)rc), IRT_CDATA);
     break;
-#endif
 
   /* -- Upvalue and function ops ------------------------------------------ */
 
@@ -2364,9 +2262,6 @@ void lj_record_ins(jit_State *J)
     rc = (BCReg)(J->L->top - J->L->base) - ra + 1;
     /* fallthrough */
   case BC_RET: case BC_RET0: case BC_RET1:
-#if LJ_HASPROFILE
-    rec_profile_ret(J);
-#endif
     lj_record_ret(J, ra, (ptrdiff_t)rc-1);
     break;
 
@@ -2457,9 +2352,7 @@ void lj_record_ins(jit_State *J)
   if (bcmode_a(op) == BCMdst && rc) {
     J->base[ra] = rc;
     if (ra >= J->maxslot) {
-#if LJ_FR2
       if (ra > J->maxslot) J->base[ra-1] = 0;
-#endif
       J->maxslot = ra+1;
     }
   }
@@ -2612,10 +2505,6 @@ void lj_record_setup(jit_State *J)
     if (1 + J->pt->framesize >= LJ_MAX_JSLOTS)
       lj_trace_err(J, LJ_TRERR_STACKOV);
   }
-#if LJ_HASPROFILE
-  J->prev_pt = NULL;
-  J->prev_line = -1;
-#endif
 #ifdef LUAJIT_ENABLE_CHECKHOOK
   /* Regularly check for instruction/line hooks from compiled code and
   ** exit to the interpreter if the hooks are set.
@@ -2643,4 +2532,3 @@ void lj_record_setup(jit_State *J)
 #undef emitir_raw
 #undef emitir
 
-#endif

@@ -32,7 +32,6 @@
 #define SYMPREFIX_CF		"luaopen_%s"
 #define SYMPREFIX_BC		"luaJIT_BC_%s"
 
-#if LJ_TARGET_DLOPEN
 
 #include <dlfcn.h>
 
@@ -65,120 +64,6 @@ static const char *ll_bcsym(void *lib, const char *sym)
   return (const char *)dlsym(lib, sym);
 }
 
-#elif LJ_TARGET_WINDOWS
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-#ifndef GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS
-#define GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS  4
-#define GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT  2
-BOOL WINAPI GetModuleHandleExA(DWORD, LPCSTR, HMODULE*);
-#endif
-
-#undef setprogdir
-
-static void setprogdir(lua_State *L)
-{
-  char buff[MAX_PATH + 1];
-  char *lb;
-  DWORD nsize = sizeof(buff);
-  DWORD n = GetModuleFileNameA(NULL, buff, nsize);
-  if (n == 0 || n == nsize || (lb = strrchr(buff, '\\')) == NULL) {
-    luaL_error(L, "unable to get ModuleFileName");
-  } else {
-    *lb = '\0';
-    luaL_gsub(L, lua_tostring(L, -1), LUA_EXECDIR, buff);
-    lua_remove(L, -2);  /* remove original string */
-  }
-}
-
-static void pusherror(lua_State *L)
-{
-  DWORD error = GetLastError();
-#if LJ_TARGET_XBOXONE
-  wchar_t wbuffer[128];
-  char buffer[128*2];
-  if (FormatMessageW(FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-      NULL, error, 0, wbuffer, sizeof(wbuffer)/sizeof(wchar_t), NULL) &&
-      WideCharToMultiByte(CP_ACP, 0, wbuffer, 128, buffer, 128*2, NULL, NULL))
-#else
-  char buffer[128];
-  if (FormatMessageA(FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-      NULL, error, 0, buffer, sizeof(buffer), NULL))
-#endif
-    lua_pushstring(L, buffer);
-  else
-    lua_pushfstring(L, "system error %d\n", error);
-}
-
-static void ll_unloadlib(void *lib)
-{
-  FreeLibrary((HINSTANCE)lib);
-}
-
-static void *ll_load(lua_State *L, const char *path, int gl)
-{
-  HINSTANCE lib = LoadLibraryExA(path, NULL, 0);
-  if (lib == NULL) pusherror(L);
-  UNUSED(gl);
-  return lib;
-}
-
-static lua_CFunction ll_sym(lua_State *L, void *lib, const char *sym)
-{
-  lua_CFunction f = (lua_CFunction)GetProcAddress((HINSTANCE)lib, sym);
-  if (f == NULL) pusherror(L);
-  return f;
-}
-
-static const char *ll_bcsym(void *lib, const char *sym)
-{
-  if (lib) {
-    return (const char *)GetProcAddress((HINSTANCE)lib, sym);
-  } else {
-    HINSTANCE h = GetModuleHandleA(NULL);
-    const char *p = (const char *)GetProcAddress(h, sym);
-    if (p == NULL && GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-					(const char *)ll_bcsym, &h))
-      p = (const char *)GetProcAddress(h, sym);
-    return p;
-  }
-}
-
-#else
-
-#undef PACKAGE_LIB_FAIL
-#define PACKAGE_LIB_FAIL	"absent"
-
-#define DLMSG	"dynamic libraries not enabled; no support for target OS"
-
-static void ll_unloadlib(void *lib)
-{
-  UNUSED(lib);
-}
-
-static void *ll_load(lua_State *L, const char *path, int gl)
-{
-  UNUSED(path); UNUSED(gl);
-  lua_pushliteral(L, DLMSG);
-  return NULL;
-}
-
-static lua_CFunction ll_sym(lua_State *L, void *lib, const char *sym)
-{
-  UNUSED(lib); UNUSED(sym);
-  lua_pushliteral(L, DLMSG);
-  return NULL;
-}
-
-static const char *ll_bcsym(void *lib, const char *sym)
-{
-  UNUSED(lib); UNUSED(sym);
-  return NULL;
-}
-
-#endif
 
 /* ------------------------------------------------------------------------ */
 
@@ -534,12 +419,7 @@ static int lj_cf_package_seeall(lua_State *L)
 static void setpath(lua_State *L, const char *fieldname, const char *envname,
 		    const char *def, int noenv)
 {
-#if LJ_TARGET_CONSOLE
-  const char *path = NULL;
-  UNUSED(envname);
-#else
   const char *path = getenv(envname);
-#endif
   if (path == NULL || noenv) {
     lua_pushstring(L, def);
   } else {

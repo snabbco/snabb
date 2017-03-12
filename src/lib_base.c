@@ -24,10 +24,8 @@
 #include "lj_meta.h"
 #include "lj_state.h"
 #include "lj_frame.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
 #include "lj_cconv.h"
-#endif
 #include "lj_bc.h"
 #include "lj_ff.h"
 #include "lj_dispatch.h"
@@ -81,7 +79,6 @@ LJLIB_ASM(next)
   return FFH_UNREACHABLE;
 }
 
-#if LJ_52 || LJ_HASFFI
 static int ffh_pairs(lua_State *L, MMS mm)
 {
   TValue *o = lj_lib_checkany(L, 1);
@@ -98,9 +95,6 @@ static int ffh_pairs(lua_State *L, MMS mm)
     return FFH_RES(3);
   }
 }
-#else
-#define ffh_pairs(L, mm)	(lj_lib_checktab(L, 1), FFH_UNREACHABLE)
-#endif
 
 LJLIB_PUSH(lastcl)
 LJLIB_ASM(pairs)		LJLIB_REC(xpairs 0)
@@ -265,7 +259,6 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
       copyTV(L, L->base-1-LJ_FR2, o);
       return FFH_RES(1);
     }
-#if LJ_HASFFI
     if (tviscdata(o)) {
       CTState *cts = ctype_cts(L);
       CType *ct = lj_ctype_rawref(cts, cdataV(o)->ctypeid);
@@ -283,7 +276,6 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
 	return FFH_RES(1);
       }
     }
-#endif
   } else {
     const char *p = strdata(lj_lib_checkstr(L, 1));
     char *ep;
@@ -608,10 +600,8 @@ LJLIB_NOREG LJLIB_ASM(coroutine_wrap_aux)
 
 /* Inline declarations. */
 LJ_ASMF void lj_ff_coroutine_wrap_aux(void);
-#if !(LJ_TARGET_MIPS && defined(ljamalg_c))
 LJ_FUNCA_NORET void LJ_FASTCALL lj_ffh_coroutine_wrap_err(lua_State *L,
 							  lua_State *co);
-#endif
 
 /* Error handler, called from assembler VM. */
 void LJ_FASTCALL lj_ffh_coroutine_wrap_err(lua_State *L, lua_State *co)

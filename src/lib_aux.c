@@ -22,9 +22,7 @@
 #include "lj_trace.h"
 #include "lj_lib.h"
 
-#if LJ_TARGET_POSIX
 #include <sys/wait.h>
-#endif
 
 /* -- I/O error handling -------------------------------------------------- */
 
@@ -49,7 +47,6 @@ LUALIB_API int luaL_fileresult(lua_State *L, int stat, const char *fname)
 LUALIB_API int luaL_execresult(lua_State *L, int stat)
 {
   if (stat != -1) {
-#if LJ_TARGET_POSIX
     if (WIFSIGNALED(stat)) {
       stat = WTERMSIG(stat);
       setnilV(L->top++);
@@ -63,13 +60,6 @@ LUALIB_API int luaL_execresult(lua_State *L, int stat)
 	setnilV(L->top++);
       lua_pushliteral(L, "exit");
     }
-#else
-    if (stat == 0)
-      setboolV(L->top++, 1);
-    else
-      setnilV(L->top++);
-    lua_pushliteral(L, "exit");
-#endif
     setintV(L->top++, stat);
     return 3;
   }
@@ -302,9 +292,6 @@ static int panic(lua_State *L)
 
 #ifdef LUAJIT_USE_SYSMALLOC
 
-#if LJ_64 && !LJ_GC64 && !defined(LUAJIT_USE_VALGRIND)
-#error "Must use builtin allocator for 64 bit target"
-#endif
 
 static void *mem_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
 {
@@ -334,23 +321,11 @@ LUALIB_API lua_State *luaL_newstate(void)
   lua_State *L;
   void *ud = lj_alloc_create();
   if (ud == NULL) return NULL;
-#if LJ_64 && !LJ_GC64
-  L = lj_state_newstate(lj_alloc_f, ud);
-#else
   L = lua_newstate(lj_alloc_f, ud);
-#endif
   if (L) G(L)->panic = panic;
   return L;
 }
 
-#if LJ_64 && !LJ_GC64
-LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
-{
-  UNUSED(f); UNUSED(ud);
-  fputs("Must use luaL_newstate() for 64 bit target\n", stderr);
-  return NULL;
-}
-#endif
 
 #endif
 

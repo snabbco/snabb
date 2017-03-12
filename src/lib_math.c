@@ -78,11 +78,7 @@ LJLIB_ASM_(math_fmod)
 LJLIB_ASM(math_ldexp)		LJLIB_REC(.)
 {
   lj_lib_checknum(L, 1);
-#if LJ_DUALNUM && !LJ_TARGET_X86ORX64
-  lj_lib_checkint(L, 2);
-#else
   lj_lib_checknum(L, 2);
-#endif
   return FFH_RETRY;
 }
 

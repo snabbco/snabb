@@ -8,19 +8,12 @@
 
 /* -- Registers IDs ------------------------------------------------------- */
 
-#if LJ_64
 #define GPRDEF(_) \
   _(EAX) _(ECX) _(EDX) _(EBX) _(ESP) _(EBP) _(ESI) _(EDI) \
   _(R8D) _(R9D) _(R10D) _(R11D) _(R12D) _(R13D) _(R14D) _(R15D)
 #define FPRDEF(_) \
   _(XMM0) _(XMM1) _(XMM2) _(XMM3) _(XMM4) _(XMM5) _(XMM6) _(XMM7) \
   _(XMM8) _(XMM9) _(XMM10) _(XMM11) _(XMM12) _(XMM13) _(XMM14) _(XMM15)
-#else
-#define GPRDEF(_) \
-  _(EAX) _(ECX) _(EDX) _(EBX) _(ESP) _(EBP) _(ESI) _(EDI)
-#define FPRDEF(_) \
-  _(XMM0) _(XMM1) _(XMM2) _(XMM3) _(XMM4) _(XMM5) _(XMM6) _(XMM7)
-#endif
 #define VRIDDEF(_) \
   _(MRM) _(RIP)
 
@@ -36,22 +29,12 @@ enum {
   /* Calling conventions. */
   RID_SP = RID_ESP,
   RID_RET = RID_EAX,
-#if LJ_64
   RID_FPRET = RID_XMM0,
-#else
-  RID_RETLO = RID_EAX,
-  RID_RETHI = RID_EDX,
-#endif
 
   /* These definitions must match with the *.dasc file(s): */
   RID_BASE = RID_EDX,		/* Interpreter BASE. */
-#if LJ_64 && !LJ_ABI_WIN
   RID_LPC = RID_EBX,		/* Interpreter PC. */
   RID_DISPATCH = RID_R14D,	/* Interpreter DISPATCH table. */
-#else
-  RID_LPC = RID_ESI,		/* Interpreter PC. */
-  RID_DISPATCH = RID_EBX,	/* Interpreter DISPATCH table. */
-#endif
 
   /* Register ranges [min, max) and number of registers. */
   RID_MIN_GPR = RID_EAX,
@@ -72,28 +55,11 @@ enum {
 #define RSET_ALL	(RSET_GPR|RSET_FPR)
 #define RSET_INIT	RSET_ALL
 
-#if LJ_64
 /* Note: this requires the use of FORCE_REX! */
 #define RSET_GPR8	RSET_GPR
-#else
-#define RSET_GPR8	(RSET_RANGE(RID_EAX, RID_EBX+1))
-#endif
 
 /* ABI-specific register sets. */
 #define RSET_ACD	(RID2RSET(RID_EAX)|RID2RSET(RID_ECX)|RID2RSET(RID_EDX))
-#if LJ_64
-#if LJ_ABI_WIN
-/* Windows x64 ABI. */
-#define RSET_SCRATCH \
-  (RSET_ACD|RSET_RANGE(RID_R8D, RID_R11D+1)|RSET_RANGE(RID_XMM0, RID_XMM5+1))
-#define REGARG_GPRS \
-  (RID_ECX|((RID_EDX|((RID_R8D|(RID_R9D<<5))<<5))<<5))
-#define REGARG_NUMGPR	4
-#define REGARG_NUMFPR	4
-#define REGARG_FIRSTFPR	RID_XMM0
-#define REGARG_LASTFPR	RID_XMM3
-#define STACKARG_OFS	(4*8)
-#else
 /* The rest of the civilized x64 world has a common ABI. */
 #define RSET_SCRATCH \
   (RSET_ACD|RSET_RANGE(RID_ESI, RID_R11D+1)|RSET_FPR)
@@ -105,21 +71,10 @@ enum {
 #define REGARG_FIRSTFPR	RID_XMM0
 #define REGARG_LASTFPR	RID_XMM7
 #define STACKARG_OFS	0
-#endif
-#else
-/* Common x86 ABI. */
-#define RSET_SCRATCH	(RSET_ACD|RSET_FPR)
-#define REGARG_GPRS	(RID_ECX|(RID_EDX<<5))  /* Fastcall only. */
-#define REGARG_NUMGPR	2  /* Fastcall only. */
-#define REGARG_NUMFPR	0
-#define STACKARG_OFS	0
-#endif
 
-#if LJ_64
 /* Prefer the low 8 regs of each type to reduce REX prefixes. */
 #undef rset_picktop
 #define rset_picktop(rs)	(lj_fls(lj_bswap(rs)) ^ 0x18)
-#endif
 
 /* -- Spill slots --------------------------------------------------------- */
 
@@ -130,22 +85,8 @@ enum {
 **
 ** SPS_FIRST: First spill slot for general use. Reserve min. two 32 bit slots.
 */
-#if LJ_64
-#if LJ_ABI_WIN
-#define SPS_FIXED	(4*2)
-#define SPS_FIRST	(4*2)	/* Don't use callee register save area. */
-#else
-#if LJ_GC64
 #define SPS_FIXED	2
-#else
-#define SPS_FIXED	4
-#endif
 #define SPS_FIRST	2
-#endif
-#else
-#define SPS_FIXED	6
-#define SPS_FIRST	2
-#endif
 
 #define SPOFS_TMP	0
 

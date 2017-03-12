@@ -11,7 +11,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_tab.h"
 #include "lj_ir.h"
@@ -932,4 +931,3 @@ int lj_opt_fwd_wasnonnil(jit_State *J, IROpT loadop, IRRef xref)
 #undef fleft
 #undef fright
 
-#endif

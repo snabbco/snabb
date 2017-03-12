@@ -5,7 +5,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASFFI
 
 #include "lj_err.h"
 #include "lj_tab.h"
@@ -749,4 +748,3 @@ void lj_cconv_ct_init(CTState *cts, CType *d, CTSize sz,
     cconv_err_initov(cts, d);
 }
 
-#endif
