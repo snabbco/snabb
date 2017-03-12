@@ -1,8 +1,9 @@
 # RaptorJIT
 
-RaptorJIT is an experimental fork of LuaJIT. Radical changes will be made. Lessons will be learned. Useful results may follow -- or may not!
+RaptorJIT is an experimental fork of LuaJIT. Premise: What would I do
+if I were only trying to please myself and nobody else?
 
-You are welcome to join in by sending a Pull Request. The more radical the better. Shock me! :-)
+Welcome to propose radical changes! (Shock me! :-))
 
 -- Luke Gorrie @lukego
 
