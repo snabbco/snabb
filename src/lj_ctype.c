@@ -5,7 +5,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASFFI
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -634,4 +633,3 @@ void lj_ctype_freestate(global_State *g)
   }
 }
 
-#endif

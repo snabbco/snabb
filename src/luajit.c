@@ -19,28 +19,14 @@
 
 #include "lj_arch.h"
 
-#if LJ_TARGET_POSIX
 #include <unistd.h>
 #define lua_stdin_is_tty()	isatty(0)
-#elif LJ_TARGET_WINDOWS
-#include <io.h>
-#ifdef __BORLANDC__
-#define lua_stdin_is_tty()	isatty(_fileno(stdin))
-#else
-#define lua_stdin_is_tty()	_isatty(_fileno(stdin))
-#endif
-#else
-#define lua_stdin_is_tty()	1
-#endif
 
-#if !LJ_TARGET_CONSOLE
 #include <signal.h>
-#endif
 
 static lua_State *globalL = NULL;
 static const char *progname = LUA_PROGNAME;
 
-#if !LJ_TARGET_CONSOLE
 static void lstop(lua_State *L, lua_Debug *ar)
 {
   (void)ar;  /* unused arg. */
@@ -57,7 +43,6 @@ static void laction(int i)
 			 terminate process (default action) */
   lua_sethook(globalL, lstop, LUA_MASKCALL | LUA_MASKRET | LUA_MASKCOUNT, 1);
 }
-#endif
 
 static void print_usage(void)
 {
@@ -115,13 +100,9 @@ static int docall(lua_State *L, int narg, int clear)
   int base = lua_gettop(L) - narg;  /* function index */
   lua_pushcfunction(L, traceback);  /* push traceback function */
   lua_insert(L, base);  /* put it under chunk and args */
-#if !LJ_TARGET_CONSOLE
   signal(SIGINT, laction);
-#endif
   status = lua_pcall(L, narg, (clear ? 0 : LUA_MULTRET), base);
-#if !LJ_TARGET_CONSOLE
   signal(SIGINT, SIG_DFL);
-#endif
   lua_remove(L, base);  /* remove traceback function */
   /* force a complete garbage collection in case of errors */
   if (status != 0) lua_gc(L, LUA_GCCOLLECT, 0);
@@ -488,11 +469,7 @@ static int runargs(lua_State *L, char **argv, int argn)
 
 static int handle_luainit(lua_State *L)
 {
-#if LJ_TARGET_CONSOLE
-  const char *init = NULL;
-#else
   const char *init = getenv(LUA_INIT);
-#endif
   if (init == NULL)
     return 0;  /* status OK */
   else if (init[0] == '@')

@@ -11,7 +11,6 @@
 #include "lj_obj.h"
 #include "lj_jit.h"
 
-#if LJ_HASJIT
 /* IR emitter. */
 LJ_FUNC void LJ_FASTCALL lj_ir_growtop(jit_State *J);
 LJ_FUNC TRef LJ_FASTCALL lj_ir_emit(jit_State *J);
@@ -50,11 +49,7 @@ LJ_FUNC TRef lj_ir_knull(jit_State *J, IRType t);
 LJ_FUNC TRef lj_ir_kslot(jit_State *J, TRef key, IRRef slot);
 LJ_FUNC TRef lj_ir_ktrace(jit_State *J);
 
-#if LJ_64
 #define lj_ir_kintp(J, k)	lj_ir_kint64(J, (uint64_t)(k))
-#else
-#define lj_ir_kintp(J, k)	lj_ir_kint(J, (int32_t)(k))
-#endif
 
 static LJ_AINLINE TRef lj_ir_knum(jit_State *J, lua_Number n)
 {
@@ -137,9 +132,7 @@ LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_convert(jit_State *J);
 LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_index(jit_State *J, TRef key);
 LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_toint(jit_State *J, TRef tr);
 LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_tobit(jit_State *J, TRef tr);
-#if LJ_HASFFI
 LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef key);
-#endif
 LJ_FUNC TRef lj_opt_narrow_arith(jit_State *J, TRef rb, TRef rc,
 				 TValue *vb, TValue *vc, IROp op);
 LJ_FUNC TRef lj_opt_narrow_unm(jit_State *J, TRef rc, TValue *vc);
@@ -150,13 +143,8 @@ LJ_FUNC IRType lj_opt_narrow_forl(jit_State *J, cTValue *forbase);
 /* Optimization passes. */
 LJ_FUNC void lj_opt_dce(jit_State *J);
 LJ_FUNC int lj_opt_loop(jit_State *J);
-#if LJ_SOFTFP || (LJ_32 && LJ_HASFFI)
-LJ_FUNC void lj_opt_split(jit_State *J);
-#else
 #define lj_opt_split(J)		UNUSED(J)
-#endif
 LJ_FUNC void lj_opt_sink(jit_State *J);
 
-#endif
 
 #endif

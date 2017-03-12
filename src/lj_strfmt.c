@@ -134,10 +134,8 @@ char * LJ_FASTCALL lj_strfmt_wptr(char *p, const void *v)
     *p++ = 'N'; *p++ = 'U'; *p++ = 'L'; *p++ = 'L';
     return p;
   }
-#if LJ_64
   /* Shorten output for 64 bit pointers. */
   n = 2+2*4+((x >> 32) ? 2+2*(lj_fls((uint32_t)(x >> 32))>>3) : 0);
-#endif
   p[0] = '0';
   p[1] = 'x';
   for (i = n-1; i >= 2; i--, x >>= 4)
@@ -181,13 +179,11 @@ SBuf * LJ_FASTCALL lj_strfmt_putint(SBuf *sb, int32_t k)
   return sb;
 }
 
-#if LJ_HASJIT
 /* Add number to buffer. */
 SBuf * LJ_FASTCALL lj_strfmt_putnum(SBuf *sb, cTValue *o)
 {
   return lj_strfmt_putfnum(sb, STRFMT_G14, o->n);
 }
-#endif
 
 SBuf * LJ_FASTCALL lj_strfmt_putptr(SBuf *sb, const void *v)
 {
@@ -362,7 +358,6 @@ GCstr * LJ_FASTCALL lj_strfmt_number(lua_State *L, cTValue *o)
   return tvisint(o) ? lj_strfmt_int(L, intV(o)) : lj_strfmt_num(L, o);
 }
 
-#if LJ_HASJIT
 /* Convert char value to string. */
 GCstr * LJ_FASTCALL lj_strfmt_char(lua_State *L, int c)
 {
@@ -370,7 +365,6 @@ GCstr * LJ_FASTCALL lj_strfmt_char(lua_State *L, int c)
   buf[0] = c;
   return lj_str_new(L, buf, 1);
 }
-#endif
 
 /* Raw conversion of object to string. */
 GCstr * LJ_FASTCALL lj_strfmt_obj(lua_State *L, cTValue *o)

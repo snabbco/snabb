@@ -73,7 +73,6 @@ cTValue *lj_meta_lookup(lua_State *L, cTValue *o, MMS mm)
   return niltv(L);
 }
 
-#if LJ_HASFFI
 /* Tailcall from C function. */
 int lj_meta_tailcall(lua_State *L, cTValue *tv)
 {
@@ -100,7 +99,6 @@ int lj_meta_tailcall(lua_State *L, cTValue *tv)
   */
   return 0;
 }
-#endif
 
 /* Setup call to metamethod to be run by Assembler VM. */
 static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
@@ -346,7 +344,6 @@ TValue *lj_meta_equal(lua_State *L, GCobj *o1, GCobj *o2, int ne)
   return (TValue *)(intptr_t)ne;
 }
 
-#if LJ_HASFFI
 TValue * LJ_FASTCALL lj_meta_equal_cd(lua_State *L, BCIns ins)
 {
   ASMFunction cont = (bc_op(ins) & 1) ? lj_cont_condf : lj_cont_condt;
@@ -373,7 +370,6 @@ TValue * LJ_FASTCALL lj_meta_equal_cd(lua_State *L, BCIns ins)
   else
     return (TValue *)(intptr_t)(bc_op(ins) & 1);
 }
-#endif
 
 /* Helper for ordered comparisons. String compare, __lt/__le metamethods. */
 TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)

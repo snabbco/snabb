@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 #include "lj_jit.h"
 #include "lj_dispatch.h"
 
@@ -42,14 +41,5 @@ LJ_FUNCA int LJ_FASTCALL lj_trace_exit(jit_State *J, void *exptr);
 #define lj_trace_abort(g)	(G2J(g)->state &= ~LJ_TRACE_ACTIVE)
 #define lj_trace_end(J)		(J->state = LJ_TRACE_END)
 
-#else
-
-#define lj_trace_flushall(L)	(UNUSED(L), 0)
-#define lj_trace_initstate(g)	UNUSED(g)
-#define lj_trace_freestate(g)	UNUSED(g)
-#define lj_trace_abort(g)	UNUSED(g)
-#define lj_trace_end(J)		UNUSED(J)
-
-#endif
 
 #endif

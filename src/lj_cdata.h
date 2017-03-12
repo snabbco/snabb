@@ -10,7 +10,6 @@
 #include "lj_gc.h"
 #include "lj_ctype.h"
 
-#if LJ_HASFFI
 
 /* Get C data pointer. */
 static LJ_AINLINE void *cdata_getptr(void *p, CTSize sz)
@@ -73,6 +72,5 @@ LJ_FUNC int lj_cdata_get(CTState *cts, CType *s, TValue *o, uint8_t *sp);
 LJ_FUNC void lj_cdata_set(CTState *cts, CType *d, uint8_t *dp, TValue *o,
 			  CTInfo qual);
 
-#endif
 
 #endif

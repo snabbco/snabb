@@ -40,10 +40,6 @@ LJ_FUNC void lj_debug_addloc(lua_State *L, const char *msg,
 LJ_FUNC void lj_debug_pushloc(lua_State *L, GCproto *pt, BCPos pc);
 LJ_FUNC int lj_debug_getinfo(lua_State *L, const char *what, lj_Debug *ar,
 			     int ext);
-#if LJ_HASPROFILE
-LJ_FUNC void lj_debug_dumpstack(lua_State *L, SBuf *sb, const char *fmt,
-				int depth);
-#endif
 
 /* Fixed internal variable names. */
 #define VARNAMEDEF(_) \

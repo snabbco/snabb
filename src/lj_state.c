@@ -19,9 +19,7 @@
 #include "lj_meta.h"
 #include "lj_state.h"
 #include "lj_frame.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
-#endif
 #include "lj_trace.h"
 #include "lj_dispatch.h"
 #include "lj_vm.h"
@@ -165,9 +163,7 @@ static void close_state(lua_State *L)
   lua_assert(gcref(g->gc.root) == obj2gco(L));
   lua_assert(g->strnum == 0);
   lj_trace_freestate(g);
-#if LJ_HASFFI
   lj_ctype_freestate(g);
-#endif
   lj_mem_freevec(g, g->strhash, g->strmask+1, GCRef);
   lj_buf_free(g, &g->tmpbuf);
   lj_mem_freevec(g, tvref(L->stack), L->stacksize, TValue);
@@ -180,11 +176,7 @@ static void close_state(lua_State *L)
     g->allocf(g->allocd, G2GG(g), sizeof(GG_State), 0);
 }
 
-#if LJ_64 && !LJ_GC64 && !(defined(LUAJIT_USE_VALGRIND) && defined(LUAJIT_USE_SYSMALLOC))
-lua_State *lj_state_newstate(lua_Alloc f, void *ud)
-#else
 LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
-#endif
 {
   GG_State *GG = (GG_State *)f(ud, NULL, 0, sizeof(GG_State));
   lua_State *L = &GG->L;
@@ -207,9 +199,6 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   setnilV(registry(L));
   setnilV(&g->nilnode.val);
   setnilV(&g->nilnode.key);
-#if !LJ_GC64
-  setmref(g->nilnode.freetop, &g->nilnode);
-#endif
   lj_buf_init(NULL, &g->tmpbuf);
   g->gc.state = GCSpause;
   setgcref(g->gc.root, obj2gco(L));
@@ -243,17 +232,12 @@ LUA_API void lua_close(lua_State *L)
   global_State *g = G(L);
   int i;
   L = mainthread(g);  /* Only the main thread can be closed. */
-#if LJ_HASPROFILE
-  luaJIT_profile_stop(L);
-#endif
   setgcrefnull(g->cur_L);
   lj_func_closeuv(L, tvref(L->stack));
   lj_gc_separateudata(g, 1);  /* Separate udata which have GC metamethods. */
-#if LJ_HASJIT
   G2J(g)->flags &= ~JIT_F_ON;
   G2J(g)->state = LJ_TRACE_IDLE;
   lj_dispatch_update(g);
-#endif
   for (i = 0;;) {
     hook_enter(g);
     L->status = 0;

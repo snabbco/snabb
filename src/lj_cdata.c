@@ -5,7 +5,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASFFI
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -132,10 +131,6 @@ collect_attrib:
     idx = (ptrdiff_t)intV(key);
     goto integer_key;
   } else if (tvisnum(key)) {  /* Numeric key. */
-#ifdef _MSC_VER
-    /* Workaround for MSVC bug. */
-    volatile
-#endif
     lua_Number n = numV(key);
     idx = LJ_64 ? (ptrdiff_t)n : (ptrdiff_t)lj_num2int(n);
   integer_key:
@@ -296,4 +291,3 @@ void lj_cdata_set(CTState *cts, CType *d, uint8_t *dp, TValue *o, CTInfo qual)
   lj_cconv_ct_tv(cts, d, dp, o, 0);
 }
 
-#endif

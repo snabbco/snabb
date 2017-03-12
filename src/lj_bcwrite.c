@@ -10,13 +10,9 @@
 #include "lj_gc.h"
 #include "lj_buf.h"
 #include "lj_bc.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
-#endif
-#if LJ_HASJIT
 #include "lj_dispatch.h"
 #include "lj_jit.h"
-#endif
 #include "lj_strfmt.h"
 #include "lj_bcdump.h"
 #include "lj_vm.h"
@@ -123,7 +119,6 @@ static void bcwrite_kgc(BCWriteCtx *ctx, GCproto *pt)
     } else if (o->gch.gct == ~LJ_TPROTO) {
       lua_assert((pt->flags & PROTO_CHILD));
       tp = BCDUMP_KGC_CHILD;
-#if LJ_HASFFI
     } else if (o->gch.gct == ~LJ_TCDATA) {
       CTypeID id = gco2cd(o)->ctypeid;
       need = 1+4*5;
@@ -135,7 +130,6 @@ static void bcwrite_kgc(BCWriteCtx *ctx, GCproto *pt)
 	lua_assert(id == CTID_COMPLEX_DOUBLE);
 	tp = BCDUMP_KGC_COMPLEX;
       }
-#endif
     } else {
       lua_assert(o->gch.gct == ~LJ_TTAB);
       tp = BCDUMP_KGC_TAB;
@@ -150,7 +144,6 @@ static void bcwrite_kgc(BCWriteCtx *ctx, GCproto *pt)
     } else if (tp == BCDUMP_KGC_TAB) {
       bcwrite_ktab(ctx, p, gco2tab(o));
       continue;
-#if LJ_HASFFI
     } else if (tp != BCDUMP_KGC_CHILD) {
       cTValue *q = (TValue *)cdataptr(gco2cd(o));
       p = lj_strfmt_wuleb128(p, q[0].u32.lo);
@@ -159,7 +152,6 @@ static void bcwrite_kgc(BCWriteCtx *ctx, GCproto *pt)
 	p = lj_strfmt_wuleb128(p, q[1].u32.lo);
 	p = lj_strfmt_wuleb128(p, q[1].u32.hi);
       }
-#endif
     }
     setsbufP(&ctx->sb, p);
   }
@@ -202,12 +194,9 @@ static void bcwrite_knum(BCWriteCtx *ctx, GCproto *pt)
 static char *bcwrite_bytecode(BCWriteCtx *ctx, char *p, GCproto *pt)
 {
   MSize nbc = pt->sizebc-1;  /* Omit the [JI]FUNC* header. */
-#if LJ_HASJIT
   uint8_t *q = (uint8_t *)p;
-#endif
   p = lj_buf_wmem(p, proto_bc(pt)+1, nbc*(MSize)sizeof(BCIns));
   UNUSED(ctx);
-#if LJ_HASJIT
   /* Unpatch modified bytecode containing ILOOP/JLOOP etc. */
   if ((pt->flags & PROTO_ILOOP) || pt->trace) {
     jit_State *J = L2J(sbufL(&ctx->sb));
@@ -226,7 +215,6 @@ static char *bcwrite_bytecode(BCWriteCtx *ctx, char *p, GCproto *pt)
       }
     }
   }
-#endif
   return p;
 }
 

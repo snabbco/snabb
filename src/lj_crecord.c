@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT && LJ_HASFFI
 
 #include "lj_err.h"
 #include "lj_tab.h"
@@ -128,13 +127,7 @@ static IRType crec_ct2irt(CTState *cts, CType *ct)
 #define CREC_FILL_MAXUNROLL		16
 
 /* Number of windowed registers used for optimized memory copy. */
-#if LJ_TARGET_X86
-#define CREC_COPY_REGWIN		2
-#elif LJ_TARGET_PPC || LJ_TARGET_MIPS
-#define CREC_COPY_REGWIN		8
-#else
 #define CREC_COPY_REGWIN		4
-#endif
 
 /* List of memory offsets for copy/fill. */
 typedef struct CRecMemList {
@@ -642,10 +635,8 @@ static TRef crec_ct_tv(jit_State *J, CType *d, TRef dp, TRef sp, cTValue *sval)
       sid = CTID_A_CCHAR;
     }
   } else if (tref_islightud(sp)) {
-#if LJ_64
     sp = emitir(IRT(IR_BAND, IRT_P64), sp,
 		lj_ir_kint64(J, U64x(00007fff,ffffffff)));
-#endif
   } else {  /* NYI: tref_istab(sp). */
     IRType t;
     sid = argv2cdata(J, sp, sval)->ctypeid;
@@ -716,12 +707,8 @@ static TRef crec_reassoc_ofs(jit_State *J, TRef tr, ptrdiff_t *ofsp, MSize sz)
 static void crec_tailcall(jit_State *J, RecordFFData *rd, cTValue *tv)
 {
   TRef kfunc = lj_ir_kfunc(J, funcV(tv));
-#if LJ_FR2
   J->base[-2] = kfunc;
   J->base[-1] = TREF_FRAME;
-#else
-  J->base[-1] = kfunc | TREF_FRAME;
-#endif
   rd->nres = -1;  /* Pending tailcall. */
 }
 
@@ -780,17 +767,6 @@ again:
 	idx = emitir(IRT(IR_BAND, IRT_INTP), idx, lj_ir_kintp(J, 1));
       sz = lj_ctype_size(cts, (sid = ctype_cid(ct->info)));
       idx = crec_reassoc_ofs(J, idx, &ofs, sz);
-#if LJ_TARGET_ARM || LJ_TARGET_PPC
-      /* Hoist base add to allow fusion of index/shift into operands. */
-      if (LJ_LIKELY(J->flags & JIT_F_OPT_LOOP) && ofs
-#if LJ_TARGET_ARM
-	  && (sz == 1 || sz == 4)
-#endif
-	  ) {
-	ptr = emitir(IRT(IR_ADD, IRT_PTR), ptr, lj_ir_kintp(J, ofs));
-	ofs = 0;
-      }
-#endif
       idx = emitir(IRT(IR_MUL, IRT_INTP), idx, lj_ir_kintp(J, sz));
       ptr = emitir(IRT(IR_ADD, IRT_PTR), idx, ptr);
     }
@@ -1037,16 +1013,6 @@ static TRef crec_call_args(jit_State *J, RecordFFData *rd,
   MSize i, n;
   TRef tr, *base;
   cTValue *o;
-#if LJ_TARGET_X86
-#if LJ_ABI_WIN
-  TRef *arg0 = NULL, *arg1 = NULL;
-#endif
-  int ngpr = 0;
-  if (ctype_cconv(ct->info) == CTCC_THISCALL)
-    ngpr = 1;
-  else if (ctype_cconv(ct->info) == CTCC_FASTCALL)
-    ngpr = 2;
-#endif
 
   /* Skip initial attributes. */
   fid = ct->sib;
@@ -1088,35 +1054,6 @@ static TRef crec_call_args(jit_State *J, RecordFFData *rd,
     } else if (LJ_SOFTFP && ctype_isfp(d->info) && d->size > 4) {
       lj_needsplit(J);
     }
-#if LJ_TARGET_X86
-    /* 64 bit args must not end up in registers for fastcall/thiscall. */
-#if LJ_ABI_WIN
-    if (!ctype_isfp(d->info)) {
-      /* Sigh, the Windows/x86 ABI allows reordering across 64 bit args. */
-      if (tref_typerange(tr, IRT_I64, IRT_U64)) {
-	if (ngpr) {
-	  arg0 = &args[n]; args[n++] = TREF_NIL; ngpr--;
-	  if (ngpr) {
-	    arg1 = &args[n]; args[n++] = TREF_NIL; ngpr--;
-	  }
-	}
-      } else {
-	if (arg0) { *arg0 = tr; arg0 = NULL; n--; continue; }
-	if (arg1) { *arg1 = tr; arg1 = NULL; n--; continue; }
-	if (ngpr) ngpr--;
-      }
-    }
-#else
-    if (!ctype_isfp(d->info) && ngpr) {
-      if (tref_typerange(tr, IRT_I64, IRT_U64)) {
-	/* No reordering for other x86 ABIs. Simply add alignment args. */
-	do { args[n++] = TREF_NIL; } while (--ngpr);
-      } else {
-	ngpr--;
-      }
-    }
-#endif
-#endif
     args[n] = tr;
   }
   tr = args[0];
@@ -1176,9 +1113,6 @@ static int crec_call(jit_State *J, RecordFFData *rd, GCcdata *cd)
       lj_trace_err(J, LJ_TRERR_NYICALL);
     }
     if ((ct->info & CTF_VARARG)
-#if LJ_TARGET_X86
-	|| ctype_cconv(ct->info) != CTCC_CDECL
-#endif
 	)
       func = emitir(IRT(IR_CARG, IRT_NIL), func,
 		    lj_ir_kint(J, ctype_typeid(cts, ct)));
@@ -1189,12 +1123,8 @@ static int crec_call(jit_State *J, RecordFFData *rd, GCcdata *cd)
 	tr = TREF_NIL;
       } else {
 	crec_snap_caller(J);
-#if LJ_TARGET_X86ORX64
 	/* Note: only the x86/x64 backend supports U8 and only for EQ(tr, 0). */
 	lj_ir_set(J, IRTG(IR_NE, IRT_U8), tr, lj_ir_kint(J, 0));
-#else
-	lj_ir_set(J, IRTGI(IR_NE), tr, lj_ir_kint(J, 0));
-#endif
 	J->postproc = LJ_POST_FIXGUARDSNAP;
 	tr = TREF_TRUE;
       }
@@ -1318,9 +1248,7 @@ static TRef crec_arith_ptr(jit_State *J, TRef *sp, CType **s, MMS mm)
 	  return 0;  /* NYI: integer division. */
 	tr = emitir(IRT(IR_SUB, IRT_INTP), sp[0], sp[1]);
 	tr = emitir(IRT(IR_BSAR, IRT_INTP), tr, lj_ir_kint(J, lj_fls(sz)));
-#if LJ_64
 	tr = emitconv(tr, IRT_NUM, IRT_INTP, 0);
-#endif
 	return tr;
       } else {  /* Pointer comparison (unsigned). */
 	/* Assume true comparison. Fixup and emit pending guard later. */
@@ -1344,18 +1272,11 @@ static TRef crec_arith_ptr(jit_State *J, TRef *sp, CType **s, MMS mm)
     IRType t = tref_type(tr);
     CTSize sz = lj_ctype_size(cts, ctype_cid(ctp->info));
     CTypeID id;
-#if LJ_64
     if (t == IRT_NUM || t == IRT_FLOAT)
       tr = emitconv(tr, IRT_INTP, t, IRCONV_ANY);
     else if (!(t == IRT_I64 || t == IRT_U64))
       tr = emitconv(tr, IRT_INTP, IRT_INT,
 		    ((t - IRT_I8) & 1) ? 0 : IRCONV_SEXT);
-#else
-    if (!tref_typerange(sp[1], IRT_I8, IRT_U32)) {
-      tr = emitconv(tr, IRT_INTP, t,
-		    (t == IRT_NUM || t == IRT_FLOAT) ? IRCONV_ANY : 0);
-    }
-#endif
     tr = emitir(IRT(IR_MUL, IRT_INTP), tr, lj_ir_kintp(J, sz));
     tr = emitir(IRT(mm+(int)IR_ADD-(int)MM_add, IRT_PTR), sp[0], tr);
     id = lj_ctype_intern(cts, CTINFO(CT_PTR, CTALIGN_PTR|ctype_cid(ctp->info)),
@@ -1842,4 +1763,3 @@ void LJ_FASTCALL lj_crecord_tonumber(jit_State *J, RecordFFData *rd)
 #undef emitir
 #undef emitconv
 
-#endif

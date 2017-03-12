@@ -28,12 +28,8 @@ static LJ_AINLINE Node *hashmask(const GCtab *t, uint32_t hash)
 
 #define hashlohi(t, lo, hi)	hashmask((t), hashrot((lo), (hi)))
 #define hashnum(t, o)		hashlohi((t), (o)->u32.lo, ((o)->u32.hi << 1))
-#if LJ_GC64
 #define hashgcref(t, r) \
   hashlohi((t), (uint32_t)gcrefu(r), (uint32_t)(gcrefu(r) >> 32))
-#else
-#define hashgcref(t, r)		hashlohi((t), gcrefu(r), gcrefu(r) + HASH_BIAS)
-#endif
 
 /* Hash an arbitrary key and return its anchor position in the hash table. */
 static Node *hashkey(const GCtab *t, cTValue *key)
@@ -114,9 +110,7 @@ static GCtab *newtab(lua_State *L, uint32_t asize, uint32_t hbits)
     t->hmask = 0;
     nilnode = &G(L)->nilnode;
     setmref(t->node, nilnode);
-#if LJ_GC64
     setmref(t->freetop, nilnode);
-#endif
   } else {  /* Otherwise separately allocate the array part. */
     Node *nilnode;
     t = lj_mem_newobj(L, GCtab);
@@ -129,9 +123,7 @@ static GCtab *newtab(lua_State *L, uint32_t asize, uint32_t hbits)
     t->hmask = 0;
     nilnode = &G(L)->nilnode;
     setmref(t->node, nilnode);
-#if LJ_GC64
     setmref(t->freetop, nilnode);
-#endif
     if (asize > 0) {
       if (asize > LJ_MAX_ASIZE)
 	lj_err_msg(L, LJ_ERR_TABOV);
@@ -169,7 +161,6 @@ GCtab *lj_tab_new_ah(lua_State *L, int32_t a, int32_t h)
   return lj_tab_new(L, (uint32_t)(a > 0 ? a+1 : 0), hsize2hbits(h));
 }
 
-#if LJ_HASJIT
 GCtab * LJ_FASTCALL lj_tab_new1(lua_State *L, uint32_t ahsize)
 {
   GCtab *t = newtab(L, ahsize & 0xffffff, ahsize >> 24);
@@ -177,7 +168,6 @@ GCtab * LJ_FASTCALL lj_tab_new1(lua_State *L, uint32_t ahsize)
   if (t->hmask > 0) clearhpart(t);
   return t;
 }
-#endif
 
 /* Duplicate a table. */
 GCtab * LJ_FASTCALL lj_tab_dup(lua_State *L, const GCtab *kt)
@@ -278,9 +268,7 @@ void lj_tab_resize(lua_State *L, GCtab *t, uint32_t asize, uint32_t hbits)
   } else {
     global_State *g = G(L);
     setmref(t->node, &g->nilnode);
-#if LJ_GC64
     setmref(t->freetop, &g->nilnode);
-#endif
     t->hmask = 0;
   }
   if (asize < oldasize) {  /* Array part shrinks? */
@@ -385,12 +373,10 @@ static void rehashtab(lua_State *L, GCtab *t, cTValue *ek)
   lj_tab_resize(L, t, asize, hsize2hbits(total));
 }
 
-#if LJ_HASFFI
 void lj_tab_rehash(lua_State *L, GCtab *t)
 {
   rehashtab(L, t, niltv(L));
 }
-#endif
 
 void lj_tab_reasize(lua_State *L, GCtab *t, uint32_t nasize)
 {

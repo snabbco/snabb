@@ -51,38 +51,17 @@ typedef struct CCallInfo {
 #define CCI_XARGS(ci)		(((ci)->flags >> CCI_XARGS_SHIFT) & 3)
 #define CCI_XA			(1u << CCI_XARGS_SHIFT)
 
-#if LJ_SOFTFP || (LJ_32 && LJ_HASFFI)
-#define CCI_XNARGS(ci)		(CCI_NARGS((ci)) + CCI_XARGS((ci)))
-#else
 #define CCI_XNARGS(ci)		CCI_NARGS((ci))
-#endif
 
 /* Helpers for conditional function definitions. */
 #define IRCALLCOND_ANY(x)		x
 
-#if LJ_TARGET_X86ORX64
 #define IRCALLCOND_FPMATH(x)		NULL
-#else
-#define IRCALLCOND_FPMATH(x)		x
-#endif
 
-#if LJ_SOFTFP
-#define IRCALLCOND_SOFTFP(x)		x
-#if LJ_HASFFI
-#define IRCALLCOND_SOFTFP_FFI(x)	x
-#else
-#define IRCALLCOND_SOFTFP_FFI(x)	NULL
-#endif
-#else
 #define IRCALLCOND_SOFTFP(x)		NULL
 #define IRCALLCOND_SOFTFP_FFI(x)	NULL
-#endif
 
-#if LJ_SOFTFP && LJ_TARGET_MIPS32
-#define IRCALLCOND_SOFTFP_MIPS(x)	x
-#else
 #define IRCALLCOND_SOFTFP_MIPS(x)	NULL
-#endif
 
 #define LJ_NEED_FP64	(LJ_TARGET_ARM || LJ_TARGET_PPC || LJ_TARGET_MIPS32)
 
@@ -92,33 +71,14 @@ typedef struct CCallInfo {
 #define IRCALLCOND_FP64_FFI(x)		NULL
 #endif
 
-#if LJ_HASFFI
 #define IRCALLCOND_FFI(x)		x
-#if LJ_32
-#define IRCALLCOND_FFI32(x)		x
-#else
 #define IRCALLCOND_FFI32(x)		NULL
-#endif
-#else
-#define IRCALLCOND_FFI(x)		NULL
-#define IRCALLCOND_FFI32(x)		NULL
-#endif
 
-#if LJ_SOFTFP
-#define XA_FP		CCI_XA
-#define XA2_FP		(CCI_XA+CCI_XA)
-#else
 #define XA_FP		0
 #define XA2_FP		0
-#endif
 
-#if LJ_32
-#define XA_64		CCI_XA
-#define XA2_64		(CCI_XA+CCI_XA)
-#else
 #define XA_64		0
 #define XA2_64		0
-#endif
 
 /* Function definitions for CALL* instructions. */
 #define IRCALLDEF(_) \
@@ -240,79 +200,6 @@ LJ_FUNC TRef lj_ir_call(jit_State *J, IRCallID id, ...);
 LJ_DATA const CCallInfo lj_ir_callinfo[IRCALL__MAX+1];
 
 /* Soft-float declarations. */
-#if LJ_SOFTFP
-#if LJ_TARGET_ARM
-#define softfp_add __aeabi_dadd
-#define softfp_sub __aeabi_dsub
-#define softfp_mul __aeabi_dmul
-#define softfp_div __aeabi_ddiv
-#define softfp_cmp __aeabi_cdcmple
-#define softfp_i2d __aeabi_i2d
-#define softfp_d2i __aeabi_d2iz
-#define softfp_ui2d __aeabi_ui2d
-#define softfp_f2d __aeabi_f2d
-#define softfp_d2ui __aeabi_d2uiz
-#define softfp_d2f __aeabi_d2f
-#define softfp_i2f __aeabi_i2f
-#define softfp_ui2f __aeabi_ui2f
-#define softfp_f2i __aeabi_f2iz
-#define softfp_f2ui __aeabi_f2uiz
-#define fp64_l2d __aeabi_l2d
-#define fp64_ul2d __aeabi_ul2d
-#define fp64_l2f __aeabi_l2f
-#define fp64_ul2f __aeabi_ul2f
-#if LJ_TARGET_IOS
-#define fp64_d2l __fixdfdi
-#define fp64_d2ul __fixunsdfdi
-#define fp64_f2l __fixsfdi
-#define fp64_f2ul __fixunssfdi
-#else
-#define fp64_d2l __aeabi_d2lz
-#define fp64_d2ul __aeabi_d2ulz
-#define fp64_f2l __aeabi_f2lz
-#define fp64_f2ul __aeabi_f2ulz
-#endif
-#elif LJ_TARGET_MIPS
-#define softfp_add __adddf3
-#define softfp_sub __subdf3
-#define softfp_mul __muldf3
-#define softfp_div __divdf3
-#define softfp_cmp __ledf2
-#define softfp_i2d __floatsidf
-#define softfp_d2i __fixdfsi
-#define softfp_ui2d __floatunsidf
-#define softfp_f2d __extendsfdf2
-#define softfp_d2ui __fixunsdfsi
-#define softfp_d2f __truncdfsf2
-#define softfp_i2f __floatsisf
-#define softfp_ui2f __floatunsisf
-#define softfp_f2i __fixsfsi
-#define softfp_f2ui __fixunssfsi
-#else
-#error "Missing soft-float definitions for target architecture"
-#endif
-extern double softfp_add(double a, double b);
-extern double softfp_sub(double a, double b);
-extern double softfp_mul(double a, double b);
-extern double softfp_div(double a, double b);
-extern void softfp_cmp(double a, double b);
-extern double softfp_i2d(int32_t a);
-extern int32_t softfp_d2i(double a);
-#if LJ_HASFFI
-extern double softfp_ui2d(uint32_t a);
-extern double softfp_f2d(float a);
-extern uint32_t softfp_d2ui(double a);
-extern float softfp_d2f(double a);
-extern float softfp_i2f(int32_t a);
-extern float softfp_ui2f(uint32_t a);
-extern int32_t softfp_f2i(float a);
-extern uint32_t softfp_f2ui(float a);
-#endif
-#if LJ_TARGET_MIPS
-extern double lj_vm_sfmin(double a, double b);
-extern double lj_vm_sfmax(double a, double b);
-#endif
-#endif
 
 #if LJ_HASFFI && LJ_NEED_FP64 && !(LJ_TARGET_ARM && LJ_SOFTFP)
 #ifdef __GNUC__
