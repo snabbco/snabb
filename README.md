@@ -19,11 +19,29 @@ Initial changes (ongoing work):
   the [Studio](https://github.com/studio) project.)
 - Continuous Integration testing
   with [Travis-CI](https://travis-ci.org/raptorjit/raptorjit) and
-  with [automatic performance regression tests](https://github.com/lukego/LuaJIT-branch-tests).
+  with [automatic performance regression tests](https://hydra.snabb.co/job/luajit/branchmarks/benchmarkResults/latest/download/2).
 
 Goal is to strip the code down to the minimum that is needed for
 writing high-performance soft-realtime server applications for
 Linux/x86-64. PRs with radical code reductions welcome! :-)
 
--- Luke Gorrie @lukego
+### Quotes
+
+Here are some borrowed words to put this branch into context:
+
+> Personal Mastery: If a system is to serve the creative spirit, it
+> must be entirely comprehensible to a single individual. _Dan
+> Ingalls_
+
+> The competent programmer is fully aware of the strictly limited size
+> of his own skull. _E.W. Dijkstra_
+
+> Debugging is twice as hard as writing the code in the first place.
+> Therefore, if you write the code as cleverly as possible, you are,
+> by definition, not smart enough to debug it. _Brian Kernighan_
+
+> Optimal code is not optimal to maintain. _Vyacheslav Egorov_
+
+> I'm outta here in a couple of days. Good luck. You'll need it.
+> _[Mike Pall](http://www.freelists.org/post/luajit/Turning-Lua-into-C-was-alleviate-the-load-of-the-GC)_
 
