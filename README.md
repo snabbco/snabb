@@ -2,8 +2,7 @@
 
 [![Build Status](https://travis-ci.org/raptorjit/raptorjit.svg?branch=master)](https://travis-ci.org/raptorjit/raptorjit)
 
-RaptorJIT is an experimental fork of LuaJIT. Premise: What would I do
-if I were only trying to please myself and nobody else?
+RaptorJIT is a fork of LuaJIT targeting Linux/x86-64 server applications.
 
 Initial changes (ongoing work):
 
@@ -21,9 +20,7 @@ Initial changes (ongoing work):
   with [Travis-CI](https://travis-ci.org/raptorjit/raptorjit) and
   with [automatic performance regression tests](https://hydra.snabb.co/job/luajit/branchmarks/benchmarkResults/latest/download/2).
 
-Goal is to strip the code down to the minimum that is needed for
-writing high-performance soft-realtime server applications for
-Linux/x86-64. PRs with radical code reductions welcome! :-)
+PRs welcome! Shock me with your radical ideas! :-)
 
 ### Quotes
 
