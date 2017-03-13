@@ -1,3 +1,10 @@
+RaptorJIT -- a LuaJIT fork for Linux/x86-64.
+
+Copyright is retained by the individual authors and contributors.
+
+[ Apache 2.0 license - see the file COPYING. ]
+
+[ RaptorJIT includes code from LuaJIT 2.1 which has the following statements: ]
 ===============================================================================
 LuaJIT -- a Just-In-Time Compiler for Lua. http://luajit.org/
 
