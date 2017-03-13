@@ -23,7 +23,9 @@ SNABB_CMD = TESTS_DIR.parents[2] / 'snabb'
 BENCHMARK_FILENAME = 'benchtest.csv'
 # Snabb creates the benchmark file in the current directory
 BENCHMARK_PATH = Path.cwd() / BENCHMARK_FILENAME
+
 COMMAND_TIMEOUT = 10
+ENC = 'utf-8'
 
 
 def nic_names():
@@ -39,7 +41,7 @@ def tap_name():
     tap_iface = output.split(b':')[0]
     if not tap_iface:
         return None, 'No TAP interface available'
-    return tap_iface, None
+    return str(tap_iface, ENC), None
 
 
 class BaseTestCase(unittest.TestCase):
@@ -71,14 +73,18 @@ class BaseTestCase(unittest.TestCase):
         except TimeoutExpired:
             proc.kill()
             output, errput = proc.communicate()
-            msg = '\n'.join(('Timeout running command:', str(args),
-                'STDOUT', str(output), 'STDERR', str(errput)))
+            msg = '\n'.join((
+                'Timeout running command:', str(args),
+                'STDOUT', str(output, ENC), 'STDERR', str(errput, ENC),
+            ))
             self.fail(msg)
         else:
             if proc.returncode != 0:
-                msg = '\n'.join(('Error running command:', str(args),
+                msg = '\n'.join((
+                    'Error running command:', str(args),
                     'Exit code:', str(proc.returncode),
-                    'STDOUT', str(output), 'STDERR', str(errput)))
+                    'STDOUT', str(output, ENC), 'STDERR', str(errput, ENC),
+                ))
                 self.fail(msg)
         return output
 
@@ -91,7 +97,9 @@ class BaseTestCase(unittest.TestCase):
             cls.daemon.terminate()
             ret_code = cls.daemon.wait()
         if ret_code not in (0, -SIGTERM):
-            print('Error running daemon:', cls.daemon.args)
+            print('Error terminating daemon:', cls.daemon.args)
             print('Exit code:', ret_code)
-            print('STDOUT\n', cls.daemon.stdout.read())
-            print('STDERR\n', cls.daemon.stderr.read())
+            print('STDOUT\n', str(cls.daemon.stdout.read(), ENC))
+            print('STDERR\n', str(cls.daemon.stderr.read(), ENC))
+        cls.daemon.stdout.close()
+        cls.daemon.stderr.close()
