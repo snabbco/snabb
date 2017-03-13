@@ -1,0 +1,5 @@
+language: c
+sudo: false
+script:
+  - make
+  - src/luajit -e 'for i = 1, 1000 do end'
