@@ -112,6 +112,7 @@ local function construct_packet(exporter, ptr, len)
    udp_h:checksum(ptr, len)
    dgram:push(udp_h)
    ip_h:total_length(ip_h:sizeof() + udp_h:sizeof() + len)
+   ip_h:checksum()
    dgram:push(ip_h)
    dgram:push(eth_h)
 
