@@ -4,7 +4,7 @@ Test the "snabb lwaftr check" subcommand. Does not need NIC names.
 
 import unittest
 
-from lib.test_env import COUNTERS_DIR, DATA_DIR, SNABB_CMD, BaseTestCase
+from test_env import COUNTERS_DIR, DATA_DIR, SNABB_CMD, BaseTestCase
 
 
 class TestCheck(BaseTestCase):

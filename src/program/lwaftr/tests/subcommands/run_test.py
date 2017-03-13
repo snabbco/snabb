@@ -4,7 +4,7 @@ Test the "snabb lwaftr run" subcommand. Needs NIC names.
 
 import unittest
 
-from lib.test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
+from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
 
 
 SNABB_PCI0, SNABB_PCI1 = nic_names()

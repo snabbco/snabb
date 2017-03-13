@@ -7,7 +7,7 @@ Test the "snabb lwaftr monitor" subcommand. Needs a NIC name and a TAP interface
 
 import unittest
 
-from lib.test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names, tap_name
+from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names, tap_name
 
 
 SNABB_PCI0 = nic_names()[0]
