@@ -216,44 +216,58 @@ local function write64(record, field, ptr, idx)
    dst[1] = htonl(fp[0])
 end
 
--- Given a flow exporter & an array of records, construct Netflow v9
+-- Given a flow exporter & an array of records, construct flow record
 -- packet(s) and transmit them
--- TODO: account for the MTU and divide up records
 function export_records(exporter, records)
-   local data_len = 24 + (63 * #records)
-   local padding  = 4 - (data_len % 4)
-   local length   = data_len + padding
-   local buffer   = ffi.new("uint8_t[?]", length)
-   write_header(buffer, #records, exporter.boot_time)
+   local mtu         = exporter.mtu_to_collector
+   -- length of v9 header + flow set ID/length
+   local header_len  = 24
+   local record_len  = 63
+   -- 4 is the max padding, so account for that conservatively to
+   -- figure out how many records we can fit in the MTU
+   local max_records = math.floor((mtu - header_len - 4 - 28) / record_len)
 
-   -- flow set ID and length
-   ffi.cast("uint16_t*", buffer + 20)[0] = htons(256)
-   ffi.cast("uint16_t*", buffer + 22)[0] = htons(length - 20)
+   local record_idx  = 1
+   while record_idx <= #records do
+      local num_to_take = math.min(max_records, #records - record_idx + 1)
+      local data_len    = 24 + (record_len * num_to_take)
+      local padding     = 4 - (data_len % 4)
+      local length      = data_len + padding
+      local buffer      = ffi.new("uint8_t[?]", length)
+      write_header(buffer, num_to_take, exporter.boot_time)
 
-   for idx, record in ipairs(records) do
-      local ptr = buffer + 24 + (63 * (idx - 1))
+      -- flow set ID and length
+      ffi.cast("uint16_t*", buffer + 20)[0] = htons(256)
+      ffi.cast("uint16_t*", buffer + 22)[0] = htons(length - 20)
 
-      ffi.copy(ptr, record.key.src_ip, 4)
-      ffi.copy(ptr + 4, record.key.dst_ip, 4)
-      ffi.cast("uint16_t*", ptr + 8)[0]  = record.key.src_port
-      ffi.cast("uint16_t*", ptr + 10)[0] = record.key.dst_port
-      ffi.cast("uint8_t*", ptr + 12)[0]  = record.key.protocol
+      for idx = record_idx, record_idx + num_to_take - 1 do
+         local record = records[idx]
+         local ptr    = buffer + 24 + (63 * (idx - record_idx))
 
-      write64(record, "start_time", ptr, 13)
-      write64(record, "end_time", ptr, 21)
-      write64(record, "pkt_count", ptr, 29)
-      write64(record, "octet_count", ptr, 37)
+         ffi.copy(ptr, record.key.src_ip, 4)
+         ffi.copy(ptr + 4, record.key.dst_ip, 4)
+         ffi.cast("uint16_t*", ptr + 8)[0]  = record.key.src_port
+         ffi.cast("uint16_t*", ptr + 10)[0] = record.key.dst_port
+         ffi.cast("uint8_t*", ptr + 12)[0]  = record.key.protocol
 
-      ffi.cast("uint8_t*", ptr + 45)[0]  = record.tos
-      -- in V9 this is 1 octet, in IPFIX it's 2 octets
-      ffi.cast("uint8_t*", ptr + 46)[0]  = record.tcp_control
-      ffi.cast("uint32_t*", ptr + 47)[0] = record.ingress
-      ffi.cast("uint32_t*", ptr + 51)[0] = record.egress
-      ffi.cast("uint32_t*", ptr + 55)[0] = record.src_peer_as
-      ffi.cast("uint32_t*", ptr + 59)[0] = record.dst_peer_as
+         write64(record, "start_time", ptr, 13)
+         write64(record, "end_time", ptr, 21)
+         write64(record, "pkt_count", ptr, 29)
+         write64(record, "octet_count", ptr, 37)
+
+         ffi.cast("uint8_t*", ptr + 45)[0]  = record.tos
+         -- in V9 this is 1 octet, in IPFIX it's 2 octets
+         ffi.cast("uint8_t*", ptr + 46)[0]  = record.tcp_control
+         ffi.cast("uint32_t*", ptr + 47)[0] = record.ingress
+         ffi.cast("uint32_t*", ptr + 51)[0] = record.egress
+         ffi.cast("uint32_t*", ptr + 55)[0] = record.src_peer_as
+         ffi.cast("uint32_t*", ptr + 59)[0] = record.dst_peer_as
+      end
+
+      local pkt = construct_packet(exporter, buffer, length)
+
+      link.transmit(exporter.output.output, pkt)
+
+      record_idx = record_idx + num_to_take
    end
-
-   local pkt = construct_packet(exporter, buffer, length)
-
-   link.transmit(exporter.output.output, pkt)
 end
