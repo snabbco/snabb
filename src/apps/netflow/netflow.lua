@@ -79,17 +79,24 @@ local function get_timestamp()
    return C.get_time_ns() / 1000000ULL
 end
 
-function NetflowExporter:new()
+function NetflowExporter:new(config)
    local params = {
       key_type = ffi.typeof("struct flow_key"),
       value_type = ffi.typeof("struct flow_record"),
       max_occupancy_rate = 0.4,
-      initial_size = math.ceil(cache_size / 0.4)
+      initial_size = math.ceil(cache_size / 0.4),
    }
    local o = { flows = ctable.new(params),
                export_timer = nil,
                template_timer = nil,
-               boot_time = get_timestamp() }
+               boot_time = get_timestamp(),
+               exporter_mac = assert(config.exporter_mac),
+               exporter_ip = assert(config.exporter_ip),
+               collector_ip = assert(config.collector_ip),
+               collector_port = assert(config.collector_port),
+               -- TODO: use ARP to avoid needing this
+               collector_mac = assert(config.collector_mac),
+               observation_domain = config.observation_domain or 256 }
 
    return setmetatable(o, { __index = self })
 end
