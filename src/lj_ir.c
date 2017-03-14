@@ -66,7 +66,7 @@ IRCALLDEF(IRCALLCI)
 /* -- IR emitter ---------------------------------------------------------- */
 
 /* Grow IR buffer at the top. */
-void LJ_FASTCALL lj_ir_growtop(jit_State *J)
+void lj_ir_growtop(jit_State *J)
 {
   IRIns *baseir = J->irbuf + J->irbotlim;
   MSize szins = J->irtoplim - J->irbotlim;
@@ -109,7 +109,7 @@ static void lj_ir_growbot(jit_State *J)
 }
 
 /* Emit IR without any optimizations. */
-TRef LJ_FASTCALL lj_ir_emit(jit_State *J)
+TRef lj_ir_emit(jit_State *J)
 {
   IRRef ref = lj_ir_nextins(J);
   IRIns *ir = IR(ref);
@@ -187,7 +187,7 @@ static LJ_AINLINE IRRef ir_nextk64(jit_State *J)
 #define ir_nextkgc ir_nextk64
 
 /* Intern int32_t constant. */
-TRef LJ_FASTCALL lj_ir_kint(jit_State *J, int32_t k)
+TRef lj_ir_kint(jit_State *J, int32_t k)
 {
   IRIns *ir, *cir = J->cur.ir;
   IRRef ref;
@@ -388,7 +388,7 @@ void lj_ir_kvalue(lua_State *L, TValue *tv, const IRIns *ir)
 /* -- Convert IR operand types -------------------------------------------- */
 
 /* Convert from string to number. */
-TRef LJ_FASTCALL lj_ir_tonumber(jit_State *J, TRef tr)
+TRef lj_ir_tonumber(jit_State *J, TRef tr)
 {
   if (!tref_isnumber(tr)) {
     if (tref_isstr(tr))
@@ -400,7 +400,7 @@ TRef LJ_FASTCALL lj_ir_tonumber(jit_State *J, TRef tr)
 }
 
 /* Convert from integer or string to number. */
-TRef LJ_FASTCALL lj_ir_tonum(jit_State *J, TRef tr)
+TRef lj_ir_tonum(jit_State *J, TRef tr)
 {
   if (!tref_isnum(tr)) {
     if (tref_isinteger(tr))
@@ -414,7 +414,7 @@ TRef LJ_FASTCALL lj_ir_tonum(jit_State *J, TRef tr)
 }
 
 /* Convert from integer or number to string. */
-TRef LJ_FASTCALL lj_ir_tostr(jit_State *J, TRef tr)
+TRef lj_ir_tostr(jit_State *J, TRef tr)
 {
   if (!tref_isstr(tr)) {
     if (!tref_isnumber(tr))

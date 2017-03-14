@@ -82,7 +82,7 @@ static TraceNo trace_findfree(jit_State *J)
   p += J->cur.szfield*sizeof(tp);
 
 /* Allocate space for copy of T. */
-GCtrace * LJ_FASTCALL lj_trace_alloc(lua_State *L, GCtrace *T)
+GCtrace * lj_trace_alloc(lua_State *L, GCtrace *T)
 {
   size_t sztr = ((sizeof(GCtrace)+7)&~7);
   size_t szins = (T->nins-T->nk)*sizeof(IRIns);
@@ -125,7 +125,7 @@ static void trace_save(jit_State *J, GCtrace *T)
   lj_gdbjit_addtrace(J, T);
 }
 
-void LJ_FASTCALL lj_trace_free(global_State *g, GCtrace *T)
+void lj_trace_free(global_State *g, GCtrace *T)
 {
   jit_State *J = G2J(g);
   if (T->traceno) {
@@ -664,7 +664,7 @@ void lj_trace_ins(jit_State *J, const BCIns *pc)
 }
 
 /* A hotcount triggered. Start recording a root trace. */
-void LJ_FASTCALL lj_trace_hot(jit_State *J, const BCIns *pc)
+void lj_trace_hot(jit_State *J, const BCIns *pc)
 {
   /* Note: pc is the interpreter bytecode PC here. It's offset by 1. */
   ERRNO_SAVE
@@ -697,7 +697,7 @@ static void trace_hotside(jit_State *J, const BCIns *pc)
 }
 
 /* Stitch a new trace to the previous trace. */
-void LJ_FASTCALL lj_trace_stitch(jit_State *J, const BCIns *pc)
+void lj_trace_stitch(jit_State *J, const BCIns *pc)
 {
   /* Only start a new trace if not recording or inside __gc call or vmevent. */
   if (J->state == LJ_TRACE_IDLE &&
@@ -744,7 +744,7 @@ static TraceNo trace_exit_find(jit_State *J, MCode *pc)
 #endif
 
 /* A trace exited. Restore interpreter state. */
-int LJ_FASTCALL lj_trace_exit(jit_State *J, void *exptr)
+int lj_trace_exit(jit_State *J, void *exptr)
 {
   ERRNO_SAVE
   lua_State *L = J->L;

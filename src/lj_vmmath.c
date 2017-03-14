@@ -37,7 +37,7 @@ double lj_vm_foldarith(double x, double y, int op)
   }
 }
 
-int32_t LJ_FASTCALL lj_vm_modi(int32_t a, int32_t b)
+int32_t lj_vm_modi(int32_t a, int32_t b)
 {
   uint32_t y, ua, ub;
   lua_assert(b != 0);  /* This must be checked before using this function. */

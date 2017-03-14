@@ -344,7 +344,7 @@ static size_t gc_propagate_gray(global_State *g)
 /* -- Sweep phase --------------------------------------------------------- */
 
 /* Type of GC free functions. */
-typedef void (LJ_FASTCALL *GCFreeFunc)(global_State *g, GCobj *o);
+typedef void (*GCFreeFunc)(global_State *g, GCobj *o);
 
 /* GC free functions for LJ_TSTR .. LJ_TUDATA. ORDER LJ_T */
 static const GCFreeFunc gc_freefunc[] = {
@@ -643,7 +643,7 @@ static size_t gc_onestep(lua_State *L)
 }
 
 /* Perform a limited amount of incremental GC steps. */
-int LJ_FASTCALL lj_gc_step(lua_State *L)
+int lj_gc_step(lua_State *L)
 {
   global_State *g = G(L);
   GCSize lim;
@@ -675,14 +675,14 @@ int LJ_FASTCALL lj_gc_step(lua_State *L)
 }
 
 /* Ditto, but fix the stack top first. */
-void LJ_FASTCALL lj_gc_step_fixtop(lua_State *L)
+void lj_gc_step_fixtop(lua_State *L)
 {
   if (curr_funcisL(L)) L->top = curr_topL(L);
   lj_gc_step(L);
 }
 
 /* Perform multiple GC steps. Called from JIT-compiled code. */
-int LJ_FASTCALL lj_gc_step_jit(global_State *g, MSize steps)
+int lj_gc_step_jit(global_State *g, MSize steps)
 {
   lua_State *L = gco2th(gcref(g->cur_L));
   L->base = tvref(G(L)->jit_base);
@@ -733,7 +733,7 @@ void lj_gc_barrierf(global_State *g, GCobj *o, GCobj *v)
 }
 
 /* Specialized barrier for closed upvalue. Pass &uv->tv. */
-void LJ_FASTCALL lj_gc_barrieruv(global_State *g, TValue *tv)
+void lj_gc_barrieruv(global_State *g, TValue *tv)
 {
 #define TV2MARKED(x) \
   (*((uint8_t *)(x) - offsetof(GCupval, tv) + offsetof(GCupval, marked)))
@@ -790,7 +790,7 @@ void *lj_mem_realloc(lua_State *L, void *p, GCSize osz, GCSize nsz)
 }
 
 /* Allocate new GC object and link it to the root set. */
-void * LJ_FASTCALL lj_mem_newgco(lua_State *L, GCSize size)
+void * lj_mem_newgco(lua_State *L, GCSize size)
 {
   global_State *g = G(L);
   GCobj *o = (GCobj *)g->allocf(g->allocd, NULL, 0, size);

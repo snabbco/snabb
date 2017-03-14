@@ -142,12 +142,12 @@
 #define emitir(ot, a, b)	(lj_ir_set(J, (ot), (a), (b)), lj_opt_fold(J))
 
 /* Fold function type. Fastcall on x86 significantly reduces their size. */
-typedef IRRef (LJ_FASTCALL *FoldFunc)(jit_State *J);
+typedef IRRef (*FoldFunc)(jit_State *J);
 
 /* Macros for the fold specs, so buildvm can recognize them. */
 #define LJFOLD(x)
 #define LJFOLDX(x)
-#define LJFOLDF(name)	static TRef LJ_FASTCALL fold_##name(jit_State *J)
+#define LJFOLDF(name)	static TRef fold_##name(jit_State *J)
 /* Note: They must be at the start of a line or buildvm ignores them! */
 
 /* Barrier to prevent using operands across PHIs. */
@@ -604,7 +604,7 @@ LJFOLDF(bufput_kfold_op)
   if (irref_isk(fleft->op2)) {
     const CCallInfo *ci = &lj_ir_callinfo[fins->op2];
     SBuf *sb = lj_buf_tmp_(J->L);
-    sb = ((SBuf * (LJ_FASTCALL *)(SBuf *, GCstr *))ci->func)(sb,
+    sb = ((SBuf * (*)(SBuf *, GCstr *))ci->func)(sb,
 						       ir_kstr(IR(fleft->op2)));
     fins->o = IR_BUFPUT;
     fins->op1 = fleft->op1;
@@ -2310,7 +2310,7 @@ LJFOLDX(lj_ir_emit)
 /* ------------------------------------------------------------------------ */
 
 /* Fold IR instruction. */
-TRef LJ_FASTCALL lj_opt_fold(jit_State *J)
+TRef lj_opt_fold(jit_State *J)
 {
   uint32_t key, any;
   IRRef ref;
@@ -2386,7 +2386,7 @@ retry:
 /* -- Common-Subexpression Elimination ------------------------------------ */
 
 /* CSE an IR instruction. This is very fast due to the skip-list chains. */
-TRef LJ_FASTCALL lj_opt_cse(jit_State *J)
+TRef lj_opt_cse(jit_State *J)
 {
   /* Avoid narrow to wide store-to-load forwarding stall */
   IRRef2 op12 = (IRRef2)fins->op1 + ((IRRef2)fins->op2 << 16);
@@ -2416,7 +2416,7 @@ TRef LJ_FASTCALL lj_opt_cse(jit_State *J)
 }
 
 /* CSE with explicit search limit. */
-TRef LJ_FASTCALL lj_opt_cselim(jit_State *J, IRRef lim)
+TRef lj_opt_cselim(jit_State *J, IRRef lim)
 {
   IRRef ref = J->chain[fins->o];
   IRRef2 op12 = (IRRef2)fins->op1 + ((IRRef2)fins->op2 << 16);

@@ -58,7 +58,7 @@ GCcdata *lj_cdata_newx(CTState *cts, CTypeID id, CTSize sz, CTInfo info)
 }
 
 /* Free a C data object. */
-void LJ_FASTCALL lj_cdata_free(global_State *g, GCcdata *cd)
+void lj_cdata_free(global_State *g, GCcdata *cd)
 {
   if (LJ_UNLIKELY(cd->marked & LJ_GC_CDATA_FIN)) {
     GCobj *root;

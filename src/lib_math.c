@@ -117,7 +117,7 @@ typedef union { uint64_t u64; double d; } U64double;
   r ^= z; rs->gen[i] = z;
 
 /* PRNG step function. Returns a double in the range 1.0 <= d < 2.0. */
-LJ_NOINLINE uint64_t LJ_FASTCALL lj_math_random_step(RandomState *rs)
+LJ_NOINLINE uint64_t lj_math_random_step(RandomState *rs)
 {
   uint64_t z, r = 0;
   TW223_GEN(0, 63, 31, 18)

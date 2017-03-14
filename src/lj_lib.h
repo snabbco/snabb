@@ -95,6 +95,6 @@ LJ_FUNC int lj_lib_postreg(lua_State *L, lua_CFunction cf, int id,
 /* Exported library functions. */
 
 typedef struct RandomState RandomState;
-LJ_FUNC uint64_t LJ_FASTCALL lj_math_random_step(RandomState *rs);
+LJ_FUNC uint64_t lj_math_random_step(RandomState *rs);
 
 #endif
