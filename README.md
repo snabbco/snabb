@@ -26,19 +26,20 @@ PRs welcome! Shock me with your radical ideas! :-)
 
 Here are some borrowed words to put this branch into context:
 
-> Personal Mastery: If a system is to serve the creative spirit, it
-> must be entirely comprehensible to a single individual. _Dan
-> Ingalls_
-
-> The competent programmer is fully aware of the strictly limited size
-> of his own skull. _E.W. Dijkstra_
-
-> Debugging is twice as hard as writing the code in the first place.
-> Therefore, if you write the code as cleverly as possible, you are,
-> by definition, not smart enough to debug it. _Brian Kernighan_
-
-> Optimal code is not optimal to maintain. _Vyacheslav Egorov_
-
 > I'm outta here in a couple of days. Good luck. You'll need it.
 > _[Mike Pall](http://www.freelists.org/post/luajit/Turning-Lua-into-C-was-alleviate-the-load-of-the-GC)_
+
+> Optimal code is not optimal to maintain. _[Vyacheslav Egorov](https://www.youtube.com/watch?v=EaLboOUG9VQ)_
+
+> If a programmer is indispensible, get rid of him as quickly as possible. _[Gerald M. Weinberg](https://www.amazon.com/Psychology-Computer-Programming-Silver-Anniversary/dp/0932633420)_
+
+> If a system is to serve the creative spirit, it
+> must be entirely comprehensible to a single individual. _[Dan
+> Ingalls](https://www.cs.virginia.edu/~evans/cs655/readings/smalltalk.html)_
+
+> The competent programmer is fully aware of the strictly limited size of his own skull; therefore he approaches the programming task in full humility, and among other things he avoids clever tricks like the plague. _[E.W. Dijkstra](https://www.cs.utexas.edu/~EWD/transcriptions/EWD03xx/EWD340.html)_
+
+> There are two ways of constructing a software design: One way is to make it so simple that there are obviously no deficiencies, and the other way is to make it so complicated that there are no obvious deficiencies. The first method is far more difficult. _[C.A.R. Hoare](http://zoo.cs.yale.edu/classes/cs422/2014/bib/hoare81emperor.pdf)_
+
+> Everyone knows that debugging is twice as hard as writing a program in the first place. So if you're as clever as you can be when you write it, how will you ever debug it? _[Brian Kernighan](http://www2.ing.unipi.it/~a009435/issw/extra/kp_elems_of_pgmng_sty.pdf)_
 
