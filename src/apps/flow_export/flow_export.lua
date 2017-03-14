@@ -1,11 +1,11 @@
--- This module implements the netflow exporter app, which records
+-- This module implements the flow exporter app, which records
 -- network traffic information and exports it in Netflow v9 format
--- (RFC 3954) and IPFIX format (RFC 3917 and others).
+-- (RFC 3954) or IPFIX format (RFC 3917 and others).
 
 module(..., package.seeall)
 
 local ffi    = require("ffi")
-local v9     = require("apps.netflow.v9")
+local ipfix  = require("apps.flow_export.ipfix")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local ctable = require("lib.ctable")
@@ -63,7 +63,7 @@ ffi.cdef[[
    };
 ]]
 
-NetflowExporter = {}
+FlowExporter = {}
 
 -- TODO: should be configurable
 --       these numbers are placeholders for more realistic ones
@@ -79,7 +79,7 @@ local function get_timestamp()
    return C.get_time_ns() / 1000000ULL
 end
 
-function NetflowExporter:new(config)
+function FlowExporter:new(config)
    local params = {
       key_type = ffi.typeof("struct flow_key"),
       value_type = ffi.typeof("struct flow_record"),
@@ -105,7 +105,7 @@ end
 -- (for performance reasons)
 local flow_key = ffi.new("struct flow_key")
 
-function NetflowExporter:process_packet(pkt)
+function FlowExporter:process_packet(pkt)
    -- TODO: using the header libraries for now, but can rewrite this
    --       code if it turns out to be too slow
    local eth_header  = ether:new_from_mem(pkt.data, pkt.length)
@@ -178,7 +178,7 @@ end
 
 -- Walk through flow cache to see if flow records need to be expired.
 -- Collect expired records and export them to the collector.
-function NetflowExporter:expire_records()
+function FlowExporter:expire_records()
    local now = get_timestamp()
    local keys_to_remove = {}
    local timeout_records = {}
@@ -199,7 +199,7 @@ function NetflowExporter:expire_records()
       end
    end
 
-   v9.export_records(self, to_export)
+   ipfix.export_records(self, to_export)
 
    -- TODO: Due to the key optimization above this doesn't work, fix
    --       it by changing the flow key representation
@@ -216,7 +216,7 @@ function NetflowExporter:expire_records()
    end
 end
 
-function NetflowExporter:push()
+function FlowExporter:push()
    local input  = assert(self.input.input)
 
    while not link.empty(input) do
@@ -226,11 +226,11 @@ function NetflowExporter:push()
 
    if self.template_timer then
       if self.template_timer() then
-         v9.send_template_record(self)
+         ipfix.send_template_record(self)
          self.template_timer = timeout(template_interval)
       end
    else
-      v9.send_template_record(self)
+      ipfix.send_template_record(self)
       self.template_timer = timeout(template_interval)
    end
 
@@ -247,7 +247,7 @@ end
 function selftest()
    local datagram = require("lib.protocol.datagram")
 
-   local nf = NetflowExporter:new()
+   local nf = FlowExporter:new()
    local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
                            dst = ether:pton("55:44:33:22:11:00"),
                            type = ETHER_PROTO_IPV4 })

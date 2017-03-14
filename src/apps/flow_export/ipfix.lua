@@ -1,5 +1,5 @@
 -- This module implements functions for exporting flow information as
--- Netflow v9 packets over UDP
+-- IPFIX or Netflow V9 packets to a flow collector.
 --
 -- See RFC 3954 (https://tools.ietf.org/html/rfc3954)
 

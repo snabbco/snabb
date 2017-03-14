@@ -3,9 +3,9 @@
 module(..., package.seeall)
 
 -- basic module imports
-local raw     = require("apps.socket.raw")
-local pcap    = require("apps.pcap.pcap")
-local netflow = require("apps.netflow.netflow")
+local raw  = require("apps.socket.raw")
+local pcap = require("apps.pcap.pcap")
+local flow = require("apps.flow_export.flow_export")
 
 function run (args)
    local c = config.new()
@@ -19,7 +19,7 @@ function run (args)
 
    config.app(c, "source", raw.RawSocket, args[1])
    config.app(c, "sink", raw.RawSocket, args[2])
-   config.app(c, "exporter", netflow.NetflowExporter, exporter_config)
+   config.app(c, "exporter", flow.FlowExporter, exporter_config)
 
    config.link(c, "source.tx -> exporter.input")
    config.link(c, "exporter.output -> sink.rx")
