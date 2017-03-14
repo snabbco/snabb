@@ -98,18 +98,20 @@ local function construct_packet(exporter, ptr, len)
    -- TODO: support IPv6, also obtain the MAC of the dst via ARP
    --       and use the correct src MAC (this is ok for use on the
    --       loopback device for now).
-   local eth_h = ether:new({ type = 0x0800 })
-   -- TODO: configurable collector address, ttl, port, etc.
-   local ip_h  = ipv4:new({ src = ipv4:pton("127.0.0.1"),
-                            dst = ipv4:pton("127.0.0.1"),
+   local eth_h = ether:new({ src = ether:pton(exporter.exporter_mac),
+                             dst = ether:pton(exporter.collector_mac),
+                             type = 0x0800 })
+   local ip_h  = ipv4:new({ src = ipv4:pton(exporter.exporter_ip),
+                            dst = ipv4:pton(exporter.collector_ip),
                             protocol = 17,
-                            ttl = 64 })
-   local udp_h = udp:new({ src_port = 9999,
-                           dst_port = 2100 })
+                            ttl = 64,
+                            flags = 0x02 })
+   local udp_h = udp:new({ src_port = math.random(49152, 65535),
+                           dst_port = exporter.collector_port })
 
    dgram:payload(ptr, len)
    udp_h:length(udp_h:sizeof() + len)
-   udp_h:checksum(ptr, len)
+   udp_h:checksum(ptr, len, ip_h)
    dgram:push(udp_h)
    ip_h:total_length(ip_h:sizeof() + udp_h:sizeof() + len)
    ip_h:checksum()
