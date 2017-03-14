@@ -1,3 +1,0 @@
-[submodule "submodules/luajit-test-cleanup"]
-	path = submodules/luajit-test-cleanup
-	url = https://github.com/luajit/luajit-test-cleanup
