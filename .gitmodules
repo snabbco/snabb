@@ -1,0 +1,3 @@
+[submodule "submodules/raptorjit-testsuite"]
+	path = submodules/raptorjit-testsuite
+	url = https://github.com/raptorjit/raptorjit-testsuite
