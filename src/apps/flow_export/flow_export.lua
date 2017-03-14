@@ -96,7 +96,9 @@ function FlowExporter:new(config)
                collector_port = assert(config.collector_port),
                -- TODO: use ARP to avoid needing this
                collector_mac = assert(config.collector_mac),
-               observation_domain = config.observation_domain or 256 }
+               observation_domain = config.observation_domain or 256,
+               -- TODO: make this configurable
+               mtu_to_collector = 1500 }
 
    return setmetatable(o, { __index = self })
 end
