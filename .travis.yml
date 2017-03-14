@@ -3,5 +3,5 @@ sudo: false
 script:
   - make
   - src/luajit -e 'for i = 1, 1000 do end'
-  - git submodule init submodules/luajit-test-cleanup
-  - (cd submodules/luajit-test-cleanup/test; ../../../src/luajit test.lua $(seq 1 508 | grep -v 366))
+  - git submodule init submodules/raptorjit-testsuite
+  - (cd submodules/raptorjit-testsuite/test; ../../../src/luajit test.lua)
