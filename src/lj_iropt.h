@@ -12,8 +12,8 @@
 #include "lj_jit.h"
 
 /* IR emitter. */
-LJ_FUNC void LJ_FASTCALL lj_ir_growtop(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_ir_emit(jit_State *J);
+LJ_FUNC void lj_ir_growtop(jit_State *J);
+LJ_FUNC TRef lj_ir_emit(jit_State *J);
 
 /* Save current IR in J->fold.ins, but do not emit it (yet). */
 static LJ_AINLINE void lj_ir_set_(jit_State *J, uint16_t ot, IRRef1 a, IRRef1 b)
@@ -38,7 +38,7 @@ static LJ_AINLINE IRRef lj_ir_nextins(jit_State *J)
 LJ_FUNC TRef lj_ir_ggfload(jit_State *J, IRType t, uintptr_t ofs);
 
 /* Interning of constants. */
-LJ_FUNC TRef LJ_FASTCALL lj_ir_kint(jit_State *J, int32_t k);
+LJ_FUNC TRef lj_ir_kint(jit_State *J, int32_t k);
 LJ_FUNC TRef lj_ir_k64(jit_State *J, IROp op, uint64_t u64);
 LJ_FUNC TRef lj_ir_knum_u64(jit_State *J, uint64_t u64);
 LJ_FUNC TRef lj_ir_knumint(jit_State *J, lua_Number n);
@@ -77,9 +77,9 @@ static LJ_AINLINE TRef lj_ir_knum(jit_State *J, lua_Number n)
 LJ_FUNC void lj_ir_kvalue(lua_State *L, TValue *tv, const IRIns *ir);
 
 /* Convert IR operand types. */
-LJ_FUNC TRef LJ_FASTCALL lj_ir_tonumber(jit_State *J, TRef tr);
-LJ_FUNC TRef LJ_FASTCALL lj_ir_tonum(jit_State *J, TRef tr);
-LJ_FUNC TRef LJ_FASTCALL lj_ir_tostr(jit_State *J, TRef tr);
+LJ_FUNC TRef lj_ir_tonumber(jit_State *J, TRef tr);
+LJ_FUNC TRef lj_ir_tonum(jit_State *J, TRef tr);
+LJ_FUNC TRef lj_ir_tostr(jit_State *J, TRef tr);
 
 /* Miscellaneous IR ops. */
 LJ_FUNC int lj_ir_numcmp(lua_Number a, lua_Number b, IROp op);
@@ -87,9 +87,9 @@ LJ_FUNC int lj_ir_strcmp(GCstr *a, GCstr *b, IROp op);
 LJ_FUNC void lj_ir_rollback(jit_State *J, IRRef ref);
 
 /* Emit IR instructions with on-the-fly optimizations. */
-LJ_FUNC TRef LJ_FASTCALL lj_opt_fold(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_cse(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_cselim(jit_State *J, IRRef lim);
+LJ_FUNC TRef lj_opt_fold(jit_State *J);
+LJ_FUNC TRef lj_opt_cse(jit_State *J);
+LJ_FUNC TRef lj_opt_cselim(jit_State *J, IRRef lim);
 
 /* Special return values for the fold functions. */
 enum {
@@ -110,29 +110,29 @@ enum {
 #define EMITFOLD	(lj_ir_emit(J))
 
 /* Load/store forwarding. */
-LJ_FUNC TRef LJ_FASTCALL lj_opt_fwd_aload(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_fwd_hload(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_fwd_uload(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_fwd_fload(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_fwd_xload(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_fwd_tab_len(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_fwd_hrefk(jit_State *J);
-LJ_FUNC int LJ_FASTCALL lj_opt_fwd_href_nokey(jit_State *J);
-LJ_FUNC int LJ_FASTCALL lj_opt_fwd_tptr(jit_State *J, IRRef lim);
+LJ_FUNC TRef lj_opt_fwd_aload(jit_State *J);
+LJ_FUNC TRef lj_opt_fwd_hload(jit_State *J);
+LJ_FUNC TRef lj_opt_fwd_uload(jit_State *J);
+LJ_FUNC TRef lj_opt_fwd_fload(jit_State *J);
+LJ_FUNC TRef lj_opt_fwd_xload(jit_State *J);
+LJ_FUNC TRef lj_opt_fwd_tab_len(jit_State *J);
+LJ_FUNC TRef lj_opt_fwd_hrefk(jit_State *J);
+LJ_FUNC int lj_opt_fwd_href_nokey(jit_State *J);
+LJ_FUNC int lj_opt_fwd_tptr(jit_State *J, IRRef lim);
 LJ_FUNC int lj_opt_fwd_wasnonnil(jit_State *J, IROpT loadop, IRRef xref);
 
 /* Dead-store elimination. */
-LJ_FUNC TRef LJ_FASTCALL lj_opt_dse_ahstore(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_dse_ustore(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_dse_fstore(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_dse_xstore(jit_State *J);
+LJ_FUNC TRef lj_opt_dse_ahstore(jit_State *J);
+LJ_FUNC TRef lj_opt_dse_ustore(jit_State *J);
+LJ_FUNC TRef lj_opt_dse_fstore(jit_State *J);
+LJ_FUNC TRef lj_opt_dse_xstore(jit_State *J);
 
 /* Narrowing. */
-LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_convert(jit_State *J);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_index(jit_State *J, TRef key);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_toint(jit_State *J, TRef tr);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_tobit(jit_State *J, TRef tr);
-LJ_FUNC TRef LJ_FASTCALL lj_opt_narrow_cindex(jit_State *J, TRef key);
+LJ_FUNC TRef lj_opt_narrow_convert(jit_State *J);
+LJ_FUNC TRef lj_opt_narrow_index(jit_State *J, TRef key);
+LJ_FUNC TRef lj_opt_narrow_toint(jit_State *J, TRef tr);
+LJ_FUNC TRef lj_opt_narrow_tobit(jit_State *J, TRef tr);
+LJ_FUNC TRef lj_opt_narrow_cindex(jit_State *J, TRef key);
 LJ_FUNC TRef lj_opt_narrow_arith(jit_State *J, TRef rb, TRef rc,
 				 TValue *vb, TValue *vc, IROp op);
 LJ_FUNC TRef lj_opt_narrow_unm(jit_State *J, TRef rc, TValue *vc);

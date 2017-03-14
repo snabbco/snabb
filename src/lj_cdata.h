@@ -62,7 +62,7 @@ LJ_FUNC GCcdata *lj_cdata_newv(lua_State *L, CTypeID id, CTSize sz,
 LJ_FUNC GCcdata *lj_cdata_newx(CTState *cts, CTypeID id, CTSize sz,
 			       CTInfo info);
 
-LJ_FUNC void LJ_FASTCALL lj_cdata_free(global_State *g, GCcdata *cd);
+LJ_FUNC void lj_cdata_free(global_State *g, GCcdata *cd);
 LJ_FUNC void lj_cdata_setfin(lua_State *L, GCcdata *cd, GCobj *obj,
 			     uint32_t it);
 

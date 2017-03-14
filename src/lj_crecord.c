@@ -738,7 +738,7 @@ static void crec_index_meta(jit_State *J, CTState *cts, CType *ct,
   }
 }
 
-void LJ_FASTCALL recff_cdata_index(jit_State *J, RecordFFData *rd)
+void recff_cdata_index(jit_State *J, RecordFFData *rd)
 {
   TRef idx, ptr = J->base[0];
   ptrdiff_t ofs = sizeof(GCcdata);
@@ -1147,7 +1147,7 @@ static int crec_call(jit_State *J, RecordFFData *rd, GCcdata *cd)
   return 0;
 }
 
-void LJ_FASTCALL recff_cdata_call(jit_State *J, RecordFFData *rd)
+void recff_cdata_call(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   GCcdata *cd = argv2cdata(J, J->base[0], &rd->argv[0]);
@@ -1323,7 +1323,7 @@ static TRef crec_arith_meta(jit_State *J, TRef *sp, CType **s, CTState *cts,
   return 0;
 }
 
-void LJ_FASTCALL recff_cdata_arith(jit_State *J, RecordFFData *rd)
+void recff_cdata_arith(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   TRef sp[2];
@@ -1425,7 +1425,7 @@ void LJ_FASTCALL recff_cdata_arith(jit_State *J, RecordFFData *rd)
 
 /* -- C library namespace metamethods ------------------------------------- */
 
-void LJ_FASTCALL recff_clib_index(jit_State *J, RecordFFData *rd)
+void recff_clib_index(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   if (tref_isudata(J->base[0]) && tref_isstr(J->base[1]) &&
@@ -1476,12 +1476,12 @@ static TRef crec_toint(jit_State *J, CTState *cts, TRef sp, TValue *sval)
   return crec_ct_tv(J, ctype_get(cts, CTID_INT32), 0, sp, sval);
 }
 
-void LJ_FASTCALL recff_ffi_new(jit_State *J, RecordFFData *rd)
+void recff_ffi_new(jit_State *J, RecordFFData *rd)
 {
   crec_alloc(J, rd, argv2ctype(J, J->base[0], &rd->argv[0]));
 }
 
-void LJ_FASTCALL recff_ffi_errno(jit_State *J, RecordFFData *rd)
+void recff_ffi_errno(jit_State *J, RecordFFData *rd)
 {
   UNUSED(rd);
   if (J->base[0])
@@ -1489,7 +1489,7 @@ void LJ_FASTCALL recff_ffi_errno(jit_State *J, RecordFFData *rd)
   J->base[0] = lj_ir_call(J, IRCALL_lj_vm_errno);
 }
 
-void LJ_FASTCALL recff_ffi_string(jit_State *J, RecordFFData *rd)
+void recff_ffi_string(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   TRef tr = J->base[0];
@@ -1506,7 +1506,7 @@ void LJ_FASTCALL recff_ffi_string(jit_State *J, RecordFFData *rd)
   }  /* else: interpreter will throw. */
 }
 
-void LJ_FASTCALL recff_ffi_copy(jit_State *J, RecordFFData *rd)
+void recff_ffi_copy(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   TRef trdst = J->base[0], trsrc = J->base[1], trlen = J->base[2];
@@ -1524,7 +1524,7 @@ void LJ_FASTCALL recff_ffi_copy(jit_State *J, RecordFFData *rd)
   }  /* else: interpreter will throw. */
 }
 
-void LJ_FASTCALL recff_ffi_fill(jit_State *J, RecordFFData *rd)
+void recff_ffi_fill(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   TRef trdst = J->base[0], trlen = J->base[1], trfill = J->base[2];
@@ -1548,7 +1548,7 @@ void LJ_FASTCALL recff_ffi_fill(jit_State *J, RecordFFData *rd)
   }  /* else: interpreter will throw. */
 }
 
-void LJ_FASTCALL recff_ffi_typeof(jit_State *J, RecordFFData *rd)
+void recff_ffi_typeof(jit_State *J, RecordFFData *rd)
 {
   if (tref_iscdata(J->base[0])) {
     TRef trid = lj_ir_kint(J, argv2ctype(J, J->base[0], &rd->argv[0]));
@@ -1560,7 +1560,7 @@ void LJ_FASTCALL recff_ffi_typeof(jit_State *J, RecordFFData *rd)
   }
 }
 
-void LJ_FASTCALL recff_ffi_istype(jit_State *J, RecordFFData *rd)
+void recff_ffi_istype(jit_State *J, RecordFFData *rd)
 {
   argv2ctype(J, J->base[0], &rd->argv[0]);
   if (tref_iscdata(J->base[1])) {
@@ -1572,7 +1572,7 @@ void LJ_FASTCALL recff_ffi_istype(jit_State *J, RecordFFData *rd)
   }
 }
 
-void LJ_FASTCALL recff_ffi_abi(jit_State *J, RecordFFData *rd)
+void recff_ffi_abi(jit_State *J, RecordFFData *rd)
 {
   if (tref_isstr(J->base[0])) {
     /* Specialize to the ABI string to make the boolean result a constant. */
@@ -1585,7 +1585,7 @@ void LJ_FASTCALL recff_ffi_abi(jit_State *J, RecordFFData *rd)
 }
 
 /* Record ffi.sizeof(), ffi.alignof(), ffi.offsetof(). */
-void LJ_FASTCALL recff_ffi_xof(jit_State *J, RecordFFData *rd)
+void recff_ffi_xof(jit_State *J, RecordFFData *rd)
 {
   CTypeID id = argv2ctype(J, J->base[0], &rd->argv[0]);
   if (rd->data == FF_ffi_sizeof) {
@@ -1602,7 +1602,7 @@ void LJ_FASTCALL recff_ffi_xof(jit_State *J, RecordFFData *rd)
   J->base[0] = J->base[1] = J->base[2] = TREF_NIL;
 }
 
-void LJ_FASTCALL recff_ffi_gc(jit_State *J, RecordFFData *rd)
+void recff_ffi_gc(jit_State *J, RecordFFData *rd)
 {
   argv2cdata(J, J->base[0], &rd->argv[0]);
   if (!J->base[1])
@@ -1626,7 +1626,7 @@ static CTypeID crec_bit64_type(CTState *cts, cTValue *tv)
   return 0;  /* Use regular 32 bit ops. */
 }
 
-void LJ_FASTCALL recff_bit64_tobit(jit_State *J, RecordFFData *rd)
+void recff_bit64_tobit(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   TRef tr = crec_ct_tv(J, ctype_get(cts, CTID_INT64), 0,
@@ -1636,7 +1636,7 @@ void LJ_FASTCALL recff_bit64_tobit(jit_State *J, RecordFFData *rd)
   J->base[0] = tr;
 }
 
-int LJ_FASTCALL recff_bit64_unary(jit_State *J, RecordFFData *rd)
+int recff_bit64_unary(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   CTypeID id = crec_bit64_type(cts, &rd->argv[0]);
@@ -1649,7 +1649,7 @@ int LJ_FASTCALL recff_bit64_unary(jit_State *J, RecordFFData *rd)
   return 0;
 }
 
-int LJ_FASTCALL recff_bit64_nary(jit_State *J, RecordFFData *rd)
+int recff_bit64_nary(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   CTypeID id = 0;
@@ -1672,7 +1672,7 @@ int LJ_FASTCALL recff_bit64_nary(jit_State *J, RecordFFData *rd)
   return 0;
 }
 
-int LJ_FASTCALL recff_bit64_shift(jit_State *J, RecordFFData *rd)
+int recff_bit64_shift(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   CTypeID id;
@@ -1742,7 +1742,7 @@ TRef recff_bit64_tohex(jit_State *J, RecordFFData *rd, TRef hdr)
 
 /* -- Miscellaneous library functions ------------------------------------- */
 
-void LJ_FASTCALL lj_crecord_tonumber(jit_State *J, RecordFFData *rd)
+void lj_crecord_tonumber(jit_State *J, RecordFFData *rd)
 {
   CTState *cts = ctype_ctsG(J2G(J));
   CType *d, *ct = lj_ctype_rawref(cts, cdataV(&rd->argv[0])->ctypeid);

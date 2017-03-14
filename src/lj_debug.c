@@ -106,7 +106,7 @@ static BCPos debug_framepc(lua_State *L, GCfunc *fn, cTValue *nextframe)
 /* -- Line numbers -------------------------------------------------------- */
 
 /* Get line number for a bytecode position. */
-BCLine LJ_FASTCALL lj_debug_line(GCproto *pt, BCPos pc)
+BCLine lj_debug_line(GCproto *pt, BCPos pc)
 {
   const void *lineinfo = proto_lineinfo(pt);
   if (pc <= pt->sizebc && lineinfo) {

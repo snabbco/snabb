@@ -522,7 +522,7 @@ StrScanFmt lj_strscan_scan(const uint8_t *p, TValue *o, uint32_t opt)
   }
 }
 
-int LJ_FASTCALL lj_strscan_num(GCstr *str, TValue *o)
+int lj_strscan_num(GCstr *str, TValue *o)
 {
   StrScanFmt fmt = lj_strscan_scan((const uint8_t *)strdata(str), o,
 				   STRSCAN_OPT_TONUM);
@@ -531,7 +531,7 @@ int LJ_FASTCALL lj_strscan_num(GCstr *str, TValue *o)
 }
 
 #if LJ_DUALNUM
-int LJ_FASTCALL lj_strscan_number(GCstr *str, TValue *o)
+int lj_strscan_number(GCstr *str, TValue *o)
 {
   StrScanFmt fmt = lj_strscan_scan((const uint8_t *)strdata(str), o,
 				   STRSCAN_OPT_TOINT);

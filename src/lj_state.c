@@ -96,7 +96,7 @@ void lj_state_shrinkstack(lua_State *L, MSize used)
 }
 
 /* Try to grow stack. */
-void LJ_FASTCALL lj_state_growstack(lua_State *L, MSize need)
+void lj_state_growstack(lua_State *L, MSize need)
 {
   MSize n;
   if (L->stacksize > LJ_STACK_MAXEX)  /* Overflow while handling overflow? */
@@ -114,7 +114,7 @@ void LJ_FASTCALL lj_state_growstack(lua_State *L, MSize need)
     lj_err_msg(L, LJ_ERR_STKOV);
 }
 
-void LJ_FASTCALL lj_state_growstack1(lua_State *L)
+void lj_state_growstack1(lua_State *L)
 {
   lj_state_growstack(L, 1);
 }
@@ -271,7 +271,7 @@ lua_State *lj_state_new(lua_State *L)
   return L1;
 }
 
-void LJ_FASTCALL lj_state_free(global_State *g, lua_State *L)
+void lj_state_free(global_State *g, lua_State *L)
 {
   lua_assert(L != mainthread(g));
   if (obj2gco(L) == gcref(g->cur_L))

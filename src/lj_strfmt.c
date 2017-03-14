@@ -25,7 +25,7 @@ static const uint8_t strfmt_map[('x'-'A')+1] = {
   0,STRFMT_O,STRFMT_P,STRFMT_Q,0,STRFMT_S,0,STRFMT_U,0,0,STRFMT_X
 };
 
-SFormat LJ_FASTCALL lj_strfmt_parse(FormatState *fs)
+SFormat lj_strfmt_parse(FormatState *fs)
 {
   const uint8_t *p = fs->p, *e = fs->e;
   fs->str = (const char *)p;
@@ -93,7 +93,7 @@ retlit:
   { uint32_t d = (x*(((1<<sh)+sc-1)/sc))>>sh; x -= d*sc; *p++ = (char)('0'+d); }
 
 /* Write integer to buffer. */
-char * LJ_FASTCALL lj_strfmt_wint(char *p, int32_t k)
+char * lj_strfmt_wint(char *p, int32_t k)
 {
   uint32_t u = (uint32_t)k;
   if (k < 0) { u = (uint32_t)-k; *p++ = '-'; }
@@ -126,7 +126,7 @@ char * LJ_FASTCALL lj_strfmt_wint(char *p, int32_t k)
 #undef WINT_R
 
 /* Write pointer to buffer. */
-char * LJ_FASTCALL lj_strfmt_wptr(char *p, const void *v)
+char * lj_strfmt_wptr(char *p, const void *v)
 {
   ptrdiff_t x = (ptrdiff_t)v;
   MSize i, n = STRFMT_MAXBUF_PTR;
@@ -144,7 +144,7 @@ char * LJ_FASTCALL lj_strfmt_wptr(char *p, const void *v)
 }
 
 /* Write ULEB128 to buffer. */
-char * LJ_FASTCALL lj_strfmt_wuleb128(char *p, uint32_t v)
+char * lj_strfmt_wuleb128(char *p, uint32_t v)
 {
   for (; v >= 0x80; v >>= 7)
     *p++ = (char)((v & 0x7f) | 0x80);
@@ -173,26 +173,26 @@ const char *lj_strfmt_wstrnum(lua_State *L, cTValue *o, MSize *lenp)
 /* -- Unformatted conversions to buffer ----------------------------------- */
 
 /* Add integer to buffer. */
-SBuf * LJ_FASTCALL lj_strfmt_putint(SBuf *sb, int32_t k)
+SBuf * lj_strfmt_putint(SBuf *sb, int32_t k)
 {
   setsbufP(sb, lj_strfmt_wint(lj_buf_more(sb, STRFMT_MAXBUF_INT), k));
   return sb;
 }
 
 /* Add number to buffer. */
-SBuf * LJ_FASTCALL lj_strfmt_putnum(SBuf *sb, cTValue *o)
+SBuf * lj_strfmt_putnum(SBuf *sb, cTValue *o)
 {
   return lj_strfmt_putfnum(sb, STRFMT_G14, o->n);
 }
 
-SBuf * LJ_FASTCALL lj_strfmt_putptr(SBuf *sb, const void *v)
+SBuf * lj_strfmt_putptr(SBuf *sb, const void *v)
 {
   setsbufP(sb, lj_strfmt_wptr(lj_buf_more(sb, STRFMT_MAXBUF_PTR), v));
   return sb;
 }
 
 /* Add quoted string to buffer. */
-SBuf * LJ_FASTCALL lj_strfmt_putquoted(SBuf *sb, GCstr *str)
+SBuf * lj_strfmt_putquoted(SBuf *sb, GCstr *str)
 {
   const char *s = strdata(str);
   MSize len = str->len;
@@ -345,7 +345,7 @@ SBuf *lj_strfmt_putfnum_uint(SBuf *sb, SFormat sf, lua_Number n)
 /* -- Conversions to strings ---------------------------------------------- */
 
 /* Convert integer to string. */
-GCstr * LJ_FASTCALL lj_strfmt_int(lua_State *L, int32_t k)
+GCstr * lj_strfmt_int(lua_State *L, int32_t k)
 {
   char buf[STRFMT_MAXBUF_INT];
   MSize len = (MSize)(lj_strfmt_wint(buf, k) - buf);
@@ -353,13 +353,13 @@ GCstr * LJ_FASTCALL lj_strfmt_int(lua_State *L, int32_t k)
 }
 
 /* Convert integer or number to string. */
-GCstr * LJ_FASTCALL lj_strfmt_number(lua_State *L, cTValue *o)
+GCstr * lj_strfmt_number(lua_State *L, cTValue *o)
 {
   return tvisint(o) ? lj_strfmt_int(L, intV(o)) : lj_strfmt_num(L, o);
 }
 
 /* Convert char value to string. */
-GCstr * LJ_FASTCALL lj_strfmt_char(lua_State *L, int c)
+GCstr * lj_strfmt_char(lua_State *L, int c)
 {
   char buf[1];
   buf[0] = c;
@@ -367,7 +367,7 @@ GCstr * LJ_FASTCALL lj_strfmt_char(lua_State *L, int c)
 }
 
 /* Raw conversion of object to string. */
-GCstr * LJ_FASTCALL lj_strfmt_obj(lua_State *L, cTValue *o)
+GCstr * lj_strfmt_obj(lua_State *L, cTValue *o)
 {
   if (tvisstr(o)) {
     return strV(o);

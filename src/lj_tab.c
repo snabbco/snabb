@@ -161,7 +161,7 @@ GCtab *lj_tab_new_ah(lua_State *L, int32_t a, int32_t h)
   return lj_tab_new(L, (uint32_t)(a > 0 ? a+1 : 0), hsize2hbits(h));
 }
 
-GCtab * LJ_FASTCALL lj_tab_new1(lua_State *L, uint32_t ahsize)
+GCtab * lj_tab_new1(lua_State *L, uint32_t ahsize)
 {
   GCtab *t = newtab(L, ahsize & 0xffffff, ahsize >> 24);
   clearapart(t);
@@ -170,7 +170,7 @@ GCtab * LJ_FASTCALL lj_tab_new1(lua_State *L, uint32_t ahsize)
 }
 
 /* Duplicate a table. */
-GCtab * LJ_FASTCALL lj_tab_dup(lua_State *L, const GCtab *kt)
+GCtab * lj_tab_dup(lua_State *L, const GCtab *kt)
 {
   GCtab *t;
   uint32_t asize, hmask;
@@ -209,7 +209,7 @@ GCtab * LJ_FASTCALL lj_tab_dup(lua_State *L, const GCtab *kt)
 }
 
 /* Clear a table. */
-void LJ_FASTCALL lj_tab_clear(GCtab *t)
+void lj_tab_clear(GCtab *t)
 {
   clearapart(t);
   if (t->hmask > 0) {
@@ -220,7 +220,7 @@ void LJ_FASTCALL lj_tab_clear(GCtab *t)
 }
 
 /* Free a table. */
-void LJ_FASTCALL lj_tab_free(global_State *g, GCtab *t)
+void lj_tab_free(global_State *g, GCtab *t)
 {
   if (t->hmask > 0)
     lj_mem_freevec(g, noderef(t->node), t->hmask+1, Node);
@@ -385,7 +385,7 @@ void lj_tab_reasize(lua_State *L, GCtab *t, uint32_t nasize)
 
 /* -- Table getters ------------------------------------------------------- */
 
-cTValue * LJ_FASTCALL lj_tab_getinth(GCtab *t, int32_t key)
+cTValue * lj_tab_getinth(GCtab *t, int32_t key)
 {
   TValue k;
   Node *n;
@@ -632,7 +632,7 @@ static MSize unbound_search(GCtab *t, MSize j)
 ** Try to find a boundary in table `t'. A `boundary' is an integer index
 ** such that t[i] is non-nil and t[i+1] is nil (and 0 if t[1] is nil).
 */
-MSize LJ_FASTCALL lj_tab_len(GCtab *t)
+MSize lj_tab_len(GCtab *t)
 {
   MSize j = (MSize)t->asize;
   if (j > 1 && tvisnil(arrayslot(t, j-1))) {
