@@ -180,9 +180,6 @@ static LJ_AINLINE uint32_t lj_getu32(const void *p)
 #endif
 
 /* Optional defines. */
-#ifndef LJ_FASTCALL
-#define LJ_FASTCALL
-#endif
 #ifndef LJ_NORET
 #define LJ_NORET
 #endif
