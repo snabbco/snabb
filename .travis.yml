@@ -4,4 +4,4 @@ script:
   - nix-build
   - result/bin/raptorjit -e 'for i = 1, 1000 do end'
   - git submodule init submodules/raptorjit-testsuite
-  - (cd submodules/raptorjit-testsuite/test; ../../../result/bin/raptorjit test.lua)
+  - (cd submodules/raptorjit-testsuite/test; ../../../result/bin/raptorjit test.lua +slow)
