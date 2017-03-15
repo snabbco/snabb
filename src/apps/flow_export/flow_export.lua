@@ -104,16 +104,13 @@ function FlowExporter:new(config)
    return setmetatable(o, { __index = self })
 end
 
--- allocate a single flow key that we will re-use
--- (for performance reasons)
-local flow_key = ffi.new("struct flow_key")
-
 function FlowExporter:process_packet(pkt)
    -- TODO: using the header libraries for now, but can rewrite this
    --       code if it turns out to be too slow
-   local eth_header  = ether:new_from_mem(pkt.data, pkt.length)
-   local eth_size    = eth_header:sizeof()
-   local eth_type    = eth_header:type()
+   local flow_key   = ffi.new("struct flow_key")
+   local eth_header = ether:new_from_mem(pkt.data, pkt.length)
+   local eth_size   = eth_header:sizeof()
+   local eth_type   = eth_header:type()
    local ip_header
 
    if eth_type == ETHER_PROTO_IPV4 then
@@ -251,7 +248,11 @@ end
 function selftest()
    local datagram = require("lib.protocol.datagram")
 
-   local nf = FlowExporter:new()
+   local nf = FlowExporter:new({ exporter_mac = "01:02:03:04:05:06",
+                                 exporter_ip = "192.168.0.2",
+                                 collector_mac = "09:08:07:06:05:04",
+                                 collector_ip = "192.168.0.3",
+                                 collector_port = 2100 })
    local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
                            dst = ether:pton("55:44:33:22:11:00"),
                            type = ETHER_PROTO_IPV4 })
