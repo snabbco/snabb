@@ -26,9 +26,9 @@ PRs welcome! Shock me with your radical ideas! :-)
 
 RaptorJIT uses [nix](http://nixos.org/nix/) to define a reproducible
 build environment that includes Clang for C and LuaJIT 2.0 for
-bootstrapping. The recommended way to build RaptorJIT is with nix,
-which provides the dependencies automatically, but you can build
-manually if you prefer.
+bootstrapping (see [default.nix](default.nix)). The recommended way to
+build RaptorJIT is with nix, which provides the dependencies
+automatically, but you can build manually if you prefer.
 
 #### Build with nix
 
