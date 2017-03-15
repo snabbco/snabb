@@ -4,4 +4,4 @@ script:
   - make
   - src/luajit -e 'for i = 1, 1000 do end'
   - git submodule init submodules/raptorjit-testsuite
-  - (cd submodules/raptorjit-testsuite/test; ../../../src/luajit test.lua)
+  - (cd submodules/raptorjit-testsuite/test; ../../../src/luajit test.lua +slow)
