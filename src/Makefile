@@ -192,9 +192,7 @@ LDOPTIONS= $(CCDEBUG) $(LDFLAGS)
 
 HOST_CC= $(CC)
 HOST_RM= rm -f
-# If left blank, minilua is built and used. You can supply an installed
-# copy of (plain) Lua 5.1 or 5.2, plus Lua BitOp. E.g. with: HOST_LUA=lua
-HOST_LUA=
+HOST_LUA=luajit
 
 HOST_XCFLAGS= -I.
 HOST_XLDFLAGS=
@@ -373,16 +371,6 @@ endif
 # Files and pathnames.
 ##############################################################################
 
-MINILUA_O= host/minilua.o
-MINILUA_LIBS= -lm
-MINILUA_T= host/minilua
-MINILUA_X= $(MINILUA_T)
-
-ifeq (,$(HOST_LUA))
-  HOST_LUA= $(MINILUA_X)
-  DASM_DEP= $(MINILUA_T)
-endif
-
 DASM_DIR= ../dynasm
 DASM= $(HOST_LUA) $(DASM_DIR)/dynasm.lua
 DASM_XFLAGS=
@@ -464,8 +452,8 @@ BUILDVM_O= host/buildvm.o host/buildvm_asm.o host/buildvm_peobj.o \
 BUILDVM_T= host/buildvm
 BUILDVM_X= $(BUILDVM_T)
 
-HOST_O= $(MINILUA_O) $(BUILDVM_O)
-HOST_T= $(MINILUA_T) $(BUILDVM_T)
+HOST_O= $(BUILDVM_O)
+HOST_T= $(BUILDVM_T)
 
 LJVM_S= lj_vm.S
 LJVM_O= lj_vm.o
@@ -547,16 +535,6 @@ ifeq (PS3,$(TARGET_SYS))
   BUILDMODE= static
 endif
 
-ifeq (Windows,$(HOST_SYS))
-  MINILUA_T= host/minilua.exe
-  BUILDVM_T= host/buildvm.exe
-  ifeq (,$(HOST_MSYS))
-    MINILUA_X= host\minilua
-    BUILDVM_X= host\buildvm
-    ALL_RM:= $(subst /,\,$(ALL_RM))
-  endif
-endif
-
 ifeq (static,$(BUILDMODE))
   TARGET_DYNCC= @:
   TARGET_T= $(LUAJIT_T)
@@ -623,10 +601,6 @@ depend:
 ##############################################################################
 # Rules for generated files.
 ##############################################################################
-
-$(MINILUA_T): $(MINILUA_O)
-	$(E) "HOSTLINK  $@"
-	$(Q)$(HOST_CC) $(HOST_ALDFLAGS) -o $@ $(MINILUA_O) $(MINILUA_LIBS) $(HOST_ALIBS)
 
 host/buildvm_arch.h: $(DASM_DASC) $(DASM_DEP) $(DASM_DIR)/*.lua
 	$(E) "DYNASM    $@"
