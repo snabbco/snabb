@@ -8,6 +8,7 @@ local ffi    = require("ffi")
 local ipfix  = require("apps.flow_export.ipfix")
 local lib    = require("core.lib")
 local link   = require("core.link")
+local packet = require("core.packet")
 local ctable = require("lib.ctable")
 local ether  = require("lib.protocol.ethernet")
 local ipv4   = require("lib.protocol.ipv4")
@@ -129,6 +130,7 @@ function FlowExporter:process_packet(pkt)
       flow_key.dst_ip   = ip_header:dst()
    else
       -- ignore non-IP packets
+      packet.free(pkt)
       return
    end
 
