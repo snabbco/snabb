@@ -22,6 +22,35 @@ Initial changes (ongoing work):
 
 PRs welcome! Shock me with your radical ideas! :-)
 
+### Compilation
+
+RaptorJIT is built using GNU Make, Clang (C compiler), and LuaJIT 2 (bootstrap Lua for DynASM etc.) The build environment is specified formally in `default.nix` and can be automatically provided using the [nix](http://nixos.org/nix/) package manager.
+
+Here is how to install nix:
+
+```
+$ curl https://nixos.org/nix/install | sh
+```
+
+Here is how to build raptorjit once nix is installed (note: the first
+compilation takes time to download dependencies):
+
+```shell
+$ nix-build    # produces result/bin/raptorjit
+```
+
+Here is the interactive version:
+
+```
+$ nix-shell    # start sub-shell with pristine build environment in $PATH
+[nix-shell]$ make -j    # build manually as many times as you like
+[nix-shell]$ exit       # quit when done
+```
+
+(You can also skip `nix` and install `clang` and `luajit` yourself if
+you like. The nix approach is future proof to new dependencies and
+allows for pinning specific versions.)
+
 ### Quotes
 
 Here are some borrowed words to put this branch into context:
