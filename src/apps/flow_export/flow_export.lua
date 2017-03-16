@@ -32,35 +32,25 @@ local TCP_CONTROL_BITS_OFFSET = 11
 ffi.cdef[[
    struct flow_key {
       uint8_t is_ipv6;
-      uint8_t src_ip[16];
-      uint8_t dst_ip[16];
-      uint16_t src_port;
-      uint16_t dst_port;
-      uint8_t protocol;
+      uint8_t src_ip[16];   /* sourceIPv4/v6Address */
+      uint8_t dst_ip[16];   /* destinationIPv4/v6Address */
+      uint16_t src_port;    /* sourceTransportPort */
+      uint16_t dst_port;    /* destinationTransportPort */
+      uint8_t protocol;     /* protocolIdentifier */
    };
 
    struct flow_record {
       struct flow_key key;
-      /* 152, flowStartMilliseconds */
-      uint64_t start_time;
-      /* 153, flowEndMilliseconds */
-      uint64_t end_time;
-      /* 2, packetDeltaCount */
-      uint64_t pkt_count;
-      /* 1, octetDeltaCount */
-      uint64_t octet_count;
-      /* 5, ipClassOfService */
-      uint8_t tos;
-      /* 6, tcpControlBits */
-      uint16_t tcp_control;
-      /* 10, ingressInterface */
-      uint32_t ingress;
-      /* 14, egressInterface */
-      uint32_t egress;
-      /* 129, bgpPrevAdjacentAsNumber */
-      uint32_t src_peer_as;
-      /* 128, bgpNextAdjacentAsNumber */
-      uint32_t dst_peer_as;
+      uint64_t start_time;  /* flowStartMilliseconds */
+      uint64_t end_time;    /* flowEndMilliseconds */
+      uint64_t pkt_count;   /* packetDeltaCount */
+      uint64_t octet_count; /* octetDeltaCount */
+      uint8_t tos;          /* ipClassOfService */
+      uint16_t tcp_control; /* tcpControlBits */
+      uint32_t ingress;     /* ingressInterface */
+      uint32_t egress;      /* egressInterface */
+      uint32_t src_peer_as; /* bgpPrevAdjacentAsNumber */
+      uint32_t dst_peer_as; /* bgpNextAdjacentAsNumber */
    };
 ]]
 
