@@ -24,7 +24,6 @@
 #include "lj_lex.h"
 #include "lj_parse.h"
 #include "lj_vm.h"
-#include "lj_vmevent.h"
 
 /* -- Parser structures and definitions ----------------------------------- */
 
@@ -1575,10 +1574,6 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
   fs_fixup_uv1(fs, pt, (uint16_t *)((char *)pt + ofsuv));
   fs_fixup_line(fs, pt, (void *)((char *)pt + ofsli), numline);
   fs_fixup_var(ls, pt, (uint8_t *)((char *)pt + ofsdbg), ofsvar);
-
-  lj_vmevent_send(L, BC,
-    setprotoV(L, L->top++, pt);
-  );
 
   L->top--;  /* Pop table of constants. */
   ls->vtop = fs->vbase;  /* Reset variable stack. */

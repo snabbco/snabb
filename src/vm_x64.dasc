@@ -2218,9 +2218,6 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vm_record:				// Dispatch target for recording phase.
   |.if JIT
-  |  movzx RDd, byte [DISPATCH+DISPATCH_GL(hookmask)]
-  |  test RDL, HOOK_VMEVENT		// No recording while in vmevent.
-  |  jnz >5
   |  // Decrement the hookcount for consistency, but always do the call.
   |  test RDL, HOOK_ACTIVE
   |  jnz >1
@@ -2372,19 +2369,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  add RA, 8
   |  jmp <3
   |.endif
-  |
-  |->vm_profhook:			// Dispatch target for profiler hook.
-#if LJ_HASPROFILE
-  |  mov L:RB, SAVE_L
-  |  mov L:RB->base, BASE
-  |  mov CARG2, PC			// Caveat: CARG2 == BASE
-  |  mov CARG1, L:RB
-  |  call extern lj_dispatch_profile	// (lua_State *L, const BCIns *pc)
-  |  mov BASE, L:RB->base
-  |  // HOOK_PROFILE is off again, so re-dispatch to dynamic instruction.
-  |  sub PC, 4
-  |  jmp ->cont_nop
-#endif
   |
   |//-----------------------------------------------------------------------
   |//-- Trace exit handler -------------------------------------------------
