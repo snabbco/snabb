@@ -121,8 +121,8 @@ local function init_expire_records()
 
          for _, record in ipairs(timeout_records) do
             -- TODO: what should timers reset to?
-            record.start_time = now
-            record.end_time = now
+            record.start_time = timestamp
+            record.end_time = timestamp
             record.pkt_count = 0
             record.octet_count = 0
          end
