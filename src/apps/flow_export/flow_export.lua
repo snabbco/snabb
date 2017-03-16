@@ -16,7 +16,7 @@ local ipv6   = require("lib.protocol.ipv6")
 local tcp    = require("lib.protocol.tcp")
 local C      = ffi.C
 
-local htonl, htons, timeout = lib.htonl, lib.htons, lib.timeout
+local htonl, htons = lib.htonl, lib.htons
 
 local ETHER_PROTO_IPV4 = 0x0800
 local ETHER_PROTO_IPV6 = 0x86dd
@@ -80,6 +80,70 @@ local function get_timestamp()
    return C.get_time_ns() / 1000000ULL
 end
 
+-- Walk through flow cache to see if flow records need to be expired.
+-- Collect expired records and export them to the collector.
+local function init_expire_records()
+   local last_time
+
+   return function(self)
+      local now = tonumber(engine.now())
+      last_time = last_time or now
+
+      if now - last_time >= export_interval then
+         last_time = now
+         local timestamp = get_timestamp()
+         local keys_to_remove = {}
+         local timeout_records = {}
+         local to_export = {}
+
+         -- TODO: Walking the table here is done in serial with flow record
+         --       updates, but in the future this should be done concurrently
+         --       in a separate process. i.e., locking required here
+         for entry in self.flows:iterate() do
+            local record = entry.value
+
+            if timestamp - record.end_time > idle_timeout then
+               table.insert(keys_to_remove, entry.key)
+               table.insert(to_export, record)
+            elseif timestamp - record.end_time > active_timeout then
+               table.insert(timeout_records, record)
+               table.insert(to_export, record)
+            end
+         end
+
+         ipfix.export_records(self, to_export)
+
+         -- TODO: Due to the key optimization above this doesn't work, fix
+         --       it by changing the flow key representation
+         --for _, key in ipairs(keys_to_remove) do
+         --   self.flows:remove(key)
+         --end
+
+         for _, record in ipairs(timeout_records) do
+            -- TODO: what should timers reset to?
+            record.start_time = now
+            record.end_time = now
+            record.pkt_count = 0
+            record.octet_count = 0
+         end
+      end
+   end
+end
+
+-- periodically refresh the templates on the collector
+local function init_refresh_templates()
+   local last_time
+
+   return function(self)
+      local now = tonumber(engine.now())
+
+      if not last_time or now - last_time >= template_interval then
+         ipfix.send_template_record(self)
+         last_time = now
+      end
+   end
+end
+
 function FlowExporter:new(config)
    local params = {
       key_type = ffi.typeof("struct flow_key"),
@@ -100,6 +164,9 @@ function FlowExporter:new(config)
                observation_domain = config.observation_domain or 256,
                -- TODO: make this configurable
                mtu_to_collector = 1500 }
+
+   o.expire_records = init_expire_records()
+   o.refresh_templates = init_refresh_templates()
 
    return setmetatable(o, { __index = self })
 end
@@ -177,46 +244,6 @@ function FlowExporter:process_packet(pkt)
    end
 end
 
--- Walk through flow cache to see if flow records need to be expired.
--- Collect expired records and export them to the collector.
-function FlowExporter:expire_records()
-   local now = get_timestamp()
-   local keys_to_remove = {}
-   local timeout_records = {}
-   local to_export = {}
-
-   -- TODO: Walking the table here is done in serial with flow record
-   --       updates, but in the future this should be done concurrently
-   --       in a separate process. i.e., locking required here
-   for entry in self.flows:iterate() do
-      local record = entry.value
-
-      if now - record.end_time > idle_timeout then
-         table.insert(keys_to_remove, entry.key)
-         table.insert(to_export, record)
-      elseif now - record.end_time > active_timeout then
-         table.insert(timeout_records, record)
-         table.insert(to_export, record)
-      end
-   end
-
-   ipfix.export_records(self, to_export)
-
-   -- TODO: Due to the key optimization above this doesn't work, fix
-   --       it by changing the flow key representation
-   --for _, key in ipairs(keys_to_remove) do
-   --   self.flows:remove(key)
-   --end
-
-   for _, record in ipairs(timeout_records) do
-      -- TODO: what should timers reset to?
-      record.start_time = now
-      record.end_time = now
-      record.pkt_count = 0
-      record.octet_count = 0
-   end
-end
-
 function FlowExporter:push()
    local input  = assert(self.input.input)
 
@@ -225,24 +252,8 @@ function FlowExporter:push()
       self:process_packet(pkt)
    end
 
-   if self.template_timer then
-      if self.template_timer() then
-         ipfix.send_template_record(self)
-         self.template_timer = timeout(template_interval)
-      end
-   else
-      ipfix.send_template_record(self)
-      self.template_timer = timeout(template_interval)
-   end
-
-   if self.export_timer then
-      if self.export_timer() then
-         self:expire_records()
-         self.export_timer = timeout(export_interval)
-      end
-   else
-      self.export_timer = timeout(export_interval)
-   end
+   self:refresh_templates()
+   self:expire_records()
 end
 
 function selftest()
