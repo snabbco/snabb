@@ -152,17 +152,6 @@
 #define LJ_TARGET_UNALIGNED	0
 #endif
 
-/* Various workarounds for embedded operating systems or weak C runtimes. */
-
-#if !defined(LUAJIT_NO_UNWIND) && __GNU_COMPACT_EH__
-/* NYI: no support for compact unwind specification, yet. */
-#define LUAJIT_NO_UNWIND	1
-#endif
-
-#if defined(LUAJIT_NO_UNWIND) || defined(__symbian__) || LJ_TARGET_IOS || LJ_TARGET_PS3 || LJ_TARGET_PS4
-#define LJ_NO_UNWIND		1
-#endif
-
 /* Compatibility with Lua 5.1 vs. 5.2. */
 #ifdef LUAJIT_ENABLE_LUA52COMPAT
 #define LJ_52			1

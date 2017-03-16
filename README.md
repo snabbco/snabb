@@ -6,7 +6,7 @@ RaptorJIT is a fork of LuaJIT targeting Linux/x86-64 server applications.
 
 Initial changes (ongoing work):
 
-- Support only Linux/x86-64 with `+JIT +FFI +GC64` and `-GDBJIT
+- Support only Linux/x86-64 with `+JIT +FFI +GC64 +NO_UNWIND` and `-GDBJIT
   -PERFTOOLS -VMEVENT -PROFILE` and otherwise canonical settings.
   Remove the ~50,000 lines of code for other architectures, operating
   systems, and features.

@@ -3,11 +3,13 @@
 #define LJ_GC64 1
 #define LJ_HASFFI 1
 #define LJ_HASJIT 1
+#define LJ_NO_UNWIND 1
 #define LUAJIT_DISABLE_PROFILE 1
 #define LUAJIT_DISABLE_VMEVENT 1
 #define LUAJIT_ENABLE_GC64 1
 #define LUAJIT_ENABLE_JIT 1
 #undef LJ_HASPROFILE
+#undef LJ_UNWIND_EXT
 #undef LUAJIT_DISABLE_FFI
 #undef LUAJIT_DISABLE_JIT
 #undef LUAJIT_NOFFI
@@ -61,7 +63,6 @@
 #undef LJ_ARCH_NOFFI
 #undef LJ_ARCH_PPC
 #undef LJ_BE
-#undef LJ_NOUNWIND
 #undef LJ_OS_NOJIT
 #undef LJ_SOFTFP
 #undef LJ_TARGET_ARM
