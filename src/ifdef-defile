@@ -3,7 +3,7 @@
 #define LJ_GC64 1
 #define LJ_HASFFI 1
 #define LJ_HASJIT 1
-#define LJ_NOUNWIND 1
+#define LJ_NO_UNWIND 1
 #define LUAJIT_DISABLE_PROFILE 1
 #define LUAJIT_DISABLE_VMEVENT 1
 #define LUAJIT_ENABLE_GC64 1
