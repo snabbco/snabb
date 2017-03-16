@@ -571,10 +571,6 @@ E= @echo
 
 default all:	$(TARGET_T)
 
-amalg:
-	@grep "^[+|]" ljamalg.c
-	$(MAKE) all "LJCORE_O=ljamalg.o"
-
 clean:
 	$(HOST_RM) $(ALL_RM)
 
@@ -596,7 +592,7 @@ depend:
 	  test -s $$file || $(HOST_RM) $$file; \
 	  done
 
-.PHONY: default all amalg clean libbc depend
+.PHONY: default all clean libbc depend
 
 ##############################################################################
 # Rules for generated files.

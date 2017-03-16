@@ -154,13 +154,9 @@ uninstall:
 
 ##############################################################################
 
-amalg:
-	@echo "Building LuaJIT $(VERSION)"
-	$(MAKE) -C src amalg
-
 clean:
 	$(MAKE) -C src clean
 
-.PHONY: all install amalg clean
+.PHONY: all install clean
 
 ##############################################################################
