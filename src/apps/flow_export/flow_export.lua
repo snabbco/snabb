@@ -113,11 +113,10 @@ local function init_expire_records()
 
          ipfix.export_records(self, to_export)
 
-         -- TODO: Due to the key optimization above this doesn't work, fix
-         --       it by changing the flow key representation
-         --for _, key in ipairs(keys_to_remove) do
-         --   self.flows:remove(key)
-         --end
+         -- remove idle timed out flows
+         for _, key in ipairs(keys_to_remove) do
+            self.flows:remove(key)
+         end
 
          for _, record in ipairs(timeout_records) do
             -- TODO: what should timers reset to?
