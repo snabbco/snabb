@@ -297,4 +297,6 @@ function selftest()
 
    nf:process_packet(pkt)
    assert(result.value.pkt_count == 2)
+
+   print("selftest ok")
 end
