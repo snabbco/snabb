@@ -298,5 +298,8 @@ function selftest()
    nf:process_packet(pkt)
    assert(result.value.pkt_count == 2)
 
+   -- sanity check
+   nf.flows:selfcheck()
+
    print("selftest ok")
 end
