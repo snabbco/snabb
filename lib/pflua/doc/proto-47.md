@@ -70,6 +70,36 @@ return function(P,length)
    if v2 ~= 44 then return false end
    return P[54] == 47
 end
+```
 
+## Native pflang compilation
+
+```
+7f8f726e2000  4883FE22          cmp rsi, +0x22
+7f8f726e2004  7C43              jl 0x7f8f726e2049
+7f8f726e2006  0FB7470C          movzx eax, word [rdi+0xc]
+7f8f726e200a  4883F808          cmp rax, +0x08
+7f8f726e200e  750A              jnz 0x7f8f726e201a
+7f8f726e2010  0FB64F17          movzx ecx, byte [rdi+0x17]
+7f8f726e2014  4883F92F          cmp rcx, +0x2f
+7f8f726e2018  7432              jz 0x7f8f726e204c
+7f8f726e201a  4883FE36          cmp rsi, +0x36
+7f8f726e201e  7C29              jl 0x7f8f726e2049
+7f8f726e2020  4881F886DD0000    cmp rax, 0xdd86
+7f8f726e2027  7520              jnz 0x7f8f726e2049
+7f8f726e2029  0FB64714          movzx eax, byte [rdi+0x14]
+7f8f726e202d  4883F82F          cmp rax, +0x2f
+7f8f726e2031  7419              jz 0x7f8f726e204c
+7f8f726e2033  4883FE37          cmp rsi, +0x37
+7f8f726e2037  7C10              jl 0x7f8f726e2049
+7f8f726e2039  4883F82C          cmp rax, +0x2c
+7f8f726e203d  750A              jnz 0x7f8f726e2049
+7f8f726e203f  0FB64736          movzx eax, byte [rdi+0x36]
+7f8f726e2043  4883F82F          cmp rax, +0x2f
+7f8f726e2047  7403              jz 0x7f8f726e204c
+7f8f726e2049  B000              mov al, 0x0
+7f8f726e204b  C3                ret
+7f8f726e204c  B001              mov al, 0x1
+7f8f726e204e  C3                ret
 ```
 
