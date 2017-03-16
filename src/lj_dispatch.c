@@ -69,7 +69,6 @@ void lj_dispatch_init_hotcount(global_State *g)
 #define DISPMODE_INS	0x04	/* Override instruction dispatch. */
 #define DISPMODE_JIT	0x10	/* JIT compiler on. */
 #define DISPMODE_REC	0x20	/* Recording active. */
-#define DISPMODE_PROF	0x40	/* Profiling active. */
 
 /* Update dispatch table depending on various flags. */
 void lj_dispatch_update(global_State *g)
@@ -107,7 +106,7 @@ void lj_dispatch_update(global_State *g)
     disp[GG_LEN_DDISP+BC_LOOP] = f_loop;
 
     /* Set dynamic instruction dispatch. */
-    if ((oldmode ^ mode) & (DISPMODE_PROF|DISPMODE_REC|DISPMODE_INS)) {
+    if ((oldmode ^ mode) & (DISPMODE_REC|DISPMODE_INS)) {
       /* Need to update the whole table. */
       if (!(mode & DISPMODE_INS)) {  /* No ins dispatch? */
 	/* Copy static dispatch table to dynamic dispatch table. */
@@ -121,8 +120,7 @@ void lj_dispatch_update(global_State *g)
 	}
       } else {
 	/* The recording dispatch also checks for hooks. */
-	ASMFunction f = (mode & DISPMODE_PROF) ? lj_vm_profhook :
-			(mode & DISPMODE_REC) ? lj_vm_record : lj_vm_inshook;
+	ASMFunction f = (mode & DISPMODE_REC) ? lj_vm_record : lj_vm_inshook;
 	uint32_t i;
 	for (i = 0; i < GG_LEN_SDISP; i++)
 	  disp[i] = f;
@@ -418,7 +416,7 @@ ASMFunction lj_dispatch_call(lua_State *L, const BCIns *pc)
     lua_assert(L->top - L->base == delta);
     goto out;
   } else if (J->state != LJ_TRACE_IDLE &&
-	     !(g->hookmask & (HOOK_GC|HOOK_VMEVENT))) {
+	     !(g->hookmask & HOOK_GC)) {
 #ifdef LUA_USE_ASSERT
     ptrdiff_t delta = L->top - L->base;
 #endif

@@ -127,8 +127,6 @@
 /* Disable or enable the FFI extension. */
 #define LJ_HASFFI		1
 
-#define LJ_HASPROFILE		0
-
 #ifndef LJ_ARCH_HASFPU
 #define LJ_ARCH_HASFPU		1
 #endif

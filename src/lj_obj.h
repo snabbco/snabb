@@ -553,13 +553,10 @@ typedef struct global_State {
 #define HOOK_EVENTMASK		0x0f
 #define HOOK_ACTIVE		0x10
 #define HOOK_ACTIVE_SHIFT	4
-#define HOOK_VMEVENT		0x20
-#define HOOK_GC			0x40
-#define HOOK_PROFILE		0x80
+#define HOOK_GC			0x20
 #define hook_active(g)		((g)->hookmask & HOOK_ACTIVE)
 #define hook_enter(g)		((g)->hookmask |= HOOK_ACTIVE)
 #define hook_entergc(g)		((g)->hookmask |= (HOOK_ACTIVE|HOOK_GC))
-#define hook_vmevent(g)		((g)->hookmask |= (HOOK_ACTIVE|HOOK_VMEVENT))
 #define hook_leave(g)		((g)->hookmask &= ~HOOK_ACTIVE)
 #define hook_save(g)		((g)->hookmask & ~HOOK_EVENTMASK)
 #define hook_restore(g, h) \

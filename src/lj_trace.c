@@ -27,7 +27,6 @@
 #include "lj_asm.h"
 #include "lj_dispatch.h"
 #include "lj_vm.h"
-#include "lj_vmevent.h"
 #include "lj_target.h"
 
 /* -- Error handling ------------------------------------------------------ */
@@ -257,9 +256,6 @@ int lj_trace_flushall(lua_State *L)
   /* Free the whole machine code and invalidate all exit stub groups. */
   lj_mcode_free(J);
   memset(J->exitstubgroup, 0, sizeof(J->exitstubgroup));
-  lj_vmevent_send(L, TRACE,
-    setstrV(L, L->top++, lj_str_newlit(L, "flush"));
-  );
   return 0;
 }
 
@@ -366,7 +362,8 @@ static void trace_start(jit_State *J)
   }
   setgcrefp(J->trace[traceno], &J->cur);
 
-  /* Setup enough of the current trace to be able to send the vmevent. */
+  /* Setup enough of the current trace to be able to send the vmevent. 
+     XXX Still needed with vmevent removed? -lukego */
   memset(&J->cur, 0, sizeof(GCtrace));
   J->cur.traceno = traceno;
   J->cur.nins = J->cur.nk = REF_BASE;
@@ -384,22 +381,6 @@ static void trace_start(jit_State *J)
   setgcref(J->cur.startpt, obj2gco(J->pt));
 
   L = J->L;
-  lj_vmevent_send(L, TRACE,
-    setstrV(L, L->top++, lj_str_newlit(L, "start"));
-    setintV(L->top++, traceno);
-    setfuncV(L, L->top++, J->fn);
-    setintV(L->top++, proto_bcpos(J->pt, J->pc));
-    if (J->parent) {
-      setintV(L->top++, J->parent);
-      setintV(L->top++, J->exitno);
-    } else {
-      BCOp op = bc_op(*J->pc);
-      if (op == BC_CALLM || op == BC_CALL || op == BC_ITERC) {
-	setintV(L->top++, J->exitno);  /* Parent of stitched trace. */
-	setintV(L->top++, -1);
-      }
-    }
-  );
   lj_record_setup(J);
 }
 
@@ -464,11 +445,6 @@ static void trace_stop(jit_State *J)
   trace_save(J, T);
 
   L = J->L;
-  lj_vmevent_send(L, TRACE,
-    setstrV(L, L->top++, lj_str_newlit(L, "stop"));
-    setintV(L->top++, traceno);
-    setfuncV(L, L->top++, J->fn);
-  );
 }
 
 /* Start a new root trace for down-recursion. */
@@ -525,26 +501,8 @@ static int trace_abort(jit_State *J)
     ptrdiff_t errobj = savestack(L, L->top-1);  /* Stack may be resized. */
     J->cur.link = 0;
     J->cur.linktype = LJ_TRLINK_NONE;
-    lj_vmevent_send(L, TRACE,
-      TValue *frame;
-      const BCIns *pc;
-      GCfunc *fn;
-      setstrV(L, L->top++, lj_str_newlit(L, "abort"));
-      setintV(L->top++, traceno);
-      /* Find original Lua function call to generate a better error message. */
-      frame = J->L->base-1;
-      pc = J->pc;
-      while (!isluafunc(frame_func(frame))) {
-	pc = (frame_iscont(frame) ? frame_contpc(frame) : frame_pc(frame)) - 1;
-	frame = frame_prev(frame);
-      }
-      fn = frame_func(frame);
-      setfuncV(L, L->top++, fn);
-      setintV(L->top++, proto_bcpos(funcproto(fn), pc));
-      copyTV(L, L->top++, restorestack(L, errobj));
-      copyTV(L, L->top++, &J->errinfo);
-    );
-    /* Drop aborted trace after the vmevent (which may still access it). */
+    /* Drop aborted trace after the vmevent (which may still access it).
+       XXX Rethink now that vmevent is removed? -lukego */
     setgcrefnull(J->trace[traceno]);
     if (traceno < J->freetrace)
       J->freetrace = traceno;
@@ -588,18 +546,6 @@ static TValue *trace_state(lua_State *L, lua_CFunction dummy, void *ud)
     case LJ_TRACE_RECORD:
       trace_pendpatch(J, 0);
       setvmstate(J2G(J), RECORD);
-      lj_vmevent_send_(L, RECORD,
-	/* Save/restore tmptv state for trace recorder. */
-	TValue savetv = J2G(J)->tmptv;
-	TValue savetv2 = J2G(J)->tmptv2;
-	setintV(L->top++, J->cur.traceno);
-	setfuncV(L, L->top++, J->fn);
-	setintV(L->top++, J->pt ? (int32_t)proto_bcpos(J->pt, J->pc) : -1);
-	setintV(L->top++, J->framedepth);
-      ,
-	J2G(J)->tmptv = savetv;
-	J2G(J)->tmptv2 = savetv2;
-      );
       lj_record_ins(J);
       break;
 
@@ -670,9 +616,8 @@ void lj_trace_hot(jit_State *J, const BCIns *pc)
   ERRNO_SAVE
   /* Reset hotcount. */
   hotcount_set(J2GG(J), pc, J->param[JIT_P_hotloop]*HOTCOUNT_LOOP);
-  /* Only start a new trace if not recording or inside __gc call or vmevent. */
-  if (J->state == LJ_TRACE_IDLE &&
-      !(J2G(J)->hookmask & (HOOK_GC|HOOK_VMEVENT))) {
+  /* Only start a new trace if not recording or inside __gc call. */
+  if (J->state == LJ_TRACE_IDLE && !(J2G(J)->hookmask & HOOK_GC)) {
     J->parent = 0;  /* Root trace. */
     J->exitno = 0;
     J->state = LJ_TRACE_START;
@@ -685,7 +630,7 @@ void lj_trace_hot(jit_State *J, const BCIns *pc)
 static void trace_hotside(jit_State *J, const BCIns *pc)
 {
   SnapShot *snap = &traceref(J, J->parent)->snap[J->exitno];
-  if (!(J2G(J)->hookmask & (HOOK_GC|HOOK_VMEVENT)) &&
+  if (!(J2G(J)->hookmask & HOOK_GC) &&
       isluafunc(curr_func(J->L)) &&
       snap->count != SNAPCOUNT_DONE &&
       ++snap->count >= J->param[JIT_P_hotexit]) {
@@ -699,9 +644,8 @@ static void trace_hotside(jit_State *J, const BCIns *pc)
 /* Stitch a new trace to the previous trace. */
 void lj_trace_stitch(jit_State *J, const BCIns *pc)
 {
-  /* Only start a new trace if not recording or inside __gc call or vmevent. */
-  if (J->state == LJ_TRACE_IDLE &&
-      !(J2G(J)->hookmask & (HOOK_GC|HOOK_VMEVENT))) {
+  /* Only start a new trace if not recording or inside __gc call. */
+  if (J->state == LJ_TRACE_IDLE && !(J2G(J)->hookmask & HOOK_GC)) {
     J->parent = 0;  /* Have to treat it like a root trace. */
     /* J->exitno is set to the invoking trace. */
     J->state = LJ_TRACE_START;
@@ -773,20 +717,10 @@ int lj_trace_exit(jit_State *J, void *exptr)
   if (errcode)
     return -errcode;  /* Return negated error code. */
 
-  if (!(LJ_HASPROFILE && (G(L)->hookmask & HOOK_PROFILE)))
-    lj_vmevent_send(L, TEXIT,
-      lj_state_checkstack(L, 4+RID_NUM_GPR+RID_NUM_FPR+LUA_MINSTACK);
-      setintV(L->top++, J->parent);
-      setintV(L->top++, J->exitno);
-      trace_exit_regs(L, ex);
-    );
-
   pc = exd.pc;
   cf = cframe_raw(L->cframe);
   setcframe_pc(cf, pc);
-  if (LJ_HASPROFILE && (G(L)->hookmask & HOOK_PROFILE)) {
-    /* Just exit to interpreter. */
-  } else if (G(L)->gc.state == GCSatomic || G(L)->gc.state == GCSfinalize) {
+  if (G(L)->gc.state == GCSatomic || G(L)->gc.state == GCSfinalize) {
     if (!(G(L)->hookmask & HOOK_GC))
       lj_gc_step(L);  /* Exited because of GC: drive GC forward. */
   } else {

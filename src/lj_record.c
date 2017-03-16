@@ -593,9 +593,6 @@ static void rec_loop_jit(jit_State *J, TraceNo lnk, LoopEvent ev)
   }  /* Side trace continues across a loop that's left or not entered. */
 }
 
-/* -- Record profiler hook checks ----------------------------------------- */
-
-
 /* -- Record calls and returns -------------------------------------------- */
 
 /* Specialize to the runtime value of the called function or its prototype. */
