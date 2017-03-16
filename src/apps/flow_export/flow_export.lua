@@ -287,7 +287,12 @@ function selftest()
       nf:process_packet(pkt)
    end
 
+   -- populate with some known flows
    test_packet("192.168.1.1", "192.168.1.25", 9999, 80)
+   test_packet("192.168.1.25", "192.168.1.1", 3653, 23552)
+   test_packet("192.168.1.25", "8.8.8.8", 58342, 53)
+   test_packet("8.8.8.8", "192.168.1.25", 53, 58342)
+   assert(nf.flows.occupancy == 4, "wrong number of flows")
 
    -- do some packets with random data to test that it doesn't interfere
    for i=1, 100 do
