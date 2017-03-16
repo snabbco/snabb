@@ -12,7 +12,7 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	 $(MAKE) PREFIX=`pwd`/usr/local \
 	         CFLAGS="$(LUAJIT_CFLAGS)" && \
 	 $(MAKE) DESTDIR=`pwd` install)
-	(cd lib/luajit/usr/local/bin; ln -fs luajit-2.1.0-beta1 luajit)
+	(cd lib/luajit/usr/local/bin; ln -fs luajit-2.1.0-beta2 luajit)
 #       ljsyscall
 	@mkdir -p src/syscall/linux
 	@cp -p lib/ljsyscall/syscall.lua   src/
