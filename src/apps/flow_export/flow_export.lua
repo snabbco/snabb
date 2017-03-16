@@ -264,30 +264,44 @@ function selftest()
                                  collector_mac = "09:08:07:06:05:04",
                                  collector_ip = "192.168.0.3",
                                  collector_port = 2100 })
-   local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
-                           dst = ether:pton("55:44:33:22:11:00"),
-                           type = ETHER_PROTO_IPV4 })
-   local ip = ipv4:new({ src = ipv4:pton("192.168.1.1"),
-                         dst = ipv4:pton("192.168.1.25"),
-                         protocol = IP_PROTO_TCP,
-                         ttl = 64 })
-   local tcp = tcp:new({ src_port = 9999,
-                         dst_port = 80 })
-   local dg = datagram:new()
 
-   dg:push(tcp)
-   dg:push(ip)
-   dg:push(eth)
+   -- test helper that processes a packet with some given fields
+   local function test_packet(src_ip, dst_ip, src_port, dst_port)
+      local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
+                              dst = ether:pton("55:44:33:22:11:00"),
+                              type = ETHER_PROTO_IPV4 })
+      local ip = ipv4:new({ src = ipv4:pton(src_ip),
+                            dst = ipv4:pton(dst_ip),
+                            protocol = IP_PROTO_UDP,
+                            ttl = 64 })
+      local udp = tcp:new({ src_port = src_port,
+                            dst_port = dst_port })
+      local dg = datagram:new()
 
-   local pkt = dg:packet()
+      dg:push(udp)
+      dg:push(ip)
+      dg:push(eth)
 
-   nf:process_packet(pkt)
+      local pkt = dg:packet()
+
+      nf:process_packet(pkt)
+   end
+
+   test_packet("192.168.1.1", "192.168.1.25", 9999, 80)
+
+   -- do some packets with random data to test that it doesn't interfere
+   for i=1, 100 do
+      test_packet(string.format("192.168.1.%d", math.random(2, 254)),
+                  "192.168.1.25",
+                  math.random(10000, 65535),
+                  math.random(1, 79))
+   end
 
    local key = ffi.new("struct flow_key")
    key.is_ipv6  = false
    ffi.copy(key.src_ip, ipv4:pton("192.168.1.1"), 4)
    ffi.copy(key.dst_ip, ipv4:pton("192.168.1.25"), 4)
-   key.protocol = IP_PROTO_TCP
+   key.protocol = IP_PROTO_UDP
    key.src_port = htons(9999)
    key.dst_port = htons(80)
 
@@ -295,7 +309,8 @@ function selftest()
    assert(result, "key not found")
    assert(result.value.pkt_count == 1)
 
-   nf:process_packet(pkt)
+   -- make sure the count is incremented on the same flow
+   test_packet("192.168.1.1", "192.168.1.25", 9999, 80)
    assert(result.value.pkt_count == 2)
 
    -- sanity check
