@@ -143,9 +143,7 @@
 |.define CFRAME_SPACE,	aword*5			// Delta for rsp (see <--).
 |.macro saveregs_
 |  push rbx; push r15; push r14
-|.if NO_UNWIND
 |  push r13; push r12
-|.endif
 |  sub rsp, CFRAME_SPACE
 |.endmacro
 |.macro saveregs
@@ -153,14 +151,11 @@
 |.endmacro
 |.macro restoreregs
 |  add rsp, CFRAME_SPACE
-|.if NO_UNWIND
 |  pop r12; pop r13
-|.endif
 |  pop r14; pop r15; pop rbx; pop rbp
 |.endmacro
 |
 |//----- 16 byte aligned,
-|.if NO_UNWIND
 |.define SAVE_RET,	aword [rsp+aword*11]	//<-- rsp entering interpreter.
 |.define SAVE_R4,	aword [rsp+aword*10]
 |.define SAVE_R3,	aword [rsp+aword*9]
@@ -168,13 +163,6 @@
 |.define SAVE_R1,	aword [rsp+aword*7]
 |.define SAVE_RU2,	aword [rsp+aword*6]
 |.define SAVE_RU1,	aword [rsp+aword*5]	//<-- rsp after register saves.
-|.else
-|.define SAVE_RET,	aword [rsp+aword*9]	//<-- rsp entering interpreter.
-|.define SAVE_R4,	aword [rsp+aword*8]
-|.define SAVE_R3,	aword [rsp+aword*7]
-|.define SAVE_R2,	aword [rsp+aword*6]
-|.define SAVE_R1,	aword [rsp+aword*5]	//<-- rsp after register saves.
-|.endif
 |.define SAVE_CFRAME,	aword [rsp+aword*4]
 |.define SAVE_PC,	aword [rsp+aword*3]
 |.define SAVE_L,	aword [rsp+aword*2]
@@ -4282,9 +4270,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
 
   case BC_JFORI:
   case BC_JFORL:
-#if !LJ_HASJIT
-    break;
-#endif
   case BC_FORI:
   case BC_IFORL:
     vk = (op == BC_IFORL || op == BC_JFORL);
@@ -4432,9 +4417,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     break;
 
   case BC_JITERL:
-#if !LJ_HASJIT
-    break;
-#endif
   case BC_IITERL:
     |  ins_AJ	// RA = base, RD = target
     |  lea RA, [BASE+RA*8]
@@ -4526,9 +4508,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     break;
 
   case BC_JFUNCF:
-#if !LJ_HASJIT
-    break;
-#endif
   case BC_IFUNCF:
     |  ins_AD  // BASE = new base, RA = framesize, RD = nargs+1
     |  mov KBASE, [PC-4+PC2PROTO(k)]
@@ -4556,9 +4535,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     break;
 
   case BC_JFUNCV:
-#if !LJ_HASJIT
-    break;
-#endif
     | int3  // NYI: compiled vararg functions
     break;  /* NYI: compiled vararg functions. */
 
@@ -4696,13 +4672,10 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset rbx */
 	"\t.byte 0x8f\n\t.uleb128 0x4\n"	/* offset r15 */
 	"\t.byte 0x8e\n\t.uleb128 0x5\n"	/* offset r14 */
-#if LJ_NO_UNWIND
 	"\t.byte 0x8d\n\t.uleb128 0x6\n"	/* offset r13 */
 	"\t.byte 0x8c\n\t.uleb128 0x7\n"	/* offset r12 */
-#endif
 	"\t.align 8\n"
 	".LEFDE0:\n\n", fcofs, CFRAME_SIZE);
-#if LJ_HASFFI
     fprintf(ctx->fp,
 	".LSFDE1:\n"
 	"\t.long .LEFDE1-.LASFDE1\n"
@@ -4716,176 +4689,7 @@ static void emit_asm_debug(BuildCtx *ctx)
 	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset rbx */
 	"\t.align 8\n"
 	".LEFDE1:\n\n", (int)ctx->codesz - fcofs);
-#endif
-#if !LJ_NO_UNWIND
-#if (defined(__sun__) && defined(__svr4__))
-    fprintf(ctx->fp, "\t.section .eh_frame,\"a\",@unwind\n");
-#else
-    fprintf(ctx->fp, "\t.section .eh_frame,\"a\",@progbits\n");
-#endif
-    fprintf(ctx->fp,
-	".Lframe1:\n"
-	"\t.long .LECIE1-.LSCIE1\n"
-	".LSCIE1:\n"
-	"\t.long 0\n"
-	"\t.byte 0x1\n"
-	"\t.string \"zPR\"\n"
-	"\t.uleb128 0x1\n"
-	"\t.sleb128 -8\n"
-	"\t.byte 0x10\n"
-	"\t.uleb128 6\n"			/* augmentation length */
-	"\t.byte 0x1b\n"			/* pcrel|sdata4 */
-	"\t.long lj_err_unwind_dwarf-.\n"
-	"\t.byte 0x1b\n"			/* pcrel|sdata4 */
-	"\t.byte 0xc\n\t.uleb128 0x7\n\t.uleb128 8\n"
-	"\t.byte 0x80+0x10\n\t.uleb128 0x1\n"
-	"\t.align 8\n"
-	".LECIE1:\n\n");
-    fprintf(ctx->fp,
-	".LSFDE2:\n"
-	"\t.long .LEFDE2-.LASFDE2\n"
-	".LASFDE2:\n"
-	"\t.long .LASFDE2-.Lframe1\n"
-	"\t.long .Lbegin-.\n"
-	"\t.long %d\n"
-	"\t.uleb128 0\n"			/* augmentation length */
-	"\t.byte 0xe\n\t.uleb128 %d\n"		/* def_cfa_offset */
-	"\t.byte 0x86\n\t.uleb128 0x2\n"	/* offset rbp */
-	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset rbx */
-	"\t.byte 0x8f\n\t.uleb128 0x4\n"	/* offset r15 */
-	"\t.byte 0x8e\n\t.uleb128 0x5\n"	/* offset r14 */
-	"\t.align 8\n"
-	".LEFDE2:\n\n", fcofs, CFRAME_SIZE);
-#if LJ_HASFFI
-    fprintf(ctx->fp,
-	".Lframe2:\n"
-	"\t.long .LECIE2-.LSCIE2\n"
-	".LSCIE2:\n"
-	"\t.long 0\n"
-	"\t.byte 0x1\n"
-	"\t.string \"zR\"\n"
-	"\t.uleb128 0x1\n"
-	"\t.sleb128 -8\n"
-	"\t.byte 0x10\n"
-	"\t.uleb128 1\n"			/* augmentation length */
-	"\t.byte 0x1b\n"			/* pcrel|sdata4 */
-	"\t.byte 0xc\n\t.uleb128 0x7\n\t.uleb128 8\n"
-	"\t.byte 0x80+0x10\n\t.uleb128 0x1\n"
-	"\t.align 8\n"
-	".LECIE2:\n\n");
-    fprintf(ctx->fp,
-	".LSFDE3:\n"
-	"\t.long .LEFDE3-.LASFDE3\n"
-	".LASFDE3:\n"
-	"\t.long .LASFDE3-.Lframe2\n"
-	"\t.long lj_vm_ffi_call-.\n"
-	"\t.long %d\n"
-	"\t.uleb128 0\n"			/* augmentation length */
-	"\t.byte 0xe\n\t.uleb128 16\n"		/* def_cfa_offset */
-	"\t.byte 0x86\n\t.uleb128 0x2\n"	/* offset rbp */
-	"\t.byte 0xd\n\t.uleb128 0x6\n"		/* def_cfa_register rbp */
-	"\t.byte 0x83\n\t.uleb128 0x3\n"	/* offset rbx */
-	"\t.align 8\n"
-	".LEFDE3:\n\n", (int)ctx->codesz - fcofs);
-#endif
-#endif
     break;
-#if !LJ_NO_UNWIND
-  /* Mental note: never let Apple design an assembler.
-  ** Or a linker. Or a plastic case. But I digress.
-  */
-  case BUILD_machasm: {
-#if LJ_HASFFI
-    int fcsize = 0;
-#endif
-    int i;
-    fprintf(ctx->fp, "\t.section __TEXT,__eh_frame,coalesced,no_toc+strip_static_syms+live_support\n");
-    fprintf(ctx->fp,
-	"EH_frame1:\n"
-	"\t.set L$set$x,LECIEX-LSCIEX\n"
-	"\t.long L$set$x\n"
-	"LSCIEX:\n"
-	"\t.long 0\n"
-	"\t.byte 0x1\n"
-	"\t.ascii \"zPR\\0\"\n"
-	"\t.byte 0x1\n"
-	"\t.byte 128-8\n"
-	"\t.byte 0x10\n"
-	"\t.byte 6\n"				/* augmentation length */
-	"\t.byte 0x9b\n"			/* indirect|pcrel|sdata4 */
-	"\t.long _lj_err_unwind_dwarf+4@GOTPCREL\n"
-	"\t.byte 0x1b\n"			/* pcrel|sdata4 */
-	"\t.byte 0xc\n\t.byte 0x7\n\t.byte 8\n"
-	"\t.byte 0x80+0x10\n\t.byte 0x1\n"
-	"\t.align 3\n"
-	"LECIEX:\n\n");
-    for (i = 0; i < ctx->nsym; i++) {
-      const char *name = ctx->sym[i].name;
-      int32_t size = ctx->sym[i+1].ofs - ctx->sym[i].ofs;
-      if (size == 0) continue;
-#if LJ_HASFFI
-      if (!strcmp(name, "_lj_vm_ffi_call")) { fcsize = size; continue; }
-#endif
-      fprintf(ctx->fp,
-	  "%s.eh:\n"
-	  "LSFDE%d:\n"
-	  "\t.set L$set$%d,LEFDE%d-LASFDE%d\n"
-	  "\t.long L$set$%d\n"
-	  "LASFDE%d:\n"
-	  "\t.long LASFDE%d-EH_frame1\n"
-	  "\t.long %s-.\n"
-	  "\t.long %d\n"
-	  "\t.byte 0\n"				/* augmentation length */
-	  "\t.byte 0xe\n\t.byte %d\n"		/* def_cfa_offset */
-	  "\t.byte 0x86\n\t.byte 0x2\n"		/* offset rbp */
-	  "\t.byte 0x83\n\t.byte 0x3\n"		/* offset rbx */
-	  "\t.byte 0x8f\n\t.byte 0x4\n"		/* offset r15 */
-	  "\t.byte 0x8e\n\t.byte 0x5\n"		/* offset r14 */
-	  "\t.align 3\n"
-	  "LEFDE%d:\n\n",
-	  name, i, i, i, i, i, i, i, name, size, CFRAME_SIZE, i);
-    }
-#if LJ_HASFFI
-    if (fcsize) {
-      fprintf(ctx->fp,
-	  "EH_frame2:\n"
-	  "\t.set L$set$y,LECIEY-LSCIEY\n"
-	  "\t.long L$set$y\n"
-	  "LSCIEY:\n"
-	  "\t.long 0\n"
-	  "\t.byte 0x1\n"
-	  "\t.ascii \"zR\\0\"\n"
-	  "\t.byte 0x1\n"
-	  "\t.byte 128-8\n"
-	  "\t.byte 0x10\n"
-	  "\t.byte 1\n"				/* augmentation length */
-	  "\t.byte 0x1b\n"			/* pcrel|sdata4 */
-	  "\t.byte 0xc\n\t.byte 0x7\n\t.byte 8\n"
-	  "\t.byte 0x80+0x10\n\t.byte 0x1\n"
-	  "\t.align 3\n"
-	  "LECIEY:\n\n");
-      fprintf(ctx->fp,
-	  "_lj_vm_ffi_call.eh:\n"
-	  "LSFDEY:\n"
-	  "\t.set L$set$yy,LEFDEY-LASFDEY\n"
-	  "\t.long L$set$yy\n"
-	  "LASFDEY:\n"
-	  "\t.long LASFDEY-EH_frame2\n"
-	  "\t.long _lj_vm_ffi_call-.\n"
-	  "\t.long %d\n"
-	  "\t.byte 0\n"				/* augmentation length */
-	  "\t.byte 0xe\n\t.byte 16\n"		/* def_cfa_offset */
-	  "\t.byte 0x86\n\t.byte 0x2\n"		/* offset rbp */
-	  "\t.byte 0xd\n\t.byte 0x6\n"		/* def_cfa_register rbp */
-	  "\t.byte 0x83\n\t.byte 0x3\n"		/* offset rbx */
-	  "\t.align 3\n"
-	  "LEFDEY:\n\n", fcsize);
-    }
-#endif
-    fprintf(ctx->fp, ".subsections_via_symbols\n");
-    }
-    break;
-#endif
   default:  /* Difficult for other modes. */
     break;
   }
