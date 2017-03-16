@@ -72,20 +72,14 @@ class BaseTestCase(unittest.TestCase):
             output, errput = proc.communicate(timeout=COMMAND_TIMEOUT)
         except TimeoutExpired:
             proc.kill()
-            output, errput = proc.communicate()
-            msg = '\n'.join((
-                'Timeout running command:', str(args),
+            proc.communicate()
+        if proc.returncode != 0:
+            msg_lines = (
+                'Error running command:', str(args),
+                'Exit code:', str(proc.returncode),
                 'STDOUT', str(output, ENC), 'STDERR', str(errput, ENC),
-            ))
-            self.fail(msg)
-        else:
-            if proc.returncode != 0:
-                msg = '\n'.join((
-                    'Error running command:', str(args),
-                    'Exit code:', str(proc.returncode),
-                    'STDOUT', str(output, ENC), 'STDERR', str(errput, ENC),
-                ))
-                self.fail(msg)
+            )
+            self.fail('\n'.join(msg_lines))
         return output
 
     @classmethod
