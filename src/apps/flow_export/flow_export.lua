@@ -77,7 +77,7 @@ local template_interval = 60
 
 -- produce a timestamp in milliseconds
 local function get_timestamp()
-   return C.get_time_ns() / 1000000ULL
+   return C.get_unix_time() * 1000ULL
 end
 
 -- Walk through flow cache to see if flow records need to be expired.
