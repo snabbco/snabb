@@ -157,42 +157,13 @@ LJLIB_CF(math_random)		LJLIB_REC(.)
   u.u64 = lj_math_random_step(rs);
   d = u.d - 1.0;
   if (n > 0) {
-#if LJ_DUALNUM
-    int isint = 1;
-    double r1;
-    lj_lib_checknumber(L, 1);
-    if (tvisint(L->base)) {
-      r1 = (lua_Number)intV(L->base);
-    } else {
-      isint = 0;
-      r1 = numV(L->base);
-    }
-#else
     double r1 = lj_lib_checknum(L, 1);
-#endif
     if (n == 1) {
       d = lj_vm_floor(d*r1) + 1.0;  /* d is an int in range [1, r1] */
     } else {
-#if LJ_DUALNUM
-      double r2;
-      lj_lib_checknumber(L, 2);
-      if (tvisint(L->base+1)) {
-	r2 = (lua_Number)intV(L->base+1);
-      } else {
-	isint = 0;
-	r2 = numV(L->base+1);
-      }
-#else
       double r2 = lj_lib_checknum(L, 2);
-#endif
       d = lj_vm_floor(d*(r2-r1+1.0)) + r1;  /* d is an int in range [r1, r2] */
     }
-#if LJ_DUALNUM
-    if (isint) {
-      setintV(L->top-1, lj_num2int(d));
-      return 1;
-    }
-#endif
   }  /* else: d is a double in range [0, 1] */
   setnumV(L->top++, d);
   return 1;

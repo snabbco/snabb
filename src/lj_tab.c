@@ -34,7 +34,6 @@ static LJ_AINLINE Node *hashmask(const GCtab *t, uint32_t hash)
 /* Hash an arbitrary key and return its anchor position in the hash table. */
 static Node *hashkey(const GCtab *t, cTValue *key)
 {
-  lua_assert(!tvisint(key));
   if (tvisstr(key))
     return hashstr(t, strV(key));
   else if (tvisnum(key))
@@ -298,7 +297,6 @@ void lj_tab_resize(lua_State *L, GCtab *t, uint32_t asize, uint32_t hbits)
 
 static uint32_t countint(cTValue *key, uint32_t *bins)
 {
-  lua_assert(!tvisint(key));
   if (tvisnum(key)) {
     lua_Number nk = numV(key);
     int32_t k = lj_num2int(nk);
@@ -414,10 +412,6 @@ cTValue *lj_tab_get(lua_State *L, GCtab *t, cTValue *key)
     cTValue *tv = lj_tab_getstr(t, strV(key));
     if (tv)
       return tv;
-  } else if (tvisint(key)) {
-    cTValue *tv = lj_tab_getint(t, intV(key));
-    if (tv)
-      return tv;
   } else if (tvisnum(key)) {
     lua_Number nk = numV(key);
     int32_t k = lj_num2int(nk);
@@ -526,8 +520,6 @@ TValue *lj_tab_set(lua_State *L, GCtab *t, cTValue *key)
   t->nomm = 0;  /* Invalidate negative metamethod cache. */
   if (tvisstr(key)) {
     return lj_tab_setstr(L, t, strV(key));
-  } else if (tvisint(key)) {
-    return lj_tab_setint(L, t, intV(key));
   } else if (tvisnum(key)) {
     lua_Number nk = numV(key);
     int32_t k = lj_num2int(nk);
@@ -552,14 +544,7 @@ TValue *lj_tab_set(lua_State *L, GCtab *t, cTValue *key)
 /* Get the traversal index of a key. */
 static uint32_t keyindex(lua_State *L, GCtab *t, cTValue *key)
 {
-  TValue tmp;
-  if (tvisint(key)) {
-    int32_t k = intV(key);
-    if ((uint32_t)k < t->asize)
-      return (uint32_t)k;  /* Array key indexes: [0..t->asize-1] */
-    setnumV(&tmp, (lua_Number)k);
-    key = &tmp;
-  } else if (tvisnum(key)) {
+  if (tvisnum(key)) {
     lua_Number nk = numV(key);
     int32_t k = lj_num2int(nk);
     if ((uint32_t)k < t->asize && nk == (lua_Number)k)

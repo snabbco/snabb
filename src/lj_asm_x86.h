@@ -1160,8 +1160,7 @@ static void asm_fxstore(ASMState *as, IRIns *ir)
 static void asm_ahuvload(ASMState *as, IRIns *ir)
 {
   Reg tmp = RID_NONE;
-  lua_assert(irt_isnum(ir->t) || irt_ispri(ir->t) || irt_isaddr(ir->t) ||
-	     (LJ_DUALNUM && irt_isint(ir->t)));
+  lua_assert(irt_isnum(ir->t) || irt_ispri(ir->t) || irt_isaddr(ir->t));
   if (ra_used(ir)) {
     RegSet allow = irt_isnum(ir->t) ? RSET_FPR : RSET_GPR;
     Reg dest = ra_dest(as, ir, allow);
@@ -1245,25 +1244,17 @@ static void asm_ahustore(ASMState *as, IRIns *ir)
     }
     asm_fuseahuref(as, ir->op1, allow);
     if (ra_hasreg(src)) {
-      if (!(LJ_DUALNUM && irt_isinteger(ir->t))) {
-	/* TODO: 64 bit store + 32 bit load-modify-store is suboptimal. */
-	as->mrm.ofs += 4;
-	emit_u32(as, irt_toitype(ir->t) << 15);
-	emit_mrm(as, XO_ARITHi, XOg_OR, RID_MRM);
-	as->mrm.ofs -= 4;
-	emit_mrm(as, XO_MOVto, src|REX_64, RID_MRM);
-	return;
-      }
-      emit_mrm(as, XO_MOVto, src, RID_MRM);
-    } else if (!irt_ispri(irr->t)) {
-      lua_assert(irt_isaddr(ir->t) || (LJ_DUALNUM && irt_isinteger(ir->t)));
+      /* TODO: 64 bit store + 32 bit load-modify-store is suboptimal. */
+      as->mrm.ofs += 4;
+      emit_u32(as, irt_toitype(ir->t) << 15);
+      emit_mrm(as, XO_ARITHi, XOg_OR, RID_MRM);
+      as->mrm.ofs -= 4;
+      emit_mrm(as, XO_MOVto, src|REX_64, RID_MRM);
+    } else {
+      lua_assert(!irt_ispri(irr->t) && irt_isaddr(ir->t));
       emit_i32(as, irr->i);
       emit_mrm(as, XO_MOVmi, 0, RID_MRM);
     }
-    as->mrm.ofs += 4;
-    lua_assert(LJ_DUALNUM && irt_isinteger(ir->t));
-    emit_i32(as, LJ_TNUMX << 15);
-    emit_mrm(as, XO_MOVmi, 0, RID_MRM);
   }
 }
 
@@ -1275,8 +1266,7 @@ static void asm_sload(ASMState *as, IRIns *ir)
   Reg base;
   lua_assert(!(ir->op2 & IRSLOAD_PARENT));  /* Handled by asm_head_side(). */
   lua_assert(irt_isguard(t) || !(ir->op2 & IRSLOAD_TYPECHECK));
-  lua_assert(LJ_DUALNUM ||
-	     !irt_isint(t) || (ir->op2 & (IRSLOAD_CONVERT|IRSLOAD_FRAME)));
+  lua_assert(!irt_isint(t) || (ir->op2 & (IRSLOAD_CONVERT|IRSLOAD_FRAME)));
   if ((ir->op2 & IRSLOAD_CONVERT) && irt_isguard(t) && irt_isint(t)) {
     Reg left = ra_scratch(as, RSET_FPR);
     asm_tointg(as, ir, left);  /* Frees dest reg. Do this before base alloc. */
@@ -2150,16 +2140,13 @@ static void asm_stack_restore(ASMState *as, SnapShot *snap)
       Reg src = ra_alloc1(as, ref, RSET_FPR);
       emit_rmro(as, XO_MOVSDto, src, RID_BASE, ofs);
     } else {
-      lua_assert(irt_ispri(ir->t) || irt_isaddr(ir->t) ||
-		 (LJ_DUALNUM && irt_isinteger(ir->t)));
+      lua_assert(irt_ispri(ir->t) || irt_isaddr(ir->t));
       if (!irref_isk(ref)) {
 	Reg src = ra_alloc1(as, ref, rset_exclude(RSET_GPR, RID_BASE));
 	if (irt_is64(ir->t)) {
 	  /* TODO: 64 bit store + 32 bit load-modify-store is suboptimal. */
 	  emit_u32(as, irt_toitype(ir->t) << 15);
 	  emit_rmro(as, XO_ARITHi, XOg_OR, RID_BASE, ofs+4);
-	} else if (LJ_DUALNUM && irt_isinteger(ir->t)) {
-	  emit_movmroi(as, RID_BASE, ofs+4, LJ_TISNUM << 15);
 	} else {
 	  emit_movmroi(as, RID_BASE, ofs+4, (irt_toitype(ir->t)<<15)|0x7fff);
 	}

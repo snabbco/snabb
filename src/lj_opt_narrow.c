@@ -532,8 +532,8 @@ TRef lj_opt_narrow_arith(jit_State *J, TRef rb, TRef rc,
 {
   rb = conv_str_tonum(J, rb, vb);
   rc = conv_str_tonum(J, rc, vc);
-  /* Must not narrow MUL in non-DUALNUM variant, because it loses -0. */
-  if ((op >= IR_ADD && op <= (LJ_DUALNUM ? IR_MUL : IR_SUB)) &&
+  /* Must not narrow MUL, because it loses -0. */
+  if ((op >= IR_ADD && op <= IR_SUB) &&
       tref_isinteger(rb) && tref_isinteger(rc) &&
       numisint(lj_vm_foldarith(numberVnum(vb), numberVnum(vc),
 			       (int)op - (int)IR_ADD)))
@@ -561,9 +561,9 @@ TRef lj_opt_narrow_mod(jit_State *J, TRef rb, TRef rc, TValue *vb, TValue *vc)
   TRef tmp;
   rb = conv_str_tonum(J, rb, vb);
   rc = conv_str_tonum(J, rc, vc);
-  if ((LJ_DUALNUM || (J->flags & JIT_F_OPT_NARROW)) &&
+  if (((J->flags & JIT_F_OPT_NARROW)) &&
       tref_isinteger(rb) && tref_isinteger(rc) &&
-      (tvisint(vc) ? intV(vc) != 0 : !tviszero(vc))) {
+      !tviszero(vc)) {
     emitir(IRTGI(IR_NE), rc, lj_ir_kint(J, 0));
     return emitir(IRTI(IR_MOD), rb, rc);
   }
@@ -583,7 +583,7 @@ TRef lj_opt_narrow_pow(jit_State *J, TRef rb, TRef rc, TValue *vb, TValue *vc)
   rb = lj_ir_tonum(J, rb);  /* Left arg is always treated as an FP number. */
   rc = conv_str_tonum(J, rc, vc);
   /* Narrowing must be unconditional to preserve (-x)^i semantics. */
-  if (tvisint(vc) || numisint(numV(vc))) {
+  if (numisint(numV(vc))) {
     int checkrange = 0;
     /* Split pow is faster for bigger exponents. But do this only for (+k)^i. */
     if (tref_isk(rb) && (int32_t)ir_knum(IR(tref_ref(rb)))->u32.hi >= 0) {
@@ -619,8 +619,7 @@ split_pow:
 /* Narrow a single runtime value. */
 static int narrow_forl(jit_State *J, cTValue *o)
 {
-  if (tvisint(o)) return 1;
-  if (LJ_DUALNUM || (J->flags & JIT_F_OPT_NARROW)) return numisint(numV(o));
+  if (J->flags & JIT_F_OPT_NARROW) return numisint(numV(o));
   return 0;
 }
 

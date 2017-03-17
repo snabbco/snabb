@@ -391,9 +391,6 @@ endif
 ifneq (,$(findstring LJ_HASFFI 1,$(TARGET_TESTARCH)))
   DASM_AFLAGS+= -D FFI
 endif
-ifneq (,$(findstring LJ_DUALNUM 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D DUALNUM
-endif
 ifneq (,$(findstring LJ_ARCH_HASFPU 1,$(TARGET_TESTARCH)))
   DASM_AFLAGS+= -D FPU
   TARGET_ARCH+= -DLJ_ARCH_HASFPU=1

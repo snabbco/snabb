@@ -530,16 +530,6 @@ int lj_strscan_num(GCstr *str, TValue *o)
   return (fmt != STRSCAN_ERROR);
 }
 
-#if LJ_DUALNUM
-int lj_strscan_number(GCstr *str, TValue *o)
-{
-  StrScanFmt fmt = lj_strscan_scan((const uint8_t *)strdata(str), o,
-				   STRSCAN_OPT_TOINT);
-  lua_assert(fmt == STRSCAN_ERROR || fmt == STRSCAN_NUM || fmt == STRSCAN_INT);
-  if (fmt == STRSCAN_INT) setitype(o, LJ_TISNUM);
-  return (fmt != STRSCAN_ERROR);
-}
-#endif
 
 #undef DNEXT
 #undef DPREV

@@ -67,7 +67,7 @@ static int32_t argv2int(jit_State *J, TValue *o)
 {
   if (!lj_strscan_numberobj(o))
     lj_trace_err(J, LJ_TRERR_BADTYPE);
-  return tvisint(o) ? intV(o) : lj_num2int(numV(o));
+  return lj_num2int(numV(o));
 }
 
 /* Get runtime value of string argument. */
@@ -510,11 +510,6 @@ static void recff_math_round(jit_State *J, RecordFFData *rd)
   if (!tref_isinteger(tr)) {  /* Pass through integers unmodified. */
     tr = emitir(IRTN(IR_FPMATH), lj_ir_tonum(J, tr), rd->data);
     /* Result is integral (or NaN/Inf), but may not fit an int32_t. */
-    if (LJ_DUALNUM) {  /* Try to narrow using a guarded conversion to int. */
-      lua_Number n = lj_vm_foldfpm(numberVnum(&rd->argv[0]), rd->data);
-      if (n == (lua_Number)lj_num2int(n))
-	tr = emitir(IRTGI(IR_CONV), tr, IRCONV_INT_NUM|IRCONV_CHECK);
-    }
     J->base[0] = tr;
   }
 }

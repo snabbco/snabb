@@ -50,9 +50,6 @@ static int carith_checkarg(lua_State *L, CTState *cts, CDArith *ca)
       if (ctype_isenum(ct->info)) ct = ctype_child(cts, ct);
       ca->ct[i] = ct;
       ca->p[i] = p;
-    } else if (tvisint(o)) {
-      ca->ct[i] = ctype_get(cts, CTID_INT32);
-      ca->p[i] = (uint8_t *)&o->i;
     } else if (tvisnum(o)) {
       ca->ct[i] = ctype_get(cts, CTID_DOUBLE);
       ca->p[i] = (uint8_t *)&o->n;
@@ -331,13 +328,8 @@ uint64_t lj_carith_check64(lua_State *L, int narg, CTypeID *id)
   } else if (!(tvisstr(o) && lj_strscan_number(strV(o), o))) {
     goto err;
   }
-  if (LJ_LIKELY(tvisint(o))) {
-    return (uint32_t)intV(o);
-  } else {
-    int32_t i = lj_num2bit(numV(o));
-    if (LJ_DUALNUM) setintV(o, i);
-    return (uint32_t)i;
-  }
+  int32_t i = lj_num2bit(numV(o));
+  return (uint32_t)i;
 }
 
 

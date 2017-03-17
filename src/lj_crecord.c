@@ -596,10 +596,10 @@ static TRef crec_ct_tv(jit_State *J, CType *d, TRef dp, TRef sp, cTValue *sval)
   CType *s;
   if (LJ_LIKELY(tref_isinteger(sp))) {
     sid = CTID_INT32;
-    svisnz = (void *)(intptr_t)(tvisint(sval)?(intV(sval)!=0):!tviszero(sval));
+    svisnz = (void *)(intptr_t)!tviszero(sval);
   } else if (tref_isnum(sp)) {
     sid = CTID_DOUBLE;
-    svisnz = (void *)(intptr_t)(tvisint(sval)?(intV(sval)!=0):!tviszero(sval));
+    svisnz = (void *)(intptr_t)!tviszero(sval);
   } else if (tref_isbool(sp)) {
     sp = lj_ir_kint(J, tref_istrue(sp) ? 1 : 0);
     sid = CTID_BOOL;

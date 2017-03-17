@@ -264,13 +264,6 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
       CType *ct = lj_ctype_rawref(cts, cdataV(o)->ctypeid);
       if (ctype_isenum(ct->info)) ct = ctype_child(cts, ct);
       if (ctype_isnum(ct->info) || ctype_iscomplex(ct->info)) {
-	if (LJ_DUALNUM && ctype_isinteger_or_bool(ct->info) &&
-	    ct->size <= 4 && !(ct->size == 4 && (ct->info & CTF_UNSIGNED))) {
-	  int32_t i;
-	  lj_cconv_ct_tv(cts, ctype_get(cts, CTID_INT32), (uint8_t *)&i, o, 0);
-	  setintV(L->base-1-LJ_FR2, i);
-	  return FFH_RES(1);
-	}
 	lj_cconv_ct_tv(cts, ctype_get(cts, CTID_DOUBLE),
 		       (uint8_t *)&(L->base-1-LJ_FR2)->n, o, 0);
 	return FFH_RES(1);
@@ -286,10 +279,7 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
     if (p != ep) {
       while (lj_char_isspace((unsigned char)(*ep))) ep++;
       if (*ep == '\0') {
-	if (LJ_DUALNUM && LJ_LIKELY(ul < 0x80000000u))
-	  setintV(L->base-1-LJ_FR2, (int32_t)ul);
-	else
-	  setnumV(L->base-1-LJ_FR2, (lua_Number)ul);
+        setnumV(L->base-1-LJ_FR2, (lua_Number)ul);
 	return FFH_RES(1);
       }
     }

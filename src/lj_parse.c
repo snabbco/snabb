@@ -88,7 +88,7 @@ static LJ_AINLINE void expr_init(ExpDesc *e, ExpKind k, uint32_t info)
 static int expr_numiszero(ExpDesc *e)
 {
   TValue *o = expr_numtv(e);
-  return tvisint(o) ? (intV(o) == 0) : tviszero(o);
+  return tviszero(o);
 }
 
 /* Per-function linked list of scope blocks. */
@@ -505,18 +505,11 @@ static void expr_toreg_nobranch(FuncState *fs, ExpDesc *e, BCReg reg)
   if (e->k == VKSTR) {
     ins = BCINS_AD(BC_KSTR, reg, const_str(fs, e));
   } else if (e->k == VKNUM) {
-#if LJ_DUALNUM
-    cTValue *tv = expr_numtv(e);
-    if (tvisint(tv) && checki16(intV(tv)))
-      ins = BCINS_AD(BC_KSHORT, reg, (BCReg)(uint16_t)intV(tv));
-    else
-#else
     lua_Number n = expr_numberV(e);
     int32_t k = lj_num2int(n);
     if (checki16(k) && n == (lua_Number)k)
       ins = BCINS_AD(BC_KSHORT, reg, (BCReg)(uint16_t)k);
     else
-#endif
       ins = BCINS_AD(BC_KNUM, reg, const_num(fs, e));
   } else if (e->k == VKCDATA) {
     fs->flags |= PROTO_FFI;
@@ -765,13 +758,6 @@ static int foldarith(BinOpr opr, ExpDesc *e1, ExpDesc *e2)
   n = lj_vm_foldarith(expr_numberV(e1), expr_numberV(e2), (int)opr-OPR_ADD);
   setnumV(&o, n);
   if (tvisnan(&o) || tvismzero(&o)) return 0;  /* Avoid NaN and -0 as consts. */
-  if (LJ_DUALNUM) {
-    int32_t k = lj_num2int(n);
-    if ((lua_Number)k == n) {
-      setintV(&e1->u.nval, k);
-      return 1;
-    }
-  }
   setnumV(&e1->u.nval, n);
   return 1;
 }
@@ -951,17 +937,8 @@ static void bcemit_unop(FuncState *fs, BCOp op, ExpDesc *e)
       } else
       if (expr_isnumk(e) && !expr_numiszero(e)) {  /* Avoid folding to -0. */
 	TValue *o = expr_numtv(e);
-	if (tvisint(o)) {
-	  int32_t k = intV(o);
-	  if (k == -k)
-	    setnumV(o, -(lua_Number)k);
-	  else
-	    setintV(o, -k);
-	  return;
-	} else {
-	  o->u64 ^= U64x(80000000,00000000);
-	  return;
-	}
+        o->u64 ^= U64x(80000000,00000000);
+        return;
       }
     }
     expr_toanyreg(fs, e);
@@ -1341,10 +1318,7 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
   for (i = 0; i < kt->asize; i++)
     if (tvhaskslot(&array[i])) {
       TValue *tv = &((TValue *)kptr)[tvkslot(&array[i])];
-      if (LJ_DUALNUM)
-	setintV(tv, (int32_t)i);
-      else
-	setnumV(tv, (lua_Number)i);
+      setnumV(tv, (lua_Number)i);
     }
   node = noderef(kt->node);
   hmask = kt->hmask;
@@ -1352,20 +1326,9 @@ static void fs_fixup_k(FuncState *fs, GCproto *pt, void *kptr)
     Node *n = &node[i];
     if (tvhaskslot(&n->val)) {
       ptrdiff_t kidx = (ptrdiff_t)tvkslot(&n->val);
-      lua_assert(!tvisint(&n->key));
       if (tvisnum(&n->key)) {
 	TValue *tv = &((TValue *)kptr)[kidx];
-	if (LJ_DUALNUM) {
-	  lua_Number nn = numV(&n->key);
-	  int32_t k = lj_num2int(nn);
-	  lua_assert(!tvismzero(&n->key));
-	  if ((lua_Number)k == nn)
-	    setintV(tv, k);
-	  else
-	    *tv = n->key;
-	} else {
-	  *tv = n->key;
-	}
+        *tv = n->key;
       } else {
 	GCobj *o = gcV(&n->key);
 	setgcref(((GCRef *)kptr)[~kidx], o);
@@ -1625,22 +1588,12 @@ static void expr_index(FuncState *fs, ExpDesc *t, ExpDesc *e)
   /* Already called: expr_toval(fs, e). */
   t->k = VINDEXED;
   if (expr_isnumk(e)) {
-#if LJ_DUALNUM
-    if (tvisint(expr_numtv(e))) {
-      int32_t k = intV(expr_numtv(e));
-      if (checku8(k)) {
-	t->u.s.aux = BCMAX_C+1+(uint32_t)k;  /* 256..511: const byte key */
-	return;
-      }
-    }
-#else
     lua_Number n = expr_numberV(e);
     int32_t k = lj_num2int(n);
     if (checku8(k) && n == (lua_Number)k) {
       t->u.s.aux = BCMAX_C+1+(uint32_t)k;  /* 256..511: const byte key */
       return;
     }
-#endif
   } else if (expr_isstrk(e)) {
     BCReg idx = const_str(fs, e);
     if (idx <= BCMAX_C) {

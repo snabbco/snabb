@@ -253,9 +253,7 @@ LUA_API int lua_equal(lua_State *L, int idx1, int idx2)
 {
   cTValue *o1 = index2adr(L, idx1);
   cTValue *o2 = index2adr(L, idx2);
-  if (tvisint(o1) && tvisint(o2)) {
-    return intV(o1) == intV(o2);
-  } else if (tvisnumber(o1) && tvisnumber(o2)) {
+  if (tvisnumber(o1) && tvisnumber(o2)) {
     return numberVnum(o1) == numberVnum(o2);
   } else if (itype(o1) != itype(o2)) {
     return 0;
@@ -284,8 +282,6 @@ LUA_API int lua_lessthan(lua_State *L, int idx1, int idx2)
   cTValue *o2 = index2adr(L, idx2);
   if (o1 == niltv(L) || o2 == niltv(L)) {
     return 0;
-  } else if (tvisint(o1) && tvisint(o2)) {
-    return intV(o1) < intV(o2);
   } else if (tvisnumber(o1) && tvisnumber(o2)) {
     return numberVnum(o1) < numberVnum(o2);
   } else {
@@ -342,15 +338,11 @@ LUA_API lua_Integer lua_tointeger(lua_State *L, int idx)
   cTValue *o = index2adr(L, idx);
   TValue tmp;
   lua_Number n;
-  if (LJ_LIKELY(tvisint(o))) {
-    return intV(o);
-  } else if (LJ_LIKELY(tvisnum(o))) {
+  if (LJ_LIKELY(tvisnum(o))) {
     n = numV(o);
   } else {
     if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
       return 0;
-    if (tvisint(&tmp))
-      return (lua_Integer)intV(&tmp);
     n = numV(&tmp);
   }
   return (lua_Integer)n;
@@ -361,15 +353,11 @@ LUALIB_API lua_Integer luaL_checkinteger(lua_State *L, int idx)
   cTValue *o = index2adr(L, idx);
   TValue tmp;
   lua_Number n;
-  if (LJ_LIKELY(tvisint(o))) {
-    return intV(o);
-  } else if (LJ_LIKELY(tvisnum(o))) {
+  if (LJ_LIKELY(tvisnum(o))) {
     n = numV(o);
   } else {
     if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
       lj_err_argt(L, idx, LUA_TNUMBER);
-    if (tvisint(&tmp))
-      return (lua_Integer)intV(&tmp);
     n = numV(&tmp);
   }
   return (lua_Integer)n;
@@ -380,17 +368,13 @@ LUALIB_API lua_Integer luaL_optinteger(lua_State *L, int idx, lua_Integer def)
   cTValue *o = index2adr(L, idx);
   TValue tmp;
   lua_Number n;
-  if (LJ_LIKELY(tvisint(o))) {
-    return intV(o);
-  } else if (LJ_LIKELY(tvisnum(o))) {
+  if (LJ_LIKELY(tvisnum(o))) {
     n = numV(o);
   } else if (tvisnil(o)) {
     return def;
   } else {
     if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
       lj_err_argt(L, idx, LUA_TNUMBER);
-    if (tvisint(&tmp))
-      return (lua_Integer)intV(&tmp);
     n = numV(&tmp);
   }
   return (lua_Integer)n;

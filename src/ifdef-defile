@@ -18,6 +18,7 @@
 #define LJ_64 1
 #define LJ_ARCH_BITS 64
 #define LJ_ARCH_ENDIAN == LUAJIT_LE
+#define LJ_DUALNUM 0
 #define LJ_FR2 1
 #define LJ_NUMMODE LJ_NUMMODE_SINGLE_DUAL
 #define LJ_NUMMODE_DUAL		2
@@ -47,6 +48,7 @@
 #define LUAJIT_ARCH_x64		2
 #define LUAJIT_ARCH_x86		1
 #define LUAJIT_LE 1
+#define LUAJIT_NUMMODE=1
 #define LUAJIT_OS LUAJIT_OS_LINUX
 #define LUAJIT_OS_LINUX 2
 #define LUAJIT_OS_WINDOWS 3

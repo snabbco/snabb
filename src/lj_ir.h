@@ -389,9 +389,7 @@ LJ_DATA const uint8_t lj_ir_type_size[];
 
 static LJ_AINLINE IRType itype2irt(const TValue *tv)
 {
-  if (tvisint(tv))
-    return IRT_INT;
-  else if (tvisnum(tv))
+  if (tvisnum(tv))
     return IRT_NUM;
   else
     return (IRType)~itype(tv);
@@ -400,12 +398,8 @@ static LJ_AINLINE IRType itype2irt(const TValue *tv)
 static LJ_AINLINE uint32_t irt_toitype_(IRType t)
 {
   lua_assert(!LJ_64 || LJ_GC64 || t != IRT_LIGHTUD);
-  if (LJ_DUALNUM && t > IRT_NUM) {
-    return LJ_TISNUM;
-  } else {
-    lua_assert(t <= IRT_NUM);
-    return ~(uint32_t)t;
-  }
+  lua_assert(t <= IRT_NUM);
+  return ~(uint32_t)t;
 }
 
 #define irt_toitype(t)		irt_toitype_(irt_type((t)))
