@@ -123,6 +123,4 @@ $ sudo snabb packetblaster replay capture.pcap 01:00.0
 Here are the ways you can get involved:
 
 - Use the Snabb applications in your network.
-- Join the [snabb-devel mailing list](https://groups.google.com/forum/#!forum/snabb-devel).
-- Send a mail to [introduce yourself](https://groups.google.com/forum/#!searchin/snabb-devel/introduce/snabb-devel/d8t6hGClnQY/flztyLiIGzoJ) to the community (don't be shy!).
 - Create your very own application: [Getting Started](src/doc/getting-started.md).
