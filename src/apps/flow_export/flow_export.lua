@@ -31,27 +31,36 @@ local TCP_CONTROL_BITS_OFFSET = 11
 -- information on the IEs for the flow key and record
 ffi.cdef[[
    struct flow_key {
+      uint32_t src_ipv4;    /* sourceIPv4Address */
+      uint32_t dst_ipv4;    /* destinationIPv4Address */
+      uint32_t src_ipv6_1;  /* sourceIPv6Address */
+      uint32_t src_ipv6_2;
+      uint32_t src_ipv6_3;
+      uint32_t src_ipv6_4;
+      uint32_t dst_ipv6_1;  /* destinationIPv6Address */
+      uint32_t dst_ipv6_2;
+      uint32_t dst_ipv6_3;
+      uint32_t dst_ipv6_4;
       uint8_t is_ipv6;
-      uint8_t src_ip[16];   /* sourceIPv4/v6Address */
-      uint8_t dst_ip[16];   /* destinationIPv4/v6Address */
+      uint8_t protocol;     /* protocolIdentifier */
       uint16_t src_port;    /* sourceTransportPort */
       uint16_t dst_port;    /* destinationTransportPort */
-      uint8_t protocol;     /* protocolIdentifier */
-   };
+      uint16_t __padding;
+   } __attribute__((packed));
 
    struct flow_record {
-      struct flow_key key;
       uint64_t start_time;  /* flowStartMilliseconds */
       uint64_t end_time;    /* flowEndMilliseconds */
       uint64_t pkt_count;   /* packetDeltaCount */
       uint64_t octet_count; /* octetDeltaCount */
-      uint8_t tos;          /* ipClassOfService */
-      uint16_t tcp_control; /* tcpControlBits */
       uint32_t ingress;     /* ingressInterface */
       uint32_t egress;      /* egressInterface */
       uint32_t src_peer_as; /* bgpPrevAdjacentAsNumber */
       uint32_t dst_peer_as; /* bgpNextAdjacentAsNumber */
-   };
+      uint16_t tcp_control; /* tcpControlBits */
+      uint8_t tos;          /* ipClassOfService */
+      uint8_t __padding;
+   } __attribute__((packed));
 ]]
 
 FlowExporter = {}
@@ -94,10 +103,10 @@ local function init_expire_records()
 
             if timestamp - record.end_time > idle_timeout then
                table.insert(keys_to_remove, entry.key)
-               table.insert(to_export, record)
+               table.insert(to_export, entry)
             elseif timestamp - record.end_time > active_timeout then
                table.insert(timeout_records, record)
-               table.insert(to_export, record)
+               table.insert(to_export, entry)
             end
          end
 
@@ -173,14 +182,16 @@ function FlowExporter:process_packet(pkt)
       ip_header = ipv4:new_from_mem(pkt.data + eth_size, pkt.length - eth_size)
       flow_key.is_ipv6  = false
       flow_key.protocol = ip_header:protocol()
-      ffi.copy(flow_key.src_ip, ip_header:src(), 4)
-      ffi.copy(flow_key.dst_ip, ip_header:dst(), 4)
+
+      local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ipv4")
+      ffi.copy(ptr, ip_header:src(), 4)
+      ffi.copy(ptr + 4, ip_header:dst(), 4)
    elseif eth_type == ETHER_PROTO_IPV6 then
       ip_header = ipv6:new_from_mem(pkt.data + eth_size, pkt.length - eth_size)
       flow_key.is_ipv6  = true
       flow_key.protocol = ip_header:next_header()
-      flow_key.src_ip   = ip_header:src()
-      flow_key.dst_ip   = ip_header:dst()
+      ffi.copy(flow_key.src_ipv6_1, ip_header:src(), 16)
+      ffi.copy(flow_key.dst_ipv6_1, ip_header:dst(), 16)
    else
       -- ignore non-IP packets
       packet.free(pkt)
@@ -204,7 +215,6 @@ function FlowExporter:process_packet(pkt)
 
    if lookup_result == nil then
       flow_record             = ffi.new("struct flow_record")
-      flow_record.key         = flow_key
       flow_record.start_time  = get_timestamp()
       flow_record.end_time    = flow_record.start_time
       flow_record.pkt_count   = 1ULL
@@ -293,8 +303,9 @@ function selftest()
 
    local key = ffi.new("struct flow_key")
    key.is_ipv6  = false
-   ffi.copy(key.src_ip, ipv4:pton("192.168.1.1"), 4)
-   ffi.copy(key.dst_ip, ipv4:pton("192.168.1.25"), 4)
+   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+   ffi.copy(ptr, ipv4:pton("192.168.1.1"), 4)
+   ffi.copy(ptr + 4, ipv4:pton("192.168.1.25"), 4)
    key.protocol = IP_PROTO_UDP
    key.src_port = htons(9999)
    key.dst_port = htons(80)

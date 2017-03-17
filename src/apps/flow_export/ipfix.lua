@@ -216,9 +216,9 @@ local function write64(record, field, ptr, idx)
    dst[1] = htonl(fp[0])
 end
 
--- Given a flow exporter & an array of records, construct flow record
--- packet(s) and transmit them
-function export_records(exporter, records)
+-- Given a flow exporter & an array of ctable entries, construct flow
+-- record packet(s) and transmit them
+function export_records(exporter, entries)
    local mtu         = exporter.mtu_to_collector
    -- length of v9 header + flow set ID/length
    local header_len  = 24
@@ -228,8 +228,8 @@ function export_records(exporter, records)
    local max_records = math.floor((mtu - header_len - 4 - 28) / record_len)
 
    local record_idx  = 1
-   while record_idx <= #records do
-      local num_to_take = math.min(max_records, #records - record_idx + 1)
+   while record_idx <= #entries do
+      local num_to_take = math.min(max_records, #entries - record_idx + 1)
       local data_len    = 24 + (record_len * num_to_take)
       local padding     = 4 - (data_len % 4)
       local length      = data_len + padding
@@ -241,14 +241,24 @@ function export_records(exporter, records)
       ffi.cast("uint16_t*", buffer + 22)[0] = htons(length - 20)
 
       for idx = record_idx, record_idx + num_to_take - 1 do
-         local record = records[idx]
+         local key    = entries[idx].key
+         local record = entries[idx].value
          local ptr    = buffer + 24 + (63 * (idx - record_idx))
 
-         ffi.copy(ptr, record.key.src_ip, 4)
-         ffi.copy(ptr + 4, record.key.dst_ip, 4)
-         ffi.cast("uint16_t*", ptr + 8)[0]  = record.key.src_port
-         ffi.cast("uint16_t*", ptr + 10)[0] = record.key.dst_port
-         ffi.cast("uint8_t*", ptr + 12)[0]  = record.key.protocol
+         if record.key.is_ipv6 then
+            local field_ptr =
+               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+            ffi.copy(ptr, field_ptr, 4)
+            ffi.copy(ptr + 4, field_ptr + 4, 4)
+         else
+            local field_ptr =
+               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6")
+            ffi.copy(ptr, field_ptr, 16)
+            ffi.copy(ptr + 16, field_ptr + 16, 16)
+         end
+         ffi.cast("uint16_t*", ptr + 8)[0]  = key.src_port
+         ffi.cast("uint16_t*", ptr + 10)[0] = key.dst_port
+         ffi.cast("uint8_t*", ptr + 12)[0]  = key.protocol
 
          write64(record, "start_time", ptr, 13)
          write64(record, "end_time", ptr, 21)
