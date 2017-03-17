@@ -22,6 +22,37 @@ Initial changes (ongoing work):
 
 PRs welcome! Shock me with your radical ideas! :-)
 
+### CPU support
+
+RaptorJIT is narrowly focused:
+
+- [Intel Core](https://en.wikipedia.org/wiki/Intel_Core) (i3/i5/i7/Xeon-E) is the only supported CPU family.
+- The latest microarchitecture (currently Skylake) is targetted for all new optimizations.
+- The previous microarchitecture (currently Haswell) is supported without regressions.
+- Older microarchitectures (currently Sandy Bridge and Nehalem) are not supported at all.
+
+We are flexible during the transitions between processor generations
+e.g. when the latest microarchitecture is not readily available in all
+product families.
+
+Forks focused on other CPU families (Atom, Xeon Phi, AMD, VIA, etc)
+are encouraged and may be merged in the future.
+
+### Performance
+
+RaptorJIT takes a quantitive approach to performance. The value of an
+optimization must be demonstrated by a reproducible benchmark.
+Optimizations that are not demonstrably beneficial for the currently
+supported CPUs are removed.
+
+This makes the following classes of pull requests very welcome:
+
+- Adding optimizations that improve a CI benchmark.
+- Adding CI benchmarks that demonstrate the value of optimizations.
+- Removing optimizations without degrading CI benchmark performance.
+
+The CI benchmark suite will evolve over time starting from the [standard LuaJIT benchmarks](https://hydra.snabb.co/job/luajit/branchmarks/benchmarkResults/latest/download/2) (already covers RaptorJIT) and the [Snabb end-to-end benchmark suite](https://hydra.snabb.co/job/snabb-new-tests/benchmarks-murren-large/benchmark-reports.report-full-matrix/latest/download/2) (must be updated to cover RaptorJIT.)
+
 ### Compilation
 
 RaptorJIT uses [nix](http://nixos.org/nix/) to define a reproducible
