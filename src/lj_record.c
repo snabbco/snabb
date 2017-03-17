@@ -292,6 +292,9 @@ static TRef find_kinit(jit_State *J, const BCIns *endpc, BCReg slot, IRType t)
 	} else {
 	  cTValue *tv = proto_knumtv(J->pt, bc_d(ins));
 	  if (t == IRT_INT) {
+	    int32_t k = numberVint(tv);
+	    if (numV(tv) == (lua_Number)k)  /* -0 is ok here. */
+	      return lj_ir_kint(J, k);
 	    return 0;  /* Type mismatch. */
 	  } else {
 	    return lj_ir_knum(J, numberVnum(tv));
