@@ -39,11 +39,8 @@ static void bcwrite_ktabk(BCWriteCtx *ctx, cTValue *o, int narrow)
     p = lj_buf_more(&ctx->sb, 5+len);
     p = lj_strfmt_wuleb128(p, BCDUMP_KTAB_STR+len);
     p = lj_buf_wmem(p, strdata(str), len);
-  } else if (tvisint(o)) {
-    *p++ = BCDUMP_KTAB_INT;
-    p = lj_strfmt_wuleb128(p, intV(o));
   } else if (tvisnum(o)) {
-    if (!LJ_DUALNUM && narrow) {  /* Narrow number constants to integers. */
+    if (narrow) {  /* Narrow number constants to integers. */
       lua_Number num = numV(o);
       int32_t k = lj_num2int(num);
       if (num == (lua_Number)k) {  /* -0 is never a constant. */
@@ -165,27 +162,19 @@ static void bcwrite_knum(BCWriteCtx *ctx, GCproto *pt)
   char *p = lj_buf_more(&ctx->sb, 10*sizekn);
   for (i = 0; i < sizekn; i++, o++) {
     int32_t k;
-    if (tvisint(o)) {
-      k = intV(o);
-      goto save_int;
-    } else {
-      /* Write a 33 bit ULEB128 for the int (lsb=0) or loword (lsb=1). */
-      if (!LJ_DUALNUM) {  /* Narrow number constants to integers. */
-	lua_Number num = numV(o);
-	k = lj_num2int(num);
-	if (num == (lua_Number)k) {  /* -0 is never a constant. */
-	save_int:
-	  p = lj_strfmt_wuleb128(p, 2*(uint32_t)k | ((uint32_t)k&0x80000000u));
-	  if (k < 0)
-	    p[-1] = (p[-1] & 7) | ((k>>27) & 0x18);
-	  continue;
-	}
-      }
-      p = lj_strfmt_wuleb128(p, 1+(2*o->u32.lo | (o->u32.lo & 0x80000000u)));
-      if (o->u32.lo >= 0x80000000u)
-	p[-1] = (p[-1] & 7) | ((o->u32.lo>>27) & 0x18);
-      p = lj_strfmt_wuleb128(p, o->u32.hi);
+    /* Write a 33 bit ULEB128 for the int (lsb=0) or loword (lsb=1). */
+    lua_Number num = numV(o);
+    k = lj_num2int(num);
+    if (num == (lua_Number)k) {  /* -0 is never a constant. */
+      p = lj_strfmt_wuleb128(p, 2*(uint32_t)k | ((uint32_t)k&0x80000000u));
+      if (k < 0)
+        p[-1] = (p[-1] & 7) | ((k>>27) & 0x18);
+      continue;
     }
+    p = lj_strfmt_wuleb128(p, 1+(2*o->u32.lo | (o->u32.lo & 0x80000000u)));
+    if (o->u32.lo >= 0x80000000u)
+      p[-1] = (p[-1] & 7) | ((o->u32.lo>>27) & 0x18);
+    p = lj_strfmt_wuleb128(p, o->u32.hi);
   }
   setsbufP(&ctx->sb, p);
 }

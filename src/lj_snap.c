@@ -84,9 +84,8 @@ static MSize snapshot_slots(jit_State *J, SnapEntry *map, BCReg nslots)
 	if (!(ir->op2 & IRSLOAD_INHERIT))
 	  continue;
 	/* No need to restore readonly slots and unmodified non-parent slots. */
-	if (!(LJ_DUALNUM && (ir->op2 & IRSLOAD_CONVERT)) &&
-	    (ir->op2 & (IRSLOAD_READONLY|IRSLOAD_PARENT)) != IRSLOAD_PARENT)
-	  sn |= SNAP_NORESTORE;
+	if ((ir->op2 & (IRSLOAD_READONLY|IRSLOAD_PARENT)) != IRSLOAD_PARENT)
+          sn |= SNAP_NORESTORE;
       }
       if (LJ_SOFTFP && irt_isnum(ir->t))
 	sn |= SNAP_SOFTFPNUM;
@@ -621,7 +620,6 @@ static void snap_restoreval(jit_State *J, GCtrace *T, ExitState *ex,
     if (ra_noreg(r)) {
       lua_assert(ir->o == IR_CONV && ir->op2 == IRCONV_NUM_INT);
       snap_restoreval(J, T, ex, snapno, rfilt, ir->op1, o);
-      if (LJ_DUALNUM) setnumV(o, (lua_Number)intV(o));
       return;
     } else if (irt_isinteger(t)) {
       setintV(o, (int32_t)ex->gpr[r-RID_MIN_GPR]);
@@ -816,11 +814,6 @@ const BCIns *lj_snap_restore(jit_State *J, void *exptr)
 	continue;
       }
       snap_restoreval(J, T, ex, snapno, rfilt, ref, o);
-      if (LJ_SOFTFP && (sn & SNAP_SOFTFPNUM) && tvisint(o)) {
-	TValue tmp;
-	snap_restoreval(J, T, ex, snapno, rfilt, ref+1, &tmp);
-	o->u32.hi = tmp.u32.lo;
-      }
     }
   }
   L->base += (map[nent+LJ_BE] & 0xff);

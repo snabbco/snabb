@@ -736,13 +736,8 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vmeta_tgetb:
   |  movzx RCd, PC_RC
-  |.if DUALNUM
-  |  setint RC
-  |  mov TMP1, RC
-  |.else
   |  cvtsi2sd xmm0, RCd
   |  movsd TMP1, xmm0
-  |.endif
   |  lea RC, TMP1
   |  jmp >1
   |
@@ -809,13 +804,8 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |->vmeta_tsetb:
   |  movzx RCd, PC_RC
-  |.if DUALNUM
-  |  setint RC
-  |  mov TMP1, RC
-  |.else
   |  cvtsi2sd xmm0, RCd
   |  movsd TMP1, xmm0
-  |.endif
   |  lea RC, TMP1
   |  jmp >1
   |
@@ -975,19 +965,11 @@ static void build_subroutines(BuildCtx *ctx)
   |//-- Arithmetic metamethods ---------------------------------------------
   |
   |->vmeta_arith_vno:
-  |.if DUALNUM
-  |  movzx RBd, PC_RB
-  |  movzx RCd, PC_RC
-  |.endif
   |->vmeta_arith_vn:
   |  lea RC, [KBASE+RC*8]
   |  jmp >1
   |
   |->vmeta_arith_nvo:
-  |.if DUALNUM
-  |  movzx RBd, PC_RB
-  |  movzx RCd, PC_RC
-  |.endif
   |->vmeta_arith_nv:
   |  lea TMPR, [KBASE+RC*8]
   |  lea RC, [BASE+RB*8]
@@ -1000,10 +982,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  jmp >2
   |
   |->vmeta_arith_vvo:
-  |.if DUALNUM
-  |  movzx RBd, PC_RB
-  |  movzx RCd, PC_RC
-  |.endif
   |->vmeta_arith_vv:
   |  lea RC, [BASE+RC*8]
   |1:
@@ -1319,11 +1297,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov CARG2, BASE			// Otherwise: CARG2 == BASE
   |.endif
   |  mov L:CARG1, L:RB
-  |.if DUALNUM
-  |  call extern lj_strfmt_number	// (lua_State *L, cTValue *o)
-  |.else
   |  call extern lj_strfmt_num		// (lua_State *L, lua_Number *np)
-  |.endif
   |  // GCstr returned in eax (RD).
   |  mov BASE, L:RB->base
   |  settp STR:RB, RD, LJ_TSTR
@@ -1394,24 +1368,13 @@ static void build_subroutines(BuildCtx *ctx)
   |.ffunc_2 ipairs_aux
   |  mov TAB:RB, [BASE]
   |  checktab TAB:RB, ->fff_fallback
-  |.if DUALNUM
-  |  mov RA, [BASE+8]
-  |  checkint RA, ->fff_fallback
-  |.else
   |  checknumtp [BASE+8], ->fff_fallback
   |  movsd xmm0, qword [BASE+8]
-  |.endif
   |  mov PC, [BASE-8]
-  |.if DUALNUM
-  |  add RAd, 1
-  |  setint ITYPE, RA
-  |  mov [BASE-16], ITYPE
-  |.else
   |  sseconst_1 xmm1, TMPR
   |  addsd xmm0, xmm1
   |  cvttsd2si RAd, xmm0
   |  movsd qword [BASE-16], xmm0
-  |.endif
   |  cmp RAd, TAB:RB->asize;  jae >2	// Not in array part?
   |  mov RD, TAB:RB->array
   |  lea RD, [RD+RA*8]
@@ -1456,12 +1419,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov PC, [BASE-8]
   |  mov [BASE-16], CFUNC:RD
   |  mov [BASE-8], TMPR
-  |.if DUALNUM
-  |  mov64 RD, ((uint64_t)LJ_TISNUM<<47)
-  |  mov [BASE], RD
-  |.else
   |  mov qword [BASE], 0
-  |.endif
   |  mov RDd, 1+3
   |  jmp ->fff_res
   |
@@ -1658,25 +1616,7 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |  .ffunc_1 math_abs
   |  mov RB, [BASE]
-  |.if DUALNUM
-  |  checkint RB, >3
-  |  cmp RBd, 0; jns ->fff_resi
-  |  neg RBd; js >2
-  |->fff_resbit:
-  |->fff_resi:
-  |  setint RB
-  |->fff_resRB:
-  |  mov PC, [BASE-8]
-  |  mov [BASE-16], RB
-  |  jmp ->fff_res1
-  |2:
-  |  mov64 RB, U64x(41e00000,00000000)  // 2^31.
-  |  jmp ->fff_resRB
-  |3:
-  |  ja ->fff_fallback
-  |.else
   |  checknum RB, ->fff_fallback
-  |.endif
   |  shl RB, 1
   |  shr RB, 1
   |  mov PC, [BASE-8]
@@ -1716,24 +1656,9 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.macro math_round, func
   |  .ffunc math_ .. func
-  |.if DUALNUM
-  |  mov RB, [BASE]
-  |  checknumx RB, ->fff_resRB, je
-  |  ja ->fff_fallback
-  |.else
   |  checknumtp [BASE], ->fff_fallback
-  |.endif
   |  movsd xmm0, qword [BASE]
   |  call ->vm_ .. func .. _sse
-  |.if DUALNUM
-  |  cvttsd2si RBd, xmm0
-  |  cmp RBd, 0x80000000
-  |  jne ->fff_resi
-  |  cvtsi2sd xmm1, RBd
-  |  ucomisd xmm0, xmm1
-  |  jp ->fff_resxmm0
-  |  je ->fff_resi
-  |.endif
   |  jmp ->fff_resxmm0
   |.endmacro
   |
@@ -1803,13 +1728,8 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov RBd, TMP1d
   |  mov PC, [BASE-8]
   |  movsd qword [BASE-16], xmm0
-  |.if DUALNUM
-  |  setint RB
-  |  mov [BASE-8], RB
-  |.else
   |  cvtsi2sd xmm1, RBd
   |  movsd qword [BASE-8], xmm1
-  |.endif
   |  mov RDd, 1+2
   |  jmp ->fff_res
   |
@@ -1830,40 +1750,12 @@ static void build_subroutines(BuildCtx *ctx)
   |.macro math_minmax, name, cmovop, sseop
   |  .ffunc name
   |  mov RAd, 2
-  |.if DUALNUM
-  |  mov RB, [BASE]
-  |  checkint RB, >4
-  |1:  // Handle integers.
-  |  cmp RAd, RDd; jae ->fff_resRB
-  |  mov TMPR, [BASE+RA*8-8]
-  |  checkint TMPR, >3
-  |  cmp RBd, TMPRd
-  |  cmovop RB, TMPR
-  |  add RAd, 1
-  |  jmp <1
-  |3:
-  |  ja ->fff_fallback
-  |  // Convert intermediate result to number and continue below.
-  |  cvtsi2sd xmm0, RBd
-  |  jmp >6
-  |4:
-  |  ja ->fff_fallback
-  |.else
   |  checknumtp [BASE], ->fff_fallback
-  |.endif
   |
   |  movsd xmm0, qword [BASE]
   |5:  // Handle numbers or integers.
   |  cmp RAd, RDd; jae ->fff_resxmm0
-  |.if DUALNUM
-  |  mov RB, [BASE+RA*8-8]
-  |  checknumx RB, >6, jb
-  |  ja ->fff_fallback
-  |  cvtsi2sd xmm1, RBd
-  |  jmp >7
-  |.else
   |  checknumtp [BASE+RA*8-8], ->fff_fallback
-  |.endif
   |6:
   |  movsd xmm1, qword [BASE+RA*8-8]
   |7:
@@ -1885,22 +1777,13 @@ static void build_subroutines(BuildCtx *ctx)
   |  cmp dword STR:RB->len, 1
   |  jb ->fff_res0			// Return no results for empty string.
   |  movzx RBd, byte STR:RB[1]
-  |.if DUALNUM
-  |  jmp ->fff_resi
-  |.else
   |  cvtsi2sd xmm0, RBd; jmp ->fff_resxmm0
-  |.endif
   |
   |.ffunc string_char			// Only handle the 1-arg case here.
   |  ffgccheck
   |  cmp NARGS:RDd, 1+1;  jne ->fff_fallback	// *Exactly* 1 arg.
-  |.if DUALNUM
-  |  mov RB, [BASE]
-  |  checkint RB, ->fff_fallback
-  |.else
   |  checknumtp [BASE], ->fff_fallback
   |  cvttsd2si RBd, qword [BASE]
-  |.endif
   |  cmp RBd, 255;  ja ->fff_fallback
   |  mov TMP1d, RBd
   |  mov TMPRd, 1
@@ -1926,26 +1809,13 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov TMPRd, -1
   |  cmp NARGS:RDd, 1+2;  jb ->fff_fallback
   |  jna >1
-  |.if DUALNUM
-  |  mov TMPR, [BASE+16]
-  |  checkint TMPR, ->fff_fallback
-  |.else
   |  checknumtp [BASE+16], ->fff_fallback
   |  cvttsd2si TMPRd, qword [BASE+16]
-  |.endif
   |1:
   |  mov STR:RB, [BASE]
   |  checkstr STR:RB, ->fff_fallback
-  |.if DUALNUM
-  |  mov ITYPE, [BASE+8]
-  |  mov RAd, ITYPEd			// Must clear hiword for lea below.
-  |  sar ITYPE, 47
-  |  cmp ITYPEd, LJ_TISNUM
-  |  jne ->fff_fallback
-  |.else
   |  checknumtp [BASE+8], ->fff_fallback
   |  cvttsd2si RAd, qword [BASE+8]
-  |.endif
   |  mov RCd, STR:RB->len
   |  cmp RCd, TMPRd			// len < end? (unsigned compare)
   |  jb >5
@@ -2018,21 +1888,8 @@ static void build_subroutines(BuildCtx *ctx)
   |.if kind == 2
   |  sseconst_tobit xmm1, RB
   |.endif
-  |.if DUALNUM
-  |  mov RB, [BASE]
-  |  checkint RB, >1
-  |.if kind > 0
-  |  jmp >2
-  |.else
-  |  jmp ->fff_resbit
-  |.endif
-  |1:
-  |  ja ->fff_fallback
-  |  movd xmm0, RB
-  |.else
   |  checknumtp [BASE], ->fff_fallback
   |  movsd xmm0, qword [BASE]
-  |.endif
   |.if kind < 2
   |  sseconst_tobit xmm1, RB
   |.endif
@@ -2055,19 +1912,8 @@ static void build_subroutines(BuildCtx *ctx)
   |1:
   |  cmp RD, BASE
   |  jbe ->fff_resbit
-  |.if DUALNUM
-  |  mov RA, [RD]
-  |  checkint RA, >2
-  |  ins RBd, RAd
-  |  sub RD, 8
-  |  jmp <1
-  |2:
-  |  ja ->fff_fallback_bit_op
-  |  movd xmm0, RA
-  |.else
   |  checknumtp [RD], ->fff_fallback_bit_op
   |  movsd xmm0, qword [RD]
-  |.endif
   |  addsd xmm0, xmm1
   |  movd RAd, xmm0
   |  ins RBd, RAd
@@ -2085,32 +1931,21 @@ static void build_subroutines(BuildCtx *ctx)
   |
   |.ffunc_bit bit_bnot, 1
   |  not RBd
-  |.if DUALNUM
-  |  jmp ->fff_resbit
-  |.else
   |->fff_resbit:
   |  cvtsi2sd xmm0, RBd
   |  jmp ->fff_resxmm0
-  |.endif
   |
   |->fff_fallback_bit_op:
   |  mov NARGS:RDd, TMPRd		// Restore for fallback
   |  jmp ->fff_fallback
   |
   |.macro .ffunc_bit_sh, name, ins
-  |.if DUALNUM
-  |  .ffunc_bit name, 1, .ffunc_2
-  |  // Note: no inline conversion from number for 2nd argument!
-  |  mov RA, [BASE+8]
-  |  checkint RA, ->fff_fallback
-  |.else
   |  .ffunc_nn name
   |  sseconst_tobit xmm2, RB
   |  addsd xmm0, xmm2
   |  addsd xmm1, xmm2
   |  movd RBd, xmm0
   |  movd RAd, xmm1
-  |.endif
   |  ins RBd, cl			// Assumes RA is ecx.
   |  jmp ->fff_resbit
   |.endmacro
@@ -2793,36 +2628,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mov RD, RB
     |  sar ITYPE, 47
     |  sar RB, 47
-    |.if DUALNUM
-    |  cmp ITYPEd, LJ_TISNUM; jne >7
-    |  cmp RBd, LJ_TISNUM; jne >8
-    |  add PC, 4
-    |  cmp RAd, RDd
-    |  jmp_comp jge, jl, jg, jle, >9
-    |6:
-    |  movzx RDd, PC_RD
-    |  branchPC RD
-    |9:
-    |  ins_next
-    |
-    |7:  // RA is not an integer.
-    |  ja ->vmeta_comp
-    |  // RA is a number.
-    |  cmp RBd, LJ_TISNUM; jb >1; jne ->vmeta_comp
-    |  // RA is a number, RD is an integer.
-    |  cvtsi2sd xmm0, RDd
-    |  jmp >2
-    |
-    |8:  // RA is an integer, RD is not an integer.
-    |  ja ->vmeta_comp
-    |  // RA is an integer, RD is a number.
-    |  cvtsi2sd xmm1, RAd
-    |  movd xmm0, RD
-    |  jmp >3
-    |.else
     |  cmp ITYPEd, LJ_TISNUM; jae ->vmeta_comp
     |  cmp RBd, LJ_TISNUM; jae ->vmeta_comp
-    |.endif
     |1:
     |  movd xmm0, RD
     |2:
@@ -2832,16 +2639,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ucomisd xmm0, xmm1
     |  // Unordered: all of ZF CF PF set, ordered: PF clear.
     |  // To preserve NaN semantics GE/GT branch on unordered, but LT/LE don't.
-    |.if DUALNUM
-    |  jmp_comp jbe, ja, jb, jae, <9
-    |  jmp <6
-    |.else
     |  jmp_comp jbe, ja, jb, jae, >1
     |  movzx RDd, PC_RD
     |  branchPC RD
     |1:
     |  ins_next
-    |.endif
     break;
 
   case BC_ISEQV: case BC_ISNEV:
@@ -2854,40 +2656,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mov RA, ITYPE
     |  sar RB, 47
     |  sar ITYPE, 47
-    |.if DUALNUM
-    |  cmp RBd, LJ_TISNUM; jne >7
-    |  cmp ITYPEd, LJ_TISNUM; jne >8
-    |  cmp RDd, RAd
-    if (vk) {
-      |  jne >9
-    } else {
-      |  je >9
-    }
-    |  movzx RDd, PC_RD
-    |  branchPC RD
-    |9:
-    |  ins_next
-    |
-    |7:  // RD is not an integer.
-    |  ja >5
-    |  // RD is a number.
-    |  movd xmm1, RD
-    |  cmp ITYPEd, LJ_TISNUM; jb >1; jne >5
-    |  // RD is a number, RA is an integer.
-    |  cvtsi2sd xmm0, RAd
-    |  jmp >2
-    |
-    |8:  // RD is an integer, RA is not an integer.
-    |  ja >5
-    |  // RD is an integer, RA is a number.
-    |  cvtsi2sd xmm1, RDd
-    |  jmp >1
-    |
-    |.else
     |  cmp RBd, LJ_TISNUM; jae >5
     |  cmp ITYPEd, LJ_TISNUM; jae >5
     |  movd xmm1, RD
-    |.endif
     |1:
     |  movd xmm0, RA
     |2:
@@ -2919,12 +2690,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |  branchPC RD
       |1:				// EQ: Fallthrough to next instruction.
     }
-    if (LJ_DUALNUM && (op == BC_ISEQV || op == BC_ISNEV ||
-		       op == BC_ISEQN || op == BC_ISNEN)) {
-      |  jmp <9
-    } else {
-      |  ins_next
-    }
+    |  ins_next
     |
     if (op == BC_ISEQV || op == BC_ISNEV) {
       |5:  // Either or both types are not numbers.
@@ -2957,11 +2723,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
       |.if FFI
       |3:
       |  cmp ITYPEd, LJ_TCDATA
-      if (LJ_DUALNUM && vk) {
-	|  jne <9
-      } else {
-	|  jne <2
-      }
+      |  jne <2
       |  jmp ->vmeta_equal_cd
       |.endif
     }
@@ -2985,42 +2747,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_AD	// RA = src, RD = num const, JMP with RD = target
     |  mov RB, [BASE+RA*8]
     |  add PC, 4
-    |.if DUALNUM
-    |  checkint RB, >7
-    |  mov RD, [KBASE+RD*8]
-    |  checkint RD, >8
-    |  cmp RBd, RDd
-    if (vk) {
-      |  jne >9
-    } else {
-      |  je >9
-    }
-    |  movzx RDd, PC_RD
-    |  branchPC RD
-    |9:
-    |  ins_next
-    |
-    |7:  // RA is not an integer.
-    |  ja >3
-    |  // RA is a number.
-    |  mov RD, [KBASE+RD*8]
-    |  checkint RD, >1
-    |  // RA is a number, RD is an integer.
-    |  cvtsi2sd xmm0, RDd
-    |  jmp >2
-    |
-    |8:  // RA is an integer, RD is a number.
-    |  cvtsi2sd xmm0, RBd
-    |  movd xmm1, RD
-    |  ucomisd xmm0, xmm1
-    |  jmp >4
-    |1:
-    |  movd xmm0, RD
-    |.else
     |  checknum RB, >3
     |1:
     |  movsd xmm0, qword [KBASE+RD*8]
-    |.endif
     |2:
     |  ucomisd xmm0, qword [BASE+RA*8]
     |4:
@@ -3114,46 +2843,20 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
   case BC_UNM:
     |  ins_AD	// RA = dst, RD = src
     |  mov RB, [BASE+RD*8]
-    |.if DUALNUM
-    |  checkint RB, >5
-    |  neg RBd
-    |  jo >4
-    |  setint RB
-    |9:
-    |  mov [BASE+RA*8], RB
-    |  ins_next
-    |4:
-    |  mov64 RB, U64x(41e00000,00000000)  // 2^31.
-    |  jmp <9
-    |5:
-    |  ja ->vmeta_unm
-    |.else
     |  checknum RB, ->vmeta_unm
-    |.endif
     |  mov64 RD, U64x(80000000,00000000)
     |  xor RB, RD
-    |.if DUALNUM
-    |  jmp <9
-    |.else
     |  mov [BASE+RA*8], RB
     |  ins_next
-    |.endif
     break;
   case BC_LEN:
     |  ins_AD	// RA = dst, RD = src
     |  mov RD, [BASE+RD*8]
     |  checkstr RD, >2
-    |.if DUALNUM
-    |  mov RDd, dword STR:RD->len
-    |1:
-    |  setint RD
-    |  mov [BASE+RA*8], RD
-    |.else
     |  xorps xmm0, xmm0
     |  cvtsi2sd xmm0, dword STR:RD->len
     |1:
     |  movsd qword [BASE+RA*8], xmm0
-    |.endif
     |  ins_next
     |2:
     |  cmp ITYPEd, LJ_TTAB; jne ->vmeta_len
@@ -3168,11 +2871,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  mov RB, BASE			// Save BASE.
     |  call extern lj_tab_len		// (GCtab *t)
     |  // Length of table returned in eax (RD).
-    |.if DUALNUM
-    |  // Nothing to do.
-    |.else
     |  cvtsi2sd xmm0, RDd
-    |.endif
     |  mov BASE, RB			// Restore BASE.
     |  movzx RAd, PC_RA
     |  jmp <1
@@ -3192,17 +2891,11 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     ||switch (vk) {
     ||case 0:
     |   checknumtp [BASE+RB*8], ->vmeta_arith_vn
-    |   .if DUALNUM
-    |     checknumtp [KBASE+RC*8], ->vmeta_arith_vn
-    |   .endif
     |   movsd xmm0, qword [BASE+RB*8]
     |   sseins ssereg, qword [KBASE+RC*8]
     ||  break;
     ||case 1:
     |   checknumtp [BASE+RB*8], ->vmeta_arith_nv
-    |   .if DUALNUM
-    |     checknumtp [KBASE+RC*8], ->vmeta_arith_nv
-    |   .endif
     |   movsd xmm0, qword [KBASE+RC*8]
     |   sseins ssereg, qword [BASE+RB*8]
     ||  break;
@@ -3262,11 +2955,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |.endmacro
     |
     |.macro ins_arith, intins, sseins
-    |.if DUALNUM
-    |  ins_arithdn intins
-    |.else
     |  ins_arith, sseins
-    |.endif
     |.endmacro
 
     |  // RA = dst, RB = src1 or num const, RC = src2 or num const
@@ -3345,15 +3034,9 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     break;
   case BC_KSHORT:
     |  ins_AD	// RA = dst, RD = signed int16 literal
-    |.if DUALNUM
-    |  movsx RDd, RDW
-    |  setint RD
-    |  mov [BASE+RA*8], RD
-    |.else
     |  movsx RDd, RDW			// Sign-extend literal.
     |  cvtsi2sd xmm0, RDd
     |  movsd qword [BASE+RA*8], xmm0
-    |.endif
     |  ins_next
     break;
   case BC_KNUM:
@@ -3602,9 +3285,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  checktab TAB:RB, ->vmeta_tgetv
     |
     |  // Integer key?
-    |.if DUALNUM
-    |  checkint RC, >5
-    |.else
     |  // Convert number to int and back and compare.
     |  checknum RC, >5
     |  movd xmm0, RC
@@ -3612,7 +3292,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cvtsi2sd xmm1, RCd
     |  ucomisd xmm0, xmm1
     |  jne ->vmeta_tgetv		// Generic numeric key? Use fallback.
-    |.endif
     |  cmp RCd, TAB:RB->asize		// Takes care of unordered, too.
     |  jae ->vmeta_tgetv		// Not in array part? Use fallback.
     |  shl RCd, 3
@@ -3704,11 +3383,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_ABC	// RA = dst, RB = table, RC = key
     |  mov TAB:RB, [BASE+RB*8]
     |  cleartp TAB:RB
-    |.if DUALNUM
-    |  mov RCd, dword [BASE+RC*8]
-    |.else
     |  cvttsd2si RCd, qword [BASE+RC*8]
-    |.endif
     |  cmp RCd, TAB:RB->asize
     |  jae ->vmeta_tgetr		// Not in array part? Use fallback.
     |  shl RCd, 3
@@ -3728,9 +3403,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  checktab TAB:RB, ->vmeta_tsetv
     |
     |  // Integer key?
-    |.if DUALNUM
-    |  checkint RC, >5
-    |.else
     |  // Convert number to int and back and compare.
     |  checknum RC, >5
     |  movd xmm0, RC
@@ -3738,7 +3410,6 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  cvtsi2sd xmm1, RCd
     |  ucomisd xmm0, xmm1
     |  jne ->vmeta_tsetv		// Generic numeric key? Use fallback.
-    |.endif
     |  cmp RCd, TAB:RB->asize		// Takes care of unordered, too.
     |  jae ->vmeta_tsetv
     |  shl RCd, 3
@@ -3870,11 +3541,7 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |  ins_ABC	// RA = src, RB = table, RC = key
     |  mov TAB:RB, [BASE+RB*8]
     |  cleartp TAB:RB
-    |.if DUALNUM
-    |  mov RC, [BASE+RC*8]
-    |.else
     |  cvttsd2si RCd, qword [BASE+RC*8]
-    |.endif
     |  test byte TAB:RB->marked, LJ_GC_BLACK	// isblack(table)
     |  jnz >7
     |2:
@@ -4043,19 +3710,12 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |1:  // Traverse array part.
     |  cmp RCd, TMPRd; jae >5		// Index points after array part?
     |  cmp aword [ITYPE+RC*8], LJ_TNIL; je >4
-    |.if not DUALNUM
     |  cvtsi2sd xmm0, RCd
-    |.endif
     |  // Copy array slot to returned value.
     |  mov RB, [ITYPE+RC*8]
     |  mov [BASE+RA*8+8], RB
     |  // Return array index as a numeric key.
-    |.if DUALNUM
-    |  setint ITYPE, RC
-    |  mov [BASE+RA*8], ITYPE
-    |.else
     |  movsd qword [BASE+RA*8], xmm0
-    |.endif
     |  add RCd, 1
     |  mov [BASE+RA*8-8], RCd		// Update control var.
     |2:
@@ -4275,84 +3935,8 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     vk = (op == BC_IFORL || op == BC_JFORL);
     |  ins_AJ	// RA = base, RD = target (after end of loop or start of loop)
     |  lea RA, [BASE+RA*8]
-    if (LJ_DUALNUM) {
-      |  mov RB, FOR_IDX
-      |  checkint RB, >9
-      |  mov TMPR, FOR_STOP
-      if (!vk) {
-	|  checkint TMPR, ->vmeta_for
-	|  mov ITYPE, FOR_STEP
-	|  test ITYPEd, ITYPEd; js >5
-	|  sar ITYPE, 47;
-	|  cmp ITYPEd, LJ_TISNUM; jne ->vmeta_for
-      } else {
-#ifdef LUA_USE_ASSERT
-	|  checkinttp FOR_STOP, ->assert_bad_for_arg_type
-	|  checkinttp FOR_STEP, ->assert_bad_for_arg_type
-#endif
-	|  mov ITYPE, FOR_STEP
-	|  test ITYPEd, ITYPEd; js >5
-	|  add RBd, ITYPEd; jo >1
-	|  setint RB
-	|  mov FOR_IDX, RB
-      }
-      |  cmp RBd, TMPRd
-      |  mov FOR_EXT, RB
-      if (op == BC_FORI) {
-	|  jle >7
-	|1:
-	|6:
-	|  branchPC RD
-      } else if (op == BC_JFORI) {
-	|  branchPC RD
-	|  movzx RDd, PC_RD
-	|  jle =>BC_JLOOP
-	|1:
-	|6:
-      } else if (op == BC_IFORL) {
-	|  jg >7
-	|6:
-	|  branchPC RD
-	|1:
-      } else {
-	|  jle =>BC_JLOOP
-	|1:
-	|6:
-      }
-      |7:
-      |  ins_next
-      |
-      |5:  // Invert check for negative step.
-      if (!vk) {
-	|  sar ITYPE, 47;
-	|  cmp ITYPEd, LJ_TISNUM; jne ->vmeta_for
-      } else {
-	|  add RBd, ITYPEd; jo <1
-	|  setint RB
-	|  mov FOR_IDX, RB
-      }
-      |  cmp RBd, TMPRd
-      |  mov FOR_EXT, RB
-      if (op == BC_FORI) {
-	|  jge <7
-      } else if (op == BC_JFORI) {
-	|  branchPC RD
-	|  movzx RDd, PC_RD
-	|  jge =>BC_JLOOP
-      } else if (op == BC_IFORL) {
-	|  jl <7
-      } else {
-	|  jge =>BC_JLOOP
-      }
-      |  jmp <6
-      |9:  // Fallback to FP variant.
-      if (!vk) {
-	|  jae ->vmeta_for
-      }
-    } else if (!vk) {
-      |  checknumtp FOR_IDX, ->vmeta_for
-    }
     if (!vk) {
+      |  checknumtp FOR_IDX, ->vmeta_for
       |  checknumtp FOR_STOP, ->vmeta_for
     } else {
 #ifdef LUA_USE_ASSERT
@@ -4377,32 +3961,20 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     |1:
     |  movsd qword FOR_EXT, xmm0
     if (op == BC_FORI) {
-      |.if DUALNUM
-      |  jnb <7
-      |.else
       |  jnb >2
       |  branchPC RD
-      |.endif
     } else if (op == BC_JFORI) {
       |  branchPC RD
       |  movzx RDd, PC_RD
       |  jnb =>BC_JLOOP
     } else if (op == BC_IFORL) {
-      |.if DUALNUM
-      |  jb <7
-      |.else
       |  jb >2
       |  branchPC RD
-      |.endif
     } else {
       |  jnb =>BC_JLOOP
     }
-    |.if DUALNUM
-    |  jmp <6
-    |.else
     |2:
     |  ins_next
-    |.endif
     |
     |3:  // Invert comparison if step is negative.
     |  ucomisd xmm0, xmm1

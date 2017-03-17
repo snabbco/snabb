@@ -159,8 +159,6 @@ const char *lj_strfmt_wstrnum(lua_State *L, cTValue *o, MSize *lenp)
   if (tvisstr(o)) {
     *lenp = strV(o)->len;
     return strVdata(o);
-  } else if (tvisint(o)) {
-    sb = lj_strfmt_putint(lj_buf_tmp_(L), intV(o));
   } else if (tvisnum(o)) {
     sb = lj_strfmt_putfnum(lj_buf_tmp_(L), STRFMT_G14, o->n);
   } else {
@@ -355,7 +353,7 @@ GCstr * lj_strfmt_int(lua_State *L, int32_t k)
 /* Convert integer or number to string. */
 GCstr * lj_strfmt_number(lua_State *L, cTValue *o)
 {
-  return tvisint(o) ? lj_strfmt_int(L, intV(o)) : lj_strfmt_num(L, o);
+  return lj_strfmt_num(L, o);
 }
 
 /* Convert char value to string. */

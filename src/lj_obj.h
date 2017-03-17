@@ -182,7 +182,6 @@ typedef const TValue cTValue;
 ** lightuserdata   |  itype  |  void * |  (32 bit platforms)
 ** lightuserdata   |ffff|    void *    |  (64 bit platforms, 47 bit pointers)
 ** GC objects      |  itype  |  GCRef  |
-** int (LJ_DUALNUM)|  itype  |   int   |
 ** number           -------double------
 **
 ** Format for 64 bit GC references (LJ_GC64):
@@ -194,7 +193,6 @@ typedef const TValue cTValue;
 **                     ------MSW------.------LSW------
 ** primitive types    |1..1|itype|1..................1|
 ** GC objects/lightud |1..1|itype|-------GCRef--------|
-** int (LJ_DUALNUM)   |1..1|itype|0..0|-----int-------|
 ** number              ------------double-------------
 **
 ** ORDER LJ_T
@@ -661,7 +659,6 @@ typedef union GCobj {
 #define tvistab(o)	(itype(o) == LJ_TTAB)
 #define tvisudata(o)	(itype(o) == LJ_TUDATA)
 #define tvisnumber(o)	(itype(o) <= LJ_TISNUM)
-#define tvisint(o)	(LJ_DUALNUM && itype(o) == LJ_TISNUM)
 #define tvisnum(o)	(itype(o) < LJ_TISNUM)
 
 #define tvistruecond(o)	(itype(o) < LJ_TISTRUECOND)
@@ -747,19 +744,12 @@ define_setV(setudataV, GCudata, LJ_TUDATA)
 
 static LJ_AINLINE void setintV(TValue *o, int32_t i)
 {
-#if LJ_DUALNUM
-  o->i = (uint32_t)i; setitype(o, LJ_TISNUM);
-#else
   o->n = (lua_Number)i;
-#endif
 }
 
 static LJ_AINLINE void setint64V(TValue *o, int64_t i)
 {
-  if (LJ_DUALNUM && LJ_LIKELY(i == (int64_t)(int32_t)i))
-    setintV(o, (int32_t)i);
-  else
-    setnumV(o, (lua_Number)i);
+  setnumV(o, (lua_Number)i);
 }
 
 #define setintptrV(o, i)	setint64V((o), (i))
@@ -789,18 +779,12 @@ static LJ_AINLINE uint64_t lj_num2u64(lua_Number n)
 
 static LJ_AINLINE int32_t numberVint(cTValue *o)
 {
-  if (LJ_LIKELY(tvisint(o)))
-    return intV(o);
-  else
-    return lj_num2int(numV(o));
+  return lj_num2int(numV(o));
 }
 
 static LJ_AINLINE lua_Number numberVnum(cTValue *o)
 {
-  if (LJ_UNLIKELY(tvisint(o)))
-    return (lua_Number)intV(o);
-  else
-    return numV(o);
+  return numV(o);
 }
 
 /* -- Miscellaneous object handling --------------------------------------- */

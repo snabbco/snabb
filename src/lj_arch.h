@@ -57,11 +57,6 @@
 
 
 
-#define LJ_NUMMODE_SINGLE	0	/* Single-number mode only. */
-#define LJ_NUMMODE_SINGLE_DUAL	1	/* Default to single-number mode. */
-#define LJ_NUMMODE_DUAL		2	/* Dual-number mode only. */
-#define LJ_NUMMODE_DUAL_SINGLE	3	/* Default to dual-number mode. */
-
 /* Set target architecture properties. */
 
 #define LJ_ARCH_NAME		"x64"
@@ -75,7 +70,6 @@
 #define LJ_TARGET_MASKSHIFT	1
 #define LJ_TARGET_MASKROT	1
 #define LJ_TARGET_UNALIGNED	1
-#define LJ_ARCH_NUMMODE		LJ_NUMMODE_SINGLE_DUAL
 #define LJ_TARGET_GC64		1
 
 
@@ -96,20 +90,6 @@
 #error "Need a C compiler with native exception handling on x64"
 #endif
 #endif
-
-/* Enable or disable the dual-number mode for the VM. */
-#if (LJ_ARCH_NUMMODE == LJ_NUMMODE_SINGLE && LUAJIT_NUMMODE == 2) || \
-    (LJ_ARCH_NUMMODE == LJ_NUMMODE_DUAL && LUAJIT_NUMMODE == 1)
-#error "No support for this number mode on this architecture"
-#endif
-#if LJ_ARCH_NUMMODE == LJ_NUMMODE_DUAL || \
-    (LJ_ARCH_NUMMODE == LJ_NUMMODE_DUAL_SINGLE && LUAJIT_NUMMODE != 1) || \
-    (LJ_ARCH_NUMMODE == LJ_NUMMODE_SINGLE_DUAL && LUAJIT_NUMMODE == 2)
-#define LJ_DUALNUM		1
-#else
-#define LJ_DUALNUM		0
-#endif
-
 
 /* 64 bit GC references. */
 #define LJ_GC64			1

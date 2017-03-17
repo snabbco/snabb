@@ -173,8 +173,6 @@ SBuf *lj_buf_puttab(SBuf *sb, GCtab *t, GCstr *sep, int32_t i, int32_t e)
       } else if (tvisstr(o)) {
 	MSize len = strV(o)->len;
 	p = lj_buf_wmem(lj_buf_more(sb, len + seplen), strVdata(o), len);
-      } else if (tvisint(o)) {
-	p = lj_strfmt_wint(lj_buf_more(sb, STRFMT_MAXBUF_INT+seplen), intV(o));
       } else if (tvisnum(o)) {
 	p = lj_buf_more(lj_strfmt_putfnum(sb, STRFMT_G14, numV(o)), seplen);
       } else {

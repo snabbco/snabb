@@ -127,10 +127,7 @@ collect_attrib:
   }
   lua_assert(!ctype_isref(ct->info));  /* Interning rejects refs to refs. */
 
-  if (tvisint(key)) {
-    idx = (ptrdiff_t)intV(key);
-    goto integer_key;
-  } else if (tvisnum(key)) {  /* Numeric key. */
+  if (tvisnum(key)) {  /* Numeric key. */
     lua_Number n = numV(key);
     idx = LJ_64 ? (ptrdiff_t)n : (ptrdiff_t)lj_num2int(n);
   integer_key:

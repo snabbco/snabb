@@ -498,7 +498,6 @@ static int trace_abort(jit_State *J)
   /* Is there anything to abort? */
   traceno = J->cur.traceno;
   if (traceno) {
-    ptrdiff_t errobj = savestack(L, L->top-1);  /* Stack may be resized. */
     J->cur.link = 0;
     J->cur.linktype = LJ_TRLINK_NONE;
     /* Drop aborted trace after the vmevent (which may still access it).
@@ -692,7 +691,6 @@ int lj_trace_exit(jit_State *J, void *exptr)
 {
   ERRNO_SAVE
   lua_State *L = J->L;
-  ExitState *ex = (ExitState *)exptr;
   ExitDataCP exd;
   int errcode;
   const BCIns *pc;
