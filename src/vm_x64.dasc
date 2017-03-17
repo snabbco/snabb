@@ -3935,10 +3935,15 @@ static void build_ins(BuildCtx *ctx, BCOp op, int defop)
     vk = (op == BC_IFORL || op == BC_JFORL);
     |  ins_AJ	// RA = base, RD = target (after end of loop or start of loop)
     |  lea RA, [BASE+RA*8]
+    if (!vk) {
+      |  checknumtp FOR_IDX, ->vmeta_for
+      |  checknumtp FOR_STOP, ->vmeta_for
+    } else {
 #ifdef LUA_USE_ASSERT
-    |  checknumtp FOR_STOP, ->assert_bad_for_arg_type
-    |  checknumtp FOR_STEP, ->assert_bad_for_arg_type
+      |  checknumtp FOR_STOP, ->assert_bad_for_arg_type
+      |  checknumtp FOR_STEP, ->assert_bad_for_arg_type
 #endif
+    }
     |  mov RB, FOR_STEP
     if (!vk) {
       |  checknum RB, ->vmeta_for
