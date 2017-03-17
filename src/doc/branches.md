@@ -146,3 +146,10 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Domen Kožar <domen@dev.si>
 
+#### aarch64
+
+    BRANCH: aarch64 git://github.com/jialiu02/snabb
+    Development branch for ARM aarch64 platform.
+
+    Maintainer: Jianbo Liu <jianbo.liu@linaro.org>
+
