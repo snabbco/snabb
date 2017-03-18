@@ -3,7 +3,7 @@ sudo: false
 env:
   - jit=-O3
   - jit=-O2
-  - jit=-01
+  - jit=-O1
   - jit=-joff
 script:
   - nix-build
