@@ -1,7 +1,12 @@
 language: nix
 sudo: false
+env:
+  - jit=-O3
+  - jit=-O2
+  - jit=-01
+  - jit=-joff
 script:
   - nix-build
   - result/bin/raptorjit -e 'for i = 1, 1000 do end'
   - git submodule init submodules/raptorjit-testsuite
-  - (cd submodules/raptorjit-testsuite/test; ../../../result/bin/raptorjit test.lua +slow)
+  - (cd submodules/raptorjit-testsuite/test; ../../../result/bin/raptorjit $jit test.lua +slow)
