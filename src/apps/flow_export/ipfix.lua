@@ -185,7 +185,7 @@ local function construct_packet(exporter, ptr, len)
 end
 
 local function get_timestamp()
-   return C.get_time_ns() / 1000000ULL
+   return C.get_unix_time() * 1000ULL
 end
 
 -- Write an IPFIX header into the given buffer
