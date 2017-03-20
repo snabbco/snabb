@@ -85,7 +85,7 @@ function aes_128_gcm:new (spi, key, salt)
    ffi.copy(o.key, lib.hexundump(key, 16), 16)
    o.IV_SIZE = 8
    o.iv = iv:new(lib.hexundump(salt, 4))
-   o.AUTH_SIZE = 16
+   o.AUTH_SIZE = 12
    o.auth_buf = ffi.new("uint8_t[?]", o.AUTH_SIZE)
    o.AAD_SIZE = 12
    o.aad = aad:new(spi)

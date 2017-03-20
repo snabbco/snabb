@@ -61,11 +61,15 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
+-- True when the engine is running the breathe loop.
+local running = false
+
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
 monotonic_now = false
 function now ()
-   return monotonic_now or C.get_monotonic_time()
+   -- Return cached time only if it is fresh
+   return (running and monotonic_now) or C.get_monotonic_time()
 end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
@@ -244,49 +248,63 @@ end
 function tsort (nodes, entries, successors)
    local visited = {}
    local post_order = {}
+   local maybe_visit
    local function visit(node)
       visited[node] = true
-      for _,succ in ipairs(successors[node]) do
-         if not visited[succ] then visit(succ) end
-      end
+      for succ,_ in pairs(successors[node]) do maybe_visit(succ) end
       table.insert(post_order, node)
    end
-   for _,node in ipairs(entries) do
+   function maybe_visit(node)
       if not visited[node] then visit(node) end
    end
-   for name,node in pairs(nodes) do
-      if not visited[node] then visit(node) end
-   end
+   for node,_ in pairs(entries) do maybe_visit(node) end
+   for node,_ in pairs(nodes) do maybe_visit(node) end
    local ret = {}
-   while #post_order > 0 do
-      table.insert(ret, table.remove(post_order))
-   end
+   while #post_order > 0 do table.insert(ret, table.remove(post_order)) end
    return ret
 end
 
 breathe_pull_order = {}
 breathe_push_order = {}
 
+-- Sort the links in the app graph, and arrange to run push() on the
+-- apps on the receiving ends of those links.  This will run app:push()
+-- once for each link, which for apps with multiple links may cause the
+-- app's push function to run multiple times in a breath.
 function compute_breathe_order ()
-   breathe_pull_order = {}
+   breathe_pull_order, breathe_push_order = {}, {}
+   local entries = {}
    local inputs = {}
-   for name, app in pairs(app_table) do
-      if app.pull then table.insert(breathe_pull_order, app) end
-      for _,link in pairs(app.input) do inputs[link] = app  end
-   end
    local successors = {}
-   for name, app in pairs(app_table) do
-      local succs = {}
-      for _,link in pairs(app.output) do table.insert(succs, inputs[link]) end
-      successors[app] = succs
+   for _,app in pairs(app_table) do
+      if app.pull then
+         table.insert(breathe_pull_order, app)
+         for _,link in pairs(app.output) do
+            entries[link] = true;
+            successors[link] = {}
+         end
+      end
+      for _,link in pairs(app.input) do inputs[link] = app end
    end
-   breathe_push_order = tsort(app_table, breathe_pull_order, successors)
+   for link,app in pairs(inputs) do
+      successors[link] = {}
+      if not app.pull then
+         for _,succ in pairs(app.output) do
+            successors[link][succ] = true
+            if not successors[succ] then successors[succ] = {}; end
+         end
+      end
+   end
+   for link,succs in pairs(successors) do
+      for succ,_ in pairs(succs) do
+         if not successors[succ] then successors[succ] = {}; end
+      end
+   end
+   local link_order = tsort(inputs, entries, successors)
    local i = 1
-   while i <= #breathe_push_order do
-      if breathe_push_order[i].push then
-         i = i + 1
-      else
-         table.remove(breathe_push_order, i)
+   for _,link in ipairs(link_order) do
+      if breathe_push_order[#breathe_push_order] ~= inputs[link] then
+         table.insert(breathe_push_order, inputs[link])
       end
    end
 end
@@ -298,7 +316,7 @@ function main (options)
    local no_timers = options.no_timers
    if options.duration then
       assert(not done, "You can not have both 'duration' and 'done'")
-      done = lib.timer(options.duration * 1e9)
+      done = lib.timeout(options.duration)
    end
 
    local breathe = breathe
@@ -345,6 +363,7 @@ function pace_breathing ()
 end
 
 function breathe ()
+   running = true
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
@@ -369,6 +388,7 @@ function breathe ()
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
+   running = false
 end
 
 function report (options)
@@ -474,7 +494,7 @@ function selftest ()
    print("empty -> c1")
    configure(c1)
    assert(#breathe_pull_order == 0)
-   assert(#breathe_push_order == 2)
+   assert(#breathe_push_order == 1)
    assert(app_table.app1 and app_table.app2)
    local orig_app1 = app_table.app1
    local orig_app2 = app_table.app2
@@ -501,7 +521,7 @@ function selftest ()
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
    assert(#breathe_pull_order == 0)
-   assert(#breathe_push_order == 2)
+   assert(#breathe_push_order == 1)
    print("c1 -> empty")
    configure(config.new())
    assert(#breathe_pull_order == 0)
