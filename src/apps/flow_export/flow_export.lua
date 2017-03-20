@@ -18,6 +18,8 @@ local C      = ffi.C
 
 local htonl, htons = lib.htonl, lib.htons
 
+local debug = false
+
 local ETHER_PROTO_IPV4 = 0x0800
 local ETHER_PROTO_IPV6 = 0x86dd
 
@@ -79,6 +81,34 @@ local function get_timestamp()
    return C.get_unix_time() * 1000ULL
 end
 
+-- print debugging messages for flow expiration
+local function debug_expire(entry, msg)
+   local key = entry.key
+   local src_ip, dst_ip
+
+   if key.is_ipv6 == 1 then
+      local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
+      src_ip = ipv6:ntop(ptr)
+      local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv6_1")
+      dst_ip = ipv6:ntop(ptr)
+   else
+      local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+      src_ip = ipv4:ntop(ptr)
+      local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv4")
+      dst_ip = ipv4:ntop(ptr)
+   end
+
+   if debug then
+      print(string.format("expire flow [%s] %s (%d) -> %s (%d) proto: %d",
+                          msg,
+                          src_ip,
+                          htons(key.src_port),
+                          dst_ip,
+                          htons(key.dst_port),
+                          key.protocol))
+   end
+end
+
 -- Walk through flow cache to see if flow records need to be expired.
 -- Collect expired records and export them to the collector.
 local function init_expire_records()
@@ -102,9 +132,11 @@ local function init_expire_records()
             local record = entry.value
 
             if timestamp - record.end_time > idle_timeout then
+               debug_expire(entry, "idle")
                table.insert(keys_to_remove, entry.key)
                table.insert(to_export, entry)
             elseif timestamp - record.end_time > active_timeout then
+               debug_expire(entry, "active")
                table.insert(timeout_records, record)
                table.insert(to_export, entry)
             end
