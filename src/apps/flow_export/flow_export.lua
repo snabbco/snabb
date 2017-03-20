@@ -71,8 +71,8 @@ FlowExporter = {}
 --       these numbers are placeholders for more realistic ones
 --       (and timeouts should perhaps be more fine-grained)
 local cache_size = 20000
-local idle_timeout = 120
-local active_timeout = 300
+local idle_timeout = 300
+local active_timeout = 120
 local export_interval = 60
 local template_interval = 60
 
