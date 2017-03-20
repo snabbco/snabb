@@ -341,4 +341,6 @@ function selftest()
       assert(key.lo_port == 0)
       assert(key.hi_port == 0)
    end
+
+   print("selftest ok")
 end

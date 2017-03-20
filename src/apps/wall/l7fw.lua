@@ -351,4 +351,6 @@ function selftest()
 
    test("tcpv6-1", v6http[50], [[ether proto ip6]])
    test("tcpv6-2", v6http[50], [[tcp]])
+
+   print("selftest ok")
 end
