@@ -6,6 +6,7 @@ module(..., package.seeall)
 
 local ffi    = require("ffi")
 local ipfix  = require("apps.flow_export.ipfix")
+local util   = require("apps.flow_export.util")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local packet = require("core.packet")
@@ -83,29 +84,29 @@ end
 
 -- print debugging messages for flow expiration
 local function debug_expire(entry, msg)
-   local key = entry.key
-   local src_ip, dst_ip
-
-   if key.is_ipv6 == 1 then
-      local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
-      src_ip = ipv6:ntop(ptr)
-      local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv6_1")
-      dst_ip = ipv6:ntop(ptr)
-   else
-      local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
-      src_ip = ipv4:ntop(ptr)
-      local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv4")
-      dst_ip = ipv4:ntop(ptr)
-   end
-
    if debug then
-      print(string.format("expire flow [%s] %s (%d) -> %s (%d) proto: %d",
-                          msg,
-                          src_ip,
-                          htons(key.src_port),
-                          dst_ip,
-                          htons(key.dst_port),
-                          key.protocol))
+      local key = entry.key
+      local src_ip, dst_ip
+
+      if key.is_ipv6 == 1 then
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
+         src_ip = ipv6:ntop(ptr)
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv6_1")
+         dst_ip = ipv6:ntop(ptr)
+      else
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+         src_ip = ipv4:ntop(ptr)
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv4")
+         dst_ip = ipv4:ntop(ptr)
+      end
+
+      util.fe_debug("expire flow [%s] %s (%d) -> %s (%d) proto: %d",
+                    msg,
+                    src_ip,
+                    htons(key.src_port),
+                    dst_ip,
+                    htons(key.dst_port),
+                    key.protocol)
    end
 end
 
