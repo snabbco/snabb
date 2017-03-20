@@ -7,6 +7,7 @@ module(..., package.seeall)
 
 local bit    = require("bit")
 local ffi    = require("ffi")
+local util   = require("apps.flow_export.util")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local dg     = require("lib.protocol.datagram")
@@ -230,8 +231,8 @@ function send_template_record(exporter)
    link.transmit(exporter.output.output, pkt)
 
    if debug then
-      print(string.format("Sent template packet, seq#: %d octets: %d",
-                          sequence_number - 1, length))
+      util.fe_debug("sent template packet, seq#: %d octets: %d",
+                    sequence_number - 1, length)
    end
 end
 
@@ -314,8 +315,8 @@ function export_records(exporter, entries)
       record_idx = record_idx + num_to_take
 
       if debug then
-         print(string.format("Sent data packet, seq#: %d octets: %d",
-                             sequence_number - 1, length))
+         util.fe_debug("sent data packet, seq#: %d octets: %d",
+                       sequence_number - 1, length)
       end
    end
 end
