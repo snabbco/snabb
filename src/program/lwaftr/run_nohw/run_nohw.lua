@@ -5,6 +5,7 @@ local RawSocket = require("apps.socket.raw").RawSocket
 local LwAftr = require("apps.lwaftr.lwaftr").LwAftr
 local lib = require("core.lib")
 local lwutil = require("apps.lwaftr.lwutil")
+local engine = require("core.app")
 
 local file_exists = lwutil.file_exists
 

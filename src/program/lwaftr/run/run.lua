@@ -4,10 +4,10 @@ local S          = require("syscall")
 local config     = require("core.config")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local lib        = require("core.lib")
-local numa       = require("lib.numa")
 local setup      = require("program.lwaftr.setup")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local lwutil = require("apps.lwaftr.lwutil")
+local engine = require("core.app")
 
 local fatal, file_exists = lwutil.fatal, lwutil.file_exists
 local nic_exists = lwutil.nic_exists

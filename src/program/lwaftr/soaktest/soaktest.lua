@@ -4,6 +4,7 @@ local config = require("core.config")
 local lib = require("core.lib")
 local lwconf = require('apps.lwaftr.conf')
 local setup = require("program.lwaftr.setup")
+local engine = require("core.app")
 
 local long_opts = {
    duration="D",
