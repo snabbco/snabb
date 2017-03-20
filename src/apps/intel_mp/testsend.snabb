@@ -1,0 +1,32 @@
+#!../../snabb snsh
+local args = main.parameters
+assert(#args == 3, "testsend.snabb pciaddr qno pcapfile")
+local pciaddr = table.remove(args, 1)
+local qno = tonumber(table.remove(args,1))
+local pcapfile = table.remove(args,1)
+
+local intel = require("apps.intel_mp.intel_mp")
+local pcap = require("apps.pcap.pcap")
+local C = require("ffi").C
+
+local c = config.new()
+config.app(c, "pcap", pcap.PcapReader, pcapfile)
+config.app(c, "nic", intel.Intel, {pciaddr=pciaddr, txq = qno, ndescriptors=2048, wait_for_link = true})
+
+if os.getenv("SNABB_SEND_BLAST") then
+	local basic = require("apps.basic.basic_apps")
+	config.app(c, "repeat", basic.Repeater)
+	config.link(c, "pcap.output -> repeat.input")
+	config.link(c, "repeat.output -> nic.input")
+else
+	config.link(c, "pcap.output -> nic.input")
+end
+
+engine.configure(c)
+
+local delay = os.getenv("SNABB_SEND_DELAY") or 1
+if delay then
+	C.sleep(tonumber(delay))
+end
+
+engine.main()

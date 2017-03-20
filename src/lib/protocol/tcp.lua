@@ -198,6 +198,7 @@ end
 
 function selftest ()
    test_tcp_checksum()
+   tcp:new({})
 end
 
 tcp.selftest = selftest

@@ -25,10 +25,8 @@ local use_restart = false
 
 test_skipped_code = 43
 
--- The set of all active apps and links in the system.
--- Indexed both by name (in a table) and by number (in an array).
-app_table,  app_array  = {}, {}
-link_table, link_array = {}, {}
+-- The set of all active apps and links in the system, indexed by name.
+app_table, link_table = {}, {}
 
 configuration = config.new()
 
@@ -63,11 +61,15 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
+-- True when the engine is running the breathe loop.
+local running = false
+
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
 monotonic_now = false
 function now ()
-   return monotonic_now or C.get_monotonic_time()
+   -- Return cached time only if it is fresh
+   return (running and monotonic_now) or C.get_monotonic_time()
 end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
@@ -96,9 +98,7 @@ function restart_dead_apps ()
    local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
    local restart = false
 
-   -- Collect 'restart' actions for dead apps and log their errors.
-   for i = 1, #app_array do
-      local app = app_array[i]
+   for name, app in pairs(app_table) do
       if app.dead and (now() - app.dead.time) >= restart_delay then
          restart = true
          io.stderr:write(("Restarting %s (died at %f: %s)\n")
@@ -157,10 +157,7 @@ end
 -- Update the active app network by applying the necessary actions.
 function apply_config_actions (actions, conf)
    -- The purpose of this function is to populate these tables:
-   local new_app_table,  new_app_array  = {}, {}
-   local new_link_table, new_link_array = {}, {}
-   -- Temporary name->index table for use in link renumbering
-   local app_name_to_index = {}
+   local new_app_table, new_link_table = {}, {}
    -- Table of functions that execute config actions
    local ops = {}
    function ops.stop (name)
@@ -173,8 +170,6 @@ function apply_config_actions (actions, conf)
    end
    function ops.keep (name)
       new_app_table[name] = app_table[name]
-      table.insert(new_app_array, app_table[name])
-      app_name_to_index[name] = #new_app_array
    end
    function ops.start (name)
       local class = conf.apps[name].class
@@ -189,8 +184,6 @@ function apply_config_actions (actions, conf)
       app.output = {}
       app.input = {}
       new_app_table[name] = app
-      table.insert(new_app_array, app)
-      app_name_to_index[name] = #new_app_array
       app.zone = zone
       if app.shm then
          app.shm.dtime = {counter, C.get_unix_time()}
@@ -207,8 +200,6 @@ function apply_config_actions (actions, conf)
          local app = app_table[name]
          app:reconfig(arg)
          new_app_table[name] = app
-         table.insert(new_app_array, app)
-         app_name_to_index[name] = #new_app_array
       else
          ops.restart(name)
       end
@@ -229,7 +220,6 @@ function apply_config_actions (actions, conf)
       if not new_app_table[ta] then error("no such app: " .. ta) end
       -- Create or reuse a link and assign/update receiving app index
       local link = link_table[linkspec] or link.new(linkspec)
-      link.receiving_app = app_name_to_index[ta]
       -- Add link to apps
       new_app_table[fa].output[fl] = link
       table.insert(new_app_table[fa].output, link)
@@ -237,7 +227,6 @@ function apply_config_actions (actions, conf)
       table.insert(new_app_table[ta].input, link)
       -- Remember link
       new_link_table[linkspec] = link
-      table.insert(new_link_array, link)
    end
    -- Free obsolete links.
    for linkspec, r in pairs(link_table) do
@@ -245,10 +234,78 @@ function apply_config_actions (actions, conf)
    end
    -- Commit changes.
    app_table, link_table = new_app_table, new_link_table
-   app_array, link_array = new_app_array, new_link_array
    -- Trigger link event for each app.
-   for _, app in ipairs(app_array) do
+   for name, app in pairs(app_table) do
       if app.link then app:link() end
+   end
+   compute_breathe_order ()
+end
+
+-- Sort the NODES topologically according to SUCCESSORS via
+-- reverse-post-order numbering.  The sort starts with ENTRIES.  This
+-- implementation is recursive; we should change it to be iterative
+-- instead.
+function tsort (nodes, entries, successors)
+   local visited = {}
+   local post_order = {}
+   local maybe_visit
+   local function visit(node)
+      visited[node] = true
+      for succ,_ in pairs(successors[node]) do maybe_visit(succ) end
+      table.insert(post_order, node)
+   end
+   function maybe_visit(node)
+      if not visited[node] then visit(node) end
+   end
+   for node,_ in pairs(entries) do maybe_visit(node) end
+   for node,_ in pairs(nodes) do maybe_visit(node) end
+   local ret = {}
+   while #post_order > 0 do table.insert(ret, table.remove(post_order)) end
+   return ret
+end
+
+breathe_pull_order = {}
+breathe_push_order = {}
+
+-- Sort the links in the app graph, and arrange to run push() on the
+-- apps on the receiving ends of those links.  This will run app:push()
+-- once for each link, which for apps with multiple links may cause the
+-- app's push function to run multiple times in a breath.
+function compute_breathe_order ()
+   breathe_pull_order, breathe_push_order = {}, {}
+   local entries = {}
+   local inputs = {}
+   local successors = {}
+   for _,app in pairs(app_table) do
+      if app.pull then
+         table.insert(breathe_pull_order, app)
+         for _,link in pairs(app.output) do
+            entries[link] = true;
+            successors[link] = {}
+         end
+      end
+      for _,link in pairs(app.input) do inputs[link] = app end
+   end
+   for link,app in pairs(inputs) do
+      successors[link] = {}
+      if not app.pull then
+         for _,succ in pairs(app.output) do
+            successors[link][succ] = true
+            if not successors[succ] then successors[succ] = {}; end
+         end
+      end
+   end
+   for link,succs in pairs(successors) do
+      for succ,_ in pairs(succs) do
+         if not successors[succ] then successors[succ] = {}; end
+      end
+   end
+   local link_order = tsort(inputs, entries, successors)
+   local i = 1
+   for _,link in ipairs(link_order) do
+      if breathe_push_order[#breathe_push_order] ~= inputs[link] then
+         table.insert(breathe_push_order, inputs[link])
+      end
    end
 end
 
@@ -259,7 +316,7 @@ function main (options)
    local no_timers = options.no_timers
    if options.duration then
       assert(not done, "You can not have both 'duration' and 'done'")
-      done = lib.timer(options.duration * 1e9)
+      done = lib.timeout(options.duration)
    end
 
    local breathe = breathe
@@ -306,14 +363,13 @@ function pace_breathing ()
 end
 
 function breathe ()
+   running = true
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
-   for i = 1, #app_array do
-      local app = app_array[i]
---      if app.pull then
---         zone(app.zone) app:pull() zone()
+   for i = 1, #breathe_pull_order do
+      local app = breathe_pull_order[i]
       if app.pull and not app.dead then
          zone(app.zone)
          with_restart(app, app.pull)
@@ -321,28 +377,18 @@ function breathe ()
       end
    end
    -- Exhale: push work out through the app network
-   local firstloop = true
-   repeat
-      local progress = false
-      -- For each link that has new data, run the receiving app
-      for i = 1, #link_array do
-         local link = link_array[i]
-         if firstloop or link.has_new_data then
-            link.has_new_data = false
-            local receiver = app_array[link.receiving_app]
-            if receiver.push and not receiver.dead then
-               zone(receiver.zone)
-               with_restart(receiver, receiver.push)
-               zone()
-               progress = true
-            end
-         end
+   for i = 1, #breathe_push_order do
+      local app = breathe_push_order[i]
+      if app.push and not app.dead then
+         zone(app.zone)
+         with_restart(app, app.push)
+         zone()
       end
-      firstloop = false
-   until not progress  -- Stop after no link had new data
+   end
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
+   running = false
 end
 
 function report (options)
@@ -439,7 +485,7 @@ end
 
 function selftest ()
    print("selftest: app")
-   local App = {}
+   local App = { push = true }
    function App:new () return setmetatable({}, {__index = App}) end
    local c1 = config.new()
    config.app(c1, "app1", App)
@@ -447,12 +493,12 @@ function selftest ()
    config.link(c1, "app1.x -> app2.x")
    print("empty -> c1")
    configure(c1)
-   assert(#app_array == 2)
-   assert(#link_array == 1)
+   assert(#breathe_pull_order == 0)
+   assert(#breathe_push_order == 1)
    assert(app_table.app1 and app_table.app2)
    local orig_app1 = app_table.app1
    local orig_app2 = app_table.app2
-   local orig_link = link_array[1]
+   local orig_link = link_table['app1.x -> app2.x']
    print("c1 -> c1")
    configure(c1)
    assert(app_table.app1 == orig_app1)
@@ -464,8 +510,8 @@ function selftest ()
    config.link(c2, "app2.x -> app1.x")
    print("c1 -> c2")
    configure(c2)
-   assert(#app_array == 2)
-   assert(#link_array == 2)
+   assert(#breathe_pull_order == 0)
+   assert(#breathe_push_order == 2)
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
    -- tostring() because == does not work on FFI structs?
@@ -474,12 +520,12 @@ function selftest ()
    configure(c1) -- c2 -> c1
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
-   assert(#app_array == 2)
-   assert(#link_array == 1)
+   assert(#breathe_pull_order == 0)
+   assert(#breathe_push_order == 1)
    print("c1 -> empty")
    configure(config.new())
-   assert(#app_array == 0)
-   assert(#link_array == 0)
+   assert(#breathe_pull_order == 0)
+   assert(#breathe_push_order == 0)
    -- Test app arg validation
    local AppC = {
       config = {
@@ -518,8 +564,6 @@ function selftest ()
    local orig_app1 = app_table.app1
    local orig_app2 = app_table.app2
    local orig_app3 = app_table.app3
-   local orig_link1 = link_array[1]
-   local orig_link2 = link_array[2]
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 ~= orig_app2) -- should be restarted
