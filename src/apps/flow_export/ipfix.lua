@@ -18,7 +18,7 @@ local C      = ffi.C
 
 local htonl, htons = lib.htonl, lib.htons
 
-local debug = false
+local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
 -- sequence number to use for flow packets
 local sequence_number = 1
@@ -230,7 +230,8 @@ function send_template_record(exporter)
    link.transmit(exporter.output.output, pkt)
 
    if debug then
-      print(("Sent template packet (%d octets)"):format(length))
+      print(string.format("Sent template packet, seq#: %d octets: %d",
+                          sequence_number - 1, length))
    end
 end
 
@@ -311,5 +312,10 @@ function export_records(exporter, entries)
       link.transmit(exporter.output.output, pkt)
 
       record_idx = record_idx + num_to_take
+
+      if debug then
+         print(string.format("Sent data packet, seq#: %d octets: %d",
+                             sequence_number - 1, length))
+      end
    end
 end

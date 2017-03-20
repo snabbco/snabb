@@ -18,7 +18,7 @@ local C      = ffi.C
 
 local htonl, htons = lib.htonl, lib.htons
 
-local debug = false
+local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
 local ETHER_PROTO_IPV4 = 0x0800
 local ETHER_PROTO_IPV6 = 0x86dd
