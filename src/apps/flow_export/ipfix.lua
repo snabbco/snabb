@@ -284,7 +284,7 @@ function export_records(exporter, entries)
             ffi.copy(ptr + 4, field_ptr + 4, 4)
          else
             local field_ptr =
-               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6")
+               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
             ffi.copy(ptr, field_ptr, 16)
             ffi.copy(ptr + 16, field_ptr + 16, 16)
          end
