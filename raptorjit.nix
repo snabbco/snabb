@@ -1,15 +1,6 @@
-# default.nix - define the build environment for RaptorJIT
-#
-# This file can be used by 'nix-build' or 'nix-shell' to create a
-# pristine build environment with precisely the expected software in
-# $PATH. This makes it possible to build raptorjit in the same way on
-# any machine.
-#
-# See README.md for usage instructions.
+# raptorjit.nix - compile RaptorJIT with reference toolchain
 
-{ pkgs ? (import ./pkgs.nix) {}
-, source ? ./.
-, version ? "dev" }:
+{ pkgs, source, version }:
 
 with pkgs;
 with llvmPackages_4.stdenv;  # Use clang 4.0

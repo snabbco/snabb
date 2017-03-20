@@ -7,11 +7,9 @@
 #
 # See README.md for usage instructions.
 
-args @ {
-  pkgs ? (import ./pkgs.nix) {}
-, source ? ./.
-, version ? "dev"
-}:
+{ pkgs ? (import ./pkgs.nix) {}
+, source ? pkgs.lib.cleanSource ./.
+, version ? "dev" }:
 
 let
   callPackage = (pkgs.lib.callPackageWith { inherit pkgs; inherit source; inherit version; });
