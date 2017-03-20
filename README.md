@@ -76,6 +76,10 @@ bootstrapping (see [default.nix](default.nix)). The recommended way to
 build RaptorJIT is with nix, which provides the dependencies
 automatically, but you can build manually if you prefer.
 
+Building with nix will be slow the first time due to downloading
+toolchains and related dependencies. This is all cached for future
+builds.
+
 #### Build with nix
 
 Install nix:
@@ -84,10 +88,16 @@ Install nix:
 $ curl https://nixos.org/nix/install | sh
 ```
 
-Build in batch-mode (option 1):
+Build in batch-mode and run the test suite (option 1a):
 
 ```shell
 $ nix-build    # produces result/bin/raptorjit
+```
+
+Build in batch-mode without the test suite (option 1b):
+
+```shell
+$ nix-build -A raptorjit
 ```
 
 Build interactively (option 2):
