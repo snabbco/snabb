@@ -277,7 +277,7 @@ function export_records(exporter, entries)
          local ptr    =
             buffer + v9_header_size + 4 + (record_len * (idx - record_idx))
 
-         if key.is_ipv6 then
+         if key.is_ipv6 == 0 then
             local field_ptr =
                ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
             ffi.copy(ptr, field_ptr, 4)
