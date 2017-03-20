@@ -136,7 +136,7 @@ local function init_expire_records()
                debug_expire(entry, "idle")
                table.insert(keys_to_remove, entry.key)
                table.insert(to_export, entry)
-            elseif timestamp - record.end_time > active_timeout then
+            elseif timestamp - record.start_time > active_timeout then
                debug_expire(entry, "active")
                table.insert(timeout_records, record)
                table.insert(to_export, entry)
