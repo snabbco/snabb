@@ -264,14 +264,16 @@ function export_records(exporter, entries)
    while record_idx <= #entries do
       local num_to_take = math.min(max_records, #entries - record_idx + 1)
       local data_len    = header_len + (record_len * num_to_take)
-      local padding     = 4 - (data_len % 4)
+      local padding     = (4 - (data_len % 4)) % 4
       local length      = data_len + padding
       local buffer      = ffi.new("uint8_t[?]", length)
       write_header(buffer, num_to_take, exporter.boot_time)
 
       -- flow set ID and length
-      ffi.cast("uint16_t*", buffer + v9_header_size)[0]     = htons(256)
-      ffi.cast("uint16_t*", buffer + v9_header_size + 2)[0] = htons(length - 20)
+      ffi.cast("uint16_t*", buffer + v9_header_size)[0]
+         = htons(256)
+      ffi.cast("uint16_t*", buffer + v9_header_size + 2)[0]
+         = htons(length - v9_header_size)
 
       for idx = record_idx, record_idx + num_to_take - 1 do
          local key    = entries[idx].key
