@@ -5,7 +5,7 @@ Environment support code for tests.
 import os
 from pathlib import Path
 from signal import SIGTERM
-from subprocess import PIPE, Popen, TimeoutExpired, check_output
+from subprocess import PIPE, Popen, TimeoutExpired
 import time
 import unittest
 
@@ -25,6 +25,7 @@ BENCHMARK_FILENAME = 'benchtest.csv'
 BENCHMARK_PATH = Path.cwd() / BENCHMARK_FILENAME
 
 COMMAND_TIMEOUT = 10
+DAEMON_STARTUP_WAIT = 1
 ENC = 'utf-8'
 
 
@@ -32,30 +33,16 @@ def nic_names():
     return os.environ.get('SNABB_PCI0'), os.environ.get('SNABB_PCI1')
 
 
-def tap_name():
-    """
-    Return the first TAP interface name if one found: (tap_iface, None).
-    Return (None, 'No TAP interface available') if none found.
-    """
-    output = check_output(['ip', 'tuntap', 'list'])
-    tap_iface = output.split(b':')[0]
-    if not tap_iface:
-        return None, 'No TAP interface available'
-    return str(tap_iface, ENC), None
-
-
 class BaseTestCase(unittest.TestCase):
     """
     Base class for TestCases. It has a "run_cmd" method and daemon handling,
     running a subcommand like "snabb lwaftr run" or "bench".
 
-    Set the daemon args in "cls.daemon_args" to enable the daemon.
-    Set "self.wait_for_daemon_startup" to True if it needs time to start up.
+    Set "daemon_args" to enable the daemon.
     """
 
     # Override these.
     daemon_args = ()
-    wait_for_daemon_startup = False
 
     # Use setUpClass to only setup the daemon once for all tests.
     @classmethod
@@ -63,8 +50,27 @@ class BaseTestCase(unittest.TestCase):
         if not cls.daemon_args:
             return
         cls.daemon = Popen(cls.daemon_args, stdout=PIPE, stderr=PIPE)
-        if cls.wait_for_daemon_startup:
-            time.sleep(1)
+        time.sleep(DAEMON_STARTUP_WAIT)
+        # Check that the daemon started up correctly.
+        ret_code = cls.daemon.poll()
+        if ret_code is not None:
+            cls.reportAndFail('Error starting up daemon:', ret_code)
+
+    @classmethod
+    def reportAndFail(cls, msg, ret_code):
+            msg_lines = [
+                msg, str(cls.daemon.args),
+                'Exit code: %s' % ret_code,
+            ]
+            if cls.daemon.stdout.readable:
+                msg_lines.extend(
+                    ('STDOUT\n', str(cls.daemon.stdout.read(), ENC)))
+            if cls.daemon.stderr.readable:
+                msg_lines.extend(
+                    ('STDERR\n', str(cls.daemon.stderr.read(), ENC)))
+            cls.daemon.stdout.close()
+            cls.daemon.stderr.close()
+            cls.fail(cls, '\n'.join(msg_lines))
 
     def run_cmd(self, args):
         proc = Popen(args, stdout=PIPE, stderr=PIPE)
@@ -76,7 +82,7 @@ class BaseTestCase(unittest.TestCase):
         if proc.returncode != 0:
             msg_lines = (
                 'Error running command:', str(args),
-                'Exit code:', str(proc.returncode),
+                'Exit code: %s' % proc.returncode,
                 'STDOUT', str(output, ENC), 'STDERR', str(errput, ENC),
             )
             self.fail('\n'.join(msg_lines))
@@ -90,10 +96,8 @@ class BaseTestCase(unittest.TestCase):
         if ret_code is None:
             cls.daemon.terminate()
             ret_code = cls.daemon.wait()
-        if ret_code not in (0, -SIGTERM):
-            print('Error terminating daemon:', cls.daemon.args)
-            print('Exit code:', ret_code)
-            print('STDOUT\n', str(cls.daemon.stdout.read(), ENC))
-            print('STDERR\n', str(cls.daemon.stderr.read(), ENC))
-        cls.daemon.stdout.close()
-        cls.daemon.stderr.close()
+        if ret_code in (0, -SIGTERM):
+            cls.daemon.stdout.close()
+            cls.daemon.stderr.close()
+        else:
+            cls.reportAndFail('Error terminating daemon:', ret_code)

@@ -5,28 +5,45 @@ Test the "snabb lwaftr monitor" subcommand. Needs a NIC name and a TAP interface
 2. Run "snabb lwaftr monitor" to set the counter and check its output.
 """
 
+from random import randint
+from subprocess import call, check_call
 import unittest
 
-from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names, tap_name
+from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
 
 
 SNABB_PCI0 = nic_names()[0]
-TAP_IFACE, tap_err_msg = tap_name()
 
 
 @unittest.skipUnless(SNABB_PCI0, 'NIC not configured')
-@unittest.skipUnless(TAP_IFACE, tap_err_msg)
 class TestMonitor(BaseTestCase):
 
-    daemon_args = (
+    daemon_args = [
         str(SNABB_CMD), 'lwaftr', 'run',
         '--bench-file', '/dev/null',
         '--conf', str(DATA_DIR / 'icmp_on_fail.conf'),
         '--on-a-stick', SNABB_PCI0,
-        '--mirror', TAP_IFACE,
-    )
+        '--mirror',  # TAP interface name added in setUpClass.
+    ]
     monitor_args = (str(SNABB_CMD), 'lwaftr', 'monitor', 'all')
-    wait_for_daemon_startup = True
+
+    # Use setUpClass to only setup the daemon once for all tests.
+    @classmethod
+    def setUpClass(cls):
+        # Create the TAP interface and append its name to daemon_args
+        # before calling the superclass' setUpClass, which needs both.
+        # 'tapXXXXXX' where X is a 0-9 digit.
+        cls.tap_name = 'tap%s' % randint(100000, 999999)
+        check_call(('ip', 'tuntap', 'add', cls.tap_name, 'mode', 'tap'))
+        cls.daemon_args.append(cls.tap_name)
+        cls.prev_daemon_args = BaseTestCase.daemon_args
+        BaseTestCase.daemon_args = cls.daemon_args
+        try:
+            BaseTestCase.setUpClass()
+        except Exception:
+            # Clean up the TAP interface.
+            call(('ip', 'tuntap', 'delete', cls.tap_name, 'mode', 'tap'))
+            raise
 
     def test_monitor(self):
         monitor_args = list(self.monitor_args)
@@ -36,6 +53,15 @@ class TestMonitor(BaseTestCase):
             b'\n'.join((b'OUTPUT', output)))
         self.assertIn(b'255.255.255.255', output,
             b'\n'.join((b'OUTPUT', output)))
+
+    @classmethod
+    def tearDownClass(cls):
+        try:
+            BaseTestCase.tearDownClass()
+        finally:
+            BaseTestCase.daemon_args = cls.prev_daemon_args
+            # Clean up the TAP interface.
+            call(('ip', 'tuntap', 'delete', cls.tap_name, 'mode', 'tap'))
 
 
 if __name__ == '__main__':

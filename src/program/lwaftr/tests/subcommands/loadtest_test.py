@@ -35,7 +35,6 @@ class TestLoadtest(BaseTestCase):
         str(BENCHDATA_DIR / 'ipv4_and_ipv6_stick_imix.pcap'), 'ALL', 'ALL',
         SNABB_PCI1,
     )
-    wait_for_daemon_startup = True
 
     def test_loadtest(self):
         output = self.run_cmd(self.loadtest_args)

@@ -25,7 +25,7 @@ class TestBench(BaseTestCase):
             'Cannot find {}'.format(BENCHMARK_PATH))
         BENCHMARK_PATH.unlink()
 
-    def test_bench_standard(self):
+    def test_bench_not_reconfigurable(self):
         self.execute_bench_test(self.cmd_args)
 
     def test_bench_reconfigurable(self):

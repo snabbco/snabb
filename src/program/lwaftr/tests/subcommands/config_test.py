@@ -33,8 +33,6 @@ class TestConfigGet(BaseTestCase):
     """
 
     daemon_args = DAEMON_ARGS
-    wait_for_daemon_startup = True
-
     config_args = (str(SNABB_CMD), 'config', 'get', DAEMON_PROC_NAME)
 
     def test_get_internal_iface(self):
@@ -87,8 +85,6 @@ class TestConfigListen(BaseTestCase):
     """
 
     daemon_args = DAEMON_ARGS
-    wait_for_daemon_startup = True
-
     listen_args = (str(SNABB_CMD), 'config', 'listen',
         '--socket', SOCKET_PATH, DAEMON_PROC_NAME)
 
@@ -126,7 +122,6 @@ class TestConfigListen(BaseTestCase):
 class TestConfigMisc(BaseTestCase):
 
     daemon_args = DAEMON_ARGS
-    wait_for_daemon_startup = True
 
     def get_cmd_args(self, action):
         cmd_args = list((str(SNABB_CMD), 'config', 'XXX', DAEMON_PROC_NAME))

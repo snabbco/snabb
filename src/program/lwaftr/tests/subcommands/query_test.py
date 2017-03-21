@@ -24,7 +24,6 @@ class TestQueryStandard(BaseTestCase):
         '--v4', SNABB_PCI0,
         '--v6', SNABB_PCI1,
     )
-    wait_for_daemon_startup = True
 
     query_args = (str(SNABB_CMD), 'lwaftr', 'query')
 
@@ -84,7 +83,6 @@ class TestQueryReconfigurable(TestQueryStandard):
         '--v4', SNABB_PCI0,
         '--v6', SNABB_PCI1,
     )
-    wait_for_daemon_startup = True
 
     def get_all_leader_pids(self):
         output = str(self.run_cmd(('ps', 'aux')), ENC)
