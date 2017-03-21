@@ -127,7 +127,15 @@ bugs, and please file a bug if you find one.
 
 ## License
 
-All the `ljndpi` code is under the [MIT license](http://opensource.org/licenses/mit).
+All the `ljndpi` code is under the [Apache
+License 2.0](http://www.apache.org/licenses/). A copy of the license is
+included in the [COPYING](COPYING) file in the source distribution.
+
+### Historical Note
+
+Versions prior to `0.1.0` are under the terms of the [MIT/X11
+license](https://opensource.org/licenses/mit). Versions `0.1.0` and `0.0.3`
+only differ in their license.
 
 
 ## Authors
