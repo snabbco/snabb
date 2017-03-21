@@ -255,6 +255,7 @@ local function serialize(builder, stmt)
       elseif op == 'uint32' then return '('..lhs..' % '.. 2^32 ..')'
       end
       local rhs = serialize_value(expr[3])
+      assert(expr[4] == nil) -- sanity check
       if op == '[]' then
          return read_buffer_word_by_type(builder, 'P', lhs, rhs)
       elseif op == '+' then return '('..lhs..' + '..rhs..')'

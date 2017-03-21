@@ -2,3 +2,7 @@
 	path = deps/luajit
 	url = http://github.com/SnabbCo/luajit.git
         ignore = dirty
+[submodule "deps/dynasm"]
+	path = deps/dynasm
+	url = https://github.com/luapower/dynasm.git
+        ignore = dirty

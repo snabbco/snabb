@@ -343,7 +343,7 @@ function parse_host_arg(lexer)
    if type(arg) == 'string' or arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       return arg
    end
-   lexer.error('invalid host %s', arg)
+   lexer.error('ethernet address used in non-ether expression')
 end
 
 function parse_int_arg(lexer, max_len)
@@ -383,6 +383,12 @@ function parse_net_arg(lexer)
    end
 
    local arg = lexer.next({address=true})
+   if type(arg) ~= 'table' then
+      lexer.error('named nets currently unsupported')
+   elseif arg[1] == 'ehost' then
+      lexer.error('ethernet address used in non-ether expression')
+   end
+
    -- IPv4 dotted triple, dotted pair or bare net addresses
    if arg[1] == 'ipv4' and #arg < 5 then
       local mask_len = 32
@@ -408,15 +414,15 @@ function parse_net_arg(lexer)
             lexer.error("Not valid syntax for IPv6")
          end
          local mask = lexer.next({address=true})
+         if type(mask) ~= 'table' or mask[1] ~= 'ipv4' then
+            lexer.error("Invalid IPv4 mask")
+         end
          check_non_network_bits_in_ipv4(arg, ipv4_to_int(mask),
             table.concat(mask, '.', 2))
-         assert(mask[1] == arg[1], 'bad mask', mask)
          return { arg[1]..'/mask', arg, mask }
       else
          return arg
       end
-   elseif type(arg) == 'string' then
-      lexer.error('named nets currently unsupported %s', arg)
    end
 end
 
@@ -779,8 +785,8 @@ function parse_arithmetic(lexer, tok, max_precedence, parsed_exp)
 end
 
 local primitives = {
-   dst = table_parser(src_or_dst_types),
-   src = table_parser(src_or_dst_types),
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
    host = unary(parse_host_arg),
    ether = table_parser(ether_types),
    fddi = table_parser(ether_types),
@@ -1049,6 +1055,10 @@ function selftest ()
               { 'host', '0xffffffffff-oo.com' })
    parse_test("src host 127.0.0.1",
               { 'src_host', { 'ipv4', 127, 0, 0, 1 } })
+   parse_test("src 127.0.0.1",
+              { 'src', { 'ipv4', 127, 0, 0, 1 } })
+   parse_test("dst 1::ff11",
+              { 'dst', { 'ipv6', 1, 0, 0, 0, 0, 0, 0, 65297 } })
    parse_test("src net 10.0.0.0/24",
               { 'src_net',
                 { 'ipv4/len', { 'ipv4', 10, 0, 0, 0 }, 24 }})
@@ -1199,5 +1209,10 @@ function selftest ()
    parse_error_test("0 = 08", "unexpected end of octal literal at 5")
    parse_error_test("0 = 09", "unexpected end of octal literal at 5")
    parse_error_test("host 0xffffffffff and tcp", "integer too large: 0xffffffffff")
+   parse_error_test("host ff:ff:ff:ff:ff:ff", "ethernet address used in non-ether expression")
+   parse_error_test("net ff:ff:ff:ff:ff:ff", "ethernet address used in non-ether expression")
+   parse_error_test("net 192.168.1.0 mask foobar", "Invalid IPv4 mask")
+   parse_error_test("net 192.168.1.0 mask ::", "Invalid IPv4 mask")
+   parse_error_test("net 192.168.1.0 mask ff:ff:ff:ff:ff:ff", "Invalid IPv4 mask")
    print("OK")
 end

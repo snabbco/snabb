@@ -364,11 +364,34 @@ function selftest()
    test("match { otherwise => x(1/0) }",
         { 'fail' })
 
-   local function test(str, expr)
+   local function test(str)
       -- Just a test to see if it works without errors.
       compile(str)
    end
    test("match { tcp port 80 => pass }")
+
+   local function test(str, pkt, obj)
+      -- Try calling the matching method on the given table
+      -- which should have handlers installed
+      obj.match = compile(str)
+      obj:match(pkt.packet, pkt.len)
+   end
+
+   local savefile = require("pf.savefile")
+   pkts = savefile.load_packets("../tests/data/arp.pcap")
+
+   test("match { tcp port 80 => pass }",
+        pkts[1],
+        -- the handler shouldn't be called
+        { pass = function (self, pkt, len) assert(false) end })
+   test("match { arp => handle(&arp[1:1]) }",
+        pkts[1],
+        { handle = function (self, pkt, len, off)
+                     utils.assert(self ~= nil)
+                     utils.assert(pkt ~= nil)
+                     utils.assert(len ~= nil)
+                     utils.assert_equals(off, 15)
+                   end })
 
    print("OK")
 end

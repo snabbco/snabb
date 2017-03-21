@@ -108,6 +108,65 @@ return function(P,length)
       return cast("uint16_t*", P+56)[0] == 20480
    end
 end
+```
 
+## Native pflang compilation
+
+```
+7f5ecada9000  4883FE22          cmp rsi, +0x22
+7f5ecada9004  0F8CC2000000      jl 0x7f5ecada90cc
+7f5ecada900a  0FB7470C          movzx eax, word [rdi+0xc]
+7f5ecada900e  4883F808          cmp rax, +0x08
+7f5ecada9012  756F              jnz 0x7f5ecada9083
+7f5ecada9014  0FB64F17          movzx ecx, byte [rdi+0x17]
+7f5ecada9018  4883F906          cmp rcx, +0x06
+7f5ecada901c  0F85AA000000      jnz 0x7f5ecada90cc
+7f5ecada9022  0FB74F14          movzx ecx, word [rdi+0x14]
+7f5ecada9026  4881E11FFF0000    and rcx, 0xff1f
+7f5ecada902d  4883F900          cmp rcx, +0x00
+7f5ecada9031  0F8595000000      jnz 0x7f5ecada90cc
+7f5ecada9037  0FB64F0E          movzx ecx, byte [rdi+0xe]
+7f5ecada903b  4883E10F          and rcx, +0x0f
+7f5ecada903f  48C1E102          shl rcx, 0x02
+7f5ecada9043  89CA              mov edx, ecx
+7f5ecada9045  4883C210          add rdx, +0x10
+7f5ecada9049  4839F2            cmp rdx, rsi
+7f5ecada904c  0F8F7A000000      jg 0x7f5ecada90cc
+7f5ecada9052  4189C8            mov r8d, ecx
+7f5ecada9055  4983C00E          add r8, +0x0e
+7f5ecada9059  460FB70407        movzx r8d, word [rdi+r8]
+7f5ecada905e  4981F800500000    cmp r8, 0x5000
+7f5ecada9065  0F8464000000      jz 0x7f5ecada90cf
+7f5ecada906b  4883C112          add rcx, +0x12
+7f5ecada906f  4839F1            cmp rcx, rsi
+7f5ecada9072  7F58              jg 0x7f5ecada90cc
+7f5ecada9074  0FB71417          movzx edx, word [rdi+rdx]
+7f5ecada9078  4881FA00500000    cmp rdx, 0x5000
+7f5ecada907f  744E              jz 0x7f5ecada90cf
+7f5ecada9081  EB49              jmp 0x7f5ecada90cc
+7f5ecada9083  4883FE38          cmp rsi, +0x38
+7f5ecada9087  7C43              jl 0x7f5ecada90cc
+7f5ecada9089  4881F886DD0000    cmp rax, 0xdd86
+7f5ecada9090  753A              jnz 0x7f5ecada90cc
+7f5ecada9092  0FB64714          movzx eax, byte [rdi+0x14]
+7f5ecada9096  4883F806          cmp rax, +0x06
+7f5ecada909a  7410              jz 0x7f5ecada90ac
+7f5ecada909c  4883F82C          cmp rax, +0x2c
+7f5ecada90a0  752A              jnz 0x7f5ecada90cc
+7f5ecada90a2  0FB64736          movzx eax, byte [rdi+0x36]
+7f5ecada90a6  4883F806          cmp rax, +0x06
+7f5ecada90aa  7520              jnz 0x7f5ecada90cc
+7f5ecada90ac  0FB74736          movzx eax, word [rdi+0x36]
+7f5ecada90b0  4881F800500000    cmp rax, 0x5000
+7f5ecada90b7  7416              jz 0x7f5ecada90cf
+7f5ecada90b9  4883FE3A          cmp rsi, +0x3a
+7f5ecada90bd  7C0D              jl 0x7f5ecada90cc
+7f5ecada90bf  0FB77738          movzx esi, word [rdi+0x38]
+7f5ecada90c3  4881FE00500000    cmp rsi, 0x5000
+7f5ecada90ca  7403              jz 0x7f5ecada90cf
+7f5ecada90cc  B000              mov al, 0x0
+7f5ecada90ce  C3                ret
+7f5ecada90cf  B001              mov al, 0x1
+7f5ecada90d1  C3                ret
 ```
 

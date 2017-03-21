@@ -1,6 +1,6 @@
 #!/usr/bin/env luajit
--- Do a 3-way compare between the pure-lua, bpf-lua and pure-libpcap pipelines,
--- given pflang, indicating whether or not all three match.
+-- Do a 4-way compare between the pure-lua, native-lua, bpf-lua and pure-libpcap pipelines,
+-- given pflang, indicating whether or not all four match.
 -- Input: pflang by default, or pflua IR if --ir is specified.
 package.path = package.path .. ";../src/?.lua;../tests/?.lua"
 
@@ -69,7 +69,8 @@ local function create_preds(filter_input, opt)
    local pflua_pred = pf.compile_filter(filter_input, {optimize=opt})
    local bpf_pred = pf.compile_filter(filter_input, {bpf=true, optimize=opt})
    local lpcap = pf.compile_filter(filter_input, {libpcap=true, optimize=opt})
-   return pflua_pred, bpf_pred, lpcap
+   local native_pred = pf.compile_filter(filter_input, {native=true, optimize=opt})
+   return pflua_pred, bpf_pred, lpcap, native_pred
 end
 
 local function main_pflang(pcap_file, filter_input, pkt_number, opt)
@@ -79,19 +80,22 @@ local function main_pflang(pcap_file, filter_input, pkt_number, opt)
       local o = true
       if opt == OPT_FALSE then o = false end
 
-      local p, b, l = create_preds(filter_input, o)
+      local p, b, l, n = create_preds(filter_input, o)
       preds["pure-lua"] = p
       preds["bpf-lua"] = b
       preds["libpcap"] = l
+      preds["native"] = n
    elseif opt == OPT_BOTH then
-      local p, b, l = create_preds(filter_input, false)
+      local p, b, l, n = create_preds(filter_input, false)
       preds["pure-lua-unopt"] = p
       preds["bpf-lua-unopt"] = b
       preds["libpcap-unopt"] = l
-      p, b, l = create_preds(filter_input, true)
+      preds["native-unopt"] = n
+      p, b, l, n = create_preds(filter_input, true)
       preds["pure-lua-opt"] = p
       preds["bpf-lua-opt"] = b
       preds["libpcap-opt"] = l
+      preds["native-opt"] = n
    else
       error("Invalid optimization value")
    end
@@ -154,7 +158,7 @@ local function run_filters(...)
       os.exit(main_ir(pcap_file, ir1, ir2, opt_ir, tonumber(pkt_number)))
    end
 
-   -- Do a 3-way compare between the pure-lua, bpf-lua and pure-libpcap pipelines,
+   -- Do a 4-way compare between the pure-lua, native-lua, bpf-lua and pure-libpcap pipelines,
    local optimize = OPT_BOTH
    if opts['-O0'] and opts['--force-opts'] then
       print("It's invalid to specify -O0 with --force-opts")
