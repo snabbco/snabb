@@ -1,0 +1,25 @@
+Usage: snabb flow_export run [options] <input> <output>
+       snabb flow_export run --help
+
+Mandatory arguments:
+       -m, --host-mac <macaddr> The MAC address of the host running the exporter.
+       -a, --host-ip  <ipaddr>  The IP address of the host running the exporter.
+       -c, --collector <ipaddr> The IP address of the flow collector.
+
+Optional arguments:
+       -i, --input-type <type>  One of pcap, raw, or intel10g. Specifies
+                                how to interpret the <input> argument. Interprets
+                                <input> as a pcap file path, device name, or
+                                PCI address respectively. Defaults to intel10g.
+       -o, --output-type <type> Takes the same values as -i but for <output>.
+       -D, --duration <seconds> Duration to run (in seconds).
+       -p, --port <port>        The port on the collector to send to. Defaults
+                                to port 4739.
+       --netflow-v9             Use the Netflow V9 protocol to communicate to the
+                                flow collector.
+       --ipfix                  Use IPFIX to communicate with the flow collector.
+                                (mutually exclusive with --netflow-v9, --ipfix is
+                                 the default)
+       --transport <proto>      The transport protocol to use to communicate to
+                                the flow collector. Valid values depend on whether
+                                IPFIX or Netflow V9 is used.
