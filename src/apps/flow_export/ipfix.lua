@@ -221,8 +221,8 @@ end
 --   * unix timestamp
 --   * sequence number
 --   * source ID
-function Exporter:write_header(ptr, count, length, boot_time)
-   local uptime = tonumber(get_timestamp() - boot_time)
+function Exporter:write_header(ptr, count, length)
+   local uptime = tonumber(get_timestamp() - self.boot_time)
 
    ffi.cast("uint16_t*", ptr)[0] = htons(self.version)
 
@@ -254,7 +254,7 @@ function Exporter:send_template_record(output_link)
    end
 
    local buffer = ffi.new("uint8_t[?]", length)
-   self:write_header(buffer, 2, length, self.boot_time)
+   self:write_header(buffer, 2, length)
 
    -- write the header and then the template record contents for each template
    -- note that the ptr is incrementing by 16 octets but the buffer lengths are
@@ -316,7 +316,7 @@ function Exporter:export_records(output_link, entries)
       local padding     = (4 - (data_len % 4)) % 4
       local length      = data_len + padding
       local buffer      = ffi.new("uint8_t[?]", length)
-      self:write_header(buffer, num_to_take, length, self.boot_time)
+      self:write_header(buffer, num_to_take, length)
 
       -- flow set ID and length
       ffi.cast("uint16_t*", buffer + self.header_size)[0]
