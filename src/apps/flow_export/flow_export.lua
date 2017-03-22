@@ -141,7 +141,7 @@ local function init_expire_records()
             end
          end
 
-         ipfix.export_records(self, to_export)
+         self.exporter:export_records(self.output.output, to_export)
 
          -- remove idle timed out flows
          for _, key in ipairs(keys_to_remove) do
@@ -167,7 +167,7 @@ local function init_refresh_templates()
       local now = tonumber(engine.now())
 
       if not last_time or now - last_time >= template_interval then
-         ipfix.send_template_record(self)
+         self.exporter:send_template_record(self.output.output)
          last_time = now
       end
    end
@@ -185,16 +185,18 @@ function FlowExporter:new(config)
                active_timeout = config.active_timeout or 120,
                export_timer = nil,
                template_timer = nil,
-               boot_time = get_timestamp(),
-               exporter_mac = assert(config.exporter_mac),
-               exporter_ip = assert(config.exporter_ip),
-               collector_ip = assert(config.collector_ip),
-               collector_port = assert(config.collector_port),
-               -- TODO: use ARP to avoid needing this
-               collector_mac = assert(config.collector_mac),
-               observation_domain = config.observation_domain or 256,
-               -- TODO: make this configurable
-               mtu_to_collector = 1500 }
+               -- instance of the class that talks to the collector
+               exporter = ipfix.Exporter:new({
+                     boot_time = get_timestamp(),
+                     mtu = config.mtu or 1500,
+                     observation_domain = config.observation_domain or 256,
+                     exporter_mac = assert(config.exporter_mac),
+                     exporter_ip = assert(config.exporter_ip),
+                     -- TODO: use ARP to avoid needing this
+                     collector_mac = assert(config.collector_mac),
+                     collector_ip = assert(config.collector_ip),
+                     collector_port = assert(config.collector_port)
+                  }) }
 
    o.expire_records = init_expire_records()
    o.refresh_templates = init_refresh_templates()
