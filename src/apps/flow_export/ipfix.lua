@@ -21,9 +21,6 @@ local htonl, htons = lib.htonl, lib.htons
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
--- sequence number to use for flow packets
-local sequence_number = 1
-
 -- various constants
 local v9_header_size  = 20
 local v10_header_size = 16
@@ -156,22 +153,41 @@ local template_v6 = make_template_info(257,
      "tcpControlBits",
      "ipClassOfService" })
 
-local function construct_packet(exporter, ptr, len)
+Exporter = {}
+
+function Exporter:new(config)
+   local o = { -- sequence number to use for flow packets
+               sequence_number = 1,
+               boot_time = config.boot_time,
+               -- version of IPFIX/Netflow (9 or 10)
+               version = config.version,
+               mtu = config.mtu,
+               observation_domain = config.observation_domain,
+               exporter_mac = config.exporter_mac,
+               exporter_ip = config.exporter_ip,
+               collector_mac = config.collector_mac,
+               collector_ip = config.collector_ip,
+               collector_port = config.collector_port }
+
+   return setmetatable(o, { __index = self })
+end
+
+function Exporter:construct_packet(ptr, len)
    local dgram  = dg:new()
 
    -- TODO: support IPv6, also obtain the MAC of the dst via ARP
    --       and use the correct src MAC (this is ok for use on the
    --       loopback device for now).
-   local eth_h = ether:new({ src = ether:pton(exporter.exporter_mac),
-                             dst = ether:pton(exporter.collector_mac),
+   local eth_h = ether:new({ src = ether:pton(self.exporter_mac),
+                             dst = ether:pton(self.collector_mac),
                              type = 0x0800 })
-   local ip_h  = ipv4:new({ src = ipv4:pton(exporter.exporter_ip),
-                            dst = ipv4:pton(exporter.collector_ip),
+   local ip_h  = ipv4:new({ src = ipv4:pton(self.exporter_ip),
+                            dst = ipv4:pton(self.collector_ip),
                             protocol = 17,
                             ttl = 64,
                             flags = 0x02 })
    local udp_h = udp:new({ src_port = math.random(49152, 65535),
-                           dst_port = exporter.collector_port })
+                           dst_port = self.collector_port })
 
    dgram:payload(ptr, len)
    udp_h:length(udp_h:sizeof() + len)
@@ -198,26 +214,25 @@ end
 --   * unix timestamp
 --   * sequence number
 --   * source ID
-local function write_header(ptr, count, boot_time)
+function Exporter:write_header(ptr, count, boot_time)
    local uptime = tonumber(get_timestamp() - boot_time)
 
    ffi.cast("uint16_t*", ptr)[0]      = htons(9)
    ffi.cast("uint16_t*", ptr + 2)[0]  = htons(count)
    ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(uptime)
    ffi.cast("uint32_t*", ptr + 8)[0]  = htonl(math.floor(C.get_unix_time()))
-   ffi.cast("uint32_t*", ptr + 12)[0] = htonl(sequence_number)
-   -- TODO: make source ID configurable
-   ffi.cast("uint32_t*", ptr + 16)[0] = htonl(1)
+   ffi.cast("uint32_t*", ptr + 12)[0] = htonl(self.sequence_number)
+   ffi.cast("uint32_t*", ptr + 16)[0] = htonl(self.observation_domain)
 
-   sequence_number = sequence_number + 1
+   self.sequence_number = self.sequence_number + 1
 end
 
 -- Send template records/option template records to the collector
 -- TODO: only handles template records so far
-function send_template_record(exporter)
+function Exporter:send_template_record(output_link)
    local length = v9_header_size + template_v4.buffer_len + template_v6.buffer_len
    local buffer = ffi.new("uint8_t[?]", length)
-   write_header(buffer, 2, exporter.boot_time)
+   self:write_header(buffer, 2, self.boot_time)
 
    local template = ffi.cast("uint16_t*", buffer + v9_header_size)
 
@@ -226,13 +241,13 @@ function send_template_record(exporter)
             template_v6.buffer,
             template_v6.buffer_len)
 
-   local pkt = construct_packet(exporter, ffi.cast("uint8_t*", buffer), length)
+   local pkt = self:construct_packet(ffi.cast("uint8_t*", buffer), length)
 
-   link.transmit(exporter.output.output, pkt)
+   link.transmit(output_link, pkt)
 
    if debug then
       util.fe_debug("sent template packet, seq#: %d octets: %d",
-                    sequence_number - 1, length)
+                    self.sequence_number - 1, length)
    end
 end
 
@@ -250,15 +265,14 @@ end
 
 -- Given a flow exporter & an array of ctable entries, construct flow
 -- record packet(s) and transmit them
-function export_records(exporter, entries)
-   local mtu         = exporter.mtu_to_collector
+function Exporter:export_records(output_link, entries)
    -- length of v9 header + flow set ID/length
    local header_len  = v9_header_size + 4
    -- TODO: handle IPv6
    local record_len  = template_v4.data_len
    -- 4 is the max padding, so account for that conservatively to
    -- figure out how many records we can fit in the MTU
-   local max_records = math.floor((mtu - header_len - 4 - 28) / record_len)
+   local max_records = math.floor((self.mtu - header_len - 4 - 28) / record_len)
 
    local record_idx  = 1
    while record_idx <= #entries do
@@ -267,7 +281,7 @@ function export_records(exporter, entries)
       local padding     = (4 - (data_len % 4)) % 4
       local length      = data_len + padding
       local buffer      = ffi.new("uint8_t[?]", length)
-      write_header(buffer, num_to_take, exporter.boot_time)
+      self:write_header(buffer, num_to_take, self.boot_time)
 
       -- flow set ID and length
       ffi.cast("uint16_t*", buffer + v9_header_size)[0]
@@ -310,15 +324,15 @@ function export_records(exporter, entries)
          ffi.cast("uint8_t*", ptr + 62)[0]  = record.tcp_control
       end
 
-      local pkt = construct_packet(exporter, buffer, length)
+      local pkt = self:construct_packet(buffer, length)
 
-      link.transmit(exporter.output.output, pkt)
+      link.transmit(output_link, pkt)
 
       record_idx = record_idx + num_to_take
 
       if debug then
          util.fe_debug("sent data packet, seq#: %d octets: %d",
-                       sequence_number - 1, length)
+                       self.sequence_number - 1, length)
       end
    end
 end
