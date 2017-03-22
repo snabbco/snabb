@@ -22,8 +22,10 @@ local htonl, htons = lib.htonl, lib.htons
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
 -- various constants
-local v9_header_size  = 20
-local v10_header_size = 16
+local V9_HEADER_SIZE  = 20
+local V10_HEADER_SIZE = 16
+local V9_TEMPLATE_ID  = 0
+local V10_TEMPLATE_ID = 2
 
 -- initialize a table describing the ids & field sizes for IPFIX fields
 local function make_ipfix_element_map()
@@ -84,18 +86,9 @@ local data_size_map =
 -- flow templates and data records
 local function make_template_info(id, key_fields, record_fields)
    -- the contents of the template records we will send
-   -- there is an ID & length for each field and 4 extra entries
-   local length = 2 * (#key_fields + #record_fields) + 4
+   -- there is an ID & length for each field
+   local length = 2 * (#key_fields + #record_fields)
    local buffer = ffi.new("uint16_t[?]", length)
-
-   -- flow-set id = 0
-   buffer[0] = 0
-   -- length of flowset in octets
-   buffer[1] = htons(length * 2)
-   -- buffer id, starts at 256
-   buffer[2] = htons(id)
-   -- field count
-   buffer[3] = htons(#key_fields + #record_fields)
 
    -- octets in a data record
    local data_len = 0
@@ -110,10 +103,11 @@ local function make_template_info(id, key_fields, record_fields)
       end
    end
 
-   process_fields(buffer + 4, key_fields)
-   process_fields(buffer + 4 + #key_fields * 2, record_fields)
+   process_fields(buffer, key_fields)
+   process_fields(buffer + #key_fields * 2, record_fields)
 
    return { id = id,
+            field_count = #key_fields + #record_fields,
             buffer = buffer,
             buffer_len = length * 2,
             data_len = data_len }
@@ -169,6 +163,12 @@ function Exporter:new(config)
                collector_ip = config.collector_ip,
                collector_port = config.collector_port }
 
+   if o.version == 9 then
+      o.header_size = V9_HEADER_SIZE
+   elseif o.version == 10 then
+      o.header_size = V10_HEADER_SIZE
+   end
+
    return setmetatable(o, { __index = self })
 end
 
@@ -207,22 +207,37 @@ end
 
 -- Write an IPFIX header into the given buffer
 --
--- v9 header is 20 bytes, consisting of
+-- v9 header is 20 bytes, starting with
 --   * version number (09)
---   * count
+--   * count of records
 --   * uptime (seconds)
+--
+-- a v10 header is 16 bytes, starting with
+--   * a version number (10)
+--   * total length in octets
+--
+-- both headers end with
+--
 --   * unix timestamp
 --   * sequence number
 --   * source ID
-function Exporter:write_header(ptr, count, boot_time)
+function Exporter:write_header(ptr, count, length, boot_time)
    local uptime = tonumber(get_timestamp() - boot_time)
 
-   ffi.cast("uint16_t*", ptr)[0]      = htons(9)
-   ffi.cast("uint16_t*", ptr + 2)[0]  = htons(count)
-   ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(uptime)
-   ffi.cast("uint32_t*", ptr + 8)[0]  = htonl(math.floor(C.get_unix_time()))
-   ffi.cast("uint32_t*", ptr + 12)[0] = htonl(self.sequence_number)
-   ffi.cast("uint32_t*", ptr + 16)[0] = htonl(self.observation_domain)
+   ffi.cast("uint16_t*", ptr)[0] = htons(self.version)
+
+   if self.version == 9 then
+      ffi.cast("uint16_t*", ptr + 2)[0]  = htons(count)
+      ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(uptime)
+      ffi.cast("uint32_t*", ptr + 8)[0]  = htonl(math.floor(C.get_unix_time()))
+      ffi.cast("uint32_t*", ptr + 12)[0] = htonl(self.sequence_number)
+      ffi.cast("uint32_t*", ptr + 16)[0] = htonl(self.observation_domain)
+   elseif self.version == 10 then
+      ffi.cast("uint16_t*", ptr + 2)[0]  = htons(length)
+      ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(math.floor(C.get_unix_time()))
+      ffi.cast("uint32_t*", ptr + 8)[0]  = htonl(self.sequence_number)
+      ffi.cast("uint32_t*", ptr + 12)[0] = htonl(self.observation_domain)
+   end
 
    self.sequence_number = self.sequence_number + 1
 end
@@ -230,16 +245,36 @@ end
 -- Send template records/option template records to the collector
 -- TODO: only handles template records so far
 function Exporter:send_template_record(output_link)
-   local length = v9_header_size + template_v4.buffer_len + template_v6.buffer_len
+   local templates = { template_v4, template_v6 }
+   local length = self.header_size
+
+   for _, template in ipairs(templates) do
+      -- +8 octets for the flow set header
+      length = length + template.buffer_len + 8
+   end
+
    local buffer = ffi.new("uint8_t[?]", length)
-   self:write_header(buffer, 2, self.boot_time)
+   self:write_header(buffer, 2, length, self.boot_time)
 
-   local template = ffi.cast("uint16_t*", buffer + v9_header_size)
+   -- write the header and then the template record contents for each template
+   -- note that the ptr is incrementing by 16 octets but the buffer lengths are
+   -- in octets
+   local ptr = ffi.cast("uint16_t*", buffer + self.header_size)
+   for _, template in ipairs(templates) do
+      if self.version == 9 then
+         ptr[0] = htons(V9_TEMPLATE_ID)
+      elseif self.version == 10 then
+         ptr[0] = htons(V10_TEMPLATE_ID)
+      end
 
-   ffi.copy(template, template_v4.buffer, template_v4.buffer_len)
-   ffi.copy(template + template_v4.buffer_len / 2,
-            template_v6.buffer,
-            template_v6.buffer_len)
+      ptr[1] = htons(template.buffer_len + 8)
+      ptr[2] = htons(template.id)
+      ptr[3] = htons(template.field_count)
+
+      ffi.copy(ptr + 4, template.buffer, template.buffer_len)
+
+      ptr = ptr + template.buffer_len / 2 + 4
+   end
 
    local pkt = self:construct_packet(ffi.cast("uint8_t*", buffer), length)
 
@@ -267,7 +302,7 @@ end
 -- record packet(s) and transmit them
 function Exporter:export_records(output_link, entries)
    -- length of v9 header + flow set ID/length
-   local header_len  = v9_header_size + 4
+   local header_len  = self.header_size + 4
    -- TODO: handle IPv6
    local record_len  = template_v4.data_len
    -- 4 is the max padding, so account for that conservatively to
@@ -281,19 +316,19 @@ function Exporter:export_records(output_link, entries)
       local padding     = (4 - (data_len % 4)) % 4
       local length      = data_len + padding
       local buffer      = ffi.new("uint8_t[?]", length)
-      self:write_header(buffer, num_to_take, self.boot_time)
+      self:write_header(buffer, num_to_take, length, self.boot_time)
 
       -- flow set ID and length
-      ffi.cast("uint16_t*", buffer + v9_header_size)[0]
+      ffi.cast("uint16_t*", buffer + self.header_size)[0]
          = htons(256)
-      ffi.cast("uint16_t*", buffer + v9_header_size + 2)[0]
-         = htons(length - v9_header_size)
+      ffi.cast("uint16_t*", buffer + self.header_size + 2)[0]
+         = htons(length - self.header_size)
 
       for idx = record_idx, record_idx + num_to_take - 1 do
          local key    = entries[idx].key
          local record = entries[idx].value
          local ptr    =
-            buffer + v9_header_size + 4 + (record_len * (idx - record_idx))
+            buffer + self.header_size + 4 + (record_len * (idx - record_idx))
 
          if key.is_ipv6 == 0 then
             local field_ptr =

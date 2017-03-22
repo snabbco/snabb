@@ -52,6 +52,7 @@ function run (args)
    local port = 4739
 
    local active_timeout, idle_timeout
+   local ipfix_version = 10
 
    -- TODO: better input validation
    local opt = {
@@ -94,9 +95,13 @@ function run (args)
          idle_timeout =
             assert(tonumber(arg), "expected number for idle timeout")
       end,
+      ipfix = function (arg)
+         ipfix_version = 10
+      end,
+      ["netflow-v9"] = function (arg)
+         ipfix_version = 9
+      end,
       -- TODO: not implemented
-      ipfix = function (arg) end,
-      ["netflow-v9"] = function (arg) end,
       ["transport"] = function (arg) end
    }
 
@@ -115,6 +120,7 @@ function run (args)
 
    local exporter_config = { active_timeout = active_timeout,
                              idle_timeout = idle_timeout,
+                             ipfix_version = ipfix_version,
                              exporter_mac = host_mac,
                              exporter_ip = host_ip,
                              collector_mac = collector_mac,
