@@ -1710,20 +1710,6 @@ static int asm_lea(ASMState *as, IRIns *ir)
     } else {
       return 0;
     }
-  } else if (ir->op1 != ir->op2 && irl->o == IR_ADD && mayfuse(as, ir->op1) &&
-	     (irref_isk(ir->op2) || irref_isk(irl->op2))) {
-    Reg idx, base = ra_alloc1(as, irl->op1, allow);
-    rset_clear(allow, base);
-    as->mrm.base = (uint8_t)base;
-    if (irref_isk(ir->op2)) {
-      as->mrm.ofs = irr->i;
-      idx = ra_alloc1(as, irl->op2, allow);
-    } else {
-      as->mrm.ofs = IR(irl->op2)->i;
-      idx = ra_alloc1(as, ir->op2, allow);
-    }
-    rset_clear(allow, idx);
-    as->mrm.idx = (uint8_t)idx;
   } else {
     return 0;
   }
