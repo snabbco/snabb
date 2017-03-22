@@ -11,6 +11,11 @@ Usage: run-nohw --help
                             will be based on the current directory.
        --help, -h           Show this help message.
 
+It runs the lwAFTR over two OS network interfaces.  The simplest way to run
+it is to create 2 veth pairs and use them as the inet and b4 interfaces.
+Flush traffic to the lwAFTR by pushing packets from the other end of the veth
+pairs, using a program such as tcpreplay, for example.
+
 When the -v option is used, packets on the network interfaces are counted and
 recorded, and the corresponding incoming and outgoing packet rates are print
 out to stdout, suitable for passing to a graphing program.
