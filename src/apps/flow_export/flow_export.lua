@@ -188,6 +188,7 @@ function FlowExporter:new(config)
                -- instance of the class that talks to the collector
                exporter = ipfix.Exporter:new({
                      boot_time = get_timestamp(),
+                     version = assert(config.ipfix_version),
                      mtu = config.mtu or 1500,
                      observation_domain = config.observation_domain or 256,
                      exporter_mac = assert(config.exporter_mac),
