@@ -72,8 +72,6 @@ FlowExporter = {}
 --       these numbers are placeholders for more realistic ones
 --       (and timeouts should perhaps be more fine-grained)
 local cache_size = 20000
-local idle_timeout = 300
-local active_timeout = 120
 local export_interval = 60
 local template_interval = 60
 
@@ -132,11 +130,11 @@ local function init_expire_records()
          for entry in self.flows:iterate() do
             local record = entry.value
 
-            if timestamp - record.end_time > idle_timeout then
+            if timestamp - record.end_time > self.idle_timeout then
                debug_expire(entry, "idle")
                table.insert(keys_to_remove, entry.key)
                table.insert(to_export, entry)
-            elseif timestamp - record.start_time > active_timeout then
+            elseif timestamp - record.start_time > self.active_timeout then
                debug_expire(entry, "active")
                table.insert(timeout_records, record)
                table.insert(to_export, entry)
@@ -183,6 +181,8 @@ function FlowExporter:new(config)
       initial_size = math.ceil(cache_size / 0.4),
    }
    local o = { flows = ctable.new(params),
+               idle_timeout = config.idle_timeout or 300,
+               active_timeout = config.active_timeout or 120,
                export_timer = nil,
                template_timer = nil,
                boot_time = get_timestamp(),
