@@ -73,11 +73,14 @@ function run(parameters)
    config.link(c, "b4if.tx -> aftr.v6")
    config.link(c, "aftr.v4 -> inet.rx")
    config.link(c, "aftr.v6 -> b4if.rx")
+   config.link(c, "aftr.hairpin_out -> aftr.hairpin_in")
+
+   engine.configure(c)
 
    if verbosity >= 1 then
       local csv = CSVStatsTimer:new(bench_file)
       csv:add_app("inet", {"tx", "rx"}, { tx = "IPv4 TX", rx = "IPv4 RX" })
-      csv:add_app("tob4", {"tx", "rx"}, { tx = "IPv6 TX", rx = "IPv6 RX" })
+      csv:add_app("b4if", {"tx", "rx"}, { tx = "IPv6 TX", rx = "IPv6 RX" })
       csv:activate()
 
       if verbosity >= 2 then
@@ -87,7 +90,6 @@ function run(parameters)
       end
    end
 
-   engine.configure(c)
    engine.main {
       report = {
          showlinks = true;
