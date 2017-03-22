@@ -1,30 +1,18 @@
--- This module implements the `snabb netflow` command
-
 module(..., package.seeall)
 
--- basic module imports
-local raw  = require("apps.socket.raw")
-local pcap = require("apps.pcap.pcap")
-local flow = require("apps.flow_export.flow_export")
+local lib = require("core.lib")
 
-function run (args)
-   local c = config.new()
+local function show_usage(exit_code)
+   print(require("program.flow_export.README_inc"))
+   main.exit(exit_code)
+end
 
-   -- TODO: use cmdline flags
-   local exporter_config = { exporter_mac = args[3],
-                             exporter_ip = args[4],
-                             collector_mac = args[5],
-                             collector_ip = args[6],
-                             collector_port = args[7] }
-
-   config.app(c, "source", raw.RawSocket, args[1])
-   config.app(c, "sink", raw.RawSocket, args[2])
-   config.app(c, "exporter", flow.FlowExporter, exporter_config)
-
-   config.link(c, "source.tx -> exporter.input")
-   config.link(c, "exporter.output -> sink.rx")
-
-   engine.configure(c)
-
-   engine.main({ duration=80, report = { showapps=true, showlinks=true } })
+function run(args)
+   if #args == 0 then show_usage(1) end
+   local command = string.gsub(table.remove(args, 1), "-", "_")
+   local modname = ("program.flow_export.%s.%s"):format(command, command)
+   if not lib.have_module(modname) then
+      show_usage(1)
+   end
+   require(modname).run(args)
 end
