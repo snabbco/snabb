@@ -37,7 +37,9 @@ local long_opts = {
    ["input-type"] = "i",
    ["output-type"] = "o",
    ["netflow-v9"] = 0,
-   ["ipfix"] = 0
+   ["ipfix"] = 0,
+   ["active-timeout"] = 1,
+   ["idle-timeout"] = 1
 }
 
 function run (args)
@@ -48,6 +50,8 @@ function run (args)
    local host_mac, host_ip
    local collector_mac, colletor_ip
    local port = 4739
+
+   local active_timeout, idle_timeout
 
    -- TODO: better input validation
    local opt = {
@@ -82,6 +86,14 @@ function run (args)
       M = function (arg)
          collector_mac = arg
       end,
+      ["active-timeout"] = function (arg)
+         active_timeout =
+            assert(tonumber(arg), "expected number for active timeout")
+      end,
+      ["idle-timeout"] = function (arg)
+         idle_timeout =
+            assert(tonumber(arg), "expected number for idle timeout")
+      end,
       -- TODO: not implemented
       ipfix = function (arg) end,
       ["netflow-v9"] = function (arg) end,
@@ -101,7 +113,9 @@ function run (args)
    local in_link, in_app   = in_out_apps[input_type](args[1])
    local out_link, out_app = in_out_apps[output_type](args[2])
 
-   local exporter_config = { exporter_mac = host_mac,
+   local exporter_config = { active_timeout = active_timeout,
+                             idle_timeout = idle_timeout,
+                             exporter_mac = host_mac,
                              exporter_ip = host_ip,
                              collector_mac = collector_mac,
                              collector_ip = collector_ip,
