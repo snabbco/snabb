@@ -36,10 +36,8 @@ class TestMonitor(BaseTestCase):
         cls.tap_name = 'tap%s' % randint(100000, 999999)
         check_call(('ip', 'tuntap', 'add', cls.tap_name, 'mode', 'tap'))
         cls.daemon_args.append(cls.tap_name)
-        cls.prev_daemon_args = BaseTestCase.daemon_args
-        BaseTestCase.daemon_args = cls.daemon_args
         try:
-            BaseTestCase.setUpClass()
+            super(TestMonitor, cls).setUpClass()
         except Exception:
             # Clean up the TAP interface.
             call(('ip', 'tuntap', 'delete', cls.tap_name, 'mode', 'tap'))
@@ -57,9 +55,8 @@ class TestMonitor(BaseTestCase):
     @classmethod
     def tearDownClass(cls):
         try:
-            BaseTestCase.tearDownClass()
+            super(TestMonitor, cls).tearDownClass()
         finally:
-            BaseTestCase.daemon_args = cls.prev_daemon_args
             # Clean up the TAP interface.
             call(('ip', 'tuntap', 'delete', cls.tap_name, 'mode', 'tap'))
 
