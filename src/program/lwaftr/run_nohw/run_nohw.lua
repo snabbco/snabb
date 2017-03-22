@@ -18,12 +18,12 @@ end
 
 local function parse_args(args)
    local opts = {
-      verbosity = 0,
+      verbosity = false,
    }
    local conf_file, b4_if, inet_if
    local handlers = {
       v = function ()
-         opts.verbosity = opts.verbosity + 1
+         opts.verbosity = true
       end,
       c = function (arg)
          check(file_exists(arg), "no such file '%s'", arg)
@@ -37,6 +37,7 @@ local function parse_args(args)
       end,
       b = function (arg)
          opts.bench_file = arg
+         opts.verbosity = true
       end,
       h = function (arg)
          print(require("program.lwaftr.run_nohw.README_inc"))
@@ -80,7 +81,7 @@ function run(parameters)
 
    engine.configure(c)
 
-   if opts.verbosity >= 1 then
+   if opts.verbosity then
       local csv = CSVStatsTimer:new(opts.bench_file)
       csv:add_app("inet", {"tx", "rx"}, { tx = "IPv4 TX", rx = "IPv4 RX" })
       csv:add_app("b4if", {"tx", "rx"}, { tx = "IPv6 TX", rx = "IPv6 RX" })
