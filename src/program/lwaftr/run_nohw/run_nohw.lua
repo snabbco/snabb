@@ -19,28 +19,28 @@ end
 local function parse_args(args)
    local verbosity = 0
    local conf_file, b4_if, inet_if
-   local bench_file = 'bench.csv'
+   local bench_file
    local handlers = {
       v = function ()
          verbosity = verbosity + 1
-      end;
+      end,
       c = function (arg)
          check(file_exists(arg), "no such file '%s'", arg)
          conf_file = arg
-      end;
+      end,
       B = function (arg)
          b4_if = arg
-      end;
+      end,
       I = function (arg)
          inet_if = arg
-      end;
+      end,
       b = function (arg)
          bench_file = arg
-      end;
+      end,
       h = function (arg)
          print(require("program.lwaftr.run_nohw.README_inc"))
          main.exit(0)
-      end;
+      end,
    }
    lib.dogetopt(args, handlers, "b:c:B:I:vh", {
       help = "h", conf = "c", verbose = "v",
@@ -52,7 +52,6 @@ local function parse_args(args)
    check(inet_if, "no Internet-side interface specified (--inet-if/-I)")
    return verbosity, conf_file, b4_if, inet_if, bench_file
 end
-
 
 function run(parameters)
    local verbosity, conf_file, b4_if, inet_if, bench_file = parse_args(parameters)
@@ -82,17 +81,7 @@ function run(parameters)
       csv:add_app("inet", {"tx", "rx"}, { tx = "IPv4 TX", rx = "IPv4 RX" })
       csv:add_app("b4if", {"tx", "rx"}, { tx = "IPv6 TX", rx = "IPv6 RX" })
       csv:activate()
-
-      if verbosity >= 2 then
-         timer.activate(timer.new("report", function ()
-            app.report_apps()
-         end, 1e9, "repeating"))
-      end
    end
 
-   engine.main {
-      report = {
-         showlinks = true;
-      }
-   }
+   engine.main({report = { showlinks = true }})
 end
