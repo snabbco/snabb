@@ -73,7 +73,10 @@ FlowExporter = {}
 --       (and timeouts should perhaps be more fine-grained)
 local cache_size = 20000
 local export_interval = 60
-local template_interval = 60
+
+-- RFC5153 recommends a 10-minute template refresh configurable from
+-- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
+local template_interval = 600
 
 -- produce a timestamp in milliseconds
 local function get_timestamp()
