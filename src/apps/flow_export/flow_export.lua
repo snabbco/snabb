@@ -301,7 +301,8 @@ end
 function selftest()
    local datagram = require("lib.protocol.datagram")
 
-   local nf = FlowExporter:new({ exporter_mac = "01:02:03:04:05:06",
+   local nf = FlowExporter:new({ ipfix_version = 10,
+                                 exporter_mac = "01:02:03:04:05:06",
                                  exporter_ip = "192.168.0.2",
                                  collector_mac = "09:08:07:06:05:04",
                                  collector_ip = "192.168.0.3",
