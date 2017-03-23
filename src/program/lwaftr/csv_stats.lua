@@ -48,7 +48,7 @@ function CSVStatsTimer:new(filename, hydra_mode, pid)
    local o = { hydra_mode=hydra_mode, link_data={}, file=file, period=1,
       header = hydra_mode and "benchmark,id,score,unit" or "Time (s)" }
    o.pid = pid or S.getpid()
-   o.links_by_app = open_link_counters(pid)
+   o.links_by_app = open_link_counters(o.pid)
    return setmetatable(o, {__index = CSVStatsTimer})
 end
 
