@@ -189,7 +189,7 @@ function FlowExporter:new(config)
                exporter = ipfix.Exporter:new({
                      boot_time = get_timestamp(),
                      version = assert(config.ipfix_version),
-                     mtu = config.mtu or 1500,
+                     mtu = config.mtu,
                      observation_domain = config.observation_domain or 256,
                      exporter_mac = assert(config.exporter_mac),
                      exporter_ip = assert(config.exporter_ip),

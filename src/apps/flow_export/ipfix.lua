@@ -155,7 +155,10 @@ function Exporter:new(config)
                boot_time = config.boot_time,
                -- version of IPFIX/Netflow (9 or 10)
                version = config.version,
-               mtu = config.mtu,
+               -- RFC7011 specifies that if the PMTU is unknown, a maximum
+               -- of 512 octets should be used for UDP transmission
+               -- (https://tools.ietf.org/html/rfc7011#section-10.3.3)
+               mtu = config.mtu or 512,
                observation_domain = config.observation_domain,
                exporter_mac = config.exporter_mac,
                exporter_ip = config.exporter_ip,
