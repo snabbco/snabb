@@ -282,6 +282,8 @@ function FlowExporter:process_packet(pkt)
       flow_record.pkt_count   = flow_record.pkt_count + 1ULL
       flow_record.octet_count = flow_record.octet_count + pkt.length
    end
+
+   packet.free(pkt)
 end
 
 function FlowExporter:push()
