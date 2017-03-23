@@ -11,6 +11,11 @@ struct pflua_timeval {
 int gettimeofday(struct pflua_timeval *tv, struct timezone *tz);
 ]]
 
+-- Additional function arguments other than 'P' that the
+-- compiled function may accept (this needs to be tracked in several
+-- pflua passes, which is why the data is kept here)
+filter_args = { len = true }
+
 -- now() returns the current time.  The first time it is called, the
 -- return value will be zero.  This is to preserve precision, regardless
 -- of what the current epoch is.

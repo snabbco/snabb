@@ -7,6 +7,7 @@ local constants = require('pf.constants')
 
 local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
 local uint32 = utils.uint32
+local filter_args = utils.filter_args
 
 local function skip_whitespace(str, pos)
    while pos <= #str and str:match('^%s', pos) do
@@ -248,12 +249,20 @@ local function lex(str, pos, opts)
       end
    end
 
-   -- "len" is the only bare name that can appear in an arithmetic
+   -- "len" is usually the only bare name that can appear in an arithmetic
    -- expression.  "len-1" lexes as { 'len', '-', 1 } in arithmetic
    -- contexts, but { "len-1" } otherwise.
-   if opts.maybe_arithmetic and str:match("^len", pos) then
-      if pos + 3 > #str or not str:match("^[%w.]", pos+3) then
-         return 'len', pos+3
+   --
+   -- pfmatch can require the compiled filter to take additional
+   -- parameters, in which case bare names other than "len" can show up
+   if opts.maybe_arithmetic then
+      for arg, _ in pairs(filter_args) do
+         local str_len = #arg
+         if str:match(string.format("^%s", arg), pos) then
+            if pos + str_len > #str or not str:match("^[%w.]", pos+str_len) then
+               return arg, pos+str_len
+            end
+         end
       end
    end
 
@@ -737,7 +746,7 @@ local function parse_primary_arithmetic(lexer, tok)
       local expr = parse_arithmetic(lexer)
       lexer.consume(')')
       return expr
-   elseif tok == 'len' or type(tok) == 'number' then
+   elseif filter_args[tok] or type(tok) == 'number' then
       return tok
    elseif allow_address_of and tok == '&' then
       return { 'addr', parse_addressable(lexer) }
@@ -865,7 +874,7 @@ local primitives = {
 
 local function parse_primitive_or_arithmetic(lexer)
    local tok = lexer.next({maybe_arithmetic=true})
-   if (type(tok) == 'number' or tok == 'len' or
+   if (type(tok) == 'number' or filter_args[tok] or
        addressables[tok] and lexer.peek() == '[') then
       return parse_arithmetic(lexer, tok)
    end
@@ -893,7 +902,7 @@ end
 local logical_ops = set('&&', 'and', '||', 'or')
 
 local function is_arithmetic(exp)
-   return (exp == 'len' or type(exp) == 'number' or
+   return (filter_args[exp] or type(exp) == 'number' or
               exp[1]:match("^%[") or arithmetic_precedence[exp[1]])
 end
 

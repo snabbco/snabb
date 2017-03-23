@@ -158,3 +158,13 @@ The current state of each branch with respect to master is visible here:
 
     Maintainer: Domen Kožar <domen@dev.si>
 
+#### snabbwall
+
+    BRANCH: snabbwall git://github.com/Igalia/snabb
+    Snabbwall (layer 7 firewall) application development branch.
+
+    - See snabbwall.org for more info
+
+    Maintainer: Collectively maintained by Snabbwall application developers.
+    Next hop: kbara-next
+
