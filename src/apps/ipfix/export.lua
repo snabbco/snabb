@@ -489,3 +489,47 @@ function FlowExporter:push()
    self:refresh_templates()
    self:expire_records()
 end
+
+function selftest()
+   local pf    = require("pf")
+   local cache = require("apps.ipfix.cache")
+
+   local flows = cache.FlowCache:new({})
+   local conf = { cache = flows,
+                  ipfix_version = 10,
+                  exporter_mac = "00:11:22:33:44:55",
+                  exporter_ip = "192.168.1.2",
+                  collector_mac = "55:44:33:22:11:00",
+                  collector_ip = "192.168.1.1",
+                  collector_port = 4739 }
+   local exporter = FlowExporter:new(conf)
+
+   local key = ffi.new("struct flow_key")
+   key.is_ipv6 = false
+   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+   ffi.copy(ptr, ipv4:pton("192.168.1.1"), 4)
+   ffi.copy(ptr + 4, ipv4:pton("192.168.1.25"), 4)
+   key.protocol = 17
+   key.src_port = htons(9999)
+   key.dst_port = htons(80)
+
+   local record = ffi.new("struct flow_record")
+   record.start_time = get_timestamp()
+   record.end_time = record.start_time + 30
+   record.pkt_count = 5
+   record.octet_count = 15
+
+   -- mock transmit function and output link
+   local packet
+   exporter.output = { output = {} }
+   link.transmit = function(link, pkt) packet = pkt end
+   exporter:export_records({ { key = key, value = record } })
+
+   local filter = pf.compile_filter([[
+      udp and dst port 4739 and src net 192.168.1.2 and
+      dst net 192.168.1.1]])
+
+   assert(filter(packet.data, packet.length), "pf filter failed")
+
+   print("selftest ok")
+end
