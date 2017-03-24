@@ -4,8 +4,7 @@
 module(..., package.seeall)
 
 local ffi    = require("ffi")
-local ipfix  = require("apps.flow_export.ipfix")
-local util   = require("apps.flow_export.util")
+local util   = require("apps.ipfix.util")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local packet = require("core.packet")
@@ -127,7 +126,7 @@ end
 
 function selftest()
    local datagram = require("lib.protocol.datagram")
-   local cache    = require("apps.flow_export.cache")
+   local cache    = require("apps.ipfix.cache")
 
    local flows = cache.FlowCache:new({})
    local nf    = FlowMeter:new({ cache = flows })

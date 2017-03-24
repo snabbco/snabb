@@ -7,7 +7,7 @@ module(..., package.seeall)
 
 local bit    = require("bit")
 local ffi    = require("ffi")
-local util   = require("apps.flow_export.util")
+local util   = require("apps.ipfix.util")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local dg     = require("lib.protocol.datagram")
@@ -31,7 +31,7 @@ local V10_TEMPLATE_ID = 2
 -- initialize a table describing the ids & field sizes for IPFIX fields
 local function make_ipfix_element_map()
    local ipfix_elems =
-      require("apps.flow_export.ipfix_information_elements_inc")
+      require("apps.ipfix.ipfix_information_elements_inc")
    local map = {}
    local idx = 1
 
