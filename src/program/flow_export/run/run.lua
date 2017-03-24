@@ -2,8 +2,10 @@
 
 module(..., package.seeall)
 
-local lib  = require("core.lib")
-local flow = require("apps.flow_export.flow_export")
+local lib      = require("core.lib")
+local cache    = require("apps.flow_export.cache")
+local flow     = require("apps.flow_export.flow_export")
+local exporter = require("apps.flow_export.ipfix")
 
 -- apps that can be used as an input or output for the exporter
 in_out_apps = {}
@@ -118,7 +120,10 @@ function run (args)
    local in_link, in_app   = in_out_apps[input_type](args[1])
    local out_link, out_app = in_out_apps[output_type](args[2])
 
-   local exporter_config = { active_timeout = active_timeout,
+   local flow_cache      = cache.FlowCache:new({})
+   local meter_config    = { cache = flow_cache }
+   local exporter_config = { cache = flow_cache,
+                             active_timeout = active_timeout,
                              idle_timeout = idle_timeout,
                              ipfix_version = ipfix_version,
                              exporter_mac = host_mac,
@@ -130,9 +135,10 @@ function run (args)
 
    config.app(c, "source", unpack(in_app))
    config.app(c, "sink", unpack(out_app))
-   config.app(c, "exporter", flow.FlowExporter, exporter_config)
+   config.app(c, "meter", flow.FlowMeter, meter_config)
+   config.app(c, "exporter", exporter.FlowExporter, exporter_config)
 
-   config.link(c, "source." .. in_link.output .. " -> exporter.input")
+   config.link(c, "source." .. in_link.output .. " -> meter.input")
    config.link(c, "exporter.output -> sink." .. out_link.input)
 
    local done
