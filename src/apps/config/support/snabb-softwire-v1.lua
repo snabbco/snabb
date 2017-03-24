@@ -30,7 +30,7 @@ local function validate_softwire(config, softwire)
    assert(psidmap_entry,  "No PSID map for softwire '"..ip.."'")
 end
 
-local function validate_config(config)
+function validate_config(config)
    assert(config)
    local bt = config.softwire_config.binding_table
    for softwire in bt.softwire:iterate() do
