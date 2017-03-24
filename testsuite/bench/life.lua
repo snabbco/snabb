@@ -103,7 +103,7 @@ function LIFE(w,h)
     thisgen:draw()
     write("Life - generation ",gen,"\n")
     gen=gen+1
-    if gen>2000 then break end
+    if gen>10000 then break end
     --delay()		-- no delay
   end
 end
