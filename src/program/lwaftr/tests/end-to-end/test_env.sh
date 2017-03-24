@@ -73,6 +73,10 @@ TEST_DATA=(
 "tunnel_icmp.conf" "" "ndp_incoming_ns.pcap" "" "ndp_outgoing_solicited_na.pcap"
 "nofrag6-sol.lua"
 
+"NDP: incoming NDP Neighbor Solicitation, secondary IP"
+"tunnel_icmp.conf" "" "ndp_incoming_ns_secondary.pcap" "" ""
+"ndp-secondary.lua"
+
 "NDP: incoming NDP Neighbor Solicitation, non-lwAFTR IP"
 "tunnel_icmp.conf" "" "ndp_incoming_ns_nonlwaftr.pcap" "" ""
 "nofrag6.lua"

@@ -68,9 +68,10 @@ V6=(
     ipv6-tunneled-incoming-icmpv4-34toobig.pcap
     ipv6-tunneled-incoming-icmpv4-echo-reply.pcap
     ipv6-tunneled-incoming-icmpv4-echo-request.pcap
+    ndp_incoming_ns_secondary.pcap
     ndp_getna_compound.pcap
-    ndp_incoming_ns_nonlwaftr.pcap
     ndp_incoming_ns.pcap
+    ndp_incoming_ns_nonlwaftr.pcap
     ndp_ns_and_recap.pcap
     ndp_outgoing_ns.pcap
     ndp_outgoing_solicited_na.pcap
