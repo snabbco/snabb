@@ -253,7 +253,7 @@ function Exporter:send_template_record(output_link)
    local length = self.header_size
 
    for _, template in ipairs(templates) do
-      -- +8 octets for the flow set header
+      -- +8 octets for the flow set header / record header
       length = length + template.buffer_len + 8
    end
 
@@ -324,7 +324,7 @@ function Exporter:export_records(output_link, entries)
 
       -- flow set ID and length
       ffi.cast("uint16_t*", buffer + self.header_size)[0]
-         = htons(256)
+         = htons(template_v4.id)
       ffi.cast("uint16_t*", buffer + self.header_size + 2)[0]
          = htons(length - self.header_size)
 
@@ -358,9 +358,9 @@ function Exporter:export_records(output_link, entries)
          ffi.cast("uint32_t*", ptr + 49)[0] = record.egress
          ffi.cast("uint32_t*", ptr + 53)[0] = record.src_peer_as
          ffi.cast("uint32_t*", ptr + 57)[0] = record.dst_peer_as
-         ffi.cast("uint8_t*", ptr + 61)[0]  = record.tos
          -- in V9 this is 1 octet, in IPFIX it's 2 octets
-         ffi.cast("uint8_t*", ptr + 62)[0]  = record.tcp_control
+         ffi.cast("uint8_t*", ptr + 61)[0]  = record.tcp_control
+         ffi.cast("uint8_t*", ptr + 63)[0]  = record.tos
       end
 
       local pkt = self:construct_packet(buffer, length)
