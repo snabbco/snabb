@@ -16,25 +16,41 @@ local path_mod = require('lib.yang.path')
 local util = require("lib.yang.util")
 local generic = require('apps.config.support').generic_schema_config_support
 
--- Validates that the softwire is in the PSID mapping, returns true if the
--- softwire is valid (i.e. has a corresponding PSID mapping), false if invalid.
-local function validate_softwire_psid_mapping(graph, softwire)
+-- Validates that the softwire is in the PSID mapping, if the PSID mapping is
+-- missing it will raise an error with an appropriate message.
+local function validate_softwire(config, softwire)
    local function convert_ipv4_to_key(val)
       local key = corelib.htonl(val) -- Convert endianness
       return ipv4:pton(ipv4_ntop(key))
    end
-   local bt = graph.apps.lwaftr.arg.softwire_config.binding_table
+   local bt = config.softwire_config.binding_table
    local psidmap_key = convert_ipv4_to_key(softwire.key.ipv4)
    local psidmap_entry = cltable.get(bt.psid_map, psidmap_key)
    local ip = ipv4_ntop(softwire.key.ipv4)
    assert(psidmap_entry,  "No PSID map for softwire '"..ip.."'")
 end
 
+local function validate_config(config)
+   assert(config)
+   local bt = config.softwire_config.binding_table
+   for softwire in bt.softwire:iterate() do
+      validate_softwire(config, softwire)
+   end
+end
+
+local function validate_update(config, verb, path, data)
+   -- Validate softwire has PSID Map entry.
+   if path == "/softwire-config/binding-table/softwire" then
+      for softwire in data:iterate() do
+         validate_softwire(config, softwire)
+      end
+   end
+end
+
 local function add_softwire_entry_actions(app_graph, entries)
    assert(app_graph.apps['lwaftr'])
    local ret = {}
    for entry in entries:iterate() do
-      validate_softwire_psid_mapping(app_graph, entry)
       local blob = entries.entry_type()
       ffi.copy(blob, entry, ffi.sizeof(blob))
       local args = {'lwaftr', 'add_softwire_entry', blob}
@@ -344,7 +360,7 @@ local function ietf_softwire_translator ()
          end
          local bt = native_binding_table_from_ietf(arg)
          return {{'set', {schema='snabb-softwire-v1',
-                          path='/softwire-config/binding-table', 
+                          path='/softwire-config/binding-table',
                           config=serialize_binding_table(bt)}}}
       else
          -- An update to an existing entry.  First, get the existing entry.
@@ -589,6 +605,8 @@ end
 
 function get_config_support()
    return {
+      validate_config = validate_config,
+      validate_update = validate_update,
       compute_config_actions = compute_config_actions,
       update_mutable_objects_embedded_in_app_initargs =
          update_mutable_objects_embedded_in_app_initargs,
