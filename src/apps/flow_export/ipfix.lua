@@ -17,7 +17,8 @@ local ipv6   = require("lib.protocol.ipv6")
 local udp    = require("lib.protocol.udp")
 local C      = ffi.C
 
-local htonl, htons = lib.htonl, lib.htons
+local htonl, htons  = lib.htonl, lib.htons
+local get_timestamp = util.get_timestamp
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
@@ -147,25 +148,132 @@ local template_v6 = make_template_info(257,
      "tcpControlBits",
      "ipClassOfService" })
 
-Exporter = {}
+-- TODO: should be configurable
+--       these numbers are placeholders for more realistic ones
+--       (and timeouts should perhaps be more fine-grained)
+local export_interval = 60
 
-function Exporter:new(config)
-   local o = { -- sequence number to use for flow packets
+-- RFC5153 recommends a 10-minute template refresh configurable from
+-- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
+local template_interval = 600
+
+FlowExporter = {}
+
+-- print debugging messages for flow expiration
+local function debug_expire(entry, msg)
+   if debug then
+      local key = entry.key
+      local src_ip, dst_ip
+
+      if key.is_ipv6 == 1 then
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
+         src_ip = ipv6:ntop(ptr)
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv6_1")
+         dst_ip = ipv6:ntop(ptr)
+      else
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+         src_ip = ipv4:ntop(ptr)
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv4")
+         dst_ip = ipv4:ntop(ptr)
+      end
+
+      util.fe_debug("expire flow [%s] %s (%d) -> %s (%d) proto: %d",
+                    msg,
+                    src_ip,
+                    htons(key.src_port),
+                    dst_ip,
+                    htons(key.dst_port),
+                    key.protocol)
+   end
+end
+
+-- Walk through flow cache to see if flow records need to be expired.
+-- Collect expired records and export them to the collector.
+local function init_expire_records()
+   local last_time
+
+   return function(self)
+      local now = tonumber(engine.now())
+      last_time = last_time or now
+
+      if now - last_time >= export_interval then
+         last_time = now
+         local timestamp = get_timestamp()
+         local keys_to_remove = {}
+         local timeout_records = {}
+         local to_export = {}
+
+         -- TODO: Walk the table incrementally each breath instead of traversing
+         --       the whole table each time
+         for entry in self.cache:iterate() do
+            local record = entry.value
+
+            if timestamp - record.end_time > self.idle_timeout then
+               debug_expire(entry, "idle")
+               table.insert(keys_to_remove, entry.key)
+               table.insert(to_export, entry)
+            elseif timestamp - record.start_time > self.active_timeout then
+               debug_expire(entry, "active")
+               table.insert(timeout_records, record)
+               table.insert(to_export, entry)
+            end
+         end
+
+         self:export_records(to_export)
+
+         -- remove idle timed out flows
+         for _, key in ipairs(keys_to_remove) do
+            self.cache:remove(key)
+         end
+
+         for _, record in ipairs(timeout_records) do
+            -- TODO: what should timers reset to?
+            record.start_time = timestamp
+            record.end_time = timestamp
+            record.pkt_count = 0
+            record.octet_count = 0
+         end
+      end
+   end
+end
+
+-- periodically refresh the templates on the collector
+local function init_refresh_templates()
+   local last_time
+
+   return function(self)
+      local now = tonumber(engine.now())
+
+      if not last_time or now - last_time >= template_interval then
+         self:send_template_record()
+         last_time = now
+      end
+   end
+end
+
+function FlowExporter:new(config)
+   local o = { cache = assert(config.cache),
+               -- sequence number to use for flow packets
                sequence_number = 1,
-               boot_time = config.boot_time,
+               boot_time = util.get_timestamp(),
                -- version of IPFIX/Netflow (9 or 10)
-               version = config.version,
+               version = assert(config.ipfix_version),
+               idle_timeout = config.idle_timeout or 300,
+               active_timeout = config.active_timeout or 120,
+               export_timer = nil,
+               template_timer = nil,
                -- RFC7011 specifies that if the PMTU is unknown, a maximum
                -- of 512 octets should be used for UDP transmission
                -- (https://tools.ietf.org/html/rfc7011#section-10.3.3)
                mtu = config.mtu or 512,
-               observation_domain = config.observation_domain,
-               exporter_mac = config.exporter_mac,
-               exporter_ip = config.exporter_ip,
+               observation_domain = config.observation_domain or 256,
+               exporter_mac = assert(config.exporter_mac),
+               exporter_ip = assert(config.exporter_ip),
                exporter_port = math.random(49152, 65535),
-               collector_mac = config.collector_mac,
-               collector_ip = config.collector_ip,
-               collector_port = config.collector_port }
+               -- TODO: use ARP to avoid needing this
+               collector_mac = assert(config.collector_mac),
+               collector_ip = assert(config.collector_ip),
+               collector_port = assert(config.collector_port) }
 
    if o.version == 9 then
       o.header_size = V9_HEADER_SIZE
@@ -173,10 +281,13 @@ function Exporter:new(config)
       o.header_size = V10_HEADER_SIZE
    end
 
+   o.expire_records = init_expire_records()
+   o.refresh_templates = init_refresh_templates()
+
    return setmetatable(o, { __index = self })
 end
 
-function Exporter:construct_packet(ptr, len)
+function FlowExporter:construct_packet(ptr, len)
    local dgram  = dg:new()
 
    -- TODO: support IPv6, also obtain the MAC of the dst via ARP
@@ -205,10 +316,6 @@ function Exporter:construct_packet(ptr, len)
    return dgram:packet()
 end
 
-local function get_timestamp()
-   return C.get_unix_time() * 1000ULL
-end
-
 -- Write an IPFIX header into the given buffer
 --
 -- v9 header is 20 bytes, starting with
@@ -225,7 +332,7 @@ end
 --   * unix timestamp
 --   * sequence number
 --   * source ID
-function Exporter:write_header(ptr, count, length)
+function FlowExporter:write_header(ptr, count, length)
    local uptime = tonumber(get_timestamp() - self.boot_time)
 
    ffi.cast("uint16_t*", ptr)[0] = htons(self.version)
@@ -248,7 +355,7 @@ end
 
 -- Send template records/option template records to the collector
 -- TODO: only handles template records so far
-function Exporter:send_template_record(output_link)
+function FlowExporter:send_template_record()
    local templates = { template_v4, template_v6 }
    local length = self.header_size
 
@@ -282,7 +389,7 @@ function Exporter:send_template_record(output_link)
 
    local pkt = self:construct_packet(ffi.cast("uint8_t*", buffer), length)
 
-   link.transmit(output_link, pkt)
+   link.transmit(self.output.output, pkt)
 
    if debug then
       util.fe_debug("sent template packet, seq#: %d octets: %d",
@@ -304,7 +411,7 @@ end
 
 -- Given a flow exporter & an array of ctable entries, construct flow
 -- record packet(s) and transmit them
-function Exporter:export_records(output_link, entries)
+function FlowExporter:export_records(entries)
    -- length of v9 header + flow set ID/length
    local header_len  = self.header_size + 4
    -- TODO: handle IPv6
@@ -365,7 +472,7 @@ function Exporter:export_records(output_link, entries)
 
       local pkt = self:construct_packet(buffer, length)
 
-      link.transmit(output_link, pkt)
+      link.transmit(self.output.output, pkt)
 
       record_idx = record_idx + num_to_take
 
@@ -374,4 +481,11 @@ function Exporter:export_records(output_link, entries)
                        self.sequence_number - 1, length)
       end
    end
+end
+
+function FlowExporter:push()
+   assert(self.output.output, "missing output link")
+
+   self:refresh_templates()
+   self:expire_records()
 end
