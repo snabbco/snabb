@@ -1,5 +1,5 @@
-Usage: snabb flow_export run [options] <input> <output>
-       snabb flow_export run --help
+Usage: snabb ipfix probe [options] <input> <output>
+       snabb ipfix probe --help
 
 Mandatory arguments:
        -m, --host-mac <macaddr> The MAC address of the host running the exporter.

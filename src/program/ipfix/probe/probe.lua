@@ -3,9 +3,9 @@
 module(..., package.seeall)
 
 local lib      = require("core.lib")
-local cache    = require("apps.flow_export.cache")
-local flow     = require("apps.flow_export.flow_export")
-local exporter = require("apps.flow_export.ipfix")
+local cache    = require("apps.ipfix.cache")
+local meter    = require("apps.ipfix.meter")
+local exporter = require("apps.ipfix.export")
 
 -- apps that can be used as an input or output for the exporter
 in_out_apps = {}
@@ -59,7 +59,7 @@ function run (args)
    -- TODO: better input validation
    local opt = {
       h = function (arg)
-         print(require("program.flow_export.README_inc"))
+         print(require("program.ipfix.probe.README_inc"))
          main.exit(0)
       end,
       D = function (arg)
@@ -109,7 +109,7 @@ function run (args)
 
    args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:M:", long_opts)
    if #args ~= 2 then
-      print(require("program.flow_export.README_inc"))
+      print(require("program.ipfix.probe.README_inc"))
       main.exit(1)
    end
 
@@ -135,7 +135,7 @@ function run (args)
 
    config.app(c, "source", unpack(in_app))
    config.app(c, "sink", unpack(out_app))
-   config.app(c, "meter", flow.FlowMeter, meter_config)
+   config.app(c, "meter", meter.FlowMeter, meter_config)
    config.app(c, "exporter", exporter.FlowExporter, exporter_config)
 
    config.link(c, "source." .. in_link.output .. " -> meter.input")
