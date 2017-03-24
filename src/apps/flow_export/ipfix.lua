@@ -162,6 +162,7 @@ function Exporter:new(config)
                observation_domain = config.observation_domain,
                exporter_mac = config.exporter_mac,
                exporter_ip = config.exporter_ip,
+               exporter_port = math.random(49152, 65535),
                collector_mac = config.collector_mac,
                collector_ip = config.collector_ip,
                collector_port = config.collector_port }
@@ -189,7 +190,7 @@ function Exporter:construct_packet(ptr, len)
                             protocol = 17,
                             ttl = 64,
                             flags = 0x02 })
-   local udp_h = udp:new({ src_port = math.random(49152, 65535),
+   local udp_h = udp:new({ src_port = self.exporter_port,
                            dst_port = self.collector_port })
 
    dgram:payload(ptr, len)
