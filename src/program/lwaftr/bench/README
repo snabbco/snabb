@@ -12,10 +12,9 @@ Usage: bench CONF IPV4-IN.PCAP IPV6-IN.PCAP
 
                                Time (s),Decap. MPPS,Decap. Gbps,Encap. MPPS,Encap. Gbps
   -b FILENAME, --bench-file FILENAME
-                             The file or path name to which benchmark data is
-                             written. A simple filename or relative pathname
-                             will be based on the current directory. Default
-                             is "bench.csv".
+                             The file or path name where benchmark data is to
+                             be written. A simple filename or relative pathname
+                             will be based on the current directory.
   -D DURATION, --duration DURATION
                              Duration in seconds.
   -n NAME, --name NAME       Sets the name for this program, which will be used
@@ -33,5 +32,6 @@ machine that may not have Intel 82599 NICs.  Exit when finished.  This
 program is used in the lwAFTR test suite.
 
 Packets are counted and recorded, and the corresponding incoming and outgoing
-packet rates are written to a file in CSV format, suitable for passing to a
-graphing program.
+packet rates are written to the stdout in CSV format, suitable for passing
+to a graphing program. If bench-file is set, output is written to a file
+instead of stdout.

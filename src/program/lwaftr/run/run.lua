@@ -21,7 +21,7 @@ function parse_args(args)
    if #args == 0 then show_usage(1) end
    local conf_file, v4, v6
    local ring_buffer_size
-   local opts = { verbosity = 0, bench_file = 'bench.csv' }
+   local opts = { verbosity = 0 }
    local scheduling = { ingress_drop_monitor = 'flush' }
    local handlers = {}
    function handlers.n (arg) opts.name = assert(arg) end

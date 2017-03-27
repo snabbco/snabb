@@ -5,10 +5,11 @@ Test the "snabb lwaftr run-nohw" subcommand.
 import unittest
 
 from random import randint
-from subprocess import call, check_call
+from subprocess import check_call
 from test_env import DATA_DIR, SNABB_CMD, BaseTestCase
 
-class TestRun(BaseTestCase):
+
+class TestRunNoHW(BaseTestCase):
 
     cmd_args = [
         str(SNABB_CMD), 'lwaftr', 'run-nohw',
@@ -27,8 +28,9 @@ class TestRun(BaseTestCase):
         veth0 = cls.random_veth_name()
         veth1 = cls.random_veth_name()
         # Create veth pair.
-        check_call(('ip', 'link', 'add', veth0, 'type', 'veth', 'peer', \
-            'name', veth1))
+        check_call(
+            ('ip', 'link', 'add', veth0, 'type', 'veth', 'peer', 'name', veth1)
+        )
         # Set interfaces up.
         check_call(('ip', 'link', 'set', veth0, 'up'))
         check_call(('ip', 'link', 'set', veth1, 'up'))
@@ -56,6 +58,7 @@ class TestRun(BaseTestCase):
     @classmethod
     def tearDownClass(cls):
         check_call(('ip', 'link', 'delete', cls.veths[0]))
+
 
 if __name__ == '__main__':
     unittest.main()

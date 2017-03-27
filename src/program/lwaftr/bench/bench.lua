@@ -14,7 +14,7 @@ end
 
 function parse_args(args)
    local handlers = {}
-   local opts = { bench_file = 'bench.csv' }
+   local opts = {}
    local scheduling = {}
    function handlers.D(arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")

@@ -16,8 +16,7 @@ it is to create 2 veth pairs and use them as the inet and b4 interfaces.
 Flush traffic to the lwAFTR by pushing packets from the other end of the veth
 pairs, using a program such as tcpreplay, for example.
 
-When the -v option is used, packets on the network interfaces are counted and
-recorded, and the corresponding incoming and outgoing packet rates are print
-out to stdout, suitable for passing to a graphing program.
-
-If bench-file is set, output is printed to a file instead of stdout.
+When the -v option is used, packets on the network interfaces are counted
+and recorded, and the corresponding incoming and outgoing packet rates are
+written to stdout, in a format suitable for passing to a graphing program.
+If bench-file is set, output is written to a file instead of stdout.
