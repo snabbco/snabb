@@ -132,6 +132,7 @@ command-line arguments, say how many tests to run, and allow parallel
 execution:
 
 ```shell
+# Run the benchmarks and create result visualizations result/
 $ nix-build testsuite/bench                     \
             --arg    Asrc ~/git/raptorjit       \
             --argstr Aname master               \
