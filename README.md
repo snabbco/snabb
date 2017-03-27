@@ -142,7 +142,7 @@ $ nix-build testsuite/bench                     \
             --argstr Cargs -O1                  \
             --arg    runs 100                   \
             -j 5           # Run up to 5 tests in parallel
-''
+```
 
 If you are using a distributed nix environment such
 as [Hydra](https://nixos.org/hydra/) then the tests can be
