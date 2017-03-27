@@ -7,27 +7,39 @@ local equal = require('core.lib').equal
 local dirname = require('core.lib').dirname
 local data = require('lib.yang.data')
 local ipv4_ntop = require('lib.yang.util').ipv4_ntop
-local ipv4 = require('lib.protocol.ipv4')
 local ipv6 = require('lib.protocol.ipv6')
 local yang = require('lib.yang.yang')
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 local path_mod = require('lib.yang.path')
-local util = require("lib.yang.util")
 local generic = require('apps.config.support').generic_schema_config_support
+local binding_table = require("apps.lwaftr.binding_table")
+
+
+local binding_table_instance
+local function get_binding_table(conf)
+	if binding_table_instance ~= nil then
+		-- TODO: fix me!
+		binding_table_instance = nil
+		return get_binding_table(conf)
+	else
+		binding_table_instance = binding_table.load(conf)
+	end
+	return binding_table_instance
+end
 
 -- Validates that the softwire is in the PSID mapping, if the PSID mapping is
 -- missing it will raise an error with an appropriate message.
 local function validate_softwire(config, softwire)
-   local function convert_ipv4_to_key(val)
-      local key = corelib.htonl(val) -- Convert endianness
-      return ipv4:pton(ipv4_ntop(key))
-   end
-   local bt = config.softwire_config.binding_table
-   local psidmap_key = convert_ipv4_to_key(softwire.key.ipv4)
-   local psidmap_entry = cltable.get(bt.psid_map, psidmap_key)
-   local ip = ipv4_ntop(softwire.key.ipv4)
-   assert(psidmap_entry,  "No PSID map for softwire '"..ip.."'")
+   local key = softwire.key.ipv4
+   local conf_bt = config.softwire_config.binding_table
+   local bt = get_binding_table(conf_bt)
+   local entry = bt.psid_map:lookup(key).value
+   local ip = ipv4_ntop(key)
+
+   -- Figure out if the PSID map entry is valid.
+   local reserved_port_bit_count = 16 - entry.shift - entry.psid_length
+   assert(reserved_port_bit_count ~= 16,  "No PSID map for softwire '"..ip.."'")
 end
 
 function validate_config(config)
