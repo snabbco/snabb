@@ -44,7 +44,7 @@ function main ()
    zone("startup")
    require "lib.lua.strict"
    -- Warn on unsupported platforms
-   if ffi.arch ~= 'x64' or ffi.os ~= 'Linux' then
+   if (ffi.arch ~= 'x64' and ffi.arch ~= 'arm64') or ffi.os ~= 'Linux' then
       error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
    end
    initialize()
