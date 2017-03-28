@@ -1,8 +1,8 @@
 module(...,package.seeall)
 
-local utils = require('program.quickcheck.utils')
+local utils = require('program.lwaftr.quickcheck.utils')
 
-local program_name = 'snabb quickcheck'
+local program_name = 'snabb lwaftr quickcheck'
 
 local seed, iterations, prop_name, prop_args, prop, prop_info
 

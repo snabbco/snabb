@@ -6,6 +6,7 @@ Usage:
   snabb lwaftr migrate-configuration
   snabb lwaftr monitor
   snabb lwaftr query
+  snabb lwaftr quickcheck
   snabb lwaftr run
   snabb lwaftr run_nohw
   snabb lwaftr transient
