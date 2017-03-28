@@ -8,7 +8,7 @@ local pci = require("lib.hardware.pci")
 function make_handle_prop_args(name, duration, pidbox)
   local handler = function(prop_args)
      if #prop_args ~= 1 then
-        print("Usage: snabb quickcheck prop_sameval PCI_ADDR")
+        print("Usage: snabb lwaftr quickcheck prop_sameval PCI_ADDR")
         os.exit(1)
      end
   

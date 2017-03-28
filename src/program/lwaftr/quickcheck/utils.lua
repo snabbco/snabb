@@ -106,7 +106,7 @@ function choose_with_index(choices)
 end
 
 function selftest ()
-   print("selftest: pf.utils")
+   print("selftest: quickcheck.utils")
    local tab = { 1, 2, 3 }
    assert_equals({ 1, 2, 3, 1, 2, 3 }, concat(tab, tab))
    local gu1 = gmtime()
