@@ -56,6 +56,9 @@ function FlowCache:new(config)
                -- TODO: perhaps a ring buffer is a better idea here
                expired = {} }
 
+   -- how much of the cache to traverse when iterating
+   o.stride = math.ceil(o.cache_size / 1000)
+
    local params = {
       key_type = ffi.typeof("struct flow_key"),
       value_type = ffi.typeof("struct flow_record"),
@@ -77,7 +80,22 @@ function FlowCache:lookup(flow_key)
 end
 
 function FlowCache:iterate()
-   return self.table:iterate()
+   -- use the underlying ctable's iterator, but restrict the max stride
+   -- for each use of the iterator
+   local next_entry = self.next_entry or self.table:iterate()
+   local last_entry = self.last_entry or self.table.entries - 1
+   local max_entry  = last_entry + self.stride
+   local table_max  =
+      self.table.entries + self.table.size + self.table.max_displacement
+
+   if table_max < max_entry then
+      max_entry = table_max
+      self.last_entry = nil
+   else
+      self.last_entry = max_entry
+   end
+
+   return next_entry, max_entry, last_entry
 end
 
 function FlowCache:remove(flow_key)

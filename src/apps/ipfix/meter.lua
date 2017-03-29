@@ -36,89 +36,17 @@ local export_interval = 60
 
 FlowMeter = {}
 
--- print debugging messages for flow expiration
-local function debug_expire(entry, msg)
-   if debug then
-      local key = entry.key
-      local src_ip, dst_ip
-
-      if key.is_ipv6 == 1 then
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
-         src_ip = ipv6:ntop(ptr)
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv6_1")
-         dst_ip = ipv6:ntop(ptr)
-      else
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
-         src_ip = ipv4:ntop(ptr)
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv4")
-         dst_ip = ipv4:ntop(ptr)
-      end
-
-      util.fe_debug("expire flow [%s] %s (%d) -> %s (%d) proto: %d",
-                    msg,
-                    src_ip,
-                    htons(key.src_port),
-                    dst_ip,
-                    htons(key.dst_port),
-                    key.protocol)
-   end
-end
-
--- Walk through flow cache to see if flow records need to be expired.
--- Collect expired records and export them to the collector.
-local function init_expire_records()
-   local last_time
-
-   return function(self)
-      local now = tonumber(engine.now())
-      last_time = last_time or now
-
-      if now - last_time >= export_interval then
-         last_time = now
-         local timestamp = get_timestamp()
-         local keys_to_remove = {}
-         local timeout_records = {}
-         local to_export = {}
-
-         -- TODO: Walk the table incrementally each breath instead of traversing
-         --       the whole table each time
-         for entry in self.flows:iterate() do
-            local record = entry.value
-
-            if timestamp - record.end_time > self.idle_timeout then
-               debug_expire(entry, "idle")
-               table.insert(keys_to_remove, entry.key)
-               self.flows:expire_record(entry.key, record, false)
-            elseif timestamp - record.start_time > self.active_timeout then
-               debug_expire(entry, "active")
-               table.insert(timeout_records, record)
-               self.flows:expire_record(entry.key, record, true)
-            end
-         end
-
-         -- remove idle timed out flows
-         for _, key in ipairs(keys_to_remove) do
-            self.flows:remove(key)
-         end
-
-         for _, record in ipairs(timeout_records) do
-            -- TODO: what should timers reset to?
-            record.start_time = timestamp
-            record.end_time = timestamp
-            record.pkt_count = 0
-            record.octet_count = 0
-         end
-      end
-   end
-end
-
 function FlowMeter:new(config)
    local o = { flows = assert(config.cache),
                export_timer = nil,
                idle_timeout = config.idle_timeout or 300,
-               active_timeout = config.active_timeout or 120 }
+               active_timeout = config.active_timeout or 120,
+               -- used for debugging mainly
+               boot_time = get_timestamp() }
 
-   o.expire_records = init_expire_records()
+   -- convert from secs to ms (internal timestamp granularity is ms)
+   o.idle_timeout   = o.idle_timeout * 1000
+   o.active_timeout = o.active_timeout * 1000
 
    return setmetatable(o, { __index = self })
 end
@@ -199,6 +127,78 @@ function FlowMeter:process_packet(pkt)
    end
 
    packet.free(pkt)
+end
+
+-- print debugging messages for flow expiration
+function FlowMeter:debug_expire(entry, timestamp, msg)
+   if debug then
+      local key = entry.key
+      local src_ip, dst_ip
+
+      if key.is_ipv6 == 1 then
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
+         src_ip = ipv6:ntop(ptr)
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv6_1")
+         dst_ip = ipv6:ntop(ptr)
+      else
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+         src_ip = ipv4:ntop(ptr)
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv4")
+         dst_ip = ipv4:ntop(ptr)
+      end
+
+      local time_delta
+      if msg == "idle" then
+         time_delta = tonumber(entry.value.end_time - self.boot_time) / 1000
+      else
+         time_delta = tonumber(entry.value.start_time - self.boot_time) / 1000
+      end
+
+      util.fe_debug("exp [%s, %ds] %s (%d) -> %s (%d) P:%d",
+                    msg,
+                    time_delta,
+                    src_ip,
+                    htons(key.src_port),
+                    dst_ip,
+                    htons(key.dst_port),
+                    key.protocol)
+   end
+end
+
+-- Walk through flow cache to see if flow records need to be expired.
+-- Collect expired records and export them to the collector.
+function FlowMeter:expire_records()
+   local timestamp = get_timestamp()
+   local keys_to_remove = {}
+   local timeout_records = {}
+   local to_export = {}
+
+   for entry in self.flows:iterate() do
+      local record = entry.value
+
+      if timestamp - record.end_time > self.idle_timeout then
+         self:debug_expire(entry, timestamp, "idle")
+         table.insert(keys_to_remove, entry.key)
+         self.flows:expire_record(entry.key, record, false)
+      elseif timestamp - record.start_time > self.active_timeout then
+         self:debug_expire(entry, timestamp, "active")
+         table.insert(timeout_records, record)
+         self.flows:expire_record(entry.key, record, true)
+      end
+   end
+
+   -- remove idle timed out flows
+   for _, key in ipairs(keys_to_remove) do
+      self.flows:remove(key)
+   end
+
+   for _, record in ipairs(timeout_records) do
+      -- TODO: what should timers reset to?
+      record.start_time = timestamp
+      record.end_time = timestamp
+      record.pkt_count = 0
+      record.octet_count = 0
+   end
 end
 
 function FlowMeter:push()
