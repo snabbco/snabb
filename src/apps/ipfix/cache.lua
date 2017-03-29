@@ -51,7 +51,10 @@ function FlowCache:new(config)
 
    local o = { -- TODO: compute the default cache value
                --       based on expected flow amounts?
-               cache_size = config.cache_size or 20000 }
+               cache_size = config.cache_size or 20000,
+               -- expired flows go into this array
+               -- TODO: perhaps a ring buffer is a better idea here
+               expired = {} }
 
    local params = {
       key_type = ffi.typeof("struct flow_key"),
@@ -79,4 +82,24 @@ end
 
 function FlowCache:remove(flow_key)
    self.table:remove(flow_key)
+end
+
+function FlowCache:expire_record(key, record, active)
+   -- for active expiry, we keep the record around in the cache
+   -- so we need a copy that won't be modified
+   if active then
+      local copied_record = ffi.new("struct flow_record")
+      ffi.copy(copied_record, record, ffi.sizeof("struct flow_record"))
+      table.insert(self.expired, {key = key, value = copied_record})
+   else
+      table.insert(self.expired, {key = key, value = record})
+   end
+end
+
+function FlowCache:get_expired()
+   return self.expired
+end
+
+function FlowCache:clear_expired()
+   self.expired = {}
 end

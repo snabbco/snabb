@@ -148,94 +148,11 @@ local template_v6 = make_template_info(257,
      "tcpControlBits",
      "ipClassOfService" })
 
--- TODO: should be configurable
---       these numbers are placeholders for more realistic ones
---       (and timeouts should perhaps be more fine-grained)
-local export_interval = 60
-
 -- RFC5153 recommends a 10-minute template refresh configurable from
 -- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
 local template_interval = 600
 
 FlowExporter = {}
-
--- print debugging messages for flow expiration
-local function debug_expire(entry, msg)
-   if debug then
-      local key = entry.key
-      local src_ip, dst_ip
-
-      if key.is_ipv6 == 1 then
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
-         src_ip = ipv6:ntop(ptr)
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv6_1")
-         dst_ip = ipv6:ntop(ptr)
-      else
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
-         src_ip = ipv4:ntop(ptr)
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv4")
-         dst_ip = ipv4:ntop(ptr)
-      end
-
-      util.fe_debug("expire flow [%s] %s (%d) -> %s (%d) proto: %d",
-                    msg,
-                    src_ip,
-                    htons(key.src_port),
-                    dst_ip,
-                    htons(key.dst_port),
-                    key.protocol)
-   end
-end
-
--- Walk through flow cache to see if flow records need to be expired.
--- Collect expired records and export them to the collector.
-local function init_expire_records()
-   local last_time
-
-   return function(self)
-      local now = tonumber(engine.now())
-      last_time = last_time or now
-
-      if now - last_time >= export_interval then
-         last_time = now
-         local timestamp = get_timestamp()
-         local keys_to_remove = {}
-         local timeout_records = {}
-         local to_export = {}
-
-         -- TODO: Walk the table incrementally each breath instead of traversing
-         --       the whole table each time
-         for entry in self.cache:iterate() do
-            local record = entry.value
-
-            if timestamp - record.end_time > self.idle_timeout then
-               debug_expire(entry, "idle")
-               table.insert(keys_to_remove, entry.key)
-               table.insert(to_export, entry)
-            elseif timestamp - record.start_time > self.active_timeout then
-               debug_expire(entry, "active")
-               table.insert(timeout_records, record)
-               table.insert(to_export, entry)
-            end
-         end
-
-         self:export_records(to_export)
-
-         -- remove idle timed out flows
-         for _, key in ipairs(keys_to_remove) do
-            self.cache:remove(key)
-         end
-
-         for _, record in ipairs(timeout_records) do
-            -- TODO: what should timers reset to?
-            record.start_time = timestamp
-            record.end_time = timestamp
-            record.pkt_count = 0
-            record.octet_count = 0
-         end
-      end
-   end
-end
 
 -- periodically refresh the templates on the collector
 local function init_refresh_templates()
@@ -258,9 +175,6 @@ function FlowExporter:new(config)
                boot_time = util.get_timestamp(),
                -- version of IPFIX/Netflow (9 or 10)
                version = assert(config.ipfix_version),
-               idle_timeout = config.idle_timeout or 300,
-               active_timeout = config.active_timeout or 120,
-               export_timer = nil,
                template_timer = nil,
                -- RFC7011 specifies that if the PMTU is unknown, a maximum
                -- of 512 octets should be used for UDP transmission
@@ -281,7 +195,6 @@ function FlowExporter:new(config)
       o.header_size = V10_HEADER_SIZE
    end
 
-   o.expire_records = init_expire_records()
    o.refresh_templates = init_refresh_templates()
 
    return setmetatable(o, { __index = self })
@@ -487,7 +400,12 @@ function FlowExporter:push()
    assert(self.output.output, "missing output link")
 
    self:refresh_templates()
-   self:expire_records()
+
+   local expired = self.cache:get_expired()
+   if #expired > 0 then
+      self:export_records(expired)
+      self.cache:clear_expired()
+   end
 end
 
 function selftest()
