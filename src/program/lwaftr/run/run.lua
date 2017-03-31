@@ -162,6 +162,7 @@ function run(args)
    else
       setup.apply_scheduling(scheduling)
       setup_fn(c, conf, unpack(setup_args))
+      setup.validate_config(conf)
    end
 
    engine.configure(c)

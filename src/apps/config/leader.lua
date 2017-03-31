@@ -69,6 +69,7 @@ function Leader:new (conf)
 end
 
 function Leader:set_initial_configuration (configuration)
+   self.support.validate_config(configuration)
    self.current_configuration = configuration
    self.current_app_graph = self.setup_fn(configuration)
    self.current_in_place_dependencies = {}

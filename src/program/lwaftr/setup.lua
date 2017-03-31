@@ -24,7 +24,7 @@ local S          = require("syscall")
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
-local function validate_config(conf)
+function validate_config(conf)
    local support = require("apps.config.support.snabb_softwire_v1")
    return support.validate_config(conf)
 end
@@ -62,9 +62,6 @@ function lwaftr_app(c, conf)
    if internal_interface.next_hop == nil then
       error("One or both of the 'next_hop' values must be specified")
    end
-
-   -- Validate configuration file we've been given.
-   validate_config(conf)
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler,
               { max_ipv4_reassembly_packets =

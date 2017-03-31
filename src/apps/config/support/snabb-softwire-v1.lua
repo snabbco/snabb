@@ -18,11 +18,7 @@ local binding_table = require("apps.lwaftr.binding_table")
 
 local binding_table_instance
 local function get_binding_table(conf)
-	if binding_table_instance ~= nil then
-		-- TODO: fix me!
-		binding_table_instance = nil
-		return get_binding_table(conf)
-	else
+	if binding_table_instance == nil then
 		binding_table_instance = binding_table.load(conf)
 	end
 	return binding_table_instance
@@ -96,6 +92,11 @@ end
 
 local function compute_config_actions(old_graph, new_graph, to_restart,
                                       verb, path, arg)
+   -- If the binding cable changes, remove our cached version.
+   if path ~= nil and path:match("^/softwire%-config/binding%-table") then
+      binding_table_instance = nil
+   end
+
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       return add_softwire_entry_actions(new_graph, arg)
    elseif (verb == 'remove' and
