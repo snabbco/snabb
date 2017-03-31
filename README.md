@@ -1,8 +1,8 @@
-# RaptorJIT
+<p align="center"><img src="doc/raptorjit.png" alt="RaptorJIT"></p>
 
 [![Build Status](https://travis-ci.org/raptorjit/raptorjit.svg?branch=master)](https://travis-ci.org/raptorjit/raptorjit)
 
-RaptorJIT is a fork of LuaJIT targeting Linux/x86-64 server applications.
+**RaptorJIT** is a fork of LuaJIT targeting Linux/x86-64 server applications.
 
 Initial changes (ongoing work):
 
