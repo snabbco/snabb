@@ -161,6 +161,7 @@ function run(args)
       setup.reconfigurable(scheduling, setup_fn, c, conf, unpack(setup_args))
    else
       setup.apply_scheduling(scheduling)
+      setup.validate_config(conf)
       setup_fn(c, conf, unpack(setup_args))
    end
 
