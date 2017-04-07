@@ -173,6 +173,10 @@ local rta_decode = {
     ir.cacheinfo = t.rta_cacheinfo()
     ffi.copy(ir.cacheinfo, buf, s.rta_cacheinfo)
   end,
+  [c.RTA.PREF] = function(ir, buf, len)
+    local i = pt.uint8(buf)
+    ir.pref = tonumber(i[0])
+  end,
   -- TODO some missing
 }
 

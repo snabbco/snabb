@@ -120,6 +120,9 @@ end
 
 addtype(types, "stat", "struct stat", mt.stat)
 
+-- for fstatat where we can'tseem to get 64 bit version at present
+addtype(types, "stat32", "struct stat32", mt.stat)
+
 local signames = {}
 local duplicates = {LWT = true, IOT = true, CLD = true, POLL = true}
 for k, v in pairs(c.SIG) do

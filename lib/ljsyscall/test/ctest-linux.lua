@@ -66,6 +66,54 @@ ctypes["struct termios"] = nil
 -- not defined by glibc
 ctypes["struct k_sigaction"] = nil
 
+-- eBPF not available on Travis / opaque types
+ctypes["struct bpf_insn"] = nil
+ctypes["union bpf_attr"] = nil
+c.BPF_MAP = {}
+c.BPF_CMD = {}
+c.BPF_PROG = {}
+c.BPF.ALU64 = nil
+c.BPF.DW = nil
+c.BPF.JSGT = nil
+c.BPF.JSGE = nil
+c.BPF.CALL = nil
+c.BPF.EXIT = nil
+c.BPF.TO_LE = nil
+c.BPF.TO_BE = nil
+c.BPF.ANY = nil
+c.BPF.NOEXIST = nil
+c.BPF.EXIST = nil
+c.BPF.END = nil
+c.BPF.ARSH = nil
+c.BPF.XADD = nil
+c.BPF.JNE = nil
+c.BPF.MOV = nil
+c.SYS.bpf = nil
+
+-- no perf_event_open on Travis CI
+ctypes["struct perf_event_attr"] = nil
+ctypes["struct perf_event_reader"] = nil
+ctypes["struct perf_event_header"] = nil
+ctypes["struct perf_event_mmap_page"] = nil
+c.PERF_TYPE = {}
+c.PERF_COUNT = {}
+c.PERF_SAMPLE = {}
+c.PERF_FLAG = {}
+c.PERF_SAMPLE_REGS = {}
+c.PERF_SAMPLE_BRANCH = {}
+c.PERF_READ_FORMAT = {}
+c.PERF_RECORD = {}
+-- no perf_event_open ioctls on Travis CI
+c.IOCTL.PERF_EVENT_IOC_ENABLE = nil
+c.IOCTL.PERF_EVENT_IOC_DISABLE = nil
+c.IOCTL.PERF_EVENT_IOC_REFRESH = nil
+c.IOCTL.PERF_EVENT_IOC_RESET = nil
+c.IOCTL.PERF_EVENT_IOC_PERIOD = nil
+c.IOCTL.PERF_EVENT_IOC_SET_OUTPUT = nil
+c.IOCTL.PERF_EVENT_IOC_SET_FILTER = nil
+c.IOCTL.PERF_EVENT_IOC_ID = nil
+c.IOCTL.PERF_EVENT_IOC_SET_BPF = nil
+
 if abi.arch == "arm" then ctypes["struct statfs64"] = nil end -- padding difference, not that important
 
 for k, v in pairs(c.IOCTL) do if type(v) == "table" then c.IOCTL[k] = v.number end end
@@ -223,6 +271,10 @@ c.TCP.QUEUE_SEQ = nil
 c.TCP.TIMESTAMP = nil
 c.TCP.USER_TIMEOUT = nil
 c.TCP.REPAIR_QUEUE = nil
+c.RTA.NEWDST = nil
+c.RTA.PREF = nil
+c.RTA.VIA = nil
+c.RTA.MFC_STATS = nil
 
 -- these are not in Musl at present TODO send patches to get them in
 c.IPPROTO.UDPLITE = nil
@@ -279,6 +331,23 @@ c.SO.PEEK_OFF = nil
 c.SO.GET_FILTER = nil
 c.SO.NOFCS = nil
 c.SO.WIFI_STATUS = nil
+c.SO.REUSEPORT = nil
+c.SO.LOCK_FILTER = nil
+c.SO.SELECT_ERR_QUEUE = nil
+c.SO.BUSY_POLL = nil
+c.SO.MAX_PACING_RATE = nil
+c.SO.BPF_EXTENSIONS = nil
+c.SO.INCOMING_CPU = nil
+c.SO.ATTACH_BPF = nil
+c.SO.DETACH_BPF = nil
+c.SO.ATTACH_REUSEPORT_CBPF = nil
+c.SO.ATTACH_REUSEPORT_EBPF = nil
+
+-- new fcntl
+c.F.CANCELLK = nil
+c.F.ADD_SEALS = nil
+c.F.GET_SEALS = nil
+c.F_SEAL = nil
 
 -- Musl changes some of the syscall constants in its 32/64 bit handling
 c.SYS.getdents = nil
@@ -318,6 +387,8 @@ c.CBAUDEX = nil
 
 -- missing on my mips box
 c.AUDIT_ARCH.H8300 = nil
+-- missing on CI
+c.AUDIT_ARCH.AARCH64 = nil
 
 -- defined only in linux/termios.h which we cannot include on mips
 c.TIOCM.OUT1 = nil

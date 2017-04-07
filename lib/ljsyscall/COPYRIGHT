@@ -6,7 +6,7 @@ Files under the include directory include their own copyright information.
 
 ljsyscall: System call interface for LuaJIT
 
-Copyright (C) 2011-2014 Justin Cormack. All rights reserved.
+Copyright (C) 2011-2016 Justin Cormack. All rights reserved.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

@@ -205,6 +205,89 @@ t.timer = metatype("struct {timer_t timerid[1];}", {
 --__gc = S.timer_delete,
 })
 
+if abi.os == "linux" then
+  -- Linux performance monitoring reader
+  t.perf_reader = metatype("struct {int fd; char *map; size_t map_pages; }", {
+    __new = function (ct, fd)
+      if not fd then return ffi.new(ct) end
+      if istype(t.fd, fd) then fd = fd:nogc():getfd() end
+      return ffi.new(ct, fd)
+    end,
+    __len = function(t) return ffi.sizeof(t) end,
+    __gc = function (t) t:close() end,
+    __index = {
+      close = function(t)
+        t:munmap()
+        if t.fd > 0 then S.close(t.fd) end
+      end,
+      munmap = function (t)
+        if t.map_pages > 0 then
+          S.munmap(t.map, (t.map_pages + 1) * S.getpagesize())
+          t.map_pages = 0
+        end
+      end,
+      -- read(2) interface, see `perf_attr.read_format`
+      -- @return u64 or an array of u64
+      read = function (t, len)
+        local rvals = ffi.new('uint64_t [4]')
+        local nb, err = S.read(t.fd, rvals, len or ffi.sizeof(rvals))
+        if not nb then return nil, err end
+        return nb == 8 and rvals[0] or rvals
+      end,
+      -- mmap(2) interface, see sampling interface (`perf_attr.sample_type` and `perf_attr.mmap`)
+      -- first page is metadata page, the others are sample_type dependent
+      mmap = function (t, pages)
+        t:munmap()
+        pages = pages or 8
+        local map, err = S.mmap(nil, (pages + 1) * S.getpagesize(), "read, write", "shared", t.fd, 0)
+        if not map then return nil, err end
+        t.map = map
+        t.map_pages = pages
+        return pages
+      end,
+      meta = function (t)
+        return t.map_pages > 0 and ffi.cast("struct perf_event_mmap_page *", t.map) or nil
+      end,
+      -- next() function for __ipairs returning (len, event) pairs
+      -- it only retires read events when current event length is passed
+      next = function (t, curlen)
+        local buffer_size = S.getpagesize() * t.map_pages
+        local base = t.map + S.getpagesize()
+        local meta = t:meta()
+        -- Retire last read event or start iterating
+        if curlen then
+          meta.data_tail = meta.data_tail + curlen
+        end
+        -- End of ring buffer, yield
+        -- TODO: <insert memory barrier here>
+        if meta.data_head == meta.data_tail then
+          return
+        end
+        local e = pt.perf_event_header(base + (meta.data_tail % buffer_size))
+        local e_end = base + (meta.data_tail + e.size) % buffer_size;
+        -- If the perf event wraps around the ring, we need to make a contiguous copy
+        if ffi.cast("uintptr_t", e_end) < ffi.cast("uintptr_t", e) then
+          local tmp_e = ffi.new("char [?]", e.size)
+          local len = (base + buffer_size) - ffi.cast('char *', e)
+          ffi.copy(tmp_e, e, len)
+          ffi.copy(tmp_e + len, base, e.size - len)
+          e = ffi.cast(ffi.typeof(e), tmp_e)
+        end
+        return e.size, e
+      end,
+      -- Various ioctl() wrappers
+      ioctl = function(t, cmd, val) return S.ioctl(t.fd, cmd, val or 0) end,
+      start = function(t) return t:ioctl("PERF_EVENT_IOC_ENABLE") end,
+      stop = function(t) return t:ioctl("PERF_EVENT_IOC_DISABLE") end,
+      refresh = function(t) return t:ioctl("PERF_EVENT_IOC_REFRESH") end,
+      reset = function(t) return t:ioctl("PERF_EVENT_IOC_RESET") end,
+      setfilter = function(t, val) return t:ioctl("PERF_EVENT_IOC_SET_FILTER", val) end,
+      setbpf = function(t, fd) return t:ioctl("PERF_EVENT_IOC_SET_BPF", pt.void(fd)) end,
+    },
+    __ipairs = function(t) return t.next, t, nil end
+  })
+end
+
 -- TODO reinstate this, more like fd is, hence changes to destroy
 --[[
 t.aio_context = metatype("struct {aio_context_t ctx;}", {

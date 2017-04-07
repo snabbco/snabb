@@ -42,6 +42,7 @@ local C = setmetatable({}, {
 })
 
 -- new stat structure, else get legacy one; could use syscalls instead
+-- does not work for fstatat
 C.stat = C.stat64
 C.fstat = C.fstat64
 C.lstat = C.lstat64
@@ -56,7 +57,7 @@ function C.getdirentries(fd, buf, len, basep)
 end
 ]]
 
--- cannot find these anywhere!
+-- cannot find these anywhere! Apparently not there since 64 bit inodes?
 --C.getdirentries = ffi.C._getdirentries
 --C.sigaction = ffi.C._sigaction
 

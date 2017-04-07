@@ -338,6 +338,15 @@ local nr = {
   setns            = 375,
   process_vm_readv = 376,
   process_vm_writev= 377,
+  kcmp             = 378,
+  finit_module     = 379,
+  sched_setattr    = 380,
+  sched_getattr    = 381,
+  renameat2        = 382,
+  seccomp          = 383,
+  getrandom        = 384,
+  memfd_create     = 385,
+  bpf              = 386,
 }
 }
 
