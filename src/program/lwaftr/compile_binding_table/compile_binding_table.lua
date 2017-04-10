@@ -27,6 +27,6 @@ function run(args)
       io.stderr:write(tostring(bt_or_err)..'\n')
       main.exit(1)
    end
-   bt_or_err:save(out_file, stream.mtime_sec, stream.mtime_nsec)
+   bt_or_err:save(out_file, input_stream.mtime_sec, input_stream.mtime_nsec)
    main.exit(0)
 end
