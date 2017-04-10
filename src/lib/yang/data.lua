@@ -775,5 +775,27 @@ function selftest()
    assert(parse_uint32('"1"') == 1)
    assert(parse_uint32('    "1"   \n  ') == 1)
    assert(print_uint32(1, string_output_file()) == '1')
+
+   -- Verify that lists can lack keys when "config false;" is set.
+   local list_wo_key_config_false = [[module config-false-schema {
+      namespace "urn:ietf:params:xml:ns:yang:config-false-schema";
+      prefix "test";
+
+      container test {
+         description "Top level node";
+         list node {
+            config false;
+            description "List without key as config false is set";
+            leaf name { type string; }
+         }
+      }
+   }]]
+   local keyless_schema = schema.load_schema(list_wo_key_config_false)
+   local keyless_list_schema = load_data_for_schema(keyless_schema, [[
+   test {
+      node {
+         name "hello";
+      }
+   }]])
    print('selfcheck: ok')
 end
