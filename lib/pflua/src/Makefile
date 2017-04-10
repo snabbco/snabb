@@ -1,11 +1,19 @@
 TOP_SRCDIR:=..
 include $(TOP_SRCDIR)/common.mk
 
+DYNASM = $(ABS_TOP_SRCDIR)/deps/dynasm/dynasm.lua
+CODEGEN = pf/codegen
+
 all:
 
 clean:
 
-check:
+preprocess: $(CODEGEN).lua
+
+$(CODEGEN).lua: $(CODEGEN).dasl
+	luajit $(DYNASM) $(CODEGEN).dasl > $(CODEGEN).lua
+
+check: preprocess
 	luajit -l pf.types -e 'pf.types.selftest()'
 	luajit -l pf.utils -e 'pf.utils.selftest()'
 	luajit -l pf.libpcap -e 'pf.libpcap.selftest()'
@@ -17,4 +25,7 @@ check:
 	luajit -l pf.ssa -e 'pf.ssa.selftest()'
 	luajit -l pf.backend -e 'pf.backend.selftest()'
 	luajit -l pf.match -e 'pf.match.selftest()'
+	luajit -l pf.regalloc -e 'pf.regalloc.selftest()'
+	luajit -l pf.selection -e 'pf.selection.selftest()'
+	luajit -l pf.codegen -e 'pf.codegen.selftest()'
 	luajit -l pf -e 'pf.selftest()'

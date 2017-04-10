@@ -33,6 +33,7 @@ EXAMPLES = \
 	iso-proto-47.md \
 	ip-proto-sctp.md \
 	proto-47.md \
+	proto-sctp.md \
 	decnet-src-10.15.md \
 	decnet-host-10.15.md \
 	l1.md \
@@ -155,6 +156,9 @@ ip-proto-sctp.md: $(PFLUA)
 
 proto-47.md: $(PFLUA)
 	../tools/dump-markdown "proto 47" > $@.tmp && mv $@.tmp $@
+
+proto-sctp.md: $(PFLUA)
+	../tools/dump-markdown "proto \sctp" > $@.tmp && mv $@.tmp $@
 
 decnet-src-10.15.md: $(PFLUA)
 	../tools/dump-markdown "decnet src 10.15" > $@.tmp && mv $@.tmp $@
