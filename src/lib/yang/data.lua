@@ -96,7 +96,9 @@ function data_grammar_from_schema(schema)
    function handlers.list(node)
       local members=visit_body(node)
       local keys, values = {}, {}
-      for k in node.key:split(' +') do keys[k] = assert(members[k]) end
+      if node.key then
+         for k in node.key:split(' +') do keys[k] = assert(members[k]) end
+      end
       for k,v in pairs(members) do
          if not keys[k] then values[k] = v end
       end
@@ -791,7 +793,7 @@ function selftest()
       }
    }]]
    local keyless_schema = schema.load_schema(list_wo_key_config_false)
-   local keyless_list_schema = load_data_for_schema(keyless_schema, [[
+   local keyless_list_data = load_data_for_schema(keyless_schema, [[
    test {
       node {
          name "hello";
