@@ -570,4 +570,11 @@ function selftest ()
    assert(app_table.app3 == orig_app3) -- should be the same
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
+   local c_macro, MacroApp = config.new(), {}
+   local args, got = {configuration=c_macro, name="macroTest", arg=42}, {}
+   function MacroApp:configure (c, name, arg)
+      got.configuration, got.name, got.arg = c, name, arg
+   end
+   config.app(c_macro, args.name, MacroApp, args.arg)
+   assert(lib.equal(args, got), "configure callback broken")
 end

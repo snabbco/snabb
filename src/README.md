@@ -85,10 +85,20 @@ unimplemented are marked as "optional".
 
 — Method **myapp:new** *arg*
 
-*Required*. Create an instance of the app with a given argument *arg*.
-`Myapp:new` must return an instance of the app. The handling of *arg* is
-up to the app but it is encouraged to use `core.config`'s `parse_app_arg`
-to parse *arg*.
+*Required*. Create an instance of *myapp* with a given argument *arg*. The
+`new` method must return an instance of *myapp*. The handling of *arg* is up to
+the app but it is encouraged to use `core.config`'s `parse_app_arg` to parse
+*arg*.
+
+
+— Method **myapp:configure** *configuration*, *name*, *arg*
+
+*Optional*. If this method is defined the `new` method is ignored and not
+required, and when *myapp* is configured using `config.app` this method is
+called instead of instantiating *myapp* using `new`. The `configure` method is
+called with the *configuration*, *name*, and *arg* given to `config.app`, and
+is intended to be used to add arbitrary apps and links to *configuration* using
+`config.app` and `config.link`.
 
 
 — Field **myapp.input**
