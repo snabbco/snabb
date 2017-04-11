@@ -38,6 +38,8 @@ RMOBJS := $(patsubst %,obj/%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
+LUAJIT_A := ../lib/luajit/src/libluajit.a
+
 # TESTMODS expands to:
 #   core.memory core.lib ...
 # for each module that has a top-level selftest () function.
@@ -55,7 +57,6 @@ PATH := ../lib/luajit/usr/local/bin:$(PATH)
 snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(LUAJIT_A)
 	$(E) "LINK      $@"
 	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
-	    ../lib/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
 	@ls -sh snabb
