@@ -276,6 +276,8 @@ function Lwaftrgen:pull ()
 
    local output = self.output.output
    local input = self.input.input
+   local bridge_in = self.input.output
+   local bridge_out = self.output.input
    local ipv6_packets = self.ipv6_packets
    local ipv6_bytes = self.ipv6_bytes
    local ipv4_packets = self.ipv4_packets
@@ -286,6 +288,14 @@ function Lwaftrgen:pull ()
 
    if self.current == 0 then
       main.exit(0)
+   end
+
+   -- optional passthru of packets from a bridged interface
+   if bridge_in then
+      for _=1,link.nreadable(bridge_in) do
+         local pkt = receive(bridge_in)
+         transmit(output, pkt)
+      end
    end
 
    -- count and trash incoming packets
@@ -300,6 +310,13 @@ function Lwaftrgen:pull ()
                lost_packets = lost_packets + payload.number - self.last_rx_ipv6_packet_number - 1  
             end
             self.last_rx_ipv6_packet_number = payload.number
+            packet.free(pkt)
+         else
+            if bridge_out then
+               transmit(bridge_out, pkt)
+            else
+               packet.free(pkt)
+            end
          end
       else
          ipv4_bytes = ipv4_bytes + pkt.length
@@ -310,9 +327,15 @@ function Lwaftrgen:pull ()
                lost_packets = lost_packets + payload.number - self.last_rx_ipv4_packet_number - 1  
             end
             self.last_rx_ipv4_packet_number = payload.number
+            packet.free(pkt)
+         else
+            if bridge_out then
+               transmit(bridge_out, pkt)
+            else
+               packet.free(pkt)
+            end
          end
       end
-      packet.free(pkt)
    end
 
    local cur_now = tonumber(app.now())

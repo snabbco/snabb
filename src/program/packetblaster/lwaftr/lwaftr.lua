@@ -13,6 +13,7 @@ local Tap       = require("apps.tap.tap").Tap
 local raw       = require("apps.socket.raw")
 local pcap      = require("apps.pcap.pcap")
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
+local raw       = require("apps.socket.raw")
 local lib       = require("core.lib")
 local ffi       = require("ffi")
 
@@ -37,6 +38,7 @@ local long_opts = {
    rate         = "r",    -- rate in MPPS (0 => listen only)
    v4only       = "4",    -- generate only public IPv4 traffic
    v6only       = "6",    -- generate only public IPv6 encapsulated traffic
+   bridge       = "B",    -- optional bridge to raw interface
    pcap         = "o"     -- output packet to the pcap file
 }
 
@@ -160,7 +162,12 @@ function run (args)
       single_pass = true
    end
 
-   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:i:k:", long_opts)
+   local bridge = nil
+   function opt.B (arg) 
+      bridge = arg
+   end
+
+   args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:i:k:B:", long_opts)
 
    if not target then
       print("either --pci, --tap, --sock, --int or --pcap are required parameters")
@@ -194,6 +201,13 @@ function run (args)
       b4_ipv6 = b4_ipv6, b4_ipv4 = b4_ipv4, b4_port = b4_port,
       public_ipv4 = public_ipv4, single_pass = single_pass,
       ipv4_only = ipv4_only, ipv6_only = ipv6_only })
+
+   if bridge then
+      print("Bridge traffic to interface " .. bridge)
+      config.app(c, "raw", raw.RawSocket, bridge)
+      config.link(c, "generator.input -> raw.rx")
+      config.link(c, "raw.tx -> generator.output")
+   end
 
    local input, output
 
