@@ -2,10 +2,13 @@
 
 module(..., package.seeall)
 
+local now      = require("core.app").now
 local lib      = require("core.lib")
+local link     = require("core.link")
 local cache    = require("apps.ipfix.cache")
 local meter    = require("apps.ipfix.meter")
 local exporter = require("apps.ipfix.export")
+local numa     = require("lib.numa")
 
 -- apps that can be used as an input or output for the exporter
 in_out_apps = {}
@@ -34,6 +37,7 @@ local long_opts = {
    duration = "D",
    port = "p",
    transport = 1,
+   stats = "s",
    ["host-mac"] = "m",
    ["host-ip"] = "a",
    ["input-type"] = "i",
@@ -41,7 +45,8 @@ local long_opts = {
    ["netflow-v9"] = 0,
    ["ipfix"] = 0,
    ["active-timeout"] = 1,
-   ["idle-timeout"] = 1
+   ["idle-timeout"] = 1,
+   ["cpu"] = 1
 }
 
 function run (args)
@@ -55,6 +60,9 @@ function run (args)
 
    local active_timeout, idle_timeout
    local ipfix_version = 10
+
+   local cpu
+   local report = false
 
    -- TODO: better input validation
    local opt = {
@@ -75,6 +83,9 @@ function run (args)
       end,
       p = function (arg)
          port = assert(tonumber(arg), "expected number for port")
+      end,
+      s = function (arg)
+         report = true
       end,
       m = function (arg)
          host_mac = arg
@@ -104,10 +115,13 @@ function run (args)
          ipfix_version = 9
       end,
       -- TODO: not implemented
-      ["transport"] = function (arg) end
+      ["transport"] = function (arg) end,
+      ["cpu"] = function (arg)
+         cpu = tonumber(arg)
+      end
    }
 
-   args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:M:", long_opts)
+   args = lib.dogetopt(args, opt, "hsD:i:o:p:m:a:c:M:", long_opts)
    if #args ~= 2 then
       print(require("program.ipfix.probe.README_inc"))
       main.exit(1)
@@ -148,7 +162,23 @@ function run (args)
       end
    end
 
+   local start_time = now()
+   if cpu then numa.bind_to_cpu(cpu) end
+
    engine.configure(c)
    engine.busywait = true
    engine.main({ duration = duration, done = done })
+
+   if report then
+      local end_time = now()
+      local app = engine.app_table.meter
+      local input_link = app.input.input
+      local stats = link.stats(input_link)
+      print("IPFIX probe stats:")
+      print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
+                          lib.comma_value(stats.rxbytes),
+                          lib.comma_value(stats.rxpackets),
+                          lib.comma_value(math.floor((stats.rxbytes * 8) / (end_time - start_time))),
+                          lib.comma_value(stats.rxpackets / ((end_time - start_time) * 1000000))))
+  end
 end
