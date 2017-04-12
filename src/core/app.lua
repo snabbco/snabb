@@ -14,6 +14,8 @@ local zone      = require("jit.zone")
 local jit       = require("jit")
 local ffi       = require("ffi")
 local C         = ffi.C
+local timeline_mod = require("core.timeline") -- avoid collision with timeline()
+
 require("core.packet_h")
 
 -- Packet per pull
@@ -27,6 +29,9 @@ test_skipped_code = 43
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
+-- Timeline events specific to app and link instances
+app_events  = setmetatable({}, { __mode = 'k' })
+link_events = setmetatable({}, { __mode = 'k' })
 
 configuration = config.new()
 
@@ -36,6 +41,17 @@ frees     = counter.create("engine/frees.counter")     -- Total packets freed
 freebits  = counter.create("engine/freebits.counter")  -- Total packet bits freed (for 10GbE)
 freebytes = counter.create("engine/freebytes.counter") -- Total packet bytes freed
 configs   = counter.create("engine/configs.counter")   -- Total configurations loaded
+
+-- Timeline event log
+local timeline_log, events -- initialized on demand
+
+function timeline ()
+   if timeline_log == nil then
+      timeline_log = timeline_mod.new("engine/timeline")
+      events = timeline_mod.load_events(timeline_log, "core.engine")
+   end
+   return timeline_log
+end
 
 -- Breathing regluation to reduce CPU usage when idle by calling usleep(3).
 --
@@ -180,6 +196,7 @@ function apply_config_actions (actions, conf)
                   name, tostring(app)))
       end
       local zone = app.zone or getfenv(class.new)._NAME or name
+      app_events[app] = timeline_mod.load_events(timeline(), "core.app", {app=name})
       app.appname = name
       app.output = {}
       app.input = {}
@@ -220,6 +237,8 @@ function apply_config_actions (actions, conf)
       if not new_app_table[ta] then error("no such app: " .. ta) end
       -- Create or reuse a link and assign/update receiving app index
       local link = link_table[linkspec] or link.new(linkspec)
+      link_events[link] =
+         timeline_mod.load_events(timeline(), "core.link", {linkspec=linkspec})
       -- Add link to apps
       new_app_table[fa].output[fl] = link
       table.insert(new_app_table[fa].output, link)
@@ -311,6 +330,8 @@ end
 
 -- Call this to "run snabb switch".
 function main (options)
+   timeline() -- ensure timeline is created and initialized
+   events.engine_started()
    options = options or {}
    local done = options.done
    local no_timers = options.no_timers
@@ -328,11 +349,12 @@ function main (options)
    monotonic_now = C.get_monotonic_time()
    repeat
       breathe()
-      if not no_timers then timer.run() end
+      if not no_timers then timer.run() events.polled_timers() end
       if not busywait then pace_breathing() end
    until done and done()
    counter.commit()
    if not options.no_report then report(options.report) end
+   events.engine_stopped()
 end
 
 local nextbreath
@@ -345,14 +367,18 @@ function pace_breathing ()
       nextbreath = nextbreath or monotonic_now
       local sleep = tonumber(nextbreath - monotonic_now)
       if sleep > 1e-6 then
+         events.sleep_Hz(Hz, math.round(sleep*1e6))
          C.usleep(sleep * 1e6)
          monotonic_now = C.get_monotonic_time()
+         events.wakeup_from_sleep()
       end
       nextbreath = math.max(nextbreath + 1/Hz, monotonic_now)
    else
       if lastfrees == counter.read(frees) then
          sleep = math.min(sleep + 1, maxsleep)
+         events.sleep_on_idle(sleep)
          C.usleep(sleep)
+         events.wakeup_from_sleep()
       else
          sleep = math.floor(sleep/2)
       end
@@ -363,32 +389,82 @@ function pace_breathing ()
 end
 
 function breathe ()
+   local freed_packets0 = counter.read(frees)
+   local freed_bytes0 = counter.read(freebytes)
+   events.breath_start(counter.read(breaths), freed_packets0, freed_bytes0,
+                       counter.read(freebits))
    running = true
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
    -- Inhale: pull work into the app network
+   events.got_monotonic_time(C.get_time_ns())
    for i = 1, #breathe_pull_order do
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
          zone(app.zone)
-         with_restart(app, app.pull)
+         if timeline_mod.level(timeline_log) <= 3 then
+            app_events[app].pull(linkstats(app))
+            with_restart(app, app.pull)
+            app_events[app].pulled(linkstats(app))
+         else
+            with_restart(app, app.pull)
+         end
          zone()
       end
    end
+   events.breath_pulled()
    -- Exhale: push work out through the app network
    for i = 1, #breathe_push_order do
       local app = breathe_push_order[i]
       if app.push and not app.dead then
          zone(app.zone)
-         with_restart(app, app.push)
+         if timeline_mod.level(timeline_log) <= 3 then
+            app_events[app].push(linkstats(app))
+            with_restart(app, app.push)
+            app_events[app].pushed(linkstats(app))
+         else
+            with_restart(app, app.push)
+         end
          zone()
       end
    end
+   events.breath_pushed()
+   local freed
+   local freed_packets = counter.read(frees) - freed_packets0
+   local freed_bytes = (counter.read(freebytes) - freed_bytes0)
+   local freed_bytes_per_packet = freed_bytes / math.max(tonumber(freed_packets), 1)
+   events.breath_end(counter.read(breaths), freed_packets, freed_bytes_per_packet)
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
-   if counter.read(breaths) % 100 == 0 then counter.commit() end
+   if counter.read(breaths) % 100 == 0 then
+      counter.commit()
+      events.commited_counters()
+   end
+   -- Randomize the log level. Enable each level in 5x more breaths
+   -- than the level below by randomly picking from log5() distribution.
+   -- Goal is ballpark 1000 messages per second (~15min for 1M entries.)
+   --
+   -- Could be better to reduce the log level over time to "stretch"
+   -- logs for long running processes? Improvements possible :-).
+   local level = math.max(1, math.ceil(math.log(math.random(5^9))/math.log(5)))
+   timeline_mod.level(timeline_log, level)
    running = false
+end
+
+function linkstats (app)
+   local inp, inb, outp, outb, dropp, dropb = 0, 0, 0, 0, 0, 0
+   for i = 1, #app.input do
+      inp  = inp  + tonumber(counter.read(app.input[i].stats.rxpackets))
+      inb  = inb  + tonumber(counter.read(app.input[i].stats.rxbytes))
+   end
+   for i = 1, #app.output do
+      outp = outp + tonumber(counter.read(app.output[i].stats.txpackets))
+      outb = outb + tonumber(counter.read(app.output[i].stats.txbytes))
+      dropp = dropp + tonumber(counter.read(app.output[i].stats.txdrop))
+      dropb = dropb + tonumber(counter.read(app.output[i].stats.txdropbytes))
+   end
+   return inp, inb, outp, outb, dropp, dropb
 end
 
 function report (options)

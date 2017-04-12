@@ -24,6 +24,7 @@ RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
 INCSRC = $(sort $(shell find . -regex '[^\#]*\.inc' -printf '%P ') programs.inc)
+EVTSRC = $(sort $(shell find . -regex '[^\#]*\.events' -printf '%P '))
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
@@ -36,6 +37,7 @@ JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %,obj/%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
+EVTOBJ := $(patsubst %.events,obj/%_events.o, $(EVTSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
 # TESTMODS expands to:
@@ -52,7 +54,7 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../lib/luajit/usr/local/bin:$(PATH)
 
-snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(LUAJIT_A)
+snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(EVTOBJ) $(LUAJIT_A)
 	$(E) "LINK      $@"
 	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    ../lib/luajit/src/libluajit.a \
@@ -170,6 +172,13 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	 cat $<; \
 	 echo "]=============]") > $(basename $@).luainc
 	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
+
+$(EVTOBJ): obj/%_events.o: %.events Makefile | $(OBJDIR)
+	$(E) "EVENTS    $@"
+	@(echo -n "return [=============["; \
+	 cat $<; \
+	 echo "]=============]") > $(basename $@).luainc
+	$(Q) luajit -bg -n $(subst /,.,$*)_events $(basename $@).luainc $@
 
 # Create list of programs that exist
 programs.inc: program
