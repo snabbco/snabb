@@ -402,7 +402,6 @@ function breathe ()
    for i = 1, #breathe_pull_order do
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
-         if timeline_mod.level(timeline_log) <= 2 then log_links(app.input) end
          zone(app.zone)
          if timeline_mod.level(timeline_log) <= 3 then
             app_events[app].pull(linkstats(app))
@@ -420,7 +419,6 @@ function breathe ()
       local app = breathe_push_order[i]
       if app.push and not app.dead then
          zone(app.zone)
-         if timeline_mod.level(timeline_log) <= 2 then log_links(app.output) end
          if timeline_mod.level(timeline_log) <= 3 then
             app_events[app].push(linkstats(app))
             with_restart(app, app.push)
@@ -428,7 +426,6 @@ function breathe ()
          else
             with_restart(app, app.push)
          end
-         if timeline_mod.level(timeline_log) <= 2 then log_links(app.output) end
          zone()
       end
    end
@@ -468,22 +465,6 @@ function linkstats (app)
       dropb = dropb + tonumber(counter.read(app.output[i].stats.txdropbytes))
    end
    return inp, inb, outp, outb, dropp, dropb
-end
-
--- Log packet payload from links.
-function log_links (links)
-   for _, l in ipairs(links) do
-      local p = link.front(l)
-      if p ~= nil then
-         link_events[l].packet_start(p.length)
-         local u64 = ffi.cast("uint64_t*", p.data)
-         for n = 0, p.length/8, 6 do
-            link_events[l].packet_data(u64[n+0],u64[n+1],u64[n+2],
-                                       u64[n+3],u64[n+4],u64[n+5])
-         end
-         link_events[l].packet_end(p.length)
-      end
-   end
 end
 
 function report (options)
