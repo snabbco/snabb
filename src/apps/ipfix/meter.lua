@@ -4,6 +4,7 @@
 module(..., package.seeall)
 
 local ffi    = require("ffi")
+local cache  = require("apps.ipfix.cache")
 local util   = require("apps.ipfix.util")
 local consts = require("apps.lwaftr.constants")
 local lib    = require("core.lib")
@@ -114,9 +115,12 @@ function FlowMeter:process_packet(pkt)
    local ip_ptr   = pkt.data + ethernet_header_size
    local ip_size
 
+   -- zero out the flow key
+   ffi.fill(flow_key, ffi.sizeof("struct flow_key"))
+
    if eth_type == n_ethertype_ipv4 then
-      flow_key.is_ipv6  = false
-      flow_key.protocol = get_ipv4_protocol(ip_ptr)
+      flow_key.is_ipv6    = false
+      flow_key.protocol   = get_ipv4_protocol(ip_ptr)
 
       local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ipv4")
       ffi.copy(ptr, get_ipv4_src_addr_ptr(ip_ptr), 4)
@@ -148,12 +152,6 @@ function FlowMeter:process_packet(pkt)
          ffi.cast("uint16_t*", ip_ptr + ip_size)[0]
       flow_key.dst_port =
          ffi.cast("uint16_t*", ip_ptr + ip_size + 2)[0]
-   else
-      -- zero these out explicitly as it may have junk data from
-      -- a previous flow
-      flow_key.protocol = 0
-      flow_key.src_port = 0
-      flow_key.dst_port = 0
    end
 
    local lookup_result = self.flows:lookup(flow_key)
@@ -284,7 +282,6 @@ function selftest()
    local ipv6     = require("lib.protocol.ipv6")
    local udp      = require("lib.protocol.udp")
    local datagram = require("lib.protocol.datagram")
-   local cache    = require("apps.ipfix.cache")
 
    local flows = cache.FlowCache:new({})
    local nf    = FlowMeter:new({ cache = flows })
@@ -359,7 +356,8 @@ function selftest()
 
    -- make sure the count is incremented on the same flow
    test_packet(false, "192.168.1.1", "192.168.1.25", 9999, 80)
-   assert(result.value.pkt_count == 2)
+   assert(result.value.pkt_count == 2,
+          string.format("wrong count: %d", tonumber(result.value.pkt_count)))
 
    -- check the IPv6 key too
    key = ffi.new("struct flow_key")
