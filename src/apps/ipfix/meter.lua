@@ -105,10 +105,11 @@ local function get_ipv6_traffic_class(ptr)
    return bit.band(high, low)
 end
 
+-- allocate a flow key that will be re-used and only copied when we
+-- need to insert it as a new entry into the flow cache
+local flow_key = ffi.new("struct flow_key")
+
 function FlowMeter:process_packet(pkt)
-   -- TODO: using the header libraries for now, but can rewrite this
-   --       code if it turns out to be too slow
-   local flow_key = ffi.new("struct flow_key")
    local eth_type = get_ethernet_n_ethertype(pkt.data)
    local ip_ptr   = pkt.data + ethernet_header_size
    local ip_size
@@ -147,6 +148,12 @@ function FlowMeter:process_packet(pkt)
          ffi.cast("uint16_t*", ip_ptr + ip_size)[0]
       flow_key.dst_port =
          ffi.cast("uint16_t*", ip_ptr + ip_size + 2)[0]
+   else
+      -- zero these out explicitly as it may have junk data from
+      -- a previous flow
+      flow_key.protocol = 0
+      flow_key.src_port = 0
+      flow_key.dst_port = 0
    end
 
    local lookup_result = self.flows:lookup(flow_key)
@@ -170,6 +177,10 @@ function FlowMeter:process_packet(pkt)
          local ptr = ip_ptr + ip_size + TCP_CONTROL_BITS_OFFSET
          flow_record.tcp_control = ffi.cast("uint16_t*", ptr)[0]
       end
+
+      -- copy the pre-allocated flow key for insertion
+      local new_flow_key = ffi.new("struct flow_key")
+      ffi.copy(new_flow_key, flow_key, ffi.sizeof("struct flow_key"))
 
       self.flows:add(flow_key, flow_record)
    else
