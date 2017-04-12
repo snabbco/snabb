@@ -7,6 +7,7 @@ local constants = require('pf.constants')
 
 local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
 local uint32 = utils.uint32
+local filter_args = utils.filter_args
 
 local function skip_whitespace(str, pos)
    while pos <= #str and str:match('^%s', pos) do
@@ -248,12 +249,20 @@ local function lex(str, pos, opts)
       end
    end
 
-   -- "len" is the only bare name that can appear in an arithmetic
+   -- "len" is usually the only bare name that can appear in an arithmetic
    -- expression.  "len-1" lexes as { 'len', '-', 1 } in arithmetic
    -- contexts, but { "len-1" } otherwise.
-   if opts.maybe_arithmetic and str:match("^len", pos) then
-      if pos + 3 > #str or not str:match("^[%w.]", pos+3) then
-         return 'len', pos+3
+   --
+   -- pfmatch can require the compiled filter to take additional
+   -- parameters, in which case bare names other than "len" can show up
+   if opts.maybe_arithmetic then
+      for arg, _ in pairs(filter_args) do
+         local str_len = #arg
+         if str:match(string.format("^%s", arg), pos) then
+            if pos + str_len > #str or not str:match("^[%w.]", pos+str_len) then
+               return arg, pos+str_len
+            end
+         end
       end
    end
 
@@ -334,7 +343,7 @@ function parse_host_arg(lexer)
    if type(arg) == 'string' or arg[1] == 'ipv4' or arg[1] == 'ipv6' then
       return arg
    end
-   lexer.error('invalid host %s', arg)
+   lexer.error('ethernet address used in non-ether expression')
 end
 
 function parse_int_arg(lexer, max_len)
@@ -374,6 +383,12 @@ function parse_net_arg(lexer)
    end
 
    local arg = lexer.next({address=true})
+   if type(arg) ~= 'table' then
+      lexer.error('named nets currently unsupported')
+   elseif arg[1] == 'ehost' then
+      lexer.error('ethernet address used in non-ether expression')
+   end
+
    -- IPv4 dotted triple, dotted pair or bare net addresses
    if arg[1] == 'ipv4' and #arg < 5 then
       local mask_len = 32
@@ -399,15 +414,15 @@ function parse_net_arg(lexer)
             lexer.error("Not valid syntax for IPv6")
          end
          local mask = lexer.next({address=true})
+         if type(mask) ~= 'table' or mask[1] ~= 'ipv4' then
+            lexer.error("Invalid IPv4 mask")
+         end
          check_non_network_bits_in_ipv4(arg, ipv4_to_int(mask),
             table.concat(mask, '.', 2))
-         assert(mask[1] == arg[1], 'bad mask', mask)
          return { arg[1]..'/mask', arg, mask }
       else
          return arg
       end
-   elseif type(arg) == 'string' then
-      lexer.error('named nets currently unsupported %s', arg)
    end
 end
 
@@ -731,7 +746,7 @@ local function parse_primary_arithmetic(lexer, tok)
       local expr = parse_arithmetic(lexer)
       lexer.consume(')')
       return expr
-   elseif tok == 'len' or type(tok) == 'number' then
+   elseif filter_args[tok] or type(tok) == 'number' then
       return tok
    elseif allow_address_of and tok == '&' then
       return { 'addr', parse_addressable(lexer) }
@@ -770,8 +785,8 @@ function parse_arithmetic(lexer, tok, max_precedence, parsed_exp)
 end
 
 local primitives = {
-   dst = table_parser(src_or_dst_types),
-   src = table_parser(src_or_dst_types),
+   dst = table_parser(src_or_dst_types, unary(parse_host_arg)),
+   src = table_parser(src_or_dst_types, unary(parse_host_arg)),
    host = unary(parse_host_arg),
    ether = table_parser(ether_types),
    fddi = table_parser(ether_types),
@@ -859,7 +874,7 @@ local primitives = {
 
 local function parse_primitive_or_arithmetic(lexer)
    local tok = lexer.next({maybe_arithmetic=true})
-   if (type(tok) == 'number' or tok == 'len' or
+   if (type(tok) == 'number' or filter_args[tok] or
        addressables[tok] and lexer.peek() == '[') then
       return parse_arithmetic(lexer, tok)
    end
@@ -887,7 +902,7 @@ end
 local logical_ops = set('&&', 'and', '||', 'or')
 
 local function is_arithmetic(exp)
-   return (exp == 'len' or type(exp) == 'number' or
+   return (filter_args[exp] or type(exp) == 'number' or
               exp[1]:match("^%[") or arithmetic_precedence[exp[1]])
 end
 
@@ -1040,6 +1055,10 @@ function selftest ()
               { 'host', '0xffffffffff-oo.com' })
    parse_test("src host 127.0.0.1",
               { 'src_host', { 'ipv4', 127, 0, 0, 1 } })
+   parse_test("src 127.0.0.1",
+              { 'src', { 'ipv4', 127, 0, 0, 1 } })
+   parse_test("dst 1::ff11",
+              { 'dst', { 'ipv6', 1, 0, 0, 0, 0, 0, 0, 65297 } })
    parse_test("src net 10.0.0.0/24",
               { 'src_net',
                 { 'ipv4/len', { 'ipv4', 10, 0, 0, 0 }, 24 }})
@@ -1190,5 +1209,10 @@ function selftest ()
    parse_error_test("0 = 08", "unexpected end of octal literal at 5")
    parse_error_test("0 = 09", "unexpected end of octal literal at 5")
    parse_error_test("host 0xffffffffff and tcp", "integer too large: 0xffffffffff")
+   parse_error_test("host ff:ff:ff:ff:ff:ff", "ethernet address used in non-ether expression")
+   parse_error_test("net ff:ff:ff:ff:ff:ff", "ethernet address used in non-ether expression")
+   parse_error_test("net 192.168.1.0 mask foobar", "Invalid IPv4 mask")
+   parse_error_test("net 192.168.1.0 mask ::", "Invalid IPv4 mask")
+   parse_error_test("net 192.168.1.0 mask ff:ff:ff:ff:ff:ff", "Invalid IPv4 mask")
    print("OK")
 end

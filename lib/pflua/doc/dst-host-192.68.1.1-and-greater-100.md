@@ -67,6 +67,30 @@ return function(P,length)
 ::L8::
    return cast("uint32_t*", P+38)[0] == 16860352
 end
+```
 
+## Native pflang compilation
+
+```
+7f5ab683b000  4883FE64          cmp rsi, +0x64
+7f5ab683b004  7C36              jl 0x7f5ab683b03c
+7f5ab683b006  0FB7770C          movzx esi, word [rdi+0xc]
+7f5ab683b00a  4883FE08          cmp rsi, +0x08
+7f5ab683b00e  750E              jnz 0x7f5ab683b01e
+7f5ab683b010  8B471E            mov eax, [rdi+0x1e]
+7f5ab683b013  4881F8C0440101    cmp rax, 0x010144c0
+7f5ab683b01a  7423              jz 0x7f5ab683b03f
+7f5ab683b01c  EB1E              jmp 0x7f5ab683b03c
+7f5ab683b01e  4881FE08060000    cmp rsi, 0x608
+7f5ab683b025  7409              jz 0x7f5ab683b030
+7f5ab683b027  4881FE80350000    cmp rsi, 0x3580
+7f5ab683b02e  750C              jnz 0x7f5ab683b03c
+7f5ab683b030  8B7726            mov esi, [rdi+0x26]
+7f5ab683b033  4881FEC0440101    cmp rsi, 0x010144c0
+7f5ab683b03a  7403              jz 0x7f5ab683b03f
+7f5ab683b03c  B000              mov al, 0x0
+7f5ab683b03e  C3                ret
+7f5ab683b03f  B001              mov al, 0x1
+7f5ab683b041  C3                ret
 ```
 

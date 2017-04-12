@@ -17,12 +17,8 @@ The Snabb community are active in
 [universal SIMD protocol offloads](https://groups.google.com/d/msg/snabb-devel/aez4pEnd4ow/WrXi5N7nxfkJ), and
 [applying compiler technology to networking](https://archive.fosdem.org/2015/schedule/event/packet_filtering_pflua/).
 
-You are welcome to join our community. If you have an application that
-you want to build, or you want to use one that we are already
-developing, or you want to contribute in some other way, then please
-join the [snabb-devel mailing
-list](https://groups.google.com/forum/#!forum/snabb-devel) and read
-on.
+You are welcome to join our community! Scroll down to the bottom for
+tips on how you can get involved.
 
 ## Documentation
 
@@ -102,10 +98,10 @@ Setting up a Snabb development environment takes around one
 minute:
 
 ```
-$ git clone https://github.com/SnabbCo/snabbswitch
-$ cd snabbswitch
+$ git clone https://github.com/SnabbCo/snabb
+$ cd snabb
 $ make -j
-$ src/snabb --help
+$ sudo src/snabb --help
 ```
 
 The `snabb` binary is stand-alone, includes all of the applications,
@@ -123,6 +119,7 @@ $ sudo snabb packetblaster replay capture.pcap 01:00.0
 Here are the ways you can get involved:
 
 - Use the Snabb applications in your network.
-- Join the [snabb-devel mailing list](https://groups.google.com/forum/#!forum/snabb-devel).
-- Send a mail to [introduce yourself](https://groups.google.com/forum/#!searchin/snabb-devel/introduce/snabb-devel/d8t6hGClnQY/flztyLiIGzoJ) to the community (don't be shy!).
 - Create your very own application: [Getting Started](src/doc/getting-started.md).
+- Create Github Issues with your ideas and questions and problems.
+- Hang out on the [Snabb Slack chat](https://snabb.slack.com/). You can get a no-questions-asked invitation by mailing `luke@snabb.co` with the addresses/domains you want invited.
+
