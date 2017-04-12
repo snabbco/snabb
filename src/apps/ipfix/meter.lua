@@ -5,29 +5,45 @@ module(..., package.seeall)
 
 local ffi    = require("ffi")
 local util   = require("apps.ipfix.util")
+local consts = require("apps.lwaftr.constants")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local packet = require("core.packet")
 local ctable = require("lib.ctable")
-local ether  = require("lib.protocol.ethernet")
-local ipv4   = require("lib.protocol.ipv4")
-local ipv6   = require("lib.protocol.ipv6")
-local tcp    = require("lib.protocol.tcp")
 local C      = ffi.C
 
-local htonl, htons  = lib.htonl, lib.htons
+local htonl, htons, ntohl, ntohs  = lib.htonl, lib.htons, lib.ntohl, lib.ntohs
 local get_timestamp = util.get_timestamp
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
-
-local ETHER_PROTO_IPV4 = 0x0800
-local ETHER_PROTO_IPV6 = 0x86dd
 
 local IP_PROTO_TCP  = 6
 local IP_PROTO_UDP  = 17
 local IP_PROTO_SCTP = 132
 
 local TCP_CONTROL_BITS_OFFSET = 11
+
+-- These constants are taken from the lwaftr constants module, which
+-- is maybe a bad dependency but sharing code is good
+-- TODO: move constants somewhere else? lib?
+local ethertype_ipv4         = consts.ethertype_ipv4
+local ethertype_ipv6         = consts.ethertype_ipv6
+local n_ethertype_ipv4       = consts.n_ethertype_ipv4
+local n_ethertype_ipv6       = consts.n_ethertype_ipv6
+local ethernet_header_size   = consts.ethernet_header_size
+local ipv6_fixed_header_size = consts.ipv6_fixed_header_size
+local o_ethernet_dst_addr    = consts.o_ethernet_dst_addr
+local o_ethernet_src_addr    = consts.o_ethernet_src_addr
+local o_ethernet_ethertype   = consts.o_ethernet_ethertype
+local o_ipv4_total_length    = consts.o_ipv4_total_length
+local o_ipv4_ver_and_ihl     = consts.o_ipv4_ver_and_ihl
+local o_ipv4_proto           = consts.o_ipv4_proto
+local o_ipv4_src_addr        = consts.o_ipv4_src_addr
+local o_ipv4_dst_addr        = consts.o_ipv4_dst_addr
+local o_ipv6_payload_len     = consts.o_ipv6_payload_len
+local o_ipv6_next_header     = consts.o_ipv6_next_header
+local o_ipv6_src_addr        = consts.o_ipv6_src_addr
+local o_ipv6_dst_addr        = consts.o_ipv6_dst_addr
 
 -- TODO: should be configurable
 --       these numbers are placeholders for more realistic ones
@@ -51,47 +67,86 @@ function FlowMeter:new(config)
    return setmetatable(o, { __index = self })
 end
 
+local function get_ethernet_n_ethertype(ptr)
+   return ffi.cast("uint16_t*", ptr + o_ethernet_ethertype)[0]
+end
+
+local function get_ipv4_ihl(ptr)
+   return bit.band((ptr + o_ipv4_ver_and_ihl)[0], 0x0f)
+end
+
+local function get_ipv4_protocol(ptr)
+   return (ptr + o_ipv4_proto)[0]
+end
+
+local function get_ipv6_next_header(ptr)
+   return (ptr + o_ipv6_next_header)[0]
+end
+
+local function get_ipv4_src_addr_ptr(ptr)
+   return ptr + o_ipv4_src_addr
+end
+
+local function get_ipv4_dst_addr_ptr(ptr)
+   return ptr + o_ipv4_dst_addr
+end
+
+local function get_ipv6_src_addr_ptr(ptr)
+   return ptr + o_ipv6_src_addr
+end
+
+local function get_ipv6_dst_addr_ptr(ptr)
+   return ptr + o_ipv6_dst_addr
+end
+
+local function get_ipv6_traffic_class(ptr)
+   local high = bit.band(ptr[0], 0x0f)
+   local low  = bit.rshift(bit.band(ptr[1], 0xf0), 4)
+   return bit.band(high, low)
+end
+
 function FlowMeter:process_packet(pkt)
    -- TODO: using the header libraries for now, but can rewrite this
    --       code if it turns out to be too slow
-   local flow_key   = ffi.new("struct flow_key")
-   local eth_header = ether:new_from_mem(pkt.data, pkt.length)
-   local eth_size   = eth_header:sizeof()
-   local eth_type   = eth_header:type()
-   local ip_header
+   local flow_key = ffi.new("struct flow_key")
+   local eth_type = get_ethernet_n_ethertype(pkt.data)
+   local ip_ptr   = pkt.data + ethernet_header_size
+   local ip_size
 
-   if eth_type == ETHER_PROTO_IPV4 then
-      ip_header = ipv4:new_from_mem(pkt.data + eth_size, pkt.length - eth_size)
+   if eth_type == n_ethertype_ipv4 then
       flow_key.is_ipv6  = false
-      flow_key.protocol = ip_header:protocol()
+      flow_key.protocol = get_ipv4_protocol(ip_ptr)
 
       local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ipv4")
-      ffi.copy(ptr, ip_header:src(), 4)
-      ffi.copy(ptr + 4, ip_header:dst(), 4)
-   elseif eth_type == ETHER_PROTO_IPV6 then
-      ip_header = ipv6:new_from_mem(pkt.data + eth_size, pkt.length - eth_size)
+      ffi.copy(ptr, get_ipv4_src_addr_ptr(ip_ptr), 4)
+      ffi.copy(ptr + 4, get_ipv4_dst_addr_ptr(ip_ptr), 4)
+
+      local ihl = get_ipv4_ihl(ip_ptr)
+      ip_size = ihl * 4
+   elseif eth_type == n_ethertype_ipv6 then
       flow_key.is_ipv6  = true
-      flow_key.protocol = ip_header:next_header()
+      flow_key.protocol = get_ipv6_next_header(ip_ptr)
 
       local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ipv6_1")
-      ffi.copy(ptr, ip_header:src(), 16)
-      ffi.copy(ptr + 16, ip_header:dst(), 16)
+      ffi.copy(ptr, get_ipv6_src_addr_ptr(ip_ptr), 16)
+      ffi.copy(ptr + 16, get_ipv6_dst_addr_ptr(ip_ptr), 16)
+
+      -- TODO: handle chained headers
+      ip_size = ipv6_fixed_header_size
    else
       -- ignore non-IP packets
       packet.free(pkt)
       return
    end
 
-   local ip_size = ip_header:sizeof()
-
    -- TCP, UDP, SCTP all have the ports in the same header location
    if (flow_key.protocol == IP_PROTO_TCP
        or flow_key.protocol == IP_PROTO_UDP
        or flow_key.protocol == IP_PROTO_SCTP) then
       flow_key.src_port =
-         ffi.cast("uint16_t*", pkt.data + eth_size + ip_size)[0]
+         ffi.cast("uint16_t*", ip_ptr + ip_size)[0]
       flow_key.dst_port =
-         ffi.cast("uint16_t*", pkt.data + eth_size + ip_size + 2)[0]
+         ffi.cast("uint16_t*", ip_ptr + ip_size + 2)[0]
    end
 
    local lookup_result = self.flows:lookup(flow_key)
@@ -104,15 +159,15 @@ function FlowMeter:process_packet(pkt)
       flow_record.pkt_count   = 1ULL
       flow_record.octet_count = pkt.length
 
-      if eth_type == ETHER_PROTO_IPV4 then
+      if eth_type == n_ethertype_ipv4 then
          -- simpler than combining ip_header:dscp() & ip_header:ecn()
-         flow_record.tos   = ffi.cast("uint8_t*", pkt.data + eth_size + 1)[0]
-      elseif eth_type == ETHER_PROTO_IPV6 then
-         flow_record.tos   = ip_header:traffic_class()
+         flow_record.tos = ffi.cast("uint8_t*", ip_ptr + 1)[0]
+      elseif eth_type == n_ethertype_ipv6 then
+         flow_record.tos = get_ipv6_traffic_class(ip_ptr)
       end
 
       if flow_key.protocol == IP_PROTO_TCP then
-         local ptr = pkt.data + eth_size + ip_size + TCP_CONTROL_BITS_OFFSET
+         local ptr = ip_ptr + ip_size + TCP_CONTROL_BITS_OFFSET
          flow_record.tcp_control = ffi.cast("uint16_t*", ptr)[0]
       end
 
@@ -213,6 +268,10 @@ function FlowMeter:push()
 end
 
 function selftest()
+   local ether    = require("lib.protocol.ethernet")
+   local ipv4     = require("lib.protocol.ipv4")
+   local ipv6     = require("lib.protocol.ipv6")
+   local udp      = require("lib.protocol.udp")
    local datagram = require("lib.protocol.datagram")
    local cache    = require("apps.ipfix.cache")
 
@@ -223,9 +282,9 @@ function selftest()
    local function test_packet(is_ipv6, src_ip, dst_ip, src_port, dst_port)
       local proto
       if is_ipv6 then
-         proto = ETHER_PROTO_IPV6
+         proto = ethertype_ipv6
       else
-         proto = ETHER_PROTO_IPV4
+         proto = ethertype_ipv4
       end
 
       local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
@@ -244,7 +303,7 @@ function selftest()
                          protocol = IP_PROTO_UDP,
                          ttl = 64 })
       end
-      local udp = tcp:new({ src_port = src_port,
+      local udp = udp:new({ src_port = src_port,
                             dst_port = dst_port })
       local dg = datagram:new()
 
@@ -262,7 +321,8 @@ function selftest()
    test_packet(false, "192.168.1.25", "8.8.8.8", 58342, 53)
    test_packet(false, "8.8.8.8", "192.168.1.25", 53, 58342)
    test_packet(true, "2001:4860:4860::8888", "2001:db8::ff00:42:8329", 53, 57777)
-   assert(flows.table.occupancy == 5, "wrong number of flows")
+   assert(flows.table.occupancy == 5,
+          string.format("wrong number of flows: %d", flows.table.occupancy))
 
    -- do some packets with random data to test that it doesn't interfere
    for i=1, 100 do
