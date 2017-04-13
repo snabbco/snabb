@@ -116,16 +116,19 @@ function FlowMeter:process_packet(pkt, timestamp)
    local ip_ptr   = pkt.data + ethernet_header_size
    local ip_size
 
-   -- zero out the flow key
-   ffi.fill(flow_key, ffi.sizeof("struct flow_key"))
-
    if eth_type == n_ethertype_ipv4 then
       flow_key.is_ipv6    = false
       flow_key.protocol   = get_ipv4_protocol(ip_ptr)
 
       local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ip_1")
       ffi.copy(ptr, get_ipv4_src_addr_ptr(ip_ptr), 4)
+      flow_key.src_ip_2 = 0
+      flow_key.src_ip_3 = 0
+      flow_key.src_ip_4 = 0
       ffi.copy(ptr + 16, get_ipv4_dst_addr_ptr(ip_ptr), 4)
+      flow_key.dst_ip_2 = 0
+      flow_key.dst_ip_3 = 0
+      flow_key.dst_ip_4 = 0
 
       local ihl = get_ipv4_ihl(ip_ptr)
       ip_size = ihl * 4
@@ -153,13 +156,14 @@ function FlowMeter:process_packet(pkt, timestamp)
          ffi.cast("uint16_t*", ip_ptr + ip_size)[0]
       flow_key.dst_port =
          ffi.cast("uint16_t*", ip_ptr + ip_size + 2)[0]
+   else
+      flow_key.src_port = 0
+      flow_key.src_port = 0
    end
 
    local lookup_result = self.flows:lookup(flow_key)
 
    if lookup_result == nil then
-      ffi.fill(flow_record, ffi.sizeof("struct flow_record"))
-
       flow_record.start_time  = timestamp
       flow_record.end_time    = flow_record.start_time
       flow_record.pkt_count   = 1ULL
@@ -175,6 +179,8 @@ function FlowMeter:process_packet(pkt, timestamp)
       if flow_key.protocol == IP_PROTO_TCP then
          local ptr = ip_ptr + ip_size + TCP_CONTROL_BITS_OFFSET
          flow_record.tcp_control = ffi.cast("uint16_t*", ptr)[0]
+      else
+         flow_record.tcp_control = 0
       end
 
       self.flows:add(flow_key, flow_record)
