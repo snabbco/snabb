@@ -111,7 +111,7 @@ end
 local flow_key    = ffi.new("struct flow_key")
 local flow_record = ffi.new("struct flow_record")
 
-function FlowMeter:process_packet(pkt)
+function FlowMeter:process_packet(pkt, timestamp)
    local eth_type = get_ethernet_n_ethertype(pkt.data)
    local ip_ptr   = pkt.data + ethernet_header_size
    local ip_size
@@ -160,7 +160,7 @@ function FlowMeter:process_packet(pkt)
    if lookup_result == nil then
       ffi.fill(flow_record, ffi.sizeof("struct flow_record"))
 
-      flow_record.start_time  = get_timestamp()
+      flow_record.start_time  = timestamp
       flow_record.end_time    = flow_record.start_time
       flow_record.pkt_count   = 1ULL
       flow_record.octet_count = pkt.length
@@ -182,7 +182,7 @@ function FlowMeter:process_packet(pkt)
       flow_record = lookup_result.value
 
       -- otherwise just update the counters and timestamps
-      flow_record.end_time    = get_timestamp()
+      flow_record.end_time    = timestamp
       flow_record.pkt_count   = flow_record.pkt_count + 1ULL
       flow_record.octet_count = flow_record.octet_count + pkt.length
    end
@@ -264,10 +264,11 @@ end
 
 function FlowMeter:push()
    local input = assert(self.input.input)
+   local timestamp = get_timestamp()
 
    while not link.empty(input) do
       local pkt = link.receive(input)
-      self:process_packet(pkt)
+      self:process_packet(pkt, timestamp)
    end
 
    self:expire_records()
@@ -317,7 +318,7 @@ function selftest()
       dg:push(eth)
 
       local pkt = dg:packet()
-      nf:process_packet(pkt)
+      nf:process_packet(pkt, 0) -- dummy timestamp
    end
 
    -- populate with some known flows
