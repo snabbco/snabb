@@ -12,16 +12,14 @@ local ctable = require("lib.ctable")
 -- information on the IEs for the flow key and record
 ffi.cdef[[
    struct flow_key {
-      uint32_t src_ipv4;    /* sourceIPv4Address */
-      uint32_t dst_ipv4;    /* destinationIPv4Address */
-      uint32_t src_ipv6_1;  /* sourceIPv6Address */
-      uint32_t src_ipv6_2;
-      uint32_t src_ipv6_3;
-      uint32_t src_ipv6_4;
-      uint32_t dst_ipv6_1;  /* destinationIPv6Address */
-      uint32_t dst_ipv6_2;
-      uint32_t dst_ipv6_3;
-      uint32_t dst_ipv6_4;
+      uint32_t src_ip_1;  /* sourceIPv4Address, sourceIPv6Address */
+      uint32_t src_ip_2;  /* only the 1st word used for v4 */
+      uint32_t src_ip_3;
+      uint32_t src_ip_4;
+      uint32_t dst_ip_1;  /* destinationIPv4Address / destinationIPv6Address */
+      uint32_t dst_ip_2;
+      uint32_t dst_ip_3;
+      uint32_t dst_ip_4;
       uint8_t is_ipv6;
       uint8_t protocol;     /* protocolIdentifier */
       uint16_t src_port;    /* sourceTransportPort */

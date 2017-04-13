@@ -356,12 +356,12 @@ function FlowExporter:export_records(entries)
 
          if key.is_ipv6 == 0 then
             local field_ptr =
-               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
             ffi.copy(ptr, field_ptr, 4)
-            ffi.copy(ptr + 4, field_ptr + 4, 4)
+            ffi.copy(ptr + 16, field_ptr + 4, 4)
          else
             local field_ptr =
-               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
+               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
             ffi.copy(ptr, field_ptr, 16)
             ffi.copy(ptr + 16, field_ptr + 16, 16)
          end
@@ -424,7 +424,7 @@ function selftest()
 
    local key = ffi.new("struct flow_key")
    key.is_ipv6 = false
-   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
    ffi.copy(ptr, ipv4:pton("192.168.1.1"), 4)
    ffi.copy(ptr + 4, ipv4:pton("192.168.1.25"), 4)
    key.protocol = 17
