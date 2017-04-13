@@ -123,9 +123,9 @@ function FlowMeter:process_packet(pkt, timestamp)
       flow_key.is_ipv6    = false
       flow_key.protocol   = get_ipv4_protocol(ip_ptr)
 
-      local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ipv4")
+      local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ip_1")
       ffi.copy(ptr, get_ipv4_src_addr_ptr(ip_ptr), 4)
-      ffi.copy(ptr + 4, get_ipv4_dst_addr_ptr(ip_ptr), 4)
+      ffi.copy(ptr + 16, get_ipv4_dst_addr_ptr(ip_ptr), 4)
 
       local ihl = get_ipv4_ihl(ip_ptr)
       ip_size = ihl * 4
@@ -133,7 +133,7 @@ function FlowMeter:process_packet(pkt, timestamp)
       flow_key.is_ipv6  = true
       flow_key.protocol = get_ipv6_next_header(ip_ptr)
 
-      local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ipv6_1")
+      local ptr = ffi.cast("uint8_t*", flow_key) + ffi.offsetof(flow_key, "src_ip_1")
       ffi.copy(ptr, get_ipv6_src_addr_ptr(ip_ptr), 16)
       ffi.copy(ptr + 16, get_ipv6_dst_addr_ptr(ip_ptr), 16)
 
@@ -197,14 +197,14 @@ function FlowMeter:debug_expire(entry, timestamp, msg)
       local src_ip, dst_ip
 
       if key.is_ipv6 == 1 then
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
          src_ip = ipv6:ntop(ptr)
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv6_1")
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ip_1")
          dst_ip = ipv6:ntop(ptr)
       else
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
          src_ip = ipv4:ntop(ptr)
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ipv4")
+         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ip_1")
          dst_ip = ipv4:ntop(ptr)
       end
 
@@ -341,9 +341,9 @@ function selftest()
 
    local key = ffi.new("struct flow_key")
    key.is_ipv6 = false
-   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv4")
+   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
    ffi.copy(ptr, ipv4:pton("192.168.1.1"), 4)
-   ffi.copy(ptr + 4, ipv4:pton("192.168.1.25"), 4)
+   ffi.copy(ptr + 16, ipv4:pton("192.168.1.25"), 4)
    key.protocol = IP_PROTO_UDP
    key.src_port = htons(9999)
    key.dst_port = htons(80)
@@ -360,7 +360,7 @@ function selftest()
    -- check the IPv6 key too
    key = ffi.new("struct flow_key")
    key.is_ipv6 = true
-   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ipv6_1")
+   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
    ffi.copy(ptr, ipv6:pton("2001:4860:4860::8888"), 16)
    ffi.copy(ptr + 16, ipv6:pton("2001:db8::ff00:42:8329"), 16)
    key.protocol = IP_PROTO_UDP
