@@ -70,6 +70,7 @@ local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (conf)
    local dev = { pciaddress = conf.pciaddr, -- PCI device address
+                 promiscuous = conf.promiscuous,
                  mtu = (conf.mtu or default.mtu),
                  fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
@@ -87,6 +88,8 @@ function new_sf (conf)
                  rdt = 0,          -- Cache of receive tail (RDT) register
                  rxnext = 0,       -- Index of next buffer to receive
               }
+   -- If not set, promiscuous mode is on by default.
+   if dev.promiscuous == nil then dev.promiscuous = true end
    return setmetatable(dev, M_sf)
 end
 
@@ -225,7 +228,7 @@ end
 
 function M_sf:init_receive ()
    self.r.RXCTRL:clr(bits{RXEN=0})
-   self:set_promiscuous_mode() -- NB: don't need to program MAC address filter
+   self:set_promiscuous_mode() -- Activate or deactivate promiscuous mode.
    self.r.HLREG0(bits{
       TXCRCEN=0, RXCRCSTRP=1, rsv2=3, TXPADEN=10,
       rsvd3=11, rsvd4=13, MDCSPD=16
@@ -274,7 +277,11 @@ function M_sf:wait_enable ()
 end
 
 function M_sf:set_promiscuous_mode ()
-   self.r.FCTRL(bits({MPE=8, UPE=9, BAM=10}))
+   if self.promiscuous then
+      self.r.FCTRL(bits({MPE=8, UPE=9, BAM=10}))
+   else
+      self.r.FCTRL:clr(bits({MPE=8, UPE=9, BAM=10}))
+   end
    return self
 end
 
@@ -405,6 +412,26 @@ function M_sf:wait_linkup ()
    return self
 end
 
+local mac_t = ffi.typeof([[
+   union {
+      uint8_t addr[6];
+      struct {
+         uint32_t lo;
+         uint16_t hi;
+      };
+   }
+]])
+
+function M_sf:get_mac ()
+   local ral, rah = self.r.RAL[0](), self.r.RAH[0]()
+   assert(bit.band(rah, bits({ AV = 31 })) == bits({ AV = 31 }),
+          "MAC address on "..self.pciaddress.." is not valid ")
+   local mac = ffi.new(mac_t)
+   mac.lo = ral
+   mac.hi = bit.band(rah, 0xFFFF)
+   return mac.addr
+end
+
 --- ### Status and diagnostics
 
 
@@ -487,6 +514,7 @@ local M_pf = {}; M_pf.__index = M_pf
 
 function new_pf (conf)
    local dev = { pciaddress = conf.pciaddr, -- PCI device address
+                 promiscuous = true,
                  mtu = (conf.mtu or default.mtu),
                  r = {},           -- Configuration registers
                  s = {},           -- Statistics registers

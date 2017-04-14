@@ -372,8 +372,7 @@ function mq_sq(pcidevA, pcidevB)
    config.app(c, 'repeater_ms', basic_apps.Repeater)
    config.app(c, 'nicAs', Intel82599,
               {-- Single App on NIC A
-               pciaddr = pcidevA,
-               macaddr = '52:54:00:01:01:01'})
+               pciaddr = pcidevA })
    config.app(c, 'nicBm0', Intel82599,
               {-- first VF on NIC B
                pciaddr = pcidevB,
