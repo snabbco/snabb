@@ -69,6 +69,7 @@ function Leader:new (conf)
 end
 
 function Leader:set_initial_configuration (configuration)
+   self.support.validate_config(configuration)
    self.current_configuration = configuration
    self.current_app_graph = self.setup_fn(configuration)
    self.current_in_place_dependencies = {}
@@ -395,6 +396,7 @@ function compute_remove_config_fn (schema_name, path)
 end
 
 function Leader:notify_pre_update (config, verb, path, ...)
+   self.support.validate_update(config, verb, path, ...)
    for _,translator in pairs(self.support.translators) do
       translator.pre_update(config, verb, path, ...)
    end

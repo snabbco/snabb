@@ -7,6 +7,7 @@ local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
+local engine = require("core.app")
 
 local fatal = lwutil.fatal
 local select_snabb_instance = top.select_snabb_instance

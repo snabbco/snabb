@@ -86,8 +86,7 @@ end
 
 function parse_args(args)
    local handlers = {}
-   local opts = { bitrate = 10e9, duration = 5, program=programs.ramp_up_down,
-      bench_file = 'bench.csv' }
+   local opts = { bitrate = 10e9, duration = 5, program=programs.ramp_up_down }
    local cpu
    function handlers.b(arg)
       opts.bitrate = assert(tonumber(arg), 'bitrate must be a number')
@@ -239,45 +238,49 @@ function run(args)
             rx.txpackets, rx_mpps, rx.txbytes, rx_gbps))
          print(string.format('    Loss: %d ingress drop + %d packets lost (%f%%)',
             drop, lost_packets, lost_percent))
-         if hydra_mode then
-            -- NOTE: all the stats below are available: the commented out ones
-            --   will not show in Hydra reports. They are too many, making the
-            --   graphs unreadable, and most are redundant anyway.
-            -- TX
-            --   (Hydra reports prefer integers for the X (time) axis.)
-            -- bench_file:write(('%s_tx_packets,%.f,%f,packets\n'):format(
-            --    stream.tx_name,gbps_bitrate,tx.txpackets))
-            -- bench_file:write(('%s_tx_mpps,%.f,%f,mpps\n'):format(
-            --    stream.tx_name,gbps_bitrate,tx_mpps))
-            -- bench_file:write(('%s_tx_bytes,%.f,%f,bytes\n'):format(
-            --    stream.tx_name,gbps_bitrate,tx.txbytes))
-            -- bench_file:write(('%s_tx_gbps,%.f,%f,gbps\n'):format(
-            --    stream.tx_name,gbps_bitrate,tx_gbps))
-            -- RX
-            -- bench_file:write(('%s_rx_packets,%.f,%f,packets\n'):format(
-            --    stream.tx_name,gbps_bitrate,rx.txpackets))
-            bench_file:write(('%s_rx_mpps,%.f,%f,mpps\n'):format(
-               stream.tx_name,gbps_bitrate,rx_mpps))
-            -- bench_file:write(('%s_rx_bytes,%.f,%f,bytes\n'):format(
-            --    stream.tx_name,gbps_bitrate,rx.txbytes))
-            bench_file:write(('%s_rx_gbps,%.f,%f,gbps\n'):format(
-               stream.tx_name,gbps_bitrate,rx_gbps))
-            -- Loss
-            bench_file:write(('%s_ingress_drop,%.f,%f,packets\n'):format(
-               stream.tx_name,gbps_bitrate,drop))
-            -- bench_file:write(('%s_lost_packets,%.f,%f,packets\n'):format(
-            --    stream.tx_name,gbps_bitrate,lost_packets))
-            bench_file:write(('%s_lost_percent,%.f,%f,percentage\n'):format(
-               stream.tx_name,gbps_bitrate,lost_percent))
-         else
-            bench_file:write(('%f,%s,%d,%f,%d,%f,%d,%f,%d,%f,%d,%d,%f\n'):format(
-               gbps_bitrate, stream.tx_name,
-               tx.txpackets, tx_mpps, tx.txbytes, tx_gbps,
-               rx.txpackets, rx_mpps, rx.txbytes, rx_gbps,
-               drop, lost_packets, lost_percent))
+         if bench_file then
+            if hydra_mode then
+               -- NOTE: all the stats below are available: the commented out ones
+               --   will not show in Hydra reports. They are too many, making the
+               --   graphs unreadable, and most are redundant anyway.
+               -- TX
+               --   (Hydra reports prefer integers for the X (time) axis.)
+               -- bench_file:write(('%s_tx_packets,%.f,%f,packets\n'):format(
+               --    stream.tx_name,gbps_bitrate,tx.txpackets))
+               -- bench_file:write(('%s_tx_mpps,%.f,%f,mpps\n'):format(
+               --    stream.tx_name,gbps_bitrate,tx_mpps))
+               -- bench_file:write(('%s_tx_bytes,%.f,%f,bytes\n'):format(
+               --    stream.tx_name,gbps_bitrate,tx.txbytes))
+               -- bench_file:write(('%s_tx_gbps,%.f,%f,gbps\n'):format(
+               --    stream.tx_name,gbps_bitrate,tx_gbps))
+               -- RX
+               -- bench_file:write(('%s_rx_packets,%.f,%f,packets\n'):format(
+               --    stream.tx_name,gbps_bitrate,rx.txpackets))
+               bench_file:write(('%s_rx_mpps,%.f,%f,mpps\n'):format(
+                  stream.tx_name,gbps_bitrate,rx_mpps))
+               -- bench_file:write(('%s_rx_bytes,%.f,%f,bytes\n'):format(
+               --    stream.tx_name,gbps_bitrate,rx.txbytes))
+               bench_file:write(('%s_rx_gbps,%.f,%f,gbps\n'):format(
+                  stream.tx_name,gbps_bitrate,rx_gbps))
+               -- Loss
+               bench_file:write(('%s_ingress_drop,%.f,%f,packets\n'):format(
+                  stream.tx_name,gbps_bitrate,drop))
+               -- bench_file:write(('%s_lost_packets,%.f,%f,packets\n'):format(
+               --    stream.tx_name,gbps_bitrate,lost_packets))
+               bench_file:write(('%s_lost_percent,%.f,%f,percentage\n'):format(
+                  stream.tx_name,gbps_bitrate,lost_percent))
+            else
+               bench_file:write(('%f,%s,%d,%f,%d,%f,%d,%f,%d,%f,%d,%d,%f\n'):format(
+                  gbps_bitrate, stream.tx_name,
+                  tx.txpackets, tx_mpps, tx.txbytes, tx_gbps,
+                  rx.txpackets, rx_mpps, rx.txbytes, rx_gbps,
+                  drop, lost_packets, lost_percent))
+            end
          end
       end
-      bench_file:flush()
+      if bench_file then
+         bench_file:flush()
+      end
    end
 
    function tester.measure(bitrate, duration, bench_file, hydra_mode)
@@ -315,7 +318,9 @@ function run(args)
       engine.main({done=done})
    end
 
-   opts.bench_file = create_bench_file(opts.bench_file, opts.hydra)
+   if opts.bench_file then
+      opts.bench_file = create_bench_file(opts.bench_file, opts.hydra)
+   end
    engine.busywait = true
    local head = promise.new()
    run_engine(head,

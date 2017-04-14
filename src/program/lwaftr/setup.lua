@@ -20,9 +20,15 @@ local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local S          = require("syscall")
+local engine     = require("core.app")
 
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
 require('lib.yang.schema').set_default_capabilities(capabilities)
+
+function validate_config(conf)
+   local support = require("apps.config.support.snabb_softwire_v2")
+   return support.validate_config(conf)
+end
 
 local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
@@ -34,6 +40,29 @@ function lwaftr_app(c, conf)
    local internal_interface = conf.softwire_config.internal_interface
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
+
+   -- Claim the name if one is defined.
+   local function switch_names(config)
+      local currentname = engine.program_name
+      local name = config.softwire_config.name
+      -- Don't do anything if the name isn't set.
+      if name == nil then
+         return
+      end
+
+      local success, err = pcall(engine.claim_name, name)
+      if success == false then
+         -- Restore the previous name.
+         config.softwire_config.name = currentname
+         assert(success, err)
+      end
+   end
+   switch_names(conf)
+
+   -- Verify either or both of next-hop value's are specified (can't be done in YANG)
+   if internal_interface.next_hop == nil then
+      error("One or both of the 'next_hop' values must be specified")
+   end
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler,
               { max_ipv4_reassembly_packets =
@@ -524,6 +553,7 @@ end
 
 function reconfigurable(scheduling, f, graph, conf, ...)
    local args = {...}
+
    local function setup_fn(conf)
       local graph = config.new()
       f(graph, conf, unpack(args))

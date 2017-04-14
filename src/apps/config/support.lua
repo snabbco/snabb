@@ -177,6 +177,8 @@ end
 
 
 generic_schema_config_support = {
+   validate_config = function() end,
+   validate_update = function () end,
    compute_config_actions = function(
          old_graph, new_graph, to_restart, verb, path, ...)
       return add_restarts(app.compute_config_actions(old_graph, new_graph),
