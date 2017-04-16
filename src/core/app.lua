@@ -92,11 +92,13 @@ function with_restart (app, method)
 end
 
 -- Restart dead apps.
+local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
 function restart_dead_apps ()
    if not use_restart then return end
    local restart_delay = 2 -- seconds
-   local actions = { start={}, restart={}, reconfig={}, keep={}, stop={} }
    local restart = false
+   actions.restart[1] = nil
+   actions.keep[1] = nil
 
    for name, app in pairs(app_table) do
       if app.dead and (now() - app.dead.time) >= restart_delay then
