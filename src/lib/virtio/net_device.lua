@@ -12,6 +12,7 @@ local packet    = require("core.packet")
 local timer     = require("core.timer")
 local VirtioVirtq = require("lib.virtio.virtq_device")
 local checksum  = require("lib.checksum")
+local blit      = require("lib.blit")
 local ffi       = require("ffi")
 local C         = ffi.C
 local band      = bit.band
@@ -115,6 +116,7 @@ end
 function VirtioNetDevice:poll_vring_receive ()
    -- RX
    self:receive_packets_from_vm()
+   blit.barrier()
    self:rx_signal_used()
 end
 
@@ -148,7 +150,8 @@ function VirtioNetDevice:rx_buffer_add(rx_p, addr, len)
    local addr = self:map_from_guest(addr)
    local pointer = ffi.cast(char_ptr_t, addr)
 
-   packet.append(rx_p, pointer, len)
+   rx_p.length = rx_p.length + len
+   blit.copy(rx_p, pointer, len)
    return len
 end
 
@@ -183,6 +186,7 @@ end
 function VirtioNetDevice:poll_vring_transmit ()
    -- RX
    self:transmit_packets_to_vm()
+   blit.barrier()
    self:tx_signal_used()
 end
 
@@ -249,7 +253,7 @@ function VirtioNetDevice:tx_buffer_add(tx_p, addr, len)
    local pointer = ffi.cast(char_ptr_t, addr)
 
    assert(tx_p.length <= len)
-   ffi.copy(pointer, tx_p.data, tx_p.length)
+   blit.copy(pointer, tx_p.data, tx_p.length)
 
    return tx_p.length
 end
@@ -302,7 +306,7 @@ function VirtioNetDevice:tx_buffer_add_mrg_rxbuf(tx_p, addr, len)
    local to_copy = math.min(tx_p.length - self.tx.data_sent, len + adjust)
 
    -- copy the data to the adjusted pointer
-   ffi.copy(pointer - adjust, tx_p.data + self.tx.data_sent, to_copy)
+   ffi.copy(tx_p.data + self.tx.data_sent, pointer - adjust, to_copy)
 
    -- update the num_buffers in the first virtio header
    self.tx.tx_mrg_hdr[0].num_buffers = self.tx.tx_mrg_hdr[0].num_buffers + 1
