@@ -378,69 +378,21 @@ end
 local function remove_address_list(conf)
    local bt = conf.softwire_config.binding_table
    for key, entry in cltable.pairs(bt.softwire) do
-      entry.br_address = assert(bt.br_address[entry.br])
+      local br = entry.br or 1
+      entry.br_address = assert(bt.br_address[br])
       entry.br = nil
    end
    return conf
 end
 
-local function v2_migration(src, conf_file)
-   -- Lets create a custom schema programmatically as an intermediatory so we can
-   -- switch over to v2 of snabb-softwire config.
-   local hybridscm = yang.load_schema_by_name("snabb-softwire-v1")
-   local binding_table = hybridscm.body["softwire-config"].body["binding-table"]
-
-   -- Add the new field programatically (TODO: Make a function to take a
-   -- fragment of yang and convert add it to a schema). Not robust.
-   binding_table.body.softwire.body["br-address"] = {
-      id = "br-address",
-      kind = "leaf",
-      type = binding_table.body.softwire.body["b4-ipv6"].type,
-      primitive_type="ipv6-address",
-      must={}
-   }
-
-   local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
-   conf = remove_address_list(conf)
-   conf.softwire_config.binding_table.br_address = nil
-
-   -- Now we have to convert from the migration hybrid schema back to vanila v2
-   -- so that the printers work correctly (or future migrations do).
-   local tempfile, tempfile_name = save_to_temp_file(conf, hybridscm)
-
-   -- Tell the GC that we don't need to keep this version in memory, we can't
-   -- keep large configuration files in memory twice.
-   conf = nil
-
-   -- Load the configuration from temp file and remove from file system.
-   local conf = assert(tempfile:read("*a"))
-   tempfile:close()
-   os.remove(tempfile_name)
-
-   -- Finally load it and return the config file
-   return data.load_data_for_schema_by_name("snabb-softwire-v2", conf, conf_file)
-end
-
-function psidmap_on_softwire(src, conf_file)
-   -- Create a hybrid to support both the psidmap existing and the softwire.
-   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
-   local v1 = yang.load_schema_by_name("snabb-softwire-v1")
-   local hy_binding_table = hybridscm.body["softwire-config"].body["binding-table"]
-   local v1_binding_table = v1.body["softwire-config"].body["binding-table"]
-
-   -- Add the psidmap back onto the hybrid for the conversion.
-   hy_binding_table.body["psid-map"] = v1_binding_table.body["psid-map"]
-
-   -- Load the data into the new hybrid schema
-   local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
-
+local function remove_psid_map(conf)
    -- We're actually going to load the psidmap in the schema so ranges can easily be
    -- looked up. With support of end-addr simply trying to lookup by addr will fail.
    -- Luckily this is the last time this should bother us hopefully.
    local binding_table = require("apps.lwaftr.binding_table")
    local binding_table_instance = binding_table.load(conf.softwire_config.binding_table)
 
-   -- Iterate over the softwires looking up the psidmap entries
+   -- Remove the psid-map and add it to the softwire.
    local bt = conf.softwire_config.binding_table
    for key, entry in cltable.pairs(bt.softwire) do
       -- Find the port set for the ipv4 address
@@ -456,50 +408,73 @@ function psidmap_on_softwire(src, conf_file)
       }
    end
 
-   -- Get rid of the psidmap (don't need it)
+   return conf
+end
+
+local function v2_migration(src, conf_file)
+   -- Lets create a custom schema programmatically as an intermediary so we can
+   -- switch over to v2 of snabb-softwire config.
+   local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
+   local v1_binding_table = v1_schema.body["softwire-config"].body["binding-table"]
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   local binding_table = hybridscm.body["softwire-config"].body["binding-table"]
+
+   -- Add the schema from v1 that we need to convert them.
+   binding_table.body["br-address"] = v1_binding_table.body["br-address"]
+   binding_table.body["psid-map"] = v1_binding_table.body["psid-map"]
+
+   -- Remove the mandatory requirement on softwire.br-address for the migration
+   binding_table.body["softwire"].body["br-address"].mandatory = false
+
+   local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
+
+   -- Remove the br-address leaf-list and add it onto the softwire.
+   conf = remove_address_list(conf)
+   conf.softwire_config.binding_table.br_address = nil
+
+   -- Remove the psid-map and add it to the softwire.
+   conf = remove_psid_map(conf)
    conf.softwire_config.binding_table.psid_map = nil
 
-   -- Lets also get rid of the binding_table_instance to free up some memory
-   binding_table_instance = nil
-
-   -- Finally lets convert it back to vanilla v2
+   -- Now we have to convert from the migration hybrid schema back to vanilla
+   -- v2 so that the printers work correctly (or future migrations do).
    local tempfile, tempfile_name = save_to_temp_file(conf, hybridscm)
+
+   -- Tell the GC that we don't need to keep this version in memory, we can't
+   -- keep large configuration files in memory twice.
+   conf = nil
+
+   -- Load the configuration from temp file and remove from file system.
    local conf = assert(tempfile:read("*a"))
    tempfile:close()
    os.remove(tempfile_name)
+
+   -- Finally load it and return the config file
    return data.load_data_for_schema_by_name("snabb-softwire-v2", conf, conf_file)
 end
 
-function migrate_3_2_0_1(conf_file)
-   local src = io.open(conf_file, "r"):read("*a")
-   return psidmap_on_softwire(src, conf_file)
-end
 
 local function migrate_3_0_1(conf_file)
    local data = require('lib.yang.data')
    local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   local v2 = v2_migration(increment_br(data.load_data_for_schema_by_name(
+   return v2_migration(increment_br(data.load_data_for_schema_by_name(
                           'snabb-softwire-v1', str, conf_file)), conf_file)
-   return psidmap_on_softwire(v2)
 end
 
 local function migrate_3_0_1bis(conf_file)
-   local v2 =  v2_migration(increment_br(yang.load_configuration(
+   return v2_migration(increment_br(yang.load_configuration(
                        conf_file, {schema_name='snabb-softwire-v1'})),
                        conf_file)
-   return psidmap_on_softwire(v2)
 end
 
 local function migrate_3_2_0(conf_file)
    local src = io.open(conf_file, "r"):read("*a")
-   local v2 = v2_migration(src, conf_file)
-   return psidmap_on_softwire(v2)
+   return v2_migration(src, conf_file)
 end
 
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
                     ['3.0.1.1'] = migrate_3_0_1bis,
-                    ['3.2.0'] = migrate_3_2_0,
-                    ['3.2.0.1'] = migrate_3_2_0_1, }
+                    ['3.2.0'] = migrate_3_2_0, }
 function run(args)
    local conf_file, version = parse_args(args)
    local migrate = migrators[version]
