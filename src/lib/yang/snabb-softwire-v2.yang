@@ -15,13 +15,18 @@ module snabb-softwire-v2 {
      "Initial revision.";
   }
 
-  revision 2017-01-19 {
+  revision 2017-04-17 {
     description
       "Removal of br-address leaf-list and  br leaf. It adds the
        addition of br-address binding_table.softwire. This is to
        make the schema more yang-like. One now only need to specify
        the br-address on the softwire rather than managing the index's
-       to a leaf-list of them.";
+       to a leaf-list of them.
+
+       This also removes the psid-map list and adds a new port-set
+       container on the softwire container instead. This will help
+       adding the softwires as well as bring it more inline with the
+       ietf-softwire schema.";
   }
 
   container softwire-config {
