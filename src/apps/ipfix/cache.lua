@@ -6,6 +6,7 @@ module(..., package.seeall)
 local bit    = require("bit")
 local ffi    = require("ffi")
 local ctable = require("lib.ctable")
+local fnv    = require("apps.ipfix.hash")
 
 -- Flow key & flow record FFI type definitions
 --
@@ -45,26 +46,6 @@ ffi.cdef[[
 
 FlowCache = {}
 
--- uses FNV hashing for speed
-local uint32_cast = ffi.new('uint32_t[1]')
-local hsize = ffi.sizeof("struct flow_key")
-local bxor, lshift = bit.bxor, bit.lshift
-local basis = 216613626ULL
-local FNVp  = 16777619ULL
-local function flow_key_hash(key)
-   local octets = ffi.cast("uint8_t*", key)
-   local hash = basis
-   for i=0, hsize-1 do
-      hash = bxor(hash, octets[i])
-      hash = hash * FNVp
-   end
-
-   -- see ctable.lua for why we do this
-   local i32 = lshift(hash, 1)
-   uint32_cast[0] = i32
-   return uint32_cast[0]
-end
-
 function FlowCache:new(config)
    assert(config, "expected configuration table")
 
@@ -83,7 +64,7 @@ function FlowCache:new(config)
       value_type = ffi.typeof("struct flow_record"),
       max_occupancy_rate = 0.4,
       initial_size = math.ceil(o.cache_size / 0.4),
-      hash_fn = flow_key_hash
+      hash_fn = fnv.make_fnv_hash(ffi.sizeof("struct flow_key"))
    }
 
    o.table = ctable.new(params)
