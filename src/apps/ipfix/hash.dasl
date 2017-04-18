@@ -39,15 +39,16 @@ local function gen_hash(size)
       -- rdi stores the buffer address
       -- rax stores the hash
       -- rcx is the loop index
-      | mov rcx, 0
+      | mov rcx, size
       | mov eax, basis
+      | mov r8, FNVp
 
       -- main loop
       |1:
-      | xor al, byte [rdi+rcx]
-      | imul eax, FNVp
-      | inc rcx
-      | cmp rcx, size
+      | xor al, byte [rdi]
+      | mul r8
+      | inc rdi
+      | dec rcx
       | jnz <1
 
       -- shift hash by one
