@@ -116,12 +116,13 @@ function bridge:new (conf)
          end
       end
    end
-
+   
    -- Create list of egress ports for each ingress port, containing
    -- all free ports as well as all ports from different split-horizon
    -- groups
-   local dst_ports = {}
+   local dst_ports, src_ports = {},{}
    for sport, sdesc in ipairs(ports) do
+      table.insert(src_ports, sport)
       dst_ports[sport] = {}
       for dport, ddesc in ipairs(ports) do
          if not (sport == dport or (sdesc.group ~= 0 and
@@ -130,6 +131,7 @@ function bridge:new (conf)
          end
       end
    end
+   o._src_ports = src_ports
    o._groups = groups
    o._ports = ports
    o._dst_ports = dst_ports
