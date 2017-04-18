@@ -154,7 +154,7 @@ class TestConfigMisc(BaseTestCase):
         # run_cmd checks the exit code and fails the test if it is not zero.
         get_args[-1] += '/b4-ipv6'
         self.assertEqual(
-            output.strip(), b'b4-ipv6 ::1;',
+            output.strip(), b'b4-ipv6 ::1;\nbr-address 2001:db8::;',
             '\n'.join(('OUTPUT', str(output, ENC))))
 
     def test_get_state(self):
