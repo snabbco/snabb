@@ -44,8 +44,7 @@ end
 
 function parse_args(args)
    local handlers = {}
-   local opts = {
-      bitrate = 10e9, duration = 5, period = 1, bench_file = 'bench.csv' }
+   local opts = { bitrate = 10e9, duration = 5, period = 1 }
    function handlers.b(arg)
       opts.bitrate = assert(tonumber(arg), 'bitrate must be a number')
    end

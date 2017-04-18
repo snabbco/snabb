@@ -3,7 +3,6 @@ module(..., package.seeall)
 local app = require("core.app")
 local config = require("core.config")
 local lib = require("core.lib")
-local numa = require("lib.numa")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local setup = require("program.lwaftr.setup")
 local S = require("syscall")
@@ -15,7 +14,7 @@ end
 
 function parse_args(args)
    local handlers = {}
-   local opts = { bench_file = 'bench.csv' }
+   local opts = {}
    local scheduling = {}
    function handlers.D(arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
@@ -44,7 +43,11 @@ function run(args)
    local opts, scheduling, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
 
-   if opts.name then engine.claim_name(opts.name) end
+   -- If there is a name defined on the command line, it should override
+   -- anything defined in the config.
+   if opts.name then
+      conf.softwire_config.name = opts.name
+   end
 
    local graph = config.new()
    if opts.reconfigurable then
@@ -53,6 +56,7 @@ function run(args)
    else
       setup.apply_scheduling(scheduling)
       setup.load_bench(graph, conf, inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
+      setup.validate_config(conf)
    end
    app.configure(graph)
 
@@ -80,6 +84,9 @@ function run(args)
       start_sampling_for_pid(S.getpid())
    end
 
-   app.busywait = true
+   if not opts.reconfigurable then
+      -- The leader does not need all the CPU, only the followers do.
+      app.busywait = true
+   end
    app.main({duration=opts.duration})
 end

@@ -1,13 +1,12 @@
 module(..., package.seeall)
 
-local S = require("syscall")
 local counter = require("core.counter")
 local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 local top = require("program.top.top")
-local app = require("core.app")
+local engine = require("core.app")
 local ps = require("program.ps.ps")
 
 local keys, fatal = lwutil.keys, lwutil.fatal

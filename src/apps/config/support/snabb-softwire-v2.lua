@@ -2,6 +2,7 @@
 module(..., package.seeall)
 local ffi = require('ffi')
 local app = require('core.app')
+local corelib = require('core.lib')
 local equal = require('core.lib').equal
 local dirname = require('core.lib').dirname
 local data = require('lib.yang.data')
@@ -12,6 +13,47 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 local path_mod = require('lib.yang.path')
 local generic = require('apps.config.support').generic_schema_config_support
+local binding_table = require("apps.lwaftr.binding_table")
+
+
+local binding_table_instance
+local function get_binding_table(conf)
+	if binding_table_instance == nil then
+		binding_table_instance = binding_table.load(conf)
+	end
+	return binding_table_instance
+end
+
+-- Validates that the softwire is in the PSID mapping, if the PSID mapping is
+-- missing it will raise an error with an appropriate message.
+local function validate_softwire(config, softwire)
+   local key = softwire.key.ipv4
+   local conf_bt = config.softwire_config.binding_table
+   local bt = get_binding_table(conf_bt)
+   local entry = bt.psid_map:lookup(key).value
+   local ip = ipv4_ntop(key)
+
+   -- Figure out if the PSID map entry is valid.
+   local reserved_port_bit_count = 16 - entry.shift - entry.psid_length
+   assert(reserved_port_bit_count ~= 16,  "No PSID map for softwire '"..ip.."'")
+end
+
+function validate_config(config)
+   assert(config)
+   local bt = config.softwire_config.binding_table
+   for softwire in bt.softwire:iterate() do
+      validate_softwire(config, softwire)
+   end
+end
+
+local function validate_update(config, verb, path, data)
+   -- Validate softwire has PSID Map entry.
+   if path == "/softwire-config/binding-table/softwire" then
+      for softwire in data:iterate() do
+         validate_softwire(config, softwire)
+      end
+   end
+end
 
 local function add_softwire_entry_actions(app_graph, entries)
    assert(app_graph.apps['lwaftr'])
@@ -50,11 +92,18 @@ end
 
 local function compute_config_actions(old_graph, new_graph, to_restart,
                                       verb, path, arg)
+   -- If the binding cable changes, remove our cached version.
+   if path ~= nil and path:match("^/softwire%-config/binding%-table") then
+      binding_table_instance = nil
+   end
+
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
       return add_softwire_entry_actions(new_graph, arg)
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
       return remove_softwire_entry_actions(new_graph, path)
+   elseif (verb == 'set' and path == '/softwire-config/name') then
+      return {}
    else
       return generic.compute_config_actions(
          old_graph, new_graph, to_restart, verb, path, arg)
@@ -80,6 +129,8 @@ local function compute_apps_to_restart_after_configuration_update(
       return {}
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
+      return {}
+   elseif (verb == 'set' and path == '/softwire-config/name') then
       return {}
    else
       return generic.compute_apps_to_restart_after_configuration_update(
@@ -212,6 +263,7 @@ local function ietf_softwire_translator ()
       local br_instance, br_instance_key_t =
          cltable_for_grammar(get_ietf_br_instance_grammar())
       br_instance[br_instance_key_t({id=1})] = {
+         name = native_config.softwire_config.name,
          tunnel_payload_mtu = native_config.softwire_config.internal_interface.mtu,
          tunnel_path_mru = native_config.softwire_config.external_interface.mtu,
          -- FIXME: There's no equivalent of softwire-num-threshold in snabb-softwire-v1.
@@ -284,6 +336,11 @@ local function ietf_softwire_translator ()
          if path[#path].name == 'softwire-num-threshold' then
             error('not yet implemented: softwire-num-threshold')
          end
+	 if path[#path].name == 'name' then
+	    return {{'set', {schema='snabb-softwire-v1',
+			    path="/softwire-config/name",
+			    config=arg}}}
+	 end
          error('unrecognized leaf: '..path[#path].name)
       end
 
@@ -309,7 +366,7 @@ local function ietf_softwire_translator ()
          end
          local bt = native_binding_table_from_ietf(arg)
          return {{'set', {schema='snabb-softwire-v2',
-                          path='/softwire-config/binding-table', 
+                          path='/softwire-config/binding-table',
                           config=serialize_binding_table(bt)}}}
       else
          -- An update to an existing entry.  First, get the existing entry.
@@ -503,6 +560,11 @@ local function ietf_softwire_translator ()
                instance.binding_table.binding_entry[k] = v
             end
          end
+      elseif (verb == 'set' and path == "/softwire-config/name") then
+	 local br = cached_config.softwire_config.binding.br
+	 for _, instance in cltable.pairs(br.br_instances.br_instance) do
+	    instance.name = data
+	 end
       else
          cached_config = nil
       end
@@ -512,6 +574,8 @@ end
 
 function get_config_support()
    return {
+      validate_config = validate_config,
+      validate_update = validate_update,
       compute_config_actions = compute_config_actions,
       update_mutable_objects_embedded_in_app_initargs =
          update_mutable_objects_embedded_in_app_initargs,

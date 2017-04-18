@@ -35,6 +35,19 @@ function data_parser(schema_name, path)
    return data.data_parser_from_grammar(path_grammar(schema_name, path))
 end
 
+function error_and_quit(err)
+   io.stderr:write(err .. "\n")
+   io.stderr:flush()
+   os.exit(1)
+end
+
+function validate_path(schema_name, path)
+   local succ, err = pcall(path_grammar, schema_name, path)
+   if succ == false then
+      error_and_quit(err)
+   end
+end
+
 function parse_command_line(args, opts)
    opts = lib.parse(opts, parse_command_line_opts)
    local function err(msg) show_usage(opts.command, 1, msg) end
@@ -65,8 +78,8 @@ function parse_command_line(args, opts)
    end
    if opts.with_path then
       if #args == 0 then err("missing path argument") end
-      -- FIXME: Validate path?
       ret.path = table.remove(args, 1)
+      validate_path(ret.schema_name, ret.path)
    end
    if opts.with_value then
       local parser = data_parser(ret.schema_name, ret.path)

@@ -2,7 +2,6 @@ module(..., package.seeall)
 
 local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
-local dump = require('apps.lwaftr.dump')
 local icmp = require("apps.lwaftr.icmp")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local lwdebug = require("apps.lwaftr.lwdebug")
@@ -14,6 +13,8 @@ local ethernet = require("lib.protocol.ethernet")
 local counter = require("core.counter")
 local packet = require("core.packet")
 local lib = require("core.lib")
+local link = require("core.link")
+local engine = require("core.app")
 local bit = require("bit")
 
 local band, bnot = bit.band, bit.bnot
@@ -27,8 +28,8 @@ local is_ipv4_fragment, is_ipv6_fragment = lwutil.is_ipv4_fragment, lwutil.is_ip
 
 -- Note whether an IPv4 packet is actually coming from the internet, or from
 -- a b4 and hairpinned to be re-encapsulated in another IPv6 packet.
-PKT_FROM_INET = 1
-PKT_HAIRPINNED = 2
+local PKT_FROM_INET = 1
+local PKT_HAIRPINNED = 2
 
 local debug = lib.getenv("LWAFTR_DEBUG")
 
@@ -490,10 +491,10 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
    return transmit(lwstate.o6, pkt)
 end
 
-local function select_lookup_queue (lwstate, link)
-   if link == PKT_FROM_INET then
+local function select_lookup_queue(lwstate, src_link)
+   if src_link == PKT_FROM_INET then
       return lwstate.inet_lookup_queue
-   elseif link == PKT_HAIRPINNED then
+   elseif src_link == PKT_HAIRPINNED then
       return lwstate.hairpin_lookup_queue
    end
    assert(false, "Programming error, bad link: " .. link)

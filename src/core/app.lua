@@ -27,7 +27,10 @@ local use_restart = false
 test_skipped_code = 43
 
 -- Set the directory for the named programs.
-named_program_root = shm.root .. "/" .. "by-name"
+local named_program_root = shm.root .. "/" .. "by-name"
+
+-- The currently claimed name (think false = nil but nil makes strict.lua unhappy).
+program_name = false
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
@@ -130,27 +133,57 @@ function configure (new_config)
    counter.add(configs)
 end
 
+-- Removes the claim on a name, freeing it for other programs.
+--
+-- This relinquish a claim on a name if one exists. if the name does not
+-- exist it will raise an error with an error message.
+function unclaim_name(claimed_name)
+   local name = assert(claimed_name or program_name, "No claim to name.")
+   local name_fq = named_program_root .. "/" .. name
+   local piddir = assert(S.readlink(name_fq))
+   local backlink = piddir .. "/name"
+
+   -- First unlink the backlink
+   assert(S.unlink(backlink))
+
+   -- Remove the actual namedir
+   assert(S.unlink(name_fq))
+
+   -- Remove from the name from the configuration
+   program_name = false
+end
+
 -- Claims a name for a program so it's identified by name by other processes.
 --
 -- The name given to the function must be unique; if a name has been used before
 -- by an active process the function will error displaying an appropriate error
--- message. The program can only claim one name, successive calls will produce
--- an error.
+-- message.Successive calls to claim_name with the same name will return with
+-- inaction. If the program has already claimed a name and this is called with
+-- a different name, it will attempt to claim the new name and then unclaim the
+-- old name. If an problem occurs whilst claiming the new name, the old name
+-- will remain claimed.
 function claim_name(name)
-   configuration[name] = name
-   local bynamedir = "by-name/"
    local namedir_fq = named_program_root .. "/" .. name
-   local piddir = shm.root .. "/" .. S.getpid()
+   local procpid = S.getpid()
+   local piddir = shm.root .. "/" .. procpid
    local backlinkdir = piddir.."/name"
 
+   -- If we're being asked to claim the name we already have, return false.
+   if program_name == name then
+      return
+   end
+
    -- Verify that the by-name directory exists.
-   shm.mkdir(bynamedir)
+   shm.mkdir("by-name/")
 
-   -- Verify that we've not already claimed a name
-   assert(configuration.name == nil, "Name already claimed, cannot claim: "..name)
+   -- Create the new symlink (name has probably been taken if this fails).
+   assert(S.symlink(piddir, namedir_fq), "Name already taken.")
 
-   -- Create the new symlink.
-   assert(S.symlink(piddir, namedir_fq))
+   -- We've successfully secured the new name, so we can unclaim the old now.
+   if program_name ~= false then unclaim_name(program_name) end
+
+   -- Save our current name so we know what it is later.
+   program_name = name
 
    -- Create a backlink so to the symlink so we can easily cleanup
    assert(S.symlink(namedir_fq, backlinkdir))
@@ -650,18 +683,29 @@ function selftest ()
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
 
+   -- Check one can't unclaim a name if no name is claimed.
+   assert(not pcall(unclaim_name))
+   
    -- Test claiming and enumerating app names
    local basename = "testapp"
-   claim_name(basename.."1")
+   local progname = basename.."1"
+   claim_name(progname)
    
-   -- Ensure to claim two names fails
-   assert(not pcall(claim_name, basename.."2"))
-
    -- Check if it can be enumerated.
-   local progs = enumerate_named_programs()
-   assert(progs)
-   assert(progs["testapp1"])
+   local progs = assert(enumerate_named_programs())
+   assert(progs[progname])
 
-   -- Ensure that trying to take the same name fails
-   assert(not pcall(claim_name, basename.."1"))
+   -- Ensure changing the name succeeds
+   local newname = basename.."2"
+   claim_name(newname)
+   local progs = assert(enumerate_named_programs())
+   assert(progs[progname] == nil)
+   assert(progs[newname])
+
+   -- Ensure unclaiming the name occurs
+   unclaim_name()
+   local progs = enumerate_named_programs()
+   assert(progs[newname] == nil)
+   assert(not program_name)
+   
 end

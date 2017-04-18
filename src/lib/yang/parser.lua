@@ -76,10 +76,25 @@ function Parser:next()
    return chr
 end
 
+function Parser:peek_n(n)
+   local end_index = self.pos + n - 1
+   if end_index < #self.str then
+      return self:peek() .. self.str:sub(self.pos, (end_index - 1))
+   end
+   return self:peek() .. self.str:sub(self.pos)
+end
+
 function Parser:check(expected)
    if self:peek() == expected then
       if expected then self:next() end
       return true
+   end
+   return false
+end
+
+function Parser:check_pattern(pattern)
+   if not self:is_eof() then
+      return self:peek():match(pattern)
    end
    return false
 end
@@ -189,7 +204,19 @@ end
 function Parser:parse_string()
    if self:check("'") then return self:parse_qstring("'")
    elseif self:check('"') then return self:parse_qstring('"')
-   else return self:take_while("[^%s;{}\"'/]") end
+   else
+      local ret = {}
+      repeat
+         table.insert(ret, self:take_while("[^%s;{}\"'/]"))
+         if self:is_eof() then break end
+         if self:peek_n(2) == "/*" then break end
+         if self:peek_n(2) == "//" then break end
+         if self:check("/") then
+            table.insert(ret, "/")
+         end
+      until not self:check_pattern("[^%s;{}\"'/]")
+      return table.concat(ret)
+   end
 end
 
 function Parser:parse_identifier()
@@ -384,6 +411,7 @@ function selftest()
    test_string('"// foo bar;"', '// foo bar;')
    test_string('"/* foo bar */"', '/* foo bar */')
    test_string([["foo \"bar\""]], 'foo "bar"')
+   test_string("hello//world", "hello")
    test_string(lines("  'foo", "    bar'"), lines("foo", " bar"))
    test_string(lines("  'foo", "  bar'"), lines("foo", "bar"))
    test_string(lines("   'foo", "\tbar'"), lines("foo", "    bar"))
@@ -401,7 +429,8 @@ function selftest()
    argument="port", statements={{keyword="type", argument="number"}}}})
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
    argument="port", statements={{keyword="type"}}}})
-
+   test_module('description hello/world;', {{keyword="description",
+   argument="hello/world"}})
    parse(require('lib.yang.ietf_inet_types_yang'))
    parse(require('lib.yang.ietf_yang_types_yang'))
    parse(require('lib.yang.ietf_softwire_yang'))

@@ -96,7 +96,9 @@ function data_grammar_from_schema(schema)
    function handlers.list(node)
       local members=visit_body(node)
       local keys, values = {}, {}
-      for k in node.key:split(' +') do keys[k] = assert(members[k]) end
+      if node.key then
+         for k in node.key:split(' +') do keys[k] = assert(members[k]) end
+      end
       for k,v in pairs(members) do
          if not keys[k] then values[k] = v end
       end
@@ -204,9 +206,16 @@ local function struct_parser(keyword, members, ctype)
       return parse1(P)
    end
    local struct_t = ctype and typeof(ctype)
-   local function finish(out)
-      -- FIXME check mandatory values.
-      if struct_t then return struct_t(out) else return out end
+   local function finish(out, leaf)
+     -- FIXME check mandatory values.
+      if struct_t then
+        local ret
+        if out == nil then ret = struct_t()
+        else ret = struct_t(out) end
+        return ret
+      else
+        return out
+      end
    end
    return {init=init, parse=parse, finish=finish}
 end
@@ -768,5 +777,27 @@ function selftest()
    assert(parse_uint32('"1"') == 1)
    assert(parse_uint32('    "1"   \n  ') == 1)
    assert(print_uint32(1, string_output_file()) == '1')
+
+   -- Verify that lists can lack keys when "config false;" is set.
+   local list_wo_key_config_false = [[module config-false-schema {
+      namespace "urn:ietf:params:xml:ns:yang:config-false-schema";
+      prefix "test";
+
+      container test {
+         description "Top level node";
+         list node {
+            config false;
+            description "List without key as config false is set";
+            leaf name { type string; }
+         }
+      }
+   }]]
+   local keyless_schema = schema.load_schema(list_wo_key_config_false)
+   local keyless_list_data = load_data_for_schema(keyless_schema, [[
+   test {
+      node {
+         name "hello";
+      }
+   }]])
    print('selfcheck: ok')
 end

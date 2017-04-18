@@ -23,7 +23,6 @@
 # The command 'lwaftrctl all start', run all the steps above.
 
 QEMU=qemu-system-x86_64
-QEMU_ARGS=""
 LWAFTR_DELAY=${LWAFTR_DELAY:-"20"}
 
 tmux_session=""
@@ -49,16 +48,17 @@ function qemu_start_vm {
         "sudo numactl -m ${NUMA_NODE} taskset -c ${QEMU_CORE} \
             $QEMU $QEMU_ARGS \
             -kernel ${BZ_IMAGE} \
-                -append \"earlyprintk root=/dev/vda rw console=tty0 ip=${VM_IP} hugepages=256\" \
+                -append \"earlyprintk root=/dev/vda rw console=ttyS1 ${KERNEL_PARAMS} ip=${VM_IP} hugepages=256\" \
             -M pc -smp 1 -cpu host -m ${MEM} -enable-kvm \
+            -fsdev local,security_model=passthrough,id=fsdev0,path=${SHARED_LOCATION} \
+            -device virtio-9p-pci,id=fs0,fsdev=fsdev0,mount_tag=share \
             -numa node,memdev=mem -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGES_FS},share=on \
             -netdev type=vhost-user,id=net0,chardev=char0 -chardev socket,id=char0,path=${SNABBNFV_SOCK1},server \
                 -device virtio-net-pci,netdev=net0,addr=0x8,mac=${SNABBNFV_MAC1} \
             -netdev type=vhost-user,id=net1,chardev=char1 -chardev socket,id=char1,path=${SNABBNFV_SOCK2},server \
                 -device virtio-net-pci,netdev=net1,addr=0x9,mac=${SNABBNFV_MAC2} \
-            -netdev type=tap,id=net2,ifname=${IFACE},vhost=on,script=${NETSCRIPT} \
-                -device virtio-net-pci,netdev=net2,addr=0xa,mac=52:54:00:00:00:03 \
             -serial telnet:localhost:${VM_PORT},server,nowait \
+            -serial stdio \
             -display none \
             -drive if=virtio,format=${VM_FORMAT},file=${VM_IMAGE} " \
         "qemu0.log"
@@ -239,7 +239,7 @@ function restart_command {
 
 function usage {
     local exit_code=$1
-    echo "Usage: lwaftrctl -f lwaftrctl.conf [start|stop|restart] [all|snabbnfv|vm]"
+    echo "Usage: lwaftrctl -f lwaftrctl.conf [start|stop|restart] [all|snabbnfv|vm|lwaftr]"
     exit $exit_code
 }
 
