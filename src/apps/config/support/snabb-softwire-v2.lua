@@ -49,7 +49,7 @@ local function pack_softwire(app_graph, key, value)
    packed_softwire.value.br_address = value.br_address
 
    local packed_psid_map = ffi.new(psid_map_t)
-   packed_psid_map.key = key.ipv4
+   packed_psid_map.key.addr = key.ipv4
    if value.port_set.psid_length then
       packed_psid_map.value.psid_length = value.port_set.psid_length
    end
@@ -62,11 +62,17 @@ end
 
 local function add_softwire_entry_actions(app_graph, entries)
    assert(app_graph.apps['lwaftr'])
+   local bt_conf = app_graph.apps.lwaftr.arg.softwire_config.binding_table
+   local bt = get_binding_table_instance(bt_conf)
    local ret = {}
    for key, entry in cltable.pairs(entries) do
       local psoftwire, ppsid = pack_softwire(app_graph, key, entry)
-      local args = {'lwaftr', 'add_softwire_entry', psoftwire}
-      table.insert(ret, {'call_app_method_with_blob', args})
+      local softwire_args = {'lwaftr', 'add_softwire_entry', psoftwire}
+      table.insert(ret, {'call_app_method_with_blob', softwire_args})
+      if bt.psid_map:lookup_ptr(ppsid) == nil then
+         local psid_map_args = {'lwaftr', 'add_psid_map_entry', ppsid}
+         table.insert(ret, {'call_app_method_with_blob', psid_map_args})
+      end
    end
    table.insert(ret, {'commit', {}})
    return ret
@@ -91,6 +97,8 @@ local function remove_softwire_entry_actions(app_graph, path)
    local key = path_mod.prepare_table_lookup(
       grammar.keys, grammar.key_ctype, path[#path].query)
    local args = {'lwaftr', 'remove_softwire_entry', key}
+   -- If it's the last softwire for the corresponding psid entry, remove it.
+   -- TODO: check if last psid entry and then remove.
    return {{'call_app_method_with_blob', args}, {'commit', {}}}
 end
 
@@ -463,7 +471,6 @@ local function ietf_softwire_translator ()
             ipv4_ntop(new.binding_ipv4_addr), new.port_set.psid,
             ipv6:ntop(new.br_ipv6_addr),
             path[entry_path_len].query['binding-ipv6info'])
-         require("debugger.debugger")()
          table.insert(updates,
                       {'add', {schema='snabb-softwire-v2',
                                path=softwire_path,
@@ -510,7 +517,6 @@ local function ietf_softwire_translator ()
             '{ ipv4 %s; psid %s; br-address %s; b4-ipv6 %s; }',
             ipv4_ntop(entry.key.ipv4), entry.key.psid,
             ipv6:ntop(entry.value.br_address), ipv6:ntop(entry.value.b4_ipv6))
-         require("debugger.debugger")()
          table.insert(additions, config_str)
       end
       table.insert(updates,
