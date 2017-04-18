@@ -180,7 +180,8 @@ function BindingTable:is_managed_ipv4_address(ipv4)
    -- The PSID info map covers only the addresses that are declared in
    -- the binding table.  Other addresses are recorded as having
    -- psid_length == shift == 0.
-   local psid_info = self.psid_map:lookup(ipv4).value
+   local psid_map_key = ffi.new(psid_map_key_t, {addr=ipv4})
+   local psid_info = self.psid_map:lookup_key(psid_map_key).value
    return psid_info.psid_length + psid_info.shift > 0
 end
 
@@ -274,25 +275,55 @@ local function transform_config(conf)
    return conf
 end
 
-function load(conf)
-   -- Used in the migration so can't rely on always being v2 unfortunately =/
-   if conf.psid_map == nil then
-      conf = transform_config(conf)
-   end
+function pack_psid_map_entry(softwire_key, softwire_value)
+   assert(softwire_value.port_set)
+   local port_set = softwire_value.port_set
 
-   local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
-   local psid_value = psid_map_value_t()
-   for k, v in cltable.pairs(conf.psid_map) do
-      local psid_length, shift = v.psid_length, v.shift
-      shift = shift or 16 - psid_length - (v.reserved_ports_bit_count or 0)
-      assert(psid_length + shift <= 16,
-             'psid_length '..psid_length..' + shift '..shift..
-             ' should not exceed 16')
-      psid_value.psid_length, psid_value.shift = psid_length, shift
-      psid_builder:add_range(k.addr, v.end_addr or k.addr, psid_value)
+   local psid_length, shift = port_set.psid_length, port_set.shift
+   shift = shift or 16 - psid_length - (port_set.reserved_ports_bit_count or 0)
+   assert(psid_length + shift <= 16,
+         'psid_length '..psid_length..' + shift '..shift..
+         ' should not exceed 16')
+
+   local key = ffi.new(psid_map_key_t, {addr=softwire_key.ipv4})
+   local value = ffi.new(psid_map_value_t,
+      {psid_length=psid_length, shift=shift})
+   return key, value
+end
+
+function pack_softwire_entry(softwire_key, softwire_value)
+      local key = ffi.new(softwire_key_t, {
+      ipv4=softwire_key.ipv4,
+      padding=softwire_key.padding,
+      psid=softwire_key.psid
+   })
+   local value = ffi.new(softwire_value_t {
+      b4_ipv6=softwire_value.b4_ipv6,
+      br_address=softwire_value.br_address
+   })
+   return key, value
+end
+
+function load(conf)
+   local softwires = ctable.new({
+      key_type = ffi.typeof(softwire_key_t),
+      value_type = ffi.typeof(softwire_value_t)
+   })
+
+   local psid_map = ctable.new({
+      key_type=ffi.typeof(psid_map_key_t),
+      value_type=ffi.typeof(psid_map_value_t)
+   })
+   for k, v in cltable.pairs(conf.softwire) do
+      -- Add the port set to the psid-map
+      psid_key, psid_value = pack_psid_map_entry(k, v)
+      psid_map:add(psid_key, psid_value)
+
+      -- Add the softwire to softwires ctable
+      local softwire_key, softwire_value = pack_softwire_entry(k,v)
+      softwires:add(softwire_key, softwire_value)
    end
-   local psid_map = psid_builder:build(psid_map_value_t())
-   return BindingTable.new(psid_map, conf.softwire)
+   return BindingTable.new(psid_map, softwires)
 end
 
 function selftest()
