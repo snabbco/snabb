@@ -1,0 +1,14 @@
+Usage:
+  selftest [options..] module <module-name>
+    Execute built-in selftest functions of Snabb.
+
+The common [options] determine the environment variables that are
+provided to the test case. These can be inherited from the parent
+process (default), reset to a clean slate, and selectively overridden.
+
+  -z,        --zap-env       Unset all test-related environment variables.
+  -p ID,     --pci ID        Set variable SNABB_PCI<n> to ID.
+                             (Use multiple times to provide <n> = 0, 1, ...)
+  -i ID,     --pci-intel ID  Set variable SNABB_PCI_INTEL<n> to ID.
+  -s ID,     --pci-solarflare Set variable SNABB_PCI_SOLARFLARE<n> to ID.
+  -f FILE,   --pcap-file FILE Set variable SNABB_PCAP to FILE.
