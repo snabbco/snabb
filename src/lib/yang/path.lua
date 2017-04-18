@@ -146,7 +146,7 @@ function prepare_table_lookup(keys, ctype, query)
    return static_key
 end
 
--- Returns a resolver for a paticular schema and *lua* path.
+-- Returns a resolver for a particular schema and *lua* path.
 function resolver(grammar, path_string)
    local function ctable_getter(key, getter)
       return function(data)

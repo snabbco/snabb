@@ -63,11 +63,16 @@ module(..., package.seeall)
 local bit = require('bit')
 local ffi = require("ffi")
 local rangemap = require("apps.lwaftr.rangemap")
+local ctable = require("lib.ctable")
 local cltable = require("lib.cltable")
+local ipv6 = require("lib.protocol.ipv6")
 
 local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
 
 -- FIXME: Pull these types from the yang model, not out of thin air.
+psid_map_key_t = ffi.typeof[[
+   struct { uint32_t addr; }
+]]
 psid_map_value_t = ffi.typeof[[
    struct { uint16_t psid_length; uint16_t shift; }
 ]]
@@ -77,6 +82,9 @@ softwire_key_t = ffi.typeof[[
       uint16_t padding;    // Zeroes.
       uint16_t psid;       // Port set ID.
    } __attribute__((packed))
+]]
+softwire_value_t = ffi.typeof[[
+   struct { uint8_t br_address[16];  uint8_t b4_ipv6[16]; }
 ]]
 
 BTLookupQueue = {}
@@ -225,7 +233,53 @@ function BindingTable:iterate_softwires()
    return self.softwires:iterate()
 end
 
+-- Transforms configuration from snabb-softwire-v2 to efficient form.
+--
+-- This has psid-map in a separate table to quickly access the values
+-- as well as having the softwire values pruned down to fit inside a ctable
+-- to enable streamer. These are done for space and speed savings.
+local function transform_config(conf)
+   -- The PSID map needs generating, the information is on the softwires now
+   conf.psid_map = cltable.new({key_type = ffi.typeof(psid_map_key_t)})
+
+   local softwires = ctable.new({
+      key_type = ffi.typeof(softwire_key_t),
+      value_type = ffi.typeof(softwire_value_t)
+   })
+
+   for key, entry in cltable.pairs(conf.softwire) do
+      -- Create a key pointer.
+      local psid_map_key = ffi.new(psid_map_key_t, {addr=key.ipv4})
+      local psid_entry = cltable.get(conf.psid_map, psid_map_key)
+      if psid_entry == nil then
+         cltable.set(conf.psid_map, psid_map_key, entry.port_set)
+      end
+
+      -- Once it's been copied over we should populate the new softwire ctable.
+      local softwire_key = ffi.new(softwire_key_t, {
+         ipv4=key.ipv4,
+         padding=key.padding,
+         psid=key.psid
+      })
+      local softwire_value = ffi.new(softwire_value_t {
+         b4_ipv6=entry.b4_ipv6,
+         br_address=entry.br_address
+      })
+      softwires:add(softwire_key, softwire_value)
+   end
+
+   -- Replace the previous softwire config (cltable) with new ctable version.
+   conf.softwire = softwires
+
+   return conf
+end
+
 function load(conf)
+   -- Used in the migration so can't rely on always being v2 unfortunately =/
+   if conf.psid_map == nil then
+      conf = transform_config(conf)
+   end
+
    local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
    local psid_value = psid_map_value_t()
    for k, v in cltable.pairs(conf.psid_map) do

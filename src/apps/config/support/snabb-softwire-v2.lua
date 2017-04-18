@@ -15,53 +15,57 @@ local path_mod = require('lib.yang.path')
 local generic = require('apps.config.support').generic_schema_config_support
 local binding_table = require("apps.lwaftr.binding_table")
 
-
 local binding_table_instance
-local function get_binding_table(conf)
-	if binding_table_instance == nil then
-		binding_table_instance = binding_table.load(conf)
-	end
-	return binding_table_instance
-end
-
--- Validates that the softwire is in the PSID mapping, if the PSID mapping is
--- missing it will raise an error with an appropriate message.
-local function validate_softwire(config, softwire)
-   local key = softwire.key.ipv4
-   local conf_bt = config.softwire_config.binding_table
-   local bt = get_binding_table(conf_bt)
-   local entry = bt.psid_map:lookup(key).value
-   local ip = ipv4_ntop(key)
-
-   -- Figure out if the PSID map entry is valid.
-   local reserved_port_bit_count = 16 - entry.shift - entry.psid_length
-   assert(reserved_port_bit_count ~= 16,  "No PSID map for softwire '"..ip.."'")
-end
-
-function validate_config(config)
-   assert(config)
-   local bt = config.softwire_config.binding_table
-   for softwire in bt.softwire:iterate() do
-      validate_softwire(config, softwire)
+local function get_binding_table_instance(conf)
+   if binding_table_instance == nil then
+      binding_table_instance = binding_table.load(conf)
    end
+   return binding_table_instance
 end
 
-local function validate_update(config, verb, path, data)
-   -- Validate softwire has PSID Map entry.
-   if path == "/softwire-config/binding-table/softwire" then
-      for softwire in data:iterate() do
-         validate_softwire(config, softwire)
-      end
+-- Packs snabb-softwire-v2 softwire entry into softwire and PSID blob
+--
+-- The data plane stores a separate table of psid maps and softwires. It
+-- requires that we give it a blob it can quickly add. These look rather
+-- similar to snabb-softwire-v1 structures however it maintains the br-address
+-- on the softwire so are subtly different.
+local function pack_softwire(app_graph, key, value)
+   assert(app_graph.apps['lwaftr'])
+   assert(value.port_set, "Softwire lacks port-set definition")
+
+   -- Get the binding table
+   local bt_conf = app_graph.apps.lwaftr.arg.softwire_config.binding_table
+   bt = get_binding_table_instance(bt_conf)
+
+   local softwire_t = bt.softwires.entry_type()
+   psid_map_t = bt.psid_map.entry_type()
+
+   -- Now lets pack the stuff!
+   local packed_softwire = ffi.new(softwire_t)
+   packed_softwire.key.ipv4 = key.ipv4
+   packed_softwire.key.psid = key.psid
+   packed_softwire.key.padding = key.padding
+   packed_softwire.value.b4_ipv6 = value.b4_ipv6
+   packed_softwire.value.br_address = value.br_address
+
+   local packed_psid_map = ffi.new(psid_map_t)
+   packed_psid_map.key = key.ipv4
+   if value.port_set.psid_length then
+      packed_psid_map.value.psid_length = value.port_set.psid_length
    end
+   if value.port_set.shift then
+      packed_psid_map.value.shift = value.port_set.shift
+   end
+
+   return packed_softwire, packed_psid_map
 end
 
 local function add_softwire_entry_actions(app_graph, entries)
    assert(app_graph.apps['lwaftr'])
    local ret = {}
-   for entry in entries:iterate() do
-      local blob = entries.entry_type()
-      ffi.copy(blob, entry, ffi.sizeof(blob))
-      local args = {'lwaftr', 'add_softwire_entry', blob}
+   for key, entry in cltable.pairs(entries) do
+      local psoftwire, ppsid = pack_softwire(app_graph, key, entry)
+      local args = {'lwaftr', 'add_softwire_entry', psoftwire}
       table.insert(ret, {'call_app_method_with_blob', args})
    end
    table.insert(ret, {'commit', {}})
