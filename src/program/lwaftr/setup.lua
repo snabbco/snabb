@@ -25,11 +25,6 @@ local engine     = require("core.app")
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
-function validate_config(conf)
-   local support = require("apps.config.support.snabb_softwire_v2")
-   return support.validate_config(conf)
-end
-
 local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
 end

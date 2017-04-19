@@ -584,8 +584,6 @@ end
 
 function get_config_support()
    return {
-      validate_config = function() end,
-      validate_update = function() end,
       compute_config_actions = compute_config_actions,
       update_mutable_objects_embedded_in_app_initargs =
          update_mutable_objects_embedded_in_app_initargs,
