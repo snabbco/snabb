@@ -389,15 +389,34 @@ local function remove_psid_map(conf)
    -- We're actually going to load the psidmap in the schema so ranges can easily be
    -- looked up. With support of end-addr simply trying to lookup by addr will fail.
    -- Luckily this is the last time this should bother us hopefully.
-   local binding_table = require("apps.lwaftr.binding_table")
-   local binding_table_instance = binding_table.load(conf.softwire_config.binding_table)
+   local function load_range_map(conf)
+      local rangemap = require("apps.lwaftr.rangemap")
+      local psid_map_value_t = binding_table.psid_map_value_t
+
+      -- This has largely been taken from the binding_table.lua at 3db2896
+      -- however it only builds the psidmap and not the entire binding table.
+      local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
+      local psid_value = psid_map_value_t()
+      for k, v in cltable.pairs(conf.psid_map) do
+         local psid_length, shift = v.psid_length, v.shift
+         shift = shift or 16 - psid_length - (v.reserved_ports_bit_count or 0)
+         assert(psid_length + shift <= 16,
+               'psid_length '..psid_length..' + shift '..shift..
+               ' should not exceed 16')
+         psid_value.psid_length, psid_value.shift = psid_length, shift
+         psid_builder:add_range(k.addr, v.end_addr or k.addr, psid_value)
+      end
+      return psid_builder:build(psid_map_value_t())
+   end
+
+   local psid_map = load_range_map(conf.softwire_config.binding_table)
 
    -- Remove the psid-map and add it to the softwire.
    local bt = conf.softwire_config.binding_table
    for key, entry in cltable.pairs(bt.softwire) do
       -- Find the port set for the ipv4 address
-      local port_set = binding_table_instance.psid_map:lookup(key.ipv4)
-      assert(port_set, "Unable to migrate config: softwire without psidmapping")
+      local port_set = psid_map:lookup(key.ipv4)
+      assert(port_set, "Unable to migrate conf: softwire without psidmapping")
 
       -- Add the psidmapping to the softwire
       local shift, length = port_set.value.shift, port_set.value.psid_length
@@ -422,6 +441,7 @@ local function v2_migration(src, conf_file)
    -- Add the schema from v1 that we need to convert them.
    binding_table.body["br-address"] = v1_binding_table.body["br-address"]
    binding_table.body["psid-map"] = v1_binding_table.body["psid-map"]
+   binding_table.body.softwire.body.br = v1_binding_table.body.softwire.body.br
 
    -- Remove the mandatory requirement on softwire.br-address for the migration
    binding_table.body["softwire"].body["br-address"].mandatory = false
