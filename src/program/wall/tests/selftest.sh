@@ -2,7 +2,7 @@
 set -e
 
 SKIPPED_CODE=43
-if env LD_PRELOAD=libndpi.so true 2>&1 | grep -qvi error; then
+if env LD_PRELOAD=libndpi.so true 2>&1 | grep -qi error; then
     echo "libndpi.so seems to be unavailable; skipping test"
     exit $SKIPPED_CODE
 fi
