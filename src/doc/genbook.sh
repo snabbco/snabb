@@ -38,6 +38,8 @@ $(cat $mdroot/apps/basic/README.md)
 
 $(cat $mdroot/apps/intel/README.md)
 
+$(cat $mdroot/apps/intel_mp/README.md)
+
 $(cat $mdroot/apps/solarflare/README.md)
 
 $(cat $mdroot/apps/rate_limiter/README.md)
@@ -65,6 +67,8 @@ $(cat $mdroot/apps/bridge/README.md)
 $(cat $mdroot/apps/ipsec/README.md)
 
 $(cat $mdroot/apps/test/README.md)
+
+$(cat $mdroot/apps/wall/README.md)
 
 # Libraries
 

@@ -72,11 +72,11 @@ is given the current value is returned.
 Example:
 
 ```
-local eth = ethernet:new({src = ethernet:pton("00:00:00:00"),
-                          dst = ethernet:pton("00:00:00:00"),
+local eth = ethernet:new({src = ethernet:pton("00:00:00:00:00:00"),
+                          dst = ethernet:pton("00:00:00:00:00:00"),
                           type = 0x86dd})
-eth:dst(ethernet:pton("54:52:00:01"))
-ethernet:ntop(eth:dst()) => "54:52:00:01"
+eth:dst(ethernet:pton("54:52:00:01:00:00"))
+ethernet:ntop(eth:dst()) => "54:52:00:01:00:00"
 ```
 
 — Method **ethernet:src_eq** *mac*
@@ -249,7 +249,7 @@ the current value is returned.
 — Method **ipv6:version** *version*
 
 Combined accessor and setter method for the version field (4 bit unsigned
-integer). Defaults to 4 (set automatically by `new`). Sets the "Version"
+integer). Defaults to 6 (set automatically by `new`). Sets the "Version"
 field to *version*. If no argument is given the current value is returned.
 
 — Method **ipv6:dscp** *dscp*

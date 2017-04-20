@@ -27,7 +27,7 @@ function Tap:new (name)
    local ok, err = sock:ioctl("TUNSETIFF", ifr)
    if not ok then
       sock:close()
-      error("Error opening /dev/net/tun: " .. tostring(err))
+      error("ioctl(TUNSETIFF) failed on /dev/net/tun: " .. tostring(err))
    end
    return setmetatable({sock = sock,
                         name = name,

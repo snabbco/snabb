@@ -1,6 +1,6 @@
 /*
 ** Package library.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
 **
 ** Major portions taken verbatim or adapted from the Lua interpreter.
 ** Copyright (C) 1994-2012 Lua.org, PUC-Rio. See Copyright Notice in lua.h
@@ -399,8 +399,7 @@ static int lj_cf_package_loader_preload(lua_State *L)
 
 /* ------------------------------------------------------------------------ */
 
-static const int sentinel_ = 0;
-#define sentinel	((void *)&sentinel_)
+#define sentinel	((void *)0x4004)
 
 static int lj_cf_package_require(lua_State *L)
 {
@@ -590,6 +589,10 @@ LUALIB_API int luaopen_package(lua_State *L)
     lj_lib_pushcf(L, package_loaders[i], 1);
     lua_rawseti(L, -2, i+1);
   }
+#if LJ_52
+  lua_pushvalue(L, -1);
+  lua_setfield(L, -3, "searchers");
+#endif
   lua_setfield(L, -2, "loaders");
   lua_getfield(L, LUA_REGISTRYINDEX, "LUA_NOENV");
   noenv = lua_toboolean(L, -1);
