@@ -250,23 +250,28 @@ function bounds_checked (type, base, offset, size)
    return wrap(ffi.cast(tptr, ffi.cast("uint8_t *", base) + offset))
 end
 
--- Return a function that will return false until duration has elapsed.
--- If mode is 'repeating' the timer will reset itself after returning true,
--- thus implementing an interval timer. Timefun defaults to `C.get_time_ns'.
-function timer (duration, mode, timefun)
-   timefun = timefun or C.get_time_ns
-   local deadline = timefun() + duration
-   local function oneshot ()
-      return timefun() >= deadline
-   end
-   local function repeating ()
-      if timefun() >= deadline then
-         deadline = deadline + duration
+-- Return a throttle function.
+--
+-- The throttle returns true at most once in any <seconds> time interval.
+function throttle (seconds)
+   local deadline = engine.now()
+   return function ()
+      if engine.now() > deadline then
+         deadline = engine.now() + seconds
          return true
-      else return false end
+      else
+         return false
+      end
    end
-   if mode == 'repeating' then return repeating
-   else return oneshot end
+end
+
+-- Return a timeout function.
+--
+-- The timeout function returns true only if <seconds> have elapsed
+-- since it was created.
+function timeout (seconds)
+   local deadline = engine.now() + seconds
+   return function () return engine.now() > deadline end
 end
 
 -- Loop until the function `condition` returns true.

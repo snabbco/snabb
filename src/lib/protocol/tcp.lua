@@ -33,7 +33,7 @@ tcp:init(
 -- Class methods
 
 function tcp:new (config)
-   local o tcp:superClass().new(self)
+   local o = tcp:superClass().new(self)
    o:src_port(config.src_port)
    o:dst_port(config.dst_port)
    o:seq_num(config.seq)
@@ -198,6 +198,7 @@ end
 
 function selftest ()
    test_tcp_checksum()
+   tcp:new({})
 end
 
 tcp.selftest = selftest

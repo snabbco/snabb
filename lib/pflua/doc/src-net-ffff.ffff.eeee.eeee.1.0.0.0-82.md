@@ -56,6 +56,31 @@ return function(P,length)
    if cast("uint32_t*", P+26)[0] ~= 4008636142 then return false end
    return band(cast("uint32_t*", P+30)[0],12648447) == 256
 end
+```
 
+## Native pflang compilation
+
+```
+7ff0ac218000  4883FE36          cmp rsi, +0x36
+7ff0ac218004  7C44              jl 0x7ff0ac21804a
+7ff0ac218006  0FB7770C          movzx esi, word [rdi+0xc]
+7ff0ac21800a  4881FE86DD0000    cmp rsi, 0xdd86
+7ff0ac218011  7537              jnz 0x7ff0ac21804a
+7ff0ac218013  8B7716            mov esi, [rdi+0x16]
+7ff0ac218016  48B8FFFFFFFF0000. mov rax, 0x00000000ffffffff
+7ff0ac218020  4839C6            cmp rsi, rax
+7ff0ac218023  7525              jnz 0x7ff0ac21804a
+7ff0ac218025  8B471A            mov eax, [rdi+0x1a]
+7ff0ac218028  48BEEEEEEEEE0000. mov rsi, 0x00000000eeeeeeee
+7ff0ac218032  4839F0            cmp rax, rsi
+7ff0ac218035  7513              jnz 0x7ff0ac21804a
+7ff0ac218037  8B771E            mov esi, [rdi+0x1e]
+7ff0ac21803a  4881E6FFFFC000    and rsi, 0x00c0ffff
+7ff0ac218041  4881FE00010000    cmp rsi, 0x100
+7ff0ac218048  7403              jz 0x7ff0ac21804d
+7ff0ac21804a  B000              mov al, 0x0
+7ff0ac21804c  C3                ret
+7ff0ac21804d  B001              mov al, 0x1
+7ff0ac21804f  C3                ret
 ```
 

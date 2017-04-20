@@ -10,11 +10,12 @@ local optimize = require('pf.optimize')
 local anf = require('pf.anf')
 local ssa = require('pf.ssa')
 local backend = require('pf.backend')
+local codegen = require('pf.codegen')
 local utils = require('pf.utils')
 
 -- TODO: rename the 'libpcap' option to reduce terminology overload
 local compile_defaults = {
-   optimize=true, libpcap=false, bpf=false, source=false
+   optimize=true, libpcap=false, bpf=false, source=false, native=false
 }
 function compile_filter(filter_str, opts)
    local opts = utils.parse_opts(opts or {}, compile_defaults)
@@ -32,14 +33,19 @@ function compile_filter(filter_str, opts)
       local bytecode = libpcap.compile(filter_str, dlt, opts.optimize)
       if opts.source then return bpf.compile_lua(bytecode) end
       return bpf.compile(bytecode)
-   else -- pflua
+   else -- pflua (to lua or native)
       local expr = parse.parse(filter_str)
       expr = expand.expand(expr, dlt)
       if opts.optimize then expr = optimize.optimize(expr) end
       expr = anf.convert_anf(expr)
       expr = ssa.convert_ssa(expr)
-      if opts.source then return backend.emit_lua(expr) end
-      return backend.emit_and_load(expr, filter_str)
+      if opts.native then
+         return codegen.load(expr, opts.source or false)
+      elseif opts.source then
+         return backend.emit_lua(expr)
+      else
+         return backend.emit_and_load(expr, filter_str)
+      end
    end
 end
 
@@ -87,6 +93,8 @@ function selftest ()
    assert_count('ip', v4, 43)
    assert_count('tcp', v4, 41)
    assert_count('tcp port 80', v4, 41)
+
+   compile_filter("ip[0] * ip[1] = 4", { bpf=true })
 
    print("OK")
 end

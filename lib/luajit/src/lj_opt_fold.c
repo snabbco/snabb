@@ -2,7 +2,7 @@
 ** FOLD: Constant Folding, Algebraic Simplifications and Reassociation.
 ** ABCelim: Array Bounds Check Elimination.
 ** CSE: Common-Subexpression Elimination.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_opt_fold_c
@@ -136,8 +136,8 @@
 /* Some local macros to save typing. Undef'd at the end. */
 #define IR(ref)		(&J->cur.ir[(ref)])
 #define fins		(&J->fold.ins)
-#define fleft		(&J->fold.left)
-#define fright		(&J->fold.right)
+#define fleft		(J->fold.left)
+#define fright		(J->fold.right)
 #define knumleft	(ir_knum(fleft)->n)
 #define knumright	(ir_knum(fright)->n)
 
@@ -173,8 +173,6 @@ LJFOLD(ADD KNUM KNUM)
 LJFOLD(SUB KNUM KNUM)
 LJFOLD(MUL KNUM KNUM)
 LJFOLD(DIV KNUM KNUM)
-LJFOLD(NEG KNUM KNUM)
-LJFOLD(ABS KNUM KNUM)
 LJFOLD(ATAN2 KNUM KNUM)
 LJFOLD(LDEXP KNUM KNUM)
 LJFOLD(MIN KNUM KNUM)
@@ -184,6 +182,15 @@ LJFOLDF(kfold_numarith)
   lua_Number a = knumleft;
   lua_Number b = knumright;
   lua_Number y = lj_vm_foldarith(a, b, fins->o - IR_ADD);
+  return lj_ir_knum(J, y);
+}
+
+LJFOLD(NEG KNUM FLOAD)
+LJFOLD(ABS KNUM FLOAD)
+LJFOLDF(kfold_numabsneg)
+{
+  lua_Number a = knumleft;
+  lua_Number y = lj_vm_foldarith(a, a, fins->o - IR_ADD);
   return lj_ir_knum(J, y);
 }
 
@@ -347,6 +354,11 @@ static uint64_t kfold_int64arith(uint64_t k1, uint64_t k2, IROp op)
   case IR_BAND: k1 &= k2; break;
   case IR_BOR: k1 |= k2; break;
   case IR_BXOR: k1 ^= k2; break;
+  case IR_BSHL: k1 <<= (k2 & 63); break;
+  case IR_BSHR: k1 = (int32_t)((uint32_t)k1 >> (k2 & 63)); break;
+  case IR_BSAR: k1 >>= (k2 & 63); break;
+  case IR_BROL: k1 = (int32_t)lj_rol((uint32_t)k1, (k2 & 63)); break;
+  case IR_BROR: k1 = (int32_t)lj_ror((uint32_t)k1, (k2 & 63)); break;
 #endif
   default: UNUSED(k2); lua_assert(0); break;
   }
@@ -502,7 +514,7 @@ LJFOLDF(kfold_strref_snew)
       PHIBARRIER(ir);
       fins->op2 = emitir(IRTI(IR_ADD), ir->op2, fins->op2); /* Clobbers fins! */
       fins->op1 = str;
-      fins->ot = IRT(IR_STRREF, IRT_P32);
+      fins->ot = IRT(IR_STRREF, IRT_PGC);
       return RETRYFOLD;
     }
   }
@@ -911,13 +923,13 @@ LJFOLDF(shortcut_round)
   return NEXTFOLD;
 }
 
-LJFOLD(ABS ABS KNUM)
+LJFOLD(ABS ABS FLOAD)
 LJFOLDF(shortcut_left)
 {
   return LEFTFOLD;  /* f(g(x)) ==> g(x) */
 }
 
-LJFOLD(ABS NEG KNUM)
+LJFOLD(ABS NEG FLOAD)
 LJFOLDF(shortcut_dropleft)
 {
   PHIBARRIER(fleft);
@@ -998,8 +1010,10 @@ LJFOLDF(simplify_nummuldiv_k)
   if (n == 1.0) {  /* x o 1 ==> x */
     return LEFTFOLD;
   } else if (n == -1.0) {  /* x o -1 ==> -x */
+    IRRef op1 = fins->op1;
+    fins->op2 = (IRRef1)lj_ir_ksimd(J, LJ_KSIMD_NEG);  /* Modifies fins. */
+    fins->op1 = op1;
     fins->o = IR_NEG;
-    fins->op2 = (IRRef1)lj_ir_knum_neg(J);
     return RETRYFOLD;
   } else if (fins->o == IR_MUL && n == 2.0) {  /* x * 2 ==> x + x */
     fins->o = IR_ADD;
@@ -1650,6 +1664,14 @@ LJFOLDF(simplify_shiftk_andk)
     fins->op1 = (IRRef1)lj_opt_fold(J);
     fins->op2 = (IRRef1)lj_ir_kint(J, k);
     fins->ot = IRTI(IR_BAND);
+    return RETRYFOLD;
+  } else if (irk->o == IR_KINT64) {
+    uint64_t k = kfold_int64arith(ir_k64(irk)->u64, fright->i, (IROp)fins->o);
+    IROpT ot = fleft->ot;
+    fins->op1 = fleft->op1;
+    fins->op1 = (IRRef1)lj_opt_fold(J);
+    fins->op2 = (IRRef1)lj_ir_kint64(J, k);
+    fins->ot = ot;
     return RETRYFOLD;
   }
   return NEXTFOLD;
@@ -2393,10 +2415,14 @@ retry:
   if (fins->op1 >= J->cur.nk) {
     key += (uint32_t)IR(fins->op1)->o << 10;
     *fleft = *IR(fins->op1);
+    if (fins->op1 < REF_TRUE)
+      fleft[1] = IR(fins->op1)[1];
   }
   if (fins->op2 >= J->cur.nk) {
     key += (uint32_t)IR(fins->op2)->o;
     *fright = *IR(fins->op2);
+    if (fins->op2 < REF_TRUE)
+      fright[1] = IR(fins->op2)[1];
   } else {
     key += (fins->op2 & 0x3ffu);  /* Literal mask. Must include IRCONV_*MASK. */
   }

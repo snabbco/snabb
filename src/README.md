@@ -819,18 +819,15 @@ Returns a table that acts as a bounds checked wrapper around a C array of
 ctype and the caller must ensure that the allocated memory region at
 *base*/*offset* is at least `sizeof(type)*size` bytes long.
 
-— Function **lib.timer** *duration*, *mode*, *timefun*
+— Function **lib.throttle** *seconds*
 
-Returns a closure that will return `false` until *duration* has elapsed. If
-*mode* is `'repeating'` the timer will reset itself after returning `true`,
-thus implementing an interval timer. *Timefun* is used to get a monotonic time.
-*Timefun* defaults to `C.get_time_ns`.
+Return a closure that returns `true` at most once during any *seconds*
+(a floating point value) time interval, otherwise false.
 
-The “deadline” for a given *duration* is computed by adding *duration* to the
-result of calling *timefun*, and is saved in the resulting closure. A
-*duration* has elapsed when its deadline is less than or equal the value
-obtained using *timefun* when calling the closure.
+— Function **lib.timeout** *seconds*
 
+Returns a closure that returns `true` if *seconds* (a floating point
+value) have elapsed since it was created, otherwise false.
 
 — Function **lib.waitfor** *condition*
 

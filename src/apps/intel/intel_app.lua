@@ -91,7 +91,7 @@ function Intel82599:new (conf)
           txbcast   = {counter},
           txdrop    = {counter},
           txerrors  = {counter}})
-      self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
+      self.stats.sync_timer = lib.throttle(0.001)
 
       if not conf.vmdq and conf.macaddr then
          counter.set(self.stats.shm.macaddr, macaddress:new(conf.macaddr).bits)
