@@ -72,14 +72,6 @@ function FlowCache:new(config)
    return setmetatable(o, { __index = self })
 end
 
-function FlowCache:add(flow_key, flow_record)
-   self.table:add(flow_key, flow_record)
-end
-
-function FlowCache:lookup(flow_key)
-   return self.table:lookup_ptr(flow_key)
-end
-
 function FlowCache:iterate()
    -- use the underlying ctable's iterator, but restrict the max stride
    -- for each use of the iterator
