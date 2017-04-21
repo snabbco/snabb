@@ -161,7 +161,7 @@ function FlowMeter:process_packet(pkt, timestamp)
       flow_key.src_port = 0
    end
 
-   local lookup_result = self.flows:lookup(flow_key)
+   local lookup_result = self.flows.table:lookup_ptr(flow_key)
 
    if lookup_result == nil then
       flow_record.start_time  = timestamp
@@ -183,7 +183,7 @@ function FlowMeter:process_packet(pkt, timestamp)
          flow_record.tcp_control = 0
       end
 
-      self.flows:add(flow_key, flow_record)
+      self.flows.table:add(flow_key, flow_record)
    else
       flow_record = lookup_result.value
 
