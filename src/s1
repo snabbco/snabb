@@ -1,0 +1,7 @@
+x = core.memory.dma_alloc(100)
+print("address", x)
+while true do
+  print("current value = " .. x[0])
+  require("ffi").C.usleep(1e6)
+end
+
