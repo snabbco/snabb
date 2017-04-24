@@ -168,6 +168,12 @@ local function init_natural(node, loc, argument, children)
                    loc, 'not a natural number: %s', arg)
    node.value = as_num
 end
+-- Must be one or 1 or 1.1.
+local function init_yang_version (node, loc, argument, children)
+   local arg = require_argument(loc, argument)
+   assert_with_loc(arg == "1" or arg == "1.1", 'not a valid version number: %s', arg)
+   node.value = tonumber(arg)
+end
 local function init_boolean(node, loc, argument, children)
    local arg = require_argument(loc, argument)
    if arg == 'true' then node.value = true
@@ -502,8 +508,10 @@ declare_initializer(
    'error-message', 'error-app-tag', 'max-value', 'key', 'unique', 'when',
    'deviation', 'deviate')
 declare_initializer(
-   init_natural, 'yang-version', 'fraction-digits', 'position',
-   'min-elements', 'max-elements')
+   init_natural, 'fraction-digits', 'position', 'min-elements', 'max-elements')
+declare_initializer(
+   init_yang_version, 'yang-version'
+)
 declare_initializer(
    init_boolean, 'config', 'mandatory', 'require-instance', 'yin-element')
 declare_initializer(init_anyxml, 'anyxml')
