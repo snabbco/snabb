@@ -196,7 +196,7 @@ function BindingTable:is_managed_ipv4_address(ipv4)
    -- psid_length == shift == 0.
    local psid_map_key = ffi.new(psid_map_key_t, {addr=ipv4})
    local psid_info = self.psid_map:lookup_ptr(psid_map_key)
-   return psid_info == nil
+   return psid_info ~= nil
 end
 
 function BindingTable:lookup_psid(ipv4, port)
