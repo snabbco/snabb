@@ -150,7 +150,7 @@ table.
 The `softwire` clauses define the set of softwires to provision.  Each
 softwire associates an IPv4 address, a PSID, and a B4 address. It also
 contains a `port-set` container which defines the IPv4 address that has
-been provisioned by an lwAFTR. See RFC 7597 for more detaisl on the PSID
+been provisioned by an lwAFTR. See RFC 7597 for more details on the PSID
 scheme for how to share IPv4 addresses.
 
 For example:
