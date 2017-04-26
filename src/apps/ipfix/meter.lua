@@ -198,6 +198,9 @@ end
 
 -- print debugging messages for flow expiration
 function FlowMeter:debug_expire(entry, timestamp, msg)
+   local ipv4 = require("lib.protocol.ipv4")
+   local ipv6 = require("lib.protocol.ipv4")
+
    if debug then
       local key = entry.key
       local src_ip, dst_ip
