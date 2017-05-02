@@ -421,7 +421,6 @@ local function remove_psid_map(conf)
       -- Add the psidmapping to the softwire
       local shift, length = port_set.value.shift, port_set.value.psid_length
       entry.port_set = {
-         shift=shift,
          psid_length=length,
          reserved_ports_bit_count=(16 - shift - length)
       }
@@ -442,6 +441,7 @@ local function v2_migration(src, conf_file)
    binding_table.body["br-address"] = v1_binding_table.body["br-address"]
    binding_table.body["psid-map"] = v1_binding_table.body["psid-map"]
    binding_table.body.softwire.body.br = v1_binding_table.body.softwire.body.br
+   binding_table.body.softwire.body.padding = v1_binding_table.body.softwire.body.padding
 
    -- Remove the mandatory requirement on softwire.br-address for the migration
    binding_table.body["softwire"].body["br-address"].mandatory = false
@@ -455,6 +455,11 @@ local function v2_migration(src, conf_file)
    -- Remove the psid-map and add it to the softwire.
    conf = remove_psid_map(conf)
    conf.softwire_config.binding_table.psid_map = nil
+
+   -- Finally ensure padding is always nil
+   for key, entry in cltable.pairs(conf.softwire_config.binding_table.softwire) do
+      entry.padding = nil
+   end
 
    -- Now we have to convert from the migration hybrid schema back to vanilla
    -- v2 so that the printers work correctly (or future migrations do).
