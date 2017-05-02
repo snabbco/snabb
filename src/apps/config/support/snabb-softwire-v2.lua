@@ -29,10 +29,11 @@ end
 -- requires that we give it a blob it can quickly add. These look rather
 -- similar to snabb-softwire-v1 structures however it maintains the br-address
 -- on the softwire so are subtly different.
-local function pack_softwire(app_graph, key, value)
+local function pack_softwire(app_graph, entry)
    assert(app_graph.apps['lwaftr'])
-   assert(value.port_set, "Softwire lacks port-set definition")
-
+   assert(entry.value.port_set, "Softwire lacks port-set definition")
+   local key, value = entry.key, entry.value
+   
    -- Get the binding table
    local bt_conf = app_graph.apps.lwaftr.arg.softwire_config.binding_table
    bt = get_binding_table_instance(bt_conf)
@@ -44,7 +45,6 @@ local function pack_softwire(app_graph, key, value)
    local packed_softwire = ffi.new(softwire_t)
    packed_softwire.key.ipv4 = key.ipv4
    packed_softwire.key.psid = key.psid
-   packed_softwire.key.padding = key.padding
    packed_softwire.value.b4_ipv6 = value.b4_ipv6
    packed_softwire.value.br_address = value.br_address
 
@@ -52,9 +52,6 @@ local function pack_softwire(app_graph, key, value)
    packed_psid_map.key.addr = key.ipv4
    if value.port_set.psid_length then
       packed_psid_map.value.psid_length = value.port_set.psid_length
-   end
-   if value.port_set.shift then
-      packed_psid_map.value.shift = value.port_set.shift
    end
 
    return packed_softwire, packed_psid_map
@@ -65,8 +62,8 @@ local function add_softwire_entry_actions(app_graph, entries)
    local bt_conf = app_graph.apps.lwaftr.arg.softwire_config.binding_table
    local bt = get_binding_table_instance(bt_conf)
    local ret = {}
-   for key, entry in cltable.pairs(entries) do
-      local psoftwire, ppsid = pack_softwire(app_graph, key, entry)
+   for entry in entries:iterate() do
+      local psoftwire, ppsid = pack_softwire(app_graph, entry)
       local softwire_args = {'lwaftr', 'add_softwire_entry', psoftwire}
       table.insert(ret, {'call_app_method_with_blob', softwire_args})
       if bt.psid_map:lookup_ptr(ppsid) == nil then
@@ -196,16 +193,16 @@ end
 local function ietf_binding_table_from_native(bt)
    local ret, key_t = cltable_for_grammar(get_ietf_softwire_grammar())
    local psid_key_t = data.typeof('struct { uint32_t ipv4; }')
-   for key, entry in cltable.pairs(bt.softwire) do
-      local k = key_t({ binding_ipv6info = entry.b4_ipv6 })
+   for softwire in bt.softwire:iterate() do
+      local k = key_t({ binding_ipv6info = softwire.value.b4_ipv6 })
       local v = {
-         binding_ipv4_addr = key.ipv4,
+         binding_ipv4_addr = softwire.key.ipv4,
          port_set = {
-            psid_offset = entry.port_set.reserved_ports_bit_count,
-            psid_len = entry.port_set.psid_length,
-            psid = key.psid
+            psid_offset = softwire.value.port_set.reserved_ports_bit_count,
+            psid_len = softwire.value.port_set.psid_length,
+            psid = softwire.key.psid
          },
-         br_ipv6_addr = entry.br_address,
+         br_ipv6_addr = softwire.value.br_address,
       }
       ret[k] = v
    end
@@ -462,9 +459,9 @@ local function ietf_softwire_translator ()
       local psid_map_path = '/softwire-config/binding-table/psid-map'
       -- Add softwires.
       local additions = {}
-      for key, entry in cltable.pairs(new_bt.softwire) do
-
-         if cltable.get(old_bt.softwire, key) ~= nil then
+      for entry in new_bt.softwire:iterate() do
+         local key, value = entry.key, entry.value
+         if old_bt.softwire:lookup_ptr(key) ~= nil then
             error('softwire already present in table: '..
                      inet_ntop(key.ipv4)..'/'..key.psid)
          end
@@ -478,10 +475,10 @@ local function ietf_softwire_translator ()
                reserved-ports-bit-count %s;
             }
          }]], ipv4_ntop(key.ipv4), key.psid,
-              ipv6:ntop(entry.br_address),
-              ipv6:ntop(entry.b4_ipv6),
-              entry.port_set.psid_length,
-              entry.port_set.reserved_ports_bit_count
+              ipv6:ntop(value.br_address),
+              ipv6:ntop(value.b4_ipv6),
+              value.port_set.psid_length,
+              value.port_set.reserved_ports_bit_count
          )
          table.insert(additions, config_str)
       end

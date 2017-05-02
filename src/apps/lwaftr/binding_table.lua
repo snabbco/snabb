@@ -64,7 +64,6 @@ local bit = require('bit')
 local ffi = require("ffi")
 local rangemap = require("apps.lwaftr.rangemap")
 local ctable = require("lib.ctable")
-local cltable = require("lib.cltable")
 local ipv6 = require("lib.protocol.ipv6")
 
 local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
@@ -75,16 +74,6 @@ psid_map_key_t = ffi.typeof[[
 ]]
 psid_map_value_t = ffi.typeof[[
    struct { uint16_t psid_length; uint16_t shift; }
-]]
-softwire_key_t = ffi.typeof[[
-   struct {
-      uint32_t ipv4;       // Public IPv4 address of this softwire (host-endian).
-      uint16_t padding;    // Zeroes.
-      uint16_t psid;       // Port set ID.
-   } __attribute__((packed))
-]]
-softwire_value_t = ffi.typeof[[
-   struct { uint8_t br_address[16];  uint8_t b4_ipv6[16]; }
 ]]
 
 BTLookupQueue = {}
@@ -180,8 +169,8 @@ function BindingTable:remove_softwire_entry(entry_key_blob)
    self.softwires:remove(entry.key)
 end
 
-local lookup_key = softwire_key_t()
 function BindingTable:lookup(ipv4, port)
+   local lookup_key = ffi.new(self.softwires.entry_type).key
    local psid = self:lookup_psid(ipv4, port) or 0
    lookup_key.ipv4 = ipv4
    lookup_key.psid = psid
@@ -242,57 +231,36 @@ function BindingTable:iterate_softwires()
    return self.softwires:iterate()
 end
 
-function pack_psid_map_entry(softwire_key, softwire_value)
-   assert(softwire_value.port_set)
-   local port_set = softwire_value.port_set
+function pack_psid_map_entry(softwire)
+   assert(softwire.value.port_set)
+   local port_set = softwire.value.port_set
 
-   local psid_length, shift = port_set.psid_length, port_set.shift
-   shift = shift or 16 - psid_length - (port_set.reserved_ports_bit_count or 0)
+   local psid_length = port_set.psid_length
+   local shift = 16 - psid_length - (port_set.reserved_ports_bit_count or 0)
    assert(psid_length + shift <= 16,
          'psid_length '..psid_length..' + shift '..shift..
          ' should not exceed 16')
 
-   local key = ffi.new(psid_map_key_t, {addr=softwire_key.ipv4})
+   local key = ffi.new(psid_map_key_t, {addr=softwire.key.ipv4})
    local value = ffi.new(psid_map_value_t,
       {psid_length=psid_length, shift=shift})
    return key, value
 end
 
-function pack_softwire_entry(softwire_key, softwire_value)
-      local key = ffi.new(softwire_key_t, {
-      ipv4=softwire_key.ipv4,
-      padding=softwire_key.padding,
-      psid=softwire_key.psid
-   })
-   local value = ffi.new(softwire_value_t)
-   value.b4_ipv6 = softwire_value.b4_ipv6
-   value.br_address = softwire_value.br_address
-   return key, value
-end
-
 function load(conf)
-   local softwires = ctable.new({
-      key_type = ffi.typeof(softwire_key_t),
-      value_type = ffi.typeof(softwire_value_t)
-   })
-
    local psid_map = ctable.new({
       key_type=ffi.typeof(psid_map_key_t),
       value_type=ffi.typeof(psid_map_value_t)
    })
-   for k, v in cltable.pairs(conf.softwire) do
+   for entry in conf.softwire:iterate() do
       -- Add the port set to the psid-map
-      psid_key, psid_value = pack_psid_map_entry(k, v)
+      psid_key, psid_value = pack_psid_map_entry(entry)
       if psid_map:lookup_ptr(psid_key) == nil then
          psid_map:add(psid_key, psid_value)
       end
-
-      -- Add the softwire to softwires ctable
-      local softwire_key, softwire_value = pack_softwire_entry(k,v)
-      softwires:add(softwire_key, softwire_value)
    end
 
-   return BindingTable.new(psid_map, softwires)
+   return BindingTable.new(psid_map, conf.softwire)
 end
 
 function selftest()
@@ -315,8 +283,8 @@ function selftest()
       softwire { ipv4 178.79.150.233; psid 7850; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; port-set { psid-length 16; }}
       softwire { ipv4 178.79.150.233; psid 22788; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; port-set { psid-length 16; }}
       softwire { ipv4 178.79.150.233; psid 54192; b4-ipv6 127:11:12:13:14:15:16:128; br-address 8:9:a:b:c:d:e:f; port-set { psid-length 16; }}
-      softwire { ipv4 178.79.150.15; psid 0; b4-ipv6 127:22:33:44:55:66:77:128; br-address 8:9:a:b:c:d:e:f; port-set { psid-length 4; shift 12; }}
-      softwire { ipv4 178.79.150.15; psid 1; b4-ipv6 127:22:33:44:55:66:77:128; br-address 8:9:a:b:c:d:e:f; port-set { psid-length 4; shift 12; }}
+      softwire { ipv4 178.79.150.15; psid 0; b4-ipv6 127:22:33:44:55:66:77:128; br-address 8:9:a:b:c:d:e:f; port-set { psid-length 4; }}
+      softwire { ipv4 178.79.150.15; psid 1; b4-ipv6 127:22:33:44:55:66:77:128; br-address 8:9:a:b:c:d:e:f; port-set { psid-length 4; }}
       softwire { ipv4 178.79.150.2; psid 7850; b4-ipv6 127:24:35:46:57:68:79:128; br-address 1E:1:1:1:1:1:1:af; port-set { psid-length 16; }}
       softwire { ipv4 178.79.150.3; psid 4; b4-ipv6 127:14:25:36:47:58:69:128; br-address 1E:2:2:2:2:2:2:af; port-set { psid-length 6; }}
    ]])

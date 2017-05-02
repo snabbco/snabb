@@ -251,20 +251,13 @@ module snabb-softwire-v2 {
         of the IPv4 and IPv6 addresses handled by the lwAFTR.";
 
       list softwire {
-        key "ipv4 psid padding";
+        key "ipv4 psid";
 
         leaf ipv4 {
           type inet:ipv4-address;
           mandatory true;
           description
            "Public IPv4 address of the softwire.";
-        }
-
-        leaf padding {
-          type uint16 { range 0..0; }
-          default 0;
-          description
-           "Reserved bytes.";
         }
 
         leaf br-address {
@@ -291,9 +284,8 @@ module snabb-softwire-v2 {
           description
           "The set of IPv4 addresses managed by the lwAFTR, along with
             the way in which those IPv4 addresses share ports.  A PSID map
-            entry associates a PSID length, shift, and
-            reserved-ports-bit-count with each IPv4 address served by
-            the lwAFTR.
+            entry associates a PSID length and reserved-ports-bit-count
+            with each IPv4 address served by the lwAFTR.
 
             The lightweight 4-over-6 architecture supports sharing of
             IPv4 addresses by partitioning the space of TCP/UDP/ICMP
@@ -321,7 +313,13 @@ module snabb-softwire-v2 {
 
               a bits = reserved-ports-bit-count.
               k bits = psid-length.
-              m bits = shift.";
+              m bits = shift.
+
+            The shift parameter is calculated from psid-length and
+            reserved-ports-bit-count. The calculation performed to
+            get the value of shift is:
+
+              shift = 16 - psid-length - reserved-ports-bit-count";
 
           leaf psid-length {
             type uint8 { range 0..16; }
@@ -330,16 +328,6 @@ module snabb-softwire-v2 {
             "The number of bits devoted to the PSID in the port map.
               If the psid-length is N, then the IPv4 address will be
               shared 2^N ways.  Note that psid-length, shift, and
-              reserved-ports-bit-count must add up to 16.";
-          }
-
-          leaf shift {
-            type uint8 { range 0..16; }
-            description
-            "Given an incoming port, one can obtain the PSID by
-              shifting the port right by 'shift' bits and then masking
-              off the lowest 'psid-length' bits.  Defaults to 16 -
-              psid-length.  Note that psid-length, shift, and
               reserved-ports-bit-count must add up to 16.";
           }
 
