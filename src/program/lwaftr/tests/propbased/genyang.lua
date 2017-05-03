@@ -213,9 +213,16 @@ local function value_from_type(a_type)
       return string.format("%f", tonumber(int64 * (10 ^ -exp)))
    elseif prim == "boolean" then
       return choose({ true, false })
-   elseif prim == "ipv4-address" then
-      return math.random(0, 255) .. "." .. math.random(0, 255) .. "." ..
-             math.random(0, 255) .. "." .. math.random(0, 255)
+   elseif prim == "ipv4-address" or prim == "ipv4-prefix" then
+      local addr = {}
+      for i=1,4 do
+         table.insert(addr, math.random(255))
+      end
+      addr = table.concat(addr, ".")
+      if prim == "ipv4-prefix" then
+         return ("%s/%d"):format(addr, math.random(32))
+      end
+      return addr
    elseif prim == "ipv6-address" or prim == "ipv6-prefix" then
       local addr = random_hexes()
       for i=1, 7 do
@@ -285,7 +292,7 @@ local function value_from_type(a_type)
    -- instance-identifier
    -- leafref
 
-   error("NYI or unknown type")
+   error("NYI or unknown type: "..prim)
 end
 
 -- from a config schema, generate an xpath query string
