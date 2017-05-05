@@ -251,13 +251,18 @@ module snabb-softwire-v2 {
         of the IPv4 and IPv6 addresses handled by the lwAFTR.";
 
       list softwire {
-        key "ipv4 psid";
+        key "ipv4 psid padding";
 
         leaf ipv4 {
           type inet:ipv4-address;
           mandatory true;
           description
            "Public IPv4 address of the softwire.";
+        }
+        
+        leaf padding {
+          type uint16;
+          default 0;
         }
 
         leaf br-address {

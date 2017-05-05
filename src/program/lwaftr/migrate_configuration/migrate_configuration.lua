@@ -263,13 +263,6 @@ function load_binding_table(file)
    return parse_binding_table(Parser.new(source:as_text_stream()))
 end
 
-function save_to_temp_file(conf, scm)
-   local tempfile_name = "/tmp/snabb-softwire-migration-temp" .. os.time()
-   local tempfile = io.open(tempfile_name, "w")
-   yang.print_data_for_schema(scm, conf, tempfile)
-   tempfile:close()
-   return io.open(tempfile_name, "r"), tempfile_name
-end
 
 local function migrate_conf(old)
    function convert_ipv4(addr)
@@ -455,27 +448,8 @@ local function v2_migration(src, conf_file)
    -- Remove the psid-map and add it to the softwire.
    conf = remove_psid_map(conf)
    conf.softwire_config.binding_table.psid_map = nil
-
-   -- Finally ensure padding is always nil
-   for key, entry in cltable.pairs(conf.softwire_config.binding_table.softwire) do
-      entry.padding = nil
-   end
-
-   -- Now we have to convert from the migration hybrid schema back to vanilla
-   -- v2 so that the printers work correctly (or future migrations do).
-   local tempfile, tempfile_name = save_to_temp_file(conf, hybridscm)
-
-   -- Tell the GC that we don't need to keep this version in memory, we can't
-   -- keep large configuration files in memory twice.
-   conf = nil
-
-   -- Load the configuration from temp file and remove from file system.
-   local conf = assert(tempfile:read("*a"))
-   tempfile:close()
-   os.remove(tempfile_name)
-
-   -- Finally load it and return the config file
-   return data.load_data_for_schema_by_name("snabb-softwire-v2", conf, conf_file)
+      
+   return conf
 end
 
 
