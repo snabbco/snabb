@@ -14,6 +14,8 @@ Usage: packetblaster lwaftr [OPTIONS]
 
   --sock <SOCKET>       Socket name for virtio interface
 
+  --bridge <interface>  Bridge traffic to Linux interface (optional)
+
   --vlan VLANID         VLAN tag traffic with VLANID if set
 
   --src_mac SOURCE
@@ -169,3 +171,25 @@ Example with Linux tap interface:
 14:04:43.573161 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 608: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 558
   14:04:43.573297 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 1514: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 1464
   14:04:43.573430 00:00:00:00:00:00 > 00:00:00:00:00:00, ethertype IPv4 (0x0800), length 78: 8.8.8.8.12345 > 0.0.0.0.1024: UDP, length 28
+
+
+Example with non-generator traffic bridged to a Linux interface:
+
+In addition to just generating traffic and measuring the return rate, it is also possible to transparently
+pass packets from a Linux network interface thru packetblaster in both directions. This allows e.g.
+to offer network connectivity between a 10GE port and a linux interface (e.g. eno1), while injecting 
+traffic at the same time:
+
+$ sudo ./snabb packetblaster lwaftr -4 --pci 0000:04:00.0 --bridge eth0 --rate 1
+
+IPv4: 8.8.8.8:12345 > 10.0.0.0:1024
+      destination IPv4 and Port adjusted per client
+IPv4 packet sizes: 64
+Bridge traffic to interface eno1
+v6+v4: 0.000+0.000 = 0.000000 MPPS, 0.000+0.000 = 0.000000 Gbps, lost nan%
+v6+v4: 0.000+0.358 = 0.357769 MPPS, 0.000+0.223 = 0.223248 Gbps, lost 20.232%
+v6+v4: 0.000+2.000 = 2.000007 MPPS, 0.000+1.248 = 1.248004 Gbps, lost 0.000%
+v6+v4: 0.000+2.000 = 1.999986 MPPS, 0.000+1.248 = 1.247996 Gbps, lost 0.000%
+
+
+
