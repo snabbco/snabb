@@ -22,6 +22,7 @@ local lib         = require("core.lib")
 local bits        = lib.bits
 local tophysical  = core.memory.virtual_to_physical
 local register    = require("lib.hardware.register")
+local index_set   = require("lib.index_set")
 local counter     = require("core.counter")
 local macaddress  = require("lib.macaddress")
 local shm         = require("core.shm")
@@ -129,6 +130,7 @@ RTRUP2TC    0x03020 -            RW DCB Receive Use rPriority to Traffic Class
 RTTUP2TC    0x0C800 -            RW DCB Transmit User Priority to Traffic Class
 RTTBCNRC    0x04984 -            RW DCB Transmit Rate-Scheduler Config
 RXCSUM      0x05000 -               RW Receive Checksum Control
+RFCTL       0x05008 -               RW Receive Filter Control Register
 RXCTRL      0x03000 -               RW Receive Control
 RXDGPC      0x02F50 -               RC DMA Good Rx Packet Counter
 RXDSTATCTRL 0x02F40 -               RW Rx DMA Statistic Counter Control
@@ -248,6 +250,18 @@ EEC       0x00010 -            RW EEPROM-Mode Control Register
 ]]
 }
 
+-- table to track index sets for use in VMDq mode per pci address
+local vmdq_sets = {}
+
+-- helper for pool number allocation
+local function firsthole(t)
+   for i = 1, #t+1 do
+      if t[i] == nil then
+         return i
+      end
+   end
+end
+
 Intel = {
    config = {
       pciaddr = {required=true},
@@ -289,7 +303,10 @@ function Intel:new (conf)
       rxq = conf.rxq,
       mtu = conf.mtu or self.config.mtu.default,
       linkup_wait = conf.linkup_wait or self.config.linkup_wait.default,
-      wait_for_link = conf.wait_for_link
+      wait_for_link = conf.wait_for_link,
+      vmdq = conf.vmdq,
+      poolnum = conf.poolnum,
+      macaddr = conf.macaddr
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -300,6 +317,15 @@ function Intel:new (conf)
    self = setmetatable(self, { __index = byid.driver})
 
    self.max_q = byid.max_q
+
+   -- VMDq checks
+   assert(not self.vmdq or device == "0x1533", "VMDq not supported on i210")
+   assert(not self.poolnum or self.vmdq, "Pool number only supported for VMDq")
+   if self.vmdq then
+      assert(self.rxq >= 4 * self.poolnum and
+             self.rxq <= 4 * self.poolnum + 3,
+             "Pool number and rxq do not match")
+   end
 
    -- Setup device access
    self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
@@ -659,6 +685,30 @@ function Intel:sync_stats ()
    end
 end
 
+-- set MAC address (4.6.10.1.4)
+function Intel:set_MAC ()
+   if not self.mac then return end
+   local mac = macaddress:new(self.mac)
+   self:add_receive_MAC(mac)
+   self:set_transmit_MAC(mac)
+end
+
+function Intel:add_receive_MAC (mac)
+   local mac_set = vmdq_sets[self.pciaddress].mac_set
+   local mac_index, is_new = mac_set:add(tostring(mac))
+   if is_new then
+      self.r.RAL[mac_index](mac:subbits(0,32))
+      self.r.RAH[mac_index](bits({AV=31},mac:subbits(32,48)))
+   end
+   self.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]
+      :set(bits{Ena=self.poolnum%32})
+end
+
+function Intel:set_transmit_MAC (mac)
+   local poolnum = self.poolnum or 0
+   self.r.PFVFSPOOF[math.floor(poolnum/8)]:set(bits{MACAS=poolnum%8})
+end
+
 function Intel:rxpackets () return self.r.GPRC()                 end
 function Intel:txpackets () return self.r.GPTC()                 end
 function Intel:rxmcast   () return self.r.MPRC() + self.r.BPRC() end
@@ -803,6 +853,11 @@ function Intel1g:init_queue_stats (frame)
          frame[name] = {counter}
       end
    end
+end
+
+function Intel1g:vmdq_enable ()
+   -- 011 -> VMDq mode, no RSS
+   self.r.MRQC:set(bits { VMDq1 = 0, VMDq2 = 1 })
 end
 
 Intel82599.driver = "Intel82599"
@@ -952,7 +1007,85 @@ function Intel82599:init ()
    self.r.CTRL_EXT:set(bits {NS_DIS = 1})
 
    self:rss_enable()
+
+   if self.vmdq then
+      self:vmdq_enable()
+      self:set_MAC()
+   end
+
    self:unlock_sw_sem()
+end
+
+-- enable VMDq mode, see 4.6.10.1
+-- follows the configuration flow in 4.6.11.3.3
+-- (should only be called on the master instance)
+function Intel82599:vmdq_enable ()
+   -- must be set prior to setting MTQC (7.2.1.2.1)
+   self.r.RTTDCS:set(bits { ARBDIS=6 })
+
+   -- 1010 -> 32 pools, 4 RSS queues each
+   self.r.MRQC:set(bits { VMDq = 3, RSS = 1 })
+
+   -- TODO: not sure this is needed, but it's in intel10g
+   -- disable RSC (7.11)
+   self.r.RFCTL:set(bits { RSC_Dis=5 })
+
+   -- 128 Tx Queues, 64 VMs (4.6.11.3.3)
+   self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=2 })
+
+   -- enable virtualization, replication enabled, define default pool
+   self.r.PFVTCTL(bits { VT_Ena=0, Rpl_En=30, DisDefPool=29 })
+
+   -- enable VMDq Tx to Rx loopback
+   self.r.PFDTXGSWC:set(bits { LBE=0 })
+
+   -- needs to be set for loopback (7.10.3.4)
+   self.r.FCRTH[0](0x10000)
+
+   -- enable vlan filter (4.6.7, 7.1.1.2)
+   self.r.VLNCTRL:set(bits { VFE=30 })
+
+   -- intel10g zeroes out ETQF,ETQS here but they are init to 0
+
+   -- initialize index sets
+   vmdq_sets[self.pciaddress] = {
+      mac_set    = index_set:new(127, "MAC address table"),
+      vlan_set   = index_set:new(64, "VLAN Filter table"),
+      mirror_set = index_set:new(4, "Mirror pool table") }
+
+   -- RTRUP2TC/RTTUP2TC cleared above in init
+
+   -- DMA TX TCP max allowed size requests (set to 1MB)
+   self.r.DTXMXSZRQ(0xFFF)
+
+   -- disable PFC, enable legacy control flow
+   self.r.MFLCN(bits { RFCE=3 })
+   self.r.FCCFG(bits { TFCE=3 })
+
+   -- RTTDT2C, RTTPT2C, RTRPT4C cleared above in init()
+
+   -- QDE bit = 0 for all queues
+   for i = 0, 127 do
+      self.r.PFQDE(bor(lshift(1,16), lshift(i,8)))
+   end
+
+   -- clear RTTDT1C, PFVLVF for all pools, set them later
+   for i = 0, 63 do
+      self.r.RTTDQSEL(i)
+      self.r.RTTDT1C(0x00)
+   end
+
+   -- disable TC arbitrations, enable packet buffer free space monitor
+   self.r.RTTDCS:set()
+   self.r.RTTDCS:clr(bits { TDPAC=0, TDRM=4, BPBFSM=23 })
+   self.r.RTTDCS:set(bits { VMPAC=1, BDPM=22 })
+   self.r.RTTPCS:clr(bits { TPPAC=5, TPRM=8 })
+   -- set RTTPCS.ARBD
+   self.r.RTTPCS:bits(22, 31, 0x244)
+   self.r.RTRPCS:clr(bits { RAC=2, RRM=1 })
+
+   -- must be cleared after MTQC configuration (7.2.1.2.1)
+   self.r.RTTDCS:clr(bits { ARBDIS=6 })
 end
 
 function Intel:debug (args)
