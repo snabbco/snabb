@@ -1,7 +1,8 @@
 #!../../snabb snsh
 local args = main.parameters
-assert(#args == 3, "testvmdqrecv.snabb pciaddr poolno qno")
+assert(#args == 4, "testvmdqrecv.snabb pciaddr macaddr poolno qno")
 local pciaddr = table.remove(args, 1)
+local macaddr = table.remove(args, 1)
 local poolno = tonumber(table.remove(args,1))
 local qno = tonumber(table.remove(args,1))
 
@@ -11,7 +12,7 @@ local ffi = require("ffi")
 local C = ffi.C
 
 local c = config.new()
-config.app(c, "nic", intel.Intel, { pciaddr=pciaddr, macaddr="90:72:82:78:c9:7a", vmdq=true, poolnum=poolno, rxq = qno, ndescriptors = 2048, wait_for_link=true })
+config.app(c, "nic", intel.Intel, { pciaddr=pciaddr, macaddr=macaddr, vmdq=true, poolnum=poolno, rxq = qno, ndescriptors = 2048, wait_for_link=true })
 config.app(c, "sink", basic.Sink)
 if os.getenv("SNABB_RECV_EXPENSIVE") then
 	local filter = require("apps.packet_filter.pcap_filter")
