@@ -609,6 +609,12 @@ function Intel:rss_key ()
       self.r.RSSRK[i](math.random(2^32))
    end
 end
+
+-- Set RSS redirection table, which has 32 * 4 entries which contain
+-- RSS indices, the lower 4 bits (or fewer) of which are used to
+-- select an RSS queue.
+--
+-- Also returns the current state of the redirection table
 function Intel:rss_tab (newtab)
    local current = {}
    local pos = 0
