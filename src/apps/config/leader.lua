@@ -405,7 +405,7 @@ function Leader:update_configuration (update_fn, verb, path, ...)
    local to_restart =
       self.support.compute_apps_to_restart_after_configuration_update (
          self.schema_name, self.current_configuration, verb, path,
-         self.current_in_place_dependencies)
+         self.current_in_place_dependencies, ...)
    local new_config = update_fn(self.current_configuration, ...)
    local new_app_graph = self.setup_fn(new_config)
    local actions = self.support.compute_config_actions(

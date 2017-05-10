@@ -83,7 +83,7 @@ function RangeMapBuilder:add(key, value)
    self:add_range(key, key, value)
 end
 
-function RangeMapBuilder:build(default_value)
+function RangeMapBuilder:build(default_value, ignore_duplicates)
    assert(default_value)
    table.sort(self.entries, function(a,b) return a.max.key < b.max.key end)
 
@@ -104,7 +104,8 @@ function RangeMapBuilder:build(default_value)
    for i=#self.entries-1,1,-1 do
       local entry = self.entries[i]
       if entry.max.key >= range_end.key then
-         error("Multiple range map entries for key: "..entry.max.key)
+	 local err = "Multiple range map entries for key: "..entry.max.key
+         assert(ignore_duplicates, err)
       elseif entry.max.key + 1 ~= range_end.key then
          table.insert(ranges, self.entry_type(range_end.key - 1, default_value))
          range_end = self.entry_type(entry.max.key + 1, default_value)

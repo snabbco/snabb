@@ -64,12 +64,10 @@ local function add_softwire_entry_actions(app_graph, entries)
    local ret = {}
    for entry in entries:iterate() do
       local psoftwire, ppsid = pack_softwire(app_graph, entry)
+      assert(bt:is_managed_ipv4_address(psoftwire.key.ipv4))
+
       local softwire_args = {'lwaftr', 'add_softwire_entry', psoftwire}
       table.insert(ret, {'call_app_method_with_blob', softwire_args})
-      if bt.psid_map:lookup_ptr(ppsid) == nil then
-         local psid_map_args = {'lwaftr', 'add_psid_map_entry', ppsid}
-         table.insert(ret, {'call_app_method_with_blob', psid_map_args})
-      end
    end
    table.insert(ret, {'commit', {}})
    return ret
@@ -107,16 +105,17 @@ local function compute_config_actions(old_graph, new_graph, to_restart,
    end
 
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
-      return add_softwire_entry_actions(new_graph, arg)
+      if to_restart == false then
+	 return add_softwire_entry_actions(new_graph, arg)
+      end
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
       return remove_softwire_entry_actions(new_graph, path)
    elseif (verb == 'set' and path == '/softwire-config/name') then
       return {}
-   else
-      return generic.compute_config_actions(
-         old_graph, new_graph, to_restart, verb, path, arg)
    end
+   return generic.compute_config_actions(
+      old_graph, new_graph, to_restart, verb, path, arg)
 end
 
 local function update_mutable_objects_embedded_in_app_initargs(
@@ -133,18 +132,24 @@ local function update_mutable_objects_embedded_in_app_initargs(
 end
 
 local function compute_apps_to_restart_after_configuration_update(
-      schema_name, configuration, verb, path, in_place_dependencies)
+      schema_name, configuration, verb, path, in_place_dependencies, arg)
    if verb == 'add' and path == '/softwire-config/binding-table/softwire' then
-      return {}
+      -- We need to check if the softwire defines a new port-set, if so we need to
+      -- restart unfortunately. If not we can just add the softwire.
+      local bt = get_binding_table_instance(configuration.softwire_config.binding_table)
+      local to_restart = false
+      for entry in arg:iterate() do
+	 to_restart = (bt:is_managed_ipv4_address(entry.key.ipv4) == false) or false
+      end
+      if to_restart == false then return {} end
    elseif (verb == 'remove' and
            path:match('^/softwire%-config/binding%-table/softwire')) then
       return {}
    elseif (verb == 'set' and path == '/softwire-config/name') then
       return {}
-   else
-      return generic.compute_apps_to_restart_after_configuration_update(
-         schema_name, configuration, verb, path, in_place_dependencies)
    end
+   return generic.compute_apps_to_restart_after_configuration_update(
+      schema_name, configuration, verb, path, in_place_dependencies, arg)
 end
 
 local function memoize1(f)

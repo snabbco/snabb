@@ -130,7 +130,7 @@ local function compute_mutable_objects_embedded_in_app_initargs (app_graph)
 end
 
 local function compute_apps_to_restart_after_configuration_update (
-      schema_name, configuration, verb, changed_path, in_place_dependencies)
+      schema_name, configuration, verb, changed_path, in_place_dependencies, arg)
    local maybe_updated = compute_objects_maybe_updated_in_place(
       schema_name, configuration, changed_path)
    local needs_restart = {}

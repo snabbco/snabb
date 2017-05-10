@@ -141,20 +141,6 @@ function BindingTable.new(psid_map, softwires)
    return setmetatable(ret, {__index=BindingTable})
 end
 
-function BindingTable:add_psid_map_entry(entry_blob)
-   local entry = self.psid_map.entry_type()
-   assert(ffi.sizeof(entry) == ffi.sizeof(entry_blob))
-   ffi.copy(entry, entry_blob, ffi.sizeof(entry_blob))
-   self.psid_map:add(entry.key, entry.value)
-end
-
-function BindingTable:remove_psid_map_entry(entry_bob)
-   local entry = self.psid_map.entry_type()
-   assert(ffi.sizeof(entry.key) == ffi.sizeof(entry_key_blob))
-   ffi.copy(entry.key, entry_key_blob, ffi.sizeof(entry_key_blob))
-   self.psid_map:remove(entry.key)
-end
-
 function BindingTable:add_softwire_entry(entry_blob)
    local entry = self.softwires.entry_type()
    assert(ffi.sizeof(entry) == ffi.sizeof(entry_blob))
@@ -183,16 +169,12 @@ function BindingTable:is_managed_ipv4_address(ipv4)
    -- The PSID info map covers only the addresses that are declared in
    -- the binding table.  Other addresses are recorded as having
    -- psid_length == shift == 0.
-   local psid_map_key = ffi.new(psid_map_key_t, {addr=ipv4})
-   local psid_info = self.psid_map:lookup_ptr(psid_map_key)
-   return psid_info ~= nil
+   local psid_info = self.psid_map:lookup(ipv4).value
+   return psid_info.psid_length + psid_info.shift > 0
 end
 
 function BindingTable:lookup_psid(ipv4, port)
-   local psid_map_key  = ffi.new(psid_map_key_t, {addr=ipv4})
-   local psid_entry = self.psid_map:lookup_ptr(psid_map_key)
-   if psid_entry == nil then return nil end
-   local psid_info = psid_entry.value
+   local psid_info = self.psid_map:lookup(ipv4).value
    local psid_len, shift = psid_info.psid_length, psid_info.shift
    local psid_mask = lshift(1, psid_len) - 1
    local psid = band(rshift(port, shift), psid_mask)
@@ -216,7 +198,16 @@ end
 -- softwire_key_t which has a "addr" and psid_info is a psid_map_value_t
 -- pointer, which has psid_length and shift members.
 function BindingTable:iterate_psid_map()
-   return self.psid_map:iterate()
+   local f, state, lo = self.psid_map:iterate()
+   local function next_entry()
+      local hi, value
+      repeat
+         lo, hi, value = f(state, lo)
+         if lo == nil then return end
+      until value.psid_length > 0 or value.shift > 0
+      return lo, hi, value
+   end
+   return next_entry
 end
 
 -- Iterate over the softwires in a binding table.  Invoke like:
@@ -231,7 +222,7 @@ function BindingTable:iterate_softwires()
    return self.softwires:iterate()
 end
 
-function pack_psid_map_entry(softwire)
+function pack_psid_map_value(softwire)
    assert(softwire.value.port_set)
    local port_set = softwire.value.port_set
 
@@ -241,25 +232,20 @@ function pack_psid_map_entry(softwire)
          'psid_length '..psid_length..' + shift '..shift..
          ' should not exceed 16')
 
-   local key = ffi.new(psid_map_key_t, {addr=softwire.key.ipv4})
    local value = ffi.new(psid_map_value_t,
       {psid_length=psid_length, shift=shift})
-   return key, value
+   return value
 end
 
 function load(conf)
-   local psid_map = ctable.new({
-      key_type=ffi.typeof(psid_map_key_t),
-      value_type=ffi.typeof(psid_map_value_t)
-   })
+   local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
    for entry in conf.softwire:iterate() do
       -- Add the port set to the psid-map
-      psid_key, psid_value = pack_psid_map_entry(entry)
-      if psid_map:lookup_ptr(psid_key) == nil then
-         psid_map:add(psid_key, psid_value)
-      end
+      psid_value = pack_psid_map_value(entry)
+      psid_builder:add(entry.key.ipv4, psid_value)
    end
 
+   local psid_map = psid_builder:build(psid_map_value_t(), true)
    return BindingTable.new(psid_map, conf.softwire)
 end
 
@@ -315,25 +301,22 @@ function selftest()
    assert(lookup('178.79.150.4', 7850) == nil)
 
    do
-      -- You can't assume the order of a ctable so just check all the records
-      -- we expect are there with the correct values.
       local psid_map_iter = {
-         [ipv4_pton('178.79.150.2')]={ psid_length=16, shift=0 },
-         [ipv4_pton('178.79.150.3')]={ psid_length=6, shift=10 },
-         [ipv4_pton('178.79.150.15')]={ psid_length=4, shift=12 },
-         [ipv4_pton('178.79.150.233')]={ psid_length=16, shift=0 }
+         { ipv4_pton('178.79.150.2'), { psid_length=16, shift=0 } },
+         { ipv4_pton('178.79.150.3'), { psid_length=6, shift=10 } },
+         { ipv4_pton('178.79.150.15'), { psid_length=4, shift=12 } },
+         { ipv4_pton('178.79.150.233'), { psid_length=16, shift=0 } }
       }
       local i = 1
-      for entry in map.psid_map:iterate() do
-         local expected = psid_map_iter[entry.key.addr]
-         assert(expected)
-         assert(entry.value.psid_length == expected.psid_length)
-         assert(entry.value.shift == expected.shift)
+      for lo, hi, value in map:iterate_psid_map() do
+         local ipv4, expected = unpack(psid_map_iter[i])
+         assert(lo == ipv4)
+         assert(hi == ipv4)
+         assert(value.psid_length == expected.psid_length)
+         assert(value.shift == expected.shift)
          i = i + 1
       end
-      local pmi_length = 0
-      for x in pairs(psid_map_iter) do pmi_length = pmi_length + 1 end
-      assert(i == pmi_length + 1)
+      assert(i == #psid_map_iter + 1)
    end
 
    print('ok')
