@@ -417,8 +417,8 @@ function Intel:init_rx_q ()
 
    -- VMDq pool state (4.6.10.1.4)
    if self.vmdq then
-      -- packet splitting (none)
-      self.r.PSRTYPE[self.poolnum](0)
+      -- packet splitting none, enable 4 RSS queues per pool
+      self.r.PSRTYPE[self.poolnum](bits { RQPL=30 })
       -- multicast promiscuous, broadcast accept, accept untagged pkts
       self.r.PFVML2FLT[self.poolnum]:set(bits { MPE=28, BAM=27, AUPE=24 })
    end
