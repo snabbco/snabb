@@ -1071,7 +1071,7 @@ function Intel82599:vmdq_enable ()
    self.r.RTTDCS:set(bits { ARBDIS=6 })
 
    -- 1010 -> 32 pools, 4 RSS queues each
-   self.r.MRQC:set(bits { VMDq = 3, RSS = 1 })
+   self.r.MRQC:bits(0, 4, 0xA)
 
    -- TODO: not sure this is needed, but it's in intel10g
    -- disable RSC (7.11)
