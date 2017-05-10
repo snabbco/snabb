@@ -22,7 +22,6 @@ local lib         = require("core.lib")
 local bits        = lib.bits
 local tophysical  = core.memory.virtual_to_physical
 local register    = require("lib.hardware.register")
-local index_set   = require("lib.index_set")
 local counter     = require("core.counter")
 local macaddress  = require("lib.macaddress")
 local shm         = require("core.shm")
@@ -262,9 +261,6 @@ EEC       0x00010 -            RW EEPROM-Mode Control Register
 ]]
 }
 
--- table to track index sets for use in VMDq mode per pci address
-local vmdq_sets = {}
-
 -- helper for pool number allocation
 local function firsthole(t)
    for i = 1, #t+1 do
@@ -336,6 +332,7 @@ function Intel:new (conf)
    -- VMDq checks
    assert(not self.vmdq or device ~= "0x1533" or device ~= "0x157b",
           "VMDq not supported on i210")
+   assert(not self.vmdq or self.macaddr, "VMDq must be set to set macaddr")
    assert(not self.poolnum or self.vmdq, "Pool number only supported for VMDq")
    if self.vmdq then
       assert(self.rxq >= 4 * self.poolnum and
@@ -353,6 +350,8 @@ function Intel:new (conf)
    self.fd:flock("sh")
    self:init_tx_q()
    self:init_rx_q()
+   self:set_MAC()
+   -- TODO: set VLAN, mirror here
 
    -- Initialize per app statistics
    counter.set(self.shm.mtu, self.mtu)
@@ -722,12 +721,27 @@ function Intel:set_MAC ()
 end
 
 function Intel:add_receive_MAC (mac)
-   local mac_set = vmdq_sets[self.pciaddress].mac_set
-   local mac_index, is_new = mac_set:add(tostring(mac))
-   if is_new then
-      self.r.RAL[mac_index](mac:subbits(0,32))
-      self.r.RAH[mac_index](bits({AV=31},mac:subbits(32,48)))
+   local mac_index
+
+   -- scan to see if the MAC is already recorded or find the
+   -- first free MAC index
+   for idx=1, 127 do
+      local valid = self.r.RAH[idx]:bits(31, 1)
+
+      if valid == 0 then
+         mac_index = idx
+         self.r.RAL[mac_index](mac:subbits(0,32))
+         self.r.RAH[mac_index](bits({AV=31},mac:subbits(32,48)))
+         break
+      else
+         if self.r.RAL[idx]() == mac:subbits(0, 32) and
+            self.r.RAH[idx]:bits(0, 15) == mac:subbits(32, 48) then
+            mac_index = idx
+            break
+         end
+      end
    end
+
    self.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]
       :set(bits{Ena=self.poolnum%32})
 end
@@ -1038,7 +1052,6 @@ function Intel82599:init ()
 
    if self.vmdq then
       self:vmdq_enable()
-      self:set_MAC()
    end
 
    self:unlock_sw_sem()
@@ -1048,12 +1061,6 @@ end
 -- follows the configuration flow in 4.6.11.3.3
 -- (should only be called on the master instance)
 function Intel82599:vmdq_enable ()
-   -- initialize index sets
-   vmdq_sets[self.pciaddress] = {
-      mac_set    = index_set:new(127, "MAC address table"),
-      vlan_set   = index_set:new(64, "VLAN Filter table"),
-      mirror_set = index_set:new(4, "Mirror pool table") }
-
    -- must be set prior to setting MTQC (7.2.1.2.1)
    self.r.RTTDCS:set(bits { ARBDIS=6 })
 
