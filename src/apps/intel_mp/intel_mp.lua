@@ -632,10 +632,6 @@ function Intel:rss_tab (newtab)
    return current
 end
 function Intel:rss_tab_build ()
-   -- noop if rss is not enabled
-   local b = bits { RSS = self:offset("MRQC", "RSS") }
-   if bit.band(self.r.MRQC(), b) ~= b then return end
-
    local tab = {}
    for i=0,self.max_q-1,1 do
       if band(self.r.ALLRXDCTL[i](), bits { Enable = 25 }) > 0 then
