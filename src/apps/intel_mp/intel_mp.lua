@@ -1117,7 +1117,7 @@ function Intel82599:vmdq_enable ()
    self.r.RTTDCS:set(bits { VMPAC=1, BDPM=22 })
    self.r.RTTPCS:clr(bits { TPPAC=5, TPRM=8 })
    -- set RTTPCS.ARBD
-   self.r.RTTPCS:bits(22, 31, 0x244)
+   self.r.RTTPCS:bits(22, 10, 0x244)
    self.r.RTRPCS:clr(bits { RAC=2, RRM=1 })
 
    -- must be cleared after MTQC configuration (7.2.1.2.1)
