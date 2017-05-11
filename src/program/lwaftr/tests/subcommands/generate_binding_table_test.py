@@ -39,10 +39,17 @@ class TestGenerateBindingTable(BaseTestCase):
         self.assertEqual(generation_proc.returncode, 0)
 
         # Finally get the stdout value which should be the config.
-        config = generation_proc.stdout.readlines()
+        config = [l.decode("utf-8") for l in generation_proc.stdout.readlines()]
 
-        # Iterate over the lines and count the number of softwire definitions.
-        count = sum([1 for line in config if b"softwire {" in line])
+        # The output should be "binding-table {" followed by 10 softwires then "}"
+        self.assertEqual("binding-table {\n", config[0])
 
-        self.assertEqual(count, num)
+        for softwire in config[1:-1]:
+            self.assertTrue(softwire.startswith("  softwire {"))
+            self.assertTrue(softwire.endswith("}\n"))
+
+        self.assertEqual(config[-1], "}\n")
+
+        # Check the count is 12 (10 softwires + start and end block)
+        self.assertEqual(len(config), num+2)
 
