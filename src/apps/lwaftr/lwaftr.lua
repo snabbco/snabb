@@ -276,12 +276,6 @@ end
 function LwAftr:remove_softwire_entry(entry_key_blob)
    self.binding_table:remove_softwire_entry(entry_key_blob)
 end
-function LwAftr:add_psid_map_entry(psid_blob)
-   self.binding_table:add_psid_map_entry(psid_blob)
-end
-function LwAftr:remove_psid_map_entry(psid_map_key_blob)
-   self.binding_table:remove_psid_map_entry(psid_map_key_blob)
-end
 
 local function decrement_ttl(pkt)
    local ipv4_header = get_ethernet_payload(pkt)

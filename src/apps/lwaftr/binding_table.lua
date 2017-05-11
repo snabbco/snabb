@@ -65,10 +65,10 @@ local ffi = require("ffi")
 local rangemap = require("apps.lwaftr.rangemap")
 local ctable = require("lib.ctable")
 local ipv6 = require("lib.protocol.ipv6")
+local ipv4_ntop = require("lib.yang.util").ipv4_ntop
 
 local band, lshift, rshift = bit.band, bit.lshift, bit.rshift
 
--- FIXME: Pull these types from the yang model, not out of thin air.
 psid_map_key_t = ffi.typeof[[
    struct { uint32_t addr; }
 ]]
@@ -194,9 +194,9 @@ end
 --
 --   for entry in bt:iterate_psid_map() do ... end
 --
--- The IPv4 values are host-endianness uint32 values. The key is a
--- softwire_key_t which has a "addr" and psid_info is a psid_map_value_t
--- pointer, which has psid_length and shift members.
+-- The IPv4 values are host-endianness uint32 values, and are an
+-- inclusive range to which the psid_info applies.  The psid_info is a
+-- psid_map_value_t pointer, which has psid_length and shift members.
 function BindingTable:iterate_psid_map()
    local f, state, lo = self.psid_map:iterate()
    local function next_entry()
@@ -222,7 +222,7 @@ function BindingTable:iterate_softwires()
    return self.softwires:iterate()
 end
 
-function pack_psid_map_value(softwire)
+function pack_psid_map_entry(softwire)
    assert(softwire.value.port_set)
    local port_set = softwire.value.port_set
 
@@ -232,17 +232,40 @@ function pack_psid_map_value(softwire)
          'psid_length '..psid_length..' + shift '..shift..
          ' should not exceed 16')
 
+   local key = ffi.new(psid_map_key_t, {addr=softwire.key.ipv4})
    local value = ffi.new(psid_map_value_t,
-      {psid_length=psid_length, shift=shift})
-   return value
+			 {psid_length=psid_length, shift=shift})
+   
+   return key, value
 end
 
 function load(conf)
    local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
+
+   -- Lets create an intermediatory PSID map to verify if we've added
+   -- a PSID entry yet, if we have we need to verify that the values
+   -- are the same, if not we need to error.
+   local inter_psid_map = ctable.new({
+	 key_type = psid_map_key_t,
+	 value_type = psid_map_value_t
+   })
+   
    for entry in conf.softwire:iterate() do
-      -- Add the port set to the psid-map
-      psid_value = pack_psid_map_value(entry)
-      psid_builder:add(entry.key.ipv4, psid_value)
+      -- Check that the map either hasn't been added or that
+      -- it's the same value as one which has.
+      local psid_key, psid_value = pack_psid_map_entry(entry)
+      local added_entry = inter_psid_map:lookup_ptr(psid_key)
+      if added_entry == nil then
+	 -- Add the port set to the psid-map
+	 psid_builder:add(entry.key.ipv4, psid_value)
+	 inter_psid_map:add(psid_key, psid_value)
+      else
+	 local err = "Port set already added with different values: "
+	 err = err .. ipv4_ntop(entry.key.ipv4)
+	 
+	 assert(added_entry.value.psid_length == psid_value.psid_length, err)
+	 assert(added_entry.value.shift == psid_value.shift, err)
+      end
    end
 
    local psid_map = psid_builder:build(psid_map_value_t(), true)

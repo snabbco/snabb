@@ -349,11 +349,7 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
       end
       for k,_ in pairs(values) do
          local id = normalize_id(k)
-         if type(struct[id]) == "cdata" and type(value[id]) == "cdata" then
-            ffi.copy(value[id], struct[id], ffi.sizeof(value[id]))
-         else
-            value[id] = struct[id]
-         end
+	 value[id] = struct[id]
       end
       assoc:add(key, value)
       return assoc

@@ -164,21 +164,20 @@ For example:
     port-set {
       psid-length 6;
       reserved-ports-bit-count 0;
-      shift 10;
     }
   }
 ```
 
-`reserved-ports-bit-count` and `shift` in the `port-set` container are
-both optional.
+`reserved-ports-bit-count` in the `port-set` container is optional.
 
-An entry's `psid-length`, `shift` and `reserved-ports-bit-count`
-parameters must necessarily add up to 16, so it is sufficient to
-specify just two of them. Actually it's sufficient to just specify the
-`psid-length`, which is the only required one.
-`reserved-ports-bit-count` defaults to 0, and `shift` defaults to `16
-- psid-length`.
+An entry's `psid-length` and `reserved-ports-bit-count` must not exceed
+16 when summed. The shift parameter is calculated from the two parameters
+in this equation:
 
+   shift = `psid-length` + `reserved-ports-bit-count` - 16
+
+It's only necessary to specify `psid-length` as
+`reserved-ports-bit-count` defaults to 0.
 
 ## Ingress and egress filters
 
