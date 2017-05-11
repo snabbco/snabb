@@ -680,6 +680,9 @@ function Intel:stop ()
          end
       end
    end
+   if self.vmdq then
+      self.unset_MAC()
+   end
    if self.fd:flock("nb, ex") then
       self.r.CTRL:clr( bits { SETLINKUP = 6 } )
       --self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
@@ -727,7 +730,7 @@ function Intel:add_receive_MAC (mac)
 
    -- scan to see if the MAC is already recorded or find the
    -- first free MAC index
-   for idx=1, 127 do
+   for idx=1, self.max_mac_addr do
       local valid = self.r.RAH[idx]:bits(31, 1)
 
       if valid == 0 then
@@ -744,8 +747,8 @@ function Intel:add_receive_MAC (mac)
       end
    end
 
-   self.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]
-      :set(bits{Ena=self.poolnum%32})
+   -- associate MAC with the app's VMDq pool
+   self:enable_MAC_for_pool(mac_index)
 end
 
 function Intel:set_transmit_MAC (mac)
@@ -769,6 +772,7 @@ Intel1g.offsets = {
        RSS = 1
     }
 }
+Intel1g.max_mac_addr = 15
 function Intel1g:init_phy ()
    -- 4.3.1.4 PHY Reset
    self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
@@ -904,6 +908,17 @@ function Intel1g:vmdq_enable ()
    self.r.MRQC:set(bits { VMDq1 = 0, VMDq2 = 1 })
 end
 
+function Intel1g:enable_MAC_for_pool(mac_index)
+   self.r.RAH[mac_index]:set(bits { Ena = 18 + self.poolnum })
+end
+
+function Intel1g:unset_MAC ()
+   local msk = bits { Ena = 18 + self.poolnum }
+   for mac_index = 0, self.max_mac_addr do
+      pf.r.RAH[mac_index]:clr(msk)
+   end
+end
+
 Intel82599.driver = "Intel82599"
 Intel82599.offsets = {
    SRRCTL = {
@@ -913,6 +928,7 @@ Intel82599.offsets = {
        RSS = 0
    }
 }
+Intel82599.max_mac_addr = 127
 function Intel82599:link_status ()
    local mask = bits { Link_up = 30 }
    return bit.band(self.r.LINKS(), mask) == mask
@@ -1122,6 +1138,18 @@ function Intel82599:vmdq_enable ()
 
    -- must be cleared after MTQC configuration (7.2.1.2.1)
    self.r.RTTDCS:clr(bits { ARBDIS=6 })
+end
+
+function Intel82599:enable_MAC_for_pool (mac_index)
+   self.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]
+      :set(bits{Ena=self.poolnum%32})
+end
+
+function Intel82599:unset_MAC ()
+   local msk = bits { Ena=self.poolnum%32 }
+   for mac_index = 0, self.max_mac_addr do
+      pf.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]:clr(msk)
+   end
 end
 
 function Intel:debug (args)
