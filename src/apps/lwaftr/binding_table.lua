@@ -132,12 +132,13 @@ function BTLookupQueue:reset_queue()
 end
 
 local BindingTable = {}
-
+local lookup_key
 function BindingTable.new(psid_map, softwires)
    local ret = {
       psid_map = assert(psid_map),
       softwires = assert(softwires),
    }
+   lookup_key = ret.softwires.entry_type().key
    return setmetatable(ret, {__index=BindingTable})
 end
 
@@ -155,8 +156,8 @@ function BindingTable:remove_softwire_entry(entry_key_blob)
    self.softwires:remove(entry.key)
 end
 
+
 function BindingTable:lookup(ipv4, port)
-   local lookup_key = ffi.new(self.softwires.entry_type).key
    local psid = self:lookup_psid(ipv4, port) or 0
    lookup_key.ipv4 = ipv4
    lookup_key.psid = psid
