@@ -7,26 +7,11 @@ if [[ $EUID != 0 ]]; then
     exit 1
 fi
 
-export LWAFTR_IPV6_ADDRESS=fc00::100/64
-export LWAFTR_IPV4_ADDRESS=10.0.1.1/24
-export BZ_IMAGE="$HOME/.test_env/bzImage"
-export HUGEPAGES_FS=/dev/hugepages
-export IMAGE="$HOME/.test_env/qemu.img"
-export MAC_ADDRESS_NET0="02:AA:AA:AA:AA:AA"
-export MEM=1024M
-export MIRROR_TAP=tap0
-export SNABBVMX_DIR=program/snabbvmx
-export PCAP_INPUT=$SNABBVMX_DIR/tests/pcap/input
-export PCAP_OUTPUT=$SNABBVMX_DIR/tests/pcap/output
-export SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr-vlan.cfg
-export SNABBVMX_ID=xe1
-export SNABB_TELNET0=5000
-export VHU_SOCK0=/tmp/vh1a.sock
-export SNABBVMX_LOG=snabbvmx.log
+BZ_IMAGE="$HOME/.test_env/bzImage"
+HUGEPAGES_FS=/dev/hugepages
+IMAGE="$HOME/.test_env/qemu.img"
+MEM=1024M
 
-# Usage: run_telnet <port> <command> [<sleep>]
-# Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
-# for before closing connection. The default of <sleep> is 2.
 function run_telnet {
     (echo "$2"; sleep ${3:-2}) \
         | telnet localhost $1 2>&1
@@ -51,7 +36,6 @@ function wait_vm_up {
     echo " [OK]"
 }
 
-# TODO: Use standard launch_qemu command.
 function qemu_cmd {
     echo "qemu-system-x86_64 \
          -kernel ${BZ_IMAGE} -append \"earlyprintk root=/dev/vda rw console=tty0\" \
@@ -66,8 +50,13 @@ function qemu_cmd {
          -display none"
 }
 
+function quit_screen { screen_id=$1
+    screen -X -S "$screen_id" quit &> /dev/null
+}
+
 function run_cmd_in_screen { screen_id=$1; cmd=$2
     screen_id="${screen_id}-$$"
+    quit_screen "$screen_id"
     screen -dmS "$screen_id" bash -c "$cmd >> $SNABBVMX_LOG"
 }
 
@@ -89,12 +78,20 @@ function start_test_env {
 
     # Manually set ip addresses.
     run_telnet $SNABB_TELNET0 "ifconfig eth0 up" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip -6 addr add $LWAFTR_IPV6_ADDRESS dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip addr add $LWAFTR_IPV4_ADDRESS dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip neigh add 10.0.1.100 lladdr 02:99:99:99:99:99 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip -6 neigh add fc00::1 lladdr 02:99:99:99:99:99 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "route add default gw 10.0.1.100 eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "route -6 add default gw fc00::1 eth0" >/dev/null
+
+    # Assign lwAFTR's IPV4 and IPV6 addresses to eth0.
+    run_telnet $SNABB_TELNET0 "ip -6 addr add ${LWAFTR_IPV6_ADDRESS}/64 dev eth0" >/dev/null
+    run_telnet $SNABB_TELNET0 "ip addr add ${LWAFTR_IPV4_ADDRESS}/24 dev eth0" >/dev/null
+
+    # Add IPv4 and IPv6 nexthop address resolution to MAC.
+    run_telnet $SNABB_TELNET0 "ip neigh add ${NEXT_HOP_V4} lladdr ${NEXT_HOP_MAC} dev eth0" >/dev/null
+    run_telnet $SNABB_TELNET0 "ip -6 neigh add ${NEXT_HOP_V6} lladdr ${NEXT_HOP_MAC} dev eth0" >/dev/null
+
+    # Set nexthop as default gateway, both in IPv4 and IPv6.
+    run_telnet $SNABB_TELNET0 "route add default gw ${NEXT_HOP_V4} eth0" >/dev/null
+    run_telnet $SNABB_TELNET0 "route -6 add default gw ${NEXT_HOP_V6} eth0" >/dev/null
+
+    # Activate IPv4 and IPv6 forwarding.
     run_telnet $SNABB_TELNET0 "sysctl -w net.ipv4.conf.all.forwarding=1" >/dev/null
     run_telnet $SNABB_TELNET0 "sysctl -w net.ipv6.conf.all.forwarding=1" >/dev/null
 }

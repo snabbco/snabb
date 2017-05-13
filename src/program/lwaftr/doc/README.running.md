@@ -61,3 +61,8 @@ The load generator will push packets on the IPv4 and IPv6 interfaces,
 ramping up from 0 Gbps to 10 Gbps (by default).  At each step it measures
 the return traffic from the lwAFTR, and prints out all this information
 to the console.  The load generator stops when the test is done.
+
+## The packetblaster
+
+Another way of generating load is via the `packetblaster lwaftr` command,
+see [its documentation](../../packetblaster/lwaftr/README).

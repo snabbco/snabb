@@ -11,10 +11,11 @@ Usage: bench CONF IPV4-IN.PCAP IPV6-IN.PCAP
                              rather than the default:
 
                                Time (s),Decap. MPPS,Decap. Gbps,Encap. MPPS,Encap. Gbps
-  -f FILENAME, --filename FILENAME
-                             The file or path name to which CSV data is written.
-                             A simple filename or relative pathname will be based
-                             on the current directory. Default is "bench.csv".
+  -b FILENAME, --bench-file FILENAME
+                              The file or path name to which benchmark data is
+                              written. A simple filename or relative pathname
+                              will be based on the current directory. Default
+                              is "bench.csv".
   -D DURATION, --duration DURATION
                              Duration in seconds.
 

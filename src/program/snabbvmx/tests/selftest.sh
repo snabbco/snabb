@@ -15,83 +15,26 @@ if [[ -z "$SNABB_PCI1" ]]; then
     exit $SKIPPED_CODE
 fi
 
-LWAFTR_IPV6_ADDRESS=fc00::100
 LWAFTR_IPV4_ADDRESS=10.0.1.1
-
-BZ_IMAGE="$HOME/.test_env/bzImage"
-HUGEPAGES_FS=/dev/hugepages
-IMAGE="$HOME/.test_env/qemu.img"
-MAC_ADDRESS_NET0="02:AA:AA:AA:AA:AA"
-MEM=1024M
+LWAFTR_IPV6_ADDRESS=fc00::100
+MAC_ADDRESS_NET0=02:AA:AA:AA:AA:AA
 MIRROR_TAP=tap0
+NEXT_HOP_MAC=02:99:99:99:99:99
+NEXT_HOP_V4=10.0.1.100
+NEXT_HOP_V6=fc00::1
 SNABBVMX_DIR=program/snabbvmx
 PCAP_INPUT=$SNABBVMX_DIR/tests/pcap/input
 PCAP_OUTPUT=$SNABBVMX_DIR/tests/pcap/output
 SNABBVMX_CONF=$SNABBVMX_DIR/tests/conf/snabbvmx-lwaftr.cfg
 SNABBVMX_ID=xe1
+SNABBVMX_LOG=snabbvmx.log
 SNABB_TELNET0=5000
 VHU_SOCK0=/tmp/vh1a.sock
 
-SNABBVMX_LOG=snabbvmx.log
+# Load environment settings.
+source program/snabbvmx/tests/test_env/test_env.sh
+
 rm -f $SNABBVMX_LOG
-
-# Some of these functions are from program/snabbfv/selftest.sh.
-# TODO: Refactor code to a common library.
-
-# Usage: run_telnet <port> <command> [<sleep>]
-# Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
-# for before closing connection. The default of <sleep> is 2.
-function run_telnet {
-    (echo "$2"; sleep ${3:-2}) \
-        | telnet localhost $1 2>&1
-}
-
-# Usage: wait_vm_up <port>
-# Blocks until ping to 0::0 suceeds.
-function wait_vm_up {
-    local timeout_counter=0
-    local timeout_max=50
-    echo -n "Waiting for VM listening on telnet port $1 to get ready..."
-    while ( ! (run_telnet $1 "ping6 -c 1 0::0" | grep "1 received" \
-        >/dev/null) ); do
-        # Time out eventually.
-        if [ $timeout_counter -gt $timeout_max ]; then
-            echo " [TIMEOUT]"
-            exit 1
-        fi
-        timeout_counter=$(expr $timeout_counter + 1)
-        sleep 2
-    done
-    echo " [OK]"
-}
-
-function qemu_cmd {
-    echo "qemu-system-x86_64 \
-         -kernel ${BZ_IMAGE} -append \"earlyprintk root=/dev/vda rw console=tty0\" \
-         -enable-kvm -drive format=raw,if=virtio,file=${IMAGE} \
-         -M pc -smp 1 -cpu host -m ${MEM} \
-         -object memory-backend-file,id=mem,size=${MEM},mem-path=${HUGEPAGES_FS},share=on \
-         -numa node,memdev=mem \
-         -chardev socket,id=char1,path=${VHU_SOCK0},server \
-             -netdev type=vhost-user,id=net0,chardev=char1 \
-             -device virtio-net-pci,netdev=net0,addr=0x8,mac=${MAC_ADDRESS_NET0} \
-         -serial telnet:localhost:${SNABB_TELNET0},server,nowait \
-         -display none"
-}
-
-function quit_screen { screen_id=$1
-    screen -X -S "$screen_id" quit &> /dev/null
-}
-
-function run_cmd_in_screen { screen_id=$1; cmd=$2
-    screen_id="${screen_id}-$$"
-    quit_screen "$screen_id"
-    screen -dmS "$screen_id" bash -c "$cmd >> $SNABBVMX_LOG"
-}
-
-function qemu {
-    run_cmd_in_screen "qemu" "`qemu_cmd`"
-}
 
 function monitor { action=$1
     local cmd="sudo ./snabb lwaftr monitor $action"
@@ -101,30 +44,6 @@ function monitor { action=$1
 function tcpreplay { pcap=$1; pci=$2
     local cmd="sudo ./snabb packetblaster replay --no-loop $pcap $pci"
     run_cmd_in_screen "tcpreplay" "$cmd"
-}
-
-function start_test_env {
-    if [[ ! -f "$IMAGE" ]]; then
-       echo "Couldn't find QEMU image: $IMAGE"
-       exit $SKIPPED_CODE
-    fi
-
-    # Run qemu.
-    qemu
-
-    # Wait until VMs are ready.
-    wait_vm_up $SNABB_TELNET0
-
-    # Manually set ip addresses.
-    run_telnet $SNABB_TELNET0 "ifconfig eth0 up" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip -6 addr add $LWAFTR_IPV6_ADDRESS/64 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip addr add $LWAFTR_IPV4_ADDRESS/24 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip neigh add 10.0.1.100 lladdr 02:99:99:99:99:99 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "ip -6 neigh add fc00::1 lladdr 02:99:99:99:99:99 dev eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "route add default gw 10.0.1.100 eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "route -6 add default gw fc00::1 eth0" >/dev/null
-    run_telnet $SNABB_TELNET0 "sysctl -w net.ipv4.conf.all.forwarding=1" >/dev/null
-    run_telnet $SNABB_TELNET0 "sysctl -w net.ipv6.conf.all.forwarding=1" >/dev/null
 }
 
 function create_mirror_tap_if_needed {

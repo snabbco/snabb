@@ -8,13 +8,12 @@ local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
 local main      = require("core.main")
 local S         = require("syscall")
-local Lwaftrgen = require("apps.test.lwaftr").Lwaftrgen
+local Lwaftrgen = require("program.packetblaster.lwaftr.lib").Lwaftrgen
 local Tap       = require("apps.tap.tap").Tap
 local raw       = require("apps.socket.raw")
 local pcap      = require("apps.pcap.pcap")
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local lib       = require("core.lib")
-local ffi       = require("ffi")
 
 local usage = require("program.packetblaster.lwaftr.README_inc")
 

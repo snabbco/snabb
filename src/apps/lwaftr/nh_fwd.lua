@@ -40,11 +40,9 @@ nh_fwd6 = {
 }
 
 local ethernet_header_size = constants.ethernet_header_size
-local n_ether_hdr_size = 14
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
-local n_ipencap = 4
-local n_ipfragment = 44
-local n_ipv4_hdr_size = 20
+local proto_ipv4 = constants.proto_ipv4
+local ipv6_frag = constants.ipv6_frag
 local o_ipv4_checksum = constants.o_ipv4_checksum
 local o_ipv4_dst_addr = constants.o_ipv4_dst_addr
 local o_ipv4_src_addr = constants.o_ipv4_src_addr
@@ -95,6 +93,10 @@ end
 local function copy_ipv6(dst, src)
    ffi.copy(dst, src, 16)
 end
+local function get_ipv4_header_length(ptr)
+   local ver_and_ihl = ptr[0]
+   return lshift(band(ver_and_ihl, 0xf), 2)
+end
 
 -- Set a bogus source IP address fe80::, so we can recognize it later when
 -- it comes back from the VM.
@@ -121,6 +123,7 @@ local function send_ipv4_cache_trigger(r, pkt, mac)
    -- Set a bogus source IP address of 0.0.0.0.
    local ether_dhost = get_ether_dhost_ptr(pkt)
    local ipv4_hdr = get_ethernet_payload(pkt)
+   local ipv4_hdr_size = get_ipv4_header_length(ipv4_header)
    local ipv4_src_ip = get_ipv4_src_ptr(ipv4_hdr)
    local ipv4_checksum = get_ipv4_checksum_ptr(ipv4_hdr)
 
@@ -130,7 +133,7 @@ local function send_ipv4_cache_trigger(r, pkt, mac)
 
    -- Clear checksum to recalculate it with new source IPv4 address.
    wr16(ipv4_checksum, 0)
-   wr16(ipv4_checksum, htons(ipsum(pkt.data + n_ether_hdr_size, n_ipv4_hdr_size, 0)))
+   wr16(ipv4_checksum, htons(ipsum(pkt.data + ethernet_header_size, ipv4_hdr_size, 0)))
    transmit(r, pkt)
 end
 
@@ -281,7 +284,7 @@ function nh_fwd6:push ()
          local ipv6_header = get_ethernet_payload(pkt)
          local proto = get_ipv6_next_header(ipv6_header)
 
-         if proto == n_ipencap or proto == n_ipfragment then
+         if proto == proto_ipv4 or proto == ipv6_frag then
             transmit(output_service, pkt)
          elseif output_vm then
             transmit(output_vm, pkt)
