@@ -332,12 +332,21 @@ function Intel:new (conf)
    -- VMDq checks
    assert(not self.vmdq or device ~= "0x1533" or device ~= "0x157b",
           "VMDq not supported on i210")
-   assert(not self.vmdq or self.macaddr, "VMDq must be set to set macaddr")
+   assert(not self.macaddr or self.vmdq, "VMDq must be set to use MAC address")
    assert(not self.poolnum or self.vmdq, "Pool number only supported for VMDq")
    if self.vmdq then
+      assert(self.macaddr, "MAC address must be set in VMDq mode")
+      assert(self.poolnum, "Pool number must be set in VMDq mode")
       assert(self.rxq >= 4 * self.poolnum and
              self.rxq <= 4 * self.poolnum + 3,
              "Pool number and rxq do not match")
+      if self.driver == "Intel82599" then
+         assert(self.poolnum < 32,
+                "Pool overflow: Intel 82599 supports up to 32 VMDq pools")
+      elseif self.driver == "Intel1g" then
+         assert(self.poolnum < 8,
+                "Pool overflow: Intel i350 supports up to 8 VMDq pools")
+      end
    end
 
    -- Setup device access
