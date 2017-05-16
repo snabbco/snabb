@@ -257,6 +257,7 @@ Intel = {
       mtu = {default=9014},
       rssseed = {default=314159},
       linkup_wait = {default=120},
+      linkup_wait_recheck = {default=0.1},
       wait_for_link = {default=false},
       master_stats = {default=true},
       run_stats = {default=false}
@@ -291,6 +292,8 @@ function Intel:new (conf)
       mtu = conf.mtu or self.config.mtu.default,
       rssseed = conf.rssseed or self.config.mtu.default,
       linkup_wait = conf.linkup_wait or self.config.linkup_wait.default,
+      linkup_wait_recheck =
+         conf.linkup_wait_recheck or self.config.linkup_wait_recheck.default,
       wait_for_link = conf.wait_for_link
    }
 
@@ -757,10 +760,10 @@ function Intel1g:init ()
    self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
    self.r.RLPML(self.mtu + 4) -- mtu + crc
    self:unlock_sw_sem()
-   for i=1, math.floor(self.linkup_wait/2) do
+   for i=1, math.floor(self.linkup_wait/self.linkup_wait_recheck) do
       if self:link_status() then break end
       if not self.wait_for_link then break end
-      C.usleep(2000000)
+      C.usleep(math.floor(self.linkup_wait_recheck * 1e6))
    end
 end
 
@@ -866,24 +869,24 @@ function Intel82599:init ()
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
 
-   for i=1,math.floor(self.linkup_wait/2) do
-      self:disable_interrupts()
-      local reset = bits{ LinkReset=3, DeviceReset=26 }
-      self.r.CTRL(reset)
-      C.usleep(1000)
-      self.r.CTRL:wait(reset, 0)
-      self.r.EEC:wait(bits{AutoreadDone=9})           -- 3.
-      self.r.RDRXCTL:wait(bits{DMAInitDone=3})        -- 4.
+   self:disable_interrupts()
+   local reset = bits{ LinkReset=3, DeviceReset=26 }
+   self.r.CTRL(reset)
+   C.usleep(1000)
+   self.r.CTRL:wait(reset, 0)
+   self.r.EEC:wait(bits{AutoreadDone=9})           -- 3.
+   self.r.RDRXCTL:wait(bits{DMAInitDone=3})        -- 4.
 
-      -- 4.6.4.2
-      -- 3.7.4.2
-      self.r.AUTOC:set(bits { LMS0 = 13, LMS1 = 14 })
-      self.r.AUTOC2(0)
-      self.r.AUTOC2:set(bits { tenG_PMA_PMD_Serial = 17 })
-      self.r.AUTOC:set(bits{restart_AN=12})
-      C.usleep(2000000)
+   -- 4.6.4.2
+   -- 3.7.4.2
+   self.r.AUTOC:set(bits { LMS0 = 13, LMS1 = 14 })
+   self.r.AUTOC2(0)
+   self.r.AUTOC2:set(bits { tenG_PMA_PMD_Serial = 17 })
+   self.r.AUTOC:set(bits{restart_AN=12})
+   for i=1,math.floor(self.linkup_wait/self.linkup_wait_recheck) do
       if self:link_status() then break end
       if not self.wait_for_link then break end
+      C.usleep(math.floor(self.linkup_wait_recheck * 1e6))
    end
 
    -- 4.6.7
