@@ -9,10 +9,10 @@ SNABB_RECV_SPINUP=2 SNABB_RECV_DURATION=5 ./testvmdqrecv.snabb $SNABB_PCI_INTEL0
 SNABB_RECV_SPINUP=2 SNABB_RECV_DURATION=5 ./testvmdqrecv.snabb $SNABB_PCI_INTEL0 "12:34:56:78:9a:bc" nil 1 4 > results.1
 
 kill -9 $BLAST
-test `cat results.* | grep "^RXDGPC" | awk '{print $2}'` -gt 10000
 
+[[ `cat results.* | grep "^RXDGPC" | awk '{print $2}'` -gt 10000 ]] &&\
 # both queues should see packets
-test \( $? -eq 0 \) -a \( `cat results.0 | grep -m 1 fpb | awk '{print $9}'` -gt 0 \)
-test \( $? -eq 0 \) -a \( `cat results.1 | grep -m 1 fpb | awk '{print $9}'` -gt 0 \)
+[[ `cat results.0 | grep -m 1 fpb | awk '{print $9}'` -gt 0 ]] &&\
+[[ `cat results.1 | grep -m 1 fpb | awk '{print $9}'` -gt 0 ]]
 
 exit $?
