@@ -356,6 +356,15 @@ end
 function Intel:disable_interrupts ()
    self.r.EIMC(0xffffffff)
 end
+function Intel:wait_linkup (timeout)
+   if timeout == nil then timeout = self.linkup_wait end
+   if self:link_status() then return true end
+   for i=1,math.max(math.floor(timeout/self.linkup_wait_recheck), 1) do
+      C.usleep(math.floor(self.linkup_wait_recheck * 1e6))
+      if self:link_status() then return true end
+   end
+   return false
+end
 function Intel:init_rx_q ()
    if not self.rxq then return end
    assert((self.rxq >=0) and (self.rxq < self.max_q),
@@ -760,11 +769,7 @@ function Intel1g:init ()
    self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
    self.r.RLPML(self.mtu + 4) -- mtu + crc
    self:unlock_sw_sem()
-   for i=1, math.floor(self.linkup_wait/self.linkup_wait_recheck) do
-      if self:link_status() then break end
-      if not self.wait_for_link then break end
-      C.usleep(math.floor(self.linkup_wait_recheck * 1e6))
-   end
+   if self.wait_for_link then self:wait_linkup() end
 end
 
 function Intel1g:link_status ()
@@ -869,24 +874,29 @@ function Intel82599:init ()
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
 
-   self:disable_interrupts()
-   local reset = bits{ LinkReset=3, DeviceReset=26 }
-   self.r.CTRL(reset)
-   C.usleep(1000)
-   self.r.CTRL:wait(reset, 0)
-   self.r.EEC:wait(bits{AutoreadDone=9})           -- 3.
-   self.r.RDRXCTL:wait(bits{DMAInitDone=3})        -- 4.
+   -- The 82599 devices sometimes just don't come up, especially when
+   -- there is traffic already on the link.  If 2s have passed and the
+   -- link is still not up, loop and retry.
+   local reset_timeout = math.max(self.linkup_wait_recheck, 2)
+   local reset_count = math.max(math.floor(self.linkup_wait / reset_timeout), 1)
+   for i=1,reset_count do
+      self:disable_interrupts()
+      local reset = bits{ LinkReset=3, DeviceReset=26 }
+      self.r.CTRL(reset)
+      C.usleep(1000)
+      self.r.CTRL:wait(reset, 0)
+      self.r.EEC:wait(bits{AutoreadDone=9})           -- 3.
+      self.r.RDRXCTL:wait(bits{DMAInitDone=3})        -- 4.
 
-   -- 4.6.4.2
-   -- 3.7.4.2
-   self.r.AUTOC:set(bits { LMS0 = 13, LMS1 = 14 })
-   self.r.AUTOC2(0)
-   self.r.AUTOC2:set(bits { tenG_PMA_PMD_Serial = 17 })
-   self.r.AUTOC:set(bits{restart_AN=12})
-   for i=1,math.floor(self.linkup_wait/self.linkup_wait_recheck) do
-      if self:link_status() then break end
+      -- 4.6.4.2
+      -- 3.7.4.2
+      self.r.AUTOC:set(bits { LMS0 = 13, LMS1 = 14 })
+      self.r.AUTOC2(0)
+      self.r.AUTOC2:set(bits { tenG_PMA_PMD_Serial = 17 })
+      self.r.AUTOC:set(bits{restart_AN=12})
+
       if not self.wait_for_link then break end
-      C.usleep(math.floor(self.linkup_wait_recheck * 1e6))
+      if self:wait_linkup(reset_timeout) then break end
    end
 
    -- 4.6.7
