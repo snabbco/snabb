@@ -756,6 +756,8 @@ function Intel:add_receive_MAC (mac)
       end
    end
 
+   assert(mac_index, "Max number of MAC addresses reached")
+
    -- associate MAC with the app's VMDq pool
    self:enable_MAC_for_pool(mac_index)
 end
