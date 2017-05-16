@@ -68,6 +68,7 @@ PFVLVF      0x0F100 +0x04*0..63     RW PF VM VLAN Pool Filter
 PFVLVFB     0x0F200 +0x04*0..127    RW PF VM VLAN Pool Filter Bitmap
 PFVFRE      0x051E0 +0x04*0..1      RW PF VF Receive Enable
 PFVFSPOOF   0x08200 +0x04*0..7      RW PF VF Anti Spoof Control
+PFVMVIR     0x08000 +0x04*0..63     RW PF VM VLAN Insert Register
 PFVML2FLT   0x0F000 +0x04*0..63     RW PF VM L2 Control Register
 QPRC        0x01030 +0x40*0..15     RC Queue Packets Received Count
 QPRDC       0x01430 +0x40*0..15     RC Queue Packets Received Drop Count
@@ -277,6 +278,7 @@ Intel = {
       vmdq = {default=false},
       macaddr = {},
       poolnum = {},
+      vlan = {},
       txq = {},
       rxq = {},
       mtu = {default=9014},
@@ -317,7 +319,8 @@ function Intel:new (conf)
       wait_for_link = conf.wait_for_link,
       vmdq = conf.vmdq,
       poolnum = conf.poolnum,
-      macaddr = conf.macaddr
+      macaddr = conf.macaddr,
+      vlan = conf.vlan
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -360,7 +363,8 @@ function Intel:new (conf)
    self:init_tx_q()
    self:init_rx_q()
    self:set_MAC()
-   -- TODO: set VLAN, mirror here
+   self:set_VLAN()
+   -- TODO: set mirror here
 
    -- Initialize per app statistics
    counter.set(self.shm.mtu, self.mtu)
@@ -767,6 +771,71 @@ function Intel:set_transmit_MAC (mac)
    self.r.PFVFSPOOF[math.floor(poolnum/8)]:set(bits{MACAS=poolnum%8})
 end
 
+-- set VLAN for the driver instance
+function Intel:set_VLAN ()
+   local vlan = self.vlan
+   if not vlan then return end
+   assert(vlan>=0 and vlan<4096, "bad VLAN number")
+   self:add_receive_VLAN(vlan)
+   self:set_tag_VLAN(vlan)
+end
+
+function Intel:add_receive_VLAN (vlan)
+   assert(vlan>=0 and vlan<4096, "bad VLAN number")
+   local vlan_index
+
+   -- scan to see if the VLAN is already recorded or find the
+   -- first free VLAN index
+   for idx=1, self.max_vlan do
+      local valid = self.r.PFVLVF[idx]:bits(31, 1)
+
+      if valid == 0 then
+         vlan_index = idx
+         self.r.VFTA[math.floor(vlan/32)]:set(bits{Ena=vlan%32})
+         self.r.PFVLVF[vlan_index](bits({Vl_En=31},vlan))
+         break
+      else
+         if self.r.PFVLVF[idx]:bits(0, 11) == vlan then
+            mac_index = idx
+            break
+         end
+      end
+
+   end
+
+   assert(vlan_index, "Max number of VLAN IDs reached")
+
+   self.r.PFVLVFB[2*vlan_index + math.floor(self.poolnum/32)]
+      :set(bits{PoolEna=self.poolnum%32})
+end
+
+function Intel:set_tag_VLAN (vlan)
+   local poolnum = self.poolnum or 0
+   self.r.PFVFSPOOF[math.floor(poolnum/8)]:set(bits{VLANAS=poolnum%8+8})
+   -- set Port VLAN ID & VLANA to always add VLAN tag
+   -- TODO: on i350 it's the VMVIR register
+   self.r.PFVMVIR[poolnum](bits({VLANA=30}, vlan))
+end
+
+function Intel:unset_VLAN ()
+   local r = self.r
+   local offs, mask = math.floor(self.poolnum/32), bits{PoolEna=self.poolnum%32}
+
+   for vln_ndx = 0, 63 do
+      if band(r.PFVLVFB[2*vln_ndx+offs](), mask) ~= 0 then
+         -- found a vlan this pool belongs to
+         r.PFVLVFB[2*vln_ndx+offs]:clr(mask)
+         if r.PFVLVFB[2*vln_ndx+offs]() == 0 then
+            -- it was the last pool of the vlan
+            local vlan = tonumber(band(r.PFVLVF[vln_ndx](), 0xFFF))
+            r.PFVLVF[vln_ndx](0x0)
+            r.VFTA[math.floor(vlan/32)]:clr(bits{Ena=vlan%32})
+            --self.pf.vlan_set:pop(vlan)
+         end
+      end
+   end
+end
+
 function Intel:rxpackets () return self.r.GPRC()                 end
 function Intel:txpackets () return self.r.GPTC()                 end
 function Intel:rxmcast   () return self.r.MPRC() + self.r.BPRC() end
@@ -784,6 +853,7 @@ Intel1g.offsets = {
     }
 }
 Intel1g.max_mac_addr = 15
+Intel1g.max_vlan = 8
 function Intel1g:init_phy ()
    -- 4.3.1.4 PHY Reset
    self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
@@ -940,6 +1010,7 @@ Intel82599.offsets = {
    }
 }
 Intel82599.max_mac_addr = 127
+Intel82599.max_vlan = 64
 function Intel82599:link_status ()
    local mask = bits { Link_up = 30 }
    return bit.band(self.r.LINKS(), mask) == mask
