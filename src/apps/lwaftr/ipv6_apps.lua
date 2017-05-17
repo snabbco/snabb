@@ -14,6 +14,8 @@ local checksum = require("lib.checksum")
 local packet = require("core.packet")
 local counter = require("core.counter")
 local lib = require("core.lib")
+local link = require("core.link")
+local engine = require("core.app")
 
 local bit = require("bit")
 local ffi = require("ffi")

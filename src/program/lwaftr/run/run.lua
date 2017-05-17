@@ -4,10 +4,10 @@ local S          = require("syscall")
 local config     = require("core.config")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local lib        = require("core.lib")
-local numa       = require("lib.numa")
 local setup      = require("program.lwaftr.setup")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local lwutil = require("apps.lwaftr.lwutil")
+local engine = require("core.app")
 
 local fatal, file_exists = lwutil.fatal, lwutil.file_exists
 local nic_exists = lwutil.nic_exists
@@ -21,7 +21,7 @@ function parse_args(args)
    if #args == 0 then show_usage(1) end
    local conf_file, v4, v6
    local ring_buffer_size
-   local opts = { verbosity = 0, bench_file = 'bench.csv' }
+   local opts = { verbosity = 0 }
    local scheduling = { ingress_drop_monitor = 'flush' }
    local handlers = {}
    function handlers.n (arg) opts.name = assert(arg) end
@@ -137,7 +137,11 @@ function run(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local use_splitter = requires_splitter(opts, conf)
 
-   if opts.name then engine.claim_name(opts.name) end
+   -- If there is a name defined on the command line, it should override
+   -- anything defined in the config.
+   if opts.name then
+      conf.softwire_config.name = opts.name
+   end
 
    local c = config.new()
    local setup_fn, setup_args
@@ -157,6 +161,7 @@ function run(args)
       setup.reconfigurable(scheduling, setup_fn, c, conf, unpack(setup_args))
    else
       setup.apply_scheduling(scheduling)
+      setup.validate_config(conf)
       setup_fn(c, conf, unpack(setup_args))
    end
 
@@ -217,8 +222,10 @@ function run(args)
       end
    end
 
-   if not opts.reconfigurable then engine.busywait = true end
-
+   if not opts.reconfigurable then
+      -- The leader does not need all the CPU, only the followers do.
+      engine.busywait = true
+   end
    if opts.duration then
       engine.main({duration=opts.duration, report={showlinks=true}})
    else

@@ -1,7 +1,7 @@
 ----------------------------------------------------------------------------
 -- LuaJIT x86/x64 disassembler module.
 --
--- Copyright (C) 2005-2015 Mike Pall. All rights reserved.
+-- Copyright (C) 2005-2017 Mike Pall. All rights reserved.
 -- Released under the MIT license. See Copyright Notice in luajit.h
 ----------------------------------------------------------------------------
 -- This is a helper module used by the LuaJIT machine code dumper module.
@@ -244,6 +244,7 @@ nil,"||psrlvVSXrvm","||psravdXrvm","||psllvVSXrvm",
 [0xde] = "||aesdecXrvm", [0xdf] = "||aesdeclastXrvm",
 --Fx
 [0xf0] = "|||crc32TrBmt",[0xf1] = "|||crc32TrVmt",
+[0xf7] = "| sarxVrmv| shlxVrmv| shrxVrmv",
 },
 
 ["3a"] = { -- [66] 0f 3a xx
@@ -273,6 +274,8 @@ nil,nil,nil,nil,
 [0x60] = "||pcmpestrmXrmu",[0x61] = "||pcmpestriXrmu",
 [0x62] = "||pcmpistrmXrmu",[0x63] = "||pcmpistriXrmu",
 [0xdf] = "||aeskeygenassistXrmu",
+--Fx
+[0xf0] = "||| rorxVrmu",
 },
 }
 
@@ -414,8 +417,8 @@ local function putop(ctx, text, operands)
 	      (ctx.rexx and "x" or "")..(ctx.rexb and "b" or "")..
 	      (ctx.vexl and "l" or "")
     if ctx.vexv and ctx.vexv ~= 0 then t = t.."v"..ctx.vexv end
-    if t ~= "" then text = ctx.rex.."."..t.." "..text
-    elseif ctx.rex == "vex" then text = "v"..text end
+    if t ~= "" then text = ctx.rex.."."..t.." "..gsub(text, "^ ", "")
+    elseif ctx.rex == "vex" then text = gsub("v"..text, "^v ", "") end
     ctx.rexw = false; ctx.rexr = false; ctx.rexx = false; ctx.rexb = false
     ctx.rex = false; ctx.vexl = false; ctx.vexv = false
   end
@@ -815,7 +818,7 @@ map_act = {
       m = b%32; b = (b-m)/32
       local nb = b%2; b = (b-nb)/2
       if nb == 0 then ctx.rexb = true end
-      local nx = b%2; b = (b-nx)/2
+      local nx = b%2
       if nx == 0 then ctx.rexx = true end
       b = byte(ctx.code, pos, pos)
       if not b then return incomplete(ctx) end

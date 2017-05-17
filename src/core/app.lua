@@ -27,7 +27,10 @@ local use_restart = false
 test_skipped_code = 43
 
 -- Set the directory for the named programs.
-named_program_root = shm.root .. "/" .. "by-name"
+local named_program_root = shm.root .. "/" .. "by-name"
+
+-- The currently claimed name (think false = nil but nil makes strict.lua unhappy).
+program_name = false
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
@@ -65,11 +68,15 @@ maxsleep = 100
 -- loop (100% CPU) instead of sleeping according to the Hz setting.
 busywait = false
 
+-- True when the engine is running the breathe loop.
+local running = false
+
 -- Return current monotonic time in seconds.
 -- Can be used to drive timers in apps.
 monotonic_now = false
 function now ()
-   return monotonic_now or C.get_monotonic_time()
+   -- Return cached time only if it is fresh
+   return (running and monotonic_now) or C.get_monotonic_time()
 end
 
 -- Run app:methodname() in protected mode (pcall). If it throws an
@@ -130,27 +137,57 @@ function configure (new_config)
    counter.add(configs)
 end
 
+-- Removes the claim on a name, freeing it for other programs.
+--
+-- This relinquish a claim on a name if one exists. if the name does not
+-- exist it will raise an error with an error message.
+function unclaim_name(claimed_name)
+   local name = assert(claimed_name or program_name, "No claim to name.")
+   local name_fq = named_program_root .. "/" .. name
+   local piddir = assert(S.readlink(name_fq))
+   local backlink = piddir .. "/name"
+
+   -- First unlink the backlink
+   assert(S.unlink(backlink))
+
+   -- Remove the actual namedir
+   assert(S.unlink(name_fq))
+
+   -- Remove from the name from the configuration
+   program_name = false
+end
+
 -- Claims a name for a program so it's identified by name by other processes.
 --
 -- The name given to the function must be unique; if a name has been used before
 -- by an active process the function will error displaying an appropriate error
--- message. The program can only claim one name, successive calls will produce
--- an error.
+-- message.Successive calls to claim_name with the same name will return with
+-- inaction. If the program has already claimed a name and this is called with
+-- a different name, it will attempt to claim the new name and then unclaim the
+-- old name. If an problem occurs whilst claiming the new name, the old name
+-- will remain claimed.
 function claim_name(name)
-   configuration[name] = name
-   local bynamedir = "by-name/"
    local namedir_fq = named_program_root .. "/" .. name
-   local piddir = shm.root .. "/" .. S.getpid()
+   local procpid = S.getpid()
+   local piddir = shm.root .. "/" .. procpid
    local backlinkdir = piddir.."/name"
 
+   -- If we're being asked to claim the name we already have, return false.
+   if program_name == name then
+      return
+   end
+
    -- Verify that the by-name directory exists.
-   shm.mkdir(bynamedir)
+   shm.mkdir("by-name/")
 
-   -- Verify that we've not already claimed a name
-   assert(configuration.name == nil, "Name already claimed, cannot claim: "..name)
+   -- Create the new symlink (name has probably been taken if this fails).
+   assert(S.symlink(piddir, namedir_fq), "Name already taken.")
 
-   -- Create the new symlink.
-   assert(S.symlink(piddir, namedir_fq))
+   -- We've successfully secured the new name, so we can unclaim the old now.
+   if program_name ~= false then unclaim_name(program_name) end
+
+   -- Save our current name so we know what it is later.
+   program_name = name
 
    -- Create a backlink so to the symlink so we can easily cleanup
    assert(S.symlink(namedir_fq, backlinkdir))
@@ -342,49 +379,63 @@ end
 function tsort (nodes, entries, successors)
    local visited = {}
    local post_order = {}
+   local maybe_visit
    local function visit(node)
       visited[node] = true
-      for _,succ in ipairs(successors[node]) do
-         if not visited[succ] then visit(succ) end
-      end
+      for succ,_ in pairs(successors[node]) do maybe_visit(succ) end
       table.insert(post_order, node)
    end
-   for _,node in ipairs(entries) do
+   function maybe_visit(node)
       if not visited[node] then visit(node) end
    end
-   for name,node in pairs(nodes) do
-      if not visited[node] then visit(node) end
-   end
+   for node,_ in pairs(entries) do maybe_visit(node) end
+   for node,_ in pairs(nodes) do maybe_visit(node) end
    local ret = {}
-   while #post_order > 0 do
-      table.insert(ret, table.remove(post_order))
-   end
+   while #post_order > 0 do table.insert(ret, table.remove(post_order)) end
    return ret
 end
 
 breathe_pull_order = {}
 breathe_push_order = {}
 
+-- Sort the links in the app graph, and arrange to run push() on the
+-- apps on the receiving ends of those links.  This will run app:push()
+-- once for each link, which for apps with multiple links may cause the
+-- app's push function to run multiple times in a breath.
 function compute_breathe_order ()
-   breathe_pull_order = {}
+   breathe_pull_order, breathe_push_order = {}, {}
+   local entries = {}
    local inputs = {}
-   for name, app in pairs(app_table) do
-      if app.pull then table.insert(breathe_pull_order, app) end
-      for _,link in pairs(app.input) do inputs[link] = app  end
-   end
    local successors = {}
-   for name, app in pairs(app_table) do
-      local succs = {}
-      for _,link in pairs(app.output) do table.insert(succs, inputs[link]) end
-      successors[app] = succs
+   for _,app in pairs(app_table) do
+      if app.pull then
+         table.insert(breathe_pull_order, app)
+         for _,link in pairs(app.output) do
+            entries[link] = true;
+            successors[link] = {}
+         end
+      end
+      for _,link in pairs(app.input) do inputs[link] = app end
    end
-   breathe_push_order = tsort(app_table, breathe_pull_order, successors)
+   for link,app in pairs(inputs) do
+      successors[link] = {}
+      if not app.pull then
+         for _,succ in pairs(app.output) do
+            successors[link][succ] = true
+            if not successors[succ] then successors[succ] = {}; end
+         end
+      end
+   end
+   for link,succs in pairs(successors) do
+      for succ,_ in pairs(succs) do
+         if not successors[succ] then successors[succ] = {}; end
+      end
+   end
+   local link_order = tsort(inputs, entries, successors)
    local i = 1
-   while i <= #breathe_push_order do
-      if breathe_push_order[i].push then
-         i = i + 1
-      else
-         table.remove(breathe_push_order, i)
+   for _,link in ipairs(link_order) do
+      if breathe_push_order[#breathe_push_order] ~= inputs[link] then
+         table.insert(breathe_push_order, inputs[link])
       end
    end
 end
@@ -396,7 +447,7 @@ function main (options)
    local no_timers = options.no_timers
    if options.duration then
       assert(not done, "You can not have both 'duration' and 'done'")
-      done = lib.timer(options.duration * 1e9)
+      done = lib.timeout(options.duration)
    end
 
    local breathe = breathe
@@ -443,6 +494,7 @@ function pace_breathing ()
 end
 
 function breathe ()
+   running = true
    monotonic_now = C.get_monotonic_time()
    -- Restart: restart dead apps
    restart_dead_apps()
@@ -467,6 +519,7 @@ function breathe ()
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
+   running = false
 end
 
 function report (options)
@@ -572,7 +625,7 @@ function selftest ()
    print("empty -> c1")
    configure(c1)
    assert(#breathe_pull_order == 0)
-   assert(#breathe_push_order == 2)
+   assert(#breathe_push_order == 1)
    assert(app_table.app1 and app_table.app2)
    local orig_app1 = app_table.app1
    local orig_app2 = app_table.app2
@@ -600,7 +653,7 @@ function selftest ()
    assert(app_table.app1 ~= orig_app1) -- should be restarted
    assert(app_table.app2 == orig_app2) -- should be the same
    assert(#breathe_pull_order == 0)
-   assert(#breathe_push_order == 2)
+   assert(#breathe_push_order == 1)
    print("c1 -> empty")
    configure(config.new())
    assert(#breathe_pull_order == 0)
@@ -650,18 +703,29 @@ function selftest ()
    main({duration = 4, report = {showapps = true}})
    assert(app_table.app3 ~= orig_app3) -- should be restarted
 
+   -- Check one can't unclaim a name if no name is claimed.
+   assert(not pcall(unclaim_name))
+   
    -- Test claiming and enumerating app names
    local basename = "testapp"
-   claim_name(basename.."1")
+   local progname = basename.."1"
+   claim_name(progname)
    
-   -- Ensure to claim two names fails
-   assert(not pcall(claim_name, basename.."2"))
-
    -- Check if it can be enumerated.
-   local progs = enumerate_named_programs()
-   assert(progs)
-   assert(progs["testapp1"])
+   local progs = assert(enumerate_named_programs())
+   assert(progs[progname])
 
-   -- Ensure that trying to take the same name fails
-   assert(not pcall(claim_name, basename.."1"))
+   -- Ensure changing the name succeeds
+   local newname = basename.."2"
+   claim_name(newname)
+   local progs = assert(enumerate_named_programs())
+   assert(progs[progname] == nil)
+   assert(progs[newname])
+
+   -- Ensure unclaiming the name occurs
+   unclaim_name()
+   local progs = enumerate_named_programs()
+   assert(progs[newname] == nil)
+   assert(not program_name)
+   
 end

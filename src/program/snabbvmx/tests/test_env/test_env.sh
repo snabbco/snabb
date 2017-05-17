@@ -69,6 +69,7 @@ function start_test_env {
     wait_vm_up $SNABB_TELNET0
 
     # Configure eth0 interface in the VM.
+    echo -n "Setting up VM..."
 
     # Bring up interface.
     run_telnet $SNABB_TELNET0 "ifconfig eth0 up" >/dev/null
@@ -88,4 +89,6 @@ function start_test_env {
     # Activate IPv4 and IPv6 forwarding.
     run_telnet $SNABB_TELNET0 "sysctl -w net.ipv4.conf.all.forwarding=1" >/dev/null
     run_telnet $SNABB_TELNET0 "sysctl -w net.ipv6.conf.all.forwarding=1" >/dev/null
+
+    echo " [OK]"
 }

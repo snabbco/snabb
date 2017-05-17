@@ -10,12 +10,13 @@ local utils = require("pf.utils")
 
 function usage()
    local content = [=[
-Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua] <expression>
+Usage: pflua-compile [-O0] [--bpf-asm | --bpf-lua | --lua | --native | --match] <expression>
 
 Options:
    --bpf-asm   Print libpcap-generated BPF asm code for the pflang <expression>
    --bpf-lua   Print Lua code compiled from BPF for the pflang <expression>
    --lua       Print Lua code compiled directly for the pflang <expression> (DEFAULT)
+   --native    Print dynasm-generated asm code for the pflang <expression>
    --match     Print Lua code compiled from the pfmatch <expression>
 
    -O0         Disable optimizations. (Optimizations are on by default) ]=]
@@ -36,7 +37,7 @@ if flags["--help"] or flags["-h"] then
 end
 
 -- No code-generation flag defined
-if (not(flags["--bpf-asm"] or flags["--bpf-lua"] or flags["--lua"] or flags['--match'])) then
+if (not(flags["--bpf-asm"] or flags["--bpf-lua"] or flags["--lua"] or flags["--native"] or flags['--match'])) then
    -- Default action
    flags["--lua"] = true
 end
@@ -56,6 +57,9 @@ if flags["--bpf-lua"] then
 end
 if flags["--lua"] then
    print(pf.compile_filter(filter, {source=true, optimize=optimize}))
+end
+if flags["--native"] then
+   print(pf.compile_filter(filter, {native=true, source=true, optimize=optimize}))
 end
 if flags["--match"] then
    print(match.compile(filter, {source=true, optimize=optimize}))

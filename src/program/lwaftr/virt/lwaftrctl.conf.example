@@ -15,6 +15,7 @@ QEMU_CORE=0
 MEM=2G
 HUGEPAGES_FS=/dev/hugepages
 
+KERNEL_PARAMS=
 BZ_IMAGE=~/.test_env/bzImage
 VM_IMAGE=~/.test_env/lwaftr-vm.img
 
@@ -24,6 +25,8 @@ VM_IP=10.21.21.2
 
 IFACE=mgmt0
 NETSCRIPT=$SNABB_LWAFTR/virt/setup_networks/lwaftr1.sh
+
+SHARED_LOCATION=
 
 # SnabbNFV
 
