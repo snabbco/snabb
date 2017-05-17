@@ -217,7 +217,8 @@ function run(args)
       end
    end
 
-   engine.busywait = true
+   if not opts.reconfigurable then engine.busywait = true end
+
    if opts.duration then
       engine.main({duration=opts.duration, report={showlinks=true}})
    else
