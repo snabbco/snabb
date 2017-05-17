@@ -47,7 +47,9 @@ function start (name, luacode)
       for key, value in pairs(S.environ()) do
          table.insert(env, key.."="..value)
       end
-      S.execve(("/proc/%d/exe"):format(S.getpid()), {}, env)
+      local filename = ("/proc/%d/exe"):format(S.getpid())
+      local argv = { ("[snabb worker '%s' for %d]"):format(name, S.getppid()) }
+      S.execve(filename, argv, env)
    else
       -- Parent process
       children[name] = { pid = pid }
