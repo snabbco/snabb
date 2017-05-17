@@ -67,6 +67,8 @@ function select_program (args)
          local opt = table.remove(args, 1)
          if opt == '-h' or opt == '--help' then
             usage(0)
+         elseif opt == '-v' or opt == '--version' then
+            version()
          else
             print("unrecognized option: "..opt)
             usage(1)
@@ -90,6 +92,17 @@ function usage (status)
    print("If you rename (or copy or symlink) this executable with one of")
    print("the names above then that program will be chosen automatically.")
    os.exit(status)
+end
+
+function version ()
+   print(ffi.string(C.basename(C.argv[0])).." "..require('core.version').version)
+   print([[
+Copyright (C) 2012-2017 Snabb authors; see revision control logs for details.
+License: <https://www.apache.org/licenses/LICENSE-2.0>
+
+Snabb is open source software.  For more information on Snabb, see
+https://github.com/snabbco/snabb.]])
+   os.exit(0)
 end
 
 function programname (name)
