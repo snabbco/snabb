@@ -695,6 +695,7 @@ function Intel:stop ()
    end
    if self.vmdq then
       self.unset_MAC()
+      self.unset_VLAN()
    end
    if self.fd:flock("nb, ex") then
       self.r.CTRL:clr( bits { SETLINKUP = 6 } )
@@ -830,7 +831,6 @@ function Intel:unset_VLAN ()
             local vlan = tonumber(band(r.PFVLVF[vln_ndx](), 0xFFF))
             r.PFVLVF[vln_ndx](0x0)
             r.VFTA[math.floor(vlan/32)]:clr(bits{Ena=vlan%32})
-            --self.pf.vlan_set:pop(vlan)
          end
       end
    end
