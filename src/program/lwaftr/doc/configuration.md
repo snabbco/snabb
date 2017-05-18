@@ -174,10 +174,7 @@ An entry's `psid-length` and `reserved-ports-bit-count` must not exceed
 16 when summed. The shift parameter is calculated from the two parameters
 in this equation:
 
-   shift = `psid-length` + `reserved-ports-bit-count` - 16
-
-It's only necessary to specify `psid-length` as
-`reserved-ports-bit-count` defaults to 0.
+   shift = 16 - `psid-length` + `reserved-ports-bit-count`
 
 ## Ingress and egress filters
 

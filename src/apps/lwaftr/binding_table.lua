@@ -106,7 +106,7 @@ function BTLookupQueue:process_queue()
       for n = 0, self.length-1 do
          local ipv4 = streamer.entries[n].key.ipv4
          local port = streamer.entries[n].key.psid
-         streamer.entries[n].key.psid = self.binding_table:lookup_psid(ipv4, port) or 0
+         streamer.entries[n].key.psid = self.binding_table:lookup_psid(ipv4, port)
       end
       streamer:stream()
    end
@@ -158,7 +158,7 @@ end
 
 
 function BindingTable:lookup(ipv4, port)
-   local psid = self:lookup_psid(ipv4, port) or 0
+   local psid = self:lookup_psid(ipv4, port)
    lookup_key.ipv4 = ipv4
    lookup_key.psid = psid
    local entry = self.softwires:lookup_ptr(lookup_key)
@@ -193,7 +193,7 @@ end
 -- Iterate over the set of IPv4 addresses managed by a binding
 -- table. Invoke like:
 --
---   for entry in bt:iterate_psid_map() do ... end
+--   for ipv4_lo, ipv4_hi, psid_info in bt:iterate_psid_map() do ... end
 --
 -- The IPv4 values are host-endianness uint32 values, and are an
 -- inclusive range to which the psid_info applies.  The psid_info is a
