@@ -215,7 +215,13 @@ local function parse_softwires(parser, psid_map, br_address_count)
       end
    }
 
-   local softwire_key_t = binding_table.softwire_key_t
+   local softwire_key_t = ffi.typeof[[
+     struct {
+         uint32_t ipv4;       // Public IPv4 address of this softwire (host-endian).
+         uint16_t padding;    // Zeroes.
+         uint16_t psid;       // Port set ID.
+     } __attribute__((packed))
+   ]]
    -- FIXME: Pull this type from the yang model, not out of thin air.
    local softwire_value_t = ffi.typeof[[
       struct {
@@ -344,11 +350,6 @@ local function migrate_conf(old)
    }
 end
 
-local function migrate_legacy(stream)
-   local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
-   return migrate_conf(conf)
-end
-
 local function increment_br(conf)
    for entry in conf.softwire_config.binding_table.softwire:iterate() do
       -- Sadly it's not easy to make an updater that always works for
@@ -452,18 +453,32 @@ local function v2_migration(src, conf_file)
    return conf
 end
 
+local function v1_to_v2_config(conf, conf_file)
+   -- Because we're changing underlying schema stuff we're building up a hybrid
+   -- schema which we need to load it into so we need to convert conf to a file.
+   local memfile = util.string_output_file()
+   yang.print_data_for_schema_by_name("snabb-softwire-v1", conf, memfile)
+   return v2_migration(memfile:flush(), conf_file)
+end
+
+local function migrate_legacy(stream)
+   local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
+   local v_3_0_1 = migrate_conf(conf)
+   return v1_to_v2_config(increment_br(v_3_0_1))
+end
+
 
 local function migrate_3_0_1(conf_file)
    local data = require('lib.yang.data')
    local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   return v2_migration(increment_br(data.load_data_for_schema_by_name(
+   return v1_to_v2_config(increment_br(data.load_data_for_schema_by_name(
                           'snabb-softwire-v1', str, conf_file)), conf_file)
 end
 
 local function migrate_3_0_1bis(conf_file)
-   return v2_migration(increment_br(yang.load_configuration(
-                       conf_file, {schema_name='snabb-softwire-v1'})),
-                       conf_file)
+   return v1_to_v2_config(increment_br(yang.load_configuration(
+			  conf_file, {schema_name='snabb-softwire-v1'})),
+                          conf_file)
 end
 
 local function migrate_3_2_0(conf_file)
