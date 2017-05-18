@@ -71,7 +71,7 @@ function load_configuration(filename, opts)
       local compiled = result
       if opts.schema_name and opts.schema_name ~= compiled.schema_name then
          log('expected schema name %s in compiled file, but got %s',
-             opts.schema_name, compiled.schema.name)
+             opts.schema_name, compiled.schema_name)
          return
       end
       if opts.revision_date and opts.revision_date ~= schema.revision_date then
