@@ -95,7 +95,12 @@ function usage (status)
 end
 
 function version ()
-   print(ffi.string(C.basename(C.argv[0])).." "..require('core.version').version)
+   local v = require('core.version')
+   local version_str = v.version
+   if v.extra_version ~= '' then
+      version_str = version_str.." ("..v.extra_version..")"
+   end
+   print(ffi.string(C.basename(C.argv[0])).." "..version_str)
    print([[
 Copyright (C) 2012-2017 Snabb authors; see revision control logs for details.
 License: <https://www.apache.org/licenses/LICENSE-2.0>
