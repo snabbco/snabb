@@ -11,6 +11,7 @@ local yang = require('lib.yang.yang')
 local stream = require('lib.yang.stream')
 local binding_table = require("apps.lwaftr.binding_table")
 local Parser = require("program.lwaftr.migrate_configuration.conf_parser").Parser
+local data = require('lib.yang.data')
 
 local br_address_t = ffi.typeof('uint8_t[16]')
 local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
@@ -214,7 +215,13 @@ local function parse_softwires(parser, psid_map, br_address_count)
       end
    }
 
-   local softwire_key_t = binding_table.softwire_key_t
+   local softwire_key_t = ffi.typeof[[
+     struct {
+         uint32_t ipv4;       // Public IPv4 address of this softwire (host-endian).
+         uint16_t padding;    // Zeroes.
+         uint16_t psid;       // Port set ID.
+     } __attribute__((packed))
+   ]]
    -- FIXME: Pull this type from the yang model, not out of thin air.
    local softwire_value_t = ffi.typeof[[
       struct {
@@ -261,6 +268,7 @@ function load_binding_table(file)
    local source = stream.open_input_byte_stream(file)
    return parse_binding_table(Parser.new(source:as_text_stream()))
 end
+
 
 local function migrate_conf(old)
    function convert_ipv4(addr)
@@ -342,11 +350,6 @@ local function migrate_conf(old)
    }
 end
 
-local function migrate_legacy(stream)
-   local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
-   return migrate_conf(conf)
-end
-
 local function increment_br(conf)
    for entry in conf.softwire_config.binding_table.softwire:iterate() do
       -- Sadly it's not easy to make an updater that always works for
@@ -366,20 +369,126 @@ local function increment_br(conf)
    return conf
 end
 
+local function remove_address_list(conf)
+   local bt = conf.softwire_config.binding_table
+   for key, entry in cltable.pairs(bt.softwire) do
+      local br = entry.br or 1
+      entry.br_address = assert(bt.br_address[br])
+      entry.br = nil
+   end
+   return conf
+end
+
+local function remove_psid_map(conf)
+   -- We're actually going to load the psidmap in the schema so ranges can easily be
+   -- looked up. With support of end-addr simply trying to lookup by addr will fail.
+   -- Luckily this is the last time this should bother us hopefully.
+   local function load_range_map(conf)
+      local rangemap = require("apps.lwaftr.rangemap")
+      local psid_map_value_t = binding_table.psid_map_value_t
+
+      -- This has largely been taken from the binding_table.lua at 3db2896
+      -- however it only builds the psidmap and not the entire binding table.
+      local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
+      local psid_value = psid_map_value_t()
+      for k, v in cltable.pairs(conf.psid_map) do
+         local psid_length, shift = v.psid_length, v.shift
+         shift = shift or 16 - psid_length - (v.reserved_ports_bit_count or 0)
+         assert(psid_length + shift <= 16,
+               'psid_length '..psid_length..' + shift '..shift..
+               ' should not exceed 16')
+         psid_value.psid_length, psid_value.shift = psid_length, shift
+         psid_builder:add_range(k.addr, v.end_addr or k.addr, psid_value)
+      end
+      return psid_builder:build(psid_map_value_t())
+   end
+
+   local psid_map = load_range_map(conf.softwire_config.binding_table)
+
+   -- Remove the psid-map and add it to the softwire.
+   local bt = conf.softwire_config.binding_table
+   for key, entry in cltable.pairs(bt.softwire) do
+      -- Find the port set for the ipv4 address
+      local port_set = psid_map:lookup(key.ipv4)
+      assert(port_set, "Unable to migrate conf: softwire without psidmapping")
+
+      -- Add the psidmapping to the softwire
+      local shift, length = port_set.value.shift, port_set.value.psid_length
+      entry.port_set = {
+         psid_length=length,
+         reserved_ports_bit_count=(16 - shift - length)
+      }
+   end
+
+   return conf
+end
+
+local function v2_migration(src, conf_file)
+   -- Lets create a custom schema programmatically as an intermediary so we can
+   -- switch over to v2 of snabb-softwire config.
+   local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
+   local v1_binding_table = v1_schema.body["softwire-config"].body["binding-table"]
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   local binding_table = hybridscm.body["softwire-config"].body["binding-table"]
+
+   -- Add the schema from v1 that we need to convert them.
+   binding_table.body["br-address"] = v1_binding_table.body["br-address"]
+   binding_table.body["psid-map"] = v1_binding_table.body["psid-map"]
+   binding_table.body.softwire.body.br = v1_binding_table.body.softwire.body.br
+   binding_table.body.softwire.body.padding = v1_binding_table.body.softwire.body.padding
+
+   -- Remove the mandatory requirement on softwire.br-address for the migration
+   binding_table.body["softwire"].body["br-address"].mandatory = false
+
+   local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
+
+   -- Remove the br-address leaf-list and add it onto the softwire.
+   conf = remove_address_list(conf)
+   conf.softwire_config.binding_table.br_address = nil
+
+   -- Remove the psid-map and add it to the softwire.
+   conf = remove_psid_map(conf)
+   conf.softwire_config.binding_table.psid_map = nil
+      
+   return conf
+end
+
+local function v1_to_v2_config(conf, conf_file)
+   -- Because we're changing underlying schema stuff we're building up a hybrid
+   -- schema which we need to load it into so we need to convert conf to a file.
+   local memfile = util.string_output_file()
+   yang.print_data_for_schema_by_name("snabb-softwire-v1", conf, memfile)
+   return v2_migration(memfile:flush(), conf_file)
+end
+
+local function migrate_legacy(stream)
+   local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
+   local v_3_0_1 = migrate_conf(conf)
+   return v1_to_v2_config(increment_br(v_3_0_1))
+end
+
+
 local function migrate_3_0_1(conf_file)
    local data = require('lib.yang.data')
    local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   return increment_br(data.load_data_for_schema_by_name(
-                          'snabb-softwire-v1', str, conf_file))
+   return v1_to_v2_config(increment_br(data.load_data_for_schema_by_name(
+                          'snabb-softwire-v1', str, conf_file)), conf_file)
 end
 
 local function migrate_3_0_1bis(conf_file)
-   return increment_br(yang.load_configuration(
-                          conf_file, {schema_name='snabb-softwire-v1'}))
+   return v1_to_v2_config(increment_br(yang.load_configuration(
+			  conf_file, {schema_name='snabb-softwire-v1'})),
+                          conf_file)
+end
+
+local function migrate_3_2_0(conf_file)
+   local src = io.open(conf_file, "r"):read("*a")
+   return v2_migration(src, conf_file)
 end
 
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
-                    ['3.0.1.1'] = migrate_3_0_1bis }
+                    ['3.0.1.1'] = migrate_3_0_1bis,
+                    ['3.2.0'] = migrate_3_2_0, }
 function run(args)
    local conf_file, version = parse_args(args)
    local migrate = migrators[version]
@@ -388,6 +497,6 @@ function run(args)
       show_usage(1)
    end
    local conf = migrate(conf_file)
-   yang.print_data_for_schema_by_name('snabb-softwire-v1', conf, io.stdout)
+   yang.print_data_for_schema_by_name('snabb-softwire-v2', conf, io.stdout)
    main.exit(0)
 end

@@ -771,6 +771,13 @@ function resolve(schema, features)
             end
          end
       end
+      -- Mark "key" children of lists as being mandatory.
+      if node.kind == 'list' and node.key then
+         for k in node.key:split(' +') do
+            local leaf = assert(node.body[k])
+            leaf.mandatory = true
+         end
+      end
       return node, env
    end
    local function include(dst, src)
@@ -993,7 +1000,7 @@ function selftest()
 
    load_schema_by_name('ietf-yang-types')
    load_schema_by_name('ietf-softwire')
-   load_schema_by_name('snabb-softwire-v1')
+   load_schema_by_name('snabb-softwire-v2')
 
    local inherit_config_schema = [[module config-inheritance {
       namespace cs;

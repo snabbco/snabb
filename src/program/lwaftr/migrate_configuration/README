@@ -17,6 +17,9 @@ configuration.  Available VERSION values are:
   3.0.1.1
     lwAFTR development snapshot where "br" fields of softwires were
     0-based instead of 1-based.
+  3.2.0
+    lwAFTR versions where "br" fields were indexes for the "br-address"
+    leaf-list instead of "br-address" IPv6 entries on the softwire.
 
 The default version is "legacy".
 
