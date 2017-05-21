@@ -9,6 +9,7 @@
 #include "lj_obj.h"
 
 
+#include "lj_auditlog.h"
 #include "lj_gc.h"
 #include "lj_err.h"
 #include "lj_debug.h"
@@ -28,6 +29,7 @@
 #include "lj_dispatch.h"
 #include "lj_vm.h"
 #include "lj_target.h"
+#include "lj_auditlog.h"
 
 /* -- Error handling ------------------------------------------------------ */
 
@@ -122,6 +124,7 @@ static void trace_save(jit_State *J, GCtrace *T)
   setgcrefp(J->trace[T->traceno], T);
   lj_gc_barriertrace(J2G(J), T->traceno);
   lj_gdbjit_addtrace(J, T);
+  lj_auditlog_trace_stop(J, T);
 }
 
 void lj_trace_free(global_State *g, GCtrace *T)
