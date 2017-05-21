@@ -4,17 +4,20 @@ module(..., package.seeall)
 
 local usage = require("program.snabbmark.README_inc")
 
-local basic_apps = require("apps.basic.basic_apps")
-local pci           = require("lib.hardware.pci")
-local ethernet      = require("lib.protocol.ethernet")
-local lib = require("core.lib")
-local ffi = require("ffi")
-local C = ffi.C
+local basic_apps  = require("apps.basic.basic_apps")
+local socket      = require("apps.socket.unix")
+local pci         = require("lib.hardware.pci")
+local ethernet    = require("lib.protocol.ethernet")
+local lib         = require("core.lib")
+local ffi         = require("ffi")
+local C           = ffi.C
 
 function run (args)
    local command = table.remove(args, 1)
    if command == 'basic1' and #args == 1 then
       basic1(unpack(args))
+   elseif command == 'socket_test' and #args == 2 then
+      socket_test(unpack(args))
    elseif command == 'nfvconfig' and #args == 3 then
       nfvconfig(unpack(args))
    elseif command == 'solarflare' and #args >= 2 and #args <= 3 then
@@ -57,6 +60,37 @@ function basic1 (npackets)
    local finish = C.get_monotonic_time()
    local runtime = finish - start
    local packets = link.stats(engine.app_table.Source.output.tx).txpackets
+   engine.report()
+   print()
+   print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
+end
+
+
+function socket_test (npackets, nsockets)
+   npackets = tonumber(npackets) or error("Invalid number of packets: " .. npackets)
+   nsockets = tonumber(nsockets) or error("Invalid number of sockets: " .. nsockets)
+
+   local c = config.new()
+   config.app(c, "source",    basic_apps.Source)
+   config.app(c, "join",      basic_apps.Tee)
+   config.app(c, "sink",      basic_apps.Sink)
+
+   for i=1,nsockets do
+      config.app(c, "socket0"..i,  socket.UnixSocket, {filename="/tmp/socket0"..i, listen=true, mode="packet"})
+      config.link(c, ("socket0%d.tx  -> join.in%d"):format(i,i))
+   end
+   config.link(c, "source.tx    -> join.in")
+   config.link(c, "join.out     -> sink.in1")
+   engine.configure(c)
+
+   local start = C.get_monotonic_time()
+   timer.activate(timer.new("null", function () end, 1e6, 'repeating'))
+   while link.stats(engine.app_table.source.output.tx).txpackets < npackets do
+      engine.main({duration = 0.01, no_report = true})
+   end
+   local finish = C.get_monotonic_time()
+   local runtime = finish - start
+   local packets = link.stats(engine.app_table.source.output.tx).txpackets
    engine.report()
    print()
    print(("Processed %.1f million packets in %.2f seconds (rate: %.1f Mpps)."):format(packets / 1e6, runtime, packets / runtime / 1e6))
