@@ -492,6 +492,10 @@ If *readonly* is non-nil the shared object is mapped in read-only mode.
 *Readonly* defaults to nil. Fails if the shared object does not already exist.
 Returns a pointer to the mapped object.
 
+— Function **shm.alias** *new-path* *existing-path*
+
+Create an alias (symbolic link) for an object.
+
 — Function **shm.exists** *name*
 
 Returns a true value if shared object by *name* exists.
@@ -909,6 +913,93 @@ lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
   => {foo=42, bar=43, baz=44}
 ```
 
+
+## Multiprocess operation (core.worker)
+
+Snabb can operate as a _group_ of cooperating processes. The _main_
+process is the initial one that you start directly. The optional
+_worker_ processes are children spawned when the main process calls
+the `core.worker` module.
+
+    DIAGRAM:
+                  +----------+
+          +-------+   Main   +-------+
+          |       +----------+       |
+          :            :             :
+    +-----+----+  +----+-----+  +----+-----+
+    | worker 1 |  :   ....   |  | worker N |
+    +----------+  +----------+  +----------+
+
+Each worker is a complete Snabb process. They can define app networks,
+run the engine, and do everything else that ordinary Snabb processes
+do. The exact behavior of each worker is determined by a Lua
+expression provided upon creation.
+
+Groups of Snabb processes each have the following special properties:
+
+- **Group termination**: Terminating the main process automatically terminates all of the
+  workers. This works for all process termination scenarios including
+  `kill -9`.
+- **Shared DMA memory**: DMA memory pointers obtained with `memory.dma_alloc()` are usable by
+  all processes in the group. This means that you can share DMA memory
+  pointers between processes, for example via `shm` shared memory
+  objects, and reference them from any process. (The memory is
+  automatically mapped at the expected address via a `SEGV` signal
+  handler.)
+- **PCI device shutdown**: For each PCI device opened by a process within the group, bus
+  mastering (DMA) is disabled upon termination before any DMA memory
+  is returned to the kernel. This prevents "dangling" DMA requests
+  from corrupting memory that has been freed and reused.
+
+The `core.worker` API functions are available in the main process only:
+
+— Function **worker.start** *name* *luacode*
+
+Start a named worker process. The worker starts with a completely
+fresh Snabb process image (`fork()+execve()`) and then executes the
+string *luacode* as a Lua source code expression.
+
+Example:
+
+```
+worker.start("myworker", [[
+   print("hello world, from a Snabb worker process!")
+   print("could configure and run the engine now...")
+]])
+```
+
+— Function **worker.stop** *name*
+
+Stop a named worker process. The worker is abruptly killed.
+
+Example:
+
+```
+worker.stop("myworker")
+```
+
+— Function **worker.status**
+
+Return a table summarizing the status of all workers. The table key is
+the worker name and the value is a table with `pid` and `alive`
+attributes.
+
+Example:
+
+```
+for w, s in pairs(worker.status()) do
+   print(("  worker %s: pid=%s alive=%s"):format(
+         w, s.pid, s.alive))
+end
+```
+
+Output:
+
+```
+worker w3: pid=21949 alive=true
+worker w1: pid=21947 alive=true
+worker w2: pid=21948 alive=true
+```
 
 ## Main
 
