@@ -22,7 +22,7 @@ counter_names = {
    "in-ipv6-bytes",
    "in-ipv6-packets",
 
--- Outgoing traffic, not including internally generated ICMP error packets.
+-- Outgoing traffic, including internally generated ICMP error packets.
    "out-ipv4-bytes",
    "out-ipv4-packets",
    "out-ipv6-bytes",

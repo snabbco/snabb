@@ -1,12 +1,15 @@
 Usage:
   top [OPTIONS] [<pid>]
 
-  -h, --help
-                             Print usage information.
+Options:
+  -n, --name   <name>   Query by process name.
+  -h, --help            Print usage information.
 
-Display realtime lwaftr statistics for a running lwaftr Snabb Switch
+Display realtime lwaftr statistics for a running Snabb's lwaftr
 instance with <pid>. If <pid> is not supplied and there is only one Snabb
 Switch instance, top will connect to that instance.
+
+It is possible to query a process by name, passing the flag --name.
 
 Example output:
 

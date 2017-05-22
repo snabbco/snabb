@@ -169,6 +169,12 @@ function shutdown (pid)
    end
    -- Free shared memory objects
    if not _G.developer_debug and not lib.getenv("SNABB_SHM_KEEP") then
+      -- Try cleaning up symlinks for named apps, if none exist, fail silently.
+      local backlink = shm.root.."/"..pid.."/name"
+      local name_link = S.readlink(backlink)
+      S.unlink(name_link)
+      S.unlink(backlink)
+
       shm.unlink("/"..pid)
    end
 end

@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+SNABB_PCI0=0000:00:08.0
+SNABB_PCI1=0000:00:09.0
+SNABB_EXE=/root/snabb/src/snabb
+LWAFTR_CONF=/root/lwaftr-migrated.conf
+
+sudo ${SNABB_EXE} lwaftr run --virtio \
+   --conf ${LWAFTR_CONF} \
+   --v4 ${SNABB_PCI0} --v6 ${SNABB_PCI1}

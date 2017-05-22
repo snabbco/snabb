@@ -24,6 +24,7 @@ end
 
 -- Start a named worker to execute the given Lua code (a string).
 function start (name, luacode)
+   shm.mkdir(shm.resolve("group"))
    local pid = S.fork()
    if pid == 0 then
       -- First we perform some initialization functions and then we
@@ -50,6 +51,7 @@ function start (name, luacode)
    else
       -- Parent process
       children[name] = { pid = pid }
+      return pid
    end
 end
 
