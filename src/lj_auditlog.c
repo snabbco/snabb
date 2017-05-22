@@ -54,11 +54,10 @@ static void ensure_log_open()
 static void log(const char *type, void *ptr, unsigned int size)
 {
   ensure_log_open();
-  fixmap(5);
+  fixmap(4);
   str_16("type");    /* = */ str_16("memory");
   str_16("hint");    /* = */ str_16(type);
   str_16("address"); /* = */ uint_64((uint64_t)ptr);
-  str_16("size");    /* = */ uint_64(size);
   str_16("data");    /* = */ bin_32(ptr, size);
 }
 
