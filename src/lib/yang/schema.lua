@@ -900,6 +900,25 @@ function load_schema_by_name(name, revision)
 end
 load_schema_by_name = util.memoize(load_schema_by_name)
 
+function lookup_identity (fqid)
+   local schema_name, id = fqid:match("^([^:]*):(.*)$")
+   local schema, env = load_schema_by_name(schema_name)
+   local id_thunk = env.identities[id]
+   if not id_thunk then
+      error('no identity '..id..' in module '..schema_name)
+   end
+   return id_thunk() -- Force the lazy lookup.
+end
+
+function identity_is_instance_of (identity, fqid)
+   for _, base in ipairs(identity.bases) do
+      if base == fqid then return true end
+      local base_id = lookup_identity(base)
+      if identity_is_instance_of(base_id, fqid) then return true end
+   end
+   return false
+end
+
 function selftest()
    print('selftest: lib.yang.schema')
    local test_schema = [[module fruit {
@@ -997,6 +1016,8 @@ function selftest()
    assert(#env.identities["bar"]().bases == 1)
    assert(env.identities["bar"]().bases[1] == 'fruit:foo')
    assert(#env.identities["foo"]().bases == 0)
+
+   assert(#lookup_identity("ietf-alarms:alarm-identity").bases == 0)
 
    -- Check that groupings get inlined into their uses.
    assert(schema.body['fruit-bowl'])

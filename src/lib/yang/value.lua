@@ -79,7 +79,15 @@ function types.decimal64.tostring(val)
 end
 
 types.empty = unimplemented('empty')
-types.identityref = unimplemented('identityref')
+
+types.identityref = {}
+function types.identityref.parse(str, what)
+   return assert(str, 'missing value for '..what)
+end
+function types.identityref.tostring(val)
+   return val
+end
+
 types['instance-identifier'] = unimplemented('instance-identifier')
 leafref = unimplemented('leafref')
 
