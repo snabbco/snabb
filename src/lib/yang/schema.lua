@@ -701,6 +701,7 @@ function resolve(schema, features)
             node.union = union
          elseif node.id == 'identityref' then
             node.bases = resolve_bases(node.bases, env)
+            node.default_prefix = schema.id
          end
          node.primitive_type = node.id
       end
