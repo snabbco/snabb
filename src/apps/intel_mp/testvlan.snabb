@@ -1,0 +1,54 @@
+#!../../snabb snsh
+
+-- Snabb test script for vlan tagging/insertion. This test is for checking
+-- that vlan stripping is working.
+
+local args = main.parameters
+assert(#args == 4, "testvlan.snabb pciaddr1 pciaddr2 macaddr pcapfile")
+local pciaddr1 = table.remove(args, 1)
+local pciaddr2 = table.remove(args, 1)
+local macaddr  = table.remove(args, 1)
+local pcapfile = table.remove(args,1)
+
+local basic_apps = require("apps.basic.basic_apps")
+local intel = require("apps.intel_mp.intel_mp")
+local pcap = require("apps.pcap.pcap")
+local filter = require("apps.packet_filter.pcap_filter")
+local C = require("ffi").C
+
+local c = config.new()
+config.app(c, "pcap", pcap.PcapReader, pcapfile)
+
+-- these are on the same core but that's ok, this is a correctness test
+config.app(c, "nic1", intel.Intel,
+           {pciaddr=pciaddr1, txq = 0, ndescriptors=2048, wait_for_link = true})
+config.app(c, "nic2", intel.Intel,
+           {pciaddr=pciaddr2,
+            vmdq = true,
+            macaddr = macaddr,
+            vlan = 1,
+            poolnum = 0,
+            rxq = 0,
+            ndescriptors=2048,
+            wait_for_link = true})
+
+-- use pflua to filter based on presence of vlan tag
+config.app(c, "filter1", filter.PcapFilter, { filter = [[ ether[12:2] == 0x8100 ]] })
+config.app(c, "filter2", filter.PcapFilter, { filter = [[ ether[12:2] != 0x8100 ]] })
+config.app(c, "tee", basic_apps.Tee)
+config.app(c, 'sink', basic_apps.Sink)
+
+config.link(c, "pcap.output -> nic1.input")
+config.link(c, "nic2.output -> tee.input")
+config.link(c, "tee.output1 -> filter1.input")
+config.link(c, "tee.output2 -> filter2.input")
+config.link(c, "filter1.output -> sink.in1")
+config.link(c, "filter2.output -> sink.in2")
+
+engine.configure(c)
+engine.main({ duration = 1 })
+
+assert(link.stats(engine.app_table.sink.input.in1).rxpackets == 0,
+       "expected no vlan tagged packets")
+assert(link.stats(engine.app_table.sink.input.in2).rxpackets > 0,
+       "expected some non-vlan tagged packets")

@@ -456,6 +456,12 @@ function Intel:init_rx_q ()
       Drop_En = self:offset("SRRCTL", "Drop_En")
    })
    self:lock_sw_sem()
+
+   -- enable VLAN tag stripping in VMDq mode
+   if self.vmdq then
+      self.r.RXDCTL:set(bits { VME = 30 })
+   end
+
    self.r.RXDCTL:set( bits { Enable = 25 })
    self.r.RXDCTL:wait( bits { Enable = 25 })
    C.full_memory_barrier()
