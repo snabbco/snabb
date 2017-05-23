@@ -270,7 +270,7 @@ local function init_grouping(node, loc, argument, children)
 end
 local function init_identity(node, loc, argument, children)
    node.id = require_argument(loc, argument)
-   node.base = maybe_child_property(loc, children, 'base', 'id')
+   node.bases = collect_child_properties(children, 'base', 'value')
    node.status = maybe_child_property(loc, children, 'status', 'value')
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
@@ -441,7 +441,7 @@ local function init_type(node, loc, argument, children)
    -- !!! path
    node.leafref = maybe_child_property(loc, children, 'path', 'value')
    node.require_instances = collect_children(children, 'require-instance')
-   node.identityref = maybe_child_property(loc, children, 'base', 'value')
+   node.bases = collect_child_properties(children, 'base', 'value')
    node.union = collect_children(children, 'type')
    node.bits = collect_children(children, 'bit')
 end
@@ -616,7 +616,7 @@ end
 -- Inline "submodule" into "include".
 -- Inline "imports" into "module".
 -- Inline "typedef" into "type".
--- Resolve if-feature.
+-- Resolve if-feature, identity bases, and identityref bases.
 -- Warn on any "when", resolving them as being true.
 -- Resolve all augment and refine nodes. (TODO)
 function resolve(schema, features)
@@ -673,7 +673,14 @@ function resolve(schema, features)
       end
       return ret
    end
-   function visit_type(node, env)
+   local function resolve_bases(bases, env)
+      local ret = {}
+      for _, base in ipairs(bases) do
+         table.insert(ret, lookup_lazy(env, 'identities', base).fqid)
+      end
+      return ret
+   end
+   local function visit_type(node, env)
       node = shallow_copy(node)
       local success, typedef = pcall(lookup, env, 'typedefs', node.id)
       if success then
@@ -692,11 +699,14 @@ function resolve(schema, features)
                table.insert(union, visit_type(type, env))
             end
             node.union = union
+         elseif node.id == 'identityref' then
+            node.bases = resolve_bases(node.bases, env)
          end
          node.primitive_type = node.id
       end
       return node
    end
+   -- Already made "local" above.
    function visit(node, env)
       node = shallow_copy(node)
       env = {env=env}
@@ -717,10 +727,10 @@ function resolve(schema, features)
       end
       if node.kind == 'module' or node.kind == 'submodule' then
          visit_top_level(node, env, 'extensions')
-         -- Because features can themselves have if-feature, expand them
-         -- lazily.
+         -- Because features can themselves have if-feature, and
+         -- identities can reference each other, expand them lazily.
          env.features = visit_lazy(pop_prop(node, 'features'), env)
-         visit_top_level(node, env, 'identities')
+         env.identities = visit_lazy(pop_prop(node, 'identities'), env)
          for _,prop in ipairs({'rpcs', 'notifications'}) do
             node[prop] = shallow_copy(node[prop])
             for k,v in pairs(node[prop]) do node[prop][k] = visit(v, env) end
@@ -729,6 +739,11 @@ function resolve(schema, features)
       if node.kind == 'rpc' then
          if node.input then node.input = visit(node.input, env) end
          if node.output then node.output = visit(node.output, env) end
+      end
+      if node.kind == 'identity' then
+         -- Attach fully-qualified identity.
+         node.fqid = lookup(env, 'module_id', '_')..":"..node.id
+         node.bases = resolve_bases(node.bases, env)
       end
       if node.kind == 'feature' then
          node.module_id = lookup(env, 'module_id', '_')
@@ -914,6 +929,10 @@ function selftest()
          reference "fruit-bowl";
       }
 
+      identity foo;
+      identity bar { base foo; }
+      identity baz { base bar; base foo; }
+
       grouping fruit {
          description "Represents a piece of fruit";
 
@@ -971,6 +990,12 @@ function selftest()
    assert(env.features["bowl"])
    -- Poke through lazy features abstraction by invoking thunk.
    assert(env.features["bowl"]().description == 'A fruit bowl')
+
+   -- Poke through lazy identity bases by invoking thunk.
+   assert(#env.identities["baz"]().bases == 2)
+   assert(#env.identities["bar"]().bases == 1)
+   assert(env.identities["bar"]().bases[1] == 'fruit:foo')
+   assert(#env.identities["foo"]().bases == 0)
 
    -- Check that groupings get inlined into their uses.
    assert(schema.body['fruit-bowl'])
