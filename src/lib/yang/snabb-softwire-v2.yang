@@ -37,6 +37,23 @@ module snabb-softwire-v2 {
     description
      "Configuration for Snabb lwaftr.";
 
+    leaf name {
+      type string;
+      description
+        "Name of lwAFTR instance. This must be unique amongst the Snabb
+        processes on the system. This may be specified either here, in the
+        YANG configuration or via the command line when the lwAFTR is started.
+
+        The order of presidence for this leaf is as followers:
+        1. The name set on an already running lwAFTR instance via snabb set.
+        2. A command line option to specify the name upon starting the lwAFTR
+            instance (i.e. overriding this value).
+        3. The value here in the configuration when starting a lwaftr instance.
+
+        If no name is specified the lwaftr can be referred to using the PID of
+        the lwAFTR process on the system.";
+    }
+
     list instance {
       description
        "Provides configuration for specific instances of the lwAFTR.
@@ -44,92 +61,78 @@ module snabb-softwire-v2 {
         with the given name specified in the name leaf. The other options
         not present in this list are shared amongst all instances.";
 
-      key "name";
+      key "device";
 
-      leaf name {
+      leaf device {
         type string;
-        description
-         "Name of lwAFTR instance. This must be unique amongst the Snabb
-          processes on the system. This may be specified either here, in the
-          YANG configuration or via the command line when the lwAFTR is started.
-
-          The order of presidence for this leaf is as followers:
-          1. The name set on an already running lwAFTR instance via snabb set.
-          2. A command line option to specify the name upon starting the lwAFTR
-              instance (i.e. overriding this value).
-          3. The value here in the configuration when starting a lwaftr instance.
-
-          If no name is specified the lwaftr can be referred to using the PID of
-          the lwAFTR process on the system.";
+        description "PCI device name.";
       }
 
-      container external-interface {
-        leaf ip {
-          type inet:ipv4-address;
-          mandatory true;
-          description
-           "L3 Address of the internet-facing network interface.  Used
-            when generating error messages and responding to ICMP echo
-            requests.";
+      list queue {
+        description
+         "List of Receive-Side Scaling (RSS) queues.";
+        key "id";
+
+        leaf id {
+          type uint8;
         }
 
-        leaf mac {
-          type yang:mac-address;
-          mandatory true;
-          description
-            "MAC address of the internet-facing NIC.";
-        }
-
-        container next-hop {
+        container external-interface {
           leaf ip {
             type inet:ipv4-address;
+            mandatory true;
             description
-             "IPv4 address of the next hop for the internet-facing NIC.
-              The lwAFTR will resolve this to a MAC address using ARP.";
+            "L3 Address of the internet-facing network interface.  Used
+              when generating error messages and responding to ICMP echo
+              requests.";
           }
 
-          leaf mac {
-            type yang:mac-address;
-            description
-             "Statically configured MAC address of the next hop for the
-              internet-facing NIC.";
+          container next-hop {
+            leaf ip {
+              type inet:ipv4-address;
+              description
+              "IPv4 address of the next hop for the internet-facing NIC.
+                The lwAFTR will resolve this to a MAC address using ARP.";
+            }
+
+            leaf mac {
+              type yang:mac-address;
+              description
+              "Statically configured MAC address of the next hop for the
+                internet-facing NIC.";
+            }
           }
         }
-      }
 
-      container internal-interface {
-        leaf ip {
-          type inet:ipv6-address;
-          mandatory true;
-          description
-           "L3 Address of the internal-facing network interface.  Used
-            when generating error messages and responding to ICMP echo
-            requests.";
-        }
-
-        leaf mac {
-          type yang:mac-address;
-          mandatory true;
-          description
-           "MAC address of the internal-facing NIC.";
-        }
-
-        container next-hop {
+        container internal-interface {
           leaf ip {
             type inet:ipv6-address;
+            mandatory true;
             description
-             "IPv6 address of the next hop for the internal-facing NIC.
-              The lwAFTR will resolve this to a MAC address using NDP.";
+            "L3 Address of the internal-facing network interface.  Used
+              when generating error messages and responding to ICMP echo
+              requests.";
           }
 
-          leaf mac {
-            type yang:mac-address;
-            description
-             "Statically configured MAC address of the next hop for the
-              internal-facing NIC.";
+          container next-hop {
+            leaf ip {
+              type inet:ipv6-address;
+              description
+              "IPv6 address of the next hop for the internal-facing NIC.
+                The lwAFTR will resolve this to a MAC address using NDP.";
+            }
+
+            leaf mac {
+              type yang:mac-address;
+              description
+              "Statically configured MAC address of the next hop for the
+                internal-facing NIC.";
+            }
           }
         }
       }
+
+
     }
 
     grouping traffic-filters {
