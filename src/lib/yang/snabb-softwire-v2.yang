@@ -10,11 +10,6 @@ module snabb-softwire-v2 {
   description
    "Configuration for the Snabb Switch lwAFTR.";
 
-  revision 2016-11-04 {
-    description
-     "Initial revision.";
-  }
-
   revision 2017-04-17 {
     description
       "Removal of br-address leaf-list and  br leaf. It adds the
@@ -26,12 +21,116 @@ module snabb-softwire-v2 {
        This also removes the psid-map list and adds a new port-set
        container on the softwire container instead. This will help
        adding the softwires as well as bring it more inline with the
-       ietf-softwire schema.";
+       ietf-softwire schema.
+
+       The addition of /softwire-config/instance allows for configuring
+       multiple instances of the lwAFTR with a shared binding table and
+       other common configuration properties.";
+  }
+
+  revision 2016-11-04 {
+    description
+     "Initial revision.";
   }
 
   container softwire-config {
     description
      "Configuration for Snabb lwaftr.";
+
+    list instance {
+      description
+       "Provides configuration for specific instances of the lwAFTR.
+        These configuration options will only affect the specific lwaftr
+        with the given name specified in the name leaf. The other options
+        not present in this list are shared amongst all instances.";
+
+      key "name";
+
+      leaf name {
+        type string;
+        description
+         "Name of lwAFTR instance. This must be unique amongst the Snabb
+          processes on the system. This may be specified either here, in the
+          YANG configuration or via the command line when the lwAFTR is started.
+
+          The order of presidence for this leaf is as followers:
+          1. The name set on an already running lwAFTR instance via snabb set.
+          2. A command line option to specify the name upon starting the lwAFTR
+              instance (i.e. overriding this value).
+          3. The value here in the configuration when starting a lwaftr instance.
+
+          If no name is specified the lwaftr can be referred to using the PID of
+          the lwAFTR process on the system.";
+      }
+
+      container external-interface {
+        leaf ip {
+          type inet:ipv4-address;
+          mandatory true;
+          description
+           "L3 Address of the internet-facing network interface.  Used
+            when generating error messages and responding to ICMP echo
+            requests.";
+        }
+
+        leaf mac {
+          type yang:mac-address;
+          mandatory true;
+          description
+            "MAC address of the internet-facing NIC.";
+        }
+
+        container next-hop {
+          leaf ip {
+            type inet:ipv4-address;
+            description
+             "IPv4 address of the next hop for the internet-facing NIC.
+              The lwAFTR will resolve this to a MAC address using ARP.";
+          }
+
+          leaf mac {
+            type yang:mac-address;
+            description
+             "Statically configured MAC address of the next hop for the
+              internet-facing NIC.";
+          }
+        }
+      }
+
+      container internal-interface {
+        leaf ip {
+          type inet:ipv6-address;
+          mandatory true;
+          description
+           "L3 Address of the internal-facing network interface.  Used
+            when generating error messages and responding to ICMP echo
+            requests.";
+        }
+
+        leaf mac {
+          type yang:mac-address;
+          mandatory true;
+          description
+           "MAC address of the internal-facing NIC.";
+        }
+
+        container next-hop {
+          leaf ip {
+            type inet:ipv6-address;
+            description
+             "IPv6 address of the next hop for the internal-facing NIC.
+              The lwAFTR will resolve this to a MAC address using NDP.";
+          }
+
+          leaf mac {
+            type yang:mac-address;
+            description
+             "Statically configured MAC address of the next hop for the
+              internal-facing NIC.";
+          }
+        }
+      }
+    }
 
     grouping traffic-filters {
       description
@@ -140,27 +239,11 @@ module snabb-softwire-v2 {
       }
     }
 
-
-
     container external-interface {
       description
        "Configuration for the external, internet-facing IPv4
         interface.";
 
-      leaf ip {
-        type inet:ipv4-address;
-        mandatory true;
-        description
-         "L3 Address of the internet-facing network interface.  Used
-          when generating error messages and responding to ICMP echo
-          requests.";
-      }
-      leaf mac {
-        type yang:mac-address;
-        mandatory true;
-        description
-         "MAC address of the internet-facing NIC.";
-      }
       leaf mtu {
         type uint16;
         default 1460;
@@ -174,40 +257,13 @@ module snabb-softwire-v2 {
       uses error-rate-limiting;
       uses reassembly;
 
-      container next-hop {
-        leaf ip {
-          type inet:ipv4-address;
-          description
-           "IPv4 address of the next hop for the internet-facing NIC.
-            The lwAFTR will resolve this to a MAC address using ARP.";
-        }
-        leaf mac {
-          type yang:mac-address;
-          description
-           "Statically configured MAC address of the next hop for the
-            internet-facing NIC.";
-        }
-      }
+
     }
 
     container internal-interface {
       description
        "Configuration for the internal IPv6 interface.";
 
-      leaf ip {
-        type inet:ipv6-address;
-        mandatory true;
-        description
-         "L3 Address of the internal-facing network interface.  Used
-          when generating error messages and responding to ICMP echo
-          requests.";
-      }
-      leaf mac {
-        type yang:mac-address;
-        mandatory true;
-        description
-         "MAC address of the internal-facing NIC.";
-      }
       leaf mtu {
         type uint16;
         default 1500;
@@ -220,21 +276,6 @@ module snabb-softwire-v2 {
       uses vlan-tagging;
       uses error-rate-limiting;
       uses reassembly;
-
-      container next-hop {
-        leaf ip {
-          type inet:ipv6-address;
-          description
-           "IPv6 address of the next hop for the internal-facing NIC.
-            The lwAFTR will resolve this to a MAC address using NDP.";
-        }
-        leaf mac {
-          type yang:mac-address;
-          description
-           "Statically configured MAC address of the next hop for the
-            internal-facing NIC.";
-        }
-      }
 
       leaf hairpinning {
         type boolean;
@@ -259,7 +300,7 @@ module snabb-softwire-v2 {
           description
            "Public IPv4 address of the softwire.";
         }
-        
+
         leaf padding {
           type uint16;
           default 0;
