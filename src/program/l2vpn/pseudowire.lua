@@ -223,8 +223,8 @@ end
 --             [ dead_factor = <dead_factor>, ]
 --           } ]
 --  }
-function pseudowire:new (arg)
-   local conf = arg and config.parse_app_arg(arg) or {}
+function pseudowire:new (conf_in)
+   local conf = conf_in or {}
    local o = pseudowire:superClass().new(self)
    o._conf = conf
    local bpf_program
@@ -264,12 +264,11 @@ function pseudowire:new (arg)
    -- to the data packets with a single call to push_raw().  In order
    -- to be able to update the headers before copying, we re-locate
    -- the headers to the payload of the template packet.
-   local tp = packet.allocate()
-   local template = datagram:new(tp)
+   local template = datagram:new(packet.allocate())
    template:push(o._tunnel.header)
    template:push(o._transport.header)
    template:push(o._ether)
-   template:new(tp, ethernet) -- Reset the parse stack
+   template:new(template:packet(), ethernet) -- Reset the parse stack
    o._tunnel.header:free()
    o._transport.header:free()
    o._ether:free()
@@ -517,8 +516,7 @@ function pseudowire:new (arg)
       end
 
       -- -- Create a static packet to transmit on the control channel
-      local cc_p = packet.allocate()
-      local dgram = datagram:new(cc_p)
+      local dgram = datagram:new(packet.allocate())
       dgram:push(o._tunnel.cc_header)
       dgram:push(o._transport.header)
       dgram:push(o._ether)
@@ -533,7 +531,7 @@ function pseudowire:new (arg)
       cc.add_tlv(dgram, 'if_description', conf.name)
       cc.add_tlv(dgram, 'vc_id', conf.vc_id)
       -- Set the IPv6 payload length
-      dgram:new(cc_p, ethernet)
+      dgram:new(dgram:packet(), ethernet)
       local cc_ipv6 = dgram:parse_n(2)
       local _, p_length = dgram:payload()
       cc_ipv6:payload_length(p_length)
@@ -599,7 +597,7 @@ function pseudowire:push()
 
       -- Copy the finished headers into the packet
       datagram:push_raw(self._template:data())
-      transmit(l_out, p[0])
+      transmit(l_out, datagram:packet())
    end
 
    l_in = self.input.uplink
@@ -612,7 +610,7 @@ function pseudowire:push()
          local status, code = self._tunnel:decapsulate(datagram)
          if status == true then
             datagram:commit()
-            transmit(l_out, p[0])
+            transmit(l_out, datagram:packet())
          else
             if code == 0 then
                increment_errors(self)
@@ -622,7 +620,7 @@ function pseudowire:push()
             packet.free(p[0])
          end
       else
-         packet.free(p[0])
+         packet.free(datagram:packet())
       end
    end
 end
