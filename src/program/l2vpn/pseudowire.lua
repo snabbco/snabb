@@ -627,32 +627,40 @@ function pseudowire:push()
    end
 end
 
-local function selftest_aux(type, pseudowire_config)
+local function selftest_aux(type, pseudowire_config, local_mac, remote_mac)
    local c = config.new()
    local pcap_base = "program/l2vpn/selftest/"
    local pcap_type = pcap_base..type
+   local nd_static = require("apps.ipv6.nd_static").nd_static
+   config.app(c, "nd", nd_static,
+              { local_mac = ethernet:pton(local_mac),
+                remote_mac = ethernet:pton(remote_mac)})
    config.app(c, "from_uplink", pcap.PcapReader, pcap_type.."-uplink.cap.input")
    config.app(c, "from_ac", pcap.PcapReader, pcap_base.."ac.cap.input")
    config.app(c, "to_ac", pcap.PcapWriter, pcap_type.."-ac.cap.output")
    config.app(c, "to_uplink", pcap.PcapWriter, pcap_type.."-uplink.cap.output")
    config.app(c, "pw", pseudowire, pseudowire_config)
 
-   config.link(c, "from_uplink.output -> pw.uplink")
+   config.link(c, "from_uplink.output -> nd.south")
+   config.link(c, "nd.north -> pw.uplink")
    config.link(c, "pw.ac -> to_ac.input")
    config.link(c, "from_ac.output -> pw.ac")
-   config.link(c, "pw.uplink -> to_uplink.input")
+   config.link(c, "pw.uplink -> nd.north")
+   config.link(c, "nd.south -> to_uplink.input")
    app.configure(c)
    app.main({duration = 1})
+   local ok = true
    if (io.open(pcap_type.."-ac.cap.output"):read('*a') ~=
  io.open(pcap_type.."-ac.cap.expect"):read('*a')) then
       print('tunnel '..type..' decapsulation selftest failed.')
-      os.exit(1)
+      ok = false
    end
    if (io.open(pcap_type.."-uplink.cap.output"):read('*a') ~=
  io.open(pcap_type.."-uplink.cap.expect"):read('*a')) then
       print('tunnel '..type..' encapsulation selftest failed.')
-      os.exit(1)
+      ok = false
    end
+   if not ok then os.exit(1) end
    app.configure(config.new())
 end
 
@@ -674,11 +682,11 @@ function selftest()
                     tunnel = { type = 'gre',
                                checksum = true,
                                key = 0x12345678 } }
-   selftest_aux('gre', config)
+   selftest_aux('gre', config, local_mac, remote_mac)
    config.tunnel = { type = 'l2tpv3',
                      local_session = 0x11111111,
                      remote_session = 0x22222222,
                      local_cookie  = '\x00\x11\x22\x33\x44\x55\x66\x77',
                      remote_cookie = '\x88\x99\xaa\xbb\xcc\xdd\xee\xff' }
-   selftest_aux('l2tpv3', config)
+   selftest_aux('l2tpv3', config, local_mac, remote_mac)
 end
