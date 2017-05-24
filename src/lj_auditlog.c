@@ -42,8 +42,7 @@ static void bin_32(void *ptr, int n) {
 /* -- low-level object logging API ---------------------------------------- */
 
 /* Ensure that the log file is open. */
-static void ensure_log_open()
-{
+static void ensure_log_open() {
   if (!fp) {
     fp = fopen("audit.log", "w");
     lua_assert(fp != NULL);
@@ -51,8 +50,7 @@ static void ensure_log_open()
 }
 
 /* Log a snapshot of an object in memory. */
-static void log(const char *type, void *ptr, unsigned int size)
-{
+static void log_mem(const char *type, void *ptr, unsigned int size) {
   ensure_log_open();
   fixmap(4);
   str_16("type");    /* = */ str_16("memory");
@@ -61,16 +59,24 @@ static void log(const char *type, void *ptr, unsigned int size)
   str_16("data");    /* = */ bin_32(ptr, size);
 }
 
+static void log_event(const char *type, int nattributes) {
+  lua_assert(nattributes <= 253);
+  fixmap(nattributes+2);
+  str_16("type");  /* = */ str_16("event");
+  str_16("event"); /* = */ str_16(type);
+  /* Caller fills in the further nattributes... */
+}
+
 /* -- high-level LuaJIT object logging ------------------------------------ */
 
 /* Log a trace that has just been compiled. */
 void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 {
-  /* Log the memory containing the GCtrace object and other important
-     memory that it references. */
-  log("GCtrace", T, sizeof(*T));
-  log("MCode[]", T->mcode, T->szmcode);
-  log("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
-  log("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
+  log_mem("GCtrace", T, sizeof(*T));
+  log_mem("MCode[]", T->mcode, T->szmcode);
+  log_mem("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
+  log_mem("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
+  log_event("trace_stop", 1);
+  str_16("GCtrace"); /* = */ uint_64((uint64_t)T);
 }
 
