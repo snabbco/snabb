@@ -136,7 +136,7 @@ function Tap:new (conf)
                         sock = sock,
                         ifr = ifr,
                         name = name,
-                        status_timer = lib.timer(0.001, 'repeating', engine.now),
+                        status_timer = lib.throttle(0.001),
                         pkt = packet.allocate(),
                         shm = { rxbytes   = {counter},
                                 rxpackets = {counter},
@@ -164,7 +164,7 @@ function Tap:pull ()
       self:status()
    end
    for i=1,engine.pull_npackets do
-      local len, err = S.read(self.sock, self.pkt.data, C.PACKET_PAYLOAD_SIZE)
+      local len, err = S.read(self.fd, self.pkt.data, C.PACKET_PAYLOAD_SIZE)
       -- errno == EAGAIN indicates that the read would of blocked as there is no
       -- packet waiting. It is not a failure.
       if not len and err.errno == const.E.AGAIN then
