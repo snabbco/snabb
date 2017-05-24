@@ -254,7 +254,7 @@ function Intel1g:new(conf)
           txbcast   = {counter},
           txdrop    = {counter},
           txerrors  = {counter}})
-      self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
+      self.stats.sync_timer = lib.throttle(0.001)
       -- After a reset of the NIC, the "native" MAC address is copied to
       -- the receive address register #0 from the FLASH
       local ral, rah = s.RAL[0](), s.RAH[0]()
