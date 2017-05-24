@@ -896,5 +896,24 @@ function selftest()
          name "hello";
       }
    }]])
+
+   local test_schema = [[module test-schema {
+      namespace "urn:ietf:params:xml:ns:yang:test-schema";
+      prefix "test";
+
+      container summary {
+         leaf shelves-active {
+             type empty;
+         }
+      }
+   }]]
+   local loaded_schema = schema.load_schema(test_schema)
+   local object = load_data_for_schema(loaded_schema, [[
+      summary {
+         shelves-active;
+      }
+   ]])
+   assert(object.summary.shelves_active)
+
    print('selfcheck: ok')
 end
