@@ -74,9 +74,13 @@ local cards = {
       ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
       ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
       ["0x154d"] = {model = model["X520"],      driver = 'apps.intel.intel_app'},
+      -- FIXME move to intel_mp after l2vpn has been migrated
       ["0x1521"] = {model = model["i350"],      driver = 'apps.intel.intel1g'},
       ["0x1533"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
       ["0x157b"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
+      -- ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
+      -- ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
+      -- ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
    },
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
@@ -143,15 +147,12 @@ function map_pci_memory (device, n, lock)
    if lock then
      assert(f:flock("ex, nb"), "failed to lock " .. filepath)
    end
-   local st, err = f:stat()
-   assert(st, tostring(err))
-   local mem, err = f:mmap(nil, st.size, "read, write", "shared", 0)
-   assert(mem, tostring(err))
+   local st = assert(f:stat())
+   local mem = assert(f:mmap(nil, st.size, "read, write", "shared", 0))
    return ffi.cast("uint32_t *", mem), f
 end
 function close_pci_resource (fd, base)
-   local st, err = fd:stat()
-   assert(st, tostring(err))
+   local st = assert(fd:stat())
    S.munmap(base, st.size)
    fd:close()
 end
@@ -160,8 +161,7 @@ end
 --- mastering is enabled.
 function set_bus_master (device, enable)
    root_check()
-   local f,err = S.open(path(device).."/config", "rdwr")
-   assert(f, tostring(err))
+   local f = assert(S.open(path(device).."/config", "rdwr"))
    local fd = f:getfd()
 
    local value = ffi.new("uint16_t[1]")
@@ -180,7 +180,7 @@ function root_check ()
 end
 
 -- Return the canonical (abbreviated) representation of the PCI address.
--- 
+--
 -- example: canonical("0000:01:00.0") -> "01:00.0"
 function canonical (address)
    return address:gsub("^0000:", "")

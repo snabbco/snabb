@@ -106,9 +106,15 @@ Name of the app. *Read-only*.
 
 — Field **myapp.shm**
 
-Can be set to a specification for `core.shm.create_frame` during `new`. When
-set, this field will be initialized to a frame of shared memory objects by the
-engine.
+Can be set to a specification for `core.shm.create_frame`. When set, this field
+will be initialized to a frame of shared memory objects by the engine.
+
+
+— Field **myapp.config**
+
+Can be set to a specification for `core.lib.parse`. When set, the specification
+will be used to validate the app’s arg when it is configured using
+`config.app`.
 
 
 — Method **myapp:link**
@@ -294,6 +300,16 @@ Predicate used to test if a link is full. Returns true if *link* is full
 and false otherwise.
 
 
+— Function **link.nreadable** *link*
+
+Returns the number of packets on *link*.
+
+
+— Function **link.nwriteable** *link*
+
+Returns the remaining number of packets that fit onto *link*.
+
+
 — Function **link.receive** *link*
 
 Returns the next available packet (and advances the read cursor) on
@@ -323,7 +339,7 @@ Returns a structure holding ring statistics for the *link*:
 
 ## Packet (core.packet)
 
-A *packet* is an FFI object of type `packet.packet_t` representing a network
+A *packet* is an FFI object of type `struct packet` representing a network
 packet that is currently being processed. The packet is used to explicitly
 manage the life cycle of the packet. Packets are explicitly allocated and freed
 by using `packet.allocate` and `packet.free`. When a packet is received using
@@ -335,12 +351,12 @@ freed. The number of allocatable packets is limited by the size of the
 underlying “freelist”, e.g. a pool of unused packet objects from and to which
 packets are allocated and freed.
 
-— Ctype **packet.packet_t**
+— Type **struct packet**
 
 ```
 struct packet {
-    uint8_t  data[packet.max_payload];
     uint16_t length;
+    uint8_t  data[packet.max_payload];
 };
 ```
 
@@ -377,18 +393,21 @@ error is raised if there is not enough space in *packet* to accomodate
 — Function **packet.prepend** *packet*, *pointer*, *length*
 
 Prepends *length* bytes starting at *pointer* to the front of
-*packet*. An error is raised if there is not enough space in *packet* to
+*packet*, taking ownership of the packet and returning a new packet.
+An error is raised if there is not enough space in *packet* to
 accomodate *length* additional bytes.
 
 — Function **packet.shiftleft** *packet*, *length*
 
-Truncates *packet* by *length* bytes from the front. *Length* must be less than
-or equal to `length` of *packet*.
+Take ownership of *packet*, truncate it by *length* bytes from the
+front, and return a new packet. *Length* must be less than or equal to
+`length` of *packet*.
 
 — Function **packet.shiftright** *packet*, *length*
 
-Move *packet* payload to the right by *length* bytes, growing *packet* by
-*length*. The sum of *length* and `length` of *packet* must be less than or
+Take ownership of *packet*, moves *packet* payload to the right by
+*length* bytes, growing *packet* by *length*. Returns a new packet.
+The sum of *length* and `length` of *packet* must be less than or
 equal to `packet.max_payload`.
 
 — Function **packet.from_pointer** *pointer*, *length*
@@ -399,6 +418,10 @@ Allocate packet and fill it with *length* bytes from *pointer*.
 
 Allocate packet and fill it with the contents of *string*.
 
+— Function **packet.clone_to_memory* *pointer* *packet*
+
+Creates an exact copy of at memory pointed to by *pointer*. *Pointer* must
+point to a `packet.packet_t`.
 
 ## Memory (core.memory)
 
@@ -468,6 +491,10 @@ Maps an existing shared object of *type* into memory via a hierarchical *name*.
 If *readonly* is non-nil the shared object is mapped in read-only mode.
 *Readonly* defaults to nil. Fails if the shared object does not already exist.
 Returns a pointer to the mapped object.
+
+— Function **shm.exists** *name*
+
+Returns a true value if shared object by *name* exists.
 
 — Function **shm.unmap** *pointer*
 
@@ -788,18 +815,15 @@ Returns a table that acts as a bounds checked wrapper around a C array of
 ctype and the caller must ensure that the allocated memory region at
 *base*/*offset* is at least `sizeof(type)*size` bytes long.
 
-— Function **lib.timer** *duration*, *mode*, *timefun*
+— Function **lib.throttle** *seconds*
 
-Returns a closure that will return `false` until *duration* has elapsed. If
-*mode* is `'repeating'` the timer will reset itself after returning `true`,
-thus implementing an interval timer. *Timefun* is used to get a monotonic time.
-*Timefun* defaults to `C.get_time_ns`.
+Return a closure that returns `true` at most once during any *seconds*
+(a floating point value) time interval, otherwise false.
 
-The “deadline” for a given *duration* is computed by adding *duration* to the
-result of calling *timefun*, and is saved in the resulting closure. A
-*duration* has elapsed when its deadline is less than or equal the value
-obtained using *timefun* when calling the closure.
+— Function **lib.timeout** *seconds*
 
+Returns a closure that returns `true` if *seconds* (a floating point
+value) have elapsed since it was created, otherwise false.
 
 — Function **lib.waitfor** *condition*
 
@@ -853,15 +877,37 @@ Returns a copy of *array*. *Array* must not be a "sparse array".
 — Function **lib.htons** *n*
 
 Host to network byte order conversion functions for 32 and 16 bit
-integers *n* respectively.
+integers *n* respectively. Unsigned.
 
 — Function **lib.ntohl** *n*
 
 — Function **lib.ntohs** *n*
 
 Network to host byte order conversion functions for 32 and 16 bit
-integers *n* respectively.
+integers *n* respectively. Unsigned.
 
+— Function **lib.parse** *arg*, *config*
+
+Validates *arg* against the specification in *config*, and returns a fresh
+table containing the parameters in *arg* and any omitted optional parameters
+with their default values. Given *arg*, a table of parameters or `nil`, assert
+that from *config* all of the required keys are present, fill in any missing
+values for optional keys, and error if any unknown keys are found. *Config* has
+the following format:
+
+```
+config := { key = {[required=boolean], [default=value]}, ... }
+```
+
+Each key is optional unless `required` is set to a true value, and its default
+value defaults to `nil`.
+
+Example:
+
+```
+lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
+  => {foo=42, bar=43, baz=44}
+```
 
 
 ## Main

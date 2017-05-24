@@ -70,6 +70,7 @@ end
 
 function selftest ()
    print("selftest: timer")
+
    ticks = 0
    local ntimers, runtime = 10000, 100000
    local count, expected_count = 0, 0

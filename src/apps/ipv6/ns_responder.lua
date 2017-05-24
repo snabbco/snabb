@@ -100,7 +100,7 @@ function ns_responder:push()
    local l_in = self.input.north
    local l_out = self.output.south
    if l_in and l_out then
-      while not link.empty(l_in) and not link.full(l_out) do
+      while not link.empty(l_in) do
          local p = link.receive(l_in)
          if self._header then
             -- Insert the static MAC header
@@ -112,7 +112,7 @@ function ns_responder:push()
    l_in = self.input.south
    l_out = self.output.north
    local l_reply = self.output.south
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       local p = link.receive(l_in)
       local status = process(self, p)
       if status == nil then

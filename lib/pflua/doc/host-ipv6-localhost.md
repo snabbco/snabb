@@ -89,6 +89,43 @@ return function(P,length)
    if cast("uint32_t*", P+46)[0] ~= 0 then return false end
    return cast("uint32_t*", P+50)[0] == 16777216
 end
+```
 
+## Native pflang compilation
+
+```
+7f5e7dc55000  4883FE36          cmp rsi, +0x36
+7f5e7dc55004  7C5B              jl 0x7f5e7dc55061
+7f5e7dc55006  0FB7770C          movzx esi, word [rdi+0xc]
+7f5e7dc5500a  4881FE86DD0000    cmp rsi, 0xdd86
+7f5e7dc55011  754E              jnz 0x7f5e7dc55061
+7f5e7dc55013  8B7716            mov esi, [rdi+0x16]
+7f5e7dc55016  4883FE00          cmp rsi, +0x00
+7f5e7dc5501a  751E              jnz 0x7f5e7dc5503a
+7f5e7dc5501c  8B771A            mov esi, [rdi+0x1a]
+7f5e7dc5501f  4883FE00          cmp rsi, +0x00
+7f5e7dc55023  7515              jnz 0x7f5e7dc5503a
+7f5e7dc55025  8B771E            mov esi, [rdi+0x1e]
+7f5e7dc55028  4883FE00          cmp rsi, +0x00
+7f5e7dc5502c  750C              jnz 0x7f5e7dc5503a
+7f5e7dc5502e  8B7722            mov esi, [rdi+0x22]
+7f5e7dc55031  4881FE00000001    cmp rsi, 0x01000000
+7f5e7dc55038  742A              jz 0x7f5e7dc55064
+7f5e7dc5503a  8B7726            mov esi, [rdi+0x26]
+7f5e7dc5503d  4883FE00          cmp rsi, +0x00
+7f5e7dc55041  751E              jnz 0x7f5e7dc55061
+7f5e7dc55043  8B772A            mov esi, [rdi+0x2a]
+7f5e7dc55046  4883FE00          cmp rsi, +0x00
+7f5e7dc5504a  7515              jnz 0x7f5e7dc55061
+7f5e7dc5504c  8B772E            mov esi, [rdi+0x2e]
+7f5e7dc5504f  4883FE00          cmp rsi, +0x00
+7f5e7dc55053  750C              jnz 0x7f5e7dc55061
+7f5e7dc55055  8B7732            mov esi, [rdi+0x32]
+7f5e7dc55058  4881FE00000001    cmp rsi, 0x01000000
+7f5e7dc5505f  7403              jz 0x7f5e7dc55064
+7f5e7dc55061  B000              mov al, 0x0
+7f5e7dc55063  C3                ret
+7f5e7dc55064  B001              mov al, 0x1
+7f5e7dc55066  C3                ret
 ```
 

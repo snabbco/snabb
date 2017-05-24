@@ -9,13 +9,6 @@ local link   = require("core.link")
 local packet = require("core.packet")
 local S      = require("syscall")
 
---ljsyscall returns error as a a cdata instead of a string,
---and the standard assert() doesn't use tostring() on it.
-local function assert(v, ...)
-   if not v then error(tostring(... or 'assertion failed'), 2) end
-   return v, ...
-end
-
 UnixSocket = {}
 UnixSocket.__index = UnixSocket
 
@@ -148,7 +141,9 @@ function UnixSocket:new (arg)
    function self:pull()
       local l = self.output.tx
       if l == nil then return end
-      while not link.full(l) and can_receive() do
+      local limit = engine.pull_npackets
+      while limit > 0 and can_receive() do
+         limit = limit - 1
          local p = receive()
          if p then
             link.transmit(l, p) --link owns p now so we mustn't free it
@@ -197,7 +192,7 @@ function selftest ()
          pull = function(self)
             local l = self.output.tx
             if l == nil then return end
-            while not link.full(l) do
+            for i=1,engine.pull_npackets do
                local p = packet.allocate()
                ffi.copy(p.data, text)
                p.length = #text

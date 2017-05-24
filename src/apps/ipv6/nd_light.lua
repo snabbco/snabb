@@ -50,6 +50,24 @@ local lib = require("core.lib")
 
 nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
+nd_light.config = {
+   local_mac = {required=true},
+   local_ip = {required=true},
+   next_hop =  {required=true},
+   delay = {default=1000},
+   retrans = {}
+}
+nd_light.shm = {
+   status                   = {counter, 2}, -- Link down
+   rxerrors                 = {counter},
+   txerrors                 = {counter},
+   txdrop                   = {counter},
+   ns_checksum_errors       = {counter},
+   ns_target_address_errors = {counter},
+   na_duplicate_errors      = {counter},
+   na_target_address_errors = {counter},
+   nd_protocol_errors       = {counter}
+}
 
 -- config:
 --   local_mac  MAC address of the interface attached to "south".
@@ -79,11 +97,7 @@ local function check_ip_address(ip, desc)
    return ip
 end
 
-function _new (self, arg)
-   --copy the args to avoid changing the arg table so that it stays reusable.
-   local conf = arg and lib.deepcopy(config.parse_app_arg(arg)) or {}
-   conf.delay = conf.delay or 1000
-   assert(conf.local_mac, "nd_light: missing local MAC address")
+function _new (self, conf)
    if type(conf.local_mac) == "string" and string.len(conf.local_mac) ~= 6 then
       conf.local_mac = ethernet:pton(conf.local_mac)
    else
@@ -105,7 +119,6 @@ function _new (self, arg)
    -- Prepare packet for solicitation of next hop
    local nh = self._next_hop
    local dgram = datagram:new()
-   nh.packet = dgram:packet()
    local sol_node_mcast = ipv6:solicited_node_mcast(conf.next_hop)
    local ipv6 = ipv6:new({ next_header = 58, -- ICMP6
          hop_limit = 255,
@@ -130,12 +143,12 @@ function _new (self, arg)
    dgram:push(ethernet:new({ src = conf.local_mac,
                              dst = ethernet:ipv6_mcast(sol_node_mcast),
                              type = 0x86dd }))
+   nh.packet = dgram:packet()
    dgram:free()
 
    -- Prepare packet for solicited neighbor advertisement
    local sna = self._sna
    dgram = datagram:new()
-   sna.packet = dgram:packet()
    -- Leave dst address unspecified.  It will be set to the source of
    -- the incoming solicitation
    ipv6 = ipv6:new({ next_header = 58, -- ICMP6
@@ -156,6 +169,8 @@ function _new (self, arg)
    -- Leave dst address unspecified.
    dgram:push(ethernet:new({ src = conf.local_mac,
                              type = 0x86dd }))
+   sna.packet = dgram:packet()
+
    -- Parse the headers we want to modify later on from our template
    -- packet.
    dgram = dgram:new(sna.packet, ethernet)
@@ -209,16 +224,6 @@ function nd_light:new (arg)
    }
    o._logger = lib.logger_new({ module = 'nd_light' })
 
-   -- Create counters
-   o.shm = { status                   = {counter, 2}, -- Link down
-             rxerrors                 = {counter},
-             txerrors                 = {counter},
-             txdrop                   = {counter},
-             ns_checksum_errors       = {counter},
-             ns_target_address_errors = {counter},
-             na_duplicate_errors      = {counter},
-             na_target_address_errors = {counter},
-             nd_protocol_errors       = {counter} }
    return o
 end
 
@@ -324,7 +329,7 @@ function nd_light:push ()
    local l_in = self.input.south
    local l_out = self.output.north
    local l_reply = self.output.south
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       local p = cache.p
       p[0] = link.receive(l_in)
       local status = from_south(self, p)
@@ -343,7 +348,7 @@ function nd_light:push ()
 
    l_in = self.input.north
    l_out = self.output.south
-   while not link.empty(l_in) and not link.full(l_out) do
+   while not link.empty(l_in) do
       if not self._eth_header then
          -- Drop packets until ND for the next-hop
          -- has completed.
