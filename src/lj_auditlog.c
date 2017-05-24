@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 
+#include "lj_trace.h"
 #include "lj_auditlog.h"
 
 /* File where the audit log is written. */
@@ -78,5 +79,12 @@ void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
   log_mem("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
   log_event("trace_stop", 1);
   str_16("GCtrace"); /* = */ uint_64((uint64_t)T);
+}
+
+void lj_auditlog_trace_abort(jit_State *J, TraceError e) {
+  log_mem("jit_State", J, sizeof(*J));
+  log_event("trace_abort", 2);
+  str_16("jit_State");  /* = */ uint_64((uint64_t)J);
+  str_16("TraceError"); /* = */ uint_64(e);
 }
 
