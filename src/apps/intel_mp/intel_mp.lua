@@ -507,6 +507,11 @@ function Intel:init_tx_q ()                               -- 4.5.10
    self.r.TDBAH(tophysical(self.txdesc) / 2^32)
    self.r.TDLEN(self.ndesc * ffi.sizeof(txdesc_t))
 
+   -- for VMDq need some additional pool configs
+   if self.vmdq then
+      self.r.RTTDQSEL(self.poolnum)
+   end
+
    if self.r.DMATXCTL then
       self.r.DMATXCTL:set(bits { TE = 0 })
       self.r.TXDCTL:set(bits{SWFLSH=26, hthresh=8} + 32)
