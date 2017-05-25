@@ -357,7 +357,7 @@ function selftest()
    key.src_port = htons(9999)
    key.dst_port = htons(80)
 
-   local result = flows:lookup(key)
+   local result = flows.table:lookup_ptr(key)
    assert(result, "key not found")
    assert(result.value.pkt_count == 1)
 
@@ -376,7 +376,7 @@ function selftest()
    key.src_port = htons(53)
    key.dst_port = htons(57777)
 
-   local result = flows:lookup(key)
+   local result = flows.table:lookup_ptr(key)
    assert(result, "key not found")
    assert(result.value.pkt_count == 1)
 
