@@ -1,0 +1,53 @@
+#!../../snabb snsh
+
+-- Snabb test script for transmit in VMDq mode, also tests VLAN
+-- tag insertion
+
+local args = main.parameters
+assert(#args == 4, "testvmdqtx.snabb pciaddr1 pciaddr2 macaddr pcapfile")
+local pciaddr1 = table.remove(args, 1)
+local pciaddr2 = table.remove(args, 1)
+local macaddr  = table.remove(args, 1)
+local pcapfile = table.remove(args,1)
+
+local basic_apps = require("apps.basic.basic_apps")
+local intel = require("apps.intel_mp.intel_mp")
+local pcap = require("apps.pcap.pcap")
+local filter = require("apps.packet_filter.pcap_filter")
+local C = require("ffi").C
+
+local c = config.new()
+
+-- send packets on nic1
+config.app(c, "nic1", intel.Intel,
+           { pciaddr=pciaddr1,
+             vmdq = true,
+             macaddr = macaddr,
+             poolnum = 0,
+             txq = 0,
+             vlan = 1,
+             ndescriptors=2048,
+             wait_for_link = true })
+
+-- nic2 just receives packets so we can check them
+config.app(c, "nic2", intel.Intel,
+           { pciaddr=pciaddr2,
+             rxq = 0,
+             ndescriptors=2048,
+             wait_for_link = true })
+
+config.app(c, "pcap", pcap.PcapReader, pcapfile)
+config.app(c, "filter", filter.PcapFilter, { filter = [[ ether[12:2] == 0x8100 ]] })
+config.app(c, 'sink', basic_apps.Sink)
+
+config.link(c, "pcap.output -> nic1.input")
+config.link(c, "nic2.output -> filter.input")
+config.link(c, "filter.output -> sink.input")
+
+engine.configure(c)
+engine.main({ duration = 1 })
+
+assert(link.stats(engine.app_table.filter.input.input).rxpackets > 0,
+       "expected some packets on the receiving NIC")
+assert(link.stats(engine.app_table.sink.input.input).rxpackets > 0,
+       "expected VLAN tagged packets on the receiving NIC")
