@@ -1,0 +1,243 @@
+-- One of Bob Jenkins' hashes from
+-- http://burtleburtle.net/bob/hash/integer.html.  It's about twice as
+-- fast as MurmurHash3_x86_32 and seems to do just as good a job --
+-- tables using this hash function seem to have the same max
+-- displacement as tables using the murmur hash.
+--
+-- TODO: Switch to a hash function with good security properties,
+-- perhaps by using the DynASM support for AES.
+
+module(..., package.seeall)
+
+local bit  = require("bit")
+local dasm = require("dasm")
+local ffi  = require("ffi")
+
+local debug = false
+
+|.arch x64
+|.actionlist actions
+
+local function generate_siphash(size, key)
+   local k0 = ffi.cast('uint64_t*', key)[0]
+   local k1 = ffi.cast('uint64_t*', key)[1]
+
+   -- Initial state constants.
+   local v0 = 0x736f6d6570736575ULL
+   local v1 = 0x646f72616e646f6dULL
+   local v2 = 0x6c7967656e657261ULL
+   local v3 = 0x7465646279746573ULL
+
+   -- Mix key into state constants.
+   v0 = bit.bxor(v0, k0)
+   v1 = bit.bxor(v1, k1)
+   v2 = bit.bxor(v2, k0)
+   v3 = bit.bxor(v3, k1)
+
+   function gen(Dst)
+      -- Arguments:
+      -- rdi: data as pointer
+
+      -- Registers used:
+      -- r8, r9, r10, r11 map to SipHash variables v0, v1, v2, v3
+      -- rax, rdx: scratch registers
+
+      -- Initialize state variables.
+      | mov64 r8, v0
+      | mov64 r9, v1
+      | mov64 r10, v2
+      | mov64 r11, v3
+
+      local function sipround()
+         | add r8, r9
+         | rol r9, 13
+         | xor r9, r8
+         | rol r8, 32
+         | add r10, r11
+         | rol r11, 16
+         | xor r11, r10
+         | add r8, r11
+         | rol r11, 21
+         | xor r11, r8
+         | add r10, r9
+         | rol r9, 17
+         | xor r9, r10
+         | rol r10, 32
+      end
+
+      -- Add rax into state.
+      local function process()
+         | xor r11, rax
+         -- SipHash-2-4 has 2 siprounds.
+         sipround()
+         sipround()
+         | xor r8, rax
+      end
+
+      -- Compression phase.
+      for i=1,size/8 do
+         | mov rax, [rdi]
+         | add rdi, 8
+         process()
+      end
+      -- Load tail word and process it.
+      | mov rax, size
+      | shl rax, 56
+      for i=1,size%8 do
+         | movzx rdx, byte [rdi]
+         | inc rdi
+         if i > 1 then
+           | shl rdx, ((i - 1) * 8)
+         end
+         | xor rax, rdx
+      end
+      process()
+  
+      -- Finalization.
+      | xor r10, 0xff
+      -- SipHash-2-4 has 4 siprounds in the finalization phase.
+      sipround()
+      sipround()
+      sipround()
+      sipround()
+
+      | mov rax, r8
+      | xor rax, r9
+      | xor rax, r10
+      | xor rax, r11
+      | shr rax, 32
+      | ret
+   end
+   return gen
+end
+
+-- the definitions here (anchor, assemble, gen) are borrowed from lwaftr
+-- (see multi_copy.lua)
+__anchor = {}
+
+local function assemble (name, prototype, generator)
+   local Dst = dasm.new(actions)
+   generator(Dst)
+   local mcode, size = Dst:build()
+   table.insert(__anchor, mcode)
+   if debug then
+      print("mcode dump: "..name)
+      dasm.dump(mcode, size)
+   end
+   return ffi.cast(prototype, mcode)
+end
+
+function random_sip_hash_key()
+   error('unimplemented')
+end
+
+function reference_sip_hash_key()
+   return ffi.new('uint8_t[16]',
+                  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+end
+
+function make_sip_hash(size, key)
+   -- Taking only lowest 32 bits (?)
+   key = key or reference_sip_hash_key()
+   return assemble("make_sip_hash",
+                   ffi.typeof("uint32_t (*)(uint8_t *)"),
+                   generate_siphash(size, key))
+end
+
+local function make_lua_sip_hash(size, key)
+   key = key or reference_sip_hash_key()
+   local k0 = ffi.cast('uint64_t*', key)[0]
+   local k1 = ffi.cast('uint64_t*', key)[1]
+
+   -- Initial state constants.
+   local v0 = 0x736f6d6570736575ULL
+   local v1 = 0x646f72616e646f6dULL
+   local v2 = 0x6c7967656e657261ULL
+   local v3 = 0x7465646279746573ULL
+
+   -- Mix key into state constants.
+   v0 = bit.bxor(v0, k0)
+   v1 = bit.bxor(v1, k1)
+   v2 = bit.bxor(v2, k0)
+   v3 = bit.bxor(v3, k1)
+
+   local function sipround(v0, v1, v2, v3)
+      v0 = v0 + v1
+      v1 = bit.rol(v1, 13)
+      v1 = bit.bxor(v1, v0)
+      v0 = bit.rol(v0, 32)
+      v2 = v2 + v3
+      v3 = bit.rol(v3, 16)
+      v3 = bit.bxor(v3, v2)
+      v0 = v0 + v3
+      v3 = bit.rol(v3, 21)
+      v3 = bit.bxor(v3, v0)
+      v2 = v2 + v1
+      v1 = bit.rol(v1, 17)
+      v1 = bit.bxor(v1, v2)
+      v2 = bit.rol(v2, 32)
+      return v0, v1, v2, v3
+   end
+
+   local function process(m, v0, v1, v2, v3)
+      v3 = bit.bxor(v3, m)
+      -- SipHash-2-4 has 2 siprounds.
+      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      v0 = bit.bxor(v0, m)
+      return v0, v1, v2, v3
+   end
+
+   return function(ptr)
+      ptr = ffi.cast('uint8_t*', ptr)
+      -- Initialization phase: make fresh state variables.
+      local v0, v1, v2, v3 = v0, v1, v2, v3
+
+      -- Compression phase.
+      for i=1,size/8 do
+         local m = ffi.cast('uint64_t*', ptr)[0]
+         ptr = ptr + 8
+         v0, v1, v2, v3 = process(m, v0, v1, v2, v3)
+      end
+      -- Process tail word.
+      local tail = size + 0ULL
+      tail = bit.lshift(tail, 56)
+      for i=1,size%8 do
+         local byte = ptr[0]
+         ptr = ptr + 1
+         tail = bit.bor(tail, bit.lshift(byte+0ULL, (i-1)*8))
+      end
+      v0, v1, v2, v3 = process(tail, v0, v1, v2, v3)
+  
+      -- Finalization.
+      v2 = bit.bxor(v2, 0xffULL)
+      -- SipHash-2-4 has 4 siprounds in the finalization phase.
+      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      return tonumber(bit.rshift(bit.bxor(v0, v1, v2, v3), 32))
+   end
+end
+
+function selftest()
+   -- test that the lua and dasm versions produce the same output
+   local function test(size)
+      local dasm_hash = make_sip_hash(size)
+      local lua_hash = make_lua_sip_hash(size)
+
+      for i=0, 255 do
+         local buf = ffi.new("uint8_t[?]", size)
+         for j=0, size-1 do
+            buf[j] = i
+         end
+         local h1 = dasm_hash(buf)
+         local h2 = lua_hash(buf)
+         assert(h1 == h2)
+      end
+   end
+
+   for size=0,32 do test(size) end
+
+   print("selftest ok")
+end
