@@ -23,7 +23,7 @@ function run (args)
       intel1g(unpack(args))
    elseif command == 'esp' and #args >= 2 then
       esp(unpack(args))
-   elseif command == 'hash' and #args == 0 then
+   elseif command == 'hash' and #args <= 1 then
       hash(unpack(args))
    elseif command == 'ctable' and #args == 0 then
       ctable(unpack(args))
@@ -432,30 +432,43 @@ local function test_perf(f, iterations, what)
    return res
 end
 
-function hash ()
+function hash (key_size)
+   if key_size then
+      key_size = assert(tonumber(key_size))
+   else
+      key_size = 4
+   end
+   local value_t = ffi.typeof("uint8_t[$]", key_size)
+   local value = value_t()
+   local band = require('bit').band
+   local fill = require('ffi').fill
+
+   local jenkins_hash = require('lib.ctable').compute_hash_fn(value_t)
    local murmur = require('lib.hash.murmur').MurmurHash3_x86_32:new()
-   local vptr = ffi.new("uint8_t [4]")
-   local uint32_ptr_t = ffi.typeof('uint32_t*')
-   local lshift = require('bit').lshift
-   local INT32_MIN = -0x80000000
-   function murmur_hash_32(u32)
-      ffi.cast(uint32_ptr_t, vptr)[0] = u32
-      return murmur:hash(vptr, 4, 0ULL).u32[0]
+   local function murmur_hash(v)
+      return murmur:hash(v, key_size, 0ULL).u32[0]      
    end
 
-   local jenkins_hash_32 = require('lib.ctable').hash_32
+   local function test_hash(iterations, hash)
+      local result
+      for i=1,iterations do
+         fill(value, key_size, band(i, 255))
+         result = hash(value)
+      end
+      return result
+   end
+
+   local function test_baseline(iterations)
+      return test_hash(iterations, function (ptr) return ptr[0] end)
+   end
    local function test_jenkins(iterations)
-      local result
-      for i=1,iterations do result=jenkins_hash_32(i) end
-      return result
+      return test_hash(iterations, jenkins_hash)
    end
-
    local function test_murmur(iterations)
-      local result
-      for i=1,iterations do result=murmur_hash_32(i) end
-      return result
+      return test_hash(iterations, murmur_hash)
    end
 
+   test_perf(test_baseline, 1e8, 'baseline')
    test_perf(test_jenkins, 1e8, 'jenkins hash')
    test_perf(test_murmur, 1e8, 'murmur hash (32 bit)')
 end
