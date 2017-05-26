@@ -18,7 +18,7 @@ local debug = false
 |.arch x64
 |.actionlist actions
 
-local function generate_siphash(size, key)
+local function generate_siphash(size, key, c, d)
    local k0 = ffi.cast('uint64_t*', key)[0]
    local k1 = ffi.cast('uint64_t*', key)[1]
 
@@ -68,9 +68,7 @@ local function generate_siphash(size, key)
       -- Add rax into state.
       local function process()
          | xor r11, rax
-         -- SipHash-2-4 has 2 siprounds.
-         sipround()
-         sipround()
+         for i=1,c do sipround() end
          | xor r8, rax
       end
 
@@ -95,11 +93,7 @@ local function generate_siphash(size, key)
   
       -- Finalization.
       | xor r10, 0xff
-      -- SipHash-2-4 has 4 siprounds in the finalization phase.
-      sipround()
-      sipround()
-      sipround()
-      sipround()
+      for i=1,d do sipround() end
 
       | mov rax, r8
       | xor rax, r9
@@ -136,16 +130,22 @@ function reference_sip_hash_key()
                   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
 end
 
-function make_sip_hash(size, key)
+function make_sip_hash(size, key, c, d)
    -- Taking only lowest 32 bits (?)
    key = key or reference_sip_hash_key()
+   c = c or 2
+   d = d or 4
+
    return assemble("make_sip_hash",
                    ffi.typeof("uint32_t (*)(uint8_t *)"),
-                   generate_siphash(size, key))
+                   generate_siphash(size, key, c, d))
 end
 
-local function make_lua_sip_hash(size, key)
+local function make_lua_sip_hash(size, key, c, d)
    key = key or reference_sip_hash_key()
+   c = c or 2
+   d = d or 4
+
    local k0 = ffi.cast('uint64_t*', key)[0]
    local k1 = ffi.cast('uint64_t*', key)[1]
 
