@@ -1,11 +1,5 @@
--- One of Bob Jenkins' hashes from
--- http://burtleburtle.net/bob/hash/integer.html.  It's about twice as
--- fast as MurmurHash3_x86_32 and seems to do just as good a job --
--- tables using this hash function seem to have the same max
--- displacement as tables using the murmur hash.
---
--- TODO: Switch to a hash function with good security properties,
--- perhaps by using the DynASM support for AES.
+-- Implementation of SipHash, based on the reference implementation.
+-- See https://131002.net/siphash/ for more details.
 
 module(..., package.seeall)
 
@@ -18,7 +12,14 @@ local debug = false
 |.arch x64
 |.actionlist actions
 
-local function generate_siphash(size, key, c, d)
+-- SipHash is a family of hash functions, parameterized by the number
+-- of rounds that run per 8-byte input block and the number of rounds
+-- that run at the end.  Because we use SipHash as a hash function for
+-- fixed-sized inputs, we can simplify processing of the tail word.
+-- This simplification is enabled unless a true value for
+-- "as_specified" is passed.
+
+local function generate_siphash(size, key, c, d, as_specified)
    local k0 = ffi.cast('uint64_t*', key)[0]
    local k1 = ffi.cast('uint64_t*', key)[1]
 
@@ -79,18 +80,41 @@ local function generate_siphash(size, key, c, d)
          process()
       end
       -- Load tail word and process it.
-      | mov rax, size
-      | shl rax, 56
-      for i=1,size%8 do
-         | movzx rdx, byte [rdi]
-         | inc rdi
-         if i > 1 then
-           | shl rdx, ((i - 1) * 8)
+      if as_specified then
+         | mov rax, size
+         | shl rax, 56
+         for i=1,size%8 do
+            | movzx rdx, byte [rdi]
+            | inc rdi
+            if i > 1 then
+              | shl rdx, ((i - 1) * 8)
+            end
+            | or rax, rdx
          end
-         | xor rax, rdx
+         process()
+      elseif size%8 ~= 0 then
+         -- Fixed-size simplification: no need to add in size byte, we
+         -- can use different byte orders if it's more convenient, and
+         -- we don't have to do anything at all if the size is a
+         -- multiple of 8.
+         if size%8 >= 4 then
+            | mov eax, [rdi]
+            | add rdi, 4
+         else
+            | xor rax, rax
+         end
+         if size%4 >= 2 then
+            | shl rax, 16
+            | mov ax, [rdi]
+            | add rdi, 2
+         end
+         if size%2 ~= 0 then
+            | shl rax, 8
+            | mov al, [rdi]
+            | inc rdi
+         end
+         process()
       end
-      process()
-  
       -- Finalization.
       | xor r10, 0xff
       for i=1,d do sipround() end
@@ -130,7 +154,7 @@ function reference_sip_hash_key()
                   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
 end
 
-function make_sip_hash(size, key, c, d)
+function make_sip_hash(size, key, c, d, as_specified)
    -- Taking only lowest 32 bits (?)
    key = key or reference_sip_hash_key()
    c = c or 2
@@ -138,10 +162,10 @@ function make_sip_hash(size, key, c, d)
 
    return assemble("make_sip_hash",
                    ffi.typeof("uint32_t (*)(uint8_t *)"),
-                   generate_siphash(size, key, c, d))
+                   generate_siphash(size, key, c, d, as_specified))
 end
 
-local function make_lua_sip_hash(size, key, c, d)
+local function make_lua_sip_hash(size, key, c, d, as_specified)
    key = key or reference_sip_hash_key()
    c = c or 2
    d = d or 4
@@ -181,9 +205,9 @@ local function make_lua_sip_hash(size, key, c, d)
 
    local function process(m, v0, v1, v2, v3)
       v3 = bit.bxor(v3, m)
-      -- SipHash-2-4 has 2 siprounds.
-      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      for i=1,c do
+         v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      end
       v0 = bit.bxor(v0, m)
       return v0, v1, v2, v3
    end
@@ -200,31 +224,48 @@ local function make_lua_sip_hash(size, key, c, d)
          v0, v1, v2, v3 = process(m, v0, v1, v2, v3)
       end
       -- Process tail word.
-      local tail = size + 0ULL
-      tail = bit.lshift(tail, 56)
-      for i=1,size%8 do
-         local byte = ptr[0]
-         ptr = ptr + 1
-         tail = bit.bor(tail, bit.lshift(byte+0ULL, (i-1)*8))
+      if as_specified then
+         local tail = size + 0ULL
+         tail = bit.lshift(tail, 56)
+         for i=1,size%8 do
+            local byte = ptr[0]
+            ptr = ptr + 1
+            tail = bit.bor(tail, bit.lshift(byte+0ULL, (i-1)*8))
+         end
+         v0, v1, v2, v3 = process(tail, v0, v1, v2, v3)
+      elseif size%8 ~= 0 then
+         -- Fixed-size simplification; see above.
+         local tail = 0ULL
+         if size%8 >= 4 then
+            tail = tail + ffi.cast('uint32_t*', ptr)[0]
+            ptr = ptr + 4
+         end
+         if size%4 >= 2 then
+            tail = bit.lshift(tail, 16) + ffi.cast('uint16_t*', ptr)[0]
+            ptr = ptr + 2
+         end
+         if size%2 ~= 0 then
+            tail = bit.lshift(tail, 8) + ptr[0]
+            ptr = ptr + 1
+         end
+         v0, v1, v2, v3 = process(tail, v0, v1, v2, v3)
       end
-      v0, v1, v2, v3 = process(tail, v0, v1, v2, v3)
   
       -- Finalization.
       v2 = bit.bxor(v2, 0xffULL)
       -- SipHash-2-4 has 4 siprounds in the finalization phase.
-      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-      v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      for i=1,d do
+         v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
+      end
       return tonumber(bit.rshift(bit.bxor(v0, v1, v2, v3), 32))
    end
 end
 
 function selftest()
    -- test that the lua and dasm versions produce the same output
-   local function test(size)
-      local dasm_hash = make_sip_hash(size)
-      local lua_hash = make_lua_sip_hash(size)
+   local function test(size, key, c, d, as_specified)
+      local dasm_hash = make_sip_hash(size, key, c, d, as_specified)
+      local lua_hash = make_lua_sip_hash(size, key, c, d, as_specified)
 
       for i=0, 255 do
          local buf = ffi.new("uint8_t[?]", size)
@@ -233,11 +274,23 @@ function selftest()
          end
          local h1 = dasm_hash(buf)
          local h2 = lua_hash(buf)
-         assert(h1 == h2)
+         if h1 ~= h2 then
+            print(size, key, c, d, as_specified, h1, h2)
+            error('not equal')
+         end
       end
    end
 
-   for size=0,32 do test(size) end
+   local key = reference_sip_hash_key()
+   for size=0,32 do
+      for c=0,2 do
+         for d=0,4 do
+            for _, as_specified in ipairs({true, false}) do
+               test(size, key, c, d, as_specified)
+            end
+         end
+      end
+   end
 
    print("selftest ok")
 end
