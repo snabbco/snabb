@@ -444,7 +444,9 @@ function hash (key_size)
    local fill = require('ffi').fill
 
    local jenkins_hash = require('lib.ctable').compute_hash_fn(value_t)
-   local sip_hash = require('lib.hash.siphash').make_sip_hash(ffi.sizeof(value_t))
+   local lib_siphash = require('lib.hash.siphash')
+   local sip_hash_1_2 = lib_siphash.make_sip_hash(ffi.sizeof(value_t), nil, 1, 2)
+   local sip_hash_2_4 = lib_siphash.make_sip_hash(ffi.sizeof(value_t), nil, 2, 4)
    local murmur = require('lib.hash.murmur').MurmurHash3_x86_32:new()
    local function murmur_hash(v)
       return murmur:hash(v, key_size, 0ULL).u32[0]      
@@ -465,8 +467,11 @@ function hash (key_size)
    local function test_jenkins(iterations)
       return test_hash(iterations, jenkins_hash)
    end
-   local function test_sip(iterations)
-      return test_hash(iterations, sip_hash)
+   local function test_sip_1_2(iterations)
+      return test_hash(iterations, sip_hash_1_2)
+   end
+   local function test_sip_2_4(iterations)
+      return test_hash(iterations, sip_hash_2_4)
    end
    local function test_murmur(iterations)
       return test_hash(iterations, murmur_hash)
@@ -474,7 +479,8 @@ function hash (key_size)
 
    test_perf(test_baseline, 1e8, 'baseline')
    test_perf(test_jenkins, 1e8, 'jenkins hash')
-   test_perf(test_sip, 1e8, 'sip hash')
+   test_perf(test_sip_1_2, 1e8, 'sip hash c=1,d=2')
+   test_perf(test_sip_2_4, 1e8, 'sip hash c=2,d=4')
    test_perf(test_murmur, 1e8, 'murmur hash (32 bit)')
 end
 
