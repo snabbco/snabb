@@ -65,8 +65,7 @@ function run (args)
    local opts, prop_name, prop_args = parse_args(args)
    local rerun_usage = function (i)
       print(("Rerun as: snabb lwaftr quickcheck --seed=%s --iterations=%s %s %s"):
-            format(program_name, opts.seed, i + 1,
-                   prop_name, table.concat(prop_args, " ")))
+            format(opts.seed, i + 1, prop_name, table.concat(prop_args, " ")))
    end
    math.randomseed(opts.seed)
 
