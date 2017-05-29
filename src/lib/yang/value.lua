@@ -82,6 +82,7 @@ types.empty = unimplemented('empty')
 
 types.identityref = {}
 function types.identityref.parse(str, what)
+   -- References are expanded in the validation phase.
    return assert(str, 'missing value for '..what)
 end
 function types.identityref.tostring(val)

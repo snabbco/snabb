@@ -509,9 +509,7 @@ declare_initializer(
    'deviation', 'deviate')
 declare_initializer(
    init_natural, 'fraction-digits', 'position', 'min-elements', 'max-elements')
-declare_initializer(
-   init_yang_version, 'yang-version'
-)
+declare_initializer(init_yang_version, 'yang-version')
 declare_initializer(
    init_boolean, 'config', 'mandatory', 'require-instance', 'yin-element')
 declare_initializer(init_anyxml, 'anyxml')
@@ -681,6 +679,7 @@ function resolve(schema, features)
       end
       return ret
    end
+   -- Resolve argument of "base" statements to identity fqid and collect in a list.
    local function resolve_bases(bases, env)
       local ret = {}
       for _, base in ipairs(bases) do
@@ -917,6 +916,7 @@ function lookup_identity (fqid)
    end
    return id_thunk() -- Force the lazy lookup.
 end
+lookup_identity = util.memoize(lookup_identity)
 
 function identity_is_instance_of (identity, fqid)
    for _, base in ipairs(identity.bases) do
@@ -926,6 +926,7 @@ function identity_is_instance_of (identity, fqid)
    end
    return false
 end
+identity_is_instance_of = util.memoize(identity_is_instance_of)
 
 function selftest()
    print('selftest: lib.yang.schema')
