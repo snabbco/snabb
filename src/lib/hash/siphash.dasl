@@ -1,3 +1,4 @@
+-- -*- lua -*-
 -- Implementation of SipHash, based on the reference implementation.
 -- See https://131002.net/siphash/ for more details.
 
@@ -12,6 +13,22 @@ local debug = false
 |.arch x64
 |.actionlist actions
 
+-- the definitions here (anchor, assemble, gen) are borrowed from lwaftr
+-- (see multi_copy.lua)
+__anchor = {}
+
+local function assemble (name, prototype, generator)
+   local Dst = dasm.new(actions)
+   generator(Dst)
+   local mcode, size = Dst:build()
+   table.insert(__anchor, mcode)
+   if debug then
+      print("mcode dump: "..name)
+      dasm.dump(mcode, size)
+   end
+   return ffi.cast(prototype, mcode)
+end
+
 -- SipHash is a family of hash functions, parameterized by the number
 -- of rounds that run per 8-byte input block and the number of rounds
 -- that run at the end.  Because we use SipHash as a hash function for
@@ -19,7 +36,18 @@ local debug = false
 -- This simplification is enabled unless a true value for
 -- "as_specified" is passed.
 
-local function generate_siphash(size, key, c, d, as_specified)
+function random_sip_hash_key()
+   error('unimplemented')
+end
+
+function reference_sip_hash_key()
+   return ffi.new('uint8_t[16]',
+                  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+end
+
+local function load_initial_state(key)
+   key = key or reference_sip_hash_key()
+
    local k0 = ffi.cast('uint64_t*', key)[0]
    local k1 = ffi.cast('uint64_t*', key)[1]
 
@@ -34,6 +62,14 @@ local function generate_siphash(size, key, c, d, as_specified)
    v1 = bit.bxor(v1, k1)
    v2 = bit.bxor(v2, k0)
    v3 = bit.bxor(v3, k1)
+
+   return v0, v1, v2, v3
+end
+
+function make_sip_hash(size, key, c, d, as_specified)
+   local v0, v1, v2, v3 = load_initial_state(key)
+   c = c or 2
+   d = d or 4
 
    function gen(Dst)
       -- Arguments:
@@ -126,64 +162,15 @@ local function generate_siphash(size, key, c, d, as_specified)
       | shr rax, 32
       | ret
    end
-   return gen
-end
-
--- the definitions here (anchor, assemble, gen) are borrowed from lwaftr
--- (see multi_copy.lua)
-__anchor = {}
-
-local function assemble (name, prototype, generator)
-   local Dst = dasm.new(actions)
-   generator(Dst)
-   local mcode, size = Dst:build()
-   table.insert(__anchor, mcode)
-   if debug then
-      print("mcode dump: "..name)
-      dasm.dump(mcode, size)
-   end
-   return ffi.cast(prototype, mcode)
-end
-
-function random_sip_hash_key()
-   error('unimplemented')
-end
-
-function reference_sip_hash_key()
-   return ffi.new('uint8_t[16]',
-                  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
-end
-
-function make_sip_hash(size, key, c, d, as_specified)
-   -- Taking only lowest 32 bits (?)
-   key = key or reference_sip_hash_key()
-   c = c or 2
-   d = d or 4
 
    return assemble("make_sip_hash",
                    ffi.typeof("uint32_t (*)(uint8_t *)"),
-                   generate_siphash(size, key, c, d, as_specified))
+                   gen)
 end
 
 local function make_lua_sip_hash(size, key, c, d, as_specified)
-   key = key or reference_sip_hash_key()
    c = c or 2
    d = d or 4
-
-   local k0 = ffi.cast('uint64_t*', key)[0]
-   local k1 = ffi.cast('uint64_t*', key)[1]
-
-   -- Initial state constants.
-   local v0 = 0x736f6d6570736575ULL
-   local v1 = 0x646f72616e646f6dULL
-   local v2 = 0x6c7967656e657261ULL
-   local v3 = 0x7465646279746573ULL
-
-   -- Mix key into state constants.
-   v0 = bit.bxor(v0, k0)
-   v1 = bit.bxor(v1, k1)
-   v2 = bit.bxor(v2, k0)
-   v3 = bit.bxor(v3, k1)
 
    local function sipround(v0, v1, v2, v3)
       v0 = v0 + v1
@@ -214,8 +201,8 @@ local function make_lua_sip_hash(size, key, c, d, as_specified)
 
    return function(ptr)
       ptr = ffi.cast('uint8_t*', ptr)
-      -- Initialization phase: make fresh state variables.
-      local v0, v1, v2, v3 = v0, v1, v2, v3
+      -- Initialization phase.
+      local v0, v1, v2, v3 = load_initial_state(key)
 
       -- Compression phase.
       for i=1,size/8 do
