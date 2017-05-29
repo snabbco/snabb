@@ -30,7 +30,7 @@ local function map (name, type, readonly, create)
    if create then
       -- Create the parent directories. If this fails then so will the open().
       mkdir(path)
-      fd, err = S.open(root..'/'..path, "creat, rdwr", "rwxu")
+      fd, err = S.open(root..'/'..path, "creat, rdwr", "rusr, wusr, rgrp, roth")
    else
       fd, err = S.open(root..'/'..path, readonly and "rdonly" or "rdwr")
    end
@@ -83,7 +83,7 @@ function mkdir (name)
    -- Create sub directories
    local dir = root
    name:gsub("([^/]+)",
-             function (x) S.mkdir(dir, "rwxu")  dir = dir.."/"..x end)
+             function (x) S.mkdir(dir, "rwxu, rgrp, xgrp, roth, xoth")  dir = dir.."/"..x end)
 end
 
 -- Delete a shared object memory mapping.
