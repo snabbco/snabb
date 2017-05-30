@@ -440,9 +440,7 @@ function selftest()
 
       typedef severity  {
          type enumeration {
-            enum indetermiante {
-               value 2;
-            }
+            enum indeterminate;
             enum minor {
                value 3;
             }
