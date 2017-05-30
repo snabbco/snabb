@@ -235,27 +235,39 @@ local function integer_type(min, max)
    end
 end
 
--- FIXME :)
+-- FIXME
 local function range_validator(range, f) return f end
 local function length_validator(range, f) return f end
 local function pattern_validator(range, f) return f end
 local function bit_validator(range, f) return f end
 local function enum_validator(range, f) return f end
+local function identityref_validator(bases, default_prefix, f)
+   if not default_prefix then return f end
+   return function(val)
+      if not val:match(':') then val = default_prefix..":"..val end
+      local identity = schema.lookup_identity(val)
+      for _, base in ipairs(bases) do
+         if not schema.identity_is_instance_of(identity, base) then
+            error('identity '..val..' not an instance of '..base)
+         end
+      end
+      return val
+   end
+end
 
 local function value_parser(typ)
    local prim = typ.primitive_type
    local parse = assert(value.types[prim], prim).parse
-   local validate
+   local validate = function(val) return val end
    validate = range_validator(typ.range, validate)
    validate = length_validator(typ.length, validate)
    validate = pattern_validator(typ.pattern, validate)
    validate = bit_validator(typ.bit, validate)
    validate = enum_validator(typ.enums, validate)
+   validate = identityref_validator(typ.bases, typ.default_prefix, validate)
    -- TODO: union, require-instance.
    return function(str, k)
-      local val = parse(str, k)
-      if validate then validate(val) end
-      return val
+      return validate(parse(str, k))
    end
 end
 
@@ -884,5 +896,24 @@ function selftest()
          name "hello";
       }
    }]])
+
+   local test_schema = [[module test-schema {
+      namespace "urn:ietf:params:xml:ns:yang:test-schema";
+      prefix "test";
+
+      container summary {
+         leaf shelves-active {
+             type empty;
+         }
+      }
+   }]]
+   local loaded_schema = schema.load_schema(test_schema)
+   local object = load_data_for_schema(loaded_schema, [[
+      summary {
+         shelves-active;
+      }
+   ]])
+   assert(object.summary.shelves_active)
+
    print('selfcheck: ok')
 end

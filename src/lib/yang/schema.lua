@@ -168,6 +168,12 @@ local function init_natural(node, loc, argument, children)
                    loc, 'not a natural number: %s', arg)
    node.value = as_num
 end
+-- Must be one or 1 or 1.1.
+local function init_yang_version (node, loc, argument, children)
+   local arg = require_argument(loc, argument)
+   assert_with_loc(arg == "1" or arg == "1.1", 'not a valid version number: %s', arg)
+   node.value = tonumber(arg)
+end
 local function init_boolean(node, loc, argument, children)
    local arg = require_argument(loc, argument)
    if arg == 'true' then node.value = true
@@ -270,7 +276,7 @@ local function init_grouping(node, loc, argument, children)
 end
 local function init_identity(node, loc, argument, children)
    node.id = require_argument(loc, argument)
-   node.base = maybe_child_property(loc, children, 'base', 'id')
+   node.bases = collect_child_properties(children, 'base', 'value')
    node.status = maybe_child_property(loc, children, 'status', 'value')
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
@@ -441,7 +447,7 @@ local function init_type(node, loc, argument, children)
    -- !!! path
    node.leafref = maybe_child_property(loc, children, 'path', 'value')
    node.require_instances = collect_children(children, 'require-instance')
-   node.identityref = maybe_child_property(loc, children, 'base', 'value')
+   node.bases = collect_child_properties(children, 'base', 'value')
    node.union = collect_children(children, 'type')
    node.bits = collect_children(children, 'bit')
 end
@@ -502,8 +508,8 @@ declare_initializer(
    'error-message', 'error-app-tag', 'max-value', 'key', 'unique', 'when',
    'deviation', 'deviate')
 declare_initializer(
-   init_natural, 'yang-version', 'fraction-digits', 'position',
-   'min-elements', 'max-elements')
+   init_natural, 'fraction-digits', 'position', 'min-elements', 'max-elements')
+declare_initializer(init_yang_version, 'yang-version')
 declare_initializer(
    init_boolean, 'config', 'mandatory', 'require-instance', 'yin-element')
 declare_initializer(init_anyxml, 'anyxml')
@@ -616,7 +622,7 @@ end
 -- Inline "submodule" into "include".
 -- Inline "imports" into "module".
 -- Inline "typedef" into "type".
--- Resolve if-feature.
+-- Resolve if-feature, identity bases, and identityref bases.
 -- Warn on any "when", resolving them as being true.
 -- Resolve all augment and refine nodes. (TODO)
 function resolve(schema, features)
@@ -673,7 +679,15 @@ function resolve(schema, features)
       end
       return ret
    end
-   function visit_type(node, env)
+   -- Resolve argument of "base" statements to identity fqid and collect in a list.
+   local function resolve_bases(bases, env)
+      local ret = {}
+      for _, base in ipairs(bases) do
+         table.insert(ret, lookup_lazy(env, 'identities', base).fqid)
+      end
+      return ret
+   end
+   local function visit_type(node, env)
       node = shallow_copy(node)
       local success, typedef = pcall(lookup, env, 'typedefs', node.id)
       if success then
@@ -692,11 +706,15 @@ function resolve(schema, features)
                table.insert(union, visit_type(type, env))
             end
             node.union = union
+         elseif node.id == 'identityref' then
+            node.bases = resolve_bases(node.bases, env)
+            node.default_prefix = schema.id
          end
          node.primitive_type = node.id
       end
       return node
    end
+   -- Already made "local" above.
    function visit(node, env)
       node = shallow_copy(node)
       env = {env=env}
@@ -717,10 +735,10 @@ function resolve(schema, features)
       end
       if node.kind == 'module' or node.kind == 'submodule' then
          visit_top_level(node, env, 'extensions')
-         -- Because features can themselves have if-feature, expand them
-         -- lazily.
+         -- Because features can themselves have if-feature, and
+         -- identities can reference each other, expand them lazily.
          env.features = visit_lazy(pop_prop(node, 'features'), env)
-         visit_top_level(node, env, 'identities')
+         env.identities = visit_lazy(pop_prop(node, 'identities'), env)
          for _,prop in ipairs({'rpcs', 'notifications'}) do
             node[prop] = shallow_copy(node[prop])
             for k,v in pairs(node[prop]) do node[prop][k] = visit(v, env) end
@@ -729,6 +747,11 @@ function resolve(schema, features)
       if node.kind == 'rpc' then
          if node.input then node.input = visit(node.input, env) end
          if node.output then node.output = visit(node.output, env) end
+      end
+      if node.kind == 'identity' then
+         -- Attach fully-qualified identity.
+         node.fqid = lookup(env, 'module_id', '_')..":"..node.id
+         node.bases = resolve_bases(node.bases, env)
       end
       if node.kind == 'feature' then
          node.module_id = lookup(env, 'module_id', '_')
@@ -884,6 +907,27 @@ function load_schema_by_name(name, revision)
 end
 load_schema_by_name = util.memoize(load_schema_by_name)
 
+function lookup_identity (fqid)
+   local schema_name, id = fqid:match("^([^:]*):(.*)$")
+   local schema, env = load_schema_by_name(schema_name)
+   local id_thunk = env.identities[id]
+   if not id_thunk then
+      error('no identity '..id..' in module '..schema_name)
+   end
+   return id_thunk() -- Force the lazy lookup.
+end
+lookup_identity = util.memoize(lookup_identity)
+
+function identity_is_instance_of (identity, fqid)
+   for _, base in ipairs(identity.bases) do
+      if base == fqid then return true end
+      local base_id = lookup_identity(base)
+      if identity_is_instance_of(base_id, fqid) then return true end
+   end
+   return false
+end
+identity_is_instance_of = util.memoize(identity_is_instance_of)
+
 function selftest()
    print('selftest: lib.yang.schema')
    local test_schema = [[module fruit {
@@ -913,6 +957,10 @@ function selftest()
          description "A fruit bowl";
          reference "fruit-bowl";
       }
+
+      identity foo;
+      identity bar { base foo; }
+      identity baz { base bar; base foo; }
 
       grouping fruit {
          description "Represents a piece of fruit";
@@ -971,6 +1019,14 @@ function selftest()
    assert(env.features["bowl"])
    -- Poke through lazy features abstraction by invoking thunk.
    assert(env.features["bowl"]().description == 'A fruit bowl')
+
+   -- Poke through lazy identity bases by invoking thunk.
+   assert(#env.identities["baz"]().bases == 2)
+   assert(#env.identities["bar"]().bases == 1)
+   assert(env.identities["bar"]().bases[1] == 'fruit:foo')
+   assert(#env.identities["foo"]().bases == 0)
+
+   assert(#lookup_identity("ietf-alarms:alarm-identity").bases == 0)
 
    -- Check that groupings get inlined into their uses.
    assert(schema.body['fruit-bowl'])
