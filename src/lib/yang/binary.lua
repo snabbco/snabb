@@ -437,11 +437,29 @@ function selftest()
 
       leaf-list integers { type uint32; }
       leaf-list addrs { type inet:ipv4-address; }
+
+      typedef severity  {
+         type enumeration {
+            enum indetermiante {
+               value 2;
+            }
+            enum minor {
+               value 3;
+            }
+            enum warning {
+               value 4;
+            }
+         }
+      }
+
       container routes {
          list route {
             key addr;
             leaf addr { type inet:ipv4-address; mandatory true; }
             leaf port { type uint8 { range 0..11; } mandatory true; }
+         }
+         leaf severity {
+            type severity;
          }
       }
    }]])
@@ -456,6 +474,7 @@ function selftest()
         route { addr 1.2.3.4; port 1; }
         route { addr 2.3.4.5; port 10; }
         route { addr 3.4.5.6; port 2; }
+        severity minor;
       }
    ]])
 
