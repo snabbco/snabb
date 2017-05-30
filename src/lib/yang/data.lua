@@ -240,7 +240,15 @@ local function range_validator(range, f) return f end
 local function length_validator(range, f) return f end
 local function pattern_validator(range, f) return f end
 local function bit_validator(range, f) return f end
-local function enum_validator(range, f) return f end
+local function enum_validator(enums, f)
+   if not enums or #enums == 0 then return f end
+   return function (val)
+      for _, enum in ipairs(enums) do
+         if enum.value == val then return val end
+      end
+      error('enumeration '..val..' is not a valid value')
+   end
+end
 local function identityref_validator(bases, default_prefix, f)
    if not default_prefix then return f end
    return function(val)
