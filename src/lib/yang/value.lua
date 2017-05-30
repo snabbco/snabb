@@ -78,7 +78,13 @@ function types.decimal64.tostring(val)
    return tostring(val)
 end
 
-types.empty = unimplemented('empty')
+types.empty = {}
+function types.empty.parse (str, what)
+   return assert(str == nil, "not empty value for "..what)
+end
+function types.empty.tostring (val)
+   return ""
+end
 
 types.identityref = {}
 function types.identityref.parse(str, what)
