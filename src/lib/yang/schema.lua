@@ -453,7 +453,6 @@ local function init_type(node, loc, argument, children)
    node.length = maybe_child_property(loc, children, 'length', 'value')
    node.patterns = collect_children(children, 'pattern')
    node.enums = collect_children(children, 'enum')
-   node.enumerations = collect_children(children, 'enum')
    -- !!! path
    node.leafref = maybe_child_property(loc, children, 'path', 'value')
    node.require_instances = collect_children(children, 'require-instance')
@@ -709,8 +708,8 @@ function resolve(schema, features)
          node.base_type = typedef
          node.primitive_type = assert(typedef.primitive_type)
          node.enums = {}
-         for _, enum in pairs(typedef.type.enums) do
-            node.enums[enum] = true
+         for _, enum in ipairs(typedef.type.enums) do
+            node.enums[enum.name] = true
          end
       else
          -- If the type name wasn't bound, it must be primitive.
