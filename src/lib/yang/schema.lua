@@ -405,9 +405,9 @@ local function init_range(node, loc, argument, children)
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
 local function init_enum(node, loc, argument, children)
-   node.value = require_argument(loc, argument)
-   local intvalue = maybe_child_property(loc, children, 'value', 'value')
-   if intvalue then node.intvalue = tonumber(intvalue) end
+   node.name = require_argument(loc, argument)
+   local value = maybe_child_property(loc, children, 'value', 'value')
+   if value then node.value = tonumber(value) end
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
    node.status = maybe_child_property(loc, children, 'status', 'value')
@@ -708,7 +708,10 @@ function resolve(schema, features)
          typedef = typedef()
          node.base_type = typedef
          node.primitive_type = assert(typedef.primitive_type)
-         node.enums = typedef.type.enums
+         node.enums = {}
+         for _, enum in pairs(typedef.type.enums) do
+            node.enums[enum] = true
+         end
       else
          -- If the type name wasn't bound, it must be primitive.
          assert(primitive_types[node.id], 'unknown type: '..node.id)
