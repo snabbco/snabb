@@ -168,6 +168,281 @@ function make_sip_hash(size, key, c, d, as_specified)
                    gen)
 end
 
+local function SSE(Dst, stride)
+   local asm = {}
+   function asm.init(key)
+      local initial_state = ffi.new('uint64_t[4]', load_initial_state(key))
+      table.insert(__anchor, initial_state)
+      | mov rax, initial_state
+      | movddup xmm0, [rax]
+      | movddup xmm1, [rax+8]
+      | movddup xmm2, [rax+16]
+      | movddup xmm3, [rax+24]
+   end
+   function asm.add(dst, other)
+      | paddq xmm(dst), xmm(other)
+   end
+   function asm.shl(reg, bits)
+      | psllq xmm(reg), bits
+   end
+   function asm.ior(dst, other)
+      | por xmm(dst), xmm(other)
+   end
+   function asm.xor(dst, other)
+      | pxor xmm(dst), xmm(other)
+   end
+   function asm.rol(reg, bits)
+      | movupd xmm5, xmm(reg)
+      | psllq xmm5, bits
+      | psrlq xmm(reg), (64 - bits)
+      | por xmm(reg), xmm5
+   end
+   function asm.load_u64_and_advance(dst)
+      | movlpd xmm(dst), qword [rdi]
+      | movhpd xmm(dst), qword [rdi+stride]
+      | add rdi, 8
+   end
+   function asm.load_u32_and_advance(dst)
+      | movss xmm(dst), dword [rdi]
+      | pinsrd xmm(dst), dword [rdi + stride], 2
+      | add rdi, 4
+   end
+   function asm.load_u16_and_advance(dst)
+      | pxor xmm(dst), xmm(dst)
+      | pinsrw xmm(dst), word [rdi], 0
+      | pinsrw xmm(dst), word [rdi + stride], 4
+      | add rdi, 2
+   end
+   function asm.load_u8_and_advance(dst)
+      | pxor xmm(dst), xmm(dst)
+      | pinsrb xmm(dst), byte [rdi], 0
+      | pinsrb xmm(dst), byte [rdi + stride], 8
+      | add rdi, 1
+   end
+   function asm.load_imm8(dst, imm)
+      | xor rax, rax
+      | mov al, imm
+      | pinsrq xmm(dst), rax, 0
+      | pinsrq xmm(dst), rax, 1
+   end
+   function asm.ret(reg)
+      -- Extract high 32 bits from each 64-bit value to uint32_t[2] in
+      -- rsi.
+      | pextrd dword [rsi], xmm(reg), 1
+      | pextrd dword [rsi+4], xmm(reg), 3
+      | xor rax, rax
+      | ret
+   end
+   return asm
+end
+
+local function AVX2(Dst, stride)
+   local asm = {}
+   function asm.init(key)
+      local initial_state = ffi.new('uint64_t[4]', load_initial_state(key))
+      table.insert(__anchor, initial_state)
+      | vzeroall
+      | mov rax, initial_state
+      | vbroadcastsd ymm0, qword [rax]
+      | vbroadcastsd ymm1, qword [rax+8]
+      | vbroadcastsd ymm2, qword [rax+16]
+      | vbroadcastsd ymm3, qword [rax+24]
+   end
+   function asm.add(dst, other)
+      | vpaddq ymm(dst), ymm(dst), ymm(other)
+   end
+   function asm.shl(reg, bits)
+      | vpsllq ymm(reg), ymm(reg), bits
+   end
+   function asm.ior(dst, other)
+      | vpor ymm(dst), ymm(dst), ymm(other)
+   end
+   function asm.xor(dst, other)
+      | vpxor ymm(dst), ymm(dst), ymm(other)
+   end
+   function asm.rol(reg, bits)
+      | vpsllq ymm5, ymm(reg), bits
+      | vpsrlq ymm(reg), ymm(reg), (64 - bits)
+      | vpor ymm(reg), ymm(reg), ymm5
+   end
+   function asm.load_u64_and_advance(dst)
+      -- Though we could use a parallel load here, I understand that
+      -- it decomposes into approximately the same number of uops as
+      -- this.  Note that we load u64 words into DST in the
+      -- interleaved order 0, 2, 1, 3; this makes the return sequence
+      -- easier.
+      assert(dst > 5)
+      | mov rax, [rdi]
+      | mov rdx, [rdi+stride]
+      | vpinsrq xmm(dst), xmm(dst), rax, 0
+      | vpinsrq xmm5, xmm5, rdx, 0
+      | mov rax, [rdi+stride*2]
+      | mov rdx, [rdi+stride*3]
+      | vpinsrq xmm(dst), xmm(dst), rax, 1
+      | vpinsrq xmm5, xmm5, rdx, 1
+      | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
+      | add rdi, 8
+   end
+   function asm.load_u32_and_advance(dst)
+      assert(dst > 5)
+      | mov eax, [rdi]
+      | mov edx, [rdi+stride]
+      | vpinsrq xmm(dst), xmm(dst), rax, 0
+      | vpinsrq xmm5, xmm5, rdx, 0
+      | mov eax, [rdi+stride*2]
+      | mov edx, [rdi+stride*3]
+      | vpinsrq xmm(dst), xmm(dst), rax, 1
+      | vpinsrq xmm5, xmm5, rdx, 1
+      | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
+      | add rdi, 4
+   end
+   function asm.load_u16_and_advance(dst)
+      assert(dst > 5)
+      | movzx eax, word [rdi]
+      | movzx edx, word [rdi+stride]
+      | vpinsrq xmm(dst), xmm(dst), rax, 0
+      | vpinsrq xmm5, xmm5, rdx, 0
+      | movzx eax, word [rdi+stride*2]
+      | movzx edx, word [rdi+stride*3]
+      | vpinsrq xmm(dst), xmm(dst), rax, 1
+      | vpinsrq xmm5, xmm5, rdx, 1
+      | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
+      | add rdi, 2
+   end
+   function asm.load_u8_and_advance(dst)
+      assert(dst > 5)
+      | movzx eax, byte [rdi]
+      | movzx edx, byte [rdi+stride]
+      | vpinsrq xmm(dst), xmm(dst), rax, 0
+      | vpinsrq xmm5, xmm5, rdx, 0
+      | movzx eax, byte [rdi+stride*2]
+      | movzx edx, byte [rdi+stride*3]
+      | vpinsrq xmm(dst), xmm(dst), rax, 1
+      | vpinsrq xmm5, xmm5, rdx, 1
+      | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
+      | add rdi, 1
+   end
+   function asm.load_imm8(dst, imm)
+      | xor rax, rax
+      | mov al, imm
+      | vpinsrq xmm(dst), xmm(dst), rax, 0
+      | vpinsrq xmm(dst), xmm(dst), rax, 1
+      | vinsertf128 ymm(dst), ymm(dst), xmm(dst), 1
+   end
+   function asm.ret(reg)
+      -- Extract high 32 bits from each 64-bit value.
+      | vextractf128 xmm5, ymm(reg), 1
+      | vpunpckhdq xmm(reg), xmm(reg), xmm5
+      -- The unpack operation leaves results in order O 2 1 3.
+      -- Permute back to 0 1 2 3.
+      local control = bit.bor(bit.lshift(0, 0),
+                              bit.lshift(2, 2),
+                              bit.lshift(1, 4),
+                              bit.lshift(3, 6))
+      | vpshufd xmm(reg), xmm(reg), control
+      -- Now write to uint32_t[4] in rsi.
+      | vmovdqu [rsi], xmm(reg)
+      | ret
+   end
+   return asm
+end
+
+function make_sip_hash_x(assembler, size, key, c, d, as_specified)
+   c = c or 2
+   d = d or 4
+   function gen(emit)
+      local asm = assembler(emit, size)
+      -- Arguments:
+      -- rdi: packed keys as pointer
+      -- rsi: output uint32_t[4]
+      -- rax: scratch
+
+      -- Registers used:
+      -- ymm0-ymm3 map to SipHash variables v0-v3
+      -- Other ymm registers are scratch.
+
+      local function sipround()
+         asm.add(0, 1)
+         asm.rol(1, 13)
+         asm.xor(1, 0)
+         asm.rol(0, 32)
+         asm.add(2, 3)
+         asm.rol(3, 16)
+         asm.xor(3, 2)
+         asm.add(0, 3)
+         asm.rol(3, 21)
+         asm.xor(3, 0)
+         asm.add(1, 0)
+         asm.rol(1, 17)
+         asm.xor(1, 2)
+         asm.rol(2, 32)
+      end
+
+      local function process(input)
+         asm.xor(3, input)
+         for i=1,c do sipround() end
+         asm.xor(0, input)
+      end
+
+      -- Initialization phase.
+      asm.init(key)
+
+      -- Compression phase.
+      for i=1,size/8 do
+         asm.load_u64_and_advance(6)
+         process(6)
+      end
+      -- Load tail word and process it.
+      if as_specified then
+         asm.load_imm8(6, 0xff)
+         asm.shl(6, 56)
+         for i=1,size%8 do
+            asm.load_u8_and_advance(7)
+            if i > 1 then asm.shl(7, (i - 1) * 8) end
+            asm.ior(6, 7)
+         end
+         process(6)
+      elseif size%8 ~= 0 then
+         -- Fixed-size simplification: no need to add in size byte, we
+         -- can use different byte orders if it's more convenient, and
+         -- we don't have to do anything at all if the size is a
+         -- multiple of 8.
+         if size%8 >= 4 then
+            asm.load_u32_and_advance(6)
+         else
+            asm.xor(6, 6)
+         end
+         if size%4 >= 2 then
+            asm.load_u16_and_advance(7)
+            asm.shl(6, 16)
+            asm.ior(6, 7)
+         end
+         if size%2 ~= 0 then
+            asm.load_u8_and_advance(7)
+            asm.shl(6, 8)
+            asm.ior(6, 7)
+         end
+         process(6)
+      end
+      -- Finalization.
+      asm.load_imm8(6, 0xff)
+      asm.xor(3, 6)
+      for i=1,d do sipround(6) end
+      asm.xor(0, 1)
+      asm.xor(2, 3)
+      asm.xor(0, 2)
+      return asm.ret(0)
+   end
+
+   return assemble("siphash_"..c.."_"..d.."_x",
+                   ffi.typeof("void (*)(uint8_t*,uint32_t*)"),
+                   gen)
+end
+
+function make_sip_hash_x2(...)
+   return make_sip_hash_x(SSE, ...)
+end
+
 local function make_lua_sip_hash(size, key, c, d, as_specified)
    c = c or 2
    d = d or 4
@@ -252,15 +527,24 @@ function selftest()
    -- test that the lua and dasm versions produce the same output
    local function test(size, key, c, d, as_specified)
       local dasm_hash = make_sip_hash(size, key, c, d, as_specified)
+      local dasm_hash_x2 = make_sip_hash_x(SSE, size, key, c, d, as_specified)
+      -- local dasm_hash_x4 = make_sip_hash_x(AVX2, size, key, c, d, as_specified)
       local lua_hash = make_lua_sip_hash(size, key, c, d, as_specified)
 
       for i=0, 255 do
          local buf = ffi.new("uint8_t[?]", size)
+         local vbuf = ffi.new("uint8_t[?]", size*2)
+         local vres = ffi.new("uint32_t[2]")
          for j=0, size-1 do
-            buf[j] = i
+            buf[j] = (i + j) % size
+            for stride=0,1 do
+               vbuf[j + stride*size] = buf[j]
+            end
          end
          local h1 = dasm_hash(buf)
          local h2 = lua_hash(buf)
+         dasm_hash_x2(vbuf, vres)
+         -- TODO: Check elements of vres.
          if h1 ~= h2 then
             print(size, key, c, d, as_specified, h1, h2)
             error('not equal')
@@ -269,7 +553,11 @@ function selftest()
    end
 
    local key = reference_sip_hash_key()
+   io.stdout:write("selftest: ")
+   io.stdout:flush()
    for size=0,32 do
+      io.stdout:write(".")
+      io.stdout:flush()
       for c=0,2 do
          for d=0,4 do
             for _, as_specified in ipairs({true, false}) do
@@ -278,6 +566,5 @@ function selftest()
          end
       end
    end
-
-   print("selftest ok")
+   print("\nselftest ok")
 end
