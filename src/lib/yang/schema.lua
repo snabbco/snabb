@@ -404,6 +404,15 @@ local function init_range(node, loc, argument, children)
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
+local function init_enum(node, loc, argument, children)
+   node.value = require_argument(loc, argument)
+   local intvalue = maybe_child_property(loc, children, 'value', 'value')
+   if intvalue then node.intvalue = tonumber(intvalue) end
+   node.description = maybe_child_property(loc, children, 'description', 'value')
+   node.reference = maybe_child_property(loc, children, 'reference', 'value')
+   node.status = maybe_child_property(loc, children, 'status', 'value')
+   node.if_features = collect_child_properties(children, 'if-feature', 'value')
+end
 local function init_refine(node, loc, argument, children)
    node.node_id = require_argument(loc, argument)
    -- All subnode kinds.
@@ -444,6 +453,7 @@ local function init_type(node, loc, argument, children)
    node.length = maybe_child_property(loc, children, 'length', 'value')
    node.patterns = collect_children(children, 'pattern')
    node.enums = collect_children(children, 'enum')
+   node.enumerations = collect_children(children, 'enum')
    -- !!! path
    node.leafref = maybe_child_property(loc, children, 'path', 'value')
    node.require_instances = collect_children(children, 'require-instance')
@@ -537,6 +547,7 @@ declare_initializer(init_output, 'output')
 declare_initializer(init_path, 'path')
 declare_initializer(init_pattern, 'pattern')
 declare_initializer(init_range, 'range')
+declare_initializer(init_enum, 'enum')
 declare_initializer(init_refine, 'refine')
 declare_initializer(init_revision, 'revision')
 declare_initializer(init_rpc, 'rpc')
@@ -697,6 +708,7 @@ function resolve(schema, features)
          typedef = typedef()
          node.base_type = typedef
          node.primitive_type = assert(typedef.primitive_type)
+         node.enums = typedef.type.enums
       else
          -- If the type name wasn't bound, it must be primitive.
          assert(primitive_types[node.id], 'unknown type: '..node.id)
