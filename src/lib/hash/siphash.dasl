@@ -272,14 +272,10 @@ local function AVX2(Dst, stride)
       -- interleaved order 0, 2, 1, 3; this makes the return sequence
       -- easier.
       assert(dst > 5)
-      | mov rax, [rdi]
-      | mov rdx, [rdi+stride]
-      | vpinsrq xmm(dst), xmm(dst), rax, 0
-      | vpinsrq xmm5, xmm5, rdx, 0
-      | mov rax, [rdi+stride*2]
-      | mov rdx, [rdi+stride*3]
-      | vpinsrq xmm(dst), xmm(dst), rax, 1
-      | vpinsrq xmm5, xmm5, rdx, 1
+      | vpinsrq xmm(dst), xmm(dst), qword [rdi], 0
+      | vpinsrq xmm5, xmm5, qword [rdi+stride], 0
+      | vpinsrq xmm(dst), xmm(dst), qword [rdi+stride*2], 1
+      | vpinsrq xmm5, xmm5, qword [rdi+stride*3], 1
       | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
       | add rdi, 8
    end
@@ -298,12 +294,12 @@ local function AVX2(Dst, stride)
    end
    function asm.load_u16_and_advance(dst)
       assert(dst > 5)
-      | movzx eax, word [rdi]
-      | movzx edx, word [rdi+stride]
+      | movzx rax, word [rdi]
+      | movzx rdx, word [rdi+stride]
       | vpinsrq xmm(dst), xmm(dst), rax, 0
       | vpinsrq xmm5, xmm5, rdx, 0
-      | movzx eax, word [rdi+stride*2]
-      | movzx edx, word [rdi+stride*3]
+      | movzx rax, word [rdi+stride*2]
+      | movzx rdx, word [rdi+stride*3]
       | vpinsrq xmm(dst), xmm(dst), rax, 1
       | vpinsrq xmm5, xmm5, rdx, 1
       | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
@@ -311,12 +307,12 @@ local function AVX2(Dst, stride)
    end
    function asm.load_u8_and_advance(dst)
       assert(dst > 5)
-      | movzx eax, byte [rdi]
-      | movzx edx, byte [rdi+stride]
+      | movzx rax, byte [rdi]
+      | movzx rdx, byte [rdi+stride]
       | vpinsrq xmm(dst), xmm(dst), rax, 0
       | vpinsrq xmm5, xmm5, rdx, 0
-      | movzx eax, byte [rdi+stride*2]
-      | movzx edx, byte [rdi+stride*3]
+      | movzx rax, byte [rdi+stride*2]
+      | movzx rdx, byte [rdi+stride*3]
       | vpinsrq xmm(dst), xmm(dst), rax, 1
       | vpinsrq xmm5, xmm5, rdx, 1
       | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
@@ -333,15 +329,8 @@ local function AVX2(Dst, stride)
       -- Extract high 32 bits from each 64-bit value.
       | vextractf128 xmm5, ymm(reg), 1
       | vpunpckhdq xmm(reg), xmm(reg), xmm5
-      -- The unpack operation leaves results in order O 2 1 3.
-      -- Permute back to 0 1 2 3.
-      local control = bit.bor(bit.lshift(0, 0),
-                              bit.lshift(2, 2),
-                              bit.lshift(1, 4),
-                              bit.lshift(3, 6))
-      | vpshufd xmm(reg), xmm(reg), control
       -- Now write to uint32_t[4] in rsi.
-      | vmovdqu [rsi], xmm(reg)
+      | vmovdqu oword [rsi], xmm(reg)
       | ret
    end
    return asm
@@ -443,6 +432,10 @@ function make_sip_hash_x2(...)
    return make_sip_hash_x(SSE, ...)
 end
 
+function make_sip_hash_x4(...)
+   return make_sip_hash_x(AVX2, ...)
+end
+
 local function make_lua_sip_hash(size, key, c, d, as_specified)
    c = c or 2
    d = d or 4
@@ -527,23 +520,24 @@ function selftest()
    -- test that the lua and dasm versions produce the same output
    local function test(size, key, c, d, as_specified)
       local dasm_hash = make_sip_hash(size, key, c, d, as_specified)
-      local dasm_hash_x2 = make_sip_hash_x(SSE, size, key, c, d, as_specified)
-      -- local dasm_hash_x4 = make_sip_hash_x(AVX2, size, key, c, d, as_specified)
+      local dasm_hash_x2 = make_sip_hash_x2(size, key, c, d, as_specified)
+      local dasm_hash_x4 = make_sip_hash_x4(size, key, c, d, as_specified)
       local lua_hash = make_lua_sip_hash(size, key, c, d, as_specified)
 
       for i=0, 255 do
          local buf = ffi.new("uint8_t[?]", size)
-         local vbuf = ffi.new("uint8_t[?]", size*2)
-         local vres = ffi.new("uint32_t[2]")
+         local vbuf = ffi.new("uint8_t[?]", size*4)
+         local vres = ffi.new("uint32_t[4]")
          for j=0, size-1 do
             buf[j] = (i + j) % size
-            for stride=0,1 do
+            for stride=0,3 do
                vbuf[j + stride*size] = buf[j]
             end
          end
          local h1 = dasm_hash(buf)
          local h2 = lua_hash(buf)
          dasm_hash_x2(vbuf, vres)
+         dasm_hash_x4(vbuf, vres)	 
          -- TODO: Check elements of vres.
          if h1 ~= h2 then
             print(size, key, c, d, as_specified, h1, h2)

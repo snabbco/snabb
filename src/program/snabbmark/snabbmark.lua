@@ -439,7 +439,7 @@ function hash (key_size)
       key_size = 4
    end
    local value_t = ffi.typeof("uint8_t[$]", key_size)
-   local value = ffi.new(ffi.typeof('uint8_t[$]', key_size*2))
+   local value = ffi.new(ffi.typeof('uint8_t[$]', key_size*4))
    local band = require('bit').band
    local fill = require('ffi').fill
 
@@ -449,14 +449,24 @@ function hash (key_size)
    local sip_hash_2_4 = lib_siphash.make_sip_hash(ffi.sizeof(value_t), nil, 2, 4)
    local sip_hash_sse_1_2 = lib_siphash.make_sip_hash_x2(ffi.sizeof(value_t), nil, 1, 2)
    local sip_hash_sse_2_4 = lib_siphash.make_sip_hash_x2(ffi.sizeof(value_t), nil, 2, 4)
-   local result_x2 = ffi.new('uint32_t[2]')
+   local sip_hash_avx2_1_2 = lib_siphash.make_sip_hash_x4(ffi.sizeof(value_t), nil, 1, 2)
+   local sip_hash_avx2_2_4 = lib_siphash.make_sip_hash_x4(ffi.sizeof(value_t), nil, 2, 4)
+   local result_x4 = ffi.new('uint32_t[4]')
    local function sip_hash_sse_2_4_wrapper(v)
-      sip_hash_sse_2_4(v, result_x2)
-      return result_x2[0]
+      sip_hash_sse_2_4(v, result_x4)
+      return result_x4[0]
    end
    local function sip_hash_sse_1_2_wrapper(v)
-      sip_hash_sse_1_2(v, result_x2)
-      return result_x2[0]
+      sip_hash_sse_1_2(v, result_x4)
+      return result_x4[0]
+   end
+   local function sip_hash_avx2_1_2_wrapper(v)
+      sip_hash_avx2_1_2(v, result_x4)
+      return result_x4[0]
+   end
+   local function sip_hash_avx2_2_4_wrapper(v)
+      sip_hash_avx2_2_4(v, result_x4)
+      return result_x4[0]
    end
    local murmur = require('lib.hash.murmur').MurmurHash3_x86_32:new()
    local function murmur_hash(v)
@@ -466,7 +476,7 @@ function hash (key_size)
    local function test_hash(iterations, hash)
       local result
       for i=1,iterations do
-         fill(value, key_size*2, band(i, 255))
+         fill(value, key_size*4, band(i, 255))
          result = hash(value)
       end
       return result
@@ -493,6 +503,12 @@ function hash (key_size)
    local function test_sip_sse_2_4(iterations)
       return test_hash(iterations, sip_hash_sse_2_4_wrapper)
    end
+   local function test_sip_avx2_1_2(iterations)
+      return test_hash(iterations, sip_hash_avx2_1_2_wrapper)
+   end
+   local function test_sip_avx2_2_4(iterations)
+      return test_hash(iterations, sip_hash_avx2_2_4_wrapper)
+   end
 
    test_perf(test_baseline, 1e8, 'baseline')
    test_perf(test_jenkins, 1e8, 'jenkins hash')
@@ -501,6 +517,8 @@ function hash (key_size)
    test_perf(test_murmur, 1e8, 'murmur hash (32 bit)')
    test_perf(test_sip_sse_1_2, 1e8, 'sip hash c=1,d=2 (sse)')
    test_perf(test_sip_sse_2_4, 1e8, 'sip hash c=2,d=4 (sse)')
+   test_perf(test_sip_avx2_1_2, 1e8, 'sip hash c=1,d=2 (avx2)')
+   test_perf(test_sip_avx2_2_4, 1e8, 'sip hash c=2,d=4 (avx2)')
 end
 
 function ctable ()
