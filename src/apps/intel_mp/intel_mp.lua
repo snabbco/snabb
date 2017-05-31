@@ -341,8 +341,9 @@ function Intel:new (conf)
    if self.vmdq then
       assert(self.macaddr, "MAC address must be set in VMDq mode")
       assert(self.poolnum, "Pool number must be set in VMDq mode")
-      assert(self.rxq >= 4 * self.poolnum and
-             self.rxq <= 4 * self.poolnum + 3,
+      assert(not self.rxq or
+             (self.rxq >= 4 * self.poolnum and
+              self.rxq <= 4 * self.poolnum + 3),
              "Pool number and rxq do not match")
       if self.driver == "Intel82599" then
          assert(self.poolnum < 32,
