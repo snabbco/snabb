@@ -240,7 +240,15 @@ local function range_validator(range, f) return f end
 local function length_validator(range, f) return f end
 local function pattern_validator(range, f) return f end
 local function bit_validator(range, f) return f end
-local function enum_validator(range, f) return f end
+local function enum_validator(enums, f)
+   if not enums then return f end
+   return function (val)
+      if not enums[val] then
+         error('enumeration '..val..' is not a valid value')
+      end
+      return val
+   end
+end
 local function identityref_validator(bases, default_prefix, f)
    if not default_prefix then return f end
    return function(val)
@@ -259,11 +267,14 @@ local function value_parser(typ)
    local prim = typ.primitive_type
    local parse = assert(value.types[prim], prim).parse
    local validate = function(val) return val end
+   local function enums (node)
+      return node.primitive_type == 'enumeration' and node.enums or nil
+   end
    validate = range_validator(typ.range, validate)
    validate = length_validator(typ.length, validate)
    validate = pattern_validator(typ.pattern, validate)
    validate = bit_validator(typ.bit, validate)
-   validate = enum_validator(typ.enums, validate)
+   validate = enum_validator(enums(typ), validate)
    validate = identityref_validator(typ.bases, typ.default_prefix, validate)
    -- TODO: union, require-instance.
    return function(str, k)

@@ -212,20 +212,23 @@ local function data_emitter(production)
    end
    function handlers.scalar(production)
       local primitive_type = production.argument_type.primitive_type
+      local type = assert(value.types[primitive_type], "unsupported type: "..primitive_type)
       -- FIXME: needs a case for unions
-      if primitive_type == 'string' then
+      if primitive_type == 'string' or primitive_type == 'enumeration' then
          return function(data, stream)
             stream:write_stringref('stringref')
             stream:write_stringref(data)
          end
-      else
-         local ctype = assert(assert(value.types[primitive_type]).ctype)
+      elseif type.ctype then
+         local ctype = type.ctype
          local emit_value = value_emitter(ctype)
          return function(data, stream)
             stream:write_stringref('cdata')
             stream:write_stringref(ctype)
             emit_value(data, stream)
          end
+      else
+         error("unimplemented: "..primitive_type)
       end
    end
 
@@ -434,11 +437,27 @@ function selftest()
 
       leaf-list integers { type uint32; }
       leaf-list addrs { type inet:ipv4-address; }
+
+      typedef severity  {
+         type enumeration {
+            enum indeterminate;
+            enum minor {
+               value 3;
+            }
+            enum warning {
+               value 4;
+            }
+         }
+      }
+
       container routes {
          list route {
             key addr;
             leaf addr { type inet:ipv4-address; mandatory true; }
             leaf port { type uint8 { range 0..11; } mandatory true; }
+         }
+         leaf severity {
+            type severity;
          }
       }
    }]])
@@ -453,6 +472,7 @@ function selftest()
         route { addr 1.2.3.4; port 1; }
         route { addr 2.3.4.5; port 10; }
         route { addr 3.4.5.6; port 2; }
+        severity minor;
       }
    ]])
 
