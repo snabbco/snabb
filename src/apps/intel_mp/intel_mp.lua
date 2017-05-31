@@ -67,6 +67,7 @@ PFUTA       0X0F400 +0x04*0..127    RW PF Unicast Table Array
 PFVLVF      0x0F100 +0x04*0..63     RW PF VM VLAN Pool Filter
 PFVLVFB     0x0F200 +0x04*0..127    RW PF VM VLAN Pool Filter Bitmap
 PFVFRE      0x051E0 +0x04*0..1      RW PF VF Receive Enable
+PFVFTE      0x08110 +0x04*0..1      RW PF VF Transmit Enable
 PFVFSPOOF   0x08200 +0x04*0..7      RW PF VF Anti Spoof Control
 PFVMVIR     0x08000 +0x04*0..63     RW PF VM VLAN Insert Register
 PFVML2FLT   0x0F000 +0x04*0..63     RW PF VM L2 Control Register
@@ -510,6 +511,10 @@ function Intel:init_tx_q ()                               -- 4.5.10
    -- for VMDq need some additional pool configs
    if self.vmdq then
       self.r.RTTDQSEL(self.poolnum)
+      -- set baseline value for credit refill for tx bandwidth algorithm
+      self.r.RTTDT1C(0x80)
+      -- enables packet Tx for this VF's pool
+      self.r.PFVFTE[math.floor(self.poolnum/33)]:set(bits{VFTE=self.poolnum%32})
    end
 
    if self.r.DMATXCTL then
