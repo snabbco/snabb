@@ -254,7 +254,7 @@ local function AVX2(stride)
    function asm.init(key)
       local initial_state = ffi.new('uint64_t[4]', load_initial_state(key))
       table.insert(__anchor, initial_state)
-      | vzeroall
+      | vzeroupper
       | mov rax, initial_state
       | vbroadcastsd ymm0, qword [rax]
       | vbroadcastsd ymm1, qword [rax+8]
@@ -344,6 +344,7 @@ local function AVX2(stride)
       | vpunpckhdq xmm(reg), xmm(reg), xmm5
       -- Now write to uint32_t[4] in rsi.
       | vmovdqu oword [rsi], xmm(reg)
+      | vzeroupper
       | ret
    end
    function asm:assemble(name, gen)
@@ -628,7 +629,7 @@ function selftest()
             print(size, key, c, d, as_specified, h1, h3)
             error('sse not equal to lua')
          end
-         if h1 ~= h4 and false then
+         if h1 ~= h4 then
             print(size, key, c, d, as_specified, h1, h4)
             error('avx2 not equal to lua')
          end
