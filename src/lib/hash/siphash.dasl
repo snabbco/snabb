@@ -172,6 +172,81 @@ function make_sip_hash(size, key, c, d, as_specified)
                    gen)
 end
 
+local function X86_64()
+   local asm = {}
+   local Dst
+   local allregs = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
+		    "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"}
+   local regnums = {}
+   for i,reg in ipairs(allregs) do regnums[reg] = i-1 end
+   -- Map value indexes from the program to registers.  Don't allocate
+   -- to rdi; it's the input data.
+   local scratchregs = {"r8", "r9", "r10", "r11", "rax", "rcx", "rdx", "rsi"}
+   local function regnum(n) return assert(regnums[assert(scratchregs[n+1])]) end
+
+   function asm.init(key)
+      local initial_state = ffi.new('uint64_t[4]', load_initial_state(key))
+      table.insert(__anchor, initial_state)
+      | mov64 Rq(regnum(0)), initial_state[0]
+      | mov64 Rq(regnum(1)), initial_state[1]
+      | mov64 Rq(regnum(2)), initial_state[2]
+      | mov64 Rq(regnum(3)), initial_state[3]
+   end
+   function asm.add(dst, other)
+      | add Rq(regnum(dst)), Rq(regnum(other))
+   end
+   function asm.shl(reg, bits)
+      | shl Rq(regnum(reg)), bits
+   end
+   function asm.ior(dst, other)
+      | or Rq(regnum(dst)), Rq(regnum(other))
+   end
+   function asm.xor(dst, other)
+      | xor Rq(regnum(dst)), Rq(regnum(other))
+   end
+   function asm.rol(reg, bits)
+      | rol Rq(regnum(reg)), bits
+   end
+   function asm.load_u64_and_advance(dst)
+      | mov Rq(regnum(dst)), [rdi]
+      | add rdi, 8
+   end
+   function asm.load_u32_and_advance(dst)
+      -- Automatically zero-extending.
+      | mov Rd(regnum(dst)), [rdi]
+      | add rdi, 4
+   end
+   function asm.load_u16_and_advance(dst)
+      | movzx Rq(regnum(dst)), word [rdi]
+      | add rdi, 2
+   end
+   function asm.load_u8_and_advance(dst)
+      | movzx Rq(regnum(dst)), byte [rdi]
+      | add rdi, 1
+   end
+   function asm.load_imm8(dst, imm)
+      | xor Rq(regnum(dst)), Rq(regnum(dst))
+      if imm ~= 0 then
+         | mov Rb(regnum(dst)), imm
+      end
+   end
+   function asm.ret(reg)
+      if regnum(reg) ~= regnums["rax"] then
+         | mov rax, Rq(regnum(reg))
+      end
+      | shr rax, 32
+      | ret
+   end
+   function asm:assemble(name, gen)
+      Dst = dasm.new(actions)
+      gen(self)
+      return finish(name.."_x86_64",
+		    ffi.typeof("uint32_t (*)(uint8_t *)"),
+		    Dst)
+   end
+   return asm
+end
+
 local function SSE(stride)
    local asm = {}
    local Dst
@@ -226,7 +301,9 @@ local function SSE(stride)
    end
    function asm.load_imm8(dst, imm)
       | xor rax, rax
-      | mov al, imm
+      if imm ~= 0 then
+         | mov al, imm
+      end
       | pinsrq xmm(dst), rax, 0
       | pinsrq xmm(dst), rax, 1
    end
@@ -333,7 +410,9 @@ local function AVX2(stride)
    end
    function asm.load_imm8(dst, imm)
       | xor rax, rax
-      | mov al, imm
+      if imm ~= 0 then
+         | mov al, imm
+      end
       | vpinsrq xmm(dst), xmm(dst), rax, 0
       | vpinsrq xmm(dst), xmm(dst), rax, 1
       | vinsertf128 ymm(dst), ymm(dst), xmm(dst), 1
@@ -502,6 +581,10 @@ function make_sip_hash_x(assembler, size, key, c, d, as_specified)
    return assembler(size):assemble("siphash_"..c.."_"..d.."_x", gen)
 end
 
+function make_sip_hash_x1(...)
+   return make_sip_hash_x(X86_64, ...)
+end
+
 function make_sip_hash_x2(...)
    return make_sip_hash_x(SSE, ...)
 end
@@ -597,7 +680,9 @@ end
 function selftest()
    -- test that the lua and dasm versions produce the same output
    local function test(size, key, c, d, as_specified)
+      debug = true
       local dasm_hash = make_sip_hash(size, key, c, d, as_specified)
+      local dasm_hash_x1 = make_sip_hash_x1(size, key, c, d, as_specified)
       local dasm_hash_x2 = make_sip_hash_x2(size, key, c, d, as_specified)
       local dasm_hash_x4 = make_sip_hash_x4(size, key, c, d, as_specified)
       local dasm_hash_simulator = make_sip_hash_simulator(size, key, c, d, as_specified)
@@ -614,7 +699,9 @@ function selftest()
             end
          end
          local h1 = lua_hash(buf)
+
          local h2 = dasm_hash(buf)
+         local h2bis = dasm_hash_x1(buf)
          dasm_hash_x2(vbuf, vres)
 	 local h3 = vres[0]
          dasm_hash_x4(vbuf, vres)
@@ -625,11 +712,15 @@ function selftest()
             print(size, key, c, d, as_specified, h1, h2)
             error('dasm not equal to lua')
          end
+         if h1 ~= h2bis then
+            print(size, key, c, d, as_specified, h1, h2bis)
+            error('dasm bis not equal to lua')
+         end
          if h1 ~= h3 then
             print(size, key, c, d, as_specified, h1, h3)
             error('sse not equal to lua')
          end
-         if h1 ~= h4 then
+         if h1 ~= h4 and true then
             print(size, key, c, d, as_specified, h1, h4)
             error('avx2 not equal to lua')
          end
