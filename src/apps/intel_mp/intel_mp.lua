@@ -334,8 +334,7 @@ function Intel:new (conf)
    self.max_q = byid.max_q
 
    -- VMDq checks
-   assert(not self.vmdq or device ~= "0x1533" or device ~= "0x157b",
-          "VMDq not supported on i210")
+   assert(not self.vmdq or device == "0x10fb", "VMDq only supported on 82599")
    assert(not self.macaddr or self.vmdq, "VMDq must be set to use MAC address")
    assert(not self.poolnum or self.vmdq, "Pool number only supported for VMDq")
    if self.vmdq then
@@ -1002,8 +1001,7 @@ function Intel1g:init_queue_stats (frame)
 end
 
 function Intel1g:vmdq_enable ()
-   -- 011 -> VMDq mode, no RSS
-   self.r.MRQC:set(bits { VMDq1 = 0, VMDq2 = 1 })
+   error("unimplemented")
 end
 
 function Intel1g:enable_MAC_for_pool(mac_index)
