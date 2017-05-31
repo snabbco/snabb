@@ -46,10 +46,10 @@ end
 local function load_initial_state(key)
    -- Initial state constants.
    local state = ffi.new('uint64_t[4]',
-			 { 0x736f6d6570736575ULL,
-			   0x646f72616e646f6dULL,
-			   0x6c7967656e657261ULL,
-			   0x7465646279746573ULL })
+                         { 0x736f6d6570736575ULL,
+                           0x646f72616e646f6dULL,
+                           0x6c7967656e657261ULL,
+                           0x7465646279746573ULL })
 
    -- Mix key into state constants.
    key = ffi.cast('uint64_t*', key or reference_sip_hash_key())
@@ -65,7 +65,7 @@ local function X86_64()
    local asm = {}
    local Dst
    local allregs = {"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
-		    "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"}
+                    "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"}
    local regnums = {}
    for i,reg in ipairs(allregs) do regnums[reg] = i-1 end
    -- Map value indexes from the program to registers.  Don't allocate
@@ -130,8 +130,8 @@ local function X86_64()
       Dst = dasm.new(actions)
       gen(self)
       return finish(name.."_x86_64",
-		    ffi.typeof("uint32_t (*)(uint8_t *)"),
-		    Dst)
+                    ffi.typeof("uint32_t (*)(uint8_t *)"),
+                    Dst)
    end
    return asm
 end
@@ -208,8 +208,8 @@ local function SSE(stride)
       Dst = dasm.new(actions)
       gen(self)
       return finish(name.."_sse",
-		    ffi.typeof("void (*)(uint8_t *, uint32_t *)"),
-		    Dst)
+                    ffi.typeof("void (*)(uint8_t *, uint32_t *)"),
+                    Dst)
    end
    return asm
 end
@@ -306,11 +306,20 @@ local function AVX2(stride)
       | vpinsrq xmm(dst), xmm(dst), rax, 1
       | vinsertf128 ymm(dst), ymm(dst), xmm(dst), 1
    end
+   local function imm8_control(a, b, c, d)
+      assert(bit.band(bit.bor(a,b,c,d), 3) == bit.bor(a,b,c,d))
+      return a + b*4 + c*4*4 + d*4*4*4
+   end
    function asm.ret(reg)
-      -- Extract high 32 bits from each 64-bit value.
-      | vextractf128 xmm5, ymm(reg), 1
-      | vpunpckhdq xmm(reg), xmm(reg), xmm5
-      -- Now write to uint32_t[4] in rsi.
+      -- Extract high 32 bits from each 64-bit value.  For ridiculous
+      -- reasons, the way we have to do this is to read in a set of
+      -- indexes into the 32-bit words from memory, then permute, then
+      -- write out.
+      local control = ffi.new('uint32_t[8]', 1, 3, 5, 7, 0, 0, 0, 0)
+      table.insert(__anchor, control)
+      | mov rax, control
+      | vmovdqu ymm5, [rax]
+      | vpermd ymm(reg), ymm5, ymm(reg)
       | vmovdqu oword [rsi], xmm(reg)
       | vzeroupper
       | ret
@@ -319,8 +328,8 @@ local function AVX2(stride)
       Dst = dasm.new(actions)
       gen(self)
       return finish(name.."_avx2",
-		    ffi.typeof("void (*)(uint8_t *, uint32_t *)"),
-		    Dst)
+                    ffi.typeof("void (*)(uint8_t *, uint32_t *)"),
+                    Dst)
    end
    return asm
 end
@@ -373,10 +382,10 @@ local function Simulator()
    end
    function asm:assemble(name, gen)
       return function(ptr)
-	 input, output = ffi.cast('uint8_t*', ptr), nil
-	 gen(self)
-	 input = nil
-	 return output
+         input, output = ffi.cast('uint8_t*', ptr), nil
+         gen(self)
+         input = nil
+         return output
       end
    end
    return asm
@@ -497,34 +506,39 @@ function selftest()
       local hash_x4 = make_sip_hash_x4(size, key, c, d, as_specified)
 
       for i=0, 255 do
-         local buf = ffi.new("uint8_t[?]", size*4)
-	 for stride=0,3 do
-	    for j=0, size-1 do
-	       buf[j + stride*size] = (i + j) % size
-            end
-         end
+         local buf = ffi.new("uint8_t[?]", size)
+         for j=0, size-1 do buf[j] = (i + j) % size end
+
          local ref_result = reference_hash(buf)
-	 local x1_result = hash_x1(buf)
+
+         local x1_result = hash_x1(buf)
+
+         local x2_buf = ffi.new("uint8_t[?]", size*2)
          local x2_result = ffi.new("uint32_t[2]")
-         hash_x2(buf, x2_result)
+         ffi.copy(x2_buf, buf, size); ffi.copy(x2_buf+size, buf, size)
+         hash_x2(x2_buf, x2_result)
+
+         local x4_buf = ffi.new("uint8_t[?]", size*4)
+         ffi.copy(x4_buf, x2_buf, size*2); ffi.copy(x4_buf+size*2, x2_buf, size*2)
          local x4_result = ffi.new("uint32_t[4]")
-         hash_x4(buf, x4_result)
+         hash_x4(x4_buf, x4_result)
+
          if ref_result ~= x1_result then
             print(size, key, c, d, as_specified, ref_result, x1_result)
             error('scalar result does not match reference')
          end
-	 for elt=0,1 do
-	    if ref_result ~= x2_result[elt] then
-	       print(size, key, c, d, as_specified, ref_result, x2_result[elt])
-	       error('x2 result '..elt..' does not match reference')
-	    end
-	 end
-	 for elt=0,3 do
-	    if ref_result ~= x4_result[elt] and false then
-	       print(size, key, c, d, as_specified, ref_result, x4_result[elt])
-	       error('x4 result '..elt..' does not match reference')
-	    end
-	 end
+         for elt=0,1 do
+            if ref_result ~= x2_result[elt] then
+               print(size, key, c, d, as_specified, ref_result, x2_result[elt])
+               error('x2 result '..elt..' does not match reference')
+            end
+         end
+         for elt=0,3 do
+            if ref_result ~= x4_result[elt] then
+               print(size, key, c, d, as_specified, ref_result, x4_result[elt])
+               error('x4 result '..elt..' does not match reference')
+            end
+         end
       end
    end
 
