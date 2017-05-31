@@ -27,12 +27,6 @@ local function finish (name, prototype, Dst)
    return ffi.cast(prototype, mcode)
 end
 
-local function assemble (name, prototype, generator)
-   local Dst = dasm.new(actions)
-   generator(Dst)
-   return finish(name, prototype, Dst)
-end
-
 -- SipHash is a family of hash functions, parameterized by the number
 -- of rounds that run per 8-byte input block and the number of rounds
 -- that run at the end.  Because we use SipHash as a hash function for
@@ -50,126 +44,21 @@ function reference_sip_hash_key()
 end
 
 local function load_initial_state(key)
-   key = key or reference_sip_hash_key()
-
-   local k0 = ffi.cast('uint64_t*', key)[0]
-   local k1 = ffi.cast('uint64_t*', key)[1]
-
    -- Initial state constants.
-   local v0 = 0x736f6d6570736575ULL
-   local v1 = 0x646f72616e646f6dULL
-   local v2 = 0x6c7967656e657261ULL
-   local v3 = 0x7465646279746573ULL
+   local state = ffi.new('uint64_t[4]',
+			 { 0x736f6d6570736575ULL,
+			   0x646f72616e646f6dULL,
+			   0x6c7967656e657261ULL,
+			   0x7465646279746573ULL })
 
    -- Mix key into state constants.
-   v0 = bit.bxor(v0, k0)
-   v1 = bit.bxor(v1, k1)
-   v2 = bit.bxor(v2, k0)
-   v3 = bit.bxor(v3, k1)
+   key = ffi.cast('uint64_t*', key or reference_sip_hash_key())
+   state[0] = bit.bxor(state[0], key[0])
+   state[1] = bit.bxor(state[1], key[1])
+   state[2] = bit.bxor(state[2], key[0])
+   state[3] = bit.bxor(state[3], key[1])
 
-   return v0, v1, v2, v3
-end
-
-function make_sip_hash(size, key, c, d, as_specified)
-   local v0, v1, v2, v3 = load_initial_state(key)
-   c = c or 2
-   d = d or 4
-
-   function gen(Dst)
-      -- Arguments:
-      -- rdi: data as pointer
-
-      -- Registers used:
-      -- r8, r9, r10, r11 map to SipHash variables v0, v1, v2, v3
-      -- rax, rdx: scratch registers
-
-      -- Initialize state variables.
-      | mov64 r8, v0
-      | mov64 r9, v1
-      | mov64 r10, v2
-      | mov64 r11, v3
-
-      local function sipround()
-         | add r8, r9
-         | rol r9, 13
-         | xor r9, r8
-         | rol r8, 32
-         | add r10, r11
-         | rol r11, 16
-         | xor r11, r10
-         | add r8, r11
-         | rol r11, 21
-         | xor r11, r8
-         | add r10, r9
-         | rol r9, 17
-         | xor r9, r10
-         | rol r10, 32
-      end
-
-      -- Add rax into state.
-      local function process()
-         | xor r11, rax
-         for i=1,c do sipround() end
-         | xor r8, rax
-      end
-
-      -- Compression phase.
-      for i=1,size/8 do
-         | mov rax, [rdi]
-         | add rdi, 8
-         process()
-      end
-      -- Load tail word and process it.
-      if as_specified then
-         | mov rax, size
-         | shl rax, 56
-         for i=1,size%8 do
-            | movzx rdx, byte [rdi]
-            | inc rdi
-            if i > 1 then
-              | shl rdx, ((i - 1) * 8)
-            end
-            | or rax, rdx
-         end
-         process()
-      elseif size%8 ~= 0 then
-         -- Fixed-size simplification: no need to add in size byte, we
-         -- can use different byte orders if it's more convenient, and
-         -- we don't have to do anything at all if the size is a
-         -- multiple of 8.
-         if size%8 >= 4 then
-            | mov eax, [rdi]
-            | add rdi, 4
-         else
-            | xor rax, rax
-         end
-         if size%4 >= 2 then
-            | shl rax, 16
-            | mov ax, [rdi]
-            | add rdi, 2
-         end
-         if size%2 ~= 0 then
-            | shl rax, 8
-            | mov al, [rdi]
-            | inc rdi
-         end
-         process()
-      end
-      -- Finalization.
-      | xor r10, 0xff
-      for i=1,d do sipround() end
-
-      | mov rax, r8
-      | xor rax, r9
-      | xor rax, r10
-      | xor rax, r11
-      | shr rax, 32
-      | ret
-   end
-
-   return assemble("make_sip_hash",
-                   ffi.typeof("uint32_t (*)(uint8_t *)"),
-                   gen)
+   return state
 end
 
 local function X86_64()
@@ -185,7 +74,7 @@ local function X86_64()
    local function regnum(n) return assert(regnums[assert(scratchregs[n+1])]) end
 
    function asm.init(key)
-      local initial_state = ffi.new('uint64_t[4]', load_initial_state(key))
+      local initial_state = load_initial_state(key)
       table.insert(__anchor, initial_state)
       | mov64 Rq(regnum(0)), initial_state[0]
       | mov64 Rq(regnum(1)), initial_state[1]
@@ -251,7 +140,7 @@ local function SSE(stride)
    local asm = {}
    local Dst
    function asm.init(key)
-      local initial_state = ffi.new('uint64_t[4]', load_initial_state(key))
+      local initial_state = load_initial_state(key)
       table.insert(__anchor, initial_state)
       | mov rax, initial_state
       | movddup xmm0, [rax]
@@ -329,7 +218,7 @@ local function AVX2(stride)
    local asm = {}
    local Dst
    function asm.init(key)
-      local initial_state = ffi.new('uint64_t[4]', load_initial_state(key))
+      local initial_state = load_initial_state(key)
       table.insert(__anchor, initial_state)
       | vzeroupper
       | mov rax, initial_state
@@ -441,7 +330,9 @@ local function Simulator()
    local input, output
    local state
    function asm.init(key)
-      state = ffi.new('uint64_t[8]', load_initial_state(key))
+      local initial_state = load_initial_state(key)
+      state = ffi.new('uint64_t[8]')
+      for i=0,3 do state[i] = initial_state[i] end
    end
    function asm.add(dst, other)
       state[dst] = state[dst] + state[other]
@@ -593,141 +484,47 @@ function make_sip_hash_x4(...)
    return make_sip_hash_x(AVX2, ...)
 end
 
-function make_sip_hash_simulator(...)
+local function make_reference_sip_hash(...)
    return make_sip_hash_x(Simulator, ...)
-end
-
-local function make_lua_sip_hash(size, key, c, d, as_specified)
-   c = c or 2
-   d = d or 4
-
-   local function sipround(v0, v1, v2, v3)
-      v0 = v0 + v1
-      v1 = bit.rol(v1, 13)
-      v1 = bit.bxor(v1, v0)
-      v0 = bit.rol(v0, 32)
-      v2 = v2 + v3
-      v3 = bit.rol(v3, 16)
-      v3 = bit.bxor(v3, v2)
-      v0 = v0 + v3
-      v3 = bit.rol(v3, 21)
-      v3 = bit.bxor(v3, v0)
-      v2 = v2 + v1
-      v1 = bit.rol(v1, 17)
-      v1 = bit.bxor(v1, v2)
-      v2 = bit.rol(v2, 32)
-      return v0, v1, v2, v3
-   end
-
-   local function process(m, v0, v1, v2, v3)
-      v3 = bit.bxor(v3, m)
-      for i=1,c do
-         v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-      end
-      v0 = bit.bxor(v0, m)
-      return v0, v1, v2, v3
-   end
-
-   return function(ptr)
-      ptr = ffi.cast('uint8_t*', ptr)
-      -- Initialization phase.
-      local v0, v1, v2, v3 = load_initial_state(key)
-
-      -- Compression phase.
-      for i=1,size/8 do
-         local m = ffi.cast('uint64_t*', ptr)[0]
-         ptr = ptr + 8
-         v0, v1, v2, v3 = process(m, v0, v1, v2, v3)
-      end
-      -- Process tail word.
-      if as_specified then
-         local tail = size + 0ULL
-         tail = bit.lshift(tail, 56)
-         for i=1,size%8 do
-            local byte = ptr[0]
-            ptr = ptr + 1
-            tail = bit.bor(tail, bit.lshift(byte+0ULL, (i-1)*8))
-         end
-         v0, v1, v2, v3 = process(tail, v0, v1, v2, v3)
-      elseif size%8 ~= 0 then
-         -- Fixed-size simplification; see above.
-         local tail = 0ULL
-         if size%8 >= 4 then
-            tail = tail + ffi.cast('uint32_t*', ptr)[0]
-            ptr = ptr + 4
-         end
-         if size%4 >= 2 then
-            tail = bit.lshift(tail, 16) + ffi.cast('uint16_t*', ptr)[0]
-            ptr = ptr + 2
-         end
-         if size%2 ~= 0 then
-            tail = bit.lshift(tail, 8) + ptr[0]
-            ptr = ptr + 1
-         end
-         v0, v1, v2, v3 = process(tail, v0, v1, v2, v3)
-      end
-  
-      -- Finalization.
-      v2 = bit.bxor(v2, 0xffULL)
-      -- SipHash-2-4 has 4 siprounds in the finalization phase.
-      for i=1,d do
-         v0, v1, v2, v3 = sipround(v0, v1, v2, v3)
-      end
-      return tonumber(bit.rshift(bit.bxor(v0, v1, v2, v3), 32))
-   end
 end
 
 function selftest()
    -- test that the lua and dasm versions produce the same output
    local function test(size, key, c, d, as_specified)
-      debug = true
-      local dasm_hash = make_sip_hash(size, key, c, d, as_specified)
-      local dasm_hash_x1 = make_sip_hash_x1(size, key, c, d, as_specified)
-      local dasm_hash_x2 = make_sip_hash_x2(size, key, c, d, as_specified)
-      local dasm_hash_x4 = make_sip_hash_x4(size, key, c, d, as_specified)
-      local dasm_hash_simulator = make_sip_hash_simulator(size, key, c, d, as_specified)
-      local lua_hash = make_lua_sip_hash(size, key, c, d, as_specified)
+      local reference_hash = make_reference_sip_hash(size, key, c, d, as_specified)
+      local hash_x1 = make_sip_hash_x1(size, key, c, d, as_specified)
+      local hash_x2 = make_sip_hash_x2(size, key, c, d, as_specified)
+      local hash_x4 = make_sip_hash_x4(size, key, c, d, as_specified)
 
       for i=0, 255 do
-         local buf = ffi.new("uint8_t[?]", size)
-         local vbuf = ffi.new("uint8_t[?]", size*4)
-         local vres = ffi.new("uint32_t[4]")
-         for j=0, size-1 do
-            buf[j] = (i + j) % size
-            for stride=0,3 do
-               vbuf[j + stride*size] = buf[j]
+         local buf = ffi.new("uint8_t[?]", size*4)
+	 for stride=0,3 do
+	    for j=0, size-1 do
+	       buf[j + stride*size] = (i + j) % size
             end
          end
-         local h1 = lua_hash(buf)
-
-         local h2 = dasm_hash(buf)
-         local h2bis = dasm_hash_x1(buf)
-         dasm_hash_x2(vbuf, vres)
-	 local h3 = vres[0]
-         dasm_hash_x4(vbuf, vres)
-	 local h4 = vres[0]
-         local h5 = dasm_hash_simulator(vbuf)
-         -- TODO: Check elements of vres.
-         if h1 ~= h2 then
-            print(size, key, c, d, as_specified, h1, h2)
-            error('dasm not equal to lua')
+         local ref_result = reference_hash(buf)
+	 local x1_result = hash_x1(buf)
+         local x2_result = ffi.new("uint32_t[2]")
+         hash_x2(buf, x2_result)
+         local x4_result = ffi.new("uint32_t[4]")
+         hash_x4(buf, x4_result)
+         if ref_result ~= x1_result then
+            print(size, key, c, d, as_specified, ref_result, x1_result)
+            error('scalar result does not match reference')
          end
-         if h1 ~= h2bis then
-            print(size, key, c, d, as_specified, h1, h2bis)
-            error('dasm bis not equal to lua')
-         end
-         if h1 ~= h3 then
-            print(size, key, c, d, as_specified, h1, h3)
-            error('sse not equal to lua')
-         end
-         if h1 ~= h4 and true then
-            print(size, key, c, d, as_specified, h1, h4)
-            error('avx2 not equal to lua')
-         end
-         if h1 ~= h5 then
-            print(size, key, c, d, as_specified, h1, h5)
-            error('dasm simulator not equal to lua')
-         end
+	 for elt=0,1 do
+	    if ref_result ~= x2_result[elt] then
+	       print(size, key, c, d, as_specified, ref_result, x2_result[elt])
+	       error('x2 result '..elt..' does not match reference')
+	    end
+	 end
+	 for elt=0,3 do
+	    if ref_result ~= x4_result[elt] and false then
+	       print(size, key, c, d, as_specified, ref_result, x4_result[elt])
+	       error('x4 result '..elt..' does not match reference')
+	    end
+	 end
       end
    end
 

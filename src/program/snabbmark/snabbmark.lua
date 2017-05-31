@@ -439,96 +439,64 @@ function hash (key_size)
       key_size = 4
    end
    local value_t = ffi.typeof("uint8_t[$]", key_size)
-   local value = ffi.new(ffi.typeof('uint8_t[$]', key_size*4))
    local band = require('bit').band
    local fill = require('ffi').fill
 
+   local function baseline_hash(ptr) return ptr[0] end
    local jenkins_hash = require('lib.ctable').compute_hash_fn(value_t)
-   local lib_siphash = require('lib.hash.siphash')
-   local sip_hash_1_2 = lib_siphash.make_sip_hash(ffi.sizeof(value_t), nil, 1, 2)
-   local sip_hash_2_4 = lib_siphash.make_sip_hash(ffi.sizeof(value_t), nil, 2, 4)
-   local sip_hash_1_2_bis = lib_siphash.make_sip_hash_x1(ffi.sizeof(value_t), nil, 1, 2)
-   local sip_hash_2_4_bis = lib_siphash.make_sip_hash_x1(ffi.sizeof(value_t), nil, 2, 4)
-   local sip_hash_sse_1_2 = lib_siphash.make_sip_hash_x2(ffi.sizeof(value_t), nil, 1, 2)
-   local sip_hash_sse_2_4 = lib_siphash.make_sip_hash_x2(ffi.sizeof(value_t), nil, 2, 4)
-   local sip_hash_avx2_1_2 = lib_siphash.make_sip_hash_x4(ffi.sizeof(value_t), nil, 1, 2)
-   local sip_hash_avx2_2_4 = lib_siphash.make_sip_hash_x4(ffi.sizeof(value_t), nil, 2, 4)
-   local result_x4 = ffi.new('uint32_t[4]')
-   local function sip_hash_sse_2_4_wrapper(v)
-      sip_hash_sse_2_4(v, result_x4)
-      return result_x4[0]
-   end
-   local function sip_hash_sse_1_2_wrapper(v)
-      sip_hash_sse_1_2(v, result_x4)
-      return result_x4[0]
-   end
-   local function sip_hash_avx2_1_2_wrapper(v)
-      sip_hash_avx2_1_2(v, result_x4)
-      return result_x4[0]
-   end
-   local function sip_hash_avx2_2_4_wrapper(v)
-      sip_hash_avx2_2_4(v, result_x4)
-      return result_x4[0]
-   end
    local murmur = require('lib.hash.murmur').MurmurHash3_x86_32:new()
    local function murmur_hash(v)
       return murmur:hash(v, key_size, 0ULL).u32[0]      
    end
+   local lib_siphash = require('lib.hash.siphash')
+   local sip_hash_1_2_x1 = lib_siphash.make_sip_hash_x1(key_size, nil, 1, 2)
+   local sip_hash_1_2_x2 = lib_siphash.make_sip_hash_x2(key_size, nil, 1, 2)
+   local sip_hash_1_2_x4 = lib_siphash.make_sip_hash_x4(key_size, nil, 1, 2)
+   local sip_hash_2_4_x1 = lib_siphash.make_sip_hash_x1(key_size, nil, 2, 4)
+   local sip_hash_2_4_x2 = lib_siphash.make_sip_hash_x2(key_size, nil, 2, 4)
+   local sip_hash_2_4_x4 = lib_siphash.make_sip_hash_x4(key_size, nil, 2, 4)
 
-   local function test_hash(iterations, hash)
+   local function test_scalar_hash(iterations, hash)
+      local value = ffi.new(ffi.typeof('uint8_t[$]', key_size))
       local result
       for i=1,iterations do
-         fill(value, key_size*4, band(i, 255))
-         result = hash(value)
+	 fill(value, key_size, band(i, 255))
+	 result = hash(value)
       end
       return result
    end
 
-   local function test_baseline(iterations)
-      return test_hash(iterations, function (ptr) return ptr[0] end)
-   end
-   local function test_jenkins(iterations)
-      return test_hash(iterations, jenkins_hash)
-   end
-   local function test_sip_1_2(iterations)
-      return test_hash(iterations, sip_hash_1_2)
-   end
-   local function test_sip_2_4(iterations)
-      return test_hash(iterations, sip_hash_2_4)
-   end
-   local function test_sip_1_2_bis(iterations)
-      return test_hash(iterations, sip_hash_1_2_bis)
-   end
-   local function test_sip_2_4_bis(iterations)
-      return test_hash(iterations, sip_hash_2_4_bis)
-   end
-   local function test_murmur(iterations)
-      return test_hash(iterations, murmur_hash)
-   end
-   local function test_sip_sse_1_2(iterations)
-      return test_hash(iterations, sip_hash_sse_1_2_wrapper)
-   end
-   local function test_sip_sse_2_4(iterations)
-      return test_hash(iterations, sip_hash_sse_2_4_wrapper)
-   end
-   local function test_sip_avx2_1_2(iterations)
-      return test_hash(iterations, sip_hash_avx2_1_2_wrapper)
-   end
-   local function test_sip_avx2_2_4(iterations)
-      return test_hash(iterations, sip_hash_avx2_2_4_wrapper)
+   local function test_parallel_hash(iterations, hash, stride)
+      local value = ffi.new('uint8_t[?]', key_size*stride)
+      local result = ffi.new('uint32_t[?]', stride)
+      for i=1,iterations,stride do
+	 fill(value, key_size*stride, band(i+stride-1, 255))
+	 hash(value, result)
+      end
+      return result[stride-1]
    end
 
-   test_perf(test_baseline, 1e8, 'baseline')
-   test_perf(test_jenkins, 1e8, 'jenkins hash')
-   test_perf(test_sip_1_2, 1e8, 'sip hash c=1,d=2')
-   test_perf(test_sip_2_4, 1e8, 'sip hash c=2,d=4')
-   test_perf(test_sip_1_2_bis, 1e8, 'sip hash c=1,d=2 (bis)')
-   test_perf(test_sip_2_4_bis, 1e8, 'sip hash c=2,d=4 (bis)')
-   test_perf(test_murmur, 1e8, 'murmur hash (32 bit)')
-   test_perf(test_sip_sse_1_2, 1e8, 'sip hash c=1,d=2 (sse)')
-   test_perf(test_sip_sse_2_4, 1e8, 'sip hash c=2,d=4 (sse)')
-   test_perf(test_sip_avx2_1_2, 1e8, 'sip hash c=1,d=2 (avx2)')
-   test_perf(test_sip_avx2_2_4, 1e8, 'sip hash c=2,d=4 (avx2)')
+   local function hash_tester(hash, stride)
+      if stride then
+	 return function(iterations)
+	    return test_parallel_hash(iterations, hash, stride)
+	 end
+      else
+	 return function(iterations)
+	    return test_scalar_hash(iterations, hash)
+	 end
+      end
+   end
+
+   test_perf(hash_tester(baseline_hash), 1e8, 'baseline')
+   test_perf(hash_tester(jenkins_hash), 1e8, 'jenkins hash')
+   test_perf(hash_tester(murmur_hash), 1e8, 'murmur hash (32 bit)')
+   test_perf(hash_tester(sip_hash_1_2_x1), 1e8, 'sip hash c=1,d=2 (x1)')
+   test_perf(hash_tester(sip_hash_1_2_x2, 2), 1e8, 'sip hash c=1,d=2 (x2)')
+   test_perf(hash_tester(sip_hash_1_2_x4, 4), 1e8, 'sip hash c=1,d=2 (x4)')
+   test_perf(hash_tester(sip_hash_2_4_x1), 1e8, 'sip hash c=2,d=4 (x1)')
+   test_perf(hash_tester(sip_hash_2_4_x2, 2), 1e8, 'sip hash c=2,d=4 (x2)')
+   test_perf(hash_tester(sip_hash_2_4_x4, 4), 1e8, 'sip hash c=2,d=4 (x4)')
 end
 
 function ctable ()
