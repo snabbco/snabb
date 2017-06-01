@@ -794,18 +794,19 @@ function resolve(schema, features)
          end
       end
       if node.body then
-         node.body = shallow_copy(node.body)
-         for k,v in pairs(node.body or {}) do
+         local body = node.body
+         node.body = {}
+         for k,v in pairs(body) do
             if v.kind == 'uses' then
                -- Inline "grouping" into "uses".
                local grouping = lookup_lazy(env, 'groupings', v.id)
-               node.body[k] = nil
                for k,v in pairs(grouping.body) do
                   assert(not node.body[k], 'duplicate identifier: '..k)
                   node.body[k] = v
                end
                -- TODO: Handle refine and augment statements.
             else
+               assert(not node.body[k], 'duplicate identifier: '..k)
                node.body[k] = visit(v, env)
             end
          end

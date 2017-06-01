@@ -182,7 +182,7 @@ function data_grammar_from_schema(schema)
       local members=visit_body(node)
       local keys, values = {}, {}
       if node.key then
-         for k in node.key:split(' +') do keys[k] = assert(members[k]) end
+         for k in node.key:split(' +') do keys[k] = assert(members[k], node.key) end
       end
       for k,v in pairs(members) do
          if not keys[k] then values[k] = v end
