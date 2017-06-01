@@ -118,6 +118,13 @@ local function X86_64()
    function asm.rol(reg, bits)
       | rol Rq(regnum(reg)), bits
    end
+   function asm.copy_argument(dst, arg)
+      -- For use by make_sip_hash_u64.
+      local arg = assert(({"rdi", "rsi"})[arg])
+      if regnum(dst) ~= regnums[arg] then
+         | mov Rq(regnum(dst)), Rq(regnums[arg])
+      end
+   end
    function asm.load_u64_and_advance(dst)
       | mov Rq(regnum(dst)), [rdi]
       | add rdi, 8
@@ -148,12 +155,15 @@ local function X86_64()
       | shr rax, 32
       | ret
    end
+   function asm.finish(name, Dst)
+      return finish(name.."_x1",
+                    ffi.typeof("uint32_t (*)(uint8_t *)"),
+                    Dst)
+   end
    function asm:assemble(name, gen)
       Dst = dasm.new(actions)
       gen(self)
-      return finish(name.."_x86_64",
-                    ffi.typeof("uint32_t (*)(uint8_t *)"),
-                    Dst)
+      return self.finish(name, Dst)
    end
    return asm
 end
@@ -508,6 +518,30 @@ local function make_sip_hash(assembler, opts)
    return asm:assemble("siphash_"..opts.c.."_"..opts.d, siphash)
 end
 
+-- A special implementation to hash immediate values; requires our
+-- fixed-size simplification.
+function make_sip_hash_u64(opts)
+   local opts = lib.deepcopy(opts)
+   opts.size = 8
+   assert(not opts.as_specified)
+   local function ImmX86_64()
+      local asm = X86_64()
+      function asm.load_u64_and_advance(dst)
+         asm.copy_argument(dst, 1)
+      end
+      function asm.finish(name, Dst)
+         return finish(name.."_u64",
+                       ffi.typeof("uint32_t (*)(uint64_t)"),
+                       Dst)
+      end
+      asm.load_u32_and_advance = error
+      asm.load_u16_and_advance = error
+      asm.load_u8_and_advance = error
+      return asm
+   end
+   return make_sip_hash(ImmX86_64, opts)
+end
+
 function make_sip_hash_x1(opts) return make_sip_hash(X86_64, opts) end
 
 function make_sip_hash_x2(opts)
@@ -586,7 +620,7 @@ function selftest()
       for c=0,2 do
          opts.c = c
          for d=0,4 do
-            opts.d=d
+            opts.d = d
             for _, as_specified in ipairs({true, false}) do
                opts.as_specified = as_specified
                test(opts)
@@ -594,5 +628,22 @@ function selftest()
          end
       end
    end
+
+   -- We need a hash function for immediates as well; test that here.
+   opts.size, opts.as_specified = 8, false
+   local val = ffi.new('uint64_t[1]', 0x12345678ULL)
+   for c=0,2 do
+      opts.c = c
+      for d=0,4 do
+         io.stdout:write(".")
+         io.stdout:flush()
+         opts.d = d
+         val[0] = val[0] * 257
+         local hash_x1 = make_sip_hash_x1(opts)
+         local hash_u64 = make_sip_hash_u64(opts)
+         assert(hash_x1(ffi.cast('uint8_t*', val)) == hash_u64(val[0]))
+      end
+   end
+
    print("\nselftest ok")
 end
