@@ -153,11 +153,15 @@ local function X86_64()
          | mov rax, Rq(regnum(reg))
       end
       | shr rax, 32
+      -- The ctable needs the hash to not be 0xFFFFFFFF.  If we did the
+      -- lshift there instead of here, we'd have to compensate for that
+      -- weird thing where LuaJIT's bitops can produce negative numbers.
+      | shl eax, 1
       | ret
    end
    function asm.finish(name, Dst)
       return finish(name.."_x1",
-                    ffi.typeof("uint32_t (*)(uint8_t *)"),
+                    ffi.typeof("uint32_t (*)(void *)"),
                     Dst)
    end
    function asm:assemble(name, gen)
@@ -231,8 +235,9 @@ local function SSE(stride)
       | pinsrq xmm(dst), rax, 1
    end
    function asm.ret(reg)
-      -- Extract high 32 bits from each 64-bit value to uint32_t[2] in
+      -- Extract high 31 bits from each 64-bit value to uint32_t[2] in
       -- rsi.
+      | pslld xmm(reg), 1
       | pextrd dword [rsi], xmm(reg), 1
       | pextrd dword [rsi+4], xmm(reg), 3
       | ret
@@ -351,6 +356,7 @@ local function AVX2(stride)
       | mov rax, control
       | vmovdqu ymm5, [rax]
       | vpermd ymm(reg), ymm5, ymm(reg)
+      | vpslld xmm(reg), xmm(reg), 1
       | vmovdqu oword [rsi], xmm(reg)
       | vzeroupper
       | ret
@@ -412,6 +418,7 @@ local function Simulator()
    end
    function asm.ret(reg)
       output = tonumber(bit.rshift(state[reg], 32))
+      output = ffi.new('uint32_t[1]', bit.lshift(output, 1))[0]
    end
    function asm:assemble(name, gen)
       return function(ptr)
@@ -641,7 +648,7 @@ function selftest()
          val[0] = val[0] * 257
          local hash_x1 = make_sip_hash_x1(opts)
          local hash_u64 = make_sip_hash_u64(opts)
-         assert(hash_x1(ffi.cast('uint8_t*', val)) == hash_u64(val[0]))
+         assert(hash_x1(val) == hash_u64(val[0]))
       end
    end
 

@@ -3,11 +3,9 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
-local bit = require("bit")
 local binary_search = require("lib.binary_search")
 local multi_copy = require("lib.multi_copy")
-local bxor, bnot = bit.bxor, bit.bnot
-local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
+local siphash = require("lib.hash.siphash")
 local max, floor, ceil = math.max, math.floor, math.ceil
 
 CTable = {}
@@ -526,70 +524,23 @@ function CTable:iterate()
    return next_entry, max_entry, self.entries - 1
 end
 
--- One of Bob Jenkins' hashes from
--- http://burtleburtle.net/bob/hash/integer.html.  It's about twice as
--- fast as MurmurHash3_x86_32 and seems to do just as good a job --
--- tables using this hash function seem to have the same max
--- displacement as tables using the murmur hash.
---
--- TODO: Switch to a hash function with good security properties,
--- perhaps by using the DynASM support for AES.
-local uint32_cast = ffi.new('uint32_t[1]')
-function hash_32(i32)
-   i32 = tobit(i32)
-   i32 = i32 + bnot(lshift(i32, 15))
-   i32 = bxor(i32, (rshift(i32, 10)))
-   i32 = i32 + lshift(i32, 3)
-   i32 = bxor(i32, rshift(i32, 6))
-   i32 = i32 + bnot(lshift(i32, 11))
-   i32 = bxor(i32, rshift(i32, 16))
+hash_32 = siphash.make_sip_hash_u64({c=1,d=2})
+hashv_32 = siphash.make_sip_hash_x1({c=1,d=2,size=4})
+hashv_48 = siphash.make_sip_hash_x1({c=1,d=2,size=6})
+hashv_64 = siphash.make_sip_hash_x1({c=1,d=2,size=8})
 
-   -- Unset the low bit, to distinguish valid hashes from HASH_MAX.
-   i32 = lshift(i32, 1)
-
-   -- Project result to u32 range.
-   uint32_cast[0] = i32
-   return uint32_cast[0]
-end
-
-local cast = ffi.cast
-function hashv_32(key)
-   return hash_32(cast(uint32_ptr_t, key)[0])
-end
-
-function hashv_48(key)
-   local hi = cast(uint32_ptr_t, key)[0]
-   local lo = cast(uint16_ptr_t, key)[2]
-   -- Extend lo to the upper half too so that the hash function isn't
-   -- spreading around needless zeroes.
-   lo = bor(lo, lshift(lo, 16))
-   return hash_32(bxor(hi, hash_32(lo)))
-end
-
-function hashv_64(key)
-   local hi = cast(uint32_ptr_t, key)[0]
-   local lo = cast(uint32_ptr_t, key)[1]
-   return hash_32(bxor(hi, hash_32(lo)))
-end
-
-local hash_fns_by_size = { [4]=hashv_32, [8]=hashv_64 }
+local hash_fns_by_size = { [4]=hashv_32, [6]=hashv_48, [8]=hashv_64 }
 function compute_hash_fn(ctype)
    local size = ffi.sizeof(ctype)
    if not hash_fns_by_size[size] then
-      hash_fns_by_size[size] = function(key)
-         local h = 0
-         local words = cast(uint32_ptr_t, key)
-         local bytes = cast(uint8_ptr_t, key)
-         for i=1,size/4 do h = hash_32(bxor(h, words[i-1])) end
-         for i=1,size%4 do h = hash_32(bxor(h, bytes[size-i])) end
-         return h
-      end
+      hash_fns_by_size[size] = siphash.make_sip_hash_x1({c=1,d=2,size=size})
    end
    return hash_fns_by_size[size]
 end
 
 function selftest()
    print("selftest: ctable")
+   local bnot = require("bit").bnot
 
    -- 32-byte entries
    local occupancy = 2e6
@@ -611,9 +562,9 @@ function selftest()
    end
 
    for i=1,2 do
-      -- In this case we know max_displacement is 8.  Assert here so that
+      -- In this case we know max_displacement is 9.  Assert here so that
       -- we can detect any future deviation or regression.
-      assert(ctab.max_displacement == 8)
+      assert(ctab.max_displacement == 9)
 
       ctab:selfcheck()
 
