@@ -22,10 +22,11 @@ local bit  = require("bit")
 local dasm = require("dasm")
 local ffi  = require("ffi")
 local S    = require("syscall")
+local lib  = require("core.lib")
 
 local debug = false
 
-local cpuinfo = require('core.lib').readfile("/proc/cpuinfo", "*a")
+local cpuinfo = lib.readfile("/proc/cpuinfo", "*a")
 assert(cpuinfo, "failed to read /proc/cpuinfo for hardware check")
 local have_avx2 = cpuinfo:match("avx2")
 local have_sse2 = cpuinfo:match("sse2")
@@ -413,9 +414,11 @@ local function Simulator()
    return asm
 end
 
-local function make_sip_hash(assembler, size, stride, key, c, d, as_specified)
-   c = c or 2
-   d = d or 4
+local sip_hash_config = {
+   size={required=true}, stride={}, key={default=reference_sip_hash_key()},
+   c={default=2}, d={default=4}, as_specified={default=false}
+}
+local function make_sip_hash(assembler, opts)
    function siphash(asm)
       -- Arguments:
       -- rdi: packed keys as pointer
@@ -444,44 +447,44 @@ local function make_sip_hash(assembler, size, stride, key, c, d, as_specified)
 
       local function process(input)
          asm.xor(3, input)
-         for i=1,c do sipround() end
+         for i=1,opts.c do sipround() end
          asm.xor(0, input)
       end
 
       -- Initialization phase.
-      asm.init(key)
+      asm.init(opts.key)
 
       -- Compression phase.
-      for i=1,size/8 do
+      for i=1,opts.size/8 do
          asm.load_u64_and_advance(6)
          process(6)
       end
       -- Load tail word and process it.
-      if as_specified then
-         asm.load_imm8(6, bit.band(size, 0xff))
+      if opts.as_specified then
+         asm.load_imm8(6, bit.band(opts.size, 0xff))
          asm.shl(6, 56)
-         for i=1,size%8 do
+         for i=1,opts.size%8 do
             asm.load_u8_and_advance(7)
             if i > 1 then asm.shl(7, (i - 1) * 8) end
             asm.ior(6, 7)
          end
          process(6)
-      elseif size%8 ~= 0 then
+      elseif opts.size%8 ~= 0 then
          -- Fixed-size simplification: no need to add in size byte, we
          -- can use different byte orders if it's more convenient, and
          -- we don't have to do anything at all if the size is a
          -- multiple of 8.
-         if size%8 >= 4 then
+         if opts.size%8 >= 4 then
             asm.load_u32_and_advance(6)
          else
             asm.xor(6, 6)
          end
-         if size%4 >= 2 then
+         if opts.size%4 >= 2 then
             asm.load_u16_and_advance(7)
             asm.shl(6, 16)
             asm.ior(6, 7)
          end
-         if size%2 ~= 0 then
+         if opts.size%2 ~= 0 then
             asm.load_u8_and_advance(7)
             asm.shl(6, 8)
             asm.ior(6, 7)
@@ -492,26 +495,25 @@ local function make_sip_hash(assembler, size, stride, key, c, d, as_specified)
       -- Finalization.
       asm.load_imm8(6, 0xff)
       asm.xor(2, 6)
-      for i=1,d do sipround() end
+      for i=1,opts.d do sipround() end
       asm.xor(0, 1)
       asm.xor(2, 3)
       asm.xor(0, 2)
       asm.ret(0)
    end
 
-   return assembler(stride):assemble("siphash_"..c.."_"..d, siphash)
+   opts = lib.parse(opts, sip_hash_config)
+   if not opts.stride then opts.stride = opts.size end
+   local asm = assembler(opts.stride)
+   return asm:assemble("siphash_"..opts.c.."_"..opts.d, siphash)
 end
 
-function make_sip_hash_x1(size, key, c, d, as_specified)
-   local stride = nil
-   return make_sip_hash(X86_64, size, stride, key, c, d, as_specified)
-end
+function make_sip_hash_x1(opts) return make_sip_hash(X86_64, opts) end
 
-function make_sip_hash_x2(size, stride, key, c, d, as_specified)
-   if have_sse2 then
-      return make_sip_hash(SSE, size, stride, key, c, d, as_specified)
-   end
-   local hash = make_sip_hash_x1(size, key, c, d, as_specified)
+function make_sip_hash_x2(opts)
+   if have_sse2 then return make_sip_hash(SSE, opts) end
+   local hash = make_sip_hash_x1(opts)
+   local stride = opts.stride or opts.size
    return function(ptr, result)
       ptr = ffi.cast('uint8_t*', ptr)
       result = ffi.cast('uint32_t*', result)
@@ -520,11 +522,10 @@ function make_sip_hash_x2(size, stride, key, c, d, as_specified)
    end
 end
 
-function make_sip_hash_x4(size, stride, key, c, d, as_specified)
-   if have_avx2 then
-      return make_sip_hash(AVX2, size, stride, key, c, d, as_specified)
-   end
-   local hash = make_sip_hash_x2(size, stride, key, c, d, as_specified)
+function make_sip_hash_x4(opts)
+   if have_avx2 then return make_sip_hash(AVX2, opts) end
+   local hash = make_sip_hash_x2(opts)
+   local stride = opts.stride or opts.size
    return function(ptr, result)
       ptr = ffi.cast('uint8_t*', ptr)
       result = ffi.cast('uint32_t*', result)
@@ -533,19 +534,24 @@ function make_sip_hash_x4(size, stride, key, c, d, as_specified)
    end
 end
 
-local function make_reference_sip_hash(size, key, c, d, as_specified)
-   local stride = nil
-   return make_sip_hash(Simulator, size, stride, key, c, d, as_specified)
+local function make_reference_sip_hash(opts)
+   return make_sip_hash(Simulator, opts)
 end
 
 function selftest()
-   -- test that the lua and dasm versions produce the same output
-   local function test(size, key, c, d, as_specified)
-      local reference_hash = make_reference_sip_hash(size, key, c, d, as_specified)
-      local hash_x1 = make_sip_hash_x1(size, key, c, d, as_specified)
-      local stride = size
-      local hash_x2 = make_sip_hash_x2(size, stride, key, c, d, as_specified)
-      local hash_x4 = make_sip_hash_x4(size, stride, key, c, d, as_specified)
+   local function test(opts)
+      local size = opts.size
+      local reference_hash = make_reference_sip_hash(opts)
+      local hash_x1 = make_sip_hash_x1(opts)
+      local hash_x2 = make_sip_hash_x2(opts)
+      local hash_x4 = make_sip_hash_x4(opts)
+
+      local function check(ref, result, what)
+         if ref ~= result then
+            for k,v in pairs(opts) do print(k,v) end
+            error(what..' result '..result..' does not match reference '..ref)
+         end
+      end
 
       for i=0, 255 do
          local buf = ffi.new("uint8_t[?]", size)
@@ -554,46 +560,36 @@ function selftest()
          local ref_result = reference_hash(buf)
 
          local x1_result = hash_x1(buf)
+         check(ref_result, x1_result, 'x1')
 
          local x2_buf = ffi.new("uint8_t[?]", size*2)
          local x2_result = ffi.new("uint32_t[2]")
          ffi.copy(x2_buf, buf, size); ffi.copy(x2_buf+size, buf, size)
          hash_x2(x2_buf, x2_result)
+         for elt=0,1 do check(ref_result, x2_result[elt], 'x2['..elt..']') end
 
          local x4_buf = ffi.new("uint8_t[?]", size*4)
          ffi.copy(x4_buf, x2_buf, size*2); ffi.copy(x4_buf+size*2, x2_buf, size*2)
          local x4_result = ffi.new("uint32_t[4]")
          hash_x4(x4_buf, x4_result)
-
-         if ref_result ~= x1_result then
-            print(size, key, c, d, as_specified, ref_result, x1_result)
-            error('scalar result does not match reference')
-         end
-         for elt=0,1 do
-            if ref_result ~= x2_result[elt] then
-               print(size, key, c, d, as_specified, ref_result, x2_result[elt])
-               error('x2 result '..elt..' does not match reference')
-            end
-         end
-         for elt=0,3 do
-            if ref_result ~= x4_result[elt] then
-               print(size, key, c, d, as_specified, ref_result, x4_result[elt])
-               error('x4 result '..elt..' does not match reference')
-            end
-         end
+         for elt=0,3 do check(ref_result, x4_result[elt], 'x4['..elt..']') end
       end
    end
 
-   local key = reference_sip_hash_key()
    io.stdout:write("selftest: ")
    io.stdout:flush()
+   local opts = { key=random_sip_hash_key() }
    for size=0,32 do
+      opts.size = size
       io.stdout:write(".")
       io.stdout:flush()
       for c=0,2 do
+         opts.c = c
          for d=0,4 do
+            opts.d=d
             for _, as_specified in ipairs({true, false}) do
-               test(size, key, c, d, as_specified)
+               opts.as_specified = as_specified
+               test(opts)
             end
          end
       end
