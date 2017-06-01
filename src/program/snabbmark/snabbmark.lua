@@ -449,12 +449,13 @@ function hash (key_size)
       return murmur:hash(v, key_size, 0ULL).u32[0]      
    end
    local lib_siphash = require('lib.hash.siphash')
+   local stride = key_size
    local sip_hash_1_2_x1 = lib_siphash.make_sip_hash_x1(key_size, nil, 1, 2)
-   local sip_hash_1_2_x2 = lib_siphash.make_sip_hash_x2(key_size, nil, 1, 2)
-   local sip_hash_1_2_x4 = lib_siphash.make_sip_hash_x4(key_size, nil, 1, 2)
+   local sip_hash_1_2_x2 = lib_siphash.make_sip_hash_x2(key_size, stride, nil, 1, 2)
+   local sip_hash_1_2_x4 = lib_siphash.make_sip_hash_x4(key_size, stride, nil, 1, 2)
    local sip_hash_2_4_x1 = lib_siphash.make_sip_hash_x1(key_size, nil, 2, 4)
-   local sip_hash_2_4_x2 = lib_siphash.make_sip_hash_x2(key_size, nil, 2, 4)
-   local sip_hash_2_4_x4 = lib_siphash.make_sip_hash_x4(key_size, nil, 2, 4)
+   local sip_hash_2_4_x2 = lib_siphash.make_sip_hash_x2(key_size, stride, nil, 2, 4)
+   local sip_hash_2_4_x4 = lib_siphash.make_sip_hash_x4(key_size, stride, nil, 2, 4)
 
    local function test_scalar_hash(iterations, hash)
       local value = ffi.new(ffi.typeof('uint8_t[$]', key_size))

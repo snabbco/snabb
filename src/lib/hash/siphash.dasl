@@ -1,22 +1,39 @@
 -- -*- lua -*-
--- Implementation of SipHash, based on the reference implementation.
--- See https://131002.net/siphash/ for more details.
+--
+-- SipHash is a family of hash functions, parameterized by the number of
+-- rounds that run per 8-byte input block and the number of rounds that
+-- run at the end.  SipHash was designed to be good for short inputs and
+-- to resist "hash flooding" attacks, where users attack a hash table
+-- with many inputs that map to the same area of the hash table.
+--
+-- We provide implementations of SipHash with a normal scalar DynASM
+-- backend as well as parallel SSE and AVX2 backends.
+--
+-- Because we use SipHash as a hash function for fixed-sized inputs, we
+-- can simplify processing of the tail word.  This simplification is
+-- enabled unless a true value for "as_specified" is passed.
+--
+-- This implementation was based on the reference implementation.  See
+-- https://131002.net/siphash/ for more details.
 
 module(..., package.seeall)
 
 local bit  = require("bit")
 local dasm = require("dasm")
 local ffi  = require("ffi")
+local S    = require("syscall")
 
 local debug = false
+
+local cpuinfo = require('core.lib').readfile("/proc/cpuinfo", "*a")
+assert(cpuinfo, "failed to read /proc/cpuinfo for hardware check")
+local have_avx2 = cpuinfo:match("avx2")
+local have_sse2 = cpuinfo:match("sse2")
 
 |.arch x64
 |.actionlist actions
 
--- the definitions here (anchor, assemble, gen) are borrowed from lwaftr
--- (see multi_copy.lua)
 __anchor = {}
-
 local function finish (name, prototype, Dst)
    local mcode, size = Dst:build()
    table.insert(__anchor, mcode)
@@ -27,15 +44,18 @@ local function finish (name, prototype, Dst)
    return ffi.cast(prototype, mcode)
 end
 
--- SipHash is a family of hash functions, parameterized by the number
--- of rounds that run per 8-byte input block and the number of rounds
--- that run at the end.  Because we use SipHash as a hash function for
--- fixed-sized inputs, we can simplify processing of the tail word.
--- This simplification is enabled unless a true value for
--- "as_specified" is passed.
+local function random_bytes(count)
+   local bytes = ffi.new('uint8_t[?]', count)
+   local f = S.open('/dev/urandom', 'rdonly')
+   local written = 0
+   while written < count do
+      written = written + assert(f:read(bytes, count-written))
+   end
+   return bytes
+end
 
 function random_sip_hash_key()
-   error('unimplemented')
+   return random_bytes(16)
 end
 
 function reference_sip_hash_key()
@@ -61,6 +81,7 @@ local function load_initial_state(key)
    return state
 end
 
+-- Scalar x86-64 backend for the SipHash implementation.
 local function X86_64()
    local asm = {}
    local Dst
@@ -136,6 +157,8 @@ local function X86_64()
    return asm
 end
 
+-- Parallel SSE backend for the SipHash implementation that can hash two
+-- inputs at once.
 local function SSE(stride)
    local asm = {}
    local Dst
@@ -201,19 +224,20 @@ local function SSE(stride)
       -- rsi.
       | pextrd dword [rsi], xmm(reg), 1
       | pextrd dword [rsi+4], xmm(reg), 3
-      | xor rax, rax
       | ret
    end
    function asm:assemble(name, gen)
       Dst = dasm.new(actions)
       gen(self)
-      return finish(name.."_sse",
+      return finish(name.."_x2",
                     ffi.typeof("void (*)(uint8_t *, uint32_t *)"),
                     Dst)
    end
    return asm
 end
 
+-- Parallel AVX2 backend for the SipHash implementation that can hash
+-- four inputs at once.
 local function AVX2(stride)
    local asm = {}
    local Dst
@@ -245,15 +269,11 @@ local function AVX2(stride)
       | vpor ymm(reg), ymm(reg), ymm5
    end
    function asm.load_u64_and_advance(dst)
-      -- Though we could use a parallel load here, I understand that
-      -- it decomposes into approximately the same number of uops as
-      -- this.  Note that we load u64 words into DST in the
-      -- interleaved order 0, 2, 1, 3; this makes the return sequence
-      -- easier.
+      -- TODO: Use a parallel load here.
       assert(dst > 5)
       | vpinsrq xmm(dst), xmm(dst), qword [rdi], 0
-      | vpinsrq xmm5, xmm5, qword [rdi+stride], 0
-      | vpinsrq xmm(dst), xmm(dst), qword [rdi+stride*2], 1
+      | vpinsrq xmm(dst), xmm(dst), qword [rdi+stride*1], 1
+      | vpinsrq xmm5, xmm5, qword [rdi+stride*2], 0
       | vpinsrq xmm5, xmm5, qword [rdi+stride*3], 1
       | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
       | add rdi, 8
@@ -327,13 +347,15 @@ local function AVX2(stride)
    function asm:assemble(name, gen)
       Dst = dasm.new(actions)
       gen(self)
-      return finish(name.."_avx2",
+      return finish(name.."_x4",
                     ffi.typeof("void (*)(uint8_t *, uint32_t *)"),
                     Dst)
    end
    return asm
 end
 
+-- Portable backend for the SipHash implementation to use as a
+-- reference.
 local function Simulator()
    local asm = {}
    local input, output
@@ -391,18 +413,17 @@ local function Simulator()
    return asm
 end
 
-function make_sip_hash_x(assembler, size, key, c, d, as_specified)
+local function make_sip_hash(assembler, size, stride, key, c, d, as_specified)
    c = c or 2
    d = d or 4
-   function gen(asm)
+   function siphash(asm)
       -- Arguments:
       -- rdi: packed keys as pointer
-      -- rsi: output uint32_t[4]
-      -- rax: scratch
+      -- rsi: for parallel implementations, an output uint32_t[4]
 
-      -- Registers used:
-      -- ymm0-ymm3 map to SipHash variables v0-v3
-      -- Other ymm registers are scratch.
+      -- Working registers:
+      -- Registers 0-3 map to SipHash variables v0-v3
+      -- Registers 6 and 7 used as scratch.
 
       local function sipround()
          asm.add(0, 1)
@@ -478,23 +499,43 @@ function make_sip_hash_x(assembler, size, key, c, d, as_specified)
       asm.ret(0)
    end
 
-   return assembler(size):assemble("siphash_"..c.."_"..d.."_x", gen)
+   return assembler(stride):assemble("siphash_"..c.."_"..d, siphash)
 end
 
-function make_sip_hash_x1(...)
-   return make_sip_hash_x(X86_64, ...)
+function make_sip_hash_x1(size, key, c, d, as_specified)
+   local stride = nil
+   return make_sip_hash(X86_64, size, stride, key, c, d, as_specified)
 end
 
-function make_sip_hash_x2(...)
-   return make_sip_hash_x(SSE, ...)
+function make_sip_hash_x2(size, stride, key, c, d, as_specified)
+   if have_sse2 then
+      return make_sip_hash(SSE, size, stride, key, c, d, as_specified)
+   end
+   local hash = make_sip_hash_x1(size, key, c, d, as_specified)
+   return function(ptr, result)
+      ptr = ffi.cast('uint8_t*', ptr)
+      result = ffi.cast('uint32_t*', result)
+      result[0] = hash(ptr)
+      result[1] = hash(ptr + stride)
+   end
 end
 
-function make_sip_hash_x4(...)
-   return make_sip_hash_x(AVX2, ...)
+function make_sip_hash_x4(size, stride, key, c, d, as_specified)
+   if have_avx2 then
+      return make_sip_hash(AVX2, size, stride, key, c, d, as_specified)
+   end
+   local hash = make_sip_hash_x2(size, stride, key, c, d, as_specified)
+   return function(ptr, result)
+      ptr = ffi.cast('uint8_t*', ptr)
+      result = ffi.cast('uint32_t*', result)
+      hash(ptr, result)
+      hash(ptr + stride*2, result + 2)
+   end
 end
 
-local function make_reference_sip_hash(...)
-   return make_sip_hash_x(Simulator, ...)
+local function make_reference_sip_hash(size, key, c, d, as_specified)
+   local stride = nil
+   return make_sip_hash(Simulator, size, stride, key, c, d, as_specified)
 end
 
 function selftest()
@@ -502,8 +543,9 @@ function selftest()
    local function test(size, key, c, d, as_specified)
       local reference_hash = make_reference_sip_hash(size, key, c, d, as_specified)
       local hash_x1 = make_sip_hash_x1(size, key, c, d, as_specified)
-      local hash_x2 = make_sip_hash_x2(size, key, c, d, as_specified)
-      local hash_x4 = make_sip_hash_x4(size, key, c, d, as_specified)
+      local stride = size
+      local hash_x2 = make_sip_hash_x2(size, stride, key, c, d, as_specified)
+      local hash_x4 = make_sip_hash_x4(size, stride, key, c, d, as_specified)
 
       for i=0, 255 do
          local buf = ffi.new("uint8_t[?]", size)
