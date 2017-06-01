@@ -443,20 +443,13 @@ function hash (key_size)
    local fill = require('ffi').fill
 
    local function baseline_hash(ptr) return ptr[0] end
-   local jenkins_hash = require('lib.ctable').compute_hash_fn(value_t)
    local murmur = require('lib.hash.murmur').MurmurHash3_x86_32:new()
    local function murmur_hash(v)
       return murmur:hash(v, key_size, 0ULL).u32[0]      
    end
    local lib_siphash = require('lib.hash.siphash')
    local sip_hash_1_2_opts = { size=key_size, c=1, d=2 }
-   local sip_hash_1_2_x1 = lib_siphash.make_sip_hash_x1(sip_hash_1_2_opts)
-   local sip_hash_1_2_x2 = lib_siphash.make_sip_hash_x2(sip_hash_1_2_opts)
-   local sip_hash_1_2_x4 = lib_siphash.make_sip_hash_x4(sip_hash_1_2_opts)
    local sip_hash_2_4_opts = { size=key_size, c=2, d=4 }
-   local sip_hash_2_4_x1 = lib_siphash.make_sip_hash_x1(sip_hash_2_4_opts)
-   local sip_hash_2_4_x2 = lib_siphash.make_sip_hash_x2(sip_hash_2_4_opts)
-   local sip_hash_2_4_x4 = lib_siphash.make_sip_hash_x4(sip_hash_2_4_opts)
 
    local function test_scalar_hash(iterations, hash)
       local value = ffi.new(ffi.typeof('uint8_t[$]', key_size))
@@ -468,69 +461,82 @@ function hash (key_size)
       return result
    end
 
-   local function test_parallel_hash(iterations, hash, stride)
-      local value = ffi.new('uint8_t[?]', key_size*stride)
-      local result = ffi.new('uint32_t[?]', stride)
-      for i=1,iterations,stride do
-	 fill(value, key_size*stride, band(i+stride-1, 255))
+   local function test_parallel_hash(iterations, hash, width)
+      local value = ffi.new('uint8_t[?]', key_size*width)
+      local result = ffi.new('uint32_t[?]', width)
+      for i=1,iterations,width do
+	 fill(value, key_size*width, band(i+width-1, 255))
 	 hash(value, result)
       end
-      return result[stride-1]
+      return result[width-1]
    end
 
-   local function hash_tester(hash, stride)
-      if stride then
+   local function hash_tester(hash)
+      return function(iterations)
+         return test_scalar_hash(iterations, hash)
+      end
+   end
+
+   local function sip_hash_tester(opts, width)
+      local opts = lib.deepcopy(opts)
+      opts.size = key_size
+      if width > 1 then
+         opts.width = width
+         local hash = lib_siphash.make_multi_hash(opts)
 	 return function(iterations)
-	    return test_parallel_hash(iterations, hash, stride)
+	    return test_parallel_hash(iterations, hash, width)
 	 end
       else
-	 return function(iterations)
-	    return test_scalar_hash(iterations, hash)
-	 end
+         return hash_tester(lib_siphash.make_hash(opts))
       end
    end
 
    test_perf(hash_tester(baseline_hash), 1e8, 'baseline')
-   test_perf(hash_tester(jenkins_hash), 1e8, 'jenkins hash')
    test_perf(hash_tester(murmur_hash), 1e8, 'murmur hash (32 bit)')
-   test_perf(hash_tester(sip_hash_1_2_x1), 1e8, 'sip hash c=1,d=2 (x1)')
-   test_perf(hash_tester(sip_hash_1_2_x2, 2), 1e8, 'sip hash c=1,d=2 (x2)')
-   test_perf(hash_tester(sip_hash_1_2_x4, 4), 1e8, 'sip hash c=1,d=2 (x4)')
-   test_perf(hash_tester(sip_hash_2_4_x1), 1e8, 'sip hash c=2,d=4 (x1)')
-   test_perf(hash_tester(sip_hash_2_4_x2, 2), 1e8, 'sip hash c=2,d=4 (x2)')
-   test_perf(hash_tester(sip_hash_2_4_x4, 4), 1e8, 'sip hash c=2,d=4 (x4)')
+   for _, opts in ipairs({{c=1,d=2}, {c=2,d=4}}) do
+      for _, width in ipairs({1,2,4,8}) do
+         test_perf(sip_hash_tester(opts, width), 1e8,
+                   string.format('sip hash c=%d,d=%d (x%d)',
+                                 opts.c, opts.d, width))
+      end
+   end
 end
 
 function ctable ()
    local ctable = require('lib.ctable')
    local bnot = require('bit').bnot
    local ctab = ctable.new(
-      { key_type = ffi.typeof('uint32_t'),
-        value_type = ffi.typeof('int32_t[6]'),
-        hash_fn = ctable.hash_32 })
+      { key_type = ffi.typeof('uint32_t[2]'),
+        value_type = ffi.typeof('int32_t[5]') })
    local occupancy = 2e6
    ctab:resize(occupancy / 0.4 + 1)
 
    local function test_insertion(count)
-      local v = ffi.new('int32_t[6]');
+      local k = ffi.new('uint32_t[2]');
+      local v = ffi.new('int32_t[5]');
       for i = 1,count do
-         for j=0,5 do v[j] = bnot(i) end
-         ctab:add(i, v)
+         k[0], k[1] = i, i
+         for j=0,4 do v[j] = bnot(i) end
+         ctab:add(k, v)
       end
    end
 
    local function test_lookup_ptr(count)
+      local k = ffi.new('uint32_t[2]');
       local result = ctab.entry_type()
       for i = 1, count do
-         result = ctab:lookup_ptr(i)
+         k[0], k[1] = i, i
+         result = ctab:lookup_ptr(k)
       end
       return result
    end
 
    local function test_lookup_and_copy(count)
+      local k = ffi.new('uint32_t[2]');
       local result = ctab.entry_type()
       for i = 1, count do
-         ctab:lookup_and_copy(i, result)
+         k[0], k[1] = i, i
+         ctab:lookup_and_copy(k, result)
       end
       return result
    end
@@ -547,7 +553,8 @@ function ctable ()
          for i = 1, count, stride do
             local n = math.min(stride, count-i+1)
             for j = 0, n-1 do
-               streamer.entries[j].key = i + j
+               streamer.entries[j].key[0] = i + j
+               streamer.entries[j].key[1] = i + j
             end
             streamer:stream()
             result = streamer.entries[n-1].value[0]

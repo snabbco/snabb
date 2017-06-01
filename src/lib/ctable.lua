@@ -106,6 +106,7 @@ end
 local required_params = set('key_type', 'value_type')
 local optional_params = {
    hash_fn = false,
+   make_multi_hash_fn = false,
    initial_size = 8,
    max_occupancy_rate = 0.9,
    min_occupancy_rate = 0.0
@@ -117,6 +118,12 @@ function new(params)
    ctab.entry_type = make_entry_type(params.key_type, params.value_type)
    ctab.type = make_entries_type(ctab.entry_type)
    ctab.hash_fn = params.hash_fn or compute_hash_fn(params.key_type)
+   ctab.make_multi_hash_fn = params.make_multi_hash_fn or function(width, stride)
+      if params.hash_fn then
+         error("streaming lookup missing custom multi_hash function")
+      end
+      return compute_multi_hash_fn(params.key_type, width, stride)
+   end
    ctab.equal_fn = make_equal_fn(params.key_type)
    ctab.size = 0
    ctab.max_displacement = 0
@@ -365,12 +372,12 @@ function CTable:make_lookup_streamer(stride)
    local res = {
       all_entries = self.entries,
       stride = stride,
-      hash_fn = self.hash_fn,
       equal_fn = self.equal_fn,
       entries_per_lookup = self.max_displacement + 1,
       scale = self.scale,
       pointers = ffi.new('void*['..stride..']'),
       entries = self.type(stride),
+      hashes = ffi.new('uint32_t[?]', stride),
       -- Binary search over N elements can return N if no entry was
       -- found that was greater than or equal to the key.  We would
       -- have to check the result of binary search to ensure that we
@@ -391,6 +398,7 @@ function CTable:make_lookup_streamer(stride)
    -- specialized for this table and this stride.
    local entry_size = ffi.sizeof(self.entry_type)
    res.multi_copy = multi_copy.gen(stride, res.entries_per_lookup * entry_size)
+   res.multi_hash = self.make_multi_hash_fn(stride, entry_size)
    res.binary_search = binary_search.gen(res.entries_per_lookup, self.entry_type)
 
    return setmetatable(res, { __index = LookupStreamer })
@@ -404,11 +412,13 @@ function LookupStreamer:stream()
    local entries_per_lookup = self.entries_per_lookup
    local equal_fn = self.equal_fn
 
+   local key_offset = 4 -- Skip past uint32_t hash.
+   self.multi_hash(ffi.cast('uint8_t*', entries) + key_offset, self.hashes)
+
    for i=0,stride-1 do
-      local hash = self.hash_fn(entries[i].key)
-      local index = hash_to_index(hash, self.scale)
+      local hash = self.hashes[i]
       entries[i].hash = hash
-      pointers[i] = self.all_entries + index
+      pointers[i] = self.all_entries + hash_to_index(hash, self.scale)
    end
 
    self.multi_copy(stream_entries, pointers)
@@ -524,18 +534,23 @@ function CTable:iterate()
    return next_entry, max_entry, self.entries - 1
 end
 
-hash_32 = siphash.make_sip_hash_u64({c=1,d=2})
-hashv_32 = siphash.make_sip_hash_x1({c=1,d=2,size=4})
-hashv_48 = siphash.make_sip_hash_x1({c=1,d=2,size=6})
-hashv_64 = siphash.make_sip_hash_x1({c=1,d=2,size=8})
+hash_32 = siphash.make_u64_hash({c=1,d=2})
+hashv_32 = siphash.make_hash({c=1,d=2,size=4})
+hashv_48 = siphash.make_hash({c=1,d=2,size=6})
+hashv_64 = siphash.make_hash({c=1,d=2,size=8})
 
 local hash_fns_by_size = { [4]=hashv_32, [6]=hashv_48, [8]=hashv_64 }
 function compute_hash_fn(ctype)
    local size = ffi.sizeof(ctype)
    if not hash_fns_by_size[size] then
-      hash_fns_by_size[size] = siphash.make_sip_hash_x1({c=1,d=2,size=size})
+      hash_fns_by_size[size] = siphash.make_hash({c=1,d=2,size=size})
    end
    return hash_fns_by_size[size]
+end
+
+function compute_multi_hash_fn(ctype, width, stride)
+   return siphash.make_multi_hash({c=1, d=2, size=ffi.sizeof(ctype),
+                                   width=width, stride=stride})
 end
 
 function selftest()
@@ -545,20 +560,21 @@ function selftest()
    -- 32-byte entries
    local occupancy = 2e6
    local params = {
-      key_type = ffi.typeof('uint32_t'),
+      key_type = ffi.typeof('uint32_t[1]'),
       value_type = ffi.typeof('int32_t[6]'),
-      hash_fn = hash_32,
       max_occupancy_rate = 0.4,
       initial_size = ceil(occupancy / 0.4)
    }
    local ctab = new(params)
    ctab:resize(occupancy / 0.4 + 1)
 
-   -- Fill with i -> { bnot(i), ... }.
+   -- Fill with {i} -> { bnot(i), ... }.
+   local k = ffi.new('uint32_t[1]');
    local v = ffi.new('int32_t[6]');
    for i = 1,occupancy do
+      k[0] = i
       for j=0,5 do v[j] = bnot(i) end
-      ctab:add(i, v)
+      ctab:add(k, v)
    end
 
    for i=1,2 do
@@ -569,7 +585,8 @@ function selftest()
       ctab:selfcheck()
 
       for i = 1, occupancy do
-         local value = ctab:lookup_ptr(i).value[0]
+         k[0] = i
+         local value = ctab:lookup_ptr(k).value[0]
          assert(value == bnot(i))
       end
       ctab:selfcheck()
@@ -578,13 +595,14 @@ function selftest()
       do
          local entry = ctab.entry_type()
          for i = 1, occupancy, 31 do
-            assert(ctab:lookup_and_copy(i, entry))
-            assert(entry.key == i)
+            k[0] = i
+            assert(ctab:lookup_and_copy(k, entry))
+            assert(entry.key[0] == i)
             assert(entry.value[0] == bnot(i))
             ctab:remove(entry.key)
-            assert(ctab:lookup_ptr(i) == nil)
+            assert(ctab:lookup_ptr(k) == nil)
             ctab:add(entry.key, entry.value)
-            assert(ctab:lookup_ptr(i).value[0] == bnot(i))
+            assert(ctab:lookup_ptr(k).value[0] == bnot(i))
          end
       end
 
@@ -638,7 +656,7 @@ function selftest()
       for i = 1, occupancy, stride do
          local n = math.min(stride, occupancy-i+1)
          for j = 0, n-1 do
-            streamer.entries[j].key = i + j
+            streamer.entries[j].key[0] = i + j
          end
          streamer:stream()
          for j = 0, n-1 do
