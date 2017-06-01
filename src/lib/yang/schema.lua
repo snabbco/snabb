@@ -705,12 +705,14 @@ function resolve(schema, features)
          -- lookup_lazy because we don't want the pcall to hide errors
          -- from the lazy expansion.
          typedef = typedef()
+         assert(typedef.kind == "typedef")
          node.base_type = typedef
          node.primitive_type = assert(typedef.primitive_type)
          node.enums = {}
          for _, enum in ipairs(typedef.type.enums) do
             node.enums[enum.name] = true
          end
+         node.union = typedef.type.union
       else
          -- If the type name wasn't bound, it must be primitive.
          assert(primitive_types[node.id], 'unknown type: '..node.id)

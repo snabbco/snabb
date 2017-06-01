@@ -125,9 +125,10 @@ function load_configuration(filename, opts)
                               source_mtime)
    if not success then
       log('error saving compiled configuration %s: %s', compiled_filename, err)
+   else
+      log('wrote compiled configuration %s', compiled_filename)
    end
 
-   log('wrote compiled configuration %s', compiled_filename)
    -- Done.
    return conf
 end
