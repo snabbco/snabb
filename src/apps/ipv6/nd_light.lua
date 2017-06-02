@@ -55,7 +55,8 @@ nd_light.config = {
    local_ip = {required=true},
    next_hop =  {required=true},
    delay = {default=1000},
-   retrans = {}
+   retrans = {},
+   quiet = {default=false}
 }
 nd_light.shm = {
    status                   = {counter, 2}, -- Link down
