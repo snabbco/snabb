@@ -42,7 +42,8 @@ dist: all
 	mkdir "$(DISTDIR)"
 	git clone "$(BUILDDIR)" "$(DISTDIR)/snabbswitch"
 	rm -rf "$(DISTDIR)/snabbswitch/.git"
-	cp "$(BUILDDIR)/src/snabb" "$(DISTDIR)/$(DIST_BINARY)"
+	cp "$(BUILDDIR)/src/snabb" "$(DISTDIR)/"
+	if test "$(DIST_BINARY)" != "snabb"; then ln -s "snabb" "$(DISTDIR)/$(DIST_BINARY)"; fi
 	cd "$(DISTDIR)/.." && tar cJvf "`basename '$(DISTDIR)'`.tar.xz" "`basename '$(DISTDIR)'`"
 	rm -rf "$(DISTDIR)"
 
