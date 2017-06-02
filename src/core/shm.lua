@@ -71,11 +71,10 @@ end
 -- Make directories needed for a named object.
 -- Given the name "foo/bar/baz" create /var/run/foo and /var/run/foo/bar.
 function mkdir (name)
-   -- Create root with mode "rwxrwxrwt" (R/W for all and sticky) if it
-   -- does not exist yet.
+   -- Create root with mode "rwxr-xr-x" if it does not exist yet.
    if not S.stat(root) then
       local mask = S.umask(0)
-      local status, err = S.mkdir(root, "01777")
+      local status, err = S.mkdir(root, "00755")
       assert(status or err.errno == const.E.EXIST, ("Unable to create %s: %s"):format(
                 root, tostring(err or "unspecified error")))
       S.umask(mask)
