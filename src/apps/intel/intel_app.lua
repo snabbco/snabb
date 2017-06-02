@@ -25,7 +25,8 @@ Intel82599 = {
       rxcounter  = {default=0},
       txcounter  = {default=0},
       rate_limit = {default=0},
-      priority   = {default=1.0}
+      priority   = {default=1.0},
+      wait_link_up = {default=false}
    }
 }
 Intel82599.__index = Intel82599

@@ -69,12 +69,8 @@ local function pass (...) return ... end
 local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (conf)
-   local wait_link_up = true
-   if conf.wait_link_up ~= nil then
-      wait_link_up = conf.wait_link_up
-   end
    local dev = { pciaddress = conf.pciaddr, -- PCI device address
-                 wait_link_up = wait_link_up,
+                 wait_link_up = conf.wait_link_up,
                  mtu = (conf.mtu or default.mtu),
                  fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
