@@ -86,6 +86,8 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
 local vmux = require("apps.vlan.vlan").VlanMux
 local ifmib = require("lib.ipc.shmem.iftable_mib")
+local counter = require("core.counter")
+local macaddress = require("lib.macaddress")
 
 -- config = {
 --   [ shmem_dir = <shmem_dir> , ]
@@ -250,24 +252,21 @@ function parse_if (if_app_name, config)
    end
    if type(drv_c.config) == "table" then
       drv_c.config.mtu = config.mtu
-      -- Don't wait for hardware links to come up.  This
-      -- is currently supported by the intel{1,10}g drivers
-      -- and (hopefully) ignored by all other drivers
-      drv_c.config.wait_link_up = false
+      -- These settings are specific to intel_mp.  They
+      -- should be moved to the l2vpn configuration 
+      drv_c.config.wait_for_link = false
+      drv_c.config.rxq = 0
+      drv_c.config.txq = 0
    end
    result.module = require(drv_c.path)[drv_c.name]
    result.config = drv_c.config
-   -- We need to know the names of links used for input/output of the
-   -- driver.  The intel drivers all use "rx/tx", but tap uses
-   -- "input/output".  This is kind of hacky but there currently is no
-   -- convention for this.
-   if drv_c.name == "Tap" then
-      result.input = "input"
-      result.output = "output"
-   else
-      result.input = "rx"
-      result.output = "tx"
-   end
+   -- Parametrize the names of the links used by the
+   -- drivers for input/output.  The Tap and intel_mp drivers
+   -- use "input" and "output", but this has not yet been
+   -- standardized (and the old inel{1,10}g drivers uses a
+   -- different convention).
+   result.input = "input"
+   result.output = "output"
    local l3_links = { input = if_app_name.."."..result.input,
                       output = if_app_name.."."..result.output }
 
@@ -382,9 +381,9 @@ function parse_if (if_app_name, config)
          print("        VLAN ID: "..(vid > 0 and vid or "<untagged>"))
 
          result.vlans[vid] = {
-	   description = vlan_c.description,
-	   vmux_app = vmux_app_name
-	 }
+           description = vlan_c.description,
+           vmux_app = vmux_app_name
+         }
          if vlan_c.afs then
             local link
             if vid == 0 then
@@ -676,7 +675,7 @@ function run (parameters)
       local app = engine.app_table[nd.name]
       if app then
          nd.config.local_mac =
-            engine.app_table[nd.if_app_name].dev.macaddr.bytes;
+            macaddress:new(counter.read(engine.app_table[nd.if_app_name].stats.macaddr)).bytes
          app:reconfig(nd.config)
       end
    end
@@ -685,14 +684,14 @@ function run (parameters)
       if afs then
          if afs.ipv6 then
             reconfig_mac(afs.ipv6.nd)
-	 end
+         end
       end
       for vid, vlan in pairs(intf.vlans) do
          local afs = vlan.afs
          if afs then
-	    if afs.ipv6 then
+            if afs.ipv6 then
                reconfig_mac(afs.ipv6.nd)
-	    end
+            end
          end
       end
    end
@@ -702,16 +701,18 @@ function run (parameters)
          -- Set up SNMP for physical interfaces
          local app = engine.app_table[intf.name]
          if app == nil then goto continue end
-         local shm = (app.stats and app.stats.shm) or app.shm
-         if shm then
+	 -- Assume that all drivers store their stats
+	 -- like this.
+         local stats = app.stats
+         if stats then
             ifmib.init_snmp( { ifDescr = name,
                                ifName = name,
                                ifAlias = intf.description, },
-               string.gsub(name, '/', '-'), shm,
+               string.gsub(name, '/', '-'), stats,
                shmem_dir, snmp.interval or 5)
-	 else
-	    print("Can't enable SNMP for interface "..name
-	           ..": no statistics counters available")
+         else
+            print("Can't enable SNMP for interface "..name
+                   ..": no statistics counters available")
          end
          for vid, vlan in pairs(intf.vlans) do
             -- Set up SNMP for sub-interfaces
@@ -723,17 +724,17 @@ function run (parameters)
             counters.type = counter_t()
             if vlan.afs then
                counters.type.c = 0x1003ULL -- l3ipvlan
-	    else
+            else
                counters.type.c = 0x1002ULL -- l2vlan
-	    end
-	    if shm then
+            end
+            if stats then
                -- Inherit the operational status, MAC address, MTU, speed
                -- from the physical interface
-               counters.status = map(shm.status)
-               counters.macaddr = map(shm.macaddr)
-               counters.mtu = map(shm.mtu)
-               counters.speed = map(shm.speed)
-	    end
+               counters.status = map(stats.status)
+               counters.macaddr = map(stats.macaddr)
+               counters.mtu = map(stats.mtu)
+               counters.speed = map(stats.speed)
+            end
             -- Create mappings to the counters of the relevant VMUX link
             local name = name.."."..vid
             local vmux = engine.app_table[vlan.vmux_app]
