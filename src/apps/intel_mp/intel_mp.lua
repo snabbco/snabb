@@ -263,15 +263,6 @@ EEC       0x00010 -            RW EEPROM-Mode Control Register
 ]]
 }
 
--- helper for pool number allocation
-local function firsthole(t)
-   for i = 1, #t+1 do
-      if t[i] == nil then
-         return i
-      end
-   end
-end
-
 Intel = {
    config = {
       pciaddr = {required=true},
