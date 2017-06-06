@@ -1,5 +1,7 @@
 -- Helper module for testing intel_mp driver receive
 
+module(..., package.seeall)
+
 local intel = require("apps.intel_mp.intel_mp")
 local basic = require("apps.basic.basic_apps")
 local ffi = require("ffi")
