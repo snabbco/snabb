@@ -33,6 +33,32 @@ specified but assumed to be broadly applicable.
 
 *Optional*. The transmit queue to attach to, numbered from 0.
 
+— Key **vmdq**
+
+*Optional*. A boolean parameter that specifies whether VMDq (Virtual Machine
+Device Queues) is enabled. When VMDq is enabled, each instance of the driver
+is associated with a *pool* that can be assigned a MAC address or VLAN tag.
+Packets are delivered to pools that match the corresponding MACs or VLAN tags.
+Each pool may be associated with several receive and transmit queues.
+
+For a given NIC, all driver instances should have this parameter either
+enabled or disabled uniformly. If this is enabled, *macaddr* must be
+specified.
+
+— Key **poolnum**
+
+*Optional*. The VMDq pool to associated with, numbered from 0. The default
+is 0.
+
+— Key **macaddr**
+
+*Optional*. The MAC address to use as a string. The default is a wild-card
+(i.e., accept all packets).
+
+— Key **vlan**
+*Optional*. A twelve-bit integer (0-4095). If set, incoming packets from
+other VLANs are dropped and outgoing packets are tagged with a VLAN header.
+
 — Key **rsskey**
 
 *Optional*. The rsskey is a 32 bit integer that seeds the hash used to
@@ -86,3 +112,7 @@ Each chipset supports a differing number of receive / transmit queues:
 * Intel82599 supports 16 receive and 16 transmit queues, 0-15
 * Intel1g i350 supports 8 receive and 8 transmit queues, 0-7
 * Intel1g i210 supports 4 receive and 4 transmit queues, 0-3
+
+The Intel82599 supports both VMDq and RSS with 32/64 pools and 4/2 RSS queues for
+each pool. This driver only supports configurations with 32 pools/4 queues.
+While the i350 supports VMDq, this driver does not currently support it.
