@@ -325,10 +325,8 @@ function Intel:new (conf)
    self.max_q = byid.max_q
 
    -- VMDq checks
-   assert(not self.vmdq or device == "0x10fb", "VMDq only supported on 82599")
-   assert(not self.macaddr or self.vmdq, "VMDq must be set to use MAC address")
-   assert(not self.poolnum or self.vmdq, "Pool number only supported for VMDq")
    if self.vmdq then
+      assert(device == "0x10fb", "VMDq only supported on 82599")
       assert(self.macaddr, "MAC address must be set in VMDq mode")
       assert(self.poolnum, "Pool number must be set in VMDq mode")
       assert(not self.rxq or
@@ -342,6 +340,9 @@ function Intel:new (conf)
          assert(self.poolnum < 8,
                 "Pool overflow: Intel i350 supports up to 8 VMDq pools")
       end
+   else
+      assert(not self.macaddr, "VMDq must be set to use MAC address")
+      assert(not self.poolnum, "VMDq must be set to specify a pool number")
    end
 
    -- Setup device access
