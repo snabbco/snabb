@@ -745,9 +745,9 @@ return {
       name = "TenGigE0/1",
       description = "uplink",
       driver = {
-        path = "apps.intel.intel_app",
-        name = "Intel82599",
-        config = { pciaddr = "0000:04:00.1" },
+        path = "apps.intel_mp.intel_mp",
+        name = "Intel",
+        config = { pciaddr = "0000:04:00.1", rxq = 0, txq = 0 },
       },
     },
     mtu = 9206,
@@ -761,9 +761,9 @@ return {
       name = "TenGigE0/0",
       description = "AC",
       driver = {
-        path = "apps.intel.intel_app",
-        name = "Intel82599",
-        config = { pciaddr = "0000:04:00.0" }
+        path = "apps.intel_mp.intel_mp",
+        name = "Intel",
+        config = { pciaddr = "0000:04:00.0", rxq = 0, txq = 0 }
       },
     },
     mtu = 9206,
@@ -806,9 +806,9 @@ return {
       name = "TenGigE0/1",
       description = "uplink",
       driver = {
-        path = "apps.intel.intel_app",
-        name = "Intel82599",
-        config = { pciaddr = "0000:04:00.1" },
+        path = "apps.intel_mp.intel_mp",
+        name = "Intel",
+        config = { pciaddr = "0000:04:00.1", rxq = 0, txq = 0 },
       },
     },
     mtu = 9206,
@@ -822,9 +822,9 @@ return {
       name = "TenGigE0/0",
       description = "AC",
       driver = {
-        path = "apps.intel.intel_app",
-        name = "Intel82599",
-        config = { pciaddr = "0000:04:00.0" },
+        path = "apps.intel_mp.intel_mp",
+        name = "Intel",
+        config = { pciaddr = "0000:04:00.0", rxq = 0, txq = 0 },
       },
     },
     mtu = 9206,
@@ -958,9 +958,9 @@ interfaces = {
   {
      name = address,
      driver = {
-        path = "apps.intel.intel_app",
-        name = "Intel82599",
-        config = { pciaddr = address },
+        path = "apps.intel_mp.intel_mp",
+        name = "Intel",
+        config = { pciaddr = address, rxq = 0, txq = 0 },
      },
   },
 }
@@ -996,9 +996,9 @@ interfaces = {
   {
      name = "TenGigE0/0",
      driver = {
-        path = "apps.intel.intel_app",
-        name = "Intel82599",
-        config = { pciaddr = "0000:03:00.0" },
+        path = "apps.intel_mp.intel_mp",
+        name = "Intel",
+        config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
      },
   },
 }
@@ -1051,10 +1051,10 @@ by executing
 require(<path>).<name>
 ```
 
-For example, for the Intel 82599 NIC, `path` would be
-`apps.intel.intel_app` and `name` would be `Intel82599`.  The result
-of the `require` will be passed to the `confi.app()` API call to
-create an instance of the driver.
+For example, for the Intel NIC, `path` would be
+`apps.intel_mp.intel_mp` and `name` would be `Intel`.  The result of
+the `require` will be passed to the `confi.app()` API call to create
+an instance of the driver.
 
 The `config` table is passed as argument to the constructor of the
 driver module.  It is driver-specific.  For a physical interface, it
@@ -1155,9 +1155,9 @@ configuration for this case:
 {
    name = "TenGigE0/0",
    driver = {
-      path = "apps.intel.intel_app",
-      name = "Intel82599",
-      config = { pciaddr = "0000:03:00.0" },
+      path = "apps.intel_mp.intel_mp",
+      name = "Intel",
+      config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
    },
    mtu = 1514,
    trunk = { enable = false }
@@ -1419,9 +1419,9 @@ by a dot.  For example,
 {
   name = "TenGigE0/0",
   driver = {
-     path = "apps.intel.intel_app",
-     name = "Intel82599",
-     config = { pciaddr = "0000:03:00.0" },
+     path = "apps.intel_mp.intel_mp",
+     name = "Intel",
+     config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
   },
   mtu = 1518,
   trunk = {
@@ -1453,9 +1453,9 @@ ID 0.  For example,
 {
   name = "TenGigE0/0",
   driver = {
-     path = "apps.intel.intel_app",
-     name = "Intel82599",
-     config = { pciaddr = "0000:03:00.0" },
+     path = "apps.intel_mp.intel_mp",
+     name = "Intel",
+     config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
   },
   mtu = 1518,
   trunk = {
@@ -1547,9 +1547,9 @@ interfaces = {
      name = "TenGigE0/0",
      description = "AC customer A",
      driver = {
-        path = "apps.intel.intel_app",
-        name = "Intel82599",
-        config = { pciaddr = "0000:03:00.0" },
+        path = "apps.intel_mp.intel_mp",
+        name = "Intel",
+        config = { pciaddr = "0000:03:00.0", rxq = 0, txq = 0 },
      },
      mtu = 1514,
      trunk = { enable = false }
@@ -1558,9 +1558,9 @@ interfaces = {
      name = "TenGigE0/1",
      description = "AC customer B",
      driver = {
-        path = "apps.intel.intel_app",
-        name = "Intel82599",
-        config = { pciaddr = "0000:03:00.1" },
+        path = "apps.intel_mp.intel_mp",
+        name = "Intel",
+        config = { pciaddr = "0000:03:00.1", rxq = 0, txq = 0 },
      },
      mtu = 1514,
      trunk = { enable = false }
