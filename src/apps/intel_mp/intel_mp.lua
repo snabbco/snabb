@@ -353,6 +353,7 @@ function Intel:new (conf)
 
    self:init()
    self.fd:flock("sh")
+   self:check_vmdq()
    self:init_tx_q()
    self:init_rx_q()
    self:set_MAC()
@@ -992,6 +993,9 @@ function Intel1g:init_queue_stats (frame)
    end
 end
 
+function Intel1g:check_vmdq ()
+   error("unimplemented")
+end
 function Intel1g:vmdq_enable ()
    error("unimplemented")
 end
@@ -1018,6 +1022,7 @@ Intel82599.offsets = {
 }
 Intel82599.max_mac_addr = 127
 Intel82599.max_vlan = 64
+Intel82599.mrqc_bits = 0xA
 function Intel82599:link_status ()
    local mask = bits { Link_up = 30 }
    return bit.band(self.r.LINKS(), mask) == mask
@@ -1164,6 +1169,20 @@ function Intel82599:init ()
    self:unlock_sw_sem()
 end
 
+-- helper method for checking that the main process used the same
+-- VMDq setting if this is a worker process (noop on main)
+function Intel82599:check_vmdq ()
+   if not self.master then
+      if self.vmdq then
+         assert(self.r.MRQC:bits(0, 4) == self.mrqc_bits,
+                "VMDq not set by the main process for this NIC")
+      else
+         assert(self.r.MRQC:bits(0, 4) ~= self.mrqc_bits,
+                "VMDq was set by the main process for this NIC")
+      end
+   end
+end
+
 -- enable VMDq mode, see 4.6.10.1
 -- follows the configuration flow in 4.6.11.3.3
 -- (should only be called on the master instance)
@@ -1172,7 +1191,7 @@ function Intel82599:vmdq_enable ()
    self.r.RTTDCS:set(bits { ARBDIS=6 })
 
    -- 1010 -> 32 pools, 4 RSS queues each
-   self.r.MRQC:bits(0, 4, 0xA)
+   self.r.MRQC:bits(0, 4, self.mrqc_bits)
 
    -- TODO: not sure this is needed, but it's in intel10g
    -- disable RSC (7.11)
