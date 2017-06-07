@@ -103,6 +103,7 @@ local macaddress = require("lib.macaddress")
 --         config = {
 --           pciaddr = <pciaddress>,
 --         },
+--         [ extra_config = <extra_config>, ]
 --       },
 --       mtu = <mtu>,
 --       [ -- only allowed if trunk.enable == false
@@ -247,16 +248,22 @@ function parse_if (if_app_name, config)
    local drv_c = config.driver
    assert(drv_c.path and drv_c.name and
              drv_c.config, "Incomplete driver configuration")
-   if (drv_c.config.pciaddr) then
-      print("  PCI address: "..drv_c.config.pciaddr)
-   end
    if type(drv_c.config) == "table" then
+      if (drv_c.config.pciaddr) then
+         print("  PCI address: "..drv_c.config.pciaddr)
+      end
       drv_c.config.mtu = config.mtu
-      -- These settings are specific to intel_mp.  They
-      -- should be moved to the l2vpn configuration 
-      drv_c.config.wait_for_link = false
-      drv_c.config.rxq = 0
-      drv_c.config.txq = 0
+      if drv_c.extra_config then
+         -- If present, extra_config must be a table, whose elements
+         -- are merged with the regular config.  This feature allows
+         -- for more flexibility when the configuration is created by
+         -- a Lua-agnostic layer on top, e.g. by a NixOS module
+         assert(type(drv_c.extra_config) == "table",
+                "Driver extra configuration must be a table")
+         for k, v in pairs(drv_c.extra_config) do
+            drv_c.config[k] = v
+         end
+      end
    end
    result.module = require(drv_c.path)[drv_c.name]
    result.config = drv_c.config
