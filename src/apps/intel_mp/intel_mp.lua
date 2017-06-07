@@ -326,7 +326,7 @@ function Intel:new (conf)
 
    -- VMDq checks
    if self.vmdq then
-      assert(device == "0x10fb", "VMDq only supported on 82599")
+      assert(byid.driver == Intel82599, "VMDq only supported on 82599")
       assert(self.macaddr, "MAC address must be set in VMDq mode")
       assert(self.poolnum, "Pool number must be set in VMDq mode")
       assert(not self.rxq or
