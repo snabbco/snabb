@@ -874,46 +874,46 @@ Each physical interface that is to be used by the `l2vpn` program is
 configured by a Lua table of the following form
 
 ```
-  {
+{
+  name = <name>,
+  [ description = <description>, ]
+  driver = {
+    path = <path>,
     name = <name>,
-    [ description = <description>, ]
-    driver = {
-      path = <path>,
-      name = <name>,
-      config = {
-        pciaddr = <pciaddress>,
-      },
+    config = {
+      pciaddr = <pciaddress>,
     },
-    mtu = <mtu>,
-    [ -- only allowed if trunk.enable == false
-      afs = {
-        ipv6 = {
-          address = <address>,
-          next_hop = <next_hop>,
-          [ neighbor_mac = <neighbor_mac>,
-            [ neighbor_nd = true | false, ] ]
-        }
-      }, ]
-    [ trunk = {
-        enable = true | false,
-        encapsulation = "dot1q" | "dot1ad" | <number>,
-        vlans = {
-          {
-            [ description = <description>, ]
-            vid = <vid>,
-            [ afs = {
-                ipv6 = {
-                  address = <address>,
-                  next_hop = <next_hop>,
-                  [ neighbor_mac = <neighbor_mac>,
-                    [ neighbor_nd = true | false, ] ]
-                }
-              } ]
-           },
-           ...
-        }
-      } ]
-  }
+  },
+  mtu = <mtu>,
+  [ -- only allowed if trunk.enable == false
+    afs = {
+      ipv6 = {
+        address = <address>,
+        next_hop = <next_hop>,
+        [ neighbor_mac = <neighbor_mac>,
+          [ neighbor_nd = true | false, ] ]
+      }
+    }, ]
+  [ trunk = {
+      enable = true | false,
+      encapsulation = "dot1q" | "dot1ad" | <number>,
+      vlans = {
+        {
+          [ description = <description>, ]
+          vid = <vid>,
+          [ afs = {
+              ipv6 = {
+                address = <address>,
+                next_hop = <next_hop>,
+                [ neighbor_mac = <neighbor_mac>,
+                  [ neighbor_nd = true | false, ] ]
+              }
+            } ]
+         },
+         ...
+      }
+    } ]
+}
 ```
 
 In this pseudo-code, square brackets enclose optional elements, angle
@@ -1025,15 +1025,16 @@ vpls = {
 The following items make up the basic configuration of an interface
 
 ```
-    name = <name>,
-    [ description = <description>, ]
-    driver = {
-      path = <path>,
-      name = <name>,
-      config = {
-        pciaddr = <pciaddress>,
-      },
-    },
+name = <name>,
+[ description = <description>, ]
+driver = {
+  path = <path>,
+  name = <name>,
+  config = {
+    pciaddr = <pciaddress>,
+  },
+  [ extra_config = <extra_config>, ]
+},
 ```
 
 The `name` and `pciaddr` items have already been discussed in the
@@ -1082,21 +1083,19 @@ interface property via the `mtu` option as shown in the next section.
 The MTU is automatically added to the `config` table with the key
 `mtu`.
 
-Whether `config` is a table or not depends on the requirement of the
-driver.  For example, the driver for a tap interface only accepts a
-string:
+It is allowed to use a different data type than a table for the
+`config` paramter to support non-standard drivers.  In that case, the
+MTU cannot automatically be passed to the driver.
 
-```
-  name = "Tap1",
-  driver = {
-    path = "apps.tap.tap",
-    name = "Tap",
-    config = "Tap1",
-  }
-```
+The optional element `extra_config` must be a table.  It will be
+merged with the `config` table to form the final configuration of the
+driver.  When elements with the same name exist in both tables, the
+one from `extra_config` takes precedence.  The main purpose of this
+feature is to support Lua-agnostic front-ends that generate the entire
+`l2vpn` configuration or parts of it from a higher layer of
+abstraction.
 
-In this case, the MTU cannot be added to `config` and is, of course,
-not needed by the driver.
+If `config` is not a table, `extra_config` is ignored.
 
 ### L2 Configuration
 
@@ -1104,10 +1103,10 @@ Every physical interface is associated with parameters that control
 its behavior at the Ethernet layer (L2) consisting of the items
 
 ```
-    mtu = <mtu>,
-    [ trunk = {
-        enable = true | false,
-        encapsulation = "dot1q" | "dot1ad" | <number>, ]
+mtu = <mtu>,
+[ trunk = {
+    enable = true | false,
+    encapsulation = "dot1q" | "dot1ad" | <number>, ]
 ```
 
 The `vlans` section of the trunk configuration is not shown here and
@@ -1195,27 +1194,27 @@ L3-port by adding a section containing address-family-specific
 configurations called `afs`:
 
 ```
-  {
+{
+  name = <name>,
+  [ description = <description>, ]
+  driver = {
+    path = <path>,
     name = <name>,
-    [ description = <description>, ]
-    driver = {
-      path = <path>,
-      name = <name>,
-      config = {
-        pciaddr = <pciaddress>,
-      },
+    config = {
+      pciaddr = <pciaddress>,
     },
-    mtu = <mtu>,
-    trunk = { enable = false },
-    afs = {
-      ipv6 = {
-        address = <address>,
-        next_hop = <next_hop>,
-        [ neighbor_mac = <neighbor_mac>,
-          [ neighbor_nd = true | false, ] ]
-      }
+  },
+  mtu = <mtu>,
+  trunk = { enable = false },
+  afs = {
+    ipv6 = {
+      address = <address>,
+      next_hop = <next_hop>,
+      [ neighbor_mac = <neighbor_mac>,
+        [ neighbor_nd = true | false, ] ]
     }
   }
+}
 ```
 
 The `afs` table is intended to contain separate sections for each
