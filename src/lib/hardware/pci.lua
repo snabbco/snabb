@@ -74,13 +74,9 @@ local cards = {
       ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
       ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
       ["0x154d"] = {model = model["X520"],      driver = 'apps.intel.intel_app'},
-      -- FIXME move to intel_mp after l2vpn has been migrated
-      ["0x1521"] = {model = model["i350"],      driver = 'apps.intel.intel1g'},
-      ["0x1533"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
-      ["0x157b"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
-      -- ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
-      -- ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
-      -- ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
    },
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
