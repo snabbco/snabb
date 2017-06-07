@@ -445,10 +445,14 @@ form.
 
 The keys define the properties of the VPLS instance.
 
-   * `description`: a human readable description of the purpose of the
-      VPLS instance as a Lua string
+   * `description`
 
-   * `mtu`: the MTU in bytes of all ACs connected to the VPLS instance
+     a human readable description of the purpose of the VPLS instance
+     as a Lua string
+
+   * `mtu`
+
+     the MTU in bytes of all ACs connected to the VPLS instance
      including the Ethernet header (but neither the CRC, SOF nor
      preamble, also see [the definition of the interface MTU](#MTU)).
      As with any Ethernet bridge (and IP subnet), it is mandatory that
@@ -460,244 +464,255 @@ The keys define the properties of the VPLS instance.
      independently in the `interfaces` section, an error is raised
      when the MTU setting between the VPLS and any of its ACs differs.
 
-   *  `vc_id`: (TODO)
+   *  `vc_id`
 
-   * `uplink`: a reference to an interface defined in the global
-     `interfaces` definition, for example
-     
- ```
-  uplink = "TenGigE0/1"
- ```
+      (TODO)
 
- or
+   * `uplink`
 
- ```
-  uplink = "TenGigE0/1.100"  
- ```
+     a reference to an interface defined in the global `interfaces`
+     definition, for example
+     ```
+     uplink = "TenGigE0/1"
+     ```
 
- The referenced interface must be configured as a L3-port, i.e. it
- must contain an `addressFamilies` section.  (see the [interface
- abstraction](#interface-abstraction) section for details)
+     or
+     ```
+     uplink = "TenGigE0/1.100"  
+     ```
 
-   * `bridge`: if the VPLS contains more than one pseudowire or
-     connects more than one AC at any location, a bridge is needed to
-     perform forwarding of Ethernet frames.  The `bridge` key selects
-     the type of switch and its properties.  Its value is a Lua table:
+     The referenced interface must be configured as a L3-port, i.e. it
+     must contain an `addressFamilies` section.  (see the [interface
+     abstraction](#interface-abstraction) section for details)
 
- ```
-  bridge = {
-    type = "learning" | "flooding",
-    -- learning configuration
-    config = {
-      mac_table = {
-        timeout = <MAC_timeout>
-      }
-    }
-  }
- ```
- If omitted, the default configuration
- ```
- bridge = { type = "flooding" }
- ```
- is used.
+   * `bridge`
+
+     if the VPLS contains more than one pseudowire or connects more
+     than one AC at any location, a bridge is needed to perform
+     forwarding of Ethernet frames.  The `bridge` key selects the type
+     of switch and its properties.  Its value is a Lua table:
+     ```
+     bridge = {
+       type = "learning" | "flooding",
+       -- learning configuration
+       config = {
+         mac_table = {
+           timeout = <MAC_timeout>
+         }
+       }
+     }
+     ```
+
+     If omitted, the default configuration
+     ```
+     bridge = { type = "flooding" }
+     ```
+     is used.
         
-  If `type` is set to `"flooding"`, the bridge will send copies of all
-  Ethernet frames received on any port to all other ports, i.e. every
-  frame will be flooded across the entire VPLS.  Any other key in the
-  table is ignored.
+     If `type` is set to `"flooding"`, the bridge will send copies of
+     all Ethernet frames received on any port to all other ports,
+     i.e. every frame will be flooded across the entire VPLS.  Any
+     other key in the table is ignored.
 
-  If `type` is set to `"learning"`, the bridge performs MAC learning
-  as described in the [overview](#overview_MAC_learning).  The table
-  `config` sets the properties of the bridge. It contains a single key
-  `mac_table`, whose value is another table that represents the
-  configuration of the underlying MAC address table as implemented by
-  the `apps.bridge.mac_table` module.  Please refer to the
-  documentation of that module for a complete description of
-  configuration options.  The most important one is the `timeout`
-  parameter, which specifies the time in seconds, after which a MAC
-  address that has been learned on a port is removed from the table if
-  no frame that carries the address in its source address field has
-  been seen during that interval.  The default is 60 seconds.
+     If `type` is set to `"learning"`, the bridge performs MAC
+     learning as described in the [overview](#overview_MAC_learning).
+     The table `config` sets the properties of the bridge. It contains
+     a single key `mac_table`, whose value is another table that
+     represents the configuration of the underlying MAC address table
+     as implemented by the `apps.bridge.mac_table` module.  Please
+     refer to the documentation of that module for a complete
+     description of configuration options.  The most important one is
+     the `timeout` parameter, which specifies the time in seconds,
+     after which a MAC address that has been learned on a port is
+     removed from the table if no frame that carries the address in
+     its source address field has been seen during that interval.  The
+     default is 60 seconds.
 
-  If the VPLS is a VPWS (i.e. a point-to-point VPN with a single AC at
-  each end), an actual bridge is not necessary.  In this case, the
-  bridge module is not instantiated and the local end of the
-  pseudowire is "short-circuited" to the AC and a message to this
-  effect is logged.
+     If the VPLS is a VPWS (i.e. a point-to-point VPN with a single AC
+     at each end), an actual bridge is not necessary.  In this case,
+     the bridge module is not instantiated and the local end of the
+     pseudowire is "short-circuited" to the AC and a message to this
+     effect is logged.
 
-   * `ac`: this table specifies the ACs that are assigned to the VPLS
-     as references to interfaces defined in the global `interfaces`
+   * `ac`
+
+     this table specifies the ACs that are assigned to the VPLS as
+     references to interfaces defined in the global `interfaces`
      configuration, for example
-
- ```
-  ac = {
-    AC_1 = "TenGigE0/0",
-    AC_2 = "TenGigE0/1.100",
-    AC_3 = "TenGigE0/1.200"
-  }
- ```
+     ```
+     ac = {
+       AC_1 = "TenGigE0/0",
+       AC_2 = "TenGigE0/1.100",
+       AC_3 = "TenGigE0/1.200"
+     }
+     ```
  
- would define three ACs named `AC_1`, `AC_2` and `AC_3`.  The first
- one refers to a physical interface called `TenGigE0/0` while the
- other two refer to VLAN-based sub-interfaces associated with the
- physical interface called `TenGigE0/1`.  Interfaces configured as AC
- must be L2-ports, i.e. they must not have an `addressFamilies`
- configuration associated with them (see the [interface
- abstraction](#interface-abstraction) section for details).
+     would define three ACs named `AC_1`, `AC_2` and `AC_3`.  The
+     first one refers to a physical interface called `TenGigE0/0`
+     while the other two refer to VLAN-based sub-interfaces associated
+     with the physical interface called `TenGigE0/1`.  Interfaces
+     configured as AC must be L2-ports, i.e. they must not have an
+     `addressFamilies` configuration associated with them (see the
+     [interface abstraction](#interface-abstraction) section for
+     details).
 
-   * `address`: the IPv6 address that uniquely identifies the VPLS
-     instance.  It is used as endpoint for all attached pseudowires.
+   * `address`
 
-   * `tunnel`: a table that specifies the default tunnel configuration
-     for all pseudowires that do not contain a tunnel configuration
+     the IPv6 address that uniquely identifies the VPLS instance.  It
+     is used as endpoint for all attached pseudowires.
+
+   * `tunnel`
+
+     a table that specifies the default tunnel configuration for all
+     pseudowires that do not contain a tunnel configuration
      themselves.  It is optional.  If it is omitted, all pseudowires
      must have an explicit tunnel configuration.  The table is of the
      form
-
- ```
-  <tunnel_config> = {
-    type = "gre" | "l2tpv3",
-    -- Type-specific configuration
-  }
- ```
-
- The `type` selects either the [GRE or L2TPv3
- encapsulation](#tunnel_protos).  The type-specific configurations are
- as follows
-
-     * GRE
-
-    ```
-     {
-       type = "gre",
-       key = <key>,            -- optional
-       checksum = true | false -- optional
+     ```
+     <tunnel_config> = {
+       type = "gre" | "l2tpv3",
+       -- Type-specific configuration
      }
-    ```
+     ```
 
-    The optional key `key` is a 32-bit value (for example `key =
-    0x12345678`) that will be placed in the GRE key header field for
-    packets transmitted on the pseudowire.  Packets arriving on the
-    pseudowire are expected to contain the same key, otherwise they
-    are discarded and an error message is logged. Hence, both sides of
-    the pseudowire must be configured with the same key (or none).
+     The `type` selects either the [GRE or L2TPv3
+     encapsulation](#tunnel_protos).  The type-specific configurations are
+     as follows
 
-    The value of `0xFFFFFFFE` is reserved for the control channel.
-    Note that while the control channel always uses a key, it is
-    permitted to configure the tunnel itself without a key.
+      * GRE
 
-    If `checksum = true`, outgoing GRE packets will contain a checksum
-    that covers the encapsulated Ethernet frame.  When a pseudowire
-    receives a packet that contains a checksum, it is always
-    validated, irrespective of the setting of the `checksum`
-    configuration key.  If validation fails, the packet is dropped and
-    an error is logged.
+        ```
+        {
+          type = "gre",
+          key = <key>,            -- optional
+          checksum = true | false -- optional
+        }
+        ```
 
-     * L2TPv3
+        The optional key `key` is a 32-bit value (for example `key =
+        0x12345678`) that will be placed in the GRE key header field
+        for packets transmitted on the pseudowire.  Packets arriving
+        on the pseudowire are expected to contain the same key,
+        otherwise they are discarded and an error message is
+        logged. Hence, both sides of the pseudowire must be configured
+        with the same key (or none).
 
-    ```
-     {
-       type = "l2tpv3",
-       local_session = <local_session>,   -- optional
-       remote_session = <remote_session>, -- optional
-       local_cookie = <local_cookie>,
-       remote_cookie = <remote_cookie>,
+        The value of `0xFFFFFFFE` is reserved for the control channel.
+        Note that while the control channel always uses a key, it is
+        permitted to configure the tunnel itself without a key.
+
+        If `checksum = true`, outgoing GRE packets will contain a
+        checksum that covers the encapsulated Ethernet frame.  When a
+        pseudowire receives a packet that contains a checksum, it is
+        always validated, irrespective of the setting of the
+        `checksum` configuration key.  If validation fails, the packet
+        is dropped and an error is logged.
+
+      * L2TPv3
+
+        ```
+        {
+          type = "l2tpv3",
+          local_session = <local_session>,   -- optional
+          remote_session = <remote_session>, -- optional
+          local_cookie = <local_cookie>,
+          remote_cookie = <remote_cookie>,
+        }
+        ```
+
+        The optional `local_session` and `remote_session` keys specify
+        32-bit numbers that can be used as session identifiers.  As
+        [discussed above](#tunnel_keyed_ipv6), they are only needed to
+        ensure interoperability in certain cases.  If omitted, they
+        will default to the value `0xFFFFFFFF`.  The value
+        `<remote_session>` is placed in outgoing packets, while the
+        the session ID of incoming packets is compared to
+        `<local_session>`.  If the values don't match, the packet is
+        discarded and an error is logged.  Hence, the pseudowire
+        endpoints must be configured with one's local session ID
+        identical to that of the other's remote session ID.
+
+        The mandatory `<local_cookie>` and `<remote_cookie>` keys must
+        specify 64-bit numbers for the purpose [explained
+        above](#tunnel_keyed_ipv6).  Like the session ID, the cookies
+        are unidirectional, i.e. one's local cookie must be equal to
+        the other's remote cookie.  The value must consist of a
+        sequence of 8 bytes, e.g. a Lua string of length 8 like
+        `'\x00\x11\x22\x33\x44\x55\x66\x77'`.
+
+   * `cc`
+
+     a table that specifies the default control channel configuration
+     for all pseudowires that do not contain such a configuration
+     themselves.  It is optional.  If omitted, the pseudowires that
+     don't specify a control-channel will not make use of the control
+     channel (but note that it is an error if one end of the
+     pseudowire uses the control-channel and the other doesn't).  The
+     table is of the form
+     ```
+     <cc_config> = {
+       heartbeat = <heartbeat>,
+       dead_factor = <dead_factor>
      }
-    ```
+     ```
 
-    The optional `local_session` and `remote_session` keys specify
-    32-bit numbers that can be used as session identifiers.  As
-    [discussed above](#tunnel_keyed_ipv6), they are only needed to
-    ensure interoperability in certain cases.  If omitted, they will
-    default to the value `0xFFFFFFFF`.  The value `<remote_session>`
-    is placed in outgoing packets, while the the session ID of
-    incoming packets is compared to `<local_session>`.  If the values
-    don't match, the packet is discarded and an error is logged.
-    Hence, the pseudowire endpoints must be configured with one's
-    local session ID identical to that of the other's remote session
-    ID.
+     `<heartbeat>` is the interval in seconds at which the pseudowire
+     sends control messages to its peer.  This number itself is
+     transmitted within the control message as the `heartbeat`
+     parameter.  The value 0 disables the control channel.  The value
+     of the `dead_factor`, which must be an integer, is used to detect
+     when the remote endpoint can no longer reach the local endpoint
+     in the following manner, see the [description of the
+     control-channel](#control_channel) for details.
 
-    The mandatory `<local_cookie>` and `<remote_cookie>` keys must
-    specify 64-bit numbers for the purpose [explained
-    above](#tunnel_keyed_ipv6).  Like the session ID, the cookies are
-    unidirectional, i.e. one's local cookie must be equal to the
-    other's remote cookie.  The value must consist of a sequence of 8
-    bytes, e.g. a Lua string of length 8 like
-    `'\x00\x11\x22\x33\x44\x55\x66\x77'`.
+   * `pw`
 
-   * `cc`: a table that specifies the default control channel
-     configuration for all pseudowires that do not contain such a
-     configuration themselves.  It is optional.  If omitted, the
-     pseudowires that don't specify a control-channel will not make
-     use of the control channel (but note that it is an error if one
-     end of the pseudowire uses the control-channel and the other
-     doesn't).  The table is of the form
+     this table contains one key per pseudowire which is part of the
+     VPLS instance.  The keys represent the (arbitrary) names of these
+     pseudowires, e.g.
+     ```
+     pw = {
+       pw_1 = <pw_config>,
+       pw_2 = <pw_config>,
+     }
+     ```
 
- ```
-  <cc_config> = {
-    heartbeat = <heartbeat>,
-    dead_factor = <dead_factor>
-  }
- ```
+     defines two pseudowires named `pw_1` and `pw_2`.  Each
+     configuration is a Lua table of the form
+     ```
+     <pw_config> = {
+       address = <remote_address>,
+       tunnel = <tunnel_config>, -- optional
+       cc = <cc_config>          -- optional
+     }
+     ```
 
- `<heartbeat>` is the interval in seconds at which the pseudowire
- sends control messages to its peer.  This number itself is
- transmitted within the control message as the `heartbeat` parameter.
- The value 0 disables the control channel.  The value of the
- `dead_factor`, which must be an integer, is used to detect when the
- remote endpoint can no longer reach the local endpoint in the
- following manner, see the [description of the
- control-channel](#control_channel) for details.
+     The mandatory key `address` specifies the IPv6 address of the
+     remote end of the pseudowire.  The `tunnel` and `cc` keys specify
+     the configurations of the tunnel and control-channel of the
+     pseudowire, respectively, as described above.
 
-   * `pw`: this table contains one key per pseudowire which is part of
-     the VPLS instance.  The keys represent the (arbitrary) names of
-     these pseudowires, e.g.
+     The tunnel configuration is mandatory for a pseudowire, either
+     through the default at the VPLS top-level configuration or the
+     specific configuration here.
 
- ```
-  pw = {
-    pw_1 = <pw_config>,
-    pw_2 = <pw_config>,
-  }
- ```
+     If neither a local nor a default control-channel configuration
+     exists, the pseudowire will not transmit any control messages and
+     expects to receive none either.  The reception of a control
+     message from the remote end is considered an error.  In that
+     case, a message will be logged and the pseudowire will be marked
+     as down, i.e. no packets will be forwarded in either direction.
 
- defines two pseudowires named `pw_1` and `pw_2`.  Each configuration
- is a Lua table of the form
-
- ```
-  <pw_config> = {
-    address = <remote_address>,
-    tunnel = <tunnel_config>, -- optional
-    cc = <cc_config>          -- optional
-  }
- ```
-
- The mandatory key `address` specifies the IPv6 address of the remote
- end of the pseudowire.  The `tunnel` and `cc` keys specify the
- configurations of the tunnel and control-channel of the pseudowire,
- respectively, as described above.
-
- The tunnel configuration is mandatory for a pseudowire, either
- through the default at the VPLS top-level configuration or the
- specific configuration here.
-
- If neither a local nor a default control-channel configuration
- exists, the pseudowire will not transmit any control messages and
- expects to receive none either.  The reception of a control message
- from the remote end is considered an error.  In that case, a message
- will be logged and the pseudowire will be marked as down, i.e. no
- packets will be forwarded in either direction.
-
- To disable the control-channel on a per-PW basis when it is enabled
- by default, an explicit `cc` section must be added to the PW with the
- `heartbeat` parameter set to 0, i.e.
-
- ```
-  <pw_config> = {
-    address = <remote_address>,
-    tunnel = <tunnel_config>, -- optional
-    cc = { heartbeat = 0}
-  }
- ```
+     To disable the control-channel on a per-PW basis when it is
+     enabled by default, an explicit `cc` section must be added to the
+     PW with the `heartbeat` parameter set to 0, i.e.
+     ```
+     <pw_config> = {
+       address = <remote_address>,
+       tunnel = <tunnel_config>, -- optional
+       cc = { heartbeat = 0}
+     }
+     ```
 
 ### Examples
 
