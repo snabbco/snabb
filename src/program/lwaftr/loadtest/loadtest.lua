@@ -4,7 +4,7 @@ local engine = require("core.app")
 local counter = require("core.counter")
 local config = require("core.config")
 local pci = require("lib.hardware.pci")
-local Intel82599 = require("apps.intel.intel_app").Intel82599
+local Intel82599 = require("apps.intel_mp.intel_mp").driver
 local basic_apps = require("apps.basic.basic_apps")
 local loadgen = require("apps.lwaftr.loadgen")
 local main = require("core.main")
@@ -29,7 +29,7 @@ local function find_devices(pattern)
    pattern = pci.qualified(pattern)
    local ret = {}
    for _,device in ipairs(pci.devices) do
-      if (device.usable and device.driver == 'apps.intel.intel_app' and
+      if (device.usable and device.driver == 'apps.intel_mp.intel_mp' and
           pattern:match(device.pciaddress)) then
          table.insert(ret, device.pciaddress)
       end
@@ -165,13 +165,13 @@ function run(args)
 
       config.app(c, stream.pcap_id, PcapReader, stream.capture_file)
       config.app(c, stream.repeater_id, loadgen.RateLimitedRepeater, {})
-      config.app(c, stream.nic_tx_id, Intel82599, { pciaddr = stream.pci_addr })
+      config.app(c, stream.nic_tx_id, Intel82599, { pciaddr = stream.pci_addr, rxq = 0, txq = 0 })
       config.app(c, stream.rx_sink_id, basic_apps.Sink)
 
       config.link(c, stream.pcap_id..".output -> "..stream.repeater_id..".input")
-      config.link(c, stream.repeater_id..".output -> "..stream.nic_tx_id..".rx")
+      config.link(c, stream.repeater_id..".output -> "..stream.nic_tx_id..".input")
 
-      config.link(c, stream.nic_rx_id..".tx -> "..stream.rx_sink_id..".input")
+      config.link(c, stream.nic_rx_id..".output -> "..stream.rx_sink_id..".input")
    end
    engine.configure(c)
 
@@ -204,9 +204,9 @@ function run(args)
          local rx_nic = assert(engine.app_table[stream.nic_rx_id],
                                "NIC "..stream.nic_rx_id.." not found")
          ret[stream.nic_tx_id] = {
-            tx = read_counters(tx_nic.input.rx),
-            rx = read_counters(rx_nic.output.tx),
-            drop = rx_nic:ingress_packet_drops()
+            tx = read_counters(tx_nic.input.input),
+            rx = read_counters(rx_nic.output.output),
+            drop = rx_nic:rxdrop()
          }
       end
       return ret
