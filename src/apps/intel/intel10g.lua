@@ -70,7 +70,6 @@ local M_sf = {}; M_sf.__index = M_sf
 
 function new_sf (conf)
    local dev = { pciaddress = conf.pciaddr, -- PCI device address
-                 wait_link_up = conf.wait_link_up,
                  mtu = (conf.mtu or default.mtu),
                  fd = false,       -- File descriptor for PCI memory
                  r = {},           -- Configuration registers
@@ -127,38 +126,14 @@ end
 function M_sf:init ()
    self:init_dma_memory()
 
-   if self.wait_link_up then
-      self.redos = 0
-      local mask = bits{Link_up=30}
-      for i = 1, 100 do
-         self
-            :disable_interrupts()
-            :global_reset()
-            :disable_interrupts()
-         if i%5 == 0 then self:autonegotiate_sfi() end
-         self
-            :wait_eeprom_autoread()
-            :wait_dma()
-            :init_statistics()
-            :init_receive()
-            :init_transmit()
-            :init_txdesc_prefetch()
-            :wait_enable()
-            :wait_linkup()
-
-         if band(self.r.LINKS(), mask) == mask then
-            self.redos = i
-            return self
-         end
-      end
-      io.write ('never got link up: ', self.pciaddress, '\n')
-      os.exit(2)
-   else
+   self.redos = 0
+   local mask = bits{Link_up=30}
+   for i = 1, 100 do
       self
          :disable_interrupts()
          :global_reset()
-         :disable_interrupts()
-         :autonegotiate_sfi()
+      if i%5 == 0 then self:autonegotiate_sfi() end
+      self
          :wait_eeprom_autoread()
          :wait_dma()
          :init_statistics()
@@ -166,7 +141,15 @@ function M_sf:init ()
          :init_transmit()
          :init_txdesc_prefetch()
          :wait_enable()
+         :wait_linkup()
+
+      if band(self.r.LINKS(), mask) == mask then
+         self.redos = i
+         return self
+      end
    end
+   io.write ('never got link up: ', self.pciaddress, '\n')
+   os.exit(2)
    return self
 end
 
@@ -218,11 +201,7 @@ function M_sf:global_reset ()
    return self
 end
 
-function M_sf:disable_interrupts ()
-   self.r.EIMC:write(0xFFFFFFFF)
-   return self
-end
-
+function M_sf:disable_interrupts () return self end --- XXX do this
 function M_sf:wait_eeprom_autoread ()
    self.r.EEC:wait(bits{AutoreadDone=9})
    return self
@@ -265,24 +244,6 @@ function M_sf:init_receive ()
       -- Have observed payload corruption when this is not done.
       self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
    end
-
-   -- After a reset of the NIC, the "native" MAC address is copied to
-   -- the receive address register #0 from the EEPROM
-   local ral, rah = self.r.RAL[0](), self.r.RAH[0]()
-   assert(bit.band(rah, bits({ AV = 31 })) == bits({ AV = 31 }),
-          "MAC address on "..self.pciaddress.." is not valid ")
-   local mac = ffi.new[[
-      union {
-         uint64_t bits;
-         struct {
-            uint32_t lo;
-            uint16_t hi;
-         } hilo;
-         uint8_t bytes[6];
-      }]]
-   mac.hilo.lo = ral
-   mac.hilo.hi = bit.band(rah, 0xFFFF)
-   self.macaddr = mac
    return self
 end
 
@@ -1086,7 +1047,6 @@ DTXMXSZRQ 0x08100 -            RW DMA Tx Map Allow Size Requests
 DTXTCPFLGL 0x04A88 -           RW DMA Tx TCP Flags Control Low
 DTXTCPFLGH 0x04A88 -           RW DMA Tx TCP Flags Control High
 EEC       0x10010 -            RW EEPROM/Flash Control
-EIMC      0x00888 -            RW Extended Interrupt Clear Register (should be WO)
 FCTRL     0x05080 -            RW Filter Control
 FCCFG     0x03D00 -            RW Flow Control Configuration
 HLREG0    0x04240 -            RW MAC Core Control 0

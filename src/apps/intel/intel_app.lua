@@ -25,8 +25,7 @@ Intel82599 = {
       rxcounter  = {default=0},
       txcounter  = {default=0},
       rate_limit = {default=0},
-      priority   = {default=1.0},
-      wait_link_up = {default=false}
+      priority   = {default=1.0}
    }
 }
 Intel82599.__index = Intel82599
@@ -77,7 +76,6 @@ function Intel82599:new (conf)
          {dtime     = {counter, C.get_unix_time()},
           mtu       = {counter, self.dev.mtu},
           speed     = {counter, 10000000000}, -- 10 Gbits
-          type      = {counter, 0x1000},      -- ethernetCsmacd
           status    = {counter, 2},           -- Link down
           promisc   = {counter},
           macaddr   = {counter},
@@ -95,12 +93,8 @@ function Intel82599:new (conf)
           txerrors  = {counter}})
       self.stats.sync_timer = lib.throttle(0.001)
 
-      if not conf.vmdq then
-         if conf.macaddr then
-            counter.set(self.stats.shm.macaddr, macaddress:new(conf.macaddr).bits)
-         else
-            counter.set(self.stats.shm.macaddr, self.dev.macaddr.bits)
-         end
+      if not conf.vmdq and conf.macaddr then
+         counter.set(self.stats.shm.macaddr, macaddress:new(conf.macaddr).bits)
       end
    end
    return setmetatable(self, Intel82599)
@@ -135,13 +129,9 @@ function Intel82599:reconfig (conf)
 
    self.dev:reconfig(conf)
 
-   if not self.dev.pf then
-      if conf.macaddr then
-         counter.set(self.stats.shm.macaddr,
-                     macaddress:new(conf.macaddr).bits)
-      else
-         counter.set(self.stats.shm.macaddr, self.dev.macaddr.bits)
-      end
+   if not self.dev.pf and conf.macaddr then
+      counter.set(self.stats.shm.macaddr,
+                  macaddress:new(conf.macaddr).bits)
    end
 end
 
