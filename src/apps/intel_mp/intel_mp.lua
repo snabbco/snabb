@@ -353,7 +353,9 @@ function Intel:new (conf)
 
    self:init()
    self.fd:flock("sh")
-   self:check_vmdq()
+   if self.vmdq then
+      self:check_vmdq()
+   end
    self:init_tx_q()
    self:init_rx_q()
    self:set_MAC()
