@@ -12,7 +12,7 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
-local VERSION = 0x00002000
+local VERSION = 0x00003000
 
 local header_t = ffi.typeof([[
 struct {
