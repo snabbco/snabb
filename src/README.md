@@ -921,7 +921,7 @@ process is the initial one that you start directly. The optional
 _worker_ processes are children spawned when the main process calls
 the `core.worker` module.
 
-    DIAGRAM:
+    DIAGRAM: Multiprocessing
                   +----------+
           +-------+   Main   +-------+
           |       +----------+       |
