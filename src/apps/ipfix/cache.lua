@@ -6,7 +6,6 @@ module(..., package.seeall)
 local bit    = require("bit")
 local ffi    = require("ffi")
 local ctable = require("lib.ctable")
-local fnv    = require("apps.ipfix.hash")
 
 -- Flow key & flow record FFI type definitions
 --
@@ -64,7 +63,6 @@ function FlowCache:new(config)
       value_type = ffi.typeof("struct flow_record"),
       max_occupancy_rate = 0.4,
       initial_size = math.ceil(o.cache_size / 0.4),
-      hash_fn = fnv.make_fnv_hash(ffi.sizeof("struct flow_key"))
    }
 
    o.table = ctable.new(params)
