@@ -926,5 +926,82 @@ function selftest()
    ]])
    assert(object.summary.shelves_active)
 
+   -- Test choice field.
+   local choice_schema = schema.load_schema([[module choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:choice-schema";
+      prefix "test";
+
+      list boat {
+         key "name";
+         leaf name { type string; }
+         choice country {
+            mandatory true;
+            case name {
+               leaf country-name { type string; }
+            }
+            case iso-code {
+               leaf country-code { type string; }
+            }
+         }
+      }
+   }]])
+   local choice_data = load_data_for_schema(choice_schema, [[
+      boat {
+         name "Boaty McBoatFace";
+         country-name "United Kingdom";
+      }
+      boat {
+         name "Vasa";
+         country-code "SE";
+      }
+   ]])
+   assert(choice_data.boat["Boaty McBoatFace"].country_name == "United Kingdom")
+   assert(choice_data.boat["Vasa"].country_code == "SE")
+
+   -- Test mandatory true on choice statement. (should fail)
+   local success, err = pcall(load_data_for_schema, choice_schema, [[
+      boat {
+         name "Boaty McBoatFace";
+      }
+   ]])
+   assert(success == false)
+
+   -- Test default statement.
+   local choice_default_schema = schema.load_schema([[module choice-w-default-schema {
+      namespace "urn:ietf:params:xml:ns:yang:choice-w-default-schema";
+      prefix "test";
+
+      list boat {
+         key "name";
+         leaf name { type string; }
+         choice country {
+            default "iso-code";
+            case name {
+               leaf country-name { type string; }
+            }
+            case iso-code {
+               leaf country-code { type string; default "SE"; }
+            }
+         }
+      }
+   }]])
+
+   local choice_data_with_default = load_data_for_schema(choice_default_schema, [[
+      boat {
+         name "Kronan";
+      }
+   ]])
+   assert(choice_data_with_default.boat["Kronan"].country_code == "SE")
+
+   -- Check that we can't specify both of the choice fields. (should fail)
+   local success, err = pcall(load_data_for_schema, choice_schema, [[
+      boat {
+         name "Boaty McBoatFace";
+         country-name "United Kingdom";
+         country-code "GB";
+      }
+   ]])
+   assert(success == false)
+
    print('selfcheck: ok')
 end
