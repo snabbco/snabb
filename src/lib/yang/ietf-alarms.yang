@@ -91,7 +91,7 @@ module ietf-alarms {
                 Administrative actions like removing closed alarms older than a
                 given time is supported.";
 
-    revision 2016-10-27 {
+    revision 2017-05-08 {
         description
             "Initial revision.";
         reference
@@ -430,7 +430,10 @@ module ietf-alarms {
                 create one alarm instead of several.  An example might be a
                 logging system (alarm resource) that fails, the alarm can
                 reference the file-system in the 'root-cause-resource'
-                leaf-list.";
+                leaf-list. Note that the intended use is not to also send an
+                an alarm with the root-cause-resource as alarming resource.
+                The root-cause-resource leaf list is a hint and should not
+                also generate an alarm for the same problem.";
         }
     }
 
