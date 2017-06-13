@@ -66,6 +66,9 @@ MPSAR       0x0A600 +0x04*0..255    RW MAC Pool Select Array
 PFUTA       0X0F400 +0x04*0..127    RW PF Unicast Table Array
 PFVLVF      0x0F100 +0x04*0..63     RW PF VM VLAN Pool Filter
 PFVLVFB     0x0F200 +0x04*0..127    RW PF VM VLAN Pool Filter Bitmap
+PFMRCTL     0x0F600 +0x04*0..3      RW PF Mirror Rule Control
+PFMRVLAN    0x0F610 +0x04*0..7      RW PF Mirror Rule VLAN
+PFMRVM      0x0F630 +0x04*0..7      RW PF Mirror Rule Pool
 PFVFRE      0x051E0 +0x04*0..1      RW PF VF Receive Enable
 PFVFTE      0x08110 +0x04*0..1      RW PF VF Transmit Enable
 PFVFSPOOF   0x08200 +0x04*0..7      RW PF VF Anti Spoof Control
@@ -271,6 +274,7 @@ Intel = {
       macaddr = {},
       poolnum = {},
       vlan = {},
+      mirror = {},
       txq = {},
       rxq = {},
       mtu = {default=9014},
@@ -312,7 +316,8 @@ function Intel:new (conf)
       vmdq = conf.vmdq,
       poolnum = conf.poolnum,
       macaddr = conf.macaddr,
-      vlan = conf.vlan
+      vlan = conf.vlan,
+      want_mirror = conf.mirror
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -343,6 +348,7 @@ function Intel:new (conf)
    else
       assert(not self.macaddr, "VMDq must be set to use MAC address")
       assert(not self.poolnum, "VMDq must be set to specify a pool number")
+      assert(not self.mirror, "VMDq must be set to specify mirroring rules")
    end
 
    -- Setup device access
@@ -360,7 +366,7 @@ function Intel:new (conf)
    self:init_rx_q()
    self:set_MAC()
    self:set_VLAN()
-   -- TODO: set mirror here
+   self:set_mirror()
 
    -- Initialize per app statistics
    counter.set(self.shm.mtu, self.mtu)
@@ -707,6 +713,7 @@ function Intel:stop ()
    if self.vmdq then
       self.unset_MAC()
       self.unset_VLAN()
+      self.unset_mirror()
    end
    if self.fd:flock("nb, ex") then
       self.r.CTRL:clr( bits { SETLINKUP = 6 } )
@@ -843,6 +850,90 @@ function Intel:unset_VLAN ()
             r.PFVLVF[vln_ndx](0x0)
             r.VFTA[math.floor(vlan/32)]:clr(bits{Ena=vlan%32})
          end
+      end
+   end
+end
+
+function Intel:set_mirror ()
+   if not self.want_mirror then return end
+   want_mirror = self.want_mirror
+
+   -- set MAC promiscuous
+   self.r.PFVML2FLT[self.poolnum]:set(bits{
+      AUPE=24, ROMPE=25, ROPE=26, BAM=27, MPE=28})
+
+   -- pick one of a limited (4) number of mirroring rules
+   for idx=0, 3 do
+      -- check if no mirroring enable bits (3:0) are set
+      -- (i.e., this rule is unused and available)
+      if self.r.PFMRCTL[idx]:bits(0, 4) == 0 then
+         mirror_ndx = idx
+         break
+      -- there's already a rule for this pool, overwrite
+      elseif self.r.PFMRCTL[idx]:bits(8, 5) == self.poolnum then
+         mirror_ndx = idx
+         break
+      end
+   end
+
+   assert(mirror_ndx, "Max number of mirroring rules reached")
+
+   local mirror_rule = 0ULL
+
+   -- mirror some or all pools
+   if want_mirror.pool then
+      mirror_rule = bor(bits{VPME=0}, mirror_rule)
+      if want_mirror.pool == true then -- mirror all pools
+         self.r.PFMRVM[mirror_ndx](0xFFFFFFFF)
+         self.r.PFMRVM[mirror_ndx+4](0xFFFFFFFF)
+      elseif type(want_mirror.pool) == 'table' then
+         local bm0 = self.r.PFMRVM[mirror_ndx]()
+         local bm1 = self.r.PFMRVM[mirror_ndx+4]()
+         for _, pool in ipairs(want_mirror.pool) do
+            if pool <= 32 then
+               bm0 = bor(lshift(1, pool), bm0)
+            else
+               bm1 = bor(lshift(1, pool-32), bm1)
+            end
+         end
+         self.r.PFMRVM[mirror_ndx](bm0)
+         self.r.PFMRVM[mirror_ndx+4](bm1)
+      end
+   end
+
+   -- mirror hardware port
+   if want_mirror.port then
+      if want_mirror.port == true or
+            want_mirror.port == 'in' or
+            want_mirror.port == 'inout' then
+         mirror_rule = bor(bits{UPME=1}, mirror_rule)
+      end
+      if want_mirror.port == true or
+            want_mirror.port == 'out' or
+            want_mirror.port == 'inout' then
+         mirror_rule = bor(bits{DPME=2}, mirror_rule)
+      end
+   end
+
+   -- TODO: implement VLAN mirroring
+
+   if mirror_rule ~= 0 then
+      mirror_rule = bor(mirror_rule, lshift(self.poolnum, 8))
+      self.r.PFMRCTL[mirror_ndx]:set(mirror_rule)
+   end
+end
+
+function Intel:unset_mirror ()
+   for rule_i = 0, 3 do
+      -- check if any mirror rule points here
+      local rule_dest = band(bit.rshift(self.r.PFMRCTL[rule_i](), 8), 63)
+      local bits = band(self.r.PFMRCTL[rule_i](), 0x07)
+      if bits ~= 0 and rule_dest == self.poolnum then
+         self.r.PFMRCTL[rule_i](0x0)     -- clear rule
+         self.r.PFMRVLAN[rule_i](0x0)    -- clear VLANs mirrored
+         self.r.PFMRVLAN[rule_i+4](0x0)
+         self.r.PFMRVM[rule_i](0x0)      -- clear pools mirrored
+         self.r.PFMRVM[rule_i+4](0x0)
       end
    end
 end
