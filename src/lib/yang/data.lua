@@ -173,6 +173,14 @@ function data_grammar_from_schema(schema)
       return {[node.id]={type='struct', members=members,
                          ctype=struct_ctype(members)}}
    end
+   function handlers.choice(node)
+      local choices = {}
+      for choice, n in pairs(node.body) do
+         choices[choice] = visit_body(n)
+      end
+      return {[node.id] = {type="choice", default=node.default, mandatory=node.mandatory,
+                           choices=choices}}
+   end
    handlers['leaf-list'] = function(node)
       local t = elide_unions(node.type)
       return {[node.id]={type='array', element_type=t,
@@ -288,7 +296,22 @@ local function struct_parser(keyword, members, ctype)
    local function init() return nil end
    local function parse1(P)
       local ret = {}
-      for _,k in ipairs(keys) do ret[normalize_id(k)] = members[k].init() end
+      local expanded_members = {}
+      for _,k in ipairs(keys) do
+         if members[k].represents then
+            -- Choice fields don't include the name of the choice block in the data. They
+            -- need to be able to provide the parser for the leaves it represents.
+            local member_parser = members[k].stateful_parser()
+            for _, node in pairs(members[k].represents()) do
+               -- Choice fields need to keep state around as they're called multiple times
+               -- and need to do some validation to comply with spec.
+               expanded_members[node] = member_parser
+            end
+         else
+            ret[normalize_id(k)] = members[k].init()
+            expanded_members[k] = members[k]
+         end
+      end
       P:skip_whitespace()
       P:consume("{")
       P:skip_whitespace()
@@ -298,14 +321,14 @@ local function struct_parser(keyword, members, ctype)
          -- Scalar/array parser responsible for requiring whitespace
          -- after keyword.  Struct/table don't need it as they have
          -- braces.
-         local sub = assert(members[k], 'unrecognized parameter: '..k)
+         local sub = assert(expanded_members[k], 'unrecognized parameter: '..k)
          local id = normalize_id(k)
-         ret[id] = sub.parse(P, ret[id])
+         ret[id] = sub.parse(P, ret[id], k)
          P:skip_whitespace()
       end
-      for _,k in ipairs(keys) do
+      for k,_ in pairs(expanded_members) do
          local id = normalize_id(k)
-         ret[id] = members[k].finish(ret[id])
+         ret[id] = expanded_members[k].finish(ret[id], k)
       end
       return ret
    end
@@ -377,6 +400,48 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
       if mandatory then error('missing scalar value: '..keyword) end
    end
    return {init=init, parse=parse, finish=finish}
+end
+
+function choice_parser(keyword, choices, members, default, mandatory)
+   -- Create a table matching the leaf names to the case statement
+   local choice_map = {}
+   for case, choice in pairs(choices) do
+      for leaf in pairs(choice) do
+         choice_map[leaf] = case
+      end
+   end
+
+   local function stateful_parser()
+      -- This holds the value of the chosen case block so we're able to prevent mixing of
+      -- using different leaves from different case statements.
+      local chosen
+
+      local function init() return {} end
+      local function parse(P, out, k)
+         if chosen and choice_map[k] ~= chosen then
+            error("Only one choice set can exist at one time: "..keyword)
+         else
+            chosen = choice_map[k]
+         end
+         return members[chosen][k].parse(P, members[chosen][k].init(), k)
+      end
+
+      -- This holds a copy of all the nodes so we know when we've hit the last one.
+      local function finish(out, k)
+         if out ~= nil then return out end
+         if mandatory and chosen == nil then error("missing choice value: "..keyword) end
+         if default and default == choice_map[k] then
+            return members[default][k].finish()
+         end
+      end
+      return {init=init, parse=parse, finish=finish}
+   end
+   local function represents()
+      local nodes = {}
+      for name, _ in pairs(choice_map) do table.insert(nodes, name) end
+      return nodes
+   end
+   return {represents=represents, stateful_parser=stateful_parser}
 end
 
 local function ctable_builder(key_t, value_t)
@@ -455,9 +520,11 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
          local id = normalize_id(k)
          key[id] = struct[id]
       end
-      for k,_ in pairs(values) do
+      for k, v in pairs(struct) do
          local id = normalize_id(k)
-         value[id] = struct[id]
+         if keys[k] == nil then
+            value[id] = struct[id]
+         end
       end
       assoc:add(key, value)
       return assoc
@@ -500,6 +567,12 @@ function data_parser_from_grammar(production)
       return scalar_parser(keyword, production.argument_type,
                            production.default, production.mandatory)
    end
+   function handlers.choice(keyword, production)
+      local members = {}
+      for case, choice in pairs(production.choices) do members[case] = visitn(choice) end
+      return choice_parser(keyword, production.choices, members,
+                           production.default, production.mandatory)
+   end
 
    local top_parsers = {}
    function top_parsers.struct(production)
@@ -516,7 +589,7 @@ function data_parser_from_grammar(production)
             if k == '' then P:error("Expected a keyword") end
             local sub = assert(members[k], 'unrecognized parameter: '..k)
             local id = normalize_id(k)
-            ret[id] = sub.parse(P, ret[id])
+            ret[id] = sub.parse(P, ret[id], k)
          end
          for k,sub in pairs(members) do
             local id = normalize_id(k)
@@ -536,7 +609,7 @@ function data_parser_from_grammar(production)
             local k = P:parse_identifier()
             P:consume_whitespace()
             local sub = assert(members[k], 'unrecognized rpc: '..k)
-            local data = sub.finish(sub.parse(P, sub.init()))
+            local data = sub.finish(sub.parse(P, sub.init(), k))
             table.insert(ret, {id=k, data=data})
          end
          return ret
@@ -925,6 +998,83 @@ function selftest()
       }
    ]])
    assert(object.summary.shelves_active)
+
+   -- Test choice field.
+   local choice_schema = schema.load_schema([[module choice-schema {
+      namespace "urn:ietf:params:xml:ns:yang:choice-schema";
+      prefix "test";
+
+      list boat {
+         key "name";
+         leaf name { type string; }
+         choice country {
+            mandatory true;
+            case name {
+               leaf country-name { type string; }
+            }
+            case iso-code {
+               leaf country-code { type string; }
+            }
+         }
+      }
+   }]])
+   local choice_data = load_data_for_schema(choice_schema, [[
+      boat {
+         name "Boaty McBoatFace";
+         country-name "United Kingdom";
+      }
+      boat {
+         name "Vasa";
+         country-code "SE";
+      }
+   ]])
+   assert(choice_data.boat["Boaty McBoatFace"].country_name == "United Kingdom")
+   assert(choice_data.boat["Vasa"].country_code == "SE")
+
+   -- Test mandatory true on choice statement. (should fail)
+   local success, err = pcall(load_data_for_schema, choice_schema, [[
+      boat {
+         name "Boaty McBoatFace";
+      }
+   ]])
+   assert(success == false)
+
+   -- Test default statement.
+   local choice_default_schema = schema.load_schema([[module choice-w-default-schema {
+      namespace "urn:ietf:params:xml:ns:yang:choice-w-default-schema";
+      prefix "test";
+
+      list boat {
+         key "name";
+         leaf name { type string; }
+         choice country {
+            default "iso-code";
+            case name {
+               leaf country-name { type string; }
+            }
+            case iso-code {
+               leaf country-code { type string; default "SE"; }
+            }
+         }
+      }
+   }]])
+
+   local choice_data_with_default = load_data_for_schema(choice_default_schema, [[
+      boat {
+         name "Kronan";
+      }
+   ]])
+   assert(choice_data_with_default.boat["Kronan"].country_code == "SE")
+
+   -- Check that we can't specify both of the choice fields. (should fail)
+   local success, err = pcall(load_data_for_schema, choice_schema, [[
+      boat {
+         name "Boaty McBoatFace";
+         country-name "United Kingdom";
+         country-code "GB";
+      }
+   ]])
+   assert(success == false)
 
    print('selfcheck: ok')
 end
