@@ -296,7 +296,22 @@ local function struct_parser(keyword, members, ctype)
    local function init() return nil end
    local function parse1(P)
       local ret = {}
-      for _,k in ipairs(keys) do ret[normalize_id(k)] = members[k].init() end
+      local expanded_members = {}
+      for _,k in ipairs(keys) do
+         if members[k].represents then
+            -- Choice fields don't include the name of the choice block in the data. They
+            -- need to be able to provide the parser for the leaves it represents.
+            local member_parser = members[k].stateful_parser()
+            for _, node in pairs(members[k].represents()) do
+               -- Choice fields need to keep state around as they're called multiple times
+               -- and need to do some validation to comply with spec.
+               expanded_members[node] = member_parser
+            end
+         else
+            ret[normalize_id(k)] = members[k].init()
+            expanded_members[k] = members[k]
+         end
+      end
       P:skip_whitespace()
       P:consume("{")
       P:skip_whitespace()
@@ -308,7 +323,7 @@ local function struct_parser(keyword, members, ctype)
          -- braces.
          local sub = assert(expanded_members[k], 'unrecognized parameter: '..k)
          local id = normalize_id(k)
-         ret[id] = sub.parse(k, P, ret[id])
+         ret[id] = sub.parse(P, ret[id], k)
          P:skip_whitespace()
       end
       for k,_ in pairs(expanded_members) do
@@ -317,7 +332,7 @@ local function struct_parser(keyword, members, ctype)
       end
       return ret
    end
-   local function parse(k, P, out)
+   local function parse(P, out)
       if out ~= nil then P:error('duplicate parameter: '..keyword) end
       return parse1(P)
    end
@@ -346,7 +361,7 @@ local function array_parser(keyword, element_type, ctype)
       P:consume(";")
       return parsev(str, keyword)
    end
-   local function parse(k, P, out)
+   local function parse(P, out)
       table.insert(out, parse1(P))
       return out
    end
@@ -375,7 +390,7 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
       P:consume(";")
       return parsev(maybe_str, keyword)
    end
-   local function parse(k, P, out)
+   local function parse(P, out)
       if out ~= nil then P:error('duplicate parameter: '..keyword) end
       return parse1(P)
    end
@@ -402,13 +417,13 @@ function choice_parser(keyword, choices, members, default, mandatory)
       local chosen
 
       local function init() return {} end
-      local function parse(k, P, out)
+      local function parse(P, out, k)
          if chosen and choice_map[k] ~= chosen then
             error("Only one choice set can exist at one time: "..keyword)
          else
             chosen = choice_map[k]
          end
-         return members[chosen][k].parse(k, P, members[chosen][k].init())
+         return members[chosen][k].parse(P, members[chosen][k].init(), k)
       end
 
       -- This holds a copy of all the nodes so we know when we've hit the last one.
@@ -494,9 +509,9 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
       function init() return ltable_builder() end
    end
    local function parse1(P)
-      return parser.finish(parser.parse(nil, P, parser.init()))
+      return parser.finish(parser.parse(P, parser.init()))
    end
-   local function parse(k, P, assoc)
+   local function parse(P, assoc)
       local struct = parse1(P)
       local key, value = {}, {}
       if key_t then key = key_t() end
@@ -574,7 +589,7 @@ function data_parser_from_grammar(production)
             if k == '' then P:error("Expected a keyword") end
             local sub = assert(members[k], 'unrecognized parameter: '..k)
             local id = normalize_id(k)
-            ret[id] = sub.parse(k, P, ret[id])
+            ret[id] = sub.parse(P, ret[id], k)
          end
          for k,sub in pairs(members) do
             local id = normalize_id(k)
@@ -594,7 +609,7 @@ function data_parser_from_grammar(production)
             local k = P:parse_identifier()
             P:consume_whitespace()
             local sub = assert(members[k], 'unrecognized rpc: '..k)
-            local data = sub.finish(sub.parse(k, P, sub.init()))
+            local data = sub.finish(sub.parse(P, sub.init(), k))
             table.insert(ret, {id=k, data=data})
          end
          return ret
@@ -608,7 +623,7 @@ function data_parser_from_grammar(production)
          while true do
             P:skip_whitespace()
             if P:is_eof() then break end
-            out = parser.parse(nil, P, out)
+            out = parser.parse(P, out)
          end
          return parser.finish(out)
       end
@@ -621,7 +636,7 @@ function data_parser_from_grammar(production)
          while true do
             P:skip_whitespace()
             if P:is_eof() then break end
-            out = parser.parse(nil, P, out)
+            out = parser.parse(P, out)
          end
          return parser.finish(out)
       end
