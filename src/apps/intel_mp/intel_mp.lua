@@ -744,7 +744,8 @@ function Intel:sync_stats ()
    set(stats.txdrop, self:txdrop())
    set(stats.txerrors, self:txerrors())
    set(stats.rxdmapackets, self:rxdmapackets())
-   for name, register in pairs(self.queue_stats) do
+   for idx = 1, #self.queue_stats, 2 do
+      local name, register = self.queue_stats[idx], self.queue_stats[idx+1]
       set(stats[name], register())
    end
 end
@@ -1079,7 +1080,8 @@ function Intel1g:init_queue_stats (frame)
    for i=0,self.max_q-1 do
       for k,v in pairs(perqregs) do
          local name = "q" .. i .. "_" .. k
-         self.queue_stats[name] = self.r[v][i]
+         table.insert(self.queue_stats, name)
+         table.insert(self.queue_stats, self.r[v][i])
          frame[name] = {counter}
       end
    end
@@ -1154,7 +1156,8 @@ function Intel82599:init_queue_stats (frame)
    for i=0,15 do
       for k,v in pairs(perqregs) do
          local name = "q" .. i .. "_" .. k
-         self.queue_stats[name] = self.r[v][i]
+         table.insert(self.queue_stats, name)
+         table.insert(self.queue_stats, self.r[v][i])
          frame[name] = {counter}
       end
    end
