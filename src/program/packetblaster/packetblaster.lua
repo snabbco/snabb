@@ -10,7 +10,7 @@ local LoadGen   = require("apps.intel.loadgen").LoadGen
 local Intel82599 = require("apps.intel.intel_app").Intel82599
 
 local function is_device_suitable (pcidev, patterns)
-   if not pcidev.usable or pcidev.driver ~= 'apps.intel.intel_app' then
+   if not pcidev.usable or pcidev.driver ~= 'apps.intel_mp.intel_mp' then
       return false
    end
    if #patterns == 0 then
