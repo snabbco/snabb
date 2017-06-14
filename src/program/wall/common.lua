@@ -16,12 +16,7 @@ function inputs.tap (kind, device)
    return "output", { require("apps.tap.tap").Tap, device }
 end
 
-function inputs.intel10g (kind, device)
-   local conf = { pciaddr = device }
-   return "tx", { require("apps.intel.intel_app").Intel82599, conf }
-end
-
-function inputs.intel1g (kind, device)
-   local conf = { pciaddr = device }
-   return "tx", { require("apps.intel.intel1g").Intel1g, conf }
+function inputs.intel (kind, device)
+   local conf = { pciaddr = device, rxq = 0 }
+   return "output", { require("apps.intel_mp.intel_mp").driver, conf }
 end

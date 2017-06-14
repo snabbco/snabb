@@ -2,8 +2,7 @@ Usage:
   snabb wall filter [options] pcap <input.pcap>
   snabb wall filter [options] raw <device>
   snabb wall filter [options] tap <device>
-  snabb wall filter [options] intel10g <pci-address>
-  snabb wall filter [options] intel1g <pci-address>
+  snabb wall filter [options] intel <pci-address>
   snabb wall filter --help
 
 Filters packets from the given source (e.g., a .pcap file) using the
