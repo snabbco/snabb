@@ -1044,14 +1044,13 @@ function Intel1g:init ()
 end
 
 function Intel1g:link_status ()
-   local mask = bits { Link_up = 1 }
-   return bit.band(self.r.STATUS(), mask) == mask
+   return bit.band(self.r.STATUS(), lshift(1, 1)) == mask
 end
 function Intel1g:link_speed ()
    return ({10000,100000,1000000,1000000})[1+bit.band(bit.rshift(self.r.STATUS(), 6),3)]
 end
 function Intel1g:promisc ()
-   return band(self.r.RCTL(), bits{UPE=3}) ~= 0ULL
+   return band(self.r.RCTL(), lshift(1, 3)) ~= 0ULL
 end
 function Intel1g:rxbytes   () return self.r.GORCH()*2^32 + self.r.GORCL() end
 function Intel1g:rxdrop    () return self.r.MPC() + self.r.RNBC()         end
@@ -1117,7 +1116,7 @@ Intel82599.max_mac_addr = 127
 Intel82599.max_vlan = 64
 Intel82599.mrqc_bits = 0xA
 function Intel82599:link_status ()
-   local mask = bits { Link_up = 30 }
+   local mask = lshift(1, 30)
    return bit.band(self.r.LINKS(), mask) == mask
 end
 function Intel82599:link_speed ()
@@ -1128,7 +1127,7 @@ function Intel82599:link_speed ()
       or  1000000                                -- 100 Mb/s
 end
 function Intel82599:promisc ()
-   return band(self.r.FCTRL(), bits{UPE=9}) ~= 0ULL
+   return band(self.r.FCTRL(), lshift(1, 9)) ~= 0ULL
 end
 function Intel82599:rxbytes  () return self.r.GORC64()   end
 function Intel82599:rxdrop   () return self.r.QPRDC[0]() end
