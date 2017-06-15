@@ -280,9 +280,9 @@ function FlowExporter:send_template_record()
    local buffer = ffi.new("uint8_t[?]", length)
    self:write_header(buffer, 2, length)
 
-   -- write the header and then the template record contents for each template
-   -- note that the ptr is incrementing by 16 octets but the buffer lengths are
-   -- in octets
+   -- write the header and then the template record contents for each
+   -- template note that the ptr is incrementing by 2-byte units but the
+   -- buffer lengths are in bytes
    local ptr = ffi.cast("uint16_t*", buffer + self.header_size)
    for _, template in ipairs(templates) do
       if self.version == 9 then
