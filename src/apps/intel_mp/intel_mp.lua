@@ -77,8 +77,8 @@ PFVML2FLT   0x0F000 +0x04*0..63     RW PF VM L2 Control Register
 QPRC        0x01030 +0x40*0..15     RC Queue Packets Received Count
 QPRDC       0x01430 +0x40*0..15     RC Queue Packets Received Drop Count
 QBRC64      0x01034 +0x40*0..15     RC64 Queue Bytes Received Count
-QPTC        0x08680 +0x40*0..15     RC Queue Packets Transmitted Count
-QBTC64      0x08700 +0x40*0..15     RC64 Queue Bytes Transmitted Count Low
+QPTC        0x08680 +0x04*0..15     RC Queue Packets Transmitted Count
+QBTC64      0x08700 +0x08*0..15     RC64 Queue Bytes Transmitted Count Low
 SAQF        0x0E000 +0x04*0..127    RW Source Address Queue Filter
 SDPQF       0x0E400 +0x04*0..127    RW Source Destination Port Queue Filter
 PSRTYPE     0x0EA00 +0x04*0..63     RW Packet Split Receive Type Register
