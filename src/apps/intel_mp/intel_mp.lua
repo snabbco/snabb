@@ -1413,8 +1413,13 @@ function Intel:debug (args)
    end
 
    if prnt then
-     for k,v in pairs(r) do
-        print(pfx..k,v)
+     local keys = {}
+     for k,_ in pairs(r) do
+       table.insert(keys, k)
+     end
+     table.sort(keys)
+     for _,k in ipairs(keys) do
+        print(pfx..k, r[k])
      end
    end
    return r
