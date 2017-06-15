@@ -1045,7 +1045,8 @@ function Intel1g:init ()
 end
 
 function Intel1g:link_status ()
-   return bit.band(self.r.STATUS(), lshift(1, 1)) == mask
+   local mask = lshift(1, 1)
+   return bit.band(self.r.STATUS(), mask) == mask
 end
 function Intel1g:link_speed ()
    return ({10000,100000,1000000,1000000})[1+bit.band(bit.rshift(self.r.STATUS(), 6),3)]
