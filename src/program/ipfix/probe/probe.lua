@@ -6,6 +6,7 @@ local now      = require("core.app").now
 local lib      = require("core.lib")
 local link     = require("core.link")
 local cache    = require("apps.ipfix.cache")
+local V4V6     = require("apps.lwaftr.V4V6")
 local meter    = require("apps.ipfix.meter")
 local exporter = require("apps.ipfix.export")
 local numa     = require("lib.numa")
@@ -149,10 +150,13 @@ function run (args)
 
    config.app(c, "source", unpack(in_app))
    config.app(c, "sink", unpack(out_app))
+   config.app(c, "splitter", V4V6.V4V6, {})
    config.app(c, "meter", meter.FlowMeter, meter_config)
    config.app(c, "exporter", exporter.FlowExporter, exporter_config)
 
-   config.link(c, "source." .. in_link.output .. " -> meter.input")
+   config.link(c, "source." .. in_link.output .. " -> splitter.input")
+   config.link(c, "splitter.v4 -> meter.v4")
+   config.link(c, "splitter.v6 -> meter.v6")
    config.link(c, "exporter.output -> sink." .. out_link.input)
 
    local done
@@ -172,8 +176,10 @@ function run (args)
    if report then
       local end_time = now()
       local app = engine.app_table.meter
-      local input_link = app.input.input
-      local stats = link.stats(input_link)
+      local v4_link, v6_link = app.input.v4, app.input.v6
+      local v4_stats, v6_stats = link.stats(v4_link), link.stats(v6_link)
+      local stats = { rxbytes = v4_stats.rxbytes + v6_stats.rxbytes,
+		      rxpackets = v4_stats.rxpackets + v6_stats.rxpackets }
       print("IPFIX probe stats:")
       print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
                           lib.comma_value(stats.rxbytes),

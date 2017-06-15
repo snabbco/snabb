@@ -22,9 +22,54 @@ local get_timestamp = util.get_timestamp
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
--- various constants
-local V9_HEADER_SIZE  = 20
-local V10_HEADER_SIZE = 16
+-- Types.
+
+local netflow_v9_packet_header_t = ffi.typeof([[
+   struct {
+      /* Network byte order.  */
+      uint16_t version; /* 09 */
+      uint16_t record_count;
+      uint32_t uptime; /* seconds */
+      uint32_t timestamp;
+      uint32_t sequence_number;
+      uint32_t observation_domain;
+   } __attribute__((packed))
+]])
+local ipfix_packet_header_t = ffi.typeof([[
+   struct {
+      /* Network byte order.  */
+      uint16_t version; /* 10 */
+      uint16_t byte_length;
+      uint32_t timestamp; /* seconds */
+      uint32_t sequence_number;
+      uint32_t observation_domain;
+   } __attribute__((packed))
+]])
+-- RFC 7011 §3.3.2
+local set_header_t = ffi.typeof([[
+   struct {
+      /* Network byte order.  */
+      uint16_t id;
+      uint16_t length;
+   } __attribute__((packed))
+]])
+-- RFC 7011 §3.4.1.
+local template_header_t = ffi.typeof([[
+   struct {
+      /* Network byte order.  */
+      $ set_header;
+      uint16_t template_id;
+      uint16_t field_count;
+   } __attribute__((packed))
+]], set_header_t)
+
+local function ptr_to(ctype)
+   return ffi.typeof('$*', ctype)
+end
+
+local set_header_ptr_t = ptr_to(set_header_t)
+local template_header_ptr_t = ptr_to(template_header_t)
+
 local V9_TEMPLATE_ID  = 0
 local V10_TEMPLATE_ID = 2
 
@@ -72,19 +117,25 @@ end
 
 local ipfix_elements = make_ipfix_element_map()
 
--- Describes the sizes (in octets) of IPFIX IEs
--- TODO: fill in others as needed
-local data_size_map =
-   { unsigned8 = 1,
-     unsigned16 = 2,
-     unsigned32 = 4,
-     unsigned64 = 8,
-     ipv4Address = 4,
-     ipv6Address = 16,
-     dateTimeMilliseconds = 8 }
+-- Representations of IPFIX IEs.
+local uint8_t = ffi.typeof('uint8_t')
+local uint16_t = ffi.typeof('uint16_t')
+local uint32_t = ffi.typeof('uint32_t')
+local uint64_t = ffi.typeof('uint64_t')
+local ipv4_t = ffi.typeof('uint8_t[4]')
+local ipv6_t = ffi.typeof('uint8_t[4]')
 
--- create a table describing the information needed to create
--- flow templates and data records
+local data_ctypes =
+   { unsigned8 = uint8_t,
+     unsigned16 = uint16_t,
+     unsigned32 = uint32_t,
+     unsigned64 = uint64_t,
+     ipv4Address = ipv4_t,
+     ipv6Address = ipv6_t,
+     dateTimeMilliseconds = uint64_t }
+
+-- Create a table describing the information needed to create
+-- flow templates and data records.
 local function make_template_info(id, key_fields, record_fields)
    -- the contents of the template records we will send
    -- there is an ID & length for each field
@@ -93,25 +144,36 @@ local function make_template_info(id, key_fields, record_fields)
 
    -- octets in a data record
    local data_len = 0
+   local struct_def = {}
+   local types = {}
 
    local function process_fields(buffer, fields)
       for idx, name in ipairs(fields) do
          local entry = ipfix_elements[name]
-         local size  = assert(data_size_map[entry.data_type])
-         data_len = data_len + size
+         local ctype = assert(data_ctypes[entry.data_type],
+                              'unimplemented type: '..entry.data_type)
+         data_len = data_len + ffi.sizeof(ctype)
          buffer[2 * (idx - 1)]     = htons(entry.id)
-         buffer[2 * (idx - 1) + 1] = htons(size)
+         buffer[2 * (idx - 1) + 1] = htons(ffi.sizeof(ctype))
+         table.insert(struct_def, '$ '..name..';')
+         table.insert(types, ctype)
       end
    end
 
+   table.insert(struct_def, 'struct {')
    process_fields(buffer, key_fields)
    process_fields(buffer + #key_fields * 2, record_fields)
+   table.insert(struct_def, '} __attribute((packed))')
+   local struct_t = ffi.typeof(table.concat(struct_def, ' '), unpack(types))
+   assert(ffi.sizeof(struct_t) == data_len)
 
    return { id = id,
             field_count = #key_fields + #record_fields,
             buffer = buffer,
             buffer_len = length * 2,
-            data_len = data_len }
+            data_len = data_len,
+            record_t = struct_t,
+            record_ptr_t = ptr_to(struct_t) }
 end
 
 local template_v4 = make_template_info(256,
@@ -190,10 +252,14 @@ function FlowExporter:new(config)
                collector_port = assert(config.collector_port) }
 
    if o.version == 9 then
-      o.header_size = V9_HEADER_SIZE
+      o.header_t = netflow_v9_packet_header_t
    elseif o.version == 10 then
-      o.header_size = V10_HEADER_SIZE
+      o.header_t = ipfix_packet_header_t
+   else
+      error('unsupported ipfix version: '..o.version)
    end
+   o.header_ptr_t = ptr_to(o.header_t)
+   o.header_size = ffi.sizeof(o.header_t)
 
    o.refresh_templates = init_refresh_templates()
 
@@ -229,39 +295,24 @@ function FlowExporter:construct_packet(ptr, len)
    return dgram:packet()
 end
 
--- Write an IPFIX header into the given buffer
---
--- v9 header is 20 bytes, starting with
---   * version number (09)
---   * count of records
---   * uptime (seconds)
---
--- a v10 header is 16 bytes, starting with
---   * a version number (10)
---   * total length in octets
---
--- both headers end with
---
---   * unix timestamp
---   * sequence number
---   * source ID
+local uint8_ptr_t = ffi.typeof('uint8_t*')
+local function as_uint8_ptr(x) return ffi.cast(uint8_ptr_t, x) end
+local function htonq(v) return bit.bswap(v + 0ULL) end
+
+
 function FlowExporter:write_header(ptr, count, length)
-   local uptime = tonumber(get_timestamp() - self.boot_time)
+   local header = ffi.cast(self.header_ptr_t, ptr)
 
-   ffi.cast("uint16_t*", ptr)[0] = htons(self.version)
-
+   header.version = htons(self.version)
    if self.version == 9 then
-      ffi.cast("uint16_t*", ptr + 2)[0]  = htons(count)
-      ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(uptime)
-      ffi.cast("uint32_t*", ptr + 8)[0]  = htonl(math.floor(C.get_unix_time()))
-      ffi.cast("uint32_t*", ptr + 12)[0] = htonl(self.sequence_number)
-      ffi.cast("uint32_t*", ptr + 16)[0] = htonl(self.observation_domain)
+      header.count = htons(count)
+      header.uptime = htonl(tonumber(get_timestamp() - self.boot_time))
    elseif self.version == 10 then
-      ffi.cast("uint16_t*", ptr + 2)[0]  = htons(length)
-      ffi.cast("uint32_t*", ptr + 4)[0]  = htonl(math.floor(C.get_unix_time()))
-      ffi.cast("uint32_t*", ptr + 8)[0]  = htonl(self.sequence_number)
-      ffi.cast("uint32_t*", ptr + 12)[0] = htonl(self.observation_domain)
+      header.byte_length = htons(length)
    end
+   header.timestamp = htonl(math.floor(C.get_unix_time()))
+   header.sequence_number = htonl(self.sequence_number)
+   header.observation_domain = htonl(self.observation_domain)
 
    self.sequence_number = self.sequence_number + 1
 end
@@ -280,27 +331,27 @@ function FlowExporter:send_template_record()
    local buffer = ffi.new("uint8_t[?]", length)
    self:write_header(buffer, 2, length)
 
-   -- write the header and then the template record contents for each
-   -- template note that the ptr is incrementing by 2-byte units but the
-   -- buffer lengths are in bytes
-   local ptr = ffi.cast("uint16_t*", buffer + self.header_size)
+   -- Write the header and then the template record contents for each
+   -- template.
+   local ptr = buffer + self.header_size
    for _, template in ipairs(templates) do
+      local header = ffi.cast(template_header_ptr_t, ptr)
       if self.version == 9 then
-         ptr[0] = htons(V9_TEMPLATE_ID)
+         header.set_header.id = htons(V9_TEMPLATE_ID)
       elseif self.version == 10 then
-         ptr[0] = htons(V10_TEMPLATE_ID)
+         header.set_header.id = htons(V10_TEMPLATE_ID)
       end
-
-      ptr[1] = htons(template.buffer_len + 8)
-      ptr[2] = htons(template.id)
-      ptr[3] = htons(template.field_count)
-
-      ffi.copy(ptr + 4, template.buffer, template.buffer_len)
-
-      ptr = ptr + template.buffer_len / 2 + 4
+      local length = template.buffer_len + ffi.sizeof(template_header_t)
+      header.set_header.length = htons(length)
+      header.template_id = htons(template.id)
+      header.field_count = htons(template.field_count)
+      ptr = ptr + ffi.sizeof(template_header_t)
+      
+      ffi.copy(ptr, template.buffer, template.buffer_len)
+      ptr = ptr + template.buffer_len
    end
 
-   local pkt = self:construct_packet(ffi.cast("uint8_t*", buffer), length)
+   local pkt = self:construct_packet(as_uint8_ptr(buffer), length)
 
    link.transmit(self.output.output, pkt)
 
@@ -310,24 +361,11 @@ function FlowExporter:send_template_record()
    end
 end
 
--- Helper function to write a 64-bit record field in network-order
--- TODO: don't just assume host is little-endian
-local function write64(record, field, ptr, idx)
-   local off = ffi.offsetof(record, field)
-   local rp  = ffi.cast("uint8_t*", record)
-   local fp  = ffi.cast("uint32_t*", rp + off)
-   local dst = ffi.cast("uint32_t*", ptr + idx)
-
-   dst[0] = htonl(fp[1])
-   dst[1] = htonl(fp[0])
-end
-
 -- Given a flow exporter & an array of ctable entries, construct flow
 -- record packet(s) and transmit them
-function FlowExporter:export_records(entries)
-   -- length of v9 header + flow set ID/length
+function FlowExporter:export_ipv4_records(entries)
+   -- length of header + flow set ID/length
    local header_len  = self.header_size + 4
-   -- TODO: handle IPv6
    local record_len  = template_v4.data_len
    -- 4 is the max padding, so account for that conservatively to
    -- figure out how many records we can fit in the MTU
@@ -342,45 +380,35 @@ function FlowExporter:export_records(entries)
       local buffer      = ffi.new("uint8_t[?]", length)
       self:write_header(buffer, num_to_take, length)
 
-      -- flow set ID and length
-      ffi.cast("uint16_t*", buffer + self.header_size)[0]
-         = htons(template_v4.id)
-      ffi.cast("uint16_t*", buffer + self.header_size + 2)[0]
-         = htons(length - self.header_size)
+      local set_header = ffi.cast(set_header_ptr_t, buffer + self.header_size)
+      set_header.id = htons(template_v4.id)
+      set_header.length = htons(length - self.header_size)
+      local records = ffi.cast(template_v4.record_ptr_t, buffer + self.header_size)
 
-      for idx = record_idx, record_idx + num_to_take - 1 do
-         local key    = entries[idx].key
-         local record = entries[idx].value
-         local ptr    =
-            buffer + self.header_size + 4 + (record_len * (idx - record_idx))
+      for idx = 0, num_to_take - 1 do
+         local key    = entries[record_idx + idx].key
+         local value  = entries[record_idx + idx].value
+         local record = records[idx]
 
-         if key.is_ipv6 == 0 then
-            local field_ptr =
-               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
-            ffi.copy(ptr, field_ptr, 4)
-            ffi.copy(ptr + 16, field_ptr + 4, 4)
-         else
-            local field_ptr =
-               ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
-            ffi.copy(ptr, field_ptr, 16)
-            ffi.copy(ptr + 16, field_ptr + 16, 16)
-         end
-         ffi.cast("uint8_t*", ptr + 8)[0]  = key.protocol
-         ffi.cast("uint16_t*", ptr + 9)[0]  = key.src_port
-         ffi.cast("uint16_t*", ptr + 11)[0] = key.dst_port
+         -- Should we somehow line up the key/value representation in
+         -- the ctable with the actual binary data that we export?
+         record.sourceIPv4Address = key.src_ip
+         record.destinationIPv4Address = key.dst_ip
+         record.protocolIdentifier = key.protocol
+         record.sourceTransportPort = key.src_port
+         record.destinationTransportPort = key.dst_port
 
-         write64(record, "start_time", ptr, 13)
-         write64(record, "end_time", ptr, 21)
-         write64(record, "pkt_count", ptr, 29)
-         write64(record, "octet_count", ptr, 37)
+         record.flowStartMilliseconds = htonq(value.start_time)
+         record.flowEndMilliseconds = htonq(value.end_time)
+         record.packetDeltaCount = htonq(value.pkt_count)
+         record.octetDeltaCount = htonq(value.octet_count)
 
-         ffi.cast("uint32_t*", ptr + 45)[0] = record.ingress
-         ffi.cast("uint32_t*", ptr + 49)[0] = record.egress
-         ffi.cast("uint32_t*", ptr + 53)[0] = record.src_peer_as
-         ffi.cast("uint32_t*", ptr + 57)[0] = record.dst_peer_as
-         -- in V9 this is 1 octet, in IPFIX it's 2 octets
-         ffi.cast("uint8_t*", ptr + 61)[0]  = record.tcp_control
-         ffi.cast("uint8_t*", ptr + 63)[0]  = record.tos
+         record.ingressInterface = value.ingress
+         record.egressInterface = value.egress
+         record.bgpPrevAdjacentAsNumber = value.src_peer_as
+         record.bgpNextAdjacentAsNumber = value.dst_peer_as
+         record.tcpControlBits = value.tcp_control
+         record.ipClassOfService = value.tos
       end
 
       local pkt = self:construct_packet(buffer, length)
@@ -401,10 +429,16 @@ function FlowExporter:push()
 
    self:refresh_templates()
 
-   local expired = self.cache:get_expired()
+   local expired = self.cache.v4:get_expired()
    if #expired > 0 then
-      self:export_records(expired)
-      self.cache:clear_expired()
+      self:export_ipv4_flow_records(expired)
+      self.cache.v4:clear_expired()
+   end
+
+   local expired = self.cache.v6:get_expired()
+   if #expired > 0 then
+      self:export_ipv6_flow_records(expired)
+      self.cache.v6:clear_expired()
    end
 end
 
@@ -422,26 +456,24 @@ function selftest()
                   collector_port = 4739 }
    local exporter = FlowExporter:new(conf)
 
-   local key = ffi.new("struct flow_key")
-   key.is_ipv6 = false
-   local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
-   ffi.copy(ptr, ipv4:pton("192.168.1.1"), 4)
-   ffi.copy(ptr + 4, ipv4:pton("192.168.1.25"), 4)
+   local key = flows.v4.preallocated_key
+   key.src_ip = ipv4:pton("192.168.1.1")
+   key.dst_ip = ipv4:pton("192.168.1.25")
    key.protocol = 17
    key.src_port = htons(9999)
    key.dst_port = htons(80)
 
-   local record = ffi.new("struct flow_record")
-   record.start_time = get_timestamp()
-   record.end_time = record.start_time + 30
-   record.pkt_count = 5
-   record.octet_count = 15
+   local value = flows.v4.preallocated_value
+   value.start_time = get_timestamp()
+   value.end_time = value.start_time + 30
+   value.pkt_count = 5
+   value.octet_count = 15
 
    -- mock transmit function and output link
    local packet
    exporter.output = { output = {} }
    link.transmit = function(link, pkt) packet = pkt end
-   exporter:export_records({ { key = key, value = record } })
+   exporter:export_ipv4_records({ { key = key, value = value } })
 
    local filter = pf.compile_filter([[
       udp and dst port 4739 and src net 192.168.1.2 and

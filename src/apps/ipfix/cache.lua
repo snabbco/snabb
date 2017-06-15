@@ -12,23 +12,28 @@ local ctable = require("lib.ctable")
 -- see https://www.iana.org/assignments/ipfix/ipfix.xhtml for
 -- information on the IEs for the flow key and record
 --
-ffi.cdef[[
-   struct flow_key {
-      uint32_t src_ip_1;  /* sourceIPv4Address, sourceIPv6Address */
-      uint32_t src_ip_2;  /* only the 1st word used for v4 */
-      uint32_t src_ip_3;
-      uint32_t src_ip_4;
-      uint32_t dst_ip_1;  /* destinationIPv4Address / destinationIPv6Address */
-      uint32_t dst_ip_2;
-      uint32_t dst_ip_3;
-      uint32_t dst_ip_4;
-      uint8_t is_ipv6;
+local ipv4_flow_key_t = ffi.typeof[[
+   struct {
+      uint8_t src_ip[4];    /* sourceIPv4Address */
+      uint8_t dst_ip[4];    /* destinationIPv4Address */
       uint8_t protocol;     /* protocolIdentifier */
       uint16_t src_port;    /* sourceTransportPort */
       uint16_t dst_port;    /* destinationTransportPort */
-   } __attribute__((packed));
+   } __attribute__((packed))
+]]
 
-   struct flow_record {
+local ipv6_flow_key_t = ffi.typeof[[
+   struct {
+      uint8_t src_ip[16];   /* sourceIPv6Address */
+      uint8_t dst_ip[16];   /* destinationIPv6Address */
+      uint8_t protocol;     /* protocolIdentifier */
+      uint16_t src_port;    /* sourceTransportPort */
+      uint16_t dst_port;    /* destinationTransportPort */
+   } __attribute__((packed))
+]]
+
+local flow_record_t = ffi.typeof[[
+   struct {
       uint64_t start_time;  /* flowStartMilliseconds */
       uint64_t end_time;    /* flowEndMilliseconds */
       uint64_t pkt_count;   /* packetDeltaCount */
@@ -40,12 +45,12 @@ ffi.cdef[[
       uint16_t tcp_control; /* tcpControlBits */
       uint8_t tos;          /* ipClassOfService */
       uint8_t __padding;
-   } __attribute__((packed));
+   } __attribute__((packed))
 ]]
 
-FlowCache = {}
+local Cache = {}
 
-function FlowCache:new(config)
+function Cache:new(config, key_t)
    assert(config, "expected configuration table")
 
    local o = { -- TODO: compute the default cache value
@@ -59,18 +64,20 @@ function FlowCache:new(config)
    o.stride = math.ceil(o.cache_size / 1000)
 
    local params = {
-      key_type = ffi.typeof("struct flow_key"),
-      value_type = ffi.typeof("struct flow_record"),
+      key_type = key_t,
+      value_type = flow_record_t,
       max_occupancy_rate = 0.4,
       initial_size = math.ceil(o.cache_size / 0.4),
    }
 
+   o.preallocated_key = key_t()
+   o.preallocated_value = flow_record_t()
    o.table = ctable.new(params)
 
    return setmetatable(o, { __index = self })
 end
 
-function FlowCache:iterate()
+function Cache:iterate()
    -- use the underlying ctable's iterator, but restrict the max stride
    -- for each use of the iterator
    local next_entry = self.next_entry or self.table:iterate()
@@ -89,11 +96,11 @@ function FlowCache:iterate()
    return next_entry, max_entry, last_entry
 end
 
-function FlowCache:remove(flow_key)
+function Cache:remove(flow_key)
    self.table:remove(flow_key)
 end
 
-function FlowCache:expire_record(key, record, active)
+function Cache:expire_record(key, record, active)
    -- for active expiry, we keep the record around in the cache
    -- so we need a copy that won't be modified
    if active then
@@ -105,10 +112,20 @@ function FlowCache:expire_record(key, record, active)
    end
 end
 
-function FlowCache:get_expired()
+function Cache:get_expired()
    return self.expired
 end
 
-function FlowCache:clear_expired()
+function Cache:clear_expired()
    self.expired = {}
+end
+
+FlowCache = {}
+
+function FlowCache:new(config)
+   assert(config, "expected configuration table")
+   local o = {}
+   o.v4 = Cache:new(config, ipv4_flow_key_t)
+   o.v6 = Cache:new(config, ipv6_flow_key_t)
+   return setmetatable(o, { __index = self })
 end
