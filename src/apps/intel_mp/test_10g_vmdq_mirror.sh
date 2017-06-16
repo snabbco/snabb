@@ -1,6 +1,8 @@
 #!../../snabb snsh
 
 -- Snabb test script for mirroring rules in VMDq mode
+--
+-- Also tests rxcounters for consistency with link counts
 
 local basic_apps = require("apps.basic.basic_apps")
 local intel      = require("apps.intel_mp.intel_mp")
@@ -25,6 +27,7 @@ config.app(c, "nic1p0", intel.Intel,
              poolnum = 0,
              macaddr = "90:72:82:78:c9:7a",
              rxq = 0,
+             rxcounter = 1,
              wait_for_link = true })
 
 config.app(c, "nic1p1", intel.Intel,
@@ -34,6 +37,7 @@ config.app(c, "nic1p1", intel.Intel,
              mirror = { pool = { 0 } },
              macaddr = "12:34:56:78:9a:bc",
              rxq = 4,
+             rxcounter = 2,
              wait_for_link = true })
 
 config.app(c, "nic1p2", intel.Intel,
@@ -43,6 +47,7 @@ config.app(c, "nic1p2", intel.Intel,
              mirror = { pool = true },
              macaddr = "aa:aa:aa:aa:aa:aa",
              rxq = 8,
+             rxcounter = 3,
              wait_for_link = true })
 
 config.app(c, "pcap", pcap.PcapReader, "source2.pcap")
@@ -58,7 +63,13 @@ engine.main({ duration = 1 })
 
 assert(link.stats(engine.app_table.sink.input.input0).rxpackets == 51,
        "wrong number of packets received on pool 0")
+assert(engine.app_table.nic1p0:get_rxstats().packets == 51,
+       "expected get_rxstats and link stats to agree")
 assert(link.stats(engine.app_table.sink.input.input1).rxpackets == 102,
        "wrong number of packets received on pool 1")
+assert(engine.app_table.nic1p1:get_rxstats().packets == 102,
+       "expected get_rxstats and link stats to agree")
 assert(link.stats(engine.app_table.sink.input.input2).rxpackets == 102,
        "wrong number of packets received on pool 2")
+assert(engine.app_table.nic1p2:get_rxstats().packets == 102,
+       "expected get_rxstats and link stats to agree")
