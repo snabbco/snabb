@@ -155,7 +155,10 @@ function run(args)
              ndescriptors = opts.ring_buffer_size,
              mirror = opts.mirror } }
    else
-      setup_fn, setup_args = setup.load_phy, { 'inetNic', v4, 'b4sideNic', v6 }
+      setup_fn = setup.load_phy
+      setup_args =
+         { { v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
+             ndescriptors = opts.ring_buffer_size } }
    end
 
    if opts.reconfigurable then
@@ -233,4 +236,3 @@ function run(args)
       engine.main({report={showlinks=true}})
    end
 end
-ring_buffer_size
