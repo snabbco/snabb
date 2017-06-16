@@ -278,6 +278,8 @@ Intel = {
       mirror = {},
       rxcounter = {},
       txcounter = {},
+      rate_limit = {default=0},
+      priority = {default=1.0},
       txq = {},
       rxq = {},
       mtu = {default=9014},
@@ -322,7 +324,9 @@ function Intel:new (conf)
       vlan = conf.vlan,
       want_mirror = conf.mirror,
       rxcounter = conf.rxcounter,
-      txcounter = conf.txcounter
+      txcounter = conf.txcounter,
+      limit = conf.rate_limit,
+      priority = conf.priority
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -374,6 +378,7 @@ function Intel:new (conf)
    self:set_mirror()
    self:set_rxstats()
    self:set_txstats()
+   self:set_tx_rate()
 
    -- Initialize per app statistics
    counter.set(self.shm.mtu, self.mtu)
@@ -727,6 +732,7 @@ function Intel:stop ()
       self.unset_VLAN()
       self.unset_mirror()
    end
+   self.unset_tx_rate()
    if self.fd:flock("nb, ex") then
       self.r.CTRL:clr( bits { SETLINKUP = 6 } )
       --self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
@@ -1146,6 +1152,9 @@ function Intel1g:unset_MAC ()
    end
 end
 
+function Intel1g:set_tx_rate () return end
+function Intel1g:unset_tx_rate () return end
+
 Intel82599.driver = "Intel82599"
 Intel82599.offsets = {
    SRRCTL = {
@@ -1394,6 +1403,27 @@ function Intel82599:unset_MAC ()
    for mac_index = 0, self.max_mac_addr do
       pf.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]:clr(msk)
    end
+end
+
+function Intel82599:set_tx_rate ()
+   if not self.txq then return end
+   self.r.RTTDQSEL(self.poolnum or self.txq)
+   if self.limit >= 10 then
+      -- line rate = 10,000 Mb/s
+      local factor = 10000 / tonumber(self.limit)
+      -- 10.14 bits
+      factor = bit.band(math.floor(factor*2^14+0.5), 2^24-1)
+      self.r.RTTBCNRC(bits({RS_ENA=31}, factor))
+   else
+      self.r.RTTBCNRC(0x00)
+   end
+   self.r.RTTDT1C(bit.band(math.floor(self.priority * 0x80), 0x3FF))
+end
+
+function Intel82599:unset_tx_rate ()
+   self.limit = 0
+   self.priority = 0
+   self:set_tx_rate()
 end
 
 -- return rxstats for the counter assigned to this queue
