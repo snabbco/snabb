@@ -3,7 +3,6 @@ module(..., package.seeall)
 local config = require("core.config")
 local constants = require("apps.lwaftr.constants")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
-local intel10g = require("apps.intel.intel10g")
 local lib = require("core.lib")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local lwtypes = require("apps.lwaftr.lwtypes")
@@ -136,8 +135,6 @@ function run(args)
       end
    end
 
-   intel10g.ring_buffer_size(ring_buffer_size)
-
    if id then engine.claim_name(id) end
 
    local vlan = false
@@ -157,6 +154,7 @@ function run(args)
       mtu = mtu,
       vlan = vlan,
       mirror_id = mirror_id,
+      ring_buffer_size = ring_buffer_size,
    }
 
    local c = config.new()
