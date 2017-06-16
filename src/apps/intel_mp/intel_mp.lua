@@ -277,6 +277,7 @@ Intel = {
       vlan = {},
       mirror = {},
       rxcounter = {},
+      txcounter = {},
       txq = {},
       rxq = {},
       mtu = {default=9014},
@@ -320,7 +321,8 @@ function Intel:new (conf)
       macaddr = conf.macaddr,
       vlan = conf.vlan,
       want_mirror = conf.mirror,
-      rxcounter = conf.rxcounter
+      rxcounter = conf.rxcounter,
+      txcounter = conf.txcounter
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -371,6 +373,7 @@ function Intel:new (conf)
    self:set_VLAN()
    self:set_mirror()
    self:set_rxstats()
+   self:set_txstats()
 
    -- Initialize per app statistics
    counter.set(self.shm.mtu, self.mtu)
@@ -589,6 +592,11 @@ function Intel:push ()
       cursor = self:ringnext(cursor)
    end
    self.r.TDT(self.tdt)
+
+   -- same code as in pull, we repeat it in case this app only enables Tx
+   if self.run_stats and self.sync_timer() then
+      self:sync_stats()
+   end
 end
 
 function Intel:pull ()
@@ -1104,9 +1112,21 @@ function Intel1g:get_rxstats ()
    }
 end
 
+function Intel1g:get_txstats ()
+   assert(self.txq, "cannot retrieve rxstats without txq")
+   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local txc   = self.txq
+   return {
+      counter_id = txc,
+      packets = counter.read(frame["q"..txc.."_txpackets"]),
+      bytes = counter.read(frame["q"..txc.."_txbytes"])
+   }
+end
+
 -- noop because 1g NICs have per-queue counters that aren't
 -- configurable
 function Intel1g:set_rxstats () return end
+function Intel1g:set_txstats () return end
 
 function Intel1g:check_vmdq ()
    error("unimplemented")
@@ -1391,12 +1411,31 @@ function Intel82599:get_rxstats ()
    }
 end
 
+function Intel82599:get_txstats ()
+   assert(self.txcounter and self.txq, "cannot retrieve txstats")
+   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local txc   = self.txcounter
+   return {
+      counter_id = txc,
+      packets = counter.read(frame["q"..txc.."_txpackets"]),
+      bytes = counter.read(frame["q"..txc.."_txbytes"])
+   }
+end
+
 -- enable the given counter for this app's rx queue
 function Intel82599:set_rxstats ()
    if not self.rxcounter or not self.rxq then return end
    local counter = self.rxcounter
    assert(counter>=0 and counter<16, "bad Rx counter")
    self.r.RQSMR[math.floor(self.rxq/4)]:set(lshift(counter,8*(self.rxq%4)))
+end
+
+-- enable the given counter for this app's tx queue
+function Intel82599:set_txstats ()
+   if not self.txcounter or not self.txq then return end
+   local counter = self.txcounter
+   assert(counter>=0 and counter<16, "bad Tx counter")
+   self.r.TQSM[math.floor(self.txq/4)]:set(lshift(counter,8*(self.txq%4)))
 end
 
 function Intel:debug (args)

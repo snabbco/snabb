@@ -2,6 +2,8 @@
 
 -- Snabb test script for transmit in VMDq mode, also tests VLAN
 -- tag insertion
+--
+-- Also ensures that the Tx counters work
 
 local args = main.parameters
 assert(#args == 4, "testvmdqtx.snabb pciaddr1 pciaddr2 macaddr pcapfile")
@@ -25,6 +27,7 @@ config.app(c, "nic1", intel.Intel,
              macaddr = macaddr,
              poolnum = 0,
              txq = 0,
+             txcounter = 1,
              vlan = 1,
              ndescriptors=2048,
              wait_for_link = true })
@@ -47,7 +50,12 @@ config.link(c, "filter.output -> sink.input")
 engine.configure(c)
 engine.main({ duration = 1 })
 
+assert(link.stats(engine.app_table.nic1.input.input).rxpackets > 0,
+       "expected some packets from pcap to Tx NIC")
 assert(link.stats(engine.app_table.filter.input.input).rxpackets > 0,
        "expected some packets on the receiving NIC")
+assert(link.stats(engine.app_table.filter.input.input).rxpackets ==
+       engine.app_table.nic1:get_txstats().packets,
+       "expected txstats() to match up with link stats")
 assert(link.stats(engine.app_table.sink.input.input).rxpackets > 0,
        "expected VLAN tagged packets on the receiving NIC")
