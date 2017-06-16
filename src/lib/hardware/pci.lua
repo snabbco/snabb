@@ -22,7 +22,7 @@ devices = {}
 --- * `device` id hex string e.g. `"0x10fb"` for 82599 chip.
 --- * `interface` name of Linux interface using this device e.g. `"eth0"`.
 --- * `status` string Linux operational status, or `nil` if not known.
---- * `driver` Lua module that supports this hardware e.g. `"intel10g"`.
+--- * `driver` Lua module that supports this hardware e.g. `"intel_mp"`.
 --- * `usable` device was suitable to use when scanned? `yes` or `no`
 
 --- Initialize (or re-initialize) the `devices` table.
