@@ -90,6 +90,7 @@ RTTDT2C     0x04910 +0x04*0..7      RW DCB Transmit Descriptor Plane T2 Config
 RTTPT2C     0x0CD20 +0x04*0..7      RW DCB Transmit Packet Plane T2 Config
 RTRPT4C     0x02140 +0x04*0..7      RW DCB Receive Packet Plane T4 Config
 RXPBSIZE    0x03C00 +0x04*0..7      RW Receive Packet Buffer Size
+RQSMR       0x02300 +0x04*0..31     RW Receive Queue Statistic Mapping Registers
 TQSM        0x08600 +0x04*0..31     RW Transmit Queue Statistic Mapping Registers
 TXPBSIZE    0x0CC00 +0x04*0..7      RW Transmit Packet Buffer Size
 TXPBTHRESH  0x04950 +0x04*0..7      RW Tx Packet Buffer Threshold
@@ -275,6 +276,7 @@ Intel = {
       poolnum = {},
       vlan = {},
       mirror = {},
+      rxcounter = {},
       txq = {},
       rxq = {},
       mtu = {default=9014},
@@ -317,7 +319,8 @@ function Intel:new (conf)
       poolnum = conf.poolnum,
       macaddr = conf.macaddr,
       vlan = conf.vlan,
-      want_mirror = conf.mirror
+      want_mirror = conf.mirror,
+      rxcounter = conf.rxcounter
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -367,6 +370,7 @@ function Intel:new (conf)
    self:set_MAC()
    self:set_VLAN()
    self:set_mirror()
+   self:set_rxstats()
 
    -- Initialize per app statistics
    counter.set(self.shm.mtu, self.mtu)
@@ -1088,6 +1092,22 @@ function Intel1g:init_queue_stats (frame)
    end
 end
 
+function Intel1g:get_rxstats ()
+   assert(self.rxq, "cannot retrieve rxstats without rxq")
+   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local rxc   = self.rxq
+   return {
+      counter_id = rxc,
+      packets = counter.read(frame["q"..rxc.."_rxpackets"]),
+      dropped = counter.read(frame["q"..rxc.."_rxdrops"]),
+      bytes = counter.read(frame["q"..rxc.."_rxbytes"])
+   }
+end
+
+-- noop because 1g NICs have per-queue counters that aren't
+-- configurable
+function Intel1g:set_rxstats () return end
+
 function Intel1g:check_vmdq ()
    error("unimplemented")
 end
@@ -1354,6 +1374,29 @@ function Intel82599:unset_MAC ()
    for mac_index = 0, self.max_mac_addr do
       pf.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]:clr(msk)
    end
+end
+
+-- return rxstats for the counter assigned to this queue
+-- the data has to be read from the shm frame since the main instance
+-- is in control of the counter registers (and clears them on read)
+function Intel82599:get_rxstats ()
+   assert(self.rxcounter and self.rxq, "cannot retrieve rxstats")
+   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local rxc   = self.rxcounter
+   return {
+      counter_id = rxc,
+      packets = counter.read(frame["q"..rxc.."_rxpackets"]),
+      dropped = counter.read(frame["q"..rxc.."_rxdrops"]),
+      bytes = counter.read(frame["q"..rxc.."_rxbytes"])
+   }
+end
+
+-- enable the given counter for this app's rx queue
+function Intel82599:set_rxstats ()
+   if not self.rxcounter or not self.rxq then return end
+   local counter = self.rxcounter
+   assert(counter>=0 and counter<16, "bad Rx counter")
+   self.r.RQSMR[math.floor(self.rxq/4)]:set(lshift(counter,8*(self.rxq%4)))
 end
 
 function Intel:debug (args)
