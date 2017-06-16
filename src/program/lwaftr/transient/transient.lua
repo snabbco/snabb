@@ -5,7 +5,7 @@ local config = require("core.config")
 local timer = require("core.timer")
 local csv_stats = require("program.lwaftr.csv_stats")
 local pci = require("lib.hardware.pci")
-local Intel82599 = require("apps.intel.intel_app").Intel82599
+local Intel82599 = require("apps.intel_mp.intel_mp").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
 local loadgen = require("apps.lwaftr.loadgen")
 local main = require("core.main")
@@ -22,7 +22,7 @@ local function find_devices(pattern)
    pattern = pci.qualified(pattern)
    local ret = {}
    for _,device in ipairs(pci.devices) do
-      if (device.usable and device.driver == 'apps.intel.intel_app' and
+      if (device.usable and device.driver == 'apps.intel_mp.intel_mp' and
           pattern:match(device.pciaddress)) then
          table.insert(ret, device.pciaddress)
       end

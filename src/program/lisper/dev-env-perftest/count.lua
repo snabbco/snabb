@@ -6,7 +6,7 @@ local ffi      = require("ffi")
 local app      = require("core.app")
 local lib      = require("core.lib")
 local packet   = require("core.packet")
-local intel    = require("apps.intel.intel_app")
+local Intel82599 = require("apps.intel_mp.intel_mp").Intel82599
 
 _NAME = ""
 local Counter = {}
@@ -37,7 +37,7 @@ local c = config.new()
 
 config.app(c, "count", Counter)
 
-config.app(c, "eth", intel.Intel82599, {
+config.app(c, "eth", Intel82599, {
 	pciaddr = "0000:03:00.1",
 	macaddr = "00:00:00:00:02:02",
 })

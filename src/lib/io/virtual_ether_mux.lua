@@ -13,7 +13,7 @@ function configure (c, ports, io)
    local links
    if io and io.pci then
       local device = pci.device_info(io.pci)
-      if device and (device.driver == 'apps.intel.intel_app'
+      if device and (device.driver == 'apps.intel_mp.intel_mp'
                   or device.driver == 'apps.solarflare.solarflare') then
          links = configureVMDq(c, device, ports)
       else
