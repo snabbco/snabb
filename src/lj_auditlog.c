@@ -77,6 +77,7 @@ void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
   log_mem("MCode[]", T->mcode, T->szmcode);
   log_mem("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
   log_mem("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
+  log_mem("IRIns[]", &T->ir[T->nk], (T->nins - T->nk + 1) * sizeof(IRIns));
   log_event("trace_stop", 1);
   str_16("GCtrace"); /* = */ uint_64((uint64_t)T);
 }
