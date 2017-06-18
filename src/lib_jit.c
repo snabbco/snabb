@@ -200,10 +200,7 @@ LJLIB_CF(jit_opt_start)
 
 #include "lj_libdef.h"
 
-
 /* -- jit.vmprofile module  ----------------------------------------------- */
-
-#ifdef LUAJIT_VMPROFILE
 
 #define LJLIB_MODULE_jit_vmprofile
 
@@ -226,8 +223,6 @@ static int luaopen_jit_vmprofile(lua_State *L)
   LJ_LIB_REG(L, NULL, jit_vmprofile);
   return 1;
 }
-
-#endif
 
 /* -- JIT compiler initialization ----------------------------------------- */
 

@@ -19,12 +19,13 @@ typedef struct VMProfileTraceCount {
   VMProfileCount head;          /* Head of the trace (non-looping part) */
   VMProfileCount loop;          /* Loop of the trace */
   VMProfileCount other;         /* Outside the trace mcode (unidentified) */
+  VMProfileCount gc;            /* Garbage collection from this trace. */
 } VMProfileTraceCount;
 
 /* Complete set of counters for VM and traces. */
 typedef struct VMProfile {
   uint32_t magic;               /* 0x1d50f007 */
-  uint16_t major, minor;        /* 1, 0 */
+  uint16_t major, minor;        /* 2, 0 */
   VMProfileCount vm[LJ_VMST__MAX];
   VMProfileTraceCount trace[LJ_VMPROFILE_TRACE_MAX+1];
 } VMProfile;

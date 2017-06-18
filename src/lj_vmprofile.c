@@ -6,8 +6,6 @@
 #define lj_vmprofile_c
 #define LUA_CORE
 
-#ifdef LUAJIT_VMPROFILE
-
 #define _GNU_SOURCE 1
 #include <stdio.h>
 #include <assert.h>
@@ -42,7 +40,7 @@ int vmprofile_get_profile_size() {
 void vmprofile_set_profile(void *counters) {
   profile = (VMProfile*)counters;
   profile->magic = 0x1d50f007;
-  profile->major = 1;
+  profile->major = 2;
   profile->minor = 0;
 }
 
@@ -54,16 +52,19 @@ static void vmprofile_signal(int sig, siginfo_t *si, void *data)
   if (profile != NULL) {
     lua_State *L = gco2th(gcref(state.g->cur_L));
     int vmstate = state.g->vmstate;
+    int trace = ~vmstate == LJ_VMST_GC ? state.g->gcvmstate : vmstate;
     /* Not in a trace */
-    if (vmstate < 0) {
+    if (trace < 0) {
       profile->vm[~vmstate]++;
     } else {
-      int bucket = vmstate > LJ_VMPROFILE_TRACE_MAX ? 0 : vmstate;
+      int bucket = trace > LJ_VMPROFILE_TRACE_MAX ? 0 : trace;
       VMProfileTraceCount *count = &profile->trace[bucket];
-      GCtrace *T = traceref(L2J(L), (TraceNo)vmstate);
+      GCtrace *T = traceref(L2J(L), (TraceNo)trace);
       intptr_t ip = (intptr_t)((ucontext_t*)data)->uc_mcontext.gregs[REG_RIP];
       ptrdiff_t mcposition = ip - (intptr_t)T->mcode;
-      if ((mcposition < 0) || (mcposition >= T->szmcode)) {
+      if (~vmstate == LJ_VMST_GC) {
+        count->gc++;
+      } else if ((mcposition < 0) || (mcposition >= T->szmcode)) {
         count->other++;
       } else if ((T->mcloop != 0) && (mcposition >= T->mcloop)) {
         count->loop++;
@@ -110,4 +111,3 @@ LUA_API void luaJIT_vmprofile_stop(lua_State *L)
   stop_timer();
 }
 
-#endif
