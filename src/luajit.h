@@ -64,6 +64,10 @@ enum {
 /* Control the JIT engine. */
 LUA_API int luaJIT_setmode(lua_State *L, int idx, int mode);
 
+/* VM profiling API. */
+LUA_API void luaJIT_vmprofile_start(lua_State *L);
+LUA_API void luaJIT_vmprofile_stop(lua_State *L);
+
 /* Enforce (dynamic) linker error for version mismatches. Call from main. */
 LUA_API void LUAJIT_VERSION_SYM(void);
 
