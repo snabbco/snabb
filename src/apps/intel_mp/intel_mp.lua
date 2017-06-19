@@ -1,4 +1,4 @@
--- intel1g: Device driver app for Intel 1G and 10G network cards
+-- intel_mp: Device driver app for Intel 1G and 10G network cards
 -- It supports
 --    - Intel1G i210 and i350 based 1G network cards
 --    - Intel82599 82599 based 10G network cards
@@ -568,7 +568,7 @@ end
 function Intel:push ()
    if not self.txq then return end
    local li = self.input["input"]
-   assert(li, "intel1g:push: no input link")
+   assert(li, "intel_mp:push: no input link")
 
    while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
       local p = link.receive(li)
@@ -605,7 +605,7 @@ end
 function Intel:pull ()
    if not self.rxq then return end
    local lo = self.output["output"]
-   assert(lo, "intel1g: output link required")
+   assert(lo, "intel_mp:pull: output link required")
 
    local pkts = 0
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
