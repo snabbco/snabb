@@ -63,9 +63,7 @@ local template_header_t = ffi.typeof([[
    } __attribute__((packed))
 ]], set_header_t)
 
-local function ptr_to(ctype)
-   return ffi.typeof('$*', ctype)
-end
+local function ptr_to(ctype) return ffi.typeof('$*', ctype) end
 
 local set_header_ptr_t = ptr_to(set_header_t)
 local template_header_ptr_t = ptr_to(template_header_t)
@@ -73,45 +71,40 @@ local template_header_ptr_t = ptr_to(template_header_t)
 local V9_TEMPLATE_ID  = 0
 local V10_TEMPLATE_ID = 2
 
--- initialize a table describing the ids & field sizes for IPFIX fields
-local function make_ipfix_element_map()
-   local ipfix_elems =
-      require("apps.ipfix.ipfix_information_elements_inc")
-   local map = {}
+local function string_parser(str)
    local idx = 1
-
-   while idx <= ipfix_elems:len() do
-      local comma = (","):byte()
-      local quote = ('"'):byte()
-      local newline = ("\n"):byte()
-      local function consume_until_char(char)
-         local start_idx = idx
-
-         while ipfix_elems:byte(idx) ~= char do
-            if ipfix_elems:byte(idx) == quote then
-               idx = idx + 1
-               while ipfix_elems:byte(idx) ~= quote do
-                  idx = idx + 1
-               end
-            end
+   local quote = ('"'):byte()
+   local ret = {}
+   function ret.consume_upto(char)
+      local start_idx = idx
+      local byte = char:byte()
+      while str:byte(idx) ~= byte do
+         if str:byte(idx) == quote then
             idx = idx + 1
+            while str:byte(idx) ~= quote do idx = idx + 1 end
          end
          idx = idx + 1
-
-         return string.sub(ipfix_elems, start_idx, idx - 2)
       end
+      idx = idx + 1
+      return string.sub(str, start_idx, idx - 2)
+   end
+   function ret.is_done() return idx > str:len() end
+   return ret
+end
 
-      local id = consume_until_char(comma)
-      local name = consume_until_char(comma)
-      local data_type = consume_until_char(comma)
-      for i=1,8 do
-         consume_until_char(comma)
-      end
-      consume_until_char(newline)
-
+-- Parse out available IPFIX fields.
+local function make_ipfix_element_map()
+   local elems = require("apps.ipfix.ipfix_information_elements_inc")
+   local parser = string_parser(elems)
+   local map = {}
+   while not parser.is_done() do
+      local id = parser.consume_upto(",")
+      local name = parser.consume_upto(",")
+      local data_type = parser.consume_upto(",")
+      for i=1,8 do parser.consume_upto(",") end
+      parser.consume_upto("\n")
       map[name] = { id = id, data_type = data_type }
    end
-
    return map
 end
 
