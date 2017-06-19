@@ -732,7 +732,7 @@ function Intel:stop ()
       self.unset_VLAN()
       self.unset_mirror()
    end
-   self.unset_tx_rate()
+   self:unset_tx_rate()
    if self.fd:flock("nb, ex") then
       self.r.CTRL:clr( bits { SETLINKUP = 6 } )
       --self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
