@@ -23,7 +23,8 @@ config.app(c, "pcap", pcap.PcapReader, pcapfile)
 config.app(c, "nic1", intel.Intel,
            {pciaddr=pciaddr1,
             txq = 0,
-            ndescriptors=2048, wait_for_link = true})
+            ndescriptors=2048,
+            wait_for_link = true})
 config.app(c, "nic2", intel.Intel,
            {pciaddr=pciaddr2,
             vmdq = true,

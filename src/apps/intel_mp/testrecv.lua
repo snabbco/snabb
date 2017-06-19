@@ -83,7 +83,7 @@ function test(pciaddr, qno, vmdq, poolno, macaddr, vlan)
    
    if master then
       for _,v in pairs(counters[nic.driver]) do
-                   print(string.format("%s %d", v, tonumber(nic.r[v]() - before[v])/duration))
+         print(string.format("%s %d", v, tonumber(nic.r[v]() - before[v])/duration))
       end
    end
    main.exit(0)
