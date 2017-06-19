@@ -355,7 +355,6 @@ function Intel:new (conf)
       end
    else
       assert(not self.macaddr, "VMDq must be set to use MAC address")
-      assert(not self.poolnum, "VMDq must be set to specify a pool number")
       assert(not self.mirror, "VMDq must be set to specify mirroring rules")
    end
 
