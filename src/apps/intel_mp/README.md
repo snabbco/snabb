@@ -27,11 +27,11 @@ specified but assumed to be broadly applicable.
 
 — Key **rxq**
 
-*Optional*. The receive queue to attach to, numbered from 0.
+*Optional*. The receive queue to attach to, numbered from 0. The default is 0.
 
 — Key **txq**
 
-*Optional*. The transmit queue to attach to, numbered from 0.
+*Optional*. The transmit queue to attach to, numbered from 0. The default is 0.
 
 — Key **vmdq**
 
