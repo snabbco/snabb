@@ -273,7 +273,7 @@ Intel = {
       ndescriptors = {default=2048},
       vmdq = {default=false},
       macaddr = {},
-      poolnum = {},
+      poolnum = {default=0},
       vlan = {},
       mirror = {},
       rxcounter = {},
