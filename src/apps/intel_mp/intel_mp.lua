@@ -600,8 +600,12 @@ end
 function Intel:pull ()
    if not self.rxq then return end
    local lo = self.output["output"]
+<<<<<<< HEAD
    if lo == nil then return end
 --   assert(lo, "intel_mp:pull: output link required")
+=======
+   assert(lo, "intel_mp:pull: output link required")
+>>>>>>> 43c7c14aa... Replace intel1g with intel_mp in comments and strings
 
    local pkts = 0
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
