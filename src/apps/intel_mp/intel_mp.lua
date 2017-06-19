@@ -568,7 +568,8 @@ end
 function Intel:push ()
    if not self.txq then return end
    local li = self.input["input"]
-   assert(li, "intel_mp:push: no input link")
+   if li == nil then return end
+--   assert(li, "intel_mp:push: no input link")
 
    while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
       local p = link.receive(li)
@@ -605,7 +606,8 @@ end
 function Intel:pull ()
    if not self.rxq then return end
    local lo = self.output["output"]
-   assert(lo, "intel_mp:pull: output link required")
+   if lo == nil then return end
+--   assert(lo, "intel_mp:pull: output link required")
 
    local pkts = 0
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
