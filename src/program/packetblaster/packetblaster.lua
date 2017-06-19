@@ -34,11 +34,10 @@ function run_loadgen (c, patterns, opts)
          local name = "nic"..nics
          if use_loadgen then
             config.app(c, name, LoadGen, device.pciaddress)
-            config.link(c, "source."..tostring(nics).."->"..name..".input")
          else
             config.app(c, name, Intel82599, {pciaddr = device.pciaddress})
-            config.link(c, "source."..tostring(nics).."->"..name..".rx")
          end
+         config.link(c, "source."..tostring(nics).."->"..name..".input")
       end
    end
    assert(nics > 0, "<PCI> matches no suitable devices.")

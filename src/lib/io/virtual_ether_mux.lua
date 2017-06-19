@@ -91,7 +91,7 @@ function configureVMDq (c, device, ports)
                   vmdq = vmdq,
                   macaddr = port.mac_address,
                   vlan = port.vlan})
-      links[i] = {input = NIC..".rx", output = NIC..".tx"}
+      links[i] = {input = NIC..".input", output = NIC..".output"}
    end
    return links
 end
