@@ -110,29 +110,18 @@ end
 
 local ipfix_elements = make_ipfix_element_map()
 
--- Representations of IPFIX IEs.
-local uint8_t = ffi.typeof('uint8_t')
-local uint16_t = ffi.typeof('uint16_t')
-local uint32_t = ffi.typeof('uint32_t')
-local uint64_t = ffi.typeof('uint64_t')
-local ipv4_t = ffi.typeof('uint8_t[4]')
-local ipv6_t = ffi.typeof('uint8_t[4]')
-
-local data_ctypes =
-   { unsigned8 = uint8_t,
-     unsigned16 = uint16_t,
-     unsigned32 = uint32_t,
-     unsigned64 = uint64_t,
-     ipv4Address = ipv4_t,
-     ipv6Address = ipv6_t,
-     dateTimeMilliseconds = uint64_t }
-
 -- Create a table describing the information needed to create
 -- flow templates and data records.
-local function make_template_info(id, key_fields, record_fields)
+local function make_template_info(spec)
+   -- Representations of IPFIX IEs.
+   local ctypes =
+      { unsigned8 = 'uint8_t', unsigned16 = 'uint16_t',
+        unsigned32 = 'uint32_t', unsigned64 = 'uint64_t',
+        ipv4Address = 'uint8_t[4]', ipv6Address = 'uint8_t[16]',
+        dateTimeMilliseconds = 'uint64_t' }
    -- the contents of the template records we will send
    -- there is an ID & length for each field
-   local length = 2 * (#key_fields + #record_fields)
+   local length = 2 * (#spec.keys + #spec.values)
    local buffer = ffi.new("uint16_t[?]", length)
 
    -- octets in a data record
@@ -143,25 +132,25 @@ local function make_template_info(id, key_fields, record_fields)
    local function process_fields(buffer, fields)
       for idx, name in ipairs(fields) do
          local entry = ipfix_elements[name]
-         local ctype = assert(data_ctypes[entry.data_type],
-                              'unimplemented type: '..entry.data_type)
+         local ctype = assert(ctypes[entry.data_type],
+                              'unimplemented: '..entry.data_type)
          data_len = data_len + ffi.sizeof(ctype)
          buffer[2 * (idx - 1)]     = htons(entry.id)
          buffer[2 * (idx - 1) + 1] = htons(ffi.sizeof(ctype))
          table.insert(struct_def, '$ '..name..';')
-         table.insert(types, ctype)
+         table.insert(types, ffi.typeof(ctype))
       end
    end
 
    table.insert(struct_def, 'struct {')
-   process_fields(buffer, key_fields)
-   process_fields(buffer + #key_fields * 2, record_fields)
+   process_fields(buffer, spec.keys)
+   process_fields(buffer + #spec.keys * 2, spec.values)
    table.insert(struct_def, '} __attribute((packed))')
    local struct_t = ffi.typeof(table.concat(struct_def, ' '), unpack(types))
    assert(ffi.sizeof(struct_t) == data_len)
 
-   return { id = id,
-            field_count = #key_fields + #record_fields,
+   return { id = spec.id,
+            field_count = #spec.keys + #spec.values,
             buffer = buffer,
             buffer_len = length * 2,
             data_len = data_len,
@@ -169,39 +158,43 @@ local function make_template_info(id, key_fields, record_fields)
             record_ptr_t = ptr_to(struct_t) }
 end
 
-local template_v4 = make_template_info(256,
-   { "sourceIPv4Address",
-     "destinationIPv4Address",
-     "protocolIdentifier",
-     "sourceTransportPort",
-     "destinationTransportPort" },
-   { "flowStartMilliseconds",
-     "flowEndMilliseconds",
-     "packetDeltaCount",
-     "octetDeltaCount",
-     "ingressInterface",
-     "egressInterface",
-     "bgpPrevAdjacentAsNumber",
-     "bgpNextAdjacentAsNumber",
-     "tcpControlBits",
-     "ipClassOfService" })
+local template_v4 = make_template_info {
+   id     = 256,
+   keys   = { "sourceIPv4Address",
+              "destinationIPv4Address",
+              "protocolIdentifier",
+              "sourceTransportPort",
+              "destinationTransportPort" },
+   values = { "flowStartMilliseconds",
+              "flowEndMilliseconds",
+              "packetDeltaCount",
+              "octetDeltaCount",
+              "ingressInterface",
+              "egressInterface",
+              "bgpPrevAdjacentAsNumber",
+              "bgpNextAdjacentAsNumber",
+              "tcpControlBits",
+              "ipClassOfService" }
+}
 
-local template_v6 = make_template_info(257,
-   { "sourceIPv6Address",
-     "destinationIPv6Address",
-     "protocolIdentifier",
-     "sourceTransportPort",
-     "destinationTransportPort" },
-   { "flowStartMilliseconds",
-     "flowEndMilliseconds",
-     "packetDeltaCount",
-     "octetDeltaCount",
-     "ingressInterface",
-     "egressInterface",
-     "bgpPrevAdjacentAsNumber",
-     "bgpNextAdjacentAsNumber",
-     "tcpControlBits",
-     "ipClassOfService" })
+local template_v6 = make_template_info {
+   id     = 257,
+   keys   = { "sourceIPv6Address",
+              "destinationIPv6Address",
+              "protocolIdentifier",
+              "sourceTransportPort",
+              "destinationTransportPort" },
+   values = { "flowStartMilliseconds",
+              "flowEndMilliseconds",
+              "packetDeltaCount",
+              "octetDeltaCount",
+              "ingressInterface",
+              "egressInterface",
+              "bgpPrevAdjacentAsNumber",
+              "bgpNextAdjacentAsNumber",
+              "tcpControlBits",
+              "ipClassOfService" }
+}
 
 -- RFC5153 recommends a 10-minute template refresh configurable from
 -- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
