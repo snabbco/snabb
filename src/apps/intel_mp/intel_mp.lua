@@ -723,9 +723,9 @@ function Intel:stop ()
       self.r.TXDCTL:wait(bits { ENABLE = 25 }, 0)
    end
    if self.vmdq then
-      self.unset_MAC()
-      self.unset_VLAN()
-      self.unset_mirror()
+      self:unset_MAC()
+      self:unset_VLAN()
+      self:unset_mirror()
    end
    self:unset_tx_rate()
    if self.fd:flock("nb, ex") then
@@ -833,7 +833,7 @@ function Intel:add_receive_VLAN (vlan)
 
    -- scan to see if the VLAN is already recorded or find the
    -- first free VLAN index
-   for idx=1, self.max_vlan do
+   for idx=0, self.max_vlan-1 do
       local valid = self.r.PFVLVF[idx]:bits(31, 1)
 
       if valid == 0 then
@@ -1410,7 +1410,7 @@ end
 function Intel82599:unset_MAC ()
    local msk = bits { Ena=self.poolnum%32 }
    for mac_index = 0, self.max_mac_addr do
-      pf.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]:clr(msk)
+      self.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]:clr(msk)
    end
 end
 
