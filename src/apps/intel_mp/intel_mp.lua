@@ -718,14 +718,9 @@ function Intel:stop ()
       --TXDCTL[n].SWFLSH and wait
       --wait until tdh == tdt
       --wait on rxd[tdh].status = dd
+      self:discard_unsent_packets()
       self.r.TXDCTL(0)
       self.r.TXDCTL:wait(bits { ENABLE = 25 }, 0)
-      for i = 0, self.ndesc-1 do
-         if self.txqueue[i] then
-            packet.free(self.txqueue[i])
-            self.txqueue[i] = nil
-         end
-      end
    end
    if self.vmdq then
       self.unset_MAC()
@@ -742,6 +737,20 @@ function Intel:stop ()
    if self.run_stats then
       shm.delete_frame(self.stats)
    end
+end
+
+function Intel:discard_unsent_packets ()
+   local old_tdt = self.tdt
+   self.tdt = self.r.TDT()
+   self.tdh = self.r.TDH()
+   self.r.TDT(self.tdh)
+   while old_tdt ~= self.tdh do
+      old_tdt = band(old_tdt - 1, self.ndesc - 1)
+      packet.free(self.txqueue[old_tdt])
+      self.txdesc[old_tdt].address = -1
+      self.txdesc[old_tdt].options = 0
+   end
+   self.tdt = self.tdh
 end
 
 function Intel:sync_stats ()
