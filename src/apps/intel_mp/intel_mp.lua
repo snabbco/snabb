@@ -325,7 +325,7 @@ function Intel:new (conf)
       want_mirror = conf.mirror,
       rxcounter = conf.rxcounter,
       txcounter = conf.txcounter,
-      limit = conf.rate_limit,
+      rate_limit = conf.rate_limit,
       priority = conf.priority
    }
 
@@ -1417,9 +1417,9 @@ end
 function Intel82599:set_tx_rate ()
    if not self.txq then return end
    self.r.RTTDQSEL(self.poolnum or self.txq)
-   if self.limit >= 10 then
+   if self.rate_limit >= 10 then
       -- line rate = 10,000 Mb/s
-      local factor = 10000 / tonumber(self.limit)
+      local factor = 10000 / tonumber(self.rate_limit)
       -- 10.14 bits
       factor = bit.band(math.floor(factor*2^14+0.5), 2^24-1)
       self.r.RTTBCNRC(bits({RS_ENA=31}, factor))
@@ -1430,7 +1430,7 @@ function Intel82599:set_tx_rate ()
 end
 
 function Intel82599:unset_tx_rate ()
-   self.limit = 0
+   self.rate_limit = 0
    self.priority = 0
    self:set_tx_rate()
 end
