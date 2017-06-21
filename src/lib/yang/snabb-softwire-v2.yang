@@ -544,7 +544,12 @@ module snabb-softwire-v2 {
 
       leaf device {
         type string;
-        description "PCI device name.";
+        description
+          "The PCI device the instance should use during lwAFTR operation. If
+           device is configured in on-a-stick mode, the 'external-interface'
+           device should not be configured. If the 'external-interface is
+           specified this option should specify the PCI device of the
+           'internal-interface' (IPv6 traffic only).";
       }
 
       list queue {
@@ -566,7 +571,9 @@ module snabb-softwire-v2 {
           }
           leaf device {
             description
-             "PCI device name";
+             "PCI device of the instance uses for external IPv6 traffic. If this
+              is left unspecified the lwAFTR configures itself in on-a-stick
+              mode.";
             type string;
           }
           leaf mac {
@@ -588,19 +595,19 @@ module snabb-softwire-v2 {
                   "IPv4 address of the next hop for the internet-facing NIC.
                     The lwAFTR will resolve this to a MAC address using ARP.";
                 }
-                leaf mac {
+                leaf resolved-mac {
                   config false;
-                  description "Resolved next-hop mac address found by ARP."
+                  description "Resolved next-hop mac address found by ARP.";
                   type yang:mac-address;
                 }
               }
               case mac {
                 leaf mac {
-                type yang:mac-address;
-                description
-                "Statically configured MAC address of the next hop for the
-                  internet-facing NIC.";
-              }
+                  type yang:mac-address;
+                  description
+                  "Statically configured MAC address of the next hop for the
+                    internet-facing NIC.";
+                }
               }
             }
           }
@@ -635,19 +642,19 @@ module snabb-softwire-v2 {
                   "IPv4 address of the next hop for the internet-facing NIC.
                     The lwAFTR will resolve this to a MAC address using ARP.";
                 }
-                leaf mac {
+                leaf resolved-mac {
                   config false;
-                  description "Resolved next-hop mac address found by ARP."
+                  description "Resolved next-hop mac address found by ARP.";
                   type yang:mac-address;
                 }
               }
               case mac {
                 leaf mac {
-                type yang:mac-address;
-                description
-                "Statically configured MAC address of the next hop for the
-                  internet-facing NIC.";
-              }
+                  type yang:mac-address;
+                  description
+                  "Statically configured MAC address of the next hop for the
+                    internet-facing NIC.";
+                }
               }
             }
           }
@@ -673,7 +680,7 @@ module snabb-softwire-v2 {
         type uint16;
         default 1460;
         description
-         "Maximm packet size to recieve on the IPv4 interface.";
+         "Maximum packet size to receive on the IPv4 interface.";
       }
 
       uses traffic-filters;
@@ -821,19 +828,20 @@ module snabb-softwire-v2 {
         }
       }
 
-      container binding-table-version {
+      container version {
         description
          "Optional versioning for binding table. The vesioning information
           will change on every update or change to the binding table.";
 
-        leaf binding-table-version{
+        leaf number {
           type uint64;
           description "Incremental version number.";
         }
-        leaf binding-table-date {
+        leaf date {
           type yang:date-and-time;
           description "Timestamp of last change.";
         }
+      }
     }
   }
 
