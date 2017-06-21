@@ -843,11 +843,10 @@ function Intel:add_receive_VLAN (vlan)
          break
       else
          if self.r.PFVLVF[idx]:bits(0, 11) == vlan then
-            mac_index = idx
+            vlan_index = idx
             break
          end
       end
-
    end
 
    assert(vlan_index, "Max number of VLAN IDs reached")
