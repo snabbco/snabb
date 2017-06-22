@@ -27,7 +27,14 @@ function test-filter {
   return 0
 }
 
+# Reject all DHCPv6 packets and drop all the rest.
 test-filter "dhcpv6.pcap" 0 6 4 "{ DHCPV6 = 'reject', default = 'drop' }"
+
+# Reject all HTTP packets and accept all the test.
 test-filter "v6-http.cap" 51 4 0 "{ HTTP = 'reject', default = 'accept' }"
+
+# Accept RTP packets which flow_count is equals or higher than 69 and drop otherwise. Drop non RTP packets.
 test-filter "rtp_example.pcap" 465 0 34 "{ RTP = [[match { flow_count >= 69 => accept; otherwise => drop }]], default = 'drop' }"
+
+# Reject RTP packets which flow_count is equals or higher than 69 and drop otherwise. Drop non RTP packets.
 test-filter "rtp_example.pcap" 0 465 34 "{ RTP = [[match { flow_count >= 69 => reject; otherwise => drop }]], default = 'drop' }"
