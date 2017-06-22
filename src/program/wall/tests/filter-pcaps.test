@@ -13,12 +13,13 @@ readonly mac="01:23:45:67:89:ab"
 # run a test given the pcap file path, the no. of packets expected to
 # the output file, the no. packets for the reject file, and a firewall policy
 function test-filter {
+  local test_name=$1 n_accepted=$2 n_rejected=$3 n_dropped=$4 rule=$5
   output=`mktemp`
-  echo "TEST $1"
-  "${mydir}/../../../snabb" wall filter -p -4 $ip4 -6 $ip6 -m $mac -o `mktemp` -r `mktemp` -e "$5" pcap "${datadir}/$1" > $output
-  if ! (grep "Accepted packets: $2" $output &&
-        grep "Rejected packets: $3" $output &&
-        grep "Dropped packets:  $4" $output); then
+  echo "TEST $test_name"
+  "${mydir}/../../../snabb" wall filter -p -4 $ip4 -6 $ip6 -m $mac -o `mktemp` -r `mktemp` -e "$rule" pcap "${datadir}/$test_name" > $output
+  if ! (grep "Accepted packets: $n_accepted" $output &&
+        grep "Rejected packets: $n_rejected" $output &&
+        grep "Dropped packets:  $n_dropped" $output); then
       echo "FAIL"
       return 1
   fi
