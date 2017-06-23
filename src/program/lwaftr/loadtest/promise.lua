@@ -12,6 +12,8 @@ local function curry(f, ...)
    if #curried_args == 0 then return f end
    return function(...)
       local args = { ... }
+      -- Prepend the curried args to the passed ones, in the correct order:
+      -- if curried_args == (A, B), args == (C, D) -> (B, C, D) -> (A, B, C, D)
       for i=#curried_args, 1, -1 do
          table.insert(args, 1, curried_args[i])
       end

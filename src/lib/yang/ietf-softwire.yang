@@ -1,0 +1,778 @@
+module ietf-softwire {
+  namespace "urn:ietf:params:xml:ns:yang:ietf-softwire";
+  prefix "softwire";
+
+  import ietf-inet-types {prefix inet; }
+  import ietf-yang-types {prefix yang; }
+
+  organization "Softwire Working Group";
+
+  contact
+    "
+    Qi Sun <sunqi.ietf@gmail.com>
+    Hao Wang <wangh13@mails.tsinghua.edu.cn>
+    Yong Cui <yong@csnet1.cs.tsinghua.edu.cn>
+    Ian <Farrer ian.farrer@telekom.de>
+    Sladjana Zoric <sladjana.zoric@telekom.de>
+    Mohamed Boucadair <mohamed.boucadair@orange.com>
+    Rajiv <Asati rajiva@cisco.com>
+    ";
+
+  description
+    "This document defines a YANG data model for the configuration and
+    management of A+P Softwire Border Routers (BRs) and Customer
+    Premises Equipment (CEs). It covers Lightweight 4over6,
+    MAP-E and MAP-T mechanisms.
+
+    Copyright (c) 2016 IETF Trust and the persons identified
+    as authors of the code. All rights reserved.
+    This version of this YANG module is part of RFC XXX; see the RFC
+    itself for full legal notices.";
+
+  revision 2016-06-04 {
+    description
+      "Version-05: Combined MAP-E/MAP-T into a single tree. Added binding
+          table/alogorthm versioning";
+       reference "-05";
+  }
+
+  revision 2015-09-30 {
+    description
+      "Version-04: Fix YANG syntax; Add flags to map-rule; Remove
+      the map-rule-type element. ";
+       reference "-04";
+  }
+
+  revision 2015-04-07 {
+    description
+      "Version-03: Integrate lw4over6; Updata state nodes; Correct
+      grammar errors; Reuse groupings; Update descriptions.
+      Simplify the model.";
+       reference "-03";
+  }
+
+  revision 2015-02-10 {
+    description
+      "Version-02: Add notifications.";
+       reference "-02";
+  }
+
+
+  revision 2015-02-06 {
+    description
+      "Version-01: Correct grammar errors; Reuse groupings; Update
+      descriptions.";
+       reference "-01";
+  }
+
+  revision 2015-02-02 {
+    description
+      "Initial revision.";
+       reference "-00";
+  }
+
+/*
+ * Features
+ */
+
+  feature binding {
+    description
+    "Lightweight 4over6 (binding) is an IPv4-over-IPv6 tunnelling
+     transition mechanism. Lightweight 4over6 is a solution designed
+     specifically for complete independence between IPv6 subnet
+     prefix (and /128 IPv6 address) and IPv4 address with or
+     without IPv4 address sharing.
+
+     This is accomplished by maintaining state for
+     each softwire (per-subscriber state) in the central lwAFTR and
+     a hub-and-spoke forwarding architecture. In order to delegate
+     the NAPT function and achieve IPv4 address sharing,
+     port-restricted IPv4 addresses needs to be allocated to CEs.
+
+     Besides lw4o6, this feature also covers MAP in 1:1 mode
+     (offset=0, PSID explicit)";
+
+   reference
+      "RFC7596";
+  }
+
+  feature br {
+    if-feature binding;
+    description
+     "The AFTR for Lightweight 4over6, so-called lwAFTR (BR). This
+      feature indicates that a instance functions as a lwAFTR (BR).
+      A lwAFTR (BR) is an IPv4-in-IPv6 tunnel concentrator that
+      maintains per-subscriber IPv4-IPv6 address binding.";
+  }
+
+  feature ce {
+    if-feature binding;
+    description
+      "The B4 for Lightweight 4over6, so-called lwB4 (CE). This
+      feature indicates that a instance functions as a lwB4 (CE). A
+      lwB4 (ce) is an IPv4-in-IPv6 tunnel initiator. It is
+      dual-stack capable node, either a directly connected end-host
+      or a CE. It sources IPv4 connections using the configured
+      port-set and the public IPv4 address.";
+  }
+
+  feature algorithm {
+    description
+      "MAP-E is an IPv6 transition mechanism for transporting IPv4
+      packets across an IPv6 network using IP encapsulation. MAP-E
+      allows for a reduction of the amount of centralized state using
+      rules to express IPv4/IPv6 address mappings. This introduces an
+      algorithmic relationship between the IPv6 subnet
+      and IPv4 address.
+      The Mapping of Address and Port - Translation (MAP-T)
+      architecture is a double stateless NAT64 based solution. It uses
+      the stateless algorithmic address & transport layer port mapping
+      scheme defined in MAP-E. The MAP-T solution differs from MAP-E in
+      the use of IPv4-IPv6 translation, rather than encapsulation, as
+      the form of IPv6 domain transport.
+      This feature indicates the instance functions as a MAP-E or
+      MAP-T instance.";
+    reference
+      "RFC7597 & RFC7599";
+  }
+
+/*
+ * Grouping
+ */
+
+  grouping port-set {
+    description
+      "Use the PSID algorithm to represent a range of transport layer
+      ports.";
+    leaf psid-offset {
+      type uint8 {
+        range 0..16;
+      }
+      mandatory true;
+      description
+        "The number of offset bits. In Lightweight 4over6, the default
+        value is 0 for assigning one contiguous port range. In MAP-E/T,
+        the default value is 6, which excludes system ports by default
+        and assigns distributed port ranges. If the this parameter is
+        larger than 0, the value of offset MUST be greater than 0.";
+    }
+    leaf psid-len {
+      type uint8 {
+        range 0..15;
+      }
+      mandatory true;
+      description
+        "The length of PSID, representing the sharing ratio for an
+        IPv4 address.";
+    }
+    leaf psid {
+      type uint16;
+      mandatory true;
+      description
+        "Port Set Identifier (PSID) value, which identifies a set
+        of ports algorithmically.";
+    }
+  }
+
+  grouping binding-entry {
+    description
+      "The lwAFTR maintains an address binding table that contains
+      the binding between the lwB4's IPv6 address, the allocated IPv4
+      address and restricted port-set.";
+    leaf binding-ipv6info {
+      type union {
+        type inet:ipv6-address;
+        type inet:ipv6-prefix;
+      }
+      mandatory true;
+      description
+        "The IPv6 information for a binding entry.
+         If it's an IPv6 prefix, it indicates that
+         the IPv6 source address of the lwB4 is constructed
+         according to the description in RFC7596;
+         if it's an IPv6 address, it means the lwB4 uses
+         any /128 address from the assigned IPv6 prefix.
+         ";
+    }
+    leaf binding-ipv4-addr {
+      type inet:ipv4-address;
+      mandatory true;
+      description
+        "The IPv4 address assigned to the lwB4, which is
+         used as the IPv4 external address
+         for lwB4 local NAPT44.";
+    }
+    container port-set {
+      description
+        "For Lightweight 4over6, the default value
+        of offset should be 0, to configure one contiguous
+        port range.";
+      uses port-set {
+        refine psid-offset {
+          default "0";
+        }
+      }
+    }
+    leaf br-ipv6-addr {
+      type inet:ipv6-address;
+      mandatory true;
+      description
+        "The IPv6 address for lwaftr.";
+    }
+    leaf lifetime {
+      type uint32;
+      units seconds;
+      description "The lifetime for the binding entry";
+    }
+  }
+
+/*
+  grouping nat-table {
+
+    description
+      "Grouping 'nat-table' is not extended. The current mechanism
+      is focusing on the provisioning of external IP address and
+      port set; other NAT-specific considerations are out of scope.";
+  }
+*/
+
+  grouping traffic-stat {
+    description "Traffic statistics";
+    leaf sentPacket {
+      type yang:zero-based-counter64;
+      description "Number of packets sent.";
+    }
+    leaf sentByte {
+      type yang:zero-based-counter64;
+      description "Traffic sent, in bytes";
+    }
+    leaf rcvdPacket {
+      type yang:zero-based-counter64;
+      description "Number of packets received.";
+    }
+    leaf rcvdByte {
+      type yang:zero-based-counter64;
+      description "Traffic received, in bytes";
+    }
+    leaf droppedPacket {
+      type yang:zero-based-counter64;
+      description "Number of packets dropped.";
+    }
+    leaf droppedByte {
+      type yang:zero-based-counter64;
+      description "Traffic dropped, in bytes";
+    }
+  }
+
+
+/*
+ * Configuration Data Nodes
+ */
+
+
+  container softwire-config {
+    description
+      "The configuration data for Softwire instances. And the shared
+      data describes the softwire data model which is common to all of
+      the different softwire mechanisms, such as description.";
+    leaf description {
+      type string;
+      description
+        "A textual description of Softwire.";
+    }
+    container binding {
+      if-feature binding;
+      description
+        "lw4over6 (binding) configuration.";
+      container br {
+        if-feature br;
+        description
+          "Indicate this instance supports the lwAFTR (BR) function.
+          The instances advertise the BR feature through the
+          capability exchange mechanism when a NETCONF session is
+          established.";
+        leaf enable {
+          type boolean;
+          description
+            "Enable/disable the lwAFTR (BR) function.";
+        }
+        container br-instances {
+          description
+            "A set of BRs to be configured.";
+          list br-instance {
+            key "id";
+            description
+            "A set of lwAFTRs to be configured.";
+            leaf id {
+              type uint32;
+              mandatory true;
+              description "An instance identifier.";
+            }
+            container binding-table-version {
+              description "binding table's version";
+              leaf binding-table-version{
+                type uint64;
+                description "Incremental version number
+                to the binding table";
+              }
+              leaf binding-table-date {
+                type yang:date-and-time;
+                description "Timestamp to the binding
+                table";
+              }
+            }
+            leaf name {
+              type string;
+              description "The name for the lwaftr.";
+            }
+            leaf softwire-num-threshold {
+              type uint32;
+              mandatory true;
+              description
+                "The maximum number of tunnels that can be created on
+                the lwAFTR.";
+            }
+            leaf tunnel-payload-mtu {
+              type uint16;
+              mandatory true;
+              description
+                "The payload MTU for Lightweight 4over6 tunnel.";
+            }
+            leaf tunnel-path-mru {
+              type uint16;
+              mandatory true;
+              description
+                "The path MRU for Lightweight 4over6 tunnel.";
+            }
+            container binding-table {
+              description "binding table";
+              list binding-entry {
+                key "binding-ipv6info";
+                description "binding entry";
+                uses binding-entry;
+              }
+            }
+          }
+        }
+      }
+
+      container ce {
+        if-feature ce;
+        description
+          "Indicate this instance supports the lwB4 (CE) function.
+          The instances advertise the CE feature through the
+          capability exchange mechanism when a NETCONF session is
+          established.";
+        leaf enable {
+          type boolean;
+          description
+            "Enable/disable the lwB4 (CE) function.";
+        }
+        container ce-instances {
+          description
+            "A set of CEs to be configured.";
+          list ce-instance {
+            key "binding-ipv6info";
+            description "instances for CE";
+            uses binding-entry;
+            leaf name {
+              type string;
+              description "The CE's name.";
+            }
+            leaf tunnel-payload-mtu {
+              type uint16;
+              mandatory true;
+              description
+                "The payload MTU for Lightweight 4over6 tunnel.";
+            }
+            leaf tunnel-path-mru {
+              type uint16;
+              mandatory true;
+              description
+                "The path MRU for Lightweight 4over6 tunnel.";
+            }
+            leaf b4-ipv6-addr-format {
+              type boolean;
+              mandatory true;
+              description
+               "The format of lwB4 (CE) IPv6 address. If set to true,
+               it indicates that the IPv6 source address of the lwB4
+               is constructed according to the description in
+               [RFC7596]; if set to false, the lwB4 (CE)
+               can use any /128 address from the assigned IPv6
+               prefix.";
+            }
+          }
+        }
+      }
+    }
+
+    container algorithm {
+      if-feature algorithm;
+      description
+        "Indicate the instances support the MAP-E and MAP-T function.
+        The instances advertise the map-e feature through the
+        capability exchange mechanism when a NETCONF session is
+        established.";
+      leaf enable {
+        type boolean;
+        description
+          "Enable/disable the MAP-E or MAP-T function.";
+      }
+      container algo-instances {
+        description
+          "A set of MAP-E or MAP-T instances to be configured,
+           applying to BRs and CEs. A MAP-E/T instance defines a MAP
+           domain comprising one or more MAP-CE and MAP-BR";
+        list algo-instance {
+          key "id";
+          description "instance for MAP-E/MAP-T";
+          leaf id {
+            type uint32;
+            mandatory true;
+            description "Algorithm Instance ID";
+          }
+          container algo-versioning {
+            description "algorithm's version";
+            leaf algo-version {
+              type uint64;
+              description "Incremental version number to
+              the algorithm";
+            }
+            leaf algo-date {
+              type yang:date-and-time;
+              description "Timestamp to the algorithm";
+            }
+          }
+          leaf name {
+            type string;
+            description "The name for the instance.";
+          }
+          leaf data-plane {
+            type enumeration {
+              enum "encapsulation" {
+                description "encapsulation for MAP-E";
+              }
+              enum "translation" {
+                description "translation for MAP-T";
+              }
+            }
+            description
+              "Encapsulation is for MAP-E while translation is
+              for MAP-T";
+          }
+          leaf ea-len {
+            type uint8;
+            mandatory true;
+            description
+              "Embedded Address (EA) bits are the IPv4 EA-bits
+              in the IPv6 address identify an IPv4
+              prefix/address (or part thereof) or
+              a shared IPv4 address (or part thereof)
+              and a port-set identifier.
+              The length of the EA-bits is defined as
+              part of a MAP rule for a MAP domain.";
+          }
+          leaf rule-ipv6-prefix {
+            type inet:ipv6-prefix;
+            mandatory true;
+            description
+              "The Rule IPv6 prefix defined in the mapping rule.";
+          }
+          leaf rule-ipv4-prefix {
+            type inet:ipv4-prefix;
+            mandatory true;
+            description
+              "The Rule IPv4 prefix defined in the mapping rule.";
+          }
+          leaf forwarding {
+            type boolean;
+            mandatory true;
+            description
+              "This parameter specifies whether the rule may be used for
+              forwarding (FMR). If set, this rule is used as an FMR;
+              if not set, this rule is a BMR only and must not be used
+              for forwarding.";
+          }
+          leaf psid-offset {
+            type uint8 {
+              range 0..16;
+            }
+            mandatory true;
+            description
+              "The number of offset bits. In Lightweight 4over6, the default
+              value is 0 for assigning one contiguous port range. In MAP-E/T,
+              the default value is 6, which excludes system ports by default
+              and assigns distributed port ranges. If the this parameter is
+              larger than 0, the value of offset MUST be greater than 0.";
+          }
+          leaf psid-len {
+            type uint8 {
+              range 0..15;
+            }
+            mandatory true;
+            description
+              "The length of PSID, representing the sharing ratio for an
+              IPv4 address.";
+          }
+          leaf tunnel-payload-mtu {
+            type uint16;
+            description
+              "The payload MTU for MAP-E tunnel.";
+          }
+          leaf tunnel-path-mru {
+            type uint16;
+            description
+              "The path MRU for MAP-E tunnel.";
+          }
+          leaf br-ipv6-addr {
+            type inet:ipv6-address;
+            mandatory true;
+            description
+              "The IPv6 address of the MAP-E BR.";
+          }
+          leaf dmr-ipv6-prefix {
+            type inet:ipv6-prefix;
+            description
+              "The IPv6 prefix of the MAP-T BR. ";
+          }
+        }
+      }
+    }
+  }
+
+/*
+ * Operational state Data Nodes
+ */
+
+  container softwire-state {
+    config false;
+    description
+      "The operational state data for Softwire instances. ";
+    leaf description {
+      type string;
+      description
+        "A textual description of the softwire instances.";
+    }
+    container binding {
+      if-feature binding;
+      description
+        "lw4over6 (binding) state.";
+      container br {
+        if-feature br;
+        config false;
+        description
+          "Indicate this instance supports the lwAFTR (BR) function.
+          The instances advertise the lwaftr (BR) feature through the
+          capability exchange mechanism when a NETCONF session is
+          established.";
+        container br-instances {
+          description
+            "A set of BRs.";
+          list br-instance {
+            key "id";
+            description "instances for BR";
+            leaf id {
+              type uint32;
+              mandatory true;
+              description "id";
+            }
+            leaf name {
+              type string;
+              description "The name for this lwaftr.";
+            }
+            uses traffic-stat;
+            leaf active-softwire-num {
+              type uint32;
+              description
+                "The number of currently active tunnels on the
+                lw4over6 (binding) instance.";
+            }
+            container binding-table {
+              description "id";
+              list binding-entry {
+                key "binding-ipv6info";
+                description "An identifier of the binding entry.";
+                leaf binding-ipv6info {
+                  type union {
+                    type inet:ipv6-address;
+                    type inet:ipv6-prefix;
+                  }
+                  mandatory true;
+                  description
+                    "The IPv6 information used to identify
+                      a binding entry. ";
+                }
+                leaf active {
+                  type boolean;
+                  description
+                    "Status of a specific tunnel.";
+                }
+              }
+            }
+          }
+        }
+      }
+
+
+      container ce {
+        if-feature ce;
+        config false;
+        description
+          "Indicate this instance supports the lwB4 (CE) function.
+          The instances advertise the lwb4 (CE) feature through the
+          capability exchange mechanism when a NETCONF session is
+          established.";
+        container ce-instances {
+          description
+            "Status of the configured CEs.";
+          list ce-instance {
+            key "binding-ipv6info";
+            description "a lwB4 (CE) instance.";
+            leaf binding-ipv6info {
+              type union {
+                type inet:ipv6-address;
+                type inet:ipv6-prefix;
+              }
+              mandatory true;
+              description
+                "The IPv6 information used to identify
+                 a binding entry. ";
+            }
+            leaf name {
+              type string;
+              description "The CE's name.";
+            }
+            uses traffic-stat;
+          }
+        }
+      }
+    }
+
+    container algorithm {
+      if-feature algorithm;
+      config false;
+      description
+        "Indicate the instances support the MAP-E and MAP-T function.
+        The instances advertise the map-e/map-t feature through the
+        capability exchange mechanism when a NETCONF session is
+        established.";
+      container algo-instances {
+        description
+          "Status of MAP-E instance(s).";
+        list algo-instance {
+          key "id";
+          description "Instances for algorithm";
+          leaf id {
+            type uint32;
+            mandatory true;
+            description "id";
+          }
+          leaf name {
+            type string;
+            description "The map-e instance name.";
+
+          }
+          uses traffic-stat;
+        }
+      }
+    }
+  }
+
+/*
+ * Notifications
+ */
+  notification softwire-br-event {
+    if-feature binding;
+    if-feature br;
+    description "Notification for BR.";
+
+    leaf br-id {
+      type leafref {
+        path
+          "/softwire-state/binding/br/br-instances/"
+          + "br-instance/id";
+      }
+          description "...";
+    }
+    leaf-list invalid-entry {
+      type leafref {
+        path
+          "/softwire-config/binding/br/br-instances/"
+          + "br-instance[id=current()/../br-id]/"
+          + "binding-table/binding-entry/binding-ipv6info";
+      }
+      description
+        "Notify the client that a specific binding entry has been
+        expired/invalid. The binding-ipv6info identifies an entry.";
+    }
+    leaf-list added-entry {
+        type inet:ipv6-address;
+        description
+          "Notify the client that a binding entry has been added.
+          The ipv6 address of that entry is the index. The client
+          get other information from the lwaftr about the entry
+          indexed by that ipv6 address.
+          ";
+    }
+    leaf-list modified-entry {
+        type leafref {
+          path
+            "/softwire-config/binding/br/br-instances/"
+            + "br-instance[id=current()/../br-id]/"
+            + "binding-table/binding-entry/binding-ipv6info";
+        }
+          description "...";
+    }
+  }
+
+  notification softwire-ce-event {
+    if-feature binding;
+    if-feature ce;
+    description "CE notification";
+    leaf ce-binding-ipv6-addr-change {
+      type inet:ipv6-address;
+      mandatory true;
+      description
+        "The source tunnel IPv6 address of the lwB4.
+         If 'b4-ipv6-addr-format' is false, or the lwb4's
+         binding-ipv6-address changes for any reason,
+         it SHOULD notify the NETCONF client.";
+    }
+  }
+
+  notification softwire-algorithm-instance-event {
+    if-feature algorithm;
+    description "Notifications for MAP-E or MAP-T.";
+    leaf algo-id {
+      type leafref {
+        path
+          "/softwire-config/algorithm/algo-instances/algo-instance/id";
+      }
+      mandatory true;
+      description "MAP-E or MAP-T event.";
+    }
+    leaf-list invalid-entry-id {
+      type leafref {
+        path
+          "/softwire-config/algorithm/algo-instances/algo-instance/id";
+      }
+      description "Invalid entry event.";
+    }
+    leaf-list added-entry {
+      type leafref {
+        path
+          "/softwire-config/algorithm/algo-instances/algo-instance/id";
+      }
+      description "Added entry.";
+    }
+    leaf-list modified-entry {
+      type leafref {
+        path
+          "/softwire-config/algorithm/algo-instances/algo-instance/id";
+      }
+      description "Modified entry.";
+    }
+  }
+}
+     

@@ -43,3 +43,9 @@ Usage:
     latter being the default. Optionally, a LuaJIT profiler option string can
     be supplied as <profile>, which will cause the benchmark run to be profiled
     accordingly.
+
+  snabbmark hash
+    Benchmark hash functions used for internal data structures.
+
+  snabbmark ctable
+    Benchmark insertion and lookup for the "ctable" data structure.

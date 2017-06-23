@@ -1,108 +1,100 @@
-/* Use of this source code is governed by the Apache 2.0 license; see COPYING. */
+// memory.c - supporting code for DMA memory management
+// Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
-// memory.c -- allocate dma-friendly memory
+// This file implements a SIGSEGV handler that traps access to DMA
+// memory that is available to the Snabb process but not yet mapped.
+// These accesses are transparently supported by mapping the required
+// memory "just in time."
 //
-// Allocate HugeTLB memory pages for DMA. HugeTLB memory is always
-// mapped to a virtual address with a specific scheme:
+// The overall effect is that each Snabb process in a group can
+// transparently access the DMA memory allocated by other processes.
+// DMA pointers in each process are also valid in all other processes
+// within the same group.
 //
-//   virtual_address = physical_address | 0x500000000000ULL
-//
-// This makes it possible to resolve physical addresses directly from
-// virtual addresses (remove the tag bits) and to test addresses for
-// validity (check the tag bits).
-
-#define _GNU_SOURCE 1
+// Note that every process maps DMA memory to the same address i.e.
+// the physical address of the memory with some tag bits added.
 
 #include <assert.h>
 #include <fcntl.h>
-#include <stdbool.h>
+#include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <sys/ipc.h>
 #include <sys/mman.h>
-#include <sys/shm.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "memory.h"
+// See memory.lua for pointer tagging scheme.
+#define TAG 0x500000000000ULL
+#define PATH_MAX 256
 
-// Convert from virtual addresses in our own process address space to
-// physical addresses in the RAM chips.
-uint64_t virtual_to_physical(uintptr_t *ptr)
+static uint64_t page_mask;
+static char path_template[PATH_MAX];
+
+// Counter for the number of times a page has been mapped on-demand by
+// the SIGSEGV handler.
+int memory_demand_mappings;
+
+static void memory_sigsegv_handler(int sig, siginfo_t *si, void *unused);
+
+// Install signal handler
+static void set_sigsegv_handler()
 {
-  uintptr_t virt_page;
-  static int pagemap_fd;
-  virt_page = ((uintptr_t)ptr) / 4096;
-  if (pagemap_fd == 0) {
-    if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY)) <= 0) {
-      perror("open pagemap");
-      return 0;
-    }
-  }
-  uintptr_t data;
-  int len;
-  len = pread(pagemap_fd, &data, sizeof(data), virt_page * sizeof(uint64_t));
-  if (len != sizeof(data)) {
-    perror("pread");
-    return 0;
-  }
-  if ((data & (1ULL<<63)) == 0) {
-    fprintf(stderr, "page %lx not present: %lx", virt_page, data);
-    return 0;
-  }
-  return (data & ((1ULL << 55) - 1)) * 4096;
+  struct sigaction sa;
+  sa.sa_flags = SA_SIGINFO;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_sigaction = memory_sigsegv_handler;
+  assert(sigaction(SIGSEGV, &sa, NULL) != -1);
 }
 
-// Map a new HugeTLB page to an appropriate virtual address.
-//
-// The HugeTLB page is allocated and mapped using the shm (shared
-// memory) API. This API makes it easy to remap the page to a new
-// virtual address after we resolve the physical address.
-//
-// There are two other APIs for allocating HugeTLB pages but they do
-// not work as well:
-//
-//   mmap() anonymous page with MAP_HUGETLB: cannot remap the address
-//   after allocation because Linux mremap() does not seem to work on
-//   HugeTLB pages.
-//
-//   mmap() with file-backed MAP_HUGETLB: the file has to be on a
-//   hugetlbfs mounted filesystem and that is not necessarily
-//   available.
-//
-// Happily the shm API is happy to remap a HugeTLB page with an
-// additional call to shmat() and does not depend on hugetlbfs.
-//
-// Further reading:
-//   https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt
-//   http://stackoverflow.com/questions/27997934/mremap2-with-hugetlb-to-change-virtual-address
-void *allocate_huge_page(int size)
+static void memory_sigsegv_handler(int sig, siginfo_t *si, void *unused)
 {
-  int shmid = -1;
-  uintptr_t physical_address, virtual_address;
-  void *tmpptr = MAP_FAILED;  // initial kernel assigned virtual address
-  void *realptr = MAP_FAILED; // remapped virtual address
-  shmid = shmget(IPC_PRIVATE, size, SHM_HUGETLB | IPC_CREAT | SHM_R | SHM_W);
-  tmpptr = shmat(shmid, NULL, 0);
-  if (tmpptr == MAP_FAILED) { goto fail; }
-  if (mlock(tmpptr, size) != 0) { goto fail; }
-  physical_address = virtual_to_physical(tmpptr);
-  if (physical_address == 0) { goto fail; }
-  virtual_address = physical_address | 0x500000000000ULL;
-  realptr = shmat(shmid, (void*)virtual_address, 0);
-  if (realptr == MAP_FAILED) { goto fail; }
-  if (mlock(realptr, size) != 0) { goto fail; }
-  memset(realptr, 0, size); // zero memory to avoid potential surprises
-  shmdt(tmpptr);
-  shmctl(shmid, IPC_RMID, 0);
-  return realptr;
- fail:
-  if (tmpptr  != MAP_FAILED) { shmdt(tmpptr); }
-  if (realptr != MAP_FAILED) { shmdt(realptr); }
-  if (shmid   != -1)         { shmctl(shmid, IPC_RMID, 0); }
-  return NULL;
+  int fd = -1;
+  struct stat st;
+  char path[PATH_MAX];
+  uint64_t address = (uint64_t)si->si_addr;
+  uint64_t page = address & ~TAG & page_mask;
+  // Disable this handler to avoid potential recursive signals.
+  signal(SIGSEGV, SIG_DFL);
+  fflush(stdout);
+  // Check that this is a DMA memory address
+  if ((address & TAG) != TAG) {
+    goto punt;
+  }
+  snprintf(path, PATH_MAX, path_template, page);
+  // Check that the memory is accessible to this process
+  if ((fd = open(path, O_RDWR)) == -1) {
+    goto punt;
+  }
+  if (fstat(fd, &st) == -1) {
+    goto punt;
+  }
+  // Map the memory at the expected address
+  if (mmap((void *)(page | TAG), st.st_size, PROT_READ|PROT_WRITE,
+           MAP_SHARED|MAP_FIXED|MAP_HUGETLB, fd, 0) == MAP_FAILED) {
+    goto punt;
+  }
+  close(fd);
+  memory_demand_mappings++;
+  // Re-enable the handler for next time
+  set_sigsegv_handler();
+  return;
+ punt:
+  // Fall back to the default SEGV behavior by resending the signal
+  // now that the handler is disabled.
+  // See https://www.cons.org/cracauer/sigint.html
+  kill(getpid(), SIGSEGV);
+}
+
+// Setup a SIGSEGV handler to map DMA memory on demand.
+void memory_sigsegv_setup(int huge_page_size, const char *path)
+{
+  // Save parameters
+  page_mask = ~(uint64_t)(huge_page_size - 1);
+  assert(strlen(path) < PATH_MAX);
+  strncpy(path_template, path, PATH_MAX);
+  memory_demand_mappings = 0;
+  set_sigsegv_handler();
 }
 
