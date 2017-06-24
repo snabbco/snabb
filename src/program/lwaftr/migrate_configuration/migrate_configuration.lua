@@ -12,6 +12,7 @@ local stream = require('lib.yang.stream')
 local binding_table = require("apps.lwaftr.binding_table")
 local Parser = require("program.lwaftr.migrate_configuration.conf_parser").Parser
 local data = require('lib.yang.data')
+local path = require('lib.yang.path')
 
 local br_address_t = ffi.typeof('uint8_t[16]')
 local SOFTWIRE_TABLE_LOAD_FACTOR = 0.4
@@ -24,11 +25,23 @@ end
 local function parse_args(args)
    local handlers = {}
    local version = 'legacy'
+   local options = {}
    function handlers.h() show_usage(0) end
    function handlers.f(v) version = string.lower(v) end
-   args = lib.dogetopt(args, handlers, "hf:", { help="h", from="f" })
+   function handlers.o(o) options[#options + 1] = o end
+   args = lib.dogetopt(args, handlers, "hf:o:", { help="h", from="f", options="o" })
    if #args ~= 1 then show_usage(1) end
-   return args[1], version
+   return args[1], version, options
+end
+
+local function find_option(options, path, leaf)
+   path = path .. "[" .. leaf
+   local length = string.len(path)
+   for _, opt in pairs(options) do
+      if opt:sub(0, length) == path then
+         return opt:sub(length+2, string.len(opt)-1)
+      end
+   end
 end
 
 local policies = {
@@ -423,6 +436,89 @@ local function remove_psid_map(conf)
    return conf
 end
 
+local function multiprocess_migration(src, conf_file, device, ex_device)
+   -- We should build up a hybrid schema from parts of v1 and v2.
+   local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
+   local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
+   local v1_external = v1_schema.body["softwire-config"].body["external-interface"]
+   local v1_internal = v1_schema.body["softwire-config"].body["internal-interface"]
+   local external = hybridscm.body["softwire-config"].body["external-interface"]
+   local internal = hybridscm.body["softwire-config"].body["internal-interface"]
+   local queue = hybridscm.body["softwire-config"].body.instance.body.queue
+
+   -- Remove the mandatory requirements
+   queue.body["external-interface"].body.ip.mandatory = false
+   queue.body["external-interface"].body.mac.mandatory = false
+   queue.body["external-interface"].body["next-hop"].mandatory = false
+   queue.body["internal-interface"].body.ip.mandatory = false
+   queue.body["internal-interface"].body.mac.mandatory = false
+   queue.body["internal-interface"].body["next-hop"].mandatory = false
+
+   hybridscm.body["softwire-config"].body["external-interface"] = v1_external
+   hybridscm.body["softwire-config"].body["internal-interface"] = v1_internal
+
+   -- Extract the grammar, load the config and find the key
+   local hybridgmr = data.data_grammar_from_schema(hybridscm)
+   local instgmr = hybridgmr.members["softwire-config"].members.instance
+   local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
+   local queue_key = ffi.typeof(instgmr.values.queue.key_ctype)
+   local global_external_if = conf.softwire_config.external_interface
+   local global_internal_if = conf.softwire_config.internal_interface
+   -- If there is a external device listed we should include that too.
+
+
+   -- Build up the instance list
+   local instance = {
+      [device] = {queue = cltable.new({ key_type = queue_key }),},
+   }
+   local key = ffi.new(queue_key, 1)
+   local value = {
+      external_interface = {
+         device = ex_device,
+         ip = conf.softwire_config.external_interface.ip,
+         mac = conf.softwire_config.external_interface.mac,
+         next_hop = {},
+         vlan_tag = conf.softwire_config.external_interface.vlan_tag
+      },
+      internal_interface = {
+         ip = conf.softwire_config.internal_interface.ip,
+         mac = conf.softwire_config.internal_interface.mac,
+         next_hop = {},
+         vlan_tag = conf.softwire_config.internal_interface.vlan_tag
+      }
+   }
+
+   -- Add the list to the config
+   if global_external_if.next_hop.mac then
+      value.external_interface.next_hop.mac = global_external_if.next_hop.mac
+   elseif global_external_if.next_hop.ip then
+      value.external_interface.next_hop.ip = global_external_if.next_hop.ip
+   else
+      error("One or both of next-hop values must be provided.")
+   end
+
+   if global_internal_if.next_hop.mac then
+      value.internal_interface.next_hop.mac = global_internal_if.next_hop.mac
+   elseif global_internal_if.next_hop.ip then
+      value.internal_interface.next_hop.ip = global_internal_if.next_hop.ip
+   else
+      error("One or both of next-hop values must be provided.")
+   end
+   cltable.set(instance[device].queue, key, value)
+   conf.softwire_config.instance = instance
+
+   -- Remove the fields which no longer should exist
+   conf.softwire_config.internal_interface.ip = nil
+   conf.softwire_config.internal_interface.mac = nil
+   conf.softwire_config.internal_interface.next_hop = nil
+   conf.softwire_config.internal_interface.vlan_tag = nil
+   conf.softwire_config.external_interface.ip = nil
+   conf.softwire_config.external_interface.mac = nil
+   conf.softwire_config.external_interface.next_hop = nil
+   conf.softwire_config.external_interface.vlan_tag = nil
+   return conf
+end
+
 local function v2_migration(src, conf_file)
    -- Lets create a custom schema programmatically as an intermediary so we can
    -- switch over to v2 of snabb-softwire config.
@@ -449,7 +545,7 @@ local function v2_migration(src, conf_file)
    -- Remove the psid-map and add it to the softwire.
    conf = remove_psid_map(conf)
    conf.softwire_config.binding_table.psid_map = nil
-      
+
    return conf
 end
 
@@ -486,17 +582,32 @@ local function migrate_3_2_0(conf_file)
    return v2_migration(src, conf_file)
 end
 
+local function migrate_dev(conf_file, options)
+   local device = assert(
+      find_option(options, "/softwire-config/instance", "device"),
+      "Must specify value for /softwire-config/instance/device"
+   )
+   local ex_device = find_option(
+      options,
+      "/softwire-config/instance/queue/external-interface",
+      "device"
+   )
+   local src = io.open(conf_file, "r"):read("*a")
+   return multiprocess_migration(src, conf_file, device, ex_device)
+end
+
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
                     ['3.0.1.1'] = migrate_3_0_1bis,
-                    ['3.2.0'] = migrate_3_2_0, }
+                    ['3.2.0'] = migrate_3_2_0,
+                    ["dev"] = migrate_dev, }
 function run(args)
-   local conf_file, version = parse_args(args)
+   local conf_file, version, options = parse_args(args)
    local migrate = migrators[version]
    if not migrate then
       io.stderr:write("error: unknown version: "..version.."\n")
       show_usage(1)
    end
-   local conf = migrate(conf_file)
+   local conf = migrate(conf_file, options)
    yang.print_data_for_schema_by_name('snabb-softwire-v2', conf, io.stdout)
    main.exit(0)
 end
