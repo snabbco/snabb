@@ -31,10 +31,44 @@ local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
 end
 
-function lwaftr_app(c, conf)
+function lwaftr_app(c, conf, ipv4_pci_device)
    assert(type(conf) == 'table')
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
+
+   local function select_instance(config, device)
+      local function table_len(t)
+         local count = 0
+         for k,v in pairs(t) do count = count + 1 end
+         return count
+      end
+      local function table_merge(t1, t2)
+         local rtn = {}
+         for k,v in pairs(t1) do rtn[k] = v end
+         for k,v in pairs(t2) do rtn[k] = v end
+         return rtn
+      end
+
+      assert(
+         table_len(conf.softwire_config.instance) == 1,
+         "Config must only have one instance"
+      )
+      device = next(conf.softwire_config.instance)
+      instance = conf.softwire_config.instance[device]
+
+      local queue = instance.queue.values
+      assert(table_len(queue) == 1, "Config must only have one queue.")
+
+      local external = table_merge(
+         config.softwire_config.external_interface,
+         queue[1].external_interface
+      )
+      local internal = table_merge(
+         config.softwire_config.internal_interface,
+         queue[1].internal_interface
+      )
+      return device, external, internal
+   end
+
+   local device, external_interface, internal_interface = select_instance(conf)
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
 
@@ -134,6 +168,11 @@ function lwaftr_app(c, conf)
    set_preprocessors(c, preprocessing_apps_v6, "lwaftr.v6")
    set_postprocessors(c, "lwaftr.v6", postprocessing_apps_v6)
    set_postprocessors(c, "lwaftr.v4", postprocessing_apps_v4)
+
+   -- Convert the config back to a instance form so the lwaftr can use it.
+   conf.softwire_config.external_interface = external_interface
+   conf.softwire_config.internal_interface = internal_interface
+   return conf, device, internal_interface, external_interface
 end
 
 local function link_apps(c, apps)
@@ -180,41 +219,38 @@ local function link_sink(c, v4_out, v6_out)
    config.link(c, 'fragmenterv6.output -> '..v6_out)
 end
 
-function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
-   lwaftr_app(c, conf)
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
+function load_phy(c, conf, v4_nic_name, v6_nic_name)
+   local conf, v4_pci, external_if, internal_if = lwaftr_app(c, conf)
+   local v6_pci = external_interface.device
 
    config.app(c, v4_nic_name, Intel82599, {
-      pciaddr=v4_nic_pci,
-      vmdq=external_interface.vlan_tag,
-      vlan=external_interface.vlan_tag,
+      pciaddr=v4_pci,
+      vmdq=external_if.vlan_tag,
+      vlan=external_if.vlan_tag,
       rxcounter=1,
-      macaddr=ethernet:ntop(external_interface.mac)})
+      macaddr=ethernet:ntop(external_if.mac)})
    config.app(c, v6_nic_name, Intel82599, {
-      pciaddr=v6_nic_pci,
-      vmdq=internal_interface.vlan_tag,
-      vlan=internal_interface.vlan_tag,
+      pciaddr=v6_pci,
+      vmdq=internal_if.vlan_tag,
+      vlan=internal_if.vlan_tag,
       rxcounter=1,
-      macaddr = ethernet:ntop(internal_interface.mac)})
+      macaddr = ethernet:ntop(internal_if.mac)})
 
    link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
    link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
 end
 
 function load_on_a_stick(c, conf, args)
-   lwaftr_app(c, conf)
-   local v4_nic_name, v6_nic_name, v4v6, pciaddr, mirror = args.v4_nic_name,
-      args.v6_nic_name, args.v4v6, args.pciaddr, args.mirror
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
+   local conf, pciaddr, external_if, internal_if = lwaftr_app(c, conf)
+   local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
+      args.v6_nic_name, args.v4v6, args.mirror
 
    if v4v6 then
       config.app(c, 'nic', Intel82599, {
          pciaddr = pciaddr,
-         vmdq=external_interface.vlan_tag,
-         vlan=external_interface.vlan_tag,
-         macaddr = ethernet:ntop(external_interface.mac)})
+         vmdq=external_if.vlan_tag,
+         vlan=external_if.vlan_tag,
+         macaddr = ethernet:ntop(external_if.mac)})
       if mirror then
          local Tap = require("apps.tap.tap").Tap
          local ifname = mirror
@@ -234,14 +270,14 @@ function load_on_a_stick(c, conf, args)
    else
       config.app(c, v4_nic_name, Intel82599, {
          pciaddr = pciaddr,
-         vmdq=external_interface.vlan_tag,
-         vlan=external_interface.vlan_tag,
-         macaddr = ethernet:ntop(external_interface.mac)})
+         vmdq=external_if.vlan_tag,
+         vlan=external_if.vlan_tag,
+         macaddr = ethernet:ntop(external_if.mac)})
       config.app(c, v6_nic_name, Intel82599, {
          pciaddr = pciaddr,
-         vmdq=internal_interface.vlan_tag,
-         vlan=internal_interface.vlan_tag,
-         macaddr = ethernet:ntop(internal_interface.mac)})
+         vmdq=internal_if.vlan_tag,
+         vlan=internal_if.vlan_tag,
+         macaddr = ethernet:ntop(internal_if.mac)})
 
       link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
       link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
@@ -249,27 +285,23 @@ function load_on_a_stick(c, conf, args)
 end
 
 function load_virt(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
-   lwaftr_app(c, conf)
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
-
+   local conf, v4_pci, v6_pci, external_if, internal_if = lwaftr_app(c, conf)
+   local v6_pci = external_if.device
    config.app(c, v4_nic_name, VirtioNet, {
-      pciaddr=v4_nic_pci,
-      vlan=external_interface.vlan_tag,
-      macaddr=ethernet:ntop(external_interface.mac)})
+      pciaddr=v4_pci,
+      vlan=external_if.vlan_tag,
+      macaddr=ethernet:ntop(external_if.mac)})
    config.app(c, v6_nic_name, VirtioNet, {
-      pciaddr=v6_nic_pci,
-      vlan=internal_interface.vlan_tag,
-      macaddr = ethernet:ntop(internal_interface.mac)})
+      pciaddr=v6_pci,
+      vlan=internal_if.vlan_tag,
+      macaddr = ethernet:ntop(internal_if.mac)})
 
    link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
    link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
-   lwaftr_app(c, conf)
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
+   local conf, _, external_interface, internal_interface = lwaftr_app(c, conf)
 
    config.app(c, "capturev4", pcap.PcapReader, v4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, v6_pcap)
@@ -303,9 +335,7 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
 end
 
 function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   lwaftr_app(c, conf)
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
+   local conf, _, external_interface, internal_interface = lwaftr_app(c, conf)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -356,9 +386,7 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
 end
 
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   lwaftr_app(c, conf)
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
+   local conf, _, external_interface, internal_interface = lwaftr_app(c, conf)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -395,9 +423,7 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
 end
 
 function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
-   lwaftr_app(c, conf)
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
+   local conf, _, external_interface, internal_interface = lwaftr_app(c, conf)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -438,9 +464,7 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
 end
 
 function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
-   lwaftr_app(c, conf)
-   local external_interface = conf.softwire_config.external_interface
-   local internal_interface = conf.softwire_config.internal_interface
+   local conf, _, external_interface, internal_interface = lwaftr_app(c, conf)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
