@@ -102,15 +102,38 @@ end
 
 local function data_emitter(production)
    local handlers = {}
+   local translators = {}
    local function visit1(production)
       return assert(handlers[production.type])(production)
    end
    local function visitn(productions)
       local ret = {}
-      for keyword,production in pairs(productions) do
+      local expanded_production = productions
+      for keyword, production in pairs(productions) do
+         if translators[production.type] ~= nil then
+            expanded_production = translators[production.type](
+               expanded_production, keyword, production
+            )
+         end
+      end
+      for keyword,production in pairs(expanded_production) do
          ret[keyword] = visit1(production)
       end
       return ret
+   end
+   function translators.choice(productions, keyword, production)
+      local rtn = {}
+      -- First, do a shallow copy.
+      for k,v in pairs(productions) do rtn[k] = v end
+
+      -- Now bring the choice statements up to the same level replacing it.
+      for case, block in pairs(production.choices) do
+         for name, body in pairs(block) do rtn[name] = body end
+      end
+
+      -- Finally remove the choice statement entirely.
+      rtn[keyword] = nil
+      return rtn
    end
    function handlers.struct(production)
       local member_names = {}
