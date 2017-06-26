@@ -719,14 +719,17 @@ function data_printer_from_grammar(production)
       -- Iterate over productions trying to translate to other statements. This
       -- is used for example in choice statements raising the lower statements
       -- in case blocks up to the level of the choice, in place of the choice.
+      local translated = {}
       for keyword,production in pairs(productions) do
          local translator = translators[production.type]
          if translator ~= nil then
             local statements = translator(keyword, production)
-            for k,v in pairs(statements) do productions[k] = v end
-            productions[keyword] = nil
+            for k,v in pairs(statements) do translated[k] = v end
+         else
+            translated[keyword] = production
          end
       end
+      productions = translated
       if not order then
          order = {}
          for k,_ in pairs(productions) do table.insert(order, k) end
