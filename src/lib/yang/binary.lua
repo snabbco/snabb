@@ -455,6 +455,7 @@ function selftest()
       prefix simple-router;
 
       import ietf-inet-types {prefix inet;}
+      import ietf-yang-types { prefix yang; }
 
       leaf is-active { type boolean; default true; }
 
@@ -483,6 +484,20 @@ function selftest()
             type severity;
          }
       }
+
+      container next-hop {
+         choice address {
+            case mac {
+               leaf mac { type yang:mac-address; }
+            }
+            case ipv4 {
+               leaf ipv4 { type inet:ipv4-address; }
+            }
+            case ipv6 {
+               leaf ipv6 { type inet:ipv6-address; }
+            }
+         }
+      }
    }]])
    local data = data.load_data_for_schema(test_schema, [[
       is-active true;
@@ -496,6 +511,9 @@ function selftest()
         route { addr 2.3.4.5; port 10; }
         route { addr 3.4.5.6; port 2; }
         severity minor;
+      }
+      next-hop {
+         ipv4 5.6.7.8;
       }
    ]])
 
@@ -518,6 +536,7 @@ function selftest()
       assert(routing_table:lookup_ptr(key).value.port == 10)
       key.addr = util.ipv4_pton('3.4.5.6')
       assert(routing_table:lookup_ptr(key).value.port == 2)
+      assert(data.next_hop.ipv4 == util.ipv4_pton('5.6.7.8'))
 
       local tmp = os.tmpname()
       compile_data_for_schema(test_schema, data, tmp)
