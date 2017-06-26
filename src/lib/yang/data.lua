@@ -703,8 +703,9 @@ end
 
 function data_printer_from_grammar(production)
    local handlers = {}
-   local function printer(keyword, production)
-      return assert(handlers[production.type])(keyword, production)
+   local translators = {}
+   local function printer(keyword, production, printers)
+      return assert(handlers[production.type])(keyword, production, printers)
    end
    local function print_string(str, file)
       file:write(encode_yang_string(str))
@@ -715,6 +716,20 @@ function data_printer_from_grammar(production)
       file:write(' ')
    end
    local function body_printer(productions, order)
+      -- Iterate over productions trying to translate to other statements. This
+      -- is used for example in choice statements raising the lower statements
+      -- in case blocks up to the level of the choice, in place of the choice.
+      local translated = {}
+      for keyword,production in pairs(productions) do
+         local translator = translators[production.type]
+         if translator ~= nil then
+            local statements = translator(keyword, production)
+            for k,v in pairs(statements) do translated[k] = v end
+         else
+            translated[keyword] = production
+         end
+      end
+      productions = translated
       if not order then
          order = {}
          for k,_ in pairs(productions) do table.insert(order, k) end
@@ -722,7 +737,10 @@ function data_printer_from_grammar(production)
       end
       local printers = {}
       for keyword,production in pairs(productions) do
-         printers[keyword] = printer(keyword, production)
+         local printer = printer(keyword, production, printers)
+         if printer ~= nil then
+            printers[keyword] = printer
+         end
       end
       return function(data, file, indent)
          for _,k in ipairs(order) do
@@ -730,6 +748,15 @@ function data_printer_from_grammar(production)
             if v ~= nil then printers[k](v, file, indent) end
          end
       end
+   end
+   function translators.choice(keyword, production)
+      local rtn = {}
+      for case, body in pairs(production.choices) do
+         for name, statement in pairs(body) do
+            rtn[name] = statement
+         end
+      end
+      return rtn
    end
    function handlers.struct(keyword, production)
       local print_body = body_printer(production.members)
