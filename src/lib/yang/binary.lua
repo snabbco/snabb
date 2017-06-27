@@ -536,7 +536,10 @@ function selftest()
       assert(routing_table:lookup_ptr(key).value.port == 10)
       key.addr = util.ipv4_pton('3.4.5.6')
       assert(routing_table:lookup_ptr(key).value.port == 2)
-      assert(data.next_hop.ipv4 == util.ipv4_pton('5.6.7.8'))
+      assert(
+         data.next_hop.ipv4 == util.ipv4_pton('5.6.7.8'),
+         "Choice type test failed (round: "..i..")"
+      )
 
       local tmp = os.tmpname()
       compile_data_for_schema(test_schema, data, tmp)
