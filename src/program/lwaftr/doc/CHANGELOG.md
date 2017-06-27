@@ -1,6 +1,10 @@
 # Change Log
 
-## [3.1.6] - 2017-01-20
+## [3.1.8] - 2017-03-10
+
+* Retry ARP and NDP resolution indefinitely.
+
+## [3.1.7] - 2017-01-20
 
 * Reverts commit 86b9835 ("Remove end-addr in psid-map"), which 
   introduced a severe regression that caused high packet loss due
