@@ -1,3 +1,4 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
 -- This module provides some common definitions for snabbwall programs
