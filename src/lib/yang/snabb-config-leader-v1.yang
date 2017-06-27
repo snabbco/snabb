@@ -38,6 +38,7 @@ module snabb-config-leader-v1 {
       leaf schema { type string; mandatory true; }
       leaf revision { type string; }
       leaf path { type string; default "/"; }
+      leaf print-default { type boolean; }
     }
     output {
       uses error-reporting;
@@ -85,6 +86,7 @@ module snabb-config-leader-v1 {
       leaf schema { type string; mandatory true; }
       leaf revision { type string; }
       leaf path { type string; default "/"; }
+      leaf print-default { type boolean; }
     }
     output {
       uses error-reporting;

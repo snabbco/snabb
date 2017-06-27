@@ -51,15 +51,21 @@ end
 function parse_command_line(args, opts)
    opts = lib.parse(opts, parse_command_line_opts)
    local function err(msg) show_usage(opts.command, 1, msg) end
-   local ret = {}
+   local ret = {
+      print_default = false,
+   }
    local handlers = {}
    function handlers.h() show_usage(opts.command, 0) end
    function handlers.s(arg) ret.schema_name = arg end
    function handlers.r(arg) ret.revision_date = arg end
    function handlers.c(arg) ret.socket = arg end
+   handlers['print-default'] = function ()
+      ret.print_default = true
+   end
    args = lib.dogetopt(args, handlers, "hs:r:c:",
                        {help="h", ['schema-name']="s", schema="s",
-                        ['revision-date']="r", revision="r", socket="c"})
+                        ['revision-date']="r", revision="r", socket="c",
+                        ['print-default']=0})
    if #args == 0 then err() end
    ret.instance_id = table.remove(args, 1)
    local descr = call_leader(ret.instance_id, 'describe', {})

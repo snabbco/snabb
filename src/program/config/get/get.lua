@@ -8,6 +8,6 @@ function run(args)
    local response = common.call_leader(
       args.instance_id, 'get-config',
       { schema = args.schema_name, revision = args.revision_date,
-        path = args.path })
+        path = args.path, print_default = args.print_default })
    common.print_and_exit(response, "config")
 end

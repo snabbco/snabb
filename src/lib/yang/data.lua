@@ -701,7 +701,7 @@ local function value_serializer(typ)
    return serializer
 end
 
-function data_printer_from_grammar(production)
+function data_printer_from_grammar(production, print_default)
    local handlers = {}
    local translators = {}
    local function printer(keyword, production, printers)
@@ -834,7 +834,7 @@ function data_printer_from_grammar(production)
       local serialize = value_serializer(production.argument_type)
       return function(data, file, indent)
          local str = serialize(data)
-         if str ~= production.default then
+         if print_default or str ~= production.default then
             print_keyword(keyword, file, indent)
             file:write(str)
             file:write(';\n')
