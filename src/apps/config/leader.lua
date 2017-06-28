@@ -114,20 +114,25 @@ function Leader:rpc_describe (args)
             capability = schema.get_default_capabilities() }
 end
 
-local function path_printer_for_grammar(grammar, path, print_default)
+local function path_printer_for_grammar(grammar, path, opts)
    local getter, subgrammar = path_mod.resolver(grammar, path)
-   local printer = data.data_printer_from_grammar(subgrammar, print_default)
+   local printer
+   if opts.xpath_format then
+      printer = data.xpath_printer_from_grammar(subgrammar, opts.print_default, path)
+   else
+      printer = data.data_printer_from_grammar(subgrammar, opts.print_default)
+   end
    return function(data, file)
       return printer(getter(data), file)
    end
 end
 
-local function path_printer_for_schema(schema, path, print_default)
-   return path_printer_for_grammar(data.data_grammar_from_schema(schema), path, print_default)
+local function path_printer_for_schema(schema, path, opts)
+   return path_printer_for_grammar(data.data_grammar_from_schema(schema), path, opts)
 end
 
-local function path_printer_for_schema_by_name(schema_name, path, print_default)
-   return path_printer_for_schema(yang.load_schema_by_name(schema_name), path, print_default)
+local function path_printer_for_schema_by_name(schema_name, path, opts)
+   return path_printer_for_schema(yang.load_schema_by_name(schema_name), path, opts)
 end
 
 function Leader:rpc_get_config (args)
@@ -135,7 +140,7 @@ function Leader:rpc_get_config (args)
       if args.schema ~= self.schema_name then
          return self:foreign_rpc_get_config(args.schema, args.path)
       end
-      local printer = path_printer_for_schema_by_name(args.schema, args.path, args.print_default)
+      local printer = path_printer_for_schema_by_name(args.schema, args.path, args)
       local config = printer(self.current_configuration, yang.string_output_file())
       return { config = config }
    end
