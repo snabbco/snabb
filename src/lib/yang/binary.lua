@@ -210,11 +210,16 @@ local function data_emitter(production)
          end
       end
    end
+   local native_types = {
+      enumeration = true,
+      identityref = true,
+      string = true,
+   }
    function handlers.scalar(production)
       local primitive_type = production.argument_type.primitive_type
       local type = assert(value.types[primitive_type], "unsupported type: "..primitive_type)
       -- FIXME: needs a case for unions
-      if primitive_type == 'string' or primitive_type == 'enumeration' then
+      if native_types[primitive_type] then
          return function(data, stream)
             stream:write_stringref('stringref')
             stream:write_stringref(data)
