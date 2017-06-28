@@ -135,11 +135,12 @@ In the example above, attributes sucha as `period` and `mtu` take their
 default values.  They wouldn't be printed out unless `--print-default`
 was used.
 
-In addition, it's possible to print output in XPath format.  When `--xpath-format`
-is selected, every attribute is printed as an absolute path.  Example:
+In addition, it is possible to print output in two different formats:
+Yang or XPath.  By default, output is printed in Yang format.  Here is an
+example for XPath formatted output:
 
 ```
-$ sudo ./snabb config get --xpath-format lwaftr2 /softwire-config/external-interface
+$ sudo ./snabb config get --format=xpath ID /softwire-config/external-interface
 /softwire-config/external-interface/allow-incoming-icmp false;
 /softwire-config/external-interface/error-rate-limiting/packets 600000;
 /softwire-config/external-interface/ip 10.10.10.10;

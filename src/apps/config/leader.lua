@@ -117,7 +117,7 @@ end
 local function path_printer_for_grammar(grammar, path, opts)
    local getter, subgrammar = path_mod.resolver(grammar, path)
    local printer
-   if opts.xpath_format then
+   if opts.format == "xpath" then
       printer = data.xpath_printer_from_grammar(subgrammar, opts.print_default, path)
    else
       printer = data.data_printer_from_grammar(subgrammar, opts.print_default)

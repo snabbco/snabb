@@ -9,6 +9,6 @@ function run(args)
       args.instance_id, 'get-config',
       { schema = args.schema_name, revision = args.revision_date,
         path = args.path, print_default = args.print_default,
-        xpath_format = args.xpath_format })
+        format = args.format })
    common.print_and_exit(response, "config")
 end
