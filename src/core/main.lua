@@ -146,7 +146,7 @@ end
 
 function handler (reason)
    print(reason)
-   print(debug.traceback())
+   print(STP.stacktrace())
    if debug_on_error then debug.debug() end
    os.exit(1)
 end
