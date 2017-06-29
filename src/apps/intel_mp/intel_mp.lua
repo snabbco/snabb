@@ -260,10 +260,6 @@ Intel = {
       master_stats = {default=true},
       run_stats = {default=false}
    },
-   shm = {
-      mtu    = {counter},
-      txdrop = {counter}
-   }
 }
 Intel1g = setmetatable({}, {__index = Intel })
 Intel82599 = setmetatable({}, {__index = Intel})
@@ -313,7 +309,10 @@ function Intel:new (conf)
    self:init_rx_q()
 
    -- Initialize per app statistics
-   counter.set(self.shm.mtu, self.mtu)
+   self.shm = {
+      mtu    = {counter, self.mtu},
+      txdrop = {counter}
+   }
 
    -- Figure out if we are supposed to collect device statistics
    self.run_stats = conf.run_stats or (self.master and conf.master_stats)
@@ -322,8 +321,12 @@ function Intel:new (conf)
    if self.run_stats then
       local frame = {
          dtime     = {counter, C.get_unix_time()},
+         -- Keep a copy of the mtu here to have all
+         -- data available in a single shm frame
+         mtu       = {counter, self.mtu},
          speed     = {counter},
          status    = {counter, 2}, -- Link down
+         type      = {counter, 0x1000}, -- ethernetCsmacd
          promisc   = {counter},
          macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
          rxbytes   = {counter},
