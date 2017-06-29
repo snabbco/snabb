@@ -701,9 +701,6 @@ local function value_serializer(typ)
    return serializer
 end
 
--- XXX: This is a verbatim copy of data_printer_from_grammar. So far it differs
--- on the handling of keyword printing and structs. Still more work to do
--- regarding other data types such as arrays, tables, etc.
 function xpath_printer_from_grammar(production, print_default, root)
    local handlers = {}
    local translators = {}
@@ -752,6 +749,30 @@ function xpath_printer_from_grammar(production, print_default, root)
          end
       end
    end
+   local function key_composer (productions, order)
+      local printer = body_printer(productions, order)
+      local file = {t={}}
+      function file:write (str)
+         str = str:match("([^%s]+)")
+         if str and #str > 0 and str ~= ";" and str ~= root..'/' then
+            table.insert(self.t, str)
+         end
+      end
+      function file:flush ()
+         local ret = {}
+         for i=1,#self.t,2 do
+            local key, value = self.t[i], self.t[i+1]
+            table.insert(ret, key.."="..value)
+         end
+         self.t = {}
+         return table.concat(ret, ";")
+      end
+      return function (data, path)
+         path = path or ''
+         printer(data, file, path)
+         return file:flush()
+      end
+   end
    function translators.choice(keyword, production)
       local rtn = {}
       for case, body in pairs(production.choices) do
@@ -764,7 +785,7 @@ function xpath_printer_from_grammar(production, print_default, root)
    function handlers.struct(keyword, production)
       local print_body = body_printer(production.members)
       return function(data, file, indent)
-         print_body(data, file, keyword..'/')
+         print_body(data, file, indent)
       end
    end
    function handlers.array(keyword, production)
@@ -785,47 +806,35 @@ function xpath_printer_from_grammar(production, print_default, root)
       for k,_ in pairs(production.values) do table.insert(value_order, k) end
       table.sort(key_order)
       table.sort(value_order)
-      local print_key = body_printer(production.keys, key_order)
+      local compose_key = key_composer(production.keys, key_order)
       local print_value = body_printer(production.values, value_order)
       if production.key_ctype and production.value_ctype then
-         return function(data, file, indent)
+         return function(data, file, path)
             for entry in data:iterate() do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key(entry.key, file, indent..'  ')
-               print_value(entry.value, file, indent..'  ')
-               file:write(indent..'}\n')
+               local key = compose_key(entry.key)
+               print_value(entry.value, file, path..'['..key..']/')
             end
          end
       elseif production.string_key then
          local id = normalize_id(production.string_key)
-         return function(data, file, indent)
+         return function(data, file, path)
             for key, value in pairs(data) do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key({[id]=key}, file, indent..'  ')
-               print_value(value, file, indent..'  ')
-               file:write(indent..'}\n')
+               local key = compose_key({[id]=key})
+               print_value(value, file, path..'['..key..']/')
             end
          end
       elseif production.key_ctype then
-         return function(data, file, indent)
+         return function(data, file, path)
             for key, value in cltable.pairs(data) do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key(key, file, indent..'  ')
-               print_value(value, file, indent..'  ')
-               file:write(indent..'}\n')
+               local key = compose_key(key)
+               print_value(value, file, path..'['..key..']/')
             end
          end
       else
-         return function(data, file, indent)
+         return function(data, file, path)
             for key, value in pairs(data) do
-               if keyword then print_keyword(keyword, file, indent) end
-               file:write('{\n')
-               print_key(key, file, indent..'  ')
-               print_value(value, file, indent..'  ')
-               file:write(indent..'}\n')
+               print_key(key, file, path..'/')
+               print_value(value, file, path..'['..key..']/')
             end
          end
       end
