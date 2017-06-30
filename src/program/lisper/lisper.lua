@@ -744,16 +744,16 @@ function run(args)
             next_hop = ip6str(exit.next_hop),
          })
 
-         config.link(c, _("nd_%s.south -> if_%s.rx", ifname, ifname))
-         config.link(c, _("if_%s.tx -> nd_%s.south", ifname, ifname))
+         config.link(c, _("nd_%s.south -> if_%s.input", ifname, ifname))
+         config.link(c, _("if_%s.output -> nd_%s.south", ifname, ifname))
 
          config.link(c, _("lisper.%s -> nd_%s.north", ifname, ifname))
          config.link(c, _("nd_%s.north -> lisper.%s", ifname, ifname))
 
       else -- phy -> lisper
 
-         config.link(c, _("lisper.%s -> if_%s.rx", ifname, ifname))
-         config.link(c, _("if_%s.tx -> lisper.%s", ifname, ifname))
+         config.link(c, _("lisper.%s -> if_%s.input", ifname, ifname))
+         config.link(c, _("if_%s.output -> lisper.%s", ifname, ifname))
 
       end
 

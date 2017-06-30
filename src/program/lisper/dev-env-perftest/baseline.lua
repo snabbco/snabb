@@ -20,8 +20,8 @@ config.app(c, "e1", Intel82599, {
 	macaddr = "00:00:00:00:01:02",
 })
 
-config.link(c, "e0.tx -> e1.rx")
-config.link(c, "e1.tx -> e0.rx")
+config.link(c, "e0.output -> e1.input")
+config.link(c, "e1.output -> e0.input")
 
 engine.configure(c)
 engine.main({report = {showlinks=true}})

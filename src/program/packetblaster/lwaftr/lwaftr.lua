@@ -212,7 +212,7 @@ function run (args)
       if device_info then
          config.app(c, "nic", require(device_info.driver).driver,
          {pciaddr = pciaddr, vmdq = false, macaddr = src_mac, mtu = 9500})
-         input, output = "nic.rx", "nic.tx"
+         input, output = "nic.input", "nic.output"
       else
          fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))
       end

@@ -42,7 +42,7 @@ config.app(c, "eth", Intel82599, {
 	macaddr = "00:00:00:00:02:02",
 })
 
-config.link(c, "eth.tx -> count.rx")
+config.link(c, "eth.output -> count.rx")
 
 engine.configure(c)
 engine.main({report = {showlinks=true}})
