@@ -202,7 +202,7 @@ local function data_emitter(production)
          -- FIXME: lctable if production.value_ctype?
          return function(data, stream)
             stream:write_stringref('lltable')
-            stream:write_uint32(table_count(data))
+            stream:write_uint32(table_size(data))
             for k,v in pairs(data) do
                emit_key(k, stream)
                emit_value(v, stream)
