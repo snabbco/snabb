@@ -702,6 +702,9 @@ local function value_serializer(typ)
 end
 
 function xpath_printer_from_grammar(production, print_default, root)
+   if #root > 1 and root:sub(#root, #root) == '/' then
+      root = root:sub(1, #root-1)
+   end
    local handlers = {}
    local translators = {}
    local function printer(keyword, production, printers)
@@ -711,7 +714,8 @@ function xpath_printer_from_grammar(production, print_default, root)
       file:write(encode_yang_string(str))
    end
    local function print_keyword(k, file, path)
-      file:write(root..'/'..path)
+      path = path:sub(1, 1) ~= '[' and root..'/'..path or root..path
+      file:write(path)
       print_string(k, file)
       file:write(' ')
    end
@@ -812,7 +816,8 @@ function xpath_printer_from_grammar(production, print_default, root)
          return function(data, file, path)
             for entry in data:iterate() do
                local key = compose_key(entry.key)
-               print_value(entry.value, file, keyword..key..'/')
+               local path = keyword and keyword..key..'/' or key..'/'
+               print_value(entry.value, file, path)
             end
          end
       elseif production.string_key then
@@ -820,21 +825,24 @@ function xpath_printer_from_grammar(production, print_default, root)
          return function(data, file, path)
             for key, value in pairs(data) do
                local key = compose_key({[id]=key})
-               print_value(value, file, keyword..key..'/')
+               local path = keyword and keyword..key..'/' or key..'/'
+               print_value(value, file, path)
             end
          end
       elseif production.key_ctype then
          return function(data, file, path)
             for key, value in cltable.pairs(data) do
                local key = compose_key(key)
-               print_value(value, file, keyword..key..'/')
+               local path = keyword and keyword..key..'/' or key..'/'
+               print_value(value, file, path)
             end
          end
       else
          return function(data, file, path)
             for key, value in pairs(data) do
-               print_key(key, file, path..'/')
-               print_value(value, file, keyword..key..'/')
+               local key = compose_key(key)
+               local path = keyword and keyword..key..'/' or key..'/'
+               print_value(value, file, path)
             end
          end
       end
