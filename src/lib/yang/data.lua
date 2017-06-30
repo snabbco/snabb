@@ -788,8 +788,8 @@ function xpath_printer_from_grammar(production, print_default, root)
    end
    function handlers.struct(keyword, production)
       local print_body = body_printer(production.members)
-      return function(data, file, indent)
-         print_body(data, file, indent)
+      return function(data, file, path)
+         print_body(data, file, path..keyword..'/')
       end
    end
    function handlers.array(keyword, production)
