@@ -795,10 +795,12 @@ function xpath_printer_from_grammar(production, print_default, root)
    function handlers.array(keyword, production)
       local serialize = value_serializer(production.element_type)
       return function(data, file, indent)
+         local count = 1
          for _,v in ipairs(data) do
-            print_keyword(keyword, file, indent)
+            print_keyword(keyword.."[position()="..count.."]", file, '')
             file:write(serialize(v))
             file:write(';\n')
+            count = count + 1
          end
       end
    end
