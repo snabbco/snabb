@@ -38,10 +38,41 @@ local function table_keys(t)
    return ret
 end
 
-local function extract_parts(fragment)
+local syntax_error = function (str, pos)
+   local header = "Syntax error in "
+   io.stderr:write(header..str.."\n")
+   io.stderr:write(string.rep(" ", #header + pos-1))
+   io.stderr:write("^\n")
+   os.exit(1)
+end
+
+local function extract_parts (fragment)
    local rtn = {query={}}
-   rtn.name = string.match(fragment, "([^%[]+)")
-   for k,v in string.gmatch(fragment, "%[([^=]+)=([^%]]+)%]") do
+   local pos
+   function consume (char)
+      if fragment:sub(pos, pos) ~= char then
+         syntax_error(fragment, pos)
+      end
+      pos = pos + 1
+   end
+   function eol ()
+      return pos > #fragment
+   end
+   function token ()
+      local ret, new_pos = fragment:match("([^=%]]+)()", pos)
+      if not ret then
+         syntax_error(fragment, pos)
+      end
+      pos = new_pos
+      return ret
+   end
+   rtn.name, pos = string.match(fragment, "([^%[]+)()")
+   while not eol() do
+      consume('[', pos)
+      local k = token()
+      consume('=')
+      local v = token()
+      consume(']')
       rtn.query[k] = v
    end
    return rtn
@@ -345,6 +376,8 @@ function selftest()
    assert(normalize_path('//foo//bar//') == '/foo/bar')
    assert(normalize_path('//foo[b=1][c=2]//bar//') == '/foo[b=1][c=2]/bar')
    assert(normalize_path('//foo[c=1][b=2]//bar//') == '/foo[b=2][c=1]/bar')
+
+   assert(extract_parts('//foo[b=1]'))
 
    print("selftest: ok")
 end
