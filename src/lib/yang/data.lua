@@ -762,10 +762,10 @@ function xpath_printer_from_grammar(production, print_default, root)
          local ret = {}
          for i=1,#self.t,2 do
             local key, value = self.t[i], self.t[i+1]
-            table.insert(ret, key.."="..value)
+            table.insert(ret, '['..key.."="..value..']')
          end
          self.t = {}
-         return table.concat(ret, ";")
+         return table.concat(ret, '')
       end
       return function (data, path)
          path = path or ''
@@ -812,7 +812,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          return function(data, file, path)
             for entry in data:iterate() do
                local key = compose_key(entry.key)
-               print_value(entry.value, file, path..'['..key..']/')
+               print_value(entry.value, file, keyword..key..'/')
             end
          end
       elseif production.string_key then
@@ -820,21 +820,21 @@ function xpath_printer_from_grammar(production, print_default, root)
          return function(data, file, path)
             for key, value in pairs(data) do
                local key = compose_key({[id]=key})
-               print_value(value, file, path..'['..key..']/')
+               print_value(value, file, keyword..key..'/')
             end
          end
       elseif production.key_ctype then
          return function(data, file, path)
             for key, value in cltable.pairs(data) do
                local key = compose_key(key)
-               print_value(value, file, path..'['..key..']/')
+               print_value(value, file, keyword..key..'/')
             end
          end
       else
          return function(data, file, path)
             for key, value in pairs(data) do
                print_key(key, file, path..'/')
-               print_value(value, file, path..'['..key..']/')
+               print_value(value, file, keyword..key..'/')
             end
          end
       end
