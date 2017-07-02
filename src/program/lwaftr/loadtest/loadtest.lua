@@ -223,10 +223,10 @@ function run(args)
          print(string.format('  %s:', stream.tx_name))
          local nic_id = stream.nic_tx_id
          local nic_before, nic_after = before[nic_id], after[nic_id]
-         local tx = diff_counters(nic_before.output, nic_after.output)
+         local tx = diff_counters(nic_before.tx, nic_after.tx)
          local tx_mpps = tx.txpackets / duration / 1e6
          local tx_gbps = bitrate(tx) / 1e9
-         local rx = diff_counters(nic_before.input, nic_after.input)
+         local rx = diff_counters(nic_before.rx, nic_after.rx)
          local rx_mpps = rx.txpackets / duration / 1e6
          local rx_gbps = bitrate(rx) / 1e9
          local drop = tonumber(nic_after.drop - nic_before.drop)

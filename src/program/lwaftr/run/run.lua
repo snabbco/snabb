@@ -156,9 +156,7 @@ function run(args)
              mirror = opts.mirror } }
    else
       setup_fn = setup.load_phy
-      setup_args =
-         { { v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
-             ndescriptors = opts.ring_buffer_size } }
+      setup_args = { 'inetNic', v4, 'b4sideNic', v6, opts.ring_buffer_size }
    end
 
    if opts.reconfigurable then
