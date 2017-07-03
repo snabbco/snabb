@@ -135,9 +135,10 @@ function new(params)
    local params = parse_params(params, required_params, optional_params)
    ctab.entry_type = make_entry_type(params.key_type, params.value_type)
    ctab.type = make_entries_type(ctab.entry_type)
-   ctab.hash_seed = params.hash_seed or siphash.random_sip_hash_key()
-   ctab.hash_fn = compute_hash_fn(params.key_type, ctab.hash_seed)
-   ctab.make_multi_hash_fn = function(width)
+   function ctab.make_hash_fn()
+      return compute_hash_fn(params.key_type, ctab.hash_seed)
+   end
+   function ctab.make_multi_hash_fn(width)
       local stride, seed = ffi.sizeof(ctab.entry_type), ctab.hash_seed
       return compute_multi_hash_fn(params.key_type, width, stride, seed)
    end
@@ -148,6 +149,7 @@ function new(params)
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
    ctab = setmetatable(ctab, { __index = CTable })
+   ctab:reseed_hash_function(params.hash_seed)
    ctab:resize(params.initial_size)
    return ctab
 end
@@ -178,6 +180,13 @@ local function calloc(t, count)
    return ret, byte_size
 end
 
+function CTable:reseed_hash_function(seed)
+   self.hash_seed = seed or siphash.random_sip_hash_key()
+   self.hash_fn = self.make_hash_fn()
+   -- FIXME: Invalidate associated lookup streamers, as they need new
+   -- multi_hash functions.
+end
+
 function CTable:resize(size)
    assert(size >= (self.occupancy / self.max_occupancy_rate))
    local old_entries = self.entries
@@ -195,9 +204,11 @@ function CTable:resize(size)
    self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
    for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
 
+   if old_size ~= 0 then self:reseed_hash_function() end
+
    for i=0,old_size+old_max_displacement-1 do
       if old_entries[i].hash ~= HASH_MAX then
-         self:insert(old_entries[i].hash, old_entries[i].key, old_entries[i].value)
+         self:add(old_entries[i].key, old_entries[i].value)
       end
    end
 end
@@ -250,10 +261,16 @@ function CTable:save(stream)
                       self.size + self.max_displacement)
 end
 
-function CTable:insert(hash, key, value, updates_allowed)
+function CTable:add(key, value, updates_allowed)
    if self.occupancy + 1 > self.occupancy_hi then
+      -- Note that resizing will invalidate all hash keys, so we need
+      -- to hash the key after resizing.
       self:resize(self.size * 2)
    end
+
+   local hash = self.hash_fn(key)
+   assert(hash >= 0)
+   assert(hash < HASH_MAX)
 
    local entries = self.entries
    local scale = self.scale
@@ -312,13 +329,6 @@ function CTable:insert(hash, key, value, updates_allowed)
    entries[index].key = key
    entries[index].value = value
    return index
-end
-
-function CTable:add(key, value, updates_allowed)
-   local hash = self.hash_fn(key)
-   assert(hash >= 0)
-   assert(hash < HASH_MAX)
-   return self:insert(hash, key, value, updates_allowed)
 end
 
 function CTable:update(key, value)
