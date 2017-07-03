@@ -33,7 +33,10 @@ local lib        = require("core.lib")
 
 local alarm_notification = false
 
-local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
+local capabilities = {
+   ['ietf-softwire']={feature={'binding', 'br'}},
+   ['ietf-alarms']={feature={'operator-actions', 'alarm-shelving', 'alarm-history'}},
+}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
 local function convert_ipv4(addr)
