@@ -55,8 +55,13 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 PATH := ../lib/luajit/usr/local/bin:$(PATH)
 
 snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(YANGOBJ) $(LUAJIT_A)
+	$(E) "GEN       obj/version.lua.gen"
+	$(Q) ../generate-version-lua.sh > obj/version.lua.gen
+	$(E) "LUA       obj/version.lua"
+	$(Q) luajit -bg -n core.version obj/version.lua.gen obj/version_lua.o
 	$(E) "LINK      $@"
 	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
+	    obj/version_lua.o \
 	    ../lib/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
@@ -73,7 +78,6 @@ $(EXE): snabb bin
 	$(Q) upx -f --brute -o$@ snabb
 	@echo -n "BINARY    "
 	@ls -sh $@
-
 markdown: $(RMOBJS)
 
 test: $(TESTMODS) $(TESTSCRIPTS)
