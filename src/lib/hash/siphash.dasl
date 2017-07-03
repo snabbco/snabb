@@ -299,10 +299,10 @@ local function AVX2(stride)
       | mov eax, [rdi]
       | mov edx, [rdi+stride]
       | vpinsrq xmm(dst), xmm(dst), rax, 0
-      | vpinsrq xmm5, xmm5, rdx, 0
+      | vpinsrq xmm(dst), xmm(dst), rdx, 1
       | mov eax, [rdi+stride*2]
       | mov edx, [rdi+stride*3]
-      | vpinsrq xmm(dst), xmm(dst), rax, 1
+      | vpinsrq xmm5, xmm5, rax, 0
       | vpinsrq xmm5, xmm5, rdx, 1
       | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
       | add rdi, 4
@@ -312,10 +312,10 @@ local function AVX2(stride)
       | movzx rax, word [rdi]
       | movzx rdx, word [rdi+stride]
       | vpinsrq xmm(dst), xmm(dst), rax, 0
-      | vpinsrq xmm5, xmm5, rdx, 0
+      | vpinsrq xmm(dst), xmm(dst), rdx, 1
       | movzx rax, word [rdi+stride*2]
       | movzx rdx, word [rdi+stride*3]
-      | vpinsrq xmm(dst), xmm(dst), rax, 1
+      | vpinsrq xmm5, xmm5, rax, 0
       | vpinsrq xmm5, xmm5, rdx, 1
       | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
       | add rdi, 2
@@ -325,10 +325,10 @@ local function AVX2(stride)
       | movzx rax, byte [rdi]
       | movzx rdx, byte [rdi+stride]
       | vpinsrq xmm(dst), xmm(dst), rax, 0
-      | vpinsrq xmm5, xmm5, rdx, 0
+      | vpinsrq xmm(dst), xmm(dst), rdx, 1
       | movzx rax, byte [rdi+stride*2]
       | movzx rdx, byte [rdi+stride*3]
-      | vpinsrq xmm(dst), xmm(dst), rax, 1
+      | vpinsrq xmm5, xmm5, rax, 0
       | vpinsrq xmm5, xmm5, rdx, 1
       | vinsertf128 ymm(dst), ymm(dst), xmm5, 1
       | add rdi, 1
@@ -644,14 +644,22 @@ function selftest()
 
       check(hash1(test_input), 'scalar')
 
+      local zero_hash = reference_hash(ffi.new("uint8_t[?]", size))
       for _,width in ipairs({1,2,4,8}) do
          local mbuf = ffi.new("uint8_t[?]", size*width)
          local result = ffi.new("uint32_t[?]", width)
          local mhash = make_multi_hash(union(opts, {width=width}))
-         for i=0,width-1 do ffi.copy(mbuf+i*size, test_input, size) end
-         mhash(mbuf, result)
-         for elt=0,width-1 do
-            check(result[elt], string.format('x%d[%d]', width, elt))
+         for i=0,width-1 do
+            ffi.fill(mbuf, size*width)
+            ffi.copy(mbuf+i*size, test_input, size) 
+            mhash(mbuf, result)
+            for elt=0,width-1 do
+               if elt == i then
+                  check(result[i], string.format('x%d[%d]', width, elt))
+               elseif result[elt] ~= zero_hash then
+                  error('got hash(0)='..result[elt]..'; expected '..zero_hash)
+               end
+            end
          end
       end
    end
