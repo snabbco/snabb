@@ -40,6 +40,8 @@ INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
 YANGOBJ:= $(patsubst %.yang,obj/%_yang.o, $(YANGSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
+LUAJIT_A := ../lib/luajit/src/libluajit.a
+
 # TESTMODS expands to:
 #   core.memory core.lib ...
 # for each module that has a top-level selftest () function.
@@ -62,7 +64,6 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ)
 	$(E) "LINK      $@"
 	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    obj/version_lua.o \
-	    ../lib/luajit/src/libluajit.a \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
 	@ls -sh snabb
