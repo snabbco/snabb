@@ -17,6 +17,25 @@ local uint16_ptr_t = ffi.typeof('uint16_t*')
 local uint32_ptr_t = ffi.typeof('uint32_t*')
 local uint64_ptr_t = ffi.typeof('uint64_t*')
 
+local function compute_hash_fn(key_ctype, seed)
+   if tonumber(ffi.new(key_ctype)) then
+      return siphash.make_u64_hash({c=1, d=2, key=seed})
+   else
+      return siphash.make_hash({c=1, d=2, size=ffi.sizeof(key_ctype),
+                                key=seed})
+   end
+end
+
+local function compute_multi_hash_fn(key_ctype, width, stride, seed)
+   if tonumber(ffi.new(key_ctype)) then
+      -- We could fix this, but really it would be nicest to prohibit
+      -- scalar keys.
+      error('streaming lookup not available for scalar keys')
+   end
+   return siphash.make_multi_hash({c=1, d=2, size=ffi.sizeof(key_ctype),
+                                   width=width, stride=stride, key=seed})
+end
+
 local entry_types = {}
 local function make_entry_type(key_type, value_type)
    local cache = entry_types[key_type]
@@ -105,8 +124,7 @@ end
 -- map.
 local required_params = set('key_type', 'value_type')
 local optional_params = {
-   hash_fn = false,
-   make_multi_hash_fn = false,
+   hash_seed = false,
    initial_size = 8,
    max_occupancy_rate = 0.9,
    min_occupancy_rate = 0.0
@@ -117,12 +135,11 @@ function new(params)
    local params = parse_params(params, required_params, optional_params)
    ctab.entry_type = make_entry_type(params.key_type, params.value_type)
    ctab.type = make_entries_type(ctab.entry_type)
-   ctab.hash_fn = params.hash_fn or compute_hash_fn(params.key_type)
-   ctab.make_multi_hash_fn = params.make_multi_hash_fn or function(width, stride)
-      if params.hash_fn then
-         error("streaming lookup missing custom multi_hash function")
-      end
-      return compute_multi_hash_fn(params.key_type, width, stride)
+   ctab.hash_seed = params.hash_seed or siphash.reference_sip_hash_key()
+   ctab.hash_fn = compute_hash_fn(params.key_type, ctab.hash_seed)
+   ctab.make_multi_hash_fn = function(width)
+      local stride, seed = ffi.sizeof(ctab.entry_type), ctab.hash_seed
+      return compute_multi_hash_fn(params.key_type, width, stride, seed)
    end
    ctab.equal_fn = make_equal_fn(params.key_type)
    ctab.size = 0
@@ -368,44 +385,44 @@ function CTable:remove(key, missing_allowed)
    return true
 end
 
-function CTable:make_lookup_streamer(stride)
+function CTable:make_lookup_streamer(width)
    local res = {
       all_entries = self.entries,
-      stride = stride,
+      width = width,
       equal_fn = self.equal_fn,
       entries_per_lookup = self.max_displacement + 1,
       scale = self.scale,
-      pointers = ffi.new('void*['..stride..']'),
-      entries = self.type(stride),
-      hashes = ffi.new('uint32_t[?]', stride),
+      pointers = ffi.new('void*['..width..']'),
+      entries = self.type(width),
+      hashes = ffi.new('uint32_t[?]', width),
       -- Binary search over N elements can return N if no entry was
       -- found that was greater than or equal to the key.  We would
       -- have to check the result of binary search to ensure that we
       -- are reading a value in bounds.  To avoid this, allocate one
       -- more entry.
-      stream_entries = self.type(stride * (self.max_displacement + 1) + 1)
+      stream_entries = self.type(width * (self.max_displacement + 1) + 1)
    }
    -- Give res.pointers sensible default values in case the first lookup
    -- doesn't fill the pointers vector.
-   for i = 0, stride-1 do res.pointers[i] = self.entries end
+   for i = 0, width-1 do res.pointers[i] = self.entries end
 
    -- Initialize the stream_entries to HASH_MAX for sanity.
-   for i = 0, stride * (self.max_displacement + 1) do
+   for i = 0, width * (self.max_displacement + 1) do
       res.stream_entries[i].hash = HASH_MAX
    end
 
    -- Compile multi-copy and binary-search procedures that are
-   -- specialized for this table and this stride.
+   -- specialized for this table and this width.
    local entry_size = ffi.sizeof(self.entry_type)
-   res.multi_copy = multi_copy.gen(stride, res.entries_per_lookup * entry_size)
-   res.multi_hash = self.make_multi_hash_fn(stride, entry_size)
+   res.multi_copy = multi_copy.gen(width, res.entries_per_lookup * entry_size)
+   res.multi_hash = self.make_multi_hash_fn(width)
    res.binary_search = binary_search.gen(res.entries_per_lookup, self.entry_type)
 
    return setmetatable(res, { __index = LookupStreamer })
 end
 
 function LookupStreamer:stream()
-   local stride = self.stride
+   local width = self.width
    local entries = self.entries
    local pointers = self.pointers
    local stream_entries = self.stream_entries
@@ -415,7 +432,7 @@ function LookupStreamer:stream()
    local key_offset = 4 -- Skip past uint32_t hash.
    self.multi_hash(ffi.cast('uint8_t*', entries) + key_offset, self.hashes)
 
-   for i=0,stride-1 do
+   for i=0,width-1 do
       local hash = self.hashes[i]
       entries[i].hash = hash
       pointers[i] = self.all_entries + hash_to_index(hash, self.scale)
@@ -424,7 +441,7 @@ function LookupStreamer:stream()
    self.multi_copy(stream_entries, pointers)
 
    -- Copy results into entries.
-   for i=0,stride-1 do
+   for i=0,width-1 do
       local hash = entries[i].hash
       local index = i * entries_per_lookup
       local found = self.binary_search(stream_entries + index, hash)
@@ -460,7 +477,7 @@ function LookupStreamer:stream()
 end
 
 function LookupStreamer:is_empty(i)
-   assert(i >= 0 and i < self.stride)
+   assert(i >= 0 and i < self.width)
    return self.entries[i].hash == HASH_MAX
 end
 
@@ -532,25 +549,6 @@ function CTable:iterate()
       end
    end
    return next_entry, max_entry, self.entries - 1
-end
-
-hash_32 = siphash.make_u64_hash({c=1,d=2})
-hashv_32 = siphash.make_hash({c=1,d=2,size=4})
-hashv_48 = siphash.make_hash({c=1,d=2,size=6})
-hashv_64 = siphash.make_hash({c=1,d=2,size=8})
-
-local hash_fns_by_size = { [4]=hashv_32, [6]=hashv_48, [8]=hashv_64 }
-function compute_hash_fn(ctype)
-   local size = ffi.sizeof(ctype)
-   if not hash_fns_by_size[size] then
-      hash_fns_by_size[size] = siphash.make_hash({c=1,d=2,size=size})
-   end
-   return hash_fns_by_size[size]
-end
-
-function compute_multi_hash_fn(ctype, width, stride)
-   return siphash.make_multi_hash({c=1, d=2, size=ffi.sizeof(ctype),
-                                   width=width, stride=stride})
 end
 
 function selftest()
@@ -650,14 +648,15 @@ function selftest()
 
    -- OK, all looking good with the normal interfaces; let's check out
    -- streaming lookup.
-   local stride = 1
+   local width = 1
    repeat
-      local streamer = ctab:make_lookup_streamer(stride)
-      for i = 1, occupancy, stride do
-         local n = math.min(stride, occupancy-i+1)
+      local streamer = ctab:make_lookup_streamer(width)
+      for i = 1, occupancy, width do
+         local n = math.min(width, occupancy-i+1)
          for j = 0, n-1 do
             streamer.entries[j].key[0] = i + j
          end
+
          streamer:stream()
          for j = 0, n-1 do
             assert(streamer:is_found(j))
@@ -665,8 +664,8 @@ function selftest()
             assert(value == bnot(i + j))
          end
       end
-      stride = stride * 2
-   until stride > 256
+      width = width * 2
+   until width > 256
 
    -- A check that our equality functions work as intended.
    local numbers_equal = make_equal_fn(ffi.typeof('int'))

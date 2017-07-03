@@ -47,14 +47,11 @@ end
 
 function selftest()
    local ffi = require("ffi")
-   local hash_32 = ctable.hash_32
-
    local occupancy = 4
    -- 32-byte entries 
    local params = {
       key_type = ffi.typeof('uint32_t'),
       value_type = ffi.typeof('int32_t[6]'),
-      hash_fn = hash_32,
       max_occupancy_rate = 0.4,
       initial_size = ceil(occupancy / 0.4)
    }
