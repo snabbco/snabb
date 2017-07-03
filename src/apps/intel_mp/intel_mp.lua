@@ -748,7 +748,7 @@ function Intel:discard_unsent_packets ()
       old_tdt = band(old_tdt - 1, self.ndesc - 1)
       packet.free(self.txqueue[old_tdt])
       self.txdesc[old_tdt].address = -1
-      self.txdesc[old_tdt].options = 0
+      self.txdesc[old_tdt].flags = 0
    end
    self.tdt = self.tdh
 end
