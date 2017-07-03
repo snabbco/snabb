@@ -9,10 +9,9 @@ Usage: transient [OPTIONS] <PCAP-FILE> <NAME> <PCI> [<PCAP-FILE> <NAME> <PCI>]..
   -p period, --period PERIOD
                              Measure each PERIOD seconds.
   --bench-file FILENAME
-                             The file or path name to which benchmark data is
-                             written. A simple filename or relative pathname
-                             will be based on the current directory. Default
-                             is "bench.csv".
+                             The file or path name where benchmark data is to
+                             be written. A simple filename or relative pathname
+                             will be based on the current directory.
   -h, --help
                              Print usage information.
 
@@ -25,10 +24,11 @@ peak bitrate is reached, back down the same way until 0 is reached, and
 end the test.
 
 Packets received on the network interfaces are counted and recorded, and the
-corresponding incoming and outgoing packet rates are written to a file in CSV
-format, suitable for passing to a graphing program. The NAME values are used
-to label the columns. Measurements will be taken each PERIOD seconds, which
-defaults to 1.
+corresponding incoming and outgoing packet rates are written to standard
+output in CSV format, suitable for passing to a graphing program. If
+bench-file is set, output is written to a file instead of stdout. The NAME
+values are used to label the columns. Measurements will be taken each PERIOD
+seconds, which defaults to 1.
 
 Examples:
   transient cap1.pcap tx 01:00.0

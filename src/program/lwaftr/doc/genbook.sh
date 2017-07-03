@@ -23,24 +23,30 @@ cat <<EOF
 
 $(cat README.md)
 
-$(cat README.running.md)
+$(cat running.md)
 
-$(cat README.bindingtable.md)
+$(cat bindingtable.md)
 
-$(cat README.configuration.md)
+$(cat configuration.md)
 
-$(cat README.benchmarking.md)
+$(cat benchmarking.md)
 
-$(cat README.performance.md)
+$(cat continuous-integration.md)
 
-$(cat README.virtualization.md)
+$(cat performance.md)
 
-$(cat README.rfccompliance.md)
+$(cat filters-performance.md)
 
-$(cat README.troubleshooting.md)
+$(cat virtualization.md)
 
-$(cat README.counters.md)
+$(cat rfccompliance.md)
 
-$(cat README.breaking_changes.md)
+$(cat troubleshooting.md)
+
+$(cat counters.md)
+
+$(cat breaking_changes.md)
+
+$(cat ndp.md)
 
 EOF

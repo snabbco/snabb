@@ -1,10 +1,187 @@
 # Change Log
 
-## Pre-release changes
+## [3.1.6] - 2017-01-20
+
+* Reverts commit 86b9835 ("Remove end-addr in psid-map"), which 
+  introduced a severe regression that caused high packet loss due
+  to not maching softwires.
+
+## [3.1.6] - 2017-01-19
+
+* Add basic error reporting to snabb-softwire-v1.
+
+* Add property-based testing for snabb config.
+
+* Add socket support for "snabb config listen".
+
+* Clean stale object files in program/lwaftr and program/snabbvmx.
+
+* Fix "lwaftr query". Added selftest.
+
+* Fix "snabb config remove" on arrays.
+
+* Fix bug parsing empty strings in YANG parser.
+
+* Fix tunnel-path-mtu and tunnel-payload-mtu in ietf-softwire.
+
+* Respond to ping packets to internal and external interfaces when
+  running in on-a-stick mode. Added test.
+
+* Several improvements in lwaftrctl script (no screen command, connect
+  via telnet, internet access in VM).
+
+## [3.1.5] - 2016-12-09
+
+ * Improve "snabb ps" output.  Processes with a "*" by them are
+   listening for "snabb config" connections.
+
+ * Fix race condition in multiprocess --reconfigurable mode.
+
+ * Improve configuration change throughput.
+
+ * Add "snabb config bench" utility for benchmarking configuration
+   throughput.
+
+ * Add automated "snabb config" tests.
+
+ * Improve error message when --cpu setting was not possible.
+
+## [3.1.4] - 2016-12-09
+
+ * Fix memory corruption bug in main process of --reconfigurable "snabb
+   lwaftr run" that would cause the dataplane to prematurely exit.
+
+## [3.1.3] - 2016-12-08
+
+ * Fix performance problem for --reconfigurable "snabb lwaftr run"
+   wherein the main coordination process would also get scheduled on the
+   data plane CPU.  Also re-enable ingress drop monitor and --real-time
+   support for multiprocess lwaftr.
+
+ * "snabb config --help" fixes.
+
+ * Allow "snabb lwaftr query", "snabb lwaftr monitor", "snabbvmx query",
+   and "snabbvmx top" to locate Snabb instances by name.
+
+## [3.1.2] - 2016-12-07
+
+ * Re-enabled multi-process mode for --reconfigurable "snabb lwaftr
+   run", including support for "snabb config get-state".
+
+ * Improve memory consumption when parsing big configurations, such as a
+   binding table with a million entries.
+
+ * Re-enable CSV-format statistics for "snabb lwaftr bench" and "snabb
+   lwaftr run", which were disabled while we landed multiprocess
+   support.
+
+ * Fix "snabb ps --help".
+
+## [3.1.1] - 2016-12-06
+
+A hotfix to work around bugs in multiprocess support when using Intel
+NICs.
+
+ * Passing --reconfigurable to "snabb lwaftr run" now just uses a single
+   process while we sort out multiprocess issues.
+
+ * Fixed "snabb lwaftr query" and "snabb top", broken during
+   refactoring.
+
+## [3.1.0] - 2016-12-06
+
+Adding "ietf-softwire" support, process separation between control and
+the data plane, and some configuration file changes.
+
+ * Passing --reconfigurable to "snabb lwaftr run" now forks off a
+   dedicated data plane child process.  This removes the overhead of
+   --reconfigurable that was present in previous releases.
+
+ * Add support for ietf-softwire.  Pass the "-s ietf-softwire" to "snabb
+   config" invocations to use this schema.
+
+ * Add support for fast binding-table updates.  This is the first
+   version since the YANG migration that can make fast updates to
+   individual binding-table entries without causing the whole table to
+   reload, via "snabb config add
+   /softwire-config/binding-table/softwire".  See "snabb config"
+   documentation for more on how to use "snabb config add" and "snabb
+   config remove".
+
+ * Add support for named lwAFTR instances.  Pass "--name foo" to the
+   "snabb lwaftr run" command to have it claim a name on a machine.
+   "snabb config" can identify the remote Snabb instance by name, which
+   is often much more convenient than using the instance's PID.
+
+ * Final tweaks to the YANG schema before deployment -- now the
+   binding-table section is inside softwire-config, and the
+   configuration file format is now enclosed in "softwire-config {...}".
+   It used to be that only YANG "container" nodes which had "presence
+   true;" would have corresponding data nodes; this was a mistake.  The
+   new mapping where every container node from the YANG schema appears
+   in the data more closely follows the YANG standard XML mapping that
+   the XPath expressions are designed to operate over.
+
+   Additionally, the "br" leaf inside "snabb-softwire-v1" lists is now a
+   1-based index into the "br-address" leaf-list instead of a zero-based
+   index.
+
+   The "snabb lwaftr migrate-configation --from=3.0.1" command can
+   migrate your 3.0.1 configuration files to the new format.  See "snabb
+   lwaftr migrate-configuration --help" for more details.  The default
+   "--from" version is "legacy", meaning pre-3.0 lwAFTR configurations.
+
+## [3.0.1] - 2016-11-28
+
+A release to finish "snabb config" features.
+
+ * New "snabb config" commands "get-state", "add", "remove", and
+   "listen".  See [the `snabb config` documentation](../../config/README.md)
+   for full details.
+
+ * The "get-state", "get", "set", "add", and "remove" "snabb config"
+   commands can now take paths to indicate sub-configurations on which
+   to operate.  This was documented before but not yet implemented.
+
+## [3.0.0] - 2016-11-18
+
+A change to migrate the lwAFTR to use a new YANG-based configuration.
+
+ * New configuration format based on YANG.  To migrate old
+   configurations, run "snabb lwaftr migrate-configation old.conf" on
+   the old configuration.  See the [snabb-softwire-v1.yang
+   schema](../../../lib/yang/snabb-softwire-v1.yang) or
+   [configuration.md](./configuration.md) for full details
+   on the new configuration format.
 
  * Send ICMPv6 unreachable messages from the most appropriate source address
    available (the one associated with a B4 if possible, or else the one the
-   packet one is in reply to had as a destination.) 
+   packet one is in reply to had as a destination.)
+
+ * Add support for ARP resolution of the next hop on the external (IPv4)
+   interface.
+
+ * Add support for virtualized control planes via Snabb vMX.  See [the
+   `snabbvmx` documentation](../../snabbvmx/doc/README.md) for more.
+
+ * Add many more counters, used to diagnose the path that packets take
+   in the lwAFTR.  See [counters.md](./counters.md) for
+   more.
+
+ * Add "snabb config" set of commands, to replace "snabb lwaftr control".
+   See [the `snabb config` documentation](../../config/README.md) for
+   full details.
+
+ * Add initial support for being able to reconfigure an entire lwAFTR
+   process while it is running, including changes that can add or remove
+   ingresss or egress filters, change NIC settings, or the like.  Pass
+   the `--reconfigurable` argument to `snabb lwaftr run`, then interact
+   with the lwAFTR instance via `snabb config`.  Enabling this option
+   currently has a small performance impact; this will go away in the
+   next release.  A future release will also support efficient
+   incremental binding-table updates.
+
+ * Many updates from upstream Snabb.
 
 ## [2.10] - 2016-06-17
 
@@ -63,10 +240,10 @@ A bug-fix and documentation release.
 
  * Added performance analysis of the overhead of ingress and egress
    filtering.  See
-   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.filters-performance.md.
+   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/filters-performance.md.
 
  * Updated documentation for performance tuning.  See
-   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/README.performance.md
+   https://github.com/Igalia/snabb/blob/lwaftr_starfruit/src/program/lwaftr/doc/performance.md
 
  * Add a time-stamp for the JIT self-healing behavior, and adapt the
    message to be more helpful.
@@ -122,7 +299,7 @@ A bug fix release.
  * Add ability to read in ingress and egress filters from files.  If the
    filter value starts with a "<", it is interpreted as a file that
    should be read.  For example, `ipv6_egress_filter =
-   <ipv6-egress-filter.txt"`.  See README.configuration.md.
+   <ipv6-egress-filter.txt"`.  See configuration.md.
 
 ## [2.4] - 2016-05-03
 
