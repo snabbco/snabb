@@ -46,7 +46,7 @@ local function finish (name, prototype, Dst)
 end
 
 local function random_bytes(count)
-   local bytes = ffi.new('uint8_t[?]', count)
+   local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
    local f = S.open('/dev/urandom', 'rdonly')
    local written = 0
    while written < count do

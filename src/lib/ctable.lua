@@ -135,7 +135,7 @@ function new(params)
    local params = parse_params(params, required_params, optional_params)
    ctab.entry_type = make_entry_type(params.key_type, params.value_type)
    ctab.type = make_entries_type(ctab.entry_type)
-   ctab.hash_seed = params.hash_seed or siphash.reference_sip_hash_key()
+   ctab.hash_seed = params.hash_seed or siphash.random_sip_hash_key()
    ctab.hash_fn = compute_hash_fn(params.key_type, ctab.hash_seed)
    ctab.make_multi_hash_fn = function(width)
       local stride, seed = ffi.sizeof(ctab.entry_type), ctab.hash_seed
@@ -211,6 +211,7 @@ struct {
    uint32_t size;
    uint32_t occupancy;
    uint32_t max_displacement;
+   uint8_t hash_seed[16];
    double max_occupancy_rate;
    double min_occupancy_rate;
 }
@@ -222,6 +223,8 @@ function load(stream, params)
    for k,v in pairs(params) do params_copy[k] = v end
    params_copy.initial_size = header.size
    params_copy.min_occupancy_rate = header.min_occupancy_rate
+   params_copy.hash_seed = ffi.new('uint8_t[16]')
+   ffi.copy(params_copy.hash_seed, header.hash_seed, 16)
    params_copy.max_occupancy_rate = header.max_occupancy_rate
    local ctab = new(params_copy)
    ctab.occupancy = header.occupancy
@@ -239,7 +242,8 @@ end
 
 function CTable:save(stream)
    stream:write_ptr(header_t(self.size, self.occupancy, self.max_displacement,
-                             self.max_occupancy_rate, self.min_occupancy_rate),
+                             self.hash_seed, self.max_occupancy_rate,
+                             self.min_occupancy_rate),
                     header_t)
    stream:write_array(self.entries,
                       self.entry_type,
@@ -576,9 +580,12 @@ function selftest()
    end
 
    for i=1,2 do
-      -- In this case we know max_displacement is 9.  Assert here so that
-      -- we can detect any future deviation or regression.
-      assert(ctab.max_displacement == 9)
+      -- The max displacement of this table will depend on the hash
+      -- seed, but we know for this input that it should be between 8
+      -- and 10.  Assert here so that we can detect any future
+      -- deviation or regression.
+      assert(ctab.max_displacement >= 8, ctab.max_displacement)
+      assert(ctab.max_displacement <= 10, ctab.max_displacement)
 
       ctab:selfcheck()
 
