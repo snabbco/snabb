@@ -61,6 +61,12 @@ local function initialize_property (name, args)
    return prop, prop.handle_prop_args(args)
 end
 
+local function random_bytes_from_math_random(count)
+   local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
+   for i = 0,count-1 do bytes[i] = math.random(0, 255) end
+   return bytes
+end
+
 function run (args)
    local opts, prop_name, prop_args = parse_args(args)
    local rerun_usage = function (i)
@@ -68,7 +74,9 @@ function run (args)
             format(program_name, opts.seed, i + 1,
                    prop_name, table.concat(prop_args, " ")))
    end
+
    math.randomseed(opts.seed)
+   lib.random_bytes = random_bytes_from_math_random
 
    local prop, prop_info = initialize_property(prop_name, prop_args)
    for i=1,opts.iterations do

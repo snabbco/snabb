@@ -715,6 +715,17 @@ function getenv (name)
    else return nil end
 end
 
+-- Return an array of random bytes.
+function random_bytes(count)
+   local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
+   local f = syscall.open('/dev/urandom', 'rdonly')
+   local written = 0
+   while written < count do
+      written = written + assert(f:read(bytes, count-written))
+   end
+   return bytes
+end
+
 -- Compiler barrier.
 -- Prevents LuaJIT from moving load/store operations over this call.
 -- Any FFI call is sufficient to achieve this, see:

@@ -898,6 +898,11 @@ integers *n* respectively. Unsigned.
 Network to host byte order conversion functions for 32 and 16 bit
 integers *n* respectively. Unsigned.
 
+— Function **lib.random_bytes** *count*
+
+Return a fresh array of *count* random bytes.  Suitable for
+cryptographic usage.
+
 — Function **lib.parse** *arg*, *config*
 
 Validates *arg* against the specification in *config*, and returns a fresh
