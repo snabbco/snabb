@@ -469,8 +469,16 @@ of this process:
 - Fully qualified: `/1234/foo/bar` ⇒ `/var/run/snabb/1234/foo/bar`
 
 Behind the scenes the objects are backed by files on ram disk
-(`/var/run/snabb/<pid>`) and accessed with the equivalent of POSIX shared
-memory (`shm_overview(7)`).
+(`/var/run/snabb/<pid>`) and accessed with the equivalent of POSIX
+shared memory (`shm_overview(7)`). The files are automatically removed
+on shutdown unless the environment `SNABB_SHM_KEEP` is set. The
+location `/var/run/snabb` can be overridden by the environment
+variable `SNABB_SHM_ROOT`.
+
+Shared memory objects are created world-readable for convenient access
+by diagnostic tools. You can lock this down by setting
+`SNABB_SHM_ROOT` to a path under a directory with appropriate
+permissions.
 
 The practical limit on the number of objects that can be mapped will depend on
 the operating system limit for memory mappings. On Linux the default limit is
