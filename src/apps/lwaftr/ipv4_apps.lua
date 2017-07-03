@@ -6,6 +6,7 @@ local fragmentv4 = require("apps.lwaftr.fragmentv4")
 local fragv4_h = require("apps.lwaftr.fragmentv4_hardened")
 local lwutil = require("apps.lwaftr.lwutil")
 local icmp = require("apps.lwaftr.icmp")
+local lwcounter = require("apps.lwaftr.lwcounter")
 
 local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")
@@ -13,6 +14,8 @@ local checksum = require("lib.checksum")
 local packet = require("core.packet")
 local lib = require("core.lib")
 local counter = require("core.counter")
+local link = require("core.link")
+local engine = require("core.app")
 
 local receive, transmit = link.receive, link.transmit
 local wr16, rd32, wr32 = lwutil.wr16, lwutil.rd32, lwutil.wr32
@@ -37,7 +40,7 @@ function Reassembler:new(conf)
    local max_ipv4_reassembly_packets = assert(conf.max_ipv4_reassembly_packets)
    local max_fragments_per_reassembly_packet = assert(conf.max_fragments_per_reassembly_packet)
    local o = {
-      counters = assert(conf.counters, "Counters not initialized"),
+      counters = lwcounter.init_counters(),
       ctab = fragv4_h.initialize_frag_table(max_ipv4_reassembly_packets,
          max_fragments_per_reassembly_packet),
    }
@@ -85,7 +88,7 @@ end
 
 function Fragmenter:new(conf)
    local o = {
-      counters = assert(conf.counters, "Counters not initialized"),
+      counters = lwcounter.init_counters(),
       mtu = assert(conf.mtu),
    }
    return setmetatable(o, {__index=Fragmenter})
@@ -124,8 +127,6 @@ function ARP:new(conf)
    if not conf.dst_eth then
       o.arp_request_pkt = arp.form_request(conf.src_eth, conf.src_ipv4, conf.dst_ipv4)
       self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
-      self.arp_request_max_retries = 5 -- Max number of arp_request retries.
-      self.arp_request_retries = 0
    end
    o.dst_eth = conf.dst_eth -- intentionally nil if to request via ARP
    return o
@@ -133,15 +134,11 @@ end
 
 function ARP:maybe_send_arp_request (output)
    if self.dst_eth then return end
-   if self.arp_request_retries == self.arp_request_max_retries then
-      error(("Could not resolve IPv4 address: %s"):format(
-         ipv4:ntop(self.conf.dst_ipv4)))
-   end
    self.next_arp_request_time = self.next_arp_request_time or engine.now()
    if self.next_arp_request_time <= engine.now() then
+      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.conf.dst_ipv4)))
       self:send_arp_request(output)
       self.next_arp_request_time = engine.now() + self.arp_request_interval
-      self.arp_request_retries = self.arp_request_retries + 1
    end
 end
 
@@ -161,6 +158,8 @@ function ARP:push()
          if not self.dst_eth and arp.is_arp_reply(p) then
             local dst_ethernet = arp.get_isat_ethernet(p)
             if dst_ethernet then
+               print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(self.conf.dst_ipv4),
+                                                        ethernet:ntop(dst_ethernet)))
                self.dst_eth = dst_ethernet
             end
             packet.free(p)

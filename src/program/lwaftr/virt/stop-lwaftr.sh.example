@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+ps aux | grep "snabb lwaftr run" | awk '{ print $2; }' | xargs kill

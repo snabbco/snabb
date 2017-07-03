@@ -24,6 +24,7 @@ RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
 INCSRC = $(sort $(shell find . -regex '[^\#]*\.inc' -printf '%P ') programs.inc)
+YANGSRC= $(shell find . -regex '[^\#]*\.yang' -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
@@ -36,6 +37,7 @@ JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %,obj/%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
+YANGOBJ:= $(patsubst %.yang,obj/%_yang.o, $(YANGSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
 LUAJIT_A := ../lib/luajit/src/libluajit.a
@@ -43,9 +45,9 @@ LUAJIT_A := ../lib/luajit/src/libluajit.a
 # TESTMODS expands to:
 #   core.memory core.lib ...
 # for each module that has a top-level selftest () function.
-TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
+TESTMODS = $(shell find . -regex '[^\#]*\.\(lua\|dasl\)' -printf '%P ' | \
              xargs grep -s -l '^function selftest *[[:punct:]]' | \
-             sed -e 's_\.lua__' -e 's_/_._g')
+             sed -e 's_\.lua__' -e 's_\.dasl__' -e 's_/_._g')
 
 # TESTSCRIPTS expands to:
 #   lib/watchdog/selftest.sh ...
@@ -54,7 +56,7 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../lib/luajit/usr/local/bin:$(PATH)
 
-snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(LUAJIT_A)
+snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(YANGOBJ) $(LUAJIT_A)
 	$(E) "LINK      $@"
 	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
 	    -lrt -lc -ldl -lm -lpthread
@@ -172,6 +174,13 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	 echo "]=============]") > $(basename $@).luainc
 	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
 
+$(YANGOBJ): obj/%_yang.o: %.yang Makefile | $(OBJDIR)
+	$(E) "YANG      $@"
+	@(echo -n "return [=============["; \
+	 cat $<; \
+	 echo "]=============]") > $(basename $@).luayang
+	$(Q) luajit -bg -n $(subst /,.,$*)_yang $(basename $@).luayang $@
+
 # Create list of programs that exist
 programs.inc: program
 	@(for d in program/*/; do basename $$d; done) > $@
@@ -210,7 +219,15 @@ obj/doc/snabb.epub: obj/doc/snabb.markdown
 
 CLEAN = snabb obj bin testlog programs.inc
 
-clean:
+clean_programs:
+	@(for d in program/*/; do \
+		if [ -f "$$d/Makefile" ]; then \
+			echo "CLEAN     $$d"; \
+			make -s -C $$d clean; \
+		fi \
+	  done)
+
+clean: clean_programs
 	$(E) "RM        $(CLEAN)"
 	$(Q)-rm -rf $(CLEAN)
 
@@ -221,5 +238,4 @@ mrproper: clean
 benchmarks:
 	$(Q) (scripts/bench.sh)
 
-.PHONY: clean $(TESTMODS) $(TESTSCRIPTS) benchmarks
-
+.PHONY: clean_programs clean $(TESTMODS) $(TESTSCRIPTS) benchmarks
