@@ -238,12 +238,29 @@ local function init_transmit_icmpv4_reply (rate_limiting)
    end
 end
 
+function select_instance(conf, device)
+   -- Merges t1 into t2 by mutating t1 with t2's values. This is quicker than
+   -- producing a new table with the combination of t1 & t2 like I'd have liked.
+   local function table_merge(t1, t2)
+      for k,v in pairs(t2) do t1[k] = v end
+   end
+
+   instance = assert(conf.softwire_config.instance[device])
+
+   table_merge(conf.softwire_config.external_interface,
+               instance.queue.values[1].external_interface)
+   table_merge(conf.softwire_config.internal_interface,
+               instance.queue.values[1].internal_interface)
+   return conf
+end
+
 LwAftr = { yang_schema = 'snabb-softwire-v2' }
 
-function LwAftr:new(conf)
+function LwAftr:new(args)
+   local conf, device = args.conf, args.device
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
-   conf = conf.softwire_config
+   conf = select_instance(conf, device).softwire_config
    o.conf = conf
 
    o.binding_table = bt.load(conf.binding_table)

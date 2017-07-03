@@ -131,13 +131,22 @@ local function encoder()
    end
    function encoder:config(class, arg)
       local file_name = random_file_name()
+      local schema_file
       if class.yang_schema then
-         yang.compile_data_for_schema_by_name(class.yang_schema, arg,
-                                              file_name)
-      else
-         if arg == nil then arg = {} end
-         binary.compile_ad_hoc_lua_data_to_file(file_name, arg)
+         schema_file = random_file_name()
+         if class.config_arg then
+            yang.compile_data_for_schema_by_name(class.yang_schema,
+                                             arg[class.config_arg], schema_file)
+            arg[class.config_arg] = nil
+         else
+            yang.compile_data_for_schema_by_name(class.yang_schema, arg, schema_file)
+            arg = nil
+         end
       end
+      local prepped_arg = {
+         config_arg = class.config_arg, config=schema_file, args=arg
+      }
+      binary.compile_ad_hoc_lua_data_to_file(file_name, prepped_arg)
       self:string(file_name)
    end
    function encoder:finish()
@@ -188,7 +197,11 @@ local function decoder(buf, len)
       return assert(require(require_path)[name])
    end
    function decoder:config()
-      return binary.load_compiled_data_file(self:string()).data
+      local raw = binary.load_compiled_data_file(self:string()).data
+      if raw.config_arg then
+         raw.args[raw.config_arg] = binary.load_compiled_data_file(raw.config).data
+      end
+      return raw.args
    end
    function decoder:finish(...)
       return { ... }
