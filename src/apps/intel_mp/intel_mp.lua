@@ -738,6 +738,7 @@ function Intel1g:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
+   pci.disable_bus_master_cleanup(self.pciaddress)
 
    -- 4.5.3  Initialization Sequence
    self:disable_interrupts()
@@ -873,6 +874,7 @@ function Intel82599:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
+   pci.disable_bus_master_cleanup(self.pciaddress)
 
    -- The 82599 devices sometimes just don't come up, especially when
    -- there is traffic already on the link.  If 2s have passed and the

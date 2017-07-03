@@ -13,33 +13,11 @@ local C = ffi.C
 local fatal = lwutil.fatal
 
 local long_opts = {
-   help = "h"
+   help = "h",
+   name = "n"
 }
 
 local function clearterm () io.write('\027[2J') end
-
-local function select_snabb_instance_by_id (target_id)
-   local pids = shm.children("/")
-   for _, pid in ipairs(pids) do
-      local path = "/"..pid.."/nic/id"
-      if shm.exists(path) then
-         local lwaftr_id = shm.open(path, lwtypes.lwaftr_id_type)
-         if ffi.string(lwaftr_id.value) == target_id then
-            return pid
-         end
-      end
-   end
-   print(("Couldn't find instance with id '%s'"):format(target_id))
-   main.exit(1)
-end
-
-local function select_snabb_instance (id)
-   if not id or tonumber(id) then
-      return top.select_snabb_instance(id)
-   else
-      return select_snabb_instance_by_id(id)
-   end
-end
 
 local counter_names = (function ()
    local counters = {
@@ -207,17 +185,28 @@ end
 
 local function parse_args (args)
    local handlers = {}
+   local opts = {}
    function handlers.h ()
       show_usage(0)
    end
-   args = lib.dogetopt(args, handlers, "h", long_opts)
+   function handlers.n (arg)
+      opts.name = assert(arg)
+   end
+   args = lib.dogetopt(args, handlers, "hn:", long_opts)
    if #args > 1 then show_usage(1) end
-   return args[1]
+   return opts, args[1]
 end
 
 function run (args)
-   local target_pid = parse_args(args)
-   local instance_tree = "/"..select_snabb_instance(target_pid)
+   local opts, target_pid = parse_args(args)
+   if opts.name then
+      local programs = engine.enumerate_named_programs(opts.name)
+      target_pid = programs[opts.name]
+      if not target_pid then
+         fatal(("Couldn't find process with name '%s'"):format(opts.name))
+      end
+   end
+   local instance_tree = "/" .. top.select_snabb_instance(target_pid)
    if not has_lwaftr_app(instance_tree) then
       fatal("Selected instance doesn't include lwaftr app")
    end

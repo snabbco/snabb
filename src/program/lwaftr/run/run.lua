@@ -4,10 +4,10 @@ local S          = require("syscall")
 local config     = require("core.config")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local lib        = require("core.lib")
-local numa       = require("lib.numa")
 local setup      = require("program.lwaftr.setup")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local lwutil = require("apps.lwaftr.lwutil")
+local engine = require("core.app")
 
 local fatal, file_exists = lwutil.fatal, lwutil.file_exists
 local nic_exists = lwutil.nic_exists
@@ -21,10 +21,10 @@ function parse_args(args)
    if #args == 0 then show_usage(1) end
    local conf_file, v4, v6
    local ring_buffer_size
-   local opts = {
-      verbosity = 0, ingress_drop_monitor = 'flush', bench_file = 'bench.csv' }
+   local opts = { verbosity = 0 }
+   local scheduling = { ingress_drop_monitor = 'flush' }
    local handlers = {}
-   local cpu
+   function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
    function handlers.i () opts.virtio_net = true end
    function handlers.D (arg)
@@ -38,15 +38,14 @@ function parse_args(args)
       end
    end
    function handlers.cpu(arg)
-      cpu = tonumber(arg)
+      local cpu = tonumber(arg)
       if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
          fatal("Invalid cpu number: "..arg)
       end
+      scheduling.cpu = cpu
    end
    handlers['real-time'] = function(arg)
-      if not S.sched_setscheduler(0, "fifo", 1) then
-         fatal('Failed to enable real-time scheduling.  Try running as root.')
-      end
+      scheduling.real_time = true
    end
    function handlers.v4(arg)
       v4 = arg
@@ -82,25 +81,25 @@ function parse_args(args)
       opts["mirror"] = ifname
    end
    function handlers.y() opts.hydra = true end
-   handlers["bench-file"] = function (bench_file)
-      opts.bench_file = bench_file
-   end
+   function handlers.b(arg) opts.bench_file = arg end
    handlers["ingress-drop-monitor"] = function (arg)
       if arg == 'flush' or arg == 'warn' then
-         opts.ingress_drop_monitor = arg
+         scheduling.ingress_drop_monitor = arg
       elseif arg == 'off' then
-         opts.ingress_drop_monitor = nil
+         scheduling.ingress_drop_monitor = false
       else
          fatal("invalid --ingress-drop-monitor argument: " .. arg
                   .." (valid values: flush, warn, off)")
       end
    end
+   function handlers.reconfigurable() opts.reconfigurable = true end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:vD:yhir:",
+   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:",
       { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
         verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
-        ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = 0,
-        ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1, hydra = "y" })
+        ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
+        ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
+        hydra = "y", reconfigurable = 0, name="n" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -111,43 +110,61 @@ function parse_args(args)
    if opts.mirror then
       assert(opts["on-a-stick"], "Mirror option is only valid in on-a-stick mode")
    end
-   if cpu then numa.bind_to_cpu(cpu) end
    if opts["on-a-stick"] then
-      numa.check_affinity_for_pci_addresses({ v4 })
-      return opts, conf_file, v4
+      scheduling.pci_addrs = { v4 }
+      return opts, scheduling, conf_file, v4
    else
-      if not v4 then fatal("Missing required --v4-pci argument.") end
-      if not v6 then fatal("Missing required --v6-pci argument.") end
-      numa.check_affinity_for_pci_addresses({ v4, v6 })
-      return opts, conf_file, v4, v6
+      if not v4 then fatal("Missing required --v4 argument.") end
+      if not v6 then fatal("Missing required --v6 argument.") end
+      scheduling.pci_addrs = { v4, v6 }
+      return opts, scheduling, conf_file, v4, v6
    end
 end
 
--- Requires a V4V6 splitter iff:
---   Always when running in on-a-stick mode, except if v4_vlan_tag != v6_vlan_tag.
+-- Requires a V4V6 splitter if running in on-a-stick mode and VLAN tag values
+-- are the same for the internal and external interfaces.
 local function requires_splitter (opts, conf)
-   if not opts["on-a-stick"] then return false end
-   if not conf.vlan_tagging then return true end
-   return conf.v4_vlan_tag == conf.v6_vlan_tag
+   if opts["on-a-stick"] then
+      local internal_interface = conf.softwire_config.internal_interface
+      local external_interface = conf.softwire_config.external_interface
+      return internal_interface.vlan_tag == external_interface.vlan_tag
+   end
+   return false
 end
 
 function run(args)
-   local opts, conf_file, v4, v6 = parse_args(args)
+   local opts, scheduling, conf_file, v4, v6 = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local use_splitter = requires_splitter(opts, conf)
 
-   local c = config.new()
-   if opts.virtio_net then
-      setup.load_virt(c, conf, 'inetNic', v4, 'b4sideNic', v6)
-   elseif opts["on-a-stick"] then
-      setup.load_on_a_stick(c, conf, { v4_nic_name = 'inetNic',
-                                       v6_nic_name = 'b4sideNic',
-                                       v4v6 = use_splitter and 'v4v6',
-                                       pciaddr = v4,
-                                       mirror = opts.mirror})
-   else
-      setup.load_phy(c, conf, 'inetNic', v4, 'b4sideNic', v6)
+   -- If there is a name defined on the command line, it should override
+   -- anything defined in the config.
+   if opts.name then
+      conf.softwire_config.name = opts.name
    end
+
+   local c = config.new()
+   local setup_fn, setup_args
+   if opts.virtio_net then
+      setup_fn, setup_args = setup.load_virt, { 'inetNic', v4, 'b4sideNic', v6 }
+   elseif opts["on-a-stick"] then
+      setup_fn = setup.load_on_a_stick
+      setup_args =
+         { { v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
+             v4v6 = use_splitter and 'v4v6', pciaddr = v4,
+             mirror = opts.mirror } }
+   else
+      setup_fn, setup_args = setup.load_phy, { 'inetNic', v4, 'b4sideNic', v6 }
+   end
+
+   if opts.reconfigurable then
+      setup.reconfigurable(scheduling, setup_fn, c, conf, unpack(setup_args))
+   else
+      setup.apply_scheduling(scheduling)
+      setup.validate_config(conf)
+      setup_fn(c, conf, unpack(setup_args))
+   end
+
    engine.configure(c)
 
    if opts.verbosity >= 2 then
@@ -157,28 +174,58 @@ function run(args)
    end
 
    if opts.verbosity >= 1 then
-      local csv = csv_stats.CSVStatsTimer.new(opts.csv_file, opts.hydra)
-      -- Why are the names cross-referenced like this?
-      local ipv4_tx = opts.hydra and 'ipv4rx' or 'IPv4 RX'
-      local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
-      local ipv6_tx = opts.hydra and 'ipv6rx' or 'IPv6 RX'
-      local ipv6_rx = opts.hydra and 'ipv6tx' or 'IPv6 TX'
-      if use_splitter then
-         csv:add_app('v4v6', { 'v4', 'v4' }, { tx=ipv4_tx, rx=ipv4_rx })
-         csv:add_app('v4v6', { 'v6', 'v6' }, { tx=ipv6_tx, rx=ipv6_rx })
-      else
-         csv:add_app('inetNic', { 'tx', 'rx' }, { tx=ipv4_tx, rx=ipv4_rx })
-         csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx=ipv6_tx, rx=ipv6_rx })
+      function add_csv_stats_for_pid(pid)
+         local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra, pid)
+         -- Link names like "tx" are from the app's perspective, but
+         -- these labels are from the perspective of the lwAFTR as a
+         -- whole so they are reversed.
+         local ipv4_tx = opts.hydra and 'ipv4rx' or 'IPv4 RX'
+         local ipv4_rx = opts.hydra and 'ipv4tx' or 'IPv4 TX'
+         local ipv6_tx = opts.hydra and 'ipv6rx' or 'IPv6 RX'
+         local ipv6_rx = opts.hydra and 'ipv6tx' or 'IPv6 TX'
+         if use_splitter then
+            csv:add_app('v4v6', { 'v4', 'v4' }, { tx=ipv4_tx, rx=ipv4_rx })
+            csv:add_app('v4v6', { 'v6', 'v6' }, { tx=ipv6_tx, rx=ipv6_rx })
+         else
+            csv:add_app('inetNic', { 'tx', 'rx' }, { tx=ipv4_tx, rx=ipv4_rx })
+            csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx=ipv6_tx, rx=ipv6_rx })
+         end
+         csv:activate()
       end
-      csv:activate()
+      if opts.reconfigurable then
+         local pids = engine.configuration.apps['leader'].arg.follower_pids
+         for _,pid in ipairs(pids) do
+            local function start_sampling()
+               -- The worker will be fed its configuration by the
+               -- leader, but we don't know when that will all be ready.
+               -- Just retry if this doesn't succeed.
+               if not pcall(add_csv_stats_for_pid, pid) then
+                  io.stderr:write("Waiting on follower "..pid.." to start "..
+                                     "before recording statistics...\n")
+                  timer.activate(timer.new('retry_csv', start_sampling, 2e9))
+               end
+            end
+            timer.activate(timer.new('spawn_csv_stats', start_sampling, 50e6))
+         end
+      else
+         add_csv_stats_for_pid(S.getpid())
+      end
    end
 
    if opts.ingress_drop_monitor then
-      local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
-      timer.activate(mon:timer())
+      if opts.reconfigurable then
+         io.stderr:write("Warning: Ingress drop monitor not yet supported "..
+                            "in multiprocess mode.\n")
+      else
+         local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
+         timer.activate(mon:timer())
+      end
    end
 
-   engine.busywait = true
+   if not opts.reconfigurable then
+      -- The leader does not need all the CPU, only the followers do.
+      engine.busywait = true
+   end
    if opts.duration then
       engine.main({duration=opts.duration, report={showlinks=true}})
    else
