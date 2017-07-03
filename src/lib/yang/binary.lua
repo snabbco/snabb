@@ -102,15 +102,38 @@ end
 
 local function data_emitter(production)
    local handlers = {}
+   local translators = {}
    local function visit1(production)
       return assert(handlers[production.type])(production)
    end
+   local function expand(production)
+      if production.type ~= "struct" then return production end
+      local expanded = {}
+      for keyword,prod in pairs(production.members) do
+         if translators[prod.type] ~= nil then
+            translators[prod.type](expanded, keyword, prod)
+         else
+            expanded[keyword] = prod
+         end
+      end
+      return {type="struct", members=expanded}
+   end
    local function visitn(productions)
       local ret = {}
-      for keyword,production in pairs(productions) do
+      local expanded_production = productions
+      for keyword, production in pairs(productions) do
+         expanded_production[keyword] = expand(production)
+      end
+      for keyword,production in pairs(expanded_production) do
          ret[keyword] = visit1(production)
       end
       return ret
+   end
+   function translators.choice(productions, keyword, production)
+      -- Now bring the choice statements up to the same level replacing it.
+      for case, block in pairs(production.choices) do
+         for name, body in pairs(block) do productions[name] = body end
+      end
    end
    function handlers.struct(production)
       local member_names = {}
@@ -437,6 +460,7 @@ function selftest()
       prefix simple-router;
 
       import ietf-inet-types {prefix inet;}
+      import ietf-yang-types { prefix yang; }
 
       leaf is-active { type boolean; default true; }
 
@@ -465,6 +489,20 @@ function selftest()
             type severity;
          }
       }
+
+      container next-hop {
+         choice address {
+            case mac {
+               leaf mac { type yang:mac-address; }
+            }
+            case ipv4 {
+               leaf ipv4 { type inet:ipv4-address; }
+            }
+            case ipv6 {
+               leaf ipv6 { type inet:ipv6-address; }
+            }
+         }
+      }
    }]])
    local data = data.load_data_for_schema(test_schema, [[
       is-active true;
@@ -478,6 +516,9 @@ function selftest()
         route { addr 2.3.4.5; port 10; }
         route { addr 3.4.5.6; port 2; }
         severity minor;
+      }
+      next-hop {
+         ipv4 5.6.7.8;
       }
    ]])
 
@@ -500,6 +541,10 @@ function selftest()
       assert(routing_table:lookup_ptr(key).value.port == 10)
       key.addr = util.ipv4_pton('3.4.5.6')
       assert(routing_table:lookup_ptr(key).value.port == 2)
+      assert(
+         data.next_hop.ipv4 == util.ipv4_pton('5.6.7.8'),
+         "Choice type test failed (round: "..i..")"
+      )
 
       local tmp = os.tmpname()
       compile_data_for_schema(test_schema, data, tmp)
