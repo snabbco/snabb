@@ -264,7 +264,7 @@ end
 
 function VirtioNetDevice:tx_packet_start_mrg_rxbuf(addr, len)
    local tx_mrg_hdr = ffi.cast(virtio_net_hdr_mrg_rxbuf_type, self:map_from_guest(addr))
-   local l = self.owner.input.rx
+   local l = self.owner.input.rx or self.owner.input.input
    local tx_p = self.tx.p
    ffi.fill(tx_mrg_hdr, virtio_net_hdr_mrg_rxbuf_size)
 
