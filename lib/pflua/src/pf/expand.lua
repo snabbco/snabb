@@ -9,6 +9,7 @@ local expand_arith, expand_relop, expand_bool
 local set, concat, pp = utils.set, utils.concat, utils.pp
 local uint16, uint32 = utils.uint16, utils.uint32
 local ipv4_to_int, ipv6_as_4x32 = utils.ipv4_to_int, utils.ipv6_as_4x32
+local filter_args = utils.filter_args
 
 local llc_types = set(
    'i', 's', 'u', 'rr', 'rnr', 'rej', 'ui', 'ua',
@@ -459,7 +460,7 @@ local function expand_ip6_proto(expr)
 end
 
 local function expand_ip_proto(expr)
-   return { 'or', has_ipv4_protocol(expr[2]), has_ipv6_protocol(expr[2]) }
+   return { 'or', expand_ip4_proto(expr), expand_ip6_proto(expr) }
 end
 
 -- ISO
@@ -847,10 +848,12 @@ local function expand_psnp(expr)
 end
 
 local primitive_expanders = {
+   dst = expand_dst_host,
    dst_host = expand_dst_host,
    dst_net = expand_dst_net,
    dst_port = expand_dst_port,
    dst_portrange = expand_dst_portrange,
+   src = expand_src_host,
    src_host = expand_src_host,
    src_net = expand_src_net,
    src_port = expand_src_port,
@@ -1116,7 +1119,9 @@ end
 -- or { 'fail' }.
 function expand_arith(expr, dlt)
    assert(expr)
-   if type(expr) == 'number' or expr == 'len' then return expr, {} end
+   if type(expr) == 'number' or filter_args[expr] then
+      return expr, {}
+   end
 
    local op = expr[1]
    if binops[op] then
@@ -1203,7 +1208,7 @@ function expand_bool(expr, dlt)
       local expander = primitive_expanders[expr[1]]
       assert(expander, "unimplemented primitive: "..expr[1])
       local expanded = expander(expr, dlt)
-      return expand_bool(expander(expr, dlt), dlt)
+      return expand_bool(expanded, dlt)
    end
 end
 
@@ -1232,6 +1237,12 @@ function selftest ()
                    { '=', { '[]', { '+', 0, 0 }, 1 }, 2 },
                    { 'fail' } },
       expand(parse("ether[0] = 2"), 'EN10MB'))
+   assert_equals(expand(parse("src 1::ff11"), 'EN10MB'),
+      expand(parse("src host 1::ff11"), 'EN10MB'))
+   assert_equals(expand(parse("proto \\sctp"), 'EN10MB'),
+      expand(parse("ip proto \\sctp or ip6 proto \\sctp"), 'EN10MB'))
+   assert_equals(expand(parse("proto \\tcp"), 'EN10MB'),
+      expand(parse("ip proto \\tcp or ip6 proto \\tcp"), 'EN10MB'))
    -- Could check this, but it's very large
    expand(parse("tcp port 80 and (((ip[2:2] - ((ip[0]&0xf)<<2)) - ((tcp[12]&0xf0)>>2)) != 0)"),
           "EN10MB")

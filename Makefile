@@ -12,7 +12,7 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	 $(MAKE) PREFIX=`pwd`/usr/local \
 	         CFLAGS="$(LUAJIT_CFLAGS)" && \
 	 $(MAKE) DESTDIR=`pwd` install)
-	(cd lib/luajit/usr/local/bin; ln -fs luajit-2.1.0-beta1 luajit)
+	(cd lib/luajit/usr/local/bin; ln -fs luajit-2.1.0-beta2 luajit)
 #       ljsyscall
 	@mkdir -p src/syscall/linux
 	@cp -p lib/ljsyscall/syscall.lua   src/
@@ -20,6 +20,10 @@ all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 	@cp -p  lib/ljsyscall/syscall/linux/*.lua src/syscall/linux/
 	@cp -pr lib/ljsyscall/syscall/linux/x64   src/syscall/linux/
 	@cp -pr lib/ljsyscall/syscall/shared      src/syscall/
+#       ljndpi
+	@mkdir -p src/ndpi
+	@cp -p lib/ljndpi/ndpi.lua src/
+	@cp -p lib/ljndpi/ndpi/*.lua src/ndpi/
 	cd src && $(MAKE)
 
 install: all
@@ -38,7 +42,8 @@ dist: all
 	mkdir "$(DISTDIR)"
 	git clone "$(BUILDDIR)" "$(DISTDIR)/snabbswitch"
 	rm -rf "$(DISTDIR)/snabbswitch/.git"
-	cp "$(BUILDDIR)/src/snabb" "$(DISTDIR)/$(DIST_BINARY)"
+	cp "$(BUILDDIR)/src/snabb" "$(DISTDIR)/"
+	if test "$(DIST_BINARY)" != "snabb"; then ln -s "snabb" "$(DISTDIR)/$(DIST_BINARY)"; fi
 	cd "$(DISTDIR)/.." && tar cJvf "`basename '$(DISTDIR)'`.tar.xz" "`basename '$(DISTDIR)'`"
 	rm -rf "$(DISTDIR)"
 

@@ -53,6 +53,29 @@ return function(P,length)
    if v1 ~= 44 then return false end
    return P[54] == 47
 end
+```
 
+## Native pflang compilation
+
+```
+7fa374c2d000  4883FE36          cmp rsi, +0x36
+7fa374c2d004  7C2D              jl 0x7fa374c2d033
+7fa374c2d006  0FB7470C          movzx eax, word [rdi+0xc]
+7fa374c2d00a  4881F886DD0000    cmp rax, 0xdd86
+7fa374c2d011  7520              jnz 0x7fa374c2d033
+7fa374c2d013  0FB64714          movzx eax, byte [rdi+0x14]
+7fa374c2d017  4883F82F          cmp rax, +0x2f
+7fa374c2d01b  7419              jz 0x7fa374c2d036
+7fa374c2d01d  4883FE37          cmp rsi, +0x37
+7fa374c2d021  7C10              jl 0x7fa374c2d033
+7fa374c2d023  4883F82C          cmp rax, +0x2c
+7fa374c2d027  750A              jnz 0x7fa374c2d033
+7fa374c2d029  0FB64736          movzx eax, byte [rdi+0x36]
+7fa374c2d02d  4883F82F          cmp rax, +0x2f
+7fa374c2d031  7403              jz 0x7fa374c2d036
+7fa374c2d033  B000              mov al, 0x0
+7fa374c2d035  C3                ret
+7fa374c2d036  B001              mov al, 0x1
+7fa374c2d038  C3                ret
 ```
 

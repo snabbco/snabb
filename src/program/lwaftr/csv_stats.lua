@@ -1,10 +1,26 @@
 module(..., package.seeall)
 
+local S = require("syscall")
+local shm = require("core.shm")
 local timer = require("core.timer")
 local engine = require("core.app")
+local config = require("core.config")
 local counter = require("core.counter")
 
 CSVStatsTimer = {}
+
+local function open_link_counters(pid)
+   local counters = {}
+   for _, linkspec in ipairs(shm.children("/"..pid.."/links")) do
+      local fa, fl, ta, tl = config.parse_link(linkspec)
+      local link = shm.open_frame("/"..pid.."/links/"..linkspec)
+      if not counters[fa] then counters[fa] = {input={},output={}} end
+      if not counters[ta] then counters[ta] = {input={},output={}} end
+      counters[fa].output[fl] = link
+      counters[ta].input[tl] = link
+   end
+   return counters
+end
 
 -- A timer that monitors packet rate and bit rate on a set of links,
 -- printing the data out to a CSV file.
@@ -17,20 +33,22 @@ CSVStatsTimer = {}
 --
 -- Hydra mode example:
 --
--- benchmark,snabb,id,score,unit
--- decap_mpps,master,1,3.362784,mpps
--- decap_gbps,master,1,13.720160,gbps
--- encap_mpps,master,1,3.362886,mpps
--- encap_gbps,master,1,15.872824,gbps
--- decap_mpps,master,2,3.407569,mpps
--- decap_gbps,master,2,13.902880,gbps
--- encap_mpps,master,2,3.407569,mpps
--- encap_gbps,master,2,16.083724,gbps
+-- benchmark,id,score,unit
+-- decap_mpps,1,3.362784,mpps
+-- decap_gbps,1,13.720160,gbps
+-- encap_mpps,1,3.362886,mpps
+-- encap_gbps,1,15.872824,gbps
+-- decap_mpps,2,3.407569,mpps
+-- decap_gbps,2,13.902880,gbps
+-- encap_mpps,2,3.407569,mpps
+-- encap_gbps,2,16.083724,gbps
 --
-function CSVStatsTimer:new(filename, hydra_mode)
+function CSVStatsTimer:new(filename, hydra_mode, pid)
    local file = filename and io.open(filename, "w") or io.stdout
    local o = { hydra_mode=hydra_mode, link_data={}, file=file, period=1,
       header = hydra_mode and "benchmark,id,score,unit" or "Time (s)" }
+   o.pid = pid or S.getpid()
+   o.links_by_app = open_link_counters(o.pid)
    return setmetatable(o, {__index = CSVStatsTimer})
 end
 
@@ -40,29 +58,24 @@ end
 -- human-readable names, for the column headers.
 function CSVStatsTimer:add_app(id, links, link_names)
    local function add_link_data(name, link)
-      local link_name = link_names and link_names[name] or name
+      local link_name = link_names[name] or name
       if not self.hydra_mode then
          local h = (',%s MPPS,%s Gbps'):format(link_name, link_name)
          self.header = self.header..h
       end
       local data = {
          link_name = link_name,
-         txpackets = link.stats.txpackets,
-         txbytes = link.stats.txbytes,
+         txpackets = link.txpackets,
+         txbytes = link.txbytes,
       }
       table.insert(self.link_data, data)
    end
 
-   local app = assert(engine.app_table[id], "App named "..id.." not found")
-   if links then
-      for _,name in ipairs(links) do
-         local link = app.input[name] or app.output[name]
-         assert(link, "Link named "..name.." not found in "..id)
-         add_link_data(name, link)
-      end
-   else
-      for name,link in pairs(app.input) do add_link_data(name, link) end
-      for name,link in pairs(app.output) do add_link_data(name, link) end
+   local app = assert(self.links_by_app[id], "App named "..id.." not found")
+   for _,name in ipairs(links) do
+      local link = app.input[name] or app.output[name]
+      assert(link, "Link named "..name.." not found in "..id)
+      add_link_data(name, link)
    end
 end
 

@@ -4,6 +4,8 @@ local constants = require("apps.lwaftr.constants")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 
+local link = require("core.link")
+local engine = require("core.app")
 local transmit, receive = link.transmit, link.receive
 local rd16, rd32 = lwutil.rd16, lwutil.rd32
 

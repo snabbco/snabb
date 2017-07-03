@@ -68,6 +68,8 @@ $(cat $mdroot/apps/ipsec/README.md)
 
 $(cat $mdroot/apps/test/README.md)
 
+$(cat $mdroot/apps/wall/README.md)
+
 # Libraries
 
 $(cat $mdroot/lib/README.checksum.md)

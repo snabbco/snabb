@@ -83,6 +83,15 @@ Optional entries that may be present in the *parameters* table include:
  * `min_occupancy_rate`: Minimum ratio of `occupancy/size`.  Removing an
    entry from an "empty" table will shrink the table.
 
+— Function **ctable.load** *stream* *parameters*
+
+Load a ctable that was previously saved out to a binary format.
+*parameters* are as for `ctable.new`.  *stream* should be an object
+that has a **:read_ptr**(*ctype*) method, which returns a pointer to
+an embedded instances of *ctype* in the stream, advancing the stream
+over the object; and **:read_array**(*ctype*, *count*) which is the
+same but reading *count* instances of *ctype* instead of just one.
+
 #### Methods
 
 Users interact with a ctable through methods.  In these method
@@ -156,6 +165,13 @@ Return true if we actually do find a value and remove it.  Otherwise if
 no entry is found in the table and *missing_allowed* is true, then
 return false.  Otherwise raise an error.
 
+— Method **:save** *stream*
+
+Save a ctable to a byte sink.  *stream* should be an object that has a
+**:write_ptr**(*ctype*) method, which writes an instance of a struct
+type out to a stream, and **:write_array**(*ctype*, *count*) which is
+the same but writing *count* instances of *ctype* instead of just one.
+
 — Method **:selfcheck**
 
 Run an expensive internal diagnostic to verify that the table's internal
@@ -175,6 +191,66 @@ for entry in ctab:iterate() do
    print(entry.key, entry.value)
 end
 ```
+
+#### Streaming interface
+
+As mentioned earlier, batching multiple lookups can amortize the cost
+of a round-trip to RAM.  To do this, first prepare a `LookupStreamer`
+for the batch size that you need.  You will have to experiment to find
+the batch size that works best for your table's entry sizes; for
+reference, for 32-byte entries a 32-wide lookup seems to be optimum.
+
+```lua
+-- Stream in 32 lookups at once.
+local stride = 32
+local streamer = ctab:make_lookup_streamer(stride)
+```
+
+Wiring up streaming lookup in a packet-processing network is a bit of
+a chore currently, as you have to maintain separate queues of lookup
+keys and packets, assuming that each lookup maps to a packet.  Let's
+make a little helper:
+
+```lua
+local lookups = {
+   queue = ffi.new("struct packet * [?]", stride),
+   queue_len = 0,
+   streamer = streamer
+}
+
+local function flush(lookups)
+   if lookups.queue_len > 0 then
+      -- Here is the magic!
+      lookups.streamer:stream()
+      for i = 0, lookups.queue_len - 1 do
+         local pkt = lookups.queue[i]
+         if lookups.streamer:is_found(i)
+            local val = lookups.streamer.entries[i].value
+            --- Do something cool here!
+         end
+      end
+      lookups.queue_len = 0
+   end
+end
+
+local function enqueue(lookups, pkt, key)
+   local n = lookups.queue_len
+   lookups.streamer.entries[n].key = key
+   lookups.queue[n] = pkt
+   n = n + 1
+   if n == stride then
+      flush(lookups)
+   else
+      lookups.queue_len = n
+   end
+end
+```
+
+Then as you see packets, you enqueue them via `enqueue`, extracting
+out the key from the packet in some way and passing that value as the
+argument.  When `enqueue` detects that the queue is full, it will
+flush it, performing the lookups in parallel and processing the
+results.
 
 #### Hash functions
 
