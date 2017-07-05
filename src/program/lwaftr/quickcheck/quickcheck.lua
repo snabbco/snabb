@@ -10,23 +10,19 @@ end
 
 local function parse_args (args)
    local handlers = {}
-   local opts = {
-      iterations = 100,
-   }
+   local opts = { iterations = 100 }
    function handlers.h() show_usage(0) end
-   handlers["seed"] = function (arg)
-      opts["seed"] = assert(tonumber(arg), "seed must be a number")
+   function handlers.seed(arg)
+      opts.seed = assert(tonumber(arg), "seed must be a number")
    end
-   handlers["iterations"] = function (arg)
-		opts["iterations"] = assert(tonumber(arg), "iterations must be a number")
+   function handlers.iterations(arg)
+      opts.iterations = assert(tonumber(arg), "iterations must be a number")
    end
-   args = lib.dogetopt(args, handlers, "h",
-      { help="h", ["seed"] = 0, ["iterations"] = 0 })
+   args = lib.dogetopt(args, handlers, "h", {help="h", seed=1, iterations=1})
    if #args == 0 then show_usage(1) end
    if not opts.seed then
-      local seed = math.floor(utils.gmtime() * 1e6) % 10^9
-      print("Using time as seed: "..seed)
-      opts.seed = seed
+      local bytes = lib.random_bytes_from_dev_urandom(4)
+      opts.seed = require('ffi').cast('uint32_t*', bytes)[0]
    end
    local prop_name = table.remove(args, 1)
 
@@ -61,12 +57,6 @@ local function initialize_property (name, args)
    return prop, prop.handle_prop_args(args)
 end
 
-local function random_bytes_from_math_random(count)
-   local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
-   for i = 0,count-1 do bytes[i] = math.random(0, 255) end
-   return bytes
-end
-
 function run (args)
    local opts, prop_name, prop_args = parse_args(args)
    local rerun_usage = function (i)
@@ -74,8 +64,8 @@ function run (args)
             format(opts.seed, i + 1, prop_name, table.concat(prop_args, " ")))
    end
 
-   math.randomseed(opts.seed)
-   lib.random_bytes = random_bytes_from_math_random
+   lib.randomseed(opts.seed)
+   require('syscall').setenv("SNABB_RANDOM_SEED", tostring(opts.seed), true)
 
    local prop, prop_info = initialize_property(prop_name, prop_args)
    for i=1,opts.iterations do

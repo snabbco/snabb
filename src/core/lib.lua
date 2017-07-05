@@ -224,15 +224,6 @@ function comma_value(n) -- credit http://richard.warburton.it
    return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
 end
 
-function random_data(length)
-   result = ""
-   math.randomseed(os.time())
-   for i=1,length do
-      result = result..string.char(math.random(0, 255))
-   end
-   return result
-end
-
 -- Return a table for bounds-checked array access.
 function bounds_checked (type, base, offset, size)
    type = ffi.typeof(type)
@@ -716,7 +707,7 @@ function getenv (name)
 end
 
 -- Return an array of random bytes.
-function random_bytes(count)
+function random_bytes_from_dev_urandom (count)
    local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
    local f = syscall.open('/dev/urandom', 'rdonly')
    local written = 0
@@ -724,6 +715,32 @@ function random_bytes(count)
       written = written + assert(f:read(bytes, count-written))
    end
    return bytes
+end
+
+function random_bytes_from_math_random (count)
+   local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
+   for i = 0,count-1 do bytes[i] = math.random(0, 255) end
+   return bytes
+end
+
+function randomseed (seed)
+   seed = tonumber(seed)
+   if seed then
+      local msg = 'Using deterministic random numbers, SNABB_RANDOM_SEED=%d.\n'
+      io.stderr:write(msg:format(seed))
+      math.randomseed(seed)
+      -- When setting a seed, use deterministic random bytes.
+      random_bytes = random_bytes_from_math_random
+   else
+      -- Otherwise use /dev/urandom.
+      seed = ffi.cast('uint32_t*', random_bytes_from_dev_urandom(4))[0]
+      random_bytes = random_bytes_from_dev_urandom
+   end
+   return seed
+end
+
+function random_data (length)
+   return ffi.string(random_bytes(length), length)
 end
 
 -- Compiler barrier.

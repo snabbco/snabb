@@ -40,8 +40,6 @@ end
 function new(params)
    local ctab = ctable.new(params)
    ctab.add_with_random_ejection = add_with_random_ejection
-   -- Not local-ized because it's called once
-   math.randomseed(bxor(os.time(), S.getpid()))
    return ctab
 end
 
