@@ -88,6 +88,7 @@ local vmux = require("apps.vlan.vlan").VlanMux
 local ifmib = require("lib.ipc.shmem.iftable_mib")
 local counter = require("core.counter")
 local macaddress = require("lib.macaddress")
+local shm = require("core.shm")
 
 -- config = {
 --   [ shmem_dir = <shmem_dir> , ]
@@ -236,6 +237,35 @@ function config_if (c, afs, app_c)
    end
 end
 
+-- Helper functions to abstract from driver-specific behaviour.  The
+-- key into this table is the full path to the module used to create
+-- the driver object. For each driver, the following functions must be
+-- defined
+--   link_names ()
+--     Return the name of the links used for input and ouput
+--   stats_path (driver)
+--     This function is called after the driver has been created
+--     and receives the driver object as input.  It returns the
+--     path to the shm frame where the driver stores its stats counters.
+local driver_helpers = {
+   ['apps.intel_mp.intel_mp.Intel'] = {
+      link_names = function ()
+         return 'input', 'output'
+      end,
+      stats_path = function (driver)
+         return driver.stats.path
+      end
+   },
+   ['apps.tap.tap.Tap'] = {
+      link_names = function ()
+         return 'input', 'output'
+      end,
+      stats_path = function (driver)
+         return driver.shm.path
+      end
+   },
+}
+
 function parse_if (if_app_name, config)
    local result = { name = if_app_name,
                     description = config.description,
@@ -272,8 +302,11 @@ function parse_if (if_app_name, config)
    -- use "input" and "output", but this has not yet been
    -- standardized (and the old inel{1,10}g drivers uses a
    -- different convention).
-   result.input = "input"
-   result.output = "output"
+   local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
+   assert(driver_helper,
+          "Unsupported driver "..drv_c.path.."."..drv_c.name)
+   result.driver_helper = driver_helper
+   result.input, result.output = driver_helper.link_names()
    local l3_links = { input = if_app_name.."."..result.input,
                       output = if_app_name.."."..result.output }
 
@@ -415,6 +448,15 @@ function parse_if (if_app_name, config)
       end
    end
    return config.name, result
+end
+
+function intf_from_app_name (intfs, app_name)
+   for _, intf in pairs(intfs) do
+      if intf.name == app_name then
+         return intf
+      end
+   end
+   return nil
 end
 
 function run (parameters)
@@ -674,6 +716,16 @@ function run (parameters)
    end
    engine.configure(c)
 
+   -- For each interface, attach to the shm frame that stores
+   -- the statistics counters
+   for _, intf in pairs(intfs) do
+      local app = engine.app_table[intf.name]
+      intf.stats = shm.open_frame(intf.driver_helper.stats_path(app))
+   end
+   -- Commit all counters to the backing store to make them available
+   -- immediately through the read-only frames we just created
+   counter.commit()
+
    -- The physical MAC addresses of the interfaces are only known
    -- after the drivers have been configured.  We need to reconfigure
    -- all relevant ND apps to use those MAC addresses as their "local"
@@ -681,8 +733,10 @@ function run (parameters)
    local function reconfig_mac(nd)
       local app = engine.app_table[nd.name]
       if app then
+         local if_app = nd.if_app_name
+         local stats = intf_from_app_name(intfs, if_app).stats
          nd.config.local_mac =
-            macaddress:new(counter.read(engine.app_table[nd.if_app_name].stats.macaddr)).bytes
+            macaddress:new(counter.read(stats.macaddr)).bytes
          app:reconfig(nd.config)
       end
    end
@@ -708,9 +762,8 @@ function run (parameters)
          -- Set up SNMP for physical interfaces
          local app = engine.app_table[intf.name]
          if app == nil then goto continue end
-	 -- Assume that all drivers store their stats
-	 -- like this.
-         local stats = app.stats
+         if engine.app_table[intf.name] == nil then goto continue end
+         local stats = intf.stats
          if stats then
             ifmib.init_snmp( { ifDescr = name,
                                ifName = name,
