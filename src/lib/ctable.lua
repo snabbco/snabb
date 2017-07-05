@@ -3,6 +3,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
+local lib = require("core.lib")
 local binary_search = require("lib.binary_search")
 local multi_copy = require("lib.multi_copy")
 local siphash = require("lib.hash.siphash")
@@ -181,8 +182,28 @@ local function calloc(t, count)
 end
 
 function CTable:reseed_hash_function(seed)
-   self.hash_seed = seed or siphash.random_sip_hash_key()
+   -- The hash function's seed determines the hash value of an input,
+   -- and thus the iteration order for the table.  Usually this is a
+   -- feature: besides preventing hash-flood attacks, it also prevents a
+   -- quadratic-time complexity when initially populating a table from
+   -- entries stored in hash order, as can happen when reading in a
+   -- table from a serialization.  However, when SNABB_RANDOM_SEED is
+   -- set, then presumably we're trying to reproduce deterministic
+   -- behavior, as with quickcheck, and in that case a random seed can
+   -- make it more onerous to prove that make_table({A=B,C=D}) is equal
+   -- to make_table({A=B,C=D}) as the two tables could have different
+   -- iteration orders.  So, in "quickcheck mode", always seed hash
+   -- tables with the same value.
+   if seed then
+      self.hash_seed = seed
+   elseif lib.getenv("SNABB_RANDOM_SEED") then
+      self.hash_seed = siphash.sip_hash_key_from_seed(
+         lib.getenv("SNABB_RANDOM_SEED"))
+   else
+      self.hash_seed = siphash.random_sip_hash_key()
+   end
    self.hash_fn = self.make_hash_fn()
+
    -- FIXME: Invalidate associated lookup streamers, as they need new
    -- multi_hash functions.
 end

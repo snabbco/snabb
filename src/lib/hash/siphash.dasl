@@ -49,9 +49,10 @@ function random_sip_hash_key()
    return lib.random_bytes(16)
 end
 
-function reference_sip_hash_key()
-   return ffi.new('uint8_t[16]',
-                  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15)
+function sip_hash_key_from_seed(seed)
+   local res = ffi.new('uint8_t[16]')
+   ffi.cast('uint32_t*', res)[0] = assert(tonumber(seed))
+   return res
 end
 
 local function load_initial_state(key)
@@ -63,7 +64,7 @@ local function load_initial_state(key)
                            0x7465646279746573ULL })
 
    -- Mix key into state constants.
-   key = ffi.cast('uint64_t*', key or reference_sip_hash_key())
+   key = ffi.cast('uint64_t*', key or random_sip_hash_key())
    state[0] = bit.bxor(state[0], key[0])
    state[1] = bit.bxor(state[1], key[1])
    state[2] = bit.bxor(state[2], key[0])
@@ -422,7 +423,7 @@ local function Simulator()
 end
 
 local sip_hash_config = {
-   size={required=true}, stride={}, key={default=reference_sip_hash_key()},
+   size={required=true}, stride={}, key={default=false},
    c={default=2}, d={default=4}, as_specified={default=false}, width={default=1}
 }
 local function make_sip_hash(assembler, opts)
