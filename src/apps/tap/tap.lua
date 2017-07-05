@@ -7,135 +7,140 @@ local link = require("core.link")
 local packet = require("core.packet")
 local counter = require("core.counter")
 local ethernet = require("lib.protocol.ethernet")
+local macaddr = require("lib.macaddress")
 local ffi = require("ffi")
 local C = ffi.C
 local const = require("syscall.linux.constants")
 local os = require("os")
 local lib = require("core.lib")
-local band = bit.band
+local band, bor, bnot = bit.band, bit.bor, bit.bnot
 
 local t = S.types.t
 
 Tap = { }
+-- The original version of this driver expected the name of the tap
+-- device as only configuration option.  To be backwards compatible,
+-- we don't use the automatic arg checking capability of core.config,
+-- hence the name _config instead of config for this table.
+Tap._config = {
+   name = { required = true },
+   mtu = { default = 1514 },
+   mtu_fixup = { default = true },
+   mtu_offset = { default = 14 },
+   mtu_set = { default = nil },
+}
 
-local function _mtu (sock, ifr)
-   local ok, err = sock:ioctl("SIOCGIFMTU", ifr)
+-- Get or set the MTU of a tap device.  Return the current value.
+local function _mtu (sock, ifr, mtu)
+   local op = "SIOCGIFMTU"
+   if mtu then
+      op = "SIOCSIFMTU"
+      ifr.ivalue = mtu
+   end
+   local ok, err = sock:ioctl(op, ifr)
    if not ok then
-      error("Error getting MTU for tap device "..ifr.name
-               ..": "..tostring(err))
+      error(op.." failed for tap device " .. ifr.name
+               .. ": " ..tostring(err))
    end
    return ifr.ivalue
 end
 
-local function _status (sock, ifr)
+-- Get or set the operational status of a tap device.  Return the
+-- current status.
+local function _status (sock, ifr, status)
    local ok, err = sock:ioctl("SIOCGIFFLAGS", ifr)
    if not ok then
-      error("Error getting flags for tap device "..ifr.name
-               ..": ".. tostring(err))
+      error("Error getting flags for tap device " .. ifr.name
+               .. ": " .. tostring(err))
    end
-   if band(ifr.flags, const.IFF.UP) ~= 0 then
-      return 1 -- up
+   if status ~= nil then
+      if status == 1 then
+         -- up
+         ifr.flags = bor(ifr.flags, const.IFF.UP)
+      else
+         -- down
+         ifr.flags = band(ifr.flags, bnot(const.IFF.UP))
+      end
+      local ok, err = sock:ioctl("SIOCSIFFLAGS", ifr)
+      if not ok then
+         error("Error setting flags for tap device " .. ifr.name
+                  .. ": " .. tostring(err))
+      end
    else
-      return 2 -- down
+      if band(ifr.flags, const.IFF.UP) ~= 0 then
+         return 1 -- up
+      else
+         return 2 -- down
+      end
    end
 end
 
-local macaddr_t = ffi.typeof[[
-   union {
-      uint64_t bits;
-      uint8_t bytes[6];
-   }
-]]
+-- Get the MAC address of a tap device as a int64_t
 local function _macaddr (sock, ifr)
    local ok, err = sock:ioctl("SIOCGIFHWADDR", ifr)
    if not ok then
       error("Error getting MAC address for tap device "
-               ..ifr.name..": ".. tostring(err))
+               .. ifr.name ..": " .. tostring(err))
    end
    local sa = ifr.hwaddr
    if sa.sa_family ~= const.ARPHRD.ETHER then
-      error("Tap interface "..ifr.name
-               .." is not of type ethernet "..sa.sa_family)
+      error("Tap interface " .. ifr.name
+               .. " is not of type ethernet: " .. sa.sa_family)
    else
-      return ffi.cast(ffi.typeof("$*", macaddr_t), sa.sa_data).bits
+      return macaddr:new(ffi.cast("uint64_t*", sa.sa_data)[0]).bits
    end
 end
 
 function Tap:new (conf)
-   local name, mtu, mtu2
    -- Backwards compatibility
    if type(conf) == "string" then
-      name = conf
-   elseif type(conf) == "table" then
-      name = conf.name
-      -- MTU handling
-      --
-      -- For a regular networking device, we use the convention that
-      -- the MTU includes the Ethernet header including any VLAN tags.
-      -- This value is passed to us in the "mtu" configuration
-      -- variable.  However, the MTU of a TAP device does not include
-      -- any part of the Ethernet header.  Since the device doesn't
-      -- know whether there are any VLAN tags used on top of it, this
-      -- driver cannot figure out the proper MTU from that value
-      -- alone.  For that reason, another value is passed to the
-      -- driver in the variable "mtu2", which excludes all L2 headers.
-      -- Like "mtu", this value originates from the user-supplied
-      -- configuration and assumes knowledge of the L2 structure of
-      -- the TAP device.
-      --
-      -- Contrary to a physical device, whose MTU is controlled solely
-      -- by the driver, the MTU of a TAP device is controlled by the
-      -- external process that set up the device.  Hence, it would be
-      -- unexpected if the MTU were changed here.  Therefore, we
-      -- merely check whether the externally configured MTU matches
-      -- the one supplied to us by the Snabb process.  An error is
-      -- thrown in case of a mismatch to avoid MTU blackholes within
-      -- the Snabb app network.
-      --
-      -- Both values must be supplied.  "mtu2" is used for checking
-      -- but mtu is stored as the actual MTU in the driver stats for
-      -- consistency with regular devices.
-      mtu = conf.mtu
-      mtu2 = conf.mtu2
-      assert(mtu and mtu2, "missing MTU and/or MTU2 for tap interface "
-                ..(name and name or "<unknown>"))
+      conf = { name = conf }
    end
-   assert(name, "missing tap interface name")
+   conf = lib.parse(conf, self._config)
 
+   local ephemeral = not S.stat('/sys/class/net/'..conf.name)
    local fd, err = S.open("/dev/net/tun", "rdwr, nonblock");
    assert(fd, "Error opening /dev/net/tun: " .. tostring(err))
    local ifr = t.ifreq()
    ifr.flags = "tap, no_pi"
-   ifr.name = name
+   ifr.name = conf.name
    local ok, err = fd:ioctl("TUNSETIFF", ifr)
    if not ok then
       fd:close()
       error("ioctl(TUNSETIFF) failed on /dev/net/tun: " .. tostring(err))
    end
 
-   -- A dummy socket to perform SIOC{G,S}IF* ioctl() calls
-   local sock, err = S.socket(const.AF.INET, const.SOCK.DGRAM, 0)
+   -- A dummy socket to perform SIOC{G,S}IF* ioctl() calls. Any
+   -- PF/type would do.
+   local sock, err = S.socket(const.AF.PACKET, const.SOCK.RAW, 0)
    if not sock then
       fd:close()
-      error("Error creating query socket for tap device: " .. tostring(err))
+      error("Error creating ioctl socket for tap device: " .. tostring(err))
    end
 
-   local mtu_tap = _mtu(sock, ifr)
-   if mtu2 then
-      assert(mtu2 == mtu_tap, "MTU mismatch on "..name
-                ..": required "..mtu..", configured "..mtu_tap)
+   if ephemeral then
+      -- Set status to "up"
+      _status(sock, ifr, 1)
+   end
+   local mtu_eff = conf.mtu - (conf.mtu_fixup and conf.mtu_offset) or 0
+   local mtu_set = conf.mtu_set
+   if mtu_set == nil then
+      mtu_set = ephemeral
+   end
+   if mtu_set then
+      _mtu(sock, ifr, mtu_eff)
    else
-      -- Old-style configuration without MTU: use the MTU from the TAP
-      -- device in the stats table.  This value is inconsistent with
-      -- that of other devices, because it doesn't include the L2
-      -- headers.
-      mtu = mtu_tap
+      local mtu_configured = _mtu(sock, ifr)
+      assert(mtu_configured == mtu_eff,
+             "Mismatch of IP MTU on tap device " .. conf.name
+                .. ": expected " .. mtu_eff .. ", configured "
+                .. mtu_configured)
    end
 
    return setmetatable({fd = fd,
                         sock = sock,
                         ifr = ifr,
-                        name = name,
+                        name = conf.name,
                         status_timer = lib.throttle(0.001),
                         pkt = packet.allocate(),
                         shm = { rxbytes   = {counter},
@@ -148,7 +153,8 @@ function Tap:new (conf)
                                 txbcast   = {counter},
                                 type      = {counter, 0x1001}, -- propVirtual
                                 status    = {counter, _status(sock, ifr)},
-                                mtu       = {counter, mtu},
+                                mtu       = {counter, conf.mtu},
+                                speed     = {counter, 0},
                                 macaddr   = {counter, _macaddr(sock, ifr)} }},
       {__index = Tap})
 end
@@ -165,7 +171,7 @@ function Tap:pull ()
    end
    for i=1,engine.pull_npackets do
       local len, err = S.read(self.fd, self.pkt.data, C.PACKET_PAYLOAD_SIZE)
-      -- errno == EAGAIN indicates that the read would of blocked as there is no
+      -- errno == EAGAIN indicates that the read would have blocked as there is no
       -- packet waiting. It is not a failure.
       if not len and err.errno == const.E.AGAIN then
          return
@@ -190,7 +196,7 @@ end
 function Tap:push ()
    local l = self.input.input
    while not link.empty(l) do
-      -- The write might of blocked so don't dequeue the packet from the link
+      -- The write might have blocked so don't dequeue the packet from the link
       -- until the write has completed.
       local p = link.front(l)
       local len, err = S.write(self.fd, p.data, p.length)
