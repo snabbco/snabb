@@ -12,9 +12,24 @@ local cast = ffi.cast
 local htons, htonl = lib.htons, lib.htonl
 local ntohs, ntohl = htons, htonl
 
-Tagger = {}
-Untagger = {}
-VlanMux = {}
+local default_encap = { default = "dot1q" }
+Tagger = {
+   config = {
+      encapsulation = default_encap,
+      tag = { required = true }
+   }
+}
+Untagger = {
+   config = {
+      encapsulation = default_encap,
+      tag = { required = true }
+   }
+}
+VlanMux = {
+   config = {
+      encapsulation = default_encap,
+   }
+}
 
 local tpids = { dot1q = 0x8100, dot1ad = 0x88A8 }
 local o_ethernet_ethertype = 12
@@ -59,22 +74,26 @@ function tci_to_vid (tci)
 end
 
 function new_aux (self, conf)
-   local encap = (conf and conf.encapsulation) or "dot1q"
-   self.tpid = encap
+   local encap = conf.encapsulation
    if (type(encap) == "string") then
-      local tpid = tpids[encap]
-      assert(tpid)
-      self.tpid = tpid
+      self.tpid = tpids[encap]
+      assert(self.tpid, "Unsupported encapsulation type "..encap)
    else
       assert(type(encap) == "number")
+      self.tpid = encap
    end
    return self
+end
+
+function check_tag (tag)
+   assert(tag > 0 and tag < 4095, "VLAN tag "..tag.." out of range")
+   return tag
 end
 
 function Tagger:new (conf)
    local o = setmetatable({}, {__index=Tagger})
    new_aux(o, conf)
-   o.tag = build_tag(assert(conf.tag), o.tpid)
+   o.tag = build_tag(check_tag(conf.tag), o.tpid)
    return(o)
 end
 
@@ -91,7 +110,7 @@ end
 function Untagger:new (conf)
    local o = setmetatable({}, {__index=Untagger})
    new_aux(o, conf)
-   o.tag = build_tag(assert(conf.tag), o.tpid)
+   o.tag = build_tag(check_tag(conf.tag), o.tpid)
    return(o)
 end
 
@@ -121,7 +140,7 @@ function VlanMux:link ()
    local from_vlans, to_vlans = {}, {}
    for name, l in pairs(self.input) do
       if string.match(name, "vlan%d+") then
-         local vid = tonumber(string.sub(name, 5))
+         local vid = check_tag(tonumber(string.sub(name, 5)))
          to_vlans[vid] = self.output[name]
          table.insert(from_vlans, { link = l, vid = vid })
       elseif name == "native" then
