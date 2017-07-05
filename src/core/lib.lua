@@ -706,6 +706,13 @@ function getenv (name)
    else return nil end
 end
 
+-- Wrapper around execve.
+function execv(path, argv)
+   local env = {}
+   for k, v in pairs(syscall.environ()) do table.insert(env, k.."="..v) end
+   return syscall.execve(path, argv or {}, env)
+end
+
 -- Return an array of random bytes.
 function random_bytes_from_dev_urandom (count)
    local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
