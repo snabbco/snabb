@@ -10,7 +10,6 @@ local timer     = require("core.timer")
 local shm       = require("core.shm")
 local histogram = require('core.histogram')
 local counter   = require("core.counter")
-local zone      = require("jit.zone")
 local jit       = require("jit")
 local S         = require("syscall")
 local ffi       = require("ffi")
@@ -502,18 +501,14 @@ function breathe ()
    for i = 1, #breathe_pull_order do
       local app = breathe_pull_order[i]
       if app.pull and not app.dead then
-         zone(app.zone)
          with_restart(app, app.pull)
-         zone()
       end
    end
    -- Exhale: push work out through the app network
    for i = 1, #breathe_push_order do
       local app = breathe_push_order[i]
       if app.push and not app.dead then
-         zone(app.zone)
          with_restart(app, app.push)
-         zone()
       end
    end
    counter.add(breaths)

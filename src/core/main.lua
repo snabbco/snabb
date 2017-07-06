@@ -8,7 +8,6 @@ package.path = ''
 
 local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
-local zone = require("jit.zone")
 local lib = require("core.lib")
 local shm = require("core.shm")
 local C   = ffi.C
@@ -41,7 +40,6 @@ _G.developer_debug = lib.getenv("SNABB_DEBUG") ~= nil
 debug_on_error = _G.developer_debug
 
 function main ()
-   zone("startup")
    require "lib.lua.strict"
    -- Warn on unsupported platforms
    if ffi.arch ~= 'x64' or ffi.os ~= 'Linux' then
