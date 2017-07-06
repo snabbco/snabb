@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -28,7 +27,6 @@
 #include "lj_asm.h"
 #include "lj_dispatch.h"
 #include "lj_vm.h"
-#include "lj_vmevent.h"
 #include "lj_target.h"
 
 /* -- Error handling ------------------------------------------------------ */
@@ -82,43 +80,8 @@ static TraceNo trace_findfree(jit_State *J)
   memcpy(p, J->cur.field, J->cur.szfield*sizeof(tp)); \
   p += J->cur.szfield*sizeof(tp);
 
-#ifdef LUAJIT_USE_PERFTOOLS
-/*
-** Create symbol table of JIT-compiled code. For use with Linux perf tools.
-** Example usage:
-**   perf record -f -e cycles luajit test.lua
-**   perf report -s symbol
-**   rm perf.data /tmp/perf-*.map
-*/
-#include <stdio.h>
-#include <unistd.h>
-
-static void perftools_addtrace(GCtrace *T)
-{
-  static FILE *fp;
-  GCproto *pt = &gcref(T->startpt)->pt;
-  const BCIns *startpc = mref(T->startpc, const BCIns);
-  const char *name = proto_chunknamestr(pt);
-  BCLine lineno;
-  if (name[0] == '@' || name[0] == '=')
-    name++;
-  else
-    name = "(string)";
-  lua_assert(startpc >= proto_bc(pt) && startpc < proto_bc(pt) + pt->sizebc);
-  lineno = lj_debug_line(pt, proto_bcpos(pt, startpc));
-  if (!fp) {
-    char fname[40];
-    sprintf(fname, "/tmp/perf-%d.map", getpid());
-    if (!(fp = fopen(fname, "w"))) return;
-    setlinebuf(fp);
-  }
-  fprintf(fp, "%lx %x TRACE_%d::%s:%u\n",
-	  (long)T->mcode, T->szmcode, T->traceno, name, lineno);
-}
-#endif
-
 /* Allocate space for copy of T. */
-GCtrace * LJ_FASTCALL lj_trace_alloc(lua_State *L, GCtrace *T)
+GCtrace * lj_trace_alloc(lua_State *L, GCtrace *T)
 {
   size_t sztr = ((sizeof(GCtrace)+7)&~7);
   size_t szins = (T->nins-T->nk)*sizeof(IRIns);
@@ -159,12 +122,9 @@ static void trace_save(jit_State *J, GCtrace *T)
   setgcrefp(J->trace[T->traceno], T);
   lj_gc_barriertrace(J2G(J), T->traceno);
   lj_gdbjit_addtrace(J, T);
-#ifdef LUAJIT_USE_PERFTOOLS
-  perftools_addtrace(T);
-#endif
 }
 
-void LJ_FASTCALL lj_trace_free(global_State *g, GCtrace *T)
+void lj_trace_free(global_State *g, GCtrace *T)
 {
   jit_State *J = G2J(g);
   if (T->traceno) {
@@ -296,9 +256,6 @@ int lj_trace_flushall(lua_State *L)
   /* Free the whole machine code and invalidate all exit stub groups. */
   lj_mcode_free(J);
   memset(J->exitstubgroup, 0, sizeof(J->exitstubgroup));
-  lj_vmevent_send(L, TRACE,
-    setstrV(L, L->top++, lj_str_newlit(L, "flush"));
-  );
   return 0;
 }
 
@@ -317,32 +274,10 @@ void lj_trace_initstate(global_State *g)
   tv[1].u64 = U64x(80000000,00000000);
 
   /* Initialize 32/64 bit constants. */
-#if LJ_TARGET_X86ORX64
   J->k64[LJ_K64_TOBIT].u64 = U64x(43380000,00000000);
-#if LJ_32
-  J->k64[LJ_K64_M2P64_31].u64 = U64x(c1e00000,00000000);
-#endif
   J->k64[LJ_K64_2P64].u64 = U64x(43f00000,00000000);
   J->k32[LJ_K32_M2P64_31] = LJ_64 ? 0xdf800000 : 0xcf000000;
-#endif
-#if LJ_TARGET_X86ORX64 || LJ_TARGET_MIPS64
   J->k64[LJ_K64_M2P64].u64 = U64x(c3f00000,00000000);
-#endif
-#if LJ_TARGET_PPC
-  J->k32[LJ_K32_2P52_2P31] = 0x59800004;
-  J->k32[LJ_K32_2P52] = 0x59800000;
-#endif
-#if LJ_TARGET_PPC || LJ_TARGET_MIPS
-  J->k32[LJ_K32_2P31] = 0x4f000000;
-#endif
-#if LJ_TARGET_MIPS
-  J->k64[LJ_K64_2P31].u64 = U64x(41e00000,00000000);
-#if LJ_64
-  J->k64[LJ_K64_2P63].u64 = U64x(43e00000,00000000);
-  J->k32[LJ_K32_2P63] = 0x5f000000;
-  J->k32[LJ_K32_M2P64] = 0xdf800000;
-#endif
-#endif
 }
 
 /* Free everything associated with the JIT compiler state. */
@@ -427,7 +362,8 @@ static void trace_start(jit_State *J)
   }
   setgcrefp(J->trace[traceno], &J->cur);
 
-  /* Setup enough of the current trace to be able to send the vmevent. */
+  /* Setup enough of the current trace to be able to send the vmevent. 
+     XXX Still needed with vmevent removed? -lukego */
   memset(&J->cur, 0, sizeof(GCtrace));
   J->cur.traceno = traceno;
   J->cur.nins = J->cur.nk = REF_BASE;
@@ -445,22 +381,6 @@ static void trace_start(jit_State *J)
   setgcref(J->cur.startpt, obj2gco(J->pt));
 
   L = J->L;
-  lj_vmevent_send(L, TRACE,
-    setstrV(L, L->top++, lj_str_newlit(L, "start"));
-    setintV(L->top++, traceno);
-    setfuncV(L, L->top++, J->fn);
-    setintV(L->top++, proto_bcpos(J->pt, J->pc));
-    if (J->parent) {
-      setintV(L->top++, J->parent);
-      setintV(L->top++, J->exitno);
-    } else {
-      BCOp op = bc_op(*J->pc);
-      if (op == BC_CALLM || op == BC_CALL || op == BC_ITERC) {
-	setintV(L->top++, J->exitno);  /* Parent of stitched trace. */
-	setintV(L->top++, -1);
-      }
-    }
-  );
   lj_record_setup(J);
 }
 
@@ -525,11 +445,6 @@ static void trace_stop(jit_State *J)
   trace_save(J, T);
 
   L = J->L;
-  lj_vmevent_send(L, TRACE,
-    setstrV(L, L->top++, lj_str_newlit(L, "stop"));
-    setintV(L->top++, traceno);
-    setfuncV(L, L->top++, J->fn);
-  );
 }
 
 /* Start a new root trace for down-recursion. */
@@ -583,29 +498,10 @@ static int trace_abort(jit_State *J)
   /* Is there anything to abort? */
   traceno = J->cur.traceno;
   if (traceno) {
-    ptrdiff_t errobj = savestack(L, L->top-1);  /* Stack may be resized. */
     J->cur.link = 0;
     J->cur.linktype = LJ_TRLINK_NONE;
-    lj_vmevent_send(L, TRACE,
-      TValue *frame;
-      const BCIns *pc;
-      GCfunc *fn;
-      setstrV(L, L->top++, lj_str_newlit(L, "abort"));
-      setintV(L->top++, traceno);
-      /* Find original Lua function call to generate a better error message. */
-      frame = J->L->base-1;
-      pc = J->pc;
-      while (!isluafunc(frame_func(frame))) {
-	pc = (frame_iscont(frame) ? frame_contpc(frame) : frame_pc(frame)) - 1;
-	frame = frame_prev(frame);
-      }
-      fn = frame_func(frame);
-      setfuncV(L, L->top++, fn);
-      setintV(L->top++, proto_bcpos(funcproto(fn), pc));
-      copyTV(L, L->top++, restorestack(L, errobj));
-      copyTV(L, L->top++, &J->errinfo);
-    );
-    /* Drop aborted trace after the vmevent (which may still access it). */
+    /* Drop aborted trace after the vmevent (which may still access it).
+       XXX Rethink now that vmevent is removed? -lukego */
     setgcrefnull(J->trace[traceno]);
     if (traceno < J->freetrace)
       J->freetrace = traceno;
@@ -649,18 +545,6 @@ static TValue *trace_state(lua_State *L, lua_CFunction dummy, void *ud)
     case LJ_TRACE_RECORD:
       trace_pendpatch(J, 0);
       setvmstate(J2G(J), RECORD);
-      lj_vmevent_send_(L, RECORD,
-	/* Save/restore tmptv state for trace recorder. */
-	TValue savetv = J2G(J)->tmptv;
-	TValue savetv2 = J2G(J)->tmptv2;
-	setintV(L->top++, J->cur.traceno);
-	setfuncV(L, L->top++, J->fn);
-	setintV(L->top++, J->pt ? (int32_t)proto_bcpos(J->pt, J->pc) : -1);
-	setintV(L->top++, J->framedepth);
-      ,
-	J2G(J)->tmptv = savetv;
-	J2G(J)->tmptv2 = savetv2;
-      );
       lj_record_ins(J);
       break;
 
@@ -725,15 +609,14 @@ void lj_trace_ins(jit_State *J, const BCIns *pc)
 }
 
 /* A hotcount triggered. Start recording a root trace. */
-void LJ_FASTCALL lj_trace_hot(jit_State *J, const BCIns *pc)
+void lj_trace_hot(jit_State *J, const BCIns *pc)
 {
   /* Note: pc is the interpreter bytecode PC here. It's offset by 1. */
   ERRNO_SAVE
   /* Reset hotcount. */
   hotcount_set(J2GG(J), pc, J->param[JIT_P_hotloop]*HOTCOUNT_LOOP);
-  /* Only start a new trace if not recording or inside __gc call or vmevent. */
-  if (J->state == LJ_TRACE_IDLE &&
-      !(J2G(J)->hookmask & (HOOK_GC|HOOK_VMEVENT))) {
+  /* Only start a new trace if not recording or inside __gc call. */
+  if (J->state == LJ_TRACE_IDLE && !(J2G(J)->hookmask & HOOK_GC)) {
     J->parent = 0;  /* Root trace. */
     J->exitno = 0;
     J->state = LJ_TRACE_START;
@@ -746,7 +629,7 @@ void LJ_FASTCALL lj_trace_hot(jit_State *J, const BCIns *pc)
 static void trace_hotside(jit_State *J, const BCIns *pc)
 {
   SnapShot *snap = &traceref(J, J->parent)->snap[J->exitno];
-  if (!(J2G(J)->hookmask & (HOOK_GC|HOOK_VMEVENT)) &&
+  if (!(J2G(J)->hookmask & HOOK_GC) &&
       isluafunc(curr_func(J->L)) &&
       snap->count != SNAPCOUNT_DONE &&
       ++snap->count >= J->param[JIT_P_hotexit]) {
@@ -758,11 +641,10 @@ static void trace_hotside(jit_State *J, const BCIns *pc)
 }
 
 /* Stitch a new trace to the previous trace. */
-void LJ_FASTCALL lj_trace_stitch(jit_State *J, const BCIns *pc)
+void lj_trace_stitch(jit_State *J, const BCIns *pc)
 {
-  /* Only start a new trace if not recording or inside __gc call or vmevent. */
-  if (J->state == LJ_TRACE_IDLE &&
-      !(J2G(J)->hookmask & (HOOK_GC|HOOK_VMEVENT))) {
+  /* Only start a new trace if not recording or inside __gc call. */
+  if (J->state == LJ_TRACE_IDLE && !(J2G(J)->hookmask & HOOK_GC)) {
     J->parent = 0;  /* Have to treat it like a root trace. */
     /* J->exitno is set to the invoking trace. */
     J->state = LJ_TRACE_START;
@@ -788,29 +670,6 @@ static TValue *trace_exit_cp(lua_State *L, lua_CFunction dummy, void *ud)
   return NULL;
 }
 
-#ifndef LUAJIT_DISABLE_VMEVENT
-/* Push all registers from exit state. */
-static void trace_exit_regs(lua_State *L, ExitState *ex)
-{
-  int32_t i;
-  setintV(L->top++, RID_NUM_GPR);
-  setintV(L->top++, RID_NUM_FPR);
-  for (i = 0; i < RID_NUM_GPR; i++) {
-    if (sizeof(ex->gpr[i]) == sizeof(int32_t))
-      setintV(L->top++, (int32_t)ex->gpr[i]);
-    else
-      setnumV(L->top++, (lua_Number)ex->gpr[i]);
-  }
-#if !LJ_SOFTFP
-  for (i = 0; i < RID_NUM_FPR; i++) {
-    setnumV(L->top, ex->fpr[i]);
-    if (LJ_UNLIKELY(tvisnan(L->top)))
-      setnanV(L->top);
-    L->top++;
-  }
-#endif
-}
-#endif
 
 #ifdef EXITSTATE_PCREG
 /* Determine trace number from pc of exit instruction. */
@@ -828,11 +687,10 @@ static TraceNo trace_exit_find(jit_State *J, MCode *pc)
 #endif
 
 /* A trace exited. Restore interpreter state. */
-int LJ_FASTCALL lj_trace_exit(jit_State *J, void *exptr)
+int lj_trace_exit(jit_State *J, void *exptr)
 {
   ERRNO_SAVE
   lua_State *L = J->L;
-  ExitState *ex = (ExitState *)exptr;
   ExitDataCP exd;
   int errcode;
   const BCIns *pc;
@@ -857,20 +715,10 @@ int LJ_FASTCALL lj_trace_exit(jit_State *J, void *exptr)
   if (errcode)
     return -errcode;  /* Return negated error code. */
 
-  if (!(LJ_HASPROFILE && (G(L)->hookmask & HOOK_PROFILE)))
-    lj_vmevent_send(L, TEXIT,
-      lj_state_checkstack(L, 4+RID_NUM_GPR+RID_NUM_FPR+LUA_MINSTACK);
-      setintV(L->top++, J->parent);
-      setintV(L->top++, J->exitno);
-      trace_exit_regs(L, ex);
-    );
-
   pc = exd.pc;
   cf = cframe_raw(L->cframe);
   setcframe_pc(cf, pc);
-  if (LJ_HASPROFILE && (G(L)->hookmask & HOOK_PROFILE)) {
-    /* Just exit to interpreter. */
-  } else if (G(L)->gc.state == GCSatomic || G(L)->gc.state == GCSfinalize) {
+  if (G(L)->gc.state == GCSatomic || G(L)->gc.state == GCSfinalize) {
     if (!(G(L)->hookmask & HOOK_GC))
       lj_gc_step(L);  /* Exited because of GC: drive GC forward. */
   } else {
@@ -906,4 +754,3 @@ int LJ_FASTCALL lj_trace_exit(jit_State *J, void *exptr)
   }
 }
 
-#endif

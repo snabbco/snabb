@@ -1,0 +1,9 @@
+language: nix
+sudo: false
+env:
+  - test=test-O3
+  - test=test-O2
+  - test=test-O1
+  - test=test-nojit
+script:
+  - nix-build -A $test

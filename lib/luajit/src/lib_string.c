@@ -681,21 +681,10 @@ again:
 	luaL_argerror(L, arg, lj_obj_typename[0]);
       switch (STRFMT_TYPE(sf)) {
       case STRFMT_INT:
-	if (tvisint(L->base+arg-1)) {
-	  int32_t k = intV(L->base+arg-1);
-	  if (sf == STRFMT_INT)
-	    lj_strfmt_putint(sb, k);  /* Shortcut for plain %d. */
-	  else
-	    lj_strfmt_putfxint(sb, sf, k);
-	} else {
-	  lj_strfmt_putfnum_int(sb, sf, lj_lib_checknum(L, arg));
-	}
+        lj_strfmt_putfnum_int(sb, sf, lj_lib_checknum(L, arg));
 	break;
       case STRFMT_UINT:
-	if (tvisint(L->base+arg-1))
-	  lj_strfmt_putfxint(sb, sf, intV(L->base+arg-1));
-	else
-	  lj_strfmt_putfnum_uint(sb, sf, lj_lib_checknum(L, arg));
+        lj_strfmt_putfnum_uint(sb, sf, lj_lib_checknum(L, arg));
 	break;
       case STRFMT_NUM:
 	lj_strfmt_putfnum(sb, sf, lj_lib_checknum(L, arg));

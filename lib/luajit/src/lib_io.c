@@ -97,14 +97,7 @@ static int io_file_close(lua_State *L, IOFileUD *iof)
     ok = (fclose(iof->fp) == 0);
   } else if ((iof->type & IOFILE_TYPE_MASK) == IOFILE_TYPE_PIPE) {
     int stat = -1;
-#if LJ_TARGET_POSIX
     stat = pclose(iof->fp);
-#elif LJ_TARGET_WINDOWS && !LJ_TARGET_XBOXONE
-    stat = _pclose(iof->fp);
-#else
-    lua_assert(0);
-    return 0;
-#endif
 #if LJ_52
     iof->fp = NULL;
     return luaL_execresult(L, stat);
@@ -127,13 +120,6 @@ static int io_file_readnum(lua_State *L, FILE *fp)
 {
   lua_Number d;
   if (fscanf(fp, LUA_NUMBER_SCAN, &d) == 1) {
-    if (LJ_DUALNUM) {
-      int32_t i = lj_num2int(d);
-      if (d == (lua_Number)i && !tvismzero((cTValue *)&d)) {
-	setintV(L->top++, i);
-	return 1;
-      }
-    }
     setnumV(L->top++, d);
     return 1;
   } else {
@@ -318,33 +304,15 @@ LJLIB_CF(io_method_seek)
   else if (opt == 2) opt = SEEK_END;
   o = L->base+2;
   if (o < L->top) {
-    if (tvisint(o))
-      ofs = (int64_t)intV(o);
-    else if (tvisnum(o))
+    if (tvisnum(o))
       ofs = (int64_t)numV(o);
     else if (!tvisnil(o))
       lj_err_argt(L, 3, LUA_TNUMBER);
   }
-#if LJ_TARGET_POSIX
   res = fseeko(fp, ofs, opt);
-#elif _MSC_VER >= 1400
-  res = _fseeki64(fp, ofs, opt);
-#elif defined(__MINGW32__)
-  res = fseeko64(fp, ofs, opt);
-#else
-  res = fseek(fp, (long)ofs, opt);
-#endif
   if (res)
     return luaL_fileresult(L, 0, NULL);
-#if LJ_TARGET_POSIX
   ofs = ftello(fp);
-#elif _MSC_VER >= 1400
-  ofs = _ftelli64(fp);
-#elif defined(__MINGW32__)
-  ofs = ftello64(fp);
-#else
-  ofs = (int64_t)ftell(fp);
-#endif
   setint64V(L->top-1, ofs);
   return 1;
 }
@@ -406,32 +374,20 @@ LJLIB_CF(io_open)
 
 LJLIB_CF(io_popen)
 {
-#if LJ_TARGET_POSIX || (LJ_TARGET_WINDOWS && !LJ_TARGET_XBOXONE)
   const char *fname = strdata(lj_lib_checkstr(L, 1));
   GCstr *s = lj_lib_optstr(L, 2);
   const char *mode = s ? strdata(s) : "r";
   IOFileUD *iof = io_file_new(L);
   iof->type = IOFILE_TYPE_PIPE;
-#if LJ_TARGET_POSIX
   fflush(NULL);
   iof->fp = popen(fname, mode);
-#else
-  iof->fp = _popen(fname, mode);
-#endif
   return iof->fp != NULL ? 1 : luaL_fileresult(L, 0, fname);
-#else
-  return luaL_error(L, LUA_QL("popen") " not supported");
-#endif
 }
 
 LJLIB_CF(io_tmpfile)
 {
   IOFileUD *iof = io_file_new(L);
-#if LJ_TARGET_PS3 || LJ_TARGET_PS4 || LJ_TARGET_PSVITA
-  iof->fp = NULL; errno = ENOSYS;
-#else
   iof->fp = tmpfile();
-#endif
   return iof->fp != NULL ? 1 : luaL_fileresult(L, 0, NULL);
 }
 

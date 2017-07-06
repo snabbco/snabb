@@ -24,10 +24,8 @@
 #include "lj_meta.h"
 #include "lj_state.h"
 #include "lj_frame.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
 #include "lj_cconv.h"
-#endif
 #include "lj_bc.h"
 #include "lj_ff.h"
 #include "lj_dispatch.h"
@@ -81,7 +79,6 @@ LJLIB_ASM(next)
   return FFH_UNREACHABLE;
 }
 
-#if LJ_52 || LJ_HASFFI
 static int ffh_pairs(lua_State *L, MMS mm)
 {
   TValue *o = lj_lib_checkany(L, 1);
@@ -98,9 +95,6 @@ static int ffh_pairs(lua_State *L, MMS mm)
     return FFH_RES(3);
   }
 }
-#else
-#define ffh_pairs(L, mm)	(lj_lib_checktab(L, 1), FFH_UNREACHABLE)
-#endif
 
 LJLIB_PUSH(lastcl)
 LJLIB_ASM(pairs)		LJLIB_REC(xpairs 0)
@@ -265,25 +259,16 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
       copyTV(L, L->base-1-LJ_FR2, o);
       return FFH_RES(1);
     }
-#if LJ_HASFFI
     if (tviscdata(o)) {
       CTState *cts = ctype_cts(L);
       CType *ct = lj_ctype_rawref(cts, cdataV(o)->ctypeid);
       if (ctype_isenum(ct->info)) ct = ctype_child(cts, ct);
       if (ctype_isnum(ct->info) || ctype_iscomplex(ct->info)) {
-	if (LJ_DUALNUM && ctype_isinteger_or_bool(ct->info) &&
-	    ct->size <= 4 && !(ct->size == 4 && (ct->info & CTF_UNSIGNED))) {
-	  int32_t i;
-	  lj_cconv_ct_tv(cts, ctype_get(cts, CTID_INT32), (uint8_t *)&i, o, 0);
-	  setintV(L->base-1-LJ_FR2, i);
-	  return FFH_RES(1);
-	}
 	lj_cconv_ct_tv(cts, ctype_get(cts, CTID_DOUBLE),
 		       (uint8_t *)&(L->base-1-LJ_FR2)->n, o, 0);
 	return FFH_RES(1);
       }
     }
-#endif
   } else {
     const char *p = strdata(lj_lib_checkstr(L, 1));
     char *ep;
@@ -294,10 +279,7 @@ LJLIB_ASM(tonumber)		LJLIB_REC(.)
     if (p != ep) {
       while (lj_char_isspace((unsigned char)(*ep))) ep++;
       if (*ep == '\0') {
-	if (LJ_DUALNUM && LJ_LIKELY(ul < 0x80000000u))
-	  setintV(L->base-1-LJ_FR2, (int32_t)ul);
-	else
-	  setnumV(L->base-1-LJ_FR2, (lua_Number)ul);
+        setnumV(L->base-1-LJ_FR2, (lua_Number)ul);
 	return FFH_RES(1);
       }
     }
@@ -608,13 +590,11 @@ LJLIB_NOREG LJLIB_ASM(coroutine_wrap_aux)
 
 /* Inline declarations. */
 LJ_ASMF void lj_ff_coroutine_wrap_aux(void);
-#if !(LJ_TARGET_MIPS && defined(ljamalg_c))
-LJ_FUNCA_NORET void LJ_FASTCALL lj_ffh_coroutine_wrap_err(lua_State *L,
+LJ_FUNCA_NORET void lj_ffh_coroutine_wrap_err(lua_State *L,
 							  lua_State *co);
-#endif
 
 /* Error handler, called from assembler VM. */
-void LJ_FASTCALL lj_ffh_coroutine_wrap_err(lua_State *L, lua_State *co)
+void lj_ffh_coroutine_wrap_err(lua_State *L, lua_State *co)
 {
   co->top--; copyTV(L, L->top, co->top); L->top++;
   if (tvisstr(L->top-1))

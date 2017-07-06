@@ -211,14 +211,6 @@ GCstr *lj_lib_optstr(lua_State *L, int narg)
   return (o < L->top && !tvisnil(o)) ? lj_lib_checkstr(L, narg) : NULL;
 }
 
-#if LJ_DUALNUM
-void lj_lib_checknumber(lua_State *L, int narg)
-{
-  TValue *o = L->base + narg-1;
-  if (!(o < L->top && lj_strscan_numberobj(o)))
-    lj_err_argt(L, narg, LUA_TNUMBER);
-}
-#endif
 
 lua_Number lj_lib_checknum(lua_State *L, int narg)
 {
@@ -226,13 +218,7 @@ lua_Number lj_lib_checknum(lua_State *L, int narg)
   if (!(o < L->top &&
 	(tvisnumber(o) || (tvisstr(o) && lj_strscan_num(strV(o), o)))))
     lj_err_argt(L, narg, LUA_TNUMBER);
-  if (LJ_UNLIKELY(tvisint(o))) {
-    lua_Number n = (lua_Number)intV(o);
-    setnumV(o, n);
-    return n;
-  } else {
-    return numV(o);
-  }
+  return numV(o);
 }
 
 int32_t lj_lib_checkint(lua_State *L, int narg)
@@ -240,13 +226,8 @@ int32_t lj_lib_checkint(lua_State *L, int narg)
   TValue *o = L->base + narg-1;
   if (!(o < L->top && lj_strscan_numberobj(o)))
     lj_err_argt(L, narg, LUA_TNUMBER);
-  if (LJ_LIKELY(tvisint(o))) {
-    return intV(o);
-  } else {
-    int32_t i = lj_num2int(numV(o));
-    if (LJ_DUALNUM) setintV(o, i);
-    return i;
-  }
+  int32_t i = lj_num2int(numV(o));
+  return i;
 }
 
 int32_t lj_lib_optint(lua_State *L, int narg, int32_t def)

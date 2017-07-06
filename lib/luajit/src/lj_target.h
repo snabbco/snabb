@@ -55,11 +55,7 @@ typedef uint32_t RegSP;
 /* Bitset for registers. 32 registers suffice for most architectures.
 ** Note that one set holds bits for both GPRs and FPRs.
 */
-#if LJ_TARGET_PPC || LJ_TARGET_MIPS || LJ_TARGET_ARM64
-typedef uint64_t RegSet;
-#else
 typedef uint32_t RegSet;
-#endif
 
 #define RID2RSET(r)		(((RegSet)1) << (r))
 #define RSET_EMPTY		((RegSet)0)
@@ -69,13 +65,8 @@ typedef uint32_t RegSet;
 #define rset_set(rs, r)		(rs |= RID2RSET(r))
 #define rset_clear(rs, r)	(rs &= ~RID2RSET(r))
 #define rset_exclude(rs, r)	(rs & ~RID2RSET(r))
-#if LJ_TARGET_PPC || LJ_TARGET_MIPS || LJ_TARGET_ARM64
-#define rset_picktop(rs)	((Reg)(__builtin_clzll(rs)^63))
-#define rset_pickbot(rs)	((Reg)__builtin_ctzll(rs))
-#else
 #define rset_picktop(rs)	((Reg)lj_fls(rs))
 #define rset_pickbot(rs)	((Reg)lj_ffs(rs))
-#endif
 
 /* -- Register allocation cost -------------------------------------------- */
 
@@ -134,19 +125,7 @@ typedef uint32_t RegCost;
 
 /* -- Target-specific definitions ----------------------------------------- */
 
-#if LJ_TARGET_X86ORX64
 #include "lj_target_x86.h"
-#elif LJ_TARGET_ARM
-#include "lj_target_arm.h"
-#elif LJ_TARGET_ARM64
-#include "lj_target_arm64.h"
-#elif LJ_TARGET_PPC
-#include "lj_target_ppc.h"
-#elif LJ_TARGET_MIPS
-#include "lj_target_mips.h"
-#else
-#error "Missing include for target CPU"
-#endif
 
 #ifdef EXITSTUBS_PER_GROUP
 /* Return the address of an exit stub. */

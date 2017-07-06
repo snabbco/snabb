@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_err.h"
 #include "lj_buf.h"
@@ -446,4 +445,3 @@ int lj_opt_loop(jit_State *J)
 #undef emitir
 #undef emitir_raw
 
-#endif

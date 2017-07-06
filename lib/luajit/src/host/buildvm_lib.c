@@ -176,7 +176,7 @@ static void libdef_fixupbc(uint8_t *p)
     uint8_t ra = p[libbc_endian ? 2 : 1];
     uint8_t rc = p[libbc_endian ? 1 : 2];
     uint8_t rb = p[libbc_endian ? 0 : 3];
-    if (!LJ_DUALNUM && op == BC_ISTYPE && rc == ~LJ_TNUMX+1) {
+    if (op == BC_ISTYPE && rc == ~LJ_TNUMX+1) {
       op = BC_ISNUM; rc++;
     }
     p[LJ_ENDIAN_SELECT(0, 3)] = op;

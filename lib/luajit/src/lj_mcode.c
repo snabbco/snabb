@@ -7,30 +7,22 @@
 #define LUA_CORE
 
 #include "lj_obj.h"
-#if LJ_HASJIT
 #include "lj_gc.h"
 #include "lj_err.h"
 #include "lj_jit.h"
 #include "lj_mcode.h"
 #include "lj_trace.h"
 #include "lj_dispatch.h"
-#endif
-#if LJ_HASJIT || LJ_HASFFI
 #include "lj_vm.h"
-#endif
 
 /* -- OS-specific functions ----------------------------------------------- */
 
-#if LJ_HASJIT || LJ_HASFFI
 
 /* Define this if you want to run LuaJIT with Valgrind. */
 #ifdef LUAJIT_USE_VALGRIND
 #include <valgrind/valgrind.h>
 #endif
 
-#if LJ_TARGET_IOS
-void sys_icache_invalidate(void *start, size_t len);
-#endif
 
 /* Synchronize data/instruction cache. */
 void lj_mcode_sync(void *start, void *end)
@@ -38,54 +30,11 @@ void lj_mcode_sync(void *start, void *end)
 #ifdef LUAJIT_USE_VALGRIND
   VALGRIND_DISCARD_TRANSLATIONS(start, (char *)end-(char *)start);
 #endif
-#if LJ_TARGET_X86ORX64
   UNUSED(start); UNUSED(end);
-#elif LJ_TARGET_IOS
-  sys_icache_invalidate(start, (char *)end-(char *)start);
-#elif LJ_TARGET_PPC
-  lj_vm_cachesync(start, end);
-#elif defined(__GNUC__)
-  __clear_cache(start, end);
-#else
-#error "Missing builtin to flush instruction cache"
-#endif
 }
 
-#endif
 
-#if LJ_HASJIT
 
-#if LJ_TARGET_WINDOWS
-
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
-#define MCPROT_RW	PAGE_READWRITE
-#define MCPROT_RX	PAGE_EXECUTE_READ
-#define MCPROT_RWX	PAGE_EXECUTE_READWRITE
-
-static void *mcode_alloc_at(jit_State *J, uintptr_t hint, size_t sz, DWORD prot)
-{
-  void *p = VirtualAlloc((void *)hint, sz,
-			 MEM_RESERVE|MEM_COMMIT|MEM_TOP_DOWN, prot);
-  if (!p && !hint)
-    lj_trace_err(J, LJ_TRERR_MCODEAL);
-  return p;
-}
-
-static void mcode_free(jit_State *J, void *p, size_t sz)
-{
-  UNUSED(J); UNUSED(sz);
-  VirtualFree(p, 0, MEM_RELEASE);
-}
-
-static int mcode_setprot(void *p, size_t sz, DWORD prot)
-{
-  DWORD oprot;
-  return !VirtualProtect(p, sz, prot, &oprot);
-}
-
-#elif LJ_TARGET_POSIX
 
 #include <sys/mman.h>
 
@@ -118,30 +67,6 @@ static int mcode_setprot(void *p, size_t sz, int prot)
   return mprotect(p, sz, prot);
 }
 
-#elif LJ_64
-
-#error "Missing OS support for explicit placement of executable memory"
-
-#else
-
-/* Fallback allocator. This will fail if memory is not executable by default. */
-#define LUAJIT_UNPROTECT_MCODE
-#define MCPROT_RW	0
-#define MCPROT_RX	0
-#define MCPROT_RWX	0
-
-static void *mcode_alloc_at(jit_State *J, uintptr_t hint, size_t sz, int prot)
-{
-  UNUSED(hint); UNUSED(prot);
-  return lj_mem_new(J->L, sz);
-}
-
-static void mcode_free(jit_State *J, void *p, size_t sz)
-{
-  lj_mem_free(J2G(J), p, sz);
-}
-
-#endif
 
 /* -- MCode area protection ----------------------------------------------- */
 
@@ -204,11 +129,7 @@ static void mcode_protect(jit_State *J, int prot)
 
 /* -- MCode area allocation ----------------------------------------------- */
 
-#if LJ_64
 #define mcode_validptr(p)	(p)
-#else
-#define mcode_validptr(p)	((p) && (uintptr_t)(p) < 0xffff0000)
-#endif
 
 #ifdef LJ_TARGET_JUMPRANGE
 
@@ -219,13 +140,7 @@ static void *mcode_alloc(jit_State *J, size_t sz)
   ** Try addresses within a distance of target-range/2+1MB..target+range/2-1MB.
   ** Use half the jump range so every address in the range can reach any other.
   */
-#if LJ_TARGET_MIPS
-  /* Use the middle of the 256MB-aligned region. */
-  uintptr_t target = ((uintptr_t)(void *)lj_vm_exit_handler &
-		      ~(uintptr_t)0x0fffffffu) + 0x08000000u;
-#else
   uintptr_t target = (uintptr_t)(void *)lj_vm_exit_handler & ~(uintptr_t)0xffff;
-#endif
   const uintptr_t range = (1u << (LJ_TARGET_JUMPRANGE-1)) - (1u << 21);
   /* First try a contiguous area below the last one. */
   uintptr_t hint = J->mcarea ? (uintptr_t)J->mcarea - sz : 0;
@@ -255,17 +170,7 @@ static void *mcode_alloc(jit_State *J, size_t sz)
 /* All memory addresses are reachable by relative jumps. */
 static void *mcode_alloc(jit_State *J, size_t sz)
 {
-#ifdef __OpenBSD__
-  /* Allow better executable memory allocation for OpenBSD W^X mode. */
-  void *p = mcode_alloc_at(J, 0, sz, MCPROT_RUN);
-  if (p && mcode_setprot(p, sz, MCPROT_GEN)) {
-    mcode_free(J, p, sz);
-    return NULL;
-  }
-  return p;
-#else
   return mcode_alloc_at(J, 0, sz, MCPROT_GEN);
-#endif
 }
 
 #endif
@@ -384,4 +289,3 @@ void lj_mcode_limiterr(jit_State *J, size_t need)
   lj_trace_err(J, LJ_TRERR_MCODELM);  /* Retry with new area. */
 }
 
-#endif

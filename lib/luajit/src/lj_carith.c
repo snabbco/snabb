@@ -5,7 +5,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASFFI
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -51,9 +50,6 @@ static int carith_checkarg(lua_State *L, CTState *cts, CDArith *ca)
       if (ctype_isenum(ct->info)) ct = ctype_child(cts, ct);
       ca->ct[i] = ct;
       ca->p[i] = p;
-    } else if (tvisint(o)) {
-      ca->ct[i] = ctype_get(cts, CTID_INT32);
-      ca->p[i] = (uint8_t *)&o->i;
     } else if (tvisnum(o)) {
       ca->ct[i] = ctype_get(cts, CTID_DOUBLE);
       ca->p[i] = (uint8_t *)&o->n;
@@ -276,14 +272,8 @@ int lj_carith_op(lua_State *L, MMS mm)
 
 /* -- 64 bit bit operations helpers --------------------------------------- */
 
-#if LJ_64
 #define B64DEF(name) \
   static LJ_AINLINE uint64_t lj_carith_##name(uint64_t x, int32_t sh)
-#else
-/* Not inlined on 32 bit archs, since some of these are quite lengthy. */
-#define B64DEF(name) \
-  uint64_t LJ_NOINLINE lj_carith_##name(uint64_t x, int32_t sh)
-#endif
 
 B64DEF(shl64) { return x << (sh&63); }
 B64DEF(shr64) { return x >> (sh&63); }
@@ -338,25 +328,13 @@ uint64_t lj_carith_check64(lua_State *L, int narg, CTypeID *id)
   } else if (!(tvisstr(o) && lj_strscan_number(strV(o), o))) {
     goto err;
   }
-  if (LJ_LIKELY(tvisint(o))) {
-    return (uint32_t)intV(o);
-  } else {
-    int32_t i = lj_num2bit(numV(o));
-    if (LJ_DUALNUM) setintV(o, i);
-    return (uint32_t)i;
-  }
+  int32_t i = lj_num2bit(numV(o));
+  return (uint32_t)i;
 }
 
 
 /* -- 64 bit integer arithmetic helpers ----------------------------------- */
 
-#if LJ_32 && LJ_HASJIT
-/* Signed/unsigned 64 bit multiplication. */
-int64_t lj_carith_mul64(int64_t a, int64_t b)
-{
-  return a * b;
-}
-#endif
 
 /* Unsigned 64 bit division. */
 uint64_t lj_carith_divu64(uint64_t a, uint64_t b)
@@ -426,4 +404,3 @@ int64_t lj_carith_powi64(int64_t x, int64_t k)
   return (int64_t)lj_carith_powu64((uint64_t)x, (uint64_t)k);
 }
 
-#endif

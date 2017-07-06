@@ -9,7 +9,6 @@
 #include "lj_obj.h"
 #include "lj_jit.h"
 
-#if LJ_HASJIT
 /* Context for recording an indexed load/store. */
 typedef struct RecordIndex {
   TValue tabv;		/* Runtime value of table (or indexed object). */
@@ -40,6 +39,5 @@ LJ_FUNC TRef lj_record_idx(jit_State *J, RecordIndex *ix);
 
 LJ_FUNC void lj_record_ins(jit_State *J);
 LJ_FUNC void lj_record_setup(jit_State *J);
-#endif
 
 #endif
