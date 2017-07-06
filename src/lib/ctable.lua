@@ -4,25 +4,39 @@ local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
 local bit = require("bit")
+local binary_search = require("lib.binary_search")
+local multi_copy = require("lib.multi_copy")
 local bxor, bnot = bit.bxor, bit.bnot
 local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
 local max, floor, ceil = math.max, math.floor, math.ceil
 
 CTable = {}
+LookupStreamer = {}
 
 local HASH_MAX = 0xFFFFFFFF
+local uint8_ptr_t = ffi.typeof('uint8_t*')
 local uint16_ptr_t = ffi.typeof('uint16_t*')
 local uint32_ptr_t = ffi.typeof('uint32_t*')
 local uint64_ptr_t = ffi.typeof('uint64_t*')
 
+local entry_types = {}
 local function make_entry_type(key_type, value_type)
-   return ffi.typeof([[struct {
+   local cache = entry_types[key_type]
+   if cache then
+      cache = cache[value_type]
+      if cache then return cache end
+   else
+      entry_types[key_type] = {}
+   end
+   local ret = ffi.typeof([[struct {
          uint32_t hash;
          $ key;
          $ value;
       } __attribute__((packed))]],
       key_type,
       value_type)
+   entry_types[key_type][value_type] = ret
+   return ret
 end
 
 local function make_entries_type(entry_type)
@@ -31,7 +45,7 @@ end
 
 -- hash := [0,HASH_MAX); scale := size/HASH_MAX
 local function hash_to_index(hash, scale)
-   return floor(hash*scale + 0.5)
+   return floor(hash*scale)
 end
 
 local function make_equal_fn(key_type)
@@ -107,6 +121,7 @@ function new(params)
    ctab.hash_fn = params.hash_fn or compute_hash_fn(params.key_type)
    ctab.equal_fn = make_equal_fn(params.key_type)
    ctab.size = 0
+   ctab.max_displacement = 0
    ctab.occupancy = 0
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
@@ -145,6 +160,7 @@ function CTable:resize(size)
    assert(size >= (self.occupancy / self.max_occupancy_rate))
    local old_entries = self.entries
    local old_size = self.size
+   local old_max_displacement = self.max_displacement
 
    -- Allocate double the requested number of entries to make sure there
    -- is sufficient displacement if all hashes map to the last bucket.
@@ -157,7 +173,7 @@ function CTable:resize(size)
    self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
    for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
 
-   for i=0,old_size*2-1 do
+   for i=0,old_size+old_max_displacement-1 do
       if old_entries[i].hash ~= HASH_MAX then
          self:insert(old_entries[i].hash, old_entries[i].key, old_entries[i].value)
       end
@@ -168,6 +184,46 @@ function CTable:get_backing_size()
    return self.byte_size
 end
 
+local header_t = ffi.typeof[[
+struct {
+   uint32_t size;
+   uint32_t occupancy;
+   uint32_t max_displacement;
+   double max_occupancy_rate;
+   double min_occupancy_rate;
+}
+]]
+
+function load(stream, params)
+   local header = stream:read_ptr(header_t)
+   local params_copy = {}
+   for k,v in pairs(params) do params_copy[k] = v end
+   params_copy.initial_size = header.size
+   params_copy.min_occupancy_rate = header.min_occupancy_rate
+   params_copy.max_occupancy_rate = header.max_occupancy_rate
+   local ctab = new(params_copy)
+   ctab.occupancy = header.occupancy
+   ctab.max_displacement = header.max_displacement
+   local entry_count = ctab.size + ctab.max_displacement
+
+   -- Slurp the entries directly into the ctable's backing store.
+   -- This ensures that the ctable is in hugepages.
+   C.memcpy(ctab.entries,
+            stream:read_array(ctab.entry_type, entry_count),
+            ffi.sizeof(ctab.entry_type) * entry_count)
+
+   return ctab
+end
+
+function CTable:save(stream)
+   stream:write_ptr(header_t(self.size, self.occupancy, self.max_displacement,
+                             self.max_occupancy_rate, self.min_occupancy_rate),
+                    header_t)
+   stream:write_array(self.entries,
+                      self.entry_type,
+                      self.size + self.max_displacement)
+end
+
 function CTable:insert(hash, key, value, updates_allowed)
    if self.occupancy + 1 > self.occupancy_hi then
       self:resize(self.size * 2)
@@ -175,8 +231,18 @@ function CTable:insert(hash, key, value, updates_allowed)
 
    local entries = self.entries
    local scale = self.scale
-   local start_index = hash_to_index(hash, self.scale)
+   -- local start_index = hash_to_index(hash, self.scale)
+   local start_index = floor(hash*self.scale)
    local index = start_index
+
+   -- Fast path.
+   if entries[index].hash == HASH_MAX and updates_allowed ~= 'required' then
+      self.occupancy = self.occupancy + 1
+      entries[index].hash = hash
+      entries[index].key = key
+      entries[index].value = value
+      return index
+   end
 
    while entries[index].hash < hash do
       index = index + 1
@@ -256,8 +322,8 @@ end
 
 function CTable:lookup_and_copy(key, entry)
    local entry_ptr = self:lookup_ptr(key)
-   if not ptr then return false end
-   entry = entry_ptr
+   if not entry_ptr then return false end
+   ffi.copy(entry, entry_ptr, ffi.sizeof(entry))
    return true
 end
 
@@ -265,7 +331,7 @@ function CTable:remove_ptr(entry)
    local scale = self.scale
    local index = entry - self.entries
    assert(index >= 0)
-   assert(index <= self.size + self.max_displacement)
+   assert(index < self.size + self.max_displacement)
    assert(entry.hash ~= HASH_MAX)
 
    self.occupancy = self.occupancy - 1
@@ -297,6 +363,103 @@ function CTable:remove(key, missing_allowed)
    return true
 end
 
+function CTable:make_lookup_streamer(stride)
+   local res = {
+      all_entries = self.entries,
+      stride = stride,
+      hash_fn = self.hash_fn,
+      equal_fn = self.equal_fn,
+      entries_per_lookup = self.max_displacement + 1,
+      scale = self.scale,
+      pointers = ffi.new('void*['..stride..']'),
+      entries = self.type(stride),
+      -- Binary search over N elements can return N if no entry was
+      -- found that was greater than or equal to the key.  We would
+      -- have to check the result of binary search to ensure that we
+      -- are reading a value in bounds.  To avoid this, allocate one
+      -- more entry.
+      stream_entries = self.type(stride * (self.max_displacement + 1) + 1)
+   }
+   -- Give res.pointers sensible default values in case the first lookup
+   -- doesn't fill the pointers vector.
+   for i = 0, stride-1 do res.pointers[i] = self.entries end
+
+   -- Initialize the stream_entries to HASH_MAX for sanity.
+   for i = 0, stride * (self.max_displacement + 1) do
+      res.stream_entries[i].hash = HASH_MAX
+   end
+
+   -- Compile multi-copy and binary-search procedures that are
+   -- specialized for this table and this stride.
+   local entry_size = ffi.sizeof(self.entry_type)
+   res.multi_copy = multi_copy.gen(stride, res.entries_per_lookup * entry_size)
+   res.binary_search = binary_search.gen(res.entries_per_lookup, self.entry_type)
+
+   return setmetatable(res, { __index = LookupStreamer })
+end
+
+function LookupStreamer:stream()
+   local stride = self.stride
+   local entries = self.entries
+   local pointers = self.pointers
+   local stream_entries = self.stream_entries
+   local entries_per_lookup = self.entries_per_lookup
+   local equal_fn = self.equal_fn
+
+   for i=0,stride-1 do
+      local hash = self.hash_fn(entries[i].key)
+      local index = hash_to_index(hash, self.scale)
+      entries[i].hash = hash
+      pointers[i] = self.all_entries + index
+   end
+
+   self.multi_copy(stream_entries, pointers)
+
+   -- Copy results into entries.
+   for i=0,stride-1 do
+      local hash = entries[i].hash
+      local index = i * entries_per_lookup
+      local found = self.binary_search(stream_entries + index, hash)
+      -- It could be that we read one beyond the ENTRIES_PER_LOOKUP
+      -- entries allocated for this key; that's fine.  See note in
+      -- make_lookup_streamer.
+      if found.hash == hash then
+         -- Direct hit?
+         if equal_fn(found.key, entries[i].key) then
+            entries[i].value = found.value
+         else
+            -- Mark this result as not found unless we prove
+            -- otherwise.
+            entries[i].hash = HASH_MAX
+
+            -- Collision?
+            found = found + 1
+            while found.hash == hash do
+               if equal_fn(found.key, entries[i].key) then
+                  -- Yay!  Re-mark this result as found.
+                  entries[i].hash = hash
+                  entries[i].value = found.value
+                  break
+               end
+               found = found + 1
+            end
+         end
+      else
+         -- Not found.
+         entries[i].hash = HASH_MAX
+      end
+   end
+end
+
+function LookupStreamer:is_empty(i)
+   assert(i >= 0 and i < self.stride)
+   return self.entries[i].hash == HASH_MAX
+end
+
+function LookupStreamer:is_found(i)
+   return not self:is_empty(i)
+end
+
 function CTable:selfcheck()
    local occupancy = 0
    local max_displacement = 0
@@ -313,7 +476,7 @@ function CTable:selfcheck()
    end
 
    local prev = 0
-   for i = 0,self.size*2-1 do
+   for i = 0,self.size+self.max_displacement-1 do
       local entry = self.entries[i]
       local hash = entry.hash
       if hash ~= 0xffffffff then
@@ -348,18 +511,15 @@ function CTable:dump()
          io.write('  value: '..tostring(entry.value)..'\n')
       end
    end
-   for index=0,self.size-1 do dump_one(index) end
-   for index=self.size,self.size*2-1 do
-      if self.entries[index].hash == HASH_MAX then break end
-      dump_one(index)
-   end
+   for index=0,self.size-1+self.max_displacement do dump_one(index) end
 end
 
 function CTable:iterate()
    local max_entry = self.entries + self.size + self.max_displacement
    local function next_entry(max_entry, entry)
-      while entry <= max_entry do
+      while true do
          entry = entry + 1
+         if entry >= max_entry then return nil end
          if entry.hash ~= HASH_MAX then return entry end
       end
    end
@@ -419,8 +579,8 @@ function compute_hash_fn(ctype)
       hash_fns_by_size[size] = function(key)
          local h = 0
          local words = cast(uint32_ptr_t, key)
-         local bytes = cast('uint8_t*', key)
-         for i=0,size/4 do h = hash_32(bxor(h, words[i])) end
+         local bytes = cast(uint8_ptr_t, key)
+         for i=1,size/4 do h = hash_32(bxor(h, words[i-1])) end
          for i=1,size%4 do h = hash_32(bxor(h, bytes[size-i])) end
          return h
       end
@@ -450,23 +610,94 @@ function selftest()
       ctab:add(i, v)
    end
 
-   -- In this case we know max_displacement is 8.  Assert here so that
-   -- we can detect any future deviation or regression.
-   assert(ctab.max_displacement == 8)
+   for i=1,2 do
+      -- In this case we know max_displacement is 8.  Assert here so that
+      -- we can detect any future deviation or regression.
+      assert(ctab.max_displacement == 8)
 
-   ctab:selfcheck()
+      ctab:selfcheck()
 
-   for i = 1, occupancy do
-      local value = ctab:lookup_ptr(i).value[0]
-      assert(value == bnot(i))
+      for i = 1, occupancy do
+         local value = ctab:lookup_ptr(i).value[0]
+         assert(value == bnot(i))
+      end
+      ctab:selfcheck()
+
+      -- Incrementing by 31 instead of 1 just to save test time.
+      do
+         local entry = ctab.entry_type()
+         for i = 1, occupancy, 31 do
+            assert(ctab:lookup_and_copy(i, entry))
+            assert(entry.key == i)
+            assert(entry.value[0] == bnot(i))
+            ctab:remove(entry.key)
+            assert(ctab:lookup_ptr(i) == nil)
+            ctab:add(entry.key, entry.value)
+            assert(ctab:lookup_ptr(i).value[0] == bnot(i))
+         end
+      end
+
+      local iterated = 0
+      for entry in ctab:iterate() do iterated = iterated + 1 end
+      assert(iterated == occupancy)
+
+      -- Save the table out to disk, reload it, and run the same
+      -- checks.
+      local tmp = os.tmpname()
+      do
+         local file = io.open(tmp, 'wb')
+         local function write(ptr, size)
+            file:write(ffi.string(ptr, size))
+         end
+         local stream = {}
+         function stream:write_ptr(ptr, type)
+            assert(ffi.sizeof(ptr) == ffi.sizeof(type))
+            write(ptr, ffi.sizeof(type))
+         end
+         function stream:write_array(ptr, type, count)
+            write(ptr, ffi.sizeof(type) * count)
+         end
+         ctab:save(stream)
+         file:close()
+      end
+      do
+         local file = io.open(tmp, 'rb')
+         local function read(size)
+            return ffi.new('uint8_t[?]', size, file:read(size))
+         end
+         local stream = {}
+         function stream:read_ptr(type)
+            return ffi.cast(ffi.typeof('$*', type), read(ffi.sizeof(type)))
+         end
+         function stream:read_array(type, count)
+            return ffi.cast(ffi.typeof('$*', type),
+                            read(ffi.sizeof(type) * count))
+         end
+         ctab = load(stream, params)
+         file:close()
+      end         
+      os.remove(tmp)
    end
-   ctab:selfcheck()
 
-   local iterated = 0
-   for entry in ctab:iterate() do iterated = iterated + 1 end
-   assert(iterated == occupancy)
-
-   -- OK, all looking good with our ctab.
+   -- OK, all looking good with the normal interfaces; let's check out
+   -- streaming lookup.
+   local stride = 1
+   repeat
+      local streamer = ctab:make_lookup_streamer(stride)
+      for i = 1, occupancy, stride do
+         local n = math.min(stride, occupancy-i+1)
+         for j = 0, n-1 do
+            streamer.entries[j].key = i + j
+         end
+         streamer:stream()
+         for j = 0, n-1 do
+            assert(streamer:is_found(j))
+            local value = streamer.entries[j].value[0]
+            assert(value == bnot(i + j))
+         end
+      end
+      stride = stride * 2
+   until stride > 256
 
    -- A check that our equality functions work as intended.
    local numbers_equal = make_equal_fn(ffi.typeof('int'))

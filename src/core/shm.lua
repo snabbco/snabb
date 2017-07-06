@@ -29,7 +29,7 @@ local function map (name, type, readonly, create)
    local fd, err
    if create then
       -- Create the parent directories. If this fails then so will the open().
-      mkdir(path)
+      mkdir(lib.dirname(path))
       fd, err = S.open(root..'/'..path, "creat, rdwr", "rwxu")
    else
       fd, err = S.open(root..'/'..path, readonly and "rdonly" or "rdwr")
@@ -61,6 +61,12 @@ function exists (name)
    return fd and fd:close()
 end
 
+function alias (name, target)
+   mkdir(lib.dirname(resolve(name)))
+   assert(S.symlink(root.."/"..resolve(target), root.."/"..resolve(name)),
+          "shm alias failed")
+end
+
 function resolve (name)
    local q, p = name:match("^(/*)(.*)") -- split qualifier (/)
    local result = p
@@ -68,8 +74,7 @@ function resolve (name)
    return result
 end
 
--- Make directories needed for a named object.
--- Given the name "foo/bar/baz" create /var/run/foo and /var/run/foo/bar.
+-- Make the named subdirectory in the shm folder.
 function mkdir (name)
    -- Create root with mode "rwxrwxrwt" (R/W for all and sticky) if it
    -- does not exist yet.
@@ -83,7 +88,10 @@ function mkdir (name)
    -- Create sub directories
    local dir = root
    name:gsub("([^/]+)",
-             function (x) S.mkdir(dir, "rwxu")  dir = dir.."/"..x end)
+             function (x)
+                dir = dir.."/"..x
+                S.mkdir(dir, "rwxu")
+             end)
 end
 
 -- Delete a shared object memory mapping.
