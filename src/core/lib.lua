@@ -735,7 +735,6 @@ function randomseed (seed)
    if seed then
       local msg = 'Using deterministic random numbers, SNABB_RANDOM_SEED=%d.\n'
       io.stderr:write(msg:format(seed))
-      math.randomseed(seed)
       -- When setting a seed, use deterministic random bytes.
       random_bytes = random_bytes_from_math_random
    else
@@ -743,6 +742,7 @@ function randomseed (seed)
       seed = ffi.cast('uint32_t*', random_bytes_from_dev_urandom(4))[0]
       random_bytes = random_bytes_from_dev_urandom
    end
+   math.randomseed(seed)
    return seed
 end
 
