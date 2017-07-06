@@ -34,7 +34,7 @@ module snabb-softwire-v2 {
   }
 
   grouping state-counters {
-    container state {
+    container softwire-state {
 
       description "State data about interface.";
       config false;
@@ -845,8 +845,5 @@ module snabb-softwire-v2 {
     }
   }
 
-  container softwire-state {
-    description "Counters for all configured interfaces.";
-    uses state-counters;
-  }
+  uses state-counters;
 }

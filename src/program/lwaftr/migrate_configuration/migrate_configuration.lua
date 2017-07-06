@@ -436,7 +436,17 @@ local function remove_psid_map(conf)
    return conf
 end
 
-local function multiprocess_migration(src, conf_file, device, ex_device)
+local function multiprocess_migration(src, conf_file, options)
+   local device = assert(
+      find_option(options, "/softwire-config/instance", "device"),
+      "Must specify value for /softwire-config/instance/device"
+   )
+   local ex_device = find_option(
+      options,
+      "/softwire-config/instance/queue/external-interface",
+      "device"
+   )
+
    -- We should build up a hybrid schema from parts of v1 and v2.
    local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
    local hybridscm = yang.load_schema_by_name("snabb-softwire-v2")
@@ -560,46 +570,65 @@ end
 local function migrate_legacy(stream)
    local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
    local v_3_0_1 = migrate_conf(conf)
-   return v1_to_v2_config(increment_br(v_3_0_1))
+   return multiprocess_migration(v1_to_v2_config(increment_br(v_3_0_1)), options)
 end
 
 
-local function migrate_3_0_1(conf_file)
+local function migrate_3_0_1(conf_file, options)
    local data = require('lib.yang.data')
    local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   return v1_to_v2_config(increment_br(data.load_data_for_schema_by_name(
-                          'snabb-softwire-v1', str, conf_file)), conf_file)
+   return multiprocess_migration(v1_to_v2_config(increment_br(
+      data.load_data_for_schema_by_name(
+            'snabb-softwire-v1', str, conf_file)), conf_file), options)
 end
 
-local function migrate_3_0_1bis(conf_file)
-   return v1_to_v2_config(increment_br(yang.load_configuration(
+local function migrate_3_0_1bis(conf_file, options)
+   return multiprocess_migration(v1_to_v2_config(increment_br(
+      yang.load_configuration(
 			  conf_file, {schema_name='snabb-softwire-v1'})),
-                          conf_file)
+                          conf_file), options)
 end
 
-local function migrate_3_2_0(conf_file)
+local function migrate_3_2_0(conf_file, options)
    local src = io.open(conf_file, "r"):read("*a")
-   return v2_migration(src, conf_file)
+   return multiprocess_migration(v2_migration(src, conf_file), options)
 end
 
-local function migrate_dev(conf_file, options)
-   local device = assert(
-      find_option(options, "/softwire-config/instance", "device"),
-      "Must specify value for /softwire-config/instance/device"
-   )
-   local ex_device = find_option(
-      options,
-      "/softwire-config/instance/queue/external-interface",
-      "device"
-   )
+local function migrate_3_3_0(conf_file, options)
    local src = io.open(conf_file, "r"):read("*a")
-   return multiprocess_migration(src, conf_file, device, ex_device)
+   return multiprocess_migration(src, conf_file, options)
+end
+
+-- This will take a configuration file with options and map one device to
+-- another. One useful use case of this is producing tests specific to the
+-- server.
+local function map_pci_device(conf_file, options)
+   -- Validate options and load configuration
+   local old = assert(find_option(options, "from", "device"),
+                     "Must specify device to map from.")
+   local new = assert(find_option(options, "internal", "device"),
+                      "Must specify a internal (ipv6) device to map to.")
+   local src = io.open(conf_file, "r"):read("*a")
+   local config = yang.load_data_for_schema_by_name(
+                     "snabb-softwire-v2", src, conf_file)
+
+   -- Migrate configuration
+   assert(config.softwire_config.instance[old], "Device '"..old.."' missing")
+   config.softwire_config.instance[new] = config.softwire_config.instance[old]
+   config.softwire_config.instance[old] = nil
+   local external = find_option(options, "external", "device")
+   if external ~= nil then
+      local queue = config.softwire_config.instance[new].queue.values[1]
+      queue.external_interface.device = external
+   end
+   return config
 end
 
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
                     ['3.0.1.1'] = migrate_3_0_1bis,
                     ['3.2.0'] = migrate_3_2_0,
-                    ["dev"] = migrate_dev, }
+                    ["3.3.0"] = migrate_3_3_0,
+                    ["pci-device"] = map_pci_device,}
 function run(args)
    local conf_file, version, options = parse_args(args)
    local migrate = migrators[version]

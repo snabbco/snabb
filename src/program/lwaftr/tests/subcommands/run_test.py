@@ -9,6 +9,7 @@ from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
 
 SNABB_PCI0, SNABB_PCI1 = nic_names()
 
+CONFIG_PATH = BaseTestCase.get_config_path(str(DATA_DIR / 'icmp_on_fail.conf'))
 
 @unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
 class TestRun(BaseTestCase):
@@ -17,7 +18,7 @@ class TestRun(BaseTestCase):
         str(SNABB_CMD), 'lwaftr', 'run',
         '--duration', '1',
         '--bench-file', '/dev/null',
-        '--conf', str(DATA_DIR / 'icmp_on_fail.conf'),
+        '--conf', CONFIG_PATH,
         '--v4', SNABB_PCI0,
         '--v6', SNABB_PCI1,
     )

@@ -7,17 +7,16 @@ import unittest
 from test_env import (BENCHMARK_FILENAME, BENCHMARK_PATH, DATA_DIR,
     BENCHDATA_DIR, SNABB_CMD, BaseTestCase)
 
-
 class TestBench(BaseTestCase):
 
-    cmd_args = (
+    cmd_args = [
         str(SNABB_CMD), 'lwaftr', 'bench',
         '--duration', '0.1',
         '--bench-file', BENCHMARK_FILENAME,
-        str(DATA_DIR / 'icmp_on_fail.conf'),
+        BaseTestCase.get_config_path(str(DATA_DIR / 'icmp_on_fail.conf')),
         str(BENCHDATA_DIR / 'ipv4-0550.pcap'),
         str(BENCHDATA_DIR / 'ipv6-0550.pcap'),
-    )
+    ]
 
     def execute_bench_test(self, cmd_args):
         self.run_cmd(cmd_args)

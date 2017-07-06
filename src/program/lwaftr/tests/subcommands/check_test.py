@@ -6,12 +6,11 @@ import unittest
 
 from test_env import COUNTERS_DIR, DATA_DIR, SNABB_CMD, BaseTestCase
 
-
 class TestCheck(BaseTestCase):
 
     cmd_args = (
         str(SNABB_CMD), 'lwaftr', 'check',
-        str(DATA_DIR / 'icmp_on_fail.conf'),
+        BaseTestCase.get_config_path(str(DATA_DIR / 'icmp_on_fail.conf')),
         str(DATA_DIR / 'empty.pcap'), str(DATA_DIR / 'empty.pcap'),
         '/dev/null', '/dev/null',
         str(COUNTERS_DIR / 'empty.lua'),

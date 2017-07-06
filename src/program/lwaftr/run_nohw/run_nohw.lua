@@ -62,9 +62,12 @@ function run(parameters)
    local conf_file, b4_if, inet_if, opts = parse_args(parameters)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local c = config.new()
+   local lwaftr_class =  LwAftr
+   lwaftr_class.config_arg = "conf"
+   local device = next(assert(conf.softwire_config.instance))
 
    -- AFTR
-   config.app(c, "aftr", LwAftr, conf)
+   config.app(c, "aftr", lwaftr_class, {conf=conf, device=device})
 
    -- B4 side interface
    config.app(c, "b4if", RawSocket, b4_if)

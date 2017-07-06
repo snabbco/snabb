@@ -257,7 +257,7 @@ end
 LwAftr = { yang_schema = 'snabb-softwire-v2' }
 
 function LwAftr:new(args)
-   local conf, device = args.conf, args.device
+   local conf, device = assert(args.conf, "conf"), assert(args.device, "device")
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
    conf = select_instance(conf, device).softwire_config

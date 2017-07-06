@@ -14,6 +14,7 @@ from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
 
 DAEMON_PROC_NAME = 'monitor-test-daemon'
 SNABB_PCI0 = nic_names()[0]
+CONFIG_PATH = BaseTestCase.get_config_path(str(DATA_DIR / 'icmp_on_fail.conf'))
 
 
 @unittest.skipUnless(SNABB_PCI0, 'NIC not configured')
@@ -23,7 +24,7 @@ class TestMonitor(BaseTestCase):
         str(SNABB_CMD), 'lwaftr', 'run',
         '--name', DAEMON_PROC_NAME,
         '--bench-file', '/dev/null',
-        '--conf', str(DATA_DIR / 'icmp_on_fail.conf'),
+        '--conf', CONFIG_PATH,
         '--on-a-stick', SNABB_PCI0,
         '--mirror',  # TAP interface name added in setUpClass.
     ]

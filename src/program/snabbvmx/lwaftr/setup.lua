@@ -41,8 +41,10 @@ local function load_driver (pciaddr)
 end
 
 local function load_virt (c, nic_id, lwconf, interface)
-   local external_interface = lwconf.softwire_config.external_interface
-   local internal_interface = lwconf.softwire_config.internal_interface
+   local nic_id = next(lwconf.softwire_config.instance)
+   local new_config = lwaftr.select_instance(lwconf, nic_id)
+   local external_interface = new_config.softwire_config.external_interface
+   local internal_interface = new_config.softwire_config.internal_interface
    assert(type(interface) == 'table')
    assert(nic_exists(interface.pci), "Couldn't find NIC: "..interface.pci)
    local driver = assert(load_driver(interface.pci))
@@ -126,8 +128,14 @@ end
 function lwaftr_app(c, conf, lwconf, sock_path)
    assert(type(conf) == 'table')
    assert(type(lwconf) == 'table')
-   local external_interface = lwconf.softwire_config.external_interface
-   local internal_interface = lwconf.softwire_config.internal_interface
+
+   local device = next(conf.softwire_config.instance)
+   local new_config = lwaftr.select_instance(conf, device)
+   local external_interface = new_config.softwire_config.external_interface
+   local internal_interface = new_config.softwire_config.internal_interface
+
+   local lwaftr_class = lwaftr.LwAftr
+   lwaftr_class.config_arg = "conf"
 
    print(("Hairpinning: %s"):format(yesno(internal_interface.hairpinning)))
    local virt_id = "vm_" .. conf.interface.id
@@ -249,7 +257,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       config.link(c, "nh_fwd4.wire -> " .. v4_input)
       v4_input, v4_output = "nh_fwd4.vm", "nh_fwd4.vm"
 
-      config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
+      config.app(c, "lwaftr", lwaftr_class, {conf=lwconf, device=device})
       config.link(c, "nh_fwd6.service -> lwaftr.v6")
       config.link(c, "lwaftr.v6 -> nh_fwd6.service")
       config.link(c, "nh_fwd4.service -> lwaftr.v4")
@@ -322,8 +330,13 @@ end
 local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
    assert(type(conf) == "table")
    assert(type(lwconf) == "table")
-   local external_interface = lwconf.softwire_config.external_interface
-   local internal_interface = lwconf.softwire_config.internal_interface
+   local device = next(lwconf.softwire_config.instance)
+   local new_config = lwaftr.select_instance(lwconf, device)
+   local external_interface = new_config.softwire_config.external_interface
+   local internal_interface = new_config.softwire_config.internal_interface
+
+   local lwaftr_class = lwaftr.LwAftr
+   lwaftr_class.config_arg = "conf"
 
    local v4_src, v6_src = unpack(sources)
    local v4_sink, v6_sink = unpack(sinks)
@@ -399,7 +412,7 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
       config.link(c, v4_src.."-> nh_fwd4.wire")
       config.link(c, "nh_fwd4.wire -> "..v4_sink)
 
-      config.app(c, "lwaftr", lwaftr.LwAftr, lwconf)
+      config.app(c, "lwaftr", lwaftr_class, {conf=lwconf, device=device})
       config.link(c, "nh_fwd6.service -> lwaftr.v6")
       config.link(c, "lwaftr.v6 -> nh_fwd6.service")
       config.link(c, "nh_fwd4.service -> lwaftr.v4")

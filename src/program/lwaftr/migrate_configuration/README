@@ -3,6 +3,8 @@ Usage: migrate-configuration LWAFTR.CONF
 Options:
   -h, --help                 Print usage information.
   -f, --from=VERSION         Specify version from which to migrate.
+  -o, --option=option        Specify an option (additional data) for the
+                             migration.
 
 Migrate an old-style configuration and binding table to the new YANG
 configuration.  LWAFTR.CONF should be the name of an old lwAFTR
@@ -20,6 +22,29 @@ configuration.  Available VERSION values are:
   3.2.0
     lwAFTR versions where "br" fields were indexes for the "br-address"
     leaf-list instead of "br-address" IPv6 entries on the softwire.
+  3.3.0
+    lwAFTR changes to multiprcoess configuration with the introduction of the
+    instance list.
+
+  pci-device
+    This option is different from the other options in that it does not migrate
+    the configuration from a specific version to a newer one but it migrates the
+    configuration from one device configuration to another.
+
+    This allows you to feed in a configuration file and modify the device of a
+    instance block and/or add/modify the external IPv6 device too.
+
+    This VERSION option takes two required additional options:
+      - "from[device=DEVICE]" the current internal IPv4 PCI device listed.
+      - "internal[device=DEVICE]" the internal IPv4 PCI device
+
+    and one optional argument:
+      - "external[device=DEVICE]" the external IPv4 PCI device
+
+    DEVICE should be replaced with the PCI device. The from device must exist or
+    an error will occur.
+
+    This option is only compatible with the latest configuration version.
 
 The default version is "legacy".
 

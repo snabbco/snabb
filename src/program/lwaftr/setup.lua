@@ -56,7 +56,7 @@ function lwaftr_app(c, conf)
    local function prepend(t, elem) table.insert(t, 1, elem) end
 
    -- If this is modified, please remember to modify the config_arg below.
-   lwaftr_class = lwaftr.LwAftr
+   local lwaftr_class = lwaftr.LwAftr
    lwaftr_class.config_arg = "conf"
 
    -- Claim the name if one is defined.
@@ -320,15 +320,15 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
    config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
    if conf.softwire_config.external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=external_interface.vlan_tag })
+                 { tag=conf.softwire_config.external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=external_interface.vlan_tag })
+                 { tag=conf.softwire_config.external_interface.vlan_tag })
    end
    if conf.softwire_config.internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=internal_interface.vlan_tag })
+                 { tag=conf.softwire_config.internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=internal_interface.vlan_tag })
+                 { tag=conf.softwire_config.internal_interface.vlan_tag })
    end
 
    config.app(c, 'v4v6', V4V6)
@@ -338,7 +338,7 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
    local sources = { "v4v6.v4", "v4v6.v6" }
    local sinks = { "v4v6.v4", "v4v6.v6" }
 
-   if external_interface.vlan_tag then
+   if conf.softwire_config.external_interface.vlan_tag then
       config.link(c, "capturev4.output -> untagv4.input")
       config.link(c, "capturev6.output -> untagv6.input")
       config.link(c, "untagv4.output -> join.in1")
@@ -369,11 +369,11 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "output_filev4", pcap.PcapWriter, outv4_pcap)
    config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
-   if external_interface.vlan_tag then
+   if conf.softwire_config.external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=external_interface.vlan_tag })
+                 { tag=conf.softwire_config.external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=external_interface.vlan_tag })
+                 { tag=conf.softwire_config.external_interface.vlan_tag })
    end
    if conf.softwire_config.internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
@@ -385,7 +385,7 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    local sources = { "capturev4.output", "capturev6.output" }
    local sinks = { "output_filev4.input", "output_filev6.input" }
 
-   if external_interface.vlan_tag then
+   if conf.softwire_config.external_interface.vlan_tag then
       sources = { "untagv4.output", "untagv6.output" }
       sinks = { "tagv4.input", "tagv6.input" }
 

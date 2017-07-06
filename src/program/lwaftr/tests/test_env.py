@@ -2,12 +2,14 @@
 Environment support code for tests.
 """
 
-import os
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import PIPE, Popen, TimeoutExpired
+import os
 import time
 import unittest
+import random
+import string
 
 
 # Commands run under "sudo" run as root. The root's user PATH should not
@@ -32,6 +34,8 @@ ENC = 'utf-8'
 def nic_names():
     return os.environ.get('SNABB_PCI0'), os.environ.get('SNABB_PCI1')
 
+def jit_config_dir():
+    return os.environ.get("JIT_CONFIG_DIR")
 
 class BaseTestCase(unittest.TestCase):
     """
@@ -72,6 +76,52 @@ class BaseTestCase(unittest.TestCase):
             cls.daemon.stderr.close()
             cls.fail(cls, '\n'.join(msg_lines))
 
+    @classmethod
+    def get_config_path(cls, path):
+        """  Gets the config path.
+
+        This will either produce a new configuration specifically for the test
+        so if specific PCI cards should be used. It otherwise returns the config
+        path passed in."""
+        ipv4_nic, ipv6_nic = nic_names()
+        if ipv4_nic is None and ipv6_nic is None :
+            return path
+
+        if ipv6_nic is not None:
+            raise Exception("Missing IPv4 internal NIC information.")
+
+        # Figure out this config's path
+        filename = "/".join((jit_config_dir(), path.split("/")[-1]))
+
+        if os.path.isfile(filename):
+            return filename
+
+        internal_device = "internal[device={device}]".format(
+            device=ipv4_nic
+        )
+        external_device = "external[device={device}]".format(
+            device=ipv6_nic
+        )
+        cmd = [
+            str(SNABB_CMD), "lwaftr", "migrate-configuration", "-f",
+            "pci-device", "-o", "from[device=test]", "-o", internal_device
+        ]
+
+        if ipv6_nic:
+            cmd.extend(("-o", external_device))
+        cmd.append(path)
+
+        # Migrate the config to our new one with the PCI device.
+        proc = Popen(cmd, stdout=PIPE)
+        proc.wait()
+
+        # Finally write the config out.
+        fout = open(filename, "w")
+        fout.write(proc.stdout.read().decode("utf-8"))
+        fout.close()
+
+        return filename
+
     def run_cmd(self, args):
         proc = Popen(args, stdout=PIPE, stderr=PIPE)
         try:
@@ -84,7 +134,8 @@ class BaseTestCase(unittest.TestCase):
             raise
         if proc.returncode != 0:
             msg_lines = (
-                'Error running command:', str(args),
+                'Error running command:', " ".join(args),
+                'Daemon Command:', " ".join(self.daemon_args),
                 'Exit code: %s' % proc.returncode,
                 'STDOUT', str(output, ENC), 'STDERR', str(errput, ENC),
             )

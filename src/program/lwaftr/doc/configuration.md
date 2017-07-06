@@ -11,6 +11,32 @@ Here's an example:
 
 ```
 softwire-config {
+  instances {
+    device "00:05.0"
+    queue {
+      id 1;
+      external-interface {
+        ip 10.10.10.10;
+        mac 12:12:12:12:12:12;
+        // vlan-tag 42;
+        next-hop {
+          mac 68:68:68:68:68:68;
+          ip 1.2.3.4;
+        }
+      }
+      internal-interface {
+        ip 8:9:a:b:c:d:e:f;
+        mac 22:22:22:22:22:22;
+        // vlan-tag 64;
+        next-hop {
+          mac 44:44:44:44:44:44;
+          // NDP instead of ARP of course.
+          ip 7:8:9:a:b:c:d:e;
+        }
+      }
+    }
+  }
+
   // IPv4 interface.
   external-interface {
     allow-incoming-icmp true;
@@ -22,16 +48,9 @@ softwire-config {
     // Generate ICMP errors at all?
     generate-icmp-errors true;
     // Basic parameters.
-    ip 10.10.10.10;
-    mac 12:12:12:12:12:12;
     mtu 1460;
-    // vlan-tag 42;
     // Where to go next.  Either one will suffice; if you specify the IP,
     // the next-hop MAC will be determined by ARP.
-    next-hop {
-      mac 68:68:68:68:68:68;
-      ip 1.2.3.4;
-    }
     // Control the size of the fragment reassembly buffer.
     reassembly {
       max-fragments-per-packet 40;
@@ -50,15 +69,7 @@ softwire-config {
     // One more interesting thing -- here we control whether to support
     // routing traffic between two B4s.
     hairpinning true;
-    ip 8:9:a:b:c:d:e:f;
-    mac 22:22:22:22:22:22;
     mtu 1500;
-    // vlan-tag 64;
-    next-hop {
-      mac 44:44:44:44:44:44;
-      // NDP instead of ARP of course.
-      ip 7:8:9:a:b:c:d:e;
-    }
     reassembly {
       max-fragments-per-packet 40;
       max-packets 20000;
