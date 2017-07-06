@@ -892,9 +892,13 @@ function xpath_printer_from_grammar(production, print_default, root)
    function top_printers.array(production)
       local serialize = value_serializer(production.element_type)
       return function(data, file, indent)
+         local count = 1
          for _,v in ipairs(data) do
+            file:write(root.."[position()="..count.."]")
+            file:write(' ')
             file:write(serialize(v))
-            file:write('\n')
+            file:write(';\n')
+            count = count + 1
          end
          return file:flush()
       end
@@ -902,10 +906,14 @@ function xpath_printer_from_grammar(production, print_default, root)
    function top_printers.scalar(production)
       local serialize = value_serializer(production.argument_type)
       return function(data, file)
+         file:write(root)
+         file:write(' ')
          file:write(serialize(data))
+         file:write(';\n')
          return file:flush()
       end
    end
+
    return assert(top_printers[production.type])(production)
 end
 xpath_printer_from_grammar = util.memoize(xpath_printer_from_grammar)
