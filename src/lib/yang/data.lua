@@ -701,6 +701,226 @@ local function value_serializer(typ)
    return serializer
 end
 
+function xpath_printer_from_grammar(production, print_default, root)
+   if #root > 1 and root:sub(#root, #root) == '/' then
+      root = root:sub(1, #root-1)
+   end
+   local handlers = {}
+   local translators = {}
+   local function printer(keyword, production, printers)
+      return assert(handlers[production.type])(keyword, production, printers)
+   end
+   local function print_string(str, file)
+      file:write(encode_yang_string(str))
+   end
+   local function print_keyword(k, file, path)
+      path = path:sub(1, 1) ~= '[' and root..'/'..path or root..path
+      file:write(path)
+      print_string(k, file)
+      file:write(' ')
+   end
+   local function body_printer(productions, order)
+      -- Iterate over productions trying to translate to other statements. This
+      -- is used for example in choice statements raising the lower statements
+      -- in case blocks up to the level of the choice, in place of the choice.
+      local translated = {}
+      for keyword,production in pairs(productions) do
+         local translator = translators[production.type]
+         if translator ~= nil then
+            local statements = translator(keyword, production)
+            for k,v in pairs(statements) do translated[k] = v end
+         else
+            translated[keyword] = production
+         end
+      end
+      productions = translated
+      if not order then
+         order = {}
+         for k,_ in pairs(productions) do table.insert(order, k) end
+         table.sort(order)
+      end
+      local printers = {}
+      for keyword,production in pairs(productions) do
+         local printer = printer(keyword, production, printers)
+         if printer ~= nil then
+            printers[keyword] = printer
+         end
+      end
+      return function(data, file, indent)
+         for _,k in ipairs(order) do
+            local v = data[normalize_id(k)]
+            if v ~= nil then printers[k](v, file, indent) end
+         end
+      end
+   end
+   local function key_composer (productions, order)
+      local printer = body_printer(productions, order)
+      local file = {t={}}
+      function file:write (str)
+         str = str:match("([^%s]+)")
+         if str and #str > 0 and str ~= ";" and str ~= root..'/' then
+            table.insert(self.t, str)
+         end
+      end
+      function file:flush ()
+         local ret = {}
+         for i=1,#self.t,2 do
+            local key, value = self.t[i], self.t[i+1]
+            table.insert(ret, '['..key.."="..value..']')
+         end
+         self.t = {}
+         return table.concat(ret, '')
+      end
+      return function (data, path)
+         path = path or ''
+         printer(data, file, path)
+         return file:flush()
+      end
+   end
+   function translators.choice(keyword, production)
+      local rtn = {}
+      for case, body in pairs(production.choices) do
+         for name, statement in pairs(body) do
+            rtn[name] = statement
+         end
+      end
+      return rtn
+   end
+   function handlers.struct(keyword, production)
+      local print_body = body_printer(production.members)
+      return function(data, file, path)
+         print_body(data, file, path..keyword..'/')
+      end
+   end
+   function handlers.array(keyword, production)
+      local serialize = value_serializer(production.element_type)
+      return function(data, file, indent)
+         local count = 1
+         for _,v in ipairs(data) do
+            print_keyword(keyword.."[position()="..count.."]", file, '')
+            file:write(serialize(v))
+            file:write('\n')
+            count = count + 1
+         end
+      end
+   end
+   -- As a special case, the table handler allows the keyword to be nil,
+   -- for printing tables at the top level without keywords.
+   function handlers.table(keyword, production)
+      local key_order, value_order = {}, {}
+      for k,_ in pairs(production.keys) do table.insert(key_order, k) end
+      for k,_ in pairs(production.values) do table.insert(value_order, k) end
+      table.sort(key_order)
+      table.sort(value_order)
+      local compose_key = key_composer(production.keys, key_order)
+      local print_value = body_printer(production.values, value_order)
+      if production.key_ctype and production.value_ctype then
+         return function(data, file, path)
+            for entry in data:iterate() do
+               local key = compose_key(entry.key)
+               local path = keyword and keyword..key..'/' or key..'/'
+               print_value(entry.value, file, path)
+            end
+         end
+      elseif production.string_key then
+         local id = normalize_id(production.string_key)
+         return function(data, file, path)
+            for key, value in pairs(data) do
+               local key = compose_key({[id]=key})
+               local path = keyword and keyword..key..'/' or key..'/'
+               print_value(value, file, path)
+            end
+         end
+      elseif production.key_ctype then
+         return function(data, file, path)
+            for key, value in cltable.pairs(data) do
+               local key = compose_key(key)
+               local path = keyword and keyword..key..'/' or key..'/'
+               print_value(value, file, path)
+            end
+         end
+      else
+         return function(data, file, path)
+            for key, value in pairs(data) do
+               local key = compose_key(key)
+               local path = keyword and keyword..key..'/' or key..'/'
+               print_value(value, file, path)
+            end
+         end
+      end
+   end
+   function handlers.scalar(keyword, production)
+      local serialize = value_serializer(production.argument_type)
+      return function(data, file, path)
+         local str = serialize(data)
+         if print_default or str ~= production.default then
+            print_keyword(keyword, file, path)
+            file:write(str)
+            file:write('\n')
+         end
+      end
+   end
+
+   local top_printers = {}
+   function top_printers.struct(production)
+      local printer = body_printer(production.members)
+      return function(data, file)
+         printer(data, file, '')
+         return file:flush()
+      end
+   end
+   function top_printers.sequence(production)
+      local printers = {}
+      for k,v in pairs(production.members) do
+         printers[k] = printer(k, v)
+      end
+      return function(data, file)
+         for _,elt in ipairs(data) do
+            local id = assert(elt.id)
+            assert(printers[id])(elt.data, file, '')
+         end
+         return file:flush()
+      end
+   end
+   function top_printers.table(production)
+      local printer = handlers.table(nil, production)
+      return function(data, file)
+         printer(data, file, '')
+         return file:flush()
+      end
+   end
+   function top_printers.array(production)
+      local serialize = value_serializer(production.element_type)
+      return function(data, file, indent)
+         local count = 1
+         for _,v in ipairs(data) do
+            file:write(root.."[position()="..count.."]")
+            file:write(' ')
+            file:write(serialize(v))
+            file:write('\n')
+            count = count + 1
+         end
+         return file:flush()
+      end
+   end
+   function top_printers.scalar(production)
+      local serialize = value_serializer(production.argument_type)
+      return function(data, file)
+         local str = serialize(data)
+         if print_default or str ~= production.default then
+            file:write(root)
+            file:write(' ')
+            file:write(str)
+            file:write('\n')
+            return file:flush()
+         end
+      end
+   end
+
+   return assert(top_printers[production.type])(production)
+end
+xpath_printer_from_grammar = util.memoize(xpath_printer_from_grammar)
+
 function data_printer_from_grammar(production, print_default)
    local handlers = {}
    local translators = {}

@@ -4,6 +4,7 @@ Get the state for a Snabb network function.
 Available options:
   -s, --schema SCHEMA        YANG data interface to request.
   -r, --revision REVISION    Require a specific revision of the YANG module.
+  -f, --format               Selects output format (yang or xpath). Default: yang.
       --print-default        Forces print out of default values.
   -h, --help                 Displays this message.
 

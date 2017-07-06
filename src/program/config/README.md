@@ -135,6 +135,20 @@ In the example above, attributes sucha as `period` and `mtu` take their
 default values.  They wouldn't be printed out unless `--print-default`
 was used.
 
+In addition, it is possible to print output in two different formats:
+Yang or XPath.  By default, output is printed in Yang format.  Here is an
+example for XPath formatted output:
+
+```
+$ sudo ./snabb config get --format=xpath ID /softwire-config/external-interface
+/softwire-config/external-interface/allow-incoming-icmp false;
+/softwire-config/external-interface/error-rate-limiting/packets 600000;
+/softwire-config/external-interface/ip 10.10.10.10;
+/softwire-config/external-interface/mac 12:12:12:12:12:12;
+/softwire-config/external-interface/next-hop/mac 68:68:68:68:68:68;
+/softwire-config/external-interface/reassembly/max-fragments-per-packet 40;
+```
+
 Users can limit their query to a particular subtree via passing a
 different `PATH`.  For example, with the same configuration, we can
 query just the `active` value:

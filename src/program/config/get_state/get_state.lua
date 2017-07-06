@@ -8,6 +8,7 @@ function run(args)
 	local response = common.call_leader(
    	args.instance_id, 'get-state',
       { schema = args.schema_name, revision = args.revision_date,
-        path = args.path, print_default = args.print_default })
+        path = args.path, print_default = args.print_default,
+        format = args.format })
 	common.print_and_exit(response, "state")
 end
