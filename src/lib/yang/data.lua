@@ -799,7 +799,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          for _,v in ipairs(data) do
             print_keyword(keyword.."[position()="..count.."]", file, '')
             file:write(serialize(v))
-            file:write(';\n')
+            file:write('\n')
             count = count + 1
          end
       end
@@ -856,7 +856,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          if print_default or str ~= production.default then
             print_keyword(keyword, file, path)
             file:write(str)
-            file:write(';\n')
+            file:write('\n')
          end
       end
    end
@@ -897,7 +897,7 @@ function xpath_printer_from_grammar(production, print_default, root)
             file:write(root.."[position()="..count.."]")
             file:write(' ')
             file:write(serialize(v))
-            file:write(';\n')
+            file:write('\n')
             count = count + 1
          end
          return file:flush()
@@ -911,7 +911,7 @@ function xpath_printer_from_grammar(production, print_default, root)
             file:write(root)
             file:write(' ')
             file:write(str)
-            file:write(';\n')
+            file:write('\n')
             return file:flush()
          end
       end
