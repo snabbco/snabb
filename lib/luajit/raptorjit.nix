@@ -3,7 +3,7 @@
 { pkgs, source, version }:
 
 with pkgs;
-with llvmPackages_4.stdenv;  # Use clang 4.0
+with stdenv;  # Use clang 4.0
 
 mkDerivation rec {
   name = "raptorjit-${version}";
@@ -13,6 +13,8 @@ mkDerivation rec {
   installPhase = ''
     mkdir -p $out/bin
     cp src/luajit $out/bin/raptorjit
+    mkdir -p $out/lib
+    cp src/libluajit.a $out/lib/
   '';
 
   enableParallelBuilding = true;  # Do 'make -j'

@@ -52,7 +52,7 @@ TESTMODS = $(shell find . -regex '[^\#]*\.\(lua\|dasl\)' -printf '%P ' | \
 # for each executable selftext.sh script in src.
 TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
-PATH := ../lib/luajit/usr/local/bin:$(PATH)
+PATH := ../lib/luajit/src:$(PATH)
 
 snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(YANGOBJ) $(LUAJIT_A)
 	$(E) "LINK      $@"
