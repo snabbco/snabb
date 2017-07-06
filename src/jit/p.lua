@@ -1,1 +1,0 @@
-../../lib/luajit/src/jit/p.lua
