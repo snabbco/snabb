@@ -243,18 +243,49 @@ local function integer_type(min, max)
    end
 end
 
--- FIXME
-local function range_validator(range, f) return f end
-local function length_validator(range, f) return f end
-local function pattern_validator(range, f) return f end
-local function bit_validator(range, f) return f end
+local function range_predicate(range, val)
+   return function(val)
+      for _,part in ipairs(range) do
+         local l, r = unpack(part)
+         if (l == 'min' or l <= val) and (r == 'max' or val <= r) then
+            return true
+         end
+      end
+      return false
+   end
+end
+
+local function range_validator(range, f)
+   if not range then return f end
+   local is_in_range = range_predicate(range.value)
+   return function(val)
+      if is_in_range(val) then return f(val) end
+      error('value '..val..' is out of the valid range')
+   end
+end
+local function length_validator(length, f)
+   if not length then return f end
+   local is_in_range = range_predicate(length.value)
+   return function(val)
+      if is_in_range(string.length(val)) then return f(val) end
+      error('length of string '..val..' is out of the valid range')
+   end
+end
+local function pattern_validator(pattern, f)
+   -- FIXME: Implement me!
+   return f
+end
+local function bit_validator(range, f)
+   -- FIXME: Implement me!
+   return f
+end
 local function enum_validator(enums, f)
    if not enums then return f end
    return function (val)
       if not enums[val] then
          error('enumeration '..val..' is not a valid value')
       end
-      return val
+      return f(val)
    end
 end
 local function identityref_validator(bases, default_prefix, f)
