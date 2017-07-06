@@ -75,36 +75,6 @@ function status ()
    return status
 end
 
---------------------------------------------------------------
--- Worker (child) process code
---------------------------------------------------------------
-
--- Initialize the worker by attaching to relevant shared memory
--- objects and entering the main engine loop.
-function init ()
-   local name = assert(lib.getenv("SNABB_WORKER_NAME"))
-   local parent = assert(lib.getenv("SNABB_WORKER_PARENT"))
-   print(("Starting worker %s for parent %d"):format(name, parent))
-
-   -- Create "group" alias to the shared group folder in the parent process
-   shm.alias("group", "/"..parent.."/group")
-
-   -- Run the engine with continuous configuration updates
-   local current_config
-   local child_path = "group/config/..name"
-   local update = function () return current_config ~= counter.read(configs) end
-   while true do
-      if update() then
-         -- note: read counter _before_ config file to avoid a race
-         current_config = counter.read(configs)
-         local c = config.load(shm.path(child_path.."/config"))
-         engine.configure(c)
-      end
-      -- Run until next update
-      engine.main({done = update, no_report = true})
-   end
-end
-
 function selftest ()
    print("selftest: worker")
    -- XXX This selftest function is very basic. Should be expanded to

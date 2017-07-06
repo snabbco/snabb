@@ -120,15 +120,17 @@ end
 
 -- Receive all available packets from the virtual machine.
 function VirtioNetDevice:receive_packets_from_vm ()
-   local ops = {
-      packet_start = self.rx_packet_start,
-      buffer_add   = self.rx_buffer_add,
-      packet_end   = self.rx_packet_end
-   }
+   if self.receive_packets_ops == nil then
+      self.receive_packets_ops = {
+         packet_start = self.rx_packet_start,
+         buffer_add   = self.rx_buffer_add,
+         packet_end   = self.rx_packet_end
+      }
+   end
    for i = 0, self.virtq_pairs-1 do
       self.ring_id = 2*i+1
       local virtq = self.virtq[self.ring_id]
-      virtq:get_buffers('rx', ops, self.hdr_size)
+      virtq:get_buffers('rx', self.receive_packets_ops, self.hdr_size)
    end
 end
 
@@ -188,24 +190,25 @@ end
 
 -- Receive all available packets from the virtual machine.
 function VirtioNetDevice:transmit_packets_to_vm ()
-   local ops = {}
-   if not self.mrg_rxbuf then
-      ops = {
-         packet_start = self.tx_packet_start,
-         buffer_add   = self.tx_buffer_add,
-         packet_end   = self.tx_packet_end
-      }
-   else
-      ops = {
-         packet_start = self.tx_packet_start_mrg_rxbuf,
-         buffer_add   = self.tx_buffer_add_mrg_rxbuf,
-         packet_end   = self.tx_packet_end_mrg_rxbuf
-      }
+   if self.transmit_packet_ops == nil then
+      if not self.mrg_rxbuf then
+         self.transmit_packet_ops = {
+            packet_start = self.tx_packet_start,
+            buffer_add   = self.tx_buffer_add,
+            packet_end   = self.tx_packet_end
+         }
+      else
+         self.transmit_packet_ops = {
+            packet_start = self.tx_packet_start_mrg_rxbuf,
+            buffer_add   = self.tx_buffer_add_mrg_rxbuf,
+            packet_end   = self.tx_packet_end_mrg_rxbuf
+         }
+      end
    end
    for i = 0, self.virtq_pairs-1 do
       self.ring_id = 2*i
       local virtq = self.virtq[self.ring_id]
-      virtq:get_buffers('tx', ops, self.hdr_size)
+      virtq:get_buffers('tx', self.transmit_packet_ops, self.hdr_size)
    end
 end
 

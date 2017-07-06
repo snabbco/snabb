@@ -123,6 +123,14 @@ end
 
 function selftest ()
    print("selftest: multi_copy")
+
+   local cpuinfo = require('core.lib').readfile("/proc/cpuinfo", "*a")
+   assert(cpuinfo, "failed to read /proc/cpuinfo for hardware check")
+   if not cpuinfo:match("avx2") then
+      print("selftest: not supported; avx2 unavailable")
+      return
+   end
+
    local src = ffi.new('uint8_t[78]',
                        { 1,
                          2, 2,
