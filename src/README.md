@@ -816,9 +816,36 @@ commas. Example:
 comma_value(1000000) => "1,000,000"
 ```
 
-— Function **lib.random_data** *length*
+— Function **lib.random_bytes_from_dev_urandom** *length*
 
-Returns a string of *length* bytes of random data.
+Return *length* bytes of random data, as a byte array, taken from
+`/dev/urandom`.  Suitable for cryptographic usage.
+
+— Function **lib.random_bytes_from_math_random** *length*
+
+Return *length* bytes of random data, as a byte array, where each byte
+was taken from `math.random(0, 255)`.  *Not* suitable for cryptographic
+usage.
+
+— Function **lib.random_bytes** *length*
+— Function **lib.randomseed** *seed*
+
+Initialize Snabb's random number generation facility.  If *seed* is nil,
+then the Lua `math.random()` function will be seeded from
+`/dev/urandom`, and `lib.random_bytes` will be initialized to
+`lib.random_bytes_from_dev_urandom`.  This is Snabb's default mode of
+operation.
+
+Sometimes it's useful to make Snabb use deterministic random numbers.
+In that case, pass a seed to **lib.randomseed**; Snabb will set
+`lib.random_bytes` to `lib.random_bytes_from_math_random`, and also
+print out a message to stderr indicating that we are using lower-quality
+deterministic random numbers.
+
+As part of its initialization process, Snabb will call `lib.randomseed`
+with the value of the `SNABB_RANDOM_SEED` environment variable (if
+any).  Set this environment variable to enable deterministic random
+numbers.
 
 — Function **lib.bounds_checked** *type*, *base*, *offset*, *size*
 
@@ -897,6 +924,11 @@ integers *n* respectively. Unsigned.
 
 Network to host byte order conversion functions for 32 and 16 bit
 integers *n* respectively. Unsigned.
+
+— Function **lib.random_bytes** *count*
+
+Return a fresh array of *count* random bytes.  Suitable for
+cryptographic usage.
 
 — Function **lib.parse** *arg*, *config*
 

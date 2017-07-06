@@ -152,6 +152,7 @@ function initialize ()
    require("core.lib")
    require("core.clib_h")
    require("core.lib_h")
+   lib.randomseed(tonumber(lib.getenv("SNABB_RANDOM_SEED")))
    -- Global API
    _G.config = require("core.config")
    _G.engine = require("core.app")

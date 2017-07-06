@@ -98,12 +98,9 @@ local extra = "0123456789_-"
 local alphabet = table.concat({lower_case, upper_case, extra})
 assert(#alphabet == 64)
 local function random_file_name()
-   local f = io.open('/dev/urandom', 'rb')
    -- 22 bytes, but we only use 2^6=64 bits from each byte, so total of
    -- 132 bits of entropy.
-   local bytes = f:read(22)
-   assert(#bytes == 22)
-   f:close()
+   local bytes = lib.random_data(22)
    local out = {}
    for i=1,#bytes do
       table.insert(out, alphabet:byte(bytes:byte(i) % 64 + 1))
