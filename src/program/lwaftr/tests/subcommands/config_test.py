@@ -137,7 +137,7 @@ class TestConfigMisc(BaseTestCase):
         add_args = self.get_cmd_args('add')
         add_args.extend((
             '/softwire-config/binding-table/softwire',
-            '{ ipv4 1.2.3.4; psid 7; b4-ipv6 ::1; br-address 2001:db8::;'
+            '{ ipv4 1.2.3.4; psid 7; b4-ipv6 ::2; br-address 2001:db8::;'
             'port-set { psid-length 16; }}',
         ))
         self.run_cmd(add_args)
@@ -148,7 +148,7 @@ class TestConfigMisc(BaseTestCase):
         output = self.run_cmd(get_args)
         # run_cmd checks the exit code and fails the test if it is not zero.
         self.assertEqual(
-            output.strip(), b'::1',
+            output.strip(), b'::2',
             '\n'.join(('OUTPUT', str(output, ENC))))
 
     def test_get_state(self):
@@ -247,7 +247,6 @@ class TestConfigMisc(BaseTestCase):
         output = self.run_cmd(get_args)
         self.assertEqual(output.strip(), bytes(test_psid, ENC),
             '\n'.join(('OUTPUT', str(output, ENC))))
-
 
 
 if __name__ == '__main__':
