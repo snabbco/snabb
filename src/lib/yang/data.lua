@@ -906,11 +906,14 @@ function xpath_printer_from_grammar(production, print_default, root)
    function top_printers.scalar(production)
       local serialize = value_serializer(production.argument_type)
       return function(data, file)
-         file:write(root)
-         file:write(' ')
-         file:write(serialize(data))
-         file:write(';\n')
-         return file:flush()
+         local str = serialize(data)
+         if print_default or str ~= production.default then
+            file:write(root)
+            file:write(' ')
+            file:write(str)
+            file:write(';\n')
+            return file:flush()
+         end
       end
    end
 
