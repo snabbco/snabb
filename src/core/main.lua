@@ -79,6 +79,8 @@ function select_program (args)
          local opt = table.remove(args, 1)
          if opt == '-h' or opt == '--help' then
             usage(0)
+         elseif opt == '-v' or opt == '--version' then
+            version()
          else
             print("unrecognized option: "..opt)
             usage(1)
@@ -102,6 +104,22 @@ function usage (status)
    print("If you rename (or copy or symlink) this executable with one of")
    print("the names above then that program will be chosen automatically.")
    os.exit(status)
+end
+
+function version ()
+   local v = require('core.version')
+   local version_str = v.version
+   if v.extra_version ~= '' then
+      version_str = version_str.." ("..v.extra_version..")"
+   end
+   print(ffi.string(C.basename(C.argv[0])).." "..version_str)
+   print([[
+Copyright (C) 2012-2017 Snabb authors; see revision control logs for details.
+License: <https://www.apache.org/licenses/LICENSE-2.0>
+
+Snabb is open source software.  For more information on Snabb, see
+https://github.com/snabbco/snabb.]])
+   os.exit(0)
 end
 
 function programname (name)
@@ -134,6 +152,7 @@ function initialize ()
    require("core.lib")
    require("core.clib_h")
    require("core.lib_h")
+   lib.randomseed(tonumber(lib.getenv("SNABB_RANDOM_SEED")))
    -- Global API
    _G.config = require("core.config")
    _G.engine = require("core.app")
@@ -146,7 +165,7 @@ end
 
 function handler (reason)
    print(reason)
-   print(debug.traceback())
+   print(STP.stacktrace())
    if debug_on_error then debug.debug() end
    os.exit(1)
 end
