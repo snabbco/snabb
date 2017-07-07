@@ -445,6 +445,7 @@ function hash (key_size)
    local function murmur_hash(v)
       return murmur:hash(v, key_size, 0ULL).u32[0]      
    end
+   local fnv_hash = require('lib.hash.fnv').make_fnv_hash(key_size)
    local lib_siphash = require('lib.hash.siphash')
    local sip_hash_1_2_opts = { size=key_size, c=1, d=2 }
    local sip_hash_2_4_opts = { size=key_size, c=2, d=4 }
@@ -491,6 +492,7 @@ function hash (key_size)
 
    test_perf(hash_tester(baseline_hash), 1e8, 'baseline')
    test_perf(hash_tester(murmur_hash), 1e8, 'murmur hash (32 bit)')
+   test_perf(hash_tester(fnv_hash), 1e8, 'fnv hash')
    for _, opts in ipairs({{c=1,d=2}, {c=2,d=4}}) do
       for _, width in ipairs({1,2,4,8}) do
          test_perf(sip_hash_tester(opts, width), 1e8,
