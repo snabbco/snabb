@@ -68,16 +68,32 @@ details in discussions then these are the places to look for answers.
 
 The [AnandTech review of the Haswell microarchitecture](http://www.anandtech.com/show/6355/intels-haswell-architecture) is also excellent lighter reading.
 
-### Compilation
+### Compilation for users
 
-RaptorJIT uses [nix](http://nixos.org/nix/) to define a reproducible
-build environment that includes Clang for C and LuaJIT 2.0 for
-bootstrapping (see [default.nix](default.nix)). The recommended way to
-build RaptorJIT is with nix, which provides the dependencies
-automatically, but you can build manually if you prefer.
+Building a standard RaptorJIT from source is easy:
 
-Building with nix will be slow the first time due to downloading
-toolchains and related dependencies. This is all cached for future
+```
+$ make
+$ ls -l src/raptorjit{,.a,.o} src/libraptorjit.so 
+-rwxr-xr-x 1 luke users 553592 Jul  7 08:22 src/raptorjit
+-rw-r--r-- 1 luke users 843116 Jul  7 08:21 src/raptorjit.a
+-rw-r--r-- 1 luke users  18072 Jul  7 08:22 src/raptorjit.o
+-rwxr-xr-x 1 luke users 566288 Jul  7 08:22 src/libraptorjit.so
+```
+
+### Compilation for VM hackers
+
+If you are hacking the virtual machine definition then you need a few
+additional software dependencies for the build. For example, you need
+LuaJIT to run DynASM in order to regenerate the virtual machine sources.
+
+You can install these dependencies yourself or you can use the
+reference [Nix](http://nixos.org/nix/) build environment provided with
+RaptorJIT.
+
+Note: Building with nix will be slow the first time because it
+downloads the exact reference versions of the toolchain (clang, etc)
+and all dependencies (glibc, etc). This is all cached for future
 builds.
 
 #### Build with nix
