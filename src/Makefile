@@ -42,18 +42,6 @@ CCOPT= -O2 -fomit-frame-pointer
 # Note: it's no longer recommended to use -O3 with GCC 4.x.
 # The I-Cache bloat usually outweighs the benefits from aggressive inlining.
 #
-# Target-specific compiler options:
-#
-# x86/x64 only: For GCC 4.2 or higher and if you don't intend to distribute
-# the binaries to a different machine you could also use: -march=native
-#
-CCOPT_x86= -march=i686 -msse -msse2 -mfpmath=sse
-CCOPT_x64=
-CCOPT_arm=
-CCOPT_arm64=
-CCOPT_ppc=
-CCOPT_mips=
-#
 CCDEBUG=
 # Uncomment the next line to generate debug information:
 #CCDEBUG= -g
@@ -61,24 +49,6 @@ CCDEBUG=
 CCWARN= -Wall
 # Uncomment the next line to enable more warnings:
 #CCWARN+= -Wextra -Wdeclaration-after-statement -Wredundant-decls -Wshadow -Wpointer-arith
-#
-##############################################################################
-
-##############################################################################
-################################  BUILD MODE  ################################
-##############################################################################
-# The default build mode is mixed mode on POSIX. On Windows this is the same
-# as dynamic mode.
-#
-# Mixed mode creates a static + dynamic library and a statically linked luajit.
-BUILDMODE= mixed
-#
-# Static mode creates a static library and a statically linked luajit.
-#BUILDMODE= static
-#
-# Dynamic mode creates a dynamic library and a dynamically linked luajit.
-# Note: this executable will only run when the library is installed!
-#BUILDMODE= dynamic
 #
 ##############################################################################
 
@@ -153,25 +123,6 @@ XCFLAGS=
 ##############################################################################
 
 ##############################################################################
-# Host system detection.
-##############################################################################
-
-ifeq (Windows,$(findstring Windows,$(OS))$(MSYSTEM)$(TERM))
-  HOST_SYS= Windows
-  HOST_RM= del
-else
-  HOST_SYS:= $(shell uname -s)
-  ifneq (,$(findstring MINGW,$(HOST_SYS)))
-    HOST_SYS= Windows
-    HOST_MSYS= mingw
-  endif
-  ifneq (,$(findstring CYGWIN,$(HOST_SYS)))
-    HOST_SYS= Windows
-    HOST_MSYS= cygwin
-  endif
-endif
-
-##############################################################################
 # Flags and options for host and target.
 ##############################################################################
 
@@ -208,7 +159,6 @@ TARGET_STCC= $(STATIC_CC)
 TARGET_DYNCC= $(DYNAMIC_CC)
 TARGET_LD= $(CROSS)$(CC)
 TARGET_AR= $(CROSS)ar rcus 2>/dev/null
-TARGET_STRIP= $(CROSS)strip
 
 TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
 TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
@@ -230,52 +180,8 @@ TARGET_ASHLDFLAGS= $(LDOPTIONS) $(TARGET_XSHLDFLAGS) $(TARGET_FLAGS) $(TARGET_SH
 TARGET_ALIBS= $(TARGET_XLIBS) $(LIBS) $(TARGET_LIBS)
 
 TARGET_TESTARCH=$(shell $(TARGET_CC) $(TARGET_TCFLAGS) -E lj_arch.h -dM)
-ifneq (,$(findstring LJ_TARGET_X64 ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= x64
-else
-ifneq (,$(findstring LJ_TARGET_X86 ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= x86
-else
-ifneq (,$(findstring LJ_TARGET_ARM ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= arm
-else
-ifneq (,$(findstring LJ_TARGET_ARM64 ,$(TARGET_TESTARCH)))
-  TARGET_LJARCH= arm64
-else
-ifneq (,$(findstring LJ_TARGET_PPC ,$(TARGET_TESTARCH)))
-  ifneq (,$(findstring LJ_LE 1,$(TARGET_TESTARCH)))
-    TARGET_ARCH= -DLJ_ARCH_ENDIAN=LUAJIT_LE
-  else
-    TARGET_ARCH= -DLJ_ARCH_ENDIAN=LUAJIT_BE
-  endif
-  TARGET_LJARCH= ppc
-else
-ifneq (,$(findstring LJ_TARGET_MIPS ,$(TARGET_TESTARCH)))
-  ifneq (,$(findstring MIPSEL ,$(TARGET_TESTARCH)))
-    TARGET_ARCH= -D__MIPSEL__=1
-  endif
-  ifneq (,$(findstring LJ_TARGET_MIPS64 ,$(TARGET_TESTARCH)))
-    TARGET_LJARCH= mips64
-  else
-    TARGET_LJARCH= mips
-  endif
-else
-  $(error Unsupported target architecture)
-endif
-endif
-endif
-endif
-endif
-endif
+TARGET_LJARCH= x64
 
-ifneq (,$(findstring LJ_TARGET_PS3 1,$(TARGET_TESTARCH)))
-  TARGET_SYS= PS3
-  TARGET_ARCH+= -D__CELLOS_LV2__
-  TARGET_XCFLAGS+= -DLUAJIT_USE_SYSMALLOC
-  TARGET_XLIBS+= -lpthread
-endif
-
-TARGET_XCFLAGS+= $(CCOPT_$(TARGET_LJARCH))
 TARGET_ARCH+= $(patsubst %,-DLUAJIT_TARGET=LUAJIT_ARCH_%,$(TARGET_LJARCH))
 
 ifneq (,$(PREFIX))
@@ -297,75 +203,9 @@ endif
 # Target system detection.
 ##############################################################################
 
-TARGET_SYS?= $(HOST_SYS)
-ifeq (Windows,$(TARGET_SYS))
-  TARGET_STRIP+= --strip-unneeded
-  TARGET_XSHLDFLAGS= -shared
-  TARGET_DYNXLDOPTS=
-else
-ifeq (,$(shell $(TARGET_CC) -o /dev/null -c -x c /dev/null -fno-stack-protector 2>/dev/null || echo 1))
-  TARGET_XCFLAGS+= -fno-stack-protector
-endif
-ifeq (Darwin,$(TARGET_SYS))
-  ifeq (,$(MACOSX_DEPLOYMENT_TARGET))
-    export MACOSX_DEPLOYMENT_TARGET=10.4
-  endif
-  TARGET_STRIP+= -x
-  TARGET_XSHLDFLAGS= -dynamiclib -single_module -undefined dynamic_lookup -fPIC
-  TARGET_DYNXLDOPTS=
-  TARGET_XSHLDFLAGS+= -install_name $(TARGET_DYLIBPATH) -compatibility_version $(MAJVER).$(MINVER) -current_version $(MAJVER).$(MINVER).$(RELVER)
-  ifeq (x64,$(TARGET_LJARCH))
-    TARGET_XLDFLAGS+= -pagezero_size 10000 -image_base 100000000
-    TARGET_XSHLDFLAGS+= -image_base 7fff04c4a000
-  endif
-else
-ifeq (iOS,$(TARGET_SYS))
-  TARGET_STRIP+= -x
-  TARGET_XSHLDFLAGS= -dynamiclib -single_module -undefined dynamic_lookup -fPIC
-  TARGET_DYNXLDOPTS=
-  TARGET_XSHLDFLAGS+= -install_name $(TARGET_DYLIBPATH) -compatibility_version $(MAJVER).$(MINVER) -current_version $(MAJVER).$(MINVER).$(RELVER)
-  ifeq (arm64,$(TARGET_LJARCH))
-    TARGET_XCFLAGS+= -fno-omit-frame-pointer
-  endif
-else
-  ifneq (SunOS,$(TARGET_SYS))
-    ifneq (PS3,$(TARGET_SYS))
-      TARGET_XLDFLAGS+= -Wl,-E
-    endif
-  endif
-  ifeq (Linux,$(TARGET_SYS))
-    TARGET_XLIBS+= -ldl
-  endif
-  ifeq (GNU/kFreeBSD,$(TARGET_SYS))
-    TARGET_XLIBS+= -ldl
-  endif
-endif
-endif
-endif
-
-ifneq ($(HOST_SYS),$(TARGET_SYS))
-  ifeq (Windows,$(TARGET_SYS))
-    HOST_XCFLAGS+= -malign-double -DLUAJIT_OS=LUAJIT_OS_WINDOWS
-  else
-  ifeq (Linux,$(TARGET_SYS))
-    HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_LINUX
-  else
-  ifeq (Darwin,$(TARGET_SYS))
-    HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_OSX
-  else
-  ifeq (iOS,$(TARGET_SYS))
-    HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_OSX
-  else
-    HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_OTHER
-  endif
-  endif
-  endif
-  endif
-endif
-
-ifneq (,$(CCDEBUG))
-  TARGET_STRIP= @:
-endif
+TARGET_XCFLAGS+= -fno-stack-protector
+TARGET_XLIBS+= -ldl
+HOST_XCFLAGS+= -DLUAJIT_OS=LUAJIT_OS_LINUX
 
 ##############################################################################
 # Files and pathnames.
@@ -373,75 +213,7 @@ endif
 
 DASM_DIR= ../dynasm
 DASM= $(HOST_LUA) $(DASM_DIR)/dynasm.lua
-DASM_XFLAGS=
-DASM_AFLAGS=
-DASM_ARCH= $(TARGET_LJARCH)
-
-ifneq (,$(findstring LJ_LE 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D ENDIAN_LE
-else
-  DASM_AFLAGS+= -D ENDIAN_BE
-endif
-ifneq (,$(findstring LJ_ARCH_BITS 64,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D P64
-endif
-ifneq (,$(findstring LJ_HASJIT 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D JIT
-endif
-ifneq (,$(findstring LJ_HASFFI 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D FFI
-endif
-ifneq (,$(findstring LJ_ARCH_HASFPU 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D FPU
-  TARGET_ARCH+= -DLJ_ARCH_HASFPU=1
-else
-  TARGET_ARCH+= -DLJ_ARCH_HASFPU=0
-endif
-ifeq (,$(findstring LJ_ABI_SOFTFP 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D HFABI
-  TARGET_ARCH+= -DLJ_ABI_SOFTFP=0
-else
-  TARGET_ARCH+= -DLJ_ABI_SOFTFP=1
-endif
-ifneq (,$(findstring LJ_NO_UNWIND 1,$(TARGET_TESTARCH)))
-  DASM_AFLAGS+= -D NO_UNWIND
-  TARGET_ARCH+= -DLUAJIT_NO_UNWIND
-endif
-DASM_AFLAGS+= -D VER=$(subst LJ_ARCH_VERSION_,,$(filter LJ_ARCH_VERSION_%,$(subst LJ_ARCH_VERSION ,LJ_ARCH_VERSION_,$(TARGET_TESTARCH))))
-ifeq (Windows,$(TARGET_SYS))
-  DASM_AFLAGS+= -D WIN
-endif
-ifeq (x64,$(TARGET_LJARCH))
-  ifeq (,$(findstring LJ_FR2 1,$(TARGET_TESTARCH)))
-    DASM_ARCH= x86
-  endif
-else
-ifeq (arm,$(TARGET_LJARCH))
-  ifeq (iOS,$(TARGET_SYS))
-    DASM_AFLAGS+= -D IOS
-  endif
-else
-ifeq (ppc,$(TARGET_LJARCH))
-  ifneq (,$(findstring LJ_ARCH_SQRT 1,$(TARGET_TESTARCH)))
-    DASM_AFLAGS+= -D SQRT
-  endif
-  ifneq (,$(findstring LJ_ARCH_ROUND 1,$(TARGET_TESTARCH)))
-    DASM_AFLAGS+= -D ROUND
-  endif
-  ifneq (,$(findstring LJ_ARCH_PPC32ON64 1,$(TARGET_TESTARCH)))
-    DASM_AFLAGS+= -D GPR64
-  endif
-  ifeq (PS3,$(TARGET_SYS))
-    DASM_AFLAGS+= -D PPE -D TOC
-  endif
-  ifneq (,$(findstring LJ_ARCH_PPC64 ,$(TARGET_TESTARCH)))
-    DASM_ARCH= ppc64
-  endif
-endif
-endif
-endif
-
-DASM_FLAGS= $(DASM_XFLAGS) $(DASM_AFLAGS)
+DASM_ARCH= x64
 DASM_DASC= vm_$(DASM_ARCH).dasc
 
 BUILDVM_O= host/buildvm.o host/buildvm_asm.o host/buildvm_peobj.o \
@@ -497,65 +269,9 @@ ALL_RM= $(ALL_T) $(ALL_GEN) *.o host/*.o $(WIN_RM)
 # Build mode handling.
 ##############################################################################
 
-# Mixed mode defaults.
 TARGET_O= $(LUAJIT_A)
 TARGET_T= $(LUAJIT_T) $(LUAJIT_SO)
 TARGET_DEP= $(LIB_VMDEF) $(LUAJIT_SO)
-
-ifeq (Windows,$(TARGET_SYS))
-  TARGET_DYNCC= $(STATIC_CC)
-  LJVM_MODE= peobj
-  LJVM_BOUT= $(LJVM_O)
-  LUAJIT_T= luajit.exe
-  ifeq (cygwin,$(HOST_MSYS))
-    LUAJIT_SO= cyg$(TARGET_DLLNAME)
-  else
-    LUAJIT_SO= $(TARGET_DLLNAME)
-  endif
-  # Mixed mode is not supported on Windows. And static mode doesn't work well.
-  # C modules cannot be loaded, because they bind to lua51.dll.
-  ifneq (static,$(BUILDMODE))
-    BUILDMODE= dynamic
-    TARGET_XCFLAGS+= -DLUA_BUILD_AS_DLL
-  endif
-endif
-ifeq (Darwin,$(TARGET_SYS))
-  LJVM_MODE= machasm
-endif
-ifeq (iOS,$(TARGET_SYS))
-  LJVM_MODE= machasm
-endif
-ifeq (SunOS,$(TARGET_SYS))
-  BUILDMODE= static
-endif
-ifeq (PS3,$(TARGET_SYS))
-  BUILDMODE= static
-endif
-
-ifeq (static,$(BUILDMODE))
-  TARGET_DYNCC= @:
-  TARGET_T= $(LUAJIT_T)
-  TARGET_DEP= $(LIB_VMDEF)
-else
-ifeq (dynamic,$(BUILDMODE))
-  ifneq (Windows,$(TARGET_SYS))
-    TARGET_CC= $(DYNAMIC_CC)
-  endif
-  TARGET_DYNCC= @:
-  LJVMCORE_DYNO= $(LJVMCORE_O)
-  TARGET_O= $(LUAJIT_SO)
-  TARGET_XLDFLAGS+= $(TARGET_DYNXLDOPTS)
-else
-ifeq (Darwin,$(TARGET_SYS))
-  TARGET_DYNCC= @:
-  LJVMCORE_DYNO= $(LJVMCORE_O)
-endif
-ifeq (iOS,$(TARGET_SYS))
-  TARGET_DYNCC= @:
-  LJVMCORE_DYNO= $(LJVMCORE_O)
-endif
-endif
-endif
 
 Q= @
 E= @echo
@@ -597,7 +313,7 @@ depend:
 
 host/buildvm_arch.h: $(DASM_DASC) $(DASM_DEP) $(DASM_DIR)/*.lua
 	$(E) "DYNASM    $@"
-	$(Q)$(DASM) $(DASM_FLAGS) -o $@ $(DASM_DASC)
+	$(Q)$(DASM) -o $@ $(DASM_DASC)
 
 host/buildvm.o: $(DASM_DIR)/dasm_*.h
 
@@ -669,12 +385,10 @@ $(LUAJIT_A): $(LJVMCORE_O)
 $(LUAJIT_SO): $(LJVMCORE_O)
 	$(E) "DYNLINK   $@"
 	$(Q)$(TARGET_LD) $(TARGET_ASHLDFLAGS) -o $@ $(LJVMCORE_DYNO) $(TARGET_ALIBS)
-	$(Q)$(TARGET_STRIP) $@
 
 $(LUAJIT_T): $(TARGET_O) $(LUAJIT_O) $(TARGET_DEP)
 	$(E) "LINK      $@"
 	$(Q)$(TARGET_LD) $(TARGET_ALDFLAGS) -o $@ $(LUAJIT_O) $(TARGET_O) $(TARGET_ALIBS)
-	$(Q)$(TARGET_STRIP) $@
 	$(E) "OK        Successfully built LuaJIT"
 
 ##############################################################################
