@@ -36,7 +36,7 @@ config.app(c, "nic1p1", intel.Intel,
              poolnum = 1,
              mirror = { pool = { 0 } },
              macaddr = "12:34:56:78:9a:bc",
-             rxq = 4,
+             rxq = 0,
              rxcounter = 2,
              wait_for_link = true })
 
@@ -46,7 +46,7 @@ config.app(c, "nic1p2", intel.Intel,
              poolnum = 2,
              mirror = { pool = true },
              macaddr = "aa:aa:aa:aa:aa:aa",
-             rxq = 8,
+             rxq = 0,
              rxcounter = 3,
              wait_for_link = true })
 
