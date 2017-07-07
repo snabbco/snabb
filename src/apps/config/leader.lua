@@ -683,9 +683,8 @@ function Leader:send_messages_to_followers()
    for _,follower in ipairs(self.followers) do
       if not follower.channel then
          local name = '/'..tostring(follower.pid)..'/config-follower-channel'
-         -- local success, channel = pcall(channel.open, name)
-         --if success then follower.channel = channel end
-         follower.channel = channel.open(name)
+         local success, channel = pcall(channel.open, name)
+         if success then follower.channel = channel end
       end
       local channel = follower.channel
       if channel then
