@@ -150,59 +150,46 @@ local function choose_bounded(lo, hi)
    end
 end
 
--- choose a random number, taking range statements into account
-local function choose_range(rng, lo, hi)
+-- Choose a random number from within a range of valid value.  RANGES
+-- is an array of {LO, HI} arrays; each of LO and HI can be numbers.
+-- LO can additionally be "min" and HI can be "max".
+local function choose_value_from_ranges(ranges, type_min, type_max)
    local r = math.random()
 
-   if #rng == 0 or (generate_invalid and r < 0.1) then
-      return choose_bounded(lo, hi)
-   elseif rng[1] == "or" then
-      local intervals = {}
-      local num_intervals = (#rng - 1) / 2
-
-      for i=1, num_intervals do
-         intervals[i] = { rng[2*i], rng[2*i+1] }
-      end
-
-      return choose_range(choose(intervals), lo, hi)
+   if #ranges == 0 or (generate_invalid and r < 0.1) then
+      return choose_bounded(type_min, type_max)
    else
-      local lo_rng, hi_rng = rng[1], rng[2]
-
-      if lo_rng == "min" then
-         lo_rng = lo
-      end
-      if hi_rng == "max" then
-         hi_rng = hi
-      end
-
-      return choose_bounded(math.max(lo_rng, lo), math.min(hi_rng, hi))
+      local lo, hi = unpack(ranges[math.random(1,#ranges)])
+      if lo == "min" then lo = type_min end
+      if hi == "max" then hi = type_max end
+      return choose_bounded(lo, hi)
    end
 end
 
 local function value_from_type(a_type)
    local prim = a_type.primitive_type
-   local rng
+   local ranges
 
    if a_type.range then
-      rng = a_type.range.value
+      ranges = a_type.range.value
    else
-      rng = {}
+      ranges = {}
    end
 
    if prim == "int8" then
-      return choose_range(rng, -128, 127)
+      return choose_value_from_ranges(ranges, -128, 127)
    elseif prim == "int16" then
-      return choose_range(rng, -32768, 32767)
+      return choose_value_from_ranges(ranges, -32768, 32767)
    elseif prim == "int32" then
-      return choose_range(rng, -2147483648, 2147483647)
+      return choose_value_from_ranges(ranges, -2147483648, 2147483647)
    elseif prim == "int64" then
       return ffi.cast("int64_t", random64())
    elseif prim == "uint8" then
-      return choose_range(rng, 0, 255)
+      return choose_value_from_ranges(ranges, 0, 255)
    elseif prim == "uint16" then
-      return choose_range(rng, 0, 65535)
+      return choose_value_from_ranges(ranges, 0, 65535)
    elseif prim == "uint32" then
-      return choose_range(rng, 0, 4294967295)
+      return choose_value_from_ranges(ranges, 0, 4294967295)
    elseif prim == "uint64" then
       return random64()
    -- TODO: account for fraction-digits and range
@@ -533,11 +520,11 @@ function selftest()
    -- check some int types with range statements
    for i=1, 100 do
       local val1 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {1, 16} } })
+                                     range={ value = {{1, 16}} } })
       local val2 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {"or", 1, 16, 18, 32} } })
+                                     range={ value = {{1, 16}, {18, 32}} } })
       local val3 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {"or", "min", 10, 250, "max"} } })
+                                     range={ value = {{"min", 10}, {250, "max"}} } })
       assert(val1 >= 1 and val1 <= 16, string.format("test value: %d", val1))
       assert(val2 >= 1 and val2 <= 32 and val2 ~= 17,
              string.format("test value: %d", val2))
