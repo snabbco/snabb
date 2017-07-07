@@ -1069,8 +1069,8 @@ function selftest()
    assert(contents.body["name"].description == "Name of fruit.")
    assert(contents.body["score"].type.id == "uint8")
    assert(contents.body["score"].mandatory == true)
-   assert(contents.body["score"].type.range.value[1] == 0)
-   assert(contents.body["score"].type.range.value[2] == 10)
+   local equal = require('core.lib').equal
+   assert(equal(contents.body["score"].type.range.value, {{0, 10}}))
 
    -- Check the container has a leaf called "description"
    local desc = schema.body["fruit-bowl"].body['description']
