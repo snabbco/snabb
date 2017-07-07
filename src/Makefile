@@ -10,8 +10,8 @@
 # Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
-MAJVER=  2
-MINVER=  1
+MAJVER=  1
+MINVER=  0
 RELVER=  0
 ABIVER=  5.1
 NODOTABIVER= 51
@@ -23,14 +23,6 @@ NODOTABIVER= 51
 # speed of the JIT-compiled code. Turn any of the optional settings on by
 # removing the '#' in front of them. Make sure you force a full recompile
 # with "make clean", followed by "make" if you change any options.
-#
-DEFAULT_CC = clang
-#
-# LuaJIT builds as a native 32 or 64 bit binary by default.
-CC= $(DEFAULT_CC)
-#
-# Use this if you want to force a 32 bit build on a 64 bit multilib OS.
-#CC= $(DEFAULT_CC) -m32
 #
 # Since the assembler part does NOT maintain a frame pointer, it's pointless
 # to slow down the C part by not omitting it. Debugging, tracebacks and
@@ -161,8 +153,8 @@ TARGET_LD= $(CROSS)$(CC)
 TARGET_AR= $(CROSS)ar rcus 2>/dev/null
 
 TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
-TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
-TARGET_DYLIBNAME= libluajit-$(ABIVER).$(MAJVER).dylib
+TARGET_SONAME= libraptorjit-$(ABIVER).so.$(MAJVER)
+TARGET_DYLIBNAME= libraptorjit-$(ABIVER).$(MAJVER).dylib
 TARGET_DYLIBPATH= $(TARGET_LIBPATH)/$(TARGET_DYLIBNAME)
 TARGET_DLLNAME= lua$(NODOTABIVER).dll
 TARGET_XSHLDFLAGS= -shared -fPIC -Wl,-soname,$(TARGET_SONAME)
@@ -253,17 +245,17 @@ LJVMCORE_DYNO= $(LJVMCORE_O:.o=_dyn.o)
 LIB_VMDEF= jit/vmdef.lua
 LIB_VMDEFP= $(LIB_VMDEF)
 
-LUAJIT_O= luajit.o
-LUAJIT_A= libluajit.a
-LUAJIT_SO= libluajit.so
-LUAJIT_T= luajit
+LUAJIT_O= raptorjit.o
+LUAJIT_A= raptorjit.a
+LUAJIT_SO= libraptorjit.so
+LUAJIT_T= raptorjit
 
 ALL_T= $(LUAJIT_T) $(LUAJIT_A) $(LUAJIT_SO) $(HOST_T)
 ALL_HDRGEN= lj_bcdef.h lj_ffdef.h lj_libdef.h lj_recdef.h lj_folddef.h \
 	    host/buildvm_arch.h
 ALL_GEN= $(LJVM_S) $(ALL_HDRGEN) $(LIB_VMDEFP)
 WIN_RM= *.obj *.lib *.exp *.dll *.exe *.manifest *.pdb *.ilk
-ALL_RM= $(ALL_T) $(ALL_GEN) *.o host/*.o $(WIN_RM)
+ALL_RM= $(ALL_T) *.o host/*.o $(WIN_RM)
 
 ##############################################################################
 # Build mode handling.
@@ -365,7 +357,7 @@ lj_folddef.h: $(BUILDVM_T) lj_opt_fold.c
 
 $(LUAJIT_O):
 	$(E) "CC        $@"
-	$(Q)$(TARGET_STCC) $(TARGET_ACFLAGS) -c -o $@ $<
+	$(Q)$(TARGET_STCC) $(TARGET_ACFLAGS) -c -o $@ luajit.c
 
 $(HOST_O): %.o: %.c
 	$(E) "HOSTCC    $@"
@@ -389,6 +381,6 @@ $(LUAJIT_SO): $(LJVMCORE_O)
 $(LUAJIT_T): $(TARGET_O) $(LUAJIT_O) $(TARGET_DEP)
 	$(E) "LINK      $@"
 	$(Q)$(TARGET_LD) $(TARGET_ALDFLAGS) -o $@ $(LUAJIT_O) $(TARGET_O) $(TARGET_ALIBS)
-	$(E) "OK        Successfully built LuaJIT"
+	$(E) "OK        Successfully built RaptorJIT"
 
 ##############################################################################
