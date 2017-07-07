@@ -64,7 +64,6 @@ local function parse_range_or_length_arg(loc, kind, range)
       end
       return { l, r }
    end
-   local parts = range:split("|")
    local res = {}
    for part in range:split("|") do table.insert(res, parse_part(part)) end
    if #res == 0 then error_with_loc(loc, "empty "..kind, range) end
