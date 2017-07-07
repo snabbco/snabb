@@ -28,6 +28,8 @@ specified but assumed to be broadly applicable.
 — Key **rxq**
 
 *Optional*. The receive queue to attach to, numbered from 0. The default is 0.
+When VMDq is enabled, this number is used to index a queue (from 0 to 3)
+for the selected pool.
 
 — Key **txq**
 
