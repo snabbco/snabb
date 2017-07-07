@@ -262,7 +262,7 @@ function load_on_a_stick(c, conf, args)
    end
 end
 
-function load_virt(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
+function load_virt(c, conf, v4_nic_name, v6_nic_name)
    local v4_pci, v6_pci = lwaftr_app(c, conf)
    config.app(c, v4_nic_name, VirtioNet, {
       pciaddr=v4_pci,

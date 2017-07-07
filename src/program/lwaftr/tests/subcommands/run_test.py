@@ -19,8 +19,6 @@ class TestRun(BaseTestCase):
         '--duration', '1',
         '--bench-file', '/dev/null',
         '--conf', CONFIG_PATH,
-        '--v4', SNABB_PCI0,
-        '--v6', SNABB_PCI1,
     )
 
     def execute_run_test(self, cmd_args):

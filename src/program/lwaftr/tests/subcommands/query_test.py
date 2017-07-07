@@ -23,8 +23,6 @@ class TestQueryStandard(BaseTestCase):
         str(SNABB_CMD), 'lwaftr', 'run',
         '--name', DAEMON_PROC_NAME,
         '--conf', CONFIG_PATH,
-        '--v4', SNABB_PCI0,
-        '--v6', SNABB_PCI1,
     )
 
     query_args = (str(SNABB_CMD), 'lwaftr', 'query')
@@ -82,8 +80,6 @@ class TestQueryReconfigurable(TestQueryStandard):
         str(SNABB_CMD), 'lwaftr', 'run', '--reconfigurable',
         '--name', DAEMON_PROC_NAME,
         '--conf', str(DATA_DIR / 'no_icmp.conf'),
-        '--v4', SNABB_PCI0,
-        '--v6', SNABB_PCI1,
     )
 
     def get_all_leader_pids(self):

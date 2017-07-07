@@ -129,8 +129,8 @@ function lwaftr_app(c, conf, lwconf, sock_path)
    assert(type(conf) == 'table')
    assert(type(lwconf) == 'table')
 
-   local device = next(conf.softwire_config.instance)
-   local new_config = lwaftr.select_instance(conf, device)
+   local device = next(lwconf.softwire_config.instance)
+   local new_config = lwaftr.select_instance(lwconf, device)
    local external_interface = new_config.softwire_config.external_interface
    local internal_interface = new_config.softwire_config.internal_interface
 

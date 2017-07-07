@@ -47,26 +47,6 @@ function parse_args(args)
    handlers['real-time'] = function(arg)
       scheduling.real_time = true
    end
-   function handlers.v4(arg)
-      v4 = arg
-      if not nic_exists(v4) then
-         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
-      end
-   end
-   handlers["v4-pci"] = function(arg)
-      print("WARNING: Deprecated argument '--v4-pci'. Use '--v4' instead.")
-      handlers.v4(arg)
-   end
-   function handlers.v6(arg)
-      v6 = arg
-      if not nic_exists(v6) then
-         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v6))
-      end
-   end
-   handlers["v6-pci"] = function(arg)
-      print("WARNING: Deprecated argument '--v6-pci'. Use '--v6' instead.")
-      handlers.v6(arg)
-   end
    function handlers.r (arg)
       ring_buffer_size = tonumber(arg)
    end
@@ -95,11 +75,10 @@ function parse_args(args)
    function handlers.reconfigurable() opts.reconfigurable = true end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:yhir:n:",
-      { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
-        verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
-        ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
-        ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
-        hydra = "y", reconfigurable = 0, name="n" })
+      { conf = "c", verbose = "v", duration = "D", help = "h", virtio = "i",
+        cpu = 1, ["ring-buffer-size"] = "r", ["real-time"] = 0,
+        ["bench-file"] = "b", ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1,
+        mirror = 1, hydra = "y", reconfigurable = 0, name="n" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -133,7 +112,7 @@ local function requires_splitter (opts, conf)
 end
 
 function run(args)
-   local opts, scheduling, conf_file, v4, v6 = parse_args(args)
+   local opts, scheduling, conf_file = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local use_splitter = requires_splitter(opts, conf)
 
@@ -146,15 +125,14 @@ function run(args)
    local c = config.new()
    local setup_fn, setup_args
    if opts.virtio_net then
-      setup_fn, setup_args = setup.load_virt, { 'inetNic', v4, 'b4sideNic', v6 }
+      setup_fn, setup_args = setup.load_virt, { 'inetNic', 'b4sideNic' }
    elseif opts["on-a-stick"] then
       setup_fn = setup.load_on_a_stick
       setup_args =
          { { v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
-             v4v6 = use_splitter and 'v4v6', pciaddr = v4,
-             mirror = opts.mirror } }
+             v4v6 = use_splitter and 'v4v6', mirror = opts.mirror } }
    else
-      setup_fn, setup_args = setup.load_phy, { 'inetNic', v4, 'b4sideNic', v6 }
+      setup_fn, setup_args = setup.load_phy, { 'inetNic', 'b4sideNic' }
    end
 
    if opts.reconfigurable then
