@@ -77,6 +77,8 @@ class BaseTestCase(unittest.TestCase):
         try:
             output, errput = proc.communicate(timeout=COMMAND_TIMEOUT)
         except TimeoutExpired:
+            proc.stdout.close()
+            proc.stderr.close()
             print('\nTimeout running command, trying to kill PID %s' % proc.pid)
             proc.kill()
             raise

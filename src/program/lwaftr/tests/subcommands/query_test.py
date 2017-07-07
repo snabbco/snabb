@@ -9,7 +9,7 @@ import unittest
 from test_env import DATA_DIR, ENC, SNABB_CMD, BaseTestCase, nic_names
 
 
-DAEMON_PROC_NAME = 'query_test_daemon'
+DAEMON_PROC_NAME = 'query-test-daemon'
 SNABB_PCI0, SNABB_PCI1 = nic_names()
 RUN_DIR = Path('/var/run/snabb')
 

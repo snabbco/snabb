@@ -14,7 +14,7 @@ import unittest
 from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, BaseTestCase
 
 
-DAEMON_PROC_NAME = 'config_test_daemon'
+DAEMON_PROC_NAME = 'config-test-daemon'
 DAEMON_ARGS = (
     str(SNABB_CMD), 'lwaftr', 'bench', '--reconfigurable',
     '--bench-file', '/dev/null',
