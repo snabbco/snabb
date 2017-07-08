@@ -279,6 +279,9 @@ default all:	$(TARGET_T)
 clean:
 	$(HOST_RM) $(ALL_RM)
 
+bootstrapclean: clean
+	$(HOST_RM) $(ALL_GEN)
+
 libbc:
 	./$(LUAJIT_T) host/genlibbc.lua -o host/buildvm_libbc.h $(LJLIB_C)
 	$(MAKE) all

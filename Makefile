@@ -157,6 +157,9 @@ uninstall:
 clean:
 	$(MAKE) -C src clean
 
+bootstrapclean:
+	$(MAKE) -C src bootstrapclean
+
 .PHONY: all install clean
 
 ##############################################################################
