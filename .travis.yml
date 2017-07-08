@@ -1,9 +1,10 @@
 language: nix
 sudo: false
 env:
-  - test=test-O3
-  - test=test-O2
-  - test=test-O1
-  - test=test-nojit
+  - nix-build -A test-O3
+  - nix-build -A test-O2
+  - nix-build -A test-O1
+  - nix-build -A test-nojit
+  - nix-build -A check-generated-code --arg check true
 script:
-  - nix-build -A $test
+  - $test
