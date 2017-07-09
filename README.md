@@ -70,26 +70,25 @@ The [AnandTech review of the Haswell microarchitecture](http://www.anandtech.com
 
 ### Compilation for users
 
-Building a standard RaptorJIT from source is easy:
+Simple build:
 
+```shell
+$ make  # requires LuaJIT (2.0 or 2.1) to run DynASM
 ```
-$ make
-$ ls -l src/raptorjit{,.a,.o} src/libraptorjit.so 
--rwxr-xr-x 1 luke users 553592 Jul  7 08:22 src/raptorjit
--rw-r--r-- 1 luke users 843116 Jul  7 08:21 src/raptorjit.a
--rw-r--r-- 1 luke users  18072 Jul  7 08:22 src/raptorjit.o
--rwxr-xr-x 1 luke users 566288 Jul  7 08:22 src/libraptorjit.so
+
+Alternative if you don't have LuaJIT available and you are building a
+pristine copy from the master branch:
+
+```shell
+$ make reusevm  # Reuse reference copy of the generated VM code
+$ make          # Does not require LuaJIT now
 ```
 
 ### Compilation for VM hackers
 
-If you are hacking the virtual machine definition then you need a few
-additional software dependencies for the build. For example, you need
-LuaJIT to run DynASM in order to regenerate the virtual machine sources.
-
-You can install these dependencies yourself or you can use the
-reference [Nix](http://nixos.org/nix/) build environment provided with
-RaptorJIT.
+RaptorJIT uses [Nix](http://nixos.org/nix/) to provide a reference
+build environment. You can use Nix to build/test/benchmark RaptorJIT
+with suitable versions of all dependencies provided.
 
 Note: Building with nix will be slow the first time because it
 downloads the exact reference versions of the toolchain (clang, etc)

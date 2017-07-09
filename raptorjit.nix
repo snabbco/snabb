@@ -9,9 +9,6 @@ mkDerivation rec {
   name = "raptorjit-${version}";
   inherit version;
   src = source;
-  preBuild = ''
-    make bootstrapclean
-  '';
   buildInputs = [ luajit ];  # LuaJIT to bootstrap DynASM
   installPhase = ''
     mkdir -p $out/bin
