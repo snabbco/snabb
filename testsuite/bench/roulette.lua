@@ -6,7 +6,7 @@
 -- (Let the test harness determine the random seed)
 -- math.randomseed(os.time())
 
-local population = 100e6
+local population = 200e6
 local live = 0
 local die  = 0
 
