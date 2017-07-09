@@ -10,8 +10,8 @@
 # Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
 ##############################################################################
 
-MAJVER=  2
-MINVER=  1
+MAJVER=  1
+MINVER=  0
 RELVER=  0
 ABIVER=  5.1
 NODOTABIVER= 51
@@ -23,14 +23,6 @@ NODOTABIVER= 51
 # speed of the JIT-compiled code. Turn any of the optional settings on by
 # removing the '#' in front of them. Make sure you force a full recompile
 # with "make clean", followed by "make" if you change any options.
-#
-DEFAULT_CC = clang
-#
-# LuaJIT builds as a native 32 or 64 bit binary by default.
-CC= $(DEFAULT_CC)
-#
-# Use this if you want to force a 32 bit build on a 64 bit multilib OS.
-#CC= $(DEFAULT_CC) -m32
 #
 # Since the assembler part does NOT maintain a frame pointer, it's pointless
 # to slow down the C part by not omitting it. Debugging, tracebacks and
@@ -161,8 +153,8 @@ TARGET_LD= $(CROSS)$(CC)
 TARGET_AR= $(CROSS)ar rcus 2>/dev/null
 
 TARGET_LIBPATH= $(or $(PREFIX),/usr/local)/$(or $(MULTILIB),lib)
-TARGET_SONAME= libluajit-$(ABIVER).so.$(MAJVER)
-TARGET_DYLIBNAME= libluajit-$(ABIVER).$(MAJVER).dylib
+TARGET_SONAME= libraptorjit-$(ABIVER).so.$(MAJVER)
+TARGET_DYLIBNAME= libraptorjit-$(ABIVER).$(MAJVER).dylib
 TARGET_DYLIBPATH= $(TARGET_LIBPATH)/$(TARGET_DYLIBNAME)
 TARGET_DLLNAME= lua$(NODOTABIVER).dll
 TARGET_XSHLDFLAGS= -shared -fPIC -Wl,-soname,$(TARGET_SONAME)
@@ -250,20 +242,17 @@ LJCORE_O= lj_gc.o lj_err.o lj_char.o lj_bc.o lj_obj.o lj_buf.o \
 LJVMCORE_O= $(LJVM_O) $(LJCORE_O)
 LJVMCORE_DYNO= $(LJVMCORE_O:.o=_dyn.o)
 
-LIB_VMDEF= jit/vmdef.lua
-LIB_VMDEFP= $(LIB_VMDEF)
-
-LUAJIT_O= luajit.o
-LUAJIT_A= libluajit.a
-LUAJIT_SO= libluajit.so
-LUAJIT_T= luajit
+LUAJIT_O= raptorjit.o
+LUAJIT_A= raptorjit.a
+LUAJIT_SO= libraptorjit.so
+LUAJIT_T= raptorjit
 
 ALL_T= $(LUAJIT_T) $(LUAJIT_A) $(LUAJIT_SO) $(HOST_T)
 ALL_HDRGEN= lj_bcdef.h lj_ffdef.h lj_libdef.h lj_recdef.h lj_folddef.h \
 	    host/buildvm_arch.h
-ALL_GEN= $(LJVM_S) $(ALL_HDRGEN) $(LIB_VMDEFP)
+ALL_GEN= $(LJVM_S) $(ALL_HDRGEN)
 WIN_RM= *.obj *.lib *.exp *.dll *.exe *.manifest *.pdb *.ilk
-ALL_RM= $(ALL_T) $(ALL_GEN) *.o host/*.o $(WIN_RM)
+ALL_RM= $(ALL_T) *.o host/*.o $(WIN_RM)
 
 ##############################################################################
 # Build mode handling.
@@ -271,7 +260,7 @@ ALL_RM= $(ALL_T) $(ALL_GEN) *.o host/*.o $(WIN_RM)
 
 TARGET_O= $(LUAJIT_A)
 TARGET_T= $(LUAJIT_T) $(LUAJIT_SO)
-TARGET_DEP= $(LIB_VMDEF) $(LUAJIT_SO)
+TARGET_DEP= $(LUAJIT_SO)
 
 Q= @
 E= @echo
@@ -286,6 +275,12 @@ default all:	$(TARGET_T)
 
 clean:
 	$(HOST_RM) $(ALL_RM)
+	$(HOST_RM) $(ALL_GEN)
+
+reusevm:
+	cd reusevm; \
+	cp -r * ../
+	@echo "Copied reference VM. Ready to build."
 
 libbc:
 	./$(LUAJIT_T) host/genlibbc.lua -o host/buildvm_libbc.h $(LJLIB_C)
@@ -305,13 +300,28 @@ depend:
 	  test -s $$file || $(HOST_RM) $$file; \
 	  done
 
-.PHONY: default all clean libbc depend
+.PHONY: default all clean libbc depend reusevm
 
 ##############################################################################
 # Rules for generated files.
 ##############################################################################
 
 host/buildvm_arch.h: $(DASM_DASC) $(DASM_DEP) $(DASM_DIR)/*.lua
+	@command -v $(DASM) 2>/dev/null || { \
+	  echo "Error: Missing dependency (luajit) for bootstrapping the VM."; \
+	  echo "";                                                             \
+	  echo "Here are your options to build RaptorJIT:";                    \
+	  echo "  make reusevm     # copy reference VM from reusevm/";          \
+	  echo "  (install luajit) # satisfy the dependency";                   \
+	  echo "  nix-build        # use nix to satisfy the dependencies";      \
+	  echo "";                                                             \
+	  echo "Warning:";                                                     \
+	  echo "  Only reusevm when running a pristine copy of RaptorJIT from";\
+	  echo "  a repository that keeps the reference VM up-to-date.";       \
+	  echo "  (Otherwise you might mix some stale code into your build.)"; \
+	  echo;                                                                \
+	  exit 1;                                                              \
+	}
 	$(E) "DYNASM    $@"
 	$(Q)$(DASM) -o $@ $(DASM_DASC)
 
@@ -341,10 +351,6 @@ lj_recdef.h: $(BUILDVM_T) $(LJLIB_C)
 	$(E) "BUILDVM   $@"
 	$(Q)$(BUILDVM_X) -m recdef -o $@ $(LJLIB_C)
 
-$(LIB_VMDEF): $(BUILDVM_T) $(LJLIB_C)
-	$(E) "BUILDVM   $@"
-	$(Q)$(BUILDVM_X) -m vmdef -o $(LIB_VMDEFP) $(LJLIB_C)
-
 lj_folddef.h: $(BUILDVM_T) lj_opt_fold.c
 	$(E) "BUILDVM   $@"
 	$(Q)$(BUILDVM_X) -m folddef -o $@ lj_opt_fold.c
@@ -365,7 +371,7 @@ lj_folddef.h: $(BUILDVM_T) lj_opt_fold.c
 
 $(LUAJIT_O):
 	$(E) "CC        $@"
-	$(Q)$(TARGET_STCC) $(TARGET_ACFLAGS) -c -o $@ $<
+	$(Q)$(TARGET_STCC) $(TARGET_ACFLAGS) -c -o $@ luajit.c
 
 $(HOST_O): %.o: %.c
 	$(E) "HOSTCC    $@"
@@ -389,6 +395,6 @@ $(LUAJIT_SO): $(LJVMCORE_O)
 $(LUAJIT_T): $(TARGET_O) $(LUAJIT_O) $(TARGET_DEP)
 	$(E) "LINK      $@"
 	$(Q)$(TARGET_LD) $(TARGET_ALDFLAGS) -o $@ $(LUAJIT_O) $(TARGET_O) $(TARGET_ALIBS)
-	$(E) "OK        Successfully built LuaJIT"
+	$(E) "OK        Successfully built RaptorJIT"
 
 ##############################################################################
