@@ -733,8 +733,6 @@ end
 function randomseed (seed)
    seed = tonumber(seed)
    if seed then
-      local msg = 'Using deterministic random numbers, SNABB_RANDOM_SEED=%d.\n'
-      io.stderr:write(msg:format(seed))
       -- When setting a seed, use deterministic random bytes.
       random_bytes = random_bytes_from_math_random
    else
