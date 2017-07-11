@@ -730,16 +730,12 @@ function random_bytes_from_math_random (count)
    return bytes
 end
 
-local lastseed=0
 function randomseed (seed)
    seed = tonumber(seed)
    if seed then
+      local msg = 'Using deterministic random numbers, SNABB_RANDOM_SEED=%d.\n'
+      io.stderr:write(msg:format(seed))
       -- When setting a seed, use deterministic random bytes.
-      if seed ~= lastseed then
-        lastseed = seed
-        local msg = 'Using deterministic random numbers, SNABB_RANDOM_SEED=%d.\n'
-        io.stderr:write(msg:format(seed))
-      end
       random_bytes = random_bytes_from_math_random
    else
       -- Otherwise use /dev/urandom.
