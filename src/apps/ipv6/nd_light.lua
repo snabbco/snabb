@@ -127,7 +127,7 @@ function _new (self, conf)
                     return(ns:target_eq(conf.local_ip))
                  end
    self._match_na = function(na)
-                    return(na:target_eq(conf.next_hop) and na:solicited())
+                    return(na:target_eq(conf.next_hop) and na:solicited() == 1)
                  end
 
    -- Prepare packet for solicitation of next hop
