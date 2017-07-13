@@ -629,10 +629,12 @@ local function selftest_aux(type, pseudowire_config, local_mac, remote_mac)
    local c = config.new()
    local pcap_base = "program/l2vpn/selftest/"
    local pcap_type = pcap_base..type
-   local nd_static = require("apps.ipv6.nd_static").nd_static
-   config.app(c, "nd", nd_static,
-              { local_mac = ethernet:pton(local_mac),
-                remote_mac = ethernet:pton(remote_mac)})
+   local nd_light = require("apps.ipv6.nd_light").nd_light
+   config.app(c, "nd", nd_light,
+              { local_mac = local_mac,
+                remote_mac = remote_mac,
+                local_ip = "::",
+                next_hop = "::" })
    config.app(c, "from_uplink", pcap.PcapReader, pcap_type.."-uplink.cap.input")
    config.app(c, "from_ac", pcap.PcapReader, pcap_base.."ac.cap.input")
    config.app(c, "to_ac", pcap.PcapWriter, pcap_type.."-ac.cap.output")
@@ -649,12 +651,12 @@ local function selftest_aux(type, pseudowire_config, local_mac, remote_mac)
    app.main({duration = 1})
    local ok = true
    if (io.open(pcap_type.."-ac.cap.output"):read('*a') ~=
- io.open(pcap_type.."-ac.cap.expect"):read('*a')) then
+       io.open(pcap_type.."-ac.cap.expect"):read('*a')) then
       print('tunnel '..type..' decapsulation selftest failed.')
       ok = false
    end
    if (io.open(pcap_type.."-uplink.cap.output"):read('*a') ~=
- io.open(pcap_type.."-uplink.cap.expect"):read('*a')) then
+       io.open(pcap_type.."-uplink.cap.expect"):read('*a')) then
       print('tunnel '..type..' encapsulation selftest failed.')
       ok = false
    end

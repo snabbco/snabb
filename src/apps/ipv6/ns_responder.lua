@@ -21,30 +21,18 @@ local filter = require("lib.pcap.filter")
 ns_responder = subClass(nil)
 ns_responder._name = "ipv6 neighbor solicitation responder"
 
-function _new (self, config)
-   self._config = config
-   self._match_ns = function(ns)
-      return(ns:target_eq(config.local_ip))
-   end
-   self._eth:src(config.local_mac)
-   self._eth:dst(config.remote_mac)
-   return self
-end
-
-function ns_responder:new (config)
+function ns_responder:new(config)
    local o = ns_responder:superClass().new(self)
+   o._config = config
+   o._match_ns = function(ns)
+                    return(ns:target_eq(config.local_ip))
+                 end
    local filter, errmsg = filter:new("icmp6 and ip6[40] = 135")
    assert(filter, errmsg and ffi.string(errmsg))
    o._filter = filter
    o._dgram = datagram:new()
    packet.free(o._dgram:packet())
-   o._eth = ethernet:new({ type = 0x86dd })
-   o._header = o._eth:header()
-   return _new(o, config)
-end
-
-function ns_responder:reconfig (config)
-   return _new(self, config)
+   return o
 end
 
 local function process (self, p)
@@ -101,12 +89,8 @@ function ns_responder:push()
    local l_out = self.output.south
    if l_in and l_out then
       while not link.empty(l_in) do
-         local p = link.receive(l_in)
-         if self._header then
-            -- Insert the static MAC header
-            ffi.copy(p.data, self._header, 14)
-         end
-         link.transmit(l_out, p)
+         -- Pass everything on north -> south
+         link.transmit(l_out, link.receive(l_in))
       end
    end
    l_in = self.input.south

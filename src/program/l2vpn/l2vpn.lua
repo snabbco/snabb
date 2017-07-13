@@ -22,14 +22,8 @@
 -- the given configuration.  In non-trunking mode and without a L3
 -- configuration, initialization is finished and other apps can link
 -- to the interface via the "rx" and "tx" links of the driver.  For a
--- L3 interface, one of three possible neighbor discovery modules is
--- attached to the "rx" and "tx" links of the driver.  If dynamic ND
--- is selected in both directions, the nd_light module is selected.
--- If a static MAC address for the next-hop is configured and dynamic
--- inbound ND is selected, the ns_responder ND module is selected.  If
--- both sides use static MAC addresses, the nd_static module is
--- selected.  In either case, apps connect to the "north" links of the
--- ND module.
+-- L3 interface, the nd_light app is attached to the "rx" and "tx"
+-- links of the driver.
 --
 -- If the interface is in trunking mode, an instance of the VlanMux
 -- app from apps.vlan.vlan is instantiated and its "trunk" port is
@@ -79,7 +73,6 @@ local usage_msg = require("program.l2vpn.README_inc")
 local lib = require("core.lib")
 local app = require("core.app")
 local c_config = require("core.config")
-local nd = require("apps.ipv6.nd_light").nd_light
 local dispatch = require("program.l2vpn.dispatch").dispatch
 local pseudowire = require("program.l2vpn.pseudowire").pseudowire
 local ethernet = require("lib.protocol.ethernet")
@@ -127,8 +120,7 @@ local shm = require("core.shm")
 --                   ipv6 = {
 --                     address = <address>,
 --                     next_hop = <next_hop>,
---                     [ neighbor_mac = <neighbor_mac>,
---                       [ neighbor_nd = true | false, ] ]
+--                     [ next_hop_mac = <next_hop_mac> ]
 --                   }
 --                 } ]
 --              },
@@ -322,40 +314,25 @@ function parse_if (if_app_name, config)
       assert(ipv6.address, "Missing address")
       local c = { address = ipv6_pton(ipv6.address),
                   next_hop = ipv6_pton(ipv6.next_hop),
-                  neighbor_mac = ipv6.neighbor_mac and
-                     ether_pton(ipv6.neighbor_mac) or nil,
-                  neighbor_nd = ipv6.neighbor_nd,
+                  next_hop_mac = ipv6.next_hop_mac and
+                     ether_pton(ipv6.next_hop_mac) or nil,
                   nd = { name = nd_app_name } }
       -- FIXME: check fo uniqueness of subnet
       print(indent.."    Address: "..ipv6.address.."/64")
       print(indent.."    Next-Hop: "..ipv6.next_hop)
-      local nd_c = c.nd
-      local dummy_mac = ethernet:pton("00:00:00:00:00:00")
-      if c.neighbor_mac then
-         print(indent.."    Using static neighbor MAC address "
-                  ..ipv6.neighbor_mac)
-         if c.neighbor_nd then
-            print(indent.."    Using dynamic outbound ND")
-            nd_c.module = require("apps.ipv6.ns_responder").ns_responder
-            nd_c.config = { local_ip  = c.address,
-                            local_mac = dummy_mac,
-                            remote_mac = c.neighbor_mac }
-         else
-            print(indent.."    Dynamic outbound ND disabled")
-            nd_c.module = require("apps.ipv6.nd_static").nd_static
-            nd_c.config = { remote_mac  = c.neighbor_mac,
-                            local_mac = dummy_mac }
-         end
+      if c.next_hop_mac then
+         print(indent.."    Next-Hop MAC address: "..ipv6.next_hop_mac)
       else
          assert(ipv6.next_hop, "Missing next-hop")
-         print(indent.."    Using dynamic ND")
-         nd_c.module = nd
-         nd_c.config = { local_ip  = ipv6.address,
-                         local_mac = dummy_mac,
-                         next_hop = ipv6.next_hop,
-                         quiet = true }
       end
-      nd_c.links = { l3_links.output.." -> "..c.nd.name..".south",
+      local nd_c = c.nd
+      c.nd.module = require("apps.ipv6.nd_light").nd_light
+      c.nd.config = { local_ip  = ipv6.address,
+                      local_mac = ethernet:pton("00:00:00:00:00:00"),
+                      remote_mac = c.next_hop_mac,
+                      next_hop = ipv6.next_hop,
+                      quiet = true }
+      c.nd.links = { l3_links.output.." -> "..c.nd.name..".south",
                      c.nd.name..".south -> "..l3_links.input }
       return(c)
    end
