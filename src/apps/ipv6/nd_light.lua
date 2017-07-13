@@ -52,6 +52,7 @@ nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
 nd_light.config = {
    local_mac = {required=true},
+   remote_mac = {},
    local_ip = {required=true},
    next_hop =  {required=true},
    delay = {default=1000},
@@ -84,10 +85,11 @@ nd_light.shm = {
 --                a Lus string of length 16.
 --   next_hop   IPv6 address of next-hop for all packets to south.  Accepted
 --              formats as for local_ip.
+--   remote_mac Optional MAC address of next_hop in case dynamic ND is not
+--              available on the link
 --   delay      NS retransmit delay in ms (default 1000ms)
 --   retrans    Number of NS retransmits (default 10)
-local function check_ip_address(ip, desc)
-   assert(ip, "nd_light: missing "..desc.." IP address")
+local function check_ip_address (ip, desc)
    if type(ip) == "string" and string.len(ip) ~= 16 then
       ip = ipv6:pton(ip)
    else
@@ -98,16 +100,27 @@ local function check_ip_address(ip, desc)
    return ip
 end
 
-function _new (self, conf)
-   if type(conf.local_mac) == "string" and string.len(conf.local_mac) ~= 6 then
-      conf.local_mac = ethernet:pton(conf.local_mac)
+local function check_mac_address (mac, desc)
+   if type(mac) == "string" and string.len(mac) ~= 6 then
+      mac = ethernet:pton(mac)
    else
-      assert(type(conf.local_mac) == "cdata",
-             "nd_light: invalid type for local MAC address, expected cdata, got "
-                ..type(conf.local_mac))
+      assert(type(mac) == "cdata",
+             "nd_light: invalid type of "..desc.." MAC address, expected cdata, got "
+                ..type(mac))
    end
+   return mac
+end
+
+function _new (self, conf)
    conf.local_ip = check_ip_address(conf.local_ip, "local")
    conf.next_hop = check_ip_address(conf.next_hop, "next-hop")
+   conf.local_mac = check_mac_address(conf.local_mac, "local")
+   if conf.remote_mac then
+      conf.remote_mac = check_mac_address(conf.remote_mac, "remote")
+      self._eth_header = ethernet:new({ src = conf.local_mac,
+                                        dst = conf.remote_mac,
+                                        type = 0x86dd })
+   end
 
    self._config = conf
    self._match_ns = function(ns)
@@ -321,7 +334,7 @@ local function from_south (self, p)
 end
 
 function nd_light:push ()
-   if self._next_hop.nsent == 0 then
+   if self._next_hop.nsent == 0 and self._eth_header == nil then
       -- Kick off address resolution
       self._next_hop.timer_cb()
    end

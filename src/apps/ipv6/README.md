@@ -37,6 +37,14 @@ following keys are defined:
 
 *Required*. Local MAC address as a string or in binary representation.
 
+— Key **remote_mac**
+
+*Optional*. MAC address of **next_hop** address as a string or in
+binary representation.  If this option is present, the `nd_light` app
+does not perform neighbor solicitation for the **next_hop** address
+and uses **remote_mac** as the MAC address associated with
+**next_hop**.
+
 — Key **local_ip**
 
 *Required*. Local IPv6 address as a string or in binary representation.
