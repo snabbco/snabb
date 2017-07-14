@@ -475,6 +475,8 @@ LJCORE_O= lj_gc.o lj_err.o lj_char.o lj_bc.o lj_obj.o lj_buf.o \
 	  lj_lib.o lj_alloc.o lib_aux.o \
 	  $(LJLIB_O) lib_init.o
 
+DWARF_DWO= lj_dwarf.dwo
+
 LJVMCORE_O= $(LJVM_O) $(LJCORE_O)
 LJVMCORE_DYNO= $(LJVMCORE_O:.o=_dyn.o)
 
@@ -566,7 +568,7 @@ E= @echo
 # Make targets.
 ##############################################################################
 
-default all:	$(TARGET_T)
+default all:	$(TARGET_T) $(DWARF_DWO)
 
 clean:
 	$(HOST_RM) $(ALL_RM)
@@ -654,6 +656,11 @@ $(LUAJIT_O):
 $(HOST_O): %.o: %.c
 	$(E) "HOSTCC    $@"
 	$(Q)$(HOST_CC) $(HOST_ACFLAGS) -c -o $@ $<
+
+$(DWARF_DWO): %.dwo: %.c
+	$(E) "CC(debug) $@"
+#       GCC because clang does not seem to produce decent debug info (?)
+	$(Q)gcc -g3 -gdwarf-4 -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
 
 include Makefile.dep
 
