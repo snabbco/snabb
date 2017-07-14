@@ -343,9 +343,11 @@ function Intel:new (conf)
       assert(byid.driver == Intel82599, "VMDq only supported on 82599")
       assert(self.macaddr, "MAC address must be set in VMDq mode")
 
-      -- for VMDq, make rxq relative to the pool number
+      -- for VMDq, make rxq/txq relative to the pool number
       assert(self.rxq >= 0 and self.rxq < 4, "rxqueue must be in 0..3")
       self.rxq = self.rxq + 4 * self.poolnum
+      assert(self.txq >= 0 and self.txq < 4, "txqueue must be in 0..3")
+      self.txq = self.txq + 4 * self.poolnum
 
       if self.driver == "Intel82599" then
          assert(self.poolnum < 32,
@@ -1352,8 +1354,8 @@ function Intel82599:vmdq_enable ()
    -- disable RSC (7.11)
    self.r.RFCTL:set(bits { RSC_Dis=5 })
 
-   -- 128 Tx Queues, 64 VMs (4.6.11.3.3)
-   self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=2 })
+   -- 128 Tx Queues, 32 VMs (4.6.11.3.3)
+   self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=3 })
 
    -- enable virtualization, replication enabled, disable default pool
    self.r.PFVTCTL(bits { VT_Ena=0, Rpl_En=30, DisDefPool=29 })
