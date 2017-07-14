@@ -574,16 +574,17 @@ function Intel:push ()
 
    while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
       local p = link.receive(li)
-      if p.length > self.mtu then
-         packet.free(p)
-         counter.add(self.shm.txdrop)
-      else
-         self.txdesc[self.tdt].address = tophysical(p.data)
-         self.txdesc[self.tdt].flags =
-            bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
-         self.txqueue[self.tdt] = p
-         self.tdt = self:ringnext(self.tdt)
-      end
+      -- NB: see comment in intel10g for why this is commented out,
+      --     the rest of the loop body goes in an else branch
+      --if p.length > self.mtu then
+      --   packet.free(p)
+      --   counter.add(self.shm.txdrop)
+      --end
+      self.txdesc[self.tdt].address = tophysical(p.data)
+      self.txdesc[self.tdt].flags =
+         bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
+      self.txqueue[self.tdt] = p
+      self.tdt = self:ringnext(self.tdt)
    end
    -- Reclaim transmit contexts
    local cursor = self.tdh
