@@ -9,6 +9,7 @@ local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
 local lwaftr     = require("apps.lwaftr.lwaftr")
+local lwutil     = require("apps.lwaftr.lwutil")
 local lwcounter  = require("apps.lwaftr.lwcounter")
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
@@ -18,11 +19,14 @@ local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
 local ndp        = require("apps.lwaftr.ndp")
 local vlan       = require("apps.vlan.vlan")
 local numa       = require("lib.numa")
+local cltable    = require("lib.cltable")
 local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local S          = require("syscall")
 local engine     = require("core.app")
+
+
 
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
 require('lib.yang.schema').set_default_capabilities(capabilities)
@@ -31,9 +35,22 @@ local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
 end
 
-function lwaftr_app(c, conf)
-   assert(type(conf) == 'table')
+-- Checks the existance and NUMA affinity of PCI devices
+-- NB: "nil" can be passed in and will be siliently ignored.
+local function validate_pci_devices(...)
+   for device in pairs(...) do
+      if device then
+         assert(lwutil.nic_exists(address),
+                ("Could not locate PCI device '%s'"):format(address))
+         numa.check_affinity_for_pci_addresses(address)
+      end
+   end
+end
 
+-- Temporary function to validate that there is only a single instance.
+-- In the future this should be remove in favour of simply configuring
+-- multiple instqances when specified.
+function temp_validate_configuration()
    -- Validate and figure out the device to use. This assumes for now that there
    -- is only one instance configured with one queue. This will change come
    -- full multiprocessing support.
@@ -48,16 +65,16 @@ function lwaftr_app(c, conf)
    assert(
       table_len(conf.softwire_config.instance[device].queue.values) == 1,
       "Only one queue is supported in '/softwire-config/instance/queue'")
-   local new_config = lwaftr.select_instance(conf, device)
+end
 
-   local external_interface = new_config.softwire_config.external_interface
-   local internal_interface = new_config.softwire_config.internal_interface
+function lwaftr_app(c, conf)
+   assert(type(conf) == 'table')
+
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
 
    -- If this is modified, please remember to modify the config_arg below.
-   local lwaftr_class = lwaftr.LwAftr
-   lwaftr_class.config_arg = "conf"
+   local inst_configs = lwutil.produce_instance_configs(conf)
 
    -- Claim the name if one is defined.
    local function switch_names(config)
@@ -75,61 +92,73 @@ function lwaftr_app(c, conf)
          assert(success, err)
       end
    end
-   switch_names(new_config)
+   switch_names(conf)
+
+   -- We need to verify there is only one instance for now.
+   local device, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
+
+   -- Global interfaces
+   local gexternal_interface = lwaftr_config.softwire_config.external_interface
+   local ginternal_interface = lwaftr_config.softwire_config.internal_interface
+
+   -- Instance specific interfaces
+   local iexternal_interface = queue.external_interface
+   local iinternal_interface = queue.internal_interface
 
    config.app(c, "reassemblerv4", ipv4_apps.Reassembler,
               { max_ipv4_reassembly_packets =
-                   external_interface.reassembly.max_packets,
+                   gexternal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =
-                   external_interface.reassembly.max_fragments_per_packet })
+                   gexternal_interface.reassembly.max_fragments_per_packet })
    config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6,
               { max_ipv6_reassembly_packets =
-                   internal_interface.reassembly.max_packets,
+                   ginternal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =
-                   internal_interface.reassembly.max_fragments_per_packet })
+                   ginternal_interface.reassembly.max_fragments_per_packet })
    config.app(c, "icmpechov4", ipv4_apps.ICMPEcho,
-              { address = convert_ipv4(external_interface.ip) })
+              { address = convert_ipv4(iexternal_interface.ip) })
    config.app(c, "icmpechov6", ipv6_apps.ICMPEcho,
-              { address = internal_interface.ip })
-   config.app(c, "lwaftr", lwaftr_class, {conf=conf, device=device})
+              { address = iinternal_interface.ip })
+   config.app(c, "lwaftr", lwaftr.LwAftr, lwaftr_config)
    config.app(c, "fragmenterv4", ipv4_apps.Fragmenter,
-              { mtu=external_interface.mtu })
+              { mtu=gexternal_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
-              { mtu=internal_interface.mtu })
+              { mtu=ginternal_interface.mtu })
    config.app(c, "ndp", ndp.NDP,
-              { self_ip = internal_interface.ip,
-                self_mac = internal_interface.mac,
-                next_mac = internal_interface.next_hop.mac,
-                next_ip = internal_interface.next_hop.ip })
+              { self_ip = iinternal_interface.ip,
+                self_mac = iinternal_interface.mac,
+                next_mac = iinternal_interface.next_hop.mac,
+                next_ip = iinternal_interface.next_hop.ip })
    config.app(c, "arp", arp.ARP,
-              { self_ip = convert_ipv4(external_interface.ip),
-                self_mac = external_interface.mac,
-                next_mac = external_interface.next_hop.mac,
-                next_ip = convert_ipv4(external_interface.next_hop.ip) })
+              { self_ip = convert_ipv4(iexternal_interface.ip),
+                self_mac = iexternal_interface.mac,
+                next_mac = iexternal_interface.next_hop.mac,
+                next_ip = convert_ipv4(iexternal_interface.next_hop.ip) })
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
    local preprocessing_apps_v6  = { "reassemblerv6" }
    local postprocessing_apps_v4  = { "fragmenterv4" }
    local postprocessing_apps_v6  = { "fragmenterv6" }
 
-   if external_interface.ingress_filter then
+   if gexternal_interface.ingress_filter then
       config.app(c, "ingress_filterv4", PcapFilter,
-                 { filter = external_interface.ingress_filter })
+                 { filter = gexternal_interface.ingress_filter })
       append(preprocessing_apps_v4, "ingress_filterv4")
    end
-   if internal_interface.ingress_filter then
+   if ginternal_interface.ingress_filter then
       config.app(c, "ingress_filterv6", PcapFilter,
-                 { filter = internal_interface.ingress_filter })
+                 { filter = ginternal_interface.ingress_filter })
       append(preprocessing_apps_v6, "ingress_filterv6")
    end
-   if external_interface.egress_filter then
+   if gexternal_interface.egress_filter then
       config.app(c, "egress_filterv4", PcapFilter,
-                 { filter = external_interface.egress_filter })
+                 { filter = gexternal_interface.egress_filter })
       prepend(postprocessing_apps_v4, "egress_filterv4")
    end
-   if internal_interface.egress_filter then
+   if ginternal_interface.egress_filter then
       config.app(c, "egress_filterv6", PcapFilter,
-                 { filter = internal_interface.egress_filter })
+                 { filter = ginternal_interface.egress_filter })
       prepend(postprocessing_apps_v6, "egress_filterv6")
    end
 
@@ -151,7 +180,7 @@ function lwaftr_app(c, conf)
    set_postprocessors(c, "lwaftr.v6", postprocessing_apps_v6)
    set_postprocessors(c, "lwaftr.v4", postprocessing_apps_v4)
 
-   return device, new_config.softwire_config.external_interface.device
+   return device, lwaftr_config.softwire_config.external_interface.device
 end
 
 local function link_apps(c, apps)
@@ -200,6 +229,7 @@ end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name)
    local v4_pci, v6_pci = lwaftr_app(c, conf)
+   validate_pci_devices(v4_pci, v6_pci)
 
    config.app(c, v4_nic_name, Intel82599, {
       pciaddr=v4_pci,
@@ -220,6 +250,7 @@ end
 
 function load_on_a_stick(c, conf, args)
    local pciaddr = lwaftr_app(c, conf)
+   validate_pci_devices(pciaddr)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.mirror
 
@@ -264,6 +295,7 @@ end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
    local v4_pci, v6_pci = lwaftr_app(c, conf)
+   validate_pci_devices(v4_pci, v6_pci)
    config.app(c, v4_nic_name, VirtioNet, {
       pciaddr=v4_pci,
       vlan=external_if.vlan_tag,
@@ -512,7 +544,6 @@ function apply_scheduling(opts)
       if not success then fatal(err) end
       print("Bound data plane to CPU:", opts.cpu)
    end
-   numa.check_affinity_for_pci_addresses(opts.pci_addrs)
    if opts.ingress_drop_monitor then
       local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
       timer.activate(mon:timer())
