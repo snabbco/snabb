@@ -5,10 +5,8 @@ module(..., package.seeall)
 local now      = require("core.app").now
 local lib      = require("core.lib")
 local link     = require("core.link")
-local cache    = require("apps.ipfix.cache")
+local ipfix    = require("apps.ipfix.ipfix")
 local V4V6     = require("apps.lwaftr.V4V6")
-local meter    = require("apps.ipfix.meter")
-local exporter = require("apps.ipfix.export")
 local numa     = require("lib.numa")
 
 -- apps that can be used as an input or output for the exporter
@@ -135,7 +133,7 @@ function run (args)
    local in_link, in_app   = in_out_apps[input_type](args[1])
    local out_link, out_app = in_out_apps[output_type](args[2])
 
-   local flow_cache      = cache.FlowCache:new({})
+   local flow_cache      = ipfix.FlowCache:new({})
    local meter_config    = { cache = flow_cache }
    local exporter_config = { cache = flow_cache,
                              active_timeout = active_timeout,
@@ -151,8 +149,8 @@ function run (args)
    config.app(c, "source", unpack(in_app))
    config.app(c, "sink", unpack(out_app))
    config.app(c, "splitter", V4V6.V4V6, {})
-   config.app(c, "meter", meter.FlowMeter, meter_config)
-   config.app(c, "exporter", exporter.FlowExporter, exporter_config)
+   config.app(c, "meter", ipfix.FlowMeter, meter_config)
+   config.app(c, "exporter", ipfix.FlowExporter, exporter_config)
 
    config.link(c, "source." .. in_link.output .. " -> splitter.input")
    config.link(c, "splitter.v4 -> meter.v4")
