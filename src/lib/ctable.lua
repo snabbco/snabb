@@ -611,9 +611,9 @@ function selftest()
    end
 
    for i=1,2 do
-      -- In this case we know max_displacement is 8.  Assert here so that
+      -- max_displacement should be rather small.  Assert here so that
       -- we can detect any future deviation or regression.
-      assert(ctab.max_displacement == 8)
+      assert(ctab.max_displacement < 15, ctab.max_displacement)
 
       ctab:selfcheck()
 
