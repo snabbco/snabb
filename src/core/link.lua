@@ -35,6 +35,15 @@ function new (name)
    return r
 end
 
+function new_anonymous ()
+   local r = ffi.new(link_t)
+   for _, c in ipairs(provided_counters) do
+      r.stats[c] = counter.create_anonymous()
+   end
+   counter.set(r.stats.dtime, C.get_unix_time())
+   return r
+end
+
 function free (r, name)
    for _, c in ipairs(provided_counters) do
       counter.delete("links/"..name.."/"..c..".counter")

@@ -56,6 +56,12 @@ function create (name, initval)
    return private[n]
 end
 
+function create_anonymous (initval)
+   local c = counter_t()
+   if initval ~= nil then set(c, initval) end
+   return c
+end
+
 function open (name)
    if numbers[name] then return private[numbers[name]] end
    local n = #public+1
