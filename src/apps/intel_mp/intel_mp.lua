@@ -349,6 +349,9 @@ function Intel:new (conf)
       assert(self.txq >= 0 and self.txq < 4, "txqueue must be in 0..3")
       self.txq = self.txq + 4 * self.poolnum
 
+      -- max queue number is different in VMDq mode
+      self.max_q = 128
+
       if self.driver == "Intel82599" then
          assert(self.poolnum < 32,
                 "Pool overflow: Intel 82599 supports up to 32 VMDq pools")
