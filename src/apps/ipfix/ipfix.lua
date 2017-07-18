@@ -809,7 +809,11 @@ function selftest()
    local flows = FlowCache:new({})
    local nf    = FlowMeter:new({ cache = flows })
 
-   -- test helper that processes a packet with some given fields
+   -- Mock input and output.
+   nf.input = { v4 = link.new_anonymous(), v6 = link.new_anonymous() }
+   nf.output = { output = link.new_anonymous() }
+
+   -- Test helper that supplies a packet with some given fields.
    local function test_packet(is_ipv6, src_ip, dst_ip, src_port, dst_port)
       local proto
       if is_ipv6 then
@@ -842,16 +846,12 @@ function selftest()
       dg:push(ip)
       dg:push(eth)
 
-      local pkt = dg:packet()
-      if is_ipv6 then
-         nf:process_ipv6_packet(pkt, 0) -- dummy timestamp
-      else
-         nf:process_ipv4_packet(pkt, 0) -- dummy timestamp
-      end
-      packet.free(pkt)
+      local input = is_ipv6 and nf.input.v6 or nf.input.v4
+      link.transmit(input, dg:packet())
+      nf:push()
    end
 
-   -- populate with some known flows
+   -- Populate with some known flows.
    test_packet(false, "192.168.1.1", "192.168.1.25", 9999, 80)
    test_packet(false, "192.168.1.25", "192.168.1.1", 3653, 23552)
    test_packet(false, "192.168.1.25", "8.8.8.8", 58342, 53)
