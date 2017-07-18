@@ -347,17 +347,17 @@ function Intel:new (conf)
       assert(self.macaddr, "MAC address must be set in VMDq mode")
 
       -- for VMDq, make rxq/txq relative to the pool number
-      assert(self.rxq >= 0 and self.rxq < 4, "rxqueue must be in 0..3")
-      self.rxq = self.rxq + 4 * self.poolnum
-      assert(self.txq >= 0 and self.txq < 4, "txqueue must be in 0..3")
-      self.txq = self.txq + 4 * self.poolnum
+      assert(self.rxq >= 0 and self.rxq < 2, "rxqueue must be in 0..1")
+      self.rxq = self.rxq + 2 * self.poolnum
+      assert(self.txq >= 0 and self.txq < 1, "txqueue must be in 0..1")
+      self.txq = self.txq + 2 * self.poolnum
 
       -- max queue number is different in VMDq mode
       self.max_q = 128
 
       if self.driver == "Intel82599" then
-         assert(self.poolnum < 32,
-                "Pool overflow: Intel 82599 supports up to 32 VMDq pools")
+         assert(self.poolnum < 64,
+                "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
       elseif self.driver == "Intel1g" then
          assert(self.poolnum < 8,
                 "Pool overflow: Intel i350 supports up to 8 VMDq pools")
@@ -460,8 +460,8 @@ function Intel:init_rx_q ()
 
    -- VMDq pool state (4.6.10.1.4)
    if self.vmdq then
-      -- packet splitting none, enable 4 RSS queues per pool
-      self.r.PSRTYPE[self.poolnum](bits { RQPL=30 })
+      -- packet splitting none, enable 2 RSS queues per pool
+      self.r.PSRTYPE[self.poolnum](bits { RQPL=29 })
       -- multicast promiscuous, broadcast accept, accept untagged pkts
       self.r.PFVML2FLT[self.poolnum]:set(bits { MPE=28, BAM=27, AUPE=24 })
    end
@@ -543,7 +543,7 @@ function Intel:init_tx_q ()                               -- 4.5.10
       -- set baseline value for credit refill for tx bandwidth algorithm
       self.r.RTTDT1C(0x80)
       -- enables packet Tx for this VF's pool
-      self.r.PFVFTE[math.floor(self.poolnum/33)]:set(bits{VFTE=self.poolnum%32})
+      self.r.PFVFTE[math.floor(self.poolnum/32)]:set(bits{VFTE=self.poolnum%32})
    end
 
    if self.r.DMATXCTL then
@@ -676,7 +676,7 @@ function Intel:rss_key ()
    end
 end
 
--- Set RSS redirection table, which has 32 * 4 entries which contain
+-- Set RSS redirection table, which has 64 * 2 entries which contain
 -- RSS indices, the lower 4 bits (or fewer) of which are used to
 -- select an RSS queue.
 --
@@ -685,8 +685,8 @@ function Intel:rss_tab (newtab)
    local current = {}
    local pos = 0
 
-   for i=0,31,1 do
-      for j=0,3,1 do
+   for i=0,63,1 do
+      for j=0,1,1 do
          current[self.r.RETA[i]:byte(j)] = 1
          if newtab ~= nil then
             local new = newtab[pos%#newtab+1]
@@ -936,10 +936,10 @@ function Intel:set_mirror ()
          local bm0 = self.r.PFMRVM[mirror_ndx]()
          local bm1 = self.r.PFMRVM[mirror_ndx+4]()
          for _, pool in ipairs(want_mirror.pool) do
-            if pool <= 32 then
+            if pool <= 64 then
                bm0 = bor(lshift(1, pool), bm0)
             else
-               bm1 = bor(lshift(1, pool-32), bm1)
+               bm1 = bor(lshift(1, pool-64), bm1)
             end
          end
          self.r.PFMRVM[mirror_ndx](bm0)
@@ -1189,7 +1189,11 @@ Intel82599.offsets = {
 }
 Intel82599.max_mac_addr = 127
 Intel82599.max_vlan = 64
-Intel82599.mrqc_bits = 0xA
+
+-- 1010 -> 32 pools, 4 RSS queues each
+-- 1011 -> 64 pools, 2 RSS queues each
+Intel82599.mrqc_bits = 0xB
+
 function Intel82599:link_status ()
    local mask = lshift(1, 30)
    return bit.band(self.r.LINKS(), mask) == mask
@@ -1363,15 +1367,14 @@ function Intel82599:vmdq_enable ()
    -- must be set prior to setting MTQC (7.2.1.2.1)
    self.r.RTTDCS:set(bits { ARBDIS=6 })
 
-   -- 1010 -> 32 pools, 4 RSS queues each
    self.r.MRQC:bits(0, 4, self.mrqc_bits)
 
    -- TODO: not sure this is needed, but it's in intel10g
    -- disable RSC (7.11)
    self.r.RFCTL:set(bits { RSC_Dis=5 })
 
-   -- 128 Tx Queues, 32 VMs (4.6.11.3.3)
-   self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=3 })
+   -- 128 Tx Queues, 64 VMs (4.6.11.3.3 and 8.2.3.9.15)
+   self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=2 })
 
    -- enable virtualization, replication enabled, disable default pool
    self.r.PFVTCTL(bits { VT_Ena=0, Rpl_En=30, DisDefPool=29 })
