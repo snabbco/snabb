@@ -258,36 +258,71 @@ local template_v6 = make_template_info {
               "ipClassOfService" }
 }
 
-local Cache = {}
+-- RFC5153 recommends a 10-minute template refresh configurable from
+-- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
+local template_interval = 600
 
-function Cache:new(config, key_t, value_t)
-   assert(config, "expected configuration table")
+-- Pad length to multiple of 4.
+local max_padding = 3
+local function padded_length(len)
+   return bit.band(len + max_padding, bit.bnot(max_padding))
+end
 
-   local o = { -- TODO: compute the default cache value
-               --       based on expected flow amounts?
-               cache_size = config.cache_size or 20000,
-               -- expired flows go into this array
-               -- TODO: perhaps a ring buffer is a better idea here
-               expired = {} }
+-- Sadly, for NetFlow v9, the header needs to know the number of
+-- records in a message.  So before flushing out a message, an
+-- FlowSet will append the record count, and then the exporter
+-- needs to slurp this data off before adding the NetFlow/IPFIX
+-- header.
+local uint16_ptr_t = ffi.typeof('uint16_t*')
+local function add_record_count(pkt, count)
+   pkt.length = pkt.length + 2
+   ffi.cast(uint16_ptr_t, pkt.data + pkt.length)[-1] = count
+end
+local function remove_record_count(pkt, count)
+   local count = ffi.cast(uint16_ptr_t, pkt.data + pkt.length)[-1]
+   pkt.length = pkt.length - 2
+   return count
+end
 
+FlowSet = {}
+
+function FlowSet:new (template, mtu, version, cache_size, idle_timeout, active_timeout)
+   local o = {template=template, idle_timeout=idle_timeout, active_timeout=active_timeout}
+   local template_ids = {[9]=V9_TEMPLATE_ID, [10]=V10_TEMPLATE_ID}
+   o.template_id = assert(template_ids[version], 'bad version: '..version)
+
+   -- Accumulate outgoing records in a packet.  Although it would be
+   -- possible to be more efficient, packing all outgoing records into
+   -- a central record accumulator for all types of data and template
+   -- records, the old NetFlow v9 standard doesn't support mixing
+   -- different types of records in the same export packet.
+   o.record_buffer = packet.allocate()
+   o.record_count = 0
+   -- Max number of records + padding that fit in packet, with set header.
+   local avail = padded_length(mtu - ffi.sizeof(set_header_t) - max_padding)
+   o.max_record_count = math.floor(avail / o.template.data_len)
+
+   -- TODO: Compute the default cache value based on expected flow
+   -- amounts?
+   o.cache_size = cache_size or 20000
    -- how much of the cache to traverse when iterating
    o.stride = math.ceil(o.cache_size / 1000)
 
    local params = {
-      key_type = key_t,
-      value_type = value_t,
+      key_type = template.key_t,
+      value_type = template.value_t,
       max_occupancy_rate = 0.4,
       initial_size = math.ceil(o.cache_size / 0.4),
    }
 
-   o.preallocated_key = key_t()
-   o.preallocated_value = value_t()
+   o.preallocated_key = template.key_t()
+   o.preallocated_value = template.value_t()
    o.table = ctable.new(params)
 
    return setmetatable(o, { __index = self })
 end
 
-function Cache:iterate()
+function FlowSet:iterate()
    -- use the underlying ctable's iterator, but restrict the max stride
    -- for each use of the iterator
    local next_entry = self.next_entry or self.table:iterate()
@@ -306,87 +341,11 @@ function Cache:iterate()
    return next_entry, max_entry, last_entry
 end
 
-function Cache:remove(flow_key)
-   self.table:remove(flow_key)
+function FlowSet:remove(key)
+   self.table:remove(key)
 end
 
-function Cache:expire_record(key, record, active)
-   -- for active expiry, we keep the record around in the cache
-   -- so we need a copy that won't be modified
-   if active then
-      -- FIXME
-      local copied_record = ffi.new("struct flow_record")
-      ffi.copy(copied_record, record, ffi.sizeof("struct flow_record"))
-      table.insert(self.expired, {key = key, value = copied_record})
-   else
-      table.insert(self.expired, {key = key, value = record})
-   end
-end
-
-function Cache:get_expired()
-   local ret = self.expired
-   self.expired = {}
-   return ret
-end
-
-FlowCache = {}
-
-function FlowCache:new(config)
-   assert(config, "expected configuration table")
-   local o = {}
-   o.v4 = Cache:new(config, template_v4.key_t, template_v4.value_t)
-   o.v6 = Cache:new(config, template_v6.key_t, template_v6.value_t)
-   return setmetatable(o, { __index = self })
-end
-
--- RFC5153 recommends a 10-minute template refresh configurable from
--- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
-local template_interval = 600
-
--- Pad length to multiple of 4.
-local max_padding = 3
-local function padded_length(len)
-   return bit.band(len + max_padding, bit.bnot(max_padding))
-end
-
--- Sadly, for NetFlow v9, the header needs to know the number of
--- records in a message.  So before flushing out a message, an
--- Exporter will append the record count, and then the FlowExporter
--- needs to slurp this data off before adding the NetFlow/IPFIX
--- header.
-local uint16_ptr_t = ffi.typeof('uint16_t*')
-local function add_record_count(pkt, count)
-   pkt.length = pkt.length + 2
-   ffi.cast(uint16_ptr_t, pkt.data + pkt.length)[-1] = count
-end
-local function remove_record_count(pkt, count)
-   local count = ffi.cast(uint16_ptr_t, pkt.data + pkt.length)[-1]
-   pkt.length = pkt.length - 2
-   return count
-end
-
-Exporter = {}
-
-function Exporter:new (template, mtu, version)
-   local o = {template=template}
-   local template_ids = {[9]=V9_TEMPLATE_ID, [10]=V10_TEMPLATE_ID}
-   o.template_id = assert(template_ids[version], 'bad version: '..version)
-
-   -- Accumulate outgoing records in a packet.  Although it would be
-   -- possible to be more efficient, packing all outgoing records into
-   -- a central record accumulator for all types of data and template
-   -- records, the old NetFlow v9 standard doesn't support mixing
-   -- different types of records in the same export packet.
-   o.record_buffer = packet.allocate()
-   o.record_count = 0
-   -- Max number of records + padding that fit in packet, with set header.
-   local avail = padded_length(mtu - ffi.sizeof(set_header_t) - max_padding)
-   o.max_record_count = math.floor(avail / o.template.data_len)
-
-   return setmetatable(o, { __index = self })
-end
-
-function Exporter:append_template_record(pkt)
+function FlowSet:append_template_record(pkt)
    -- Write the header and then the template record contents for each
    -- template.
    local header = ffi.cast(template_header_ptr_t, pkt.data + pkt.length)
@@ -401,7 +360,7 @@ end
 
 -- Given a flow exporter & an array of ctable entries, construct flow
 -- record packet(s) and transmit them
-function Exporter:add_data_record(record, out)
+function FlowSet:add_data_record(record, out)
    local pkt = self.record_buffer
    local record_len = self.template.data_len
    ptr = pkt.data + pkt.length
@@ -415,7 +374,7 @@ function Exporter:add_data_record(record, out)
    end
 end
 
-function Exporter:flush_data_records(out)
+function FlowSet:flush_data_records(out)
    if self.record_count == 0 then return end
 
    -- Pop off the now-full record buffer and replace it with a fresh one.
@@ -437,11 +396,73 @@ function Exporter:flush_data_records(out)
    link.transmit(out, pkt)
 end
 
+-- print debugging messages for flow expiration
+function FlowSet:debug_expire(entry, timestamp, msg)
+   if debug then
+      local key = entry.key
+      local src_ip, dst_ip
+
+      if key.is_ipv6 == 1 then
+         src_ip = ipv6:ntop(key.sourceIPv6Address)
+         dst_ip = ipv6:ntop(key.destinationIPv6Address)
+      else
+         src_ip = ipv4:ntop(key.sourceIPv4Address)
+         dst_ip = ipv4:ntop(key.destinationIPv4Address)
+      end
+
+      local time_delta
+      if msg == "idle" then
+         time_delta = tonumber(entry.value.flowEndMilliseconds - self.boot_time) / 1000
+      else
+         time_delta = tonumber(entry.value.flowStartMilliseconds - self.boot_time) / 1000
+      end
+
+      util.fe_debug("exp [%s, %ds] %s (%d) -> %s (%d) P:%d",
+                    msg,
+                    time_delta,
+                    src_ip,
+                    key.sourceTransportPort,
+                    dst_ip,
+                    key.destinationTransportPort,
+                    key.protocolIdentifier)
+   end
+end
+
+-- Walk through flow set to see if flow records need to be expired.
+-- Collect expired records and export them to the collector.
+function FlowSet:expire_records(out)
+   local timestamp = get_timestamp()
+   -- FIXME: remove these table allocations
+   local keys_to_remove = {}
+   for entry in self:iterate() do
+      if timestamp - entry.value.flowEndMilliseconds > self.idle_timeout then
+         self:debug_expire(entry, timestamp, "idle")
+         table.insert(keys_to_remove, entry.key)
+         -- Relying on key and value being contiguous.
+         self:add_data_record(entry.key, out)
+      elseif timestamp - entry.value.flowStartMilliseconds > self.active_timeout then
+         self:debug_expire(entry, timestamp, "active")
+         -- TODO: what should timers reset to?
+         entry.value.flowStartMilliseconds = timestamp
+         entry.value.flowEndMilliseconds = timestamp
+         entry.value.packetDeltaCount = 0
+         entry.value.octetDeltaCount = 0
+         self:add_data_record(entry.key, out)
+      end
+   end
+
+   self:flush_data_records(out)
+
+   -- FIXME: Remove flows as we go.
+   for _, key in ipairs(keys_to_remove) do
+      self.table:remove(key)
+   end
+end
+
 IPFIX = {}
 
 function IPFIX:new(config)
-   local o = { flows = assert(config.cache),
-               export_timer = nil,
+   local o = { export_timer = nil,
                idle_timeout = config.idle_timeout or 300,
                active_timeout = config.active_timeout or 120,
                -- sequence number to use for flow packets
@@ -483,8 +504,8 @@ function IPFIX:new(config)
    local ipfix_header_len = o.header_size
    local total_header_len = l4_header_len + l3_header_len + ipfix_header_len
    local payload_mtu = o.mtu - total_header_len
-   o.export_v4 = Exporter:new(template_v4, payload_mtu, o.version)
-   o.export_v6 = Exporter:new(template_v6, payload_mtu, o.version)
+   o.ipv4_flows = FlowSet:new(template_v4, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
+   o.ipv6_flows = FlowSet:new(template_v6, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
 
    self.outgoing_messages = link.new_anonymous()
 
@@ -493,8 +514,8 @@ end
 
 function IPFIX:send_template_records(out)
    local pkt = packet.allocate()
-   pkt = self.export_v4:append_template_record(pkt)
-   pkt = self.export_v6:append_template_record(pkt)
+   pkt = self.ipv4_flows:append_template_record(pkt)
+   pkt = self.ipv6_flows:append_template_record(pkt)
    add_record_count(pkt, 2)
    link.transmit(out, pkt)
 end
@@ -626,7 +647,7 @@ function IPFIX:process_ipv6_packet(pkt, timestamp)
    -- We could warn here.
    if get_ethernet_n_ethertype(l2_header) ~= n_ethertype_ipv6 then return end
 
-   local flows = self.flows.v6
+   local flows = self.ipv6_flows
    local flow_key = flows.preallocated_key
    local flow_record = flows.preallocated_value
    local l3_header = l2_header + ethernet_header_size
@@ -650,7 +671,7 @@ function IPFIX:process_ipv4_packet(pkt, timestamp)
    -- We could warn here.
    if get_ethernet_n_ethertype(l2_header) ~= n_ethertype_ipv4 then return end
 
-   local flows = self.flows.v4
+   local flows = self.ipv4_flows
    local flow_key = flows.preallocated_key
    local flow_record = flows.preallocated_value
    local l3_header = l2_header + ethernet_header_size
@@ -670,82 +691,16 @@ function IPFIX:process_ipv4_packet(pkt, timestamp)
    IPFIX:process_flow(flows, flow_key, flow_record, l4_header)
 end
 
--- print debugging messages for flow expiration
-function IPFIX:debug_expire(entry, timestamp, msg)
-   local ipv4 = require("lib.protocol.ipv4")
-   local ipv6 = require("lib.protocol.ipv6")
-
-   if debug then
-      local key = entry.key
-      local src_ip, dst_ip
-
-      if key.is_ipv6 == 1 then
-         src_ip = ipv6:ntop(key.sourceIPv6Address)
-         dst_ip = ipv6:ntop(key.destinationIPv6Address)
-      else
-         src_ip = ipv4:ntop(key.sourceIPv4Address)
-         dst_ip = ipv4:ntop(key.destinationIPv4Address)
-      end
-
-      local time_delta
-      if msg == "idle" then
-         time_delta = tonumber(entry.value.flowEndMilliseconds - self.boot_time) / 1000
-      else
-         time_delta = tonumber(entry.value.flowStartMilliseconds - self.boot_time) / 1000
-      end
-
-      util.fe_debug("exp [%s, %ds] %s (%d) -> %s (%d) P:%d",
-                    msg,
-                    time_delta,
-                    src_ip,
-                    key.sourceTransportPort,
-                    dst_ip,
-                    key.destinationTransportPort,
-                    key.protocolIdentifier)
-   end
-end
-
--- Walk through flow cache to see if flow records need to be expired.
--- Collect expired records and export them to the collector.
-function IPFIX:expire_records()
-   for _,proto in ipairs({'v4', 'v6'}) do
-      local timestamp = get_timestamp()
-      local keys_to_remove = {}
-      local timeout_records = {}
-      local to_export = {}
-      local flows = self.flows[proto]
-      for entry in flows:iterate() do
-         local record = entry.value
-
-         if timestamp - record.flowEndMilliseconds > self.idle_timeout then
-            self:debug_expire(entry, timestamp, "idle")
-            table.insert(keys_to_remove, entry.key)
-            flows:expire_record(entry.key, record, false)
-         elseif timestamp - record.flowStartMilliseconds > self.active_timeout then
-            self:debug_expire(entry, timestamp, "active")
-            table.insert(timeout_records, record)
-            flows:expire_record(entry.key, record, true)
-         end
-      end
-
-      -- remove idle timed out flows
-      for _, key in ipairs(keys_to_remove) do
-         flows:remove(key)
-      end
-
-      for _, record in ipairs(timeout_records) do
-         -- TODO: what should timers reset to?
-         record.flowStartMilliseconds = timestamp
-         record.flowEndMilliseconds = timestamp
-         record.packetDeltaCount = 0
-         record.octetDeltaCount = 0
-      end
-   end
-end
-
 function IPFIX:push()
    local v4, v6 = self.input.v4, self.input.v6
    local timestamp = get_timestamp()
+   assert(self.output.output, "missing output link")
+   local outgoing = self.outgoing_messages
+
+   if self.next_template_refresh < engine.now() then
+      self.next_template_refresh = engine.now() + template_interval
+      self:send_template_records(outgoing)
+   end
 
    if v4 then
       for i=1,link.nreadable(v4) do
@@ -763,26 +718,8 @@ function IPFIX:push()
       end
    end
 
-   self:expire_records()
-
-   assert(self.output.output, "missing output link")
-
-   local outgoing = self.outgoing_messages
-
-   if self.next_template_refresh < engine.now() then
-      self.next_template_refresh = engine.now() + template_interval
-      self:send_template_records(outgoing)
-   end
-
-   for _, record in ipairs(self.flows.v4:get_expired()) do
-      self.export_v4:add_data_record(record, outgoing)
-   end
-   self.export_v4:flush_data_records(outgoing)
-
-   for _, record in ipairs(self.flows.v6:get_expired()) do
-      self.export_v6:add_data_record(record, outgoing)
-   end
-   self.export_v6:flush_data_records(outgoing)
+   self.ipv4_flows:expire_records(outgoing)
+   self.ipv6_flows:expire_records(outgoing)
 
    for i=1,link.nreadable(outgoing) do
       local pkt = link.receive(outgoing)
@@ -794,9 +731,7 @@ end
 
 function selftest()
    print('selftest: apps.ipfix.ipfix')
-   local flows = FlowCache:new({})
-   local ipfix = IPFIX:new({ cache = flows,
-                             ipfix_version = 10,
+   local ipfix = IPFIX:new({ ipfix_version = 10,
                              exporter_mac = "00:11:22:33:44:55",
                              exporter_ip = "192.168.1.2",
                              collector_mac = "55:44:33:22:11:00",
@@ -851,10 +786,10 @@ function selftest()
    test_packet(false, "192.168.1.25", "8.8.8.8", 58342, 53)
    test_packet(false, "8.8.8.8", "192.168.1.25", 53, 58342)
    test_packet(true, "2001:4860:4860::8888", "2001:db8::ff00:42:8329", 53, 57777)
-   assert(flows.v4.table.occupancy == 4,
-          string.format("wrong number of v4 flows: %d", flows.v4.table.occupancy))
-   assert(flows.v6.table.occupancy == 1,
-          string.format("wrong number of v6 flows: %d", flows.v6.table.occupancy))
+   assert(ipfix.ipv4_flows.table.occupancy == 4,
+          string.format("wrong number of v4 flows: %d", ipfix.ipv4_flows.table.occupancy))
+   assert(ipfix.ipv6_flows.table.occupancy == 1,
+          string.format("wrong number of v6 flows: %d", ipfix.ipv6_flows.table.occupancy))
 
    -- do some packets with random data to test that it doesn't interfere
    for i=1, 100 do
@@ -865,14 +800,14 @@ function selftest()
                   math.random(1, 79))
    end
 
-   local key = flows.v4.preallocated_key
+   local key = ipfix.ipv4_flows.preallocated_key
    key.sourceIPv4Address = ipv4:pton("192.168.1.1")
    key.destinationIPv4Address = ipv4:pton("192.168.1.25")
    key.protocolIdentifier = IP_PROTO_UDP
    key.sourceTransportPort = 9999
    key.destinationTransportPort = 80
 
-   local result = flows.v4.table:lookup_ptr(key)
+   local result = ipfix.ipv4_flows.table:lookup_ptr(key)
    assert(result, "key not found")
    assert(result.value.packetDeltaCount == 1)
 
@@ -882,43 +817,42 @@ function selftest()
           string.format("wrong count: %d", tonumber(result.value.packetDeltaCount)))
 
    -- check the IPv6 key too
-   local key = flows.v6.preallocated_key
+   local key = ipfix.ipv6_flows.preallocated_key
    key.sourceIPv6Address = ipv6:pton("2001:4860:4860::8888")
    key.destinationIPv6Address = ipv6:pton("2001:db8::ff00:42:8329")
    key.protocolIdentifier = IP_PROTO_UDP
    key.sourceTransportPort = 53
    key.destinationTransportPort = 57777
 
-   local result = flows.v6.table:lookup_ptr(key)
+   local result = ipfix.ipv6_flows.table:lookup_ptr(key)
    assert(result, "key not found")
    assert(result.value.packetDeltaCount == 1)
 
    -- sanity check
-   flows.v4.table:selfcheck()
-   flows.v6.table:selfcheck()
+   ipfix.ipv4_flows.table:selfcheck()
+   ipfix.ipv6_flows.table:selfcheck()
 
-   local key = flows.v4.preallocated_key
-   key.sourceIPv4Address = ipv4:pton("192.168.1.1")
-   key.destinationIPv4Address = ipv4:pton("192.168.1.25")
+   local key = ipfix.ipv4_flows.preallocated_key
+   key.sourceIPv4Address = ipv4:pton("192.168.2.1")
+   key.destinationIPv4Address = ipv4:pton("192.168.2.25")
    key.protocolIdentifier = 17
    key.sourceTransportPort = 9999
    key.destinationTransportPort = 80
 
-   local value = flows.v4.preallocated_value
-   value.flowStartMilliseconds = get_timestamp()
+   local value = ipfix.ipv4_flows.preallocated_value
+   value.flowStartMilliseconds = get_timestamp() - 500e3
    value.flowEndMilliseconds = value.flowStartMilliseconds + 30
    value.packetDeltaCount = 5
    value.octetDeltaCount = 15
 
-   local record = ipfix.export_v4.template.record_t(key, value)
-   -- Mock expiry.
-   function ipfix.flows.v4:get_expired()
-      return { record }
-   end
+   -- Add value that should be immediately expired
+   ipfix.ipv4_flows.table:add(key, value)
 
    -- Template message; no data yet.
    assert(link.nreadable(ipfix.output.output) == 1)
-   ipfix:push()
+   -- Cause expiry.  By default we do 1/1000th of the table per push,
+   -- so this should be good.
+   for i=1,2000 do ipfix:push() end
    -- Template message and data message.
    assert(link.nreadable(ipfix.output.output) == 2)
 

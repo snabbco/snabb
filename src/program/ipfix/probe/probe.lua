@@ -133,9 +133,7 @@ function run (args)
    local in_link, in_app   = in_out_apps[input_type](args[1])
    local out_link, out_app = in_out_apps[output_type](args[2])
 
-   local flow_cache      = ipfix.FlowCache:new({})
-   local ipfix_config    = { cache = flow_cache,
-                             active_timeout = active_timeout,
+   local ipfix_config    = { active_timeout = active_timeout,
                              idle_timeout = idle_timeout,
                              ipfix_version = ipfix_version,
                              exporter_mac = host_mac,
