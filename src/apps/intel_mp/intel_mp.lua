@@ -673,8 +673,8 @@ function Intel:rss_tab (newtab)
    local current = {}
    local pos = 0
 
-   for i=0,63,1 do
-      for j=0,1,1 do
+   for i=0,31,1 do
+      for j=0,3,1 do
          current[self.r.RETA[i]:byte(j)] = 1
          if newtab ~= nil then
             local new = newtab[pos%#newtab+1]
