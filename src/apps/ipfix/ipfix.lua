@@ -59,126 +59,6 @@ local o_ipv6_dst_addr        = consts.o_ipv6_dst_addr
 --       (and timeouts should perhaps be more fine-grained)
 local export_interval = 60
 
--- Flow key & flow record FFI type definitions
---
--- see https://www.iana.org/assignments/ipfix/ipfix.xhtml for
--- information on the IEs for the flow key and record
---
-local ipv4_flow_key_t = ffi.typeof[[
-   struct {
-      uint8_t sourceIPv4Address[4];
-      uint8_t destinationIPv4Address[4];
-      uint8_t protocolIdentifier;
-      uint16_t sourceTransportPort;
-      uint16_t destinationTransportPort;
-   } __attribute__((packed))
-]]
-
-local ipv6_flow_key_t = ffi.typeof[[
-   struct {
-      uint8_t sourceIPv6Address[16];
-      uint8_t destinationIPv6Address[16];
-      uint8_t protocolIdentifier;
-      uint16_t sourceTransportPort;
-      uint16_t destinationTransportPort;
-   } __attribute__((packed))
-]]
-
-local flow_record_t = ffi.typeof[[
-   struct {
-      uint64_t flowStartMilliseconds;
-      uint64_t flowEndMilliseconds;
-      uint64_t packetDeltaCount;
-      uint64_t octetDeltaCount;
-      uint32_t ingressInterface;
-      uint32_t egressInterface;
-      uint32_t bgpPrevAdjacentAsNumber;
-      uint32_t bgpNextAdjacentAsNumber;
-      uint16_t tcpControlBits;
-      uint8_t ipClassOfService;
-   } __attribute__((packed))
-]]
-
-local Cache = {}
-
-function Cache:new(config, key_t)
-   assert(config, "expected configuration table")
-
-   local o = { -- TODO: compute the default cache value
-               --       based on expected flow amounts?
-               cache_size = config.cache_size or 20000,
-               -- expired flows go into this array
-               -- TODO: perhaps a ring buffer is a better idea here
-               expired = {} }
-
-   -- how much of the cache to traverse when iterating
-   o.stride = math.ceil(o.cache_size / 1000)
-
-   local params = {
-      key_type = key_t,
-      value_type = flow_record_t,
-      max_occupancy_rate = 0.4,
-      initial_size = math.ceil(o.cache_size / 0.4),
-   }
-
-   o.preallocated_key = key_t()
-   o.preallocated_value = flow_record_t()
-   o.table = ctable.new(params)
-
-   return setmetatable(o, { __index = self })
-end
-
-function Cache:iterate()
-   -- use the underlying ctable's iterator, but restrict the max stride
-   -- for each use of the iterator
-   local next_entry = self.next_entry or self.table:iterate()
-   local last_entry = self.last_entry or self.table.entries - 1
-   local max_entry  = last_entry + self.stride
-   local table_max  =
-      self.table.entries + self.table.size + self.table.max_displacement
-
-   if table_max < max_entry then
-      max_entry = table_max
-      self.last_entry = nil
-   else
-      self.last_entry = max_entry
-   end
-
-   return next_entry, max_entry, last_entry
-end
-
-function Cache:remove(flow_key)
-   self.table:remove(flow_key)
-end
-
-function Cache:expire_record(key, record, active)
-   -- for active expiry, we keep the record around in the cache
-   -- so we need a copy that won't be modified
-   if active then
-      local copied_record = ffi.new("struct flow_record")
-      ffi.copy(copied_record, record, ffi.sizeof("struct flow_record"))
-      table.insert(self.expired, {key = key, value = copied_record})
-   else
-      table.insert(self.expired, {key = key, value = record})
-   end
-end
-
-function Cache:get_expired()
-   local ret = self.expired
-   self.expired = {}
-   return ret
-end
-
-FlowCache = {}
-
-function FlowCache:new(config)
-   assert(config, "expected configuration table")
-   local o = {}
-   o.v4 = Cache:new(config, ipv4_flow_key_t)
-   o.v6 = Cache:new(config, ipv6_flow_key_t)
-   return setmetatable(o, { __index = self })
-end
-
 -- Types.
 
 local netflow_v9_packet_header_t = ffi.typeof([[
@@ -377,6 +257,87 @@ local template_v6 = make_template_info {
               "tcpControlBits",
               "ipClassOfService" }
 }
+
+local Cache = {}
+
+function Cache:new(config, key_t, value_t)
+   assert(config, "expected configuration table")
+
+   local o = { -- TODO: compute the default cache value
+               --       based on expected flow amounts?
+               cache_size = config.cache_size or 20000,
+               -- expired flows go into this array
+               -- TODO: perhaps a ring buffer is a better idea here
+               expired = {} }
+
+   -- how much of the cache to traverse when iterating
+   o.stride = math.ceil(o.cache_size / 1000)
+
+   local params = {
+      key_type = key_t,
+      value_type = value_t,
+      max_occupancy_rate = 0.4,
+      initial_size = math.ceil(o.cache_size / 0.4),
+   }
+
+   o.preallocated_key = key_t()
+   o.preallocated_value = value_t()
+   o.table = ctable.new(params)
+
+   return setmetatable(o, { __index = self })
+end
+
+function Cache:iterate()
+   -- use the underlying ctable's iterator, but restrict the max stride
+   -- for each use of the iterator
+   local next_entry = self.next_entry or self.table:iterate()
+   local last_entry = self.last_entry or self.table.entries - 1
+   local max_entry  = last_entry + self.stride
+   local table_max  =
+      self.table.entries + self.table.size + self.table.max_displacement
+
+   if table_max < max_entry then
+      max_entry = table_max
+      self.last_entry = nil
+   else
+      self.last_entry = max_entry
+   end
+
+   return next_entry, max_entry, last_entry
+end
+
+function Cache:remove(flow_key)
+   self.table:remove(flow_key)
+end
+
+function Cache:expire_record(key, record, active)
+   -- for active expiry, we keep the record around in the cache
+   -- so we need a copy that won't be modified
+   if active then
+      -- FIXME
+      local copied_record = ffi.new("struct flow_record")
+      ffi.copy(copied_record, record, ffi.sizeof("struct flow_record"))
+      table.insert(self.expired, {key = key, value = copied_record})
+   else
+      table.insert(self.expired, {key = key, value = record})
+   end
+end
+
+function Cache:get_expired()
+   local ret = self.expired
+   self.expired = {}
+   return ret
+end
+
+FlowCache = {}
+
+function FlowCache:new(config)
+   assert(config, "expected configuration table")
+   local o = {}
+   o.v4 = Cache:new(config, template_v4.key_t, template_v4.value_t)
+   o.v6 = Cache:new(config, template_v6.key_t, template_v6.value_t)
+   return setmetatable(o, { __index = self })
+end
 
 -- RFC5153 recommends a 10-minute template refresh configurable from
 -- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
@@ -965,9 +926,6 @@ function selftest()
    value.packetDeltaCount = 5
    value.octetDeltaCount = 15
 
-   -- FIXME: Remove this impedance matching.
-   key = ffi.cast(ptr_to(exporter.export_v4.template.key_t), key)[0]
-   value = ffi.cast(ptr_to(exporter.export_v4.template.value_t), value)[0]
    local record = exporter.export_v4.template.record_t(key, value)
    -- Mock expiry.
    function exporter.cache.v4:get_expired()
