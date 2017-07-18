@@ -134,8 +134,7 @@ function run (args)
    local out_link, out_app = in_out_apps[output_type](args[2])
 
    local flow_cache      = ipfix.FlowCache:new({})
-   local meter_config    = { cache = flow_cache }
-   local exporter_config = { cache = flow_cache,
+   local ipfix_config    = { cache = flow_cache,
                              active_timeout = active_timeout,
                              idle_timeout = idle_timeout,
                              ipfix_version = ipfix_version,
@@ -147,15 +146,14 @@ function run (args)
    local c = config.new()
 
    config.app(c, "source", unpack(in_app))
-   config.app(c, "sink", unpack(out_app))
    config.app(c, "splitter", V4V6.V4V6, {})
-   config.app(c, "meter", ipfix.FlowMeter, meter_config)
-   config.app(c, "exporter", ipfix.FlowExporter, exporter_config)
+   config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
+   config.app(c, "sink", unpack(out_app))
 
    config.link(c, "source." .. in_link.output .. " -> splitter.input")
-   config.link(c, "splitter.v4 -> meter.v4")
-   config.link(c, "splitter.v6 -> meter.v6")
-   config.link(c, "exporter.output -> sink." .. out_link.input)
+   config.link(c, "splitter.v4 -> ipfix.v4")
+   config.link(c, "splitter.v6 -> ipfix.v6")
+   config.link(c, "ipfix.output -> sink." .. out_link.input)
 
    local done
    if not duration then
@@ -173,7 +171,7 @@ function run (args)
 
    if report then
       local end_time = now()
-      local app = engine.app_table.meter
+      local app = engine.app_table.ipfix
       local v4_link, v6_link = app.input.v4, app.input.v6
       local v4_stats, v6_stats = link.stats(v4_link), link.stats(v6_link)
       local stats = { rxbytes = v4_stats.rxbytes + v6_stats.rxbytes,
