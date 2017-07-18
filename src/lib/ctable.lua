@@ -628,10 +628,10 @@ function selftest()
 
    for i=1,2 do
       -- The max displacement of this table will depend on the hash
-      -- seed, but we know for this input that it should rather small.
-      -- Assert here so that we can detect any future deviation or
-      -- regression.
-      assert(ctab.max_displacement < 15, ctab.max_displacement)
+      -- seed, but we know for this input that it should be rather
+      -- small.  Assert here so that we can detect any future
+      -- deviation or regression.
+      assert(ctab.max_displacement <= 15, ctab.max_displacement)
 
       ctab:selfcheck()
 
