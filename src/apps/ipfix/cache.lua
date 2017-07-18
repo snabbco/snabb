@@ -14,36 +14,36 @@ local ctable = require("lib.ctable")
 --
 local ipv4_flow_key_t = ffi.typeof[[
    struct {
-      uint8_t src_ip[4];    /* sourceIPv4Address */
-      uint8_t dst_ip[4];    /* destinationIPv4Address */
-      uint8_t protocol;     /* protocolIdentifier */
-      uint16_t src_port;    /* sourceTransportPort */
-      uint16_t dst_port;    /* destinationTransportPort */
+      uint8_t sourceIPv4Address[4];
+      uint8_t destinationIPv4Address[4];
+      uint8_t protocolIdentifier;
+      uint16_t sourceTransportPort;
+      uint16_t destinationTransportPort;
    } __attribute__((packed))
 ]]
 
 local ipv6_flow_key_t = ffi.typeof[[
    struct {
-      uint8_t src_ip[16];   /* sourceIPv6Address */
-      uint8_t dst_ip[16];   /* destinationIPv6Address */
-      uint8_t protocol;     /* protocolIdentifier */
-      uint16_t src_port;    /* sourceTransportPort */
-      uint16_t dst_port;    /* destinationTransportPort */
+      uint8_t sourceIPv6Address[16];
+      uint8_t destinationIPv6Address[16];
+      uint8_t protocolIdentifier;
+      uint16_t sourceTransportPort;
+      uint16_t destinationTransportPort;
    } __attribute__((packed))
 ]]
 
 local flow_record_t = ffi.typeof[[
    struct {
-      uint64_t start_time;  /* flowStartMilliseconds */
-      uint64_t end_time;    /* flowEndMilliseconds */
-      uint64_t pkt_count;   /* packetDeltaCount */
-      uint64_t octet_count; /* octetDeltaCount */
-      uint32_t ingress;     /* ingressInterface */
-      uint32_t egress;      /* egressInterface */
-      uint32_t src_peer_as; /* bgpPrevAdjacentAsNumber */
-      uint32_t dst_peer_as; /* bgpNextAdjacentAsNumber */
-      uint16_t tcp_control; /* tcpControlBits */
-      uint8_t tos;          /* ipClassOfService */
+      uint64_t flowStartMilliseconds;
+      uint64_t flowEndMilliseconds;
+      uint64_t packetDeltaCount;
+      uint64_t octetDeltaCount;
+      uint32_t ingressInterface;
+      uint32_t egressInterface;
+      uint32_t bgpPrevAdjacentAsNumber;
+      uint32_t bgpNextAdjacentAsNumber;
+      uint16_t tcpControlBits;
+      uint8_t ipClassOfService;
    } __attribute__((packed))
 ]]
 

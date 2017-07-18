@@ -13,7 +13,7 @@ local packet = require("core.packet")
 local ctable = require("lib.ctable")
 local C      = ffi.C
 
-local htonl, htons, ntohl, ntohs  = lib.htonl, lib.htons, lib.ntohl, lib.ntohs
+local ntohs  = lib.ntohs
 local get_timestamp = util.get_timestamp
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
@@ -108,38 +108,38 @@ end
 
 function FlowMeter:process_flow(flows, flow_key, flow_record, l4_header)
    -- TCP, UDP, SCTP all have the ports in the same header location
-   if (flow_key.protocol == IP_PROTO_TCP
-       or flow_key.protocol == IP_PROTO_UDP
-       or flow_key.protocol == IP_PROTO_SCTP) then
+   if (flow_key.protocolIdentifier == IP_PROTO_TCP
+       or flow_key.protocolIdentifier == IP_PROTO_UDP
+       or flow_key.protocolIdentifier == IP_PROTO_SCTP) then
       -- FIXME: Use host endianness.
-      flow_key.src_port = ffi.cast("uint16_t*", l4_header)[0]
-      flow_key.dst_port = ffi.cast("uint16_t*", l4_header)[1]
+      flow_key.sourceTransportPort = ntohs(ffi.cast("uint16_t*", l4_header)[0])
+      flow_key.destinationTransportPort = ntohs(ffi.cast("uint16_t*", l4_header)[1])
    else
-      flow_key.src_port = 0
-      flow_key.dst_port = 0
+      flow_key.sourceTransportPort = 0
+      flow_key.destinationTransportPort = 0
    end
 
    local lookup_result = flows.table:lookup_ptr(flow_key)
 
    if lookup_result == nil then
-      flow_record.start_time  = flow_record.end_time
-      flow_record.pkt_count   = 1ULL
-      if flow_key.protocol == IP_PROTO_TCP then
+      flow_record.flowStartMilliseconds  = flow_record.flowEndMilliseconds
+      flow_record.packetDeltaCount   = 1ULL
+      if flow_key.protocolIdentifier == IP_PROTO_TCP then
          local ptr = l4_header + TCP_CONTROL_BITS_OFFSET
-         flow_record.tcp_control = ffi.cast("uint16_t*", ptr)[0]
+         flow_record.tcpControlBits = ntohs(ffi.cast("uint16_t*", ptr)[0])
       else
-         flow_record.tcp_control = 0
+         flow_record.tcpControlBits = 0
       end
 
       flows.table:add(flow_key, flow_record)
    else
-      local timestamp, bytes = flow_record.end_time, flow_record.octet_count
+      local timestamp, bytes = flow_record.flowEndMilliseconds, flow_record.octetDeltaCount
       local flow_record = lookup_result.value
 
       -- otherwise just update the counters and timestamps
-      flow_record.end_time    = timestamp
-      flow_record.pkt_count   = flow_record.pkt_count + 1ULL
-      flow_record.octet_count = flow_record.octet_count + bytes
+      flow_record.flowEndMilliseconds    = timestamp
+      flow_record.packetDeltaCount   = flow_record.packetDeltaCount + 1ULL
+      flow_record.octetDeltaCount = flow_record.octetDeltaCount + bytes
    end
 end
 
@@ -152,14 +152,14 @@ function FlowMeter:process_ipv6_packet(pkt, timestamp)
    local flow_key = flows.preallocated_key
    local flow_record = flows.preallocated_value
    local l3_header = l2_header + ethernet_header_size
-   flow_key.protocol = get_ipv6_next_header(l3_header)
-   ffi.copy(flow_key.src_ip, get_ipv6_src_addr_ptr(l3_header), 16)
-   ffi.copy(flow_key.dst_ip, get_ipv6_dst_addr_ptr(l3_header), 16)
+   flow_key.protocolIdentifier = get_ipv6_next_header(l3_header)
+   ffi.copy(flow_key.sourceIPv6Address, get_ipv6_src_addr_ptr(l3_header), 16)
+   ffi.copy(flow_key.destinationIPv6Address, get_ipv6_dst_addr_ptr(l3_header), 16)
 
-   flow_record.end_time = timestamp
+   flow_record.flowEndMilliseconds = timestamp
    -- Measure bytes starting with the IP header.
-   flow_record.octet_count = pkt.length - ethernet_header_size
-   flow_record.tos = get_ipv6_traffic_class(l3_header)
+   flow_record.octetDeltaCount = pkt.length - ethernet_header_size
+   flow_record.ipClassOfService = get_ipv6_traffic_class(l3_header)
 
    -- TODO: handle chained headers
    local l4_header = l3_header + ipv6_fixed_header_size
@@ -176,15 +176,15 @@ function FlowMeter:process_ipv4_packet(pkt, timestamp)
    local flow_key = flows.preallocated_key
    local flow_record = flows.preallocated_value
    local l3_header = l2_header + ethernet_header_size
-   flow_key.protocol = get_ipv4_protocol(l3_header)
-   ffi.copy(flow_key.src_ip, get_ipv4_src_addr_ptr(l3_header), 4)
-   ffi.copy(flow_key.dst_ip, get_ipv4_dst_addr_ptr(l3_header), 4)
+   flow_key.protocolIdentifier = get_ipv4_protocol(l3_header)
+   ffi.copy(flow_key.sourceIPv4Address, get_ipv4_src_addr_ptr(l3_header), 4)
+   ffi.copy(flow_key.destinationIPv4Address, get_ipv4_dst_addr_ptr(l3_header), 4)
 
-   flow_record.end_time = timestamp
+   flow_record.flowEndMilliseconds = timestamp
    -- Measure bytes starting with the IP header.
-   flow_record.octet_count = pkt.length - ethernet_header_size
+   flow_record.octetDeltaCount = pkt.length - ethernet_header_size
    -- Simpler than combining ip_header:dscp() and ip_header:ecn().
-   flow_record.tos = l3_header[1]
+   flow_record.ipClassOfService = l3_header[1]
 
    local ihl = get_ipv4_ihl(l3_header)
    local l4_header = l3_header + ihl * 4
@@ -195,39 +195,35 @@ end
 -- print debugging messages for flow expiration
 function FlowMeter:debug_expire(entry, timestamp, msg)
    local ipv4 = require("lib.protocol.ipv4")
-   local ipv6 = require("lib.protocol.ipv4")
+   local ipv6 = require("lib.protocol.ipv6")
 
    if debug then
       local key = entry.key
       local src_ip, dst_ip
 
       if key.is_ipv6 == 1 then
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
-         src_ip = ipv6:ntop(ptr)
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ip_1")
-         dst_ip = ipv6:ntop(ptr)
+         src_ip = ipv6:ntop(key.sourceIPv6Address)
+         dst_ip = ipv6:ntop(key.destinationIPv6Address)
       else
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "src_ip_1")
-         src_ip = ipv4:ntop(ptr)
-         local ptr = ffi.cast("uint8_t*", key) + ffi.offsetof(key, "dst_ip_1")
-         dst_ip = ipv4:ntop(ptr)
+         src_ip = ipv4:ntop(key.sourceIPv4Address)
+         dst_ip = ipv4:ntop(key.destinationIPv4Address)
       end
 
       local time_delta
       if msg == "idle" then
-         time_delta = tonumber(entry.value.end_time - self.boot_time) / 1000
+         time_delta = tonumber(entry.value.flowEndMilliseconds - self.boot_time) / 1000
       else
-         time_delta = tonumber(entry.value.start_time - self.boot_time) / 1000
+         time_delta = tonumber(entry.value.flowStartMilliseconds - self.boot_time) / 1000
       end
 
       util.fe_debug("exp [%s, %ds] %s (%d) -> %s (%d) P:%d",
                     msg,
                     time_delta,
                     src_ip,
-                    htons(key.src_port),
+                    key.sourceTransportPort,
                     dst_ip,
-                    htons(key.dst_port),
-                    key.protocol)
+                    key.destinationTransportPort,
+                    key.protocolIdentifier)
    end
 end
 
@@ -243,11 +239,11 @@ function FlowMeter:expire_records()
       for entry in flows:iterate() do
          local record = entry.value
 
-         if timestamp - record.end_time > self.idle_timeout then
+         if timestamp - record.flowEndMilliseconds > self.idle_timeout then
             self:debug_expire(entry, timestamp, "idle")
             table.insert(keys_to_remove, entry.key)
             flows:expire_record(entry.key, record, false)
-         elseif timestamp - record.start_time > self.active_timeout then
+         elseif timestamp - record.flowStartMilliseconds > self.active_timeout then
             self:debug_expire(entry, timestamp, "active")
             table.insert(timeout_records, record)
             flows:expire_record(entry.key, record, true)
@@ -261,10 +257,10 @@ function FlowMeter:expire_records()
 
       for _, record in ipairs(timeout_records) do
          -- TODO: what should timers reset to?
-         record.start_time = timestamp
-         record.end_time = timestamp
-         record.pkt_count = 0
-         record.octet_count = 0
+         record.flowStartMilliseconds = timestamp
+         record.flowEndMilliseconds = timestamp
+         record.packetDeltaCount = 0
+         record.octetDeltaCount = 0
       end
    end
 end
@@ -365,32 +361,32 @@ function selftest()
    end
 
    local key = flows.v4.preallocated_key
-   key.src_ip = ipv4:pton("192.168.1.1")
-   key.dst_ip = ipv4:pton("192.168.1.25")
-   key.protocol = IP_PROTO_UDP
-   key.src_port = htons(9999)
-   key.dst_port = htons(80)
+   key.sourceIPv4Address = ipv4:pton("192.168.1.1")
+   key.destinationIPv4Address = ipv4:pton("192.168.1.25")
+   key.protocolIdentifier = IP_PROTO_UDP
+   key.sourceTransportPort = 9999
+   key.destinationTransportPort = 80
 
    local result = flows.v4.table:lookup_ptr(key)
    assert(result, "key not found")
-   assert(result.value.pkt_count == 1)
+   assert(result.value.packetDeltaCount == 1)
 
    -- make sure the count is incremented on the same flow
    test_packet(false, "192.168.1.1", "192.168.1.25", 9999, 80)
-   assert(result.value.pkt_count == 2,
-          string.format("wrong count: %d", tonumber(result.value.pkt_count)))
+   assert(result.value.packetDeltaCount == 2,
+          string.format("wrong count: %d", tonumber(result.value.packetDeltaCount)))
 
    -- check the IPv6 key too
    local key = flows.v6.preallocated_key
-   key.src_ip = ipv6:pton("2001:4860:4860::8888")
-   key.dst_ip = ipv6:pton("2001:db8::ff00:42:8329")
-   key.protocol = IP_PROTO_UDP
-   key.src_port = htons(53)
-   key.dst_port = htons(57777)
+   key.sourceIPv6Address = ipv6:pton("2001:4860:4860::8888")
+   key.destinationIPv6Address = ipv6:pton("2001:db8::ff00:42:8329")
+   key.protocolIdentifier = IP_PROTO_UDP
+   key.sourceTransportPort = 53
+   key.destinationTransportPort = 57777
 
    local result = flows.v6.table:lookup_ptr(key)
    assert(result, "key not found")
-   assert(result.value.pkt_count == 1)
+   assert(result.value.packetDeltaCount == 1)
 
    -- sanity check
    flows.v4.table:selfcheck()
