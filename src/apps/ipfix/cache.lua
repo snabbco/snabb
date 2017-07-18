@@ -44,7 +44,6 @@ local flow_record_t = ffi.typeof[[
       uint32_t dst_peer_as; /* bgpNextAdjacentAsNumber */
       uint16_t tcp_control; /* tcpControlBits */
       uint8_t tos;          /* ipClassOfService */
-      uint8_t __padding;
    } __attribute__((packed))
 ]]
 
@@ -113,11 +112,9 @@ function Cache:expire_record(key, record, active)
 end
 
 function Cache:get_expired()
-   return self.expired
-end
-
-function Cache:clear_expired()
+   local ret = self.expired
    self.expired = {}
+   return ret
 end
 
 FlowCache = {}
