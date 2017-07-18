@@ -25,7 +25,6 @@ local register    = require("lib.hardware.register")
 local counter     = require("core.counter")
 local macaddress  = require("lib.macaddress")
 local shm         = require("core.shm")
-local counter = require("core.counter")
 
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
