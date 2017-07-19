@@ -44,7 +44,7 @@ Usage:
     be supplied as <profile>, which will cause the benchmark run to be profiled
     accordingly.
 
-  snabbmark hash
+  snabbmark hash [<key-size>]
     Benchmark hash functions used for internal data structures.
 
   snabbmark ctable
