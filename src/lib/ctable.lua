@@ -3,11 +3,10 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
-local bit = require("bit")
+local lib = require("core.lib")
 local binary_search = require("lib.binary_search")
 local multi_copy = require("lib.multi_copy")
-local bxor, bnot = bit.bxor, bit.bnot
-local tobit, lshift, rshift = bit.tobit, bit.lshift, bit.rshift
+local siphash = require("lib.hash.siphash")
 local max, floor, ceil = math.max, math.floor, math.ceil
 
 CTable = {}
@@ -18,6 +17,25 @@ local uint8_ptr_t = ffi.typeof('uint8_t*')
 local uint16_ptr_t = ffi.typeof('uint16_t*')
 local uint32_ptr_t = ffi.typeof('uint32_t*')
 local uint64_ptr_t = ffi.typeof('uint64_t*')
+
+local function compute_hash_fn(key_ctype, seed)
+   if tonumber(ffi.new(key_ctype)) then
+      return siphash.make_u64_hash({c=1, d=2, key=seed})
+   else
+      return siphash.make_hash({c=1, d=2, size=ffi.sizeof(key_ctype),
+                                key=seed})
+   end
+end
+
+local function compute_multi_hash_fn(key_ctype, width, stride, seed)
+   if tonumber(ffi.new(key_ctype)) then
+      -- We could fix this, but really it would be nicest to prohibit
+      -- scalar keys.
+      error('streaming lookup not available for scalar keys')
+   end
+   return siphash.make_multi_hash({c=1, d=2, size=ffi.sizeof(key_ctype),
+                                   width=width, stride=stride, key=seed})
+end
 
 local entry_types = {}
 local function make_entry_type(key_type, value_type)
@@ -107,7 +125,7 @@ end
 -- map.
 local required_params = set('key_type', 'value_type')
 local optional_params = {
-   hash_fn = false,
+   hash_seed = false,
    initial_size = 8,
    max_occupancy_rate = 0.9,
    min_occupancy_rate = 0.0
@@ -118,7 +136,13 @@ function new(params)
    local params = parse_params(params, required_params, optional_params)
    ctab.entry_type = make_entry_type(params.key_type, params.value_type)
    ctab.type = make_entries_type(ctab.entry_type)
-   ctab.hash_fn = params.hash_fn or compute_hash_fn(params.key_type)
+   function ctab.make_hash_fn()
+      return compute_hash_fn(params.key_type, ctab.hash_seed)
+   end
+   function ctab.make_multi_hash_fn(width)
+      local stride, seed = ffi.sizeof(ctab.entry_type), ctab.hash_seed
+      return compute_multi_hash_fn(params.key_type, width, stride, seed)
+   end
    ctab.equal_fn = make_equal_fn(params.key_type)
    ctab.size = 0
    ctab.max_displacement = 0
@@ -126,6 +150,7 @@ function new(params)
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
    ctab = setmetatable(ctab, { __index = CTable })
+   ctab:reseed_hash_function(params.hash_seed)
    ctab:resize(params.initial_size)
    return ctab
 end
@@ -156,6 +181,33 @@ local function calloc(t, count)
    return ret, byte_size
 end
 
+function CTable:reseed_hash_function(seed)
+   -- The hash function's seed determines the hash value of an input,
+   -- and thus the iteration order for the table.  Usually this is a
+   -- feature: besides preventing hash-flood attacks, it also prevents a
+   -- quadratic-time complexity when initially populating a table from
+   -- entries stored in hash order, as can happen when reading in a
+   -- table from a serialization.  However, when SNABB_RANDOM_SEED is
+   -- set, then presumably we're trying to reproduce deterministic
+   -- behavior, as with quickcheck, and in that case a random seed can
+   -- make it more onerous to prove that make_table({A=B,C=D}) is equal
+   -- to make_table({A=B,C=D}) as the two tables could have different
+   -- iteration orders.  So, in "quickcheck mode", always seed hash
+   -- tables with the same value.
+   if seed then
+      self.hash_seed = seed
+   elseif lib.getenv("SNABB_RANDOM_SEED") then
+      self.hash_seed = siphash.sip_hash_key_from_seed(
+         lib.getenv("SNABB_RANDOM_SEED"))
+   else
+      self.hash_seed = siphash.random_sip_hash_key()
+   end
+   self.hash_fn = self.make_hash_fn()
+
+   -- FIXME: Invalidate associated lookup streamers, as they need new
+   -- multi_hash functions.
+end
+
 function CTable:resize(size)
    assert(size >= (self.occupancy / self.max_occupancy_rate))
    local old_entries = self.entries
@@ -173,9 +225,11 @@ function CTable:resize(size)
    self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
    for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
 
+   if old_size ~= 0 then self:reseed_hash_function() end
+
    for i=0,old_size+old_max_displacement-1 do
       if old_entries[i].hash ~= HASH_MAX then
-         self:insert(old_entries[i].hash, old_entries[i].key, old_entries[i].value)
+         self:add(old_entries[i].key, old_entries[i].value)
       end
    end
 end
@@ -189,6 +243,7 @@ struct {
    uint32_t size;
    uint32_t occupancy;
    uint32_t max_displacement;
+   uint8_t hash_seed[16];
    double max_occupancy_rate;
    double min_occupancy_rate;
 }
@@ -200,6 +255,8 @@ function load(stream, params)
    for k,v in pairs(params) do params_copy[k] = v end
    params_copy.initial_size = header.size
    params_copy.min_occupancy_rate = header.min_occupancy_rate
+   params_copy.hash_seed = ffi.new('uint8_t[16]')
+   ffi.copy(params_copy.hash_seed, header.hash_seed, 16)
    params_copy.max_occupancy_rate = header.max_occupancy_rate
    local ctab = new(params_copy)
    ctab.occupancy = header.occupancy
@@ -217,17 +274,24 @@ end
 
 function CTable:save(stream)
    stream:write_ptr(header_t(self.size, self.occupancy, self.max_displacement,
-                             self.max_occupancy_rate, self.min_occupancy_rate),
+                             self.hash_seed, self.max_occupancy_rate,
+                             self.min_occupancy_rate),
                     header_t)
    stream:write_array(self.entries,
                       self.entry_type,
                       self.size + self.max_displacement)
 end
 
-function CTable:insert(hash, key, value, updates_allowed)
+function CTable:add(key, value, updates_allowed)
    if self.occupancy + 1 > self.occupancy_hi then
+      -- Note that resizing will invalidate all hash keys, so we need
+      -- to hash the key after resizing.
       self:resize(self.size * 2)
    end
+
+   local hash = self.hash_fn(key)
+   assert(hash >= 0)
+   assert(hash < HASH_MAX)
 
    local entries = self.entries
    local scale = self.scale
@@ -286,13 +350,6 @@ function CTable:insert(hash, key, value, updates_allowed)
    entries[index].key = key
    entries[index].value = value
    return index
-end
-
-function CTable:add(key, value, updates_allowed)
-   local hash = self.hash_fn(key)
-   assert(hash >= 0)
-   assert(hash < HASH_MAX)
-   return self:insert(hash, key, value, updates_allowed)
 end
 
 function CTable:update(key, value)
@@ -363,60 +420,63 @@ function CTable:remove(key, missing_allowed)
    return true
 end
 
-function CTable:make_lookup_streamer(stride)
+function CTable:make_lookup_streamer(width)
    local res = {
       all_entries = self.entries,
-      stride = stride,
-      hash_fn = self.hash_fn,
+      width = width,
       equal_fn = self.equal_fn,
       entries_per_lookup = self.max_displacement + 1,
       scale = self.scale,
-      pointers = ffi.new('void*['..stride..']'),
-      entries = self.type(stride),
+      pointers = ffi.new('void*['..width..']'),
+      entries = self.type(width),
+      hashes = ffi.new('uint32_t[?]', width),
       -- Binary search over N elements can return N if no entry was
       -- found that was greater than or equal to the key.  We would
       -- have to check the result of binary search to ensure that we
       -- are reading a value in bounds.  To avoid this, allocate one
       -- more entry.
-      stream_entries = self.type(stride * (self.max_displacement + 1) + 1)
+      stream_entries = self.type(width * (self.max_displacement + 1) + 1)
    }
    -- Give res.pointers sensible default values in case the first lookup
    -- doesn't fill the pointers vector.
-   for i = 0, stride-1 do res.pointers[i] = self.entries end
+   for i = 0, width-1 do res.pointers[i] = self.entries end
 
    -- Initialize the stream_entries to HASH_MAX for sanity.
-   for i = 0, stride * (self.max_displacement + 1) do
+   for i = 0, width * (self.max_displacement + 1) do
       res.stream_entries[i].hash = HASH_MAX
    end
 
    -- Compile multi-copy and binary-search procedures that are
-   -- specialized for this table and this stride.
+   -- specialized for this table and this width.
    local entry_size = ffi.sizeof(self.entry_type)
-   res.multi_copy = multi_copy.gen(stride, res.entries_per_lookup * entry_size)
+   res.multi_copy = multi_copy.gen(width, res.entries_per_lookup * entry_size)
+   res.multi_hash = self.make_multi_hash_fn(width)
    res.binary_search = binary_search.gen(res.entries_per_lookup, self.entry_type)
 
    return setmetatable(res, { __index = LookupStreamer })
 end
 
 function LookupStreamer:stream()
-   local stride = self.stride
+   local width = self.width
    local entries = self.entries
    local pointers = self.pointers
    local stream_entries = self.stream_entries
    local entries_per_lookup = self.entries_per_lookup
    local equal_fn = self.equal_fn
 
-   for i=0,stride-1 do
-      local hash = self.hash_fn(entries[i].key)
-      local index = hash_to_index(hash, self.scale)
+   local key_offset = 4 -- Skip past uint32_t hash.
+   self.multi_hash(ffi.cast('uint8_t*', entries) + key_offset, self.hashes)
+
+   for i=0,width-1 do
+      local hash = self.hashes[i]
       entries[i].hash = hash
-      pointers[i] = self.all_entries + index
+      pointers[i] = self.all_entries + hash_to_index(hash, self.scale)
    end
 
    self.multi_copy(stream_entries, pointers)
 
    -- Copy results into entries.
-   for i=0,stride-1 do
+   for i=0,width-1 do
       local hash = entries[i].hash
       local index = i * entries_per_lookup
       local found = self.binary_search(stream_entries + index, hash)
@@ -452,7 +512,7 @@ function LookupStreamer:stream()
 end
 
 function LookupStreamer:is_empty(i)
-   assert(i >= 0 and i < self.stride)
+   assert(i >= 0 and i < self.width)
    return self.entries[i].hash == HASH_MAX
 end
 
@@ -526,99 +586,42 @@ function CTable:iterate()
    return next_entry, max_entry, self.entries - 1
 end
 
--- One of Bob Jenkins' hashes from
--- http://burtleburtle.net/bob/hash/integer.html.  It's about twice as
--- fast as MurmurHash3_x86_32 and seems to do just as good a job --
--- tables using this hash function seem to have the same max
--- displacement as tables using the murmur hash.
---
--- TODO: Switch to a hash function with good security properties,
--- perhaps by using the DynASM support for AES.
-local uint32_cast = ffi.new('uint32_t[1]')
-function hash_32(i32)
-   i32 = tobit(i32)
-   i32 = i32 + bnot(lshift(i32, 15))
-   i32 = bxor(i32, (rshift(i32, 10)))
-   i32 = i32 + lshift(i32, 3)
-   i32 = bxor(i32, rshift(i32, 6))
-   i32 = i32 + bnot(lshift(i32, 11))
-   i32 = bxor(i32, rshift(i32, 16))
-
-   -- Unset the low bit, to distinguish valid hashes from HASH_MAX.
-   i32 = lshift(i32, 1)
-
-   -- Project result to u32 range.
-   uint32_cast[0] = i32
-   return uint32_cast[0]
-end
-
-local cast = ffi.cast
-function hashv_32(key)
-   return hash_32(cast(uint32_ptr_t, key)[0])
-end
-
-function hashv_48(key)
-   local hi = cast(uint32_ptr_t, key)[0]
-   local lo = cast(uint16_ptr_t, key)[2]
-   -- Extend lo to the upper half too so that the hash function isn't
-   -- spreading around needless zeroes.
-   lo = bor(lo, lshift(lo, 16))
-   return hash_32(bxor(hi, hash_32(lo)))
-end
-
-function hashv_64(key)
-   local hi = cast(uint32_ptr_t, key)[0]
-   local lo = cast(uint32_ptr_t, key)[1]
-   return hash_32(bxor(hi, hash_32(lo)))
-end
-
-local hash_fns_by_size = { [4]=hashv_32, [8]=hashv_64 }
-function compute_hash_fn(ctype)
-   local size = ffi.sizeof(ctype)
-   if not hash_fns_by_size[size] then
-      hash_fns_by_size[size] = function(key)
-         local h = 0
-         local words = cast(uint32_ptr_t, key)
-         local bytes = cast(uint8_ptr_t, key)
-         for i=1,size/4 do h = hash_32(bxor(h, words[i-1])) end
-         for i=1,size%4 do h = hash_32(bxor(h, bytes[size-i])) end
-         return h
-      end
-   end
-   return hash_fns_by_size[size]
-end
-
 function selftest()
    print("selftest: ctable")
+   local bnot = require("bit").bnot
 
    -- 32-byte entries
    local occupancy = 2e6
    local params = {
-      key_type = ffi.typeof('uint32_t'),
+      key_type = ffi.typeof('uint32_t[1]'),
       value_type = ffi.typeof('int32_t[6]'),
-      hash_fn = hash_32,
       max_occupancy_rate = 0.4,
       initial_size = ceil(occupancy / 0.4)
    }
    local ctab = new(params)
    ctab:resize(occupancy / 0.4 + 1)
 
-   -- Fill with i -> { bnot(i), ... }.
+   -- Fill with {i} -> { bnot(i), ... }.
+   local k = ffi.new('uint32_t[1]');
    local v = ffi.new('int32_t[6]');
    for i = 1,occupancy do
+      k[0] = i
       for j=0,5 do v[j] = bnot(i) end
-      ctab:add(i, v)
+      ctab:add(k, v)
    end
 
    for i=1,2 do
-      -- max_displacement should be rather small.  Assert here so that
-      -- we can detect any future deviation or regression.
+      -- The max displacement of this table will depend on the hash
+      -- seed, but we know for this input that it should rather small.
+      -- Assert here so that we can detect any future deviation or
+      -- regression.
       assert(ctab.max_displacement < 15, ctab.max_displacement)
 
       ctab:selfcheck()
 
       for i = 1, occupancy do
-         local value = ctab:lookup_ptr(i).value[0]
+         k[0] = i
+         local value = ctab:lookup_ptr(k).value[0]
          assert(value == bnot(i))
       end
       ctab:selfcheck()
@@ -627,13 +630,14 @@ function selftest()
       do
          local entry = ctab.entry_type()
          for i = 1, occupancy, 31 do
-            assert(ctab:lookup_and_copy(i, entry))
-            assert(entry.key == i)
+            k[0] = i
+            assert(ctab:lookup_and_copy(k, entry))
+            assert(entry.key[0] == i)
             assert(entry.value[0] == bnot(i))
             ctab:remove(entry.key)
-            assert(ctab:lookup_ptr(i) == nil)
+            assert(ctab:lookup_ptr(k) == nil)
             ctab:add(entry.key, entry.value)
-            assert(ctab:lookup_ptr(i).value[0] == bnot(i))
+            assert(ctab:lookup_ptr(k).value[0] == bnot(i))
          end
       end
 
@@ -681,14 +685,15 @@ function selftest()
 
    -- OK, all looking good with the normal interfaces; let's check out
    -- streaming lookup.
-   local stride = 1
+   local width = 1
    repeat
-      local streamer = ctab:make_lookup_streamer(stride)
-      for i = 1, occupancy, stride do
-         local n = math.min(stride, occupancy-i+1)
+      local streamer = ctab:make_lookup_streamer(width)
+      for i = 1, occupancy, width do
+         local n = math.min(width, occupancy-i+1)
          for j = 0, n-1 do
-            streamer.entries[j].key = i + j
+            streamer.entries[j].key[0] = i + j
          end
+
          streamer:stream()
          for j = 0, n-1 do
             assert(streamer:is_found(j))
@@ -696,8 +701,8 @@ function selftest()
             assert(value == bnot(i + j))
          end
       end
-      stride = stride * 2
-   until stride > 256
+      width = width * 2
+   until width > 256
 
    -- A check that our equality functions work as intended.
    local numbers_equal = make_equal_fn(ffi.typeof('int'))

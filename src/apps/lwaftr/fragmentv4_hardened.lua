@@ -33,7 +33,6 @@ constants.o_ipv4_flags, constants.o_ipv4_checksum,
 constants.o_ipv4_total_length, constants.o_ipv4_src_addr,
 constants.o_ipv4_dst_addr
 
-local hash_32 = ctable.hash_32
 local rd16, wr16, wr32 = lwutil.rd16, lwutil.wr16, lwutil.wr32
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
 local uint16_ptr_t = ffi.typeof("uint16_t*")
@@ -232,20 +231,6 @@ local function packet_to_reassembly_buffer(pkt)
    return reassembly_buf
 end
 
--- The key is 80 bits: source IPv4 address, destination IPv4 address, and
--- the 16-bit identification field.
--- This function intentionally re-hashes 3 of the 5 16-byte chunks.
-local function hash_ipv4(key)
-   local hash = 0
-   local to_hash = ffi.cast(uint16_ptr_t, key)
-   for i=0,3 do
-      local current = to_hash[i]
-      hash = hash_32(bxor(hash, hash_32(current)))
-   end
-   
-   return hash
-end
-
 function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
    -- Initialize module-scoped variables
    max_frags_per_packet = max_pkt_frag
@@ -268,7 +253,6 @@ function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
    local params = {
       key_type = ffi.typeof(ipv4_fragment_key_t),
       value_type = ffi.typeof(ipv4_reassembly_buffer_t),
-      hash_fn = hash_ipv4,
       initial_size = math.ceil(max_fragmented_packets / max_occupy),
       max_occupancy_rate = max_occupy,
    }

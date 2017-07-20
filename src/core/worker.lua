@@ -43,11 +43,7 @@ function start (name, luacode)
       S.setenv("SNABB_PROGRAM_LUACODE", luacode, true)
       -- Restart the process with execve().
       -- /proc/$$/exe is a link to the same Snabb executable that we are running
-      local env = {}
-      for key, value in pairs(S.environ()) do
-         table.insert(env, key.."="..value)
-      end
-      S.execve(("/proc/%d/exe"):format(S.getpid()), {}, env)
+      lib.execv(("/proc/%d/exe"):format(S.getpid()), {})
    else
       -- Parent process
       children[name] = { pid = pid }
