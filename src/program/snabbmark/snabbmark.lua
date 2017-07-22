@@ -23,7 +23,7 @@ function run (args)
       intel1g(unpack(args))
    elseif command == 'esp' and #args >= 2 then
       esp(unpack(args))
-   elseif command == 'hash' and #args == 0 then
+   elseif command == 'hash' and #args <= 1 then
       hash(unpack(args))
    elseif command == 'ctable' and #args == 0 then
       ctable(unpack(args))
@@ -363,9 +363,8 @@ function esp (npackets, packet_size, mode, profile)
    if mode == "encapsulate" then
       if profile then profiler.start(profile) end
       local start = C.get_monotonic_time()
-      local encapsulated
       for i = 1, npackets do
-         encapsulated = packet.clone(plain)
+         local encapsulated = packet.clone(plain)
          enc:encapsulate(encapsulated)
          packet.free(encapsulated)
       end
@@ -379,9 +378,8 @@ function esp (npackets, packet_size, mode, profile)
       enc:encapsulate(encapsulated)
       if profile then profiler.start(profile) end
       local start = C.get_monotonic_time()
-      local plain
       for i = 1, npackets do
-         plain = packet.clone(encapsulated)
+         local plain = packet.clone(encapsulated)
          dec:decapsulate(plain)
          dec.seq.no = 0
          dec.window[0] = 0
@@ -432,64 +430,111 @@ local function test_perf(f, iterations, what)
    return res
 end
 
-function hash ()
+function hash (key_size)
+   if key_size then
+      key_size = assert(tonumber(key_size))
+   else
+      key_size = 4
+   end
+   local value_t = ffi.typeof("uint8_t[$]", key_size)
+   local band = require('bit').band
+   local fill = require('ffi').fill
+
+   local function baseline_hash(ptr) return ptr[0] end
    local murmur = require('lib.hash.murmur').MurmurHash3_x86_32:new()
-   local vptr = ffi.new("uint8_t [4]")
-   local uint32_ptr_t = ffi.typeof('uint32_t*')
-   local lshift = require('bit').lshift
-   local INT32_MIN = -0x80000000
-   function murmur_hash_32(u32)
-      ffi.cast(uint32_ptr_t, vptr)[0] = u32
-      return murmur:hash(vptr, 4, 0ULL).u32[0]
+   local function murmur_hash(v)
+      return murmur:hash(v, key_size, 0ULL).u32[0]      
    end
+   local lib_siphash = require('lib.hash.siphash')
+   local sip_hash_1_2_opts = { size=key_size, c=1, d=2 }
+   local sip_hash_2_4_opts = { size=key_size, c=2, d=4 }
 
-   local jenkins_hash_32 = require('lib.ctable').hash_32
-   local function test_jenkins(iterations)
+   local function test_scalar_hash(iterations, hash)
+      local value = ffi.new(ffi.typeof('uint8_t[$]', key_size))
       local result
-      for i=1,iterations do result=jenkins_hash_32(i) end
+      for i=1,iterations do
+	 fill(value, key_size, band(i, 255))
+	 result = hash(value)
+      end
       return result
    end
 
-   local function test_murmur(iterations)
-      local result
-      for i=1,iterations do result=murmur_hash_32(i) end
-      return result
+   local function test_parallel_hash(iterations, hash, width)
+      local value = ffi.new('uint8_t[?]', key_size*width)
+      local result = ffi.new('uint32_t[?]', width)
+      for i=1,iterations,width do
+	 fill(value, key_size*width, band(i+width-1, 255))
+	 hash(value, result)
+      end
+      return result[width-1]
    end
 
-   test_perf(test_jenkins, 1e8, 'jenkins hash')
-   test_perf(test_murmur, 1e8, 'murmur hash (32 bit)')
+   local function hash_tester(hash)
+      return function(iterations)
+         return test_scalar_hash(iterations, hash)
+      end
+   end
+
+   local function sip_hash_tester(opts, width)
+      local opts = lib.deepcopy(opts)
+      opts.size = key_size
+      if width > 1 then
+         opts.width = width
+         local hash = lib_siphash.make_multi_hash(opts)
+	 return function(iterations)
+	    return test_parallel_hash(iterations, hash, width)
+	 end
+      else
+         return hash_tester(lib_siphash.make_hash(opts))
+      end
+   end
+
+   test_perf(hash_tester(baseline_hash), 1e8, 'baseline')
+   test_perf(hash_tester(murmur_hash), 1e8, 'murmur hash (32 bit)')
+   for _, opts in ipairs({{c=1,d=2}, {c=2,d=4}}) do
+      for _, width in ipairs({1,2,4,8}) do
+         test_perf(sip_hash_tester(opts, width), 1e8,
+                   string.format('sip hash c=%d,d=%d (x%d)',
+                                 opts.c, opts.d, width))
+      end
+   end
 end
 
 function ctable ()
    local ctable = require('lib.ctable')
    local bnot = require('bit').bnot
    local ctab = ctable.new(
-      { key_type = ffi.typeof('uint32_t'),
-        value_type = ffi.typeof('int32_t[6]'),
-        hash_fn = ctable.hash_32 })
+      { key_type = ffi.typeof('uint32_t[2]'),
+        value_type = ffi.typeof('int32_t[5]') })
    local occupancy = 2e6
    ctab:resize(occupancy / 0.4 + 1)
 
    local function test_insertion(count)
-      local v = ffi.new('int32_t[6]');
+      local k = ffi.new('uint32_t[2]');
+      local v = ffi.new('int32_t[5]');
       for i = 1,count do
-         for j=0,5 do v[j] = bnot(i) end
-         ctab:add(i, v)
+         k[0], k[1] = i, i
+         for j=0,4 do v[j] = bnot(i) end
+         ctab:add(k, v)
       end
    end
 
    local function test_lookup_ptr(count)
+      local k = ffi.new('uint32_t[2]');
       local result = ctab.entry_type()
       for i = 1, count do
-         result = ctab:lookup_ptr(i)
+         k[0], k[1] = i, i
+         result = ctab:lookup_ptr(k)
       end
       return result
    end
 
    local function test_lookup_and_copy(count)
+      local k = ffi.new('uint32_t[2]');
       local result = ctab.entry_type()
       for i = 1, count do
-         ctab:lookup_and_copy(i, result)
+         k[0], k[1] = i, i
+         ctab:lookup_and_copy(k, result)
       end
       return result
    end
@@ -506,7 +551,8 @@ function ctable ()
          for i = 1, count, stride do
             local n = math.min(stride, count-i+1)
             for j = 0, n-1 do
-               streamer.entries[j].key = i + j
+               streamer.entries[j].key[0] = i + j
+               streamer.entries[j].key[1] = i + j
             end
             streamer:stream()
             result = streamer.entries[n-1].value[0]

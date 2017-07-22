@@ -95,7 +95,7 @@ function run(args)
       assert(S.dup2(output_write, 1))
       input_read:close()
       output_write:close()
-      S.execve(("/proc/%d/exe"):format(S.getpid()), argv, {})
+      lib.execv(("/proc/%d/exe"):format(S.getpid()), argv)
    end
    input_read:close()
    output_write:close()
