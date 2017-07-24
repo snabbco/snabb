@@ -76,10 +76,6 @@ local template_header_ptr_t = ptr_to(template_header_t)
 local V9_TEMPLATE_ID  = 0
 local V10_TEMPLATE_ID = 2
 
--- RFC5153 recommends a 10-minute template refresh configurable from
--- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
-local template_interval = 600
-
 -- Pad length to multiple of 4.
 local max_padding = 3
 local function padded_length(len)
@@ -298,6 +294,10 @@ function IPFIX:new(config)
                -- sequence number to use for flow packets
                sequence_number = 1,
                boot_time = util.get_timestamp(),
+	       -- RFC5153 recommends a 10-minute template refresh
+	       -- configurable from 1 minute to 1 day
+	       -- (https://tools.ietf.org/html/rfc5153#section-6.2)
+	       template_refresh_interval = config.template_refresh_interval or 600,
                next_template_refresh = 0,
                -- version of IPFIX/Netflow (9 or 10)
                version = assert(config.ipfix_version),
@@ -405,7 +405,7 @@ function IPFIX:push()
    local outgoing = self.outgoing_messages
 
    if self.next_template_refresh < engine.now() then
-      self.next_template_refresh = engine.now() + template_interval
+      self.next_template_refresh = engine.now() + self.template_refresh_interval
       self:send_template_records(outgoing)
    end
 
