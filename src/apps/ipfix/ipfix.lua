@@ -153,6 +153,7 @@ function FlowSet:record_flows(timestamp)
    for i=1,link.nreadable(self.incoming) do
       local pkt = link.receive(self.incoming)
       self.template.extract(pkt, timestamp, entry)
+      packet.free(pkt)
       local lookup_result = self.table:lookup_ptr(entry.key)
       if lookup_result == nil then
          self.table:add(entry.key, entry.value)
