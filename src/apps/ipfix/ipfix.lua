@@ -109,6 +109,17 @@ local function remove_record_count(pkt, count)
    return count
 end
 
+local internal_link_counters = {}
+local function new_internal_link(name_prefix)
+   local count, name = internal_link_counters[name_prefix], name_prefix
+   if count then
+      count = count + 1
+      name = name..' '..tostring(count)
+   end
+   internal_link_counters[name_prefix] = count or 1
+   return name, link.new(name)
+end
+
 FlowSet = {}
 
 function FlowSet:new (template, mtu, version, cache_size, idle_timeout, active_timeout)
@@ -141,7 +152,7 @@ function FlowSet:new (template, mtu, version, cache_size, idle_timeout, active_t
    }
 
    o.match = o.template.match
-   o.incoming = link.new_anonymous()
+   o.incoming_link_name, o.incoming = new_internal_link('IPFIX incoming')
    o.table = ctable.new(params)
    o.scratch_entry = o.table.entry_type()
 
@@ -348,7 +359,8 @@ function IPFIX:new(config)
    o.ipv4_flows = FlowSet:new(template.v4, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
    o.ipv6_flows = FlowSet:new(template.v6, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
 
-   self.outgoing_messages = link.new_anonymous()
+   self.outgoung_messages_link_name, self.outgoing_messages =
+      new_internal_link('IPFIX outgoing')
 
    return setmetatable(o, { __index = self })
 end
@@ -458,8 +470,9 @@ function selftest()
                              collector_port = 4739 })
 
    -- Mock input and output.
-   ipfix.input = { input = link.new_anonymous() }
-   ipfix.output = { output = link.new_anonymous() }
+   local input_name, input = new_internal_link('ipfix selftest input')
+   local output_name, output = new_internal_link('ipfix selftest output')
+   ipfix.input, ipfix.output = { input = input }, { output = output }
 
    -- Test helper that supplies a packet with some given fields.
    local function test(src_ip, dst_ip, src_port, dst_port)
@@ -484,7 +497,7 @@ function selftest()
       dg:push(ip)
       dg:push(eth)
 
-      link.transmit(ipfix.input.input, dg:packet())
+      link.transmit(input, dg:packet())
       ipfix:push()
    end
 
@@ -500,7 +513,7 @@ function selftest()
           string.format("wrong number of v6 flows: %d", ipfix.ipv6_flows.table.occupancy))
 
    -- do some packets with random data to test that it doesn't interfere
-   for i=1, 100 do
+   for i=1, 10000 do
       test(string.format("192.168.1.%d", math.random(2, 254)),
            "192.168.1.25",
            math.random(10000, 65535),
@@ -556,23 +569,25 @@ function selftest()
    ipfix.ipv4_flows.table:add(key, value)
 
    -- Template message; no data yet.
-   assert(link.nreadable(ipfix.output.output) == 1)
+   assert(link.nreadable(output) == 1)
    -- Cause expiry.  By default we do 1/1000th of the table per push,
    -- so this should be good.
    for i=1,2000 do ipfix:push() end
    -- Template message and data message.
-   assert(link.nreadable(ipfix.output.output) == 2)
+   assert(link.nreadable(output) == 2)
 
    local filter = require("pf").compile_filter([[
       udp and dst port 4739 and src net 192.168.1.2 and
       dst net 192.168.1.1]])
 
-   for i=1,link.nreadable(ipfix.output.output) do
-      local p = link.receive(ipfix.output.output)
+   for i=1,link.nreadable(output) do
+      local p = link.receive(output)
       assert(filter(p.data, p.length), "pf filter failed")
       packet.free(p)
    end
-   ipfix.output = {}
+
+   link.free(input, input_name)
+   link.free(output, output_name)
 
    print("selftest ok")
 end
