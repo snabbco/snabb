@@ -7,7 +7,7 @@ local bit    = require("bit")
 local ffi    = require("ffi")
 local pf     = require("pf")
 local util   = require("apps.ipfix.util")
-local consts = require("apps.lwaftr.constants")
+local template = require("apps.ipfix.template")
 local lib    = require("core.lib")
 local link   = require("core.link")
 local packet = require("core.packet")
@@ -27,29 +27,7 @@ local get_timestamp = util.get_timestamp
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
-local IP_PROTO_TCP  = 6
 local IP_PROTO_UDP  = 17
-local IP_PROTO_SCTP = 132
-
-local TCP_CONTROL_BITS_OFFSET = 11
-
--- These constants are taken from the lwaftr constants module, which
--- is maybe a bad dependency but sharing code is good
--- TODO: move constants somewhere else? lib?
-local ethertype_ipv4         = consts.ethertype_ipv4
-local ethertype_ipv6         = consts.ethertype_ipv6
-local ethernet_header_size   = consts.ethernet_header_size
-local ipv6_fixed_header_size = consts.ipv6_fixed_header_size
-local o_ethernet_ethertype   = consts.o_ethernet_ethertype
-local o_ipv4_total_length    = consts.o_ipv4_total_length
-local o_ipv4_ver_and_ihl     = consts.o_ipv4_ver_and_ihl
-local o_ipv4_proto           = consts.o_ipv4_proto
-local o_ipv4_src_addr        = consts.o_ipv4_src_addr
-local o_ipv4_dst_addr        = consts.o_ipv4_dst_addr
-local o_ipv6_payload_len     = consts.o_ipv6_payload_len
-local o_ipv6_next_header     = consts.o_ipv6_next_header
-local o_ipv6_src_addr        = consts.o_ipv6_src_addr
-local o_ipv6_dst_addr        = consts.o_ipv6_dst_addr
 
 -- TODO: should be configurable
 --       these numbers are placeholders for more realistic ones
@@ -104,290 +82,6 @@ local template_header_ptr_t = ptr_to(template_header_t)
 
 local V9_TEMPLATE_ID  = 0
 local V10_TEMPLATE_ID = 2
-
-local function string_parser(str)
-   local idx = 1
-   local quote = ('"'):byte()
-   local ret = {}
-   function ret.consume_upto(char)
-      local start_idx = idx
-      local byte = char:byte()
-      while str:byte(idx) ~= byte do
-         if str:byte(idx) == quote then
-            idx = idx + 1
-            while str:byte(idx) ~= quote do idx = idx + 1 end
-         end
-         idx = idx + 1
-      end
-      idx = idx + 1
-      return string.sub(str, start_idx, idx - 2)
-   end
-   function ret.is_done() return idx > str:len() end
-   return ret
-end
-
--- Parse out available IPFIX fields.
-local function make_ipfix_element_map()
-   local elems = require("apps.ipfix.ipfix_information_elements_inc")
-   local parser = string_parser(elems)
-   local map = {}
-   while not parser.is_done() do
-      local id = parser.consume_upto(",")
-      local name = parser.consume_upto(",")
-      local data_type = parser.consume_upto(",")
-      for i=1,8 do parser.consume_upto(",") end
-      parser.consume_upto("\n")
-      map[name] = { id = id, data_type = data_type }
-   end
-   return map
-end
-
-local ipfix_elements = make_ipfix_element_map()
-
-local swap_fn_env = { htons = htons, htonl = htonl, htonq = htonq }
-
--- Create a table describing the information needed to create
--- flow templates and data records.
-local function make_template_info(spec)
-   -- Representations of IPFIX IEs.
-   local ctypes =
-      { unsigned8 = 'uint8_t', unsigned16 = 'uint16_t',
-        unsigned32 = 'uint32_t', unsigned64 = 'uint64_t',
-        ipv4Address = 'uint8_t[4]', ipv6Address = 'uint8_t[16]',
-        dateTimeMilliseconds = 'uint64_t' }
-   local bswap = { uint16_t='htons', uint32_t='htonl', uint64_t='htonq' }
-   -- the contents of the template records we will send
-   -- there is an ID & length for each field
-   local length = 2 * (#spec.keys + #spec.values)
-   local buffer = ffi.new("uint16_t[?]", length)
-
-   -- octets in a data record
-   local data_len = 0
-   local swap_fn = {}
-
-   local function process_fields(buffer, fields, struct_def, types, swap_tmpl)
-      for idx, name in ipairs(fields) do
-         local entry = ipfix_elements[name]
-         local ctype = assert(ctypes[entry.data_type],
-                              'unimplemented: '..entry.data_type)
-         data_len = data_len + ffi.sizeof(ctype)
-         buffer[2 * (idx - 1)]     = htons(entry.id)
-         buffer[2 * (idx - 1) + 1] = htons(ffi.sizeof(ctype))
-         table.insert(struct_def, '$ '..name..';')
-         table.insert(types, ffi.typeof(ctype))
-         if bswap[ctype] then
-            table.insert(swap_fn, swap_tmpl:format(name, bswap[ctype], name))
-         end
-      end
-   end
-
-   table.insert(swap_fn, 'return function(o)')
-   local key_struct_def = { 'struct {' }
-   local key_types = {}
-   process_fields(buffer, spec.keys, key_struct_def, key_types,
-                  'o.key.%s = %s(o.key.%s)')
-   table.insert(key_struct_def, '} __attribute__((packed))')
-   local value_struct_def = { 'struct {' }
-   local value_types = {}
-   process_fields(buffer + #spec.keys * 2, spec.values, value_struct_def,
-                  value_types, 'o.value.%s = %s(o.value.%s)')
-   table.insert(value_struct_def, '} __attribute__((packed))')
-   table.insert(swap_fn, 'end')
-   local key_t = ffi.typeof(table.concat(key_struct_def, ' '),
-                            unpack(key_types))
-   local value_t = ffi.typeof(table.concat(value_struct_def, ' '),
-                              unpack(value_types))
-   local record_t = ffi.typeof(
-      'struct { $ key; $ value; } __attribute__((packed))', key_t, value_t)
-   gen_swap_fn = loadstring(table.concat(swap_fn, '\n'))
-   setfenv(gen_swap_fn, swap_fn_env)
-
-   assert(ffi.sizeof(record_t) == data_len)
-
-   return { id = spec.id,
-            field_count = #spec.keys + #spec.values,
-            buffer = buffer,
-            buffer_len = length * 2,
-            data_len = data_len,
-            key_t = key_t,
-            value_t = value_t,
-            record_t = record_t,
-            record_ptr_t = ptr_to(record_t),
-            swap_fn = gen_swap_fn(),
-            match = pf.compile_filter(spec.filter)
-          }
-end
-
-local uint16_ptr_t = ffi.typeof('uint16_t *')
-
-local function get_ipv4_ihl(l3)
-   return bit.band((l3 + o_ipv4_ver_and_ihl)[0], 0x0f)
-end
-
-local function get_ipv4_protocol(l3)    return l3[o_ipv4_proto] end
-local function get_ipv6_next_header(l3) return l3[o_ipv6_next_header] end
-
-local function get_ipv4_src_addr_ptr(l3) return l3 + o_ipv4_src_addr end
-local function get_ipv4_dst_addr_ptr(l3) return l3 + o_ipv4_dst_addr end
-
-local function get_ipv6_src_addr_ptr(l3) return l3 + o_ipv6_src_addr end
-local function get_ipv6_dst_addr_ptr(l3) return l3 + o_ipv6_dst_addr end
-
-local function read_ipv4_src_address(l3, dst)
-   ffi.copy(dst, get_ipv4_src_addr_ptr(l3), 4)
-end
-local function read_ipv4_dst_address(l3, dst)
-   ffi.copy(dst, get_ipv4_dst_addr_ptr(l3), 4)
-end
-local function read_ipv6_src_address(l3, dst)
-   ffi.copy(dst, get_ipv6_src_addr_ptr(l3), 16)
-end
-local function read_ipv6_dst_address(l3, dst)
-   ffi.copy(dst, get_ipv6_dst_addr_ptr(l3), 16)
-end
-
-local function get_ipv4_traffic_class(l3)
-   -- Simpler than combining ip_header:dscp() and ip_header:ecn().
-   return l3[1]
-end
-local function get_ipv6_traffic_class(l3)
-   local high = bit.band(l3[0], 0x0f)
-   local low  = bit.rshift(bit.band(l3[1], 0xf0), 4)
-   return bit.band(high, low)
-end
-
-local function get_tcp_src_port(l4)
-   return ntohs(ffi.cast(uint16_ptr_t, l4)[0])
-end
-local function get_tcp_dst_port(l4)
-   return ntohs(ffi.cast(uint16_ptr_t, l4)[1])
-end
-local function get_tcp_control_bits(l4)
-   local ptr = l4 + TCP_CONTROL_BITS_OFFSET
-   return ntohs(ffi.cast(uint16_ptr_t, ptr)[0])
-end
-
-local template_v4 = make_template_info {
-   id     = 256,
-   filter = "ip",
-   keys   = { "sourceIPv4Address",
-              "destinationIPv4Address",
-              "protocolIdentifier",
-              "sourceTransportPort",
-              "destinationTransportPort" },
-   values = { "flowStartMilliseconds",
-              "flowEndMilliseconds",
-              "packetDeltaCount",
-              "octetDeltaCount",
-              "ingressInterface",
-              "egressInterface",
-              "bgpPrevAdjacentAsNumber",
-              "bgpNextAdjacentAsNumber",
-              "tcpControlBits",
-              "ipClassOfService" }
-}
-
-function template_v4.extract(pkt, timestamp, entry)
-   local l2 = pkt.data
-   local l3 = l2 + ethernet_header_size
-   local ihl = get_ipv4_ihl(l3)
-   local l4 = l3 + ihl * 4
-
-   -- Fill key.
-   -- FIXME: Try using normal Lua assignment.
-   read_ipv4_src_address(l3, entry.key.sourceIPv4Address)
-   read_ipv4_dst_address(l3, entry.key.destinationIPv4Address)
-   local prot = get_ipv4_protocol(l3)
-   entry.key.protocolIdentifier = prot
-   if prot == IP_PROTO_TCP or prot == IP_PROTO_UDP or prot == IP_PROTO_SCTP then
-      entry.key.sourceTransportPort = get_tcp_src_port(l4)
-      entry.key.destinationTransportPort = get_tcp_dst_port(l4)
-   else
-      entry.key.sourceTransportPort = 0
-      entry.key.destinationTransportPort = 0
-   end
-
-   -- Fill value.
-   entry.value.flowStartMilliseconds = timestamp
-   entry.value.flowEndMilliseconds = timestamp
-   entry.value.packetDeltaCount = 1
-   -- Measure bytes starting with the IP header.
-   entry.value.octetDeltaCount = pkt.length - ethernet_header_size
-   if prot == IP_PROTO_TCP then
-      entry.value.tcpControlBits = get_tcp_control_bits(l4)
-   else
-      entry.value.tcpControlBits = 0
-   end
-   entry.value.ipClassOfService = get_ipv4_traffic_class(l3)
-end
-
-function template_v4.accumulate(dst, new)
-   dst.value.flowEndMilliseconds = new.value.flowEndMilliseconds
-   dst.value.packetDeltaCount = dst.value.packetDeltaCount + 1
-   dst.value.octetDeltaCount =
-      dst.value.octetDeltaCount + new.value.octetDeltaCount
-end
-
-local template_v6 = make_template_info {
-   id     = 257,
-   filter = "ip6",
-   keys   = { "sourceIPv6Address",
-              "destinationIPv6Address",
-              "protocolIdentifier",
-              "sourceTransportPort",
-              "destinationTransportPort" },
-   values = { "flowStartMilliseconds",
-              "flowEndMilliseconds",
-              "packetDeltaCount",
-              "octetDeltaCount",
-              "ingressInterface",
-              "egressInterface",
-              "bgpPrevAdjacentAsNumber",
-              "bgpNextAdjacentAsNumber",
-              "tcpControlBits",
-              "ipClassOfService" }
-}
-
-function template_v6.extract(pkt, timestamp, entry)
-   local l2 = pkt.data
-   local l3 = l2 + ethernet_header_size
-   -- TODO: handle chained headers
-   local l4 = l3 + ipv6_fixed_header_size
-
-   -- Fill key.
-   -- FIXME: Try using normal Lua assignment.
-   read_ipv6_src_address(l3, entry.key.sourceIPv6Address)
-   read_ipv6_dst_address(l3, entry.key.destinationIPv6Address)
-   local prot = get_ipv6_next_header(l3)
-   entry.key.protocolIdentifier = prot
-   if prot == IP_PROTO_TCP or prot == IP_PROTO_UDP or prot == IP_PROTO_SCTP then
-      entry.key.sourceTransportPort = get_tcp_src_port(l4)
-      entry.key.destinationTransportPort = get_tcp_dst_port(l4)
-   else
-      entry.key.sourceTransportPort = 0
-      entry.key.destinationTransportPort = 0
-   end
-
-   -- Fill value.
-   entry.value.flowStartMilliseconds = timestamp
-   entry.value.flowEndMilliseconds = timestamp
-   entry.value.packetDeltaCount = 1
-   -- Measure bytes starting with the IP header.
-   entry.value.octetDeltaCount = pkt.length - ethernet_header_size
-   if prot == IP_PROTO_TCP then
-      entry.value.tcpControlBits = get_tcp_control_bits(l4)
-   else
-      entry.value.tcpControlBits = 0
-   end
-   entry.value.ipClassOfService = get_ipv6_traffic_class(l3)
-end
-
-function template_v6.accumulate(dst, new)
-   dst.value.flowEndMilliseconds = new.value.flowEndMilliseconds
-   dst.value.packetDeltaCount = dst.value.packetDeltaCount + 1
-   dst.value.octetDeltaCount =
-      dst.value.octetDeltaCount + new.value.octetDeltaCount
-end
 
 -- RFC5153 recommends a 10-minute template refresh configurable from
 -- 1 minute to 1 day (https://tools.ietf.org/html/rfc5153#section-6.2)
@@ -650,8 +344,8 @@ function IPFIX:new(config)
    local ipfix_header_len = o.header_size
    local total_header_len = l4_header_len + l3_header_len + ipfix_header_len
    local payload_mtu = o.mtu - total_header_len
-   o.ipv4_flows = FlowSet:new(template_v4, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
-   o.ipv6_flows = FlowSet:new(template_v6, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
+   o.ipv4_flows = FlowSet:new(template.v4, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
+   o.ipv6_flows = FlowSet:new(template.v6, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
 
    self.outgoing_messages = link.new_anonymous()
 
@@ -752,6 +446,9 @@ end
 
 function selftest()
    print('selftest: apps.ipfix.ipfix')
+   local consts = require("apps.lwaftr.constants")
+   local ethertype_ipv4 = consts.ethertype_ipv4
+   local ethertype_ipv6 = consts.ethertype_ipv6
    local ipfix = IPFIX:new({ ipfix_version = 10,
                              exporter_mac = "00:11:22:33:44:55",
                              exporter_ip = "192.168.1.2",
@@ -764,32 +461,22 @@ function selftest()
    ipfix.output = { output = link.new_anonymous() }
 
    -- Test helper that supplies a packet with some given fields.
-   local function test_packet(is_ipv6, src_ip, dst_ip, src_port, dst_port)
-      local proto
-      if is_ipv6 then
-         proto = ethertype_ipv6
-      else
-         proto = ethertype_ipv4
-      end
-
+   local function test(src_ip, dst_ip, src_port, dst_port)
+      local is_ipv6 = not not src_ip:match(':')
+      local proto = is_ipv6 and ethertype_ipv6 or ethertype_ipv4
       local eth = ether:new({ src = ether:pton("00:11:22:33:44:55"),
                               dst = ether:pton("55:44:33:22:11:00"),
                               type = proto })
       local ip
 
       if is_ipv6 then
-         ip = ipv6:new({ src = ipv6:pton(src_ip),
-                         dst = ipv6:pton(dst_ip),
-                         next_header = IP_PROTO_UDP,
-                         ttl = 64 })
+         ip = ipv6:new({ src = ipv6:pton(src_ip), dst = ipv6:pton(dst_ip),
+                         next_header = IP_PROTO_UDP, ttl = 64 })
       else
-         ip = ipv4:new({ src = ipv4:pton(src_ip),
-                         dst = ipv4:pton(dst_ip),
-                         protocol = IP_PROTO_UDP,
-                         ttl = 64 })
+         ip = ipv4:new({ src = ipv4:pton(src_ip), dst = ipv4:pton(dst_ip),
+                         protocol = IP_PROTO_UDP, ttl = 64 })
       end
-      local udp = udp:new({ src_port = src_port,
-                            dst_port = dst_port })
+      local udp = udp:new({ src_port = src_port, dst_port = dst_port })
       local dg = datagram:new()
 
       dg:push(udp)
@@ -801,11 +488,11 @@ function selftest()
    end
 
    -- Populate with some known flows.
-   test_packet(false, "192.168.1.1", "192.168.1.25", 9999, 80)
-   test_packet(false, "192.168.1.25", "192.168.1.1", 3653, 23552)
-   test_packet(false, "192.168.1.25", "8.8.8.8", 58342, 53)
-   test_packet(false, "8.8.8.8", "192.168.1.25", 53, 58342)
-   test_packet(true, "2001:4860:4860::8888", "2001:db8::ff00:42:8329", 53, 57777)
+   test("192.168.1.1", "192.168.1.25", 9999, 80)
+   test("192.168.1.25", "192.168.1.1", 3653, 23552)
+   test("192.168.1.25", "8.8.8.8", 58342, 53)
+   test("8.8.8.8", "192.168.1.25", 53, 58342)
+   test("2001:4860:4860::8888", "2001:db8::ff00:42:8329", 53, 57777)
    assert(ipfix.ipv4_flows.table.occupancy == 4,
           string.format("wrong number of v4 flows: %d", ipfix.ipv4_flows.table.occupancy))
    assert(ipfix.ipv6_flows.table.occupancy == 1,
@@ -813,11 +500,10 @@ function selftest()
 
    -- do some packets with random data to test that it doesn't interfere
    for i=1, 100 do
-      test_packet(false,
-                  string.format("192.168.1.%d", math.random(2, 254)),
-                  "192.168.1.25",
-                  math.random(10000, 65535),
-                  math.random(1, 79))
+      test(string.format("192.168.1.%d", math.random(2, 254)),
+           "192.168.1.25",
+           math.random(10000, 65535),
+           math.random(1, 79))
    end
 
    local key = ipfix.ipv4_flows.scratch_entry.key
@@ -832,7 +518,7 @@ function selftest()
    assert(result.value.packetDeltaCount == 1)
 
    -- make sure the count is incremented on the same flow
-   test_packet(false, "192.168.1.1", "192.168.1.25", 9999, 80)
+   test("192.168.1.1", "192.168.1.25", 9999, 80)
    assert(result.value.packetDeltaCount == 2,
           string.format("wrong count: %d", tonumber(result.value.packetDeltaCount)))
 
