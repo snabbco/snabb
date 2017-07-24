@@ -6,7 +6,7 @@ local engine    = require("core.app")
 local timer     = require("core.timer")
 local lib       = require("core.lib")
 local pci       = require("lib.hardware.pci")
-local LoadGen   = require("apps.intel.loadgen").LoadGen
+local LoadGen   = require("apps.intel_mp.loadgen").LoadGen
 local Intel82599 = require("apps.intel_mp.intel_mp").Intel82599
 
 local function is_device_suitable (pcidev, patterns)

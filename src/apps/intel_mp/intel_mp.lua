@@ -401,6 +401,7 @@ end
 function Intel:disable_interrupts ()
    self.r.EIMC(0xffffffff)
 end
+
 function Intel:wait_linkup (timeout)
    if timeout == nil then timeout = self.linkup_wait end
    if self:link_status() then return true end
@@ -410,6 +411,16 @@ function Intel:wait_linkup (timeout)
    end
    return false
 end
+
+rxdesc_t = ffi.typeof([[
+struct {
+   uint64_t address;
+   uint16_t length, cksum;
+   uint8_t status, errors;
+   uint16_t vlan;
+} __attribute__((packed))
+]])
+
 function Intel:init_rx_q ()
    if not self.rxq then return end
    assert((self.rxq >=0) and (self.rxq < self.max_q),
@@ -421,14 +432,6 @@ function Intel:init_rx_q ()
    self.rdh = 0
    self.rdt = 0
    -- setup 4.5.9
-   local rxdesc_t = ffi.typeof([[
-   struct {
-      uint64_t address;
-      uint16_t length, cksum;
-      uint8_t status, errors;
-      uint16_t vlan;
-   } __attribute__((packed))
-   ]])
    local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, self.ndesc)
    self.rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
    memory.dma_alloc(ffi.sizeof(rxdesc_ring_t)))
@@ -564,7 +567,7 @@ function Intel:push ()
    if li == nil then return end
 --   assert(li, "intel_mp:push: no input link")
 
-   while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
+   while not link.empty(li) and self:can_transmit() do
       local p = link.receive(li)
       -- NB: see comment in intel10g for why this is commented out,
       --     the rest of the loop body goes in an else branch
@@ -572,11 +575,7 @@ function Intel:push ()
       --   packet.free(p)
       --   counter.add(self.shm.txdrop)
       --end
-      self.txdesc[self.tdt].address = tophysical(p.data)
-      self.txdesc[self.tdt].flags =
-         bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
-      self.txqueue[self.tdt] = p
-      self.tdt = self:ringnext(self.tdt)
+      self:transmit(p)
    end
    -- Reclaim transmit contexts
    local cursor = self.tdh
@@ -633,6 +632,19 @@ end
 function Intel:ringnext (index)
    return band(index+1, self.ndesc-1)
 end
+
+function Intel:can_transmit ()
+   return self:ringnext(self.tdt) ~= self.tdh
+end
+
+function Intel:transmit (p)
+   self.txdesc[self.tdt].address = tophysical(p.data)
+   self.txdesc[self.tdt].flags =
+      bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
+   self.txqueue[self.tdt] = p
+   self.tdt = self:ringnext(self.tdt)
+end
+
 function Intel:rss_enable ()
    -- set default q = 0 on i350,i210 noop on 82599
    self.r.MRQC(0)
