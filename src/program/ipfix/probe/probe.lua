@@ -6,7 +6,6 @@ local now      = require("core.app").now
 local lib      = require("core.lib")
 local link     = require("core.link")
 local ipfix    = require("apps.ipfix.ipfix")
-local V4V6     = require("apps.lwaftr.V4V6")
 local numa     = require("lib.numa")
 
 -- apps that can be used as an input or output for the exporter
@@ -144,13 +143,10 @@ function run (args)
    local c = config.new()
 
    config.app(c, "source", unpack(in_app))
-   config.app(c, "splitter", V4V6.V4V6, {})
    config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
    config.app(c, "sink", unpack(out_app))
 
-   config.link(c, "source." .. in_link.output .. " -> splitter.input")
-   config.link(c, "splitter.v4 -> ipfix.v4")
-   config.link(c, "splitter.v6 -> ipfix.v6")
+   config.link(c, "source." .. in_link.output .. " -> ipfix.input")
    config.link(c, "ipfix.output -> sink." .. out_link.input)
 
    local done
@@ -169,11 +165,7 @@ function run (args)
 
    if report then
       local end_time = now()
-      local app = engine.app_table.ipfix
-      local v4_link, v6_link = app.input.v4, app.input.v6
-      local v4_stats, v6_stats = link.stats(v4_link), link.stats(v6_link)
-      local stats = { rxbytes = v4_stats.rxbytes + v6_stats.rxbytes,
-		      rxpackets = v4_stats.rxpackets + v6_stats.rxpackets }
+      local stats = link.stats(engine.app_table.ipfix.input.input)
       print("IPFIX probe stats:")
       print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
                           lib.comma_value(stats.rxbytes),
