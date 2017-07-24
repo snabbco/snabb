@@ -835,7 +835,7 @@ end
 
 function Intel:add_receive_VLAN (vlan)
    assert(vlan>=0 and vlan<4096, "bad VLAN number")
-   local vlan_index
+   local vlan_index, first_empty
 
    -- scan to see if the VLAN is already recorded or find the
    -- first free VLAN index
@@ -843,16 +843,19 @@ function Intel:add_receive_VLAN (vlan)
       local valid = self.r.PFVLVF[idx]:bits(31, 1)
 
       if valid == 0 then
-         vlan_index = idx
-         self.r.VFTA[math.floor(vlan/32)]:set(bits{Ena=vlan%32})
-         self.r.PFVLVF[vlan_index](bits({Vl_En=31},vlan))
-         break
-      else
-         if self.r.PFVLVF[idx]:bits(0, 11) == vlan then
-            vlan_index = idx
-            break
+         if not first_empty then
+            first_empty = idx
          end
+      elseif self.r.PFVLVF[idx]:bits(0, 11) == vlan then
+         vlan_index = idx
+         break
       end
+   end
+
+   if not vlan_index and first_empty then
+      vlan_index = first_empty
+      self.r.VFTA[math.floor(vlan/32)]:set(bits{Ena=vlan%32})
+      self.r.PFVLVF[vlan_index](bits({Vl_En=31},vlan))
    end
 
    assert(vlan_index, "Max number of VLAN IDs reached")
