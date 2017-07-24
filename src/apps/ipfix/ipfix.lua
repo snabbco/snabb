@@ -153,6 +153,7 @@ function FlowSet:new (template, mtu, version, cache_size, idle_timeout, active_t
    o.incoming_link_name, o.incoming = new_internal_link('IPFIX incoming')
    o.table = ctable.new(params)
    o.scratch_entry = o.table.entry_type()
+   o.expiry_cursor = 0
 
    return setmetatable(o, { __index = self })
 end
@@ -170,29 +171,6 @@ function FlowSet:record_flows(timestamp)
          self.template.accumulate(lookup_result, entry)
       end
    end
-end
-
-function FlowSet:iterate()
-   -- use the underlying ctable's iterator, but restrict the max stride
-   -- for each use of the iterator
-   local next_entry = self.next_entry or self.table:iterate()
-   local last_entry = self.last_entry or self.table.entries - 1
-   local max_entry  = last_entry + self.stride
-   local table_max  =
-      self.table.entries + self.table.size + self.table.max_displacement
-
-   if table_max < max_entry then
-      max_entry = table_max
-      self.last_entry = nil
-   else
-      self.last_entry = max_entry
-   end
-
-   return next_entry, max_entry, last_entry
-end
-
-function FlowSet:remove(key)
-   self.table:remove(key)
 end
 
 function FlowSet:append_template_record(pkt)
@@ -281,15 +259,22 @@ end
 -- Walk through flow set to see if flow records need to be expired.
 -- Collect expired records and export them to the collector.
 function FlowSet:expire_records(out)
+   -- For a breath time of 100us, we will get 1e4 calls to push() every
+   -- second.  We'd like to sweep through the flow table once every 10
+   -- seconds, so on each breath we process 1e-5th of the table.
+   local cursor = self.expiry_cursor
+   local limit = cursor + math.ceil(self.table.size * 1e-5)
    local timestamp = get_timestamp()
-   -- FIXME: remove these table allocations
-   local keys_to_remove = {}
-   for entry in self:iterate() do
+   while true do
+      local entry
+      cursor, entry = self.table:next_entry(cursor, limit)
+      if not entry then break end
+      -- print (timestamp, entry.value.flowEndMilliseconds)
       if timestamp - entry.value.flowEndMilliseconds > self.idle_timeout then
          self:debug_expire(entry, timestamp, "idle")
-         table.insert(keys_to_remove, entry.key)
          -- Relying on key and value being contiguous.
          self:add_data_record(entry.key, out)
+         self.table:remove(entry.key)
       elseif timestamp - entry.value.flowStartMilliseconds > self.active_timeout then
          self:debug_expire(entry, timestamp, "active")
          -- TODO: what should timers reset to?
@@ -298,15 +283,15 @@ function FlowSet:expire_records(out)
          entry.value.packetDeltaCount = 0
          entry.value.octetDeltaCount = 0
          self:add_data_record(entry.key, out)
+         cursor = cursor + 1
+      else
+         -- Flow still live.
+         cursor = cursor + 1
       end
    end
+   self.expiry_cursor = cursor
 
    self:flush_data_records(out)
-
-   -- FIXME: Remove flows as we go.
-   for _, key in ipairs(keys_to_remove) do
-      self.table:remove(key)
-   end
 end
 
 IPFIX = {}
@@ -568,9 +553,9 @@ function selftest()
 
    -- Template message; no data yet.
    assert(link.nreadable(output) == 1)
-   -- Cause expiry.  By default we do 1/1000th of the table per push,
+   -- Cause expiry.  By default we do 1e-5th of the table per push,
    -- so this should be good.
-   for i=1,2000 do ipfix:push() end
+   for i=1,2e5 do ipfix:push() end
    -- Template message and data message.
    assert(link.nreadable(output) == 2)
 
