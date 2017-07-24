@@ -236,6 +236,18 @@ function v4.accumulate(dst, new)
       dst.value.octetDeltaCount + new.value.octetDeltaCount
 end
 
+function v4.tostring(entry)
+   local ipv4   = require("lib.protocol.ipv4")
+   local key = entry.key
+   local protos =
+      { [IP_PROTO_TCP]='TCP', [IP_PROTO_UDP]='UDP', [IP_PROTO_SCTP]='SCTP' }
+   return string.format(
+      "%s (%d) -> %s (%d) [%s]",
+      ipv4:ntop(key.sourceIPv4Address), key.sourceTransportPort,
+      ipv4:ntop(key.destinationIPv4Address), key.destinationTransportPort,
+      protos[key.protocolIdentifier] or tostring(key.protocolIdentifier))
+end
+
 v6 = make_template_info {
    id     = 257,
    filter = "ip6",
@@ -283,6 +295,18 @@ function v6.accumulate(dst, new)
    dst.value.packetDeltaCount = dst.value.packetDeltaCount + 1
    dst.value.octetDeltaCount =
       dst.value.octetDeltaCount + new.value.octetDeltaCount
+end
+
+function v6.tostring(entry)
+   local ipv6 = require("lib.protocol.ipv6")
+   local key = entry.key
+   local protos =
+      { [IP_PROTO_TCP]='TCP', [IP_PROTO_UDP]='UDP', [IP_PROTO_SCTP]='SCTP' }
+   return string.format(
+      "%s (%d) -> %s (%d) [%s]",
+      ipv6:ntop(key.sourceIPv6Address), key.sourceTransportPort,
+      ipv6:ntop(key.destinationIPv6Address), key.destinationTransportPort,
+      protos[key.protocolIdentifier] or tostring(key.protocolIdentifier))
 end
 
 function selftest()

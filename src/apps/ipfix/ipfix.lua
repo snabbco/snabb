@@ -6,7 +6,6 @@ module(..., package.seeall)
 local bit    = require("bit")
 local ffi    = require("ffi")
 local pf     = require("pf")
-local util   = require("apps.ipfix.util")
 local template = require("apps.ipfix.template")
 local lib    = require("core.lib")
 local link   = require("core.link")
@@ -20,8 +19,6 @@ local ctable = require("lib.ctable")
 local C      = ffi.C
 
 local htonl, htons = lib.htonl, lib.htons
-
-local get_timestamp = util.get_timestamp
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
@@ -216,35 +213,18 @@ function FlowSet:flush_data_records(out)
 end
 
 -- print debugging messages for flow expiration
-function FlowSet:debug_expire(entry, timestamp, msg)
+function FlowSet:debug_expire(entry, msg)
    if debug then
-      local key = entry.key
-      local src_ip, dst_ip
-
-      if key.is_ipv6 == 1 then
-         src_ip = ipv6:ntop(key.sourceIPv6Address)
-         dst_ip = ipv6:ntop(key.destinationIPv6Address)
-      else
-         src_ip = ipv4:ntop(key.sourceIPv4Address)
-         dst_ip = ipv4:ntop(key.destinationIPv4Address)
-      end
-
-      local time_delta
-      if msg == "idle" then
-         time_delta = tonumber(entry.value.flowEndMilliseconds - self.boot_time) / 1000
-      else
-         time_delta = tonumber(entry.value.flowStartMilliseconds - self.boot_time) / 1000
-      end
-
-      util.fe_debug("exp [%s, %ds] %s (%d) -> %s (%d) P:%d",
-                    msg,
-                    time_delta,
-                    src_ip,
-                    key.sourceTransportPort,
-                    dst_ip,
-                    key.destinationTransportPort,
-                    key.protocolIdentifier)
+      local msg = string.format("%s | expire %s %s\n", os.date("%F %H:%M:%S"),
+				self.template.tostring(entry))
+      io.stderr:write(msg)
+      io.stderr:flush()
    end
+end
+
+-- produce a timestamp in milliseconds
+function get_milliseconds()
+   return C.get_unix_time() * 1000ULL
 end
 
 -- Walk through flow set to see if flow records need to be expired.
@@ -255,19 +235,19 @@ function FlowSet:expire_records(out)
    -- seconds, so on each breath we process 1e-5th of the table.
    local cursor = self.expiry_cursor
    local limit = cursor + math.ceil(self.table.size * 1e-5)
-   local timestamp = get_timestamp()
+   local timestamp = get_milliseconds()
    while true do
       local entry
       cursor, entry = self.table:next_entry(cursor, limit)
       if not entry then break end
       -- print (timestamp, entry.value.flowEndMilliseconds)
       if timestamp - entry.value.flowEndMilliseconds > self.idle_timeout then
-         self:debug_expire(entry, timestamp, "idle")
+         self:debug_expire(entry, "idle")
          -- Relying on key and value being contiguous.
          self:add_data_record(entry.key, out)
          self.table:remove(entry.key)
       elseif timestamp - entry.value.flowStartMilliseconds > self.active_timeout then
-         self:debug_expire(entry, timestamp, "active")
+         self:debug_expire(entry, "active")
          -- TODO: what should timers reset to?
          entry.value.flowStartMilliseconds = timestamp
          entry.value.flowEndMilliseconds = timestamp
@@ -293,7 +273,7 @@ function IPFIX:new(config)
                active_timeout = config.active_timeout or 120,
                -- sequence number to use for flow packets
                sequence_number = 1,
-               boot_time = util.get_timestamp(),
+               boot_time = get_milliseconds(),
 	       -- RFC5153 recommends a 10-minute template refresh
 	       -- configurable from 1 minute to 1 day
 	       -- (https://tools.ietf.org/html/rfc5153#section-6.2)
@@ -358,7 +338,7 @@ function IPFIX:add_ipfix_header(pkt, count)
    header.version = htons(self.version)
    if self.version == 9 then
       header.count = htons(count)
-      header.uptime = htonl(tonumber(get_timestamp() - self.boot_time))
+      header.uptime = htonl(tonumber(get_milliseconds() - self.boot_time))
    elseif self.version == 10 then
       header.byte_length = htons(pkt.length)
    end
@@ -400,7 +380,7 @@ end
 
 function IPFIX:push()
    local input = self.input.input
-   local timestamp = get_timestamp()
+   local timestamp = get_milliseconds()
    assert(self.output.output, "missing output link")
    local outgoing = self.outgoing_messages
 
@@ -538,7 +518,7 @@ function selftest()
    key.destinationTransportPort = 80
 
    local value = ipfix.ipv4_flows.scratch_entry.value
-   value.flowStartMilliseconds = get_timestamp() - 500e3
+   value.flowStartMilliseconds = get_milliseconds() - 500e3
    value.flowEndMilliseconds = value.flowStartMilliseconds + 30
    value.packetDeltaCount = 5
    value.octetDeltaCount = 15
