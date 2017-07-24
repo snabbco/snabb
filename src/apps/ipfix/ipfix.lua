@@ -19,9 +19,7 @@ local udp    = require("lib.protocol.udp")
 local ctable = require("lib.ctable")
 local C      = ffi.C
 
-local ntohs  = lib.ntohs
 local htonl, htons = lib.htonl, lib.htons
-local function htonq(v) return bit.bswap(v + 0ULL) end
 
 local get_timestamp = util.get_timestamp
 

@@ -21,8 +21,6 @@ local IP_PROTO_TCP  = 6
 local IP_PROTO_UDP  = 17
 local IP_PROTO_SCTP = 132
 
-local TCP_CONTROL_BITS_OFFSET = 11
-
 -- These constants are taken from the lwaftr constants module, which
 -- is maybe a bad dependency but sharing code is good
 -- TODO: move constants somewhere else? lib?
@@ -182,25 +180,11 @@ local function read_ipv6_dst_address(l3, dst)
    ffi.copy(dst, get_ipv6_dst_addr_ptr(l3), 16)
 end
 
-local function get_ipv4_traffic_class(l3)
-   -- Simpler than combining ip_header:dscp() and ip_header:ecn().
-   return l3[1]
-end
-local function get_ipv6_traffic_class(l3)
-   local high = bit.band(l3[0], 0x0f)
-   local low  = bit.rshift(bit.band(l3[1], 0xf0), 4)
-   return bit.band(high, low)
-end
-
 local function get_tcp_src_port(l4)
    return ntohs(ffi.cast(uint16_ptr_t, l4)[0])
 end
 local function get_tcp_dst_port(l4)
    return ntohs(ffi.cast(uint16_ptr_t, l4)[1])
-end
-local function get_tcp_control_bits(l4)
-   local ptr = l4 + TCP_CONTROL_BITS_OFFSET
-   return ntohs(ffi.cast(uint16_ptr_t, ptr)[0])
 end
 
 v4 = make_template_info {
@@ -214,13 +198,7 @@ v4 = make_template_info {
    values = { "flowStartMilliseconds",
               "flowEndMilliseconds",
               "packetDeltaCount",
-              "octetDeltaCount",
-              "ingressInterface",
-              "egressInterface",
-              "bgpPrevAdjacentAsNumber",
-              "bgpNextAdjacentAsNumber",
-              "tcpControlBits",
-              "ipClassOfService" }
+              "octetDeltaCount"}
 }
 
 function v4.extract(pkt, timestamp, entry)
@@ -249,12 +227,6 @@ function v4.extract(pkt, timestamp, entry)
    entry.value.packetDeltaCount = 1
    -- Measure bytes starting with the IP header.
    entry.value.octetDeltaCount = pkt.length - ethernet_header_size
-   if prot == IP_PROTO_TCP then
-      entry.value.tcpControlBits = get_tcp_control_bits(l4)
-   else
-      entry.value.tcpControlBits = 0
-   end
-   entry.value.ipClassOfService = get_ipv4_traffic_class(l3)
 end
 
 function v4.accumulate(dst, new)
@@ -275,13 +247,7 @@ v6 = make_template_info {
    values = { "flowStartMilliseconds",
               "flowEndMilliseconds",
               "packetDeltaCount",
-              "octetDeltaCount",
-              "ingressInterface",
-              "egressInterface",
-              "bgpPrevAdjacentAsNumber",
-              "bgpNextAdjacentAsNumber",
-              "tcpControlBits",
-              "ipClassOfService" }
+              "octetDeltaCount" }
 }
 
 function v6.extract(pkt, timestamp, entry)
@@ -310,12 +276,6 @@ function v6.extract(pkt, timestamp, entry)
    entry.value.packetDeltaCount = 1
    -- Measure bytes starting with the IP header.
    entry.value.octetDeltaCount = pkt.length - ethernet_header_size
-   if prot == IP_PROTO_TCP then
-      entry.value.tcpControlBits = get_tcp_control_bits(l4)
-   else
-      entry.value.tcpControlBits = 0
-   end
-   entry.value.ipClassOfService = get_ipv6_traffic_class(l3)
 end
 
 function v6.accumulate(dst, new)
