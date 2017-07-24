@@ -27,11 +27,6 @@ local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
 local IP_PROTO_UDP  = 17
 
--- TODO: should be configurable
---       these numbers are placeholders for more realistic ones
---       (and timeouts should perhaps be more fine-grained)
-local export_interval = 60
-
 -- Types.
 
 local netflow_v9_packet_header_t = ffi.typeof([[
