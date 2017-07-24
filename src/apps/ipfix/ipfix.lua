@@ -1,30 +1,30 @@
--- This module implements the flow metering app, which records
--- IP flows as part of an IP flow export program.
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+-- This module implements an IPFIX exporter, recording flows on its
+-- input link and exporting IPFIX messages on its output.
 
 module(..., package.seeall)
 
-local bit    = require("bit")
-local ffi    = require("ffi")
-local pf     = require("pf")
+local bit      = require("bit")
+local ffi      = require("ffi")
+local pf       = require("pf")
 local template = require("apps.ipfix.template")
-local lib    = require("core.lib")
-local link   = require("core.link")
-local packet = require("core.packet")
+local lib      = require("core.lib")
+local link     = require("core.link")
+local packet   = require("core.packet")
 local datagram = require("lib.protocol.datagram")
-local ether  = require("lib.protocol.ethernet")
-local ipv4   = require("lib.protocol.ipv4")
-local ipv6   = require("lib.protocol.ipv6")
-local udp    = require("lib.protocol.udp")
-local ctable = require("lib.ctable")
-local C      = ffi.C
+local ether    = require("lib.protocol.ethernet")
+local ipv4     = require("lib.protocol.ipv4")
+local ipv6     = require("lib.protocol.ipv6")
+local udp      = require("lib.protocol.udp")
+local ctable   = require("lib.ctable")
+local C        = ffi.C
 
 local htonl, htons = lib.htonl, lib.htons
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
 local IP_PROTO_UDP  = 17
-
--- Types.
 
 local netflow_v9_packet_header_t = ffi.typeof([[
    struct {
