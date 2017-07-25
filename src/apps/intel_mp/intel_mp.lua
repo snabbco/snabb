@@ -150,6 +150,7 @@ RXCSUM      0x05000 -               RW Receive Checksum Control
 RFCTL       0x05008 -               RW Receive Filter Control Register
 RXCTRL      0x03000 -               RW Receive Control
 RXDGPC      0x02F50 -               RC DMA Good Rx Packet Counter
+TXDGPC      0x087A0 -               RC DMA Good Tx Packet Counter
 RXDSTATCTRL 0x02F40 -               RW Rx DMA Statistic Counter Control
 RUC         0x040A4 -               RC Receive Undersize Count
 RFC         0x040A8 -               RC Receive Fragment Count
@@ -165,15 +166,19 @@ RUC         0x040A4 -               RC Receive Undersize Count
 RFC         0x040A8 -               RC Receive Fragment Count
 ROC         0x040AC -               RC Receive Oversize Count
 RJC         0x040B0 -               RC Receive Jabber Count
+GORCL       0x04088 -               RC Good Octets Received Count Low
+GOTCL       0x04090 -               RC Good Octets Transmitted Count Low
 ]],
    txq = [[
 DCA_TXCTRL  0x0600C +0x40*0..127    RW Tx DCA Control Register
 TDBAL       0x06000 +0x40*0..127    RW Transmit Descriptor Base Address Low
 TDBAH       0x06004 +0x40*0..127    RW Transmit Descriptor Base Address High
+TDLEN       0x06008 +0x40*0..127    RW Transmit Descriptor Length
 TDH         0x06010 +0x40*0..127    RW Transmit Descriptor Head
 TDT         0x06018 +0x40*0..127    RW Transmit Descriptor Tail
-TDLEN       0x06008 +0x40*0..127    RW Transmit Descriptor Length
 TXDCTL      0x06028 +0x40*0..127    RW Transmit Descriptor Control
+TDWBAL      0x06038 +0x40*0..127    RW Tx Descriptor Completion Write Back Address Low
+TDWBAH      0x0603C +0x40*0..127    RW Tx Descriptor Completion Write Back Address High
 ]]
 }
 reg['1000BaseX'] = {

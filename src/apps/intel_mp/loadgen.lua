@@ -21,9 +21,12 @@ LoadGen = {}
 function LoadGen:new (pciaddress)
    local o = {
       pciaddress = pciaddress,
-      dev = intel_mp.new({
+      dev = intel_mp.Intel82599:new({
          pciaddr = pciaddress,
          ndescriptors = num_descriptors,
+         txq = 0,
+         rate_limit = 0,
+         priority = 1.0,
          wait_for_link = true,
       })
    }
@@ -50,16 +53,16 @@ function zero_descriptors (dev)
    for i = 0, num_descriptors-1 do
       -- Make each descriptors point to valid DMA memory but be 0 bytes long.
       dev.txdesc[i].address = memory.virtual_to_physical(b)
-      dev.txdesc[i].options = bit.lshift(1, 24) -- End of Packet flag
+      dev.txdesc[i].flags = bit.lshift(1, 24) -- End of Packet flag
    end
 end
 
 function LoadGen:push ()
    local dev = self.dev
    if self.input.input then
-      while not link.empty(self.input.input) and dev.can_transmit(dev) do
+      while not link.empty(self.input.input) and dev:can_transmit() do
          do local p = receive(self.input.input)
-            dev.transmit(dev, p)
+            dev:transmit(p)
          end
       end
    end
@@ -79,11 +82,14 @@ function LoadGen:pull ()
 end
 
 function LoadGen:report ()
-   self.dev.sync_stats()
    print(self.pciaddress,
-         "TX packets", lib.comma_value(tonumber(self.dev.stats.txpackets)),
-         "TX bytes", lib.comma_value(tonumber(self.dev.stats.txbytes)))
+         "TXDGPC (TX packets)", lib.comma_value(tonumber(self.dev.r.TXDGPC())),
+         "GOTCL (TX bytes)", lib.comma_value(tonumber(self.dev.r.GOTCL())))
    print(self.pciaddress,
-         "RX packets", lib.comma_value(tonumber(self.dev.stats.rxpackets),
-         "RX bytes", lib.comma_value(tonumber(self.dev.stats.rxbytes)))
+         "RXDGPC (RX packets)", lib.comma_value(tonumber(self.dev.r.RXDGPC())),
+         "GORCL (RX bytes)", lib.comma_value(tonumber(self.dev.r.GORCL())))
+   self.dev.r.TXDGPC:reset()
+   self.dev.r.GOTCL:reset()
+   self.dev.r.RXDGPC:reset()
+   self.dev.r.GORCL:reset()
 end
