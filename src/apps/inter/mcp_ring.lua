@@ -36,11 +36,10 @@ end
 
 function init (r) -- initialization must be performed by consumer
    assert(full(r) and empty(r)) -- only satisfied if uninitialized
-   repeat
-      r.packets[r.nwrite] = packet.allocate()
-      r.nwrite = r.nwrite - 1
-   until r.nwrite == 0
-   r.packets[r.nwrite] = packet.allocate()
+   for i = 0, r.max do
+      r.packets[i] = packet.allocate()
+   end
+   r.nwrite = 0
 end
 
 local function NEXT (r, i)
