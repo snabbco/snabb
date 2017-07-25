@@ -26,8 +26,18 @@ end
 function create (size, name)
    assert(band(size, size-1) == 0, "size is not a power of two")
    local r = shm.create(name, mcp_t(size))
-   r.max = size-1
+   r.max = size - 1
+   r.nwrite = r.max -- “full” until initlaized
    return r
+end
+
+function init (r) -- initialization must be performed by consumer
+   assert(full(r) and empty(r)) -- only satisfied if uninitialized
+   repeat
+      r.packets[r.nwrite] = packet.allocate()
+      r.nwrite = r.nwrite - 1
+   until r.nwrite == 0
+   r.packets[r.nwrite] = packet.allocate()
 end
 
 local function NEXT (r, i)
@@ -45,6 +55,7 @@ function full (r)
 end
 
 function insert (r, p)
+   packet.free(r.packets[r.nwrite])
    r.packets[r.nwrite] = p
    r.nwrite = NEXT(r, r.nwrite)
 end
@@ -64,6 +75,7 @@ end
 
 function extract (r)
    local p = r.packets[r.nread]
+   r.packets[r.nread] = packet.allocate()
    r.nread = NEXT(r, r.nread)
    return p
 end
