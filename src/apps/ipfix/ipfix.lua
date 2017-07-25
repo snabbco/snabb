@@ -26,6 +26,7 @@ local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
 local IP_PROTO_UDP  = 17
 
+-- RFC 3954 §5.1.
 local netflow_v9_packet_header_t = ffi.typeof([[
    struct {
       /* Network byte order.  */
@@ -37,6 +38,7 @@ local netflow_v9_packet_header_t = ffi.typeof([[
       uint32_t observation_domain;
    } __attribute__((packed))
 ]])
+-- RFC 7011 §3.1.
 local ipfix_packet_header_t = ffi.typeof([[
    struct {
       /* Network byte order.  */
@@ -47,7 +49,7 @@ local ipfix_packet_header_t = ffi.typeof([[
       uint32_t observation_domain;
    } __attribute__((packed))
 ]])
--- RFC 7011 §3.3.2
+-- RFC 7011 §3.3.2.
 local set_header_t = ffi.typeof([[
    struct {
       /* Network byte order.  */
@@ -73,17 +75,24 @@ local template_header_ptr_t = ptr_to(template_header_t)
 local V9_TEMPLATE_ID  = 0
 local V10_TEMPLATE_ID = 2
 
--- Pad length to multiple of 4.
+-- This result is a double, which can store precise integers up to
+-- 2^51 or so.  For milliseconds this corresponds to the year 77300 or
+-- so, assuming an epoch of 1970.  If we went to microseconds, it
+-- would be good until 2041.
+local function to_milliseconds(secs)
+   return math.floor(secs * 1e3 + 0.5)
+end
+
+-- Pad a length value to multiple of 4.
 local max_padding = 3
 local function padded_length(len)
    return bit.band(len + max_padding, bit.bnot(max_padding))
 end
 
 -- Sadly, for NetFlow v9, the header needs to know the number of
--- records in a message.  So before flushing out a message, an
--- FlowSet will append the record count, and then the exporter
--- needs to slurp this data off before adding the NetFlow/IPFIX
--- header.
+-- records in a message.  So before flushing out a message, a FlowSet
+-- will append the record count, and then the exporter needs to slurp
+-- this data off before adding the NetFlow/IPFIX header.
 local uint16_ptr_t = ffi.typeof('uint16_t*')
 local function add_record_count(pkt, count)
    pkt.length = pkt.length + 2
@@ -95,6 +104,16 @@ local function remove_record_count(pkt, count)
    return count
 end
 
+-- The real work in the IPFIX app is performed by FlowSet objects,
+-- which record and export flows.  However an IPv4 FlowSet won't know
+-- what to do with IPv6 packets, so the IPFIX app can have multiple
+-- FlowSets.  When a packet comes in, the IPFIX app will determine
+-- which FlowSet it corresponds to, and then add the packet to the
+-- FlowSet's incoming work queue.  This incoming work queue is a
+-- normal Snabb link.  Likewise when the FlowSet exports flow records,
+-- it will send flow-expiry messages out its outgoing link, which need
+-- to be encapsulated by the IPFIX app.  We use internal links for
+-- that purpose as well.
 local internal_link_counters = {}
 local function new_internal_link(name_prefix)
    local count, name = internal_link_counters[name_prefix], name_prefix
@@ -151,6 +170,7 @@ end
 
 function FlowSet:record_flows(timestamp)
    local entry = self.scratch_entry
+   timestamp = to_milliseconds(timestamp)
    for i=1,link.nreadable(self.incoming) do
       local pkt = link.receive(self.incoming)
       self.template.extract(pkt, timestamp, entry)
@@ -215,45 +235,41 @@ function FlowSet:flush_data_records(out)
    link.transmit(out, pkt)
 end
 
--- print debugging messages for flow expiration
-function FlowSet:debug_expire(entry, msg)
+-- Print debugging messages for a flow.
+function FlowSet:debug_flow(entry, msg)
    if debug then
-      local msg = string.format("%s | expire %s %s\n", os.date("%F %H:%M:%S"),
-				self.template.tostring(entry))
-      io.stderr:write(msg)
+      local out = string.format("%s | %s %s\n", os.date("%F %H:%M:%S"),
+				msg, self.template.tostring(entry))
+      io.stderr:write(out)
       io.stderr:flush()
    end
 end
 
--- produce a timestamp in milliseconds
-function get_milliseconds()
-   return C.get_unix_time() * 1000ULL
-end
-
 -- Walk through flow set to see if flow records need to be expired.
 -- Collect expired records and export them to the collector.
-function FlowSet:expire_records(out)
+function FlowSet:expire_records(out, now)
    -- For a breath time of 100us, we will get 1e4 calls to push() every
    -- second.  We'd like to sweep through the flow table once every 10
    -- seconds, so on each breath we process 1e-5th of the table.
    local cursor = self.expiry_cursor
    local limit = cursor + math.ceil(self.table.size * 1e-5)
-   local timestamp = get_milliseconds()
+   now = to_milliseconds(now)
+   local active = to_milliseconds(self.active_timeout)
+   local idle = to_milliseconds(self.idle_timeout)
    while true do
       local entry
       cursor, entry = self.table:next_entry(cursor, limit)
       if not entry then break end
-      -- print (timestamp, entry.value.flowEndMilliseconds)
-      if timestamp - entry.value.flowEndMilliseconds > self.idle_timeout then
-         self:debug_expire(entry, "idle")
+      if now - tonumber(entry.value.flowEndMilliseconds) > idle then
+         self:debug_flow(entry, "expire idle")
          -- Relying on key and value being contiguous.
          self:add_data_record(entry.key, out)
          self.table:remove(entry.key)
-      elseif timestamp - entry.value.flowStartMilliseconds > self.active_timeout then
-         self:debug_expire(entry, "active")
+      elseif now - tonumber(entry.value.flowStartMilliseconds) > active then
+         self:debug_flow(entry, "expire active")
          -- TODO: what should timers reset to?
-         entry.value.flowStartMilliseconds = timestamp
-         entry.value.flowEndMilliseconds = timestamp
+         entry.value.flowStartMilliseconds = now
+         entry.value.flowEndMilliseconds = now
          entry.value.packetDeltaCount = 0
          entry.value.octetDeltaCount = 0
          self:add_data_record(entry.key, out)
@@ -276,7 +292,7 @@ function IPFIX:new(config)
                active_timeout = config.active_timeout or 120,
                -- sequence number to use for flow packets
                sequence_number = 1,
-               boot_time = get_milliseconds(),
+               boot_time = engine.now(),
 	       -- RFC5153 recommends a 10-minute template refresh
 	       -- configurable from 1 minute to 1 day
 	       -- (https://tools.ietf.org/html/rfc5153#section-6.2)
@@ -296,10 +312,6 @@ function IPFIX:new(config)
                collector_mac = assert(config.collector_mac),
                collector_ip = assert(config.collector_ip),
                collector_port = assert(config.collector_port) }
-
-   -- Convert from secs to ms (internal timestamp granularity is ms).
-   o.idle_timeout   = o.idle_timeout * 1000
-   o.active_timeout = o.active_timeout * 1000
 
    if o.version == 9 then
       o.header_t = netflow_v9_packet_header_t
@@ -345,7 +357,7 @@ function IPFIX:add_ipfix_header(pkt, count)
    header.version = htons(self.version)
    if self.version == 9 then
       header.count = htons(count)
-      header.uptime = htonl(tonumber(get_milliseconds() - self.boot_time))
+      header.uptime = htonl(to_milliseconds(engine.now() - self.boot_time))
    elseif self.version == 10 then
       header.byte_length = htons(pkt.length)
    end
@@ -387,7 +399,9 @@ end
 
 function IPFIX:push()
    local input = self.input.input
-   local timestamp = get_milliseconds()
+   -- FIXME: Use engine.now() for monotonic time.  Have to check that
+   -- engine.now() gives values relative to the UNIX epoch though.
+   local timestamp = ffi.C.get_unix_time()
    assert(self.output.output, "missing output link")
    local outgoing = self.outgoing_messages
 
@@ -411,8 +425,8 @@ function IPFIX:push()
    self.ipv4_flows:record_flows(timestamp)
    self.ipv6_flows:record_flows(timestamp)
 
-   self.ipv4_flows:expire_records(outgoing)
-   self.ipv6_flows:expire_records(outgoing)
+   self.ipv4_flows:expire_records(outgoing, timestamp)
+   self.ipv6_flows:expire_records(outgoing, timestamp)
 
    for i=1,link.nreadable(outgoing) do
       local pkt = link.receive(outgoing)
@@ -525,7 +539,7 @@ function selftest()
    key.destinationTransportPort = 80
 
    local value = ipfix.ipv4_flows.scratch_entry.value
-   value.flowStartMilliseconds = get_milliseconds() - 500e3
+   value.flowStartMilliseconds = to_milliseconds(C.get_unix_time() - 500)
    value.flowEndMilliseconds = value.flowStartMilliseconds + 30
    value.packetDeltaCount = 5
    value.octetDeltaCount = 15
