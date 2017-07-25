@@ -304,7 +304,8 @@ local ipfix_config_params = {
    -- FIXME: Use ARP to determine the L2 destination address.
    collector_mac = { required = true },
    collector_ip = { required = true },
-   collector_port = { required = true }
+   collector_port = { required = true },
+   templates = { default = { template.v4, template.v6 } }
 }
 
 function IPFIX:new(config)
@@ -342,8 +343,11 @@ function IPFIX:new(config)
                            cache_size = config.cache_size,
                            idle_timeout = config.idle_timeout,
                            active_timeout = config.active_timeout }
-   o.ipv4_flows = FlowSet:new(template.v4, flow_set_args)
-   o.ipv6_flows = FlowSet:new(template.v6, flow_set_args)
+
+   o.flow_sets = {}
+   for _, template in ipairs(config.templates) do
+      table.insert(o.flow_sets, FlowSet:new(template, flow_set_args))
+   end
 
    self.outgoing_link_name, self.outgoing = new_internal_link('IPFIX outgoing')
 
@@ -352,9 +356,10 @@ end
 
 function IPFIX:send_template_records(out)
    local pkt = packet.allocate()
-   pkt = self.ipv4_flows:append_template_record(pkt)
-   pkt = self.ipv6_flows:append_template_record(pkt)
-   add_record_count(pkt, 2)
+   for _, flow_set in ipairs(self.flow_sets) do
+      pkt = flow_set:append_template_record(pkt)
+   end
+   add_record_count(pkt, #self.flow_sets)
    link.transmit(out, pkt)
 end
 
@@ -418,23 +423,23 @@ function IPFIX:push()
       self:send_template_records(outgoing)
    end
 
+   local flow_sets = self.flow_sets
    for i=1,link.nreadable(input) do
       local pkt = link.receive(input)
-      if self.ipv4_flows.match(pkt.data, pkt.length) then
-         link.transmit(self.ipv4_flows.incoming, pkt)
-      elseif self.ipv6_flows.match(pkt.data, pkt.length) then
-         link.transmit(self.ipv6_flows.incoming, pkt)
-      else
-         -- Drop packet.
-         packet.free(pkt)
+      local handled = false
+      for _,set in ipairs(flow_sets) do
+         if set.match(pkt.data, pkt.length) then
+            link.transmit(set.incoming, pkt)
+            handled = true
+            break
+         end
       end
+      -- Drop packet if it didn't match any flow set.
+      if not handled then packet.free(pkt) end
    end
 
-   self.ipv4_flows:record_flows(timestamp)
-   self.ipv6_flows:record_flows(timestamp)
-
-   self.ipv4_flows:expire_records(outgoing, timestamp)
-   self.ipv6_flows:expire_records(outgoing, timestamp)
+   for _,set in ipairs(flow_sets) do set:record_flows(timestamp) end
+   for _,set in ipairs(flow_sets) do set:expire_records(outgoing, timestamp) end
 
    for i=1,link.nreadable(outgoing) do
       local pkt = link.receive(outgoing)
@@ -460,6 +465,7 @@ function selftest()
    local input_name, input = new_internal_link('ipfix selftest input')
    local output_name, output = new_internal_link('ipfix selftest output')
    ipfix.input, ipfix.output = { input = input }, { output = output }
+   local ipv4_flows, ipv6_flows = unpack(ipfix.flow_sets)
 
    -- Test helper that supplies a packet with some given fields.
    local function test(src_ip, dst_ip, src_port, dst_port)
@@ -494,10 +500,10 @@ function selftest()
    test("192.168.1.25", "8.8.8.8", 58342, 53)
    test("8.8.8.8", "192.168.1.25", 53, 58342)
    test("2001:4860:4860::8888", "2001:db8::ff00:42:8329", 53, 57777)
-   assert(ipfix.ipv4_flows.table.occupancy == 4,
-          string.format("wrong number of v4 flows: %d", ipfix.ipv4_flows.table.occupancy))
-   assert(ipfix.ipv6_flows.table.occupancy == 1,
-          string.format("wrong number of v6 flows: %d", ipfix.ipv6_flows.table.occupancy))
+   assert(ipv4_flows.table.occupancy == 4,
+          string.format("wrong number of v4 flows: %d", ipv4_flows.table.occupancy))
+   assert(ipv6_flows.table.occupancy == 1,
+          string.format("wrong number of v6 flows: %d", ipv6_flows.table.occupancy))
 
    -- do some packets with random data to test that it doesn't interfere
    for i=1, 10000 do
@@ -507,14 +513,14 @@ function selftest()
            math.random(1, 79))
    end
 
-   local key = ipfix.ipv4_flows.scratch_entry.key
+   local key = ipv4_flows.scratch_entry.key
    key.sourceIPv4Address = ipv4:pton("192.168.1.1")
    key.destinationIPv4Address = ipv4:pton("192.168.1.25")
    key.protocolIdentifier = IP_PROTO_UDP
    key.sourceTransportPort = 9999
    key.destinationTransportPort = 80
 
-   local result = ipfix.ipv4_flows.table:lookup_ptr(key)
+   local result = ipv4_flows.table:lookup_ptr(key)
    assert(result, "key not found")
    assert(result.value.packetDeltaCount == 1)
 
@@ -524,36 +530,36 @@ function selftest()
           string.format("wrong count: %d", tonumber(result.value.packetDeltaCount)))
 
    -- check the IPv6 key too
-   local key = ipfix.ipv6_flows.scratch_entry.key
+   local key = ipv6_flows.scratch_entry.key
    key.sourceIPv6Address = ipv6:pton("2001:4860:4860::8888")
    key.destinationIPv6Address = ipv6:pton("2001:db8::ff00:42:8329")
    key.protocolIdentifier = IP_PROTO_UDP
    key.sourceTransportPort = 53
    key.destinationTransportPort = 57777
 
-   local result = ipfix.ipv6_flows.table:lookup_ptr(key)
+   local result = ipv6_flows.table:lookup_ptr(key)
    assert(result, "key not found")
    assert(result.value.packetDeltaCount == 1)
 
    -- sanity check
-   ipfix.ipv4_flows.table:selfcheck()
-   ipfix.ipv6_flows.table:selfcheck()
+   ipv4_flows.table:selfcheck()
+   ipv6_flows.table:selfcheck()
 
-   local key = ipfix.ipv4_flows.scratch_entry.key
+   local key = ipv4_flows.scratch_entry.key
    key.sourceIPv4Address = ipv4:pton("192.168.2.1")
    key.destinationIPv4Address = ipv4:pton("192.168.2.25")
    key.protocolIdentifier = 17
    key.sourceTransportPort = 9999
    key.destinationTransportPort = 80
 
-   local value = ipfix.ipv4_flows.scratch_entry.value
+   local value = ipv4_flows.scratch_entry.value
    value.flowStartMilliseconds = to_milliseconds(C.get_unix_time() - 500)
    value.flowEndMilliseconds = value.flowStartMilliseconds + 30
    value.packetDeltaCount = 5
    value.octetDeltaCount = 15
 
    -- Add value that should be immediately expired
-   ipfix.ipv4_flows.table:add(key, value)
+   ipv4_flows.table:add(key, value)
 
    -- Template message; no data yet.
    assert(link.nreadable(output) == 1)
