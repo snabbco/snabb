@@ -20,8 +20,8 @@ engine.configure(c)
 engine.main({duration=10, report={showlinks=true}})
 
 for w, s in pairs(worker.status()) do
-   print(("worker %s: pid=%s alive=%s"):format(
-         w, s.pid, s.alive))
+   print(("worker %s: pid=%s alive=%s status=%s"):format(
+         w, s.pid, s.alive, s.status))
 end
 local stats = link.stats(engine.app_table["sink"].input.input)
 print(stats.txpackets / 1e6 / 10 .. " Mpps")
