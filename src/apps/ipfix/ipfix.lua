@@ -108,40 +108,43 @@ end
 
 FlowSet = {}
 
-function FlowSet:new (template, mtu, version, cache_size, idle_timeout, active_timeout)
-   local o = {template=template, idle_timeout=idle_timeout, active_timeout=active_timeout}
-   local template_ids = {[9]=V9_TEMPLATE_ID, [10]=V10_TEMPLATE_ID}
-   o.template_id = assert(template_ids[version], 'bad version: '..version)
+function FlowSet:new (template, args)
+   local o = { template = template,
+               idle_timeout = assert(args.idle_timeout),
+               active_timeout = assert(args.active_timeout) }
 
-   -- Accumulate outgoing records in a packet.  Although it would be
-   -- possible to be more efficient, packing all outgoing records into
-   -- a central record accumulator for all types of data and template
-   -- records, the old NetFlow v9 standard doesn't support mixing
-   -- different types of records in the same export packet.
-   o.record_buffer = packet.allocate()
-   o.record_count = 0
+   if     args.version == 9  then o.template_id = V9_TEMPLATE_ID
+   elseif args.version == 10 then o.template_id = V10_TEMPLATE_ID
+   else error('bad version: '..args.version) end
+
+   -- Accumulate outgoing records in a packet.  Instead of this
+   -- per-FlowSet accumulator, it would be possible to instead pack
+   -- all outgoing records into a central record accumulator for all
+   -- types of data and template records.  This would pack more
+   -- efficiently, but sadly the old NetFlow v9 standard doesn't
+   -- support mixing different types of records in the same export
+   -- packet.
+   o.record_buffer, o.record_count = packet.allocate(), 0
+
    -- Max number of records + padding that fit in packet, with set header.
+   local mtu = assert(args.mtu)
    local avail = padded_length(mtu - ffi.sizeof(set_header_t) - max_padding)
-   o.max_record_count = math.floor(avail / o.template.data_len)
-
-   -- TODO: Compute the default cache value based on expected flow
-   -- amounts?
-   o.cache_size = cache_size or 20000
-   -- how much of the cache to traverse when iterating
-   o.stride = math.ceil(o.cache_size / 1000)
+   o.max_record_count = math.floor(avail / template.data_len)
 
    local params = {
       key_type = template.key_t,
       value_type = template.value_t,
       max_occupancy_rate = 0.4,
-      initial_size = math.ceil(o.cache_size / 0.4),
    }
-
-   o.match = o.template.match
-   o.incoming_link_name, o.incoming = new_internal_link('IPFIX incoming')
+   if args.cache_size then
+      params.initial_size = math.ceil(args.cache_size / 0.4)
+   end
    o.table = ctable.new(params)
    o.scratch_entry = o.table.entry_type()
    o.expiry_cursor = 0
+
+   o.match = template.match
+   o.incoming_link_name, o.incoming = new_internal_link('IPFIX incoming')
 
    return setmetatable(o, { __index = self })
 end
@@ -313,9 +316,13 @@ function IPFIX:new(config)
    local l4_header_len = 8
    local ipfix_header_len = o.header_size
    local total_header_len = l4_header_len + l3_header_len + ipfix_header_len
-   local payload_mtu = o.mtu - total_header_len
-   o.ipv4_flows = FlowSet:new(template.v4, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
-   o.ipv6_flows = FlowSet:new(template.v6, payload_mtu, o.version, config.cache_size, o.idle_timeout, o.active_timeout)
+   local args = { mtu = o.mtu - total_header_len,
+		  version = o.version,
+		  cache_size = config.cache_size or 20000,
+		  idle_timeout = o.idle_timeout,
+		  active_timeout = o.active_timeout }
+   o.ipv4_flows = FlowSet:new(template.v4, args)
+   o.ipv6_flows = FlowSet:new(template.v6, args)
 
    self.outgoung_messages_link_name, self.outgoing_messages =
       new_internal_link('IPFIX outgoing')
