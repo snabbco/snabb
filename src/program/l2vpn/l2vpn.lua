@@ -80,6 +80,11 @@
 --         },
 --         [ extra_config = <extra_config>, ]
 --       },
+--       [ mirror = {
+--           [ rx = true | false | <rx_name>, ]
+--           [ tx = true | false | <tx_name>, ]
+--           [ type = 'tap' | 'pcap', ]
+--         }, ]
 --       mtu = <mtu>,
 --       [ -- only allowed if trunk.enable == false
 --         afs = {
@@ -152,9 +157,13 @@ local dispatch = require("program.l2vpn.dispatch").dispatch
 local shm = require("core.shm")
 local counter = require("core.counter")
 local macaddress = require("lib.macaddress")
-local sink = require("apps.basic.basic_apps").Sink
+local Sink = require("apps.basic.basic_apps").Sink
 local ifmib = require("lib.ipc.shmem.iftable_mib")
 local S = require("syscall")
+local const = require("syscall.linux.constants")
+local Tap = require("apps.tap.tap").Tap
+local Tee = require("apps.basic.basic_apps").Tee
+local PcapWriter = require("apps.pcap.pcap").PcapWriter
 
 local bridge_types = { flooding = true, learning = true }
 
@@ -269,6 +278,56 @@ function parse_if (c, config, app_name)
    iface.mtu = config.mtu
    local trunk = config.trunk or { enable = false }
    assert(type(trunk) == "table", "Trunk configuration must be a table")
+
+   -- Port mirror configuration
+   if config.mirror then
+      local mirror = config.mirror
+      local mtype = mirror.type or 'tap'
+      assert(type(mtype) == "string", "Mirror type must be a string")
+      for _, dir in ipairs({ 'rx', 'tx' }) do
+         if mirror[dir] then
+            local out_app_name
+            if mtype == "pcap" then
+               local file
+               if type(mirror[dir]) == "string" then
+                  file = mirror[dir]
+               else
+                  file = '/tmp/'..string.gsub(config.name, "/", "-")
+                     .."_"..dir..".pcap"
+               end
+               out_app_name = app_name.."_pcap_"..dir
+               add_app(c, out_app_name, PcapWriter, file)
+               print("    "..dir.." port-mirror on pcap file "..file)
+            elseif mtype == "tap" then
+               local tap_name
+               if type(mirror[dir]) == "string" then
+                  tap_name = mirror[dir]
+               else
+                  tap_name = string.gsub(config.name, "/", "-")
+                  tap_name = string.sub(tap_name, 0, const.IFNAMSIZ-3).."_"..dir
+               end
+               out_app_name = app_name.."_tap_"..dir
+               add_app(c, out_app_name, Tap, { name = tap_name, mtu = config.mtu})
+               local sink_app_name = app_name.."_tap_sink_"..dir
+               add_app(c, sink_app_name, Sink)
+               add_link(c, out_app_name..".output -> "..sink_app_name..".input")
+               print("    "..dir.." port-mirror on tap interface "..tap_name)
+            else
+               error("Illegal mirror type: "..mtype)
+            end
+            local tee_app_name = "tee_"..out_app_name
+            add_app(c, tee_app_name, Tee)
+            add_link(c, tee_app_name..".tap -> "..out_app_name..".input")
+            if dir == "rx" then
+               add_link(c, from_if.." -> "..tee_app_name..".input")
+               from_if = tee_app_name..".pass_out"
+            else
+               add_link(c, tee_app_name..".pass_in -> "..to_if)
+               to_if = tee_app_name..".input"
+            end
+         end
+      end
+   end
 
    local afs = {}
    afs.ipv6 = function (config, vid, ports_in, indent)
@@ -602,7 +661,7 @@ function parse_config (c, main_config)
    for _, iface in pairs(c.ifaces) do
       local function attach_sink (ports, vid)
          local sink_app = iface.app_name.."_sink_"..(vid or '')
-         add_app(c, sink_app, sink)
+         add_app(c, sink_app, Sink)
          add_link(c, ports.output.." -> "..sink_app..".input")
          add_link(c, sink_app..".input -> "..ports.input)
       end

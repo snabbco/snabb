@@ -989,6 +989,11 @@ configured by a Lua table of the following form
       pciaddr = <pciaddress>,
     },
   },
+  [ mirror = {
+      [ rx = true | false | <rx_name>, ]
+      [ tx = true | false | <tx_name>, ]
+      [ type = "tap" | "pcap", ]
+    }, ]
   mtu = <mtu>,
   [ -- only allowed if trunk.enable == false
     afs = {
@@ -1212,12 +1217,16 @@ mtu = <mtu>,
 [ trunk = {
     enable = true | false,
     encapsulation = "dot1q" | "dot1ad" | <number>, ]
+[ mirror = {
+    [ rx = true | false | <rx_name>, ]
+    [ tx = true | false | <tx_name>, ]
+    [ type = "tap" | "pcap", ]
+  }, ]
 ```
 
 The `vlans` section of the trunk configuration is not shown here and
 will be discussed with the concept of
-[sub-interfaces](#sub-interfaces) and the `<mac>` item is explained in
-the next section.
+[sub-interfaces](#sub-interfaces).
 
 <a name="MTU">The MTU (Maximum Transmission Unit)</a> is the maximum
 number of bytes in an entire Ethernet packet that can be transmitted
@@ -1291,6 +1300,58 @@ carrying her own VLAN trunk on top of the service-delimiting tag, the
 packets actually contain two tags and the MTU must be set to 1522
 bytes in order for the customer to be able to transport 1500-byte IP
 packets within her VLANs.
+
+The optional `mirror` table is used to configure per-direction
+port-mirroring of the traffic that is received from (`rx`) or sent to
+(`tx`) the interface.  Mirroring is enabled by setting the
+corresponding option to `true` or a string.
+
+If the `type` option is not specified or is set to `tap`, a `Tap`
+device is created to which a copy of all packets in the selected
+direction is sent.  Packets can be examined by the standatd tools
+(`tcpdump`, `wireshark` etc.) applied to such an interface.  If the
+mirror selector is set to `true`, the name of the `Tap` device is
+derived from the name of the interface in the following manner.
+First, all slashes are replaced by hyphens, then the name is truncated
+to 13 characters (corresponding to the system limit `IFNAMSIZ`, which
+is 16 on a Linux system, minus 3) and the string `_rx` or `_tx` is
+appended, depending on the selected direction of traffic.  If the
+mirror selector is set to a string, that string is used as the name of
+the `Tap` device.
+
+If the `type` option is set to `pcap`, the packets are written to a
+file in the `pcap` format.  If the mirror selector is `true`, the
+filename is constructed by replacing slashes by hyphens in the name of
+the interface and appending the string `_rx.pcap` or `_tx.pcap`,
+depending on the selected direction of traffic.  The full path name is
+constructed by prepending the file name with `/tmp/`.  If the mirror
+selector is a string, that string is used as the file name.
+
+Examples: the fragment
+```
+{
+  name = "TenGigE1/1",
+  mirror = {
+    rx = true,
+    tx = 'foo'
+  }
+}
+```
+will create the `Tap` devices `TenGigE1-1_rx` and `foo`, where as
+```
+{
+  name = "TenGigE1/1",
+  mirror = {
+    rx = '/tmp/foo_rx.pcap',
+    tx = true,
+    type = 'pcap'
+  }
+}
+```
+will create the files `/tmp/foo_rx.pcap` and `/tmp/TenGigE1-1_tx.pcap`.
+
+Enabling port-mirroring incurs a substantial performance penalty due to
+the packet replication.
 
 ### Address-family (L3) Configuration
 
