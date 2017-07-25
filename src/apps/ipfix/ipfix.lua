@@ -285,33 +285,42 @@ function FlowSet:expire_records(out, now)
 end
 
 IPFIX = {}
+local ipfix_config_params = {
+   idle_timeout = { default = 300 },
+   active_timeout = { default = 120 },
+   cache_size = { default = 20000 },
+   -- RFC 5153 §6.2 recommends a 10-minute template refresh
+   -- configurable from 1 minute to 1 day.
+   template_refresh_interval = { default = 600 },
+   -- Valid values: 9 or 10.
+   ipfix_version = { required = true },
+   -- RFC 7011 §10.3.3 specifies that if the PMTU is unknown, a
+   -- maximum of 512 octets should be used for UDP transmission.
+   mtu = { default = 512 },
+   observation_domain = { default = 256 },
+   -- FIXME: Let the interface set the L2 source address.
+   exporter_mac = { required = true },
+   exporter_ip = { required = true },
+   -- FIXME: Use ARP to determine the L2 destination address.
+   collector_mac = { required = true },
+   collector_ip = { required = true },
+   collector_port = { required = true }
+}
 
 function IPFIX:new(config)
-   local o = { export_timer = nil,
-               idle_timeout = config.idle_timeout or 300,
-               active_timeout = config.active_timeout or 120,
-               -- sequence number to use for flow packets
-               sequence_number = 1,
+   config = lib.parse(config, ipfix_config_params)
+   local o = { sequence_number = 1,
                boot_time = engine.now(),
-	       -- RFC5153 recommends a 10-minute template refresh
-	       -- configurable from 1 minute to 1 day
-	       -- (https://tools.ietf.org/html/rfc5153#section-6.2)
-	       template_refresh_interval = config.template_refresh_interval or 600,
-               next_template_refresh = 0,
-               -- version of IPFIX/Netflow (9 or 10)
-               version = assert(config.ipfix_version),
-               -- RFC7011 specifies that if the PMTU is unknown, a maximum
-               -- of 512 octets should be used for UDP transmission
-               -- (https://tools.ietf.org/html/rfc7011#section-10.3.3)
-               mtu = config.mtu or 512,
-               observation_domain = config.observation_domain or 256,
-               exporter_mac = assert(config.exporter_mac),
-               exporter_ip = assert(config.exporter_ip),
+	       template_refresh_interval = config.template_refresh_interval,
+               next_template_refresh = -1,
+               version = config.ipfix_version,
+               observation_domain = config.observation_domain,
+               exporter_mac = config.exporter_mac,
+               exporter_ip = config.exporter_ip,
                exporter_port = math.random(49152, 65535),
-               -- TODO: use ARP to avoid needing this
-               collector_mac = assert(config.collector_mac),
-               collector_ip = assert(config.collector_ip),
-               collector_port = assert(config.collector_port) }
+               collector_mac = config.collector_mac,
+               collector_ip = config.collector_ip,
+               collector_port = config.collector_port }
 
    if o.version == 9 then
       o.header_t = netflow_v9_packet_header_t
@@ -328,16 +337,15 @@ function IPFIX:new(config)
    local l4_header_len = 8
    local ipfix_header_len = o.header_size
    local total_header_len = l4_header_len + l3_header_len + ipfix_header_len
-   local args = { mtu = o.mtu - total_header_len,
-		  version = o.version,
-		  cache_size = config.cache_size or 20000,
-		  idle_timeout = o.idle_timeout,
-		  active_timeout = o.active_timeout }
-   o.ipv4_flows = FlowSet:new(template.v4, args)
-   o.ipv6_flows = FlowSet:new(template.v6, args)
+   local flow_set_args = { mtu = config.mtu - total_header_len,
+                           version = config.ipfix_version,
+                           cache_size = config.cache_size,
+                           idle_timeout = config.idle_timeout,
+                           active_timeout = config.active_timeout }
+   o.ipv4_flows = FlowSet:new(template.v4, flow_set_args)
+   o.ipv6_flows = FlowSet:new(template.v6, flow_set_args)
 
-   self.outgoung_messages_link_name, self.outgoing_messages =
-      new_internal_link('IPFIX outgoing')
+   self.outgoing_link_name, self.outgoing = new_internal_link('IPFIX outgoing')
 
    return setmetatable(o, { __index = self })
 end
@@ -403,7 +411,7 @@ function IPFIX:push()
    -- engine.now() gives values relative to the UNIX epoch though.
    local timestamp = ffi.C.get_unix_time()
    assert(self.output.output, "missing output link")
-   local outgoing = self.outgoing_messages
+   local outgoing = self.outgoing
 
    if self.next_template_refresh < engine.now() then
       self.next_template_refresh = engine.now() + self.template_refresh_interval
