@@ -2,12 +2,12 @@
 
 module(...,package.seeall)
 
-local Transmitter = require("apps.inter.transmitter")
+local Transmitter = require("apps.interlink.transmitter")
 local Source = require("apps.basic.basic_apps").Source
 
-function start (ring_name)
+function start (link_name)
    local c = config.new()
-   config.app(c, "tx", Transmitter, {name=ring_name})
+   config.app(c, "tx", Transmitter, {name=link_name})
    config.app(c, "source", Source)
    config.link(c, "source.output->tx.input")
    engine.configure(c)

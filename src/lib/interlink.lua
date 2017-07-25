@@ -13,7 +13,7 @@ local SIZE = link.max + 1
 local CACHELINE = 64 -- XXX - make dynamic
 local INT = ffi.sizeof("int")
 
-mcp_t = ffi.typeof([[struct {
+ffi.cdef([[ struct interlink {
    char pad0[]]..CACHELINE..[[];
    int read, write;
    char pad1[]]..CACHELINE-2*INT..[[];
@@ -28,7 +28,7 @@ mcp_t = ffi.typeof([[struct {
 
 function create (name)
    assert(band(SIZE, SIZE-1) == 0, "SIZE is not a power of two")
-   local r = shm.create(name, mcp_t)
+   local r = shm.create(name, "struct interlink")
    r.max = SIZE - 1
    r.nwrite = r.max -- “full” until initlaized
    return r

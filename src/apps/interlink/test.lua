@@ -1,14 +1,14 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
 local worker = require("core.worker")
-local ring = require("apps.inter.mcp_ring")
-local Receiver = require("apps.inter.receiver")
+local interlink = require("lib.interlink")
+local Receiver = require("apps.interlink.receiver")
 local Sink = require("apps.basic.basic_apps").Sink
 
-ring.create("group/test.mcp")
+interlink.create("group/test.mcp")
 
 worker.start("source",
-             [[require("apps.inter.test_source").start("group/test.mcp")]])
+             [[require("apps.interlink.test_source").start("group/test.mcp")]])
 
 local c = config.new()
 

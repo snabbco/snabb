@@ -3,7 +3,7 @@
 module(...,package.seeall)
 
 local shm = require("core.shm")
-local ring = require("apps.inter.mcp_ring")
+local interlink = require("lib.interlink")
 
 local Transmitter = {
    config = {
@@ -15,24 +15,24 @@ local Transmitter = {
 function Transmitter:new (conf)
    local self = {}
    if conf.create then
-      self.ring = ring.create(conf.name)
+      self.interlink = interlink.create(conf.name)
       self.destroy = conf.name
    else
-      self.ring = shm.open(conf.name, ring.mcp_t)
+      self.interlink = shm.open(conf.name, "struct interlink")
    end
    return setmetatable(self, {__index=Transmitter})
 end
 
 function Transmitter:push ()
-   local i, r = self.input.input, self.ring
-   while not (ring.full(r) or link.empty(i)) do
-      ring.insert(r, link.receive(i))
+   local i, r = self.input.input, self.interlink
+   while not (interlink.full(r) or link.empty(i)) do
+      interlink.insert(r, link.receive(i))
    end
-   ring.push(r)
+   interlink.push(r)
 end
 
 function Transmitter:stop ()
-   shm.unmap(self.ring)
+   shm.unmap(self.interlink)
    if self.destroy then
       shm.unlink(self.destroy)
    end
