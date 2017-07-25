@@ -13,22 +13,20 @@ function mcp_t (size)
       char pad0[]]..cacheline..[[];
       int read, write;
       char pad1[]]..cacheline-2*int..[[];
-      int lwrite, nread, rbatch;
-      char pad2[]]..cacheline-3*int..[[];
-      int lread, nwrite, wbatch;
-      char pad3[]]..cacheline-3*int..[[];
-      int max, batch;
-      char pad4[]]..cacheline-2*int..[[];
+      int lwrite, nread;
+      char pad2[]]..cacheline-2*int..[[];
+      int lread, nwrite;
+      char pad3[]]..cacheline-2*int..[[];
+      int max;
+      char pad4[]]..cacheline-1*int..[[];
       struct packet *packets[]]..size..[[];
    }]])
 end
 
-function create_mcp (size, batch, name)
+function create (size, name)
    assert(band(size, size-1) == 0, "size is not a power of two")
-   assert(batch <= size, "batch is greater than size")
    local r = shm.create(name, mcp_t(size))
    r.max = size-1
-   r.batch = batch
    return r
 end
 
@@ -36,51 +34,40 @@ local function NEXT (r, i)
    return band(i + 1, r.max)
 end
 
-function mcp_insert (r, p)
+function full (r)
    local after_nwrite = NEXT(r, r.nwrite)
    if after_nwrite == r.lread then
       if after_nwrite == r.read then
-         return false
+         return true
       end
       r.lread = r.read
    end
+end
+
+function insert (r, p)
    r.packets[r.nwrite] = p
-   r.nwrite = after_nwrite
-   r.wbatch = r.wbatch + 1
-   if r.wbatch >= r.batch then
-      r.write = r.nwrite
-      r.wbatch = 0
-   end
-   return true
+   r.nwrite = NEXT(r, r.nwrite)
 end
 
-function mcp_push (r)
-   if r.wbatch > 0 then
-      r.write = r.nwrite
-      r.wbatch = 0
-   end
+function push (r)
+   r.write = r.nwrite
 end
 
-function mcp_extract (r)
+function empty (r)
    if r.nread == r.lwrite then
       if r.nread == r.write then
-         return nil
+         return true
       end
       r.lwrite = r.write
    end
+end
+
+function extract (r)
    local p = r.packets[r.nread]
    r.nread = NEXT(r, r.nread)
-   r.rbatch = r.rbatch + 1
-   if r.rbatch > r.batch then
-      r.read = r.nread
-      r.rbatch = 0
-   end
    return p
 end
 
-function mcp_pull (r)
-   if r.rbatch > 0 then
-      r.read = r.nread
-      r.rbatch = 0
-   end
+function pull (r)
+   r.read = r.nread
 end
