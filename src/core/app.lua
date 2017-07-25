@@ -170,6 +170,9 @@ function apply_config_actions (actions, conf)
    end
    function ops.keep (name)
       new_app_table[name] = app_table[name]
+      -- Clear input/output tables, they will be re-populated below
+      new_app_table[name].output = {}
+      new_app_table[name].input = {}
    end
    function ops.start (name)
       local class = conf.apps[name].class
