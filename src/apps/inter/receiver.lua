@@ -5,21 +5,20 @@ module(...,package.seeall)
 local shm = require("core.shm")
 local ring = require("apps.inter.mcp_ring")
 
-Receiver = {
+local Receiver = {
    config = {
       name = {required=true},
-      create = {default=false},
-      size = {default=link.max+1}
+      create = {default=false}
    }
 }
 
 function Receiver:new (conf)
    local self = {}
    if conf.create then
-      self.ring = ring.create(conf.size, conf.name)
+      self.ring = ring.create(conf.name)
       self.destroy = conf.name
    else
-      self.ring = shm.open(conf.name, ring.mcp_t(conf.size))
+      self.ring = shm.open(conf.name, ring.mcp_t)
    end
    ring.init(self.ring)
    return setmetatable(self, {__index=Receiver})

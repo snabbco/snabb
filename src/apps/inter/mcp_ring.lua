@@ -2,31 +2,34 @@
 
 module(...,package.seeall)
 
+-- Based on MCRingBuffer, see
+--   http://www.cse.cuhk.edu.hk/%7Epclee/www/pubs/ipdps10.pdf
+
 local shm = require("core.shm")
 local ffi = require("ffi")
 local band = require("bit").band
 
-function mcp_t (size)
-   local cacheline = 64 -- XXX - make dynamic
-   local int = ffi.sizeof("int")
-   return ffi.typeof([[struct {
-      char pad0[]]..cacheline..[[];
-      int read, write;
-      char pad1[]]..cacheline-2*int..[[];
-      int lwrite, nread;
-      char pad2[]]..cacheline-2*int..[[];
-      int lread, nwrite;
-      char pad3[]]..cacheline-2*int..[[];
-      int max;
-      char pad4[]]..cacheline-1*int..[[];
-      struct packet *packets[]]..size..[[];
-   }]])
-end
+local SIZE = link.max + 1
+local CACHELINE = 64 -- XXX - make dynamic
+local INT = ffi.sizeof("int")
 
-function create (size, name)
-   assert(band(size, size-1) == 0, "size is not a power of two")
-   local r = shm.create(name, mcp_t(size))
-   r.max = size - 1
+mcp_t = ffi.typeof([[struct {
+   char pad0[]]..CACHELINE..[[];
+   int read, write;
+   char pad1[]]..CACHELINE-2*INT..[[];
+   int lwrite, nread;
+   char pad2[]]..CACHELINE-2*INT..[[];
+   int lread, nwrite;
+   char pad3[]]..CACHELINE-2*INT..[[];
+   int max;
+   char pad4[]]..CACHELINE-1*INT..[[];
+   struct packet *packets[]]..SIZE..[[];
+}]])
+
+function create (name)
+   assert(band(SIZE, SIZE-1) == 0, "SIZE is not a power of two")
+   local r = shm.create(name, mcp_t)
+   r.max = SIZE - 1
    r.nwrite = r.max -- “full” until initlaized
    return r
 end

@@ -5,7 +5,7 @@ local ring = require("apps.inter.mcp_ring")
 local Receiver = require("apps.inter.receiver")
 local Sink = require("apps.basic.basic_apps").Sink
 
-ring.create(link.max+1, "group/test.mcp")
+ring.create("group/test.mcp")
 
 worker.start("source",
              [[require("apps.inter.test_source").start("group/test.mcp")]])
@@ -18,8 +18,9 @@ config.link(c, "rx.output->sink.input")
 
 engine.configure(c)
 engine.main({duration=10, report={showlinks=true}})
+
 for w, s in pairs(worker.status()) do
-   print(("  worker %s: pid=%s alive=%s"):format(
+   print(("worker %s: pid=%s alive=%s"):format(
          w, s.pid, s.alive))
 end
 local stats = link.stats(engine.app_table["sink"].input.input)
