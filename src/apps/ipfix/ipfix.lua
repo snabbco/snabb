@@ -293,7 +293,7 @@ local ipfix_config_params = {
    -- configurable from 1 minute to 1 day.
    template_refresh_interval = { default = 600 },
    -- Valid values: 9 or 10.
-   ipfix_version = { required = true },
+   ipfix_version = { default = 10 },
    -- RFC 7011 §10.3.3 specifies that if the PMTU is unknown, a
    -- maximum of 512 octets should be used for UDP transmission.
    mtu = { default = 512 },
@@ -454,8 +454,7 @@ function selftest()
    local consts = require("apps.lwaftr.constants")
    local ethertype_ipv4 = consts.ethertype_ipv4
    local ethertype_ipv6 = consts.ethertype_ipv6
-   local ipfix = IPFIX:new({ ipfix_version = 10,
-                             exporter_mac = "00:11:22:33:44:55",
+   local ipfix = IPFIX:new({ exporter_mac = "00:11:22:33:44:55",
                              exporter_ip = "192.168.1.2",
                              collector_mac = "55:44:33:22:11:00",
                              collector_ip = "192.168.1.1",
