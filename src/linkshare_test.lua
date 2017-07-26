@@ -8,7 +8,7 @@ local c = config.new()
 config.app(c, "sink", Sink)
 engine.configure(c)
 
-link.new("test")
+local l = link.new("test")
 shm.alias("group/test.link", "links/test")
 
 engine.attach_input("sink", "input", "group/test.link")
@@ -21,18 +21,16 @@ config.app(c, "source", Source)
 engine.configure(c)
 
 engine.attach_output("source", "output", "group/test.link")
+link.transmit(engine.link_table["group/test.link"], packet.allocate())
 
 engine.main()
 ]])
 
-engine.main({duration=10})
-link.open("group/test.link")
-engine.report_links()
-engine.report_apps()
+engine.main({duration=10, report={showlinks=true}})
 
 for w, s in pairs(worker.status()) do
    print(("worker %s: pid=%s alive=%s status=%s"):format(
          w, s.pid, s.alive, s.status))
 end
-local stats = link.stats(engine.app_table["sink"].input.input)
+local stats = link.stats(l)
 print(stats.txpackets / 1e6 / 10 .. " Mpps")
