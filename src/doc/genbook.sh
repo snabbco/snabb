@@ -46,6 +46,8 @@ $(cat $mdroot/apps/rate_limiter/README.md)
 
 $(cat $mdroot/apps/packet_filter/README.md)
 
+$(cat $mdroot/apps/ipv4/README.md)
+
 $(cat $mdroot/apps/ipv6/README.md)
 
 $(cat $mdroot/apps/vhost/README.md)
