@@ -1,0 +1,12 @@
+#!../../snabb snsh
+local args = main.parameters
+assert(#args == 5, "testvmdqrecv.snabb pciaddr macaddr vlan poolno qno")
+local pciaddr = table.remove(args, 1)
+local macaddr = table.remove(args, 1)
+local vlan = load("return " .. table.remove(args, 1))()
+local poolno = tonumber(table.remove(args,1))
+local qno = tonumber(table.remove(args,1))
+
+local test = require("apps.intel_mp.testrecv").test
+
+test(pciaddr, qno, true, poolno, macaddr, vlan)
