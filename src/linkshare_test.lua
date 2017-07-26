@@ -25,7 +25,10 @@ engine.attach_output("source", "output", "group/test.link")
 engine.main()
 ]])
 
-engine.main({duration=10, report={showlinks=true}})
+engine.main({duration=10})
+link.open("group/test.link")
+engine.report_links()
+engine.report_apps()
 
 for w, s in pairs(worker.status()) do
    print(("worker %s: pid=%s alive=%s status=%s"):format(

@@ -36,9 +36,11 @@ function new (name)
 end
 
 function open (path)
+   print("link open", path)
    local r = shm.open(path.."/link", link_t)
    for _, c in ipairs(provided_counters) do
       r.stats[c] = counter.open(path.."/"..c..".counter")
+      print(c, r.stats[c])
    end
    return r
 end
