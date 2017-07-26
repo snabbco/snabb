@@ -302,7 +302,7 @@ byPciID = {
 }
 
 -- The `driver' variable is used as a reference to the driver class in
--- order to interchangably use NIC drivers.
+-- order to interchangeably use NIC drivers.
 driver = Intel
 
 function Intel:new (conf)
