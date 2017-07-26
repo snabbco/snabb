@@ -39,6 +39,7 @@ local ffi = require("ffi")
 local C = ffi.C
 local packet = require("core.packet")
 local link   = require("core.link")
+local lib    = require("core.lib")
 
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
@@ -141,25 +142,29 @@ function get_isat_ethernet(arp_p)
 end
 
 ARP = {}
+local arp_config_params = {
+   src_eth =  { default=false },
+   src_ipv4 = { default=false },
+   dst_eth =  { default=false },
+   dst_ipv4 = { default=false },
+}
 
 function ARP:new(conf)
-   local o = setmetatable({}, {__index=ARP})
-   o.conf = conf
+   local o = lib.parse(conf, arp_config_params)
    -- TODO: verify that the src and dst ipv4 addresses and src mac address
    -- have been provided, in pton format.
-   if not conf.dst_eth then
-      o.arp_request_pkt = form_request(conf.src_eth, conf.src_ipv4, conf.dst_ipv4)
+   if not o.dst_eth then
+      o.arp_request_pkt = form_request(o.src_eth, o.src_ipv4, o.dst_ipv4)
       self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
    end
-   o.dst_eth = conf.dst_eth -- intentionally nil if to request via ARP
-   return o
+   return setmetatable(o, {__index=ARP})
 end
 
 function ARP:maybe_send_arp_request (output)
    if self.dst_eth then return end
    self.next_arp_request_time = self.next_arp_request_time or engine.now()
    if self.next_arp_request_time <= engine.now() then
-      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.conf.dst_ipv4)))
+      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.dst_ipv4)))
       self:send_arp_request(output)
       self.next_arp_request_time = engine.now() + self.arp_request_interval
    end
@@ -181,13 +186,13 @@ function ARP:push()
          if not self.dst_eth and is_arp_reply(p) then
             local dst_ethernet = get_isat_ethernet(p)
             if dst_ethernet then
-               print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(self.conf.dst_ipv4),
+               print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(self.dst_ipv4),
                                                         ethernet:ntop(dst_ethernet)))
                self.dst_eth = dst_ethernet
             end
             packet.free(p)
-         elseif is_arp_request(p, self.conf.src_ipv4) then
-            local arp_reply_pkt = form_reply(self.conf.src_eth, self.conf.src_ipv4, p)
+         elseif is_arp_request(p, self.src_ipv4) then
+            local arp_reply_pkt = form_reply(self.src_eth, self.src_ipv4, p)
             if arp_reply_pkt then
                transmit(osouth, arp_reply_pkt)
             end
@@ -213,17 +218,61 @@ function ARP:push()
 end
 
 function selftest()
-   local ipv4 = require("lib.protocol.ipv4")
-   local tlocal_eth = ethernet:pton("01:02:03:04:05:06")
-   local tlocal_ip = ipv4:pton("1.2.3.4")
-   local tremote_eth = ethernet:pton("07:08:09:0a:0b:0c")
-   local tremote_ip = ipv4:pton("6.7.8.9")
-   local req = form_request(tlocal_eth, tlocal_ip, tremote_ip)
+   print('selftest: arp')
+
+   local arp = ARP:new({ src_ipv4 = ipv4:pton('1.2.3.4'),
+                         dst_ipv4 = ipv4:pton('5.6.7.8'), -- Static gateway.
+                         src_eth  = ethernet:pton('01:02:03:04:05:06') })
+   arp.input  = { south=link.new('south in'),  north=link.new('north in') }
+   arp.output = { south=link.new('south out'), north=link.new('north out') }
+   
+   -- After first push, ARP should have sent out request.
+   arp:push()
+   assert(link.nreadable(arp.output.south) == 1)
+   assert(link.nreadable(arp.output.north) == 0)
+   local req = link.receive(arp.output.south)
    assert(is_arp(req))
    assert(is_arp_request(req))
-   local rep = form_reply(tremote_eth, tremote_ip, req)
+   -- Send a response.
+   local rep = form_reply(
+      ethernet:pton('11:22:33:44:55:66'), ipv4:pton('5.6.7.8'), req)
+   packet.free(req)
    assert(is_arp(rep))
    assert(is_arp_reply(rep))
-   local isat = get_isat_ethernet(rep, tlocal_ip)
-   assert(C.memcmp(isat, tremote_eth, 6) == 0)
+   link.transmit(arp.input.south, rep)
+   -- Process response.
+   arp:push()
+   assert(link.nreadable(arp.output.south) == 0)
+   assert(link.nreadable(arp.output.north) == 0)
+
+   -- Now push some payload.
+   local payload = datagram:new()
+   local udp = require("lib.protocol.udp")
+   local IP_PROTO_UDP  = 17
+   local udp_h = udp:new({ src_port = 1234,
+                           dst_port = 5678 })
+   local ipv4_h = ipv4:new({ src = ipv4:pton('1.1.1.1'),
+                             dst = ipv4:pton('2.2.2.2'),
+                             protocol = IP_PROTO_UDP,
+                             ttl = 64 })
+   payload:push(udp_h)
+   payload:push(ipv4_h)
+   payload:push(ethernet:new({ src = ethernet:pton("00:00:00:00:00:00"),
+                               dst = ethernet:pton("00:00:00:00:00:00"),
+                               type = constants.ethertype_ipv4 }))
+   link.transmit(arp.input.north, payload:packet())
+   arp:push()
+   assert(link.nreadable(arp.output.south) == 1)
+   assert(link.nreadable(arp.output.north) == 0)
+
+   -- The packet should have the destination ethernet address set.
+   local routed = link.receive(arp.output.south)
+   local payload = datagram:new(routed, ethernet)
+   local eth_h = payload:parse()
+   assert(eth_h:src_eq(ethernet:pton('00:00:00:00:00:00')))
+   assert(eth_h:dst_eq(ethernet:pton('11:22:33:44:55:66')))
+   assert(ipv4_h:eq(payload:parse()))
+   assert(udp_h:eq(payload:parse()))
+   packet.free(payload:packet())
+   print('selftest ok')
 end
