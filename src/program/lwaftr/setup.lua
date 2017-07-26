@@ -13,6 +13,7 @@ local lwcounter  = require("apps.lwaftr.lwcounter")
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
 local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
+local arp        = require("apps.ipv4.arp")
 local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
 local vlan       = require("apps.vlan.vlan")
 local numa       = require("lib.numa")
@@ -88,7 +89,7 @@ function lwaftr_app(c, conf)
                 src_eth = internal_interface.mac,
                 dst_eth = internal_interface.next_hop.mac,
                 dst_ipv6 = internal_interface.next_hop.ip })
-   config.app(c, "arp", ipv4_apps.ARP,
+   config.app(c, "arp", arp.ARP,
               { src_ipv4 = convert_ipv4(external_interface.ip),
                 src_eth = external_interface.mac,
                 dst_eth = external_interface.next_hop.mac,
