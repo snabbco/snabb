@@ -7,6 +7,8 @@ local lib      = require("core.lib")
 local link     = require("core.link")
 local arp      = require("apps.ipv4.arp")
 local ipfix    = require("apps.ipfix.ipfix")
+local ipv4     = require("lib.protocol.ipv4")
+local ethernet = require("lib.protocol.ethernet")
 local numa     = require("lib.numa")
 
 -- apps that can be used as an input or output for the exporter
