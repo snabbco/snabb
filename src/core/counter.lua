@@ -56,10 +56,10 @@ function create (name, initval)
    return private[n]
 end
 
-function open (name)
+function open (name, readonly)
    if numbers[name] then return private[numbers[name]] end
    local n = #public+1
-   public[n] = shm.open(name, counter_t, 'readonly')
+   public[n] = shm.open(name, counter_t, readonly)
    private[n] = public[#public] -- use counter directly
    numbers[name] = n
    return private[n]

@@ -27,11 +27,19 @@ local provided_counters = {
 }
 
 function new (name)
-   local r = ffi.new(link_t)
+   local r = shm.create("links/"..name.."/link", link_t)
    for _, c in ipairs(provided_counters) do
       r.stats[c] = counter.create("links/"..name.."/"..c..".counter")
    end
    counter.set(r.stats.dtime, C.get_unix_time())
+   return r
+end
+
+function open (path)
+   local r = shm.open(path.."/link", link_t)
+   for _, c in ipairs(provided_counters) do
+      r.stats[c] = counter.open(path.."/"..c..".counter")
+   end
    return r
 end
 

@@ -137,6 +137,16 @@ function configure (new_config)
    counter.add(configs)
 end
 
+-- XXX - Shared links mud, wax off
+function attach_input (app, port, path)
+   link_table[path] = link.open(path)
+   app_table[app].input[port] = link_table[path]
+end
+function attach_output (app, port, path)
+   link_table[path] = link.open(path)
+   app_table[app].output[port] = link_table[path]
+end
+
 -- Removes the claim on a name, freeing it for other programs.
 --
 -- This relinquish a claim on a name if one exists. if the name does not
