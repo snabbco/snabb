@@ -139,12 +139,18 @@ end
 
 -- XXX - Shared links mud, wax off
 function attach_input (app, port, path)
-   link_table[path] = link.open(path)
-   app_table[app].input[port] = link_table[path]
+   local l = link.open(path)
+   link_table[path] = l
+   local app = app_table[app]
+   app.input[port] = l
+   table.insert(app.input, l)
 end
 function attach_output (app, port, path)
-   link_table[path] = link.open(path)
-   app_table[app].output[port] = link_table[path]
+   local l = link.open(path)
+   link_table[path] = l
+   local app = app_table[app]
+   app.output[port] = l
+   table.insert(app.output, l)
 end
 
 -- Removes the claim on a name, freeing it for other programs.

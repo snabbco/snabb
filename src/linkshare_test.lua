@@ -21,7 +21,6 @@ config.app(c, "source", Source)
 engine.configure(c)
 
 engine.attach_output("source", "output", "group/test.link")
-link.transmit(engine.link_table["group/test.link"], packet.allocate())
 
 engine.main()
 ]])
