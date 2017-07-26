@@ -103,7 +103,6 @@ local function is_arp(p)
 end
 
 local function ipv4_eq(a, b) return C.memcmp(a, b, 4) == 0 end
-local function mac_eq(a, b)  return C.memcmp(a, b, 6) == 0 end
 
 local function copy_mac(src)
    local dst = ffi.new('uint8_t[6]')
@@ -176,12 +175,12 @@ function ARP:push()
              h.arp.hlen ~= 6 or h.arp.plen ~= 4) then
             -- Ignore invalid packet.
          elseif ntohs(h.arp.oper) == arp_oper_request then
-            if self.self_ip and ipv4_eq(h.arp.tpa, self.self_ip, 4) then
+            if self.self_ip and ipv4_eq(h.arp.tpa, self.self_ip) then
                transmit(osouth, make_arp_reply(self.self_mac, self.self_ip,
                                                h.arp.sha, h.arp.spa))
             end
          elseif ntohs(h.arp.oper) == arp_oper_reply then
-            if ipv4_eq(h.arp.spa, self.next_ip, 4) then
+            if ipv4_eq(h.arp.spa, self.next_ip) then
                local next_mac = copy_mac(h.arp.sha)
                print(string.format("ARP: '%s' resolved (%s)",
                                    ipv4:ntop(self.next_ip),
