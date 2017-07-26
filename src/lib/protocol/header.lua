@@ -228,6 +228,7 @@ function header:new_from_mem (mem, size)
    local o = _new(self)
    local header = o._header
    if ffi.sizeof(header.t) > size then
+      o:free()
       return nil
    end
    header.box[0] = ffi.cast(header.ptr_t, mem)
