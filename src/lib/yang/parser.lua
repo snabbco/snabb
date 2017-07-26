@@ -275,16 +275,12 @@ function Parser:parse_statement()
       self:error("keyword expected")
    end
    returnval.keyword = keyword
-   if self:check(";") then
-      -- We've ended the statement without an argument.
-      return returnval
-   end
 
    -- Take the identifier
-   self:consume_whitespace()
-   local argument = self:parse_string()
-   if argument ~= "" then returnval.argument = argument end
-   self:skip_whitespace()
+   if self:skip_whitespace() and self:peek() ~= ';' and self:peek() ~= '{' then
+      returnval.argument = self:parse_string()
+      self:skip_whitespace()
+   end
 
    if self:check(";") then
       return returnval
@@ -424,7 +420,9 @@ function selftest()
    test_module("// foo bar;\nleaf port;", {{keyword="leaf", argument="port"}})
    test_module("type/** hellooo */string;", {{keyword="type", argument="string"}})
    test_module('type "hello\\pq";', {{keyword="type", argument="hello\\pq"}})
-   test_module('description "";', {{keyword="description"}})
+   test_module('description "";', {{keyword="description", argument=""}})
+   test_module('description;', {{keyword="description"}})
+   test_module('description ;', {{keyword="description"}})
    test_module(lines("leaf port {", "type number;", "}"), {{keyword="leaf",
    argument="port", statements={{keyword="type", argument="number"}}}})
    test_module(lines("leaf port {", "type;", "}"), {{keyword="leaf",
