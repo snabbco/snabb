@@ -1,7 +1,6 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
 -- ARP address resolution (RFC 826)
--- Note: all incoming configurations are assumed to be in network byte order.
 
 -- Given a remote IPv4 address, try to find out its MAC address.
 -- If resolution succeeds:
@@ -10,135 +9,105 @@
 -- All packets coming through the 'north' interface (the lwaftr) will have
 -- their Ethernet headers rewritten.
 
--- Expected configuration:
--- lwaftr <-> ipv4 fragmentation app <-> lw_eth_resolve <-> vlan tag handler
--- That is, neither fragmentation nor vlan tagging are within the scope of this app.
-
---[[ Packet format (IPv4/Ethernet), as described on Wikipedia.
-Internet Protocol (IPv4) over Ethernet ARP packet
-octet offset 	0 	1
-0 	Hardware type (HTYPE)
-2 	Protocol type (PTYPE)
-4 	Hardware address length (HLEN) 	Protocol address length (PLEN)
-6 	Operation (OPER)
-8 	Sender hardware address (SHA) (first 2 bytes)
-10 	(next 2 bytes)
-12 	(last 2 bytes)
-14 	Sender protocol address (SPA) (first 2 bytes)
-16 	(last 2 bytes)
-18 	Target hardware address (THA) (first 2 bytes)
-20 	(next 2 bytes)
-22 	(last 2 bytes)
-24 	Target protocol address (TPA) (first 2 bytes)
-26 	(last 2 bytes)
---]]
-
 module(..., package.seeall)
 
-local ffi = require("ffi")
-local C = ffi.C
-local packet = require("core.packet")
-local link   = require("core.link")
-local lib    = require("core.lib")
-
+local ffi      = require("ffi")
+local packet   = require("core.packet")
+local link     = require("core.link")
+local lib      = require("core.lib")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
 
-local constants = require("apps.lwaftr.constants")
-local lwutil = require("apps.lwaftr.lwutil")
-
+local C = ffi.C
 local receive, transmit = link.receive, link.transmit
-local rd16, wr16 = lwutil.rd16, lwutil.wr16
+local htons, ntohs = lib.htons, lib.ntohs
 
-local ethernet_header_size = constants.ethernet_header_size
-local o_ethernet_ethertype = constants.o_ethernet_ethertype
+local ether_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  dhost[6];
+   uint8_t  shost[6];
+   uint16_t type;
+} __attribute__((packed))
+]]
+local arp_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint16_t htype;      /* Hardware type */
+   uint16_t ptype;      /* Protocol type */
+   uint8_t  hlen;       /* Hardware address length */
+   uint8_t  plen;       /* Protocol address length */
+   uint16_t oper;       /* Operation */
+   uint8_t  sha[6];     /* Sender hardware address */
+   uint8_t  spa[4];     /* Sender protocol address */
+   uint8_t  tha[6];     /* Target hardware address */
+   uint8_t  tpa[4];     /* Target protocol address */
+} __attribute__((packed))
+]]
+local ether_arp_header_t = ffi.typeof(
+   'struct { $ ether; $ arp; } __attribute__((packed))',
+   ether_header_t, arp_header_t)
+local ether_header_ptr_t = ffi.typeof('$*', ether_header_t)
+local ether_header_len = ffi.sizeof(ether_header_t)
+local ether_arp_header_ptr_t = ffi.typeof('$*', ether_arp_header_t)
+local ether_arp_header_len = ffi.sizeof(ether_arp_header_t)
+local ether_type_arp = 0x0806
+local ether_type_ipv4 = 0x0800
+local arp_oper_request = 1
+local arp_oper_reply = 2
+local arp_htype_ethernet = 1
+local arp_ptype_ipv4 = 0x0800
+local arp_hlen_ethernet = 6
+local arp_plen_ipv4 = 4
 
--- local onstants
-local arp_request = C.htons(1)
-local arp_reply = C.htons(2)
+local mac_unknown = ethernet:pton("00:00:00:00:00:00")
+local mac_broadcast = ethernet:pton("ff:ff:ff:ff:ff:ff")
 
-local unknown_eth = ethernet:pton("00:00:00:00:00:00")
-local ethernet_broadcast = ethernet:pton("ff:ff:ff:ff:ff:ff")
+local function make_arp_packet(src_mac, dst_mac, arp_oper,
+                               arp_src_mac, arp_src_ipv4,
+                               arp_dst_mac, arp_dst_ipv4)
+   local pkt = packet.allocate()
+   pkt.length = ether_arp_header_len
 
-local ethernet_htype = C.htons(1)
-local ipv4_ptype = C.htons(0x0800)
-local ethernet_hlen = 6
-local ipv4_plen = 4
-local arp_eth_ipv4_size = 28
-local ethertype_arp = 0x0806
-local n_ethertype_arp = C.htons(ethertype_arp)
+   local h = ffi.cast(ether_arp_header_ptr_t, pkt.data)
+   h.ether.dhost = dst_mac
+   h.ether.shost = src_mac
+   h.ether.type = htons(ether_type_arp)
+   h.arp.htype, h.arp.ptype = htons(arp_htype_ethernet), htons(arp_ptype_ipv4)
+   h.arp.hlen, h.arp.plen = arp_hlen_ethernet, arp_plen_ipv4
+   h.arp.oper = htons(arp_oper)
+   h.arp.sha = arp_src_mac
+   h.arp.spa = arp_src_ipv4
+   h.arp.tha = arp_dst_mac
+   h.arp.tpa = arp_dst_ipv4
 
-local o_htype = 0
-local o_ptype = 2
-local o_hlen = 4
-local o_plen = 5
-local o_oper = 6
-local o_sha = 8
-local o_spa = 14
-local o_tha = 18
-local o_tpa = 24
-
-local function write_arp(pkt, oper, local_eth, local_ipv4, remote_eth, remote_ipv4)
-   wr16(pkt.data + o_htype, ethernet_htype)
-   wr16(pkt.data + o_ptype, ipv4_ptype)
-   pkt.data[o_hlen] = ethernet_hlen
-   pkt.data[o_plen] = ipv4_plen
-   wr16(pkt.data + o_oper,  oper)
-   ffi.copy(pkt.data + o_sha, local_eth, ethernet_hlen)
-   ffi.copy(pkt.data + o_spa, local_ipv4, ipv4_plen)
-   ffi.copy(pkt.data + o_tha, remote_eth, ethernet_hlen)
-   ffi.copy(pkt.data + o_tpa, remote_ipv4, ipv4_plen)
-
-   pkt.length = arp_eth_ipv4_size
+   return pkt
 end
 
-function form_request(src_eth, src_ipv4, dst_ipv4)
-   local req_pkt = packet.allocate()
-   write_arp(req_pkt, arp_request, src_eth, src_ipv4, unknown_eth, dst_ipv4)
-   local dgram = datagram:new(req_pkt)
-   dgram:push(ethernet:new({ src = src_eth, dst = ethernet_broadcast,
-                             type = ethertype_arp }))
-   req_pkt = dgram:packet()
-   dgram:free()
-   return req_pkt
+local function make_arp_request(src_mac, src_ipv4, dst_ipv4)
+   return make_arp_packet(src_mac, mac_broadcast, arp_oper_request,
+                          src_mac, src_ipv4, mac_unknown, dst_ipv4)
 end
 
-function form_reply(local_eth, local_ipv4, arp_request_pkt)
-   local reply_pkt = packet.allocate()
-   local base = arp_request_pkt.data + ethernet_header_size
-   local dst_eth = base + o_sha
-   local dst_ipv4 = base + o_spa
-   write_arp(reply_pkt, arp_reply, local_eth, local_ipv4, dst_eth, dst_ipv4)
-   local dgram = datagram:new(reply_pkt)
-   dgram:push(ethernet:new({ src = local_eth, dst = dst_eth,
-                             type = ethertype_arp }))
-   reply_pkt = dgram:packet()
-   dgram:free()
-   return reply_pkt
+local function make_arp_reply(src_mac, src_ipv4, dst_mac, dst_ipv4)
+   return make_arp_packet(src_mac, dst_mac, arp_oper_reply,
+                          src_mac, src_ipv4, dst_mac, dst_ipv4)
 end
 
-function is_arp(p)
-   if p.length < ethernet_header_size + arp_eth_ipv4_size then return false end
-   return rd16(p.data + o_ethernet_ethertype) == n_ethertype_arp
+local function is_arp(p)
+   if p.length < ether_arp_header_len then return false end
+   local h = ffi.cast(ether_arp_header_ptr_t, p.data)
+   return ntohs(h.ether.type) == ether_type_arp
 end
 
-function is_arp_reply(p)
-   if not is_arp(p) then return false end
-   return rd16(p.data + ethernet_header_size + o_oper) == arp_reply
-end
+local function ipv4_eq(a, b) return C.memcmp(a, b, 4) == 0 end
+local function mac_eq(a, b)  return C.memcmp(a, b, 6) == 0 end
 
-function is_arp_request(p)
-   if not is_arp(p) then return false end
-   return rd16(p.data + ethernet_header_size + o_oper) == arp_request
-end
-
--- ARP does a 'who has' request, and the reply is in the *source* fields
-function get_isat_ethernet(arp_p)
-   if not is_arp_reply(arp_p) then return nil end
-   local eth_addr = ffi.new("uint8_t[?]", 6)
-   ffi.copy(eth_addr, arp_p.data + ethernet_header_size + o_sha, 6)
-   return eth_addr
+local function copy_mac(src)
+   local dst = ffi.new('uint8_t[6]')
+   ffi.copy(dst, src, 6)
+   return dst
 end
 
 ARP = {}
@@ -154,7 +123,7 @@ function ARP:new(conf)
    -- TODO: verify that the src and dst ipv4 addresses and src mac address
    -- have been provided, in pton format.
    if not o.dst_eth then
-      o.arp_request_pkt = form_request(o.src_eth, o.src_ipv4, o.dst_ipv4)
+      o.arp_request_pkt = make_arp_request(o.src_eth, o.src_ipv4, o.dst_ipv4)
       self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
    end
    return setmetatable(o, {__index=ARP})
@@ -182,24 +151,32 @@ function ARP:push()
 
    for _ = 1, link.nreadable(isouth) do
       local p = receive(isouth)
-      if is_arp(p) then
-         if not self.dst_eth and is_arp_reply(p) then
-            local dst_ethernet = get_isat_ethernet(p)
-            if dst_ethernet then
-               print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(self.dst_ipv4),
-                                                        ethernet:ntop(dst_ethernet)))
-               self.dst_eth = dst_ethernet
+      if p.length < ether_header_len then
+         -- Packet too short.
+         packet.free(p)
+      elseif is_arp(p) then
+         local h = ffi.cast(ether_arp_header_ptr_t, p.data)
+         if (ntohs(h.arp.htype) ~= arp_htype_ethernet or
+             ntohs(h.arp.ptype) ~= arp_ptype_ipv4 or
+             h.arp.hlen ~= 6 or h.arp.plen ~= 4) then
+            -- Ignore invalid packet.
+         elseif ntohs(h.arp.oper) == arp_oper_request then
+            if ipv4_eq(h.arp.tpa, self.src_ipv4, 4) then
+               transmit(osouth, make_arp_reply(self.src_eth, self.src_ipv4,
+                                               h.arp.sha, h.arp.spa))
             end
-            packet.free(p)
-         elseif is_arp_request(p, self.src_ipv4) then
-            local arp_reply_pkt = form_reply(self.src_eth, self.src_ipv4, p)
-            if arp_reply_pkt then
-               transmit(osouth, arp_reply_pkt)
+         elseif ntohs(h.arp.oper) == arp_oper_reply then
+            if ipv4_eq(h.arp.spa, self.dst_ipv4, 4) then
+               local dst_mac = copy_mac(h.arp.sha)
+               print(string.format("ARP: '%s' resolved (%s)",
+                                   ipv4:ntop(self.dst_ipv4),
+                                   ethernet:ntop(dst_mac)))
+               self.dst_eth = dst_mac
             end
-            packet.free(p)
-         else -- incoming ARP that isn't handled; drop it silently
-            packet.free(p)
+         else
+            -- Incoming ARP that isn't handled; drop it silently.
          end
+         packet.free(p)
       else
          transmit(onorth, p)
       end
@@ -211,7 +188,9 @@ function ARP:push()
          -- drop all southbound packets until the next hop's ethernet address is known
          packet.free(p)
       else
-         lwutil.set_dst_ethernet(p, self.dst_eth)
+         local e = ffi.cast(ether_header_ptr_t, p.data)
+         e.dhost = self.dst_eth
+         -- e.shost = self.src_eth
          transmit(osouth, p)
       end
    end
@@ -225,20 +204,20 @@ function selftest()
                          src_eth  = ethernet:pton('01:02:03:04:05:06') })
    arp.input  = { south=link.new('south in'),  north=link.new('north in') }
    arp.output = { south=link.new('south out'), north=link.new('north out') }
-   
+
    -- After first push, ARP should have sent out request.
    arp:push()
    assert(link.nreadable(arp.output.south) == 1)
    assert(link.nreadable(arp.output.north) == 0)
    local req = link.receive(arp.output.south)
    assert(is_arp(req))
-   assert(is_arp_request(req))
    -- Send a response.
-   local rep = form_reply(
-      ethernet:pton('11:22:33:44:55:66'), ipv4:pton('5.6.7.8'), req)
+   local rep = make_arp_reply(ethernet:pton('11:22:33:44:55:66'),
+                              ipv4:pton('5.6.7.8'),
+                              ethernet:pton('22:22:22:22:22:22'),
+                              ipv4:pton('2.2.2.2'))
    packet.free(req)
    assert(is_arp(rep))
-   assert(is_arp_reply(rep))
    link.transmit(arp.input.south, rep)
    -- Process response.
    arp:push()
@@ -259,7 +238,7 @@ function selftest()
    payload:push(ipv4_h)
    payload:push(ethernet:new({ src = ethernet:pton("00:00:00:00:00:00"),
                                dst = ethernet:pton("00:00:00:00:00:00"),
-                               type = constants.ethertype_ipv4 }))
+                               type = ether_type_ipv4 }))
    link.transmit(arp.input.north, payload:packet())
    arp:push()
    assert(link.nreadable(arp.output.south) == 1)
