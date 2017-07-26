@@ -90,10 +90,10 @@ function lwaftr_app(c, conf)
                 dst_eth = internal_interface.next_hop.mac,
                 dst_ipv6 = internal_interface.next_hop.ip })
    config.app(c, "arp", arp.ARP,
-              { src_ipv4 = convert_ipv4(external_interface.ip),
-                src_eth = external_interface.mac,
-                dst_eth = external_interface.next_hop.mac,
-                dst_ipv4 = convert_ipv4(external_interface.next_hop.ip) })
+              { self_ip = convert_ipv4(external_interface.ip),
+                self_mac = external_interface.mac,
+                next_mac = external_interface.next_hop.mac,
+                next_ip = convert_ipv4(external_interface.next_hop.ip) })
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
    local preprocessing_apps_v6  = { "reassemblerv6" }

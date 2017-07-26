@@ -11,6 +11,7 @@
 
 module(..., package.seeall)
 
+local bit      = require("bit")
 local ffi      = require("ffi")
 local packet   = require("core.packet")
 local link     = require("core.link")
@@ -110,30 +111,44 @@ local function copy_mac(src)
    return dst
 end
 
+local function random_locally_administered_unicast_mac_address()
+   local mac = lib.random_bytes(6)
+   -- Bit 0 is 0, indicating unicast.  Bit 1 is 1, indicating locally
+   -- administered.
+   mac[0] = bit.lshift(mac[0], 2) + 2
+   return mac
+end
+
 ARP = {}
 local arp_config_params = {
-   src_eth =  { default=false },
-   src_ipv4 = { default=false },
-   dst_eth =  { default=false },
-   dst_ipv4 = { default=false },
+   -- Source MAC address will default to a random address.
+   self_mac = { default=false },
+   -- Source IP is required though.
+   self_ip  = { required=true },
+   -- The next-hop MAC address can be statically configured.
+   next_mac = { default=false },
+   -- But if the next-hop MAC isn't configured, ARP will figure it out.
+   next_ip  = { default=false }
 }
 
 function ARP:new(conf)
    local o = lib.parse(conf, arp_config_params)
-   -- TODO: verify that the src and dst ipv4 addresses and src mac address
-   -- have been provided, in pton format.
-   if not o.dst_eth then
-      o.arp_request_pkt = make_arp_request(o.src_eth, o.src_ipv4, o.dst_ipv4)
+   if not o.self_mac then
+      o.self_mac = random_locally_administered_unicast_mac_address()
+   end
+   if not o.next_mac then
+      assert(o.next_ip, 'ARP needs next-hop IPv4 address to learn next-hop MAC')
+      o.arp_request_pkt = make_arp_request(o.self_mac, o.self_ip, o.next_ip)
       self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
    end
    return setmetatable(o, {__index=ARP})
 end
 
 function ARP:maybe_send_arp_request (output)
-   if self.dst_eth then return end
+   if self.next_mac then return end
    self.next_arp_request_time = self.next_arp_request_time or engine.now()
    if self.next_arp_request_time <= engine.now() then
-      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.dst_ipv4)))
+      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.next_ip)))
       self:send_arp_request(output)
       self.next_arp_request_time = engine.now() + self.arp_request_interval
    end
@@ -161,17 +176,17 @@ function ARP:push()
              h.arp.hlen ~= 6 or h.arp.plen ~= 4) then
             -- Ignore invalid packet.
          elseif ntohs(h.arp.oper) == arp_oper_request then
-            if ipv4_eq(h.arp.tpa, self.src_ipv4, 4) then
-               transmit(osouth, make_arp_reply(self.src_eth, self.src_ipv4,
+            if self.self_ip and ipv4_eq(h.arp.tpa, self.self_ip, 4) then
+               transmit(osouth, make_arp_reply(self.self_mac, self.self_ip,
                                                h.arp.sha, h.arp.spa))
             end
          elseif ntohs(h.arp.oper) == arp_oper_reply then
-            if ipv4_eq(h.arp.spa, self.dst_ipv4, 4) then
-               local dst_mac = copy_mac(h.arp.sha)
+            if ipv4_eq(h.arp.spa, self.next_ip, 4) then
+               local next_mac = copy_mac(h.arp.sha)
                print(string.format("ARP: '%s' resolved (%s)",
-                                   ipv4:ntop(self.dst_ipv4),
-                                   ethernet:ntop(dst_mac)))
-               self.dst_eth = dst_mac
+                                   ipv4:ntop(self.next_ip),
+                                   ethernet:ntop(next_mac)))
+               self.next_mac = next_mac
             end
          else
             -- Incoming ARP that isn't handled; drop it silently.
@@ -184,13 +199,13 @@ function ARP:push()
 
    for _ = 1, link.nreadable(inorth) do
       local p = receive(inorth)
-      if not self.dst_eth then
+      if not self.next_mac then
          -- drop all southbound packets until the next hop's ethernet address is known
          packet.free(p)
       else
          local e = ffi.cast(ether_header_ptr_t, p.data)
-         e.dhost = self.dst_eth
-         -- e.shost = self.src_eth
+         e.dhost = self.next_mac
+         -- e.shost = self.self_mac
          transmit(osouth, p)
       end
    end
@@ -199,9 +214,8 @@ end
 function selftest()
    print('selftest: arp')
 
-   local arp = ARP:new({ src_ipv4 = ipv4:pton('1.2.3.4'),
-                         dst_ipv4 = ipv4:pton('5.6.7.8'), -- Static gateway.
-                         src_eth  = ethernet:pton('01:02:03:04:05:06') })
+   local arp = ARP:new({ self_ip = ipv4:pton('1.2.3.4'),
+                         next_ip = ipv4:pton('5.6.7.8') })
    arp.input  = { south=link.new('south in'),  north=link.new('north in') }
    arp.output = { south=link.new('south out'), north=link.new('north out') }
 
