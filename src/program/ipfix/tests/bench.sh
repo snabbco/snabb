@@ -26,7 +26,7 @@ function benchmark {
   for (( i=1; i<=$ITERS; i++ ))
   do
     # run the probe
-    ./snabb ipfix probe --cpu $CPU -s -i intel10g -o intel10g -m 00:11:22:33:44:55 -a 192.168.1.2 -M 55:44:33:22:11:00 -c 192.168.1.3 -p 2100 -D $DURATION $PCI1 $PCI3 > $output &
+    ./snabb ipfix probe --cpu $CPU -D $DURATION $PCI1 $PCI3 > $output &
     # blast with pcap traffic
     ./snabb packetblaster replay -D $DURATION $pcap $PCI2 > /dev/null &
     wait
