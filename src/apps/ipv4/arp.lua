@@ -205,7 +205,7 @@ function ARP:push()
       else
          local e = ffi.cast(ether_header_ptr_t, p.data)
          e.dhost = self.next_mac
-         -- e.shost = self.self_mac
+         e.shost = self.self_mac
          transmit(osouth, p)
       end
    end
@@ -262,7 +262,7 @@ function selftest()
    local routed = link.receive(arp.output.south)
    local payload = datagram:new(routed, ethernet)
    local eth_h = payload:parse()
-   assert(eth_h:src_eq(ethernet:pton('00:00:00:00:00:00')))
+   assert(eth_h:src_eq(arp.self_mac))
    assert(eth_h:dst_eq(ethernet:pton('11:22:33:44:55:66')))
    assert(ipv4_h:eq(payload:parse()))
    assert(udp_h:eq(payload:parse()))
