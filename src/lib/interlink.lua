@@ -13,6 +13,8 @@ local SIZE = link.max + 1
 local CACHELINE = 64 -- XXX - make dynamic
 local INT = ffi.sizeof("int")
 
+assert(band(SIZE, SIZE-1) == 0, "SIZE is not a power of two")
+
 ffi.cdef([[ struct interlink {
    char pad0[]]..CACHELINE..[[];
    int read, write;
@@ -21,29 +23,25 @@ ffi.cdef([[ struct interlink {
    char pad2[]]..CACHELINE-2*INT..[[];
    int lread, nwrite;
    char pad3[]]..CACHELINE-2*INT..[[];
-   int max;
-   char pad4[]]..CACHELINE-1*INT..[[];
    struct packet *packets[]]..SIZE..[[];
 }]])
 
 function create (name)
-   assert(band(SIZE, SIZE-1) == 0, "SIZE is not a power of two")
    local r = shm.create(name, "struct interlink")
-   r.max = SIZE - 1
-   r.nwrite = r.max -- “full” until initlaized
+   r.nwrite = link.max -- “full” until initlaized
    return r
 end
 
 function init (r) -- initialization must be performed by consumer
    assert(full(r) and empty(r)) -- only satisfied if uninitialized
-   for i = 0, r.max do
+   for i = 0, link.max do
       r.packets[i] = packet.allocate()
    end
    r.nwrite = 0
 end
 
 local function NEXT (r, i)
-   return band(i + 1, r.max)
+   return band(i + 1, link.max)
 end
 
 function full (r)
