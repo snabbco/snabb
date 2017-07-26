@@ -1,4 +1,4 @@
-module(..., package.seeall)
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
 -- ARP address resolution (RFC 826)
 -- Note: all incoming configurations are assumed to be in network byte order.
@@ -33,17 +33,21 @@ octet offset 	0 	1
 26 	(last 2 bytes)
 --]]
 
+module(..., package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
 local packet = require("core.packet")
+local link   = require("core.link")
 
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
+local ipv4     = require("lib.protocol.ipv4")
 
 local constants = require("apps.lwaftr.constants")
 local lwutil = require("apps.lwaftr.lwutil")
 
+local receive, transmit = link.receive, link.transmit
 local rd16, wr16 = lwutil.rd16, lwutil.wr16
 
 local ethernet_header_size = constants.ethernet_header_size
@@ -134,6 +138,78 @@ function get_isat_ethernet(arp_p)
    local eth_addr = ffi.new("uint8_t[?]", 6)
    ffi.copy(eth_addr, arp_p.data + ethernet_header_size + o_sha, 6)
    return eth_addr
+end
+
+ARP = {}
+
+function ARP:new(conf)
+   local o = setmetatable({}, {__index=ARP})
+   o.conf = conf
+   -- TODO: verify that the src and dst ipv4 addresses and src mac address
+   -- have been provided, in pton format.
+   if not conf.dst_eth then
+      o.arp_request_pkt = form_request(conf.src_eth, conf.src_ipv4, conf.dst_ipv4)
+      self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
+   end
+   o.dst_eth = conf.dst_eth -- intentionally nil if to request via ARP
+   return o
+end
+
+function ARP:maybe_send_arp_request (output)
+   if self.dst_eth then return end
+   self.next_arp_request_time = self.next_arp_request_time or engine.now()
+   if self.next_arp_request_time <= engine.now() then
+      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.conf.dst_ipv4)))
+      self:send_arp_request(output)
+      self.next_arp_request_time = engine.now() + self.arp_request_interval
+   end
+end
+
+function ARP:send_arp_request (output)
+   transmit(output, packet.clone(self.arp_request_pkt))
+end
+
+function ARP:push()
+   local isouth, osouth = self.input.south, self.output.south
+   local inorth, onorth = self.input.north, self.output.north
+
+   self:maybe_send_arp_request(osouth)
+
+   for _ = 1, link.nreadable(isouth) do
+      local p = receive(isouth)
+      if is_arp(p) then
+         if not self.dst_eth and is_arp_reply(p) then
+            local dst_ethernet = get_isat_ethernet(p)
+            if dst_ethernet then
+               print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(self.conf.dst_ipv4),
+                                                        ethernet:ntop(dst_ethernet)))
+               self.dst_eth = dst_ethernet
+            end
+            packet.free(p)
+         elseif is_arp_request(p, self.conf.src_ipv4) then
+            local arp_reply_pkt = form_reply(self.conf.src_eth, self.conf.src_ipv4, p)
+            if arp_reply_pkt then
+               transmit(osouth, arp_reply_pkt)
+            end
+            packet.free(p)
+         else -- incoming ARP that isn't handled; drop it silently
+            packet.free(p)
+         end
+      else
+         transmit(onorth, p)
+      end
+   end
+
+   for _ = 1, link.nreadable(inorth) do
+      local p = receive(inorth)
+      if not self.dst_eth then
+         -- drop all southbound packets until the next hop's ethernet address is known
+         packet.free(p)
+      else
+         lwutil.set_dst_ethernet(p, self.dst_eth)
+         transmit(osouth, p)
+      end
+   end
 end
 
 function selftest()
