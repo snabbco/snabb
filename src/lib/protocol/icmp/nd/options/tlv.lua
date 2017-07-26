@@ -53,6 +53,7 @@ function tlv:new_from_mem (mem, size)
    local class = o._types[tlv.type].class
    o._option = require(class):new_from_mem(mem + tlv_t_size,
                                            size - tlv_t_size)
+   assert(o._option)
    local t = ffi.typeof("struct { tlv_t tlv; uint8_t data[$]; }", size-tlv_t_size)
    o._tlv = ffi.cast(ffi.typeof("$*", t), mem)
    return o
