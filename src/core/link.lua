@@ -28,27 +28,16 @@ local provided_counters = {
 
 function new (name)
    local r = shm.create("links/"..name.."/link", link_t)
-   for _, c in ipairs(provided_counters) do
-      r.stats[c] = counter.create("links/"..name.."/"..c..".counter")
-   end
    counter.set(r.stats.dtime, C.get_unix_time())
    return r
 end
 
 function open (path)
-   print("link open", path)
    local r = shm.open(path.."/link", link_t)
-   for _, c in ipairs(provided_counters) do
-      r.stats[c] = counter.open(path.."/"..c..".counter")
-      print(c, r.stats[c])
-   end
    return r
 end
 
 function free (r, name)
-   for _, c in ipairs(provided_counters) do
-      counter.delete("links/"..name.."/"..c..".counter")
-   end
    shm.unlink("links/"..name)
 end
 
