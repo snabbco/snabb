@@ -5,6 +5,7 @@ module(..., package.seeall)
 local now      = require("core.app").now
 local lib      = require("core.lib")
 local link     = require("core.link")
+local arp      = require("apps.ipv4.arp")
 local ipfix    = require("apps.ipfix.ipfix")
 local numa     = require("lib.numa")
 
@@ -132,6 +133,10 @@ function run (args)
    local in_link, in_app   = in_out_apps[input_type](args[1])
    local out_link, out_app = in_out_apps[output_type](args[2])
 
+   local arp_config    = { self_mac = host_mac,
+                           self_ip = host_ip,
+                           next_mac = collector_mac,
+                           next_ip = collector_ip }
    local ipfix_config    = { active_timeout = active_timeout,
                              idle_timeout = idle_timeout,
                              ipfix_version = ipfix_version,
@@ -143,11 +148,14 @@ function run (args)
    local c = config.new()
 
    config.app(c, "source", unpack(in_app))
+   config.app(c, "arp", arp.ARP, arp_config)
    config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
    config.app(c, "sink", unpack(out_app))
 
-   config.link(c, "source." .. in_link.output .. " -> ipfix.input")
-   config.link(c, "ipfix.output -> sink." .. out_link.input)
+   config.link(c, "source." .. in_link.output .. " -> arp.south")
+   config.link(c, "arp.north -> ipfix.input")
+   config.link(c, "ipfix.output -> arp.north")
+   config.link(c, "arp.south -> sink." .. out_link.input)
 
    local done
    if not duration then
