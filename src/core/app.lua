@@ -215,11 +215,14 @@ end
 -- Return the configuration actions needed to migrate from old config to new.
 function compute_config_actions (old, new)
    local actions = {}
+   local post_link_apps = {}
 
    -- First determine the links that are going away and remove them.
    for linkspec in pairs(old.links) do
       if not new.links[linkspec] then
          local fa, fl, ta, tl = config.parse_link(linkspec)
+         post_link_apps[fa] = true
+         post_link_apps[ta] = true
          table.insert(actions, {'unlink_output', {fa, fl}})
          table.insert(actions, {'unlink_input', {ta, tl}})
          table.insert(actions, {'free_link', {linkspec}})
@@ -262,6 +265,8 @@ function compute_config_actions (old, new)
    -- Now rebuild links.
    for linkspec,_ in pairs(new.links) do
       local fa, fl, ta, tl = config.parse_link(linkspec)
+      post_link_apps[fa] = true
+      post_link_apps[ta] = true
       local fresh_link = not old.links[linkspec]
       if fresh_link then table.insert(actions, {'new_link', {linkspec}}) end
       if not new.apps[fa] then error("no such app: " .. fa) end
@@ -272,6 +277,10 @@ function compute_config_actions (old, new)
       if fresh_link or fresh_apps[ta] then
          table.insert(actions, {'link_input', {ta, tl, linkspec}})
       end
+   end
+
+   for appname, _ in pairs(post_link_apps) do
+      table.insert(actions, {'post_link', {appname}})
    end
 
    return actions
@@ -360,6 +369,10 @@ function apply_config_actions (actions)
       local app = app_table[name]
       app:reconfig(arg)
       configuration.apps[name].arg = arg
+   end
+   function ops.post_link(name)
+      local app = app_table[name]
+      if app.post_link then app:post_link() end
    end
 
    -- Dispatch actions.
