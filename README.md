@@ -68,16 +68,31 @@ details in discussions then these are the places to look for answers.
 
 The [AnandTech review of the Haswell microarchitecture](http://www.anandtech.com/show/6355/intels-haswell-architecture) is also excellent lighter reading.
 
-### Compilation
+### Compilation for users
 
-RaptorJIT uses [nix](http://nixos.org/nix/) to define a reproducible
-build environment that includes Clang for C and LuaJIT 2.0 for
-bootstrapping (see [default.nix](default.nix)). The recommended way to
-build RaptorJIT is with nix, which provides the dependencies
-automatically, but you can build manually if you prefer.
+Simple build:
 
-Building with nix will be slow the first time due to downloading
-toolchains and related dependencies. This is all cached for future
+```shell
+$ make  # requires LuaJIT (2.0 or 2.1) to run DynASM
+```
+
+Alternative if you don't have LuaJIT available and you are building a
+pristine copy from the master branch:
+
+```shell
+$ make reusevm  # Reuse reference copy of the generated VM code
+$ make          # Does not require LuaJIT now
+```
+
+### Compilation for VM hackers
+
+RaptorJIT uses [Nix](http://nixos.org/nix/) to provide a reference
+build environment. You can use Nix to build/test/benchmark RaptorJIT
+with suitable versions of all dependencies provided.
+
+Note: Building with nix will be slow the first time because it
+downloads the exact reference versions of the toolchain (clang, etc)
+and all dependencies (glibc, etc). This is all cached for future
 builds.
 
 #### Build with nix
@@ -115,6 +130,40 @@ $ make
 ```
 
 ... but make sure you have at least `make`, `clang`, and `luajit` in your `$PATH`.
+
+### Run the benchmarks
+
+Nix can also run the full benchmark suite and generate visualizations
+with R/ggplot2.
+
+The simplest incantation tests one branch:
+
+```shell
+$ nix-build testsuite/bench --arg Asrc ./.   # note: ./. means ./
+```
+
+You can also test several branches (A-E), give them names, specify
+command-line arguments, say how many tests to run, and allow parallel
+execution:
+
+```shell
+# Run the benchmarks and create result visualizations result/
+$ nix-build testsuite/bench                     \
+            --arg    Asrc ~/git/raptorjit       \
+            --argstr Aname master               \
+            --arg    Bsrc ~/git/raptorjit-hack  \
+            --argstr Bname hacked               \
+            --arg    Csrc ~/git/raptorjit-hack2 \
+            --argstr Cname hacked-O1            \
+            --argstr Cargs -O1                  \
+            --arg    runs 100                   \
+            -j 5           # Run up to 5 tests in parallel
+```
+
+If you are using a distributed nix environment such
+as [Hydra](https://nixos.org/hydra/) then the tests can be
+automatically parallelized and distributed across a suitable build
+farm.
 
 ### Quotes
 
