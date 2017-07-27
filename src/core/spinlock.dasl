@@ -41,6 +41,7 @@ end
 
 local entry = dasm.globals(globals, globalnames)
 
-return setmetatable ({ lock = ffi.cast("void (*)(int32_t *)", entry.lock),
+return setmetatable ({ new = function () return ffi.new("int32_t[1]") end,
+                       lock = ffi.cast("void (*)(int32_t *)", entry.lock),
 		       unlock = ffi.cast("void (*)(int32_t *)", entry.unlock)
 		     }, {_anchor = code})
