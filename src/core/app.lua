@@ -485,6 +485,8 @@ function breathe ()
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
    running = false
+   -- Rebalance freelist
+   packet.rebalance()
 end
 
 function report (options)
