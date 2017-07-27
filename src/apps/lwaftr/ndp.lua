@@ -453,10 +453,11 @@ function NDP:push()
       local p = receive(inorth)
       if not self.dst_eth then
          -- drop all southbound packets until the next hop's ethernet address is known
-          packet.free(p)
+         packet.free(p)
       else
-          lwutil.set_dst_ethernet(p, self.dst_eth)
-          transmit(osouth, p)
+         ffi.copy(p.data, self.dst_eth, 6)
+         -- ffi.copy(p.data + 6, self.src_eth, 6)
+         transmit(osouth, p)
       end
    end
 end
@@ -485,7 +486,6 @@ function selftest()
    local nsp = form_ns(lmac, lip, rip)
    assert(is_ndp(nsp))
    assert(is_solicited_neighbor_advertisement(nsp) == false)
-   lwutil.set_dst_ethernet(nsp, lmac) -- Not a meaningful thing to do, just a test
    
    local sol_na = form_nsolicitation_reply(lmac, lip, nsp)
    local dst_eth = get_dst_ethernet(sol_na, {rip})

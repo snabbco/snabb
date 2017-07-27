@@ -85,10 +85,6 @@ function is_ipv4_fragment(pkt)
       band(flags_and_frag_offset, non_zero_offset) ~= 0
 end
 
-function set_dst_ethernet(pkt, dst_eth)
-   ffi.copy(pkt.data, dst_eth, 6)
-end
-
 function write_to_file(filename, content)
    local fd, err = io.open(filename, "wt+")
    if not fd then error(err) end
