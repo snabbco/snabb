@@ -204,16 +204,42 @@ LJLIB_CF(jit_opt_start)
 
 #define LJLIB_MODULE_jit_vmprofile
 
+LJLIB_CF(jit_vmprofile_open)
+{
+  if (L->base < L->top && tvisstr(L->base)) {
+    return luaJIT_vmprofile_open(L, strdata(lj_lib_checkstr(L, 1)));
+  } else {
+    lj_err_argtype(L, 1, "filename");
+    return 0;
+  }
+}
+
+LJLIB_CF(jit_vmprofile_close)
+{
+  if (L->base < L->top && tvislightud(L->base)) {
+    return luaJIT_vmprofile_close(L, lightudV(L->base));
+  } else {
+    lj_err_argtype(L, 1, "vmprofile");
+  }
+}
+
+LJLIB_CF(jit_vmprofile_select)
+{
+  if (L->base < L->top && tvislightud(L->base)) {
+    return luaJIT_vmprofile_select(L, lightudV(L->base));
+  } else {
+    lj_err_argtype(L, 1, "vmprofile");
+  }
+}
+
 LJLIB_CF(jit_vmprofile_start)
 {
-  luaJIT_vmprofile_start(L);
-  return 0;
+  return luaJIT_vmprofile_start(L);
 }
 
 LJLIB_CF(jit_vmprofile_stop)
 {
-  luaJIT_vmprofile_stop(L);
-  return 0;
+  return luaJIT_vmprofile_stop(L);
 }
 
 #include "lj_libdef.h"
@@ -233,7 +259,6 @@ JIT_PARAMDEF(JIT_PARAMINIT)
 #undef JIT_PARAMINIT
   0
 };
-
 
 /* Arch-dependent CPU detection. */
 static uint32_t jit_cpudetect(lua_State *L)
