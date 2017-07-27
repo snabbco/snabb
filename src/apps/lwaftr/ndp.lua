@@ -1,18 +1,15 @@
-module(..., package.seeall)
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
--- NDP address resolution.
+-- NDP address resolution (RFC 4861)
+
 -- Given a remote IPv6 address, try to find out its MAC address.
 -- If resolution succeeds:
 -- All packets coming through the 'south' interface (ie, via the network card)
--- are silently forwarded.
--- Note that the network card can drop packets; if it does, they will not get
--- to this app.
+-- are silently forwarded (unless dropped by the network card).
 -- All packets coming through the 'north' interface (the lwaftr) will have
 -- their Ethernet headers rewritten.
 
--- Expected configuration:
--- lwaftr <-> ipv6 fragmentation app <-> lw_eth_resolve <-> vlan tag handler
--- That is, neither fragmentation nor vlan tagging are within the scope of this app.
+module(..., package.seeall)
 
 local bit      = require("bit")
 local ffi      = require("ffi")
@@ -29,6 +26,8 @@ local lwutil = require("apps.lwaftr.lwutil")
 local checksum = require("lib.checksum")
 
 local C = ffi.C
+local htons, ntohs = lib.htons, lib.ntohs
+local htonl, ntohl = lib.htonl, lib.ntohl
 local receive, transmit = link.receive, link.transmit
 local rd16, wr16, wr32, ipv6_equals = lwutil.rd16, lwutil.wr16, lwutil.wr32, lwutil.ipv6_equals
 
@@ -60,22 +59,60 @@ local ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
 local ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
 
 
--- Pseudo-header:
--- 32 bytes src and dst addresses
--- 4 bytes content length, network byte order
---   (2 0 bytes and then 2 possibly-0 content length bytes in practice)
--- three zero bytes, then the next_header byte
-local _scratch_pseudoheader = ffi.new('uint8_t[?]', ipv6_pseudoheader_size)
+local ether_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  dhost[6];
+   uint8_t  shost[6];
+   uint16_t type;
+} __attribute__((packed))
+]]
+local ipv6_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint32_t v_tc_fl; // version, tc, flow_label
+   uint16_t payload_length;
+   uint8_t  next_header;
+   uint8_t  hop_limit;
+   uint8_t  src_ip[16];
+   uint8_t  dst_ip[16];
+} __attribute__((packed))
+]]
+local icmpv6_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  type;
+   uint8_t  code;
+   uint16_t checksum;
+} __attribute__((packed))
+]]
+assert(ffi.sizeof(icmpv6_header_t) == 4)
+local ndp_header_t = ffi.typeof(
+   'struct { $ ether; $ ipv6; $ icmpv6; } __attribute__((packed))',
+   ether_header_t, ipv6_header_t, icmpv6_header_t)
+local ndp_header_ptr_t = ffi.typeof('$*', ndp_header_t)
+local ndp_header_len = ffi.sizeof(ndp_header_t)
+local ether_type_ipv6 = 0x86DD
+
+local ipv6_pseudoheader_t = ffi.typeof [[
+struct {
+   char src_ip[16];
+   char dst_ip[16];
+   uint32_t ulp_length;
+   uint32_t next_header;
+} __attribute__((packed))
+]]
 local function checksum_pseudoheader_from_header(ipv6_fixed_header)
-   local ph_size = ipv6_pseudoheader_size
-   ffi.fill(_scratch_pseudoheader, ph_size)
-   ffi.copy(_scratch_pseudoheader, ipv6_fixed_header + o_ipv6_src_addr, 32)
-   ffi.copy(_scratch_pseudoheader + 34, ipv6_fixed_header + o_ipv6_payload_len, 2)
-   ffi.copy(_scratch_pseudoheader + 39, ipv6_fixed_header + o_ipv6_next_header, 1)
-   return checksum.ipsum(_scratch_pseudoheader, ph_size, 0)
+   local ph = ipv6_pseudoheader_t()
+   ph.src_ip = ipv6_fixed_header.src_ip
+   ph.dst_ip = ipv6_fixed_header.dst_ip
+   ph.ulp_length = htonl(ntohs(ipv6_fixed_header.payload_length))
+   ph.next_header = htonl(ipv6_fixed_header.next_header)
+   return checksum.ipsum(ffi.cast('char*', ph),
+                         ffi.sizeof(ipv6_pseudoheader_t), 0)
 end
 
-local function eth_next_is_ipv6(pkt)
+local function eth_next_is_ipv6(header)
    return rd16(pkt.data + o_ethernet_ethertype) == n_ethertype_ipv6
 end
 
@@ -106,27 +143,12 @@ local function is_solicited_na(pkt)
 end
 
 
---[[ All NDP messages are >= 8 bytes. Router solicitation is the shortest:
-      0                   1                   2                   3
-      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |     Type      |     Code      |          Checksum             |
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |                            Reserved                           |
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |   Options ...
-     +-+-+-+-+-+-+-+-+-+-+-+-
---]]
 local function is_ndp(pkt)
-   local min_ndp_len = eth_ipv6_size + 8
-   if pkt.length >= min_ndp_len and
-      eth_next_is_ipv6(pkt) and
-      ipv6_next_is_icmp6(pkt)
-   then
-      local icmp_type = pkt.data[eth_ipv6_size]
-      return (icmp_type >= 133 and icmp_type <= 137)
-   end
-   return false
+   if pkt.length < ndp_header_len then return false end
+   local h = ffi.cast(ndp_header_ptr_t, pkt.data)
+   if ntohs(h.ether.type) ~= ether_type_ipv6 then return false end
+   if h.ipv6.next_header ~= proto_icmpv6 then return false end
+   return h.icmpv6.type >= 133 and h.icmpv6.type <= 137
 end
 
 -- TODO: tune this for speed
@@ -289,12 +311,11 @@ local function form_sna(local_eth, local_ipv6, is_router, soliciting_pkt)
 end
 
 local function verify_icmp_checksum(pkt)
-   local offset = ethernet_header_size + o_ipv6_payload_len
-   local icmp_length = C.ntohs(rd16(pkt.data + offset))
-   local ph_csum = checksum_pseudoheader_from_header(
-      pkt.data + ethernet_header_size)
-   local a = checksum.ipsum(pkt.data + eth_ipv6_size, icmp_length, bit.bnot(
-      ph_csum))
+   local h = ffi.cast(ndp_header_ptr_t, pkt.data)
+   local ph_csum = checksum_pseudoheader_from_header(h.ipv6)
+   local icmp_length = ntohs(h.ipv6.payload_length)
+   local a = checksum.ipsum(ffi.cast('char*', h.icmpv6), icmp_length,
+                            bit.bnot(ph_csum))
    return a == 0
 end
 
