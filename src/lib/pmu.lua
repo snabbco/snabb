@@ -105,6 +105,7 @@ function setup (patterns)
    if not avail then
       error("PMU not available: " .. err)
    end
+   pmu_x86.enable_rdpmc()
    local set = {}
    for event in pairs(defs) do
       for _, pattern in pairs(patterns or {}) do

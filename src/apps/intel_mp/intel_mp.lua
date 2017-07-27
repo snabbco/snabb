@@ -256,6 +256,7 @@ Intel = {
       rxq = {},
       mtu = {default=9014},
       linkup_wait = {default=120},
+      linkup_wait_recheck = {default=0.1},
       wait_for_link = {default=false},
       master_stats = {default=true},
       run_stats = {default=false}
@@ -289,6 +290,8 @@ function Intel:new (conf)
       rxq = conf.rxq,
       mtu = conf.mtu or self.config.mtu.default,
       linkup_wait = conf.linkup_wait or self.config.linkup_wait.default,
+      linkup_wait_recheck =
+         conf.linkup_wait_recheck or self.config.linkup_wait_recheck.default,
       wait_for_link = conf.wait_for_link
    }
 
@@ -350,6 +353,15 @@ end
 
 function Intel:disable_interrupts ()
    self.r.EIMC(0xffffffff)
+end
+function Intel:wait_linkup (timeout)
+   if timeout == nil then timeout = self.linkup_wait end
+   if self:link_status() then return true end
+   for i=1,math.max(math.floor(timeout/self.linkup_wait_recheck), 1) do
+      C.usleep(math.floor(self.linkup_wait_recheck * 1e6))
+      if self:link_status() then return true end
+   end
+   return false
 end
 function Intel:init_rx_q ()
    if not self.rxq then return end
@@ -755,11 +767,7 @@ function Intel1g:init ()
    self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
    self.r.RLPML(self.mtu + 4) -- mtu + crc
    self:unlock_sw_sem()
-   for i=1, math.floor(self.linkup_wait/2) do
-      if self:link_status() then break end
-      if not self.wait_for_link then break end
-      C.usleep(2000000)
-   end
+   if self.wait_for_link then self:wait_linkup() end
 end
 
 function Intel1g:link_status ()
@@ -865,7 +873,12 @@ function Intel82599:init ()
    pci.set_bus_master(self.pciaddress, true)
    pci.disable_bus_master_cleanup(self.pciaddress)
 
-   for i=1,math.floor(self.linkup_wait/2) do
+   -- The 82599 devices sometimes just don't come up, especially when
+   -- there is traffic already on the link.  If 2s have passed and the
+   -- link is still not up, loop and retry.
+   local reset_timeout = math.max(self.linkup_wait_recheck, 2)
+   local reset_count = math.max(math.floor(self.linkup_wait / reset_timeout), 1)
+   for i=1,reset_count do
       self:disable_interrupts()
       local reset = bits{ LinkReset=3, DeviceReset=26 }
       self.r.CTRL(reset)
@@ -880,9 +893,9 @@ function Intel82599:init ()
       self.r.AUTOC2(0)
       self.r.AUTOC2:set(bits { tenG_PMA_PMD_Serial = 17 })
       self.r.AUTOC:set(bits{restart_AN=12})
-      C.usleep(2000000)
-      if self:link_status() then break end
+
       if not self.wait_for_link then break end
+      if self:wait_linkup(reset_timeout) then break end
    end
 
    -- 4.6.7
