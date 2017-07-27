@@ -1,14 +1,16 @@
 Usage:
   snabb lwaftr bench
   snabb lwaftr check
-  snabb lwaftr run
-  snabb lwaftr transient
-  snabb lwaftr compile-binding-table
   snabb lwaftr generate-binding-table
-  snabb lwaftr control
   snabb lwaftr loadtest
-  snabb lwaftr generator
+  snabb lwaftr migrate-configuration
+  snabb lwaftr monitor
   snabb lwaftr query
+  snabb lwaftr quickcheck
+  snabb lwaftr run
+  snabb lwaftr run_nohw
+  snabb lwaftr soaktest
+  snabb lwaftr transient
 
 Use --help for per-command usage.
 Example:

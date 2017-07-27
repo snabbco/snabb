@@ -4,6 +4,7 @@ obj
 *.so
 *.o
 *#
+__pycache__
 /src/snabbswitch
 /src/snabb
 /src/testlog
@@ -19,3 +20,4 @@ obj
 /src/programs.inc
 .images
 /lib/luajit/usr
+/src/core/version.lua

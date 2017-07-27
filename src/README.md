@@ -469,8 +469,16 @@ of this process:
 - Fully qualified: `/1234/foo/bar` ⇒ `/var/run/snabb/1234/foo/bar`
 
 Behind the scenes the objects are backed by files on ram disk
-(`/var/run/snabb/<pid>`) and accessed with the equivalent of POSIX shared
-memory (`shm_overview(7)`).
+(`/var/run/snabb/<pid>`) and accessed with the equivalent of POSIX
+shared memory (`shm_overview(7)`). The files are automatically removed
+on shutdown unless the environment `SNABB_SHM_KEEP` is set. The
+location `/var/run/snabb` can be overridden by the environment
+variable `SNABB_SHM_ROOT`.
+
+Shared memory objects are created world-readable for convenient access
+by diagnostic tools. You can lock this down by setting
+`SNABB_SHM_ROOT` to a path under a directory with appropriate
+permissions.
 
 The practical limit on the number of objects that can be mapped will depend on
 the operating system limit for memory mappings. On Linux the default limit is
@@ -491,6 +499,10 @@ Maps an existing shared object of *type* into memory via a hierarchical *name*.
 If *readonly* is non-nil the shared object is mapped in read-only mode.
 *Readonly* defaults to nil. Fails if the shared object does not already exist.
 Returns a pointer to the mapped object.
+
+— Function **shm.alias** *new-path* *existing-path*
+
+Create an alias (symbolic link) for an object.
 
 — Function **shm.exists** *name*
 
@@ -804,9 +816,36 @@ commas. Example:
 comma_value(1000000) => "1,000,000"
 ```
 
-— Function **lib.random_data** *length*
+— Function **lib.random_bytes_from_dev_urandom** *length*
 
-Returns a string of *length* bytes of random data.
+Return *length* bytes of random data, as a byte array, taken from
+`/dev/urandom`.  Suitable for cryptographic usage.
+
+— Function **lib.random_bytes_from_math_random** *length*
+
+Return *length* bytes of random data, as a byte array, where each byte
+was taken from `math.random(0, 255)`.  *Not* suitable for cryptographic
+usage.
+
+— Function **lib.random_bytes** *length*
+— Function **lib.randomseed** *seed*
+
+Initialize Snabb's random number generation facility.  If *seed* is nil,
+then the Lua `math.random()` function will be seeded from
+`/dev/urandom`, and `lib.random_bytes` will be initialized to
+`lib.random_bytes_from_dev_urandom`.  This is Snabb's default mode of
+operation.
+
+Sometimes it's useful to make Snabb use deterministic random numbers.
+In that case, pass a seed to **lib.randomseed**; Snabb will set
+`lib.random_bytes` to `lib.random_bytes_from_math_random`, and also
+print out a message to stderr indicating that we are using lower-quality
+deterministic random numbers.
+
+As part of its initialization process, Snabb will call `lib.randomseed`
+with the value of the `SNABB_RANDOM_SEED` environment variable (if
+any).  Set this environment variable to enable deterministic random
+numbers.
 
 — Function **lib.bounds_checked** *type*, *base*, *offset*, *size*
 
@@ -886,6 +925,11 @@ integers *n* respectively. Unsigned.
 Network to host byte order conversion functions for 32 and 16 bit
 integers *n* respectively. Unsigned.
 
+— Function **lib.random_bytes** *count*
+
+Return a fresh array of *count* random bytes.  Suitable for
+cryptographic usage.
+
 — Function **lib.parse** *arg*, *config*
 
 Validates *arg* against the specification in *config*, and returns a fresh
@@ -909,6 +953,93 @@ lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
   => {foo=42, bar=43, baz=44}
 ```
 
+
+## Multiprocess operation (core.worker)
+
+Snabb can operate as a _group_ of cooperating processes. The _main_
+process is the initial one that you start directly. The optional
+_worker_ processes are children spawned when the main process calls
+the `core.worker` module.
+
+    DIAGRAM: Multiprocessing
+                  +----------+
+          +-------+   Main   +-------+
+          |       +----------+       |
+          :            :             :
+    +-----+----+  +----+-----+  +----+-----+
+    | worker 1 |  :   ....   |  | worker N |
+    +----------+  +----------+  +----------+
+
+Each worker is a complete Snabb process. They can define app networks,
+run the engine, and do everything else that ordinary Snabb processes
+do. The exact behavior of each worker is determined by a Lua
+expression provided upon creation.
+
+Groups of Snabb processes each have the following special properties:
+
+- **Group termination**: Terminating the main process automatically terminates all of the
+  workers. This works for all process termination scenarios including
+  `kill -9`.
+- **Shared DMA memory**: DMA memory pointers obtained with `memory.dma_alloc()` are usable by
+  all processes in the group. This means that you can share DMA memory
+  pointers between processes, for example via `shm` shared memory
+  objects, and reference them from any process. (The memory is
+  automatically mapped at the expected address via a `SEGV` signal
+  handler.)
+- **PCI device shutdown**: For each PCI device opened by a process within the group, bus
+  mastering (DMA) is disabled upon termination before any DMA memory
+  is returned to the kernel. This prevents "dangling" DMA requests
+  from corrupting memory that has been freed and reused.
+
+The `core.worker` API functions are available in the main process only:
+
+— Function **worker.start** *name* *luacode*
+
+Start a named worker process. The worker starts with a completely
+fresh Snabb process image (`fork()+execve()`) and then executes the
+string *luacode* as a Lua source code expression.
+
+Example:
+
+```
+worker.start("myworker", [[
+   print("hello world, from a Snabb worker process!")
+   print("could configure and run the engine now...")
+]])
+```
+
+— Function **worker.stop** *name*
+
+Stop a named worker process. The worker is abruptly killed.
+
+Example:
+
+```
+worker.stop("myworker")
+```
+
+— Function **worker.status**
+
+Return a table summarizing the status of all workers. The table key is
+the worker name and the value is a table with `pid` and `alive`
+attributes.
+
+Example:
+
+```
+for w, s in pairs(worker.status()) do
+   print(("  worker %s: pid=%s alive=%s"):format(
+         w, s.pid, s.alive))
+end
+```
+
+Output:
+
+```
+worker w3: pid=21949 alive=true
+worker w1: pid=21947 alive=true
+worker w2: pid=21948 alive=true
+```
 
 ## Main
 

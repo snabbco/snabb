@@ -48,12 +48,24 @@ function main ()
       error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
    end
    initialize()
-   local program, args = select_program(parse_command_line())
-   if not lib.have_module(modulename(program)) then
-      print("unsupported program: "..program:gsub("_", "-"))
-      usage(1)
+   if lib.getenv("SNABB_PROGRAM_LUACODE") then
+      -- Run the given Lua code instead of the command-line
+      local expr = lib.getenv("SNABB_PROGRAM_LUACODE")
+      local f = loadstring(expr)
+      if f == nil then
+         error(("Failed to load $SNABB_PROGRAM_LUACODE: %q"):format(expr))
+      else
+         f()
+      end
    else
-      require(modulename(program)).run(args)
+      -- Choose a program based on the command line
+      local program, args = select_program(parse_command_line())
+      if not lib.have_module(modulename(program)) then
+         print("unsupported program: "..program:gsub("_", "-"))
+         usage(1)
+      else
+         require(modulename(program)).run(args)
+      end
    end
 end
 
@@ -67,6 +79,8 @@ function select_program (args)
          local opt = table.remove(args, 1)
          if opt == '-h' or opt == '--help' then
             usage(0)
+         elseif opt == '-v' or opt == '--version' then
+            version()
          else
             print("unrecognized option: "..opt)
             usage(1)
@@ -90,6 +104,22 @@ function usage (status)
    print("If you rename (or copy or symlink) this executable with one of")
    print("the names above then that program will be chosen automatically.")
    os.exit(status)
+end
+
+function version ()
+   local v = require('core.version')
+   local version_str = v.version
+   if v.extra_version ~= '' then
+      version_str = version_str.." ("..v.extra_version..")"
+   end
+   print(ffi.string(C.basename(C.argv[0])).." "..version_str)
+   print([[
+Copyright (C) 2012-2017 Snabb authors; see revision control logs for details.
+License: <https://www.apache.org/licenses/LICENSE-2.0>
+
+Snabb is open source software.  For more information on Snabb, see
+https://github.com/snabbco/snabb.]])
+   os.exit(0)
 end
 
 function programname (name)
@@ -122,6 +152,7 @@ function initialize ()
    require("core.lib")
    require("core.clib_h")
    require("core.lib_h")
+   lib.randomseed(tonumber(lib.getenv("SNABB_RANDOM_SEED")))
    -- Global API
    _G.config = require("core.config")
    _G.engine = require("core.app")
@@ -134,14 +165,35 @@ end
 
 function handler (reason)
    print(reason)
-   print(debug.traceback())
+   print(STP.stacktrace())
    if debug_on_error then debug.debug() end
    os.exit(1)
 end
 
 -- Cleanup after Snabb process.
 function shutdown (pid)
+   -- Parent process performs additional cleanup steps.
+   -- (Parent is the process whose 'group' folder is not a symlink.)
+   local st, err = S.lstat(shm.root.."/"..pid.."/group")
+   local is_parent = st and st.isdir
+   if is_parent then
+      -- simple pcall helper to print error and continue
+      local function safely (f)
+         local ok, err = pcall(f)
+         if not ok then print(err) end
+      end
+      -- Run cleanup hooks
+      safely(function () require("lib.hardware.pci").shutdown(pid) end)
+      safely(function () require("core.memory").shutdown(pid) end)
+   end
+   -- Free shared memory objects
    if not _G.developer_debug and not lib.getenv("SNABB_SHM_KEEP") then
+      -- Try cleaning up symlinks for named apps, if none exist, fail silently.
+      local backlink = shm.root.."/"..pid.."/name"
+      local name_link = S.readlink(backlink)
+      S.unlink(name_link)
+      S.unlink(backlink)
+
       shm.unlink("/"..pid)
    end
 end

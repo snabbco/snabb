@@ -255,7 +255,6 @@ Intel = {
       txq = {},
       rxq = {},
       mtu = {default=9014},
-      rssseed = {default=314159},
       linkup_wait = {default=120},
       wait_for_link = {default=false},
       master_stats = {default=true},
@@ -285,7 +284,6 @@ function Intel:new (conf)
       txq = conf.txq,
       rxq = conf.rxq,
       mtu = conf.mtu or self.config.mtu.default,
-      rssseed = conf.rssseed or self.config.mtu.default,
       linkup_wait = conf.linkup_wait or self.config.linkup_wait.default,
       wait_for_link = conf.wait_for_link
    }
@@ -557,7 +555,6 @@ function Intel:rss_enable ()
    self:rss_key()
 end
 function Intel:rss_key ()
-   math.randomseed(self.rssseed)
    for i=0,9,1 do
       self.r.RSSRK[i](math.random(2^32))
    end
@@ -729,6 +726,7 @@ function Intel1g:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
+   pci.disable_bus_master_cleanup(self.pciaddress)
 
    -- 4.5.3  Initialization Sequence
    self:disable_interrupts()
@@ -868,6 +866,7 @@ function Intel82599:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
+   pci.disable_bus_master_cleanup(self.pciaddress)
 
    for i=1,math.floor(self.linkup_wait/2) do
       self:disable_interrupts()
