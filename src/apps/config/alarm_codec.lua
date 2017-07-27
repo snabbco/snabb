@@ -2,6 +2,8 @@
 
 module(...,package.seeall)
 
+local S = require("syscall")
+local channel = require("apps.config.channel")
 local ffi = require("ffi")
 
 local alarm_names = { 'raise_alarm', 'clear_alarm' }
@@ -79,6 +81,36 @@ function decode(buf, len)
    local codec = decoder(buf, len)
    local name = assert(alarm_names[codec:uint32()])
    return { name, assert(alarms[name], name)(codec) }
+end
+
+---
+
+local alarms_channel
+
+function get_channel()
+   if alarms_channel then return alarms_channel end
+   local name = '/'..S.getpid()..'/alarms-follower-channel'
+   local success, value = pcall(channel.open, name)
+   if success then
+      alarms_channel = value
+   end
+   return alarms_channel
+end
+
+function raise_alarm (key, args)
+   local channel = get_channel()
+   if channel then
+      local buf, len = encode({'raise_alarm', {key, args}})
+      channel:put_message(buf, len)
+   end
+end
+
+function clear_alarm (key)
+   local channel = get_channel()
+   if channel then
+      local buf, len = encode({'clear_alarm', {key, args}})
+      channel:put_message(buf, len)
+   end
 end
 
 function selftest ()

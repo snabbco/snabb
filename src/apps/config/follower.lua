@@ -23,6 +23,7 @@ function Follower:new (conf)
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
    ret.channel = channel.create('config-follower-channel', 1e6)
+   ret.alarms_channel = channel.create('alarms-follower-channel', 1e6)
    ret.pending_actions = {}
    return ret
 end
