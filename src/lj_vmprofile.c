@@ -9,12 +9,18 @@
 #define _GNU_SOURCE 1
 #include <stdio.h>
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <signal.h>
 #include <ucontext.h>
 #undef _GNU_SOURCE
 
+#include "lj_err.h"
 #include "lj_obj.h"
 #include "lj_dispatch.h"
 #include "lj_jit.h"
@@ -99,15 +105,49 @@ static void stop_timer()
 
 /* -- Lua API ------------------------------------------------------------- */
 
-LUA_API void luaJIT_vmprofile_start(lua_State *L)
+LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str)
+{
+  int fd;
+  void *ptr;
+  if (((fd = open(str, O_RDWR|O_CREAT, 0666)) != -1) &&
+      ((ftruncate(fd, sizeof(VMProfile))) != -1) &&
+      ((ptr = mmap(NULL, sizeof(VMProfile), PROT_READ|PROT_WRITE,
+                   MAP_SHARED, fd, 0)) != MAP_FAILED)) {
+    memset(ptr, 0, sizeof(VMProfile));
+    setlightudV(L->base, checklightudptr(L, ptr));
+  } else {
+    setnilV(L->base);
+  }
+  if (fd != -1) {
+    close(fd);
+  }
+  return 1;
+}
+
+LUA_API int luaJIT_vmprofile_close(lua_State *L, void *ud)
+{
+  munmap(ud, sizeof(VMProfile));
+  return 0;
+}
+
+LUA_API int luaJIT_vmprofile_select(lua_State *L, void *ud)
+{
+  setlightudV(L->base, checklightudptr(L, profile));
+  profile = (VMProfile *)ud;
+  return 1;
+}
+
+LUA_API int luaJIT_vmprofile_start(lua_State *L)
 {
   memset(&state, 0, sizeof(state));
   state.g = G(L);
   start_timer(1);               /* Sample every 1ms */
+  return 0;
 }
 
-LUA_API void luaJIT_vmprofile_stop(lua_State *L)
+LUA_API int luaJIT_vmprofile_stop(lua_State *L)
 {
   stop_timer();
+  return 0;
 }
 
