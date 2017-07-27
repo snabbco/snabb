@@ -386,26 +386,44 @@ function form_nsolicitation_reply(local_eth, local_ipv6, ns_pkt)
    return form_sna(local_eth, local_ipv6, true, ns_pkt)
 end
 
+local function random_locally_administered_unicast_mac_address()
+   local mac = lib.random_bytes(6)
+   -- Bit 0 is 0, indicating unicast.  Bit 1 is 1, indicating locally
+   -- administered.
+   mac[0] = bit.lshift(mac[0], 2) + 2
+   return mac
+end
+
 NDP = {}
+local ndp_config_params = {
+   -- Source MAC address will default to a random address.
+   self_mac = { default=false },
+   -- Source IP is required though.
+   self_ip  = { required=true },
+   -- The next-hop MAC address can be statically configured.
+   next_mac = { default=false },
+   -- But if the next-hop MAC isn't configured, NDP will figure it out.
+   next_ip  = { default=false }
+}
 
 function NDP:new(conf)
-   local o = setmetatable({}, {__index=NDP})
-   o.conf = conf
-   -- TODO: verify that the src and dst ipv6 addresses and src mac address
-   -- have been provided, in pton format.
-   if not conf.dst_eth then
-      self.ns_pkt = form_ns(conf.src_eth, conf.src_ipv6, conf.dst_ipv6)
+   local o = lib.parse(conf, ndp_config_params)
+   if not o.self_mac then
+      o.self_mac = random_locally_administered_unicast_mac_address()
+   end
+   if not o.next_mac then
+      assert(o.next_ip, 'NDP needs next-hop IPv6 address to learn next-hop MAC')
+      o.ns_pkt = form_ns(o.self_mac, o.self_ip, o.next_ip)
       self.ns_interval = 3 -- Send a new NS every three seconds.
    end
-   o.dst_eth = conf.dst_eth -- Intentionally nil if to request by NS
-   return o
+   return setmetatable({}, {__index=NDP})
 end
 
 function NDP:maybe_send_ns_request (output)
-   if self.dst_eth then return end
+   if self.next_mac then return end
    self.next_ns_time = self.next_ns_time or engine.now()
    if self.next_ns_time <= engine.now() then
-      print(("NDP: Resolving '%s'"):format(ipv6:ntop(self.conf.dst_ipv6)))
+      print(("NDP: Resolving '%s'"):format(ipv6:ntop(self.next_ip)))
       self:send_ns(output)
       self.next_ns_time = engine.now() + self.ns_interval
    end
@@ -427,16 +445,16 @@ function NDP:push()
    for _ = 1, link.nreadable(isouth) do
       local p = receive(isouth)
       if is_ndp(p) then
-         if not self.dst_eth and is_solicited_neighbor_advertisement(p) then
-            local dst_ethernet = get_dst_ethernet(p, {self.conf.dst_ipv6})
+         if not self.next_mac and is_solicited_neighbor_advertisement(p) then
+            local dst_ethernet = get_dst_ethernet(p, {self.next_ip})
             if dst_ethernet then
-               print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.conf.dst_ipv6),
+               print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.next_ip),
                                                         ethernet:ntop(dst_ethernet)))
-               self.dst_eth = dst_ethernet
+               self.next_mac = dst_ethernet
             end
             packet.free(p)
-         elseif is_neighbor_solicitation_for_addr(p, self.conf.src_ipv6) then
-            local snap = form_nsolicitation_reply(self.conf.src_eth, self.conf.src_ipv6, p)
+         elseif is_neighbor_solicitation_for_addr(p, self.self_ip) then
+            local snap = form_nsolicitation_reply(self.self_mac, self.self_ip, p)
             if snap then 
                transmit(osouth, snap)
             end
@@ -451,12 +469,12 @@ function NDP:push()
 
    for _ = 1, link.nreadable(inorth) do
       local p = receive(inorth)
-      if not self.dst_eth then
+      if not self.next_mac then
          -- drop all southbound packets until the next hop's ethernet address is known
          packet.free(p)
       else
-         ffi.copy(p.data, self.dst_eth, 6)
-         -- ffi.copy(p.data + 6, self.src_eth, 6)
+         ffi.copy(p.data, self.next_mac, 6)
+         ffi.copy(p.data + 6, self.self_mac, 6)
          transmit(osouth, p)
       end
    end

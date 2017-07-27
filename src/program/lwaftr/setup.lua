@@ -81,10 +81,10 @@ function lwaftr_app(c, conf)
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
               { mtu=internal_interface.mtu })
    config.app(c, "ndp", ndp.NDP,
-              { src_ipv6 = internal_interface.ip,
-                src_eth = internal_interface.mac,
-                dst_eth = internal_interface.next_hop.mac,
-                dst_ipv6 = internal_interface.next_hop.ip })
+              { self_ip = internal_interface.ip,
+                self_mac = internal_interface.mac,
+                next_mac = internal_interface.next_hop.mac,
+                next_ip = internal_interface.next_hop.ip })
    config.app(c, "arp", arp.ARP,
               { self_ip = convert_ipv4(external_interface.ip),
                 self_mac = external_interface.mac,
