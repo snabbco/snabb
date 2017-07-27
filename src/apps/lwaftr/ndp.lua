@@ -386,6 +386,81 @@ function form_nsolicitation_reply(local_eth, local_ipv6, ns_pkt)
    return form_sna(local_eth, local_ipv6, true, ns_pkt)
 end
 
+NDP = {}
+
+function NDP:new(conf)
+   local o = setmetatable({}, {__index=NDP})
+   o.conf = conf
+   -- TODO: verify that the src and dst ipv6 addresses and src mac address
+   -- have been provided, in pton format.
+   if not conf.dst_eth then
+      self.ns_pkt = form_ns(conf.src_eth, conf.src_ipv6, conf.dst_ipv6)
+      self.ns_interval = 3 -- Send a new NS every three seconds.
+   end
+   o.dst_eth = conf.dst_eth -- Intentionally nil if to request by NS
+   return o
+end
+
+function NDP:maybe_send_ns_request (output)
+   if self.dst_eth then return end
+   self.next_ns_time = self.next_ns_time or engine.now()
+   if self.next_ns_time <= engine.now() then
+      print(("NDP: Resolving '%s'"):format(ipv6:ntop(self.conf.dst_ipv6)))
+      self:send_ns(output)
+      self.next_ns_time = engine.now() + self.ns_interval
+   end
+end
+
+function NDP:send_ns (output)
+   transmit(output, packet.clone(self.ns_pkt))
+end
+
+function NDP:push()
+   local isouth, osouth = self.input.south, self.output.south
+   local inorth, onorth = self.input.north, self.output.north
+
+   -- TODO: do unsolicited neighbor advertisement on start and on
+   -- configuration reloads?
+   -- This would be an optimization, not a correctness issue
+   self:maybe_send_ns_request(osouth)
+
+   for _ = 1, link.nreadable(isouth) do
+      local p = receive(isouth)
+      if is_ndp(p) then
+         if not self.dst_eth and is_solicited_neighbor_advertisement(p) then
+            local dst_ethernet = get_dst_ethernet(p, {self.conf.dst_ipv6})
+            if dst_ethernet then
+               print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.conf.dst_ipv6),
+                                                        ethernet:ntop(dst_ethernet)))
+               self.dst_eth = dst_ethernet
+            end
+            packet.free(p)
+         elseif is_neighbor_solicitation_for_addr(p, self.conf.src_ipv6) then
+            local snap = form_nsolicitation_reply(self.conf.src_eth, self.conf.src_ipv6, p)
+            if snap then 
+               transmit(osouth, snap)
+            end
+            packet.free(p)
+         else -- TODO? incoming NDP that we don't handle; drop it silently
+            packet.free(p)
+         end
+      else
+         transmit(onorth, p)
+      end
+   end
+
+   for _ = 1, link.nreadable(inorth) do
+      local p = receive(inorth)
+      if not self.dst_eth then
+         -- drop all southbound packets until the next hop's ethernet address is known
+          packet.free(p)
+      else
+          lwutil.set_dst_ethernet(p, self.dst_eth)
+          transmit(osouth, p)
+      end
+   end
+end
+
 local function test_ndp_without_target_link()
    local lib = require("core.lib")
    -- Neighbor Advertisement packet.

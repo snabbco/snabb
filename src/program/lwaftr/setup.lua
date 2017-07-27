@@ -15,6 +15,7 @@ local pcap       = require("apps.pcap.pcap")
 local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
 local arp        = require("apps.ipv4.arp")
 local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+local ndp        = require("apps.lwaftr.ndp")
 local vlan       = require("apps.vlan.vlan")
 local numa       = require("lib.numa")
 local ipv4       = require("lib.protocol.ipv4")
@@ -79,7 +80,7 @@ function lwaftr_app(c, conf)
               { mtu=external_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
               { mtu=internal_interface.mtu })
-   config.app(c, "ndp", ipv6_apps.NDP,
+   config.app(c, "ndp", ndp.NDP,
               { src_ipv6 = internal_interface.ip,
                 src_eth = internal_interface.mac,
                 dst_eth = internal_interface.next_hop.mac,
