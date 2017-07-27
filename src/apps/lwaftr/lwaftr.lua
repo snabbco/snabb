@@ -250,13 +250,6 @@ function LwAftr:new(conf)
    o.inet_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
    o.hairpin_lookup_queue = bt.BTLookupQueue.new(o.binding_table)
 
-   if not conf.internal_interface.next_hop.mac then
-      conf.internal_interface.next_hop.mac = ethernet:pton('00:00:00:00:00:00')
-   end
-   if not conf.external_interface.next_hop.mac then
-      conf.external_interface.next_hop.mac = ethernet:pton('00:00:00:00:00:00')
-   end
-
    o.counters = lwcounter.init_counters()
 
    o.transmit_icmpv6_reply = init_transmit_icmpv6_reply(
@@ -360,8 +353,6 @@ local function drop_ipv4_packet_to_unreachable_host(lwstate, pkt, pkt_src_link)
       code = constants.icmpv4_host_unreachable,
    }
    local icmp_dis = icmp.new_icmpv4_packet(
-      lwstate.conf.external_interface.mac,
-      lwstate.conf.external_interface.next_hop.mac,
       convert_ipv4(lwstate.conf.external_interface.ip),
       to_ip, pkt, icmp_config)
 
@@ -387,8 +378,6 @@ local function drop_ipv6_packet_from_bad_softwire(lwstate, pkt, br_addr)
                         code = constants.icmpv6_failed_ingress_egress_policy,
                        }
    local b4fail_icmp = icmp.new_icmpv6_packet(
-      lwstate.conf.internal_interface.mac,
-      lwstate.conf.internal_interface.next_hop.mac,
       icmpv6_src_addr, orig_src_addr_icmp_dst, pkt, icmp_config)
    drop(pkt)
    lwstate:transmit_icmpv6_reply(b4fail_icmp)
@@ -421,8 +410,6 @@ local function cannot_fragment_df_packet_error(lwstate, pkt)
       next_hop_mtu = mtu - constants.ipv6_fixed_header_size,
    }
    return icmp.new_icmpv4_packet(
-      lwstate.conf.external_interface.mac,
-      lwstate.conf.external_interface.next_hop.mac,
       convert_ipv4(lwstate.conf.external_interface.ip),
       dst_ip, pkt, icmp_config)
 end
@@ -444,8 +431,6 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
                            code = constants.icmpv4_ttl_exceeded_in_transit,
                            }
       local reply = icmp.new_icmpv4_packet(
-         lwstate.conf.external_interface.mac,
-         lwstate.conf.external_interface.next_hop.mac,
          convert_ipv4(lwstate.conf.external_interface.ip),
          dst_ip, pkt, icmp_config)
 
@@ -455,8 +440,6 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
    if debug then print("ipv6", ipv6_src, ipv6_dst) end
 
    local next_hdr_type = proto_ipv4
-   local ether_src = lwstate.conf.internal_interface.mac
-   local ether_dst = lwstate.conf.internal_interface.next_hop.mac
 
    if encapsulating_packet_with_df_flag_would_exceed_mtu(lwstate, pkt) then
       counter.add(lwstate.counters["drop-over-mtu-but-dont-fragment-ipv4-bytes"], pkt.length)
@@ -477,7 +460,7 @@ local function encapsulate_and_transmit(lwstate, pkt, ipv6_dst, ipv6_src, pkt_sr
    pkt = packet.shiftright(pkt, ipv6_fixed_header_size)
    -- Fetch possibly-moved L3 header location.
    l3_header = get_ethernet_payload(pkt)
-   write_eth_header(pkt.data, ether_src, ether_dst, n_ethertype_ipv6)
+   write_eth_header(pkt.data, n_ethertype_ipv6)
    write_ipv6_header(l3_header, ipv6_src, ipv6_dst,
                      dscp_and_ecn, next_hdr_type, payload_length)
 
@@ -648,8 +631,6 @@ local function tunnel_unreachable(lwstate, pkt, code, next_hop_mtu)
                         }
    local dst_ip = get_ipv4_src_address_ptr(embedded_ipv4_header)
    local icmp_reply = icmp.new_icmpv4_packet(
-      lwstate.conf.external_interface.mac,
-      lwstate.conf.external_interface.next_hop.mac,
       convert_ipv4(lwstate.conf.external_interface.ip),
       dst_ip, pkt, icmp_config)
    return icmp_reply
@@ -719,11 +700,7 @@ local function flush_decapsulation(lwstate)
          -- Source softwire is valid; decapsulate and forward.
          -- Note that this may invalidate any pointer into pkt.data.  Be warned!
          pkt = packet.shiftleft(pkt, ipv6_fixed_header_size)
-         write_eth_header(
-            pkt.data,
-            lwstate.conf.external_interface.mac,
-            lwstate.conf.external_interface.next_hop.mac,
-            n_ethertype_ipv4)
+         write_eth_header(pkt.data, n_ethertype_ipv4)
          transmit_ipv4(lwstate, pkt)
       else
          counter.add(lwstate.counters["drop-no-source-softwire-ipv6-bytes"], pkt.length)

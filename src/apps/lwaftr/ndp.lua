@@ -14,17 +14,22 @@ module(..., package.seeall)
 -- lwaftr <-> ipv6 fragmentation app <-> lw_eth_resolve <-> vlan tag handler
 -- That is, neither fragmentation nor vlan tagging are within the scope of this app.
 
+local bit      = require("bit")
+local ffi      = require("ffi")
+local packet   = require("core.packet")
+local link     = require("core.link")
+local lib      = require("core.lib")
+local datagram = require("lib.protocol.datagram")
+local ethernet = require("lib.protocol.ethernet")
+local ipv6     = require("lib.protocol.ipv6")
+
 local constants = require("apps.lwaftr.constants")
 local lwutil = require("apps.lwaftr.lwutil")
 
-local datagram = require("lib.protocol.datagram")
-local ethernet = require("lib.protocol.ethernet")
-local ipv6 = require("lib.protocol.ipv6")
-
 local checksum = require("lib.checksum")
-local ffi = require("ffi")
 
 local C = ffi.C
+local receive, transmit = link.receive, link.transmit
 local rd16, wr16, wr32, ipv6_equals = lwutil.rd16, lwutil.wr16, lwutil.wr32, lwutil.ipv6_equals
 
 local option_source_link_layer_address = 1
@@ -49,10 +54,10 @@ local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 local ethertype_ipv6 = constants.ethertype_ipv6
 
 -- Special addresses
-ipv6_all_nodes_local_segment_addr = ipv6:pton("ff02::1")
-ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
+local ipv6_all_nodes_local_segment_addr = ipv6:pton("ff02::1")
+local ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
 -- Really just the first 13 bytes of the following...
-ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
+local ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
 
 
 -- Pseudo-header:
@@ -112,7 +117,7 @@ end
      |   Options ...
      +-+-+-+-+-+-+-+-+-+-+-+-
 --]]
-function is_ndp(pkt)
+local function is_ndp(pkt)
    local min_ndp_len = eth_ipv6_size + 8
    if pkt.length >= min_ndp_len and
       eth_next_is_ipv6(pkt) and
@@ -129,7 +134,7 @@ end
 -- and after any reassembly has been done, and no extra IPv6 headers
 -- must be present
 --- TODO: could this reasonably use pflang?
-function is_solicited_neighbor_advertisement(pkt)
+local function is_solicited_neighbor_advertisement(pkt)
    return is_ndp(pkt) and
           icmpv6_type_is_na(pkt) and
           is_solicited_na(pkt)
@@ -140,7 +145,7 @@ local function is_neighbor_solicitation(pkt)
 end
 
 -- Check whether NS target address matches IPv6 address.
-function is_neighbor_solicitation_for_addr(pkt, ipv6_addr)
+local function is_neighbor_solicitation_for_addr(pkt, ipv6_addr)
    if not is_neighbor_solicitation(pkt) then return false end
    local target_offset = eth_ipv6_size + o_icmp_target_offset
    local target_ipv6 = pkt.data + target_offset
@@ -156,7 +161,7 @@ end
 -- The option format is, for ethernet networks:
 -- 1 byte option type, 1 byte option length (in chunks of 8 bytes)
 -- 6 bytes MAC address
-function get_dst_ethernet(pkt, target_ipv6_addrs)
+local function get_dst_ethernet(pkt, target_ipv6_addrs)
    if pkt == nil or target_ipv6_addrs == nil then return false end
    local na_addr_offset = eth_ipv6_size + o_icmp_target_offset
    for i=1,#target_ipv6_addrs do
@@ -212,7 +217,7 @@ local function write_ns(pkt, local_eth, target_addr)
 end
 
 
-function form_ns(local_eth, local_ipv6, dst_ipv6)
+local function form_ns(local_eth, local_ipv6, dst_ipv6)
    local ns_pkt = packet.allocate()
    local ethernet_broadcast = ethernet:pton("ff:ff:ff:ff:ff:ff")
    local hop_limit = 255 -- as per RFC 4861
@@ -380,14 +385,107 @@ end
                      An address assigned to the interface from which the
                      advertisement is sent.
 --]]
-function form_nsolicitation_reply(local_eth, local_ipv6, ns_pkt)
+local function form_nsolicitation_reply(local_eth, local_ipv6, ns_pkt)
    if not local_eth or not local_ipv6 then return nil end
    if not is_valid_ns(ns_pkt) then return nil end
    return form_sna(local_eth, local_ipv6, true, ns_pkt)
 end
 
+local function random_locally_administered_unicast_mac_address()
+   local mac = lib.random_bytes(6)
+   -- Bit 0 is 0, indicating unicast.  Bit 1 is 1, indicating locally
+   -- administered.
+   mac[0] = bit.lshift(mac[0], 2) + 2
+   return mac
+end
+
+NDP = {}
+local ndp_config_params = {
+   -- Source MAC address will default to a random address.
+   self_mac = { default=false },
+   -- Source IP is required though.
+   self_ip  = { required=true },
+   -- The next-hop MAC address can be statically configured.
+   next_mac = { default=false },
+   -- But if the next-hop MAC isn't configured, NDP will figure it out.
+   next_ip  = { default=false }
+}
+
+function NDP:new(conf)
+   local o = lib.parse(conf, ndp_config_params)
+   if not o.self_mac then
+      o.self_mac = random_locally_administered_unicast_mac_address()
+   end
+   if not o.next_mac then
+      assert(o.next_ip, 'NDP needs next-hop IPv6 address to learn next-hop MAC')
+      o.ns_pkt = form_ns(o.self_mac, o.self_ip, o.next_ip)
+      self.ns_interval = 3 -- Send a new NS every three seconds.
+   end
+   return setmetatable(o, {__index=NDP})
+end
+
+function NDP:maybe_send_ns_request (output)
+   if self.next_mac then return end
+   self.next_ns_time = self.next_ns_time or engine.now()
+   if self.next_ns_time <= engine.now() then
+      print(("NDP: Resolving '%s'"):format(ipv6:ntop(self.next_ip)))
+      self:send_ns(output)
+      self.next_ns_time = engine.now() + self.ns_interval
+   end
+end
+
+function NDP:send_ns (output)
+   transmit(output, packet.clone(self.ns_pkt))
+end
+
+function NDP:push()
+   local isouth, osouth = self.input.south, self.output.south
+   local inorth, onorth = self.input.north, self.output.north
+
+   -- TODO: do unsolicited neighbor advertisement on start and on
+   -- configuration reloads?
+   -- This would be an optimization, not a correctness issue
+   self:maybe_send_ns_request(osouth)
+
+   for _ = 1, link.nreadable(isouth) do
+      local p = receive(isouth)
+      if is_ndp(p) then
+         if not self.next_mac and is_solicited_neighbor_advertisement(p) then
+            local dst_ethernet = get_dst_ethernet(p, {self.next_ip})
+            if dst_ethernet then
+               print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.next_ip),
+                                                        ethernet:ntop(dst_ethernet)))
+               self.next_mac = dst_ethernet
+            end
+            packet.free(p)
+         elseif is_neighbor_solicitation_for_addr(p, self.self_ip) then
+            local snap = form_nsolicitation_reply(self.self_mac, self.self_ip, p)
+            if snap then 
+               transmit(osouth, snap)
+            end
+            packet.free(p)
+         else -- TODO? incoming NDP that we don't handle; drop it silently
+            packet.free(p)
+         end
+      else
+         transmit(onorth, p)
+      end
+   end
+
+   for _ = 1, link.nreadable(inorth) do
+      local p = receive(inorth)
+      if not self.next_mac then
+         -- drop all southbound packets until the next hop's ethernet address is known
+         packet.free(p)
+      else
+         ffi.copy(p.data, self.next_mac, 6)
+         ffi.copy(p.data + 6, self.self_mac, 6)
+         transmit(osouth, p)
+      end
+   end
+end
+
 local function test_ndp_without_target_link()
-   local lib = require("core.lib")
    -- Neighbor Advertisement packet.
    local na_pkt = lib.hexundump([[
       02:aa:aa:aa:aa:aa 90:e2:ba:a9:89:2d 86 dd 60 00 
@@ -410,7 +508,6 @@ function selftest()
    local nsp = form_ns(lmac, lip, rip)
    assert(is_ndp(nsp))
    assert(is_solicited_neighbor_advertisement(nsp) == false)
-   lwutil.set_dst_ethernet(nsp, lmac) -- Not a meaningful thing to do, just a test
    
    local sol_na = form_nsolicitation_reply(lmac, lip, nsp)
    local dst_eth = get_dst_ethernet(sol_na, {rip})
@@ -420,6 +517,29 @@ function selftest()
    assert(is_solicited_neighbor_advertisement(sol_na), "sol_na must be sna!")
 
    test_ndp_without_target_link()
+
+   local config = require("core.config")
+   local sink = require("apps.basic.basic_apps").Sink
+   local c = config.new()
+   config.app(c, "nd1", NDP, { self_ip  = ipv6:pton("2001:DB8::1"),
+                               next_ip  = ipv6:pton("2001:DB8::2") })
+   config.app(c, "nd2", NDP, { self_ip  = ipv6:pton("2001:DB8::2"),
+                               next_ip  = ipv6:pton("2001:DB8::1") })
+   config.app(c, "sink1", sink)
+   config.app(c, "sink2", sink)
+   config.link(c, "nd1.south -> nd2.south")
+   config.link(c, "nd2.south -> nd1.south")
+   config.link(c, "sink1.tx -> nd1.north")
+   config.link(c, "nd1.north -> sink1.rx")
+   config.link(c, "sink2.tx -> nd2.north")
+   config.link(c, "nd2.north -> sink2.rx")
+   engine.configure(c)
+   engine.main({ duration = 0.1 })
+
+   local function mac_eq(a, b) return C.memcmp(a, b, 6) == 0 end
+   local nd1, nd2 = engine.app_table.nd1, engine.app_table.nd2
+   assert(mac_eq(nd1.next_mac, nd2.self_mac))
+   assert(mac_eq(nd2.next_mac, nd1.self_mac))
 
    print("selftest: ok")
 end

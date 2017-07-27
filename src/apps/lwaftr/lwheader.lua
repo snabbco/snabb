@@ -18,10 +18,10 @@ local htons = lib.htons
 -- payload lengths should be in host byte order.
 -- next_hdr_type and dscp_and_ecn are <= 1 byte, so byte order is irrelevant.
 
-function write_eth_header(dst_ptr, ether_src, ether_dst, eth_type)
+function write_eth_header(dst_ptr, eth_type)
    local eth_hdr = cast(ethernet_header_ptr_type, dst_ptr)
-   eth_hdr.ether_shost = ether_src
-   eth_hdr.ether_dhost = ether_dst
+   ffi.fill(eth_hdr.ether_shost, 6, 0)
+   ffi.fill(eth_hdr.ether_dhost, 6, 0)
    eth_hdr.ether_type = eth_type
 end
 

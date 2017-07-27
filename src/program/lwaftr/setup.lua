@@ -13,7 +13,9 @@ local lwcounter  = require("apps.lwaftr.lwcounter")
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
 local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
+local arp        = require("apps.ipv4.arp")
 local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+local ndp        = require("apps.lwaftr.ndp")
 local vlan       = require("apps.vlan.vlan")
 local numa       = require("lib.numa")
 local ipv4       = require("lib.protocol.ipv4")
@@ -78,16 +80,16 @@ function lwaftr_app(c, conf)
               { mtu=external_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
               { mtu=internal_interface.mtu })
-   config.app(c, "ndp", ipv6_apps.NDP,
-              { src_ipv6 = internal_interface.ip,
-                src_eth = internal_interface.mac,
-                dst_eth = internal_interface.next_hop.mac,
-                dst_ipv6 = internal_interface.next_hop.ip })
-   config.app(c, "arp", ipv4_apps.ARP,
-              { src_ipv4 = convert_ipv4(external_interface.ip),
-                src_eth = external_interface.mac,
-                dst_eth = external_interface.next_hop.mac,
-                dst_ipv4 = convert_ipv4(external_interface.next_hop.ip) })
+   config.app(c, "ndp", ndp.NDP,
+              { self_ip = internal_interface.ip,
+                self_mac = internal_interface.mac,
+                next_mac = internal_interface.next_hop.mac,
+                next_ip = internal_interface.next_hop.ip })
+   config.app(c, "arp", arp.ARP,
+              { self_ip = convert_ipv4(external_interface.ip),
+                self_mac = external_interface.mac,
+                next_mac = external_interface.next_hop.mac,
+                next_ip = convert_ipv4(external_interface.next_hop.ip) })
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
    local preprocessing_apps_v6  = { "reassemblerv6" }

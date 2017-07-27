@@ -78,7 +78,7 @@ local function to_datagram(pkt)
 end
 
 -- initial_pkt is the one to embed (a subset of) in the ICMP payload
-function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config)
+function new_icmpv4_packet(from_ip, to_ip, initial_pkt, config)
    local new_pkt = packet.allocate()
    local dgram = to_datagram(new_pkt)
    local ipv4_header = ipv4:new({ttl = constants.default_ttl,
@@ -88,7 +88,7 @@ function new_icmpv4_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config
    new_pkt = dgram:packet()
    ipv4_header:free()
    new_pkt = packet.shiftright(new_pkt, ehs)
-   write_eth_header(new_pkt.data, from_eth, to_eth, constants.n_ethertype_ipv4, config.vlan_tag)
+   write_eth_header(new_pkt.data, constants.n_ethertype_ipv4)
 
    -- Generate RFC 1812 ICMPv4 packets, which carry as much payload as they can,
    -- rather than RFC 792 packets, which only carry the original IPv4 header + 8 octets
@@ -120,7 +120,7 @@ function is_icmpv4_message(pkt, msg_type, msg_code)
    end
 end
 
-function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config)
+function new_icmpv6_packet(from_ip, to_ip, initial_pkt, config)
    local new_pkt = packet.allocate()
    local dgram = to_datagram(new_pkt)
    local ipv6_header = ipv6:new({hop_limit = constants.default_ttl,
@@ -128,7 +128,7 @@ function new_icmpv6_packet(from_eth, to_eth, from_ip, to_ip, initial_pkt, config
                                  src = from_ip, dst = to_ip})
    dgram:push(ipv6_header)
    new_pkt = packet.shiftright(dgram:packet(), ehs)
-   write_eth_header(new_pkt.data, from_eth, to_eth, constants.n_ethertype_ipv6)
+   write_eth_header(new_pkt.data, constants.n_ethertype_ipv6)
 
    local max_size = constants.max_icmpv6_packet_size
    local ph_len = calculate_payload_size(new_pkt, initial_pkt, max_size, config) + constants.icmp_base_size
