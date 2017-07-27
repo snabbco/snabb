@@ -14,17 +14,22 @@ module(..., package.seeall)
 -- lwaftr <-> ipv6 fragmentation app <-> lw_eth_resolve <-> vlan tag handler
 -- That is, neither fragmentation nor vlan tagging are within the scope of this app.
 
+local bit      = require("bit")
+local ffi      = require("ffi")
+local packet   = require("core.packet")
+local link     = require("core.link")
+local lib      = require("core.lib")
+local datagram = require("lib.protocol.datagram")
+local ethernet = require("lib.protocol.ethernet")
+local ipv6     = require("lib.protocol.ipv6")
+
 local constants = require("apps.lwaftr.constants")
 local lwutil = require("apps.lwaftr.lwutil")
 
-local datagram = require("lib.protocol.datagram")
-local ethernet = require("lib.protocol.ethernet")
-local ipv6 = require("lib.protocol.ipv6")
-
 local checksum = require("lib.checksum")
-local ffi = require("ffi")
 
 local C = ffi.C
+local receive, transmit = link.receive, link.transmit
 local rd16, wr16, wr32, ipv6_equals = lwutil.rd16, lwutil.wr16, lwutil.wr32, lwutil.ipv6_equals
 
 local option_source_link_layer_address = 1
@@ -416,7 +421,7 @@ function NDP:new(conf)
       o.ns_pkt = form_ns(o.self_mac, o.self_ip, o.next_ip)
       self.ns_interval = 3 -- Send a new NS every three seconds.
    end
-   return setmetatable({}, {__index=NDP})
+   return setmetatable(o, {__index=NDP})
 end
 
 function NDP:maybe_send_ns_request (output)
@@ -481,7 +486,6 @@ function NDP:push()
 end
 
 local function test_ndp_without_target_link()
-   local lib = require("core.lib")
    -- Neighbor Advertisement packet.
    local na_pkt = lib.hexundump([[
       02:aa:aa:aa:aa:aa 90:e2:ba:a9:89:2d 86 dd 60 00 
@@ -513,6 +517,29 @@ function selftest()
    assert(is_solicited_neighbor_advertisement(sol_na), "sol_na must be sna!")
 
    test_ndp_without_target_link()
+
+   local config = require("core.config")
+   local sink = require("apps.basic.basic_apps").Sink
+   local c = config.new()
+   config.app(c, "nd1", NDP, { self_ip  = ipv6:pton("2001:DB8::1"),
+                               next_ip  = ipv6:pton("2001:DB8::2") })
+   config.app(c, "nd2", NDP, { self_ip  = ipv6:pton("2001:DB8::2"),
+                               next_ip  = ipv6:pton("2001:DB8::1") })
+   config.app(c, "sink1", sink)
+   config.app(c, "sink2", sink)
+   config.link(c, "nd1.south -> nd2.south")
+   config.link(c, "nd2.south -> nd1.south")
+   config.link(c, "sink1.tx -> nd1.north")
+   config.link(c, "nd1.north -> sink1.rx")
+   config.link(c, "sink2.tx -> nd2.north")
+   config.link(c, "nd2.north -> sink2.rx")
+   engine.configure(c)
+   engine.main({ duration = 0.1 })
+
+   local function mac_eq(a, b) return C.memcmp(a, b, 6) == 0 end
+   local nd1, nd2 = engine.app_table.nd1, engine.app_table.nd2
+   assert(mac_eq(nd1.next_mac, nd2.self_mac))
+   assert(mac_eq(nd2.next_mac, nd1.self_mac))
 
    print("selftest: ok")
 end
