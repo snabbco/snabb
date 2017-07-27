@@ -43,7 +43,6 @@ local ethernet_header_size = constants.ethernet_header_size
 local o_ipv6_src_addr =  constants.o_ipv6_src_addr
 local o_ipv6_dst_addr =  constants.o_ipv6_dst_addr
 local o_ipv6_payload_len = constants.o_ipv6_payload_len
-local o_ipv6_next_header = constants.o_ipv6_next_header
 local o_ipv6_hop_limit = constants.o_ipv6_hop_limit
 local o_ethernet_ethertype = constants.o_ethernet_ethertype
 local proto_icmpv6 = constants.proto_icmpv6
@@ -86,13 +85,59 @@ struct {
    uint16_t checksum;
 } __attribute__((packed))
 ]]
-assert(ffi.sizeof(icmpv6_header_t) == 4)
-local ndp_header_t = ffi.typeof(
-   'struct { $ ether; $ ipv6; $ icmpv6; } __attribute__((packed))',
-   ether_header_t, ipv6_header_t, icmpv6_header_t)
-local ndp_header_ptr_t = ffi.typeof('$*', ndp_header_t)
+local na_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint32_t rso_and_reserved;    /* Bit 31: Router; Bit 30: Solicited;
+                                    Bit 29: Override; Bits 28-0: Reserved. */
+   uint8_t  target_ip[16];
+   uint8_t  options[0];
+} __attribute__((packed))
+]]
+local ns_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint32_t reserved;            /* Bits 31-0: Reserved.  */
+   uint8_t  target_ip[16];
+   uint8_t  options[0];
+} __attribute__((packed))
+]]
+local option_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  type;
+   uint8_t  length;
+} __attribute__((packed))
+]]
+local ether_option_header_t = ffi.typeof ([[
+/* All values in network byte order.  */
+struct {
+   $ header;
+   uint8_t  addr[6];
+} __attribute__((packed))
+]], option_header_t)
+
+local ndp_header_t = ffi.typeof([[
+struct {
+   $ ether;
+   $ ipv6;
+   $ icmpv6;
+   uint8_t body[0];
+} __attribute__((packed))]], ether_header_t, ipv6_header_t, icmpv6_header_t)
 local ndp_header_len = ffi.sizeof(ndp_header_t)
+
+local function ptr_to(t) return ffi.typeof('$*', t) end
+local ndp_header_ptr_t = ptr_to(ndp_header_t)
+local na_header_ptr_t = ptr_to(na_header_t)
+local ns_header_ptr_t = ptr_to(ns_header_t)
+local option_header_ptr_t = ptr_to(option_header_t)
+local ether_option_header_ptr_t = ptr_to(ether_option_header_t)
+
 local ether_type_ipv6 = 0x86DD
+
+local na_router_bit = 31
+local na_solicited_bit = 30
+local na_override_bit = 29
 
 local ipv6_pseudoheader_t = ffi.typeof [[
 struct {
@@ -110,23 +155,6 @@ local function checksum_pseudoheader_from_header(ipv6_fixed_header)
    ph.next_header = htonl(ipv6_fixed_header.next_header)
    return checksum.ipsum(ffi.cast('char*', ph),
                          ffi.sizeof(ipv6_pseudoheader_t), 0)
-end
-
-local function eth_next_is_ipv6(header)
-   return rd16(pkt.data + o_ethernet_ethertype) == n_ethertype_ipv6
-end
-
-local function ipv6_next_is_icmp6(pkt)
-   local offset = ethernet_header_size + o_ipv6_next_header
-   return pkt.data[offset] == proto_icmpv6
-end
-
-local function icmpv6_type_is_na(pkt)
-   return pkt.data[eth_ipv6_size] == icmpv6_na
-end
-
-local function icmpv6_type_is_ns(pkt)
-   return pkt.data[eth_ipv6_size] == icmpv6_ns
 end
 
 -- The relevant byte is:
@@ -151,24 +179,8 @@ local function is_ndp(pkt)
    return h.icmpv6.type >= 133 and h.icmpv6.type <= 137
 end
 
--- TODO: tune this for speed
--- Note that this must be run after any vlan tags have been stripped out
--- and after any reassembly has been done, and no extra IPv6 headers
--- must be present
---- TODO: could this reasonably use pflang?
-local function is_solicited_neighbor_advertisement(pkt)
-   return is_ndp(pkt) and
-          icmpv6_type_is_na(pkt) and
-          is_solicited_na(pkt)
-end
-
-local function is_neighbor_solicitation(pkt)
-   return is_ndp(pkt) and icmpv6_type_is_ns(pkt)
-end
-
 -- Check whether NS target address matches IPv6 address.
 local function is_neighbor_solicitation_for_addr(pkt, ipv6_addr)
-   if not is_neighbor_solicitation(pkt) then return false end
    local target_offset = eth_ipv6_size + o_icmp_target_offset
    local target_ipv6 = pkt.data + target_offset
    return ipv6_equals(target_ipv6, ipv6_addr)
@@ -178,29 +190,6 @@ local function to_ether_addr(pkt, offset)
    local ether_src = ffi.new("uint8_t[?]", 6)
    ffi.copy(ether_src, pkt.data + offset, 6)
    return ether_src
-end
-
--- The option format is, for ethernet networks:
--- 1 byte option type, 1 byte option length (in chunks of 8 bytes)
--- 6 bytes MAC address
-local function get_dst_ethernet(pkt, target_ipv6_addrs)
-   if pkt == nil or target_ipv6_addrs == nil then return false end
-   local na_addr_offset = eth_ipv6_size + o_icmp_target_offset
-   for i=1,#target_ipv6_addrs do
-      if ipv6_equals(target_ipv6_addrs[i], pkt.data + na_addr_offset) then
-         local na_option_offset = eth_ipv6_size + o_icmp_first_option
-         if pkt.data[na_option_offset] == option_target_link_layer_address then
-            return to_ether_addr(pkt, na_option_offset + 2)
-         end
-         -- When responding to unicast solicitations, the option can be omitted
-         -- since the sender of the solicitation has the correct link-layer
-         -- address (See 4.4. Neighbor Advertisement Message Format)
-         if pkt.length == na_option_offset then
-            return to_ether_addr(pkt, 6)
-         end
-      end
-   end
-   return false
 end
 
 local function write_ndp(pkt, local_eth, target_addr, i_type, flags, option_type)
@@ -459,6 +448,65 @@ function NDP:send_ns (output)
    transmit(output, packet.clone(self.ns_pkt))
 end
 
+function NDP:resolve_next_hop(next_mac)
+   print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.next_ip),
+                                            ethernet:ntop(next_mac)))
+   self.next_mac = next_mac
+end
+
+local function copy_mac(src)
+   local dst = ffi.new('uint8_t[6]')
+   ffi.copy(dst, src, 6)
+   return dst
+end
+
+function NDP:handle_ndp (pkt)
+   local h = ffi.cast(ndp_header_ptr_t, pkt.data)
+   if h.icmpv6.type == icmpv6_na then
+      -- Only process advertisements when we are looking for a
+      -- next-hop MAC.
+      if self.next_mac then return end
+      -- Drop packets that are too short.
+      if pkt.length < ndp_header_len + ffi.sizeof(na_header_t) then return end
+      local na = ffi.cast(na_header_ptr_t, h.body)
+      local solicited = bit.lshift(1, na_solicited_bit)
+      local rso_bits = ntohl(na.rso_and_reserved)
+      -- Reject unsolicited advertisements.
+      if bit.band(solicited, rso_bits) ~= solicited then return end
+      -- We only are looking for the MAC of our next-hop; no others.
+      if not ipv6_equals(na.target_ip, self.next_ip) then return end
+      -- First try to get the MAC from the options.
+      local offset = na.options - pkt.data
+      while offset < pkt.length do
+         local option = ffi.cast(option_header_ptr_t, pkt.data + offset)
+         if option.length == 0 then return end
+         if offset + option.length*8 > pkt.length then return end
+         offset = offset + option.length*8
+         if option.type == option_target_link_layer_address then
+            if option.length ~= 1 then return end
+            local ether = ffi.cast(ether_option_header_ptr_t, option)
+            self:resolve_next_hop(copy_mac(ether.addr))
+            return
+         end
+      end
+      -- Otherwise, when responding to unicast solicitations, the
+      -- option can be omitted since the sender of the solicitation
+      -- has the correct link-layer address.  See 4.4. Neighbor
+      -- Advertisement Message Format.
+      self:resolve_next_hop(copy_mac(h.ether.shost))
+   elseif h.icmpv6.type == icmpv6_ns then
+      if is_neighbor_solicitation_for_addr(pkt, self.self_ip) then
+         local snap = form_nsolicitation_reply(self.self_mac, self.self_ip, pkt)
+         if snap then 
+            link.transmit(self.output.south, snap)
+         end
+      end
+   else
+      -- Unhandled NDP packet; silently drop.
+      return
+   end
+end
+
 function NDP:push()
    local isouth, osouth = self.input.south, self.output.south
    local inorth, onorth = self.input.north, self.output.north
@@ -471,23 +519,8 @@ function NDP:push()
    for _ = 1, link.nreadable(isouth) do
       local p = receive(isouth)
       if is_ndp(p) then
-         if not self.next_mac and is_solicited_neighbor_advertisement(p) then
-            local dst_ethernet = get_dst_ethernet(p, {self.next_ip})
-            if dst_ethernet then
-               print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.next_ip),
-                                                        ethernet:ntop(dst_ethernet)))
-               self.next_mac = dst_ethernet
-            end
-            packet.free(p)
-         elseif is_neighbor_solicitation_for_addr(p, self.self_ip) then
-            local snap = form_nsolicitation_reply(self.self_mac, self.self_ip, p)
-            if snap then 
-               transmit(osouth, snap)
-            end
-            packet.free(p)
-         else -- TODO? incoming NDP that we don't handle; drop it silently
-            packet.free(p)
-         end
+         self:handle_ndp(p)
+         packet.free(p)
       else
          transmit(onorth, p)
       end
@@ -506,38 +539,8 @@ function NDP:push()
    end
 end
 
-local function test_ndp_without_target_link()
-   -- Neighbor Advertisement packet.
-   local na_pkt = lib.hexundump([[
-      02:aa:aa:aa:aa:aa 90:e2:ba:a9:89:2d 86 dd 60 00 
-      00 00 00 18 3a ff fe 80 00 00 00 00 00 00 92 e2 
-      ba ff fe a9 89 2d fc 00 00 00 00 00 00 00 00 00 
-      00 00 00 00 01 00 88 00 92 36 40 00 00 00 fe 80 
-      00 00 00 00 00 00 92 e2 ba ff fe a9 89 2d
-   ]], 78)
-   local dst_eth = get_dst_ethernet(packet.from_string(na_pkt),
-      {ipv6:pton("fe80::92e2:baff:fea9:892d")})
-   assert(ethernet:ntop(dst_eth) == "90:e2:ba:a9:89:2d")
-end
-
 function selftest()
    print("selftest: ndp")
-
-   local lmac = ethernet:pton("01:02:03:04:05:06")
-   local lip = ipv6:pton("1:2:3:4:5:6:7:8")
-   local rip = ipv6:pton("9:a:b:c:d:e:f:0")
-   local nsp = form_ns(lmac, lip, rip)
-   assert(is_ndp(nsp))
-   assert(is_solicited_neighbor_advertisement(nsp) == false)
-   
-   local sol_na = form_nsolicitation_reply(lmac, lip, nsp)
-   local dst_eth = get_dst_ethernet(sol_na, {rip})
-   assert(ethernet:ntop(dst_eth) == "01:02:03:04:05:06")
-   assert(sol_na, "an na packet should have been formed")
-   assert(is_ndp(sol_na), "sol_na must be ndp!")
-   assert(is_solicited_neighbor_advertisement(sol_na), "sol_na must be sna!")
-
-   test_ndp_without_target_link()
 
    local config = require("core.config")
    local sink = require("apps.basic.basic_apps").Sink
