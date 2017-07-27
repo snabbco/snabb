@@ -49,10 +49,10 @@ local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 local ethertype_ipv6 = constants.ethertype_ipv6
 
 -- Special addresses
-ipv6_all_nodes_local_segment_addr = ipv6:pton("ff02::1")
-ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
+local ipv6_all_nodes_local_segment_addr = ipv6:pton("ff02::1")
+local ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
 -- Really just the first 13 bytes of the following...
-ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
+local ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
 
 
 -- Pseudo-header:
@@ -112,7 +112,7 @@ end
      |   Options ...
      +-+-+-+-+-+-+-+-+-+-+-+-
 --]]
-function is_ndp(pkt)
+local function is_ndp(pkt)
    local min_ndp_len = eth_ipv6_size + 8
    if pkt.length >= min_ndp_len and
       eth_next_is_ipv6(pkt) and
@@ -129,7 +129,7 @@ end
 -- and after any reassembly has been done, and no extra IPv6 headers
 -- must be present
 --- TODO: could this reasonably use pflang?
-function is_solicited_neighbor_advertisement(pkt)
+local function is_solicited_neighbor_advertisement(pkt)
    return is_ndp(pkt) and
           icmpv6_type_is_na(pkt) and
           is_solicited_na(pkt)
@@ -140,7 +140,7 @@ local function is_neighbor_solicitation(pkt)
 end
 
 -- Check whether NS target address matches IPv6 address.
-function is_neighbor_solicitation_for_addr(pkt, ipv6_addr)
+local function is_neighbor_solicitation_for_addr(pkt, ipv6_addr)
    if not is_neighbor_solicitation(pkt) then return false end
    local target_offset = eth_ipv6_size + o_icmp_target_offset
    local target_ipv6 = pkt.data + target_offset
@@ -156,7 +156,7 @@ end
 -- The option format is, for ethernet networks:
 -- 1 byte option type, 1 byte option length (in chunks of 8 bytes)
 -- 6 bytes MAC address
-function get_dst_ethernet(pkt, target_ipv6_addrs)
+local function get_dst_ethernet(pkt, target_ipv6_addrs)
    if pkt == nil or target_ipv6_addrs == nil then return false end
    local na_addr_offset = eth_ipv6_size + o_icmp_target_offset
    for i=1,#target_ipv6_addrs do
@@ -212,7 +212,7 @@ local function write_ns(pkt, local_eth, target_addr)
 end
 
 
-function form_ns(local_eth, local_ipv6, dst_ipv6)
+local function form_ns(local_eth, local_ipv6, dst_ipv6)
    local ns_pkt = packet.allocate()
    local ethernet_broadcast = ethernet:pton("ff:ff:ff:ff:ff:ff")
    local hop_limit = 255 -- as per RFC 4861
@@ -380,7 +380,7 @@ end
                      An address assigned to the interface from which the
                      advertisement is sent.
 --]]
-function form_nsolicitation_reply(local_eth, local_ipv6, ns_pkt)
+local function form_nsolicitation_reply(local_eth, local_ipv6, ns_pkt)
    if not local_eth or not local_ipv6 then return nil end
    if not is_valid_ns(ns_pkt) then return nil end
    return form_sna(local_eth, local_ipv6, true, ns_pkt)
