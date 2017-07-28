@@ -233,6 +233,7 @@ function compute_config_actions (old, new)
    for appname, info in pairs(old.apps) do
       if not new.apps[appname] then
          table.insert(actions, {'stop_app', {appname}})
+         post_link_apps[appname] = nil
       end
    end
 
@@ -370,7 +371,7 @@ function apply_config_actions (actions)
       app:reconfig(arg)
       configuration.apps[name].arg = arg
    end
-   function ops.post_link(name)
+   function ops.post_link (name)
       local app = app_table[name]
       if app.post_link then app:post_link() end
    end
