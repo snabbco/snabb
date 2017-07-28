@@ -11,7 +11,7 @@ overrideDerivation raptorjit (as:
   {
     checkPhase = ''
       for f in ${generatedFiles}; do
-        diff -u src/$f src/reusevm/$f
+        diff -u src/reusevm/$f src/$f
       done
     '';
     doCheck = true;
