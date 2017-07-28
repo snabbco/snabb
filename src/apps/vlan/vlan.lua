@@ -136,7 +136,6 @@ function VlanMux:new (conf)
 end
 
 function VlanMux:link ()
-   assert(self.input.trunk)
    local from_vlans, to_vlans = {}, {}
    for name, l in pairs(self.input) do
       if string.match(name, "vlan%d+") then
@@ -157,6 +156,7 @@ function VlanMux:push ()
    local from, to = self.from_vlans, self.to_vlans
    local tpid = self.tpid
    local l_in = self.input.trunk
+   assert(l_in)
    while not empty(l_in) do
       local p = receive(l_in)
       local ethertype = cast("uint16_t*", p.data
@@ -177,7 +177,7 @@ function VlanMux:push ()
    while from[i] do
       local from = from[i]
       local l_in = from.link
-      while not empty(l_in) and not full(l_out) do
+      while not empty(l_in) do
          local p = receive(l_in)
          push_tag(p, build_tag(from.vid, tpid))
          self:transmit(l_out, p)
@@ -187,7 +187,7 @@ function VlanMux:push ()
 
    local l_in = self.input.native
    if l_in then
-      while not empty(l_in) and not full(l_out) do
+      while not empty(l_in) do
          self:transmit(l_out, receive(l_in))
       end
    end
