@@ -10,8 +10,8 @@ local binary = require("lib.yang.binary")
 local shm = require("core.shm")
 
 local action_names = { 'unlink_output', 'unlink_input', 'free_link',
-                       'new_link', 'link_output', 'link_input', 'stop_app',
-                       'start_app', 'reconfig_app',
+                       'new_link', 'link_output', 'link_input', 'post_link',
+                       'stop_app', 'start_app', 'reconfig_app',
                        'call_app_method_with_blob', 'commit' }
 local action_codes = {}
 for i, name in ipairs(action_names) do action_codes[name] = i end
@@ -47,6 +47,10 @@ function actions.link_input (codec, appname, linkname, linkspec)
    local linkname = codec:string(linkname)
    local linkspec = codec:string(linkspec)
    return codec:finish(appname, linkname, linkspec)
+end
+function actions.post_link (codec, appname)
+   local appname = codec:string(appname)
+   return codec:finish(appname)
 end
 function actions.stop_app (codec, appname)
    local appname = codec:string(appname)
@@ -234,6 +238,7 @@ function selftest ()
    test_action({'new_link', {linkspec}})
    test_action({'link_output', {appname, linkname, linkspec}})
    test_action({'link_input', {appname, linkname, linkspec}})
+   test_action({'post_link', {appname}})
    test_action({'stop_app', {appname}})
    test_action({'start_app', {appname, class, arg}})
    test_action({'reconfig_app', {appname, class, arg}})
