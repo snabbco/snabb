@@ -12,7 +12,7 @@ mkDerivation rec {
   buildInputs = [ luajit ];  # LuaJIT to bootstrap DynASM
   installPhase = ''
     mkdir -p $out/bin
-    cp src/luajit $out/bin/raptorjit
+    cp src/raptorjit $out/bin/raptorjit
   '';
 
   enableParallelBuilding = true;  # Do 'make -j'
