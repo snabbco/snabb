@@ -9,23 +9,10 @@ in
 
 overrideDerivation raptorjit (as:
   {
-    preBuild = ''
-      pushd src
-      mkdir old
-      for f in ${generatedFiles}; do
-        cp $f old/
-      done
-      popd
-    '' + as.preBuild;
     checkPhase = ''
-      pushd src
-      mkdir new
       for f in ${generatedFiles}; do
-        cp $f new/
+        diff -u src/$f src/reusevm/$f
       done
-      echo "Checking that in-tree generated VM code is up-to-date..."
-      diff -u old new || (echo "Error: Stale generated code"; exit 1)
-      popd
     '';
     doCheck = true;
   })
