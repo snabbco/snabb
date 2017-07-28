@@ -15,7 +15,7 @@ mkDerivation rec {
     ];
   dontStrip = true;         # No extra stripping (preserve debug info)
   installPhase = ''
-    install -D src/luajit $out/bin/raptorjit
+    install -D src/raptorjit $out/bin/raptorjit
     install -D src/lj_dwarf.dwo $out/lib/raptorjit.dwo
   '';
 

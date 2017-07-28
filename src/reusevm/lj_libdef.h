@@ -291,6 +291,21 @@ static const uint8_t lj_lib_init_jit_opt[] = {
 };
 #endif
 
+#ifdef LJLIB_MODULE_jit_vmprofile
+#undef LJLIB_MODULE_jit_vmprofile
+static const lua_CFunction lj_lib_cf_jit_vmprofile[] = {
+  lj_cf_jit_vmprofile_open,
+  lj_cf_jit_vmprofile_close,
+  lj_cf_jit_vmprofile_select,
+  lj_cf_jit_vmprofile_start,
+  lj_cf_jit_vmprofile_stop
+};
+static const uint8_t lj_lib_init_jit_vmprofile[] = {
+148,57,5,4,111,112,101,110,5,99,108,111,115,101,6,115,101,108,101,99,116,5,
+115,116,97,114,116,4,115,116,111,112,255
+};
+#endif
+
 #ifdef LJLIB_MODULE_ffi_meta
 #undef LJLIB_MODULE_ffi_meta
 static const lua_CFunction lj_lib_cf_ffi_meta[] = {
@@ -314,7 +329,7 @@ static const lua_CFunction lj_lib_cf_ffi_meta[] = {
   lj_cf_ffi_meta___ipairs
 };
 static const uint8_t lj_lib_init_ffi_meta[] = {
-148,57,19,7,95,95,105,110,100,101,120,10,95,95,110,101,119,105,110,100,101,
+153,57,19,7,95,95,105,110,100,101,120,10,95,95,110,101,119,105,110,100,101,
 120,4,95,95,101,113,5,95,95,108,101,110,4,95,95,108,116,4,95,95,108,101,8,95,
 95,99,111,110,99,97,116,6,95,95,99,97,108,108,5,95,95,97,100,100,5,95,95,115,
 117,98,5,95,95,109,117,108,5,95,95,100,105,118,5,95,95,109,111,100,5,95,95,
@@ -332,7 +347,7 @@ static const lua_CFunction lj_lib_cf_ffi_clib[] = {
   lj_cf_ffi_clib___gc
 };
 static const uint8_t lj_lib_init_ffi_clib[] = {
-166,57,3,7,95,95,105,110,100,101,120,10,95,95,110,101,119,105,110,100,101,120,
+171,57,3,7,95,95,105,110,100,101,120,10,95,95,110,101,119,105,110,100,101,120,
 4,95,95,103,99,255
 };
 #endif
@@ -344,7 +359,7 @@ static const lua_CFunction lj_lib_cf_ffi_callback[] = {
   lj_cf_ffi_callback_set
 };
 static const uint8_t lj_lib_init_ffi_callback[] = {
-169,57,3,4,102,114,101,101,3,115,101,116,252,1,199,95,95,105,110,100,101,120,
+174,57,3,4,102,114,101,101,3,115,101,116,252,1,199,95,95,105,110,100,101,120,
 250,255
 };
 #endif
@@ -371,7 +386,7 @@ static const lua_CFunction lj_lib_cf_ffi[] = {
   lj_cf_ffi_load
 };
 static const uint8_t lj_lib_init_ffi[] = {
-171,57,23,4,99,100,101,102,3,110,101,119,4,99,97,115,116,6,116,121,112,101,
+176,57,23,4,99,100,101,102,3,110,101,119,4,99,97,115,116,6,116,121,112,101,
 111,102,8,116,121,112,101,105,110,102,111,6,105,115,116,121,112,101,6,115,105,
 122,101,111,102,7,97,108,105,103,110,111,102,8,111,102,102,115,101,116,111,
 102,5,101,114,114,110,111,6,115,116,114,105,110,103,4,99,111,112,121,4,102,
