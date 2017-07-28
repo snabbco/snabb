@@ -42,7 +42,7 @@ following keys are defined:
 *Optional*. MAC address of **next_hop** address as a string or in
 binary representation.  If this option is present, the `nd_light` app
 does not perform neighbor solicitation for the **next_hop** address
-and use **remote_mac** as the MAC address associated with
+and uses **remote_mac** as the MAC address associated with
 **next_hop**.
 
 — Key **local_ip**
@@ -63,6 +63,11 @@ milliseconds. Default is 1,000ms.
 
 *Optional*. Number of neighbor solicitation retransmissions. Default is
 unlimited retransmissions.
+
+— Key **quiet**
+
+*Optional*. If set to **true**, suppress log messages about ND
+activity. Default is **false**.
 
 ### Special Counters
 
