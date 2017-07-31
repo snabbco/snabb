@@ -239,7 +239,7 @@ end
 function FlowSet:debug_flow(entry, msg)
    if debug then
       local out = string.format("%s | %s %s\n", os.date("%F %H:%M:%S"),
-				msg, self.template.tostring(entry))
+                                msg, self.template.tostring(entry))
       io.stderr:write(out)
       io.stderr:flush()
    end
@@ -312,7 +312,7 @@ function IPFIX:new(config)
    config = lib.parse(config, ipfix_config_params)
    local o = { sequence_number = 1,
                boot_time = engine.now(),
-	       template_refresh_interval = config.template_refresh_interval,
+               template_refresh_interval = config.template_refresh_interval,
                next_template_refresh = -1,
                version = config.ipfix_version,
                observation_domain = config.observation_domain,
