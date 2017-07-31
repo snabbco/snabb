@@ -594,7 +594,7 @@ local function migrate_3_2_0(conf_file, options)
    return multiprocess_migration(v2_migration(src, conf_file), options)
 end
 
-local function migrate_3_3_0(conf_file, options)
+local function migrate_2017_07_01(conf_file, options)
    local src = io.open(conf_file, "r"):read("*a")
    return multiprocess_migration(src, conf_file, options)
 end
@@ -627,7 +627,7 @@ end
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
                     ['3.0.1.1'] = migrate_3_0_1bis,
                     ['3.2.0'] = migrate_3_2_0,
-                    ["3.3.0"] = migrate_3_3_0,
+                    ["2017.07.01"] = migrate_2017_07_01,
                     ["pci-device"] = map_pci_device,}
 function run(args)
    local conf_file, version, options = parse_args(args)
