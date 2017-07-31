@@ -586,6 +586,22 @@ function CTable:iterate()
    return next_entry, max_entry, self.entries - 1
 end
 
+function CTable:next_entry(offset, limit)
+   if offset >= self.size + self.max_displacement then
+      return 0, nil
+   elseif limit == nil then
+      limit = self.size + self.max_displacement
+   else
+      limit = math.min(limit, self.size + self.max_displacement)
+   end
+   for offset=offset, limit-1 do
+      if self.entries[offset].hash ~= HASH_MAX then
+         return offset, self.entries + offset
+      end
+   end
+   return limit, nil
+end
+
 function selftest()
    print("selftest: ctable")
    local bnot = require("bit").bnot
