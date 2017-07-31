@@ -10,12 +10,20 @@ example assumes NICs `02:00.0` and `02:00.1` and wired to NICs `02:00.0` and
 Please, change the PCI addresses to match the settings in your current system; 
 See [running.md](running.md).
 
+Make a configuration with the PCI devices we're using:
+
+```
+$ sudo ./src/snabb lwaftr migrate-configuration -f pci-device \
+    -o "from[device=test]" -o "internal[device=0000:02:00.0]" \
+    -o "external[device=0000:02:00.1]" \
+    src/program/lwaftr/tests/data/icmp_on_fail.conf >> /tmp/icmp_on_fail.conf
+````
+
 In one server, start the lwAFTR:
 
 ```
 $ sudo numactl -m 0 taskset -c 1 ./src/snabb lwaftr run -v \
-    --conf program/lwaftr/tests/data/icmp_on_fail.conf \
-    --v4 0000:02:00.0 --v6 0000:02:00.1
+    --conf /tmp/icmp_on_fail.conf
 ```
 
 See [performance.md](performance.md) for a discussion of `numactl`,

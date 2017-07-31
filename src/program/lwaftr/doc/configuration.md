@@ -117,11 +117,21 @@ softwire-config {
 }
 ```
 
-Basically there's an `external-interface` section defining the
-parameters around the IPv4 interface that communicates with the
-internet, an `internal-interface` section doing the same for the IPv6
-side that communicates with the B4s, and then the `binding-table` that
-declares the set of softwires.  The whole thing is surrounded in a
+The lwaftr will soon be able to support multiple processes and thus there is a
+`instance` list which when it does will be populated with all the configuration
+options which are specific to a given instance. The rest of the configuration
+including the binding table will be shared with the other instances. Until the
+multiprocess support is available, there should only be one instance configured
+and the lwAFTR will simply use the one, and only instance specified in the
+`instance` list. Specifying more than one instance (or less than one) will
+result in an error.
+
+The `external-interface` define parameters around the IPv4 interface that
+communicates with the internet and the `internal-interface` section does the
+same but for the IPv6 side that communicates with the B4s. Anything that is in
+the `external-interface` or `internal-interface` blocks outside of the
+`instance` list are shared amongst all instances. The binding table then
+declares the set of softwires and the whole thing is surrounded in the
 `softwire-config { ... }` block.
 
 ## Compiling conigurations

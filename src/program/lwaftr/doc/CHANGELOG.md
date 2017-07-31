@@ -1,5 +1,9 @@
 # Change Log
 
+## [3.2.0]
+
+* Added multiprocess support to snabb-softwire-v2 schema (not lwaftr itself).
+
 ## [3.1.8] - 2017-03-10
 
 * Retry ARP and NDP resolution indefinitely.

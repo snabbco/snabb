@@ -48,7 +48,7 @@ $ cat ~/bin/run-lwaftr
 BASEDIR=/home/kbarone/snabbswitch/src/
 CONF="`realpath $1`"
 cd ${BASEDIR} && sudo numactl -m 0 taskset -c 1 \
- ./snabb lwaftr run --conf ${CONF} --v4-pci 0000:02:00.0 --v6-pci 0000:02:00.1
+ ./snabb lwaftr run --conf ${CONF}
 ```
 
 ## Load generation
