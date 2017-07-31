@@ -124,6 +124,21 @@ local function normalize_args (t)
    return normalize(t, args_attrs)
 end
 
+-- To be used by the leader to group args into key and args.
+function parse_args (args)
+   local resource, alarm_type_id, alarm_type_qualifier, perceived_severity, alarm_text = unpack(args)
+   local key = {
+      resource = resource,
+      alarm_type_id = alarm_type_id,
+      alarm_type_qualifier = alarm_type_qualifier,
+   }
+   local args = {
+      perceived_severity = perceived_severity,
+      alarm_text = alarm_text,
+   }
+   return key, args
+end
+
 function raise_alarm (key, args)
    local channel = get_channel()
    if channel then

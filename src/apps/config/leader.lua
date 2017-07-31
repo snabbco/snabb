@@ -754,10 +754,12 @@ end
 function Leader:handle_alarm (follower, alarm)
    local fn, args = unpack(alarm)
    if fn == 'raise_alarm' then
-      alarms.raise_alarm(unpack(args))
+      local key, args = alarm_codec.parse_args(args)
+      alarms.raise_alarm(key, args)
    end
    if fn == 'clear_alarm' then
-      alarms.clear_alarm(unpack(args))
+      local key = alarm_codec.parse_args(args)
+      alarms.clear_alarm(key)
    end
 end
 
