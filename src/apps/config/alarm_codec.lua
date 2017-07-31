@@ -12,15 +12,25 @@ for i, name in ipairs(alarm_names) do alarm_codes[name] = i end
 
 local alarms = {}
 
-function alarms.raise_alarm (codec, key, args)
-   local key = codec:string(key)
-   local args = codec:string(args)
-   return codec:finish(key, args)
+function alarms.raise_alarm (codec, resource, alarm_type_id, alarm_type_qualifier,
+   perceived_severity, alarm_text)
+
+   local resource = codec:string(resource)
+   local alarm_type_id = codec:string(alarm_type_id)
+   local alarm_type_qualifier = codec:string(alarm_type_qualifier)
+
+   local perceived_severity = codec:string(perceived_severity)
+   local alarm_text = codec:string(alarm_text)
+
+   return codec:finish(resource, alarm_type_id, alarm_type_qualifier,
+                       perceived_severity, alarm_text)
 end
-function alarms.clear_alarm (codec, key, args)
-   local key = codec:string(key)
-   local args = codec:string(args)
-   return codec:finish(key, args)
+function alarms.clear_alarm (codec, resource, alarm_type_id, alarm_type_qualifier)
+   local resource = codec:string(resource)
+   local alarm_type_id = codec:string(alarm_type_id)
+   local alarm_type_qualifier = codec:string(alarm_type_qualifier)
+
+   return codec:finish(resource, alarm_type_id, alarm_type_qualifier)
 end
 
 local function encoder()
@@ -97,10 +107,32 @@ function get_channel()
    return alarms_channel
 end
 
+local key_attrs = {'resource', 'alarm_type_id', 'alarm_type_qualifier'}
+local args_attrs = {'perceived_severity', 'alarm_text'}
+local function normalize (t, attrs)
+   t = t or {}
+   local ret = {}
+   for _, k in ipairs(attrs) do
+      table.insert(ret, t[k] or '')
+   end
+   return ret
+end
+local function normalize_key (t)
+   return normalize(t, key_attrs)
+end
+local function normalize_args (t)
+   return normalize(t, args_attrs)
+end
+
 function raise_alarm (key, args)
    local channel = get_channel()
    if channel then
-      local buf, len = encode({'raise_alarm', {key, args}})
+      local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
+      local perceived_severity, alarm_text = unpack(normalize_args(args))
+      local buf, len = encode({'raise_alarm', {
+         resource, alarm_type_id, alarm_type_qualifier,
+         perceived_severity, alarm_text,
+      }})
       channel:put_message(buf, len)
    end
 end
@@ -108,7 +140,10 @@ end
 function clear_alarm (key)
    local channel = get_channel()
    if channel then
-      local buf, len = encode({'clear_alarm', {key, args}})
+      local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
+      local buf, len = encode({'clear_alarm', {
+         resource, alarm_type_id, alarm_type_qualifier
+      }})
       channel:put_message(buf, len)
    end
 end
@@ -121,7 +156,26 @@ function selftest ()
       local decoded = decode(encoded, len)
       assert(lib.equal(alarm, decoded))
    end
-   test_alarm({'raise_alarm', {'foo', 'bar'}})
-   test_alarm({'clear_alarm', {'foo', 'bar'}})
+   local function test_raise_alarm ()
+      local key = {resource='res1'}
+      local args = {perceived_severity='critical'}
+
+      local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
+      local perceived_severity, alarm_text = unpack(normalize_args(args))
+
+      local alarm = {'raise_alarm', {resource, alarm_type_id, alarm_type_qualifier,
+                                     perceived_severity, alarm_text}}
+      test_alarm(alarm)
+   end
+   local function test_clear_alarm ()
+      local key = {resource='res1'}
+      local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
+      local alarm = {'clear_alarm', {resource, alarm_type_id, alarm_type_qualifier}}
+      test_alarm(alarm)
+   end
+
+   test_raise_alarm()
+   test_clear_alarm()
+
    print('selftest: ok')
 end
