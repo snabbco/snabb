@@ -55,7 +55,7 @@ function Reassembler:push ()
    local input, output = self.input.input, self.output.output
    local errors = self.output.errors
 
-   for _ = 1, math.min(link.nreadable(input), link.nwritable(output)) do
+   for _ = 1, link.nreadable(input) do
       local pkt = receive(input)
       if is_ipv4_fragment(pkt) then
          counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
