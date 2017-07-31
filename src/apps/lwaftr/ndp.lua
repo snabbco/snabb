@@ -155,10 +155,9 @@ end
 local function make_ndp_packet(src_mac, dst_mac, src_ip, dst_ip, message_type,
                                message, option)
    local pkt = packet.allocate()
-   local ptr
 
-   ptr, pkt.length = pkt.data, ndp_header_len
-   local h = ffi.cast(ndp_header_ptr_t, ptr)
+   pkt.length = ndp_header_len
+   local h = ffi.cast(ndp_header_ptr_t, pkt.data)
    h.ether.dhost = dst_mac
    h.ether.shost = src_mac
    h.ether.type = htons(ether_type_ipv6)
@@ -175,11 +174,8 @@ local function make_ndp_packet(src_mac, dst_mac, src_ip, dst_ip, message_type,
    h.icmpv6.code = 0
    h.icmpv6.checksum = 0
 
-   ptr, pkt.length = pkt.data + pkt.length, pkt.length + ffi.sizeof(message)
-   ffi.copy(ptr, message, ffi.sizeof(message))
-
-   ptr, pkt.length = pkt.data + pkt.length, pkt.length + ffi.sizeof(option)
-   ffi.copy(ptr, option, ffi.sizeof(option))
+   packet.append(pkt, message, ffi.sizeof(message))
+   packet.append(pkt, option, ffi.sizeof(option))
 
    -- Now fix up lengths and checksums.
    h.ipv6.payload_length = htons(pkt.length - ffi.sizeof(ether_header_t))
@@ -235,7 +231,7 @@ local function verify_icmp_checksum(pkt)
    return a == 0
 end
 
-local function ipv6_eq(a, b) return ffi.C.memcmp(a, b, 6) == 0 end
+local function ipv6_eq(a, b) return ffi.C.memcmp(a, b, 16) == 0 end
 
 -- IPv6 multicast addresses start with FF.
 local function is_address_multicast(ipv6_addr)
