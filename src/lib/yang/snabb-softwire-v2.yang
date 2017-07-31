@@ -706,7 +706,7 @@ module snabb-softwire-v2 {
         type uint16;
         default 1460;
         description
-         "Maximm packet size to recieve on the IPv6 interface.";
+         "Maximum packet size to recieve on the IPv6 interface.";
       }
 
       uses traffic-filters;

@@ -6,7 +6,6 @@ local S = require("syscall")
 local bit = require("bit")
 local ffi = require("ffi")
 local lib = require("core.lib")
-local corelib = require("core.lib")
 
 
 local band = bit.band
@@ -27,7 +26,7 @@ local ntohs = lib.ntohs
 function produce_instance_configs(conf)
    local ret = {}
    for device, queues in pairs(conf.softwire_config.instance) do
-      ret[device] = corelib.deepcopy(conf)
+      ret[device] = lib.deepcopy(conf)
       ret[device].softwire_config.instance = {[device]=queues}
    end
    return ret
