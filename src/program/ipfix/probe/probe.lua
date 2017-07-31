@@ -38,7 +38,6 @@ local long_opts = {
    duration = "D",
    port = "p",
    transport = 1,
-   stats = "s",
    ["host-ip"] = "a",
    ["input-type"] = "i",
    ["output-type"] = "o",
@@ -114,7 +113,7 @@ function run (args)
       end
    }
 
-   args = lib.dogetopt(args, opt, "hsD:i:o:p:m:a:c:M:", long_opts)
+   args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:", long_opts)
    if #args ~= 2 then
       print(require("program.ipfix.probe.README_inc"))
       main.exit(1)
