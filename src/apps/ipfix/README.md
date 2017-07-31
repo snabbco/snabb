@@ -55,20 +55,10 @@ v9; 10 indicates RFC 7011 IPFIX.  The default is 10.
 *Optional*.  Observation domain tag to attach to all exported packets.
 The default is 256.
 
-— Key **exporter_mac**
-
-*Required*, sadly.  The Ethernet address from which to send exported
-packets.  See the to-do list below, for more discussion.
-
 — Key **exporter_ip**
 
 *Required*, sadly.  The IPv4 address from which to send exported UDP
 packets.
-
-— Key **collector_mac**
-
-*Required*, sadly.  The Ethernet address to which to send exported
-packets.  See the to-do list below, for more discussion.
 
 — Key **collector_ip**
 
@@ -117,11 +107,6 @@ should use a special-purpose data structure.
 Currently internal flow start and end times use UNIX time.  This isn't
 great for timers, but it does match what's specified in RFC 7011.
 Could we switch to monotonic time?
-
-#### Remove L2 addresses from IPFIX configuration
-
-We should use the ARP app to look up next-hop destination MAC address,
-and let the interface set the source address.
 
 #### Allow export to IPv6 collectors
 

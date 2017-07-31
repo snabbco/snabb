@@ -5,7 +5,10 @@ module(..., package.seeall)
 local now      = require("core.app").now
 local lib      = require("core.lib")
 local link     = require("core.link")
+local arp      = require("apps.ipv4.arp")
 local ipfix    = require("apps.ipfix.ipfix")
+local ipv4     = require("lib.protocol.ipv4")
+local ethernet = require("lib.protocol.ethernet")
 local numa     = require("lib.numa")
 
 -- apps that can be used as an input or output for the exporter
@@ -35,8 +38,6 @@ local long_opts = {
    duration = "D",
    port = "p",
    transport = 1,
-   stats = "s",
-   ["host-mac"] = "m",
    ["host-ip"] = "a",
    ["input-type"] = "i",
    ["output-type"] = "o",
@@ -52,15 +53,15 @@ function run (args)
 
    local input_type, output_type = "intel10g", "intel10g"
 
-   local host_mac, host_ip
-   local collector_mac, colletor_ip
+   local host_mac
+   local host_ip = '10.0.0.1' -- Just to have a default.
+   local collector_ip = '10.0.0.2' -- Likewise.
    local port = 4739
 
    local active_timeout, idle_timeout
    local ipfix_version = 10
 
    local cpu
-   local report = false
 
    -- TODO: better input validation
    local opt = {
@@ -82,9 +83,6 @@ function run (args)
       p = function (arg)
          port = assert(tonumber(arg), "expected number for port")
       end,
-      s = function (arg)
-         report = true
-      end,
       m = function (arg)
          host_mac = arg
       end,
@@ -93,10 +91,6 @@ function run (args)
       end,
       c = function (arg)
          collector_ip = arg
-      end,
-      -- TODO: this should probably be superceded by using ARP
-      M = function (arg)
-         collector_mac = arg
       end,
       ["active-timeout"] = function (arg)
          active_timeout =
@@ -119,35 +113,35 @@ function run (args)
       end
    }
 
-   args = lib.dogetopt(args, opt, "hsD:i:o:p:m:a:c:M:", long_opts)
+   args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:", long_opts)
    if #args ~= 2 then
       print(require("program.ipfix.probe.README_inc"))
       main.exit(1)
    end
 
-   assert(host_mac, "--host-mac argument required")
-   assert(host_ip, "--host-ip argument required")
-   assert(collector_ip, "--collector argument required")
-
    local in_link, in_app   = in_out_apps[input_type](args[1])
    local out_link, out_app = in_out_apps[output_type](args[2])
 
+   local arp_config    = { self_mac = host_mac and ethernet:pton(self_mac),
+                           self_ip = ipv4:pton(host_ip),
+                           next_ip = ipv4:pton(collector_ip) }
    local ipfix_config    = { active_timeout = active_timeout,
                              idle_timeout = idle_timeout,
                              ipfix_version = ipfix_version,
-                             exporter_mac = host_mac,
                              exporter_ip = host_ip,
-                             collector_mac = collector_mac,
                              collector_ip = collector_ip,
                              collector_port = port }
    local c = config.new()
 
    config.app(c, "source", unpack(in_app))
+   config.app(c, "arp", arp.ARP, arp_config)
    config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
    config.app(c, "sink", unpack(out_app))
 
-   config.link(c, "source." .. in_link.output .. " -> ipfix.input")
-   config.link(c, "ipfix.output -> sink." .. out_link.input)
+   config.link(c, "source." .. in_link.output .. " -> arp.south")
+   config.link(c, "arp.north -> ipfix.input")
+   config.link(c, "ipfix.output -> arp.north")
+   config.link(c, "arp.south -> sink." .. out_link.input)
 
    local done
    if not duration then
@@ -156,21 +150,20 @@ function run (args)
       end
    end
 
-   local start_time = now()
+   local t1 = now()
    if cpu then numa.bind_to_cpu(cpu) end
 
    engine.configure(c)
    engine.busywait = true
    engine.main({ duration = duration, done = done })
 
-   if report then
-      local end_time = now()
-      local stats = link.stats(engine.app_table.ipfix.input.input)
-      print("IPFIX probe stats:")
-      print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
-                          lib.comma_value(stats.rxbytes),
-                          lib.comma_value(stats.rxpackets),
-                          lib.comma_value(math.floor((stats.rxbytes * 8) / (end_time - start_time))),
-                          lib.comma_value(stats.rxpackets / ((end_time - start_time) * 1000000))))
-  end
+   local t2 = now()
+   local stats = link.stats(engine.app_table.ipfix.input.input)
+   print("IPFIX probe stats:")
+   local comma = lib.comma_value
+   print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
+                       comma(stats.rxbytes),
+                       comma(stats.rxpackets),
+                       comma(math.floor((stats.rxbytes * 8) / (t2 - t1))),
+                       comma(stats.rxpackets / ((t2 - t1) * 1000000))))
 end

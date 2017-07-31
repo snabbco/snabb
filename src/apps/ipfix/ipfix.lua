@@ -298,11 +298,7 @@ local ipfix_config_params = {
    -- maximum of 512 octets should be used for UDP transmission.
    mtu = { default = 512 },
    observation_domain = { default = 256 },
-   -- FIXME: Let the interface set the L2 source address.
-   exporter_mac = { required = true },
    exporter_ip = { required = true },
-   -- FIXME: Use ARP to determine the L2 destination address.
-   collector_mac = { required = true },
    collector_ip = { required = true },
    collector_port = { required = true },
    templates = { default = { template.v4, template.v6 } }
@@ -316,10 +312,8 @@ function IPFIX:new(config)
                next_template_refresh = -1,
                version = config.ipfix_version,
                observation_domain = config.observation_domain,
-               exporter_mac = config.exporter_mac,
                exporter_ip = config.exporter_ip,
                exporter_port = math.random(49152, 65535),
-               collector_mac = config.collector_mac,
                collector_ip = config.collector_ip,
                collector_port = config.collector_port }
 
@@ -384,11 +378,9 @@ function IPFIX:add_ipfix_header(pkt, count)
 end
 
 function IPFIX:add_transport_headers (pkt)
-   -- TODO: support IPv6, also obtain the MAC of the dst via ARP
-   --       and use the correct src MAC (this is ok for use on the
-   --       loopback device for now).
-   local eth_h = ether:new({ src = ether:pton(self.exporter_mac),
-                             dst = ether:pton(self.collector_mac),
+   -- TODO: Support IPv6.
+   local eth_h = ether:new({ src = ether:pton('00:00:00:00:00:00'),
+                             dst = ether:pton('00:00:00:00:00:00'),
                              type = 0x0800 })
    local ip_h  = ipv4:new({ src = ipv4:pton(self.exporter_ip),
                             dst = ipv4:pton(self.collector_ip),
@@ -454,9 +446,7 @@ function selftest()
    local consts = require("apps.lwaftr.constants")
    local ethertype_ipv4 = consts.ethertype_ipv4
    local ethertype_ipv6 = consts.ethertype_ipv6
-   local ipfix = IPFIX:new({ exporter_mac = "00:11:22:33:44:55",
-                             exporter_ip = "192.168.1.2",
-                             collector_mac = "55:44:33:22:11:00",
+   local ipfix = IPFIX:new({ exporter_ip = "192.168.1.2",
                              collector_ip = "192.168.1.1",
                              collector_port = 4739 })
 

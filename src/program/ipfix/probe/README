@@ -1,12 +1,13 @@
 Usage: snabb ipfix probe [options] <input> <output>
        snabb ipfix probe --help
 
-Mandatory arguments:
+Available options:
        -m, --host-mac <macaddr> The MAC address of the host running the exporter.
+                                Defaults to a randomly generated MAC.
        -a, --host-ip  <ipaddr>  The IP address of the host running the exporter.
+                                Defaults to 10.0.0.1.
        -c, --collector <ipaddr> The IP address of the flow collector.
-
-Optional arguments:
+                                Defaults to 10.0.0.2.
        -i, --input-type <type>  One of pcap, raw, or intel10g. Specifies
                                 how to interpret the <input> argument. Interprets
                                 <input> as a pcap file path, device name, or
@@ -23,3 +24,5 @@ Optional arguments:
        --transport <proto>      The transport protocol to use to communicate to
                                 the flow collector. Valid values depend on whether
                                 IPFIX or Netflow V9 is used.
+       --cpu <cpu>              Bind to the given CPU.  See the Snabb
+                                performance guide for more details.
