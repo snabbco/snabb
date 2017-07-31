@@ -133,7 +133,7 @@ LUA_API int luaJIT_vmprofile_close(lua_State *L, void *ud)
 LUA_API int luaJIT_vmprofile_select(lua_State *L, void *ud)
 {
   setlightudV(L->base, checklightudptr(L, profile));
-  profile = (VMProfile *)ud;
+  vmprofile_set_profile(ud);
   return 1;
 }
 
