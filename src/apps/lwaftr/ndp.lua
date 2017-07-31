@@ -163,7 +163,7 @@ local function make_ndp_packet(src_mac, dst_mac, src_ip, dst_ip, message_type,
    h.ether.type = htons(ether_type_ipv6)
    h.ipv6.v_tc_fl = 0
    lib.bitfield(32, h.ipv6, 'v_tc_fl', 0, 4, 6)  -- IPv6 Version
-   lib.bitfield(32, h.ipv6, 'v_tc_fl', 4, 8, 1)  -- Traffic class
+   lib.bitfield(32, h.ipv6, 'v_tc_fl', 4, 8, 0)  -- Traffic class
    lib.bitfield(32, h.ipv6, 'v_tc_fl', 12, 20, 0) -- Flow label
    h.ipv6.payload_length = 0
    h.ipv6.next_header = proto_icmpv6
@@ -178,7 +178,8 @@ local function make_ndp_packet(src_mac, dst_mac, src_ip, dst_ip, message_type,
    packet.append(pkt, option, ffi.sizeof(option))
 
    -- Now fix up lengths and checksums.
-   h.ipv6.payload_length = htons(pkt.length - ffi.sizeof(ether_header_t))
+   h.ipv6.payload_length = htons(pkt.length - ffi.sizeof(ether_header_t)
+   - ffi.sizeof(ipv6_header_t))
    ptr = ffi.cast('char*', h.icmpv6)
    local base_checksum = checksum_pseudoheader_from_header(h.ipv6)
    h.icmpv6.checksum = htons(checksum.ipsum(ptr,
