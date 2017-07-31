@@ -67,14 +67,11 @@ function temp_validate_configuration()
       "Only one queue is supported in '/softwire-config/instance/queue'")
 end
 
-function lwaftr_app(c, conf)
+function lwaftr_app(c, conf, device)
    assert(type(conf) == 'table')
 
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
-
-   -- If this is modified, please remember to modify the config_arg below.
-   local inst_configs = lwutil.produce_instance_configs(conf)
 
    -- Claim the name if one is defined.
    local function switch_names(config)
@@ -95,12 +92,11 @@ function lwaftr_app(c, conf)
    switch_names(conf)
 
    -- We need to verify there is only one instance for now.
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
+   local queue = conf.softwire_config.instance[device].queue.values[1]
 
    -- Global interfaces
-   local gexternal_interface = lwaftr_config.softwire_config.external_interface
-   local ginternal_interface = lwaftr_config.softwire_config.internal_interface
+   local gexternal_interface = conf.softwire_config.external_interface
+   local ginternal_interface = conf.softwire_config.internal_interface
 
    -- Instance specific interfaces
    local iexternal_interface = queue.external_interface
@@ -120,7 +116,7 @@ function lwaftr_app(c, conf)
               { address = convert_ipv4(iexternal_interface.ip) })
    config.app(c, "icmpechov6", ipv6_apps.ICMPEcho,
               { address = iinternal_interface.ip })
-   config.app(c, "lwaftr", lwaftr.LwAftr, lwaftr_config)
+   config.app(c, "lwaftr", lwaftr.LwAftr, conf)
    config.app(c, "fragmenterv4", ipv4_apps.Fragmenter,
               { mtu=gexternal_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
@@ -179,8 +175,6 @@ function lwaftr_app(c, conf)
    set_preprocessors(c, preprocessing_apps_v6, "lwaftr.v6")
    set_postprocessors(c, "lwaftr.v6", postprocessing_apps_v6)
    set_postprocessors(c, "lwaftr.v4", postprocessing_apps_v4)
-
-   return device, lwaftr_config.softwire_config.external_interface.device
 end
 
 local function link_apps(c, apps)
@@ -228,19 +222,23 @@ local function link_sink(c, v4_out, v6_out)
 end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name)
-   local v4_pci, v6_pci = lwaftr_app(c, conf)
+   local inst_configs = lwutil.produce_instance_configs(conf)
+   local v4_pci, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
+   local v6_pci = queue.external_interface.device
    validate_pci_devices(v4_pci, v6_pci)
+   lwaftr_app(c, lwaftr_config, v4_pci)
 
    config.app(c, v4_nic_name, Intel82599, {
       pciaddr=v4_pci,
-      vmdq=external_if.vlan_tag,
-      vlan=external_if.vlan_tag,
+      vmdq=queue.external_interface.vlan_tag,
+      vlan=queue.external_interface.vlan_tag,
       rxcounter=1,
       macaddr=ethernet:ntop(external_if.mac)})
    config.app(c, v6_nic_name, Intel82599, {
       pciaddr=v6_pci,
-      vmdq=internal_if.vlan_tag,
-      vlan=internal_if.vlan_tag,
+      vmdq=queue.internal_interface.vlan_tag,
+      vlan=queue.internal_interface.vlan_tag,
       rxcounter=1,
       macaddr = ethernet:ntop(internal_if.mac)})
 
@@ -249,17 +247,20 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_on_a_stick(c, conf, args)
-   local pciaddr = lwaftr_app(c, conf)
+   local inst_configs = lwutil.produce_instance_configs(conf)
+   local device, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
    validate_pci_devices(pciaddr)
+   lwaftr_app(c, lwaftr_config, device)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.mirror
 
    if v4v6 then
       config.app(c, 'nic', Intel82599, {
          pciaddr = pciaddr,
-         vmdq=external_if.vlan_tag,
-         vlan=external_if.vlan_tag,
-         macaddr = ethernet:ntop(external_if.mac)})
+         vmdq=queue.external_interface.vlan_tag,
+         vlan=queue.external_interface.vlan_tag,
+         macaddr = ethernet:ntop(queue.external_interface.mac)})
       if mirror then
          local Tap = require("apps.tap.tap").Tap
          local ifname = mirror
@@ -279,14 +280,14 @@ function load_on_a_stick(c, conf, args)
    else
       config.app(c, v4_nic_name, Intel82599, {
          pciaddr = pciaddr,
-         vmdq=external_if.vlan_tag,
-         vlan=external_if.vlan_tag,
-         macaddr = ethernet:ntop(external_if.mac)})
+         vmdq=queue.external_interface.vlan_tag,
+         vlan=queue.external_interface.vlan_tag,
+         macaddr = ethernet:ntop(queue.external_interface.mac)})
       config.app(c, v6_nic_name, Intel82599, {
          pciaddr = pciaddr,
-         vmdq=internal_if.vlan_tag,
-         vlan=internal_if.vlan_tag,
-         macaddr = ethernet:ntop(internal_if.mac)})
+         vmdq=queue.internal_interface.vlan_tag,
+         vlan=queue.internal_interface.vlan_tag,
+         macaddr = ethernet:ntop(queue.internal_interface.mac)})
 
       link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
       link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
@@ -294,7 +295,12 @@ function load_on_a_stick(c, conf, args)
 end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
-   local v4_pci, v6_pci = lwaftr_app(c, conf)
+   local inst_configs = lwutil.produce_instance_configs(conf)
+   local v4_pci, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
+   local v6_pci = queue.external_device.device
+   lwaftr_app(c, lwaftr_config, device)
+
    validate_pci_devices(v4_pci, v6_pci)
    config.app(c, v4_nic_name, VirtioNet, {
       pciaddr=v4_pci,
@@ -310,19 +316,22 @@ function load_virt(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
-   lwaftr_app(c, conf)
+   local inst_configs = lwutil.produce_instance_configs(conf)
+   local device, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
+   lwaftr_app(c, lwaftr_config, device)
 
    config.app(c, "capturev4", pcap.PcapReader, v4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, v6_pcap)
    config.app(c, "repeaterv4", basic_apps.Repeater)
    config.app(c, "repeaterv6", basic_apps.Repeater)
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
    end
-   if conf.softwire_config.internal_interface.vlan_tag then
+   if queue.internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
    end
    config.app(c, v4_sink, basic_apps.Sink)
    config.app(c, v6_sink, basic_apps.Sink)
@@ -331,11 +340,11 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
    config.link(c, "capturev6.output -> repeaterv6.input")
 
    local v4_src, v6_src = 'repeaterv4.output', 'repeaterv6.output'
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       config.link(c, v4_src.." -> untagv4.input")
       v4_src = "untagv4.output"
    end
-   if conf.softwire_config.internal_interface.vlan_tag then
+   if queue.internal_interface.vlan_tag then
       config.link(c, v6_src.." -> untagv6.input")
       v6_src = "untagv6.output"
    end
@@ -344,23 +353,26 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
 end
 
 function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   lwaftr_app(c, conf)
+   local inst_configs = lwutil.produce_instance_configs(conf)
+   local device, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
+   lwaftr_app(c, lwaftr_config, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "output_filev4", pcap.PcapWriter, outv4_pcap)
    config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
    end
-   if conf.softwire_config.internal_interface.vlan_tag then
+   if queue.internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
    end
 
    config.app(c, 'v4v6', V4V6)
@@ -370,7 +382,7 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
    local sources = { "v4v6.v4", "v4v6.v6" }
    local sinks = { "v4v6.v4", "v4v6.v6" }
 
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       config.link(c, "capturev4.output -> untagv4.input")
       config.link(c, "capturev6.output -> untagv6.input")
       config.link(c, "untagv4.output -> join.in1")
@@ -395,29 +407,32 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
 end
 
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   lwaftr_app(c, conf)
+   local inst_configs = lwutil.produce_instance_configs(conf)
+   local device, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
+   lwaftr_app(c, lwaftr_config, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "output_filev4", pcap.PcapWriter, outv4_pcap)
    config.app(c, "output_filev6", pcap.PcapWriter, outv6_pcap)
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
    end
-   if conf.softwire_config.internal_interface.vlan_tag then
+   if queue.internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
    end
 
    local sources = { "capturev4.output", "capturev6.output" }
    local sinks = { "output_filev4.input", "output_filev6.input" }
 
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       sources = { "untagv4.output", "untagv6.output" }
       sinks = { "tagv4.input", "tagv6.input" }
 
@@ -432,24 +447,27 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
 end
 
 function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
-   lwaftr_app(c, conf)
+   local inst_configs = lwutil.produce_instance_configs(conf)
+   local device, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
+   lwaftr_app(c, lwaftr_config, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "loop_v4", basic_apps.Repeater)
    config.app(c, "loop_v6", basic_apps.Repeater)
    config.app(c, "sink", basic_apps.Sink)
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
    end
-   if conf.softwire_config.internal_interface.vlan_tag then
+   if queue.internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
    end
 
    local sources = { "loop_v4.output", "loop_v6.output" }
@@ -458,7 +476,7 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
    config.link(c, "capturev4.output -> loop_v4.input")
    config.link(c, "capturev6.output -> loop_v6.input")
 
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       sources = { "untagv4.output", "untagv6.output" }
       sinks = { "tagv4.input", "tagv6.input" }
 
@@ -473,24 +491,27 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
 end
 
 function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
-   lwaftr_app(c, conf)
+   local inst_configs = lwutil.produce_instance_configs(conf)
+   local device, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
+   lwaftr_app(c, lwaftr_config, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
    config.app(c, "loop_v4", basic_apps.Repeater)
    config.app(c, "loop_v6", basic_apps.Repeater)
    config.app(c, "sink", basic_apps.Sink)
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       config.app(c, "untagv4", vlan.Untagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
       config.app(c, "tagv4", vlan.Tagger,
-                 { tag=conf.softwire_config.external_interface.vlan_tag })
+                 { tag=queue.external_interface.vlan_tag })
    end
-   if conf.softwire_config.internal_interface.vlan_tag then
+   if queue.internal_interface.vlan_tag then
       config.app(c, "untagv6", vlan.Untagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
       config.app(c, "tagv6", vlan.Tagger,
-                 { tag=conf.softwire_config.internal_interface.vlan_tag })
+                 { tag=queue.internal_interface.vlan_tag })
    end
 
    config.app(c, 'v4v6', V4V6)
@@ -503,7 +524,7 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
    config.link(c, "capturev4.output -> loop_v4.input")
    config.link(c, "capturev6.output -> loop_v6.input")
 
-   if conf.softwire_config.external_interface.vlan_tag then
+   if queue.external_interface.vlan_tag then
       config.link(c, "loop_v4.output -> untagv4.input")
       config.link(c, "loop_v6.output -> untagv6.input")
       config.link(c, "untagv4.output -> join.in1")
