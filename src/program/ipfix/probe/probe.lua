@@ -5,6 +5,7 @@ module(..., package.seeall)
 local now      = require("core.app").now
 local lib      = require("core.lib")
 local link     = require("core.link")
+local basic    = require("apps.basic.basic_apps")
 local arp      = require("apps.ipv4.arp")
 local ipfix    = require("apps.ipfix.ipfix")
 local ipv4     = require("lib.protocol.ipv4")
@@ -141,15 +142,28 @@ function run (args)
                              collector_port = port }
    local c = config.new()
 
-   config.app(c, "source", unpack(in_app))
-   config.app(c, "arp", arp.ARP, arp_config)
+   config.app(c, "in", unpack(in_app))
    config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
-   config.app(c, "sink", unpack(out_app))
+   config.app(c, "out", unpack(out_app))
 
-   config.link(c, "source." .. in_link.output .. " -> arp.south")
-   config.link(c, "arp.north -> ipfix.input")
-   config.link(c, "ipfix.output -> arp.north")
-   config.link(c, "arp.south -> sink." .. out_link.input)
+   -- use ARP for link-layer concerns unless the output is connected
+   -- to a pcap writer
+   if output_type ~= "pcap" then
+      config.app(c, "arp", arp.ARP, arp_config)
+      config.app(c, "sink", basic.Sink)
+
+      config.link(c, "in." .. in_link.output .. " -> ipfix.input")
+      config.link(c, "out." .. out_link.output .. " -> arp.south")
+
+      -- with UDP, ipfix doesn't need to handle packets from the collector
+      config.link(c, "arp.north -> sink.input")
+
+      config.link(c, "ipfix.output -> arp.north")
+      config.link(c, "arp.south -> out." .. out_link.input)
+   else
+      config.link(c, "in." .. in_link.output .. " -> ipfix.input")
+      config.link(c, "ipfix.output -> out." .. out_link.input)
+   end
 
    local done
    if not duration then
