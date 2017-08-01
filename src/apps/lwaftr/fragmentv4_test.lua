@@ -27,6 +27,7 @@ local function make_ipv4_packet(payload_size, vlan_id)
    local eth_header = eth_proto:new_from_mem(pkt.data, pkt.length)
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
+   assert(eth_header and ip4_header)
    assert(pkt.length == eth_size + ip4_header:sizeof() + payload_size)
 
    -- Ethernet header. The leading bits of the MAC addresses are those for
@@ -65,7 +66,7 @@ end
 
 local function eth_header_size(pkt)
    local eth_size = eth_proto:sizeof()
-   local eth_header = eth_proto:new_from_mem(pkt.data, pkt.length)
+   local eth_header = assert(eth_proto:new_from_mem(pkt.data, pkt.length))
    if eth_header:type() == constants.dotq_tpid then
       return eth_size + 4  -- Packet has VLAN tagging
    else
@@ -79,6 +80,7 @@ local function pkt_payload_size(pkt)
    local eth_size = eth_header_size(pkt)
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
+   assert(ip4_header)
    local total_length = ip4_header:total_length()
    local ihl = ip4_header:ihl() * 4
    assert(ihl == get_ihl_from_offset(pkt, eth_size))
@@ -94,6 +96,7 @@ local function pkt_frag_offset(pkt)
    local eth_size = eth_header_size(pkt)
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
+   assert(ip4_header)
    return ip4_header:frag_off() * 8
 end
 
@@ -103,6 +106,7 @@ local function pkt_total_length(pkt)
    local eth_size = eth_header_size(pkt)
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
+   assert(ip4_header)
    return ip4_header:total_length()
 end
 
@@ -113,6 +117,7 @@ local function check_packet_fragment(orig_pkt, frag_pkt, is_last_fragment)
    -- Ethernet fields
    local orig_hdr = eth_proto:new_from_mem(orig_pkt.data, orig_pkt.length)
    local frag_hdr = eth_proto:new_from_mem(frag_pkt.data, frag_pkt.length)
+   assert(orig_hdr and frag_hdr)
    assert(orig_hdr:src_eq(frag_hdr:src()))
    assert(orig_hdr:dst_eq(frag_hdr:dst()))
    assert(orig_hdr:type() == frag_hdr:type())
@@ -130,6 +135,7 @@ local function check_packet_fragment(orig_pkt, frag_pkt, is_last_fragment)
                                      orig_pkt.length - eth_size)
    frag_hdr = ip4_proto:new_from_mem(frag_pkt.data + eth_size,
                                      frag_pkt.length - eth_size)
+   assert(orig_hdr and frag_hdr)
    assert(orig_hdr:ihl() == frag_hdr:ihl())
    assert(orig_hdr:dscp() == frag_hdr:dscp())
    assert(orig_hdr:ecn() == frag_hdr:ecn())
@@ -215,6 +221,7 @@ function test_dont_fragment_flag()
    local pkt = assert(make_ipv4_packet(1200))
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_proto:sizeof(),
                                              pkt.length - eth_proto:sizeof())
+   assert(ip4_header)
    ip4_header:flags(0x2) -- Set "don't fragment"
    local code, result = fragmentv4.fragment(pkt, 500)
    assert(code == fragmentv4.FRAGMENT_FORBIDDEN)

@@ -221,6 +221,7 @@ function ICMPEcho:push()
       if icmp.is_icmpv6_message(pkt, icmpv6_echo_request, 0) then
          local pkt_ipv6 = ipv6:new_from_mem(pkt.data + ethernet_header_size,
                                             pkt.length - ethernet_header_size)
+         assert(pkt_ipv6)
          local pkt_ipv6_dst = ffi.string(pkt_ipv6:dst(), 16)
          if self.addresses[pkt_ipv6_dst] then
             ethernet:new_from_mem(pkt.data, ethernet_header_size):swap()
