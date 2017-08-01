@@ -16,6 +16,34 @@ local function show_usage(exit_code)
    print(require("program.lwaftr.run.README_inc"))
    if exit_code then main.exit(exit_code) end
 end
+local function migrate_device_on_config(config, v4, v6)
+   -- Validate there is only one instance, otherwise the option is ambiguous.
+   local device, instance
+   for pci_addr, inst in pairs(config.softwire_config.instance) do
+      assert(device == nil, "Unable to migrate config to '"..pci_addr.."' as"..
+                             "there are multiple instances configured.")
+      device, instance = pci_addr, inst
+   end
+
+   local migrated = config
+   migrated.softwire_config.instance = lib.deepcopy(
+      migrated.softwire_config.instance
+   )
+   local instances = migrated.softwire_config.instance
+
+   if v4 and v4 ~= device then
+      print("Migrating instance '"..device.."' to '"..v4.."'")
+      instances[v4] = instances[device]
+      instances[device] = nil
+   end
+
+   if v6 then
+      local device, instance = next(instances)
+      instance.queue.values[1].external_interface.device = v6
+   end
+
+   return migrated
+end
 
 function parse_args(args)
    if #args == 0 then show_usage(1) end
@@ -60,6 +88,8 @@ function parse_args(args)
    handlers["mirror"] = function (ifname)
       opts["mirror"] = ifname
    end
+   function handlers.v4(arg) v4 = arg end
+   function handlers.v6(arg) v6 = arg end
    function handlers.y() opts.hydra = true end
    function handlers.b(arg) opts.bench_file = arg end
    handlers["ingress-drop-monitor"] = function (arg)
@@ -75,10 +105,11 @@ function parse_args(args)
    function handlers.reconfigurable() opts.reconfigurable = true end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:yhir:n:",
-      { conf = "c", verbose = "v", duration = "D", help = "h", virtio = "i",
-        cpu = 1, ["ring-buffer-size"] = "r", ["real-time"] = 0,
-        ["bench-file"] = "b", ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1,
-        mirror = 1, hydra = "y", reconfigurable = 0, name="n" })
+   { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
+     verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
+     ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
+     ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
+     hydra = "y", reconfigurable = 0, name="n" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -93,8 +124,6 @@ function parse_args(args)
       scheduling.pci_addrs = { v4 }
       return opts, scheduling, conf_file, v4
    else
-      if not v4 then fatal("Missing required --v4 argument.") end
-      if not v6 then fatal("Missing required --v6 argument.") end
       scheduling.pci_addrs = { v4, v6 }
       return opts, scheduling, conf_file, v4, v6
    end
@@ -112,8 +141,16 @@ local function requires_splitter (opts, conf)
 end
 
 function run(args)
-   local opts, scheduling, conf_file = parse_args(args)
+   local opts, scheduling, conf_file, v4, v6 = parse_args(args)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
+
+   -- If there are v4 or v6 options we need to migrate the configuration in
+   -- memory from the PCI device specified, later we'll want to support
+   -- selecting multiple devices, this is where you will do it.
+   if v4 or v6 then
+      conf = migrate_device_on_config(conf, v4, v6)
+   end
+
    local use_splitter = requires_splitter(opts, conf)
 
    -- If there is a name defined on the command line, it should override

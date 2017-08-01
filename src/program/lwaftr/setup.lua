@@ -37,13 +37,11 @@ end
 
 -- Checks the existance and NUMA affinity of PCI devices
 -- NB: "nil" can be passed in and will be siliently ignored.
-local function validate_pci_devices(...)
-   for device in pairs(...) do
-      if device then
-         assert(lwutil.nic_exists(address),
-                ("Could not locate PCI device '%s'"):format(address))
-         numa.check_affinity_for_pci_addresses(address)
-      end
+local function validate_pci_devices(devices)
+   for _, address in pairs(devices) do
+      assert(lwutil.nic_exists(address),
+             ("Could not locate PCI device '%s'"):format(address))
+      numa.check_affinity_for_pci_addresses(address)
    end
 end
 
@@ -226,7 +224,7 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name)
    local v4_pci, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
    local v6_pci = queue.external_interface.device
-   validate_pci_devices(v4_pci, v6_pci)
+   validate_pci_devices({v4_pci, v6_pci})
    lwaftr_app(c, lwaftr_config, v4_pci)
 
    config.app(c, v4_nic_name, Intel82599, {
@@ -250,7 +248,7 @@ function load_on_a_stick(c, conf, args)
    local inst_configs = lwutil.produce_instance_configs(conf)
    local device, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
-   validate_pci_devices(pciaddr)
+   validate_pci_devices({pciaddr})
    lwaftr_app(c, lwaftr_config, device)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.mirror
@@ -301,7 +299,7 @@ function load_virt(c, conf, v4_nic_name, v6_nic_name)
    local v6_pci = queue.external_device.device
    lwaftr_app(c, lwaftr_config, device)
 
-   validate_pci_devices(v4_pci, v6_pci)
+   validate_pci_devices({v4_pci, v6_pci})
    config.app(c, v4_nic_name, VirtioNet, {
       pciaddr=v4_pci,
       vlan=external_if.vlan_tag,

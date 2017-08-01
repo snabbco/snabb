@@ -12,9 +12,6 @@ from test_env import DATA_DIR, ENC, SNABB_CMD, BaseTestCase, nic_names
 DAEMON_PROC_NAME = 'query-test-daemon'
 SNABB_PCI0, SNABB_PCI1 = nic_names()
 RUN_DIR = Path('/var/run/snabb')
-CONFIG_PATH = BaseTestCase.get_config_path(str(DATA_DIR / 'no_icmp.conf'))
-
-
 
 @unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
 class TestQueryStandard(BaseTestCase):
@@ -22,7 +19,9 @@ class TestQueryStandard(BaseTestCase):
     daemon_args = (
         str(SNABB_CMD), 'lwaftr', 'run',
         '--name', DAEMON_PROC_NAME,
-        '--conf', CONFIG_PATH,
+        '--conf', str(DATA_DIR / 'no_icmp.conf'),
+        '--v4', SNABB_PCI0,
+        '--v6', SNABB_PCI1
     )
 
     query_args = (str(SNABB_CMD), 'lwaftr', 'query')
@@ -80,6 +79,8 @@ class TestQueryReconfigurable(TestQueryStandard):
         str(SNABB_CMD), 'lwaftr', 'run', '--reconfigurable',
         '--name', DAEMON_PROC_NAME,
         '--conf', str(DATA_DIR / 'no_icmp.conf'),
+        '--v4', SNABB_PCI0,
+        '--v6', SNABB_PCI1,
     )
 
     def get_all_leader_pids(self):

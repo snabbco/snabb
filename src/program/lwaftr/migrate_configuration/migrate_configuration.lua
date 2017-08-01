@@ -599,36 +599,12 @@ local function migrate_2017_07_01(conf_file, options)
    return multiprocess_migration(src, conf_file, options)
 end
 
--- This will take a configuration file with options and map one device to
--- another. One useful use case of this is producing tests specific to the
--- server.
-local function map_pci_device(conf_file, options)
-   -- Validate options and load configuration
-   local old = assert(find_option(options, "from", "device"),
-                     "Must specify device to map from.")
-   local new = assert(find_option(options, "internal", "device"),
-                      "Must specify a internal (ipv6) device to map to.")
-   local src = io.open(conf_file, "r"):read("*a")
-   local config = yang.load_data_for_schema_by_name(
-                     "snabb-softwire-v2", src, conf_file)
-
-   -- Migrate configuration
-   assert(config.softwire_config.instance[old], "Device '"..old.."' missing")
-   config.softwire_config.instance[new] = config.softwire_config.instance[old]
-   config.softwire_config.instance[old] = nil
-   local external = find_option(options, "external", "device")
-   if external ~= nil then
-      local queue = config.softwire_config.instance[new].queue.values[1]
-      queue.external_interface.device = external
-   end
-   return config
-end
 
 local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
                     ['3.0.1.1'] = migrate_3_0_1bis,
                     ['3.2.0'] = migrate_3_2_0,
-                    ["2017.07.01"] = migrate_2017_07_01,
-                    ["pci-device"] = map_pci_device,}
+                    ["2017.07.01"] = migrate_2017_07_01,}
+
 function run(args)
    local conf_file, version, options = parse_args(args)
    local migrate = migrators[version]

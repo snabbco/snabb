@@ -20,22 +20,13 @@ DAEMON_ARGS = [
     str(SNABB_CMD), 'lwaftr', 'bench', '--reconfigurable',
     '--bench-file', '/dev/null',
     '--name', DAEMON_PROC_NAME,
-    BaseTestCase.get_config_path(str(DATA_DIR / 'icmp_on_fail.conf')),
+    str(DATA_DIR / 'icmp_on_fail.conf'),
     str(BENCHDATA_DIR / 'ipv4-0550.pcap'),
     str(BENCHDATA_DIR / 'ipv6-0550.pcap'),
 ]
 SOCKET_PATH = '/tmp/snabb-lwaftr-listen-sock-%s' % DAEMON_PROC_NAME
 
-class BaseConfigTestCase(BaseTestCase):
-
-    @property
-    def instance_path(self):
-        ipv4_nic, ipv6_nic = nic_names()
-        return '/softwire-config/instance[device={device}]/queue[id=1]'.format(
-            device=(ipv4_nic or "test")
-        )
-
-class TestConfigGet(BaseConfigTestCase):
+class TestConfigGet(BaseTestCase):
     """
     Test querying from a known config, testing basic "getting".
     It performs numerous gets on different paths.
@@ -46,7 +37,8 @@ class TestConfigGet(BaseConfigTestCase):
 
     def test_get_internal_iface(self):
         cmd_args = list(self.config_args)
-        cmd_args.append(self.instance_path + '/internal-interface/ip')
+        cmd_args.append('/softwire-config/instance[device=test/queue[id=1]'
+                        '/internal-interface/ip')
         output = self.run_cmd(cmd_args)
         self.assertEqual(
             output.strip(), b'8:9:a:b:c:d:e:f',
@@ -54,7 +46,8 @@ class TestConfigGet(BaseConfigTestCase):
 
     def test_get_external_iface(self):
         cmd_args = list(self.config_args)
-        cmd_args.append(self.instance_path + '/external-interface/ip')
+        cmd_args.append('/softwire-config/instance[device=test/queue[id=1]/'
+                        'external-interface/ip')
         output = self.run_cmd(cmd_args)
         self.assertEqual(
             output.strip(), b'10.10.10.10',
@@ -86,7 +79,7 @@ class TestConfigGet(BaseConfigTestCase):
             '\n'.join(('OUTPUT', str(output, ENC))))
 
 
-class TestConfigListen(BaseConfigTestCase):
+class TestConfigListen(BaseTestCase):
     """
     Test it can listen, send a command and get a response. Only test the
     socket method of communicating with the listen command, due to the
@@ -128,7 +121,7 @@ class TestConfigListen(BaseConfigTestCase):
         os.unlink(SOCKET_PATH)
 
 
-class TestConfigMisc(BaseConfigTestCase):
+class TestConfigMisc(BaseTestCase):
 
     daemon_args = DAEMON_ARGS
 
@@ -204,7 +197,8 @@ class TestConfigMisc(BaseConfigTestCase):
         test_ipv4 = '208.118.235.148'
         set_args = self.get_cmd_args('set')
         set_args.extend((
-            self.instance_path + "/external-interface/ip", test_ipv4
+            "/softwire-config/instance[device=test/queue[id=1]/"
+            "external-interface/ip", test_ipv4
         ))
         self.run_cmd(set_args)
         get_args = list(set_args)[:-1]

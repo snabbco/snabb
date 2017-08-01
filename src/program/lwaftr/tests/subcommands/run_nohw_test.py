@@ -8,7 +8,7 @@ from random import randint
 from subprocess import check_call
 from test_env import DATA_DIR, SNABB_CMD, BaseTestCase
 
-CONFIG_PATH = BaseTestCase.get_config_path(str(DATA_DIR / 'icmp_on_fail.conf'))
+CONFIG_PATH = str(DATA_DIR / 'icmp_on_fail.conf')
 
 
 class TestRunNoHW(BaseTestCase):
