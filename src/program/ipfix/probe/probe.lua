@@ -130,7 +130,7 @@ function run (args)
    local in_link, in_app   = in_apps[input_type](args[1])
    local out_link, out_app = out_apps[output_type](args[2])
 
-   local arp_config    = { self_mac = host_mac and ethernet:pton(self_mac),
+   local arp_config    = { self_mac = host_mac and ethernet:pton(host_mac),
                            self_ip = ipv4:pton(host_ip),
                            next_ip = ipv4:pton(collector_ip) }
    local ipfix_config    = { active_timeout = active_timeout,
