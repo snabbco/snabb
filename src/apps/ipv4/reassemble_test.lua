@@ -16,8 +16,8 @@ local function random_ipv4() return lib.random_bytes(4) end
 local function random_mac() return lib.random_bytes(6) end
 
 --
--- Returns a new packet, which contains an Ethernet frame, with an IPv4 header,
--- followed by a payload of "payload_size" random bytes.
+-- Returns a new packet containing an Ethernet frame with an IPv4
+-- header followed by PAYLOAD_SIZE random bytes.
 --
 local function make_ipv4_packet(payload_size)
    local pkt = packet.from_pointer(lib.random_bytes(payload_size),
@@ -35,69 +35,6 @@ local function make_ipv4_packet(payload_size)
    return dgram:packet()
 end
 
-local function payload_size(pkt)
-   return pkt.length - ether:sizeof() - ipv4:sizeof()
-end
-
-local function pkt_frag_offset(pkt)
-   assert(pkt.length >= (ether:sizeof() + ipv4:sizeof()))
-   local eth_size = ether:sizeof()
-   local ip4_header = ipv4:new_from_mem(pkt.data + eth_size,
-                                        pkt.length - eth_size)
-   return ip4_header:frag_off() * 8
-end
-
---
--- Checks that "frag_pkt" is a valid fragment of the "orig_pkt" packet.
---
-local function check_packet_fragment(orig_pkt, frag_pkt, is_last_fragment)
-   -- Ethernet fields
-   local orig_hdr = ether:new_from_mem(orig_pkt.data, orig_pkt.length)
-   local frag_hdr = ether:new_from_mem(frag_pkt.data, frag_pkt.length)
-   assert(orig_hdr:src_eq(frag_hdr:src()))
-   assert(orig_hdr:dst_eq(frag_hdr:dst()))
-   assert(orig_hdr:type() == frag_hdr:type())
-
-   -- IPv4 fields
-   local eth_size = ether:sizeof()
-   orig_hdr = ipv4:new_from_mem(orig_pkt.data + eth_size,
-                                orig_pkt.length - eth_size)
-   frag_hdr = ipv4:new_from_mem(frag_pkt.data + eth_size,
-                                frag_pkt.length - eth_size)
-   assert(orig_hdr:ihl() == frag_hdr:ihl())
-   assert(orig_hdr:dscp() == frag_hdr:dscp())
-   assert(orig_hdr:ecn() == frag_hdr:ecn())
-   assert(orig_hdr:ttl() == frag_hdr:ttl())
-   assert(orig_hdr:protocol() == frag_hdr:protocol())
-   assert(orig_hdr:src_eq(frag_hdr:src()))
-   assert(orig_hdr:dst_eq(frag_hdr:dst()))
-
-   assert(payload_size(frag_pkt) == frag_pkt.length - eth_size - ipv4:sizeof())
-
-   if is_last_fragment then
-      assert(bit.band(frag_hdr:flags(), 0x1) == 0x0)
-   else
-      assert(bit.band(frag_hdr:flags(), 0x1) == 0x1)
-   end
-end
-
-
-local pattern_fill, pattern_check = (function ()
-   local pattern = { 0xCC, 0xAA, 0xFF, 0xEE, 0xBB, 0x11, 0xDD }
-   local function fill(array, length)
-      for i = 0, length-1 do
-         array[i] = pattern[(i % #pattern) + 1]
-      end
-   end
-   local function check(array, length)
-      for i = 0, length-1 do
-         assert(array[i], pattern[(i % #pattern) + 1], "pos: " .. i)
-      end
-   end
-   return fill, check
-end)()
-
-
 local function fragment(pkt, mtu)
    local fragment = ipv4_apps.Fragmenter:new({mtu=mtu})
    fragment.input = { input = link.new('fragment input') }
@@ -111,35 +48,6 @@ local function fragment(pkt, mtu)
    link.free(fragment.input.input, 'fragment input')
    link.free(fragment.output.output, 'fragment output')
    return ret
-end
-
-local function test_reassemble_fragments()
-   print("test:   length=1046 mtu=520 + reassembly")
-   local pkt = make_ipv4_packet(1046 - ipv4:sizeof() - ether:sizeof())
-   pattern_fill(pkt.data + ipv4:sizeof() + ether:sizeof(),
-                pkt.length - ipv4:sizeof() - ether:sizeof())
-
-   local result = fragment(pkt, 520)
-   packet.free(pkt)
-   assert(#result == 3)
-
-   assert(payload_size(result[1]) + payload_size(result[2]) +
-          payload_size(result[3]) == 1046 - ipv4:sizeof() - ether:sizeof())
-
-   local size = payload_size(result[1]) + payload_size(result[2]) + payload_size(result[3])
-   local data = ffi.new("uint8_t[?]", size)
-
-   for i = 1, #result do
-      local pkt = result[i]
-      local eth_size = ether:sizeof()
-      local ip4_header = ipv4:new_from_mem(pkt.data + eth_size,
-                                           pkt.length - eth_size)
-      local ihl = ip4_header:ihl() * 4
-      ffi.copy(data + pkt_frag_offset(result[i]),
-               result[i].data + ether:sizeof() + ihl,
-               payload_size(result[i]))
-   end
-   pattern_check(data, size)
 end
 
 local function test_reassemble_two_missing_fragments()
@@ -292,7 +200,6 @@ end
 
 function selftest()
    print("selftest: apps.ipv4.reassemble_test")
-   test_reassemble_fragments()
    test_reassemble_two_missing_fragments()
    test_reassemble_three_missing_fragments()
    test_reassemble_two()
