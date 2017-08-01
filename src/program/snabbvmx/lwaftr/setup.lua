@@ -8,6 +8,7 @@ local bt = require("apps.lwaftr.binding_table")
 local config = require("core.config")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4_apps = require("apps.lwaftr.ipv4_apps")
+local ipv4_reassemble = require("apps.ipv4.reassemble")
 local ipv6_apps = require("apps.lwaftr.ipv6_apps")
 local lib = require("core.lib")
 local lwaftr = require("apps.lwaftr.lwaftr")
@@ -224,7 +225,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
              conf.ipv4_interface.fragmentation)))
       if conf.ipv4_interface.fragmentation then
          local mtu = conf.ipv4_interface.mtu or gexternal_interface.mtu
-         config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
+         config.app(c, "reassemblerv4", ipv4_reassemble.Reassembler, {
             max_ipv4_reassembly_packets =
                gexternal_interface.reassembly.max_packets,
             max_fragments_per_reassembly_packet =
@@ -379,7 +380,7 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
    if conf.ipv4_interface then
       if conf.ipv4_interface.fragmentation then
          local mtu = conf.ipv4_interface.mtu or external_interface.mtu
-         config.app(c, "reassemblerv4", ipv4_apps.Reassembler, {
+         config.app(c, "reassemblerv4", ipv4_reassemble.Reassembler, {
             max_ipv4_reassembly_packets =
                external_interface.reassembly.max_packets,
             max_fragments_per_reassembly_packet =
