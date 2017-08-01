@@ -25,6 +25,8 @@ local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local S          = require("syscall")
 local engine     = require("core.app")
+local lib        = require("core.lib")
+
 
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
 require('lib.yang.schema').set_default_capabilities(capabilities)
