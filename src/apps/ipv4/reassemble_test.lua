@@ -1,17 +1,14 @@
--- Allow both importing this script as a module and running as a script
-if type((...)) == "string" then module(..., package.seeall) end
+module(..., package.seeall)
 
-local constants = require("apps.lwaftr.constants")
 local fragmentv4 = require("apps.lwaftr.fragmentv4")
 local reassemble = require("apps.ipv4.reassemble")
 local eth_proto = require("lib.protocol.ethernet")
 local ip4_proto = require("lib.protocol.ipv4")
-local lwutil = require("apps.lwaftr.lwutil")
 local packet = require("core.packet")
 local band = require("bit").band
 local ffi = require("ffi")
 
-local get_ihl_from_offset = lwutil.get_ihl_from_offset
+local ethertype_ipv4 = 0x0800
 
 --
 -- Returns a new packet, which contains an Ethernet frame, with an IPv4 header,
@@ -30,7 +27,7 @@ local function make_ipv4_packet(payload_size)
    -- "Intel Corp" devices, the rest are arbitrary.
    eth_header:src(eth_proto:pton("5c:51:4f:8f:aa:ee"))
    eth_header:dst(eth_proto:pton("5c:51:4f:8f:aa:ef"))
-   eth_header:type(constants.ethertype_ipv4)
+   eth_header:type(ethertype_ipv4)
 
    -- IPv4 header
    ip4_header:ihl(ip4_header:sizeof() / 4)
@@ -59,7 +56,6 @@ local function pkt_payload_size(pkt)
                                              pkt.length - eth_size)
    local total_length = ip4_header:total_length()
    local ihl = ip4_header:ihl() * 4
-   assert(ihl == get_ihl_from_offset(pkt, eth_size))
    assert(ihl == ip4_header:sizeof())
    assert(total_length - ihl >= 0)
    assert(total_length == pkt.length - eth_size)
@@ -133,7 +129,7 @@ local pattern_fill, pattern_check = (function ()
 end)()
 
 
-function test_reassemble_pattern_fragments()
+local function test_reassemble_pattern_fragments()
    print("test:   length=1046 mtu=520 + reassembly")
 
    local pkt = make_ipv4_packet(1046 - ip4_proto:sizeof() - eth_proto:sizeof())
@@ -151,16 +147,19 @@ function test_reassemble_pattern_fragments()
    local data = ffi.new("uint8_t[?]", size)
 
    for i = 1, #result do
-      local ih = get_ihl_from_offset(result[i], constants.ethernet_header_size)
+      local pkt = result[i]
+      local eth_size = eth_proto:sizeof()
+      local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
+                                                pkt.length - eth_size)
+      local ihl = ip4_header:ihl() * 4
       ffi.copy(data + pkt_frag_offset(result[i]),
-               result[i].data + eth_proto:sizeof() + ih,
+               result[i].data + eth_proto:sizeof() + ihl,
                pkt_payload_size(result[i]))
    end
    pattern_check(data, size)
 end
 
-
-function test_reassemble_two_missing_fragments()
+local function test_reassemble_two_missing_fragments()
    print("test:   two fragments (one missing)")
    local pkt = make_ipv4_packet(1200)
    local code, fragments = fragmentv4.fragment(pkt, 1000)
@@ -175,8 +174,7 @@ function test_reassemble_two_missing_fragments()
           (reassemble.cache_fragment(frag_table, fragments[2])))
 end
 
-
-function test_reassemble_three_missing_fragments()
+local function test_reassemble_three_missing_fragments()
    print("test:   three fragments (one/two missing)")
    local pkt = make_ipv4_packet(1000)
    local code, fragments = fragmentv4.fragment(packet.clone(pkt), 400)
@@ -321,13 +319,11 @@ end
 
 
 function selftest()
-   print("test: lwaftr.fragmentv4.fragment_ipv4")
+   print("selftest: apps.ipv4.reassemble_test")
    test_reassemble_pattern_fragments()
    test_reassemble_two_missing_fragments()
    test_reassemble_three_missing_fragments()
    test_reassemble_two()
    test_reassemble_three()
+   print("selftest: ok")
 end
-
--- Run tests when being invoked as a script from the command line.
-if type((...)) == "nil" then selftest() end
