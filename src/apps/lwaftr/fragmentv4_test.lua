@@ -16,11 +16,8 @@ local rd16, wr16, get_ihl_from_offset = lwutil.rd16, lwutil.wr16, lwutil.get_ihl
 -- Returns a new packet, which contains an Ethernet frame, with an IPv4 header,
 -- followed by a payload of "payload_size" random bytes.
 --
-local function make_ipv4_packet(payload_size, vlan_id)
+local function make_ipv4_packet(payload_size)
    local eth_size = eth_proto:sizeof()
-   if vlan_id then
-      eth_size = eth_size + 4  -- VLAN tag takes 4 extra bytes
-   end
    local pkt = packet.allocate()
    pkt.length = eth_size + ip4_proto:sizeof() + payload_size
    local eth_header = eth_proto:new_from_mem(pkt.data, pkt.length)
@@ -32,14 +29,7 @@ local function make_ipv4_packet(payload_size, vlan_id)
    -- "Intel Corp" devices, the rest are arbitrary.
    eth_header:src(eth_proto:pton("5c:51:4f:8f:aa:ee"))
    eth_header:dst(eth_proto:pton("5c:51:4f:8f:aa:ef"))
-
-   if vlan_id then
-      eth_header:type(constants.dotq_tpid)
-      wr16(pkt.data + eth_proto:sizeof(), vlan_id)
-      wr16(pkt.data + eth_proto:sizeof() + 2, constants.ethertype_ipv4)
-   else
-      eth_header:type(constants.ethertype_ipv4)
-   end
+   eth_header:type(constants.ethertype_ipv4)
 
    -- IPv4 header
    ip4_header:ihl(ip4_header:sizeof() / 4)
@@ -61,21 +51,9 @@ local function make_ipv4_packet(payload_size, vlan_id)
    return pkt
 end
 
-
-local function eth_header_size(pkt)
-   local eth_size = eth_proto:sizeof()
-   local eth_header = eth_proto:new_from_mem(pkt.data, pkt.length)
-   if eth_header:type() == constants.dotq_tpid then
-      return eth_size + 4  -- Packet has VLAN tagging
-   else
-      return eth_size
-   end
-end
-
-
 local function pkt_payload_size(pkt)
    assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_header_size(pkt)
+   local eth_size = eth_proto:sizeof()
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
    local total_length = ip4_header:total_length()
@@ -87,19 +65,17 @@ local function pkt_payload_size(pkt)
    return total_length - ihl
 end
 
-
 local function pkt_frag_offset(pkt)
    assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_header_size(pkt)
+   local eth_size = eth_proto:sizeof()
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
    return ip4_header:frag_off() * 8
 end
 
-
 local function pkt_total_length(pkt)
    assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_header_size(pkt)
+   local eth_size = eth_proto:sizeof()
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
    return ip4_header:total_length()
@@ -116,15 +92,8 @@ local function check_packet_fragment(orig_pkt, frag_pkt, is_last_fragment)
    assert(orig_hdr:dst_eq(frag_hdr:dst()))
    assert(orig_hdr:type() == frag_hdr:type())
 
-   -- Check for VLAN tagging and check the additional fields
-   local eth_size = eth_proto:sizeof()
-   if orig_hdr:type() == constants.dotq_tpid then
-      assert(rd16(orig_pkt.data + eth_size) == rd16(frag_pkt.data + eth_size)) -- VLAN id
-      assert(rd16(orig_pkt.data + eth_size + 2) == rd16(frag_pkt.data + eth_size + 2)) -- Protocol
-      eth_size = eth_size + 4
-   end
-
    -- IPv4 fields
+   local eth_size = eth_proto:sizeof()
    orig_hdr = ip4_proto:new_from_mem(orig_pkt.data + eth_size,
                                      orig_pkt.length - eth_size)
    frag_hdr = ip4_proto:new_from_mem(frag_pkt.data + eth_size,
@@ -146,20 +115,18 @@ local function check_packet_fragment(orig_pkt, frag_pkt, is_last_fragment)
    end
 end
 
-
 function test_payload_1200_mtu_1500()
    print("test:   payload=1200 mtu=1500")
 
-   local pkt = assert(make_ipv4_packet(1200))
+   local pkt = make_ipv4_packet(1200)
    local code, result = fragmentv4.fragment(pkt, 1500)
    assert(code == fragmentv4.FRAGMENT_UNNEEDED)
    assert(pkt == result)
 end
 
-
 function test_payload_1200_mtu_1000()
    print("test:   payload=1200 mtu=1000")
-   local pkt = assert(make_ipv4_packet(1200))
+   local pkt = make_ipv4_packet(1200)
 
    -- Keep a copy of the packet, for comparisons
    local orig_pkt = packet.clone(pkt)
@@ -180,10 +147,9 @@ function test_payload_1200_mtu_1000()
    assert(pkt_payload_size(result[1]) == pkt_frag_offset(result[2]))
 end
 
-
 function test_payload_1200_mtu_400()
    print("test:   payload=1200 mtu=400")
-   local pkt = assert(make_ipv4_packet(1200))
+   local pkt = make_ipv4_packet(1200)
 
    -- Keep a copy of the packet, for comparisons
    local orig_pkt = packet.clone(pkt)
@@ -207,11 +173,10 @@ function test_payload_1200_mtu_400()
           pkt_payload_size(result[3]) == pkt_frag_offset(result[4]))
 end
 
-
 function test_dont_fragment_flag()
    print("test:   packet with \"don't fragment\" flag")
    -- Try to fragment a packet with the "don't fragment" flag set
-   local pkt = assert(make_ipv4_packet(1200))
+   local pkt = make_ipv4_packet(1200)
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_proto:sizeof(),
                                              pkt.length - eth_proto:sizeof())
    ip4_header:flags(0x2) -- Set "don't fragment"
@@ -219,7 +184,6 @@ function test_dont_fragment_flag()
    assert(code == fragmentv4.FRAGMENT_FORBIDDEN)
    assert(type(result) == "nil")
 end
-
 
 function selftest()
    print("test: lwaftr.fragmentv4.fragment_ipv4")
