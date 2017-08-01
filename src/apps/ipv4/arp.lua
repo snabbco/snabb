@@ -19,6 +19,7 @@ local lib      = require("core.lib")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
+local alarm_codec = require("apps.config.alarm_codec")
 
 local C = ffi.C
 local receive, transmit = link.receive, link.transmit
@@ -143,11 +144,17 @@ function ARP:new(conf)
    return setmetatable(o, {__index=ARP})
 end
 
+function ARP:arp_resolving (ip)
+   print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.next_ip)))
+   local key = {resource='external-interface', alarm_type_id='arp-resolution'}
+   alarm_codec.raise_alarm(key)
+end
+
 function ARP:maybe_send_arp_request (output)
    if self.next_mac then return end
    self.next_arp_request_time = self.next_arp_request_time or engine.now()
    if self.next_arp_request_time <= engine.now() then
-      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.next_ip)))
+      self:arp_resolving(self.next_ip)
       self:send_arp_request(output)
       self.next_arp_request_time = engine.now() + self.arp_request_interval
    end
@@ -155,6 +162,12 @@ end
 
 function ARP:send_arp_request (output)
    transmit(output, packet.clone(self.arp_request_pkt))
+end
+
+function ARP:arp_resolved (ip, mac)
+   print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(ip), ethernet:ntop(mac)))
+   local key = {resource='external-interface', alarm_type_id='arp-resolution'}
+   alarm_codec.clear_alarm(key)
 end
 
 function ARP:push()
@@ -182,9 +195,7 @@ function ARP:push()
          elseif ntohs(h.arp.oper) == arp_oper_reply then
             if ipv4_eq(h.arp.spa, self.next_ip) then
                local next_mac = copy_mac(h.arp.sha)
-               print(string.format("ARP: '%s' resolved (%s)",
-                                   ipv4:ntop(self.next_ip),
-                                   ethernet:ntop(next_mac)))
+               self:arp_resolved(self.next_ip, next_mac)
                self.next_mac = next_mac
             end
          else
