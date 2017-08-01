@@ -1,15 +1,14 @@
 module(..., package.seeall)
 
-local bit = require("bit")
-local constants = require("apps.lwaftr.constants")
-local ctable = require('lib.ctable')
-local ctablew = require('apps.lwaftr.ctable_wrapper')
-local ffi = require('ffi')
-local lwutil = require("apps.lwaftr.lwutil")
-local C = ffi.C
-local packet = require("core.packet")
-local lib = require("core.lib")
-local ipsum = require("lib.checksum").ipsum
+local bit        = require("bit")
+local ffi        = require("ffi")
+local lib        = require("core.lib")
+local packet     = require("core.packet")
+local ipsum      = require("lib.checksum").ipsum
+local ctable     = require('lib.ctable')
+local ctablew    = require('apps.lwaftr.ctable_wrapper')
+local constants  = require("apps.lwaftr.constants")
+local lwutil     = require("apps.lwaftr.lwutil")
 
 REASSEMBLY_OK = 1
 FRAGMENT_MISSING = 2
@@ -37,7 +36,7 @@ local rd16, wr16, wr32 = lwutil.rd16, lwutil.wr16, lwutil.wr32
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
 local uint16_ptr_t = ffi.typeof("uint16_t*")
 local bxor, band = bit.bxor, bit.band
-local packet_payload_size = C.PACKET_PAYLOAD_SIZE
+local packet_payload_size = ffi.C.PACKET_PAYLOAD_SIZE
 local ntohs, htons = lib.ntohs, lib.htons
 
 local ipv4_fragment_key_t = ffi.typeof[[
@@ -218,7 +217,7 @@ end
 
 local function packet_to_reassembly_buffer(pkt)
    local reassembly_buf = scratch_rbuf
-   C.memset(reassembly_buf, 0, ffi.sizeof(ipv4_reassembly_buffer_t))
+   ffi.C.memset(reassembly_buf, 0, ffi.sizeof(ipv4_reassembly_buffer_t))
    local ihl = get_ihl_from_offset(pkt, ehs)
    reassembly_buf.fragment_id = get_frag_id(pkt)
    reassembly_buf.reassembly_base = ehs + ihl
@@ -531,7 +530,7 @@ function selftest()
    rbuf2.fragment_starts[1] = 10
    sort_array(rbuf1.fragment_starts, 1)
    sort_array(rbuf2.fragment_starts, 1)
-   assert(0 == C.memcmp(rbuf1.fragment_starts, rbuf2.fragment_starts, 4))
+   assert(0 == ffi.C.memcmp(rbuf1.fragment_starts, rbuf2.fragment_starts, 4))
 
    local rbuf3 = ffi.new(ipv4_reassembly_buffer_t)
    rbuf3.fragment_starts[0] = 5
@@ -539,6 +538,6 @@ function selftest()
    rbuf3.fragment_starts[2] = 100
    rbuf1.fragment_starts[2] = 5
    sort_array(rbuf1.fragment_starts, 2)
-   assert(0 == C.memcmp(rbuf1.fragment_starts, rbuf3.fragment_starts, 6))
+   assert(0 == ffi.C.memcmp(rbuf1.fragment_starts, rbuf3.fragment_starts, 6))
    print("selftest: ok")
 end
