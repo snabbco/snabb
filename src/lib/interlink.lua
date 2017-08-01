@@ -33,7 +33,7 @@ function create (name)
 end
 
 function init (r) -- initialization must be performed by consumer
-   assert(full(r) and empty(r)) -- only satisfied if uninitialized
+   assert(r.packets[0] == ffi.new("void *")) -- only satisfied if uninitialized
    for i = 0, link.max do
       r.packets[i] = packet.allocate()
    end
