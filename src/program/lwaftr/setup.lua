@@ -131,7 +131,8 @@ function lwaftr_app(c, conf, device)
               { self_ip = convert_ipv4(iexternal_interface.ip),
                 self_mac = iexternal_interface.mac,
                 next_mac = iexternal_interface.next_hop.mac,
-                next_ip = convert_ipv4(iexternal_interface.next_hop.ip) })
+                next_ip = convert_ipv4(iexternal_interface.next_hop.ip),
+                alarm_notification = conf.alarm_notification })
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
    local preprocessing_apps_v6  = { "reassemblerv6" }

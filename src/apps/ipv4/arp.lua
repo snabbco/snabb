@@ -128,7 +128,9 @@ local arp_config_params = {
    -- The next-hop MAC address can be statically configured.
    next_mac = { default=false },
    -- But if the next-hop MAC isn't configured, ARP will figure it out.
-   next_ip  = { default=false }
+   next_ip  = { default=false },
+   -- Emits an alarm notification on arp-resolving and arp-resolved.
+   alarm_notification = { default=false },
 }
 
 function ARP:new(conf)
@@ -141,13 +143,16 @@ function ARP:new(conf)
       o.arp_request_pkt = make_arp_request(o.self_mac, o.self_ip, o.next_ip)
       self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
    end
+   o.alarm_notification = conf.alarm_notification
    return setmetatable(o, {__index=ARP})
 end
 
 function ARP:arp_resolving (ip)
    print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.next_ip)))
-   local key = {resource='external-interface', alarm_type_id='arp-resolution'}
-   alarm_codec.raise_alarm(key)
+   if self.alarm_notification then
+      local key = {resource='external-interface', alarm_type_id='arp-resolution'}
+      alarm_codec.raise_alarm(key)
+   end
 end
 
 function ARP:maybe_send_arp_request (output)
@@ -166,8 +171,10 @@ end
 
 function ARP:arp_resolved (ip, mac)
    print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(ip), ethernet:ntop(mac)))
-   local key = {resource='external-interface', alarm_type_id='arp-resolution'}
-   alarm_codec.clear_alarm(key)
+   if self.alarm_notification then
+      local key = {resource='external-interface', alarm_type_id='arp-resolution'}
+      alarm_codec.clear_alarm(key)
+   end
 end
 
 function ARP:push()

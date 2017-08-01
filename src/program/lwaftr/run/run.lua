@@ -175,6 +175,7 @@ function run(args)
       setup_fn, setup_args = setup.load_phy, { 'inetNic', 'b4sideNic' }
    end
 
+   conf.alarm_notification = true
    setup.reconfigurable(scheduling, setup_fn, c, conf, unpack(setup_args))
    engine.configure(c)
 
