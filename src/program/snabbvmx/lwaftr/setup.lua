@@ -19,7 +19,6 @@ local pci = require("lib.hardware.pci")
 local raw = require("apps.socket.raw")
 local tap = require("apps.tap.tap")
 local pcap = require("apps.pcap.pcap")
-local lwaftr_setup = require("program.lwaftr.setup")
 
 local fatal, file_exists = lwutil.fatal, lwutil.file_exists
 local dir_exists, nic_exists = lwutil.dir_exists, lwutil.nic_exists
@@ -43,7 +42,7 @@ end
 
 local function load_virt (c, nic_id, lwconf, interface)
    -- Validate the lwaftr and split the interfaces into global and instance.
-   local inst_configs = lwaftr_setup.produce_instance_configs(lwconf)
+   local inst_configs = lwutil.produce_instance_configs(lwconf)
    local device, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
 
