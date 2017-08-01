@@ -40,6 +40,7 @@ function tlv:new (type, data)
    ffi.copy(tlv.data, data, ffi.sizeof(data))
    o._tlv = tlv
    o._option = require(o._types[type].class):new_from_mem(tlv.data, ffi.sizeof(data))
+   assert(o._option)
    return o
 end
 
