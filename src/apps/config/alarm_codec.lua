@@ -103,6 +103,8 @@ function get_channel()
    local success, value = pcall(channel.open, name)
    if success then
       alarms_channel = value
+   else
+      alarms_channel = channel.create('alarms-follower-channel', 1e6)
    end
    return alarms_channel
 end

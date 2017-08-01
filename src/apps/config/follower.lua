@@ -11,6 +11,7 @@ local shm = require("core.shm")
 local app_graph = require("core.config")
 local channel = require("apps.config.channel")
 local action_codec = require("apps.config.action_codec")
+local alarm_codec = require("apps.config.alarm_codec")
 
 Follower = {
    config = {
@@ -23,7 +24,7 @@ function Follower:new (conf)
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
    ret.channel = channel.create('config-follower-channel', 1e6)
-   ret.alarms_channel = channel.create('alarms-follower-channel', 1e6)
+   ret.alarms_channel = alarm_codec.get_channel()
    ret.pending_actions = {}
    return ret
 end
