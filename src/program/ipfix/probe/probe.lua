@@ -12,26 +12,34 @@ local ethernet = require("lib.protocol.ethernet")
 local numa     = require("lib.numa")
 
 -- apps that can be used as an input or output for the exporter
-in_out_apps = {}
+local in_apps, out_apps = {}, {}
 
-function in_out_apps.pcap (path)
+function in_apps.pcap (path)
    return { input = "input",
             output = "output" },
           { require("apps.pcap.pcap").PcapReader, path }
 end
 
-function in_out_apps.raw (device)
+function out_apps.pcap (path)
+   return { input = "input",
+            output = "output" },
+          { require("apps.pcap.pcap").PcapWriter, path }
+end
+
+function in_apps.raw (device)
    return { input = "rx",
             output = "tx" },
           { require("apps.socket.raw").RawSocket, device }
 end
+out_apps.raw = in_apps.raw
 
-function in_out_apps.intel10g (device)
+function in_apps.intel10g (device)
    local conf = { pciaddr = device }
    return { input = "rx",
             output = "tx" },
           { require("apps.intel.intel_app").Intel82599, conf }
 end
+out_apps.intel10g = in_apps.intel10g
 
 local long_opts = {
    help = "h",
@@ -73,11 +81,11 @@ function run (args)
          duration = assert(tonumber(arg), "expected number for duration")
       end,
       i = function (arg)
-         assert(in_out_apps[arg], "unknown input type")
+         assert(in_apps[arg], "unknown input type")
          input_type = arg
       end,
       o = function (arg)
-         assert(in_out_apps[arg], "unknown output type")
+         assert(out_apps[arg], "unknown output type")
          output_type = arg
       end,
       p = function (arg)
@@ -119,8 +127,8 @@ function run (args)
       main.exit(1)
    end
 
-   local in_link, in_app   = in_out_apps[input_type](args[1])
-   local out_link, out_app = in_out_apps[output_type](args[2])
+   local in_link, in_app   = in_apps[input_type](args[1])
+   local out_link, out_app = out_apps[output_type](args[2])
 
    local arp_config    = { self_mac = host_mac and ethernet:pton(self_mac),
                            self_ip = ipv4:pton(host_ip),
