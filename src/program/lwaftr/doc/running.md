@@ -57,7 +57,7 @@ First, start the lwAFTR:
 
 ```
 $ sudo ./snabb lwaftr run \
-    --conf /tmp/icmp_on_fail.conf --v4 0000:01:00.1 --v6 0000:02:00.1
+    --conf program/lwaftr/tests/data/icmp_on_fail.conf --v4 0000:01:00.1 --v6 0000:02:00.1
 ```
 
 Then run a load generator:
