@@ -4,11 +4,14 @@ local bit        = require("bit")
 local ffi        = require("ffi")
 local lib        = require("core.lib")
 local packet     = require("core.packet")
+local counter    = require("core.counter")
+local link       = require("core.link")
 local ipsum      = require("lib.checksum").ipsum
 local ctable     = require('lib.ctable')
 local ctablew    = require('apps.lwaftr.ctable_wrapper')
 local constants  = require("apps.lwaftr.constants")
 local lwutil     = require("apps.lwaftr.lwutil")
+local lwcounter  = require("apps.lwaftr.lwcounter")
 
 REASSEMBLY_OK = 1
 FRAGMENT_MISSING = 2
@@ -32,6 +35,7 @@ constants.o_ipv4_flags, constants.o_ipv4_checksum,
 constants.o_ipv4_total_length, constants.o_ipv4_src_addr,
 constants.o_ipv4_dst_addr
 
+local receive, transmit = link.receive, link.transmit
 local rd16, wr16, wr32 = lwutil.rd16, lwutil.wr16, lwutil.wr32
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
 local uint16_ptr_t = ffi.typeof("uint16_t*")
@@ -278,7 +282,7 @@ function Reassembler:new(conf)
    local max_fragments_per_reassembly_packet = assert(conf.max_fragments_per_reassembly_packet)
    local o = {
       counters = lwcounter.init_counters(),
-      ctab = fragv4_h.initialize_frag_table(max_ipv4_reassembly_packets,
+      ctab = initialize_frag_table(max_ipv4_reassembly_packets,
          max_fragments_per_reassembly_packet),
    }
    counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
@@ -287,7 +291,7 @@ function Reassembler:new(conf)
 end
 
 function Reassembler:cache_fragment(fragment)
-   return fragv4_h.cache_fragment(self.ctab, fragment)
+   return cache_fragment(self.ctab, fragment)
 end
 
 function Reassembler:push ()
@@ -295,19 +299,19 @@ function Reassembler:push ()
    local errors = self.output.errors
 
    for _ = 1, link.nreadable(input) do
-      local pkt = receive(input)
-      if is_ipv4_fragment(pkt) then
+      local pkt = link.receive(input)
+      if lwutil.is_ipv4_fragment(pkt) then
          counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
          local status, maybe_pkt, ejected = self:cache_fragment(pkt)
          if ejected then
             counter.add(self.counters["drop-ipv4-frag-random-evicted"])
          end
 
-         if status == fragv4_h.REASSEMBLY_OK then -- Reassembly was successful
+         if status == REASSEMBLY_OK then -- Reassembly was successful
             counter.add(self.counters["in-ipv4-frag-reassembled"])
             transmit(output, maybe_pkt)
-         elseif status == fragv4_h.FRAGMENT_MISSING then -- Nothing to do, wait.
-         elseif status == fragv4_h.REASSEMBLY_INVALID then
+         elseif status == FRAGMENT_MISSING then -- Nothing to do, wait.
+         elseif status == REASSEMBLY_INVALID then
             counter.add(self.counters["drop-ipv4-frag-invalid-reassembly"])
             if maybe_pkt then -- This is an ICMP packet
                transmit(errors, maybe_pkt)
@@ -338,7 +342,7 @@ function selftest()
 
    -- Returns a new packet containing an Ethernet frame with an IPv4
    -- header followed by PAYLOAD_SIZE random bytes.
-   local function make_ipv4_packet(payload_size)
+   local function make_test_packet(payload_size)
       local pkt = packet.from_pointer(lib.random_bytes(payload_size),
                                       payload_size)
       local eth_h = ether:new({ src = random_mac(), dst = random_mac(),
@@ -369,175 +373,56 @@ function selftest()
       return ret
    end
 
-   local function test_reassemble_two_missing_fragments()
-      print("test:   two fragments (one missing)")
-      local pkt = make_ipv4_packet(1200)
-      local fragments = fragment(pkt, 1000)
+   local function permute_indices(lo, hi)
+      if lo == hi then return {{hi}} end
+      local ret = {}
+      for _, tail in ipairs(permute_indices(lo + 1, hi)) do
+         for pos = 1, #tail + 1 do
+            local order = lib.deepcopy(tail)
+            table.insert(order, pos, lo)
+            table.insert(ret, order)
+         end
+      end
+      return ret
+   end
+
+   for _, size in ipairs({100, 400, 1000, 1500, 2000}) do
+      local pkt = make_test_packet(size)
+      for _, mtu in ipairs({512, 1000, 1500}) do
+         local fragments = fragment(pkt, mtu)
+         for _, order in ipairs(permute_indices(1, #fragments)) do
+            local reassembler = Reassembler:new {
+               max_ipv4_reassembly_packets = 100,
+               max_fragments_per_reassembly_packet = 20
+            }
+            reassembler.input = { input = link.new('reassembly input') }
+            reassembler.output = { output = link.new('reassembly output') }
+            local last = table.remove(order)
+            for _, i in ipairs(order) do
+               link.transmit(reassembler.input.input,
+                             packet.clone(fragments[i]))
+               reassembler:push()
+               assert(link.empty(reassembler.output.output))
+            end
+            link.transmit(reassembler.input.input,
+                          packet.clone(fragments[last]))
+            reassembler:push()
+            assert(link.nreadable(reassembler.output.output) == 1)
+            local result = link.receive(reassembler.output.output)
+            assert(pkt.length == result.length)
+            for i = ether:sizeof(), result.length - 1 do
+               local expected, actual = pkt.data[i], result.data[i]
+               assert(expected == actual,
+                      "pkt["..i.."] expected "..expected..", got "..actual)
+            end
+            packet.free(result)
+            link.free(reassembler.input.output, 'reassembly input')
+            link.free(reassembler.output.output, 'reassembly output')
+         end
+         for _, p in ipairs(fragments) do packet.free(p) end
+      end
       packet.free(pkt)
-      assert(#fragments == 2)
-
-      local frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[1])))
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[2])))
    end
 
-   local function test_reassemble_three_missing_fragments()
-      print("test:   three fragments (one/two missing)")
-      local pkt = make_ipv4_packet(1000)
-      local fragments = fragment(pkt, 400)
-      assert(#fragments == 3)
-
-      local frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[1])))
-      fragments = fragment(pkt, 400)
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[2])))
-      fragments = fragment(pkt, 400)
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[3])))
-
-      fragments = fragment(pkt, 400)
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[1])))
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[2])))
-      fragments = fragment(pkt, 400)
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[1])))
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[3])))
-      fragments = fragment(pkt, 400)
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[2])))
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[3])))
-
-      fragments = fragment(pkt, 400)
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[2])))
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[1])))
-      fragments = fragment(pkt, 400)
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[3])))
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[1])))
-      fragments = fragment(pkt, 400)
-      frag_table = initialize_frag_table(20, 5)
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[2])))
-      assert(FRAGMENT_MISSING ==
-             (cache_fragment(frag_table, fragments[3])))
-   end
-
-
-   function test_reassemble_two()
-      print("test:   payload=1200 mtu=1000")
-      local pkt = make_ipv4_packet(1200)
-      assert(pkt.length > 1200, "packet shorter than payload size")
-
-      local fragments = fragment(pkt, 1000)
-      assert(#fragments == 2)
-      assert(fragments[1].length ~= 0, "fragment[1] length must not be 0")
-      assert(fragments[2].length ~= 0, "fragment[2] length must not be 0")
-
-      local function try(f)
-         local frag_table = initialize_frag_table(20, 5)
-         local code, p
-         for i=1,#f do
-            code, p = cache_fragment(frag_table, f[i])
-         end
-         assert(code == REASSEMBLY_OK, "returned: " .. code)
-         assert(p.length == pkt.length)
-
-         for i = 1, p.length do
-            if i ~= 24 and i ~= 25 then
-               assert(p.data[i] == pkt.data[i],
-                      "byte["..i.."] expected="..pkt.data[i].." got="..p.data[i])
-            end
-         end
-      end
-
-      try { fragments[1], fragments[2] }
-      fragments = fragment(pkt, 1000)
-      assert(fragments[1].length ~= 0, "fragment[1] length must not be 0")
-      assert(fragments[2].length ~= 0, "fragment[2] length must not be 0")
-      try { fragments[2], fragments[1] }
-   end
-
-
-   function test_reassemble_three()
-      print("test:   payload=1000 mtu=400")
-      local pkt = make_ipv4_packet(1000)
-
-      local fragments = fragment(pkt, 400)
-      assert(#fragments == 3)
-      assert(pkt.length == 1034, "wtf")
-
-      local function try(f)
-         local frag_table = initialize_frag_table(20, 5)
-         local code, p
-         for i=1,#f do
-            code, p = cache_fragment(frag_table, f[i])
-         end
-         assert(code == REASSEMBLY_OK, "returned: " .. code)
-         assert(p.length == pkt.length)
-
-         for i = 0, p.length-1 do
-            if i ~= 24 and i ~= 25 then
-               assert(p.data[i] == pkt.data[i],
-                      "byte["..i.."] expected="..pkt.data[i].." got="..p.data[i])
-            end
-         end
-      end
-
-      try { fragments[1], fragments[2], fragments[3] }
-      fragments = fragment(pkt, 400)
-      try { fragments[2], fragments[3], fragments[1] }
-      fragments = fragment(pkt, 400)
-      try { fragments[3], fragments[1], fragments[2] }
-
-      fragments = fragment(pkt, 400)
-      try { fragments[3], fragments[2], fragments[1] }
-      fragments = fragment(pkt, 400)
-      try { fragments[2], fragments[1], fragments[3] }
-      fragments = fragment(pkt, 400)
-      try { fragments[1], fragments[3], fragments[2] }
-   end
-   test_reassemble_two_missing_fragments()
-   test_reassemble_three_missing_fragments()
-   test_reassemble_two()
-   test_reassemble_three()
-
-   print("selftest: bis")
-   initialize_frag_table(20, 20)
-   local rbuf1 = ffi.new(ipv4_reassembly_buffer_t)
-   local rbuf2 = ffi.new(ipv4_reassembly_buffer_t)
-   rbuf1.fragment_starts[0] = 10
-   rbuf1.fragment_starts[1] = 100
-   rbuf2.fragment_starts[0] = 100
-   rbuf2.fragment_starts[1] = 10
-   sort_array(rbuf1.fragment_starts, 1)
-   sort_array(rbuf2.fragment_starts, 1)
-   assert(0 == ffi.C.memcmp(rbuf1.fragment_starts, rbuf2.fragment_starts, 4))
-
-   local rbuf3 = ffi.new(ipv4_reassembly_buffer_t)
-   rbuf3.fragment_starts[0] = 5
-   rbuf3.fragment_starts[1] = 10
-   rbuf3.fragment_starts[2] = 100
-   rbuf1.fragment_starts[2] = 5
-   sort_array(rbuf1.fragment_starts, 2)
-   assert(0 == ffi.C.memcmp(rbuf1.fragment_starts, rbuf3.fragment_starts, 6))
    print("selftest: ok")
 end
