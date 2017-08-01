@@ -2,7 +2,9 @@ module(..., package.seeall)
 
 local bit        = require("bit")
 local ffi        = require("ffi")
+local lib        = require("core.lib")
 local packet     = require("core.packet")
+local datagram   = require("lib.protocol.datagram")
 local ether      = require("lib.protocol.ethernet")
 local ipv4       = require("lib.protocol.ipv4")
 local fragment   = require("apps.lwaftr.fragmentv4")
@@ -10,43 +12,27 @@ local reassemble = require("apps.ipv4.reassemble")
 
 local ethertype_ipv4 = 0x0800
 
+local function random_ipv4() return lib.random_bytes(4) end
+local function random_mac() return lib.random_bytes(6) end
+
 --
 -- Returns a new packet, which contains an Ethernet frame, with an IPv4 header,
 -- followed by a payload of "payload_size" random bytes.
 --
 local function make_ipv4_packet(payload_size)
-   local eth_size = ether:sizeof()
-   local pkt = packet.allocate()
-   pkt.length = eth_size + ipv4:sizeof() + payload_size
-   local eth_header = ether:new_from_mem(pkt.data, pkt.length)
-   local ip4_header = ipv4:new_from_mem(pkt.data + eth_size,
-                                             pkt.length - eth_size)
-   assert(pkt.length == eth_size + ip4_header:sizeof() + payload_size)
+   local pkt = packet.from_pointer(lib.random_bytes(payload_size),
+                                   payload_size)
+   local eth_h = ether:new({ src = random_mac(), dst = random_mac(),
+                             type = ethertype_ipv4 })
+   local ip_h  = ipv4:new({ src = random_ipv4(), dst = random_ipv4(),
+                            protocol = 0xff, ttl = 64 })
+   ip_h:total_length(ip_h:sizeof() + pkt.length)
+   ip_h:checksum()
 
-   -- Ethernet header. The leading bits of the MAC addresses are those for
-   -- "Intel Corp" devices, the rest are arbitrary.
-   eth_header:src(ether:pton("5c:51:4f:8f:aa:ee"))
-   eth_header:dst(ether:pton("5c:51:4f:8f:aa:ef"))
-   eth_header:type(ethertype_ipv4)
-
-   -- IPv4 header
-   ip4_header:ihl(ip4_header:sizeof() / 4)
-   ip4_header:dscp(0)
-   ip4_header:ecn(0)
-   ip4_header:total_length(ip4_header:sizeof() + payload_size)
-   ip4_header:id(0)
-   ip4_header:flags(0)
-   ip4_header:frag_off(0)
-   ip4_header:ttl(15)
-   ip4_header:protocol(0xFF)
-   ip4_header:src(ipv4:pton("192.168.10.10"))
-   ip4_header:dst(ipv4:pton("192.168.10.20"))
-   ip4_header:checksum()
-
-   -- We do not fill up the rest of the packet: random contents works fine
-   -- because we are testing IP fragmentation, so there's no need to care
-   -- about upper layers.
-   return pkt
+   local dgram = datagram:new(pkt)
+   dgram:push(ip_h)
+   dgram:push(eth_h)
+   return dgram:packet()
 end
 
 local function pkt_payload_size(pkt)
