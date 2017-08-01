@@ -58,11 +58,16 @@ local function encoder()
    return encoder
 end
 
-function encode(alarm)
-   local name, args = unpack(alarm)
+function encode_raise_alarm (...)
    local codec = encoder()
-   codec:uint32(assert(alarm_codes[name], name))
-   return assert(alarms[name], name)(codec, unpack(args))
+   codec:uint32(assert(alarm_codes['raise_alarm']))
+   return assert(alarms['raise_alarm'])(codec, ...)
+end
+
+function encode_clear_alarm (...)
+   local codec = encoder()
+   codec:uint32(assert(alarm_codes['clear_alarm']))
+   return assert(alarms['clear_alarm'])(codec, ...)
 end
 
 local uint32_ptr_t = ffi.typeof('uint32_t*')
@@ -146,10 +151,10 @@ function raise_alarm (key, args)
    if channel then
       local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
       local perceived_severity, alarm_text = unpack(normalize_args(args))
-      local buf, len = encode({'raise_alarm', {
+      local buf, len = encode_raise_alarm(
          resource, alarm_type_id, alarm_type_qualifier,
-         perceived_severity, alarm_text,
-      }})
+         perceived_severity, alarm_text
+      )
       channel:put_message(buf, len)
    end
 end
@@ -158,9 +163,7 @@ function clear_alarm (key)
    local channel = get_channel()
    if channel then
       local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
-      local buf, len = encode({'clear_alarm', {
-         resource, alarm_type_id, alarm_type_qualifier
-      }})
+      local buf, len = encode_clear_alarm(resource, alarm_type_id, alarm_type_qualifier)
       channel:put_message(buf, len)
    end
 end
@@ -168,10 +171,17 @@ end
 function selftest ()
    print('selftest: apps.config.alarm_codec')
    local lib = require("core.lib")
-   local function test_alarm(alarm)
-      local encoded, len = encode(alarm)
+   local function test_alarm (name, args)
+      local encoded, len
+      if name == 'raise_alarm' then
+         encoded, len = encode_raise_alarm(unpack(args))
+      elseif name == 'clear_alarm' then
+         encoded, len = encode_clear_alarm(unpack(args))
+      else
+         error('not valid alarm name: '..alarm)
+      end
       local decoded = decode(encoded, len)
-      assert(lib.equal(alarm, decoded))
+      assert(lib.equal({name, args}, decoded))
    end
    local function test_raise_alarm ()
       local key = {resource='res1'}
@@ -179,16 +189,16 @@ function selftest ()
 
       local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
       local perceived_severity, alarm_text = unpack(normalize_args(args))
+      local alarm = {resource, alarm_type_id, alarm_type_qualifier,
+                     perceived_severity, alarm_text}
 
-      local alarm = {'raise_alarm', {resource, alarm_type_id, alarm_type_qualifier,
-                                     perceived_severity, alarm_text}}
-      test_alarm(alarm)
+      test_alarm('raise_alarm', alarm)
    end
    local function test_clear_alarm ()
       local key = {resource='res1'}
       local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
-      local alarm = {'clear_alarm', {resource, alarm_type_id, alarm_type_qualifier}}
-      test_alarm(alarm)
+      local alarm = {resource, alarm_type_id, alarm_type_qualifier}
+      test_alarm('clear_alarm', alarm)
    end
 
    test_raise_alarm()
