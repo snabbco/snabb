@@ -11,17 +11,14 @@ local packet = require("core.packet")
 local band = require("bit").band
 local ffi = require("ffi")
 
-local rd16, wr16, get_ihl_from_offset = lwutil.rd16, lwutil.wr16, lwutil.get_ihl_from_offset
+local get_ihl_from_offset = lwutil.get_ihl_from_offset
 
 --
 -- Returns a new packet, which contains an Ethernet frame, with an IPv4 header,
 -- followed by a payload of "payload_size" random bytes.
 --
-local function make_ipv4_packet(payload_size, vlan_id)
+local function make_ipv4_packet(payload_size)
    local eth_size = eth_proto:sizeof()
-   if vlan_id then
-      eth_size = eth_size + 4  -- VLAN tag takes 4 extra bytes
-   end
    local pkt = packet.allocate()
    pkt.length = eth_size + ip4_proto:sizeof() + payload_size
    local eth_header = eth_proto:new_from_mem(pkt.data, pkt.length)
@@ -33,14 +30,7 @@ local function make_ipv4_packet(payload_size, vlan_id)
    -- "Intel Corp" devices, the rest are arbitrary.
    eth_header:src(eth_proto:pton("5c:51:4f:8f:aa:ee"))
    eth_header:dst(eth_proto:pton("5c:51:4f:8f:aa:ef"))
-
-   if vlan_id then
-      eth_header:type(constants.dotq_tpid)
-      wr16(pkt.data + eth_proto:sizeof(), vlan_id)
-      wr16(pkt.data + eth_proto:sizeof() + 2, constants.ethertype_ipv4)
-   else
-      eth_header:type(constants.ethertype_ipv4)
-   end
+   eth_header:type(constants.ethertype_ipv4)
 
    -- IPv4 header
    ip4_header:ihl(ip4_header:sizeof() / 4)
@@ -62,21 +52,9 @@ local function make_ipv4_packet(payload_size, vlan_id)
    return pkt
 end
 
-
-local function eth_header_size(pkt)
-   local eth_size = eth_proto:sizeof()
-   local eth_header = eth_proto:new_from_mem(pkt.data, pkt.length)
-   if eth_header:type() == constants.dotq_tpid then
-      return eth_size + 4  -- Packet has VLAN tagging
-   else
-      return eth_size
-   end
-end
-
-
 local function pkt_payload_size(pkt)
    assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_header_size(pkt)
+   local eth_size = eth_proto:sizeof()
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
    local total_length = ip4_header:total_length()
@@ -88,19 +66,17 @@ local function pkt_payload_size(pkt)
    return total_length - ihl
 end
 
-
 local function pkt_frag_offset(pkt)
    assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_header_size(pkt)
+   local eth_size = eth_proto:sizeof()
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
    return ip4_header:frag_off() * 8
 end
 
-
 local function pkt_total_length(pkt)
    assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_header_size(pkt)
+   local eth_size = eth_proto:sizeof()
    local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
                                              pkt.length - eth_size)
    return ip4_header:total_length()
@@ -117,15 +93,8 @@ local function check_packet_fragment(orig_pkt, frag_pkt, is_last_fragment)
    assert(orig_hdr:dst_eq(frag_hdr:dst()))
    assert(orig_hdr:type() == frag_hdr:type())
 
-   -- Check for VLAN tagging and check the additional fields
-   local eth_size = eth_proto:sizeof()
-   if orig_hdr:type() == constants.dotq_tpid then
-      assert(rd16(orig_pkt.data + eth_size) == rd16(frag_pkt.data + eth_size)) -- VLAN id
-      assert(rd16(orig_pkt.data + eth_size + 2) == rd16(frag_pkt.data + eth_size + 2)) -- Protocol
-      eth_size = eth_size + 4
-   end
-
    -- IPv4 fields
+   local eth_size = eth_proto:sizeof()
    orig_hdr = ip4_proto:new_from_mem(orig_pkt.data + eth_size,
                                      orig_pkt.length - eth_size)
    frag_hdr = ip4_proto:new_from_mem(frag_pkt.data + eth_size,
@@ -191,9 +160,9 @@ function test_reassemble_pattern_fragments()
 end
 
 
-function test_reassemble_two_missing_fragments(vlan_id)
+function test_reassemble_two_missing_fragments()
    print("test:   two fragments (one missing)")
-   local pkt = assert(make_ipv4_packet(1200), vlan_id)
+   local pkt = make_ipv4_packet(1200)
    local code, fragments = fragmentv4.fragment(pkt, 1000)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#fragments == 2)
@@ -207,9 +176,9 @@ function test_reassemble_two_missing_fragments(vlan_id)
 end
 
 
-function test_reassemble_three_missing_fragments(vlan_id)
+function test_reassemble_three_missing_fragments()
    print("test:   three fragments (one/two missing)")
-   local pkt = assert(make_ipv4_packet(1000))
+   local pkt = make_ipv4_packet(1000)
    local code, fragments = fragmentv4.fragment(packet.clone(pkt), 400)
    assert(code == fragmentv4.FRAGMENT_OK)
    assert(#fragments == 3)
@@ -266,9 +235,9 @@ function test_reassemble_three_missing_fragments(vlan_id)
 end
 
 
-function test_reassemble_two(vlan_id)
+function test_reassemble_two()
    print("test:   payload=1200 mtu=1000")
-   local pkt = assert(make_ipv4_packet(1200), vlan_id)
+   local pkt = make_ipv4_packet(1200)
    assert(pkt.length > 1200, "packet shorter than payload size")
 
    -- Keep a copy of the packet, for comparisons
@@ -307,9 +276,9 @@ function test_reassemble_two(vlan_id)
 end
 
 
-function test_reassemble_three(vlan_id)
+function test_reassemble_three()
    print("test:   payload=1000 mtu=400")
-   local pkt = assert(make_ipv4_packet(1000), vlan_id)
+   local pkt = make_ipv4_packet(1000)
 
    -- Keep a copy of the packet, for comparisons
    local orig_pkt = packet.clone(pkt)
@@ -354,20 +323,10 @@ end
 function selftest()
    print("test: lwaftr.fragmentv4.fragment_ipv4")
    test_reassemble_pattern_fragments()
-
-   local function testall(vlan_id)
-      local suffix = " (no vlan tag)"
-      if vlan_id then
-         suffix = " (vlan id=" .. vlan_id .. ")"
-      end
-      print("test: lwaftr.reassemble.cache_fragment_ipv4" .. suffix)
-      test_reassemble_two_missing_fragments(vlan_id)
-      test_reassemble_three_missing_fragments(vlan_id)
-      test_reassemble_two(vlan_id)
-      test_reassemble_three(vlan_id)
-   end
-   testall(nil)
-   testall(42)
+   test_reassemble_two_missing_fragments()
+   test_reassemble_three_missing_fragments()
+   test_reassemble_two()
+   test_reassemble_three()
 end
 
 -- Run tests when being invoked as a script from the command line.
