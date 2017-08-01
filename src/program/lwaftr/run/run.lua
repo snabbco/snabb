@@ -105,7 +105,7 @@ function parse_args(args)
    function handlers.reconfigurable() opts.reconfigurable = true end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:yhir:n:",
-   { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
+     { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
      verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
      ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
      ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,

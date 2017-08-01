@@ -8,7 +8,6 @@ local lwdebug = require("apps.lwaftr.lwdebug")
 local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
 
-local cltable = require("lib.cltable")
 local checksum = require("lib.checksum")
 local ethernet = require("lib.protocol.ethernet")
 local counter = require("core.counter")

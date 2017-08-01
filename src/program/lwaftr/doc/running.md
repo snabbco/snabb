@@ -57,7 +57,8 @@ First, start the lwAFTR:
 
 ```
 $ sudo ./snabb lwaftr run \
-    --conf program/lwaftr/tests/data/icmp_on_fail.conf --v4 0000:01:00.1 --v6 0000:02:00.1
+    --conf program/lwaftr/tests/data/icmp_on_fail.conf \
+    --v4 0000:01:00.1 --v6 0000:02:00.1
 ```
 
 Then run a load generator:
@@ -82,6 +83,7 @@ and specify only one PCI address:
 
 ```
 $ sudo ./snabb lwaftr run --conf /tmp/icmp_on_fail.conf \
+    --on-a-stick 0000:02:00.1
 ```
 
 You can run a load generator in on-a-stick mode:

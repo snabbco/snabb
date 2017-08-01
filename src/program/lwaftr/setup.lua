@@ -26,8 +26,6 @@ local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local S          = require("syscall")
 local engine     = require("core.app")
 
-
-
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
@@ -38,11 +36,24 @@ end
 -- Checks the existance and NUMA affinity of PCI devices
 -- NB: "nil" can be passed in and will be siliently ignored.
 local function validate_pci_devices(devices)
+   numa.check_affinity_for_pci_addresses(devices)
    for _, address in pairs(devices) do
       assert(lwutil.nic_exists(address),
              ("Could not locate PCI device '%s'"):format(address))
-      numa.check_affinity_for_pci_addresses(address)
    end
+end
+
+-- Produces configuration for each instance.
+-- Provided a multi-process configuration it will iterate over each instance
+-- and produce a configuration for each device with a single instance in. This
+-- is then able to be provided to the lwaftr app.
+local function produce_instance_configs(conf)
+   local ret = {}
+   for device, queues in pairs(conf.softwire_config.instance) do
+      ret[device] = lib.deepcopy(conf)
+      ret[device].softwire_config.instance = {[device]=queues}
+   end
+   return ret
 end
 
 -- Temporary function to validate that there is only a single instance.
@@ -220,7 +231,7 @@ local function link_sink(c, v4_out, v6_out)
 end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name)
-   local inst_configs = lwutil.produce_instance_configs(conf)
+   local inst_configs = produce_instance_configs(conf)
    local v4_pci, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance[v4_pci].queue.values[1]
    local v6_pci = queue.external_interface.device
@@ -245,9 +256,9 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_on_a_stick(c, conf, args)
-   local inst_configs = lwutil.produce_instance_configs(conf)
+   local inst_configs = produce_instance_configs(conf)
    local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance.test.queue.values[1]
+   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
    validate_pci_devices({pciaddr})
    lwaftr_app(c, lwaftr_config, device)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
@@ -293,7 +304,7 @@ function load_on_a_stick(c, conf, args)
 end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
-   local inst_configs = lwutil.produce_instance_configs(conf)
+   local inst_configs = produce_instance_configs(conf)
    local v4_pci, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance[v4_pci].queue.values[1]
    local v6_pci = queue.external_device.device
@@ -314,7 +325,7 @@ function load_virt(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
-   local inst_configs = lwutil.produce_instance_configs(conf)
+   local inst_configs = produce_instance_configs(conf)
    local device, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
    lwaftr_app(c, lwaftr_config, device)
@@ -351,7 +362,7 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
 end
 
 function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
+   local inst_configs = produce_instance_configs(conf)
    local device, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
    lwaftr_app(c, lwaftr_config, device)
@@ -405,7 +416,7 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
 end
 
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
+   local inst_configs = produce_instance_configs(conf)
    local device, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
    lwaftr_app(c, lwaftr_config, device)
@@ -445,7 +456,7 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
 end
 
 function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
+   local inst_configs = produce_instance_configs(conf)
    local device, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
    lwaftr_app(c, lwaftr_config, device)
@@ -489,7 +500,7 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
 end
 
 function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
+   local inst_configs = produce_instance_configs(conf)
    local device, lwaftr_config = next(inst_configs)
    local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
    lwaftr_app(c, lwaftr_config, device)
@@ -555,7 +566,7 @@ local apply_scheduling_opts = {
 function apply_scheduling(opts)
    local lib = require("core.lib")
    local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
-   local fatal = require("apps.lwaftr.lwutil").fatal
+   local fatal = lwutil.fatal
 
    opts = lib.parse(opts, apply_scheduling_opts)
    if opts.cpu then
