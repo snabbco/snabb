@@ -259,9 +259,7 @@ function cache_fragment(frags_table, fragment)
    local did_evict = false
    if not ptr then
       local reassembly_buf = packet_to_reassembly_buffer(fragment)
-      local idx
-      idx, did_evict = frags_table:add(key, reassembly_buf, false)
-      ptr = frags_table:lookup_ptr(key)
+      ptr, did_evict = frags_table:add(key, reassembly_buf, false)
    end
    local status, maybe_pkt = attempt_reassembly(frags_table, ptr.value, fragment)
    return status, maybe_pkt, did_evict

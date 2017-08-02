@@ -84,7 +84,8 @@ then an error will be raised if *key* is *not* already in the table.
 Any other true value allows updates but does not require them.  An
 update will replace the existing entry in the table.
 
-Returns the index of the inserted entry.
+Returns a pointer to the inserted entry.  Any subsequent modification
+to the table may invalidate this pointer.
 
 — Method **:update** *key*, *value*
 

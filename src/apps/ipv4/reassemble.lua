@@ -295,12 +295,9 @@ function Reassembler:cache_fragment(fragment)
    local entry = frags_table:lookup_ptr(key)
    local did_evict = false
    if not entry then
-      -- FIXME: Avoid the double lookup.
       local reassembly_buf = self.scratch_reassembly_buffer
       initialize_reassembly_buffer(reassembly_buf, fragment)
-      local idx
-      idx, did_evict = frags_table:add(key, reassembly_buf, false)
-      entry = frags_table:lookup_ptr(key)
+      entry, did_evict = frags_table:add(key, reassembly_buf, false)
    end
    local status, maybe_pkt = self:attempt_reassembly(entry.value, fragment)
    return status, maybe_pkt, did_evict

@@ -68,12 +68,12 @@ function selftest()
 
    local old_occupancy = ctab.occupancy
    for j=0,5 do v[j] = bnot(i) end
-   local newest_index = ctab:add(i, v)
+   local entry = ctab:add(i, v)
    local iterated = 0
    for entry in ctab:iterate() do iterated = iterated + 1 end
    assert(old_occupancy == ctab.occupancy, "bad random eviction!")
  
-   ctab:remove_ptr(ctab.entries + newest_index, false)
+   ctab:remove_ptr(entry, false)
    local iterated = 0
    for entry in ctab:iterate() do iterated = iterated + 1 end
    assert(iterated == ctab.occupancy)
