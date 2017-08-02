@@ -42,6 +42,8 @@ local uint16_ptr_t = ffi.typeof("uint16_t*")
 local bxor, band = bit.bxor, bit.band
 local ntohs, htons = lib.ntohs, lib.htons
 
+local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
+
 local ipv4_fragment_key_t = ffi.typeof[[
    struct {
       uint8_t src_addr[4];
@@ -50,28 +52,62 @@ local ipv4_fragment_key_t = ffi.typeof[[
    } __attribute__((packed))
 ]]
 
+local ether_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  dhost[6];
+   uint8_t  shost[6];
+   uint16_t type;
+} __attribute__((packed))
+]]
+local ipv4_header_t = ffi.typeof[[
+struct {
+   uint8_t version_and_ihl;               // version:4, ihl:4
+   uint8_t dscp_and_ecn;                  // dscp:6, ecn:2
+   uint16_t total_length;
+   uint16_t id;
+   uint16_t flags_and_fragment_offset;    // flags:3, fragment_offset:13
+   uint8_t  ttl;
+   uint8_t  protocol;
+   uint16_t checksum;
+   uint8_t  src_ip[4];
+   uint8_t  dst_ip[4];
+} __attribute__((packed))
+]]
+local ether_header_len = ffi.sizeof(ether_header_t)
+local ipv4_fragment_offset_bits = 13
+local ipv4_fragment_offset_mask = bit_mask(ipv4_fragment_offset_bits)
+local ipv4_flag_more_fragments = 0x1
+local ipv4_ihl_bits = 4
+local ipv4_ihl_mask = bit_mask(ipv4_ihl_bits)
+
+local ether_ipv4_header_t = ffi.typeof(
+   'struct { $ ether; $ ipv4; } __attribute__((packed))',
+   ether_header_t, ipv4_header_t)
+local ether_ipv4_header_ptr_t = ffi.typeof('$*', ether_ipv4_header_t)
+
 local function get_frag_len(frag)
-   return ntohs(rd16(frag.data + ehs + o_ipv4_total_length))
+   local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
+   return ntohs(h.ipv4.total_length)
 end
 
 local function get_frag_id(frag)
-   local o_id = ehs + o_ipv4_identification
-   return ntohs(rd16(frag.data + o_id))
+   local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
+   return ntohs(h.ipv4.id)
 end
 
--- The most significant three bits are other information, and the
--- offset is expressed in 8-octet units, so just mask them off and * 8 it.
 local function get_frag_start(frag)
-   local o_fstart = ehs + o_ipv4_flags
-   local raw_start = ntohs(rd16(frag.data + o_fstart))
-   return band(raw_start, 0x1fff) * 8
+   local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
+   local flags_and_fragment_offset = ntohs(h.ipv4.flags_and_fragment_offset)
+   -- Fragment offset is expressed in 8-octet units.
+   return band(flags_and_fragment_offset, ipv4_fragment_offset_mask) * 8
 end
 
--- This is the 'MF' bit of the IPv4 fragment header; it's the 3rd bit
--- of the flags.
 local function is_last_fragment(frag)
-   local o_flag = ehs + o_ipv4_flags
-   return band(frag.data[o_flag], 0x20) == 0
+   local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
+   local flags = bit.rshift(ntohs(h.ipv4.flags_and_fragment_offset),
+                            ipv4_fragment_offset_bits)
+   return band(flags, ipv4_flag_more_fragments) == 0
 end
 
 Reassembler = {}
@@ -126,34 +162,33 @@ local function reassembly_status(reassembly_buf)
 end
 
 -- IPv4 requires recalculating an embedded checksum.
-local function fix_pkt_checksum(pkt)
-   local ihl = get_ihl_from_offset(pkt, ehs)
-   local checksum_offset = ehs + o_ipv4_checksum
-   wr16(pkt.data + checksum_offset, 0)
-   wr16(pkt.data + checksum_offset,
-        htons(ipsum(pkt.data + ehs, ihl, 0)))
+local function fix_ipv4_checksum(pkt)
+   local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
+   local ihl = band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
+   h.ipv4.checksum = 0
+   h.ipv4.checksum = htons(ipsum(ffi.cast('char*', h.ipv4), ihl * 4, 0))
 end
 
-local function initialize_fragment_key(key, fragment)
-   local o_src = ehs + o_ipv4_src_addr
-   local o_dst = ehs + o_ipv4_dst_addr
-   local o_id = ehs + o_ipv4_identification
-   ffi.copy(key.src_addr, fragment.data + o_src, 4)
-   ffi.copy(key.dst_addr, fragment.data + o_dst, 4)
-   key.fragment_id = ntohs(rd16(fragment.data + o_id))
+local function initialize_fragment_key(key, pkt)
+   local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
+   key.src_addr, key.dst_addr = h.ipv4.src_ip, h.ipv4.dst_ip
+   key.fragment_id = ntohs(h.ipv4.id)
 end
 
 local function initialize_reassembly_buffer(buf, pkt)
-   ffi.C.memset(buf, 0, ffi.sizeof(buf))
-   local ihl = get_ihl_from_offset(pkt, ehs)
-   buf.fragment_id = get_frag_id(pkt)
-   buf.reassembly_base = ehs + ihl
+   local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
+   local ihl = band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
+   local headers_len = ether_header_len + ihl * 4
 
-   local headers_len = ehs + ihl
-   local re_data = buf.reassembly_data
-   ffi.copy(re_data, pkt.data, headers_len)
-   wr32(re_data + ehs + o_ipv4_identification, 0) -- Clear fragmentation data
+   ffi.C.memset(buf, 0, ffi.sizeof(buf))
+   buf.fragment_id = ntohs(h.ipv4.id)
+   buf.reassembly_base = headers_len
    buf.running_length = headers_len
+
+   ffi.copy(buf.reassembly_data, pkt.data, headers_len)
+   -- Clear fragmentation data.
+   local data_header = ffi.cast(ether_ipv4_header_ptr_t, buf.reassembly_data)
+   data_header.ipv4.id, data_header.ipv4.flags_and_fragment_offset = 0, 0
 end
 
 function Reassembler:new(conf)
@@ -256,7 +291,7 @@ function Reassembler:attempt_reassembly(reassembly_buf, fragment)
       wr16(reassembly_data + o_len, pkt_len)
       local reassembled_packet = packet.from_pointer(
 	 reassembly_buf.reassembly_data, reassembly_buf.reassembly_length)
-      fix_pkt_checksum(reassembled_packet)
+      fix_ipv4_checksum(reassembled_packet)
       self:free_reassembly_buf_and_pkt(fragment, frags_table)
       return REASSEMBLY_OK, reassembled_packet
    else
