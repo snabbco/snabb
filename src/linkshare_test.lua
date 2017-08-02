@@ -22,9 +22,11 @@ engine.configure(c)
 
 engine.attach_output("source", "output", "group/test.link")
 
+engine.busywait = true
 engine.main()
 ]])
 
+engine.busywait = true
 engine.main({duration=10, report={showlinks=true}})
 
 for w, s in pairs(worker.status()) do
