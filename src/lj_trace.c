@@ -76,7 +76,7 @@ static TraceNo trace_findfree(jit_State *J)
   lj_mem_growvec(J->L, J->trace, J->sizetrace, lim, GCRef);
   for (; osz < J->sizetrace; osz++)
     setgcrefnull(J->trace[osz]);
-  return J->freetrace;
+  return J->freetrace++;
 }
 
 #define TRACE_APPENDVEC(field, szfield, tp) \
@@ -136,8 +136,6 @@ void lj_trace_free(global_State *g, GCtrace *T)
   jit_State *J = G2J(g);
   if (T->traceno) {
     lj_gdbjit_deltrace(J, T);
-    if (T->traceno < J->freetrace)
-      J->freetrace = T->traceno;
     setgcrefnull(J->trace[T->traceno]);
   }
   lj_mem_free(g, T,
@@ -257,7 +255,6 @@ int lj_trace_flushall(lua_State *L)
     }
   }
   J->cur.traceno = 0;
-  J->freetrace = 0;
   /* Clear penalty cache. */
   memset(J->penalty, 0, sizeof(J->penalty));
   /* Free the whole machine code and invalidate all exit stub groups. */
