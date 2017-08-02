@@ -13,9 +13,9 @@ local constants  = require("apps.lwaftr.constants")
 local lwutil     = require("apps.lwaftr.lwutil")
 local lwcounter  = require("apps.lwaftr.lwcounter")
 
-REASSEMBLY_OK = 1
-FRAGMENT_MISSING = 2
-REASSEMBLY_INVALID = 3
+local REASSEMBLY_OK = 1
+local FRAGMENT_MISSING = 2
+local REASSEMBLY_INVALID = 3
 
 -- IPv4 reassembly with RFC 5722's recommended exclusion of overlapping packets.
 -- Defined in RFC 791.
@@ -40,7 +40,6 @@ local rd16, wr16, wr32 = lwutil.rd16, lwutil.wr16, lwutil.wr32
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
 local uint16_ptr_t = ffi.typeof("uint16_t*")
 local bxor, band = bit.bxor, bit.band
-local packet_payload_size = ffi.C.PACKET_PAYLOAD_SIZE
 local ntohs, htons = lib.ntohs, lib.htons
 
 local ipv4_fragment_key_t = ffi.typeof[[
@@ -50,14 +49,6 @@ local ipv4_fragment_key_t = ffi.typeof[[
       uint32_t fragment_id;
    } __attribute__((packed))
 ]]
-
--- The fragment_starts and fragment_ends buffers are big enough for
--- non-malicious input. If a fragment requires more slots, refuse to
--- reassemble it.
-local max_frags_per_packet
-local ipv4_reassembly_buffer_t
-local scratch_rbuf
-local scratch_fragkey = ipv4_fragment_key_t()
 
 local function get_frag_len(frag)
    return ntohs(rd16(frag.data + ehs + o_ipv4_total_length))
@@ -83,22 +74,14 @@ local function is_last_fragment(frag)
    return band(frag.data[o_flag], 0x20) == 0
 end
 
-local function get_key(fragment)
-   local key = scratch_fragkey
-   local o_src = ehs + o_ipv4_src_addr
-   local o_dst = ehs + o_ipv4_dst_addr
-   local o_id = ehs + o_ipv4_identification
-   ffi.copy(key.src_addr, fragment.data + o_src, 4)
-   ffi.copy(key.dst_addr, fragment.data + o_dst, 4)
-   key.fragment_id = ntohs(rd16(fragment.data + o_id))
-   return key
-end
-
-local function free_reassembly_buf_and_pkt(pkt, frags_table)
-   local key = get_key(pkt)
-   frags_table:remove(key, false)
-   packet.free(pkt)
-end
+Reassembler = {}
+local reassembler_config_params = {
+   -- Maximum number of in-progress reassemblies.  Each one uses about
+   -- 11 kB of memory.
+   max_ipv4_reassembly_packets = { default=20000 },
+   -- Maximum number of fragments to reassemble.
+   max_fragments_per_reassembly_packet = { default=40 },
+}
 
 local function swap(array, i, j)
    local tmp = array[j]
@@ -151,7 +134,70 @@ local function fix_pkt_checksum(pkt)
         htons(ipsum(pkt.data + ehs, ihl, 0)))
 end
 
-local function attempt_reassembly(frags_table, reassembly_buf, fragment)
+local function initialize_fragment_key(key, fragment)
+   local o_src = ehs + o_ipv4_src_addr
+   local o_dst = ehs + o_ipv4_dst_addr
+   local o_id = ehs + o_ipv4_identification
+   ffi.copy(key.src_addr, fragment.data + o_src, 4)
+   ffi.copy(key.dst_addr, fragment.data + o_dst, 4)
+   key.fragment_id = ntohs(rd16(fragment.data + o_id))
+end
+
+local function initialize_reassembly_buffer(buf, pkt)
+   ffi.C.memset(buf, 0, ffi.sizeof(buf))
+   local ihl = get_ihl_from_offset(pkt, ehs)
+   buf.fragment_id = get_frag_id(pkt)
+   buf.reassembly_base = ehs + ihl
+
+   local headers_len = ehs + ihl
+   local re_data = buf.reassembly_data
+   ffi.copy(re_data, pkt.data, headers_len)
+   wr32(re_data + ehs + o_ipv4_identification, 0) -- Clear fragmentation data
+   buf.running_length = headers_len
+end
+
+function Reassembler:new(conf)
+   local o = lib.parse(conf, reassembler_config_params)
+   o.counters = lwcounter.init_counters()
+
+   local max_occupy = 0.9
+   local params = {
+      key_type = ipv4_fragment_key_t,
+      value_type = ffi.typeof([[
+         struct {
+             uint16_t fragment_starts[$];
+             uint16_t fragment_ends[$];
+             uint16_t fragment_count;
+             uint16_t final_start;
+             uint16_t reassembly_base;
+             uint16_t fragment_id;
+             uint32_t running_length; // bytes copied so far
+             uint16_t reassembly_length; // analog to packet.length
+             uint8_t reassembly_data[PACKET_PAYLOAD_SIZE];
+         } __attribute((packed))]],
+         o.max_fragments_per_reassembly_packet,
+         o.max_fragments_per_reassembly_packet),
+      initial_size = math.ceil(o.max_ipv4_reassembly_packets / max_occupy),
+      max_occupancy_rate = max_occupy,
+   }
+   o.ctab = ctablew.new(params)
+   o.scratch_fragment_key = params.key_type()
+   o.scratch_reassembly_buffer = params.value_type()
+
+   counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
+               o.ctab:get_backing_size())
+   return setmetatable(o, {__index=Reassembler})
+end
+
+function Reassembler:free_reassembly_buf_and_pkt(pkt)
+   local key = self.scratch_fragment_key
+   initialize_fragment_key(key, pkt)
+   self.ctab:remove(key, false)
+   packet.free(pkt)
+end
+
+function Reassembler:attempt_reassembly(reassembly_buf, fragment)
+   local frags_table = self.ctab
    local ihl = get_ihl_from_offset(fragment, ehs)
    local frag_id = get_frag_id(fragment)
    if frag_id ~= reassembly_buf.fragment_id then -- unreachable
@@ -161,9 +207,9 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    local frag_start = get_frag_start(fragment)
    local frag_size = get_frag_len(fragment) - ihl
    local fcount = reassembly_buf.fragment_count
-   if fcount + 1 > max_frags_per_packet then
+   if fcount + 1 > self.max_fragments_per_reassembly_packet then
       -- too many fragments to reassembly this packet, assume malice
-      free_reassembly_buf_and_pkt(fragment, frags_table)
+      self:free_reassembly_buf_and_pkt(fragment, frags_table)
       return REASSEMBLY_INVALID
    end
    reassembly_buf.fragment_starts[fcount] = frag_start
@@ -177,7 +223,7 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    if is_last_fragment(fragment) then
       if reassembly_buf.final_start ~= 0 then
          -- There cannot be 2+ final fragments
-         free_reassembly_buf_and_pkt(fragment, frags_table)
+         self:free_reassembly_buf_and_pkt(fragment, frags_table)
          return REASSEMBLY_INVALID
       else
          reassembly_buf.final_start = frag_start
@@ -188,7 +234,7 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    -- Specifically, it requires this file to know the details of struct packet.
    local skip_headers = reassembly_buf.reassembly_base
    local dst_offset = skip_headers + frag_start
-   local last_ok = packet_payload_size
+   local last_ok = ffi.C.PACKET_PAYLOAD_SIZE
    if dst_offset + frag_size > last_ok then
       -- Prevent a buffer overflow. The relevant RFC allows hosts to silently discard
       -- reassemblies above a certain rather small size, smaller than this.
@@ -211,7 +257,7 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
       local reassembled_packet = packet.from_pointer(
 	 reassembly_buf.reassembly_data, reassembly_buf.reassembly_length)
       fix_pkt_checksum(reassembled_packet)
-      free_reassembly_buf_and_pkt(fragment, frags_table)
+      self:free_reassembly_buf_and_pkt(fragment, frags_table)
       return REASSEMBLY_OK, reassembled_packet
    else
       packet.free(fragment)
@@ -219,79 +265,21 @@ local function attempt_reassembly(frags_table, reassembly_buf, fragment)
    end
 end
 
-local function packet_to_reassembly_buffer(pkt)
-   local reassembly_buf = scratch_rbuf
-   ffi.C.memset(reassembly_buf, 0, ffi.sizeof(ipv4_reassembly_buffer_t))
-   local ihl = get_ihl_from_offset(pkt, ehs)
-   reassembly_buf.fragment_id = get_frag_id(pkt)
-   reassembly_buf.reassembly_base = ehs + ihl
-
-   local headers_len = ehs + ihl
-   local re_data = reassembly_buf.reassembly_data
-   ffi.copy(re_data, pkt.data, headers_len)
-   wr32(re_data + ehs + o_ipv4_identification, 0) -- Clear fragmentation data
-   reassembly_buf.running_length = headers_len
-   return reassembly_buf
-end
-
-function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
-   -- Initialize module-scoped variables
-   max_frags_per_packet = max_pkt_frag
-   ipv4_reassembly_buffer_t = ffi.typeof([[
-   struct {
-       uint16_t fragment_starts[$];
-       uint16_t fragment_ends[$];
-       uint16_t fragment_count;
-       uint16_t final_start;
-       uint16_t reassembly_base;
-       uint16_t fragment_id;
-       uint32_t running_length; // bytes copied so far
-       uint16_t reassembly_length; // analog to packet.length
-       uint8_t reassembly_data[$];
-   } __attribute((packed))]],
-   max_frags_per_packet, max_frags_per_packet, packet.max_payload)
-   scratch_rbuf = ipv4_reassembly_buffer_t()
-
-   local max_occupy = 0.9
-   local params = {
-      key_type = ffi.typeof(ipv4_fragment_key_t),
-      value_type = ffi.typeof(ipv4_reassembly_buffer_t),
-      initial_size = math.ceil(max_fragmented_packets / max_occupy),
-      max_occupancy_rate = max_occupy,
-   }
-   return ctablew.new(params)
-end
-
-function cache_fragment(frags_table, fragment)
-   local key = get_key(fragment)
-   local ptr = frags_table:lookup_ptr(key)
-   local ej = false
-   if not ptr then
-      local reassembly_buf = packet_to_reassembly_buffer(fragment)
-      _, ej = frags_table:add_with_random_ejection(key, reassembly_buf, false)
-      ptr = frags_table:lookup_ptr(key)
-   end
-   local status, maybe_pkt = attempt_reassembly(frags_table, ptr.value, fragment)
-   return status, maybe_pkt, ej
-end
-
-Reassembler = {}
-
-function Reassembler:new(conf)
-   local max_ipv4_reassembly_packets = assert(conf.max_ipv4_reassembly_packets)
-   local max_fragments_per_reassembly_packet = assert(conf.max_fragments_per_reassembly_packet)
-   local o = {
-      counters = lwcounter.init_counters(),
-      ctab = initialize_frag_table(max_ipv4_reassembly_packets,
-         max_fragments_per_reassembly_packet),
-   }
-   counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
-               o.ctab:get_backing_size())
-   return setmetatable(o, {__index=Reassembler})
-end
-
 function Reassembler:cache_fragment(fragment)
-   return cache_fragment(self.ctab, fragment)
+   local frags_table = self.ctab
+   local key = self.scratch_fragment_key
+   initialize_fragment_key(key, fragment)
+   local entry = frags_table:lookup_ptr(key)
+   local ej = false
+   if not entry then
+      -- FIXME: Avoid the double lookup.
+      local reassembly_buf = self.scratch_reassembly_buffer
+      initialize_reassembly_buffer(reassembly_buf, fragment)
+      _, ej = frags_table:add_with_random_ejection(key, reassembly_buf, false)
+      entry = frags_table:lookup_ptr(key)
+   end
+   local status, maybe_pkt = self:attempt_reassembly(entry.value, fragment)
+   return status, maybe_pkt, ej
 end
 
 function Reassembler:push ()

@@ -18,7 +18,7 @@ local engine = require("core.app")
 local receive, transmit = link.receive, link.transmit
 local wr16, rd32, wr32 = lwutil.wr16, lwutil.rd32, lwutil.wr32
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local is_ipv4, is_ipv4_fragment = lwutil.is_ipv4, lwutil.is_ipv4_fragment
+local is_ipv4 = lwutil.is_ipv4
 local htons = lib.htons
 
 local ehs = constants.ethernet_header_size
