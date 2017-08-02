@@ -470,6 +470,9 @@ function breathe ()
          zone(app.zone)
          with_restart(app, app.pull)
          zone()
+         for _, r in ipairs(app.output) do
+            link.produce(r)
+         end
       end
    end
    -- Exhale: push work out through the app network
@@ -479,6 +482,12 @@ function breathe ()
          zone(app.zone)
          with_restart(app, app.push)
          zone()
+         for _, r in ipairs(app.input) do
+            link.consume(r)
+         end
+         for _, r in ipairs(app.output) do
+            link.produce(r)
+         end
       end
    end
    counter.add(breaths)
@@ -553,8 +562,8 @@ function report_links ()
    table.sort(names)
    for i, name in ipairs(names) do
       l = link_table[name]
-      local txpackets = counter.read(l.stats.txpackets)
-      local txdrop = counter.read(l.stats.txdrop)
+      local txpackets = counter.read(l.txpackets)
+      local txdrop = counter.read(l.txdrop)
       print(("%20s sent on %s (loss rate: %d%%)"):format(
             lib.comma_value(txpackets), name, loss_rate(txdrop, txpackets)))
    end
