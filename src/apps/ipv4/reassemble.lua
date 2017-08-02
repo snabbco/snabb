@@ -98,21 +98,6 @@ local function fix_ipv4_checksum(h)
    h.checksum = htons(ipsum(ffi.cast('char*', h), ihl * 4, 0))
 end
 
-local function initialize_reassembly(reassembly, h, pkt)
-   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
-   local headers_len = ether_header_len + ihl * 4
-
-   ffi.C.memset(reassembly, 0, ffi.sizeof(reassembly))
-   reassembly.fragment_id = ntohs(h.ipv4.id)
-   reassembly.reassembly_base = headers_len
-   reassembly.running_length = headers_len
-
-   ffi.copy(reassembly.packet.data, pkt.data, headers_len)
-   -- Clear fragmentation data.
-   local data_header = ffi.cast(ether_ipv4_header_ptr_t, reassembly.packet.data)
-   data_header.ipv4.id, data_header.ipv4.flags_and_fragment_offset = 0, 0
-end
-
 Reassembler = {}
 local reassembler_config_params = {
    -- Maximum number of in-progress reassemblies.  Each one uses about
@@ -141,7 +126,6 @@ function Reassembler:new(conf)
             uint16_t fragment_count;
             uint16_t final_start;
             uint16_t reassembly_base;
-            uint16_t fragment_id;
             uint32_t running_length; // bytes copied so far
             struct packet packet;
          } __attribute((packed))]],
@@ -177,9 +161,6 @@ function Reassembler:reassembly_error(entry, icmp_error)
    end
 end
 
-function Reassembler:continue_reassembly(entry, fragment)
-end
-
 function Reassembler:lookup_reassembly(h, pkt)
    local key = self.scratch_fragment_key
    key.src_addr, key.dst_addr = h.ipv4.src_ip, h.ipv4.dst_ip
@@ -188,10 +169,17 @@ function Reassembler:lookup_reassembly(h, pkt)
    local entry = self.ctab:lookup_ptr(key)
    if entry then return entry end
 
-   local buf = self.scratch_reassembly
-   initialize_reassembly(buf, h, pkt)
+   local reassembly = self.scratch_reassembly
+   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
+   local headers_len = ether_header_len + ihl * 4
+
+   ffi.fill(reassembly, ffi.sizeof(reassembly))
+   reassembly.reassembly_base = headers_len
+   reassembly.running_length = headers_len
+   packet.append(reassembly.packet, pkt.data, headers_len)
+
    local did_evict = false
-   entry, did_evict = self.ctab:add(key, buf, false)
+   entry, did_evict = self.ctab:add(key, reassembly, false)
    if did_evict then self:record_eviction() end
    return entry
 end
@@ -260,6 +248,7 @@ function Reassembler:handle_fragment(fragment)
    else
       local out = packet.clone(reassembly.packet)
       local header = ffi.cast(ether_ipv4_header_ptr_t, out.data)
+      header.ipv4.id, header.ipv4.flags_and_fragment_offset = 0, 0
       header.ipv4.total_length = htons(out.length - ether_header_len)
       fix_ipv4_checksum(header.ipv4)
       return self:reassembly_success(entry, out)
