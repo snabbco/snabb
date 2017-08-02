@@ -28,7 +28,6 @@ local REASSEMBLY_INVALID = 3
 -- TODO: test every branch of this
 
 local receive, transmit = link.receive, link.transmit
-local bxor, band = bit.bxor, bit.band
 local ntohs, htons = lib.ntohs, lib.htons
 
 local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
@@ -89,24 +88,15 @@ local function get_frag_start(frag)
    local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
    local flags_and_fragment_offset = ntohs(h.ipv4.flags_and_fragment_offset)
    -- Fragment offset is expressed in 8-octet units.
-   return band(flags_and_fragment_offset, ipv4_fragment_offset_mask) * 8
+   return bit.band(flags_and_fragment_offset, ipv4_fragment_offset_mask) * 8
 end
 
 local function is_last_fragment(frag)
    local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
    local flags = bit.rshift(ntohs(h.ipv4.flags_and_fragment_offset),
                             ipv4_fragment_offset_bits)
-   return band(flags, ipv4_flag_more_fragments) == 0
+   return bit.band(flags, ipv4_flag_more_fragments) == 0
 end
-
-Reassembler = {}
-local reassembler_config_params = {
-   -- Maximum number of in-progress reassemblies.  Each one uses about
-   -- 11 kB of memory.
-   max_ipv4_reassembly_packets = { default=20000 },
-   -- Maximum number of fragments to reassemble.
-   max_fragments_per_reassembly_packet = { default=40 },
-}
 
 local function swap(array, i, j)
    local tmp = array[j]
@@ -152,7 +142,7 @@ end
 
 -- IPv4 requires recalculating an embedded checksum.
 local function fix_ipv4_checksum(h)
-   local ihl = band(h.version_and_ihl, ipv4_ihl_mask)
+   local ihl = bit.band(h.version_and_ihl, ipv4_ihl_mask)
    h.checksum = 0
    h.checksum = htons(ipsum(ffi.cast('char*', h), ihl * 4, 0))
 end
@@ -165,7 +155,7 @@ end
 
 local function initialize_reassembly_buffer(buf, pkt)
    local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
-   local ihl = band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
+   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    local headers_len = ether_header_len + ihl * 4
 
    ffi.C.memset(buf, 0, ffi.sizeof(buf))
@@ -178,6 +168,15 @@ local function initialize_reassembly_buffer(buf, pkt)
    local data_header = ffi.cast(ether_ipv4_header_ptr_t, buf.reassembly_data)
    data_header.ipv4.id, data_header.ipv4.flags_and_fragment_offset = 0, 0
 end
+
+Reassembler = {}
+local reassembler_config_params = {
+   -- Maximum number of in-progress reassemblies.  Each one uses about
+   -- 11 kB of memory.
+   max_ipv4_reassembly_packets = { default=20000 },
+   -- Maximum number of fragments to reassemble.
+   max_fragments_per_reassembly_packet = { default=40 },
+}
 
 function Reassembler:new(conf)
    local o = lib.parse(conf, reassembler_config_params)
@@ -221,7 +220,7 @@ end
 
 function Reassembler:attempt_reassembly(reassembly_buf, fragment)
    local h = ffi.cast(ether_ipv4_header_ptr_t, fragment.data)
-   local ihl = band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
+   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    local headers_len = ether_header_len + ihl * 4
    local frags_table = self.ctab
    local frag_id = ntohs(h.ipv4.id)
@@ -294,16 +293,17 @@ function Reassembler:cache_fragment(fragment)
    local key = self.scratch_fragment_key
    initialize_fragment_key(key, fragment)
    local entry = frags_table:lookup_ptr(key)
-   local ej = false
+   local did_evict = false
    if not entry then
       -- FIXME: Avoid the double lookup.
       local reassembly_buf = self.scratch_reassembly_buffer
       initialize_reassembly_buffer(reassembly_buf, fragment)
-      _, ej = frags_table:add_with_random_ejection(key, reassembly_buf, false)
+      local idx
+      idx, did_evict = frags_table:add(key, reassembly_buf, false)
       entry = frags_table:lookup_ptr(key)
    end
    local status, maybe_pkt = self:attempt_reassembly(entry.value, fragment)
-   return status, maybe_pkt, ej
+   return status, maybe_pkt, did_evict
 end
 
 function Reassembler:push ()
@@ -314,8 +314,8 @@ function Reassembler:push ()
       local pkt = link.receive(input)
       if lwutil.is_ipv4_fragment(pkt) then
          counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
-         local status, maybe_pkt, ejected = self:cache_fragment(pkt)
-         if ejected then
+         local status, maybe_pkt, did_evict = self:cache_fragment(pkt)
+         if did_evict then
             counter.add(self.counters["drop-ipv4-frag-random-evicted"])
          end
 

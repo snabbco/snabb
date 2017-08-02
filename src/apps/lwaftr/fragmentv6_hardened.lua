@@ -256,14 +256,15 @@ end
 function cache_fragment(frags_table, fragment)
    local key = get_key(fragment)
    local ptr = frags_table:lookup_ptr(key)
-   local ej = false
+   local did_evict = false
    if not ptr then
       local reassembly_buf = packet_to_reassembly_buffer(fragment)
-      _, ej = frags_table:add_with_random_ejection(key, reassembly_buf, false)
+      local idx
+      idx, did_evict = frags_table:add(key, reassembly_buf, false)
       ptr = frags_table:lookup_ptr(key)
    end
    local status, maybe_pkt = attempt_reassembly(frags_table, ptr.value, fragment)
-   return status, maybe_pkt, ej
+   return status, maybe_pkt, did_evict
 end
 
 function selftest()
