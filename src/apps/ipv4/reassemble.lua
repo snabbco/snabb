@@ -28,14 +28,6 @@ local ntohs, htons = lib.ntohs, lib.htons
 
 local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
 
-local ipv4_fragment_key_t = ffi.typeof[[
-   struct {
-      uint8_t src_addr[4];
-      uint8_t dst_addr[4];
-      uint32_t fragment_id;
-   } __attribute__((packed))
-]]
-
 local ether_header_t = ffi.typeof [[
 /* All values in network byte order.  */
 struct {
@@ -69,30 +61,6 @@ local ether_ipv4_header_t = ffi.typeof(
    'struct { $ ether; $ ipv4; } __attribute__((packed))',
    ether_header_t, ipv4_header_t)
 local ether_ipv4_header_ptr_t = ffi.typeof('$*', ether_ipv4_header_t)
-
-local function get_frag_len(frag)
-   local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
-   return ntohs(h.ipv4.total_length)
-end
-
-local function get_frag_id(frag)
-   local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
-   return ntohs(h.ipv4.id)
-end
-
-local function get_frag_start(frag)
-   local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
-   local flags_and_fragment_offset = ntohs(h.ipv4.flags_and_fragment_offset)
-   -- Fragment offset is expressed in 8-octet units.
-   return bit.band(flags_and_fragment_offset, ipv4_fragment_offset_mask) * 8
-end
-
-local function is_last_fragment(frag)
-   local h = ffi.cast(ether_ipv4_header_ptr_t, frag.data)
-   local flags = bit.rshift(ntohs(h.ipv4.flags_and_fragment_offset),
-                            ipv4_fragment_offset_bits)
-   return bit.band(flags, ipv4_flag_more_fragments) == 0
-end
 
 local function swap(array, i, j)
    local tmp = array[j]
@@ -167,18 +135,23 @@ function Reassembler:new(conf)
 
    local max_occupy = 0.9
    local params = {
-      key_type = ipv4_fragment_key_t,
+      key_type = ffi.typeof[[
+         struct {
+            uint8_t src_addr[4];
+            uint8_t dst_addr[4];
+            uint32_t fragment_id;
+         } __attribute__((packed))]],
       value_type = ffi.typeof([[
          struct {
-             uint16_t fragment_starts[$];
-             uint16_t fragment_ends[$];
-             uint16_t fragment_count;
-             uint16_t final_start;
-             uint16_t reassembly_base;
-             uint16_t fragment_id;
-             uint32_t running_length; // bytes copied so far
-             uint16_t reassembly_length; // analog to packet.length
-             uint8_t reassembly_data[PACKET_PAYLOAD_SIZE];
+            uint16_t fragment_starts[$];
+            uint16_t fragment_ends[$];
+            uint16_t fragment_count;
+            uint16_t final_start;
+            uint16_t reassembly_base;
+            uint16_t fragment_id;
+            uint32_t running_length; // bytes copied so far
+            uint16_t reassembly_length; // analog to packet.length
+            uint8_t reassembly_data[PACKET_PAYLOAD_SIZE];
          } __attribute((packed))]],
          o.max_fragments_per_reassembly_packet,
          o.max_fragments_per_reassembly_packet),
@@ -236,12 +209,15 @@ function Reassembler:handle_fragment(fragment)
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    local headers_len = ether_header_len + ihl * 4
    local frag_id = ntohs(h.ipv4.id)
-   if frag_id ~= reassembly_buf.fragment_id then -- unreachable
-      error("Impossible case reached in v4 reassembly") --REASSEMBLY_INVALID
-   end
+   local flags_and_fragment_offset = ntohs(h.ipv4.flags_and_fragment_offset)
+   local flags = bit.rshift(
+      flags_and_fragment_offset, ipv4_fragment_offset_bits)
+   local fragment_offset = bit.band(
+      flags_and_fragment_offset, ipv4_fragment_offset_mask)
+   -- Fragment offset is expressed in 8-octet units.
+   local frag_start = fragment_offset * 8
+   local frag_size = ntohs(h.ipv4.total_length) - ihl * 4
 
-   local frag_start = get_frag_start(fragment)
-   local frag_size = get_frag_len(fragment) - ihl * 4
    local fcount = reassembly_buf.fragment_count
    if fcount + 1 > self.max_fragments_per_reassembly_packet then
       -- too many fragments to reassembly this packet, assume malice
@@ -255,7 +231,7 @@ function Reassembler:handle_fragment(fragment)
       sort_array(reassembly_buf.fragment_ends, fcount)
    end
    reassembly_buf.fragment_count = fcount + 1
-   if is_last_fragment(fragment) then
+   if bit.band(flags, ipv4_flag_more_fragments) == 0 then
       if reassembly_buf.final_start ~= 0 then
          -- There cannot be 2+ final fragments
          return self:reassembly_error(entry)
