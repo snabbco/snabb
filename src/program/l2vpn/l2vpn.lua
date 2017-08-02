@@ -49,10 +49,10 @@
 -- the attachment circuits and not to any of the other pseudowires
 -- (this is a consequence of the full-mesh topology of the pseudowires
 -- of a VPLS).  All attachment circuits defined for a VPLS must
--- reference a L2 sub-interface of a physical interface.  In
--- non-trunking mode, the interface driver us connected directly to
--- the bridge module.  In trunking mode, the corresponding "vlan"
--- links of the VlanMux app are connected to the bridge instead.
+-- reference a L2 interface or sub-interface.  In non-trunking mode,
+-- the interface driver is connected directly to the bridge module.
+-- In trunking mode, the corresponding "vlan" links of the VlanMux app
+-- are connected to the bridge instead.
 --
 -- Every pseudowire can have its own tunnel configuration or it can
 -- inherit a default configuration for the entire VPLS instance.
@@ -143,27 +143,30 @@
 --     <vpls2> = ...
 --   }
 -- }
-
 module(...,package.seeall)
+
 local ffi = require("ffi")
-local lib = require("core.lib")
+local C = ffi.C
 local usage_msg = require("program.l2vpn.README_inc")
-local core_config = require("core.config")
-local vmux = require("apps.vlan.vlan").VlanMux
-local nd_light = require("apps.ipv6.nd_light").nd_light
-local ipv6 = require("lib.protocol.ipv6")
-local pseudowire = require("program.l2vpn.pseudowire").pseudowire
-local dispatch = require("program.l2vpn.dispatch").dispatch
-local shm = require("core.shm")
+local lib = require("core.lib")
 local counter = require("core.counter")
 local macaddress = require("lib.macaddress")
-local Sink = require("apps.basic.basic_apps").Sink
-local ifmib = require("lib.ipc.shmem.iftable_mib")
-local S = require("syscall")
+local shm = require("core.shm")
 local const = require("syscall.linux.constants")
+local S = require("syscall")
+local app_graph = require("core.config")
+local leader = require("apps.config.leader").Leader
+local ipv6 = require("lib.protocol.ipv6")
+local dipatch = require("program.l2vpn.dispatch").dispatch
 local Tap = require("apps.tap.tap").Tap
 local Tee = require("apps.basic.basic_apps").Tee
 local PcapWriter = require("apps.pcap.pcap").PcapWriter
+local Sink = require("apps.basic.basic_apps").Sink
+local VlanMux = require("apps.vlan.vlan").VlanMux
+local nd_light = require("apps.ipv6.nd_light").nd_light
+local dispatch = require("program.l2vpn.dispatch").dispatch
+local pseudowire = require("program.l2vpn.pseudowire").pseudowire
+local ifmib = require("lib.ipc.shmem.iftable_mib")
 
 local bridge_types = { flooding = true, learning = true }
 
@@ -172,32 +175,64 @@ function usage ()
    main.exit(0)
 end
 
-function add_app (c, name, class, arg)
-   assert(not c.apps[name], "Duplicate app name "..name)
-   c.apps[name] = { class = class, arg = arg }
+local state
+local function clear_state ()
+   state =  {
+      apps = {},
+      links = {},
+      intfs = {},
+      nds = {},
+   }
 end
 
-function add_link (c, link_spec)
-   table.insert(c.links, link_spec)
+local App = {}
+function App:new (name, class, initial_arg)
+   -- assert(not state.apps[name], "Duplicate app "..name)
+   local self = setmetatable({}, { __index = App })
+   state.apps[name] = self
+   self._name = name
+   self._class = class
+   self:arg(initial_arg)
+   return self
 end
 
-function create_config (c)
-   local cc = core_config.new()
-   for name, config in pairs(c.apps) do
-      core_config.app(cc, name, config.class, config.arg)
-   end
-   for _, link_spec in ipairs(c.links) do
-      core_config.link(cc, link_spec)
-   end
-   return cc
+function App:name ()
+   return self._name
 end
 
-local function ipv6_pton (addr)
-   if type(addr) == "string" then
-      return ipv6:pton(addr)
-   else
-      return addr
-   end
+function App:class ()
+   return self._class
+end
+
+function App:arg (arg)
+   if arg == nil then return self._arg end
+   self._arg = arg
+end
+
+function App:connector (input, output)
+   assert(input)
+   local output = output or input
+   return {
+      input = function ()
+         return self:name()..'.'..input
+      end,
+      output = function ()
+         return self:name()..'.'..output
+      end
+   }
+end
+
+local function connect (from, to)
+   table.insert(state.links, from.output()..' -> '..to.input())
+end
+
+local function connect_duplex (from, to)
+   connect(from, to)
+   connect(to, from)
+end
+
+local function normalize_name (name)
+   return string.gsub(name, '[/%.]', '_')
 end
 
 -- Helper functions to abstract from driver-specific behaviour.  The
@@ -215,28 +250,30 @@ local driver_helpers = {
       link_names = function ()
          return 'input', 'output'
       end,
-      stats_path = function (driver)
-         return driver.stats.path
+      stats_path = function (intf)
+         return 'pci/'..intf.pci_address
       end
    },
    ['apps.tap.tap.Tap'] = {
       link_names = function ()
          return 'input', 'output'
       end,
-      stats_path = function (driver)
-         return driver.shm.path
+      stats_path = function (intf)
+         return 'apps/'..intf.app:name()
       end
    },
 }
 
-function parse_if (c, config, app_name)
-   assert(config.name, "Missing interface name for interface app"..app_name)
-   assert(not c.ifaces[config.name], "Duplicate interface name "..config.name)
+function parse_intf(config)
+   assert(config.name, "Missing interface name")
    print("Setting up interface "..config.name)
    print("  Description: "..(config.description or "<none>"))
-   c.ifaces[config.name] = { app_name = app_name,
-                           description = config.description }
-   local iface = c.ifaces[config.name]
+   local intf = {
+      description = config.description,
+      name = config.name,
+      -- The normalized name is used in app and link names
+      nname = normalize_name(config.name),
+   }
 
    -- NIC driver
    assert(config.driver, "Missing driver configuration")
@@ -246,6 +283,7 @@ function parse_if (c, config, app_name)
    if type(drv_c.config) == "table" then
       if (drv_c.config.pciaddr) then
          print("  PCI address: "..drv_c.config.pciaddr)
+	 intf.pci_address = drv_c.config.pciaddr
       end
       drv_c.config.mtu = config.mtu
       if drv_c.extra_config then
@@ -260,24 +298,20 @@ function parse_if (c, config, app_name)
          end
       end
    end
-   add_app(c, app_name, require(drv_c.path)[drv_c.name], drv_c.config)
-
+   intf.app = App:new('intf_'..intf.nname,
+                      require(drv_c.path)[drv_c.name], drv_c.config)
    local driver_helper = driver_helpers[drv_c.path.."."..drv_c.name]
    assert(driver_helper,
           "Unsupported driver (missing driver helper)"
              ..drv_c.path.."."..drv_c.name)
-   iface.driver_helper = driver_helper
-   local input, output = driver_helper.link_names()
-   local from_if = app_name.."."..output
-   local to_if = app_name.."."..input
+   intf.driver_helper = driver_helper
+   intf.connector = intf.app:connector(driver_helper.link_names())
 
-   -- L2 configuration (MTU, trunk)
+   -- L2 configuration
    print("  L2 configuration")
    assert(config.mtu, "Missing MTU")
    print("    MTU: "..config.mtu)
-   iface.mtu = config.mtu
-   local trunk = config.trunk or { enable = false }
-   assert(type(trunk) == "table", "Trunk configuration must be a table")
+   intf.mtu = config.mtu
 
    -- Port mirror configuration
    if config.mirror then
@@ -285,8 +319,8 @@ function parse_if (c, config, app_name)
       local mtype = mirror.type or 'tap'
       assert(type(mtype) == "string", "Mirror type must be a string")
       for _, dir in ipairs({ 'rx', 'tx' }) do
+         local mirror_connector
          if mirror[dir] then
-            local out_app_name
             if mtype == "pcap" then
                local file
                if type(mirror[dir]) == "string" then
@@ -295,8 +329,9 @@ function parse_if (c, config, app_name)
                   file = '/tmp/'..string.gsub(config.name, "/", "-")
                      .."_"..dir..".pcap"
                end
-               out_app_name = app_name.."_pcap_"..dir
-               add_app(c, out_app_name, PcapWriter, file)
+               local mirror = App:new('tap_'..intf.nname..'_pcap_'..dir,
+                                      PcapWriter, file)
+               mirror_connector = mirror:connector('input')
                print("    "..dir.." port-mirror on pcap file "..file)
             elseif mtype == "tap" then
                local tap_name
@@ -306,72 +341,68 @@ function parse_if (c, config, app_name)
                   tap_name = string.gsub(config.name, "/", "-")
                   tap_name = string.sub(tap_name, 0, const.IFNAMSIZ-3).."_"..dir
                end
-               out_app_name = app_name.."_tap_"..dir
-               add_app(c, out_app_name, Tap, { name = tap_name, mtu = config.mtu})
-               local sink_app_name = app_name.."_tap_sink_"..dir
-               add_app(c, sink_app_name, Sink)
-               add_link(c, out_app_name..".output -> "..sink_app_name..".input")
+               local mirror = App:new('tap_'..intf.nname..'_'..dir,
+                                      Tap, { name = tap_name, mtu = config.mtu})
+               mirror_connector = mirror:connector('input', 'output')
+               local sink = App:new('sink_'..intf.nname..'_tap_'..dir,
+                                    Sink)
+               connect(mirror_connector, sink:connector('input'))
                print("    "..dir.." port-mirror on tap interface "..tap_name)
             else
                error("Illegal mirror type: "..mtype)
             end
-            local tee_app_name = "tee_"..out_app_name
-            add_app(c, tee_app_name, Tee)
-            add_link(c, tee_app_name..".tap -> "..out_app_name..".input")
+            local tee = App:new('tee_'..intf.nname..'_'..dir, Tee)
+            connect(tee:connector('mirror'), mirror_connector)
             if dir == "rx" then
-               add_link(c, from_if.." -> "..tee_app_name..".input")
-               from_if = tee_app_name..".pass_out"
+               connect(intf.connector, tee:connector('input'))
+               intf.connector.output = tee:connector('pass').output
             else
-               add_link(c, tee_app_name..".pass_in -> "..to_if)
-               to_if = tee_app_name..".input"
+               connect(tee:connector('pass'), intf.connector)
+               intf.connector.input = tee:connector('input').input
             end
          end
       end
    end
 
-   local afs = {}
-   afs.ipv6 = function (config, vid, ports_in, indent)
-      assert(config.address, "Missing address")
-      assert(config.next_hop, "Missing next-hop")
-      -- FIXME: check fo uniqueness of subnet
-      print(indent.."    Address: "..config.address.."/64")
-      print(indent.."    Next-Hop: "..config.next_hop)
-      if config.next_hop_mac then
-         print(indent.."    Next-Hop MAC address: "
-                  ..config.next_hop_mac)
+   local afs_procs = {
+      ipv6 = function (config, vid, connector, indent)
+         assert(config.address, "Missing address")
+         assert(config.next_hop, "Missing next-hop")
+         -- FIXME: check fo uniqueness of subnet
+         print(indent.."    Address: "..config.address.."/64")
+         print(indent.."    Next-Hop: "..config.next_hop)
+         if config.next_hop_mac then
+            print(indent.."    Next-Hop MAC address: "
+                     ..config.next_hop_mac)
+         end
+         local nd = App:new('nd_'..intf.nname..((vid and "_"..vid) or ''),
+                            nd_light,
+                            { local_ip  = config.address,
+                              local_mac = "00:00:00:00:00:00",
+                              remote_mac = config.next_hop_mac,
+                              next_hop = config.next_hop,
+                              quiet = true })
+         state.nds[nd:name()] = { app = nd, intf = intf }
+         connect_duplex(nd:connector('south'), connector)
+         return nd:connector('north')
       end
-      local nd_app_name = "nd_"..app_name..((vid and "_"..vid) or '')
-      c.nd2if_apps[nd_app_name] = app_name
-      add_app(c, nd_app_name, nd_light,
-              { local_ip  = config.address,
-                local_mac = "00:00:00:00:00:00",
-                remote_mac = config.next_hop_mac,
-                next_hop = config.next_hop,
-                quiet = true })
-      local ports_out = {
-         input = nd_app_name..".south",
-         output = nd_app_name..".south"
-      }
-      add_link(c, ports_in.output.." -> "..nd_app_name..".south")
-      add_link(c, nd_app_name..".south -> "..ports_in.input)
-      return {
-         input = nd_app_name..".north",
-         output = nd_app_name..".north"
-      }
-   end
+   }
 
-   local function process_afs (afs_c, vid, ports, indent)
+   local function process_afs (afs, vid, connector, indent)
       print(indent.."  Address family configuration")
-      local config = afs_c.ipv6
+      local config = afs.ipv6
       assert(config, "IPv6 configuration missing")
       print(indent.."    IPv6")
-      return afs.ipv6(config, vid, ports, indent.."  ")
+      return afs_procs.ipv6(config, vid, connector, indent.."  ")
    end
 
+   local trunk = config.trunk or { enable = false }
+   assert(type(trunk) == "table", "Trunk configuration must be a table")
    if trunk.enable then
       -- The interface is configured as a VLAN trunk. Attach an
       -- instance of the VLAN multiplexer.
       print("    Trunking mode: enabled")
+      intf.subintfs = {}
       assert(not config.afs,
              "Address family configuration not allowed in trunking mode")
       local encap = trunk.encapsulation or "dot1q"
@@ -381,380 +412,242 @@ function parse_if (c, config, app_name)
       print("      Encapsulation "..
                (type(encap) == "string" and encap
                    or string.format("ether-type 0x%04x", encap)))
-      local vmux_app_name = "vmux_"..app_name
-      add_app(c, vmux_app_name, vmux, { encapsulation = encap })
-      add_link(c, from_if.." -> "..vmux_app_name..".trunk")
-      add_link(c, vmux_app_name..".trunk -> "..to_if)
+      local vmux = App:new('vmux_'..intf.nname, VlanMux,
+                           { encapsulation = encap })
+      connect_duplex(vmux:connector('trunk'), intf.connector)
 
       -- Process VLANs and create sub-interfaces
-      iface.vlans = {}
       assert(trunk.vlans, "Missing VLAN configuration on trunk port")
       print("  Sub-Interfaces")
-      local vlans = {}
-      for n, vlan_c in ipairs(trunk.vlans) do
-         local vid = vlan_c.vid
+      for n, vlan in ipairs(trunk.vlans) do
+         local vid = vlan.vid
          assert(vid, "Missing VLAN ID for sub-interface #"..n)
          assert(type(vid) == "number" and vid >= 0 and vid < 4095,
                 "Invalid VLAN ID "..vid.." for sub-interface #"..n)
-         if vlans[vid] then
-            error("VLAN ID "..vid.." already assigned to sub-interface #"
-                     ..vlans[vid])
-         end
-         vlans[vid] = n
+         local name = config.name..'.'..vid
+         assert(not intf.subintfs[name], "Duplicate VID: "..vid)
+         local subintf = {
+            name = name,
+            description = vlan.description,
+            vlan = true,
+            phys_intf = intf,
+            -- The effective MTU of the VLAN port
+            mtu = intf.mtu-4,
+         }
+         intf.subintfs[name] = subintf
          print("    "..config.name.."."..vid)
-         if vlan_c.description then
-            print("      Description: "..vlan_c.description)
-         end
+         print("      Description: "..(vlan.description or '<none>'))
          print("      L2 configuration")
          print("        VLAN ID: "..(vid > 0 and vid or "<untagged>"))
-
-         iface.vlans[vid] = {
-            description = vlan_c.description,
-            vmux_app = vmux_app_name
-         }
-         local link = (vid == 0 and 'native') or 'vlan'..vid
-         local ports = {
-            input = vmux_app_name.."."..link,
-            output = vmux_app_name.."."..link
-         }
-         if vlan_c.afs then
-            iface.vlans[vid].ports = process_afs(vlan_c.afs, vid, ports, "    ")
-            iface.vlans[vid].l3 = true
+         local connector = vmux:connector((vid == 0 and 'native') or 'vlan'..vid)
+         if vlan.afs then
+            subintf.connector = process_afs(vlan.afs, vid, connector
+                                            , "    ")
+            subintf.l3 = true
          else
-            iface.vlans[vid].ports = ports
-            iface.vlans[vid].l3 = false
+            subintf.connector = connector
+            subintf.l3 = false
          end
+
+         -- Store a copy of the vmux connector to find the proper shm
+         -- frame for the interface counters later on
+         subintf.vmux_connector = connector
       end
    else
       print("    Trunking mode: disabled")
-      local ports = {
-         input = to_if,
-         output = from_if
-      }
       if config.afs then
-         iface.ports = process_afs(config.afs, nil, ports, "")
-         iface.l3 = true
+         intf.connector = process_afs(config.afs, nil, intf.connector, "")
+         intf.l3 = true
       else
-         iface.ports = ports
-         iface.l3 = false
+         intf.l3 = false
       end
    end
+
+   return intf
 end
 
--- Parse an interface specifier, which must be of the form "<name>" or
--- "<name>.<vid>", where <name> must not contain any dots.  Return the
--- name and VID
-function parse_int_spec (spec)
-   local name, vid
-   if spec:match("%.") then
-      name, vid = spec:match("([%w/]+)%.([%d]+)")
-      assert(name and vid, "Invalid interface specifier "..spec)
-   else
-      name = spec
-   end
-   return name, (vid and tonumber(vid)) or nil
-end
-
-function parse_config (c, main_config)
-   local interfaces = main_config.interfaces
-   assert(interfaces, "Missing interfaces configuration")
-   for n, config in ipairs(interfaces) do
-      parse_if(c, config, "intf"..n)
+function parse_config (main_config)
+   local intfs_config = main_config.interfaces
+   assert(intfs_config, "Missing interfaces configuration")
+   local intfs = state.intfs
+   for _, config in ipairs(intfs_config) do
+      local intf = parse_intf(config)
+      assert(not intfs[intf.name], "Duplicate interface name: "..intf.name)
+      intfs[intf.name] = intf
+      for name, subintf in pairs(intf.subintfs or {}) do
+         intfs[name] = subintf
+      end
    end
 
-   assert(main_config.vpls, "Missing vpls configuration")
-   local uplinks = {}
-   for vpls, vpls_c in pairs(main_config.vpls) do
-      local pws, acs = {}, {}
-      print("Creating VPLS instance "..vpls
-            .." ("..(vpls_c.description or "<no description>")..")")
-      assert(vpls_c.mtu, "Missing MTU")
-      print("  MTU: "..vpls_c.mtu)
-      assert(vpls_c.vc_id, "Missing VC ID")
-      print("  VC ID: "..vpls_c.vc_id)
-      assert(vpls_c.address, "Missing address")
-      print("  Address: "..vpls_c.address)
+   local vpls_config = main_config.vpls
+   assert(vpls_config, "Missing VPLS configuration")
 
-      local uplink = vpls_c.uplink
-      assert(uplink, "Missing uplink configuarion")
+   local dispatchers = {}
+   local bridge_groups = {}
+   for vpls_name, vpls in pairs(vpls_config) do
+      local function assert_vpls (cond, msg)
+         assert(cond, "VPLS "..vpls_name..": "..msg)
+      end
+
+      print("Creating VPLS instance "..vpls_name
+            .." ("..(vpls.description or "<no description>")..")")
+      assert_vpls(vpls.vc_id, "Missing VC ID")
+      print("  VC ID: "..vpls.vc_id)
+      assert_vpls(vpls.mtu, "Missing MTU")
+      print("  MTU: "..vpls.mtu)
+      assert_vpls(vpls.address, "Mssing address")
+      print("  Address: "..vpls.address)
+
+      assert_vpls(vpls.ac, "Missing ac configuration")
+      assert_vpls(vpls.pw, "Missing pseudowire configuration")
+
+      local uplink = vpls.uplink
+      assert_vpls(uplink, "missing uplink")
       assert(type(uplink) == "string",
              "Uplink interface specifier must be a string")
-      local iface, vid = parse_int_spec(uplink)
-      local uplink_iface = c.ifaces[iface]
-      assert(uplink_iface, "Interface "..iface.." referenced "
-                .."by uplink does not exist")
+      local intf = intfs[uplink]
+      assert_vpls(intf, "Uplink interface "..uplink.." does not exist")
+      assert_vpls(intf.l3, "Uplink interface "..uplink
+                     .." is L2 when L3 is expected")
       print("  Uplink is on "..uplink)
-      if not uplinks[uplink] then
-         -- The same uplink can be used by multiple VPLS instances.
-         -- We only need to do this check once.
-         uplinks[uplink] = {}
-         if vid then
-            assert(uplink_iface.vlans, "Uplink references a sub-interface "
-                      .."on a non-trunk port")
-            local vlan = uplink_iface.vlans[vid]
-            assert(vlan, "Sub-Interface "..vid.." of "..iface..
-                      " referenced by uplink does not exist")
-            assert(vlan.l3, "Sub-Interafce "..vid.." of "..iface..
-                   " is L2 while L3 was expected")
-            vlan.used = true
-            uplinks[uplink].iface = vlan
-            uplinks[uplink].app_name = "dispatcher_"
-               ..uplink_iface.app_name.."_vlan"..vid
-         else
-            assert(uplink_iface.l3 , "Interface "..uplink.." is L2 while "..
-                      "L3 was expected")
-            uplink_iface.used = true
-            uplinks[uplink].iface = uplink_iface
-            uplinks[uplink].app_name = "dispatcher_"
-               ..uplink_iface.app_name
-         end
-      end
+      intf.used = true
+      local tunnel = vpls.tunnel
+      local cc = vpls.cc
 
-      local bridge_config = { ports = {},
-                              split_horizon_groups = { pw = {} } }
-      if (vpls_c.bridge) then
-         local bridge = vpls_c.bridge
-         if bridge.type then
-            assert(bridge_types[bridge.type],
-                   "Invalid bridge type: "..bridge.type)
-         else
-            bridge.type = "flooding"
-         end
-         bridge_config.config = bridge.config
+      local dispatcher = dispatchers[uplink]
+      if not dispatcher then
+         dispatcher = App:new('disp_'..normalize_name(uplink),
+                              dispatch, {})
+         dispatchers[uplink] = dispatcher
+         local south = dispatcher:connector('south')
+         connect(intf.connector, south)
+         connect(south, intf.connector)
       end
-      assert(vpls_c.address, "Missing address")
-      vpls_address = ipv6_pton(vpls_c.address)
-      assert(vpls_c.ac, "Missing ac configuration")
-      assert(vpls_c.pw, "Missing pseudowire configuration")
+      local bridge_group = {
+         config = vpls.bridge or { type = 'flooding' },
+         pws = {},
+         acs = {}
+      }
+      assert(bridge_types[bridge_group.config.type],
+             "Invalid bridge type: "..bridge_group.config.type)
+      bridge_groups[vpls_name] = bridge_group
+      print("  Creating pseudowires")
+      for name, pw in pairs(vpls.pw) do
+         print("    "..name)
+         assert(tunnel or pw.tunnel,
+                "Missing tunnel configuration for pseudowire"
+                   .." and no default specified")
+         assert(pw.address, "Missing remote address configuration")
+         print("      Address: "..pw.address)
+         dispatcher:arg()[name] = { source = ipv6:pton(pw.address),
+                                    destination = ipv6:pton(vpls.address) }
+         local app = App:new('pw_'..vpls_name..'_'..name,
+                             pseudowire,
+                             { name = vpls_name..'_'..name,
+                               vc_id = vpls.vc_id,
+                               mtu = vpls.mtu,
+                               shmem_dir = main_config.shmem_dir,
+                               description = vpls.description,
+                               transport = { type = 'ipv6',
+                                             src = vpls.address,
+                                             dst = pw.address },
+                               tunnel = pw.tunnel or tunnel,
+                               cc = pw.cc or cc or nil })
+         connect_duplex(dispatcher:connector(name), app:connector('uplink'))
+         table.insert(bridge_group.pws, app)
+      end
 
       print("  Creating attachment circuits")
-      for name, ac_iface_name in pairs(vpls_c.ac) do
-         assert(ac_iface_name, "Missing configuration for AC "..name)
-         assert(type(ac_iface_name) == "string",
+      for name, ac in pairs(vpls.ac) do
+         print("    "..name)
+         assert(type(ac) == "string",
                 "AC interface specifier must be a string")
-         local ac_name = vpls.."_ac_"..name
-         print("    "..ac_name)
-         local iface, vid = parse_int_spec(ac_iface_name)
-         local ac_iface = c.ifaces[iface]
-         assert(ac_iface, "Interface "..iface.." referenced "
-                   .."by AC "..name.." does not exist")
-         print("      AC is on "..ac_iface_name)
-         local ac = { name = ac_name, iface_name = ac_iface_name }
-         if vid then
-            assert(ac_iface.vlans, "AC references a sub-interface "
-                      .."on a non-trunk port")
-            local vlan = ac_iface.vlans[vid]
-            assert(vlan, "Sub-Interface "..vid.." of "..iface
-                      .." referenced by AC "..name.." does not exist")
-            assert(not vlan.l3,
-                   "Sub-Interface "..vid.." is L3 while "..
-                      "L2 was expected")
-            vlan.used = true
-            ac.iface = vlan
-         else
-            assert(not ac_iface.l3,
-                   "Interface "..iface.." is L3 while "..
-                      "L2 was expected")
-            ac_iface.used = true
-            ac.iface = ac_iface
-         end
-
-         -- The effective MTU of the AC must match the MTU of the
-         -- VPLS, where the effective MTU is given by
-         --
-         --   - The actual MTU if the AC is not a trunk
-         --   - The actual MTU minus 4 if the AC is a trunk
-         --
-         -- If the AC is the native VLAN on a trunk, the actual packets
+         print("      AC is on "..ac)
+         local intf = intfs[ac]
+         assert_vpls(intf, "AC interface "..ac.." does not exist")
+         assert_vpls(not intf.l3, "AC interface "..ac
+                        .." is L3 when L2 is expected")
+         table.insert(bridge_group.acs, intf)
+         intf.used = true
+         -- Note: if the AC is the native VLAN on a trunk, the actual packets
          -- can carry frames which exceed the nominal MTU by 4 bytes.
-         local effective_mtu = (ac_iface.vlans and ac_iface.mtu-4) or ac_iface.mtu
-         assert(vpls_c.mtu == effective_mtu, "MTU mismatch between "
-                   .."VPLS ("..vpls_c.mtu..") and interface "
-                   ..iface.." (real: "..ac_iface.mtu..", effective: "
-                   ..effective_mtu..")")
-         table.insert(bridge_config.ports, ac_name)
-         table.insert(acs, ac)
+         assert(vpls.mtu == intf.mtu, "MTU mismatch between "
+                   .."VPLS ("..vpls.mtu..") and interface "
+                   ..ac.." ("..intf.mtu..")")
       end
+   end
 
-      local npws = 0
-      for _, _ in pairs(vpls_c.pw) do
-        npws = npws + 1
-      end
-      print("  Creating pseudowires")
-      local tunnel_config = vpls_c.tunnel
-      for pw_name, pw_config in pairs(vpls_c.pw) do
-         assert(tunnel_config or pw_config.tunnel,
-                "Missing tunnel configuration for pseudowire "..pw_name
-                   .." and no default specified")
-         assert(pw_config.address,
-                "Missing remote address configuration for pseudowire "..pw_name)
-         pw_address = ipv6_pton(pw_config.address)
-         local pw_app_name = vpls..'_pw_'..pw_name
-         print("    "..pw_app_name)
-         print("      Address: "..pw_config.address)
-         add_app(c, pw_app_name, pseudowire,
-                 { name = pw_app_name,
-                   vc_id = vpls_c.vc_id,
-                   mtu = vpls_c.mtu,
-                   shmem_dir = main_config.shmem_dir,
-                   description = vpls_c.description,
-                   -- For a p2p VPN, pass the name of the AC
-                   -- interface so the PW module can set up the
-                   -- proper service-specific MIB
-                   interface = (npws == 1 and #acs == 1 and
-                                   acs[1].iface_name) or '',
-                   transport = { type = 'ipv6',
-                                 src = vpls_address,
-                                 dst = pw_address },
-                   tunnel = pw_config.tunnel or tunnel_config,
-                   cc = pw_config.cc or vpls_c.cc or nil })
-         table.insert(pws, pw_app_name)
-         table.insert(bridge_config.split_horizon_groups.pw, pw_app_name)
-         if not uplinks[uplink].dispatch then
-            uplinks[uplink].dispatch = {}
-         end
-         uplinks[uplink].dispatch[pw_app_name] = { source      = pw_address,
-                                                   destination = vpls_address }
-      end
-
-      if #pws == 1 and #acs == 1 then
-         -- Optimize a two-port bridge as a direct attachment of the
-         -- PW and AC
-         print("  Short-Circuit "..pws[1].." <-> "..acs[1].name)
-         local pw, ac = pws[1], acs[1].iface
-         add_link(c, pw..".ac -> "..ac.ports.input)
-         add_link(c, ac.ports.output.." -> "..pw..".ac")
+   for vpls_name, bridge_group in pairs(bridge_groups) do
+      if #bridge_group.pws == 1 and #bridge_group.acs == 1 then
+         -- No bridge needed for a p2p VPN
+         local pw, ac = bridge_group.pws[1], bridge_group.acs[1]
+         local pw_connector = pw:connector('ac')
+         connect_duplex(pw:connector('ac'), ac.connector)
+         -- For a p2p VPN, pass the name of the AC
+         -- interface so the PW module can set up the
+         -- proper service-specific MIB
+         pw:arg().interface = intf.name
       else
-         local vpls_bridge = vpls.."_bridge"
-         print("  Creating bridge "..vpls_bridge)
-         add_app(c, vpls_bridge,
-                 require("apps.bridge."..vpls_c.bridge.type).bridge,
-                 bridge_config)
-         for _, pw in ipairs(pws) do
-            add_link(c, pw..".ac -> "..vpls_bridge.."."..pw)
-            add_link(c, vpls_bridge.."."..pw.." -> "..pw..".ac")
+         local bridge =
+            App:new('bridge_'..vpls_name,
+                    require("apps.bridge."..bridge_group.config.type).bridge,
+                    { ports = {},
+                      split_horizon_groups = { pw = {} },
+                      config = bridge_group.config.config })
+         for _, pw in ipairs(bridge_group.pws) do
+            connect_duplex(pw:connector('ac'),
+                           bridge:connector(pw:name()))
+            table.insert(bridge:arg().split_horizon_groups.pw, pw:name())
          end
-         for _, ac in ipairs(acs) do
-            add_link(c, vpls_bridge.."."..ac.name.." -> "..ac.iface.ports.input)
-            add_link(c, ac.iface.ports.output.." -> "..vpls_bridge.."."..ac.name)
+         for _, ac in ipairs(bridge_group.acs) do
+            local ac_name = normalize_name(ac.name)
+            connect_duplex(ac.connector,
+                           bridge:connector(ac_name))
+            table.insert(bridge:arg().ports, ac_name)
          end
       end
    end
 
-   -- Create dispatchers and attach PWs
-   for uplink, uplink_c in pairs(uplinks) do
-      local app_name = uplink_c.app_name
-      add_app(c, app_name, dispatch, uplink_c.dispatch)
-      for pw, pw_c in pairs(uplink_c.dispatch) do
-         add_link(c, app_name.."."..pw.." -> "..pw..".uplink")
-         add_link(c, pw..".uplink -> "..app_name.."."..pw)
-      end
-      local if_ports = uplink_c.iface.ports
-      add_link(c, if_ports.output.." -> "..app_name..".south")
-      add_link(c, app_name..".south -> "..if_ports.input)
-   end
-
-   -- Attach a sink to unused interfaces.  This discards all packets
-   -- coming from the interface and never sends any packets to the
-   -- interface, since the Sink app does not use its "input" port for
-   -- sending.
-   for _, iface in pairs(c.ifaces) do
-      local function attach_sink (ports, vid)
-         local sink_app = iface.app_name.."_sink_"..(vid or '')
-         add_app(c, sink_app, Sink)
-         add_link(c, ports.output.." -> "..sink_app..".input")
-         add_link(c, sink_app..".input -> "..ports.input)
-      end
-      if iface.vlans then
-         for vid, vlan in pairs(iface.vlans) do
-            if not vlan.used then
-               attach_sink(vlan.ports, vid)
-            end
-         end
-      else
-         if not iface.used then
-            attach_sink(iface.ports, nil)
-         end
+   -- Create sinks for interfaces not used as uplink or AC
+   for name, intf in pairs(intfs) do
+      if not intf.used and not intf.subintfs then
+         local sink = App:new('sink_'..intf.nname,
+                              Sink, {})
+         connect_duplex(intf.connector, sink:connector('input'))
       end
    end
 end
 
-function instantiate_config (main_config)
-   local c = {
-      -- Table of parsed interfaces keyed by the names of the interfaces.
-      -- Each entry is a table with the keys
-      --  app_name
-      --  stats
-      --  description
-      --  ports (nil if trunk)
-      --  l3 (nil if trunk)
-      --  vlans
-      --    description
-      --    vmux_app
-      --    ports
-      --    l3
-      --  driver_helper
-      --  mtu
-      ifaces = {},
-      
-      -- Mapping of ND app names to the names of the underlying physical
-      -- interface apps. Needed to re-configure the proper source MAC
-      -- addresses after the interfaces have been configured
-      nd2if_apps = {},
-
-      -- This table stores the list of apps that need to be
-      -- instantiated. The keys are the names of the apps (as passed to
-      -- core.config.app()) and the values are tables with elements "class"
-      -- and "arg" as required by core.config.app()
-      apps = {},
-
-      -- An array of link specs that can be passed directly to
-      -- core.config.link
-      links = {},
-   }
-
-   parse_config(c, main_config)
-   engine.configure(create_config(c))
-
+local function setup_shm_and_snmp (main_config)
    -- For each interface, attach to the shm frame that stores
    -- the statistics counters
-   for _, iface in pairs(c.ifaces) do
-      local app = engine.app_table[iface.app_name]
-      iface.stats = shm.open_frame(iface.driver_helper.stats_path(app))
+   for _, intf in pairs(state.intfs) do
+      if not intf.vlan then
+         local stats_path = intf.driver_helper.stats_path(intf)
+         intf.stats = shm.open_frame(stats_path)
+      end
    end
    -- Commit all counters to the backing store to make them available
    -- immediately through the read-only frames we just created
    counter.commit()
 
-   -- The physical MAC addresses of the interfaces are only known
-   -- after the drivers have been configured.  We need to reconfigure
-   -- all relevant ND apps to use those MAC addresses as their "local"
-   -- MAC.
-   for nd_app, if_app in pairs(c.nd2if_apps) do
-      local stats = engine.app_table[if_app].stats
-      c.apps[nd_app].arg.local_mac =
-         macaddress:new(counter.read(stats.macaddr)).bytes
-   end
-   engine.configure(create_config(c))
-
    local snmp = main_config.snmp or { enable = false }
    if snmp.enable then
-      for name, iface in pairs(c.ifaces) do
-         -- Set up SNMP for physical interfaces
-         local app = engine.app_table[iface.app_name]
-         if app == nil then goto continue end
-         local stats = iface.stats
-         if stats then
-            ifmib.init_snmp( { ifDescr = name,
-                               ifName = name,
-                               ifAlias = iface.description, },
-               string.gsub(name, '/', '-'), stats,
-               main_config.shmem_dir, snmp.interval or 5)
+      for name, intf in pairs(state.intfs) do
+         if not intf.vlan then
+            -- Set up SNMP for physical interfaces
+            local stats = intf.stats
+            if stats then
+               ifmib.init_snmp( { ifDescr = name,
+                                  ifName = name,
+                                  ifAlias = intf.description, },
+                  string.gsub(name, '/', '-'), stats,
+                  main_config.shmem_dir, snmp.interval or 5)
+            else
+               print("Can't enable SNMP for interface "..name
+                        ..": no statistics counters available")
+            end
          else
-            print("Can't enable SNMP for interface "..name
-                   ..": no statistics counters available")
-         end
-         for vid, vlan in pairs(iface.vlans or {}) do
             -- Set up SNMP for sub-interfaces
             counter_t = ffi.typeof("struct counter")
             local counters = {}
@@ -762,32 +655,37 @@ function instantiate_config (main_config)
                return (c and ffi.cast("struct counter *", c)) or nil
             end
             counters.type = counter_t()
-            if vlan.l3 then
+            if intf.l3 then
                counters.type.c = 0x1003ULL -- l3ipvlan
             else
                counters.type.c = 0x1002ULL -- l2vlan
             end
-            if stats then
-               -- Inherit the operational status, MAC address, MTU, speed
-               -- from the physical interface
-               counters.status = map(stats.status)
-               counters.macaddr = map(stats.macaddr)
-               counters.mtu = map(stats.mtu)
-               counters.speed = map(stats.speed)
-            end
-            -- Create mappings to the counters of the relevant VMUX link
-            local name = name.."."..vid
-            local vmux = engine.app_table[vlan.vmux_app]
-            local link = (vid == 0 and "native") or "vlan"..vid
-            local rx = vmux.input[link]
-            local tx = vmux.output[link]
-            assert(rx and tx)
-            local rstats = rx.stats
-            local tstats = tx.stats
-            -- The VMUX app replaces the physical network for a
+            -- Inherit the operational status, MAC address, MTU, speed
+            -- from the physical interface
+            local stats = intf.phys_intf.stats
+            counters.status = map(stats.status)
+            counters.macaddr = map(stats.macaddr)
+            counters.mtu = map(stats.mtu)
+            counters.speed = map(stats.speed)
+
+            -- Create mappings to the counters of the relevant VMUX
+            -- link The VMUX app replaces the physical network for a
             -- sub-interface.  Hence, its output is what the
             -- sub-interface receives and its input is what the
             -- sub-interface transmits to the "virtual wire".
+            local function find_linkspec (pattern)
+               pattern = string.gsub(pattern, '%.', '%%.')
+               for _, linkspec in ipairs(state.links) do
+                  if string.match(linkspec, pattern) then
+                     return linkspec
+                  end
+               end
+               error("No links match pattern: "..pattern)
+            end
+            local tstats = shm.open_frame(
+               find_linkspec('^'..intf.vmux_connector.output()))
+            local rstats = shm.open_frame(
+               find_linkspec(intf.vmux_connector.input()..'$'))
             counters.rxpackets = map(tstats.txpackets)
             counters.rxbytes = map(tstats.txbytes)
             counters.rxdrop = map(tstats.txdrop)
@@ -795,13 +693,23 @@ function instantiate_config (main_config)
             counters.txbytes = map(rstats.rxbytes)
             ifmib.init_snmp( { ifDescr = name,
                                ifName = name,
-                               ifAlias = vlan.description, },
+                               ifAlias = intf.description, },
                string.gsub(name, '/', '-'), counters,
                main_config.shmem_dir, snmp.interval or 5)
          end
-         ::continue::
       end
    end
+end
+
+local function create_app_graph ()
+   local graph = app_graph.new()
+   for name, app in pairs(state.apps) do
+      app_graph.app(graph, app:name(), app:class(), app:arg())
+   end
+   for _, linkspec in ipairs(state.links) do
+      app_graph.link(graph, linkspec)
+   end
+   return graph
 end
 
 local long_opts = {
@@ -883,9 +791,21 @@ function run (parameters)
          -- of the configuration while the system is running. It
          -- requires setting -D to a reasonable non-zero value. By
          -- default, the configuration is instantiated only once and
-         -- engine.main() runs indefinitely.
+         -- engine.main() runs indefinitely.  The proper way to do
+         -- this is to write a YANG schema and use core.config.
          print("Instantiating configuration")
-         instantiate_config(assert(loadfile(file))())
+         clear_state()
+         local main_config = assert(loadfile(file))()
+         parse_config(main_config)
+         engine.configure(create_app_graph())
+         setup_shm_and_snmp(main_config)
+         -- Reconfigure ND apps with proper MAC addresses from the
+         -- interfaces to which they are attached
+         for name, nd in pairs(state.nds) do
+            nd.app:arg().local_mac =
+               macaddress:new(counter.read(nd.intf.stats.macaddr)).bytes
+         end
+         engine.configure(create_app_graph())
          jit.flush()
       end
       mtime = stat.mtime
