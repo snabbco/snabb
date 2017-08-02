@@ -13,7 +13,7 @@ class TestBench(BaseTestCase):
         str(SNABB_CMD), 'lwaftr', 'bench',
         '--duration', '0.1',
         '--bench-file', BENCHMARK_FILENAME,
-        BaseTestCase.get_config_path(str(DATA_DIR / 'icmp_on_fail.conf')),
+        str(DATA_DIR / 'icmp_on_fail.conf'),
         str(BENCHDATA_DIR / 'ipv4-0550.pcap'),
         str(BENCHDATA_DIR / 'ipv6-0550.pcap'),
     ]

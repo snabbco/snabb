@@ -246,10 +246,10 @@ end
 
 function load_on_a_stick(c, conf, args)
    local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
+   local pciaddr, lwaftr_config = next(inst_configs)
+   local queue = lwaftr_config.softwire_config.instance[pciaddr].queue.values[1]
    validate_pci_devices({pciaddr})
-   lwaftr_app(c, lwaftr_config, device)
+   lwaftr_app(c, lwaftr_config, pciaddr)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.mirror
 

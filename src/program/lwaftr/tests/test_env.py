@@ -76,52 +76,6 @@ class BaseTestCase(unittest.TestCase):
             cls.daemon.stderr.close()
             cls.fail(cls, '\n'.join(msg_lines))
 
-    @classmethod
-    def get_config_path(cls, path):
-        """  Gets the config path.
-
-        This will either produce a new configuration specifically for the test
-        so if specific PCI cards should be used. It otherwise returns the config
-        path passed in."""
-        ipv4_nic, ipv6_nic = nic_names()
-        if ipv4_nic is None and ipv6_nic is None :
-            return path
-
-        if ipv6_nic is not None:
-            raise Exception("Missing IPv4 internal NIC information.")
-
-        # Figure out this config's path
-        filename = "/".join((jit_config_dir(), path.split("/")[-1]))
-
-        if os.path.isfile(filename):
-            return filename
-
-        internal_device = "internal[device={device}]".format(
-            device=ipv4_nic
-        )
-        external_device = "external[device={device}]".format(
-            device=ipv6_nic
-        )
-        cmd = [
-            str(SNABB_CMD), "lwaftr", "migrate-configuration", "-f",
-            "pci-device", "-o", "from[device=test]", "-o", internal_device
-        ]
-
-        if ipv6_nic:
-            cmd.extend(("-o", external_device))
-        cmd.append(path)
-
-        # Migrate the config to our new one with the PCI device.
-        proc = Popen(cmd, stdout=PIPE)
-        proc.wait()
-
-        # Finally write the config out.
-        fout = open(filename, "w")
-        fout.write(proc.stdout.read().decode("utf-8"))
-        fout.close()
-
-        return filename
-
     def run_cmd(self, args):
         proc = Popen(args, stdout=PIPE, stderr=PIPE)
         try:
