@@ -12,10 +12,6 @@ local ctablew    = require('apps.lwaftr.ctable_wrapper')
 local lwutil     = require("apps.lwaftr.lwutil")
 local lwcounter  = require("apps.lwaftr.lwcounter")
 
-local REASSEMBLY_OK = 1
-local FRAGMENT_MISSING = 2
-local REASSEMBLY_INVALID = 3
-
 -- IPv4 reassembly with RFC 5722's recommended exclusion of overlapping packets.
 -- Defined in RFC 791.
 
@@ -127,19 +123,6 @@ local function verify_valid_offsets(reassembly_buf)
    return true
 end
 
-local function reassembly_status(reassembly_buf)
-   if reassembly_buf.final_start == 0 then
-      return FRAGMENT_MISSING
-   end
-   if reassembly_buf.running_length ~= reassembly_buf.reassembly_length then
-      return FRAGMENT_MISSING
-   end
-   if not verify_valid_offsets(reassembly_buf) then
-      return REASSEMBLY_INVALID
-   end
-   return REASSEMBLY_OK
-end
-
 -- IPv4 requires recalculating an embedded checksum.
 local function fix_ipv4_checksum(h)
    local ihl = bit.band(h.version_and_ihl, ipv4_ihl_mask)
@@ -211,18 +194,47 @@ function Reassembler:new(conf)
    return setmetatable(o, {__index=Reassembler})
 end
 
-function Reassembler:free_reassembly_buf_and_pkt(pkt)
-   local key = self.scratch_fragment_key
-   initialize_fragment_key(key, pkt)
-   self.ctab:remove(key, false)
-   packet.free(pkt)
+function Reassembler:record_eviction()
+   counter.add(self.counters["drop-ipv4-frag-random-evicted"])
 end
 
-function Reassembler:attempt_reassembly(reassembly_buf, fragment)
+function Reassembler:reassembly_success(entry, pkt)
+   self.ctab:remove_ptr(entry)
+   counter.add(self.counters["in-ipv4-frag-reassembled"])
+   transmit(self.output.output, pkt)
+end
+
+function Reassembler:reassembly_error(entry, icmp_error)
+   self.ctab:remove_ptr(entry)
+   counter.add(self.counters["drop-ipv4-frag-invalid-reassembly"])
+   if icmp_error then -- This is an ICMP packet
+      transmit(self.output.errors, icmp_error)
+   end
+end
+
+function Reassembler:continue_reassembly(entry, fragment)
+end
+
+function Reassembler:lookup_reassembly(fragment)
+   local key = self.scratch_fragment_key
+   initialize_fragment_key(key, fragment)
+   local entry = self.ctab:lookup_ptr(key)
+   if entry then return entry end
+   local buf = self.scratch_reassembly_buffer
+   initialize_reassembly_buffer(buf, fragment)
+   local did_evict = false
+   entry, did_evict = self.ctab:add(key, buf, false)
+   if did_evict then self:record_eviction() end
+   return entry
+end
+
+function Reassembler:handle_fragment(fragment)
+   local entry = self:lookup_reassembly(fragment)
+
+   local reassembly_buf = entry.value
    local h = ffi.cast(ether_ipv4_header_ptr_t, fragment.data)
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    local headers_len = ether_header_len + ihl * 4
-   local frags_table = self.ctab
    local frag_id = ntohs(h.ipv4.id)
    if frag_id ~= reassembly_buf.fragment_id then -- unreachable
       error("Impossible case reached in v4 reassembly") --REASSEMBLY_INVALID
@@ -233,8 +245,7 @@ function Reassembler:attempt_reassembly(reassembly_buf, fragment)
    local fcount = reassembly_buf.fragment_count
    if fcount + 1 > self.max_fragments_per_reassembly_packet then
       -- too many fragments to reassembly this packet, assume malice
-      self:free_reassembly_buf_and_pkt(fragment, frags_table)
-      return REASSEMBLY_INVALID
+      return self:reassembly_error(entry)
    end
    reassembly_buf.fragment_starts[fcount] = frag_start
    reassembly_buf.fragment_ends[fcount] = frag_start + frag_size
@@ -247,8 +258,7 @@ function Reassembler:attempt_reassembly(reassembly_buf, fragment)
    if is_last_fragment(fragment) then
       if reassembly_buf.final_start ~= 0 then
          -- There cannot be 2+ final fragments
-         self:free_reassembly_buf_and_pkt(fragment, frags_table)
-         return REASSEMBLY_INVALID
+         return self:reassembly_error(entry)
       else
          reassembly_buf.final_start = frag_start
       end
@@ -260,9 +270,10 @@ function Reassembler:attempt_reassembly(reassembly_buf, fragment)
    local dst_offset = skip_headers + frag_start
    local last_ok = ffi.C.PACKET_PAYLOAD_SIZE
    if dst_offset + frag_size > last_ok then
-      -- Prevent a buffer overflow. The relevant RFC allows hosts to silently discard
-      -- reassemblies above a certain rather small size, smaller than this.
-      return REASSEMBLY_INVALID
+      -- Prevent a buffer overflow.  The relevant RFC allows hosts to
+      -- silently discard reassemblies above a certain rather small
+      -- size, smaller than this.
+      self:record_reassembly_error()
    end
    local reassembly_data = reassembly_buf.reassembly_data
    ffi.copy(reassembly_data + dst_offset,
@@ -273,61 +284,33 @@ function Reassembler:attempt_reassembly(reassembly_buf, fragment)
                                                max_data_offset)
    reassembly_buf.running_length = reassembly_buf.running_length + frag_size
 
-   local restatus = reassembly_status(reassembly_buf)
-   if restatus == REASSEMBLY_OK then
+   if reassembly_buf.final_start == 0 then
+      -- Still reassembling.
+      return
+   elseif reassembly_buf.running_length ~= reassembly_buf.reassembly_length then
+      -- Still reassembling.
+      return
+   elseif not verify_valid_offsets(reassembly_buf) then
+      return self:reassembly_error(entry)
+   else
       local out = packet.from_pointer(
          reassembly_data, reassembly_buf.reassembly_length)
       local header = ffi.cast(ether_ipv4_header_ptr_t, out.data)
       header.ipv4.total_length = htons(out.length - ether_header_len)
       fix_ipv4_checksum(header.ipv4)
-      self:free_reassembly_buf_and_pkt(fragment, frags_table)
-      return REASSEMBLY_OK, out
-   else
-      packet.free(fragment)
-      return restatus
+      return self:reassembly_success(entry, out)
    end
-end
-
-function Reassembler:cache_fragment(fragment)
-   local frags_table = self.ctab
-   local key = self.scratch_fragment_key
-   initialize_fragment_key(key, fragment)
-   local entry = frags_table:lookup_ptr(key)
-   local did_evict = false
-   if not entry then
-      local reassembly_buf = self.scratch_reassembly_buffer
-      initialize_reassembly_buffer(reassembly_buf, fragment)
-      entry, did_evict = frags_table:add(key, reassembly_buf, false)
-   end
-   local status, maybe_pkt = self:attempt_reassembly(entry.value, fragment)
-   return status, maybe_pkt, did_evict
 end
 
 function Reassembler:push ()
    local input, output = self.input.input, self.output.output
-   local errors = self.output.errors
 
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       if lwutil.is_ipv4_fragment(pkt) then
          counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
-         local status, maybe_pkt, did_evict = self:cache_fragment(pkt)
-         if did_evict then
-            counter.add(self.counters["drop-ipv4-frag-random-evicted"])
-         end
-
-         if status == REASSEMBLY_OK then -- Reassembly was successful
-            counter.add(self.counters["in-ipv4-frag-reassembled"])
-            transmit(output, maybe_pkt)
-         elseif status == FRAGMENT_MISSING then -- Nothing to do, wait.
-         elseif status == REASSEMBLY_INVALID then
-            counter.add(self.counters["drop-ipv4-frag-invalid-reassembly"])
-            if maybe_pkt then -- This is an ICMP packet
-               transmit(errors, maybe_pkt)
-            end
-         else -- unreachable
-            packet.free(pkt)
-         end
+         self:handle_fragment(pkt)
+         packet.free(pkt)
       else
          -- Forward all packets that aren't IPv4 fragments.
          counter.add(self.counters["in-ipv4-frag-reassembly-unneeded"])
