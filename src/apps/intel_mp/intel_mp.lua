@@ -340,32 +340,6 @@ function Intel:new (conf)
 
    self.max_q = byid.max_q
 
-   -- VMDq checks
-   if self.vmdq then
-      assert(byid.driver == Intel82599, "VMDq only supported on 82599")
-      assert(self.macaddr, "MAC address must be set in VMDq mode")
-
-      -- for VMDq, make rxq/txq relative to the pool number
-      assert(self.rxq >= 0 and self.rxq < 2, "rxqueue must be in 0..1")
-      self.rxq = self.rxq + 2 * self.poolnum
-      assert(self.txq >= 0 and self.txq < 1, "txqueue must be in 0..1")
-      self.txq = self.txq + 2 * self.poolnum
-
-      -- max queue number is different in VMDq mode
-      self.max_q = 128
-
-      if self.driver == "Intel82599" then
-         assert(self.poolnum < 64,
-                "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
-      elseif self.driver == "Intel1g" then
-         assert(self.poolnum < 8,
-                "Pool overflow: Intel i350 supports up to 8 VMDq pools")
-      end
-   else
-      assert(not self.macaddr, "VMDq must be set to use MAC address")
-      assert(not self.mirror, "VMDq must be set to specify mirroring rules")
-   end
-
    -- Setup device access
    self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
@@ -374,9 +348,7 @@ function Intel:new (conf)
 
    self:init()
    self.fd:flock("sh")
-   if self.vmdq then
-      self:check_vmdq()
-   end
+   self:check_vmdq()
    self:init_tx_q()
    self:init_rx_q()
    self:set_MAC()
@@ -1159,12 +1131,11 @@ end
 function Intel1g:set_rxstats () return end
 function Intel1g:set_txstats () return end
 
-function Intel1g:check_vmdq ()
-   error("unimplemented")
-end
+function Intel1g:check_vmdq () return end
 function Intel1g:vmdq_enable ()
    error("unimplemented")
 end
+function Intel1g:select_pool () return end
 
 function Intel1g:enable_MAC_for_pool(mac_index)
    self.r.RAH[mac_index]:set(bits { Ena = 18 + self.poolnum })
@@ -1348,16 +1319,42 @@ function Intel82599:init ()
    self:unlock_sw_sem()
 end
 
--- helper method for checking that the main process used the same
--- VMDq setting if this is a worker process (noop on main)
+-- Implements various status checks related to VMDq configuration.
+-- Also checks that the main process used the same VMDq setting if
+-- this is a worker process
 function Intel82599:check_vmdq ()
-   if not self.master then
-      if self.vmdq then
-         assert(self.r.MRQC:bits(0, 4) == self.mrqc_bits,
-                "VMDq not set by the main process for this NIC")
-      else
+   if not self.vmdq then
+      assert(not self.macaddr, "VMDq must be set to use MAC address")
+      assert(not self.mirror, "VMDq must be set to specify mirroring rules")
+
+      if not self.master then
          assert(self.r.MRQC:bits(0, 4) ~= self.mrqc_bits,
                 "VMDq was set by the main process for this NIC")
+      end
+   else
+      assert(self.driver == "Intel82599", "VMDq only supported on 82599")
+      assert(self.macaddr, "MAC address must be set in VMDq mode")
+
+      -- for VMDq, make rxq/txq relative to the pool number
+      assert(self.rxq >= 0 and self.rxq < 2, "rxqueue must be in 0..1")
+      self.rxq = self.rxq + 2 * self.poolnum
+      assert(self.txq >= 0 and self.txq < 1, "txqueue must be in 0..1")
+      self.txq = self.txq + 2 * self.poolnum
+
+      -- max queue number is different in VMDq mode
+      self.max_q = 128
+
+      if self.driver == "Intel82599" then
+         assert(self.poolnum < 64,
+                "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
+      elseif self.driver == "Intel1g" then
+         assert(self.poolnum < 8,
+                "Pool overflow: Intel i350 supports up to 8 VMDq pools")
+      end
+
+      if not self.master then
+         assert(self.r.MRQC:bits(0, 4) == self.mrqc_bits,
+                "VMDq not set by the main process for this NIC")
       end
    end
 end
