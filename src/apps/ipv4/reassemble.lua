@@ -1,3 +1,16 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+-- IPv4 reassembly (RFC 791)
+--
+-- This reassembly implementation will abort ongoing reassemblies if
+-- it sees overlapping fragments.  This follows the recommendation of
+-- RFC 5722, which although it is given specifically for IPv6, it
+-- applies just as well to IPv4.
+--
+-- Reassembly failures are currently silent.  We could implement
+-- timeouts and then we could issue "timeout exceeded" ICMP errors if
+-- needed.
+
 module(..., package.seeall)
 
 local bit        = require("bit")
@@ -9,21 +22,8 @@ local link       = require("core.link")
 local ipsum      = require("lib.checksum").ipsum
 local ctable     = require('lib.ctable')
 local ctablew    = require('apps.lwaftr.ctable_wrapper')
-local lwutil     = require("apps.lwaftr.lwutil")
 local lwcounter  = require("apps.lwaftr.lwcounter")
 
--- IPv4 reassembly with RFC 5722's recommended exclusion of overlapping packets.
--- Defined in RFC 791.
-
--- Possible TODOs:
--- TODO: implement a timeout, and associated ICMP iff the fragment
--- with offset 0 was received
--- TODO: handle silently discarding fragments that arrive later if
--- an overlapping fragment was detected (keep a list for a few minutes?)
--- TODO: handle packets of > 10240 octets correctly...
--- TODO: test every branch of this
-
-local receive, transmit = link.receive, link.transmit
 local ntohs, htons = lib.ntohs, lib.htons
 
 local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
@@ -51,9 +51,15 @@ struct {
 } __attribute__((packed))
 ]]
 local ether_header_len = ffi.sizeof(ether_header_t)
+local ether_type_ipv4 = 0x0800
 local ipv4_fragment_offset_bits = 13
 local ipv4_fragment_offset_mask = bit_mask(ipv4_fragment_offset_bits)
 local ipv4_flag_more_fragments = 0x1
+-- If a packet has the "more fragments" flag set, or the fragment
+-- offset is non-zero, it is a fragment.
+local ipv4_is_fragment_mask = bit.bor(
+   ipv4_fragment_offset_mask,
+   bit.lshift(ipv4_flag_more_fragments, ipv4_fragment_offset_bits))
 local ipv4_ihl_bits = 4
 local ipv4_ihl_mask = bit_mask(ipv4_ihl_bits)
 
@@ -61,6 +67,21 @@ local ether_ipv4_header_t = ffi.typeof(
    'struct { $ ether; $ ipv4; } __attribute__((packed))',
    ether_header_t, ipv4_header_t)
 local ether_ipv4_header_ptr_t = ffi.typeof('$*', ether_ipv4_header_t)
+
+local function is_valid_ipv4_packet(h, len)
+   if len < ffi.sizeof(ether_ipv4_header_t) then return false end
+   if ntohs(h.ether.type) ~= ether_type_ipv4 then return false end
+   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
+   if ihl < 5 then return false end
+   return true
+end
+
+-- IPv4 requires recalculating an embedded checksum.
+local function fix_ipv4_checksum(h)
+   local ihl = bit.band(h.version_and_ihl, ipv4_ihl_mask)
+   h.checksum = 0
+   h.checksum = htons(ipsum(ffi.cast('char*', h), ihl * 4, 0))
+end
 
 local function swap(array, i, j)
    local tmp = array[j]
@@ -89,13 +110,6 @@ local function verify_valid_offsets(reassembly)
       end
    end
    return true
-end
-
--- IPv4 requires recalculating an embedded checksum.
-local function fix_ipv4_checksum(h)
-   local ihl = bit.band(h.version_and_ihl, ipv4_ihl_mask)
-   h.checksum = 0
-   h.checksum = htons(ipsum(ffi.cast('char*', h), ihl * 4, 0))
 end
 
 Reassembler = {}
@@ -150,14 +164,14 @@ end
 function Reassembler:reassembly_success(entry, pkt)
    self.ctab:remove_ptr(entry)
    counter.add(self.counters["in-ipv4-frag-reassembled"])
-   transmit(self.output.output, pkt)
+   link.transmit(self.output.output, pkt)
 end
 
 function Reassembler:reassembly_error(entry, icmp_error)
    self.ctab:remove_ptr(entry)
    counter.add(self.counters["drop-ipv4-frag-invalid-reassembly"])
    if icmp_error then -- This is an ICMP packet
-      transmit(self.output.errors, icmp_error)
+      link.transmit(self.output.errors, icmp_error)
    end
 end
 
@@ -184,8 +198,7 @@ function Reassembler:lookup_reassembly(h, pkt)
    return entry
 end
 
-function Reassembler:handle_fragment(fragment)
-   local h = ffi.cast(ether_ipv4_header_ptr_t, fragment.data)
+function Reassembler:handle_fragment(h, fragment)
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    local headers_len = ether_header_len + ihl * 4
    local flags_and_fragment_offset = ntohs(h.ipv4.flags_and_fragment_offset)
@@ -202,7 +215,7 @@ function Reassembler:handle_fragment(fragment)
 
    local fcount = reassembly.fragment_count
    if fcount + 1 > self.max_fragments_per_reassembly_packet then
-      -- too many fragments to reassembly this packet, assume malice
+      -- Too many fragments to reassembly this packet; fail.
       return self:reassembly_error(entry)
    end
    reassembly.fragment_starts[fcount] = frag_start
@@ -215,7 +228,7 @@ function Reassembler:handle_fragment(fragment)
    reassembly.fragment_count = fcount + 1
    if bit.band(flags, ipv4_flag_more_fragments) == 0 then
       if reassembly.final_start ~= 0 then
-         -- There cannot be 2+ final fragments
+         -- There cannot be more than one final fragment.
          return self:reassembly_error(entry)
       else
          reassembly.final_start = frag_start
@@ -224,7 +237,7 @@ function Reassembler:handle_fragment(fragment)
 
    local skip_headers = reassembly.reassembly_base
    local dst_offset = skip_headers + frag_start
-   if dst_offset + frag_size > ffi.C.PACKET_PAYLOAD_SIZE then
+   if dst_offset + frag_size > ffi.sizeof(reassembly.packet.data) then
       -- Prevent a buffer overflow.  The relevant RFC allows hosts to
       -- silently discard reassemblies above a certain rather small
       -- size, smaller than this.
@@ -260,14 +273,22 @@ function Reassembler:push ()
 
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
-      if lwutil.is_ipv4_fragment(pkt) then
-         counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
-         self:handle_fragment(pkt)
+      local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
+      if not is_valid_ipv4_packet(h, pkt.length) then
+         -- Not a valid IPv4 packet; drop.  FIXME: we could expose a
+         -- configuration option to transmit packets with unknown
+         -- protocols instead.
          packet.free(pkt)
-      else
-         -- Forward all packets that aren't IPv4 fragments.
+      elseif bit.band(ntohs(h.ipv4.flags_and_fragment_offset),
+                      ipv4_is_fragment_mask) == 0 then
+         -- Not fragmented; forward it on.
          counter.add(self.counters["in-ipv4-frag-reassembly-unneeded"])
-         transmit(output, pkt)
+         link.transmit(output, pkt)
+      else
+         -- A fragment; try to reassemble.
+         counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
+         self:handle_fragment(h, pkt)
+         packet.free(pkt)
       end
    end
 end
