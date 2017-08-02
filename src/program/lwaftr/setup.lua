@@ -31,6 +31,8 @@ local engine     = require("core.app")
 local lib        = require("core.lib")
 
 
+local alarm_notification = false
+
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
@@ -605,6 +607,9 @@ end
 
 function reconfigurable(scheduling, f, graph, conf, ...)
    local args = {...}
+
+   -- Always enabled in reconfigurable mode.
+   alarm_notification = true
 
    local function setup_fn(conf)
       local graph = config.new()

@@ -143,7 +143,6 @@ function ARP:new(conf)
       o.arp_request_pkt = make_arp_request(o.self_mac, o.self_ip, o.next_ip)
       self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
    end
-   o.alarm_notification = conf.alarm_notification
    return setmetatable(o, {__index=ARP})
 end
 
