@@ -9,7 +9,6 @@ local link       = require("core.link")
 local ipsum      = require("lib.checksum").ipsum
 local ctable     = require('lib.ctable')
 local ctablew    = require('apps.lwaftr.ctable_wrapper')
-local constants  = require("apps.lwaftr.constants")
 local lwutil     = require("apps.lwaftr.lwutil")
 local lwcounter  = require("apps.lwaftr.lwcounter")
 
@@ -28,17 +27,7 @@ local REASSEMBLY_INVALID = 3
 -- TODO: handle packets of > 10240 octets correctly...
 -- TODO: test every branch of this
 
-local ehs, o_ipv4_identification, o_ipv4_flags,
-o_ipv4_checksum, o_ipv4_total_length, o_ipv4_src_addr, o_ipv4_dst_addr =
-constants.ethernet_header_size, constants.o_ipv4_identification,
-constants.o_ipv4_flags, constants.o_ipv4_checksum,
-constants.o_ipv4_total_length, constants.o_ipv4_src_addr,
-constants.o_ipv4_dst_addr
-
 local receive, transmit = link.receive, link.transmit
-local rd16, wr16, wr32 = lwutil.rd16, lwutil.wr16, lwutil.wr32
-local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local uint16_ptr_t = ffi.typeof("uint16_t*")
 local bxor, band = bit.bxor, bit.band
 local ntohs, htons = lib.ntohs, lib.htons
 
@@ -162,11 +151,10 @@ local function reassembly_status(reassembly_buf)
 end
 
 -- IPv4 requires recalculating an embedded checksum.
-local function fix_ipv4_checksum(pkt)
-   local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
-   local ihl = band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
-   h.ipv4.checksum = 0
-   h.ipv4.checksum = htons(ipsum(ffi.cast('char*', h.ipv4), ihl * 4, 0))
+local function fix_ipv4_checksum(h)
+   local ihl = band(h.version_and_ihl, ipv4_ihl_mask)
+   h.checksum = 0
+   h.checksum = htons(ipsum(ffi.cast('char*', h), ihl * 4, 0))
 end
 
 local function initialize_fragment_key(key, pkt)
@@ -232,15 +220,17 @@ function Reassembler:free_reassembly_buf_and_pkt(pkt)
 end
 
 function Reassembler:attempt_reassembly(reassembly_buf, fragment)
+   local h = ffi.cast(ether_ipv4_header_ptr_t, fragment.data)
+   local ihl = band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
+   local headers_len = ether_header_len + ihl * 4
    local frags_table = self.ctab
-   local ihl = get_ihl_from_offset(fragment, ehs)
-   local frag_id = get_frag_id(fragment)
+   local frag_id = ntohs(h.ipv4.id)
    if frag_id ~= reassembly_buf.fragment_id then -- unreachable
       error("Impossible case reached in v4 reassembly") --REASSEMBLY_INVALID
    end
 
    local frag_start = get_frag_start(fragment)
-   local frag_size = get_frag_len(fragment) - ihl
+   local frag_size = get_frag_len(fragment) - ihl * 4
    local fcount = reassembly_buf.fragment_count
    if fcount + 1 > self.max_fragments_per_reassembly_packet then
       -- too many fragments to reassembly this packet, assume malice
@@ -286,14 +276,13 @@ function Reassembler:attempt_reassembly(reassembly_buf, fragment)
 
    local restatus = reassembly_status(reassembly_buf)
    if restatus == REASSEMBLY_OK then
-      local pkt_len = htons(reassembly_buf.reassembly_length - ehs)
-      local o_len = ehs + o_ipv4_total_length
-      wr16(reassembly_data + o_len, pkt_len)
-      local reassembled_packet = packet.from_pointer(
-	 reassembly_buf.reassembly_data, reassembly_buf.reassembly_length)
-      fix_ipv4_checksum(reassembled_packet)
+      local out = packet.from_pointer(
+         reassembly_data, reassembly_buf.reassembly_length)
+      local header = ffi.cast(ether_ipv4_header_ptr_t, out.data)
+      header.ipv4.total_length = htons(out.length - ether_header_len)
+      fix_ipv4_checksum(header.ipv4)
       self:free_reassembly_buf_and_pkt(fragment, frags_table)
-      return REASSEMBLY_OK, reassembled_packet
+      return REASSEMBLY_OK, out
    else
       packet.free(fragment)
       return restatus
