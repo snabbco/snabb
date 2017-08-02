@@ -238,12 +238,31 @@ local function init_transmit_icmpv4_reply (rate_limiting)
    end
 end
 
+local function select_instance(conf)
+   local function table_merge(t1, t2)
+      local ret = {}
+      for k,v in pairs(t1) do ret[k] = v end
+      for k,v in pairs(t2) do ret[k] = v end
+      return ret
+   end
+   local device = next(conf.softwire_config.instance)
+   conf.softwire_config.external_interface = table_merge(
+      conf.softwire_config.external_interface,
+      conf.softwire_config.instance[device].queue.values[1].external_interface
+   )
+   conf.softwire_config.internal_interface = table_merge(
+      conf.softwire_config.internal_interface,
+      conf.softwire_config.instance[device].queue.values[1].internal_interface
+   )
+   return conf
+end
+
 LwAftr = { yang_schema = 'snabb-softwire-v2' }
 
 function LwAftr:new(conf)
    if conf.debug then debug = true end
    local o = setmetatable({}, {__index=LwAftr})
-   conf = conf.softwire_config
+   conf = select_instance(conf).softwire_config
    o.conf = conf
 
    o.binding_table = bt.load(conf.binding_table)

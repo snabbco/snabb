@@ -21,3 +21,4 @@ python3 -m unittest discover \
     --start-directory "${TESTS_DIR}" \
     --pattern "${TEST_WHAT}_test.py" \
     --verbose
+

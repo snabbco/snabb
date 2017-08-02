@@ -2,12 +2,14 @@
 Environment support code for tests.
 """
 
-import os
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import PIPE, Popen, TimeoutExpired
+import os
 import time
 import unittest
+import random
+import string
 
 
 # Commands run under "sudo" run as root. The root's user PATH should not
@@ -32,6 +34,8 @@ ENC = 'utf-8'
 def nic_names():
     return os.environ.get('SNABB_PCI0'), os.environ.get('SNABB_PCI1')
 
+def jit_config_dir():
+    return os.environ.get("JIT_CONFIG_DIR")
 
 class BaseTestCase(unittest.TestCase):
     """
@@ -84,7 +88,8 @@ class BaseTestCase(unittest.TestCase):
             raise
         if proc.returncode != 0:
             msg_lines = (
-                'Error running command:', str(args),
+                'Error running command:', " ".join(args),
+                'Daemon Command:', " ".join(self.daemon_args),
                 'Exit code: %s' % proc.returncode,
                 'STDOUT', str(output, ENC), 'STDERR', str(errput, ENC),
             )

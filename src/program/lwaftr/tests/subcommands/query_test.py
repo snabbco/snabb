@@ -13,7 +13,6 @@ DAEMON_PROC_NAME = 'query-test-daemon'
 SNABB_PCI0, SNABB_PCI1 = nic_names()
 RUN_DIR = Path('/var/run/snabb')
 
-
 @unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
 class TestQueryStandard(BaseTestCase):
 
@@ -22,7 +21,7 @@ class TestQueryStandard(BaseTestCase):
         '--name', DAEMON_PROC_NAME,
         '--conf', str(DATA_DIR / 'no_icmp.conf'),
         '--v4', SNABB_PCI0,
-        '--v6', SNABB_PCI1,
+        '--v6', SNABB_PCI1
     )
 
     query_args = (str(SNABB_CMD), 'lwaftr', 'query')

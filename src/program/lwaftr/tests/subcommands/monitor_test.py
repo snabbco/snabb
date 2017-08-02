@@ -15,7 +15,6 @@ from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
 DAEMON_PROC_NAME = 'monitor-test-daemon'
 SNABB_PCI0 = nic_names()[0]
 
-
 @unittest.skipUnless(SNABB_PCI0, 'NIC not configured')
 class TestMonitor(BaseTestCase):
 

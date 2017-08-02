@@ -11,20 +11,20 @@ from subprocess import PIPE, Popen
 import time
 import unittest
 
-from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, BaseTestCase
+from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, BaseTestCase, \
+                     nic_names
 
 
 DAEMON_PROC_NAME = 'config-test-daemon'
-DAEMON_ARGS = (
+DAEMON_ARGS = [
     str(SNABB_CMD), 'lwaftr', 'bench', '--reconfigurable',
     '--bench-file', '/dev/null',
     '--name', DAEMON_PROC_NAME,
     str(DATA_DIR / 'icmp_on_fail.conf'),
     str(BENCHDATA_DIR / 'ipv4-0550.pcap'),
     str(BENCHDATA_DIR / 'ipv6-0550.pcap'),
-)
+]
 SOCKET_PATH = '/tmp/snabb-lwaftr-listen-sock-%s' % DAEMON_PROC_NAME
-
 
 class TestConfigGet(BaseTestCase):
     """
@@ -37,7 +37,8 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_internal_iface(self):
         cmd_args = list(self.config_args)
-        cmd_args.append('/softwire-config/internal-interface/ip')
+        cmd_args.append('/softwire-config/instance[device=test]/queue[id=1]'
+                        '/internal-interface/ip')
         output = self.run_cmd(cmd_args)
         self.assertEqual(
             output.strip(), b'8:9:a:b:c:d:e:f',
@@ -45,7 +46,8 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_external_iface(self):
         cmd_args = list(self.config_args)
-        cmd_args.append('/softwire-config/external-interface/ip')
+        cmd_args.append('/softwire-config/instance[device=test]/queue[id=1]/'
+                        'external-interface/ip')
         output = self.run_cmd(cmd_args)
         self.assertEqual(
             output.strip(), b'10.10.10.10',
@@ -194,7 +196,10 @@ class TestConfigMisc(BaseTestCase):
         # External IPv4.
         test_ipv4 = '208.118.235.148'
         set_args = self.get_cmd_args('set')
-        set_args.extend(('/softwire-config/external-interface/ip', test_ipv4))
+        set_args.extend((
+            "/softwire-config/instance[device=test]/queue[id=1]/"
+            "external-interface/ip", test_ipv4
+        ))
         self.run_cmd(set_args)
         get_args = list(set_args)[:-1]
         get_args[2] = 'get'
