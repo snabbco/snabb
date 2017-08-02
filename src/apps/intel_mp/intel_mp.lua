@@ -25,6 +25,7 @@ local register    = require("lib.hardware.register")
 local counter     = require("core.counter")
 local macaddress  = require("lib.macaddress")
 local shm         = require("core.shm")
+local S           = require("syscall")
 
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
@@ -272,7 +273,7 @@ Intel = {
       ndescriptors = {default=2048},
       vmdq = {default=false},
       macaddr = {},
-      poolnum = {default=0},
+      poolnum = {},
       vlan = {},
       mirror = {},
       rxcounter = {},
@@ -343,6 +344,9 @@ function Intel:new (conf)
    -- Setup device access
    self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
+
+   -- this needs to happen before register loading for rxq/txq
+   self:select_pool()
 
    self:load_registers(byid.registers)
 
@@ -1335,15 +1339,6 @@ function Intel82599:check_vmdq ()
       assert(self.driver == "Intel82599", "VMDq only supported on 82599")
       assert(self.macaddr, "MAC address must be set in VMDq mode")
 
-      -- for VMDq, make rxq/txq relative to the pool number
-      assert(self.rxq >= 0 and self.rxq < 2, "rxqueue must be in 0..1")
-      self.rxq = self.rxq + 2 * self.poolnum
-      assert(self.txq >= 0 and self.txq < 1, "txqueue must be in 0..1")
-      self.txq = self.txq + 2 * self.poolnum
-
-      -- max queue number is different in VMDq mode
-      self.max_q = 128
-
       if self.driver == "Intel82599" then
          assert(self.poolnum < 64,
                 "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
@@ -1421,6 +1416,49 @@ function Intel82599:vmdq_enable ()
 
    -- must be cleared after MTQC configuration (7.2.1.2.1)
    self.r.RTTDCS:clr(bits { ARBDIS=6 })
+end
+
+-- In VMDq mode, selects an available pool if one isn't provided by the user.
+local pooldir = "intel-mp-pools"
+function Intel82599:select_pool()
+   if not self.vmdq then return end
+
+   -- if the poolnum was set manually in the config, just use that
+   if not self.poolnum then
+      local available_pool
+
+      -- we use some (empty) files in the shm directory to track what pools are
+      -- claimed (pick the first poolnum file that this process can obtain an
+      -- exclusive lock on)
+      if not shm.exists(pooldir) then
+         shm.mkdir(pooldir .. "/" .. self.pciaddress)
+      end
+
+      for poolnum = 0, 63 do
+         local path = shm.root.."/"..pooldir.."/"..self.pciaddress.."/"..poolnum
+         local fd = S.open(path, "creat, rdwr")
+         if fd:flock("nb, ex") then
+            available_pool = poolnum
+            break
+         end
+         fd:close()
+      end
+
+      assert(available_pool, "No free VMDq pools are available")
+      self.poolnum = available_pool
+   end
+
+   -- Once we know the pool number, figure out txq and rxq numbers. This
+   -- needs to be done prior to loading registers.
+   --
+   -- for VMDq, make rxq/txq relative to the pool number
+   assert(self.rxq >= 0 and self.rxq < 2, "rxqueue must be in 0..1")
+   self.rxq = self.rxq + 2 * self.poolnum
+   assert(self.txq >= 0 and self.txq < 1, "txqueue must be in 0..1")
+   self.txq = self.txq + 2 * self.poolnum
+
+   -- max queue number is different in VMDq mode
+   self.max_q = 128
 end
 
 function Intel82599:enable_MAC_for_pool (mac_index)
