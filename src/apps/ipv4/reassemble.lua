@@ -79,12 +79,12 @@ local function sort_array(array, last_index)
    end
 end
 
-local function verify_valid_offsets(reassembly_buf)
-   if reassembly_buf.fragment_starts[0] ~= 0 then
+local function verify_valid_offsets(reassembly)
+   if reassembly.fragment_starts[0] ~= 0 then
       return false
    end
-   for i=1,reassembly_buf.fragment_count-1 do
-      if reassembly_buf.fragment_starts[i] ~= reassembly_buf.fragment_ends[i-1] then
+   for i=1,reassembly.fragment_count-1 do
+      if reassembly.fragment_starts[i] ~= reassembly.fragment_ends[i-1] then
          return false
       end
    end
@@ -98,25 +98,18 @@ local function fix_ipv4_checksum(h)
    h.checksum = htons(ipsum(ffi.cast('char*', h), ihl * 4, 0))
 end
 
-local function initialize_fragment_key(key, pkt)
-   local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
-   key.src_addr, key.dst_addr = h.ipv4.src_ip, h.ipv4.dst_ip
-   key.fragment_id = ntohs(h.ipv4.id)
-end
-
-local function initialize_reassembly_buffer(buf, pkt)
-   local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
+local function initialize_reassembly(reassembly, h, pkt)
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    local headers_len = ether_header_len + ihl * 4
 
-   ffi.C.memset(buf, 0, ffi.sizeof(buf))
-   buf.fragment_id = ntohs(h.ipv4.id)
-   buf.reassembly_base = headers_len
-   buf.running_length = headers_len
+   ffi.C.memset(reassembly, 0, ffi.sizeof(reassembly))
+   reassembly.fragment_id = ntohs(h.ipv4.id)
+   reassembly.reassembly_base = headers_len
+   reassembly.running_length = headers_len
 
-   ffi.copy(buf.reassembly_data, pkt.data, headers_len)
+   ffi.copy(reassembly.reassembly_data, pkt.data, headers_len)
    -- Clear fragmentation data.
-   local data_header = ffi.cast(ether_ipv4_header_ptr_t, buf.reassembly_data)
+   local data_header = ffi.cast(ether_ipv4_header_ptr_t, reassembly.reassembly_data)
    data_header.ipv4.id, data_header.ipv4.flags_and_fragment_offset = 0, 0
 end
 
@@ -160,7 +153,7 @@ function Reassembler:new(conf)
    }
    o.ctab = ctablew.new(params)
    o.scratch_fragment_key = params.key_type()
-   o.scratch_reassembly_buffer = params.value_type()
+   o.scratch_reassembly = params.value_type()
 
    counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
                o.ctab:get_backing_size())
@@ -188,13 +181,16 @@ end
 function Reassembler:continue_reassembly(entry, fragment)
 end
 
-function Reassembler:lookup_reassembly(fragment)
+function Reassembler:lookup_reassembly(h, pkt)
    local key = self.scratch_fragment_key
-   initialize_fragment_key(key, fragment)
+   key.src_addr, key.dst_addr = h.ipv4.src_ip, h.ipv4.dst_ip
+   key.fragment_id = ntohs(h.ipv4.id)
+
    local entry = self.ctab:lookup_ptr(key)
    if entry then return entry end
-   local buf = self.scratch_reassembly_buffer
-   initialize_reassembly_buffer(buf, fragment)
+
+   local buf = self.scratch_reassembly
+   initialize_reassembly(buf, h, pkt)
    local did_evict = false
    entry, did_evict = self.ctab:add(key, buf, false)
    if did_evict then self:record_eviction() end
@@ -202,13 +198,9 @@ function Reassembler:lookup_reassembly(fragment)
 end
 
 function Reassembler:handle_fragment(fragment)
-   local entry = self:lookup_reassembly(fragment)
-
-   local reassembly_buf = entry.value
    local h = ffi.cast(ether_ipv4_header_ptr_t, fragment.data)
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    local headers_len = ether_header_len + ihl * 4
-   local frag_id = ntohs(h.ipv4.id)
    local flags_and_fragment_offset = ntohs(h.ipv4.flags_and_fragment_offset)
    local flags = bit.rshift(
       flags_and_fragment_offset, ipv4_fragment_offset_bits)
@@ -218,31 +210,34 @@ function Reassembler:handle_fragment(fragment)
    local frag_start = fragment_offset * 8
    local frag_size = ntohs(h.ipv4.total_length) - ihl * 4
 
-   local fcount = reassembly_buf.fragment_count
+   local entry = self:lookup_reassembly(h, fragment)
+   local reassembly = entry.value
+
+   local fcount = reassembly.fragment_count
    if fcount + 1 > self.max_fragments_per_reassembly_packet then
       -- too many fragments to reassembly this packet, assume malice
       return self:reassembly_error(entry)
    end
-   reassembly_buf.fragment_starts[fcount] = frag_start
-   reassembly_buf.fragment_ends[fcount] = frag_start + frag_size
-   if reassembly_buf.fragment_starts[fcount] <
-      reassembly_buf.fragment_starts[fcount - 1] then
-      sort_array(reassembly_buf.fragment_starts, fcount)
-      sort_array(reassembly_buf.fragment_ends, fcount)
+   reassembly.fragment_starts[fcount] = frag_start
+   reassembly.fragment_ends[fcount] = frag_start + frag_size
+   if reassembly.fragment_starts[fcount] <
+      reassembly.fragment_starts[fcount - 1] then
+      sort_array(reassembly.fragment_starts, fcount)
+      sort_array(reassembly.fragment_ends, fcount)
    end
-   reassembly_buf.fragment_count = fcount + 1
+   reassembly.fragment_count = fcount + 1
    if bit.band(flags, ipv4_flag_more_fragments) == 0 then
-      if reassembly_buf.final_start ~= 0 then
+      if reassembly.final_start ~= 0 then
          -- There cannot be 2+ final fragments
          return self:reassembly_error(entry)
       else
-         reassembly_buf.final_start = frag_start
+         reassembly.final_start = frag_start
       end
    end
 
    -- This is a massive layering violation. :/
    -- Specifically, it requires this file to know the details of struct packet.
-   local skip_headers = reassembly_buf.reassembly_base
+   local skip_headers = reassembly.reassembly_base
    local dst_offset = skip_headers + frag_start
    local last_ok = ffi.C.PACKET_PAYLOAD_SIZE
    if dst_offset + frag_size > last_ok then
@@ -251,26 +246,26 @@ function Reassembler:handle_fragment(fragment)
       -- size, smaller than this.
       self:record_reassembly_error()
    end
-   local reassembly_data = reassembly_buf.reassembly_data
+   local reassembly_data = reassembly.reassembly_data
    ffi.copy(reassembly_data + dst_offset,
             fragment.data + skip_headers,
             frag_size)
    local max_data_offset = skip_headers + frag_start + frag_size
-   reassembly_buf.reassembly_length = math.max(reassembly_buf.reassembly_length,
-                                               max_data_offset)
-   reassembly_buf.running_length = reassembly_buf.running_length + frag_size
+   reassembly.reassembly_length = math.max(reassembly.reassembly_length,
+                                           max_data_offset)
+   reassembly.running_length = reassembly.running_length + frag_size
 
-   if reassembly_buf.final_start == 0 then
+   if reassembly.final_start == 0 then
       -- Still reassembling.
       return
-   elseif reassembly_buf.running_length ~= reassembly_buf.reassembly_length then
+   elseif reassembly.running_length ~= reassembly.reassembly_length then
       -- Still reassembling.
       return
-   elseif not verify_valid_offsets(reassembly_buf) then
+   elseif not verify_valid_offsets(reassembly) then
       return self:reassembly_error(entry)
    else
       local out = packet.from_pointer(
-         reassembly_data, reassembly_buf.reassembly_length)
+         reassembly_data, reassembly.reassembly_length)
       local header = ffi.cast(ether_ipv4_header_ptr_t, out.data)
       header.ipv4.total_length = htons(out.length - ether_header_len)
       fix_ipv4_checksum(header.ipv4)
