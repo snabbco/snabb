@@ -107,9 +107,9 @@ local function initialize_reassembly(reassembly, h, pkt)
    reassembly.reassembly_base = headers_len
    reassembly.running_length = headers_len
 
-   ffi.copy(reassembly.reassembly_data, pkt.data, headers_len)
+   ffi.copy(reassembly.packet.data, pkt.data, headers_len)
    -- Clear fragmentation data.
-   local data_header = ffi.cast(ether_ipv4_header_ptr_t, reassembly.reassembly_data)
+   local data_header = ffi.cast(ether_ipv4_header_ptr_t, reassembly.packet.data)
    data_header.ipv4.id, data_header.ipv4.flags_and_fragment_offset = 0, 0
 end
 
@@ -143,8 +143,7 @@ function Reassembler:new(conf)
             uint16_t reassembly_base;
             uint16_t fragment_id;
             uint32_t running_length; // bytes copied so far
-            uint16_t reassembly_length; // analog to packet.length
-            uint8_t reassembly_data[PACKET_PAYLOAD_SIZE];
+            struct packet packet;
          } __attribute((packed))]],
          o.max_fragments_per_reassembly_packet,
          o.max_fragments_per_reassembly_packet),
@@ -235,37 +234,31 @@ function Reassembler:handle_fragment(fragment)
       end
    end
 
-   -- This is a massive layering violation. :/
-   -- Specifically, it requires this file to know the details of struct packet.
    local skip_headers = reassembly.reassembly_base
    local dst_offset = skip_headers + frag_start
-   local last_ok = ffi.C.PACKET_PAYLOAD_SIZE
-   if dst_offset + frag_size > last_ok then
+   if dst_offset + frag_size > ffi.C.PACKET_PAYLOAD_SIZE then
       -- Prevent a buffer overflow.  The relevant RFC allows hosts to
       -- silently discard reassemblies above a certain rather small
       -- size, smaller than this.
-      self:record_reassembly_error()
+      return self:record_reassembly_error()
    end
-   local reassembly_data = reassembly.reassembly_data
-   ffi.copy(reassembly_data + dst_offset,
-            fragment.data + skip_headers,
+   ffi.copy(reassembly.packet.data + dst_offset, fragment.data + skip_headers,
             frag_size)
    local max_data_offset = skip_headers + frag_start + frag_size
-   reassembly.reassembly_length = math.max(reassembly.reassembly_length,
-                                           max_data_offset)
+   reassembly.packet.length = math.max(reassembly.packet.length,
+                                       max_data_offset)
    reassembly.running_length = reassembly.running_length + frag_size
 
    if reassembly.final_start == 0 then
       -- Still reassembling.
       return
-   elseif reassembly.running_length ~= reassembly.reassembly_length then
+   elseif reassembly.running_length ~= reassembly.packet.length then
       -- Still reassembling.
       return
    elseif not verify_valid_offsets(reassembly) then
       return self:reassembly_error(entry)
    else
-      local out = packet.from_pointer(
-         reassembly_data, reassembly.reassembly_length)
+      local out = packet.clone(reassembly.packet)
       local header = ffi.cast(ether_ipv4_header_ptr_t, out.data)
       header.ipv4.total_length = htons(out.length - ether_header_len)
       fix_ipv4_checksum(header.ipv4)
