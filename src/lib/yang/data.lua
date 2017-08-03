@@ -130,6 +130,10 @@ local function elide_unions(t)
 end
 
 function data_grammar_from_schema(schema, is_config)
+   local function is_empty(tab)
+      for k,v in pairs(tab) do return false end
+      return true
+   end
    local function struct_ctype(members)
       local member_names = {}
       for k,v in pairs(members) do
@@ -154,62 +158,77 @@ function data_grammar_from_schema(schema, is_config)
    local function visit(node)
       local handler = handlers[node.kind]
       if handler then return handler(node) end
-      return {}
    end
    local function visit_body(node)
       local ret = {}
-      for id,node in pairs(node.body) do
-         for keyword,node in pairs(visit(node)) do
-            assert(not ret[keyword], 'duplicate identifier: '..keyword)
-            assert(not ret[normalize_id(keyword)],
-                   'duplicate identifier: '..normalize_id(keyword))
-            ret[keyword] = node
+      local norm = {}
+      for k, child in pairs(node.body) do
+         local out = visit(child)
+         if out then
+            ret[k] = out
+            local id = normalize_id(k)
+            assert(not norm[id], 'duplicate data identifier: '..id)
+            norm[id] = k
          end
       end
       return ret
    end
    function handlers.container(node)
       local members = visit_body(node)
-      return {[node.id]={type='struct', members=members,
-                         ctype=struct_ctype(members)}}
+      if is_empty(members) then return end
+      return {type='struct', members=members, ctype=struct_ctype(members)}
    end
    function handlers.choice(node)
-      if node.config ~= is_config then return {} end
       local choices = {}
       for choice, n in pairs(node.body) do
          choices[choice] = visit_body(n)
       end
-      return {[node.id] = {type="choice", default=node.default, mandatory=node.mandatory,
-                           choices=choices}}
+      if is_empty(choices) then return end
+      return {type="choice", default=node.default, mandatory=node.mandatory,
+              choices=choices}
    end
    handlers['leaf-list'] = function(node)
-      if node.config ~= is_config then return {} end
+      if node.config ~= is_config then return end
       local t = elide_unions(node.type)
-      return {[node.id]={type='array', element_type=t,
-                         ctype=value_ctype(t)}}
+      return {type='array', element_type=t, ctype=value_ctype(t)}
    end
    function handlers.list(node)
-      local members=visit_body(node)
+      local norm = {}
       local keys, values = {}, {}
       if node.key then
-         for k in node.key:split(' +') do keys[k] = assert(members[k], node.key) end
+         for k in node.key:split(' +') do
+            local leaf = node.body[k]
+            assert(leaf, 'missing key leaf: '..k)
+            assert(leaf.kind == 'leaf', 'key not a leaf: '..k)
+            assert(not keys[k], 'duplicate key: '..k)
+            keys[k] = assert(handlers.leaf(leaf, true))
+            local id = normalize_id(k)
+            assert(not norm[id], 'duplicate data identifier: '..id)
+            norm[id] = k
+         end
       end
-      for k,v in pairs(members) do
-         if not keys[k] then values[k] = v end
+      for k,node in pairs(node.body) do
+         if not keys[k] then
+            values[k] = visit(node)
+            local id = normalize_id(k)
+            assert(not norm[id], 'duplicate data identifier: '..id)
+            norm[id] = k
+         end
       end
-      return {[node.id]={type='table', keys=keys, values=values,
-                         string_key=table_string_key(keys),
-                         key_ctype=struct_ctype(keys),
-                         value_ctype=struct_ctype(values)}}
+      if is_empty(values) and node.config ~= is_config then return end
+      return {type='table', keys=keys, values=values,
+              string_key=table_string_key(keys),
+              key_ctype=struct_ctype(keys),
+              value_ctype=struct_ctype(values)}
    end
-   function handlers.leaf(node)
-      if node.config ~= is_config then return {} end
+   function handlers.leaf(node, for_key)
+      if node.config ~= is_config and not for_key then return end
       local ctype
       local t = elide_unions(node.type)
       if node.default or node.mandatory then ctype=value_ctype(t) end
-      return {[node.id]={type='scalar', argument_type=t,
-                         default=node.default, mandatory=node.mandatory,
-                         ctype=ctype}}
+      return {type='scalar', argument_type=t,
+              default=node.default, mandatory=node.mandatory,
+              ctype=ctype}
    end
    local members = visit_body(schema)
    return {type="struct", members=members, ctype=struct_ctype(members)}
