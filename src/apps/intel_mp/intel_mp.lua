@@ -720,6 +720,13 @@ function Intel:stop ()
       self:unset_MAC()
       self:unset_VLAN()
       self:unset_mirror()
+      if self.poolfd then
+         -- we need to explicitly unlock this in case multiple instances
+         -- are running on the same process and we can't rely on process
+         -- termination to free the lock
+         self.poolfd:flock("un")
+         self.poolfd:close()
+      end
    end
    self:unset_tx_rate()
    if self.fd:flock("nb, ex") then
@@ -1436,12 +1443,11 @@ function Intel82599:select_pool()
 
       for poolnum = 0, 63 do
          local path = shm.root.."/"..pooldir.."/"..self.pciaddress.."/"..poolnum
-         local fd = S.open(path, "creat, rdwr")
-         if fd:flock("nb, ex") then
+         self.poolfd = S.open(path, "creat, rdwr")
+         if self.poolfd:flock("nb, ex") then
             available_pool = poolnum
             break
          end
-         fd:close()
       end
 
       assert(available_pool, "No free VMDq pools are available")
