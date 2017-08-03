@@ -8,6 +8,8 @@
   and a lwaftr specific version number which is reset upon merging a newer
   version of Snabb from upstream.
 
+* Improve configuration migration system.
+
 ## [3.1.8] - 2017-03-10
 
 * Retry ARP and NDP resolution indefinitely.

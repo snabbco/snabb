@@ -3,8 +3,6 @@ Usage: migrate-configuration LWAFTR.CONF
 Options:
   -h, --help                 Print usage information.
   -f, --from=VERSION         Specify version from which to migrate.
-  -o, --option=option        Specify an option (additional data) for the
-                             migration.
 
 Migrate an old-style configuration and binding table to the new YANG
 configuration.  LWAFTR.CONF should be the name of an old lwAFTR
@@ -25,6 +23,13 @@ configuration.  Available VERSION values are:
   2017.07.01
     lwAFTR changes to multiprcoess configuration with the introduction of the
     instance list.
+
+    This change will put place holders "IPv4 PCI Address" and "IPv6 PCI Address"
+    where the external and internal PCI addresses of your NICs go respectively.
+    This should be changed however when running the lwAFTR with only one
+    instance defined a in-memory migration will occur on each run of the lwAFTR
+    please refer to program/lwaftr/doc/running.md documentation for further
+    information.
 
 The default version is "legacy".
 
