@@ -91,7 +91,7 @@ end
 
 function show_state(scm, pid, raw_path)
    local schema = yang.load_schema_by_name(scm)
-   local grammar = yang_data.data_grammar_from_schema(schema)
+   local grammar = yang_data.state_grammar_from_schema(schema)
    local counters = find_counters(pid)
    local path = xpath.convert_path(grammar, raw_path)
 

@@ -267,15 +267,6 @@ function resolver(grammar, path_string)
 end
 resolver = util.memoize(resolver)
 
--- Loads a module and converts the rest of the path.
-function load_from_path(path)
-   -- First extract and load the module name then load it.
-   local module_name, path = next_element(path)
-   local scm = schemalib.load_schema_by_name(module_name)
-   local grammar = datalib.data_grammar_from_schema(scm)
-   return module_name, convert_path(grammar.members, path)
-end
-
 function selftest()
    print("selftest: lib.yang.path")
    local schema_src = [[module snabb-simple-router {
@@ -296,7 +287,7 @@ function selftest()
       }}]]
 
    local scm = schemalib.load_schema(schema_src, "xpath-test")
-   local grammar = datalib.data_grammar_from_schema(scm)
+   local grammar = datalib.config_grammar_from_schema(scm)
 
    -- Test path to lua path.
    local path = convert_path(grammar,"/routes/route[addr=1.2.3.4]/port")
@@ -325,7 +316,7 @@ function selftest()
       }
    ]]
 
-   local data = datalib.load_data_for_schema(scm, data_src)
+   local data = datalib.load_config_for_schema(scm, data_src)
 
    -- Try resolving a path in a list (ctable).
    local getter = resolver(grammar, "/routes/route[addr=1.2.3.4]/port")
@@ -361,8 +352,8 @@ function selftest()
    ]]
 
    local fruit_scm = schemalib.load_schema(fruit_schema_src, "xpath-fruit-test")
-   local fruit_prod = datalib.data_grammar_from_schema(fruit_scm)
-   local fruit_data = datalib.load_data_for_schema(fruit_scm, fruit_data_src)
+   local fruit_prod = datalib.config_grammar_from_schema(fruit_scm)
+   local fruit_data = datalib.load_config_for_schema(fruit_scm, fruit_data_src)
 
    local getter = resolver(fruit_prod, "/bowl/fruit[name=banana]/rating")
    assert(getter(fruit_data) == 10)

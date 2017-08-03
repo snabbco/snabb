@@ -5,7 +5,7 @@ local common = require("program.config.common")
 
 function run(args)
    args = common.parse_command_line(
-      args, { command='remove', with_path=true })
+      args, { command='remove', with_path=true, is_config=true })
    local response = common.call_leader(
       args.instance_id, 'remove-config',
       { schema = args.schema_name, revision = args.revision_date,

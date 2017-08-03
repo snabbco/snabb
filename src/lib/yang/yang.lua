@@ -12,15 +12,15 @@ load_schema = schema.load_schema
 load_schema_file = schema.load_schema_file
 load_schema_by_name = schema.load_schema_by_name
 
-load_data_for_schema = data.load_data_for_schema
-load_data_for_schema_by_name = data.load_data_for_schema_by_name
+load_config_for_schema = data.load_config_for_schema
+load_config_for_schema_by_name = data.load_config_for_schema_by_name
 
-print_data_for_schema = data.print_data_for_schema
-print_data_for_schema_by_name = data.print_data_for_schema_by_name
+print_config_for_schema = data.print_config_for_schema
+print_config_for_schema_by_name = data.print_config_for_schema_by_name
 string_output_file = util.string_output_file
 
-compile_data_for_schema = binary.compile_data_for_schema
-compile_data_for_schema_by_name = binary.compile_data_for_schema_by_name
+compile_config_for_schema = binary.compile_config_for_schema
+compile_config_for_schema_by_name = binary.compile_config_for_schema_by_name
 
 load_compiled_data_file = binary.load_compiled_data_file
 
@@ -117,12 +117,12 @@ function load_configuration(filename, opts)
    local source_str = source:read_string()
    source:close()
    log('loading source configuration')
-   local conf = load_data_for_schema_by_name(opts.schema_name, source_str,
-                                             filename)
+   local conf = load_config_for_schema_by_name(opts.schema_name, source_str,
+                                               filename)
 
    if use_compiled_cache then
       -- Save it, if we can.
-      local success, err = pcall(binary.compile_data_for_schema_by_name,
+      local success, err = pcall(binary.compile_config_for_schema_by_name,
                                  opts.schema_name, conf, compiled_filename,
                                  source_mtime)
       if success then

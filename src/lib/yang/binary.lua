@@ -292,19 +292,27 @@ function data_compiler_from_grammar(emit_data, schema_name, schema_revision)
    end
 end
 
-function data_compiler_from_schema(schema)
-   local grammar = data.data_grammar_from_schema(schema)
+function data_compiler_from_schema(schema, is_config)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
    return data_compiler_from_grammar(data_emitter(grammar),
                                      schema.id, schema.revision_date)
 end
 
-function compile_data_for_schema(schema, data, filename, source_mtime)
-   return data_compiler_from_schema(schema)(data, filename, source_mtime)
+function config_compiler_from_schema(schema)
+   return data_compiler_from_schema(schema, true)
 end
 
-function compile_data_for_schema_by_name(schema_name, data, filename, source_mtime)
-   return compile_data_for_schema(schema.load_schema_by_name(schema_name),
-                                  data, filename, source_mtime)
+function state_compiler_from_schema(schema)
+   return data_compiler_from_schema(schema, false)
+end
+
+function compile_config_for_schema(schema, data, filename, source_mtime)
+   return config_compiler_from_schema(schema)(data, filename, source_mtime)
+end
+
+function compile_config_for_schema_by_name(schema_name, data, filename, source_mtime)
+   return compile_config_for_schema(schema.load_schema_by_name(schema_name),
+                                    data, filename, source_mtime)
 end
 
 -- Hackily re-use the YANG serializer for Lua data consisting of tables,
@@ -504,7 +512,7 @@ function selftest()
          }
       }
    }]])
-   local data = data.load_data_for_schema(test_schema, [[
+   local data = data.load_config_for_schema(test_schema, [[
       is-active true;
       integers 1;
       integers 2;
@@ -547,7 +555,7 @@ function selftest()
       )
 
       local tmp = os.tmpname()
-      compile_data_for_schema(test_schema, data, tmp)
+      compile_config_for_schema(test_schema, data, tmp)
       local data2 = load_compiled_data_file(tmp)
       assert(data2.schema_name == 'snabb-simple-router')
       assert(data2.revision_date == '')
