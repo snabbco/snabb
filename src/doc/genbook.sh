@@ -66,6 +66,8 @@ $(cat $mdroot/apps/vlan/README.md)
 
 $(cat $mdroot/apps/bridge/README.md)
 
+$(cat $mdroot/apps/ipfix/README.md)
+
 $(cat $mdroot/apps/ipsec/README.md)
 
 $(cat $mdroot/apps/test/README.md)
