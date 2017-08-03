@@ -270,13 +270,18 @@ function load_binding_table(file)
    return parse_binding_table(Parser.new(source:as_text_stream()))
 end
 
+
 local function config_to_string(schema, conf)
    if type(schema) == "string" then
       schema = yang.load_schema_by_name(schema)
    end
-   local memfile = util.string_output_file()
-   yang.print_config_for_schema(schema, conf, memfile)
-   return memfile:flush()
+   -- To keep memory usage as low as possible write it out to a temp file.
+   local temp = io.open("/tmp/migrate-configuration-temp", "w")
+   yang.print_config_for_schema(schema, conf, temp)
+   temp:close()
+   conf = io.open("/tmp/migrate-configuration-temp", "r"):read("*a")
+   os.remove("/tmp/migrate-configuration-temp")
+   return conf
 end
 
 
@@ -563,7 +568,8 @@ end
 
 local function migrate_legacy(stream)
    local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
-   return migrate_conf(conf)
+   conf = migrate_conf(conf)
+   return conf
 end
 
 
@@ -617,6 +623,8 @@ function run(args)
    local conf = io.open(conf_file, "r"):read("*a")
    for _, migration in next,migrations,start do
       conf = migration.migrator(conf_file, conf)
+      -- Prompt the garbage collection to do a full collect after each migration
+      collectgarbage()
    end
 
    print(conf)
