@@ -335,7 +335,7 @@ local function identityref_validator(bases, default_prefix, f)
    end
 end
 
-local function value_parser(typ)
+function value_parser(typ)
    local prim = typ.primitive_type
    local parse = assert(value.types[prim], prim).parse
    local validate = function(val) return val end

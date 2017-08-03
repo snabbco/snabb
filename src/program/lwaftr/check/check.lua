@@ -46,9 +46,9 @@ function run(args)
    load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    engine.configure(c)
    if counters_path then
-      local initial_counters = read_counters(c)
+      local initial_counters = read_counters()
       engine.main({duration=opts.duration})
-      local final_counters = read_counters(c)
+      local final_counters = read_counters()
       local counters_diff = diff_counters(final_counters, initial_counters)
       if opts.r then
          regen_counters(counters_diff, counters_path)

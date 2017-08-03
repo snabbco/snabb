@@ -470,12 +470,12 @@ function Leader:foreign_rpc_get_state (schema_name, path, format,
                                        print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
-   local native_state = state.show_state(self.schema_name, S.getpid(), "/")
+   local native_state = state.read_state(self.schema_name, S.getpid())
    local foreign_state = translate.get_state(native_state)
    local printer = path_printer_for_schema_by_name(
       schema_name, path, false, format, print_default)
-   local config = printer(foreign_state, yang.string_output_file())
-   return { state = config }
+   local state = printer(foreign_state, yang.string_output_file())
+   return { state = state }
 end
 function Leader:foreign_rpc_set_config (schema_name, path, config_str)
    path = path_mod.normalize_path(path)
@@ -558,17 +558,18 @@ end
 function Leader:rpc_get_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
-            return self:foreign_rpc_get_state(args.schema, args.path, args)
+         return self:foreign_rpc_get_state(args.schema, args.path,
+                                           args.format, args.print_default)
       end
       local printer = path_printer_for_schema_by_name(
          self.schema_name, args.path, false, args.format, args.print_default)
-      local s = {}
+      local states = {}
       for _, follower in pairs(self.followers) do
-         for k,v in pairs(state.show_state(self.schema_name, follower.pid, args.path)) do
-            s[k] = v
-         end
+         table.insert(states, state.read_state(self.schema_name, follower.pid))
       end
-      return {state=printer(s, yang.string_output_file())}
+      -- FIXME: How to combine states?  Add counters?
+      local state = printer(states[1], yang.string_output_file())
+      return { state = state }
    end
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end
