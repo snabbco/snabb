@@ -8,8 +8,6 @@ local yang = require("lib.yang.yang")
 local yang_data = require("lib.yang.data")
 local counter = require("core.counter")
 
-local counter_directory = "/apps"
-
 local function flatten(val)
    local rtn = {}
    for k, v in pairs(val) do
@@ -24,17 +22,18 @@ local function flatten(val)
 end
 
 function find_counters(pid)
-   local path = shm.root.."/"..pid..counter_directory
+   local path = '/'..pid..'/apps'
    local apps = {}
-   for _, c in pairs(lib.files_in_directory(path)) do
+   for _, app in ipairs(shm.children(path)) do
       local counters = {}
-      local counterdir = "/"..pid..counter_directory.."/"..c
-      for k,v in pairs(shm.open_frame(counterdir)) do
-         if type(v) == "cdata" then
-            counters[k] = v.c
+      local app_path = path..'/'..app
+      for _, file in ipairs(shm.children(app_path)) do
+         local name, type = file:match("(.*)[.](.*)$")
+         if type == 'counter' then
+            counters[name] = counter.open(app_path..'/'..file)
          end
       end
-      apps[c] = counters
+      apps[app] = counters
    end
    return apps
 end
