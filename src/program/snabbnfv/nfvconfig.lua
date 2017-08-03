@@ -123,6 +123,7 @@ function load (file, pciaddr, sockpath, soft_bench)
 end
 
 function selftest ()
+   print("selftest: program.snabbnfv.nfvconfig")
    local pcideva = lib.getenv("SNABB_PCI0")
    if not pcideva then
       print("SNABB_PCI0 not set\nTest skipped")
