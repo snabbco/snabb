@@ -539,8 +539,9 @@ function parse_config (main_config)
                    .." and no default specified")
          assert(pw.address, "Missing remote address configuration")
          print("      Address: "..pw.address)
-         dispatcher:arg()[name] = { source = ipv6:pton(pw.address),
-                                    destination = ipv6:pton(vpls.address) }
+         local link_name = vpls_name..'_'..name
+         dispatcher:arg()[link_name] = { source = ipv6:pton(pw.address),
+                                         destination = ipv6:pton(vpls.address) }
          local app = App:new('pw_'..vpls_name..'_'..name,
                              pseudowire,
                              { name = vpls_name..'_'..name,
@@ -553,7 +554,7 @@ function parse_config (main_config)
                                              dst = pw.address },
                                tunnel = pw.tunnel or tunnel,
                                cc = pw.cc or cc or nil })
-         connect_duplex(dispatcher:connector(name), app:connector('uplink'))
+         connect_duplex(dispatcher:connector(link_name), app:connector('uplink'))
          table.insert(bridge_group.pws, app)
       end
 
