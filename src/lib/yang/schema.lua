@@ -595,23 +595,27 @@ local primitive_types = set(
    'identityref', 'instance-identifier', 'leafref', 'string', 'union')
 
 -- Inherits config attributes from parents
-local function inherit_config(schema, config)
-   if schema.config ~= nil then
-      assert(not config or schema.config == false)
-      config = schema.config
-   elseif config ~= nil then
-      schema = shallow_copy(schema)
-      schema.config = config
-   end
-
-   if schema.body then
-      schema.body = shallow_copy(schema.body)
-      for name, node in pairs(schema.body) do
-         schema.body[name] = inherit_config(node, config)
+local function inherit_config(schema)
+   local function visit(node, config)
+      if node.config == nil then
+         node = shallow_copy(node)
+         node.config = config
+      elseif node.config == false then
+         config = node.config
+      else
+         assert(config)
       end
+
+      if node.body then
+         node.body = shallow_copy(node.body)
+         for name, child in pairs(node.body) do
+            node.body[name] = visit(child, config)
+         end
+      end
+      return node
    end
 
-   return schema
+   return visit(schema, true)
 end
 
 local default_features = {}
@@ -1111,16 +1115,16 @@ function selftest()
    local icschema = load_schema(inherit_config_schema)
 
    -- Test things that should be null, still are.
-   assert(icschema.config == nil)
-   assert(icschema.body.foo.config == nil)
+   assert(icschema.config == true)
+   assert(icschema.body.foo.config == true)
 
    -- Assert the regular config is propergated through container.
    assert(icschema.body.foo.body.bar.config == false)
    assert(icschema.body.foo.body.bar.body.baz.config == false)
 
    -- Now test the grouping, we need to ensure copying is done correctly.
-   assert(icschema.body.corge.config == nil)
-   assert(icschema.body.corge.body.quuz.config == nil)
+   assert(icschema.body.corge.config == true)
+   assert(icschema.body.corge.body.quuz.config == true)
    assert(icschema.body.grault.config == true)
    assert(icschema.body.grault.body.quuz.config == true)
    assert(icschema.body.garply.config == false)
