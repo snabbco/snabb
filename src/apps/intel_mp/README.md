@@ -49,8 +49,8 @@ specified.
 
 — Key **poolnum**
 
-*Optional*. The VMDq pool to associated with, numbered from 0. The default
-is 0.
+*Optional*. The VMDq pool to associate with, numbered from 0. The default
+is to select a pool number automatically.
 
 — Key **macaddr**
 
