@@ -129,7 +129,11 @@ local function elide_unions(t)
    return t
 end
 
-function data_grammar_from_schema(schema)
+function data_grammar_from_schema(schema, is_config)
+   local function is_empty(tab)
+      for k,v in pairs(tab) do return false end
+      return true
+   end
    local function struct_ctype(members)
       local member_names = {}
       for k,v in pairs(members) do
@@ -154,64 +158,92 @@ function data_grammar_from_schema(schema)
    local function visit(node)
       local handler = handlers[node.kind]
       if handler then return handler(node) end
-      return {}
    end
    local function visit_body(node)
       local ret = {}
-      for id,node in pairs(node.body) do
-         for keyword,node in pairs(visit(node)) do
-            assert(not ret[keyword], 'duplicate identifier: '..keyword)
-            assert(not ret[normalize_id(keyword)],
-                   'duplicate identifier: '..normalize_id(keyword))
-            ret[keyword] = node
+      local norm = {}
+      for k, child in pairs(node.body) do
+         local out = visit(child)
+         if out then
+            ret[k] = out
+            local id = normalize_id(k)
+            assert(not norm[id], 'duplicate data identifier: '..id)
+            norm[id] = k
          end
       end
       return ret
    end
    function handlers.container(node)
       local members = visit_body(node)
-      return {[node.id]={type='struct', members=members,
-                         ctype=struct_ctype(members)}}
+      if is_empty(members) then return end
+      return {type='struct', members=members, ctype=struct_ctype(members)}
    end
    function handlers.choice(node)
       local choices = {}
       for choice, n in pairs(node.body) do
          choices[choice] = visit_body(n)
       end
-      return {[node.id] = {type="choice", default=node.default, mandatory=node.mandatory,
-                           choices=choices}}
+      if is_empty(choices) then return end
+      return {type="choice", default=node.default, mandatory=node.mandatory,
+              choices=choices}
    end
    handlers['leaf-list'] = function(node)
+      if node.config ~= is_config then return end
       local t = elide_unions(node.type)
-      return {[node.id]={type='array', element_type=t,
-                         ctype=value_ctype(t)}}
+      return {type='array', element_type=t, ctype=value_ctype(t)}
    end
    function handlers.list(node)
-      local members=visit_body(node)
+      local norm = {}
       local keys, values = {}, {}
       if node.key then
-         for k in node.key:split(' +') do keys[k] = assert(members[k], node.key) end
+         for k in node.key:split(' +') do
+            local leaf = node.body[k]
+            assert(leaf, 'missing key leaf: '..k)
+            assert(leaf.kind == 'leaf', 'key not a leaf: '..k)
+            assert(not keys[k], 'duplicate key: '..k)
+            keys[k] = assert(handlers.leaf(leaf, true))
+            local id = normalize_id(k)
+            assert(not norm[id], 'duplicate data identifier: '..id)
+            norm[id] = k
+         end
       end
-      for k,v in pairs(members) do
-         if not keys[k] then values[k] = v end
+      for k,node in pairs(node.body) do
+         if not keys[k] then
+            values[k] = visit(node)
+            local id = normalize_id(k)
+            assert(not norm[id], 'duplicate data identifier: '..id)
+            norm[id] = k
+         end
       end
-      return {[node.id]={type='table', keys=keys, values=values,
-                         string_key=table_string_key(keys),
-                         key_ctype=struct_ctype(keys),
-                         value_ctype=struct_ctype(values)}}
+      if is_empty(values) and node.config ~= is_config then return end
+      return {type='table', keys=keys, values=values,
+              string_key=table_string_key(keys),
+              key_ctype=struct_ctype(keys),
+              value_ctype=struct_ctype(values)}
    end
-   function handlers.leaf(node)
+   function handlers.leaf(node, for_key)
+      if node.config ~= is_config and not for_key then return end
       local ctype
       local t = elide_unions(node.type)
       if node.default or node.mandatory then ctype=value_ctype(t) end
-      return {[node.id]={type='scalar', argument_type=t,
-                         default=node.default, mandatory=node.mandatory,
-                         ctype=ctype}}
+      return {type='scalar', argument_type=t,
+              default=node.default, mandatory=node.mandatory,
+              ctype=ctype}
    end
    local members = visit_body(schema)
    return {type="struct", members=members, ctype=struct_ctype(members)}
 end
 data_grammar_from_schema = util.memoize(data_grammar_from_schema)
+
+function config_grammar_from_schema(schema)
+   return data_grammar_from_schema(schema, true)
+end
+config_grammar_from_schema = util.memoize(config_grammar_from_schema)
+
+function state_grammar_from_schema(schema)
+   return data_grammar_from_schema(schema, false)
+end
+state_grammar_from_schema = util.memoize(state_grammar_from_schema)
 
 function rpc_grammar_from_schema(schema)
    local grammar = {}
@@ -220,6 +252,7 @@ function rpc_grammar_from_schema(schema)
       for k,rpc in pairs(schema.rpcs) do
          local node = rpc[prop]
          if node then
+            -- Hack to mark RPC is-config as being true
             grammar[prop].members[k] = data_grammar_from_schema(node)
          else
             grammar[prop].members[k] = {type="struct", members={}}
@@ -566,10 +599,6 @@ local function table_parser(keyword, keys, values, string_key, key_ctype,
    return {init=init, parse=parse, finish=finish}
 end
 
-function data_parser_from_schema(schema)
-   return data_parser_from_grammar(data_grammar_from_schema(schema))
-end
-
 function data_parser_from_grammar(production)
    local handlers = {}
    local function visit1(keyword, production)
@@ -682,13 +711,42 @@ function data_parser_from_grammar(production)
 end
 data_parser_from_grammar = util.memoize(data_parser_from_grammar)
 
-function load_data_for_schema(schema, str, filename)
-   return data_parser_from_schema(schema)(str, filename)
+function data_parser_from_schema(schema, is_config)
+   local grammar = data_grammar_from_schema(schema, is_config)
+   return data_parser_from_grammar(grammar)
 end
 
-function load_data_for_schema_by_name(schema_name, str, filename)
+function config_parser_from_schema(schema)
+   return data_parser_from_schema(schema, true)
+end
+
+function state_parser_from_schema(schema)
+   return data_parser_from_schema(schema, false)
+end
+
+function load_data_for_schema(schema, str, filename, is_config)
+   return data_parser_from_schema(schema, is_config)(str, filename)
+end
+
+function load_config_for_schema(schema, str, filename)
+   return load_data_for_schema(schema, str, filename, true)
+end
+
+function load_state_for_schema(schema, str, filename)
+   return load_data_for_schema(schema, str, filename, false)
+end
+
+function load_data_for_schema_by_name(schema_name, str, filename, is_config)
    local schema = schema.load_schema_by_name(schema_name)
-   return load_data_for_schema(schema, str, filename)
+   return load_data_for_schema(schema, str, filename, is_config)
+end
+
+function load_config_for_schema_by_name(schema_name, str, filename)
+   return load_data_for_schema_by_name(schema_name, str, filename, true)
+end
+
+function load_state_for_schema_by_name(schema_name, str, filename)
+   return load_data_for_schema_by_name(schema_name, str, filename, false)
 end
 
 function rpc_input_parser_from_schema(schema)
@@ -1150,17 +1208,42 @@ local function string_output_file()
    return file
 end
 
-function data_printer_from_schema(schema)
-   return data_printer_from_grammar(data_grammar_from_schema(schema))
+function data_printer_from_schema(schema, is_config)
+   local grammar = data_grammar_from_schema(schema, is_config)
+   return data_printer_from_grammar(grammar)
 end
 
-function print_data_for_schema(schema, data, file)
-   return data_printer_from_schema(schema)(data, file)
+function config_printer_from_schema(schema)
+   return data_printer_from_schema(schema, true)
 end
 
-function print_data_for_schema_by_name(schema_name, data, file)
+function state_printer_from_schema(schema)
+   return data_printer_from_schema(schema, false)
+end
+
+function print_data_for_schema(schema, data, file, is_config)
+   return data_printer_from_schema(schema, is_config)(data, file)
+end
+
+function print_config_for_schema(schema, data, file)
+   return config_printer_from_schema(schema)(data, file)
+end
+
+function print_state_for_schema(schema, data, file)
+   return state_printer_from_schema(schema)(data, file)
+end
+
+function print_data_for_schema_by_name(schema_name, data, file, is_config)
    local schema = schema.load_schema_by_name(schema_name)
-   return print_data_for_schema(schema, data, file)
+   return print_data_for_schema(schema, data, file, is_config)
+end
+
+function print_config_for_schema_by_name(schema_name, data, file)
+   return print_data_for_schema_by_name(schema_name, data, file, true)
+end
+
+function print_state_for_schema_by_name(schema_name, data, file)
+   return print_data_for_schema_by_name(schema_name, data, file, false)
 end
 
 function rpc_input_printer_from_schema(schema)
@@ -1199,7 +1282,7 @@ function selftest()
       }
    }]])
 
-   local data = load_data_for_schema(test_schema, [[
+   local data = load_config_for_schema(test_schema, [[
      fruit-bowl {
        description 'ohai';
        contents { name foo; score 7; }
@@ -1221,10 +1304,10 @@ function selftest()
 
       local tmp = os.tmpname()
       local file = io.open(tmp, 'w')
-      print_data_for_schema(test_schema, data, file)
+      print_config_for_schema(test_schema, data, file)
       file:close()
       local file = io.open(tmp, 'r')
-      data = load_data_for_schema(test_schema, file:read('*a'), tmp)
+      data = load_config_for_schema(test_schema, file:read('*a'), tmp)
       file:close()
       os.remove(tmp)
    end
@@ -1252,7 +1335,7 @@ function selftest()
       }
    }]]
    local keyless_schema = schema.load_schema(list_wo_key_config_false)
-   local keyless_list_data = load_data_for_schema(keyless_schema, [[
+   local keyless_list_data = load_state_for_schema(keyless_schema, [[
    test {
       node {
          name "hello";
@@ -1270,7 +1353,7 @@ function selftest()
       }
    }]]
    local loaded_schema = schema.load_schema(test_schema)
-   local object = load_data_for_schema(loaded_schema, [[
+   local object = load_config_for_schema(loaded_schema, [[
       summary {
          shelves-active;
       }
@@ -1296,7 +1379,7 @@ function selftest()
          }
       }
    }]])
-   local choice_data = load_data_for_schema(choice_schema, [[
+   local choice_data = load_config_for_schema(choice_schema, [[
       boat {
          name "Boaty McBoatFace";
          country-name "United Kingdom";
@@ -1310,7 +1393,7 @@ function selftest()
    assert(choice_data.boat["Vasa"].country_code == "SE")
 
    -- Test mandatory true on choice statement. (should fail)
-   local success, err = pcall(load_data_for_schema, choice_schema, [[
+   local success, err = pcall(load_config_for_schema, choice_schema, [[
       boat {
          name "Boaty McBoatFace";
       }
@@ -1337,7 +1420,7 @@ function selftest()
       }
    }]])
 
-   local choice_data_with_default = load_data_for_schema(choice_default_schema, [[
+   local choice_data_with_default = load_config_for_schema(choice_default_schema, [[
       boat {
          name "Kronan";
       }
@@ -1345,7 +1428,7 @@ function selftest()
    assert(choice_data_with_default.boat["Kronan"].country_code == "SE")
 
    -- Check that we can't specify both of the choice fields. (should fail)
-   local success, err = pcall(load_data_for_schema, choice_schema, [[
+   local success, err = pcall(load_config_for_schema, choice_schema, [[
       boat {
          name "Boaty McBoatFace";
          country-name "United Kingdom";

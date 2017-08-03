@@ -132,8 +132,8 @@ local function encoder()
    function encoder:config(class, arg)
       local file_name = random_file_name()
       if class.yang_schema then
-         yang.compile_data_for_schema_by_name(class.yang_schema, arg,
-                                              file_name)
+         yang.compile_config_for_schema_by_name(class.yang_schema, arg,
+                                                file_name)
       else
          if arg == nil then arg = {} end
          binary.compile_ad_hoc_lua_data_to_file(file_name, arg)

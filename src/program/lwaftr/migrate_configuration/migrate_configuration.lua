@@ -468,9 +468,9 @@ local function multiprocess_migration(src, conf_file, options)
    hybridscm.body["softwire-config"].body["internal-interface"] = v1_internal
 
    -- Extract the grammar, load the config and find the key
-   local hybridgmr = data.data_grammar_from_schema(hybridscm)
+   local hybridgmr = data.config_grammar_from_schema(hybridscm)
    local instgmr = hybridgmr.members["softwire-config"].members.instance
-   local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
+   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
    local queue_key = ffi.typeof(instgmr.values.queue.key_ctype)
    local global_external_if = conf.softwire_config.external_interface
    local global_internal_if = conf.softwire_config.internal_interface
@@ -546,7 +546,7 @@ local function v2_migration(src, conf_file)
    -- Remove the mandatory requirement on softwire.br-address for the migration
    binding_table.body["softwire"].body["br-address"].mandatory = false
 
-   local conf = yang.load_data_for_schema(hybridscm, src, conf_file)
+   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
 
    -- Remove the br-address leaf-list and add it onto the softwire.
    conf = remove_address_list(conf)
@@ -563,7 +563,7 @@ local function v1_to_v2_config(conf, conf_file)
    -- Because we're changing underlying schema stuff we're building up a hybrid
    -- schema which we need to load it into so we need to convert conf to a file.
    local memfile = util.string_output_file()
-   yang.print_data_for_schema_by_name("snabb-softwire-v1", conf, memfile)
+   yang.print_config_for_schema_by_name("snabb-softwire-v1", conf, memfile)
    return v2_migration(memfile:flush(), conf_file)
 end
 
@@ -578,7 +578,7 @@ local function migrate_3_0_1(conf_file, options)
    local data = require('lib.yang.data')
    local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
    return multiprocess_migration(v1_to_v2_config(increment_br(
-      data.load_data_for_schema_by_name(
+      data.load_config_for_schema_by_name(
             'snabb-softwire-v1', str, conf_file)), conf_file), options)
 end
 
@@ -613,6 +613,6 @@ function run(args)
       show_usage(1)
    end
    local conf = migrate(conf_file, options)
-   yang.print_data_for_schema_by_name('snabb-softwire-v2', conf, io.stdout)
+   yang.print_config_for_schema_by_name('snabb-softwire-v2', conf, io.stdout)
    main.exit(0)
 end

@@ -21,18 +21,28 @@ local parse_command_line_opts = {
    with_config_file = { default=false },
    with_path = { default=false },
    with_value = { default=false },
-   require_schema = { default=false }
+   require_schema = { default=false },
+   is_config = { default=true }
 }
 
-local function path_grammar(schema_name, path)
+local function path_grammar(schema_name, path, is_config)
    local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.data_grammar_from_schema(schema)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
    local getter, subgrammar = path_resolver(grammar, path)
    return subgrammar
 end
 
-function data_parser(schema_name, path)
-   return data.data_parser_from_grammar(path_grammar(schema_name, path))
+function data_parser(schema_name, path, is_config)
+   local grammar = path_grammar(schema_name, path, is_config)
+   return data.data_parser_from_grammar(grammar)
+end
+
+function config_parser(schema_name, path)
+   return data_parser(schema_name, path, true)
+end
+
+function state_parser(schema_name, path)
+   return data_parser(schema_name, path, false)
 end
 
 function error_and_quit(err)
@@ -41,8 +51,8 @@ function error_and_quit(err)
    os.exit(1)
 end
 
-function validate_path(schema_name, path)
-   local succ, err = pcall(path_grammar, schema_name, path)
+function validate_path(schema_name, path, is_config)
+   local succ, err = pcall(path_grammar, schema_name, path, is_config)
    if succ == false then
       error_and_quit(err)
    end
@@ -90,10 +100,10 @@ function parse_command_line(args, opts)
    if opts.with_path then
       if #args == 0 then err("missing path argument") end
       ret.path = table.remove(args, 1)
-      validate_path(ret.schema_name, ret.path)
+      validate_path(ret.schema_name, ret.path, opts.is_config)
    end
    if opts.with_value then
-      local parser = data_parser(ret.schema_name, ret.path)
+      local parser = data_parser(ret.schema_name, ret.path, opts.is_config)
       if #args == 0 then
          ret.value_str = io.stdin:read('*a')
       else
@@ -120,10 +130,22 @@ function open_socket_or_die(instance_id)
    return socket
 end
 
+function data_serializer(schema_name, path, is_config)
+   local grammar = path_grammar(schema_name, path or '/', is_config)
+   return data.data_printer_from_grammar(grammar)
+end
+
+function serialize_data(data, schema_name, path, is_config)
+   local printer = data_serializer(schema_name, path, is_config)
+   return printer(data, yang.string_output_file())
+end
+
 function serialize_config(config, schema_name, path)
-   local grammar = path_grammar(schema_name, path or '/')
-   local printer = data.data_printer_from_grammar(grammar)
-   return printer(config, yang.string_output_file())
+   return serialize_data(config, schema_name, path, true)
+end
+
+function serialize_state(config, schema_name, path)
+   return serialize_data(config, schema_name, path, false)
 end
 
 function send_message(socket, msg_str)

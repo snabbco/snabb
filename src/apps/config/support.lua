@@ -72,7 +72,7 @@ end
 local function compute_objects_maybe_updated_in_place (schema_name, config,
                                                        changed_path)
    local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.data_grammar_from_schema(schema)
+   local grammar = data.config_grammar_from_schema(schema)
    local objs = {}
    local getter, subgrammar
    for _,path in ipairs(compute_parent_paths(changed_path)) do

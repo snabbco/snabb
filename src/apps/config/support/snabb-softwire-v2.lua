@@ -77,7 +77,7 @@ local softwire_grammar
 local function get_softwire_grammar()
    if not softwire_grammar then
       local schema = yang.load_schema_by_name('snabb-softwire-v2')
-      local grammar = data.data_grammar_from_schema(schema)
+      local grammar = data.config_grammar_from_schema(schema)
       softwire_grammar =
          assert(grammar.members['softwire-config'].
                    members['binding-table'].members['softwire'])
@@ -166,7 +166,7 @@ local ietf_br_instance_grammar
 local function get_ietf_br_instance_grammar()
    if not ietf_br_instance_grammar then
       local schema = yang.load_schema_by_name('ietf-softwire')
-      local grammar = data.data_grammar_from_schema(schema)
+      local grammar = data.config_grammar_from_schema(schema)
       grammar = assert(grammar.members['softwire-config'])
       grammar = assert(grammar.members['binding'])
       grammar = assert(grammar.members['br'])
@@ -216,7 +216,7 @@ end
 
 local function schema_getter(schema_name, path)
    local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.data_grammar_from_schema(schema)
+   local grammar = data.config_grammar_from_schema(schema)
    return path_mod.resolver(grammar, path)
 end
 

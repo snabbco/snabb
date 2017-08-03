@@ -510,7 +510,7 @@ function selftest()
    local data = require("lib.yang.data")
    local path = require("lib.yang.path")
    local schema = schema.load_schema_by_name("snabb-softwire-v1")
-   local grammar = data.data_grammar_from_schema(schema)
+   local grammar = data.config_grammar_from_schema(schema)
 
    path.convert_path(grammar, generate_xpath(schema))
 
