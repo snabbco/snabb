@@ -69,12 +69,12 @@ model = {
 -- Supported cards indexed by vendor and device id.
 local cards = {
    ["0x8086"] =  {
-      ["0x10fb"] = {model = model["82599_SFP"], driver = 'apps.intel.intel_app'},
-      ["0x10d3"] = {model = model["82574L"],    driver = 'apps.intel.intel_app'},
-      ["0x105e"] = {model = model["82571"],     driver = 'apps.intel.intel_app'},
-      ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
-      ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
-      ["0x154d"] = {model = model["X520"],      driver = 'apps.intel.intel_app'},
+      ["0x10fb"] = {model = model["82599_SFP"], driver = 'apps.intel_mp.intel_mp'},
+      ["0x10d3"] = {model = model["82574L"],    driver = 'apps.intel_mp.intel_mp'},
+      ["0x105e"] = {model = model["82571"],     driver = 'apps.intel_mp.intel_mp'},
+      ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel_mp.intel_mp'},
+      ["0x1528"] = {model = model["X540"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x154d"] = {model = model["X520"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
