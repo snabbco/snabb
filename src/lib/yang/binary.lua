@@ -10,6 +10,7 @@ local stream = require("lib.yang.stream")
 local data = require('lib.yang.data')
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
+local lib = require("core.lib")
 
 local MAGIC = "yangconf"
 local VERSION = 0x00005000
@@ -233,11 +234,7 @@ local function data_emitter(production)
          end
       end
    end
-   local native_types = {
-      enumeration = true,
-      identityref = true,
-      string = true,
-   }
+   local native_types = lib.set('enumeration', 'identityref', 'string')
    function handlers.scalar(production)
       local primitive_type = production.argument_type.primitive_type
       local type = assert(value.types[primitive_type], "unsupported type: "..primitive_type)
