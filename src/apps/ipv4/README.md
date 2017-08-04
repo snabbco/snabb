@@ -57,3 +57,44 @@ it will be determined from the *next_ip* via ARP.
 
 *Optional*.  The IPv4 address of the next-hop host.  Required only if
  *next_mac* is not specified as part of the configuration.
+
+## Reassembler (apps.ipv4.reassemble)
+
+The `Reassembler` app is a filter on incoming IPv4 packets that
+reassembles fragments.  Note that Snabb's internal MTU is 10240 bytes;
+attempts to reassemble larger packets will fail.
+
+    DIAGRAM: IPv4Reassembler
+                   +-----------+
+                   |           |
+    input     ---->*Reassembler*---->   output
+                   |           |
+                   +-----------+
+
+The reassembler has a configurable limit for the reassembly buffer
+size.  If the buffer is full and a new reassembly comes in on the
+input, the reassembler app will randomly evict a pending reassembly
+from its buffer before starting the new reassembly.
+
+The reassembler app currently does not time out reassemblies that have
+been around for too long.  It could be a good idea to implement
+timeouts and then be able to issue "timeout exceeded" ICMP errors if
+needed.
+
+Finally, note that any incoming packet that is not IPv4 is silently
+dropped; all output packets are valid unfragmented IPv4.
+
+### Configuration
+
+The `Reassembler` app accepts a table as its configuration
+argument. The following keys are defined:
+
+— Key **max_concurrent_reassemblies**
+
+*Optional*.  The maximum number of concurrent reassemblies.  Note that
+each reassembly uses about 11kB of memory.  The default is 20000.
+
+— Key **max_fragments_per_reassembly**
+
+*Optional*.  The maximum number of fragments per reassembly.  The
+default is 40.
