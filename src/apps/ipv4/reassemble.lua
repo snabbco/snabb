@@ -124,9 +124,9 @@ Reassembler.shm = {
 local reassembler_config_params = {
    -- Maximum number of in-progress reassemblies.  Each one uses about
    -- 11 kB of memory.
-   max_ipv4_reassembly_packets = { default=20000 },
+   max_concurrent_reassemblies = { default=20000 },
    -- Maximum number of fragments to reassemble.
-   max_fragments_per_reassembly_packet = { default=40 },
+   max_fragments_per_reassembly = { default=40 },
 }
 
 function Reassembler:new(conf)
@@ -150,9 +150,9 @@ function Reassembler:new(conf)
             uint32_t running_length; // bytes copied so far
             struct packet packet;
          } __attribute((packed))]],
-         o.max_fragments_per_reassembly_packet,
-         o.max_fragments_per_reassembly_packet),
-      initial_size = math.ceil(o.max_ipv4_reassembly_packets / max_occupy),
+         o.max_fragments_per_reassembly,
+         o.max_fragments_per_reassembly),
+      initial_size = math.ceil(o.max_concurrent_reassemblies / max_occupy),
       max_occupancy_rate = max_occupy,
    }
    o.ctab = ctablew.new(params)
@@ -221,7 +221,7 @@ function Reassembler:handle_fragment(h, fragment)
    local reassembly = entry.value
 
    local fcount = reassembly.fragment_count
-   if fcount + 1 > self.max_fragments_per_reassembly_packet then
+   if fcount + 1 > self.max_fragments_per_reassembly then
       -- Too many fragments to reassembly this packet; fail.
       return self:reassembly_error(entry)
    end
@@ -366,8 +366,8 @@ function selftest()
          local fragments = fragment(pkt, mtu)
          for _, order in ipairs(permute_indices(1, #fragments)) do
             local reassembler = Reassembler:new {
-               max_ipv4_reassembly_packets = 100,
-               max_fragments_per_reassembly_packet = 20
+               max_concurrent_reassemblies = 100,
+               max_fragments_per_reassembly = 20
             }
             reassembler.shm = shm.create_frame(
                "apps/reassembler", reassembler.shm)

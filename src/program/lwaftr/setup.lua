@@ -101,9 +101,9 @@ function lwaftr_app(c, conf, device)
    local iinternal_interface = queue.internal_interface
 
    config.app(c, "reassemblerv4", ipv4_reassemble.Reassembler,
-              { max_ipv4_reassembly_packets =
+              { max_concurrent_reassemblies =
                    gexternal_interface.reassembly.max_packets,
-                max_fragments_per_reassembly_packet =
+                max_fragments_per_reassembly =
                    gexternal_interface.reassembly.max_fragments_per_packet })
    config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6,
               { max_ipv6_reassembly_packets =

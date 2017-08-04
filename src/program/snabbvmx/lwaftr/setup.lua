@@ -226,9 +226,9 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       if conf.ipv4_interface.fragmentation then
          local mtu = conf.ipv4_interface.mtu or gexternal_interface.mtu
          config.app(c, "reassemblerv4", ipv4_reassemble.Reassembler, {
-            max_ipv4_reassembly_packets =
+            max_concurrent_reassemblies =
                gexternal_interface.reassembly.max_packets,
-            max_fragments_per_reassembly_packet =
+            max_fragments_per_reassembly =
                gexternal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
@@ -381,9 +381,9 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
       if conf.ipv4_interface.fragmentation then
          local mtu = conf.ipv4_interface.mtu or external_interface.mtu
          config.app(c, "reassemblerv4", ipv4_reassemble.Reassembler, {
-            max_ipv4_reassembly_packets =
+            max_concurrent_reassemblies =
                external_interface.reassembly.max_packets,
-            max_fragments_per_reassembly_packet =
+            max_fragments_per_reassembly =
                external_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv4", ipv4_apps.Fragmenter, {
