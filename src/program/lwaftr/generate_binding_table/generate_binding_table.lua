@@ -43,9 +43,8 @@ end
 
 local function softwire_entry(v4addr, psid_len, b4)
    if tonumber(v4addr) then v4addr = to_ipv4_string(v4addr) end
-   local softwire = "  softwire { ipv4 %s; psid %d; b4-ipv6 %s; br-address %s;"
-   softwire = softwire .. " port-set { psid-length %d; }}"
-   return softwire:format(v4addr, psid_len, b4, br_address, port_set.psid_len)
+   return ("  softwire { ipv4 %s; psid %d; b4-ipv6 %s; }"):format(
+       v4addr, psid_len, b4)
 end
 
 local function inc_ipv6(ipv6)
