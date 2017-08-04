@@ -3,7 +3,7 @@ module(..., package.seeall)
 local config = require("core.config")
 local lib = require("core.lib")
 local util = require("program.lwaftr.check.util")
-local lwcounter = require("program.lwaftr.lwcounter")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local setup = require("program.snabbvmx.lwaftr.setup")
 
 local function show_usage(code)
