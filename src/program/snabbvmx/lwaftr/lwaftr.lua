@@ -5,6 +5,7 @@ local constants = require("apps.lwaftr.constants")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local intel10g = require("apps.intel.intel10g")
 local lib = require("core.lib")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local setup = require("program.snabbvmx.lwaftr.setup")
@@ -179,7 +180,7 @@ function run(args)
              "Not valid ingress-drop-monitor action")
       print(("Ingress drop monitor: %s (threshold: %d packets; wait: %d seconds; interval: %.2f seconds)"):format(
              ingress_drop_action, ingress_drop_threshold, ingress_drop_wait, 1e6/ingress_drop_interval))
-      local counter_path = "apps/lwaftr/ingress-packet-drops"
+      local counter_path = lwcounter.counters_dir.."/ingress-packet-drops"
       local mon = ingress_drop_monitor.new({
          action = ingress_drop_action,
          threshold = ingress_drop_threshold,
