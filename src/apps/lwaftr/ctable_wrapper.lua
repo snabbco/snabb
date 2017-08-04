@@ -46,6 +46,7 @@ function new(params)
 end
 
 function selftest()
+   print('selftest: apps.lwaftr.ctable_wrapper')
    local ffi = require("ffi")
    local occupancy = 4
    -- 32-byte entries 
@@ -79,4 +80,5 @@ function selftest()
    assert(iterated == ctab.occupancy)
    assert(iterated == old_occupancy - 1)
    -- OK, all looking good with our ctab.
+   print('selftest: ok')
 end

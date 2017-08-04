@@ -302,7 +302,7 @@ function CTable:add(key, value, updates_allowed)
    -- Fast path.
    if entries[index].hash == HASH_MAX and updates_allowed ~= 'required' then
       self.occupancy = self.occupancy + 1
-      local entry = entries[index]
+      local entry = entries + index
       entry.hash = hash
       entry.key = key
       entry.value = value
@@ -314,7 +314,7 @@ function CTable:add(key, value, updates_allowed)
    end
 
    while entries[index].hash == hash do
-      local entry = entries[index]
+      local entry = entries + index
       if self.equal_fn(key, entry.key) then
          assert(updates_allowed, "key is already present in ctable")
          entry.key = key
@@ -348,7 +348,7 @@ function CTable:add(key, value, updates_allowed)
    end
            
    self.occupancy = self.occupancy + 1
-   local entry = entries[index]
+   local entry = entries + index
    entry.hash = hash
    entry.key = key
    entry.value = value
