@@ -196,17 +196,15 @@ function ARP:push()
       end
    end
 
-   for _ = 1, link.nreadable(inorth) do
-      local p = receive(inorth)
-      if not self.next_mac then
-         -- drop all southbound packets until the next hop's ethernet address is known
-         packet.free(p)
-      else
-         local e = ffi.cast(ether_header_ptr_t, p.data)
-         e.dhost = self.next_mac
-         e.shost = self.self_mac
-         transmit(osouth, p)
-      end
+   -- don't read southbound packets until the next hop's ethernet address is known
+   if self.next_mac then
+     for _ = 1, link.nreadable(inorth) do
+        local p = receive(inorth)
+        local e = ffi.cast(ether_header_ptr_t, p.data)
+        e.dhost = self.next_mac
+        e.shost = self.self_mac
+        transmit(osouth, p)
+     end
    end
 end
 
