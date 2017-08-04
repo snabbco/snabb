@@ -22,7 +22,6 @@ local link       = require("core.link")
 local ipsum      = require("lib.checksum").ipsum
 local ctable     = require('lib.ctable')
 local ctablew    = require('apps.lwaftr.ctable_wrapper')
-local lwcounter  = require("apps.lwaftr.lwcounter")
 
 local ntohs, htons = lib.ntohs, lib.htons
 
@@ -113,6 +112,15 @@ local function verify_valid_offsets(reassembly)
 end
 
 Reassembler = {}
+Reassembler.shm = {
+   ["in-ipv4-frag-needs-reassembly"]      = {counter},
+   ["in-ipv4-frag-reassembled"]           = {counter},
+   ["in-ipv4-frag-reassembly-unneeded"]   = {counter},
+   ["drop-ipv4-frag-disabled"]            = {counter},
+   ["drop-ipv4-frag-invalid-reassembly"]  = {counter},
+   ["drop-ipv4-frag-random-evicted"]      = {counter},
+   ["memuse-ipv4-frag-reassembly-buffer"] = {counter}
+}
 local reassembler_config_params = {
    -- Maximum number of in-progress reassemblies.  Each one uses about
    -- 11 kB of memory.
@@ -123,7 +131,6 @@ local reassembler_config_params = {
 
 function Reassembler:new(conf)
    local o = lib.parse(conf, reassembler_config_params)
-   o.counters = lwcounter.init_counters()
 
    local max_occupy = 0.9
    local params = {
@@ -152,24 +159,24 @@ function Reassembler:new(conf)
    o.scratch_fragment_key = params.key_type()
    o.scratch_reassembly = params.value_type()
 
-   counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
-               o.ctab:get_backing_size())
+   -- counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
+   -- o.ctab:get_backing_size())
    return setmetatable(o, {__index=Reassembler})
 end
 
 function Reassembler:record_eviction()
-   counter.add(self.counters["drop-ipv4-frag-random-evicted"])
+   counter.add(self.shm["drop-ipv4-frag-random-evicted"])
 end
 
 function Reassembler:reassembly_success(entry, pkt)
    self.ctab:remove_ptr(entry)
-   counter.add(self.counters["in-ipv4-frag-reassembled"])
+   counter.add(self.shm["in-ipv4-frag-reassembled"])
    link.transmit(self.output.output, pkt)
 end
 
 function Reassembler:reassembly_error(entry, icmp_error)
    self.ctab:remove_ptr(entry)
-   counter.add(self.counters["drop-ipv4-frag-invalid-reassembly"])
+   counter.add(self.shm["drop-ipv4-frag-invalid-reassembly"])
    if icmp_error then -- This is an ICMP packet
       link.transmit(self.output.errors, icmp_error)
    end
@@ -282,11 +289,11 @@ function Reassembler:push ()
       elseif bit.band(ntohs(h.ipv4.flags_and_fragment_offset),
                       ipv4_is_fragment_mask) == 0 then
          -- Not fragmented; forward it on.
-         counter.add(self.counters["in-ipv4-frag-reassembly-unneeded"])
+         counter.add(self.shm["in-ipv4-frag-reassembly-unneeded"])
          link.transmit(output, pkt)
       else
          -- A fragment; try to reassemble.
-         counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
+         counter.add(self.shm["in-ipv4-frag-needs-reassembly"])
          self:handle_fragment(h, pkt)
          packet.free(pkt)
       end
@@ -296,6 +303,7 @@ end
 function selftest()
    print("selftest: apps.ipv4.reassemble")
 
+   local shm        = require("core.shm")
    local datagram   = require("lib.protocol.datagram")
    local ether      = require("lib.protocol.ethernet")
    local ipv4       = require("lib.protocol.ipv4")
@@ -361,6 +369,8 @@ function selftest()
                max_ipv4_reassembly_packets = 100,
                max_fragments_per_reassembly_packet = 20
             }
+            reassembler.shm = shm.create_frame(
+               "apps/reassembler", reassembler.shm)
             reassembler.input = { input = link.new('reassembly input') }
             reassembler.output = { output = link.new('reassembly output') }
             local last = table.remove(order)
@@ -384,6 +394,7 @@ function selftest()
             packet.free(result)
             link.free(reassembler.input.output, 'reassembly input')
             link.free(reassembler.output.output, 'reassembly output')
+            shm.delete_frame(reassembler.shm)
          end
          for _, p in ipairs(fragments) do packet.free(p) end
       end
