@@ -13,7 +13,7 @@
   Use "snabb lwaftr migrate-configuration" to migrate old
   configurations.  
 
-* New version numbering schemd which includes the Snabb version the
+* New version numbering scheme which includes the Snabb version the
   lwaftr is based off and a lwaftr specific version number which is
   reset upon merging a newer version of Snabb from upstream.
 
