@@ -12,20 +12,22 @@ import unittest
 from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
 
 
+DAEMON_PROC_NAME = 'monitor-test-daemon'
 SNABB_PCI0 = nic_names()[0]
-
 
 @unittest.skipUnless(SNABB_PCI0, 'NIC not configured')
 class TestMonitor(BaseTestCase):
 
     daemon_args = [
         str(SNABB_CMD), 'lwaftr', 'run',
+        '--name', DAEMON_PROC_NAME,
         '--bench-file', '/dev/null',
         '--conf', str(DATA_DIR / 'icmp_on_fail.conf'),
         '--on-a-stick', SNABB_PCI0,
         '--mirror',  # TAP interface name added in setUpClass.
     ]
-    monitor_args = (str(SNABB_CMD), 'lwaftr', 'monitor', 'all')
+    monitor_args = (
+        str(SNABB_CMD), 'lwaftr', 'monitor', '--name', DAEMON_PROC_NAME, 'all')
 
     # Use setUpClass to only setup the daemon once for all tests.
     @classmethod
@@ -44,9 +46,7 @@ class TestMonitor(BaseTestCase):
             raise
 
     def test_monitor(self):
-        monitor_args = list(self.monitor_args)
-        monitor_args.append(str(self.daemon.pid))
-        output = self.run_cmd(monitor_args)
+        output = self.run_cmd(self.monitor_args)
         self.assertIn(b'Mirror address set', output,
             b'\n'.join((b'OUTPUT', output)))
         self.assertIn(b'255.255.255.255', output,

@@ -1,425 +1,447 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+-- NDP address resolution (RFC 4861)
+
+-- This app uses the neighbor discovery protocol to determine the
+-- Ethernet address of an IPv6 next-hop.  It's a limited
+-- implementation; if you need to route traffic to multiple IPv6
+-- next-hops on the local network, probably you want to build a more
+-- capable NDP app.
+--
+-- All non-NDP traffic coming in on the "south" interface (i.e., from
+-- the network card) is directly forwarded out the "north" interface
+-- to be handled by the network function.  Incoming traffic on the
+-- "north" inferface is dropped until the MAC address of the next-hop
+-- is known.  Once we do have a MAC address for the next-hop, this app
+-- sends all outgoing traffic there, overwriting the source and
+-- destination Ethernet addresses on outgoing southbound traffic.
+
 module(..., package.seeall)
 
--- NDP address resolution.
--- Given a remote IPv6 address, try to find out its MAC address.
--- If resolution succeeds:
--- All packets coming through the 'south' interface (ie, via the network card)
--- are silently forwarded.
--- Note that the network card can drop packets; if it does, they will not get
--- to this app.
--- All packets coming through the 'north' interface (the lwaftr) will have
--- their Ethernet headers rewritten.
-
--- Expected configuration:
--- lwaftr <-> ipv6 fragmentation app <-> lw_eth_resolve <-> vlan tag handler
--- That is, neither fragmentation nor vlan tagging are within the scope of this app.
-
-local constants = require("apps.lwaftr.constants")
-local lwutil = require("apps.lwaftr.lwutil")
-
+local bit      = require("bit")
+local ffi      = require("ffi")
+local packet   = require("core.packet")
+local link     = require("core.link")
+local lib      = require("core.lib")
+local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
-local ipv6 = require("lib.protocol.ipv6")
+local ipv6     = require("lib.protocol.ipv6")
 
-local checksum = require("lib.checksum")
-local ffi = require("ffi")
+local constants = require("apps.lwaftr.constants")
 
-local C = ffi.C
-local rd16, wr16, wr32, ipv6_equals = lwutil.rd16, lwutil.wr16, lwutil.wr32, lwutil.ipv6_equals
+local htons, ntohs = lib.htons, lib.ntohs
+local htonl, ntohl = lib.htonl, lib.ntohl
+local receive, transmit = link.receive, link.transmit
 
+local ether_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  dhost[6];
+   uint8_t  shost[6];
+   uint16_t type;
+} __attribute__((packed))
+]]
+local ipv6_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint32_t v_tc_fl; // version, tc, flow_label
+   uint16_t payload_length;
+   uint8_t  next_header;
+   uint8_t  hop_limit;
+   uint8_t  src_ip[16];
+   uint8_t  dst_ip[16];
+} __attribute__((packed))
+]]
+local icmpv6_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  type;
+   uint8_t  code;
+   uint16_t checksum;
+} __attribute__((packed))
+]]
+local na_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint32_t flags;               /* Bit 31: Router; Bit 30: Solicited;
+                                    Bit 29: Override; Bits 28-0: Reserved. */
+   uint8_t  target_ip[16];
+   uint8_t  options[0];
+} __attribute__((packed))
+]]
+local ns_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint32_t flags;               /* Bits 31-0: Reserved.  */
+   uint8_t  target_ip[16];
+   uint8_t  options[0];
+} __attribute__((packed))
+]]
+local option_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  type;
+   uint8_t  length;
+} __attribute__((packed))
+]]
+local ether_option_header_t = ffi.typeof ([[
+/* All values in network byte order.  */
+struct {
+   $ header;
+   uint8_t  addr[6];
+} __attribute__((packed))
+]], option_header_t)
+local ipv6_pseudoheader_t = ffi.typeof [[
+struct {
+   char src_ip[16];
+   char dst_ip[16];
+   uint32_t ulp_length;
+   uint32_t next_header;
+} __attribute__((packed))
+]]
+local ndp_header_t = ffi.typeof([[
+struct {
+   $ ether;
+   $ ipv6;
+   $ icmpv6;
+   uint8_t body[0];
+} __attribute__((packed))]], ether_header_t, ipv6_header_t, icmpv6_header_t)
+
+local function ptr_to(t) return ffi.typeof('$*', t) end
+local ether_header_ptr_t = ptr_to(ether_header_t)
+local ndp_header_ptr_t = ptr_to(ndp_header_t)
+local na_header_ptr_t = ptr_to(na_header_t)
+local ns_header_ptr_t = ptr_to(ns_header_t)
+local option_header_ptr_t = ptr_to(option_header_t)
+local ether_option_header_ptr_t = ptr_to(ether_option_header_t)
+
+local ndp_header_len = ffi.sizeof(ndp_header_t)
+
+local ether_type_ipv6 = 0x86DD
+local proto_icmpv6 = 58
+local icmpv6_ns = 135
+local icmpv6_na = 136
+local na_router_bit = 31
+local na_solicited_bit = 30
+local na_override_bit = 29
 local option_source_link_layer_address = 1
 local option_target_link_layer_address = 2
-local eth_ipv6_size = constants.ethernet_header_size + constants.ipv6_fixed_header_size
-local o_icmp_target_offset = 8
-local o_icmp_first_option = 24
-
--- Cache constants
-local ipv6_pseudoheader_size = constants.ipv6_pseudoheader_size
-local ethernet_header_size = constants.ethernet_header_size
-local o_ipv6_src_addr =  constants.o_ipv6_src_addr
-local o_ipv6_dst_addr =  constants.o_ipv6_dst_addr
-local o_ipv6_payload_len = constants.o_ipv6_payload_len
-local o_ipv6_next_header = constants.o_ipv6_next_header
-local o_ipv6_hop_limit = constants.o_ipv6_hop_limit
-local o_ethernet_ethertype = constants.o_ethernet_ethertype
-local proto_icmpv6 = constants.proto_icmpv6
-local icmpv6_na = constants.icmpv6_na
-local icmpv6_ns = constants.icmpv6_ns
-local n_ethertype_ipv6 = constants.n_ethertype_ipv6
-local ethertype_ipv6 = constants.ethertype_ipv6
 
 -- Special addresses
-ipv6_all_nodes_local_segment_addr = ipv6:pton("ff02::1")
-ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
+local ipv6_all_nodes_local_segment_addr = ipv6:pton("ff02::1")
+local ipv6_unspecified_addr = ipv6:pton("0::0") -- aka ::/128
 -- Really just the first 13 bytes of the following...
-ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
+local ipv6_solicited_multicast = ipv6:pton("ff02:0000:0000:0000:0000:0001:ff00:00")
 
-
--- Pseudo-header:
--- 32 bytes src and dst addresses
--- 4 bytes content length, network byte order
---   (2 0 bytes and then 2 possibly-0 content length bytes in practice)
--- three zero bytes, then the next_header byte
-local _scratch_pseudoheader = ffi.new('uint8_t[?]', ipv6_pseudoheader_size)
 local function checksum_pseudoheader_from_header(ipv6_fixed_header)
-   local ph_size = ipv6_pseudoheader_size
-   ffi.fill(_scratch_pseudoheader, ph_size)
-   ffi.copy(_scratch_pseudoheader, ipv6_fixed_header + o_ipv6_src_addr, 32)
-   ffi.copy(_scratch_pseudoheader + 34, ipv6_fixed_header + o_ipv6_payload_len, 2)
-   ffi.copy(_scratch_pseudoheader + 39, ipv6_fixed_header + o_ipv6_next_header, 1)
-   return checksum.ipsum(_scratch_pseudoheader, ph_size, 0)
+   local ph = ipv6_pseudoheader_t()
+   ph.src_ip = ipv6_fixed_header.src_ip
+   ph.dst_ip = ipv6_fixed_header.dst_ip
+   ph.ulp_length = htonl(ntohs(ipv6_fixed_header.payload_length))
+   ph.next_header = htonl(ipv6_fixed_header.next_header)
+   return checksum.ipsum(ffi.cast('char*', ph),
+                         ffi.sizeof(ipv6_pseudoheader_t), 0)
 end
 
-local function eth_next_is_ipv6(pkt)
-   return rd16(pkt.data + o_ethernet_ethertype) == n_ethertype_ipv6
+local function is_ndp(pkt)
+   if pkt.length < ndp_header_len then return false end
+   local h = ffi.cast(ndp_header_ptr_t, pkt.data)
+   if ntohs(h.ether.type) ~= ether_type_ipv6 then return false end
+   if h.ipv6.next_header ~= proto_icmpv6 then return false end
+   return h.icmpv6.type >= 133 and h.icmpv6.type <= 137
 end
 
-local function ipv6_next_is_icmp6(pkt)
-   local offset = ethernet_header_size + o_ipv6_next_header
-   return pkt.data[offset] == proto_icmpv6
+local function make_ndp_packet(src_mac, dst_mac, src_ip, dst_ip, message_type,
+                               message, option)
+   local pkt = packet.allocate()
+
+   pkt.length = ndp_header_len
+   local h = ffi.cast(ndp_header_ptr_t, pkt.data)
+   h.ether.dhost = dst_mac
+   h.ether.shost = src_mac
+   h.ether.type = htons(ether_type_ipv6)
+   h.ipv6.v_tc_fl = 0
+   lib.bitfield(32, h.ipv6, 'v_tc_fl', 0, 4, 6)  -- IPv6 Version
+   lib.bitfield(32, h.ipv6, 'v_tc_fl', 4, 8, 0)  -- Traffic class
+   lib.bitfield(32, h.ipv6, 'v_tc_fl', 12, 20, 0) -- Flow label
+   h.ipv6.payload_length = 0
+   h.ipv6.next_header = proto_icmpv6
+   h.ipv6.hop_limit = 255
+   h.ipv6.src_ip = src_ip
+   h.ipv6.dst_ip = dst_ip
+   h.icmpv6.type = message_type
+   h.icmpv6.code = 0
+   h.icmpv6.checksum = 0
+
+   packet.append(pkt, message, ffi.sizeof(message))
+   packet.append(pkt, option, ffi.sizeof(option))
+
+   -- Now fix up lengths and checksums.
+   h.ipv6.payload_length = htons(pkt.length - ffi.sizeof(ether_header_t)
+   - ffi.sizeof(ipv6_header_t))
+   ptr = ffi.cast('char*', h.icmpv6)
+   local base_checksum = checksum_pseudoheader_from_header(h.ipv6)
+   h.icmpv6.checksum = htons(checksum.ipsum(ptr,
+                                            pkt.length - (ptr - pkt.data),
+                                            bit.bnot(base_checksum)))
+   return pkt
 end
 
-local function icmpv6_type_is_na(pkt)
-   return pkt.data[eth_ipv6_size] == icmpv6_na
-end
-
-local function icmpv6_type_is_ns(pkt)
-   return pkt.data[eth_ipv6_size] == icmpv6_ns
-end
-
--- The relevant byte is:
--- [ R S O 0 0 0 0 0 0 ], where S = solicited
--- Format:
--- 1 byte type, 1 byte code, 2 bytes checksum
--- RSO + 29 reserved bits.
--- Then target address (16 bytes) and possibly options.
-local function is_solicited_na(pkt)
-   local o_rso_bits = 4
-   local offset = eth_ipv6_size + o_rso_bits
-   local sol_bit = 0x40
-   return bit.band(sol_bit, pkt.data[offset]) == sol_bit
-end
-
-
---[[ All NDP messages are >= 8 bytes. Router solicitation is the shortest:
-      0                   1                   2                   3
-      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |     Type      |     Code      |          Checksum             |
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |                            Reserved                           |
-     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-     |   Options ...
-     +-+-+-+-+-+-+-+-+-+-+-+-
---]]
-function is_ndp(pkt)
-   local min_ndp_len = eth_ipv6_size + 8
-   if pkt.length >= min_ndp_len and
-      eth_next_is_ipv6(pkt) and
-      ipv6_next_is_icmp6(pkt)
-   then
-      local icmp_type = pkt.data[eth_ipv6_size]
-      return (icmp_type >= 133 and icmp_type <= 137)
+-- Respond to a neighbor solicitation for our own address.
+local function make_na_packet(src_mac, dst_mac, src_ip, dst_ip, is_router)
+   local message = na_header_t()
+   local flags = bit.lshift(1, na_solicited_bit)
+   if is_router then
+      flags = bit.bor(bit.lshift(1, na_router_bit), flags)
    end
-   return false
+   message.flags = htonl(flags)
+   message.target_ip = src_ip
+
+   local option = ether_option_header_t()
+   option.header.type = option_target_link_layer_address
+   option.header.length = 1 -- One 8-byte unit.
+   option.addr = src_mac
+
+   return make_ndp_packet(src_mac, dst_mac, src_ip, dst_ip, icmpv6_na,
+                          message, option)
 end
 
--- TODO: tune this for speed
--- Note that this must be run after any vlan tags have been stripped out
--- and after any reassembly has been done, and no extra IPv6 headers
--- must be present
---- TODO: could this reasonably use pflang?
-function is_solicited_neighbor_advertisement(pkt)
-   return is_ndp(pkt) and
-          icmpv6_type_is_na(pkt) and
-          is_solicited_na(pkt)
-end
+-- Solicit a neighbor's address.
+local function make_ns_packet(src_mac, src_ip, dst_ip)
+   local message = ns_header_t()
+   message.flags = 0
+   message.target_ip = dst_ip
 
-local function is_neighbor_solicitation(pkt)
-   return is_ndp(pkt) and icmpv6_type_is_ns(pkt)
-end
+   local option = ether_option_header_t()
+   option.header.type = option_source_link_layer_address
+   option.header.length = 1 -- One 8-byte unit.
+   option.addr = src_mac
 
--- Check whether NS target address matches IPv6 address.
-function is_neighbor_solicitation_for_addr(pkt, ipv6_addr)
-   if not is_neighbor_solicitation(pkt) then return false end
-   local target_offset = eth_ipv6_size + o_icmp_target_offset
-   local target_ipv6 = pkt.data + target_offset
-   return ipv6_equals(target_ipv6, ipv6_addr)
-end
-
-local function to_ether_addr(pkt, offset)
-   local ether_src = ffi.new("uint8_t[?]", 6)
-   ffi.copy(ether_src, pkt.data + offset, 6)
-   return ether_src
-end
-
--- The option format is, for ethernet networks:
--- 1 byte option type, 1 byte option length (in chunks of 8 bytes)
--- 6 bytes MAC address
-function get_dst_ethernet(pkt, target_ipv6_addrs)
-   if pkt == nil or target_ipv6_addrs == nil then return false end
-   local na_addr_offset = eth_ipv6_size + o_icmp_target_offset
-   for i=1,#target_ipv6_addrs do
-      if ipv6_equals(target_ipv6_addrs[i], pkt.data + na_addr_offset) then
-         local na_option_offset = eth_ipv6_size + o_icmp_first_option
-         if pkt.data[na_option_offset] == option_target_link_layer_address then
-            return to_ether_addr(pkt, na_option_offset + 2)
-         end
-         -- When responding to unicast solicitations, the option can be omitted
-         -- since the sender of the solicitation has the correct link-layer
-         -- address (See 4.4. Neighbor Advertisement Message Format)
-         if pkt.length == na_option_offset then
-            return to_ether_addr(pkt, 6)
-         end
-      end
-   end
-   return false
-end
-
-local function write_ndp(pkt, local_eth, target_addr, i_type, flags, option_type)
-   local i_code = 0
-   pkt.data[0] = i_type
-   pkt.data[1] = i_code
-   wr16(pkt.data + 2, 0) -- initial 0 checksum
-   wr32(pkt.data + 4, 0) -- 29-32 reserved bits, depending on type
-   pkt.data[4] = flags
-   ffi.copy(pkt.data + 8, target_addr, 16)
-
-   -- The link layer address SHOULD or MUST be set, so set it
-   pkt.data[o_icmp_first_option] = option_type
-   pkt.data[25] = 1 -- this option is one 8-octet chunk long
-   ffi.copy(pkt.data + 26, local_eth, 6)
-   pkt.length = 32
-end
-
--- This only does solicited neighbor advertisements
-local function write_sna(pkt, local_eth, is_router, soliciting_pkt, base_checksum)
-   local target_addr = soliciting_pkt.data + eth_ipv6_size + 8
-   local i_type = icmpv6_na -- RFC 4861 neighbor advertisement
-   local flags = 0x40 -- solicited
-   -- don't support the override flag for now; TODO?
-   if is_router then flags = flags + 0x80 end
-   local option_type = option_target_link_layer_address
-   write_ndp(pkt, local_eth, target_addr, i_type, flags, option_type)
-end
-
--- This does not allow setting any options in the packet.
--- Target address must be in the format that results from pton.
-local function write_ns(pkt, local_eth, target_addr)
-   local i_type = icmpv6_ns -- RFC 4861 neighbor solicitation
-   local option_type = option_source_link_layer_address
-   write_ndp(pkt, local_eth, target_addr, i_type, 0, option_type)
-end
-
-
-function form_ns(local_eth, local_ipv6, dst_ipv6)
-   local ns_pkt = packet.allocate()
-   local ethernet_broadcast = ethernet:pton("ff:ff:ff:ff:ff:ff")
-   local hop_limit = 255 -- as per RFC 4861
-
-   write_ns(ns_pkt, local_eth, dst_ipv6)
-   local dgram = datagram:new(ns_pkt)
-   local i = ipv6:new({ hop_limit = hop_limit, 
-                        next_header = proto_icmpv6,
-                        src = local_ipv6, dst = dst_ipv6 })
-   i:payload_length(dgram:packet().length)
-   
-   local ph = i:pseudo_header(dgram:packet().length, proto_icmpv6)
-   local ph_len = ipv6_pseudoheader_size
-   local base_checksum = checksum.ipsum(ffi.cast("uint8_t*", ph), ph_len, 0)
-   local csum = checksum.ipsum(dgram:packet().data, dgram:packet().length, bit.bnot(base_checksum))
-   wr16(dgram:packet().data + 2, C.htons(csum))
-   
-   dgram:push(i)
-   dgram:push(ethernet:new({ src = local_eth, dst = ethernet_broadcast,
-                             type = ethertype_ipv6 }))
-   ns_pkt = dgram:packet()
-   dgram:free()
-   return ns_pkt
-end
-
---[[ IPv6 Destination Address
-                     For solicited advertisements, the Source Address of
-                     an invoking Neighbor Solicitation or, if the
-                     solicitation s Source Address is the unspecified
-                     address, the all-nodes multicast address.
---]]
--- TODO: verify that the all nodes *local segment* rather than *node local*
--- IPv6 multicast address is the right one.
-local function form_sna(local_eth, local_ipv6, is_router, soliciting_pkt)
-   if not soliciting_pkt then return nil end
-   local na_pkt = packet.allocate()
-   -- The destination of the reply is the source of the original packet
-   local dst_eth = soliciting_pkt.data + 6
-   local hop_limit = 255 -- as per RFC 4861
-
-   write_sna(na_pkt, local_eth, is_router, soliciting_pkt)
-   local dgram = datagram:new(na_pkt)
-   local src_addr_offset = ethernet_header_size + o_ipv6_src_addr
-   local invoking_src_addr = soliciting_pkt.data + src_addr_offset
-   local dst_ipv6
-   if ipv6_equals(invoking_src_addr, ipv6_unspecified_addr) then
-      dst_ipv6 = ipv6_all_nodes_local_segment_addr
-   else
-      dst_ipv6 = invoking_src_addr
-   end
-   local i = ipv6:new({ hop_limit = hop_limit,
-                        next_header = proto_icmpv6,
-                        src = local_ipv6, dst = dst_ipv6 })
-   i:payload_length(dgram:packet().length)
-   
-   local ph = i:pseudo_header(dgram:packet().length, proto_icmpv6)
-   local ph_len = ipv6_pseudoheader_size
-   local base_checksum = checksum.ipsum(ffi.cast("uint8_t*", ph), ph_len, 0)
-   local csum = checksum.ipsum(dgram:packet().data, dgram:packet().length,
-                               bit.bnot(base_checksum))
-   wr16(dgram:packet().data + 2, C.htons(csum))
-   
-   dgram:push(i)
-   dgram:push(ethernet:new({ src = local_eth, dst = dst_eth,
-                             type = ethertype_ipv6 }))
-   na_pkt = dgram:packet()
-   dgram:free()
-   return na_pkt
+   local broadcast_mac = ethernet:pton("ff:ff:ff:ff:ff:ff")
+   return make_ndp_packet(src_mac, broadcast_mac, src_ip, dst_ip, icmpv6_ns,
+                          message, option)
 end
 
 local function verify_icmp_checksum(pkt)
-   local offset = ethernet_header_size + o_ipv6_payload_len
-   local icmp_length = C.ntohs(rd16(pkt.data + offset))
-   local ph_csum = checksum_pseudoheader_from_header(
-      pkt.data + ethernet_header_size)
-   local a = checksum.ipsum(pkt.data + eth_ipv6_size, icmp_length, bit.bnot(
-      ph_csum))
+   local h = ffi.cast(ndp_header_ptr_t, pkt.data)
+   local ph_csum = checksum_pseudoheader_from_header(h.ipv6)
+   local icmp_length = ntohs(h.ipv6.payload_length)
+   local a = checksum.ipsum(ffi.cast('char*', h.icmpv6), icmp_length,
+                            bit.bnot(ph_csum))
    return a == 0
 end
+
+local function ipv6_eq(a, b) return ffi.C.memcmp(a, b, 16) == 0 end
 
 -- IPv6 multicast addresses start with FF.
 local function is_address_multicast(ipv6_addr)
    return ipv6_addr[0] == 0xff
 end
 
-local function target_address_is_multicast(pkt)
-   return is_address_multicast(pkt.data + eth_ipv6_size + 8)
+-- Solicited multicast addresses have their first 13 bytes set to
+-- ff02::1:ff00:0/104, aka ff02:0000:0000:0000:0000:0001:ff[UV:WXYZ].
+local function is_solicited_node_multicast_address(addr)
+   return ffi.C.memcmp(addr, ipv6_solicited_multicast, 13) == 0
 end
 
--- Each 1 added to length represents an 8 octet chunk.
-local function option_lengths_are_nonzero(pkt)
-   local start = eth_ipv6_size + o_icmp_first_option
-   while start < pkt.length do
-      local cur_option_length = pkt.data[start + 1]
-      if cur_option_length == 0 then return false end
-      start = start + 8 * cur_option_length
+local function random_locally_administered_unicast_mac_address()
+   local mac = lib.random_bytes(6)
+   -- Bit 0 is 0, indicating unicast.  Bit 1 is 1, indicating locally
+   -- administered.
+   mac[0] = bit.lshift(mac[0], 2) + 2
+   return mac
+end
+
+NDP = {}
+local ndp_config_params = {
+   -- Source MAC address will default to a random address.
+   self_mac  = { default=false },
+   -- Source IP is required though.
+   self_ip   = { required=true },
+   -- The next-hop MAC address can be statically configured.
+   next_mac  = { default=false },
+   -- But if the next-hop MAC isn't configured, NDP will figure it out.
+   next_ip   = { default=false },
+   is_router = { default=true }
+}
+
+function NDP:new(conf)
+   local o = lib.parse(conf, ndp_config_params)
+   if not o.self_mac then
+      o.self_mac = random_locally_administered_unicast_mac_address()
    end
-   return true
-end
-
--- Solicited multicast addresses have their first 13 bytes
--- set to ff02::1:ff00:0/104, aka
--- ff02:0000:0000:0000:0000:0001:ff[UV:WXYZ]
-local function ip_dst_is_solicited_node_multicast_address(pkt)
-   local dst_addr = pkt.data + ethernet_header_size + o_ipv6_dst_addr
-   return C.memcmp(dst_addr, ipv6_solicited_multicast, 13) == 0
-end
-
-local function has_src_link_layer_address_option(pkt)
-   local start = eth_ipv6_size + o_icmp_first_option
-   while start < pkt.length do
-      local cur_option_length = pkt.data[start + 1]
-      local cur_option_type = pkt.data[start]
-      if cur_option_type == option_source_link_layer_address then return true end
-      start = start + 8 * cur_option_length
+   if not o.next_mac then
+      assert(o.next_ip, 'NDP needs next-hop IPv6 address to learn next-hop MAC')
+      self.ns_interval = 3 -- Send a new NS every three seconds.
    end
-   return false
+   return setmetatable(o, {__index=NDP})
 end
 
---[[ RFC 4861
-   A node MUST silently discard any received Neighbor Solicitation
-   messages that do not satisfy all of the following validity checks:
-
-      - The IP Hop Limit field has a value of 255, i.e., the packet
-        could not possibly have been forwarded by a router.
-      - ICMP length (derived from the IP length) is 24 or more octets.
-      - ICMP Checksum is valid.
-      - ICMP Code is 0.
-      - Target Address is not a multicast address.
-      - All included options have a length that is greater than zero.
-      - If the IP source address is the unspecified address, the IP
-        destination address is a solicited-node multicast address.
-      - If the IP source address is the unspecified address, there is no
-        source link-layer address option in the message.
---]]
--- Note that any vlan/etc tags have been stripped off already by another app
-local function is_valid_ns(pkt)
-   -- Verify that there are no extra IPv6 headers via is_ndp
-   if not is_ndp(pkt) then return false end
-
-   local ehs = ethernet_header_size
-   local ip_hop_offset = ehs + o_ipv6_hop_limit
-   if pkt.data[ip_hop_offset] ~= 255 then return false end
-
-   local iplen_offset = ehs + o_ipv6_payload_len
-   local icmp_length = C.ntohs(rd16(pkt.data + iplen_offset))
-   if icmp_length < 24 then return false end
-   if not verify_icmp_checksum(pkt) then return false end
-   local icmp_code_offset = eth_ipv6_size + 1
-   if pkt.data[icmp_code_offset] ~= 0 then return false end
-
-   if target_address_is_multicast(pkt) then return false end
-   if not option_lengths_are_nonzero(pkt) then return false end
-   local src_addr = pkt.data + ehs + o_ipv6_src_addr
-   if ipv6_equals(ipv6_unspecified_addr, src_addr) then
-      if ip_dst_is_solicited_node_multicast_address(pkt) then return false end
-      if has_src_link_layer_address_option(pkt) then return false end
+function NDP:maybe_send_ns_request (output)
+   if self.next_mac then return end
+   self.next_ns_time = self.next_ns_time or engine.now()
+   if self.next_ns_time <= engine.now() then
+      print(("NDP: Resolving '%s'"):format(ipv6:ntop(self.next_ip)))
+      transmit(self.output.south,
+               make_ns_packet(self.self_mac, self.self_ip, self.next_ip))
+      self.next_ns_time = engine.now() + self.ns_interval
    end
-   return true -- all checks passed
 end
 
---[[Sending this from the main local IPv6 address is ok. The RFC says:
-
-      Source Address
-                     An address assigned to the interface from which the
-                     advertisement is sent.
---]]
-function form_nsolicitation_reply(local_eth, local_ipv6, ns_pkt)
-   if not local_eth or not local_ipv6 then return nil end
-   if not is_valid_ns(ns_pkt) then return nil end
-   return form_sna(local_eth, local_ipv6, true, ns_pkt)
+function NDP:resolve_next_hop(next_mac)
+   -- It's possible for a NA packet to indicate the MAC address in
+   -- more than one way (e.g. unicast ethernet source address and the
+   -- link layer address in the NDP options).  Just take the first
+   -- one.
+   if self.next_mac then return end
+   print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.next_ip),
+                                            ethernet:ntop(next_mac)))
+   self.next_mac = next_mac
 end
 
-local function test_ndp_without_target_link()
-   local lib = require("core.lib")
-   -- Neighbor Advertisement packet.
-   local na_pkt = lib.hexundump([[
-      02:aa:aa:aa:aa:aa 90:e2:ba:a9:89:2d 86 dd 60 00 
-      00 00 00 18 3a ff fe 80 00 00 00 00 00 00 92 e2 
-      ba ff fe a9 89 2d fc 00 00 00 00 00 00 00 00 00 
-      00 00 00 00 01 00 88 00 92 36 40 00 00 00 fe 80 
-      00 00 00 00 00 00 92 e2 ba ff fe a9 89 2d
-   ]], 78)
-   local dst_eth = get_dst_ethernet(packet.from_string(na_pkt),
-      {ipv6:pton("fe80::92e2:baff:fea9:892d")})
-   assert(ethernet:ntop(dst_eth) == "90:e2:ba:a9:89:2d")
+local function copy_mac(src)
+   local dst = ffi.new('uint8_t[6]')
+   ffi.copy(dst, src, 6)
+   return dst
+end
+
+function NDP:handle_ndp (pkt)
+   local h = ffi.cast(ndp_header_ptr_t, pkt.data)
+   -- Generic checks.
+   if h.ipv6.hop_limit ~= 255 then return end
+   if h.icmpv6.code ~= 0 then return end
+   if not verify_icmp_checksum(pkt) then return end
+
+   if h.icmpv6.type == icmpv6_na then
+      -- Only process advertisements when we are looking for a
+      -- next-hop MAC.
+      if self.next_mac then return end
+      -- Drop packets that are too short.
+      if pkt.length < ndp_header_len + ffi.sizeof(na_header_t) then return end
+      local na = ffi.cast(na_header_ptr_t, h.body)
+      local solicited = bit.lshift(1, na_solicited_bit)
+      -- Reject unsolicited advertisements.
+      if bit.band(solicited, ntohl(na.flags)) ~= solicited then return end
+      -- We only are looking for the MAC of our next-hop; no others.
+      if not ipv6_eq(na.target_ip, self.next_ip) then return end
+      -- First try to get the MAC from the options.
+      local offset = na.options - pkt.data
+      while offset < pkt.length do
+         local option = ffi.cast(option_header_ptr_t, pkt.data + offset)
+         -- Any option whose length is 0 or too large causes us to
+         -- drop the packet.
+         if option.length == 0 then return end
+         if offset + option.length*8 > pkt.length then return end
+         offset = offset + option.length*8
+         if option.type == option_target_link_layer_address then
+            if option.length ~= 1 then return end
+            local ether = ffi.cast(ether_option_header_ptr_t, option)
+            self:resolve_next_hop(copy_mac(ether.addr))
+         end
+      end
+      -- Otherwise, when responding to unicast solicitations, the
+      -- option can be omitted since the sender of the solicitation
+      -- has the correct link-layer address.  See 4.4. Neighbor
+      -- Advertisement Message Format.
+      self:resolve_next_hop(copy_mac(h.ether.shost))
+   elseif h.icmpv6.type == icmpv6_ns then
+      if pkt.length < ndp_header_len + ffi.sizeof(ns_header_t) then return end
+      local ns = ffi.cast(ns_header_ptr_t, h.body)
+      if is_address_multicast(ns.target_ip) then return end
+      if not ipv6_eq(ns.target_ip, self.self_ip) then return end
+      local dst_ip
+      if ipv6_eq(h.ipv6.src_ip, ipv6_unspecified_addr) then
+         if is_solicited_node_multicast_address(h.ipv6.dst_ip) then return end
+         dst_ip = ipv6_all_nodes_local_segment_addr
+      else
+         dst_ip = h.ipv6.src_ip
+      end
+      -- We don't need the options, but we do need to check them for
+      -- validity.
+      local offset = ns.options - pkt.data
+      while offset < pkt.length do
+         local option = ffi.cast(option_header_ptr_t, pkt.data + offset)
+         -- Any option whose length is 0 or too large causes us to
+         -- drop the packet.
+         if option.length == 0 then return end
+         if offset + option.length * 8 > pkt.length then return end
+         offset = offset + option.length*8
+         if option.type == option_source_link_layer_address then
+            if ipv6_eq(h.ipv6.src_ip, ipv6_unspecified_addr) then
+               return
+            end
+         end
+      end
+      link.transmit(self.output.south,
+                    make_na_packet(self.self_mac, h.ether.shost,
+                                   self.self_ip, dst_ip, self.is_router))
+   else
+      -- Unhandled NDP packet; silently drop.
+      return
+   end
+end
+
+function NDP:push()
+   local isouth, osouth = self.input.south, self.output.south
+   local inorth, onorth = self.input.north, self.output.north
+
+   -- TODO: do unsolicited neighbor advertisement on start and on
+   -- configuration reloads?
+   -- This would be an optimization, not a correctness issue
+   self:maybe_send_ns_request(osouth)
+
+   for _ = 1, link.nreadable(isouth) do
+      local p = receive(isouth)
+      if is_ndp(p) then
+         self:handle_ndp(p)
+         packet.free(p)
+      else
+         transmit(onorth, p)
+      end
+   end
+
+   for _ = 1, link.nreadable(inorth) do
+      local p = receive(inorth)
+      if not self.next_mac then
+         -- drop all southbound packets until the next hop's ethernet address is known
+         packet.free(p)
+      else
+         local h = ffi.cast(ether_header_ptr_t, p.data)
+         h.shost = self.self_mac
+         h.dhost = self.next_mac
+         transmit(osouth, p)
+      end
+   end
 end
 
 function selftest()
    print("selftest: ndp")
 
-   local lmac = ethernet:pton("01:02:03:04:05:06")
-   local lip = ipv6:pton("1:2:3:4:5:6:7:8")
-   local rip = ipv6:pton("9:a:b:c:d:e:f:0")
-   local nsp = form_ns(lmac, lip, rip)
-   assert(is_ndp(nsp))
-   assert(is_solicited_neighbor_advertisement(nsp) == false)
-   lwutil.set_dst_ethernet(nsp, lmac) -- Not a meaningful thing to do, just a test
-   
-   local sol_na = form_nsolicitation_reply(lmac, lip, nsp)
-   local dst_eth = get_dst_ethernet(sol_na, {rip})
-   assert(ethernet:ntop(dst_eth) == "01:02:03:04:05:06")
-   assert(sol_na, "an na packet should have been formed")
-   assert(is_ndp(sol_na), "sol_na must be ndp!")
-   assert(is_solicited_neighbor_advertisement(sol_na), "sol_na must be sna!")
+   local config = require("core.config")
+   local sink = require("apps.basic.basic_apps").Sink
+   local c = config.new()
+   config.app(c, "nd1", NDP, { self_ip  = ipv6:pton("2001:DB8::1"),
+                               next_ip  = ipv6:pton("2001:DB8::2") })
+   config.app(c, "nd2", NDP, { self_ip  = ipv6:pton("2001:DB8::2"),
+                               next_ip  = ipv6:pton("2001:DB8::1") })
+   config.app(c, "sink1", sink)
+   config.app(c, "sink2", sink)
+   config.link(c, "nd1.south -> nd2.south")
+   config.link(c, "nd2.south -> nd1.south")
+   config.link(c, "sink1.tx -> nd1.north")
+   config.link(c, "nd1.north -> sink1.rx")
+   config.link(c, "sink2.tx -> nd2.north")
+   config.link(c, "nd2.north -> sink2.rx")
+   engine.configure(c)
+   engine.main({ duration = 0.1 })
 
-   test_ndp_without_target_link()
+   local function mac_eq(a, b) return ffi.C.memcmp(a, b, 6) == 0 end
+   local nd1, nd2 = engine.app_table.nd1, engine.app_table.nd2
+   assert(nd1.next_mac)
+   assert(nd2.next_mac)
+   assert(mac_eq(nd1.next_mac, nd2.self_mac))
+   assert(mac_eq(nd2.next_mac, nd1.self_mac))
 
    print("selftest: ok")
 end

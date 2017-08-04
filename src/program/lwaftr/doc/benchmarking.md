@@ -14,8 +14,7 @@ In one server, start the lwAFTR:
 
 ```
 $ sudo numactl -m 0 taskset -c 1 ./src/snabb lwaftr run -v \
-    --conf program/lwaftr/tests/data/icmp_on_fail.conf \
-    --v4 0000:02:00.0 --v6 0000:02:00.1
+    --v4 0000:02:00.0 --v6 0000:02:00.1 --conf /tmp/icmp_on_fail.conf
 ```
 
 See [performance.md](performance.md) for a discussion of `numactl`,

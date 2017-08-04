@@ -69,7 +69,6 @@ function Leader:new (conf)
 end
 
 function Leader:set_initial_configuration (configuration)
-   self.support.validate_config(configuration)
    self.current_configuration = configuration
    self.current_app_graph = self.setup_fn(configuration)
    self.current_in_place_dependencies = {}
@@ -115,28 +114,40 @@ function Leader:rpc_describe (args)
             capability = schema.get_default_capabilities() }
 end
 
-local function path_printer_for_grammar(grammar, path)
+local function path_printer_for_grammar(grammar, path, format, print_default)
    local getter, subgrammar = path_mod.resolver(grammar, path)
-   local printer = data.data_printer_from_grammar(subgrammar)
+   local printer
+   if format == "xpath" then
+      printer = data.xpath_printer_from_grammar(subgrammar, print_default, path)
+   else
+      printer = data.data_printer_from_grammar(subgrammar, print_default)
+   end
    return function(data, file)
       return printer(getter(data), file)
    end
 end
 
-local function path_printer_for_schema(schema, path)
-   return path_printer_for_grammar(data.data_grammar_from_schema(schema), path)
+local function path_printer_for_schema(schema, path, is_config,
+                                       format, print_default)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
+   return path_printer_for_grammar(grammar, path, format, print_default)
 end
 
-local function path_printer_for_schema_by_name(schema_name, path)
-   return path_printer_for_schema(yang.load_schema_by_name(schema_name), path)
+local function path_printer_for_schema_by_name(schema_name, path, is_config,
+                                               format, print_default)
+   local schema = yang.load_schema_by_name(schema_name)
+   return path_printer_for_schema(schema, path, is_config, format,
+                                  print_default)
 end
 
 function Leader:rpc_get_config (args)
    local function getter()
       if args.schema ~= self.schema_name then
-         return self:foreign_rpc_get_config(args.schema, args.path)
+         return self:foreign_rpc_get_config(
+            args.schema, args.path, args.format, args.print_default)
       end
-      local printer = path_printer_for_schema_by_name(args.schema, args.path)
+      local printer = path_printer_for_schema_by_name(
+         args.schema, args.path, true, args.format, args.print_default)
       local config = printer(self.current_configuration, yang.string_output_file())
       return { config = config }
    end
@@ -150,7 +161,8 @@ local function path_parser_for_grammar(grammar, path)
 end
 
 local function path_parser_for_schema(schema, path)
-   return path_parser_for_grammar(data.data_grammar_from_schema(schema), path)
+   local grammar = data.config_grammar_from_schema(schema)
+   return path_parser_for_grammar(grammar, path)
 end
 
 local function path_parser_for_schema_by_name(schema_name, path)
@@ -227,7 +239,8 @@ local function path_setter_for_grammar(grammar, path)
 end
 
 local function path_setter_for_schema(schema, path)
-   return path_setter_for_grammar(data.data_grammar_from_schema(schema), path)
+   local grammar = data.config_grammar_from_schema(schema)
+   return path_setter_for_grammar(grammar, path)
 end
 
 function compute_set_config_fn (schema_name, path)
@@ -307,7 +320,8 @@ local function path_adder_for_grammar(grammar, path)
 end
 
 local function path_adder_for_schema(schema, path)
-   return path_adder_for_grammar(data.data_grammar_from_schema(schema), path)
+   local grammar = data.config_grammar_from_schema(schema)
+   return path_adder_for_grammar(grammar, path)
 end
 
 function compute_add_config_fn (schema_name, path)
@@ -388,7 +402,8 @@ local function path_remover_for_grammar(grammar, path)
 end
 
 local function path_remover_for_schema(schema, path)
-   return path_remover_for_grammar(data.data_grammar_from_schema(schema), path)
+   local grammar = data.config_grammar_from_schema(schema)
+   return path_remover_for_grammar(grammar, path)
 end
 
 function compute_remove_config_fn (schema_name, path)
@@ -396,7 +411,6 @@ function compute_remove_config_fn (schema_name, path)
 end
 
 function Leader:notify_pre_update (config, verb, path, ...)
-   self.support.validate_update(config, verb, path, ...)
    for _,translator in pairs(self.support.translators) do
       translator.pre_update(config, verb, path, ...)
    end
@@ -407,7 +421,7 @@ function Leader:update_configuration (update_fn, verb, path, ...)
    local to_restart =
       self.support.compute_apps_to_restart_after_configuration_update (
          self.schema_name, self.current_configuration, verb, path,
-         self.current_in_place_dependencies)
+         self.current_in_place_dependencies, ...)
    local new_config = update_fn(self.current_configuration, ...)
    local new_app_graph = self.setup_fn(new_config)
    local actions = self.support.compute_config_actions(
@@ -442,22 +456,26 @@ function Leader:apply_translated_rpc_updates (updates)
    end
    return {}
 end
-function Leader:foreign_rpc_get_config (schema_name, path)
+function Leader:foreign_rpc_get_config (schema_name, path, format,
+                                        print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
    local foreign_config = translate.get_config(self.current_configuration)
-   local printer = path_printer_for_schema_by_name(schema_name, path)
+   local printer = path_printer_for_schema_by_name(
+      schema_name, path, true, format, print_default)
    local config = printer(foreign_config, yang.string_output_file())
    return { config = config }
 end
-function Leader:foreign_rpc_get_state (schema_name, path)
+function Leader:foreign_rpc_get_state (schema_name, path, format,
+                                       print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
-   local native_state = state.show_state(self.schema_name, S.getpid(), "/")
+   local native_state = state.read_state(self.schema_name, S.getpid())
    local foreign_state = translate.get_state(native_state)
-   local printer = path_printer_for_schema_by_name(schema_name, path)
-   local config = printer(foreign_state, yang.string_output_file())
-   return { state = config }
+   local printer = path_printer_for_schema_by_name(
+      schema_name, path, false, format, print_default)
+   local state = printer(foreign_state, yang.string_output_file())
+   return { state = state }
 end
 function Leader:foreign_rpc_set_config (schema_name, path, config_str)
    path = path_mod.normalize_path(path)
@@ -540,16 +558,18 @@ end
 function Leader:rpc_get_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
-            return self:foreign_rpc_get_state(args.schema, args.path)
+         return self:foreign_rpc_get_state(args.schema, args.path,
+                                           args.format, args.print_default)
       end
-      local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
-      local s = {}
+      local printer = path_printer_for_schema_by_name(
+         self.schema_name, args.path, false, args.format, args.print_default)
+      local states = {}
       for _, follower in pairs(self.followers) do
-         for k,v in pairs(state.show_state(self.schema_name, follower.pid, args.path)) do
-            s[k] = v
-         end
+         table.insert(states, state.read_state(self.schema_name, follower.pid))
       end
-      return {state=printer(s, yang.string_output_file())}
+      -- FIXME: How to combine states?  Add counters?
+      local state = printer(states[1], yang.string_output_file())
+      return { state = state }
    end
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end
@@ -680,9 +700,8 @@ function Leader:send_messages_to_followers()
    for _,follower in ipairs(self.followers) do
       if not follower.channel then
          local name = '/'..tostring(follower.pid)..'/config-follower-channel'
-         -- local success, channel = pcall(channel.open, name)
-         --if success then follower.channel = channel end
-         follower.channel = channel.open(name)
+         local success, channel = pcall(channel.open, name)
+         if success then follower.channel = channel end
       end
       local channel = follower.channel
       if channel then

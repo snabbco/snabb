@@ -5,12 +5,7 @@ local lwconf = require("apps.lwaftr.conf")
 local setup = require("program.lwaftr.setup")
 local util = require("program.lwaftr.check.util")
 local engine = require("core.app")
-
-local load_requested_counters = util.load_requested_counters
-local read_counters = util.read_counters
-local diff_counters = util.diff_counters
-local validate_diff = util.validate_diff
-local regen_counters = util.regen_counters
+local lwcounter = require("apps.lwaftr.lwcounter")
 
 local function show_usage(code)
    print(require("program.lwaftr.check.README_inc"))
@@ -46,15 +41,16 @@ function run(args)
    load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    engine.configure(c)
    if counters_path then
-      local initial_counters = read_counters(c)
+      local initial_counters = lwcounter.read_counters()
       engine.main({duration=opts.duration})
-      local final_counters = read_counters(c)
-      local counters_diff = diff_counters(final_counters, initial_counters)
+      local final_counters = lwcounter.read_counters()
+      local counters_diff = util.diff_counters(final_counters,
+                                               initial_counters)
       if opts.r then
-         regen_counters(counters_diff, counters_path)
+         util.regen_counters(counters_diff, counters_path)
       else
-         local req_counters = load_requested_counters(counters_path)
-         validate_diff(counters_diff, req_counters)
+         local req_counters = util.load_requested_counters(counters_path)
+         util.validate_diff(counters_diff, req_counters)
       end
    else
       engine.main({duration=opts.duration})

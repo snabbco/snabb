@@ -8,6 +8,8 @@ from random import randint
 from subprocess import check_call
 from test_env import DATA_DIR, SNABB_CMD, BaseTestCase
 
+CONFIG_PATH = str(DATA_DIR / 'icmp_on_fail.conf')
+
 
 class TestRunNoHW(BaseTestCase):
 
@@ -17,7 +19,7 @@ class TestRunNoHW(BaseTestCase):
     cmd_options = {
         '--duration': '1',
         '--bench-file': '/dev/null',
-        '--conf': str(DATA_DIR / 'icmp_on_fail.conf'),
+        '--conf': CONFIG_PATH,
         '--inet-if': '',
         '--b4-if': '',
     }

@@ -72,7 +72,7 @@ end
 local function compute_objects_maybe_updated_in_place (schema_name, config,
                                                        changed_path)
    local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.data_grammar_from_schema(schema)
+   local grammar = data.config_grammar_from_schema(schema)
    local objs = {}
    local getter, subgrammar
    for _,path in ipairs(compute_parent_paths(changed_path)) do
@@ -130,7 +130,7 @@ local function compute_mutable_objects_embedded_in_app_initargs (app_graph)
 end
 
 local function compute_apps_to_restart_after_configuration_update (
-      schema_name, configuration, verb, changed_path, in_place_dependencies)
+      schema_name, configuration, verb, changed_path, in_place_dependencies, arg)
    local maybe_updated = compute_objects_maybe_updated_in_place(
       schema_name, configuration, changed_path)
    local needs_restart = {}
@@ -177,8 +177,6 @@ end
 
 
 generic_schema_config_support = {
-   validate_config = function() end,
-   validate_update = function () end,
    compute_config_actions = function(
          old_graph, new_graph, to_restart, verb, path, ...)
       return add_restarts(app.compute_config_actions(old_graph, new_graph),

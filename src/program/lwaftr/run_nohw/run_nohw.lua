@@ -62,6 +62,7 @@ function run(parameters)
    local conf_file, b4_if, inet_if, opts = parse_args(parameters)
    local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
    local c = config.new()
+   local device = next(assert(conf.softwire_config.instance))
 
    -- AFTR
    config.app(c, "aftr", LwAftr, conf)

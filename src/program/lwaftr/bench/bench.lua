@@ -56,7 +56,6 @@ function run(args)
    else
       setup.apply_scheduling(scheduling)
       setup.load_bench(graph, conf, inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
-      setup.validate_config(conf)
    end
    app.configure(graph)
 

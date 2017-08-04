@@ -18,6 +18,19 @@ local ehs = constants.ethernet_header_size
 local o_ipv4_flags = constants.o_ipv4_flags
 local ntohs = lib.ntohs
 
+-- Produces configuration for each instance.
+-- Provided a multi-process configuration it will iterate over each instance
+-- and produce a configuration for each device with a single instance in. This
+-- is then able to be provided to the lwaftr app.
+function produce_instance_configs(conf)
+   local ret = {}
+   for device, queues in pairs(conf.softwire_config.instance) do
+      ret[device] = lib.deepcopy(conf)
+      ret[device].softwire_config.instance = {[device]=queues}
+   end
+   return ret
+end
+
 function get_ihl_from_offset(pkt, offset)
    local ver_and_ihl = pkt.data[offset]
    return band(ver_and_ihl, 0xf) * 4
@@ -83,10 +96,6 @@ function is_ipv4_fragment(pkt)
    local flags_and_frag_offset = ntohs(rd16(pkt.data + ehs + o_ipv4_flags))
    return band(flags_and_frag_offset, flag_more_fragments_mask) ~= 0 or
       band(flags_and_frag_offset, non_zero_offset) ~= 0
-end
-
-function set_dst_ethernet(pkt, dst_eth)
-   ffi.copy(pkt.data, dst_eth, 6)
 end
 
 function write_to_file(filename, content)

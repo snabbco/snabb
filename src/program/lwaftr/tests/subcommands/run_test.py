@@ -9,7 +9,6 @@ from test_env import DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
 
 SNABB_PCI0, SNABB_PCI1 = nic_names()
 
-
 @unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
 class TestRun(BaseTestCase):
 
@@ -19,7 +18,7 @@ class TestRun(BaseTestCase):
         '--bench-file', '/dev/null',
         '--conf', str(DATA_DIR / 'icmp_on_fail.conf'),
         '--v4', SNABB_PCI0,
-        '--v6', SNABB_PCI1,
+        '--v6', SNABB_PCI1
     )
 
     def execute_run_test(self, cmd_args):
@@ -34,15 +33,6 @@ class TestRun(BaseTestCase):
         reconf_args = list(self.cmd_args)
         reconf_args.insert(3, '--reconfigurable')
         self.execute_run_test(reconf_args)
-
-    def test_config_with_invalid_softwire(self):
-        config_file = str(DATA_DIR / "missing_softwire_psidmap.conf")
-        invalid_softwire_args = list(self.cmd_args)
-        invalid_softwire_args[-5] = config_file
-        # Verify it errors when there is a softwire lacking a PSID mapping entry
-        err = "Started with config file that has softwire without PSID mapping"
-        with self.assertRaises(AssertionError, msg=err):
-            self.execute_run_test(invalid_softwire_args)
 
 if __name__ == '__main__':
     unittest.main()

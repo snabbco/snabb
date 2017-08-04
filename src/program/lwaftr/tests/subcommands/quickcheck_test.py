@@ -4,19 +4,17 @@ Test the "snabb lwaftr quickcheck" subcommand.
 
 import unittest
 
-from test_env import SNABB_CMD, BaseTestCase
+from test_env import ENC, SNABB_CMD, BaseTestCase
 
 
 class TestQuickcheck(BaseTestCase):
 
-    cmd_args = [
-        str(SNABB_CMD), 'lwaftr', 'quickcheck', '-h'
-    ]
+    cmd_args = (str(SNABB_CMD), 'lwaftr', 'quickcheck', '-h')
 
-    def test_run_nohw(self):
-        output = self.run_cmd(self.cmd_args)
-        self.assertIn(b'Usage: quickcheck', output,
-            b'\n'.join((b'OUTPUT', output)))
+    def test_quickcheck(self):
+        output = str(self.run_cmd(self.cmd_args), ENC)
+        self.assertIn('Usage: quickcheck', output,
+            '\n'.join(('OUTPUT', output)))
 
 
 if __name__ == '__main__':

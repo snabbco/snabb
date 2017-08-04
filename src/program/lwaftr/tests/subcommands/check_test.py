@@ -6,7 +6,6 @@ import unittest
 
 from test_env import COUNTERS_DIR, DATA_DIR, SNABB_CMD, BaseTestCase
 
-
 class TestCheck(BaseTestCase):
 
     cmd_args = (

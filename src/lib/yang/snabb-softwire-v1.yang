@@ -291,7 +291,6 @@ module snabb-softwire-v1 {
 
         leaf addr {
           type inet:ipv4-address;
-          mandatory true;
           description
            "Public IPv4 address managed by the lwAFTR.";
         }
@@ -346,14 +345,12 @@ module snabb-softwire-v1 {
 
         leaf ipv4 {
           type inet:ipv4-address;
-          mandatory true;
           description
            "Public IPv4 address of the softwire.";
         }
 
         leaf psid {
           type uint16;
-          mandatory true;
           description
            "Port set ID.";
         }

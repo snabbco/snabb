@@ -11,20 +11,20 @@ from subprocess import PIPE, Popen
 import time
 import unittest
 
-from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, BaseTestCase
+from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, BaseTestCase, \
+                     nic_names
 
 
-DAEMON_PROC_NAME = 'config_test_daemon'
-DAEMON_ARGS = (
+DAEMON_PROC_NAME = 'config-test-daemon'
+DAEMON_ARGS = [
     str(SNABB_CMD), 'lwaftr', 'bench', '--reconfigurable',
     '--bench-file', '/dev/null',
     '--name', DAEMON_PROC_NAME,
     str(DATA_DIR / 'icmp_on_fail.conf'),
     str(BENCHDATA_DIR / 'ipv4-0550.pcap'),
     str(BENCHDATA_DIR / 'ipv6-0550.pcap'),
-)
+]
 SOCKET_PATH = '/tmp/snabb-lwaftr-listen-sock-%s' % DAEMON_PROC_NAME
-
 
 class TestConfigGet(BaseTestCase):
     """
@@ -37,7 +37,8 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_internal_iface(self):
         cmd_args = list(self.config_args)
-        cmd_args.append('/softwire-config/internal-interface/ip')
+        cmd_args.append('/softwire-config/instance[device=test]/queue[id=1]'
+                        '/internal-interface/ip')
         output = self.run_cmd(cmd_args)
         self.assertEqual(
             output.strip(), b'8:9:a:b:c:d:e:f',
@@ -45,7 +46,8 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_external_iface(self):
         cmd_args = list(self.config_args)
-        cmd_args.append('/softwire-config/external-interface/ip')
+        cmd_args.append('/softwire-config/instance[device=test]/queue[id=1]/'
+                        'external-interface/ip')
         output = self.run_cmd(cmd_args)
         self.assertEqual(
             output.strip(), b'10.10.10.10',
@@ -132,29 +134,23 @@ class TestConfigMisc(BaseTestCase):
         """
         Add a softwire section, get it back and check all the values.
         """
-        # Add a PSID map for the IP we're going to use.
-        psidmap_add_args = self.get_cmd_args('add')
-        psidmap_add_args.extend((
-            '/softwire-config/binding-table/psid-map',
-            '{ addr 1.2.3.4; psid-length 16; }'
-        ))
-        self.run_cmd(psidmap_add_args)
 
         # External IPv4.
         add_args = self.get_cmd_args('add')
         add_args.extend((
             '/softwire-config/binding-table/softwire',
-            '{ ipv4 1.2.3.4; psid 72; b4-ipv6 ::2; br 1; }',
+            '{ ipv4 1.2.3.4; psid 7; b4-ipv6 ::2; br-address 2001:db8::;'
+            'port-set { psid-length 16; }}',
         ))
         self.run_cmd(add_args)
         get_args = self.get_cmd_args('get')
         get_args.append(
-            '/softwire-config/binding-table/softwire[ipv4=1.2.3.4][psid=72]')
+            '/softwire-config/binding-table/softwire[ipv4=1.2.3.4][psid=7]'
+            '/b4-ipv6')
         output = self.run_cmd(get_args)
         # run_cmd checks the exit code and fails the test if it is not zero.
-        get_args[-1] += '/b4-ipv6'
         self.assertEqual(
-            output.strip(), b'b4-ipv6 ::2;',
+            output.strip(), b'::2',
             '\n'.join(('OUTPUT', str(output, ENC))))
 
     def test_get_state(self):
@@ -200,7 +196,10 @@ class TestConfigMisc(BaseTestCase):
         # External IPv4.
         test_ipv4 = '208.118.235.148'
         set_args = self.get_cmd_args('set')
-        set_args.extend(('/softwire-config/external-interface/ip', test_ipv4))
+        set_args.extend((
+            "/softwire-config/instance[device=test]/queue[id=1]/"
+            "external-interface/ip", test_ipv4
+        ))
         self.run_cmd(set_args)
         get_args = list(set_args)[:-1]
         get_args[2] = 'get'
@@ -253,52 +252,6 @@ class TestConfigMisc(BaseTestCase):
         output = self.run_cmd(get_args)
         self.assertEqual(output.strip(), bytes(test_psid, ENC),
             '\n'.join(('OUTPUT', str(output, ENC))))
-
-    def test_softwire_not_in_psidmap_add(self):
-        """
-        Tests that adding softwire without PSID map entry errors
-        """
-        # Create a softwire which won't have an IPv4 address in the PSID map.
-        test_softwire = '{ ipv4 192.168.1.23; psid 72; b4-ipv6 ::3; } '
-
-        add_args = self.get_cmd_args('add')
-        add_args.extend((
-            '/softwire-config/binding-table/softwire',
-            test_softwire,
-        ))
-        add_error = 'Able to add softwire with without PSID mapping'
-        with self.assertRaises(AssertionError, msg=add_error):
-            self.run_cmd(add_args)
-
-        # Then try and get the softwire added to ensure it's not been added
-        get_args = self.get_cmd_args('get')
-        get_args.append(
-            '/softwire-config/binding-table/softwire[ipv4=192.168.1.23][psid=72]'
-        )
-        get_error = 'Softwire was added with an invalid PSID mapping.'
-        with self.assertRaises(AssertionError, msg=get_error):
-            self.run_cmd(get_args)
-
-    def test_softwire_not_in_psidmap_set(self):
-        """
-        Test setting softwire without PSID map entry errors
-        """
-        # Set the entire binding-table
-        set_args = self.get_cmd_args('set')
-
-        # PSID mapping for a softwire.
-        binding_table = ["psid-map { addr 1.1.1.1; psid-length 16;}"]
-
-        # Add a valid softwire
-        binding_table.append("softwire { ipv4 1.1.1.1; psid 1; b4-ipv6 ::3; }")
-
-        # Add an invalid softwire
-        binding_table.append("softwire { ipv4 5.5.5.5; psid 1; b4-ipv6 ::3; }")
-
-        set_args.append(" ".join(binding_table))
-        err = "Softwire with an invalid PSID mapping was set"
-        with self.assertRaises(AssertionError, msg=err):
-            self.run_cmd(set_args)
 
 
 if __name__ == '__main__':

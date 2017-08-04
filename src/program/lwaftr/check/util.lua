@@ -2,13 +2,9 @@ module(..., package.seeall)
 
 local counter = require("core.counter")
 local lib = require("core.lib")
-local lwcounter = require("apps.lwaftr.lwcounter")
+local data = require("lib.yang.data")
+local state = require("lib.yang.state")
 local lwutil = require("apps.lwaftr.lwutil")
-
--- Get the counter directory and names from the code, so that any change
--- in there will be automatically picked up by the tests.
-local counter_names = lwcounter.counter_names
-local counters_dir = lwcounter.counters_dir
 
 local write_to_file = lwutil.write_to_file
 
@@ -16,15 +12,6 @@ function load_requested_counters(counters)
    local result = dofile(counters)
    assert(type(result) == "table", "Not a valid counters file: "..counters)
    return result
-end
-
-function read_counters(c)
-   local results = {}
-   for _, name in ipairs(counter_names) do
-      local cnt = counter.open(counters_dir .. name .. ".counter", "readonly")
-      results[name] = counter.read(cnt)
-   end
-   return results
 end
 
 function diff_counters(final, initial)
