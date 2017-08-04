@@ -43,8 +43,9 @@ end
 
 local function softwire_entry(v4addr, psid_len, b4)
    if tonumber(v4addr) then v4addr = to_ipv4_string(v4addr) end
-   return ("  softwire { ipv4 %s; psid %d; b4-ipv6 %s; }"):format(
-      v4addr, psid_len, b4)
+   local softwire = "  softwire { ipv4 %s; psid %d; b4-ipv6 %s; br-address %s;"
+   softwire = softwire .. " port-set { psid-length %d; }}"
+   return softwire:format(v4addr, psid_len, b4, br_address, port_set.psid_len)
 end
 
 local function inc_ipv6(ipv6)
@@ -121,8 +122,12 @@ end
 function run(args)
    local from_ipv4, num_ips, br_address, from_b4, psid_len, shift = parse_args(args)
    psid_len = assert(tonumber(psid_len))
-   if not shift then shift = 16 - psid_len end
-   assert(psid_len + shift == 16)
+   if not shift then
+      shift = 16 - psid_len
+   else
+      shift = assert(tonumber(shift))
+   end
+   assert(psid_len + shift <= 16)
 
    w:ln("binding-table {")
    psid_map(w, {
