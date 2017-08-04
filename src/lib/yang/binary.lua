@@ -246,8 +246,8 @@ local function data_emitter(production)
          end
       elseif primitive_type == 'empty' then
          return function (data, stream)
-            stream:write_stringref('stringref')
-            stream:write_stringref('')
+            stream:write_stringref('flag')
+            stream:write_uint32(data and 1 or 0)
          end
       elseif type.ctype then
          local ctype = type.ctype
@@ -426,6 +426,10 @@ local function read_compiled_data(stream, strtab)
    function readers.cdata()
       local ctype = scalar_type(read_string())
       return stream:read_ptr(ctype)[0]
+   end
+   function readers.flag()
+      if stream:read_uint32() ~= 0 then return true end
+      return nil
    end
    return read1()
 end
