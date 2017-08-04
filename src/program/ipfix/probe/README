@@ -8,7 +8,7 @@ Available options:
                                 Defaults to 10.0.0.1.
        -c, --collector <ipaddr> The IP address of the flow collector.
                                 Defaults to 10.0.0.2.
-       -i, --input-type <type>  One of pcap, raw, or intel10g. Specifies
+       -i, --input-type <type>  One of pcap, raw, tap, or intel10g. Specifies
                                 how to interpret the <input> argument. Interprets
                                 <input> as a pcap file path, device name, or
                                 PCI address respectively. Defaults to intel10g.

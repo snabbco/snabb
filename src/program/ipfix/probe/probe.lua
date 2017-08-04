@@ -34,6 +34,13 @@ function in_apps.raw (device)
 end
 out_apps.raw = in_apps.raw
 
+function in_apps.tap (device)
+   return { input = "input",
+            output = "output" },
+          { require("apps.tap.tap").Tap, device }
+end
+out_apps.tap = in_apps.tap
+
 function in_apps.intel10g (device)
    local conf = { pciaddr = device }
    return { input = "rx",
