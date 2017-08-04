@@ -82,6 +82,8 @@ $(cat $mdroot/lib/README.ctable.md)
 
 $(cat $mdroot/lib/README.pmu.md)
 
+$(cat $mdroot/lib/README.yang.md)
+
 ## Hardware
 
 $(cat $mdroot/lib/hardware/README.md)
