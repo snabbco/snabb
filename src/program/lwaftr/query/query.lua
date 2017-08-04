@@ -1,18 +1,18 @@
 module(..., package.seeall)
 
+local engine = require("core.app")
 local counter = require("core.counter")
 local lib = require("core.lib")
+local shm = require("core.shm")
+local data = require("lib.yang.data")
+local schema = require("lib.yang.schema")
+local state = require("lib.yang.state")
 local lwcounter = require("apps.lwaftr.lwcounter")
 local lwutil = require("apps.lwaftr.lwutil")
-local shm = require("core.shm")
 local top = require("program.top.top")
-local engine = require("core.app")
 local ps = require("program.ps.ps")
 
 local keys, fatal = lwutil.keys, lwutil.fatal
-
--- Get the counter dir from the code.
-local counters_dir = lwcounter.counters_dir
 
 function show_usage (code)
    print(require("program.lwaftr.query.README_inc"))
@@ -24,17 +24,13 @@ local function sort (t)
    return t
 end
 
-local function is_counter_name (name)
-   return lwcounter.counter_names[name] ~= nil
-end
-
 function parse_args (raw_args)
    local handlers = {}
    local opts = {}
    local name
    function handlers.h() show_usage(0) end
    function handlers.l ()
-      for _, name in ipairs(sort(lwcounter.counter_names)) do
+      for _, name in ipairs(sort(keys(lwcounter.counter_names()))) do
          print(name)
       end
       main.exit(0)
@@ -48,23 +44,14 @@ function parse_args (raw_args)
    return opts, unpack(args)
 end
 
-local function read_counters (tree)
-   local ret = {}
-   local cnt, cnt_path, value
+local function max_key_width (counters)
    local max_width = 0
-   local counters_path = "/" .. tree .. "/" .. counters_dir
-   local counters = shm.children(counters_path)
-   for _, name in ipairs(counters) do
-      cnt_path = counters_path .. name
-      cnt = counter.open(cnt_path, 'readonly')
-      value = tonumber(counter.read(cnt))
+   for name, value in pairs(counters) do
       if value ~= 0 then
-         name = name:gsub(".counter$", "")
          if #name > max_width then max_width = #name end
-         ret[name] = value
       end
    end
-   return ret, max_width
+   return max_width
 end
 
 -- Filters often contain '-', which is a special character for match.
@@ -80,14 +67,17 @@ local function print_counter (name, value, max_width)
    print(("%s: %s%s"):format(name, (" "):rep(nspaces), lib.comma_value(value)))
 end
 
-local function print_counters (tree, filter)
+local function print_counters (pid, filter)
    print("lwAFTR operational counters (non-zero)")
    -- Open, read and print whatever counters are in that directory.
-   local counters, max_width = read_counters(tree)
+   local counters = lwcounter.read_counters(pid)
+   local max_width = max_key_width(counters)
    for _, name in ipairs(sort(keys(counters))) do
       if not skip_counter(name, filter) then
          local value = counters[name]
-         print_counter(name, value, max_width)
+         if value ~= 0 then
+            print_counter(name, value, max_width)
+         end
       end
    end
 end
@@ -104,7 +94,7 @@ local function pid_to_parent(pid)
          local leader_pid = tonumber(ps.get_leader_pid(p))
          -- If the precomputed by-name pid is the leader pid, set the pid
          -- to be the follower's pid instead to get meaningful counters.
-      if leader_pid == pid then pid = p end
+         if leader_pid == pid then pid = p end
       end
    end
    return pid

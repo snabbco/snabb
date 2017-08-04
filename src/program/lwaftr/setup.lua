@@ -10,7 +10,6 @@ local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
 local lwaftr     = require("apps.lwaftr.lwaftr")
 local lwutil     = require("apps.lwaftr.lwutil")
-local lwcounter  = require("apps.lwaftr.lwcounter")
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
 local ipv4_apps  = require("apps.lwaftr.ipv4_apps")

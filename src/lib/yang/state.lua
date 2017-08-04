@@ -5,23 +5,23 @@ local lib = require("core.lib")
 local shm = require("core.shm")
 local xpath = require("lib.yang.path")
 local yang = require("lib.yang.yang")
-local yang_data = require("lib.yang.data")
+local data = require("lib.yang.data")
+local util = require("lib.yang.util")
 local counter = require("core.counter")
 
-local function flatten(val)
-   local rtn = {}
+local function flatten(val, out)
+   out = out or {}
    for k, v in pairs(val) do
       if type(v) == "table" then
-         v = flatten(v)
-         for k1, v1 in pairs(v) do rtn[k1] = v1 end
+         flatten(v, out)
       else
-         rtn[k] = v
+         out[k] = v
       end
    end
-   return rtn
+   return out
 end
 
-function find_counters(pid)
+local function find_counters(pid)
    local path = '/'..pid..'/apps'
    local apps = {}
    for _, app in ipairs(shm.children(path)) do
@@ -38,74 +38,75 @@ function find_counters(pid)
    return apps
 end
 
-function collect_state_leaves(schema)
-   -- Iterate over schema looking fo state leaves at a specific path into the
-   -- schema. This should return a dictionary of leaf to lua path.
-   local function collection(scm, path)
-      local function newpath(oldpath)
-         return lib.deepcopy(oldpath)
-      end
-      if path == nil then path = {} end
-      table.insert(path, scm.id)
-
-      if scm.kind == "container" then
-         -- Iterate over the body and recursively call self on all children.
-         local rtn = {}
-         for _, child in pairs(scm.body) do
-            local leaves = collection(child, newpath(path))
-            table.insert(rtn, leaves)
-         end
-         return rtn
-      elseif scm.kind == "leaf" then
-         if scm.config == false then
-            local rtn = {}
-            rtn[path] = scm.id
-            return rtn
-         end
-      elseif scm.kind == "module" then
-         local rtn = {}
-         for _, v in pairs(scm.body) do
-            -- We deliberately don't want to include the module in the path.
-            table.insert(rtn, collection(v, {}))
-         end
-         return rtn
-      end
-      return {}
+local function state_reader_from_grammar(production, maybe_keyword)
+   local visitor = {}
+   local function visit(keyword, production)
+      return assert(visitor[production.type])(keyword, production)
    end
-
-   local leaves = collection(schema)
-   if leaves == nil then return {} end
-   leaves = flatten(leaves)
-   return function () return leaves end
+   local function visitn(productions)
+      local ret = {}
+      for keyword, production in pairs(productions) do
+         ret[data.normalize_id(keyword)] = visit(keyword, production)
+      end
+      return ret
+   end
+   function visitor.table(keyword, production)
+      -- TODO: Right now we basically map leaves to counters; we have
+      -- no structured way to know what keys we might use.  To make
+      -- tables here we'd need more of a design!
+      io.stderr:write(
+         'WARNING: Reading state into tables not yet implemented\n')
+      return function(counters) return nil end
+   end
+   function visitor.array(keyword, production)
+      -- For similar reasons as tables, no idea what to do here!
+      io.stderr:write(
+         'WARNING: Reading state into arrays not yet implemented\n')
+      return function(counters) return nil end
+   end
+   function visitor.struct(keyword, production)
+      local readers = visitn(production.members)
+      local function finish(x) return x end
+      if production.ctype then finish = data.typeof(production.ctype) end
+      return function(counters)
+         local ret = {}
+         for id, reader in pairs(readers) do
+            ret[id] = reader(counters)
+         end
+         return finish(ret)
+      end
+   end
+   function visitor.scalar(keyword, production)
+      local default = production.default
+      if default then
+         local parse = data.value_parser(production.argument_type)
+         default = parse(default, keyword)
+      end
+      return function(counters)
+         local c = counters[keyword]
+         if c then return counter.read(c) end
+         return default
+      end
+   end
+   return visit(maybe_keyword, production)
 end
+state_reader_from_grammar = util.memoize(state_reader_from_grammar)
 
-local function set_data_value(data, path, value)
-   local head = yang_data.normalize_id(table.remove(path, 1))
-   if #path == 0 then
-      data[head] = value
-      return
-   end
-   if data[head] == nil then data[head] = {} end
-   set_data_value(data[head], path, value)
+function state_reader_from_schema(schema)
+   local grammar = data.state_grammar_from_schema(schema)
+   return state_reader_from_grammar(grammar)
 end
+state_reader_from_schema = util.memoize(state_reader_from_schema)
 
-function show_state(scm, pid, raw_path)
-   local schema = yang.load_schema_by_name(scm)
-   local grammar = yang_data.state_grammar_from_schema(schema)
-   local counters = find_counters(pid)
-   local path = xpath.convert_path(grammar, raw_path)
+function state_reader_from_schema_by_name(schema_name)
+   local schema = yang.load_schema_by_name(schema_name)
+   return state_reader_from_schema(schema)
+end
+state_reader_from_schema_by_name = util.memoize(state_reader_from_schema_by_name)
 
-   -- Lookup the specific schema element that's being addressed by the path
-   local leaves = collect_state_leaves(schema)()
-   local data = {}
-   for leaf_path, leaf in pairs(leaves) do
-      for _, counter in pairs(counters) do
-         if counter[leaf] then
-            set_data_value(data, leaf_path, counter[leaf])
-         end
-      end
-   end
-   return data
+function read_state(schema_name, pid)
+   local reader = state_reader_from_schema_by_name(schema_name)
+   return reader(flatten(find_counters(pid)))
 end
 
 function selftest ()
@@ -131,24 +132,20 @@ function selftest ()
          config false;
 
          leaf total-packets {
-            type uint64 {
-               default 0;
-            }
+            type uint64; default 0;
          }
 
          leaf dropped-packets {
-            type uint64 {
-               default 0;
-            }
+            type uint64; default 0;
          }
       }
 
       grouping detailed-counters {
          leaf dropped-wrong-route {
-            type uint64 { default 0; }
+            type uint64; default 0;
          }
          leaf dropped-not-permitted {
-            type uint64 { default 0; }
+            type uint64; default 0;
          }
       }
 
@@ -169,24 +166,14 @@ function selftest ()
 
    local simple_router_schema = yang.load_schema(simple_router_schema_src,
                                                  "state-test")
-   local leaves = collect_state_leaves(simple_router_schema)()
-
-   -- Check the correct number of leaves have been found
-   assert(table_length(leaves) == 4)
-
-   -- Check it's found every state path.
-   local state_leaves = {
-      "total-packets",
-      "dropped-packets",
-      "dropped-wrong-route",
-      "dropped-not-permitted"
-   }
-   for _, leaf in pairs(leaves) do
-      assert(in_array(leaf, state_leaves))
-   end
-
-   -- Check flatten produces a single dimentional table with all the elements.
-   local multi_dimentional = {{hello="hello"}, {world="world"}}
-   assert(flatten(multi_dimentional), {hello="hello", world="world"})
-   print("selftest: ok")
+   local reader = state_reader_from_schema(simple_router_schema)
+   local state = reader({})
+   assert(0 == state.state.total_packets)
+   assert(0 == state.state.dropped_packets)
+   assert(0 == state.detailed_state.dropped_wrong_route)
+   assert(0 == state.detailed_state.dropped_not_permitted)
+   -- Would like to assert "state.routes == nil" but state is actually
+   -- a cdata object, and trying to access the non-existent routes
+   -- property throws an error.
+   print('selftest: ok')
 end
