@@ -25,23 +25,11 @@ end
 local function parse_args(args)
    local handlers = {}
    local version = 'legacy'
-   local options = {}
    function handlers.h() show_usage(0) end
    function handlers.f(v) version = string.lower(v) end
-   function handlers.o(o) options[#options + 1] = o end
-   args = lib.dogetopt(args, handlers, "hf:o:", { help="h", from="f", options="o" })
+   args = lib.dogetopt(args, handlers, "hf:", { help="h", from="f" })
    if #args ~= 1 then show_usage(1) end
-   return args[1], version, options
-end
-
-local function find_option(options, path, leaf)
-   path = path .. "[" .. leaf
-   local length = string.len(path)
-   for _, opt in pairs(options) do
-      if opt:sub(0, length) == path then
-         return opt:sub(length+2, string.len(opt)-1)
-      end
-   end
+   return args[1], version
 end
 
 local policies = {
@@ -253,7 +241,7 @@ local function parse_softwires(parser, psid_map, br_address_count)
    while not parser:check('}') do
       local entry = parser:parse_property_list(softwire_spec, '{', '}')
       key.ipv4, key.psid = entry.ipv4, entry.psid
-      value.br, value.b4_ipv6 = entry.aftr + 1, entry.b4
+      value.br, value.b4_ipv6 = entry.aftr, entry.b4
       local success = pcall(map.add, map, key, value)
       if not success then
          parser:error('duplicate softwire for ipv4=%s, psid=%d',
@@ -280,6 +268,22 @@ end
 function load_binding_table(file)
    local source = stream.open_input_byte_stream(file)
    return parse_binding_table(Parser.new(source:as_text_stream()))
+end
+
+
+local function config_to_string(schema, conf)
+   if type(schema) == "string" then
+      schema = yang.load_schema_by_name(schema)
+   end
+   -- To keep memory usage as low as possible write it out to a temp file.
+   local memfile = util.string_output_file()
+   yang.print_config_for_schema(schema, conf, memfile)
+   conf = memfile:flush()
+
+   -- Do best to remove things manually which take a lot of memory
+   memfile:clear()
+   memfile = nil
+   return conf
 end
 
 
@@ -350,7 +354,12 @@ local function migrate_conf(old)
       end
    end
 
-   return {
+   -- Build a version of snabb-softwire-v1 with a 0-based index so increment_br
+   -- does the correct thing.
+   local schema = yang.load_schema_by_name("snabb-softwire-v1")
+   local bt = schema.body["softwire-config"].body["binding-table"].body
+   bt.softwire.body.br.default = "0"
+   return config_to_string(schema, {
       softwire_config = {
          external_interface = external,
          internal_interface = internal,
@@ -360,7 +369,7 @@ local function migrate_conf(old)
             softwire = old_bt.softwires
          }
       }
-   }
+   })
 end
 
 local function increment_br(conf)
@@ -379,7 +388,7 @@ local function increment_br(conf)
                          'verification needed.\n')
       io.stderr:flush()
    end
-   return conf
+   return config_to_string('snabb-softwire-v1', conf)
 end
 
 local function remove_address_list(conf)
@@ -436,16 +445,9 @@ local function remove_psid_map(conf)
    return conf
 end
 
-local function multiprocess_migration(src, conf_file, options)
-   local device = assert(
-      find_option(options, "/softwire-config/instance", "device"),
-      "Must specify value for /softwire-config/instance/device"
-   )
-   local ex_device = find_option(
-      options,
-      "/softwire-config/instance/queue/external-interface",
-      "device"
-   )
+local function multiprocess_migration(src, conf_file)
+   local device = "IPv6 PCI Address"
+   local ex_device = "IPv4 PCI address"
 
    -- We should build up a hybrid schema from parts of v1 and v2.
    local v1_schema = yang.load_schema_by_name("snabb-softwire-v1")
@@ -526,7 +528,8 @@ local function multiprocess_migration(src, conf_file, options)
    conf.softwire_config.external_interface.mac = nil
    conf.softwire_config.external_interface.next_hop = nil
    conf.softwire_config.external_interface.vlan_tag = nil
-   return conf
+
+   return config_to_string('snabb-softwire-v2', conf)
 end
 
 local function v2_migration(src, conf_file)
@@ -543,6 +546,12 @@ local function v2_migration(src, conf_file)
    binding_table.body.softwire.body.br = v1_binding_table.body.softwire.body.br
    binding_table.body.softwire.body.padding = v1_binding_table.body.softwire.body.padding
 
+   -- Add the external and internal interfaces
+   local hybridconfig = hybridscm.body["softwire-config"]
+   local v1config = v1_schema.body["softwire-config"]
+   hybridconfig.body["external-interface"] = v1config.body["external-interface"]
+   hybridconfig.body["internal-interface"] = v1config.body["internal-interface"]
+
    -- Remove the mandatory requirement on softwire.br-address for the migration
    binding_table.body["softwire"].body["br-address"].mandatory = false
 
@@ -556,63 +565,70 @@ local function v2_migration(src, conf_file)
    conf = remove_psid_map(conf)
    conf.softwire_config.binding_table.psid_map = nil
 
-   return conf
-end
-
-local function v1_to_v2_config(conf, conf_file)
-   -- Because we're changing underlying schema stuff we're building up a hybrid
-   -- schema which we need to load it into so we need to convert conf to a file.
-   local memfile = util.string_output_file()
-   yang.print_config_for_schema_by_name("snabb-softwire-v1", conf, memfile)
-   return v2_migration(memfile:flush(), conf_file)
+   return config_to_string(hybridscm, conf)
 end
 
 local function migrate_legacy(stream)
    local conf = Parser.new(stream):parse_property_list(lwaftr_conf_spec)
-   local v_3_0_1 = migrate_conf(conf)
-   return multiprocess_migration(v1_to_v2_config(increment_br(v_3_0_1)), options)
+   conf = migrate_conf(conf)
+   return conf
 end
 
 
-local function migrate_3_0_1(conf_file, options)
-   local data = require('lib.yang.data')
-   local str = "softwire-config {\n"..io.open(conf_file, 'r'):read('*a').."\n}"
-   return multiprocess_migration(v1_to_v2_config(increment_br(
-      data.load_config_for_schema_by_name(
-            'snabb-softwire-v1', str, conf_file)), conf_file), options)
+local function migrate_3_0_1(conf_file, src)
+   if src:sub(0, 15) == "softwire-config" then
+      return src
+   else
+      return "softwire-config { "..src.." }"
+   end
 end
 
-local function migrate_3_0_1bis(conf_file, options)
-   return multiprocess_migration(v1_to_v2_config(increment_br(
-      yang.load_configuration(
-			  conf_file, {schema_name='snabb-softwire-v1'})),
-                          conf_file), options)
+local function migrate_3_0_1bis(conf_file, src)
+   return increment_br(
+      yang.load_config_for_schema_by_name('snabb-softwire-v1', src, conf_file)
+   )
 end
 
-local function migrate_3_2_0(conf_file, options)
-   local src = io.open(conf_file, "r"):read("*a")
-   return multiprocess_migration(v2_migration(src, conf_file), options)
+local function migrate_3_2_0(conf_file, src)
+   return v2_migration(src, conf_file)
 end
 
-local function migrate_2017_07_01(conf_file, options)
-   local src = io.open(conf_file, "r"):read("*a")
-   return multiprocess_migration(src, conf_file, options)
+local function migrate_2017_07_01(conf_file, src)
+   return multiprocess_migration(src, conf_file)
 end
 
 
-local migrators = { legacy = migrate_legacy, ['3.0.1'] = migrate_3_0_1,
-                    ['3.0.1.1'] = migrate_3_0_1bis,
-                    ['3.2.0'] = migrate_3_2_0,
-                    ["2017.07.01"] = migrate_2017_07_01,}
+local migrations = {
+   {version='legacy',    migrator=migrate_legacy},
+   {version='3.0.1',     migrator=migrate_3_0_1},
+   {version='3.0.1.1',   migrator=migrate_3_0_1bis},
+   {version='3.2.0',     migrator=migrate_3_2_0},
+   {version='2017.07.01',migrator=migrate_2017_07_01}
+}
+
 
 function run(args)
-   local conf_file, version, options = parse_args(args)
-   local migrate = migrators[version]
-   if not migrate then
+   local conf_file, version = parse_args(args)
+
+   -- Iterate over migrations until we've found the
+   local start
+   for id, migration in pairs(migrations) do
+      if migration.version == version then
+         start = id - 1
+      end
+   end
+   if start == nil then
       io.stderr:write("error: unknown version: "..version.."\n")
       show_usage(1)
    end
-   local conf = migrate(conf_file, options)
-   yang.print_config_for_schema_by_name('snabb-softwire-v2', conf, io.stdout)
+
+   local conf = io.open(conf_file, "r"):read("*a")
+   for _, migration in next,migrations,start do
+      conf = migration.migrator(conf_file, conf)
+      -- Prompt the garbage collection to do a full collect after each migration
+      collectgarbage()
+   end
+
+   print(conf)
    main.exit(0)
 end

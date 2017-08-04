@@ -92,6 +92,7 @@ function string_output_file()
    local out = {}
    function file:write(str) table.insert(out, str) end
    function file:flush(str) return table.concat(out) end
+   function file:clear(str) out = {} end
    return file
 end
 
