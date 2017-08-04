@@ -1345,14 +1345,7 @@ function Intel82599:check_vmdq ()
    else
       assert(self.driver == "Intel82599", "VMDq only supported on 82599")
       assert(self.macaddr, "MAC address must be set in VMDq mode")
-
-      if self.driver == "Intel82599" then
-         assert(self.poolnum < 64,
-                "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
-      elseif self.driver == "Intel1g" then
-         assert(self.poolnum < 8,
-                "Pool overflow: Intel i350 supports up to 8 VMDq pools")
-      end
+      assert(self.poolnum < 64, "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
 
       if not self.master then
          assert(self.r.MRQC:bits(0, 4) == self.mrqc_bits,
@@ -1460,7 +1453,7 @@ function Intel82599:select_pool()
    -- for VMDq, make rxq/txq relative to the pool number
    assert(self.rxq >= 0 and self.rxq < 2, "rxqueue must be in 0..1")
    self.rxq = self.rxq + 2 * self.poolnum
-   assert(self.txq >= 0 and self.txq < 1, "txqueue must be in 0..1")
+   assert(self.txq >= 0 and self.txq < 2, "txqueue must be in 0..1")
    self.txq = self.txq + 2 * self.poolnum
 
    -- max queue number is different in VMDq mode
