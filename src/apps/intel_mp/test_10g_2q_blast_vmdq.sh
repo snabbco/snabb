@@ -12,8 +12,8 @@ SNABB_RECV_SPINUP=2 SNABB_RECV_DURATION=5 ./testvmdqrecv.snabb $SNABB_PCI_INTEL0
 wait $PID1
 kill -9 $BLAST
 
-[[ `cat results.* | grep "^RXDGPC" | awk '{print $2}'` -gt 10000 ]] &&\
 # both queues should see packets
+[[ `cat results.* | grep "^RXDGPC" | awk '{print $2}'` -gt 10000 ]] &&\
 [[ `cat results.0 | grep -m 1 fpb | awk '{print $9}'` -gt 0 ]] &&\
 [[ `cat results.1 | grep -m 1 fpb | awk '{print $9}'` -gt 0 ]]
 
