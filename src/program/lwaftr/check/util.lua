@@ -5,7 +5,6 @@ local lib = require("core.lib")
 local data = require("lib.yang.data")
 local state = require("lib.yang.state")
 local lwutil = require("apps.lwaftr.lwutil")
-local S = require("syscall")
 
 local write_to_file = lwutil.write_to_file
 
@@ -13,26 +12,6 @@ function load_requested_counters(counters)
    local result = dofile(counters)
    assert(type(result) == "table", "Not a valid counters file: "..counters)
    return result
-end
-
-local function counter_names()
-   local names = {}
-   local schema = schema.load_schema_by_name('snabb-softwire-v2')
-   for k, node in pairs(schema.body['softwire-state'].body) do
-      if node.kind == 'leaf' then
-         names[k] = data.normalize_id(k)
-      end
-   end
-   return names
-end
-
-function read_counters(c)
-   local s = state.read_state('snabb-softwire-v2', S.getpid())
-   local ret = {}
-   for k, id in pairs(counter_names()) do
-      ret[k] = assert(s.softwire_state[id])
-   end
-   return ret
 end
 
 function diff_counters(final, initial)

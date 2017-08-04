@@ -168,7 +168,7 @@ local function print_lwaftr_metrics (new_stats, last_stats, time_delta)
             print_row(metrics_row, { lwaftrspec .. " " .. name,
                int_s(t[name]), int_s(diff)})
          else
-            for _, name in ipairs(counter_names(lwaftrspec)) do
+            for name, id in pairs(counter_names(lwaftrspec)) do
                local diff = delta(t, s, name)
                print_row(metrics_row, { lwaftrspec .. " " .. name,
                   int_s(t[name]), int_s(diff)})

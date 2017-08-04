@@ -7,6 +7,7 @@ local shm = require("core.shm")
 local data = require("lib.yang.data")
 local schema = require("lib.yang.schema")
 local state = require("lib.yang.state")
+local lwcounter = require("apps.lwaftr.lwcounter")
 local lwutil = require("apps.lwaftr.lwutil")
 local top = require("program.top.top")
 local ps = require("program.ps.ps")
@@ -23,34 +24,13 @@ local function sort (t)
    return t
 end
 
-local function counter_names ()
-   local names = {}
-   local schema = schema.load_schema_by_name('snabb-softwire-v2')
-   for k, node in pairs(schema.body['softwire-state'].body) do
-      if node.kind == 'leaf' then
-         names[k] = data.normalize_id(k)
-      end
-   end
-   return names
-end
-
-function read_counters(pid)
-   local s = state.read_state('snabb-softwire-v2', pid)
-   local ret = {}
-   for k, id in pairs(counter_names()) do
-      ret[k] = assert(s.softwire_state[id])
-   end
-   return ret
-end
-
 function parse_args (raw_args)
    local handlers = {}
    local opts = {}
    local name
    function handlers.h() show_usage(0) end
    function handlers.l ()
-      -- Could get keys from schema instead without needing PID.
-      for _, name in ipairs(sort(keys(counter_names()))) do
+      for _, name in ipairs(sort(keys(lwcounter.counter_names()))) do
          print(name)
       end
       main.exit(0)
@@ -90,7 +70,7 @@ end
 local function print_counters (pid, filter)
    print("lwAFTR operational counters (non-zero)")
    -- Open, read and print whatever counters are in that directory.
-   local counters = read_counters(pid)
+   local counters = lwcounter.read_counters(pid)
    local max_width = max_key_width(counters)
    for _, name in ipairs(sort(keys(counters))) do
       if not skip_counter(name, filter) then
