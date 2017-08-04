@@ -1,12 +1,21 @@
 # Change Log
 
-## [2017.07.01]
+## [2017.07.01] - 2017-08-04
 
-* Added multiprocess support to snabb-softwire-v2 schema (not lwaftr itself).
+* New YANG schema snabb-softwire-v2 replaces old snabb-softwire-v1
+  schema.
 
-* New version numbering which includes the Snabb version the lwaftr is based off
-  and a lwaftr specific version number which is reset upon merging a newer
-  version of Snabb from upstream.
+  The new schema has support for multiple worker processes running on
+  different PCI interfaces, though this support has not yet landed in
+  the data-plane itself.  See src/lib/yang/snabb-softwire-v2.lua for
+  full details.
+
+  Use "snabb lwaftr migrate-configuration" to migrate old
+  configurations.  
+
+* New version numbering scheme which includes the Snabb version the
+  lwaftr is based off and a lwaftr specific version number which is
+  reset upon merging a newer version of Snabb from upstream.
 
 * Improve configuration migration system.
 
