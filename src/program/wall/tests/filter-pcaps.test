@@ -27,10 +27,13 @@ function test-filter {
         grep "Rejected packets: $n_rejected" $output &&
         grep "Dropped packets:  $n_dropped" $output); then
       echo "FAIL"
-      return 1
+      result=1
+  else
+      echo "SUCCESS"
+      result=0
   fi
-  echo "SUCCESS"
-  return 0
+  rm $output
+  return $result
 }
 
 # Reject all DHCPv6 packets and drop all the rest.
