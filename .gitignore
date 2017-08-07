@@ -20,3 +20,4 @@ __pycache__
 /src/programs.inc
 .images
 /lib/luajit/usr
+/src/core/version.lua

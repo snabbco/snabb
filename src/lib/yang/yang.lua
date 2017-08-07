@@ -101,10 +101,11 @@ function load_configuration(filename, opts)
    -- in a well-known place.
    local compiled_filename = filename:gsub("%.conf$", "")..'.o'
    local source_mtime = {sec=source.mtime_sec, nsec=source.mtime_nsec}
+   local use_compiled_cache = not lib.getenv("SNABB_RANDOM_SEED")
    local compiled_stream = maybe(stream.open_input_byte_stream,
                                  compiled_filename)
    if compiled_stream then
-      if binary.has_magic(compiled_stream) then
+      if binary.has_magic(compiled_stream) and use_compiled_cache then
          log('loading compiled configuration from %s', compiled_filename)
          local conf = load_compiled(compiled_stream, source_mtime)
          if conf then return conf end
@@ -119,15 +120,18 @@ function load_configuration(filename, opts)
    local conf = load_data_for_schema_by_name(opts.schema_name, source_str,
                                              filename)
 
-   -- Save it, if we can.
-   local success, err = pcall(binary.compile_data_for_schema_by_name,
-                              opts.schema_name, conf, compiled_filename,
-                              source_mtime)
-   if not success then
-      log('error saving compiled configuration %s: %s', compiled_filename, err)
+   if use_compiled_cache then
+      -- Save it, if we can.
+      local success, err = pcall(binary.compile_data_for_schema_by_name,
+                                 opts.schema_name, conf, compiled_filename,
+                                 source_mtime)
+      if not success then
+         log('error saving compiled configuration %s: %s', compiled_filename, err)
+      end
+
+      log('wrote compiled configuration %s', compiled_filename)
    end
 
-   log('wrote compiled configuration %s', compiled_filename)
    -- Done.
    return conf
 end
