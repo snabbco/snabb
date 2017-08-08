@@ -1419,6 +1419,10 @@ function Intel82599:vmdq_enable ()
 end
 
 -- In VMDq mode, selects an available pool if one isn't provided by the user.
+--
+-- This method runs before registers are loaded, because the rxq/txq registers
+-- depend on the pool number prior to loading. As a result, we can't use the
+-- lock_sw_sem() method to protect the critical section and use flock() instead.
 local pooldir = "intel-mp-pools"
 function Intel82599:select_pool()
    if not self.vmdq then return end
@@ -1427,16 +1431,14 @@ function Intel82599:select_pool()
    if not self.poolnum then
       local available_pool
 
-      -- we use some (empty) files in the shm directory to track what pools are
-      -- claimed (pick the first poolnum file that this process can obtain an
-      -- exclusive lock on)
-      if not shm.exists(pooldir) then
-         shm.mkdir(pooldir .. "/" .. self.pciaddress)
-      end
-
+      -- We use some shared memory to track which pool numbers are claimed
+      -- using flock() to avoid conflicts. The contents of the memory doesn't
+      -- matter since we only care about the lock state.
       for poolnum = 0, 63 do
-         local path = shm.root.."/"..pooldir.."/"..self.pciaddress.."/"..poolnum
-         self.poolfd = S.open(path, "creat, rdwr")
+         local path   = "/"..pooldir.."/"..self.pciaddress.."/"..poolnum
+         shm.create(path, "uint8_t")
+         self.poolfd  = S.open(shm.root .. path, "rdwr")
+
          if self.poolfd:flock("nb, ex") then
             available_pool = poolnum
             break
