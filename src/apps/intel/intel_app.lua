@@ -2,7 +2,6 @@
 
 module(...,package.seeall)
 
-local zone = require("jit.zone")
 local basic_apps = require("apps.basic.basic_apps")
 local ffi      = require("ffi")
 local lib      = require("core.lib")

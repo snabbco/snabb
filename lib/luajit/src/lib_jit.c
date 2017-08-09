@@ -200,6 +200,56 @@ LJLIB_CF(jit_opt_start)
 
 #include "lj_libdef.h"
 
+/* -- jit.vmprofile module  ----------------------------------------------- */
+
+#define LJLIB_MODULE_jit_vmprofile
+
+LJLIB_CF(jit_vmprofile_open)
+{
+  if (L->base < L->top && tvisstr(L->base)) {
+    return luaJIT_vmprofile_open(L, strdata(lj_lib_checkstr(L, 1)));
+  } else {
+    lj_err_argtype(L, 1, "filename");
+    return 0;
+  }
+}
+
+LJLIB_CF(jit_vmprofile_close)
+{
+  if (L->base < L->top && tvislightud(L->base)) {
+    return luaJIT_vmprofile_close(L, lightudV(L->base));
+  } else {
+    lj_err_argtype(L, 1, "vmprofile");
+  }
+}
+
+LJLIB_CF(jit_vmprofile_select)
+{
+  if (L->base < L->top && tvislightud(L->base)) {
+    return luaJIT_vmprofile_select(L, lightudV(L->base));
+  } else {
+    lj_err_argtype(L, 1, "vmprofile");
+  }
+}
+
+LJLIB_CF(jit_vmprofile_start)
+{
+  return luaJIT_vmprofile_start(L);
+}
+
+LJLIB_CF(jit_vmprofile_stop)
+{
+  return luaJIT_vmprofile_stop(L);
+}
+
+#include "lj_libdef.h"
+
+static int luaopen_jit_vmprofile(lua_State *L)
+{
+  LJ_LIB_REG(L, NULL, jit_vmprofile);
+  return 1;
+}
+
 /* -- JIT compiler initialization ----------------------------------------- */
 
 /* Default values for JIT parameters. */
@@ -209,7 +259,6 @@ JIT_PARAMDEF(JIT_PARAMINIT)
 #undef JIT_PARAMINIT
   0
 };
-
 
 /* Arch-dependent CPU detection. */
 static uint32_t jit_cpudetect(lua_State *L)
@@ -258,6 +307,8 @@ LUALIB_API int luaopen_jit(lua_State *L)
   lua_pushinteger(L, LUAJIT_VERSION_NUM);
   lua_pushliteral(L, LUAJIT_VERSION);
   LJ_LIB_REG(L, LUA_JITLIBNAME, jit);
+  lj_lib_prereg(L, LUA_JITLIBNAME ".vmprofile", luaopen_jit_vmprofile,
+                tabref(L->env));
   LJ_LIB_REG(L, "jit.opt", jit_opt);
   L->top -= 2;
   return 1;
