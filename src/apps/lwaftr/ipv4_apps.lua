@@ -1,6 +1,5 @@
 module(..., package.seeall)
 
-local arp = require("apps.lwaftr.arp")
 local constants = require("apps.lwaftr.constants")
 local fragmentv4 = require("apps.lwaftr.fragmentv4")
 local fragv4_h = require("apps.lwaftr.fragmentv4_hardened")
@@ -33,7 +32,6 @@ local icmpv4_echo_reply = constants.icmpv4_echo_reply
 
 Reassembler = {}
 Fragmenter = {}
-ARP = {}
 ICMPEcho = {}
 
 function Reassembler:new(conf)
@@ -115,76 +113,6 @@ function Fragmenter:push ()
       else
          counter.add(self.counters["out-ipv4-frag-not"])
          transmit(output, pkt)
-      end
-   end
-end
-
-function ARP:new(conf)
-   local o = setmetatable({}, {__index=ARP})
-   o.conf = conf
-   -- TODO: verify that the src and dst ipv4 addresses and src mac address
-   -- have been provided, in pton format.
-   if not conf.dst_eth then
-      o.arp_request_pkt = arp.form_request(conf.src_eth, conf.src_ipv4, conf.dst_ipv4)
-      self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
-   end
-   o.dst_eth = conf.dst_eth -- intentionally nil if to request via ARP
-   return o
-end
-
-function ARP:maybe_send_arp_request (output)
-   if self.dst_eth then return end
-   self.next_arp_request_time = self.next_arp_request_time or engine.now()
-   if self.next_arp_request_time <= engine.now() then
-      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.conf.dst_ipv4)))
-      self:send_arp_request(output)
-      self.next_arp_request_time = engine.now() + self.arp_request_interval
-   end
-end
-
-function ARP:send_arp_request (output)
-   transmit(output, packet.clone(self.arp_request_pkt))
-end
-
-function ARP:push()
-   local isouth, osouth = self.input.south, self.output.south
-   local inorth, onorth = self.input.north, self.output.north
-
-   self:maybe_send_arp_request(osouth)
-
-   for _ = 1, link.nreadable(isouth) do
-      local p = receive(isouth)
-      if arp.is_arp(p) then
-         if not self.dst_eth and arp.is_arp_reply(p) then
-            local dst_ethernet = arp.get_isat_ethernet(p)
-            if dst_ethernet then
-               print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(self.conf.dst_ipv4),
-                                                        ethernet:ntop(dst_ethernet)))
-               self.dst_eth = dst_ethernet
-            end
-            packet.free(p)
-         elseif arp.is_arp_request(p, self.conf.src_ipv4) then
-            local arp_reply_pkt = arp.form_reply(self.conf.src_eth, self.conf.src_ipv4, p)
-            if arp_reply_pkt then
-               transmit(osouth, arp_reply_pkt)
-            end
-            packet.free(p)
-         else -- incoming ARP that isn't handled; drop it silently
-            packet.free(p)
-         end
-      else
-         transmit(onorth, p)
-      end
-   end
-
-   for _ = 1, link.nreadable(inorth) do
-      local p = receive(inorth)
-      if not self.dst_eth then
-         -- drop all southbound packets until the next hop's ethernet address is known
-         packet.free(p)
-      else
-         lwutil.set_dst_ethernet(p, self.dst_eth)
-         transmit(osouth, p)
       end
    end
 end
