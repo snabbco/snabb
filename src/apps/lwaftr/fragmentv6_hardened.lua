@@ -37,7 +37,6 @@ constants.o_ipv6_frag_offset, constants.o_ipv6_frag_id,
 constants.o_ipv6_payload_len, constants.ipv6_frag_header_size,
 constants.o_ipv6_next_header
 
-local hash_32 = ctable.hash_32
 local rd16, rd32 = lwutil.rd16, lwutil.rd32
 local uint32_ptr_t = ffi.typeof("uint32_t*")
 local bxor, band = bit.bxor, bit.band
@@ -226,18 +225,6 @@ local function packet_to_reassembly_buffer(pkt)
    return reassembly_buf
 end
 
--- The key is 288 bits: source IPv6 address, destination IPv6 address, and
--- the identification field from the IPv6 fragmentation header.
-local function hash_ipv6(key)
-   local hash = 0
-   local to_hash = ffi.cast(uint32_ptr_t, key)
-   for i=0,8 do
-      local current = to_hash[i]
-      hash = hash_32(bxor(hash, hash_32(current)))
-   end
-   return hash
-end
-
 function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
    -- Initialize module-scoped variables
    max_frags_per_packet = max_pkt_frag
@@ -260,7 +247,6 @@ function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
    local params = {
       key_type = ffi.typeof(ipv6_fragment_key_t),
       value_type = ffi.typeof(ipv6_reassembly_buffer_t),
-      hash_fn = hash_ipv6,
       initial_size = math.ceil(max_fragmented_packets / max_occupy),
       max_occupancy_rate = max_occupy,
    }
