@@ -791,6 +791,10 @@ function Intel:add_receive_MAC (mac)
 
    -- scan to see if the MAC is already recorded or find the
    -- first free MAC index
+   --
+   -- the lock protects the critical section so that driver apps on
+   -- separate processes do not use conflicting registers
+   self:lock_sw_sem()
    for idx=1, self.max_mac_addr do
       local valid = self.r.RAH[idx]:bits(31, 1)
 
@@ -807,6 +811,7 @@ function Intel:add_receive_MAC (mac)
          end
       end
    end
+   self:unlock_sw_sem()
 
    assert(mac_index, "Max number of MAC addresses reached")
 
@@ -832,8 +837,8 @@ function Intel:add_receive_VLAN (vlan)
    assert(vlan>=0 and vlan<4096, "bad VLAN number")
    local vlan_index, first_empty
 
-   -- scan to see if the VLAN is already recorded or find the
-   -- first free VLAN index
+   -- works the same as add_receive_MAC
+   self:lock_sw_sem()
    for idx=0, self.max_vlan-1 do
       local valid = self.r.PFVLVF[idx]:bits(31, 1)
 
@@ -846,6 +851,7 @@ function Intel:add_receive_VLAN (vlan)
          break
       end
    end
+   self:unlock_sw_sem()
 
    if not vlan_index and first_empty then
       vlan_index = first_empty
