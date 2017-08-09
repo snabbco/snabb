@@ -8,7 +8,7 @@ Available options:
                                 Defaults to 10.0.0.1.
        -c, --collector <ipaddr> The IP address of the flow collector.
                                 Defaults to 10.0.0.2.
-       -i, --input-type <type>  One of pcap, raw, or intel10g. Specifies
+       -i, --input-type <type>  One of pcap, raw, tap, or intel10g. Specifies
                                 how to interpret the <input> argument. Interprets
                                 <input> as a pcap file path, device name, or
                                 PCI address respectively. Defaults to intel10g.
@@ -16,6 +16,10 @@ Available options:
        -D, --duration <seconds> Duration to run (in seconds).
        -p, --port <port>        The port on the collector to send to. Defaults
                                 to port 4739.
+       --active-timeout <secs>  The timeout period for flows that are still receiving
+                                packets (in seconds).
+       --idle-timeout <secs>    The timeout period for flows with no recent activity
+                                (in seconds).
        --netflow-v9             Use the Netflow V9 protocol to communicate to the
                                 flow collector.
        --ipfix                  Use IPFIX to communicate with the flow collector.
