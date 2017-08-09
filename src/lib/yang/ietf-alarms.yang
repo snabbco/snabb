@@ -152,11 +152,14 @@ module ietf-alarms {
 
     typedef resource {
         type union {
+            type string;
+            /*
+             * Comment use of instance-identifier as it's not currently supported.
             type instance-identifier {
                 require-instance false;
             }
+            */
             type yang:object-identifier;
-            type string;
         }
         description
             "This is an identification of the alarming resource, such as an
