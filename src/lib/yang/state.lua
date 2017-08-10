@@ -1,6 +1,7 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
+local alarms = require("lib.yang.alarms")
 local lib = require("core.lib")
 local shm = require("core.shm")
 local xpath = require("lib.yang.path")
@@ -104,9 +105,16 @@ function state_reader_from_schema_by_name(schema_name)
 end
 state_reader_from_schema_by_name = util.memoize(state_reader_from_schema_by_name)
 
+local function append_alarms (state)
+   state.softwire_state = state.softwire_state or {}
+   state.softwire_state.alarms = alarms.get_state() or {}
+end
+
 function read_state(schema_name, pid)
    local reader = state_reader_from_schema_by_name(schema_name)
-   return reader(flatten(find_counters(pid)))
+   local state = reader(flatten(find_counters(pid)))
+   append_alarms(state)
+   return state
 end
 
 function selftest ()
