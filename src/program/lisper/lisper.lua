@@ -253,23 +253,23 @@ local function update_fib(s)
             local w = tonumber(t.weight)
             local encrypt
             if false and key_id and encap_key and decap_key then
-               local enc = esp.esp_v6_encrypt:new{
+               local enc = esp.encrypt:new{
                   spi = key_id,
-                  mode = "aes-128-gcm",
+                  mode = "aes-gcm-128-12",
                   keymat = encap_key,
                   salt = conf.esp_salt,
                }
                function encrypt(p)
-                  return enc:encapsulate(p)
+                  return enc:encapsulate_transport6(p)
                end
-               local dec = esp.esp_v6_decrypt:new{
+               local dec = esp.decrypt:new{
                   spi = key_id,
-                  mode = "aes-128-gcm",
+                  mode = "aes-gcm-128-12",
                   keymat = decap_key,
                   salt = conf.esp_salt,
                }
                local function decrypt(p)
-                  return dec:decapsulate(p)
+                  return dec:decapsulate_transport6(p)
                end
                spis[key_id] = decrypt
             end
@@ -501,7 +501,9 @@ local function route_packet(p, rxname, txports)
       local spi = parse_esp(p)
       if spi then --packed is encrypted, decrypt it
          local decrypt = spis[spi]
-         if not (decrypt and decrypt(p)) then return end --invalid packet
+         local decapsulated = decrypt and decrypt(p)
+         if decapsulated then p = decapsulated
+         else return end
       end
       local src_ip, session_id, cookie
       src_ip, session_id, cookie, smac, dmac, payload_offset = parse_l2tp(p)
@@ -566,7 +568,9 @@ local function route_packet(p, rxname, txports)
          tx = txports[txname]
          log_l2tp(")))", dp, txname)
          if loc.encrypt then
-            if not loc.encrypt(dp) then return end --invalid packet
+            local encapsulated = loc.encrypt(dp)
+            if encapsulated then dp = encapsulated
+            else return end --invalid packet
          end
       end
       link.transmit(tx, dp)
