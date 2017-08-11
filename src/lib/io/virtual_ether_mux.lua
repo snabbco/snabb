@@ -54,12 +54,15 @@ function configure (c, ports, io)
          local name = port_name(port)
          local Switch_link = Switch.."."..name
          local Port_tx, Port_rx = Switch_link, Switch_link
-         if port.vlan then
+         local vlan = port.vlan
+         -- Backwards compat: VLAN 0 is accepted by nfvconfig but is not valid.
+         if vlan == 0 then vlan = nil end
+         if vlan then
             local VlanTag, VlanUntag = name.."_VlanTag", name.."_VlanUntag"
-            config.app(c, VlanTag, vlan.Tagger, {tag = port.vlan})
+            config.app(c, VlanTag, vlan.Tagger, {tag = vlan})
             config.link(c, VlanTag..".output -> "..Port_rx)
             Port_rx = VlanTag..".input"
-            config.app(c, VlanUntag, vlan.Untagger, {tag = port.vlan})
+            config.app(c, VlanUntag, vlan.Untagger, {tag = vlan})
             config.link(c, Port_tx.." -> "..VlanUntag..".input")
             Port_tx = VlanUntag..".output"
          end
@@ -86,11 +89,14 @@ function configureVMDq (c, device, ports)
          end
          vmdq = false
       end
+      local vlan = port.vlan
+      -- Backwards compat: VLAN 0 is accepted by nfvconfig but is not valid.
+      if vlan == 0 then vlan = nil end
       config.app(c, NIC, require(device.driver).driver,
                  {pciaddr = device.pciaddress,
                   vmdq = vmdq,
                   macaddr = port.mac_address,
-                  vlan = port.vlan})
+                  vlan = vlan})
       links[i] = {input = NIC..".rx", output = NIC..".tx"}
    end
    return links
