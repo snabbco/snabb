@@ -8,8 +8,7 @@ LUAJIT_CFLAGS := -include $(CURDIR)/gcc-preinclude.h
 
 all: $(LUAJIT) $(SYSCALL) $(PFLUA)
 #       LuaJIT
-	@(cd lib/luajit && \
-	 $(MAKE))
+	@(cd lib/luajit && (cd src && $(MAKE) reusevm) && $(MAKE))
 #       ljsyscall
 	@mkdir -p src/syscall/linux
 	@cp -p lib/ljsyscall/syscall.lua   src/
