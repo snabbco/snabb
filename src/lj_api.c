@@ -376,8 +376,6 @@ LUA_API lua_Integer lua_tointeger(lua_State *L, int idx)
   } else {
     if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp)))
       return 0;
-    if (tvisint(&tmp))
-      return intV(&tmp);
     n = numV(&tmp);
   }
   return (lua_Integer)n;
@@ -388,19 +386,12 @@ LUA_API lua_Integer lua_tointegerx(lua_State *L, int idx, int *ok)
   cTValue *o = index2adr(L, idx);
   TValue tmp;
   lua_Number n;
-  if (LJ_LIKELY(tvisint(o))) {
-    if (ok) *ok = 1;
-    return intV(o);
-  } else if (LJ_LIKELY(tvisnum(o))) {
+  if (LJ_LIKELY(tvisnum(o))) {
     n = numV(o);
   } else {
     if (!(tvisstr(o) && lj_strscan_number(strV(o), &tmp))) {
       if (ok) *ok = 0;
       return 0;
-    }
-    if (tvisint(&tmp)) {
-      if (ok) *ok = 1;
-      return intV(&tmp);
     }
     n = numV(&tmp);
   }
