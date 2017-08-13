@@ -1244,12 +1244,17 @@ static TRef crec_arith_ptr(jit_State *J, TRef *sp, CType **s, MMS mm)
       if (mm == MM_sub) {  /* Pointer difference. */
 	TRef tr;
 	CTSize sz = lj_ctype_size(cts, ctype_cid(ctp->info));
-	if (sz == 0 || (sz & (sz-1)) != 0)
-	  return 0;  /* NYI: integer division. */
-	tr = emitir(IRT(IR_SUB, IRT_INTP), sp[0], sp[1]);
-	tr = emitir(IRT(IR_BSAR, IRT_INTP), tr, lj_ir_kint(J, lj_fls(sz)));
-	tr = emitconv(tr, IRT_NUM, IRT_INTP, 0);
-	return tr;
+        if (sz == 0) {
+          return 0;
+        }
+        tr = emitir(IRT(IR_SUB, IRT_INTP), sp[0], sp[1]);
+        if ((sz & (sz-1)) == 0) { /* special case: divide using bit-shift */
+          tr = emitir(IRT(IR_BSAR, IRT_INTP), tr, lj_ir_kint(J, lj_fls(sz)));
+        } else {                  /* general case: divide using division */
+          tr = emitir(IRT(IR_DIV, IRT_INTP), tr, lj_ir_kint(J, sz));
+        }
+        tr = emitconv(tr, IRT_NUM, IRT_INTP, 0);
+        return tr;
       } else {  /* Pointer comparison (unsigned). */
 	/* Assume true comparison. Fixup and emit pending guard later. */
 	IROp op = mm == MM_eq ? IR_EQ : mm == MM_lt ? IR_ULT : IR_ULE;
