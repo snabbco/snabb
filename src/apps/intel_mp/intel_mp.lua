@@ -1441,13 +1441,16 @@ function Intel82599:select_pool()
       -- using flock() to avoid conflicts. The contents of the memory doesn't
       -- matter since we only care about the lock state.
       for poolnum = 0, 63 do
-         local path   = "/"..pooldir.."/"..self.pciaddress.."/"..poolnum
-         shm.create(path, "uint8_t")
-         self.poolfd  = S.open(shm.root .. path, "rdwr")
+         local path = "/"..pooldir.."/"..self.pciaddress.."/"..poolnum
+         local ptr  = shm.create(path, "uint8_t")
+         local poolfd = S.open(shm.root .. path, "creat, rdwr")
 
-         if self.poolfd:flock("nb, ex") then
+         if poolfd:flock("nb, ex") then
             available_pool = poolnum
+            self.poolfd = poolfd
             break
+         else
+            poolfd:close()
          end
       end
 
