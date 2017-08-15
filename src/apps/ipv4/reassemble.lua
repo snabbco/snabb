@@ -165,7 +165,7 @@ end
 
 function Reassembler:update_counters()
    counter.set(self.shm["memuse-ipv4-frag-reassembly-buffer"],
-               o.ctab:get_backing_size())
+               self.ctab:get_backing_size())
 end
 
 function Reassembler:record_eviction()
@@ -252,7 +252,7 @@ function Reassembler:handle_fragment(h, fragment)
       -- Prevent a buffer overflow.  The relevant RFC allows hosts to
       -- silently discard reassemblies above a certain rather small
       -- size, smaller than this.
-      return self:record_reassembly_error()
+      return self:reassembly_error()
    end
    ffi.copy(reassembly.packet.data + dst_offset, fragment.data + skip_headers,
             frag_size)
