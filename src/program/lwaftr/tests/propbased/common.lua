@@ -12,16 +12,16 @@ function make_handle_prop_args(name, duration, pidbox)
         print("Usage: snabb lwaftr quickcheck prop_sameval PCI_ADDR")
         os.exit(1)
      end
-  
+
      local pci_addr = prop_args[1]
      assert(S.stat(pci.path(pci_addr)),
             string.format("Invalid PCI address: %s", pci_addr))
-  
+
      local pid = S.fork()
      if pid == 0 then
         local cmdline = {"snabb", "lwaftr", "run", "-D", tostring(duration),
             "--conf", "program/lwaftr/tests/data/icmp_on_fail.conf",
-            "--reconfigurable", "--on-a-stick", pci_addr}
+            "--on-a-stick", pci_addr}
         lib.execv(("/proc/%d/exe"):format(S.getpid()), cmdline)
      else
         pidbox[1] = pid

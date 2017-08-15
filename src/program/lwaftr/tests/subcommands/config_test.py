@@ -17,7 +17,7 @@ from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, BaseTestCase, \
 
 DAEMON_PROC_NAME = 'config-test-daemon'
 DAEMON_ARGS = [
-    str(SNABB_CMD), 'lwaftr', 'bench', '--reconfigurable',
+    str(SNABB_CMD), 'lwaftr', 'bench',
     '--bench-file', '/dev/null',
     '--name', DAEMON_PROC_NAME,
     str(DATA_DIR / 'icmp_on_fail.conf'),

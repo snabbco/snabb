@@ -31,10 +31,8 @@ function parse_args(args)
    function handlers.b(arg) opts.bench_file = arg end
    function handlers.y() opts.hydra = true end
    function handlers.h() show_usage(0) end
-   function handlers.reconfigurable() opts.reconfigurable = true end
    args = lib.dogetopt(args, handlers, "n:hyb:D:", {
-      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1,
-      reconfigurable = 0 })
+      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1})
    if #args ~= 3 then show_usage(1) end
    return opts, scheduling, unpack(args)
 end
@@ -50,13 +48,8 @@ function run(args)
    end
 
    local graph = config.new()
-   if opts.reconfigurable then
-      setup.reconfigurable(scheduling, setup.load_bench, graph, conf,
-                           inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
-   else
-      setup.apply_scheduling(scheduling)
-      setup.load_bench(graph, conf, inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
-   end
+   setup.reconfigurable(scheduling, setup.load_bench, graph, conf,
+			inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
    app.configure(graph)
 
    local function start_sampling_for_pid(pid)
@@ -65,27 +58,19 @@ function run(args)
       csv:add_app('sinkv6', { 'input' }, { input=opts.hydra and 'encap' or 'Encap.' })
       csv:activate()
    end
-   if opts.reconfigurable then
-      for _,pid in ipairs(app.configuration.apps['leader'].arg.follower_pids) do
-         -- The worker will be fed its configuration by the
-         -- leader, but we don't know when that will all be ready.
-         -- Just retry if this doesn't succeed.
-         local function start_sampling()
-            if not pcall(start_sampling_for_pid, pid) then
-               io.stderr:write("Waiting on follower "..pid.." to start "..
-                                  "before recording statistics...\n")
-               timer.activate(timer.new('retry_csv', start_sampling, 1e9))
-            end
-         end
-         timer.activate(timer.new('spawn_csv_stats', start_sampling, 10e6))
+   for _,pid in ipairs(app.configuration.apps['leader'].arg.follower_pids) do
+      -- The worker will be fed its configuration by the
+      -- leader, but we don't know when that will all be ready.
+      -- Just retry if this doesn't succeed.
+      local function start_sampling()
+	 if not pcall(start_sampling_for_pid, pid) then
+	    io.stderr:write("Waiting on follower "..pid.." to start "..
+			       "before recording statistics...\n")
+	    timer.activate(timer.new('retry_csv', start_sampling, 1e9))
+	 end
       end
-   else
-      start_sampling_for_pid(S.getpid())
+      timer.activate(timer.new('spawn_csv_stats', start_sampling, 10e6))
    end
 
-   if not opts.reconfigurable then
-      -- The leader does not need all the CPU, only the followers do.
-      app.busywait = true
-   end
    app.main({duration=opts.duration})
 end
