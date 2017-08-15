@@ -18,19 +18,12 @@ class TestBench(BaseTestCase):
         str(BENCHDATA_DIR / 'ipv6-0550.pcap'),
     ]
 
-    def execute_bench_test(self, cmd_args):
-        self.run_cmd(cmd_args)
+    def test_bench(self):
+        self.run_cmd(self.cmd_args)
         self.assertTrue(BENCHMARK_PATH.is_file(),
             'Cannot find {}'.format(BENCHMARK_PATH))
         BENCHMARK_PATH.unlink()
 
-    def test_bench_not_reconfigurable(self):
-        self.execute_bench_test(self.cmd_args)
-
-    def test_bench_reconfigurable(self):
-        reconf_args = list(self.cmd_args)
-        reconf_args.insert(3, '--reconfigurable')
-        self.execute_bench_test(reconf_args)
 
 if __name__ == '__main__':
     unittest.main()

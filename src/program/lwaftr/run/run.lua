@@ -102,7 +102,9 @@ function parse_args(args)
                   .." (valid values: flush, warn, off)")
       end
    end
-   function handlers.reconfigurable() opts.reconfigurable = true end
+   function handlers.reconfigurable()
+      io.stderr:write("Warning: --reconfigurable flag has been deprecated.\n")
+   end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:yhir:n:",
      { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
@@ -172,13 +174,7 @@ function run(args)
       setup_fn, setup_args = setup.load_phy, { 'inetNic', 'b4sideNic' }
    end
 
-   if opts.reconfigurable then
-      setup.reconfigurable(scheduling, setup_fn, c, conf, unpack(setup_args))
-   else
-      setup.apply_scheduling(scheduling)
-      setup_fn(c, conf, unpack(setup_args))
-   end
-
+   setup.reconfigurable(scheduling, setup_fn, c, conf, unpack(setup_args))
    engine.configure(c)
 
    if opts.verbosity >= 2 then
@@ -206,40 +202,26 @@ function run(args)
          end
          csv:activate()
       end
-      if opts.reconfigurable then
-         local pids = engine.configuration.apps['leader'].arg.follower_pids
-         for _,pid in ipairs(pids) do
-            local function start_sampling()
-               -- The worker will be fed its configuration by the
-               -- leader, but we don't know when that will all be ready.
-               -- Just retry if this doesn't succeed.
-               if not pcall(add_csv_stats_for_pid, pid) then
-                  io.stderr:write("Waiting on follower "..pid.." to start "..
-                                     "before recording statistics...\n")
-                  timer.activate(timer.new('retry_csv', start_sampling, 2e9))
-               end
-            end
-            timer.activate(timer.new('spawn_csv_stats', start_sampling, 50e6))
-         end
-      else
-         add_csv_stats_for_pid(S.getpid())
+      local pids = engine.configuration.apps['leader'].arg.follower_pids
+      for _,pid in ipairs(pids) do
+	 local function start_sampling()
+	    -- The worker will be fed its configuration by the
+	    -- leader, but we don't know when that will all be ready.
+	    -- Just retry if this doesn't succeed.
+	    if not pcall(add_csv_stats_for_pid, pid) then
+	       io.stderr:write("Waiting on follower "..pid.." to start "..
+				  "before recording statistics...\n")
+	       timer.activate(timer.new('retry_csv', start_sampling, 2e9))
+	    end
+	 end
+	 timer.activate(timer.new('spawn_csv_stats', start_sampling, 50e6))
       end
    end
 
    if opts.ingress_drop_monitor then
-      if opts.reconfigurable then
-         io.stderr:write("Warning: Ingress drop monitor not yet supported "..
-                            "in multiprocess mode.\n")
-      else
-         local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
-         timer.activate(mon:timer())
-      end
+      io.stderr:write("Warning: Ingress drop monitor not yet supported\n")
    end
 
-   if not opts.reconfigurable then
-      -- The leader does not need all the CPU, only the followers do.
-      engine.busywait = true
-   end
    if opts.duration then
       engine.main({duration=opts.duration, report={showlinks=true}})
    else

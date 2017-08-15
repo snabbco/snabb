@@ -1,5 +1,10 @@
 # Change Log
 
+## [2017.07.02]
+
+* Deprecate the --reconfigurable flags in favour of the lwaftr always
+  being reconfigurable.
+
 ## [2017.07.01] - 2017-08-04
 
 * New YANG schema snabb-softwire-v2 replaces old snabb-softwire-v1
