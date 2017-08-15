@@ -31,12 +31,8 @@ function parse_args(args)
    function handlers.b(arg) opts.bench_file = arg end
    function handlers.y() opts.hydra = true end
    function handlers.h() show_usage(0) end
-   function handlers.reconfigurable()
-      io.stderr:write("Warning: --reconfigurable flag has been deprecated.\n")
-   end
    args = lib.dogetopt(args, handlers, "n:hyb:D:", {
-      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1,
-      reconfigurable = 0 })
+      help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1})
    if #args ~= 3 then show_usage(1) end
    return opts, scheduling, unpack(args)
 end

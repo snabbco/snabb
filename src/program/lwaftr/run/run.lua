@@ -103,7 +103,8 @@ function parse_args(args)
       end
    end
    function handlers.reconfigurable()
-      io.stderr:write("Warning: --reconfigurable flag has been deprecated.\n")
+      io.stderr:write("Warning: the --reconfigurable flag has been deprecated")
+      io.stderr:write(" as the lwaftr is now always reconfigurable.\n")
    end
    function handlers.h() show_usage(0) end
    lib.dogetopt(args, handlers, "b:c:vD:yhir:n:",
