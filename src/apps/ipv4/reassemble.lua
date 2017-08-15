@@ -158,10 +158,14 @@ function Reassembler:new(conf)
    o.ctab = ctablew.new(params)
    o.scratch_fragment_key = params.key_type()
    o.scratch_reassembly = params.value_type()
+   o.next_counter_update = -1
 
-   -- counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
-   -- o.ctab:get_backing_size())
    return setmetatable(o, {__index=Reassembler})
+end
+
+function Reassembler:update_counters()
+   counter.set(self.shm["memuse-ipv4-frag-reassembly-buffer"],
+               o.ctab:get_backing_size())
 end
 
 function Reassembler:record_eviction()
@@ -297,6 +301,13 @@ function Reassembler:push ()
          self:handle_fragment(h, pkt)
          packet.free(pkt)
       end
+   end
+
+   if self.next_counter_update < engine.now() then
+      -- Update counters every second, but add a bit of jitter to smooth
+      -- things out.
+      self:update_counters()
+      self.next_counter_update = engine.now() + math.random(0.9, 1.1)
    end
 end
 
