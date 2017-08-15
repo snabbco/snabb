@@ -16,6 +16,7 @@ local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
 local ipv4_reassemble = require("apps.ipv4.reassemble")
 local arp        = require("apps.ipv4.arp")
 local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+local ipv6_reassemble = require("apps.ipv6.reassemble")
 local ndp        = require("apps.lwaftr.ndp")
 local vlan       = require("apps.vlan.vlan")
 local numa       = require("lib.numa")
@@ -105,7 +106,7 @@ function lwaftr_app(c, conf, device)
                    gexternal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly =
                    gexternal_interface.reassembly.max_fragments_per_packet })
-   config.app(c, "reassemblerv6", ipv6_apps.ReassembleV6,
+   config.app(c, "reassemblerv6", ipv6_reassemble.Reassembler,
               { max_ipv6_reassembly_packets =
                    ginternal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly_packet =

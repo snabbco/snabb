@@ -1,32 +1,40 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+-- IPv6 reassembly (RFC 2460 §4.5)
+--
+-- This reassembly implementation will abort ongoing reassemblies if
+-- it sees overlapping fragments, following the recommendation of
+-- RFC 5722.
+--
+-- Reassembly failures are currently silent.  We could implement
+-- timeouts and then we could issue "timeout exceeded" ICMP errors if 60
+-- seconds go by without success; we'd need to have received the first
+-- fragment though.  Additionally we should emit "parameter problem"
+-- code 0 ICMP errors for non-terminal fragments whose sizes aren't a
+-- multiple of 8 bytes, or for reassembled packets that are too big.
+
 module(..., package.seeall)
 
-local bit = require("bit")
+local bit        = require("bit")
+local ffi        = require("ffi")
+local lib        = require("core.lib")
+local packet     = require("core.packet")
+local counter    = require("core.counter")
+local link       = require("core.link")
+local ipsum      = require("lib.checksum").ipsum
+local ctable     = require('lib.ctable')
+local ctablew    = require('apps.lwaftr.ctable_wrapper')
+
 local constants = require("apps.lwaftr.constants")
-local ctablew = require('apps.lwaftr.ctable_wrapper')
-local ctable = require('lib.ctable')
-local ffi = require('ffi')
 local lwutil = require("apps.lwaftr.lwutil")
-local C = ffi.C
-local packet = require("core.packet")
-local lib = require("core.lib")
 
-REASSEMBLY_OK = 1
-FRAGMENT_MISSING = 2
-REASSEMBLY_INVALID = 3
+local ntohs, htons = lib.ntohs, lib.htons
 
--- IPv6 reassembly, as per https://tools.ietf.org/html/rfc2460#section-4.5
--- with RFC 5722's recommended exclusion of overlapping packets.
+local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
 
--- Possible TODOs:
--- TODO: handle the 60-second timeout, and associated ICMP iff the fragment
--- with offset 0 was received
--- TODO: handle silently discarding fragments that arrive later if
--- an overlapping fragment was detected (keep a list for a few minutes?)
--- TODO: send ICMP parameter problem code 0 if needed, as per RFC2460
--- (if the fragment's data isn't a multiple of 8 octets and M=1, or
--- if the length of the reassembled packet would exceed 65535 octets)
--- TODO: handle packets of > 10240 octets correctly...
--- TODO: test every branch of this
+local REASSEMBLY_OK = 1
+local FRAGMENT_MISSING = 2
+local REASSEMBLY_INVALID = 3
 
 local ehs, ipv6_fixed_header_size, o_ipv6_src_addr, o_ipv6_dst_addr,
 o_ipv6_frag_offset, o_ipv6_frag_id, o_ipv6_payload_len, ipv6_frag_header_size,
@@ -40,7 +48,7 @@ constants.o_ipv6_next_header
 local rd16, rd32 = lwutil.rd16, lwutil.rd32
 local uint32_ptr_t = ffi.typeof("uint32_t*")
 local bxor, band = bit.bxor, bit.band
-local packet_payload_size = C.PACKET_PAYLOAD_SIZE
+local packet_payload_size = ffi.C.PACKET_PAYLOAD_SIZE
 local ntohs, ntohl = lib.ntohs, lib.ntohl
 
 local ipv6_fragment_key_t = ffi.typeof[[
@@ -208,7 +216,7 @@ end
 
 local function packet_to_reassembly_buffer(pkt)
    local reassembly_buf = scratch_rbuf
-   C.memset(reassembly_buf, 0, ffi.sizeof(ipv6_reassembly_buffer_t))
+   ffi.C.memset(reassembly_buf, 0, ffi.sizeof(ipv6_reassembly_buffer_t))
    reassembly_buf.fragment_id = get_frag_id(pkt)
    reassembly_buf.reassembly_base = ehs + ipv6_fixed_header_size
 
@@ -225,7 +233,7 @@ local function packet_to_reassembly_buffer(pkt)
    return reassembly_buf
 end
 
-function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
+local function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
    -- Initialize module-scoped variables
    max_frags_per_packet = max_pkt_frag
    ipv6_reassembly_buffer_t = ffi.typeof([[
@@ -253,7 +261,7 @@ function initialize_frag_table(max_fragmented_packets, max_pkt_frag)
    return ctablew.new(params)
 end
 
-function cache_fragment(frags_table, fragment)
+local function cache_fragment(frags_table, fragment)
    local key = get_key(fragment)
    local ptr = frags_table:lookup_ptr(key)
    local did_evict = false
@@ -263,6 +271,59 @@ function cache_fragment(frags_table, fragment)
    end
    local status, maybe_pkt = attempt_reassembly(frags_table, ptr.value, fragment)
    return status, maybe_pkt, did_evict
+end
+
+Reassembler = {}
+
+function Reassembler:new(conf)
+   local max_ipv6_reassembly_packets = conf.max_ipv6_reassembly_packets
+   local max_fragments_per_reassembly_packet = conf.max_fragments_per_reassembly_packet
+   local o = {
+      counters = require('apps.lwaftr.lwcounter').init_counters(),
+      ctab = initialize_frag_table(max_ipv6_reassembly_packets,
+         max_fragments_per_reassembly_packet),
+   }
+   counter.set(o.counters["memuse-ipv6-frag-reassembly-buffer"],
+               o.ctab:get_backing_size())
+   return setmetatable(o, {__index = Reassembler})
+end
+
+function Reassembler:cache_fragment(fragment)
+   return cache_fragment(self.ctab, fragment)
+end
+
+function Reassembler:push ()
+   local input, output = self.input.input, self.output.output
+   local errors = self.output.errors
+
+   for _ = 1, link.nreadable(input) do
+      local pkt = receive(input)
+      if lwutil.is_ipv6_fragment(pkt) then
+         counter.add(self.counters["in-ipv6-frag-needs-reassembly"])
+         local status, maybe_pkt, did_evict = self:cache_fragment(pkt)
+         if did_evict then
+            counter.add(self.counters["drop-ipv6-frag-random-evicted"])
+         end
+
+         if status == REASSEMBLY_OK then
+            counter.add(self.counters["in-ipv6-frag-reassembled"])
+            transmit(output, maybe_pkt)
+         elseif status == FRAGMENT_MISSING then
+            -- Nothing useful to be done yet, continue
+         elseif status == REASSEMBLY_INVALID then
+            counter.add(self.counters["drop-ipv6-frag-invalid-reassembly"])
+            if maybe_pkt then -- This is an ICMP packet
+               transmit(errors, maybe_pkt)
+            end
+         else -- unreachable
+            packet.free(pkt)
+         end
+      else
+         -- Forward all packets that aren't IPv6 fragments.
+         counter.add(self.counters["in-ipv6-frag-reassembly-unneeded"])
+         transmit(output, pkt)
+      end
+   end
 end
 
 function selftest()
@@ -275,7 +336,7 @@ function selftest()
    rbuf2.fragment_starts[1] = 10
    sort_array(rbuf1.fragment_starts, 1)
    sort_array(rbuf2.fragment_starts, 1)
-   assert(0 == C.memcmp(rbuf1.fragment_starts, rbuf2.fragment_starts, 4))
+   assert(0 == ffi.C.memcmp(rbuf1.fragment_starts, rbuf2.fragment_starts, 4))
 
    local rbuf3 = ffi.new(ipv6_reassembly_buffer_t)
    rbuf3.fragment_starts[0] = 5
@@ -283,5 +344,5 @@ function selftest()
    rbuf3.fragment_starts[2] = 100
    rbuf1.fragment_starts[2] = 5
    sort_array(rbuf1.fragment_starts, 2)
-   assert(0 == C.memcmp(rbuf1.fragment_starts, rbuf3.fragment_starts, 6))
+   assert(0 == ffi.C.memcmp(rbuf1.fragment_starts, rbuf3.fragment_starts, 6))
 end
