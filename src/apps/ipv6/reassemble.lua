@@ -276,8 +276,8 @@ end
 Reassembler = {}
 
 function Reassembler:new(conf)
-   local max_ipv6_reassembly_packets = conf.max_ipv6_reassembly_packets
-   local max_fragments_per_reassembly_packet = conf.max_fragments_per_reassembly_packet
+   local max_ipv6_reassembly_packets = conf.max_concurrent_reassemblies
+   local max_fragments_per_reassembly_packet = conf.max_fragments_per_reassembly
    local o = {
       counters = require('apps.lwaftr.lwcounter').init_counters(),
       ctab = initialize_frag_table(max_ipv6_reassembly_packets,
@@ -297,7 +297,7 @@ function Reassembler:push ()
    local errors = self.output.errors
 
    for _ = 1, link.nreadable(input) do
-      local pkt = receive(input)
+      local pkt = link.receive(input)
       if lwutil.is_ipv6_fragment(pkt) then
          counter.add(self.counters["in-ipv6-frag-needs-reassembly"])
          local status, maybe_pkt, did_evict = self:cache_fragment(pkt)
@@ -307,13 +307,13 @@ function Reassembler:push ()
 
          if status == REASSEMBLY_OK then
             counter.add(self.counters["in-ipv6-frag-reassembled"])
-            transmit(output, maybe_pkt)
+            link.transmit(output, maybe_pkt)
          elseif status == FRAGMENT_MISSING then
             -- Nothing useful to be done yet, continue
          elseif status == REASSEMBLY_INVALID then
             counter.add(self.counters["drop-ipv6-frag-invalid-reassembly"])
             if maybe_pkt then -- This is an ICMP packet
-               transmit(errors, maybe_pkt)
+               link.transmit(errors, maybe_pkt)
             end
          else -- unreachable
             packet.free(pkt)
@@ -321,28 +321,110 @@ function Reassembler:push ()
       else
          -- Forward all packets that aren't IPv6 fragments.
          counter.add(self.counters["in-ipv6-frag-reassembly-unneeded"])
-         transmit(output, pkt)
+         link.transmit(output, pkt)
       end
    end
 end
 
 function selftest()
-   initialize_frag_table(20, 20)
-   local rbuf1 = ffi.new(ipv6_reassembly_buffer_t)
-   local rbuf2 = ffi.new(ipv6_reassembly_buffer_t)
-   rbuf1.fragment_starts[0] = 10
-   rbuf1.fragment_starts[1] = 100
-   rbuf2.fragment_starts[0] = 100
-   rbuf2.fragment_starts[1] = 10
-   sort_array(rbuf1.fragment_starts, 1)
-   sort_array(rbuf2.fragment_starts, 1)
-   assert(0 == ffi.C.memcmp(rbuf1.fragment_starts, rbuf2.fragment_starts, 4))
+   print("selftest: apps.ipv6.reassemble")
 
-   local rbuf3 = ffi.new(ipv6_reassembly_buffer_t)
-   rbuf3.fragment_starts[0] = 5
-   rbuf3.fragment_starts[1] = 10
-   rbuf3.fragment_starts[2] = 100
-   rbuf1.fragment_starts[2] = 5
-   sort_array(rbuf1.fragment_starts, 2)
-   assert(0 == ffi.C.memcmp(rbuf1.fragment_starts, rbuf3.fragment_starts, 6))
+   local shm        = require("core.shm")
+   local datagram   = require("lib.protocol.datagram")
+   local ether      = require("lib.protocol.ethernet")
+   local ipv6       = require("lib.protocol.ipv6")
+   local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+
+   local ethertype_ipv6 = 0x86dd
+
+   local function random_ipv6() return lib.random_bytes(16) end
+   local function random_mac() return lib.random_bytes(6) end
+
+   -- Returns a new packet containing an Ethernet frame with an IPv6
+   -- header followed by PAYLOAD_SIZE random bytes.
+   local function make_test_packet(payload_size)
+      local pkt = packet.from_pointer(lib.random_bytes(payload_size),
+                                      payload_size)
+      local eth_h = ether:new({ src = random_mac(), dst = random_mac(),
+                                type = ethertype_ipv6 })
+      local ip_h  = ipv6:new({ src = random_ipv6(), dst = random_ipv6(),
+                               next_header = 0xff, hop_limit = 64 })
+      ip_h:payload_length(payload_size)
+
+      local dgram = datagram:new(pkt)
+      dgram:push(ip_h)
+      dgram:push(eth_h)
+      return dgram:packet()
+   end
+
+   local function fragment(pkt, mtu)
+      local fragment = ipv6_apps.Fragmenter:new({mtu=mtu})
+      fragment.input = { input = link.new('fragment input') }
+      fragment.output = { output = link.new('fragment output') }
+      link.transmit(fragment.input.input, packet.clone(pkt))
+      fragment:push()
+      local ret = {}
+      while not link.empty(fragment.output.output) do
+         table.insert(ret, link.receive(fragment.output.output))
+      end
+      link.free(fragment.input.input, 'fragment input')
+      link.free(fragment.output.output, 'fragment output')
+      return ret
+   end
+
+   local function permute_indices(lo, hi)
+      if lo == hi then return {{hi}} end
+      local ret = {}
+      for _, tail in ipairs(permute_indices(lo + 1, hi)) do
+         for pos = 1, #tail + 1 do
+            local order = lib.deepcopy(tail)
+            table.insert(order, pos, lo)
+            table.insert(ret, order)
+         end
+      end
+      return ret
+   end
+
+   for _, size in ipairs({100, 400, 1000, 1500, 2000}) do
+      local pkt = make_test_packet(size)
+      for _, mtu in ipairs({512, 1000, 1500}) do
+         local fragments = fragment(pkt, mtu)
+         for _, order in ipairs(permute_indices(1, #fragments)) do
+            local reassembler = Reassembler:new {
+               max_concurrent_reassemblies = 100,
+               max_fragments_per_reassembly = 20
+            }
+            -- reassembler.shm = shm.create_frame(
+            --    "apps/reassembler", reassembler.shm)
+            reassembler.input = { input = link.new('reassembly input') }
+            reassembler.output = { output = link.new('reassembly output') }
+            local last = table.remove(order)
+            for _, i in ipairs(order) do
+               link.transmit(reassembler.input.input,
+                             packet.clone(fragments[i]))
+               reassembler:push()
+               assert(link.empty(reassembler.output.output))
+            end
+            link.transmit(reassembler.input.input,
+                          packet.clone(fragments[last]))
+            reassembler:push()
+            assert(link.nreadable(reassembler.output.output) == 1)
+            local result = link.receive(reassembler.output.output)
+            assert(pkt.length == result.length)
+            -- for i = ether:sizeof(), result.length - 1 do
+            --    local expected, actual = pkt.data[i], result.data[i]
+            --    assert(expected == actual,
+            --           "pkt["..i.."] expected "..expected..", got "..actual)
+            -- end
+            packet.free(result)
+            link.free(reassembler.input.output, 'reassembly input')
+            link.free(reassembler.output.output, 'reassembly output')
+            -- shm.delete_frame(reassembler.shm)
+         end
+         for _, p in ipairs(fragments) do packet.free(p) end
+      end
+      packet.free(pkt)
+   end
+
+   print("selftest: ok")
 end

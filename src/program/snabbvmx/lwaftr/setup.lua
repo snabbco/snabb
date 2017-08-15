@@ -192,9 +192,9 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       if conf.ipv6_interface.fragmentation then
          local mtu = conf.ipv6_interface.mtu or internal_interface.mtu
          config.app(c, "reassemblerv6", ipv6_reassemble.Reassembler, {
-            max_ipv6_reassembly_packets =
+            max_concurrent_reassemblies =
                ginternal_interface.reassembly.max_packets,
-            max_fragments_per_reassembly_packet =
+            max_fragments_per_reassembly =
                ginternal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
@@ -352,9 +352,9 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
       if conf.ipv6_interface.fragmentation then
          local mtu = conf.ipv6_interface.mtu or internal_interface.mtu
          config.app(c, "reassemblerv6", ipv6_reassemble.Reassembler, {
-            max_ipv6_reassembly_packets =
+            max_concurrent_reassemblies =
                internal_interface.reassembly.max_packets,
-            max_fragments_per_reassembly_packet =
+            max_fragments_per_reassembly =
                internal_interface.reassembly.max_fragments_per_packet
          })
          config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {

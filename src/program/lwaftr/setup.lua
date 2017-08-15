@@ -107,9 +107,9 @@ function lwaftr_app(c, conf, device)
                 max_fragments_per_reassembly =
                    gexternal_interface.reassembly.max_fragments_per_packet })
    config.app(c, "reassemblerv6", ipv6_reassemble.Reassembler,
-              { max_ipv6_reassembly_packets =
+              { max_concurrent_reassemblies =
                    ginternal_interface.reassembly.max_packets,
-                max_fragments_per_reassembly_packet =
+                max_fragments_per_reassembly =
                    ginternal_interface.reassembly.max_fragments_per_packet })
    config.app(c, "icmpechov4", ipv4_apps.ICMPEcho,
               { address = convert_ipv4(iexternal_interface.ip) })
