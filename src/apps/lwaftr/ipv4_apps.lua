@@ -2,7 +2,6 @@ module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
 local fragmentv4 = require("apps.lwaftr.fragmentv4")
-local fragv4_h = require("apps.lwaftr.fragmentv4_hardened")
 local lwutil = require("apps.lwaftr.lwutil")
 local icmp = require("apps.lwaftr.icmp")
 local lwcounter = require("apps.lwaftr.lwcounter")
@@ -19,7 +18,7 @@ local engine = require("core.app")
 local receive, transmit = link.receive, link.transmit
 local wr16, rd32, wr32 = lwutil.wr16, lwutil.rd32, lwutil.wr32
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local is_ipv4, is_ipv4_fragment = lwutil.is_ipv4, lwutil.is_ipv4_fragment
+local is_ipv4 = lwutil.is_ipv4
 local htons = lib.htons
 
 local ehs = constants.ethernet_header_size
@@ -30,59 +29,8 @@ local o_icmpv4_checksum_sans_ihl = ehs + constants.o_icmpv4_checksum
 local icmpv4_echo_request = constants.icmpv4_echo_request
 local icmpv4_echo_reply = constants.icmpv4_echo_reply
 
-Reassembler = {}
 Fragmenter = {}
 ICMPEcho = {}
-
-function Reassembler:new(conf)
-   local max_ipv4_reassembly_packets = assert(conf.max_ipv4_reassembly_packets)
-   local max_fragments_per_reassembly_packet = assert(conf.max_fragments_per_reassembly_packet)
-   local o = {
-      counters = lwcounter.init_counters(),
-      ctab = fragv4_h.initialize_frag_table(max_ipv4_reassembly_packets,
-         max_fragments_per_reassembly_packet),
-   }
-   counter.set(o.counters["memuse-ipv4-frag-reassembly-buffer"],
-               o.ctab:get_backing_size())
-   return setmetatable(o, {__index=Reassembler})
-end
-
-function Reassembler:cache_fragment(fragment)
-   return fragv4_h.cache_fragment(self.ctab, fragment)
-end
-
-function Reassembler:push ()
-   local input, output = self.input.input, self.output.output
-   local errors = self.output.errors
-
-   for _ = 1, link.nreadable(input) do
-      local pkt = receive(input)
-      if is_ipv4_fragment(pkt) then
-         counter.add(self.counters["in-ipv4-frag-needs-reassembly"])
-         local status, maybe_pkt, ejected = self:cache_fragment(pkt)
-         if ejected then
-            counter.add(self.counters["drop-ipv4-frag-random-evicted"])
-         end
-
-         if status == fragv4_h.REASSEMBLY_OK then -- Reassembly was successful
-            counter.add(self.counters["in-ipv4-frag-reassembled"])
-            transmit(output, maybe_pkt)
-         elseif status == fragv4_h.FRAGMENT_MISSING then -- Nothing to do, wait.
-         elseif status == fragv4_h.REASSEMBLY_INVALID then
-            counter.add(self.counters["drop-ipv4-frag-invalid-reassembly"])
-            if maybe_pkt then -- This is an ICMP packet
-               transmit(errors, maybe_pkt)
-            end
-         else -- unreachable
-            packet.free(pkt)
-         end
-      else
-         -- Forward all packets that aren't IPv4 fragments.
-         counter.add(self.counters["in-ipv4-frag-reassembly-unneeded"])
-         transmit(output, pkt)
-      end
-   end
-end
 
 function Fragmenter:new(conf)
    local o = {

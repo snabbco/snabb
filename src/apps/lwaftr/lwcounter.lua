@@ -38,10 +38,17 @@ function read_counters (pid)
    return ret
 end
 
+-- Temporary hack until we migrate all of the lwAFTR's apps to use the
+-- SHM frame mechanism.
+local ipv4_reassemble = require('apps.ipv4.reassemble')
 function init_counters ()
    local counters = {}
    for k, id in pairs(counter_names()) do
-      counters[k] = {counter}
+      if ipv4_reassemble.Reassembler.shm[k] then
+         -- Don't create this counter; IPv4 reassemble app handles it.
+      else
+         counters[k] = {counter}
+      end
    end
    return shm.create_frame(counters_dir, counters)
 end
