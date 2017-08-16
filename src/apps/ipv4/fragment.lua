@@ -37,7 +37,7 @@ struct {
    uint16_t type;
 } __attribute__((packed))
 ]]
-local ipv4_header_t = ffi.typeof[[
+local ipv4_header_t = ffi.typeof [[
 struct {
    uint8_t version_and_ihl;               // version:4, ihl:4
    uint8_t dscp_and_ecn;                  // dscp:6, ecn:2
@@ -85,45 +85,45 @@ local flag_dont_fragment_mask  = 0x4000
 local flag_more_fragments_mask = 0x2000
 local frag_offset_field_mask   = 0x1FFF
 
--- TODO: Consider security/performance tradeoffs of randomization
-local fresh_frag_id = (function ()
-   local internal_frag_id = 0x4242
-   return function ()
-      internal_frag_id = band(internal_frag_id + 1, 0xFFFF)
-      return internal_frag_id
+Fragmenter = {}
+Fragmenter.shm = {
+   ["out-ipv4-frag"]      = {counter},
+   ["out-ipv4-frag-not"]  = {counter}
+}
+local fragmenter_config_params = {
+   -- Maximum transmission unit, in bytes, not including the ethernet
+   -- header.
+   mtu = { mandatory=true }
+}
+
+function Fragmenter:new(conf)
+   local o = lib.parse(conf, fragmenter_config_params)
+   -- RFC 791: "Every internet module must be able to forward a datagram
+   -- of 68 octets without further fragmentation.  This is because an
+   -- internet header may be up to 60 octets, and the minimum fragment
+   -- is 8 octets."
+   assert(o.mtu >= 68)
+   o.next_fragment_id = math.random(0, 0xffff)
+   return setmetatable(o, {__index=Fragmenter})
+end
+
+function Fragmenter:fresh_fragment_id()
+   local id = self.next_fragment_id
+   -- TODO: Consider making fragment ID not trivially predictable.
+   self.next_fragment_id = bit.band(self.next_fragment_id + 1, 0xffff)
+   return id
+end
+
+function Fragmenter:fragment_and_transmit (h, ipv4_pkt)
+   local l2_mtu = self.mtu + ehs
+
+   if bit.band(ntohs(h.ipv4.flags_and_fragment_offset),
+               bit.lshift(ipv4_flag_dont_fragment,
+                          ipv4_fragment_offset_bits)) ~= 0 then
+      -- Unfragmentable packet that doesn't fit in the MTU; drop it.
+      -- TODO: Send an error packet.
+      return packet.free(ipv4_pkt)
    end
-end)()
-
-local FRAGMENT_OK = 1
-local FRAGMENT_UNNEEDED = 2
-local FRAGMENT_FORBIDDEN = 3
-
---
--- IPv4 fragmentation, as per https://tools.ietf.org/html/rfc791
---
--- For an invocation:
---
---    local statuscode, packets = fragment_ipv4(input_packet, mtu)
---
--- the possible values for the returned "statuscode" are:
---
---   * FRAGMENT_OK: the returned "packets" is a list of IPv4 packets, all
---     of them smaller or equal than "mtu" bytes, which contain the payload
---     from the "input_packet" properly fragmented. Note that "input_packet"
---     is modified in-place. Note that the MTU is for layer 3, excluding
---     L2 ethernet/vlan headers.
---
---   * FRAGMENT_UNNEEDED: the returned "packets" is the same object as
---     "input_packet", unmodified. This is the case when the size of packet
---     is smaller or equal than "mtu" bytes.
---
---   * FRAGMENT_FORBIDDEN: the returned "packets" will be "nil". This is
---     the case when "input_packet" has the "don't fragment" flag set, and
---     its size is bigger than "mtu" bytes. Client code may want to return
---     an ICMP Datagram Too Big (Type 3, Code 4) packet back to the sender.
---
-local function fragment(ipv4_pkt, mtu)
-   local l2_mtu = mtu + ehs
 
    local ver_and_ihl_offset = ehs + constants.o_ipv4_ver_and_ihl
    local total_length_offset = ehs + constants.o_ipv4_total_length
@@ -141,7 +141,7 @@ local function fragment(ipv4_pkt, mtu)
 
    local pkts = { ipv4_pkt }
 
-   wr16(ipv4_pkt.data + frag_id_offset, htons(fresh_frag_id()))
+   wr16(ipv4_pkt.data + frag_id_offset, htons(self:fresh_fragment_id()))
    wr16(ipv4_pkt.data + total_length_offset, htons(total_length_per_packet))
    wr16(ipv4_pkt.data + flags_and_frag_offset_offset, htons(flag_more_fragments_mask))
    wr16(ipv4_pkt.data + checksum_offset, 0)
@@ -184,28 +184,10 @@ local function fragment(ipv4_pkt, mtu)
    wr16(ipv4_pkt.data + checksum_offset,
         htons(ipsum(ipv4_pkt.data + ver_and_ihl_offset, ihl, 0)))
 
-   return pkts
-end
-
-Fragmenter = {}
-Fragmenter.shm = {
-   ["out-ipv4-frag"]      = {counter},
-   ["out-ipv4-frag-not"]  = {counter}
-}
-local fragmenter_config_params = {
-   -- Maximum transmission unit, in bytes, not including the ethernet
-   -- header.
-   mtu = { mandatory=true }
-}
-
-function Fragmenter:new(conf)
-   local o = lib.parse(conf, fragmenter_config_params)
-   -- RFC 791: "Every internet module must be able to forward a datagram
-   -- of 68 octets without further fragmentation.  This is because an
-   -- internet header may be up to 60 octets, and the minimum fragment
-   -- is 8 octets."
-   assert(o.mtu >= 68)
-   return setmetatable(o, {__index=Fragmenter})
+   for i=1,#pkts do
+      counter.add(self.shm["out-ipv4-frag"])
+      link.transmit(self.output.output, pkts[i])
+   end
 end
 
 function Fragmenter:push ()
@@ -228,20 +210,9 @@ function Fragmenter:push ()
          -- No need to fragment; forward it on.
          counter.add(self.shm["out-ipv4-frag-not"])
          link.transmit(output, pkt)
-      elseif bit.band(ntohs(h.ipv4.flags_and_fragment_offset),
-                      bit.lshift(ipv4_flag_dont_fragment,
-                                 ipv4_fragment_offset_bits)) ~= 0 then
-         -- Unfragmentable packet that doesn't fit in the MTU; drop it.
-         -- TODO: Send an error packet.
-         packet.free(pkt)
       else
-         local frags = fragment(pkt, self.mtu)
-         -- The original packet will be truncated and used as the
-         -- first fragment.
-         for i=1,#frags do
-            counter.add(self.shm["out-ipv4-frag"])
-            transmit(output, frags[i])
-         end
+         -- Packet doesn't fit into MTU; need to fragment.
+         self:fragment_and_transmit(h, pkt)
       end
    end
 end
