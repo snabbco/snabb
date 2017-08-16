@@ -51,14 +51,7 @@ class TestQuery(BaseTestCase):
             '\n'.join(('OUTPUT', str(output, ENC))))
 
     def get_lwaftr_pid(self):
-        output = str(self.run_cmd(('ps', 'aux')), ENC)
-        pids = []
-        for line in output.splitlines():
-            if SNABB_PCI0 in line:
-                pids.append(line.split()[1])
-        for pid in pids:
-            if (RUN_DIR / pid / 'apps' / 'lwaftr').is_dir():
-                return pid
+        return (RUN_DIR / 'by-name' / DAEMON_PROC_NAME).resolve().name
 
     def test_query_by_pid(self):
         lwaftr_pid = self.get_lwaftr_pid()
