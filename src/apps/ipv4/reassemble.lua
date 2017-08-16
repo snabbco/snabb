@@ -67,9 +67,9 @@ local ether_ipv4_header_t = ffi.typeof(
    ether_header_t, ipv4_header_t)
 local ether_ipv4_header_ptr_t = ffi.typeof('$*', ether_ipv4_header_t)
 
-local function is_valid_ipv4_packet(h, len)
+-- Precondition: packet already has IPv4 ethertype.
+local function is_valid_ipv4_header(h, len)
    if len < ffi.sizeof(ether_ipv4_header_t) then return false end
-   if ntohs(h.ether.type) ~= ether_type_ipv4 then return false end
    local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
    if ihl < 5 then return false end
    return true
@@ -285,10 +285,14 @@ function Reassembler:push ()
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
-      if not is_valid_ipv4_packet(h, pkt.length) then
-         -- Not a valid IPv4 packet; drop.  FIXME: we could expose a
-         -- configuration option to transmit packets with unknown
-         -- protocols instead.
+      if ntohs(h.ether.type) ~= ether_type_ipv4 then
+         -- Not IPv4; forward it on.  FIXME: should make a different
+         -- counter here.
+         counter.add(self.shm["in-ipv4-frag-reassembly-unneeded"])
+         link.transmit(output, pkt)
+      elseif not is_valid_ipv4_header(h, pkt.length) then
+         -- IPv4 packet too short; drop.  FIXME: Should add a counter
+         -- here.
          packet.free(pkt)
       elseif bit.band(ntohs(h.ipv4.flags_and_fragment_offset),
                       ipv4_is_fragment_mask) == 0 then
