@@ -11,21 +11,9 @@ local packet     = require("core.packet")
 local counter    = require("core.counter")
 local link       = require("core.link")
 local ipsum      = require("lib.checksum").ipsum
-local eth_proto  = require("lib.protocol.ethernet")
-local ip4_proto  = require("lib.protocol.ipv4")
-
-local constants = require("apps.lwaftr.constants")
-local lwutil = require("apps.lwaftr.lwutil")
 
 local receive, transmit = link.receive, link.transmit
-
-local is_ipv4 = lwutil.is_ipv4
-local rd16, wr16, get_ihl_from_offset = lwutil.rd16, lwutil.wr16, lwutil.get_ihl_from_offset
-local band, bor = bit.band, bit.bor
 local ntohs, htons = lib.ntohs, lib.htons
-local ceil = math.ceil
-
-local ehs = constants.ethernet_header_size
 
 local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
 
@@ -57,11 +45,6 @@ local ipv4_fragment_offset_bits = 13
 local ipv4_fragment_offset_mask = bit_mask(ipv4_fragment_offset_bits)
 local ipv4_flag_more_fragments = 0x1
 local ipv4_flag_dont_fragment = 0x2
--- If a packet has the "more fragments" flag set, or the fragment
--- offset is non-zero, it is a fragment.
-local ipv4_is_fragment_mask = bit.bor(
-   ipv4_fragment_offset_mask,
-   bit.lshift(ipv4_flag_more_fragments, ipv4_fragment_offset_bits))
 local ipv4_ihl_bits = 4
 local ipv4_ihl_mask = bit_mask(ipv4_ihl_bits)
 
@@ -70,20 +53,16 @@ local ether_ipv4_header_t = ffi.typeof(
    ether_header_t, ipv4_header_t)
 local ether_ipv4_header_ptr_t = ffi.typeof('$*', ether_ipv4_header_t)
 
+local function ipv4_header_length(h)
+   return bit.band(h.version_and_ihl, ipv4_ihl_mask) * 4
+end
+
 -- Precondition: packet already has IPv4 ethertype.
 local function ipv4_packet_has_valid_length(h, len)
    if len < ffi.sizeof(ether_ipv4_header_t) then return false end
-   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
-   if ihl < 5 then return false end
+   if ipv4_header_length(h.ipv4) < 20 then return false end
    return ntohs(h.ipv4.total_length) == len - ether_header_len
 end
-
-
--- Constants to manipulate the flags next to the frag-offset field directly
--- as a 16-bit integer, without needing to shift the 3 flag bits.
-local flag_dont_fragment_mask  = 0x4000
-local flag_more_fragments_mask = 0x2000
-local frag_offset_field_mask   = 0x1FFF
 
 Fragmenter = {}
 Fragmenter.shm = {
@@ -114,79 +93,51 @@ function Fragmenter:fresh_fragment_id()
    return id
 end
 
-function Fragmenter:fragment_and_transmit (h, ipv4_pkt)
-   local l2_mtu = self.mtu + ehs
+function Fragmenter:transmit_fragment(p)
+   counter.add(self.shm["out-ipv4-frag"])
+   link.transmit(self.output.output, p)
+end
 
-   if bit.band(ntohs(h.ipv4.flags_and_fragment_offset),
-               bit.lshift(ipv4_flag_dont_fragment,
-                          ipv4_fragment_offset_bits)) ~= 0 then
-      -- Unfragmentable packet that doesn't fit in the MTU; drop it.
-      -- TODO: Send an error packet.
-      return packet.free(ipv4_pkt)
+function Fragmenter:unfragmentable_packet(p)
+   -- Unfragmentable packet that doesn't fit in the MTU; drop it.
+   -- TODO: Send an error packet.
+end
+
+function Fragmenter:fragment_and_transmit(in_h, in_pkt)
+   local in_flags = bit.rshift(ntohs(in_h.ipv4.flags_and_fragment_offset),
+                               ipv4_fragment_offset_bits)
+   if bit.band(in_flags, ipv4_flag_dont_fragment) ~= 0 then
+      return self:unfragmentable_packet(in_pkt)
    end
 
-   local ver_and_ihl_offset = ehs + constants.o_ipv4_ver_and_ihl
-   local total_length_offset = ehs + constants.o_ipv4_total_length
-   local frag_id_offset = ehs + constants.o_ipv4_identification
-   local flags_and_frag_offset_offset = ehs + constants.o_ipv4_flags
-   local checksum_offset = ehs + constants.o_ipv4_checksum
+   local mtu_with_l2 = self.mtu + ether_header_len
+   local header_size = ether_header_len + ipv4_header_length(in_h.ipv4)
+   local total_payload_size = in_pkt.length - header_size
+   local offset, id = 0, self:fresh_fragment_id()
 
-   local ihl = get_ihl_from_offset(ipv4_pkt, ehs)
-   local header_size = ehs + ihl
-   local payload_size = ipv4_pkt.length - header_size
-   -- Payload bytes per packet must be a multiple of 8
-   local payload_bytes_per_packet = band(l2_mtu - header_size, 0xFFF8)
-   local total_length_per_packet = payload_bytes_per_packet + ihl
-   local num_packets = ceil(payload_size / payload_bytes_per_packet)
-
-   local pkts = { ipv4_pkt }
-
-   wr16(ipv4_pkt.data + frag_id_offset, htons(self:fresh_fragment_id()))
-   wr16(ipv4_pkt.data + total_length_offset, htons(total_length_per_packet))
-   wr16(ipv4_pkt.data + flags_and_frag_offset_offset, htons(flag_more_fragments_mask))
-   wr16(ipv4_pkt.data + checksum_offset, 0)
-
-   local raw_frag_offset = payload_bytes_per_packet
-
-   for i = 2, num_packets - 1 do
-      local frag_pkt = packet.allocate()
-      ffi.copy(frag_pkt.data, ipv4_pkt.data, header_size)
-      ffi.copy(frag_pkt.data + header_size,
-               ipv4_pkt.data + header_size + raw_frag_offset,
-               payload_bytes_per_packet)
-      wr16(frag_pkt.data + flags_and_frag_offset_offset,
-           htons(bor(flag_more_fragments_mask,
-                       band(frag_offset_field_mask, raw_frag_offset / 8))))
-      wr16(frag_pkt.data + checksum_offset,
-           htons(ipsum(frag_pkt.data + ver_and_ihl_offset, ihl, 0)))
-      frag_pkt.length = header_size + payload_bytes_per_packet
-      raw_frag_offset = raw_frag_offset + payload_bytes_per_packet
-      pkts[i] = frag_pkt
-   end
-
-   -- Last packet
-   local last_pkt = packet.allocate()
-   local last_payload_len = payload_size - raw_frag_offset
-   ffi.copy(last_pkt.data, ipv4_pkt.data, header_size)
-   ffi.copy(last_pkt.data + header_size,
-            ipv4_pkt.data + header_size + raw_frag_offset,
-            last_payload_len)
-   wr16(last_pkt.data + flags_and_frag_offset_offset,
-        htons(band(frag_offset_field_mask, raw_frag_offset / 8)))
-   wr16(last_pkt.data + total_length_offset, htons(last_payload_len + ihl))
-   wr16(last_pkt.data + checksum_offset,
-        htons(ipsum(last_pkt.data + ver_and_ihl_offset, ihl, 0)))
-   last_pkt.length = header_size + last_payload_len
-   pkts[num_packets] = last_pkt
-
-   -- Truncate the original packet, and update its checksum
-   ipv4_pkt.length = header_size + payload_bytes_per_packet
-   wr16(ipv4_pkt.data + checksum_offset,
-        htons(ipsum(ipv4_pkt.data + ver_and_ihl_offset, ihl, 0)))
-
-   for i=1,#pkts do
-      counter.add(self.shm["out-ipv4-frag"])
-      link.transmit(self.output.output, pkts[i])
+   while offset < total_payload_size do
+      local out_pkt = packet.allocate()
+      packet.append(out_pkt, in_pkt.data, header_size)
+      local out_h = ffi.cast(ether_ipv4_header_ptr_t, out_pkt.data)
+      local payload_size, flags = mtu_with_l2 - header_size, in_flags
+      if offset + payload_size < total_payload_size then
+         -- Round down payload size to nearest multiple of 8.
+         payload_size = bit.band(payload_size, 0xFFF8)
+         flags = bit.bor(flags, ipv4_flag_more_fragments)
+      else
+         payload_size = total_payload_size - offset
+         flags = bit.band(flags, bit.bnot(ipv4_flag_more_fragments))
+      end
+      packet.append(out_pkt, in_pkt.data + header_size + offset, payload_size)
+      out_h.ipv4.id = htons(id)
+      out_h.ipv4.total_length = htons(out_pkt.length - ether_header_len)
+      out_h.ipv4.flags_and_fragment_offset = htons(
+         bit.bor(offset / 8, bit.lshift(flags, ipv4_fragment_offset_bits)))
+      out_h.ipv4.checksum = 0
+      out_h.ipv4.checksum = htons(ipsum(out_pkt.data + ether_header_len,
+                                        ipv4_header_length(out_h.ipv4), 0))
+      self:transmit_fragment(out_pkt)
+      offset = offset + payload_size
    end
 end
 
@@ -195,7 +146,7 @@ function Fragmenter:push ()
    local max_length = self.mtu + ether_header_len
 
    for _ = 1, link.nreadable(input) do
-      local pkt = receive(input)
+      local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
       if ntohs(h.ether.type) ~= ether_type_ipv4 then
          -- Not IPv4; forward it on.  FIXME: should make a different
@@ -213,6 +164,7 @@ function Fragmenter:push ()
       else
          -- Packet doesn't fit into MTU; need to fragment.
          self:fragment_and_transmit(h, pkt)
+         packet.free(pkt)
       end
    end
 end
@@ -274,12 +226,12 @@ function selftest()
          local fragments = fragment(pkt, mtu)
          local payload_size = 0
          for i, p in ipairs(fragments) do
-            assert(p.length >= ehs + ipv4:sizeof())
-            local ipv4 = ipv4:new_from_mem(p.data + ehs,
-                                           p.length - ehs)
-            assert(p.length == ehs + ipv4:total_length())
-            local this_payload_size = p.length - ipv4:sizeof() - ehs
-            payload_size = payload_size + this_payload_size
+            assert(p.length >= ether_header_len + ipv4:sizeof())
+            local ipv4 = ipv4:new_from_mem(p.data + ether_header_len,
+                                           p.length - ether_header_len)
+            assert(p.length == ether_header_len + ipv4:total_length())
+            payload_size = payload_size +
+               (p.length - ipv4:sizeof() - ether_header_len)
             packet.free(p)
          end
          assert(size == payload_size)
