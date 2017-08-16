@@ -4,6 +4,7 @@ Test the "snabb lwaftr query" subcommand. Needs NIC names.
 
 import os
 from pathlib import Path
+import time
 import unittest
 
 from test_env import DATA_DIR, ENC, SNABB_CMD, BaseTestCase, nic_names
@@ -54,12 +55,16 @@ class TestQuery(BaseTestCase):
         return (RUN_DIR / 'by-name' / DAEMON_PROC_NAME).resolve().name
 
     def test_query_by_pid(self):
+        # Work around https://github.com/Igalia/snabb/issues/904.
+        time.sleep(1.0)
         lwaftr_pid = self.get_lwaftr_pid()
         pid_args = list(self.query_args)
         pid_args.append(str(lwaftr_pid))
         self.execute_query_test(pid_args)
 
     def test_query_by_name(self):
+        # Work around https://github.com/Igalia/snabb/issues/904.
+        time.sleep(1.0)
         name_args = list(self.query_args)
         name_args.extend(('--name', DAEMON_PROC_NAME))
         self.execute_query_test(name_args)
@@ -89,21 +94,6 @@ class TestQuery(BaseTestCase):
                     target_pid = target.parts[4]
                     if target_pid == leader_pid:
                         return run_pid
-
-    def test_query_by_pid(self):
-        leader_pid = self.get_leader_pid()
-        if not leader_pid:
-            self.fail('Could not find the leader PID')
-        pid_args = list(self.query_args)
-        pid_args.append(str(leader_pid))
-        self.execute_query_test(pid_args)
-        follower_pid = self.get_follower_pid()
-        if not follower_pid:
-            self.fail('Could not find the follower PID')
-        pid_args = list(self.query_args)
-        pid_args.append(str(follower_pid))
-        self.execute_query_test(pid_args)
-
 
 if __name__ == '__main__':
     unittest.main()
