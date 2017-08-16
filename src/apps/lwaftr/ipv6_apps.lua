@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
-local fragmentv6 = require("apps.lwaftr.fragmentv6")
 local lwutil = require("apps.lwaftr.lwutil")
 local icmp = require("apps.lwaftr.icmp")
 local lwcounter = require("apps.lwaftr.lwcounter")
@@ -34,42 +33,7 @@ local icmpv6_echo_request = constants.icmpv6_echo_request
 local icmpv6_echo_reply = constants.icmpv6_echo_reply
 local ehs = constants.ethernet_header_size
 
-Fragmenter = {}
 ICMPEcho = {}
-
-function Fragmenter:new(conf)
-   local o = {
-      counters = lwcounter.init_counters(),
-      mtu = assert(conf.mtu),
-   }
-   return setmetatable(o, {__index=Fragmenter})
-end
-
-function Fragmenter:push ()
-   local input, output = self.input.input, self.output.output
-
-   local mtu = self.mtu
-
-   for _ = 1, link.nreadable(input) do
-      local pkt = receive(input)
-      if pkt.length > mtu + ehs and is_ipv6(pkt) then
-         -- It's possible that the IPv6 packet has an IPv4 packet as
-         -- payload, and that payload has the Don't Fragment flag set.
-         -- However ignore this; the fragmentation policy of the L3
-         -- protocol (in this case, IP) doesn't affect the L2 protocol.
-         -- We always fragment.
-         local unfragmentable_header_size = ehs + ipv6_fixed_header_size
-         local pkts = fragmentv6.fragment(pkt, unfragmentable_header_size, mtu)
-         for i=1,#pkts do
-            counter.add(self.counters["out-ipv6-frag"])
-            transmit(output, pkts[i])
-         end
-      else
-         counter.add(self.counters["out-ipv6-frag-not"])
-         transmit(output, pkt)
-      end
-   end
-end
 
 function ICMPEcho:new(conf)
    local addresses = {}

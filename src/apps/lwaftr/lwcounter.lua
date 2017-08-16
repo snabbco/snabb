@@ -43,7 +43,8 @@ end
 local managed_counters = {}
 for _, app in ipairs({ require('apps.ipv4.reassemble').Reassembler,
                        require('apps.ipv6.reassemble').Reassembler,
-                       require('apps.ipv4.fragment').Fragmenter }) do
+                       require('apps.ipv4.fragment').Fragmenter,
+                       require('apps.ipv6.fragment').Fragmenter }) do
    for k, v in pairs(app.shm) do managed_counters[k] = true end
 end
 

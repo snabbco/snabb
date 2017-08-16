@@ -11,6 +11,7 @@ local ipv4_apps = require("apps.lwaftr.ipv4_apps")
 local ipv4_fragment = require("apps.ipv4.fragment")
 local ipv4_reassemble = require("apps.ipv4.reassemble")
 local ipv6_apps = require("apps.lwaftr.ipv6_apps")
+local ipv6_fragment = require("apps.ipv6.fragment")
 local ipv6_reassemble = require("apps.ipv6.reassemble")
 local lib = require("core.lib")
 local lwaftr = require("apps.lwaftr.lwaftr")
@@ -198,7 +199,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
             max_fragments_per_reassembly =
                ginternal_interface.reassembly.max_fragments_per_packet
          })
-         config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
+         config.app(c, "fragmenterv6", ipv6_fragment.Fragmenter, {
             mtu = mtu,
          })
          config.link(c, v6_output .. " -> reassemblerv6.input")
@@ -358,7 +359,7 @@ local function lwaftr_app_check (c, conf, lwconf, sources, sinks)
             max_fragments_per_reassembly =
                internal_interface.reassembly.max_fragments_per_packet
          })
-         config.app(c, "fragmenterv6", ipv6_apps.Fragmenter, {
+         config.app(c, "fragmenterv6", ipv6_fragment.Fragmenter, {
             mtu = mtu,
          })
          config.link(c, v6_src .. " -> reassemblerv6.input")

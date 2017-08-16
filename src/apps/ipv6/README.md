@@ -162,3 +162,25 @@ Ingress packets dropped due to wrong remote IPv6 endpoint address.
 — Key **local_address_errors**
 
 Ingress packets dropped due to wrong local IPv6 endpoint address.
+
+## Fragmenter (apps.ipv6.fragment)
+
+The `Fragmenter` app that will fragment any IPv6 packets larger than a
+configured maximum transmission unit (MTU).
+
+    DIAGRAM: IPv6Fragmenter
+                   +-----------+
+                   |           |
+    input     ---->*Fragmenter *---->   output
+                   |           |
+                   +-----------+
+
+### Configuration
+
+The `Fragmenter` app accepts a table as its configuration argument. The
+following key is defined:
+
+— Key **mtu**
+
+*Required*.  The maximum transmission unit, in bytes, not including the
+Ethernet header.

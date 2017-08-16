@@ -323,7 +323,7 @@ function selftest()
    local datagram   = require("lib.protocol.datagram")
    local ether      = require("lib.protocol.ethernet")
    local ipv6       = require("lib.protocol.ipv6")
-   local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+   local Fragmenter = require("apps.ipv6.fragment").Fragmenter
 
    local ethertype_ipv6 = 0x86dd
 
@@ -348,7 +348,8 @@ function selftest()
    end
 
    local function fragment(pkt, mtu)
-      local fragment = ipv6_apps.Fragmenter:new({mtu=mtu})
+      local fragment = Fragmenter:new({mtu=mtu})
+      fragment.shm = shm.create_frame("apps/fragmenter", fragment.shm)
       fragment.input = { input = link.new('fragment input') }
       fragment.output = { output = link.new('fragment output') }
       link.transmit(fragment.input.input, packet.clone(pkt))
@@ -357,6 +358,7 @@ function selftest()
       while not link.empty(fragment.output.output) do
          table.insert(ret, link.receive(fragment.output.output))
       end
+      shm.delete_frame(fragment.shm)
       link.free(fragment.input.input, 'fragment input')
       link.free(fragment.output.output, 'fragment output')
       return ret
