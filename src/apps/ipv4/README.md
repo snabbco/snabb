@@ -81,8 +81,8 @@ been around for too long.  It could be a good idea to implement
 timeouts and then be able to issue "timeout exceeded" ICMP errors if
 needed.
 
-Finally, note that any incoming packet that is not IPv4 is silently
-dropped; all output packets are valid unfragmented IPv4.
+Finally, note that the reassembler app will pass through any incoming
+packet that is not IPv4.
 
 ### Configuration
 
