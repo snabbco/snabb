@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local constants = require("apps.lwaftr.constants")
-local fragmentv4 = require("apps.lwaftr.fragmentv4")
 local lwutil = require("apps.lwaftr.lwutil")
 local icmp = require("apps.lwaftr.icmp")
 local lwcounter = require("apps.lwaftr.lwcounter")
@@ -18,7 +17,6 @@ local engine = require("core.app")
 local receive, transmit = link.receive, link.transmit
 local wr16, rd32, wr32 = lwutil.wr16, lwutil.rd32, lwutil.wr32
 local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local is_ipv4 = lwutil.is_ipv4
 local htons = lib.htons
 
 local ehs = constants.ethernet_header_size
@@ -29,41 +27,7 @@ local o_icmpv4_checksum_sans_ihl = ehs + constants.o_icmpv4_checksum
 local icmpv4_echo_request = constants.icmpv4_echo_request
 local icmpv4_echo_reply = constants.icmpv4_echo_reply
 
-Fragmenter = {}
 ICMPEcho = {}
-
-function Fragmenter:new(conf)
-   local o = {
-      counters = lwcounter.init_counters(),
-      mtu = assert(conf.mtu),
-   }
-   return setmetatable(o, {__index=Fragmenter})
-end
-
-function Fragmenter:push ()
-   local input, output = self.input.input, self.output.output
-
-   local mtu = self.mtu
-
-   for _ = 1, link.nreadable(input) do
-      local pkt = receive(input)
-      if pkt.length > mtu + ehs and is_ipv4(pkt) then
-         local status, frags = fragmentv4.fragment(pkt, mtu)
-         if status == fragmentv4.FRAGMENT_OK then
-            for i=1,#frags do
-               counter.add(self.counters["out-ipv4-frag"])
-               transmit(output, frags[i])
-            end
-         else
-            -- TODO: send ICMPv4 info if allowed by policy
-            packet.free(pkt)
-         end
-      else
-         counter.add(self.counters["out-ipv4-frag-not"])
-         transmit(output, pkt)
-      end
-   end
-end
 
 function ICMPEcho:new(conf)
    local addresses = {}

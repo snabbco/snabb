@@ -13,6 +13,7 @@ local lwutil     = require("apps.lwaftr.lwutil")
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
 local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
+local ipv4_fragment   = require("apps.ipv4.fragment")
 local ipv4_reassemble = require("apps.ipv4.reassemble")
 local arp        = require("apps.ipv4.arp")
 local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
@@ -116,7 +117,7 @@ function lwaftr_app(c, conf, device)
    config.app(c, "icmpechov6", ipv6_apps.ICMPEcho,
               { address = iinternal_interface.ip })
    config.app(c, "lwaftr", lwaftr.LwAftr, conf)
-   config.app(c, "fragmenterv4", ipv4_apps.Fragmenter,
+   config.app(c, "fragmenterv4", ipv4_fragment.Fragmenter,
               { mtu=gexternal_interface.mtu })
    config.app(c, "fragmenterv6", ipv6_apps.Fragmenter,
               { mtu=ginternal_interface.mtu })

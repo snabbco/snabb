@@ -322,7 +322,7 @@ function selftest()
    local datagram   = require("lib.protocol.datagram")
    local ether      = require("lib.protocol.ethernet")
    local ipv4       = require("lib.protocol.ipv4")
-   local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
+   local Fragmenter = require("apps.ipv4.fragment").Fragmenter
 
    local ethertype_ipv4 = 0x0800
 
@@ -348,7 +348,8 @@ function selftest()
    end
 
    local function fragment(pkt, mtu)
-      local fragment = ipv4_apps.Fragmenter:new({mtu=mtu})
+      local fragment = Fragmenter:new({mtu=mtu})
+      fragment.shm = shm.create_frame("apps/fragmenter", fragment.shm)
       fragment.input = { input = link.new('fragment input') }
       fragment.output = { output = link.new('fragment output') }
       link.transmit(fragment.input.input, packet.clone(pkt))
@@ -357,6 +358,7 @@ function selftest()
       while not link.empty(fragment.output.output) do
          table.insert(ret, link.receive(fragment.output.output))
       end
+      shm.delete_frame(fragment.shm)
       link.free(fragment.input.input, 'fragment input')
       link.free(fragment.output.output, 'fragment output')
       return ret
