@@ -124,7 +124,7 @@ local function fragment(ipv4_pkt, mtu)
 
    -- Last packet
    local last_pkt = packet.allocate()
-   local last_payload_len = payload_size % payload_bytes_per_packet
+   local last_payload_len = payload_size - raw_frag_offset
    ffi.copy(last_pkt.data, ipv4_pkt.data, header_size)
    ffi.copy(last_pkt.data + header_size,
             ipv4_pkt.data + header_size + raw_frag_offset,
@@ -420,11 +420,23 @@ function selftest()
       return ret
    end
 
+   -- Correct reassembly is tested in apps.ipv4.reassemble.  Here we
+   -- just test that the packet chunks add up to the original size.
    for size = 0, 2000, 7 do
       local pkt = make_test_packet(size, 0)
       for mtu = 68, 2500, 3 do
          local fragments = fragment(pkt, mtu)
-         for _, p in ipairs(fragments) do packet.free(p) end
+         local payload_size = 0
+         for i, p in ipairs(fragments) do
+            assert(p.length >= ehs + ipv4:sizeof())
+            local ipv4 = ipv4:new_from_mem(p.data + ehs,
+                                           p.length - ehs)
+            assert(p.length == ehs + ipv4:total_length())
+            local this_payload_size = p.length - ipv4:sizeof() - ehs
+            payload_size = payload_size + this_payload_size
+            packet.free(p)
+         end
+         assert(size == payload_size)
       end
       packet.free(pkt)
    end
