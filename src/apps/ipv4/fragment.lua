@@ -27,6 +27,58 @@ local ceil = math.ceil
 
 local ehs = constants.ethernet_header_size
 
+local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
+
+local ether_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  dhost[6];
+   uint8_t  shost[6];
+   uint16_t type;
+} __attribute__((packed))
+]]
+local ipv4_header_t = ffi.typeof[[
+struct {
+   uint8_t version_and_ihl;               // version:4, ihl:4
+   uint8_t dscp_and_ecn;                  // dscp:6, ecn:2
+   uint16_t total_length;
+   uint16_t id;
+   uint16_t flags_and_fragment_offset;    // flags:3, fragment_offset:13
+   uint8_t  ttl;
+   uint8_t  protocol;
+   uint16_t checksum;
+   uint8_t  src_ip[4];
+   uint8_t  dst_ip[4];
+} __attribute__((packed))
+]]
+local ether_header_len = ffi.sizeof(ether_header_t)
+local ether_type_ipv4 = 0x0800
+local ipv4_fragment_offset_bits = 13
+local ipv4_fragment_offset_mask = bit_mask(ipv4_fragment_offset_bits)
+local ipv4_flag_more_fragments = 0x1
+local ipv4_flag_dont_fragment = 0x2
+-- If a packet has the "more fragments" flag set, or the fragment
+-- offset is non-zero, it is a fragment.
+local ipv4_is_fragment_mask = bit.bor(
+   ipv4_fragment_offset_mask,
+   bit.lshift(ipv4_flag_more_fragments, ipv4_fragment_offset_bits))
+local ipv4_ihl_bits = 4
+local ipv4_ihl_mask = bit_mask(ipv4_ihl_bits)
+
+local ether_ipv4_header_t = ffi.typeof(
+   'struct { $ ether; $ ipv4; } __attribute__((packed))',
+   ether_header_t, ipv4_header_t)
+local ether_ipv4_header_ptr_t = ffi.typeof('$*', ether_ipv4_header_t)
+
+-- Precondition: packet already has IPv4 ethertype.
+local function ipv4_packet_has_valid_length(h, len)
+   if len < ffi.sizeof(ether_ipv4_header_t) then return false end
+   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
+   if ihl < 5 then return false end
+   return ntohs(h.ipv4.total_length) == len - ether_header_len
+end
+
+
 -- Constants to manipulate the flags next to the frag-offset field directly
 -- as a 16-bit integer, without needing to shift the 3 flag bits.
 local flag_dont_fragment_mask  = 0x4000
@@ -71,9 +123,6 @@ local FRAGMENT_FORBIDDEN = 3
 --     an ICMP Datagram Too Big (Type 3, Code 4) packet back to the sender.
 --
 local function fragment(ipv4_pkt, mtu)
-   if ipv4_pkt.length - ehs <= mtu then
-      return FRAGMENT_UNNEEDED, ipv4_pkt
-   end
    local l2_mtu = mtu + ehs
 
    local ver_and_ihl_offset = ehs + constants.o_ipv4_ver_and_ihl
@@ -81,13 +130,6 @@ local function fragment(ipv4_pkt, mtu)
    local frag_id_offset = ehs + constants.o_ipv4_identification
    local flags_and_frag_offset_offset = ehs + constants.o_ipv4_flags
    local checksum_offset = ehs + constants.o_ipv4_checksum
-   -- Discard packets with the DF (dont't fragment) flag set
-   do
-      local flags_and_frag_offset = ntohs(rd16(ipv4_pkt.data + flags_and_frag_offset_offset))
-      if band(flags_and_frag_offset, flag_dont_fragment_mask) ~= 0 then
-         return FRAGMENT_FORBIDDEN, nil
-      end
-   end
 
    local ihl = get_ihl_from_offset(ipv4_pkt, ehs)
    local header_size = ehs + ihl
@@ -142,7 +184,7 @@ local function fragment(ipv4_pkt, mtu)
    wr16(ipv4_pkt.data + checksum_offset,
         htons(ipsum(ipv4_pkt.data + ver_and_ihl_offset, ihl, 0)))
 
-   return FRAGMENT_OK, pkts
+   return pkts
 end
 
 Fragmenter = {}
@@ -168,210 +210,44 @@ end
 
 function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
-   local mtu = self.mtu
+   local max_length = self.mtu + ether_header_len
 
    for _ = 1, link.nreadable(input) do
       local pkt = receive(input)
-      if pkt.length > mtu + ehs and is_ipv4(pkt) then
-         local status, frags = fragment(pkt, mtu)
-         if status == FRAGMENT_OK then
-            -- The original packet will be truncated and used as the
-            -- first fragment.
-            for i=1,#frags do
-               counter.add(self.shm["out-ipv4-frag"])
-               transmit(output, frags[i])
-            end
-         else
-            -- TODO: send ICMPv4 info if allowed by policy
-            packet.free(pkt)
-         end
-      else
+      local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
+      if ntohs(h.ether.type) ~= ether_type_ipv4 then
+         -- Not IPv4; forward it on.  FIXME: should make a different
+         -- counter here.
          counter.add(self.shm["out-ipv4-frag-not"])
-         transmit(output, pkt)
+         link.transmit(output, pkt)
+      elseif not ipv4_packet_has_valid_length(h, pkt.length) then
+         -- IPv4 packet has invalid length; drop.  FIXME: Should add a
+         -- counter here.
+         packet.free(pkt)
+      elseif pkt.length <= max_length then
+         -- No need to fragment; forward it on.
+         counter.add(self.shm["out-ipv4-frag-not"])
+         link.transmit(output, pkt)
+      elseif bit.band(ntohs(h.ipv4.flags_and_fragment_offset),
+                      bit.lshift(ipv4_flag_dont_fragment,
+                                 ipv4_fragment_offset_bits)) ~= 0 then
+         -- Unfragmentable packet that doesn't fit in the MTU; drop it.
+         -- TODO: Send an error packet.
+         packet.free(pkt)
+      else
+         local frags = fragment(pkt, self.mtu)
+         -- The original packet will be truncated and used as the
+         -- first fragment.
+         for i=1,#frags do
+            counter.add(self.shm["out-ipv4-frag"])
+            transmit(output, frags[i])
+         end
       end
    end
 end
 
---
--- Returns a new packet, which contains an Ethernet frame, with an IPv4 header,
--- followed by a payload of "payload_size" random bytes.
---
-local function make_ipv4_packet(payload_size)
-   local eth_size = eth_proto:sizeof()
-   local pkt = packet.allocate()
-   pkt.length = eth_size + ip4_proto:sizeof() + payload_size
-   local eth_header = eth_proto:new_from_mem(pkt.data, pkt.length)
-   local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
-                                             pkt.length - eth_size)
-   assert(pkt.length == eth_size + ip4_header:sizeof() + payload_size)
-
-   -- Ethernet header. The leading bits of the MAC addresses are those for
-   -- "Intel Corp" devices, the rest are arbitrary.
-   eth_header:src(eth_proto:pton("5c:51:4f:8f:aa:ee"))
-   eth_header:dst(eth_proto:pton("5c:51:4f:8f:aa:ef"))
-   eth_header:type(constants.ethertype_ipv4)
-
-   -- IPv4 header
-   ip4_header:ihl(ip4_header:sizeof() / 4)
-   ip4_header:dscp(0)
-   ip4_header:ecn(0)
-   ip4_header:total_length(ip4_header:sizeof() + payload_size)
-   ip4_header:id(0)
-   ip4_header:flags(0)
-   ip4_header:frag_off(0)
-   ip4_header:ttl(15)
-   ip4_header:protocol(0xFF)
-   ip4_header:src(ip4_proto:pton("192.168.10.10"))
-   ip4_header:dst(ip4_proto:pton("192.168.10.20"))
-   ip4_header:checksum()
-
-   -- We do not fill up the rest of the packet: random contents works fine
-   -- because we are testing IP fragmentation, so there's no need to care
-   -- about upper layers.
-   return pkt
-end
-
-local function pkt_payload_size(pkt)
-   assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_proto:sizeof()
-   local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
-                                             pkt.length - eth_size)
-   local total_length = ip4_header:total_length()
-   local ihl = ip4_header:ihl() * 4
-   assert(ihl == get_ihl_from_offset(pkt, eth_size))
-   assert(ihl == ip4_header:sizeof())
-   assert(total_length - ihl >= 0)
-   assert(total_length == pkt.length - eth_size)
-   return total_length - ihl
-end
-
-local function pkt_frag_offset(pkt)
-   assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_proto:sizeof()
-   local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
-                                             pkt.length - eth_size)
-   return ip4_header:frag_off() * 8
-end
-
-local function pkt_total_length(pkt)
-   assert(pkt.length >= (eth_proto:sizeof() + ip4_proto:sizeof()))
-   local eth_size = eth_proto:sizeof()
-   local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_size,
-                                             pkt.length - eth_size)
-   return ip4_header:total_length()
-end
-
---
--- Checks that "frag_pkt" is a valid fragment of the "orig_pkt" packet.
---
-local function check_packet_fragment(orig_pkt, frag_pkt, is_last_fragment)
-   -- Ethernet fields
-   local orig_hdr = eth_proto:new_from_mem(orig_pkt.data, orig_pkt.length)
-   local frag_hdr = eth_proto:new_from_mem(frag_pkt.data, frag_pkt.length)
-   assert(orig_hdr:src_eq(frag_hdr:src()))
-   assert(orig_hdr:dst_eq(frag_hdr:dst()))
-   assert(orig_hdr:type() == frag_hdr:type())
-
-   -- IPv4 fields
-   local eth_size = eth_proto:sizeof()
-   orig_hdr = ip4_proto:new_from_mem(orig_pkt.data + eth_size,
-                                     orig_pkt.length - eth_size)
-   frag_hdr = ip4_proto:new_from_mem(frag_pkt.data + eth_size,
-                                     frag_pkt.length - eth_size)
-   assert(orig_hdr:ihl() == frag_hdr:ihl())
-   assert(orig_hdr:dscp() == frag_hdr:dscp())
-   assert(orig_hdr:ecn() == frag_hdr:ecn())
-   assert(orig_hdr:ttl() == frag_hdr:ttl())
-   assert(orig_hdr:protocol() == frag_hdr:protocol())
-   assert(orig_hdr:src_eq(frag_hdr:src()))
-   assert(orig_hdr:dst_eq(frag_hdr:dst()))
-
-   assert(pkt_payload_size(frag_pkt) == frag_pkt.length - eth_size - ip4_proto:sizeof())
-
-   if is_last_fragment then
-      assert(band(frag_hdr:flags(), 0x1) == 0x0)
-   else
-      assert(band(frag_hdr:flags(), 0x1) == 0x1)
-   end
-end
-
-local function test_payload_1200_mtu_1500()
-   print("test:   payload=1200 mtu=1500")
-
-   local pkt = make_ipv4_packet(1200)
-   local code, result = fragment(pkt, 1500)
-   assert(code == FRAGMENT_UNNEEDED)
-   assert(pkt == result)
-end
-
-local function test_payload_1200_mtu_1000()
-   print("test:   payload=1200 mtu=1000")
-   local pkt = make_ipv4_packet(1200)
-
-   -- Keep a copy of the packet, for comparisons
-   local orig_pkt = packet.clone(pkt)
-
-   assert(pkt.length > 1200, "packet short than payload size")
-   local ehs = constants.ethernet_header_size
-   local code, result = fragment(pkt, 1000 - ehs)
-   assert(code == FRAGMENT_OK)
-   assert(#result == 2, "fragmentation returned " .. #result .. " packets (2 expected)")
-
-   for i = 1, #result do
-      assert(result[i].length <= 1000, "packet " .. i .. " longer than MTU")
-      local is_last = (i == #result)
-      check_packet_fragment(orig_pkt, result[i], is_last)
-   end
-
-   assert(pkt_payload_size(result[1]) + pkt_payload_size(result[2]) == 1200)
-   assert(pkt_payload_size(result[1]) == pkt_frag_offset(result[2]))
-end
-
-local function test_payload_1200_mtu_400()
-   print("test:   payload=1200 mtu=400")
-   local pkt = make_ipv4_packet(1200)
-
-   -- Keep a copy of the packet, for comparisons
-   local orig_pkt = packet.clone(pkt)
-   local ehs = constants.ethernet_header_size
-   local code, result = fragment(pkt, 400 - ehs)
-   assert(code == FRAGMENT_OK)
-   assert(#result == 4,
-          "fragmentation returned " .. #result .. " packets (4 expected)")
-   for i = 1, #result do
-      assert(result[i].length <= 1000, "packet " .. i .. " longer than MTU")
-      local is_last = (i == #result)
-      check_packet_fragment(orig_pkt, result[i], is_last)
-   end
-
-   assert(pkt_payload_size(result[1]) + pkt_payload_size(result[2]) +
-          pkt_payload_size(result[3]) + pkt_payload_size(result[4]) == 1200)
-   assert(pkt_payload_size(result[1]) == pkt_frag_offset(result[2]))
-   assert(pkt_payload_size(result[1]) + pkt_payload_size(result[2]) ==
-          pkt_frag_offset(result[3]))
-   assert(pkt_payload_size(result[1]) + pkt_payload_size(result[2]) +
-          pkt_payload_size(result[3]) == pkt_frag_offset(result[4]))
-end
-
-local function test_dont_fragment_flag()
-   print("test:   packet with \"don't fragment\" flag")
-   -- Try to fragment a packet with the "don't fragment" flag set
-   local pkt = make_ipv4_packet(1200)
-   local ip4_header = ip4_proto:new_from_mem(pkt.data + eth_proto:sizeof(),
-                                             pkt.length - eth_proto:sizeof())
-   ip4_header:flags(0x2) -- Set "don't fragment"
-   local code, result = fragment(pkt, 500)
-   assert(code == FRAGMENT_FORBIDDEN)
-   assert(type(result) == "nil")
-end
-
 function selftest()
    print("selftest: apps.ipv4.fragment")
-
-   test_payload_1200_mtu_1500()
-   test_payload_1200_mtu_1000()
-   test_payload_1200_mtu_400()
-   test_dont_fragment_flag()
 
    local shm        = require("core.shm")
    local datagram   = require("lib.protocol.datagram")
@@ -392,9 +268,8 @@ function selftest()
       local eth_h = ether:new({ src = random_mac(), dst = random_mac(),
                                 type = ethertype_ipv4 })
       local ip_h  = ipv4:new({ src = random_ipv4(), dst = random_ipv4(),
-                               protocol = 0xff, ttl = 64 })
+                               protocol = 0xff, ttl = 64, flags = flags })
       ip_h:total_length(ip_h:sizeof() + pkt.length)
-      ip_h:flags(flags)
       ip_h:checksum()
 
       local dgram = datagram:new(pkt)
@@ -437,6 +312,23 @@ function selftest()
             packet.free(p)
          end
          assert(size == payload_size)
+      end
+      packet.free(pkt)
+   end
+
+   -- Now check that don't-fragment packets are handled correctly.
+   for size = 0, 2000, 7 do
+      local pkt = make_test_packet(size, ipv4_flag_dont_fragment)
+      for mtu = 68, 2500, 3 do
+         local fragments = fragment(pkt, mtu)
+         if #fragments == 1 then
+            assert(size + ffi.sizeof(ipv4_header_t) <= mtu)
+            assert(fragments[1].length == pkt.length)
+            packet.free(fragments[1])
+         else
+            assert(#fragments == 0)
+            assert(size + ffi.sizeof(ipv4_header_t) > mtu)
+         end
       end
       packet.free(pkt)
    end
