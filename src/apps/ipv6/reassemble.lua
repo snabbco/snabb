@@ -377,7 +377,7 @@ function selftest()
 
    for _, size in ipairs({100, 400, 1000, 1500, 2000}) do
       local pkt = make_test_packet(size)
-      for _, mtu in ipairs({512, 1000, 1500}) do
+      for mtu = 1280, 2500, 113 do
          local fragments = fragment(pkt, mtu)
          for _, order in ipairs(permute_indices(1, #fragments)) do
             local reassembler = Reassembler:new {
