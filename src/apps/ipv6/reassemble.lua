@@ -1,15 +1,17 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
--- IPv4 reassembly (RFC 791)
+-- IPv6 reassembly (RFC 2460 §4.5)
 --
 -- This reassembly implementation will abort ongoing reassemblies if
--- it sees overlapping fragments.  This follows the recommendation of
--- RFC 5722, which although it is given specifically for IPv6, it
--- applies just as well to IPv4.
+-- it sees overlapping fragments, following the recommendation of
+-- RFC 5722.
 --
 -- Reassembly failures are currently silent.  We could implement
--- timeouts and then we could issue "timeout exceeded" ICMP errors if
--- needed.
+-- timeouts and then we could issue "timeout exceeded" ICMP errors if 60
+-- seconds go by without success; we'd need to have received the first
+-- fragment though.  Additionally we should emit "parameter problem"
+-- code 0 ICMP errors for non-terminal fragments whose sizes aren't a
+-- multiple of 8 bytes, or for reassembled packets that are too big.
 
 module(..., package.seeall)
 
@@ -24,6 +26,7 @@ local ctable     = require('lib.ctable')
 local ctablew    = require('apps.lwaftr.ctable_wrapper')
 
 local ntohs, htons = lib.ntohs, lib.htons
+local ntohl = lib.ntohl
 
 local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
 
@@ -35,51 +38,51 @@ struct {
    uint16_t type;
 } __attribute__((packed))
 ]]
-local ipv4_header_t = ffi.typeof[[
+local ipv6_header_t = ffi.typeof [[
+/* All values in network byte order.  */
 struct {
-   uint8_t version_and_ihl;               // version:4, ihl:4
-   uint8_t dscp_and_ecn;                  // dscp:6, ecn:2
-   uint16_t total_length;
-   uint16_t id;
-   uint16_t flags_and_fragment_offset;    // flags:3, fragment_offset:13
-   uint8_t  ttl;
-   uint8_t  protocol;
-   uint16_t checksum;
-   uint8_t  src_ip[4];
-   uint8_t  dst_ip[4];
+   uint32_t v_tc_fl;               // version:4, traffic class:8, flow label:20
+   uint16_t payload_length;
+   uint8_t  next_header;
+   uint8_t  hop_limit;
+   uint8_t  src_ip[16];
+   uint8_t  dst_ip[16];
+   uint8_t  payload[0];
 } __attribute__((packed))
 ]]
-local ether_header_len = ffi.sizeof(ether_header_t)
-local ether_type_ipv4 = 0x0800
-local ipv4_fragment_offset_bits = 13
-local ipv4_fragment_offset_mask = bit_mask(ipv4_fragment_offset_bits)
-local ipv4_flag_more_fragments = 0x1
+local fragment_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t next_header;
+   uint8_t reserved;
+   uint16_t fragment_offset_and_flags;    // fragment_offset:13, flags:3
+   uint32_t id;
+   uint8_t payload[0];
+} __attribute__((packed))
+]]
+local ether_type_ipv6 = 0x86dd
+-- The fragment offset is in units of 2^3=8 bytes, and it's also shifted
+-- by that many bits, so we can read its value in bytes just by masking
+-- off the flags bits.
+local fragment_offset_mask = bit_mask(16) - bit_mask(3)
+local fragment_flag_more_fragments = 0x1
 -- If a packet has the "more fragments" flag set, or the fragment
 -- offset is non-zero, it is a fragment.
-local ipv4_is_fragment_mask = bit.bor(
-   ipv4_fragment_offset_mask,
-   bit.lshift(ipv4_flag_more_fragments, ipv4_fragment_offset_bits))
-local ipv4_ihl_bits = 4
-local ipv4_ihl_mask = bit_mask(ipv4_ihl_bits)
+local fragment_proto = 44
 
-local ether_ipv4_header_t = ffi.typeof(
-   'struct { $ ether; $ ipv4; } __attribute__((packed))',
-   ether_header_t, ipv4_header_t)
-local ether_ipv4_header_ptr_t = ffi.typeof('$*', ether_ipv4_header_t)
+local ether_ipv6_header_t = ffi.typeof(
+   'struct { $ ether; $ ipv6; uint8_t payload[0]; } __attribute__((packed))',
+   ether_header_t, ipv6_header_t)
+local ether_ipv6_header_len = ffi.sizeof(ether_ipv6_header_t)
+local ether_ipv6_header_ptr_t = ffi.typeof('$*', ether_ipv6_header_t)
 
--- Precondition: packet already has IPv4 ethertype.
-local function ipv4_packet_has_valid_length(h, len)
-   if len < ffi.sizeof(ether_ipv4_header_t) then return false end
-   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
-   if ihl < 5 then return false end
-   return ntohs(h.ipv4.total_length) == len - ether_header_len
-end
+local fragment_header_len = ffi.sizeof(fragment_header_t)
+local fragment_header_ptr_t = ffi.typeof('$*', fragment_header_t)
 
--- IPv4 requires recalculating an embedded checksum.
-local function fix_ipv4_checksum(h)
-   local ihl = bit.band(h.version_and_ihl, ipv4_ihl_mask)
-   h.checksum = 0
-   h.checksum = htons(ipsum(ffi.cast('char*', h), ihl * 4, 0))
+-- Precondition: packet already has IPv6 ethertype.
+local function ipv6_packet_has_valid_length(h, len)
+   if len < ether_ipv6_header_len then return false end
+   return ntohs(h.ipv6.payload_length) == len - ether_ipv6_header_len
 end
 
 local function swap(array, i, j)
@@ -113,13 +116,13 @@ end
 
 Reassembler = {}
 Reassembler.shm = {
-   ["in-ipv4-frag-needs-reassembly"]      = {counter},
-   ["in-ipv4-frag-reassembled"]           = {counter},
-   ["in-ipv4-frag-reassembly-unneeded"]   = {counter},
-   ["drop-ipv4-frag-disabled"]            = {counter},
-   ["drop-ipv4-frag-invalid-reassembly"]  = {counter},
-   ["drop-ipv4-frag-random-evicted"]      = {counter},
-   ["memuse-ipv4-frag-reassembly-buffer"] = {counter}
+   ["in-ipv6-frag-needs-reassembly"]      = {counter},
+   ["in-ipv6-frag-reassembled"]           = {counter},
+   ["in-ipv6-frag-reassembly-unneeded"]   = {counter},
+   ["drop-ipv6-frag-disabled"]            = {counter},
+   ["drop-ipv6-frag-invalid-reassembly"]  = {counter},
+   ["drop-ipv6-frag-random-evicted"]      = {counter},
+   ["memuse-ipv6-frag-reassembly-buffer"] = {counter}
 }
 local reassembler_config_params = {
    -- Maximum number of in-progress reassemblies.  Each one uses about
@@ -136,8 +139,8 @@ function Reassembler:new(conf)
    local params = {
       key_type = ffi.typeof[[
          struct {
-            uint8_t src_addr[4];
-            uint8_t dst_addr[4];
+            uint8_t src_addr[16];
+            uint8_t dst_addr[16];
             uint32_t fragment_id;
          } __attribute__((packed))]],
       value_type = ffi.typeof([[
@@ -164,44 +167,41 @@ function Reassembler:new(conf)
 end
 
 function Reassembler:update_counters()
-   counter.set(self.shm["memuse-ipv4-frag-reassembly-buffer"],
+   counter.set(self.shm["memuse-ipv6-frag-reassembly-buffer"],
                self.ctab:get_backing_size())
 end
 
 function Reassembler:record_eviction()
-   counter.add(self.shm["drop-ipv4-frag-random-evicted"])
+   counter.add(self.shm["drop-ipv6-frag-random-evicted"])
 end
 
 function Reassembler:reassembly_success(entry, pkt)
    self.ctab:remove_ptr(entry)
-   counter.add(self.shm["in-ipv4-frag-reassembled"])
+   counter.add(self.shm["in-ipv6-frag-reassembled"])
    link.transmit(self.output.output, pkt)
 end
 
 function Reassembler:reassembly_error(entry, icmp_error)
    self.ctab:remove_ptr(entry)
-   counter.add(self.shm["drop-ipv4-frag-invalid-reassembly"])
+   counter.add(self.shm["drop-ipv6-frag-invalid-reassembly"])
    if icmp_error then -- This is an ICMP packet
       link.transmit(self.output.errors, icmp_error)
    end
 end
 
-function Reassembler:lookup_reassembly(h, pkt)
+function Reassembler:lookup_reassembly(src_ip, dst_ip, fragment_id)
    local key = self.scratch_fragment_key
-   key.src_addr, key.dst_addr = h.ipv4.src_ip, h.ipv4.dst_ip
-   key.fragment_id = ntohs(h.ipv4.id)
+   key.src_addr, key.dst_addr, key.fragment_id = src_ip, dst_ip, fragment_id
 
    local entry = self.ctab:lookup_ptr(key)
    if entry then return entry end
 
    local reassembly = self.scratch_reassembly
-   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
-   local headers_len = ether_header_len + ihl * 4
-
    ffi.fill(reassembly, ffi.sizeof(reassembly))
-   reassembly.reassembly_base = headers_len
-   reassembly.running_length = headers_len
-   packet.append(reassembly.packet, pkt.data, headers_len)
+   reassembly.reassembly_base = ether_ipv6_header_len
+   reassembly.running_length = ether_ipv6_header_len
+   -- Fragment 0 will fill in the contents of this data.
+   packet.length = ether_ipv6_header_len
 
    local did_evict = false
    entry, did_evict = self.ctab:add(key, reassembly, false)
@@ -209,21 +209,23 @@ function Reassembler:lookup_reassembly(h, pkt)
    return entry
 end
 
-function Reassembler:handle_fragment(h, fragment)
-   local ihl = bit.band(h.ipv4.version_and_ihl, ipv4_ihl_mask)
-   local headers_len = ether_header_len + ihl * 4
-   local flags_and_fragment_offset = ntohs(h.ipv4.flags_and_fragment_offset)
-   local flags = bit.rshift(
-      flags_and_fragment_offset, ipv4_fragment_offset_bits)
-   local fragment_offset = bit.band(
-      flags_and_fragment_offset, ipv4_fragment_offset_mask)
-   -- Fragment offset is expressed in 8-octet units.
-   local frag_start = fragment_offset * 8
-   local frag_size = ntohs(h.ipv4.total_length) - ihl * 4
+function Reassembler:handle_fragment(h)
+   local fragment = ffi.cast(fragment_header_ptr_t, h.ipv6.payload)
+   local fragment_offset_and_flags = ntohs(fragment.fragment_offset_and_flags)
+   local frag_start = bit.band(fragment_offset_and_flags, fragment_offset_mask)
+   local frag_size = ntohs(h.ipv6.payload_length) - fragment_header_len
 
-   local entry = self:lookup_reassembly(h, fragment)
+   local entry = self:lookup_reassembly(h.ipv6.src_ip, h.ipv6.dst_ip,
+                                        ntohl(fragment.id))
    local reassembly = entry.value
 
+   -- Header comes from unfragmentable part of packet 0.
+   if frag_start == 0 then
+      local header = ffi.cast(ether_ipv6_header_ptr_t, reassembly.packet.data)
+      ffi.copy(header, h, ether_ipv6_header_len)
+      header.ipv6.next_header = fragment.next_header
+      -- Payload length will be overwritten at end.
+   end
    local fcount = reassembly.fragment_count
    if fcount + 1 > self.max_fragments_per_reassembly then
       -- Too many fragments to reassembly this packet; fail.
@@ -237,26 +239,28 @@ function Reassembler:handle_fragment(h, fragment)
       sort_array(reassembly.fragment_ends, fcount)
    end
    reassembly.fragment_count = fcount + 1
-   if bit.band(flags, ipv4_flag_more_fragments) == 0 then
+   if bit.band(fragment_offset_and_flags, fragment_flag_more_fragments) == 0 then
       if reassembly.final_start ~= 0 then
          -- There cannot be more than one final fragment.
          return self:reassembly_error(entry)
       else
          reassembly.final_start = frag_start
       end
+   elseif frag_size % 8 ~= 0 then
+      -- The size of all non-terminal fragments must be a multiple of 8.
+      -- Here we should send "ICMP Parameter Problem, Code 0 to the
+      -- source of the fragment, pointing to the Payload Length field of
+      -- the fragment packet".
+      return self:reassembly_error(entry)
    end
 
-   local skip_headers = reassembly.reassembly_base
-   local dst_offset = skip_headers + frag_start
-   if dst_offset + frag_size > ffi.sizeof(reassembly.packet.data) then
-      -- Prevent a buffer overflow.  The relevant RFC allows hosts to
-      -- silently discard reassemblies above a certain rather small
-      -- size, smaller than this.
-      return self:reassembly_error()
+   local max_data_offset = ether_ipv6_header_len + frag_start + frag_size
+   if max_data_offset > ffi.sizeof(reassembly.packet.data) then
+      -- Snabb packets have a maximum size of 10240 bytes.
+      return self:reassembly_error(entry)
    end
-   ffi.copy(reassembly.packet.data + dst_offset, fragment.data + skip_headers,
-            frag_size)
-   local max_data_offset = skip_headers + frag_start + frag_size
+   ffi.copy(reassembly.packet.data + reassembly.reassembly_base + frag_start,
+            fragment.payload, frag_size)
    reassembly.packet.length = math.max(reassembly.packet.length,
                                        max_data_offset)
    reassembly.running_length = reassembly.running_length + frag_size
@@ -271,10 +275,8 @@ function Reassembler:handle_fragment(h, fragment)
       return self:reassembly_error(entry)
    else
       local out = packet.clone(reassembly.packet)
-      local header = ffi.cast(ether_ipv4_header_ptr_t, out.data)
-      header.ipv4.id, header.ipv4.flags_and_fragment_offset = 0, 0
-      header.ipv4.total_length = htons(out.length - ether_header_len)
-      fix_ipv4_checksum(header.ipv4)
+      local header = ffi.cast(ether_ipv6_header_ptr_t, out.data)
+      header.ipv6.payload_length = htons(out.length - ether_ipv6_header_len)
       return self:reassembly_success(entry, out)
    end
 end
@@ -284,26 +286,25 @@ function Reassembler:push ()
 
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
-      local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
-      if ntohs(h.ether.type) ~= ether_type_ipv4 then
-         -- Not IPv4; forward it on.  FIXME: should make a different
+      local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
+      if ntohs(h.ether.type) ~= ether_type_ipv6 then
+         -- Not IPv6; forward it on.  FIXME: should make a different
          -- counter here.
-         counter.add(self.shm["in-ipv4-frag-reassembly-unneeded"])
+         counter.add(self.shm["in-ipv6-frag-reassembly-unneeded"])
          link.transmit(output, pkt)
-      elseif not ipv4_packet_has_valid_length(h, pkt.length) then
-         -- IPv4 packet has invalid length; drop.  FIXME: Should add a
+      elseif not ipv6_packet_has_valid_length(h, pkt.length) then
+         -- IPv6 packet has invalid length; drop.  FIXME: Should add a
          -- counter here.
          packet.free(pkt)
-      elseif bit.band(ntohs(h.ipv4.flags_and_fragment_offset),
-                      ipv4_is_fragment_mask) == 0 then
-         -- Not fragmented; forward it on.
-         counter.add(self.shm["in-ipv4-frag-reassembly-unneeded"])
-         link.transmit(output, pkt)
-      else
+      elseif h.ipv6.next_header == fragment_proto then
          -- A fragment; try to reassemble.
-         counter.add(self.shm["in-ipv4-frag-needs-reassembly"])
-         self:handle_fragment(h, pkt)
+         counter.add(self.shm["in-ipv6-frag-needs-reassembly"])
+         self:handle_fragment(h)
          packet.free(pkt)
+      else
+         -- Not fragmented; forward it on.
+         counter.add(self.shm["in-ipv6-frag-reassembly-unneeded"])
+         link.transmit(output, pkt)
       end
    end
 
@@ -316,30 +317,29 @@ function Reassembler:push ()
 end
 
 function selftest()
-   print("selftest: apps.ipv4.reassemble")
+   print("selftest: apps.ipv6.reassemble")
 
    local shm        = require("core.shm")
    local datagram   = require("lib.protocol.datagram")
    local ether      = require("lib.protocol.ethernet")
-   local ipv4       = require("lib.protocol.ipv4")
-   local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
+   local ipv6       = require("lib.protocol.ipv6")
+   local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
 
-   local ethertype_ipv4 = 0x0800
+   local ethertype_ipv6 = 0x86dd
 
-   local function random_ipv4() return lib.random_bytes(4) end
+   local function random_ipv6() return lib.random_bytes(16) end
    local function random_mac() return lib.random_bytes(6) end
 
-   -- Returns a new packet containing an Ethernet frame with an IPv4
+   -- Returns a new packet containing an Ethernet frame with an IPv6
    -- header followed by PAYLOAD_SIZE random bytes.
    local function make_test_packet(payload_size)
       local pkt = packet.from_pointer(lib.random_bytes(payload_size),
                                       payload_size)
       local eth_h = ether:new({ src = random_mac(), dst = random_mac(),
-                                type = ethertype_ipv4 })
-      local ip_h  = ipv4:new({ src = random_ipv4(), dst = random_ipv4(),
-                               protocol = 0xff, ttl = 64 })
-      ip_h:total_length(ip_h:sizeof() + pkt.length)
-      ip_h:checksum()
+                                type = ethertype_ipv6 })
+      local ip_h  = ipv6:new({ src = random_ipv6(), dst = random_ipv6(),
+                               next_header = 0xff, hop_limit = 64 })
+      ip_h:payload_length(payload_size)
 
       local dgram = datagram:new(pkt)
       dgram:push(ip_h)
@@ -348,7 +348,7 @@ function selftest()
    end
 
    local function fragment(pkt, mtu)
-      local fragment = ipv4_apps.Fragmenter:new({mtu=mtu})
+      local fragment = ipv6_apps.Fragmenter:new({mtu=mtu})
       fragment.input = { input = link.new('fragment input') }
       fragment.output = { output = link.new('fragment output') }
       link.transmit(fragment.input.input, packet.clone(pkt))

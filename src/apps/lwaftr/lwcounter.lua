@@ -41,11 +41,14 @@ end
 -- Temporary hack until we migrate all of the lwAFTR's apps to use the
 -- SHM frame mechanism.
 local ipv4_reassemble = require('apps.ipv4.reassemble')
+local ipv6_reassemble = require('apps.ipv6.reassemble')
 function init_counters ()
    local counters = {}
    for k, id in pairs(counter_names()) do
       if ipv4_reassemble.Reassembler.shm[k] then
          -- Don't create this counter; IPv4 reassemble app handles it.
+      elseif ipv6_reassemble.Reassembler.shm[k] then
+         -- Don't create this counter; IPv6 reassemble app handles it.
       else
          counters[k] = {counter}
       end
