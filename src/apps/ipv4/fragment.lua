@@ -158,6 +158,11 @@ local fragmenter_config_params = {
 
 function Fragmenter:new(conf)
    local o = lib.parse(conf, fragmenter_config_params)
+   -- RFC 791: "Every internet module must be able to forward a datagram
+   -- of 68 octets without further fragmentation.  This is because an
+   -- internet header may be up to 60 octets, and the minimum fragment
+   -- is 8 octets."
+   assert(o.mtu >= 68)
    return setmetatable(o, {__index=Fragmenter})
 end
 
@@ -360,9 +365,71 @@ end
 
 function selftest()
    print("selftest: apps.ipv4.fragment")
+
    test_payload_1200_mtu_1500()
    test_payload_1200_mtu_1000()
    test_payload_1200_mtu_400()
    test_dont_fragment_flag()
+
+   local shm        = require("core.shm")
+   local datagram   = require("lib.protocol.datagram")
+   local ether      = require("lib.protocol.ethernet")
+   local ipv4       = require("lib.protocol.ipv4")
+   local Fragmenter = require("apps.ipv4.fragment").Fragmenter
+
+   local ethertype_ipv4 = 0x0800
+
+   local function random_ipv4() return lib.random_bytes(4) end
+   local function random_mac() return lib.random_bytes(6) end
+
+   -- Returns a new packet containing an Ethernet frame with an IPv4
+   -- header followed by PAYLOAD_SIZE random bytes.
+   local function make_test_packet(payload_size, flags)
+      local pkt = packet.from_pointer(lib.random_bytes(payload_size),
+                                      payload_size)
+      local eth_h = ether:new({ src = random_mac(), dst = random_mac(),
+                                type = ethertype_ipv4 })
+      local ip_h  = ipv4:new({ src = random_ipv4(), dst = random_ipv4(),
+                               protocol = 0xff, ttl = 64 })
+      ip_h:total_length(ip_h:sizeof() + pkt.length)
+      ip_h:flags(flags)
+      ip_h:checksum()
+
+      local dgram = datagram:new(pkt)
+      dgram:push(ip_h)
+      dgram:push(eth_h)
+      return dgram:packet()
+   end
+
+   local frame = shm.create_frame("apps/fragmenter", Fragmenter.shm)
+   local input = link.new('fragment input')
+   local output = link.new('fragment output')
+
+   local function fragment(pkt, mtu)
+      local fragment = Fragmenter:new({mtu=mtu})
+      fragment.shm = frame
+      fragment.input, fragment.output = { input = input }, { output = output }
+      link.transmit(input, packet.clone(pkt))
+      fragment:push()
+      local ret = {}
+      while not link.empty(output) do
+         table.insert(ret, link.receive(output))
+      end
+      return ret
+   end
+
+   for size = 0, 2000, 7 do
+      local pkt = make_test_packet(size, 0)
+      for mtu = 68, 2500, 3 do
+         local fragments = fragment(pkt, mtu)
+         for _, p in ipairs(fragments) do packet.free(p) end
+      end
+      packet.free(pkt)
+   end
+
+   shm.delete_frame(frame)
+   link.free(input, 'fragment input')
+   link.free(output, 'fragment output')
+
    print("selftest: ok")
 end
