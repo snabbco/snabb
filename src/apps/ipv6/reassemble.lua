@@ -79,9 +79,9 @@ local ether_ipv6_header_ptr_t = ffi.typeof('$*', ether_ipv6_header_t)
 local fragment_header_len = ffi.sizeof(fragment_header_t)
 local fragment_header_ptr_t = ffi.typeof('$*', fragment_header_t)
 
-local function is_valid_ipv6_packet(h, len)
+-- Precondition: packet already has IPv6 ethertype.
+local function ipv6_packet_has_valid_length(h, len)
    if len < ether_ipv6_header_len then return false end
-   if ntohs(h.ether.type) ~= ether_type_ipv6 then return false end
    return ntohs(h.ipv6.payload_length) == len - ether_ipv6_header_len
 end
 
@@ -287,10 +287,14 @@ function Reassembler:push ()
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
       local h = ffi.cast(ether_ipv6_header_ptr_t, pkt.data)
-      if not is_valid_ipv6_packet(h, pkt.length) then
-         -- Not a valid IPv6 packet; drop.  FIXME: we could expose a
-         -- configuration option to transmit packets with unknown
-         -- protocols instead.
+      if ntohs(h.ether.type) ~= ether_type_ipv6 then
+         -- Not IPv6; forward it on.  FIXME: should make a different
+         -- counter here.
+         counter.add(self.shm["in-ipv6-frag-reassembly-unneeded"])
+         link.transmit(output, pkt)
+      elseif not ipv6_packet_has_valid_length(h, pkt.length) then
+         -- IPv6 packet has invalid length; drop.  FIXME: Should add a
+         -- counter here.
          packet.free(pkt)
       elseif h.ipv6.next_header == fragment_proto then
          -- A fragment; try to reassemble.
