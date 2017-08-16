@@ -175,6 +175,8 @@ function Fragmenter:push ()
       if pkt.length > mtu + ehs and is_ipv4(pkt) then
          local status, frags = fragment(pkt, mtu)
          if status == FRAGMENT_OK then
+            -- The original packet will be truncated and used as the
+            -- first fragment.
             for i=1,#frags do
                counter.add(self.shm["out-ipv4-frag"])
                transmit(output, frags[i])
