@@ -25,8 +25,10 @@ local ipv6_fixed_header_size = constants.ipv6_fixed_header_size
 
 local proto_icmpv6 = constants.proto_icmpv6
 local ethernet_header_size = constants.ethernet_header_size
+local o_ipv6_next_header = ethernet_header_size + constants.o_ipv6_next_header
 local o_icmpv6_header = ethernet_header_size + ipv6_fixed_header_size
 local o_icmpv6_msg_type = o_icmpv6_header + constants.o_icmpv6_msg_type
+local o_icmpv6_msg_code = o_icmpv6_header + constants.o_icmpv6_msg_code
 local o_icmpv6_checksum = o_icmpv6_header + constants.o_icmpv6_checksum
 local icmpv6_echo_request = constants.icmpv6_echo_request
 local icmpv6_echo_reply = constants.icmpv6_echo_reply
@@ -47,13 +49,24 @@ function ICMPEcho:new(conf)
    return setmetatable({addresses = addresses}, {__index = ICMPEcho})
 end
 
+local function is_icmpv6(pkt)
+   return is_ipv6(pkt) and pkt.data[o_ipv6_next_header] == proto_icmpv6
+end
+
+
+local function is_icmpv6_echo_request(pkt)
+   return is_icmpv6(pkt)
+      and pkt.data[o_icmpv6_msg_type] == icmpv6_echo_request
+      and pkt.data[o_icmpv6_msg_code] == 0
+end
+
 function ICMPEcho:push()
    local l_in, l_out, l_reply = self.input.south, self.output.north, self.output.south
 
    for _ = 1, link.nreadable(l_in) do
       local out, pkt = l_out, receive(l_in)
 
-      if icmp.is_icmpv6_message(pkt, icmpv6_echo_request, 0) then
+      if is_icmpv6_echo_request(pkt) then
          local pkt_ipv6 = ipv6:new_from_mem(pkt.data + ethernet_header_size,
                                             pkt.length - ethernet_header_size)
          local pkt_ipv6_dst = ffi.string(pkt_ipv6:dst(), 16)
