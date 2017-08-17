@@ -9,9 +9,7 @@ local ipv4 = require("lib.protocol.ipv4")
 local checksum = require("lib.checksum")
 local packet = require("core.packet")
 local lib = require("core.lib")
-local counter = require("core.counter")
 local link = require("core.link")
-local engine = require("core.app")
 
 local receive, transmit = link.receive, link.transmit
 local wr16, rd32, wr32 = lwutil.wr16, lwutil.rd32, lwutil.wr32
@@ -59,47 +57,51 @@ local function is_icmpv4_echo_request(pkt)
    end
 end
 
+function ICMPEcho:handle_icmp_echo_request(pkt)
+   if not is_icmpv4_echo_request(pkt) then return false end
+   local pkt_ipv4 = ipv4:new_from_mem(pkt.data + ehs,
+                                      pkt.length - ehs)
+   local pkt_ipv4_dst = rd32(pkt_ipv4:dst())
+   if not self.addresses[pkt_ipv4_dst] then return false end
+
+   ethernet:new_from_mem(pkt.data, ehs):swap()
+
+   -- Swap IP source/destination
+   pkt_ipv4:dst(pkt_ipv4:src())
+   wr32(pkt_ipv4:src(), pkt_ipv4_dst)
+
+   -- Change ICMP message type
+   local ihl = get_ihl_from_offset(pkt, o_ipv4_ver_and_ihl)
+   pkt.data[o_icmpv4_msg_type_sans_ihl + ihl] = icmpv4_echo_reply
+
+   -- Clear out flags
+   pkt_ipv4:flags(0)
+
+   -- Recalculate checksums
+   wr16(pkt.data + o_icmpv4_checksum_sans_ihl + ihl, 0)
+   local icmp_offset = ehs + ihl
+   local csum = checksum.ipsum(pkt.data + icmp_offset, pkt.length - icmp_offset, 0)
+   wr16(pkt.data + o_icmpv4_checksum_sans_ihl + ihl, htons(csum))
+   wr16(pkt.data + o_ipv4_checksum, 0)
+   pkt_ipv4:checksum()
+
+   transmit(self.output.south, pkt)
+
+   return true
+end
+
 function ICMPEcho:push()
-   local l_in, l_out, l_reply = self.input.south, self.output.north, self.output.south
+   local northbound_in, northbound_out = self.input.south, self.output.north
+   for _ = 1, link.nreadable(northbound_in) do
+      local pkt = receive(northbound_in)
 
-   for _ = 1, link.nreadable(l_in) do
-      local out, pkt = l_out, receive(l_in)
-
-      if is_icmpv4_echo_request(pkt) then
-         local pkt_ipv4 = ipv4:new_from_mem(pkt.data + ehs,
-                                            pkt.length - ehs)
-         local pkt_ipv4_dst = rd32(pkt_ipv4:dst())
-         if self.addresses[pkt_ipv4_dst] then
-            ethernet:new_from_mem(pkt.data, ehs):swap()
-
-            -- Swap IP source/destination
-            pkt_ipv4:dst(pkt_ipv4:src())
-            wr32(pkt_ipv4:src(), pkt_ipv4_dst)
-
-            -- Change ICMP message type
-            local ihl = get_ihl_from_offset(pkt, o_ipv4_ver_and_ihl)
-            pkt.data[o_icmpv4_msg_type_sans_ihl + ihl] = icmpv4_echo_reply
-
-            -- Clear out flags
-            pkt_ipv4:flags(0)
-
-            -- Recalculate checksums
-            wr16(pkt.data + o_icmpv4_checksum_sans_ihl + ihl, 0)
-            local icmp_offset = ehs + ihl
-            local csum = checksum.ipsum(pkt.data + icmp_offset, pkt.length - icmp_offset, 0)
-            wr16(pkt.data + o_icmpv4_checksum_sans_ihl + ihl, htons(csum))
-            wr16(pkt.data + o_ipv4_checksum, 0)
-            pkt_ipv4:checksum()
-
-            out = l_reply
-         end
+      if not self:handle_icmp_echo_request(pkt) then
+         transmit(northbound_out, pkt)
       end
-
-      transmit(out, pkt)
    end
 
-   l_in, l_out = self.input.north, self.output.south
-   for _ = 1, link.nreadable(l_in) do
-      transmit(l_out, receive(l_in))
+   local southbound_in, southbound_out = self.input.north, self.output.south
+   for _ = 1, link.nreadable(southbound_in) do
+      transmit(southbound_out, receive(southbound_in))
    end
 end
