@@ -84,7 +84,7 @@ local fragmenter_config_params = {
    mtu = { mandatory=true }
 }
 
-deterministic_first_fragment_id = nil
+deterministic_first_fragment_id = false
 function use_deterministic_first_fragment_id()
    deterministic_first_fragment_id = 0x42424242
 end
