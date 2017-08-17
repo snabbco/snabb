@@ -3,7 +3,7 @@ module(..., package.seeall)
 local counter = require("core.counter")
 local ffi = require("ffi")
 local lib = require("core.lib")
-local lwcounter = require("apps.lwaftr.lwcounter")
+local counters = require("program.lwaftr.coutners")
 local lwutil = require("apps.lwaftr.lwutil")
 local lwtypes = require("apps.lwaftr.lwtypes")
 local shm = require("core.shm")
@@ -46,12 +46,12 @@ local counter_names = (function ()
 end)()
 
 local function has_lwaftr_app (tree)
-   return shm.exists(tree.."/"..lwcounter.counters_dir)
+   return shm.exists(tree.."/apps/lwaftr")
 end
 
 local function open_counters (tree)
    local function open_counter (name)
-      return counter.open(tree.."/"..lwcounter.counters_dir..name..".counter", 'readonly')
+      return counter.open(tree.."/apps/lwaftr/"..name..".counter", 'readonly')
    end
    local function open_counter_list (t)
       local ret = {}
