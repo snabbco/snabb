@@ -84,19 +84,24 @@ local fragmenter_config_params = {
    mtu = { mandatory=true }
 }
 
+deterministic_first_fragment_id = nil
+function use_deterministic_first_fragment_id()
+   deterministic_first_fragment_id = 0x42424242
+end
+
 function Fragmenter:new(conf)
    local o = lib.parse(conf, fragmenter_config_params)
    -- RFC 2460 §5.
    assert(o.mtu >= 1280)
-   o.next_fragment_id = math.random(0, 0xffffffff)
+   o.next_fragment_id = deterministic_first_fragment_id or
+      math.random(0, 0xffffffff)
    return setmetatable(o, {__index=Fragmenter})
 end
 
 function Fragmenter:fresh_fragment_id()
-   local id = self.next_fragment_id
    -- TODO: Consider making fragment ID not trivially predictable.
    self.next_fragment_id = bit.band(self.next_fragment_id + 1, 0xffffffff)
-   return id
+   return self.next_fragment_id
 end
 
 function Fragmenter:transmit_fragment(p)
