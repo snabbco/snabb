@@ -116,7 +116,6 @@ Reassembler.shm = {
    ["in-ipv4-frag-needs-reassembly"]      = {counter},
    ["in-ipv4-frag-reassembled"]           = {counter},
    ["in-ipv4-frag-reassembly-unneeded"]   = {counter},
-   ["drop-ipv4-frag-disabled"]            = {counter},
    ["drop-ipv4-frag-invalid-reassembly"]  = {counter},
    ["drop-ipv4-frag-random-evicted"]      = {counter},
    ["memuse-ipv4-frag-reassembly-buffer"] = {counter}

@@ -119,7 +119,6 @@ Reassembler.shm = {
    ["in-ipv6-frag-needs-reassembly"]      = {counter},
    ["in-ipv6-frag-reassembled"]           = {counter},
    ["in-ipv6-frag-reassembly-unneeded"]   = {counter},
-   ["drop-ipv6-frag-disabled"]            = {counter},
    ["drop-ipv6-frag-invalid-reassembly"]  = {counter},
    ["drop-ipv6-frag-random-evicted"]      = {counter},
    ["memuse-ipv6-frag-reassembly-buffer"] = {counter}
