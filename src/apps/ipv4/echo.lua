@@ -1,91 +1,142 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+-- ICMPv4 echo request ("ping") responder (RFC 792)
+
 module(..., package.seeall)
 
-local constants = require("apps.lwaftr.constants")
-local lwutil = require("apps.lwaftr.lwutil")
-local icmp = require("apps.lwaftr.icmp")
+local bit        = require("bit")
+local ffi        = require("ffi")
+local lib        = require("core.lib")
+local packet     = require("core.packet")
+local counter    = require("core.counter")
+local link       = require("core.link")
+local ipsum      = require("lib.checksum").ipsum
 
-local ethernet = require("lib.protocol.ethernet")
-local ipv4 = require("lib.protocol.ipv4")
-local checksum = require("lib.checksum")
-local packet = require("core.packet")
-local lib = require("core.lib")
-local link = require("core.link")
+local ntohs, htons = lib.ntohs, lib.htons
+local ntohl, htonl = lib.ntohl, lib.htonl
 
-local receive, transmit = link.receive, link.transmit
-local wr16, rd32, wr32 = lwutil.wr16, lwutil.rd32, lwutil.wr32
-local get_ihl_from_offset = lwutil.get_ihl_from_offset
-local is_ipv4 = lwutil.is_ipv4
-local htons = lib.htons
+local function bit_mask(bits) return bit.lshift(1, bits) - 1 end
 
-local ehs = constants.ethernet_header_size
-local proto_icmp = constants.proto_icmp
-local o_ipv4_proto = constants.ethernet_header_size + constants.o_ipv4_proto
-local o_ipv4_ver_and_ihl = ehs + constants.o_ipv4_ver_and_ihl
-local o_ipv4_checksum = ehs + constants.o_ipv4_checksum
-local o_icmpv4_msg_type_sans_ihl = ehs + constants.o_icmpv4_msg_type
-local o_icmpv4_msg_code_sans_ihl = ehs + constants.o_icmpv4_msg_code
-local o_icmpv4_checksum_sans_ihl = ehs + constants.o_icmpv4_checksum
-local icmpv4_echo_request = constants.icmpv4_echo_request
-local icmpv4_echo_reply = constants.icmpv4_echo_reply
+local ether_header_t = ffi.typeof [[
+/* All values in network byte order.  */
+struct {
+   uint8_t  dhost[6];
+   uint8_t  shost[6];
+   uint16_t type;
+   uint8_t  payload[0];
+} __attribute__((packed))
+]]
+local ipv4_header_t = ffi.typeof [[
+struct {
+   uint8_t version_and_ihl;               // version:4, ihl:4
+   uint8_t dscp_and_ecn;                  // dscp:6, ecn:2
+   uint16_t total_length;
+   uint16_t id;
+   uint16_t flags_and_fragment_offset;    // flags:3, fragment_offset:13
+   uint8_t  ttl;
+   uint8_t  protocol;
+   uint16_t checksum;
+   uint8_t  src_ip[4];
+   uint8_t  dst_ip[4];
+} __attribute__((packed))
+]]
+local icmp_header_t = ffi.typeof [[
+struct {
+   uint8_t type;
+   uint8_t code;
+   int16_t checksum;
+} __attribute__((packed))
+]]
+local ether_header_len = ffi.sizeof(ether_header_t)
+local ether_type_ipv4 = 0x0800
+local min_ipv4_header_len = ffi.sizeof(ipv4_header_t)
+local ipv4_fragment_offset_bits = 13
+local ipv4_fragment_offset_mask = bit_mask(ipv4_fragment_offset_bits)
+local ipv4_ihl_bits = 4
+local ipv4_ihl_mask = bit_mask(ipv4_ihl_bits)
+local proto_icmp = 1
+local icmp_header_len = ffi.sizeof(icmp_header_t)
+local icmpv4_echo_reply = 0
+local icmpv4_echo_request = 8
+
+local ether_ipv4_header_t = ffi.typeof(
+   'struct { $ ether; $ ipv4; } __attribute__((packed))',
+   ether_header_t, ipv4_header_t)
+local ether_ipv4_header_ptr_t = ffi.typeof('$*', ether_ipv4_header_t)
+local icmp_header_ptr_t = ffi.typeof('$*', icmp_header_t)
+
+local uint32_ptr_t = ffi.typeof('uint32_t*')
+local function ipv4_as_uint32(addr)
+   return ntohl(ffi.cast(uint32_ptr_t, addr)[0])
+end
+local function ipv4_header_length(h)
+   return bit.band(h.version_and_ihl, ipv4_ihl_mask) * 4
+end
 
 ICMPEcho = {}
 
 function ICMPEcho:new(conf)
    local addresses = {}
    if conf.address then
-      addresses[rd32(conf.address)] = true
+      addresses[ipv4_as_uint32(conf.address)] = true
    end
    if conf.addresses then
       for _, v in ipairs(conf.addresses) do
-         addresses[rd32(v)] = true
+         addresses[ipv4_as_uint32(v)] = true
       end
    end
    return setmetatable({addresses = addresses}, {__index = ICMPEcho})
 end
 
-local function is_icmpv4(pkt)
-   return is_ipv4(pkt) and pkt.data[o_ipv4_proto] == proto_icmp
-end
+function ICMPEcho:respond_to_echo_request(pkt)
+   -- Pass on packets too small to be ICMPv4.
+   local min_len = ether_header_len + min_ipv4_header_len + icmp_header_len
+   if pkt.length < min_len then return false end
 
-local function is_icmpv4_echo_request(pkt)
-   if is_icmpv4(pkt) then
-      local ihl = get_ihl_from_offset(pkt, o_ipv4_ver_and_ihl)
-      return pkt.data[o_icmpv4_msg_type_sans_ihl + ihl] == icmpv4_echo_request
-         and pkt.data[o_icmpv4_msg_code_sans_ihl + ihl] == 0
-   else
-      return false
-   end
-end
+   -- Is it ICMPv4?
+   local h = ffi.cast(ether_ipv4_header_ptr_t, pkt.data)
+   if ntohs(h.ether.type) ~= ether_type_ipv4 then return false end
+   if h.ipv4.protocol ~= proto_icmp then return false end
 
-function ICMPEcho:handle_icmp_echo_request(pkt)
-   if not is_icmpv4_echo_request(pkt) then return false end
-   local pkt_ipv4 = ipv4:new_from_mem(pkt.data + ehs,
-                                      pkt.length - ehs)
-   local pkt_ipv4_dst = rd32(pkt_ipv4:dst())
-   if not self.addresses[pkt_ipv4_dst] then return false end
+   -- Find the ICMP header.  Is it an echo request?
+   local ipv4_header_len = ipv4_header_length(h.ipv4)
+   local min_len = min_len - min_ipv4_header_len + ipv4_header_len
+   if pkt.length < min_len then return false end
+   local icmp = ffi.cast(icmp_header_ptr_t, h.ether.payload + ipv4_header_len)
+   if icmp.type ~= icmpv4_echo_request then return false end
+   if icmp.code ~= 0 then return false end
 
-   ethernet:new_from_mem(pkt.data, ehs):swap()
+   -- Is it sent to us?
+   if not self.addresses[ipv4_as_uint32(h.ipv4.dst_ip)] then return false end
 
-   -- Swap IP source/destination
-   pkt_ipv4:dst(pkt_ipv4:src())
-   wr32(pkt_ipv4:src(), pkt_ipv4_dst)
+   -- OK, all good.  Let's reply.
+   local out = packet.clone(pkt)
+   local out_h = ffi.cast(ether_ipv4_header_ptr_t, out.data)
 
-   -- Change ICMP message type
-   local ihl = get_ihl_from_offset(pkt, o_ipv4_ver_and_ihl)
-   pkt.data[o_icmpv4_msg_type_sans_ihl + ihl] = icmpv4_echo_reply
+   -- Swap addresses.
+   out_h.ether.dhost, out_h.ether.shost = h.ether.shost, h.ether.dhost
+   out_h.ipv4.src_ip, out_h.ipv4.dst_ip = h.ipv4.dst_ip, h.ipv4.src_ip
 
-   -- Clear out flags
-   pkt_ipv4:flags(0)
+   -- Clear flags
+   out_h.ipv4.flags_and_fragment_offset =
+      bit.band(out_h.ipv4.flags_and_fragment_offset, ipv4_fragment_offset_mask)
 
-   -- Recalculate checksums
-   wr16(pkt.data + o_icmpv4_checksum_sans_ihl + ihl, 0)
-   local icmp_offset = ehs + ihl
-   local csum = checksum.ipsum(pkt.data + icmp_offset, pkt.length - icmp_offset, 0)
-   wr16(pkt.data + o_icmpv4_checksum_sans_ihl + ihl, htons(csum))
-   wr16(pkt.data + o_ipv4_checksum, 0)
-   pkt_ipv4:checksum()
+   -- Recalculate IPv4 checksum.
+   out_h.ipv4.checksum = 0
+   out_h.ipv4.checksum = htons(
+      ipsum(out.data + ether_header_len, ipv4_header_len, 0))
 
-   transmit(self.output.south, pkt)
+   -- Change ICMP message type.
+   icmp = ffi.cast(icmp_header_ptr_t, out_h.ether.payload + ipv4_header_len)
+   icmp.type = icmpv4_echo_reply
+
+   -- Recalculate ICMP checksum.
+   icmp.checksum = 0
+   icmp.checksum = htons(
+      ipsum(out.data + ether_header_len + ipv4_header_len,
+            out.length - ether_header_len - ipv4_header_len, 0))
+
+   link.transmit(self.output.south, out)
 
    return true
 end
@@ -93,15 +144,17 @@ end
 function ICMPEcho:push()
    local northbound_in, northbound_out = self.input.south, self.output.north
    for _ = 1, link.nreadable(northbound_in) do
-      local pkt = receive(northbound_in)
+      local pkt = link.receive(northbound_in)
 
-      if not self:handle_icmp_echo_request(pkt) then
-         transmit(northbound_out, pkt)
+      if self:respond_to_echo_request(pkt) then
+         packet.free(pkt)
+      else
+         link.transmit(northbound_out, pkt)
       end
    end
 
    local southbound_in, southbound_out = self.input.north, self.output.south
    for _ = 1, link.nreadable(southbound_in) do
-      transmit(southbound_out, receive(southbound_in))
+      link.transmit(southbound_out, link.receive(southbound_in))
    end
 end
