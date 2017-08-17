@@ -119,7 +119,6 @@ Reassembler.shm = {
    ["in-ipv6-frag-needs-reassembly"]      = {counter},
    ["in-ipv6-frag-reassembled"]           = {counter},
    ["in-ipv6-frag-reassembly-unneeded"]   = {counter},
-   ["drop-ipv6-frag-disabled"]            = {counter},
    ["drop-ipv6-frag-invalid-reassembly"]  = {counter},
    ["drop-ipv6-frag-random-evicted"]      = {counter},
    ["memuse-ipv6-frag-reassembly-buffer"] = {counter}
@@ -323,7 +322,7 @@ function selftest()
    local datagram   = require("lib.protocol.datagram")
    local ether      = require("lib.protocol.ethernet")
    local ipv6       = require("lib.protocol.ipv6")
-   local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+   local Fragmenter = require("apps.ipv6.fragment").Fragmenter
 
    local ethertype_ipv6 = 0x86dd
 
@@ -348,7 +347,8 @@ function selftest()
    end
 
    local function fragment(pkt, mtu)
-      local fragment = ipv6_apps.Fragmenter:new({mtu=mtu})
+      local fragment = Fragmenter:new({mtu=mtu})
+      fragment.shm = shm.create_frame("apps/fragmenter", fragment.shm)
       fragment.input = { input = link.new('fragment input') }
       fragment.output = { output = link.new('fragment output') }
       link.transmit(fragment.input.input, packet.clone(pkt))
@@ -357,6 +357,7 @@ function selftest()
       while not link.empty(fragment.output.output) do
          table.insert(ret, link.receive(fragment.output.output))
       end
+      shm.delete_frame(fragment.shm)
       link.free(fragment.input.input, 'fragment input')
       link.free(fragment.output.output, 'fragment output')
       return ret
@@ -377,7 +378,7 @@ function selftest()
 
    for _, size in ipairs({100, 400, 1000, 1500, 2000}) do
       local pkt = make_test_packet(size)
-      for _, mtu in ipairs({512, 1000, 1500}) do
+      for mtu = 1280, 2500, 113 do
          local fragments = fragment(pkt, mtu)
          for _, order in ipairs(permute_indices(1, #fragments)) do
             local reassembler = Reassembler:new {

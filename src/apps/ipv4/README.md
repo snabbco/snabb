@@ -98,3 +98,25 @@ each reassembly uses about 11kB of memory.  The default is 20000.
 
 *Optional*.  The maximum number of fragments per reassembly.  The
 default is 40.
+
+## Fragmenter (apps.ipv4.fragment)
+
+The `Fragmenter` app that will fragment any IPv4 packets larger than a
+configured maximum transmission unit (MTU).
+
+    DIAGRAM: IPv4Fragmenter
+                   +-----------+
+                   |           |
+    input     ---->*Fragmenter *---->   output
+                   |           |
+                   +-----------+
+
+### Configuration
+
+The `Fragmenter` app accepts a table as its configuration argument. The
+following key is defined:
+
+— Key **mtu**
+
+*Required*.  The maximum transmission unit, in bytes, not including the
+Ethernet header.

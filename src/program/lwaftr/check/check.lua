@@ -30,7 +30,14 @@ local function parse_args (args)
    return opts, args
 end
 
+local function fix_nondeterminacy()
+   require('apps.ipv4.fragment').use_deterministic_first_fragment_id()
+   require('apps.ipv6.fragment').use_deterministic_first_fragment_id()
+end
+
 function run(args)
+   fix_nondeterminacy()
+
    local opts, args = parse_args(args)
    local load_check = opts["on-a-stick"] and setup.load_check_on_a_stick
                                          or  setup.load_check
