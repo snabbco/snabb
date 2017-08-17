@@ -6,7 +6,6 @@ local data = require('lib.yang.data')
 local state = require('lib.yang.state')
 local S = require('syscall')
 
-
 function counter_names ()
    local names = {}
    local schema = schema.load_schema_by_name('snabb-softwire-v2')
