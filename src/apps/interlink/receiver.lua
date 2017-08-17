@@ -6,6 +6,7 @@ local shm = require("core.shm")
 local interlink = require("lib.interlink")
 
 local Receiver = {
+   name = "apps.interlink.Receiver",
    config = {
       name = {required=true},
       create = {default=false}

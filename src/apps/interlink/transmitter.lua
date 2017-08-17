@@ -6,6 +6,7 @@ local shm = require("core.shm")
 local interlink = require("lib.interlink")
 
 local Transmitter = {
+   name = "apps.interlink.Transmitter",
    config = {
       name = {required=true},
       create = {default=false}
