@@ -86,6 +86,53 @@ is to select a pool number automatically.
 *Optional*. A twelve-bit integer (0-4095). If set, incoming packets from
 other VLANs are dropped and outgoing packets are tagged with a VLAN header.
 
+— Key **mirror**
+
+*Optional*. A table. If set, this app will receive copies of all selected
+packets on the physical port. The selection is configured by setting keys
+of the *mirror* table. Either *mirror.pool* or *mirror.port* may be set.
+
+If *mirror.pool* is `true` all pools defined on this physical port are
+mirrored. If *mirror.pool* is an array of pool numbers then the specified
+pools are mirrored.
+
+If *mirror.port* is one of "in", "out" or "inout" all incoming and/or
+outgoing packets on the port are mirrored respectively.  Note that this
+does not include internal traffic which does not enter or exit through
+the physical port.
+
+— Key **rxcounter**
+
+— Key **txcounter**
+
+*Optional*. Four bit integers (0-15). If set, incoming/outgoing packets
+will be counted in the selected statistics counter respectively. Multiple
+apps can share a counter. To retrieve counter statistics use
+`Intel:get_rxstats()` and `Intel:get_txstats()`.
+
+— Key **rate_limit**
+
+*Optional*. Number. Limits the maximum Mbit/s to transmit. Default is 0
+which means no limit. Only applies to outgoing traffic.
+
+— Key **priority**
+
+*Optional*. Floating point number. Weight for the *round-robin* algorithm
+used to arbitrate transmission when *rate_limit* is not set or adds up to
+more than the line rate of the physical port. Default is 1.0 (scaled to
+the geometric middle of the scale which goes from 1/128 to 128). The
+absolute value is not relevant, instead only the ratio between competing
+apps controls their respective bandwidths. Only applies to outgoing
+traffic.
+
+For example, if two apps without *rate_limit* set have the same
+*priority*, both get the same output bandwidth.  If the priorities are
+3.0/1.0, the output bandwidth is split 75%/25%.  Likewise, 1.0/0.333 or
+1.5/0.5 yield the same result.
+
+Note that even a low-priority app can use the whole line rate unless other
+(higher priority) apps are using up the available bandwidth.
+
 — Key **rsskey**
 
 *Optional*. The rsskey is a 32 bit integer that seeds the hash used to
