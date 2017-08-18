@@ -27,7 +27,7 @@ Leader = {
       -- Could relax this requirement.
       initial_configuration = {required=true},
       schema_name = {required=true},
-      follower_pids = {required=true},
+      worker_start_fn = {required=true},
       Hz = {default=100},
    }
 }
@@ -56,10 +56,8 @@ function Leader:new (conf)
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
+   ret.worker_start_fn = conf.worker_start_fn
    ret.followers = {}
-   for _,pid in ipairs(conf.follower_pids) do
-      table.insert(ret.followers, { pid=pid, queue={} })
-   end
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
 
@@ -70,16 +68,25 @@ end
 
 function Leader:set_initial_configuration (configuration)
    self.current_configuration = configuration
-   self.current_app_graph = self.setup_fn(configuration)
    self.current_in_place_dependencies = {}
-   self.current_in_place_dependencies =
-      self.support.update_mutable_objects_embedded_in_app_initargs (
-         {}, self.current_app_graph, self.schema_name, 'load', '/',
-         self.current_configuration)
-   local initial_app_graph = app_graph.new() -- Empty.
-   local actions = self.support.compute_config_actions(
-      initial_app_graph, self.current_app_graph, {}, 'load')
-   self:enqueue_config_actions(actions)
+
+   -- Start the followers and configure them.
+   local follower_configurations = self.setup_fn(configuration)
+
+   for id, config in pairs(follower_configurations) do
+      local follower_pid = self.worker_start_fn()
+      local in_place_dependencies =
+         self.support.update_mutable_objects_embedded_in_app_initargs (
+            {}, config, self.schema_name, 'load', '/',
+            self.current_configuration)
+      self.followers[id] = { pid=follower_pid, queue={}, graph=config,
+         dependences=in_place_dependencies}
+         
+      -- Configure the follower.
+      local actions = self.support.compute_config_actions(
+	     app_graph.new(), self.followers[id].graph, {}, 'load')
+      self:enqueue_config_actions_for_follower(id, actions)
+   end
 end
 
 function Leader:take_follower_message_queue ()
@@ -90,17 +97,17 @@ end
 
 local verbose = os.getenv('SNABB_LEADER_VERBOSE') and true
 
-function Leader:enqueue_config_actions (actions)
-   local messages = {}
+function Leader:enqueue_config_actions_for_follower(follower, actions)
    for _,action in ipairs(actions) do
       if verbose then print('encode', action[1], unpack(action[2])) end
       local buf, len = action_codec.encode(action)
-      table.insert(messages, { buf=buf, len=len })
+      table.insert(self.followers[follower].queue, { buf=buf, len=len })
    end
-   for _,follower in ipairs(self.followers) do
-      for _,message in ipairs(messages) do
-         table.insert(follower.queue, message)
-      end
+end
+
+function Leader:enqueue_config_actions (actions)
+   for id,_ in pairs(self.followers) do
+      self.enqueue_config_actions_for_follower(id, actions)
    end
 end
 
@@ -697,7 +704,7 @@ function Leader:handle_calls_from_peers()
 end
 
 function Leader:send_messages_to_followers()
-   for _,follower in ipairs(self.followers) do
+   for _,follower in pairs(self.followers) do
       if not follower.channel then
          local name = '/'..tostring(follower.pid)..'/config-follower-channel'
          local success, channel = pcall(channel.open, name)

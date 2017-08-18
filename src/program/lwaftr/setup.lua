@@ -606,9 +606,13 @@ function reconfigurable(scheduling, f, graph, conf, ...)
    local args = {...}
 
    local function setup_fn(conf)
-      local graph = config.new()
-      f(graph, conf, unpack(args))
-      return graph
+      local mapping = {}
+      for device, inst_config in pairs(lwutil.produce_instance_configs(conf)) do
+	 local instance_app_graph = config.new()
+	 f(instance_app_graph, conf, unpack(args))
+	 mapping[device] = instance_app_graph
+      end
+      return mapping
    end
 
    if scheduling.cpu then
@@ -616,14 +620,15 @@ function reconfigurable(scheduling, f, graph, conf, ...)
       numa.bind_to_numa_node(wanted_node)
       print("Bound main process to NUMA node: ", wanted_node)
    end
-
-   local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
-   worker_code = worker_code:format(stringify(scheduling))
-
-   local follower_pid = worker.start("follower", worker_code)
+   
+   function worker_start_fn()
+      local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
+      worker_code = worker_code:format(stringify(scheduling))
+      return worker.start("follower", worker_code)
+   end
 
    config.app(graph, 'leader', leader.Leader,
               { setup_fn = setup_fn, initial_configuration = conf,
-                follower_pids = { follower_pid },
+                worker_start_fn = worker_start_fn,
                 schema_name = 'snabb-softwire-v2'})
 end
