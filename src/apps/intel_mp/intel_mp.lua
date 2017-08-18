@@ -319,22 +319,22 @@ function Intel:new (conf)
       path = pci.path(conf.pciaddr),
       -- falling back to defaults for selftest bypassing config.app
       ndesc = conf.ndescriptors or self.config.ndescriptors.default,
-      txq = conf.txq,
-      rxq = conf.rxq,
+      txq = conf.txq or self.config.txq.default,
+      rxq = conf.rxq or self.config.rxq.default,
       mtu = conf.mtu or self.config.mtu.default,
       linkup_wait = conf.linkup_wait or self.config.linkup_wait.default,
       linkup_wait_recheck =
          conf.linkup_wait_recheck or self.config.linkup_wait_recheck.default,
       wait_for_link = conf.wait_for_link,
-      vmdq = conf.vmdq,
+      vmdq = conf.vmdq or self.config.vmdq.default,
       poolnum = conf.poolnum,
       macaddr = conf.macaddr,
       vlan = conf.vlan,
       want_mirror = conf.mirror,
       rxcounter = conf.rxcounter,
       txcounter = conf.txcounter,
-      rate_limit = conf.rate_limit,
-      priority = conf.priority,
+      rate_limit = conf.rate_limit or self.config.rate_limit.default,
+      priority = conf.priority or self.config.priority.default
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
