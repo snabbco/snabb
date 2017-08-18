@@ -222,6 +222,7 @@ local function test_ipv4_checksum ()
    ]], 66))
 
    local ip_hdr = ipv4:new_from_mem(p.data + IP_BASE, IP_HDR_SIZE)
+   assert(ip_hdr)
    local csum = ip_hdr:checksum()
    assert(csum == 0xb08e, "Wrong IPv4 checksum")
 end
