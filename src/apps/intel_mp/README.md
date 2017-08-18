@@ -6,12 +6,36 @@ be attached to separate instances of the app on different processes.
 
 The links are named `input` and `output`.
 
+    DIAGRAM: Intel
+                 +-------+
+                 |       |
+      input ---->* Intel *----> output
+                 |       |
+                 +-------+
+
 ## Caveats
 
 If attaching multiple processes to a single NIC, performance appears
 better with `engine.busywait = false`.
 
 The `intel_mp.Intel` app can drive an Intel 82599 NIC at 14 million pps.
+
+— Method **Intel:get_rxstats**
+
+Returns a table with the following keys:
+
+* `counter_id` - Counter id
+* `packets` - Number of packets received
+* `dropped` - Number of packets dropped
+* `bytes` - Total bytes received
+
+— Method **Intel:get_txstats**
+
+Returns a table with the following keys:
+
+* `counter_id` - Counter id
+* `packets` - Number of packets sent
+* `bytes` - Total bytes sent
 
 ## Configuration
 
