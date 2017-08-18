@@ -223,12 +223,11 @@ local function link_sink(c, v4_out, v6_out)
 end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local v4_pci, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[v4_pci].queue.values[1]
+   local v4_pci, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[v4_pci].queue.values[1]
    local v6_pci = queue.external_interface.device
    validate_pci_devices({v4_pci, v6_pci})
-   lwaftr_app(c, lwaftr_config, v4_pci)
+   lwaftr_app(c, conf, v4_pci)
 
    config.app(c, v4_nic_name, Intel82599, {
       pciaddr=v4_pci,
@@ -248,11 +247,10 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_on_a_stick(c, conf, args)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local pciaddr, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[pciaddr].queue.values[1]
+   local pciaddr, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[pciaddr].queue.values[1]
    validate_pci_devices({pciaddr})
-   lwaftr_app(c, lwaftr_config, pciaddr)
+   lwaftr_app(c, conf, pciaddr)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.mirror
 
@@ -296,11 +294,10 @@ function load_on_a_stick(c, conf, args)
 end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local v4_pci, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[v4_pci].queue.values[1]
+   local v4_pci, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[v4_pci].queue.values[1]
    local v6_pci = queue.external_device.device
-   lwaftr_app(c, lwaftr_config, device)
+   lwaftr_app(c, conf, device)
 
    validate_pci_devices({v4_pci, v6_pci})
    config.app(c, v4_nic_name, VirtioNet, {
@@ -317,10 +314,9 @@ function load_virt(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, v4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, v6_pcap)
@@ -354,10 +350,9 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
 end
 
 function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -408,10 +403,9 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
 end
 
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -448,10 +442,9 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
 end
 
 function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -492,10 +485,9 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
 end
 
 function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -609,7 +601,7 @@ function reconfigurable(scheduling, f, graph, conf, ...)
       local mapping = {}
       for device, inst_config in pairs(lwutil.produce_instance_configs(conf)) do
 	 local instance_app_graph = config.new()
-	 f(instance_app_graph, conf, unpack(args))
+	 f(instance_app_graph, inst_config, unpack(args))
 	 mapping[device] = instance_app_graph
       end
       return mapping
