@@ -77,11 +77,11 @@ function Leader:set_initial_configuration (configuration)
       local follower_pid = self.worker_start_fn()
       local in_place_dependencies =
          self.support.update_mutable_objects_embedded_in_app_initargs (
-            {}, config, self.schema_name, 'load', '/',
+            app_graph.new(), config, self.schema_name, 'load', '/',
             self.current_configuration)
       self.followers[id] = { pid=follower_pid, queue={}, graph=config,
          dependences=in_place_dependencies}
-         
+
       -- Configure the follower.
       local actions = self.support.compute_config_actions(
 	     app_graph.new(), self.followers[id].graph, {}, 'load')
@@ -425,21 +425,23 @@ end
 
 function Leader:update_configuration (update_fn, verb, path, ...)
    self:notify_pre_update(self.current_configuration, verb, path, ...)
-   local to_restart =
-      self.support.compute_apps_to_restart_after_configuration_update (
-         self.schema_name, self.current_configuration, verb, path,
-         self.current_in_place_dependencies, ...)
-   local new_config = update_fn(self.current_configuration, ...)
-   local new_app_graph = self.setup_fn(new_config)
-   local actions = self.support.compute_config_actions(
-      self.current_app_graph, new_app_graph, to_restart, verb, path, ...)
-   self:enqueue_config_actions(actions)
-   self.current_app_graph = new_app_graph
-   self.current_configuration = new_config
-   self.current_in_place_dependencies =
-      self.support.update_mutable_objects_embedded_in_app_initargs (
-         self.current_in_place_dependencies, self.current_app_graph,
-         verb, path, ...)
+   local new_graph = update_fn(self.current_configuration, ...)
+   for id, follower in pairs(self.followers) do
+      assert(new_graph[id], "Starting new followers not yet supported.")
+      local to_restart =
+         self.support.compute_apps_to_restart_after_configuration_update (
+            self.schema_name, self.current_configuration, verb, path,
+            follower.dependences, ...)
+      local new_config = update_fn(self.current_configuration, ...)
+      local actions = self.support.compute_config_actions(
+         follower.graph, new_graph[id], to_restart, verb, path, ...)
+      self:enqueue_config_actions_for_follower(id, actions)
+      self.current_configuration = new_config
+      follower.graph = new_graph[id]
+      follower.dependences =
+         self.support.update_mutable_objects_embedded_in_app_initargs (
+            follower.dependences, follower.graph, verb, path, ...)
+   end
 end
 
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
@@ -748,10 +750,10 @@ function selftest ()
       app_graph.app(graph, "source", basic_apps.Source, {})
       app_graph.app(graph, "sink", basic_apps.Sink, {})
       app_graph.link(graph, "source.foo -> sink.bar")
-      return graph
+      return {graph}
    end
    app_graph.app(graph, "leader", Leader,
-                 {setup_fn=setup_fn, follower_pids={S.getpid()},
+                 {setup_fn=setup_fn, worker_start_fn=S.getpid,
                   -- Use a schema with no data nodes, just for
                   -- testing.
                   schema_name='ietf-inet-types', initial_configuration={}})
