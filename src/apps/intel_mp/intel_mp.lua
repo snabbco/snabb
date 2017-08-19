@@ -337,6 +337,10 @@ function Intel:new (conf)
       priority = conf.priority or self.config.priority.default
    }
 
+   -- txq/rxq have defaults so nil can't represent off state
+   if conf.txq == "off" then self.txq = nil end
+   if conf.rxq == "off" then self.rxq = nil end
+
    local vendor = lib.firstline(self.path .. "/vendor")
    local device = lib.firstline(self.path .. "/device")
    local byid = byPciID[tonumber(device)]
