@@ -2,29 +2,29 @@
 
 [![Build Status](https://travis-ci.org/raptorjit/raptorjit.svg?branch=master)](https://travis-ci.org/raptorjit/raptorjit)
 
-**RaptorJIT** is a fork of LuaJIT targeting Linux/x86-64 server applications.
+**RaptorJIT** is a fork of LuaJIT focused on _predictably high performance_.
 
-Initial changes (ongoing work):
+Making performance predictable for application developers brings new requirements:
 
-- Support only Linux/x86-64 with `+JIT +FFI +GC64 +NO_UNWIND` and `-GDBJIT
-  -PERFTOOLS -VMEVENT -PROFILE` and otherwise canonical settings.
-  Remove the ~50,000 lines of code for other architectures, operating
-  systems, and features.
-- Remove features that are not the right thing for my use cases:
-  built-in disassemblers, `jit.v`, `jit.p`, `jit.dump`, and the VM
-  features required to support them. These need to be replaced with
-  simple and low-overhead mechanisms that provide data to be analyzed
-  be external tools. (Tools will be developed in
-  the [Studio](https://github.com/studio) project.)
-- Continuous Integration testing
-  with [Travis-CI](https://travis-ci.org/raptorjit/raptorjit) and
-  with [automatic performance regression tests](https://hydra.snabb.co/job/luajit/branchmarks/benchmarkResults/latest/download/2).
+- Providing an accurate mental model of how the JIT works and which programming techniques are effective.
+- Providing diagnostic tools consistent with this mental model to make the actual operation transparent.
+- Making profiling completely ubiquitous in development, testing, and production environments.
 
-PRs welcome! Shock me with your radical ideas! :-)
+These requirements drive RaptorJIT development in certain directions:
+
+- Providing programming constructs that produce fast code, every time.
+- Minimizing the performance impact of non-deterministic JIT decisions.
+- Creating high-level diagnostic tools in the [Studio](https://hydra.snabb.co/job/lukego/studio-manual/studio-manual-html/latest/download-by-type/file/Manual#view-hot-traces) project.
+
+The development process has to support moving quickly in these directions:
+
+- Quality assurance based on repeatable standard benchmarks executed by CI.
+- Streamlined codebase: x86-64 architecture, 64-bit heap (GC64), "no `#ifdef`."
+- Distributed development ("Linux-style") with many maintainers, forks, and merges.
 
 ### CPU support
 
-RaptorJIT is narrowly focused:
+RaptorJIT optimization is narrowly focused:
 
 - [Intel Core](https://en.wikipedia.org/wiki/Intel_Core) (i3/i5/i7/Xeon-E) is the only supported CPU family.
 - The latest microarchitecture (currently Skylake) is targetted for all new optimizations.
