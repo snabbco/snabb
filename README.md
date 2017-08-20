@@ -22,28 +22,12 @@ The development process has to support moving quickly in these directions:
 - Streamlined codebase: x86-64 architecture, 64-bit heap (GC64), "no `#ifdef`."
 - Distributed development ("Linux-style") with many maintainers, forks, and merges.
 
-### CPU support
-
-RaptorJIT optimization is narrowly focused:
-
-- [Intel Core](https://en.wikipedia.org/wiki/Intel_Core) (i3/i5/i7/Xeon-E) is the only supported CPU family.
-- The latest microarchitecture (currently Skylake) is targetted for all new optimizations.
-- The previous microarchitecture (currently Haswell) is supported without regressions.
-- Older microarchitectures (currently Sandy Bridge and Nehalem) are not supported at all.
-
-We are flexible during the transitions between processor generations
-e.g. when the latest microarchitecture is not readily available in all
-product families.
-
-Forks focused on other CPU families (Atom, Xeon Phi, AMD, VIA, etc)
-are encouraged and may be merged in the future.
-
 ### Performance
 
 RaptorJIT takes a quantitive approach to performance. The value of an
-optimization must be demonstrated by a reproducible benchmark.
-Optimizations that are not demonstrably beneficial for the currently
-supported CPUs are removed.
+optimization must be demonstrated with a reproducible benchmark.
+Optimizations that are not demonstrably beneficial on recent CPU
+generations are removed.
 
 This makes the following classes of pull requests very welcome:
 
