@@ -7,14 +7,8 @@
 Making performance predictable for application developers brings new requirements:
 
 - Providing an accurate mental model of how the JIT works and which programming techniques are effective.
-- Providing diagnostic tools consistent with this mental model to make the actual operation transparent.
+- Providing diagnostic tools ([Studio]((https://hydra.snabb.co/job/lukego/studio-manual/studio-manual-html/latest/download-by-type/file/Manual#view-hot-traces)) consistent with this mental model to make the actual operation transparent.
 - Making profiling completely ubiquitous in development, testing, and production environments.
-
-These requirements drive RaptorJIT development in certain directions:
-
-- Providing programming constructs that produce fast code, every time.
-- Minimizing the performance impact of non-deterministic JIT decisions.
-- Creating high-level diagnostic tools in the [Studio](https://hydra.snabb.co/job/lukego/studio-manual/studio-manual-html/latest/download-by-type/file/Manual#view-hot-traces) project.
 
 The development process has to support moving quickly in these directions:
 
@@ -36,21 +30,6 @@ This makes the following classes of pull requests very welcome:
 - Removing optimizations without degrading CI benchmark performance.
 
 The CI benchmark suite will evolve over time starting from the [standard LuaJIT benchmarks](https://hydra.snabb.co/job/luajit/branchmarks/benchmarkResults/latest/download/2) (already covers RaptorJIT) and the [Snabb end-to-end benchmark suite](https://hydra.snabb.co/job/snabb-new-tests/benchmarks-murren-large/benchmark-reports.report-full-matrix/latest/download/2) (must be updated to cover RaptorJIT.)
-
-### Optimization resources
-
-These are the authoritative optimization resources for processors
-supported by RaptorJIT. If you are confused by references to CPU
-details in discussions then these are the places to look for answers.
-
-- [Computer Architecture: A Quantitiave Approach](https://www.amazon.com/Computer-Architecture-Fifth-Quantitative-Approach/dp/012383872X) by Hennessy and Patterson.
-- [Intel Architectures Optimization Reference Manual](http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html).
-- Agner Fog's [software optimization resources](http://www.agner.org/optimize/):
-    - [Instruction latency and throughput tables](http://www.agner.org/optimize/instruction_tables.pdf).
-    - [Microarchitecture of Intel, AMD, and VIA CPUs](http://www.agner.org/optimize/microarchitecture.pdf).
-    - [Optimizing subroutines in assembly language for x86](http://www.agner.org/optimize/optimizing_assembly.pdf).
-
-The [AnandTech review of the Haswell microarchitecture](http://www.anandtech.com/show/6355/intels-haswell-architecture) is also excellent lighter reading.
 
 ### Compilation for users
 
@@ -148,6 +127,21 @@ If you are using a distributed nix environment such
 as [Hydra](https://nixos.org/hydra/) then the tests can be
 automatically parallelized and distributed across a suitable build
 farm.
+
+### Optimization resources
+
+These are the authoritative optimization resources for processors
+supported by RaptorJIT. If you are confused by references to CPU
+details in discussions then these are the places to look for answers.
+
+- [Computer Architecture: A Quantitiave Approach](https://www.amazon.com/Computer-Architecture-Fifth-Quantitative-Approach/dp/012383872X) by Hennessy and Patterson.
+- [Intel Architectures Optimization Reference Manual](http://www.intel.com/content/www/us/en/architecture-and-technology/64-ia-32-architectures-optimization-manual.html).
+- Agner Fog's [software optimization resources](http://www.agner.org/optimize/):
+    - [Instruction latency and throughput tables](http://www.agner.org/optimize/instruction_tables.pdf).
+    - [Microarchitecture of Intel, AMD, and VIA CPUs](http://www.agner.org/optimize/microarchitecture.pdf).
+    - [Optimizing subroutines in assembly language for x86](http://www.agner.org/optimize/optimizing_assembly.pdf).
+
+The [AnandTech review of the Haswell microarchitecture](http://www.anandtech.com/show/6355/intels-haswell-architecture) is also excellent lighter reading.
 
 ### Quotes
 
