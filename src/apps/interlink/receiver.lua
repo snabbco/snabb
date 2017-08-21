@@ -19,9 +19,8 @@ function Receiver:new (conf)
       self.interlink = interlink.create(conf.name)
       self.destroy = conf.name
    else
-      self.interlink = shm.open(conf.name, "struct interlink")
+      self.interlink = interlink.open(conf.name)
    end
-   interlink.init(self.interlink)
    return setmetatable(self, {__index=Receiver})
 end
 
@@ -35,9 +34,11 @@ function Receiver:pull ()
 end
 
 function Receiver:stop ()
-   shm.unmap(self.interlink)
    if self.destroy then
+      interlink.free(self.interlink)
       shm.unlink(self.destroy)
+   else
+      shm.unmap(self.interlink)
    end
 end
 

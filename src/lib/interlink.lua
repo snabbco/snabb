@@ -8,6 +8,8 @@ module(...,package.seeall)
 local shm = require("core.shm")
 local ffi = require("ffi")
 local band = require("bit").band
+local waitfor = require("core.lib").waitfor
+local full_memory_barrier = ffi.C.full_memory_barrier
 
 local SIZE = link.max + 1
 local CACHELINE = 64 -- XXX - make dynamic
@@ -15,10 +17,12 @@ local INT = ffi.sizeof("int")
 
 assert(band(SIZE, SIZE-1) == 0, "SIZE is not a power of two")
 
+local status = { Locked = 0, Unlocked = 1 }
+
 ffi.cdef([[ struct interlink {
    char pad0[]]..CACHELINE..[[];
-   int read, write;
-   char pad1[]]..CACHELINE-2*INT..[[];
+   int read, write, lock;
+   char pad1[]]..CACHELINE-3*INT..[[];
    int lwrite, nread;
    char pad2[]]..CACHELINE-2*INT..[[];
    int lread, nwrite;
@@ -28,26 +32,42 @@ ffi.cdef([[ struct interlink {
 
 function create (name)
    local r = shm.create(name, "struct interlink")
-   r.nwrite = link.max -- “full” until initlaized
-   return r
-end
-
-function init (r) -- initialization must be performed by consumer
-   assert(r.packets[0] == ffi.new("void *")) -- only satisfied if uninitialized
    for i = 0, link.max do
       r.packets[i] = packet.allocate()
    end
-   r.nwrite = 0
+   full_memory_barrier()
+   r.lock = status.Unlocked
+   return r
 end
 
-local function NEXT (r, i)
+function free (r)
+   r.lock = status.Locked
+   full_memory_barrier()
+   local function ring_consistent ()
+      return r.write == r.nwrite and r.read == r.nread
+   end
+   waitfor(ring_consistent)
+   for i = 0, link.max do
+      packet.free(r.packets[i])
+   end
+   shm.unmap(r)
+end
+
+function open (name)
+   local r = shm.open(name, "struct interlink")
+   waitfor(function () return r.lock == status.Unlocked end)
+   full_memory_barrier()
+   return r
+end
+
+local function NEXT (i)
    return band(i + 1, link.max)
 end
 
 function full (r)
-   local after_nwrite = NEXT(r, r.nwrite)
+   local after_nwrite = NEXT(r.nwrite)
    if after_nwrite == r.lread then
-      if after_nwrite == r.read then
+      if after_nwrite == r.read or r.lock == status.Locked then
          return true
       end
       r.lread = r.read
@@ -57,16 +77,17 @@ end
 function insert (r, p)
    packet.free(r.packets[r.nwrite])
    r.packets[r.nwrite] = p
-   r.nwrite = NEXT(r, r.nwrite)
+   r.nwrite = NEXT(r.nwrite)
 end
 
 function push (r)
+   full_memory_barrier()
    r.write = r.nwrite
 end
 
 function empty (r)
    if r.nread == r.lwrite then
-      if r.nread == r.write then
+      if r.nread == r.write or r.lock == status.Locked then
          return true
       end
       r.lwrite = r.write
@@ -76,10 +97,11 @@ end
 function extract (r)
    local p = r.packets[r.nread]
    r.packets[r.nread] = packet.allocate()
-   r.nread = NEXT(r, r.nread)
+   r.nread = NEXT(r.nread)
    return p
 end
 
 function pull (r)
+   full_memory_barrier()
    r.read = r.nread
 end

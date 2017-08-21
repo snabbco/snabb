@@ -25,3 +25,7 @@ for w, s in pairs(worker.status()) do
 end
 local stats = link.stats(engine.app_table["sink"].input.input)
 print(stats.txpackets / 1e6 / 10 .. " Mpps")
+
+-- test teardown
+interlink.free(interlink.open("group/test.mcp"))
+engine.main({duration=1})
