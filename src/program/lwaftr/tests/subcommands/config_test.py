@@ -139,13 +139,13 @@ class TestConfigMisc(BaseTestCase):
         add_args = self.get_cmd_args('add')
         add_args.extend((
             '/softwire-config/binding-table/softwire',
-            '{ ipv4 1.2.3.4; psid 7; b4-ipv6 ::2; br-address 2001:db8::;'
+            '{ ipv4 8.8.8.8; psid 7; b4-ipv6 ::2; br-address 2001:db8::;'
             'port-set { psid-length 16; }}',
         ))
         self.run_cmd(add_args)
         get_args = self.get_cmd_args('get')
         get_args.append(
-            '/softwire-config/binding-table/softwire[ipv4=1.2.3.4][psid=7]'
+            '/softwire-config/binding-table/softwire[ipv4=8.8.8.8][psid=7]'
             '/b4-ipv6')
         output = self.run_cmd(get_args)
         # run_cmd checks the exit code and fails the test if it is not zero.
