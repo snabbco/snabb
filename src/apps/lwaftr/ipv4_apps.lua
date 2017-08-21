@@ -3,7 +3,6 @@ module(..., package.seeall)
 local constants = require("apps.lwaftr.constants")
 local lwutil = require("apps.lwaftr.lwutil")
 local icmp = require("apps.lwaftr.icmp")
-local lwcounter = require("apps.lwaftr.lwcounter")
 
 local ethernet = require("lib.protocol.ethernet")
 local ipv4 = require("lib.protocol.ipv4")

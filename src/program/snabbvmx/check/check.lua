@@ -3,7 +3,7 @@ module(..., package.seeall)
 local config = require("core.config")
 local lib = require("core.lib")
 local util = require("program.lwaftr.check.util")
-local lwcounter = require("apps.lwaftr.lwcounter")
+local counters = require("program.lwaftr.counters")
 local setup = require("program.snabbvmx.lwaftr.setup")
 
 local function show_usage(code)
@@ -32,9 +32,9 @@ function run(args)
    setup.load_check(c, conf_file, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    engine.configure(c)
    if counters_path then
-      local initial_counters = lwcounter.read_counters(c)
+      local initial_counters = counters.read_counters(c)
       engine.main({duration=opts.duration})
-      local final_counters = lwcounter.read_counters(c)
+      local final_counters = counters.read_counters(c)
       local counters_diff = util.diff_counters(final_counters,
                                                initial_counters)
       if opts.r then
