@@ -6,6 +6,7 @@
 
 Making performance predictable for application developers brings new requirements:
 
+- Minimizing the performance impact of non-deterministic JIT decisions.
 - Providing an accurate mental model of how the JIT works and which programming techniques are effective.
 - Providing diagnostic tools ([Studio](https://hydra.snabb.co/job/lukego/studio-manual/studio-manual-html/latest/download-by-type/file/Manual#view-hot-traces)) consistent with this mental model to make the actual operation transparent.
 - Making profiling completely ubiquitous in development, testing, and production environments.
