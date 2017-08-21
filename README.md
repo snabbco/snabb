@@ -16,10 +16,9 @@ The development process has to support moving quickly in these directions:
 - Streamlined codebase: x86-64 architecture, 64-bit heap (GC64), "no `#ifdef`."
 - Distributed development ("Linux-style") with many maintainers, forks, and merges.
 
-Once these requirements are thoroughly satisfied then ports to new
-architectures (e.g. ARM64) can be (re)introduced together with full CI
-test and benchmark coverage. The x86-64 platform restriction is to
-make development more fluid in the meantime.
+Once these requirements have been thoroughly satisfied then new
+requirements can be introduced. For example, ARM64 and other platforms
+can be supported as the project matures.
 
 ### Performance
 
