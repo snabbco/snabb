@@ -489,6 +489,7 @@ function Intel:init_rx_q ()
       self.r.RXCTRL:set(bits{ RXEN=0 })
       self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
       if self.vmdq then
+         -- enable packet reception for this pool/VF (4.6.10.1.4)
          self.r.PFVFRE[math.floor(self.poolnum/32)]:set(bits{VFRE=self.poolnum%32})
       end
    elseif self.driver == "Intel1g" then
@@ -574,16 +575,19 @@ function Intel:push ()
    if not self.txq then return end
    local li = self.input["input"]
    if li == nil then return end
---   assert(li, "intel_mp:push: no input link")
 
    while not link.empty(li) and self:can_transmit() do
       local p = link.receive(li)
-      -- NB: see comment in intel10g for why this is commented out,
-      --     the rest of the loop body goes in an else branch
+      -- NB: the comment below is taken from intel_mp.lua, which disables
+      -- this check for the same reason.
+      --   We must not send packets that are bigger than the MTU.  This
+      --   check is currently disabled to satisfy some selftests until
+      --   agreement on this strategy is reached.
       --if p.length > self.mtu then
       --   packet.free(p)
       --   counter.add(self.shm.txdrop)
       --end
+      --else ...
       self:transmit(p)
    end
    -- Reclaim transmit contexts
@@ -609,7 +613,6 @@ function Intel:pull ()
    if not self.rxq then return end
    local lo = self.output["output"]
    if lo == nil then return end
---   assert(lo, "intel_mp:pull: output link required")
 
    local pkts = 0
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
