@@ -102,7 +102,7 @@ function run(args)
       conf, lwconf = setup.load_conf(conf_file)
       external_interface = lwconf.softwire_config.external_interface
       internal_interface = lwconf.softwire_config.internal_interface
-      -- If one interface has vlan tags, the other one should as well.
+      -- If one interface has vlan tags, then the other one should as well.
       assert((not external_interface.vlan_tag) == (not internal_interface.vlan_tag))
    else
       print(("Interface '%s' set to passthrough mode."):format(id))
