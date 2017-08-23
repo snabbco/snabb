@@ -120,3 +120,35 @@ following key is defined:
 
 *Required*.  The maximum transmission unit, in bytes, not including the
 Ethernet header.
+
+## ICMP Echo responder (apps.ipv4.echo)
+
+The `ICMPEcho` app responds to ICMP echo requests ("pings") to a given
+set of IPv4 addresses.
+
+Like the `ARP` app, `ICMPEcho` sits between your network function and
+outside traffic.  Its `north` link relays traffic to and from the
+network function; the `south` link talks to the world.
+
+    DIAGRAM: IPv4ICMPEcho
+                   +-----------+
+                   |           |
+    north     ---->* ICMPEcho  *<----   south
+              <----*           *---->
+                   |           |
+                   +-----------+
+
+### Configuration
+
+The `ICMPEcho` app accepts a table as its configuration argument. The
+following keys is defined:
+
+— Key **address**
+
+*Optional*.  An IPv4 address for which to respond to pings, as a
+ `uint8_t[4]`.
+
+— Key **addresses**
+
+*Optional*.  An array of IPv4 addresses for which to respond to pings,
+as a Lua array of `uint8_t[4]` values.
