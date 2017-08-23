@@ -99,15 +99,7 @@ function run(args)
    local ingress_drop_wait = 20
 
    if file_exists(conf_file) then
-      conf = lib.load_conf(conf_file)
-      if not file_exists(conf.lwaftr) then
-         -- Search in main config file.
-         conf.lwaftr = lib.dirname(conf_file).."/"..conf.lwaftr
-      end
-      if not file_exists(conf.lwaftr) then
-         fatal(("lwAFTR conf file '%s' not found"):format(conf.lwaftr))
-      end
-      lwconf = setup.read_config(conf.lwaftr)
+      conf, lwconf = setup.load_conf(conf_file)
       external_interface = lwconf.softwire_config.external_interface
       internal_interface = lwconf.softwire_config.internal_interface
       -- If one interface has vlan tags, the other one should as well.
