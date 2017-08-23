@@ -34,6 +34,11 @@ local lib        = require("core.lib")
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
+function read_config(filename)
+   return yang.load_configuration(filename,
+                                  {schema_name=lwaftr.LwAftr.yang_schema})
+end
+
 local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
 end
