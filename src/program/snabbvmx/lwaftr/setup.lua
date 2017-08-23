@@ -330,7 +330,7 @@ function passthrough(c, conf, sock_path)
    end
 end
 
-local function load_conf (conf_filename)
+function load_conf (conf_filename)
    local function load_lwaftr_config (conf, conf_filename)
       local filename = conf.lwaftr
       if not file_exists(filename) then
