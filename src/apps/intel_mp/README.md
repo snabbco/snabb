@@ -194,5 +194,5 @@ Each chipset supports a differing number of receive / transmit queues:
 * Intel1g i210 supports 4 receive and 4 transmit queues, 0-3
 
 The Intel82599 supports both VMDq and RSS with 32/64 pools and 4/2 RSS queues for
-each pool. This driver only supports configurations with 32 pools/4 queues.
+each pool. This driver only supports configurations with 64 pools/2 queues.
 While the i350 supports VMDq, this driver does not currently support it.
