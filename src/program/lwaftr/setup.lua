@@ -29,6 +29,7 @@ local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local S          = require("syscall")
 local engine     = require("core.app")
 local lib        = require("core.lib")
+local yang       = require("lib.yang.yang")
 
 
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}

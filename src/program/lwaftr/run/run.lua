@@ -145,7 +145,7 @@ end
 
 function run(args)
    local opts, scheduling, conf_file, v4, v6 = parse_args(args)
-   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
+   local conf = setup.read_config(conf_file)
 
    -- If there are v4 or v6 options we need to migrate the configuration in
    -- memory from the PCI device specified, later we'll want to support
