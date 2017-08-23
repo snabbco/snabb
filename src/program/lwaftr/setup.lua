@@ -12,11 +12,11 @@ local lwaftr     = require("apps.lwaftr.lwaftr")
 local lwutil     = require("apps.lwaftr.lwutil")
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
-local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
+local ipv4_echo  = require("apps.ipv4.echo")
 local ipv4_fragment   = require("apps.ipv4.fragment")
 local ipv4_reassemble = require("apps.ipv4.reassemble")
 local arp        = require("apps.ipv4.arp")
-local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+local ipv6_echo  = require("apps.ipv6.echo")
 local ipv6_fragment   = require("apps.ipv6.fragment")
 local ipv6_reassemble = require("apps.ipv6.reassemble")
 local ndp        = require("apps.lwaftr.ndp")
@@ -113,9 +113,9 @@ function lwaftr_app(c, conf, device)
                    ginternal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly =
                    ginternal_interface.reassembly.max_fragments_per_packet })
-   config.app(c, "icmpechov4", ipv4_apps.ICMPEcho,
+   config.app(c, "icmpechov4", ipv4_echo.ICMPEcho,
               { address = convert_ipv4(iexternal_interface.ip) })
-   config.app(c, "icmpechov6", ipv6_apps.ICMPEcho,
+   config.app(c, "icmpechov6", ipv6_echo.ICMPEcho,
               { address = iinternal_interface.ip })
    config.app(c, "lwaftr", lwaftr.LwAftr, conf)
    config.app(c, "fragmenterv4", ipv4_fragment.Fragmenter,
