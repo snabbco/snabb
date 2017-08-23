@@ -107,7 +107,7 @@ function run(args)
       if not file_exists(conf.lwaftr) then
          fatal(("lwAFTR conf file '%s' not found"):format(conf.lwaftr))
       end
-      lwconf = require('apps.lwaftr.conf').load_lwaftr_config(conf.lwaftr)
+      lwconf = setup.read_config(conf.lwaftr)
       external_interface = lwconf.softwire_config.external_interface
       internal_interface = lwconf.softwire_config.internal_interface
       -- If one interface has vlan tags, the other one should as well.
