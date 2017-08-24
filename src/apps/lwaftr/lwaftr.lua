@@ -4,7 +4,6 @@ local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
 local lwdebug = require("apps.lwaftr.lwdebug")
 local lwutil = require("apps.lwaftr.lwutil")
-local lwtypes = require("apps.lwaftr.lwtypes")
 
 local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
@@ -35,9 +34,47 @@ local PKT_HAIRPINNED = 2
 
 local debug = lib.getenv("LWAFTR_DEBUG")
 
+local ethernet_header_type = ffi.typeof([[
+   struct {
+      uint8_t  ether_dhost[6];
+      uint8_t  ether_shost[6];
+      uint16_t ether_type;
+   }
+]])
+local ethernet_header_ptr_type = ffi.typeof("$*", ethernet_header_type)
+local ethernet_header_size = ffi.sizeof(ethernet_header_type)
+
+local ipv4_header_type = ffi.typeof[[
+struct {
+  uint16_t ihl_v_tos; // ihl:4, version:4, tos(dscp:6 + ecn:2)
+  uint16_t total_length;
+  uint16_t id;
+  uint16_t frag_off; // flags:3, fragmen_offset:13
+  uint8_t  ttl;
+  uint8_t  protocol;
+  uint16_t checksum;
+  uint8_t  src_ip[4];
+  uint8_t  dst_ip[4];
+} __attribute__((packed))
+]]
+local ipv4_header_ptr_type = ffi.typeof("$*", ipv4_header_type)
+local ipv4_header_size = ffi.sizeof(ipv4_header_type)
+
+local ipv6_ptr_type = ffi.typeof([[
+   struct {
+      uint32_t v_tc_fl; // version, tc, flow_label
+      uint16_t payload_length;
+      uint8_t  next_header;
+      uint8_t  hop_limit;
+      uint8_t  src_ip[16];
+      uint8_t  dst_ip[16];
+   } __attribute__((packed))
+]])
+local ipv6_header_ptr_type = ffi.typeof("$*", ipv6_ptr_type)
+local ipv6_header_size = ffi.sizeof(ipv6_ptr_type)
+
 -- Local bindings for constants that are used in the hot path of the
 -- data plane.  Not having them here is a 1-2% performance penalty.
-local ethernet_header_size = constants.ethernet_header_size
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
 local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 
@@ -138,14 +175,14 @@ local function get_icmp_payload(ptr)
 end
 
 function write_eth_header(dst_ptr, eth_type)
-   local eth_hdr = ffi.cast(lwtypes.ethernet_header_ptr_type, dst_ptr)
+   local eth_hdr = ffi.cast(ethernet_header_ptr_type, dst_ptr)
    ffi.fill(eth_hdr.ether_shost, 6, 0)
    ffi.fill(eth_hdr.ether_dhost, 6, 0)
    eth_hdr.ether_type = eth_type
 end
 
 function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_type, payload_length)
-   local ipv6_hdr = ffi.cast(lwtypes.ipv6_header_ptr_type, dst_ptr)
+   local ipv6_hdr = ffi.cast(ipv6_header_ptr_type, dst_ptr)
    ffi.fill(ipv6_hdr, ffi.sizeof(ipv6_hdr), 0)
    lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6)            -- IPv6 Version
    lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, dscp_and_ecn) -- Traffic class
