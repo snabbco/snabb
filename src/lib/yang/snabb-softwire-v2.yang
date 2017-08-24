@@ -4,6 +4,7 @@ module snabb-softwire-v2 {
 
   import ietf-inet-types { prefix inet; }
   import ietf-yang-types { prefix yang; }
+  import ietf-alarms { prefix al; }
 
   organization "Igalia, S.L.";
   contact "Jessica Tallon <tsyesika@igalia.com>";
@@ -400,6 +401,289 @@ module snabb-softwire-v2 {
       leaf out-ipv6-packets {
         type yang:zero-based-counter64;
         description "All valid outgoing IPv6 packets.";
+      }
+
+      container alarms {
+        description
+          "Container for alarms status information. The container is composed of
+           four major subcontainers: alarm-inventory, alarm-list, summary and
+           shelved-alarms";
+
+        container alarm-inventory {
+          config false;
+          description
+            "This list contains all possible alarm types for the system.
+            If the system knows for wich resources a a specific alarm
+            type can appear, this is also identified in the inventory.
+            The list also tells if each alarm type has a corresponding
+            clear state.  The inventory shall only contain concrete
+            alarm types.
+
+            The alarm inventory MUST be updated by the system when new
+            alarms can appear.  This can be the case when installing new
+            software modules or inserting new card types.  A
+            notification 'alarm-inventory-changed' is sent when the
+            inventory is changed.";
+
+          list alarm-type {
+            key "alarm-type-id alarm-type-qualifier";
+            description
+              "An entry in this list defines a possible alarm.";
+            leaf alarm-type-id {
+              type al:alarm-type-id;
+              mandatory true;
+              description
+                "The statically defined alarm type identifier for this
+                possible alarm.";
+            }
+            leaf alarm-type-qualifier {
+              type al:alarm-type-qualifier;
+              description
+                "The optionally dynamically defined alarm type identifier
+                for this possible alarm.";
+            }
+            leaf-list resource {
+              type string;
+              description
+                "Optionally, specifies for which resources the alarm type
+                is valid.  This string is for human consumption but
+                SHOULD refer to paths in the model.";
+            }
+            leaf has-clear {
+              type boolean;
+              mandatory true;
+              description
+                "This leaf tells the operator if the alarm will be
+                cleared when the correct corrective action has been
+                taken.  Implementations SHOULD strive for detecting the
+                cleared state for all alarm types.  If this leaf is
+                true, the operator can monitor the alarm until it
+                becomes cleared after the corrective action has been
+                taken.  If this leaf is false the operator needs to
+                validate that the alarm is not longer active using other
+                mechanisms.  Alarms can lack a corresponding clear due
+                to missing instrumentation or that there is no logical
+                corresponding clear state.";
+            }
+            leaf description {
+              type string;
+              mandatory true;
+              description
+                "A description of the possible alarm.  It SHOULD include
+                information on possible underlying root causes and
+                corrective actions.";
+            }
+          }
+        }
+
+        container summary {
+          config false;
+          description
+            "This container gives a summary of number of alarms
+            and shelved alarms";
+          list alarm-summary {
+            key severity;
+            description
+              "A global summary of all alarms in the system.";
+            leaf severity {
+              type al:severity;
+              description
+                "Alarm summary for this severity level.";
+            }
+            leaf total {
+              type yang:gauge32;
+              description
+                "Total number of alarms of this severity level.";
+            }
+            leaf cleared {
+              type yang:gauge32;
+              description
+                "For this severity level, the number of alarms that are
+                cleared.";
+            }
+            leaf cleared-not-closed {
+              if-feature al:operator-actions;
+              type yang:gauge32;
+              description
+                "For this severity level, the number of alarms that are
+                cleared but not closed.";
+            }
+            leaf cleared-closed {
+              if-feature al:operator-actions;
+              type yang:gauge32;
+              description
+                "For this severity level, the number of alarms that are
+                cleared and closed.";
+            }
+            leaf not-cleared-closed {
+              if-feature al:operator-actions;
+              type yang:gauge32;
+              description
+                "For this severity level, the number of alarms that are
+                not cleared but closed.";
+            }
+            leaf not-cleared-not-closed {
+              if-feature al:operator-actions;
+              type yang:gauge32;
+              description
+                "For this severity level, the number of alarms that are
+                not cleared and not closed.";
+            }
+          }
+          leaf shelves-active {
+            if-feature al:alarm-shelving;
+            type empty;
+            description
+              "This is a hint to the operator that there are active
+              alarm shelves.  This leaf MUST exist if the
+              alarms/shelved-alarms/number-of-shelved-alarms is > 0.";
+          }
+        }
+
+        container alarm-list {
+          config false;
+          description
+            "The alarms in the system.";
+          leaf number-of-alarms {
+            type yang:gauge32;
+            description
+              "This object shows the total number of
+              alarms in the system, i.e., the total number
+              of entries in the alarm list.";
+          }
+
+          leaf last-changed {
+            type yang:date-and-time;
+            description
+              "A timestamp when the alarm list was last
+              changed.  The value can be used by a manager to
+              initiate an alarm resynchronization procedure.";
+          }
+
+          list alarm {
+            key "resource alarm-type-id alarm-type-qualifier";
+
+            description
+              "The list of alarms.  Each entry in the list holds one
+              alarm for a given alarm type and resource.
+              An alarm can be updated from the underlying resource or
+              by the user.  The following leafs are maintained by the
+              resource:  is-cleared, last-change, perceived-severity,
+              and alarm-text.  An operator can change: operator-state
+                and operator-text.
+
+                Entries appear in the alarm list the first time an
+                alarm becomes active for a given alarm-type and resource.
+                Entries do not get deleted when the alarm is cleared, this
+                is a boolean state in the alarm.
+
+                Alarm entries are removed, purged, from the list by an
+                explicit purge action.  For example, delete all alarms
+                that are cleared and in closed operator-state that are
+                older than 24 hours.  Systems may also remove alarms based
+                on locally configured policies which is out of scope for
+                this module.";
+            leaf time-created {
+              type yang:date-and-time;
+              mandatory true;
+              description
+                "The time-stamp when this alarm entry was created. This
+                represents the first time the alarm appeared, it can
+                also represent that the alarm re-appeared after a purge.
+                Further state-changes of the same alarm does not change
+                this leaf, these changes will update the 'last-changed'
+                leaf.";
+            }
+
+            uses al:common-alarm-parameters;
+            uses al:resource-alarm-parameters;
+
+            list operator-state-change {
+              if-feature al:operator-actions;
+              key time;
+              description
+                "This list is used by operators to indicate
+                the state of human intervention on an alarm.
+                For example, if an operator has seen an alarm,
+                  the operator can add a new item to this list indicating
+                    that the alarm is acknowledged.";
+              uses al:operator-parameters;
+            }
+
+            action set-operator-state {
+              if-feature al:operator-actions;
+              description
+                "This is a means for the operator to indicate
+                the level of human intervention on an alarm.";
+              input {
+                leaf state {
+                  type operator-state;
+                  mandatory true;
+                  description
+                    "Set this operator state.";
+                }
+                leaf text {
+                  type string;
+                  description
+                    "Additional optional textual information.";
+                }
+              }
+            }
+          }
+        }
+
+        container shelved-alarms {
+          if-feature al:alarm-shelving;
+          config false;
+          description
+            "The shelved alarms.  Alarms appear here if they match the
+            criterias in /alarms/control/alarm-shelving.  This list does
+            not generate any notifications.  The list represents alarms
+            that are considered not relevant by the operator.  Alarms in
+            this list have an operator-state of 'shelved'.  This can not
+            be changed.";
+          leaf number-of-shelved-alarms {
+            type yang:gauge32;
+            description
+              "This object shows the total number of currently
+              alarms, i.e., the total number of entries
+              in the alarm list.";
+          }
+
+          leaf alarm-shelf-last-changed {
+            type yang:date-and-time;
+            description
+              "A timestamp when the shelved alarm list was last
+              changed.  The value can be used by a manager to
+              initiate an alarm resynchronization procedure.";
+          }
+
+          list shelved-alarm {
+            key "resource alarm-type-id alarm-type-qualifier";
+
+            description
+              "The list of shelved alarms.  Each entry in the list holds
+              one alarm for a given alarm type and resource.  An alarm
+              can be updated from the underlying resource or by the
+              user.  These changes are reflected in different lists
+              below the corresponding alarm.";
+
+            uses al:common-alarm-parameters;
+            uses al:resource-alarm-parameters;
+
+            list operator-state-change {
+              if-feature al:operator-actions;
+              key time;
+              description
+                "This list is used by operators to indicate
+                the state of human intervention on an alarm.
+                For example, if an operator has seen an alarm,
+                  the operator can add a new item to this list indicating
+                    that the alarm is acknowledged.";
+              uses al:operator-parameters;
+            }
+          }
+        }
       }
     }
   }
@@ -840,6 +1124,97 @@ module snabb-softwire-v2 {
         leaf date {
           type yang:date-and-time;
           description "Timestamp of last change.";
+        }
+      }
+    }
+
+    container alarms {
+      description
+        "Container for alarms configuration information";
+
+      container control {
+        description
+          "Configuration to control the alarm behaviour.";
+
+        leaf max-alarm-status-changes {
+          type union {
+            type uint16;
+            type enumeration {
+              enum infinite {
+                description
+                  "The status change entries are accumulated
+                  infinitely.";
+              }
+            }
+          }
+          default 32;
+          description
+            "The status-change entries are kept in a circular list
+            per alarm.  When this number is exceeded, the oldest
+            status change entry is automatically removed.  If the
+            value is 'infinite', the status change entries are
+            accumulated infinitely.";
+        }
+
+        leaf notify-status-changes {
+          type boolean;
+          default false;
+          description
+            "This leaf controls whether notifications are sent on all
+            alarm status updates, e.g., updated perceived-severity or
+            alarm-text.  By default the notifications are only sent
+            when a new alarm is raised, re-raised after being cleared
+            and when an alarm is cleared.";
+        }
+        container alarm-shelving {
+          if-feature al:alarm-shelving;
+          description
+            "This list is used to shelve alarms.  The server will move
+            any alarms corresponding to the shelving criteria from the
+            alarms/alarm-list/alarm list to the
+            alarms/shelved-alarms/shelved-alarm list.  It will also
+            stop sending notifications for the shelved alarms.  The
+            conditions in the shelf criteria are logically ANDed.
+            When the shelving criteria is deleted or changed, the
+            non-matching alarms MUST appear in the
+            alarms/alarm-list/alarm list according to the real state.
+            This means that the instrumentation MUST maintain states
+            for the shelved alarms.  Alarms that match the criteria
+              shall have an operator-state 'shelved'.";
+          list shelf {
+            key shelf-name;
+            leaf shelf-name {
+              type string;
+              description
+                "An arbitrary name for the alarm shelf.";
+            }
+            description
+              "Each entry defines the criteria for shelving alarms.
+              Criterias are ANDed.";
+
+            leaf resource {
+              type al:resource;
+              description
+                "Shelve alarms for this resource.";
+            }
+            leaf alarm-type-id {
+              type al:alarm-type-id;
+              description
+                "Shelve alarms for this alarm type identifier.";
+            }
+            leaf alarm-type-qualifier {
+              type al:alarm-type-qualifier;
+              description
+                "Shelve alarms for this alarm type qualifier.";
+            }
+            leaf description {
+              type string;
+              description
+                "An optional textual description of the shelf.  This
+                description should include the reason for shelving
+                these alarms.";
+            }
+          }
         }
       }
     }

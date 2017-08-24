@@ -1,6 +1,7 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
+local lib = require("core.lib")
 local parser = require("lib.yang.parser")
 local util = require("lib.yang.util")
 
@@ -583,13 +584,7 @@ local function schema_from_ast(ast)
    return ret
 end
 
-local function set(...)
-   local ret = {}
-   for k, v in pairs({...}) do ret[v] = true end
-   return ret
-end
-
-local primitive_types = set(
+local primitive_types = lib.set(
    'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64',
    'binary', 'bits', 'boolean', 'decimal64', 'empty', 'enumeration',
    'identityref', 'instance-identifier', 'leafref', 'string', 'union')
@@ -899,9 +894,9 @@ function resolve(schema, features)
 end
 
 local primitive_types = {
-   ['ietf-inet-types']=set('ipv4-address', 'ipv6-address',
+   ['ietf-inet-types']=lib.set('ipv4-address', 'ipv6-address',
                            'ipv4-prefix', 'ipv6-prefix'),
-   ['ietf-yang-types']=set('mac-address')
+   ['ietf-yang-types']=lib.set('mac-address')
 }
 
 -- NB: mutates schema in place!

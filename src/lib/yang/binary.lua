@@ -10,6 +10,7 @@ local stream = require("lib.yang.stream")
 local data = require('lib.yang.data')
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
+local lib = require("core.lib")
 
 local MAGIC = "yangconf"
 local VERSION = 0x00005000
@@ -233,11 +234,7 @@ local function data_emitter(production)
          end
       end
    end
-   local native_types = {
-      enumeration = true,
-      identityref = true,
-      string = true,
-   }
+   local native_types = lib.set('enumeration', 'identityref', 'string')
    function handlers.scalar(production)
       local primitive_type = production.argument_type.primitive_type
       local type = assert(value.types[primitive_type], "unsupported type: "..primitive_type)
@@ -246,6 +243,11 @@ local function data_emitter(production)
          return function(data, stream)
             stream:write_stringref('stringref')
             stream:write_stringref(data)
+         end
+      elseif primitive_type == 'empty' then
+         return function (data, stream)
+            stream:write_stringref('flag')
+            stream:write_uint32(data and 1 or 0)
          end
       elseif type.ctype then
          local ctype = type.ctype
@@ -425,6 +427,10 @@ local function read_compiled_data(stream, strtab)
       local ctype = scalar_type(read_string())
       return stream:read_ptr(ctype)[0]
    end
+   function readers.flag()
+      if stream:read_uint32() ~= 0 then return true end
+      return nil
+   end
    return read1()
 end
 
@@ -511,6 +517,12 @@ function selftest()
             }
          }
       }
+
+      container foo {
+         leaf enable-qos {
+            type empty;
+         }
+      }
    }]])
    local data = data.load_config_for_schema(test_schema, [[
       is-active true;
@@ -527,6 +539,9 @@ function selftest()
       }
       next-hop {
          ipv4 5.6.7.8;
+      }
+      foo {
+         enable-qos;
       }
    ]])
 
