@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local config     = require("core.config")
-local worker     = require("core.worker")
 local leader     = require("apps.config.leader")
 local follower   = require("apps.config.follower")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
@@ -600,9 +599,9 @@ function reconfigurable(scheduling, f, graph, conf, ...)
    local function setup_fn(conf)
       local mapping = {}
       for device, inst_config in pairs(lwutil.produce_instance_configs(conf)) do
-	 local instance_app_graph = config.new()
-	 f(instance_app_graph, inst_config, unpack(args))
-	 mapping[device] = instance_app_graph
+         local instance_app_graph = config.new()
+         f(instance_app_graph, inst_config, unpack(args))
+         mapping[device] = instance_app_graph
       end
       return mapping
    end
@@ -613,14 +612,11 @@ function reconfigurable(scheduling, f, graph, conf, ...)
       print("Bound main process to NUMA node: ", wanted_node)
    end
    
-   function worker_start_fn()
-      local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
-      worker_code = worker_code:format(stringify(scheduling))
-      return worker.start("follower", worker_code)
-   end
+   local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
+   worker_code = worker_code:format(stringify(scheduling))
 
    config.app(graph, 'leader', leader.Leader,
               { setup_fn = setup_fn, initial_configuration = conf,
-                worker_start_fn = worker_start_fn,
+                worker_start_code = worker_code,
                 schema_name = 'snabb-softwire-v2'})
 end
