@@ -34,11 +34,11 @@ local PKT_HAIRPINNED = 2
 
 local debug = lib.getenv("LWAFTR_DEBUG")
 
-local ether_header_t = ffi.typeof([[
+local ethernet_header_t = ffi.typeof([[
    struct {
-      uint8_t  ether_dhost[6];
-      uint8_t  ether_shost[6];
-      uint16_t ether_type;
+      uint8_t  dhost[6];
+      uint8_t  shost[6];
+      uint16_t type;
       uint8_t  payload[0];
    }
 ]])
@@ -66,9 +66,24 @@ local ipv6_header_t = ffi.typeof([[
       uint8_t  dst_ip[16];
    } __attribute__((packed))
 ]])
+local ipv6_pseudo_header_t = ffi.typeof[[
+struct {
+   char src_ip[16];
+   char dst_ip[16];
+   uint32_t payload_length;
+   uint32_t next_header;
+} __attribute__((packed))
+]]
+local icmp_header_t = ffi.typeof [[
+struct {
+   uint8_t type;
+   uint8_t code;
+   int16_t checksum;
+} __attribute__((packed))
+]]
 
-local ether_header_ptr_t = ffi.typeof("$*", ether_header_t)
-local ether_header_size = ffi.sizeof(ether_header_t)
+local ethernet_header_ptr_t = ffi.typeof("$*", ethernet_header_t)
+local ethernet_header_size = ffi.sizeof(ethernet_header_t)
 
 local ipv4_header_ptr_t = ffi.typeof("$*", ipv4_header_t)
 local ipv4_header_size = ffi.sizeof(ipv4_header_t)
@@ -76,16 +91,24 @@ local ipv4_header_size = ffi.sizeof(ipv4_header_t)
 local ipv6_header_ptr_t = ffi.typeof("$*", ipv6_header_t)
 local ipv6_header_size = ffi.sizeof(ipv6_header_t)
 
+local ipv6_header_ptr_t = ffi.typeof("$*", ipv6_header_t)
+local ipv6_header_size = ffi.sizeof(ipv6_header_t)
+
+local icmp_header_t = ffi.typeof("$*", icmp_header_t)
+local icmp_header_size = ffi.sizeof(icmp_header_t)
+
+local ipv6_pseudo_header_size = ffi.sizeof(ipv6_pseudo_header_t)
+
 -- Local bindings for constants that are used in the hot path of the
 -- data plane.  Not having them here is a 1-2% performance penalty.
 local n_ethertype_ipv4 = constants.n_ethertype_ipv4
 local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 
 local function get_ethernet_payload(pkt)
-   return pkt.data + ether_header_size
+   return pkt.data + ethernet_header_size
 end
 local function get_ethernet_payload_length(pkt)
-   return pkt.length - ether_header_size
+   return pkt.length - ethernet_header_size
 end
 
 local o_ipv4_checksum = constants.o_ipv4_checksum
@@ -177,14 +200,20 @@ local function get_icmp_payload(ptr)
    return ptr + constants.icmp_base_size
 end
 
-function write_eth_header(dst_ptr, eth_type)
-   local eth_hdr = ffi.cast(ether_header_ptr_t, dst_ptr)
-   ffi.fill(eth_hdr.ether_shost, 6, 0)
-   ffi.fill(eth_hdr.ether_dhost, 6, 0)
-   eth_hdr.ether_type = eth_type
+local function write_ethernet_header(pkt, ether_type)
+   local h = ffi.cast(ethernet_header_ptr_t, pkt.data)
+   ffi.fill(h.shost, 6, 0)
+   ffi.fill(h.dhost, 6, 0)
+   h.type = ether_type
 end
 
-function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_type, payload_length)
+local function prepend_ethernet_header(pkt, ether_type)
+   pkt = packet.shiftright(pkt, ethernet_header_size)
+   write_ethernet_header(pkt, ether_type)
+   return pkt
+end
+
+local function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_type, payload_length)
    local ipv6_hdr = ffi.cast(ipv6_header_ptr_t, dst_ptr)
    ffi.fill(ipv6_hdr, ffi.sizeof(ipv6_hdr), 0)
    lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6)            -- IPv6 Version
@@ -197,15 +226,15 @@ function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_t
 end
 
 local function calculate_icmp_payload_size(dst_pkt, initial_pkt, max_size, config)
-   local original_bytes_to_skip = ether_header_size
+   local original_bytes_to_skip = ethernet_header_size
    if config.extra_payload_offset then
       original_bytes_to_skip = original_bytes_to_skip + config.extra_payload_offset
    end
    local payload_size = initial_pkt.length - original_bytes_to_skip
    local non_payload_bytes = dst_pkt.length + constants.icmp_base_size
    local full_pkt_size = payload_size + non_payload_bytes
-   if full_pkt_size > max_size + ether_header_size then
-      full_pkt_size = max_size + ether_header_size
+   if full_pkt_size > max_size + ethernet_header_size then
+      full_pkt_size = max_size + ethernet_header_size
       payload_size = full_pkt_size - non_payload_bytes
    end
    return payload_size, original_bytes_to_skip, non_payload_bytes
@@ -251,20 +280,19 @@ function new_icmpv4_packet(from_ip, to_ip, initial_pkt, config)
    dgram:push(ipv4_header)
    new_pkt = dgram:packet()
    ipv4_header:free()
-   new_pkt = packet.shiftright(new_pkt, ether_header_size)
-   write_eth_header(new_pkt.data, constants.n_ethertype_ipv4)
+   new_pkt = prepend_ethernet_header(new_pkt, n_ethertype_ipv4)
 
    -- Generate RFC 1812 ICMPv4 packets, which carry as much payload as they can,
    -- rather than RFC 792 packets, which only carry the original IPv4 header + 8 octets
    write_icmp(new_pkt, initial_pkt, constants.max_icmpv4_packet_size, 0, config)
 
    -- Fix up the IPv4 total length and checksum
-   local new_ipv4_len = new_pkt.length - ether_header_size
-   local ip_tl_p = new_pkt.data + ether_header_size + constants.o_ipv4_total_length
+   local new_ipv4_len = new_pkt.length - ethernet_header_size
+   local ip_tl_p = new_pkt.data + ethernet_header_size + constants.o_ipv4_total_length
    wr16(ip_tl_p, ntohs(new_ipv4_len))
-   local ip_checksum_p = new_pkt.data + ether_header_size + constants.o_ipv4_checksum
+   local ip_checksum_p = new_pkt.data + ethernet_header_size + constants.o_ipv4_checksum
    wr16(ip_checksum_p,  0) -- zero out the checksum before recomputing
-   local csum = checksum.ipsum(new_pkt.data + ether_header_size, new_ipv4_len, 0)
+   local csum = checksum.ipsum(new_pkt.data + ethernet_header_size, new_ipv4_len, 0)
    wr16(ip_checksum_p, htons(csum))
 
    return new_pkt
@@ -277,8 +305,7 @@ function new_icmpv6_packet(from_ip, to_ip, initial_pkt, config)
                                  next_header = constants.proto_icmpv6,
                                  src = from_ip, dst = to_ip})
    dgram:push(ipv6_header)
-   new_pkt = packet.shiftright(dgram:packet(), ether_header_size)
-   write_eth_header(new_pkt.data, constants.n_ethertype_ipv6)
+   new_pkt = prepend_ethernet_header(dgram:packet(), n_ethertype_ipv6)
 
    local max_size = constants.max_icmpv6_packet_size
    local ph_len = calculate_icmp_payload_size(new_pkt, initial_pkt, max_size, config) + constants.icmp_base_size
@@ -287,8 +314,8 @@ function new_icmpv6_packet(from_ip, to_ip, initial_pkt, config)
    ph_csum = band(bnot(ph_csum), 0xffff)
    write_icmp(new_pkt, initial_pkt, max_size, ph_csum, config)
 
-   local new_ipv6_len = new_pkt.length - (constants.ipv6_fixed_header_size + ether_header_size)
-   local ip_pl_p = new_pkt.data + ether_header_size + constants.o_ipv6_payload_len
+   local new_ipv6_len = new_pkt.length - (constants.ipv6_fixed_header_size + ethernet_header_size)
+   local ip_pl_p = new_pkt.data + ethernet_header_size + constants.o_ipv6_payload_len
    wr16(ip_pl_p, ntohs(new_ipv6_len))
 
    ipv6_header:free()
@@ -688,10 +715,10 @@ function LwAftr:encapsulate_and_transmit(pkt, ipv6_dst, ipv6_src, pkt_src_link)
    local l3_header = get_ethernet_payload(pkt)
    local dscp_and_ecn = get_ipv4_dscp_and_ecn(l3_header)
    -- Note that this may invalidate any pointer into pkt.data.  Be warned!
-   pkt = packet.shiftright(pkt, ipv6_fixed_header_size)
+   pkt = packet.shiftright(pkt, ipv6_header_size)
+   write_ethernet_header(pkt, n_ethertype_ipv6)
    -- Fetch possibly-moved L3 header location.
    l3_header = get_ethernet_payload(pkt)
-   write_eth_header(pkt.data, n_ethertype_ipv6)
    write_ipv6_header(l3_header, ipv6_src, ipv6_dst,
                      dscp_and_ecn, next_hdr_type, payload_length)
 
@@ -924,7 +951,7 @@ function LwAftr:flush_decapsulation()
          -- Source softwire is valid; decapsulate and forward.
          -- Note that this may invalidate any pointer into pkt.data.  Be warned!
          pkt = packet.shiftleft(pkt, ipv6_fixed_header_size)
-         write_eth_header(pkt.data, n_ethertype_ipv4)
+         write_ethernet_header(pkt, n_ethertype_ipv4)
          self:transmit_ipv4(pkt)
       else
          counter.add(self.shm["drop-no-source-softwire-ipv6-bytes"], pkt.length)
