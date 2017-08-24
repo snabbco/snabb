@@ -213,16 +213,17 @@ local function prepend_ethernet_header(pkt, ether_type)
    return pkt
 end
 
-local function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_type, payload_length)
-   local ipv6_hdr = ffi.cast(ipv6_header_ptr_t, dst_ptr)
-   ffi.fill(ipv6_hdr, ffi.sizeof(ipv6_hdr), 0)
-   lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6)            -- IPv6 Version
-   lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, dscp_and_ecn) -- Traffic class
-   ipv6_hdr.payload_length = htons(payload_length)
-   ipv6_hdr.next_header = next_hdr_type
-   ipv6_hdr.hop_limit = constants.default_ttl
-   ipv6_hdr.src_ip = ipv6_src
-   ipv6_hdr.dst_ip = ipv6_dst
+local function write_ipv6_header(ptr, src, dst, tc, next_header, payload_length)
+   local h = ffi.cast(ipv6_header_ptr_t, ptr)
+   h.v_tc_fl = 0
+   lib.bitfield(32, h, 'v_tc_fl', 0, 4, 6)   -- IPv6 Version
+   lib.bitfield(32, h, 'v_tc_fl', 4, 8, tc)  -- Traffic class
+   lib.bitfield(32, h, 'v_tc_fl', 12, 20, 0) -- Flow label
+   h.payload_length = htons(payload_length)
+   h.next_header = next_header
+   h.hop_limit = constants.default_ttl
+   h.src_ip = src
+   h.dst_ip = dst
 end
 
 local function calculate_icmp_payload_size(dst_pkt, initial_pkt, max_size, config)
@@ -697,8 +698,6 @@ function LwAftr:encapsulate_and_transmit(pkt, ipv6_dst, ipv6_src, pkt_src_link)
 
    if debug then print("ipv6", ipv6_src, ipv6_dst) end
 
-   local next_hdr_type = proto_ipv4
-
    if self:encapsulating_packet_with_df_flag_would_exceed_mtu(pkt) then
       counter.add(self.shm["drop-over-mtu-but-dont-fragment-ipv4-bytes"], pkt.length)
       counter.add(self.shm["drop-over-mtu-but-dont-fragment-ipv4-packets"])
@@ -713,14 +712,15 @@ function LwAftr:encapsulate_and_transmit(pkt, ipv6_dst, ipv6_src, pkt_src_link)
 
    local payload_length = get_ethernet_payload_length(pkt)
    local l3_header = get_ethernet_payload(pkt)
-   local dscp_and_ecn = get_ipv4_dscp_and_ecn(l3_header)
+   local traffic_class = get_ipv4_dscp_and_ecn(l3_header)
    -- Note that this may invalidate any pointer into pkt.data.  Be warned!
    pkt = packet.shiftright(pkt, ipv6_header_size)
    write_ethernet_header(pkt, n_ethertype_ipv6)
    -- Fetch possibly-moved L3 header location.
    l3_header = get_ethernet_payload(pkt)
-   write_ipv6_header(l3_header, ipv6_src, ipv6_dst,
-                     dscp_and_ecn, next_hdr_type, payload_length)
+
+   write_ipv6_header(l3_header, ipv6_src, ipv6_dst, traffic_class,
+                     proto_ipv4, payload_length)
 
    if debug then
       print("encapsulated packet:")
