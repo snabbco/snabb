@@ -34,35 +34,31 @@ local PKT_HAIRPINNED = 2
 
 local debug = lib.getenv("LWAFTR_DEBUG")
 
-local ethernet_header_type = ffi.typeof([[
+local ether_header_t = ffi.typeof([[
    struct {
       uint8_t  ether_dhost[6];
       uint8_t  ether_shost[6];
       uint16_t ether_type;
+      uint8_t  payload[0];
    }
 ]])
-local ethernet_header_ptr_type = ffi.typeof("$*", ethernet_header_type)
-local ethernet_header_size = ffi.sizeof(ethernet_header_type)
-
-local ipv4_header_type = ffi.typeof[[
-struct {
-  uint16_t ihl_v_tos; // ihl:4, version:4, tos(dscp:6 + ecn:2)
-  uint16_t total_length;
-  uint16_t id;
-  uint16_t frag_off; // flags:3, fragmen_offset:13
-  uint8_t  ttl;
-  uint8_t  protocol;
-  uint16_t checksum;
-  uint8_t  src_ip[4];
-  uint8_t  dst_ip[4];
-} __attribute__((packed))
-]]
-local ipv4_header_ptr_type = ffi.typeof("$*", ipv4_header_type)
-local ipv4_header_size = ffi.sizeof(ipv4_header_type)
-
-local ipv6_ptr_type = ffi.typeof([[
+local ipv4_header_t = ffi.typeof [[
    struct {
-      uint32_t v_tc_fl; // version, tc, flow_label
+      uint8_t version_and_ihl;       // version:4, ihl:4
+      uint8_t dscp_and_ecn;          // dscp:6, ecn:2
+      uint16_t total_length;
+      uint16_t id;
+      uint16_t flags_and_fragment_offset;  // flags:3, fragment_offset:13
+      uint8_t  ttl;
+      uint8_t  protocol;
+      uint16_t checksum;
+      uint8_t  src_ip[4];
+      uint8_t  dst_ip[4];
+   } __attribute__((packed))
+]]
+local ipv6_header_t = ffi.typeof([[
+   struct {
+      uint32_t v_tc_fl;             // version:4, traffic class:8, flow label:20
       uint16_t payload_length;
       uint8_t  next_header;
       uint8_t  hop_limit;
@@ -70,8 +66,15 @@ local ipv6_ptr_type = ffi.typeof([[
       uint8_t  dst_ip[16];
    } __attribute__((packed))
 ]])
-local ipv6_header_ptr_type = ffi.typeof("$*", ipv6_ptr_type)
-local ipv6_header_size = ffi.sizeof(ipv6_ptr_type)
+
+local ether_header_ptr_t = ffi.typeof("$*", ether_header_t)
+local ether_header_size = ffi.sizeof(ether_header_t)
+
+local ipv4_header_ptr_t = ffi.typeof("$*", ipv4_header_t)
+local ipv4_header_size = ffi.sizeof(ipv4_header_t)
+
+local ipv6_header_ptr_t = ffi.typeof("$*", ipv6_header_t)
+local ipv6_header_size = ffi.sizeof(ipv6_header_t)
 
 -- Local bindings for constants that are used in the hot path of the
 -- data plane.  Not having them here is a 1-2% performance penalty.
@@ -79,10 +82,10 @@ local n_ethertype_ipv4 = constants.n_ethertype_ipv4
 local n_ethertype_ipv6 = constants.n_ethertype_ipv6
 
 local function get_ethernet_payload(pkt)
-   return pkt.data + ethernet_header_size
+   return pkt.data + ether_header_size
 end
 local function get_ethernet_payload_length(pkt)
-   return pkt.length - ethernet_header_size
+   return pkt.length - ether_header_size
 end
 
 local o_ipv4_checksum = constants.o_ipv4_checksum
@@ -175,14 +178,14 @@ local function get_icmp_payload(ptr)
 end
 
 function write_eth_header(dst_ptr, eth_type)
-   local eth_hdr = ffi.cast(ethernet_header_ptr_type, dst_ptr)
+   local eth_hdr = ffi.cast(ether_header_ptr_t, dst_ptr)
    ffi.fill(eth_hdr.ether_shost, 6, 0)
    ffi.fill(eth_hdr.ether_dhost, 6, 0)
    eth_hdr.ether_type = eth_type
 end
 
 function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_type, payload_length)
-   local ipv6_hdr = ffi.cast(ipv6_header_ptr_type, dst_ptr)
+   local ipv6_hdr = ffi.cast(ipv6_header_ptr_t, dst_ptr)
    ffi.fill(ipv6_hdr, ffi.sizeof(ipv6_hdr), 0)
    lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6)            -- IPv6 Version
    lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, dscp_and_ecn) -- Traffic class
@@ -194,15 +197,15 @@ function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_t
 end
 
 local function calculate_icmp_payload_size(dst_pkt, initial_pkt, max_size, config)
-   local original_bytes_to_skip = ethernet_header_size
+   local original_bytes_to_skip = ether_header_size
    if config.extra_payload_offset then
       original_bytes_to_skip = original_bytes_to_skip + config.extra_payload_offset
    end
    local payload_size = initial_pkt.length - original_bytes_to_skip
    local non_payload_bytes = dst_pkt.length + constants.icmp_base_size
    local full_pkt_size = payload_size + non_payload_bytes
-   if full_pkt_size > max_size + ethernet_header_size then
-      full_pkt_size = max_size + ethernet_header_size
+   if full_pkt_size > max_size + ether_header_size then
+      full_pkt_size = max_size + ether_header_size
       payload_size = full_pkt_size - non_payload_bytes
    end
    return payload_size, original_bytes_to_skip, non_payload_bytes
@@ -248,7 +251,7 @@ function new_icmpv4_packet(from_ip, to_ip, initial_pkt, config)
    dgram:push(ipv4_header)
    new_pkt = dgram:packet()
    ipv4_header:free()
-   new_pkt = packet.shiftright(new_pkt, ethernet_header_size)
+   new_pkt = packet.shiftright(new_pkt, ether_header_size)
    write_eth_header(new_pkt.data, constants.n_ethertype_ipv4)
 
    -- Generate RFC 1812 ICMPv4 packets, which carry as much payload as they can,
@@ -256,12 +259,12 @@ function new_icmpv4_packet(from_ip, to_ip, initial_pkt, config)
    write_icmp(new_pkt, initial_pkt, constants.max_icmpv4_packet_size, 0, config)
 
    -- Fix up the IPv4 total length and checksum
-   local new_ipv4_len = new_pkt.length - ethernet_header_size
-   local ip_tl_p = new_pkt.data + ethernet_header_size + constants.o_ipv4_total_length
+   local new_ipv4_len = new_pkt.length - ether_header_size
+   local ip_tl_p = new_pkt.data + ether_header_size + constants.o_ipv4_total_length
    wr16(ip_tl_p, ntohs(new_ipv4_len))
-   local ip_checksum_p = new_pkt.data + ethernet_header_size + constants.o_ipv4_checksum
+   local ip_checksum_p = new_pkt.data + ether_header_size + constants.o_ipv4_checksum
    wr16(ip_checksum_p,  0) -- zero out the checksum before recomputing
-   local csum = checksum.ipsum(new_pkt.data + ethernet_header_size, new_ipv4_len, 0)
+   local csum = checksum.ipsum(new_pkt.data + ether_header_size, new_ipv4_len, 0)
    wr16(ip_checksum_p, htons(csum))
 
    return new_pkt
@@ -274,7 +277,7 @@ function new_icmpv6_packet(from_ip, to_ip, initial_pkt, config)
                                  next_header = constants.proto_icmpv6,
                                  src = from_ip, dst = to_ip})
    dgram:push(ipv6_header)
-   new_pkt = packet.shiftright(dgram:packet(), ethernet_header_size)
+   new_pkt = packet.shiftright(dgram:packet(), ether_header_size)
    write_eth_header(new_pkt.data, constants.n_ethertype_ipv6)
 
    local max_size = constants.max_icmpv6_packet_size
@@ -284,8 +287,8 @@ function new_icmpv6_packet(from_ip, to_ip, initial_pkt, config)
    ph_csum = band(bnot(ph_csum), 0xffff)
    write_icmp(new_pkt, initial_pkt, max_size, ph_csum, config)
 
-   local new_ipv6_len = new_pkt.length - (constants.ipv6_fixed_header_size + ethernet_header_size)
-   local ip_pl_p = new_pkt.data + ethernet_header_size + constants.o_ipv6_payload_len
+   local new_ipv6_len = new_pkt.length - (constants.ipv6_fixed_header_size + ether_header_size)
+   local ip_pl_p = new_pkt.data + ether_header_size + constants.o_ipv6_payload_len
    wr16(ip_pl_p, ntohs(new_ipv6_len))
 
    ipv6_header:free()
