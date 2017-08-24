@@ -20,6 +20,15 @@ local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
 local alarm_codec = require("apps.config.alarm_codec")
+local alarms = require("lib.yang.alarms")
+
+alarms.add_to_inventory {
+  [{alarm_type_id='arp-resolution', alarm_type_qualifier=''}] = {
+    resource={'external-interface'},
+    has_clear=true,
+    description='Raise up if ARP app cannot resolve IP address'
+  }
+}
 
 local C = ffi.C
 local receive, transmit = link.receive, link.transmit

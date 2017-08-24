@@ -27,6 +27,15 @@ local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6     = require("lib.protocol.ipv6")
+local alarms = require("lib.yang.alarms")
+
+alarms.add_to_inventory {
+   [{alarm_type_id='ndp-resolution', alarm_type_qualifier=''}] = {
+      resource={'internal-interface'},
+      has_clear=true,
+      description='Raise up if NDP app cannot resolve IPv6 address'
+   }
+}
 
 local htons, ntohs = lib.htons, lib.ntohs
 local htonl, ntohl = lib.htonl, lib.ntohl

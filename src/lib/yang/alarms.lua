@@ -4,7 +4,9 @@ local data = require('lib.yang.data')
 local util = require('lib.yang.util')
 
 local state = {
-   alarm_inventory = {},
+   alarm_inventory = {
+      alarm_type = {},
+   },
 }
 
 function get_state ()
@@ -34,14 +36,12 @@ function alarm_type_keys:fetch (alarm_type_id, alarm_type_qualifier)
    return key
 end
 
-local function load_default_configuration ()
-   local content = require("apps.lwaftr.alarms.lwaftr_default_alarms.inc")
-   local conf = data.load_state_for_schema_by_name('ietf-alarms', content)
-   return conf.alarms
+function add_to_inventory (alarm_types)
+   for k,v in pairs(alarm_types) do
+      local key = alarm_type_keys:fetch(k.alarm_type_id, k.alarm_type_qualifier)
+      state.alarm_inventory.alarm_type[key] = v
+   end
 end
-
-local default = load_default_configuration()
-state.alarm_inventory = default.alarm_inventory
 
 ---
 
@@ -66,6 +66,7 @@ function selftest ()
       return size
    end
 
+   require("apps.ipv4.arp")
    assert(table_size(state.alarm_inventory.alarm_type) > 0)
 
    print("ok")
