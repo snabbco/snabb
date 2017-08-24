@@ -3,8 +3,8 @@ module(..., package.seeall)
 local bt = require("apps.lwaftr.binding_table")
 local constants = require("apps.lwaftr.constants")
 local lwdebug = require("apps.lwaftr.lwdebug")
-local lwheader = require("apps.lwaftr.lwheader")
 local lwutil = require("apps.lwaftr.lwutil")
+local lwtypes = require("apps.lwaftr.lwtypes")
 
 local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
@@ -26,7 +26,6 @@ local rd16, wr16, rd32, wr32 = lwutil.rd16, lwutil.wr16, lwutil.rd32, lwutil.wr3
 local ipv6_equals = lwutil.rd16, lwutil.wr16, lwutil.rd32, lwutil.ipv6_equals
 local is_ipv4, is_ipv6 = lwutil.is_ipv4, lwutil.is_ipv6
 local htons, ntohs, ntohl = lib.htons, lib.ntohs, lib.ntohl
-local write_eth_header, write_ipv6_header = lwheader.write_eth_header, lwheader.write_ipv6_header
 local is_ipv4_fragment, is_ipv6_fragment = lwutil.is_ipv4_fragment, lwutil.is_ipv6_fragment
 
 -- Note whether an IPv4 packet is actually coming from the internet, or from
@@ -138,7 +137,26 @@ local function get_icmp_payload(ptr)
    return ptr + constants.icmp_base_size
 end
 
-local function calculate_payload_size(dst_pkt, initial_pkt, max_size, config)
+function write_eth_header(dst_ptr, eth_type)
+   local eth_hdr = ffi.cast(lwtypes.ethernet_header_ptr_type, dst_ptr)
+   ffi.fill(eth_hdr.ether_shost, 6, 0)
+   ffi.fill(eth_hdr.ether_dhost, 6, 0)
+   eth_hdr.ether_type = eth_type
+end
+
+function write_ipv6_header(dst_ptr, ipv6_src, ipv6_dst, dscp_and_ecn, next_hdr_type, payload_length)
+   local ipv6_hdr = ffi.cast(lwtypes.ipv6_header_ptr_type, dst_ptr)
+   ffi.fill(ipv6_hdr, ffi.sizeof(ipv6_hdr), 0)
+   lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 0, 4, 6)            -- IPv6 Version
+   lib.bitfield(32, ipv6_hdr, 'v_tc_fl', 4, 8, dscp_and_ecn) -- Traffic class
+   ipv6_hdr.payload_length = htons(payload_length)
+   ipv6_hdr.next_header = next_hdr_type
+   ipv6_hdr.hop_limit = constants.default_ttl
+   ipv6_hdr.src_ip = ipv6_src
+   ipv6_hdr.dst_ip = ipv6_dst
+end
+
+local function calculate_icmp_payload_size(dst_pkt, initial_pkt, max_size, config)
    local original_bytes_to_skip = ethernet_header_size
    if config.extra_payload_offset then
       original_bytes_to_skip = original_bytes_to_skip + config.extra_payload_offset
@@ -159,7 +177,7 @@ end
 
 local function write_icmp(dst_pkt, initial_pkt, max_size, base_checksum, config)
    local payload_size, original_bytes_to_skip, non_payload_bytes =
-      calculate_payload_size(dst_pkt, initial_pkt, max_size, config)
+      calculate_icmp_payload_size(dst_pkt, initial_pkt, max_size, config)
    local off = dst_pkt.length
    dst_pkt.data[off] = config.type
    dst_pkt.data[off + 1] = config.code
@@ -223,7 +241,7 @@ function new_icmpv6_packet(from_ip, to_ip, initial_pkt, config)
    write_eth_header(new_pkt.data, constants.n_ethertype_ipv6)
 
    local max_size = constants.max_icmpv6_packet_size
-   local ph_len = calculate_payload_size(new_pkt, initial_pkt, max_size, config) + constants.icmp_base_size
+   local ph_len = calculate_icmp_payload_size(new_pkt, initial_pkt, max_size, config) + constants.icmp_base_size
    local ph = ipv6_header:pseudo_header(ph_len, constants.proto_icmpv6)
    local ph_csum = checksum.ipsum(ffi.cast("uint8_t*", ph), ffi.sizeof(ph), 0)
    ph_csum = band(bnot(ph_csum), 0xffff)
