@@ -28,8 +28,6 @@ local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6     = require("lib.protocol.ipv6")
 
-local constants = require("apps.lwaftr.constants")
-
 local htons, ntohs = lib.htons, lib.ntohs
 local htonl, ntohl = lib.htonl, lib.ntohl
 local receive, transmit = link.receive, link.transmit

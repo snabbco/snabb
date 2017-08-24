@@ -16,7 +16,6 @@ local lib = require("core.lib")
 local band, bnot = bit.band, bit.bnot
 local C = ffi.C
 local wr16, wr32 = lwutil.wr16, lwutil.wr32
-local get_ihl_from_offset = lwutil.get_ihl_from_offset
 local htons, ntohs = lib.htons, lib.ntohs
 local write_eth_header = lwheader.write_eth_header
 
