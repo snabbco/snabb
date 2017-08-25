@@ -244,8 +244,15 @@ end
 -- Clear alarm.
 
 function clear_alarm (key)
-   print('clear alarm')
-   assert(type(key) == 'table')
+   assert(key)
+   local args = {is_cleared = true}
+   key = alarm_keys:normalize(key)
+   local alarm = lookup_alarm(key)
+   if not alarm then
+      create_alarm(key, args)
+   else
+      update_alarm(alarm, args)
+   end
 end
 
 ---
@@ -314,6 +321,26 @@ function selftest ()
    raise_alarm(key, {alarm_text='new text'})
    assert(table_size(alarm.status_change) == number_of_status_change + 1)
    assert(alarm.alarm_text == 'new text')
+
+   -- Clear alarm. Should clear alarm and create a new status change in the alarm.
+   local alarm = state.alarm_list.alarm[key]
+   local number_of_status_change = table_size(alarm.status_change)
+   assert(not alarm.is_cleared)
+   sleep(1)
+   clear_alarm(key)
+   assert(alarm.is_cleared)
+   assert(table_size(alarm.status_change) == number_of_status_change + 1)
+
+   -- Clear alarm again. Nothing should change.
+   local alarm = state.alarm_list.alarm[key]
+   local last_changed = alarm.last_changed
+   local number_of_status_change = table_size(alarm.status_change)
+   assert(alarm.is_cleared)
+   clear_alarm(key)
+   assert(alarm.is_cleared)
+   assert(table_size(alarm.status_change) == number_of_status_change,
+          table_size(alarm.status_change).." == "..number_of_status_change)
+   assert(alarm.last_changed == last_changed)
 
    print("ok")
 end
