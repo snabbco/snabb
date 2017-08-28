@@ -72,16 +72,16 @@ function Leader:set_initial_configuration (configuration)
    self.current_in_place_dependencies = {}
 
    -- Start the followers and configure them.
-   local follower_configurations = self.setup_fn(configuration)
+   local worker_app_graphs = self.setup_fn(configuration)
 
    -- Calculate the dependences
-   self.in_place_dependencies =
+   self.current_in_place_dependencies =
       self.support.update_mutable_objects_embedded_in_app_initargs (
-            app_graph.new(), follower_configurations, self.schema_name, 'load',
+	    {}, worker_app_graphs, self.schema_name, 'load',
             '/', self.current_configuration)
-   
+
    -- Iterate over followers starting the workers and queuing up actions.
-   for id, config in pairs(follower_configurations) do
+   for id, config in pairs(worker_app_graphs) do
       local follower_pid = self:start_worker()
       self.followers[id] = { pid=follower_pid, queue={}, graph=config}
 
@@ -435,19 +435,19 @@ function Leader:update_configuration (update_fn, verb, path, ...)
    local to_restart =
       self.support.compute_apps_to_restart_after_configuration_update (
          self.schema_name, self.current_configuration, verb, path,
-         self.in_place_dependencies, ...)
+         self.current_in_place_dependencies, ...)
    local new_config = update_fn(self.current_configuration, ...)
-   local new_graph = self.setup_fn(new_config, ...)
+   local new_graphs = self.setup_fn(new_config, ...)
    for id, follower in pairs(self.followers) do
       local actions = self.support.compute_config_actions(
-         follower.graph, new_graph[id], to_restart, verb, path, ...)
+         follower.graph, new_graphs[id], to_restart, verb, path, ...)
       self:enqueue_config_actions_for_follower(id, actions)
-      follower.graph = new_graph[id]
+      follower.graph = new_graphs[id]
    end
    self.current_configuration = new_config
-   self.in_place_dependencies =
+   self.current_in_place_dependencies =
       self.support.update_mutable_objects_embedded_in_app_initargs (
-         self.in_place_dependencies, new_graph, verb, path, ...)
+         self.current_in_place_dependencies, new_graphs, verb, path, ...)
 end
 
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)

@@ -101,9 +101,7 @@ end
 local function record_mutable_objects_embedded_in_app_initarg (id, name, obj, accum)
    local function record(obj)
       local tab = accum[obj]
-      local debugit = true
       if not tab then
-         debugit = false
          tab = {}
          accum[obj] = tab
       end
@@ -128,8 +126,9 @@ local function record_mutable_objects_embedded_in_app_initarg (id, name, obj, ac
    visit(obj)
 end
 
--- Takes a table of follower ids (app_graph_map) and returns
--- "in-place dependencies": a table mapping mutable object -> list of app names
+-- Takes a table of follower ids (app_graph_map) and returns a tabl≈e which has
+-- the follower id as the key and a table listing all app names
+--   i.e. {follower_id => {app name, ...}, ...}
 local function compute_mutable_objects_embedded_in_app_initargs (app_graph_map)
    local deps = {}
    for id, app_graph in pairs(app_graph_map) do
