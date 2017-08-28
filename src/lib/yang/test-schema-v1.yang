@@ -13,4 +13,14 @@ module test-schema-v1 {
       }
     }
   }
+
+  container test-list  {
+    list entry {
+      key "ip01 port01";
+      leaf ip01    { type inet:ipv4-address; mandatory true; }
+      leaf port01  { type uint16; mandatory true; }
+      leaf ip02    { type inet:ipv4-address; mandatory true; }
+      leaf port02  { type uint16; mandatory true; }
+    }
+  }
 }

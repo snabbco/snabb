@@ -1,8 +1,5 @@
-test-config {
-  ports{
-    port-range{
-      start 1024;
-      end 32000;
-    }
-  }
+test-list {
+  entry{ip01 192.168.1.195; port01 22; ip02 192.168.11.229; port02 22; }
+  entry{ip01 192.168.1.194; port01 80; ip02 192.168.11.230; port02 80; }
 }
+
