@@ -29,16 +29,24 @@ Rand.u32 = (function()
 end)()
 
 function Rand:selftest()
-	local pmu = require("lib.pmu")
-	local v = 0
-	local million = 1000000
-	local start = C.get_time_ns()
-	pmu.profile(function()
-		for i=0, 500*million do
-			v = Rand.u32(v)
-		end
-	end, {}, { random_u32 = 500*million })
-	print((C.get_time_ns() - start)/(500*million))
+   local pmu = require("lib.pmu")
+   local v = 0
+   local million = 1000000
+   local function test()
+      for i=0, 500*million do
+         v = Rand.u32(v)
+      end
+   end
+   local avail, err = pmu.is_available()
+   local start = C.get_time_ns()
+   if not avail then
+      print("PMU not available:")
+      print("  "..err)
+      test()
+   else
+      pmu.profile(test, {}, { random_u32 = 500*million })
+   end
+   print(tonumber((C.get_time_ns() - start))/(500*million))
 end
 
 return Rand
