@@ -19,7 +19,6 @@ local lib      = require("core.lib")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
-local alarm_codec = require("apps.config.alarm_codec")
 local alarms = require("lib.yang.alarms")
 
 alarms.add_to_inventory {
@@ -28,6 +27,16 @@ alarms.add_to_inventory {
     has_clear=true,
     description='Raise up if ARP app cannot resolve IP address'
   }
+}
+local resolve_alarm = alarms.declare_alarm {
+   [{resource='external-interface', alarm_type_id='arp-resolution', alarm_type_qualifier=''}] = {
+      perceived_severity = 'critical',
+      alarm_text =
+         'Make sure you can resolve external-interface.next-hop.ip address '..
+         'manually.  If it cannot be resolved, consider setting the MAC '..
+         'address of the next-hop directly.  To do it so, set '..
+         'external-interface.next-hop.mac to the value of the MAC address.',
+   },
 }
 
 local C = ffi.C
@@ -158,8 +167,7 @@ end
 function ARP:arp_resolving (ip)
    print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.next_ip)))
    if self.alarm_notification then
-      local key = {resource='external-interface', alarm_type_id='arp-resolution'}
-      alarm_codec.raise_alarm(key)
+      resolve_alarm:raise()
    end
 end
 
@@ -180,8 +188,7 @@ end
 function ARP:arp_resolved (ip, mac)
    print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(ip), ethernet:ntop(mac)))
    if self.alarm_notification then
-      local key = {resource='external-interface', alarm_type_id='arp-resolution'}
-      alarm_codec.clear_alarm(key)
+      resolve_alarm:clear()
    end
 end
 
