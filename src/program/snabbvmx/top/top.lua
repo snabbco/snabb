@@ -5,7 +5,6 @@ local ffi = require("ffi")
 local lib = require("core.lib")
 local counters = require("program.lwaftr.coutners")
 local lwutil = require("apps.lwaftr.lwutil")
-local lwtypes = require("apps.lwaftr.lwtypes")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
