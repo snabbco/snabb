@@ -133,9 +133,7 @@ local args_attrs = {'perceived_severity', 'alarm_text'}
 local function normalize (t, attrs)
    t = t or {}
    local ret = {}
-   for _, k in ipairs(attrs) do
-      table.insert(ret, t[k])
-   end
+   for i, k in ipairs(attrs) do ret[i] = t[k] end
    return ret
 end
 local function normalize_key (t)
@@ -217,6 +215,9 @@ function selftest ()
 
    test_raise_alarm()
    test_clear_alarm()
+
+   local a, b = unpack(normalize({b='foo'}, {'a', 'b'}))
+   assert(a == nil and b == 'foo')
 
    print('selftest: ok')
 end
