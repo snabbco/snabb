@@ -31,6 +31,16 @@ idle and available for expiry.  The default is 300 seconds.
 *Optional*.  Period at which an active, non-idle flow should produce
 export records.  The default is 120 seconds.
 
+— Key **flush_timeout**
+
+*Optional*.  Maximum number of seconds after which queued data records
+are exported.  If set to a positive value, data records are queued
+until a flow export packet of maximum size according to the configured
+**mtu** can be generated or **flush_timeout** seconds have passed
+since the last export packet was generated, whichever occurs first.
+If set to zero, data records are exported immediately after each scan
+of the flow cache.  The default is 10 seconds.
+
 — Key **cache_size**
 
 *Optional*.  Initial size of flow tables, in terms of number of flows.

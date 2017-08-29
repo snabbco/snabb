@@ -129,6 +129,9 @@ FlowSet = {}
 
 function FlowSet:new (template, args)
    local o = { template = template,
+               flush_timer = (args.flush_timeout > 0 and
+                                 lib.throttle(args.flush_timeout))
+                  or function () return true end,
                idle_timeout = assert(args.idle_timeout),
                active_timeout = assert(args.active_timeout) }
 
@@ -286,13 +289,14 @@ function FlowSet:expire_records(out, now)
    end
    self.expiry_cursor = cursor
 
-   self:flush_data_records(out)
+   if self.flush_timer() then self:flush_data_records(out) end
 end
 
 IPFIX = {}
 local ipfix_config_params = {
    idle_timeout = { default = 300 },
    active_timeout = { default = 120 },
+   flush_timeout = { default = 10 },
    cache_size = { default = 20000 },
    -- RFC 5153 §6.2 recommends a 10-minute template refresh
    -- configurable from 1 minute to 1 day.
@@ -341,7 +345,8 @@ function IPFIX:new(config)
                            version = config.ipfix_version,
                            cache_size = config.cache_size,
                            idle_timeout = config.idle_timeout,
-                           active_timeout = config.active_timeout }
+                           active_timeout = config.active_timeout,
+                           flush_timeout = config.flush_timeout }
 
    o.flow_sets = {}
    for _, template in ipairs(config.templates) do
@@ -464,7 +469,8 @@ function selftest()
    local ethertype_ipv6 = consts.ethertype_ipv6
    local ipfix = IPFIX:new({ exporter_ip = "192.168.1.2",
                              collector_ip = "192.168.1.1",
-                             collector_port = 4739 })
+                             collector_port = 4739,
+                             flush_timeout = 0 })
 
    -- Mock input and output.
    local input_name, input = new_internal_link('ipfix selftest input')
