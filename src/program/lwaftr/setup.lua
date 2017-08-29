@@ -1,7 +1,6 @@
 module(..., package.seeall)
 
 local config     = require("core.config")
-local worker     = require("core.worker")
 local leader     = require("apps.config.leader")
 local follower   = require("apps.config.follower")
 local Intel82599 = require("apps.intel.intel_app").Intel82599
@@ -29,8 +28,8 @@ local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local S          = require("syscall")
 local engine     = require("core.app")
 local lib        = require("core.lib")
+local shm        = require("core.shm")
 local yang       = require("lib.yang.yang")
-
 
 local alarm_notification = false
 
@@ -236,12 +235,11 @@ local function link_sink(c, v4_out, v6_out)
 end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local v4_pci, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[v4_pci].queue.values[1]
+   local v4_pci, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[v4_pci].queue.values[1]
    local v6_pci = queue.external_interface.device
    validate_pci_devices({v4_pci, v6_pci})
-   lwaftr_app(c, lwaftr_config, v4_pci)
+   lwaftr_app(c, conf, v4_pci)
 
    config.app(c, v4_nic_name, Intel82599, {
       pciaddr=v4_pci,
@@ -261,11 +259,10 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_on_a_stick(c, conf, args)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local pciaddr, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[pciaddr].queue.values[1]
+   local pciaddr, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[pciaddr].queue.values[1]
    validate_pci_devices({pciaddr})
-   lwaftr_app(c, lwaftr_config, pciaddr)
+   lwaftr_app(c, conf, pciaddr)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
       args.v6_nic_name, args.v4v6, args.mirror
 
@@ -309,11 +306,10 @@ function load_on_a_stick(c, conf, args)
 end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local v4_pci, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[v4_pci].queue.values[1]
+   local v4_pci, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[v4_pci].queue.values[1]
    local v6_pci = queue.external_device.device
-   lwaftr_app(c, lwaftr_config, device)
+   lwaftr_app(c, conf, device)
 
    validate_pci_devices({v4_pci, v6_pci})
    config.app(c, v4_nic_name, VirtioNet, {
@@ -330,10 +326,9 @@ function load_virt(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, v4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, v6_pcap)
@@ -367,10 +362,9 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
 end
 
 function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -421,10 +415,9 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
 end
 
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -461,10 +454,9 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
 end
 
 function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -505,10 +497,9 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
 end
 
 function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
-   local inst_configs = lwutil.produce_instance_configs(conf)
-   local device, lwaftr_config = next(inst_configs)
-   local queue = lwaftr_config.softwire_config.instance[device].queue.values[1]
-   lwaftr_app(c, lwaftr_config, device)
+   local device, _ = next(conf.softwire_config.instance)
+   local queue = conf.softwire_config.instance[device].queue.values[1]
+   lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
    config.app(c, "capturev6", pcap.PcapReader, inv6_pcap)
@@ -615,6 +606,51 @@ local function stringify(x)
    return table.concat(ret)
 end
 
+-- Takes a function (which takes a follower PID) and starts sampling
+--
+-- The function searches for followers of the leader and when a new one
+-- appears it calls the sampling function (passed in) with the follower
+-- PID to begin the sampling. The sampling function should look like:
+--    function(pid, write_header)
+-- If write_header is false it should not write a new header.
+function start_sampling(sample_fn)
+   local header_written = false
+   local followers = {}
+   local function find_followers()
+      local ret = {}
+      local mypid = S.getpid()
+      for _, name in ipairs(shm.children("/")) do
+         local pid = tonumber(name)
+         if pid ~= nil and shm.exists("/"..pid.."/group") then
+            local path = S.readlink(shm.root.."/"..pid.."/group")
+            local parent = tonumber(lib.basename(lib.dirname(path)))
+            if parent == mypid then
+               ret[pid] = true
+            end
+         end
+      end
+      return ret
+   end
+
+   local function sample_for_new_followers()
+      local new_followers = find_followers()
+      for pid, _ in pairs(new_followers) do
+         if followers[pid] == nil then
+            if not pcall(sample_fn, pid, (not header_written)) then
+               new_followers[pid] = nil
+               io.stderr:write("Waiting on follower "..pid..
+                  " to start ".."before recording statistics...\n")
+            else
+               header_written = true
+            end
+         end
+      end
+      followers = new_followers
+   end
+   timer.activate(timer.new('start_sampling', sample_for_new_followers,
+      1e9, 'repeating'))
+end
+
 function reconfigurable(scheduling, f, graph, conf, ...)
    local args = {...}
 
@@ -622,9 +658,13 @@ function reconfigurable(scheduling, f, graph, conf, ...)
    alarm_notification = true
 
    local function setup_fn(conf)
-      local graph = config.new()
-      f(graph, conf, unpack(args))
-      return graph
+      local mapping = {}
+      for device, inst_config in pairs(lwutil.produce_instance_configs(conf)) do
+         local instance_app_graph = config.new()
+         f(instance_app_graph, inst_config, unpack(args))
+         mapping[device] = instance_app_graph
+      end
+      return mapping
    end
 
    if scheduling.cpu then
@@ -632,14 +672,12 @@ function reconfigurable(scheduling, f, graph, conf, ...)
       numa.bind_to_numa_node(wanted_node)
       print("Bound main process to NUMA node: ", wanted_node)
    end
-
+   
    local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
    worker_code = worker_code:format(stringify(scheduling))
 
-   local follower_pid = worker.start("follower", worker_code)
-
    config.app(graph, 'leader', leader.Leader,
               { setup_fn = setup_fn, initial_configuration = conf,
-                follower_pids = { follower_pid },
+                worker_start_code = worker_code,
                 schema_name = 'snabb-softwire-v2'})
 end

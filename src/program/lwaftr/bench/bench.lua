@@ -5,7 +5,9 @@ local config = require("core.config")
 local lib = require("core.lib")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local setup = require("program.lwaftr.setup")
+local shm = require("core.shm")
 local S = require("syscall")
+
 
 function show_usage(code)
    print(require("program.lwaftr.bench.README_inc"))
@@ -37,6 +39,23 @@ function parse_args(args)
    return opts, scheduling, unpack(args)
 end
 
+-- Finds current followers for leader (note it puts the pid as the key)
+local function find_followers()
+   local followers = {}
+   local mypid = S.getpid()
+   for _, name in ipairs(shm.children("/")) do
+      local pid = tonumber(name)
+      if pid ~= nil and shm.exists("/"..pid.."/group") then
+         local path = S.readlink(shm.root.."/"..pid.."/group")
+         local parent = tonumber(lib.basename(lib.dirname(path)))
+         if parent == mypid then
+            followers[pid] = true
+         end
+      end
+   end
+   return followers
+end
+
 function run(args)
    local opts, scheduling, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
    local conf = setup.read_config(conf_file)
@@ -52,25 +71,14 @@ function run(args)
 			inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
    app.configure(graph)
 
-   local function start_sampling_for_pid(pid)
+   local function start_sampling_for_pid(pid, write_header)
       local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra, pid)
       csv:add_app('sinkv4', { 'input' }, { input=opts.hydra and 'decap' or 'Decap.' })
       csv:add_app('sinkv6', { 'input' }, { input=opts.hydra and 'encap' or 'Encap.' })
-      csv:activate()
+      csv:activate(write_header)
    end
-   for _,pid in ipairs(app.configuration.apps['leader'].arg.follower_pids) do
-      -- The worker will be fed its configuration by the
-      -- leader, but we don't know when that will all be ready.
-      -- Just retry if this doesn't succeed.
-      local function start_sampling()
-	 if not pcall(start_sampling_for_pid, pid) then
-	    io.stderr:write("Waiting on follower "..pid.." to start "..
-			       "before recording statistics...\n")
-	    timer.activate(timer.new('retry_csv', start_sampling, 1e9))
-	 end
-      end
-      timer.activate(timer.new('spawn_csv_stats', start_sampling, 10e6))
-   end
-
+   
+   setup.start_sampling(start_sampling_for_pid)
+   
    app.main({duration=opts.duration})
 end

@@ -15,6 +15,7 @@ local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
 local app = require("core.app")
 local shm = require("core.shm")
+local worker = require("core.worker")
 local app_graph = require("core.config")
 local action_codec = require("apps.config.action_codec")
 local alarm_codec = require("apps.config.alarm_codec")
@@ -29,7 +30,7 @@ Leader = {
       -- Could relax this requirement.
       initial_configuration = {required=true},
       schema_name = {required=true},
-      follower_pids = {required=true},
+      worker_start_code = {required=true},
       Hz = {default=100},
    }
 }
@@ -58,10 +59,8 @@ function Leader:new (conf)
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
+   ret.worker_start_code = conf.worker_start_code
    ret.followers = {}
-   for _,pid in ipairs(conf.follower_pids) do
-      table.insert(ret.followers, { pid=pid, queue={} })
-   end
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
 
@@ -72,16 +71,31 @@ end
 
 function Leader:set_initial_configuration (configuration)
    self.current_configuration = configuration
-   self.current_app_graph = self.setup_fn(configuration)
    self.current_in_place_dependencies = {}
+
+   -- Start the followers and configure them.
+   local worker_app_graphs = self.setup_fn(configuration)
+
+   -- Calculate the dependences
    self.current_in_place_dependencies =
       self.support.update_mutable_objects_embedded_in_app_initargs (
-         {}, self.current_app_graph, self.schema_name, 'load', '/',
-         self.current_configuration)
-   local initial_app_graph = app_graph.new() -- Empty.
-   local actions = self.support.compute_config_actions(
-      initial_app_graph, self.current_app_graph, {}, 'load')
-   self:enqueue_config_actions(actions)
+	    {}, worker_app_graphs, self.schema_name, 'load',
+            '/', self.current_configuration)
+
+   -- Iterate over followers starting the workers and queuing up actions.
+   for id, config in pairs(worker_app_graphs) do
+      local follower_pid = self:start_worker()
+      self.followers[id] = { pid=follower_pid, queue={}, graph=config}
+
+      -- Configure the follower.
+      local actions = self.support.compute_config_actions(
+	     app_graph.new(), self.followers[id].graph, {}, 'load')
+      self:enqueue_config_actions_for_follower(id, actions)
+   end
+end
+
+function Leader:start_worker()
+   return worker.start("follower", self.worker_start_code)
 end
 
 function Leader:take_follower_message_queue ()
@@ -92,17 +106,17 @@ end
 
 local verbose = os.getenv('SNABB_LEADER_VERBOSE') and true
 
-function Leader:enqueue_config_actions (actions)
-   local messages = {}
+function Leader:enqueue_config_actions_for_follower(follower, actions)
    for _,action in ipairs(actions) do
       if verbose then print('encode', action[1], unpack(action[2])) end
       local buf, len = action_codec.encode(action)
-      table.insert(messages, { buf=buf, len=len })
+      table.insert(self.followers[follower].queue, { buf=buf, len=len })
    end
-   for _,follower in ipairs(self.followers) do
-      for _,message in ipairs(messages) do
-         table.insert(follower.queue, message)
-      end
+end
+
+function Leader:enqueue_config_actions (actions)
+   for id,_ in pairs(self.followers) do
+      self.enqueue_config_actions_for_follower(id, actions)
    end
 end
 
@@ -425,16 +439,17 @@ function Leader:update_configuration (update_fn, verb, path, ...)
          self.schema_name, self.current_configuration, verb, path,
          self.current_in_place_dependencies, ...)
    local new_config = update_fn(self.current_configuration, ...)
-   local new_app_graph = self.setup_fn(new_config)
-   local actions = self.support.compute_config_actions(
-      self.current_app_graph, new_app_graph, to_restart, verb, path, ...)
-   self:enqueue_config_actions(actions)
-   self.current_app_graph = new_app_graph
+   local new_graphs = self.setup_fn(new_config, ...)
+   for id, follower in pairs(self.followers) do
+      local actions = self.support.compute_config_actions(
+         follower.graph, new_graphs[id], to_restart, verb, path, ...)
+      self:enqueue_config_actions_for_follower(id, actions)
+      follower.graph = new_graphs[id]
+   end
    self.current_configuration = new_config
    self.current_in_place_dependencies =
       self.support.update_mutable_objects_embedded_in_app_initargs (
-         self.current_in_place_dependencies, self.current_app_graph,
-         verb, path, ...)
+         self.current_in_place_dependencies, new_graphs, verb, path, ...)
 end
 
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
@@ -699,7 +714,7 @@ function Leader:handle_calls_from_peers()
 end
 
 function Leader:send_messages_to_followers()
-   for _,follower in ipairs(self.followers) do
+   for _,follower in pairs(self.followers) do
       if not follower.channel then
          local name = '/'..tostring(follower.pid)..'/config-follower-channel'
          local success, channel = pcall(channel.open, name)
@@ -770,6 +785,15 @@ function Leader:stop ()
    S.unlink(self.socket_file_name)
 end
 
+function test_worker()
+   local follower = require("apps.config.follower")
+   local myconf = config.new()
+   config.app(myconf, "follower", follower.Follower, {})
+   app.configure(myconf)
+   app.busywait = true
+   app.main({})
+end
+
 function selftest ()
    print('selftest: apps.config.leader')
    local graph = app_graph.new()
@@ -779,25 +803,20 @@ function selftest ()
       app_graph.app(graph, "source", basic_apps.Source, {})
       app_graph.app(graph, "sink", basic_apps.Sink, {})
       app_graph.link(graph, "source.foo -> sink.bar")
-      return graph
+      return {graph}
    end
+   local worker_start_code = "require('apps.config.leader').test_worker()"
    app_graph.app(graph, "leader", Leader,
-                 {setup_fn=setup_fn, follower_pids={S.getpid()},
+                 {setup_fn=setup_fn, worker_start_code=worker_start_code,
                   -- Use a schema with no data nodes, just for
                   -- testing.
                   schema_name='ietf-inet-types', initial_configuration={}})
-   app_graph.app(graph, "follower", require('apps.config.follower').Follower,
-                 {})
    engine.configure(graph)
    engine.main({ duration = 0.05, report = {showapps=true,showlinks=true}})
-   assert(app.app_table.source)
-   assert(app.app_table.sink)
-   assert(app.link_table["source.foo -> sink.bar"])
+   assert(app.app_table.leader.followers[1])
+   assert(app.app_table.leader.followers[1].graph.links)
+   assert(app.app_table.leader.followers[1].graph.links["source.foo -> sink.bar"])
    local link = app.link_table["source.foo -> sink.bar"]
-   local counter = require('core.counter')
-   assert(counter.read(link.stats.txbytes) > 0)
-   assert(counter.read(link.stats.txbytes) == counter.read(link.stats.rxbytes))
-   assert(counter.read(link.stats.txdrop) == 0)
    engine.configure(app_graph.new())
    print('selftest: ok')
 end

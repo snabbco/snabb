@@ -186,7 +186,7 @@ function run(args)
    end
 
    if opts.verbosity >= 1 then
-      function add_csv_stats_for_pid(pid)
+      function add_csv_stats_for_pid(pid, write_header)
          local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra, pid)
          -- Link names like "tx" are from the app's perspective, but
          -- these labels are from the perspective of the lwAFTR as a
@@ -202,22 +202,9 @@ function run(args)
             csv:add_app('inetNic', { 'tx', 'rx' }, { tx=ipv4_tx, rx=ipv4_rx })
             csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx=ipv6_tx, rx=ipv6_rx })
          end
-         csv:activate()
+         csv:activate(write_header)
       end
-      local pids = engine.configuration.apps['leader'].arg.follower_pids
-      for _,pid in ipairs(pids) do
-	 local function start_sampling()
-	    -- The worker will be fed its configuration by the
-	    -- leader, but we don't know when that will all be ready.
-	    -- Just retry if this doesn't succeed.
-	    if not pcall(add_csv_stats_for_pid, pid) then
-	       io.stderr:write("Waiting on follower "..pid.." to start "..
-				  "before recording statistics...\n")
-	       timer.activate(timer.new('retry_csv', start_sampling, 2e9))
-	    end
-	 end
-	 timer.activate(timer.new('spawn_csv_stats', start_sampling, 50e6))
-      end
+      setup.start_sampling(add_csv_stats_for_pid)
    end
 
    if opts.ingress_drop_monitor then
