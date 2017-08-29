@@ -36,7 +36,7 @@ function RateLimitedRepeater:set_rate (bit_rate)
    self.rate = math.max(bit_rate, 0)
 end
 
-function RateLimitedRepeater:pull ()
+function RateLimitedRepeater:push ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
       local p = receive(i)
