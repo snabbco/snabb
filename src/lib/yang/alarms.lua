@@ -5,7 +5,7 @@ local lib = require('core.lib')
 local util = require('lib.yang.util')
 local alarm_codec = require('apps.config.alarm_codec')
 
-local iso_8601 = util.iso_8601
+local format_date_as_iso_8601 = util.format_date_as_iso_8601
 
 local state = {
    alarm_inventory = {
@@ -108,9 +108,14 @@ local function table_size (t)
 end
 
 -- Contains a table with all the declared alarms.
-local alarm_list = {}
+local alarm_list = {
+   list = {},
+}
+function alarm_list:new (key, alarm)
+   self.list[key] = alarm
+end
 function alarm_list:lookup (key)
-   return alarm_list[key]
+   return alarm_list.list[key]
 end
 function alarm_list:copy (src, args)
    local ret = {}
@@ -129,7 +134,7 @@ function declare_alarm (alarm)
    local key
    for k, v in pairs(alarm) do
       key = alarm_keys:normalize(k)
-      alarm_list[key] = v
+      alarm_list:new(key, v)
    end
    function alarm:raise (args)
       alarm_codec.raise_alarm(key, args)
@@ -156,13 +161,13 @@ end
 
 -- Creates a new alarm.
 --
--- The alarm is retrieved from the db of predefined alarms. Default values got
+-- The alarm is retrieved from the db of predefined alarms. Default values get
 -- overridden by args. Additional fields are initialized too and an initial
 -- status change is added to the alarm.
 local function new_alarm (key, args)
    local ret = assert(alarm_list:retrieve(key, args), 'Not supported alarm')
    local status = {
-      time = iso_8601(),
+      time = format_date_as_iso_8601(),
       perceived_severity = args.perceived_severity or ret.perceived_severity,
       alarm_text = args.alarm_text or ret.alarm_text,
    }
@@ -203,7 +208,7 @@ end
 local function update_alarm (alarm, args)
    if needs_status_change(alarm, args) then
       local status = {
-         time = assert(iso_8601()),
+         time = assert(format_date_as_iso_8601()),
          perceived_severity = assert(args.perceived_severity or alarm.perceived_severity),
          alarm_text = assert(args.alarm_text or alarm.alarm_text),
       }

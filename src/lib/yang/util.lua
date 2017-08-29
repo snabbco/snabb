@@ -138,7 +138,7 @@ local function gmtime ()
    return now + timediff
 end
 
-function iso_8601 (time)
+function format_date_as_iso_8601 (time)
    time = time or gmtime()
    return os.date("%Y-%m-%dT%H:%M:%SZ", time)
 end
