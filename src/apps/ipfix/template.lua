@@ -159,6 +159,13 @@ local function get_ipv4_ihl(l3)
    return bit.band((l3 + o_ipv4_ver_and_ihl)[0], 0x0f)
 end
 
+local function get_ipv4_total_length(l3)
+   return ntohs(ffi.cast(uint16_ptr_t, l3 + o_ipv4_total_length)[0])
+end
+local function get_ipv6_payload_length(l3)
+   return ntohs(ffi.cast(uint16_ptr_t, l3 + o_ipv6_payload_len)[0])
+end
+
 local function get_ipv4_protocol(l3)    return l3[o_ipv4_proto] end
 local function get_ipv6_next_header(l3) return l3[o_ipv6_next_header] end
 
@@ -226,8 +233,7 @@ function v4.extract(pkt, timestamp, entry)
    entry.value.flowStartMilliseconds = timestamp
    entry.value.flowEndMilliseconds = timestamp
    entry.value.packetDeltaCount = 1
-   -- Measure bytes starting with the IP header.
-   entry.value.octetDeltaCount = pkt.length - ethernet_header_size
+   entry.value.octetDeltaCount = get_ipv4_total_length(l3)
 end
 
 function v4.accumulate(dst, new)
@@ -287,8 +293,8 @@ function v6.extract(pkt, timestamp, entry)
    entry.value.flowStartMilliseconds = timestamp
    entry.value.flowEndMilliseconds = timestamp
    entry.value.packetDeltaCount = 1
-   -- Measure bytes starting with the IP header.
-   entry.value.octetDeltaCount = pkt.length - ethernet_header_size
+   entry.value.octetDeltaCount = get_ipv6_payload_length(l3)
+      + ipv6_fixed_header_size
 end
 
 function v6.accumulate(dst, new)
