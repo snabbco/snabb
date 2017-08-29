@@ -96,6 +96,9 @@ end
 
 function gre:new_from_mem (mem, size)
    local o = gre:superClass().new_from_mem(self, mem, size)
+   if o == nil then
+      return nil
+   end
    local header = o._header
    local data = header.box[0]
    -- Reserved bits and version MUST be zero.  We don't support

@@ -11,11 +11,11 @@ local lwaftr     = require("apps.lwaftr.lwaftr")
 local lwutil     = require("apps.lwaftr.lwutil")
 local basic_apps = require("apps.basic.basic_apps")
 local pcap       = require("apps.pcap.pcap")
-local ipv4_apps  = require("apps.lwaftr.ipv4_apps")
+local ipv4_echo  = require("apps.ipv4.echo")
 local ipv4_fragment   = require("apps.ipv4.fragment")
 local ipv4_reassemble = require("apps.ipv4.reassemble")
 local arp        = require("apps.ipv4.arp")
-local ipv6_apps  = require("apps.lwaftr.ipv6_apps")
+local ipv6_echo  = require("apps.ipv6.echo")
 local ipv6_fragment   = require("apps.ipv6.fragment")
 local ipv6_reassemble = require("apps.ipv6.reassemble")
 local ndp        = require("apps.lwaftr.ndp")
@@ -29,11 +29,20 @@ local S          = require("syscall")
 local engine     = require("core.app")
 local lib        = require("core.lib")
 local shm        = require("core.shm")
+local yang       = require("lib.yang.yang")
 
+local alarm_notification = false
 
-
-local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
+local capabilities = {
+   ['ietf-softwire']={feature={'binding', 'br'}},
+   ['ietf-alarms']={feature={'operator-actions', 'alarm-shelving', 'alarm-history'}},
+}
 require('lib.yang.schema').set_default_capabilities(capabilities)
+
+function read_config(filename)
+   return yang.load_configuration(filename,
+                                  {schema_name=lwaftr.LwAftr.yang_schema})
+end
 
 local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
@@ -114,9 +123,9 @@ function lwaftr_app(c, conf, device)
                    ginternal_interface.reassembly.max_packets,
                 max_fragments_per_reassembly =
                    ginternal_interface.reassembly.max_fragments_per_packet })
-   config.app(c, "icmpechov4", ipv4_apps.ICMPEcho,
+   config.app(c, "icmpechov4", ipv4_echo.ICMPEcho,
               { address = convert_ipv4(iexternal_interface.ip) })
-   config.app(c, "icmpechov6", ipv6_apps.ICMPEcho,
+   config.app(c, "icmpechov6", ipv6_echo.ICMPEcho,
               { address = iinternal_interface.ip })
    config.app(c, "lwaftr", lwaftr.LwAftr, conf)
    config.app(c, "fragmenterv4", ipv4_fragment.Fragmenter,
@@ -127,12 +136,14 @@ function lwaftr_app(c, conf, device)
               { self_ip = iinternal_interface.ip,
                 self_mac = iinternal_interface.mac,
                 next_mac = iinternal_interface.next_hop.mac,
-                next_ip = iinternal_interface.next_hop.ip })
+                next_ip = iinternal_interface.next_hop.ip,
+                alarm_notification = conf.alarm_notification })
    config.app(c, "arp", arp.ARP,
               { self_ip = convert_ipv4(iexternal_interface.ip),
                 self_mac = iexternal_interface.mac,
                 next_mac = iexternal_interface.next_hop.mac,
-                next_ip = convert_ipv4(iexternal_interface.next_hop.ip) })
+                next_ip = convert_ipv4(iexternal_interface.next_hop.ip),
+                alarm_notification = conf.alarm_notification })
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
    local preprocessing_apps_v6  = { "reassemblerv6" }
@@ -642,6 +653,9 @@ end
 
 function reconfigurable(scheduling, f, graph, conf, ...)
    local args = {...}
+
+   -- Always enabled in reconfigurable mode.
+   alarm_notification = true
 
    local function setup_fn(conf)
       local mapping = {}

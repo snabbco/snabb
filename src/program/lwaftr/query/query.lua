@@ -7,7 +7,7 @@ local shm = require("core.shm")
 local data = require("lib.yang.data")
 local schema = require("lib.yang.schema")
 local state = require("lib.yang.state")
-local lwcounter = require("apps.lwaftr.lwcounter")
+local counters = require("program.lwaftr.counters")
 local lwutil = require("apps.lwaftr.lwutil")
 local top = require("program.top.top")
 local ps = require("program.ps.ps")
@@ -30,7 +30,7 @@ function parse_args (raw_args)
    local name
    function handlers.h() show_usage(0) end
    function handlers.l ()
-      for _, name in ipairs(sort(keys(lwcounter.counter_names()))) do
+      for _, name in ipairs(sort(keys(counters.counter_names()))) do
          print(name)
       end
       main.exit(0)
@@ -70,7 +70,7 @@ end
 local function print_counters (pid, filter)
    print("lwAFTR operational counters (non-zero)")
    -- Open, read and print whatever counters are in that directory.
-   local counters = lwcounter.read_counters(pid)
+   local counters = counters.read_counters(pid)
    local max_width = max_key_width(counters)
    for _, name in ipairs(sort(keys(counters))) do
       if not skip_counter(name, filter) then

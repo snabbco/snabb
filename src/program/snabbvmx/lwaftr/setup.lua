@@ -7,10 +7,10 @@ local basic_apps = require("apps.basic.basic_apps")
 local bt = require("apps.lwaftr.binding_table")
 local config = require("core.config")
 local ethernet = require("lib.protocol.ethernet")
-local ipv4_apps = require("apps.lwaftr.ipv4_apps")
+local ipv4_echo = require("apps.ipv4.echo")
 local ipv4_fragment = require("apps.ipv4.fragment")
 local ipv4_reassemble = require("apps.ipv4.reassemble")
-local ipv6_apps = require("apps.lwaftr.ipv6_apps")
+local ipv6_echo = require("apps.ipv6.echo")
 local ipv6_fragment = require("apps.ipv6.fragment")
 local ipv6_reassemble = require("apps.ipv6.reassemble")
 local lib = require("core.lib")
@@ -22,6 +22,7 @@ local pci = require("lib.hardware.pci")
 local raw = require("apps.socket.raw")
 local tap = require("apps.tap.tap")
 local pcap = require("apps.pcap.pcap")
+local yang = require("lib.yang.yang")
 
 local fatal, file_exists = lwutil.fatal, lwutil.file_exists
 local dir_exists, nic_exists = lwutil.dir_exists, lwutil.nic_exists
@@ -329,13 +330,14 @@ function passthrough(c, conf, sock_path)
    end
 end
 
-local function load_conf (conf_filename)
+function load_conf (conf_filename)
    local function load_lwaftr_config (conf, conf_filename)
       local filename = conf.lwaftr
       if not file_exists(filename) then
          filename = lib.dirname(conf_filename).."/"..filename
       end
-      return require("apps.lwaftr.conf").load_lwaftr_config(filename)
+      return yang.load_configuration(filename,
+                                     {schema_name=lwaftr.LwAftr.yang_schema})
    end
    local conf = dofile(conf_filename)
    return conf, load_lwaftr_config(conf, conf_filename)

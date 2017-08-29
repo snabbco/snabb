@@ -363,7 +363,7 @@ function IPFIX:add_ipfix_header(pkt, count)
 
    header.version = htons(self.version)
    if self.version == 9 then
-      header.count = htons(count)
+      header.record_count = htons(count)
       header.uptime = htonl(to_milliseconds(engine.now() - self.boot_time))
    elseif self.version == 10 then
       header.byte_length = htons(pkt.length)

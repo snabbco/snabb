@@ -19,6 +19,25 @@ local lib      = require("core.lib")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
+local alarms = require("lib.yang.alarms")
+
+alarms.add_to_inventory {
+  [{alarm_type_id='arp-resolution', alarm_type_qualifier=''}] = {
+    resource={'external-interface'},
+    has_clear=true,
+    description='Raise up if ARP app cannot resolve IP address'
+  }
+}
+local resolve_alarm = alarms.declare_alarm {
+   [{resource='external-interface', alarm_type_id='arp-resolution', alarm_type_qualifier=''}] = {
+      perceived_severity = 'critical',
+      alarm_text =
+         'Make sure you can resolve external-interface.next-hop.ip address '..
+         'manually.  If it cannot be resolved, consider setting the MAC '..
+         'address of the next-hop directly.  To do it so, set '..
+         'external-interface.next-hop.mac to the value of the MAC address.',
+   },
+}
 
 local C = ffi.C
 local receive, transmit = link.receive, link.transmit
@@ -127,7 +146,9 @@ local arp_config_params = {
    -- The next-hop MAC address can be statically configured.
    next_mac = { default=false },
    -- But if the next-hop MAC isn't configured, ARP will figure it out.
-   next_ip  = { default=false }
+   next_ip  = { default=false },
+   -- Emits an alarm notification on arp-resolving and arp-resolved.
+   alarm_notification = { default=false },
 }
 
 function ARP:new(conf)
@@ -143,11 +164,18 @@ function ARP:new(conf)
    return setmetatable(o, {__index=ARP})
 end
 
+function ARP:arp_resolving (ip)
+   print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.next_ip)))
+   if self.alarm_notification then
+      resolve_alarm:raise()
+   end
+end
+
 function ARP:maybe_send_arp_request (output)
    if self.next_mac then return end
    self.next_arp_request_time = self.next_arp_request_time or engine.now()
    if self.next_arp_request_time <= engine.now() then
-      print(("ARP: Resolving '%s'"):format(ipv4:ntop(self.next_ip)))
+      self:arp_resolving(self.next_ip)
       self:send_arp_request(output)
       self.next_arp_request_time = engine.now() + self.arp_request_interval
    end
@@ -155,6 +183,13 @@ end
 
 function ARP:send_arp_request (output)
    transmit(output, packet.clone(self.arp_request_pkt))
+end
+
+function ARP:arp_resolved (ip, mac)
+   print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(ip), ethernet:ntop(mac)))
+   if self.alarm_notification then
+      resolve_alarm:clear()
+   end
 end
 
 function ARP:push()
@@ -182,9 +217,7 @@ function ARP:push()
          elseif ntohs(h.arp.oper) == arp_oper_reply then
             if ipv4_eq(h.arp.spa, self.next_ip) then
                local next_mac = copy_mac(h.arp.sha)
-               print(string.format("ARP: '%s' resolved (%s)",
-                                   ipv4:ntop(self.next_ip),
-                                   ethernet:ntop(next_mac)))
+               self:arp_resolved(self.next_ip, next_mac)
                self.next_mac = next_mac
             end
          else
@@ -196,17 +229,15 @@ function ARP:push()
       end
    end
 
-   for _ = 1, link.nreadable(inorth) do
-      local p = receive(inorth)
-      if not self.next_mac then
-         -- drop all southbound packets until the next hop's ethernet address is known
-         packet.free(p)
-      else
-         local e = ffi.cast(ether_header_ptr_t, p.data)
-         e.dhost = self.next_mac
-         e.shost = self.self_mac
-         transmit(osouth, p)
-      end
+   -- don't read southbound packets until the next hop's ethernet address is known
+   if self.next_mac then
+     for _ = 1, link.nreadable(inorth) do
+        local p = receive(inorth)
+        local e = ffi.cast(ether_header_ptr_t, p.data)
+        e.dhost = self.next_mac
+        e.shost = self.self_mac
+        transmit(osouth, p)
+     end
    end
 end
 

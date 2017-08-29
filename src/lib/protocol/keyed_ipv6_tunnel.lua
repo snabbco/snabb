@@ -83,6 +83,9 @@ end
 
 function tunnel:new_from_mem (mem, size)
    local o = tunnel:superClass().new_from_mem(self, mem, size)
+   if o == nil then
+      return nil
+   end
    if o:session_id() == 0 then
       -- Session ID 0 is reserved for L2TPv3 control messages
       o:free()

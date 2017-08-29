@@ -58,7 +58,7 @@ end
 
 function run(args)
    local opts, scheduling, conf_file, inv4_pcap, inv6_pcap = parse_args(args)
-   local conf = require('apps.lwaftr.conf').load_lwaftr_config(conf_file)
+   local conf = setup.read_config(conf_file)
 
    -- If there is a name defined on the command line, it should override
    -- anything defined in the config.

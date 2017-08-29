@@ -27,8 +27,25 @@ local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6     = require("lib.protocol.ipv6")
+local alarms = require("lib.yang.alarms")
 
-local constants = require("apps.lwaftr.constants")
+alarms.add_to_inventory {
+   [{alarm_type_id='ndp-resolution', alarm_type_qualifier=''}] = {
+      resource={'internal-interface'},
+      has_clear=true,
+      description='Raise up if NDP app cannot resolve IPv6 address'
+   }
+}
+local resolve_alarm = alarms.declare_alarm {
+   [{resource='internal-interface', alarm_type_id='ndp-resolution', alarm_type_qualifier=''}] = {
+      perceived_severity = 'critical',
+      alarm_text =
+         'Make sure you can resolve internal-interface.next-hop.ip address '..
+         'manually.  If it cannot be resolved, consider setting the MAC '..
+         'address of the next-hop directly.  To do it so, set '..
+         'internal-interface.next-hop.mac to the value of the MAC address.',
+   },
+}
 
 local htons, ntohs = lib.htons, lib.ntohs
 local htonl, ntohl = lib.htonl, lib.ntohl
@@ -263,7 +280,9 @@ local ndp_config_params = {
    next_mac  = { default=false },
    -- But if the next-hop MAC isn't configured, NDP will figure it out.
    next_ip   = { default=false },
-   is_router = { default=true }
+   is_router = { default=true },
+   -- Emit alarms if set.
+   alarm_notification = { default=false },
 }
 
 function NDP:new(conf)
@@ -278,14 +297,28 @@ function NDP:new(conf)
    return setmetatable(o, {__index=NDP})
 end
 
+function NDP:ndp_resolving (ip)
+   print(("NDP: Resolving '%s'"):format(ipv6:ntop(ip)))
+   if self.alarm_notification then
+      resolve_alarm:raise()
+   end
+end
+
 function NDP:maybe_send_ns_request (output)
    if self.next_mac then return end
    self.next_ns_time = self.next_ns_time or engine.now()
    if self.next_ns_time <= engine.now() then
-      print(("NDP: Resolving '%s'"):format(ipv6:ntop(self.next_ip)))
+      self:ndp_resolving(self.next_ip)
       transmit(self.output.south,
                make_ns_packet(self.self_mac, self.self_ip, self.next_ip))
       self.next_ns_time = engine.now() + self.ns_interval
+   end
+end
+
+function NDP:ndp_resolved (ip, mac)
+   print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(ip), ethernet:ntop(mac)))
+   if self.alarm_notification then
+      resolve_alarm:clear()
    end
 end
 
@@ -295,8 +328,7 @@ function NDP:resolve_next_hop(next_mac)
    -- link layer address in the NDP options).  Just take the first
    -- one.
    if self.next_mac then return end
-   print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.next_ip),
-                                            ethernet:ntop(next_mac)))
+   self:ndp_resolved(self.next_ip, next_mac)
    self.next_mac = next_mac
 end
 

@@ -780,6 +780,12 @@ function parse (arg, config)
    return ret
 end
 
+function set(...)
+   local ret = {}
+   for k, v in pairs({...}) do ret[v] = true end
+   return ret
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")

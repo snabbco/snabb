@@ -953,6 +953,19 @@ lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
   => {foo=42, bar=43, baz=44}
 ```
 
+- Function **lib.set** *vargs*
+
+Reads a variable number of arguments and returns a table representing a set.
+The returned value can be used to query whether an element belongs or not to
+the set.
+
+Example:
+
+```
+local t = set('foo', 'bar')
+t['foo']  -- yields true.
+t['quax'] -- yields false.
+```
 
 ## Multiprocess operation (core.worker)
 

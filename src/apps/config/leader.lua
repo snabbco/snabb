@@ -18,8 +18,10 @@ local shm = require("core.shm")
 local worker = require("core.worker")
 local app_graph = require("core.config")
 local action_codec = require("apps.config.action_codec")
+local alarm_codec = require("apps.config.alarm_codec")
 local support = require("apps.config.support")
 local channel = require("apps.config.channel")
+local alarms = require("lib.yang.alarms")
 
 Leader = {
    config = {
@@ -738,6 +740,42 @@ function Leader:pull ()
    self.next_time = app.now() + self.period
    self:handle_calls_from_peers()
    self:send_messages_to_followers()
+   self:receive_alarms_from_followers()
+end
+
+function Leader:receive_alarms_from_followers ()
+   for _,follower in ipairs(self.followers) do
+      self:receive_alarms_from_follower(follower)
+   end
+end
+
+function Leader:receive_alarms_from_follower (follower)
+   if not follower.alarms_channel then
+      local name = '/'..tostring(follower.pid)..'/alarms-follower-channel'
+      local success, channel = pcall(channel.open, name)
+      if not success then return end
+      follower.alarms_channel = channel
+   end
+   local channel = follower.alarms_channel
+   while true do
+      local buf, len = channel:peek_message()
+      if not buf then break end
+      local alarm = alarm_codec.decode(buf, len)
+      self:handle_alarm(follower, alarm)
+      channel:discard_message(len)
+   end
+end
+
+function Leader:handle_alarm (follower, alarm)
+   local fn, args = unpack(alarm)
+   if fn == 'raise_alarm' then
+      local key, args = alarm_codec.parse_args(args)
+      alarms.raise_alarm(key, args)
+   end
+   if fn == 'clear_alarm' then
+      local key = alarm_codec.parse_args(args)
+      alarms.clear_alarm(key)
+   end
 end
 
 function Leader:stop ()

@@ -97,12 +97,6 @@ local function make_equal_fn(key_type)
    end
 end
 
-local function set(...)
-   local ret = {}
-   for k, v in pairs({...}) do ret[v] = true end
-   return ret
-end
-
 local function parse_params(params, required, optional)
    local ret = {}
    for k, _ in pairs(required) do
@@ -123,7 +117,7 @@ end
 -- FIXME: For now the value_type option is required, but in the future
 -- we should allow for a nil value type to create a set instead of a
 -- map.
-local required_params = set('key_type', 'value_type')
+local required_params = lib.set('key_type', 'value_type')
 local optional_params = {
    hash_seed = false,
    initial_size = 8,
