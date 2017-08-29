@@ -272,12 +272,12 @@ function FlowSet:expire_records(out, now)
          self.table:remove(entry.key)
       elseif now - tonumber(entry.value.flowStartMilliseconds) > active then
          self:debug_flow(entry, "expire active")
+         self:add_data_record(entry.key, out)
          -- TODO: what should timers reset to?
          entry.value.flowStartMilliseconds = now
          entry.value.flowEndMilliseconds = now
          entry.value.packetDeltaCount = 0
          entry.value.octetDeltaCount = 0
-         self:add_data_record(entry.key, out)
          cursor = cursor + 1
       else
          -- Flow still live.
