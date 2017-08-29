@@ -89,10 +89,10 @@ local function padded_length(len)
    return bit.band(len + max_padding, bit.bnot(max_padding))
 end
 
--- Sadly, for NetFlow v9, the header needs to know the number of
--- records in a message.  So before flushing out a message, a FlowSet
--- will append the record count, and then the exporter needs to slurp
--- this data off before adding the NetFlow/IPFIX header.
+-- The header needs to know the number of records in a message.  So
+-- before flushing out a message, a FlowSet will append the record
+-- count, and then the exporter needs to slurp this data off before
+-- adding the NetFlow/IPFIX header.
 local uint16_ptr_t = ffi.typeof('uint16_t*')
 local function add_record_count(pkt, count)
    pkt.length = pkt.length + 2
@@ -358,7 +358,13 @@ function IPFIX:send_template_records(out)
    for _, flow_set in ipairs(self.flow_sets) do
       pkt = flow_set:append_template_record(pkt)
    end
-   add_record_count(pkt, #self.flow_sets)
+   if self.version == 9 then
+      add_record_count(pkt, #self.flow_sets)
+   else
+      -- For IPFIX, template records are not accounted for in the
+      -- sequence number of the header
+      add_record_count(pkt, 0)
+   end
    link.transmit(out, pkt)
 end
 
@@ -367,17 +373,22 @@ function IPFIX:add_ipfix_header(pkt, count)
    local header = ffi.cast(self.header_ptr_t, pkt.data)
 
    header.version = htons(self.version)
+   header.sequence_number = htonl(self.sequence_number)
    if self.version == 9 then
+      -- record_count counts the number of all records in this packet
+      -- (template and data)
       header.record_count = htons(count)
+      -- sequence_number counts the number of exported packets
+      self.sequence_number = self.sequence_number + 1
       header.uptime = htonl(to_milliseconds(engine.now() - self.boot_time))
    elseif self.version == 10 then
+      -- sequence_number counts the cumulative number of data records
+      -- (i.e. excluding template and option records)
+      self.sequence_number = self.sequence_number + count
       header.byte_length = htons(pkt.length)
    end
    header.timestamp = htonl(math.floor(C.get_unix_time()))
-   header.sequence_number = htonl(self.sequence_number)
    header.observation_domain = htonl(self.observation_domain)
-
-   self.sequence_number = self.sequence_number + 1
 
    return pkt
 end
