@@ -6,6 +6,8 @@ local S = require("syscall")
 local channel = require("apps.config.channel")
 local ffi = require("ffi")
 
+local UINT32_MAX = 0xffffffff
+
 local alarm_names = { 'raise_alarm', 'clear_alarm' }
 local alarm_codes = {}
 for i, name in ipairs(alarm_names) do alarm_codes[name] = i end
@@ -19,8 +21,8 @@ function alarms.raise_alarm (codec, resource, alarm_type_id, alarm_type_qualifie
    local alarm_type_id = codec:string(alarm_type_id)
    local alarm_type_qualifier = codec:string(alarm_type_qualifier)
 
-   local perceived_severity = codec:string(perceived_severity)
-   local alarm_text = codec:string(alarm_text)
+   local perceived_severity = codec:maybe_string(perceived_severity)
+   local alarm_text = codec:maybe_string(alarm_text)
 
    return codec:finish(resource, alarm_type_id, alarm_type_qualifier,
                        perceived_severity, alarm_text)
@@ -43,6 +45,13 @@ local function encoder()
       local buf = ffi.new('uint8_t[?]', #str)
       ffi.copy(buf, str, #str)
       table.insert(self.out, buf)
+   end
+   function encoder:maybe_string(str)
+      if str == nil then
+         self:uint32(UINT32_MAX)
+      else
+         self:string(str)
+      end
    end
    function encoder:finish()
       local size = 0
@@ -86,6 +95,11 @@ local function decoder(buf, len)
       local len = self:uint32()
       return ffi.string(self:read(len), len)
    end
+   function decoder:maybe_string()
+      local len = self:uint32()
+      if len == UINT32_MAX then return nil end
+      return ffi.string(self:read(len), len)
+   end
    function decoder:finish(...)
       return { ... }
    end
@@ -120,7 +134,7 @@ local function normalize (t, attrs)
    t = t or {}
    local ret = {}
    for _, k in ipairs(attrs) do
-      table.insert(ret, t[k] or '')
+      table.insert(ret, t[k])
    end
    return ret
 end
@@ -184,7 +198,7 @@ function selftest ()
       assert(lib.equal({name, args}, decoded))
    end
    local function test_raise_alarm ()
-      local key = {resource='res1'}
+      local key = {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''}
       local args = {perceived_severity='critical'}
 
       local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
@@ -195,7 +209,7 @@ function selftest ()
       test_alarm('raise_alarm', alarm)
    end
    local function test_clear_alarm ()
-      local key = {resource='res1'}
+      local key = {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''}
       local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
       local alarm = {resource, alarm_type_id, alarm_type_qualifier}
       test_alarm('clear_alarm', alarm)

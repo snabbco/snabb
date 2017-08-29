@@ -222,21 +222,10 @@ local function lookup_alarm (key)
    return state.alarm_list.alarm[key]
 end
 
--- Codec serializes nil values as empty strings. Convert them back to nil values.
-local function remove_empty_values (t)
-   assert(t)
-   for k, v in pairs(t) do
-      if type(v) == 'string' and v == '' then
-         t[k] = nil
-      end
-   end
-end
-
 function raise_alarm (key, args)
    assert(key)
    args = args or {}
    args.is_cleared = false
-   remove_empty_values(args)
    key = alarm_keys:normalize(key)
    local alarm = lookup_alarm(key)
    if not alarm then
