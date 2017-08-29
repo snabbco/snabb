@@ -71,37 +71,14 @@ function run(args)
 			inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
    app.configure(graph)
 
-   local function start_sampling_for_pid(pid)
+   local function start_sampling_for_pid(pid, write_header)
       local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra, pid)
       csv:add_app('sinkv4', { 'input' }, { input=opts.hydra and 'decap' or 'Decap.' })
       csv:add_app('sinkv6', { 'input' }, { input=opts.hydra and 'encap' or 'Encap.' })
-      csv:activate()
+      csv:activate(write_header)
    end
    
-   -- We don't know the followers PIDs until the leader starts them. There may
-   -- be additional followers started as instances that have been added or
-   -- removed during the running. We need to look for the PIDs and start
-   -- sampling for each new PID we find.
-   local function start_sampling()
-      local followers = {}
-      local function cycle()
-         local new_followers = find_followers()
-         for pid, _ in pairs(new_followers) do
-            if followers[pid] == nil then
-               if not pcall(start_sampling_for_pid, pid) then
-                  new_followers[pid] = nil
-                  --io.stderr:write("Waiting on follower "..pid.." to start "..
-                  --   "before recording statistics...\n")
-               end
-            end
-         end
-         followers = new_followers
-      end
-      timer.activate(timer.new('start_sampling', cycle, 1e9,
-                                       'repeating'))
-   end
-   
-   start_sampling()
+   setup.start_sampling(start_sampling_for_pid)
    
    app.main({duration=opts.duration})
 end

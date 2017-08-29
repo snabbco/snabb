@@ -28,6 +28,8 @@ local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local S          = require("syscall")
 local engine     = require("core.app")
 local lib        = require("core.lib")
+local shm        = require("core.shm")
+
 
 
 local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
@@ -591,6 +593,51 @@ local function stringify(x)
    end
    table.insert(ret, "}")
    return table.concat(ret)
+end
+
+-- Takes a function (which takes a follower PID) and starts sampling
+--
+-- The function searches for followers of the leader and when a new one
+-- appears it calls the sampling function (passed in) with the follower
+-- PID to begin the sampling. The sampling function should look like:
+--    function(pid, write_header)
+-- If write_header is false it should not write a new header.
+function start_sampling(sample_fn)
+   local header_written = false
+   local followers = {}
+   local function find_followers()
+      local ret = {}
+      local mypid = S.getpid()
+      for _, name in ipairs(shm.children("/")) do
+         local pid = tonumber(name)
+         if pid ~= nil and shm.exists("/"..pid.."/group") then
+            local path = S.readlink(shm.root.."/"..pid.."/group")
+            local parent = tonumber(lib.basename(lib.dirname(path)))
+            if parent == mypid then
+               ret[pid] = true
+            end
+         end
+      end
+      return ret
+   end
+
+   local function sample_for_new_followers()
+      local new_followers = find_followers()
+      for pid, _ in pairs(new_followers) do
+         if followers[pid] == nil then
+            if not pcall(sample_fn, pid, (not header_written)) then
+               new_followers[pid] = nil
+               io.stderr:write("Waiting on follower "..pid..
+                  " to start ".."before recording statistics...\n")
+            else
+               header_written = true
+            end
+         end
+      end
+      followers = new_followers
+   end
+   timer.activate(timer.new('start_sampling', sample_for_new_followers,
+      1e9, 'repeating'))
 end
 
 function reconfigurable(scheduling, f, graph, conf, ...)

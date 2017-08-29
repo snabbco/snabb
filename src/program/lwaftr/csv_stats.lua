@@ -46,7 +46,7 @@ end
 function CSVStatsTimer:new(filename, hydra_mode, pid)
    local file = filename and io.open(filename, "w") or io.stdout
    local o = { hydra_mode=hydra_mode, link_data={}, file=file, period=1,
-      header = hydra_mode and "benchmark,id,score,unit" or "Time (s)" }
+      header = hydra_mode and "benchmark,id,score,unit" or "Time (s)"}
    o.pid = pid or S.getpid()
    o.links_by_app = open_link_counters(o.pid)
    return setmetatable(o, {__index = CSVStatsTimer})
@@ -82,9 +82,11 @@ end
 function CSVStatsTimer:set_period(period) self.period = period end
 
 -- Activate the timer with a period of PERIOD seconds.
-function CSVStatsTimer:activate()
-   self.file:write(self.header..'\n')
-   self.file:flush()
+function CSVStatsTimer:activate(write_header)
+   if write_header then
+      self.file:write(self.header..'\n')
+      self.file:flush()
+   end
    self.start = engine.now()
    self.prev_elapsed = 0
    for _,data in ipairs(self.link_data) do
