@@ -115,17 +115,17 @@ function alarm_list:new (key, alarm)
    self.list[key] = alarm
 end
 function alarm_list:lookup (key)
-   return alarm_list.list[key]
-end
-function alarm_list:copy (src, args)
-   local ret = {}
-   for k,v in pairs(src) do ret[k] = args[k] or v end
-   return ret
+   return self.list[key]
 end
 function alarm_list:retrieve (key, args)
+   local function copy (src, args)
+      local ret = {}
+      for k,v in pairs(src) do ret[k] = args[k] or v end
+      return ret
+   end
    local alarm = self:lookup(key)
    if alarm then
-      return self:copy(alarm, args)
+      return copy(alarm, args)
    end
 end
 
