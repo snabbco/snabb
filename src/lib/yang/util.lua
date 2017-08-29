@@ -129,6 +129,20 @@ function memoize(f, max_occupancy)
    end
 end
 
+local function gmtime ()
+   local now = os.time()
+   local utcdate = os.date("!*t", now)
+   local localdate = os.date("*t", now)
+   localdate.isdst = false
+   local timediff = os.difftime(os.time(utcdate), os.time(localdate))
+   return now + timediff
+end
+
+function format_date_as_iso_8601 (time)
+   time = time or gmtime()
+   return os.date("%Y-%m-%dT%H:%M:%SZ", time)
+end
+
 function selftest()
    print('selftest: lib.yang.util')
    assert(tointeger('0') == 0)
