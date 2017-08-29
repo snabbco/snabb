@@ -744,7 +744,7 @@ function Leader:pull ()
 end
 
 function Leader:receive_alarms_from_followers ()
-   for _,follower in ipairs(self.followers) do
+   for _,follower in pairs(self.followers) do
       self:receive_alarms_from_follower(follower)
    end
 end
