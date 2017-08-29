@@ -96,10 +96,9 @@ function run(args)
             end
          end
          followers = new_followers
-         
-         timer.activate(timer.new('start_sampling', cycle, 1e9))
       end
-      timer.activate(timer.new('start_sampling', cycle, 1e9))
+      timer.activate(timer.new('start_sampling', cycle, 1e9,
+                                       'repeating'))
    end
    
    start_sampling()

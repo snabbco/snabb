@@ -98,17 +98,17 @@ local function compute_objects_maybe_updated_in_place (schema_name, config,
    return objs
 end
 
-local function record_mutable_objects_embedded_in_app_initarg (id, name, obj, accum)
+local function record_mutable_objects_embedded_in_app_initarg (follower_id, app_name, obj, accum)
    local function record(obj)
       local tab = accum[obj]
       if not tab then
          tab = {}
          accum[obj] = tab
       end
-      if tab[id] == nil then
-         tab[id] = {name}
+      if tab[follower_id] == nil then
+         tab[follower_id] = {app_name}
       else
-         table.insert(tab[id], name)
+         table.insert(tab[follower_id], app_name)
       end
    end
    local function visit(obj)
