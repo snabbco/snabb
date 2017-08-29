@@ -20,6 +20,15 @@ local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 local IP_PROTO_TCP  = 6
 local IP_PROTO_UDP  = 17
 local IP_PROTO_SCTP = 132
+-- A protocol's predicate whether it is a transport protocol is
+-- encoded in this table to implement a check as a single table lookup
+-- instead of a conditional with logical operators that can lead to
+-- multiple levels of side-traces
+local transport_proto_p = {
+   [IP_PROTO_TCP] = true,
+   [IP_PROTO_UDP] = true,
+   [IP_PROTO_SCTP] = true
+}
 
 -- These constants are taken from the lwaftr constants module, which
 -- is maybe a bad dependency but sharing code is good
@@ -188,11 +197,15 @@ local function read_ipv6_dst_address(l3, dst)
    ffi.copy(dst, get_ipv6_dst_addr_ptr(l3), 16)
 end
 
-local function get_tcp_src_port(l4)
+local function get_transport_src_port(l4)
    return ntohs(ffi.cast(uint16_ptr_t, l4)[0])
 end
-local function get_tcp_dst_port(l4)
+local function get_transport_dst_port(l4)
    return ntohs(ffi.cast(uint16_ptr_t, l4)[1])
+end
+
+local function get_tcp_flags(l4)
+   return ntohs(ffi.cast(uint16_ptr_t, l4)[6])
 end
 
 v4 = make_template_info {
@@ -206,8 +219,24 @@ v4 = make_template_info {
    values = { "flowStartMilliseconds",
               "flowEndMilliseconds",
               "packetDeltaCount",
-              "octetDeltaCount"}
+              "octetDeltaCount",
+              "tcpControlBits" }
 }
+
+local function extract_transport_key(entry, l4)
+   entry.key.sourceTransportPort = get_transport_src_port(l4)
+   entry.key.destinationTransportPort = get_transport_dst_port(l4)
+end
+
+local function extract_tcp_flags(entry, l4)
+   -- Mask off data offset bits
+   entry.value.tcpControlBits = bit.band(0xFFF, get_tcp_flags(l4))
+end
+
+local function accumulate_tcp_flags(dst, new)
+   dst.value.tcpControlBits = bit.bor(dst.value.tcpControlBits,
+                                      new.value.tcpControlBits)
+end
 
 function v4.extract(pkt, timestamp, entry)
    local l2 = pkt.data
@@ -215,18 +244,16 @@ function v4.extract(pkt, timestamp, entry)
    local ihl = get_ipv4_ihl(l3)
    local l4 = l3 + ihl * 4
 
+   ffi.fill(entry.key, ffi.sizeof(entry.key))
+   ffi.fill(entry.value, ffi.sizeof(entry.value))
    -- Fill key.
    -- FIXME: Try using normal Lua assignment.
    read_ipv4_src_address(l3, entry.key.sourceIPv4Address)
    read_ipv4_dst_address(l3, entry.key.destinationIPv4Address)
-   local prot = get_ipv4_protocol(l3)
-   entry.key.protocolIdentifier = prot
-   if prot == IP_PROTO_TCP or prot == IP_PROTO_UDP or prot == IP_PROTO_SCTP then
-      entry.key.sourceTransportPort = get_tcp_src_port(l4)
-      entry.key.destinationTransportPort = get_tcp_dst_port(l4)
-   else
-      entry.key.sourceTransportPort = 0
-      entry.key.destinationTransportPort = 0
+   local proto = get_ipv4_protocol(l3)
+   entry.key.protocolIdentifier = proto
+   if transport_proto_p[proto] then
+      extract_transport_key(entry, l4)
    end
 
    -- Fill value.
@@ -234,6 +261,9 @@ function v4.extract(pkt, timestamp, entry)
    entry.value.flowEndMilliseconds = timestamp
    entry.value.packetDeltaCount = 1
    entry.value.octetDeltaCount = get_ipv4_total_length(l3)
+   if proto == IP_PROTO_TCP then
+      extract_tcp_flags(entry, l4)
+   end
 end
 
 function v4.accumulate(dst, new)
@@ -241,6 +271,9 @@ function v4.accumulate(dst, new)
    dst.value.packetDeltaCount = dst.value.packetDeltaCount + 1
    dst.value.octetDeltaCount =
       dst.value.octetDeltaCount + new.value.octetDeltaCount
+   if dst.key.protocolIdentifier == IP_PROTO_TCP then
+      accumulate_tcp_flags(dst, new)
+   end
 end
 
 function v4.tostring(entry)
@@ -266,7 +299,8 @@ v6 = make_template_info {
    values = { "flowStartMilliseconds",
               "flowEndMilliseconds",
               "packetDeltaCount",
-              "octetDeltaCount" }
+              "octetDeltaCount",
+              "tcpControlBits" }
 }
 
 function v6.extract(pkt, timestamp, entry)
@@ -275,18 +309,16 @@ function v6.extract(pkt, timestamp, entry)
    -- TODO: handle chained headers
    local l4 = l3 + ipv6_fixed_header_size
 
+   ffi.fill(entry.key, ffi.sizeof(entry.key))
+   ffi.fill(entry.value, ffi.sizeof(entry.value))
    -- Fill key.
    -- FIXME: Try using normal Lua assignment.
    read_ipv6_src_address(l3, entry.key.sourceIPv6Address)
    read_ipv6_dst_address(l3, entry.key.destinationIPv6Address)
-   local prot = get_ipv6_next_header(l3)
-   entry.key.protocolIdentifier = prot
-   if prot == IP_PROTO_TCP or prot == IP_PROTO_UDP or prot == IP_PROTO_SCTP then
-      entry.key.sourceTransportPort = get_tcp_src_port(l4)
-      entry.key.destinationTransportPort = get_tcp_dst_port(l4)
-   else
-      entry.key.sourceTransportPort = 0
-      entry.key.destinationTransportPort = 0
+   local proto = get_ipv6_next_header(l3)
+   entry.key.protocolIdentifier = proto
+   if transport_proto_p[proto] then
+      extract_transport_key(entry, l4)
    end
 
    -- Fill value.
@@ -295,6 +327,9 @@ function v6.extract(pkt, timestamp, entry)
    entry.value.packetDeltaCount = 1
    entry.value.octetDeltaCount = get_ipv6_payload_length(l3)
       + ipv6_fixed_header_size
+   if proto == IP_PROTO_TCP then
+      extract_tcp_flags(entry, l4)
+   end
 end
 
 function v6.accumulate(dst, new)
@@ -302,6 +337,9 @@ function v6.accumulate(dst, new)
    dst.value.packetDeltaCount = dst.value.packetDeltaCount + 1
    dst.value.octetDeltaCount =
       dst.value.octetDeltaCount + new.value.octetDeltaCount
+   if dst.key.protocolIdentifier == IP_PROTO_TCP then
+      accumulate_tcp_flags(dst, new)
+   end
 end
 
 function v6.tostring(entry)
