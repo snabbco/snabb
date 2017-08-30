@@ -705,6 +705,37 @@ function Intel:rss_tab_build ()
    end
    self:rss_tab(tab)
 end
+
+-- reconfiguration should not change poolnum or queues
+function Intel:reconfig (conf)
+   self:unset_mirror()
+   self:unset_VLAN()
+   self:unset_MAC()
+
+   self.macaddr = conf.macaddr
+   self.mirror = conf.mirror
+   self.vlan = conf.vlan
+   self.rxcounter = conf.rxcounter
+   self.txcounter = conf.txcounter
+   self.rate_limit = conf.rate_limit
+   self.priority = conf.priority
+
+   self:set_MAC()
+   self:set_mirror()
+   self:set_VLAN()
+   self:set_rxstats()
+   self:set_txstats()
+   self:set_tx_rate()
+
+   -- TODO: factor this out & share with code in rx/tx init above
+   self.r.RXDCTL(bits{Enable=25, VME=30})
+   self.r.RXDCTL:wait(bits{enable=25})
+   self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
+   self.r.DMATXCTL:set(bits{TE=0})
+   self.r.TXDCTL:set(bits({Enable=25, SWFLSH=26, hthresh=8}) + 32)
+   self.r.TXDCTL:wait(bits{Enable=25})
+end
+
 function Intel:stop ()
    if self.rxq then
       -- 4.5.9
