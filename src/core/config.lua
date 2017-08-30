@@ -32,7 +32,11 @@ function app (config, name, class, arg)
       if status then arg = result
       else error("failed to configure '"..name.."': "..result) end
    end
-   config.apps[name] = { class = class, arg = arg}
+   if class.configure then
+      class:configure(config, name, arg)
+   else
+      config.apps[name] = { class = class, arg = arg}
+   end
 end
 
 -- API: Add a link to the configuration.

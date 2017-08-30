@@ -2,13 +2,15 @@
 
 module(...,package.seeall)
 
+local IO = require("apps.io.common").IO
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local RateLimiter = require("apps.rate_limiter.rate_limiter").RateLimiter
 local nd_light = require("apps.ipv6.nd_light").nd_light
 local L2TPv3 = require("apps.keyed_ipv6_tunnel.tunnel").SimpleKeyedTunnel
 local AES128gcm = require("apps.ipsec.esp").AES128gcm
-local virtual_ether_mux = require("lib.io.virtual_ether_mux")
+local Synth = require("apps.test.synth").Synth
+local Sink = require("apps.basic.basic_apps").Sink
 local pci = require("lib.hardware.pci")
 local ffi = require("ffi")
 local C = ffi.C
@@ -24,12 +26,22 @@ end
 function load (file, pciaddr, sockpath, soft_bench)
    local ports = lib.load_conf(file)
    local c = config.new()
-   local io_links
-   if pciaddr then
-      io_links = virtual_ether_mux.configure(c, ports, {pci = pciaddr})
-   else
-      io_links = virtual_ether_mux.configure(c, ports, {bench = soft_bench})
+   local NIC_suffix = "_NIC"
+   local queues = {}
+   for _, port in ipairs(ports) do
+      local NIC = port_name(port)..NIC_suffix
+      queues[NIC] = {macaddr = port.mac_address, vlan = port.vlan}
    end
+   -- Set up virtual packet generator if requested.
+   if soft_bench then
+      assert(not queues["__SoftBench"])
+      queues["__SoftBench"] {macaddr = soft_bench.src}
+      config.app(c, "BenchSource", Synth, io.bench)
+      config.app(c, "BenchSink", Sink)
+      config.link(c, "BenchSource.output -> __SoftBench.rx")
+      config.link(c, "__SoftBench.tx -> BenchSink.input")
+   end
+   config.app(c, "IO", IO, {type=(pciaddr and 'pci'), device=pciaddr, queues=queues})
    for i,t in ipairs(ports) do
       -- Backwards compatibity / deprecated fields
       for deprecated, current in pairs({tx_police_gbps = "tx_police",
@@ -114,8 +126,10 @@ function load (file, pciaddr, sockpath, soft_bench)
          config.link(c, RxLimit..".output -> "..VM_rx)
          VM_rx = RxLimit..".input"
       end
-      config.link(c, io_links[i].output.." -> "..VM_rx)
-      config.link(c, VM_tx.." -> "..io_links[i].input)
+      -- Finally, connect ends to I/O port
+      local NIC = name..NIC_suffix
+      config.link(c, NIC..".tx".." -> "..VM_rx)
+      config.link(c, VM_tx.." -> "..NIC..".rx")
    end
 
    -- Return configuration c.
