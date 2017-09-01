@@ -1351,12 +1351,12 @@ function Intel82599:init ()
    self.r.VLNCTRL(0x8100)                    -- explicity set default
    self.r.RXCSUM(0)                          -- turn off all checksum offload
 
-   self.r.RXPBSIZE[0]:bits(10,19, 0x200)
-   self.r.TXPBSIZE[0]:bits(10,19, 0xA0)
+   self.r.RXPBSIZE[0]:bits(10,10, 0x200)
+   self.r.TXPBSIZE[0]:bits(10,10, 0xA0)
    self.r.TXPBTHRESH[0](0xA0)
    for i=1,7 do
-      self.r.RXPBSIZE[i]:bits(10,19, 0)
-      self.r.TXPBSIZE[i]:bits(10,19, 0)
+      self.r.RXPBSIZE[i]:bits(10,10, 0)
+      self.r.TXPBSIZE[i]:bits(10,10, 0)
       self.r.TXPBTHRESH[i](0)
    end
 
