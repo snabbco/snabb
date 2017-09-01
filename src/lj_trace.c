@@ -327,7 +327,7 @@ static void penalty_pc(jit_State *J, GCproto *pt, BCIns *pc, TraceError e)
   J->penaltyslot = (J->penaltyslot + 1) & (PENALTY_SLOTS-1);
   setmref(J->penalty[i].pc, pc);
 setpenalty:
-  J->penalty[i].val = (uint16_t)val;
+  J->penalty[i].val = val;
   J->penalty[i].reason = e;
   hotcount_set(J2GG(J), pc+1, val);
 }
