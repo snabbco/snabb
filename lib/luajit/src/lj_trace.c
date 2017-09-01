@@ -293,6 +293,8 @@ int lj_trace_flushall(lua_State *L)
   J->freetrace = 0;
   /* Clear penalty cache. */
   memset(J->penalty, 0, sizeof(J->penalty));
+  /* Reset hotcounts. */
+  lj_dispatch_init_hotcount(J2G(J));
   /* Free the whole machine code and invalidate all exit stub groups. */
   lj_mcode_free(J);
   memset(J->exitstubgroup, 0, sizeof(J->exitstubgroup));
