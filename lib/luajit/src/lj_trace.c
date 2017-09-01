@@ -473,6 +473,7 @@ static void trace_stop(jit_State *J)
   TraceNo traceno = J->cur.traceno;
   GCtrace *T = J->curfinal;
   lua_State *L;
+  int i;
 
   switch (op) {
   case BC_FORL:
@@ -523,6 +524,11 @@ static void trace_stop(jit_State *J)
   lj_mcode_commit(J, J->cur.mcode);
   J->postproc = LJ_POST_NONE;
   trace_save(J, T);
+
+  /* Clear any penalty after successful recording. */
+  for (i = 0; i < PENALTY_SLOTS; i++)
+    if (mref(J->penalty[i].pc, const BCIns) == pc)
+      J->penalty[i].val = PENALTY_MIN;
 
   L = J->L;
   lj_vmevent_send(L, TRACE,
