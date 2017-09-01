@@ -62,6 +62,8 @@ ALLRXDCTL   0x01028 +0x40*0..63     RW Receive Descriptor Control
 ALLRXDCTL   0x0D028 +0x40*64..127   RW Receive Descriptor Control
 DAQF        0x0E200 +0x04*0..127    RW Destination Address Queue Filter
 FTQF        0x0E600 +0x04*0..127    RW Five Tuple Queue Filter
+ETQF        0x05128 +0x04*0..7      RW EType Queue Filter
+ETQS        0x0EC00 +0x04*0..7      RW EType Queue Select
 MPSAR       0x0A600 +0x04*0..255    RW MAC Pool Select Array
 PFUTA       0X0F400 +0x04*0..127    RW PF Unicast Table Array
 PFVLVF      0x0F100 +0x04*0..63     RW PF VM VLAN Pool Filter
@@ -1371,6 +1373,8 @@ function Intel82599:init ()
       self.r.RTTDT2C[i](0)
       self.r.RTTPT2C[i](0)
       self.r.RTRPT4C[i](0)
+      self.r.ETQF[i](0)
+      self.r.ETQS[i](0)
    end
 
    self.r.HLREG0(bits{
@@ -1442,8 +1446,6 @@ function Intel82599:vmdq_enable ()
 
    -- enable vlan filter (4.6.7, 7.1.1.2)
    self.r.VLNCTRL:set(bits { VFE=30 })
-
-   -- intel10g zeroes out ETQF,ETQS here but they are init to 0
 
    -- RTRUP2TC/RTTUP2TC cleared above in init
 
