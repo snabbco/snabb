@@ -192,6 +192,7 @@ typedef struct GCtrace {
   MSize szmcode;	/* Size of machine code. */
   MCode *mcode;		/* Start of machine code. */
   MSize mcloop;		/* Offset of loop start in machine code. */
+  uint16_t *szirmcode;  /* Bytes of mcode for each IR instruction (array.) */
   uint16_t nchild;	/* Number of child traces (root trace only). */
   uint16_t spadjust;	/* Stack pointer adjustment (offset in bytes). */
   TraceNo1 traceno;	/* Trace number. */

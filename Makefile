@@ -113,6 +113,9 @@ default all $(INSTALL_DEP):
 	$(MAKE) -C src
 	@echo "==== Successfully built RaptorJIT $(VERSION) ===="
 
+reusevm:
+	$(MAKE) -C src reusevm
+
 install: $(INSTALL_DEP)
 	@echo "==== Installing RaptorJIT $(VERSION) to $(PREFIX) ===="
 	$(MKDIR) $(INSTALL_DIRS)

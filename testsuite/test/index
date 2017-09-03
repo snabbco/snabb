@@ -1,5 +1,5 @@
 lang
-lib
+lib +compat5.2
 bc +luajit>=2
 computations.lua
 trace +jit
