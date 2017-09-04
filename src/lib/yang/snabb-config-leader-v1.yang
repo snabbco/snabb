@@ -2,6 +2,8 @@ module snabb-config-leader-v1 {
   namespace snabb:config-leader;
   prefix config-leader;
 
+  import ietf-alarms { prefix al; }
+
   organization "Igalia, S.L.";
   contact "Andy Wingo <wingo@igalia.com>";
   description
@@ -103,6 +105,27 @@ module snabb-config-leader-v1 {
     }
     output {
       uses error-reporting;
+    }
+  }
+
+  rpc set-operator-state {
+    description
+      "This is a means for the operator to indicate
+       the level of human intervention on an alarm.";
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
+      leaf resource { type string; mandatory true; }
+      leaf alarm-type-id { type string; mandatory true; }
+      leaf alarm-type-qualifier { type string; mandatory true; }
+      leaf state { type al:operator-state; mandatory true; }
+      leaf text { type string; description "Additional optional textual information."; }
+    }
+    output {
+      uses error-reporting;
+      leaf success { type boolean; description "True if operation succeeded."; }
     }
   }
 }

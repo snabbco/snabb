@@ -171,6 +171,21 @@ function Leader:rpc_get_config (args)
    if success then return response else return {status=1, error=response} end
 end
 
+function Leader:rpc_set_operator_state (args)
+   local function getter()
+      if args.schema ~= self.schema_name then
+         return false, ("Set-operator-state operation not supported in"..
+                        "'%s' schema"):format(args.schema)
+      end
+      local key = {resource=args.resource, alarm_type_id=args.alarm_type_id,
+                   alarm_type_qualifier=args.alarm_type_qualifier}
+      local params = {state=args.state, text=args.text}
+      return { success = alarms.set_operator_state(key, params) }
+   end
+   local success, response = pcall(getter)
+   if success then return response else return {status=1, error=response} end
+end
+
 local function path_parser_for_grammar(grammar, path)
    local getter, subgrammar = path_mod.resolver(grammar, path)
    return data.data_parser_from_grammar(subgrammar)

@@ -1,0 +1,19 @@
+Usage: snabb config set-operator-state [OPTION]... ID ALARM-ID OPERATOR-STATE ALARM-TEXT
+Adds a new operator-state in an alarm.
+
+Available options:
+  -s, --schema SCHEMA        YANG data interface to request.
+  -r, --revision REVISION    Require a specific revision of the YANG module.
+  -f, --format               Selects output format (yang or xpath). Default: yang.
+      --print-default        Forces print out of default values.
+  -h, --help                 Displays this message.
+
+Given an instance identifier, an alarm id and an operator-state, add a new
+operator-state to the given alarm.
+
+Typical usage:
+
+$ snabb config get-state lwaftr external-interface,arp-resolution ack.
+
+See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
+for full documentation.
