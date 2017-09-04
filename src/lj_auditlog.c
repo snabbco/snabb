@@ -42,17 +42,8 @@ static void bin_32(void *ptr, int n) {
 
 /* -- low-level object logging API ---------------------------------------- */
 
-/* Ensure that the log file is open. */
-static void ensure_log_open() {
-  if (!fp) {
-    fp = fopen("audit.log", "w");
-    lua_assert(fp != NULL);
-  }
-}
-
 /* Log a snapshot of an object in memory. */
 static void log_mem(const char *type, void *ptr, unsigned int size) {
-  ensure_log_open();
   fixmap(4);
   str_16("type");    /* = */ str_16("memory");
   str_16("hint");    /* = */ str_16(type);
@@ -68,11 +59,27 @@ static void log_event(const char *type, int nattributes) {
   /* Caller fills in the further nattributes... */
 }
 
+/* Log objects that define the virtual machine. */
+void lj_auditlog_vm_definitions()
+{
+  log_mem("lj_ir_mode", &lj_ir_mode, sizeof(lj_ir_mode));
+}
+
+/* Ensure that the log file is open. */
+static void ensure_log_open() {
+  if (!fp) {
+    fp = fopen("audit.log", "w");
+    lua_assert(fp != NULL);
+    lj_auditlog_vm_definitions();
+  }
+}
+
 /* -- high-level LuaJIT object logging ------------------------------------ */
 
 /* Log a trace that has just been compiled. */
 void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 {
+  ensure_log_open();
   log_mem("GCtrace", T, sizeof(*T));
   log_mem("MCode[]", T->mcode, T->szmcode);
   log_mem("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
@@ -83,6 +90,7 @@ void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 }
 
 void lj_auditlog_trace_abort(jit_State *J, TraceError e) {
+  ensure_log_open();
   log_mem("jit_State", J, sizeof(*J));
   log_event("trace_abort", 2);
   str_16("jit_State");  /* = */ uint_64((uint64_t)J);
