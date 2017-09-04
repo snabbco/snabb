@@ -21,7 +21,7 @@ local state = {
 function get_state ()
    -- status-change is stored as an array while according to ietf-alarms schema
    -- it should be a hashmap indexed by time.
-   local function transform_status_change (status_change)
+   local function index_by_time (status_change)
       local ret = {}
       for _, v in pairs(status_change) do ret[v.time] = v end
       return ret
@@ -31,7 +31,8 @@ function get_state ()
       local ret = {}
       for k,v in pairs(alarm) do
          ret[k] = lib.deepcopy(v)
-         ret[k].status_change = transform_status_change(ret[k].status_change)
+         ret[k].status_change = index_by_time(ret[k].status_change)
+         ret[k].operator_state_change = index_by_time(ret[k].operator_state_change)
       end
       alarm_list.alarm = ret
       return alarm_list
@@ -39,7 +40,68 @@ function get_state ()
    return {
       alarm_inventory = state.alarm_inventory,
       alarm_list = transform_alarm_list(state.alarm_list),
+      summary = {
+         alarm_summary = build_summary(state.alarm_list.alarm),
+      }
    }
+end
+
+function build_summary (alarms)
+   local function last_operator_state_change (alarm)
+      return alarm.operator_state_change[#alarm.operator_state_change]
+   end
+   local function state_change (alarm)
+      local state_change = last_operator_state_change(alarm)
+      return state_change and state_change.state or ''
+   end
+   local function is_cleared (alarm)
+      return alarm.is_cleared
+   end
+   local function is_cleared_not_closed (alarm)
+      return alarm.is_cleared and state_change(alarm) ~= 'closed'
+   end
+   local function is_cleared_closed (alarm)
+      return alarm.is_cleared and state_change(alarm) == 'closed'
+   end
+   local function is_not_cleared_closed (alarm)
+      return not alarm.is_cleared and state_change(alarm) == 'closed'
+   end
+   local function is_not_cleared_not_closed (alarm)
+      return not alarm.is_cleared and state_change(alarm) ~= 'closed'
+   end
+   local ret = {}
+   for key, alarm in pairs(alarms) do
+      local severity = alarm.perceived_severity
+      local entry = ret[severity]
+      if not entry then
+         entry = {
+             total = 0,
+             cleared = 0,
+             cleared_not_closed = 0,
+             cleared_closed = 0,
+             not_cleared_closed = 0,
+             not_cleared_not_closed = 0,
+         }
+      end
+      entry.total = entry.total + 1
+      if is_cleared(alarm) then
+         entry.cleared = entry.cleared + 1
+      end
+      if is_cleared_not_closed(alarm) then
+         entry.cleared_not_closed = entry.cleared_not_closed + 1
+      end
+      if is_cleared_closed(alarm) then
+         entry.cleared_closed = entry.cleared_closed + 1
+      end
+      if is_not_cleared_closed(alarm) then
+         entry.not_cleared_closed = entry.not_cleared_closed + 1
+      end
+      if is_not_cleared_not_closed(alarm) then
+         entry.not_cleared_not_closed = entry.not_cleared_not_closed + 1
+      end
+      ret[severity] = entry
+   end
+   return ret
 end
 
 -- Single point to access alarm type keys.
@@ -266,12 +328,12 @@ function set_operator_state (key, args)
       alarm.operator_state_change = {}
    end
    local time = format_date_as_iso_8601()
-   alarm.operator_state_change[time] = {
+   table.insert(alarm.operator_state_change, {
       time = time,
       operator = 'admin',
       state = args.state,
       text = args.text,
-   }
+   })
    return true
 end
 
@@ -541,6 +603,15 @@ function selftest ()
    sleep(1)
    set_operator_state(key, {state='ack'})
    assert(table_size(alarm.operator_state_change) == 2)
+
+   -- Summary.
+   local t = build_summary(state.alarm_list.alarm)
+   assert(t.minor.cleared == 1)
+   assert(t.minor.cleared_closed == 0)
+   assert(t.minor.cleared_not_closed == 1)
+   assert(t.minor.not_cleared_closed == 0)
+   assert(t.minor.not_cleared_not_closed == 0)
+   assert(t.minor.total == 1)
 
    -- Compress alarms.
    local key = alarm_keys:fetch('external-interface', 'arp-resolution')
