@@ -410,6 +410,54 @@ function purge_alarms (args)
    return count
 end
 
+local function alarm_key_matches (k1, k2)
+   if k1.resource and k1.resource ~= k2.resource then
+     return false
+   elseif k1.alarm_type_id and k1.alarm_type_id ~= k2.alarm_type_id then
+     return false
+   elseif k1.alarm_type_qualifier and
+          k1.alarm_type_qualifier ~= k2.alarm_type_qualifier then
+     return false
+   end
+   return true
+end
+
+local function compress_alarm (alarm)
+   assert(alarm.status_change)
+   local latest_status_change = alarm.status_change[#alarm.status_change]
+   alarm.status_change = {latest_status_change}
+end
+
+-- This operation requests the server to compress entries in the
+-- alarm list by removing all but the latest state change for all
+-- alarms.  Conditions in the input are logically ANDed.  If no
+-- input condition is given, all alarms are compressed.
+function compress_alarms (key)
+   local function parse_key (key)
+      local t = {}
+      for each in key:gmatch('([^/]+)') do
+         table.insert(t, each)
+      end
+      return {
+         resource = t[1],
+         alarm_type_id = t[2],
+         alarm_type_qualifier = t[3] or '',
+      }
+   end
+   if type(key) == 'string' then
+      key = parse_key(key)
+   end
+   assert(type(key) == 'table')
+   local count = 0
+   for k, alarm in pairs(state.alarm_list.alarm) do
+      if alarm_key_matches(key, k) then
+         compress_alarm(alarm)
+         count = count + 1
+      end
+   end
+   return count
+end
+
 --
 
 function selftest ()
@@ -507,6 +555,13 @@ function selftest ()
    sleep(1)
    set_operator_state(key, {state='ack'})
    assert(table_size(alarm.operator_state_change) == 2)
+
+   -- Compress alarms.
+   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   local alarm = state.alarm_list.alarm[key]
+   assert(table_size(alarm.status_change) == 4)
+   compress_alarms({resource='external-interface'})
+   assert(table_size(alarm.status_change) == 1)
 
    -- Set operator state change on non existent alarm should fail.
    local key = {resource='none', alarm_type_id='none', alarm_type_qualifier=''}
