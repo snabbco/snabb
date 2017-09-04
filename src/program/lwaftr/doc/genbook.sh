@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This shell scripts generates the top-level Markdown structure of the
 # Snabb lwAFTR manual.
@@ -8,7 +8,7 @@
 
 # Script based on src/doc/genbook.sh
 
-lwaftr_app=../../../apps/lwaftr/
+lwaftr_app=../
 
 cat <<EOF
 % Snabb lwAFTR Manual
@@ -21,26 +21,32 @@ cat <<EOF
              END { print("") }')
 % Version $(git log -n1 --format="format:%h, %ad%n")
 
-$(cat README.welcome.md)
+$(cat README.md)
 
-$(cat README.build.md)
+$(cat running.md)
 
-$(cat README.running.md)
+$(cat bindingtable.md)
 
-$(cat README.testing.md)
+$(cat configuration.md)
 
-$(cat README.troubleshooting.md)
+$(cat benchmarking.md)
 
-$(cat README.bindingtable.md)
+$(cat continuous-integration.md)
 
-$(cat README.configuration.md)
+$(cat performance.md)
 
-$(cat README.rfccompliance.md)
+$(cat filters-performance.md)
 
-$(cat README.benchmarking.md)
+$(cat virtualization.md)
 
-$(cat README.performance.md)
+$(cat rfccompliance.md)
 
-$(cat README.virtualization.md)
+$(cat troubleshooting.md)
+
+$(cat counters.md)
+
+$(cat breaking_changes.md)
+
+$(cat ndp.md)
 
 EOF

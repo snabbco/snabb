@@ -53,8 +53,8 @@ local UDPing = {
 function UDPing:new (conf)
    local o = {
       conf = conf,
-      ping = lib.timer(1*1e9, 'repeating'),
-      timeout = lib.timer(120*1e9)
+      ping = lib.throttle(1),
+      timeout = lib.timeout(120)
    }
    return setmetatable(o, {__index = UDPing})
 end

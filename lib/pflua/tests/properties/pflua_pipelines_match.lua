@@ -10,6 +10,8 @@ local utils = require('pf.utils')
 
 local pflang = require('pfquickcheck.pflang')
 
+local use_native = os.getenv("PF_QUICKCHECK_NATIVE");
+
 function property(packets)
    --nil pkt_idx, pflang_expr, bpf_result, pflua_result to avoid
    -- confusing debug information
@@ -20,7 +22,7 @@ function property(packets)
    pkt, pkt_idx = utils.choose_with_index(packets)
    P, pkt_len = pkt.packet, pkt.len
    libpcap_pred = pf.compile_filter(pflang_expr, { bpf = true })
-   pflua_pred = pf.compile_filter(pflang_expr)
+   pflua_pred = pf.compile_filter(pflang_expr, { native = use_native })
    bpf_result = libpcap_pred(P, pkt_len)
    pflua_result = pflua_pred(P, pkt_len)
    return bpf_result, pflua_result

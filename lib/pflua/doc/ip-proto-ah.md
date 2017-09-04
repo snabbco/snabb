@@ -41,6 +41,22 @@ return function(P,length)
    if cast("uint16_t*", P+12)[0] ~= 8 then return false end
    return P[23] == 51
 end
+```
 
+## Native pflang compilation
+
+```
+7f58f3365000  4883FE22          cmp rsi, +0x22
+7f58f3365004  7C14              jl 0x7f58f336501a
+7f58f3365006  0FB7770C          movzx esi, word [rdi+0xc]
+7f58f336500a  4883FE08          cmp rsi, +0x08
+7f58f336500e  750A              jnz 0x7f58f336501a
+7f58f3365010  0FB67717          movzx esi, byte [rdi+0x17]
+7f58f3365014  4883FE33          cmp rsi, +0x33
+7f58f3365018  7403              jz 0x7f58f336501d
+7f58f336501a  B000              mov al, 0x0
+7f58f336501c  C3                ret
+7f58f336501d  B001              mov al, 0x1
+7f58f336501f  C3                ret
 ```
 

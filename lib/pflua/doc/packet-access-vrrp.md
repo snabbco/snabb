@@ -63,6 +63,37 @@ return function(P,length)
    if (v1 + 23) > length then return false end
    return P[(v1 + 22)] < 8
 end
+```
 
+## Native pflang compilation
+
+```
+7f0490f27000  4883FE2A          cmp rsi, +0x2a
+7f0490f27004  7C4A              jl 0x7f0490f27050
+7f0490f27006  0FB7470C          movzx eax, word [rdi+0xc]
+7f0490f2700a  4883F808          cmp rax, +0x08
+7f0490f2700e  7540              jnz 0x7f0490f27050
+7f0490f27010  0FB64717          movzx eax, byte [rdi+0x17]
+7f0490f27014  4883F870          cmp rax, +0x70
+7f0490f27018  7536              jnz 0x7f0490f27050
+7f0490f2701a  0FB74714          movzx eax, word [rdi+0x14]
+7f0490f2701e  4881E01FFF0000    and rax, 0xff1f
+7f0490f27025  4883F800          cmp rax, +0x00
+7f0490f27029  7525              jnz 0x7f0490f27050
+7f0490f2702b  0FB6470E          movzx eax, byte [rdi+0xe]
+7f0490f2702f  4883E00F          and rax, +0x0f
+7f0490f27033  48C1E002          shl rax, 0x02
+7f0490f27037  89C1              mov ecx, eax
+7f0490f27039  4883C117          add rcx, +0x17
+7f0490f2703d  4839F1            cmp rcx, rsi
+7f0490f27040  7F0E              jg 0x7f0490f27050
+7f0490f27042  4883C016          add rax, +0x16
+7f0490f27046  0FB60407          movzx eax, byte [rdi+rax]
+7f0490f2704a  4883F808          cmp rax, +0x08
+7f0490f2704e  7C03              jl 0x7f0490f27053
+7f0490f27050  B000              mov al, 0x0
+7f0490f27052  C3                ret
+7f0490f27053  B001              mov al, 0x1
+7f0490f27055  C3                ret
 ```
 

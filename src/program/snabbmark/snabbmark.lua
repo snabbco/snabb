@@ -23,6 +23,10 @@ function run (args)
       intel1g(unpack(args))
    elseif command == 'esp' and #args >= 2 then
       esp(unpack(args))
+   elseif command == 'hash' and #args <= 1 then
+      hash(unpack(args))
+   elseif command == 'ctable' and #args == 0 then
+      ctable(unpack(args))
    else
       print(usage) 
       main.exit(1)
@@ -359,9 +363,8 @@ function esp (npackets, packet_size, mode, profile)
    if mode == "encapsulate" then
       if profile then profiler.start(profile) end
       local start = C.get_monotonic_time()
-      local encapsulated
       for i = 1, npackets do
-         encapsulated = packet.clone(plain)
+         local encapsulated = packet.clone(plain)
          enc:encapsulate(encapsulated)
          packet.free(encapsulated)
       end
@@ -375,9 +378,8 @@ function esp (npackets, packet_size, mode, profile)
       enc:encapsulate(encapsulated)
       if profile then profiler.start(profile) end
       local start = C.get_monotonic_time()
-      local plain
       for i = 1, npackets do
-         plain = packet.clone(encapsulated)
+         local plain = packet.clone(encapsulated)
          dec:decapsulate(plain)
          dec.seq.no = 0
          dec.window[0] = 0
@@ -389,4 +391,179 @@ function esp (npackets, packet_size, mode, profile)
       print(("Decapsulation (packet size = %d): %.2f Gbit/s")
             :format(packet_size, gbits(bps)))
    end
+end
+
+local pmu = require('lib.pmu')
+local has_pmu_counters, err = pmu.is_available()
+if not has_pmu_counters then
+   io.stderr:write('No PMU available: '..err..'\n')
+end
+
+if has_pmu_counters then pmu.setup() end
+
+local function measure(f, iterations)
+   local set
+   if has_pmu_counters then set = pmu.new_counter_set() end
+   local start = C.get_time_ns()
+   if has_pmu_counters then pmu.switch_to(set) end
+   local res = f(iterations)
+   if has_pmu_counters then pmu.switch_to(nil) end
+   local stop = C.get_time_ns()
+   local ns = tonumber(stop-start)
+   local cycles = nil
+   if has_pmu_counters then cycles = pmu.to_table(set).cycles end
+   return cycles, ns, res
+end
+
+local function test_perf(f, iterations, what)
+   require('jit').flush()
+   io.write(tostring(what or f)..': ')
+   io.flush()
+   local cycles, ns, res = measure(f, iterations)
+   if cycles then
+      cycles = cycles/iterations
+      io.write(('%.2f cycles, '):format(cycles))
+   end
+   ns = ns/iterations
+   io.write(('%.2f ns per iteration (result: %s)\n'):format(
+         ns, tostring(res)))
+   return res
+end
+
+function hash (key_size)
+   if key_size then
+      key_size = assert(tonumber(key_size))
+   else
+      key_size = 4
+   end
+   local value_t = ffi.typeof("uint8_t[$]", key_size)
+   local band = require('bit').band
+   local fill = require('ffi').fill
+
+   local function baseline_hash(ptr) return ptr[0] end
+   local murmur = require('lib.hash.murmur').MurmurHash3_x86_32:new()
+   local function murmur_hash(v)
+      return murmur:hash(v, key_size, 0ULL).u32[0]      
+   end
+   local lib_siphash = require('lib.hash.siphash')
+   local sip_hash_1_2_opts = { size=key_size, c=1, d=2 }
+   local sip_hash_2_4_opts = { size=key_size, c=2, d=4 }
+
+   local function test_scalar_hash(iterations, hash)
+      local value = ffi.new(ffi.typeof('uint8_t[$]', key_size))
+      local result
+      for i=1,iterations do
+	 fill(value, key_size, band(i, 255))
+	 result = hash(value)
+      end
+      return result
+   end
+
+   local function test_parallel_hash(iterations, hash, width)
+      local value = ffi.new('uint8_t[?]', key_size*width)
+      local result = ffi.new('uint32_t[?]', width)
+      for i=1,iterations,width do
+	 fill(value, key_size*width, band(i+width-1, 255))
+	 hash(value, result)
+      end
+      return result[width-1]
+   end
+
+   local function hash_tester(hash)
+      return function(iterations)
+         return test_scalar_hash(iterations, hash)
+      end
+   end
+
+   local function sip_hash_tester(opts, width)
+      local opts = lib.deepcopy(opts)
+      opts.size = key_size
+      if width > 1 then
+         opts.width = width
+         local hash = lib_siphash.make_multi_hash(opts)
+	 return function(iterations)
+	    return test_parallel_hash(iterations, hash, width)
+	 end
+      else
+         return hash_tester(lib_siphash.make_hash(opts))
+      end
+   end
+
+   test_perf(hash_tester(baseline_hash), 1e8, 'baseline')
+   test_perf(hash_tester(murmur_hash), 1e8, 'murmur hash (32 bit)')
+   for _, opts in ipairs({{c=1,d=2}, {c=2,d=4}}) do
+      for _, width in ipairs({1,2,4,8}) do
+         test_perf(sip_hash_tester(opts, width), 1e8,
+                   string.format('sip hash c=%d,d=%d (x%d)',
+                                 opts.c, opts.d, width))
+      end
+   end
+end
+
+function ctable ()
+   local ctable = require('lib.ctable')
+   local bnot = require('bit').bnot
+   local ctab = ctable.new(
+      { key_type = ffi.typeof('uint32_t[2]'),
+        value_type = ffi.typeof('int32_t[5]') })
+   local occupancy = 2e6
+   ctab:resize(occupancy / 0.4 + 1)
+
+   local function test_insertion(count)
+      local k = ffi.new('uint32_t[2]');
+      local v = ffi.new('int32_t[5]');
+      for i = 1,count do
+         k[0], k[1] = i, i
+         for j=0,4 do v[j] = bnot(i) end
+         ctab:add(k, v)
+      end
+   end
+
+   local function test_lookup_ptr(count)
+      local k = ffi.new('uint32_t[2]');
+      local result = ctab.entry_type()
+      for i = 1, count do
+         k[0], k[1] = i, i
+         result = ctab:lookup_ptr(k)
+      end
+      return result
+   end
+
+   local function test_lookup_and_copy(count)
+      local k = ffi.new('uint32_t[2]');
+      local result = ctab.entry_type()
+      for i = 1, count do
+         k[0], k[1] = i, i
+         ctab:lookup_and_copy(k, result)
+      end
+      return result
+   end
+
+   test_perf(test_insertion, occupancy, 'insertion (40% occupancy)')
+   test_perf(test_lookup_ptr, occupancy, 'lookup_ptr (40% occupancy)')
+   test_perf(test_lookup_and_copy, occupancy, 'lookup_and_copy (40% occupancy)')
+
+   local stride = 1
+   repeat
+      local streamer = ctab:make_lookup_streamer(stride)
+      local function test_lookup_streamer(count)
+         local result
+         for i = 1, count, stride do
+            local n = math.min(stride, count-i+1)
+            for j = 0, n-1 do
+               streamer.entries[j].key[0] = i + j
+               streamer.entries[j].key[1] = i + j
+            end
+            streamer:stream()
+            result = streamer.entries[n-1].value[0]
+         end
+         return result
+      end
+      -- Note that "result" is part of the value, not an index into
+      -- the table, and so we expect the results to be different from
+      -- ctab:lookup().
+      test_perf(test_lookup_streamer, occupancy,
+                'streaming lookup, stride='..stride)
+      stride = stride * 2
+   until stride > 256
 end

@@ -8,6 +8,7 @@ local C = ffi.C
 proto_icmp = 1
 proto_ipv4 = 4
 proto_tcp = 6
+proto_udp = 17
 ipv6_frag = 44
 proto_icmpv6 = 58
 
@@ -18,6 +19,7 @@ ethertype_ipv6 = 0x86DD
 
 n_ethertype_ipv4 = C.htons(0x0800)
 n_ethertype_ipv6 = C.htons(0x86DD)
+n_ethertype_arp = C.htons(0x0806)
 
 -- ICMPv4 types
 icmpv4_echo_reply = 0

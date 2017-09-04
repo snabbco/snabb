@@ -5,6 +5,7 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
+local shm = require("core.shm")
 
 local lib = require("core.lib")
 
@@ -74,8 +75,9 @@ local cards = {
       ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
       ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
       ["0x154d"] = {model = model["X520"],      driver = 'apps.intel.intel_app'},
-      ["0x1521"] = {model = model["i350"],      driver = 'apps.intel.intel1g'},
-      ["0x157b"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
+      ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
    },
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
@@ -146,6 +148,7 @@ function map_pci_memory (device, n, lock)
    local mem = assert(f:mmap(nil, st.size, "read, write", "shared", 0))
    return ffi.cast("uint32_t *", mem), f
 end
+
 function close_pci_resource (fd, base)
    local st = assert(fd:stat())
    S.munmap(base, st.size)
@@ -162,12 +165,32 @@ function set_bus_master (device, enable)
    local value = ffi.new("uint16_t[1]")
    assert(C.pread(fd, value, 2, 0x4) == 2)
    if enable then
+      shm.create('group/dma/pci/'..canonical(device), 'uint64_t')
       value[0] = bit.bor(value[0], lib.bits({Master=2}))
    else
+      shm.unlink('group/dma/pci/'..canonical(device))
       value[0] = bit.band(value[0], bit.bnot(lib.bits({Master=2})))
    end
    assert(C.pwrite(fd, value, 2, 0x4) == 2)
    f:close()
+end
+
+-- For devices used by some Snabb apps, PCI bus mastering should
+-- outlive the life of the process.
+function disable_bus_master_cleanup (device)
+   shm.unlink('group/dma/pci/'..canonical(device))
+end
+
+-- Shutdown DMA to prevent "dangling" requests for PCI devices opened
+-- by pid (or other processes in its process group).
+--
+-- This is an internal API function provided for cleanup during
+-- process termination.
+function shutdown (pid)
+   local dma = shm.children("/"..pid.."/group/dma/pci")
+   for _, device in ipairs(dma) do
+      set_bus_master(device, false)
+   end
 end
 
 function root_check ()
@@ -175,7 +198,7 @@ function root_check ()
 end
 
 -- Return the canonical (abbreviated) representation of the PCI address.
--- 
+--
 -- example: canonical("0000:01:00.0") -> "01:00.0"
 function canonical (address)
    return address:gsub("^0000:", "")
