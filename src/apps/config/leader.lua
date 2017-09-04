@@ -198,6 +198,19 @@ function Leader:rpc_purge_alarms (args)
    if success then return response else return {status=1, error=response} end
 end
 
+function Leader:rpc_compress_alarms (args)
+   local function compress()
+      if args.schema ~= self.schema_name then
+         return false, ("Compress-alarms operation not supported in"..
+                        "'%s' schema"):format(args.schema)
+      end
+      return { compressed_alarms = alarms.compress_alarms(args) }
+   end
+   local success, response = pcall(compress)
+   if success then return response else return {status=1, error=response} end
+end
+
+
 local function path_parser_for_grammar(grammar, path)
    local getter, subgrammar = path_mod.resolver(grammar, path)
    return data.data_parser_from_grammar(subgrammar)

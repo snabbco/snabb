@@ -175,4 +175,40 @@ module snabb-config-leader-v1 {
     }
   }
 
+  rpc compress-alarms {
+    description
+      "This operation requests the server to compress entries in the
+       alarm list by removing all but the latest state change for all
+       alarms.  Conditions in the input are logically ANDed.  If no
+       input condition is given, all alarms are compressed.";
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
+      leaf resource {
+        type string;
+        description
+          "Compress the alarms with this resource.";
+      }
+      leaf alarm-type-id {
+        type string;
+        description
+          "Compress alarms with this alarm-type-id.";
+      }
+      leaf alarm-type-qualifier {
+        type string;
+        description
+          "Compress the alarms with this alarm-type-qualifier.";
+      }
+    }
+    output {
+      leaf compressed-alarms {
+        type uint32;
+        description
+          "Number of compressed alarm entries.";
+      }
+    }
+  }
+
 }
