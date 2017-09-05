@@ -460,9 +460,8 @@ function Intel:init_rx_q ()
    end
    self.r.SRRCTL(0)
    self.r.SRRCTL:set(bits {
-      -- Set packet buff size to 0b1010 kbytes
-      BSIZEPACKET1 = 1,
-      BSIZEPACKET3 = 3,
+      -- Set packet buff size to 0b10000 kbytes (max)
+      BSIZEPACKET4 = 4,
       -- Drop packets when no descriptors
       Drop_En = self:offset("SRRCTL", "Drop_En")
    })
