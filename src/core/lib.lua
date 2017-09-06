@@ -374,8 +374,8 @@ if ffi.abi("be") then
    function htons(b) return b end
 else
   -- htonl is unsigned, matching the C version and expectations.
-   function htonl(b) return tonumber(cast('uint32_t', bswap(b))) end
-   function htons(b) return rshift(bswap(b), 16) end
+   function htonl(b) return (tonumber(cast('uint32_t', bswap(b)))) end
+   function htons(b) return (rshift(bswap(b), 16)) end
 end
 ntohl = htonl
 ntohs = htons
