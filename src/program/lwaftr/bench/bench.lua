@@ -32,8 +32,9 @@ function parse_args(args)
    function handlers.n(arg) opts.name = assert(arg) end
    function handlers.b(arg) opts.bench_file = arg end
    function handlers.y() opts.hydra = true end
+   function handlers.j(arg) scheduling.j = arg end
    function handlers.h() show_usage(0) end
-   args = lib.dogetopt(args, handlers, "n:hyb:D:", {
+   args = lib.dogetopt(args, handlers, "j:n:hyb:D:", {
       help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1})
    if #args ~= 3 then show_usage(1) end
    return opts, scheduling, unpack(args)

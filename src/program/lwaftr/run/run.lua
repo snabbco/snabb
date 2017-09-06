@@ -106,8 +106,9 @@ function parse_args(args)
       io.stderr:write("Warning: the --reconfigurable flag has been deprecated")
       io.stderr:write(" as the lwaftr is now always reconfigurable.\n")
    end
+   function handlers.j(arg) scheduling.j = arg end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:",
+   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:",
      { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
      verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
      ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
