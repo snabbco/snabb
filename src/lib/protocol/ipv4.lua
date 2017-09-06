@@ -58,6 +58,9 @@ ipv4:init(
 
 function ipv4:new (config)
    local o = ipv4:superClass().new(self)
+   if not o._recycled then
+      o._ph = ipv4hdr_pseudo_t()
+   end
    o:header().ihl_v_tos = htons(0x4000) -- v4
    o:ihl(o:sizeof() / 4)
    o:dscp(config.dscp or 0)
@@ -71,6 +74,14 @@ function ipv4:new (config)
    o:src(config.src)
    o:dst(config.dst)
    o:checksum()
+   return o
+end
+
+function ipv4:new_from_mem(mem, size)
+   local o = ipv4:superClass().new_from_mem(self, mem, size)
+   if not o._recycled then
+      o._ph = ipv4hdr_pseudo_t()
+   end
    return o
 end
 
@@ -201,7 +212,8 @@ end
 -- protocol.  They differ from the respective values of the ipv6
 -- header if extension headers are present.
 function ipv4:pseudo_header (ulplen, proto)
-   local ph = ipv4hdr_pseudo_t()
+   local ph = self._ph
+   ffi.fill(ph, ffi.sizeof(ph))
    local h = self:header()
    ffi.copy(ph, h.src_ip, 2*ipv4_addr_t_size)  -- Copy source and destination
    ph.ulp_length = htons(ulplen)
