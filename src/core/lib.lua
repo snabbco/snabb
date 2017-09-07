@@ -374,8 +374,13 @@ if ffi.abi("be") then
    function htons(b) return b end
 else
   -- htonl is unsigned, matching the C version and expectations.
-   function htonl(b) return tonumber(cast('uint32_t', bswap(b))) end
-   function htons(b) return rshift(bswap(b), 16) end
+  -- Wrapping the return call in parenthesis avoids the compiler to do
+  -- a tail call optimization.  In LuaJIT when the number of successive
+  -- tail calls is higher than the loop unroll threshold, the
+  -- compilation of a trace is aborted.  If the trace was long that
+  -- can result in poor performance.
+   function htonl(b) return (tonumber(cast('uint32_t', bswap(b)))) end
+   function htons(b) return (rshift(bswap(b), 16)) end
 end
 ntohl = htonl
 ntohs = htons

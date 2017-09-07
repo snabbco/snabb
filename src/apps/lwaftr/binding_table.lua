@@ -223,49 +223,50 @@ function BindingTable:iterate_softwires()
    return self.softwires:iterate()
 end
 
-function pack_psid_map_entry(softwire)
-   assert(softwire.value.port_set)
-   local port_set = softwire.value.port_set
+function pack_psid_map_entry (softwire)
+   local port_set = assert(softwire.value.port_set)
 
    local psid_length = port_set.psid_length
    local shift = 16 - psid_length - (port_set.reserved_ports_bit_count or 0)
-   assert(psid_length + shift <= 16,
-         'psid_length '..psid_length..' + shift '..shift..
-         ' should not exceed 16')
 
-   local key = ffi.new(psid_map_key_t, {addr=softwire.key.ipv4})
-   local value = ffi.new(psid_map_value_t,
-			 {psid_length=psid_length, shift=shift})
-   
+   assert(psid_length + shift <= 16,
+            ("psid_length %s + shift %s should not exceed 16"):
+               format(psid_length, shift))
+
+   local key = softwire.key.ipv4
+   local value = {psid_length = psid_length, shift = shift}
+
    return key, value
 end
 
-function load(conf)
+function load (conf)
    local psid_builder = rangemap.RangeMapBuilder.new(psid_map_value_t)
 
    -- Lets create an intermediatory PSID map to verify if we've added
    -- a PSID entry yet, if we have we need to verify that the values
    -- are the same, if not we need to error.
-   local inter_psid_map = ctable.new({
-	 key_type = psid_map_key_t,
-	 value_type = psid_map_value_t
-   })
-   
+   local inter_psid_map = {
+      keys = {}
+   }
+   function inter_psid_map:exists (key, value)
+      local v = self.keys[key]
+      if not v then return false end
+      if v.psid_length ~= v.psid_length or v.shift ~= v.shift then
+         error("Port set already added with different values: "..key)
+      end
+      return true
+   end
+   function inter_psid_map:add (key, value)
+      self.keys[key] = value
+   end
+
    for entry in conf.softwire:iterate() do
       -- Check that the map either hasn't been added or that
       -- it's the same value as one which has.
       local psid_key, psid_value = pack_psid_map_entry(entry)
-      local added_entry = inter_psid_map:lookup_ptr(psid_key)
-      if added_entry == nil then
-	 -- Add the port set to the psid-map
-	 psid_builder:add(entry.key.ipv4, psid_value)
-	 inter_psid_map:add(psid_key, psid_value)
-      else
-	 local err = "Port set already added with different values: "
-	 err = err .. ipv4_ntop(entry.key.ipv4)
-	 
-	 assert(added_entry.value.psid_length == psid_value.psid_length, err)
-	 assert(added_entry.value.shift == psid_value.shift, err)
+      if not inter_psid_map:exists(psid_key, psid_value) then
+         inter_psid_map:add(psid_key, psid_value)
+         psid_builder:add(entry.key.ipv4, psid_value)
       end
    end
 
