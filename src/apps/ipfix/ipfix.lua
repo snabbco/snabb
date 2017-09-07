@@ -89,21 +89,6 @@ local function padded_length(len)
    return bit.band(len + max_padding, bit.bnot(max_padding))
 end
 
--- The header needs to know the number of records in a message.  So
--- before flushing out a message, a FlowSet will append the record
--- count, and then the exporter needs to slurp this data off before
--- adding the NetFlow/IPFIX header.
-local uint16_ptr_t = ffi.typeof('uint16_t*')
-local function add_record_count(pkt, count)
-   pkt.length = pkt.length + 2
-   ffi.cast(uint16_ptr_t, pkt.data + pkt.length)[-1] = count
-end
-local function remove_record_count(pkt, count)
-   local count = ffi.cast(uint16_ptr_t, pkt.data + pkt.length)[-1]
-   pkt.length = pkt.length - 2
-   return count
-end
-
 -- The real work in the IPFIX app is performed by FlowSet objects,
 -- which record and export flows.  However an IPv4 FlowSet won't know
 -- what to do with IPv6 packets, so the IPFIX app can have multiple
@@ -133,7 +118,8 @@ function FlowSet:new (template, args)
                                  lib.throttle(args.flush_timeout))
                   or function () return true end,
                idle_timeout = assert(args.idle_timeout),
-               active_timeout = assert(args.active_timeout) }
+               active_timeout = assert(args.active_timeout),
+               parent = assert(args.parent) }
 
    if     args.version == 9  then o.template_id = V9_TEMPLATE_ID
    elseif args.version == 10 then o.template_id = V10_TEMPLATE_ID
@@ -238,8 +224,9 @@ function FlowSet:flush_data_records(out)
    set_header.id = htons(self.template.id)
    set_header.length = htons(pkt.length)
 
-   -- Add record count and push.
-   add_record_count(pkt, record_count)
+   -- Add headers provided by the IPFIX object that created us
+   pkt = self.parent:add_ipfix_header(pkt, record_count)
+   pkt = self.parent:add_transport_headers(pkt)
    link.transmit(out, pkt)
 end
 
@@ -308,6 +295,8 @@ local ipfix_config_params = {
    mtu = { default = 512 },
    observation_domain = { default = 256 },
    exporter_ip = { required = true },
+   exporter_eth_src = { default = '00:00:00:00:00:00' },
+   exporter_eth_dst = { default = '00:00:00:00:00:00' },
    collector_ip = { required = true },
    collector_port = { required = true },
    templates = { default = { template.v4, template.v6 } }
@@ -320,11 +309,7 @@ function IPFIX:new(config)
                template_refresh_interval = config.template_refresh_interval,
                next_template_refresh = -1,
                version = config.ipfix_version,
-               observation_domain = config.observation_domain,
-               exporter_ip = config.exporter_ip,
-               exporter_port = math.random(49152, 65535),
-               collector_ip = config.collector_ip,
-               collector_port = config.collector_port }
+               observation_domain = config.observation_domain }
 
    if o.version == 9 then
       o.header_t = netflow_v9_packet_header_t
@@ -336,6 +321,34 @@ function IPFIX:new(config)
    o.header_ptr_t = ptr_to(o.header_t)
    o.header_size = ffi.sizeof(o.header_t)
 
+   -- Prepare transport headers to prepend to each export packet
+   -- TODO: Support IPv6.
+   local eth_h = ether:new({ src = ether:pton(config.exporter_eth_src),
+                             dst = ether:pton(config.exporter_eth_dst),
+                             type = 0x0800 })
+   local ip_h  = ipv4:new({ src = ipv4:pton(config.exporter_ip),
+                            dst = ipv4:pton(config.collector_ip),
+                            protocol = 17,
+                            ttl = 64,
+                            flags = 0x02 })
+   local udp_h = udp:new({ src_port = math.random(49152, 65535),
+                           dst_port = config.collector_port })
+   local transport_headers = datagram:new(packet.allocate())
+   transport_headers:push(udp_h)
+   transport_headers:push(ip_h)
+   transport_headers:push(eth_h)
+   -- We need to update the IP and UDP headers after adding a payload.
+   -- The following re-locates ip_h and udp_h to point to the headers
+   -- in the template packet.
+   transport_headers:new(transport_headers:packet(), ether) -- Reset the parse stack
+   transport_headers:parse_n(3)
+   _, ip_h, udp_h = unpack(transport_headers:stack())
+   o.transport_headers = {
+      ip_h = ip_h,
+      udp_h = udp_h,
+      pkt = transport_headers:packet()
+   }
+
    -- FIXME: Assuming we export to IPv4 address.
    local l3_header_len = 20
    local l4_header_len = 8
@@ -346,14 +359,13 @@ function IPFIX:new(config)
                            cache_size = config.cache_size,
                            idle_timeout = config.idle_timeout,
                            active_timeout = config.active_timeout,
-                           flush_timeout = config.flush_timeout }
+                           flush_timeout = config.flush_timeout,
+                           parent = o }
 
    o.flow_sets = {}
    for _, template in ipairs(config.templates) do
       table.insert(o.flow_sets, FlowSet:new(template, flow_set_args))
    end
-
-   self.outgoing_link_name, self.outgoing = new_internal_link('IPFIX outgoing')
 
    return setmetatable(o, { __index = self })
 end
@@ -363,13 +375,16 @@ function IPFIX:send_template_records(out)
    for _, flow_set in ipairs(self.flow_sets) do
       pkt = flow_set:append_template_record(pkt)
    end
+   local record_count
    if self.version == 9 then
-      add_record_count(pkt, #self.flow_sets)
+      record_count = #self.flow_sets
    else
       -- For IPFIX, template records are not accounted for in the
       -- sequence number of the header
-      add_record_count(pkt, 0)
+      record_count = 0
    end
+   pkt = self:add_ipfix_header(pkt, record_count)
+   pkt = self:add_transport_headers(pkt)
    link.transmit(out, pkt)
 end
 
@@ -399,28 +414,13 @@ function IPFIX:add_ipfix_header(pkt, count)
 end
 
 function IPFIX:add_transport_headers (pkt)
-   -- TODO: Support IPv6.
-   local eth_h = ether:new({ src = ether:pton('00:00:00:00:00:00'),
-                             dst = ether:pton('00:00:00:00:00:00'),
-                             type = 0x0800 })
-   local ip_h  = ipv4:new({ src = ipv4:pton(self.exporter_ip),
-                            dst = ipv4:pton(self.collector_ip),
-                            protocol = 17,
-                            ttl = 64,
-                            flags = 0x02 })
-   local udp_h = udp:new({ src_port = self.exporter_port,
-                           dst_port = self.collector_port })
-
+   local headers = self.transport_headers
+   local ip_h, udp_h = headers.ip_h, headers.udp_h
    udp_h:length(udp_h:sizeof() + pkt.length)
    udp_h:checksum(pkt.data, pkt.length, ip_h)
    ip_h:total_length(ip_h:sizeof() + udp_h:sizeof() + pkt.length)
    ip_h:checksum()
-
-   local dgram = datagram:new(pkt)
-   dgram:push(udp_h)
-   dgram:push(ip_h)
-   dgram:push(eth_h)
-   return dgram:packet()
+   return packet.prepend(pkt, headers.pkt.data, headers.pkt.length)
 end
 
 function IPFIX:push()
@@ -429,11 +429,11 @@ function IPFIX:push()
    -- engine.now() gives values relative to the UNIX epoch though.
    local timestamp = ffi.C.get_unix_time()
    assert(self.output.output, "missing output link")
-   local outgoing = self.outgoing
+   local output = self.output.output
 
    if self.next_template_refresh < engine.now() then
       self.next_template_refresh = engine.now() + self.template_refresh_interval
-      self:send_template_records(outgoing)
+      self:send_template_records(output)
    end
 
    local flow_sets = self.flow_sets
@@ -452,14 +452,7 @@ function IPFIX:push()
    end
 
    for _,set in ipairs(flow_sets) do set:record_flows(timestamp) end
-   for _,set in ipairs(flow_sets) do set:expire_records(outgoing, timestamp) end
-
-   for i=1,link.nreadable(outgoing) do
-      local pkt = link.receive(outgoing)
-      pkt = self:add_ipfix_header(pkt, remove_record_count(pkt))
-      pkt = self:add_transport_headers(pkt)
-      link.transmit(self.output.output, pkt)
-   end
+   for _,set in ipairs(flow_sets) do set:expire_records(output, timestamp) end
 end
 
 function selftest()
