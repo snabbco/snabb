@@ -70,22 +70,26 @@ local function string_parser(str)
 end
 
 -- Parse out available IPFIX fields.
-local function make_ipfix_element_map()
-   local elems = require("apps.ipfix.ipfix_information_elements_inc")
-   local parser = string_parser(elems)
+local function make_ipfix_element_map(names)
    local map = {}
-   while not parser.is_done() do
-      local id = parser.consume_upto(",")
-      local name = parser.consume_upto(",")
-      local data_type = parser.consume_upto(",")
-      for i=1,8 do parser.consume_upto(",") end
-      parser.consume_upto("\n")
-      map[name] = { id = id, data_type = data_type }
+   for _, name in ipairs(names) do
+      local elems = require("apps.ipfix."..name.."_inc")
+      local parser = string_parser(elems)
+      while not parser.is_done() do
+         local id = parser.consume_upto(",")
+         local name = parser.consume_upto(",")
+         local data_type = parser.consume_upto(",")
+         for i=1,8 do parser.consume_upto(",") end
+         parser.consume_upto("\n")
+         map[name] = { id = id, data_type = data_type }
+      end
    end
    return map
 end
 
-local ipfix_elements = make_ipfix_element_map()
+local ipfix_elements =
+   make_ipfix_element_map({ 'ipfix_information_elements',
+                            'ipfix_information_elements_local' })
 
 local swap_fn_env = { htons = htons, htonl = htonl, htonq = htonq }
 
@@ -220,7 +224,7 @@ v4 = make_template_info {
               "flowEndMilliseconds",
               "packetDeltaCount",
               "octetDeltaCount",
-              "tcpControlBits" }
+              "tcpControlBitsReduced" }
 }
 
 local function extract_transport_key(entry, l4)
@@ -236,6 +240,16 @@ end
 local function accumulate_tcp_flags(dst, new)
    dst.value.tcpControlBits = bit.bor(dst.value.tcpControlBits,
                                       new.value.tcpControlBits)
+end
+
+local function extract_tcp_flags_reduced(l4, entry)
+   entry.value.tcpControlBitsReduced = bit.band(0xFF, get_tcp_flags(l4))
+end
+
+local function accumulate_tcp_flags_reduced(dst, new)
+   dst.value.tcpControlBitsReduced =
+      bit.bor(dst.value.tcpControlBitsReduced,
+              new.value.tcpControlBitsReduced)
 end
 
 function v4.extract(pkt, timestamp, entry)
@@ -262,7 +276,7 @@ function v4.extract(pkt, timestamp, entry)
    entry.value.packetDeltaCount = 1
    entry.value.octetDeltaCount = get_ipv4_total_length(l3)
    if proto == IP_PROTO_TCP then
-      extract_tcp_flags(entry, l4)
+      extract_tcp_flags_reduced(entry, l4)
    end
 end
 
@@ -272,7 +286,7 @@ function v4.accumulate(dst, new)
    dst.value.octetDeltaCount =
       dst.value.octetDeltaCount + new.value.octetDeltaCount
    if dst.key.protocolIdentifier == IP_PROTO_TCP then
-      accumulate_tcp_flags(dst, new)
+      accumulate_tcp_flags_reduced(dst, new)
    end
 end
 
@@ -300,7 +314,7 @@ v6 = make_template_info {
               "flowEndMilliseconds",
               "packetDeltaCount",
               "octetDeltaCount",
-              "tcpControlBits" }
+              "tcpControlBitsReduced" }
 }
 
 function v6.extract(pkt, timestamp, entry)
@@ -328,7 +342,7 @@ function v6.extract(pkt, timestamp, entry)
    entry.value.octetDeltaCount = get_ipv6_payload_length(l3)
       + ipv6_fixed_header_size
    if proto == IP_PROTO_TCP then
-      extract_tcp_flags(entry, l4)
+      extract_tcp_flags_reduced(entry, l4)
    end
 end
 
@@ -338,7 +352,7 @@ function v6.accumulate(dst, new)
    dst.value.octetDeltaCount =
       dst.value.octetDeltaCount + new.value.octetDeltaCount
    if dst.key.protocolIdentifier == IP_PROTO_TCP then
-      accumulate_tcp_flags(dst, new)
+      accumulate_tcp_flags_reduced(dst, new)
    end
 end
 
