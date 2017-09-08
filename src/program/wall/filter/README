@@ -26,3 +26,11 @@ Options:
   -6, --ipv6 <ip_addr>    Set the IPv6 address of this firewall host
   -D, --duration <secs>   Set the duration to run the program (in seconds).
   --cpu <cpu-num>         Pin to a particular CPU and appropriate NUMA node
+
+Example:
+
+# Reject all HTTP packets and accept all the test.
+sudo ./snabb wall filter -e "{ HTTP = 'reject', default = 'accept' }" pcap v6-http.cap
+
+# Accept RTP packets which flow_count is equals or higher than 69 and drop otherwise. Drop non RTP packets.
+sudo ./snabb wall filter -e "{ RTP = [[match { flow_count >= 69 => accept; otherwise => drop }]], default = 'drop' }" pcap rtp_example.pcap
