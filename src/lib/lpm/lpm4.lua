@@ -41,7 +41,9 @@ function LPM4:search_entry_string (ip)
    return self:search_entry(ip4.parse(ip))
 end
 function LPM4:search (ip)
-   return self:search_entry(ip).key
+   local entry = self:search_entry(ip)
+   if entry then return entry.key end
+   return nil
 end
 function LPM4:search_string (str)
    return self:search(ip4.parse(str))
@@ -233,7 +235,11 @@ function selftest ()
    s:add_string("10.0.0.0/24", 10)
    s:add_string("0.0.0.10/32", 11)
    assert(10 == s:search_bytes(ffi.new("uint8_t[4]", {10,0,0,0})))
+   assert(10 == s:search_bytes(ffi.new("uint8_t[4]", {10,0,0,124})))
    assert(11 == s:search_bytes(ffi.new("uint8_t[4]", {0,0,0,10})))
+
+   -- Search for non-existent entry should return nil
+   assert(nil == s:search_bytes(ffi.new("uint8_t[4]", {10,0,1,0})))
 end
 function LPM4:selftest (cfg, millions)
    assert(self, "selftest must be called with : ")
