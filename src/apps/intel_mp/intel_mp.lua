@@ -26,6 +26,7 @@ local counter     = require("core.counter")
 local macaddress  = require("lib.macaddress")
 local shm         = require("core.shm")
 local S           = require("syscall")
+local transmit, receive, empty = link.transmit, link.receive, link.empty
 
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
@@ -569,8 +570,8 @@ function Intel:push ()
    if li == nil then return end
 --   assert(li, "intel_mp:push: no input link")
 
-   while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
-      local p = link.receive(li)
+   while not empty(li) and self:ringnext(self.tdt) ~= self.tdh do
+      local p = receive(li)
       -- NB: see comment in intel10g for why this is commented out,
       --     the rest of the loop body goes in an else branch
       --if p.length > self.mtu then
@@ -614,7 +615,7 @@ function Intel:pull ()
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
       local p = self.rxqueue[self.rdt]
       p.length = self.rxdesc[self.rdt].length
-      link.transmit(lo, p)
+      transmit(lo, p)
 
       local np = packet.allocate()
       self.rxqueue[self.rdt] = np
