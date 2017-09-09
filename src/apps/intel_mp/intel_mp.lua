@@ -26,6 +26,7 @@ local counter     = require("core.counter")
 local macaddress  = require("lib.macaddress")
 local shm         = require("core.shm")
 local S           = require("syscall")
+local transmit, receive, empty = link.transmit, link.receive, link.empty
 
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
@@ -577,8 +578,8 @@ function Intel:push ()
    local li = self.input["input"]
    if li == nil then return end
 
-   while not link.empty(li) and self:can_transmit() do
-      local p = link.receive(li)
+   while not empty(li) and self:can_transmit() do
+      local p = receive(li)
       -- NB: the comment below is taken from intel_mp.lua, which disables
       -- this check for the same reason.
       --   We must not send packets that are bigger than the MTU.  This
@@ -621,7 +622,7 @@ function Intel:pull ()
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
       local p = self.rxqueue[self.rdt]
       p.length = self.rxdesc[self.rdt].length
-      link.transmit(lo, p)
+      transmit(lo, p)
 
       local np = packet.allocate()
       self.rxqueue[self.rdt] = np
