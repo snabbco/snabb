@@ -604,7 +604,9 @@ function Intel:push ()
    end
    self.r.TDT(self.tdt)
 
-   -- same code as in pull, we repeat it in case this app only enables Tx
+   -- same code as in pull, but we only call it in case the rxq
+   -- is disabled for this app
+   if self.rxq and self.output["output"] then return end
    if self.run_stats and self.sync_timer() then
       self:sync_stats()
    end
