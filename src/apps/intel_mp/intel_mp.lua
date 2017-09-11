@@ -74,6 +74,7 @@ PFMRVLAN    0x0F610 +0x04*0..7      RW PF Mirror Rule VLAN
 PFMRVM      0x0F630 +0x04*0..7      RW PF Mirror Rule Pool
 PFVFRE      0x051E0 +0x04*0..1      RW PF VF Receive Enable
 PFVFTE      0x08110 +0x04*0..1      RW PF VF Transmit Enable
+PFVMTXSW    0x05180 +0x04*0..1      RW PF VM Tx Switch Loopback Enable
 PFVFSPOOF   0x08200 +0x04*0..7      RW PF VF Anti Spoof Control
 PFVMVIR     0x08000 +0x04*0..63     RW PF VM VLAN Insert Register
 PFVML2FLT   0x0F000 +0x04*0..63     RW PF VM L2 Control Register
@@ -525,6 +526,8 @@ function Intel:init_tx_q ()                               -- 4.5.10
       self.r.RTTDT1C(0x80)
       -- enables packet Tx for this VF's pool
       self.r.PFVFTE[math.floor(self.poolnum/32)]:set(bits{VFTE=self.poolnum%32})
+      -- enable TX loopback
+      self.r.PFVMTXSW[math.floor(self.poolnum/32)]:clr(bits{LLE=self.poolnum%32})
    end
 
    if self.r.DMATXCTL then
