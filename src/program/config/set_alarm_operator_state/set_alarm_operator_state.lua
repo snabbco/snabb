@@ -9,19 +9,21 @@ local function usage(exit_code)
 end
 
 local function parse_args (args)
-   local function parse_alarm_key (key)
-      local t = {}
-      for each in key:gmatch("([^,]+)") do
-         table.insert(t, each)
-      end
-      return {resource=t[1], alarm_type_id=t[2], alarm_type_qualifier=t[3] or ''}
+   if #args < 4 or #args > 5 then usage(1) end
+   local alarm_type_id, alarm_type_qualifier = (args[3]):match("([%w]+)/([%w]+)")
+   if not alarm_type_id then
+      alarm_type_id, alarm_type_qualifier = args[3], ''
    end
-   if #args < 3 or #args > 4 then usage(1) end
    local ret = {
-      key = parse_alarm_key(args[2]),
-      state = args[3],
-      text = args[4] or '',
+      key = {
+         resource = args[2],
+         alarm_type_id = alarm_type_id,
+         alarm_type_qualifier = alarm_type_qualifier,
+      },
+      state = args[4],
+      text = args[5] or '',
    }
+   -- Remove all arguments except first one.
    for i=2,#args do
       table.remove(args, #args)
    end
