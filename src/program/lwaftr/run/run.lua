@@ -137,8 +137,9 @@ end
 -- are the same for the internal and external interfaces.
 local function requires_splitter (opts, conf)
    if opts["on-a-stick"] then
-      local internal_interface = conf.softwire_config.internal_interface
-      local external_interface = conf.softwire_config.external_interface
+      local _, instance = next(conf.softwire_config.instance)
+      local internal_interface = instance.queue.values[1].internal_interface
+      local external_interface = instance.queue.values[1].external_interface
       return internal_interface.vlan_tag == external_interface.vlan_tag
    end
    return false

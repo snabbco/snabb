@@ -267,6 +267,7 @@ function load_on_a_stick(c, conf, args)
       args.v6_nic_name, args.v4v6, args.mirror
 
    if v4v6 then
+      assert(queue.external_interface.vlan_tag == queue.internal_interface.vlan_tag)
       config.app(c, 'nic', Intel82599, {
          pciaddr = pciaddr,
          vmdq=queue.external_interface.vlan_tag,
