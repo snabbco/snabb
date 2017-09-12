@@ -5,7 +5,7 @@ local config = require("core.config")
 local timer = require("core.timer")
 local csv_stats = require("program.lwaftr.csv_stats")
 local pci = require("lib.hardware.pci")
-local Intel82599 = require("apps.intel.intel_app").Intel82599
+local Intel82599 = require("apps.intel_mp.intel_mp").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
 local loadgen = require("apps.lwaftr.loadgen")
 local main = require("core.main")
@@ -22,7 +22,7 @@ local function find_devices(pattern)
    pattern = pci.qualified(pattern)
    local ret = {}
    for _,device in ipairs(pci.devices) do
-      if (device.usable and device.driver == 'apps.intel.intel_app' and
+      if (device.usable and device.driver == 'apps.intel_mp.intel_mp' and
           pattern:match(device.pciaddress)) then
          table.insert(ret, device.pciaddress)
       end
@@ -114,9 +114,9 @@ function run(args)
       config.app(c, stream.rx_sink_id, basic_apps.Sink)
 
       config.link(c, stream.pcap_id..".output -> "..stream.repeater_id..".input")
-      config.link(c, stream.repeater_id..".output -> "..stream.nic_id..".rx")
+      config.link(c, stream.repeater_id..".output -> "..stream.nic_id..".input")
 
-      config.link(c, stream.nic_id..".tx -> "..stream.rx_sink_id..".input")
+      config.link(c, stream.nic_id..".output -> "..stream.rx_sink_id..".input")
    end
    engine.configure(c)
 
@@ -127,7 +127,7 @@ function run(args)
                             opts.duration * 1e9, 'repeating'))
    local csv = csv_stats.CSVStatsTimer:new(opts.bench_file)
    for _,stream in ipairs(streams) do
-      csv:add_app(stream.nic_id, { 'rx', 'tx' },
+      csv:add_app(stream.nic_id, { 'input', 'output' },
                   { rx=stream.name..' TX', tx=stream.name..' RX' })
    end
    csv:activate()

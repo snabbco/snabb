@@ -4,7 +4,7 @@ local config     = require("core.config")
 local worker     = require("core.worker")
 local leader     = require("apps.config.leader")
 local follower   = require("apps.config.follower")
-local Intel82599 = require("apps.intel.intel_app").Intel82599
+local Intel82599 = require("apps.intel_mp.intel_mp").Intel82599
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
@@ -184,26 +184,28 @@ local function link_sink(c, v4_out, v6_out)
    config.link(c, 'fragmenterv6.output -> '..v6_out)
 end
 
-function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
+function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci, ndescriptors)
    lwaftr_app(c, conf)
    local external_interface = conf.softwire_config.external_interface
    local internal_interface = conf.softwire_config.internal_interface
 
    config.app(c, v4_nic_name, Intel82599, {
       pciaddr=v4_nic_pci,
-      vmdq=external_interface.vlan_tag,
+      vmdq=true,
       vlan=external_interface.vlan_tag,
       rxcounter=1,
+      ndescriptors=ndescriptors,
       macaddr=ethernet:ntop(external_interface.mac)})
    config.app(c, v6_nic_name, Intel82599, {
       pciaddr=v6_nic_pci,
-      vmdq=internal_interface.vlan_tag,
+      vmdq=true,
       vlan=internal_interface.vlan_tag,
       rxcounter=1,
-      macaddr = ethernet:ntop(internal_interface.mac)})
+      ndescriptors=ndescriptors,
+      macaddr=ethernet:ntop(internal_interface.mac)})
 
-   link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
-   link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
+   link_source(c, v4_nic_name..'.output', v6_nic_name..'.output')
+   link_sink(c, v4_nic_name..'.input', v6_nic_name..'.input')
 end
 
 function load_on_a_stick(c, conf, args)
@@ -216,9 +218,10 @@ function load_on_a_stick(c, conf, args)
    if v4v6 then
       config.app(c, 'nic', Intel82599, {
          pciaddr = pciaddr,
-         vmdq=external_interface.vlan_tag,
+         vmdq=true,
          vlan=external_interface.vlan_tag,
-         macaddr = ethernet:ntop(external_interface.mac)})
+         ndescriptors=args.ndescriptors,
+         macaddr=ethernet:ntop(external_interface.mac)})
       if mirror then
          local Tap = require("apps.tap.tap").Tap
          local ifname = mirror
@@ -230,8 +233,8 @@ function load_on_a_stick(c, conf, args)
       else
          config.app(c, v4v6, V4V6)
       end
-      config.link(c, 'nic.tx -> '..v4v6..'.input')
-      config.link(c, v4v6..'.output -> nic.rx')
+      config.link(c, 'nic.output -> '..v4v6..'.input')
+      config.link(c, v4v6..'.output -> nic.input')
 
       link_source(c, v4v6..'.v4', v4v6..'.v6')
       link_sink(c, v4v6..'.v4', v4v6..'.v6')
@@ -247,8 +250,8 @@ function load_on_a_stick(c, conf, args)
          vlan=internal_interface.vlan_tag,
          macaddr = ethernet:ntop(internal_interface.mac)})
 
-      link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
-      link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
+      link_source(c, v4_nic_name..'.output', v6_nic_name..'.output')
+      link_sink(c, v4_nic_name..'.input', v6_nic_name..'.input')
    end
 end
 
@@ -266,8 +269,8 @@ function load_virt(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
       vlan=internal_interface.vlan_tag,
       macaddr = ethernet:ntop(internal_interface.mac)})
 
-   link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
-   link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
+   link_source(c, v4_nic_name..'.output', v6_nic_name..'.output')
+   link_sink(c, v4_nic_name..'.input', v6_nic_name..'.input')
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)

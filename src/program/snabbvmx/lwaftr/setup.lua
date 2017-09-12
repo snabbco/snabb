@@ -61,6 +61,7 @@ local function load_virt (c, nic_id, lwconf, interface)
       vmdq = interface.vlan and true,
       vlan = interface.vlan and interface.vlan.v4_vlan_tag,
       macaddr = ethernet:ntop(external_interface.mac),
+      ndescriptors = interface.ring_buffer_size,
       mtu = v4_mtu })
    local v6_mtu = internal_interface.mtu + constants.ethernet_header_size
    if internal_interface.vlan_tag then
@@ -72,6 +73,7 @@ local function load_virt (c, nic_id, lwconf, interface)
       vmdq = interface.vlan and true,
       vlan = interface.vlan and interface.vlan.v6_vlan_tag,
       macaddr = ethernet:ntop(internal_interface.mac),
+      ndescriptors = interface.ring_buffer_size,
       mtu = v6_mtu})
 
    return v4_nic_name, v6_nic_name
@@ -94,15 +96,16 @@ local function load_phy (c, nic_id, interface)
          vmdq = true,
          vlan = vlan,
          macaddr = interface.mac_address,
+         ndescriptors = interface.ring_buffer_size,
          mtu = interface.mtu})
-      chain_input, chain_output = nic_id .. ".rx", nic_id .. ".tx"
+      chain_input, chain_output = nic_id .. ".input", nic_id .. ".output"
    elseif net_exists(interface.pci) then
       print(("%s network interface %s mtu %d"):format(nic_id, interface.pci, interface.mtu))
       if vlan then
          print(("WARNING: VLAN not supported over %s. %s vlan %d"):format(interface.pci, nic_id, vlan))
       end
       config.app(c, nic_id, raw.RawSocket, interface.pci)
-      chain_input, chain_output = nic_id .. ".rx", nic_id .. ".tx"
+      chain_input, chain_output = nic_id .. ".input", nic_id .. ".output"
    else
       print(("Couldn't find device info for PCI address '%s'"):format(interface.pci))
       if not interface.mirror_id then
@@ -139,8 +142,8 @@ function lwaftr_app(c, conf, lwconf, sock_path)
    local use_splitter = requires_splitter(internal_interface, external_interface)
    if not use_splitter then
       local v4, v6 = load_virt(c, phy_id, lwconf, conf.interface)
-      v4_output, v6_output = v4..".tx", v6..".tx"
-      v4_input, v6_input   = v4..".rx", v6..".rx"
+      v4_output, v6_output = v4..".output", v6..".output"
+      v4_input, v6_input   = v4..".input", v6..".input"
    else
       chain_input, chain_output = load_phy(c, phy_id, conf.interface)
    end
@@ -275,11 +278,11 @@ function lwaftr_app(c, conf, lwconf, sock_path)
       local socket_path = sock_path:format(conf.interface.id)
       config.app(c, virt_id, VhostUser, { socket_path = socket_path })
       config.link(c, virt_id .. ".tx -> " .. chain_input)
-      config.link(c, chain_output .. " -> " .. virt_id  .. ".rx")
+      config.link(c, chain_output .. " -> " .. virt_id  .. ".input")
    else
       config.app(c, "DummyVhost", basic_apps.Sink)
       config.link(c, "DummyVhost" .. ".tx -> " .. chain_input)
-      config.link(c, chain_output .. " -> " .. "DummyVhost"  .. ".rx")
+      config.link(c, chain_output .. " -> " .. "DummyVhost"  .. ".input")
       print("Running without VM (no vHostUser sock_path set)")
    end
 end
@@ -298,11 +301,11 @@ function passthrough(c, conf, sock_path)
       local socket_path = sock_path:format(conf.interface.id)
       config.app(c, virt_id, VhostUser, { socket_path = socket_path })
       config.link(c, virt_id .. ".tx -> " .. chain_input)
-      config.link(c, chain_output .. " -> " .. virt_id  .. ".rx")
+      config.link(c, chain_output .. " -> " .. virt_id  .. ".input")
    else
       config.app(c, "DummyVhost", basic_apps.Sink)
       config.link(c, "DummyVhost" .. ".tx -> " .. chain_input)
-      config.link(c, chain_output .. " -> " .. "DummyVhost"  .. ".rx")
+      config.link(c, chain_output .. " -> " .. "DummyVhost"  .. ".input")
       print("Running without VM (no vHostUser sock_path set)")
    end
 end

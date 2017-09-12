@@ -2,8 +2,7 @@ Usage:
   snabb wall spy [options] pcap <input.pcap>
   snabb wall spy [options] raw <device>
   snabb wall spy [options] tap <device>
-  snabb wall spy [options] intel10g <pci-address>
-  snabb wall spy [options] intel1g <pci-address>
+  snabb wall spy [options] intel <pci-address>
   snabb wall spy --help
 
 Analyzes traffic from .pcap capture file (in "pcap" mode), or live from a

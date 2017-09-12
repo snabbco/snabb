@@ -19,7 +19,7 @@ function benchmark {
   for (( i=1; i<=$ITERS; i++ ))
   do
     # run the filter
-    ./snabb wall filter --cpu $CPU -p -e "{ BITTORRENT = 'drop', default = 'accept' }" -D $DURATION -4 192.168.0.1 -m "01:23:45:67:89:ab" intel10g $PCI1 > $output &
+    ./snabb wall filter --cpu $CPU -p -e "{ BITTORRENT = 'drop', default = 'accept' }" -D $DURATION -4 192.168.0.1 -m "01:23:45:67:89:ab" intel $PCI1 > $output &
     # blast with pcap traffic
     ./snabb packetblaster replay -D $DURATION program/wall/tests/data/$1 $PCI2 > /dev/null
     grep "bytes:.*packets:.*bps:" $output

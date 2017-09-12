@@ -75,6 +75,9 @@ end
 
 function ipv6:new_from_mem(mem, size)
    local o = ipv6:superClass().new_from_mem(self, mem, size)
+   if o == nil then
+      return nil
+   end
    if not o._recycled then
       o._ph = ipv6hdr_pseudo_t()
    end

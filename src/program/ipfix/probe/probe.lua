@@ -45,7 +45,7 @@ function in_apps.intel10g (device)
    local conf = { pciaddr = device }
    return { input = "rx",
             output = "tx" },
-          { require("apps.intel.intel_app").Intel82599, conf }
+          { require("apps.intel_mp.intel_mp").Intel82599, conf }
 end
 out_apps.intel10g = in_apps.intel10g
 
@@ -67,7 +67,7 @@ local long_opts = {
 function run (args)
    local duration
 
-   local input_type, output_type = "intel10g", "intel10g"
+   local input_type, output_type = "intel_mp", "intel_mp"
 
    local host_mac
    local host_ip = '10.0.0.1' -- Just to have a default.
