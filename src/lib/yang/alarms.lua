@@ -259,8 +259,7 @@ function set_operator_state (key, args)
    key = alarm_keys:normalize(key)
    local alarm = state.alarm_list.alarm[key]
    if not alarm then
-      -- Return error. Could not locate alarm.
-      return false, 'Error: Set operate state operation failed. Could not locate alarm.'
+      error('Set operate state operation failed. Could not locate alarm.')
    end
    if not alarm.operator_state_change then
       alarm.operator_state_change = {}
@@ -364,19 +363,17 @@ function selftest ()
 
    -- Set operator state change.
    assert(table_size(alarm.operator_state_change) == 0)
-   local success = set_operator_state(key, {state='ack'})
-   assert(success)
+   set_operator_state(key, {state='ack'})
    assert(table_size(alarm.operator_state_change) == 1)
 
    -- Set operator state change again. Should create a new operator state change.
    sleep(1)
-   local success = set_operator_state(key, {state='ack'})
-   assert(success)
+   set_operator_state(key, {state='ack'})
    assert(table_size(alarm.operator_state_change) == 2)
 
    -- Set operator state change on non existent alarm should fail.
    local key = {resource='none', alarm_type_id='none', alarm_type_qualifier=''}
-   local success = set_operator_state(key, {state='ack'})
+   local success = pcall(set_operator_state, key, {state='ack'})
    assert(not success)
 
    print("ok")
