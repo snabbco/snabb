@@ -7,8 +7,8 @@ module(..., package.seeall)
 
 local bit      = require("bit")
 local ffi      = require("ffi")
-local pf       = require("pf")
 local template = require("apps.ipfix.template")
+local metadata = require("apps.ipfix.packet_metadata")
 local lib      = require("core.lib")
 local link     = require("core.link")
 local packet   = require("core.packet")
@@ -23,6 +23,7 @@ local ctable   = require("lib.ctable")
 local C        = ffi.C
 
 local htonl, htons = lib.htonl, lib.htons
+local metadata_add = metadata.add
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
@@ -495,21 +496,22 @@ function IPFIX:push()
    local flow_sets = self.flow_sets
    local nreadable = link.nreadable(input)
    counter.add(self.shm.received_packets, nreadable)
-   for i=1, nreadable do
-      local pkt = link.receive(input)
-      local handled = false
-      for _,set in ipairs(flow_sets) do
-         if set.match(pkt.data, pkt.length) then
-            link.transmit(set.incoming, pkt)
-            handled = true
-            break
+   for _,set in ipairs(flow_sets) do
+      for _ = 1, nreadable do
+         local p = link.receive(input)
+         local md = metadata_add(p)
+         if set.match(md.filter_start, md.filter_length) then
+            link.transmit(set.incoming, p)
+         else
+            link.transmit(input, p)
          end
       end
-      -- Drop packet if it didn't match any flow set.
-      if not handled then
-         counter.add(self.shm.ignored_packets)
-         packet.free(pkt)
-      end
+      nreadable = link.nreadable(input)
+   end
+
+   counter.add(self.shm.ignored_packets, nreadable)
+   for _ = 1, nreadable do
+      packet.free(link.receive(input))
    end
 
    for _,set in ipairs(flow_sets) do set:record_flows(timestamp) end
@@ -520,7 +522,6 @@ function IPFIX:push()
          set:sync_stats()
       end
    end
-
 end
 
 function selftest()

@@ -3,15 +3,20 @@
 
 module(..., package.seeall)
 
-local bit    = require("bit")
-local ffi    = require("ffi")
-local pf     = require("pf")
-local consts = require("apps.lwaftr.constants")
-local lib    = require("core.lib")
+local bit      = require("bit")
+local ffi      = require("ffi")
+local pf       = require("pf")
+local consts   = require("apps.lwaftr.constants")
+local lib      = require("core.lib")
+local ctable   = require("lib.ctable")
+local ethernet = require("lib.protocol.ethernet")
+local ipv4     = require("lib.protocol.ipv4")
+local metadata = require("apps.ipfix.packet_metadata")
 
 local ntohs  = lib.ntohs
 local htonl, htons = lib.htonl, lib.htons
 local function htonq(v) return bit.bswap(v + 0ULL) end
+local metadata_get = metadata.get
 
 local function ptr_to(ctype) return ffi.typeof('$*', ctype) end
 
@@ -33,18 +38,12 @@ local transport_proto_p = {
 -- These constants are taken from the lwaftr constants module, which
 -- is maybe a bad dependency but sharing code is good
 -- TODO: move constants somewhere else? lib?
-local ethertype_ipv4         = consts.ethertype_ipv4
-local ethertype_ipv6         = consts.ethertype_ipv6
-local ethernet_header_size   = consts.ethernet_header_size
-local ipv6_fixed_header_size = consts.ipv6_fixed_header_size
-local o_ethernet_ethertype   = consts.o_ethernet_ethertype
-local o_ipv4_total_length    = consts.o_ipv4_total_length
-local o_ipv4_ver_and_ihl     = consts.o_ipv4_ver_and_ihl
+local o_ipv4_dscp_and_ecn    = consts.o_ipv4_dscp_and_ecn
 local o_ipv4_proto           = consts.o_ipv4_proto
 local o_ipv4_src_addr        = consts.o_ipv4_src_addr
 local o_ipv4_dst_addr        = consts.o_ipv4_dst_addr
-local o_ipv6_payload_len     = consts.o_ipv6_payload_len
-local o_ipv6_next_header     = consts.o_ipv6_next_header
+local o_icmpv4_msg_type      = consts.o_icmpv4_msg_type
+local o_icmpv4_msg_code      = consts.o_icmpv4_msg_code
 local o_ipv6_src_addr        = consts.o_ipv6_src_addr
 local o_ipv6_dst_addr        = consts.o_ipv6_dst_addr
 
@@ -168,19 +167,17 @@ end
 
 local uint16_ptr_t = ffi.typeof('uint16_t *')
 
-local function get_ipv4_ihl(l3)
-   return bit.band((l3 + o_ipv4_ver_and_ihl)[0], 0x0f)
+local function get_ipv4_tos(l3) return l3[o_ipv4_dscp_and_ecn] end
+local function get_ipv6_tc(l3)
+   -- Version, traffic class and first part of flow label
+   local v_tc_fl = ntohs(ffi.cast(uint16_ptr_t, l3)[0])
+   -- Traffic class is bits 4-11 (MSB to LSB)
+   return (bit.rshift(bit.band(0x0FF0, v_tc_fl), 4))
 end
 
-local function get_ipv4_total_length(l3)
-   return ntohs(ffi.cast(uint16_ptr_t, l3 + o_ipv4_total_length)[0])
+local function get_icmp_typecode(l4)
+   return ntohs(ffi.cast(uint16_ptr_t, l4+o_icmpv4_msg_type)[0])
 end
-local function get_ipv6_payload_length(l3)
-   return ntohs(ffi.cast(uint16_ptr_t, l3 + o_ipv6_payload_len)[0])
-end
-
-local function get_ipv4_protocol(l3)    return l3[o_ipv4_proto] end
-local function get_ipv6_next_header(l3) return l3[o_ipv6_next_header] end
 
 local function get_ipv4_src_addr_ptr(l3) return l3 + o_ipv4_src_addr end
 local function get_ipv4_dst_addr_ptr(l3) return l3 + o_ipv4_dst_addr end
@@ -212,27 +209,26 @@ local function get_tcp_flags(l4)
    return ntohs(ffi.cast(uint16_ptr_t, l4)[6])
 end
 
-v4 = make_template_info {
-   id     = 256,
-   filter = "ip",
-   keys   = { "sourceIPv4Address",
-              "destinationIPv4Address",
-              "protocolIdentifier",
-              "sourceTransportPort",
-              "destinationTransportPort" },
-   values = { "flowStartMilliseconds",
-              "flowEndMilliseconds",
-              "packetDeltaCount",
-              "octetDeltaCount",
-              "tcpControlBitsReduced" }
-}
+-- Address-family dependent extractors
 
-local function extract_transport_key(entry, l4)
+local function extract_v4_addr(l3, entry)
+   read_ipv4_src_address(l3, entry.key.sourceIPv4Address)
+   read_ipv4_dst_address(l3, entry.key.destinationIPv4Address)
+end
+
+local function extract_v6_addr(l3, entry)
+   read_ipv6_src_address(l3, entry.key.sourceIPv6Address)
+   read_ipv6_dst_address(l3, entry.key.destinationIPv6Address)
+end
+
+-- Address-family independent extract/accumulate functions
+
+local function extract_transport_key(l4, entry)
    entry.key.sourceTransportPort = get_transport_src_port(l4)
    entry.key.destinationTransportPort = get_transport_dst_port(l4)
 end
 
-local function extract_tcp_flags(entry, l4)
+local function extract_tcp_flags(l4, entry)
    -- Mask off data offset bits
    entry.value.tcpControlBits = bit.band(0xFFF, get_tcp_flags(l4))
 end
@@ -252,39 +248,61 @@ local function accumulate_tcp_flags_reduced(dst, new)
               new.value.tcpControlBitsReduced)
 end
 
-function v4.extract(pkt, timestamp, entry)
-   local l2 = pkt.data
-   local l3 = l2 + ethernet_header_size
-   local ihl = get_ipv4_ihl(l3)
-   local l4 = l3 + ihl * 4
-
+-- Clear key and value, extract the 3-tuple, fill in flow start/end
+-- times and packet/octet counters.  This is the bare minimum any
+-- template will need.
+local function extract_3_tuple(pkt, timestamp, entry, md, extract_addr_fn)
    ffi.fill(entry.key, ffi.sizeof(entry.key))
    ffi.fill(entry.value, ffi.sizeof(entry.value))
-   -- Fill key.
-   -- FIXME: Try using normal Lua assignment.
-   read_ipv4_src_address(l3, entry.key.sourceIPv4Address)
-   read_ipv4_dst_address(l3, entry.key.destinationIPv4Address)
-   local proto = get_ipv4_protocol(l3)
-   entry.key.protocolIdentifier = proto
-   if transport_proto_p[proto] then
-      extract_transport_key(entry, l4)
-   end
 
-   -- Fill value.
+   extract_addr_fn(md.l3, entry)
+   entry.key.protocolIdentifier = md.proto
+
    entry.value.flowStartMilliseconds = timestamp
    entry.value.flowEndMilliseconds = timestamp
    entry.value.packetDeltaCount = 1
-   entry.value.octetDeltaCount = get_ipv4_total_length(l3)
-   if proto == IP_PROTO_TCP then
-      extract_tcp_flags_reduced(entry, l4)
+   entry.value.octetDeltaCount = md.total_length
+end
+
+local function extract_5_tuple(pkt, timestamp, entry, md, extract_addr_fn)
+   extract_3_tuple(pkt, timestamp, entry, md, extract_addr_fn)
+   if transport_proto_p[md.proto] and md.frag_offset == 0 then
+      extract_transport_key(md.l4, entry)
    end
 end
 
-function v4.accumulate(dst, new)
+local function accumulate_generic(dst, new)
    dst.value.flowEndMilliseconds = new.value.flowEndMilliseconds
    dst.value.packetDeltaCount = dst.value.packetDeltaCount + 1
    dst.value.octetDeltaCount =
       dst.value.octetDeltaCount + new.value.octetDeltaCount
+end
+
+v4 = make_template_info {
+   id     = 256,
+   filter = "ip",
+   keys   = { "sourceIPv4Address",
+              "destinationIPv4Address",
+              "protocolIdentifier",
+              "sourceTransportPort",
+              "destinationTransportPort" },
+   values = { "flowStartMilliseconds",
+              "flowEndMilliseconds",
+              "packetDeltaCount",
+              "octetDeltaCount",
+              "tcpControlBitsReduced" }
+}
+
+function v4.extract(pkt, timestamp, entry)
+   local md = metadata_get(pkt)
+   extract_5_tuple(pkt, timestamp, entry, md, extract_v4_addr)
+   if md.proto == IP_PROTO_TCP and md.frag_offset == 0 then
+      extract_tcp_flags_reduced(md.l4, entry)
+   end
+end
+
+function v4.accumulate(dst, new)
+   accumulate_generic(dst, new)
    if dst.key.protocolIdentifier == IP_PROTO_TCP then
       accumulate_tcp_flags_reduced(dst, new)
    end
@@ -318,39 +336,15 @@ v6 = make_template_info {
 }
 
 function v6.extract(pkt, timestamp, entry)
-   local l2 = pkt.data
-   local l3 = l2 + ethernet_header_size
-   -- TODO: handle chained headers
-   local l4 = l3 + ipv6_fixed_header_size
-
-   ffi.fill(entry.key, ffi.sizeof(entry.key))
-   ffi.fill(entry.value, ffi.sizeof(entry.value))
-   -- Fill key.
-   -- FIXME: Try using normal Lua assignment.
-   read_ipv6_src_address(l3, entry.key.sourceIPv6Address)
-   read_ipv6_dst_address(l3, entry.key.destinationIPv6Address)
-   local proto = get_ipv6_next_header(l3)
-   entry.key.protocolIdentifier = proto
-   if transport_proto_p[proto] then
-      extract_transport_key(entry, l4)
-   end
-
-   -- Fill value.
-   entry.value.flowStartMilliseconds = timestamp
-   entry.value.flowEndMilliseconds = timestamp
-   entry.value.packetDeltaCount = 1
-   entry.value.octetDeltaCount = get_ipv6_payload_length(l3)
-      + ipv6_fixed_header_size
-   if proto == IP_PROTO_TCP then
-      extract_tcp_flags_reduced(entry, l4)
+   local md = metadata_get(pkt)
+   extract_5_tuple(pkt, timestamp, entry, md, extract_v6_addr)
+   if md.proto == IP_PROTO_TCP and md.frag_offset == 0 then
+      extract_tcp_flags_reduced(md.l4, entry)
    end
 end
 
 function v6.accumulate(dst, new)
-   dst.value.flowEndMilliseconds = new.value.flowEndMilliseconds
-   dst.value.packetDeltaCount = dst.value.packetDeltaCount + 1
-   dst.value.octetDeltaCount =
-      dst.value.octetDeltaCount + new.value.octetDeltaCount
+   accumulate_generic(dst, new)
    if dst.key.protocolIdentifier == IP_PROTO_TCP then
       accumulate_tcp_flags_reduced(dst, new)
    end
