@@ -1,4 +1,4 @@
-Usage: snabb config set-operator-state [OPTION]... ID ALARM-ID OPERATOR-STATE ALARM-TEXT
+Usage: snabb config set-alarm-operator-state [OPTION]... ID ALARM-ID OPERATOR-STATE ALARM-TEXT
 Adds a new operator-state in an alarm.
 
 Available options:
@@ -13,7 +13,7 @@ operator-state to the given alarm.
 
 Typical usage:
 
-$ snabb config get-state lwaftr external-interface,arp-resolution ack.
+$ snabb config set-alarm-operator-state lwaftr external-interface,arp-resolution ack
 
 See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
 for full documentation.

@@ -108,7 +108,7 @@ module snabb-config-leader-v1 {
     }
   }
 
-  rpc set-operator-state {
+  rpc set-alarm-operator-state {
     description
       "This is a means for the operator to indicate
        the level of human intervention on an alarm.";

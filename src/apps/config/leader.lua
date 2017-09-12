@@ -171,7 +171,7 @@ function Leader:rpc_get_config (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_set_operator_state (args)
+function Leader:rpc_set_alarm_operator_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
          return false, ("Set-operator-state operation not supported in"..

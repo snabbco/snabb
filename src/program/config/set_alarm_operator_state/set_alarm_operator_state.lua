@@ -4,7 +4,7 @@ module(..., package.seeall)
 local common = require("program.config.common")
 
 local function usage(exit_code)
-   print(require("program.config.set_operator_state.README_inc"))
+   print(require("program.config.set_alarm_operator_state.README_inc"))
    main.exit(exit_code)
 end
 
@@ -30,10 +30,10 @@ end
 
 function run(args)
    local l_args = parse_args(args)
-   local opts = { command='set-operator-state', with_path=false, is_config=false }
+   local opts = { command='set-alarm-operator-state', with_path=false, is_config=false }
    args = common.parse_command_line(args, opts)
    local response = common.call_leader(
-      args.instance_id, 'set-operator-state',
+      args.instance_id, 'set-alarm-operator-state',
       { schema = args.schema_name, revision = args.revision_date,
         resource = l_args.key.resource, alarm_type_id = l_args.key.alarm_type_id,
         alarm_type_qualifier = l_args.key.alarm_type_qualifier,
