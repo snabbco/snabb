@@ -147,6 +147,7 @@ function new(params)
    ctab.size = 0
    ctab.max_displacement = 0
    ctab.occupancy = 0
+   ctab.lookup_helpers = {}
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
    ctab = setmetatable(ctab, { __index = CTable })
@@ -221,6 +222,7 @@ function CTable:resize(size)
    self.scale = self.size / HASH_MAX
    self.occupancy = 0
    self.max_displacement = 0
+   self.lookup_helper = self:make_lookup_helper()
    self.occupancy_hi = ceil(self.size * self.max_occupancy_rate)
    self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
    for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
@@ -260,7 +262,7 @@ function load(stream, params)
    params_copy.max_occupancy_rate = header.max_occupancy_rate
    local ctab = new(params_copy)
    ctab.occupancy = header.occupancy
-   ctab.max_displacement = header.max_displacement
+   ctab:maybe_increase_max_displacement(header.max_displacement)
    local entry_count = ctab.size + ctab.max_displacement
 
    -- Slurp the entries directly into the ctable's backing store.
@@ -280,6 +282,22 @@ function CTable:save(stream)
    stream:write_array(self.entries,
                       self.entry_type,
                       self.size + self.max_displacement)
+end
+
+function CTable:make_lookup_helper()
+   local entries_per_lookup = self.max_displacement + 1
+   local search = self.lookup_helpers[entries_per_lookup]
+   if search == nil then
+      search = binary_search.gen(entries_per_lookup, self.entry_type)
+      self.lookup_helpers[entries_per_lookup] = search
+   end
+   return search
+end
+
+function CTable:maybe_increase_max_displacement(displacement)
+   if displacement <= self.max_displacement then return end
+   self.max_displacement = displacement
+   self.lookup_helper = self:make_lookup_helper()
 end
 
 function CTable:add(key, value, updates_allowed)
@@ -324,7 +342,7 @@ function CTable:add(key, value, updates_allowed)
 
    assert(updates_allowed ~= 'required', "key not found in ctable")
 
-   self.max_displacement = max(self.max_displacement, index - start_index)
+   self:maybe_increase_max_displacement(index - start_index)
 
    if entries[index].hash ~= HASH_MAX then
       -- In a robin hood hash, we seek to spread the wealth around among
@@ -340,7 +358,7 @@ function CTable:add(key, value, updates_allowed)
       while empty > index do
          entries[empty] = entries[empty - 1]
          local displacement = empty - hash_to_index(entries[empty].hash, scale)
-         self.max_displacement = max(self.max_displacement, displacement)
+         self:maybe_increase_max_displacement(displacement)
          empty = empty - 1;
       end
    end
@@ -359,22 +377,24 @@ end
 function CTable:lookup_ptr(key)
    local hash = self.hash_fn(key)
    local entry = self.entries + hash_to_index(hash, self.scale)
+   entry = self.lookup_helper(entry, hash)
 
-   -- Fast path in case we find it directly.
-   if hash == entry.hash and self.equal_fn(key, entry.key) then
-      return entry
-   end
-
-   while entry.hash < hash do entry = entry + 1 end
-
-   while entry.hash == hash do
+   if hash == entry.hash then
+      -- Peel the first iteration of the loop; collisions will be rare.
       if self.equal_fn(key, entry.key) then return entry end
-      -- Otherwise possibly a collision.
       entry = entry + 1
+      if entry.hash ~= hash then return nil end
+      while entry.hash == hash do
+         if self.equal_fn(key, entry.key) then return entry end
+         -- Otherwise possibly a collision.
+         entry = entry + 1
+      end
+      -- Not found.
+      return nil
+   else
+      -- Not found.
+      return nil
    end
-
-   -- Not found.
-   return nil
 end
 
 function CTable:lookup_and_copy(key, entry)
