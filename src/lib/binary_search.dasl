@@ -35,6 +35,8 @@ local function assemble (name, prototype, generator)
    return ffi.cast(prototype, mcode)
 end
 
+local ffi_type_cache = {}
+
 function gen(count, entry_type)
    local function gen_binary_search(Dst)
       if count == 1 then
@@ -80,8 +82,11 @@ function gen(count, entry_type)
       | mov rax, rdi
       | ret
    end
-   return assemble("binary_search_"..count,
-                   ffi.typeof("$*(*)($*, uint32_t)", entry_type, entry_type),
+   if not ffi_type_cache[entry_type] then
+      ffi_type_cache[entry_type] = ffi.typeof(
+         "$*(*)($*, uint32_t)", entry_type, entry_type)
+   end
+   return assemble("binary_search_"..count, ffi_type_cache[entry_type],
                    gen_binary_search)
 end
 
