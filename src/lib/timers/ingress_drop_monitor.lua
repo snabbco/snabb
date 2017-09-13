@@ -20,7 +20,8 @@ local IngressDropMonitor = {}
 function new(args)
    local ret = {
       threshold = args.threshold or 100000,
-      wait = args.wait or 20,
+      wait = args.wait or 30,
+      grace_period = args.grace_period or 10,
       action = args.action or 'flush',
       tips_url = args.tips_url or default_tips_url,
       last_flush = 0,
@@ -56,6 +57,10 @@ function IngressDropMonitor:sample ()
 end
 
 function IngressDropMonitor:jit_flush_if_needed ()
+   if now() - self.last_flush < self.grace_period then
+      self.last_value[0] = self.current_value[0]
+      return
+   end
    if self.current_value[0] - self.last_value[0] < self.threshold then return end
    if now() - self.last_flush < self.wait then return end
    self.last_flush = now()
