@@ -37,6 +37,9 @@ def nic_names():
 def jit_config_dir():
     return os.environ.get("JIT_CONFIG_DIR")
 
+class DaemonException(Exception):
+    pass
+
 class BaseTestCase(unittest.TestCase):
     """
     Base class for TestCases. It has a "run_cmd" method and daemon handling,
@@ -96,16 +99,20 @@ class BaseTestCase(unittest.TestCase):
             self.fail('\n'.join(msg_lines))
         return output
 
+    @staticmethod
+    def stop_daemon(daemon):
+        ret_code = daemon.poll()
+        if ret_code is None:
+            daemon.terminate()
+            ret_code = daemon.wait()
+        if ret_code in (0, -SIGTERM):
+            daemon.stdout.close()
+            daemon.stderr.close()
+        else:
+            raise DaemonException('Error terminating deamon: ' + str(ret_code))
+
     @classmethod
     def tearDownClass(cls):
         if not cls.daemon_args:
             return
-        ret_code = cls.daemon.poll()
-        if ret_code is None:
-            cls.daemon.terminate()
-            ret_code = cls.daemon.wait()
-        if ret_code in (0, -SIGTERM):
-            cls.daemon.stdout.close()
-            cls.daemon.stderr.close()
-        else:
-            cls.reportAndFail('Error terminating daemon:', ret_code)
+        cls.stop_daemon(cls.daemon)

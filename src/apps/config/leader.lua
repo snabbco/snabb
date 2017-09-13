@@ -83,19 +83,25 @@ function Leader:set_initial_configuration (configuration)
             '/', self.current_configuration)
 
    -- Iterate over followers starting the workers and queuing up actions.
-   for id, config in pairs(worker_app_graphs) do
-      local follower_pid = self:start_worker()
-      self.followers[id] = { pid=follower_pid, queue={}, graph=config}
-
-      -- Configure the follower.
-      local actions = self.support.compute_config_actions(
-	     app_graph.new(), self.followers[id].graph, {}, 'load')
-      self:enqueue_config_actions_for_follower(id, actions)
+   for id, worker_app_graph in pairs(worker_app_graphs) do
+      self:start_follower_for_graph(id, worker_app_graph)
    end
 end
 
 function Leader:start_worker()
    return worker.start("follower", self.worker_start_code)
+end
+
+function Leader:stop_worker(worker)
+   S.kill(worker.pid, 15)
+end
+
+function Leader:start_follower_for_graph(id, graph)
+   self.followers[id] = { pid=self:start_worker(), queue={}, graph=graph }
+   local actions = self.support.compute_config_actions(
+      app_graph.new(), self.followers[id].graph, {}, 'load')
+   self:enqueue_config_actions_for_follower(id, actions)
+   return self.followers[id]
 end
 
 function Leader:take_follower_message_queue ()
@@ -440,11 +446,21 @@ function Leader:update_configuration (update_fn, verb, path, ...)
          self.current_in_place_dependencies, ...)
    local new_config = update_fn(self.current_configuration, ...)
    local new_graphs = self.setup_fn(new_config, ...)
+   for id, graph in pairs(new_graphs) do
+      if self.followers[id] == nil then
+	 self:start_follower_for_graph(id, graph)
+      end
+   end
+
    for id, follower in pairs(self.followers) do
-      local actions = self.support.compute_config_actions(
-         follower.graph, new_graphs[id], to_restart, verb, path, ...)
-      self:enqueue_config_actions_for_follower(id, actions)
-      follower.graph = new_graphs[id]
+      if new_graphs[id] == nil then
+	 self:stop_worker(follower)
+      else
+	 local actions = self.support.compute_config_actions(
+	    follower.graph, new_graphs[id], to_restart, verb, path, ...)
+	 self:enqueue_config_actions_for_follower(id, actions)
+	 follower.graph = new_graphs[id]
+      end
    end
    self.current_configuration = new_config
    self.current_in_place_dependencies =
