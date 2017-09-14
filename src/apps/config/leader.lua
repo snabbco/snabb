@@ -187,14 +187,14 @@ function Leader:rpc_set_alarm_operator_state (args)
 end
 
 function Leader:rpc_purge_alarms (args)
-   local function getter()
+   local function purge()
       if args.schema ~= self.schema_name then
          return false, ("Purge-alarms operation not supported in"..
                         "'%s' schema"):format(args.schema)
       end
       return { purged_alarms = alarms.purge_alarms(args) }
    end
-   local success, response = pcall(getter)
+   local success, response = pcall(purge)
    if success then return response else return {status=1, error=response} end
 end
 

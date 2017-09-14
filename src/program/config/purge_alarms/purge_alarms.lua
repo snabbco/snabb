@@ -29,14 +29,10 @@ local function parse_args (args)
       end
       return ret
    end
-   handlers['by-older-than'] = function (arg)
-      opts['older_than'] = arg
-   end
-   handlers['by-severity'] = function (arg)
-      opts['severity'] = arg
-   end
+   handlers['by-older-than'] = function (arg) opts.older_than = arg end
+   handlers['by-severity'] = function (arg) opts.severity = arg end
    handlers['by-operator-state'] = function (arg)
-      opts['operator_state_filter'] = arg
+      opts.operator_state_filter = arg
    end
    args = lib.dogetopt(args, handlers, "", { ['by-older-than']=1,
       ['by-severity']=1, ['by-operator-state']=1 })

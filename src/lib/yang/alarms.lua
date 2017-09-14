@@ -321,7 +321,7 @@ function purge_alarms (args)
    local function by_older_than (alarm, args)
       local older_than = assert(args.older_than)
       if type(older_than) == 'string' then
-         local age_spec, value = older_than:match("([%w]+)/([%d]+)")
+         local age_spec, value = older_than:match("([%w]+):([%d]+)")
          older_than = {value = value, age_spec = age_spec}
       end
       assert(type(older_than) == 'table')
@@ -332,7 +332,7 @@ function purge_alarms (args)
    local function by_severity (alarm, args)
       local severity = assert(args.severity)
       if type(severity) == 'string' then
-         local sev_spec, value = severity:match("([%w]+)/([%w]+)")
+         local sev_spec, value = severity:match("([%w]+):([%w]+)")
          severity = {sev_spec = sev_spec, value = value}
       end
       assert(type(severity) == 'table' and severity.sev_spec and severity.value,
@@ -358,7 +358,7 @@ function purge_alarms (args)
       local operator_state = assert(args.operator_state_filter)
       local state, user
       if type(operator_state) == 'string' then
-         state, user = operator_state:match("([%w]+)/([%w]+)")
+         state, user = operator_state:match("([%w]+):([%w]+)")
          if not state then
             state, user = operator_state, operator_state
          end

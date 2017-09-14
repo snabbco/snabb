@@ -9,15 +9,15 @@ Available options:
   -h, --help                    Displays this message.
 
 Filtering options:
-  --by-severity                 [severity-spec/value].
+  --by-severity                 [severity-spec:value].
                                   Severity spec: 'is', 'below', 'above'.
                                   Value: 'indeterminate', 'minor', 'warning', 'major', 'critical'.
-  --by-older-than               [age-spec/value].
+  --by-older-than               [age-spec:value].
                                   Age spec: 'seconds', 'minutes', 'hours', 'days', 'weeks'.
                                   Value: integer.
-  --by-operator-state-filter    [state/user].
-                                  State: 'none', 'ack', 'closed', 'shelved', 'un-shelved'.
-                                  User: string.
+  --by-operator-state-filter    [state:user].
+                                  State (optional): 'none', 'ack', 'closed', 'shelved', 'un-shelved'.
+                                  User (optional): string.
 
 Given an instance identifier and an alarm state ('any', 'cleared' or 'not-cleared')
 remove all alarms that match the filtering options.
@@ -25,8 +25,8 @@ remove all alarms that match the filtering options.
 Typical usage:
 
 $ sudo ./snabb config purge-alarms lwaftr any
-$ sudo ./snabb config purge-alarms --by-severity above/minor lwaftr any
-$ sudo ./snabb config purge-alarms --by-older-than minutes/5 lwaftr cleared
+$ sudo ./snabb config purge-alarms --by-severity above:minor lwaftr any
+$ sudo ./snabb config purge-alarms --by-older-than minutes:5 lwaftr cleared
 
 See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
 for full documentation.
