@@ -6,6 +6,7 @@ local util = require('lib.yang.util')
 local alarm_codec = require('apps.config.alarm_codec')
 
 local format_date_as_iso_8601 = util.format_date_as_iso_8601
+local parse_date_as_iso_8601 = util.parse_date_as_iso_8601
 
 local state = {
    alarm_inventory = {
@@ -274,6 +275,141 @@ function set_operator_state (key, args)
    return true
 end
 
+-- Purge alarms.
+
+local ages = {seconds=1, minutes=60, hours=3600, days=3600*24, weeks=3600*24*7}
+
+local function toseconds (date)
+   if type(date) == 'table' then
+      assert(date.age_spec and date.value, "Not a valid 'older_than' data type")
+
+      local multiplier = assert(ages[date.age_spec],
+                                "Not a valid 'age_spec' value: "..date.age_spec)
+      return date.value * multiplier
+   elseif type(date) == 'string' then
+      local t = {}
+      t.year, t.month, t.day, t.hour, t.min, t.sec = parse_date_as_iso_8601(date)
+      return os.time(t)
+   else
+      error('Wrong data type: '..type(date))
+   end
+end
+
+-- `purge_alarms` requests the server to delete entries from the alarm list
+-- according to the supplied criteria.  Typically it can be used to delete
+-- alarms that are in closed operator state and older than a specified time.
+-- The number of purged alarms is returned as an output parameter.
+--
+-- args: {status, older_than, severity, operator_state}
+function purge_alarms (args)
+   local alarm_list = state.alarm_list
+   local alarms = state.alarm_list.alarm
+   args.alarm_status = args.alarm_status or 'any'
+   local function purge_alarm (key)
+      alarms[key] = nil
+      alarm_list.number_of_alarms = alarm_list.number_of_alarms - 1
+   end
+   local function by_status (alarm, args)
+      local status = assert(args.alarm_status)
+      local alarm_statuses = lib.set('any', 'cleared', 'not-cleared')
+      assert(alarm_statuses[status], 'Not a valid status value: '..status)
+      if status == 'any' then return true end
+      if status == 'cleared' then return alarm.is_cleared end
+      if status == 'not-cleared' then return not alarm.is_cleared end
+      return false
+   end
+   local function by_older_than (alarm, args)
+      local older_than = assert(args.older_than)
+      if type(older_than) == 'string' then
+         local age_spec, value = older_than:match("([%w]+):([%d]+)")
+         older_than = {value = value, age_spec = age_spec}
+      end
+      assert(type(older_than) == 'table')
+      local alarm_time = toseconds(alarm.time_created)
+      local threshold = toseconds(older_than)
+      return util.gmtime() - alarm_time >= threshold
+   end
+   local function by_severity (alarm, args)
+      local severity = assert(args.severity)
+      if type(severity) == 'string' then
+         local sev_spec, value = severity:match("([%w]+):([%w]+)")
+         severity = {sev_spec = sev_spec, value = value}
+      end
+      assert(type(severity) == 'table' and severity.sev_spec and severity.value,
+             'Not valid severity data type')
+      local severities = {indeterminate=2, minor=3 , warning=4, major=5, critical=6}
+      local function tonumber (severity)
+         return severities[severity]
+      end
+      local sev_spec, severity = severity.sev_spec, tonumber(severity.value)
+      local alarm_severity = tonumber(alarm.perceived_severity)
+      if sev_spec == 'below' then
+         return alarm_severity < severity
+      elseif sev_spec == 'is' then
+         return alarm_severity == severity
+      elseif sev_spec == 'above' then
+         return alarm_severity > severity
+      else
+         error('Not valid sev-spec value: '..sev_spec)
+      end
+      return false
+   end
+   local function by_operator_state (alarm, args)
+      local operator_state = assert(args.operator_state_filter)
+      local state, user
+      if type(operator_state) == 'string' then
+         state, user = operator_state:match("([%w]+):([%w]+)")
+         if not state then
+            state, user = operator_state, operator_state
+         end
+         operator_state = {state=state, user=user}
+      end
+      assert(type(operator_state) == 'table')
+      local function tonumber (state)
+         return operator_states[state]
+      end
+      state, user = operator_state.state, operator_state.user
+      if state or user then
+         for _, state_change in pairs(alarm.operator_state_change or {}) do
+            if state and tonumber(state_change.state) == tonumber(state) then
+               return true
+            elseif user and state_change.user == user then
+               return true
+            end
+         end
+      end
+      return false
+   end
+   local args_to_filters = { older_than=by_older_than,
+                             severity = by_severity,
+                             operator_state_filter = by_operator_state, }
+   local filter = {}
+   function filter:initialize (args)
+      self.args = args
+      self.filters = { by_status }
+      for name, filter in pairs(args_to_filters) do
+         if args[name] then
+            table.insert(self.filters, filter)
+         end
+      end
+   end
+   function filter:apply (alarm)
+      for _, filter in ipairs(self.filters) do
+         if not filter(alarm, self.args) then return false end
+      end
+      return true
+   end
+   local count = 0
+   filter:initialize(args)
+   for key, alarm in pairs(alarms) do
+      if filter:apply(alarm) then
+         purge_alarm(key)
+         count = count + 1
+      end
+   end
+   return count
+end
+
 --
 
 function selftest ()
@@ -292,6 +428,7 @@ function selftest ()
 
    -- Check alarm inventory has been loaded.
    require("apps.ipv4.arp")
+   require("apps.lwaftr.ndp")
    assert(table_size(state.alarm_inventory.alarm_type) > 0)
 
    -- Check number of alarms is zero.
@@ -375,6 +512,48 @@ function selftest ()
    local key = {resource='none', alarm_type_id='none', alarm_type_qualifier=''}
    local success = pcall(set_operator_state, key, {state='ack'})
    assert(not success)
+
+   -- Test toseconds.
+   assert(toseconds({age_spec='weeks', value=1}) == 3600*24*7)
+   assert(toseconds('1970-01-01T00:00:00Z') == 0)
+
+   -- Purge alarms by status.
+   assert(table_size(state.alarm_list.alarm) == 1)
+   assert(purge_alarms({alarm_status = 'any'}) == 1)
+   assert(table_size(state.alarm_list.alarm) == 0)
+   assert(purge_alarms({alarm_status = 'any'}) == 0)
+
+   -- Purge alarms filtering by older_than.
+   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   raise_alarm(key)
+   sleep(1)
+   assert(purge_alarms({older_than={age_spec='seconds', value='1'}}) == 1)
+
+   -- Purge alarms by severity.
+   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   raise_alarm(key)
+   assert(table_size(state.alarm_list.alarm) == 1)
+   assert(purge_alarms({severity={sev_spec='is', value='minor'}}) == 0)
+   assert(purge_alarms({severity={sev_spec='below', value='minor'}}) == 0)
+   assert(purge_alarms({severity={sev_spec='above', value='minor'}}) == 1)
+
+   raise_alarm(key, {perceived_severity='minor'})
+   assert(purge_alarms({severity={sev_spec='is', value='minor'}}) == 1)
+
+   raise_alarm(alarm_keys:fetch('external-interface', 'arp-resolution'))
+   raise_alarm(alarm_keys:fetch('internal-interface', 'ndp-resolution'))
+   assert(table_size(state.alarm_list.alarm) == 2)
+   assert(purge_alarms({severity={sev_spec='above', value='minor'}}) == 2)
+
+   -- Purge alarms by operator_state_filter.
+   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   raise_alarm(key)
+   assert(table_size(state.alarm_list.alarm) == 1)
+   local success = set_operator_state(key, {state='ack'})
+   assert(success)
+   local alarm = assert(state.alarm_list.alarm[key])
+   assert(table_size(alarm.operator_state_change) == 1)
+   assert(purge_alarms({operator_state_filter={state='ack'}}) == 1)
 
    print("ok")
 end

@@ -128,4 +128,51 @@ module snabb-config-leader-v1 {
       leaf success { type boolean; description "True if operation succeeded."; }
     }
   }
+
+  grouping filter-input {
+      description
+          "Grouping to specify a filter construct on alarm information.";
+      leaf alarm-status {
+        type string;
+        mandatory true;
+        description
+          "The clearance status of the alarm.";
+      }
+      leaf older-than {
+        type string;
+        description "Matches the 'last-status-change' leaf in the alarm.";
+      }
+      leaf severity {
+        type string;
+        description "Filter based on severity.";
+      }
+      leaf operator-state-filter {
+        type string;
+        description "Filter based on operator state.";
+      }
+  }
+
+  rpc purge-alarms {
+    description
+      "This operation requests the server to delete entries from the
+      alarm list according to the supplied criteria.  Typically it
+      can be used to delete alarms that are in closed operator state
+      and older than a specified time.  The number of purged alarms
+      is returned as an output parameter";
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
+      uses filter-input;
+    }
+    output {
+      uses error-reporting;
+      leaf purged-alarms {
+        type uint32;
+        description "Number of purged alarms.";
+      }
+    }
+  }
+
 }

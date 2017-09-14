@@ -129,7 +129,7 @@ function memoize(f, max_occupancy)
    end
 end
 
-local function gmtime ()
+function gmtime ()
    local now = os.time()
    local utcdate = os.date("!*t", now)
    local localdate = os.date("*t", now)
@@ -141,6 +141,14 @@ end
 function format_date_as_iso_8601 (time)
    time = time or gmtime()
    return os.date("%Y-%m-%dT%H:%M:%SZ", time)
+end
+
+-- XXX: ISO 8601 can be more complex. We asumme date is the format returned
+-- by 'format_date_as_iso8601'.
+function parse_date_as_iso_8601 (date)
+   assert(type(date) == 'string')
+   local pattern = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)Z"
+   return assert(date:match(pattern))
 end
 
 function selftest()

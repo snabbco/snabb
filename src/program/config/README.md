@@ -33,6 +33,9 @@ include:
 * [`snabb config set-alarm-operator-state`](./set_alarm_operator_state/README):
   add a new operator-state to an alarm
 
+* [`snabb config purge-alarms`](./purge_alarms/README):
+  purge alarms by several criteria
+
 The `snabb config get` et al commands are the normal way that Snabb
 users interact with Snabb applications in an ad-hoc fashion via the
 command line.  `snabb config listen` is the standard way that a NETCONF
