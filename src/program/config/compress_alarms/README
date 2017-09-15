@@ -1,4 +1,4 @@
-Usage: snabb config compress-alarms [OPTION]... ID RESOURCE ALARM-TYPE-ID ALARM-TYPE-QUALIFIER
+Usage: snabb config compress-alarms [OPTION]... ID RESOURCE ALARM-TYPE-ID/ALARM-TYPE-QUALIFIER
 Compress status change for all matching alarms.
 
 Available options:
@@ -8,14 +8,14 @@ Available options:
       --print-default           Forces print out of default values.
   -h, --help                    Displays this message.
 
-Given an instance identifier, a resource, an alarm type identifier and an alarm
-type qualifier compresses entries in the alarm list by removing all but the
-latest state change for al alarms.  Conditions in the input are logically ANDed.
-If no input condition is given, all alarms are compressed.
+Given an instance identifier, a resource, an alarm type identifier an alarm
+type qualifier (optional) compresses entries in the alarm list by removing all
+but the latest state change for al alarms.  Conditions in the input are
+logically ANDed.  If no input condition is given, all alarms are compressed.
 
 Typical usage:
 
-$ sudo ./snabb config compress-alarms lwaftr external-resource arp-resolution
+$ sudo ./snabb config compress-alarms lwaftr external-interface arp-resolution
 
 See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
 for full documentation.

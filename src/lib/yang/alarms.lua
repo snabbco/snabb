@@ -433,20 +433,6 @@ end
 -- alarms.  Conditions in the input are logically ANDed.  If no
 -- input condition is given, all alarms are compressed.
 function compress_alarms (key)
-   local function parse_key (key)
-      local t = {}
-      for each in key:gmatch('([^/]+)') do
-         table.insert(t, each)
-      end
-      return {
-         resource = t[1],
-         alarm_type_id = t[2],
-         alarm_type_qualifier = t[3] or '',
-      }
-   end
-   if type(key) == 'string' then
-      key = parse_key(key)
-   end
    assert(type(key) == 'table')
    local count = 0
    for k, alarm in pairs(state.alarm_list.alarm) do
