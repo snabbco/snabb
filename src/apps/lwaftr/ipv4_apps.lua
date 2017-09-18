@@ -139,6 +139,7 @@ function ICMPEcho:push()
       if icmp.is_icmpv4_message(pkt, icmpv4_echo_request, 0) then
          local pkt_ipv4 = ipv4:new_from_mem(pkt.data + ehs,
                                             pkt.length - ehs)
+         assert(pkt_ipv4)
          local pkt_ipv4_dst = rd32(pkt_ipv4:dst())
          if self.addresses[pkt_ipv4_dst] then
             ethernet:new_from_mem(pkt.data, ehs):swap()

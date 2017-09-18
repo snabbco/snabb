@@ -88,6 +88,7 @@ function esp_v6_encrypt:encapsulate (p)
    packet.resize(p, length + overhead)
    self.ip:new_from_mem(data + ETHERNET_SIZE, IPV6_SIZE)
    self.esp_tail:new_from_mem(data + length + pad_length, ESP_TAIL_SIZE)
+   assert(self.ip and self.esp_tail)
    self.esp_tail:next_header(self.ip:next_header())
    self.esp_tail:pad_length(pad_length)
    self:next_seq_no()
@@ -97,6 +98,7 @@ function esp_v6_encrypt:encapsulate (p)
    local ctext = iv + gcm.IV_SIZE
    C.memmove(ctext, payload, ptext_length + gcm.AUTH_SIZE)
    self.esp:new_from_mem(payload, ESP_SIZE)
+   assert(self.esp)
    self.esp:spi(self.spi)
    self.esp:seq_no(self.seq:low())
    ffi.copy(iv, self.seq, gcm.IV_SIZE)
@@ -137,6 +139,7 @@ function esp_v6_decrypt:decapsulate (p)
    self.ip:new_from_mem(data + ETHERNET_SIZE, IPV6_SIZE)
    local payload = data + PAYLOAD_OFFSET
    self.esp:new_from_mem(payload, ESP_SIZE)
+   assert(self.ip and self.esp)
    local iv_start = payload + ESP_SIZE
    local ctext_start = payload + self.CTEXT_OFFSET
    local ctext_length = length - self.PLAIN_OVERHEAD
@@ -159,6 +162,7 @@ function esp_v6_decrypt:decapsulate (p)
       self.seq.no = C.track_seq_no(seq_high, seq_low, self.seq.no, self.window, self.window_size)
       local esp_tail_start = ctext_start + ctext_length - ESP_TAIL_SIZE
       self.esp_tail:new_from_mem(esp_tail_start, ESP_TAIL_SIZE)
+      assert(self.esp_tail)
       local ptext_length = ctext_length - self.esp_tail:pad_length() - ESP_TAIL_SIZE
       self.ip:next_header(self.esp_tail:next_header())
       self.ip:payload_length(ptext_length)
