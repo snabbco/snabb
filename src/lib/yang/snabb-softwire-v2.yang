@@ -1,4 +1,5 @@
 module snabb-softwire-v2 {
+  yang-version 1.1;
   namespace snabb:lwaftr;
   prefix softwire;
 
@@ -617,7 +618,7 @@ module snabb-softwire-v2 {
                 the level of human intervention on an alarm.";
               input {
                 leaf state {
-                  type operator-state;
+                  type al:operator-state;
                   mandatory true;
                   description
                     "Set this operator state.";
