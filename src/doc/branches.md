@@ -166,7 +166,7 @@ The current state of each branch with respect to master is visible here:
     - See snabbwall.org for more info
 
     Maintainer: Collectively maintained by Snabbwall application developers.
-    Next hop: kbara-next
+    Next hop: wingo-next
 
 #### aarch64
 
