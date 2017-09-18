@@ -259,6 +259,13 @@ function LPM4:selftest (cfg, millions)
    g:verify(f)
    C.free(ptr)
 
-   self:new(cfg):add_random_entries():benchmark(millions)
+   local avail, err = require('lib.pmu').is_available()
+   if not avail then
+      print("PMU not available:")
+      print("  "..err)
+      print("Skipping benchmark.")
+   else
+      self:new(cfg):add_random_entries():benchmark(millions)
+   end
    print("selftest complete")
 end
