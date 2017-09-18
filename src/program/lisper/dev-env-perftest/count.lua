@@ -6,7 +6,7 @@ local ffi      = require("ffi")
 local app      = require("core.app")
 local lib      = require("core.lib")
 local packet   = require("core.packet")
-local intel    = require("apps.intel.intel_app")
+local pci      = require("lib.hardware.pci")
 
 _NAME = ""
 local Counter = {}
@@ -37,12 +37,14 @@ local c = config.new()
 
 config.app(c, "count", Counter)
 
-config.app(c, "eth", intel.Intel82599, {
-	pciaddr = "0000:03:00.1",
+local eth = pci.device_info("03:00.1")
+
+config.app(c, "eth", require(eth.driver).driver, {
+	pciaddr = eth.pciaddress,
 	macaddr = "00:00:00:00:02:02",
 })
 
-config.link(c, "eth.tx -> count.rx")
+config.link(c, "eth."..eth.tx.." -> count.rx")
 
 engine.configure(c)
 engine.main({report = {showlinks=true}})
