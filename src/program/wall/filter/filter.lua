@@ -1,3 +1,4 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
 local fw     = require("apps.wall.l7fw")
