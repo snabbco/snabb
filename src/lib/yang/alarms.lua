@@ -194,11 +194,21 @@ end
 
 function declare_alarm (alarm)
    assert(table_size(alarm) == 1)
-   local key
-   for k, v in pairs(alarm) do
-      key = alarm_keys:normalize(k)
-      alarm_list:new(key, v)
+   local function create_or_update (key, src)
+      local dst = alarm_list:lookup(key)
+      if dst then
+         -- Extend or overwrite existing alarm values.
+         for k, v in pairs(src) do
+            dst[k] = v
+         end
+         alarm_list:new(key, dst)
+      else
+         alarm_list:new(key, src)
+      end
    end
+   local k, v = next(alarm)
+   local key = alarm_keys:normalize(k)
+   create_or_update(key, v)
    function alarm:raise (args)
       alarm_codec.raise_alarm(key, args)
    end
@@ -531,7 +541,7 @@ function selftest ()
    assert(state.alarm_list.number_of_alarms == 0)
 
    -- Raising an alarm when alarms is empty, creates an alarm.
-   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   local key = alarm_keys:fetch('nic-v4', 'arp-resolution')
    raise_alarm(key)
    local alarm = assert(state.alarm_list.alarm[key])
    assert(table_size(alarm.status_change) == 1)
@@ -614,10 +624,10 @@ function selftest ()
    assert(t.minor.total == 1)
 
    -- Compress alarms.
-   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   local key = alarm_keys:fetch('nic-v4', 'arp-resolution')
    local alarm = state.alarm_list.alarm[key]
    assert(table_size(alarm.status_change) == 4)
-   compress_alarms({resource='external-interface'})
+   compress_alarms({resource='nic-v4'})
    assert(table_size(alarm.status_change) == 1)
 
    -- Set operator state change on non existent alarm should fail.
@@ -636,13 +646,13 @@ function selftest ()
    assert(purge_alarms({alarm_status = 'any'}) == 0)
 
    -- Purge alarms filtering by older_than.
-   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   local key = alarm_keys:fetch('nic-v4', 'arp-resolution')
    raise_alarm(key)
    sleep(1)
    assert(purge_alarms({older_than={age_spec='seconds', value='1'}}) == 1)
 
    -- Purge alarms by severity.
-   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   local key = alarm_keys:fetch('nic-v4', 'arp-resolution')
    raise_alarm(key)
    assert(table_size(state.alarm_list.alarm) == 1)
    assert(purge_alarms({severity={sev_spec='is', value='minor'}}) == 0)
@@ -652,13 +662,13 @@ function selftest ()
    raise_alarm(key, {perceived_severity='minor'})
    assert(purge_alarms({severity={sev_spec='is', value='minor'}}) == 1)
 
-   raise_alarm(alarm_keys:fetch('external-interface', 'arp-resolution'))
-   raise_alarm(alarm_keys:fetch('internal-interface', 'ndp-resolution'))
+   raise_alarm(alarm_keys:fetch('nic-v4', 'arp-resolution'))
+   raise_alarm(alarm_keys:fetch('nic-v6', 'ndp-resolution'))
    assert(table_size(state.alarm_list.alarm) == 2)
    assert(purge_alarms({severity={sev_spec='above', value='minor'}}) == 2)
 
    -- Purge alarms by operator_state_filter.
-   local key = alarm_keys:fetch('external-interface', 'arp-resolution')
+   local key = alarm_keys:fetch('nic-v4', 'arp-resolution')
    raise_alarm(key)
    assert(table_size(state.alarm_list.alarm) == 1)
    local success = set_operator_state(key, {state='ack'})
