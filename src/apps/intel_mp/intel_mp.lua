@@ -316,24 +316,22 @@ function Intel:new (conf)
       r = {},
       pciaddress = conf.pciaddr,
       path = pci.path(conf.pciaddr),
-      -- falling back to defaults for selftest bypassing config.app
-      ndesc = conf.ndescriptors or self.config.ndescriptors.default,
-      txq = conf.txq or self.config.txq.default,
-      rxq = conf.rxq or self.config.rxq.default,
-      mtu = conf.mtu or self.config.mtu.default,
-      linkup_wait = conf.linkup_wait or self.config.linkup_wait.default,
-      linkup_wait_recheck =
-         conf.linkup_wait_recheck or self.config.linkup_wait_recheck.default,
+      ndesc = conf.ndescriptors,
+      txq = conf.txq,
+      rxq = conf.rxq,
+      mtu = conf.mtu,
+      linkup_wait = conf.linkup_wait,
+      linkup_wait_recheck = conf.linkup_wait_recheck,
       wait_for_link = conf.wait_for_link,
-      vmdq = conf.vmdq or self.config.vmdq.default,
+      vmdq = conf.vmdq,
       poolnum = conf.poolnum,
       macaddr = conf.macaddr,
       vlan = conf.vlan,
       want_mirror = conf.mirror,
       rxcounter = conf.rxcounter,
       txcounter = conf.txcounter,
-      rate_limit = conf.rate_limit or self.config.rate_limit.default,
-      priority = conf.priority or self.config.priority.default
+      rate_limit = conf.rate_limit,
+      priority = conf.priority
    }
 
    -- txq/rxq have defaults so nil can't represent off state
