@@ -191,13 +191,13 @@ function load_phy(c, conf, v4_nic_name, v4_nic_pci, v6_nic_name, v6_nic_pci)
 
    config.app(c, v4_nic_name, Intel82599, {
       pciaddr=v4_nic_pci,
-      vmdq=external_interface.vlan_tag,
+      vmdq=true, -- Needed to enable MAC filtering/stamping.
       vlan=external_interface.vlan_tag,
       rxcounter=1,
       macaddr=ethernet:ntop(external_interface.mac)})
    config.app(c, v6_nic_name, Intel82599, {
       pciaddr=v6_nic_pci,
-      vmdq=internal_interface.vlan_tag,
+      vmdq=true, -- Needed to enable MAC filtering/stamping.
       vlan=internal_interface.vlan_tag,
       rxcounter=1,
       macaddr = ethernet:ntop(internal_interface.mac)})
@@ -216,7 +216,7 @@ function load_on_a_stick(c, conf, args)
    if v4v6 then
       config.app(c, 'nic', Intel82599, {
          pciaddr = pciaddr,
-         vmdq=external_interface.vlan_tag,
+         vmdq=true, -- Needed to enable MAC filtering/stamping.
          vlan=external_interface.vlan_tag,
          macaddr = ethernet:ntop(external_interface.mac)})
       if mirror then
@@ -238,12 +238,12 @@ function load_on_a_stick(c, conf, args)
    else
       config.app(c, v4_nic_name, Intel82599, {
          pciaddr = pciaddr,
-         vmdq=external_interface.vlan_tag,
+         vmdq=true, -- Needed to enable MAC filtering/stamping.
          vlan=external_interface.vlan_tag,
          macaddr = ethernet:ntop(external_interface.mac)})
       config.app(c, v6_nic_name, Intel82599, {
          pciaddr = pciaddr,
-         vmdq=internal_interface.vlan_tag,
+         vmdq=true, -- Needed to enable MAC filtering/stamping.
          vlan=internal_interface.vlan_tag,
          macaddr = ethernet:ntop(internal_interface.mac)})
 
