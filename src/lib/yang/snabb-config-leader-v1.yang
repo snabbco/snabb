@@ -98,6 +98,20 @@ module snabb-config-leader-v1 {
     }
   }
 
+  rpc get-alarms-state {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf path { type string; default "/"; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
+    }
+    output {
+      uses error-reporting;
+      leaf state { type string; }
+    }
+  }
+
   rpc attach-listener {
     input {
       leaf schema { type string; mandatory true; }
