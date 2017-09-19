@@ -31,8 +31,8 @@ alarms.add_to_inventory {
 local resolve_alarm = alarms.declare_alarm {
    [{resource='nic-v4', alarm_type_id='arp-resolution'}] = {
       perceived_severity = 'critical',
-		alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
-	},
+      alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
+   },
 }
 
 local C = ffi.C
