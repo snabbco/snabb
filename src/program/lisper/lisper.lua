@@ -722,7 +722,7 @@ function run(args)
             pciaddr = iface.pci,
             macaddr = macstr(iface.mac),
             vlan = iface.vlan_id,
-            vmdq = iface.vlan_id and true or nil,
+            vmdq = true,
          })
       else
          config.app(c, "if_"..ifname, raw.RawSocket, ifname)
