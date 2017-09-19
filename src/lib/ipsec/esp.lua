@@ -188,7 +188,7 @@ function decrypt:new (conf)
 end
 
 function decrypt:decrypt_payload (ptr, length)
-   self.esp:new_from_mem(ptr, length)
+   assert(self.esp:new_from_mem(ptr, length), "packet too short")
    if self.esp:spi() ~= self.spi then return nil end
 
    local iv_start = ptr + ESP_SIZE

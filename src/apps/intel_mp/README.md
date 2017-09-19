@@ -49,6 +49,12 @@ light or not. The default is `false`.
 *Optional* Number of seconds `new` waits for the device to come up. The default
 is 120.
 
+— Key **linkup_wait_recheck**
+
+*Optional* If the `linkup_wait` option is true, the number of seconds
+to sleep between checking the link state again.  The default is 0.1
+seconds.
+
 — Key **mtu**
 
 *Optional* The maximum packet length sent or received, excluding the trailing
