@@ -29,14 +29,12 @@ config.app(c, "nic1", intel.Intel,
              txq = 0,
              txcounter = 1,
              vlan = 1,
-             ndescriptors=2048,
              wait_for_link = true })
 
 -- nic2 just receives packets so we can check them
 config.app(c, "nic2", intel.Intel,
            { pciaddr=pciaddr2,
              rxq = 0,
-             ndescriptors=2048,
              wait_for_link = true })
 
 config.app(c, "pcap", pcap.PcapReader, pcapfile)

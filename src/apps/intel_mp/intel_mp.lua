@@ -274,7 +274,7 @@ EEC       0x00010 -            RW EEPROM-Mode Control Register
 Intel = {
    config = {
       pciaddr = {required=true},
-      ndescriptors = {default=2048},
+      ring_buffer_size = {default=2048},
       vmdq = {default=false},
       macaddr = {},
       poolnum = {},
@@ -316,7 +316,7 @@ function Intel:new (conf)
       r = {},
       pciaddress = conf.pciaddr,
       path = pci.path(conf.pciaddr),
-      ndesc = conf.ndescriptors,
+      ndesc = conf.ring_buffer_size,
       txq = conf.txq,
       rxq = conf.rxq,
       mtu = conf.mtu,
