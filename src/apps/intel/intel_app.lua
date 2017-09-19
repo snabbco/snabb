@@ -25,7 +25,8 @@ Intel82599 = {
       rxcounter  = {default=0},
       txcounter  = {default=0},
       rate_limit = {default=0},
-      priority   = {default=1.0}
+      priority   = {default=1.0},
+      ring_buffer_size = {default=intel10g.ring_buffer_size()}
    }
 }
 Intel82599.__index = Intel82599
@@ -52,6 +53,10 @@ end
 function Intel82599:new (conf)
    local self = {}
 
+   -- FIXME: ring_buffer_size is really a global variable for this
+   -- driver; taking the parameter as an initarg is just to make the
+   -- intel_mp transition easier.
+   intel10g.ring_buffer_size(conf.ring_buffer_size)
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
          local pf = intel10g.new_pf(conf):open()
