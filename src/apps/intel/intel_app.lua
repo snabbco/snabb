@@ -160,8 +160,8 @@ function Intel82599:pull ()
    end
 end
 
-function Intel82599:ingress_packet_drops ()
-   return self.dev:ingress_packet_drops()
+function Intel82599:rxdrop ()
+   return self.dev:rxdrop()
 end
 
 function Intel82599:add_receive_buffers ()
