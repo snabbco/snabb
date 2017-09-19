@@ -146,7 +146,7 @@ function lwaftr_app(c, conf, device)
                 alarm_notification = conf.alarm_notification })
 
    if conf.alarm_notification then
-      require('apps.lwaftr.alarms')
+      require('program.lwaftr.alarms')
    end
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
