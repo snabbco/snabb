@@ -30,20 +30,16 @@ local ipv6     = require("lib.protocol.ipv6")
 local alarms = require("lib.yang.alarms")
 
 alarms.add_to_inventory {
-   [{alarm_type_id='ndp-resolution', alarm_type_qualifier=''}] = {
-      resource={'internal-interface'},
+   [{alarm_type_id='ndp-resolution'}] = {
+      resource={'nic-v6'},
       has_clear=true,
       description='Raise up if NDP app cannot resolve IPv6 address'
    }
 }
 local resolve_alarm = alarms.declare_alarm {
-   [{resource='internal-interface', alarm_type_id='ndp-resolution', alarm_type_qualifier=''}] = {
+   [{resource='nic-v6', alarm_type_id='ndp-resolution'}] = {
       perceived_severity = 'critical',
-      alarm_text =
-         'Make sure you can resolve internal-interface.next-hop.ip address '..
-         'manually.  If it cannot be resolved, consider setting the MAC '..
-         'address of the next-hop directly.  To do it so, set '..
-         'internal-interface.next-hop.mac to the value of the MAC address.',
+      alarm_text = 'Make sure you can NDP resolve IP addresses on NIC',
    },
 }
 

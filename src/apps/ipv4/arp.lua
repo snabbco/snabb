@@ -22,20 +22,16 @@ local ipv4     = require("lib.protocol.ipv4")
 local alarms = require("lib.yang.alarms")
 
 alarms.add_to_inventory {
-  [{alarm_type_id='arp-resolution', alarm_type_qualifier=''}] = {
-    resource={'external-interface'},
+  [{alarm_type_id='arp-resolution'}] = {
+    resource={'nic-v4'},
     has_clear=true,
-    description='Raise up if ARP app cannot resolve IP address'
+    description='Raise up if ARP app cannot resolve IP address',
   }
 }
 local resolve_alarm = alarms.declare_alarm {
-   [{resource='external-interface', alarm_type_id='arp-resolution', alarm_type_qualifier=''}] = {
+   [{resource='nic-v4', alarm_type_id='arp-resolution'}] = {
       perceived_severity = 'critical',
-      alarm_text =
-         'Make sure you can resolve external-interface.next-hop.ip address '..
-         'manually.  If it cannot be resolved, consider setting the MAC '..
-         'address of the next-hop directly.  To do it so, set '..
-         'external-interface.next-hop.mac to the value of the MAC address.',
+      alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
    },
 }
 
