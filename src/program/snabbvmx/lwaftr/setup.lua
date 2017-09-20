@@ -70,7 +70,7 @@ local function load_virt (c, nic_id, lwconf, interface)
    print(("Setting %s interface MTU to %d"):format(v4_nic_name, v4_mtu))
    config.app(c, v4_nic_name, driver, {
       pciaddr = interface.pci,
-      vmdq = interface.vlan and true,
+      vmdq = true, -- Needed to enable MAC filtering/stamping.
       vlan = interface.vlan and interface.vlan.v4_vlan_tag,
       macaddr = ethernet:ntop(iexternal_interface.mac),
       ring_buffer_size = interface.ring_buffer_size,
@@ -82,7 +82,7 @@ local function load_virt (c, nic_id, lwconf, interface)
    print(("Setting %s interface MTU to %d"):format(v6_nic_name, v6_mtu))
    config.app(c, v6_nic_name, driver, {
       pciaddr = interface.pci,
-      vmdq = interface.vlan and true,
+      vmdq = true, -- Needed to enable MAC filtering/stamping.
       vlan = interface.vlan and interface.vlan.v6_vlan_tag,
       macaddr = ethernet:ntop(iinternal_interface.mac),
       ring_buffer_size = interface.ring_buffer_size,
@@ -107,7 +107,7 @@ local function load_phy (c, nic_id, interface)
       end
       config.app(c, nic_id, driver, {
          pciaddr = interface.pci,
-         vmdq = true,
+         vmdq = true, -- Needed to enable MAC filtering/stamping.
          vlan = vlan,
          macaddr = interface.mac_address,
          ring_buffer_size = interface.ring_buffer_size,
