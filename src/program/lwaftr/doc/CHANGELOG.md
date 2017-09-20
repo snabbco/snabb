@@ -1,9 +1,55 @@
 # Change Log
 
-## [2017.07.02]
+## [2017.08.01]
 
-* Deprecate the --reconfigurable flags in favour of the lwaftr always
-  being reconfigurable.
+* intel_mp work included in v2017.07.01 preview is now properly merged
+  upstream.  The previous milestone release was on a side branch.
+
+* The alarms facility now has support for set-operator-state, purge,
+  compress, and get-status operations.  Note that the alarms code is in
+  a state of flux currently; we are migrating alarms support out of the
+  snabb-softwire-v2 YANG schema over the next few days.
+
+* Fix some bugs with the snabb-softwire-v2 schema in which we were
+  missing statements and namespace qualifiers.
+
+* Fix bug in ingress drop monitor in which drops immediately following a
+  JIT flush would cause further JIT flushes.
+
+## [2017.07.01-318]
+
+* The intel_mp driver has been brought up to feature parity with the
+  intel10g one by adding support for VMDq mode. The changes support VMDq
+  mode with RSS (64 VM pools with 2 RSS queues each) with MAC/VLAN
+  filtering on the Intel 82599. For now, the driver just rejects VMDq
+  mode on i210 and i350 NICs.  The added features include VLAN tag
+  insertion and removal, MAC-based receive and transmit queue
+  assignment, mirroring between pools/VFs, and support for rxcounter,
+  txcounter, rate_limit, priority. The following combinations are
+  supported: no VMDq nor RSS, VMDq only, RSS only.
+
+* All network functions have been updated to use intel_mp instead of
+  intel10g. The resulting performance has been checked to be as good as
+  before the change.  The intel10g driver is temporarily being kept
+  around as a fallback in case of regressions, and to give external apps
+  some time to switch to intel_mp.
+
+* Multiprocess in the data-plane.  If multiple instance are defined in the
+  configuration file, the lwaftr will start those multiple instances.
+  However, new ones cannot be added via `snabb config` nor can they be
+  shutdown by removing them.
+
+* Initial support for alarms.  NDP and ARP raise up an alarm if they cannot
+  resolve an IP address.  The alarms is cleared up when the apps manage
+  to resolve the IP addresses.  Alarms state can be consulted via
+  `./snabb config get-state` program.
+
+* Several apps have been refactored and moved out from lwaftr. Mainly
+  the fragmentation and refactoring apps and the ARP and NDP apps.
+  Several minor bugs have been fixed in these apps too, including packet
+  corruption issues.
+
+* Other minor bug fixes and improvements.
 
 ## [2017.07.01] - 2017-08-04
 
