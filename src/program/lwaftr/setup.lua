@@ -3,7 +3,6 @@ module(..., package.seeall)
 local config     = require("core.config")
 local leader     = require("apps.config.leader")
 local follower   = require("apps.config.follower")
-local Intel82599 = require("apps.intel.intel_app").Intel82599
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
@@ -20,6 +19,7 @@ local ipv6_fragment   = require("apps.ipv6.fragment")
 local ipv6_reassemble = require("apps.ipv6.reassemble")
 local ndp        = require("apps.lwaftr.ndp")
 local vlan       = require("apps.vlan.vlan")
+local pci        = require("lib.hardware.pci")
 local numa       = require("lib.numa")
 local cltable    = require("lib.cltable")
 local ipv4       = require("lib.protocol.ipv4")
@@ -238,33 +238,39 @@ local function link_sink(c, v4_out, v6_out)
    config.link(c, 'fragmenterv6.output -> '..v6_out)
 end
 
-function load_phy(c, conf, v4_nic_name, v6_nic_name)
+function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
    local v4_pci, _ = next(conf.softwire_config.instance)
    local queue = conf.softwire_config.instance[v4_pci].queue.values[1]
    local v6_pci = queue.external_interface.device
+   local v4_info = pci.device_info(v4_pci)
+   local v6_info = pci.device_info(v6_pci)
    validate_pci_devices({v4_pci, v6_pci})
    lwaftr_app(c, conf, v4_pci)
 
-   config.app(c, v4_nic_name, Intel82599, {
+   config.app(c, v4_nic_name, require(v4_info.driver).driver, {
       pciaddr=v4_pci,
-      vmdq=queue.external_interface.vlan_tag,
+      vmdq=true, -- Needed to enable MAC filtering/stamping.
       vlan=queue.external_interface.vlan_tag,
       rxcounter=1,
+      ring_buffer_size=ring_buffer_size,
       macaddr=ethernet:ntop(queue.external_interface.mac)})
-   config.app(c, v6_nic_name, Intel82599, {
+   config.app(c, v6_nic_name, require(v6_info.driver).driver, {
       pciaddr=v6_pci,
-      vmdq=queue.internal_interface.vlan_tag,
+      vmdq=true, -- Needed to enable MAC filtering/stamping.
       vlan=queue.internal_interface.vlan_tag,
       rxcounter=1,
+      ring_buffer_size=ring_buffer_size,
       macaddr = ethernet:ntop(queue.internal_interface.mac)})
 
-   link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
-   link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
+   link_source(c, v4_nic_name..'.'..v4_info.tx, v6_nic_name..'.'..v6_info.tx)
+   link_sink(c,   v4_nic_name..'.'..v4_info.rx, v6_nic_name..'.'..v6_info.rx)
 end
 
 function load_on_a_stick(c, conf, args)
    local pciaddr, _ = next(conf.softwire_config.instance)
    local queue = conf.softwire_config.instance[pciaddr].queue.values[1]
+   local device = pci.device_info(pciaddr)
+   local driver = require(device.driver).driver
    validate_pci_devices({pciaddr})
    lwaftr_app(c, conf, pciaddr)
    local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
@@ -272,10 +278,11 @@ function load_on_a_stick(c, conf, args)
 
    if v4v6 then
       assert(queue.external_interface.vlan_tag == queue.internal_interface.vlan_tag)
-      config.app(c, 'nic', Intel82599, {
+      config.app(c, 'nic', driver, {
          pciaddr = pciaddr,
-         vmdq=queue.external_interface.vlan_tag,
+         vmdq=true, -- Needed to enable MAC filtering/stamping.
          vlan=queue.external_interface.vlan_tag,
+         ring_buffer_size=args.ring_buffer_size,
          macaddr = ethernet:ntop(queue.external_interface.mac)})
       if mirror then
          local Tap = require("apps.tap.tap").Tap
@@ -288,25 +295,27 @@ function load_on_a_stick(c, conf, args)
       else
          config.app(c, v4v6, V4V6)
       end
-      config.link(c, 'nic.tx -> '..v4v6..'.input')
-      config.link(c, v4v6..'.output -> nic.rx')
+      config.link(c, 'nic.'..device.tx..' -> '..v4v6..'.input')
+      config.link(c, v4v6..'.output -> nic.'..device.rx)
 
       link_source(c, v4v6..'.v4', v4v6..'.v6')
       link_sink(c, v4v6..'.v4', v4v6..'.v6')
    else
-      config.app(c, v4_nic_name, Intel82599, {
+      config.app(c, v4_nic_name, driver, {
          pciaddr = pciaddr,
-         vmdq=queue.external_interface.vlan_tag,
+         vmdq=true, -- Needed to enable MAC filtering/stamping.
          vlan=queue.external_interface.vlan_tag,
+         ring_buffer_size=args.ring_buffer_size,
          macaddr = ethernet:ntop(queue.external_interface.mac)})
-      config.app(c, v6_nic_name, Intel82599, {
+      config.app(c, v6_nic_name, driver, {
          pciaddr = pciaddr,
-         vmdq=queue.internal_interface.vlan_tag,
+         vmdq=true, -- Needed to enable MAC filtering/stamping.
          vlan=queue.internal_interface.vlan_tag,
+         ring_buffer_size=args.ring_buffer_size,
          macaddr = ethernet:ntop(queue.internal_interface.mac)})
 
-      link_source(c, v4_nic_name..'.tx', v6_nic_name..'.tx')
-      link_sink(c, v4_nic_name..'.rx', v6_nic_name..'.rx')
+      link_source(c, v4_nic_name..'.'..device.tx, v6_nic_name..'.'..device.tx)
+      link_sink(c,   v4_nic_name..'.'..device.rx, v6_nic_name..'.'..device.rx)
    end
 end
 
