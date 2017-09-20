@@ -189,9 +189,7 @@ do
    end
 end
 
-function M_sf:ingress_packet_drops ()
-   return self.qs.QPRDC[0]()
-end
+function M_sf:rxdrop () return self.qs.QPRDC[0]() end
 
 function M_sf:global_reset ()
    local reset = bits{LinkReset=3, DeviceReset=26}
@@ -1004,9 +1002,7 @@ function M_vf:set_tx_rate (limit, priority)
    return self
 end
 
-function M_vf:ingress_packet_drops ()
-   return self.pf.qs.QPRDC[self.rxstats]()
-end
+function M_vf:rxdrop () return self.pf.qs.QPRDC[self.rxstats]() end
 
 rxdesc_t = ffi.typeof [[
    union {

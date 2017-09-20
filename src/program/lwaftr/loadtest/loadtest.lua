@@ -206,7 +206,7 @@ function run(args)
          ret[stream.nic_tx_id] = {
             tx = read_counters(tx_nic.input.rx),
             rx = read_counters(rx_nic.output.tx),
-            drop = rx_nic:ingress_packet_drops()
+            drop = rx_nic:rxdrop()
          }
       end
       return ret

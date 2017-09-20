@@ -17,13 +17,11 @@ function test(pciaddr, qno, vmdq, poolno, macaddr, vlan)
                    vmdq=true,
                    poolnum=poolno,
                    rxq = qno,
-                   ndescriptors = 2048,
                    wait_for_link=true })
    else
       config.app(c, "nic", intel.Intel,
                  { pciaddr=pciaddr,
                    rxq = qno,
-                   ndescriptors = 2048,
                    wait_for_link=true })
    end
    config.app(c, "sink", basic.Sink)
