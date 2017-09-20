@@ -631,6 +631,22 @@ function Leader:rpc_get_state (args)
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end
 end
+
+function Leader:rpc_get_alarms_state (args)
+   local function getter()
+      assert(args.schema == "ietf-alarms")
+      local printer = path_printer_for_schema_by_name(
+         args.schema, args.path, false, args.format, args.print_default)
+      local state = {
+         alarms = alarms.get_state()
+      }
+      state = printer(state, yang.string_output_file())
+      return { state = state }
+   end
+   local success, response = pcall(getter)
+   if success then return response else return {status=1, error=response} end
+end
+
 function Leader:handle (payload)
    return rpc.handle_calls(self.rpc_callee, payload, self.rpc_handler)
 end
