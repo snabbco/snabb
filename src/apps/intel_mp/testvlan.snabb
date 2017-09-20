@@ -23,7 +23,6 @@ config.app(c, "pcap", pcap.PcapReader, pcapfile)
 config.app(c, "nic1", intel.Intel,
            {pciaddr=pciaddr1,
             txq = 0,
-            ndescriptors=2048,
             wait_for_link = true})
 config.app(c, "nic2", intel.Intel,
            {pciaddr=pciaddr2,
@@ -32,7 +31,6 @@ config.app(c, "nic2", intel.Intel,
             vlan = 1,
             poolnum = 0,
             rxq = 0,
-            ndescriptors=2048,
             wait_for_link = true})
 
 -- use pflua to filter based on presence of vlan tag

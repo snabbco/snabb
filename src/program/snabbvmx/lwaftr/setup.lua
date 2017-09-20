@@ -41,7 +41,7 @@ end
 
 local function load_driver (pciaddr)
    local device_info = pci.device_info(pciaddr)
-   return require(device_info.driver).driver
+   return require(device_info.driver).driver, device_info.rx, device_info.tx
 end
 
 local function load_virt (c, nic_id, lwconf, interface)
@@ -57,7 +57,7 @@ local function load_virt (c, nic_id, lwconf, interface)
 
    assert(type(interface) == 'table')
    assert(nic_exists(interface.pci), "Couldn't find NIC: "..interface.pci)
-   local driver = assert(load_driver(interface.pci))
+   local driver, rx, tx = assert(load_driver(interface.pci))
 
    print("Different VLAN tags: load two virtual interfaces")
    print(("%s ether %s"):format(nic_id, interface.mac_address))
@@ -73,6 +73,7 @@ local function load_virt (c, nic_id, lwconf, interface)
       vmdq = interface.vlan and true,
       vlan = interface.vlan and interface.vlan.v4_vlan_tag,
       macaddr = ethernet:ntop(iexternal_interface.mac),
+      ring_buffer_size = interface.ring_buffer_size,
       mtu = v4_mtu })
    local v6_mtu = ginternal_interface.mtu + constants.ethernet_header_size
    if iinternal_interface.vlan_tag then
@@ -84,9 +85,12 @@ local function load_virt (c, nic_id, lwconf, interface)
       vmdq = interface.vlan and true,
       vlan = interface.vlan and interface.vlan.v6_vlan_tag,
       macaddr = ethernet:ntop(iinternal_interface.mac),
+      ring_buffer_size = interface.ring_buffer_size,
       mtu = v6_mtu})
 
-   return v4_nic_name, v6_nic_name
+   local v4_in, v4_out = v4_nic_name.."."..rx, v4_nic_name.."."..tx
+   local v6_in, v6_out = v6_nic_name.."."..rx, v6_nic_name.."."..tx
+   return v4_in, v4_out, v6_in, v6_out
 end
 
 local function load_phy (c, nic_id, interface)
@@ -95,7 +99,7 @@ local function load_phy (c, nic_id, interface)
    local chain_input, chain_output
 
    if nic_exists(interface.pci) then
-      local driver = load_driver(interface.pci)
+      local driver, rx, tx = load_driver(interface.pci)
       vlan = interface.vlan and tonumber(interface.vlan)
       print(("%s network ether %s mtu %d"):format(nic_id, interface.mac_address, interface.mtu))
       if vlan then
@@ -106,8 +110,9 @@ local function load_phy (c, nic_id, interface)
          vmdq = true,
          vlan = vlan,
          macaddr = interface.mac_address,
+         ring_buffer_size = interface.ring_buffer_size,
          mtu = interface.mtu})
-      chain_input, chain_output = nic_id .. ".rx", nic_id .. ".tx"
+      chain_input, chain_output = nic_id.."."..rx, nic_id.."."..tx
    elseif net_exists(interface.pci) then
       print(("%s network interface %s mtu %d"):format(nic_id, interface.pci, interface.mtu))
       if vlan then
@@ -161,9 +166,8 @@ function lwaftr_app(c, conf, lwconf, sock_path)
 
    local use_splitter = requires_splitter(iinternal_interface, iexternal_interface)
    if not use_splitter then
-      local v4, v6 = load_virt(c, phy_id, lwconf, conf.interface)
-      v4_output, v6_output = v4..".tx", v6..".tx"
-      v4_input, v6_input   = v4..".rx", v6..".rx"
+      v4_input, v4_output, v6_input, v6_output =
+         load_virt(c, phy_id, lwconf, conf.interface)
    else
       chain_input, chain_output = load_phy(c, phy_id, conf.interface)
    end
