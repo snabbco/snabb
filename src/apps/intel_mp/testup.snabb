@@ -12,7 +12,6 @@ local function new_intel (arg)
    return intel.Intel:new(parse(arg, intel.Intel.config))
 end
 
-local nic = new_intel(
-   { pciaddr=pciaddr, rxq = qno, ndescriptors = 2048, wait_for_link = true })
+local nic = new_intel({ pciaddr=pciaddr, rxq = qno, wait_for_link = true })
 print(nic:link_status())
 main.exit(0)
