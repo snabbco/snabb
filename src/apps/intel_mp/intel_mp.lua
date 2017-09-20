@@ -279,7 +279,7 @@ EEC       0x00010 -            RW EEPROM-Mode Control Register
 Intel = {
    config = {
       pciaddr = {required=true},
-      ndescriptors = {default=2048},
+      ndescriptors = {default=1024},
       vmdq = {default=false},
       macaddr = {},
       poolnum = {},
