@@ -634,8 +634,9 @@ end
 
 function Leader:rpc_get_alarms_state (args)
    local function getter()
+      assert(args.schema == "ietf-alarms")
       local printer = path_printer_for_schema_by_name(
-         'ietf-alarms', args.path, false, args.format, args.print_default)
+         args.schema, args.path, false, args.format, args.print_default)
       local state = {
          alarms = alarms.get_state()
       }
