@@ -41,7 +41,7 @@ end
 
 local function load_driver (pciaddr)
    local device_info = pci.device_info(pciaddr)
-   return require(device_info.driver), device_info.rx, device_info.tx
+   return require(device_info.driver).driver, device_info.rx, device_info.tx
 end
 
 local function load_virt (c, nic_id, lwconf, interface)
