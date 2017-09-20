@@ -104,7 +104,7 @@ function parse_args(args)
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
       end
-      require("apps.intel.intel10g").ring_buffer_size(ring_buffer_size)
+      opts.ring_buffer_size = ring_buffer_size
    end
    if not conf_file then fatal("Missing required --conf argument.") end
    if opts.mirror then
@@ -152,9 +152,11 @@ function run(args)
       setup_args =
          { { v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
              v4v6 = use_splitter and 'v4v6', pciaddr = v4,
+             ring_buffer_size = opts.ring_buffer_size,
              mirror = opts.mirror } }
    else
-      setup_fn, setup_args = setup.load_phy, { 'inetNic', v4, 'b4sideNic', v6 }
+      setup_fn = setup.load_phy
+      setup_args = { 'inetNic', v4, 'b4sideNic', v6, opts.ring_buffer_size }
    end
 
    if opts.reconfigurable then
