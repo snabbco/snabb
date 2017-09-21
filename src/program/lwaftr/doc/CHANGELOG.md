@@ -1,5 +1,25 @@
 # Change Log
 
+## [2017.08.02]
+
+* Adapt --cpu argument to "snabb lwaftr run" to take a range of
+  available CPUs to dedicate to the forwarding plane.  To provision CPUs
+  1 to 9 inclusive, run as --cpu=1-9.  Snabb will attempt to assign CPUs
+  only from the local NUMA node of the PCI devices.
+
+* Beginnings of the "snabb alarm" utility, extracting the alarms
+  facilities that we had implemented as part of the "snabb config"
+  utility as a separate binary.  This also removes the alarms-related
+  components from the Snabb YANG model.
+
+* Update the ietf-softwire translation layer for multiple worker
+  instances.
+
+* Dynamically add and remove worker instances via "snabb config".
+  Documentation to come; follow
+  https://github.com/Igalia/snabb/issues/953 for the summary of the
+  multi-process deliverable.
+
 ## [2017.08.01]
 
 * intel_mp work included in v2017.07.01 preview is now properly merged
