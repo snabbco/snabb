@@ -92,11 +92,12 @@ function Leader:set_initial_configuration (configuration)
 end
 
 function Leader:start_worker(cpu)
-   local start_code = self.worker_start_code
+   local start_code = { self.worker_start_code }
    if cpu then
-      start_code = "require('lib.numa').bind_to_cpu("..cpu..")\n"..start_code
+      table.insert(start_code, 1, "print('Bound data plane to CPU:',"..cpu..")")
+      table.insert(start_code, 1, "require('lib.numa').bind_to_cpu("..cpu..")")
    end
-   return worker.start("follower", start_code)
+   return worker.start("follower", table.concat(start_code, "\n"))
 end
 
 function Leader:stop_worker(worker)
