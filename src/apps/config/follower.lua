@@ -29,6 +29,14 @@ function Follower:new (conf)
    return ret
 end
 
+function Follower:shutdown()
+   -- This will shutdown everything.
+   engine.configure(app_graph.new())
+
+   -- Now we can exit.
+   S.exit(0)
+end
+
 function Follower:commit_pending_actions()
    local to_apply = {}
    local should_flush = false
@@ -42,6 +50,8 @@ function Follower:commit_pending_actions()
          local callee, method, blob = unpack(args)
          local obj = assert(app.app_table[callee])
          assert(obj[method])(obj, blob)
+      elseif name == "shutdown" then
+         self:shutdown()
       else
          if name == 'start_app' or name == 'reconfig_app' then
             should_flush = true
