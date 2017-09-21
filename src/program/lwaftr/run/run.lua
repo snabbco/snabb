@@ -2,6 +2,7 @@ module(..., package.seeall)
 
 local S          = require("syscall")
 local config     = require("core.config")
+local cpuset     = require("lib.cpuset")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local lib        = require("core.lib")
 local setup      = require("program.lwaftr.setup")
@@ -66,11 +67,7 @@ function parse_args(args)
       end
    end
    function handlers.cpu(arg)
-      local cpu = tonumber(arg)
-      if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
-         fatal("Invalid cpu number: "..arg)
-      end
-      scheduling.cpu = cpu
+      cpuset.global_cpuset():add_from_string(arg)
    end
    handlers['real-time'] = function(arg)
       scheduling.real_time = true
@@ -124,6 +121,7 @@ function parse_args(args)
    if opts.mirror then
       assert(opts["on-a-stick"], "Mirror option is only valid in on-a-stick mode")
    end
+   cpuset.global_cpuset():bind_to_numa_node()
    if opts["on-a-stick"] then
       scheduling.pci_addrs = { v4 }
       return opts, scheduling, conf_file, v4
