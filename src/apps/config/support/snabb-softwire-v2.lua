@@ -263,22 +263,39 @@ end
 
 local function ietf_softwire_translator ()
    local ret = {}
+   local instance_id_map = {}
    local cached_config
+   local function instance_id_by_device(device)
+      local last
+      for id, pciaddr in ipairs(instance_id_map) do
+	 if pciaddr == device then return id end
+	 last = id
+      end
+      if last == nil then
+	 last = 1
+      else
+	 last = last + 1
+      end
+      instance_id_map[last] = device
+      return last
+   end
    function ret.get_config(native_config)
       if cached_config ~= nil then return cached_config end
       local br_instance, br_instance_key_t =
          cltable_for_grammar(get_ietf_br_instance_grammar())
-      br_instance[br_instance_key_t({id=1})] = {
-         name = native_config.softwire_config.name,
-         tunnel_payload_mtu = native_config.softwire_config.internal_interface.mtu,
-         tunnel_path_mru = native_config.softwire_config.external_interface.mtu,
-         -- FIXME: There's no equivalent of softwire-num-threshold in snabb-softwire-v1.
-         softwire_num_threshold = 0xffffffff,
-         binding_table = {
-            binding_entry = ietf_binding_table_from_native(
-               native_config.softwire_config.binding_table)
-         }
-      }
+      for device, instance in pairs(native_config.softwire_config.instance) do
+	 br_instance[br_instance_key_t({id=instance_id_by_device(device)})] = {
+	    name = native_config.softwire_config.name,
+	    tunnel_payload_mtu = native_config.softwire_config.internal_interface.mtu,
+	    tunnel_path_mru = native_config.softwire_config.external_interface.mtu,
+	    -- FIXME: There's no equivalent of softwire-num-threshold in snabb-softwire-v1.
+	    softwire_num_threshold = 0xffffffff,
+	    binding_table = {
+	       binding_entry = ietf_binding_table_from_native(
+		  native_config.softwire_config.binding_table)
+	    }
+	 }
+      end
       cached_config = {
          softwire_config = {
             binding = {
@@ -327,6 +344,11 @@ local function ietf_softwire_translator ()
                                  'br-instances', 'br-instance'}
       local bt_paths = {'binding-table', 'binding-entry'}
 
+      -- Can't actually set the instance itself.
+      if #path <= #br_instance_paths then
+         error("Unspported path: "..path_str)
+      end
+
       -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-threshold).
       if #path > #br_instance_paths then
          if path[#path].name == 'tunnel-payload-mtu' then
@@ -342,11 +364,11 @@ local function ietf_softwire_translator ()
          if path[#path].name == 'softwire-num-threshold' then
             error('not yet implemented: softwire-num-threshold')
          end
-	 if path[#path].name == 'name' then
-	    return {{'set', {schema='snabb-softwire-v2',
-			    path="/softwire-config/name",
-			    config=arg}}}
-	 end
+         if path[#path].name == 'name' then
+            return {{'set', {schema='snabb-softwire-v2',
+               path="/softwire-config/name",
+               config=arg}}}
+         end
          error('unrecognized leaf: '..path[#path].name)
       end
 
@@ -450,13 +472,16 @@ local function ietf_softwire_translator ()
          return updates
       end
    end
-   function ret.add_config(native_config, path, data)
-      if path ~= ('/softwire-config/binding/br/br-instances'..
-                     '/br-instance[id=1]/binding-table/binding-entry') then
+   function ret.add_config(native_config, path_str, data)
+      local binding_entry_path = {'softwire_config', 'binding', 'br',
+         'br_instances', 'br-instance', 'binding-table', 'binding-entry'}
+      local path = path_mod.parse_path(path_str)
+
+      if #path ~= #binding_entry_path then
          error('unsupported path: '..path)
       end
       local config = ret.get_config(native_config)
-      local ietf_bt = ietf_softwire_getter(path)(config)
+      local ietf_bt = ietf_softwire_getter(path_str)(config)
       local old_bt = native_config.softwire_config.binding_table
       local new_bt = native_binding_table_from_ietf(data)
       local updates = {}
@@ -493,22 +518,46 @@ local function ietf_softwire_translator ()
                             config=table.concat(additions, '\n')}})
       return updates
    end
-   function ret.remove_config(native_config, path)
-      local ietf_binding_table_path =
-         '/softwire-config/binding/br/br-instances/br-instance[id=1]/binding-table'
-      local softwire_path = '/softwire-config/binding-table/softwire'
-      if (dirname(path) ~= ietf_binding_table_path or
-          path:sub(-1) ~= ']') then
-         error('unsupported path: '..path)
+   function ret.remove_config(native_config, path_str)
+      local path = path_mod.parse_path(path_str)
+      local ietf_binding_table_path = {'softwire_config', 'binding', 'br',
+         'br-instances', 'br-instance', 'binding-table'}
+      local ietf_instance_path = {'softwire_config', 'binding', 'br',
+         'br-instances', 'br-instance'}
+
+      if #path == #ietf_instance_path then
+         -- Remove appropriate instance
+         local ietf_instance_id = tonumber(assert(path[5].query).id)
+         local instance_path = "/softwire-config/instance"
+
+         -- If it's not been populated in instance_id_map this is meaningless
+         -- and dangerous as they have no mapping from snabb's "device".
+         local function q(device) return
+            string.format("[device=%s]", device)
+         end
+         local device = instance_id_map[ietf_instance_id]
+         if device then
+            return {{'remove', {schema='snabb-softwire-v2',
+                                path=instance_path..q(device)}}}
+         else
+            error(string.format(
+               "Could not find '%s' in ietf instance mapping", ietf_instance_id
+            ))
+         end
+      elseif #path == #ietf_binding_table_path then
+         local softwire_path = '/softwire-config/binding-table/softwire'
+         if path:sub(-1) ~= ']' then error('unsupported path: '..path_str) end
+         local config = ret.get_config(native_config)
+         local entry = ietf_softwire_getter(path_str)(config)
+         local function q(ipv4, psid)
+            return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
+         end
+         local query = q(entry.binding_ipv4_addr, entry.port_set.psid)
+         return {{'remove', {schema='snabb-softwire-v2',
+                             path=softwire_path..query}}}
+      else
+         return error('unsupported path: '..path_str)
       end
-      local config = ret.get_config(native_config)
-      local entry = ietf_softwire_getter(path)(config)
-      local function q(ipv4, psid)
-         return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
-      end
-      local query = q(entry.binding_ipv4_addr, entry.port_set.psid)
-      return {{'remove', {schema='snabb-softwire-v2',
-                          path=softwire_path..query}}}
    end
    function ret.pre_update(native_config, verb, path, data)
       -- Given the notification that the native config is about to be

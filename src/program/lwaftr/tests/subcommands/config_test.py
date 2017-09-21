@@ -11,9 +11,8 @@ from subprocess import PIPE, Popen
 import time
 import unittest
 
-from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, BaseTestCase, \
-                     nic_names
-
+from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, \
+                     DAEMON_STARTUP_WAIT, BaseTestCase, nic_names
 
 DAEMON_PROC_NAME = 'config-test-daemon'
 DAEMON_ARGS = [
@@ -77,6 +76,150 @@ class TestConfigGet(BaseTestCase):
         self.assertEqual(
             output.strip(), b'178.79.150.15',
             '\n'.join(('OUTPUT', str(output, ENC))))
+
+
+class TestConfigMultiproc(BaseTestCase):
+    """
+    Test the ability to start, stop, get, etc. multiple processes.
+    """
+
+    daemon = None
+    daemon_args = DAEMON_ARGS
+    ps_args = (str(SNABB_CMD), 'ps')
+    config_args = (str(SNABB_CMD), 'config', 'XXX', DAEMON_PROC_NAME)
+
+    @classmethod
+    def setUpClass(cls):
+        pass
+
+    @classmethod
+    def tearDownClass(cls):
+        pass
+
+    def start_daemon(self, config, additional=None):
+        """ Starts the daemon with a specific config """
+        if self.daemon is not None:
+            raise Exception("Daemon already started")
+
+        daemon_args = list(self.daemon_args)
+        daemon_args[7] = config
+        for option in (additional or []):
+            daemon_args.insert(3, option)
+
+        # Start the daemon itself
+        self.daemon = Popen(daemon_args, stdout=PIPE, stderr=PIPE)
+        time.sleep(DAEMON_STARTUP_WAIT)
+        return_code = self.daemon.poll()
+        if return_code is not None:
+            stdout = self.daemon.stdout.read().decode(ENC)
+            stderr = self.daemon.stderr.read().decode(ENC)
+            self.fail("\n".join((
+                "Failed starting daemon",
+                "Command:", " ".join(daemon_args),
+                "Exit code: {0}".format(return_code),
+                "STDOUT", stdout,
+                "STDOUT", stderr,
+            )))
+        return self.daemon.pid
+
+    @property
+    def instances(self):
+        """ Gets list of all the instance PIDs for lwaftr """
+        mypid = self.daemon.pid
+        output = self.run_cmd(self.ps_args).decode("utf-8")
+        my_lines = [inst for inst in output.split("\n") if str(mypid) in inst]
+
+        # The list won't be clean and have lots of text, extract the PIDs
+        instances = {}
+        for inst in my_lines:
+            # parts example: ['\\-', '20422', 'worker', 'for', '20420']
+            parts = inst.split()
+            if parts[0] == "\\-":
+                instances[int(parts[-1])].add(int(parts[1]))
+            else:
+                instances[int(parts[0])] = set()
+
+        return instances
+
+
+    def tearDown(self):
+        self.stop_daemon(self.daemon)
+        self.daemon = None
+        return super().tearDown()
+
+    def test_start_empty(self):
+        """ Lwaftr can be started with no instances """
+        config = str(DATA_DIR / "empty.conf")
+        pid = self.start_daemon(config)
+        self.assertEqual(len(self.instances[pid]), 0)
+
+
+    def test_snabb_config(self):
+        """ New instance can be started by snabb config """
+        config = str(DATA_DIR / "icmp_on_fail.conf")
+        pid = self.start_daemon(config)
+        initial_instance_amount = len(self.instances[pid])
+
+        # add an instance
+        device = """{
+        device addtest1;
+        queue {
+          id 1;
+          external-interface {
+            ip 72.72.72.72;
+            mac 14:14:14:14:14:14;
+            next-hop {
+              mac 15:15:15:15:15:15;
+            }
+          }
+          internal-interface {
+            ip 7:8:9:A:B:C:D:E;
+            mac 16:16:16:16:16:16;
+            next-hop {
+              mac 17:17:17:17:17:17;
+            }
+          }
+        }}"""
+        config_add_cmd = list(self.config_args)
+        config_add_cmd[2] = 'add'
+        config_add_cmd.extend((
+            '/softwire-config/instance',
+            device
+        ))
+
+        # Add the instance
+        self.run_cmd(config_add_cmd)
+
+        # Wait around for it to start the instance
+        time.sleep(1)
+
+        # Verify we've got one more instance
+        self.assertEqual(
+            len(self.instances[pid]), (initial_instance_amount + 1)
+        )
+
+    def test_snabb_config(self):
+        """ Removed instances are stopped by snabb config """
+        config = str(DATA_DIR / "icmp_on_fail.conf")
+        pid = self.start_daemon(config)
+        initial_instance_amount = len(self.instances[pid])
+
+        # There should be an instance called "test" in the initial
+        # config that's loaded. We'll try removing that.
+        config_remove_cmd = list(self.config_args)
+        config_remove_cmd[2] = 'remove'
+        config_remove_cmd.append('/softwire-config/instance[device=test]')
+
+        # Remove it
+        self.run_cmd(config_remove_cmd)
+
+        # Wait for the isntance to shutdown
+        time.sleep(1)
+
+        # Verify we've got one less instance than when we started.
+        self.assertEqual(
+            len(self.instances[pid]), (initial_instance_amount - 1)
+        )
 
 
 class TestConfigListen(BaseTestCase):
