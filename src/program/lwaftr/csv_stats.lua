@@ -104,12 +104,21 @@ function CSVStatsTimer:activate(write_header)
       data.prev_txbytes = counter.read(data.txbytes)
    end
    local function tick() return self:tick() end
-   local t = timer.new('csv_stats', tick, self.period*1e9, 'repeating')
-   timer.activate(t)
-   return t
+   self.tick_timer = timer.new('csv_stats', tick, self.period*1e9, 'repeating')
+   timer.activate(self.tick_timer)
+   return self.tick_timer
+end
+
+function CSVStatsTimer:check_alive()
+   -- Instances can be terminated periodically, this checks for that and if so
+   -- removes the timer so the3 stats don't get displayed indefinitely.
+   if S.waitpid(self.pid, S.c.W["NOHANG"]) ~= 0 then
+      self.tick_timer.repeating = false
+   end
 end
 
 function CSVStatsTimer:tick()
+   self:check_alive()
    local elapsed = engine.now() - self.start
    local dt = elapsed - self.prev_elapsed
    self.prev_elapsed = elapsed

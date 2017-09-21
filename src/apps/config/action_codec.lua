@@ -12,7 +12,7 @@ local shm = require("core.shm")
 local action_names = { 'unlink_output', 'unlink_input', 'free_link',
                        'new_link', 'link_output', 'link_input', 'stop_app',
                        'start_app', 'reconfig_app',
-                       'call_app_method_with_blob', 'commit' }
+                       'call_app_method_with_blob', 'commit', 'shutdown' }
 local action_codes = {}
 for i, name in ipairs(action_names) do action_codes[name] = i end
 
@@ -71,6 +71,9 @@ function actions.call_app_method_with_blob (codec, appname, methodname, blob)
    return codec:finish(appname, methodname, blob)
 end
 function actions.commit (codec)
+   return codec:finish()
+end
+function actions.shutdown (codec)
    return codec:finish()
 end
 

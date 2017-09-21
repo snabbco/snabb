@@ -100,9 +100,30 @@ function Leader:start_worker(cpu)
    return worker.start("follower", table.concat(start_code, "\n"))
 end
 
-function Leader:stop_worker(worker)
-   if worker.cpu then self.cpuset:release(worker.cpu) end
-   S.kill(worker.pid, 15)
+function Leader:stop_worker(id)
+   -- Tell the worker to terminate
+   local stop_actions = {{'shutdown', {}}, {'commit', {}}}
+   self:enqueue_config_actions_for_follower(id, stop_actions)
+   self:send_messages_to_followers()
+   self.followers[id].shutting_down = true
+end
+
+function Leader:remove_stale_followers()
+   local stale = {}
+   for id, follower in pairs(self.followers) do
+      if follower.shutting_down then
+	 if S.waitpid(follower.pid, S.c.W["NOHANG"]) ~= 0 then
+	    stale[#stale + 1] = id
+	 end
+      end
+   end
+   for _, id in ipairs(stale) do
+      if self.followers[id].cpu then
+	 self.cpuset:release(self.followers[id].cpu)
+      end
+      self.followers[id] = nil
+
+   end
 end
 
 function Leader:acquire_cpu_for_follower(id, app_graph)
@@ -518,7 +539,7 @@ function Leader:update_configuration (update_fn, verb, path, ...)
 
    for id, follower in pairs(self.followers) do
       if new_graphs[id] == nil then
-	 self:stop_worker(follower)
+         self:stop_worker(id)
       else
 	 local actions = self.support.compute_config_actions(
 	    follower.graph, new_graphs[id], to_restart, verb, path, ...)
@@ -834,6 +855,7 @@ end
 function Leader:pull ()
    if app.now() < self.next_time then return end
    self.next_time = app.now() + self.period
+   self:remove_stale_followers()
    self:handle_calls_from_peers()
    self:send_messages_to_followers()
    self:receive_alarms_from_followers()
