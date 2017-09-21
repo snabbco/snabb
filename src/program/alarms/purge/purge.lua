@@ -5,7 +5,7 @@ local common = require("program.config.common")
 local lib = require("core.lib")
 
 local function usage(exit_code)
-   print(require('program.config.purge_alarms.README_inc'))
+   print(require('program.alarms.purge.README_inc'))
    main.exit(exit_code)
 end
 

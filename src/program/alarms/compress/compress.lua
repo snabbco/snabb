@@ -4,7 +4,7 @@ module(..., package.seeall)
 local common = require("program.config.common")
 
 local function usage(exit_code)
-   print(require('program.config.compress_alarms.README_inc'))
+   print(require('program.alarms.compress.README_inc'))
    main.exit(exit_code)
 end
 

@@ -4,7 +4,7 @@ module(..., package.seeall)
 local common = require("program.config.common")
 
 local function usage(exit_code)
-   print(require("program.config.set_alarm_operator_state.README_inc"))
+   print(require("program.alarms.set_operator_state.README_inc"))
    main.exit(exit_code)
 end
 
