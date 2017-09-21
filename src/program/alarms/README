@@ -1,5 +1,8 @@
 Usage:
+  snabb alarms compress
   snabb alarms get-state
+  snabb alarms purge
+  snabb alarms set-operator-state
 
 Use --help for per-command usage.
 Example:
