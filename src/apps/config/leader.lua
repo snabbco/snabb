@@ -66,7 +66,6 @@ function Leader:new (conf)
    ret.followers = {}
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
-   ret.check_for_stale = false
 
    ret:set_initial_configuration(conf.initial_configuration)
 
@@ -106,14 +105,16 @@ function Leader:stop_worker(id)
    local stop_actions = {{'shutdown', {}}, {'commit', {}}}
    self:enqueue_config_actions_for_follower(id, stop_actions)
    self:send_messages_to_followers()
-   self.check_for_stale = true
+   self.followers[id].shutting_down = true
 end
 
 function Leader:remove_stale_followers()
    local stale = {}
    for id, follower in pairs(self.followers) do
-      if S.waitpid(follower.pid, S.c.W["NOHANG"]) ~= 0 then
-         stale[#stale + 1] = id
+      if follower.shutting_down then
+	 if S.waitpid(follower.pid, S.c.W["NOHANG"]) ~= 0 then
+	    stale[#stale + 1] = id
+	 end
       end
    end
    for _, id in ipairs(stale) do
@@ -854,7 +855,7 @@ end
 function Leader:pull ()
    if app.now() < self.next_time then return end
    self.next_time = app.now() + self.period
-   if self.check_for_stale then self:remove_stale_followers() end
+   self:remove_stale_followers()
    self:handle_calls_from_peers()
    self:send_messages_to_followers()
    self:receive_alarms_from_followers()
