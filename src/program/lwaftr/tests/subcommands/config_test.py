@@ -12,9 +12,7 @@ import time
 import unittest
 
 from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, \
-                     DAEMON_STARTUP_WAIT, BaseTestCase, nic_names, \
-                     DaemonException
-
+                     DAEMON_STARTUP_WAIT, BaseTestCase, nic_names
 
 DAEMON_PROC_NAME = 'config-test-daemon'
 DAEMON_ARGS = [
@@ -113,7 +111,15 @@ class TestConfigMultiproc(BaseTestCase):
         time.sleep(DAEMON_STARTUP_WAIT)
         return_code = self.daemon.poll()
         if return_code is not None:
-            raise DaemonException("Error starting daemon: " + str(return_code))
+            stdout = self.daemon.stdout.read().decode(ENC)
+            stderr = self.daemon.stderr.read().decode(ENC)
+            self.fail("\n".join((
+                "Failed starting daemon",
+                "Command:", " ".join(daemon_args),
+                "Exit code: {0}".format(return_code),
+                "STDOUT", stdout,
+                "STDOUT", stderr,
+            )))
         return self.daemon.pid
 
     @property

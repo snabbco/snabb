@@ -37,9 +37,6 @@ def nic_names():
 def jit_config_dir():
     return os.environ.get("JIT_CONFIG_DIR")
 
-class DaemonException(Exception):
-    pass
-
 class BaseTestCase(unittest.TestCase):
     """
     Base class for TestCases. It has a "run_cmd" method and daemon handling,
@@ -109,7 +106,7 @@ class BaseTestCase(unittest.TestCase):
             daemon.stdout.close()
             daemon.stderr.close()
         else:
-            raise DaemonException('Error terminating deamon: ' + str(ret_code))
+            raise Exception('Error terminating deamon: ' + str(ret_code))
 
     @classmethod
     def tearDownClass(cls):
