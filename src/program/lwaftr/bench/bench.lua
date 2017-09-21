@@ -3,6 +3,7 @@ module(..., package.seeall)
 local app = require("core.app")
 local config = require("core.config")
 local lib = require("core.lib")
+local cpuset = require("lib.cpuset")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local setup = require("program.lwaftr.setup")
 local shm = require("core.shm")
@@ -23,11 +24,7 @@ function parse_args(args)
       assert(opts.duration >= 0, "duration can't be negative")
    end
    function handlers.cpu(arg)
-      local cpu = tonumber(arg)
-      if not cpu or cpu ~= math.floor(cpu) or cpu < 0 then
-         fatal("Invalid cpu number: "..arg)
-      end
-      scheduling.cpu = cpu
+      cpuset.global_cpuset():add_from_string(arg)
    end
    function handlers.n(arg) opts.name = assert(arg) end
    function handlers.b(arg) opts.bench_file = arg end
@@ -37,6 +34,7 @@ function parse_args(args)
    args = lib.dogetopt(args, handlers, "j:n:hyb:D:", {
       help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1})
    if #args ~= 3 then show_usage(1) end
+   cpuset.global_cpuset():bind_to_numa_node()
    return opts, scheduling, unpack(args)
 end
 

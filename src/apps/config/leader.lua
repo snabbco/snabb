@@ -6,6 +6,7 @@ local S = require("syscall")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local cltable = require("lib.cltable")
+local cpuset = require("lib.cpuset")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local util = require("lib.yang.util")
@@ -31,6 +32,7 @@ Leader = {
       initial_configuration = {required=true},
       schema_name = {required=true},
       worker_start_code = {required=true},
+      cpuset = {default=cpuset.global_cpuset()},
       Hz = {default=100},
    }
 }
@@ -47,6 +49,7 @@ end
 
 function Leader:new (conf)
    local ret = setmetatable({}, {__index=Leader})
+   ret.cpuset = conf.cpuset
    ret.socket_file_name = conf.socket_file_name
    if not ret.socket_file_name:match('^/') then
       local instance_dir = shm.root..'/'..tostring(S.getpid())
@@ -88,16 +91,36 @@ function Leader:set_initial_configuration (configuration)
    end
 end
 
-function Leader:start_worker()
-   return worker.start("follower", self.worker_start_code)
+function Leader:start_worker(cpu)
+   local start_code = self.worker_start_code
+   if cpu then
+      start_code = "require('lib.numa').bind_to_cpu("..cpu..")\n"..start_code
+   end
+   return worker.start("follower", start_code)
 end
 
 function Leader:stop_worker(worker)
+   if worker.cpu then self.cpuset:release(worker.cpu) end
    S.kill(worker.pid, 15)
 end
 
+function Leader:acquire_cpu_for_follower(id, app_graph)
+   local pci_addresses = {}
+   -- Grovel through app initargs for keys named "pciaddr".  Hacky!
+   for name, init in pairs(app_graph.apps) do
+      if type(init.arg) == 'table' then
+         for k, v in pairs(init.arg) do
+            if k == 'pciaddr' then table.insert(pci_addresses, v) end
+         end
+      end
+   end
+   return self.cpuset:acquire_for_pci_addresses(pci_addresses)
+end
+
 function Leader:start_follower_for_graph(id, graph)
-   self.followers[id] = { pid=self:start_worker(), queue={}, graph=graph }
+   local cpu = self:acquire_cpu_for_follower(id, graph)
+   self.followers[id] = { cpu=cpu, pid=self:start_worker(cpu), queue={},
+                          graph=graph }
    local actions = self.support.compute_config_actions(
       app_graph.new(), self.followers[id].graph, {}, 'load')
    self:enqueue_config_actions_for_follower(id, actions)

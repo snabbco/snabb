@@ -568,7 +568,6 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
 end
 
 local apply_scheduling_opts = {
-   cpu = { required=false },
    pci_addrs = { default={} },
    real_time = { default=false },
    ingress_drop_monitor = { default='flush' },
@@ -580,11 +579,6 @@ function apply_scheduling(opts)
    local fatal = lwutil.fatal
 
    opts = lib.parse(opts, apply_scheduling_opts)
-   if opts.cpu then
-      local success, err = pcall(numa.bind_to_cpu, opts.cpu)
-      if not success then fatal(err) end
-      print("Bound data plane to CPU:", opts.cpu)
-   end
    if opts.ingress_drop_monitor then
       local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
       timer.activate(mon:timer())
@@ -706,12 +700,6 @@ function reconfigurable(scheduling, f, graph, conf, ...)
       return mapping
    end
 
-   if scheduling.cpu then
-      local wanted_node = numa.cpu_get_numa_node(scheduling.cpu)
-      numa.bind_to_numa_node(wanted_node)
-      print("Bound main process to NUMA node: ", wanted_node)
-   end
-   
    local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
    worker_code = worker_code:format(stringify(scheduling))
 
