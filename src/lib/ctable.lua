@@ -682,8 +682,12 @@ function selftest()
       end
       do
          local file = io.open(tmp, 'rb')
+         -- keep references to avoid GCing too early
+         local handle = {}
          local function read(size)
-            return ffi.new('uint8_t[?]', size, file:read(size))
+            local buf = ffi.new('uint8_t[?]', size, file:read(size))
+            table.insert(handle, buf)
+            return buf
          end
          local stream = {}
          function stream:read_ptr(type)
