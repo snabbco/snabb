@@ -154,31 +154,40 @@ function run(args)
       conf = migrate_device_on_config(conf, v4, v6)
    end
 
-   local use_splitter = requires_splitter(opts, conf)
-
    -- If there is a name defined on the command line, it should override
    -- anything defined in the config.
    if opts.name then
       conf.softwire_config.name = opts.name
    end
 
-   local c = config.new()
-   local setup_fn, setup_args
-   if opts.virtio_net then
-      setup_fn, setup_args = setup.load_virt, { 'inetNic', 'b4sideNic' }
-   elseif opts["on-a-stick"] then
-      setup_fn = setup.load_on_a_stick
-      setup_args =
-         { { v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
-             v4v6 = use_splitter and 'v4v6', mirror = opts.mirror,
-             ring_buffer_size = opts.ring_buffer_size } }
-   else
-      setup_fn = setup.load_phy
-      setup_args = { 'inetNic', 'b4sideNic', opts.ring_buffer_size }
+   local function setup_fn(graph, lwconfig)
+      -- If --virtio has been specified, always use this.
+      if opts.virtio_net then
+	 return setup_fn(graph, lwconfig, 'inetNic', 'b4sideNic')
+      end
+
+      -- If instance has external-interface.device configure as bump-in-the-wire
+      -- otherwise configure it in on-a-stick mode.
+      local name, instance = next(lwconfig.softwire_config.instance)
+      local queue = instance.queue.values[1]
+      if queue.external_interface.device then
+	 return setup.load_phy(graph, lwconfig, 'inetNick', 'b4sideNic',
+			       opts.ring_buffer_size)
+      else
+	 local use_splitter = requires_splitter(opts, lwconfig)
+	 local options = {
+	    v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNick',
+	    v4v6 = use_splitter and 'v4v6', mirror = opts.mirror,
+	    ring_buffer_size = opts.ring_buffer_size
+	 }
+	 return setup.load_on_a_stick(graph, lwconfig, options)
+      end
    end
 
+   local c = config.new()
+
    conf.alarm_notification = true
-   setup.reconfigurable(scheduling, setup_fn, c, conf, unpack(setup_args))
+   setup.reconfigurable(scheduling, setup_fn, c, conf)
    engine.configure(c)
 
    if opts.verbosity >= 2 then
