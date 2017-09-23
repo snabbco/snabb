@@ -336,7 +336,9 @@ function Intel:new (conf)
       rxcounter = conf.rxcounter,
       txcounter = conf.txcounter,
       rate_limit = conf.rate_limit,
-      priority = conf.priority
+      priority = conf.priority,
+      -- a path used for shm operations on NIC-global state
+      shm_root = "/intel-mp/" .. conf.pciaddr .. "/"
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -754,6 +756,8 @@ function Intel:stop ()
    end
    self:unset_tx_rate()
    if self.fd:flock("nb, ex") then
+      -- delete shm state for this NIC
+      shm.unlink(self.shm_root)
       self.r.CTRL:clr( bits { SETLINKUP = 6 } )
       --self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
       pci.set_bus_master(self.pciaddress, false)
@@ -1254,6 +1258,9 @@ function Intel82599:init_queue_stats (frame)
    end
 end
 
+-- C type for VMDq enabled state
+vmdq_enabled_t = ffi.typeof("struct { uint8_t enabled; }")
+
 function Intel82599:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
@@ -1355,6 +1362,11 @@ function Intel82599:init ()
 
    self:rss_enable()
 
+   -- set shm to indicate whether the NIC is in VMDq mode
+   local vmdq_shm = shm.create(self.shm_root .. "vmdq_enabled", vmdq_enabled_t)
+   vmdq_shm.enabled = self.vmdq
+   shm.unmap(vmdq_shm)
+
    if self.vmdq then
       self:vmdq_enable()
    end
@@ -1366,12 +1378,14 @@ end
 -- Also checks that the main process used the same VMDq setting if
 -- this is a worker process
 function Intel82599:check_vmdq ()
+   local vmdq_shm = shm.open(self.shm_root .. "vmdq_enabled", vmdq_enabled_t)
+
    if not self.vmdq then
       assert(not self.macaddr, "VMDq must be set to use MAC address")
       assert(not self.mirror, "VMDq must be set to specify mirroring rules")
 
       if not self.master then
-         assert(self.r.MRQC:bits(0, 4) ~= self.mrqc_bits,
+         assert(vmdq_shm.enabled == 0,
                 "VMDq was set by the main process for this NIC")
       end
    else
@@ -1380,7 +1394,7 @@ function Intel82599:check_vmdq ()
       assert(self.poolnum < 64, "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
 
       if not self.master then
-         assert(self.r.MRQC:bits(0, 4) == self.mrqc_bits,
+         assert(vmdq_shm.enabled == 1,
                 "VMDq not set by the main process for this NIC")
       end
    end
