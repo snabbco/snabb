@@ -1,5 +1,18 @@
 # Change Log
 
+## [2017.08.03]
+
+* Fix on-a-stick mode for multiple worker processes.  The lwAFTR will now
+  detect based on the configuration whether an lwAFTR instance is
+  running in on-a-stick or bump-in-the-wire configuration.  The
+  --on-a-stick, --v4, and --v6 arguments are still around if you want to
+  use a single lwAFTR binding table, but run separate single-instance
+  lwAFTR processes manually.
+
+* The "compress", "purge", and "set-operator-state" commands have been
+  moved from "snabb config" to "snabb alarms".  Documentation will be
+  forthcoming; otherwise see their --help outputs.
+
 ## [2017.08.02]
 
 * Adapt --cpu argument to "snabb lwaftr run" to take a range of
