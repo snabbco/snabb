@@ -22,7 +22,8 @@ local parse_command_line_opts = {
    with_path = { default=false },
    with_value = { default=false },
    require_schema = { default=false },
-   is_config = { default=true }
+   is_config = { default=true },
+   usage = { default=show_usage },
 }
 
 local function path_grammar(schema_name, path, is_config)
@@ -65,6 +66,7 @@ function parse_command_line(args, opts)
       print_default = false,
       format = "yang",
    }
+   if opts.usage then show_usage = opts.usage end
    local handlers = {}
    function handlers.h() show_usage(opts.command, 0) end
    function handlers.s(arg) ret.schema_name = arg end

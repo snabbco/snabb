@@ -1,4 +1,4 @@
-Usage: snabb config purge-alarms [OPTION]... ID STATE
+Usage: snabb alarms purge [OPTION]... ID STATE
 Adds a new operator-state in an alarm.
 
 Available options:
@@ -24,9 +24,9 @@ remove all alarms that match the filtering options.
 
 Typical usage:
 
-$ sudo ./snabb config purge-alarms lwaftr any
-$ sudo ./snabb config purge-alarms --by-severity above:minor lwaftr any
-$ sudo ./snabb config purge-alarms --by-older-than minutes:5 lwaftr cleared
+$ sudo ./snabb alarms purge lwaftr any
+$ sudo ./snabb alarms purge --by-severity above:minor lwaftr any
+$ sudo ./snabb alarms purge --by-older-than minutes:5 lwaftr cleared
 
-See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
+See https://github.com/Igalia/snabb/blob/lwaftr/src/program/alarms/README.md
 for full documentation.

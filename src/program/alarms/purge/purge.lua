@@ -4,9 +4,14 @@ module(..., package.seeall)
 local common = require("program.config.common")
 local lib = require("core.lib")
 
-local function usage(exit_code)
-   print(require('program.config.purge_alarms.README_inc'))
-   main.exit(exit_code)
+function show_usage(command, status, err_msg)
+   if err_msg then print('error: '..err_msg) end
+   print(require("program.alarms.purge.README_inc"))
+   main.exit(status)
+end
+
+local function fatal()
+   show_usage(nil, 1)
 end
 
 local function parse_args (args)
@@ -37,14 +42,15 @@ local function parse_args (args)
    args = lib.dogetopt(args, handlers, "", { ['by-older-than']=1,
       ['by-severity']=1, ['by-operator-state']=1 })
    opts.status = table.remove(args, #args)
-   if table_size(opts) == 0 then usage(1) end
+   if table_size(opts) == 0 then fatal() end
    local args = without_opts(args)
    return opts, args
 end
 
 function run(args)
    local l_args, args = parse_args(args)
-   local opts = { command='purge-alarms', with_path=false, is_config=false }
+   local opts = { command='purge-alarms', with_path=false, is_config=false,
+                  usage = show_usage }
    args = common.parse_command_line(args, opts)
    local response = common.call_leader(
       args.instance_id, 'purge-alarms',
