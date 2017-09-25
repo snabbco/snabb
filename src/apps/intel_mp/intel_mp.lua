@@ -336,7 +336,9 @@ function Intel:new (conf)
       rxcounter = conf.rxcounter,
       txcounter = conf.txcounter,
       rate_limit = conf.rate_limit,
-      priority = conf.priority
+      priority = conf.priority,
+      -- a path used for shm operations on NIC-global state
+      shm_root = "/intel-mp/" .. conf.pciaddr .. "/"
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -352,14 +354,15 @@ function Intel:new (conf)
    self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
 
-   -- this needs to happen before register loading for rxq/txq
-   self:select_pool()
-
    self:load_registers(byid.registers)
 
    self:init()
    self.fd:flock("sh")
    self:check_vmdq()
+   -- this needs to happen before register loading for rxq/txq
+   -- because it determines the queue numbers
+   self:select_pool()
+   self:load_queue_registers(byid.registers)
    self:init_tx_q()
    self:init_rx_q()
    self:set_MAC()
@@ -550,12 +553,15 @@ function Intel:load_registers(key)
    if v.inherit then self:load_registers(v.inherit) end
    if v.singleton then register.define(v.singleton, self.r, self.base) end
    if v.array then register.define_array(v.array, self.r, self.base) end
-   if v.txq and self.txq then
-      register.define(v.txq, self.r, self.base, self.txq)
-   end
-   if v.rxq and self.rxq then
-      register.define(v.rxq, self.r, self.base, self.rxq)
-   end
+end
+function Intel:load_queue_registers(key)
+  local v = reg[key]
+  if v.txq and self.txq then
+    register.define(v.txq, self.r, self.base, self.txq)
+  end
+  if v.rxq and self.rxq then
+    register.define(v.rxq, self.r, self.base, self.rxq)
+  end
 end
 function Intel:lock_sw_sem()
    for i=1,50,1 do
@@ -744,16 +750,12 @@ function Intel:stop ()
       self:unset_MAC()
       self:unset_VLAN()
       self:unset_mirror()
-      if self.poolfd then
-         -- we need to explicitly unlock this in case multiple instances
-         -- are running on the same process and we can't rely on process
-         -- termination to free the lock
-         self.poolfd:flock("un")
-         self.poolfd:close()
-      end
+      self:unset_pool()
    end
    self:unset_tx_rate()
    if self.fd:flock("nb, ex") then
+      -- delete shm state for this NIC
+      shm.unlink(self.shm_root)
       self.r.CTRL:clr( bits { SETLINKUP = 6 } )
       --self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
       pci.set_bus_master(self.pciaddress, false)
@@ -1254,6 +1256,9 @@ function Intel82599:init_queue_stats (frame)
    end
 end
 
+-- C type for VMDq enabled state
+vmdq_enabled_t = ffi.typeof("struct { uint8_t enabled; }")
+
 function Intel82599:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
@@ -1355,6 +1360,11 @@ function Intel82599:init ()
 
    self:rss_enable()
 
+   -- set shm to indicate whether the NIC is in VMDq mode
+   local vmdq_shm = shm.create(self.shm_root .. "vmdq_enabled", vmdq_enabled_t)
+   vmdq_shm.enabled = self.vmdq
+   shm.unmap(vmdq_shm)
+
    if self.vmdq then
       self:vmdq_enable()
    end
@@ -1366,30 +1376,40 @@ end
 -- Also checks that the main process used the same VMDq setting if
 -- this is a worker process
 function Intel82599:check_vmdq ()
+   local vmdq_shm = shm.open(self.shm_root .. "vmdq_enabled", vmdq_enabled_t)
+
    if not self.vmdq then
       assert(not self.macaddr, "VMDq must be set to use MAC address")
       assert(not self.mirror, "VMDq must be set to specify mirroring rules")
 
       if not self.master then
-         assert(self.r.MRQC:bits(0, 4) ~= self.mrqc_bits,
+         assert(vmdq_shm.enabled == 0,
                 "VMDq was set by the main process for this NIC")
       end
    else
       assert(self.driver == "Intel82599", "VMDq only supported on 82599")
       assert(self.macaddr, "MAC address must be set in VMDq mode")
-      assert(self.poolnum < 64, "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
 
       if not self.master then
-         assert(self.r.MRQC:bits(0, 4) == self.mrqc_bits,
+         assert(vmdq_shm.enabled == 1,
                 "VMDq not set by the main process for this NIC")
       end
    end
 end
 
+-- C type for shared memory indicating which pools are used
+local vmdq_pools_t = ffi.typeof("struct { uint8_t pools[64]; }")
+
 -- enable VMDq mode, see 4.6.10.1
 -- follows the configuration flow in 4.6.11.3.3
 -- (should only be called on the master instance)
 function Intel82599:vmdq_enable ()
+   -- create shared memory for tracking VMDq pools
+   local vmdq_shm = shm.create(self.shm_root .. "vmdq_pools", vmdq_pools_t)
+   -- explicitly initialize to 0 since we can't rely on cleanup
+   for i=0, 63 do vmdq_shm.pools[i] = 0 end
+   shm.unmap(vmdq_shm)
+
    -- must be set prior to setting MTQC (7.2.1.2.1)
    self.r.RTTDCS:set(bits { ARBDIS=6 })
 
@@ -1450,37 +1470,36 @@ end
 
 -- In VMDq mode, selects an available pool if one isn't provided by the user.
 --
--- This method runs before registers are loaded, because the rxq/txq registers
--- depend on the pool number prior to loading. As a result, we can't use the
--- lock_sw_sem() method to protect the critical section and use flock() instead.
-local pooldir = "intel-mp-pools"
+-- This method runs before rxq/txq registers are loaded, because the rxq/txq registers
+-- depend on the pool number prior to loading.
 function Intel82599:select_pool()
    if not self.vmdq then return end
+
+   self:lock_sw_sem()
 
    -- if the poolnum was set manually in the config, just use that
    if not self.poolnum then
       local available_pool
 
       -- We use some shared memory to track which pool numbers are claimed
-      -- using flock() to avoid conflicts. The contents of the memory doesn't
-      -- matter since we only care about the lock state.
-      for poolnum = 0, 63 do
-         local path = "/"..pooldir.."/"..self.pciaddress.."/"..poolnum
-         local ptr  = shm.create(path, "uint8_t")
-         local poolfd = S.open(shm.root .. path, "creat, rdwr")
+      local pool_shm = shm.open(self.shm_root .. "vmdq_pools", vmdq_pools_t)
 
-         if poolfd:flock("nb, ex") then
+      for poolnum = 0, 63 do
+         if pool_shm.pools[poolnum] == 0 then
             available_pool = poolnum
-            self.poolfd = poolfd
             break
-         else
-            poolfd:close()
          end
       end
 
       assert(available_pool, "No free VMDq pools are available")
+      pool_shm.pools[available_pool] = 1
+      shm.unmap(pool_shm)
       self.poolnum = available_pool
+   else
+      assert(self.poolnum < 64, "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
    end
+
+   self:unlock_sw_sem()
 
    -- Once we know the pool number, figure out txq and rxq numbers. This
    -- needs to be done prior to loading registers.
@@ -1493,6 +1512,17 @@ function Intel82599:select_pool()
 
    -- max queue number is different in VMDq mode
    self.max_q = 128
+end
+
+-- used to disable the pool number for this instance on stop()
+function Intel82599:unset_pool ()
+  self:lock_sw_sem()
+
+  local pool_shm = shm.open(self.shm_root .. "vmdq_pools", vmdq_pools_t)
+  pool_shm.pools[self.poolnum] = 0
+  shm.unmap(pool_shm)
+
+  self:unlock_sw_sem()
 end
 
 function Intel82599:enable_MAC_for_pool (mac_index)
