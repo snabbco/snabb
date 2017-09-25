@@ -684,9 +684,7 @@ function start_sampling(sample_fn)
       1e9, 'repeating'))
 end
 
-function reconfigurable(scheduling, f, graph, conf, ...)
-   local args = {...}
-
+function reconfigurable(scheduling, f, graph, conf)
    -- Always enabled in reconfigurable mode.
    alarm_notification = true
 
@@ -694,7 +692,7 @@ function reconfigurable(scheduling, f, graph, conf, ...)
       local mapping = {}
       for device, inst_config in pairs(lwutil.produce_instance_configs(conf)) do
          local instance_app_graph = config.new()
-         f(instance_app_graph, inst_config, unpack(args))
+         f(instance_app_graph, inst_config)
          mapping[device] = instance_app_graph
       end
       return mapping

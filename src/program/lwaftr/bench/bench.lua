@@ -66,8 +66,12 @@ function run(args)
    end
 
    local graph = config.new()
-   setup.reconfigurable(scheduling, setup.load_bench, graph, conf,
-			inv4_pcap, inv6_pcap, 'sinkv4', 'sinkv6')
+   local function setup_fn(graph, lwconfig)
+      return setup.load_bench(graph, lwconfig, inv4_pcap, inv6_pcap, 'sinkv4',
+			      'sinkv6')
+   end
+
+   setup.reconfigurable(scheduling, setup_fn, graph, conf)
    app.configure(graph)
 
    local function start_sampling_for_pid(pid, write_header)
@@ -76,8 +80,8 @@ function run(args)
       csv:add_app('sinkv6', { 'input' }, { input=opts.hydra and 'encap' or 'Encap.' })
       csv:activate(write_header)
    end
-   
+
    setup.start_sampling(start_sampling_for_pid)
-   
+
    app.main({duration=opts.duration})
 end
