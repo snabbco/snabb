@@ -339,10 +339,6 @@ function Intel:new (conf)
       priority = conf.priority
    }
 
-   -- txq/rxq have defaults so nil can't represent off state
-   if conf.txq == "off" then self.txq = nil end
-   if conf.rxq == "off" then self.rxq = nil end
-
    local vendor = lib.firstline(self.path .. "/vendor")
    local device = lib.firstline(self.path .. "/device")
    local byid = byPciID[tonumber(device)]
@@ -576,7 +572,7 @@ function Intel:offset(reg, key)
 end
 function Intel:push ()
    if not self.txq then return end
-   local li = self.input["input"]
+   local li = self.input.input
    if li == nil then return end
 
    while not empty(li) and self:can_transmit() do
@@ -607,7 +603,7 @@ function Intel:push ()
 
    -- same code as in pull, but we only call it in case the rxq
    -- is disabled for this app
-   if self.rxq and self.output["output"] then return end
+   if self.rxq and self.output.output then return end
    if self.run_stats and self.sync_timer() then
       self:sync_stats()
    end
@@ -615,7 +611,7 @@ end
 
 function Intel:pull ()
    if not self.rxq then return end
-   local lo = self.output["output"]
+   local lo = self.output.output
    if lo == nil then return end
 
    local pkts = 0

@@ -53,12 +53,12 @@ specified but assumed to be broadly applicable.
 
 *Optional*. The receive queue to attach to, numbered from 0. The default is 0.
 When VMDq is enabled, this number is used to index a queue (0 or 1)
-for the selected pool. Passing `"off"` will disable the receive queue.
+for the selected pool. Passing `false` will disable the receive queue.
 
 — Key **txq**
 
 *Optional*. The transmit queue to attach to, numbered from 0. The default is 0.
-Passing `"off"` will disable the transmit queue.
+Passing `false` will disable the transmit queue.
 
 — Key **vmdq**
 

@@ -6,7 +6,7 @@ local parse = require("core.lib").parse
 local function new_intel (arg)
    return intel.Intel:new(parse(arg, intel.Intel.config))
 end
-local nic = new_intel({pciaddr = pci0, rxq = "off", txq = "off"})
+local nic = new_intel({pciaddr = pci0, rxq = false, txq = false})
 
 nic:unlock_sw_sem()
 nic:lock_sw_sem()
