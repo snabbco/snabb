@@ -95,21 +95,9 @@ local function find_public_name(obj)
    error('could not determine public name for object: '..tostring(obj))
 end
 
-local lower_case = "abcdefghijklmnopqrstuvwxyz"
-local upper_case = lower_case:upper()
-local extra = "0123456789_-"
-local alphabet = table.concat({lower_case, upper_case, extra})
-assert(#alphabet == 64)
 local function random_file_name()
-   -- 22 bytes, but we only use 2^6=64 bits from each byte, so total of
-   -- 132 bits of entropy.
-   local bytes = lib.random_data(22)
-   local out = {}
-   for i=1,#bytes do
-      table.insert(out, alphabet:byte(bytes:byte(i) % 64 + 1))
-   end
-   local basename = string.char(unpack(out))
-   return shm.root..'/'..tostring(S.getpid())..'/app-conf-'..basename
+   local basename = 'app-conf-'..lib.random_printable_string(160)
+   return shm.root..'/'..shm.resolve(basename)
 end
 
 local function encoder()

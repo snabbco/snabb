@@ -755,6 +755,23 @@ function random_data (length)
    return ffi.string(random_bytes(length), length)
 end
 
+local lower_case = "abcdefghijklmnopqrstuvwxyz"
+local upper_case = lower_case:upper()
+local extra = "0123456789_-"
+local alphabet = table.concat({lower_case, upper_case, extra})
+assert(#alphabet == 64)
+function random_printable_string (entropy)
+   -- 64 choices in our alphabet, so 6 bits of entropy per byte.
+   entropy = entropy or 160
+   local length = math.floor((entropy - 1) / 6) + 1
+   local bytes = random_data(length)
+   local out = {}
+   for i=1,length do
+      out[i] = alphabet:byte(bytes:byte(i) % 64 + 1)
+   end
+   return string.char(unpack(out))
+end
+
 -- Compiler barrier.
 -- Prevents LuaJIT from moving load/store operations over this call.
 -- Any FFI call is sufficient to achieve this, see:
