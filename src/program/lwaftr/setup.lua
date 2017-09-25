@@ -25,6 +25,8 @@ local cltable    = require("lib.cltable")
 local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
+local binary     = require("lib.yang.binary")
+local cltable    = require("lib.cltable")
 local S          = require("syscall")
 local engine     = require("core.app")
 local lib        = require("core.lib")
@@ -682,18 +684,46 @@ function start_sampling(sample_fn)
       1e9, 'repeating'))
 end
 
+-- Produces configuration for each worker.  Each queue on each device
+-- will get its own worker process.
+local function compute_worker_configs(conf)
+   local ret = {}
+   local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v2')
+   local make_copy = copier(conf)
+   for device, queues in pairs(conf.softwire_config.instance) do
+      for id, _ in cltable.pairs(queues.queue) do
+         local worker_config = make_copy()
+         local instance = worker_config.softwire_config.instance
+         for other_device, queues in pairs(conf.softwire_config.instance) do
+            if other_device ~= device then
+               instance[other_device] = nil
+            else
+               for other_id, _ in cltable.pairs(queues.queue) do
+                  if other_id ~= id then
+                     instance[device].queue[other_id] = nil
+                  end
+               end
+            end
+         end
+         local worker_id = string.format('%s/%s', device, id)
+         ret[worker_id] = worker_config
+      end
+   end
+   return ret
+end
+
 function reconfigurable(scheduling, f, graph, conf)
    -- Always enabled in reconfigurable mode.
    alarm_notification = true
 
    local function setup_fn(conf)
-      local mapping = {}
-      for device, inst_config in pairs(lwutil.produce_instance_configs(conf)) do
-         local instance_app_graph = config.new()
-         f(instance_app_graph, inst_config)
-         mapping[device] = instance_app_graph
+      local worker_app_graphs = {}
+      for worker_id, worker_config in pairs(compute_worker_configs(conf)) do
+         local app_graph = config.new()
+         f(app_graph, worker_config)
+         worker_app_graphs[worker_id] = app_graph
       end
-      return mapping
+      return worker_app_graphs
    end
 
    local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
