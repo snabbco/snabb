@@ -3,6 +3,8 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
+local lib = require("core.lib")
+local shm = require("core.shm")
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
@@ -10,7 +12,6 @@ local stream = require("lib.yang.stream")
 local data = require('lib.yang.data')
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
-local lib = require("core.lib")
 
 local MAGIC = "yangconf"
 local VERSION = 0x00005000
@@ -467,6 +468,41 @@ function load_compiled_data_file(filename)
    return load_compiled_data(stream.open_input_byte_stream(filename))
 end
 
+function data_copier_from_grammar(production)
+   local compile = data_compiler_from_grammar(data_emitter(production), '')
+   return function(data)
+      local basename = 'copy-'..lib.random_printable_string(160)
+      local tmp = shm.root..'/'..shm.resolve(basename)
+      compile(data, tmp)
+      return function() return load_compiled_data_file(tmp).data end
+   end
+end
+
+function data_copier_for_schema(schema, is_config)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
+   return data_copier_from_grammar(grammar)
+end
+
+function config_copier_for_schema(schema)
+   return data_copier_for_schema(schema, true)
+end
+
+function state_copier_for_schema(schema)
+   return data_copier_for_schema(schema, false)
+end
+
+function config_copier_for_schema_by_name(schema_name)
+   return config_copier_for_schema(schema.load_schema_by_name(schema_name))
+end
+
+function copy_config_for_schema(schema, data)
+   return config_copier_for_schema(schema)(data)()
+end
+
+function copy_config_for_schema_by_name(schema_name, data)
+   return config_copier_for_schema_by_name(schema_name)(data)()
+end
+
 function selftest()
    print('selfcheck: lib.yang.binary')
    local test_schema = schema.load_schema([[module snabb-simple-router {
@@ -574,7 +610,7 @@ function selftest()
       local data2 = load_compiled_data_file(tmp)
       assert(data2.schema_name == 'snabb-simple-router')
       assert(data2.revision_date == '')
-      data = data2.data
+      data = copy_config_for_schema(test_schema, data2.data)
       os.remove(tmp)
    end
    print('selfcheck: ok')

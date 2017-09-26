@@ -483,7 +483,7 @@ local function multiprocess_migration(src, conf_file)
    local instance = {
       [device] = {queue = cltable.new({ key_type = queue_key }),},
    }
-   local key = ffi.new(queue_key, 1)
+   local key = ffi.new(queue_key, 0)
    local value = {
       external_interface = {
          device = ex_device,
