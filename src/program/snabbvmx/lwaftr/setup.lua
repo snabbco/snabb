@@ -64,7 +64,7 @@ end
 
 local function load_virt (c, nic_id, lwconf, interface)
    -- Validate the lwaftr and split the interfaces into global and instance.
-   local device, id, queue = parse_instance(conf)
+   local device, id, queue = parse_instance(lwconf)
 
    local gexternal_interface = lwconf.softwire_config.external_interface
    local ginternal_interface = lwconf.softwire_config.internal_interface
