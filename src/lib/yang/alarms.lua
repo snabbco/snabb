@@ -126,11 +126,16 @@ function alarm_type_keys:fetch (alarm_type_id, alarm_type_qualifier)
 end
 
 function add_to_inventory (alarm_types)
-   for k,v in pairs(alarm_types) do
-      local key = alarm_type_keys:fetch(k.alarm_type_id, k.alarm_type_qualifier)
-      v.resource = {v.resource}
-      state.alarm_inventory.alarm_type[key] = v
+   assert(type(alarm_types) == 'table')
+   for key,args in pairs(alarm_types) do
+      alarm_codec.add_to_inventory(key, args)
    end
+end
+
+function do_add_to_inventory (k, v)
+   local key = alarm_type_keys:fetch(k.alarm_type_id, k.alarm_type_qualifier)
+   v.resource = {v.resource}
+   state.alarm_inventory.alarm_type[key] = v
 end
 
 -- Single point to access alarm keys.

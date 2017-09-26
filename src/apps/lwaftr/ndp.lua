@@ -31,17 +31,19 @@ local alarms = require("lib.yang.alarms")
 
 alarms.add_to_inventory {
    [{alarm_type_id='ndp-resolution'}] = {
-      resource={'nic-v6'},
+      resource='nic-v6',
       has_clear=true,
       description='Raise up if NDP app cannot resolve IPv6 address'
    }
 }
+--[[
 local resolve_alarm = alarms.declare_alarm {
    [{resource='nic-v6', alarm_type_id='ndp-resolution'}] = {
       perceived_severity = 'critical',
       alarm_text = 'Make sure you can NDP resolve IP addresses on NIC',
    },
 }
+--]]
 
 local htons, ntohs = lib.htons, lib.ntohs
 local htonl, ntohl = lib.htonl, lib.ntohl

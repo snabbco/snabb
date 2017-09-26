@@ -8,7 +8,7 @@ local ffi = require("ffi")
 
 local UINT32_MAX = 0xffffffff
 
-local alarm_names = { 'raise_alarm', 'clear_alarm' }
+local alarm_names = { 'raise_alarm', 'clear_alarm', 'add_to_inventory' }
 local alarm_codes = {}
 for i, name in ipairs(alarm_names) do alarm_codes[name] = i end
 
@@ -33,6 +33,19 @@ function alarms.clear_alarm (codec, resource, alarm_type_id, alarm_type_qualifie
    local alarm_type_qualifier = codec:string(alarm_type_qualifier)
 
    return codec:finish(resource, alarm_type_id, alarm_type_qualifier)
+end
+function alarms.add_to_inventory (codec, alarm_type_id, alarm_type_qualifier,
+   resource, has_clear, description)
+
+   local alarm_type_id = codec:string(alarm_type_id)
+   local alarm_type_qualifier = codec:maybe_string(alarm_type_qualifier)
+
+   local resource = codec:string(resource)
+   local has_clear = codec:string((has_clear and "true" or "false"))
+   local description = codec:maybe_string(description)
+
+   return codec:finish(alarm_type_id, alarm_type_qualifier,
+                       resource, has_clear, description)
 end
 
 local function encoder()
@@ -77,6 +90,12 @@ function encode_clear_alarm (...)
    local codec = encoder()
    codec:uint32(assert(alarm_codes['clear_alarm']))
    return assert(alarms['clear_alarm'])(codec, ...)
+end
+
+function encode_add_to_inventory (...)
+   local codec = encoder()
+   codec:uint32(assert(alarm_codes['add_to_inventory']))
+   return assert(alarms['add_to_inventory'])(codec, ...)
 end
 
 local uint32_ptr_t = ffi.typeof('uint32_t*')
@@ -148,15 +167,39 @@ end
 
 -- To be used by the leader to group args into key and args.
 function to_alarm (args)
-   local resource, alarm_type_id, alarm_type_qualifier, perceived_severity, alarm_text = unpack(args)
    local key = {
-      resource = resource,
+      resource = args[1],
+      alarm_type_id = args[2],
+      alarm_type_qualifier = args[3],
+   }
+   local args = {
+      perceived_severity = args[4],
+      alarm_text = args[5],
+   }
+   return key, args
+end
+
+local alarm_type = {
+   key_attrs = {'alarm_type_id', 'alarm_type_qualifier'},
+   args_attrs = {'resource', 'has_clear', 'description'},
+}
+function alarm_type:normalize_key (t)
+   return normalize(t, self.key_attrs)
+end
+function alarm_type:normalize_args (t)
+   return normalize(t, self.args_attrs)
+end
+
+function to_alarm_type (args)
+   local alarm_type_id, alarm_type_qualifier, resource, has_clear, description = unpack(args)
+   local key = {
       alarm_type_id = alarm_type_id,
       alarm_type_qualifier = alarm_type_qualifier,
    }
    local args = {
-      perceived_severity = perceived_severity,
-      alarm_text = alarm_text,
+      resource = resource,
+      has_clear = has_clear,
+      description = description,
    }
    return key, args
 end
@@ -179,6 +222,19 @@ function clear_alarm (key)
    if channel then
       local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
       local buf, len = encode_clear_alarm(resource, alarm_type_id, alarm_type_qualifier)
+      channel:put_message(buf, len)
+   end
+end
+
+function add_to_inventory (key, args)
+   local channel = get_channel()
+   if channel then
+      local alarm_type_id, alarm_type_qualifier = alarm_type:normalize_key(key)
+      local resource, has_clear, description = alarm_type:normalize_args(args)
+      local buf, len = encode_add_to_inventory(
+         alarm_type_id, alarm_type_qualifier,
+         resource, has_clear, description
+      )
       channel:put_message(buf, len)
    end
 end
