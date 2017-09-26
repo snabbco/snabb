@@ -161,7 +161,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
    assert(type(lwconf) == 'table')
 
    -- Validate the lwaftr and split the interfaces into global and instance.
-   local device, id, queue = parse_instance(conf)
+   local device, id, queue = parse_instance(lwconf)
 
    local gexternal_interface = lwconf.softwire_config.external_interface
    local ginternal_interface = lwconf.softwire_config.internal_interface
