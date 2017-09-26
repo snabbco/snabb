@@ -58,27 +58,24 @@ local function validate_pci_devices(devices)
    end
 end
 
--- Temporary function to validate that there is only a single instance.
--- In the future this should be remove in favour of simply configuring
--- multiple instqances when specified.
-function temp_validate_configuration()
-   -- Validate and figure out the device to use. This assumes for now that there
-   -- is only one instance configured with one queue. This will change come
-   -- full multiprocessing support.
-   local function table_len(t)
-      local count = 0
-      for _,_ in pairs(t) do count = count + 1 end
-      return count
+-- Return device PCI address, queue ID, and queue configuration.
+local function parse_instance(conf)
+   local device, instance
+   for k, v in pairs(conf.softwire_config.instance) do
+      assert(device == nil, "configuration has more than one instance")
+      device, instance = k, v
    end
-   assert(table_len(conf.softwire_config.instance) == 1,
-          "Only one instance is supported in '/softwire-config/instance'")
-   local device = next(conf.softwire_config.instance)
-   assert(
-      table_len(conf.softwire_config.instance[device].queue.values) == 1,
-      "Only one queue is supported in '/softwire-config/instance/queue'")
+   assert(device ~= nil, "configuration has no instance")
+   local id, queue
+   for k, v in cltable.pairs(instance.queue) do
+      assert(id == nil, "configuration has more than one RSS queue")
+      id, queue = k.id, v
+   end
+   assert(id ~= nil, "configuration has no RSS queues")
+   return device, id, queue
 end
 
-function lwaftr_app(c, conf, device)
+function lwaftr_app(c, conf)
    assert(type(conf) == 'table')
 
    local function append(t, elem) table.insert(t, elem) end
@@ -102,8 +99,7 @@ function lwaftr_app(c, conf, device)
    end
    switch_names(conf)
 
-   -- We need to verify there is only one instance for now.
-   local queue = conf.softwire_config.instance[device].queue.values[1]
+   local device, id, queue = parse_instance(conf)
 
    -- Global interfaces
    local gexternal_interface = conf.softwire_config.external_interface
@@ -239,8 +235,7 @@ local function link_sink(c, v4_out, v6_out)
 end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
-   local v4_pci, _ = next(conf.softwire_config.instance)
-   local queue = conf.softwire_config.instance[v4_pci].queue.values[1]
+   local v4_pci, id, queue = parse_instance(conf)
    local v6_pci = queue.external_interface.device
    local v4_info = pci.device_info(v4_pci)
    local v6_info = pci.device_info(v6_pci)
@@ -267,8 +262,7 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
 end
 
 function load_on_a_stick(c, conf, args)
-   local pciaddr, _ = next(conf.softwire_config.instance)
-   local queue = conf.softwire_config.instance[pciaddr].queue.values[1]
+   local pciaddr, id, queue = parse_instance(conf)
    local device = pci.device_info(pciaddr)
    local driver = require(device.driver).driver
    validate_pci_devices({pciaddr})
@@ -320,8 +314,7 @@ function load_on_a_stick(c, conf, args)
 end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
-   local v4_pci, _ = next(conf.softwire_config.instance)
-   local queue = conf.softwire_config.instance[v4_pci].queue.values[1]
+   local v4_pci, id, queue = parse_instance(conf)
    local v6_pci = queue.external_device.device
    lwaftr_app(c, conf, device)
 
@@ -340,8 +333,7 @@ function load_virt(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
-   local device, _ = next(conf.softwire_config.instance)
-   local queue = conf.softwire_config.instance[device].queue.values[1]
+   local device, id, queue = parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, v4_pcap)
@@ -376,8 +368,7 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
 end
 
 function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local device, _ = next(conf.softwire_config.instance)
-   local queue = conf.softwire_config.instance[device].queue.values[1]
+   local device, id, queue = parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
@@ -429,8 +420,7 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
 end
 
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local device, _ = next(conf.softwire_config.instance)
-   local queue = conf.softwire_config.instance[device].queue.values[1]
+   local device, id, queue = parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
@@ -468,8 +458,7 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
 end
 
 function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
-   local device, _ = next(conf.softwire_config.instance)
-   local queue = conf.softwire_config.instance[device].queue.values[1]
+   local device, id, queue = parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
@@ -511,8 +500,7 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
 end
 
 function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
-   local device, _ = next(conf.softwire_config.instance)
-   local queue = conf.softwire_config.instance[device].queue.values[1]
+   local device, id, queue = parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
