@@ -558,7 +558,20 @@ module snabb-softwire-v2 {
         key "id";
 
         leaf id {
-          type uint8;
+          type uint8 { range 0..1; }
+          description
+          "RSS queue on which to attach.  Traffic will be partitioned
+           evenly between instances servicing queues on the same
+           interface.  The queue to which an incoming packet is assigned
+           is a function of the TCP or UDP source and destination ports
+           (if any) and the source and destination IPv4 or IPv6
+           addresses.  Fragmented packets will be delivered to the
+           lowest-numbered queue.
+
+           Note that currently the lwAFTR is restricted to running at
+           most 2 RSS workers per device.  This limitation may be lifted
+           to 4 soon.  Raising it farther is possible but needs changes
+           to how the lwAFTR uses its PCI devices.";
         }
 
         container external-interface {

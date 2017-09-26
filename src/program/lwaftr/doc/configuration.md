@@ -14,7 +14,7 @@ softwire-config {
   instances {
     device "00:05.0"
     queue {
-      id 1;
+      id 0;
       external-interface {
         ip 10.10.10.10;
         mac 12:12:12:12:12:12;

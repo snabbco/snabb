@@ -36,7 +36,7 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_internal_iface(self):
         cmd_args = list(self.config_args)
-        cmd_args.append('/softwire-config/instance[device=test]/queue[id=1]'
+        cmd_args.append('/softwire-config/instance[device=test]/queue[id=0]'
                         '/internal-interface/ip')
         output = self.run_cmd(cmd_args)
         self.assertEqual(
@@ -45,7 +45,7 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_external_iface(self):
         cmd_args = list(self.config_args)
-        cmd_args.append('/softwire-config/instance[device=test]/queue[id=1]/'
+        cmd_args.append('/softwire-config/instance[device=test]/queue[id=0]/'
                         'external-interface/ip')
         output = self.run_cmd(cmd_args)
         self.assertEqual(
@@ -164,7 +164,7 @@ class TestConfigMultiproc(BaseTestCase):
         device = """{
         device addtest1;
         queue {
-          id 1;
+          id 0;
           external-interface {
             ip 72.72.72.72;
             mac 14:14:14:14:14:14;
@@ -340,7 +340,7 @@ class TestConfigMisc(BaseTestCase):
         test_ipv4 = '208.118.235.148'
         set_args = self.get_cmd_args('set')
         set_args.extend((
-            "/softwire-config/instance[device=test]/queue[id=1]/"
+            "/softwire-config/instance[device=test]/queue[id=0]/"
             "external-interface/ip", test_ipv4
         ))
         self.run_cmd(set_args)
