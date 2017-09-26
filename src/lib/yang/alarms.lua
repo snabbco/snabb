@@ -198,8 +198,21 @@ function alarm_list:retrieve (key, args)
    end
 end
 
-function declare_alarm (alarm)
-   assert(table_size(alarm) == 1)
+function declare_alarm (alarms)
+   local k, v = next(alarms)
+   alarm_codec.declare_alarm(k, v)
+   local key = alarm_keys:normalize(k)
+   local alarm = {}
+   function alarm:raise (args)
+      alarm_codec.raise_alarm(key, args)
+   end
+   function alarm:clear ()
+      alarm_codec.clear_alarm(key)
+   end
+   return alarm
+end
+
+function do_declare_alarm (key, args)
    local function create_or_update (key, src)
       local dst = alarm_list:lookup(key)
       if dst then
@@ -212,16 +225,8 @@ function declare_alarm (alarm)
          alarm_list:new(key, src)
       end
    end
-   local k, v = next(alarm)
-   local key = alarm_keys:normalize(k)
-   create_or_update(key, v)
-   function alarm:raise (args)
-      alarm_codec.raise_alarm(key, args)
-   end
-   function alarm:clear ()
-      alarm_codec.clear_alarm(key)
-   end
-   return alarm
+   key = alarm_keys:normalize(key)
+   create_or_update(key, args)
 end
 
 -- Raise alarm.

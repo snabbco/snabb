@@ -898,6 +898,10 @@ function Leader:handle_alarm (follower, alarm)
       local key, args = alarm_codec.to_alarm_type(args)
       alarms.do_add_to_inventory(key, args)
    end
+   if fn == 'declare_alarm' then
+      local key, args = alarm_codec.to_alarm(args)
+      alarms.do_declare_alarm(key, args)
+   end
 end
 
 function Leader:stop ()

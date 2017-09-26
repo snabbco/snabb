@@ -8,7 +8,7 @@ local ffi = require("ffi")
 
 local UINT32_MAX = 0xffffffff
 
-local alarm_names = { 'raise_alarm', 'clear_alarm', 'add_to_inventory' }
+local alarm_names = { 'raise_alarm', 'clear_alarm', 'add_to_inventory', 'declare_alarm' }
 local alarm_codes = {}
 for i, name in ipairs(alarm_names) do alarm_codes[name] = i end
 
@@ -46,6 +46,19 @@ function alarms.add_to_inventory (codec, alarm_type_id, alarm_type_qualifier,
 
    return codec:finish(alarm_type_id, alarm_type_qualifier,
                        resource, has_clear, description)
+end
+function alarms.declare_alarm (codec, resource, alarm_type_id, alarm_type_qualifier,
+   perceived_severity, alarm_text)
+
+   local resource = codec:string(resource)
+   local alarm_type_id = codec:string(alarm_type_id)
+   local alarm_type_qualifier = codec:maybe_string(alarm_type_qualifier)
+
+   local perceived_severity = codec:maybe_string(perceived_severity)
+   local alarm_text = codec:maybe_string(alarm_text)
+
+   return codec:finish(resource, alarm_type_id, alarm_type_qualifier,
+                       perceived_severity, alarm_text)
 end
 
 local function encoder()
@@ -96,6 +109,12 @@ function encode_add_to_inventory (...)
    local codec = encoder()
    codec:uint32(assert(alarm_codes['add_to_inventory']))
    return assert(alarms['add_to_inventory'])(codec, ...)
+end
+
+function encode_declare_alarm (...)
+   local codec = encoder()
+   codec:uint32(assert(alarm_codes['declare_alarm']))
+   return assert(alarms['declare_alarm'])(codec, ...)
 end
 
 local uint32_ptr_t = ffi.typeof('uint32_t*')
@@ -193,13 +212,13 @@ end
 function to_alarm_type (args)
    local alarm_type_id, alarm_type_qualifier, resource, has_clear, description = unpack(args)
    local key = {
-      alarm_type_id = alarm_type_id,
-      alarm_type_qualifier = alarm_type_qualifier,
+      alarm_type_id = args[1],
+      alarm_type_qualifier = args[2],
    }
    local args = {
-      resource = resource,
-      has_clear = has_clear,
-      description = description,
+      resource = args[3],
+      has_clear = args[4],
+      description = args[5],
    }
    return key, args
 end
@@ -234,6 +253,19 @@ function add_to_inventory (key, args)
       local buf, len = encode_add_to_inventory(
          alarm_type_id, alarm_type_qualifier,
          resource, has_clear, description
+      )
+      channel:put_message(buf, len)
+   end
+end
+
+function declare_alarm (key, args)
+   local channel = get_channel()
+   if channel then
+      local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
+      local perceived_severity, alarm_text = alarm:normalize_args(args)
+      local buf, len = encode_declare_alarm(
+         resource, alarm_type_id, alarm_type_qualifier,
+         perceived_severity, alarm_text
       )
       channel:put_message(buf, len)
    end
