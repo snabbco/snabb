@@ -6,6 +6,7 @@ local cpuset     = require("lib.cpuset")
 local csv_stats  = require("program.lwaftr.csv_stats")
 local lib        = require("core.lib")
 local setup      = require("program.lwaftr.setup")
+local cltable    = require("lib.cltable")
 local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
 local lwutil = require("apps.lwaftr.lwutil")
 local engine = require("core.app")
@@ -20,30 +21,27 @@ end
 local function migrate_device_on_config(config, v4, v6)
    -- Validate there is only one instance, otherwise the option is ambiguous.
    local device, instance
-   for pci_addr, inst in pairs(config.softwire_config.instance) do
-      assert(device == nil, "Unable to migrate config to '"..pci_addr.."' as"..
-                             "there are multiple instances configured.")
-      device, instance = pci_addr, inst
+   for k, v in pairs(config.softwire_config.instance) do
+      assert(device == nil,
+             "Unable to specialize config for specified NIC(s) as"..
+                "there are multiple instances configured.")
+      device, instance = k, v
    end
-
-   local migrated = config
-   migrated.softwire_config.instance = lib.deepcopy(
-      migrated.softwire_config.instance
-   )
-   local instances = migrated.softwire_config.instance
+   assert(device ~= nil,
+          "Unable to specialize config for specified NIC(s) as"..
+             "there are no instances configured.")
 
    if v4 and v4 ~= device then
       print("Migrating instance '"..device.."' to '"..v4.."'")
-      instances[v4] = instances[device]
-      instances[device] = nil
+      config.softwire_config.instance[v4] = instance
+      config.softwire_config.instance[device] = nil
    end
 
    if v6 then
-      local device, instance = next(instances)
-      instance.queue.values[1].external_interface.device = v6
+      for id, queue in cltable.pairs(instance.queue) do
+         queue.external_interface.device = v6
+      end
    end
-
-   return migrated
 end
 
 function parse_args(args)
@@ -147,18 +145,13 @@ function run(args)
    local opts, scheduling, conf_file, v4, v6 = parse_args(args)
    local conf = setup.read_config(conf_file)
 
-   -- If there are v4 or v6 options we need to migrate the configuration in
-   -- memory from the PCI device specified, later we'll want to support
-   -- selecting multiple devices, this is where you will do it.
-   if v4 or v6 then
-      conf = migrate_device_on_config(conf, v4, v6)
-   end
+   -- If the user passed --v4, --v6, or --on-a-stick, migrate the
+   -- configuration's device.
+   if v4 or v6 then migrate_device_on_config(conf, v4, v6) end
 
    -- If there is a name defined on the command line, it should override
    -- anything defined in the config.
-   if opts.name then
-      conf.softwire_config.name = opts.name
-   end
+   if opts.name then conf.softwire_config.name = opts.name end
 
    local function setup_fn(graph, lwconfig)
       -- If --virtio has been specified, always use this.
