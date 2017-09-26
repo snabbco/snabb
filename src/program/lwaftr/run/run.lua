@@ -132,10 +132,10 @@ end
 -- Requires a V4V6 splitter if running in on-a-stick mode and VLAN tag values
 -- are the same for the internal and external interfaces.
 local function requires_splitter (opts, conf)
+   local device, id, queue = lwutil.parse_instance(conf)
    if opts["on-a-stick"] then
-      local _, instance = next(conf.softwire_config.instance)
-      local internal_interface = instance.queue.values[1].internal_interface
-      local external_interface = instance.queue.values[1].external_interface
+      local internal_interface = queue.internal_interface
+      local external_interface = queue.external_interface
       return internal_interface.vlan_tag == external_interface.vlan_tag
    end
    return false
@@ -161,8 +161,7 @@ function run(args)
 
       -- If instance has external-interface.device configure as bump-in-the-wire
       -- otherwise configure it in on-a-stick mode.
-      local name, instance = next(lwconfig.softwire_config.instance)
-      local queue = instance.queue.values[1]
+      local device, id, queue = lwutil.parse_instance(lwconfig)
       if queue.external_interface.device then
 	 return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
 			       opts.ring_buffer_size)

@@ -342,15 +342,11 @@ local function select_instance(conf)
       for k,v in pairs(t2) do ret[k] = v end
       return ret
    end
-   local device = next(conf.softwire_config.instance)
+   local device, id, queue = lwutil.parse_instance(conf)
    conf.softwire_config.external_interface = table_merge(
-      conf.softwire_config.external_interface,
-      conf.softwire_config.instance[device].queue.values[1].external_interface
-   )
+      conf.softwire_config.external_interface, queue.external_interface)
    conf.softwire_config.internal_interface = table_merge(
-      conf.softwire_config.internal_interface,
-      conf.softwire_config.instance[device].queue.values[1].internal_interface
-   )
+      conf.softwire_config.internal_interface, queue.internal_interface)
    return conf
 end
 
