@@ -128,23 +128,26 @@ function get_channel()
    return alarms_channel
 end
 
-local key_attrs = {'resource', 'alarm_type_id', 'alarm_type_qualifier'}
-local args_attrs = {'perceived_severity', 'alarm_text'}
 local function normalize (t, attrs)
    t = t or {}
    local ret = {}
    for i, k in ipairs(attrs) do ret[i] = t[k] end
-   return ret
+   return unpack(ret)
 end
-local function normalize_key (t)
-   return normalize(t, key_attrs)
+
+local alarm = {
+   key_attrs = {'resource', 'alarm_type_id', 'alarm_type_qualifier'},
+   args_attrs = {'perceived_severity', 'alarm_text'},
+}
+function alarm:normalize_key (t)
+   return normalize(t, self.key_attrs)
 end
-local function normalize_args (t)
-   return normalize(t, args_attrs)
+function alarm:normalize_args (t)
+   return normalize(t, self.args_attrs)
 end
 
 -- To be used by the leader to group args into key and args.
-function parse_args (args)
+function to_alarm (args)
    local resource, alarm_type_id, alarm_type_qualifier, perceived_severity, alarm_text = unpack(args)
    local key = {
       resource = resource,
@@ -161,8 +164,8 @@ end
 function raise_alarm (key, args)
    local channel = get_channel()
    if channel then
-      local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
-      local perceived_severity, alarm_text = unpack(normalize_args(args))
+      local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
+      local perceived_severity, alarm_text = alarm:normalize_args(args)
       local buf, len = encode_raise_alarm(
          resource, alarm_type_id, alarm_type_qualifier,
          perceived_severity, alarm_text
@@ -174,7 +177,7 @@ end
 function clear_alarm (key)
    local channel = get_channel()
    if channel then
-      local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
+      local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
       local buf, len = encode_clear_alarm(resource, alarm_type_id, alarm_type_qualifier)
       channel:put_message(buf, len)
    end
@@ -199,8 +202,8 @@ function selftest ()
       local key = {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''}
       local args = {perceived_severity='critical'}
 
-      local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
-      local perceived_severity, alarm_text = unpack(normalize_args(args))
+      local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
+      local perceived_severity, alarm_text = alarm:normalize_args(args)
       local alarm = {resource, alarm_type_id, alarm_type_qualifier,
                      perceived_severity, alarm_text}
 
@@ -208,7 +211,7 @@ function selftest ()
    end
    local function test_clear_alarm ()
       local key = {resource='res1', alarm_type_id='type1', alarm_type_qualifier=''}
-      local resource, alarm_type_id, alarm_type_qualifier = unpack(normalize_key(key))
+      local resource, alarm_type_id, alarm_type_qualifier = alarm:normalize_key(key)
       local alarm = {resource, alarm_type_id, alarm_type_qualifier}
       test_alarm('clear_alarm', alarm)
    end

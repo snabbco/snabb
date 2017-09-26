@@ -887,11 +887,11 @@ end
 function Leader:handle_alarm (follower, alarm)
    local fn, args = unpack(alarm)
    if fn == 'raise_alarm' then
-      local key, args = alarm_codec.parse_args(args)
+      local key, args = alarm_codec.to_alarm(args)
       alarms.raise_alarm(key, args)
    end
    if fn == 'clear_alarm' then
-      local key = alarm_codec.parse_args(args)
+      local key = alarm_codec.to_alarm(args)
       alarms.clear_alarm(key)
    end
 end
