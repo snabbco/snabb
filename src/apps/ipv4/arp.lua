@@ -23,7 +23,7 @@ local alarms = require("lib.yang.alarms")
 
 alarms.add_to_inventory {
   [{alarm_type_id='arp-resolution'}] = {
-    resource={'nic-v4'},
+    resource='nic-v4',
     has_clear=true,
     description='Raise up if ARP app cannot resolve IP address',
   }

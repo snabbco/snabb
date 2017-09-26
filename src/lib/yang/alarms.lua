@@ -128,6 +128,7 @@ end
 function add_to_inventory (alarm_types)
    for k,v in pairs(alarm_types) do
       local key = alarm_type_keys:fetch(k.alarm_type_id, k.alarm_type_qualifier)
+      v.resource = {v.resource}
       state.alarm_inventory.alarm_type[key] = v
    end
 end
