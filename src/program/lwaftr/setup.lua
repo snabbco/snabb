@@ -691,21 +691,21 @@ local function compute_worker_configs(conf)
    local copier = binary.config_copier_for_schema_by_name('snabb-softwire-v2')
    local make_copy = copier(conf)
    for device, queues in pairs(conf.softwire_config.instance) do
-      for id, _ in cltable.pairs(queues.queue) do
+      for k, _ in cltable.pairs(queues.queue) do
          local worker_config = make_copy()
          local instance = worker_config.softwire_config.instance
          for other_device, queues in pairs(conf.softwire_config.instance) do
             if other_device ~= device then
                instance[other_device] = nil
             else
-               for other_id, _ in cltable.pairs(queues.queue) do
-                  if other_id ~= id then
-                     instance[device].queue[other_id] = nil
+               for other_k, _ in cltable.pairs(queues.queue) do
+                  if other_k.id ~= k.id then
+                     instance[device].queue[other_k] = nil
                   end
                end
             end
          end
-         local worker_id = string.format('%s/%s', device, id)
+         local worker_id = string.format('%s/%s', device, k.id)
          ret[worker_id] = worker_config
       end
    end
