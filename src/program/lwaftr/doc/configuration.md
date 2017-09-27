@@ -117,14 +117,14 @@ softwire-config {
 }
 ```
 
-The lwaftr will soon be able to support multiple processes and thus there is a
-`instance` list which when it does will be populated with all the configuration
-options which are specific to a given instance. The rest of the configuration
-including the binding table will be shared with the other instances. Until the
-multiprocess support is available, there should only be one instance configured
-and the lwAFTR will simply use the one, and only instance specified in the
-`instance` list. Specifying more than one instance (or less than one) will
-result in an error.
+The lwaftr will spawn a number of worker processes that perform packet
+forwarding.  Each `queue` statement in the configuration corresponds to
+one process servicing one RSS queue on one or two network devices.  For
+on-a-stick operation, only the `device` leaf that is part of the
+`instance` leaf will be specified.  For bump-in-the-wire operation, the
+`instance` device will handle IPv6 traffic, and the `device` specified
+in the `external-interface` that's part of the `queue` will handle IPv4
+traffic.
 
 The `external-interface` define parameters around the IPv4 interface that
 communicates with the internet and the `internal-interface` section does the
@@ -144,8 +144,8 @@ configuration ahead of time.
 
 Use the `snabb lwaftr compile-configuration` command to compile a
 configuration ahead of time.  If you do this, you can use the `snabb
-lwaftr control PID reload` command to tell the Snabb process with the
-given *PID* to reload the table.
+config load PID /path/to/file` command to tell the Snabb process with
+the given *PID* to reload its configuration from the given file.
 
 ## In-depth configuration explanation
 
@@ -248,3 +248,198 @@ egress-filter "
 
 Enabling ingress and egress filters currently has a performance cost.
 See [performance.md](performance.md).
+
+## Multiple devices
+
+One lwAFTR can run multiple worker processes.  For example, here is a
+configuration snippet that specifies two on-a-stick processes on NICs on
+PCI address `83:00.0` and `83:00.1`:
+
+```
+  instance {
+    device 83:00.0;
+    queue {
+      id 0;
+      external-interface {
+        ip 10.10.10.10;
+        mac 02:12:12:12:12:12;
+        next-hop { mac 02:44:44:44:44:44; }
+      }
+      internal-interface {
+        ip 8:9:a:b:c:d:e:f;
+        mac 02:12:12:12:12:12;
+        next-hop { mac 02:44:44:44:44:44; }
+      }
+    }
+  }
+
+  instance {
+    device 83:00.1;
+    queue {
+      id 0;
+      external-interface {
+        ip 10.10.10.10;
+        mac 56:56:56:56:56:56;
+        next-hop { mac 02:68:68:68:68:68; }
+      }
+      internal-interface {
+        ip 8:9:a:b:c:d:e:f;
+        mac 56:56:56:56:56:56;
+        next-hop { mac 02:68:68:68:68:68; }
+      }
+    }
+  }
+```
+
+Here you see that the two blocks are the same, except that the `device`
+in the second `instance` is `83:00.1` instead of `83:00.0`.  The layer-2
+`mac` addresses for the two interfaces within each instance are the same
+because this is an on-a-stick configuration, and likewise for the
+next-hops.  Although instance `83:00.0` has a different `mac` address
+from instance `83:00.1`, the two instances have the same `ip` addresses.
+Usually the idea is that the whole bank of lwAFTRs are reachable at the
+layer-3 address, and it's up to some other router to shard traffic
+between the interfaces.
+
+The `id` leaf that's part of the `queue` container specifies the
+Receive-Side Scaling (RSS) queue ID that a worker should service.  For
+example, here's a bump-in-the-wire configuration with two RSS workers:
+
+```
+  instance {
+    device 83:00.0;
+    queue {
+      id 0;
+      external-interface {
+        device 83:00.1;
+        ip 10.10.10.10;
+        mac 56:56:56:56:56:56;
+        next-hop { mac 02:68:68:68:68:68; }
+      }
+      internal-interface {
+        ip 8:9:a:b:c:d:e:f;
+        mac 56:56:56:56:56:56;
+        next-hop { mac 02:68:68:68:68:68; }
+      }
+    }
+    queue {
+      id 1;
+      external-interface {
+        device 83:00.1;
+        ip 10.10.10.10;
+        mac 56:56:56:56:56:56;
+        next-hop { mac 02:68:68:68:68:68; }
+      }
+      internal-interface {
+        ip 8:9:a:b:c:d:e:f;
+        mac 56:56:56:56:56:56;
+        next-hop { mac 02:68:68:68:68:68; }
+      }
+    }
+  }
+```
+
+These queues are configured on the `83:00.0` instance, and because the
+queues have a different device configured on the `external-interface`
+containers, that makes this configuration a bump-in-the-wire
+configuration.  The two queues are identical with the exception of their
+`id` fields.  Incoming IPv6 traffic on `83:00.0` and IPv4 traffic on
+`83:00.1` will be evenly split between these two worker processes using
+RSS hashing.
+
+For reasons specific to the 82599 NIC, the RSS `id` can currently be
+only `0` or `1`.  Expanding the range will be possible in the future.
+The actual value of the ID doesn't matter; you can have a lwAFTR running
+with only RSS queue 0 or only RSS queue 1, and in both cases that worker
+process will get all the traffic.  Traffic is split only when multiple
+queues are configured.
+
+Which queue is chosen for any given packet is determined by the RSS hash
+function.  The RSS hash function will take the source and destination IP
+addresses (version 4 or 6 as appropriate) together with the source and
+destination ports (for TCP or UDP packets) and use them to compute a
+hash value.  The NIC then computes the remainder when that hash value is
+divided by the number of queues, and then uses that index to select a
+queue from among the available queues.
+
+In the encapsulation direction (IPv4 to IPv6), all inputs to the RSS
+hash function will be available, except for the case of incoming ICMP
+packets and for incoming fragmented traffic.  This should yield good
+distribution of the traffic among available queues.  However in the
+decapsulation direction (IPv6 to IPv4), the destination IPv6 address is
+a constant (it's the address of the lwAFTR) and there are no ports as
+the upper-layer protocol is IPv4 instead of TCP or UDP.  The only
+contributor for entropy in the decapsulation direction is the source
+IPv6 address.  All decapsulation traffic from a given softwire will thus
+be handled by the same lwAFTR instance, provided the router's ECMP
+function also performs a similarly deterministic function to choose the
+device to which to send the packets.
+
+## Run-time reconfiguration
+
+See [`snabb config`](../../config/README.md) for general details.  For
+the lwAFTR, the specifics are fairly generic.  For example to change the
+next-hop address of the external interface on lwaftr instance `lwaftr`'s
+queue `0` on device `83:00.0`, do:
+
+```
+$ snabb config set lwaftr \
+    /softwire-config/instance[device=83:00.0]/queue[id=0]/external-interface/next-hop/mac \
+    02:02:02:02:02:02
+```
+
+However it's worth a bit of reflection to describe how to add and remove
+instances at run-time.
+
+Firstly, we suggest getting a lwAFTR configuration working that runs on
+only one interface and one queue.  Once you have that working, do a
+`snabb config get lwaftr /softwire-config/instance` to get the
+`instance` configuration for the `lwaftr` instance.  You'll get
+something like this:
+
+```
+{
+  device 83:00.0;
+  queue {
+    id 0;
+    external-interface { ... };
+    internal-interface { ... };
+  }
+}
+```
+
+So to add another device, you can just past that into a file, change the
+devices, and then do:
+
+```
+$ snabb config add lwaftr /softwire-config/instance < my-instance.file.conf
+```
+
+If all goes well, you should be able to get `/softwire-config/instance`
+again and that should show you two instances running.
+
+Likewise to add an RSS worker, it's the same except you work on
+`/softwire-config/instance[device=XX:XX.X]/queue`.
+
+Getting the MAC addresses right is tricky of course; the NIC filters
+incoming traffic by MAC, and if you've configured a queue or device with
+the wrong MAC, you might wonder why none of your packets are getting
+through!  Unfortunately these counters are not exposed by the lwaftr, at
+least not currently, but you can detect this situation if the
+`in-ipv6-packets` or `in-ipv4-packets` counters are not incrementing
+like you think they should be.
+
+To remove a queue, use `snabb config remove`:
+
+```
+$ snabb config remove lwaftr /softwire-config/instance[device=XX:XX.X]/queue[id=ID]
+```
+
+Likewise you can remove instances this way:
+
+```
+$ snabb config remove lwaftr /softwire-config/instance[device=XX:XX.X]
+```
+
+Of course all of this also works via `snabb config listen`, for nice
+integration with NETCONF agents.
