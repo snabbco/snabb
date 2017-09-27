@@ -339,7 +339,9 @@ function Intel:new (conf)
       rate_limit = conf.rate_limit,
       priority = conf.priority,
       -- a path used for shm operations on NIC-global state
-      shm_root = "/intel-mp/" .. conf.pciaddr .. "/",
+      -- canonicalize to ensure the reference is the same from all
+      -- processes
+      shm_root = "/intel-mp/" .. pci.canonical(conf.pciaddr) .. "/",
       -- only used for main process, affects max pool number
       vmdq_queuing_mode = conf.vmdq_queuing_mode
    }
