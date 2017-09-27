@@ -758,6 +758,7 @@ function rpc_output_parser_from_schema(schema)
 end
 
 local function encode_yang_string(str)
+   if #str == 0 then return "''" end
    if str:match("^[^%s;{}\"'/]*$") then return str end
    local out = {}
    table.insert(out, '"')

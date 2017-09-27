@@ -124,12 +124,29 @@ function alarm_type_keys:fetch (alarm_type_id, alarm_type_qualifier)
    end
    return key
 end
+function alarm_type_keys:normalize (key)
+   local alarm_type_id = assert(key.alarm_type_id)
+   local alarm_type_qualifier = key.alarm_type_qualifier or ''
+   return self:fetch(alarm_type_id, alarm_type_qualifier)
+end
 
 function add_to_inventory (alarm_types)
-   for k,v in pairs(alarm_types) do
-      local key = alarm_type_keys:fetch(k.alarm_type_id, k.alarm_type_qualifier)
-      state.alarm_inventory.alarm_type[key] = v
+   assert(type(alarm_types) == 'table')
+   for key,args in pairs(alarm_types) do
+      alarm_codec.add_to_inventory(key, args)
    end
+end
+
+function do_add_to_inventory (k, v)
+   local key = alarm_type_keys:normalize(k)
+   local resource = {v.resource}
+   -- Preserve previously defined resources.
+   if state.alarm_inventory.alarm_type[key] then
+      resource = state.alarm_inventory.alarm_type[key].resource
+      table.insert(resource, v.resource)
+   end
+   state.alarm_inventory.alarm_type[key] = v
+   state.alarm_inventory.alarm_type[key].resource = resource
 end
 
 -- Single point to access alarm keys.
@@ -170,12 +187,27 @@ local function table_size (t)
    return size
 end
 
+
 -- Contains a table with all the declared alarms.
 local alarm_list = {
    list = {},
+   defaults = {},
 }
 function alarm_list:new (key, alarm)
    self.list[key] = alarm
+   self:set_defaults_if_any(key)
+end
+function alarm_list:set_defaults_if_any (key)
+   k = alarm_type_keys:normalize(key)
+   local default = self.defaults[k]
+   if default then
+      for k,v in pairs(defaults) do
+         self.list[key][k] = v
+      end
+   end
+end
+function add_default (key, args)
+   self.defaults[key] = args
 end
 function alarm_list:lookup (key)
    return self.list[key]
@@ -192,8 +224,28 @@ function alarm_list:retrieve (key, args)
    end
 end
 
-function declare_alarm (alarm)
-   assert(table_size(alarm) == 1)
+function default_alarms (alarms)
+   for k,v in pairs(alarms) do
+      k = alarm_type_keys:normalize(k)
+      alarm_list.defaults[k] = v
+   end
+end
+
+function declare_alarm (alarms)
+   local k, v = next(alarms)
+   alarm_codec.declare_alarm(k, v)
+   local key = alarm_keys:normalize(k)
+   local alarm = {}
+   function alarm:raise (args)
+      alarm_codec.raise_alarm(key, args)
+   end
+   function alarm:clear ()
+      alarm_codec.clear_alarm(key)
+   end
+   return alarm
+end
+
+function do_declare_alarm (key, args)
    local function create_or_update (key, src)
       local dst = alarm_list:lookup(key)
       if dst then
@@ -206,16 +258,8 @@ function declare_alarm (alarm)
          alarm_list:new(key, src)
       end
    end
-   local k, v = next(alarm)
-   local key = alarm_keys:normalize(k)
-   create_or_update(key, v)
-   function alarm:raise (args)
-      alarm_codec.raise_alarm(key, args)
-   end
-   function alarm:clear ()
-      alarm_codec.clear_alarm(key)
-   end
-   return alarm
+   key = alarm_keys:normalize(key)
+   create_or_update(key, args)
 end
 
 -- Raise alarm.
@@ -532,9 +576,28 @@ function selftest ()
       end
    end
 
+   -- ARP alarm.
+   do_add_to_inventory({alarm_type_id='arp-resolution'}, {
+      resource='nic-v4',
+      has_clear=true,
+      description='Raise up if ARP app cannot resolve IP address',
+   })
+   do_declare_alarm({resource='nic-v4', alarm_type_id='arp-resolution'}, {
+      perceived_severity = 'critical',
+      alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
+   })
+   -- NDP alarm.
+   do_add_to_inventory({alarm_type_id='ndp-resolution'}, {
+      resource='nic-v6',
+      has_clear=true,
+      description='Raise up if NDP app cannot resolve IP address',
+   })
+   do_declare_alarm({resource='nic-v6', alarm_type_id='ndp-resolution'}, {
+      perceived_severity = 'critical',
+      alarm_text = 'Make sure you can NDP resolve IP addresses on NIC',
+   })
+
    -- Check alarm inventory has been loaded.
-   require("apps.ipv4.arp")
-   require("apps.lwaftr.ndp")
    assert(table_size(state.alarm_inventory.alarm_type) > 0)
 
    -- Check number of alarms is zero.
