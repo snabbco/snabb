@@ -231,6 +231,7 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
       vmdq=true, -- Needed to enable MAC filtering/stamping.
       rxq=id,
       txq=id,
+      poolnum=0,
       vlan=queue.external_interface.vlan_tag,
       rxcounter=1,
       ring_buffer_size=ring_buffer_size,
@@ -240,6 +241,7 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
       vmdq=true, -- Needed to enable MAC filtering/stamping.
       rxq=id,
       txq=id,
+      poolnum=0,
       vlan=queue.internal_interface.vlan_tag,
       rxcounter=1,
       ring_buffer_size=ring_buffer_size,
@@ -265,6 +267,7 @@ function load_on_a_stick(c, conf, args)
          vmdq=true, -- Needed to enable MAC filtering/stamping.
          rxq=id,
          txq=id,
+         poolnum=0,
          vlan=queue.external_interface.vlan_tag,
          ring_buffer_size=args.ring_buffer_size,
          macaddr = ethernet:ntop(queue.external_interface.mac)})
@@ -290,6 +293,7 @@ function load_on_a_stick(c, conf, args)
          vmdq=true, -- Needed to enable MAC filtering/stamping.
          rxq=id,
          txq=id,
+         poolnum=0,
          vlan=queue.external_interface.vlan_tag,
          ring_buffer_size=args.ring_buffer_size,
          macaddr = ethernet:ntop(queue.external_interface.mac)})
@@ -298,6 +302,7 @@ function load_on_a_stick(c, conf, args)
          vmdq=true, -- Needed to enable MAC filtering/stamping.
          rxq=id,
          txq=id,
+         poolnum=0,
          vlan=queue.internal_interface.vlan_tag,
          ring_buffer_size=args.ring_buffer_size,
          macaddr = ethernet:ntop(queue.internal_interface.mac)})
