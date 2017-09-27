@@ -148,6 +148,7 @@ function Lwaftrgen:new(conf)
    local aftr_ipv6 = conf.aftr_ipv6 and ipv6:pton(conf.aftr_ipv6)
 
    local ipv4_pkt = packet.allocate()
+   ffi.fill(ipv4_pkt.data, packet.max_payload)
    local eth_hdr = cast(ether_header_ptr_type, ipv4_pkt.data)
    eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
 
@@ -185,6 +186,7 @@ function Lwaftrgen:new(conf)
    -- IPv4 in IPv6 packet
    copy(n_cache_src_ipv6, b4_ipv6, 16)
    local ipv6_pkt = packet.allocate()
+   ffi.fill(ipv6_pkt.data, packet.max_payload)
    local eth_hdr = cast(ether_header_ptr_type, ipv6_pkt.data)
    eth_hdr.ether_dhost, eth_hdr.ether_shost = dst_mac, src_mac
 
