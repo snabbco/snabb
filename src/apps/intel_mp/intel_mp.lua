@@ -281,6 +281,7 @@ Intel = {
       pciaddr = {required=true},
       ring_buffer_size = {default=2048},
       vmdq = {default=false},
+      vmdq_queuing_mode = {default="rss-64-2"},
       macaddr = {},
       poolnum = {},
       vlan = {},
@@ -338,7 +339,9 @@ function Intel:new (conf)
       rate_limit = conf.rate_limit,
       priority = conf.priority,
       -- a path used for shm operations on NIC-global state
-      shm_root = "/intel-mp/" .. conf.pciaddr .. "/"
+      shm_root = "/intel-mp/" .. conf.pciaddr .. "/",
+      -- only used for main process, affects max pool number
+      vmdq_queuing_mode = conf.vmdq_queuing_mode
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -448,8 +451,12 @@ function Intel:init_rx_q ()
 
    -- VMDq pool state (4.6.10.1.4)
    if self.vmdq then
-      -- packet splitting none, enable 2 RSS queues per pool
-      self.r.PSRTYPE[self.poolnum](bits { RQPL=29 })
+      -- packet splitting none, enable 4 or 2 RSS queues per pool
+      if self.max_pool == 32 then
+         self.r.PSRTYPE[self.poolnum](bits { RQPL=30 })
+      else
+         self.r.PSRTYPE[self.poolnum](bits { RQPL=29 })
+      end
       -- multicast promiscuous, broadcast accept, accept untagged pkts
       self.r.PFVML2FLT[self.poolnum]:set(bits { MPE=28, BAM=27, AUPE=24 })
    end
@@ -1206,10 +1213,6 @@ Intel82599.offsets = {
 Intel82599.max_mac_addr = 127
 Intel82599.max_vlan = 64
 
--- 1010 -> 32 pools, 4 RSS queues each
--- 1011 -> 64 pools, 2 RSS queues each
-Intel82599.mrqc_bits = 0xB
-
 function Intel82599:link_status ()
    local mask = lshift(1, 30)
    return bit.band(self.r.LINKS(), mask) == mask
@@ -1399,6 +1402,9 @@ end
 
 -- C type for shared memory indicating which pools are used
 local vmdq_pools_t = ffi.typeof("struct { uint8_t pools[64]; }")
+-- C type for VMDq queuing mode
+-- mode = 0 for 32 pools/4 queues, 1 for 64 pools/2 queues
+local vmdq_queuing_mode_t = ffi.typeof("struct { uint8_t mode; }")
 
 -- enable VMDq mode, see 4.6.10.1
 -- follows the configuration flow in 4.6.11.3.3
@@ -1410,17 +1416,36 @@ function Intel82599:vmdq_enable ()
    for i=0, 63 do vmdq_shm.pools[i] = 0 end
    shm.unmap(vmdq_shm)
 
+   -- set VMDq queuing mode for all instances on this NIC
+   local mode_shm = shm.create(self.shm_root .. "vmdq_queuing_mode",
+                               vmdq_queuing_mode_t)
+   if self.vmdq_queuing_mode == "rss-32-4" then
+      mode_shm.mode = 0
+   elseif self.vmdq_queuing_mode == "rss-64-2" then
+      mode_shm.mode = 1
+   else
+      error("Invalid VMDq queuing mode")
+   end
+   shm.unmap(mode_shm)
+
    -- must be set prior to setting MTQC (7.2.1.2.1)
    self.r.RTTDCS:set(bits { ARBDIS=6 })
 
-   self.r.MRQC:bits(0, 4, self.mrqc_bits)
+   if self.vmdq_queuing_mode == "rss-32-4" then
+      -- 1010 -> 32 pools, 4 RSS queues each
+      self.r.MRQC:bits(0, 4, 0xA)
+      -- Num_TC_OR_Q=10b -> 32 pools (4.6.11.3.3 and 8.2.3.9.15)
+      self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=3 })
+   else
+      -- 1011 -> 64 pools, 2 RSS queues each
+      self.r.MRQC:bits(0, 4, 0xB)
+      -- Num_TC_OR_Q=01b -> 64 pools
+      self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=2 })
+   end
 
    -- TODO: not sure this is needed, but it's in intel10g
    -- disable RSC (7.11)
    self.r.RFCTL:set(bits { RSC_Dis=5 })
-
-   -- 128 Tx Queues, 64 VMs (4.6.11.3.3 and 8.2.3.9.15)
-   self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=2 })
 
    -- enable virtualization, replication enabled, disable default pool
    self.r.PFVTCTL(bits { VT_Ena=0, Rpl_En=30, DisDefPool=29 })
@@ -1477,6 +1502,14 @@ function Intel82599:select_pool()
 
    self:lock_sw_sem()
 
+   local mode_shm = shm.open(self.shm_root .. "vmdq_queuing_mode", vmdq_queuing_mode_t)
+   if mode_shm.mode == 0 then
+      self.max_pool = 32
+   else
+      self.max_pool = 64
+   end
+   shm.unmap(mode_shm)
+
    -- if the poolnum was set manually in the config, just use that
    if not self.poolnum then
       local available_pool
@@ -1484,7 +1517,7 @@ function Intel82599:select_pool()
       -- We use some shared memory to track which pool numbers are claimed
       local pool_shm = shm.open(self.shm_root .. "vmdq_pools", vmdq_pools_t)
 
-      for poolnum = 0, 63 do
+      for poolnum = 0, self.max_pool-1 do
          if pool_shm.pools[poolnum] == 0 then
             available_pool = poolnum
             break
@@ -1496,7 +1529,9 @@ function Intel82599:select_pool()
       shm.unmap(pool_shm)
       self.poolnum = available_pool
    else
-      assert(self.poolnum < 64, "Pool overflow: Intel 82599 supports up to 64 VMDq pools")
+      assert(self.poolnum < self.max_pool,
+             string.format("Pool overflow: Intel 82599 supports up to %d VMDq pools",
+                           self.max_pool))
    end
 
    self:unlock_sw_sem()
@@ -1505,10 +1540,13 @@ function Intel82599:select_pool()
    -- needs to be done prior to loading registers.
    --
    -- for VMDq, make rxq/txq relative to the pool number
-   assert(self.rxq >= 0 and self.rxq < 2, "rxqueue must be in 0..1")
-   self.rxq = self.rxq + 2 * self.poolnum
-   assert(self.txq >= 0 and self.txq < 2, "txqueue must be in 0..1")
-   self.txq = self.txq + 2 * self.poolnum
+   local max_rxq_or_txq = 128 / self.max_pool
+   assert(self.rxq >= 0 and self.rxq < max_rxq_or_txq,
+          "rxqueue must be in 0.." .. max_rxq_or_txq-1)
+   self.rxq = self.rxq + max_rxq_or_txq * self.poolnum
+   assert(self.txq >= 0 and self.txq < max_rxq_or_txq,
+          "txqueue must be in 0.." .. max_rxq_or_txq-1)
+   self.txq = self.txq + max_rxq_or_txq * self.poolnum
 
    -- max queue number is different in VMDq mode
    self.max_q = 128
