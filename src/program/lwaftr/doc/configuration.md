@@ -134,7 +134,7 @@ the `external-interface` or `internal-interface` blocks outside of the
 declares the set of softwires and the whole thing is surrounded in the
 `softwire-config { ... }` block.
 
-## Compiling conigurations
+## Compiling configurations
 
 When a lwAFTR is started, it will automatically compile its
 configuration if it does not find a compiled configuration that's fresh.
@@ -252,8 +252,8 @@ See [performance.md](performance.md).
 ## Multiple devices
 
 One lwAFTR can run multiple worker processes.  For example, here is a
-configuration snippet that specifies two on-a-stick processes on NICs on
-PCI address `83:00.0` and `83:00.1`:
+configuration snippet that specifies two on-a-stick processes that service traffic on
+PCI addresses `83:00.0` and `83:00.1`:
 
 ```
   instance {
@@ -295,7 +295,7 @@ Here you see that the two blocks are the same, except that the `device`
 in the second `instance` is `83:00.1` instead of `83:00.0`.  The layer-2
 `mac` addresses for the two interfaces within each instance are the same
 because this is an on-a-stick configuration, and likewise for the
-next-hops.  Although instance `83:00.0` has a different `mac` address
+next-hops.  Although instance `83:00.0` has different `mac` addresses
 from instance `83:00.1`, the two instances have the same `ip` addresses.
 Usually the idea is that the whole bank of lwAFTRs are reachable at the
 layer-3 address, and it's up to some other router to shard traffic
@@ -359,7 +359,7 @@ function.  The RSS hash function will take the source and destination IP
 addresses (version 4 or 6 as appropriate) together with the source and
 destination ports (for TCP or UDP packets) and use them to compute a
 hash value.  The NIC then computes the remainder when that hash value is
-divided by the number of queues, and then uses that index to select a
+divided by the number of queues, and then uses that remainder as an index to select a
 queue from among the available queues.
 
 In the encapsulation direction (IPv4 to IPv6), all inputs to the RSS
@@ -377,8 +377,9 @@ device to which to send the packets.
 
 ## Run-time reconfiguration
 
-See [`snabb config`](../../config/README.md) for general details.  For
-the lwAFTR, the specifics are fairly generic.  For example to change the
+See [`snabb config`](../../config/README.md) for a general overview of run-time configuration query and update in Snabb.
+By default, the lwAFTR is addressable using the [`snabb-softwire-v2`](../../../lib/yang/snabb-softwire-v2.yang) YANG schema.
+For example to change the
 next-hop address of the external interface on lwaftr instance `lwaftr`'s
 queue `0` on device `83:00.0`, do:
 
@@ -408,7 +409,7 @@ something like this:
 }
 ```
 
-So to add another device, you can just past that into a file, change the
+So to add another device, you can just paste that into a file, change the
 devices, and then do:
 
 ```
