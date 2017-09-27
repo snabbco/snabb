@@ -307,7 +307,7 @@ function selftest ()
    test_raise_alarm()
    test_clear_alarm()
 
-   local a, b = unpack(normalize({b='foo'}, {'a', 'b'}))
+   local a, b = normalize({b='foo'}, {'a', 'b'})
    assert(a == nil and b == 'foo')
 
    print('selftest: ok')
