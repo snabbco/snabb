@@ -682,11 +682,14 @@ function Leader:rpc_get_state (args)
       local printer = path_printer_for_schema_by_name(
          self.schema_name, args.path, false, args.format, args.print_default)
       local states = {}
+      local state_reader = self.support.compute_state_reader(self.schema_name)
       for _, follower in pairs(self.followers) do
-         table.insert(states, state.read_state(self.schema_name, follower.pid))
+         local follower_config = self.support.configuration_for_follower(
+            follower, self.current_configuration)
+         table.insert(states, state_reader(follower.pid, follower_config))
       end
-      -- FIXME: How to combine states?  Add counters?
-      local state = printer(states[1], yang.string_output_file())
+      local state = printer(self.support.process_states(states),
+                            yang.string_output_file())
       return { state = state }
    end
    local success, response = pcall(getter)

@@ -38,7 +38,11 @@ local function find_counters(pid)
    return apps
 end
 
-local function state_reader_from_grammar(production, maybe_keyword)
+function counters_for_pid(pid)
+   return flatten(find_counters(pid))
+end
+
+function state_reader_from_grammar(production, maybe_keyword)
    local visitor = {}
    local function visit(keyword, production)
       return assert(visitor[production.type])(keyword, production)
@@ -103,11 +107,6 @@ function state_reader_from_schema_by_name(schema_name)
    return state_reader_from_schema(schema)
 end
 state_reader_from_schema_by_name = util.memoize(state_reader_from_schema_by_name)
-
-function read_state(schema_name, pid)
-   local reader = state_reader_from_schema_by_name(schema_name)
-   return reader(flatten(find_counters(pid)))
-end
 
 function selftest ()
    print("selftest: lib.yang.state")

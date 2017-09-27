@@ -18,7 +18,8 @@ function counter_names ()
 end
 
 function read_counters (pid)
-   local s = state.read_state('snabb-softwire-v2', pid or S.getpid())
+   local reader = state.state_reader_from_schema_by_name('snabb-softwire-v2')
+   local s = reader(state.counters_for_pid(pid or S.getpid()))
    local ret = {}
    for k, id in pairs(counter_names()) do
       ret[k] = s.softwire_state[id]
