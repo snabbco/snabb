@@ -576,9 +576,28 @@ function selftest ()
       end
    end
 
+   -- ARP alarm.
+   do_add_to_inventory({alarm_type_id='arp-resolution'}, {
+      resource='nic-v4',
+      has_clear=true,
+      description='Raise up if ARP app cannot resolve IP address',
+   })
+   do_declare_alarm({resource='nic-v4', alarm_type_id='arp-resolution'}, {
+      perceived_severity = 'critical',
+      alarm_text = 'Make sure you can ARP resolve IP addresses on NIC',
+   })
+   -- NDP alarm.
+   do_add_to_inventory({alarm_type_id='ndp-resolution'}, {
+      resource='nic-v6',
+      has_clear=true,
+      description='Raise up if NDP app cannot resolve IP address',
+   })
+   do_declare_alarm({resource='nic-v6', alarm_type_id='ndp-resolution'}, {
+      perceived_severity = 'critical',
+      alarm_text = 'Make sure you can NDP resolve IP addresses on NIC',
+   })
+
    -- Check alarm inventory has been loaded.
-   require("apps.ipv4.arp")
-   require("apps.lwaftr.ndp")
    assert(table_size(state.alarm_inventory.alarm_type) > 0)
 
    -- Check number of alarms is zero.
