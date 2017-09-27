@@ -43,6 +43,12 @@ Available options:
        --template-refresh <seconds>
                                 The interval at which template records are sent in
                                 seconds. Defaults to 600.
+       --pfx-to-as <file>       Name of the file that contains mappings from prefixes
+                                to AS numbers from RIR data (used by SWITCH templates)
+       --vlan-to-ifindex <file> Name of the file that contains mappings from VLAN
+                                tags to interface indices (used by SWITCH templates)
+       --mac-to-as <file>       Name of the file that contains mappings from MAC
+                                addresses to adjacent AS numbers (used by SWITCH templates)
        --netflow-v9             Use the Netflow V9 protocol to communicate to the
                                 flow collector.
        --ipfix                  Use IPFIX to communicate with the flow collector.

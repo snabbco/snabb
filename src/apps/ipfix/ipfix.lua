@@ -9,6 +9,7 @@ local bit      = require("bit")
 local ffi      = require("ffi")
 local template = require("apps.ipfix.template")
 local metadata = require("apps.ipfix.packet_metadata")
+local maps     = require("apps.ipfix.maps")
 local lib      = require("core.lib")
 local link     = require("core.link")
 local packet   = require("core.packet")
@@ -134,6 +135,15 @@ function FlowSet:new (spec, args)
    local template =
       template.make_template_info(template.templates[template_name])
    template.name = template_name
+   template.maps = {}
+   for _, name in ipairs(template.require_maps) do
+      assert(args.maps[name],
+             string.format("Template #%d: required map %s "
+                              .."not configured", template.id, name))
+      template.maps[name] = maps.mk_map(name, args.maps[name],
+                                        nil, args.maps_log_fh)
+   end
+
    assert(args.active_timeout > args.scan_time,
           string.format("Template #%d: active timeout (%d) "
                            .."must be larger than scan time (%d)",
@@ -378,7 +388,9 @@ local ipfix_config_params = {
    exporter_eth_dst = { default = '00:00:00:00:00:00' },
    collector_ip = { required = true },
    collector_port = { required = true },
-   templates = { default = { "v4", "v6" } }
+   templates = { default = { "v4", "v6" } },
+   maps = { default = {} },
+   maps_log_fh = { default = nil }
 }
 
 local function setup_transport_header(self, config)
@@ -455,8 +467,9 @@ function IPFIX:new(config)
                            active_timeout = config.active_timeout,
                            scan_time = config.scan_time,
                            flush_timeout = config.flush_timeout,
-                           parent = o }
-
+                           parent = o,
+                           maps = config.maps,
+                           maps_log_fh = config.maps_log_fh }
    o.flow_sets = {}
    for _, template in ipairs(config.templates) do
       table.insert(o.flow_sets, FlowSet:new(template, flow_set_args))

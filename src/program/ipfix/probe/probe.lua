@@ -11,7 +11,6 @@ local basic    = require("apps.basic.basic_apps")
 local arp      = require("apps.ipv4.arp")
 local ipfix    = require("apps.ipfix.ipfix")
 local pci      = require("lib.hardware.pci")
-local template = require("apps.ipfix.template")
 local ipv4     = require("lib.protocol.ipv4")
 local ethernet = require("lib.protocol.ethernet")
 local macaddress = require("lib.macaddress")
@@ -95,6 +94,10 @@ local long_opts = {
    ["flush-timeout"] = 1,
    ["cache-size"] = 1,
    ["scan-time"] = 1,
+   ["pfx-to-as"] = 1,
+   ["maps-log"] = 1,
+   ["vlan-to-ifindex"] = 1,
+   ["mac-to-as"] = 1,
    ["cpu"] = 1,
    ["busy-wait"] = "b"
 }
@@ -118,6 +121,8 @@ function run (args)
    local cache_size
    local ipfix_version = 10
    local templates = {}
+   local maps = {}
+   local maps_log_fh
 
    local pfx_to_as, vlan_to_ifindex, mac_to_as
 
@@ -183,6 +188,26 @@ function run (args)
          cache_size =
             assert(tonumber(arg), "expected number for cache size")
       end,
+      ["pfx-to-as"] = function (arg)
+         if arg then
+            maps.pfx_to_as = arg
+         end
+      end,
+      ["vlan-to-ifindex"] = function (arg)
+         if arg then
+            maps.vlan_to_ifindex = arg
+         end
+      end,
+      ["mac-to-as"] = function (arg)
+         if arg then
+            maps.mac_to_as = arg
+         end
+      end,
+      ["maps-log"] = function (arg)
+         if arg then
+            maps_log_fh = assert(io.open(arg, "a"))
+         end
+      end,
       ipfix = function (arg)
          ipfix_version = 10
       end,
@@ -234,17 +259,7 @@ function run (args)
    local out_link, out_app = out_apps[output_type](args[2])
 
    for i = 3, #args do
-      local name, template_cache_size = unpack(parse_spec(args[i]))
-      local template_ref
-      if not pcall( function () template_ref = template[name] end) then
-         error("undefined template: "..name)
-      end
-      template_cache_size = template_cache_size or cache_size
-      print("Adding template "..name.." (id = "..template[name].id..
-               (template_cache_size and
-                   ", cache size "..template_cache_size or '')..")")
-      table.insert(templates, { template = template_ref,
-                                cache_size = template_cache_size })
+      table.insert(templates, args[i])
    end
 
    local arp_config    = { self_mac = host_mac and ethernet:pton(host_mac),
@@ -263,7 +278,9 @@ function run (args)
                collector_ip = collector_ip,
                collector_port = port,
                mtu = mtu - 14,
-               templates = templates }
+               templates = templates,
+               maps = maps,
+               maps_log_fh = maps_log_fh }
    end
    local ipfix_config = mk_ipfix_config()
    if output_type == "tap_routed" then
