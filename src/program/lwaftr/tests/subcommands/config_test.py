@@ -148,14 +148,12 @@ class TestConfigMultiproc(BaseTestCase):
         return super().tearDown()
 
     def test_start_empty(self):
-        """ Lwaftr can be started with no instances """
         config = str(DATA_DIR / "empty.conf")
         pid = self.start_daemon(config)
         self.assertEqual(len(self.instances[pid]), 0)
 
 
-    def test_snabb_config(self):
-        """ New instance can be started by snabb config """
+    def test_added_instances_startup(self):
         config = str(DATA_DIR / "icmp_on_fail.conf")
         pid = self.start_daemon(config)
         initial_instance_amount = len(self.instances[pid])
@@ -198,8 +196,7 @@ class TestConfigMultiproc(BaseTestCase):
             len(self.instances[pid]), (initial_instance_amount + 1)
         )
 
-    def test_snabb_config(self):
-        """ Removed instances are stopped by snabb config """
+    def test_removed_instances_shutdown(self):
         config = str(DATA_DIR / "icmp_on_fail.conf")
         pid = self.start_daemon(config)
         initial_instance_amount = len(self.instances[pid])
@@ -220,6 +217,66 @@ class TestConfigMultiproc(BaseTestCase):
         self.assertEqual(
             len(self.instances[pid]), (initial_instance_amount - 1)
         )
+
+    def test_snabb_get_state_summation(self):
+        config = str(DATA_DIR / "icmp_on_fail_multiproc.conf")
+        pid = self.start_daemon(config)
+
+        get_state_cmd = list(self.config_args)
+        get_state_cmd[2] = "get-state"
+        get_state_cmd.insert(3, "-f")
+        get_state_cmd.insert(4, "xpath")
+        get_state_cmd.append("/")
+
+        state = self.run_cmd(get_state_cmd).decode(ENC)
+        state = [line for line in state.split("\n") if line]
+
+        # Build two dictionaries, one of each instance counter (a total)
+        # and one of just the values in the global "softwire-state"
+        summed = {}
+        instance = {}
+        for line in state:
+            if "softwire-state" not in line:
+                continue
+
+            path = [elem for elem in line.split("/") if elem]
+            cname = path[-1].split()[0]
+            cvalue = int(path[-1].split()[1])
+
+            if path[0].startswith("instance"):
+                instance[cname] = instance.get(cname, 0) + cvalue
+            elif len(path) < 3:
+                summed[cname] = cvalue
+
+        # Now assert they're the same :)
+        for name, value in summed.items():
+            self.assertEqual(value, instance[name])
+
+    def test_snabb_get_state_lists_instances(self):
+        config = str(DATA_DIR / "icmp_on_fail_multiproc.conf")
+        pid = self.start_daemon(config)
+
+        get_state_cmd = list(self.config_args)
+        get_state_cmd[2] = "get-state"
+        get_state_cmd.insert(3, "-f")
+        get_state_cmd.insert(4, "xpath")
+        get_state_cmd.append("/")
+
+        state = self.run_cmd(get_state_cmd).decode(ENC)
+        state = [line for line in state.split("\n") if line]
+
+        instances = set()
+        for line in state:
+            path = [elem for elem in line.split("/") if elem]
+            if not path[0].startswith("instance"):
+                continue
+
+            device_name = path[0][path[0].find("=")+1:-1]
+            instances.add(device_name)
+
+        self.assertTrue(len(instances) == 2)
+        self.assertTrue("test" in instances)
+        self.assertTrue("test1" in instances)
 
 
 class TestConfigListen(BaseTestCase):

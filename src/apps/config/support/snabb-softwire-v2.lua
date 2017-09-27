@@ -653,7 +653,7 @@ local function process_states(states)
 
       for name, value in pairs(instance.softwire_state) do
          unified.softwire_state[name] = total_counter(
-            unified.softwire_state, name, value)
+            name, unified.softwire_state, value)
       end
    end
 
