@@ -199,8 +199,11 @@ function alarm_list:new (key, alarm)
 end
 function alarm_list:set_defaults_if_any (key)
    k = alarm_type_keys:normalize(key)
-   for k,v in pairs(self.defaults[k]) do
-      self.list[key][k] = v
+   local default = self.defaults[k]
+   if default then
+      for k,v in pairs(defaults) do
+         self.list[key][k] = v
+      end
    end
 end
 function add_default (key, args)
