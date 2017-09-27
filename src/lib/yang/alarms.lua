@@ -138,9 +138,15 @@ function add_to_inventory (alarm_types)
 end
 
 function do_add_to_inventory (k, v)
-   local key = alarm_type_keys:fetch(k.alarm_type_id, k.alarm_type_qualifier)
-   v.resource = {v.resource}
+   local key = alarm_type_keys:normalize(k)
+   local resource = {v.resource}
+   -- Preserve previously defined resources.
+   if state.alarm_inventory.alarm_type[key] then
+      resource = state.alarm_inventory.alarm_type[key].resource
+      table.insert(resource, v.resource)
+   end
    state.alarm_inventory.alarm_type[key] = v
+   state.alarm_inventory.alarm_type[key].resource = resource
 end
 
 -- Single point to access alarm keys.
