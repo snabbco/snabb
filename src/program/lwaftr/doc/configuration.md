@@ -126,13 +126,14 @@ on-a-stick operation, only the `device` leaf that is part of the
 in the `external-interface` that's part of the `queue` will handle IPv4
 traffic.
 
-The `external-interface` define parameters around the IPv4 interface that
-communicates with the internet and the `internal-interface` section does the
-same but for the IPv6 side that communicates with the B4s. Anything that is in
-the `external-interface` or `internal-interface` blocks outside of the
-`instance` list are shared amongst all instances. The binding table then
-declares the set of softwires and the whole thing is surrounded in the
-`softwire-config { ... }` block.
+The `external-interface` define parameters around the IPv4 interface
+that communicates with the internet and the `internal-interface` section
+does the same but for the IPv6 side that communicates with the
+B4s. Anything that is in the `external-interface` or
+`internal-interface` blocks outside of the `instance` list are shared
+amongst all instances. The binding table then declares the set of
+softwires and the whole thing is surrounded in the `softwire-config {
+... }` block.
 
 ## Compiling configurations
 
@@ -252,8 +253,8 @@ See [performance.md](performance.md).
 ## Multiple devices
 
 One lwAFTR can run multiple worker processes.  For example, here is a
-configuration snippet that specifies two on-a-stick processes that service traffic on
-PCI addresses `83:00.0` and `83:00.1`:
+configuration snippet that specifies two on-a-stick processes that
+service traffic on PCI addresses `83:00.0` and `83:00.1`:
 
 ```
   instance {
@@ -359,8 +360,8 @@ function.  The RSS hash function will take the source and destination IP
 addresses (version 4 or 6 as appropriate) together with the source and
 destination ports (for TCP or UDP packets) and use them to compute a
 hash value.  The NIC then computes the remainder when that hash value is
-divided by the number of queues, and then uses that remainder as an index to select a
-queue from among the available queues.
+divided by the number of queues, and then uses that remainder as an
+index to select a queue from among the available queues.
 
 In the encapsulation direction (IPv4 to IPv6), all inputs to the RSS
 hash function will be available, except for the case of incoming ICMP
@@ -377,11 +378,13 @@ device to which to send the packets.
 
 ## Run-time reconfiguration
 
-See [`snabb config`](../../config/README.md) for a general overview of run-time configuration query and update in Snabb.
-By default, the lwAFTR is addressable using the [`snabb-softwire-v2`](../../../lib/yang/snabb-softwire-v2.yang) YANG schema.
-For example to change the
-next-hop address of the external interface on lwaftr instance `lwaftr`'s
-queue `0` on device `83:00.0`, do:
+See [`snabb config`](../../config/README.md) for a general overview of
+run-time configuration query and update in Snabb.  By default, the
+lwAFTR is addressable using the
+[`snabb-softwire-v2`](../../../lib/yang/snabb-softwire-v2.yang) YANG
+schema.  For example to change the next-hop address of the external
+interface on lwaftr instance `lwaftr`'s queue `0` on device `83:00.0`,
+do:
 
 ```
 $ snabb config set lwaftr \
