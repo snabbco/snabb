@@ -401,7 +401,7 @@ local function path_adder_for_grammar(grammar, path)
          return function(config, subconfig)
             local tab = getter(config)
             for k,_ in pairs(subconfig) do
-               if tab[k] ~= nil then error('already-existing entry', k) end
+               if tab[k] ~= nil then error('already-existing entry') end
             end
             for k,v in pairs(subconfig) do tab[k] = v end
             return config

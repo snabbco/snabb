@@ -18,7 +18,6 @@ local lwaftr = require("apps.lwaftr.lwaftr")
 local lwutil = require("apps.lwaftr.lwutil")
 local constants = require("apps.lwaftr.constants")
 local nh_fwd = require("apps.lwaftr.nh_fwd")
-local cltable = require("lib.cltable")
 local pci = require("lib.hardware.pci")
 local raw = require("apps.socket.raw")
 local tap = require("apps.tap.tap")
@@ -45,26 +44,9 @@ local function load_driver (pciaddr)
    return require(device_info.driver).driver, device_info.rx, device_info.tx
 end
 
--- Return device PCI address, queue ID, and queue configuration.
-local function parse_instance(conf)
-   local device, instance
-   for k, v in pairs(conf.softwire_config.instance) do
-      assert(device == nil, "configuration has more than one instance")
-      device, instance = k, v
-   end
-   assert(device ~= nil, "configuration has no instance")
-   local id, queue
-   for k, v in cltable.pairs(instance.queue) do
-      assert(id == nil, "configuration has more than one RSS queue")
-      id, queue = k.id, v
-   end
-   assert(id ~= nil, "configuration has no RSS queues")
-   return device, id, queue
-end
-
 local function load_virt (c, nic_id, lwconf, interface)
    -- Validate the lwaftr and split the interfaces into global and instance.
-   local device, id, queue = parse_instance(lwconf)
+   local device, id, queue = lwutil.parse_instance(lwconf)
 
    local gexternal_interface = lwconf.softwire_config.external_interface
    local ginternal_interface = lwconf.softwire_config.internal_interface
@@ -161,7 +143,7 @@ function lwaftr_app(c, conf, lwconf, sock_path)
    assert(type(lwconf) == 'table')
 
    -- Validate the lwaftr and split the interfaces into global and instance.
-   local device, id, queue = parse_instance(lwconf)
+   local device, id, queue = lwutil.parse_instance(lwconf)
 
    local gexternal_interface = lwconf.softwire_config.external_interface
    local ginternal_interface = lwconf.softwire_config.internal_interface

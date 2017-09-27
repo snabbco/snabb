@@ -26,7 +26,6 @@ local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
 local ipv4_ntop  = require("lib.yang.util").ipv4_ntop
 local binary     = require("lib.yang.binary")
-local cltable    = require("lib.cltable")
 local S          = require("syscall")
 local engine     = require("core.app")
 local lib        = require("core.lib")
@@ -60,23 +59,6 @@ local function validate_pci_devices(devices)
    end
 end
 
--- Return device PCI address, queue ID, and queue configuration.
-local function parse_instance(conf)
-   local device, instance
-   for k, v in pairs(conf.softwire_config.instance) do
-      assert(device == nil, "configuration has more than one instance")
-      device, instance = k, v
-   end
-   assert(device ~= nil, "configuration has no instance")
-   local id, queue
-   for k, v in cltable.pairs(instance.queue) do
-      assert(id == nil, "configuration has more than one RSS queue")
-      id, queue = k.id, v
-   end
-   assert(id ~= nil, "configuration has no RSS queues")
-   return device, id, queue
-end
-
 function lwaftr_app(c, conf)
    assert(type(conf) == 'table')
 
@@ -101,7 +83,7 @@ function lwaftr_app(c, conf)
    end
    switch_names(conf)
 
-   local device, id, queue = parse_instance(conf)
+   local device, id, queue = lwutil.parse_instance(conf)
 
    -- Global interfaces
    local gexternal_interface = conf.softwire_config.external_interface
@@ -237,7 +219,7 @@ local function link_sink(c, v4_out, v6_out)
 end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
-   local v4_pci, id, queue = parse_instance(conf)
+   local v4_pci, id, queue = lwutil.parse_instance(conf)
    local v6_pci = queue.external_interface.device
    local v4_info = pci.device_info(v4_pci)
    local v6_info = pci.device_info(v6_pci)
@@ -268,7 +250,7 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
 end
 
 function load_on_a_stick(c, conf, args)
-   local pciaddr, id, queue = parse_instance(conf)
+   local pciaddr, id, queue = lwutil.parse_instance(conf)
    local device = pci.device_info(pciaddr)
    local driver = require(device.driver).driver
    validate_pci_devices({pciaddr})
@@ -326,7 +308,7 @@ function load_on_a_stick(c, conf, args)
 end
 
 function load_virt(c, conf, v4_nic_name, v6_nic_name)
-   local v4_pci, id, queue = parse_instance(conf)
+   local v4_pci, id, queue = lwutil.parse_instance(conf)
    local v6_pci = queue.external_device.device
    lwaftr_app(c, conf, device)
 
@@ -345,7 +327,7 @@ function load_virt(c, conf, v4_nic_name, v6_nic_name)
 end
 
 function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
-   local device, id, queue = parse_instance(conf)
+   local device, id, queue = lwutil.parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, v4_pcap)
@@ -380,7 +362,7 @@ function load_bench(c, conf, v4_pcap, v6_pcap, v4_sink, v6_sink)
 end
 
 function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local device, id, queue = parse_instance(conf)
+   local device, id, queue = lwutil.parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
@@ -432,7 +414,7 @@ function load_check_on_a_stick (c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6
 end
 
 function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
-   local device, id, queue = parse_instance(conf)
+   local device, id, queue = lwutil.parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
@@ -470,7 +452,7 @@ function load_check(c, conf, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
 end
 
 function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
-   local device, id, queue = parse_instance(conf)
+   local device, id, queue = lwutil.parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
@@ -512,7 +494,7 @@ function load_soak_test(c, conf, inv4_pcap, inv6_pcap)
 end
 
 function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
-   local device, id, queue = parse_instance(conf)
+   local device, id, queue = lwutil.parse_instance(conf)
    lwaftr_app(c, conf, device)
 
    config.app(c, "capturev4", pcap.PcapReader, inv4_pcap)
@@ -692,6 +674,7 @@ local function compute_worker_configs(conf)
    local make_copy = copier(conf)
    for device, queues in pairs(conf.softwire_config.instance) do
       for k, _ in cltable.pairs(queues.queue) do
+         local worker_id = string.format('%s/%s', device, k.id)
          local worker_config = make_copy()
          local instance = worker_config.softwire_config.instance
          for other_device, queues in pairs(conf.softwire_config.instance) do
@@ -705,7 +688,6 @@ local function compute_worker_configs(conf)
                end
             end
          end
-         local worker_id = string.format('%s/%s', device, k.id)
          ret[worker_id] = worker_config
       end
    end
