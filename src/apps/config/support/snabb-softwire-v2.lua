@@ -6,6 +6,7 @@ local corelib = require('core.lib')
 local equal = require('core.lib').equal
 local dirname = require('core.lib').dirname
 local data = require('lib.yang.data')
+local state = require('lib.yang.state')
 local ipv4_ntop = require('lib.yang.util').ipv4_ntop
 local ipv6 = require('lib.protocol.ipv6')
 local yang = require('lib.yang.yang')
@@ -599,6 +600,67 @@ local function ietf_softwire_translator ()
    return ret
 end
 
+local function configuration_for_follower(follower, configuration)
+   return follower.graph.apps.lwaftr.arg
+end
+
+local function compute_state_reader(schema_name)
+   -- The schema has two lists which we want to look in.
+   local schema = yang.load_schema_by_name(schema_name)
+   local grammar = data.data_grammar_from_schema(schema, false)
+
+   local instance_list_gmr = grammar.members["softwire-config"].members.instance
+   local instance_state_gmr = instance_list_gmr.values["softwire-state"]
+
+   local base_reader = state.state_reader_from_grammar(grammar)
+   local instance_state_reader = state.state_reader_from_grammar(instance_state_gmr)
+
+   return function(pid, data)
+      local counters = state.counters_for_pid(pid)
+      local ret = base_reader(counters)
+      ret.softwire_config.instance = {}
+
+      for device, instance in pairs(data.softwire_config.instance) do
+         local instance_state = instance_state_reader(counters)
+         ret.softwire_config.instance[device] = {}
+         ret.softwire_config.instance[device].softwire_state = instance_state
+      end
+
+      return ret
+   end
+end
+
+local function process_states(states)
+   -- We need to create a summation of all the states as well as adding all the
+   -- instance specific state data to create a total in software-state.
+
+   local unified = {
+      softwire_config = {instance = {}},
+      softwire_state = {}
+   }
+
+   local function total_counter(name, softwire_stats, value)
+      if softwire_stats[name] == nil then
+         return value
+      else
+         return softwire_stats[name] + value
+      end
+   end
+
+   for _, inst_config in ipairs(states) do
+      local name, instance = next(inst_config.softwire_config.instance)
+      unified.softwire_config.instance[name] = instance
+
+      for name, value in pairs(instance.softwire_state) do
+         unified.softwire_state[name] = total_counter(
+            unified.softwire_state, name, value)
+      end
+   end
+
+   return unified
+end
+
+
 function get_config_support()
    return {
       compute_config_actions = compute_config_actions,
@@ -606,6 +668,9 @@ function get_config_support()
          update_mutable_objects_embedded_in_app_initargs,
       compute_apps_to_restart_after_configuration_update =
          compute_apps_to_restart_after_configuration_update,
+      compute_state_reader = compute_state_reader,
+      process_states = process_states,
+      configuration_for_follower = configuration_for_follower,
       translators = { ['ietf-softwire'] = ietf_softwire_translator () }
    }
 end

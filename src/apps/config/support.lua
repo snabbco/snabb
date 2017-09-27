@@ -190,6 +190,20 @@ local function add_restarts(actions, app_graph, to_restart)
    return actions
 end
 
+local function configuration_for_follower(follower, configuration)
+   return configuration
+end
+
+local function compute_state_reader(schema_name)
+   return function(pid)
+      local reader = state.state_reader_from_schema_by_name(schema_name)
+      return reader(state.counters_for_pid(pid))
+   end
+end
+
+local function process_states(states)
+   return states[1]
+end
 
 generic_schema_config_support = {
    compute_config_actions = function(
@@ -201,6 +215,9 @@ generic_schema_config_support = {
          in_place_dependencies, app_graph, schema_name, verb, path, arg)
       return compute_mutable_objects_embedded_in_app_initargs(app_graph)
    end,
+   compute_state_reader = compute_state_reader,
+   configuration_for_follower = configuration_for_follower,
+   process_states = process_states,
    compute_apps_to_restart_after_configuration_update =
       compute_apps_to_restart_after_configuration_update,
    translators = {}
