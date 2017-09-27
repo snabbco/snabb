@@ -218,7 +218,7 @@ local function data_emitter(production)
          return function(data, stream)
             stream:write_stringref('cltable')
             emit_keys(data.keys, stream)
-            for i, value in ipairs(data.values) do
+            for i, value in pairs(data.values) do
                stream:write_uint32(i)
                emit_value(value, stream)
             end
