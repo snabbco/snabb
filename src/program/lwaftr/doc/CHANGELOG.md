@@ -1,5 +1,19 @@
 # Change Log
 
+## [2017.08.04]
+
+* Enable RSS.  For full details, see:
+
+    https://github.com/Igalia/snabb/blob/lwaftr/src/program/lwaftr/doc/configuration.md#multiple-devices
+
+* Fix bugs related to dynamically adding and removing RSS workers.
+
+* Extend `snabb config get-state` to understand multiple worker
+  processes.  Counter values from worker processes are available
+  individually and are also summed for the lwAFTR as a whole.
+
+* Bug fixes to VMDq support in the new intel_mp driver.
+
 ## [2017.08.03]
 
 * Fix on-a-stick mode for multiple worker processes.  The lwAFTR will now
