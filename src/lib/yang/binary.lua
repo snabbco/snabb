@@ -14,7 +14,7 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
-local VERSION = 0x00005000
+local VERSION = 0x00006000
 
 local header_t = ffi.typeof([[
 struct {
@@ -217,7 +217,10 @@ local function data_emitter(production)
             stream:write_stringref('cltable')
             emit_keys(data.keys, stream)
             stream:write_uint32(#data.values)
-            for i=1,#data.values do emit_value(data.values[i], stream) end
+            for i, value in ipairs(data.values) do
+               stream:write_uint32(i)
+               emit_value(value, stream)
+            end
          end
       else
          local emit_key = visit1({type='struct', members=production.keys,
@@ -410,7 +413,10 @@ local function read_compiled_data(stream, strtab)
    function readers.cltable()
       local keys = read1()
       local values = {}
-      for i=1,stream:read_uint32() do table.insert(values, read1()) end
+      for i=1,stream:read_uint32() do
+         local i = stream:read_uint32()
+         values[i] = read1()
+      end
       return cltable.build(keys, values)
    end
    function readers.lltable()
