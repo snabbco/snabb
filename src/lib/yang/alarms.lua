@@ -124,6 +124,11 @@ function alarm_type_keys:fetch (alarm_type_id, alarm_type_qualifier)
    end
    return key
 end
+function alarm_type_keys:normalize (key)
+   local alarm_type_id = assert(key.alarm_type_id)
+   local alarm_type_qualifier = key.alarm_type_qualifier or ''
+   return self:fetch(alarm_type_id, alarm_type_qualifier)
+end
 
 function add_to_inventory (alarm_types)
    assert(type(alarm_types) == 'table')
@@ -176,12 +181,24 @@ local function table_size (t)
    return size
 end
 
+
 -- Contains a table with all the declared alarms.
 local alarm_list = {
    list = {},
+   defaults = {},
 }
 function alarm_list:new (key, alarm)
    self.list[key] = alarm
+   self:set_defaults_if_any(key)
+end
+function alarm_list:set_defaults_if_any (key)
+   k = alarm_type_keys:normalize(key)
+   for k,v in pairs(self.defaults[k]) do
+      self.list[key][k] = v
+   end
+end
+function add_default (key, args)
+   self.defaults[key] = args
 end
 function alarm_list:lookup (key)
    return self.list[key]
@@ -195,6 +212,13 @@ function alarm_list:retrieve (key, args)
    local alarm = self:lookup(key)
    if alarm then
       return copy(alarm, args)
+   end
+end
+
+function default_alarms (alarms)
+   for k,v in pairs(alarms) do
+      k = alarm_type_keys:normalize(k)
+      alarm_list.defaults[k] = v
    end
 end
 

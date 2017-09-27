@@ -30,6 +30,7 @@ local engine     = require("core.app")
 local lib        = require("core.lib")
 local shm        = require("core.shm")
 local yang       = require("lib.yang.yang")
+local alarms     = require("lib.yang.alarms")
 
 local alarm_notification = false
 
@@ -145,11 +146,10 @@ function lwaftr_app(c, conf, device)
                 next_ip = convert_ipv4(iexternal_interface.next_hop.ip),
                 alarm_notification = conf.alarm_notification })
 
-   --[[
    if conf.alarm_notification then
-      require('program.lwaftr.alarms')
+      local lwaftr = require('program.lwaftr.alarms')
+      alarms.default_alarms(lwaftr.alarms)
    end
-   --]]
 
    local preprocessing_apps_v4  = { "reassemblerv4" }
    local preprocessing_apps_v6  = { "reassemblerv6" }
