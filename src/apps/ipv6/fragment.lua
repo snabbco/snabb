@@ -10,7 +10,10 @@ local lib        = require("core.lib")
 local packet     = require("core.packet")
 local counter    = require("core.counter")
 local link       = require("core.link")
+local alarms     = require('lib.yang.alarms')
+local S          = require('syscall')
 
+local CounterAlarm = alarms.CounterAlarm
 local receive, transmit = link.receive, link.transmit
 local ntohs, htons = lib.ntohs, lib.htons
 local htonl = lib.htonl
@@ -95,6 +98,23 @@ function Fragmenter:new(conf)
    assert(o.mtu >= 1280)
    o.next_fragment_id = deterministic_first_fragment_id or
       math.random(0, 0xffffffff)
+
+   alarms.add_to_inventory {
+      [{alarm_type_id='outgoing-ipv6-fragments'}] = {
+         resource=tostring(S.getpid()),
+         has_clear=true,
+         description='Outgoing IPv6 fragments over N fragments/s',
+      }
+   }
+   local outgoing_fragments_alarm = alarms.declare_alarm {
+      [{resource=tostring(S.getpid()),alarm_type_id='outgoing-ipv6-fragments'}] = {
+         perceived_severity='warning',
+         alarm_text='More than 10,000 outgoing IPv6 fragments per second',
+      }
+   }
+   o.outgoing_ipv6_fragments_alarm = CounterAlarm.new(outgoing_fragments_alarm,
+      1, 1e4, o, "out-ipv6-frag")
+
    return setmetatable(o, {__index=Fragmenter})
 end
 
@@ -151,6 +171,8 @@ end
 function Fragmenter:push ()
    local input, output = self.input.input, self.output.output
    local max_length = self.mtu + ether_header_len
+
+   self.outgoing_ipv6_fragments_alarm:check()
 
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
