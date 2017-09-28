@@ -339,7 +339,9 @@ function Intel:new (conf)
       rate_limit = conf.rate_limit,
       priority = conf.priority,
       -- a path used for shm operations on NIC-global state
-      shm_root = "/intel-mp/" .. conf.pciaddr .. "/",
+      -- canonicalize to ensure the reference is the same from all
+      -- processes
+      shm_root = "/intel-mp/" .. pci.canonical(conf.pciaddr) .. "/",
       -- only used for main process, affects max pool number
       vmdq_queuing_mode = conf.vmdq_queuing_mode
    }
@@ -1502,6 +1504,7 @@ function Intel82599:select_pool()
 
    self:lock_sw_sem()
 
+   -- check the queueing mode in shm, adjust max pools based on that
    local mode_shm = shm.open(self.shm_root .. "vmdq_queuing_mode", vmdq_queuing_mode_t)
    if mode_shm.mode == 0 then
       self.max_pool = 32
@@ -1510,12 +1513,12 @@ function Intel82599:select_pool()
    end
    shm.unmap(mode_shm)
 
+   -- We use some shared memory to track which pool numbers are claimed
+   local pool_shm = shm.open(self.shm_root .. "vmdq_pools", vmdq_pools_t)
+
    -- if the poolnum was set manually in the config, just use that
    if not self.poolnum then
       local available_pool
-
-      -- We use some shared memory to track which pool numbers are claimed
-      local pool_shm = shm.open(self.shm_root .. "vmdq_pools", vmdq_pools_t)
 
       for poolnum = 0, self.max_pool-1 do
          if pool_shm.pools[poolnum] == 0 then
@@ -1525,14 +1528,15 @@ function Intel82599:select_pool()
       end
 
       assert(available_pool, "No free VMDq pools are available")
-      pool_shm.pools[available_pool] = 1
-      shm.unmap(pool_shm)
       self.poolnum = available_pool
    else
       assert(self.poolnum < self.max_pool,
              string.format("Pool overflow: Intel 82599 supports up to %d VMDq pools",
                            self.max_pool))
    end
+
+   pool_shm.pools[self.poolnum] = 1
+   shm.unmap(pool_shm)
 
    self:unlock_sw_sem()
 
