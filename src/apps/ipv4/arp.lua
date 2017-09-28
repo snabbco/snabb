@@ -212,7 +212,7 @@ function ARP:push()
                                                h.arp.sha, h.arp.spa))
             end
          elseif ntohs(h.arp.oper) == arp_oper_reply then
-            if ipv4_eq(h.arp.spa, self.next_ip) then
+            if self.next_ip and ipv4_eq(h.arp.spa, self.next_ip) then
                local next_mac = copy_mac(h.arp.sha)
                self:arp_resolved(self.next_ip, next_mac)
                self.next_mac = next_mac
