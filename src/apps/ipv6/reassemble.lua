@@ -24,7 +24,10 @@ local link       = require("core.link")
 local ipsum      = require("lib.checksum").ipsum
 local ctable     = require('lib.ctable')
 local ctablew    = require('apps.lwaftr.ctable_wrapper')
+local alarms     = require('lib.yang.alarms')
+local S          = require('syscall')
 
+local CounterAlarm = alarms.CounterAlarm
 local ntohs, htons = lib.ntohs, lib.htons
 local ntohl = lib.ntohl
 
@@ -162,6 +165,22 @@ function Reassembler:new(conf)
    o.scratch_reassembly = params.value_type()
    o.next_counter_update = -1
 
+   alarms.add_to_inventory {
+      [{alarm_type_id='incoming-ipv6-fragments'}] = {
+         resource=tostring(S.getpid()),
+         has_clear=true,
+         description='Incoming IPv6 fragments over N fragments/s',
+      }
+   }
+   local incoming_fragments_alarm = alarms.declare_alarm {
+      [{resource=tostring(S.getpid()),alarm_type_id='incoming-ipv6-fragments'}] = {
+         perceived_severity='warning',
+         alarm_text='More than 10,000 IPv6 fragments per second',
+      }
+   }
+   o.incoming_ipv6_fragments_alarm = CounterAlarm.new(incoming_fragments_alarm,
+      1, 1e4, o, "in-ipv6-frag-needs-reassembly")
+
    return setmetatable(o, {__index=Reassembler})
 end
 
@@ -282,6 +301,8 @@ end
 
 function Reassembler:push ()
    local input, output = self.input.input, self.output.output
+
+   self.incoming_ipv6_fragments_alarm:check()
 
    for _ = 1, link.nreadable(input) do
       local pkt = link.receive(input)
