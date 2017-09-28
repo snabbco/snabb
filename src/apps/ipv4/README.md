@@ -58,6 +58,17 @@ it will be determined from the *next_ip* via ARP.
 *Optional*.  The IPv4 address of the next-hop host.  Required only if
  *next_mac* is not specified as part of the configuration.
 
+— Key **shared_next_mac_key**
+
+*Optional*.  Path to a shared memory location
+(i.e. */var/run/snabb/PID/PATH*) in which to store the resolved
+next_mac.  This ARP resolver might be part of a set of peer processes
+sharing work via RSS.  In that case, an ARP response will probably
+arrive only to one of the RSS processes, not to all of them.  If you are
+using ARP behind RSS, set *shared_next_mac_key* to, for example,
+`group/arp-next-mac`, to enable the different workers to communicate the
+next-hop MAC address.
+
 ## Reassembler (apps.ipv4.reassemble)
 
 The `Reassembler` app is a filter on incoming IPv4 packets that
