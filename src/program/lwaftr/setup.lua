@@ -304,7 +304,7 @@ function load_on_a_stick(c, conf, args)
          vmdq=true, -- Needed to enable MAC filtering/stamping.
          rxq=id,
          txq=id,
-         poolnum=0,
+         poolnum=1,
          vlan=queue.internal_interface.vlan_tag,
          ring_buffer_size=args.ring_buffer_size,
          macaddr = ethernet:ntop(queue.internal_interface.mac)})
