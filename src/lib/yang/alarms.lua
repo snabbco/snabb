@@ -4,6 +4,7 @@ local data = require('lib.yang.data')
 local lib = require('core.lib')
 local util = require('lib.yang.util')
 local alarm_codec = require('apps.config.alarm_codec')
+local counter = require("core.counter")
 
 local format_date_as_iso_8601 = util.format_date_as_iso_8601
 local parse_date_as_iso_8601 = util.parse_date_as_iso_8601
@@ -359,9 +360,7 @@ function clear_alarm (key)
    local args = {is_cleared = true}
    key = alarm_keys:normalize(key)
    local alarm = lookup_alarm(key)
-   if not alarm then
-      create_alarm(key, args)
-   else
+   if alarm then
       update_alarm(alarm, args)
    end
 end
@@ -558,6 +557,28 @@ function compress_alarms (key)
       end
    end
    return count
+end
+
+CounterAlarm = {}
+
+function CounterAlarm.new (alarm, period, limit, object, counter_name)
+   return setmetatable({alarm=alarm, period=period, limit=limit,  object=object,
+      counter_name=counter_name}, {__index = CounterAlarm})
+end
+function CounterAlarm:check ()
+   if self.next_check == nil then
+      self.next_check = engine.now() + self.period
+      self.last_value = counter.read(self.object.shm[self.counter_name])
+   elseif self.next_check < engine.now() then
+      local value = counter.read(self.object.shm[self.counter_name])
+      if (value - self.last_value > self.limit) then
+         self.alarm:raise()
+      else
+         self.alarm:clear()
+      end
+      self.next_check = engine.now() + self.period
+      self.last_value = value
+   end
 end
 
 --

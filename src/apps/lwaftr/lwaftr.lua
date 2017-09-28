@@ -17,7 +17,9 @@ local link = require("core.link")
 local engine = require("core.app")
 local bit = require("bit")
 local ffi = require("ffi")
+local alarms = require("lib.yang.alarms")
 
+local CounterAlarm = alarms.CounterAlarm
 local band, bnot = bit.band, bit.bnot
 local rshift, lshift = bit.rshift, bit.lshift
 local receive, transmit = link.receive, link.transmit
@@ -26,6 +28,8 @@ local ipv6_equals = lwutil.ipv6_equals
 local is_ipv4, is_ipv6 = lwutil.is_ipv4, lwutil.is_ipv6
 local htons, ntohs, ntohl = lib.htons, lib.ntohs, lib.ntohl
 local is_ipv4_fragment, is_ipv6_fragment = lwutil.is_ipv4_fragment, lwutil.is_ipv6_fragment
+
+local S = require("syscall")
 
 -- Note whether an IPv4 packet is actually coming from the internet, or from
 -- a b4 and hairpinned to be re-encapsulated in another IPv6 packet.
@@ -427,6 +431,43 @@ function LwAftr:new(conf)
    o.icmpv4_error_rate_limit_start = 0
    o.icmpv6_error_count = 0
    o.icmpv6_error_rate_limit_start = 0
+
+   alarms.add_to_inventory {
+     [{alarm_type_id='bad-ipv4-softwires-matches'}] = {
+       resource=tostring(S.getpid()),
+       has_clear=true,
+       description="lwAFTR's bad matching softwires due to not found destination "..
+         "address for IPv4 packets",
+     }
+   }
+   alarms.add_to_inventory {
+     [{alarm_type_id='bad-ipv6-softwires-matches'}] = {
+       resource=tostring(S.getpid()),
+       has_clear=true,
+       description="lwAFTR's bad matching softwires due to not found source"..
+         "address for IPv6 packets",
+     }
+   }
+   local bad_ipv4_softwire_matches = alarms.declare_alarm {
+      [{resource=tostring(S.getpid()), alarm_type_id='bad-ipv4-softwires-matches'}] = {
+         perceived_severity = 'major',
+         alarm_text = "lwAFTR's bad softwires matches due to non matching destination"..
+            "address for incoming packets (IPv4) has reached over 100,000 softwires "..
+            "binding-table.  Please review your lwAFTR's configuration binding-table."
+      },
+   }
+   local bad_ipv6_softwire_matches = alarms.declare_alarm {
+      [{resource=tostring(S.getpid()), alarm_type_id='bad-ipv6-softwires-matches'}] = {
+         perceived_severity = 'major',
+         alarm_text = "lwAFTR's bad softwires matches due to non matching source "..
+            "address for outgoing packets (IPv6) has reached over 100,000 softwires "..
+            "binding-table.  Please review your lwAFTR's configuration binding-table."
+      },
+   }
+   o.bad_ipv4_softwire_matches_alarm = CounterAlarm.new(bad_ipv4_softwire_matches,
+      5, 1e5, o, 'drop-no-dest-softwire-ipv4-packets')
+   o.bad_ipv6_softwire_matches_alarm = CounterAlarm.new(bad_ipv6_softwire_matches,
+      5, 1e5, o, 'drop-no-source-softwire-ipv6-packets')
 
    if debug then lwdebug.pp(conf) end
    return o
@@ -1041,6 +1082,9 @@ function LwAftr:push ()
    local i4, i6, ih = self.input.v4, self.input.v6, self.input.hairpin_in
    local o4, o6 = self.output.v4, self.output.v6
    self.o4, self.o6 = o4, o6
+
+   self.bad_ipv4_softwire_matches_alarm:check()
+   self.bad_ipv6_softwire_matches_alarm:check()
 
    for _ = 1, link.nreadable(i6) do
       -- Decapsulate incoming IPv6 packets from the B4 interface and
