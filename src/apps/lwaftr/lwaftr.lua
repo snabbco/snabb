@@ -1078,15 +1078,13 @@ function LwAftr:from_b4(pkt)
    return self:enqueue_decapsulation(pkt, ipv4, port)
 end
 
-function LwAftr:pull ()
-   self.bad_ipv4_softwire_matches_alarm:check()
-   self.bad_ipv6_softwire_matches_alarm:check()
-end
-
 function LwAftr:push ()
    local i4, i6, ih = self.input.v4, self.input.v6, self.input.hairpin_in
    local o4, o6 = self.output.v4, self.output.v6
    self.o4, self.o6 = o4, o6
+
+   self.bad_ipv4_softwire_matches_alarm:check()
+   self.bad_ipv6_softwire_matches_alarm:check()
 
    for _ = 1, link.nreadable(i6) do
       -- Decapsulate incoming IPv6 packets from the B4 interface and
