@@ -359,9 +359,7 @@ function clear_alarm (key)
    local args = {is_cleared = true}
    key = alarm_keys:normalize(key)
    local alarm = lookup_alarm(key)
-   if not alarm then
-      create_alarm(key, args)
-   else
+   if alarm then
       update_alarm(alarm, args)
    end
 end
