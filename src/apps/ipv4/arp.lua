@@ -16,6 +16,7 @@ local ffi      = require("ffi")
 local packet   = require("core.packet")
 local link     = require("core.link")
 local lib      = require("core.lib")
+local shm      = require("core.shm")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
@@ -65,6 +66,7 @@ struct {
 local ether_arp_header_t = ffi.typeof(
    'struct { $ ether; $ arp; } __attribute__((packed))',
    ether_header_t, arp_header_t)
+local mac_t = ffi.typeof('uint8_t[6]')
 local ether_header_ptr_t = ffi.typeof('$*', ether_header_t)
 local ether_header_len = ffi.sizeof(ether_header_t)
 local ether_arp_header_ptr_t = ffi.typeof('$*', ether_arp_header_t)
@@ -121,7 +123,7 @@ end
 local function ipv4_eq(a, b) return C.memcmp(a, b, 4) == 0 end
 
 local function copy_mac(src)
-   local dst = ffi.new('uint8_t[6]')
+   local dst = mac_t()
    ffi.copy(dst, src, 6)
    return dst
 end
@@ -146,6 +148,12 @@ local arp_config_params = {
    next_ip  = { default=false },
    -- Emits an alarm notification on arp-resolving and arp-resolved.
    alarm_notification = { default=false },
+   -- This ARP resolver might be part of a set of peer processes sharing
+   -- work via RSS.  In that case, a response will probably arrive only
+   -- at one process, not all of them!  In that case we can arrange for
+   -- the ARP app that receives the reply to write the resolved next-hop
+   -- to a shared file.  RSS peers can poll that file.
+   shared_next_mac_key = {},
 }
 
 function ARP:new(conf)
@@ -156,7 +164,7 @@ function ARP:new(conf)
    if not o.next_mac then
       assert(o.next_ip, 'ARP needs next-hop IPv4 address to learn next-hop MAC')
       o.arp_request_pkt = make_arp_request(o.self_mac, o.self_ip, o.next_ip)
-      self.arp_request_interval = 3 -- Send a new arp_request every three seconds.
+      o.arp_request_interval = 3 -- Send a new arp_request every three seconds.
    end
    return setmetatable(o, {__index=ARP})
 end
@@ -182,10 +190,30 @@ function ARP:send_arp_request (output)
    transmit(output, packet.clone(self.arp_request_pkt))
 end
 
-function ARP:arp_resolved (ip, mac)
+function ARP:arp_resolved (ip, mac, provenance)
    print(("ARP: '%s' resolved (%s)"):format(ipv4:ntop(ip), ethernet:ntop(mac)))
    if self.alarm_notification then
       resolve_alarm:clear()
+   end
+   self.next_mac = mac
+   if self.shared_next_mac_key then
+      if provenance == 'remote' then
+         -- If we are getting this information from a packet and not
+         -- from the shared key, then update the shared key.
+         local ok, shared = pcall(shm.create, self.shared_next_mac_key, mac_t)
+         if not ok then
+            ok, shared = pcall(shm.open, self.shared_next_mac_key, mac_t)
+         end
+         if not ok then
+            print('warning: arp: failed to update shared next MAC key!')
+         else
+            ffi.copy(shared, mac, 6)
+            shm.unmap(shared)
+         end
+      else
+         assert(provenance == 'peer')
+         -- Pass.
+      end
    end
 end
 
@@ -213,9 +241,7 @@ function ARP:push()
             end
          elseif ntohs(h.arp.oper) == arp_oper_reply then
             if self.next_ip and ipv4_eq(h.arp.spa, self.next_ip) then
-               local next_mac = copy_mac(h.arp.sha)
-               self:arp_resolved(self.next_ip, next_mac)
-               self.next_mac = next_mac
+               self:arp_resolved(self.next_ip, copy_mac(h.arp.sha), 'remote')
             end
          else
             -- Incoming ARP that isn't handled; drop it silently.
@@ -235,6 +261,11 @@ function ARP:push()
         e.shost = self.self_mac
         transmit(osouth, p)
      end
+   elseif self.shared_next_mac_key then
+      local ok, mac = pcall(shm.open, self.shared_next_mac_key, mac_t)
+      -- Use the shared pointer directly, without copying; if it is ever
+      -- updated, we will get its new value.
+      if ok then self:arp_resolved(self.next_ip, mac, 'peer') end
    end
 end
 
@@ -242,7 +273,8 @@ function selftest()
    print('selftest: arp')
 
    local arp = ARP:new({ self_ip = ipv4:pton('1.2.3.4'),
-                         next_ip = ipv4:pton('5.6.7.8') })
+                         next_ip = ipv4:pton('5.6.7.8'),
+                         shared_next_mac_key = "foo" })
    arp.input  = { south=link.new('south in'),  north=link.new('north in') }
    arp.output = { south=link.new('south out'), north=link.new('north out') }
 

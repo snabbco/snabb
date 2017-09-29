@@ -23,6 +23,7 @@ local ffi      = require("ffi")
 local packet   = require("core.packet")
 local link     = require("core.link")
 local lib      = require("core.lib")
+local shm      = require("core.shm")
 local checksum = require("lib.checksum")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
@@ -48,6 +49,7 @@ local htons, ntohs = lib.htons, lib.ntohs
 local htonl, ntohl = lib.htonl, lib.ntohl
 local receive, transmit = link.receive, link.transmit
 
+local mac_t = ffi.typeof('uint8_t[6]')
 local ether_header_t = ffi.typeof [[
 /* All values in network byte order.  */
 struct {
@@ -280,6 +282,12 @@ local ndp_config_params = {
    is_router = { default=true },
    -- Emit alarms if set.
    alarm_notification = { default=false },
+   -- This NDP resolver might be part of a set of peer processes sharing
+   -- work via RSS.  In that case, a response will probably arrive only
+   -- at one process, not all of them!  In that case we can arrange for
+   -- the NDP app that receives the reply to write the resolved next-hop
+   -- to a shared file.  RSS peers can poll that file.
+   shared_next_mac_key = {},
 }
 
 function NDP:new(conf)
@@ -312,10 +320,30 @@ function NDP:maybe_send_ns_request (output)
    end
 end
 
-function NDP:ndp_resolved (ip, mac)
+function NDP:ndp_resolved (ip, mac, provenance)
    print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(ip), ethernet:ntop(mac)))
    if self.alarm_notification then
       resolve_alarm:clear()
+   end
+   self.next_mac = mac
+   if self.shared_next_mac_key then
+      if provenance == 'remote' then
+         -- If we are getting this information from a packet and not
+         -- from the shared key, then update the shared key.
+         local ok, shared = pcall(shm.create, self.shared_next_mac_key, mac_t)
+         if not ok then
+            ok, shared = pcall(shm.open, self.shared_next_mac_key, mac_t)
+         end
+         if not ok then
+            print('warning: ndp: failed to update shared next MAC key!')
+         else
+            ffi.copy(shared, mac, 6)
+            shm.unmap(shared)
+         end
+      else
+         assert(provenance == 'peer')
+         -- Pass.
+      end
    end
 end
 
@@ -325,8 +353,7 @@ function NDP:resolve_next_hop(next_mac)
    -- link layer address in the NDP options).  Just take the first
    -- one.
    if self.next_mac then return end
-   self:ndp_resolved(self.next_ip, next_mac)
-   self.next_mac = next_mac
+   self:ndp_resolved(self.next_ip, next_mac, 'remote')
 end
 
 local function copy_mac(src)
@@ -430,17 +457,21 @@ function NDP:push()
       end
    end
 
-   for _ = 1, link.nreadable(inorth) do
-      local p = receive(inorth)
-      if not self.next_mac then
-         -- drop all southbound packets until the next hop's ethernet address is known
-         packet.free(p)
-      else
+   -- Don't read southbound packets until the next hop's ethernet
+   -- address is known.
+   if self.next_mac then
+      for _ = 1, link.nreadable(inorth) do
+         local p = receive(inorth)
          local h = ffi.cast(ether_header_ptr_t, p.data)
          h.shost = self.self_mac
          h.dhost = self.next_mac
          transmit(osouth, p)
       end
+   elseif self.shared_next_mac_key then
+      local ok, mac = pcall(shm.open, self.shared_next_mac_key, mac_t)
+      -- Use the shared pointer directly, without copying; if it is ever
+      -- updated, we will get its new value.
+      if ok then self:ndp_resolved(self.next_ip, mac, 'peer') end
    end
 end
 
@@ -451,9 +482,11 @@ function selftest()
    local sink = require("apps.basic.basic_apps").Sink
    local c = config.new()
    config.app(c, "nd1", NDP, { self_ip  = ipv6:pton("2001:DB8::1"),
-                               next_ip  = ipv6:pton("2001:DB8::2") })
+                               next_ip  = ipv6:pton("2001:DB8::2"),
+                               shared_next_mac_key = "foo" })
    config.app(c, "nd2", NDP, { self_ip  = ipv6:pton("2001:DB8::2"),
-                               next_ip  = ipv6:pton("2001:DB8::1") })
+                               next_ip  = ipv6:pton("2001:DB8::1"),
+                               shared_next_mac_key = "bar" })
    config.app(c, "sink1", sink)
    config.app(c, "sink2", sink)
    config.link(c, "nd1.south -> nd2.south")
