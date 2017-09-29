@@ -722,5 +722,5 @@ function reconfigurable(scheduling, f, graph, conf)
               { setup_fn = setup_fn, initial_configuration = conf,
                 worker_start_code = worker_code,
                 schema_name = 'snabb-softwire-v2',
-		default_schema = 'ietf-softwire'})
+                default_schema = 'ietf-softwire'})
 end
