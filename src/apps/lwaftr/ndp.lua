@@ -327,16 +327,19 @@ function NDP:ndp_resolved (ip, mac, provenance)
    end
    self.next_mac = mac
    if self.shared_next_mac_key then
-      local ok, shared_mac = pcall(shm.create, self.shared_next_mac_key, mac_t)
-      if not ok then
-         ok, shared_mac = pcall(shm.open, self.shared_next_mac_key, mac_t)
-      end
-      if not ok then
-         print('warning: failed to open shared next MAC key!')
-      elseif provenance == 'remote' then
+      if provenance == 'remote' then
          -- If we are getting this information from a packet and not
          -- from the shared key, then update the shared key.
-         ffi.copy(shared_mac, mac, 6)
+         local ok, shared = pcall(shm.create, self.shared_next_mac_key, mac_t)
+         if not ok then
+            ok, shared = pcall(shm.open, self.shared_next_mac_key, mac_t)
+         end
+         if not ok then
+            print('warning: ndp: failed to update shared next MAC key!')
+         else
+            ffi.copy(shared, mac, 6)
+            shm.unmap(shared)
+         end
       else
          assert(provenance == 'peer')
          -- Pass.
