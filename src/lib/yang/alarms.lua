@@ -559,18 +559,15 @@ function compress_alarms (key)
    return count
 end
 
-CounterAlarm = {}
+local Alarm = {}
+Alarm.__index={Alarm}
 
-function CounterAlarm.new (alarm, period, limit, object, counter_name)
-   return setmetatable({alarm=alarm, period=period, limit=limit,  object=object,
-      counter_name=counter_name}, {__index = CounterAlarm})
-end
-function CounterAlarm:check ()
+function Alarm:check ()
    if self.next_check == nil then
       self.next_check = engine.now() + self.period
-      self.last_value = counter.read(self.object.shm[self.counter_name])
+      self.last_value = self:get_value()
    elseif self.next_check < engine.now() then
-      local value = counter.read(self.object.shm[self.counter_name])
+      local value = self:get_value()
       if (value - self.last_value > self.limit) then
          self.alarm:raise()
       else
@@ -579,6 +576,27 @@ function CounterAlarm:check ()
       self.next_check = engine.now() + self.period
       self.last_value = value
    end
+end
+
+ExprAlarm = {}
+
+function ExprAlarm.new (alarm, period, limit, expr)
+   assert(type(expr) == 'function')
+   return setmetatable({alarm=alarm, period=period, limit=limit, expr=expr},
+      {__index = setmetatable(ExprAlarm, {__index=Alarm})})
+end
+function ExprAlarm:get_value()
+   return self.expr()
+end
+
+CounterAlarm = {}
+
+function CounterAlarm.new (alarm, period, limit, object, counter_name)
+   return setmetatable({alarm=alarm, period=period, limit=limit,  object=object,
+      counter_name=counter_name}, {__index = setmetatable(CounterAlarm, {__index=Alarm})})
+end
+function CounterAlarm:get_value()
+   return counter.read(self.object.shm[self.counter_name])
 end
 
 --
