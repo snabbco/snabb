@@ -32,7 +32,7 @@ class TestConfigGet(BaseTestCase):
     """
 
     daemon_args = DAEMON_ARGS
-    config_args = (str(SNABB_CMD), 'config', 'get', DAEMON_PROC_NAME)
+    config_args = (str(SNABB_CMD), 'config', 'get', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME)
 
     def test_get_internal_iface(self):
         cmd_args = list(self.config_args)
@@ -65,8 +65,9 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_ietf_path(self):
         cmd_args = list(self.config_args)[:-1]
+        cmd_args[3] = '--schema=ietf-softwire'
         cmd_args.extend((
-            '--schema=ietf-softwire', DAEMON_PROC_NAME,
+            DAEMON_PROC_NAME,
             # Implicit string concatenation, do not add commas.
             '/softwire-config/binding/br/br-instances/'
             'br-instance[id=1]/binding-table/binding-entry'
@@ -86,7 +87,7 @@ class TestConfigMultiproc(BaseTestCase):
     daemon = None
     daemon_args = DAEMON_ARGS
     ps_args = (str(SNABB_CMD), 'ps')
-    config_args = (str(SNABB_CMD), 'config', 'XXX', DAEMON_PROC_NAME)
+    config_args = (str(SNABB_CMD), 'config', "--schema=snabb-softwire-v2", 'XXX', DAEMON_PROC_NAME)
 
     @classmethod
     def setUpClass(cls):
@@ -179,7 +180,7 @@ class TestConfigMultiproc(BaseTestCase):
           }
         }}"""
         config_add_cmd = list(self.config_args)
-        config_add_cmd[2] = 'add'
+        config_add_cmd[3] = 'add'
         config_add_cmd.extend((
             '/softwire-config/instance',
             device
@@ -204,7 +205,7 @@ class TestConfigMultiproc(BaseTestCase):
         # There should be an instance called "test" in the initial
         # config that's loaded. We'll try removing that.
         config_remove_cmd = list(self.config_args)
-        config_remove_cmd[2] = 'remove'
+        config_remove_cmd[3] = 'remove'
         config_remove_cmd.append('/softwire-config/instance[device=test]')
 
         # Remove it
@@ -223,9 +224,9 @@ class TestConfigMultiproc(BaseTestCase):
         pid = self.start_daemon(config)
 
         get_state_cmd = list(self.config_args)
-        get_state_cmd[2] = "get-state"
-        get_state_cmd.insert(3, "-f")
-        get_state_cmd.insert(4, "xpath")
+        get_state_cmd[3] = "get-state"
+        get_state_cmd.insert(4, "-f")
+        get_state_cmd.insert(5, "xpath")
         get_state_cmd.append("/")
 
         state = self.run_cmd(get_state_cmd).decode(ENC)
@@ -257,9 +258,9 @@ class TestConfigMultiproc(BaseTestCase):
         pid = self.start_daemon(config)
 
         get_state_cmd = list(self.config_args)
-        get_state_cmd[2] = "get-state"
-        get_state_cmd.insert(3, "-f")
-        get_state_cmd.insert(4, "xpath")
+        get_state_cmd[3] = "get-state"
+        get_state_cmd.insert(4, "-f")
+        get_state_cmd.insert(5, "xpath")
         get_state_cmd.append("/")
 
         state = self.run_cmd(get_state_cmd).decode(ENC)
@@ -326,8 +327,8 @@ class TestConfigMisc(BaseTestCase):
     daemon_args = DAEMON_ARGS
 
     def get_cmd_args(self, action):
-        cmd_args = list((str(SNABB_CMD), 'config', 'XXX', DAEMON_PROC_NAME))
-        cmd_args[2] = action
+        cmd_args = list((str(SNABB_CMD), 'config', '--schema=snabb-softwire-v2', 'XXX', DAEMON_PROC_NAME))
+        cmd_args[3] = action
         return cmd_args
 
     def test_add(self):

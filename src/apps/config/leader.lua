@@ -32,6 +32,7 @@ Leader = {
       initial_configuration = {required=true},
       schema_name = {required=true},
       worker_start_code = {required=true},
+      default_schema = {},
       cpuset = {default=cpuset.global_cpuset()},
       Hz = {default=100},
    }
@@ -56,6 +57,7 @@ function Leader:new (conf)
       ret.socket_file_name = instance_dir..'/'..ret.socket_file_name
    end
    ret.schema_name = conf.schema_name
+   ret.default_schema = conf.default_schema or conf.schema_name
    ret.support = support.load_schema_config_support(conf.schema_name)
    ret.socket = open_socket(ret.socket_file_name)
    ret.peers = {}
@@ -177,6 +179,7 @@ function Leader:rpc_describe (args)
       table.insert(alternate_schemas, schema_name)
    end
    return { native_schema = self.schema_name,
+	    default_schema = self.default_schema,
             alternate_schema = alternate_schemas,
             capability = schema.get_default_capabilities() }
 end

@@ -9,6 +9,10 @@ module snabb-config-leader-v1 {
   description
    "RPC interface for ConfigLeader Snabb app.";
 
+  revision 2017-09-28 {
+    description "Add default display schema for describe.";
+  }
+
   revision 2016-12-20 {
     description "Add basic error reporting.";
   }
@@ -26,6 +30,7 @@ module snabb-config-leader-v1 {
   rpc describe {
     output {
       leaf native-schema { type string; mandatory true; }
+      leaf default-schema { type string; mandatory true; }
       leaf-list alternate-schema { type string; }
       list capability {
         key module;
