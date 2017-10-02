@@ -88,7 +88,7 @@ function parse_command_line(args, opts)
    local descr = call_leader(ret.instance_id, 'describe', {})
    if not ret.schema_name then
       if opts.require_schema then err("missing --schema arg") end
-      ret.schema_name = descr.native_schema
+      ret.schema_name = descr.default_schema
    end
    require('lib.yang.schema').set_default_capabilities(descr.capability)
    if opts.with_config_file then

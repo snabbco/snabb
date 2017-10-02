@@ -727,5 +727,6 @@ function reconfigurable(scheduling, f, graph, conf)
    config.app(graph, 'leader', leader.Leader,
               { setup_fn = setup_fn, initial_configuration = conf,
                 worker_start_code = worker_code,
-                schema_name = 'snabb-softwire-v2'})
+                schema_name = 'snabb-softwire-v2',
+                default_schema = 'ietf-softwire'})
 end

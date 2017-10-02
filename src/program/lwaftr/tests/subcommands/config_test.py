@@ -32,7 +32,7 @@ class TestConfigGet(BaseTestCase):
     """
 
     daemon_args = DAEMON_ARGS
-    config_args = (str(SNABB_CMD), 'config', 'get', DAEMON_PROC_NAME)
+    config_args = (str(SNABB_CMD), 'config', 'get', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME)
 
     def test_get_internal_iface(self):
         cmd_args = list(self.config_args)
@@ -65,8 +65,9 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_ietf_path(self):
         cmd_args = list(self.config_args)[:-1]
+        cmd_args[3] = '--schema=ietf-softwire'
         cmd_args.extend((
-            '--schema=ietf-softwire', DAEMON_PROC_NAME,
+            DAEMON_PROC_NAME,
             # Implicit string concatenation, do not add commas.
             '/softwire-config/binding/br/br-instances/'
             'br-instance[id=1]/binding-table/binding-entry'
@@ -86,7 +87,7 @@ class TestConfigMultiproc(BaseTestCase):
     daemon = None
     daemon_args = DAEMON_ARGS
     ps_args = (str(SNABB_CMD), 'ps')
-    config_args = (str(SNABB_CMD), 'config', 'XXX', DAEMON_PROC_NAME)
+    config_args = (str(SNABB_CMD), 'config', 'XXX', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME)
 
     @classmethod
     def setUpClass(cls):
@@ -224,8 +225,8 @@ class TestConfigMultiproc(BaseTestCase):
 
         get_state_cmd = list(self.config_args)
         get_state_cmd[2] = "get-state"
-        get_state_cmd.insert(3, "-f")
-        get_state_cmd.insert(4, "xpath")
+        get_state_cmd.insert(4, "-f")
+        get_state_cmd.insert(5, "xpath")
         get_state_cmd.append("/")
 
         state = self.run_cmd(get_state_cmd).decode(ENC)
@@ -258,8 +259,8 @@ class TestConfigMultiproc(BaseTestCase):
 
         get_state_cmd = list(self.config_args)
         get_state_cmd[2] = "get-state"
-        get_state_cmd.insert(3, "-f")
-        get_state_cmd.insert(4, "xpath")
+        get_state_cmd.insert(4, "-f")
+        get_state_cmd.insert(5, "xpath")
         get_state_cmd.append("/")
 
         state = self.run_cmd(get_state_cmd).decode(ENC)
@@ -326,7 +327,7 @@ class TestConfigMisc(BaseTestCase):
     daemon_args = DAEMON_ARGS
 
     def get_cmd_args(self, action):
-        cmd_args = list((str(SNABB_CMD), 'config', 'XXX', DAEMON_PROC_NAME))
+        cmd_args = list((str(SNABB_CMD), 'config', 'XXX', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME))
         cmd_args[2] = action
         return cmd_args
 
@@ -429,8 +430,9 @@ class TestConfigMisc(BaseTestCase):
         # We actually need to look this up backwards, let's just check the
         # same IPv4 address as was used to set it above.
         get_args = self.get_cmd_args('get')[:-1]
+        get_args[3] = '--schema=ietf-softwire'
         get_args.extend((
-            '--schema=ietf-softwire', DAEMON_PROC_NAME,
+            DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
             '/softwire-config/binding/br/br-instances/'
             'br-instance[id=1]/binding-table/binding-entry'
@@ -443,8 +445,9 @@ class TestConfigMisc(BaseTestCase):
 
         # Check the portset: the IPv4 address alone is not unique.
         get_args = self.get_cmd_args('get')[:-1]
+        get_args[3] = '--schema=ietf-softwire'
         get_args.extend((
-            '--schema=ietf-softwire', DAEMON_PROC_NAME,
+            DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
             '/softwire-config/binding/br/br-instances/br-instance[id=1]/'
             'binding-table/binding-entry[binding-ipv6info=::1]/port-set/psid',
