@@ -1,5 +1,29 @@
 # Change Log
 
+## [2017.08.05]
+
+* Documented `snabb alarms` facility.  See:
+
+    https://github.com/Igalia/snabb/blob/lwaftr/src/program/alarms/README.md
+
+* Implement specific alarms for lwAFTR.  See:
+
+    https://github.com/Igalia/snabb/blob/lwaftr/src/program/lwaftr/doc/alarms.md
+
+* Fix a bug when using RSS on on-a-stick workers with VMDq.
+
+* Fix a bug when using ARP and NDP over RSS.
+
+* Fix a bug when ARP received unexpected replies.
+
+* Give `snabb-softwire-v2` the `snabb:softwire-v2` namespace instead of
+  `snabb:lwaftr`, to differentiate the namespace from the older
+  `snabb-softwire-v1` model.
+
+* Change default YANG model exposed by lwAFTR to `ietf-softwire`.  The
+  native `snabb-softwire-v2` model can of course be specified manually
+  via `-s snabb-softwire-v2`.
+
 ## [2017.08.04]
 
 * Enable RSS.  For full details, see:
