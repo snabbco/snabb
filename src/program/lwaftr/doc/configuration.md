@@ -381,25 +381,30 @@ device to which to send the packets.
 See [`snabb config`](../../config/README.md) for a general overview of
 run-time configuration query and update in Snabb.  By default, the
 lwAFTR is addressable using the
-[`snabb-softwire-v2`](../../../lib/yang/snabb-softwire-v2.yang) YANG
-schema.  For example to change the next-hop address of the external
-interface on lwaftr instance `lwaftr`'s queue `0` on device `83:00.0`,
-do:
+[`ietf-softwire`](../../../lib/yang/ietf-softwire.yang) YANG schema.
+The lwAFTR also has a "native" schema that exposes more configuration
+information,
+[`snabb-softwire-v2`](../../../lib/yang/snabb-softwire-v2.yang).  Pass
+the `-s` argument to the `snabb config` tools to specify a non-default
+YANG schema.
+
+As an example of `snabb config` usage, here is how to change the
+next-hop address of the external interface on lwaftr instance `lwaftr`'s
+queue `0` on device `83:00.0`:
 
 ```
-$ snabb config set lwaftr \
+$ snabb config set -s snabb-softwire-v2 lwaftr \
     /softwire-config/instance[device=83:00.0]/queue[id=0]/external-interface/next-hop/mac \
     02:02:02:02:02:02
 ```
 
-However it's worth a bit of reflection to describe how to add and remove
-instances at run-time.
+`snabb config` can also be used to add and remove instances at run-time.
 
 Firstly, we suggest getting a lwAFTR configuration working that runs on
 only one interface and one queue.  Once you have that working, do a
-`snabb config get lwaftr /softwire-config/instance` to get the
-`instance` configuration for the `lwaftr` instance.  You'll get
-something like this:
+`snabb config get -s snabb-softwire-v2 lwaftr /softwire-config/instance`
+to get the `instance` configuration for the `lwaftr` instance.  You'll
+get something like this:
 
 ```
 {
@@ -416,7 +421,8 @@ So to add another device, you can just paste that into a file, change the
 devices, and then do:
 
 ```
-$ snabb config add lwaftr /softwire-config/instance < my-instance.file.conf
+$ snabb config add -s snabb-softwire-v2 lwaftr \
+    /softwire-config/instance < my-instance.file.conf
 ```
 
 If all goes well, you should be able to get `/softwire-config/instance`
@@ -436,13 +442,15 @@ like you think they should be.
 To remove a queue, use `snabb config remove`:
 
 ```
-$ snabb config remove lwaftr /softwire-config/instance[device=XX:XX.X]/queue[id=ID]
+$ snabb config remove -s snabb-softwire-v2 lwaftr \
+    /softwire-config/instance[device=XX:XX.X]/queue[id=ID]
 ```
 
 Likewise you can remove instances this way:
 
 ```
-$ snabb config remove lwaftr /softwire-config/instance[device=XX:XX.X]
+$ snabb config remove -s snabb-softwire-v2 lwaftr \
+    /softwire-config/instance[device=XX:XX.X]
 ```
 
 Of course all of this also works via `snabb config listen`, for nice
