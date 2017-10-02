@@ -140,22 +140,26 @@ function lwaftr_app(c, conf)
 
    if gexternal_interface.ingress_filter then
       config.app(c, "ingress_filterv4", PcapFilter,
-                 { filter = gexternal_interface.ingress_filter })
+                 { filter = gexternal_interface.ingress_filter,
+                   alarm_type_qualifier='ingress-v4'})
       append(preprocessing_apps_v4, "ingress_filterv4")
    end
    if ginternal_interface.ingress_filter then
       config.app(c, "ingress_filterv6", PcapFilter,
-                 { filter = ginternal_interface.ingress_filter })
+                 { filter = ginternal_interface.ingress_filter,
+                   alarm_type_qualifier='ingress-v6'})
       append(preprocessing_apps_v6, "ingress_filterv6")
    end
    if gexternal_interface.egress_filter then
       config.app(c, "egress_filterv4", PcapFilter,
-                 { filter = gexternal_interface.egress_filter })
+                 { filter = gexternal_interface.egress_filter,
+                   alarm_type_qualifier='egress-v4'})
       prepend(postprocessing_apps_v4, "egress_filterv4")
    end
    if ginternal_interface.egress_filter then
       config.app(c, "egress_filterv6", PcapFilter,
-                 { filter = ginternal_interface.egress_filter })
+                 { filter = ginternal_interface.egress_filter,
+                   alarm_type_qualifier='egress-v6'})
       prepend(postprocessing_apps_v6, "egress_filterv6")
    end
 
