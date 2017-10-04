@@ -19,17 +19,20 @@ function run (parameters)
    local north_mac_config    = {src_eth = north_mac, dst_eth = north_next_hop_mac}
    local south_mac_config    = {src_eth = south_mac, dst_eth = south_next_hop_mac}
 
+   local south_rt_config    = {src_eth = south_mac}
+
    local c = config.new()
    config.app(c, "south_if",       intel.Intel, south_if_config)
    config.app(c, "north_if",       intel.Intel, north_if_config)
    config.app(c, "north_setmac",   ipv4_apps.ChangeMAC, north_mac_config)
    config.app(c, "south_setmac",   ipv4_apps.ChangeMAC, south_mac_config)
+   config.app(c, "south_rt",       ipv4_apps.RouteNorth, south_rt_config)
 
    config.link(c, "south_if.output         -> north_setmac.input")
    config.link(c, "north_setmac.output     -> north_if.input")
 
-   config.link(c, "north_if.output         -> south_setmac.input")
-   config.link(c, "south_setmac.output     -> south_if.input")
+   config.link(c, "north_if.output         -> south_rt.input")
+   config.link(c, "south_rt.output     -> south_if.input")
 
    engine.configure(c)
    logger:log ("Engine ready to start processing")
