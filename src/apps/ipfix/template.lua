@@ -81,6 +81,12 @@ local function make_ipfix_element_map(names)
          for i=1,8 do parser.consume_upto(",") end
          parser.consume_upto("\n")
          map[name] = { id = id, data_type = data_type }
+         local pen, id = id:match("(%d+):(%d+)")
+         if pen then
+            -- Private Enterprise Number
+            map[name].id = tonumber(bit.bor(id, 0x8000))
+            map[name].pen = pen
+         end
       end
    end
    return map
@@ -99,12 +105,15 @@ local function make_template_info(spec)
    local ctypes =
       { unsigned8 = 'uint8_t', unsigned16 = 'uint16_t',
         unsigned32 = 'uint32_t', unsigned64 = 'uint64_t',
+        string = 'uint8_t[?]', octetArray = 'uint8_t[?]',
         ipv4Address = 'uint8_t[4]', ipv6Address = 'uint8_t[16]',
         dateTimeMilliseconds = 'uint64_t' }
    local bswap = { uint16_t='htons', uint32_t='htonl', uint64_t='htonq' }
-   -- the contents of the template records we will send
-   -- there is an ID & length for each field
-   local length = 2 * (#spec.keys + #spec.values)
+   -- The contents of the template records we will send. There is an
+   -- ID & length (2 bytes each) for each field as well as possibly a
+   -- PEN (4 bytes).  We pre-allocate a buffer of the maximum possible
+   -- size.
+   local length = 4 * (#spec.keys + #spec.values)
    local buffer = ffi.new("uint16_t[?]", length)
 
    -- octets in a data record
@@ -112,31 +121,54 @@ local function make_template_info(spec)
    local swap_fn = {}
 
    local function process_fields(buffer, fields, struct_def, types, swap_tmpl)
-      for idx, name in ipairs(fields) do
+      local idx = 0
+      for _, name in ipairs(fields) do
+         local _name, size = name:match("(%w+)=(%d+)")
+         if _name then
+            name = _name
+         end
          local entry = ipfix_elements[name]
          local ctype = assert(ctypes[entry.data_type],
-                              'unimplemented: '..entry.data_type)
+                              name..': unimplemented data type '
+                                 ..entry.data_type)
+         if size then
+            size = tonumber(size)
+            assert(entry.data_type == 'string' or entry.data_type == 'octetArray',
+                   name..': length parameter given for fixed-length data type '
+                      ..entry.data_type)
+            ctype = ctype:gsub('%?', size)
+         else
+            assert(entry.data_type ~= 'string' and entry.data_type ~= 'octetArray',
+                   name..': length parameter required for data type '
+                      ..entry.data_type)
+         end
          data_len = data_len + ffi.sizeof(ctype)
-         buffer[2 * (idx - 1)]     = htons(entry.id)
-         buffer[2 * (idx - 1) + 1] = htons(ffi.sizeof(ctype))
+         buffer[idx]     = htons(entry.id)
+         buffer[idx + 1] = htons(ffi.sizeof(ctype))
+         idx = idx + 2
+         if entry.pen then
+            ffi.cast("uint32_t*", buffer + idx)[0] = htonl(entry.pen)
+            idx = idx + 2
+         end
          table.insert(struct_def, '$ '..name..';')
          table.insert(types, ffi.typeof(ctype))
          if bswap[ctype] then
             table.insert(swap_fn, swap_tmpl:format(name, bswap[ctype], name))
          end
       end
+      return idx
    end
 
    table.insert(swap_fn, 'return function(o)')
    local key_struct_def = { 'struct {' }
    local key_types = {}
-   process_fields(buffer, spec.keys, key_struct_def, key_types,
-                  'o.key.%s = %s(o.key.%s)')
+   local length = process_fields(buffer, spec.keys, key_struct_def, key_types,
+                                 'o.key.%s = %s(o.key.%s)')
    table.insert(key_struct_def, '} __attribute__((packed))')
    local value_struct_def = { 'struct {' }
    local value_types = {}
-   process_fields(buffer + #spec.keys * 2, spec.values, value_struct_def,
-                  value_types, 'o.value.%s = %s(o.value.%s)')
+   length = length + process_fields(buffer + length, spec.values, value_struct_def,
+                                    value_types, 'o.value.%s = %s(o.value.%s)')
    table.insert(value_struct_def, '} __attribute__((packed))')
    table.insert(swap_fn, 'end')
    local key_t = ffi.typeof(table.concat(key_struct_def, ' '),
