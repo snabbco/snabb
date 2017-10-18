@@ -457,29 +457,42 @@ function S.sched_setaffinity(pid, mask, len) -- note len last as rarely used
   return retbool(C.sched_setaffinity(pid or 0, len or s.cpu_set, mktype(t.cpu_set, mask)))
 end
 
-local function get_max_numnodes()
-  local name = "/proc/self/status"
-  local fd, err = S.open(name, c.O.RDONLY)
-  if not fd then return nil, err end
-  local content, err = S.read(fd, nil, 8192)
-  fd:close()
-  for line in content:gmatch("[^\n]+") do
-    if line:match("^Mems_allowed:") then
-      line = line:gsub("^Mems_allowed:%s+", "")
-      return math.floor(((#line+1)/9)*32)
-    end
-  end
+local function get_maxnumnodes()
+   local function filesize(fd)
+      local size = 0
+      local bufsz = 1024
+      local buf = ffi.new("uint8_t[?]", bufsz)
+      while true do
+         local len, err = S.read(fd, buf, bufsz)
+         size = size + len
+         if len ~= bufsz then break end
+      end
+      fd:seek(0, "set")
+      return size
+   end
+   local function read(filename)
+      local fd, errno = S.open(filename, 0)
+      if not fd then error(errno) end
+      local content, errno = S.read(fd, nil, filesize(fd))
+      if not content then error(errno) end
+      fd:close()
+      return content
+   end
+   local content = read("/proc/self/status")
+   for line in content:gmatch("[^\n]+") do
+     if line:match("^Mems_allowed:") then
+       line = line:gsub("^Mems_allowed:%s+", "")
+       return(math.floor(((#line+1)/9)*32))
+     end
+   end
 end
 
 function S.get_mempolicy(mode, mask, addr, flags)
   mode = mode or t.int1()
   mask = mktype(t.bitmask, mask)
-  local max_numnodes = get_max_numnodes()
-  -- Check mask.size is at least equals to the number of max_numnodes.
-  if mask.size < max_numnodes then
-    mask.size = max_numnodes
-  end
-  local ret, err = C.get_mempolicy(mode, mask.mask, mask.size, addr or 0, c.MPOL_FLAG[flags])
+  -- Size should be at least equals to maxnumnodes.
+  local size = ffi.cast("uint64_t", math.max(tonumber(mask.size), get_maxnumnodes()))
+  local ret, err = C.get_mempolicy(mode, mask.mask, size, addr or 0, c.MPOL_FLAG[flags])
   if ret == -1 then return nil, t.error(err or errno()) end
   return { mode=mode[0], mask=mask }
 end
