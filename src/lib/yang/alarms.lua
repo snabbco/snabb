@@ -578,14 +578,14 @@ function Alarm:check ()
    end
 end
 
-ExprAlarm = {}
+CallbackAlarm = {}
 
-function ExprAlarm.new (alarm, period, limit, expr)
+function CallbackAlarm.new (alarm, period, limit, expr)
    assert(type(expr) == 'function')
    return setmetatable({alarm=alarm, period=period, limit=limit, expr=expr},
-      {__index = setmetatable(ExprAlarm, {__index=Alarm})})
+      {__index = setmetatable(CallbackAlarm, {__index=Alarm})})
 end
-function ExprAlarm:get_value()
+function CallbackAlarm:get_value()
    return self.expr()
 end
 
