@@ -14,6 +14,7 @@ local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
 local metadata = require("apps.ipfix.packet_metadata")
 local strings  = require("apps.ipfix.strings")
+local dns      = require("apps.ipfix.dns")
 
 local ntohs  = lib.ntohs
 local htonl, htons = lib.htonl, lib.htons
@@ -416,6 +417,20 @@ local function HTTP_accumulate(self, dst, new, pkt)
    end
 end
 
+local function DNS_extract(self, pkt, timestamp, entry, extract_addr_fn)
+   local md = metadata_get(pkt)
+   extract_5_tuple(pkt, timestamp, entry, md, extract_addr_fn)
+   if md.length_delta == 0 and md.frag_offset == 0 then
+      local dns_hdr = md.l4 + 8
+      local msg_size = pkt.data + pkt.length - dns_hdr
+      dns.extract(dns_hdr, msg_size, entry)
+   end
+end
+
+local function DNS_accumulate(self, dst, new)
+   accumulate_generic(dst, new)
+end
+
 templates = {
    v4 = {
       id     = 256,
@@ -474,6 +489,35 @@ templates = {
          HTTP_accumulate(self, dst, new, pkt)
       end
    },
+   v4_DNS = {
+      id     = 258,
+      filter = "ip and udp port 53",
+      keys   = { "sourceIPv4Address",
+                 "destinationIPv4Address",
+                 "protocolIdentifier",
+                 "sourceTransportPort",
+                 "destinationTransportPort",
+                 "dnsFlagsCodes",
+                 "dnsQuestionCount",
+                 "dnsAnswerCount",
+                 "dnsQuestionName=64",
+                 "dnsQuestionType",
+                 "dnsQuestionClass",
+                 "dnsAnswerName=64",
+                 "dnsAnswerType",
+                 "dnsAnswerClass",
+                 "dnsAnswerTtl",
+                 "dnsAnswerRdata=64",
+                 "dnsAnswerRdataLen" },
+      values = { "flowStartMilliseconds",
+                 "flowEndMilliseconds",
+                 "packetDeltaCount",
+                 "octetDeltaCount" },
+      extract = function (self, pkt, timestamp, entry)
+         DNS_extract(self, pkt, timestamp, entry, extract_v4_addr)
+      end,
+      accumulate = DNS_accumulate
+   },
    v6 = {
       id     = 512,
       filter = "ip6",
@@ -530,6 +574,35 @@ templates = {
          accumulate_tcp_flags_reduced(dst, new)
          HTTP_accumulate(self, dst, new, pkt)
       end
+   },
+   v6_DNS = {
+      id     = 514,
+      filter = "ip6 and udp port 53",
+      keys   = { "sourceIPv6Address",
+                 "destinationIPv6Address",
+                 "protocolIdentifier",
+                 "sourceTransportPort",
+                 "destinationTransportPort",
+                 "dnsFlagsCodes",
+                 "dnsQuestionCount",
+                 "dnsAnswerCount",
+                 "dnsQuestionName=64",
+                 "dnsQuestionType",
+                 "dnsQuestionClass",
+                 "dnsAnswerName=64",
+                 "dnsAnswerType",
+                 "dnsAnswerClass",
+                 "dnsAnswerTtl",
+                 "dnsAnswerRdata=64",
+                 "dnsAnswerRdataLen" },
+      values = { "flowStartMilliseconds",
+                 "flowEndMilliseconds",
+                 "packetDeltaCount",
+                 "octetDeltaCount" },
+      extract = function (self, pkt, timestamp, entry)
+         DNS_extract(self, pkt, timestamp, entry, extract_v6_addr)
+      end,
+      accumulate = DNS_accumulate
    }
 }
 
