@@ -228,13 +228,13 @@ function FlowSet:record_flows(timestamp)
       local pkt = link.receive(self.incoming)
       counter.add(self.shm.packets_in)
       self.template:extract(pkt, timestamp, entry)
-      packet.free(pkt)
       local lookup_result = self.table:lookup_ptr(entry.key)
       if lookup_result == nil then
          self.table:add(entry.key, entry.value)
       else
-         self.template:accumulate(lookup_result, entry)
+         self.template:accumulate(lookup_result, entry, pkt)
       end
+      packet.free(pkt)
    end
 end
 
