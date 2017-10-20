@@ -428,6 +428,8 @@ function parse_intf(config)
          assert(not intf.subintfs[name], "Duplicate VID: "..vid)
          local subintf = {
             name = name,
+            -- The normalized name is used in app and link names
+            nname = normalize_name(name),
             description = vlan.description,
             vlan = true,
             phys_intf = intf,
@@ -587,7 +589,7 @@ function parse_config (main_config)
          -- For a p2p VPN, pass the name of the AC
          -- interface so the PW module can set up the
          -- proper service-specific MIB
-         pw:arg().interface = intf.name
+         pw:arg().interface = bridge_group.acs[1].name
       else
          local bridge =
             App:new('bridge_'..vpls_name,
