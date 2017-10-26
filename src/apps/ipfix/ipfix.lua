@@ -115,12 +115,23 @@ end
 FlowSet = {}
 
 function FlowSet:new (template, args)
+   assert(args.active_timeout > args.scan_time,
+          string.format("Template #%d: active timeout (%d) "
+                           .."must be larger than scan time (%d)",
+                        template.id, args.active_timeout,
+                        args.scan_time))
+   assert(args.idle_timeout > args.scan_time,
+          string.format("Template #%d: idle timeout (%d) "
+                           .."must be larger than scan time (%d)",
+                        template.id, args.idle_timeout,
+                        args.scan_time))
    local o = { template = template,
                flush_timer = (args.flush_timeout > 0 and
                                  lib.throttle(args.flush_timeout))
                   or function () return true end,
                idle_timeout = assert(args.idle_timeout),
                active_timeout = assert(args.active_timeout),
+               scan_time = args.scan_time,
                parent = assert(args.parent) }
 
    if     args.version == 9  then o.template_id = V9_TEMPLATE_ID
@@ -149,12 +160,16 @@ function FlowSet:new (template, args)
          template.logger:log("resize flow cache "..old_size..
                                 " -> "..table.size)
          require('jit').flush()
+         o.table_tb:rate(math.ceil(table.size / o.scan_time))
       end
    }
    if args.cache_size then
       params.initial_size = math.ceil(args.cache_size / 0.4)
    end
+   o.table_tb = lib.token_bucket_new()
    o.table = ctable.new(params)
+   o.table_tstamp = C.get_unix_time()
+   o.table_scan_time = 0
    o.scratch_entry = o.table.entry_type()
    o.expiry_cursor = 0
 
@@ -168,7 +183,8 @@ function FlowSet:new (template, args)
                                table_size = { counter, o.table.size },
                                table_byte_size = { counter, o.table.byte_size },
                                table_occupancy = { counter, o.table.occupancy },
-                               table_max_displacement = { counter, o.table.max_displacement } })
+                               table_max_displacement = { counter, o.table.max_displacement },
+                               table_scan_time = { counter, 0 } })
    return setmetatable(o, { __index = self })
 end
 
@@ -256,35 +272,38 @@ end
 -- Walk through flow set to see if flow records need to be expired.
 -- Collect expired records and export them to the collector.
 function FlowSet:expire_records(out, now)
-   -- For a breath time of 100us, we will get 1e4 calls to push() every
-   -- second.  We'd like to sweep through the flow table once every 10
-   -- seconds, so on each breath we process 1e-5th of the table.
    local cursor = self.expiry_cursor
-   local limit = cursor + math.ceil(self.table.size * 1e-5)
-   now = to_milliseconds(now)
+   now_ms = to_milliseconds(now)
    local active = to_milliseconds(self.active_timeout)
    local idle = to_milliseconds(self.idle_timeout)
-   while true do
+   for i = 1, self.table_tb:take_all() do
       local entry
-      cursor, entry = self.table:next_entry(cursor, limit)
-      if not entry then break end
-      if now - tonumber(entry.value.flowEndMilliseconds) > idle then
-         self:debug_flow(entry, "expire idle")
-         -- Relying on key and value being contiguous.
-         self:add_data_record(entry.key, out)
-         self.table:remove(entry.key)
-      elseif now - tonumber(entry.value.flowStartMilliseconds) > active then
-         self:debug_flow(entry, "expire active")
-         self:add_data_record(entry.key, out)
-         -- TODO: what should timers reset to?
-         entry.value.flowStartMilliseconds = now
-         entry.value.flowEndMilliseconds = now
-         entry.value.packetDeltaCount = 0
-         entry.value.octetDeltaCount = 0
-         cursor = cursor + 1
+      cursor, entry = self.table:next_entry(cursor, cursor + 1)
+      if entry then
+         if now_ms - tonumber(entry.value.flowEndMilliseconds) > idle then
+            self:debug_flow(entry, "expire idle")
+            -- Relying on key and value being contiguous.
+            self:add_data_record(entry.key, out)
+            self.table:remove_ptr(entry)
+         elseif now_ms - tonumber(entry.value.flowStartMilliseconds) > active then
+            self:debug_flow(entry, "expire active")
+            self:add_data_record(entry.key, out)
+            -- TODO: what should timers reset to?
+            entry.value.flowStartMilliseconds = now_ms
+            entry.value.flowEndMilliseconds = now_ms
+            entry.value.packetDeltaCount = 0
+            entry.value.octetDeltaCount = 0
+            cursor = cursor + 1
+         else
+            -- Flow still live.
+            cursor = cursor + 1
+         end
       else
-         -- Flow still live.
-         cursor = cursor + 1
+         -- Empty slot or end of table
+         if cursor == 0 then
+            self.table_scan_time = now - self.table_tstamp
+            self.table_tstamp = now
+         end
       end
    end
    self.expiry_cursor = cursor
@@ -297,6 +316,7 @@ function FlowSet:sync_stats()
    counter.set(self.shm.table_byte_size, self.table.byte_size)
    counter.set(self.shm.table_occupancy, self.table.occupancy)
    counter.set(self.shm.table_max_displacement, self.table.max_displacement)
+   counter.set(self.shm.table_scan_time, self.table_scan_time)
 end
 
 IPFIX = {}
@@ -305,6 +325,7 @@ local ipfix_config_params = {
    active_timeout = { default = 120 },
    flush_timeout = { default = 10 },
    cache_size = { default = 20000 },
+   scan_time = { default = 10 },
    -- RFC 5153 §6.2 recommends a 10-minute template refresh
    -- configurable from 1 minute to 1 day.
    template_refresh_interval = { default = 600 },
@@ -391,6 +412,7 @@ function IPFIX:new(config)
                            cache_size = config.cache_size,
                            idle_timeout = config.idle_timeout,
                            active_timeout = config.active_timeout,
+                           scan_time = config.scan_time,
                            flush_timeout = config.flush_timeout,
                            parent = o }
 

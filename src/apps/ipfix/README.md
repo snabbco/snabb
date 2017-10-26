@@ -46,6 +46,16 @@ of the flow cache.  The default is 10 seconds.
 *Optional*.  Initial size of flow tables, in terms of number of flows.
 The default is 20000.
 
+— Key **scan_time**
+
+*Optional*.  The flow cache for every configured template is scanned
+continously to check for entries eligible for export based on the
+**idle_timeout** and **active_timeout** parameters.  The **scan_time**
+determines the interval in seconds that a scan of the entire flow
+cache will take.  The implementation uses a token bucket mechanism by
+which access to the tables is distributed evenly over the time
+interval.  The default is 10 seconds.
+
 — Key **template_refresh_interval**
 
 *Optional*.  Period at which to send template records over UDP.  The
