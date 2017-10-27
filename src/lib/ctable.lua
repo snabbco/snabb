@@ -13,6 +13,7 @@ CTable = {}
 LookupStreamer = {}
 
 local HASH_MAX = 0xFFFFFFFF
+local MAX_MAX_DISPLACEMENT = 30
 local uint8_ptr_t = ffi.typeof('uint8_t*')
 local uint16_ptr_t = ffi.typeof('uint16_t*')
 local uint32_ptr_t = ffi.typeof('uint32_t*')
@@ -221,9 +222,17 @@ function CTable:resize(size)
    local old_size = self.size
    local old_max_displacement = self.max_displacement
 
-   -- Allocate double the requested number of entries to make sure there
-   -- is sufficient displacement if all hashes map to the last bucket.
-   self.entries, self.byte_size = calloc(self.entry_type, size * 2)
+   -- Theoretically, all hashes can map to the last bucket and
+   -- max_displacement could become as large as the table size. To be
+   -- safe, we should allocate twice as many entries as the size of
+   -- the table.  In practice, max_displacement is expected to always
+   -- be a small number.  We use a static cap for this value that
+   -- "should be enough for everyone".  This is not entirely safe,
+   -- since an overrung can occur before the check for the cap in
+   -- maybe_increase_max_displacement(). The factor 2 here reduces
+   -- that risk but does not eliminate it.
+   local alloc_size = math.min(size*2, size + 2 * MAX_MAX_DISPLACEMENT)
+   self.entries, self.byte_size = calloc(self.entry_type, alloc_size)
    self.size = size
    self.scale = self.size / HASH_MAX
    self.occupancy = 0
@@ -231,7 +240,7 @@ function CTable:resize(size)
    self.lookup_helper = self:make_lookup_helper()
    self.occupancy_hi = ceil(self.size * self.max_occupancy_rate)
    self.occupancy_lo = floor(self.size * self.min_occupancy_rate)
-   for i=0,self.size*2-1 do self.entries[i].hash = HASH_MAX end
+   for i=0,alloc_size-1 do self.entries[i].hash = HASH_MAX end
 
    if old_size ~= 0 then self:reseed_hash_function() end
 
@@ -305,6 +314,7 @@ end
 
 function CTable:maybe_increase_max_displacement(displacement)
    if displacement <= self.max_displacement then return end
+   assert(displacement <= MAX_MAX_DISPLACEMENT)
    self.max_displacement = displacement
    self.lookup_helper = self:make_lookup_helper()
 end
