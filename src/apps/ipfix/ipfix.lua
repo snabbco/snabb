@@ -154,6 +154,11 @@ function FlowSet:new (template, args)
       key_type = template.key_t,
       value_type = template.value_t,
       max_occupancy_rate = 0.4,
+      resize_callback = function(table, old_size)
+         template.logger:log("resize flow cache "..old_size..
+                                " -> "..table.size)
+         require('jit').flush()
+      end
    }
    if args.cache_size then
       params.initial_size = math.ceil(args.cache_size / 0.4)

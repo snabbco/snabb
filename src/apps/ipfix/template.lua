@@ -148,7 +148,8 @@ local function make_template_info(spec)
             record_t = record_t,
             record_ptr_t = ptr_to(record_t),
             swap_fn = gen_swap_fn(),
-            match = pf.compile_filter(spec.filter)
+            match = pf.compile_filter(spec.filter),
+            logger = lib.logger_new({ module = "IPFIX template #"..spec.id })
           }
 end
 
