@@ -77,6 +77,8 @@ function LPM4_248:build ()
       end
    end
    for e in self:entries() do
+      assert(bit.band(self.flag, e.key) == 0,
+             "Invalid value "..e.key.." for ip 0x"..bit.tohex(e.ip))
       add(e.ip, e.length, e.key)
    end
    print("Build 24_8 with " .. taboff-1 .. " tables")
