@@ -132,7 +132,8 @@ local optional_params = {
    hash_seed = false,
    initial_size = 8,
    max_occupancy_rate = 0.9,
-   min_occupancy_rate = 0.0
+   min_occupancy_rate = 0.0,
+   resize_callback = false
 }
 
 function new(params)
@@ -153,6 +154,7 @@ function new(params)
    ctab.occupancy = 0
    ctab.max_occupancy_rate = params.max_occupancy_rate
    ctab.min_occupancy_rate = params.min_occupancy_rate
+   ctab.resize_callback = params.resize_callback
    ctab = setmetatable(ctab, { __index = CTable })
    ctab:reseed_hash_function(params.hash_seed)
    ctab:resize(params.initial_size)
@@ -235,6 +237,9 @@ function CTable:resize(size)
       if old_entries[i].hash ~= HASH_MAX then
          self:add(old_entries[i].key, old_entries[i].value)
       end
+   end
+   if self.resize_callback then
+      self.resize_callback(self, old_size)
    end
 end
 
