@@ -126,7 +126,8 @@ function load_conf (file)
 end
 
 -- Store Lua representation of value in file.
-function store_conf (file, value)
+function print_object (value, stream)
+   stream = stream or io.stdout
    local indent = 0
    local function print_indent (stream)
       for i = 1, indent do stream:write(" ") end
@@ -159,10 +160,13 @@ function store_conf (file, value)
          stream:write(("%s"):format(value))
       end
    end
-   local stream = assert(io.open(file, "w"))
-   stream:write("return ")
    print_value(value, stream)
    stream:write("\n")
+end
+function store_conf (file, value)
+   local stream = assert(io.open(file, "w"))
+   stream:write("return ")
+   print_object(value, stream)
    stream:close()
 end
 
