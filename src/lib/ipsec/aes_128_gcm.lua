@@ -6,6 +6,8 @@ local header = require("lib.protocol.header")
 local lib = require("core.lib")
 local ntohl, htonl = lib.ntohl, lib.htonl
 
+-- Constant time memequal function, see consttime_memequal.c
+ffi.cdef("int consttime_memequal(const void *, const void *, size_t)")
 
 -- IV pseudo header
 
@@ -118,7 +120,7 @@ function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length
                               u8_ptr(self.iv:header_ptr()),
                               u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
                               self.auth_buf, self.AUTH_SIZE)
-   return C.memcmp(self.auth_buf, ciphertext + length, self.AUTH_SIZE) == 0
+   return C.consttime_memequal(self.auth_buf, ciphertext + length, self.AUTH_SIZE)
 end
 
 
