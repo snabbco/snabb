@@ -5,16 +5,29 @@ module(..., package.seeall)
 local now      = require("core.app").now
 local lib      = require("core.lib")
 local link     = require("core.link")
+local shm      = require("core.shm")
+local counter  = require("core.counter")
 local basic    = require("apps.basic.basic_apps")
 local arp      = require("apps.ipv4.arp")
 local ipfix    = require("apps.ipfix.ipfix")
 local pci      = require("lib.hardware.pci")
+local template = require("apps.ipfix.template")
 local ipv4     = require("lib.protocol.ipv4")
 local ethernet = require("lib.protocol.ethernet")
+local macaddress = require("lib.macaddress")
 local numa     = require("lib.numa")
+local S        = require("syscall")
 
 -- apps that can be used as an input or output for the exporter
 local in_apps, out_apps = {}, {}
+
+local function parse_spec (spec, delimiter)
+   local t = {}
+   for s in spec:split(delimiter or ':') do
+      table.insert(t, s)
+   end
+   return t
+end
 
 function in_apps.pcap (path)
    return { input = "input",
@@ -26,6 +39,12 @@ function out_apps.pcap (path)
    return { input = "input",
             output = "output" },
           { require("apps.pcap.pcap").PcapWriter, path }
+end
+
+function out_apps.tap_routed (device)
+   return { input = "input",
+            output = "output" },
+          { require("apps.tap.tap").Tap, { name = device } }
 end
 
 function in_apps.raw (device)
@@ -42,9 +61,16 @@ function in_apps.tap (device)
 end
 out_apps.tap = in_apps.tap
 
-function in_apps.pci (device)
+function in_apps.pci (spec)
+   local device, rxq = unpack(parse_spec(spec, '/'))
    local device_info = pci.device_info(device)
    local conf = { pciaddr = device }
+   if device_info.driver == 'apps.intel_mp.intel_mp' then
+      local rxq = (rxq and tonumber(rxq)) or 0
+      conf.rxq = rxq
+      conf.rxcounter = rxq
+      conf.ring_buffer_size = 32768
+   end
    return { input = device_info.rx, output = device_info.tx },
           { require(device_info.driver).driver, conf }
 end
@@ -52,21 +78,32 @@ out_apps.pci = in_apps.pci
 
 local long_opts = {
    help = "h",
+   jit = "j",
    duration = "D",
    port = "p",
    transport = 1,
    ["host-ip"] = "a",
    ["input-type"] = "i",
    ["output-type"] = "o",
+   ["mtu"] = 1,
    ["netflow-v9"] = 0,
    ["ipfix"] = 0,
    ["active-timeout"] = 1,
    ["idle-timeout"] = 1,
-   ["cpu"] = 1
+   ["observation-domain"] = 1,
+   ["template-refresh"] = 1,
+   ["flush-timeout"] = 1,
+   ["cache-size"] = 1,
+   ["scan-time"] = 1,
+   ["cpu"] = 1,
+   ["busy-wait"] = "b"
 }
 
 function run (args)
    local duration
+   local busywait = false
+   local traceprofiling = false
+   local jit_opts = {}
 
    local input_type, output_type = "pci", "pci"
 
@@ -74,9 +111,15 @@ function run (args)
    local host_ip = '10.0.0.1' -- Just to have a default.
    local collector_ip = '10.0.0.2' -- Likewise.
    local port = 4739
+   local mtu = 1514
 
-   local active_timeout, idle_timeout
+   local active_timeout, idle_timeout, flush_timeout, scan_time
+   local observation_domain, template_refresh_interval
+   local cache_size
    local ipfix_version = 10
+   local templates = {}
+
+   local pfx_to_as, vlan_to_ifindex, mac_to_as
 
    local cpu
 
@@ -109,6 +152,9 @@ function run (args)
       c = function (arg)
          collector_ip = arg
       end,
+      b = function (arg)
+         busywait = true
+      end,
       ["active-timeout"] = function (arg)
          active_timeout =
             assert(tonumber(arg), "expected number for active timeout")
@@ -117,37 +163,113 @@ function run (args)
          idle_timeout =
             assert(tonumber(arg), "expected number for idle timeout")
       end,
+      ["flush-timeout"] = function (arg)
+         flush_timeout =
+            assert(tonumber(arg), "expected number for flush timeout")
+      end,
+      ["scan-time"] = function (arg)
+         scan_time =
+            assert(tonumber(arg), "expected number for scan time")
+      end,
+      ["observation-domain"] = function (arg)
+         observation_domain =
+            assert(tonumber(arg), "expected number for observation domain")
+      end,
+      ["template-refresh"] = function (arg)
+         template_refresh_interval =
+            assert(tonumber(arg), "expected number for template refresh interval")
+      end,
+      ["cache-size"] = function (arg)
+         cache_size =
+            assert(tonumber(arg), "expected number for cache size")
+      end,
       ipfix = function (arg)
          ipfix_version = 10
       end,
       ["netflow-v9"] = function (arg)
          ipfix_version = 9
       end,
+      ["mtu"] = function (arg)
+         mtu = tonumber(arg)
+      end,
       -- TODO: not implemented
       ["transport"] = function (arg) end,
       ["cpu"] = function (arg)
          cpu = tonumber(arg)
+      end,
+      j = function (arg)
+         if arg:match("^v") then
+            local file = arg:match("^v=(.*)")
+            if file == '' then file = nil end
+            require("jit.v").start(file)
+         elseif arg:match("^p") then
+            local opts, file = arg:match("^p=([^,]*),?(.*)")
+            if file == '' then file = nil end
+            require("jit.p").start(opts, file)
+            profiling = true
+         elseif arg:match("^dump") then
+            local opts, file = arg:match("^dump=([^,]*),?(.*)")
+            if file == '' then file = nil end
+            require("jit.dump").on(opts, file)
+         elseif arg:match("^opt") then
+            local opt = arg:match("^opt=(.*)")
+            table.insert(jit_opts, opt)
+         elseif arg:match("^tprof") then
+            require("lib.traceprof.traceprof").start()
+            traceprofiling = true
+         end
       end
    }
 
-   args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:", long_opts)
-   if #args ~= 2 then
+   args = lib.dogetopt(args, opt, "hD:i:o:p:m:a:c:j:b", long_opts)
+   if #args < 2 then
       print(require("program.ipfix.probe.README_inc"))
       main.exit(1)
+   elseif #args == 2 then
+      table.insert(args, 'v4')
+      table.insert(args, 'v6')
    end
 
    local in_link, in_app   = in_apps[input_type](args[1])
    local out_link, out_app = out_apps[output_type](args[2])
 
+   for i = 3, #args do
+      local name, template_cache_size = unpack(parse_spec(args[i]))
+      local template_ref
+      if not pcall( function () template_ref = template[name] end) then
+         error("undefined template: "..name)
+      end
+      template_cache_size = template_cache_size or cache_size
+      print("Adding template "..name.." (id = "..template[name].id..
+               (template_cache_size and
+                   ", cache size "..template_cache_size or '')..")")
+      table.insert(templates, { template = template_ref,
+                                cache_size = template_cache_size })
+   end
+
    local arp_config    = { self_mac = host_mac and ethernet:pton(host_mac),
                            self_ip = ipv4:pton(host_ip),
                            next_ip = ipv4:pton(collector_ip) }
-   local ipfix_config    = { active_timeout = active_timeout,
-                             idle_timeout = idle_timeout,
-                             ipfix_version = ipfix_version,
-                             exporter_ip = host_ip,
-                             collector_ip = collector_ip,
-                             collector_port = port }
+   local function mk_ipfix_config()
+      return { active_timeout = active_timeout,
+               idle_timeout = idle_timeout,
+               flush_timeout = flush_timeout,
+               cache_size = cache_size,
+               scan_time = scan_time,
+               observation_domain = observation_domain,
+               template_refresh_interval = template_refresh_interval,
+               ipfix_version = ipfix_version,
+               exporter_ip = host_ip,
+               collector_ip = collector_ip,
+               collector_port = port,
+               mtu = mtu - 14,
+               templates = templates }
+   end
+   local ipfix_config = mk_ipfix_config()
+   if output_type == "tap_routed" then
+      tap_config = out_app[2]
+      tap_config.mtu = mtu
+   end
    local c = config.new()
 
    config.app(c, "in", unpack(in_app))
@@ -156,7 +278,7 @@ function run (args)
 
    -- use ARP for link-layer concerns unless the output is connected
    -- to a pcap writer
-   if output_type ~= "pcap" then
+   if output_type ~= "pcap" and output_type ~= "tap_routed" then
       config.app(c, "arp", arp.ARP, arp_config)
       config.app(c, "sink", basic.Sink)
 
@@ -171,12 +293,14 @@ function run (args)
    else
       config.link(c, "in." .. in_link.output .. " -> ipfix.input")
       config.link(c, "ipfix.output -> out." .. out_link.input)
+      config.app(c, "sink", basic.Sink)
+      config.link(c, "out." .. out_link.output .. " -> sink.input")
    end
 
    local done
-   if not duration then
+   if not duration and input_type == "pcap" then
       done = function ()
-         return engine.app_table.source.done
+         return engine.app_table['in'].done
       end
    end
 
@@ -184,8 +308,29 @@ function run (args)
    if cpu then numa.bind_to_cpu(cpu) end
 
    engine.configure(c)
-   engine.busywait = true
-   engine.main({ duration = duration, done = done })
+
+   if output_type == "tap_routed" then
+      local tap_config = out_app[2]
+      local name = tap_config.name
+      local tap_sysctl_base = "net/ipv4/conf/"..name
+      assert(S.sysctl(tap_sysctl_base.."/rp_filter", '0'))
+      assert(S.sysctl(tap_sysctl_base.."/accept_local", '1'))
+      assert(S.sysctl(tap_sysctl_base.."/forwarding", '1'))
+      local export_stats = engine.app_table.out.shm
+      local ipfix_config = mk_ipfix_config()
+      ipfix_config.exporter_eth_dst =
+         tostring(macaddress:new(counter.read(export_stats.macaddr)))
+      config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
+      engine.configure(c)
+   end
+   engine.busywait = busywait
+   if #jit_opts then
+      require("jit.opt").start(unpack(jit_opts))
+   end
+   engine.main({ duration = duration, done = done, measure_latency = false })
+   if traceprofiling then
+      require("lib.traceprof.traceprof").stop()
+   end
 
    local t2 = now()
    local stats = link.stats(engine.app_table.ipfix.input.input)

@@ -381,6 +381,35 @@ local ipfix_config_params = {
    templates = { default = { "v4", "v6" } }
 }
 
+local function setup_transport_header(self, config)
+   -- Prepare transport headers to prepend to each export packet
+   -- TODO: Support IPv6.
+   local eth_h = ether:new({ src = ether:pton(config.exporter_eth_src),
+                             dst = ether:pton(config.exporter_eth_dst),
+                             type = 0x0800 })
+   local ip_h  = ipv4:new({ src = ipv4:pton(config.exporter_ip),
+                            dst = ipv4:pton(config.collector_ip),
+                            protocol = 17,
+                            ttl = 64 })
+   local udp_h = udp:new({ src_port = math.random(49152, 65535),
+                           dst_port = config.collector_port })
+   local transport_headers = datagram:new(packet.allocate())
+   transport_headers:push(udp_h)
+   transport_headers:push(ip_h)
+   transport_headers:push(eth_h)
+   -- We need to update the IP and UDP headers after adding a payload.
+   -- The following re-locates ip_h and udp_h to point to the headers
+   -- in the template packet.
+   transport_headers:new(transport_headers:packet(), ether) -- Reset the parse stack
+   transport_headers:parse_n(3)
+   _, ip_h, udp_h = unpack(transport_headers:stack())
+   self.transport_headers = {
+      ip_h = ip_h,
+      udp_h = udp_h,
+      pkt = transport_headers:packet()
+   }
+end
+
 function IPFIX:new(config)
    config = lib.parse(config, ipfix_config_params)
    local o = { boot_time = engine.now(),
@@ -412,33 +441,7 @@ function IPFIX:new(config)
    o.header_ptr_t = ptr_to(o.header_t)
    o.header_size = ffi.sizeof(o.header_t)
 
-   -- Prepare transport headers to prepend to each export packet
-   -- TODO: Support IPv6.
-   local eth_h = ether:new({ src = ether:pton(config.exporter_eth_src),
-                             dst = ether:pton(config.exporter_eth_dst),
-                             type = 0x0800 })
-   local ip_h  = ipv4:new({ src = ipv4:pton(config.exporter_ip),
-                            dst = ipv4:pton(config.collector_ip),
-                            protocol = 17,
-                            ttl = 64,
-                            flags = 0x02 })
-   local udp_h = udp:new({ src_port = math.random(49152, 65535),
-                           dst_port = config.collector_port })
-   local transport_headers = datagram:new(packet.allocate())
-   transport_headers:push(udp_h)
-   transport_headers:push(ip_h)
-   transport_headers:push(eth_h)
-   -- We need to update the IP and UDP headers after adding a payload.
-   -- The following re-locates ip_h and udp_h to point to the headers
-   -- in the template packet.
-   transport_headers:new(transport_headers:packet(), ether) -- Reset the parse stack
-   transport_headers:parse_n(3)
-   _, ip_h, udp_h = unpack(transport_headers:stack())
-   o.transport_headers = {
-      ip_h = ip_h,
-      udp_h = udp_h,
-      pkt = transport_headers:packet()
-   }
+   setup_transport_header(o, config)
 
    -- FIXME: Assuming we export to IPv4 address.
    local l3_header_len = 20
@@ -462,6 +465,12 @@ function IPFIX:new(config)
 
    o.stats_timer = lib.throttle(5)
    return setmetatable(o, { __index = self })
+end
+
+function IPFIX:reconfig(config)
+   -- Only support reconfiguration of the transport header for now
+   config = lib.parse(config, ipfix_config_params)
+   setup_transport_header(self, config)
 end
 
 function IPFIX:send_template_records(out)
