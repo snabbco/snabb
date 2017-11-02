@@ -50,7 +50,8 @@ end
 
 local function open_counters (tree)
    local function open_counter (name)
-      return counter.open(tree.."/apps/lwaftr/"..name..".counter", 'readonly')
+      local path = tree.."/apps/lwaftr/"..name..".counter"
+      return shm.exists(path) and counter.open(path, 'readonly')
    end
    local function open_counter_list (t)
       local ret = {}
@@ -111,8 +112,9 @@ end
 local lwaftr_metrics_row = {51, 7, 7, 7, 7, 11}
 local function print_lwaftr_metrics (new_stats, last_stats, time_delta)
    local function delta(t, s, name)
-      assert(t[name] and s[name])
-      return tonumber(t[name] - s[name])
+      if t[name] and s[name] then
+         return tonumber(t[name] - s[name])
+      end
    end
    local function delta_v6 (t, s)
       local rx = delta(t, s, "in-ipv6-packets")
@@ -164,13 +166,17 @@ local function print_lwaftr_metrics (new_stats, last_stats, time_delta)
          if lwaftrspec == "nic" then
             local name = "ifInDiscards"
             local diff = delta(t, s, name)
-            print_row(metrics_row, { lwaftrspec .. " " .. name,
-               int_s(t[name]), int_s(diff)})
-         else
-            for name, id in pairs(counter_names(lwaftrspec)) do
-               local diff = delta(t, s, name)
+            if diff then
                print_row(metrics_row, { lwaftrspec .. " " .. name,
                   int_s(t[name]), int_s(diff)})
+            end
+         else
+            for _, name in ipairs(counter_names(lwaftrspec)) do
+               local diff = delta(t, s, name)
+               if diff then
+                  print_row(metrics_row, { lwaftrspec .. " " .. name,
+                     int_s(t[name]), int_s(diff)})
+               end
             end
          end
       end
