@@ -22,11 +22,10 @@ function import ()
    return l_match, l_capture, l_combine
 end
 
--- str, parser, [input_class] => result_value, was_successful, has_reached_eof
-function parse (str, parser, input_class)
-   input_class = input_class or input
-   local rest, value = parser(input_class:new(str))
-   return value, rest and true, #str == 0 or (rest and rest:empty())
+-- parse(str, parser) => result_value, was_successful, has_reached_eof
+function parse (str, parser)
+   local rest, value = parser(input.new(str))
+   return value, rest and true, #str == 0 or (rest and input.empty(rest))
 end
 
 
@@ -34,24 +33,24 @@ end
 
 input = {}
 
-function input:new (str)
-   return setmetatable({idx = 1, str = str}, {__index=input})
+function input.new (str)
+   return { idx = 1, str = str }
 end
 
-function input:empty ()
-   return self.idx > #self.str
+function input.empty (s)
+   return s.idx > #s.str
 end
 
-function input:first (n)
-   return self.str:sub(self.idx, self.idx + (n or 1) - 1)
+function input.first (s, n)
+   return s.str:sub(s.idx, s.idx + (n or 1) - 1)
 end
 
-function input:rest ()
-   return setmetatable({idx = self.idx + 1, str = self.str}, {__index=input})
+function input.rest (s)
+   return { idx = s.idx + 1, str = s.str }
 end
 
-function input:position ()
-   return self.idx
+function input.position (s)
+   return s.idx
 end
 
 
@@ -60,33 +59,33 @@ end
 capture, match, combine = {}, {}, {}
 
 function match.eof ()
-   return function (input)
-      if input:empty() then
-         return input
+   return function (s)
+      if input.empty(s) then
+         return s
       end
    end
 end
 
 function capture.element ()
-   return function (input)
-      if not input:empty() then
-         return input:rest(), input:first(), true
+   return function (s)
+      if not input.empty(s) then
+         return input.rest(s), input.first(s), true
       end
    end
 end
 
 function match.fail (handler)
-   return function (input)
+   return function (s)
       if handler then
-         handler(input:position())
+         handler(input.position(s))
       end
    end
 end
 
 function match.satisfies (test, parser)
    parser = parser or capture.element()
-   return function (input)
-      local rest, value = parser(input)
+   return function (s)
+      local rest, value = parser(s)
       if rest and test(value) then
          return rest
       end
@@ -94,58 +93,58 @@ function match.satisfies (test, parser)
 end
 
 function capture.subseq (parser)
-   return function (input)
-      local rest = parser(input)
+   return function (s)
+      local rest = parser(s)
       if rest then
-         local diff = rest:position() - input:position()
-         return rest, input:first(diff), true
+         local diff = input.position(rest) - input.position(s)
+         return rest, input.first(s, diff), true
       end
    end
 end
 
 function match.seq (...)
    local parsers = {...}
-   return function (input)
+   return function (s)
       for _, parser in ipairs(parsers) do
-         input = parser(input)
-         if not input then
+         s = parser(s)
+         if not s then
             return
          end
       end
-      return input
+      return s
    end
 end
 
 function capture.seq (...)
    local parsers = {...}
-   return function (input)
+   return function (s)
       local seq = {}
       for _, parser in ipairs(parsers) do
-         local rest, value = parser(input)
+         local rest, value = parser(s)
          if rest then
             table.insert(seq, value or false)
-            input = rest
+            s = rest
          else
             return
          end
       end
-      return input, seq, true
+      return s, seq, true
    end
 end
 
 function combine.any (parser)
-   return function (input)
+   return function (s)
       local seq = {}
       while true do
-         local rest, value, present = parser(input)
+         local rest, value, present = parser(s)
          if rest then
-            input = rest
+            s = rest
          else
             local value
             if #seq > 0 then
                value = seq
             end
-            return input, value, value ~= nil
+            return s, value, value ~= nil
          end
          if present then
             table.insert(seq, value or false)
@@ -156,9 +155,9 @@ end
 
 function combine._or (...)
    local parsers = {...}
-   return function (input)
+   return function (s)
       for _, parser in ipairs(parsers) do
-         local rest, value, present = parser(input)
+         local rest, value, present = parser(s)
          if rest then
             return rest, value, present
          end
@@ -168,10 +167,10 @@ end
 
 function combine._and (...)
    local parsers = {...}
-   return function (input)
+   return function (s)
       local rest, value, present
       for _, parser in ipairs(parsers) do
-         rest, value, present = parser(input)
+         rest, value, present = parser(s)
          if not rest then
             return
          end
@@ -182,16 +181,16 @@ end
 
 function combine.diff (parser, ...)
    local punion = combine._or(...)
-   return function (input)
-      if not punion(input) then
-         return parser(input)
+   return function (s)
+      if not punion(s) then
+         return parser(s)
       end
    end
 end
 
 function capture.transform (parser, transform)
-   return function (input)
-      local rest, value = parser(input)
+   return function (s)
+      local rest, value = parser(s)
       if rest then
          return rest, transform(value), true
       end
