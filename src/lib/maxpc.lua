@@ -31,22 +31,27 @@ end
 
 -- input protocol
 
+-- NB: its trivial to support *both* octet and UTF-8 input, see
+--  commit 085a5813473f1fa64502b480cc00122bef0fb32a
+
 input = {}
 
 function input.new (str)
-   return { idx = 1, str = str }
+   return { pos = 1, idx = 1, str = str }
 end
 
 function input.empty (s)
    return s.idx > #s.str
 end
 
-function input.first (s, n)
-   return s.str:sub(s.idx, s.idx + (n or 1) - 1)
+function input.first (s, n) n = n or 1
+   local to = utf8next(s.str, s.idx)
+   while n > 1 do n, to = n - 1, utf8next(s.str, to) end
+   return s.str:sub(s.idx, to - 1)
 end
 
 function input.rest (s)
-   return { idx = s.idx + 1, str = s.str }
+   return { pos = s.pos + 1, idx = utf8next(s.str, s.idx), str = s.str }
 end
 
 function input.position (s)
@@ -233,6 +238,46 @@ function capture.unpack (parser, f)
 end
 
 
+-- UTF-8 decoding (see http://nullprogram.com/blog/2017/10/06/)
+
+local bit = require("bit")
+local lshift, rshift, band, bor = bit.lshift, bit.rshift, bit.band, bit.bor
+
+function utf8length (str, idx) idx = idx or 1
+   local lengths = {
+      1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 3, 3, 4, 0
+   }
+   return lengths[rshift(str:byte(idx), 3) + 1]
+end
+
+function utf8next (str, idx) idx = idx or 1
+   return idx + math.max(utf8length(str, idx), 1) -- advance even on error
+end
+
+function codepoint (str, idx) idx = idx or 1
+   local length = utf8length(str, idx)
+   local point
+   if     length == 1 then point = str:byte(idx)
+   elseif length == 2 then point = bor(lshift(band(str:byte(idx), 0x1f), 6),
+                                       band(str:byte(idx+1), 0x3f))
+   elseif length == 3 then point = bor(lshift(band(str:byte(idx), 0x0f), 12),
+                                       lshift(band(str:byte(idx+1), 0x3f), 6),
+                                       band(str:byte(idx+2), 0x3f))
+   elseif length == 4 then point = bor(lshift(band(str:byte(idx), 0x07), 18),
+                                       lshift(band(str:byte(idx+1), 0x3f), 12),
+                                       lshift(band(str:byte(idx+2), 0x3f), 6),
+                                       band(str:byte(idx+3), 0x3f))
+   else
+      point = -1 -- invalid
+   end
+   if point >= 0xd800 and point <= 0xdfff then
+      point = -1 -- surrogate half
+   end
+   return point
+end
+
+
 -- tests
 
 function selftest ()
@@ -372,4 +417,8 @@ function selftest ()
                                    assert(b == "b")
                                 end
    ))
+
+   -- test UTF-8 input
+   local result, matched, eof = parse("λ", capture.element())
+   assert(result == "λ") assert(matched) assert(eof)
 end
