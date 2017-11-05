@@ -96,6 +96,7 @@ function with_restart (app, method)
    else
       status, result = true, method(app)
    end
+   jit.tracebarrier()
    return status, result
 end
 
