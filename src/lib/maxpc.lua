@@ -210,13 +210,8 @@ function combine.maybe (parser)
 end
 
 function match._not (parser)
-   local function constantly_nil ()
-      return nil
-   end
-   return combine.diff(
-      capture.transform(capture.element(), constantly_nil),
-      parser
-   )
+   local function constantly_true () return true end
+   return combine.diff(match.satisfies(constantly_true), parser)
 end
 
 function combine.some (parser)
@@ -394,6 +389,9 @@ function selftest ()
    local result, matched, eof =
       parse("f", capture.seq(match._not(match.eof()), match.eof()))
    assert(result) assert(matched) assert(eof)
+   local result, matched, eof =
+      parse("foo", combine.any(match._not(match.eof())))
+   assert(not result) assert(matched) assert(eof)
 
    -- capture.transform
    parse("foo", capture.transform(match.fail(), error))
