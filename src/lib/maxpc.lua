@@ -233,6 +233,43 @@ function capture.unpack (parser, f)
 end
 
 
+-- Digit parsing
+
+function match.digit (radix)
+   radix = radix or 10
+   local digits = "0123456789abcdefghijklmnopqrstuvwxyz"
+   assert(radix >= 2 and radix <= 36)
+   return match.satisfies(
+      function (s)
+         return digits:sub(1, radix):find(s:lower(), 1, true)
+      end
+   )
+end
+
+function capture.natural_number (radix)
+   return capture.transform(
+      capture.subseq(combine.some(match.digit(radix))),
+      function (s) return tonumber(s, radix) end
+   )
+end
+
+function capture.sign ()
+   local function is_sign (s) return s == "+" or s == "-" end
+   return combine._and(match.satisfies(is_sign), capture.element())
+end
+
+function capture.integer_number (radix)
+   return capture.unpack(
+      capture.seq(combine.maybe(capture.sign()),
+                  capture.natural_number(radix)),
+      function (sign, number)
+         if sign == "-" then number = -number end
+         return number
+      end
+   )
+end
+
+
 -- UTF-8 decoding (see http://nullprogram.com/blog/2017/10/06/)
 
 local bit = require("bit")
@@ -406,15 +443,30 @@ function selftest ()
                                     assert(c == "c")
                                  end
    ))
-   parse(":a:b", capture.unpack(capture.seq(match.equal("_"),
+   parse(":a:b", capture.unpack(capture.seq(match.equal(":"),
                                             capture.element(),
-                                            match.equal("_"),
+                                            match.equal(":"),
                                             capture.element()),
                                 function (_, a, _, b)
                                    assert(a == "a")
                                    assert(b == "b")
                                 end
    ))
+
+   local result, matched, eof = parse("f", match.digit(16))
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse("f423", capture.natural_number(16))
+   assert(result == 0xf423) assert(matched) assert(eof)
+   local result, matched, eof = parse("f423", capture.integer_number(16))
+   assert(result == 0xf423) assert(matched) assert(eof)
+   local result, matched, eof = parse("+f423", capture.integer_number(16))
+   assert(result == 0xf423) assert(matched) assert(eof)
+   local result, matched, eof = parse("-f423", capture.integer_number(16))
+   assert(result == -0xf423) assert(matched) assert(eof)
+   local result, matched, eof = parse("a1234", capture.integer_number())
+   assert(not result) assert(not matched) assert(not eof)
+   local result, matched, eof = parse("1234a", capture.integer_number())
+   assert(result == 1234) assert(matched) assert(not eof)
 
    -- test UTF-8 input
    local result, matched, eof = parse("λ", capture.element())
