@@ -817,7 +817,7 @@ function resolve(schema, features)
                   -- FIXME: Add additional "must" statements.
                   for _,k in ipairs({'config', 'description', 'reference',
                                      'presence', 'default', 'mandatory',
-                                     'min_elements', 'max-elements'}) do
+                                     'min_elements', 'max_elements'}) do
                      if refine[k] ~= nil then target[k] = refine[k] end
                   end
                end
