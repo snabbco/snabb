@@ -641,7 +641,7 @@ end
 -- Inline "typedef" into "type".
 -- Resolve if-feature, identity bases, and identityref bases.
 -- Warn on any "when", resolving them as being true.
--- Resolve all augment and refine nodes. (TODO)
+-- Resolve all augment nodes. (TODO)
 function resolve(schema, features)
    if features == nil then features = default_features end
    local function pop_prop(node, prop)
@@ -811,7 +811,17 @@ function resolve(schema, features)
                   assert(not node.body[k], 'duplicate identifier: '..k)
                   node.body[k] = v
                end
-               -- TODO: Handle refine and augment statements.
+               for _,refine in ipairs(v.refines) do
+                  local target = node.body[refine.node_id]
+                  assert(target, 'missing refine node: '..refine.node_id)
+                  -- FIXME: Add additional "must" statements.
+                  for _,k in ipairs({'config', 'description', 'reference',
+                                     'presence', 'default', 'mandatory',
+                                     'min_elements', 'max-elements'}) do
+                     if refine[k] ~= nil then target[k] = refine[k] end
+                  end
+               end
+               -- TODO: Handle augment statements.
             else
                assert(not node.body[k], 'duplicate identifier: '..k)
                node.body[k] = visit(v, env)
@@ -954,6 +964,9 @@ identity_is_instance_of = util.memoize(identity_is_instance_of)
 
 function selftest()
    print('selftest: lib.yang.schema')
+
+   set_default_capabilities(get_default_capabilities())
+
    local test_schema = [[module fruit {
       namespace "urn:testing:fruit";
       prefix "fruit";
@@ -1080,7 +1093,41 @@ function selftest()
 
    load_schema_by_name('ietf-yang-types')
    load_schema_by_name('ietf-softwire')
+
+   -- We could save and restore capabilities to avoid the persistent
+   -- side effect, but it would do no good:  the schemas would be
+   -- memoized when the features were present.  So just add to the
+   -- capabilities, for now, assuming tests are run independently from
+   -- programs.
+   local caps = get_default_capabilities()
+   local new_caps = {
+      ['ietf-softwire'] = {feature={'binding', 'br'}},
+      ['ietf-softwire-br'] = {feature={'binding'}}
+   }
+   for mod_name, mod_caps in pairs(new_caps) do
+      if not caps[mod_name] then caps[mod_name] = {feature={}} end
+      for _,feature in ipairs(mod_caps.feature) do
+         table.insert(caps[mod_name].feature, feature)
+      end
+   end
+   set_default_capabilities(caps)
+
+   load_schema_by_name('ietf-softwire')
+   load_schema_by_name('ietf-softwire-common')
+   load_schema_by_name('ietf-softwire-br')
    load_schema_by_name('snabb-softwire-v2')
+
+   local br = load_schema_by_name('ietf-softwire-br')
+   local binding = br.body['br-instances'].body['br-type'].body['binding']
+   assert(binding)
+   local bt = binding.body['binding'].body['br-instance'].body['binding-table']
+   assert(bt)
+   local ps = bt.body['binding-entry'].body['port-set']
+   assert(ps)
+   -- The binding-entry grouping is defined in ietf-softwire-common and
+   -- imported by ietf-softwire-br, but with a refinement that the
+   -- default is 0.  Test that the refinement was applied.
+   assert(ps.body['psid-offset'].default == "0")
 
    local inherit_config_schema = [[module config-inheritance {
       namespace cs;
