@@ -550,7 +550,7 @@ local function fmterr(err, info)
 end
 
 -- Dump trace states.
-local function dump_trace(what, tr, func, pc, otr, oex)
+local function dump_trace(what, tr, func, pc, otr, oex, penalty)
   if what == "stop" or (what == "abort" and dumpmode.a) then
     if dumpmode.i then dump_ir(tr, dumpmode.s, dumpmode.r and what == "stop")
     elseif dumpmode.s then dump_snap(tr) end
@@ -565,7 +565,15 @@ local function dump_trace(what, tr, func, pc, otr, oex)
   elseif what == "stop" or what == "abort" then
     out:write("---- TRACE ", tr, " ", what)
     if what == "abort" then
-      out:write(" ", fmtfunc(func, pc), " -- ", fmterr(otr, oex), "\n")
+      out:write(" ", fmtfunc(func, pc), " -- ", fmterr(otr, oex))
+      if penalty then
+        if penalty == 0 then
+          out:write(" -- ", 'blacklisting')
+        else
+          out:write(" -- ", 'penalty '..penalty)
+        end
+        out:write("\n")
+      end
     else
       local info = traceinfo(tr)
       local link, ltype = info.link, info.linktype
