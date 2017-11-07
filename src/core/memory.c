@@ -81,6 +81,10 @@ static void memory_sigsegv_handler(int sig, siginfo_t *si, void *unused)
   set_sigsegv_handler();
   return;
  punt:
+  // Log useful details
+  fprintf(stderr, "snabb[%d]: segfault at %p code %d\n",
+          getpid(), si->si_addr, si->si_code);
+  fflush(stderr);
   // Fall back to the default SEGV behavior by resending the signal
   // now that the handler is disabled.
   // See https://www.cons.org/cracauer/sigint.html
