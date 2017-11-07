@@ -172,7 +172,7 @@ end
 
 local ietf_br_instance_grammar
 local function get_ietf_br_instance_grammar()
-   if not ietf_02_br_instance_grammar then
+   if not ietf_br_instance_grammar then
       local schema = yang.load_schema_by_name('ietf-softwire-br')
       local grammar = data.config_grammar_from_schema(schema)
       grammar = assert(grammar.members['br-instances'])
