@@ -154,6 +154,7 @@ static const uint16_t recff_idmap[] = {
 0,
 0,
 0,
+0,
 0x2f00+(0),
 0x2f00+(1),
 0x3000+(MM_eq),
