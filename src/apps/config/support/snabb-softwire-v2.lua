@@ -172,13 +172,12 @@ end
 
 local ietf_br_instance_grammar
 local function get_ietf_br_instance_grammar()
-   if not ietf_br_instance_grammar then
-      local schema = yang.load_schema_by_name('ietf-softwire')
+   if not ietf_02_br_instance_grammar then
+      local schema = yang.load_schema_by_name('ietf-softwire-br')
       local grammar = data.config_grammar_from_schema(schema)
-      grammar = assert(grammar.members['softwire-config'])
-      grammar = assert(grammar.members['binding'])
-      grammar = assert(grammar.members['br'])
       grammar = assert(grammar.members['br-instances'])
+      grammar = assert(grammar.members['br-type'])
+      grammar = assert(grammar.choices['binding'].binding)
       grammar = assert(grammar.members['br-instance'])
       ietf_br_instance_grammar = grammar
    end
@@ -215,50 +214,6 @@ local function ietf_binding_table_from_native(bt)
    return ret
 end
 
-local ietf_02_br_instance_grammar
-local function get_ietf_02_br_instance_grammar()
-   if not ietf_02_br_instance_grammar then
-      local schema = yang.load_schema_by_name('ietf-softwire-br')
-      local grammar = data.config_grammar_from_schema(schema)
-      grammar = assert(grammar.members['br-instances'])
-      grammar = assert(grammar.members['br-type'])
-      grammar = assert(grammar.choices['binding'].binding)
-      grammar = assert(grammar.members['br-instance'])
-      ietf_02_br_instance_grammar = grammar
-   end
-   return ietf_02_br_instance_grammar
-end
-
-local ietf_02_softwire_grammar
-local function get_ietf_02_softwire_grammar()
-   if not ietf_02_softwire_grammar then
-      local grammar = get_ietf_02_br_instance_grammar()
-      grammar = assert(grammar.values['binding-table'])
-      grammar = assert(grammar.members['binding-entry'])
-      ietf_02_softwire_grammar = grammar
-   end
-   return ietf_02_softwire_grammar
-end
-
-local function ietf_02_binding_table_from_native(bt)
-   local ret, key_t = cltable_for_grammar(get_ietf_02_softwire_grammar())
-   local psid_key_t = data.typeof('struct { uint32_t ipv4; }')
-   for softwire in bt.softwire:iterate() do
-      local k = key_t({ binding_ipv6info = softwire.value.b4_ipv6 })
-      local v = {
-         binding_ipv4_addr = softwire.key.ipv4,
-         port_set = {
-            psid_offset = softwire.value.port_set.reserved_ports_bit_count,
-            psid_len = softwire.value.port_set.psid_length,
-            psid = softwire.key.psid
-         },
-         br_ipv6_addr = softwire.value.br_address,
-      }
-      ret[k] = v
-   end
-   return ret
-end
-
 local function schema_getter(schema_name, path)
    local schema = yang.load_schema_by_name(schema_name)
    local grammar = data.config_grammar_from_schema(schema)
@@ -267,10 +222,6 @@ end
 
 local function snabb_softwire_getter(path)
    return schema_getter('snabb-softwire-v2', path)
-end
-
-local function ietf_softwire_getter(path)
-   return schema_getter('ietf-softwire', path)
 end
 
 local function ietf_softwire_br_getter(path)
@@ -310,344 +261,6 @@ function ipv6_equals(a, b)
    return x[0] == y[0] and x[1] == y[1]
 end
 
-local function ietf_softwire_translator ()
-   local ret = {}
-   local instance_id_map = {}
-   local cached_config
-   local function instance_id_by_device(device)
-      local last
-      for id, pciaddr in ipairs(instance_id_map) do
-	 if pciaddr == device then return id end
-	 last = id
-      end
-      if last == nil then
-	 last = 1
-      else
-	 last = last + 1
-      end
-      instance_id_map[last] = device
-      return last
-   end
-   function ret.get_config(native_config)
-      if cached_config ~= nil then return cached_config end
-      local br_instance, br_instance_key_t =
-         cltable_for_grammar(get_ietf_br_instance_grammar())
-      for device, instance in pairs(native_config.softwire_config.instance) do
-	 br_instance[br_instance_key_t({id=instance_id_by_device(device)})] = {
-	    name = native_config.softwire_config.name,
-	    tunnel_payload_mtu = native_config.softwire_config.internal_interface.mtu,
-	    tunnel_path_mru = native_config.softwire_config.external_interface.mtu,
-	    -- FIXME: There's no equivalent of softwire-num-threshold in snabb-softwire-v1.
-	    softwire_num_threshold = 0xffffffff,
-	    binding_table = {
-	       binding_entry = ietf_binding_table_from_native(
-		  native_config.softwire_config.binding_table)
-	    }
-	 }
-      end
-      cached_config = {
-         softwire_config = {
-            binding = {
-               br = {
-                  br_instances = { br_instance = br_instance }
-               }
-            }
-         }
-      }
-      return cached_config
-   end
-   function ret.get_state(native_state)
-      -- Even though this is a different br-instance node, it is a
-      -- cltable with the same key type, so just re-use the key here.
-      local br_instance, br_instance_key_t =
-         cltable_for_grammar(get_ietf_br_instance_grammar())
-      br_instance[br_instance_key_t({id=1})] = {
-         -- FIXME!
-         sentPacket = 0,
-         sentByte = 0,
-         rcvdPacket = 0,
-         rcvdByte = 0,
-         droppedPacket = 0,
-         droppedByte = 0
-      }
-      return {
-         softwire_state = {
-            binding = {
-               br = {
-                  br_instances = { br_instance = br_instance }
-               }
-            }
-         }
-      }
-   end
-   local function sets_whole_table(path, count)
-      if #path > count then return false end
-      if #path == count then
-         for k,v in pairs(path[#path].query) do return false end
-      end
-      return true
-   end
-   function ret.set_config(native_config, path_str, arg)
-      path = path_mod.parse_path(path_str)
-      local br_instance_paths = {'softwire-config', 'binding', 'br',
-                                 'br-instances', 'br-instance'}
-      local bt_paths = {'binding-table', 'binding-entry'}
-
-      -- Can't actually set the instance itself.
-      if #path <= #br_instance_paths then
-         error("Unspported path: "..path_str)
-      end
-
-      -- Handle special br attributes (tunnel-payload-mtu, tunnel-path-mru, softwire-num-threshold).
-      if #path > #br_instance_paths then
-         if path[#path].name == 'tunnel-payload-mtu' then
-            return {{'set', {schema='snabb-softwire-v2',
-                     path="/softwire-config/internal-interface/mtu",
-                     config=tostring(arg)}}}
-         end
-         if path[#path].name == 'tunnel-path-mru' then
-            return {{'set', {schema='snabb-softwire-v2',
-                     path="/softwire-config/external-interface/mtu",
-                     config=tostring(arg)}}}
-         end
-         if path[#path].name == 'softwire-num-threshold' then
-            error('not yet implemented: softwire-num-threshold')
-         end
-         if path[#path].name == 'name' then
-            return {{'set', {schema='snabb-softwire-v2',
-               path="/softwire-config/name",
-               config=arg}}}
-         end
-         error('unrecognized leaf: '..path[#path].name)
-      end
-
-      -- Two kinds of updates: setting the whole binding table, or
-      -- updating one entry.
-      if sets_whole_table(path, #br_instance_paths + #bt_paths) then
-         -- Setting the whole binding table.
-         if sets_whole_table(path, #br_instance_paths) then
-            for i=#path+1,#br_instance_paths do
-               arg = arg[data.normalize_id(br_instance_paths[i])]
-            end
-            local instance
-            for k,v in cltable.pairs(arg) do
-               if instance then error('multiple instances in config') end
-               if k.id ~= 1 then error('instance id not 1: '..tostring(k.id)) end
-               instance = v
-            end
-            if not instance then error('no instances in config') end
-            arg = instance
-         end
-         for i=math.max(#path-#br_instance_paths,0)+1,#bt_paths do
-            arg = arg[data.normalize_id(bt_paths[i])]
-         end
-         local bt = native_binding_table_from_ietf(arg)
-         return {{'set', {schema='snabb-softwire-v2',
-                          path='/softwire-config/binding-table',
-                          config=serialize_binding_table(bt)}}}
-      else
-         -- An update to an existing entry.  First, get the existing entry.
-         local config = ret.get_config(native_config)
-         local entry_path = path_str
-         local entry_path_len = #br_instance_paths + #bt_paths
-         for i=entry_path_len+1, #path do
-            entry_path = dirname(entry_path)
-         end
-         local old = ietf_softwire_getter(entry_path)(config)
-         -- Now figure out what the new entry should look like.
-         local new
-         if #path == entry_path_len then
-            new = arg
-         else
-            new = {
-               port_set = {
-                  psid_offset = old.port_set.psid_offset,
-                  psid_len = old.port_set.psid_len,
-                  psid = old.port_set.psid
-               },
-               binding_ipv4_addr = old.binding_ipv4_addr,
-               br_ipv6_addr = old.br_ipv6_addr
-            }
-            if path[entry_path_len + 1].name == 'port-set' then
-               if #path == entry_path_len + 1 then
-                  new.port_set = arg
-               else
-                  local k = data.normalize_id(path[#path].name)
-                  new.port_set[k] = arg
-               end
-            elseif path[#path].name == 'binding-ipv4-addr' then
-               new.binding_ipv4_addr = arg
-            elseif path[#path].name == 'br-ipv6-addr' then
-               new.br_ipv6_addr = arg
-            else
-               error('bad path element: '..path[#path].name)
-            end
-         end
-         -- Apply changes.  Ensure  that the port-set
-         -- changes are compatible with the existing configuration.
-         local updates = {}
-         local softwire_path = '/softwire-config/binding-table/softwire'
-
-         -- Lets remove this softwire entry and add a new one.
-         local function q(ipv4, psid)
-            return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
-         end
-         local old_query = q(old.binding_ipv4_addr, old.port_set.psid)
-         -- FIXME: This remove will succeed but the add could fail if
-         -- there's already a softwire with this IPv4 and PSID.  We need
-         -- to add a check here that the IPv4/PSID is not present in the
-         -- binding table.
-         table.insert(updates,
-                      {'remove', {schema='snabb-softwire-v2',
-                                  path=softwire_path..old_query}})
-
-         local config_str = string.format([[{
-            ipv4 %s;
-            psid %s;
-            br-address %s;
-            b4-ipv6 %s;
-            port-set {
-               psid-length %s;
-               reserved-ports-bit-count %s;
-            }
-         }]], ipv4_ntop(new.binding_ipv4_addr), new.port_set.psid,
-              ipv6:ntop(new.br_ipv6_addr),
-              path[entry_path_len].query['binding-ipv6info'],
-              new.port_set.psid_len, new.port_set.psid_offset)
-         table.insert(updates,
-                      {'add', {schema='snabb-softwire-v2',
-                               path=softwire_path,
-                               config=config_str}})
-         return updates
-      end
-   end
-   function ret.add_config(native_config, path_str, data)
-      local binding_entry_path = {'softwire_config', 'binding', 'br',
-         'br_instances', 'br-instance', 'binding-table', 'binding-entry'}
-      local path = path_mod.parse_path(path_str)
-
-      if #path ~= #binding_entry_path then
-         error('unsupported path: '..path)
-      end
-      local config = ret.get_config(native_config)
-      local ietf_bt = ietf_softwire_getter(path_str)(config)
-      local old_bt = native_config.softwire_config.binding_table
-      local new_bt = native_binding_table_from_ietf(data)
-      local updates = {}
-      local softwire_path = '/softwire-config/binding-table/softwire'
-      local psid_map_path = '/softwire-config/binding-table/psid-map'
-      -- Add softwires.
-      local additions = {}
-      for entry in new_bt.softwire:iterate() do
-         local key, value = entry.key, entry.value
-         if old_bt.softwire:lookup_ptr(key) ~= nil then
-            error('softwire already present in table: '..
-                     inet_ntop(key.ipv4)..'/'..key.psid)
-         end
-         local config_str = string.format([[{
-            ipv4 %s;
-            psid %s;
-            br-address %s;
-            b4-ipv6 %s;
-            port-set {
-               psid-length %s;
-               reserved-ports-bit-count %s;
-            }
-         }]], ipv4_ntop(key.ipv4), key.psid,
-              ipv6:ntop(value.br_address),
-              ipv6:ntop(value.b4_ipv6),
-              value.port_set.psid_length,
-              value.port_set.reserved_ports_bit_count
-         )
-         table.insert(additions, config_str)
-      end
-      table.insert(updates,
-                   {'add', {schema='snabb-softwire-v2',
-                            path=softwire_path,
-                            config=table.concat(additions, '\n')}})
-      return updates
-   end
-   function ret.remove_config(native_config, path_str)
-      local path = path_mod.parse_path(path_str)
-      local ietf_binding_table_path = {'softwire_config', 'binding', 'br',
-         'br-instances', 'br-instance', 'binding-table'}
-      local ietf_instance_path = {'softwire_config', 'binding', 'br',
-         'br-instances', 'br-instance'}
-
-      if #path == #ietf_instance_path then
-         -- Remove appropriate instance
-         local ietf_instance_id = tonumber(assert(path[5].query).id)
-         local instance_path = "/softwire-config/instance"
-
-         -- If it's not been populated in instance_id_map this is meaningless
-         -- and dangerous as they have no mapping from snabb's "device".
-         local function q(device) return
-            string.format("[device=%s]", device)
-         end
-         local device = instance_id_map[ietf_instance_id]
-         if device then
-            return {{'remove', {schema='snabb-softwire-v2',
-                                path=instance_path..q(device)}}}
-         else
-            error(string.format(
-               "Could not find '%s' in ietf instance mapping", ietf_instance_id
-            ))
-         end
-      elseif #path == #ietf_binding_table_path then
-         local softwire_path = '/softwire-config/binding-table/softwire'
-         if path:sub(-1) ~= ']' then error('unsupported path: '..path_str) end
-         local config = ret.get_config(native_config)
-         local entry = ietf_softwire_getter(path_str)(config)
-         local function q(ipv4, psid)
-            return string.format('[ipv4=%s][psid=%s]', ipv4_ntop(ipv4), psid)
-         end
-         local query = q(entry.binding_ipv4_addr, entry.port_set.psid)
-         return {{'remove', {schema='snabb-softwire-v2',
-                             path=softwire_path..query}}}
-      else
-         return error('unsupported path: '..path_str)
-      end
-   end
-   function ret.pre_update(native_config, verb, path, data)
-      -- Given the notification that the native config is about to be
-      -- updated, make our cached config follow along if possible (and
-      -- if we have one).  Otherwise throw away our cached config; we'll
-      -- re-make it next time.
-      if cached_config == nil then return end
-      local br = cached_config.softwire_config.binding.br
-      if (verb == 'remove' and
-          path:match('^/softwire%-config/binding%-table/softwire')) then
-         -- Remove a softwire.
-         local value = snabb_softwire_getter(path)(native_config)
-         for _,instance in cltable.pairs(br.br_instances.br_instance) do
-            local grammar = get_ietf_softwire_grammar()
-            local key = path_mod.prepare_table_lookup(
-               grammar.keys, grammar.key_ctype, {['binding-ipv6info']='::'})
-            key.binding_ipv6info = value.b4_ipv6
-            assert(instance.binding_table.binding_entry[key] ~= nil)
-            instance.binding_table.binding_entry[key] = nil
-         end
-      elseif (verb == 'add' and
-              path == '/softwire-config/binding-table/softwire') then
-         local bt = native_config.softwire_config.binding_table
-         for k,v in cltable.pairs(
-            ietf_binding_table_from_native({softwire = data})) do
-            for _,instance in cltable.pairs(br.br_instances.br_instance) do
-               instance.binding_table.binding_entry[k] = v
-            end
-         end
-      elseif (verb == 'set' and path == "/softwire-config/name") then
-	 local br = cached_config.softwire_config.binding.br
-	 for _, instance in cltable.pairs(br.br_instances.br_instance) do
-	    instance.name = data
-	 end
-      else
-         cached_config = nil
-      end
-   end
-   return ret
-end
-
 local function ietf_softwire_br_translator ()
    local ret = {}
    local instance_id_map = {}
@@ -672,7 +285,7 @@ local function ietf_softwire_br_translator ()
       local int_err = int.error_rate_limiting
       local ext = native_config.softwire_config.external_interface
       local br_instance, br_instance_key_t =
-         cltable_for_grammar(get_ietf_02_br_instance_grammar())
+         cltable_for_grammar(get_ietf_br_instance_grammar())
       for device, instance in pairs(native_config.softwire_config.instance) do
 	 br_instance[br_instance_key_t({id=instance_id_by_device(device)})] = {
 	    name = native_config.softwire_config.name,
@@ -710,7 +323,7 @@ local function ietf_softwire_br_translator ()
       -- Even though this is a different br-instance node, it is a
       -- cltable with the same key type, so just re-use the key here.
       local br_instance, br_instance_key_t =
-         cltable_for_grammar(get_ietf_02_br_instance_grammar())
+         cltable_for_grammar(get_ietf_br_instance_grammar())
       for device, instance in pairs(native_state.softwire_config.instance) do
          local c = instance.softwire_state
 	 br_instance[br_instance_key_t({id=instance_id_by_device(device)})] = {
@@ -1090,7 +703,6 @@ function get_config_support()
       compute_state_reader = compute_state_reader,
       process_states = process_states,
       configuration_for_follower = configuration_for_follower,
-      translators = { ['ietf-softwire'] = ietf_softwire_translator (),
-                      ['ietf-softwire-br'] = ietf_softwire_br_translator () }
+      translators = { ['ietf-softwire-br'] = ietf_softwire_br_translator () }
    }
 end

@@ -1092,7 +1092,6 @@ function selftest()
    parse_schema(require('lib.yang.ietf_inet_types_yang'))
 
    load_schema_by_name('ietf-yang-types')
-   load_schema_by_name('ietf-softwire')
 
    -- We could save and restore capabilities to avoid the persistent
    -- side effect, but it would do no good:  the schemas would be
@@ -1100,10 +1099,7 @@ function selftest()
    -- capabilities, for now, assuming tests are run independently from
    -- programs.
    local caps = get_default_capabilities()
-   local new_caps = {
-      ['ietf-softwire'] = {feature={'binding', 'br'}},
-      ['ietf-softwire-br'] = {feature={'binding'}}
-   }
+   local new_caps = { ['ietf-softwire-br'] = {feature={'binding'}} }
    for mod_name, mod_caps in pairs(new_caps) do
       if not caps[mod_name] then caps[mod_name] = {feature={}} end
       for _,feature in ipairs(mod_caps.feature) do
@@ -1112,7 +1108,6 @@ function selftest()
    end
    set_default_capabilities(caps)
 
-   load_schema_by_name('ietf-softwire')
    load_schema_by_name('ietf-softwire-common')
    load_schema_by_name('ietf-softwire-br')
    load_schema_by_name('snabb-softwire-v2')

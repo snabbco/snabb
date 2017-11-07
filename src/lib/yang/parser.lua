@@ -431,7 +431,6 @@ function selftest()
    argument="hello/world"}})
    parse(require('lib.yang.ietf_inet_types_yang'))
    parse(require('lib.yang.ietf_yang_types_yang'))
-   parse(require('lib.yang.ietf_softwire_yang'))
    parse(require('lib.yang.ietf_softwire_common_yang'))
    parse(require('lib.yang.ietf_softwire_br_yang'))
 end

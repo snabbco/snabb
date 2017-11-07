@@ -56,7 +56,7 @@ snabb config SUBCOMMAND [-s SCHEMA-NAME] ID PATH [VALUE]
 impedance mismatch between NETCONF agents and Snabb applications.  The
 `-s SCHEMA-NAME` option allows the caller to indicate the YANG schema
 that they want to use, and for the purposes of the lwAFTR might be `-s
-ietf-softwire`.
+ietf-softwire-br`.
 
 `ID` identifies the particular Snabb instance to talk to, and can be a
 PID or a name.  Snabb supports the ability for an instance to acquire
