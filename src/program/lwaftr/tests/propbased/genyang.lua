@@ -6,10 +6,11 @@ module(..., package.seeall)
 local ffi    = require("ffi")
 local schema = require("lib.yang.schema")
 
-local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
+local capabilities = {['ietf-softwire']={feature={'binding', 'br'}},
+                      ['ietf-softwire-br']={feature={'binding'}},}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
-local schemas = { "ietf-softwire", "snabb-softwire-v1" }
+local schemas = { "ietf-softwire", "ietf-softwire-br", "snabb-softwire-v1" }
 
 -- toggles whether functions should intentionally generate invalid
 -- values for fuzzing purposes
