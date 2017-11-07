@@ -89,6 +89,11 @@ local function extract_grammar_node(grammar, name)
          return grammar.keys[name]
       end
    end
+   function handlers.choice ()
+      for case_name, case in pairs(grammar.choices) do
+         if case[name] ~= nil then return case[name] end
+      end
+   end
    return assert(assert(handlers[grammar.type], grammar.type)(), name)
 end
 
@@ -242,7 +247,19 @@ function resolver(grammar, path_string)
       end
    end
    local function compute_getter(grammar, name, query, getter)
-      local child_grammar = grammar.members[name]
+      local child_grammar
+      child_grammar = grammar.members[name]
+      if not child_grammar then
+         for member_name, member in pairs(grammar.members) do
+            if child_grammar then break end
+            if member.type == 'choice' then
+               for case_name, case in pairs(member.choices) do
+                  if child_grammar then break end
+                  if case[name] then child_grammar = case[name] end
+               end
+            end
+         end
+      end
       if not child_grammar then
          error("Struct has no field named '"..name.."'.")
       end
@@ -341,6 +358,10 @@ function selftest()
             key name;
             leaf name { type string; mandatory true; }
             leaf rating { type uint8 { range 0..10; } mandatory true; }
+            choice C {
+               case A { leaf AA { type string; } }
+               case B { leaf BB { type string; } }
+            }
          }
       }}]]
    local fruit_data_src = [[
@@ -348,6 +369,8 @@ function selftest()
          fruit { name "banana"; rating 10; }
          fruit { name "pear"; rating 2; }
          fruit { name "apple"; rating 6; }
+         fruit { name "kumquat"; rating 6; AA aa; }
+         fruit { name "tangerine"; rating 6; BB bb; }
       }
    ]]
 
@@ -360,6 +383,12 @@ function selftest()
 
    local getter = resolver(fruit_prod, "/bowl/fruit[name=apple]/rating")
    assert(getter(fruit_data) == 6)
+
+   local getter = resolver(fruit_prod, "/bowl/fruit[name=kumquat]/AA")
+   assert(getter(fruit_data) == 'aa')
+
+   local getter = resolver(fruit_prod, "/bowl/fruit[name=tangerine]/BB")
+   assert(getter(fruit_data) == 'bb')
 
    assert(normalize_path('') == '/')
    assert(normalize_path('//') == '/')
