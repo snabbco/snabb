@@ -564,6 +564,17 @@ function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
    return {}
 end
 
+function Leader:get_native_state ()
+   local states = {}
+   local state_reader = self.support.compute_state_reader(self.schema_name)
+   for _, follower in pairs(self.followers) do
+      local follower_config = self.support.configuration_for_follower(
+         follower, self.current_configuration)
+      table.insert(states, state_reader(follower.pid, follower_config))
+   end
+   return self.support.process_states(states)
+end
+
 function Leader:get_translator (schema_name)
    local translator = self.support.translators[schema_name]
    if translator then return translator end
@@ -591,8 +602,7 @@ function Leader:foreign_rpc_get_state (schema_name, path, format,
                                        print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
-   local native_state = state.read_state(self.schema_name, S.getpid())
-   local foreign_state = translate.get_state(native_state)
+   local foreign_state = translate.get_state(self:get_native_state())
    local printer = path_printer_for_schema_by_name(
       schema_name, path, false, format, print_default)
    local state = printer(foreign_state, yang.string_output_file())
@@ -682,18 +692,10 @@ function Leader:rpc_get_state (args)
          return self:foreign_rpc_get_state(args.schema, args.path,
                                            args.format, args.print_default)
       end
+      local state = self:get_native_state()
       local printer = path_printer_for_schema_by_name(
          self.schema_name, args.path, false, args.format, args.print_default)
-      local states = {}
-      local state_reader = self.support.compute_state_reader(self.schema_name)
-      for _, follower in pairs(self.followers) do
-         local follower_config = self.support.configuration_for_follower(
-            follower, self.current_configuration)
-         table.insert(states, state_reader(follower.pid, follower_config))
-      end
-      local state = printer(self.support.process_states(states),
-                            yang.string_output_file())
-      return { state = state }
+      return { state = printer(state, yang.string_output_file()) }
    end
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end
