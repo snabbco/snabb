@@ -99,6 +99,12 @@ LJLIB_CF(jit_status)
   return (int)(L->top - L->base);
 }
 
+/* Calling this forces a trace stitch. */
+LJLIB_CF(jit_tracebarrier)
+{
+  return 0;
+}
+
 LJLIB_PUSH(top-5) LJLIB_SET(os)
 LJLIB_PUSH(top-4) LJLIB_SET(arch)
 LJLIB_PUSH(top-3) LJLIB_SET(version_num)
