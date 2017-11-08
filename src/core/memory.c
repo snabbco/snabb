@@ -23,6 +23,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/ucontext.h>
 #include <unistd.h>
 
 // See memory.lua for pointer tagging scheme.
@@ -36,7 +37,7 @@ static char path_template[PATH_MAX];
 // the SIGSEGV handler.
 int memory_demand_mappings;
 
-static void memory_sigsegv_handler(int sig, siginfo_t *si, void *unused);
+static void memory_sigsegv_handler(int sig, siginfo_t *si, void *uc);
 
 // Install signal handler
 static void set_sigsegv_handler()
@@ -48,7 +49,7 @@ static void set_sigsegv_handler()
   assert(sigaction(SIGSEGV, &sa, NULL) != -1);
 }
 
-static void memory_sigsegv_handler(int sig, siginfo_t *si, void *unused)
+static void memory_sigsegv_handler(int sig, siginfo_t *si, void *uc)
 {
   int fd = -1;
   struct stat st;
@@ -81,9 +82,15 @@ static void memory_sigsegv_handler(int sig, siginfo_t *si, void *unused)
   set_sigsegv_handler();
   return;
  punt:
-  // Log useful details
-  fprintf(stderr, "snabb[%d]: segfault at %p code %d\n",
-          getpid(), si->si_addr, si->si_code);
+  // Log useful details, including instruction and stack pointers.
+  // See https://stackoverflow.com/a/7102867
+  fprintf(stderr, "snabb[%d]: segfault at %p ip %p sp %p code %d errno %d\n",
+          getpid(),
+          si->si_addr,
+          (void *)((ucontext_t *)uc)->uc_mcontext.gregs[REG_RIP],
+          (void *)((ucontext_t *)uc)->uc_mcontext.gregs[REG_RSP],
+          si->si_code,
+          si->si_errno);
   fflush(stderr);
   // Fall back to the default SEGV behavior by resending the signal
   // now that the handler is disabled.
