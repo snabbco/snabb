@@ -521,6 +521,13 @@ function token_bucket:take (n)
    return result
 end
 
+function token_bucket:take_all ()
+   local tokens = self:_update(self._tokens)
+   local result = math.floor(tokens)
+   self._tokens = tokens - result
+   return result
+end
+
 -- The can_take() method returns a true value if the bucket contains
 -- at least <n> tokens, false otherwise.  The bucket is updated in a
 -- layz fashion as described for the take() method.
