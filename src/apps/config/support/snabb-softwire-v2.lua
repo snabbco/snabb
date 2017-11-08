@@ -197,7 +197,6 @@ end
 
 local function ietf_binding_table_from_native(bt)
    local ret, key_t = cltable_for_grammar(get_ietf_softwire_grammar())
-   local psid_key_t = data.typeof('struct { uint32_t ipv4; }')
    for softwire in bt.softwire:iterate() do
       local k = key_t({ binding_ipv6info = softwire.value.b4_ipv6 })
       local v = {
@@ -365,7 +364,6 @@ local function ietf_softwire_br_translator ()
       end
       return true
    end
-   -- Re-start here tomorrow
    function ret.set_config(native_config, path_str, arg)
       path = path_mod.parse_path(path_str)
       local br_instance_paths = {'br-instances', 'binding', 'br-instance'}
