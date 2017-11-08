@@ -381,9 +381,9 @@ device to which to send the packets.
 See [`snabb config`](../../config/README.md) for a general overview of
 run-time configuration query and update in Snabb.  By default, the
 lwAFTR is addressable using the
-[`ietf-softwire`](../../../lib/yang/ietf-softwire.yang) YANG schema.
-The lwAFTR also has a "native" schema that exposes more configuration
-information,
+[`ietf-softwire-br`](../../../lib/yang/ietf-softwire-br.yang) YANG
+schema.  The lwAFTR also has a "native" schema that exposes more
+configuration information,
 [`snabb-softwire-v2`](../../../lib/yang/snabb-softwire-v2.yang).  Pass
 the `-s` argument to the `snabb config` tools to specify a non-default
 YANG schema.

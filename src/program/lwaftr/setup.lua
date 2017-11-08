@@ -36,7 +36,7 @@ local alarms     = require("lib.yang.alarms")
 local alarm_notification = false
 
 local capabilities = {
-   ['ietf-softwire']={feature={'binding', 'br'}},
+   ['ietf-softwire-br']={feature={'binding'}},
    ['ietf-alarms']={feature={'operator-actions', 'alarm-shelving', 'alarm-history'}},
 }
 require('lib.yang.schema').set_default_capabilities(capabilities)
@@ -728,5 +728,5 @@ function reconfigurable(scheduling, f, graph, conf)
               { setup_fn = setup_fn, initial_configuration = conf,
                 worker_start_code = worker_code,
                 schema_name = 'snabb-softwire-v2',
-                default_schema = 'ietf-softwire'})
+                default_schema = 'ietf-softwire-br'})
 end

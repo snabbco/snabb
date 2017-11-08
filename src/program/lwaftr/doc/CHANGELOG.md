@@ -1,5 +1,10 @@
 # Change Log
 
+## [2017.08.06]
+
+* Update IETF yang model from `ietf-softwire` to `ietf-softwire-br`.  The
+  lwAFTR no longer supports `ietf-softwire`.
+
 ## [2017.08.05]
 
 * Documented `snabb alarms` facility.  See:

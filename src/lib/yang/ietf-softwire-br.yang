@@ -246,26 +246,25 @@ module ietf-softwire-br {
               description
                 "traffic-stat";
               uses softwire-common:traffic-stat;
-            }
 
-            leaf hairpin-ipv4-bytes {
-              type yang:zero-based-counter64;
-              description "IPv4 packets locally routed between two CEs
-                (hairpinned).";
-            }
+              leaf hairpin-ipv4-bytes {
+                type yang:zero-based-counter64;
+                description "IPv4 packets locally routed between two CEs
+                  (hairpinned).";
+              }
 
-            leaf hairpin-ipv4-packets {
-              type yang:zero-based-counter64;
-              description "IPv4 bytes locally routed between two CEs
-                (hairpinned).";
-            }
+              leaf hairpin-ipv4-packets {
+                type yang:zero-based-counter64;
+                description "IPv4 bytes locally routed between two CEs
+                  (hairpinned).";
+              }
 
-            leaf active-softwire-num {
-              type uint32;
-              config false;
-              description
-                "The number of currently active softwires on the
-                lw4over6 (binding) instance.";
+              leaf active-softwire-num {
+                type uint32;
+                description
+                  "The number of currently active softwires on the
+                  lw4over6 (binding) instance.";
+              }
             }
           }
         }

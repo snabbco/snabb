@@ -65,11 +65,11 @@ class TestConfigGet(BaseTestCase):
 
     def test_get_ietf_path(self):
         cmd_args = list(self.config_args)[:-1]
-        cmd_args[3] = '--schema=ietf-softwire'
+        cmd_args[3] = '--schema=ietf-softwire-br'
         cmd_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, do not add commas.
-            '/softwire-config/binding/br/br-instances/'
+            '/br-instances/binding/'
             'br-instance[id=1]/binding-table/binding-entry'
             '[binding-ipv6info=127:22:33:44:55:66:77:128]/binding-ipv4-addr',
         ))
@@ -430,11 +430,11 @@ class TestConfigMisc(BaseTestCase):
         # We actually need to look this up backwards, let's just check the
         # same IPv4 address as was used to set it above.
         get_args = self.get_cmd_args('get')[:-1]
-        get_args[3] = '--schema=ietf-softwire'
+        get_args[3] = '--schema=ietf-softwire-br'
         get_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
-            '/softwire-config/binding/br/br-instances/'
+            '/br-instances/binding/'
             'br-instance[id=1]/binding-table/binding-entry'
             '[binding-ipv6info=::1]/binding-ipv4-addr',
         ))
@@ -445,11 +445,11 @@ class TestConfigMisc(BaseTestCase):
 
         # Check the portset: the IPv4 address alone is not unique.
         get_args = self.get_cmd_args('get')[:-1]
-        get_args[3] = '--schema=ietf-softwire'
+        get_args[3] = '--schema=ietf-softwire-br'
         get_args.extend((
             DAEMON_PROC_NAME,
             # Implicit string concatenation, no summing needed.
-            '/softwire-config/binding/br/br-instances/br-instance[id=1]/'
+            '/br-instances/binding/br-instance[id=1]/'
             'binding-table/binding-entry[binding-ipv6info=::1]/port-set/psid',
         ))
         output = self.run_cmd(get_args)
