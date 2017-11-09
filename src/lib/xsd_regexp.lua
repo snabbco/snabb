@@ -4,8 +4,8 @@ module(..., package.seeall)
 local maxpc = require("lib.maxpc")
 local match, capture, combine = maxpc.import()
 
--- Implementation of regular expressions as defined in Appendix G of "W3C XML
--- Schema Definition Language (XSD) 1.1 Part 2: Datatypes", see:
+-- ASCII only implementation of regular expressions as defined in Appendix G of
+-- "W3C XML Schema Definition Language (XSD) 1.1 Part 2: Datatypes", see:
 --
 --    https://www.w3.org/TR/xmlschema11-2/#regexs
 --
@@ -22,10 +22,7 @@ local match, capture, combine = maxpc.import()
 -- in the format defined by the specification referenced above, and compiles
 -- the denoted regular language to a MaxPC grammar.
 --
--- NYI: Block escapes and Unicode support for category escapes are not
--- implemented. Category escapes and complements only match codepoints in the
--- Basic Latin block (ASCII). Users of category escapes and complements need to
--- ensure their input is ASCII-only.
+-- NYI: Block escapes, Unicode handling.
 
 function compile (expr)
    local ast = parse(expr)
@@ -389,11 +386,10 @@ function compile_atom (atom)
       return member(s, " \t\n\r")
    end
    local function is_digit (s)
-      return GC.Nd(codepoint(s))
+      return GC.Nd(s:byte())
    end
    local function is_word (s)
-      s = codepoint(s)
-      return not (GC.P(s) or GC.Z(s) or GC.C(s))
+      return not (GC.P(s:byte()) or GC.Z(s:byte()) or GC.C(s:byte()))
    end
    if type(atom) == 'string' then return match.equal(atom)
    elseif atom.escape == "n" then return match.equal("\n")
@@ -461,15 +457,14 @@ end
 function compile_range (start, stop)
    start, stop = start:byte(), stop:byte()
    local function in_range (s)
-      s = s:byte()
-      return start <= s and s <= stop
+      return start <= s:byte() and s:byte() <= stop
    end
    return match.satisfies(in_range)
 end
 
 function compile_category (name)
    local predicate = assert(GC[name], "Invalid category: "..name)
-   return match.satisfies(function (s) return predicate(codepoint(s)) end)
+   return match.satisfies(function (s) return predicate(s:byte()) end)
 end
 
 
