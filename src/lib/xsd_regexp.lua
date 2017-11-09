@@ -3,7 +3,6 @@
 module(..., package.seeall)
 local maxpc = require("lib.maxpc")
 local match, capture, combine = maxpc.import()
-local codepoint = maxpc.codepoint
 
 -- Implementation of regular expressions as defined in Appendix G of "W3C XML
 -- Schema Definition Language (XSD) 1.1 Part 2: Datatypes", see:
@@ -460,9 +459,9 @@ function compile_group (group)
 end
 
 function compile_range (start, stop)
-   start, stop = codepoint(start), codepoint(stop)
+   start, stop = start:byte(), stop:byte()
    local function in_range (s)
-      s = codepoint(s)
+      s = s:byte()
       return start <= s and s <= stop
    end
    return match.satisfies(in_range)
