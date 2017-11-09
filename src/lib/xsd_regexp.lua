@@ -4,6 +4,7 @@ module(..., package.seeall)
 local maxpc = require("lib.maxpc")
 local match, capture, combine = maxpc.import()
 local codepoint = maxpc.codepoint
+local ucd = require("lib.ucd")
 
 -- Implementation of regular expressions (ASCII only) as defined in Appendix G
 -- of "W3C XML Schema Definition Language (XSD) 1.1 Part 2: Datatypes", see:
@@ -255,7 +256,7 @@ end
 
 function capture.charClassEsc ()
    return combine._or(
-      capture.MultiCharEsc() --, capture.catEsc(), capture.complEsc()
+      capture.MultiCharEsc(), capture.catEsc(), capture.complEsc()
    )
 end
 
@@ -272,7 +273,44 @@ function capture.SingleCharEsc ()
    )
 end
 
--- NYI: catEsc, complEsc
+function capture.catEsc ()
+   return capture.unpack(
+      capture.seq(match.equal("\\"), match.equal("p"), match.equal("{"),
+                  capture.charProp(),
+                  match.equal("}")),
+      function (_, _, _, charProp, _) return {property=charProp} end
+   )
+end
+
+function capture.complEsc ()
+   return capture.unpack(
+      capture.seq(match.equal("\\"), match.equal("P"), match.equal("{"),
+                  capture.charProp(),
+                  match.equal("}")),
+      function (_, _, _, charProp, _) return {complement=charProp} end
+   )
+end
+
+function capture.charProp ()
+   local function is_name (s)
+      return
+         ("-0123456789abcdefghijklmnopqrstiuvwxyzABCDEFGHIJKLMNOPQRSTIUVWXYZ")
+         :find(s, 1, true)
+   end
+   return combine._or(
+      capture.unpack(
+         capture.seq(
+            match.equal("I"), match.equal("s"),
+            capture.subseq(combine.some(match.satisfies(is_name)))
+         ),
+         function (_, _, block) return {block=block} end
+      ),
+      capture.transform(
+         capture.subseq(combine.some(match.satisfies(is_name))),
+         function (category) return {category=category} end
+      )
+   )
+end
 
 function capture.MultiCharEsc ()
    local function is_multiCharEsc (s)
@@ -400,6 +438,10 @@ function compile_atom (atom)
       return compile_class(atom.group, atom.subtract)
    elseif atom.range then
       return compile_range(unpack(atom.range))
+   elseif atom.property then
+      return match.satisfies(propertyPredicate(atom.property))
+   elseif atom.complement then
+      return match._not(match.satisfies(propertyPredicate(atom.complement)))
    elseif atom.branches then
       return compile_branches(atom.branches)
    else
@@ -442,6 +484,21 @@ function compile_range (start, stop)
       return start <= s and s <= stop
    end
    return match.satisfies(in_range)
+end
+
+function propertyPredicate (property)
+   local predicate
+   if property.category then
+      predicate = assert(ucd.category[property.category],
+                         "Invalid category: "..property.category)
+      predicate = function (c) return c <= 127 and predicate(c) end
+   elseif property.block then
+      predicate = assert(ucd.block[ucd.block_name(property.block)],
+                         "Invalid block: "..property.block)
+   else
+      error("Invalid property.")
+   end
+   return function (s) return predicate(codepoint(s)) end
 end
 
 
@@ -501,4 +558,10 @@ function selftest ()
    test {regexp="[abc-[ab]]{3}",
          accept={"ccc"},
          reject={"", "abc"}}
+
+   require("core.lib").print_object(parse("[\\p{L}]"))
+
+   test {regexp="[\\p{L}]",
+         accept={"A", "b", "y", "Z"},
+         reject={"0", "-", " "}}
 end
