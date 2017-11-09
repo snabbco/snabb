@@ -4,10 +4,9 @@ module(..., package.seeall)
 local maxpc = require("lib.maxpc")
 local match, capture, combine = maxpc.import()
 local codepoint = maxpc.codepoint
-local ucd = require("lib.ucd")
 
--- Implementation of regular expressions (ASCII only) as defined in Appendix G
--- of "W3C XML Schema Definition Language (XSD) 1.1 Part 2: Datatypes", see:
+-- Implementation of regular expressions as defined in Appendix G of "W3C XML
+-- Schema Definition Language (XSD) 1.1 Part 2: Datatypes", see:
 --
 --    https://www.w3.org/TR/xmlschema11-2/#regexs
 --
@@ -24,8 +23,10 @@ local ucd = require("lib.ucd")
 -- in the format defined by the specification referenced above, and compiles
 -- the denoted regular language to a MaxPC grammar.
 --
--- NYI: any Unicode support (i.e. currently a character is a single byte and no
--- category escapes are implemented)
+-- NYI: Block escapes and Unicode support for category escapes are not
+-- implemented. Category escapes and complements only match codepoints in the
+-- Basic Latin block (ASCII). Users of category escapes and complements need to
+-- ensure their input is ASCII-only.
 
 function compile (expr)
    local ast = parse(expr)
@@ -97,11 +98,7 @@ function capture.quantifier ()
 end
 
 function match.digit (s)
-   return match.satisfies(
-      function (s)
-         return ("0123456789"):find(s, 1, true)
-      end
-   )
+   return match.satisfies(function (s) return member(s, "0123456789") end)
 end
 
 function capture.quantity ()
@@ -154,11 +151,7 @@ function capture.subExp ()
 end
 
 function match.MetaChar ()
-   return match.satisfies(
-      function (s)
-         return (".\\?*+{}()|[]"):find(s, 1, true)
-      end
-   )
+   return match.satisfies(function (s) return member(s, ".\\?*+{}()|[]") end)
 end
 
 function match.NormalChar (s)
@@ -245,7 +238,7 @@ end
 
 function capture.singleCharNoEsc ()
    local function is_singleCharNoEsc (s)
-      return not ("[]"):find(s, 1, true)
+      return not member(s, "[]")
    end
    return combine.diff(
       capture.subseq(match.satisfies(is_singleCharNoEsc)),
@@ -262,7 +255,7 @@ end
 
 function capture.SingleCharEsc ()
    local function is_SingleCharEsc (s)
-      return ("nrt\\|.?*+(){}-[]^"):find(s, 1, true)
+      return member(s, "nrt\\|.?*+(){}-[]^")
    end
    return capture.unpack(
       capture.seq(
@@ -292,29 +285,14 @@ function capture.complEsc ()
 end
 
 function capture.charProp ()
-   local function is_name (s)
-      return
-         ("-0123456789abcdefghijklmnopqrstiuvwxyzABCDEFGHIJKLMNOPQRSTIUVWXYZ")
-         :find(s, 1, true)
-   end
-   return combine._or(
-      capture.unpack(
-         capture.seq(
-            match.equal("I"), match.equal("s"),
-            capture.subseq(combine.some(match.satisfies(is_name)))
-         ),
-         function (_, _, block) return {block=block} end
-      ),
-      capture.transform(
-         capture.subseq(combine.some(match.satisfies(is_name))),
-         function (category) return {category=category} end
-      )
-   )
+   local nameChars = "-0123456789abcdefghijklmnopqrstiuvwxyzABCDEFGHIJKLMNOPQRSTIUVWXYZ"
+   local function is_name (s) return member(s, nameChars) end
+   return capture.subseq(combine.some(match.satisfies(is_name)))
 end
 
 function capture.MultiCharEsc ()
    local function is_multiCharEsc (s)
-      return ("sSiIcCdDwW"):find(s, 1, true)
+      return member(s, "sSiIcCdDwW")
    end
    return capture.unpack(
       capture.seq(
@@ -406,14 +384,22 @@ end
 
 function compile_atom (atom)
    -- NYI: \i, \I, \c, \C
-   local function memberTest (set)
-      return function (s) return set:find(s, 1, true) end
+   local function is_special_escape (s)
+      return member(s, "\\|.-^?*+{}()[]")
    end
-   local is_special_escape = memberTest("\\|.-^?*+{}()[]")
-   local match_wildcard = function (x) return not memberTest("\n\r") end
-   local is_space = memberTest(" \t\n\r")
-   local is_digit = memberTest("0123456789")
-   local is_word = memberTest("0123456789abcdefghijklmnopqrstiuvwxyzABCDEFGHIJKLMNOPQRSTIUVWXYZ")
+   local function match_wildcard (s)
+      return not member(s, "\n\r")
+   end
+   local function is_space (s)
+      return member(s, " \t\n\r")
+   end
+   local function is_digit (s)
+      return GC.Nd(codepoint(s))
+   end
+   local function is_word (s)
+      s = codepoint(s)
+      return not (GC.P(s) or GC.Z(s) or GC.C(s))
+   end
    if type(atom) == 'string' then return match.equal(atom)
    elseif atom.escape == "n" then return match.equal("\n")
    elseif atom.escape == "r" then return match.equal("\r")
@@ -439,9 +425,9 @@ function compile_atom (atom)
    elseif atom.range then
       return compile_range(unpack(atom.range))
    elseif atom.property then
-      return match.satisfies(propertyPredicate(atom.property))
+      return compile_category(atom.property)
    elseif atom.complement then
-      return match._not(match.satisfies(propertyPredicate(atom.complement)))
+      return match._not(compile_category(atom.complement))
    elseif atom.branches then
       return compile_branches(atom.branches)
    else
@@ -486,19 +472,74 @@ function compile_range (start, stop)
    return match.satisfies(in_range)
 end
 
-function propertyPredicate (property)
-   local predicate
-   if property.category then
-      predicate = assert(ucd.category[property.category],
-                         "Invalid category: "..property.category)
-      predicate = function (c) return c <= 127 and predicate(c) end
-   elseif property.block then
-      predicate = assert(ucd.block[ucd.block_name(property.block)],
-                         "Invalid block: "..property.block)
-   else
-      error("Invalid property.")
-   end
-   return function (s) return predicate(codepoint(s)) end
+function compile_category (name)
+   local predicate = assert(GC[name], "Invalid category: "..name)
+   return match.satisfies(function (s) return predicate(codepoint(s)) end)
+end
+
+
+-- General category predicates for ASCII
+
+local function empty_category (c) return false end
+
+GC = {}
+GC.Lu = function (c) return 65 <= c and c <= 90 end
+GC.Ll = function (c) return 97 <= c and c <= 122 end
+GC.Lt = empty_category
+GC.Lm = empty_category
+GC.Lo = empty_category
+GC.L  = function (c) return GC.Lu(c) or GC.Ll(c) end
+GC.Mn = empty_category
+GC.Mc = empty_category
+GC.Me = empty_category
+GC.M  = empty_category
+GC.Nd = function (c) return 48 <= c and c <= 57 end
+GC.Nl = empty_category
+GC.No = empty_category
+GC.N  = GC.Nd
+GC.Pc = function (c) return c == 95 end
+GC.Pd = function (c) return c == 45 end
+GC.Ps = function (c) return c == 40 or c == 91 or c == 123 end
+GC.Pe = function (c) return c == 41 or c == 93 or c == 125 end
+GC.Pi = empty_category
+GC.Pf = empty_category
+GC.Po = function (c) return (33 <= c and c <= 35)
+                         or (37 <= c and c <= 39)
+                         or c == 42
+                         or c == 44
+                         or (46 <= c and c <= 47)
+                         or (58 <= c and c <= 59)
+                         or (63 <= c and c <= 64)
+                         or c == 92 end
+GC.P  = function (c) return GC.Pc(c)
+                         or GC.Pd(c)
+                         or GC.Ps(c)
+                         or GC.Pe(c)
+                         or GC.Po(c) end
+GC.Sm = function (c) return c == 43
+                         or (60 <= c and c <= 62)
+                         or c == 124
+                         or c == 126 end
+GC.Sc = function (c) return c == 36 end
+GC.Sk = function (c) return c == 94 or c == 96 end
+GC.So = empty_category
+GC.S  = function (c) return GC.Sm(c) or GC.Sc(c) end
+GC.Zs = function (c) return c == 32 end
+GC.Zl = empty_category
+GC.Zp = empty_category
+GC.Z  = GC.Zs
+GC.Cc = function (c) return 0 <= c and c <= 31 end
+GC.Cf = empty_category
+GC.Cs = empty_category
+GC.Co = empty_category
+GC.Cn = empty_category
+GC.C  = GC.Cc
+
+
+-- Utilities
+
+function member (element, set)
+   return set:find(element, 1, true)
 end
 
 
@@ -559,9 +600,15 @@ function selftest ()
          accept={"ccc"},
          reject={"", "abc"}}
 
-   require("core.lib").print_object(parse("[\\p{L}]"))
-
    test {regexp="[\\p{L}]",
          accept={"A", "b", "y", "Z"},
          reject={"0", "-", " "}}
+
+   test {regexp="[\\P{L}]",
+         accept={"0", "-", " "},
+         reject={"A", "b", "y", "Z"}}
+
+   test {regexp="\\P{Ps}",
+         accept={"}", "]", ")", "A", "b", "y", "Z", "0", "-", " "},
+         reject={"(", "[", "{"}}
 end
