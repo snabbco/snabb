@@ -375,7 +375,6 @@ function compile_quantifier (quantifier)
 end
 
 function compile_atom (atom)
-   -- NYI: \i, \I, \c, \C
    local function is_special_escape (s)
       return member(s, "\\|.-^?*+{}()[]")
    end
@@ -384,6 +383,12 @@ function compile_atom (atom)
    end
    local function is_space (s)
       return member(s, " \t\n\r")
+   end
+   local function is_NameStartChar (s)
+      return GC.L(s:byte()) or member(s, ":_")
+   end
+   local function is_NameChar (s)
+      return is_NameStartChar(s) or GC.Nd(s:byte()) or member(s, "-.")
    end
    local function is_digit (s)
       return GC.Nd(s:byte())
@@ -403,6 +408,14 @@ function compile_atom (atom)
       return match.satisfies(is_space)
    elseif atom.escape == "S" then
       return match._not(match.satisfies(is_space))
+   elseif atom.escape == "i" then
+      return match.satisfies(is_NameStartChar)
+   elseif atom.escape == "I" then
+      return match._not(match.satisfies(is_NameStartChar))
+   elseif atom.escape == "c" then
+      return match.satisfies(is_NameChar)
+   elseif atom.escape == "C" then
+      return match._not(match.satisfies(is_NameChar))
    elseif atom.escape == "d" then
       return match.satisfies(is_digit)
    elseif atom.escape == "D" then
@@ -601,4 +614,20 @@ function selftest ()
    test {regexp="\\P{Ps}",
          accept={"}", "]", ")", "A", "b", "y", "Z", "0", "-", " "},
          reject={"(", "[", "{"}}
+
+   test {regexp="\\P{Ps}",
+         accept={"}", "]", ")", "A", "b", "y", "Z", "0", "-", " "},
+         reject={"(", "[", "{"}}
+
+   test {regexp="\\w",
+         accept={"F", "0", "a", "~"},
+         reject={"-", " ", ".", "\t"}}
+
+   test {regexp="\\i",
+         accept={"a", "B", "_", ":"},
+         reject={"-", "1", " ", "."}}
+
+   test {regexp="\\C",
+         accept={"~", " ", "\t", "\n"},
+         reject={"a", "B", "1", ".", "_", ":"}}
 end
