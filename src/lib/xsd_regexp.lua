@@ -97,10 +97,6 @@ function capture.quantifier ()
    )
 end
 
-function match.digit (s)
-   return match.satisfies(function (s) return member(s, "0123456789") end)
-end
-
 function capture.quantity ()
    return combine._or(
       capture.quantRange(),
