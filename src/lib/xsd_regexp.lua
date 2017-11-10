@@ -26,10 +26,10 @@ local match, capture, combine = maxpc.import()
 
 function compile (expr)
    local ast = parse(expr)
-   local parser = compile_branches(ast.branches)
+   local parser = compile_branches(ast.branches, 'toplevel')
    return function (str)
-      local _, success, is_eof = maxpc.parse(str, parser)
-      return success and is_eof
+      local _, success, eof = maxpc.parse(str, parser)
+      return success and eof
    end
 end
 
@@ -308,16 +308,20 @@ charClassExpr_parser = capture.charClassExpr()
 
 -- Compiler rules: AST -> MaxPC parser
 
-function compile_branches (branches)
+function compile_branches (branches, is_toplevel)
    local parsers = {}
    for _, branch in ipairs(branches) do
       if branch.pieces then
-         table.insert(parsers, compile_pieces(branch.pieces))
+         local parser = compile_pieces(branch.pieces)
+         if is_toplevel then
+            parser = match.path(parser, match.eof())
+         end
+         table.insert(parsers, parser)
       end
    end
    if     #parsers == 0 then return match.eof()
    elseif #parsers == 1 then return parsers[1]
-   elseif #parsers  > 1 then return combine._or(unpack(parsers)) end
+   elseif #parsers  > 1 then return match.either(unpack(parsers)) end
 end
 
 function compile_pieces (pieces)
@@ -331,43 +335,20 @@ function compile_pieces (pieces)
          table.insert(parsers, atom_parser)
       end
    end
-   return match.seq(unpack(parsers))
+   return match.path(unpack(parsers))
 end
 
 function compile_quantifier (quantifier)
-   if     quantifier == "?" then return combine.maybe
-   elseif quantifier == "*" then return combine.any
-   elseif quantifier == "+" then return combine.some
-   elseif quantifier.min and quantifier.max then
-      -- [min * parser] .. [max * maybe(parser)]
+   if     quantifier == "?" then return match.optional
+   elseif quantifier == "*" then return match.all
+   elseif quantifier == "+" then return match.one_or_more
+   elseif quantifier.min or quantifier.max then
       return function (parser)
-         local parsers = {}
-         for n = 1, quantifier.min do
-            table.insert(parsers, parser)
-         end
-         for n = 1, quantifier.max - quantifier.min do
-            table.insert(parsers, combine.maybe(parser))
-         end
-         return match.seq(unpack(parsers))
-      end
-   elseif quantifier.min then
-      -- [min * parser] any(parser)
-      return function (parser)
-         local parsers = {}
-         for n = 1, quantifier.min do
-            table.insert(parsers, parser)
-         end
-         table.insert(parsers, combine.any(parser))
-         return match.seq(unpack(parsers))
+         return match.range(parser, quantifier.min, quantifier.max)
       end
    elseif quantifier.exactly then
-      -- [exactly * parser]
       return function (parser)
-         local parsers = {}
-         for n = 1, quantifier.exactly do
-            table.insert(parsers, parser)
-         end
-         return match.seq(unpack(parsers))
+         return match.range(parser, quantifier.exactly, quantifier.exactly)
       end
    else
       error("Invalid quantifier")
@@ -456,7 +437,7 @@ function compile_group (group)
       for _, atom in ipairs(atoms) do
          table.insert(parsers, compile_atom(atom))
       end
-      return combine._or(unpack(parsers))
+      return match.either(unpack(parsers))
    end
    if group.include then
       return compile_group_atoms(group.include)
@@ -630,4 +611,28 @@ function selftest ()
    test {regexp="\\C",
          accept={"~", " ", "\t", "\n"},
          reject={"a", "B", "1", ".", "_", ":"}}
+
+   test {regexp="a|aa",
+         accept={"a", "aa"},
+         reject={"ab", ""}}
+
+   test{regexp="([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])",
+        accept={"0","12", "123", "192","168","178",},
+        reject={"a.a.a.", ""}}
+
+   local ipv4_address =
+      "(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}"
+   ..  "([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])"
+   .. "(%[\\p{N}\\p{L}]+)?"
+   test {regexp=ipv4_address,
+         accept={"192.168.0.1", "8.8.8.8%eth0"},
+         reject={"1.256.8.8", "1.2.3%foo", "1.1.1.1%~"}}
+
+   local domain_name =
+      "((([a-zA-Z0-9_]([a-zA-Z0-9\\-_]){0,61})?[a-zA-Z0-9]\\.)*"
+   ..  "([a-zA-Z0-9_]([a-zA-Z0-9\\-_]){0,61})?[a-zA-Z0-9]\\.?)"
+   .. "|\\."
+   test {regexp=domain_name,
+         accept={"hello", "foo-z.bar.de", "123.com", "."},
+         reject={"___.com", "foo-.baz.de", ".."}}
 end

@@ -265,6 +265,110 @@ function capture.integer_number (radix)
 end
 
 
+-- backtracking combinators
+
+function match.plus (a, b)
+   return function (s)
+      local a_more, b_more, more
+      a_more = function () return a(s) end
+      more = function ()
+         if b_more then
+            local rest
+            rest, _, _, b_more = b_more()
+            if rest then
+               return rest, nil, nil, more
+            else
+               return more()
+            end
+         elseif a_more then
+            local suffix
+            suffix, _, _, a_more = a_more()
+            if suffix then
+               b_more = function () return b(suffix) end
+               return more()
+            end
+         end
+      end
+      return more()
+   end
+end
+
+function match.alternate (x, y)
+   return function (s)
+      local x_more, more
+      x_more = function ()
+         return x(s)
+      end
+      more = function ()
+         local rest
+         if x_more then
+            rest, _, _, x_more = x_more()
+         end
+         if rest then
+            return rest, nil, nil, more
+         else
+            return y(s)
+         end
+      end
+      return more()
+   end
+end
+
+function match.optional (parser)
+   return match.alternate(parser, match.seq())
+end
+
+function match.range (parser, min, max)
+   return function (s)
+      local rests = {}
+      while s and (not max or #rests <= max) do
+         table.insert(rests, s)
+         s = parser(s)
+      end
+      local more
+      more = function ()
+         local rest = table.remove(rests)
+         if rest and (not min or #rests >= min) then
+            return rest, nil, nil, more
+         end
+      end
+      return more()
+   end
+end
+
+function match.all (parser)
+   return match.range(parser, 0)
+end
+
+function match.one_or_more (parser)
+   return match.plus(parser, match.all(parser))
+end
+
+local function make_reducer (combinator, sentinel)
+   local reduce
+   reduce = function (parsers)
+      if #parsers == 0 then
+         return sentinel
+      elseif #parsers == 1 then
+         return parsers[1]
+      else
+         local head = table.remove(parsers, 1)
+         local tail = reduce(parsers)
+         return combinator(head, tail)
+      end
+   end
+   return function (...)
+      return reduce({...})
+   end
+end
+
+local function identity (...) return ... end
+match.path = make_reducer(match.plus, identity)
+
+local function constantly_nil () end
+match.either = make_reducer(match.alternate, constantly_nil)
+
+
 -- tests
 
 function selftest ()
@@ -294,10 +398,11 @@ function selftest ()
    local result, matched, eof = parse("", capture.element())
    assert(not result) assert(not matched) assert(eof)
 
-   -- match.satisfied
    local function is_digit (x)
       return ("01234567890"):find(x, 1, true)
    end
+
+   -- match.satisfied
    local result, matched, eof =
       parse("123", capture.subseq(match.satisfies(is_digit)))
    assert(result == "1") assert(matched) assert(not eof)
@@ -357,10 +462,11 @@ function selftest ()
    local result, matched, eof = parse("", fo)
    assert(not result) assert(not matched) assert(eof)
 
-   -- combine._and
    local function is_alphanumeric (x)
       return ("01234567890abcdefghijklmnopqrstuvwxyz"):find(x, 1, true)
    end
+
+   -- combine._and
    local d = combine._and(match.satisfies(is_alphanumeric),
                           match.satisfies(is_digit))
    local result, matched, eof = parse("12", capture.seq(d, d, match.eof()))
@@ -408,6 +514,7 @@ function selftest ()
                                 end
    ))
 
+   -- digits
    local result, matched, eof = parse("f", match.digit(16))
    assert(not result) assert(matched) assert(eof)
    local result, matched, eof = parse("f423", capture.natural_number(16))
@@ -422,4 +529,55 @@ function selftest ()
    assert(not result) assert(not matched) assert(not eof)
    local result, matched, eof = parse("1234a", capture.integer_number())
    assert(result == 1234) assert(matched) assert(not eof)
+
+   -- backtracking
+   local result, matched, eof = parse(
+      "0aaaaaaaa1",
+      match.path(match.equal("0"),
+                 match.all(match.satisfies(is_alphanumeric)),
+                 match.equal("1"))
+   )
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof =
+      parse("a", match.either(match.equal("a"), match.equal("b")))
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof =
+      parse("b", match.either(match.equal("a"), match.equal("b")))
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse(".", match.optional(match.equal(".")))
+   assert(not result) assert(matched)
+   local result, matched, eof = parse("", match.optional(match.equal(".")))
+   assert(not result) assert(matched) assert(eof)
+   local domain_like = match.either(
+      match.path(
+         match.path(
+            match.all(match.path(match.all(match.satisfies(is_alphanumeric)),
+                                 combine.diff(match.satisfies(is_alphanumeric),
+                                              match.satisfies(is_digit)),
+                                 match.equal(".")))
+         ),
+         match.path(match.all(match.satisfies(is_alphanumeric)),
+                    combine.diff(match.satisfies(is_alphanumeric),
+                                 match.satisfies(is_digit)),
+                    match.optional(match.equal("."))),
+         match.eof()
+      ),
+      match.seq(match.equal("."), match.eof())
+   )
+   local result, matched, eof = parse(".", domain_like)
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse("foo.", domain_like)
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse("1foo.bar", domain_like)
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse("foo.b2ar.baz", domain_like)
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse("foo.bar.2baz.", domain_like)
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse("foo2", domain_like)
+   assert(not result) assert(not matched) assert(not eof)
+   local result, matched, eof = parse("..", domain_like)
+   assert(not result) assert(not matched) assert(not eof)
+   local result, matched, eof = parse("123.456", domain_like)
+   assert(not result) assert(not matched) assert(not eof)
 end
