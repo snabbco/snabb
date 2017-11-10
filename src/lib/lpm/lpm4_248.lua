@@ -6,18 +6,15 @@ local C = ffi.C
 local lpm4_trie = require("lib.lpm.lpm4_trie").LPM4_trie
 local bit = require("bit")
 
-ffi.cdef([[
-uint16_t lpm4_248_search(uint32_t ip, int16_t *big, int16_t *little);
-uint32_t lpm4_248_search32(uint32_t ip, int32_t *big, int32_t *little);
-]])
-
 LPM4_248 = setmetatable({ alloc_storable = { "lpm4_248_bigarry", "lpm4_248_lilarry" } }, { __index = lpm4_trie })
 
-function LPM4_248:search16 (ip)
-   return C.lpm4_248_search(ip, self.lpm4_248_bigarry, self.lpm4_248_lilarry)
-end
-function LPM4_248:search32 (ip)
-   return C.lpm4_248_search32(ip, self.lpm4_248_bigarry, self.lpm4_248_lilarry)
+local rshift, lshift, band = bit.rshift, bit.lshift, bit.band
+function LPM4_248:search (ip)
+   local v = self.lpm4_248_bigarry[rshift(ip, 8)]
+   if (band(v, self.flag) == self.flag) then
+      v = self.lpm4_248_lilarry[lshift(band(v, self.mask), 8) + band(ip, 0xff)]
+   end
+   return v
 end
 
 function LPM4_248:new (cfg)
@@ -29,10 +26,8 @@ function LPM4_248:new (cfg)
    local arrytype
    if self.keybits == 15 then
       arrytype = "uint16_t"
-      self.search = LPM4_248.search16
    elseif self.keybits == 31 then
       arrytype = "uint32_t"
-      self.search = LPM4_248.search32
    else
       error("LPM4_248 supports 15 or 31 keybits")
    end
