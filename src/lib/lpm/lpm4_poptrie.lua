@@ -164,10 +164,17 @@ function selftest_get_bits ()
    assert(g(p("0.3.128.0"),14) == 56)
    assert(g(p("192.0.0.0"),0) == 48)
    local pmu = require("lib.pmu")
-   local n = 0
-   pmu.profile(function()
-      for i =0, 1000*1000*1000 do n = n + g(i, 7) end
-   end)
+   local avail, err = pmu.is_available()
+   if not avail then
+      print("PMU not available:")
+      print("  "..err)
+      print("Skipping benchmark.")
+   else
+      local n = 0
+      pmu.profile(function()
+         for i =0, 1000*1000*1000 do n = n + g(i, 7) end
+      end)
+   end
 end
 function selftest ()
    local n = LPM4_poptrie:new()
