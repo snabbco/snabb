@@ -9,6 +9,7 @@ local value = require("lib.yang.value")
 local ffi = require("ffi")
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
+local regexp = require("lib.xsd_regexp")
 
 function normalize_id(id)
    return id:gsub('[^%w_]', '_')
@@ -150,26 +151,67 @@ local function integer_type(min, max)
    end
 end
 
--- FIXME :)
-local function range_validator(range, f) return f end
-local function length_validator(range, f) return f end
-local function pattern_validator(range, f) return f end
-local function bit_validator(range, f) return f end
-local function enum_validator(range, f) return f end
+-- TODO: length, bit and enum validators                                  (:
+local validators = {}
+function validators.range(range, f)
+   if not range then return end
+   local rangestr
+   for _, part in ipairs(range.value) do
+      rangestr = (rangestr and rangestr.." ") or ""
+      local min, max = unpack(part)
+      if min == max then
+         rangestr = rangestr..min
+      else
+         rangestr = rangestr..min..".."..max
+      end
+   end
+   return function (val, P)
+      if f then f(val, P) end
+      if not val then return end
+      for _, part in ipairs(range.value) do
+         local min, max = unpack(part)
+         if  (min == 'min' or val >= min)
+         and (max == 'max' or val <= max) then
+            return
+         end
+      end
+      P:error("value not in range\n"..rangestr.."\n"..val)
+   end
+end
+function validators.length(length, f) return f end
+function validators.patterns(patterns, f)
+   if not patterns then return end
+   local compiled = {}
+   for _, pattern in ipairs(patterns) do
+      compiled[pattern.value] = regexp.compile(pattern.value)
+   end
+   return function (val, P)
+      if f then f(val, P) end
+      if not val then return end
+      for pattern, match in pairs(compiled) do
+         if not match(val) then
+            P:error("pattern mismatch\n"..pattern.."\n"..val)
+         end
+      end
+   end
+end
+function validators.bit(bit, f) return f end
+function validators.enum(enum, f) return f end
 
 local function value_parser(typ)
    local prim = typ.primitive_type
    local parse = assert(value.types[prim], prim).parse
    local validate
-   validate = range_validator(typ.range, validate)
-   validate = length_validator(typ.length, validate)
-   validate = pattern_validator(typ.pattern, validate)
-   validate = bit_validator(typ.bit, validate)
-   validate = enum_validator(typ.enums, validate)
+   for restriction, validator in pairs(validators) do
+      validate = validator(typ[restriction], validate)
+      if typ.base_type then
+         validate = validator(typ.base_type.type[restriction], validate)
+      end
+   end
    -- TODO: union, require-instance.
-   return function(str, k)
+   return function(str, k, P)
       local val = parse(str, k)
-      if validate then validate(val) end
+      if validate then validate(val, P) end
       return val
    end
 end
@@ -228,7 +270,7 @@ local function array_parser(keyword, element_type, ctype)
       local str = P:parse_string()
       P:skip_whitespace()
       P:consume(";")
-      return parsev(str, keyword)
+      return parsev(str, keyword, P)
    end
    local function parse(P, out)
       table.insert(out, parse1(P))
@@ -246,6 +288,9 @@ local function array_parser(keyword, element_type, ctype)
    return {init=init, parse=parse, finish=finish}
 end
 
+local default_parser = {}
+function default_parser:error (...) error(...) end
+
 local function scalar_parser(keyword, argument_type, default, mandatory)
    local function init() return nil end
    local parsev = value_parser(argument_type)
@@ -257,7 +302,7 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
       end
       P:skip_whitespace()
       P:consume(";")
-      return parsev(maybe_str, keyword)
+      return parsev(maybe_str, keyword, P)
    end
    local function parse(P, out)
       if out ~= nil then P:error('duplicate parameter: '..keyword) end
@@ -265,7 +310,7 @@ local function scalar_parser(keyword, argument_type, default, mandatory)
    end
    local function finish(out)
       if out ~= nil then return out end
-      if default then return parsev(default, keyword) end
+      if default then return parsev(default, keyword, default_parser) end
       if mandatory then error('missing scalar value: '..keyword) end
    end
    return {init=init, parse=parse, finish=finish}
@@ -463,7 +508,9 @@ function data_parser_from_grammar(production)
    function top_parsers.scalar(production)
       local parse = value_parser(production.argument_type)
       return function(str, filename)
-         return parse(parser_mod.parse_string(str, filename), '[bare scalar]')
+         return parse(parser_mod.parse_string(str, filename),
+                      '[bare scalar]',
+                      default_parser)
       end
    end
    return assert(top_parsers[production.type])(production)
