@@ -50,17 +50,20 @@ end
 local function parse_range(loc, range)
    local function parse_part(part)
       local l, r = part:match("^%s*([^%.]*)%s*%.%.%s*([^%s]*)%s*$")
+      if not l then
+         l = part:match("^%s*([^%.]*)%s*$")
+         l = (l ~= 'min') and l
+      end
       assert_with_loc(l, loc, 'bad range component: %s', part)
       if l ~= 'min' then l = util.tointeger(l) end
-      if r ~= 'max' then r = util.tointeger(r) end
+      if r ~= 'max' then r = r and util.tointeger(r) or l end
       return { l, r }
    end
    local parts = range:split("|")
-   local res = {'or'}
-   for part in range:split("|") do table.insert(res, parse_part(part)) end
-   if #res == 1 then error_with_loc(loc, "empty range", range)
-   elseif #res == 2 then return res[2]
-   else return res end
+   local parts = {}
+   for part in range:split("|") do table.insert(parts, parse_part(part)) end
+   if #parts == 0 then error_with_loc(loc, "empty range", range) end
+   return parts
 end
 
 local function collect_children(children, kinds)
@@ -319,8 +322,7 @@ local function init_leaf_list(node, loc, argument, children)
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
 local function init_length(node, loc, argument, children)
-   -- TODO: parse length arg str
-   node.value = require_argument(loc, argument)
+   node.value = parse_range(loc, require_argument(loc, argument))
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
