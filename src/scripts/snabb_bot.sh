@@ -27,10 +27,9 @@ function init {
     fi
     export logdir="$SNABBBOTDIR/log"
     export tmpdir="$SNABBBOTDIR/tmp"
+    rm -rf "$tmpdir"
     mkdir -p "$SNABBBOTDIR" "$logdir" "$tmpdir"
 }
-
-function clean { rm -rf "$tmpdir"; }
 
 function fetch_pull_requests {
     curl "https://api.github.com/repos/$REPO/pulls?per_page=100" \
@@ -204,4 +203,3 @@ for id in $(pull_request_ids); do
     [ ! -z "$GITHUB_CREDENTIALS" ] || continue
     post_status $id $(log_status $id) $(post_gist $(pull_request_log $id))
 done
-clean
