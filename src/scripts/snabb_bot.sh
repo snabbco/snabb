@@ -61,7 +61,10 @@ function pull_request_new_p {
 }
 
 function clone_upstream {
-    git clone https://github.com/$REPO.git $(repo_path)
+    git clone https://github.com/$REPO.git $(repo_path) \
+        && (cd $(repo_path)
+               git config user.email "snabb_bot.service@davos"
+               git config user.name "Snabb Bot")
 }
 
 function dock_build { (cd src && scripts/dock.sh "(cd .. && make)"); }
