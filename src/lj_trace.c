@@ -671,21 +671,6 @@ static TValue *trace_exit_cp(lua_State *L, lua_CFunction dummy, void *ud)
 }
 
 
-#ifdef EXITSTATE_PCREG
-/* Determine trace number from pc of exit instruction. */
-static TraceNo trace_exit_find(jit_State *J, MCode *pc)
-{
-  TraceNo traceno;
-  for (traceno = 1; traceno < J->sizetrace; traceno++) {
-    GCtrace *T = traceref(J, traceno);
-    if (T && pc >= T->mcode && pc < (MCode *)((char *)T->mcode + T->szmcode))
-      return traceno;
-  }
-  lua_assert(0);
-  return 0;
-}
-#endif
-
 /* A trace exited. Restore interpreter state. */
 int lj_trace_exit(jit_State *J, void *exptr)
 {
@@ -696,9 +681,6 @@ int lj_trace_exit(jit_State *J, void *exptr)
   const BCIns *pc;
   void *cf;
   GCtrace *T;
-#ifdef EXITSTATE_PCREG
-  J->parent = trace_exit_find(J, (MCode *)(intptr_t)ex->gpr[EXITSTATE_PCREG]);
-#endif
   T = traceref(J, J->parent); UNUSED(T);
 #ifdef EXITSTATE_CHECKEXIT
   if (J->exitno == T->nsnap) {  /* Treat stack check like a parent exit. */
