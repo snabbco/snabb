@@ -169,6 +169,10 @@ local function make_template_info(spec)
    local value_types = {}
    length = length + process_fields(buffer + length, spec.values, value_struct_def,
                                     value_types, 'o.value.%s = %s(o.value.%s)')
+   if spec.state_t then
+      table.insert(value_struct_def, "$ state;")
+      table.insert(value_types, spec.state_t)
+   end
    table.insert(value_struct_def, '} __attribute__((packed))')
    table.insert(swap_fn, 'end')
    local key_t = ffi.typeof(table.concat(key_struct_def, ' '),
@@ -180,7 +184,9 @@ local function make_template_info(spec)
    gen_swap_fn = loadstring(table.concat(swap_fn, '\n'))
    setfenv(gen_swap_fn, swap_fn_env)
 
-   assert(ffi.sizeof(record_t) == data_len)
+   -- State data, if present, is part of the value but must not be
+   -- included in export records.
+   assert(ffi.sizeof(record_t) - ffi.sizeof(spec.state_t or 'char [0]') == data_len)
 
    return { id = spec.id,
             field_count = #spec.keys + #spec.values,
