@@ -154,6 +154,7 @@ RXCSUM      0x05000 -               RW Receive Checksum Control
 RFCTL       0x05008 -               RW Receive Filter Control Register
 RXCTRL      0x03000 -               RW Receive Control
 RXDGPC      0x02F50 -               RC DMA Good Rx Packet Counter
+TXDGPC      0x087A0 -               RC DMA Good Tx Packet Counter
 RXDSTATCTRL 0x02F40 -               RW Rx DMA Statistic Counter Control
 RUC         0x040A4 -               RC Receive Undersize Count
 RFC         0x040A8 -               RC Receive Fragment Count
@@ -169,15 +170,19 @@ RUC         0x040A4 -               RC Receive Undersize Count
 RFC         0x040A8 -               RC Receive Fragment Count
 ROC         0x040AC -               RC Receive Oversize Count
 RJC         0x040B0 -               RC Receive Jabber Count
+GORCL       0x04088 -               RC Good Octets Received Count Low
+GOTCL       0x04090 -               RC Good Octets Transmitted Count Low
 ]],
    txq = [[
 DCA_TXCTRL  0x0600C +0x40*0..127    RW Tx DCA Control Register
 TDBAL       0x06000 +0x40*0..127    RW Transmit Descriptor Base Address Low
 TDBAH       0x06004 +0x40*0..127    RW Transmit Descriptor Base Address High
+TDLEN       0x06008 +0x40*0..127    RW Transmit Descriptor Length
 TDH         0x06010 +0x40*0..127    RW Transmit Descriptor Head
 TDT         0x06018 +0x40*0..127    RW Transmit Descriptor Tail
-TDLEN       0x06008 +0x40*0..127    RW Transmit Descriptor Length
 TXDCTL      0x06028 +0x40*0..127    RW Transmit Descriptor Control
+TDWBAL      0x06038 +0x40*0..127    RW Tx Descriptor Completion Write Back Address Low
+TDWBAH      0x0603C +0x40*0..127    RW Tx Descriptor Completion Write Back Address High
 ]]
 }
 reg['1000BaseX'] = {
@@ -407,6 +412,7 @@ end
 function Intel:disable_interrupts ()
    self.r.EIMC(0xffffffff)
 end
+
 function Intel:wait_linkup (timeout)
    if timeout == nil then timeout = self.linkup_wait end
    if self:link_status() then return true end
@@ -416,6 +422,16 @@ function Intel:wait_linkup (timeout)
    end
    return false
 end
+
+rxdesc_t = ffi.typeof([[
+struct {
+   uint64_t address;
+   uint16_t length, cksum;
+   uint8_t status, errors;
+   uint16_t vlan;
+} __attribute__((packed))
+]])
+
 function Intel:init_rx_q ()
    if not self.rxq then return end
    assert((self.rxq >=0) and (self.rxq < self.max_q),
@@ -427,14 +443,6 @@ function Intel:init_rx_q ()
    self.rdh = 0
    self.rdt = 0
    -- setup 4.5.9
-   local rxdesc_t = ffi.typeof([[
-   struct {
-      uint64_t address;
-      uint16_t length, cksum;
-      uint8_t status, errors;
-      uint16_t vlan;
-   } __attribute__((packed))
-   ]])
    local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, self.ndesc)
    self.rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
    memory.dma_alloc(ffi.sizeof(rxdesc_ring_t)))
@@ -571,7 +579,7 @@ function Intel:push ()
    local li = self.input["input"]
    if li == nil then return end
 
-   while not empty(li) and self:ringnext(self.tdt) ~= self.tdh do
+   while not empty(li) and self:can_transmit() do
       local p = receive(li)
       -- NB: the comment below is taken from intel_mp.lua, which disables
       -- this check for the same reason.
@@ -582,11 +590,7 @@ function Intel:push ()
       --   packet.free(p)
       --   counter.add(self.shm.txdrop)
       --end
-      self.txdesc[self.tdt].address = tophysical(p.data)
-      self.txdesc[self.tdt].flags =
-         bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
-      self.txqueue[self.tdt] = p
-      self.tdt = self:ringnext(self.tdt)
+      self:transmit(p)
    end
    -- Reclaim transmit contexts
    local cursor = self.tdh
@@ -644,6 +648,19 @@ end
 function Intel:ringnext (index)
    return band(index+1, self.ndesc-1)
 end
+
+function Intel:can_transmit ()
+   return self:ringnext(self.tdt) ~= self.tdh
+end
+
+function Intel:transmit (p)
+   self.txdesc[self.tdt].address = tophysical(p.data)
+   self.txdesc[self.tdt].flags =
+      bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
+   self.txqueue[self.tdt] = p
+   self.tdt = self:ringnext(self.tdt)
+end
+
 function Intel:rss_enable ()
    -- set default q = 0 on i350,i210 noop on 82599
    self.r.MRQC(0)
