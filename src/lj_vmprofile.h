@@ -6,7 +6,6 @@
 #ifndef _LJ_VMPROFILE_H
 #define _LJ_VMPROFILE_H
 
-
 /* Counters are 64-bit to avoid overflow even in long running processes. */
 typedef uint64_t VMProfileCount;
 
@@ -18,15 +17,23 @@ typedef uint64_t VMProfileCount;
 typedef struct VMProfileTraceCount {
   VMProfileCount head;          /* Head of the trace (non-looping part) */
   VMProfileCount loop;          /* Loop of the trace */
-  VMProfileCount other;         /* Outside the trace mcode (unidentified) */
+  VMProfileCount ffi;           /* Outside the trace mcode (assumed FFI) */
   VMProfileCount gc;            /* Garbage collection from this trace. */
+  VMProfileCount interp;        /* Interpreter due to exit from this trace. */
 } VMProfileTraceCount;
 
 /* Complete set of counters for VM and traces. */
 typedef struct VMProfile {
   uint32_t magic;               /* 0x1d50f007 */
   uint16_t major, minor;        /* 2, 0 */
+  /* The profiler always bumps exactly one VM state counter. */
   VMProfileCount vm[LJ_VMST__MAX];
+  /* The profiler also bumps exactly one per-trace counter for the
+  ** currently executing trace (JIT mode) or for the most recently
+  ** executing trace (interpreter mode.) This bump is skipped only if
+  ** no trace can be identified for some reason e.g. none have been
+  ** recorded.
+  **/
   VMProfileTraceCount trace[LJ_VMPROFILE_TRACE_MAX+1];
 } VMProfile;
 
