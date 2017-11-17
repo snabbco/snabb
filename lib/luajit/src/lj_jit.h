@@ -97,11 +97,11 @@
 
 /* Optimization parameters and their defaults. Length is a char in octal! */
 #define JIT_PARAMDEF(_) \
-  _(\010, maxtrace,	1000)	/* Max. # of traces in cache. */ \
-  _(\011, maxrecord,	4000)	/* Max. # of recorded IR instructions. */ \
+  _(\010, maxtrace,	2000)	/* Max. # of traces in cache. */ \
+  _(\011, maxrecord,	6000)	/* Max. # of recorded IR instructions. */ \
   _(\012, maxirconst,	500)	/* Max. # of IR constants of a trace. */ \
-  _(\007, maxside,	100)	/* Max. # of side traces of a root trace. */ \
-  _(\007, maxsnap,	500)	/* Max. # of snapshots for a trace. */ \
+  _(\007, maxside,	200)	/* Max. # of side traces of a root trace. */ \
+  _(\007, maxsnap,	1000)	/* Max. # of snapshots for a trace. */ \
   _(\011, minstitch,	0)	/* Min. # of IR ins for a stitched trace. */ \
   \
   _(\007, hotloop,	56)	/* # of iter. to detect a hot loop/call. */ \
@@ -116,7 +116,7 @@
   /* Size of each machine code area (in KBytes). */ \
   _(\011, sizemcode,	JIT_P_sizemcode_DEFAULT) \
   /* Max. total size of all machine code areas (in KBytes). */ \
-  _(\010, maxmcode,	512) \
+  _(\010, maxmcode,	4096) \
   /* End of list. */
 
 enum {
@@ -277,13 +277,13 @@ static LJ_AINLINE MSize snap_nextofs(GCtrace *T, SnapShot *snap)
 /* Round-robin penalty cache for bytecodes leading to aborted traces. */
 typedef struct HotPenalty {
   MRef pc;		/* Starting bytecode PC. */
-  uint16_t val;		/* Penalty value, i.e. hotcount start. */
+  uint32_t val;		/* Penalty value, i.e. hotcount start. */
   uint16_t reason;	/* Abort reason (really TraceErr). */
 } HotPenalty;
 
 #define PENALTY_SLOTS	64	/* Penalty cache slot. Must be a power of 2. */
 #define PENALTY_MIN	(36*2)	/* Minimum penalty value. */
-#define PENALTY_MAX	60000	/* Maximum penalty value. */
+#define PENALTY_MAX	6000000	/* Maximum penalty value. */
 #define PENALTY_RNDBITS	4	/* # of random bits to add to penalty value. */
 
 /* Round-robin backpropagation cache for narrowing conversions. */
