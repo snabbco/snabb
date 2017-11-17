@@ -527,6 +527,7 @@ typedef struct global_State {
   GCState gc;		/* Garbage collector. */
   volatile int32_t vmstate;   /* VM state or current JIT code trace number. */
   volatile int32_t gcvmstate; /* Previous VM state (only when state is GC). */
+  volatile int32_t lasttrace; /* VM state before exit to interpreter. */
   SBuf tmpbuf;		/* Temporary string buffer. */
   GCstr strempty;	/* Empty string. */
   uint8_t stremptyz;	/* Zero terminator of empty string. */
