@@ -74,6 +74,7 @@ local function load_initial_state(key)
 end
 
 -- Scalar x86-64 backend for the SipHash implementation.
+local fn_ptr_t = ffi.typeof("uint32_t (*)(void *)")
 local function X86_64()
    local asm = {}
    local Dst
@@ -152,7 +153,7 @@ local function X86_64()
    end
    function asm.finish(name, Dst)
       return finish(name.."_x1",
-                    ffi.typeof("uint32_t (*)(void *)"),
+                    fn_ptr_t,
                     Dst)
    end
    function asm:assemble(name, gen)
