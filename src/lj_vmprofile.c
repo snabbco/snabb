@@ -46,7 +46,7 @@ int vmprofile_get_profile_size() {
 void vmprofile_set_profile(void *counters) {
   profile = (VMProfile*)counters;
   profile->magic = 0x1d50f007;
-  profile->major = 2;
+  profile->major = 3;
   profile->minor = 0;
 }
 
@@ -58,25 +58,45 @@ static void vmprofile_signal(int sig, siginfo_t *si, void *data)
   if (profile != NULL) {
     lua_State *L = gco2th(gcref(state.g->cur_L));
     int vmstate = state.g->vmstate;
-    int trace = ~vmstate == LJ_VMST_GC ? state.g->gcvmstate : vmstate;
-    /* Not in a trace */
-    if (trace < 0) {
-      profile->vm[~vmstate]++;
-    } else {
+    int trace = 0;
+    /* Get the relevant trace number */
+    if (vmstate > 0) {
+      /* JIT mcode */
+      trace = vmstate;
+    } else if (~vmstate == LJ_VMST_GC) {
+      /* JIT GC */
+      trace = state.g->gcvmstate;
+    } else if (~vmstate == LJ_VMST_INTERP && state.g->lasttrace > 0) {
+      /* Interpreter entered at the end of some trace */
+      trace = state.g->lasttrace;
+    }
+    if (trace > 0) {
+      /* JIT mode: Bump a global counter and a per-trace counter. */
       int bucket = trace > LJ_VMPROFILE_TRACE_MAX ? 0 : trace;
       VMProfileTraceCount *count = &profile->trace[bucket];
       GCtrace *T = traceref(L2J(L), (TraceNo)trace);
       intptr_t ip = (intptr_t)((ucontext_t*)data)->uc_mcontext.gregs[REG_RIP];
       ptrdiff_t mcposition = ip - (intptr_t)T->mcode;
+      printf("trace %d interp %d\n", trace, ~vmstate == LJ_VMST_INTERP);
       if (~vmstate == LJ_VMST_GC) {
+        profile->vm[LJ_VMST_JGC]++;
         count->gc++;
+      } else if (~vmstate == LJ_VMST_INTERP) {
+        profile->vm[LJ_VMST_INTERP]++;
+        count->interp++;
       } else if ((mcposition < 0) || (mcposition >= T->szmcode)) {
-        count->other++;
+        profile->vm[LJ_VMST_FFI]++;
+        count->ffi++;
       } else if ((T->mcloop != 0) && (mcposition >= T->mcloop)) {
+        profile->vm[LJ_VMST_LOOP]++;
         count->loop++;
       } else {
+        profile->vm[LJ_VMST_HEAD]++;
         count->head++;
       }
+    } else {
+      /* Interpreter mode: Just bump a global counter. */
+      profile->vm[~vmstate]++;
     }
   }
 }

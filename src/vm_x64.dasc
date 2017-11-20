@@ -2061,6 +2061,10 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov KBASE, [KBASE+PC2PROTO(k)]
   |  mov L:RB->base, BASE
   |  mov qword [DISPATCH+DISPATCH_GL(jit_base)], 0
+  |  mov TMPRd, dword [DISPATCH+DISPATCH_GL(vmstate)]
+  |  // Record which trace exited to the interpreter, then switch state
+  |  mov TMPRd, dword [DISPATCH+DISPATCH_GL(vmstate)]
+  |  mov dword [DISPATCH+DISPATCH_GL(lasttrace)], TMPRd
   |  set_vmstate INTERP
   |  // Modified copy of ins_next which handles function header dispatch, too.
   |  mov RCd, [PC]

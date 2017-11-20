@@ -438,6 +438,7 @@ typedef struct GCtab {
 
 /* VM states. */
 enum {
+  /* VM states. */
   LJ_VMST_INTERP,	/* Interpreter. */
   LJ_VMST_C,		/* C function. */
   LJ_VMST_GC,		/* Garbage collector. */
@@ -445,6 +446,14 @@ enum {
   LJ_VMST_RECORD,	/* Trace recorder. */
   LJ_VMST_OPT,		/* Optimizer. */
   LJ_VMST_ASM,		/* Assembler. */
+  /* JIT trace states.
+  ** These are "abstract" states that logically exist but are never
+  ** directly used for the value of global_State.vmstate.
+  */
+  LJ_VMST_HEAD,		/* Trace mcode before loop */
+  LJ_VMST_LOOP,		/* Trace mcode inside loop */
+  LJ_VMST_JGC,		/* GC invoked from JIT mcode. */
+  LJ_VMST_FFI,		/* Other code outside trace mcode */
   LJ_VMST__MAX
 };
 
@@ -518,6 +527,7 @@ typedef struct global_State {
   GCState gc;		/* Garbage collector. */
   volatile int32_t vmstate;   /* VM state or current JIT code trace number. */
   volatile int32_t gcvmstate; /* Previous VM state (only when state is GC). */
+  volatile int32_t lasttrace; /* VM state before exit to interpreter. */
   SBuf tmpbuf;		/* Temporary string buffer. */
   GCstr strempty;	/* Empty string. */
   uint8_t stremptyz;	/* Zero terminator of empty string. */
