@@ -220,7 +220,7 @@ function run (args)
       config.app(c, "int", raw.RawSocket, int_interface)
       input, output = "int.rx", "int.tx"
    elseif sock_interface then
-      config.app(c, "virtio", VhostUser, { socket_path=sock_interface } )
+      config.app(c, "virtio", VhostUser, { socket_path=sock_interface,is_server=true } )
       input, output = "virtio.rx", "virtio.tx"
    else
       config.app(c, "pcap", pcap.PcapWriter, pcap_file)
