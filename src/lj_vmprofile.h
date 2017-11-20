@@ -25,7 +25,7 @@ typedef struct VMProfileTraceCount {
 /* Complete set of counters for VM and traces. */
 typedef struct VMProfile {
   uint32_t magic;               /* 0x1d50f007 */
-  uint16_t major, minor;        /* 2, 0 */
+  uint16_t major, minor;        /* 3, 0 */
   /* The profiler always bumps exactly one VM state counter. */
   VMProfileCount vm[LJ_VMST__MAX];
   /* The profiler also bumps exactly one per-trace counter for the
