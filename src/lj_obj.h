@@ -345,7 +345,7 @@ typedef struct GCproto {
 
 #define proto_chunkname(pt)	(strref((pt)->chunkname))
 #define proto_chunknamestr(pt)	(strdata(proto_chunkname((pt))))
-#define proto_lineinfo(pt)	(mref((pt)->lineinfo, const void))
+#define proto_lineinfo(pt)	(mref((pt)->lineinfo, const uint32_t))
 #define proto_uvinfo(pt)	(mref((pt)->uvinfo, const uint8_t))
 #define proto_varinfo(pt)	(mref((pt)->varinfo, const uint8_t))
 
