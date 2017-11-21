@@ -361,7 +361,7 @@ GCproto *lj_bcread_proto(LexState *ls)
   pt->firstline = firstline;
   pt->numline = numline;
   if (sizedbg) {
-    MSize sizeli = (sizebc-1) / sizeof(BCLine);
+    MSize sizeli = (sizebc-1) * sizeof(BCLine);
     setmref(pt->lineinfo, (char *)pt + ofsdbg);
     setmref(pt->uvinfo, (char *)pt + ofsdbg + sizeli);
     bcread_dbg(ls, pt, sizedbg);
