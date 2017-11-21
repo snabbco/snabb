@@ -151,7 +151,7 @@ static uint32_t bcread_uleb128_33(LexState *ls)
 /* Read debug info of a prototype. */
 static void bcread_dbg(LexState *ls, GCproto *pt, MSize sizedbg)
 {
-  uint32_t *lineinfo = proto_lineinfo(pt);
+  uint32_t *lineinfo = (uint32_t*)proto_lineinfo(pt);
   bcread_block(ls, lineinfo, sizedbg);
   /* Swap lineinfo if the endianess differs. */
   if (bcread_swap(ls)) {
