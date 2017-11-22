@@ -2,7 +2,7 @@
 
 local require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string = 
+pcall, type, table, string =
 require, error, assert, tonumber, tostring,
 setmetatable, pairs, ipairs, unpack, rawget, rawset,
 pcall, type, table, string
@@ -458,31 +458,29 @@ function S.sched_setaffinity(pid, mask, len) -- note len last as rarely used
 end
 
 local function get_maxnumnodes()
-   local function filesize(fd)
-      local size = 0
+   local function readfile (filename)
+      local ret = {}
       local bufsz = 1024
       local buf = ffi.new("uint8_t[?]", bufsz)
-      while true do
-         local len, err = S.read(fd, buf, bufsz)
-         size = size + len
-         if len ~= bufsz then break end
-      end
-      fd:seek(0, "set")
-      return size
-   end
-   local function read(filename)
       local fd, errno = S.open(filename, 0)
       if not fd then error(errno) end
-      local content, errno = S.read(fd, nil, filesize(fd))
-      if not content then error(errno) end
+      while true do
+         local len = S.read(fd, buf, bufsz)
+         table.insert(ret, ffi.string(buf, len))
+         if len ~= bufsz then break end
+      end
       fd:close()
-      return content
+      return table.concat(ret)
    end
-   local content = read("/proc/self/status")
+   local content = readfile("/proc/self/status")
    for line in content:gmatch("[^\n]+") do
      if line:match("^Mems_allowed:") then
        line = line:gsub("^Mems_allowed:%s+", "")
-       return(math.floor(((#line+1)/9)*32))
+       -- In Mems_allowed each 9 characters (8 digit plus comma) represents
+       -- a 32-bit mask.  Total number of maxnumnodes is the total sum of
+       -- the masks multiplied by 32.  Line length is increased by one since
+       -- there's no comma at the end of line.
+       return math.floor(((#line+1)/9)*32)
      end
    end
 end
