@@ -46,7 +46,7 @@ int vmprofile_get_profile_size() {
 void vmprofile_set_profile(void *counters) {
   profile = (VMProfile*)counters;
   profile->magic = 0x1d50f007;
-  profile->major = 3;
+  profile->major = 4;
   profile->minor = 0;
 }
 
@@ -56,48 +56,42 @@ void vmprofile_set_profile(void *counters) {
 static void vmprofile_signal(int sig, siginfo_t *si, void *data)
 {
   if (profile != NULL) {
+    int vmstate, trace;     /* sample matrix indices */
     lua_State *L = gco2th(gcref(state.g->cur_L));
-    int vmstate = state.g->vmstate;
-    int trace = 0;
-    /* Get the relevant trace number */
-    if (vmstate > 0) {
-      /* JIT mcode */
-      trace = vmstate;
-    } else if (~vmstate == LJ_VMST_GC) {
-      /* JIT GC */
-      trace = state.g->gcvmstate;
-    } else if (~vmstate == LJ_VMST_INTERP && state.g->lasttrace > 0) {
-      /* Interpreter entered at the end of some trace */
-      trace = state.g->lasttrace;
-    }
-    if (trace > 0) {
-      /* JIT mode: Bump a global counter and a per-trace counter. */
-      int bucket = trace > LJ_VMPROFILE_TRACE_MAX ? 0 : trace;
-      VMProfileTraceCount *count = &profile->trace[bucket];
-      GCtrace *T = traceref(L2J(L), (TraceNo)trace);
+    /*
+     * The basic job of this function is to select the right indices
+     * into the profile counter matrix. That requires deciding which
+     * logical state the VM is in and which trace the sample should be
+     * attributed to. Heuristics are needed to pick appropriate values.
+     */
+    if (state.g->vmstate > 0) {    /* Running JIT mcode. */
+      GCtrace *T = traceref(L2J(L), (TraceNo)state.g->vmstate);
       intptr_t ip = (intptr_t)((ucontext_t*)data)->uc_mcontext.gregs[REG_RIP];
       ptrdiff_t mcposition = ip - (intptr_t)T->mcode;
-      printf("trace %d interp %d\n", trace, ~vmstate == LJ_VMST_INTERP);
-      if (~vmstate == LJ_VMST_GC) {
-        profile->vm[LJ_VMST_JGC]++;
-        count->gc++;
-      } else if (~vmstate == LJ_VMST_INTERP) {
-        profile->vm[LJ_VMST_INTERP]++;
-        count->interp++;
-      } else if ((mcposition < 0) || (mcposition >= T->szmcode)) {
-        profile->vm[LJ_VMST_FFI]++;
-        count->ffi++;
+      if ((mcposition < 0) || (mcposition >= T->szmcode)) {
+        vmstate = LJ_VMST_FFI;    /* IP is outside the trace mcode. */
       } else if ((T->mcloop != 0) && (mcposition >= T->mcloop)) {
-        profile->vm[LJ_VMST_LOOP]++;
-        count->loop++;
+        vmstate = LJ_VMST_LOOP;   /* IP is inside the mcode loop. */
       } else {
-        profile->vm[LJ_VMST_HEAD]++;
-        count->head++;
+        vmstate = LJ_VMST_HEAD;   /* IP is inside mcode but not loop. */
       }
-    } else {
-      /* Interpreter mode: Just bump a global counter. */
-      profile->vm[~vmstate]++;
+      trace = state.g->vmstate;
+    } else {                    /* Running VM code (not JIT mcode.) */
+      if (~state.g->vmstate == LJ_VMST_GC && state.g->gcvmstate > 0) {
+        /* Special case: GC invoked from JIT mcode. */
+        vmstate = LJ_VMST_JGC;
+        trace = state.g->gcvmstate;
+      } else {
+        /* General case: count towards most recently exited trace. */
+        vmstate = ~state.g->vmstate;
+        trace = state.g->lasttrace;
+      }
     }
+    /* Handle overflow from individual trace counters. */
+    trace = trace <= LJ_VMPROFILE_TRACE_MAX ? trace : LJ_VMPROFILE_TRACE_MAX+1;
+    /* Phew! We have calculated the indices and now we can bump the counter. */
+    assert(vmstate >= 0 && vmstate <= LJ_VMST__MAX);
+    profile->count[trace][vmstate]++;
   }
 }
 
