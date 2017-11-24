@@ -88,7 +88,7 @@ static void vmprofile_signal(int sig, siginfo_t *si, void *data)
       }
     }
     /* Handle overflow from individual trace counters. */
-    trace = trace <= LJ_VMPROFILE_TRACE_MAX ? trace : LJ_VMPROFILE_TRACE_MAX+1;
+    trace = trace <= LJ_VMPROFILE_TRACE_MAX ? trace : 0;
     /* Phew! We have calculated the indices and now we can bump the counter. */
     assert(vmstate >= 0 && vmstate <= LJ_VMST__MAX);
     profile->count[trace][vmstate]++;
