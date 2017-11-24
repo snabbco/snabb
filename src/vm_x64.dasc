@@ -2018,6 +2018,7 @@ static void build_subroutines(BuildCtx *ctx)
   |  set_vmstate EXIT
   |  mov [DISPATCH+DISPATCH_J(exitno)], RCd
   |  mov [DISPATCH+DISPATCH_J(parent)], RAd
+  |  mov dword [DISPATCH+DISPATCH_GL(lasttrace)], RAd
   |  sub rsp, 16*8			// Room for SSE regs.
   |  add rbp, -128
   |  movsd qword [rbp-8],   xmm15; movsd qword [rbp-16],  xmm14
@@ -2048,6 +2049,11 @@ static void build_subroutines(BuildCtx *ctx)
   |  // RD = MULTRES or negated error code, BASE, PC and DISPATCH set.
   |  // Restore additional callee-save registers only used in compiled code.
   |  lea RA, [rsp+16]
+  |  // Record which trace exited to the interpreter (if called from a trace)
+  |  mov TMPRd, dword [DISPATCH+DISPATCH_GL(vmstate)]
+  |  cmp TMPRd, 1
+  |  jb >1
+  |  mov dword [DISPATCH+DISPATCH_GL(lasttrace)], TMPRd
   |1:
   |  mov r13, [RA-8]
   |  mov r12, [RA]
@@ -2062,9 +2068,6 @@ static void build_subroutines(BuildCtx *ctx)
   |  mov L:RB->base, BASE
   |  mov qword [DISPATCH+DISPATCH_GL(jit_base)], 0
   |  mov TMPRd, dword [DISPATCH+DISPATCH_GL(vmstate)]
-  |  // Record which trace exited to the interpreter, then switch state
-  |  mov TMPRd, dword [DISPATCH+DISPATCH_GL(vmstate)]
-  |  mov dword [DISPATCH+DISPATCH_GL(lasttrace)], TMPRd
   |  set_vmstate INTERP
   |  // Modified copy of ins_next which handles function header dispatch, too.
   |  mov RCd, [PC]
