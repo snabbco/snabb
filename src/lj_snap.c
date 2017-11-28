@@ -29,31 +29,6 @@
 /* Emit raw IR without passing through optimizations. */
 #define emitir_raw(ot, a, b)	(lj_ir_set(J, (ot), (a), (b)), lj_ir_emit(J))
 
-/* -- Snapshot buffer allocation ------------------------------------------ */
-
-/* Grow snapshot buffer. */
-void lj_snap_grow_buf_(jit_State *J, MSize need)
-{
-  MSize maxsnap = (MSize)J->param[JIT_P_maxsnap];
-  if (need > maxsnap)
-    lj_trace_err(J, LJ_TRERR_SNAPOV);
-  lj_mem_growvec(J->L, J->snapbuf, J->sizesnap, maxsnap, SnapShot);
-  J->cur.snap = J->snapbuf;
-}
-
-/* Grow snapshot map buffer. */
-void lj_snap_grow_map_(jit_State *J, MSize need)
-{
-  if (need < 2*J->sizesnapmap)
-    need = 2*J->sizesnapmap;
-  else if (need < 64)
-    need = 64;
-  J->snapmapbuf = (SnapEntry *)lj_mem_realloc(J->L, J->snapmapbuf,
-		    J->sizesnapmap*sizeof(SnapEntry), need*sizeof(SnapEntry));
-  J->cur.snapmap = J->snapmapbuf;
-  J->sizesnapmap = need;
-}
-
 /* -- Snapshot generation ------------------------------------------------- */
 
 /* Add all modified slots to the snapshot. */
@@ -130,7 +105,6 @@ static void snapshot_stack(jit_State *J, SnapShot *snap, MSize nsnapmap)
   MSize nent;
   SnapEntry *p;
   /* Conservative estimate. */
-  lj_snap_grow_map(J, nsnapmap + nslots + (MSize)(LJ_FR2?2:J->framedepth+1));
   p = &J->cur.snapmap[nsnapmap];
   nent = snapshot_slots(J, p, nslots);
   snap->nent = (uint8_t)nent;
@@ -157,7 +131,6 @@ void lj_snap_add(jit_State *J)
     nsnapmap = J->cur.snap[--nsnap].mapofs;
   } else {
   nomerge:
-    lj_snap_grow_buf(J, nsnap+1);
     J->cur.nsnap = (uint16_t)(nsnap+1);
   }
   J->mergesnap = 0;
