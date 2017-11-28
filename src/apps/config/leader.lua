@@ -6,6 +6,7 @@ local S = require("syscall")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local cltable = require("lib.cltable")
+local cpuset = require("lib.cpuset")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local util = require("lib.yang.util")
@@ -15,10 +16,13 @@ local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
 local app = require("core.app")
 local shm = require("core.shm")
+local worker = require("core.worker")
 local app_graph = require("core.config")
 local action_codec = require("apps.config.action_codec")
+local alarm_codec = require("apps.config.alarm_codec")
 local support = require("apps.config.support")
 local channel = require("apps.config.channel")
+local alarms = require("lib.yang.alarms")
 
 Leader = {
    config = {
@@ -27,7 +31,9 @@ Leader = {
       -- Could relax this requirement.
       initial_configuration = {required=true},
       schema_name = {required=true},
-      follower_pids = {required=true},
+      worker_start_code = {required=true},
+      default_schema = {},
+      cpuset = {default=cpuset.global_cpuset()},
       Hz = {default=100},
    }
 }
@@ -44,22 +50,22 @@ end
 
 function Leader:new (conf)
    local ret = setmetatable({}, {__index=Leader})
+   ret.cpuset = conf.cpuset
    ret.socket_file_name = conf.socket_file_name
    if not ret.socket_file_name:match('^/') then
       local instance_dir = shm.root..'/'..tostring(S.getpid())
       ret.socket_file_name = instance_dir..'/'..ret.socket_file_name
    end
    ret.schema_name = conf.schema_name
+   ret.default_schema = conf.default_schema or conf.schema_name
    ret.support = support.load_schema_config_support(conf.schema_name)
    ret.socket = open_socket(ret.socket_file_name)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
+   ret.worker_start_code = conf.worker_start_code
    ret.followers = {}
-   for _,pid in ipairs(conf.follower_pids) do
-      table.insert(ret.followers, { pid=pid, queue={} })
-   end
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
 
@@ -69,18 +75,80 @@ function Leader:new (conf)
 end
 
 function Leader:set_initial_configuration (configuration)
-   self.support.validate_config(configuration)
    self.current_configuration = configuration
-   self.current_app_graph = self.setup_fn(configuration)
    self.current_in_place_dependencies = {}
+
+   -- Start the followers and configure them.
+   local worker_app_graphs = self.setup_fn(configuration)
+
+   -- Calculate the dependences
    self.current_in_place_dependencies =
       self.support.update_mutable_objects_embedded_in_app_initargs (
-         {}, self.current_app_graph, self.schema_name, 'load', '/',
-         self.current_configuration)
-   local initial_app_graph = app_graph.new() -- Empty.
+	    {}, worker_app_graphs, self.schema_name, 'load',
+            '/', self.current_configuration)
+
+   -- Iterate over followers starting the workers and queuing up actions.
+   for id, worker_app_graph in pairs(worker_app_graphs) do
+      self:start_follower_for_graph(id, worker_app_graph)
+   end
+end
+
+function Leader:start_worker(cpu)
+   local start_code = { self.worker_start_code }
+   if cpu then
+      table.insert(start_code, 1, "print('Bound data plane to CPU:',"..cpu..")")
+      table.insert(start_code, 1, "require('lib.numa').bind_to_cpu("..cpu..")")
+   end
+   return worker.start("follower", table.concat(start_code, "\n"))
+end
+
+function Leader:stop_worker(id)
+   -- Tell the worker to terminate
+   local stop_actions = {{'shutdown', {}}, {'commit', {}}}
+   self:enqueue_config_actions_for_follower(id, stop_actions)
+   self:send_messages_to_followers()
+   self.followers[id].shutting_down = true
+end
+
+function Leader:remove_stale_followers()
+   local stale = {}
+   for id, follower in pairs(self.followers) do
+      if follower.shutting_down then
+	 if S.waitpid(follower.pid, S.c.W["NOHANG"]) ~= 0 then
+	    stale[#stale + 1] = id
+	 end
+      end
+   end
+   for _, id in ipairs(stale) do
+      if self.followers[id].cpu then
+	 self.cpuset:release(self.followers[id].cpu)
+      end
+      self.followers[id] = nil
+
+   end
+end
+
+function Leader:acquire_cpu_for_follower(id, app_graph)
+   local pci_addresses = {}
+   -- Grovel through app initargs for keys named "pciaddr".  Hacky!
+   for name, init in pairs(app_graph.apps) do
+      if type(init.arg) == 'table' then
+         for k, v in pairs(init.arg) do
+            if k == 'pciaddr' then table.insert(pci_addresses, v) end
+         end
+      end
+   end
+   return self.cpuset:acquire_for_pci_addresses(pci_addresses)
+end
+
+function Leader:start_follower_for_graph(id, graph)
+   local cpu = self:acquire_cpu_for_follower(id, graph)
+   self.followers[id] = { cpu=cpu, pid=self:start_worker(cpu), queue={},
+                          graph=graph }
    local actions = self.support.compute_config_actions(
-      initial_app_graph, self.current_app_graph, {}, 'load')
-   self:enqueue_config_actions(actions)
+      app_graph.new(), self.followers[id].graph, {}, 'load')
+   self:enqueue_config_actions_for_follower(id, actions)
+   return self.followers[id]
 end
 
 function Leader:take_follower_message_queue ()
@@ -91,17 +159,17 @@ end
 
 local verbose = os.getenv('SNABB_LEADER_VERBOSE') and true
 
-function Leader:enqueue_config_actions (actions)
-   local messages = {}
+function Leader:enqueue_config_actions_for_follower(follower, actions)
    for _,action in ipairs(actions) do
       if verbose then print('encode', action[1], unpack(action[2])) end
       local buf, len = action_codec.encode(action)
-      table.insert(messages, { buf=buf, len=len })
+      table.insert(self.followers[follower].queue, { buf=buf, len=len })
    end
-   for _,follower in ipairs(self.followers) do
-      for _,message in ipairs(messages) do
-         table.insert(follower.queue, message)
-      end
+end
+
+function Leader:enqueue_config_actions (actions)
+   for id,_ in pairs(self.followers) do
+      self.enqueue_config_actions_for_follower(id, actions)
    end
 end
 
@@ -111,32 +179,45 @@ function Leader:rpc_describe (args)
       table.insert(alternate_schemas, schema_name)
    end
    return { native_schema = self.schema_name,
+	    default_schema = self.default_schema,
             alternate_schema = alternate_schemas,
             capability = schema.get_default_capabilities() }
 end
 
-local function path_printer_for_grammar(grammar, path)
+local function path_printer_for_grammar(grammar, path, format, print_default)
    local getter, subgrammar = path_mod.resolver(grammar, path)
-   local printer = data.data_printer_from_grammar(subgrammar)
+   local printer
+   if format == "xpath" then
+      printer = data.xpath_printer_from_grammar(subgrammar, print_default, path)
+   else
+      printer = data.data_printer_from_grammar(subgrammar, print_default)
+   end
    return function(data, file)
       return printer(getter(data), file)
    end
 end
 
-local function path_printer_for_schema(schema, path)
-   return path_printer_for_grammar(data.data_grammar_from_schema(schema), path)
+local function path_printer_for_schema(schema, path, is_config,
+                                       format, print_default)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
+   return path_printer_for_grammar(grammar, path, format, print_default)
 end
 
-local function path_printer_for_schema_by_name(schema_name, path)
-   return path_printer_for_schema(yang.load_schema_by_name(schema_name), path)
+local function path_printer_for_schema_by_name(schema_name, path, is_config,
+                                               format, print_default)
+   local schema = yang.load_schema_by_name(schema_name)
+   return path_printer_for_schema(schema, path, is_config, format,
+                                  print_default)
 end
 
 function Leader:rpc_get_config (args)
    local function getter()
       if args.schema ~= self.schema_name then
-         return self:foreign_rpc_get_config(args.schema, args.path)
+         return self:foreign_rpc_get_config(
+            args.schema, args.path, args.format, args.print_default)
       end
-      local printer = path_printer_for_schema_by_name(args.schema, args.path)
+      local printer = path_printer_for_schema_by_name(
+         args.schema, args.path, true, args.format, args.print_default)
       local config = printer(self.current_configuration, yang.string_output_file())
       return { config = config }
    end
@@ -144,13 +225,54 @@ function Leader:rpc_get_config (args)
    if success then return response else return {status=1, error=response} end
 end
 
+function Leader:rpc_set_alarm_operator_state (args)
+   local function getter()
+      if args.schema ~= self.schema_name then
+         return false, ("Set-operator-state operation not supported in"..
+                        "'%s' schema"):format(args.schema)
+      end
+      local key = {resource=args.resource, alarm_type_id=args.alarm_type_id,
+                   alarm_type_qualifier=args.alarm_type_qualifier}
+      local params = {state=args.state, text=args.text}
+      return { success = alarms.set_operator_state(key, params) }
+   end
+   local success, response = pcall(getter)
+   if success then return response else return {status=1, error=response} end
+end
+
+function Leader:rpc_purge_alarms (args)
+   local function purge()
+      if args.schema ~= self.schema_name then
+         return false, ("Purge-alarms operation not supported in"..
+                        "'%s' schema"):format(args.schema)
+      end
+      return { purged_alarms = alarms.purge_alarms(args) }
+   end
+   local success, response = pcall(purge)
+   if success then return response else return {status=1, error=response} end
+end
+
+function Leader:rpc_compress_alarms (args)
+   local function compress()
+      if args.schema ~= self.schema_name then
+         return false, ("Compress-alarms operation not supported in"..
+                        "'%s' schema"):format(args.schema)
+      end
+      return { compressed_alarms = alarms.compress_alarms(args) }
+   end
+   local success, response = pcall(compress)
+   if success then return response else return {status=1, error=response} end
+end
+
+
 local function path_parser_for_grammar(grammar, path)
    local getter, subgrammar = path_mod.resolver(grammar, path)
    return data.data_parser_from_grammar(subgrammar)
 end
 
 local function path_parser_for_schema(schema, path)
-   return path_parser_for_grammar(data.data_grammar_from_schema(schema), path)
+   local grammar = data.config_grammar_from_schema(schema)
+   return path_parser_for_grammar(grammar, path)
 end
 
 local function path_parser_for_schema_by_name(schema_name, path)
@@ -227,7 +349,8 @@ local function path_setter_for_grammar(grammar, path)
 end
 
 local function path_setter_for_schema(schema, path)
-   return path_setter_for_grammar(data.data_grammar_from_schema(schema), path)
+   local grammar = data.config_grammar_from_schema(schema)
+   return path_setter_for_grammar(grammar, path)
 end
 
 function compute_set_config_fn (schema_name, path)
@@ -281,7 +404,7 @@ local function path_adder_for_grammar(grammar, path)
          return function(config, subconfig)
             local tab = getter(config)
             for k,_ in pairs(subconfig) do
-               if tab[k] ~= nil then error('already-existing entry', k) end
+               if tab[k] ~= nil then error('already-existing entry') end
             end
             for k,v in pairs(subconfig) do tab[k] = v end
             return config
@@ -307,7 +430,8 @@ local function path_adder_for_grammar(grammar, path)
 end
 
 local function path_adder_for_schema(schema, path)
-   return path_adder_for_grammar(data.data_grammar_from_schema(schema), path)
+   local grammar = data.config_grammar_from_schema(schema)
+   return path_adder_for_grammar(grammar, path)
 end
 
 function compute_add_config_fn (schema_name, path)
@@ -388,7 +512,8 @@ local function path_remover_for_grammar(grammar, path)
 end
 
 local function path_remover_for_schema(schema, path)
-   return path_remover_for_grammar(data.data_grammar_from_schema(schema), path)
+   local grammar = data.config_grammar_from_schema(schema)
+   return path_remover_for_grammar(grammar, path)
 end
 
 function compute_remove_config_fn (schema_name, path)
@@ -396,7 +521,6 @@ function compute_remove_config_fn (schema_name, path)
 end
 
 function Leader:notify_pre_update (config, verb, path, ...)
-   self.support.validate_update(config, verb, path, ...)
    for _,translator in pairs(self.support.translators) do
       translator.pre_update(config, verb, path, ...)
    end
@@ -407,18 +531,29 @@ function Leader:update_configuration (update_fn, verb, path, ...)
    local to_restart =
       self.support.compute_apps_to_restart_after_configuration_update (
          self.schema_name, self.current_configuration, verb, path,
-         self.current_in_place_dependencies)
+         self.current_in_place_dependencies, ...)
    local new_config = update_fn(self.current_configuration, ...)
-   local new_app_graph = self.setup_fn(new_config)
-   local actions = self.support.compute_config_actions(
-      self.current_app_graph, new_app_graph, to_restart, verb, path, ...)
-   self:enqueue_config_actions(actions)
-   self.current_app_graph = new_app_graph
+   local new_graphs = self.setup_fn(new_config, ...)
+   for id, graph in pairs(new_graphs) do
+      if self.followers[id] == nil then
+	 self:start_follower_for_graph(id, graph)
+      end
+   end
+
+   for id, follower in pairs(self.followers) do
+      if new_graphs[id] == nil then
+         self:stop_worker(id)
+      else
+	 local actions = self.support.compute_config_actions(
+	    follower.graph, new_graphs[id], to_restart, verb, path, ...)
+	 self:enqueue_config_actions_for_follower(id, actions)
+	 follower.graph = new_graphs[id]
+      end
+   end
    self.current_configuration = new_config
    self.current_in_place_dependencies =
       self.support.update_mutable_objects_embedded_in_app_initargs (
-         self.current_in_place_dependencies, self.current_app_graph,
-         verb, path, ...)
+         self.current_in_place_dependencies, new_graphs, verb, path, ...)
 end
 
 function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
@@ -427,6 +562,17 @@ function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
    self:update_configuration(compute_update_fn(args.schema, path),
                              verb, path, parser(args.config))
    return {}
+end
+
+function Leader:get_native_state ()
+   local states = {}
+   local state_reader = self.support.compute_state_reader(self.schema_name)
+   for _, follower in pairs(self.followers) do
+      local follower_config = self.support.configuration_for_follower(
+         follower, self.current_configuration)
+      table.insert(states, state_reader(follower.pid, follower_config))
+   end
+   return self.support.process_states(states)
 end
 
 function Leader:get_translator (schema_name)
@@ -442,22 +588,25 @@ function Leader:apply_translated_rpc_updates (updates)
    end
    return {}
 end
-function Leader:foreign_rpc_get_config (schema_name, path)
+function Leader:foreign_rpc_get_config (schema_name, path, format,
+                                        print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
    local foreign_config = translate.get_config(self.current_configuration)
-   local printer = path_printer_for_schema_by_name(schema_name, path)
+   local printer = path_printer_for_schema_by_name(
+      schema_name, path, true, format, print_default)
    local config = printer(foreign_config, yang.string_output_file())
    return { config = config }
 end
-function Leader:foreign_rpc_get_state (schema_name, path)
+function Leader:foreign_rpc_get_state (schema_name, path, format,
+                                       print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
-   local native_state = state.show_state(self.schema_name, S.getpid(), "/")
-   local foreign_state = translate.get_state(native_state)
-   local printer = path_printer_for_schema_by_name(schema_name, path)
-   local config = printer(foreign_state, yang.string_output_file())
-   return { state = config }
+   local foreign_state = translate.get_state(self:get_native_state())
+   local printer = path_printer_for_schema_by_name(
+      schema_name, path, false, format, print_default)
+   local state = printer(foreign_state, yang.string_output_file())
+   return { state = state }
 end
 function Leader:foreign_rpc_set_config (schema_name, path, config_str)
    path = path_mod.normalize_path(path)
@@ -540,20 +689,33 @@ end
 function Leader:rpc_get_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
-            return self:foreign_rpc_get_state(args.schema, args.path)
+         return self:foreign_rpc_get_state(args.schema, args.path,
+                                           args.format, args.print_default)
       end
-      local printer = path_printer_for_schema_by_name(self.schema_name, args.path)
-      local s = {}
-      for _, follower in pairs(self.followers) do
-         for k,v in pairs(state.show_state(self.schema_name, follower.pid, args.path)) do
-            s[k] = v
-         end
-      end
-      return {state=printer(s, yang.string_output_file())}
+      local state = self:get_native_state()
+      local printer = path_printer_for_schema_by_name(
+         self.schema_name, args.path, false, args.format, args.print_default)
+      return { state = printer(state, yang.string_output_file()) }
    end
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end
 end
+
+function Leader:rpc_get_alarms_state (args)
+   local function getter()
+      assert(args.schema == "ietf-alarms")
+      local printer = path_printer_for_schema_by_name(
+         args.schema, args.path, false, args.format, args.print_default)
+      local state = {
+         alarms = alarms.get_state()
+      }
+      state = printer(state, yang.string_output_file())
+      return { state = state }
+   end
+   local success, response = pcall(getter)
+   if success then return response else return {status=1, error=response} end
+end
+
 function Leader:handle (payload)
    return rpc.handle_calls(self.rpc_callee, payload, self.rpc_handler)
 end
@@ -677,7 +839,7 @@ function Leader:handle_calls_from_peers()
 end
 
 function Leader:send_messages_to_followers()
-   for _,follower in ipairs(self.followers) do
+   for _,follower in pairs(self.followers) do
       if not follower.channel then
          local name = '/'..tostring(follower.pid)..'/config-follower-channel'
          local success, channel = pcall(channel.open, name)
@@ -701,8 +863,53 @@ end
 function Leader:pull ()
    if app.now() < self.next_time then return end
    self.next_time = app.now() + self.period
+   self:remove_stale_followers()
    self:handle_calls_from_peers()
    self:send_messages_to_followers()
+   self:receive_alarms_from_followers()
+end
+
+function Leader:receive_alarms_from_followers ()
+   for _,follower in pairs(self.followers) do
+      self:receive_alarms_from_follower(follower)
+   end
+end
+
+function Leader:receive_alarms_from_follower (follower)
+   if not follower.alarms_channel then
+      local name = '/'..tostring(follower.pid)..'/alarms-follower-channel'
+      local success, channel = pcall(channel.open, name)
+      if not success then return end
+      follower.alarms_channel = channel
+   end
+   local channel = follower.alarms_channel
+   while true do
+      local buf, len = channel:peek_message()
+      if not buf then break end
+      local alarm = alarm_codec.decode(buf, len)
+      self:handle_alarm(follower, alarm)
+      channel:discard_message(len)
+   end
+end
+
+function Leader:handle_alarm (follower, alarm)
+   local fn, args = unpack(alarm)
+   if fn == 'raise_alarm' then
+      local key, args = alarm_codec.to_alarm(args)
+      alarms.raise_alarm(key, args)
+   end
+   if fn == 'clear_alarm' then
+      local key = alarm_codec.to_alarm(args)
+      alarms.clear_alarm(key)
+   end
+   if fn == 'add_to_inventory' then
+      local key, args = alarm_codec.to_alarm_type(args)
+      alarms.do_add_to_inventory(key, args)
+   end
+   if fn == 'declare_alarm' then
+      local key, args = alarm_codec.to_alarm(args)
+      alarms.do_declare_alarm(key, args)
+   end
 end
 
 function Leader:stop ()
@@ -710,6 +917,15 @@ function Leader:stop ()
    self.peers = {}
    self.socket:close()
    S.unlink(self.socket_file_name)
+end
+
+function test_worker()
+   local follower = require("apps.config.follower")
+   local myconf = config.new()
+   config.app(myconf, "follower", follower.Follower, {})
+   app.configure(myconf)
+   app.busywait = true
+   app.main({})
 end
 
 function selftest ()
@@ -721,25 +937,20 @@ function selftest ()
       app_graph.app(graph, "source", basic_apps.Source, {})
       app_graph.app(graph, "sink", basic_apps.Sink, {})
       app_graph.link(graph, "source.foo -> sink.bar")
-      return graph
+      return {graph}
    end
+   local worker_start_code = "require('apps.config.leader').test_worker()"
    app_graph.app(graph, "leader", Leader,
-                 {setup_fn=setup_fn, follower_pids={S.getpid()},
+                 {setup_fn=setup_fn, worker_start_code=worker_start_code,
                   -- Use a schema with no data nodes, just for
                   -- testing.
                   schema_name='ietf-inet-types', initial_configuration={}})
-   app_graph.app(graph, "follower", require('apps.config.follower').Follower,
-                 {})
    engine.configure(graph)
    engine.main({ duration = 0.05, report = {showapps=true,showlinks=true}})
-   assert(app.app_table.source)
-   assert(app.app_table.sink)
-   assert(app.link_table["source.foo -> sink.bar"])
+   assert(app.app_table.leader.followers[1])
+   assert(app.app_table.leader.followers[1].graph.links)
+   assert(app.app_table.leader.followers[1].graph.links["source.foo -> sink.bar"])
    local link = app.link_table["source.foo -> sink.bar"]
-   local counter = require('core.counter')
-   assert(counter.read(link.stats.txbytes) > 0)
-   assert(counter.read(link.stats.txbytes) == counter.read(link.stats.rxbytes))
-   assert(counter.read(link.stats.txdrop) == 0)
    engine.configure(app_graph.new())
    print('selftest: ok')
 end

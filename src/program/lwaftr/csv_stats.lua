@@ -46,7 +46,7 @@ end
 function CSVStatsTimer:new(filename, hydra_mode, pid)
    local file = filename and io.open(filename, "w") or io.stdout
    local o = { hydra_mode=hydra_mode, link_data={}, file=file, period=1,
-      header = hydra_mode and "benchmark,id,score,unit" or "Time (s)" }
+      header = hydra_mode and "benchmark,id,score,unit" or "Time (s)"}
    o.pid = pid or S.getpid()
    o.links_by_app = open_link_counters(o.pid)
    return setmetatable(o, {__index = CSVStatsTimer})
@@ -92,9 +92,11 @@ end
 function CSVStatsTimer:set_period(period) self.period = period end
 
 -- Activate the timer with a period of PERIOD seconds.
-function CSVStatsTimer:activate()
-   self.file:write(self.header..'\n')
-   self.file:flush()
+function CSVStatsTimer:activate(write_header)
+   if write_header then
+      self.file:write(self.header..'\n')
+      self.file:flush()
+   end
    self.start = engine.now()
    self.prev_elapsed = 0
    for _,data in ipairs(self.link_data) do
@@ -102,12 +104,21 @@ function CSVStatsTimer:activate()
       data.prev_txbytes = counter.read(data.txbytes)
    end
    local function tick() return self:tick() end
-   local t = timer.new('csv_stats', tick, self.period*1e9, 'repeating')
-   timer.activate(t)
-   return t
+   self.tick_timer = timer.new('csv_stats', tick, self.period*1e9, 'repeating')
+   timer.activate(self.tick_timer)
+   return self.tick_timer
+end
+
+function CSVStatsTimer:check_alive()
+   -- Instances can be terminated periodically, this checks for that and if so
+   -- removes the timer so the3 stats don't get displayed indefinitely.
+   if S.waitpid(self.pid, S.c.W["NOHANG"]) ~= 0 then
+      self.tick_timer.repeating = false
+   end
 end
 
 function CSVStatsTimer:tick()
+   self:check_alive()
    local elapsed = engine.now() - self.start
    local dt = elapsed - self.prev_elapsed
    self.prev_elapsed = elapsed

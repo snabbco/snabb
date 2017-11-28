@@ -2,16 +2,20 @@
 
 module(...,package.seeall)
 
+local alarms = require("lib.yang.alarms")
 local app = require("core.app")
-local link = require("core.link")
-local lib = require("core.lib")
-local packet = require("core.packet")
 local config = require("core.config")
-local counter = require("core.counter")
 local conntrack = require("apps.packet_filter.conntrack")
+local counter = require("core.counter")
+local lib = require("core.lib")
+local link = require("core.link")
+local packet = require("core.packet")
 local C = require("ffi").C
+local S = require("syscall")
 
 local pf = require("pf")        -- pflua
+
+local CounterAlarm = alarms.CounterAlarm
 
 PcapFilter = {}
 
@@ -37,12 +41,35 @@ function PcapFilter:new (conf)
       shm = { rxerrors = {counter}, sessions_established = {counter} }
    }
    if conf.state_table then conntrack.define(conf.state_table) end
+
+   alarms.add_to_inventory {
+      [{alarm_type_id='filtered-packets', alarm_type_qualifier=conf.alarm_type_qualifier}] = {
+         resource=tostring(S.getpid()),
+         has_clear=true,
+         description="Total number of filtered packets"
+      }
+   }
+   local alarm_key = {
+      resource=tostring(S.getpid()),
+      alarm_type_id='filtered-packets',
+      alarm_type_qualifier=conf.alarm_type_qualifier
+   }
+   local filtered_packets_alarm = alarms.declare_alarm {
+      [alarm_key] = {
+         perceived_severity = 'warning',
+         alarm_text = "More than 1,000,000 packets filtered per second",
+      }
+   }
+   o.filtered_packets_alarm = CounterAlarm.new(filtered_packets_alarm,
+      1, 1e6, o, 'rxerrors')
    return setmetatable(o, { __index = PcapFilter })
 end
 
 function PcapFilter:push ()
    local i = assert(self.input.input or self.input.rx, "input port not found")
    local o = assert(self.output.output or self.output.tx, "output port not found")
+
+   self.filtered_packets_alarm:check()
 
    while not link.empty(i) do
       local p = link.receive(i)

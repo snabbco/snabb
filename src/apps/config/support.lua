@@ -72,7 +72,7 @@ end
 local function compute_objects_maybe_updated_in_place (schema_name, config,
                                                        changed_path)
    local schema = yang.load_schema_by_name(schema_name)
-   local grammar = data.data_grammar_from_schema(schema)
+   local grammar = data.config_grammar_from_schema(schema)
    local objs = {}
    local getter, subgrammar
    for _,path in ipairs(compute_parent_paths(changed_path)) do
@@ -98,11 +98,18 @@ local function compute_objects_maybe_updated_in_place (schema_name, config,
    return objs
 end
 
-local function record_mutable_objects_embedded_in_app_initarg (name, obj, accum)
+local function record_mutable_objects_embedded_in_app_initarg (follower_id, app_name, obj, accum)
    local function record(obj)
       local tab = accum[obj]
-      if not tab then tab = {}; accum[obj] = tab end
-      table.insert(tab, name)
+      if not tab then
+         tab = {}
+         accum[obj] = tab
+      end
+      if tab[follower_id] == nil then
+         tab[follower_id] = {app_name}
+      else
+         table.insert(tab[follower_id], app_name)
+      end
    end
    local function visit(obj)
       if type(obj) == 'table' then
@@ -119,24 +126,30 @@ local function record_mutable_objects_embedded_in_app_initarg (name, obj, accum)
    visit(obj)
 end
 
--- Return "in-place dependencies": a table mapping mutable object ->
--- list of app names.
-local function compute_mutable_objects_embedded_in_app_initargs (app_graph)
+-- Takes a table of follower ids (app_graph_map) and returns a tabl≈e which has
+-- the follower id as the key and a table listing all app names
+--   i.e. {follower_id => {app name, ...}, ...}
+local function compute_mutable_objects_embedded_in_app_initargs (app_graph_map)
    local deps = {}
-   for name, info in pairs(app_graph.apps) do
-      record_mutable_objects_embedded_in_app_initarg(name, info.arg, deps)
+   for id, app_graph in pairs(app_graph_map) do
+      for name, info in pairs(app_graph.apps) do
+         record_mutable_objects_embedded_in_app_initarg(id, name, info.arg, deps)
+      end
    end
    return deps
 end
 
 local function compute_apps_to_restart_after_configuration_update (
-      schema_name, configuration, verb, changed_path, in_place_dependencies)
+      schema_name, configuration, verb, changed_path, in_place_dependencies, arg)
    local maybe_updated = compute_objects_maybe_updated_in_place(
       schema_name, configuration, changed_path)
    local needs_restart = {}
    for _,place in ipairs(maybe_updated) do
-      for _,appname in ipairs(in_place_dependencies[place] or {}) do
-         needs_restart[appname] = true
+      for _, id in ipairs(in_place_dependencies[place] or {}) do
+         if needs_restart[id] == nil then needs_restart[id] = {} end
+         for _, appname in ipairs(in_place_dependencies[place][id] or {}) do
+            needs_restart[id][appname] = true
+         end
       end
    end
    return needs_restart
@@ -151,15 +164,17 @@ local function add_restarts(actions, app_graph, to_restart)
       end
    end
    local to_relink = {}
-   for appname, _ in pairs(to_restart) do
-      local info = assert(app_graph.apps[appname])
-      local class, arg = info.class, info.arg
-      if class.reconfig then
-         table.insert(actions, {'reconfig_app', {appname, class, arg}})
-      else
-         table.insert(actions, {'stop_app', {appname}})
-         table.insert(actions, {'start_app', {appname, class, arg}})
-         to_relink[appname] = true
+   for id, apps in pairs(to_restart) do
+      for appname, _ in pairs(apps) do
+         local info = assert(app_graph.apps[appname])
+         local class, arg = info.class, info.arg
+         if class.reconfig then
+            table.insert(actions, {'reconfig_app', {appname, class, arg}})
+         else
+            table.insert(actions, {'stop_app', {appname}})
+            table.insert(actions, {'start_app', {appname, class, arg}})
+            to_relink[appname] = true
+         end
       end
    end
    for linkspec,_ in pairs(app_graph.links) do
@@ -175,10 +190,22 @@ local function add_restarts(actions, app_graph, to_restart)
    return actions
 end
 
+local function configuration_for_follower(follower, configuration)
+   return configuration
+end
+
+local function compute_state_reader(schema_name)
+   return function(pid)
+      local reader = state.state_reader_from_schema_by_name(schema_name)
+      return reader(state.counters_for_pid(pid))
+   end
+end
+
+local function process_states(states)
+   return states[1]
+end
 
 generic_schema_config_support = {
-   validate_config = function() end,
-   validate_update = function () end,
    compute_config_actions = function(
          old_graph, new_graph, to_restart, verb, path, ...)
       return add_restarts(app.compute_config_actions(old_graph, new_graph),
@@ -188,6 +215,9 @@ generic_schema_config_support = {
          in_place_dependencies, app_graph, schema_name, verb, path, arg)
       return compute_mutable_objects_embedded_in_app_initargs(app_graph)
    end,
+   compute_state_reader = compute_state_reader,
+   configuration_for_follower = configuration_for_follower,
+   process_states = process_states,
    compute_apps_to_restart_after_configuration_update =
       compute_apps_to_restart_after_configuration_update,
    translators = {}

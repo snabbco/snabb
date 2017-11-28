@@ -141,14 +141,14 @@ expensive, especially if the data file includes a large routing table or
 other big structure.  It can be useful to pay for this this parsing and
 validation cost "offline", without interrupting a running data plane.
 
-For this reason, Snabb support compiling configurations to binary data.
-A data plane can load a compiled configuration without any validation,
-very cheaply.  Users can explicitly call the `compile_data_for_schema`
-or `compile_data_for_schema_by_name` functions.  Support is planned also
-for automatic compilation and of source configuration files as well, so
-that the user can just edit configurations as text and still take
-advantage of the speedy binary configuration loads when nothing has
-changed.
+For this reason, Snabb support compiling configurations to binary
+data.  A data plane can load a compiled configuration without any
+validation, very cheaply.  Users can explicitly call the
+`compile_config_for_schema` or `compile_config_for_schema_by_name`
+functions.  Support is planned also for automatic compilation and of
+source configuration files as well, so that the user can just edit
+configurations as text and still take advantage of the speedy binary
+configuration loads when nothing has changed.
 
 #### Querying and updating configurations
 
@@ -207,7 +207,7 @@ Optional entries that may be present in the *parameters* table include:
    built against this particular schema revision date.
 
 For more information on the format of the returned value, see the
-documentation below for `load_data_for_schema`.
+documentation below for `load_config_for_schema`.
 
 — Function **load_schema** *src* *filename*
 
@@ -230,7 +230,7 @@ schema itself, or as `import *name* { ... }` in other YANG modules that
 import this module.  *revision* optionally indicates that a certain
 revision data should be required.
 
-— Function **load_data_for_schema** *schema* *src* *filename*
+— Function **load_config_for_schema** *schema* *src* *filename*
 
 Given the schema object *schema*, load the configuration from the string
 *src*.  Returns a parsed configuration as a plain old Lua value that
@@ -263,7 +263,7 @@ below for details.  In this case the `route` list compiles to a
 ```lua
 local yang = require('lib.yang.yang')
 local ipv4 = require('lib.protocol.ipv4')
-local data = yang.load_data_for_schema(router_schema, conf_str)
+local data = yang.load_config_for_schema(router_schema, conf_str)
 local port = data.routes.route:lookup_ptr(ipv4:pton('1.2.3.4')).value.port
 assert(port == 1)
 ```
@@ -329,23 +329,18 @@ pairs(foo)`, which is often good enough in this case.
 Note that there are a number of value types that are not implemented,
 including some important ones like `union`.
 
-— Function **load_data_for_schema_by_name** *schema_name* *name* *filename*
+— Function **load_config_for_schema_by_name** *schema_name* *name* *filename*
 
-Like `load_data_for_schema`, but identifying the schema by name instead
+Like `load_config_for_schema`, but identifying the schema by name instead
 of by value, as in `load_schema_by_name`.
 
-— Function **print_data_for_schema** *schema* *data* *file*
+— Function **print_config_for_schema** *schema* *data* *file*
 
 Serialize the configuration *data* as text via repeated calls to the
 `write` method of *file*.  At the end, the `flush` method is called on
 *file*.  *schema* is the schema that describes *data*.
 
-— Function **print_data_for_schema_by_name** *schema_name* *name* *filename*
-
-Like `print_data_for_schema`, but identifying the schema by name instead
-of by value, as in `load_schema_by_name`.
-
-— Function **compile_data_for_schema** *schema* *data* *filename* *mtime*
+— Function **compile_config_for_schema** *schema* *data* *filename* *mtime*
 
 Compile *data*, using a compiler generated for *schema*, and write out
 the result to the file named *filename*.  *mtime*, if given, should be a
@@ -354,10 +349,10 @@ the source file.  This information will be serialized in the compiled
 file, and may be used when loading the file to determine whether the
 configuration is up to date.
 
-— Function **compile_data_for_schema_by_name** *schema_name* *data* *filename* *mtime*
+— Function **compile_config_for_schema_by_name** *schema_name* *data* *filename* *mtime*
 
-Like `compile_data_for_schema_by_name`, but identifying the schema by
-name instead of by value, as in `load_schema_by_name`.
+Like `compile_config_for_schema_by_name`, but identifying the schema
+by name instead of by value, as in `load_schema_by_name`.
 
 — Function **load_compiled_data_file** *filename*
 
@@ -369,8 +364,8 @@ value will be table containing four keys:
     compiled.
  * `revision_date`: The revision date  of the schema for which this file
     was compiled, or the empty string (`''`) if unknown.
- * `source_mtime`: An `mtime` table, as for `compile_data_for_schema`.
+ * `source_mtime`: An `mtime` table, as for `compile_config_for_schema`.
     If no mtime was written into the file, both `secs` and `nsecs` will
     be zero.
  * `data`: The configuration data, in the same format as returned by
-    `load_data_for_schema`.
+    `load_config_for_schema`.

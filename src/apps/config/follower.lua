@@ -11,6 +11,7 @@ local shm = require("core.shm")
 local app_graph = require("core.config")
 local channel = require("apps.config.channel")
 local action_codec = require("apps.config.action_codec")
+local alarm_codec = require("apps.config.alarm_codec")
 
 Follower = {
    config = {
@@ -23,8 +24,17 @@ function Follower:new (conf)
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
    ret.channel = channel.create('config-follower-channel', 1e6)
+   ret.alarms_channel = alarm_codec.get_channel()
    ret.pending_actions = {}
    return ret
+end
+
+function Follower:shutdown()
+   -- This will shutdown everything.
+   engine.configure(app_graph.new())
+
+   -- Now we can exit.
+   S.exit(0)
 end
 
 function Follower:commit_pending_actions()
@@ -40,6 +50,8 @@ function Follower:commit_pending_actions()
          local callee, method, blob = unpack(args)
          local obj = assert(app.app_table[callee])
          assert(obj[method])(obj, blob)
+      elseif name == "shutdown" then
+         self:shutdown()
       else
          if name == 'start_app' or name == 'reconfig_app' then
             should_flush = true

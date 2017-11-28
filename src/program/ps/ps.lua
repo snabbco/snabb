@@ -3,9 +3,10 @@
 module(..., package.seeall)
 
 local S = require("syscall")
+local app = require("core.app")
+local common = require("program.config.common")
 local lib = require("core.lib")
 local shm = require("core.shm")
-local app = require("core.app")
 
 local basename, dirname = lib.basename, lib.dirname
 
@@ -68,6 +69,8 @@ local function compute_snabb_instances()
          end
          if is_addressable(p) then
             instance.addressable = true
+            local descr = common.call_leader(p, 'describe', {})
+            instance.schema = descr.native_schema
          end
          table.insert(pids, instance)
       end
@@ -93,6 +96,9 @@ function run (args)
       end
       if instance.addressable then
          io.write(" *")
+      end
+      if instance.schema then
+         io.write(" [schema: "..instance.schema.."]")
       end
       io.write("\n")
    end

@@ -12,7 +12,7 @@ local shm = require("core.shm")
 local action_names = { 'unlink_output', 'unlink_input', 'free_link',
                        'new_link', 'link_output', 'link_input', 'stop_app',
                        'start_app', 'reconfig_app',
-                       'call_app_method_with_blob', 'commit' }
+                       'call_app_method_with_blob', 'commit', 'shutdown' }
 local action_codes = {}
 for i, name in ipairs(action_names) do action_codes[name] = i end
 
@@ -73,6 +73,9 @@ end
 function actions.commit (codec)
    return codec:finish()
 end
+function actions.shutdown (codec)
+   return codec:finish()
+end
 
 local public_names = {}
 local function find_public_name(obj)
@@ -92,21 +95,9 @@ local function find_public_name(obj)
    error('could not determine public name for object: '..tostring(obj))
 end
 
-local lower_case = "abcdefghijklmnopqrstuvwxyz"
-local upper_case = lower_case:upper()
-local extra = "0123456789_-"
-local alphabet = table.concat({lower_case, upper_case, extra})
-assert(#alphabet == 64)
 local function random_file_name()
-   -- 22 bytes, but we only use 2^6=64 bits from each byte, so total of
-   -- 132 bits of entropy.
-   local bytes = lib.random_data(22)
-   local out = {}
-   for i=1,#bytes do
-      table.insert(out, alphabet:byte(bytes:byte(i) % 64 + 1))
-   end
-   local basename = string.char(unpack(out))
-   return shm.root..'/'..tostring(S.getpid())..'/app-conf-'..basename
+   local basename = 'app-conf-'..lib.random_printable_string(160)
+   return shm.root..'/'..shm.resolve(basename)
 end
 
 local function encoder()
@@ -132,8 +123,8 @@ local function encoder()
    function encoder:config(class, arg)
       local file_name = random_file_name()
       if class.yang_schema then
-         yang.compile_data_for_schema_by_name(class.yang_schema, arg,
-                                              file_name)
+         yang.compile_config_for_schema_by_name(class.yang_schema, arg,
+                                                file_name)
       else
          if arg == nil then arg = {} end
          binary.compile_ad_hoc_lua_data_to_file(file_name, arg)

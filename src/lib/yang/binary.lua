@@ -3,6 +3,8 @@
 module(..., package.seeall)
 
 local ffi = require("ffi")
+local lib = require("core.lib")
+local shm = require("core.shm")
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
@@ -12,7 +14,7 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
-local VERSION = 0x00005000
+local VERSION = 0x00008000
 
 local header_t = ffi.typeof([[
 struct {
@@ -100,17 +102,42 @@ local function table_size(tab)
    return size
 end
 
+local SPARSE_ARRAY_END = 0xffffffff
+
 local function data_emitter(production)
    local handlers = {}
+   local translators = {}
    local function visit1(production)
       return assert(handlers[production.type])(production)
    end
+   local function expand(production)
+      if production.type ~= "struct" then return production end
+      local expanded = {}
+      for keyword,prod in pairs(production.members) do
+         if translators[prod.type] ~= nil then
+            translators[prod.type](expanded, keyword, prod)
+         else
+            expanded[keyword] = prod
+         end
+      end
+      return {type="struct", members=expanded}
+   end
    local function visitn(productions)
       local ret = {}
-      for keyword,production in pairs(productions) do
+      local expanded_production = productions
+      for keyword, production in pairs(productions) do
+         expanded_production[keyword] = expand(production)
+      end
+      for keyword,production in pairs(expanded_production) do
          ret[keyword] = visit1(production)
       end
       return ret
+   end
+   function translators.choice(productions, keyword, production)
+      -- Now bring the choice statements up to the same level replacing it.
+      for case, block in pairs(production.choices) do
+         for name, body in pairs(block) do productions[name] = body end
+      end
    end
    function handlers.struct(production)
       local member_names = {}
@@ -191,8 +218,11 @@ local function data_emitter(production)
          return function(data, stream)
             stream:write_stringref('cltable')
             emit_keys(data.keys, stream)
-            stream:write_uint32(#data.values)
-            for i=1,#data.values do emit_value(data.values[i], stream) end
+            for i, value in pairs(data.values) do
+               stream:write_uint32(i)
+               emit_value(value, stream)
+            end
+            stream:write_uint32(SPARSE_ARRAY_END)
          end
       else
          local emit_key = visit1({type='struct', members=production.keys,
@@ -202,7 +232,7 @@ local function data_emitter(production)
          -- FIXME: lctable if production.value_ctype?
          return function(data, stream)
             stream:write_stringref('lltable')
-            stream:write_uint32(table_count(data))
+            stream:write_uint32(table_size(data))
             for k,v in pairs(data) do
                emit_key(k, stream)
                emit_value(v, stream)
@@ -210,22 +240,31 @@ local function data_emitter(production)
          end
       end
    end
+   local native_types = lib.set('enumeration', 'identityref', 'string')
    function handlers.scalar(production)
       local primitive_type = production.argument_type.primitive_type
+      local type = assert(value.types[primitive_type], "unsupported type: "..primitive_type)
       -- FIXME: needs a case for unions
-      if primitive_type == 'string' then
+      if native_types[primitive_type] then
          return function(data, stream)
             stream:write_stringref('stringref')
             stream:write_stringref(data)
          end
-      else
-         local ctype = assert(assert(value.types[primitive_type]).ctype)
+      elseif primitive_type == 'empty' then
+         return function (data, stream)
+            stream:write_stringref('flag')
+            stream:write_uint32(data and 1 or 0)
+         end
+      elseif type.ctype then
+         local ctype = type.ctype
          local emit_value = value_emitter(ctype)
          return function(data, stream)
             stream:write_stringref('cdata')
             stream:write_stringref(ctype)
             emit_value(data, stream)
          end
+      else
+         error("unimplemented: "..primitive_type)
       end
    end
 
@@ -261,19 +300,27 @@ function data_compiler_from_grammar(emit_data, schema_name, schema_revision)
    end
 end
 
-function data_compiler_from_schema(schema)
-   local grammar = data.data_grammar_from_schema(schema)
+function data_compiler_from_schema(schema, is_config)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
    return data_compiler_from_grammar(data_emitter(grammar),
                                      schema.id, schema.revision_date)
 end
 
-function compile_data_for_schema(schema, data, filename, source_mtime)
-   return data_compiler_from_schema(schema)(data, filename, source_mtime)
+function config_compiler_from_schema(schema)
+   return data_compiler_from_schema(schema, true)
 end
 
-function compile_data_for_schema_by_name(schema_name, data, filename, source_mtime)
-   return compile_data_for_schema(schema.load_schema_by_name(schema_name),
-                                  data, filename, source_mtime)
+function state_compiler_from_schema(schema)
+   return data_compiler_from_schema(schema, false)
+end
+
+function compile_config_for_schema(schema, data, filename, source_mtime)
+   return config_compiler_from_schema(schema)(data, filename, source_mtime)
+end
+
+function compile_config_for_schema_by_name(schema_name, data, filename, source_mtime)
+   return compile_config_for_schema(schema.load_schema_by_name(schema_name),
+                                    data, filename, source_mtime)
 end
 
 -- Hackily re-use the YANG serializer for Lua data consisting of tables,
@@ -368,7 +415,11 @@ local function read_compiled_data(stream, strtab)
    function readers.cltable()
       local keys = read1()
       local values = {}
-      for i=1,stream:read_uint32() do table.insert(values, read1()) end
+      while true do
+         local i = stream:read_uint32()
+         if i == SPARSE_ARRAY_END then break end
+         values[i] = read1()
+      end
       return cltable.build(keys, values)
    end
    function readers.lltable()
@@ -385,6 +436,10 @@ local function read_compiled_data(stream, strtab)
    function readers.cdata()
       local ctype = scalar_type(read_string())
       return stream:read_ptr(ctype)[0]
+   end
+   function readers.flag()
+      if stream:read_uint32() ~= 0 then return true end
+      return nil
    end
    return read1()
 end
@@ -422,6 +477,41 @@ function load_compiled_data_file(filename)
    return load_compiled_data(stream.open_input_byte_stream(filename))
 end
 
+function data_copier_from_grammar(production)
+   local compile = data_compiler_from_grammar(data_emitter(production), '')
+   return function(data)
+      local basename = 'copy-'..lib.random_printable_string(160)
+      local tmp = shm.root..'/'..shm.resolve(basename)
+      compile(data, tmp)
+      return function() return load_compiled_data_file(tmp).data end
+   end
+end
+
+function data_copier_for_schema(schema, is_config)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
+   return data_copier_from_grammar(grammar)
+end
+
+function config_copier_for_schema(schema)
+   return data_copier_for_schema(schema, true)
+end
+
+function state_copier_for_schema(schema)
+   return data_copier_for_schema(schema, false)
+end
+
+function config_copier_for_schema_by_name(schema_name)
+   return config_copier_for_schema(schema.load_schema_by_name(schema_name))
+end
+
+function copy_config_for_schema(schema, data)
+   return config_copier_for_schema(schema)(data)()
+end
+
+function copy_config_for_schema_by_name(schema_name, data)
+   return config_copier_for_schema_by_name(schema_name)(data)()
+end
+
 function selftest()
    print('selfcheck: lib.yang.binary')
    local test_schema = schema.load_schema([[module snabb-simple-router {
@@ -429,20 +519,57 @@ function selftest()
       prefix simple-router;
 
       import ietf-inet-types {prefix inet;}
+      import ietf-yang-types { prefix yang; }
 
       leaf is-active { type boolean; default true; }
 
       leaf-list integers { type uint32; }
       leaf-list addrs { type inet:ipv4-address; }
+
+      typedef severity  {
+         type enumeration {
+            enum indeterminate;
+            enum minor {
+               value 3;
+            }
+            enum warning {
+               value 4;
+            }
+         }
+      }
+
       container routes {
          list route {
             key addr;
             leaf addr { type inet:ipv4-address; mandatory true; }
             leaf port { type uint8 { range 0..11; } mandatory true; }
          }
+         leaf severity {
+            type severity;
+         }
+      }
+
+      container next-hop {
+         choice address {
+            case mac {
+               leaf mac { type yang:mac-address; }
+            }
+            case ipv4 {
+               leaf ipv4 { type inet:ipv4-address; }
+            }
+            case ipv6 {
+               leaf ipv6 { type inet:ipv6-address; }
+            }
+         }
+      }
+
+      container foo {
+         leaf enable-qos {
+            type empty;
+         }
       }
    }]])
-   local data = data.load_data_for_schema(test_schema, [[
+   local data = data.load_config_for_schema(test_schema, [[
       is-active true;
       integers 1;
       integers 2;
@@ -453,6 +580,13 @@ function selftest()
         route { addr 1.2.3.4; port 1; }
         route { addr 2.3.4.5; port 10; }
         route { addr 3.4.5.6; port 2; }
+        severity minor;
+      }
+      next-hop {
+         ipv4 5.6.7.8;
+      }
+      foo {
+         enable-qos;
       }
    ]])
 
@@ -475,13 +609,17 @@ function selftest()
       assert(routing_table:lookup_ptr(key).value.port == 10)
       key.addr = util.ipv4_pton('3.4.5.6')
       assert(routing_table:lookup_ptr(key).value.port == 2)
+      assert(
+         data.next_hop.ipv4 == util.ipv4_pton('5.6.7.8'),
+         "Choice type test failed (round: "..i..")"
+      )
 
       local tmp = os.tmpname()
-      compile_data_for_schema(test_schema, data, tmp)
+      compile_config_for_schema(test_schema, data, tmp)
       local data2 = load_compiled_data_file(tmp)
       assert(data2.schema_name == 'snabb-simple-router')
       assert(data2.revision_date == '')
-      data = data2.data
+      data = copy_config_for_schema(test_schema, data2.data)
       os.remove(tmp)
    end
    print('selfcheck: ok')
