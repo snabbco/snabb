@@ -295,6 +295,13 @@ typedef struct FoldState {
   IRIns right[2];	/* Instruction referenced by right operand. */
 } FoldState;
 
+/* Log entry for a bytecode that was recorded. */
+typedef struct BCRecLog {
+  GCproto *pt;
+  BCPos pos;
+  int32_t framedepth;
+} BCRecLog;
+
 /* JIT compiler state. */
 typedef struct jit_State {
   GCtrace cur;		/* Current trace. */
@@ -339,6 +346,10 @@ typedef struct jit_State {
   SnapShot *snapbuf;	/* Temp. snapshot buffer. */
   SnapEntry *snapmapbuf;  /* Temp. snapshot map buffer. */
   MSize sizesnapmap;	/* Size of temp. snapshot map buffer. */
+
+  BCRecLog *bclog;	/* Start of of recorded bytecode log. */
+  BCRecLog *bclognext;	/* Next entry in the bytecode log. */
+  BCRecLog *bcloglast;	/* Last entry in the bytecode log. */
 
   PostProc postproc;	/* Required post-processing after execution. */
   uint8_t retryrec;	/* Retry recording. */
