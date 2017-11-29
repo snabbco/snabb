@@ -3,6 +3,10 @@
 
 SKIPPED_CODE=43
 
+if [ "$SNABB_IPSEC_SKIP_E2E_TEST" = yes ]; then
+    exit $SKIPPED_CODE
+fi
+
 if [ -z "$SNABB_TELNET0" ]; then
     export SNABB_TELNET0=5000
     echo "Defaulting to SNABB_TELNET0=$SNABB_TELNET0"
