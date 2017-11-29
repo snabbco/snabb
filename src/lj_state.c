@@ -170,7 +170,7 @@ static void close_state(lua_State *L)
   lj_mem_freevec(g, tvref(L->stack), L->stacksize, TValue);
   lj_mem_free(g, J->snapmapbuf, J->sizesnapmap);
   lj_mem_free(g, J->snapbuf, J->sizesnap);
-  lj_mem_free(g, J->irbuf-REF_BIAS, 65536*sizeof(IRIns));
+  lj_mem_free(g, J->irbuf, 65536*sizeof(IRIns));
   lua_assert(g->gc.total == sizeof(GG_State));
 #ifndef LUAJIT_USE_SYSMALLOC
   if (g->allocf == lj_alloc_f)
