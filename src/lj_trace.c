@@ -37,7 +37,6 @@ void lj_trace_err(jit_State *J, TraceError e)
 {
   setnilV(&J->errinfo);  /* No error info. */
   setintV(J->L->top++, (int32_t)e);
-  lj_auditlog_trace_abort(J, e);
   lj_err_throw(J->L, LUA_ERRRUN);
 }
 
@@ -45,7 +44,6 @@ void lj_trace_err(jit_State *J, TraceError e)
 void lj_trace_err_info(jit_State *J, TraceError e)
 {
   setintV(J->L->top++, (int32_t)e);
-  lj_auditlog_trace_abort(J, e);
   lj_err_throw(J->L, LUA_ERRRUN);
 }
 
@@ -526,7 +524,6 @@ static int trace_abort(jit_State *J)
     J->cur.traceno = 0;
   }
   L->top--;  /* Remove error object */
-  lj_auditlog_trace_abort(J, e);
   if (e == LJ_TRERR_DOWNREC)
     return trace_downrec(J);
   else if (e == LJ_TRERR_MCODEAL)

@@ -107,7 +107,6 @@ void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 void lj_auditlog_trace_abort(jit_State *J, TraceError e) {
   ensure_log_open();
   log_jit_State(J);
-  log_GCtrace(&J->cur);
   log_event("trace_abort", 2);
   str_16("TraceError"); /* = */ uint_64(e);
   str_16("jit_State");  /* = */ uint_64((uint64_t)J);
