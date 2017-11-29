@@ -298,6 +298,13 @@ typedef struct FoldState {
   IRIns right[2];	/* Instruction referenced by right operand. */
 } FoldState;
 
+/* Log entry for a bytecode that was recorded. */
+typedef struct BCRecLog {
+  GCproto *pt;		/* Prototype of bytecode function (or NULL). */
+  BCPos pos;		/* Position of bytecode in prototype. */
+  int32_t framedepth;	/* Frame depth when recorded. */
+} BCRecLog;
+
 /* JIT compiler state. */
 typedef struct jit_State {
   GCtrace cur;		/* Current trace. */
@@ -336,14 +343,16 @@ typedef struct jit_State {
   uint32_t k32[LJ_K32__MAX];  /* Ditto for 4 byte constants. */
 
   IRIns *irbuf;		/* Temp. IR instruction buffer. Biased with REF_BIAS. */
-  IRRef irtoplim;	/* Upper limit of instuction buffer (biased). */
-  IRRef irbotlim;	/* Lower limit of instuction buffer (biased). */
   IRRef loopref;	/* Last loop reference or ref of final LOOP (or 0). */
 
   MSize sizesnap;	/* Size of temp. snapshot buffer. */
   SnapShot *snapbuf;	/* Temp. snapshot buffer. */
   SnapEntry *snapmapbuf;  /* Temp. snapshot map buffer. */
   MSize sizesnapmap;	/* Size of temp. snapshot map buffer. */
+
+  BCRecLog *bclog;	/* Start of of recorded bytecode log. */
+  uint32_t nbclog;	/* Number of logged bytecodes. */
+  uint32_t maxbclog;	/* Max entries in the bytecode log. */
 
   PostProc postproc;	/* Required post-processing after execution. */
   uint8_t retryrec;	/* Retry recording. */
