@@ -297,9 +297,9 @@ typedef struct FoldState {
 
 /* Log entry for a bytecode that was recorded. */
 typedef struct BCRecLog {
-  GCproto *pt;
-  BCPos pos;
-  int32_t framedepth;
+  GCproto *pt;		/* Prototype of bytecode function (or NULL). */
+  BCPos pos;		/* Position of bytecode in prototype. */
+  int32_t framedepth;	/* Frame depth when recorded. */
 } BCRecLog;
 
 /* JIT compiler state. */
@@ -348,8 +348,8 @@ typedef struct jit_State {
   MSize sizesnapmap;	/* Size of temp. snapshot map buffer. */
 
   BCRecLog *bclog;	/* Start of of recorded bytecode log. */
-  BCRecLog *bclognext;	/* Next entry in the bytecode log. */
-  BCRecLog *bcloglast;	/* Last entry in the bytecode log. */
+  uint32_t nbclog;	/* Number of logged bytecodes. */
+  uint32_t maxbclog;	/* Max entries in the bytecode log. */
 
   PostProc postproc;	/* Required post-processing after execution. */
   uint8_t retryrec;	/* Retry recording. */

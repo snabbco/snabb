@@ -217,8 +217,9 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   J->sizesnapmap = sizeof(SnapEntry)*65536;
   J->snapbuf = (SnapShot *)lj_mem_new(L, J->sizesnap);
   J->snapmapbuf = (SnapEntry *)lj_mem_new(L, J->sizesnapmap);
-  J->bclognext = J->bclog = (BCRecLog *)lj_mem_new(L, sizeof(BCRecLog)*65536);
-  J->bcloglast = J->bclog + 65535;
+  J->maxbclog = 65536;
+  J->bclog = (BCRecLog *)lj_mem_new(L, sizeof(BCRecLog)*J->maxbclog);
+  J->nbclog = 0;
   IRIns *irbufmem = (IRIns *)lj_mem_new(L, sizeof(IRIns)*65536);
   if (irbufmem == NULL || J->snapbuf == NULL || J->snapmapbuf == NULL)
     return NULL;
