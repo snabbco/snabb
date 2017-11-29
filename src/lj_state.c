@@ -171,7 +171,7 @@ static void close_state(lua_State *L)
   lj_mem_free(g, J->bclog, sizeof(BCRecLog)*65536);
   lj_mem_free(g, J->snapmapbuf, J->sizesnapmap);
   lj_mem_free(g, J->snapbuf, J->sizesnap);
-  lj_mem_free(g, J->irbuf-REF_BIAS, 65536*sizeof(IRIns));
+  lj_mem_free(g, J->irbuf, 65536*sizeof(IRIns));
   lua_assert(g->gc.total == sizeof(GG_State));
 #ifndef LUAJIT_USE_SYSMALLOC
   if (g->allocf == lj_alloc_f)
@@ -220,10 +220,9 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   J->maxbclog = 65536;
   J->bclog = (BCRecLog *)lj_mem_new(L, sizeof(BCRecLog)*J->maxbclog);
   J->nbclog = 0;
-  IRIns *irbufmem = (IRIns *)lj_mem_new(L, sizeof(IRIns)*65536);
-  if (irbufmem == NULL || J->snapbuf == NULL || J->snapmapbuf == NULL)
+  J->irbuf = (IRIns *)lj_mem_new(L, sizeof(IRIns)*65536);
+  if (J->irbuf == NULL || J->snapbuf == NULL || J->snapmapbuf == NULL)
     return NULL;
-  J->irbuf = irbufmem + REF_BIAS;
   lj_dispatch_init((GG_State *)L);
   L->status = LUA_ERRERR+1;  /* Avoid touching the stack upon memory error. */
   if (lj_vm_cpcall(L, NULL, NULL, cpluaopen) != 0) {
