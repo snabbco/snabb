@@ -62,7 +62,7 @@ static void log_event(const char *type, int nattributes) {
 /* Log objects that define the virtual machine. */
 void lj_auditlog_vm_definitions()
 {
-  log_mem("lj_ir_mode", &lj_ir_mode, sizeof(lj_ir_mode));
+  log_mem("lj_ir_mode", (void*)&lj_ir_mode, sizeof(lj_ir_mode));
 }
 
 /* Ensure that the log file is open. */
@@ -76,24 +76,40 @@ static void ensure_log_open() {
 
 /* -- high-level LuaJIT object logging ------------------------------------ */
 
-/* Log a trace that has just been compiled. */
-void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
+static void log_jit_State(jit_State *J)
 {
-  ensure_log_open();
-  log_mem("GCtrace", T, sizeof(*T));
+  log_mem("BCRecLog[]", J->bclog, J->nbclog * sizeof(*J->bclog));
+  log_mem("jit_State", J, sizeof(*J));
+}
+
+static void log_GCtrace(GCtrace *T)
+{
   log_mem("MCode[]", T->mcode, T->szmcode);
   log_mem("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
   log_mem("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
   log_mem("IRIns[]", &T->ir[T->nk], (T->nins - T->nk + 1) * sizeof(IRIns));
-  log_event("trace_stop", 1);
-  str_16("GCtrace"); /* = */ uint_64((uint64_t)T);
+  log_mem("GCtrace", T, sizeof(*T));
+}
+
+/* API functions */
+
+/* Log a trace that has just been compiled. */
+void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
+{
+  ensure_log_open();
+  log_jit_State(J);
+  log_GCtrace(T);
+  log_event("trace_stop", 2);
+  str_16("GCtrace");   /* = */ uint_64((uint64_t)T);
+  str_16("jit_State"); /* = */ uint_64((uint64_t)J);
 }
 
 void lj_auditlog_trace_abort(jit_State *J, TraceError e) {
   ensure_log_open();
-  log_mem("jit_State", J, sizeof(*J));
+  log_jit_State(J);
+  log_GCtrace(&J->cur);
   log_event("trace_abort", 2);
-  str_16("jit_State");  /* = */ uint_64((uint64_t)J);
   str_16("TraceError"); /* = */ uint_64(e);
+  str_16("jit_State");  /* = */ uint_64((uint64_t)J);
 }
 

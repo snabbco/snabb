@@ -9,7 +9,6 @@
 #include "lj_obj.h"
 
 
-#include "lj_auditlog.h"
 #include "lj_gc.h"
 #include "lj_err.h"
 #include "lj_debug.h"
@@ -308,8 +307,8 @@ static void blacklist_pc(GCproto *pt, BCIns *pc)
   pt->flags |= PROTO_ILOOP;
 }
 
-/* Penalize a bytecode instruction. */
-static void penalty_pc(jit_State *J, GCproto *pt, BCIns *pc, TraceError e)
+/* Penalize a bytecode instruction. Return true when blacklisted. */
+static int penalty_pc(jit_State *J, GCproto *pt, BCIns *pc, TraceError e)
 {
   uint32_t i, val = PENALTY_MIN;
   for (i = 0; i < PENALTY_SLOTS; i++)
@@ -319,7 +318,7 @@ static void penalty_pc(jit_State *J, GCproto *pt, BCIns *pc, TraceError e)
 	    LJ_PRNG_BITS(J, PENALTY_RNDBITS);
       if (val > PENALTY_MAX) {
 	blacklist_pc(pt, pc);  /* Blacklist it, if that didn't help. */
-	return;
+	return 1;
       }
       goto setpenalty;
     }
@@ -331,7 +330,19 @@ setpenalty:
   J->penalty[i].val = (uint16_t)val;
   J->penalty[i].reason = e;
   hotcount_set(J2GG(J), pc+1, val);
+  return 0;
 }
+
+/* Check if this is the last attempt to compile a side trace.
+** (If so the next attempt will just record a fallback to the interpreter.)
+**/
+static int last_try(jit_State *J)
+{
+  GCtrace *parent = traceref(J, J->parent);
+  int count = parent->snap[J->exitno].count;
+  return count+1 >= J->param[JIT_P_hotexit] + J->param[JIT_P_tryside];
+}
+
 
 /* -- Trace compiler state machine ---------------------------------------- */
 
@@ -483,6 +494,7 @@ static int trace_abort(jit_State *J)
     J->state = LJ_TRACE_ASM;
     return 1;  /* Retry ASM with new MCode area. */
   }
+
   /* Penalize or blacklist starting bytecode instruction. */
   if (J->parent == 0 && !bc_isret(bc_op(J->cur.startins))) {
     if (J->exitno == 0) {
@@ -490,11 +502,16 @@ static int trace_abort(jit_State *J)
       if (e == LJ_TRERR_RETRY)
 	hotcount_set(J2GG(J), startpc+1, 1);  /* Immediate retry. */
       else
-	penalty_pc(J, &gcref(J->cur.startpt)->pt, startpc, e);
+	J->final = penalty_pc(J, &gcref(J->cur.startpt)->pt, startpc, e);
     } else {
       traceref(J, J->exitno)->link = J->exitno;  /* Self-link is blacklisted. */
     }
   }
+
+  /* Is this the last attempt at a side trace? */
+  if (J->parent && last_try(J)) J->final = 1;
+
+  lj_auditlog_trace_abort(J, e);
 
   /* Is there anything to abort? */
   traceno = J->cur.traceno;

@@ -397,7 +397,7 @@ typedef struct jit_State {
   size_t szallmcarea;	/* Total size of all allocated mcode areas. */
 
   TValue errinfo;	/* Additional info element for trace errors. */
-
+  int8_t final;		/* True if trace error is final. */
 }
 jit_State;
 
