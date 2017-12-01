@@ -1352,7 +1352,7 @@ static void fs_fixup_uv1(FuncState *fs, GCproto *pt, uint16_t *uv)
 /* Prepare lineinfo for prototype. */
 static size_t fs_prep_line(FuncState *fs, BCLine numline)
 {
-  return (fs->pc-1) << (numline < 256 ? 0 : numline < 65536 ? 1 : 2);
+  return (fs->pc-1) * sizeof(BCLine);
 }
 
 /* Fixup lineinfo for prototype. */
@@ -1365,28 +1365,12 @@ static void fs_fixup_line(FuncState *fs, GCproto *pt,
   pt->firstline = fs->linedefined;
   pt->numline = numline;
   setmref(pt->lineinfo, lineinfo);
-  if (LJ_LIKELY(numline < 256)) {
-    uint8_t *li = (uint8_t *)lineinfo;
-    do {
-      BCLine delta = base[i].line - first;
-      lua_assert(delta >= 0 && delta < 256);
-      li[i] = (uint8_t)delta;
-    } while (++i < n);
-  } else if (LJ_LIKELY(numline < 65536)) {
-    uint16_t *li = (uint16_t *)lineinfo;
-    do {
-      BCLine delta = base[i].line - first;
-      lua_assert(delta >= 0 && delta < 65536);
-      li[i] = (uint16_t)delta;
-    } while (++i < n);
-  } else {
-    uint32_t *li = (uint32_t *)lineinfo;
-    do {
-      BCLine delta = base[i].line - first;
-      lua_assert(delta >= 0);
-      li[i] = (uint32_t)delta;
-    } while (++i < n);
-  }
+  uint32_t *li = (uint32_t *)lineinfo;
+  do {
+    BCLine delta = base[i].line - first;
+    lua_assert(delta >= 0);
+    li[i] = (uint32_t)delta;
+  } while (++i < n);
 }
 
 /* Prepare variable info for prototype. */
@@ -1443,7 +1427,7 @@ static void fs_fixup_var(LexState *ls, GCproto *pt, uint8_t *p, size_t ofsvar)
 /* Initialize with empty debug info, if disabled. */
 #define fs_prep_line(fs, numline)		(UNUSED(numline), 0)
 #define fs_fixup_line(fs, pt, li, numline) \
-  pt->firstline = pt->numline = 0, setmref((pt)->lineinfo, NULL)
+pt->firstline = pt->numline = 0, setmref((pt)->lineinfo, NULL)
 #define fs_prep_var(ls, fs, ofsvar)		(UNUSED(ofsvar), 0)
 #define fs_fixup_var(ls, pt, p, ofsvar) \
   setmref((pt)->uvinfo, NULL), setmref((pt)->varinfo, NULL)
