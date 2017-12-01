@@ -252,6 +252,16 @@ int lj_trace_flushall(lua_State *L)
     }
   }
   J->cur.traceno = 0;
+  J->freetrace = 0;
+  /* Unpatch blacklisted byte codes. */
+  GCRef *p = &(G(L)->gc.root);
+  GCobj *o;
+  while ((o = gcref(*p)) != NULL) {
+    if (o->gch.gct == ~LJ_TPROTO) {
+      lj_trace_reenableproto(gco2pt(o));
+    }
+    p = &o->gch.nextgc;
+  }
   /* Clear penalty cache. */
   memset(J->penalty, 0, sizeof(J->penalty));
   /* Free the whole machine code and invalidate all exit stub groups. */

@@ -221,7 +221,8 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   J->bclog = (BCRecLog *)lj_mem_new(L, sizeof(BCRecLog)*J->maxbclog);
   J->nbclog = 0;
   J->irbuf = (IRIns *)lj_mem_new(L, sizeof(IRIns)*65536);
-  if (J->irbuf == NULL || J->snapbuf == NULL || J->snapmapbuf == NULL)
+  if (J->irbuf == NULL || J->snapbuf == NULL ||
+      J->bclog == NULL || J->snapmapbuf == NULL)
     return NULL;
   lj_dispatch_init((GG_State *)L);
   L->status = LUA_ERRERR+1;  /* Avoid touching the stack upon memory error. */
