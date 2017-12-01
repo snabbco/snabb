@@ -76,6 +76,8 @@ static void ensure_log_open() {
 
 /* -- high-level LuaJIT object logging ------------------------------------ */
 
+static void log_GCobj(GCobj *o);
+
 static void log_jit_State(jit_State *J)
 {
   log_mem("BCRecLog[]", J->bclog, J->nbclog * sizeof(*J->bclog));
@@ -93,7 +95,29 @@ static void log_GCtrace(GCtrace *T)
 
 static void log_GCproto(GCproto *pt)
 {
+  log_GCobj(gcref(pt->chunkname));
   log_mem("GCproto", pt, pt->sizept); /* includes colocated arrays */
+}
+
+static void log_GCstr(GCstr *s)
+{
+  log_mem("GCstr", s, sizeof(*s) + s->len);
+}
+
+static void log_GCobj(GCobj *o)
+{
+  /* Log some kinds of objects (could be fancier...) */
+  switch (o->gch.gct) {
+  case ~LJ_TPROTO:
+    log_GCproto((GCproto *)o);
+    break;
+  case ~LJ_TTRACE:
+    log_GCtrace((GCtrace *)o);
+    break;
+  case ~LJ_TSTR:
+    log_GCstr((GCstr *)o);
+    break;
+  }
 }
 
 /* API functions */
