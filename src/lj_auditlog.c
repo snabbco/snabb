@@ -91,6 +91,11 @@ static void log_GCtrace(GCtrace *T)
   log_mem("GCtrace", T, sizeof(*T));
 }
 
+static void log_GCproto(GCproto *pt)
+{
+  log_mem("GCproto", pt, pt->sizept); /* includes colocated arrays */
+}
+
 /* API functions */
 
 /* Log a trace that has just been compiled. */
@@ -104,11 +109,21 @@ void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
   str_16("jit_State"); /* = */ uint_64((uint64_t)J);
 }
 
-void lj_auditlog_trace_abort(jit_State *J, TraceError e) {
+void lj_auditlog_trace_abort(jit_State *J, TraceError e)
+{
   ensure_log_open();
   log_jit_State(J);
   log_event("trace_abort", 2);
   str_16("TraceError"); /* = */ uint_64(e);
   str_16("jit_State");  /* = */ uint_64((uint64_t)J);
 }
+
+void lj_auditlog_new_prototype(GCproto *pt)
+{
+  ensure_log_open();
+  log_GCproto(pt);
+  log_event("new_prototype", 1);
+  str_16("GCproto"); /* = */ uint_64((uint64_t)pt);;
+}
+
 
