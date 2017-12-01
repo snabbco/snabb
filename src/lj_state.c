@@ -168,6 +168,7 @@ static void close_state(lua_State *L)
   lj_mem_freevec(g, g->strhash, g->strmask+1, GCRef);
   lj_buf_free(g, &g->tmpbuf);
   lj_mem_freevec(g, tvref(L->stack), L->stacksize, TValue);
+  lj_mem_free(g, J->bclog, sizeof(BCRecLog)*65536);
   lj_mem_free(g, J->snapmapbuf, J->sizesnapmap);
   lj_mem_free(g, J->snapbuf, J->sizesnap);
   lj_mem_free(g, J->irbuf-REF_BIAS, 65536*sizeof(IRIns));
@@ -216,6 +217,9 @@ LUA_API lua_State *lua_newstate(lua_Alloc f, void *ud)
   J->sizesnapmap = sizeof(SnapEntry)*65536;
   J->snapbuf = (SnapShot *)lj_mem_new(L, J->sizesnap);
   J->snapmapbuf = (SnapEntry *)lj_mem_new(L, J->sizesnapmap);
+  J->maxbclog = 65536;
+  J->bclog = (BCRecLog *)lj_mem_new(L, sizeof(BCRecLog)*J->maxbclog);
+  J->nbclog = 0;
   IRIns *irbufmem = (IRIns *)lj_mem_new(L, sizeof(IRIns)*65536);
   if (irbufmem == NULL || J->snapbuf == NULL || J->snapmapbuf == NULL)
     return NULL;
