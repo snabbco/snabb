@@ -20,14 +20,12 @@ typedef uint32_t MSize;
 typedef uint64_t GCSize;
 
 /* Memory reference */
-typedef struct MRef {
-  uint64_t ptr64;	/* True 64 bit pointer. */
-} MRef;
+typedef void * MRef;
 
-#define mref(r, t)	((t *)(void *)(r).ptr64)
+#define mref(r, t)	((t *)(r))
 
-#define setmref(r, p)	((r).ptr64 = (uint64_t)(void *)(p))
-#define setmrefr(r, v)	((r).ptr64 = (v).ptr64)
+#define setmref(r, p)	((r) = (void *)(p))
+#define setmrefr(r, v)	((r) = (v))
 
 /* -- GC object references (32 bit address space) ------------------------- */
 
