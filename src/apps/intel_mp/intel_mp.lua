@@ -61,6 +61,7 @@ reg['82599ES'] = {
    array = [[
 ALLRXDCTL   0x01028 +0x40*0..63     RW Receive Descriptor Control
 ALLRXDCTL   0x0D028 +0x40*64..127   RW Receive Descriptor Control
+ALLTXDCTL   0x06028 +0x40*0..127    RW Transmit Descriptor Control
 DAQF        0x0E200 +0x04*0..127    RW Destination Address Queue Filter
 FTQF        0x0E600 +0x04*0..127    RW Five Tuple Queue Filter
 ETQF        0x05128 +0x04*0..7      RW EType Queue Filter
@@ -187,7 +188,6 @@ TDWBAH      0x0603C +0x40*0..127    RW Tx Descriptor Completion Write Back Addre
 }
 reg['1000BaseX'] = {
    array = [[
-ALLRXDCTL   0x0c028 +0x40*0..7      RW Re Descriptor Control Queue
 RAL64       0x05400 +0x08*0..15     RW64 Receive Address Low
 RAL         0x05400 +0x08*0..15     RW Receive Address Low
 RAH         0x05404 +0x08*0..15     RW Receive Address High
@@ -245,6 +245,8 @@ TXCTL  0xe014 +0x40*0..7            RW Tx DCA CTRL Register Queue
 }
 reg.i210 = {
    array = [[
+ALLRXDCTL   0x0c028 +0x40*0..3      RW Re Descriptor Control Queue
+ALLTXDCTL   0x0e028 +0x40*0..3      RW Tx Descriptor Control Queue
 RQDPC       0x0C030 +0x40*0..3      RC Receive Queue Drop Packet Count
 TQDPC       0x0E030 +0x40*0..3      RC Transmit Queue Drop Packet Count
 PQGPRC      0x10010 +0x100*0..3     RC Per Queue Good Packets Received Count
@@ -261,6 +263,8 @@ EEC       0x12010 -            RW EEPROM-Mode Control Register
 }
 reg.i350 = {
    array = [[
+ALLRXDCTL   0x0c028 +0x40*0..7      RW Re Descriptor Control Queue
+ALLTXDCTL   0x0e028 +0x40*0..7      RW Tx Descriptor Control Queue
 RQDPC       0x0C030 +0x40*0..7      RCR Receive Queue Drop Packet Count
 TQDPC       0x0E030 +0x40*0..7      RCR Transmit Queue Drop Packet Count
 PQGPRC      0x10010 +0x100*0..7     RCR Per Queue Good Packets Received Count
@@ -372,7 +376,9 @@ function Intel:new (conf)
    -- Initialize per app statistics
    self.shm = {
       mtu    = {counter, self.mtu},
-      txdrop = {counter}
+      txdrop = {counter},
+      txq    = {counter, self.txq},
+      rxq    = {counter, self.rxq}
    }
 
    -- Figure out if we are supposed to collect device statistics
@@ -822,6 +828,15 @@ function Intel:sync_stats ()
       local name, register = self.queue_stats[idx], self.queue_stats[idx+1]
       set(stats[name], register())
    end
+   local enable = lshift(1, 25)
+   for i = 0, self.max_q-1 do
+      if band(self.r.ALLRXDCTL[i](), enable) > 0 then
+         set(stats[self.queue_stats_names.rx_enabled[i]], 1)
+      end
+      if band(self.r.ALLTXDCTL[i](), enable) > 0 then
+         set(stats[self.queue_stats_names.tx_enabled[i]], 1)
+      end
+   end
 end
 
 -- set MAC address (4.6.10.1.4)
@@ -1145,25 +1160,40 @@ function Intel1g:rxdmapackets ()
    return self.r.RPTHC()
 end
 
-function Intel1g:init_queue_stats (frame)
-   local perqregs = {
-      rxdrops = "RQDPC",
-      txdrops = "TQDPC",
-      rxpackets = "PQGPRC",
-      txpackets = "PQGPTC",
-      rxbytes = "PQGORC",
-      txbytes = "PQGOTC",
-      rxmcast = "PQMPRC"
-   }
+local function init_queue_stats (self, frame, perqregs)
    self.queue_stats = {}
+   self.queue_stats_names = {}
+
+   local function add_q_counter (qid, cname)
+      local name = "q" .. qid .. "_" .. cname
+      frame[name] = { counter, 0 }
+      local t = self.queue_stats_names
+      if not t[cname] then
+         t[cname] = {}
+      end
+      t[cname][qid] = name
+      return name
+   end
+
    for i=0,self.max_q-1 do
+      add_q_counter(i, "rx_enabled")
+      add_q_counter(i, "tx_enabled")
       for k,v in pairs(perqregs) do
-         local name = "q" .. i .. "_" .. k
-         table.insert(self.queue_stats, name)
+         table.insert(self.queue_stats, add_q_counter(i, k))
          table.insert(self.queue_stats, self.r[v][i])
-         frame[name] = {counter}
       end
    end
+end
+
+function Intel1g:init_queue_stats (frame)
+   init_queue_stats(self, frame,
+                    { rxdrops = "RQDPC",
+                      txdrops = "TQDPC",
+                      rxpackets = "PQGPRC",
+                      txpackets = "PQGPTC",
+                      rxbytes = "PQGORC",
+                      txbytes = "PQGOTC",
+                      rxmcast = "PQMPRC" })
 end
 
 function Intel1g:get_rxstats ()
@@ -1245,7 +1275,21 @@ function Intel82599:promisc ()
    return band(self.r.FCTRL(), lshift(1, 9)) ~= 0ULL
 end
 function Intel82599:rxbytes  () return self.r.GORC64()   end
-function Intel82599:rxdrop   () return self.r.QPRDC[0]() end
+function Intel82599:rxdrop   ()
+   -- Accumulate the per-queue rx drop counters (there is no global
+   -- drop counter).  This assumes that each queue uses its natural
+   -- counter, which is not guaranteed because the statistics register
+   -- can be chosen arbitrarily (via the rxcounter configuration
+   -- option)
+   local read, stats = counter.read, self.stats
+   local rxdrop = 0
+   for i = 0, self.max_q -1 do
+      if read(stats[self.queue_stats_names.rx_enabled[i]]) == 1 then
+         rxdrop = rxdrop + read(stats[self.queue_stats_names.rxdrops[i]])
+      end
+   end
+   return rxdrop
+end
 function Intel82599:rxerrors ()
    return self.r.CRCERRS() + self.r.ILLERRC() + self.r.ERRBC() +
       self.r.RUC() + self.r.RFC() + self.r.ROC() + self.r.RJC()
@@ -1258,22 +1302,12 @@ function Intel82599:rxdmapackets ()
 end
 
 function Intel82599:init_queue_stats (frame)
-   local perqregs = {
-      rxdrops = "QPRDC",
-      rxpackets = "QPRC",
-      txpackets = "QPTC",
-      rxbytes = "QBRC64",
-      txbytes = "QBTC64",
-   }
-   self.queue_stats = {}
-   for i=0,15 do
-      for k,v in pairs(perqregs) do
-         local name = "q" .. i .. "_" .. k
-         table.insert(self.queue_stats, name)
-         table.insert(self.queue_stats, self.r[v][i])
-         frame[name] = {counter}
-      end
-   end
+   init_queue_stats(self, frame,
+                    { rxdrops = "QPRDC",
+                      rxpackets = "QPRC",
+                      txpackets = "QPTC",
+                      rxbytes = "QBRC64",
+                      txbytes = "QBTC64" })
 end
 
 function Intel82599:init ()
