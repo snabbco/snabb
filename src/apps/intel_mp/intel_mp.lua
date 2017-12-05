@@ -435,13 +435,27 @@ struct {
 } __attribute__((packed))
 ]])
 
+local function check_ndesc(ndesc)
+   -- See 7.1.4.5/7.2.2.4(8.2.3.8.3/8.2.3.9.7)
+   assert((ndesc %128) ==0,
+      "ndesc must be a multiple of 128")
+   -- See 8.10.6/8.12.12(8.2.3.8.3/8.2.3.9.7). The actual limit is the
+   -- value 0x80000 in RDLEN/TDLEN.  The 82599 has been seen to lock
+   -- up if the reserved bits 31:16 are non-zero, requiring a hardware
+   -- reset.
+   assert((ndesc > 0 and ndesc <= 32768),
+      "ndesc must be positive and must not exceed 32768")
+   -- Not mandated by the hardware but required for efficient modulo
+   -- operations.
+   assert((bit.band(ndesc, ndesc - 1) == 0ULL),
+      "ndesc must be a power of two")
+end
+
 function Intel:init_rx_q ()
    if not self.rxq then return end
    assert((self.rxq >=0) and (self.rxq < self.max_q),
-   "rxqueue must be in 0.." .. self.max_q-1)
-   assert((self.ndesc %128) ==0,
-   "ndesc must be a multiple of 128 (for Rx only)")	-- see 7.1.4.5
-
+      "rxqueue must be in 0.." .. self.max_q-1)
+   check_ndesc(self.ndesc)
    self.rxqueue = ffi.new("struct packet *[?]", self.ndesc)
    self.rdh = 0
    self.rdt = 0
@@ -504,7 +518,8 @@ end
 function Intel:init_tx_q ()                               -- 4.5.10
    if not self.txq then return end
    assert((self.txq >=0) and (self.txq < self.max_q),
-   "txqueue must be in 0.." .. self.max_q-1)
+      "txqueue must be in 0.." .. self.max_q-1)
+   check_ndesc(self.ndesc)
    self.tdh = 0
    self.tdt = 0
    self.txqueue = ffi.new("struct packet *[?]", self.ndesc)
