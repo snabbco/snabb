@@ -245,13 +245,13 @@ TXCTL  0xe014 +0x40*0..7            RW Tx DCA CTRL Register Queue
 }
 reg.i210 = {
    array = [[
-RQDPC       0x0C030 +0x40*0..4      RC Receive Queue Drop Packet Count
-TQDPC       0x0E030 +0x40*0..4      RC Transmit Queue Drop Packet Count
-PQGPRC      0x10010 +0x100*0..4     RC Per Queue Good Packets Received Count
-PQGPTC      0x10014 +0x100*0..4     RC Per Queue Good Packets Transmitted Count
-PQGORC      0x10018 +0x100*0..4     RC Per Queue Good Octets Received Count
-PQGOTC      0x10034 +0x100*0..4     RC Per Queue Octets Transmitted Count
-PQMPRC      0x10038 +0x100*0..4     RC Per Queue Multicast Packets Received
+RQDPC       0x0C030 +0x40*0..3      RC Receive Queue Drop Packet Count
+TQDPC       0x0E030 +0x40*0..3      RC Transmit Queue Drop Packet Count
+PQGPRC      0x10010 +0x100*0..3     RC Per Queue Good Packets Received Count
+PQGPTC      0x10014 +0x100*0..3     RC Per Queue Good Packets Transmitted Count
+PQGORC      0x10018 +0x100*0..3     RC Per Queue Good Octets Received Count
+PQGOTC      0x10034 +0x100*0..3     RC Per Queue Octets Transmitted Count
+PQMPRC      0x10038 +0x100*0..3     RC Per Queue Multicast Packets Received
 ]],
    inherit = "1000BaseX",
    singleton = [[
