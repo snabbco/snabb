@@ -177,6 +177,7 @@ function FlowSet:new (template, args)
    o.match = template.match
    o.incoming_link_name, o.incoming = new_internal_link('IPFIX incoming')
 
+   -- Generic per-template counters
    o.shm = shm.create_frame("templates/"..template.id,
                             {  packets_in = { counter },
                                flow_export_packets = { counter },
@@ -186,6 +187,15 @@ function FlowSet:new (template, args)
                                table_occupancy = { counter, o.table.occupancy },
                                table_max_displacement = { counter, o.table.max_displacement },
                                table_scan_time = { counter, 0 } })
+   -- Template-specific counters
+   if template.counters then
+      local conf = {}
+      for name, _ in pairs(template.counters) do
+         conf[name] = { counter, 0 }
+      end
+      o.shm_template =
+         shm.create_frame("templates/"..template.id.."/stats", conf)
+   end
    return setmetatable(o, { __index = self })
 end
 
@@ -318,6 +328,11 @@ function FlowSet:sync_stats()
    counter.set(self.shm.table_occupancy, self.table.occupancy)
    counter.set(self.shm.table_max_displacement, self.table.max_displacement)
    counter.set(self.shm.table_scan_time, self.table_scan_time)
+   if self.shm_template then
+      for _, name in ipairs(self.template.counters_names) do
+         counter.set(self.shm_template[name], self.template.counters[name])
+      end
+   end
 end
 
 IPFIX = {}

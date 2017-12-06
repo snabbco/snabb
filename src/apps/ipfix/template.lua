@@ -188,6 +188,12 @@ local function make_template_info(spec)
    -- included in export records.
    assert(ffi.sizeof(record_t) - ffi.sizeof(spec.state_t or 'char [0]') == data_len)
 
+   local counters_names = {}
+   if spec.counters then
+      for name, _ in pairs(spec.counters) do
+         table.insert(counters_names, name)
+      end
+   end
    return { id = spec.id,
             field_count = #spec.keys + #spec.values,
             buffer = buffer,
@@ -199,7 +205,9 @@ local function make_template_info(spec)
             record_ptr_t = ptr_to(record_t),
             swap_fn = gen_swap_fn(),
             match = pf.compile_filter(spec.filter),
-            logger = lib.logger_new({ module = "IPFIX template #"..spec.id })
+            logger = lib.logger_new({ module = "IPFIX template #"..spec.id }),
+            counters = spec.counters,
+            counters_names = counters_names
           }
 end
 

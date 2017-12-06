@@ -124,6 +124,14 @@ function run (args)
          format("  Max displacement   %d", max_disp)
          format("  Last scan time     %d", read(template.table_scan_time))
          shm.delete_frame(template)
+         if shm.exists(base_path.."/templates/"..id.."/stats") then
+            format("Template-specific stats")
+            local stats = shm.open_frame(base_path.."/templates/"..id.."/stats")
+            for name, _ in pairs(stats.specs) do
+               format("  %-25s %s", name, read(stats[name], true))
+            end
+            shm.delete_frame(stats)
+         end
       end
    end
 end
