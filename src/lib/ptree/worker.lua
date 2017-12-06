@@ -13,7 +13,7 @@ local channel = require("lib.ptree.channel")
 local action_codec = require("lib.ptree.action_codec")
 local alarm_codec = require("lib.ptree.alarm_codec")
 
-Worker = {
+local Worker = {
    config = {
       Hz = {default=1000},
    }
