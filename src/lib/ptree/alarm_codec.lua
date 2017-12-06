@@ -184,7 +184,7 @@ function alarm:normalize_args (t)
    return normalize(t, self.args_attrs)
 end
 
--- To be used by the leader to group args into key and args.
+-- To be used by the manager to group args into key and args.
 function to_alarm (args)
    local key = {
       resource = args[1],

@@ -64,7 +64,7 @@ function Follower:commit_pending_actions()
    if should_flush then require('jit').flush() end
 end
 
-function Follower:handle_actions_from_leader()
+function Follower:handle_actions_from_manager()
    local channel = self.channel
    for i=1,4 do
       local buf, len = channel:peek_message()
@@ -82,7 +82,7 @@ end
 function Follower:pull ()
    if app.now() < self.next_time then return end
    self.next_time = app.now() + self.period
-   self:handle_actions_from_leader()
+   self:handle_actions_from_manager()
 end
 
 function selftest ()

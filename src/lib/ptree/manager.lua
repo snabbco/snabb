@@ -24,9 +24,9 @@ local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
 local alarms = require("lib.yang.alarms")
 
-Leader = {
+Manager = {
    config = {
-      socket_file_name = {default='config-leader-socket'},
+      socket_file_name = {default='config-manager-socket'},
       setup_fn = {required=true},
       -- Could relax this requirement.
       initial_configuration = {required=true},
@@ -48,8 +48,8 @@ local function open_socket (file)
    return socket
 end
 
-function Leader:new (conf)
-   local ret = setmetatable({}, {__index=Leader})
+function Manager:new (conf)
+   local ret = setmetatable({}, {__index=Manager})
    ret.cpuset = conf.cpuset
    ret.socket_file_name = conf.socket_file_name
    if not ret.socket_file_name:match('^/') then
@@ -74,7 +74,7 @@ function Leader:new (conf)
    return ret
 end
 
-function Leader:set_initial_configuration (configuration)
+function Manager:set_initial_configuration (configuration)
    self.current_configuration = configuration
    self.current_in_place_dependencies = {}
 
@@ -93,7 +93,7 @@ function Leader:set_initial_configuration (configuration)
    end
 end
 
-function Leader:start_worker(cpu)
+function Manager:start_worker(cpu)
    local start_code = { self.worker_start_code }
    if cpu then
       table.insert(start_code, 1, "print('Bound data plane to CPU:',"..cpu..")")
@@ -102,7 +102,7 @@ function Leader:start_worker(cpu)
    return worker.start("follower", table.concat(start_code, "\n"))
 end
 
-function Leader:stop_worker(id)
+function Manager:stop_worker(id)
    -- Tell the worker to terminate
    local stop_actions = {{'shutdown', {}}, {'commit', {}}}
    self:enqueue_config_actions_for_follower(id, stop_actions)
@@ -110,7 +110,7 @@ function Leader:stop_worker(id)
    self.followers[id].shutting_down = true
 end
 
-function Leader:remove_stale_followers()
+function Manager:remove_stale_followers()
    local stale = {}
    for id, follower in pairs(self.followers) do
       if follower.shutting_down then
@@ -128,7 +128,7 @@ function Leader:remove_stale_followers()
    end
 end
 
-function Leader:acquire_cpu_for_follower(id, app_graph)
+function Manager:acquire_cpu_for_follower(id, app_graph)
    local pci_addresses = {}
    -- Grovel through app initargs for keys named "pciaddr".  Hacky!
    for name, init in pairs(app_graph.apps) do
@@ -141,7 +141,7 @@ function Leader:acquire_cpu_for_follower(id, app_graph)
    return self.cpuset:acquire_for_pci_addresses(pci_addresses)
 end
 
-function Leader:start_follower_for_graph(id, graph)
+function Manager:start_follower_for_graph(id, graph)
    local cpu = self:acquire_cpu_for_follower(id, graph)
    self.followers[id] = { cpu=cpu, pid=self:start_worker(cpu), queue={},
                           graph=graph }
@@ -151,15 +151,15 @@ function Leader:start_follower_for_graph(id, graph)
    return self.followers[id]
 end
 
-function Leader:take_follower_message_queue ()
+function Manager:take_follower_message_queue ()
    local actions = self.config_action_queue
    self.config_action_queue = nil
    return actions
 end
 
-local verbose = os.getenv('SNABB_LEADER_VERBOSE') and true
+local verbose = os.getenv('SNABB_MANAGER_VERBOSE') and true
 
-function Leader:enqueue_config_actions_for_follower(follower, actions)
+function Manager:enqueue_config_actions_for_follower(follower, actions)
    for _,action in ipairs(actions) do
       if verbose then print('encode', action[1], unpack(action[2])) end
       local buf, len = action_codec.encode(action)
@@ -167,13 +167,13 @@ function Leader:enqueue_config_actions_for_follower(follower, actions)
    end
 end
 
-function Leader:enqueue_config_actions (actions)
+function Manager:enqueue_config_actions (actions)
    for id,_ in pairs(self.followers) do
       self.enqueue_config_actions_for_follower(id, actions)
    end
 end
 
-function Leader:rpc_describe (args)
+function Manager:rpc_describe (args)
    local alternate_schemas = {}
    for schema_name, translator in pairs(self.support.translators) do
       table.insert(alternate_schemas, schema_name)
@@ -210,7 +210,7 @@ local function path_printer_for_schema_by_name(schema_name, path, is_config,
                                   print_default)
 end
 
-function Leader:rpc_get_config (args)
+function Manager:rpc_get_config (args)
    local function getter()
       if args.schema ~= self.schema_name then
          return self:foreign_rpc_get_config(
@@ -225,7 +225,7 @@ function Leader:rpc_get_config (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_set_alarm_operator_state (args)
+function Manager:rpc_set_alarm_operator_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
          return false, ("Set-operator-state operation not supported in"..
@@ -240,7 +240,7 @@ function Leader:rpc_set_alarm_operator_state (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_purge_alarms (args)
+function Manager:rpc_purge_alarms (args)
    local function purge()
       if args.schema ~= self.schema_name then
          return false, ("Purge-alarms operation not supported in"..
@@ -252,7 +252,7 @@ function Leader:rpc_purge_alarms (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_compress_alarms (args)
+function Manager:rpc_compress_alarms (args)
    local function compress()
       if args.schema ~= self.schema_name then
          return false, ("Compress-alarms operation not supported in"..
@@ -520,13 +520,13 @@ function compute_remove_config_fn (schema_name, path)
    return path_remover_for_schema(yang.load_schema_by_name(schema_name), path)
 end
 
-function Leader:notify_pre_update (config, verb, path, ...)
+function Manager:notify_pre_update (config, verb, path, ...)
    for _,translator in pairs(self.support.translators) do
       translator.pre_update(config, verb, path, ...)
    end
 end
 
-function Leader:update_configuration (update_fn, verb, path, ...)
+function Manager:update_configuration (update_fn, verb, path, ...)
    self:notify_pre_update(self.current_configuration, verb, path, ...)
    local to_restart =
       self.support.compute_apps_to_restart_after_configuration_update (
@@ -556,7 +556,7 @@ function Leader:update_configuration (update_fn, verb, path, ...)
          self.current_in_place_dependencies, new_graphs, verb, path, ...)
 end
 
-function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
+function Manager:handle_rpc_update_config (args, verb, compute_update_fn)
    local path = path_mod.normalize_path(args.path)
    local parser = path_parser_for_schema_by_name(args.schema, path)
    self:update_configuration(compute_update_fn(args.schema, path),
@@ -564,7 +564,7 @@ function Leader:handle_rpc_update_config (args, verb, compute_update_fn)
    return {}
 end
 
-function Leader:get_native_state ()
+function Manager:get_native_state ()
    local states = {}
    local state_reader = self.support.compute_state_reader(self.schema_name)
    for _, follower in pairs(self.followers) do
@@ -575,12 +575,12 @@ function Leader:get_native_state ()
    return self.support.process_states(states)
 end
 
-function Leader:get_translator (schema_name)
+function Manager:get_translator (schema_name)
    local translator = self.support.translators[schema_name]
    if translator then return translator end
    error('unsupported schema: '..schema_name)
 end
-function Leader:apply_translated_rpc_updates (updates)
+function Manager:apply_translated_rpc_updates (updates)
    for _,update in ipairs(updates) do
       local verb, args = unpack(update)
       local method = assert(self['rpc_'..verb..'_config'])
@@ -588,7 +588,7 @@ function Leader:apply_translated_rpc_updates (updates)
    end
    return {}
 end
-function Leader:foreign_rpc_get_config (schema_name, path, format,
+function Manager:foreign_rpc_get_config (schema_name, path, format,
                                         print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
@@ -598,7 +598,7 @@ function Leader:foreign_rpc_get_config (schema_name, path, format,
    local config = printer(foreign_config, yang.string_output_file())
    return { config = config }
 end
-function Leader:foreign_rpc_get_state (schema_name, path, format,
+function Manager:foreign_rpc_get_state (schema_name, path, format,
                                        print_default)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
@@ -608,7 +608,7 @@ function Leader:foreign_rpc_get_state (schema_name, path, format,
    local state = printer(foreign_state, yang.string_output_file())
    return { state = state }
 end
-function Leader:foreign_rpc_set_config (schema_name, path, config_str)
+function Manager:foreign_rpc_set_config (schema_name, path, config_str)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
    local parser = path_parser_for_schema_by_name(schema_name, path)
@@ -616,7 +616,7 @@ function Leader:foreign_rpc_set_config (schema_name, path, config_str)
                                         parser(config_str))
    return self:apply_translated_rpc_updates(updates)
 end
-function Leader:foreign_rpc_add_config (schema_name, path, config_str)
+function Manager:foreign_rpc_add_config (schema_name, path, config_str)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
    local parser = path_parser_for_schema_by_name(schema_name, path)
@@ -624,14 +624,14 @@ function Leader:foreign_rpc_add_config (schema_name, path, config_str)
                                         parser(config_str))
    return self:apply_translated_rpc_updates(updates)
 end
-function Leader:foreign_rpc_remove_config (schema_name, path)
+function Manager:foreign_rpc_remove_config (schema_name, path)
    path = path_mod.normalize_path(path)
    local translate = self:get_translator(schema_name)
    local updates = translate.remove_config(self.current_configuration, path)
    return self:apply_translated_rpc_updates(updates)
 end
 
-function Leader:rpc_set_config (args)
+function Manager:rpc_set_config (args)
    local function setter()
       if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
          error('Attempt to modify configuration while listener attached')
@@ -645,7 +645,7 @@ function Leader:rpc_set_config (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_add_config (args)
+function Manager:rpc_add_config (args)
    local function adder()
       if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
          error('Attempt to modify configuration while listener attached')
@@ -659,7 +659,7 @@ function Leader:rpc_add_config (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_remove_config (args)
+function Manager:rpc_remove_config (args)
    local function remover()
       if self.listen_peer ~= nil and self.listen_peer ~= self.rpc_peer then
          error('Attempt to modify configuration while listener attached')
@@ -676,7 +676,7 @@ function Leader:rpc_remove_config (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_attach_listener (args)
+function Manager:rpc_attach_listener (args)
    local function attacher()
       if self.listen_peer ~= nil then error('Listener already attached') end
       self.listen_peer = self.rpc_peer
@@ -686,7 +686,7 @@ function Leader:rpc_attach_listener (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_get_state (args)
+function Manager:rpc_get_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
          return self:foreign_rpc_get_state(args.schema, args.path,
@@ -701,7 +701,7 @@ function Leader:rpc_get_state (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:rpc_get_alarms_state (args)
+function Manager:rpc_get_alarms_state (args)
    local function getter()
       assert(args.schema == "ietf-alarms")
       local printer = path_printer_for_schema_by_name(
@@ -716,13 +716,13 @@ function Leader:rpc_get_alarms_state (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Leader:handle (payload)
+function Manager:handle (payload)
    return rpc.handle_calls(self.rpc_callee, payload, self.rpc_handler)
 end
 
 local dummy_unix_sockaddr = S.t.sockaddr_un()
 
-function Leader:handle_calls_from_peers()
+function Manager:handle_calls_from_peers()
    local peers = self.peers
    while true do
       local fd, err = self.socket:accept(dummy_unix_sockaddr)
@@ -838,7 +838,7 @@ function Leader:handle_calls_from_peers()
    end
 end
 
-function Leader:send_messages_to_followers()
+function Manager:send_messages_to_followers()
    for _,follower in pairs(self.followers) do
       if not follower.channel then
          local name = '/'..tostring(follower.pid)..'/config-follower-channel'
@@ -860,7 +860,7 @@ function Leader:send_messages_to_followers()
    end
 end
 
-function Leader:pull ()
+function Manager:pull ()
    if app.now() < self.next_time then return end
    self.next_time = app.now() + self.period
    self:remove_stale_followers()
@@ -869,13 +869,13 @@ function Leader:pull ()
    self:receive_alarms_from_followers()
 end
 
-function Leader:receive_alarms_from_followers ()
+function Manager:receive_alarms_from_followers ()
    for _,follower in pairs(self.followers) do
       self:receive_alarms_from_follower(follower)
    end
 end
 
-function Leader:receive_alarms_from_follower (follower)
+function Manager:receive_alarms_from_follower (follower)
    if not follower.alarms_channel then
       local name = '/'..tostring(follower.pid)..'/alarms-follower-channel'
       local success, channel = pcall(channel.open, name)
@@ -892,7 +892,7 @@ function Leader:receive_alarms_from_follower (follower)
    end
 end
 
-function Leader:handle_alarm (follower, alarm)
+function Manager:handle_alarm (follower, alarm)
    local fn, args = unpack(alarm)
    if fn == 'raise_alarm' then
       local key, args = alarm_codec.to_alarm(args)
@@ -912,7 +912,7 @@ function Leader:handle_alarm (follower, alarm)
    end
 end
 
-function Leader:stop ()
+function Manager:stop ()
    for _,peer in ipairs(self.peers) do peer.fd:close() end
    self.peers = {}
    self.socket:close()
@@ -929,7 +929,7 @@ function test_worker()
 end
 
 function selftest ()
-   print('selftest: lib.ptree.leader')
+   print('selftest: lib.ptree.manager')
    local graph = app_graph.new()
    local function setup_fn(cfg)
       local graph = app_graph.new()
@@ -939,17 +939,17 @@ function selftest ()
       app_graph.link(graph, "source.foo -> sink.bar")
       return {graph}
    end
-   local worker_start_code = "require('lib.ptree.leader').test_worker()"
-   app_graph.app(graph, "leader", Leader,
+   local worker_start_code = "require('lib.ptree.manager').test_worker()"
+   app_graph.app(graph, "manager", Manager,
                  {setup_fn=setup_fn, worker_start_code=worker_start_code,
                   -- Use a schema with no data nodes, just for
                   -- testing.
                   schema_name='ietf-inet-types', initial_configuration={}})
    engine.configure(graph)
    engine.main({ duration = 0.05, report = {showapps=true,showlinks=true}})
-   assert(app.app_table.leader.followers[1])
-   assert(app.app_table.leader.followers[1].graph.links)
-   assert(app.app_table.leader.followers[1].graph.links["source.foo -> sink.bar"])
+   assert(app.app_table.manager.followers[1])
+   assert(app.app_table.manager.followers[1].graph.links)
+   assert(app.app_table.manager.followers[1].graph.links["source.foo -> sink.bar"])
    local link = app.link_table["source.foo -> sink.bar"]
    engine.configure(app_graph.new())
    print('selftest: ok')
