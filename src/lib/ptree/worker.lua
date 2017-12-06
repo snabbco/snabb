@@ -85,6 +85,18 @@ function Worker:pull ()
    self:handle_actions_from_manager()
 end
 
+function main (opts)
+   local app_graph = require('core.config')
+   local engine = require('core.app')
+
+   if opts == nil then opts = {} end
+
+   local graph = app_graph.new()
+   app_graph.app(graph, "worker", Worker, {})
+   engine.configure(graph)
+   engine.main(opts)
+end
+
 function selftest ()
    print('selftest: lib.ptree.worker')
    local c = config.new()

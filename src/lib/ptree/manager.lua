@@ -7,6 +7,7 @@ local ffi = require("ffi")
 local lib = require("core.lib")
 local cltable = require("lib.cltable")
 local cpuset = require("lib.cpuset")
+local scheduling = require("lib.scheduling")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local util = require("lib.yang.util")
@@ -31,7 +32,7 @@ Manager = {
       -- Could relax this requirement.
       initial_configuration = {required=true},
       schema_name = {required=true},
-      worker_start_code = {required=true},
+      worker_default_scheduling = {default={busywait=true}},
       default_schema = {},
       cpuset = {default=cpuset.global_cpuset()},
       Hz = {default=100},
@@ -64,7 +65,7 @@ function Manager:new (conf)
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
-   ret.worker_start_code = conf.worker_start_code
+   ret.worker_default_scheduling = conf.worker_default_scheduling
    ret.workers = {}
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
@@ -93,13 +94,12 @@ function Manager:set_initial_configuration (configuration)
    end
 end
 
-function Manager:start_worker(cpu)
-   local start_code = { self.worker_start_code }
-   if cpu then
-      table.insert(start_code, 1, "print('Bound data plane to CPU:',"..cpu..")")
-      table.insert(start_code, 1, "require('lib.numa').bind_to_cpu("..cpu..")")
-   end
-   return worker.start("worker", table.concat(start_code, "\n"))
+function Manager:start_worker(sched_opts)
+   local code = {
+      scheduling.stage(sched_opts),
+      "require('lib.ptree.worker').main()"
+   }
+   return worker.start("worker", table.concat(code, "\n"))
 end
 
 function Manager:stop_worker(id)
@@ -120,8 +120,8 @@ function Manager:remove_stale_workers()
       end
    end
    for _, id in ipairs(stale) do
-      if self.workers[id].cpu then
-	 self.cpuset:release(self.workers[id].cpu)
+      if self.workers[id].scheduling.cpu then
+	 self.cpuset:release(self.workers[id].scheduling.cpu)
       end
       self.workers[id] = nil
 
@@ -141,10 +141,18 @@ function Manager:acquire_cpu_for_worker(id, app_graph)
    return self.cpuset:acquire_for_pci_addresses(pci_addresses)
 end
 
+function Manager:compute_scheduling_for_worker(id, app_graph)
+   local ret = {}
+   for k, v in pairs(self.worker_default_scheduling) do ret[k] = v end
+   ret.cpu = self:acquire_cpu_for_worker(id, app_graph)
+   return ret
+end
+
 function Manager:start_worker_for_graph(id, graph)
-   local cpu = self:acquire_cpu_for_worker(id, graph)
-   self.workers[id] = { cpu=cpu, pid=self:start_worker(cpu), queue={},
-                          graph=graph }
+   local scheduling = self:compute_scheduling_for_worker(id, graph)
+   self.workers[id] = { scheduling=scheduling,
+                        pid=self:start_worker(scheduling),
+                        queue={}, graph=graph }
    local actions = self.support.compute_config_actions(
       app_graph.new(), self.workers[id].graph, {}, 'load')
    self:enqueue_config_actions_for_worker(id, actions)
@@ -939,12 +947,11 @@ function selftest ()
       app_graph.link(graph, "source.foo -> sink.bar")
       return {graph}
    end
-   local worker_start_code = "require('lib.ptree.manager').test_worker()"
    app_graph.app(graph, "manager", Manager,
-                 {setup_fn=setup_fn, worker_start_code=worker_start_code,
-                  -- Use a schema with no data nodes, just for
-                  -- testing.
-                  schema_name='ietf-inet-types', initial_configuration={}})
+                 {setup_fn=setup_fn,
+                  -- Use a schema with no data nodes, just for testing.
+                  schema_name='ietf-inet-types',
+                  initial_configuration={}})
    engine.configure(graph)
    engine.main({ duration = 0.05, report = {showapps=true,showlinks=true}})
    assert(app.app_table.manager.workers[1])
