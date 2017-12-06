@@ -156,12 +156,12 @@ local alarms_channel
 
 function get_channel()
    if alarms_channel then return alarms_channel end
-   local name = '/'..S.getpid()..'/alarms-follower-channel'
+   local name = '/'..S.getpid()..'/alarms-worker-channel'
    local success, value = pcall(channel.open, name)
    if success then
       alarms_channel = value
    else
-      alarms_channel = channel.create('alarms-follower-channel', 1e6)
+      alarms_channel = channel.create('alarms-worker-channel', 1e6)
    end
    return alarms_channel
 end

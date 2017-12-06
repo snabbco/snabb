@@ -630,8 +630,8 @@ local function ietf_softwire_br_translator ()
    return ret
 end
 
-local function configuration_for_follower(follower, configuration)
-   return follower.graph.apps.lwaftr.arg
+local function configuration_for_worker(worker, configuration)
+   return worker.graph.apps.lwaftr.arg
 end
 
 local function compute_state_reader(schema_name)
@@ -700,7 +700,7 @@ function get_config_support()
          compute_apps_to_restart_after_configuration_update,
       compute_state_reader = compute_state_reader,
       process_states = process_states,
-      configuration_for_follower = configuration_for_follower,
+      configuration_for_worker = configuration_for_worker,
       translators = { ['ietf-softwire-br'] = ietf_softwire_br_translator () }
    }
 end

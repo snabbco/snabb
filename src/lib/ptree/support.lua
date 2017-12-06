@@ -98,17 +98,17 @@ local function compute_objects_maybe_updated_in_place (schema_name, config,
    return objs
 end
 
-local function record_mutable_objects_embedded_in_app_initarg (follower_id, app_name, obj, accum)
+local function record_mutable_objects_embedded_in_app_initarg (worker_id, app_name, obj, accum)
    local function record(obj)
       local tab = accum[obj]
       if not tab then
          tab = {}
          accum[obj] = tab
       end
-      if tab[follower_id] == nil then
-         tab[follower_id] = {app_name}
+      if tab[worker_id] == nil then
+         tab[worker_id] = {app_name}
       else
-         table.insert(tab[follower_id], app_name)
+         table.insert(tab[worker_id], app_name)
       end
    end
    local function visit(obj)
@@ -126,9 +126,9 @@ local function record_mutable_objects_embedded_in_app_initarg (follower_id, app_
    visit(obj)
 end
 
--- Takes a table of follower ids (app_graph_map) and returns a tabl≈e which has
--- the follower id as the key and a table listing all app names
---   i.e. {follower_id => {app name, ...}, ...}
+-- Takes a table of worker ids (app_graph_map) and returns a tabl≈e which has
+-- the worker id as the key and a table listing all app names
+--   i.e. {worker_id => {app name, ...}, ...}
 local function compute_mutable_objects_embedded_in_app_initargs (app_graph_map)
    local deps = {}
    for id, app_graph in pairs(app_graph_map) do
@@ -190,7 +190,7 @@ local function add_restarts(actions, app_graph, to_restart)
    return actions
 end
 
-local function configuration_for_follower(follower, configuration)
+local function configuration_for_worker(worker, configuration)
    return configuration
 end
 
@@ -216,7 +216,7 @@ generic_schema_config_support = {
       return compute_mutable_objects_embedded_in_app_initargs(app_graph)
    end,
    compute_state_reader = compute_state_reader,
-   configuration_for_follower = configuration_for_follower,
+   configuration_for_worker = configuration_for_worker,
    process_states = process_states,
    compute_apps_to_restart_after_configuration_update =
       compute_apps_to_restart_after_configuration_update,

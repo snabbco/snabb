@@ -13,23 +13,23 @@ local channel = require("lib.ptree.channel")
 local action_codec = require("lib.ptree.action_codec")
 local alarm_codec = require("lib.ptree.alarm_codec")
 
-Follower = {
+Worker = {
    config = {
       Hz = {default=1000},
    }
 }
 
-function Follower:new (conf)
-   local ret = setmetatable({}, {__index=Follower})
+function Worker:new (conf)
+   local ret = setmetatable({}, {__index=Worker})
    ret.period = 1/conf.Hz
    ret.next_time = app.now()
-   ret.channel = channel.create('config-follower-channel', 1e6)
+   ret.channel = channel.create('config-worker-channel', 1e6)
    ret.alarms_channel = alarm_codec.get_channel()
    ret.pending_actions = {}
    return ret
 end
 
-function Follower:shutdown()
+function Worker:shutdown()
    -- This will shutdown everything.
    engine.configure(app_graph.new())
 
@@ -37,7 +37,7 @@ function Follower:shutdown()
    S.exit(0)
 end
 
-function Follower:commit_pending_actions()
+function Worker:commit_pending_actions()
    local to_apply = {}
    local should_flush = false
    for _,action in ipairs(self.pending_actions) do
@@ -64,7 +64,7 @@ function Follower:commit_pending_actions()
    if should_flush then require('jit').flush() end
 end
 
-function Follower:handle_actions_from_manager()
+function Worker:handle_actions_from_manager()
    local channel = self.channel
    for i=1,4 do
       local buf, len = channel:peek_message()
@@ -79,16 +79,16 @@ function Follower:handle_actions_from_manager()
    end
 end
 
-function Follower:pull ()
+function Worker:pull ()
    if app.now() < self.next_time then return end
    self.next_time = app.now() + self.period
    self:handle_actions_from_manager()
 end
 
 function selftest ()
-   print('selftest: lib.ptree.follower')
+   print('selftest: lib.ptree.worker')
    local c = config.new()
-   config.app(c, "follower", Follower, {})
+   config.app(c, "worker", Worker, {})
    engine.configure(c)
    engine.main({ duration = 0.0001, report = {showapps=true,showlinks=true}})
    engine.configure(config.new())
