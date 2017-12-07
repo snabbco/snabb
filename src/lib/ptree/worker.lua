@@ -29,7 +29,6 @@ function new_worker (conf)
    ret.period = 1/conf.Hz
    ret.duration = conf.duration or 1/0
    ret.no_report = conf.no_report
-   ret.next_time = engine.now()
    ret.channel = channel.create('config-worker-channel', 1e6)
    ret.alarms_channel = alarm_codec.get_channel()
    ret.pending_actions = {}
@@ -94,10 +93,11 @@ end
 
 function Worker:main ()
    local stop = engine.now() + self.duration
+   local next_time = engine.now()
    repeat
       self.breathe()
-      if self.next_time < engine.now() then
-         self.next_time = engine.now() + self.period
+      if next_time < engine.now() then
+         next_time = engine.now() + self.period
          self:handle_actions_from_manager()
          timer.run()
       end
@@ -113,6 +113,6 @@ end
 
 function selftest ()
    print('selftest: lib.ptree.worker')
-   main({duration=0.0001})
+   main({duration=0.005})
    print('selftest: ok')
 end
