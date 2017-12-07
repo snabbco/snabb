@@ -4,6 +4,7 @@ module(...,package.seeall)
 
 local S = require("syscall")
 local ffi = require("ffi")
+local C = ffi.C
 local lib = require("core.lib")
 local cltable = require("lib.cltable")
 local cpuset = require("lib.cpuset")
@@ -15,7 +16,6 @@ local schema = require("lib.yang.schema")
 local rpc = require("lib.yang.rpc")
 local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
-local app = require("core.app")
 local shm = require("core.shm")
 local worker = require("core.worker")
 local app_graph = require("core.config")
@@ -25,18 +25,18 @@ local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
 local alarms = require("lib.yang.alarms")
 
-Manager = {
-   config = {
-      socket_file_name = {default='config-manager-socket'},
-      setup_fn = {required=true},
-      -- Could relax this requirement.
-      initial_configuration = {required=true},
-      schema_name = {required=true},
-      worker_default_scheduling = {default={busywait=true}},
-      default_schema = {},
-      cpuset = {default=cpuset.global_cpuset()},
-      Hz = {default=100},
-   }
+local Manager = {}
+
+local manager_config_spec = {
+   socket_file_name = {default='config-manager-socket'},
+   setup_fn = {required=true},
+   -- Could relax this requirement.
+   initial_configuration = {required=true},
+   schema_name = {required=true},
+   worker_default_scheduling = {default={busywait=true}},
+   default_schema = {},
+   cpuset = {default=cpuset.global_cpuset()},
+   Hz = {default=100},
 }
 
 local function open_socket (file)
@@ -49,7 +49,8 @@ local function open_socket (file)
    return socket
 end
 
-function Manager:new (conf)
+function new_manager (conf)
+   local conf = lib.parse(conf, manager_config_spec)
    local ret = setmetatable({}, {__index=Manager})
    ret.cpuset = conf.cpuset
    ret.socket_file_name = conf.socket_file_name
@@ -64,7 +65,6 @@ function Manager:new (conf)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
-   ret.next_time = app.now()
    ret.worker_default_scheduling = conf.worker_default_scheduling
    ret.workers = {}
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
@@ -868,15 +868,6 @@ function Manager:send_messages_to_workers()
    end
 end
 
-function Manager:pull ()
-   if app.now() < self.next_time then return end
-   self.next_time = app.now() + self.period
-   self:remove_stale_workers()
-   self:handle_calls_from_peers()
-   self:send_messages_to_workers()
-   self:receive_alarms_from_workers()
-end
-
 function Manager:receive_alarms_from_workers ()
    for _,worker in pairs(self.workers) do
       self:receive_alarms_from_worker(worker)
@@ -927,18 +918,31 @@ function Manager:stop ()
    S.unlink(self.socket_file_name)
 end
 
-function test_worker()
-   local worker = require("lib.ptree.worker")
-   local myconf = config.new()
-   config.app(myconf, "worker", worker.Worker, {})
-   app.configure(myconf)
-   app.busywait = true
-   app.main({})
+function Manager:main (duration)
+   local now = C.get_monotonic_time()
+   local stop = now + (duration or 1/0)
+   while stop < now do
+      next_time = now + self.period
+      self:remove_stale_workers()
+      self:handle_calls_from_peers()
+      self:send_messages_to_workers()
+      self:receive_alarms_from_workers()
+      now = C.get_monotonic_time()
+      if now < next_time then
+         C.usleep(math.floor((next_time - now) * 1e6))
+         now = C.get_monotonic_time()
+      end
+   end
+end
+
+function main (opts, duration)
+   local m = new_manager(opts)
+   m:main(duration)
+   m:stop()
 end
 
 function selftest ()
    print('selftest: lib.ptree.manager')
-   local graph = app_graph.new()
    local function setup_fn(cfg)
       local graph = app_graph.new()
       local basic_apps = require('apps.basic.basic_apps')
@@ -947,17 +951,17 @@ function selftest ()
       app_graph.link(graph, "source.foo -> sink.bar")
       return {graph}
    end
-   app_graph.app(graph, "manager", Manager,
-                 {setup_fn=setup_fn,
-                  -- Use a schema with no data nodes, just for testing.
-                  schema_name='ietf-inet-types',
-                  initial_configuration={}})
-   engine.configure(graph)
-   engine.main({ duration = 0.05, report = {showapps=true,showlinks=true}})
-   assert(app.app_table.manager.workers[1])
-   assert(app.app_table.manager.workers[1].graph.links)
-   assert(app.app_table.manager.workers[1].graph.links["source.foo -> sink.bar"])
-   local link = app.link_table["source.foo -> sink.bar"]
-   engine.configure(app_graph.new())
+   local m = new_manager({setup_fn=setup_fn,
+                          -- Use a schema with no data nodes, just for
+                          -- testing.
+                          schema_name='ietf-inet-types',
+                          initial_configuration={}})
+   m:main(0.05)
+   assert(m.workers[1])
+   assert(m.workers[1].graph.links)
+   assert(m.workers[1].graph.links["source.foo -> sink.bar"])
+   m:stop()
+   -- FIXME: Actually stop the workers.
+   -- assert(m.workers[1] == nil)
    print('selftest: ok')
 end
