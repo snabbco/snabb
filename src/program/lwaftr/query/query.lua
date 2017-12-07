@@ -82,8 +82,9 @@ local function print_counters (pid, filter)
    end
 end
 
--- Return the pid that was specified, unless it was a leader process,
--- in which case, return the follower pid that actually has useful counters.
+-- Return the pid that was specified, unless it was a manager process,
+-- in which case, return the worker pid that actually has useful
+-- counters.
 local function pid_to_parent(pid)
    -- It's meaningless to get the parent of a nil 'pid'.
    if not pid then return pid end
@@ -91,10 +92,11 @@ local function pid_to_parent(pid)
    for _, name in ipairs(shm.children("/")) do
       local p = tonumber(name)
       if p and ps.is_worker(p) then
-         local leader_pid = tonumber(ps.get_leader_pid(p))
-         -- If the precomputed by-name pid is the leader pid, set the pid
-         -- to be the follower's pid instead to get meaningful counters.
-         if leader_pid == pid then pid = p end
+         local manager_pid = tonumber(ps.get_manager_pid(p))
+         -- If the precomputed by-name pid is the manager pid, set the
+         -- pid to be the worker's pid instead to get meaningful
+         -- counters.
+         if manager_pid == pid then pid = p end
       end
    end
    return pid
@@ -115,18 +117,19 @@ function run (raw_args)
          fatal(("Couldn't find process with name '%s'"):format(opts.name))
       end
 
-      -- Check if it was run with --reconfigurable
-      -- If it was, find the children, then find the pid of their parent.
-      -- Note that this approach will break as soon as there can be multiple
-      -- followers which need to have their statistics aggregated, as it will
-      -- only print the statistics for one child, not for all of them.
+      -- Check if it was run with --reconfigurable If it was, find the
+      -- children, then find the pid of their parent.  Note that this
+      -- approach will break as soon as there can be multiple workers
+      -- which need to have their statistics aggregated, as it will only
+      -- print the statistics for one child, not for all of them.
       for _, name in ipairs(shm.children("/")) do
          local p = tonumber(name)
          if p and ps.is_worker(p) then
-            local leader_pid = tonumber(ps.get_leader_pid(p))
-            -- If the precomputed by-name pid is the leader pid, set the pid
-            -- to be the follower's pid instead to get meaningful counters.
-            if leader_pid == pid then pid = p end
+            local manager_pid = tonumber(ps.get_manager_pid(p))
+            -- If the precomputed by-name pid is the manager pid, set
+            -- the pid to be the worker's pid instead to get meaningful
+            -- counters.
+            if manager_pid == pid then pid = p end
          end
       end
    end

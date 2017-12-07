@@ -1,8 +1,7 @@
 module(..., package.seeall)
 
 local config     = require("core.config")
-local leader     = require("apps.config.leader")
-local follower   = require("apps.config.follower")
+local manager    = require("lib.ptree.manager")
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet
@@ -562,123 +561,6 @@ function load_soak_test_on_a_stick (c, conf, inv4_pcap, inv6_pcap)
    link_sink(c, unpack(sinks))
 end
 
-local apply_scheduling_opts = {
-   pci_addrs = { default={} },
-   real_time = { default=false },
-   ingress_drop_monitor = { default='flush' },
-   j = {}
-}
-function apply_scheduling(opts)
-   local lib = require("core.lib")
-   local ingress_drop_monitor = require("lib.timers.ingress_drop_monitor")
-   local fatal = lwutil.fatal
-
-   opts = lib.parse(opts, apply_scheduling_opts)
-   if opts.ingress_drop_monitor then
-      local mon = ingress_drop_monitor.new({action=opts.ingress_drop_monitor})
-      timer.activate(mon:timer())
-   end
-   if opts.real_time then
-      if not S.sched_setscheduler(0, "fifo", 1) then
-         fatal('Failed to enable real-time scheduling.  Try running as root.')
-      end
-   end
-   if opts.j then
-      local arg = opts.j
-      if arg:match("^v") then
-         local file = arg:match("^v=(.*)")
-         if file == '' then file = nil end
-         require("jit.v").start(file)
-      elseif arg:match("^p") then
-         local opts, file = arg:match("^p=([^,]*),?(.*)")
-         if file == '' then file = nil end
-         local prof = require('jit.p')
-         prof.start(opts, file)
-         local function report() prof.stop(); prof.start(opts, file) end
-         timer.activate(timer.new('p', report, 10e9, 'repeating'))
-      elseif arg:match("^dump") then
-         local opts, file = arg:match("^dump=([^,]*),?(.*)")
-         if file == '' then file = nil end
-         require("jit.dump").on(opts, file)
-      elseif arg:match("^tprof") then
-         local prof = require('lib.traceprof.traceprof')
-         prof.start()
-         local function report() prof.stop(); prof.start() end
-         timer.activate(timer.new('tprof', report, 10e9, 'repeating'))
-      end
-   end
-end
-
-function run_worker(scheduling)
-   local app = require("core.app")
-   apply_scheduling(scheduling)
-   local myconf = config.new()
-   config.app(myconf, "follower", follower.Follower, {})
-   app.configure(myconf)
-   app.busywait = true
-   app.main({})
-end
-
-local function stringify(x)
-   if type(x) == 'string' then return string.format('%q', x) end
-   if type(x) == 'number' then return tostring(x) end
-   if type(x) == 'boolean' then return x and 'true' or 'false' end
-   assert(type(x) == 'table')
-   local ret = {"{"}
-   local first = true
-   for k,v in pairs(x) do
-      if first then first = false else table.insert(ret, ",") end
-      table.insert(ret, string.format('[%s]=%s', stringify(k), stringify(v)))
-   end
-   table.insert(ret, "}")
-   return table.concat(ret)
-end
-
--- Takes a function (which takes a follower PID) and starts sampling
---
--- The function searches for followers of the leader and when a new one
--- appears it calls the sampling function (passed in) with the follower
--- PID to begin the sampling. The sampling function should look like:
---    function(pid, write_header)
--- If write_header is false it should not write a new header.
-function start_sampling(sample_fn)
-   local header_written = false
-   local followers = {}
-   local function find_followers()
-      local ret = {}
-      local mypid = S.getpid()
-      for _, name in ipairs(shm.children("/")) do
-         local pid = tonumber(name)
-         if pid ~= nil and shm.exists("/"..pid.."/group") then
-            local path = S.readlink(shm.root.."/"..pid.."/group")
-            local parent = tonumber(lib.basename(lib.dirname(path)))
-            if parent == mypid then
-               ret[pid] = true
-            end
-         end
-      end
-      return ret
-   end
-
-   local function sample_for_new_followers()
-      local new_followers = find_followers()
-      for pid, _ in pairs(new_followers) do
-         if followers[pid] == nil then
-            if not pcall(sample_fn, pid, (not header_written)) then
-               new_followers[pid] = nil
-               io.stderr:write("Waiting on follower "..pid..
-                  " to start ".."before recording statistics...\n")
-            else
-               header_written = true
-            end
-         end
-      end
-      followers = new_followers
-   end
-   timer.activate(timer.new('start_sampling', sample_for_new_followers,
-      1e9, 'repeating'))
-end
-
 -- Produces configuration for each worker.  Each queue on each device
 -- will get its own worker process.
 local function compute_worker_configs(conf)
@@ -707,7 +589,7 @@ local function compute_worker_configs(conf)
    return ret
 end
 
-function reconfigurable(scheduling, f, graph, conf)
+function ptree_manager(scheduling, f, conf)
    -- Always enabled in reconfigurable mode.
    alarm_notification = true
 
@@ -721,12 +603,12 @@ function reconfigurable(scheduling, f, graph, conf)
       return worker_app_graphs
    end
 
-   local worker_code = "require('program.lwaftr.setup').run_worker(%s)"
-   worker_code = worker_code:format(stringify(scheduling))
-
-   config.app(graph, 'leader', leader.Leader,
-              { setup_fn = setup_fn, initial_configuration = conf,
-                worker_start_code = worker_code,
-                schema_name = 'snabb-softwire-v2',
-                default_schema = 'ietf-softwire-br'})
+   return manager.new_manager {
+      setup_fn = setup_fn,
+      initial_configuration = conf,
+      schema_name = 'snabb-softwire-v2',
+      default_schema = 'ietf-softwire-br',
+      worker_default_scheduling = scheduling,
+      -- log_level="DEBUG"
+   }
 end
