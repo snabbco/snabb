@@ -74,6 +74,7 @@ function new_manager (conf)
    ret.period = 1/conf.Hz
    ret.worker_default_scheduling = conf.worker_default_scheduling
    ret.workers = {}
+   ret.state_change_listeners = {}
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
 
@@ -92,6 +93,31 @@ end
 function Manager:debug(fmt, ...) self:log("DEBUG", fmt, ...) end
 function Manager:info(fmt, ...) self:log("INFO", fmt, ...) end
 function Manager:warn(fmt, ...) self:log("WARN", fmt, ...) end
+
+function Manager:add_state_change_listener(listener)
+   table.insert(self.state_change_listeners, listener)
+   for id, worker in pairs(self.workers) do
+      listener:worker_starting(id)
+      if worker.channel then listener:worker_started(id, worker.pid) end
+      if worker.shutting_down then listener:worker_stopping(id) end
+   end
+end
+
+function Manager:remove_state_change_listener(listener)
+   for i, x in ipairs(self.state_change_listeners) do
+      if x == listener then
+         table.remove(self.state_change_listeners, i)
+         return
+      end
+   end
+   error("listener not found")
+end
+
+function Manager:state_change_event(event, ...)
+   for _,listener in ipairs(self.state_change_listeners) do
+      listener[event](listener, ...)
+   end
+end
 
 function Manager:set_initial_configuration (configuration)
    self.current_configuration = configuration
@@ -123,6 +149,7 @@ end
 function Manager:stop_worker(id)
    self:info('Asking worker %s to shut down.', id)
    local stop_actions = {{'shutdown', {}}, {'commit', {}}}
+   self:state_change_event('worker_stopping', id)
    self:enqueue_config_actions_for_worker(id, stop_actions)
    self:send_messages_to_workers()
    self.workers[id].shutting_down = true
@@ -138,6 +165,7 @@ function Manager:remove_stale_workers()
       end
    end
    for _, id in ipairs(stale) do
+      self:state_change_event('worker_stopped', id)
       if self.workers[id].scheduling.cpu then
 	 self.cpuset:release(self.workers[id].scheduling.cpu)
       end
@@ -172,6 +200,7 @@ function Manager:start_worker_for_graph(id, graph)
    self.workers[id] = { scheduling=scheduling,
                         pid=self:start_worker(scheduling),
                         queue={}, graph=graph }
+   self:state_change_event('worker_starting', id)
    self:debug('Worker %s has PID %s.', id, self.workers[id].pid)
    local actions = self.support.compute_config_actions(
       app_graph.new(), self.workers[id].graph, {}, 'load')
@@ -871,6 +900,7 @@ function Manager:send_messages_to_workers()
          local success, channel = pcall(channel.open, name)
          if success then
             worker.channel = channel
+            self:state_change_event('worker_started', id, worker.pid)
             self:info("Worker %s has started (PID %s).", id, worker.pid)
          end
       end
@@ -966,7 +996,7 @@ function Manager:main (duration)
    local stop = now + (duration or 1/0)
    while now < stop do
       next_time = now + self.period
-      timer.run_to_time(now * 1e9)
+      if timer.ticks then timer.run_to_time(now * 1e9) end
       self:remove_stale_workers()
       self:handle_calls_from_peers()
       self:send_messages_to_workers()
@@ -1001,7 +1031,14 @@ function selftest ()
                           schema_name='ietf-inet-types',
                           initial_configuration={},
                           log_level="DEBUG"})
+   local l = {log={}}
+   function l:worker_starting(...) table.insert(self.log,{'starting',...}) end
+   function l:worker_started(...)  table.insert(self.log,{'started',...})  end
+   function l:worker_stopping(...) table.insert(self.log,{'stopping',...}) end
+   function l:worker_stopped(...)  table.insert(self.log,{'stopped',...})  end
+   m:add_state_change_listener(l)
    assert(m.workers[1])
+   local pid = m.workers[1].pid
    assert(m.workers[1].graph.links)
    assert(m.workers[1].graph.links["source.foo -> sink.bar"])
    -- Worker will be started once main loop starts to run.
@@ -1010,5 +1047,8 @@ function selftest ()
    while not m.workers[1].channel do m:main(0.005) end
    m:stop()
    assert(m.workers[1] == nil)
+   assert(lib.equal(l.log,
+                    { {'starting', 1}, {'started', 1, pid}, {'stopping', 1},
+                      {'stopped', 1} }))
    print('selftest: ok')
 end
