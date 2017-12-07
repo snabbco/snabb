@@ -27,6 +27,10 @@ local alarms = require("lib.yang.alarms")
 
 local Manager = {}
 
+local log_levels = { DEBUG=1, INFO=2, WARN=3 }
+local default_log_level = "WARN"
+if os.getenv('SNABB_MANAGER_VERBOSE') then default_log_level = "DEBUG" end
+
 local manager_config_spec = {
    socket_file_name = {default='config-manager-socket'},
    setup_fn = {required=true},
@@ -35,6 +39,7 @@ local manager_config_spec = {
    schema_name = {required=true},
    worker_default_scheduling = {default={busywait=true}},
    default_schema = {},
+   log_level = {default=default_log_level},
    cpuset = {default=cpuset.global_cpuset()},
    Hz = {default=100},
 }
@@ -52,6 +57,7 @@ end
 function new_manager (conf)
    local conf = lib.parse(conf, manager_config_spec)
    local ret = setmetatable({}, {__index=Manager})
+   ret.log_level = assert(log_levels[conf.log_level])
    ret.cpuset = conf.cpuset
    ret.socket_file_name = conf.socket_file_name
    if not ret.socket_file_name:match('^/') then
@@ -74,6 +80,17 @@ function new_manager (conf)
 
    return ret
 end
+
+function Manager:log (level, fmt, ...)
+   if log_levels[level] < self.log_level then return end
+   local prefix = os.date("%F %H:%M:%S")..": "..level..': '
+   io.stderr:write(prefix..fmt:format(...)..'\n')
+   io.stderr:flush()
+end
+
+function Manager:debug(fmt, ...) self:log("DEBUG", fmt, ...) end
+function Manager:info(fmt, ...) self:log("INFO", fmt, ...) end
+function Manager:warn(fmt, ...) self:log("WARN", fmt, ...) end
 
 function Manager:set_initial_configuration (configuration)
    self.current_configuration = configuration
@@ -103,7 +120,7 @@ function Manager:start_worker(sched_opts)
 end
 
 function Manager:stop_worker(id)
-   -- Tell the worker to terminate
+   self:info('Asking worker %s to shut down.', id)
    local stop_actions = {{'shutdown', {}}, {'commit', {}}}
    self:enqueue_config_actions_for_worker(id, stop_actions)
    self:send_messages_to_workers()
@@ -150,9 +167,11 @@ end
 
 function Manager:start_worker_for_graph(id, graph)
    local scheduling = self:compute_scheduling_for_worker(id, graph)
+   self:info('Starting worker %s.', id)
    self.workers[id] = { scheduling=scheduling,
                         pid=self:start_worker(scheduling),
                         queue={}, graph=graph }
+   self:debug('Worker %s has PID %s.', id, self.workers[id].pid)
    local actions = self.support.compute_config_actions(
       app_graph.new(), self.workers[id].graph, {}, 'load')
    self:enqueue_config_actions_for_worker(id, actions)
@@ -165,13 +184,11 @@ function Manager:take_worker_message_queue ()
    return actions
 end
 
-local verbose = os.getenv('SNABB_MANAGER_VERBOSE') and true
-
-function Manager:enqueue_config_actions_for_worker(worker, actions)
+function Manager:enqueue_config_actions_for_worker(id, actions)
    for _,action in ipairs(actions) do
-      if verbose then print('encode', action[1], unpack(action[2])) end
+      self:debug('encode %s for worker %s', action[1], id)
       local buf, len = action_codec.encode(action)
-      table.insert(self.workers[worker].queue, { buf=buf, len=len })
+      table.insert(self.workers[id].queue, { buf=buf, len=len })
    end
 end
 
@@ -836,7 +853,7 @@ function Manager:handle_calls_from_peers()
          end
       end
       if peer.state == 'done' or peer.state == 'error' then
-         if peer.state == 'error' then print('error: '..peer.msg) end
+         if peer.state == 'error' then self:warn('%s', peer.msg) end
          peer.fd:close()
          table.remove(peers, i)
          if self.listen_peer == peer then self.listen_peer = nil end
@@ -847,11 +864,14 @@ function Manager:handle_calls_from_peers()
 end
 
 function Manager:send_messages_to_workers()
-   for _,worker in pairs(self.workers) do
+   for id,worker in pairs(self.workers) do
       if not worker.channel then
          local name = '/'..tostring(worker.pid)..'/config-worker-channel'
          local success, channel = pcall(channel.open, name)
-         if success then worker.channel = channel end
+         if success then
+            worker.channel = channel
+            self:info("Worker %s has started (PID %s).", id, worker.pid)
+         end
       end
       local channel = worker.channel
       if channel then
@@ -918,10 +938,7 @@ function Manager:stop ()
    S.unlink(self.socket_file_name)
 
    for id, worker in pairs(self.workers) do
-      if not worker.shutting_down then
-         print(string.format('Asking worker %s to shut down.', id))
-         self:stop_worker(id)
-      end
+      if not worker.shutting_down then self:stop_worker(id) end
    end
    -- Wait 250ms for workers to shut down nicely, polling every 5ms.
    local start = C.get_monotonic_time()
@@ -933,19 +950,20 @@ function Manager:stop ()
    end
    -- If that didn't work, send SIGKILL and wait indefinitely.
    for id, worker in pairs(self.workers) do
-      print(string.format('Forcing worker %s to shut down.', id))
+      self:warn('Forcing worker %s to shut down.', id)
       S.kill(worker.pid, "KILL")
    end
    while next(self.workers) do
       self:remove_stale_workers()
       C.usleep(5000)
    end
+   self:info('Shutdown complete.')
 end
 
 function Manager:main (duration)
    local now = C.get_monotonic_time()
    local stop = now + (duration or 1/0)
-   while stop < now do
+   while now < stop do
       next_time = now + self.period
       self:remove_stale_workers()
       self:handle_calls_from_peers()
@@ -979,11 +997,15 @@ function selftest ()
                           -- Use a schema with no data nodes, just for
                           -- testing.
                           schema_name='ietf-inet-types',
-                          initial_configuration={}})
-   m:main(0.05)
+                          initial_configuration={},
+                          log_level="DEBUG"})
    assert(m.workers[1])
    assert(m.workers[1].graph.links)
    assert(m.workers[1].graph.links["source.foo -> sink.bar"])
+   -- Worker will be started once main loop starts to run.
+   assert(not m.workers[1].channel)
+   -- Wait for worker to start.
+   while not m.workers[1].channel do m:main(0.005) end
    m:stop()
    assert(m.workers[1] == nil)
    print('selftest: ok')
