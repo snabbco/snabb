@@ -42,7 +42,7 @@ function new_worker (conf)
 end
 
 function Worker:shutdown()
-   -- This will shutdown everything.
+   -- This will call stop() on all apps.
    engine.configure(app_graph.new())
 
    -- Now we can exit.
