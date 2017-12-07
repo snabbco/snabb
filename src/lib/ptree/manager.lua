@@ -916,6 +916,30 @@ function Manager:stop ()
    self.peers = {}
    self.socket:close()
    S.unlink(self.socket_file_name)
+
+   for id, worker in pairs(self.workers) do
+      if not worker.shutting_down then
+         print(string.format('Asking worker %s to shut down.', id))
+         self:stop_worker(id)
+      end
+   end
+   -- Wait 250ms for workers to shut down nicely, polling every 5ms.
+   local start = C.get_monotonic_time()
+   local wait = 0.25
+   while C.get_monotonic_time() < start + wait do
+      self:remove_stale_workers()
+      if not next(self.workers) then break end
+      C.usleep(5000)
+   end
+   -- If that didn't work, send SIGKILL and wait indefinitely.
+   for id, worker in pairs(self.workers) do
+      print(string.format('Forcing worker %s to shut down.', id))
+      S.kill(worker.pid, "KILL")
+   end
+   while next(self.workers) do
+      self:remove_stale_workers()
+      C.usleep(5000)
+   end
 end
 
 function Manager:main (duration)
@@ -961,7 +985,6 @@ function selftest ()
    assert(m.workers[1].graph.links)
    assert(m.workers[1].graph.links["source.foo -> sink.bar"])
    m:stop()
-   -- FIXME: Actually stop the workers.
-   -- assert(m.workers[1] == nil)
+   assert(m.workers[1] == nil)
    print('selftest: ok')
 end
