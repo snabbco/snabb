@@ -1869,6 +1869,13 @@ void lj_record_ins(jit_State *J)
   BCOp op;
   TRef ra, rb, rc;
 
+  if (J->nbclog < J->maxbclog) {
+    BCRecLog *log = &J->bclog[J->nbclog++];
+    log->pt = J->pt;
+    log->pos = J->pt ? proto_bcpos(J->pt, J->pc) : -1;
+    log->framedepth = J->framedepth;
+  }
+
   /* Perform post-processing action before recording the next instruction. */
   if (LJ_UNLIKELY(J->postproc != LJ_POST_NONE)) {
     switch (J->postproc) {
@@ -2440,6 +2447,8 @@ void lj_record_setup(jit_State *J)
 
   J->bc_min = NULL;  /* Means no limit. */
   J->bc_extent = ~(MSize)0;
+
+  J->nbclog = 0;
 
   /* Emit instructions for fixed references. Also triggers initial IR alloc. */
   emitir_raw(IRT(IR_BASE, IRT_PGC), J->parent, J->exitno);

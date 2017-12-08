@@ -6,28 +6,26 @@
 #ifndef _LJ_VMPROFILE_H
 #define _LJ_VMPROFILE_H
 
-
 /* Counters are 64-bit to avoid overflow even in long running processes. */
 typedef uint64_t VMProfileCount;
 
 /* Maximum trace number for distinct counter buckets. Traces with
-   higher numbers will be counted together in bucket zero. */
+   higher numbers will be counted together in a shared overflow bucket. */
 #define LJ_VMPROFILE_TRACE_MAX 4096
-
-/* Traces have separate counters for different machine code regions. */
-typedef struct VMProfileTraceCount {
-  VMProfileCount head;          /* Head of the trace (non-looping part) */
-  VMProfileCount loop;          /* Loop of the trace */
-  VMProfileCount other;         /* Outside the trace mcode (unidentified) */
-  VMProfileCount gc;            /* Garbage collection from this trace. */
-} VMProfileTraceCount;
 
 /* Complete set of counters for VM and traces. */
 typedef struct VMProfile {
   uint32_t magic;               /* 0x1d50f007 */
-  uint16_t major, minor;        /* 2, 0 */
-  VMProfileCount vm[LJ_VMST__MAX];
-  VMProfileTraceCount trace[LJ_VMPROFILE_TRACE_MAX+1];
+  uint16_t major, minor;        /* 4, 0 */
+  /* Profile counters are stored in a 2D matrix of count[trace][state].
+  **
+  ** The profiler attempts to attribute each sample to one vmstate and
+  ** one trace. The vmstate is an LJ_VMST_* constant. The trace is
+  ** either 1..4096 (counter for one individual trace) or 0 (shared
+  ** counter for all higher-numbered traces and for samples that can't
+  ** be attributed to a specific trace at all.)
+  **/
+  VMProfileCount count[LJ_VMPROFILE_TRACE_MAX+1][LJ_VMST__MAX];
 } VMProfile;
 
 /* Functions that should be accessed via FFI. */

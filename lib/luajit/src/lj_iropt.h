@@ -24,13 +24,10 @@ static LJ_AINLINE void lj_ir_set_(jit_State *J, uint16_t ot, IRRef1 a, IRRef1 b)
 #define lj_ir_set(J, ot, a, b) \
   lj_ir_set_(J, (uint16_t)(ot), (IRRef1)(a), (IRRef1)(b))
 
-/* Get ref of next IR instruction and optionally grow IR.
-** Note: this may invalidate all IRIns*!
-*/
+/* Get ref of next IR instruction. */
 static LJ_AINLINE IRRef lj_ir_nextins(jit_State *J)
 {
   IRRef ref = J->cur.nins;
-  if (LJ_UNLIKELY(ref >= J->irtoplim)) lj_ir_growtop(J);
   J->cur.nins = ref + 1;
   return ref;
 }

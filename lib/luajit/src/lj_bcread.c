@@ -20,6 +20,7 @@
 #include "lj_bcdump.h"
 #include "lj_state.h"
 #include "lj_strfmt.h"
+#include "lj_auditlog.h"
 
 /* Reuse some lexer fields for our own purposes. */
 #define bcread_flags(ls)	ls->level
@@ -151,18 +152,12 @@ static uint32_t bcread_uleb128_33(LexState *ls)
 /* Read debug info of a prototype. */
 static void bcread_dbg(LexState *ls, GCproto *pt, MSize sizedbg)
 {
-  void *lineinfo = (void *)proto_lineinfo(pt);
+  uint32_t *lineinfo = (uint32_t*)proto_lineinfo(pt);
   bcread_block(ls, lineinfo, sizedbg);
   /* Swap lineinfo if the endianess differs. */
-  if (bcread_swap(ls) && pt->numline >= 256) {
-    MSize i, n = pt->sizebc-1;
-    if (pt->numline < 65536) {
-      uint16_t *p = (uint16_t *)lineinfo;
-      for (i = 0; i < n; i++) p[i] = (uint16_t)((p[i] >> 8)|(p[i] << 8));
-    } else {
-      uint32_t *p = (uint32_t *)lineinfo;
-      for (i = 0; i < n; i++) p[i] = lj_bswap(p[i]);
-    }
+  if (bcread_swap(ls)) {
+    int i;
+    for (i = 0; i < pt->sizebc-1; i++) lineinfo[i] = lj_bswap(lineinfo[i]);
   }
 }
 
@@ -367,7 +362,7 @@ GCproto *lj_bcread_proto(LexState *ls)
   pt->firstline = firstline;
   pt->numline = numline;
   if (sizedbg) {
-    MSize sizeli = (sizebc-1) << (numline < 256 ? 0 : numline < 65536 ? 1 : 2);
+    MSize sizeli = (sizebc-1) * sizeof(BCLine);
     setmref(pt->lineinfo, (char *)pt + ofsdbg);
     setmref(pt->uvinfo, (char *)pt + ofsdbg + sizeli);
     bcread_dbg(ls, pt, sizedbg);
@@ -377,6 +372,7 @@ GCproto *lj_bcread_proto(LexState *ls)
     setmref(pt->uvinfo, NULL);
     setmref(pt->varinfo, NULL);
   }
+  lj_auditlog_new_prototype(pt);
   return pt;
 }
 
