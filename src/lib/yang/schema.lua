@@ -941,6 +941,25 @@ function load_schema_by_name(name, revision)
 end
 load_schema_by_name = util.memoize(load_schema_by_name)
 
+function add_schema(src, filename)
+   -- Assert that the source actually parses, and get the ID.
+   local s, e = load_schema(src, filename)
+   -- Assert that this schema isn't known.
+   assert(not pcall(load_schema_by_name, s.id))
+   assert(s.id)
+   -- Intern.
+   print('lib.yang.'..s.id:gsub('-', '_')..'_yang')
+   package.loaded['lib.yang.'..s.id:gsub('-', '_')..'_yang'] = src
+   return s.id
+end
+
+function add_schema_file(filename)
+   local file_in = assert(io.open(filename))
+   local contents = file_in:read("*a")
+   file_in:close()
+   return add_schema(contents, filename)
+end
+
 function lookup_identity (fqid)
    local schema_name, id = fqid:match("^([^:]*):(.*)$")
    local schema, env = load_schema_by_name(schema_name)

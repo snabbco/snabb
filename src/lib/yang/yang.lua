@@ -12,6 +12,9 @@ load_schema = schema.load_schema
 load_schema_file = schema.load_schema_file
 load_schema_by_name = schema.load_schema_by_name
 
+add_schema = schema.add_schema
+add_schema_file = schema.add_schema_file
+
 load_config_for_schema = data.load_config_for_schema
 load_config_for_schema_by_name = data.load_config_for_schema_by_name
 
