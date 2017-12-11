@@ -568,7 +568,8 @@ static void rec_loop_interp(jit_State *J, const BCIns *pc, LoopEvent ev)
 /* Handle the case when an already compiled loop op is hit. */
 static void rec_loop_jit(jit_State *J, TraceNo lnk, LoopEvent ev)
 {
-  if (J->parent == 0 && J->exitno == 0) {  /* Root trace hit an inner loop. */
+  /* Root trace hit an inner loop. */
+  if (J->parent == 0 && J->exitno == 0 && !innerloopleft(J, J->startpc)) {
     /* Better let the inner loop spawn a side trace back here. */
     lj_trace_err(J, LJ_TRERR_LINNER);
   } else if (ev != LOOPEV_LEAVE) {  /* Side trace enters a compiled loop. */
@@ -2291,8 +2292,6 @@ void lj_record_ins(jit_State *J)
   case BC_IFORL:
   case BC_IITERL:
   case BC_ILOOP:
-  case BC_IFUNCF:
-  case BC_IFUNCV:
     lj_trace_err(J, LJ_TRERR_BLACKL);
     break;
 
@@ -2304,6 +2303,7 @@ void lj_record_ins(jit_State *J)
   /* -- Function headers -------------------------------------------------- */
 
   case BC_FUNCF:
+  case BC_IFUNCF:
     rec_func_lua(J);
     break;
   case BC_JFUNCF:
@@ -2311,6 +2311,7 @@ void lj_record_ins(jit_State *J)
     break;
 
   case BC_FUNCV:
+  case BC_IFUNCV:
     rec_func_vararg(J);
     rec_func_lua(J);
     break;

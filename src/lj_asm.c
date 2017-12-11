@@ -1984,6 +1984,10 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   as->loopinv = 0;
   as->parent = J->parent ? traceref(J, J->parent) : NULL;
 
+  /* Initialize mcode size of IR instructions array. */
+  T->szirmcode = lj_mem_new(J->L, T->nins * sizeof(*T->szirmcode));
+  memset(T->szirmcode, 0, T->nins * sizeof(*T->szirmcode));
+
   /* Reserve MCode memory. */
   as->mctop = origtop = lj_mcode_reserve(J, &as->mcbot);
   as->mcp = as->mctop;
@@ -2043,6 +2047,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
     /* Assemble a trace in linear backwards order. */
     for (as->curins--; as->curins > as->stopins; as->curins--) {
       IRIns *ir = IR(as->curins);
+      MCode *end = as->mcp;
       lua_assert(!(LJ_32 && irt_isint64(ir->t)));  /* Handled by SPLIT. */
       if (!ra_used(ir) && !ir_sideeff(ir) && (as->flags & JIT_F_OPT_DCE))
 	continue;  /* Dead-code elimination can be soooo easy. */
@@ -2051,6 +2056,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
       RA_DBG_REF();
       checkmclim(as);
       asm_ir(as, ir);
+      T->szirmcode[as->curins] = (uint16_t)(end - as->mcp);
     }
 
     if (as->realign && J->curfinal->nins >= T->nins)

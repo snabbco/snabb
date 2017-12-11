@@ -192,6 +192,7 @@ typedef struct GCtrace {
   MSize szmcode;	/* Size of machine code. */
   MCode *mcode;		/* Start of machine code. */
   MSize mcloop;		/* Offset of loop start in machine code. */
+  uint16_t *szirmcode;  /* Bytes of mcode for each IR instruction (array.) */
   uint16_t nchild;	/* Number of child traces (root trace only). */
   uint16_t spadjust;	/* Stack pointer adjustment (offset in bytes). */
   TraceNo1 traceno;	/* Trace number. */
@@ -199,6 +200,8 @@ typedef struct GCtrace {
   TraceNo1 root;	/* Root trace of side trace (or 0 for root traces). */
   TraceNo1 nextroot;	/* Next root trace for same prototype. */
   TraceNo1 nextside;	/* Next side trace of same root trace. */
+  TraceNo1 parent;      /* Parent of this trace (or 0 for root traces). */
+  ExitNo exitno;        /* Exit number in parent (valid for side-traces only). */
   uint8_t sinktags;	/* Trace has SINK tags. */
   uint8_t unused1;
 } GCtrace;
@@ -220,13 +223,13 @@ static LJ_AINLINE MSize snap_nextofs(GCtrace *T, SnapShot *snap)
 /* Round-robin penalty cache for bytecodes leading to aborted traces. */
 typedef struct HotPenalty {
   MRef pc;		/* Starting bytecode PC. */
-  uint16_t val;		/* Penalty value, i.e. hotcount start. */
+  uint32_t val;		/* Penalty value, i.e. hotcount start. */
   uint16_t reason;	/* Abort reason (really TraceErr). */
 } HotPenalty;
 
 #define PENALTY_SLOTS	64	/* Penalty cache slot. Must be a power of 2. */
 #define PENALTY_MIN	(36*2)	/* Minimum penalty value. */
-#define PENALTY_MAX	60000	/* Maximum penalty value. */
+#define PENALTY_MAX	6000000	/* Maximum penalty value. */
 #define PENALTY_RNDBITS	4	/* # of random bits to add to penalty value. */
 
 /* Round-robin backpropagation cache for narrowing conversions. */
