@@ -953,7 +953,6 @@ function add_schema(src, filename)
    assert(not pcall(load_schema_source_by_name, s.id))
    assert(s.id)
    -- Intern.
-   print('lib.yang.'..s.id:gsub('-', '_')..'_yang')
    package.loaded['lib.yang.'..s.id:gsub('-', '_')..'_yang'] = src
    return s.id
 end
