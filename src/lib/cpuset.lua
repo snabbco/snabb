@@ -78,8 +78,8 @@ end
 function CPUSet:release(cpu)
    local node = numa.cpu_get_numa_node(cpu)
    assert(node ~= nil, 'Failed to get NUMA node for CPU: '..cpu)
-   for cpu, avail in pairs(self.by_node[node]) do
-      if avail then
+   for x, avail in pairs(self.by_node[node]) do
+      if x == cpu then
          assert(self.by_node[node][cpu] == false)
          self.by_node[node][cpu] = true
          return
