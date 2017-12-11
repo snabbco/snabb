@@ -77,7 +77,7 @@ Optional entries that may be present in the *parameters* table include:
  * `socket_file_name`: The name of the socket on which to listen for
    incoming connections from `snabb config` clients.  See [the `snabb
    config` documentation](../../program/config/README.md) for more
-   information.  Default is `$SNABB_SHM_ROOT/PID/config-manager-socket`,
+   information.  Default is `$SNABB_SHM_ROOT/PID/config-leader-socket`,
    where the `$SNABB_SHM_ROOT` environment variable defaults to
    `/var/run/snabb`.
  * `name`: A name to claim for this process tree.  `snabb config` can

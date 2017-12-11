@@ -34,7 +34,7 @@ if os.getenv('SNABB_MANAGER_VERBOSE') then default_log_level = "DEBUG" end
 
 local manager_config_spec = {
    name = {},
-   socket_file_name = {default='config-manager-socket'},
+   socket_file_name = {default='config-leader-socket'},
    setup_fn = {required=true},
    -- Could relax this requirement.
    initial_configuration = {required=true},
