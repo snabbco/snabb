@@ -77,7 +77,7 @@ function CPUSet:acquire(on_node)
       for node, cpus in pairs(self.by_node) do
          for cpu, avail in pairs(cpus) do
             if avail then
-               print("Warning: No CPU available on local NUMA node "..node)
+               print("Warning: No CPU available on local NUMA node "..on_node)
                print("Warning: Assigning CPU "..cpu.." from remote node "..node)
                cpus[cpu] = false
                return cpu
