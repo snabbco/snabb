@@ -20,37 +20,36 @@ typedef uint32_t MSize;
 typedef uint64_t GCSize;
 
 /* Memory reference */
-typedef struct MRef {
-  uint64_t ptr64;	/* True 64 bit pointer. */
-} MRef;
+typedef void * MRef;
 
-#define mref(r, t)	((t *)(void *)(r).ptr64)
+#define mref(r, t)	((t *)(r))
 
-#define setmref(r, p)	((r).ptr64 = (uint64_t)(void *)(p))
-#define setmrefr(r, v)	((r).ptr64 = (v).ptr64)
+#define setmref(r, p)	((r) = (void *)(p))
+#define setmrefr(r, v)	((r) = (v))
 
 /* -- GC object references (32 bit address space) ------------------------- */
 
+/* Forward declaration. */
+union GCobj;
+
 /* GCobj reference */
-typedef struct GCRef {
-  uint64_t gcptr64;	/* True 64 bit pointer. */
-} GCRef;
+typedef union GCobj * GCRef;
 
 /* Common GC header for all collectable objects. */
 #define GCHeader	GCRef nextgc; uint8_t marked; uint8_t gct
 /* This occupies 6 bytes, so use the next 2 bytes for non-32 bit fields. */
 
-#define gcref(r)	((GCobj *)(r).gcptr64)
-#define gcrefp(r, t)	((t *)(void *)(r).gcptr64)
-#define gcrefu(r)	((r).gcptr64)
-#define gcrefeq(r1, r2)	((r1).gcptr64 == (r2).gcptr64)
+#define gcref(r)	(r)
+#define gcrefp(r, t)	((t *)(void *)(r))
+#define gcrefu(r)	((uint64_t)(r))
+#define gcrefeq(r1, r2)	((r1)==(r2))
 
-#define setgcref(r, gc)	((r).gcptr64 = (uint64_t)&(gc)->gch)
+#define setgcref(r, gc)	((r) = (GCobj *)&(gc)->gch)
 #define setgcreft(r, gc, it) \
-  (r).gcptr64 = (uint64_t)&(gc)->gch | (((uint64_t)(it)) << 47)
-#define setgcrefp(r, p)	((r).gcptr64 = (uint64_t)(p))
-#define setgcrefnull(r)	((r).gcptr64 = 0)
-#define setgcrefr(r, v)	((r).gcptr64 = (v).gcptr64)
+  (r) = (GCobj *)((uint64_t)&(gc)->gch | ((uint64_t)(it) << 47))
+#define setgcrefp(r, p) ((r) = (GCobj *)p)
+#define setgcrefnull(r)	((r) = NULL)
+#define setgcrefr(r, v)	((r) = (v))
 
 #define gcnext(gc)	(gcref((gc)->gch.nextgc))
 
