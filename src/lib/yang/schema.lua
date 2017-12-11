@@ -933,11 +933,16 @@ function load_schema_file(filename)
    return inherit_config(s), e
 end
 load_schema_file = util.memoize(load_schema_file)
-function load_schema_by_name(name, revision)
+
+function load_schema_source_by_name(name, revision)
    -- FIXME: @ is not valid in a Lua module name.
    -- if revision then name = name .. '@' .. revision end
    name = name:gsub('-', '_')
-   return load_schema(require('lib.yang.'..name..'_yang'), name)
+   return require('lib.yang.'..name..'_yang')
+end
+
+function load_schema_by_name(name, revision)
+   return load_schema(load_schema_source_by_name(name, revision))
 end
 load_schema_by_name = util.memoize(load_schema_by_name)
 
@@ -945,7 +950,7 @@ function add_schema(src, filename)
    -- Assert that the source actually parses, and get the ID.
    local s, e = load_schema(src, filename)
    -- Assert that this schema isn't known.
-   assert(not pcall(load_schema_by_name, s.id))
+   assert(not pcall(load_schema_source_by_name, s.id))
    assert(s.id)
    -- Intern.
    print('lib.yang.'..s.id:gsub('-', '_')..'_yang')

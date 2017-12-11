@@ -249,6 +249,15 @@ function Manager:rpc_describe (args)
             capability = schema.get_default_capabilities() }
 end
 
+function Manager:rpc_get_schema (args)
+   local function getter()
+      return { source = schema.load_schema_source_by_name(
+                  args.schema, args.revision) }
+   end
+   local success, response = pcall(getter)
+   if success then return response else return {status=1, error=response} end
+end
+
 local function path_printer_for_grammar(grammar, path, format, print_default)
    local getter, subgrammar = path_mod.resolver(grammar, path)
    local printer
