@@ -1,7 +1,7 @@
 module(..., package.seeall)
 
 local config     = require("core.config")
-local manager    = require("lib.ptree.manager")
+local manager    = require("lib.ptree.ptree")
 local PcapFilter = require("apps.packet_filter.pcap_filter").PcapFilter
 local V4V6       = require("apps.lwaftr.V4V6").V4V6
 local VirtioNet  = require("apps.virtio_net.virtio_net").VirtioNet

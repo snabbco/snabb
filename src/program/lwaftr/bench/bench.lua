@@ -34,7 +34,6 @@ function parse_args(args)
    args = lib.dogetopt(args, handlers, "j:n:hyb:D:", {
       help="h", hydra="y", ["bench-file"]="b", duration="D", name="n", cpu=1})
    if #args ~= 3 then show_usage(1) end
-   cpuset.global_cpuset():bind_to_numa_node()
    return opts, scheduling, unpack(args)
 end
 

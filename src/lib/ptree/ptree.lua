@@ -33,6 +33,7 @@ local default_log_level = "WARN"
 if os.getenv('SNABB_MANAGER_VERBOSE') then default_log_level = "DEBUG" end
 
 local manager_config_spec = {
+   name = {},
    socket_file_name = {default='config-manager-socket'},
    setup_fn = {required=true},
    -- Could relax this requirement.
@@ -57,7 +58,9 @@ end
 
 function new_manager (conf)
    local conf = lib.parse(conf, manager_config_spec)
+
    local ret = setmetatable({}, {__index=Manager})
+   ret.name = conf.name
    ret.log_level = assert(log_levels[conf.log_level])
    ret.cpuset = conf.cpuset
    ret.socket_file_name = conf.socket_file_name
@@ -68,7 +71,6 @@ function new_manager (conf)
    ret.schema_name = conf.schema_name
    ret.default_schema = conf.default_schema or conf.schema_name
    ret.support = support.load_schema_config_support(conf.schema_name)
-   ret.socket = open_socket(ret.socket_file_name)
    ret.peers = {}
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
@@ -79,6 +81,8 @@ function new_manager (conf)
    ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
 
    ret:set_initial_configuration(conf.initial_configuration)
+
+   ret:start()
 
    return ret
 end
@@ -136,6 +140,12 @@ function Manager:set_initial_configuration (configuration)
    for id, worker_app_graph in pairs(worker_app_graphs) do
       self:start_worker_for_graph(id, worker_app_graph)
    end
+end
+
+function Manager:start ()
+   if self.name then engine.claim_name(self.name) end
+   self.cpuset:bind_to_numa_node()
+   self.socket = open_socket(self.socket_file_name)
 end
 
 function Manager:start_worker(sched_opts)
@@ -988,6 +998,7 @@ function Manager:stop ()
       self:remove_stale_workers()
       C.usleep(5000)
    end
+   if self.name then engine.unclaim_name(self.name) end
    self:info('Shutdown complete.')
 end
 
@@ -1016,7 +1027,7 @@ function main (opts, duration)
 end
 
 function selftest ()
-   print('selftest: lib.ptree.manager')
+   print('selftest: lib.ptree.ptree')
    local function setup_fn(cfg)
       local graph = app_graph.new()
       local basic_apps = require('apps.basic.basic_apps')

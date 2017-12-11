@@ -119,7 +119,6 @@ function parse_args(args)
    if opts.mirror then
       assert(opts["on-a-stick"], "Mirror option is only valid in on-a-stick mode")
    end
-   cpuset.global_cpuset():bind_to_numa_node()
    if opts["on-a-stick"] then
       scheduling.pci_addrs = { v4 }
       return opts, scheduling, conf_file, v4
