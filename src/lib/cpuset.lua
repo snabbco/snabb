@@ -73,6 +73,25 @@ function CPUSet:acquire(on_node)
          end
       end
    end
+   if on_node ~= nil then
+      for node, cpus in pairs(self.by_node) do
+         for cpu, avail in pairs(cpus) do
+            if avail then
+               print("Warning: No CPU available on local NUMA node "..node)
+               print("Warning: Assigning CPU "..cpu.." from remote node "..node)
+               cpus[cpu] = false
+               return cpu
+            end
+         end
+      end
+   end
+   for node, cpus in pairs(self.by_node) do
+      print("Warning: All assignable CPUs in use; "
+               .."leaving data-plane process without assigned CPU.")
+      return
+   end
+   print("Warning: No assignable CPUs declared; "
+            .."leaving data-plane process without assigned CPU.")
 end
 
 function CPUSet:release(cpu)
