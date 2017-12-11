@@ -5,9 +5,10 @@ functions.
 
 #### Overview
 
-The `lib.ptree` facility in Snabb allows network engineers to build a
-network function out of a tree of processes described by a YANG schema.
-The root process runs the management plane, and the leaf processes (the
+The [`lib.ptree`](../../lib/ptree/README.md) facility in Snabb allows
+network engineers to build a network function out of a tree of processes
+described by a [YANG schema](../../lib/yang/README.md).  The root
+process runs the management plane, and the leaf processes (the
 "workers") run the data plane.  The apps and links in the workers are
 declaratively created as a function of a YANG configuration.
 
@@ -143,11 +144,68 @@ See [`snabb ptree --help`](./README) for full details on arguments like
 
 #### Tuning
 
-(Document scheduling parameters here.)
+The `snabb ptree` program also takes a number of options that apply to
+the data-plane processes.
+
+— **--cpu** *cpus*
+
+Allocate *cpus* to the data-plane processes.  The manager of the process
+tree will allocate CPUs from this set to data-plane workers.  For
+example, For example, `--cpu 3-5,7-9` assigns CPUs 3, 4, 5, 7, 8, and 9
+to the network function.  The manager will try to allocate a CPU for a
+worker that is NUMA-local to the PCI devices used by the worker.
+
+— **--real-time**
+
+Use the `SCHED_FIFO` real-time scheduler for the data-plane processes.
+
+— **--on-ingress-drop** *action*
+
+If a data-plane process detects too many dropped packets (by default,
+100K packets over 30 seconds), perform *action*.  Available *action*s
+are `flush`, which tells Snabb to re-optimize the code; `warn`, which
+simply prints a warning and raises an alarm; and `off`, which does
+nothing.
+
+— **-j** *arg*
+
+Enable profiling in the data-plane.  Useful when you are trying to
+isolate a performance problem.  It is thought that this will be reworked
+when Snabb switches to RaptorJIT, so we leave this somewhat complicated
+option undocumented at present :)
 
 #### Reconfiguration
 
-(Document "snabb config" and NCS integration here.)
+The manager of a ptree-based Snabb network function also listens to
+configuration queries and updates on a local socket.  The user-facing
+side of this interface is [`snabb config`](../config/README.md).  A
+`snabb config` user can address a local ptree network function by PID,
+but it's easier to do so by name, so the above example passed `--name
+my-filter` to the `snabb ptree` invocation.
+
+For example, we can get the configuration of a running network function
+with `snabb config get`: 
+
+```
+$ snabb config get my-filter /
+device 83:00.0;
+rss-queue 0;
+filter "tcp port 80";
+```
+
+You can also update the configuration.  For example, to move this
+network function over to device `82:00.0`, do:
+
+```
+$ snabb config set my-filter /device 82:00.0
+$ snabb config get my-filter /
+device 82:00.0;
+rss-queue 0;
+filter "tcp port 80";
+```
+
+The ptree manager takes the necessary actions to update the dataplane to
+match the specified configuration.
 
 #### Multi-process
 
