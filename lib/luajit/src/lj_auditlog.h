@@ -8,6 +8,8 @@
 #include "lj_jit.h"
 #include "lj_trace.h"
 
+int lj_auditlog_open(const char *path);
+
 void lj_auditlog_new_prototype(GCproto *pt);
 void lj_auditlog_trace_flush(jit_State *J);
 void lj_auditlog_trace_stop(jit_State *J, GCtrace *T);
