@@ -18,6 +18,7 @@
 #include "luajit.h"
 
 #include "lj_arch.h"
+#include "lj_auditlog.h"
 
 #include <unistd.h>
 #define lua_stdin_is_tty()	isatty(0)
@@ -58,6 +59,7 @@ static void print_usage(void)
   "  -i        Enter interactive mode after executing " LUA_QL("script") ".\n"
   "  -v        Show version information.\n"
   "  -E        Ignore environment variables.\n"
+  "  -a path   Enable auditlog at path.\n"
   "  --        Stop handling options.\n"
   "  -         Execute stdin and stop handling options.\n", stderr);
   fflush(stderr);
@@ -402,6 +404,7 @@ static int collectargs(char **argv, int *flags)
       break;
     case 'e':
       *flags |= FLAGS_EXEC;
+    case 'a':  /* RaptorJIT extension */
     case 'j':  /* LuaJIT extension */
     case 'l':
       *flags |= FLAGS_OPTION;
@@ -461,6 +464,11 @@ static int runargs(lua_State *L, char **argv, int argn)
       break;
     case 'b':  /* LuaJIT extension. */
       return dobytecode(L, argv+i);
+    case 'a':  /* RaptorJIT extension. */
+      if (!lj_auditlog_open(argv[++i])) {
+        fprintf(stderr, "unable to open auditlog\n");
+        fflush(stderr);
+      }
     default: break;
     }
   }
