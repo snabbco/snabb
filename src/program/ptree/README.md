@@ -120,8 +120,8 @@ return function (conf)
                   txq=conf.rss_queue})
    app_graph.app(graph, "filter", pcap_filter.PcapFilter,
                  {filter=conf.filter})
-   app_graph.link(graph, "nic."..device.tx.." -> filter.input")
-   app_graph.link(graph, "filter.output -> nic."..device.rx)
+   app_graph.link(graph, "nic."..device_info.tx.." -> filter.input")
+   app_graph.link(graph, "filter.output -> nic."..device_info.rx)
 
    -- Use DEVICE/QUEUE as the worker ID.
    local id = conf.device..'/'..conf.rss_queue
