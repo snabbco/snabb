@@ -9,8 +9,13 @@
 #include "lj_trace.h"
 #include "lj_auditlog.h"
 
+/* Maximum data to buffer in memory before file is opened. */
+#define MAX_MEM_BUFFER 1024*1024
+
 /* File where the audit log is written. */
 FILE *fp;
+/* Have we been unable to initialize the log? */
+int error;
 
 /* -- msgpack writer - see http://msgpack.org/index.html ------------------ */
 
@@ -65,12 +70,49 @@ void lj_auditlog_vm_definitions()
   log_mem("lj_ir_mode", (void*)&lj_ir_mode, sizeof(lj_ir_mode));
 }
 
-/* Ensure that the log file is open. */
-static void ensure_log_open() {
-  if (!fp) {
-    fp = fopen("audit.log", "w");
-    lua_assert(fp != NULL);
+/* Check that the log is open before logging a message. */
+static int ensure_log_open() {
+  if (fp != NULL) return 1;     /* Log already open? */
+  if (error) return 0;          /* Log has already errored? */
+  /* Start logging into a memory buffer. The entries will be migrated
+  ** onto disk when (if) a file system path is provided.
+  ** (We want the log to be complete even if it is opened after some
+  ** JIT activity has ocurred.)
+  */
+  if ((fp = fmemopen(NULL, MAX_MEM_BUFFER, "wb+")) != NULL) {
     lj_auditlog_vm_definitions();
+    return 1;
+  } else {
+    error = 1;
+    return 0;
+  }
+}
+
+/* Open the auditlog at a new path.
+** Migrate existing log entries into the new log.
+** Return zero on failure.
+*/
+int lj_auditlog_open(const char *path)
+{
+  char buffer[4096];
+  FILE *newfp;
+  int nread;
+  if (!ensure_log_open()) return 0;
+  newfp = fopen(path, "wb+");
+  /* Migrate the contents of the existing log. */
+  fseek(fp, 0, SEEK_SET);
+  while ((nread = fread(&buffer, 1, sizeof(buffer), fp)) > 0) {
+    if (fwrite(&buffer, 1, nread, newfp) != nread) break;
+  }
+  if (!ferror(fp) && !ferror(newfp)) {
+    /* Migration succeeded. */
+    fp = newfp;
+    return 1;
+  } else {
+    /* Migration failed: revert to the old log. */
+    fclose(newfp);
+    fseek(fp, 0, SEEK_END);
+    return 0;
   }
 }
 
@@ -125,29 +167,31 @@ static void log_GCobj(GCobj *o)
 /* Log a trace that has just been compiled. */
 void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 {
-  ensure_log_open();
-  log_jit_State(J);
-  log_GCtrace(T);
-  log_event("trace_stop", 2);
-  str_16("GCtrace");   /* = */ uint_64((uint64_t)T);
-  str_16("jit_State"); /* = */ uint_64((uint64_t)J);
+  if (ensure_log_open()) {
+    log_jit_State(J);
+    log_GCtrace(T);
+    log_event("trace_stop", 2);
+    str_16("GCtrace");   /* = */ uint_64((uint64_t)T);
+    str_16("jit_State"); /* = */ uint_64((uint64_t)J);
+  }
 }
 
 void lj_auditlog_trace_abort(jit_State *J, TraceError e)
 {
-  ensure_log_open();
-  log_jit_State(J);
-  log_event("trace_abort", 2);
-  str_16("TraceError"); /* = */ uint_64(e);
-  str_16("jit_State");  /* = */ uint_64((uint64_t)J);
+  if (ensure_log_open()) {
+    log_jit_State(J);
+    log_event("trace_abort", 2);
+    str_16("TraceError"); /* = */ uint_64(e);
+    str_16("jit_State");  /* = */ uint_64((uint64_t)J);
+  }
 }
 
 void lj_auditlog_new_prototype(GCproto *pt)
 {
-  ensure_log_open();
-  log_GCproto(pt);
-  log_event("new_prototype", 1);
-  str_16("GCproto"); /* = */ uint_64((uint64_t)pt);;
+  if (ensure_log_open()) {
+    log_GCproto(pt);
+    log_event("new_prototype", 1);
+    str_16("GCproto"); /* = */ uint_64((uint64_t)pt);;
+  }
 }
-
 
