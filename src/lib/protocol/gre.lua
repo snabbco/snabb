@@ -28,7 +28,11 @@ ffi.cdef[[
 -- Class variables
 gre._name = "gre"
 gre._ulp = {
-   class_map = { [0x6558] = "lib.protocol.ethernet" },
+   class_map = {
+                  [0x6558] = "lib.protocol.ethernet",
+                  [0x0800] = "lib.protocol.ipv4",
+                  [0x86dd] = "lib.protocol.ipv6",
+                },
    method    = 'protocol' }
 gre:init(
    {

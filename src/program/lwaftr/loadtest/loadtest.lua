@@ -4,7 +4,6 @@ local engine = require("core.app")
 local counter = require("core.counter")
 local config = require("core.config")
 local pci = require("lib.hardware.pci")
-local Intel82599 = require("apps.intel.intel_app").Intel82599
 local basic_apps = require("apps.basic.basic_apps")
 local loadgen = require("apps.lwaftr.loadgen")
 local main = require("core.main")
@@ -29,8 +28,7 @@ local function find_devices(pattern)
    pattern = pci.qualified(pattern)
    local ret = {}
    for _,device in ipairs(pci.devices) do
-      if (device.usable and device.driver == 'apps.intel.intel_app' and
-          pattern:match(device.pciaddress)) then
+      if device.driver and pattern:match(device.pciaddress) then
          table.insert(ret, device.pciaddress)
       end
    end
@@ -120,19 +118,26 @@ function parse_args(args)
    assert(opts.duration > 0, 'duration must be positive')
    if #args == 0 or #args % 4 ~= 0 then show_usage(1) end
    local streams = {}
+   local streams_by_tx_id = {}
    local pci_addrs = {}
    for i=1,#args,4 do
       local capture_file, tx, rx, pattern = args[i], args[i+1], args[i+2], args[i+3]
-      local nic = {
+      local stream = {
          capture_file = capture_file,
          tx_name = tx,
          rx_name = rx,
          tx_id = tx:gsub('[^%w]', '_'),
          rx_id = rx:gsub('[^%w]', '_'),
-         pci_addr = find_device(pattern)
+         device = pci.device_info(find_device(pattern))
       }
-      table.insert(streams, nic)
-      table.insert(pci_addrs, nic.pci_addr)
+      table.insert(streams, stream)
+      assert(streams_by_tx_id[stream.tx_id] == nil, 'Duplicate: '..stream.tx_id)
+      streams_by_tx_id[stream.tx_id] = stream
+      table.insert(pci_addrs, stream.device.pciaddress)
+   end
+   for _, stream in ipairs(streams) do
+      assert(streams_by_tx_id[stream.rx_id], 'Missing stream: '..stream.rx_id)
+      stream.rx_device = streams_by_tx_id[stream.rx_id].device
    end
    if cpu then numa.bind_to_cpu(cpu) end
    numa.check_affinity_for_pci_addresses(pci_addrs)
@@ -157,21 +162,32 @@ function run(args)
    local opts, streams = parse_args(args)
    local c = config.new()
    for _,stream in ipairs(streams) do
+      local driver = require(stream.device.driver).driver
+
       stream.pcap_id = 'pcap_'..stream.tx_id
       stream.repeater_id = 'repeater_'..stream.tx_id
       stream.nic_tx_id = 'nic_'..stream.tx_id
       stream.nic_rx_id = 'nic_'..stream.rx_id
+      -- Links are named directionally with respect to NIC apps, but we
+      -- want to name tx and rx with respect to the whole network
+      -- function.
+      stream.nic_tx_link = stream.device.rx
+      stream.nic_rx_link = stream.rx_device.tx
       stream.rx_sink_id = 'rx_sink_'..stream.rx_id
 
       config.app(c, stream.pcap_id, PcapReader, stream.capture_file)
       config.app(c, stream.repeater_id, loadgen.RateLimitedRepeater, {})
-      config.app(c, stream.nic_tx_id, Intel82599, { pciaddr = stream.pci_addr })
+      config.app(c, stream.nic_tx_id, driver,
+                 { pciaddr = stream.device.pciaddress })
       config.app(c, stream.rx_sink_id, basic_apps.Sink)
 
-      config.link(c, stream.pcap_id..".output -> "..stream.repeater_id..".input")
-      config.link(c, stream.repeater_id..".output -> "..stream.nic_tx_id..".rx")
+      local function link(src_app, src_link, sink_app, sink_link)
+         config.link(c, src_app..'.'..src_link..' -> '..sink_app..'.'..sink_link)
+      end
 
-      config.link(c, stream.nic_rx_id..".tx -> "..stream.rx_sink_id..".input")
+      link(stream.pcap_id, "output", stream.repeater_id, "input")
+      link(stream.repeater_id, "output", stream.nic_tx_id, stream.nic_tx_link)
+      link(stream.nic_rx_id, stream.nic_rx_link, stream.rx_sink_id, "input")
    end
    engine.configure(c)
 
@@ -204,9 +220,9 @@ function run(args)
          local rx_nic = assert(engine.app_table[stream.nic_rx_id],
                                "NIC "..stream.nic_rx_id.." not found")
          ret[stream.nic_tx_id] = {
-            tx = read_counters(tx_nic.input.rx),
-            rx = read_counters(rx_nic.output.tx),
-            drop = rx_nic:ingress_packet_drops()
+            tx = read_counters(tx_nic.input[stream.nic_tx_link]),
+            rx = read_counters(rx_nic.output[stream.nic_rx_link]),
+            drop = rx_nic:rxdrop()
          }
       end
       return ret

@@ -289,8 +289,8 @@ receive_device.interface= "rx1GE"
    config.app(c, receive_device.interface, Intel1gNic, {pciaddr=pciaddr1, rxburst=512})
    config.app(c, "sink", basic_apps.Sink)
 
-   config.link(c, "source.tx -> " .. send_device.interface .. ".rx")
-   config.link(c, receive_device.interface .. ".tx -> sink.rx")
+   config.link(c, "source.tx -> " .. send_device.interface .. ".input")
+   config.link(c, receive_device.interface .. ".output -> sink.rx")
 
    engine.configure(c)
 

@@ -8,6 +8,7 @@ local link     = require("core.link")
 local basic    = require("apps.basic.basic_apps")
 local arp      = require("apps.ipv4.arp")
 local ipfix    = require("apps.ipfix.ipfix")
+local pci      = require("lib.hardware.pci")
 local ipv4     = require("lib.protocol.ipv4")
 local ethernet = require("lib.protocol.ethernet")
 local numa     = require("lib.numa")
@@ -41,13 +42,13 @@ function in_apps.tap (device)
 end
 out_apps.tap = in_apps.tap
 
-function in_apps.intel10g (device)
+function in_apps.pci (device)
+   local device_info = pci.device_info(device)
    local conf = { pciaddr = device }
-   return { input = "rx",
-            output = "tx" },
-          { require("apps.intel.intel_app").Intel82599, conf }
+   return { input = device_info.rx, output = device_info.tx },
+          { require(device_info.driver).driver, conf }
 end
-out_apps.intel10g = in_apps.intel10g
+out_apps.pci = in_apps.pci
 
 local long_opts = {
    help = "h",
@@ -67,7 +68,7 @@ local long_opts = {
 function run (args)
    local duration
 
-   local input_type, output_type = "intel10g", "intel10g"
+   local input_type, output_type = "pci", "pci"
 
    local host_mac
    local host_ip = '10.0.0.1' -- Just to have a default.

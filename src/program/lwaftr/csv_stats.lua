@@ -74,6 +74,16 @@ function CSVStatsTimer:add_app(id, links, link_names)
    local app = assert(self.links_by_app[id], "App named "..id.." not found")
    for _,name in ipairs(links) do
       local link = app.input[name] or app.output[name]
+      -- If we didn't find these links, allow a link name of "rx" to be
+      -- equivalent to an input named "input", and likewise for "tx" and
+      -- outputs named "output".  This papers over intel_mp versus
+      -- intel10g differences, and is especially useful when accessing
+      -- remote counters where you don't know what driver the data plane
+      -- using.
+      if not link then
+         if name == 'rx' then link = app.input.input end
+         if name == 'tx' then link = app.output.output end
+      end
       assert(link, "Link named "..name.." not found in "..id)
       add_link_data(name, link)
    end
