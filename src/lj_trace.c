@@ -252,7 +252,6 @@ int lj_trace_flushall(lua_State *L)
     }
   }
   J->cur.traceno = 0;
-  J->freetrace = 0;
   /* Unpatch blacklisted byte codes. */
   GCRef *p = &(G(L)->gc.root);
   GCobj *o;
