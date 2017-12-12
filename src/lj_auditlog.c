@@ -13,7 +13,7 @@
 #define MAX_MEM_BUFFER 1024*1024
 /* State for initial in-memory stream. */
 char *membuffer;
-int membuffersize;
+size_t membuffersize;
 
 /* File where the audit log is written. */
 FILE *fp;
