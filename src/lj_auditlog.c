@@ -120,11 +120,6 @@ int lj_auditlog_open(const char *path)
   }
 }
 
-static void flush()
-{
-  if (fp != NULL) fflush(fp);
-}
-
 /* -- high-level LuaJIT object logging ------------------------------------ */
 
 static void log_GCobj(GCobj *o);
@@ -182,7 +177,6 @@ void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
     log_event("trace_stop", 2);
     str_16("GCtrace");   /* = */ uint_64((uint64_t)T);
     str_16("jit_State"); /* = */ uint_64((uint64_t)J);
-    flush();
   }
 }
 
@@ -193,7 +187,6 @@ void lj_auditlog_trace_abort(jit_State *J, TraceError e)
     log_event("trace_abort", 2);
     str_16("TraceError"); /* = */ uint_64(e);
     str_16("jit_State");  /* = */ uint_64((uint64_t)J);
-    flush();
   }
 }
 
@@ -203,7 +196,6 @@ void lj_auditlog_new_prototype(GCproto *pt)
     log_GCproto(pt);
     log_event("new_prototype", 1);
     str_16("GCproto"); /* = */ uint_64((uint64_t)pt);;
-    flush();
   }
 }
 
