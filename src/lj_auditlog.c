@@ -15,10 +15,9 @@
 char *membuffer;
 size_t membuffersize;
 
-/* File where the audit log is written. */
-FILE *fp;
-/* Have we been unable to initialize the log? */
-int error;
+FILE *fp;    /* File where the audit log is written. */
+int error;   /* Have we been unable to initialize the log? */
+int memlog;  /* are we logging into memory? */
 
 /* -- msgpack writer - see http://msgpack.org/index.html ------------------ */
 
@@ -83,6 +82,7 @@ static int ensure_log_open() {
   ** JIT activity has ocurred.)
   */
   if ((fp = open_memstream(&membuffer, &membuffersize)) != NULL) {
+    memlog = 1;
     lj_auditlog_vm_definitions();
     return 1;
   } else {
@@ -97,27 +97,33 @@ static int ensure_log_open() {
 */
 int lj_auditlog_open(const char *path)
 {
-  char buffer[4096];
   FILE *newfp;
-  int nread;
   if (!ensure_log_open()) return 0;
   newfp = fopen(path, "wb+");
   /* Migrate the contents of the existing log. */
   fflush(fp);
-  rewind(fp);
-  while ((nread = fread(&buffer, 1, sizeof(buffer), fp)) > 0) {
-    if (fwrite(&buffer, 1, nread, newfp) != nread) break;
-  }
-  if (!ferror(fp) && !ferror(newfp)) {
-    /* Migration succeeded. */
-    fp = newfp;
-    return 1;
+  if (memlog) {
+    /* Migrate log from memory.
+    ** Special case: I don't trust glibc memory streams...
+    */
+    fwrite(membuffer, 1, membuffersize, newfp);
   } else {
-    /* Migration failed: revert to the old log. */
-    fclose(newfp);
-    fseek(fp, 0, SEEK_END);
-    return 0;
+    /* Migrate log from file. */
+    char buffer[4096];
+    int nread;
+    fseek(fp, 0, SEEK_SET);
+    while ((nread = fread(&buffer, 1, sizeof(buffer), fp)) > 0) {
+      if (fwrite(&buffer, 1, nread, newfp) != nread) break;
+    }
+    if (ferror(fp) || ferror(newfp)) {
+      /* Migration failed: revert to the old log. */
+      fclose(newfp);
+      fseek(fp, 0, SEEK_END);
+      return 0;
+    }
   }
+  fp = newfp;
+  return 1;
 }
 
 /* -- high-level LuaJIT object logging ------------------------------------ */
