@@ -11,6 +11,9 @@
 
 /* Maximum data to buffer in memory before file is opened. */
 #define MAX_MEM_BUFFER 1024*1024
+/* State for initial in-memory stream. */
+char *membuffer;
+int membuffersize;
 
 /* File where the audit log is written. */
 FILE *fp;
@@ -79,7 +82,7 @@ static int ensure_log_open() {
   ** (We want the log to be complete even if it is opened after some
   ** JIT activity has ocurred.)
   */
-  if ((fp = fmemopen(NULL, MAX_MEM_BUFFER, "wb+")) != NULL) {
+  if ((fp = open_memstream(&membuffer, &membuffersize)) != NULL) {
     lj_auditlog_vm_definitions();
     return 1;
   } else {
@@ -100,7 +103,8 @@ int lj_auditlog_open(const char *path)
   if (!ensure_log_open()) return 0;
   newfp = fopen(path, "wb+");
   /* Migrate the contents of the existing log. */
-  fseek(fp, 0, SEEK_SET);
+  fflush(fp);
+  rewind(fp);
   while ((nread = fread(&buffer, 1, sizeof(buffer), fp)) > 0) {
     if (fwrite(&buffer, 1, nread, newfp) != nread) break;
   }
@@ -114,6 +118,11 @@ int lj_auditlog_open(const char *path)
     fseek(fp, 0, SEEK_END);
     return 0;
   }
+}
+
+static void flush()
+{
+  if (fp != NULL) fflush(fp);
 }
 
 /* -- high-level LuaJIT object logging ------------------------------------ */
@@ -173,6 +182,7 @@ void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
     log_event("trace_stop", 2);
     str_16("GCtrace");   /* = */ uint_64((uint64_t)T);
     str_16("jit_State"); /* = */ uint_64((uint64_t)J);
+    flush();
   }
 }
 
@@ -183,6 +193,7 @@ void lj_auditlog_trace_abort(jit_State *J, TraceError e)
     log_event("trace_abort", 2);
     str_16("TraceError"); /* = */ uint_64(e);
     str_16("jit_State");  /* = */ uint_64((uint64_t)J);
+    flush();
   }
 }
 
@@ -192,6 +203,7 @@ void lj_auditlog_new_prototype(GCproto *pt)
     log_GCproto(pt);
     log_event("new_prototype", 1);
     str_16("GCproto"); /* = */ uint_64((uint64_t)pt);;
+    flush();
   }
 }
 
