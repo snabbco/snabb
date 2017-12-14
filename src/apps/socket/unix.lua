@@ -103,12 +103,20 @@ function UnixSocket:new (arg)
    -- Return true on success or false if no data is available.
    local function try_read ()
       local bytes = S.read(sock, rxp.data, packet.max_payload)
-      if bytes then
-         rxp.length = bytes
-         return true
-      else
+
+      -- Error, likely EAGAIN
+      if not bytes then
          return false
       end
+
+      -- EOF, reset sock
+      if bytes == 0 then
+         sock = nil
+         return false
+      end
+
+      rxp.length = bytes
+      return true
    end
    function self:pull()
       connect()

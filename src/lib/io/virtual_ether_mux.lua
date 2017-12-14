@@ -83,6 +83,9 @@ function configureVMDq (c, device, ports)
          if #ports ~= 1 then
             error("multiple ports defined but promiscuous mode requested for port: "..name)
          end
+         if port.vlan then
+            error("vlan specified but promiscuous mode requested for port: "..name)
+         end
          vmdq = false
       end
       config.app(c, NIC, require(device.driver).driver,
