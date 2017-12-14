@@ -34,8 +34,8 @@ config`](../config/README.md) uses.  Only some Snabb data-planes have
 enabled `snabb config`; currently in fact it's only the
 [lwAFTR](../lwaftr/doc/README.md).  If you are implementing a data-plane
 and want to add support for alarms, first you add support for `snabb
-config`.  See the [`apps.config`
-documentation](../../apps/config/README.md) for more.
+config` by using the `lib.ptree` process tree facility.  See the
+[`lib.ptree` documentation](../../lib/ptree/README.md) for more.
 
 ## Resource state
 
@@ -184,12 +184,13 @@ See [`snabb alarms compress --help`](./compress/README) for more information.
 ## How does it work?
 
 The Snabb instance itself should be running in *multi-process mode*,
-whereby there is one main process that shepherds a number of worker
+whereby there is one manager process that shepherds a number of worker
 processes.  The workers perform the actual data-plane functionality, are
 typically bound to reserved CPU and NUMA nodes, and have soft-real-time
-constraints.  The main process however doesn't have much to do; it just
-coordinates the workers.  Workers tell the main process about the alarms
-that they support, and then also signal the main process when an alarm
-changes state.  The main process collects all of the alarms and makes
-them available to `snabb alarms`, over a socket.  See the [`apps.config`
-documentation](../../apps/config/README.md) for full details.
+constraints.  The manager process however doesn't have much to do; it
+just coordinates the workers.  Workers tell the manager process about
+the alarms that they support, and then also signal the manager process
+when an alarm changes state.  The manager process collects all of the
+alarms and makes them available to `snabb alarms`, over a socket.  See
+the [`lib.ptree` documentation](../../lib/ptree/README.md) for full
+details.

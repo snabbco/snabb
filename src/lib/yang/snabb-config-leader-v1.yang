@@ -40,6 +40,17 @@ module snabb-config-leader-v1 {
     }
   }
 
+  rpc get-schema {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+    }
+    output {
+      uses error-reporting;
+      leaf source { type string; }
+    }
+  }
+
   rpc get-config {
     input {
       leaf schema { type string; mandatory true; }

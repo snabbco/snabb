@@ -2,14 +2,13 @@
 
 module(...,package.seeall)
 
--- A channel is a ring buffer used by the config leader app to send
--- updates to a follower.  Each follower has its own ring buffer and is
--- the only reader to the buffer.  The config leader is the only writer
--- to these buffers also.  The ring buffer is just bytes; putting a
--- message onto the buffer will write a header indicating the message
--- size, then the bytes of the message.  The channel ring buffer is
--- mapped into shared memory.  Access to a channel will never block or
--- cause a system call.
+-- A channel is a ring buffer used by the manager to send updates to a
+-- worker.  Each worker has its own ring buffer and is the only reader
+-- to the buffer.  The manager is the only writer to these buffers also.
+-- The ring buffer is just bytes; putting a message onto the buffer will
+-- write a header indicating the message size, then the bytes of the
+-- message.  The channel ring buffer is mapped into shared memory.
+-- Access to a channel will never block or cause a system call.
 
 local ffi = require('ffi')
 local S = require("syscall")
@@ -205,7 +204,7 @@ function Channel:discard_message(payload_len)
 end
 
 function selftest()
-   print('selftest: apps.config.channel')
+   print('selftest: lib.ptree.channel')
    local msg_t = ffi.typeof('struct { uint8_t a; uint8_t b; }')
    local ch = create('test/config-channel', (4+2)*16 + 1)
    local function put(i)

@@ -473,9 +473,9 @@ function LwAftr:new(conf)
    return o
 end
 
--- The following two methods are called by apps.config.follower in
--- reaction to binding table changes, via
--- apps/config/support/snabb-softwire-v2.lua.
+-- The following two methods are called by lib.ptree.worker in reaction
+-- to binding table changes, via
+-- lib/ptree/support/snabb-softwire-v2.lua.
 function LwAftr:add_softwire_entry(entry_blob)
    self.binding_table:add_softwire_entry(entry_blob)
 end
