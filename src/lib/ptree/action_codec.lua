@@ -194,7 +194,7 @@ function decode(buf, len)
 end
 
 function selftest ()
-   print('selftest: apps.config.action_codec')
+   print('selftest: lib.ptree.action_codec')
    local function serialize(data)
       local tmp = random_file_name()
       print('serializing to:', tmp)

@@ -3,7 +3,7 @@ module(..., package.seeall)
 local data = require('lib.yang.data')
 local lib = require('core.lib')
 local util = require('lib.yang.util')
-local alarm_codec = require('apps.config.alarm_codec')
+local alarm_codec = require('lib.ptree.alarm_codec')
 local counter = require("core.counter")
 
 local format_date_as_iso_8601 = util.format_date_as_iso_8601

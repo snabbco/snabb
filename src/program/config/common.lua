@@ -91,6 +91,13 @@ function parse_command_line(args, opts)
       ret.schema_name = descr.default_schema
    end
    require('lib.yang.schema').set_default_capabilities(descr.capability)
+   if not pcall(yang.load_schema_by_name, ret.schema_name) then
+      local response = call_leader(
+         ret.instance_id, 'get-schema',
+         {schema=ret.schema_name, revision=ret.revision_date})
+      assert(not response.error, response.error)
+      yang.add_schema(response.source, ret.schema_name)
+   end
    if opts.with_config_file then
       if #args == 0 then err("missing config file argument") end
       local file = table.remove(args, 1)

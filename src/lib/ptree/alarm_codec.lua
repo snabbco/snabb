@@ -3,7 +3,7 @@
 module(...,package.seeall)
 
 local S = require("syscall")
-local channel = require("apps.config.channel")
+local channel = require("lib.ptree.channel")
 local ffi = require("ffi")
 
 local UINT32_MAX = 0xffffffff
@@ -156,12 +156,12 @@ local alarms_channel
 
 function get_channel()
    if alarms_channel then return alarms_channel end
-   local name = '/'..S.getpid()..'/alarms-follower-channel'
+   local name = '/'..S.getpid()..'/alarms-worker-channel'
    local success, value = pcall(channel.open, name)
    if success then
       alarms_channel = value
    else
-      alarms_channel = channel.create('alarms-follower-channel', 1e6)
+      alarms_channel = channel.create('alarms-worker-channel', 1e6)
    end
    return alarms_channel
 end
@@ -184,7 +184,7 @@ function alarm:normalize_args (t)
    return normalize(t, self.args_attrs)
 end
 
--- To be used by the leader to group args into key and args.
+-- To be used by the manager to group args into key and args.
 function to_alarm (args)
    local key = {
       resource = args[1],
@@ -272,7 +272,7 @@ function declare_alarm (key, args)
 end
 
 function selftest ()
-   print('selftest: apps.config.alarm_codec')
+   print('selftest: lib.ptree.alarm_codec')
    local lib = require("core.lib")
    local function test_alarm (name, args)
       local encoded, len

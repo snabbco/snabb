@@ -371,17 +371,17 @@ relevant standardized schemas.  Work here is ongoing.
 ## How does it work?
 
 The Snabb instance itself should be running in *multi-process mode*,
-whereby there is one main process that shepherds a number of worker
-processes.  The workers perform the actual data-plane functionality,
-are typically bound to reserved CPU and NUMA nodes, and have
-soft-real-time constraints.  The main process however doesn't have
-much to do; it just coordinates the workers.
+whereby there is one manager process that shepherds a number of worker
+processes.  The workers perform the actual data-plane functionality, are
+typically bound to reserved CPU and NUMA nodes, and have soft-real-time
+constraints.  The manager process however doesn't have much to do; it
+just coordinates the workers.
 
-The main process runs a special app in its engine that listens on a
-UNIX socket for special remote procedure calls, translates those calls
-to updates that the data plane should apply, and dispatches those
-updates to the data plane in an efficient way.  See the [`apps.config`
-documentation](../../apps/config/README.md) for full details.
+The manager process runs a special event loop that listens on a UNIX
+socket for remote procedure calls from `snabb config` programs,
+translates those calls to updates that the data plane should apply, and
+dispatches those updates to the data plane in an efficient way.  See the
+[`lib.ptree` documentation](../../lib/ptree/README.md) for full details.
 
 Some data planes, like the lwAFTR, add hooks to the `set`, `add`, and
 `remove` subcommands of `snabb config` to allow even more efficient
