@@ -119,7 +119,6 @@ function parse_args(args)
    if opts.mirror then
       assert(opts["on-a-stick"], "Mirror option is only valid in on-a-stick mode")
    end
-   cpuset.global_cpuset():bind_to_numa_node()
    if opts["on-a-stick"] then
       scheduling.pci_addrs = { v4 }
       return opts, scheduling, conf_file, v4
@@ -176,20 +175,19 @@ function run(args)
       end
    end
 
-   local c = config.new()
+   local manager = setup.ptree_manager(scheduling, setup_fn, conf)
 
-   conf.alarm_notification = true
-   setup.reconfigurable(scheduling, setup_fn, c, conf)
-   engine.configure(c)
-
-   if opts.verbosity >= 2 then
+   -- FIXME: Doesn't work in multi-process environment.
+   if false and opts.verbosity >= 2 then
       local function lnicui_info() engine.report_apps() end
       local t = timer.new("report", lnicui_info, 1e9, 'repeating')
       timer.activate(t)
    end
 
    if opts.verbosity >= 1 then
-      function add_csv_stats_for_pid(pid, write_header)
+      local stats = {csv={}}
+      function stats:worker_starting(id) end
+      function stats:worker_started(id, pid)
          local csv = csv_stats.CSVStatsTimer:new(opts.bench_file, opts.hydra, pid)
          -- Link names like "tx" are from the app's perspective, but
          -- these labels are from the perspective of the lwAFTR as a
@@ -205,18 +203,17 @@ function run(args)
             csv:add_app('inetNic', { 'tx', 'rx' }, { tx=ipv4_tx, rx=ipv4_rx })
             csv:add_app('b4sideNic', { 'tx', 'rx' }, { tx=ipv6_tx, rx=ipv6_rx })
          end
-         csv:activate(write_header)
+         self.csv[id] = csv
+         self.csv[id]:start()
       end
-      setup.start_sampling(add_csv_stats_for_pid)
+      function stats:worker_stopping(id)
+         self.csv[id]:stop()
+         self.csv[id] = nil
+      end
+      function stats:worker_stopped(id) end
+      manager:add_state_change_listener(stats)
    end
 
-   if opts.ingress_drop_monitor then
-      io.stderr:write("Warning: Ingress drop monitor not yet supported\n")
-   end
-
-   if opts.duration then
-      engine.main({duration=opts.duration, report={showlinks=true}})
-   else
-      engine.main({report={showlinks=true}})
-   end
+   manager:main(opts.duration)
+   manager:stop()
 end

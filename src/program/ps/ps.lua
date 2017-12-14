@@ -47,7 +47,7 @@ local function is_addressable (pid)
    return false
 end
 
-function get_leader_pid (pid)
+function get_manager_pid (pid)
    local fq = shm.root.."/"..pid.."/group"
    local path = S.readlink(fq)
    return basename(dirname(path))
@@ -65,7 +65,7 @@ local function compute_snabb_instances()
       if p and p ~= my_pid then
          local instance = {pid=p, name=name}
          if is_worker(p) then
-            instance.leader = get_leader_pid(p)
+            instance.leader = get_manager_pid(p)
          end
          if is_addressable(p) then
             instance.addressable = true

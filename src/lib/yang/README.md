@@ -230,6 +230,18 @@ schema itself, or as `import *name* { ... }` in other YANG modules that
 import this module.  *revision* optionally indicates that a certain
 revision data should be required.
 
+— Function **add_schema** *src* *filename*
+
+Add the YANG schema from the string *src* to Snabb's database of YANG
+schemas, making it available to `load_schema_by_name` and related
+functionality.  *filename* is used when signalling any parse errors.
+Returns the name of the newly added schema.
+
+— Function **add_schema_file** *filename*
+
+Like `add_schema`, but reads the YANG schema in from a file.  Returns
+the name of the newly added schema.
+
 — Function **load_config_for_schema** *schema* *src* *filename*
 
 Given the schema object *schema*, load the configuration from the string

@@ -100,6 +100,14 @@ $(cat $mdroot/lib/ipsec/README.md)
 
 $(cat $mdroot/program/snabbnfv/README.md)
 
+## LISPER
+
+$(cat $mdroot/program/lisper/README.md)
+
+## Ptree
+
+$(cat $mdroot/program/ptree/README.md)
+
 ## Watchdog (lib.watchdog.watchdog)
 
 $(cat $mdroot/lib/watchdog/README.md)
