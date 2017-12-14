@@ -2,15 +2,9 @@ module(..., package.seeall)
 
 local config = require("core.config")
 local lib = require("core.lib")
-local lwcheck = require("program.lwaftr.check.util")
-local lwconf = require("apps.lwaftr.conf")
+local util = require("program.lwaftr.check.util")
+local counters = require("program.lwaftr.counters")
 local setup = require("program.snabbvmx.lwaftr.setup")
-
-local diff_counters = lwcheck.diff_counters
-local load_requested_counters = lwcheck.load_requested_counters
-local read_counters = lwcheck.read_counters
-local validate_diff = lwcheck.validate_diff
-local regen_counters = lwcheck.regen_counters
 
 local function show_usage(code)
    print(require("program.snabbvmx.check.README_inc"))
@@ -38,15 +32,16 @@ function run(args)
    setup.load_check(c, conf_file, inv4_pcap, inv6_pcap, outv4_pcap, outv6_pcap)
    engine.configure(c)
    if counters_path then
-      local initial_counters = read_counters(c)
+      local initial_counters = counters.read_counters(c)
       engine.main({duration=opts.duration})
-      local final_counters = read_counters(c)
-      local counters_diff = diff_counters(final_counters, initial_counters)
+      local final_counters = counters.read_counters(c)
+      local counters_diff = util.diff_counters(final_counters,
+                                               initial_counters)
       if opts.r then
-         regen_counters(counters_diff, counters_path)
+         util.regen_counters(counters_diff, counters_path)
       else
-         local req_counters = load_requested_counters(counters_path)
-         validate_diff(counters_diff, req_counters)
+         local req_counters = util.load_requested_counters(counters_path)
+         util.validate_diff(counters_diff, req_counters)
       end
    else
       engine.main({duration=opts.duration})

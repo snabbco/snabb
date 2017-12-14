@@ -27,13 +27,26 @@ with the appropriate prefix (`0000:`, in this example).
 Note: Compile Snabb (see [build.md](build.md)) before attempting
 the following.
 
+## PCI addresses and the configuration file
+
+The PCI addresses of the NICs are specified in the configuration file (for more
+information see [configuration.md](configuration.md)). You can either specify
+them in the configuration file or if there is only a single instance specified
+you can specify them with `--v4` and `--v6` flags. These will perform a
+in-memory migration of the configuration, however leaving your configuration
+on-disk intact. If only one of the flags is specified then other option is
+left as is.
+
 ## Running a load generator and the lwaftr (2 lwaftr NICs)
 
 To run a load generator and an `lwaftr`, you will need four
 interfaces. The following example assumes that `01:00.0` is cabled to
 `01:00.1`, and that `02:00.0` is cabled to `02:00.1`. Change the
 concrete PCI devices specified to match the current system; See [Section
-1](Section 1. Finding out the PCI addresses of your NICs).
+1](Section 1. Finding out the PCI addresses of your NICs). Once you've
+found your PCI devices please refer to
+[Section 2](PCI addresses and the configuration file) to produce the
+config.
 
 Note that unless the load generator and the lwaftr are running on the
 same NUMA nodes that their NICs are connected to, performance will be
@@ -69,8 +82,7 @@ just one NIC, because traffic is not symmetric. To do this, use --on-a-stick,
 and specify only one PCI address:
 
 ```
-$ sudo ./snabb lwaftr run \
-    --conf program/lwaftr/tests/data/icmp_on_fail.conf \
+$ sudo ./snabb lwaftr run --conf /tmp/icmp_on_fail.conf \
     --on-a-stick 0000:02:00.1
 ```
 

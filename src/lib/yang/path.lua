@@ -38,10 +38,41 @@ local function table_keys(t)
    return ret
 end
 
-local function extract_parts(fragment)
+local syntax_error = function (str, pos)
+   local header = "Syntax error in "
+   io.stderr:write(header..str.."\n")
+   io.stderr:write(string.rep(" ", #header + pos-1))
+   io.stderr:write("^\n")
+   os.exit(1)
+end
+
+local function extract_parts (fragment)
    local rtn = {query={}}
-   rtn.name = string.match(fragment, "([^%[]+)")
-   for k,v in string.gmatch(fragment, "%[([^=]+)=([^%]]+)%]") do
+   local pos
+   function consume (char)
+      if fragment:sub(pos, pos) ~= char then
+         syntax_error(fragment, pos)
+      end
+      pos = pos + 1
+   end
+   function eol ()
+      return pos > #fragment
+   end
+   function token ()
+      local ret, new_pos = fragment:match("([^=%]]+)()", pos)
+      if not ret then
+         syntax_error(fragment, pos)
+      end
+      pos = new_pos
+      return ret
+   end
+   rtn.name, pos = string.match(fragment, "([^%[]+)()")
+   while not eol() do
+      consume('[', pos)
+      local k = token()
+      consume('=')
+      local v = token()
+      consume(']')
       rtn.query[k] = v
    end
    return rtn
@@ -56,6 +87,11 @@ local function extract_grammar_node(grammar, name)
          return grammar.values[name]
       else
          return grammar.keys[name]
+      end
+   end
+   function handlers.choice ()
+      for case_name, case in pairs(grammar.choices) do
+         if case[name] ~= nil then return case[name] end
       end
    end
    return assert(assert(handlers[grammar.type], grammar.type)(), name)
@@ -146,7 +182,7 @@ function prepare_table_lookup(keys, ctype, query)
    return static_key
 end
 
--- Returns a resolver for a paticular schema and *lua* path.
+-- Returns a resolver for a particular schema and *lua* path.
 function resolver(grammar, path_string)
    local function ctable_getter(key, getter)
       return function(data)
@@ -211,7 +247,19 @@ function resolver(grammar, path_string)
       end
    end
    local function compute_getter(grammar, name, query, getter)
-      local child_grammar = grammar.members[name]
+      local child_grammar
+      child_grammar = grammar.members[name]
+      if not child_grammar then
+         for member_name, member in pairs(grammar.members) do
+            if child_grammar then break end
+            if member.type == 'choice' then
+               for case_name, case in pairs(member.choices) do
+                  if child_grammar then break end
+                  if case[name] then child_grammar = case[name] end
+               end
+            end
+         end
+      end
       if not child_grammar then
          error("Struct has no field named '"..name.."'.")
       end
@@ -236,15 +284,6 @@ function resolver(grammar, path_string)
 end
 resolver = util.memoize(resolver)
 
--- Loads a module and converts the rest of the path.
-function load_from_path(path)
-   -- First extract and load the module name then load it.
-   local module_name, path = next_element(path)
-   local scm = schemalib.load_schema_by_name(module_name)
-   local grammar = datalib.data_grammar_from_schema(scm)
-   return module_name, convert_path(grammar.members, path)
-end
-
 function selftest()
    print("selftest: lib.yang.path")
    local schema_src = [[module snabb-simple-router {
@@ -265,7 +304,7 @@ function selftest()
       }}]]
 
    local scm = schemalib.load_schema(schema_src, "xpath-test")
-   local grammar = datalib.data_grammar_from_schema(scm)
+   local grammar = datalib.config_grammar_from_schema(scm)
 
    -- Test path to lua path.
    local path = convert_path(grammar,"/routes/route[addr=1.2.3.4]/port")
@@ -294,7 +333,7 @@ function selftest()
       }
    ]]
 
-   local data = datalib.load_data_for_schema(scm, data_src)
+   local data = datalib.load_config_for_schema(scm, data_src)
 
    -- Try resolving a path in a list (ctable).
    local getter = resolver(grammar, "/routes/route[addr=1.2.3.4]/port")
@@ -319,6 +358,10 @@ function selftest()
             key name;
             leaf name { type string; mandatory true; }
             leaf rating { type uint8 { range 0..10; } mandatory true; }
+            choice C {
+               case A { leaf AA { type string; } }
+               case B { leaf BB { type string; } }
+            }
          }
       }}]]
    local fruit_data_src = [[
@@ -326,12 +369,14 @@ function selftest()
          fruit { name "banana"; rating 10; }
          fruit { name "pear"; rating 2; }
          fruit { name "apple"; rating 6; }
+         fruit { name "kumquat"; rating 6; AA aa; }
+         fruit { name "tangerine"; rating 6; BB bb; }
       }
    ]]
 
    local fruit_scm = schemalib.load_schema(fruit_schema_src, "xpath-fruit-test")
-   local fruit_prod = datalib.data_grammar_from_schema(fruit_scm)
-   local fruit_data = datalib.load_data_for_schema(fruit_scm, fruit_data_src)
+   local fruit_prod = datalib.config_grammar_from_schema(fruit_scm)
+   local fruit_data = datalib.load_config_for_schema(fruit_scm, fruit_data_src)
 
    local getter = resolver(fruit_prod, "/bowl/fruit[name=banana]/rating")
    assert(getter(fruit_data) == 10)
@@ -339,12 +384,20 @@ function selftest()
    local getter = resolver(fruit_prod, "/bowl/fruit[name=apple]/rating")
    assert(getter(fruit_data) == 6)
 
+   local getter = resolver(fruit_prod, "/bowl/fruit[name=kumquat]/AA")
+   assert(getter(fruit_data) == 'aa')
+
+   local getter = resolver(fruit_prod, "/bowl/fruit[name=tangerine]/BB")
+   assert(getter(fruit_data) == 'bb')
+
    assert(normalize_path('') == '/')
    assert(normalize_path('//') == '/')
    assert(normalize_path('/') == '/')
    assert(normalize_path('//foo//bar//') == '/foo/bar')
    assert(normalize_path('//foo[b=1][c=2]//bar//') == '/foo[b=1][c=2]/bar')
    assert(normalize_path('//foo[c=1][b=2]//bar//') == '/foo[b=2][c=1]/bar')
+
+   assert(extract_parts('//foo[b=1]'))
 
    print("selftest: ok")
 end
