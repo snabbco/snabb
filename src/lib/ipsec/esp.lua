@@ -188,15 +188,13 @@ function decrypt:new (conf)
 end
 
 function decrypt:decrypt_payload (ptr, length)
-   if not self.esp:new_from_mem(ptr, length)
-      or self.esp:spi() ~= self.spi
-   then return nil end
-
+   -- NB: bounds check is performed by caller
+   local esp = self.esp:new_from_mem(ptr, esp:sizeof())
    local iv_start = ptr + ESP_SIZE
    local ctext_start = ptr + self.CTEXT_OFFSET
    local ctext_length = length - self.PLAIN_OVERHEAD
 
-   local seq_low = self.esp:seq_no()
+   local seq_low = esp:seq_no()
    local seq_high = tonumber(
       C.check_seq_no(seq_low, self.seq.no, self.window, self.window_size)
    )
