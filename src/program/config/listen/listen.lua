@@ -57,6 +57,8 @@ local function read_request(client, schema_name, revision_date)
    local json = json_lib.read_json_object(client)
    local id, verb, path = assert(json.id), assert(json.verb), json.path or '/'
    path = path_lib.normalize_path(path)
+   if json.schema then schema_name = json.schema end
+   if json.revision then revision_date = json.revision end
    local handler = assert(request_handlers[data.normalize_id(verb)])
    local req = handler(schema_name, revision_date, path, json.value)
    local function print_reply(reply, fd)
