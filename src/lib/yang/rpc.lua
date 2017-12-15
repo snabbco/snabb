@@ -52,10 +52,11 @@ function handle_calls(callee, str, handle)
    return callee.print_output(responses, util.string_output_file())
 end
 
-function dispatch_handler(obj, prefix)
+function dispatch_handler(obj, prefix, trace)
    prefix = prefix or 'rpc_'
    local normalize_id = data.normalize_id
    return function(id, data)
+      if trace then trace:record(id, data) end
       local id = prefix..normalize_id(id)
       local f = assert(obj[id], 'handler not found: '..id)
       return f(obj, data)

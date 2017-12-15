@@ -24,6 +24,7 @@ local action_codec = require("lib.ptree.action_codec")
 local alarm_codec = require("lib.ptree.alarm_codec")
 local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
+local trace = require("lib.ptree.trace")
 local alarms = require("lib.yang.alarms")
 
 local Manager = {}
@@ -42,6 +43,7 @@ local manager_config_spec = {
    worker_default_scheduling = {default={busywait=true}},
    default_schema = {},
    log_level = {default=default_log_level},
+   rpc_trace_file = {},
    cpuset = {default=cpuset.global_cpuset()},
    Hz = {default=100},
 }
@@ -77,8 +79,20 @@ function new_manager (conf)
    ret.worker_default_scheduling = conf.worker_default_scheduling
    ret.workers = {}
    ret.state_change_listeners = {}
+
+   if conf.rpc_trace_file then
+      ret:info("Logging RPCs to %s", conf.rpc_trace_file)
+      ret.trace = trace.new({file=conf.rpc_trace_file})
+
+      -- Start trace with initial configuration.
+      local p = path_data.printer_for_schema_by_name(
+         ret.schema_name, "/", true, "yang", false)
+      local conf_str = p(conf.initial_configuration, yang.string_output_file())
+      ret.trace:record('set-config', {schema=ret.schema_name, config=conf_str})
+   end
+
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
-   ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_')
+   ret.rpc_handler = rpc.dispatch_handler(ret, 'rpc_', ret.trace)
 
    ret:set_initial_configuration(conf.initial_configuration)
 
