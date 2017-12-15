@@ -164,26 +164,36 @@ function memoize(f, max_occupancy)
    end
 end
 
-function gmtime ()
+function timezone ()
    local now = os.time()
-   local utcdate = os.date("!*t", now)
-   local localdate = os.date("*t", now)
-   localdate.isdst = false
-   local timediff = os.difftime(os.time(utcdate), os.time(localdate))
-   return now + timediff
+   local utctime = os.date("!*t", now)
+   local localtime = os.date("*t", now)
+   local timediff = os.difftime(os.time(localtime), os.time(utctime))
+   if timediff ~= 0 then
+      local sign = timediff > 0 and "+" or "-"
+      local time = os.date("!*t", math.abs(timediff))
+      return sign..("%.2d:%.2d"):format(time.hour, time.min)
+   end
 end
 
 function format_date_as_iso_8601 (time)
-   time = time or gmtime()
-   return os.date("%Y-%m-%dT%H:%M:%SZ", time)
+   local ret = {}
+   time = time or os.time()
+   local utctime = os.date("!*t", time)
+   table.insert(ret, ("%.4d-%.2d-%.2dT%.2d:%.2d:%.2dZ"):format(
+      utctime.year, utctime.month, utctime.day, utctime.hour, utctime.min, utctime.sec))
+   table.insert(ret, timezone() or "")
+   return table.concat(ret, "")
 end
 
 -- XXX: ISO 8601 can be more complex. We asumme date is the format returned
 -- by 'format_date_as_iso8601'.
 function parse_date_as_iso_8601 (date)
    assert(type(date) == 'string')
-   local pattern = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)Z"
-   return assert(date:match(pattern))
+   local gmtdate = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)Z"
+   local year, month, day, hour, min, sec = assert(date:match(gmtdate))
+   local tz_sign, tz_hour, tz_min = date:match("Z([+-]?)(%d%d):(%d%d)")
+   return {year=year, month=month, day=day, hour=hour, min=min, sec=sec, tz_sign=tz_sign, tz_hour=tz_hour, tz_min=tz_min}
 end
 
 function selftest()
