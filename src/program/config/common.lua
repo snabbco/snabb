@@ -8,7 +8,7 @@ local shm = require("core.shm")
 local rpc = require("lib.yang.rpc")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
-local path_resolver = require("lib.yang.path").resolver
+local path_resolver = require("lib.yang.path_data").resolver
 
 function show_usage(command, status, err_msg)
    if err_msg then print('error: '..err_msg) end

@@ -20,6 +20,7 @@ local schema = require("lib.yang.schema")
 local rpc = require("lib.yang.rpc")
 local state = require("lib.yang.state")
 local path_mod = require("lib.yang.path")
+local path_data = require("lib.yang.path_data")
 local action_codec = require("lib.ptree.action_codec")
 local alarm_codec = require("lib.ptree.alarm_codec")
 local support = require("lib.ptree.support")
@@ -259,7 +260,7 @@ function Manager:rpc_get_schema (args)
 end
 
 local function path_printer_for_grammar(grammar, path, format, print_default)
-   local getter, subgrammar = path_mod.resolver(grammar, path)
+   local getter, subgrammar = path_data.resolver(grammar, path)
    local printer
    if format == "xpath" then
       printer = data.xpath_printer_from_grammar(subgrammar, print_default, path)
@@ -340,7 +341,7 @@ end
 
 
 local function path_parser_for_grammar(grammar, path)
-   local getter, subgrammar = path_mod.resolver(grammar, path)
+   local getter, subgrammar = path_data.resolver(grammar, path)
    return data.data_parser_from_grammar(subgrammar)
 end
 
@@ -362,7 +363,7 @@ local function path_setter_for_grammar(grammar, path)
    local tail_name, query = tail_path[1].name, tail_path[1].query
    if lib.equal(query, {}) then
       -- No query; the simple case.
-      local getter, grammar = path_mod.resolver(grammar, head)
+      local getter, grammar = path_data.resolver(grammar, head)
       assert(grammar.type == 'struct')
       local tail_id = data.normalize_id(tail_name)
       return function(config, subconfig)
@@ -373,9 +374,9 @@ local function path_setter_for_grammar(grammar, path)
 
    -- Otherwise the path ends in a query; it must denote an array or
    -- table item.
-   local getter, grammar = path_mod.resolver(grammar, head..'/'..tail_name)
+   local getter, grammar = path_data.resolver(grammar, head..'/'..tail_name)
    if grammar.type == 'array' then
-      local idx = path_mod.prepare_array_lookup(query)
+      local idx = path_data.prepare_array_lookup(query)
       return function(config, subconfig)
          local array = getter(config)
          assert(idx <= #array)
@@ -383,7 +384,7 @@ local function path_setter_for_grammar(grammar, path)
          return config
       end
    elseif grammar.type == 'table' then
-      local key = path_mod.prepare_table_lookup(grammar.keys,
+      local key = path_data.prepare_table_lookup(grammar.keys,
                                                 grammar.key_ctype, query)
       if grammar.string_key then
          key = key[data.normalize_id(grammar.string_key)]
@@ -433,7 +434,7 @@ end
 
 local function path_adder_for_grammar(grammar, path)
    local top_grammar = grammar
-   local getter, grammar = path_mod.resolver(grammar, path)
+   local getter, grammar = path_data.resolver(grammar, path)
    if grammar.type == 'array' then
       if grammar.ctype then
          -- It's an FFI array; have to create a fresh one, sadly.
@@ -519,11 +520,11 @@ local function path_remover_for_grammar(grammar, path)
    local tail_path = path_mod.parse_path(tail)
    local tail_name, query = tail_path[1].name, tail_path[1].query
    local head_and_tail_name = head..'/'..tail_name
-   local getter, grammar = path_mod.resolver(grammar, head_and_tail_name)
+   local getter, grammar = path_data.resolver(grammar, head_and_tail_name)
    if grammar.type == 'array' then
       if grammar.ctype then
          -- It's an FFI array; have to create a fresh one, sadly.
-         local idx = path_mod.prepare_array_lookup(query)
+         local idx = path_data.prepare_array_lookup(query)
          local setter = path_setter_for_grammar(top_grammar, head_and_tail_name)
          local elt_t = data.typeof(grammar.ctype)
          local array_t = ffi.typeof('$[?]', elt_t)
@@ -546,7 +547,7 @@ local function path_remover_for_grammar(grammar, path)
          return config
       end
    elseif grammar.type == 'table' then
-      local key = path_mod.prepare_table_lookup(grammar.keys,
+      local key = path_data.prepare_table_lookup(grammar.keys,
                                                 grammar.key_ctype, query)
       if grammar.string_key then
          key = key[data.normalize_id(grammar.string_key)]
