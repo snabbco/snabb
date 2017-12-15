@@ -169,7 +169,7 @@ local function read_length(socket)
       if ch == '\n' then return len end
       assert(tonumber(ch), 'not a number: '..ch)
       len = len * 10 + tonumber(ch)
-      assert(len < 1e8, 'length too long: '..len)
+      assert(len < 1e9, 'length too long: '..len)
    end
 end
 
