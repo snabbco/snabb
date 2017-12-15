@@ -275,7 +275,7 @@ local function config_to_string(schema, conf)
       schema = yang.load_schema_by_name(schema)
    end
    -- To keep memory usage as low as possible write it out to a temp file.
-   local memfile = util.string_output_file()
+   local memfile = util.string_io_file()
    yang.print_config_for_schema(schema, conf, memfile)
    conf = memfile:flush()
 

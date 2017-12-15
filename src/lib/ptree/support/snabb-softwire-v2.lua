@@ -252,7 +252,7 @@ end
 local function serialize_binding_table(bt)
    local _, grammar = snabb_softwire_getter('/softwire-config/binding-table')
    local printer = data.data_printer_from_grammar(grammar)
-   return printer(bt, yang.string_output_file())
+   return printer(bt, yang.string_io_file())
 end
 
 local uint64_ptr_t = ffi.typeof('uint64_t*')

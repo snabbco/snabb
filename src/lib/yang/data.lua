@@ -757,38 +757,37 @@ function rpc_output_parser_from_schema(schema)
    return data_parser_from_grammar(rpc_output_grammar_from_schema(schema))
 end
 
-local function encode_yang_string(str)
-   if #str == 0 then return "''" end
-   if str:match("^[^%s;{}\"'/]*$") then return str end
-   local out = {}
-   table.insert(out, '"')
-   for i=1,#str do
-      local chr = str:sub(i,i)
-      if chr == '\n' then
-         table.insert(out, '\\n')
-      elseif chr == '\t' then
-         table.insert(out, '\\t')
-      elseif chr == '"' or chr == '\\' then
-         table.insert(out, '\\')
-         table.insert(out, chr)
-      else
-         table.insert(out, chr)
-      end
-   end
-   table.insert(out, '"')
-   return table.concat(out)
-end
-
 local value_serializers = {}
 local function value_serializer(typ)
    local prim = typ.primitive_type
    if value_serializers[prim] then return value_serializers[prim] end
    local tostring = assert(value.types[prim], prim).tostring
-   local function serializer(val)
-      return encode_yang_string(tostring(val))
+   value_serializers[prim] = tostring
+   return tostring
+end
+
+local function print_yang_string(str, file)
+   if #str == 0 then
+      file:write("''")
+   elseif str:match("^[^%s;{}\"'/]*$") then
+      file:write(str)
+   else
+      file:write('"')
+      for i=1,#str do
+         local chr = str:sub(i,i)
+         if chr == '\n' then
+            file:write('\\n')
+         elseif chr == '\t' then
+            file:write('\\t')
+         elseif chr == '"' or chr == '\\' then
+            file:write('\\')
+            file:write(chr)
+         else
+            file:write(chr)
+         end
+      end
+      file:write('"')
    end
-   value_serializers[prim] = serializer
-   return serializer
 end
 
 function xpath_printer_from_grammar(production, print_default, root)
@@ -800,13 +799,10 @@ function xpath_printer_from_grammar(production, print_default, root)
    local function printer(keyword, production, printers)
       return assert(handlers[production.type])(keyword, production, printers)
    end
-   local function print_string(str, file)
-      file:write(encode_yang_string(str))
-   end
    local function print_keyword(k, file, path)
       path = path:sub(1, 1) ~= '[' and root..'/'..path or root..path
       file:write(path)
-      print_string(k, file)
+      print_yang_string(k, file)
       file:write(' ')
    end
    local function body_printer(productions, order)
@@ -888,7 +884,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          local count = 1
          for _,v in ipairs(data) do
             print_keyword(keyword.."[position()="..count.."]", file, '')
-            file:write(serialize(v))
+            print_yang_string(serialize(v), file)
             file:write('\n')
             count = count + 1
          end
@@ -945,7 +941,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          local str = serialize(data)
          if print_default or str ~= production.default then
             print_keyword(keyword, file, path)
-            file:write(str)
+            print_yang_string(str, file)
             file:write('\n')
          end
       end
@@ -986,7 +982,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          for _,v in ipairs(data) do
             file:write(root.."[position()="..count.."]")
             file:write(' ')
-            file:write(serialize(v))
+            print_yang_string(serialize(v), file)
             file:write('\n')
             count = count + 1
          end
@@ -1000,7 +996,7 @@ function xpath_printer_from_grammar(production, print_default, root)
          if print_default or str ~= production.default then
             file:write(root)
             file:write(' ')
-            file:write(str)
+            print_yang_string(str, file)
             file:write('\n')
             return file:flush()
          end
@@ -1017,12 +1013,9 @@ function data_printer_from_grammar(production, print_default)
    local function printer(keyword, production, printers)
       return assert(handlers[production.type])(keyword, production, printers)
    end
-   local function print_string(str, file)
-      file:write(encode_yang_string(str))
-   end
    local function print_keyword(k, file, indent)
       file:write(indent)
-      print_string(k, file)
+      print_yang_string(k, file)
       file:write(' ')
    end
    local function body_printer(productions, order)
@@ -1082,7 +1075,7 @@ function data_printer_from_grammar(production, print_default)
       return function(data, file, indent)
          for _,v in ipairs(data) do
             print_keyword(keyword, file, indent)
-            file:write(serialize(v))
+            print_yang_string(serialize(v), file)
             file:write(';\n')
          end
       end
@@ -1146,7 +1139,7 @@ function data_printer_from_grammar(production, print_default)
          local str = serialize(data)
          if print_default or str ~= production.default then
             print_keyword(keyword, file, indent)
-            file:write(str)
+            print_yang_string(str, file)
             file:write(';\n')
          end
       end
@@ -1184,7 +1177,7 @@ function data_printer_from_grammar(production, print_default)
       local serialize = value_serializer(production.element_type)
       return function(data, file, indent)
          for _,v in ipairs(data) do
-            file:write(serialize(v))
+            print_yang_string(serialize(v), file)
             file:write('\n')
          end
          return file:flush()
@@ -1193,21 +1186,13 @@ function data_printer_from_grammar(production, print_default)
    function top_printers.scalar(production)
       local serialize = value_serializer(production.argument_type)
       return function(data, file)
-         file:write(serialize(data))
+         print_yang_string(serialize(data), file)
          return file:flush()
       end
    end
    return assert(top_printers[production.type])(production)
 end
 data_printer_from_grammar = util.memoize(data_printer_from_grammar)
-
-local function string_output_file()
-   local file = {}
-   local out = {}
-   function file:write(str) table.insert(out, str) end
-   function file:flush(str) return table.concat(out) end
-   return file
-end
 
 function data_printer_from_schema(schema, is_config)
    local grammar = data_grammar_from_schema(schema, is_config)
@@ -1319,7 +1304,7 @@ function selftest()
    assert(parse_uint32('1') == 1)
    assert(parse_uint32('"1"') == 1)
    assert(parse_uint32('    "1"   \n  ') == 1)
-   assert(print_uint32(1, string_output_file()) == '1')
+   assert(print_uint32(1, util.string_io_file()) == '1')
 
    -- Verify that lists can lack keys when "config false;" is set.
    local list_wo_key_config_false = [[module config-false-schema {
