@@ -119,13 +119,10 @@ function parse_args(args)
    if opts.mirror then
       assert(opts["on-a-stick"], "Mirror option is only valid in on-a-stick mode")
    end
-   if opts["on-a-stick"] then
-      scheduling.pci_addrs = { v4 }
-      return opts, scheduling, conf_file, v4
-   else
-      scheduling.pci_addrs = { v4, v6 }
-      return opts, scheduling, conf_file, v4, v6
+   if opts["on-a-stick"] and v6 then
+      fatal("Options --on-a-stick and --v6 are mutually exclusive.")
    end
+   return opts, scheduling, conf_file, v4, v6
 end
 
 -- Requires a V4V6 splitter if running in on-a-stick mode and VLAN tag values
