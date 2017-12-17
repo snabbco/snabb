@@ -110,10 +110,7 @@ BCLine lj_debug_line(GCproto *pt, BCPos pc)
 {
   const void *lineinfo = proto_lineinfo(pt);
   if (pc <= pt->sizebc && lineinfo) {
-    BCLine first = pt->firstline;
-    if (pc == pt->sizebc) return first + pt->numline;
-    if (pc-- == 0) return first;
-    return first + ((BCLine *)lineinfo)[pc];
+    return mref(lineinfo, uint32_t)[pc];
   }
   return 0;
 }
