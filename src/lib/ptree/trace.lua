@@ -63,18 +63,24 @@ function selftest ()
 
    local tmp = os.tmpname()
    local trace = new({file=tmp})
-   trace:record("foo", {bar="baz"})
-   trace:record("qux", {bar="baz", zog="100"})
+   trace:record("get-config",
+                {path="/", schema="foo", revision="bar"})
+   trace:record("set-config",
+                {path="/", schema="foo", revision="bar", config="baz"})
+   trace:record("unsupported-rpc",
+                {path="/", schema="foo", revision="bar", config="baz"})
    trace:close()
 
    local fd = S.open(tmp, 'rdonly')
    local input = json.buffered_input(fd)
    json.skip_whitespace(input)
    local parsed = json.read_json_object(input)
-   assert(lib.equal(parsed, {id="0", verb="foo", bar="baz"}))
+   assert(lib.equal(parsed, {id="0", verb="get", path="/",
+                             schema="foo", revision="bar"}))
    json.skip_whitespace(input)
    parsed = json.read_json_object(input)
-   assert(lib.equal(parsed, {id="1", verb="qux", bar="baz", zog="100"}))
+   assert(lib.equal(parsed, {id="1", verb="set", path="/",
+                             schema="foo", revision="bar", value="baz"}))
    json.skip_whitespace(input)
    assert(input:eof())
    fd:close()
