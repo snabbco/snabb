@@ -1,5 +1,13 @@
 # Change Log
 
+## [2017.11.01]
+
+* Add --trace option to "snabb lwaftr run", enabling a trace log of
+  incoming RPC calls that can be later replayed.
+
+* Fix excessive CPU and memory use when doing "snabb config get" of a
+  large configuration.
+
 ## [2017.08.06]
 
 * Update IETF yang model from `ietf-softwire` to `ietf-softwire-br`.  The
