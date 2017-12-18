@@ -20,7 +20,7 @@ load_config_for_schema_by_name = data.load_config_for_schema_by_name
 
 print_config_for_schema = data.print_config_for_schema
 print_config_for_schema_by_name = data.print_config_for_schema_by_name
-string_output_file = util.string_output_file
+string_io_file = util.string_io_file
 
 compile_config_for_schema = binary.compile_config_for_schema
 compile_config_for_schema_by_name = binary.compile_config_for_schema_by_name

@@ -53,6 +53,7 @@ function parse_args(args)
    local handlers = {}
    function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
+   function handlers.t (arg) opts.trace = assert(arg) end
    function handlers.i () opts.virtio_net = true end
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
@@ -103,12 +104,12 @@ function parse_args(args)
    end
    function handlers.j(arg) scheduling.j = arg end
    function handlers.h() show_usage(0) end
-   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:",
+   lib.dogetopt(args, handlers, "b:c:vD:yhir:n:j:t:",
      { conf = "c", v4 = 1, v6 = 1, ["v4-pci"] = 1, ["v6-pci"] = 1,
      verbose = "v", duration = "D", help = "h", virtio = "i", cpu = 1,
      ["ring-buffer-size"] = "r", ["real-time"] = 0, ["bench-file"] = "b",
      ["ingress-drop-monitor"] = 1, ["on-a-stick"] = 1, mirror = 1,
-     hydra = "y", reconfigurable = 0, name="n" })
+     hydra = "y", reconfigurable = 0, name = "n", trace = "t" })
    if ring_buffer_size ~= nil then
       if opts.virtio_net then
          fatal("setting --ring-buffer-size does not work with --virtio")
@@ -119,13 +120,10 @@ function parse_args(args)
    if opts.mirror then
       assert(opts["on-a-stick"], "Mirror option is only valid in on-a-stick mode")
    end
-   if opts["on-a-stick"] then
-      scheduling.pci_addrs = { v4 }
-      return opts, scheduling, conf_file, v4
-   else
-      scheduling.pci_addrs = { v4, v6 }
-      return opts, scheduling, conf_file, v4, v6
+   if opts["on-a-stick"] and v6 then
+      fatal("Options --on-a-stick and --v6 are mutually exclusive.")
    end
+   return opts, scheduling, conf_file, v4, v6
 end
 
 -- Requires a V4V6 splitter if running in on-a-stick mode and VLAN tag values
@@ -175,7 +173,9 @@ function run(args)
       end
    end
 
-   local manager = setup.ptree_manager(scheduling, setup_fn, conf)
+   local manager_opts = { worker_default_scheduling=scheduling,
+                          rpc_trace_file=opts.trace }
+   local manager = setup.ptree_manager(setup_fn, conf, manager_opts)
 
    -- FIXME: Doesn't work in multi-process environment.
    if false and opts.verbosity >= 2 then

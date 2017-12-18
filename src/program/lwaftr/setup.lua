@@ -589,7 +589,7 @@ local function compute_worker_configs(conf)
    return ret
 end
 
-function ptree_manager(scheduling, f, conf)
+function ptree_manager(f, conf, manager_opts)
    -- Always enabled in reconfigurable mode.
    alarm_notification = true
 
@@ -603,12 +603,17 @@ function ptree_manager(scheduling, f, conf)
       return worker_app_graphs
    end
 
-   return manager.new_manager {
+   local initargs = {
       setup_fn = setup_fn,
       initial_configuration = conf,
       schema_name = 'snabb-softwire-v2',
       default_schema = 'ietf-softwire-br',
-      worker_default_scheduling = scheduling,
       -- log_level="DEBUG"
    }
+   for k, v in pairs(manager_opts or {}) do
+      assert(not initargs[k])
+      initargs[k] = v
+   end
+
+   return manager.new_manager(initargs)
 end

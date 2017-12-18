@@ -8,7 +8,7 @@ local shm = require("core.shm")
 local rpc = require("lib.yang.rpc")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
-local path_resolver = require("lib.yang.path").resolver
+local path_resolver = require("lib.yang.path_data").resolver
 
 function show_usage(command, status, err_msg)
    if err_msg then print('error: '..err_msg) end
@@ -146,7 +146,7 @@ end
 
 function serialize_data(data, schema_name, path, is_config)
    local printer = data_serializer(schema_name, path, is_config)
-   return printer(data, yang.string_output_file())
+   return printer(data, yang.string_io_file())
 end
 
 function serialize_config(config, schema_name, path)
@@ -169,7 +169,7 @@ local function read_length(socket)
       if ch == '\n' then return len end
       assert(tonumber(ch), 'not a number: '..ch)
       len = len * 10 + tonumber(ch)
-      assert(len < 1e8, 'length too long: '..len)
+      assert(len < 1e9, 'length too long: '..len)
    end
 end
 

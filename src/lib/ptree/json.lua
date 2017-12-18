@@ -198,7 +198,7 @@ function write_json_object(output, obj)
 end
 
 function selftest ()
-   print('selftest: program.config.json')
+   print('selftest: lib.ptree.json')
    local equal = require('core.lib').equal
    local function test_json(str, obj)
       local tmp = os.tmpname()
