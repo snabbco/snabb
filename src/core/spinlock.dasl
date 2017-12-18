@@ -1,0 +1,47 @@
+module(...,package.seeall)
+
+local dasm = require("dasm")
+local ffi = require("ffi")
+
+| .arch x64
+| .actionlist actions
+| .globalnames globalnames
+
+local function generate(Dst)
+   Dst:growpc(16)
+
+   | .align 16
+   |->lock:
+   -- attempt to acquire
+   | mov eax, 1
+   | xchg eax, dword [rdi]
+   | test eax, eax		-- was it 0 (unlocked)?
+   | jnz >1			-- no, go spin
+   | ret
+   -- spin
+   |1:
+   | pause
+   | cmp dword [rdi], 1		-- does it look locked?
+   | je <1			-- spin if it does
+   | jmp ->lock			-- otherwise try to acquire
+
+   | .align 16
+   |->unlock:
+   | mov dword [rdi], 0
+   | ret
+end
+
+local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
+generate(Dst)
+local code, size = Dst:build()
+
+if nil then
+   dasm.dump(code, size)
+end
+
+local entry = dasm.globals(globals, globalnames)
+
+return setmetatable ({ new = function () return ffi.new("int32_t[1]") end,
+                       lock = ffi.cast("void (*)(int32_t *)", entry.lock),
+		       unlock = ffi.cast("void (*)(int32_t *)", entry.unlock)
+		     }, {_anchor = code})

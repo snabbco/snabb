@@ -137,6 +137,22 @@ function configure (new_config)
    counter.add(configs)
 end
 
+-- XXX - Shared links mud, wax off
+function attach_input (app, port, path)
+   local l = link.open(path)
+   link_table[path] = l
+   local app = app_table[app]
+   app.input[port] = l
+   table.insert(app.input, l)
+end
+function attach_output (app, port, path)
+   local l = link.open(path)
+   link_table[path] = l
+   local app = app_table[app]
+   app.output[port] = l
+   table.insert(app.output, l)
+end
+
 -- Removes the claim on a name, freeing it for other programs.
 --
 -- This relinquish a claim on a name if one exists. if the name does not
@@ -369,73 +385,22 @@ function apply_config_actions (actions)
       assert(ops[name], name)(unpack(args))
    end
 
-   compute_breathe_order ()
-end
-
--- Sort the NODES topologically according to SUCCESSORS via
--- reverse-post-order numbering.  The sort starts with ENTRIES.  This
--- implementation is recursive; we should change it to be iterative
--- instead.
-function tsort (nodes, entries, successors)
-   local visited = {}
-   local post_order = {}
-   local maybe_visit
-   local function visit(node)
-      visited[node] = true
-      for succ,_ in pairs(successors[node]) do maybe_visit(succ) end
-      table.insert(post_order, node)
-   end
-   function maybe_visit(node)
-      if not visited[node] then visit(node) end
-   end
-   for node,_ in pairs(entries) do maybe_visit(node) end
-   for node,_ in pairs(nodes) do maybe_visit(node) end
-   local ret = {}
-   while #post_order > 0 do table.insert(ret, table.remove(post_order)) end
-   return ret
+   compute_breathe_order()
 end
 
 breathe_pull_order = {}
 breathe_push_order = {}
 
--- Sort the links in the app graph, and arrange to run push() on the
--- apps on the receiving ends of those links.  This will run app:push()
--- once for each link, which for apps with multiple links may cause the
--- app's push function to run multiple times in a breath.
 function compute_breathe_order ()
    breathe_pull_order, breathe_push_order = {}, {}
-   local entries = {}
-   local inputs = {}
-   local successors = {}
    for _,app in pairs(app_table) do
       if app.pull then
          table.insert(breathe_pull_order, app)
-         for _,link in pairs(app.output) do
-            entries[link] = true;
-            successors[link] = {}
-         end
-      end
-      for _,link in pairs(app.input) do inputs[link] = app end
-   end
-   for link,app in pairs(inputs) do
-      successors[link] = {}
-      if not app.pull then
-         for _,succ in pairs(app.output) do
-            successors[link][succ] = true
-            if not successors[succ] then successors[succ] = {}; end
-         end
       end
    end
-   for link,succs in pairs(successors) do
-      for succ,_ in pairs(succs) do
-         if not successors[succ] then successors[succ] = {}; end
-      end
-   end
-   local link_order = tsort(inputs, entries, successors)
-   local i = 1
-   for _,link in ipairs(link_order) do
-      if breathe_push_order[#breathe_push_order] ~= inputs[link] then
-         table.insert(breathe_push_order, inputs[link])
+   for _,app in pairs(app_table) do
+      if app.push then
+         table.insert(breathe_push_order, app)
       end
    end
 end
@@ -505,6 +470,9 @@ function breathe ()
          zone(app.zone)
          with_restart(app, app.pull)
          zone()
+         for _, r in ipairs(app.output) do
+            link.produce(r)
+         end
       end
    end
    -- Exhale: push work out through the app network
@@ -514,12 +482,20 @@ function breathe ()
          zone(app.zone)
          with_restart(app, app.push)
          zone()
+         for _, r in ipairs(app.input) do
+            link.consume(r)
+         end
+         for _, r in ipairs(app.output) do
+            link.produce(r)
+         end
       end
    end
    counter.add(breaths)
    -- Commit counters at a reasonable frequency
    if counter.read(breaths) % 100 == 0 then counter.commit() end
    running = false
+   -- Rebalance freelist
+   packet.rebalance()
 end
 
 function report (options)
@@ -586,8 +562,8 @@ function report_links ()
    table.sort(names)
    for i, name in ipairs(names) do
       l = link_table[name]
-      local txpackets = counter.read(l.stats.txpackets)
-      local txdrop = counter.read(l.stats.txdrop)
+      local txpackets = counter.read(l.txpackets)
+      local txdrop = counter.read(l.txdrop)
       print(("%20s sent on %s (loss rate: %d%%)"):format(
             lib.comma_value(txpackets), name, loss_rate(txdrop, txpackets)))
    end
