@@ -99,7 +99,7 @@ ERRDEF(BADMODN,	"name conflict for module " LUA_QS)
 ERRDEF(JITPROT,	"runtime code generation failed, restricted kernel?")
 ERRDEF(NOJIT,	"JIT compiler disabled, CPU does not support SSE2")
 ERRDEF(JITOPT,	"unknown or malformed optimization flag " LUA_QS)
-ERRDEF(AUDITLOG,"auditlog could not be opened")
+ERRDEF(AUDITLOG,"auditlog could not be opened (already open?)")
 
 /* Lexer/parser errors. */
 ERRDEF(XMODE,	"attempt to load chunk with wrong mode")

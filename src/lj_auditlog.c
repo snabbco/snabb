@@ -17,7 +17,7 @@ size_t membuffersize;
 
 FILE *fp;    /* File where the audit log is written. */
 int error;   /* Have we been unable to initialize the log? */
-int memlog;  /* are we logging into memory? */
+int open;    /* are we logging to a real file? */
 
 /* -- msgpack writer - see http://msgpack.org/index.html ------------------ */
 
@@ -73,7 +73,7 @@ void lj_auditlog_vm_definitions()
 }
 
 /* Check that the log is open before logging a message. */
-static int ensure_log_open() {
+static int ensure_log_started() {
   if (fp != NULL) return 1;     /* Log already open? */
   if (error) return 0;          /* Log has already errored? */
   /* Start logging into a memory buffer. The entries will be migrated
@@ -82,7 +82,6 @@ static int ensure_log_open() {
   ** JIT activity has ocurred.)
   */
   if ((fp = open_memstream(&membuffer, &membuffersize)) != NULL) {
-    memlog = 1;
     lj_auditlog_vm_definitions();
     return 1;
   } else {
@@ -92,37 +91,20 @@ static int ensure_log_open() {
 }
 
 /* Open the auditlog at a new path.
-** Migrate existing log entries into the new log.
+** Migrate in-memory log onto file.
+** Can only open once.
 ** Return zero on failure.
 */
 int lj_auditlog_open(const char *path)
 {
   FILE *newfp;
-  if (!ensure_log_open()) return 0;
+  if (open) return 0; /* Sorry, already opened... */
+  if (!ensure_log_started()) return 0;
   newfp = fopen(path, "wb+");
-  /* Migrate the contents of the existing log. */
-  fflush(fp);
-  if (memlog) {
-    /* Migrate log from memory.
-    ** Special case: I don't trust glibc memory streams...
-    */
-    fwrite(membuffer, 1, membuffersize, newfp);
-  } else {
-    /* Migrate log from file. */
-    char buffer[4096];
-    int nread;
-    fseek(fp, 0, SEEK_SET);
-    while ((nread = fread(&buffer, 1, sizeof(buffer), fp)) > 0) {
-      if (fwrite(&buffer, 1, nread, newfp) != nread) break;
-    }
-    if (ferror(fp) || ferror(newfp)) {
-      /* Migration failed: revert to the old log. */
-      fclose(newfp);
-      fseek(fp, 0, SEEK_END);
-      return 0;
-    }
-  }
+  /* Migrate log entries from memory buffer. */
+  fwrite(membuffer, 1, membuffersize, newfp);
   fp = newfp;
+  open = 1;
   return 1;
 }
 
@@ -177,7 +159,7 @@ static void log_GCobj(GCobj *o)
 /* Log a trace that has just been compiled. */
 void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 {
-  if (ensure_log_open()) {
+  if (ensure_log_started()) {
     log_jit_State(J);
     log_GCtrace(T);
     log_event("trace_stop", 2);
@@ -188,7 +170,7 @@ void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 
 void lj_auditlog_trace_abort(jit_State *J, TraceError e)
 {
-  if (ensure_log_open()) {
+  if (ensure_log_started()) {
     log_jit_State(J);
     log_event("trace_abort", 2);
     str_16("TraceError"); /* = */ uint_64(e);
@@ -198,7 +180,7 @@ void lj_auditlog_trace_abort(jit_State *J, TraceError e)
 
 void lj_auditlog_new_prototype(GCproto *pt)
 {
-  if (ensure_log_open()) {
+  if (ensure_log_started()) {
     log_GCproto(pt);
     log_event("new_prototype", 1);
     str_16("GCproto"); /* = */ uint_64((uint64_t)pt);;
