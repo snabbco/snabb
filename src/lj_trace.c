@@ -347,7 +347,6 @@ setpenalty:
 /* Start tracing. */
 static void trace_start(jit_State *J)
 {
-  lua_State *L;
   TraceNo traceno;
 
   if ((J->pt->flags & PROTO_NOJIT)) {  /* JIT disabled for this proto? */
@@ -390,7 +389,6 @@ static void trace_start(jit_State *J)
   J->ktrace = 0;
   setgcref(J->cur.startpt, obj2gco(J->pt));
 
-  L = J->L;
   lj_record_setup(J);
 }
 
@@ -402,7 +400,6 @@ static void trace_stop(jit_State *J)
   GCproto *pt = &gcref(J->cur.startpt)->pt;
   TraceNo traceno = J->cur.traceno;
   GCtrace *T = J->curfinal;
-  lua_State *L;
   int i;
 
   switch (op) {
@@ -459,8 +456,6 @@ static void trace_stop(jit_State *J)
   for (i = 0; i < PENALTY_SLOTS; i++)
     if (mref(J->penalty[i].pc, const BCIns) == pc)
       J->penalty[i].val = PENALTY_MIN;
-
-  L = J->L;
 }
 
 /* Start a new root trace for down-recursion. */
