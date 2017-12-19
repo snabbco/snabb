@@ -102,7 +102,8 @@ int lj_auditlog_open(const char *path)
   if (!ensure_log_started()) return 0;
   newfp = fopen(path, "wb+");
   /* Migrate log entries from memory buffer. */
-  fwrite(membuffer, 1, membuffersize, newfp);
+  fflush(fp);
+  if (fwrite(membuffer, 1, membuffersize, newfp) != membuffersize) return 0;
   fp = newfp;
   open = 1;
   return 1;
