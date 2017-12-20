@@ -185,7 +185,7 @@ void lj_auditlog_lex(const char *chunkname, const char *s, int sz)
     log_mem("char[]", (void*)s, sz);
     log_event("lex", 2);
     str_16("chunkname"); /* = */ str_16(chunkname);
-    str_16("source");   /* = */ uint_64((uint64_t)s);
+    str_16("source");    /* = */ bin_32((void*)s, sz);
   }
 }
 
