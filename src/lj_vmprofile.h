@@ -6,6 +6,9 @@
 #ifndef _LJ_VMPROFILE_H
 #define _LJ_VMPROFILE_H
 
+#include <stdint.h>
+#include "lj_obj.h"
+
 /* Counters are 64-bit to avoid overflow even in long running processes. */
 typedef uint64_t VMProfileCount;
 
@@ -30,6 +33,7 @@ typedef struct VMProfile {
 
 /* Functions that should be accessed via FFI. */
 
+void *vmprofile_open_file(const char *filename);
 void vmprofile_set_profile(void *counters);
 int vmprofile_get_profile_size();
 
