@@ -179,6 +179,16 @@ void lj_auditlog_trace_abort(jit_State *J, TraceError e)
   }
 }
 
+void lj_auditlog_lex(const char *chunkname, const char *s, int sz)
+{
+  if (ensure_log_started()) {
+    log_mem("char[]", (void*)s, sz);
+    log_event("lex", 2);
+    str_16("chunkname"); /* = */ str_16(chunkname);
+    str_16("source");   /* = */ uint_64((uint64_t)s);
+  }
+}
+
 void lj_auditlog_new_prototype(GCproto *pt)
 {
   if (ensure_log_started()) {
