@@ -41,6 +41,21 @@ int vmprofile_get_profile_size() {
   return sizeof(VMProfile);
 }
 
+/* Open a counter file on disk and returned the mmapped data structure. */
+void *vmprofile_open_file(const char *filename)
+{
+  int fd;
+  void *ptr = MAP_FAILED;
+  if (((fd = open(filename, O_RDWR|O_CREAT, 0666)) != -1) &&
+      ((ftruncate(fd, sizeof(VMProfile))) != -1) &&
+      ((ptr = mmap(NULL, sizeof(VMProfile), PROT_READ|PROT_WRITE,
+                   MAP_SHARED, fd, 0)) != MAP_FAILED)) {
+    memset(ptr, 0, sizeof(VMProfile));
+  }
+  if (fd != -1) close(fd);
+  return ptr == MAP_FAILED ? NULL : ptr;
+}
+
 /* Set the memory where the next samples will be counted. 
    Size of the memory must match vmprofile_get_profile_size(). */
 void vmprofile_set_profile(void *counters) {
@@ -122,19 +137,11 @@ static void stop_timer()
 
 LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str)
 {
-  int fd;
   void *ptr;
-  if (((fd = open(str, O_RDWR|O_CREAT, 0666)) != -1) &&
-      ((ftruncate(fd, sizeof(VMProfile))) != -1) &&
-      ((ptr = mmap(NULL, sizeof(VMProfile), PROT_READ|PROT_WRITE,
-                   MAP_SHARED, fd, 0)) != MAP_FAILED)) {
-    memset(ptr, 0, sizeof(VMProfile));
+  if ((ptr = vmprofile_open_file(str)) != NULL) {
     setlightudV(L->base, checklightudptr(L, ptr));
   } else {
     setnilV(L->base);
-  }
-  if (fd != -1) {
-    close(fd);
   }
   return 1;
 }
