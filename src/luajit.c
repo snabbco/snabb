@@ -473,12 +473,10 @@ static int runargs(lua_State *L, char **argv, int argn)
         fflush(stderr);
       }
     case 'p': {
-      void *ptr;
-      if ((ptr = vmprofile_open_file(argv[++i])) != NULL) {
-        vmprofile_set_profile(ptr);
-        luaJIT_vmprofile_start(L);
-      } else {
-        fprintf(stderr, "unable to open vmprofile\n");
+      char *filename = argv[++i];
+      luaJIT_vmprofile_open(L, filename, 0, 0);
+      if (lua_isnil(L, -1)) {
+        fprintf(stderr, "unable to open vmprofile: %s\n", filename);
         fflush(stderr);
       }
       break;
