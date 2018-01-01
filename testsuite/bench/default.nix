@@ -48,8 +48,8 @@ let benchmark = letter: name: src: args: run:
       for result in result/*.perf; do
         version=${name}
         benchmark=$(basename -s.perf -a $result)
-        instructions=$(awk -F, -e '$3 == "instructions" { print $1; }' $result)
-        cycles=$(      awk -F, -e '$3 == "cycles"       { print $1; }' $result)
+        instructions=$(awk -F, -e '$3 ~ "^instructions" { print $1; }' $result)
+        cycles=$(      awk -F, -e '$3 ~ "^cycles"       { print $1; }' $result)
         echo ${letter},$version,$benchmark,${toString run},$instructions,$cycles >> $out/bench.csv
       done
     '';
