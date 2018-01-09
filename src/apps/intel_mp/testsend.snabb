@@ -11,7 +11,8 @@ local C = require("ffi").C
 
 local c = config.new()
 config.app(c, "pcap", pcap.PcapReader, pcapfile)
-config.app(c, "nic", intel.Intel, {pciaddr=pciaddr, txq = qno, ndescriptors=2048, wait_for_link = true})
+config.app(c, "nic", intel.Intel,
+           {pciaddr=pciaddr, txq=qno, wait_for_link=true})
 
 if os.getenv("SNABB_SEND_BLAST") then
 	local basic = require("apps.basic.basic_apps")

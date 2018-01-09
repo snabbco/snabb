@@ -158,7 +158,7 @@ local logging_priority = bit.bor(LOG_USER, LOG_INFO)
 function L7Fw:log_packet(type)
    local pkt      = self.current_packet
    local protocol = self.current_protocol
-   local eth_h    = ether:new_from_mem(pkt.data, pkt.length)
+   local eth_h    = assert(ether:new_from_mem(pkt.data, pkt.length))
    local ip_h
 
    if eth_h:type() == ETHER_PROTO_IPV4 then
@@ -168,6 +168,7 @@ function L7Fw:log_packet(type)
       ip_h = ipv6:new_from_mem(pkt.data + eth_h:sizeof(),
                                pkt.length - eth_h:sizeof())
    end
+   assert(ip_h)
 
    local msg = string.format("[Snabbwall %s] PROTOCOL=%s MAC=%s SRC=%s DST=%s",
                              type, protocol,
@@ -181,7 +182,7 @@ end
 -- send in case of a reject policy
 function L7Fw:make_reject_response()
    local pkt        = self.current_packet
-   local ether_orig = ether:new_from_mem(pkt.data, pkt.length)
+   local ether_orig = assert(ether:new_from_mem(pkt.data, pkt.length))
    local ip_orig
 
    if ether_orig:type() == ETHER_PROTO_IPV4 then
@@ -194,6 +195,7 @@ function L7Fw:make_reject_response()
       -- no responses to non-IP packes
       return
    end
+   assert(ip_orig)
 
    local is_tcp  = false
    local ip_protocol
@@ -242,6 +244,7 @@ function L7Fw:make_reject_response()
                                         ip_orig:sizeof(),
                                         pkt.length - ether_orig:sizeof() -
                                         ip_orig:sizeof())
+      assert(tcp_orig)
       local tcp_h    = tcp:new({src_port = tcp_orig:dst_port(),
                                 dst_port = tcp_orig:src_port(),
                                 seq_num  = tcp_orig:seq_num() + 1,

@@ -86,7 +86,7 @@ function new_aux (self, conf)
 end
 
 function check_tag (tag)
-   assert(tag > 0 and tag < 4095, "VLAN tag "..tag.." out of range")
+   assert(tag >= 0 and tag < 4095, "VLAN tag "..tag.." out of range")
    return tag
 end
 

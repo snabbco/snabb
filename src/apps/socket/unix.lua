@@ -103,12 +103,20 @@ function UnixSocket:new (arg)
    -- Return true on success or false if no data is available.
    local function try_read ()
       local bytes = S.read(sock, rxp.data, packet.max_payload)
-      if bytes then
-         rxp.length = bytes
-         return true
-      else
+
+      -- Error, likely EAGAIN
+      if not bytes then
          return false
       end
+
+      -- EOF, reset sock
+      if bytes == 0 then
+         sock = nil
+         return false
+      end
+
+      rxp.length = bytes
+      return true
    end
    function self:pull()
       connect()
@@ -146,15 +154,15 @@ end
 
 function selftest ()
    print("selftest: socket/unix")
-   local printapp = {}
-   function printapp:new (name)
+   local checkapp = {}
+   function checkapp:new (name)
       return {
          push = function(self)
             local l = self.input.rx
             if l == nil then return end
             while not link.empty(l) do
                local p = link.receive(l)
-               print(name..': ', p.length, ffi.string(p.data, p.length))
+               assert(p, "No packet received")
                packet.free(p)
             end
          end
@@ -181,9 +189,9 @@ function selftest ()
    local c = config.new()
    config.app(c,  "server", UnixSocket, {filename = file, listen = true})
    config.app(c,  "client", UnixSocket, file)
-   config.app(c,  "print_client_tx", printapp, "client tx")
+   config.app(c,  "check_client_tx", checkapp, "client tx")
    config.app(c,  "say_hello", echoapp, "hello ")
-   config.link(c, "client.tx -> print_client_tx.rx")
+   config.link(c, "client.tx -> check_client_tx.rx")
    config.link(c, "say_hello.tx -> client.rx")
    config.link(c, "server.tx -> server.rx")
 
@@ -191,4 +199,3 @@ function selftest ()
    engine.main({duration=0.1, report = {showlinks=true}})
    print("selftest: done")
 end
-
