@@ -728,6 +728,7 @@ function run (parameters)
    local duration = 0
    local reconfig = false
    local jit_conf = {}
+   local jit_opts = {}
    local opt = {}
    function opt.D (arg)
       if arg:match("^[0-9]+$") then
@@ -757,6 +758,9 @@ function run (parameters)
          local dump = jit_conf.dump
          dump.opts, dump.file = arg:match("^dump=([^,]*),?(.*)")
          if dump.file == '' then dump.file = nil end
+      elseif arg:match("^opt") then
+         local opt = arg:match("^opt=(.*)")
+         table.insert(jit_opts, opt)
       end
    end
    function opt.r (arg) reconfig = true end
@@ -768,8 +772,11 @@ function run (parameters)
       usage()
    end
 
-   -- Defaults: sizemcode=32, macmcode=512
-   require("jit.opt").start('sizemcode=128', 'maxmcode=1024')
+   -- Defaults: sizemcode=32, maxmcode=512
+   require("jit.opt").start('sizemcode=256', 'maxmcode=2048')
+   if #jit_opts then
+      require("jit.opt").start(unpack(jit_opts))
+   end
    if #parameters ~= 1 then usage () end
 
    local file = table.remove(parameters, 1)

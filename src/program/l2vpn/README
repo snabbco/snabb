@@ -23,6 +23,8 @@ according to the configuration supplied in the CONFIG file.
                                  Output JIT traces, optionally to a file.
                                -jp=OPTS[,FILE] --jit p=OPTS[,FILE]
                                  Profile execution with low-overhead sampling.
+                               -jopt=OPT
+                                 Sets JIT option OPT.
                              See luajit documentation for more information:
                                http://luajit.org/running.html
   -h,        --help          Print this usage message.
