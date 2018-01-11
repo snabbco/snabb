@@ -8,13 +8,12 @@ local timer     = require("core.timer")
 local pci       = require("lib.hardware.pci")
 local main      = require("core.main")
 local S         = require("syscall")
-local Lwaftrgen = require("apps.test.lwaftr").Lwaftrgen
+local Lwaftrgen = require("program.packetblaster.lwaftr.lib").Lwaftrgen
 local Tap       = require("apps.tap.tap").Tap
 local raw       = require("apps.socket.raw")
 local pcap      = require("apps.pcap.pcap")
 local VhostUser = require("apps.vhost.vhost_user").VhostUser
 local lib       = require("core.lib")
-local ffi       = require("ffi")
 
 local usage = require("program.packetblaster.lwaftr.README_inc")
 
@@ -212,8 +211,8 @@ function run (args)
       end
       if device_info then
          config.app(c, "nic", require(device_info.driver).driver,
-         {pciaddr = pciaddr, vmdq = false, macaddr = src_mac, mtu = 9500})
-         input, output = "nic.rx", "nic.tx"
+         {pciaddr = pciaddr, vmdq = true, macaddr = src_mac, mtu = 9500})
+         input, output = "nic."..device_info.rx, "nic."..device_info.tx
       else
          fatal(("Couldn't find device info for PCI or tap device %s"):format(pciaddr))
       end

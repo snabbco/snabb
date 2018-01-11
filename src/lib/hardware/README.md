@@ -111,7 +111,7 @@ Register   ::= Name Offset Indexing Mode Longname
 Name       ::= <identifier>
 Indexing   ::= "-"
            ::= "+" OffsetStep "*" Min ".." Max
-Mode       ::= "RO" | "RW" | "RC"
+Mode       ::= "RO" | "RW" | "RC" | "RCR" | "RW64" | "RO64" | "RC64" | "RCR64"
 Longname   ::= <string>
 Offset ::= OffsetStep ::= Min ::= Max ::= <number>
 ```
@@ -124,9 +124,10 @@ A `Register` object definition is made up of the following properties:
   supplied to `register.define` and `register.define_array`).
 * *Indexing*—Optional. Three integers specifying the offset step as well
   as minimum and maximum indexes in bytes.
-* *Mode*—One of `"RO"`, `"RW"` or `"RC"` standing for *read-only*,
-  *read-write* and *counter* modes respectively. Counter mode is for
-  counter registers that clear back to zero when read.
+* *Mode*—One of `"RO"`, `"RW"`, `"RC"`, `"RCR"` `"RO64"`, `"RW64"`, `"RC64"`,
+  `"RCR64"` standing for *read-only*, *read-write* and *counter* modes in 32bit
+  and 64bit modes respectively. Counter mode is for counter registers that
+  clear back to zero when read, RCR is for counters that wrap.
 * *Longname*—A string describing the register (used for
   self-documentation).
 

@@ -35,9 +35,11 @@ end
 
 function Synth:pull ()
    for _, o in ipairs(self.output) do
-      for i = 1, engine.pull_npackets do
+      local n = 0
+      while n < engine.pull_npackets do
          for _, p in ipairs(self.packets) do
 	    transmit(o, packet.clone(p))
+            n = n + 1
 	 end
       end
    end

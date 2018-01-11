@@ -41,13 +41,13 @@ function new(args)
 end
 
 function IngressDropMonitor:sample ()
-   local app_array = engine.app_array
+   local app_array = engine.breathe_push_order
    local sum = self.current_value
    sum[0] = 0
    for i = 1, #app_array do
       local app = app_array[i]
-      if app.ingress_packet_drops and not app.dead then
-         sum[0] = sum[0] + app:ingress_packet_drops()
+      if app.rxdrop and not app.dead then
+         sum[0] = sum[0] + app:rxdrop()
       end
    end
    if self.counter then

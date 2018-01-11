@@ -292,18 +292,26 @@ local function expand(expr, dlt)
 end
 
 local compile_defaults = {
-   dlt='EN10MB', optimize=true, source=false, subst=false
+   dlt='EN10MB', optimize=true, source=false, subst=false, extra_args={}
 }
 
 function compile(str, opts)
    opts = utils.parse_opts(opts or {}, compile_defaults)
    if opts.subst then str = subst(str, opts.subst) end
+
+   -- if the compiled function should have extra formal parameters, then
+   -- pass them to the various passes through filter_args
+   local extra_args = {}
+   for _,v in ipairs(opts.extra_args) do
+      utils.filter_args[v] = true
+   end
+
    local expr = expand(parse(str), opts.dlt)
    if opts.optimize then expr = optimize.optimize(expr) end
    expr = anf.convert_anf(expr)
    expr = ssa.convert_ssa(expr)
-   if opts.source then return backend.emit_match_lua(expr) end
-   return backend.emit_and_load_match(expr, filter_str)
+   if opts.source then return backend.emit_match_lua(expr, unpack(opts.extra_args)) end
+   return backend.emit_and_load_match(expr, str, unpack(opts.extra_args))
 end
 
 function selftest()
@@ -356,11 +364,34 @@ function selftest()
    test("match { otherwise => x(1/0) }",
         { 'fail' })
 
-   local function test(str, expr)
+   local function test(str)
       -- Just a test to see if it works without errors.
       compile(str)
    end
    test("match { tcp port 80 => pass }")
+
+   local function test(str, pkt, obj)
+      -- Try calling the matching method on the given table
+      -- which should have handlers installed
+      obj.match = compile(str)
+      obj:match(pkt.packet, pkt.len)
+   end
+
+   local savefile = require("pf.savefile")
+   pkts = savefile.load_packets("../tests/data/arp.pcap")
+
+   test("match { tcp port 80 => pass }",
+        pkts[1],
+        -- the handler shouldn't be called
+        { pass = function (self, pkt, len) assert(false) end })
+   test("match { arp => handle(&arp[1:1]) }",
+        pkts[1],
+        { handle = function (self, pkt, len, off)
+                     utils.assert(self ~= nil)
+                     utils.assert(pkt ~= nil)
+                     utils.assert(len ~= nil)
+                     utils.assert_equals(off, 15)
+                   end })
 
    print("OK")
 end

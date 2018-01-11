@@ -14,11 +14,13 @@ local pci = require("lib.hardware.pci")
 local bound_cpu
 local bound_numa_node
 
+local node_path = '/sys/devices/system/node/node'
+local MAX_CPU = 1023
+
 function cpu_get_numa_node (cpu)
    local node = 0
    while true do
-      local node_dir = S.open('/sys/devices/system/node/node'..node,
-                              'rdonly, directory')
+      local node_dir = S.open(node_path..node, 'rdonly, directory')
       if not node_dir then return end
       local found = S.readlinkat(node_dir, 'cpu'..cpu)
       node_dir:close()
@@ -28,7 +30,7 @@ function cpu_get_numa_node (cpu)
 end
 
 function has_numa ()
-   local node1 = S.open('/sys/devices/system/node/node1', 'rdonly, directory')
+   local node1 = S.open(node_path..tostring(1), 'rdonly, directory')
    if not node1 then return false end
    node1:close()
    return true
@@ -82,7 +84,7 @@ end
 function unbind_cpu ()
    local cpu_set = S.sched_getaffinity()
    cpu_set:zero()
-   for i = 0, 1023 do cpu_set:set(i) end
+   for i = 0, MAX_CPU do cpu_set:set(i) end
    assert(S.sched_setaffinity(0, cpu_set))
    bound_cpu = nil
 end
@@ -92,7 +94,8 @@ function bind_to_cpu (cpu)
    if not cpu then return unbind_cpu() end
    assert(not bound_cpu, "already bound")
 
-   assert(S.sched_setaffinity(0, cpu))
+   assert(S.sched_setaffinity(0, cpu),
+      ("Couldn't set affinity for cpu %s"):format(cpu))
    local cpu_and_node = S.getcpu()
    assert(cpu_and_node.cpu == cpu)
    bound_cpu = cpu
@@ -120,24 +123,34 @@ function bind_to_numa_node (node)
 end
 
 function prevent_preemption(priority)
-   if not S.sched_setscheduler(0, "fifo", priority or 1) then
-      fatal('Failed to enable real-time scheduling.  Try running as root.')
-   end
+   assert(S.sched_setscheduler(0, "fifo", priority or 1),
+      'Failed to enable real-time scheduling.  Try running as root.')
 end
 
 function selftest ()
+
+   function test_cpu(cpu)
+      local node = cpu_get_numa_node(cpu)
+      bind_to_cpu(cpu)
+      assert(bound_cpu == cpu)
+      assert(bound_numa_node == node)
+      assert(S.getcpu().cpu == cpu)
+      assert(S.getcpu().node == node)
+      bind_to_cpu(nil)
+      assert(bound_cpu == nil)
+      assert(bound_numa_node == node)
+      assert(S.getcpu().node == node)
+      bind_to_numa_node(nil)
+      assert(bound_cpu == nil)
+      assert(bound_numa_node == nil)
+   end
+
    print('selftest: numa')
-   bind_to_cpu(0)
-   assert(bound_cpu == 0)
-   assert(bound_numa_node == 0)
-   assert(S.getcpu().cpu == 0)
-   assert(S.getcpu().node == 0)
-   bind_to_cpu(nil)
-   assert(bound_cpu == nil)
-   assert(bound_numa_node == 0)
-   assert(S.getcpu().node == 0)
-   bind_to_numa_node(nil)
-   assert(bound_cpu == nil)
-   assert(bound_numa_node == nil)
+   local cpu_set = S.sched_getaffinity()
+   for cpuid = 0, MAX_CPU do
+      if cpu_set:get(cpuid) then
+         test_cpu(cpuid)
+      end
+   end
    print('selftest: numa: ok')
 end

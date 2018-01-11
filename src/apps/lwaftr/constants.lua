@@ -8,6 +8,7 @@ local C = ffi.C
 proto_icmp = 1
 proto_ipv4 = 4
 proto_tcp = 6
+proto_udp = 17
 ipv6_frag = 44
 proto_icmpv6 = 58
 

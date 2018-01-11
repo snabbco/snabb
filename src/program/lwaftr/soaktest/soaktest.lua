@@ -4,6 +4,7 @@ local config = require("core.config")
 local lib = require("core.lib")
 local lwconf = require('apps.lwaftr.conf')
 local setup = require("program.lwaftr.setup")
+local engine = require("core.app")
 
 local long_opts = {
    duration="D",
@@ -21,7 +22,7 @@ function parse_args (args)
    local opts = {}
    function handlers.h() show_usage(0) end
    function handlers.D (arg)
-      opts.duration = tonumber(arg, "Duration must be a number")
+      opts.duration = assert(tonumber(arg), "Duration must be a number")
    end
    handlers["on-a-stick"] = function ()
       opts["on-a-stick"] = true

@@ -6,6 +6,7 @@ local fragv6_h = require("apps.lwaftr.fragmentv6_hardened")
 local ndp = require("apps.lwaftr.ndp")
 local lwutil = require("apps.lwaftr.lwutil")
 local icmp = require("apps.lwaftr.icmp")
+local lwcounter = require("apps.lwaftr.lwcounter")
 
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
@@ -13,6 +14,8 @@ local checksum = require("lib.checksum")
 local packet = require("core.packet")
 local counter = require("core.counter")
 local lib = require("core.lib")
+local link = require("core.link")
+local engine = require("core.app")
 
 local bit = require("bit")
 local ffi = require("ffi")
@@ -42,7 +45,7 @@ function ReassembleV6:new(conf)
    local max_ipv6_reassembly_packets = conf.max_ipv6_reassembly_packets
    local max_fragments_per_reassembly_packet = conf.max_fragments_per_reassembly_packet
    local o = {
-      counters = assert(conf.counters, "Counters not initialized"),
+      counters = lwcounter.init_counters(),
       ctab = fragv6_h.initialize_frag_table(max_ipv6_reassembly_packets,
          max_fragments_per_reassembly_packet),
    }
@@ -91,7 +94,7 @@ end
 
 function Fragmenter:new(conf)
    local o = {
-      counters = assert(conf.counters, "Counters not initialized"),
+      counters = lwcounter.init_counters(),
       mtu = assert(conf.mtu),
    }
    return setmetatable(o, {__index=Fragmenter})
@@ -131,8 +134,6 @@ function NDP:new(conf)
    if not conf.dst_eth then
       self.ns_pkt = ndp.form_ns(conf.src_eth, conf.src_ipv6, conf.dst_ipv6)
       self.ns_interval = 3 -- Send a new NS every three seconds.
-      self.ns_max_retries = 5 -- Max number of NS retries.
-      self.ns_retries = 0
    end
    o.dst_eth = conf.dst_eth -- Intentionally nil if to request by NS
    return o
@@ -140,15 +141,11 @@ end
 
 function NDP:maybe_send_ns_request (output)
    if self.dst_eth then return end
-   if self.ns_retries == self.ns_max_retries then
-      error(("Could not resolve IPv6 address: %s"):format(
-         ipv6:ntop(self.conf.dst_ipv6)))
-   end
    self.next_ns_time = self.next_ns_time or engine.now()
    if self.next_ns_time <= engine.now() then
+      print(("NDP: Resolving '%s'"):format(ipv6:ntop(self.conf.dst_ipv6)))
       self:send_ns(output)
       self.next_ns_time = engine.now() + self.ns_interval
-      self.ns_retries = self.ns_retries + 1
    end
 end
 
@@ -171,6 +168,8 @@ function NDP:push()
          if not self.dst_eth and ndp.is_solicited_neighbor_advertisement(p) then
             local dst_ethernet = ndp.get_dst_ethernet(p, {self.conf.dst_ipv6})
             if dst_ethernet then
+               print(("NDP: '%s' resolved (%s)"):format(ipv6:ntop(self.conf.dst_ipv6),
+                                                        ethernet:ntop(dst_ethernet)))
                self.dst_eth = dst_ethernet
             end
             packet.free(p)
@@ -222,6 +221,7 @@ function ICMPEcho:push()
       if icmp.is_icmpv6_message(pkt, icmpv6_echo_request, 0) then
          local pkt_ipv6 = ipv6:new_from_mem(pkt.data + ethernet_header_size,
                                             pkt.length - ethernet_header_size)
+         assert(pkt_ipv6)
          local pkt_ipv6_dst = ffi.string(pkt_ipv6:dst(), 16)
          if self.addresses[pkt_ipv6_dst] then
             ethernet:new_from_mem(pkt.data, ethernet_header_size):swap()

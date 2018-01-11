@@ -12,7 +12,7 @@ module(..., package.seeall)
 
 local ffi = require("ffi")
 local C = ffi.C
-local binary_search = require('apps.lwaftr.binary_search')
+local binary_search = require('lib.binary_search')
 
 local UINT32_MAX = 0xFFFFFFFF
 
@@ -162,7 +162,8 @@ struct {
 
 function RangeMap:save(stream)
    local entry_size = ffi.sizeof(self.entry_type)
-   stream:write_ptr(range_map_header_t(self.size, entry_size))
+   stream:write_ptr(range_map_header_t(self.size, entry_size),
+                    range_map_header_t)
    stream:write_array(self.entries, self.entry_type, self.size)
 end
 

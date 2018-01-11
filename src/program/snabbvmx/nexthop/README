@@ -1,8 +1,0 @@
-Usage:
-  nexthop [OPTIONS]
-
-  -h, --help
-                             Print usage information.
-
-Prints out IPv4 and IPv6 nexthop counter values of an lwAFTR process. These
-counters are defined by 'nh_fwd' app.
