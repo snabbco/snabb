@@ -30,12 +30,12 @@ function AES128gcm:new (conf)
    assert(conf.transmit_salt ~= conf.receive_salt,
           "Refusing to operate with transmit_salt == receive_salt")
    self.encrypt = esp.encrypt:new{
-      mode = "aes-128-gcm-12",
+      mode = "aes-gcm-128-12",
       spi = conf.spi,
       key = conf.transmit_key,
       salt = conf.transmit_salt}
    self.decrypt = esp.decrypt:new{
-      mode = "aes-128-gcm-12",
+      mode = "aes-gcm-128-12",
       spi = conf.spi,
       key = conf.receive_key,
       salt = conf.receive_salt,
