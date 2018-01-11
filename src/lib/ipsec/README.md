@@ -67,13 +67,14 @@ the process: it removes the ESP frame and returns the original input packet.
 — Method **encrypt:encapsulate_tunnel** *packet*, *next_header*
 
 Encapsulates *packet* and encrypts its payload. The ESP header’s *Next Header*
-field is set to *next_header*. Frees *packet* and returns a new packet.
+field is set to *next_header*. Takes ownership of *packet* and returns a new
+packet.
 
 — Method **decrypt:decapsulate_transport6** *packet*
 
-Decapsulates *packet* and decrypts its payload. On success, *packet* is freed
-and a new packet and the value of the ESP header’s *Next Header* field are
-returned. Otherwise returns `nil`.
+Decapsulates *packet* and decrypts its payload. On success, takes ownership of
+*packet* and returns a new packet and the value of the ESP header’s
+*Next Header* field. Otherwise returns `nil`.
 
 
 #### Transport mode
@@ -103,10 +104,10 @@ header precedes the outer IPv6 header.
 
 — Method **encrypt:encapsulate_transport6** *packet*
 
-Encapsulates *packet* and encrypts its payload. On success, *packet* is
-freed and a new packet is returned. Otherwise returns `nil`.
+Encapsulates *packet* and encrypts its payload. On success, takes ownership of
+*packet* and returns a new packet. Otherwise returns `nil`.
 
 — Method **decrypt:decapsulate_transport6** *packet*
 
-Decapsulates *packet* and decrypts its payload. On success, *packet* is freed
-and a new packet is returned. Otherwise returns `nil`.
+Decapsulates *packet* and decrypts its payload. On success, takes ownership of
+*packet* and returns a new packet. Otherwise returns `nil`.
