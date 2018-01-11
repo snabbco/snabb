@@ -392,22 +392,23 @@ error is raised if there is not enough space in *packet* to accomodate
 
 — Function **packet.prepend** *packet*, *pointer*, *length*
 
-Frees *packet* and returns a new packet with *length* bytes from *pointer*
-prepended to the front of *packet*. An error is raised if there is not enough
-space in *packet* to accommodate *length* additional bytes.
+Prepends *length* bytes starting at *pointer* to the front of
+*packet*, taking ownership of the packet and returning a new packet.
+An error is raised if there is not enough space in *packet* to
+accomodate *length* additional bytes.
 
 — Function **packet.shiftleft** *packet*, *length*
 
-Frees *packet* and returns a new packet which is *packet* truncated by *length*
-bytes from the front. *Length* must be less than or equal to `length` of
-*packet*.
+Take ownership of *packet*, truncate it by *length* bytes from the
+front, and return a new packet. *Length* must be less than or equal to
+`length` of *packet*.
 
 — Function **packet.shiftright** *packet*, *length*
 
-Frees *packet*, and returns a new packet with *length* null bytes prepended to
-the front of *packet*. Thew new packet is *length* bytes larger than *packet*.
-The sum of *length* and `length` of *packet* must be less than or equal to
-`packet.max_payload`.
+Take ownership of *packet*, moves *packet* payload to the right by
+*length* bytes, growing *packet* by *length*. Returns a new packet.
+The sum of *length* and `length` of *packet* must be less than or
+equal to `packet.max_payload`.
 
 — Function **packet.from_pointer** *pointer*, *length*
 
