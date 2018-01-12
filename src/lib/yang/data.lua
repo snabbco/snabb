@@ -187,7 +187,7 @@ function validators.patterns(patterns, f)
    end
    return function (val, P)
       if f then f(val, P) end
-      if not val then return end
+      if not val or type(val) ~= 'string' then return end
       for pattern, match in pairs(compiled) do
          if not match(val) then
             P:error("pattern mismatch\n"..pattern.."\n"..val)
