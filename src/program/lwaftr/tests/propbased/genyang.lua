@@ -156,17 +156,8 @@ local function choose_range(rng, lo, hi)
 
    if #rng == 0 or (generate_invalid and r < 0.1) then
       return choose_bounded(lo, hi)
-   elseif rng[1] == "or" then
-      local intervals = {}
-      local num_intervals = (#rng - 1) / 2
-
-      for i=1, num_intervals do
-         intervals[i] = { rng[2*i], rng[2*i+1] }
-      end
-
-      return choose_range(choose(intervals), lo, hi)
    else
-      local lo_rng, hi_rng = rng[1], rng[2]
+      local lo_rng, hi_rng = unpack(choose(rng))
 
       if lo_rng == "min" then
          lo_rng = lo
@@ -526,11 +517,11 @@ function selftest()
    -- check some int types with range statements
    for i=1, 100 do
       local val1 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {1, 16} } })
+                                     range={ value = {{1, 16}} } })
       local val2 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {"or", 1, 16, 18, 32} } })
+                                     range={ value = {{1, 16}, {18, 32}} } })
       local val3 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {"or", "min", 10, 250, "max"} } })
+                                     range={ value = {{'min', 10}, {250, 'max'}} } })
       assert(val1 >= 1 and val1 <= 16, string.format("test value: %d", val1))
       assert(val2 >= 1 and val2 <= 32 and val2 ~= 17,
              string.format("test value: %d", val2))
