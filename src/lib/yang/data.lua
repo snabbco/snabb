@@ -180,7 +180,7 @@ function validators.range(range, f)
 end
 function validators.length(length, f) return f end
 function validators.patterns(patterns, f)
-   if not patterns then return end
+   if not patterns or #patterns == 0 then return end
    local compiled = {}
    for _, pattern in ipairs(patterns) do
       compiled[pattern.value] = regexp.compile(pattern.value)
