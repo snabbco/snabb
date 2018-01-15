@@ -36,26 +36,11 @@ function generate_any(pid, schema)
    -- leaf-list cases (for remove, we need a case with a selector too)
    -- Note: this assumes a list or leaf-list case exists in the schema at all
    elseif cmd == "add" then
-      local query, val, schema
-      local ok = false
-      while not ok do
-         query, val, schema = generate_config_xpath_and_val(schema)
-         if string.match(tostring(val), "^{.*}$") then
-            ok = true
-         end
-      end
-      --local query, val, schema = generate_config_xpath_and_val(schema)
+      local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config add -s %s %s \"%s\" \"%s\"",
                            schema, pid, query, val)
    else
-      local query, val, schema
-      local ok = false
-      while not ok do
-         query, val, schema = generate_config_xpath_and_val(schema)
-         if string.match(query, "[]]$") then
-            ok = true
-         end
-      end
+      local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config remove -s %s %s \"%s\"",
                            schema, pid, query)
    end
@@ -297,6 +282,7 @@ local function generate_xpath_and_node_info(schema, for_state)
       if handler then handler(node) end
    end
    local function visit_body(node)
+      if not node then return end
       local ids = {}
       for id, node in pairs(node.body) do
          -- only choose nodes that are used in configs unless
