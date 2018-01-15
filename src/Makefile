@@ -40,7 +40,7 @@ INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
 YANGOBJ:= $(patsubst %.yang,obj/%_yang.o, $(YANGSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
 
-LUAJIT_A := ../lib/luajit/src/libluajit.a
+LUAJIT_A := ../lib/luajit/src/raptorjit.a
 
 # TESTMODS expands to:
 #   core.memory core.lib ...
@@ -63,7 +63,6 @@ snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ)
 	$(Q) luajit -bg -n core.version obj/version.lua.gen obj/version_lua.o
 	$(E) "LINK      $@"
 	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
-	    ../lib/luajit/src/raptorjit.a \
 	    obj/version_lua.o \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
