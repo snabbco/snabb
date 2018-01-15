@@ -92,10 +92,10 @@ function gen(count, size)
 
          if to_copy > 0 then
             for i = 0, stride-1 do
-               | vpmaskmovd ymm(i), ymm15, [Rq(8+i)]
+               | vmaskmovps ymm(i), ymm15, [Rq(8+i)]
             end
             for i = 0, stride-1 do
-               | vpmaskmovd [rdi + i*size], ymm15, ymm(i)
+               | vmaskmovps [rdi + i*size], ymm15, ymm(i)
             end
             | add rdi, to_copy
             to_copy = 0

@@ -6,11 +6,11 @@ local engine    = require("core.app")
 local timer     = require("core.timer")
 local lib       = require("core.lib")
 local pci       = require("lib.hardware.pci")
-local LoadGen   = require("apps.intel.loadgen").LoadGen
-local Intel82599 = require("apps.intel.intel_app").Intel82599
+local LoadGen   = require("apps.intel_mp.loadgen").LoadGen
+local Intel82599 = require("apps.intel_mp.intel_mp").Intel82599
 
 local function is_device_suitable (pcidev, patterns)
-   if not pcidev.usable or pcidev.driver ~= 'apps.intel.intel_app' then
+   if not pcidev.usable or not pcidev.driver:match('intel') then
       return false
    end
    if #patterns == 0 then
@@ -34,11 +34,10 @@ function run_loadgen (c, patterns, opts)
          local name = "nic"..nics
          if use_loadgen then
             config.app(c, name, LoadGen, device.pciaddress)
-            config.link(c, "source."..tostring(nics).."->"..name..".input")
          else
             config.app(c, name, Intel82599, {pciaddr = device.pciaddress})
-            config.link(c, "source."..tostring(nics).."->"..name..".rx")
          end
+         config.link(c, "source."..tostring(nics).."->"..name..".input")
       end
    end
    assert(nics > 0, "<PCI> matches no suitable devices.")

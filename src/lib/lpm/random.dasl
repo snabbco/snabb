@@ -1,0 +1,52 @@
+module(..., package.seeall)
+
+local ffi = require('ffi')
+local C = ffi.C
+local dasm = require('dasm')
+
+|.arch x64
+|.actionlist actions
+
+Rand = {}
+
+
+-- integer arguments are passed in RDI, RSI, RDX, RCX, R8, and R9
+-- the return value is in rax
+Rand.u32 = (function()
+  local Dst = dasm.new(actions)
+| mov eax, edi
+| shl eax, 13
+| xor edi, eax
+| mov eax, edi
+| shr eax, 17
+| xor edi, eax
+| mov eax, edi
+| shl edi, 5
+| xor eax, edi
+| ret
+  Rand.code_u32 = Dst:build()
+  return ffi.cast("uint32_t (*) (uint32_t)", Rand.code_u32)
+end)()
+
+function Rand:selftest()
+   local pmu = require("lib.pmu")
+   local v = 0
+   local million = 1000000
+   local function test()
+      for i=0, 500*million do
+         v = Rand.u32(v)
+      end
+   end
+   local avail, err = pmu.is_available()
+   local start = C.get_time_ns()
+   if not avail then
+      print("PMU not available:")
+      print("  "..err)
+      test()
+   else
+      pmu.profile(test, {}, { random_u32 = 500*million })
+   end
+   print(tonumber((C.get_time_ns() - start))/(500*million))
+end
+
+return Rand

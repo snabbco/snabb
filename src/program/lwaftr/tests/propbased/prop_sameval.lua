@@ -56,6 +56,10 @@ function property()
 
       if results ~= results2 then
          print("Running the same config command twice produced different outputs")
+         print("\n\n\nFirst output:")
+         print(results)
+         print("\n\n\nSecond output:")
+         print(results2)
          return false
       end
    end

@@ -144,7 +144,7 @@ class TestConfigMisc(BaseTestCase):
         add_args = self.get_cmd_args('add')
         add_args.extend((
             '/softwire-config/binding-table/softwire',
-            '{ ipv4 1.2.3.4; psid 72; b4-ipv6 ::1; br 1; }',
+            '{ ipv4 1.2.3.4; psid 72; b4-ipv6 ::2; br 1; }',
         ))
         self.run_cmd(add_args)
         get_args = self.get_cmd_args('get')
@@ -154,7 +154,7 @@ class TestConfigMisc(BaseTestCase):
         # run_cmd checks the exit code and fails the test if it is not zero.
         get_args[-1] += '/b4-ipv6'
         self.assertEqual(
-            output.strip(), b'b4-ipv6 ::1;',
+            output.strip(), b'b4-ipv6 ::2;',
             '\n'.join(('OUTPUT', str(output, ENC))))
 
     def test_get_state(self):
@@ -259,7 +259,7 @@ class TestConfigMisc(BaseTestCase):
         Tests that adding softwire without PSID map entry errors
         """
         # Create a softwire which won't have an IPv4 address in the PSID map.
-        test_softwire = '{ ipv4 192.168.1.23; psid 72; b4-ipv6 ::1; } '
+        test_softwire = '{ ipv4 192.168.1.23; psid 72; b4-ipv6 ::3; } '
 
         add_args = self.get_cmd_args('add')
         add_args.extend((
@@ -290,10 +290,10 @@ class TestConfigMisc(BaseTestCase):
         binding_table = ["psid-map { addr 1.1.1.1; psid-length 16;}"]
 
         # Add a valid softwire
-        binding_table.append("softwire { ipv4 1.1.1.1; psid 1; b4-ipv6 ::1; }")
+        binding_table.append("softwire { ipv4 1.1.1.1; psid 1; b4-ipv6 ::3; }")
 
         # Add an invalid softwire
-        binding_table.append("softwire { ipv4 5.5.5.5; psid 1; b4-ipv6 ::1; }")
+        binding_table.append("softwire { ipv4 5.5.5.5; psid 1; b4-ipv6 ::3; }")
 
         set_args.append(" ".join(binding_table))
         err = "Softwire with an invalid PSID mapping was set"

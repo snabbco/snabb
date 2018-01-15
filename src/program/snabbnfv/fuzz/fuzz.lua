@@ -76,7 +76,7 @@ function random_uint (nbits, min)
 end
 
 function random_vlan ()
-   -- Twelve bit integer, see Intel10G (apps.intel.intel_app)
+   -- Twelve bit integer, see apps.intel_mp.intel_mp
    return random_uint(12)
 end
 

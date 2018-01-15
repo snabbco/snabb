@@ -1,4 +1,7 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
+
+local pci = require('lib.hardware.pci')
 
 -- This module provides some common definitions for snabbwall programs
 
@@ -16,12 +19,9 @@ function inputs.tap (kind, device)
    return "output", { require("apps.tap.tap").Tap, device }
 end
 
-function inputs.intel10g (kind, device)
-   local conf = { pciaddr = device }
-   return "tx", { require("apps.intel.intel_app").Intel82599, conf }
-end
-
-function inputs.intel1g (kind, device)
-   local conf = { pciaddr = device }
-   return "tx", { require("apps.intel.intel1g").Intel1g, conf }
+function inputs.pci (kind, device)
+   local info = pci.device_info(device)
+   assert(info.usable == 'yes', "Unusable PCI device: "..device)
+   local conf = { pciaddr = info.pciaddress }
+   return info.tx, { require(info.driver).driver, conf }
 end

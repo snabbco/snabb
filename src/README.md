@@ -469,8 +469,16 @@ of this process:
 - Fully qualified: `/1234/foo/bar` ⇒ `/var/run/snabb/1234/foo/bar`
 
 Behind the scenes the objects are backed by files on ram disk
-(`/var/run/snabb/<pid>`) and accessed with the equivalent of POSIX shared
-memory (`shm_overview(7)`).
+(`/var/run/snabb/<pid>`) and accessed with the equivalent of POSIX
+shared memory (`shm_overview(7)`). The files are automatically removed
+on shutdown unless the environment `SNABB_SHM_KEEP` is set. The
+location `/var/run/snabb` can be overridden by the environment
+variable `SNABB_SHM_ROOT`.
+
+Shared memory objects are created world-readable for convenient access
+by diagnostic tools. You can lock this down by setting
+`SNABB_SHM_ROOT` to a path under a directory with appropriate
+permissions.
 
 The practical limit on the number of objects that can be mapped will depend on
 the operating system limit for memory mappings. On Linux the default limit is
@@ -808,9 +816,36 @@ commas. Example:
 comma_value(1000000) => "1,000,000"
 ```
 
-— Function **lib.random_data** *length*
+— Function **lib.random_bytes_from_dev_urandom** *length*
 
-Returns a string of *length* bytes of random data.
+Return *length* bytes of random data, as a byte array, taken from
+`/dev/urandom`.  Suitable for cryptographic usage.
+
+— Function **lib.random_bytes_from_math_random** *length*
+
+Return *length* bytes of random data, as a byte array, where each byte
+was taken from `math.random(0, 255)`.  *Not* suitable for cryptographic
+usage.
+
+— Function **lib.random_bytes** *length*
+— Function **lib.randomseed** *seed*
+
+Initialize Snabb's random number generation facility.  If *seed* is nil,
+then the Lua `math.random()` function will be seeded from
+`/dev/urandom`, and `lib.random_bytes` will be initialized to
+`lib.random_bytes_from_dev_urandom`.  This is Snabb's default mode of
+operation.
+
+Sometimes it's useful to make Snabb use deterministic random numbers.
+In that case, pass a seed to **lib.randomseed**; Snabb will set
+`lib.random_bytes` to `lib.random_bytes_from_math_random`, and also
+print out a message to stderr indicating that we are using lower-quality
+deterministic random numbers.
+
+As part of its initialization process, Snabb will call `lib.randomseed`
+with the value of the `SNABB_RANDOM_SEED` environment variable (if
+any).  Set this environment variable to enable deterministic random
+numbers.
 
 — Function **lib.bounds_checked** *type*, *base*, *offset*, *size*
 
@@ -889,6 +924,11 @@ integers *n* respectively. Unsigned.
 
 Network to host byte order conversion functions for 32 and 16 bit
 integers *n* respectively. Unsigned.
+
+— Function **lib.random_bytes** *count*
+
+Return a fresh array of *count* random bytes.  Suitable for
+cryptographic usage.
 
 — Function **lib.parse** *arg*, *config*
 

@@ -28,7 +28,11 @@ ffi.cdef[[
 -- Class variables
 gre._name = "gre"
 gre._ulp = {
-   class_map = { [0x6558] = "lib.protocol.ethernet" },
+   class_map = {
+                  [0x6558] = "lib.protocol.ethernet",
+                  [0x0800] = "lib.protocol.ipv4",
+                  [0x86dd] = "lib.protocol.ipv6",
+                },
    method    = 'protocol' }
 gre:init(
    {
@@ -96,6 +100,9 @@ end
 
 function gre:new_from_mem (mem, size)
    local o = gre:superClass().new_from_mem(self, mem, size)
+   if o == nil then
+      return nil
+   end
    local header = o._header
    local data = header.box[0]
    -- Reserved bits and version MUST be zero.  We don't support

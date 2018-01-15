@@ -7,7 +7,8 @@ protocol subclasses.
 — Method **header:new_from_mem** *memory*, *length*
 
 Creates and returns a header object by "overlaying" the respective header
-structure over *length* bytes of *memory*.
+structure over *length* bytes of *memory*. Returns `nil` if *length* is
+too small to contain the header.
 
 — Method **header:header**
 

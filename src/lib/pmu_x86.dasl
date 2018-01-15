@@ -14,6 +14,7 @@ module(..., package.seeall)
 
 local debug = false
 
+local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 
@@ -130,8 +131,25 @@ function gen_rdpmc_multi (Dst)
 end
 rdpmc_multi = assemble("rdpmc_multi", "void(*)(void*)", gen_rdpmc_multi)
 
+-- Enable the RDPMC instruction in userspace via /sys/devices/cpu/rdpmc.
+-- Older kernels want value 1, newer kernels want value 2.
+-- See man perf_event_open(2) for gory details.
+function enable_rdpmc ()
+   local path = "/sys/devices/cpu/rdpmc"
+   local old = tonumber(lib.firstline(path))
+   if old < 1 then lib.writefile(path, "1") end
+   if old < 2 then lib.writefile(path, "2") end
+   local new = tonumber(lib.firstline(path))
+   if old ~= new then
+      io.write(("[pmu /sys/devices/cpu/rdpmc: %d -> %d]\n"):format(old, new))
+   elseif old ~= 2 then
+      io.write(("[pmu /sys/devices/cpu/rdpmc: %d]\n"):format(old))
+   end
+end
+
 function selftest ()
    print("selftest: pmu_x86")
+   enable_rdpmc()
    -- Expected values for Sandy Bridge - Skylake
    print("nfixed", nfixed, "ngeneral", ngeneral)
    assert(nfixed == 3,                    "nfixed: " .. nfixed)

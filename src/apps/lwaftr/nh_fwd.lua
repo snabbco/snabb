@@ -108,6 +108,7 @@ local function ipv6_cache_trigger (pkt, mac)
    local ipv6_hdr = ipv6:new_from_mem(pkt.data + ethernet_header_size, pkt.length - ethernet_header_size)
    local ipv6_payload_offset = ethernet_header_size + ipv6_fixed_header_size
    local ipv4_hdr = ipv4:new_from_mem(pkt.data + ipv6_payload_offset, pkt.length - ipv6_payload_offset)
+   assert(ether_hdr and ipv6_hdr and ipv4_hdr)
 
    -- VM will discard packets not matching its MAC address on the interface.
    ether_hdr:dst(mac)
@@ -126,6 +127,7 @@ local function ipv6_cache_trigger (pkt, mac)
       tcp_hdr = udp:new_from_mem(pkt.data + tcp_offset, pkt.length - tcp_offset)
       payload_offset = tcp_offset + tcp_hdr:sizeof()
    end
+   assert(tcp_hdr)
    tcp_hdr:src_port(random_port())
    -- Recalculate checksum.
    ipv4_hdr:checksum()
@@ -141,6 +143,7 @@ end
 local function ipv4_cache_trigger (pkt, mac)
    local ether_hdr = ethernet:new_from_mem(pkt.data, ethernet_header_size)
    local ip_hdr = ipv4:new_from_mem(pkt.data + ethernet_header_size, pkt.length - ethernet_header_size)
+   assert(ether_hdr and ip_hdr)
 
    -- VM will discard packets not matching its MAC address on the interface.
    ether_hdr:dst(mac)
@@ -158,6 +161,7 @@ local function ipv4_cache_trigger (pkt, mac)
       tcp_hdr = udp:new_from_mem(pkt.data + tcp_offset, pkt.length - tcp_offset)
       payload_offset = tcp_offset + tcp_hdr:sizeof()
    end
+   assert(tcp_hdr)
    tcp_hdr:dst_port(random_port())
    -- Recalculate checksum.
    ip_hdr:checksum()
@@ -606,6 +610,7 @@ local function test_ipv4_cache_trigger (pkt)
    local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
    local ip_hdr = ipv4:new_from_mem(refresh_packet.data + ethernet_header_size,
       refresh_packet.length - ethernet_header_size)
+   assert(eth_hdr and ip_hdr)
    assert(ip_hdr:src_eq(n_cache_src_ipv4))
    assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
    assert(checksum.verify_packet(refresh_packet.data + ethernet_header_size,
@@ -619,6 +624,7 @@ local function test_ipv6_cache_trigger (pkt)
    local eth_hdr = ethernet:new_from_mem(refresh_packet.data, ethernet_header_size)
    local ip_hdr = ipv6:new_from_mem(refresh_packet.data + ethernet_header_size,
       refresh_packet.length - ethernet_header_size)
+   assert(eth_hdr and ip_hdr)
    assert(ip_hdr:src_eq(n_cache_src_ipv6))
    assert(ethernet:ntop(eth_hdr:dst()) == ether_dhost)
    local payload_offset = ethernet_header_size + ipv6_fixed_header_size

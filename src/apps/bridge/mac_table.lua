@@ -553,7 +553,6 @@ function selftest ()
       local info = t:info()
       assert(info.size == s)
       assert(info.mask == info.buckets-1)
-      math.randomseed(0)
       local macs = {}
       local n = 0
       while true do
