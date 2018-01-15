@@ -15,7 +15,7 @@
 /* -- String helpers ------------------------------------------------------ */
 
 /* Ordered compare of strings. Assumes string data is 4-byte aligned. */
-int32_t LJ_FASTCALL lj_str_cmp(GCstr *a, GCstr *b)
+int32_t lj_str_cmp(GCstr *a, GCstr *b)
 {
   MSize i, n = a->len > b->len ? b->len : a->len;
   for (i = 0; i < n; i += 4) {
@@ -189,7 +189,7 @@ GCstr *lj_str_new(lua_State *L, const char *str, size_t lenx)
   return s;  /* Return newly interned string. */
 }
 
-void LJ_FASTCALL lj_str_free(global_State *g, GCstr *s)
+void lj_str_free(global_State *g, GCstr *s)
 {
   g->strnum--;
   lj_mem_free(g, s, sizestring(s));
