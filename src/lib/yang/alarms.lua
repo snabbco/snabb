@@ -395,6 +395,12 @@ end
 local ages = {seconds=1, minutes=60, hours=3600, days=3600*24, weeks=3600*24*7}
 
 local function toseconds (date)
+   local function tz_seconds (t)
+      if not t.tz_hour then return 0 end
+      local sign = t.tz_sign or "+"
+      local seconds = tonumber(t.tz_hour) * 3600 + tonumber(t.tz_min) * 60
+      return sign == '+' and seconds or seconds*-1
+   end
    if type(date) == 'table' then
       assert(date.age_spec and date.value, "Not a valid 'older_than' data type")
 
@@ -402,9 +408,8 @@ local function toseconds (date)
                                 "Not a valid 'age_spec' value: "..date.age_spec)
       return date.value * multiplier
    elseif type(date) == 'string' then
-      local t = {}
-      t.year, t.month, t.day, t.hour, t.min, t.sec = parse_date_as_iso_8601(date)
-      return os.time(t)
+      local t = parse_date_as_iso_8601(date)
+      return os.time(t) + tz_seconds(t)
    else
       error('Wrong data type: '..type(date))
    end
@@ -442,7 +447,7 @@ function purge_alarms (args)
       assert(type(older_than) == 'table')
       local alarm_time = toseconds(alarm.time_created)
       local threshold = toseconds(older_than)
-      return util.gmtime() - alarm_time >= threshold
+      return os.time() - alarm_time >= threshold
    end
    local function by_severity (alarm, args)
       local severity = assert(args.severity)
@@ -739,7 +744,8 @@ function selftest ()
 
    -- Test toseconds.
    assert(toseconds({age_spec='weeks', value=1}) == 3600*24*7)
-   assert(toseconds('1970-01-01T00:00:00Z') == 0)
+   local now = os.time()
+   assert(now == toseconds(format_date_as_iso_8601(now)))
 
    -- Purge alarms by status.
    assert(table_size(state.alarm_list.alarm) == 1)
