@@ -377,6 +377,10 @@ $(HOST_O): %.o: %.c
 	$(E) "HOSTCC    $@"
 	$(Q)$(HOST_CC) $(HOST_ACFLAGS) -c -o $@ $<
 
+$(DWARF_DWO): %.dwo: %.c
+	$(E) "CC(debug) $@"
+	$(Q)$(TARGET_CC) -g3 -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
+
 include Makefile.dep
 
 ##############################################################################
