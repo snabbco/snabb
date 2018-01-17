@@ -895,7 +895,7 @@ static uint32_t ir_khash(IRIns *ir)
   } else {
     lua_assert(irt_isgcv(ir->t));
     lo = u32ptr(ir_kgc(ir));
-    hi = lo + HASH_BIAS;
+    hi = (uint32_t)(u64ptr(ir_kgc(ir)) >> 32) | (irt_toitype(ir->t) << 15);
   }
   return hashrot(lo, hi);
 }
