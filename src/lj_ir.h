@@ -375,10 +375,12 @@ typedef struct IRType1 { uint8_t irt; } IRType1;
 #define irt_isaddr(t)		(irt_typerange((t), IRT_LIGHTUD, IRT_UDATA))
 #define irt_isint64(t)		(irt_typerange((t), IRT_I64, IRT_U64))
 
+/* Include IRT_NIL, so IR(ASMREF_L) (aka REF_NIL) is considered 64 bit. */
 #define IRT_IS64 \
   ((1u<<IRT_NUM)|(1u<<IRT_I64)|(1u<<IRT_U64)|(1u<<IRT_P64)|\
    (1u<<IRT_LIGHTUD)|(1u<<IRT_STR)|(1u<<IRT_THREAD)|(1u<<IRT_PROTO)|\
-   (1u<<IRT_FUNC)|(1u<<IRT_CDATA)|(1u<<IRT_TAB)|(1u<<IRT_UDATA))
+   (1u<<IRT_FUNC)|(1u<<IRT_CDATA)|(1u<<IRT_TAB)|(1u<<IRT_UDATA))\
+   (1u<<IRT_NIL))
 
 #define irt_is64(t)		((IRT_IS64 >> irt_type(t)) & 1)
 #define irt_is64orfp(t)		(((IRT_IS64|(1u<<IRT_FLOAT))>>irt_type(t)) & 1)

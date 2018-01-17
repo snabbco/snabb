@@ -1798,6 +1798,7 @@ static void asm_setup_regsp(ASMState *as)
   for (ir = IR(T->nk), lastir = IR(REF_BASE); ir < lastir; ir++) {
     ir->prev = REGSP_INIT;
     if (irt_is64(ir->t) && ir->o != IR_KNULL) {
+      /* The false-positive of irt_is64() for ASMREF_L (REF_NIL) is OK here. */
       ir->i = 0;  /* Will become non-zero only for RIP-relative addresses. */
       ir++;
     }
