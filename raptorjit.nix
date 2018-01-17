@@ -3,17 +3,14 @@
 { pkgs, source, version }:
 
 with pkgs;
-with llvmPackages_4.stdenv;  # Use clang 4.0
+with stdenv;
 
 mkDerivation rec {
   name = "raptorjit-${version}";
   inherit version;
   src = source;
-  buildInputs = [
-      luajit                # LuaJIT to bootstrap DynASM
-      gcc6                  # GCC for generating DWARF info
-    ];
-  dontStrip = true;         # No extra stripping (preserve debug info)
+  buildInputs = [ luajit ];  # LuaJIT to bootstrap DynASM
+  dontStrip = true;
   installPhase = ''
     install -D src/raptorjit $out/bin/raptorjit
     install -D src/lj_dwarf.dwo $out/lib/raptorjit.dwo

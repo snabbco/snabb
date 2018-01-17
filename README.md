@@ -59,7 +59,7 @@ build environment. You can use Nix to build/test/benchmark RaptorJIT
 with suitable versions of all dependencies provided.
 
 Note: Building with nix will be slow the first time because it
-downloads the exact reference versions of the toolchain (clang, etc)
+downloads the exact reference versions of the toolchain (gcc, etc)
 and all dependencies (glibc, etc). This is all cached for future
 builds.
 
@@ -97,7 +97,7 @@ $ nix-shell    # start sub-shell with pristine build environment in $PATH
 $ make
 ```
 
-... but make sure you have at least `make`, `clang`, and `luajit` in your `$PATH`.
+... but make sure you have at least `make`, `gcc`, and `luajit` in your `$PATH`.
 
 ### Run the benchmarks
 

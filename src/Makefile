@@ -381,8 +381,7 @@ $(HOST_O): %.o: %.c
 
 $(DWARF_DWO): %.dwo: %.c
 	$(E) "CC(debug) $@"
-#       GCC because clang does not seem to produce decent debug info (?)
-	$(Q)gcc -g3 -gdwarf-4 -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
+	$(Q)$(TARGET_CC) -g3 -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
 
 include Makefile.dep
 
