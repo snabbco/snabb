@@ -145,6 +145,12 @@ void vmprofile_start(lua_State *L)
   }
 }
 
+void vmprofile_stop()
+{
+  stop_timer();
+  started = 0;
+}
+
 /* -- Lua API ------------------------------------------------------------- */
 
 LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str, int noselect, int nostart)
@@ -181,7 +187,7 @@ LUA_API int luaJIT_vmprofile_start(lua_State *L)
 
 LUA_API int luaJIT_vmprofile_stop(lua_State *L)
 {
-  stop_timer();
+  vmprofile_stop();
   return 0;
 }
 
