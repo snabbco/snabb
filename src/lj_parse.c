@@ -1348,29 +1348,21 @@ static void fs_fixup_uv1(FuncState *fs, GCproto *pt, uint16_t *uv)
   memcpy(uv, fs->uvtmp, fs->nuv*sizeof(VarIndex));
 }
 
-#ifndef LUAJIT_DISABLE_DEBUGINFO
 /* Prepare lineinfo for prototype. */
 static size_t fs_prep_line(FuncState *fs, BCLine numline)
 {
-  return (fs->pc-1) * sizeof(BCLine);
+  return (fs->pc+1) * sizeof(BCLine);
 }
 
 /* Fixup lineinfo for prototype. */
 static void fs_fixup_line(FuncState *fs, GCproto *pt,
-			  void *lineinfo, BCLine numline)
+			  uint32_t *lineinfo, BCLine numline)
 {
-  BCInsLine *base = fs->bcbase + 1;
-  BCLine first = fs->linedefined;
-  MSize i = 0, n = fs->pc-1;
+  int i;
   pt->firstline = fs->linedefined;
   pt->numline = numline;
   setmref(pt->lineinfo, lineinfo);
-  uint32_t *li = (uint32_t *)lineinfo;
-  do {
-    BCLine delta = base[i].line - first;
-    lua_assert(delta >= 0);
-    li[i] = (uint32_t)delta;
-  } while (++i < n);
+  for (i = 0; i <= fs->pc; i++) lineinfo[i] = fs->bcbase[i].line;
 }
 
 /* Prepare variable info for prototype. */
@@ -1422,17 +1414,6 @@ static void fs_fixup_var(LexState *ls, GCproto *pt, uint8_t *p, size_t ofsvar)
   setmref(pt->varinfo, (char *)p + ofsvar);
   memcpy(p, sbufB(&ls->sb), sbuflen(&ls->sb));  /* Copy from temp. buffer. */
 }
-#else
-
-/* Initialize with empty debug info, if disabled. */
-#define fs_prep_line(fs, numline)		(UNUSED(numline), 0)
-#define fs_fixup_line(fs, pt, li, numline) \
-pt->firstline = pt->numline = 0, setmref((pt)->lineinfo, NULL)
-#define fs_prep_var(ls, fs, ofsvar)		(UNUSED(ofsvar), 0)
-#define fs_fixup_var(ls, pt, p, ofsvar) \
-  setmref((pt)->uvinfo, NULL), setmref((pt)->varinfo, NULL)
-
-#endif
 
 /* Check if bytecode op returns. */
 static int bcopisret(BCOp op)
@@ -2619,11 +2600,7 @@ GCproto *lj_parse(LexState *ls)
   FuncScope bl;
   GCproto *pt;
   lua_State *L = ls->L;
-#ifdef LUAJIT_DISABLE_DEBUGINFO
-  ls->chunkname = lj_str_newlit(L, "=");
-#else
   ls->chunkname = lj_str_newz(L, ls->chunkarg);
-#endif
   setstrV(L, L->top, ls->chunkname);  /* Anchor chunkname string. */
   incr_top(L);
   ls->level = 0;
