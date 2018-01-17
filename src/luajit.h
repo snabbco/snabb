@@ -66,7 +66,7 @@ LUA_API int luaJIT_setmode(lua_State *L, int idx, int mode);
 
 /* VM profiling API. */
 LUA_API int luaJIT_vmprofile_start(lua_State *L);
-LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str);
+LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str, int noselect, int nostart);
 LUA_API int luaJIT_vmprofile_select(lua_State *L, void *ud);
 LUA_API int luaJIT_vmprofile_close(lua_State *L, void *ud);
 LUA_API int luaJIT_vmprofile_stop(lua_State *L);

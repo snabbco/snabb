@@ -212,11 +212,14 @@ LJLIB_CF(jit_opt_start)
 
 LJLIB_CF(jit_vmprofile_open)
 {
-  if (L->base < L->top && tvisstr(L->base)) {
-    return luaJIT_vmprofile_open(L, strdata(lj_lib_checkstr(L, 1)));
+  int nargs = (int)(L->top - L->base);
+  int nostart = nargs >= 3 ? boolV(L->base+2) : 0;
+  int noselect = nargs >= 2 ? boolV(L->base+1) : 0;
+  const char *filename = nargs >= 1 ? strdata(lj_lib_checkstr(L, 1)) : NULL;
+  if (filename) {
+    return luaJIT_vmprofile_open(L, filename, noselect, nostart);
   } else {
     lj_err_argtype(L, 1, "filename");
-    return 0;
   }
 }
 
@@ -249,12 +252,6 @@ LJLIB_CF(jit_vmprofile_stop)
 }
 
 #include "lj_libdef.h"
-
-static int luaopen_jit_vmprofile(lua_State *L)
-{
-  LJ_LIB_REG(L, NULL, jit_vmprofile);
-  return 1;
-}
 
 /* -- JIT compiler initialization ----------------------------------------- */
 
@@ -313,8 +310,7 @@ LUALIB_API int luaopen_jit(lua_State *L)
   lua_pushinteger(L, LUAJIT_VERSION_NUM);
   lua_pushliteral(L, LUAJIT_VERSION);
   LJ_LIB_REG(L, LUA_JITLIBNAME, jit);
-  lj_lib_prereg(L, LUA_JITLIBNAME ".vmprofile", luaopen_jit_vmprofile,
-                tabref(L->env));
+  LJ_LIB_REG(L, "jit.vmprofile", jit_vmprofile);
   LJ_LIB_REG(L, "jit.opt", jit_opt);
   L->top -= 2;
   return 1;
