@@ -1,0 +1,60 @@
+module(...,package.seeall)
+
+local dasm = require("dasm")
+local ffi = require("ffi")
+
+| .arch x64
+| .actionlist actions
+| .globalnames globalnames
+
+|.define arg1, edi
+|.define arg2, esi
+|.define arg3, edx
+
+-- cas(dst, old, new) -> true|false: Atomic compare-and-swap; compare old with
+-- value pointed to by dst. If equal, stores new at dst and returns true. Else,
+-- returns false.
+local cas_t = "bool (*) (int *, int, int)"
+local function cas (Dst)
+   | mov eax, arg2
+   | lock; cmpxchg [arg1], arg3 -- compare-and-swap; sets ZF flag on success
+   | mov eax, 0                 -- clear eax for return value
+   | setz al                    -- set eax to 1 (true) if ZF is set
+   | ret
+end
+
+local function generate (Dst)
+   Dst:growpc(16)
+   | .align 16
+   |->cas:
+   || cas(Dst)
+end
+
+local Dst, globals = dasm.new(actions, nil, nil, 1 + #globalnames)
+generate(Dst)
+local code, size = Dst:build()
+
+if nil then
+   dasm.dump(code, size)
+end
+
+local entry = dasm.globals(globals, globalnames)
+
+local sync = {
+   cas = ffi.cast(cas_t, entry.cas)
+}
+
+sync.selftest = function ()
+   local box = ffi.new(
+      "struct { unsigned int pad1, state[1], pad2; } __attribute__((packed))"
+   )
+   assert(sync.cas(box.state, 0, 1) and box.state[0] == 1)
+   assert(not sync.cas(box.state, 0, 2) and box.state[0] == 1)
+   assert(sync.cas(box.state, 1, 2) and box.state[0] == 2)
+   assert(sync.cas(box.state, 2, 0x5555555555555555)
+             and box.state[0] == 2147483648
+             and box.pad1 == 0
+             and box.pad2 == 0)
+end
+
+return setmetatable(sync, {_anchor = code})
