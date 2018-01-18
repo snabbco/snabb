@@ -181,7 +181,8 @@ function data_grammar_from_schema(schema, is_config)
    function handlers.choice(node)
       local choices = {}
       for choice, n in pairs(node.body) do
-         choices[choice] = visit_body(n)
+         local members = visit_body(n)
+         if not is_empty(members) then choices[choice] = members end
       end
       if is_empty(choices) then return end
       return {type="choice", default=node.default, mandatory=node.mandatory,
