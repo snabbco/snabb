@@ -6,7 +6,6 @@ module(..., package.seeall)
 local ffi       = require("ffi")
 local schema    = require("lib.yang.schema")
 local data      = require("lib.yang.data")
-local path      = require("lib.yang.path")
 local path_data = require("lib.yang.path_data")
 local util      = require("lib.yang.util")
 
@@ -502,8 +501,6 @@ end
 
 function selftest()
    print('selftest: program.lwaftr.tests.propbased.genyang')
-   local data = require("lib.yang.data")
-   local path = require("lib.yang.path")
    local schema = schema.load_schema_by_name("snabb-softwire-v2")
    local grammar = data.config_grammar_from_schema(schema)
 
