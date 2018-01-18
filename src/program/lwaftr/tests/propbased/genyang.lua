@@ -504,15 +504,8 @@ function selftest()
    local schema = schema.load_schema_by_name("snabb-softwire-v2")
    local grammar = data.config_grammar_from_schema(schema)
 
-   for i=1,1000 do
-      local subpath, value = generate_xpath_and_val(schema, true)
-      -- print(i, subpath, value)
-   end
-
-   for i=1,1000 do
-      local subpath, value = generate_xpath_and_val(schema, false)
-      -- print(i, subpath, value)
-   end
+   for i=1,1000 do generate_xpath_and_val(schema, true) end
+   for i=1,1000 do generate_xpath_and_val(schema, false) end
 
    -- check some int types with range statements
    for i=1, 100 do
