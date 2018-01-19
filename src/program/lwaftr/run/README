@@ -9,12 +9,9 @@ Required arguments:
        --on-a-stick <pci-addr>  One single NIC for INET-side and B4-side
 
 Optional arguments:
-       --reconfigurable         Allow run-time configuration query and update.
-                                This runs as two processes, a leader and a
-                                follower, rather than just one.
        --virtio                 Use virtio-net interfaces instead of Intel 82599
        --ring-buffer-size <size>  Set Intel 82599 receive buffer size
-       --cpu    <cpu>           Bind the lwAFTR to the given CPU
+       --cpu <cpuset>           Run dataplane processes on the given CPUs
        --real-time              Enable real-time SCHED_FIFO scheduler
        --mirror <tap>           Copies matching packets to TAP interface. Matching
                                 address set by "lwaftr monitor".
@@ -36,7 +33,15 @@ Optional arguments:
        -n NAME, --name NAME     Sets the name as the identifier of this program.
                                 This must be unique amongst other snab programs.
 
+Optional arguments for debugging and profiling:
+       -jv, -jv=FILE            Print out when traces are recorded
+       -jp, -jp=MODE,FILE       Profile the system by method
+       -jtprof                  Profile the system by trace
+
 When the -v option is used at least once, packets on the network interfaces are
 counted and recorded, and the corresponding incoming and outgoing packet rates
 are written to stdout in CSV format, suitable for passing to a graphing program.
 If bench-file is set, output is written to a file instead of stdout.
+
+CPUSET is a list of CPU ranges.  For example "3-5,7-9", or "3,4,5,7,8,9"
+both allow the lwAFTR to run data planes on the given CPUs.

@@ -8,6 +8,6 @@ return {
    ["in-ipv6-frag-needs-reassembly"] = 15,
    ["in-ipv6-frag-reassembled"] = 5,
    ["in-ipv6-packets"] = 5,
-   ["memuse-ipv4-frag-reassembly-buffer"] = 463571780,
-   ["memuse-ipv6-frag-reassembly-buffer"] = 464727376,
+   ["memuse-ipv4-frag-reassembly-buffer"] = 463482888,
+   ["memuse-ipv6-frag-reassembly-buffer"] = 464549592,
 }
