@@ -20,3 +20,8 @@ __pycache__
 /src/programs.inc
 .images
 /lib/luajit/usr
+
+# common cmake building path
+/build
+/release
+/debug
