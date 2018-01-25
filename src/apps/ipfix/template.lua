@@ -100,7 +100,7 @@ local swap_fn_env = { htons = htons, htonl = htonl, htonq = htonq }
 
 -- Create a table describing the information needed to create
 -- flow templates and data records.
-local function make_template_info(spec)
+function make_template_info(spec)
    -- Representations of IPFIX IEs.
    local ctypes =
       { unsigned8 = 'uint8_t', unsigned16 = 'uint16_t',
@@ -207,7 +207,9 @@ local function make_template_info(spec)
             match = pf.compile_filter(spec.filter),
             logger = lib.logger_new({ module = "IPFIX template #"..spec.id }),
             counters = spec.counters,
-            counters_names = counters_names
+            counters_names = counters_names,
+            extract = spec.extract,
+            accumulate = spec.accumulate
           }
 end
 
@@ -324,22 +326,7 @@ local function accumulate_generic(dst, new)
       dst.value.octetDeltaCount + new.value.octetDeltaCount
 end
 
-v4 = make_template_info {
-   id     = 256,
-   filter = "ip",
-   keys   = { "sourceIPv4Address",
-              "destinationIPv4Address",
-              "protocolIdentifier",
-              "sourceTransportPort",
-              "destinationTransportPort" },
-   values = { "flowStartMilliseconds",
-              "flowEndMilliseconds",
-              "packetDeltaCount",
-              "octetDeltaCount",
-              "tcpControlBitsReduced" }
-}
-
-function v4.extract(pkt, timestamp, entry)
+local function v4_extract (self, pkt, timestamp, entry)
    local md = metadata_get(pkt)
    extract_5_tuple(pkt, timestamp, entry, md, extract_v4_addr)
    if md.proto == IP_PROTO_TCP and md.frag_offset == 0 then
@@ -347,41 +334,7 @@ function v4.extract(pkt, timestamp, entry)
    end
 end
 
-function v4.accumulate(dst, new)
-   accumulate_generic(dst, new)
-   if dst.key.protocolIdentifier == IP_PROTO_TCP then
-      accumulate_tcp_flags_reduced(dst, new)
-   end
-end
-
-function v4.tostring(entry)
-   local ipv4   = require("lib.protocol.ipv4")
-   local key = entry.key
-   local protos =
-      { [IP_PROTO_TCP]='TCP', [IP_PROTO_UDP]='UDP', [IP_PROTO_SCTP]='SCTP' }
-   return string.format(
-      "%s (%d) -> %s (%d) [%s]",
-      ipv4:ntop(key.sourceIPv4Address), key.sourceTransportPort,
-      ipv4:ntop(key.destinationIPv4Address), key.destinationTransportPort,
-      protos[key.protocolIdentifier] or tostring(key.protocolIdentifier))
-end
-
-v6 = make_template_info {
-   id     = 257,
-   filter = "ip6",
-   keys   = { "sourceIPv6Address",
-              "destinationIPv6Address",
-              "protocolIdentifier",
-              "sourceTransportPort",
-              "destinationTransportPort" },
-   values = { "flowStartMilliseconds",
-              "flowEndMilliseconds",
-              "packetDeltaCount",
-              "octetDeltaCount",
-              "tcpControlBitsReduced" }
-}
-
-function v6.extract(pkt, timestamp, entry)
+local function v6_extract (self, pkt, timestamp, entry)
    local md = metadata_get(pkt)
    extract_5_tuple(pkt, timestamp, entry, md, extract_v6_addr)
    if md.proto == IP_PROTO_TCP and md.frag_offset == 0 then
@@ -389,24 +342,72 @@ function v6.extract(pkt, timestamp, entry)
    end
 end
 
-function v6.accumulate(dst, new)
-   accumulate_generic(dst, new)
-   if dst.key.protocolIdentifier == IP_PROTO_TCP then
-      accumulate_tcp_flags_reduced(dst, new)
-   end
-end
-
-function v6.tostring(entry)
-   local ipv6 = require("lib.protocol.ipv6")
-   local key = entry.key
-   local protos =
-      { [IP_PROTO_TCP]='TCP', [IP_PROTO_UDP]='UDP', [IP_PROTO_SCTP]='SCTP' }
-   return string.format(
-      "%s (%d) -> %s (%d) [%s]",
-      ipv6:ntop(key.sourceIPv6Address), key.sourceTransportPort,
-      ipv6:ntop(key.destinationIPv6Address), key.destinationTransportPort,
-      protos[key.protocolIdentifier] or tostring(key.protocolIdentifier))
-end
+templates = {
+   v4 = {
+      id     = 256,
+      filter = "ip",
+      keys   = { "sourceIPv4Address",
+                 "destinationIPv4Address",
+                 "protocolIdentifier",
+                 "sourceTransportPort",
+                 "destinationTransportPort" },
+      values = { "flowStartMilliseconds",
+                 "flowEndMilliseconds",
+                 "packetDeltaCount",
+                 "octetDeltaCount",
+                 "tcpControlBitsReduced" },
+      extract = v4_extract,
+      accumulate = function (self, dst, new)
+         accumulate_generic(dst, new)
+         if dst.key.protocolIdentifier == IP_PROTO_TCP then
+            accumulate_tcp_flags_reduced(dst, new)
+         end
+      end,
+      tostring = function (entry)
+         local ipv4   = require("lib.protocol.ipv4")
+         local key = entry.key
+         local protos =
+            { [IP_PROTO_TCP]='TCP', [IP_PROTO_UDP]='UDP', [IP_PROTO_SCTP]='SCTP' }
+         return string.format(
+            "%s (%d) -> %s (%d) [%s]",
+            ipv4:ntop(key.sourceIPv4Address), key.sourceTransportPort,
+            ipv4:ntop(key.destinationIPv4Address), key.destinationTransportPort,
+            protos[key.protocolIdentifier] or tostring(key.protocolIdentifier))
+      end
+   },
+   v6 = {
+      id     = 512,
+      filter = "ip6",
+      keys   = { "sourceIPv6Address",
+                 "destinationIPv6Address",
+                 "protocolIdentifier",
+                 "sourceTransportPort",
+                 "destinationTransportPort" },
+      values = { "flowStartMilliseconds",
+                 "flowEndMilliseconds",
+                 "packetDeltaCount",
+                 "octetDeltaCount",
+                 "tcpControlBitsReduced" },
+      extract = v6_extract,
+      accumulate = function (self, dst, new)
+         accumulate_generic(dst, new)
+         if dst.key.protocolIdentifier == IP_PROTO_TCP then
+            accumulate_tcp_flags_reduced(dst, new)
+         end
+      end,
+      tostring = function (entry)
+         local ipv6 = require("lib.protocol.ipv6")
+         local key = entry.key
+         local protos =
+            { [IP_PROTO_TCP]='TCP', [IP_PROTO_UDP]='UDP', [IP_PROTO_SCTP]='SCTP' }
+         return string.format(
+            "%s (%d) -> %s (%d) [%s]",
+            ipv6:ntop(key.sourceIPv6Address), key.sourceTransportPort,
+            ipv6:ntop(key.destinationIPv6Address), key.destinationTransportPort,
+            protos[key.protocolIdentifier] or tostring(key.protocolIdentifier))
+      end
+   },
+}
 
 function selftest()
    print('selftest: apps.ipfix.template')

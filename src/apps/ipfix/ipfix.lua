@@ -115,7 +115,25 @@ end
 
 FlowSet = {}
 
-function FlowSet:new (template, args)
+function FlowSet:new (spec, args)
+   local t = {}
+   for s in spec:split(':') do
+      table.insert(t, s)
+   end
+   assert(#t == 1 or #t == 2, "Invalid template specifier: "..spec)
+   local template_name, cache_size = unpack(t)
+   assert(template.templates[template_name],
+          "Undefined template : "..template_name)
+   if cache_size then
+      assert(cache_size:match("^%d+$"),
+             string.format("Invalid cache size for template %s: %s",
+                           template_name, cache_size))
+      args.cache_size = tonumber(cache_size)
+   end
+
+   local template =
+      template.make_template_info(template.templates[template_name])
+   template.name = template_name
    assert(args.active_timeout > args.scan_time,
           string.format("Template #%d: active timeout (%d) "
                            .."must be larger than scan time (%d)",
@@ -199,19 +217,23 @@ function FlowSet:new (template, args)
    return setmetatable(o, { __index = self })
 end
 
+function FlowSet:id()
+   return string.format("%s(#%d)", self.template.name, self.template.id)
+end
+
 function FlowSet:record_flows(timestamp)
    local entry = self.scratch_entry
    timestamp = to_milliseconds(timestamp)
    for i=1,link.nreadable(self.incoming) do
       local pkt = link.receive(self.incoming)
       counter.add(self.shm.packets_in)
-      self.template.extract(pkt, timestamp, entry)
+      self.template:extract(pkt, timestamp, entry)
       packet.free(pkt)
       local lookup_result = self.table:lookup_ptr(entry.key)
       if lookup_result == nil then
          self.table:add(entry.key, entry.value)
       else
-         self.template.accumulate(lookup_result, entry)
+         self.template:accumulate(lookup_result, entry)
       end
    end
 end
@@ -356,7 +378,7 @@ local ipfix_config_params = {
    exporter_eth_dst = { default = '00:00:00:00:00:00' },
    collector_ip = { required = true },
    collector_port = { required = true },
-   templates = { default = { template.v4, template.v6 } }
+   templates = { default = { "v4", "v6" } }
 }
 
 function IPFIX:new(config)
@@ -435,6 +457,7 @@ function IPFIX:new(config)
    o.flow_sets = {}
    for _, template in ipairs(config.templates) do
       table.insert(o.flow_sets, FlowSet:new(template, flow_set_args))
+      print("Added template "..o.flow_sets[#o.flow_sets]:id())
    end
 
    o.stats_timer = lib.throttle(5)
