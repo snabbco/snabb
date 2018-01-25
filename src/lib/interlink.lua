@@ -20,7 +20,6 @@ assert(band(SIZE, SIZE-1) == 0, "SIZE is not a power of two")
 local status = { Locked = 0, Unlocked = 1 }
 
 ffi.cdef([[ struct interlink {
-   char pad0[]]..CACHELINE..[[];
    int read, write, lock;
    char pad1[]]..CACHELINE-3*INT..[[];
    int lwrite, nread;
@@ -28,7 +27,7 @@ ffi.cdef([[ struct interlink {
    int lread, nwrite;
    char pad3[]]..CACHELINE-2*INT..[[];
    struct packet *packets[]]..SIZE..[[];
-}]])
+} __attribute__((packed, aligned(]]..CACHELINE..[[)))]])
 
 function create (name)
    local r = shm.create(name, "struct interlink")
