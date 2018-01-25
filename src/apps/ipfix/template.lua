@@ -14,12 +14,14 @@ local ipv4     = require("lib.protocol.ipv4")
 local metadata = require("apps.rss.metadata")
 local strings  = require("apps.ipfix.strings")
 local dns      = require("apps.ipfix.dns")
+local S        = require("syscall")
 
 local ntohs  = lib.ntohs
 local htonl, htons = lib.htonl, lib.htons
 local function htonq(v) return bit.bswap(v + 0ULL) end
 local metadata_get = metadata.get
 local ether_header_ptr_t = metadata.ether_header_ptr_t
+local log_pid = string.format("[%5d]", S.getpid())
 
 local function ptr_to(ctype) return ffi.typeof('$*', ctype) end
 
@@ -212,7 +214,8 @@ function make_template_info(spec)
             record_ptr_t = ptr_to(record_t),
             swap_fn = gen_swap_fn(),
             match = pf.compile_filter(spec.filter),
-            logger = lib.logger_new({ module = "IPFIX template #"..spec.id }),
+            logger = lib.logger_new({module = log_pid
+                                        .." IPFIX template #"..spec.id }),
             counters = spec.counters,
             counters_names = counters_names,
             extract = spec.extract,

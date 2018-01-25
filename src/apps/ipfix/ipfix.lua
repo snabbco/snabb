@@ -24,7 +24,7 @@ local ctable   = require("lib.ctable")
 local C        = ffi.C
 
 local htonl, htons = lib.htonl, lib.htons
-local metadata_add = metadata.add
+local metadata_add, metadata_get = metadata.add, metadata.get
 
 local debug = lib.getenv("FLOW_EXPORT_DEBUG")
 
@@ -206,7 +206,8 @@ function FlowSet:new (spec, args)
    o.incoming_link_name, o.incoming = new_internal_link('IPFIX incoming')
 
    -- Generic per-template counters
-   o.shm = shm.create_frame("templates/"..template.id,
+   local shm_name = "ipfix_templates/"..args.instance.."/"..template.id
+   o.shm = shm.create_frame(shm_name,
                             {  packets_in = { counter },
                                flow_export_packets = { counter },
                                exported_flows = { counter },
@@ -222,7 +223,7 @@ function FlowSet:new (spec, args)
          conf[name] = { counter, 0 }
       end
       o.shm_template =
-         shm.create_frame("templates/"..template.id.."/stats", conf)
+         shm.create_frame(shm_name.."/stats", conf)
    end
    return setmetatable(o, { __index = self })
 end
@@ -390,7 +391,11 @@ local ipfix_config_params = {
    collector_port = { required = true },
    templates = { default = { "v4", "v6" } },
    maps = { default = {} },
-   maps_log_fh = { default = nil }
+   maps_log_fh = { default = nil },
+   -- Used to distinguish instances of the app running in the same
+   -- process
+   instance = { default = 1 },
+   add_packet_metadata = { default = true }
 }
 
 local function setup_transport_header(self, config)
@@ -428,7 +433,9 @@ function IPFIX:new(config)
                template_refresh_interval = config.template_refresh_interval,
                next_template_refresh = -1,
                version = config.ipfix_version,
-               observation_domain = config.observation_domain }
+               observation_domain = config.observation_domain,
+               instance = config.instance,
+               add_packet_metadata = config.add_packet_metadata }
    o.shm = {
       -- Total number of packets received
       received_packets = { counter },
@@ -469,7 +476,9 @@ function IPFIX:new(config)
                            flush_timeout = config.flush_timeout,
                            parent = o,
                            maps = config.maps,
-                           maps_log_fh = config.maps_log_fh }
+                           maps_log_fh = config.maps_log_fh,
+                           instance = config.instance }
+
    o.flow_sets = {}
    for _, template in ipairs(config.templates) do
       table.insert(o.flow_sets, FlowSet:new(template, flow_set_args))
@@ -556,10 +565,19 @@ function IPFIX:push()
    local flow_sets = self.flow_sets
    local nreadable = link.nreadable(input)
    counter.add(self.shm.received_packets, nreadable)
+
+   if self.add_packet_metadata then
+      for _ = 1, nreadable do
+         local p = link.receive(input)
+         metadata_add(p)
+         link.transmit(input, p)
+      end
+   end
+
    for _,set in ipairs(flow_sets) do
       for _ = 1, nreadable do
          local p = link.receive(input)
-         local md = metadata_add(p)
+         local md = metadata_get(p)
          if set.match(md.filter_start, md.filter_length) then
             link.transmit(set.incoming, p)
          else

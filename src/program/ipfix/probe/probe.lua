@@ -2,78 +2,7 @@
 
 module(..., package.seeall)
 
-local now      = require("core.app").now
-local lib      = require("core.lib")
-local link     = require("core.link")
-local shm      = require("core.shm")
-local counter  = require("core.counter")
-local basic    = require("apps.basic.basic_apps")
-local arp      = require("apps.ipv4.arp")
-local ipfix    = require("apps.ipfix.ipfix")
-local pci      = require("lib.hardware.pci")
-local ipv4     = require("lib.protocol.ipv4")
-local ethernet = require("lib.protocol.ethernet")
-local macaddress = require("lib.macaddress")
-local numa     = require("lib.numa")
-local S        = require("syscall")
-
--- apps that can be used as an input or output for the exporter
-local in_apps, out_apps = {}, {}
-
-local function parse_spec (spec, delimiter)
-   local t = {}
-   for s in spec:split(delimiter or ':') do
-      table.insert(t, s)
-   end
-   return t
-end
-
-function in_apps.pcap (path)
-   return { input = "input",
-            output = "output" },
-          { require("apps.pcap.pcap").PcapReader, path }
-end
-
-function out_apps.pcap (path)
-   return { input = "input",
-            output = "output" },
-          { require("apps.pcap.pcap").PcapWriter, path }
-end
-
-function out_apps.tap_routed (device)
-   return { input = "input",
-            output = "output" },
-          { require("apps.tap.tap").Tap, { name = device } }
-end
-
-function in_apps.raw (device)
-   return { input = "rx",
-            output = "tx" },
-          { require("apps.socket.raw").RawSocket, device }
-end
-out_apps.raw = in_apps.raw
-
-function in_apps.tap (device)
-   return { input = "input",
-            output = "output" },
-          { require("apps.tap.tap").Tap, device }
-end
-out_apps.tap = in_apps.tap
-
-function in_apps.pci (spec)
-   local device, rxq = unpack(parse_spec(spec, '/'))
-   local device_info = pci.device_info(device)
-   local conf = { pciaddr = device }
-   if device_info.driver == 'apps.intel_mp.intel_mp' then
-      local rxq = (rxq and tonumber(rxq)) or 0
-      conf.rxq = rxq
-      conf.rxcounter = rxq
-      conf.ring_buffer_size = 32768
-   end
-   return { input = device_info.rx, output = device_info.tx },
-          { require(device_info.driver).driver, conf }
-end
-out_apps.pci = in_apps.pci
+local lib   = require("core.lib")
 
 local long_opts = {
    help = "h",
@@ -105,8 +34,7 @@ local long_opts = {
 function run (args)
    local duration
    local busywait = false
-   local traceprofiling = false
-   local jit_opts = {}
+   local jit = { opts = {} }
 
    local input_type, output_type = "pci", "pci"
 
@@ -122,7 +50,7 @@ function run (args)
    local ipfix_version = 10
    local templates = {}
    local maps = {}
-   local maps_log_fh
+   local maps_logfile
 
    local pfx_to_as, vlan_to_ifindex, mac_to_as
 
@@ -138,11 +66,9 @@ function run (args)
          duration = assert(tonumber(arg), "expected number for duration")
       end,
       i = function (arg)
-         assert(in_apps[arg], "unknown input type")
          input_type = arg
       end,
       o = function (arg)
-         assert(out_apps[arg], "unknown output type")
          output_type = arg
       end,
       p = function (arg)
@@ -205,7 +131,7 @@ function run (args)
       end,
       ["maps-log"] = function (arg)
          if arg then
-            maps_log_fh = assert(io.open(arg, "a"))
+            maps_logfile = arg
          end
       end,
       ipfix = function (arg)
@@ -226,22 +152,20 @@ function run (args)
          if arg:match("^v") then
             local file = arg:match("^v=(.*)")
             if file == '' then file = nil end
-            require("jit.v").start(file)
+            jit.v = file
          elseif arg:match("^p") then
             local opts, file = arg:match("^p=([^,]*),?(.*)")
             if file == '' then file = nil end
-            require("jit.p").start(opts, file)
-            profiling = true
+            jit.p = { opts, file }
          elseif arg:match("^dump") then
             local opts, file = arg:match("^dump=([^,]*),?(.*)")
             if file == '' then file = nil end
-            require("jit.dump").on(opts, file)
+            jit.dump = { opts, file }
          elseif arg:match("^opt") then
             local opt = arg:match("^opt=(.*)")
-            table.insert(jit_opts, opt)
+            table.insert(jit.opts, opt)
          elseif arg:match("^tprof") then
-            require("lib.traceprof.traceprof").start()
-            traceprofiling = true
+            jit.traceprof = true
          end
       end
    }
@@ -255,107 +179,34 @@ function run (args)
       table.insert(args, 'v6')
    end
 
-   local in_link, in_app   = in_apps[input_type](args[1])
-   local out_link, out_app = out_apps[output_type](args[2])
+   local input, output = args[1], args[2]
 
    for i = 3, #args do
       table.insert(templates, args[i])
    end
 
-   local arp_config    = { self_mac = host_mac and ethernet:pton(host_mac),
-                           self_ip = ipv4:pton(host_ip),
-                           next_ip = ipv4:pton(collector_ip) }
-   local function mk_ipfix_config()
-      return { active_timeout = active_timeout,
-               idle_timeout = idle_timeout,
-               flush_timeout = flush_timeout,
-               cache_size = cache_size,
-               scan_time = scan_time,
-               observation_domain = observation_domain,
-               template_refresh_interval = template_refresh_interval,
-               ipfix_version = ipfix_version,
-               exporter_ip = host_ip,
-               collector_ip = collector_ip,
-               collector_port = port,
-               mtu = mtu - 14,
-               templates = templates,
-               maps = maps,
-               maps_log_fh = maps_log_fh }
-   end
-   local ipfix_config = mk_ipfix_config()
-   if output_type == "tap_routed" then
-      tap_config = out_app[2]
-      tap_config.mtu = mtu
-   end
-   local c = config.new()
+   local probe_config = {
+      active_timeout = active_timeout,
+      idle_timeout = idle_timeout,
+      flush_timeout = flush_timeout,
+      cache_size = cache_size,
+      scan_time = scan_time,
+      observation_domain = observation_domain,
+      template_refresh_interval = template_refresh_interval,
+      ipfix_version = ipfix_version,
+      exporter_ip = host_ip,
+      exporter_mac = host_mac,
+      collector_ip = collector_ip,
+      collector_port = port,
+      mtu = mtu,
+      templates = templates,
+      maps = maps,
+      maps_logfile = maps_logfile,
+      output_type = output_type,
+      output = output,
+      input_type = input_type,
+      input = input
+   }
 
-   config.app(c, "in", unpack(in_app))
-   config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
-   config.app(c, "out", unpack(out_app))
-
-   -- use ARP for link-layer concerns unless the output is connected
-   -- to a pcap writer
-   if output_type ~= "pcap" and output_type ~= "tap_routed" then
-      config.app(c, "arp", arp.ARP, arp_config)
-      config.app(c, "sink", basic.Sink)
-
-      config.link(c, "in." .. in_link.output .. " -> ipfix.input")
-      config.link(c, "out." .. out_link.output .. " -> arp.south")
-
-      -- with UDP, ipfix doesn't need to handle packets from the collector
-      config.link(c, "arp.north -> sink.input")
-
-      config.link(c, "ipfix.output -> arp.north")
-      config.link(c, "arp.south -> out." .. out_link.input)
-   else
-      config.link(c, "in." .. in_link.output .. " -> ipfix.input")
-      config.link(c, "ipfix.output -> out." .. out_link.input)
-      config.app(c, "sink", basic.Sink)
-      config.link(c, "out." .. out_link.output .. " -> sink.input")
-   end
-
-   local done
-   if not duration and input_type == "pcap" then
-      done = function ()
-         return engine.app_table['in'].done
-      end
-   end
-
-   local t1 = now()
-   if cpu then numa.bind_to_cpu(cpu) end
-
-   engine.configure(c)
-
-   if output_type == "tap_routed" then
-      local tap_config = out_app[2]
-      local name = tap_config.name
-      local tap_sysctl_base = "net/ipv4/conf/"..name
-      assert(S.sysctl(tap_sysctl_base.."/rp_filter", '0'))
-      assert(S.sysctl(tap_sysctl_base.."/accept_local", '1'))
-      assert(S.sysctl(tap_sysctl_base.."/forwarding", '1'))
-      local export_stats = engine.app_table.out.shm
-      local ipfix_config = mk_ipfix_config()
-      ipfix_config.exporter_eth_dst =
-         tostring(macaddress:new(counter.read(export_stats.macaddr)))
-      config.app(c, "ipfix", ipfix.IPFIX, ipfix_config)
-      engine.configure(c)
-   end
-   engine.busywait = busywait
-   if #jit_opts then
-      require("jit.opt").start(unpack(jit_opts))
-   end
-   engine.main({ duration = duration, done = done, measure_latency = false })
-   if traceprofiling then
-      require("lib.traceprof.traceprof").stop()
-   end
-
-   local t2 = now()
-   local stats = link.stats(engine.app_table.ipfix.input.input)
-   print("IPFIX probe stats:")
-   local comma = lib.comma_value
-   print(string.format("bytes: %s packets: %s bps: %s Mpps: %s",
-                       comma(stats.rxbytes),
-                       comma(stats.rxpackets),
-                       comma(math.floor((stats.rxbytes * 8) / (t2 - t1))),
-                       comma(stats.rxpackets / ((t2 - t1) * 1000000))))
+   require("program.ipfix.lib").run(probe_config, duration, busywait, cpu, jit)
 end
