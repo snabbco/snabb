@@ -11,7 +11,7 @@ local lib      = require("core.lib")
 local counter  = require("core.counter")
 local ethernet = require("lib.protocol.ethernet")
 local ipv4     = require("lib.protocol.ipv4")
-local metadata = require("apps.ipfix.packet_metadata")
+local metadata = require("apps.rss.metadata")
 local strings  = require("apps.ipfix.strings")
 local dns      = require("apps.ipfix.dns")
 
