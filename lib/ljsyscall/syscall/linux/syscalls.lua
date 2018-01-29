@@ -487,10 +487,11 @@ end
 
 function S.get_mempolicy(mode, mask, addr, flags)
   mode = mode or t.int1()
-  mask = mktype(t.bitmask, mask)
-  -- Size should be at least equals to maxnumnodes.
-  local size = ffi.cast("uint64_t", math.max(tonumber(mask.size), get_maxnumnodes()))
-  local ret, err = C.get_mempolicy(mode, mask.mask, size, addr or 0, c.MPOL_FLAG[flags])
+  if not ffi.istype(t.bitmask, mask) then
+     mask = t.bitmask:__new(mask, get_maxnumnodes())
+  end
+  local ret, err = C.get_mempolicy(
+     mode, mask.mask, mask.size, addr or 0, c.MPOL_FLAG[flags])
   if ret == -1 then return nil, t.error(err or errno()) end
   return { mode=mode[0], mask=mask }
 end
