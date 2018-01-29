@@ -128,9 +128,6 @@ function prevent_preemption(priority)
 end
 
 function selftest ()
-   if not has_numa() then
-      os.exit(engine.test_skipped_code)
-   end
 
    function test_cpu(cpu)
       local node = cpu_get_numa_node(cpu)
