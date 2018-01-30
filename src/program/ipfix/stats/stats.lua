@@ -3,6 +3,7 @@ module(..., package.seeall)
 local shm = require("core.shm")
 local counter = require("core.counter")
 local lib = require("core.lib")
+local S = require("syscall")
 
 local pretty = true
 local function comma_value(value)
@@ -57,6 +58,61 @@ local function pci_stats(indent, path)
    end
 end
 
+local function ipfix_info(pid)
+   local path = '/'..pid
+   local link, err = S.readlink(shm.root.."/"..shm.resolve(path..'/group'))
+   if err then
+      return { pid = pid }
+   end
+   local ppid = tonumber(link:match("/(%d+)/group$"))
+   local link
+   for _, name in ipairs(shm.children(path
+                                      .."/interlink/receiver")) do
+      link = name:match("(.*).interlink")
+      break
+   end
+   return { pid = pid, ppid = ppid, link = link }
+end
+
+local function rss_info(pid)
+   local path = '/'..pid
+   local interlinks = {}
+   if shm.exists(path..'/interlink') then
+      for _, name in ipairs(shm.children(path
+                                         .."/interlink/transmitter")) do
+         local link = name:match("(.*).interlink")
+         interlinks[link] = true
+      end
+   end
+   local receivers = {}
+   for _, link in ipairs(shm.children(path..'/links')) do
+      repeat
+         if not link:match("^rss%.") then break end
+         local id, type
+         local receiver = link:match(".* -> +([%w_]+)%.")
+         if interlinks[receiver] then
+            -- Receiver is connected through a
+            -- multi-process link
+            type = 'interlink'
+            -- Will be translated into a process ID later
+            id = receiver
+         else
+            -- Receiver is running in the same process
+            type = 'instance'
+            id = tonumber(receiver:match("ipfix(%d+)"))
+         end
+         table.insert(receivers,
+                      { id = id, type = type, link = link })
+      until true
+   end
+   return { pid = pid, receivers = receivers }
+end
+
+local function usage()
+   print(require("program.ipfix.stats.README_inc"))
+   main.exit(0)
+end
+
 local long_opts = {
    help = "h",
 }
@@ -64,8 +120,7 @@ local long_opts = {
 function run (args)
    local opt = {
       h = function (arg)
-         print(require("program.ipfix.stats.README_inc"))
-         main.exit(0)
+         usage()
       end,
       n = function (arg)
          pretty = false
@@ -74,55 +129,59 @@ function run (args)
    args = lib.dogetopt(args, opt, "hn", long_opts)
 
    local pids = {}
-   local rss = {}
    if #args == 0 then
       for _, pid in ipairs(shm.children('/')) do
          if tonumber(pid) then
-            for _, dir in ipairs(shm.children('/'..pid)) do
-               if dir == 'ipfix_templates' then
-                  table.insert(pids, tonumber(pid))
-                  break
-               end
-            end
-            for _, dir in ipairs(shm.children('/'..pid..'/apps')) do
-               if dir == 'rss' then
-                  local receivers = {}
-                  for _, link in ipairs(shm.children('/'..pid..'/links')) do
-                     repeat
-                        if not link:match("^rss%..* -> +ipfix") then break end
-                        local receiver = link:match(".* -> +([%w_]+)%.")
-                        local id, type
-                        if receiver:match("^ipfixmp") then
-                           -- Receiver is connected through a
-                           -- multi-process link
-                           id = receiver:match("ipfixmp(%d+)")
-                           type = 'pid'
-                        else
-                           -- Receiver is running in the same process
-                           id = receiver:match("ipfix(%d+)")
-                           type = 'instance'
-                        end
-                        table.insert(receivers,
-                                     { id = id, type = type, link = link })
-                     until true
-                  end
-                  table.insert(rss, { pid = tonumber(pid),
-                                      receivers = receivers })
-               end
-            end
+            table.insert(pids, pid)
          end
       end
    else
       pids = args
    end
 
-   if #pids == 0 then
+   local ipfix = {}
+   local rss = {}
+
+   for _, pid in ipairs(pids) do
+      for _, dir in ipairs(shm.children('/'..pid)) do
+         if dir == 'ipfix_templates' then
+            table.insert(ipfix, ipfix_info(tonumber(pid)))
+            break
+         end
+      end
+      for _, dir in ipairs(shm.children('/'..pid..'/apps')) do
+         if dir == 'rss' then
+            table.insert(rss, rss_info(tonumber(pid)))
+         end
+      end
+   end
+
+   if #ipfix == 0 then
       print("No IPFIX processes found")
       os.exit(0)
    end
 
-   table.sort(pids)
-   table.sort(rss, function (a, b) return a.pid < b.pid end)
+   local function by_pid(a, b)
+      return a.pid < b.pid
+   end
+   table.sort(ipfix, by_pid)
+   table.sort(rss, by_pid)
+
+   -- Get PIDs of interlink receivers
+   local function pid_from_link(link, ppid)
+      for _, ipfix in ipairs(ipfix) do
+         if ipfix.ppid == ppid and ipfix.link == link then
+            return ipfix.pid
+         end
+      end
+   end
+   for _, rss in ipairs(rss) do
+      for _, r in ipairs(rss.receivers) do
+         if r.type == "interlink" then
+            r.id = pid_from_link(r.id, rss.pid)
+         end
+      end
+   end
 
    for _, rss in ipairs(rss) do
       print()
@@ -132,7 +191,7 @@ function run (args)
       format(2, "IPFIX receivers")
       table.sort(rss.receivers, function (a, b) return a.id < b.id end)
       for _, rcv in ipairs(rss.receivers) do
-         if rcv.type == 'pid' then
+         if rcv.type == 'interlink' then
             format(4, "Process #%d", rcv.id)
          else
             format(4, "Embedded instance #%d", rcv.id)
@@ -148,10 +207,10 @@ function run (args)
       end
    end
 
-   for _, pid in ipairs(pids) do
+   for _, ipfix in ipairs(ipfix) do
       print()
-      format(0, "IPFIX process #%d", pid)
-      local base_path = "/"..pid
+      format(0, "IPFIX process #%d", ipfix.pid)
+      local base_path = "/"..ipfix.pid
 
       if #rss == 0 then
          pci_stats(2, base_path)

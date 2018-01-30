@@ -12,7 +12,6 @@ local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
 local macaddress = require("lib.macaddress")
 local S          = require("syscall")
-local interlink  = require("lib.interlink")
 local basic      = require("apps.basic.basic_apps")
 local arp        = require("apps.ipv4.arp")
 local ipfix      = require("apps.ipfix.ipfix")
@@ -64,7 +63,7 @@ out_apps.tap = in_apps.tap
 function in_apps.interlink (name)
    return { input = nil,
             output = "output" },
-   { require("apps.interlink.receiver"), { name = name, create = true } }
+   { require("apps.interlink.receiver"), {} }
 end
 
 function in_apps.pci (spec)
@@ -144,7 +143,8 @@ function configure_graph (arg, in_graph)
                mtu = config.mtu - 14,
                templates = config.templates,
                maps = config.maps,
-               maps_log_fh = assert(io.open(config.maps_logfile, "a")),
+               maps_log_fh = config.maps_logfile and
+                  assert(io.open(config.maps_logfile, "a")) or nil,
                instance = config.instance,
                add_packet_metadata = config.add_packet_metadata }
    end
@@ -156,8 +156,12 @@ function configure_graph (arg, in_graph)
 
    local graph = in_graph or app_graph.new()
    if config.input then
-      app_graph.app(graph, "in", unpack(in_app))
-      app_graph.link(graph, "in." .. in_link.output .. " -> "
+      local in_name = "in"
+      if config.input_type == "interlink" then
+         in_name = config.input
+      end
+      app_graph.app(graph, in_name, unpack(in_app))
+      app_graph.link(graph, in_name ..".".. in_link.output .. " -> "
                         ..ipfix_name..".input")
    end
    app_graph.app(graph, ipfix_name, ipfix.IPFIX, ipfix_config)
