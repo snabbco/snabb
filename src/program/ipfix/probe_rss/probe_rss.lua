@@ -78,7 +78,14 @@ function run (parameters)
    if duration ~= 0 then engine_opts.duration = duration end
 
    local probe_config = assert(loadfile(file))()
-   engine.configure(create_app_graph(probe_config, busywait))
+   local graph, in_app_specs = create_app_graph(probe_config, busywait)
+   engine.configure(graph)
+
+   for _, spec in ipairs(in_app_specs) do
+      probe.create_ifmib(engine.app_table[spec.name].stats,
+                         spec.ifname, spec.ifalias)
+   end
+
    jit.flush()
    engine.busywait = busywait
    engine.main(engine_opts)
@@ -99,6 +106,8 @@ local main_config = {
 }
 local interface_config = {
    device = { required = true },
+   name = { default = nil},
+   description = { default = nil },
    tag = { default = nil },
    config = { default = {} }
 }
@@ -183,12 +192,19 @@ function create_app_graph (probe_config, busywait)
                  main.rss)
 
    local tags = {}
+   local in_app_specs = {}
    for i, interface in ipairs(main.interfaces) do
       local interface = lib.parse(interface, interface_config)
       local suffix = #main.interfaces > 1 and i or ''
       local input_name = "input"..suffix
       local device_info = pci.device_info(interface.device)
       interface.config.pciaddr = interface.device
+      table.insert(in_app_specs,
+                   { pciaddr = interface.device,
+                     name = input_name,
+                     ifname = interface.name or
+                        (interface.device:gsub("[:%.]", "_")),
+                     ifalias = interface.description })
       app_graph.app(graph, input_name,
                     require(device_info.driver).driver,
                     interface.config)
@@ -245,7 +261,7 @@ function create_app_graph (probe_config, busywait)
          config.observation_domain = od
          config.output = "ipfixexport"..od
          if exporter.maps_log_dir then
-            config.maps_log_file =
+            config.maps_logfile =
                exporter.maps_log_dir.."/"..od..".log"
          end
          if instance.embed then
@@ -276,5 +292,6 @@ function create_app_graph (probe_config, busywait)
          end
       end
    end
-   return graph
+
+   return graph, in_app_specs
 end

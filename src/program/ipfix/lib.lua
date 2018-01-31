@@ -16,6 +16,9 @@ local basic      = require("apps.basic.basic_apps")
 local arp        = require("apps.ipv4.arp")
 local ipfix      = require("apps.ipfix.ipfix")
 local template   = require("apps.ipfix.template")
+local ifmib      = require("lib.ipc.shmem.iftable_mib")
+
+local ifmib_dir = '/ifmib'
 
 -- apps that can be used as an input or output for the exporter
 local in_apps, out_apps = {}, {}
@@ -80,6 +83,20 @@ function in_apps.pci (spec)
           { require(device_info.driver).driver, conf }
 end
 out_apps.pci = in_apps.pci
+
+function create_ifmib(stats, ifname, ifalias)
+   -- stats can be nil in case this process is not the master
+   -- of the device
+   if not stats then return end
+   if not shm.exists(ifmib_dir) then
+      shm.mkdir(ifmib_dir)
+   end
+   ifmib.init_snmp( { ifDescr = ifname,
+                      ifName = ifname,
+                      ifAlias = ifalias or "NetFlow input", },
+      ifname:gsub('/', '-'), stats,
+      shm.root..ifmib_dir, 5)
+end
 
 probe_config = {
    -- Probe-specific
@@ -197,6 +214,11 @@ function configure_graph (arg, in_graph)
    end
 
    engine.configure(graph)
+
+   if config.input_type and config.input_type == "pci" then
+      local pciaddr = unpack(parse_spec(config.input, '/'))
+      create_ifmib(engine.app_table['in'].stats, (pciaddr:gsub("[:%.]", "_")))
+   end
 
    if config.output_type == "tap_routed" then
       local tap_config = out_app[2]
