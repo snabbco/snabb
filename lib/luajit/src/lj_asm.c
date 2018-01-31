@@ -895,7 +895,7 @@ static uint32_t ir_khash(IRIns *ir)
   } else {
     lua_assert(irt_isgcv(ir->t));
     lo = u32ptr(ir_kgc(ir));
-    hi = lo + HASH_BIAS;
+    hi = (uint32_t)(u64ptr(ir_kgc(ir)) >> 32) | (irt_toitype(ir->t) << 15);
   }
   return hashrot(lo, hi);
 }
@@ -989,7 +989,7 @@ static void asm_bufput(ASMState *as, IRIns *ir)
   const CCallInfo *ci = &lj_ir_callinfo[IRCALL_lj_buf_putstr];
   IRRef args[3];
   IRIns *irs;
-  int kchar = -1;
+  int kchar = -129;
   args[0] = ir->op1;  /* SBuf * */
   args[1] = ir->op2;  /* GCstr * */
   irs = IR(ir->op2);
@@ -997,7 +997,7 @@ static void asm_bufput(ASMState *as, IRIns *ir)
   if (irs->o == IR_KGC) {
     GCstr *s = ir_kstr(irs);
     if (s->len == 1) {  /* Optimize put of single-char string constant. */
-      kchar = strdata(s)[0];
+      kchar = (int8_t)strdata(s)[0];  /* Signed! */
       args[1] = ASMREF_TMP1;  /* int, truncated to char */
       ci = &lj_ir_callinfo[IRCALL_lj_buf_putchar];
     }
@@ -1024,7 +1024,7 @@ static void asm_bufput(ASMState *as, IRIns *ir)
   asm_gencall(as, ci, args);
   if (args[1] == ASMREF_TMP1) {
     Reg tmp = ra_releasetmp(as, ASMREF_TMP1);
-    if (kchar == -1)
+    if (kchar == -129)
       asm_tvptr(as, tmp, irs->op1);
     else
       ra_allockreg(as, kchar, tmp);
@@ -1798,6 +1798,7 @@ static void asm_setup_regsp(ASMState *as)
   for (ir = IR(T->nk), lastir = IR(REF_BASE); ir < lastir; ir++) {
     ir->prev = REGSP_INIT;
     if (irt_is64(ir->t) && ir->o != IR_KNULL) {
+      /* The false-positive of irt_is64() for ASMREF_L (REF_NIL) is OK here. */
       ir->i = 0;  /* Will become non-zero only for RIP-relative addresses. */
       ir++;
     }

@@ -32,23 +32,9 @@ static struct {
   struct sigaction oldsa;
 } state;
 
-/* -- State that the application can manage via FFI ----------------------- */
+static int started;
 
 static VMProfile *profile;      /* Current counters */
-
-/* How much memory to allocate for profiler counters. */
-int vmprofile_get_profile_size() {
-  return sizeof(VMProfile);
-}
-
-/* Set the memory where the next samples will be counted. 
-   Size of the memory must match vmprofile_get_profile_size(). */
-void vmprofile_set_profile(void *counters) {
-  profile = (VMProfile*)counters;
-  profile->magic = 0x1d50f007;
-  profile->major = 4;
-  profile->minor = 0;
-}
 
 /* -- Signal handler ------------------------------------------------------ */
 
@@ -118,23 +104,64 @@ static void stop_timer()
   sigaction(SIGPROF, NULL, &state.oldsa);
 }
 
-/* -- Lua API ------------------------------------------------------------- */
+/* -- State that the application can manage via FFI ----------------------- */
 
-LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str)
+/* How much memory to allocate for profiler counters. */
+int vmprofile_get_profile_size() {
+  return sizeof(VMProfile);
+}
+
+/* Open a counter file on disk and returned the mmapped data structure. */
+void *vmprofile_open_file(const char *filename)
 {
   int fd;
-  void *ptr;
-  if (((fd = open(str, O_RDWR|O_CREAT, 0666)) != -1) &&
+  void *ptr = MAP_FAILED;
+  if (((fd = open(filename, O_RDWR|O_CREAT, 0666)) != -1) &&
       ((ftruncate(fd, sizeof(VMProfile))) != -1) &&
       ((ptr = mmap(NULL, sizeof(VMProfile), PROT_READ|PROT_WRITE,
                    MAP_SHARED, fd, 0)) != MAP_FAILED)) {
     memset(ptr, 0, sizeof(VMProfile));
+  }
+  if (fd != -1) close(fd);
+  return ptr == MAP_FAILED ? NULL : ptr;
+}
+
+/* Set the memory where the next samples will be counted. 
+   Size of the memory must match vmprofile_get_profile_size(). */
+void vmprofile_set_profile(void *counters) {
+  profile = (VMProfile*)counters;
+  profile->magic = 0x1d50f007;
+  profile->major = 4;
+  profile->minor = 0;
+}
+
+void vmprofile_start(lua_State *L)
+{
+  if (!started) {
+    memset(&state, 0, sizeof(state));
+    state.g = G(L);
+    start_timer(1);               /* Sample every 1ms */
+    started = 1;
+  }
+}
+
+void vmprofile_stop()
+{
+  stop_timer();
+  started = 0;
+}
+
+/* -- Lua API ------------------------------------------------------------- */
+
+LUA_API int luaJIT_vmprofile_open(lua_State *L, const char *str, int noselect, int nostart)
+{
+  void *ptr;
+  if ((ptr = vmprofile_open_file(str)) != NULL) {
     setlightudV(L->base, checklightudptr(L, ptr));
+    if (!noselect) vmprofile_set_profile(ptr);
+    if (!nostart) vmprofile_start(L);
   } else {
     setnilV(L->base);
-  }
-  if (fd != -1) {
-    close(fd);
   }
   return 1;
 }
@@ -154,15 +181,13 @@ LUA_API int luaJIT_vmprofile_select(lua_State *L, void *ud)
 
 LUA_API int luaJIT_vmprofile_start(lua_State *L)
 {
-  memset(&state, 0, sizeof(state));
-  state.g = G(L);
-  start_timer(1);               /* Sample every 1ms */
+  vmprofile_start(L);
   return 0;
 }
 
 LUA_API int luaJIT_vmprofile_stop(lua_State *L)
 {
-  stop_timer();
+  vmprofile_stop();
   return 0;
 }
 

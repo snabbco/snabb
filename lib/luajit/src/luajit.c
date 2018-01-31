@@ -16,6 +16,7 @@
 #include "lauxlib.h"
 #include "lualib.h"
 #include "luajit.h"
+#include "lj_vmprofile.h"
 
 #include "lj_arch.h"
 #include "lj_auditlog.h"
@@ -57,6 +58,7 @@ static void print_usage(void)
   "  -j cmd    Perform LuaJIT control command.\n"
   "  -O[opt]   Control LuaJIT optimizations.\n"
   "  -i        Enter interactive mode after executing " LUA_QL("script") ".\n"
+  "  -p file   Enable trace profiling to a VMProfile file.\n"
   "  -v        Show version information.\n"
   "  -E        Ignore environment variables.\n"
   "  -a path   Enable auditlog at path.\n"
@@ -407,6 +409,7 @@ static int collectargs(char **argv, int *flags)
     case 'a':  /* RaptorJIT extension */
     case 'j':  /* LuaJIT extension */
     case 'l':
+    case 'p':  /* RaptorJIT extension */
       *flags |= FLAGS_OPTION;
       if (argv[i][2] == '\0') {
 	i++;
@@ -468,6 +471,15 @@ static int runargs(lua_State *L, char **argv, int argn)
       if (!lj_auditlog_open(argv[++i])) {
         fprintf(stderr, "unable to open auditlog\n");
         fflush(stderr);
+      }
+    case 'p': {
+      char *filename = argv[++i];
+      luaJIT_vmprofile_open(L, filename, 0, 0);
+      if (lua_isnil(L, -1)) {
+        fprintf(stderr, "unable to open vmprofile: %s\n", filename);
+        fflush(stderr);
+      }
+      break;
       }
     default: break;
     }
