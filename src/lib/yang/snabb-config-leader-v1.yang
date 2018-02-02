@@ -2,10 +2,16 @@ module snabb-config-leader-v1 {
   namespace snabb:config-leader;
   prefix config-leader;
 
+  import ietf-alarms { prefix al; }
+
   organization "Igalia, S.L.";
   contact "Andy Wingo <wingo@igalia.com>";
   description
    "RPC interface for ConfigLeader Snabb app.";
+
+  revision 2017-09-28 {
+    description "Add default display schema for describe.";
+  }
 
   revision 2016-12-20 {
     description "Add basic error reporting.";
@@ -24,6 +30,7 @@ module snabb-config-leader-v1 {
   rpc describe {
     output {
       leaf native-schema { type string; mandatory true; }
+      leaf default-schema { type string; mandatory true; }
       leaf-list alternate-schema { type string; }
       list capability {
         key module;
@@ -33,11 +40,24 @@ module snabb-config-leader-v1 {
     }
   }
 
+  rpc get-schema {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+    }
+    output {
+      uses error-reporting;
+      leaf source { type string; }
+    }
+  }
+
   rpc get-config {
     input {
       leaf schema { type string; mandatory true; }
       leaf revision { type string; }
       leaf path { type string; default "/"; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
     }
     output {
       uses error-reporting;
@@ -85,6 +105,22 @@ module snabb-config-leader-v1 {
       leaf schema { type string; mandatory true; }
       leaf revision { type string; }
       leaf path { type string; default "/"; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
+    }
+    output {
+      uses error-reporting;
+      leaf state { type string; }
+    }
+  }
+
+  rpc get-alarms-state {
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf path { type string; default "/"; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
     }
     output {
       uses error-reporting;
@@ -101,4 +137,108 @@ module snabb-config-leader-v1 {
       uses error-reporting;
     }
   }
+
+  rpc set-alarm-operator-state {
+    description
+      "This is a means for the operator to indicate
+       the level of human intervention on an alarm.";
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
+      leaf resource { type string; mandatory true; }
+      leaf alarm-type-id { type string; mandatory true; }
+      leaf alarm-type-qualifier { type string; mandatory true; }
+      leaf state { type al:operator-state; mandatory true; }
+      leaf text { type string; description "Additional optional textual information."; }
+    }
+    output {
+      uses error-reporting;
+      leaf success { type boolean; description "True if operation succeeded."; }
+    }
+  }
+
+  grouping filter-input {
+      description
+          "Grouping to specify a filter construct on alarm information.";
+      leaf alarm-status {
+        type string;
+        mandatory true;
+        description
+          "The clearance status of the alarm.";
+      }
+      leaf older-than {
+        type string;
+        description "Matches the 'last-status-change' leaf in the alarm.";
+      }
+      leaf severity {
+        type string;
+        description "Filter based on severity.";
+      }
+      leaf operator-state-filter {
+        type string;
+        description "Filter based on operator state.";
+      }
+  }
+
+  rpc purge-alarms {
+    description
+      "This operation requests the server to delete entries from the
+      alarm list according to the supplied criteria.  Typically it
+      can be used to delete alarms that are in closed operator state
+      and older than a specified time.  The number of purged alarms
+      is returned as an output parameter";
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
+      uses filter-input;
+    }
+    output {
+      uses error-reporting;
+      leaf purged-alarms {
+        type uint32;
+        description "Number of purged alarms.";
+      }
+    }
+  }
+
+  rpc compress-alarms {
+    description
+      "This operation requests the server to compress entries in the
+       alarm list by removing all but the latest state change for all
+       alarms.  Conditions in the input are logically ANDed.  If no
+       input condition is given, all alarms are compressed.";
+    input {
+      leaf schema { type string; mandatory true; }
+      leaf revision { type string; }
+      leaf print-default { type boolean; }
+      leaf format { type string; }
+      leaf resource {
+        type string;
+        description
+          "Compress the alarms with this resource.";
+      }
+      leaf alarm-type-id {
+        type string;
+        description
+          "Compress alarms with this alarm-type-id.";
+      }
+      leaf alarm-type-qualifier {
+        type string;
+        description
+          "Compress the alarms with this alarm-type-qualifier.";
+      }
+    }
+    output {
+      leaf compressed-alarms {
+        type uint32;
+        description
+          "Number of compressed alarm entries.";
+      }
+    }
+  }
+
 }

@@ -4,25 +4,25 @@ Test the "snabb lwaftr query" subcommand. Needs NIC names.
 
 import os
 from pathlib import Path
+import time
 import unittest
 
 from test_env import DATA_DIR, ENC, SNABB_CMD, BaseTestCase, nic_names
 
 
-DAEMON_PROC_NAME = 'query_test_daemon'
+DAEMON_PROC_NAME = 'query-test-daemon'
 SNABB_PCI0, SNABB_PCI1 = nic_names()
 RUN_DIR = Path('/var/run/snabb')
 
-
 @unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
-class TestQueryStandard(BaseTestCase):
+class TestQuery(BaseTestCase):
 
     daemon_args = (
         str(SNABB_CMD), 'lwaftr', 'run',
         '--name', DAEMON_PROC_NAME,
         '--conf', str(DATA_DIR / 'no_icmp.conf'),
         '--v4', SNABB_PCI0,
-        '--v6', SNABB_PCI1,
+        '--v6', SNABB_PCI1
     )
 
     query_args = (str(SNABB_CMD), 'lwaftr', 'query')
@@ -52,47 +52,30 @@ class TestQueryStandard(BaseTestCase):
             '\n'.join(('OUTPUT', str(output, ENC))))
 
     def get_lwaftr_pid(self):
-        output = str(self.run_cmd(('ps', 'aux')), ENC)
-        pids = []
-        for line in output.splitlines():
-            if SNABB_PCI0 in line:
-                pids.append(line.split()[1])
-        for pid in pids:
-            if (RUN_DIR / pid / 'apps' / 'lwaftr').is_dir():
-                return pid
+        return (RUN_DIR / 'by-name' / DAEMON_PROC_NAME).resolve().name
 
     def test_query_by_pid(self):
+        # Work around https://github.com/Igalia/snabb/issues/904.
+        time.sleep(1.0)
         lwaftr_pid = self.get_lwaftr_pid()
         pid_args = list(self.query_args)
         pid_args.append(str(lwaftr_pid))
         self.execute_query_test(pid_args)
 
     def test_query_by_name(self):
+        # Work around https://github.com/Igalia/snabb/issues/904.
+        time.sleep(1.0)
         name_args = list(self.query_args)
         name_args.extend(('--name', DAEMON_PROC_NAME))
         self.execute_query_test(name_args)
 
-
-@unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
-class TestQueryReconfigurable(TestQueryStandard):
-
-    daemon_args = (
-        str(SNABB_CMD), 'lwaftr', 'run', '--reconfigurable',
-        '--name', DAEMON_PROC_NAME,
-        '--conf', str(DATA_DIR / 'no_icmp.conf'),
-        '--v4', SNABB_PCI0,
-        '--v6', SNABB_PCI1,
-    )
-
     def get_all_leader_pids(self):
-        output = str(self.run_cmd(('ps', 'aux')), ENC)
-        pids = []
-        for line in output.splitlines():
-            if ((SNABB_PCI0 in line) and
-                    ('--reconfigurable' in line) and
-                    ('grep' not in line)):
-                pids.append(line.split()[1])
-        return pids
+        leaders = []
+        for instance in RUN_DIR.iterdir():
+            group = RUN_DIR / instance.name / 'group'
+            if not group.is_symlink():
+                leaders.append(instance.name)
+        return leaders
 
     def get_leader_pid(self):
         for pid in self.get_all_leader_pids():
@@ -111,21 +94,6 @@ class TestQueryReconfigurable(TestQueryStandard):
                     target_pid = target.parts[4]
                     if target_pid == leader_pid:
                         return run_pid
-
-    def test_query_by_pid(self):
-        leader_pid = self.get_leader_pid()
-        if not leader_pid:
-            self.fail('Could not find the leader PID')
-        pid_args = list(self.query_args)
-        pid_args.append(str(leader_pid))
-        self.execute_query_test(pid_args)
-        follower_pid = self.get_follower_pid()
-        if not follower_pid:
-            self.fail('Could not find the follower PID')
-        pid_args = list(self.query_args)
-        pid_args.append(str(follower_pid))
-        self.execute_query_test(pid_args)
-
 
 if __name__ == '__main__':
     unittest.main()

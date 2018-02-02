@@ -106,7 +106,7 @@ function aes_128_gcm:encrypt (out_ptr, iv, seq_low, seq_high, payload, length, a
                               payload, length,
                               u8_ptr(self.iv:header_ptr()),
                               u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
-                              auth_dest, self.AUTH_SIZE)
+                              auth_dest or self.auth_buf, self.AUTH_SIZE)
 end
 
 function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length)
@@ -118,7 +118,7 @@ function aes_128_gcm:decrypt (out_ptr, seq_low, seq_high, iv, ciphertext, length
                               u8_ptr(self.iv:header_ptr()),
                               u8_ptr(self.aad:header_ptr()), self.AAD_SIZE,
                               self.auth_buf, self.AUTH_SIZE)
-   return C.memcmp(self.auth_buf, ciphertext + length, self.AUTH_SIZE) == 0
+   return ASM.auth12_equal(self.auth_buf, ciphertext + length) == 0
 end
 
 
