@@ -374,8 +374,13 @@ if ffi.abi("be") then
    function htons(b) return b end
 else
   -- htonl is unsigned, matching the C version and expectations.
-   function htonl(b) return tonumber(cast('uint32_t', bswap(b))) end
-   function htons(b) return rshift(bswap(b), 16) end
+  -- Wrapping the return call in parenthesis avoids the compiler to do
+  -- a tail call optimization.  In LuaJIT when the number of successive
+  -- tail calls is higher than the loop unroll threshold, the
+  -- compilation of a trace is aborted.  If the trace was long that
+  -- can result in poor performance.
+   function htonl(b) return (tonumber(cast('uint32_t', bswap(b)))) end
+   function htons(b) return (rshift(bswap(b), 16)) end
 end
 ntohl = htonl
 ntohs = htons
@@ -750,6 +755,23 @@ function random_data (length)
    return ffi.string(random_bytes(length), length)
 end
 
+local lower_case = "abcdefghijklmnopqrstuvwxyz"
+local upper_case = lower_case:upper()
+local extra = "0123456789_-"
+local alphabet = table.concat({lower_case, upper_case, extra})
+assert(#alphabet == 64)
+function random_printable_string (entropy)
+   -- 64 choices in our alphabet, so 6 bits of entropy per byte.
+   entropy = entropy or 160
+   local length = math.floor((entropy - 1) / 6) + 1
+   local bytes = random_data(length)
+   local out = {}
+   for i=1,length do
+      out[i] = alphabet:byte(bytes:byte(i) % 64 + 1)
+   end
+   return string.char(unpack(out))
+end
+
 -- Compiler barrier.
 -- Prevents LuaJIT from moving load/store operations over this call.
 -- Any FFI call is sufficient to achieve this, see:
@@ -777,6 +799,12 @@ function parse (arg, config)
    for k, o in pairs(config) do
       if ret[k] == nil then ret[k] = o.default end
    end
+   return ret
+end
+
+function set(...)
+   local ret = {}
+   for k, v in pairs({...}) do ret[v] = true end
    return ret
 end
 

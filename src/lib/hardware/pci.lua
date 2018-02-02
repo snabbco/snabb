@@ -22,7 +22,7 @@ devices = {}
 --- * `device` id hex string e.g. `"0x10fb"` for 82599 chip.
 --- * `interface` name of Linux interface using this device e.g. `"eth0"`.
 --- * `status` string Linux operational status, or `nil` if not known.
---- * `driver` Lua module that supports this hardware e.g. `"intel10g"`.
+--- * `driver` Lua module that supports this hardware e.g. `"intel_mp"`.
 --- * `usable` device was suitable to use when scanned? `yes` or `no`
 
 --- Initialize (or re-initialize) the `devices` table.
@@ -43,6 +43,7 @@ function device_info (pciaddress)
    info.model = which_model(info.vendor, info.device)
    info.driver = which_driver(info.vendor, info.device)
    if info.driver then
+      info.rx, info.tx = which_link_names(info.driver)
       info.interface = lib.firstfile(p.."/net")
       if info.interface then
          info.status = lib.firstline(p.."/net/"..info.interface.."/operstate")
@@ -69,12 +70,12 @@ model = {
 -- Supported cards indexed by vendor and device id.
 local cards = {
    ["0x8086"] =  {
-      ["0x10fb"] = {model = model["82599_SFP"], driver = 'apps.intel.intel_app'},
-      ["0x10d3"] = {model = model["82574L"],    driver = 'apps.intel.intel_app'},
-      ["0x105e"] = {model = model["82571"],     driver = 'apps.intel.intel_app'},
-      ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
-      ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
-      ["0x154d"] = {model = model["X520"],      driver = 'apps.intel.intel_app'},
+      ["0x10fb"] = {model = model["82599_SFP"], driver = 'apps.intel_mp.intel_mp'},
+      ["0x10d3"] = {model = model["82574L"],    driver = 'apps.intel_mp.intel_mp'},
+      ["0x105e"] = {model = model["82571"],     driver = 'apps.intel_mp.intel_mp'},
+      ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel_mp.intel_mp'},
+      ["0x1528"] = {model = model["X540"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x154d"] = {model = model["X520"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
       ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
@@ -82,6 +83,12 @@ local cards = {
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
    },
+}
+
+local link_names = {
+   ['apps.solarflare.solarflare'] = { "rx", "tx" },
+   ['apps.intel_mp.intel_mp']     = { "input", "output" },
+   ['apps.intel.intel_app']       = { "rx", "tx" }
 }
 
 -- Return the name of the Lua module that implements support for this device.
@@ -93,6 +100,10 @@ end
 function which_model (vendor, device)
    local card = cards[vendor] and cards[vendor][device]
    return card and card.model
+end
+
+function which_link_names (driver)
+   return unpack(assert(link_names[driver]))
 end
 
 --- ### Device manipulation.

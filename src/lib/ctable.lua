@@ -97,12 +97,6 @@ local function make_equal_fn(key_type)
    end
 end
 
-local function set(...)
-   local ret = {}
-   for k, v in pairs({...}) do ret[v] = true end
-   return ret
-end
-
 local function parse_params(params, required, optional)
    local ret = {}
    for k, _ in pairs(required) do
@@ -123,7 +117,7 @@ end
 -- FIXME: For now the value_type option is required, but in the future
 -- we should allow for a nil value type to create a set instead of a
 -- map.
-local required_params = set('key_type', 'value_type')
+local required_params = lib.set('key_type', 'value_type')
 local optional_params = {
    hash_seed = false,
    initial_size = 8,
@@ -302,10 +296,11 @@ function CTable:add(key, value, updates_allowed)
    -- Fast path.
    if entries[index].hash == HASH_MAX and updates_allowed ~= 'required' then
       self.occupancy = self.occupancy + 1
-      entries[index].hash = hash
-      entries[index].key = key
-      entries[index].value = value
-      return index
+      local entry = entries + index
+      entry.hash = hash
+      entry.key = key
+      entry.value = value
+      return entry
    end
 
    while entries[index].hash < hash do
@@ -313,11 +308,12 @@ function CTable:add(key, value, updates_allowed)
    end
 
    while entries[index].hash == hash do
-      if self.equal_fn(key, entries[index].key) then
+      local entry = entries + index
+      if self.equal_fn(key, entry.key) then
          assert(updates_allowed, "key is already present in ctable")
-         entries[index].key = key
-         entries[index].value = value
-         return index
+         entry.key = key
+         entry.value = value
+         return entry
       end
       index = index + 1
    end
@@ -346,10 +342,11 @@ function CTable:add(key, value, updates_allowed)
    end
            
    self.occupancy = self.occupancy + 1
-   entries[index].hash = hash
-   entries[index].key = key
-   entries[index].value = value
-   return index
+   local entry = entries + index
+   entry.hash = hash
+   entry.key = key
+   entry.value = value
+   return entry
 end
 
 function CTable:update(key, value)
@@ -682,8 +679,12 @@ function selftest()
       end
       do
          local file = io.open(tmp, 'rb')
+         -- keep references to avoid GCing too early
+         local handle = {}
          local function read(size)
-            return ffi.new('uint8_t[?]', size, file:read(size))
+            local buf = ffi.new('uint8_t[?]', size, file:read(size))
+            table.insert(handle, buf)
+            return buf
          end
          local stream = {}
          function stream:read_ptr(type)

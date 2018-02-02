@@ -6,6 +6,7 @@ local S = require("syscall")
 local counter = require("core.counter")
 local ffi = require("ffi")
 local shm = require("core.shm")
+local alarms = require("lib.yang.alarms")
 
 -- Every 100 milliseconds.
 local default_interval = 1e8
@@ -20,12 +21,13 @@ local IngressDropMonitor = {}
 function new(args)
    local ret = {
       threshold = args.threshold or 100000,
-      wait = args.wait or 20,
+      wait = args.wait or 30,
+      grace_period = args.grace_period or 10,
       action = args.action or 'flush',
       tips_url = args.tips_url or default_tips_url,
       last_flush = 0,
       last_value = ffi.new('uint64_t[1]'),
-      current_value = ffi.new('uint64_t[1]')
+      current_value = ffi.new('uint64_t[1]'),
    }
    if args.counter then
       if not args.counter:match(".counter$") then
@@ -37,6 +39,20 @@ function new(args)
          ret.counter = counter.open(args.counter)
       end
    end
+
+   alarms.add_to_inventory {
+      [{alarm_type_id='ingress-packet-drop'}] = {
+         resource=tostring(S.getpid()),
+         has_clear=true,
+         description="Ingress packet drops exceeds threshold",
+      }
+   }
+   ret.ingress_packet_drop_alarm = alarms.declare_alarm {
+      [{resource=tostring(S.getpid()),alarm_type_id='ingress-packet-drop'}] = {
+         perceived_severity='major',
+      }
+   }
+
    return setmetatable(ret, {__index=IngressDropMonitor})
 end
 
@@ -46,8 +62,8 @@ function IngressDropMonitor:sample ()
    sum[0] = 0
    for i = 1, #app_array do
       local app = app_array[i]
-      if app.ingress_packet_drops and not app.dead then
-         sum[0] = sum[0] + app:ingress_packet_drops()
+      if app.rxdrop and not app.dead then
+         sum[0] = sum[0] + app:rxdrop()
       end
    end
    if self.counter then
@@ -56,10 +72,18 @@ function IngressDropMonitor:sample ()
 end
 
 function IngressDropMonitor:jit_flush_if_needed ()
-   if self.current_value[0] - self.last_value[0] < self.threshold then return end
+   if now() - self.last_flush < self.grace_period then
+      self.last_value[0] = self.current_value[0]
+      return
+   end
+   if self.current_value[0] - self.last_value[0] < self.threshold then
+      self.ingress_packet_drop_alarm:clear()
+      return
+   end
    if now() - self.last_flush < self.wait then return end
    self.last_flush = now()
    self.last_value[0] = self.current_value[0]
+
    --- TODO: Change last_flush, last_value and current_value fields to be counters.
    local msg = now()..": warning: Dropped more than "..self.threshold.." packets"
    if self.action == 'flush' then
@@ -67,6 +91,8 @@ function IngressDropMonitor:jit_flush_if_needed ()
    end
    msg = msg..". See "..self.tips_url.." for performance tuning tips."
    print(msg)
+
+   self.ingress_packet_drop_alarm:raise({alarm_text=msg})
    if self.action == 'flush' then jit.flush() end
 end
 

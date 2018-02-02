@@ -13,8 +13,7 @@ function configure (c, ports, io)
    local links
    if io and io.pci then
       local device = pci.device_info(io.pci)
-      if device and (device.driver == 'apps.intel.intel_app'
-                  or device.driver == 'apps.solarflare.solarflare') then
+      if device and device.driver then
          links = configureVMDq(c, device, ports)
       else
          error("Unknown device: "..io.pci)
@@ -84,6 +83,9 @@ function configureVMDq (c, device, ports)
          if #ports ~= 1 then
             error("multiple ports defined but promiscuous mode requested for port: "..name)
          end
+         if port.vlan then
+            error("vlan specified but promiscuous mode requested for port: "..name)
+         end
          vmdq = false
       end
       config.app(c, NIC, require(device.driver).driver,
@@ -91,7 +93,8 @@ function configureVMDq (c, device, ports)
                   vmdq = vmdq,
                   macaddr = port.mac_address,
                   vlan = port.vlan})
-      links[i] = {input = NIC..".rx", output = NIC..".tx"}
+      links[i] = {input = NIC.."."..device.rx,
+                  output = NIC.."."..device.tx}
    end
    return links
 end

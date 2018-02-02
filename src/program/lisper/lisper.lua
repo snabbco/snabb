@@ -8,6 +8,7 @@ local app      = require("core.app")
 local lib      = require("core.lib")
 local packet   = require("core.packet")
 local usage    = require("program.lisper.README_inc")
+local pci      = require("lib.hardware.pci")
 local ipv6     = require("lib.protocol.ipv6")
 local ethernet = require("lib.protocol.ethernet")
 local esp      = require("lib.ipsec.esp")
@@ -16,7 +17,6 @@ local raw      = require("apps.socket.raw")
 local nd       = require("apps.ipv6.nd_light")
 local pcap     = require("apps.pcap.pcap")
 local basic    = require("apps.basic.basic_apps")
-local intel    = require("apps.intel.intel_app")
 local json     = require("lib.json")
 local timer    = require("core.timer")
 
@@ -253,23 +253,23 @@ local function update_fib(s)
             local w = tonumber(t.weight)
             local encrypt
             if false and key_id and encap_key and decap_key then
-               local enc = esp.esp_v6_encrypt:new{
+               local enc = esp.encrypt:new{
                   spi = key_id,
-                  mode = "aes-128-gcm",
+                  mode = "aes-gcm-128-12",
                   keymat = encap_key,
                   salt = conf.esp_salt,
                }
                function encrypt(p)
-                  return enc:encapsulate(p)
+                  return enc:encapsulate_transport6(p)
                end
-               local dec = esp.esp_v6_decrypt:new{
+               local dec = esp.decrypt:new{
                   spi = key_id,
-                  mode = "aes-128-gcm",
+                  mode = "aes-gcm-128-12",
                   keymat = decap_key,
                   salt = conf.esp_salt,
                }
                local function decrypt(p)
-                  return dec:decapsulate(p)
+                  return dec:decapsulate_transport6(p)
                end
                spis[key_id] = decrypt
             end
@@ -501,7 +501,9 @@ local function route_packet(p, rxname, txports)
       local spi = parse_esp(p)
       if spi then --packed is encrypted, decrypt it
          local decrypt = spis[spi]
-         if not (decrypt and decrypt(p)) then return end --invalid packet
+         local decapsulated = decrypt and decrypt(p)
+         if decapsulated then p = decapsulated
+         else return end
       end
       local src_ip, session_id, cookie
       src_ip, session_id, cookie, smac, dmac, payload_offset = parse_l2tp(p)
@@ -566,7 +568,9 @@ local function route_packet(p, rxname, txports)
          tx = txports[txname]
          log_l2tp(")))", dp, txname)
          if loc.encrypt then
-            if not loc.encrypt(dp) then return end --invalid packet
+            local encapsulated = loc.encrypt(dp)
+            if encapsulated then dp = encapsulated
+            else return end --invalid packet
          end
       end
       link.transmit(tx, dp)
@@ -716,16 +720,20 @@ function run(args)
    config.app(c, "lisper", Lisper)
 
    for ifname, iface in pairs(ifs) do
+      local rx, tx
 
       if iface.pci then
-         config.app(c, "if_"..ifname, intel.Intel82599, {
-            pciaddr = iface.pci,
+         local device = pci.device_info(iface.pci)
+         config.app(c, "if_"..ifname, require(device.driver).driver, {
+            pciaddr = device.pciaddress,
             macaddr = macstr(iface.mac),
             vlan = iface.vlan_id,
-            vmdq = iface.vlan_id and true or nil,
+            vmdq = true,
          })
+         rx, tx = device.rx, device.tx
       else
          config.app(c, "if_"..ifname, raw.RawSocket, ifname)
+         rx, tx = "input", "output"
       end
 
       local function needs_nd(exits)
@@ -744,16 +752,16 @@ function run(args)
             next_hop = ip6str(exit.next_hop),
          })
 
-         config.link(c, _("nd_%s.south -> if_%s.rx", ifname, ifname))
-         config.link(c, _("if_%s.tx -> nd_%s.south", ifname, ifname))
+         config.link(c, _("nd_%s.south -> if_%s.%s", ifname, ifname, rx))
+         config.link(c, _("if_%s.%s -> nd_%s.south", ifname, tx, ifname))
 
          config.link(c, _("lisper.%s -> nd_%s.north", ifname, ifname))
          config.link(c, _("nd_%s.north -> lisper.%s", ifname, ifname))
 
       else -- phy -> lisper
 
-         config.link(c, _("lisper.%s -> if_%s.rx", ifname, ifname))
-         config.link(c, _("if_%s.tx -> lisper.%s", ifname, ifname))
+         config.link(c, _("lisper.%s -> if_%s.%s", ifname, ifname, rx))
+         config.link(c, _("if_%s.%s -> lisper.%s", ifname, tx, ifname))
 
       end
 

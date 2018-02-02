@@ -82,6 +82,8 @@ $(cat $mdroot/lib/README.ctable.md)
 
 $(cat $mdroot/lib/README.pmu.md)
 
+$(cat $mdroot/lib/yang/README.md)
+
 ## Hardware
 
 $(cat $mdroot/lib/hardware/README.md)
@@ -97,6 +99,14 @@ $(cat $mdroot/lib/ipsec/README.md)
 ## Snabb NFV
 
 $(cat $mdroot/program/snabbnfv/README.md)
+
+## LISPER
+
+$(cat $mdroot/program/lisper/README.md)
+
+## Ptree
+
+$(cat $mdroot/program/ptree/README.md)
 
 ## Watchdog (lib.watchdog.watchdog)
 

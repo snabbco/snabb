@@ -1,0 +1,48 @@
+#!../../snabb snsh
+
+-- Test to make sure rx/tx queues can be explicitly disabled
+
+local basic_apps = require("apps.basic.basic_apps")
+local intel      = require("apps.intel_mp.intel_mp")
+local lib        = require("core.lib")
+
+local pciaddr0 = lib.getenv("SNABB_PCI_INTEL0")
+local pciaddr1 = lib.getenv("SNABB_PCI_INTEL1")
+
+local c = config.new()
+
+config.app(c, "n0", intel.Intel,
+           { pciaddr = pciaddr0,
+             rxcounter = 1,
+             rxq = 0, txq = 0,
+             wait_for_link = true })
+
+config.app(c, "n1", intel.Intel,
+           { pciaddr = pciaddr1,
+             rxq = false,
+             txq = false,
+             wait_for_link = true })
+
+config.app(c, "source0", basic_apps.Source)
+config.app(c, "source1", basic_apps.Source)
+
+config.app(c, "sink", basic_apps.Sink)
+
+config.link(c, "source0.output -> n0.input")
+config.link(c, "source1.output -> n1.input")
+config.link(c, "n0.output -> sink.input0")
+config.link(c, "n1.output -> sink.input1")
+
+engine.configure(c)
+engine.main({ duration = 1 })
+
+-- no packets should get queued in either NIC
+local n0_stats = engine.app_table.n0:get_rxstats()
+assert(n0_stats.bytes == 0, "n0 received packets")
+
+-- can't call get_rxstats on disabled rxq so check RXDGPC
+assert(engine.app_table.n1:rxdmapackets() == 0,
+       "n1 received packets")
+-- also make sure packets *are* going to n1 though not to a queue
+assert(engine.app_table.n1:rxbytes() > 0,
+       "n1 didn't see any traffic")
