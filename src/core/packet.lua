@@ -10,7 +10,9 @@ local C = ffi.C
 
 local lib      = require("core.lib")
 local memory   = require("core.memory")
+local shm      = require("core.shm")
 local counter  = require("core.counter")
+local spinlock = require("core.spinlock")
 
 require("core.packet_h")
 
@@ -45,18 +47,25 @@ end
 
 -- Freelist containing empty packets ready for use.
 
-ffi.cdef[[
+local max_packets = 1e6
+
+ffi.cdef([[
 struct freelist {
+    int32_t lock[1];
     uint64_t nfree;
     uint64_t max;
-    struct packet *list[?];
+    struct packet *list[]]..max_packets..[[];
 };
-]]
+]])
+
+local function freelist_full(freelist)
+   return freelist.nfree == freelist.max
+end
 
 local function freelist_add(freelist, element)
    -- Safety check
    if _G.developer_debug then
-      assert(freelist.nfree < freelist.max, "freelist overflow")
+      assert(not freelist_full(freelist), "freelist overflow")
    end
    freelist.list[freelist.nfree] = element
    freelist.nfree = freelist.nfree + 1
@@ -75,15 +84,49 @@ local function freelist_nfree(freelist)
    return freelist.nfree
 end
 
-local max_packets = 1e6
+local function freelist_lock(freelist)
+   spinlock.lock(freelist.lock)
+end
+
+local function freelist_unlock(freelist)
+   spinlock.unlock(freelist.lock)
+end
+
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = ffi.new("struct freelist", max_packets, 0, max_packets)
+local packets_fl = ffi.new("struct freelist")
+      packets_fl.max = max_packets
+local group_fl
+if not shm.exists("group/packets.freelist") then
+   group_fl = shm.create("group/packets.freelist", "struct freelist")
+   group_fl.max = max_packets
+else
+   group_fl = shm.open("group/packets.freelist", "struct freelist")
+end
+
+function rebalance_freelists ()
+   if freelist_nfree(packets_fl) > packets_allocated then
+      freelist_lock(group_fl)
+      while freelist_nfree(packets_fl) > packets_allocated
+      and not freelist_full(group_fl) do
+         freelist_add(group_fl, freelist_remove(packets_fl))
+      end
+      freelist_unlock(group_fl)
+   end
+end
 
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
-      preallocate_step()
+      freelist_lock(group_fl)
+      while freelist_nfree(group_fl) > 0
+      and freelist_nfree(packets_fl) < packets_allocated do
+         free(freelist_remove(group_fl))
+      end
+      freelist_unlock(group_fl)
+      if freelist_nfree(packets_fl) == 0 then
+         preallocate_step()
+      end
    end
    return freelist_remove(packets_fl)
 end
