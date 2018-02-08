@@ -122,7 +122,7 @@ function merge_pr_with_current {
     fi
 }
 
-function dock_make { (cd src/; scripts/dock.sh make $1); }
+function dock_make { (cd src/; timeout 1h scripts/dock.sh make $1); }
 
 function check_for_performance_regressions {
     echo "Checking for performance regressions:"
