@@ -10,8 +10,6 @@ local Sink = require("apps.basic.basic_apps").Sink
 -- Synopsis: selftest.snabb [duration]
 local DURATION = tonumber(main.parameters[1]) or 10
 
-interlink.create("group/test.mcp")
-
 worker.start("source",
              [[require("apps.interlink.test_source").start("group/test.mcp")]])
 
@@ -32,5 +30,5 @@ local stats = link.stats(engine.app_table["sink"].input.input)
 print(stats.txpackets / 1e6 / DURATION .. " Mpps")
 
 -- test teardown
-interlink.free(interlink.open("group/test.mcp"))
+engine.configure(config.new())
 engine.main({duration=0.1})
