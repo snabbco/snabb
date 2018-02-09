@@ -276,6 +276,7 @@ PQMPRC      0x10038 +0x100*0..7     RCR Per Queue Multicast Packets Received
    singleton = [[
 EEMNGCTL  0x01010 -            RW Manageability EEPROM-Mode Control Register
 EEC       0x00010 -            RW EEPROM-Mode Control Register
+FACTPS	  0x05B30 -            Function Active and Power State to MNG
 ]]
 }
 
@@ -603,6 +604,7 @@ function Intel:load_registers(key)
 end
 function Intel:load_queue_registers(key)
   local v = reg[key]
+  if v.inherit then self:load_queue_registers(v.inherit) end
   if v.txq and self.txq then
     register.define(v.txq, self.r, self.base, self.txq)
   end
@@ -1088,7 +1090,9 @@ function Intel1g:init_phy ()
    self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
    self:unlock_fw_sem()
 
-   self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
+-- NOTE: CFG_DONE0 does not necessarily correspond to PCI .0.
+-- E.g. on a PE720 2xI350 module, bits 20 & 21 are set for PCI .0 and .1 (not 18 & 19).
+--   self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
 
    --[[
    self:lock_fw_sem()
