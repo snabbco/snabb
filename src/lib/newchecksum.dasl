@@ -40,14 +40,14 @@ local function gen_checksum ()
       | xor r8, r8                  -- Clear out r8. Stores array index.
       | mov rcx, rsi                -- Rsi (2nd argument; size). Assign rsi to rcx.
       | 1:
-      | cmp rcx, 16                  -- If index is less than 8.
+      | cmp rcx, 16                 -- If index is less than 16.
       | jl >2                       -- Jump to branch '2'.
       | mov r9, [rdi + r8]          -- Fetch 64-bit from data + r8 into r9.
       | add rax, r9                 -- Sum acc with r9.
-      | adc rax, [rdi + r8 + 8]     -- Sum carry-bit into acc.
+      | adc rax, [rdi + r8 + 8]     -- Sum with carry next qword.
       | adc rax, 0                  -- Sum carry-bit into acc.
-      | sub rcx, 16                  -- Decrease index by 8.
-      | add r8, 16                   -- Next 64-bit.
+      | sub rcx, 16                 -- Decrease index by 8.
+      | add r8, 16                  -- Jump two qwords.
       | jmp <1                      -- Go to beginning of loop.
       | 2:
       | cmp rcx, 8                  -- If index is less than 8.
