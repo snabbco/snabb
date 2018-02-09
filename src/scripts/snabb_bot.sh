@@ -63,7 +63,7 @@ function pull_request_new_p {
 function clone_upstream {
     git clone https://github.com/$REPO.git $(repo_path) \
         && (cd $(repo_path)
-               git config user.email "snabb_bot.service@davos"
+               git config user.email "snabb_bot.service@$(hostname)"
                git config user.name "Snabb Bot")
 }
 
@@ -92,6 +92,8 @@ function log_header {
     pci_info SNABB_PCI1 $SNABB_PCI1
     pci_info SNABB_PCI_INTEL0 $SNABB_PCI_INTEL0
     pci_info SNABB_PCI_INTEL1 $SNABB_PCI_INTEL1
+    pci_info SNABB_PCI_INTEL1G0 $SNABB_PCI_INTEL1G0
+    pci_info SNABB_PCI_INTEL1G1 $SNABB_PCI_INTEL1G1
     pci_info SNABB_PCI_SOLARFLARE0 $SNABB_PCI_SOLARFLARE0
     pci_info SNABB_PCI_SOLARFLARE1 $SNABB_PCI_SOLARFLARE1
     echo

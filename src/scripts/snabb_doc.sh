@@ -51,7 +51,10 @@ function current_tag {
 }
 
 function clone_upstream {
-    git clone https://github.com/$REPO.git $(repo_path)
+    git clone https://github.com/$REPO.git $(repo_path) \
+        && (cd $(repo_path)
+               git config user.email "snabb_doc.service@$(hostname)"
+               git config user.name "Snabb Doc")
 }
 
 function fetch_pr_head {
