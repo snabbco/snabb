@@ -55,7 +55,6 @@ local function gen_checksum ()
       | add rax, r9                 -- Sum acc with r9. Accumulate carry.
       | sub rcx, 4                  -- Decrease index by 4.
       | add r8, 4                   -- Next 32-bit.
-      | jmp <2                      -- Go to beginning of loop.
       | 3:
       | cmp rcx, 2                  -- If index is less than 2.
       | jl >4                       -- Jump to branch '4'.
@@ -63,7 +62,6 @@ local function gen_checksum ()
       | add rax, r9                 -- Sum acc with r9. Accumulate carry.
       | sub rcx, 2                  -- Decrease index by 2.
       | add r8, 2                   -- Next 16-bit.
-      | jmp <3                      -- Go to beginning of loop.
       | 4:
       | cmp rcx, 1                  -- If index is less than 1.
       | jl >5                       -- Jump to branch '5'.
