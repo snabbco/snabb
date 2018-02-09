@@ -83,7 +83,6 @@ local function gen_checksum ()
       | not rax                     -- One-complement of rax.
       | and rax, 0xffff             -- Clear out higher part of rax.
       -- Epilogue.
-      | 6:
       | mov rsp, rbp
       | pop rbp
       -- Return.
