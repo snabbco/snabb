@@ -216,12 +216,16 @@ local function free_internal (p)
    freelist_add(packets_fl, p)
 end   
 
-function free (p)
+function account_free (p)
    counter.add(engine.frees)
    counter.add(engine.freebytes, p.length)
    -- Calculate bits of physical capacity required for packet on 10GbE
    -- Account for minimum data size and overhead of CRC and inter-packet gap
    counter.add(engine.freebits, (math.max(p.length, 46) + 4 + 5) * 8)
+end
+
+function free (p)
+   account_free(p)
    free_internal(p)
 end
 
