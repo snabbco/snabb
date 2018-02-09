@@ -1,6 +1,156 @@
 # Change Log
 
-## [3.1.6] - 2017-01-20
+## [2017.08.06]
+
+* Update IETF yang model from `ietf-softwire` to `ietf-softwire-br`.  The
+  lwAFTR no longer supports `ietf-softwire`.
+
+## [2017.08.05]
+
+* Documented `snabb alarms` facility.  See:
+
+    https://github.com/Igalia/snabb/blob/lwaftr/src/program/alarms/README.md
+
+* Implement specific alarms for lwAFTR.  See:
+
+    https://github.com/Igalia/snabb/blob/lwaftr/src/program/lwaftr/doc/alarms.md
+
+* Fix a bug when using RSS on on-a-stick workers with VMDq.
+
+* Fix a bug when using ARP and NDP over RSS.
+
+* Fix a bug when ARP received unexpected replies.
+
+* Give `snabb-softwire-v2` the `snabb:softwire-v2` namespace instead of
+  `snabb:lwaftr`, to differentiate the namespace from the older
+  `snabb-softwire-v1` model.
+
+* Change default YANG model exposed by lwAFTR to `ietf-softwire`.  The
+  native `snabb-softwire-v2` model can of course be specified manually
+  via `-s snabb-softwire-v2`.
+
+## [2017.08.04]
+
+* Enable RSS.  For full details, see:
+
+    https://github.com/Igalia/snabb/blob/lwaftr/src/program/lwaftr/doc/configuration.md#multiple-devices
+
+* Fix bugs related to dynamically adding and removing RSS workers.
+
+* Extend `snabb config get-state` to understand multiple worker
+  processes.  Counter values from worker processes are available
+  individually and are also summed for the lwAFTR as a whole.
+
+* Bug fixes to VMDq support in the new intel_mp driver.
+
+## [2017.08.03]
+
+* Fix on-a-stick mode for multiple worker processes.  The lwAFTR will now
+  detect based on the configuration whether an lwAFTR instance is
+  running in on-a-stick or bump-in-the-wire configuration.  The
+  --on-a-stick, --v4, and --v6 arguments are still around if you want to
+  use a single lwAFTR binding table, but run separate single-instance
+  lwAFTR processes manually.
+
+* The "compress", "purge", and "set-operator-state" commands have been
+  moved from "snabb config" to "snabb alarms".  Documentation will be
+  forthcoming; otherwise see their --help outputs.
+
+## [2017.08.02]
+
+* Adapt --cpu argument to "snabb lwaftr run" to take a range of
+  available CPUs to dedicate to the forwarding plane.  To provision CPUs
+  1 to 9 inclusive, run as --cpu=1-9.  Snabb will attempt to assign CPUs
+  only from the local NUMA node of the PCI devices.
+
+* Beginnings of the "snabb alarm" utility, extracting the alarms
+  facilities that we had implemented as part of the "snabb config"
+  utility as a separate binary.  This also removes the alarms-related
+  components from the Snabb YANG model.
+
+* Update the ietf-softwire translation layer for multiple worker
+  instances.
+
+* Dynamically add and remove worker instances via "snabb config".
+  Documentation to come; follow
+  https://github.com/Igalia/snabb/issues/953 for the summary of the
+  multi-process deliverable.
+
+## [2017.08.01]
+
+* intel_mp work included in v2017.07.01 preview is now properly merged
+  upstream.  The previous milestone release was on a side branch.
+
+* The alarms facility now has support for set-operator-state, purge,
+  compress, and get-status operations.  Note that the alarms code is in
+  a state of flux currently; we are migrating alarms support out of the
+  snabb-softwire-v2 YANG schema over the next few days.
+
+* Fix some bugs with the snabb-softwire-v2 schema in which we were
+  missing statements and namespace qualifiers.
+
+* Fix bug in ingress drop monitor in which drops immediately following a
+  JIT flush would cause further JIT flushes.
+
+## [2017.07.01-318]
+
+* The intel_mp driver has been brought up to feature parity with the
+  intel10g one by adding support for VMDq mode. The changes support VMDq
+  mode with RSS (64 VM pools with 2 RSS queues each) with MAC/VLAN
+  filtering on the Intel 82599. For now, the driver just rejects VMDq
+  mode on i210 and i350 NICs.  The added features include VLAN tag
+  insertion and removal, MAC-based receive and transmit queue
+  assignment, mirroring between pools/VFs, and support for rxcounter,
+  txcounter, rate_limit, priority. The following combinations are
+  supported: no VMDq nor RSS, VMDq only, RSS only.
+
+* All network functions have been updated to use intel_mp instead of
+  intel10g. The resulting performance has been checked to be as good as
+  before the change.  The intel10g driver is temporarily being kept
+  around as a fallback in case of regressions, and to give external apps
+  some time to switch to intel_mp.
+
+* Multiprocess in the data-plane.  If multiple instance are defined in the
+  configuration file, the lwaftr will start those multiple instances.
+  However, new ones cannot be added via `snabb config` nor can they be
+  shutdown by removing them.
+
+* Initial support for alarms.  NDP and ARP raise up an alarm if they cannot
+  resolve an IP address.  The alarms is cleared up when the apps manage
+  to resolve the IP addresses.  Alarms state can be consulted via
+  `./snabb config get-state` program.
+
+* Several apps have been refactored and moved out from lwaftr. Mainly
+  the fragmentation and refactoring apps and the ARP and NDP apps.
+  Several minor bugs have been fixed in these apps too, including packet
+  corruption issues.
+
+* Other minor bug fixes and improvements.
+
+## [2017.07.01] - 2017-08-04
+
+* New YANG schema snabb-softwire-v2 replaces old snabb-softwire-v1
+  schema.
+
+  The new schema has support for multiple worker processes running on
+  different PCI interfaces, though this support has not yet landed in
+  the data-plane itself.  See src/lib/yang/snabb-softwire-v2.lua for
+  full details.
+
+  Use "snabb lwaftr migrate-configuration" to migrate old
+  configurations.  
+
+* New version numbering scheme which includes the Snabb version the
+  lwaftr is based off and a lwaftr specific version number which is
+  reset upon merging a newer version of Snabb from upstream.
+
+* Improve configuration migration system.
+
+## [3.1.8] - 2017-03-10
+
+* Retry ARP and NDP resolution indefinitely.
+
+## [3.1.7] - 2017-01-20
 
 * Reverts commit 86b9835 ("Remove end-addr in psid-map"), which 
   introduced a severe regression that caused high packet loss due
