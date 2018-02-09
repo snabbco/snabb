@@ -40,35 +40,44 @@ local function gen_checksum ()
       | xor r8, r8                  -- Clear out r8. Stores array index.
       | mov rcx, rsi                -- Rsi (2nd argument; size). Assign rsi to rcx.
       | 1:
-      | cmp rcx, 8                  -- If index is less than 8.
+      | cmp rcx, 16                  -- If index is less than 8.
       | jl >2                       -- Jump to branch '2'.
+      | mov r9, [rdi + r8]          -- Fetch 64-bit from data + r8 into r9.
+      | add rax, r9                 -- Sum acc with r9.
+      | adc rax, [rdi + r8 + 8]     -- Sum carry-bit into acc.
+      | adc rax, 0                  -- Sum carry-bit into acc.
+      | sub rcx, 16                  -- Decrease index by 8.
+      | add r8, 16                   -- Next 64-bit.
+      | jmp <1                      -- Go to beginning of loop.
+      | 2:
+      | cmp rcx, 8                  -- If index is less than 8.
+      | jl >3                       -- Jump to branch '2'.
       | mov r9, [rdi + r8]          -- Fetch 64-bit from data + r8 into r9.
       | add rax, r9                 -- Sum acc with r9.
       | adc rax, 0                  -- Sum carry-bit into acc.
       | sub rcx, 8                  -- Decrease index by 8.
       | add r8, 8                   -- Next 64-bit.
-      | jmp <1                      -- Go to beginning of loop.
-      | 2:
+      | 3:
       | cmp rcx, 4                  -- If index is less than 4.
-      | jl >3                       -- Jump to branch '3'.
+      | jl >4                       -- Jump to branch '3'.
       | mov r9d, dword [rdi + r8]   -- Fetch 32-bit from data + r8 into r9d.
       | add rax, r9                 -- Sum acc with r9. Accumulate carry.
       | sub rcx, 4                  -- Decrease index by 4.
       | add r8, 4                   -- Next 32-bit.
-      | 3:
+      | 4:
       | cmp rcx, 2                  -- If index is less than 2.
-      | jl >4                       -- Jump to branch '4'.
+      | jl >5                       -- Jump to branch '4'.
       | movzx r9, word [rdi + r8]   -- Fetch 16-bit from data + r8 into r9.
       | add rax, r9                 -- Sum acc with r9. Accumulate carry.
       | sub rcx, 2                  -- Decrease index by 2.
       | add r8, 2                   -- Next 16-bit.
-      | 4:
+      | 5:
       | cmp rcx, 1                  -- If index is less than 1.
-      | jl >5                       -- Jump to branch '5'.
+      | jl >6                       -- Jump to branch '5'.
       | movzx r9, byte [rdi + r8]   -- Fetch 8-bit from data + r8 into r9.
       | add rax, r9                 -- Sum acc with r9. Accumulate carry.
       -- Fold 64-bit into 16-bit.
-      | 5:
+      | 6:
       | mov r9, rax                 -- Assign acc to r9.
       | shr r9, 32                  -- Shift r9 32-bit. Stores higher part of acc.
       | and rax, 0x00000000ffffffff -- Clear out higher-part of rax. Stores lower part of acc.
