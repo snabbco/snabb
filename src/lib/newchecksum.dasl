@@ -1,5 +1,6 @@
 module(..., package.seeall)
 
+local bit = require("bit")
 local dasm = require("dasm")
 local lib = require("core.lib")
 local ffi = require('ffi')
@@ -94,6 +95,29 @@ end
 
 local newchecksum = assemble("newchecksum", "uint32_t(*)(uint8_t*, uint32_t)", gen_checksum())
 
+-- Reference implementation in Lua.
+local function checksum_lua (data, size)
+   local function r16 (data)
+      return ffi.cast("uint16_t*", data)[0]
+   end
+   local csum = 0
+   local i = size
+   while i > 1 do
+      local word = r16(data + (size - i))
+      csum = csum + word
+      i = i - 2
+   end
+   if i == 1 then
+      csum = csum + data[size-1]
+   end
+   while true do
+      local carry = bit.rshift(csum, 16)
+      if carry == 0 then break end
+      csum = bit.band(csum, 0xffff) + carry
+   end
+   return bit.band(bit.bnot(csum), 0xffff)
+end
+
 function selftest ()
    require("lib.checksum_h")
    local function create_packet (size)
@@ -126,7 +150,8 @@ function selftest ()
    local pkt = create_packet(size)
    local times =  14.4*10^6
    -- Verify checksum is correct.
-   assert(hex(C.cksum_generic(pkt.data, pkt.length, 0)) == hex(ntohs(newchecksum(pkt.data, pkt.length))))
+   assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
+   assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
    -- Benchmark for different architectures.
    print("Gen: ", benchmark(function() return C.cksum_generic(pkt.data, pkt.length, 0) end, times))
    print("SSE2: ", benchmark(function() return C.cksum_sse2(pkt.data, pkt.length, 0) end, times))
@@ -138,7 +163,8 @@ function selftest ()
    local pkt = create_packet(size)
    local times =  2*10^6
    -- Verify checksum is correct.
-   assert(hex(C.cksum_generic(pkt.data, pkt.length, 0)) == hex(ntohs(newchecksum(pkt.data, pkt.length))))
+   assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
+   assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
    -- Benchmark for different architectures.
    print("Gen: ", benchmark(function() return C.cksum_generic(pkt.data, pkt.length, 0) end, times))
    print("SSE2: ", benchmark(function() return C.cksum_sse2(pkt.data, pkt.length, 0) end, times))
@@ -150,7 +176,8 @@ function selftest ()
    local pkt = create_packet(size)
    local times =  1*10^6
    -- Verify checksum is correct.
-   assert(hex(C.cksum_generic(pkt.data, pkt.length, 0)) == hex(ntohs(newchecksum(pkt.data, pkt.length))))
+   assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(ntohs(checksum_lua(pkt.data, pkt.length))))
+   assert(hex(ntohs(newchecksum(pkt.data, pkt.length))) == hex(C.cksum_generic(pkt.data, pkt.length, 0)))
    -- Benchmark for different architectures.
    print("Gen: ", benchmark(function() return C.cksum_generic(pkt.data, pkt.length, 0) end, times))
    print("SSE2: ", benchmark(function() return C.cksum_sse2(pkt.data, pkt.length, 0) end, times))
