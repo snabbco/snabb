@@ -12,7 +12,7 @@ local lib      = require("core.lib")
 local memory   = require("core.memory")
 local shm      = require("core.shm")
 local counter  = require("core.counter")
-local spinlock = require("core.spinlock")
+local sync     = require("core.sync")
 
 require("core.packet_h")
 
@@ -85,11 +85,11 @@ local function freelist_nfree(freelist)
 end
 
 local function freelist_lock(freelist)
-   spinlock.lock(freelist.lock)
+   sync.lock(freelist.lock)
 end
 
 local function freelist_unlock(freelist)
-   spinlock.unlock(freelist.lock)
+   sync.unlock(freelist.lock)
 end
 
 local packet_allocation_step = 1000
