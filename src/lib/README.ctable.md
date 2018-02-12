@@ -80,12 +80,15 @@ Add an entry to the ctable, returning the index of the added entry.
 *updates_allowed* is an optional parameter.  If not present or false,
 then the `:insert` method will raise an error if the *key* is already
 present in the table.  If *updates_allowed* is the string `"required"`,
-then an error will be raised if *key* is *not* already in the table.
-Any other true value allows updates but does not require them.  An
-update will replace the existing entry in the table.
+then an error will be raised if *key* is *not* already in the table.  If
+*updates_allowed* is the string `"preserve"`, then no error will be
+raised if a key is already present in the table, but in that case the
+corresponding value already in the table won't be updated either.  Any
+other true value allows updates but does not require them.  An update
+will replace the existing entry in the table.
 
-Returns a pointer to the inserted entry.  Any subsequent modification
-to the table may invalidate this pointer.
+Returns a pointer to the inserted or existing entry.  Any subsequent
+modification to the table may invalidate this pointer.
 
 — Method **:update** *key*, *value*
 
