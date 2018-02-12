@@ -40,7 +40,7 @@ local manager_config_spec = {
    -- Could relax this requirement.
    initial_configuration = {required=true},
    schema_name = {required=true},
-   worker_default_scheduling = {default={busywait=true}},
+   worker_default_scheduling = {default={}},
    default_schema = {},
    log_level = {default=default_log_level},
    rpc_trace_file = {},
