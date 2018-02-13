@@ -67,11 +67,7 @@ function run (args)
    function opt.S (arg)
       sizes = {}
       for size in string.gmatch(arg, "%d+") do
-         local s = tonumber(size)
-         if s < 18 + 20 + 8 then
-            error("Minimum frame size is 46 bytes (18 ethernet+CRC, 20 IPv4, and 8 UDP)")
-         end
-         sizes[#sizes+1] = s
+         sizes[#sizes + 1] = assert(tonumber(size), "size not a number: "..size)
       end
    end
 
@@ -156,6 +152,12 @@ function run (args)
    end
 
    args = lib.dogetopt(args, opt, "VD:hS:s:a:d:b:iI:c:r:46p:v:o:t:i:k:", long_opts)
+
+   for _,s in ipairs(sizes) do
+      if s < 18 + (vlan and 4 or 0) + 20 + 8 then
+         error("Minimum frame size is 46 bytes (18 ethernet+CRC, 20 IPv4, and 8 UDP)")
+      end
+   end
 
    if not target then
       print("either --pci, --tap, --sock, --int or --pcap are required parameters")
