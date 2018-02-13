@@ -17,6 +17,7 @@ function test_lwaftr_pcap {
     exit 1
   fi
   cmp $TEMP_PCAP $PCAP
+  status=$?
   rm $TEMP_PCAP
   if [ $status != 0 ]; then
     echo "Error: lwaftr generated pcap differs from ${PCAP}"
@@ -25,7 +26,7 @@ function test_lwaftr_pcap {
 }
 
 test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_1.pcap --count 1
-test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_2.pcap --count 2 --vlan 100 --size 0
+test_lwaftr_pcap program/packetblaster/lwaftr/test_lwaftr_2.pcap --count 2 --vlan 100 --size 50
 
 # lwaftr tap test
 sudo ip netns add snabbtest || exit $TEST_SKIPPED
