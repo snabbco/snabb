@@ -429,7 +429,7 @@ function selftest()
                       "pkt["..i.."] expected "..expected..", got "..actual)
             end
             packet.free(result)
-            link.free(reassembler.input.output, 'reassembly input')
+            link.free(reassembler.input.input, 'reassembly input')
             link.free(reassembler.output.output, 'reassembly output')
             shm.delete_frame(reassembler.shm)
          end

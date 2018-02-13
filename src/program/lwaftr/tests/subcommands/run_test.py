@@ -22,9 +22,8 @@ class TestRun(BaseTestCase):
     )
 
     def test_run(self):
-        output = self.run_cmd(self.cmd_args)
-        self.assertIn(b'link report', output,
-            b'\n'.join((b'OUTPUT', output)))
+        output = self.run_cmd(self.cmd_args).decode(ENC)
+        self.assertIn("Migrating instance", output)
 
     def test_run_on_a_stick_migration(self):
         # The LwAFTR should be abel to migrate from non-on-a-stick -> on-a-stick
