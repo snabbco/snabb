@@ -116,14 +116,14 @@ function lwaftr_app(c, conf)
               { self_ip = iinternal_interface.ip,
                 self_mac = iinternal_interface.mac,
                 next_mac = iinternal_interface.next_hop.mac,
-                shared_next_mac_key = "group/ipv6-next-mac",
+                shared_next_mac_key = "group/"..device.."-ipv6-next-mac",
                 next_ip = iinternal_interface.next_hop.ip,
                 alarm_notification = conf.alarm_notification })
    config.app(c, "arp", arp.ARP,
               { self_ip = convert_ipv4(iexternal_interface.ip),
                 self_mac = iexternal_interface.mac,
                 next_mac = iexternal_interface.next_hop.mac,
-                shared_next_mac_key = "group/ipv4-next-mac",
+                shared_next_mac_key = "group/"..device.."-ipv4-next-mac",
                 next_ip = convert_ipv4(iexternal_interface.next_hop.ip),
                 alarm_notification = conf.alarm_notification })
 
