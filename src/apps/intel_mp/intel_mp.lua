@@ -1090,9 +1090,9 @@ function Intel1g:init_phy ()
    self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
    self:unlock_fw_sem()
 
--- NOTE: CFG_DONE0 does not necessarily correspond to PCI .0.
--- E.g. on a PE720 2xI350 module, bits 20 & 21 are set for PCI .0 and .1 (not 18 & 19).
---   self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
+   -- Determine PCI function to physical port mapping
+   local lan_id = self.r.STATUS:bits(2,2)
+   self.r.EEMNGCTL:wait(bits { CFG_DONE = 18 + lan_id })
 
    --[[
    self:lock_fw_sem()

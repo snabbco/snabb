@@ -120,8 +120,8 @@ end
 --- Metatables for the three different types of register
 local mt = {
   RO = {__index = { read=Register.read, wait=Register.wait,
-                    reset=Register.noop, print=Register.print},
-                    bits=ro_bits, byte=ro_byte,
+                    reset=Register.noop, print=Register.print,
+                    bits=ro_bits, byte=ro_byte},
         __call = Register.read, __tostring = Register.__tostring},
   RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait,
                     set=Register.set, clr=Register.clr, reset=Register.noop,
