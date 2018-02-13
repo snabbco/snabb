@@ -50,8 +50,9 @@ port := { port_id        = <id>,          -- A unique string
           ingress_filter = <filter>,       -- A pcap-filter(7) expression
           egress_filter  = <filter>,       -- ..
           tunnel         = <tunnel-conf>,
-          rx_police_gbps = <n>,           -- Allowed input rate in Gbps
-          tx_police_gbps = <n> }          -- Allowed output rate in Gbps
+          crypto         = <crypto-conf>,
+          rx_police      = <n>,           -- Allowed input rate in Gbps
+          tx_police      = <n> }          -- Allowed output rate in Gbps
 ```
 
 The `tunnel` section deviates a little from `SimpleKeyedTunnel`'s
@@ -64,8 +65,22 @@ tunnel := { type          = "L2TPv3",     -- The only type (for now)
             next_hop      = <ip-address>, -- Gateway IP
             local_ip      = <ip-address>, -- ~ `local_address'
             remote_ip     = <ip-address>, -- ~ `remote_address'
-            session       = <32bit-int>   -- ~ `session_id' }
+            session       = <32bit-int> } -- ~ `session_id'
 ```
+
+The `crypto` section allows configuration of traffic encryption based on
+`apps.ipsec.esp`:
+
+```
+crypto := { type          = "esp-aes-128-gcm", -- The only type (for now)
+            spi           = <spi>,             -- As for AES128gcm
+            transmit_key  = <key>,
+            transmit_salt = <salt>,
+            receive_key   = <key>,
+            receive_salt  = <salt>,
+            auditing      = <boolean> }
+```
+
 
 ### snabbnfv traffic
 

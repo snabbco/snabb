@@ -8,11 +8,13 @@ local ffi = require("ffi")
 local lib = require("core.lib")
 
 --- ### Register object
---- There are three types of register objects, set by the mode when created:
+--- There are eight types of register objects, set by the mode when created:
 --- * `RO` - read only.
 --- * `RW` - read-write.
---- * `RC` - read-only and return the sum of all values read. This
+--- * `RC` - read-only and return the sum of all values read.
 ---   mode is for counter registers that clear back to zero when read.
+--- * `RCR` - read-only counter for registers that don't reset on read
+--- Each has a corresponding 64bit version, `RO64`, `RW64`, `RC64`, `RCR64`
 
 Register = {}
 
@@ -27,6 +29,16 @@ function Register:readrc ()
    return self.acc[0]
 end
 
+function Register:readrcr ()
+  local val = self.ptr[0]
+  self.acc[0] = self.acc[0] + val - self.last
+  if val < self.last then
+    self.acc[0] = self.acc[0] + 2^32
+  end
+  self.last = val
+  return self.acc[0]
+end
+
 --- Write a register
 function Register:write (value)
    self.ptr[0] = value
@@ -36,6 +48,36 @@ end
 --- Set and clear specific masked bits.
 function Register:set (bitmask) self(bit.bor(self(), bitmask)) end
 function Register:clr (bitmask) self(bit.band(self(), bit.bnot(bitmask))) end
+
+function ro_bits (register, start, length)
+    return bit.band(bit.rshift(register(), start), 2^length - 1)
+end
+
+-- Get / set length bits of the register at offset start
+-- if bits == nil then return length bits from the register at offset start
+-- if bits ~= nil then set length bits in the register at offset start
+function Register:bits (start, length, bits)
+  if bits == nil then
+    return ro_bits(self, start, length)
+  else
+    local tmp = self()
+    local offmask = bit.bnot(bit.lshift(2^length - 1, start))
+    tmp = bit.band(tmp, offmask)
+    tmp = bit.bor(tmp, bit.lshift(bits, start))
+    self(tmp)
+  end
+end
+function ro_byte (register, start, byte)
+  return register:bits(start * 8, 8)
+end
+-- Get / set a byte length bytes from an offset of start bytes
+function Register:byte (start, byte)
+  if byte == nil then
+    return ro_byte(self, start, byte)
+  else
+    self:bits(start * 8, 8, byte)
+  end
+end
 
 --- Block until applying `bitmask` to the register value gives `value`.
 --- If `value` is not given then until all bits in the mask are set.
@@ -79,18 +121,25 @@ end
 local mt = {
   RO = {__index = { read=Register.read, wait=Register.wait,
                     reset=Register.noop, print=Register.print},
+                    bits=ro_bits, byte=ro_byte,
         __call = Register.read, __tostring = Register.__tostring},
   RW = {__index = { read=Register.read, write=Register.write, wait=Register.wait,
                     set=Register.set, clr=Register.clr, reset=Register.noop,
-                    print=Register.print},
+                    bits=Register.bits, byte=Register.byte, print=Register.print},
         __call = Register.__call, __tostring = Register.__tostring},
   RC = {__index = { read=Register.readrc, reset=Register.reset,
+                    bits=ro_bits, byte=ro_byte,
                     print=Register.printrc},
         __call = Register.readrc, __tostring = Register.__tostring},
-  RC64 = {__index = { read=Register.readrc, reset=Register.reset,
-                     print=Register.printrc},
-         __call = Register.readrc, __tostring = Register.__tostring},
+  RCR = { __index = { read=Register.readrcr, reset = Register.reset,
+                    bits=ro_bits, byte=ro_byte,
+                    print=Register.printrc},
+          __call = Register.readrc, __tostring = Register.__tostring  }
 }
+mt['RO64'] = mt.RO
+mt['RW64'] = mt.RW
+mt['RC64'] = mt.RC
+mt['RCR64'] = mt.RCR
 
 --- Create a register `offset` bytes from `base_ptr`.
 ---
@@ -101,11 +150,11 @@ function new (name, longname, offset, base_ptr, mode)
                ptr=base_ptr + offset/4 }
    local mt = mt[mode]
    assert(mt)
-   if mode == 'RC' or mode == 'RC64' then
+   if string.find(mode, "^RC") then
       o.acc = ffi.new("uint64_t[1]")
-      if mode == 'RC64' then
-         o.ptr = ffi.cast("uint64_t*", o.ptr)
-      end
+   end
+   if string.find(mode, "64$") then
+      o.ptr = ffi.cast("uint64_t*", o.ptr)
    end
    return setmetatable(o, mt)
 end
@@ -162,7 +211,7 @@ end
 ---     Name       ::= <identifier>
 ---     Indexing   ::= "-"
 ---                ::= "+" OffsetStep "*" Min ".." Max
----     Mode       ::= "RO" | "RW" | "RC"
+---     Mode       ::= "RO" | "RW" | "RC" | "RCR" | "RO64" | "RW64" | "RC64" | "RCR64"
 ---     Longname   ::= <string>
 ---     Offset ::= OffsetStep ::= Min ::= Max ::= <number>
 ---

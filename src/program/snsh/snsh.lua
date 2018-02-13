@@ -84,11 +84,7 @@ end
 function run_script (parameters)
    local command = table.remove(parameters, 1)
    main.parameters = parameters -- make remaining args available to script
-   local r, error = pcall(dofile, command)
-   if not r then
-      print(error)
-      main.exit(1)
-   end
+   dofile(command)
 end
 
 -- This is a simple REPL similar to LuaJIT's built-in REPL. It can only
@@ -140,5 +136,3 @@ function hook_sigquit (action)
                             1e4,
                             'repeating'))
 end
-
-

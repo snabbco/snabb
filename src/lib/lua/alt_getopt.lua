@@ -24,8 +24,6 @@ local type, pairs, ipairs, io, os = type, pairs, ipairs, io, os
 module (...)
 
 local function convert_short2long (opts)
-   local i = 1
-   local len = #opts
    local ret = {}
 
    for short_opt, accept_arg in opts:gmatch("(%w)(:?)") do

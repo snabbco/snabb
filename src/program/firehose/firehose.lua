@@ -26,6 +26,7 @@ function run (args)
    local opt = {}
    local time = nil
    local pciaddresses = {}
+   -- Maximum buffers to avoid packet drops
    local ring_size = 2048
    function opt.h (arg) print(usage)  main.exit(0) end
    function opt.H (arg) print(header) main.exit(0) end
@@ -39,13 +40,6 @@ function run (args)
    end
    function opt.r (arg)
       ring_size = tonumber(arg)
-      if type(ring_size) ~= 'number' then fatal("bad ring size: " .. arg) end
-      if ring_size > 32*1024 then
-         fatal("ring size too large for hardware: " .. ring_size)
-      end
-      if math.log(ring_size)/math.log(2) % 1 ~= 0 then
-         fatal("ring size is not a power of two: " .. arg)
-      end
    end
    args = lib.dogetopt(args, opt, "hHet:i:r:", long_opts)
    if #pciaddresses == 0 then
@@ -53,6 +47,9 @@ function run (args)
    end
 
    local sofile = args[1]
+   if sofile == nil then
+      fatal("Usage error: no shared library given. Use --help for usage.")
+   end
 
    -- Load shared object
    print("Loading shared object: "..sofile)
@@ -77,11 +74,13 @@ int firehose_callback_v1(const char *pciaddr, char **packets, void *rxring,
       local pci = require("lib.hardware.pci")
       pci.unbind_device_from_linux(pciaddr) -- make kernel/ixgbe release this device
 
-      local intel10g = require("apps.intel.intel10g")
-      -- Maximum buffers to avoid packet drops
-      intel10g.num_descriptors = ring_size
-      local nic = intel10g.new_sf({pciaddr=pciaddr})
-      nic:open()
+      local driver = require("apps.intel_mp.intel_mp").driver
+      local parse = require("core.lib").parse
+      local function new_nic (config)
+         return driver:new(parse(config, driver.config))
+      end
+      local nic = new_nic({ pciaddr=pciaddr, ring_buffer_size=ring_size })
+      nic:init()
 
       -- Traffic processing
       --
@@ -98,7 +97,7 @@ int firehose_callback_v1(const char *pciaddr, char **packets, void *rxring,
       --
       -- This means that no work is done to allocate and free buffers or to
       -- write new descriptors to the RX ring. This is expected to have
-      -- extremely low overhead to recieve each packet.
+      -- extremely low overhead to receive each packet.
 
       -- Set NIC to "legacy" descriptor format. In this mode the NIC "write
       -- back" does not overwrite the address stored in the descriptor and

@@ -1002,6 +1002,74 @@ mt.cpu_set = {
 
 addtype(types, "cpu_set", "struct cpu_set_t", mt.cpu_set)
 
+local ulong_bit_count = ffi.sizeof('unsigned long') * 8
+local function ulong_index_and_bit(n)
+  local i = math.floor(n / ulong_bit_count)
+  local b = bit.lshift(1ULL, n - i * ulong_bit_count)
+  return i, b
+end
+
+mt.bitmask = {
+  index = {
+    zero = function(mask) ffi.fill(mask, s.bitmask) end,
+    set = function(mask, node)
+      if type(node) == "table" then -- table is an array of node numbers eg {1, 2, 4}
+        for i = 1, #node do mask:set(node[i]) end
+        return mask
+      end
+      if node >= mask.size then error("numa node too large " .. node) end
+      local i, b = ulong_index_and_bit(node)
+      mask.mask[i] = bit.bor(mask.mask[i], b)
+      return mask
+    end,
+    clear = function(mask, node)
+      if type(node) == "table" then -- table is an array of node numbers eg {1, 2, 4}
+        for i = 1, #node do mask:clear(node[i]) end
+        return mask
+      end
+      if node < mask.size then
+         local i, b = ulong_index_and_bit(node)
+         mask.mask[i] = bit.band(mask.mask[i], bit.bnot(b))
+      end
+      return mask
+    end,
+    get = function(mask, node)
+      local i, b = ulong_index_and_bit(node)
+      if node >= mask.size then return false end
+      return bit.band(mask.mask[i], b) ~= 0
+    end,
+  },
+  __index = function(mask, k)
+    if mt.bitmask.index[k] then return mt.bitmask.index[k] end
+    if type(k) == "number" then return mask:get(k) end
+    error("invalid index " .. k)
+  end,
+  __newindex = function(mask, k, v)
+    if type(k) ~= "number" then error("invalid index " .. k) end
+    if v then mask:set(k) else mask:clear(k) end
+  end,
+  __new = function(tp, tab, size)
+    -- Round size to multiple of ulong bit count.
+    if size then
+      size = bit.band(size + ulong_bit_count - 1, bit.bnot(ulong_bit_count - 1))
+    else
+      size = ulong_bit_count
+    end
+    local mask = ffi.new(tp, size / ulong_bit_count, size)
+    if tab then mask:set(tab) end
+    return mask
+  end,
+  __tostring = function(mask)
+    local tab = {}
+    for i = 0, tonumber(mask.size - 1) do
+       if mask:get(i) then tab[#tab + 1] = i end
+    end
+    return "{" .. table.concat(tab, ",") .. "}"
+  end,
+}
+
+addtype_var(types, "bitmask", "struct {unsigned long size; unsigned long mask[?];}", mt.bitmask)
+
 mt.mq_attr = {
   index = {
     flags = function(mqa) return tonumber(mqa.mq_flags) end,

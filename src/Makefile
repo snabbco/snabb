@@ -5,6 +5,7 @@ E= @echo
 #E= @:
 
 export TEST_SKIPPED=43
+CC ?= gcc
 
 SRCDIR = $(shell find . -type d -not -regex './obj.*' -printf '%P ')
 OBJDIR = $(patsubst %,obj/%,$(SRCDIR))
@@ -15,12 +16,15 @@ PFLUASRC = $(shell cd ../lib/pflua/src && \
 CSRC   = $(shell find . -regex '[^\#]*\.c' -not -regex './arch/.*' -printf '%P ')
 CHDR   = $(shell find . -regex '[^\#]*\.h' -printf '%P ')
 ASM    = $(shell find . -regex '[^\#]*\.dasl' -printf '%P ')
+PFLUAASM = $(shell cd ../lib/pflua/src && \
+	         find . -regex '[^\#]*\.dasl' -printf '%P ')
 ARCHSRC= $(shell find . -regex '^./arch/[^\#]*\.c' -printf '%P ')
 RMSRC  = $(shell find . -name '*.md' -not -regex './obj.*' -printf '%P ')
 # regexp is to include program/foo but not program/foo/bar
 PROGRAM = $(shell find program -regex '^[^/]+/[^/]+' -type d -printf '%P ')
 # sort to eliminate potential duplicate of programs.inc
 INCSRC = $(sort $(shell find . -regex '[^\#]*\.inc' -printf '%P ') programs.inc)
+YANGSRC= $(shell find . -regex '[^\#]*\.yang' -printf '%P ')
 
 LUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(LUASRC))
 PFLUAOBJ := $(patsubst %.lua,obj/%_lua.o,$(PFLUASRC))
@@ -28,18 +32,22 @@ COBJ   := $(patsubst %.c,obj/%_c.o,    $(CSRC))
 HOBJ   := $(patsubst %.h,obj/%_h.o,    $(CHDR))
 ARCHOBJ:= $(patsubst %.c,obj/%_c.o,    $(ARCHSRC))
 ASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(ASM))
+PFLUAASMOBJ := $(patsubst %.dasl,obj/%_dasl.o,   $(PFLUAASM))
 JITOBJS:= $(patsubst %,obj/jit_%.o,$(JITSRC))
 EXTRAOBJS := obj/jit_tprof.o obj/jit_vmprof.o obj/strict.o
 RMOBJS := $(patsubst %,obj/%,$(RMSRC))
 INCOBJ := $(patsubst %.inc,obj/%_inc.o, $(INCSRC))
+YANGOBJ:= $(patsubst %.yang,obj/%_yang.o, $(YANGSRC))
 EXE    := bin/snabb $(patsubst %,bin/%,$(PROGRAM))
+
+LUAJIT_A := ../lib/luajit/src/libluajit.a
 
 # TESTMODS expands to:
 #   core.memory core.lib ...
 # for each module that has a top-level selftest () function.
-TESTMODS = $(shell find . -regex '[^\#]*\.lua' -printf '%P ' | \
-             xargs grep -l '^function selftest *[[:punct:]]' | \
-             sed -e 's_\.lua__' -e 's_/_._g')
+TESTMODS = $(shell find . -regex '[^\#]*\.\(lua\|dasl\)' -printf '%P ' | \
+             xargs grep -s -l '^function selftest *[[:punct:]]' | \
+             sed -e 's_\.lua__' -e 's_\.dasl__' -e 's_/_._g')
 
 # TESTSCRIPTS expands to:
 #   lib/watchdog/selftest.sh ...
@@ -48,10 +56,14 @@ TESTSCRIPTS = $(shell find . -name "selftest.sh" -executable | xargs)
 
 PATH := ../lib/luajit/usr/local/bin:$(PATH)
 
-snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(INCOBJ) $(LUAJIT_A)
+snabb: $(LUAOBJ) $(PFLUAOBJ) $(HOBJ) $(COBJ) $(ARCHOBJ) $(ASMOBJ) $(PFLUAASMOBJ) $(INCOBJ) $(YANGOBJ) $(LUAJIT_A)
+	$(E) "GEN       obj/version.lua.gen"
+	$(Q) ../generate-version-lua.sh > obj/version.lua.gen
+	$(E) "LUA       obj/version.lua"
+	$(Q) luajit -bg -n core.version obj/version.lua.gen obj/version_lua.o
 	$(E) "LINK      $@"
-	$(Q) gcc $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
-	    ../lib/luajit/src/libluajit.a \
+	$(Q) $(CC) $(DEBUG) -Wl,--no-as-needed -Wl,-E -Werror -Wall -o $@ $^ \
+	    obj/version_lua.o \
 	    -lrt -lc -ldl -lm -lpthread
 	@echo -n "BINARY    "
 	@ls -sh snabb
@@ -67,7 +79,6 @@ $(EXE): snabb bin
 	$(Q) upx -f --brute -o$@ snabb
 	@echo -n "BINARY    "
 	@ls -sh $@
-
 markdown: $(RMOBJS)
 
 test: $(TESTMODS) $(TESTSCRIPTS)
@@ -124,15 +135,15 @@ $(PFLUAOBJ): obj/%_lua.o: ../lib/pflua/src/%.lua Makefile
 
 $(COBJ): obj/%_c.o: %.c $(CHDR) Makefile | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) $(DEBUG) -O3 -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/avx2_c.o: arch/avx2.c Makefile
 	$(E) "C(AVX2)   $@"
-	$(Q) gcc -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) -O2 -mavx2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 obj/arch/sse2_c.o: arch/sse2.c Makefile
 	$(E) "C(SSE2)   $@"
-	$(Q) gcc -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) -O2 -msse2 $(DEBUG) -Wl,-E -I ../lib/luajit/src -I . -include $(CURDIR)/../gcc-preinclude.h -c -Wall -Werror -o $@ $<
 
 $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 	$(E) "H         $@"
@@ -143,6 +154,12 @@ $(HOBJ): obj/%_h.o: %.h Makefile | $(OBJDIR)
 
 $(ASMOBJ): obj/%_dasl.o: %.dasl $(CHDR) Makefile | $(OBJDIR)
 	$(E) "ASM       $@"
+	$(Q) luajit dynasm.lua -o $@.gen $<
+	$(Q) luajit -bg -n $(subst /,.,$*) $@.gen $@
+
+$(PFLUAASMOBJ): obj/%_dasl.o: ../lib/pflua/src/%.dasl $(CHDR) Makefile | $(OBJDIR)
+	$(E) "ASM       $@"
+	$(Q) mkdir -p $(dir $@)
 	$(Q) luajit dynasm.lua -o $@.gen $<
 	$(Q) luajit -bg -n $(subst /,.,$*) $@.gen $@
 
@@ -161,6 +178,13 @@ $(INCOBJ): obj/%_inc.o: %.inc Makefile | $(OBJDIR)
 	 echo "]=============]") > $(basename $@).luainc
 	$(Q) luajit -bg -n $(subst /,.,$*)_inc $(basename $@).luainc $@
 
+$(YANGOBJ): obj/%_yang.o: %.yang Makefile | $(OBJDIR)
+	$(E) "YANG      $@"
+	@(echo -n "return [=============["; \
+	 cat $<; \
+	 echo "]=============]") > $(basename $@).luayang
+	$(Q) luajit -bg -n $(subst /,.,$*)_yang $(basename $@).luayang $@
+
 # Create list of programs that exist
 programs.inc: program
 	@(for d in program/*/; do basename $$d; done) > $@
@@ -178,7 +202,7 @@ obj/jit_tprof.o: extra/tprof.lua | $(OBJDIR)
 
 obj/jit_vmprof.o: extra/vmprof.c | $(OBJDIR)
 	$(E) "C         $@"
-	$(Q) gcc $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
+	$(Q) $(CC) $(DEBUG) -Wl,-E -O2 -I ../lib/luajit/src -c -Wall -Werror -o $@ $<
 
 book: obj/doc/snabb.pdf obj/doc/snabb.html obj/doc/snabb.epub
 
@@ -187,7 +211,7 @@ obj/doc/snabb.markdown: markdown Makefile doc/genbook.sh
 
 obj/doc/snabb.pdf: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
-	$(Q) (cd obj/doc; pandoc --template=template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../../$@ ../../$<)
+	$(Q) (cd obj/doc; pandoc --template=../../doc/template.latex --latex-engine=lualatex -V fontsize=10pt -V monofont=droidsansmono -V monoscale=.70 -V verbatimspacing=.85 -V mainfont=droidserif -V sansfont=droidsans -V documentclass:book -V geometry:top=1.0in -V geometry:bottom=0.75in -S --toc --chapters  -o ../../$@ ../../$<)
 
 obj/doc/snabb.html: obj/doc/snabb.markdown
 	$(E) "PANDOC    $@"
@@ -199,7 +223,15 @@ obj/doc/snabb.epub: obj/doc/snabb.markdown
 
 CLEAN = snabb obj bin testlog programs.inc
 
-clean:
+clean_programs:
+	@(for d in program/*/; do \
+		if [ -f "$$d/Makefile" ]; then \
+			echo "CLEAN     $$d"; \
+			make -s -C $$d clean; \
+		fi \
+	  done)
+
+clean: clean_programs
 	$(E) "RM        $(CLEAN)"
 	$(Q)-rm -rf $(CLEAN)
 
@@ -210,5 +242,4 @@ mrproper: clean
 benchmarks:
 	$(Q) (scripts/bench.sh)
 
-.PHONY: clean $(TESTMODS) $(TESTSCRIPTS) benchmarks
-
+.PHONY: clean_programs clean $(TESTMODS) $(TESTSCRIPTS) benchmarks

@@ -17,4 +17,7 @@ port to a PCAP file.
 ## Configuration
 
 Both `PcapReader` and `PcapWriter` expect a filename string as their
-configuration arguments to read from and write to respectively.
+configuration arguments to read from and write to respectively. `PcapWriter`
+will alternatively accept an array as its configuration argument, with the
+first element being the filename and the second element being a *mode* argument
+to `io.open`.

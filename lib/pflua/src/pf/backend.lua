@@ -255,6 +255,7 @@ local function serialize(builder, stmt)
       elseif op == 'uint32' then return '('..lhs..' % '.. 2^32 ..')'
       end
       local rhs = serialize_value(expr[3])
+      assert(expr[4] == nil) -- sanity check
       if op == '[]' then
          return read_buffer_word_by_type(builder, 'P', lhs, rhs)
       elseif op == '+' then return '('..lhs..' + '..rhs..')'
@@ -288,9 +289,9 @@ local function serialize(builder, stmt)
    end
 
    local function serialize_call(expr)
-      local args = { 'P', 'len' }
+      local args = { 'P', 'length' }
       for i=3,#expr do table.insert(args, serialize_value(expr[i])) end
-      return 'self.'..expr[2]..'('..table.concat(args, ', ')..')'
+      return 'self:'..expr[2]..'('..table.concat(args, ', ')..')'
    end
 
    local serialize_statement
@@ -364,8 +365,8 @@ function emit_lua(ssa)
    return str
 end
 
-function emit_match_lua(ssa)
-   local builder = filter_builder('self', 'P', 'length')
+function emit_match_lua(ssa, ...)
+   local builder = filter_builder('self', 'P', 'length', ...)
    serialize(builder, cleanup(residualize_lua(ssa), true))
    local str = builder.finish()
    if verbose then pp(str) end
@@ -376,8 +377,8 @@ function emit_and_load(ssa, name)
    return assert(loadstring(emit_lua(ssa), name))()
 end
 
-function emit_and_load_match(ssa, name)
-   return assert(loadstring(emit_match_lua(ssa), name))()
+function emit_and_load_match(ssa, name, ...)
+   return assert(loadstring(emit_match_lua(ssa, ...), name))()
 end
 
 function selftest()

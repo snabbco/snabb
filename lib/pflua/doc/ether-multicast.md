@@ -35,6 +35,20 @@ return function(P,length)
    if length < 1 then return false end
    return band(P[0],1) ~= 0
 end
+```
 
+## Native pflang compilation
+
+```
+7f0cb1ee1000  4883FE01          cmp rsi, +0x01
+7f0cb1ee1004  7C0D              jl 0x7f0cb1ee1013
+7f0cb1ee1006  0FB637            movzx esi, byte [rdi]
+7f0cb1ee1009  4883E601          and rsi, +0x01
+7f0cb1ee100d  4883FE00          cmp rsi, +0x00
+7f0cb1ee1011  7503              jnz 0x7f0cb1ee1016
+7f0cb1ee1013  B000              mov al, 0x0
+7f0cb1ee1015  C3                ret
+7f0cb1ee1016  B001              mov al, 0x1
+7f0cb1ee1018  C3                ret
 ```
 

@@ -10,13 +10,21 @@ local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
 local zone = require("jit.zone")
 local lib = require("core.lib")
+local shm = require("core.shm")
 local C   = ffi.C
 -- Load ljsyscall early to help detect conflicts
 -- (e.g. FFI type name conflict between Snabb and ljsyscall)
-require("syscall")
+local S = require("syscall")
 
 require("lib.lua.strict")
 require("lib.lua.class")
+
+-- ljsyscall returns error as a cdata instead of a string, and the standard
+-- assert doesn't use tostring on it.
+_G.assert = function (v, ...)
+   if v then return v, ... end
+   error(tostring(... or "assertion failed!"))
+end
 
 -- Reserve names that we want to use for global module.
 -- (This way we avoid errors from the 'strict' module.)
@@ -28,19 +36,36 @@ ffi.cdef[[
       extern char** argv;
 ]]
 
-_G.developer_debug = false
-debug_on_error = false
+-- Enable developer-level debug if SNABB_DEBUG env variable is set.
+_G.developer_debug = lib.getenv("SNABB_DEBUG") ~= nil
+debug_on_error = _G.developer_debug
 
 function main ()
    zone("startup")
    require "lib.lua.strict"
+   -- Warn on unsupported platforms
+   if ffi.arch ~= 'x64' or ffi.os ~= 'Linux' then
+      error("fatal: "..ffi.os.."/"..ffi.arch.." is not a supported platform\n")
+   end
    initialize()
-   local program, args = select_program(parse_command_line())
-   if not lib.have_module(modulename(program)) then
-      print("unsupported program: "..program:gsub("_", "-"))
-      usage(1)
+   if lib.getenv("SNABB_PROGRAM_LUACODE") then
+      -- Run the given Lua code instead of the command-line
+      local expr = lib.getenv("SNABB_PROGRAM_LUACODE")
+      local f = loadstring(expr)
+      if f == nil then
+         error(("Failed to load $SNABB_PROGRAM_LUACODE: %q"):format(expr))
+      else
+         f()
+      end
    else
-      require(modulename(program)).run(args)
+      -- Choose a program based on the command line
+      local program, args = select_program(parse_command_line())
+      if not lib.have_module(modulename(program)) then
+         print("unsupported program: "..program:gsub("_", "-"))
+         usage(1)
+      else
+         require(modulename(program)).run(args)
+      end
    end
 end
 
@@ -54,6 +79,9 @@ function select_program (args)
          local opt = table.remove(args, 1)
          if opt == '-h' or opt == '--help' then
             usage(0)
+         elseif opt == '-v' or opt == '--version' then
+            version()
+            os.exit(0)
          else
             print("unrecognized option: "..opt)
             usage(1)
@@ -77,6 +105,21 @@ function usage (status)
    print("If you rename (or copy or symlink) this executable with one of")
    print("the names above then that program will be chosen automatically.")
    os.exit(status)
+end
+
+function version ()
+   local v = require('core.version')
+   local version_str = v.version
+   if v.extra_version ~= '' then
+      version_str = version_str.." ("..v.extra_version..")"
+   end
+   print(ffi.string(C.basename(C.argv[0])).." "..version_str)
+   print([[
+Copyright (C) 2012-2017 Snabb authors; see revision control logs for details.
+License: <https://www.apache.org/licenses/LICENSE-2.0>
+
+Snabb is open source software.  For more information on Snabb, see
+https://github.com/snabbco/snabb.]])
 end
 
 function programname (name)
@@ -109,6 +152,7 @@ function initialize ()
    require("core.lib")
    require("core.clib_h")
    require("core.lib_h")
+   lib.randomseed(tonumber(lib.getenv("SNABB_RANDOM_SEED")))
    -- Global API
    _G.config = require("core.config")
    _G.engine = require("core.app")
@@ -121,9 +165,37 @@ end
 
 function handler (reason)
    print(reason)
-   print(debug.traceback())
+   print(STP.stacktrace())
    if debug_on_error then debug.debug() end
    os.exit(1)
+end
+
+-- Cleanup after Snabb process.
+function shutdown (pid)
+   -- Parent process performs additional cleanup steps.
+   -- (Parent is the process whose 'group' folder is not a symlink.)
+   local st, err = S.lstat(shm.root.."/"..pid.."/group")
+   local is_parent = st and st.isdir
+   if is_parent then
+      -- simple pcall helper to print error and continue
+      local function safely (f)
+         local ok, err = pcall(f)
+         if not ok then print(err) end
+      end
+      -- Run cleanup hooks
+      safely(function () require("lib.hardware.pci").shutdown(pid) end)
+      safely(function () require("core.memory").shutdown(pid) end)
+   end
+   -- Free shared memory objects
+   if not _G.developer_debug and not lib.getenv("SNABB_SHM_KEEP") then
+      -- Try cleaning up symlinks for named apps, if none exist, fail silently.
+      local backlink = shm.root.."/"..pid.."/name"
+      local name_link = S.readlink(backlink)
+      S.unlink(name_link)
+      S.unlink(backlink)
+
+      shm.unlink("/"..pid)
+   end
 end
 
 function selftest ()
@@ -150,4 +222,26 @@ function selftest ()
       "Incorrect program name selected")
 end
 
-xpcall(main, handler)
+-- Fork a child process that monitors us and performs cleanup actions
+-- when we terminate.
+local snabbpid = S.getpid()
+if assert(S.fork()) ~= 0 then
+   -- parent process: run snabb
+   xpcall(main, handler)
+else
+   -- child process: supervise parent & perform cleanup
+   -- Subscribe to SIGHUP on parent death
+   S.prctl("set_name", "[snabb sup]")
+   S.prctl("set_pdeathsig", "hup")
+   -- Trap relevant signals to a file descriptor
+   local exit_signals = "hup, int, quit, term"
+   local signalfd = S.signalfd(exit_signals)
+   S.sigprocmask("block", exit_signals)
+   -- wait until we receive a signal
+   local signals
+   repeat signals = assert(S.util.signalfd_read(signalfd)) until #signals > 0
+   -- cleanup after parent process
+   shutdown(snabbpid)
+   -- exit with signal-appropriate status
+   os.exit(128 + signals[1].signo)
+end

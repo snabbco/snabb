@@ -1,0 +1,15 @@
+Usage:
+  snabb config add
+  snabb config get
+  snabb config get-state
+  snabb config listen
+  snabb config load
+  snabb config remove
+  snabb config set
+
+Use --help for per-command usage.
+Example:
+    snabb config add --help
+
+See https://github.com/Igalia/snabb/blob/lwaftr/src/program/config/README.md
+for full documentation.

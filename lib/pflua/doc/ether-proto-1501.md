@@ -35,6 +35,19 @@ return function(P,length)
    if length < 14 then return false end
    return cast("uint16_t*", P+12)[0] == 56581
 end
+```
 
+## Native pflang compilation
+
+```
+7f75046ed000  4883FE0E          cmp rsi, +0x0e
+7f75046ed004  7C0D              jl 0x7f75046ed013
+7f75046ed006  0FB7770C          movzx esi, word [rdi+0xc]
+7f75046ed00a  4881FE05DD0000    cmp rsi, 0xdd05
+7f75046ed011  7403              jz 0x7f75046ed016
+7f75046ed013  B000              mov al, 0x0
+7f75046ed015  C3                ret
+7f75046ed016  B001              mov al, 0x1
+7f75046ed018  C3                ret
 ```
 

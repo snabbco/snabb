@@ -13,17 +13,21 @@ function mac_mt:new (m)
       return m
    end
    local macobj = mac_t()
-   local i = 0;
-   for b in m:gmatch('%x%x') do
-      if i == 6 then
-         -- avoid out of bound array index
+   if type(m) == 'string' then
+      local i = 0;
+      for b in m:gmatch('%x%x') do
+         if i == 6 then
+            -- avoid out of bound array index
+            return nil, "malformed MAC address: " .. m
+         end
+         macobj.bytes[i] = tonumber(b, 16)
+         i = i + 1
+      end
+      if i < 6 then
          return nil, "malformed MAC address: " .. m
       end
-      macobj.bytes[i] = tonumber(b, 16)
-      i = i + 1
-   end
-   if i < 6 then
-      return nil, "malformed MAC address: " .. m
+   else
+      macobj.bits = m
    end
    return macobj
 end

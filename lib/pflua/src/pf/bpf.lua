@@ -250,8 +250,11 @@ function compile_lua(bpf)
       if     op == BPF_ADD then rhs = add(A(), b)
       elseif op == BPF_SUB then rhs = sub(A(), b)
       elseif op == BPF_MUL then
-         local bits = is_power_of_2(b)
-         if bits then rhs = rol(A(), bits) else rhs = mul(A(), b) end
+         if src == BPF_K then
+            local bits = is_power_of_2(b)
+            if bits then rhs = rol(A(), bits) end
+         end
+         rhs = rhs or mul(A(), b)
       elseif op == BPF_DIV then
          assert(src == BPF_K, "division by non-constant value is unsupported")
          assert(k ~= 0, "program contains division by constant zero")

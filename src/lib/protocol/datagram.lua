@@ -147,7 +147,7 @@ function datagram:push_raw (data, length)
       -- The memmove() would invalidate the data pointer of headers
       -- that have already been parsed.
       assert(self._parse.index == 0, "parse stack not empty")
-      packet.prepend(self._packet[0], data, length)
+      self._packet[0] = packet.prepend(self._packet[0], data, length)
       self._parse.offset = self._parse.offset + length
    end
 end
@@ -180,8 +180,8 @@ function datagram:parse_match (class, check)
    local parse = self._parse
    local class = class or parse.ulp
    if not class then return nil end
-   local proto = class:new_from_mem(packet.data(self._packet[0]) + parse.offset,
-                                    packet.length(self._packet[0]) - parse.offset)
+   local proto = class:new_from_mem(self._packet[0].data + parse.offset,
+                                    self._packet[0].length - parse.offset)
    if proto == nil or (check and not check(proto)) then
       if proto then proto:free() end
       return nil
@@ -277,7 +277,7 @@ function datagram:pop_raw (length, ulp)
       -- The memmove() would invalidate the data pointer of headers
       -- that have already been parsed.
       assert(self._parse.index == 0, "parse stack not empty")
-      packet.shiftleft(self._packet[0], length)
+      self._packet[0] = packet.shiftleft(self._packet[0], length)
    end
    if ulp then self._parse.ulp = ulp end
 end
@@ -295,14 +295,14 @@ end
 -- appended to the packet's payload first.
 function datagram:payload (mem, size)
    if mem then packet.append(self._packet[0], mem, size) end
-   return packet.data(self._packet[0]) + self._parse.offset,
-          packet.length(self._packet[0]) - self._parse.offset
+   return self._packet[0].data + self._parse.offset,
+          self._packet[0].length - self._parse.offset
 end
 
 -- Return the location and size of the entire packet buffer
 function datagram:data ()
    local p = self._packet
-   return packet.data(p[0]), packet.length(p[0])
+   return p[0].data, p[0].length
 end
 
 -- Commit the changes induced by previous calles to the push*() and
@@ -347,6 +347,7 @@ function selftest ()
    dgram:push(l2tp)
    dgram:push(ip)
    dgram:push(ether)
+   p = dgram:packet()
    local _, p_size = dgram:payload(data, data_size)
    assert(p_size == data_size)
    local _, d_size = dgram:data()
@@ -379,7 +380,7 @@ function selftest ()
    dgram:commit()
    _, d_size = dgram:data()
    assert(d_size == ether2:sizeof() + ip2:sizeof() + l2tp:sizeof() + data_size)
-   dgram:new(p, ethernet, { delayed_commit = true })
+   dgram:new(dgram:packet(), ethernet, { delayed_commit = true })
    assert(ether2:eq(dgram:parse()))
    assert(ip2:eq(dgram:parse()))
    assert(l2tp:eq(dgram:parse()))
