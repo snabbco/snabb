@@ -19,7 +19,6 @@ local ipv6_reassemble = require("apps.ipv6.reassemble")
 local ndp        = require("apps.lwaftr.ndp")
 local vlan       = require("apps.vlan.vlan")
 local pci        = require("lib.hardware.pci")
-local numa       = require("lib.numa")
 local cltable    = require("lib.cltable")
 local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
@@ -49,10 +48,8 @@ local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
 end
 
--- Checks the existance and NUMA affinity of PCI devices
--- NB: "nil" can be passed in and will be siliently ignored.
+-- Checks the existence of PCI devices.
 local function validate_pci_devices(devices)
-   numa.check_affinity_for_pci_addresses(devices)
    for _, address in pairs(devices) do
       assert(lwutil.nic_exists(address),
              ("Could not locate PCI device '%s'"):format(address))
