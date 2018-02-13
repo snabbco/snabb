@@ -28,15 +28,13 @@ struct {
 }
 ]]
 
-local EN10MB = 1
-
 function write_file_header(file)
    local pcap_file = ffi.new(pcap_file_t)
    pcap_file.magic_number = 0xa1b2c3d4
    pcap_file.version_major = 2
    pcap_file.version_minor = 4
    pcap_file.snaplen = 65535
-   pcap_file.network = EN10MB
+   pcap_file.network = 1
    file:write(ffi.string(pcap_file, ffi.sizeof(pcap_file)))
    file:flush()
 end
@@ -47,14 +45,10 @@ function write_record (file, ffi_buffer, length)
    file:flush()
 end
 
-local en10mb_crc_size = 4
-
 function write_record_header (file, length)
    local pcap_record = ffi.new(pcap_record_t)
    pcap_record.incl_len = length
-   -- Since we mark our saved packets as having EN10MB encapsulation,
-   -- add the CRC size on to the frame size.
-   pcap_record.orig_len = length + en10mb_crc_size
+   pcap_record.orig_len = length
    file:write(ffi.string(pcap_record, ffi.sizeof(pcap_record)))
 end
 
