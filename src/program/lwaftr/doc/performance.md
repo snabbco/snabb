@@ -24,7 +24,7 @@ MTUs are set such that fragmentation is rare.
 
 ## CPU affinity
 
-The `snabb lwaftr run` and `snabb lwaftr loadtest` commands take a
+The `snabb lwaftr run` and `snabb loadtest transient` commands take a
 `--cpu` argument, which will arrange for the Snabb process to run on a
 particular CPU.  It will also arrange to make sure that all memory used
 by that Snabb process is on the same NUMA node as that CPU, and it will
