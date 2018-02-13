@@ -33,6 +33,11 @@ local ether_header_ptr_type = ffi.typeof("$*", ether_header_t)
 local ethernet_header_size = ffi.sizeof(ether_header_t)
 local OFFSET_ETHERTYPE = 12
 
+-- The ethernet CRC field is not included in the packet as seen by
+-- Snabb, but it is part of the frame and therefore a contributor to the
+-- frame size.
+local ethernet_crc_size = 4
+
 local ether_vlan_header_type = ffi.typeof([[
 struct {
    uint16_t tag;
@@ -372,7 +377,6 @@ function Lwaftrgen:pull ()
       -- that we don't see in Snabb.
 
       local vlan_size = self.vlan and ether_vlan_header_size or 0
-      local ethernet_crc_size = 4
       local ethernet_total_size = ethernet_header_size + vlan_size
       local minimum_size = ethernet_total_size + ipv4_header_size +
          udp_header_size + ethernet_crc_size
