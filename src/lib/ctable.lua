@@ -282,7 +282,7 @@ function CTable:add(key, value, updates_allowed)
    if self.occupancy + 1 > self.occupancy_hi then
       -- Note that resizing will invalidate all hash keys, so we need
       -- to hash the key after resizing.
-      self:resize(max(self.size * 2, 10)) -- Could be current size is 0.
+      self:resize(max(self.size * 2, 1)) -- Could be current size is 0.
    end
 
    local hash = self.hash_fn(key)
