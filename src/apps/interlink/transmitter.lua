@@ -5,18 +5,13 @@ module(...,package.seeall)
 local shm = require("core.shm")
 local interlink = require("lib.interlink")
 
-local Transmitter = {
-   name = "apps.interlink.Transmitter",
-   config = {
-      name = {required=true}
-   }
-}
+local Transmitter = {name="apps.interlink.Transmitter"}
 
-function Transmitter:new (conf)
-   return setmetatable(
-      {name=conf.name, interlink=interlink.new(conf.name)},
-      {__index=Transmitter}
-   )
+function Transmitter:new (_, name)
+   local self = {}
+   self.shm_name = "group/interlink/"..name
+   self.interlink = interlink.new(self.shm_name)
+   return setmetatable(self, {__index=Transmitter})
 end
 
 function Transmitter:push ()
@@ -30,7 +25,7 @@ function Transmitter:push ()
 end
 
 function Transmitter:stop ()
-   interlink.free(self.interlink, self.name)
+   interlink.free(self.interlink, self.shm_name)
 end
 
 return Transmitter

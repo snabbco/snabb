@@ -10,14 +10,13 @@ local Sink = require("apps.basic.basic_apps").Sink
 -- Synopsis: selftest.snabb [duration]
 local DURATION = tonumber(main.parameters[1]) or 10
 
-worker.start("source",
-             [[require("apps.interlink.test_source").start("group/test.mcp")]])
+worker.start("source", [[require("apps.interlink.test_source").start("test")]])
 
 local c = config.new()
 
-config.app(c, "rx", Receiver, {name="group/test.mcp"})
+config.app(c, "test", Receiver)
 config.app(c, "sink", Sink)
-config.link(c, "rx.output->sink.input")
+config.link(c, "test.output->sink.input")
 
 engine.configure(c)
 engine.main({duration=DURATION, report={showlinks=true}})
