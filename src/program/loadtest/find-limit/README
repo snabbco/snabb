@@ -14,6 +14,11 @@ Usage: find-limit [OPTIONS] DEVICE PCAP-FILE
                              Default: 3.
   --cpu CPU
                              Bind to the given CPU.
+  --exec EXEC
+                             Run EXEC in a shell after every step to
+                             determine if the step succeeded.  Otherwise
+                             a successful step is one that receives as
+                             many packets on its interface as it sends.
   -h, --help
                              Print usage information.
 
