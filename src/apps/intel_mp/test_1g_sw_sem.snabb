@@ -1,0 +1,19 @@
+#!../../snabb snsh
+local intel = require("apps.intel_mp.intel_mp")
+local pci0 = os.getenv("SNABB_PCI_INTEL1G0")
+local pci1 = os.getenv("SNABB_PCI_INTEL1G1")
+local parse = require("core.lib").parse
+local function new_intel (arg)
+   return intel.Intel:new(parse(arg, intel.Intel.config))
+end
+local nic = new_intel({pciaddr = pci0, rxq = false, txq = false})
+
+nic:unlock_sw_sem()
+nic:lock_sw_sem()
+if pcall(nic.lock_sw_sem, nic) then
+  main.exit(-1)
+end
+nic:unlock_sw_sem()
+nic:lock_sw_sem()
+nic:stop()
+main.exit(0)

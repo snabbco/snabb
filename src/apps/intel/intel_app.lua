@@ -25,7 +25,8 @@ Intel82599 = {
       rxcounter  = {default=0},
       txcounter  = {default=0},
       rate_limit = {default=0},
-      priority   = {default=1.0}
+      priority   = {default=1.0},
+      ring_buffer_size = {default=intel10g.ring_buffer_size()}
    }
 }
 Intel82599.__index = Intel82599
@@ -52,6 +53,10 @@ end
 function Intel82599:new (conf)
    local self = {}
 
+   -- FIXME: ring_buffer_size is really a global variable for this
+   -- driver; taking the parameter as an initarg is just to make the
+   -- intel_mp transition easier.
+   intel10g.ring_buffer_size(conf.ring_buffer_size)
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
          local pf = intel10g.new_pf(conf):open()
@@ -91,7 +96,7 @@ function Intel82599:new (conf)
           txbcast   = {counter},
           txdrop    = {counter},
           txerrors  = {counter}})
-      self.stats.sync_timer = lib.timer(0.001, 'repeating', engine.now)
+      self.stats.sync_timer = lib.throttle(0.001)
 
       if not conf.vmdq and conf.macaddr then
          counter.set(self.stats.shm.macaddr, macaddress:new(conf.macaddr).bits)
@@ -155,8 +160,8 @@ function Intel82599:pull ()
    end
 end
 
-function Intel82599:ingress_packet_drops ()
-   return self.dev:ingress_packet_drops()
+function Intel82599:rxdrop ()
+   return self.dev:rxdrop()
 end
 
 function Intel82599:add_receive_buffers ()

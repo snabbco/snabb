@@ -12,52 +12,22 @@ local debug = _G.developer_debug
 local ffi    = require("ffi")
 local C      = ffi.C
 local memory = require('core.memory')
+local packet = require('core.packet')
 local band   = require('bit').band
+require("lib.virtio.virtio.h")
+require("lib.virtio.virtio_vring.h")
 
 local physical = memory.virtual_to_physical
 
 local VirtioVirtq = {}
 VirtioVirtq.__index = VirtioVirtq
 
--- The Host uses this in used->flags to advise the Guest: don't kick me when you add a buffer.
-local VRING_USED_F_NO_NOTIFY = 1
--- The Guest uses this in avail->flags to advise the Host: don't interrupt me when you consume a buffer
-local VRING_AVAIL_F_NO_INTERRUPT = 1
+local VRING_F_NO_INTERRUPT = C.VRING_F_NO_INTERRUPT
+local VRING_F_NO_NOTIFY = C.VRING_F_NO_NOTIFY
 
--- This marks a buffer as continuing via the next field.
-local VRING_DESC_F_NEXT = 1
--- This marks a buffer as write-only (otherwise read-only).
-local VRING_DESC_F_WRITE = 2
--- This means the buffer contains a list of buffer descriptors.
-local VRING_DESC_F_INDIRECT = 4
-
-ffi.cdef([[
-struct pk_header {
-  uint8_t flags;
-  uint8_t gso_type;
-  uint16_t hdr_len;
-  uint16_t gso_size;
-  uint16_t csum_start;
-  uint16_t csum_offset;
-}  __attribute__((packed));
-]])
-local pk_header_t = ffi.typeof("struct pk_header")
+local pk_header_t = ffi.typeof("struct virtio_net_hdr")
 local pk_header_size = ffi.sizeof(pk_header_t)
-
-ffi.cdef([[
-  struct vring_desc { 
-    /* Address (guest-physical). */ 
-    uint64_t addr; 
-    /* Length. */ 
-    uint32_t len; 
-    /* The flags as indicated above. */ 
-    uint16_t flags; 
-    /* Next field if flags & NEXT */ 
-    uint16_t next;
-}  __attribute__((packed));
-]])
 local vring_desc_t = ffi.typeof("struct vring_desc")
-
 
 local ringtypes = {}
 local function vring_type(n)
@@ -88,10 +58,8 @@ local function vring_type(n)
          $ *vring;
          uint64_t vring_physaddr;
          struct packet *packets[$];
-         struct pk_header *headers[$];
-         struct vring_desc *desc_tables[$];
       }
-   ]], rng, n, n, n)
+   ]], rng, n)
    ffi.metatype(t, VirtioVirtq)
    ringtypes[n] = t
    return t
@@ -104,42 +72,16 @@ local function allocate_virtq(n)
    local ptr, phys = memory.dma_alloc(ffi.sizeof(vr.vring[0]))
    vr.vring = ffi.cast(ring_t, ptr)
    vr.vring_physaddr = phys
-
-   for i = 0, n-1 do
-      local desc = vr.vring.desc[i]
-      local len = 2 * ffi.sizeof(vring_desc_t)
-      ptr, phys = memory.dma_alloc(len)
-      vr.desc_tables[i] = ffi.cast("struct vring_desc *", ptr)
-
-      desc.addr = phys
-      desc.len = len
-      desc.flags = VRING_DESC_F_INDIRECT
-      desc.next = i + 1
+   -- Initialize free list.
+   vr.free_head = -1
+   vr.num_free = 0
+   for i = n-1, 0, -1 do
+      vr.vring.desc[i].next = vr.free_head
+      vr.free_head = i
+      vr.num_free = vr.num_free + 1
    end
-
-   for i = 0, n-1 do
-      local desc_table = vr.desc_tables[i]
-
-      -- Packet header descriptor
-      local desc = desc_table[0]
-      ptr, phys = memory.dma_alloc(pk_header_size)
-      vr.headers[i] = ffi.cast("struct pk_header *", ptr)
-      desc.addr = phys
-      desc.len = pk_header_size
-      desc.flags = VRING_DESC_F_NEXT
-      desc.next = 1
-
-      -- Packet data descriptor
-      desc = desc_table[1]
-      desc.addr = 0
-      desc.len = 0
-      desc.flags = 0
-      desc.next = -1
-   end
-   vr.num_free = n
-
    -- Disable the interrupts forever, we don't need them
-   vr.vring.avail.flags = VRING_AVAIL_F_NO_INTERRUPT
+   vr.vring.avail.flags = VRING_F_NO_INTERRUPT
    return vr
 end
 
@@ -148,24 +90,22 @@ function VirtioVirtq:can_add()
 end
 
 function VirtioVirtq:add(p, len, flags, csum_start, csum_offset)
-
    local idx = self.free_head
    local desc = self.vring.desc[idx]
-   local desc_table = self.desc_tables[idx]
    self.free_head = desc.next
    self.num_free = self.num_free -1
    desc.next = -1
 
-   -- Header
-   local header = self.headers[idx]
-   header[0].flags = flags
-   header[0].csum_start = csum_start
-   header[0].csum_offset = csum_offset
-
-   -- Packet
-   desc = desc_table[1]
+   p = packet.shiftright(p, pk_header_size)
+   local header = ffi.cast("struct virtio_net_hdr *", p.data)
+   header.flags = flags
+   header.gso_type = 0
+   header.hdr_len = 0
+   header.gso_size = 0
+   header.csum_start = csum_start
+   header.csum_offset = csum_offset
    desc.addr = physical(p.data)
-   desc.len = len
+   desc.len = len + pk_header_size
    desc.flags = 0
    desc.next = -1
 
@@ -175,28 +115,7 @@ function VirtioVirtq:add(p, len, flags, csum_start, csum_offset)
 end
 
 function VirtioVirtq:add_empty_header(p, len)
-   local idx = self.free_head
-   local desc = self.vring.desc[idx]
-   local desc_table = self.desc_tables[idx]
-   self.free_head = desc.next
-   self.num_free = self.num_free -1
-   desc.next = -1
-
-   -- Header
-   local header = self.headers[idx]
-   header[0].flags = 0
-
-   -- Packet
-   desc = desc_table[1]
-   desc.addr = physical(p.data)
-
-   desc.len = len
-   desc.flags = 0
-   desc.next = -1
-
-   self.vring.avail.ring[band(self.last_avail_idx, self.num-1)] = idx
-   self.last_avail_idx = self.last_avail_idx + 1
-   self.packets[idx] = p
+   self:add(p, len, 0, 0, 0)
 end
 
 function VirtioVirtq:update_avail_idx()
@@ -216,16 +135,19 @@ function VirtioVirtq:can_get()
 end
 
 function VirtioVirtq:get()
-
    local last_used_idx = band(self.last_used_idx, self.num-1)
    local used = self.vring.used.ring[last_used_idx]
    local idx = used.id
    local desc = self.vring.desc[idx]
 
+   -- FIXME: we should allow the NEXT flag or something, though with worse perf
+   if debug then assert(desc.flags == 0) end
    local p = self.packets[idx]
+   self.packets[idx] = nil
    if debug then assert(p ~= nil) end
-   p.length = used.len - pk_header_size
-   if debug then assert(physical(p.data) == self.desc_tables[idx][1].addr) end
+   if debug then assert(physical(p.data) == desc.addr) end
+   p.length = used.len
+   p = packet.shiftleft(p, pk_header_size)
 
    self.last_used_idx = self.last_used_idx + 1
    desc.next = self.free_head
@@ -237,7 +159,7 @@ end
 
 function VirtioVirtq:should_notify()
    -- Notify only if the used ring lacks the "no notify" flag
-   return band(self.vring.used.flags, VRING_USED_F_NO_NOTIFY) == 0
+   return band(self.vring.used.flags, VRING_F_NO_NOTIFY) == 0
 end
 
 return {

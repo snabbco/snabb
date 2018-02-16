@@ -40,7 +40,7 @@ function PcapWriter:new (filename)
       mode = filename[2] or mode
       filename = filename[1]
    end
-   local file = assert(io.open(filename, "w"))
+   local file = assert(io.open(filename, mode))
    pcap.write_file_header(file)
    return setmetatable({file = file}, {__index = PcapWriter})
 end

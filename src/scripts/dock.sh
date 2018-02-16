@@ -21,5 +21,6 @@ docker run --rm --privileged -i -v $(dirname $PWD):/snabb $DOCKERFLAGS \
     -e SNABB_IPERF_BENCH_CONF=$SNABB_IPERF_BENCH_CONF \
     -e SNABB_DPDK_BENCH_CONF=$SNABB_DPDK_BENCH_CONF \
     -e SNABB_PERF_SAMPLESIZE=$SNABB_PERF_SAMPLESIZE \
+    -e SNABB_IPSEC_SKIP_E2E_TEST=$SNABB_IPSEC_SKIP_E2E_TEST \
     $SNABB_TEST_IMAGE \
     bash -c "mount -t hugetlbfs none /hugetlbfs && (cd snabb/src; $*)"

@@ -41,6 +41,23 @@ return function(P,length)
    if cast("uint16_t*", P+0)[0] ~= 65535 then return false end
    return cast("uint32_t*", P+2)[0] == 4294967295
 end
+```
 
+## Native pflang compilation
+
+```
+7fe7432af000  4883FE06          cmp rsi, +0x06
+7fe7432af004  7C1E              jl 0x7fe7432af024
+7fe7432af006  0FB737            movzx esi, word [rdi]
+7fe7432af009  4881FEFFFF0000    cmp rsi, 0xffff
+7fe7432af010  7512              jnz 0x7fe7432af024
+7fe7432af012  8B7702            mov esi, [rdi+0x2]
+7fe7432af015  48B8FFFFFFFF0000. mov rax, 0x00000000ffffffff
+7fe7432af01f  4839C6            cmp rsi, rax
+7fe7432af022  7403              jz 0x7fe7432af027
+7fe7432af024  B000              mov al, 0x0
+7fe7432af026  C3                ret
+7fe7432af027  B001              mov al, 0x1
+7fe7432af029  C3                ret
 ```
 

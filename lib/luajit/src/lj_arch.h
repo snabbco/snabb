@@ -1,6 +1,6 @@
 /*
 ** Target architecture selection.
-** Copyright (C) 2005-2015 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2017 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #ifndef _LJ_ARCH_H
@@ -25,6 +25,10 @@
 #define LUAJIT_ARCH_ppc		5
 #define LUAJIT_ARCH_MIPS	6
 #define LUAJIT_ARCH_mips	6
+#define LUAJIT_ARCH_MIPS32	6
+#define LUAJIT_ARCH_mips32	6
+#define LUAJIT_ARCH_MIPS64	7
+#define LUAJIT_ARCH_mips64	7
 
 /* Target OS. */
 #define LUAJIT_OS_OTHER		0
@@ -47,8 +51,10 @@
 #define LUAJIT_TARGET	LUAJIT_ARCH_ARM64
 #elif defined(__ppc__) || defined(__ppc) || defined(__PPC__) || defined(__PPC) || defined(__powerpc__) || defined(__powerpc) || defined(__POWERPC__) || defined(__POWERPC) || defined(_M_PPC)
 #define LUAJIT_TARGET	LUAJIT_ARCH_PPC
+#elif defined(__mips64__) || defined(__mips64) || defined(__MIPS64__) || defined(__MIPS64)
+#define LUAJIT_TARGET	LUAJIT_ARCH_MIPS64
 #elif defined(__mips__) || defined(__mips) || defined(__MIPS__) || defined(__MIPS)
-#define LUAJIT_TARGET	LUAJIT_ARCH_MIPS
+#define LUAJIT_TARGET	LUAJIT_ARCH_MIPS32
 #else
 #error "No support for this architecture (yet)"
 #endif
@@ -68,7 +74,10 @@
        defined(__NetBSD__) || defined(__OpenBSD__) || \
        defined(__DragonFly__)) && !defined(__ORBIS__)
 #define LUAJIT_OS	LUAJIT_OS_BSD
-#elif (defined(__sun__) && defined(__svr4__)) || defined(__CYGWIN__)
+#elif (defined(__sun__) && defined(__svr4__))
+#define LUAJIT_OS	LUAJIT_OS_POSIX
+#elif defined(__CYGWIN__)
+#define LJ_TARGET_CYGWIN	1
 #define LUAJIT_OS	LUAJIT_OS_POSIX
 #else
 #define LUAJIT_OS	LUAJIT_OS_OTHER
@@ -137,7 +146,7 @@
 #define LJ_ARCH_NAME		"x86"
 #define LJ_ARCH_BITS		32
 #define LJ_ARCH_ENDIAN		LUAJIT_LE
-#if LJ_TARGET_WINDOWS || __CYGWIN__
+#if LJ_TARGET_WINDOWS || LJ_TARGET_CYGWIN
 #define LJ_ABI_WIN		1
 #else
 #define LJ_ABI_WIN		0
@@ -155,7 +164,7 @@
 #define LJ_ARCH_NAME		"x64"
 #define LJ_ARCH_BITS		64
 #define LJ_ARCH_ENDIAN		LUAJIT_LE
-#if LJ_TARGET_WINDOWS || __CYGWIN__
+#if LJ_TARGET_WINDOWS || LJ_TARGET_CYGWIN
 #define LJ_ABI_WIN		1
 #else
 #define LJ_ABI_WIN		0
@@ -217,7 +226,6 @@
 #define LJ_TARGET_UNIFYROT	2	/* Want only IR_BROR. */
 #define LJ_TARGET_GC64		1
 #define LJ_ARCH_NUMMODE		LJ_NUMMODE_DUAL
-#define LJ_ARCH_NOJIT		1	/* NYI */
 
 #define LJ_ARCH_VERSION		80
 
@@ -286,32 +294,60 @@
 #define LJ_ARCH_XENON		1
 #endif
 
-#elif LUAJIT_TARGET == LUAJIT_ARCH_MIPS
+#elif LUAJIT_TARGET == LUAJIT_ARCH_MIPS32 || LUAJIT_TARGET == LUAJIT_ARCH_MIPS64
 
 #if defined(__MIPSEL__) || defined(__MIPSEL) || defined(_MIPSEL)
+#if LUAJIT_TARGET == LUAJIT_ARCH_MIPS32
 #define LJ_ARCH_NAME		"mipsel"
+#else
+#define LJ_ARCH_NAME		"mips64el"
+#endif
 #define LJ_ARCH_ENDIAN		LUAJIT_LE
 #else
+#if LUAJIT_TARGET == LUAJIT_ARCH_MIPS32
 #define LJ_ARCH_NAME		"mips"
+#else
+#define LJ_ARCH_NAME		"mips64"
+#endif
 #define LJ_ARCH_ENDIAN		LUAJIT_BE
 #endif
+
+#if !defined(LJ_ARCH_HASFPU)
+#ifdef __mips_soft_float
+#define LJ_ARCH_HASFPU		0
+#else
+#define LJ_ARCH_HASFPU		1
+#endif
+#endif
+
+#if !defined(LJ_ABI_SOFTFP)
+#ifdef __mips_soft_float
+#define LJ_ABI_SOFTFP		1
+#else
+#define LJ_ABI_SOFTFP		0
+#endif
+#endif
+
+#if LUAJIT_TARGET == LUAJIT_ARCH_MIPS32
 #define LJ_ARCH_BITS		32
+#define LJ_TARGET_MIPS32	1
+#else
+#if LJ_ABI_SOFTFP || !LJ_ARCH_HASFPU
+#define LJ_ARCH_NOJIT		1	/* NYI */
+#endif
+#define LJ_ARCH_BITS		64
+#define LJ_TARGET_MIPS64	1
+#define LJ_TARGET_GC64		1
+#endif
 #define LJ_TARGET_MIPS		1
 #define LJ_TARGET_EHRETREG	4
 #define LJ_TARGET_JUMPRANGE	27	/* 2*2^27 = 256MB-aligned region */
 #define LJ_TARGET_MASKSHIFT	1
 #define LJ_TARGET_MASKROT	1
 #define LJ_TARGET_UNIFYROT	2	/* Want only IR_BROR. */
-#define LJ_ARCH_NUMMODE		LJ_NUMMODE_SINGLE
+#define LJ_ARCH_NUMMODE		LJ_NUMMODE_DUAL
 
-#if !defined(LJ_ARCH_HASFPU) && defined(__mips_soft_float)
-#define LJ_ARCH_HASFPU		0
-#endif
-#if !defined(LJ_ABI_SOFTFP) && defined(__mips_soft_float)
-#define LJ_ABI_SOFTFP		1
-#endif
-
-#if _MIPS_ARCH_MIPS32R2
+#if _MIPS_ARCH_MIPS32R2 || _MIPS_ARCH_MIPS64R2
 #define LJ_ARCH_VERSION		20
 #else
 #define LJ_ARCH_VERSION		10
@@ -392,9 +428,13 @@
 #ifdef __NO_FPRS__
 #error "No support for PPC/e500 anymore (use LuaJIT 2.0)"
 #endif
-#elif LJ_TARGET_MIPS
-#if defined(_LP64)
-#error "No support for MIPS64"
+#elif LJ_TARGET_MIPS32
+#if !((defined(_MIPS_SIM_ABI32) && _MIPS_SIM == _MIPS_SIM_ABI32) || (defined(_ABIO32) && _MIPS_SIM == _ABIO32))
+#error "Only o32 ABI supported for MIPS32"
+#endif
+#elif LJ_TARGET_MIPS64
+#if !((defined(_MIPS_SIM_ABI64) && _MIPS_SIM == _MIPS_SIM_ABI64) || (defined(_ABI64) && _MIPS_SIM == _ABI64))
+#error "Only n64 ABI supported for MIPS64"
 #endif
 #endif
 #endif
@@ -435,7 +475,7 @@
 #endif
 
 /* Disable or enable the JIT compiler. */
-#if defined(LUAJIT_DISABLE_JIT) || defined(LJ_ARCH_NOJIT) || defined(LJ_OS_NOJIT) || LJ_FR2 || LJ_GC64
+#if defined(LUAJIT_DISABLE_JIT) || defined(LJ_ARCH_NOJIT) || defined(LJ_OS_NOJIT)
 #define LJ_HASJIT		0
 #else
 #define LJ_HASJIT		1
@@ -496,7 +536,7 @@
 #endif
 
 /* Various workarounds for embedded operating systems or weak C runtimes. */
-#if (defined(__ANDROID__) && !defined(LJ_TARGET_X86ORX64)) || defined(__symbian__) || LJ_TARGET_XBOX360 || LJ_TARGET_WINDOWS
+#if defined(__ANDROID__) || defined(__symbian__) || LJ_TARGET_XBOX360 || LJ_TARGET_WINDOWS
 #define LUAJIT_NO_LOG2
 #endif
 #if defined(__symbian__) || LJ_TARGET_WINDOWS
@@ -504,6 +544,11 @@
 #endif
 #if LJ_TARGET_CONSOLE || (LJ_TARGET_IOS && __IPHONE_OS_VERSION_MIN_REQUIRED >= __IPHONE_8_0)
 #define LJ_NO_SYSTEM		1
+#endif
+
+#if !defined(LUAJIT_NO_UNWIND) && __GNU_COMPACT_EH__
+/* NYI: no support for compact unwind specification, yet. */
+#define LUAJIT_NO_UNWIND	1
 #endif
 
 #if defined(LUAJIT_NO_UNWIND) || defined(__symbian__) || LJ_TARGET_IOS || LJ_TARGET_PS3 || LJ_TARGET_PS4

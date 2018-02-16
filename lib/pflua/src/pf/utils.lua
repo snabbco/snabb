@@ -11,6 +11,11 @@ struct pflua_timeval {
 int gettimeofday(struct pflua_timeval *tv, struct timezone *tz);
 ]]
 
+-- Additional function arguments other than 'P' that the
+-- compiled function may accept (this needs to be tracked in several
+-- pflua passes, which is why the data is kept here)
+filter_args = { len = true }
+
 -- now() returns the current time.  The first time it is called, the
 -- return value will be zero.  This is to preserve precision, regardless
 -- of what the current epoch is.
@@ -114,11 +119,26 @@ function pp(expr, indent, suffix)
          pp(expr[#expr], indent, ' }'..suffix)
       end
    elseif type(expr) == 'table' then
-      if #expr == 0 then
-         print(indent .. '{}')
-      else
-         error('unimplemented')
-      end
+     if not next(expr) then
+        print(indent .. '{}' .. suffix)
+     else
+       print(indent..'{')
+       local new_indent = indent..'  '
+       for k, v in pairs(expr) do
+          if type(k) == "string" then
+             if type(v) == "table" then
+                print(new_indent..k..' = ')
+                pp(v, new_indent..string.rep(" ", string.len(k))..'   ', ',')
+             else
+                pp(v, new_indent..k..' = ', ',')
+             end
+          else
+             pp(k, new_indent..'[', '] = ')
+             pp(v, new_indent, ',')
+          end
+       end
+       print(indent..'}'..suffix)
+     end
    else
       error("unsupported type "..type(expr))
    end

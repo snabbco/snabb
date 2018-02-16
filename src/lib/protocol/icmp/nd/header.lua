@@ -17,6 +17,7 @@ function nd_header:options (mem, size)
    local result = {}
    while size > 0 do
       local tlv = tlv:new_from_mem(mem, size)
+      assert(tlv, "corrupt ND options")
       table.insert(result, tlv)
       local tlv_size = tlv:length()*8
       mem = mem + tlv_size

@@ -1,7 +1,7 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 
 -- This app implements a point-to-point encryption tunnel using ESP with
--- AES-128-GCM.
+-- AES128GCM12 in transport mode over IPv6.
 
 module(..., package.seeall)
 local esp = require("lib.ipsec.esp")
@@ -10,7 +10,15 @@ local C = require("ffi").C
 
 AES128gcm = {
    config = {
-      spi = {required=true}, key = {required=true}, window_size = {}
+      spi = {required=true},
+      transmit_key = {required=true},
+      transmit_salt =  {required=true},
+      receive_key = {required=true},
+      receive_salt =  {required=true},
+      receive_window = {},
+      resync_threshold = {},
+      resync_attempts = {},
+      auditing = {}
    },
    shm = {
       txerrors = {counter}, rxerrors = {counter}
@@ -19,17 +27,22 @@ AES128gcm = {
 
 function AES128gcm:new (conf)
    local self = {}
-   self.encrypt = esp.esp_v6_encrypt:new{
-      mode = "aes-128-gcm",
+   assert(conf.transmit_salt ~= conf.receive_salt,
+          "Refusing to operate with transmit_salt == receive_salt")
+   self.encrypt = esp.encrypt:new{
+      mode = "aes-gcm-128-12",
       spi = conf.spi,
-      keymat = conf.key:sub(1, 32),
-      salt = conf.key:sub(33, 40)}
-   self.decrypt = esp.esp_v6_decrypt:new{
-      mode = "aes-128-gcm",
+      key = conf.transmit_key,
+      salt = conf.transmit_salt}
+   self.decrypt = esp.decrypt:new{
+      mode = "aes-gcm-128-12",
       spi = conf.spi,
-      keymat = conf.key:sub(1, 32),
-      salt = conf.key:sub(33, 40),
-      window_size = conf.replay_window}
+      key = conf.receive_key,
+      salt = conf.receive_salt,
+      window_size = conf.receive_window,
+      resync_threshold = conf.resync_threshold,
+      resync_attempts = conf.resync_attempts,
+      auditing = conf.auditing}
    return setmetatable(self, {__index = AES128gcm})
 end
 
@@ -39,8 +52,9 @@ function AES128gcm:push ()
    local output = self.output.encapsulated
    for _=1,link.nreadable(input) do
       local p = link.receive(input)
-      if self.encrypt:encapsulate(p) then
-         link.transmit(output, p)
+      local p_enc = self.encrypt:encapsulate_transport6(p)
+      if p_enc then
+         link.transmit(output, p_enc)
       else
          packet.free(p)
          counter.add(self.shm.txerrors)
@@ -51,8 +65,9 @@ function AES128gcm:push ()
    local output = self.output.decapsulated
    for _=1,link.nreadable(input) do
       local p = link.receive(input)
-      if self.decrypt:decapsulate(p) then
-         link.transmit(output, p)
+      local p_dec = self.decrypt:decapsulate_transport6(p)
+      if p_dec then
+         link.transmit(output, p_dec)
       else
          packet.free(p)
          counter.add(self.shm.rxerrors)

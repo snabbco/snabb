@@ -36,6 +36,9 @@ function new (name)
 end
 
 function free (r, name)
+   while not empty(r) do
+      packet.free(receive(r))
+   end
    for _, c in ipairs(provided_counters) do
       counter.delete("links/"..name.."/"..c..".counter")
    end
@@ -66,7 +69,6 @@ function transmit (r, p)
       r.write = band(r.write + 1, size - 1)
       counter.add(r.stats.txpackets)
       counter.add(r.stats.txbytes, p.length)
-      r.has_new_data = true
    end
 end
 

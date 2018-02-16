@@ -32,25 +32,32 @@ function run (args)
 end
 
 function select_snabb_instance (pid)
-   local instances = shm.children("/")
+   local function compute_snabb_instances()
+      -- Produces set of snabb instances, excluding this one.
+      local pids = {}
+      local my_pid = S.getpid()
+      for _, name in ipairs(shm.children("/")) do
+         -- This could fail as the name could be for example "by-name"
+         local p = tonumber(name)
+         if p and p ~= my_pid then table.insert(pids, name) end
+      end
+      return pids
+   end
+
+   local instances = compute_snabb_instances()
+
    if pid then
+      pid = tostring(pid)
       -- Try to use given pid
       for _, instance in ipairs(instances) do
          if instance == pid then return pid end
       end
       print("No such Snabb instance: "..pid)
-   elseif #instances == 1 then print("No Snabb instance found.")
+   elseif #instances == 1 then return instances[1]
+   elseif #instances <= 0 then print("No Snabb instance found.")
    else
-      local own_pid = tostring(S.getpid())
-      if #instances == 2 then
-         -- Two means one is us, so we pick the other.
-         return instances[1] == own_pid and instances[2] or instances[1]
-      else
-         print("Multiple Snabb instances found. Select one:")
-         for _, instance in ipairs(instances) do
-            if instance ~= own_pid then print(instance) end
-         end
-      end
+      print("Multiple Snabb instances found. Select one:")
+      for _, instance in ipairs(instances) do print(instance) end
    end
    main.exit(1)
 end
@@ -74,7 +81,9 @@ function top (instance_pid)
    local configs = 0
    local last_stats = nil
    while (true) do
-      if configs < counter.read(counters.engine.configs) then
+      local current = counter.read(counters.engine.configs)
+      if configs < current then
+         configs = current
          -- If a (new) config is loaded we (re)open the link counters.
          open_link_counters(counters, instance_tree)
       end
