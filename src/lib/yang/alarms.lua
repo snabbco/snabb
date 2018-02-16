@@ -202,7 +202,7 @@ function alarm_list:set_defaults_if_any (key)
    k = alarm_type_keys:normalize(key)
    local default = self.defaults[k]
    if default then
-      for k,v in pairs(defaults) do
+      for k,v in pairs(default) do
          self.list[key][k] = v
       end
    end
