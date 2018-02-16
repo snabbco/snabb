@@ -126,7 +126,12 @@ end
 
 local function ethernet_address_of (iface)
    local cmd = ("ip li sh %s | grep 'link/ether' | awk '{print $2}'"):format(iface)
-   return chomp(execute(cmd))
+   local ret = chomp(execute(cmd))
+   if #ret == 0 then
+      print(("Unsupported interface: '%s' (missing MAC address)"):format(iface))
+      os.exit()
+   end
+   return ret
 end
 
 local function ipv4_address_of (iface)
@@ -150,9 +155,10 @@ function run(args)
    elseif opts.interface then
       local iface = opts.interface
       local query = args[1]
+      local src_eth = ethernet_address_of(iface)
       print(("Capturing packets from interface '%s'"):format(iface))
       config.app(c, "dnssd", DNSSD, {
-         src_eth = ethernet_address_of(iface),
+         src_eth = src_eth,
          src_ipv4 = ipv4_address_of(iface),
          query = query,
       })
