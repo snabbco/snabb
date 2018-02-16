@@ -290,8 +290,7 @@ end
 function Manager:rpc_set_alarm_operator_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
-         return false, ("Set-operator-state operation not supported in"..
-                        "'%s' schema"):format(args.schema)
+         error(("Set-operator-state operation not supported in '%s' schema"):format(args.schema))
       end
       local key = {resource=args.resource, alarm_type_id=args.alarm_type_id,
                    alarm_type_qualifier=args.alarm_type_qualifier}
@@ -305,8 +304,7 @@ end
 function Manager:rpc_purge_alarms (args)
    local function purge()
       if args.schema ~= self.schema_name then
-         return false, ("Purge-alarms operation not supported in"..
-                        "'%s' schema"):format(args.schema)
+         error(("Purge-alarms operation not supported in '%s' schema"):format(args.schema))
       end
       return { purged_alarms = alarms.purge_alarms(args) }
    end
@@ -317,8 +315,7 @@ end
 function Manager:rpc_compress_alarms (args)
    local function compress()
       if args.schema ~= self.schema_name then
-         return false, ("Compress-alarms operation not supported in"..
-                        "'%s' schema"):format(args.schema)
+         error(("Compress-alarms operation not supported in '%s' schema"):format(args.schema))
       end
       return { compressed_alarms = alarms.compress_alarms(args) }
    end
