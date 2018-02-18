@@ -6,33 +6,42 @@ module(...,package.seeall)
 --
 -- An “interlink” is a thread safe single-producer/single-consumer queue
 -- implemented as a ring buffer with a memory layout that is carefully
--- optimized for multi-threaded performance (keyword: “false sharing”).
+-- optimized for multi-threaded performance (keyword: “false sharing”). It is
+-- represented by a struct allocated in shared memory.
 --
--- The processes at each end of an interlink will both call `new' and `free' in
--- order to create/delete the shared ring buffer. Beyond this, the processes
--- that share an interlink each must restrict themselves to calling either
+-- The processes at each end of an interlink are called the “receiver” and
+-- “transmitter” which use disjoint, symmetric subsets of the API on a given
+-- queue, as shown below.
 --
---    full  insert  push          (transmitting)
+--    Receiver                   Transmitter
+--    ----------                 -------------
+--    attach_receiver(name)      attach_transmitter(name)
+--    empty(r)                   full(r)
+--    extract(r)                 insert(r, p)
+--    pull(r)                    push(r)
+--    detach_receiver(name)      detach_transmitter(name)
 --
--- or
+-- I.e., both receiver and transmitter will attach to a queue object they wish
+-- to communicate over, and detach once they cease operations.
 --
---    empty  extract  pull        (receiving)
+-- Meanwhile, the receiver can extract packets from the queue unless it is
+-- empty, while the transmitter can insert new packets into the queue unless
+-- it is full.
 --
--- on the queue.
+-- Packets inserted by the transmitter only become visible to the receiver once
+-- the transmitter calls push. Likewise, queue slots freed from extracting
+-- packets only become visible to the transmitter once the receiver calls pull.
 --
--- I.e., the transmitting process `insert's new packets into the queue while it
--- is not `full', and makes new packets visible to the receiving process by
--- calling `push'. The receiving process, on the other hand, `extract's packets
--- while the queue is not `empty', and notifies the transmitting process of
--- newly available slots by calling `pull'.
+-- API
+-- ----
 --
---    new(name)
+--    attach_receiver(name), attach_transmitter(name)
 --       Attaches to and returns a shared memory interlink object by name (a
 --       SHM path). If the target name is unavailable (possibly because it is
 --       already in use), this operation will block until it becomes available
 --       again.
 --
---    free(r, name)
+--    detach_receiver(r, name), detach_transmitter(r, name)
 --       Unmaps interlink r and unlinks it from its name. If other end has
 --       already freed the interlink, any packets remaining in the queue are
 --       freed.
@@ -78,58 +87,118 @@ ffi.cdef([[ struct interlink {
 -- and detach in any order, and even for multiple processes to attempt to
 -- attach to the same interlink at the same time.
 --
--- Interlinks can be in one of three states:
+-- Interlinks can be in one of five states:
 
 local FREE = 0 -- Implicit initial state due to 0 value.
-local UP   = 1 -- Other end has attached.
-local DOWN = 2 -- Either end has detached; must be re-allocated.
+local RXUP = 1 -- Receiver has attached.
+local TXUP = 2 -- Transmitter has attached.
+local DXUP = 3 -- Both ends have attached.
+local DOWN = 4 -- Either end has detached; must be re-allocated.
 
 -- Once either end detaches from an interlink it stays in the DOWN state
 -- until it is deallocated.
 --
 -- Here are the valid state transitions and when they occur:
 --
--- Change          When
--- -------------   --------------------------------------------------------
--- none -> FREE    a process has successfully created the queue.
--- FREE -> UP      another process has attached to the queue.
--- UP   -> DOWN    either process has detached from the queue.
--- FREE -> DOWN    creator detached before any other process could attach.
--- DOWN -> none    the process that detaches last frees the queue (and the
---                 packets remaining in it).
+-- Who      Change          Why
+-- ------   -------------   ---------------------------------------------------
+-- (any)    none -> FREE    A process creates the queue (initial state).
+-- recv.    FREE -> RXUP    Receiver attaches to free queue.
+-- recv.    TXUP -> DXUP    Receiver attaches to queue with ready transmitter.
+-- recv.    DXUP -> TXUP    Receiver detaches from queue.
+-- recv.    RXUP -> DOWN    Receiver deallocates queue.
+-- trans.   FREE -> TXUP    Transmitter attaches to free queue.
+-- trans.   RXUP -> DXUP    Transmitter attaches to queue with ready receiver.
+-- trans.   DXUP -> RXUP    Transmitter detaches from queue.
+-- trans.   TXUP -> DOWN    Transmitter deallocates queue.
+--
+-- These state transitions are *PROHIBITED* for important reasons:
+--
+-- Who      Change      Why *PROHIBITED*
+-- ------   ----------- --------------------------------------------------------
+-- (any)    FREE->DEAD  Cannot shutdown before having attached.
+-- (any)       *->FREE  Cannot transition to FREE except by reallocating.
+-- recv.    TXUP->DEAD  Receiver cannot mutate queue after it has detached.
+-- recv.    DXUP->RXUP  Receiver cannot detach Transmitter.
+-- trans.   RXUP->DEAD  Transmitter cannot mutate queue after it has detached.
+-- trans.   DXUP->TXUP  Transmitter cannot detach receiver.
+-- (any)    DXUP->DOWN  Cannot shutdown queue while it is in use.
+-- (any)    DOWN->*     Cannot transition from DOWN (must create new queue.)
 
-function new (name)
+local function attach (name, initialize)
    local ok, r
    local first_try = true
    waitfor(
       function ()
-         -- First we try to create the queue.
-         ok, r = pcall(shm.create, name, "struct interlink")
-         if ok then return true end
-         -- If that failed then we try to open (attach to) it.
+         -- Try to open the queue.
          ok, r = pcall(shm.open, name, "struct interlink")
-         if ok and sync.cas(r.state, FREE, UP) then return true end
+         -- If that failed then we try to create it.
+         if not ok then ok, r = pcall(shm.create, name, "struct interlink") end
+         -- Return if we could map the queue and succeed to initialize it.
+         if ok and initialize(r) then return true end
          -- We failed; handle error and try again.
-         if ok then shm.unmap(r) end
+         if ok then shm.unmap(r); ok, r = nil end
          if first_try then
             print("interlink: waiting for "..name.." to become available...")
             first_try = false
          end
       end
    )
+   -- Ready for action :)
    return r
 end
 
-function free (r, name)
-   if sync.cas(r.state, FREE, DOWN)
-   or not sync.cas(r.state, UP, DOWN) then
-      while not empty(r) do
-         packet.free(extract(r))
+function attach_receiver (name)
+   return attach(name,
+                 -- Attach to free queue as receiver (FREE -> RXUP)
+                 -- or queue with ready transmitter (TXUP -> DXUP.)
+                 function (r) return sync.cas(r.state, FREE, RXUP)
+                                  or sync.cas(r.state, TXUP, DXUP) end)
+end
+
+function attach_transmitter (name)
+   return attach(name,
+                 -- Attach to free queue as transmitter (FREE -> TXUP)
+                 -- or queue with ready receiver (RXUP -> DXUP.)
+                 function (r) return sync.cas(r.state, FREE, TXUP)
+                                  or sync.cas(r.state, RXUP, DXUP) end)
+end
+
+local function detach (r, name, reset, shutdown)
+   waitfor(
+      function ()
+         -- Try to detach from queue and leave it for reuse (soft reset).
+         if reset(r) then return true
+         -- Alternatively, attempt to shutdown and deallocate queue.
+         elseif shutdown(r) then
+            while not empty(r) do
+               packet.free(extract(r))
+            end
+            shm.unlink(name)
+            return true
+         end
       end
-      shm.unlink(name)
-   end
+   )
    shm.unmap(r)
 end
+
+function detach_receiver (r, name)
+   detach(r, name,
+          -- Reset: detach from queue with active transmitter (DXUP -> TXUP.)
+          function () return sync.cas(r.state, DXUP, TXUP) end,
+          -- Shutdown: deallocate no longer used (RXUP -> DOWN.)
+          function () return sync.cas(r.state, RXUP, DOWN) end)
+end
+
+function detach_transmitter (r, name)
+   detach(r, name,
+          -- Reset: detach from queue with ready receiver (DXUP -> RXUP.)
+          function () return sync.cas(r.state, DXUP, RXUP) end,
+          -- Shutdown: deallocate no longer used queue (TXUP -> DOWN.)
+          function () return sync.cas(r.state, TXUP, DOWN) end)
+end
+
+-- Queue operations follow below.
 
 local function NEXT (i)
    return band(i + 1, link.max)

@@ -10,7 +10,7 @@ local Transmitter = {name="apps.interlink.Transmitter"}
 function Transmitter:new (_, name)
    local self = {}
    self.shm_name = "group/interlink/"..name
-   self.interlink = interlink.new(self.shm_name)
+   self.interlink = interlink.attach_transmitter(self.shm_name)
    return setmetatable(self, {__index=Transmitter})
 end
 
@@ -25,7 +25,7 @@ function Transmitter:push ()
 end
 
 function Transmitter:stop ()
-   interlink.free(self.interlink, self.shm_name)
+   interlink.detach_transmitter(self.interlink, self.shm_name)
 end
 
 return Transmitter

@@ -10,7 +10,7 @@ local Receiver = {name="apps.interlink.Receiver"}
 function Receiver:new (_, name)
    local self = {}
    self.shm_name = "group/interlink/"..name
-   self.interlink = interlink.new(self.shm_name)
+   self.interlink = interlink.attach_receiver(self.shm_name)
    return setmetatable(self, {__index=Receiver})
 end
 
@@ -25,7 +25,7 @@ function Receiver:pull ()
 end
 
 function Receiver:stop ()
-   interlink.free(self.interlink, self.shm_name)
+   interlink.detach_receiver(self.interlink, self.shm_name)
 end
 
 return Receiver
