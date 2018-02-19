@@ -1,0 +1,29 @@
+Usage: find-limit [OPTIONS] DEVICE PCAP-FILE
+
+  -b BITRATE, --bitrate BITRATE
+                             Test bitrates up to BITRATE bits/second.
+                             Default: 10e9.
+  -D DURATION, --duration DURATION
+                             Linger on each step for DURATION seconds.
+                             Default: 1.
+  -p PRECISION, --precision PRECISION
+                             Measure to PRECISION bits/second.
+                             Default: 0.001e9.
+  -r RETRY-COUNT, --retry-count RETRY-COUNT
+                             If a step fails, retry it RETRY-COUNT times.
+                             Default: 3.
+  --cpu CPU
+                             Bind to the given CPU.
+  --exec EXEC
+                             Run EXEC in a shell after every step to
+                             determine if the step succeeded.  Otherwise
+                             a successful step is one that receives as
+                             many packets on its interface as it sends.
+  -h, --help
+                             Print usage information.
+
+Apply load on DEVICE by replaying packets from PCAP-FILE, and attempt to
+determine the highest bitrate at which a test passes.
+
+Examples:
+  find-limit 01:00.0 cap1.pcap
