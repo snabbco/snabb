@@ -22,7 +22,7 @@ local function fatal (msg)
 end
 
 local function show_usage(code)
-   print(require("program.lwaftr.loadtest.README_inc"))
+   print(require("program.loadtest.transient.README_inc"))
    main.exit(code)
 end
 
