@@ -121,7 +121,7 @@ function allocate ()
       freelist_lock(group_fl)
       while freelist_nfree(group_fl) > 0
       and freelist_nfree(packets_fl) < packets_allocated do
-         free(freelist_remove(group_fl))
+         freelist_add(packets_fl, freelist_remove(group_fl))
       end
       freelist_unlock(group_fl)
       if freelist_nfree(packets_fl) == 0 then
