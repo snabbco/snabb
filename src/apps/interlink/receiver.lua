@@ -10,7 +10,9 @@ local Receiver = {name="apps.interlink.Receiver"}
 function Receiver:new (_, name)
    local self = {}
    self.shm_name = "group/interlink/"..name
+   self.backlink = "interlink/receiver/"..name
    self.interlink = interlink.attach_receiver(self.shm_name)
+   shm.alias(self.backlink, self.shm_name)
    return setmetatable(self, {__index=Receiver})
 end
 
@@ -26,6 +28,22 @@ end
 
 function Receiver:stop ()
    interlink.detach_receiver(self.interlink, self.shm_name)
+   shm.unlink(self.backlink)
+end
+
+-- Detach receivers to prevent leaking interlinks opened by pid.
+--
+-- This is an internal API function provided for cleanup during
+-- process termination.
+function Receiver.shutdown (pid)
+   for _, name in ipairs(shm.children("/"..pid.."/interlink/receiver")) do
+      local backlink = "/"..pid.."/interlink/receiver/"..name
+      local shm_name = "/"..pid.."/group/interlink/"..name
+      -- Call protected in case /<pid>/group is already unlinked.
+      local ok, r = pcall(interlink.open, shm_name)
+      if ok then interlink.detach_receiver(r, shm_name) end
+      shm.unlink(backlink)
+   end
 end
 
 return Receiver

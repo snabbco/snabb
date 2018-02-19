@@ -185,17 +185,17 @@ end
 function detach_receiver (r, name)
    detach(r, name,
           -- Reset: detach from queue with active transmitter (DXUP -> TXUP.)
-          function () return sync.cas(r.state, DXUP, TXUP) end,
+          function (r) return sync.cas(r.state, DXUP, TXUP) end,
           -- Shutdown: deallocate no longer used (RXUP -> DOWN.)
-          function () return sync.cas(r.state, RXUP, DOWN) end)
+          function (r) return sync.cas(r.state, RXUP, DOWN) end)
 end
 
 function detach_transmitter (r, name)
    detach(r, name,
           -- Reset: detach from queue with ready receiver (DXUP -> RXUP.)
-          function () return sync.cas(r.state, DXUP, RXUP) end,
+          function (r) return sync.cas(r.state, DXUP, RXUP) end,
           -- Shutdown: deallocate no longer used queue (TXUP -> DOWN.)
-          function () return sync.cas(r.state, TXUP, DOWN) end)
+          function (r) return sync.cas(r.state, TXUP, DOWN) end)
 end
 
 -- Queue operations follow below.
@@ -242,4 +242,8 @@ end
 function pull (r)
    -- NB: no need for memory barrier on x86 (see push.)
    r.read = r.nread
+end
+
+function open (name, readonly)
+   return shm.open(name, "struct interlink", readonly)
 end
