@@ -244,6 +244,32 @@ function pull (r)
    r.read = r.nread
 end
 
+-- The code below registers an abstract SHM object type with core.shm, and
+-- implements the minimum API necessary for programs like snabb top to inspect
+-- interlink queues (including a tostring meta-method to describe queue
+-- objects.)
+
+shm.register('interlink', getfenv())
+
 function open (name, readonly)
    return shm.open(name, "struct interlink", readonly)
 end
+
+local function describe (r)
+   local function queue_fill (r)
+      local read, write = r.read, r.write
+      return read > write and write + SIZE - read or write - read
+   end
+   local function status (r)
+      return ({
+         [FREE] = "initializing",
+         [RXUP] = "waiting for transmitter",
+         [TXUP] = "waiting for receiver",
+         [DXUP] = "in active use",
+         [DOWN] = "deallocating"
+      })[r.state[0]]
+   end
+   return ("%d/%d (%s)"):format(queue_fill(r), SIZE, status(r))
+end
+
+ffi.metatype(ffi.typeof("struct interlink"), {__tostring=describe})

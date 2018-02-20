@@ -11,6 +11,10 @@ local S = require("syscall")
 local histogram = require("core.histogram")
 local usage = require("program.top.README_inc")
 
+-- We must load any modules that register abstract shm types that we may
+-- wish to inspect.
+require("lib.interlink")
+
 local long_opts = {
    help = "h", list = "l"
 }

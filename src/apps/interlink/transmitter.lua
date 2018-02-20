@@ -9,8 +9,8 @@ local Transmitter = {name="apps.interlink.Transmitter"}
 
 function Transmitter:new (_, name)
    local self = {}
-   self.shm_name = "group/interlink/"..name
-   self.backlink = "interlink/transmitter/"..name
+   self.shm_name = "group/interlink/"..name..".interlink"
+   self.backlink = "interlink/transmitter/"..name..".interlink"
    self.interlink = interlink.attach_transmitter(self.shm_name)
    shm.alias(self.backlink, self.shm_name)
    return setmetatable(self, {__index=Transmitter})
@@ -37,8 +37,8 @@ end
 -- process termination.
 function Transmitter.shutdown (pid)
    for _, name in ipairs(shm.children("/"..pid.."/interlink/transmitter")) do
-      local backlink = "/"..pid.."/interlink/transmitter/"..name
-      local shm_name = "/"..pid.."/group/interlink/"..name
+      local backlink = "/"..pid.."/interlink/transmitter/"..name..".interlink"
+      local shm_name = "/"..pid.."/group/interlink/"..name..".interlink"
       -- Call protected in case /<pid>/group is already unlinked.
       local ok, r = pcall(interlink.open, shm_name)
       if ok then interlink.detach_transmitter(r, shm_name) end
