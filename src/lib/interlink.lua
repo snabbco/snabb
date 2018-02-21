@@ -19,7 +19,7 @@ module(...,package.seeall)
 --    empty(r)                   full(r)
 --    extract(r)                 insert(r, p)
 --    pull(r)                    push(r)
---    detach_receiver(name)      detach_transmitter(name)
+--    detach_receiver(r, name)   detach_transmitter(r, name)
 --
 -- I.e., both receiver and transmitter will attach to a queue object they wish
 -- to communicate over, and detach once they cease operations.
@@ -38,13 +38,13 @@ module(...,package.seeall)
 --    attach_receiver(name), attach_transmitter(name)
 --       Attaches to and returns a shared memory interlink object by name (a
 --       SHM path). If the target name is unavailable (possibly because it is
---       already in use), this operation will block until it becomes available
+--       already in use) this operation will block until it becomes available
 --       again.
 --
 --    detach_receiver(r, name), detach_transmitter(r, name)
---       Unmaps interlink r and unlinks it from its name. If other end has
---       already freed the interlink, any packets remaining in the queue are
---       freed.
+--       Unmaps interlink r after detaching from the shared queue. Unless the
+--       other end is still attached the shared queue is unlinked from its
+--       name, and any packets remaining are freed.
 --
 --    full(r) / empty(r)
 --       Return true if the interlink r is full / empty.
@@ -87,16 +87,21 @@ ffi.cdef([[ struct interlink {
 -- and detach in any order, and even for multiple processes to attempt to
 -- attach to the same interlink at the same time.
 --
+-- Furthermore, more than two processes can attach to and detach from an
+-- interlink during its life time. I.e., a new receiver can attach to the queue
+-- once the former receiver has detached while the transmitter stays attached
+-- throughout, and vice-versa.
+--
 -- Interlinks can be in one of five states:
 
 local FREE = 0 -- Implicit initial state due to 0 value.
 local RXUP = 1 -- Receiver has attached.
 local TXUP = 2 -- Transmitter has attached.
 local DXUP = 3 -- Both ends have attached.
-local DOWN = 4 -- Either end has detached; must be re-allocated.
+local DOWN = 4 -- Both ends have detached; must be re-allocated.
 
--- Once either end detaches from an interlink it stays in the DOWN state
--- until it is deallocated.
+-- If at any point both ends have detached from an interlink it stays in the
+-- DOWN state until it is deallocated.
 --
 -- Here are the valid state transitions and when they occur:
 --
