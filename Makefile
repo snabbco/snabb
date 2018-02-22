@@ -49,5 +49,8 @@ dist: all
 
 docker:
 	docker build -t snabb .
+	@chmod a+rx launch-docker-container.sh
+	@ln -sf ../launch-docker-container.sh src/snabb
 	@echo "Usage: docker run -ti --rm snabb <program> ..."
+	@echo "or simply call 'src/snabb <program> ...'"
 .SERIAL: all

@@ -7,4 +7,7 @@ FROM alpine:3.7
 RUN apk add --no-cache libgcc
 COPY --from=build /snabb/src/snabb /usr/local/bin/
 
+VOLUME /u
+WORKDIR /u
+
 ENTRYPOINT ["/usr/local/bin/snabb"]
