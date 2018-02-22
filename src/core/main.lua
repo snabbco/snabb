@@ -231,7 +231,6 @@ if assert(S.fork()) ~= 0 then
    -- parent process: run snabb
    xpcall(main, handler)
 else
-   initialize()
    -- child process: supervise parent & perform cleanup
    -- Subscribe to SIGHUP on parent death
    S.prctl("set_name", "[snabb sup]")

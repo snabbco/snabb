@@ -63,7 +63,7 @@ local band = require("bit").band
 local waitfor = require("core.lib").waitfor
 local sync = require("core.sync")
 
-local SIZE = link.max + 1
+local SIZE = 1024
 local CACHELINE = 64 -- XXX - make dynamic
 local INT = ffi.sizeof("int")
 
@@ -176,7 +176,10 @@ local function detach (r, name, reset, shutdown)
          if reset(r) then return true
          -- Alternatively, attempt to shutdown and deallocate queue.
          elseif shutdown(r) then
-            while not empty(r) do
+            -- If detach is called by the supervisor (due to an abnormal exit)
+            -- the packet module will not be loaded (and there will be no
+            -- freelist to put the packets into.)
+            while packet and not empty(r) do
                packet.free(extract(r))
             end
             shm.unlink(name)
@@ -206,7 +209,7 @@ end
 -- Queue operations follow below.
 
 local function NEXT (i)
-   return band(i + 1, link.max)
+   return band(i + 1, SIZE - 1)
 end
 
 function full (r)
