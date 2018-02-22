@@ -131,18 +131,16 @@ local DOWN = 4 -- Both ends have detached; must be re-allocated.
 -- (any)    DOWN->*     Cannot transition from DOWN (must create new queue.)
 
 local function attach (name, initialize)
-   local ok, r
+   local r
    local first_try = true
    waitfor(
       function ()
-         -- Try to open the queue.
-         ok, r = pcall(shm.open, name, "struct interlink")
-         -- If that failed then we try to create it.
-         if not ok then ok, r = pcall(shm.create, name, "struct interlink") end
-         -- Return if we could map the queue and succeed to initialize it.
-         if ok and initialize(r) then return true end
+         -- Create/open the queue.
+         r = shm.create(name, "struct interlink")
+         -- Return if we succeed to initialize it.
+         if initialize(r) then return true end
          -- We failed; handle error and try again.
-         if ok then shm.unmap(r); ok, r = nil end
+         shm.unmap(r)
          if first_try then
             print("interlink: waiting for "..name.." to become available...")
             first_try = false
