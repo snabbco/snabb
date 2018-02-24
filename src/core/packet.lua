@@ -94,8 +94,7 @@ end
 
 local packet_allocation_step = 1000
 local packets_allocated = 0
-local packets_fl = ffi.new("struct freelist")
-      packets_fl.max = max_packets
+local packets_fl = ffi.new("struct freelist", {max=max_packets})
 local group_fl
 if not shm.exists("group/packets.freelist") then
    group_fl = shm.create("group/packets.freelist", "struct freelist")
