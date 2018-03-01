@@ -73,7 +73,7 @@ static TraceNo trace_findfree(jit_State *J)
   lj_mem_growvec(J->L, J->trace, J->sizetrace, lim, GCRef);
   for (; osz < J->sizetrace; osz++)
     setgcrefnull(J->trace[osz]);
-  return J->freetrace++;
+  return J->freetrace;
 }
 
 #define TRACE_APPENDVEC(field, szfield, tp) \
@@ -252,6 +252,7 @@ int lj_trace_flushall(lua_State *L)
     }
   }
   J->cur.traceno = 0;
+  J->freetrace = 0;
   /* Unpatch blacklisted byte codes. */
   GCRef *p = &(G(L)->gc.root);
   GCobj *o;
