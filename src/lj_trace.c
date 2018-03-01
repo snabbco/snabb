@@ -238,6 +238,7 @@ void lj_trace_flushproto(global_State *g, GCproto *pt)
 int lj_trace_flushall(lua_State *L)
 {
   jit_State *J = L2J(L);
+  global_State *g = G(L);
   ptrdiff_t i;
   if ((J2G(J)->hookmask & HOOK_GC))
     return 1;
@@ -253,6 +254,7 @@ int lj_trace_flushall(lua_State *L)
   }
   J->cur.traceno = 0;
   J->freetrace = 0;
+  g->lasttrace = 0;
   /* Unpatch blacklisted byte codes. */
   GCRef *p = &(G(L)->gc.root);
   GCobj *o;
