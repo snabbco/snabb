@@ -255,7 +255,7 @@ function selftest ()
    local pcideva = lib.getenv("SNABB_PCI_INTEL0")
    local pcidevb = lib.getenv("SNABB_PCI_INTEL1")
    if not pcideva or not pcidevb then
-      print("SNABB_PCI_INTEL[0|1]/SNABB_PCI[0|1] not set or not suitable.")
+      print("SNABB_PCI_INTEL[0|1] not set or not suitable.")
       os.exit(engine.test_skipped_code)
    end
 
