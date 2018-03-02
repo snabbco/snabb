@@ -356,6 +356,7 @@ function Intel:new (conf)
    self.max_q = byid.max_q
 
    -- Setup device access
+   pci.unbind_device_from_linux(self.pciaddress)
    self.base, self.fd = pci.map_pci_memory_unlocked(self.pciaddress, 0)
    self.master = self.fd:flock("ex, nb")
 
@@ -1119,7 +1120,6 @@ function Intel1g:unlock_fw_sem()
 end
 function Intel1g:init ()
    if not self.master then return end
-   pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
    pci.disable_bus_master_cleanup(self.pciaddress)
 
@@ -1311,7 +1311,6 @@ vmdq_enabled_t = ffi.typeof("struct { uint8_t enabled; }")
 
 function Intel82599:init ()
    if not self.master then return end
-   pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
    pci.disable_bus_master_cleanup(self.pciaddress)
 
