@@ -1,7 +1,7 @@
 #!/bin/sh
 
 name=$(basename $0)
-if [ ".$name" == ".launch-docker-container.sh" ]; then
+if [ ".$name" = ".launch-docker-container.sh" ]; then
   cat <<EOF 
 $0
 please link this script to the container image you like to run
