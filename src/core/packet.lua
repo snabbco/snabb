@@ -95,16 +95,19 @@ end
 local packet_allocation_step = 1000
 local packets_allocated = 0
 local packets_fl = ffi.new("struct freelist", {max=max_packets})
-local group_fl
-if not shm.exists("group/packets.freelist") then
-   group_fl = shm.create("group/packets.freelist", "struct freelist")
-   group_fl.max = max_packets
-else
-   group_fl = shm.open("group/packets.freelist", "struct freelist")
+local group_fl -- Initialized on demand.
+
+-- Call to ensure group freelist is enabled.
+function enable_group_freelist ()
+   if not group_fl then
+      group_fl = shm.create("group/packets.freelist", "struct freelist")
+      group_fl.max = max_packets
+   end
 end
 
+-- Return borrowed packets to group freelist.
 function rebalance_freelists ()
-   if freelist_nfree(packets_fl) > packets_allocated then
+   if group_fl and freelist_nfree(packets_fl) > packets_allocated then
       freelist_lock(group_fl)
       while freelist_nfree(packets_fl) > packets_allocated
       and not freelist_full(group_fl) do
@@ -117,12 +120,14 @@ end
 -- Return an empty packet.
 function allocate ()
    if freelist_nfree(packets_fl) == 0 then
-      freelist_lock(group_fl)
-      while freelist_nfree(group_fl) > 0
-      and freelist_nfree(packets_fl) < packets_allocated do
-         freelist_add(packets_fl, freelist_remove(group_fl))
+      if group_fl then
+         freelist_lock(group_fl)
+         while freelist_nfree(group_fl) > 0
+         and freelist_nfree(packets_fl) < packets_allocated do
+            freelist_add(packets_fl, freelist_remove(group_fl))
+         end
+         freelist_unlock(group_fl)
       end
-      freelist_unlock(group_fl)
       if freelist_nfree(packets_fl) == 0 then
          preallocate_step()
       end

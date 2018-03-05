@@ -8,6 +8,7 @@ local interlink = require("lib.interlink")
 local Transmitter = {name="apps.interlink.Transmitter"}
 
 function Transmitter:new (_, name)
+   packet.enable_group_freelist()
    local self = {}
    self.shm_name = "group/interlink/"..name..".interlink"
    self.backlink = "interlink/transmitter/"..name..".interlink"
