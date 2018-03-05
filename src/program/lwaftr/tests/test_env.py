@@ -2,12 +2,14 @@
 Environment support code for tests.
 """
 
-import os
 from pathlib import Path
 from signal import SIGTERM
 from subprocess import PIPE, Popen, TimeoutExpired
+import os
 import time
 import unittest
+import random
+import string
 
 
 # Commands run under "sudo" run as root. The root's user PATH should not
@@ -32,6 +34,8 @@ ENC = 'utf-8'
 def nic_names():
     return os.environ.get('SNABB_PCI0'), os.environ.get('SNABB_PCI1')
 
+def jit_config_dir():
+    return os.environ.get("JIT_CONFIG_DIR")
 
 class BaseTestCase(unittest.TestCase):
     """
@@ -77,27 +81,35 @@ class BaseTestCase(unittest.TestCase):
         try:
             output, errput = proc.communicate(timeout=COMMAND_TIMEOUT)
         except TimeoutExpired:
+            proc.stdout.close()
+            proc.stderr.close()
+            print('\nTimeout running command, trying to kill PID %s' % proc.pid)
             proc.kill()
-            proc.communicate()
+            raise
         if proc.returncode != 0:
             msg_lines = (
-                'Error running command:', str(args),
+                'Error running command:', " ".join(args),
+                'Daemon Command:', " ".join(self.daemon_args),
                 'Exit code: %s' % proc.returncode,
                 'STDOUT', str(output, ENC), 'STDERR', str(errput, ENC),
             )
             self.fail('\n'.join(msg_lines))
         return output
 
+    @staticmethod
+    def stop_daemon(daemon):
+        ret_code = daemon.poll()
+        if ret_code is None:
+            daemon.terminate()
+            ret_code = daemon.wait()
+        if ret_code in (0, -SIGTERM):
+            daemon.stdout.close()
+            daemon.stderr.close()
+        else:
+            raise Exception('Error terminating deamon: ' + str(ret_code))
+
     @classmethod
     def tearDownClass(cls):
         if not cls.daemon_args:
             return
-        ret_code = cls.daemon.poll()
-        if ret_code is None:
-            cls.daemon.terminate()
-            ret_code = cls.daemon.wait()
-        if ret_code in (0, -SIGTERM):
-            cls.daemon.stdout.close()
-            cls.daemon.stderr.close()
-        else:
-            cls.reportAndFail('Error terminating daemon:', ret_code)
+        cls.stop_daemon(cls.daemon)
