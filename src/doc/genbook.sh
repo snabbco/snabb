@@ -70,6 +70,8 @@ $(cat $mdroot/apps/test/README.md)
 
 $(cat $mdroot/apps/wall/README.md)
 
+$(cat $mdroot/apps/interlink/README.md)
+
 # Libraries
 
 $(cat $mdroot/lib/README.checksum.md)
