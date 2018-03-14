@@ -240,5 +240,182 @@ function rss:push ()
 end
 
 function selftest ()
-   -- TBD
+   local vlan_id = 123
+   local addr_ip = ffi.new("uint8_t[4]")
+   local addr_ip6 = ffi.new("uint8_t[16]")
+   local function random_ip(addr)
+      for i = 1, ffi.sizeof(addr) do
+         addr[i] = math.random(255)
+      end
+      return addr
+   end
+
+   local ext_hdr = ffi.new([[
+     struct {
+        uint8_t next_header;
+        uint8_t length;
+        uint8_t data[14];
+     }  __attribute__((packed))
+   ]])
+   local function push_ext_hdr(dgram, next_header)
+      local p = dgram:packet()
+      ext_hdr.next_header = next_header
+      ext_hdr.length = 1
+      local length = ffi.sizeof(ext_hdr)
+      p = packet.prepend(p, ext_hdr, length)
+      dgram:new(p)
+      return length
+   end
+
+   local Source = {}
+
+   function Source:new()
+      local o = {
+         eth = require("lib.protocol.ethernet"):new({}),
+         ip = require("lib.protocol.ipv4"):new({ protocol = 17 }),
+         ip6 = require("lib.protocol.ipv6"):new({ next_header = 17 }),
+         udp = require("lib.protocol.udp"):new({}),
+         dgram = require("lib.protocol.datagram"):new()
+      }
+      return setmetatable(o, {__index=Source})
+   end
+
+   function Source:random_packet()
+      local p = packet.allocate()
+      local payload_size = math.random(9000)
+      p.length = payload_size
+      self.dgram:new(p)
+      self.udp:src_port(math.random(2^16-1))
+      self.udp:dst_port(math.random(2^16-1))
+      self.dgram:push(self.udp)
+      if math.random() > 0.5 then
+         self.ip:src(random_ip(addr_ip))
+         self.ip:dst(random_ip(addr_ip))
+         self.ip:total_length(self.ip:sizeof() + self.udp:sizeof()
+                                 + payload_size)
+         self.dgram:push(self.ip)
+         self.eth:type(0x0800)
+      else
+         local next_header = 17
+         local ext_hdr_size = 0
+         for _ = 1, math.ceil(math.random(3)) do
+            ext_hdr_size = ext_hdr_size
+               + push_ext_hdr(self.dgram, next_header)
+            next_header = 0 -- Hop-by-hop header
+         end
+         self.ip6:payload_length(ext_hdr_size + self.udp:sizeof()
+                                    + payload_size)
+         self.ip6:next_header(next_header)
+         self.ip6:src(random_ip(addr_ip6))
+         self.ip6:dst(random_ip(addr_ip6))
+         self.dgram:push(self.ip6)
+         self.eth:type(0x86dd)
+      end
+      self.dgram:push(self.eth)
+      return self.dgram:packet()
+   end
+
+   function Source:pull ()
+      for _, o in ipairs(self.output) do
+         for i = 1, engine.pull_npackets do
+            transmit(o, self:random_packet())
+         end
+      end
+   end
+
+   local Sink = {}
+
+   function Sink:new ()
+      return setmetatable({}, { __index = Sink })
+   end
+
+   function Sink:push ()
+      for _, i in ipairs(self.input) do
+         for _ = 1, link.nreadable(i) do
+            local p = receive(i)
+            local md = mdget(p)
+            assert(md.ethertype == 0x0800 or md.ethertype == 0x86dd,
+                   md.ethertype)
+            assert(md.vlan == 0 or md.vlan == vlan_id)
+            local offset = md.vlan == 0 and 0 or 4
+            assert(md.filter_offset == offset, md.filter_offset)
+            assert(md.filter_start == p.data + offset)
+            assert(md.l3 == p.data + 14 + offset)
+            assert(md.total_length == p.length - 14 - offset)
+            assert(md.filter_length == p.length - offset)
+            if md.ethertype == 0x0800 then
+               assert(md.l4 == md.l3 + 20)
+            else
+               assert(md.l4 == md.l3 + 40)
+            end
+            assert(md.proto == 17)
+            assert(md.frag_offset == 0)
+            assert(md.length_delta == 0, md.length_delta)
+            packet.free(p)
+         end
+      end
+   end
+
+   local graph = config.new()
+   config.app(graph, "rss", rss, { classes = {
+                                      { name = "ip",
+                                        filter = "ip",
+                                        continue = true },
+                                      { name = "ip6",
+                                        filter = "ip6",
+                                        continue = true } } })
+   config.app(graph, "source1", Source)
+   config.app(graph, "source2", Source)
+   config.app(graph, "vlan", require("apps.vlan.vlan").Tagger,
+              { tag = vlan_id })
+   config.link(graph, "source1.output -> rss.input_plain")
+   config.link(graph, "source2.output -> vlan.input")
+   config.link(graph, "vlan.output -> rss.input_vlan")
+
+   local sink_groups = {
+      { name = "default", n = 4},
+      { name = "ip", n = 4 },
+      { name = "ip6", n = 4 },
+   }
+   local nsinks = 0
+   for g, group in ipairs(sink_groups) do
+      for i = 1, group.n do
+         nsinks = nsinks + 1
+         local sink_name = "sink"..g..i
+         config.app(graph, sink_name, Sink)
+         config.link(graph, "rss."..group.name.."_"..i
+                        .." -> "..sink_name..".input")
+      end
+   end
+
+   engine.configure(graph)
+   engine.main({ duration = 2, report = { showlinks = true } })
+
+   local function pkts(name, dir)
+      local app = engine.app_table[name]
+      if dir == "out" then
+         return tonumber(counter.read(app.output.output.stats.rxpackets))
+      else
+         return tonumber(counter.read(app.input.input.stats.rxpackets))
+      end
+   end
+
+   local npackets = pkts("source1", "out") + pkts("source2", "out")
+   for g, group in ipairs(sink_groups) do
+      for i = 1, group.n do
+         local share = npackets/group.n
+         if group.name ~= "default" then
+            share = share/2
+         end
+         local sink_name = "sink"..g..i
+         local pkts = pkts(sink_name, "in")
+         local threshold = 0.05
+         local value = math.abs(1.0 - pkts/share)
+         if value >= threshold then
+            error(string.format("Unexpected traffic share on %s "
+                                   .."(expected %f, got %f)",
+                                sink_name, threshold, value))
+         end
+      end
+   end
 end
