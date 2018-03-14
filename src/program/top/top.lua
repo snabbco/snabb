@@ -81,7 +81,9 @@ function top (instance_pid)
    local configs = 0
    local last_stats = nil
    while (true) do
-      if configs < counter.read(counters.engine.configs) then
+      local current = counter.read(counters.engine.configs)
+      if configs < current then
+         configs = current
          -- If a (new) config is loaded we (re)open the link counters.
          open_link_counters(counters, instance_tree)
       end
