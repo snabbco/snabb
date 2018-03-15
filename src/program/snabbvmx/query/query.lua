@@ -5,7 +5,6 @@ local ffi = require("ffi")
 local lib = require("core.lib")
 local ipv4 = require("lib.protocol.ipv4")
 local ethernet = require("lib.protocol.ethernet")
-local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 

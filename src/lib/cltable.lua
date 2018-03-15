@@ -28,8 +28,9 @@ function set(cltable, key, value)
       cltable.values[entry.value] = value
       if value == nil then cltable.keys:remove_ptr(entry) end
    elseif value ~= nil then
-      table.insert(cltable.values, value)
-      cltable.keys:add(key, #cltable.values)
+      local idx = #cltable.values + 1
+      cltable.values[idx] = value
+      cltable.keys:add(key, idx)
    end
 end
 
