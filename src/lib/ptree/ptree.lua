@@ -533,6 +533,21 @@ end
 
 local dummy_unix_sockaddr = S.t.sockaddr_un()
 
+local function send_message(socket, msg_str)
+   socket:write(tostring(#msg_str)..'\n'..msg_str)
+end
+
+function Manager:push_notifications_to_peers()
+   local peers = self.peers
+   local i = 1
+   while i <= #peers do
+      local peer = peers[i]
+      local notification = 'notification'
+      send_message(peer.fd, notification)
+      i = i + 1
+   end
+end
+
 function Manager:handle_calls_from_peers()
    local peers = self.peers
    while true do
@@ -756,6 +771,7 @@ function Manager:main (duration)
       if timer.ticks then timer.run_to_time(now * 1e9) end
       self:remove_stale_workers()
       self:handle_calls_from_peers()
+      self:push_notifications_to_peers()
       self:send_messages_to_workers()
       self:receive_alarms_from_workers()
       now = C.get_monotonic_time()
