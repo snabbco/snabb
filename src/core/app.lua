@@ -339,7 +339,7 @@ function apply_config_actions (actions)
       configuration.apps[name] = nil
    end
    function ops.start_app (name, class, arg)
-      local app = class:new(arg)
+      local app = class:new(arg, name)
       if type(app) ~= 'table' then
          error(("bad return value from app '%s' start() method: %s"):format(
                   name, tostring(app)))
@@ -535,8 +535,11 @@ function breathe ()
       end
    end
    counter.add(breaths)
-   -- Commit counters at a reasonable frequency
-   if counter.read(breaths) % 100 == 0 then counter.commit() end
+   -- Commit counters and rebalance freelists at a reasonable frequency
+   if counter.read(breaths) % 100 == 0 then
+      counter.commit()
+      packet.rebalance_freelists()
+   end
    running = false
 end
 
