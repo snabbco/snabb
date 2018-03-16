@@ -68,37 +68,31 @@ function Fiber:wait_for_writable(sd)
    return coroutine.yield()
 end
 
-function Fiber:sleep(dt)
-   current_scheduler:schedule_after_sleep(dt, self)
-   return coroutine.yield()
-end
-
-function Fiber:sleep_until(t)
-   current_scheduler:schedule_at_time(t, self)
-   return coroutine.yield()
-end
-
-function now(d) return current_scheduler:now() end
+function now() return current_scheduler:now() end
 function suspend(block_fn, ...) return current_fiber:suspend(block_fn, ...) end
-function sleep(dt) return current_fiber:sleep(dt) end
-function sleep_until(t) return current_fiber:sleep_until(t) end
+
+local function schedule(sched, fiber) sched:schedule(fiber) end
+function yield() return suspend(schedule) end
 
 function selftest()
    print('selftest: lib.fibers.fiber')
-   local done = {}
-   local count = 1e3
-   for i=1,count do
-      local function fn()
-         local start, dt = now(), math.random()
-         sleep(dt)
-         assert(now() >= start + dt)
-         table.insert(done, i)
-      end
-      spawn(fn)
-   end
-   for t=now(),now()+1.5,0.01 do
-      current_scheduler:run(t)
-   end
-   assert(#done == count)
+   local lib = require('core.lib')
+   local log = {}
+   local function record(x) table.insert(log, x) end
+
+   spawn(function()
+      record('a'); yield(); record('b'); yield(); record('c')
+   end)
+
+   assert(lib.equal(log, {}))
+   current_scheduler:run()
+   assert(lib.equal(log, {'a'}))
+   current_scheduler:run()
+   assert(lib.equal(log, {'a', 'b'}))
+   current_scheduler:run()
+   assert(lib.equal(log, {'a', 'b', 'c'}))
+   current_scheduler:run()
+   assert(lib.equal(log, {'a', 'b', 'c'}))
+
    print('selftest: ok')
 end

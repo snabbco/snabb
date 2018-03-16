@@ -21,6 +21,11 @@ function Suspension:complete(wrap, val)
    self.val = val
    self.sched:schedule(self)
 end
+function Suspension:maybe_complete(wrap, val)
+   if not self:waiting() then return false end
+   self:complete(wrap, val)
+   return true
+end
 function Suspension:run() -- Task method.
    assert(not self:waiting())
    return self.fiber:resume(self.wrap, self.val)
