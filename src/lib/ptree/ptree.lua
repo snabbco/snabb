@@ -540,12 +540,15 @@ end
 function Manager:push_notifications_to_peers()
    local peers = self.peers
    local i = 1
+   local notifications = alarms.notifications()
    while i <= #peers do
       local peer = peers[i]
-      local notification = 'notification'
-      send_message(peer.fd, notification)
+      for _, each in ipairs(notifications) do
+         send_message(peer.fd, each)
+      end
       i = i + 1
    end
+   alarms.clear_notifications()
 end
 
 function Manager:handle_calls_from_peers()

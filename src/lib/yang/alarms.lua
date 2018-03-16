@@ -33,6 +33,28 @@ local state = {
    }
 }
 
+function notifications ()
+   local ret = {}
+   local notifications = state.notifications
+   -- TODO: Actually insert notifications.
+   for k,v in pairs(notifications.alarm) do
+      table.insert(ret, 'alarm_notification')
+   end
+   for k,v in pairs(notifications.alarm_inventory_changed) do
+      table.insert(ret, 'alarm_inventory_changed_notification')
+   end
+   for k,v in pairs(notifications.operator_action) do
+      table.insert(ret, 'operator_action_notification')
+   end
+   return ret
+end
+
+function clear_notifications ()
+   state.notifications.alarm = {}
+   state.notifications.alarm_inventory_changed = {}
+   state.notifications.operator_action = {}
+end
+
 local function table_size (t)
    local size = 0
    for _ in pairs(t) do size = size + 1 end
