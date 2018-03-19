@@ -436,6 +436,10 @@ local function DNS_accumulate(self, dst, new)
    accumulate_generic(dst, new)
 end
 
+local function can_log(logger)
+   return logger and logger:can_log()
+end
+
 local function extended_extract(self, pkt, md, timestamp, entry, extract_addr_fn)
    extract_5_tuple(pkt, timestamp, entry, md, extract_addr_fn)
    local eth_hdr = ffi.cast(ether_header_ptr_t, pkt.data)
@@ -446,15 +450,17 @@ local function extended_extract(self, pkt, md, timestamp, entry, extract_addr_fn
    local result = mac_to_as.map:lookup_ptr(eth_hdr.shost)
    if result then
       entry.value.bgpPrevAdjacentAsNumber = result.value
-   elseif mac_to_as.logger:can_log() then
-      mac_to_as.logger:log("unknown source MAC "..ethernet:ntop(eth_hdr.shost))
+   elseif can_log(mac_to_as.logger) then
+      mac_to_as.logger:log("unknown source MAC "
+                              ..ethernet:ntop(eth_hdr.shost))
    end
    if not ethernet:is_mcast(eth_hdr.dhost) then
       local result = mac_to_as.map:lookup_ptr(eth_hdr.dhost)
       if result then
          entry.value.bgpNextAdjacentAsNumber = result.value
-      elseif mac_to_as.logger:can_log() then
-         mac_to_as.logger:log("unknown destination MAC "..ethernet:ntop(eth_hdr.dhost))
+      elseif can_log(mac_to_as.logger) then
+         mac_to_as.logger:log("unknown destination MAC "
+                                 ..ethernet:ntop(eth_hdr.dhost))
       end
    end
 
@@ -466,10 +472,8 @@ local function extended_extract(self, pkt, md, timestamp, entry, extract_addr_fn
       if result then
          entry.value.ingressInterface = result.ingress
          entry.value.egressInterface = result.egress
-      else
-         if vlan_to_ifindex.logger:can_log() then
-            vlan_to_ifindex.logger:log("unknown vlan "..vlan)
-         end
+      elseif can_log(vlan_to_ifindex.logger) then
+         vlan_to_ifindex.logger:log("unknown vlan "..vlan)
       end
    end
 
@@ -492,18 +496,16 @@ local function v4_extended_extract (self, pkt, timestamp, entry)
    local asn = pfx_to_as.map:search_bytes(entry.key.sourceIPv4Address)
    if asn ~= 0 then
       entry.value.bgpSourceAsNumber = asn
-   else
-      if pfx_to_as.logger:can_log() then
-         pfx_to_as.logger:log("missing AS for source "..ipv4:ntop(entry.key.sourceIPv4Address))
-      end
+   elseif can_log(pfx_to_as.logger) then
+      pfx_to_as.logger:log("missing AS for source "
+                              ..ipv4:ntop(entry.key.sourceIPv4Address))
    end
    local asn = pfx_to_as.map:search_bytes(entry.key.destinationIPv4Address)
    if asn ~= 0 then
       entry.value.bgpDestinationAsNumber = asn
-   else
-      if pfx_to_as.logger:can_log() then
-         pfx_to_as.logger:log("missing AS for destination "..ipv4:ntop(entry.key.destinationIPv4Address))
-      end
+   elseif can_log(pfx_to_as.logger) then
+      pfx_to_as.logger:log("missing AS for destination "
+                              ..ipv4:ntop(entry.key.destinationIPv4Address))
    end
 
    entry.value.ipClassOfService = get_ipv4_tos(md.l3)
