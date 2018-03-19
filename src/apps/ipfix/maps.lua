@@ -109,8 +109,11 @@ function mk_map(name, file, log_rate, log_fh)
       map = info.create_fn(file)
       maps[name] = map
    end
-   return { map = map,
-            logger = lib.logger_new({ rate = log_rate or 0.05,
-                                      fh = log_fh,
-                                      module = info.logger_module }) }
+   local map = { map = map }
+   if log_fh then
+      map.logger = lib.logger_new({ rate = log_rate or 0.05,
+                                    fh = log_fh,
+                                    module = info.logger_module })
+   end
+   return map
 end

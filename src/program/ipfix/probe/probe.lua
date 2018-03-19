@@ -130,7 +130,7 @@ function run (args)
          end
       end,
       ["maps-log"] = function (arg)
-         if arg then
+         if arg ~= "" then
             maps_logfile = arg
          end
       end,
