@@ -19,8 +19,8 @@ local function open_socket(file)
    return socket
 end
 
-local function validate_value(schema_name, revision_date, path, value_str)
-   local parser = common.data_parser(schema_name, path)
+local function validate_config(schema_name, revision_date, path, value_str)
+   local parser = common.config_parser(schema_name, path)
    local value = parser(value_str)
    return common.serialize_config(value, schema_name, path)
 end
@@ -36,14 +36,14 @@ function request_handlers.get_state(schema_name, revision_date, path)
 end
 function request_handlers.set(schema_name, revision_date, path, value)
    assert(value ~= nil)
-   local config = validate_value(schema_name, revision_date, path, value)
+   local config = validate_config(schema_name, revision_date, path, value)
    return {method='set-config',
            args={schema=schema_name, revision=revision_date, path=path,
                  config=config}}
 end
 function request_handlers.add(schema_name, revision_date, path, value)
    assert(value ~= nil)
-   local config = validate_value(schema_name, revision_date, path, value)
+   local config = validate_config(schema_name, revision_date, path, value)
    return {method='add-config',
            args={schema=schema_name, revision=revision_date, path=path,
                  config=config}}

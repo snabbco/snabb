@@ -13,7 +13,6 @@ from test_env import BENCHDATA_DIR, DATA_DIR, SNABB_CMD, BaseTestCase, nic_names
 
 SNABB_PCI0, SNABB_PCI1 = nic_names()
 
-
 @unittest.skipUnless(SNABB_PCI0 and SNABB_PCI1, 'NICs not configured')
 class TestLoadtest(BaseTestCase):
 

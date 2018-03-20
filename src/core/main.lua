@@ -79,6 +79,7 @@ function select_program (args)
             usage(0)
          elseif opt == '-v' or opt == '--version' then
             version()
+            os.exit(0)
          else
             print("unrecognized option: "..opt)
             usage(1)
@@ -117,7 +118,6 @@ License: <https://www.apache.org/licenses/LICENSE-2.0>
 
 Snabb is open source software.  For more information on Snabb, see
 https://github.com/snabbco/snabb.]])
-   os.exit(0)
 end
 
 function programname (name)
