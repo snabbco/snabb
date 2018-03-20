@@ -36,6 +36,9 @@ function new (name)
 end
 
 function free (r, name)
+   while not empty(r) do
+      packet.free(receive(r))
+   end
    for _, c in ipairs(provided_counters) do
       counter.delete("links/"..name.."/"..c..".counter")
    end

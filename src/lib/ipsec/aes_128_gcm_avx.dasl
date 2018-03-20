@@ -451,6 +451,15 @@ local function keyexp(Dst)
   | ret
 end
 
+local function auth12_equal(Dst)
+   | mov rax, [arg1]
+   | mov edx, [arg1 + 8]
+   | xor rax, [arg2]
+   | xor edx, [arg2 + 8]
+   | or rax, rdx
+   | ret
+end
+
 local function generator(Dst)
   Dst:growpc(16)
 
@@ -472,6 +481,9 @@ local function generator(Dst)
   || encrypt_single_block(Dst, 0)
   | vmovdqu [arg2], xmm0
   | ret
+  |.align 16
+  |->auth12_equal:
+  || auth12_equal(Dst)
 
   -- Data
   |.align 64
@@ -501,5 +513,6 @@ return setmetatable({
   aesni_gcm_precomp_avx_gen4 = ffi.cast("void(*)(gcm_data*, uint8_t*)", entry.aesni_gcm_precomp_avx_gen4),
   aesni_gcm_enc_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_enc_avx_gen4),
   aesni_gcm_dec_avx_gen4 = ffi.cast(fn_t, entry.aesni_gcm_dec_avx_gen4),
-  aesni_encrypt_single_block = ffi.cast("void(*)(gcm_data*, uint8_t*)", entry.aesni_encrypt_single_block)
+  aesni_encrypt_single_block = ffi.cast("void(*)(gcm_data*, uint8_t*)", entry.aesni_encrypt_single_block),
+  auth12_equal = ffi.cast("uint64_t(*)(uint8_t[12], uint8_t[12])", entry.auth12_equal)
 }, {_anchor = mcode})

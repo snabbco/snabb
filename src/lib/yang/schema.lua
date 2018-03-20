@@ -1,6 +1,7 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
+local lib = require("core.lib")
 local parser = require("lib.yang.parser")
 local util = require("lib.yang.util")
 
@@ -47,20 +48,27 @@ local function require_argument(loc, argument)
    return assert_with_loc(argument, loc, 'missing argument')
 end
 
-local function parse_range(loc, range)
+local function parse_range_or_length_arg(loc, kind, range)
    local function parse_part(part)
       local l, r = part:match("^%s*([^%.]*)%s*%.%.%s*([^%s]*)%s*$")
       assert_with_loc(l, loc, 'bad range component: %s', part)
       if l ~= 'min' then l = util.tointeger(l) end
       if r ~= 'max' then r = util.tointeger(r) end
+      if l ~= 'min' and l < 0 and kind == 'length' then
+         error("length argument may not be negative: "..l)
+      end
+      if r ~= 'max' and r < 0 and kind == 'length' then
+         error("length argument may not be negative: "..r)
+      end
+      if l ~= 'min' and r ~= 'max' and r < l then
+         error("invalid "..kind..": "..part)
+      end
       return { l, r }
    end
-   local parts = range:split("|")
-   local res = {'or'}
+   local res = {}
    for part in range:split("|") do table.insert(res, parse_part(part)) end
-   if #res == 1 then error_with_loc(loc, "empty range", range)
-   elseif #res == 2 then return res[2]
-   else return res end
+   if #res == 0 then error_with_loc(loc, "empty "..kind, range) end
+   return res
 end
 
 local function collect_children(children, kinds)
@@ -168,6 +176,12 @@ local function init_natural(node, loc, argument, children)
                    loc, 'not a natural number: %s', arg)
    node.value = as_num
 end
+-- Must be one or 1 or 1.1.
+local function init_yang_version (node, loc, argument, children)
+   local arg = require_argument(loc, argument)
+   assert_with_loc(arg == "1" or arg == "1.1", 'not a valid version number: %s', arg)
+   node.value = tonumber(arg)
+end
 local function init_boolean(node, loc, argument, children)
    local arg = require_argument(loc, argument)
    if arg == 'true' then node.value = true
@@ -270,7 +284,7 @@ local function init_grouping(node, loc, argument, children)
 end
 local function init_identity(node, loc, argument, children)
    node.id = require_argument(loc, argument)
-   node.base = maybe_child_property(loc, children, 'base', 'id')
+   node.bases = collect_child_properties(children, 'base', 'value')
    node.status = maybe_child_property(loc, children, 'status', 'value')
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
@@ -319,8 +333,8 @@ local function init_leaf_list(node, loc, argument, children)
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
 local function init_length(node, loc, argument, children)
-   -- TODO: parse length arg str
-   node.value = require_argument(loc, argument)
+   node.value = parse_range_or_length_arg(loc, node.kind,
+                                          require_argument(loc, argument))
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
@@ -394,9 +408,19 @@ local function init_pattern(node, loc, argument, children)
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
 end
 local function init_range(node, loc, argument, children)
-   node.value = parse_range(loc, require_argument(loc, argument))
+   node.value = parse_range_or_length_arg(loc, node.kind,
+                                          require_argument(loc, argument))
    node.description = maybe_child_property(loc, children, 'description', 'value')
    node.reference = maybe_child_property(loc, children, 'reference', 'value')
+end
+local function init_enum(node, loc, argument, children)
+   node.name = require_argument(loc, argument)
+   local value = maybe_child_property(loc, children, 'value', 'value')
+   if value then node.value = tonumber(value) end
+   node.description = maybe_child_property(loc, children, 'description', 'value')
+   node.reference = maybe_child_property(loc, children, 'reference', 'value')
+   node.status = maybe_child_property(loc, children, 'status', 'value')
+   node.if_features = collect_child_properties(children, 'if-feature', 'value')
 end
 local function init_refine(node, loc, argument, children)
    node.node_id = require_argument(loc, argument)
@@ -441,7 +465,7 @@ local function init_type(node, loc, argument, children)
    -- !!! path
    node.leafref = maybe_child_property(loc, children, 'path', 'value')
    node.require_instances = collect_children(children, 'require-instance')
-   node.identityref = maybe_child_property(loc, children, 'base', 'value')
+   node.bases = collect_child_properties(children, 'base', 'value')
    node.union = collect_children(children, 'type')
    node.bits = collect_children(children, 'bit')
 end
@@ -502,8 +526,8 @@ declare_initializer(
    'error-message', 'error-app-tag', 'max-value', 'key', 'unique', 'when',
    'deviation', 'deviate')
 declare_initializer(
-   init_natural, 'yang-version', 'fraction-digits', 'position',
-   'min-elements', 'max-elements')
+   init_natural, 'fraction-digits', 'position', 'min-elements', 'max-elements')
+declare_initializer(init_yang_version, 'yang-version')
 declare_initializer(
    init_boolean, 'config', 'mandatory', 'require-instance', 'yin-element')
 declare_initializer(init_anyxml, 'anyxml')
@@ -531,6 +555,7 @@ declare_initializer(init_output, 'output')
 declare_initializer(init_path, 'path')
 declare_initializer(init_pattern, 'pattern')
 declare_initializer(init_range, 'range')
+declare_initializer(init_enum, 'enum')
 declare_initializer(init_refine, 'refine')
 declare_initializer(init_revision, 'revision')
 declare_initializer(init_rpc, 'rpc')
@@ -559,35 +584,33 @@ local function schema_from_ast(ast)
    return ret
 end
 
-local function set(...)
-   local ret = {}
-   for k, v in pairs({...}) do ret[v] = true end
-   return ret
-end
-
-local primitive_types = set(
+local primitive_types = lib.set(
    'int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64',
    'binary', 'bits', 'boolean', 'decimal64', 'empty', 'enumeration',
    'identityref', 'instance-identifier', 'leafref', 'string', 'union')
 
 -- Inherits config attributes from parents
-local function inherit_config(schema, config)
-   if schema.config ~= nil then
-      assert(not config or schema.config == false)
-      config = schema.config
-   elseif config ~= nil then
-      schema = shallow_copy(schema)
-      schema.config = config
-   end
-
-   if schema.body then
-      schema.body = shallow_copy(schema.body)
-      for name, node in pairs(schema.body) do
-         schema.body[name] = inherit_config(node, config)
+local function inherit_config(schema)
+   local function visit(node, config)
+      if node.config == nil then
+         node = shallow_copy(node)
+         node.config = config
+      elseif node.config == false then
+         config = node.config
+      else
+         assert(config)
       end
+
+      if node.body then
+         node.body = shallow_copy(node.body)
+         for name, child in pairs(node.body) do
+            node.body[name] = visit(child, config)
+         end
+      end
+      return node
    end
 
-   return schema
+   return visit(schema, true)
 end
 
 local default_features = {}
@@ -616,9 +639,9 @@ end
 -- Inline "submodule" into "include".
 -- Inline "imports" into "module".
 -- Inline "typedef" into "type".
--- Resolve if-feature.
+-- Resolve if-feature, identity bases, and identityref bases.
 -- Warn on any "when", resolving them as being true.
--- Resolve all augment and refine nodes. (TODO)
+-- Resolve all augment nodes. (TODO)
 function resolve(schema, features)
    if features == nil then features = default_features end
    local function pop_prop(node, prop)
@@ -673,7 +696,15 @@ function resolve(schema, features)
       end
       return ret
    end
-   function visit_type(node, env)
+   -- Resolve argument of "base" statements to identity fqid and collect in a list.
+   local function resolve_bases(bases, env)
+      local ret = {}
+      for _, base in ipairs(bases) do
+         table.insert(ret, lookup_lazy(env, 'identities', base).fqid)
+      end
+      return ret
+   end
+   local function visit_type(node, env)
       node = shallow_copy(node)
       local success, typedef = pcall(lookup, env, 'typedefs', node.id)
       if success then
@@ -681,8 +712,14 @@ function resolve(schema, features)
          -- lookup_lazy because we don't want the pcall to hide errors
          -- from the lazy expansion.
          typedef = typedef()
+         assert(typedef.kind == "typedef")
          node.base_type = typedef
          node.primitive_type = assert(typedef.primitive_type)
+         node.enums = {}
+         for _, enum in ipairs(typedef.type.enums) do
+            node.enums[enum.name] = true
+         end
+         node.union = typedef.type.union
       else
          -- If the type name wasn't bound, it must be primitive.
          assert(primitive_types[node.id], 'unknown type: '..node.id)
@@ -692,11 +729,15 @@ function resolve(schema, features)
                table.insert(union, visit_type(type, env))
             end
             node.union = union
+         elseif node.id == 'identityref' then
+            node.bases = resolve_bases(node.bases, env)
+            node.default_prefix = schema.id
          end
          node.primitive_type = node.id
       end
       return node
    end
+   -- Already made "local" above.
    function visit(node, env)
       node = shallow_copy(node)
       env = {env=env}
@@ -717,10 +758,10 @@ function resolve(schema, features)
       end
       if node.kind == 'module' or node.kind == 'submodule' then
          visit_top_level(node, env, 'extensions')
-         -- Because features can themselves have if-feature, expand them
-         -- lazily.
+         -- Because features can themselves have if-feature, and
+         -- identities can reference each other, expand them lazily.
          env.features = visit_lazy(pop_prop(node, 'features'), env)
-         visit_top_level(node, env, 'identities')
+         env.identities = visit_lazy(pop_prop(node, 'identities'), env)
          for _,prop in ipairs({'rpcs', 'notifications'}) do
             node[prop] = shallow_copy(node[prop])
             for k,v in pairs(node[prop]) do node[prop][k] = visit(v, env) end
@@ -729,6 +770,11 @@ function resolve(schema, features)
       if node.kind == 'rpc' then
          if node.input then node.input = visit(node.input, env) end
          if node.output then node.output = visit(node.output, env) end
+      end
+      if node.kind == 'identity' then
+         -- Attach fully-qualified identity.
+         node.fqid = lookup(env, 'module_id', '_')..":"..node.id
+         node.bases = resolve_bases(node.bases, env)
       end
       if node.kind == 'feature' then
          node.module_id = lookup(env, 'module_id', '_')
@@ -755,20 +801,38 @@ function resolve(schema, features)
          end
       end
       if node.body then
-         node.body = shallow_copy(node.body)
-         for k,v in pairs(node.body or {}) do
+         local body = node.body
+         node.body = {}
+         for k,v in pairs(body) do
             if v.kind == 'uses' then
                -- Inline "grouping" into "uses".
                local grouping = lookup_lazy(env, 'groupings', v.id)
-               node.body[k] = nil
                for k,v in pairs(grouping.body) do
                   assert(not node.body[k], 'duplicate identifier: '..k)
                   node.body[k] = v
                end
-               -- TODO: Handle refine and augment statements.
+               for _,refine in ipairs(v.refines) do
+                  local target = node.body[refine.node_id]
+                  assert(target, 'missing refine node: '..refine.node_id)
+                  -- FIXME: Add additional "must" statements.
+                  for _,k in ipairs({'config', 'description', 'reference',
+                                     'presence', 'default', 'mandatory',
+                                     'min_elements', 'max_elements'}) do
+                     if refine[k] ~= nil then target[k] = refine[k] end
+                  end
+               end
+               -- TODO: Handle augment statements.
             else
+               assert(not node.body[k], 'duplicate identifier: '..k)
                node.body[k] = visit(v, env)
             end
+         end
+      end
+      -- Mark "key" children of lists as being mandatory.
+      if node.kind == 'list' and node.key then
+         for k in node.key:split(' +') do
+            local leaf = assert(node.body[k])
+            leaf.mandatory = true
          end
       end
       return node, env
@@ -840,9 +904,9 @@ function resolve(schema, features)
 end
 
 local primitive_types = {
-   ['ietf-inet-types']=set('ipv4-address', 'ipv6-address',
+   ['ietf-inet-types']=lib.set('ipv4-address', 'ipv6-address',
                            'ipv4-prefix', 'ipv6-prefix'),
-   ['ietf-yang-types']=set('mac-address')
+   ['ietf-yang-types']=lib.set('mac-address')
 }
 
 -- NB: mutates schema in place!
@@ -869,16 +933,63 @@ function load_schema_file(filename)
    return inherit_config(s), e
 end
 load_schema_file = util.memoize(load_schema_file)
-function load_schema_by_name(name, revision)
+
+function load_schema_source_by_name(name, revision)
    -- FIXME: @ is not valid in a Lua module name.
    -- if revision then name = name .. '@' .. revision end
    name = name:gsub('-', '_')
-   return load_schema(require('lib.yang.'..name..'_yang'), name)
+   return require('lib.yang.'..name..'_yang')
+end
+
+function load_schema_by_name(name, revision)
+   return load_schema(load_schema_source_by_name(name, revision))
 end
 load_schema_by_name = util.memoize(load_schema_by_name)
 
+function add_schema(src, filename)
+   -- Assert that the source actually parses, and get the ID.
+   local s, e = load_schema(src, filename)
+   -- Assert that this schema isn't known.
+   assert(not pcall(load_schema_source_by_name, s.id))
+   assert(s.id)
+   -- Intern.
+   package.loaded['lib.yang.'..s.id:gsub('-', '_')..'_yang'] = src
+   return s.id
+end
+
+function add_schema_file(filename)
+   local file_in = assert(io.open(filename))
+   local contents = file_in:read("*a")
+   file_in:close()
+   return add_schema(contents, filename)
+end
+
+function lookup_identity (fqid)
+   local schema_name, id = fqid:match("^([^:]*):(.*)$")
+   local schema, env = load_schema_by_name(schema_name)
+   local id_thunk = env.identities[id]
+   if not id_thunk then
+      error('no identity '..id..' in module '..schema_name)
+   end
+   return id_thunk() -- Force the lazy lookup.
+end
+lookup_identity = util.memoize(lookup_identity)
+
+function identity_is_instance_of (identity, fqid)
+   for _, base in ipairs(identity.bases) do
+      if base == fqid then return true end
+      local base_id = lookup_identity(base)
+      if identity_is_instance_of(base_id, fqid) then return true end
+   end
+   return false
+end
+identity_is_instance_of = util.memoize(identity_is_instance_of)
+
 function selftest()
    print('selftest: lib.yang.schema')
+
+   set_default_capabilities(get_default_capabilities())
+
    local test_schema = [[module fruit {
       namespace "urn:testing:fruit";
       prefix "fruit";
@@ -906,6 +1017,10 @@ function selftest()
          description "A fruit bowl";
          reference "fruit-bowl";
       }
+
+      identity foo;
+      identity bar { base foo; }
+      identity baz { base bar; base foo; }
 
       grouping fruit {
          description "Represents a piece of fruit";
@@ -965,6 +1080,14 @@ function selftest()
    -- Poke through lazy features abstraction by invoking thunk.
    assert(env.features["bowl"]().description == 'A fruit bowl')
 
+   -- Poke through lazy identity bases by invoking thunk.
+   assert(#env.identities["baz"]().bases == 2)
+   assert(#env.identities["bar"]().bases == 1)
+   assert(env.identities["bar"]().bases[1] == 'fruit:foo')
+   assert(#env.identities["foo"]().bases == 0)
+
+   assert(#lookup_identity("ietf-alarms:alarm-identity").bases == 0)
+
    -- Check that groupings get inlined into their uses.
    assert(schema.body['fruit-bowl'])
    assert(schema.body['fruit-bowl'].description == 'Represents a fruit bowl')
@@ -980,8 +1103,8 @@ function selftest()
    assert(contents.body["name"].description == "Name of fruit.")
    assert(contents.body["score"].type.id == "uint8")
    assert(contents.body["score"].mandatory == true)
-   assert(contents.body["score"].type.range.value[1] == 0)
-   assert(contents.body["score"].type.range.value[2] == 10)
+   local equal = require('core.lib').equal
+   assert(equal(contents.body["score"].type.range.value, {{0, 10}}))
 
    -- Check the container has a leaf called "description"
    local desc = schema.body["fruit-bowl"].body['description']
@@ -992,8 +1115,37 @@ function selftest()
    parse_schema(require('lib.yang.ietf_inet_types_yang'))
 
    load_schema_by_name('ietf-yang-types')
-   load_schema_by_name('ietf-softwire')
-   load_schema_by_name('snabb-softwire-v1')
+
+   -- We could save and restore capabilities to avoid the persistent
+   -- side effect, but it would do no good:  the schemas would be
+   -- memoized when the features were present.  So just add to the
+   -- capabilities, for now, assuming tests are run independently from
+   -- programs.
+   local caps = get_default_capabilities()
+   local new_caps = { ['ietf-softwire-br'] = {feature={'binding'}} }
+   for mod_name, mod_caps in pairs(new_caps) do
+      if not caps[mod_name] then caps[mod_name] = {feature={}} end
+      for _,feature in ipairs(mod_caps.feature) do
+         table.insert(caps[mod_name].feature, feature)
+      end
+   end
+   set_default_capabilities(caps)
+
+   load_schema_by_name('ietf-softwire-common')
+   load_schema_by_name('ietf-softwire-br')
+   load_schema_by_name('snabb-softwire-v2')
+
+   local br = load_schema_by_name('ietf-softwire-br')
+   local binding = br.body['br-instances'].body['br-type'].body['binding']
+   assert(binding)
+   local bt = binding.body['binding'].body['br-instance'].body['binding-table']
+   assert(bt)
+   local ps = bt.body['binding-entry'].body['port-set']
+   assert(ps)
+   -- The binding-entry grouping is defined in ietf-softwire-common and
+   -- imported by ietf-softwire-br, but with a refinement that the
+   -- default is 0.  Test that the refinement was applied.
+   assert(ps.body['psid-offset'].default == "0")
 
    local inherit_config_schema = [[module config-inheritance {
       namespace cs;
@@ -1023,16 +1175,16 @@ function selftest()
    local icschema = load_schema(inherit_config_schema)
 
    -- Test things that should be null, still are.
-   assert(icschema.config == nil)
-   assert(icschema.body.foo.config == nil)
+   assert(icschema.config == true)
+   assert(icschema.body.foo.config == true)
 
    -- Assert the regular config is propergated through container.
    assert(icschema.body.foo.body.bar.config == false)
    assert(icschema.body.foo.body.bar.body.baz.config == false)
 
    -- Now test the grouping, we need to ensure copying is done correctly.
-   assert(icschema.body.corge.config == nil)
-   assert(icschema.body.corge.body.quuz.config == nil)
+   assert(icschema.body.corge.config == true)
+   assert(icschema.body.corge.body.quuz.config == true)
    assert(icschema.body.grault.config == true)
    assert(icschema.body.grault.body.quuz.config == true)
    assert(icschema.body.garply.config == false)
