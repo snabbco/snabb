@@ -12,12 +12,12 @@
 /* Maximum data to buffer in memory before file is opened. */
 #define MAX_MEM_BUFFER 1024*1024
 /* State for initial in-memory stream. */
-char *membuffer;
-size_t membuffersize;
+static char *membuffer;
+static size_t membuffersize;
 
-FILE *fp;    /* File where the audit log is written. */
-int error;   /* Have we been unable to initialize the log? */
-int open;    /* are we logging to a real file? */
+static FILE *fp;    /* File where the audit log is written. */
+static int error;   /* Have we been unable to initialize the log? */
+static int open;    /* are we logging to a real file? */
 
 /* -- msgpack writer - see http://msgpack.org/index.html ------------------ */
 
