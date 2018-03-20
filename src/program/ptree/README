@@ -33,10 +33,5 @@ Optional arguments:
        -D       <seconds>       Duration in seconds.
        -v                       Verbose (repeat for more verbosity).
 
-Optional arguments for debugging and profiling:
-       -jv, -jv=FILE            Print out when traces are recorded
-       -jp, -jp=MODE,FILE       Profile the system by method
-       -jtprof                  Profile the system by trace
-
 CPUSET is a list of CPU ranges.  For example "3-5,7-9", or "3,4,5,7,8,9"
 both allow the data planes to run on the given CPUs.

@@ -335,12 +335,11 @@ receive_device.interface= "rx1GE"
    end
 end
 
-function esp (npackets, packet_size, mode, direction, profile)
+function esp (npackets, packet_size, mode, direction)
    local esp = require("lib.ipsec.esp")
    local ethernet = require("lib.protocol.ethernet")
    local ipv6 = require("lib.protocol.ipv6")
    local datagram = require("lib.protocol.datagram")
-   local profiler = profile and require("jit.p")
 
    npackets = assert(tonumber(npackets), "Invalid number of packets: " .. npackets)
    packet_size = assert(tonumber(packet_size), "Invalid packet size: " .. packet_size)
@@ -370,19 +369,16 @@ function esp (npackets, packet_size, mode, direction, profile)
       decap = function (p) return dec:decapsulate_transport6(p) end
    end
    if direction == "encapsulate" then
-      if profile then profiler.start(profile) end
       local start = C.get_monotonic_time()
       for i = 1, npackets do
          packet.free(encap(packet.clone(plain)))
       end
       local finish = C.get_monotonic_time()
-      if profile then profiler.stop() end
       local bps = (packet_size * npackets) / (finish - start)
       print(("Encapsulation (packet size = %d): %.2f Gbit/s")
             :format(packet_size, gbits(bps)))
    else
       local encapsulated = encap(packet.clone(plain))
-      if profile then profiler.start(profile) end
       local start = C.get_monotonic_time()
       for i = 1, npackets do
          packet.free(decap(packet.clone(encapsulated)))
@@ -390,7 +386,6 @@ function esp (npackets, packet_size, mode, direction, profile)
          dec.window[0] = 0
       end
       local finish = C.get_monotonic_time()
-      if profile then profiler.stop() end
       local bps = (packet_size * npackets) / (finish - start)
       print(("Decapsulation (packet size = %d): %.2f Gbit/s")
             :format(packet_size, gbits(bps)))
