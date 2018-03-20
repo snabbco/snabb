@@ -13,6 +13,8 @@ local fiber = require('lib.fibers.fiber')
 -- scheduled directly.
 local Suspension = {}
 Suspension.__index = Suspension
+local CompleteTask = {}
+CompleteTask.__index = CompleteTask
 function Suspension:waiting() return self.state == 'waiting' end
 function Suspension:complete(wrap, val)
    assert(self:waiting())
@@ -21,10 +23,13 @@ function Suspension:complete(wrap, val)
    self.val = val
    self.sched:schedule(self)
 end
-function Suspension:maybe_complete(wrap, val)
-   if not self:waiting() then return false end
-   self:complete(wrap, val)
-   return true
+function Suspension:complete_and_run(wrap, val)
+   assert(self:waiting())
+   self.state = 'synchronized'
+   return self.fiber:resume(wrap, val)
+end
+function Suspension:complete_task(wrap, val)
+   return setmetatable({suspension=self, wrap=wrap, val=val}, CompleteTask)
 end
 function Suspension:run() -- Task method.
    assert(not self:waiting())
@@ -34,6 +39,17 @@ local function new_suspension(sched, fiber)
    return setmetatable(
       { state='waiting', sched=sched, fiber=fiber },
       Suspension)
+end
+
+-- A complete task is a task that when run, completes a suspension, if
+-- the suspension hasn't been completed already.  There can be multiple
+-- complete tasks for a given suspension, if the suspension can complete
+-- in multiple ways (e.g. via a choice op).
+function CompleteTask:run()
+   if self.suspension:waiting() then
+      -- Use complete-and-run so that the fiber runs in this turn.
+      self.suspension:complete_and_run(self.wrap, self.val)
+   end
 end
 
 -- An operation represents the potential for synchronization with some

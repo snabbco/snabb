@@ -11,19 +11,12 @@ local now = fiber.now
 local Timeout = {}
 Timeout.__index = Timeout
 
-function Timeout:run()
-   self.suspension:maybe_complete(self.wrap_fn)
-end
-local function timeout(suspension, wrap_fn)
-   return setmetatable({suspension=suspension, wrap_fn=wrap_fn}, Timeout)
-end
-
 function sleep_until_op(t)
    local function try()
       return t <= now()
    end
    local function block(suspension, wrap_fn)
-      suspension.sched:schedule_at_time(t, timeout(suspension, wrap_fn))
+      suspension.sched:schedule_at_time(t, suspension:complete_task(wrap_fn))
    end
    return op.new_base_op(nil, try, block)
 end
@@ -35,7 +28,7 @@ end
 function sleep_op(dt)
    local function try() return dt <= 0 end
    local function block(suspension, wrap_fn)
-      suspension.sched:schedule_after_sleep(dt, timeout(suspension, wrap_fn))
+      suspension.sched:schedule_after_sleep(dt, suspension:complete_task(wrap_fn))
    end
    return op.new_base_op(nil, try, block)
 end
