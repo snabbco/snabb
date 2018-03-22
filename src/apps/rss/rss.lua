@@ -376,10 +376,8 @@ function selftest ()
       { name = "ip", n = 4 },
       { name = "ip6", n = 4 },
    }
-   local nsinks = 0
    for g, group in ipairs(sink_groups) do
       for i = 1, group.n do
-         nsinks = nsinks + 1
          local sink_name = "sink"..g..i
          config.app(graph, sink_name, Sink)
          config.link(graph, "rss."..group.name.."_"..i
