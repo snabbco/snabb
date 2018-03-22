@@ -106,10 +106,7 @@ local int_ct = ffi.typeof'int'
 local function convert_arg(arg)   --dasm_put() accepts only int32 varargs.
 	if type(arg) == "number" then  --but we make it accept uint32 too by normalizing the arg.
 		arg = bit.tobit(arg)        --non-number args are converted to int32 according to ffi rules.
-        elseif type(arg) == "cdata" and ffi.sizeof(arg) > 4 then
-		-- avoid truncating 64-bit FFI values
-		err("cannot coerce value to 32-bit immediate (consider 'mov64'): ", tostring(arg))
-        end
+	end
 	return ffi.cast(int_ct, arg)
 end
 local function convert_args(...) --not a tailcall but at least it doesn't make any garbage

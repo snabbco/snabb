@@ -2114,8 +2114,8 @@ if x64 then
     local psz, sk = wputop(sz, opcode, rex, nil, vreg)
     wvreg("opcode", vreg, psz, sk)
     if luamode then
-      waction("IMM_D", format("ffi.cast(\"uint32_t\", ffi.cast(\"uintptr_t\", %s) %% 2^32)", op64))
-      waction("IMM_D", format("ffi.cast(\"uint32_t\", ffi.cast(\"uintptr_t\", %s) / 2^32)", op64))
+      waction("IMM_D", format("ffi.cast(\"uintptr_t\", %s) %% 2^32", op64))
+      waction("IMM_D", format("ffi.cast(\"uintptr_t\", %s) / 2^32", op64))
     else
       waction("IMM_D", format("(unsigned int)(%s)", op64))
       waction("IMM_D", format("(unsigned int)((%s)>>32)", op64))
