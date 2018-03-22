@@ -185,8 +185,7 @@ function rss:push ()
       self.rxpackets = self.rxpackets + npackets
       for _ = 1, npackets do
          local p = receive(link)
-         local md = mdadd(p, self.rm_ext_headers, vlan)
-         hash(md)
+         hash(mdadd(p, self.rm_ext_headers, vlan))
          transmit(queue, p)
       end
    end
@@ -196,7 +195,7 @@ function rss:push ()
       -- put on the class' input queue.  If the class is of type
       -- "continue" or the packet doesn't match the filter, it is put
       -- back onto the main queue for inspection by the next class.
-      for j = 1, nreadable(queue) do
+      for _ = 1, nreadable(queue) do
          local p = receive(queue)
          local md = mdget(p)
          if class.match_fn(md.filter_start, md.filter_length) then
