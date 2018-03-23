@@ -41,8 +41,6 @@
 <a class="current" href="ext_jit.html">jit.* Library</a>
 </li><li>
 <a href="ext_c_api.html">Lua/C API</a>
-</li><li>
-<a href="ext_profiler.html">Profiler</a>
 </li></ul>
 </li><li>
 <a href="status.html">Status</a>
@@ -176,17 +174,6 @@ It's no longer necessary to run <tt>require("jit.opt").start()</tt>,
 which was one of the ways to enable optimization.
 </p>
 
-<h2 id="jit_util"><tt>jit.util.*</tt> &mdash; JIT compiler introspection</h2>
-<p>
-This sub-module holds functions to introspect the bytecode, generated
-traces, the IR and the generated machine code. The functionality
-provided by this module is still in flux and therefore undocumented.
-</p>
-<p>
-The debug modules <tt>-jbc</tt>, <tt>-jv</tt> and <tt>-jdump</tt> make
-extensive use of these functions. Please check out their source code,
-if you want to know more.
-</p>
 <br class="flush">
 </div>
 <div id="foot">

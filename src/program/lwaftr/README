@@ -8,7 +8,6 @@ Usage:
   snabb lwaftr query
   snabb lwaftr quickcheck
   snabb lwaftr run
-  snabb lwaftr run_nohw
   snabb lwaftr soaktest
 
 Use --help for per-command usage.

@@ -46,8 +46,6 @@ td.convop { font-style: italic; width: 40%; }
 <a href="ext_jit.html">jit.* Library</a>
 </li><li>
 <a href="ext_c_api.html">Lua/C API</a>
-</li><li>
-<a href="ext_profiler.html">Profiler</a>
 </li></ul>
 </li><li>
 <a href="status.html">Status</a>
@@ -1215,8 +1213,7 @@ perform strict checks.</li>
 <p>
 The JIT compiler already handles a large subset of all FFI operations.
 It automatically falls back to the interpreter for unimplemented
-operations (you can check for this with the
-<a href="running.html#opt_j"><tt>-jv</tt></a> command line option).
+operations.
 The following operations are currently not compiled and may exhibit
 suboptimal performance, especially when used in inner loops:
 </p>

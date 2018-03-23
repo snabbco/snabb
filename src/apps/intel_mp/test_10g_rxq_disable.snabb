@@ -19,8 +19,8 @@ config.app(c, "n0", intel.Intel,
 
 config.app(c, "n1", intel.Intel,
            { pciaddr = pciaddr1,
-             rxq = "off",
-             txq = "off",
+             rxq = false,
+             txq = false,
              wait_for_link = true })
 
 config.app(c, "source0", basic_apps.Source)
