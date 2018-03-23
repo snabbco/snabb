@@ -73,7 +73,7 @@ static TraceNo trace_findfree(jit_State *J)
   lj_mem_growvec(J->L, J->trace, J->sizetrace, lim, GCRef);
   for (; osz < J->sizetrace; osz++)
     setgcrefnull(J->trace[osz]);
-  return J->freetrace++;
+  return J->freetrace;
 }
 
 #define TRACE_APPENDVEC(field, szfield, tp) \
@@ -238,9 +238,11 @@ void lj_trace_flushproto(global_State *g, GCproto *pt)
 int lj_trace_flushall(lua_State *L)
 {
   jit_State *J = L2J(L);
+  global_State *g = G(L);
   ptrdiff_t i;
   if ((J2G(J)->hookmask & HOOK_GC))
     return 1;
+  lj_auditlog_trace_flushall(J);
   for (i = (ptrdiff_t)J->sizetrace-1; i > 0; i--) {
     GCtrace *T = traceref(J, i);
     if (T) {
@@ -252,6 +254,8 @@ int lj_trace_flushall(lua_State *L)
     }
   }
   J->cur.traceno = 0;
+  J->freetrace = 0;
+  g->lasttrace = 0;
   /* Unpatch blacklisted byte codes. */
   GCRef *p = &(G(L)->gc.root);
   GCobj *o;

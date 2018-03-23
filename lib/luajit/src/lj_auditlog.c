@@ -198,3 +198,12 @@ void lj_auditlog_new_prototype(GCproto *pt)
   }
 }
 
+void lj_auditlog_trace_flushall(jit_State *J)
+{
+  if (ensure_log_started()) {
+    log_jit_State(J);
+    log_event("trace_flushall", 1);
+    str_16("jit_State");  /* = */ uint_64((uint64_t)J);
+  }
+}
+
