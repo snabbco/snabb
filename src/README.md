@@ -504,6 +504,10 @@ Returns a pointer to the mapped object.
 
 Create an alias (symbolic link) for an object.
 
+— Function **shm.path** *name*
+
+Returns the fully-qualified path for an object called *name*.
+
 — Function **shm.exists** *name*
 
 Returns a true value if shared object by *name* exists.

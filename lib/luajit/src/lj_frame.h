@@ -30,7 +30,6 @@ enum {
 #define FRAME_TYPEP		(FRAME_TYPE|FRAME_P)
 
 /* Macros to access and modify Lua frames. */
-#if LJ_FR2
 /* Two-slot frame info, required for 64 bit PC/GCRef:
 **
 **                   base-2  base-1      |  base  base+1 ...
@@ -49,28 +48,6 @@ enum {
 #define setframe_gc(f, p, tp)	(setgcVraw((f)-1, (p), (tp)))
 #define setframe_ftsz(f, sz)	((f)->ftsz = (sz))
 #define setframe_pc(f, pc)	((f)->ftsz = (int64_t)(intptr_t)(pc))
-#else
-/* One-slot frame info, sufficient for 32 bit PC/GCRef:
-**
-**              base-1              |  base  base+1 ...
-**              lo     hi           |
-**             [func | PC/delta/ft] | [slots ...]
-**             ^-- frame            | ^-- base   ^-- top
-**
-** Continuation frames:
-**
-**  base-2      base-1              |  base  base+1 ...
-**  lo     hi   lo     hi           |
-** [cont | PC] [func | PC/delta/ft] | [slots ...]
-**             ^-- frame            | ^-- base   ^-- top
-*/
-#define frame_gc(f)		(gcref((f)->fr.func))
-#define frame_ftsz(f)		((ptrdiff_t)(f)->fr.tp.ftsz)
-#define frame_pc(f)		(mref((f)->fr.tp.pcr, const BCIns))
-#define setframe_gc(f, p, tp)	(setgcref((f)->fr.func, (p)), UNUSED(tp))
-#define setframe_ftsz(f, sz)	((f)->fr.tp.ftsz = (int32_t)(sz))
-#define setframe_pc(f, pc)	(setmref((f)->fr.tp.pcr, (pc)))
-#endif
 
 #define frame_type(f)		(frame_ftsz(f) & FRAME_TYPE)
 #define frame_typep(f)		(frame_ftsz(f) & FRAME_TYPEP)
@@ -86,22 +63,9 @@ enum {
 
 enum { LJ_CONT_TAILCALL, LJ_CONT_FFI_CALLBACK };  /* Special continuations. */
 
-#if LJ_FR2
 #define frame_contpc(f)		(frame_pc((f)-2))
 #define frame_contv(f)		(((f)-3)->u64)
-#else
-#define frame_contpc(f)		(frame_pc((f)-1))
-#define frame_contv(f)		(((f)-1)->u32.lo)
-#endif
-#if LJ_FR2
 #define frame_contf(f)		((ASMFunction)(uintptr_t)((f)-3)->u64)
-#elif LJ_64
-#define frame_contf(f) \
-  ((ASMFunction)(void *)((intptr_t)lj_vm_asm_begin + \
-			 (intptr_t)(int32_t)((f)-1)->u32.lo))
-#else
-#define frame_contf(f)		((ASMFunction)gcrefp(((f)-1)->gcr, void))
-#endif
 #define frame_iscont_fficb(f) \
   (LJ_HASFFI && frame_contv(f) == LJ_CONT_FFI_CALLBACK)
 
@@ -115,158 +79,15 @@ enum { LJ_CONT_TAILCALL, LJ_CONT_FFI_CALLBACK };  /* Special continuations. */
 /* Macros to access and modify the C stack frame chain. */
 
 /* These definitions must match with the arch-specific *.dasc files. */
-#if LJ_TARGET_X86
-#if LJ_ABI_WIN
-#define CFRAME_OFS_ERRF		(19*4)
-#define CFRAME_OFS_NRES		(18*4)
-#define CFRAME_OFS_PREV		(17*4)
-#define CFRAME_OFS_L		(16*4)
-#define CFRAME_OFS_SEH		(9*4)
-#define CFRAME_OFS_PC		(6*4)
-#define CFRAME_OFS_MULTRES	(5*4)
-#define CFRAME_SIZE		(16*4)
-#define CFRAME_SHIFT_MULTRES	0
-#else
-#define CFRAME_OFS_ERRF		(15*4)
-#define CFRAME_OFS_NRES		(14*4)
-#define CFRAME_OFS_PREV		(13*4)
-#define CFRAME_OFS_L		(12*4)
-#define CFRAME_OFS_PC		(6*4)
-#define CFRAME_OFS_MULTRES	(5*4)
-#define CFRAME_SIZE		(12*4)
-#define CFRAME_SHIFT_MULTRES	0
-#endif
-#elif LJ_TARGET_X64
-#if LJ_ABI_WIN
-#define CFRAME_OFS_PREV		(13*8)
-#if LJ_GC64
-#define CFRAME_OFS_PC		(12*8)
-#define CFRAME_OFS_L		(11*8)
-#define CFRAME_OFS_ERRF		(21*4)
-#define CFRAME_OFS_NRES		(20*4)
-#define CFRAME_OFS_MULTRES	(8*4)
-#else
-#define CFRAME_OFS_PC		(25*4)
-#define CFRAME_OFS_L		(24*4)
-#define CFRAME_OFS_ERRF		(23*4)
-#define CFRAME_OFS_NRES		(22*4)
-#define CFRAME_OFS_MULTRES	(21*4)
-#endif
-#define CFRAME_SIZE		(10*8)
-#define CFRAME_SIZE_JIT		(CFRAME_SIZE + 9*16 + 4*8)
-#define CFRAME_SHIFT_MULTRES	0
-#else
 #define CFRAME_OFS_PREV		(4*8)
-#if LJ_GC64
 #define CFRAME_OFS_PC		(3*8)
 #define CFRAME_OFS_L		(2*8)
 #define CFRAME_OFS_ERRF		(3*4)
 #define CFRAME_OFS_NRES		(2*4)
 #define CFRAME_OFS_MULTRES	(0*4)
-#else
-#define CFRAME_OFS_PC		(7*4)
-#define CFRAME_OFS_L		(6*4)
-#define CFRAME_OFS_ERRF		(5*4)
-#define CFRAME_OFS_NRES		(4*4)
-#define CFRAME_OFS_MULTRES	(1*4)
-#endif
-#if LJ_NO_UNWIND
 #define CFRAME_SIZE		(12*8)
-#else
-#define CFRAME_SIZE		(10*8)
-#endif
 #define CFRAME_SIZE_JIT		(CFRAME_SIZE + 16)
 #define CFRAME_SHIFT_MULTRES	0
-#endif
-#elif LJ_TARGET_ARM
-#define CFRAME_OFS_ERRF		24
-#define CFRAME_OFS_NRES		20
-#define CFRAME_OFS_PREV		16
-#define CFRAME_OFS_L		12
-#define CFRAME_OFS_PC		8
-#define CFRAME_OFS_MULTRES	4
-#if LJ_ARCH_HASFPU
-#define CFRAME_SIZE		128
-#else
-#define CFRAME_SIZE		64
-#endif
-#define CFRAME_SHIFT_MULTRES	3
-#elif LJ_TARGET_ARM64
-#define CFRAME_OFS_ERRF		196
-#define CFRAME_OFS_NRES		200
-#define CFRAME_OFS_PREV		160
-#define CFRAME_OFS_L		176
-#define CFRAME_OFS_PC		168
-#define CFRAME_OFS_MULTRES	192
-#define CFRAME_SIZE		208
-#define CFRAME_SHIFT_MULTRES	3
-#elif LJ_TARGET_PPC
-#if LJ_TARGET_XBOX360
-#define CFRAME_OFS_ERRF		424
-#define CFRAME_OFS_NRES		420
-#define CFRAME_OFS_PREV		400
-#define CFRAME_OFS_L		416
-#define CFRAME_OFS_PC		412
-#define CFRAME_OFS_MULTRES	408
-#define CFRAME_SIZE		384
-#define CFRAME_SHIFT_MULTRES	3
-#elif LJ_ARCH_PPC32ON64
-#define CFRAME_OFS_ERRF		472
-#define CFRAME_OFS_NRES		468
-#define CFRAME_OFS_PREV		448
-#define CFRAME_OFS_L		464
-#define CFRAME_OFS_PC		460
-#define CFRAME_OFS_MULTRES	456
-#define CFRAME_SIZE		400
-#define CFRAME_SHIFT_MULTRES	3
-#else
-#define CFRAME_OFS_ERRF		48
-#define CFRAME_OFS_NRES		44
-#define CFRAME_OFS_PREV		40
-#define CFRAME_OFS_L		36
-#define CFRAME_OFS_PC		32
-#define CFRAME_OFS_MULTRES	28
-#define CFRAME_SIZE		272
-#define CFRAME_SHIFT_MULTRES	3
-#endif
-#elif LJ_TARGET_MIPS32
-#if LJ_ARCH_HASFPU
-#define CFRAME_OFS_ERRF		124
-#define CFRAME_OFS_NRES		120
-#define CFRAME_OFS_PREV		116
-#define CFRAME_OFS_L		112
-#define CFRAME_SIZE		112
-#else
-#define CFRAME_OFS_ERRF		76
-#define CFRAME_OFS_NRES		72
-#define CFRAME_OFS_PREV		68
-#define CFRAME_OFS_L		64
-#define CFRAME_SIZE		64
-#endif
-#define CFRAME_OFS_PC		20
-#define CFRAME_OFS_MULTRES	16
-#define CFRAME_SHIFT_MULTRES	3
-#elif LJ_TARGET_MIPS64
-#if LJ_ARCH_HASFPU
-#define CFRAME_OFS_ERRF		188
-#define CFRAME_OFS_NRES		184
-#define CFRAME_OFS_PREV		176
-#define CFRAME_OFS_L		168
-#define CFRAME_OFS_PC		160
-#define CFRAME_SIZE		192
-#else
-#define CFRAME_OFS_ERRF		124
-#define CFRAME_OFS_NRES		120
-#define CFRAME_OFS_PREV		112
-#define CFRAME_OFS_L		104
-#define CFRAME_OFS_PC		96
-#define CFRAME_SIZE		128
-#endif
-#define CFRAME_OFS_MULTRES	0
-#define CFRAME_SHIFT_MULTRES	3
-#else
-#error "Missing CFRAME_* definitions for this architecture"
-#endif
 
 #ifndef CFRAME_SIZE_JIT
 #define CFRAME_SIZE_JIT		CFRAME_SIZE

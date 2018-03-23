@@ -1,0 +1,26 @@
+array3d 500
+binary-trees 16
+chameneos 1e7
+coroutine-ring 5e7
+euler14-bit 2e7
+fannkuch 11
+fasta 5e6
+life
+mandelbrot 5000
+mandelbrot-bit 5000
+md5 30000
+nbody 8e6
+nsieve 12
+nsieve-bit 13
+nsieve-bit-fp 12
+partialsums 3e7
+pidigits-nogmp 5000
+ray 9
+recursive-fib 40
+scimark-fft 50000
+scimark-lu 5000
+scimark-sor 50000
+scimark-sparse 15e4
+series 10000
+spectral-norm 3000
+roulette

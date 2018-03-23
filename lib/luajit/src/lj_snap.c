@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_gc.h"
 #include "lj_tab.h"
@@ -21,41 +20,14 @@
 #include "lj_trace.h"
 #include "lj_snap.h"
 #include "lj_target.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
 #include "lj_cdata.h"
-#endif
 
 /* Pass IR on to next optimization in chain (FOLD). */
 #define emitir(ot, a, b)	(lj_ir_set(J, (ot), (a), (b)), lj_opt_fold(J))
 
 /* Emit raw IR without passing through optimizations. */
 #define emitir_raw(ot, a, b)	(lj_ir_set(J, (ot), (a), (b)), lj_ir_emit(J))
-
-/* -- Snapshot buffer allocation ------------------------------------------ */
-
-/* Grow snapshot buffer. */
-void lj_snap_grow_buf_(jit_State *J, MSize need)
-{
-  MSize maxsnap = (MSize)J->param[JIT_P_maxsnap];
-  if (need > maxsnap)
-    lj_trace_err(J, LJ_TRERR_SNAPOV);
-  lj_mem_growvec(J->L, J->snapbuf, J->sizesnap, maxsnap, SnapShot);
-  J->cur.snap = J->snapbuf;
-}
-
-/* Grow snapshot map buffer. */
-void lj_snap_grow_map_(jit_State *J, MSize need)
-{
-  if (need < 2*J->sizesnapmap)
-    need = 2*J->sizesnapmap;
-  else if (need < 64)
-    need = 64;
-  J->snapmapbuf = (SnapEntry *)lj_mem_realloc(J->L, J->snapmapbuf,
-		    J->sizesnapmap*sizeof(SnapEntry), need*sizeof(SnapEntry));
-  J->cur.snapmap = J->snapmapbuf;
-  J->sizesnapmap = need;
-}
 
 /* -- Snapshot generation ------------------------------------------------- */
 
@@ -68,7 +40,6 @@ static MSize snapshot_slots(jit_State *J, SnapEntry *map, BCReg nslots)
   for (s = 0; s < nslots; s++) {
     TRef tr = J->slot[s];
     IRRef ref = tref_ref(tr);
-#if LJ_FR2
     if (s == 1) {  /* Ignore slot 1 in LJ_FR2 mode, except if tailcalled. */
       if ((tr & TREF_FRAME))
 	map[n++] = SNAP(1, SNAP_FRAME | SNAP_NORESTORE, REF_NIL);
@@ -79,7 +50,6 @@ static MSize snapshot_slots(jit_State *J, SnapEntry *map, BCReg nslots)
       tr = J->slot[s] = (tr & 0xff0000) | lj_ir_k64(J, IR_KNUM, base[s].u64);
       ref = tref_ref(tr);
     }
-#endif
     if (ref) {
       SnapEntry sn = SNAP_TR(s, tr);
       IRIns *ir = &J->cur.ir[ref];
@@ -89,9 +59,8 @@ static MSize snapshot_slots(jit_State *J, SnapEntry *map, BCReg nslots)
 	if (!(ir->op2 & IRSLOAD_INHERIT))
 	  continue;
 	/* No need to restore readonly slots and unmodified non-parent slots. */
-	if (!(LJ_DUALNUM && (ir->op2 & IRSLOAD_CONVERT)) &&
-	    (ir->op2 & (IRSLOAD_READONLY|IRSLOAD_PARENT)) != IRSLOAD_PARENT)
-	  sn |= SNAP_NORESTORE;
+	if ((ir->op2 & (IRSLOAD_READONLY|IRSLOAD_PARENT)) != IRSLOAD_PARENT)
+          sn |= SNAP_NORESTORE;
       }
       if (LJ_SOFTFP && irt_isnum(ir->t))
 	sn |= SNAP_SOFTFPNUM;
@@ -108,31 +77,16 @@ static MSize snapshot_framelinks(jit_State *J, SnapEntry *map, uint8_t *topslot)
   cTValue *lim = J->L->base - J->baseslot + LJ_FR2;
   GCfunc *fn = frame_func(frame);
   cTValue *ftop = isluafunc(fn) ? (frame+funcproto(fn)->framesize) : J->L->top;
-#if LJ_FR2
   uint64_t pcbase = (u64ptr(J->pc) << 8) | (J->baseslot - 2);
   lua_assert(2 <= J->baseslot && J->baseslot <= 257);
   memcpy(map, &pcbase, sizeof(uint64_t));
-#else
-  MSize f = 0;
-  map[f++] = SNAP_MKPC(J->pc);  /* The current PC is always the first entry. */
-#endif
   while (frame > lim) {  /* Backwards traversal of all frames above base. */
     if (frame_islua(frame)) {
-#if !LJ_FR2
-      map[f++] = SNAP_MKPC(frame_pc(frame));
-#endif
       frame = frame_prevl(frame);
     } else if (frame_iscont(frame)) {
-#if !LJ_FR2
-      map[f++] = SNAP_MKFTSZ(frame_ftsz(frame));
-      map[f++] = SNAP_MKPC(frame_contpc(frame));
-#endif
       frame = frame_prevd(frame);
     } else {
       lua_assert(!frame_isc(frame));
-#if !LJ_FR2
-      map[f++] = SNAP_MKFTSZ(frame_ftsz(frame));
-#endif
       frame = frame_prevd(frame);
       continue;
     }
@@ -140,13 +94,8 @@ static MSize snapshot_framelinks(jit_State *J, SnapEntry *map, uint8_t *topslot)
       ftop = frame + funcproto(frame_func(frame))->framesize;
   }
   *topslot = (uint8_t)(ftop - lim);
-#if LJ_FR2
   lua_assert(sizeof(SnapEntry) * 2 == sizeof(uint64_t));
   return 2;
-#else
-  lua_assert(f == (MSize)(1 + J->framedepth));
-  return f;
-#endif
 }
 
 /* Take a snapshot of the current stack. */
@@ -156,7 +105,6 @@ static void snapshot_stack(jit_State *J, SnapShot *snap, MSize nsnapmap)
   MSize nent;
   SnapEntry *p;
   /* Conservative estimate. */
-  lj_snap_grow_map(J, nsnapmap + nslots + (MSize)(LJ_FR2?2:J->framedepth+1));
   p = &J->cur.snapmap[nsnapmap];
   nent = snapshot_slots(J, p, nslots);
   snap->nent = (uint8_t)nent;
@@ -183,7 +131,6 @@ void lj_snap_add(jit_State *J)
     nsnapmap = J->cur.snap[--nsnap].mapofs;
   } else {
   nomerge:
-    lj_snap_grow_buf(J, nsnap+1);
     J->cur.nsnap = (uint16_t)(nsnap+1);
   }
   J->mergesnap = 0;
@@ -635,15 +582,8 @@ static void snap_restoreval(jit_State *J, GCtrace *T, ExitState *ex,
     int32_t *sps = &ex->spill[regsp_spill(rs)];
     if (irt_isinteger(t)) {
       setintV(o, *sps);
-#if !LJ_SOFTFP
     } else if (irt_isnum(t)) {
       o->u64 = *(uint64_t *)sps;
-#endif
-#if LJ_64 && !LJ_GC64
-    } else if (irt_islightud(t)) {
-      /* 64 bit lightuserdata which may escape already has the tag bits. */
-      o->u64 = *(uint64_t *)sps;
-#endif
     } else {
       lua_assert(!irt_ispri(t));  /* PRI refs never have a spill slot. */
       setgcV(J->L, o, (GCobj *)(uintptr_t)*(GCSize *)sps, irt_toitype(t));
@@ -653,19 +593,11 @@ static void snap_restoreval(jit_State *J, GCtrace *T, ExitState *ex,
     if (ra_noreg(r)) {
       lua_assert(ir->o == IR_CONV && ir->op2 == IRCONV_NUM_INT);
       snap_restoreval(J, T, ex, snapno, rfilt, ir->op1, o);
-      if (LJ_DUALNUM) setnumV(o, (lua_Number)intV(o));
       return;
     } else if (irt_isinteger(t)) {
       setintV(o, (int32_t)ex->gpr[r-RID_MIN_GPR]);
-#if !LJ_SOFTFP
     } else if (irt_isnum(t)) {
       setnumV(o, ex->fpr[r-RID_MIN_FPR]);
-#endif
-#if LJ_64 && !LJ_GC64
-    } else if (irt_is64(t)) {
-      /* 64 bit values that already have the tag bits. */
-      o->u64 = ex->gpr[r-RID_MIN_GPR];
-#endif
     } else if (irt_ispri(t)) {
       setpriV(o, irt_toitype(t));
     } else {
@@ -674,7 +606,6 @@ static void snap_restoreval(jit_State *J, GCtrace *T, ExitState *ex,
   }
 }
 
-#if LJ_HASFFI
 /* Restore raw data from the trace exit state. */
 static void snap_restoredata(GCtrace *T, ExitState *ex,
 			     SnapNo snapno, BloomFilter rfilt,
@@ -712,19 +643,10 @@ static void snap_restoredata(GCtrace *T, ExitState *ex,
 	return;
       }
       src = (int32_t *)&ex->gpr[r-RID_MIN_GPR];
-#if !LJ_SOFTFP
       if (r >= RID_MAX_GPR) {
 	src = (int32_t *)&ex->fpr[r-RID_MIN_FPR];
-#if LJ_TARGET_PPC
-	if (sz == 4) {  /* PPC FPRs are always doubles. */
-	  *(float *)dst = (float)*(double *)src;
-	  return;
-	}
-#else
 	if (LJ_BE && sz == 4) src++;
-#endif
       } else
-#endif
       if (LJ_64 && LJ_BE && sz == 4) src++;
     }
   }
@@ -734,7 +656,6 @@ static void snap_restoredata(GCtrace *T, ExitState *ex,
   else if (sz == 1) *(int8_t *)dst = (int8_t)*src;
   else *(int16_t *)dst = (int16_t)*src;
 }
-#endif
 
 /* Unsink allocation from the trace exit state. Unsink sunk stores. */
 static void snap_unsink(jit_State *J, GCtrace *T, ExitState *ex,
@@ -743,7 +664,6 @@ static void snap_unsink(jit_State *J, GCtrace *T, ExitState *ex,
 {
   lua_assert(ir->o == IR_TNEW || ir->o == IR_TDUP ||
 	     ir->o == IR_CNEW || ir->o == IR_CNEWI);
-#if LJ_HASFFI
   if (ir->o == IR_CNEW || ir->o == IR_CNEWI) {
     CTState *cts = ctype_cts(J->L);
     CTypeID id = (CTypeID)T->ir[ir->op1].i;
@@ -788,7 +708,6 @@ static void snap_unsink(jit_State *J, GCtrace *T, ExitState *ex,
 	}
     }
   } else
-#endif
   {
     IRIns *irs, *irlast;
     GCtab *t = ir->o == IR_TNEW ? lj_tab_new(J->L, ir->op1, ir->op2) :
@@ -834,9 +753,6 @@ const BCIns *lj_snap_restore(jit_State *J, void *exptr)
 #if !LJ_FR2 || defined(LUA_USE_ASSERT)
   SnapEntry *flinks = &T->snapmap[snap_nextofs(T, snap)-1-LJ_FR2];
 #endif
-#if !LJ_FR2
-  ptrdiff_t ftsz0;
-#endif
   TValue *frame;
   BloomFilter rfilt = snap_renamefilter(T, snapno);
   const BCIns *pc = snap_pc(&map[nent]);
@@ -853,9 +769,6 @@ const BCIns *lj_snap_restore(jit_State *J, void *exptr)
 
   /* Fill stack slots with data from the registers and spill slots. */
   frame = L->base-1-LJ_FR2;
-#if !LJ_FR2
-  ftsz0 = frame_ftsz(frame);  /* Preserve link to previous frame in slot #0. */
-#endif
   for (n = 0; n < nent; n++) {
     SnapEntry sn = map[n];
     if (!(sn & SNAP_NORESTORE)) {
@@ -874,22 +787,9 @@ const BCIns *lj_snap_restore(jit_State *J, void *exptr)
 	continue;
       }
       snap_restoreval(J, T, ex, snapno, rfilt, ref, o);
-      if (LJ_SOFTFP && (sn & SNAP_SOFTFPNUM) && tvisint(o)) {
-	TValue tmp;
-	snap_restoreval(J, T, ex, snapno, rfilt, ref+1, &tmp);
-	o->u32.hi = tmp.u32.lo;
-#if !LJ_FR2
-      } else if ((sn & (SNAP_CONT|SNAP_FRAME))) {
-	/* Overwrite tag with frame link. */
-	setframe_ftsz(o, snap_slot(sn) != 0 ? (int32_t)*flinks-- : ftsz0);
-	L->base = o+1;
-#endif
-      }
     }
   }
-#if LJ_FR2
   L->base += (map[nent+LJ_BE] & 0xff);
-#endif
   lua_assert(map + nent == flinks);
 
   /* Compute current stack top. */
@@ -910,4 +810,3 @@ const BCIns *lj_snap_restore(jit_State *J, void *exptr)
 #undef emitir_raw
 #undef emitir
 
-#endif

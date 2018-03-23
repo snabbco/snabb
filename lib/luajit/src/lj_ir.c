@@ -12,7 +12,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_gc.h"
 #include "lj_buf.h"
@@ -23,11 +22,9 @@
 #include "lj_ircall.h"
 #include "lj_iropt.h"
 #include "lj_trace.h"
-#if LJ_HASFFI
 #include "lj_ctype.h"
 #include "lj_cdata.h"
 #include "lj_carith.h"
-#endif
 #include "lj_vm.h"
 #include "lj_strscan.h"
 #include "lj_strfmt.h"
@@ -68,51 +65,8 @@ IRCALLDEF(IRCALLCI)
 
 /* -- IR emitter ---------------------------------------------------------- */
 
-/* Grow IR buffer at the top. */
-void LJ_FASTCALL lj_ir_growtop(jit_State *J)
-{
-  IRIns *baseir = J->irbuf + J->irbotlim;
-  MSize szins = J->irtoplim - J->irbotlim;
-  if (szins) {
-    baseir = (IRIns *)lj_mem_realloc(J->L, baseir, szins*sizeof(IRIns),
-				     2*szins*sizeof(IRIns));
-    J->irtoplim = J->irbotlim + 2*szins;
-  } else {
-    baseir = (IRIns *)lj_mem_realloc(J->L, NULL, 0, LJ_MIN_IRSZ*sizeof(IRIns));
-    J->irbotlim = REF_BASE - LJ_MIN_IRSZ/4;
-    J->irtoplim = J->irbotlim + LJ_MIN_IRSZ;
-  }
-  J->cur.ir = J->irbuf = baseir - J->irbotlim;
-}
-
-/* Grow IR buffer at the bottom or shift it up. */
-static void lj_ir_growbot(jit_State *J)
-{
-  IRIns *baseir = J->irbuf + J->irbotlim;
-  MSize szins = J->irtoplim - J->irbotlim;
-  lua_assert(szins != 0);
-  lua_assert(J->cur.nk == J->irbotlim || J->cur.nk-1 == J->irbotlim);
-  if (J->cur.nins + (szins >> 1) < J->irtoplim) {
-    /* More than half of the buffer is free on top: shift up by a quarter. */
-    MSize ofs = szins >> 2;
-    memmove(baseir + ofs, baseir, (J->cur.nins - J->irbotlim)*sizeof(IRIns));
-    J->irbotlim -= ofs;
-    J->irtoplim -= ofs;
-    J->cur.ir = J->irbuf = baseir - J->irbotlim;
-  } else {
-    /* Double the buffer size, but split the growth amongst top/bottom. */
-    IRIns *newbase = lj_mem_newt(J->L, 2*szins*sizeof(IRIns), IRIns);
-    MSize ofs = szins >= 256 ? 128 : (szins >> 1);  /* Limit bottom growth. */
-    memcpy(newbase + ofs, baseir, (J->cur.nins - J->irbotlim)*sizeof(IRIns));
-    lj_mem_free(G(J->L), baseir, szins*sizeof(IRIns));
-    J->irbotlim -= ofs;
-    J->irtoplim = J->irbotlim + 2*szins;
-    J->cur.ir = J->irbuf = newbase - J->irbotlim;
-  }
-}
-
 /* Emit IR without any optimizations. */
-TRef LJ_FASTCALL lj_ir_emit(jit_State *J)
+TRef lj_ir_emit(jit_State *J)
 {
   IRRef ref = lj_ir_nextins(J);
   IRIns *ir = IR(ref);
@@ -164,37 +118,27 @@ LJ_FUNC TRef lj_ir_ggfload(jit_State *J, IRType t, uintptr_t ofs)
 ** comparisons. The same constant must get the same reference.
 */
 
-/* Get ref of next IR constant and optionally grow IR.
-** Note: this may invalidate all IRIns *!
-*/
+/* Get ref of next IR constant. */
 static LJ_AINLINE IRRef ir_nextk(jit_State *J)
 {
   IRRef ref = J->cur.nk;
-  if (LJ_UNLIKELY(ref <= J->irbotlim)) lj_ir_growbot(J);
   J->cur.nk = --ref;
   return ref;
 }
 
-/* Get ref of next 64 bit IR constant and optionally grow IR.
-** Note: this may invalidate all IRIns *!
-*/
+/* Get ref of next 64 bit IR constant. */
 static LJ_AINLINE IRRef ir_nextk64(jit_State *J)
 {
   IRRef ref = J->cur.nk - 2;
   lua_assert(J->state != LJ_TRACE_ASM);
-  if (LJ_UNLIKELY(ref < J->irbotlim)) lj_ir_growbot(J);
   J->cur.nk = ref;
   return ref;
 }
 
-#if LJ_GC64
 #define ir_nextkgc ir_nextk64
-#else
-#define ir_nextkgc ir_nextk
-#endif
 
 /* Intern int32_t constant. */
-TRef LJ_FASTCALL lj_ir_kint(jit_State *J, int32_t k)
+TRef lj_ir_kint(jit_State *J, int32_t k)
 {
   IRIns *ir, *cir = J->cur.ir;
   IRRef ref;
@@ -312,17 +256,10 @@ TRef lj_ir_kptr_(jit_State *J, IROp op, void *ptr)
 {
   IRIns *ir, *cir = J->cur.ir;
   IRRef ref;
-#if LJ_64 && !LJ_GC64
-  lua_assert((void *)(uintptr_t)u32ptr(ptr) == ptr);
-#endif
   for (ref = J->chain[op]; ref; ref = cir[ref].prev)
     if (ir_kptr(&cir[ref]) == ptr)
       goto found;
-#if LJ_GC64
   ref = ir_nextk64(J);
-#else
-  ref = ir_nextk(J);
-#endif
   ir = IR(ref);
   ir->op12 = 0;
   setmref(ir[LJ_GC64].ptr, ptr);
@@ -389,14 +326,12 @@ void lj_ir_kvalue(lua_State *L, TValue *tv, const IRIns *ir)
   case IR_KPTR: case IR_KKPTR: setlightudV(tv, ir_kptr(ir)); break;
   case IR_KNULL: setlightudV(tv, NULL); break;
   case IR_KNUM: setnumV(tv, ir_knum(ir)->n); break;
-#if LJ_HASFFI
   case IR_KINT64: {
     GCcdata *cd = lj_cdata_new_(L, CTID_INT64, 8);
     *(uint64_t *)cdataptr(cd) = ir_kint64(ir)->u64;
     setcdataV(L, tv, cd);
     break;
     }
-#endif
   default: lua_assert(0); break;
   }
 }
@@ -404,7 +339,7 @@ void lj_ir_kvalue(lua_State *L, TValue *tv, const IRIns *ir)
 /* -- Convert IR operand types -------------------------------------------- */
 
 /* Convert from string to number. */
-TRef LJ_FASTCALL lj_ir_tonumber(jit_State *J, TRef tr)
+TRef lj_ir_tonumber(jit_State *J, TRef tr)
 {
   if (!tref_isnumber(tr)) {
     if (tref_isstr(tr))
@@ -416,7 +351,7 @@ TRef LJ_FASTCALL lj_ir_tonumber(jit_State *J, TRef tr)
 }
 
 /* Convert from integer or string to number. */
-TRef LJ_FASTCALL lj_ir_tonum(jit_State *J, TRef tr)
+TRef lj_ir_tonum(jit_State *J, TRef tr)
 {
   if (!tref_isnum(tr)) {
     if (tref_isinteger(tr))
@@ -430,7 +365,7 @@ TRef LJ_FASTCALL lj_ir_tonum(jit_State *J, TRef tr)
 }
 
 /* Convert from integer or number to string. */
-TRef LJ_FASTCALL lj_ir_tostr(jit_State *J, TRef tr)
+TRef lj_ir_tostr(jit_State *J, TRef tr)
 {
   if (!tref_isstr(tr)) {
     if (!tref_isnumber(tr))
@@ -491,4 +426,3 @@ void lj_ir_rollback(jit_State *J, IRRef ref)
 #undef fins
 #undef emitir
 
-#endif
