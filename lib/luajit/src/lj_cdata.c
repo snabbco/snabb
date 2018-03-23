@@ -5,7 +5,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASFFI
 
 #include "lj_gc.h"
 #include "lj_err.h"
@@ -59,7 +58,7 @@ GCcdata *lj_cdata_newx(CTState *cts, CTypeID id, CTSize sz, CTInfo info)
 }
 
 /* Free a C data object. */
-void LJ_FASTCALL lj_cdata_free(global_State *g, GCcdata *cd)
+void lj_cdata_free(global_State *g, GCcdata *cd)
 {
   if (LJ_UNLIKELY(cd->marked & LJ_GC_CDATA_FIN)) {
     GCobj *root;
@@ -128,14 +127,7 @@ collect_attrib:
   }
   lua_assert(!ctype_isref(ct->info));  /* Interning rejects refs to refs. */
 
-  if (tvisint(key)) {
-    idx = (ptrdiff_t)intV(key);
-    goto integer_key;
-  } else if (tvisnum(key)) {  /* Numeric key. */
-#ifdef _MSC_VER
-    /* Workaround for MSVC bug. */
-    volatile
-#endif
+  if (tvisnum(key)) {  /* Numeric key. */
     lua_Number n = numV(key);
     idx = LJ_64 ? (ptrdiff_t)n : (ptrdiff_t)lj_num2int(n);
   integer_key:
@@ -296,4 +288,3 @@ void lj_cdata_set(CTState *cts, CType *d, uint8_t *dp, TValue *o, CTInfo qual)
   lj_cconv_ct_tv(cts, d, dp, o, 0);
 }
 
-#endif

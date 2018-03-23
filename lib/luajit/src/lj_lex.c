@@ -14,18 +14,17 @@
 #include "lj_err.h"
 #include "lj_buf.h"
 #include "lj_str.h"
-#if LJ_HASFFI
 #include "lj_tab.h"
 #include "lj_ctype.h"
 #include "lj_cdata.h"
 #include "lualib.h"
-#endif
 #include "lj_state.h"
 #include "lj_lex.h"
 #include "lj_parse.h"
 #include "lj_char.h"
 #include "lj_strscan.h"
 #include "lj_strfmt.h"
+#include "lj_auditlog.h"
 
 /* Lua lexer token names. */
 static const char *const tokennames[] = {
@@ -48,6 +47,9 @@ static LJ_NOINLINE LexChar lex_more(LexState *ls)
   size_t sz;
   const char *p = ls->rfunc(ls->L, ls->rdata, &sz);
   if (p == NULL || sz == 0) return LEX_EOF;
+  if (sz != LJ_MAX_BUF) {       /* bytecode has bogus size (skip). */
+    lj_auditlog_lex(ls->chunkarg, p, sz);
+  }
   ls->pe = p + sz;
   ls->p = p + 1;
   return (LexChar)(uint8_t)p[0];
@@ -100,13 +102,9 @@ static void lex_number(LexState *ls, TValue *tv)
   }
   lex_save(ls, '\0');
   fmt = lj_strscan_scan((const uint8_t *)sbufB(&ls->sb), tv,
-	  (LJ_DUALNUM ? STRSCAN_OPT_TOINT : STRSCAN_OPT_TONUM) |
-	  (LJ_HASFFI ? (STRSCAN_OPT_LL|STRSCAN_OPT_IMAG) : 0));
-  if (LJ_DUALNUM && fmt == STRSCAN_INT) {
-    setitype(tv, LJ_TISNUM);
-  } else if (fmt == STRSCAN_NUM) {
+                        STRSCAN_OPT_TONUM|STRSCAN_OPT_LL|STRSCAN_OPT_IMAG);
+  if (fmt == STRSCAN_NUM) {
     /* Already in correct format. */
-#if LJ_HASFFI
   } else if (fmt != STRSCAN_ERROR) {
     lua_State *L = ls->L;
     GCcdata *cd;
@@ -125,7 +123,6 @@ static void lex_number(LexState *ls, TValue *tv)
       *(uint64_t *)cdataptr(cd) = tv->u64;
     }
     lj_parse_keepcdata(ls, tv, cd);
-#endif
   } else {
     lua_assert(fmt == STRSCAN_ERROR);
     lj_lex_error(ls, TK_number, LJ_ERR_XNUMBER);

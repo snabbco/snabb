@@ -73,7 +73,6 @@ cTValue *lj_meta_lookup(lua_State *L, cTValue *o, MMS mm)
   return niltv(L);
 }
 
-#if LJ_HASFFI
 /* Tailcall from C function. */
 int lj_meta_tailcall(lua_State *L, cTValue *tv)
 {
@@ -100,7 +99,6 @@ int lj_meta_tailcall(lua_State *L, cTValue *tv)
   */
   return 0;
 }
-#endif
 
 /* Setup call to metamethod to be run by Assembler VM. */
 static TValue *mmcall(lua_State *L, ASMFunction cont, cTValue *mo,
@@ -177,7 +175,6 @@ TValue *lj_meta_tset(lua_State *L, cTValue *o, cTValue *k)
 	if (tv != niltv(L))
 	  return (TValue *)tv;
 	if (tvisnil(k)) lj_err_msg(L, LJ_ERR_NILIDX);
-	else if (tvisint(k)) { setnumV(&tmp, (lua_Number)intV(k)); k = &tmp; }
 	else if (tvisnum(k) && tvisnan(k)) lj_err_msg(L, LJ_ERR_NANIDX);
 	return lj_tab_newkey(L, t, k);
       }
@@ -201,8 +198,6 @@ static cTValue *str2num(cTValue *o, TValue *n)
 {
   if (tvisnum(o))
     return o;
-  else if (tvisint(o))
-    return (setnumV(n, (lua_Number)intV(o)), n);
   else if (tvisstr(o) && lj_strscan_num(strV(o), n))
     return n;
   else
@@ -290,8 +285,6 @@ TValue *lj_meta_cat(lua_State *L, TValue *top, int left)
 	  GCstr *s = strV(o);
 	  MSize len = s->len;
 	  lj_buf_putmem(sb, strdata(s), len);
-	} else if (tvisint(o)) {
-	  lj_strfmt_putint(sb, intV(o));
 	} else {
 	  lj_strfmt_putfnum(sb, STRFMT_G14, numV(o));
 	}
@@ -307,7 +300,7 @@ TValue *lj_meta_cat(lua_State *L, TValue *top, int left)
 }
 
 /* Helper for LEN. __len metamethod. */
-TValue * LJ_FASTCALL lj_meta_len(lua_State *L, cTValue *o)
+TValue * lj_meta_len(lua_State *L, cTValue *o)
 {
   cTValue *mo = lj_meta_lookup(L, o, MM_len);
   if (tvisnil(mo)) {
@@ -346,8 +339,7 @@ TValue *lj_meta_equal(lua_State *L, GCobj *o1, GCobj *o2, int ne)
   return (TValue *)(intptr_t)ne;
 }
 
-#if LJ_HASFFI
-TValue * LJ_FASTCALL lj_meta_equal_cd(lua_State *L, BCIns ins)
+TValue * lj_meta_equal_cd(lua_State *L, BCIns ins)
 {
   ASMFunction cont = (bc_op(ins) & 1) ? lj_cont_condf : lj_cont_condt;
   int op = (int)bc_op(ins) & ~1;
@@ -373,7 +365,6 @@ TValue * LJ_FASTCALL lj_meta_equal_cd(lua_State *L, BCIns ins)
   else
     return (TValue *)(intptr_t)(bc_op(ins) & 1);
 }
-#endif
 
 /* Helper for ordered comparisons. String compare, __lt/__le metamethods. */
 TValue *lj_meta_comp(lua_State *L, cTValue *o1, cTValue *o2, int op)
@@ -426,9 +417,8 @@ void lj_meta_istype(lua_State *L, BCReg ra, BCReg tp)
 {
   L->top = curr_topL(L);
   ra++; tp--;
-  lua_assert(LJ_DUALNUM || tp != ~LJ_TNUMX);  /* ISTYPE -> ISNUM broken. */
-  if (LJ_DUALNUM && tp == ~LJ_TNUMX) lj_lib_checkint(L, ra);
-  else if (tp == ~LJ_TNUMX+1) lj_lib_checknum(L, ra);
+  lua_assert(tp != ~LJ_TNUMX);  /* ISTYPE -> ISNUM broken. */
+  if (tp == ~LJ_TNUMX+1) lj_lib_checknum(L, ra);
   else if (tp == ~LJ_TSTR) lj_lib_checkstr(L, ra);
   else lj_err_argtype(L, ra, lj_obj_itypename[tp]);
 }
@@ -446,32 +436,10 @@ void lj_meta_call(lua_State *L, TValue *func, TValue *top)
 }
 
 /* Helper for FORI. Coercion. */
-void LJ_FASTCALL lj_meta_for(lua_State *L, TValue *o)
+void lj_meta_for(lua_State *L, TValue *o)
 {
   if (!lj_strscan_numberobj(o)) lj_err_msg(L, LJ_ERR_FORINIT);
   if (!lj_strscan_numberobj(o+1)) lj_err_msg(L, LJ_ERR_FORLIM);
   if (!lj_strscan_numberobj(o+2)) lj_err_msg(L, LJ_ERR_FORSTEP);
-  if (LJ_DUALNUM) {
-    /* Ensure all slots are integers or all slots are numbers. */
-    int32_t k[3];
-    int nint = 0;
-    ptrdiff_t i;
-    for (i = 0; i <= 2; i++) {
-      if (tvisint(o+i)) {
-	k[i] = intV(o+i); nint++;
-      } else {
-	k[i] = lj_num2int(numV(o+i)); nint += ((lua_Number)k[i] == numV(o+i));
-      }
-    }
-    if (nint == 3) {  /* Narrow to integers. */
-      setintV(o, k[0]);
-      setintV(o+1, k[1]);
-      setintV(o+2, k[2]);
-    } else if (nint != 0) {  /* Widen to numbers. */
-      if (tvisint(o)) setnumV(o, (lua_Number)intV(o));
-      if (tvisint(o+1)) setnumV(o+1, (lua_Number)intV(o+1));
-      if (tvisint(o+2)) setnumV(o+2, (lua_Number)intV(o+2));
-    }
-  }
 }
 
