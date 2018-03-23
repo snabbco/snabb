@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 
+name=$(basename $0)
+if [ "$name" != "dock.sh" ]; then export SNABB_TEST_IMAGE=$name; fi
 export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:=eugeneia/snabb-nfv-test-vanilla}
 
 # Snabb Docker environment
 
 docker run --rm --privileged -i -v $(dirname $PWD):/snabb $DOCKERFLAGS \
+    --workdir /snabb \
     -e SNABB_PCI0=$SNABB_PCI0 \
     -e SNABB_PCI1=$SNABB_PCI1 \
     -e SNABB_PCI_INTEL0=$SNABB_PCI_INTEL0 \
