@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 
 name=$(basename $0)
-if [ "$name" != "dock.sh" ]; then export SNABB_TEST_IMAGE=$name; fi
-export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:=eugeneia/snabb-nfv-test-vanilla}
+if [ "$name" != "dock.sh" ]; then 
 
-# Snabb Docker environment
+  img=$(docker images -q $name)
+  if [ -z "$img" ]; then
+    echo "docker image $name doesn't exist"
+  fi
+  exec docker run -ti --rm -v ${PWD}:/u --workdir /u $name $@
 
-docker run --rm --privileged -i -v $(dirname $PWD):/snabb $DOCKERFLAGS \
+else
+
+  export SNABB_TEST_IMAGE=${SNABB_TEST_IMAGE:=eugeneia/snabb-nfv-test-vanilla}
+
+  # Snabb Docker environment
+
+  docker run --rm --privileged -i -v $(dirname $PWD):/snabb $DOCKERFLAGS \
     --workdir /snabb \
     -e SNABB_PCI0=$SNABB_PCI0 \
     -e SNABB_PCI1=$SNABB_PCI1 \
@@ -27,3 +36,4 @@ docker run --rm --privileged -i -v $(dirname $PWD):/snabb $DOCKERFLAGS \
     -e SNABB_IPSEC_SKIP_E2E_TEST=$SNABB_IPSEC_SKIP_E2E_TEST \
     $SNABB_TEST_IMAGE \
     bash -c "mount -t hugetlbfs none /hugetlbfs && (cd snabb/src; $*)"
+fi
