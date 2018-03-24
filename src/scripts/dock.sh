@@ -7,7 +7,7 @@ if [ "$name" != "dock.sh" ]; then
   if [ -z "$img" ]; then
     echo "docker image $name doesn't exist"
   fi
-  exec docker run -ti --rm -v ${PWD}:/u --workdir /u $name $@
+  exec docker run -ti --rm --privileged -v ${PWD}:/u --workdir /u $name $@
 
 else
 
@@ -16,7 +16,6 @@ else
   # Snabb Docker environment
 
   docker run --rm --privileged -i -v $(dirname $PWD):/snabb $DOCKERFLAGS \
-    --workdir /snabb \
     -e SNABB_PCI0=$SNABB_PCI0 \
     -e SNABB_PCI1=$SNABB_PCI1 \
     -e SNABB_PCI_INTEL0=$SNABB_PCI_INTEL0 \
