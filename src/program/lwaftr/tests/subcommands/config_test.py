@@ -10,6 +10,7 @@ import socket
 from subprocess import PIPE, Popen
 import time
 import unittest
+import re
 
 from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, \
                      DAEMON_STARTUP_WAIT, BaseTestCase, nic_names
@@ -239,14 +240,13 @@ class TestConfigMultiproc(BaseTestCase):
         for line in state:
             if "softwire-state" not in line:
                 continue
+            [cname, cvalue] = line.split(" ")
+            cname = os.path.basename(cname)
+            cvalue = int(cvalue)
 
-            path = [elem for elem in line.split("/") if elem]
-            cname = path[-1].split()[0]
-            cvalue = int(path[-1].split()[1])
-
-            if path[0].startswith("instance"):
+            if line.startswith("/softwire-config"):
                 instance[cname] = instance.get(cname, 0) + cvalue
-            elif len(path) < 3:
+            elif line.startswith("/softwire-state"):
                 summed[cname] = cvalue
 
         # Now assert they're the same :)
@@ -268,12 +268,13 @@ class TestConfigMultiproc(BaseTestCase):
 
         instances = set()
         for line in state:
-            path = [elem for elem in line.split("/") if elem]
-            if not path[0].startswith("instance"):
+            [key, value] = line.split(" ")
+            if key.startswith("/softwire-config") and "instance" not in key:
                 continue
-
-            device_name = path[0][path[0].find("=")+1:-1]
-            instances.add(device_name)
+            m = re.search(r"\[device=(.*)\]", key)
+            if m:
+                device_name = m.group(1)
+                instances.add(device_name)
 
         self.assertTrue(len(instances) == 2)
         self.assertTrue("test" in instances)
