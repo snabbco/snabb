@@ -5,6 +5,7 @@
 #define lj_auditlog_c
 
 #include <stdio.h>
+#include <time.h>
 
 #include "lj_trace.h"
 #include "lj_auditlog.h"
@@ -78,10 +79,13 @@ static void log_mem(const char *type, void *ptr, unsigned int size) {
 }
 
 static void log_event(const char *type, int nattributes) {
-  lua_assert(nattributes <= 253);
-  fixmap(nattributes+2);
-  str_16("type");  /* = */ str_16("event");
-  str_16("event"); /* = */ str_16(type);
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  lua_assert(nattributes <= 252);
+  fixmap(nattributes+3);
+  str_16("nanotime");  /* = */ uint_64(ts.tv_sec * 1000000000LL + ts.tv_nsec);
+  str_16("type");      /* = */ str_16("event");
+  str_16("event");     /* = */ str_16(type);
   /* Caller fills in the further nattributes... */
 }
 
