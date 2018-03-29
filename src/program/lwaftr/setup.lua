@@ -587,13 +587,11 @@ local function compute_worker_configs(conf)
 end
 
 function ptree_manager(f, conf, manager_opts)
-   -- Always enabled in reconfigurable mode.
-   alarm_notification = true
-
    local function setup_fn(conf)
       local worker_app_graphs = {}
       for worker_id, worker_config in pairs(compute_worker_configs(conf)) do
          local app_graph = config.new()
+         worker_config.alarm_notification = true
          f(app_graph, worker_config)
          worker_app_graphs[worker_id] = app_graph
       end
