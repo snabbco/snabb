@@ -84,7 +84,8 @@ LJLIB_CF(jit_flush)
 LJLIB_CF(jit_auditlog)
 {
   if (L->base < L->top && tvisstr(L->base)) {
-    if (lj_auditlog_open(strdata(lj_lib_checkstr(L, 1)))) {
+    /* XXX Support auditlog file size argument. */
+    if (lj_auditlog_open(strdata(lj_lib_checkstr(L, 1)), 0)) {
       return 0;
     } else {
       lj_err_caller(L, LJ_ERR_AUDITLOG);

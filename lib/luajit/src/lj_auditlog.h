@@ -8,7 +8,7 @@
 #include "lj_jit.h"
 #include "lj_trace.h"
 
-int lj_auditlog_open(const char *path);
+int lj_auditlog_open(const char *path, size_t maxsize);
 
 void lj_auditlog_new_prototype(GCproto *pt);
 void lj_auditlog_lex(const char *chunkname, const char *s, int sz);

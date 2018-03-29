@@ -467,13 +467,18 @@ static int runargs(lua_State *L, char **argv, int argn)
       break;
     case 'b':  /* LuaJIT extension. */
       return dobytecode(L, argv+i);
-    case 'a':  /* RaptorJIT extension. */
-      if (!lj_auditlog_open(argv[++i])) {
+    case 'a': { /* RaptorJIT extension. */
+      const char *filename = argv[i] + 2;
+      if (*filename == '\0') filename = argv[++i];
+      /* XXX Support auditlog file size limit argument. */
+      if (!lj_auditlog_open(filename, 0)) {
         fprintf(stderr, "unable to open auditlog\n");
         fflush(stderr);
       }
+    }
     case 'p': {
-      char *filename = argv[++i];
+      const char *filename = argv[i] + 2;
+      if (*filename == '\0') filename = argv[++i];
       luaJIT_vmprofile_open(L, filename, 0, 0);
       if (lua_isnil(L, -1)) {
         fprintf(stderr, "unable to open vmprofile: %s\n", filename);

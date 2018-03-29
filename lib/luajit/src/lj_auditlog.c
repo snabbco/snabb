@@ -5,6 +5,7 @@
 #define lj_auditlog_c
 
 #include <stdio.h>
+#include <time.h>
 
 #include "lj_trace.h"
 #include "lj_auditlog.h"
@@ -18,33 +19,52 @@ static size_t membuffersize;
 static FILE *fp;    /* File where the audit log is written. */
 static int error;   /* Have we been unable to initialize the log? */
 static int open;    /* are we logging to a real file? */
+static size_t loggedbytes; /* Bytes already written to log. */
+static size_t sizelimit;  /* File size when logging will stop.  */
+#define DEFAULT_SIZE_LIMIT 100*1024*1024 /* Generous size limit. */
+
+/* -- byte counting file write wrappers ----------------------------------- */
+
+static int cfputc(int c, FILE *f) {
+  loggedbytes++;
+  return fputc(c, f);
+}
+
+static int cfputs(const char *s, FILE *f) {
+  loggedbytes += strlen(s);
+  return fputs(s, f);
+}
+
+static int cfwrite(const void *ptr, size_t size, size_t nmemb, FILE *f) {
+  loggedbytes += size * nmemb;
+  return fwrite(ptr, size, nmemb, f);
+}
 
 /* -- msgpack writer - see http://msgpack.org/index.html ------------------ */
-
 /* XXX assumes little endian cpu. */
 
 static void fixmap(int size) {
-  fputc(0x80|size, fp);         /* map header with size */
+  cfputc(0x80|size, fp);         /* map header with size */
 };
 
 static void str_16(const char *s) {
   uint16_t biglen = __builtin_bswap16(strlen(s));
-  fputc(0xda, fp);                        /* string header */
-  fwrite(&biglen, sizeof(biglen), 1, fp); /* string length */
-  fputs(s, fp);                           /* string contents */
+  cfputc(0xda, fp);                        /* string header */
+  cfwrite(&biglen, sizeof(biglen), 1, fp); /* string length */
+  cfputs(s, fp);                           /* string contents */
 }
 
 static void uint_64(uint64_t n) {
   uint64_t big = __builtin_bswap64(n);
-  fputc(0xcf, fp);                  /* uint 64 header */
-  fwrite(&big, sizeof(big), 1, fp); /* value */
+  cfputc(0xcf, fp);                  /* uint 64 header */
+  cfwrite(&big, sizeof(big), 1, fp); /* value */
 }
 
 static void bin_32(void *ptr, int n) {
   uint32_t biglen = __builtin_bswap32(n);
-  fputc(0xc6, fp);                        /* array 32 header */
-  fwrite(&biglen, sizeof(biglen), 1, fp); /* length */
-  fwrite(ptr, n, 1, fp);                  /* data */
+  cfputc(0xc6, fp);                        /* array 32 header */
+  cfwrite(&biglen, sizeof(biglen), 1, fp); /* length */
+  cfwrite(ptr, n, 1, fp);                  /* data */
 }
 
 /* -- low-level object logging API ---------------------------------------- */
@@ -59,21 +79,36 @@ static void log_mem(const char *type, void *ptr, unsigned int size) {
 }
 
 static void log_event(const char *type, int nattributes) {
-  lua_assert(nattributes <= 253);
-  fixmap(nattributes+2);
-  str_16("type");  /* = */ str_16("event");
-  str_16("event"); /* = */ str_16(type);
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  lua_assert(nattributes <= 252);
+  fixmap(nattributes+3);
+  str_16("nanotime");  /* = */ uint_64(ts.tv_sec * 1000000000LL + ts.tv_nsec);
+  str_16("type");      /* = */ str_16("event");
+  str_16("event");     /* = */ str_16(type);
   /* Caller fills in the further nattributes... */
 }
 
 /* Log objects that define the virtual machine. */
-void lj_auditlog_vm_definitions()
+static void lj_auditlog_vm_definitions()
 {
   log_mem("lj_ir_mode", (void*)&lj_ir_mode, sizeof(lj_ir_mode));
 }
 
 /* Check that the log is open before logging a message. */
 static int ensure_log_started() {
+  if (fp != NULL) {
+    if (loggedbytes < sizelimit) {
+      return 1;
+    } else {
+      /* Log has grown to size limit. */
+      log_event("auditlog_size_limit_reached", 0);
+      fclose(fp);
+      fp = NULL;
+      error = 1;
+      return 0;
+    }
+  }
   if (fp != NULL) return 1;     /* Log already open? */
   if (error) return 0;          /* Log has already errored? */
   /* Start logging into a memory buffer. The entries will be migrated
@@ -83,6 +118,7 @@ static int ensure_log_started() {
   */
   if ((fp = open_memstream(&membuffer, &membuffersize)) != NULL) {
     lj_auditlog_vm_definitions();
+    sizelimit = MAX_MEM_BUFFER;
     return 1;
   } else {
     error = 1;
@@ -95,10 +131,11 @@ static int ensure_log_started() {
 ** Can only open once.
 ** Return zero on failure.
 */
-int lj_auditlog_open(const char *path)
+int lj_auditlog_open(const char *path, size_t maxsize)
 {
   FILE *newfp;
-  if (open) return 0; /* Sorry, already opened... */
+  if (open || error) return 0; /* Sorry, too late... */
+  sizelimit = maxsize ? maxsize : DEFAULT_SIZE_LIMIT;
   if (!ensure_log_started()) return 0;
   newfp = fopen(path, "wb+");
   /* Migrate log entries from memory buffer. */
