@@ -11,7 +11,7 @@
 #include "lj_auditlog.h"
 
 /* Maximum data to buffer in memory before file is opened. */
-#define MAX_MEM_BUFFER 1024*1024
+#define MAX_MEM_BUFFER 10*1024*1024
 /* State for initial in-memory stream. */
 static char *membuffer;
 static size_t membuffersize;
