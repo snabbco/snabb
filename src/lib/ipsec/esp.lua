@@ -1,3 +1,7 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(...,package.seeall)
+
 -- Implementation of IPsec ESP using AES-128-GCM with a 12 byte ICV and
 -- “Extended Sequence Number” (see RFC 4303 and RFC 4106). Provides
 -- address-family independent encapsulation/decapsulation routines for
@@ -17,7 +21,7 @@
 --    to remain correct. See the “Reassembly” section of RFC 4303 for details:
 --    https://tools.ietf.org/html/rfc4303#section-3.4.1
 --
-module(..., package.seeall)
+
 local header = require("lib.protocol.header")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
