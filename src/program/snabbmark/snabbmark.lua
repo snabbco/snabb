@@ -359,7 +359,7 @@ function esp (npackets, packet_size, mode, direction, profile)
    ip:payload_length(payload_size)
    d:payload(payload, payload_size)
    d:push(ip)
-   if not mode == "tunnel" then
+   if not (mode == "tunnel") then
       local eth = ethernet:new({type=0x86dd})
       d:push(eth)
    end
