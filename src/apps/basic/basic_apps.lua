@@ -117,7 +117,7 @@ function Repeater:new ()
                        {__index=Repeater})
 end
 
-function Repeater:pull ()
+function Repeater:push ()
    local i, o = self.input.input, self.output.output
    for _ = 1, link.nreadable(i) do
       local p = receive(i)
