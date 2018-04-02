@@ -372,7 +372,7 @@ function esp (npackets, packet_size, mode, direction, profile)
    local encap, decap
    if mode == "tunnel" then
       encap = function (p) return enc:encapsulate_tunnel(p, 41) end
-      decap = function (p) return dec:decapsulate_tunnel(p) end
+      decap = function (p) return (dec:decapsulate_tunnel(p))   end
    else
       encap = function (p) return enc:encapsulate_transport6(p) end
       decap = function (p) return dec:decapsulate_transport6(p) end
