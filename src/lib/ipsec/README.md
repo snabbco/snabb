@@ -42,7 +42,8 @@ be a table with the following keys:
   default is 8. (`decrypt` only.)
 * `auditing` - *Optional.* A boolean value indicating whether to enable or
   disable “Auditing” as specified in RFC 4303. The default is `nil` (no
-  auditing). (`decrypt` only.)
+  auditing). (`decrypt` only. Note: source address, destination address and
+  flow ID are only logged when using `decapsulate_transport6`.)
 
 #### Tunnel mode
 
