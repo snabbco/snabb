@@ -13,14 +13,10 @@ module(...,package.seeall)
 --    it is assumed to be an unrealistic scenario as it would take 584 years to
 --    overflow the counter when transmitting 10^9 packets per second.
 --
---  * decapsulate_transport6: Rejection of IP fragments is *not* implemented
---    because `lib.protocol.ipv6' does not support fragmentation. E.g.
---    fragments will be rejected because they can not be parsed as IPv6
---    packets. If however `lib.protocol.ipv6' were to be updated to be able to
---    parse IP fragments this implementation would have to be updated as well
---    to remain correct. See the “Reassembly” section of RFC 4303 for details:
+--  * IP fragments are *not* rejected by the routines in this library, and are
+--    expected to be handled prior to encapsulation/decapsulation.
+--    See the “Reassembly” section of RFC 4303 for details:
 --    https://tools.ietf.org/html/rfc4303#section-3.4.1
---
 
 local header = require("lib.protocol.header")
 local datagram = require("lib.protocol.datagram")

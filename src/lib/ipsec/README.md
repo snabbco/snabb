@@ -6,6 +6,8 @@ transport modes. Currently, the only supported cipher is AES-GCM cipher with
 128‑bit keys, 4 bytes of salt, and a 12 byte authentication code. These classes
 do not implement any key exchange protocol.
 
+Note: the classes in this module do not reject IP fragments of any sort.
+
 References:
 
 - [IPsec Wikipedia page](https://en.wikipedia.org/wiki/IPsec).
