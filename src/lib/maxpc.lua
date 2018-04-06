@@ -318,55 +318,41 @@ function match.optional (parser)
    return match.alternate(parser, match.seq())
 end
 
-function match.range (parser, min, max)
-   return function (s)
-      local rests = {}
-      while s and (not max or #rests <= max) do
-         table.insert(rests, s)
-         s = parser(s)
-      end
-      local more
-      more = function ()
-         local rest = table.remove(rests)
-         if rest and (not min or #rests >= min) then
-            return rest, nil, nil, more
-         end
-      end
-      return more()
-   end
-end
-
 function match.all (parser)
-   return match.range(parser, 0)
+   return match.optional(
+      match.plus(parser, function (s) return match.all(parser)(s) end)
+   )
 end
 
-function match.one_or_more (parser)
-   return match.plus(parser, match.all(parser))
-end
-
-local function make_reducer (combinator, sentinel)
-   local reduce
-   reduce = function (parsers)
-      if #parsers == 0 then
-         return sentinel
-      elseif #parsers == 1 then
-         return parsers[1]
-      else
-         local head = table.remove(parsers, 1)
-         local tail = reduce(parsers)
-         return combinator(head, tail)
-      end
+local function reduce (fun, tab)
+   local acc
+   for _, val in ipairs(tab) do
+      if not acc then acc = val
+      else            acc = fun(acc, val) end
    end
-   return function (...)
-      return reduce({...})
-   end
+   return acc
 end
 
 local function identity (...) return ... end
-match.path = make_reducer(match.plus, identity)
-
 local function constantly_nil () end
-match.either = make_reducer(match.alternate, constantly_nil)
+
+function match.path (...)
+   local parsers = {...}
+   if #parsers > 0 then
+      return reduce(match.plus, parsers)
+   else
+      return identity
+   end
+end
+
+function match.either (...)
+   local parsers = {...}
+   if #parsers > 0 then
+      return reduce(match.alternate, parsers)
+   else
+      return constantly_nil
+   end
+end
 
 
 -- tests
@@ -531,13 +517,6 @@ function selftest ()
    assert(result == 1234) assert(matched) assert(not eof)
 
    -- backtracking
-   local result, matched, eof = parse(
-      "0aaaaaaaa1",
-      match.path(match.equal("0"),
-                 match.all(match.satisfies(is_alphanumeric)),
-                 match.equal("1"))
-   )
-   assert(not result) assert(matched) assert(eof)
    local result, matched, eof =
       parse("a", match.either(match.equal("a"), match.equal("b")))
    assert(not result) assert(matched) assert(eof)
@@ -547,6 +526,27 @@ function selftest ()
    local result, matched, eof = parse(".", match.optional(match.equal(".")))
    assert(not result) assert(matched)
    local result, matched, eof = parse("", match.optional(match.equal(".")))
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse(
+      "0aaaaaaaa1",
+      match.path(match.equal("0"),
+                 match.all(match.satisfies(is_alphanumeric)),
+                 match.equal("1"))
+   )
+   assert(not result) assert(matched) assert(eof)
+   local result, matched, eof = parse(
+      "aaac",
+      match.path(
+         match.all(
+            match.either(
+               match.seq(match.equal("a"), match.equal("a")),
+               match.seq(match.equal("a"), match.equal("a"), match.equal("a")),
+               match.equal("c")
+            )
+         ),
+         match.eof()
+      )
+   )
    assert(not result) assert(matched) assert(eof)
    local domain_like = match.either(
       match.path(

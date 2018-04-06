@@ -348,10 +348,40 @@ function compile_quantifier (quantifier)
       end
    elseif quantifier.exactly then
       return function (parser)
-         return match.range(parser, quantifier.exactly, quantifier.exactly)
+         return match.exactly_n(parser, quantifier.exactly)
       end
    else
       error("Invalid quantifier")
+   end
+end
+
+function match.one_or_more (parser)
+   return match.path(parser, match.all(parser))
+end
+
+function match.exactly_n (parser, n)
+   local ps = {}
+   for i = 1, n do table.insert(ps, parser) end
+   return match.seq(unpack(ps))
+end
+
+function match.upto_n (parser, n)
+   local p = match.seq()
+   for i = 1, n do p = match.optional(match.plus(parser, p)) end
+   return p
+end
+
+function match.range (parser, min, max)
+   if min and max then
+      assert(min <= max, "Invalid quanitity: "..min.."-"..max)
+      return match.path(match.exactly_n(parser, min),
+                        match.upto_n(parser, max - min))
+   elseif min then
+      return match.path(match.exactly_n(parser, min), match.all(parser))
+   elseif max then
+      return match.upto_n(parser, max)
+   else
+      return match.all(parser)
    end
 end
 
@@ -619,6 +649,10 @@ function selftest ()
    test{regexp="([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])",
         accept={"0","12", "123", "192","168","178",},
         reject={"a.a.a.", ""}}
+
+   test{regexp="(aa|aaa|bb)*",
+        accept={"", "aa", "aaa", "aaaa", "aabb", "aaabb", "bb"},
+        reject={"a", "b", "bbb", "aaaab"}}
 
    local ipv4_address =
       "(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\\.){3}"
