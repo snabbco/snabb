@@ -256,23 +256,35 @@ function selftest ()
              "Authentication failed.")
    end
    -- Microbenchmarks.
+   local pmu = require("lib.pmu")
+   local has_pmu_counters, err = pmu.is_available()
+   if not has_pmu_counters then
+      io.stderr:write('No PMU available: '..err..'\n')
+   else
+      pmu.setup()
+   end
+   local profile = (has_pmu_counters and pmu.profile) or function (f) f() end
    local length = 1000 * 1000 * 100 -- 100MB
    local gcm = aes_128_gcm:new(0x0, "00000000000000000000000000000000", "00000000")
    local p = ffi.new("uint8_t[?]", length + gcm.AUTH_SIZE)
    local start = C.get_monotonic_time()
-   ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
-                              p, p, length,
-                              u8_ptr(gcm.iv:header_ptr()),
-                              p, 0, -- No AAD
-                              p + length, gcm.AUTH_SIZE)
+   profile(function ()
+         ASM.aesni_gcm_enc_avx_gen4(gcm.gcm_data,
+                                    p, p, length,
+                                    u8_ptr(gcm.iv:header_ptr()),
+                                    p, 0, -- No AAD
+                                    p + length, gcm.AUTH_SIZE)
+   end)
    local finish = C.get_monotonic_time()
    print("Encrypted", length, "bytes in", finish-start, "seconds")
    local start = C.get_monotonic_time()
-   ASM.aesni_gcm_dec_avx_gen4(gcm.gcm_data,
-                              p, p, length,
-                              u8_ptr(gcm.iv:header_ptr()),
-                              p, 0, -- No AAD
-                              p + length, gcm.AUTH_SIZE)
+   profile(function ()
+         ASM.aesni_gcm_dec_avx_gen4(gcm.gcm_data,
+                                    p, p, length,
+                                    u8_ptr(gcm.iv:header_ptr()),
+                                    p, 0, -- No AAD
+                                    p + length, gcm.AUTH_SIZE)
+   end)
    local finish = C.get_monotonic_time()
    print("Decrypted", length, "bytes in", finish-start, "seconds")
    -- Test aes_128_block with vectors from
