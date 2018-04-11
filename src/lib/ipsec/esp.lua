@@ -1,7 +1,7 @@
--- Implementation of IPsec ESP using AES-128-GCM with a 12 byte ICV and
--- “Extended Sequence Number” (see RFC 4303 and RFC 4106). Provides
--- address-family independent encapsulation/decapsulation routines for
--- “tunnel mode” and “transport mode” routines for IPv6.
+-- Implementation of IPsec ESP using AES-GCM with 128-bit keys, 16 byte ICV and
+-- “Extended Sequence Numbers” (see RFC 4303 and RFC 4106). Provides
+-- address-family independent encapsulation/decapsulation routines for “tunnel
+-- mode” and “transport mode” routines for IPv6.
 --
 -- Notes:
 --
@@ -45,8 +45,11 @@ local TRANSPORT6_PAYLOAD_OFFSET = ETHERNET_SIZE + IPV6_SIZE
 
 local function padding (a, l) return (a - l%a) % a end
 
+-- AEAD identifier from:
+--   https://github.com/YangModels/yang/blob/master/experimental/ietf-extracted-YANG-modules/ietf-ipsec@2018-01-08.yang
+
 function esp_new (conf)
-   assert(conf.mode == "aes-gcm-128-12", "Only supports 'aes-gcm-128-12'.")
+   assert(conf.aead == "aes-gcm-16-icv", "Only supports aes-gcm-16-icv")
    assert(conf.spi, "Need SPI.")
 
    local o = {
@@ -327,7 +330,7 @@ end
 
 function selftest ()
    local conf = { spi = 0x0,
-                  mode = "aes-gcm-128-12",
+                  aead = "aes-gcm-16-icv",
                   key = "00112233445566778899AABBCCDDEEFF",
                   salt = "00112233",
                   resync_threshold = 16,
