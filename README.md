@@ -114,6 +114,27 @@ $ cp src/snabb /usr/local/bin/
 $ sudo snabb packetblaster replay capture.pcap 01:00.0
 ```
 
+### snabb container
+
+Basic support for building and running snabb in a Docker container is available via
+
+```
+$ make docker
+```
+
+This will build a tiny snabb container (8MB), ready to be used:
+
+```
+$ docker run -ti --rm snabb --help
+```
+
+Or simply run snabb, as you would under linux. This is made possible by using a wrapper shell script that
+gets linked to as part of 'make docker':
+
+```
+$ src/snabb --help
+```
+
 ## How do I get involved?
 
 Here are the ways you can get involved:
