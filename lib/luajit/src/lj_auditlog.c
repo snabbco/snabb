@@ -158,10 +158,21 @@ static void log_jit_State(jit_State *J)
 
 static void log_GCtrace(GCtrace *T)
 {
+  IRRef ref;
   log_mem("MCode[]", T->mcode, T->szmcode);
   log_mem("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
   log_mem("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
   log_mem("IRIns[]", &T->ir[T->nk], (T->nins - T->nk + 1) * sizeof(IRIns));
+  for (ref = T->nk; ref < REF_TRUE; ref++) {
+    IRIns *ir = &T->ir[ref];
+    if (ir->o == IR_KGC) {
+      GCobj *o = ir_kgc(ir);
+      /* Log referenced string constants. For e.g. HREFK table keys. */
+      if (o->gch.gct == ~LJ_TSTR) {
+        log_GCobj(o);
+      }
+    }
+  }
   log_mem("GCtrace", T, sizeof(*T));
 }
 
@@ -241,6 +252,15 @@ void lj_auditlog_trace_flushall(jit_State *J)
     log_jit_State(J);
     log_event("trace_flushall", 1);
     str_16("jit_State");  /* = */ uint_64((uint64_t)J);
+  }
+}
+
+void lj_auditlog_new_ctypeid(CTypeID id, const char *desc)
+{
+  if (ensure_log_started()) {
+    log_event("new_ctypeid", 2);
+    str_16("id");   /* = */ uint_64(id);
+    str_16("desc"); /* = */ str_16(desc);
   }
 }
 
