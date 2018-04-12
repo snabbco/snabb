@@ -1,6 +1,6 @@
 module(..., package.seeall)
 
-local echo = require("apps.echo.echo")
+local fwd = require("apps.fwd.fwd")
 local intel = require("apps.intel.intel_app")
 local numa = require("lib.numa")
 
@@ -26,15 +26,15 @@ function run(parameters)
   config.app(c, "intel", intel.Intel82599, {pciaddr = pciaddr})
 
   for i = 1, chainlen do
-    config.app(c, "echo" .. i, echo.Echo)
+    config.app(c, "fwd" .. i, fwd.Fwd)
   end
 
   for i = 1, chainlen - 1 do
-    config.link(c, string.format("echo%d.output -> echo%d.input", i, i + 1))
+    config.link(c, string.format("fwd%d.output -> fwd%d.input", i, i + 1))
   end
 
-  config.link(c, "intel.tx -> echo1.input")
-  config.link(c, string.format("echo%d.output -> intel.rx", chainlen))
+  config.link(c, "intel.tx -> fwd1.input")
+  config.link(c, string.format("fwd%d.output -> intel.rx", chainlen))
 
   if cpu then numa.bind_to_cpu(cpu) end
   engine.configure(c)
