@@ -523,8 +523,6 @@ end
 
 local nextbreath
 local lastfrees = 0
-local lastfreebits = 0
-local lastfreebytes = 0
 -- Wait between breaths to keep frequency with Hz.
 function pace_breathing ()
    if Hz then
@@ -543,8 +541,6 @@ function pace_breathing ()
          sleep = math.floor(sleep/2)
       end
       lastfrees = counter.read(frees)
-      lastfreebytes = counter.read(freebytes)
-      lastfreebits = counter.read(freebits)
    end
 end
 
