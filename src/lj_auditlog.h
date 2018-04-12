@@ -7,6 +7,7 @@
 
 #include "lj_jit.h"
 #include "lj_trace.h"
+#include "lj_ctype.h"
 
 int lj_auditlog_open(const char *path, size_t maxsize);
 

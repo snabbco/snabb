@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include "lj_trace.h"
+#include "lj_ctype.h"
 #include "lj_auditlog.h"
 
 /* Maximum data to buffer in memory before file is opened. */
