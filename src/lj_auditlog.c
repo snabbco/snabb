@@ -255,3 +255,12 @@ void lj_auditlog_trace_flushall(jit_State *J)
   }
 }
 
+void lj_auditlog_new_ctypeid(CTypeID id, const char *desc)
+{
+  if (ensure_log_started()) {
+    log_event("new_ctypeid", 2);
+    str_16("id");   /* = */ uint_64(id);
+    str_16("desc"); /* = */ str_16(desc);
+  }
+}
+
