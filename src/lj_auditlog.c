@@ -169,8 +169,11 @@ static void log_GCtrace(GCtrace *T)
     if (ir->o == IR_KGC) {
       GCobj *o = ir_kgc(ir);
       /* Log referenced string constants. For e.g. HREFK table keys. */
-      if (o->gch.gct == ~LJ_TSTR) {
+      switch (o->gch.gct) {
+      case ~LJ_TSTR:
+      case ~LJ_TFUNC:
         log_GCobj(o);
+        break;
       }
     }
   }
@@ -188,6 +191,11 @@ static void log_GCstr(GCstr *s)
   log_mem("GCstr", s, sizeof(*s) + s->len);
 }
 
+static void log_GCfunc(GCfunc *f)
+{
+  log_mem("GCfunc", f, sizeof(*f));
+}
+
 static void log_GCobj(GCobj *o)
 {
   /* Log some kinds of objects (could be fancier...) */
@@ -201,6 +209,8 @@ static void log_GCobj(GCobj *o)
   case ~LJ_TSTR:
     log_GCstr((GCstr *)o);
     break;
+  case ~LJ_TFUNC:
+    log_GCfunc((GCfunc *)o);
   }
 }
 
