@@ -14,6 +14,7 @@
 #include "lj_ctype.h"
 #include "lj_ccallback.h"
 #include "lj_buf.h"
+#include "lj_auditlog.h"
 
 /* -- C type definitions -------------------------------------------------- */
 
@@ -217,6 +218,7 @@ void lj_ctype_addname(CTState *cts, CType *ct, CTypeID id)
   uint32_t h = ct_hashname(gcref(ct->name));
   ct->next = cts->hash[h];
   cts->hash[h] = (CTypeID1)id;
+  lj_auditlog_new_ctypeid(id, strdata(gco2str(gcref(ct->name))));
 }
 
 /* Get a C type by name, matching the type mask. */
