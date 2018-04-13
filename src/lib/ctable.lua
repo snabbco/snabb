@@ -682,7 +682,8 @@ function selftest()
          -- keep references to avoid GCing too early
          local handle = {}
          local function read(size)
-            local buf = ffi.new('uint8_t[?]', size, file:read(size))
+            local buf = ffi.new('uint8_t[?]', size)
+            ffi.copy(buf, file:read(size), size)
             table.insert(handle, buf)
             return buf
          end
