@@ -14,6 +14,7 @@ TESTS=$(echo "$TESTS1G" "$TESTS10G" | grep -e "$FILTER" | sort)
 ESTATUS=0
 export SNABB_RECV_DEBUG=true
 export SNABB_RECV_MASTER_STATS=true
+export SNABB_RSS_HASH_KEY="0x987654321"
 for i in $TESTS; do
    pkill -P $$ -f snabb
    sleep 1
