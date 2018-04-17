@@ -49,7 +49,6 @@ local function find_limit(tester, max_bitrate, precision, duration, retry_count)
          print(round(lo) * 1e-9)
          return lo
       end
-      -- We need to
       return tester.start_load(cur, duration):
          and_then(continue, cur)
    end
@@ -89,6 +88,14 @@ local function parse_args(args)
                          ["retry-count"]="r", help="h", cpu=1,
                          exec="e"})
 
+   if #args == 2 then
+      -- Assume legacy mode
+      args = {
+         args[2], -- PCAP file
+         'NIC 0', 'NIC 0',
+         args[1] -- PCI device
+      }
+   end
    if #args == 0 or #args % 4 ~= 0 then show_usage(1) end
    local streams, streams_by_tx_id, pci_devices = {}, {}, {}
    for i=1,#args,4 do
