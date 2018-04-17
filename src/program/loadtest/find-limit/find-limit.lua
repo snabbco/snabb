@@ -15,11 +15,6 @@ local promise = require("program.loadtest.promise")
 local WARM_UP_BIT_RATE = 1e9
 local WARM_UP_TIME = 5
 
-local function fatal (msg)
-   print(msg)
-   main.exit(1)
-end
-
 local function show_usage(code)
    print(require("program.loadtest.find_limit.README_inc"))
    main.exit(code)
