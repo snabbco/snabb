@@ -1,4 +1,4 @@
-Usage: find-limit [OPTIONS] DEVICE PCAP-FILE
+Usage: find-limit [OPTIONS] <PCAP-FILE> <TX-NAME> <RX-NAME> <PCI> [<PCAP-FILE> <TX-NAME> <RX-NAME> <PCI>]...
 
   -b BITRATE, --bitrate BITRATE
                              Test bitrates up to BITRATE bits/second.
@@ -22,8 +22,11 @@ Usage: find-limit [OPTIONS] DEVICE PCAP-FILE
   -h, --help
                              Print usage information.
 
-Apply load on DEVICE by replaying packets from PCAP-FILE, and attempt to
-determine the highest bitrate at which a test passes.
+Apply load by replaying packets from PCAP-FILE to the corresponding PCI network
+adaptors. It will attempt to determin the highest bitrate at which a test passes.
+If no script is supplied then find-limit will attempt to see if packets are being
+dropped by checking the traffic sent vs traffic recieved.
 
 Examples:
-  find-limit 01:00.0 cap1.pcap
+  find-limit cap1.pcap tx tx cap1.pcap
+  find-limit cap1.pcap "NIC 0" "NIC 1" 01:00.0 cap2.pcap "NIC 1" "NIC 0" 01:00.0
