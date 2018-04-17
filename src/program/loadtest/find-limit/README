@@ -1,5 +1,5 @@
 Usage: find-limit [OPTIONS] <PCAP-FILE> <TX-NAME> <RX-NAME> <PCI> [<PCAP-FILE> <TX-NAME> <RX-NAME> <PCI>]...
-       find-limit [OPTIONS] <PCI> <PCAP-FILE>
+       find-limit [OPTIONS] <PCAP-FILE> <PCI>
 
   -b BITRATE, --bitrate BITRATE
                              Test bitrates up to BITRATE bits/second.
@@ -29,7 +29,7 @@ If no script is supplied then find-limit will attempt to see if packets are bein
 dropped by checking the traffic sent vs traffic recieved.
 
 If you specify only a PCI address and PCAP file it will configure itself to work
-the same as specify the a single device as both the recieve and transmit interface.
+the same as specifying a single device as both the recieve and transmit interface.
 
 Examples:
   find-limit 01:00.0 cap1.pcap

@@ -84,11 +84,10 @@ local function parse_args(args)
                          exec="e"})
 
    if #args == 2 then
-      -- Assume legacy mode
       args = {
-         args[2], -- PCAP file
-         'NIC 0', 'NIC 0',
-         args[1] -- PCI device
+         args[1],
+         'NIC', 'NIC',
+         args[2]
       }
    end
    if #args == 0 or #args % 4 ~= 0 then show_usage(1) end
