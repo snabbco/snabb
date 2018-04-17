@@ -31,6 +31,10 @@ local S           = require("syscall")
 local CallbackAlarm = alarms.CallbackAlarm
 local transmit, receive, empty = link.transmit, link.receive, link.empty
 
+-- This environment variable is for use in tests, where a random hash
+-- key is often undesirable (e.g., to ensure all queues see traffic in a test)
+local rss_hash_key = tonumber(lib.getenv("SNABB_RSS_HASH_KEY"))
+
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
 -- https://sourceforge.net/p/e1000/mailman/message/34457421/
@@ -729,7 +733,11 @@ function Intel:rss_enable ()
 end
 function Intel:rss_key ()
    for i=0,9,1 do
-      self.r.RSSRK[i](math.random(2^32))
+      if rss_hash_key then
+         self.r.RSSRK[i](rss_hash_key)
+      else
+         self.r.RSSRK[i](math.random(2^32))
+      end
    end
 end
 
