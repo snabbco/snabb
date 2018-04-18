@@ -601,15 +601,10 @@ if bsdtypes then types = bsdtypes.init(c, types) end
 -- define dents type if dirent is defined
 if t.dirent then
   t.dirents = function(buf, size) -- buf should be char*
-    local d, i = nil, 0
+    local i = 0
     return function() -- TODO work out if possible to make stateless
-      if size > 0 and not d then
-        d = pt.dirent(buf)
-        i = i + d.d_reclen
-        return d
-      end
       while i < size do
-        d = pt.dirent(pt.char(d) + d.d_reclen)
+        local d = pt.dirent(buf + i)
         i = i + d.d_reclen
         if d.ino ~= 0 then return d end -- some systems use ino = 0 for deleted files before removed eg OSX; it is never valid
       end
