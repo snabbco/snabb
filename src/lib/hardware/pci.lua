@@ -27,7 +27,7 @@ devices = {}
 
 --- Initialize (or re-initialize) the `devices` table.
 function scan_devices ()
-   for _,device in ipairs(lib.files_in_directory("/sys/bus/pci/devices")) do
+   for _,device in ipairs(S.util.dirtable("/sys/bus/pci/devices")) do
       local info = device_info(device)
       if info.driver then table.insert(devices, info) end
    end
