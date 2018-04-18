@@ -718,6 +718,7 @@ function random_bytes_from_dev_urandom (count)
    while written < count do
       written = written + assert(f:read(bytes, count-written))
    end
+   f:close()
    return bytes
 end
 
