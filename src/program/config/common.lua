@@ -24,7 +24,7 @@ local parse_command_line_opts = {
    require_schema = { default=false },
    is_config = { default=true },
    usage = { default=show_usage },
-   failsafe = { default=false },
+   allow_extra_args = { default=false },
 }
 
 local function path_grammar(schema_name, path, is_config)
@@ -121,7 +121,7 @@ function parse_command_line(args, opts)
       end
       ret.value = parser(ret.value_str)
    end
-   if not opts.failsafe and #args ~= 0 then err("too many arguments") end
+   if not opts.allow_extra_args and #args ~= 0 then err("too many arguments") end
    return ret, args
 end
 
