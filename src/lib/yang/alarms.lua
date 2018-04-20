@@ -34,6 +34,11 @@ local function table_size (t)
    return size
 end
 
+local function table_is_empty(t)
+   for k,v in pairs(t) do return false end
+   return true
+end
+
 function get_state ()
    -- status-change is stored as an array while according to ietf-alarms schema
    -- it should be a hashmap indexed by time.
@@ -117,8 +122,9 @@ function build_summary (alarms)
       end
       ret[severity] = entry
    end
-   local shelved_alarms = table_size(state.shelved_alarms.shelved_alarms)
-   if shelved_alarms > 0 then ret['shelved_alarms'] = shelved_alarms end
+   if not table_is_empty(state.shelved_alarms.shelved_alarms) then
+      ret['shelved_alarms'] = table_size(state.shelved_alarms.shelved_alarms)
+   end
    return ret
 end
 
