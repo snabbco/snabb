@@ -3,43 +3,39 @@ module(..., package.seeall)
 
 local common = require("program.config.common")
 
-function show_usage(command, status, err_msg)
+function show_usage(program, status, err_msg)
    if err_msg then print('error: '..err_msg) end
    print(require("program.alarms.set_operator_state.README_inc"))
    main.exit(status)
 end
 
 local function fatal()
-   show_usage(nil, 1)
+   show_usage('set-operator-state', 1)
 end
 
 local function parse_args (args)
-   if #args < 4 or #args > 5 then fatal() end
-   local alarm_type_id, alarm_type_qualifier = (args[3]):match("([%w]+)/([%w]+)")
+   if #args < 3 or #args > 4 then fatal() end
+   local alarm_type_id, alarm_type_qualifier = (args[2]):match("([%w]+)/([%w]+)")
    if not alarm_type_id then
-      alarm_type_id, alarm_type_qualifier = args[3], ''
+      alarm_type_id, alarm_type_qualifier = args[2], ''
    end
    local ret = {
       key = {
-         resource = args[2],
+         resource = args[1],
          alarm_type_id = alarm_type_id,
          alarm_type_qualifier = alarm_type_qualifier,
       },
-      state = args[4],
-      text = args[5] or '',
+      state = args[3],
+      text = args[4] or '',
    }
-   -- Remove all arguments except first one.
-   for i=2,#args do
-      table.remove(args, #args)
-   end
    return ret
 end
 
 function run(args)
-   local l_args = parse_args(args)
    local opts = { command='set-alarm-operator-state', with_path=false, is_config=false,
-                  usage = show_usage }
-   args = common.parse_command_line(args, opts)
+                  usage=show_usage, allow_extra_args=true }
+   local args, cdr = common.parse_command_line(args, opts)
+   local l_args = parse_args(cdr)
    local response = common.call_leader(
       args.instance_id, 'set-alarm-operator-state',
       { schema = args.schema_name, revision = args.revision_date,
