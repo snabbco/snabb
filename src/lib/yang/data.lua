@@ -792,8 +792,8 @@ local function print_yang_string(str, file)
 end
 
 function xpath_printer_from_grammar(production, print_default, root)
-   if #root > 1 and root:sub(#root, #root) == '/' then
-      root = root:sub(1, #root-1)
+   if #root == 1 and root:sub(1, 1) == '/' then
+      root = ''
    end
    local handlers = {}
    local translators = {}
@@ -903,34 +903,38 @@ function xpath_printer_from_grammar(production, print_default, root)
       local print_value = body_printer(production.values, value_order)
       if production.key_ctype and production.value_ctype then
          return function(data, file, path)
+            path = path or ''
             for entry in data:iterate() do
                local key = compose_key(entry.key)
-               local path = keyword and keyword..key..'/' or key..'/'
+               local path = path..(keyword or '')..key..'/'
                print_value(entry.value, file, path)
             end
          end
       elseif production.string_key then
          local id = normalize_id(production.string_key)
          return function(data, file, path)
+            path = path or ''
             for key, value in pairs(data) do
                local key = compose_key({[id]=key})
-               local path = keyword and keyword..key..'/' or key..'/'
+               local path = path..(keyword or '')..key..'/'
                print_value(value, file, path)
             end
          end
       elseif production.key_ctype then
          return function(data, file, path)
+            path = path or ''
             for key, value in cltable.pairs(data) do
                local key = compose_key(key)
-               local path = keyword and keyword..key..'/' or key..'/'
+               local path = path..(keyword or '')..key..'/'
                print_value(value, file, path)
             end
          end
       else
          return function(data, file, path)
+            path = path or ''
             for key, value in pairs(data) do
                local key = compose_key(key)
-               local path = keyword and keyword..key..'/' or key..'/'
+               local path = path..(keyword or '')..key..'/'
                print_value(value, file, path)
             end
          end
