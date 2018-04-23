@@ -7,11 +7,7 @@ local file = require("lib.stream.file")
 
 local function round_up(x, y) return y*math.ceil(x/y) end
 
-function open_output_byte_stream(filename)
-   local stream, err = file.open(filename, 'w', "rusr, wusr, rgrp, roth")
-   if not stream then
-      error("error opening output file "..filename..": "..tostring(err))
-   end
+local function new_output_byte_stream(stream, filename)
    local ret = { written = 0, name = filename }
    function ret:close()
       stream:close()
@@ -44,39 +40,22 @@ function open_output_byte_stream(filename)
    return ret
 end
 
-local function mktemp(name, mode)
-   if not mode then mode = "rusr, wusr, rgrp, roth" end
-   -- FIXME: If nothing seeds math.random, this produces completely
-   -- predictable numbers.
-   local t = math.random(1e7)
-   local tmpnam, fd, err
-   for i = t, t+10 do
-      tmpnam = name .. '.' .. i
-      fd, err = S.open(tmpnam, "creat, wronly, excl", mode)
-      if fd then
-         fd:close()
-         return tmpnam, nil
-      end
-      i = i + 1
+function open_output_byte_stream(filename)
+   local stream, err = file.open(filename, 'w', "rusr, wusr, rgrp, roth")
+   if not stream then
+      error("error opening output file "..filename..": "..tostring(err))
    end
-   return nil, err
+   return new_output_byte_stream(stream, filename)
 end
 
 function open_temporary_output_byte_stream(target)
-   local tmp_file, err = mktemp(target)
-   if not tmp_file then
-      local dir = lib.dirname(target)
-      error("failed to create temporary file in "..dir..": "..tostring(err))
-   end
-   local stream = open_output_byte_stream(tmp_file)
-   function stream:close_and_rename()
+   local tmp, tmpnam = file.tmpfile("rusr,wusr,rgrp,roth", lib.dirname(target))
+   local ret = new_output_byte_stream(tmp, tmpnam)
+   function ret:close_and_rename()
+      tmp:rename(target)
       self:close()
-      local res, err = S.rename(tmp_file, target)
-      if not res then
-         error("failed to rename "..tmp_file.." to "..target..": "..err)
-      end
    end
-   return stream
+   return ret
 end
 
 -- FIXME: Try to copy file into huge pages?
