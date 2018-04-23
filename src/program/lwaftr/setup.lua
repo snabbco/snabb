@@ -62,24 +62,6 @@ function lwaftr_app(c, conf)
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
 
-   -- Claim the name if one is defined.
-   local function switch_names(config)
-      local currentname = engine.program_name
-      local name = config.softwire_config.name
-      -- Don't do anything if the name isn't set.
-      if name == nil then
-         return
-      end
-
-      local success, err = pcall(engine.claim_name, name)
-      if success == false then
-         -- Restore the previous name.
-         config.softwire_config.name = currentname
-         assert(success, err)
-      end
-   end
-   switch_names(conf)
-
    local device, id, queue = lwutil.parse_instance(conf)
 
    -- Global interfaces
@@ -587,7 +569,24 @@ local function compute_worker_configs(conf)
 end
 
 function ptree_manager(f, conf, manager_opts)
+   -- Claim the name if one is defined.
+   local function switch_names(config)
+      local currentname = engine.program_name
+      local name = config.softwire_config.name
+      -- Don't do anything if the name isn't set.
+      if name == nil then
+         return
+      end
+      local success, err = pcall(engine.claim_name, name)
+      if success == false then
+         -- Restore the previous name.
+         config.softwire_config.name = currentname
+         assert(success, err)
+      end
+   end
+
    local function setup_fn(conf)
+      switch_names(conf)
       local worker_app_graphs = {}
       for worker_id, worker_config in pairs(compute_worker_configs(conf)) do
          local app_graph = config.new()
