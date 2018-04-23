@@ -110,6 +110,32 @@ function fdopen(fd, flags)
    return stream.open(io, readable, writable)
 end
 
+local modes = {
+   r='rdonly',
+   w='wronly,creat,trunc',
+   a='wronly,creat,append',
+   ['r+']='rdwr',
+   ['w+']='rdwr,creat,trunc',
+   ['a+']='rdwr,creat,append'
+}
+do
+   local binary_modes = {}
+   for k,v in pairs(modes) do binary_modes[k..'b'] = v end
+   for k,v in pairs(binary_modes) do modes[k] = v end
+end
+
+function open(filename, mode, perms)
+   if mode == nil then mode = 'r' end
+   local flags = modes[mode]
+   if flags == nil then return nil, 'invalid mode: '..tostring(mode) end
+   -- This set of permissions is what fopen() uses.  Note that these
+   -- permissions will be modulated by the umask.
+   if perms == nil then perms = "rusr,wusr,rgrp,wgrp,roth,woth" end
+   local fd, err = S.open(filename, flags, perms)
+   if fd == nil then return nil, err end
+   return fdopen(fd, flags)
+end
+
 function pipe()
    local ok, err, rd, wr = S.pipe()
    assert(ok, err)

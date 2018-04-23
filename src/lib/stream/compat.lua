@@ -39,30 +39,7 @@ function io.lines(filename, ...)
    end
 end
 
-local modes = {
-   r='rdonly',
-   w='wronly,creat,trunc',
-   a='wronly,creat,append',
-   ['r+']='rdwr',
-   ['w+']='rdwr,creat,trunc',
-   ['a+']='rdwr,creat,append'
-}
-do
-   local binary_modes = {}
-   for k,v in pairs(modes) do binary_modes[k..'b'] = v end
-   for k,v in pairs(binary_modes) do modes[k] = v end
-end
-
-function io.open(filename, mode)
-   if mode == nil then mode = 'r' end
-   local flags = modes[mode]
-   if flags == nil then return nil, 'invalid mode: '..tostring(mode) end
-   -- This set of permissions is what fopen() uses.  Note that these
-   -- permissions will be modulated by the umask.
-   local fd, err = S.open(filename, flags, "rusr,wusr,rgrp,wgrp,roth,woth")
-   if fd == nil then return nil, err end
-   return file.fdopen(fd, flags)
-end
+io.open = file.open
 
 function io.output(new)
    if new == nil then return io.current_output end
