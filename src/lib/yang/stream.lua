@@ -3,34 +3,26 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local S = require("syscall")
 local lib = require("core.lib")
+local file = require("lib.stream.file")
 
 local function round_up(x, y) return y*math.ceil(x/y) end
 
 function open_output_byte_stream(filename)
-   local fd, err =
-      S.open(filename, "creat, wronly, trunc", "rusr, wusr, rgrp, roth")
-   if not fd then
+   local stream, err = file.open(filename, 'w', "rusr, wusr, rgrp, roth")
+   if not stream then
       error("error opening output file "..filename..": "..tostring(err))
    end
    local ret = { written = 0, name = filename }
    function ret:close()
-      fd:close()
+      stream:close()
    end
    function ret:error(msg)
       self:close()
       error('while writing file '..filename..': '..msg)
    end
    function ret:write(ptr, size)
-      assert(size)
-      ptr = ffi.cast("uint8_t*", ptr)
-      local to_write = size
-      while to_write > 0 do
-         local written, err = S.write(fd, ptr, to_write)
-         if not written then self:error(err) end
-         ptr = ptr + written
-         self.written = self.written + written
-         to_write = to_write - written
-      end
+      stream:write_bytes(ptr, size)
+      self.written = self.written + size
    end
    function ret:write_ptr(ptr, type)
       assert(ffi.sizeof(ptr) == ffi.sizeof(type))
@@ -38,7 +30,7 @@ function open_output_byte_stream(filename)
       self:write(ptr, ffi.sizeof(type))
    end
    function ret:rewind()
-      fd:seek(0, 'set')
+      stream:seek('set', 0)
       ret.written = 0 -- more of a position at this point
    end
    function ret:write_array(ptr, type, count)
