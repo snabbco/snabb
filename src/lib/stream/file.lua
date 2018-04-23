@@ -42,9 +42,9 @@ set_blocking_handler()
 local File = {}
 local File_mt = {__index = File}
 
-local function new_file_io(fd)
+local function new_file_io(fd, filename)
    blocking_handler:init_nonblocking(fd)
-   return setmetatable({fd=fd}, File_mt)
+   return setmetatable({fd=fd, filename=filename}, File_mt)
 end
 
 function File:nonblock() self.fd:nonblock() end
@@ -96,8 +96,8 @@ function File:close()
    self.fd = nil
 end
 
-function fdopen(fd, flags)
-   local io = new_file_io(fd)
+function fdopen(fd, flags, filename)
+   local io = new_file_io(fd, filename)
    if flags == nil then
       flags = assert(S.fcntl(fd, S.c.F.GETFL))
    else
@@ -133,7 +133,48 @@ function open(filename, mode, perms)
    if perms == nil then perms = "rusr,wusr,rgrp,wgrp,roth,woth" end
    local fd, err = S.open(filename, flags, perms)
    if fd == nil then return nil, err end
-   return fdopen(fd, flags)
+   return fdopen(fd, flags, filename)
+end
+
+local function mktemp(name, perms)
+   if perms == nil then perms = "rusr, wusr, rgrp, roth" end
+   -- In practice this requires that someone seeds math.random with good
+   -- entropy.  In Snabb that is the case (see core.main:initialize()).
+   local t = math.random(1e7)
+   local tmpnam, fd, err
+   for i = t, t+10 do
+      tmpnam = name .. '.' .. i
+      fd, err = S.open(tmpnam, 'creat, rdwr, excl', perms)
+      if fd then return fd, tmpnam end
+      i = i + 1
+   end
+   error("Failed to create temporary file "..tmpnam..": "..tostring(err))
+end
+
+function tmpfile(perms, tmpdir)
+   if tmpdir == nil then tmpdir = os.getenv("TMPDIR") or "/tmp" end
+   local fd, tmpnam = mktemp(tmpdir..'/'..'tmp', perms)
+   local f = fdopen(fd, 'rdwr', tmpnam)
+   -- FIXME: Doesn't arrange to ensure the file is removed in all cases;
+   -- calling close is required.
+   function f:rename(new)
+      self:flush()
+      self.io.fd:fsync()
+      local res, err = S.rename(self.io.filename, new)
+      if not res then
+         error("failed to rename "..self.io.filename.." to "..new..": "..tostring(err))
+      end
+      self.io.filename = new
+      self.io.close = File.close -- Disable remove-on-close.
+   end
+   function f.io:close()
+      File.close(self)
+      local res, err = S.unlink(self.filename)
+      if not res then
+         error('failed to remove '..self.filename..': '..tostring(err))
+      end
+   end
+   return f
 end
 
 function pipe()

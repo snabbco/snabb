@@ -55,18 +55,7 @@ function io.read(...)
    return io.current_input:read(...)
 end
 
-function io.tmpfile()
-   local name = os.tmpname()
-   local f = io.open(name, 'w+')
-   local close = f.io.close
-   -- FIXME: Doesn't arrange to ensure the file is removed in all cases;
-   -- calling close is required.
-   function f.io:close()
-      close()
-      S.unlink(name)
-   end
-   return f
-end
+io.tmpfile = file.tmpfile
 
 function io.type(x)
    if not stream.is_stream(x) then return nil end
