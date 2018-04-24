@@ -1,5 +1,39 @@
 # Change Log
 
+## [2018.01.2.1]
+
+* Features:
+
+   - Added limit-finding loadtester.  See:
+
+     https://github.com/Igalia/snabb/blob/lwaftr/src/program/loadtest/find-limit/README.inc
+
+   - Move "loadtest" command out of lwaftr.  Now the "loadtest" command consists of
+     two subcommands: "transient" and "find-limit". Example:
+
+     $ sudo ./snabb loadtest transient -D 1 -b 5e9 -s 0.2e9 \
+       cap1.pcap "NIC 0" "NIC 1" 01:00.0 \
+       cap2.pcap "NIC 1" "NIC 0" 01:00.1
+
+     $ sudo ./snabb loadtest find-limit 01:00.0 cap1.pcap
+
+* Bug fixes:
+
+   - Fix next-hop discovery with multiple devices (Issue: https://github.com/Igalia/snabb/issues/1014).
+   - Improve effectiveness of property-based tests.
+   - Process tree runs data-plane processes with busywait=true by default
+   - Remove early lwAFTR NUMA affinity check.  The check was unnecessary since
+     now ptree manager handles NUMA affinity and appropriate CPU selection.
+   - Sizes for "packetblaster lwaftr" are frame sizes.
+
+## [2017.11.01]
+
+* Add --trace option to "snabb lwaftr run", enabling a trace log of
+  incoming RPC calls that can be later replayed.
+
+* Fix excessive CPU and memory use when doing "snabb config get" of a
+  large configuration.
+
 ## [2017.08.06]
 
 * Update IETF yang model from `ietf-softwire` to `ietf-softwire-br`.  The

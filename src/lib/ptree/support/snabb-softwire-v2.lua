@@ -13,6 +13,7 @@ local yang = require('lib.yang.yang')
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 local path_mod = require('lib.yang.path')
+local path_data = require('lib.yang.path_data')
 local generic = require('lib.ptree.support').generic_schema_config_support
 local binding_table = require("apps.lwaftr.binding_table")
 
@@ -90,7 +91,7 @@ local function remove_softwire_entry_actions(app_graph, path)
    assert(app_graph.apps['lwaftr'])
    path = path_mod.parse_path(path)
    local grammar = get_softwire_grammar()
-   local key = path_mod.prepare_table_lookup(
+   local key = path_data.prepare_table_lookup(
       grammar.keys, grammar.key_ctype, path[#path].query)
    local args = {'lwaftr', 'remove_softwire_entry', key}
    -- If it's the last softwire for the corresponding psid entry, remove it.
@@ -216,7 +217,7 @@ end
 local function schema_getter(schema_name, path)
    local schema = yang.load_schema_by_name(schema_name)
    local grammar = data.config_grammar_from_schema(schema)
-   return path_mod.resolver(grammar, path)
+   return path_data.resolver(grammar, path)
 end
 
 local function snabb_softwire_getter(path)
@@ -251,7 +252,7 @@ end
 local function serialize_binding_table(bt)
    local _, grammar = snabb_softwire_getter('/softwire-config/binding-table')
    local printer = data.data_printer_from_grammar(grammar)
-   return printer(bt, yang.string_output_file())
+   return printer(bt, yang.string_io_file())
 end
 
 local uint64_ptr_t = ffi.typeof('uint64_t*')
@@ -603,7 +604,7 @@ local function ietf_softwire_br_translator ()
          local value = snabb_softwire_getter(path)(native_config)
          for _,instance in cltable.pairs(br_instance) do
             local grammar = get_ietf_softwire_grammar()
-            local key = path_mod.prepare_table_lookup(
+            local key = path_data.prepare_table_lookup(
                grammar.keys, grammar.key_ctype, {['binding-ipv6info']='::'})
             key.binding_ipv6info = value.b4_ipv6
             assert(instance.binding_table.binding_entry[key] ~= nil)

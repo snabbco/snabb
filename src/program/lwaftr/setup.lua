@@ -19,7 +19,6 @@ local ipv6_reassemble = require("apps.ipv6.reassemble")
 local ndp        = require("apps.lwaftr.ndp")
 local vlan       = require("apps.vlan.vlan")
 local pci        = require("lib.hardware.pci")
-local numa       = require("lib.numa")
 local cltable    = require("lib.cltable")
 local ipv4       = require("lib.protocol.ipv4")
 local ethernet   = require("lib.protocol.ethernet")
@@ -49,10 +48,8 @@ local function convert_ipv4(addr)
    if addr ~= nil then return ipv4:pton(ipv4_ntop(addr)) end
 end
 
--- Checks the existance and NUMA affinity of PCI devices
--- NB: "nil" can be passed in and will be siliently ignored.
+-- Checks the existence of PCI devices.
 local function validate_pci_devices(devices)
-   numa.check_affinity_for_pci_addresses(devices)
    for _, address in pairs(devices) do
       assert(lwutil.nic_exists(address),
              ("Could not locate PCI device '%s'"):format(address))
@@ -64,24 +61,6 @@ function lwaftr_app(c, conf)
 
    local function append(t, elem) table.insert(t, elem) end
    local function prepend(t, elem) table.insert(t, 1, elem) end
-
-   -- Claim the name if one is defined.
-   local function switch_names(config)
-      local currentname = engine.program_name
-      local name = config.softwire_config.name
-      -- Don't do anything if the name isn't set.
-      if name == nil then
-         return
-      end
-
-      local success, err = pcall(engine.claim_name, name)
-      if success == false then
-         -- Restore the previous name.
-         config.softwire_config.name = currentname
-         assert(success, err)
-      end
-   end
-   switch_names(conf)
 
    local device, id, queue = lwutil.parse_instance(conf)
 
@@ -116,14 +95,14 @@ function lwaftr_app(c, conf)
               { self_ip = iinternal_interface.ip,
                 self_mac = iinternal_interface.mac,
                 next_mac = iinternal_interface.next_hop.mac,
-                shared_next_mac_key = "group/ipv6-next-mac",
+                shared_next_mac_key = "group/"..device.."-ipv6-next-mac",
                 next_ip = iinternal_interface.next_hop.ip,
                 alarm_notification = conf.alarm_notification })
    config.app(c, "arp", arp.ARP,
               { self_ip = convert_ipv4(iexternal_interface.ip),
                 self_mac = iexternal_interface.mac,
                 next_mac = iexternal_interface.next_hop.mac,
-                shared_next_mac_key = "group/ipv4-next-mac",
+                shared_next_mac_key = "group/"..device.."-ipv4-next-mac",
                 next_ip = convert_ipv4(iexternal_interface.next_hop.ip),
                 alarm_notification = conf.alarm_notification })
 
@@ -589,26 +568,46 @@ local function compute_worker_configs(conf)
    return ret
 end
 
-function ptree_manager(scheduling, f, conf)
-   -- Always enabled in reconfigurable mode.
-   alarm_notification = true
+function ptree_manager(f, conf, manager_opts)
+   -- Claim the name if one is defined.
+   local function switch_names(config)
+      local currentname = engine.program_name
+      local name = config.softwire_config.name
+      -- Don't do anything if the name isn't set.
+      if name == nil then
+         return
+      end
+      local success, err = pcall(engine.claim_name, name)
+      if success == false then
+         -- Restore the previous name.
+         config.softwire_config.name = currentname
+         assert(success, err)
+      end
+   end
 
    local function setup_fn(conf)
+      switch_names(conf)
       local worker_app_graphs = {}
       for worker_id, worker_config in pairs(compute_worker_configs(conf)) do
          local app_graph = config.new()
+         worker_config.alarm_notification = true
          f(app_graph, worker_config)
          worker_app_graphs[worker_id] = app_graph
       end
       return worker_app_graphs
    end
 
-   return manager.new_manager {
+   local initargs = {
       setup_fn = setup_fn,
       initial_configuration = conf,
       schema_name = 'snabb-softwire-v2',
       default_schema = 'ietf-softwire-br',
-      worker_default_scheduling = scheduling,
       -- log_level="DEBUG"
    }
+   for k, v in pairs(manager_opts or {}) do
+      assert(not initargs[k])
+      initargs[k] = v
+   end
+
+   return manager.new_manager(initargs)
 end

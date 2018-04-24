@@ -47,15 +47,17 @@ function Promise:resolve(...)
    self.resolved = true
    self.vals = { self.transform(...) }
    if #self.vals == 1 and is_promise(self.vals[1]) then
-      if self.next then self.vals[1]:chain(self.next) end
-      self.next = self.vals[1]
-   else
-      if self.next then self:dispatch_next() end
+      local new_next, old_next = self.vals[1], self.next
+      self.next = nil
+      if old_next then new_next:chain(old_next) end
+   elseif self.next then
+      self:dispatch_next()
    end
 end
 
 function Promise:chain(next)
    assert(next)
+   assert(not next.resolved)
    assert(not self.next)
    self.next = next
    if self.resolved then self:dispatch_next() end

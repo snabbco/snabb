@@ -87,12 +87,47 @@ function ipv4_ntop(addr)
    return ipv4:ntop(ffi.new('uint32_t[1]', lib.htonl(addr)))
 end
 
-function string_output_file()
+ffi.cdef [[
+void* malloc (size_t);
+void free (void*);
+]]
+
+function string_io_file()
+   local function alloc(n)
+      return ffi.gc(ffi.cast('char*', ffi.C.malloc(n)), ffi.C.free)
+   end
+
    local file = {}
-   local out = {}
-   function file:write(str) table.insert(out, str) end
-   function file:flush(str) return table.concat(out) end
-   function file:clear(str) out = {} end
+   local size = 1024
+   local buf = alloc(size)
+   local written = 0
+   local read = 0
+   function file:write(str)
+      while size - written < #str do
+         if 0 < read then
+            ffi.copy(buf, buf + read, written - read)
+            read, written = 0, written - read
+         else
+            local old_buf, old_written = buf, written
+            size = size * 2
+            buf = alloc(size)
+            ffi.copy(buf, old_buf, written)
+         end
+      end
+      ffi.copy(buf + written, str, #str)
+      written = written + #str
+   end
+   function file:peek()
+      return buf + read, written - read
+   end
+   function file:flush()
+      local ptr, len = buf + read, written - read
+      return ffi.string(ptr, len)
+   end
+   function file:clear(str)
+      size, written, read = 1024, 0, 0
+      buf = alloc(size)
+   end
    return file
 end
 
@@ -129,26 +164,36 @@ function memoize(f, max_occupancy)
    end
 end
 
-function gmtime ()
+function timezone ()
    local now = os.time()
-   local utcdate = os.date("!*t", now)
-   local localdate = os.date("*t", now)
-   localdate.isdst = false
-   local timediff = os.difftime(os.time(utcdate), os.time(localdate))
-   return now + timediff
+   local utctime = os.date("!*t", now)
+   local localtime = os.date("*t", now)
+   local timediff = os.difftime(os.time(localtime), os.time(utctime))
+   if timediff ~= 0 then
+      local sign = timediff > 0 and "+" or "-"
+      local time = os.date("!*t", math.abs(timediff))
+      return sign..("%.2d:%.2d"):format(time.hour, time.min)
+   end
 end
 
 function format_date_as_iso_8601 (time)
-   time = time or gmtime()
-   return os.date("%Y-%m-%dT%H:%M:%SZ", time)
+   local ret = {}
+   time = time or os.time()
+   local utctime = os.date("!*t", time)
+   table.insert(ret, ("%.4d-%.2d-%.2dT%.2d:%.2d:%.2dZ"):format(
+      utctime.year, utctime.month, utctime.day, utctime.hour, utctime.min, utctime.sec))
+   table.insert(ret, timezone() or "")
+   return table.concat(ret, "")
 end
 
 -- XXX: ISO 8601 can be more complex. We asumme date is the format returned
 -- by 'format_date_as_iso8601'.
 function parse_date_as_iso_8601 (date)
    assert(type(date) == 'string')
-   local pattern = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)Z"
-   return assert(date:match(pattern))
+   local gmtdate = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)Z"
+   local year, month, day, hour, min, sec = assert(date:match(gmtdate))
+   local tz_sign, tz_hour, tz_min = date:match("Z([+-]?)(%d%d):(%d%d)")
+   return {year=year, month=month, day=day, hour=hour, min=min, sec=sec, tz_sign=tz_sign, tz_hour=tz_hour, tz_min=tz_min}
 end
 
 function selftest()

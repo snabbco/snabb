@@ -16,54 +16,69 @@ Usage: packetblaster lwaftr [OPTIONS]
 
   --vlan VLANID         VLAN tag traffic with VLANID if set
 
-  --src_mac SOURCE
-                        Source MAC-Address
+  --src_mac SOURCE      Source MAC-Address
                         Default: 00:00:00:00:00:00
-  --dst_mac DESTINATION
-                        Destination MAC-Address
+
+  --dst_mac DESTINATION Destination MAC-Address
                         Default: 00:00:00:00:00:00
-  --size SIZES
-                        A comma separated list of numbers. Send packets of
-                        SIZES bytes. The size specifies the lenght of the IPv4 
-                        packet. The actual packet size on the wire is 14 Bytes
-                        longer (Ethernet header). Smallest allowed IPv4 packet
-                        size is 28 (20 Bytes for IPv4 header, 8 Bytes payload
-                        for packet loss detection)
-                        Default: 64,64,64,64,64,64,64,594,594,594,1500 (IMIX)
-  --b4 IPV6,IPV4,PORT
-                        First B4 Client IPv6 mapped to IPv4 and UDP Port.
+
+  --size SIZES          A comma separated list of numbers. Send packets whose
+                        frames are SIZES bytes long.  The frame size includes
+                        the size of the packet, including its ethernet
+                        headers, and additionally a 4-byte CRC that is written
+                        and read by the NIC.
+
+                        Note that the minimum ethernet frame size is 64 bytes.
+                        While it's technically possible to make smaller frames
+                        and we do allow it, the NIC will pad it up to the
+                        minimum before sending, so it's a bit pointless.
+                        Since Snabb does not see the CRC in the packet, that
+                        means that from Snabb's perspective the minimum useful
+                        packet size is 60 bytes.
+
+                        The smallest allowed frame size is 46 bytes,
+                        comprising 14 bytes for the ethernet header, 20 for
+                        the IPv4 header, 8 for the UDP header, and 4
+                        additional bytes for the ethernet checksum.  If the
+                        packet has at least 8 bytes of payload, the generated
+                        packets will include a unique identifier in the
+                        payload as well.
+
+                        Default: 64,64,64,64,64,64,64,594,594,594,1500
+
+  --b4 IPV6,IPV4,PORT   First B4 Client IPv6 mapped to IPv4 and UDP Port.
                         B4 IPv6,IPv4 and Port are incremented for every count, 
                         then rolled over.  Port is incremented by the port number: 
                         e.g. 1024 -> 1024, 2048, 3096 .. 64512 (63 in total)
                         Default: 2001:db8::,10.0.0.0,1024
-  --aftr IPV6
-                        IPv6 address of lwaftr server (softwire tunnel endpoint)
+
+  --aftr IPV6           IPv6 address of lwaftr server (softwire tunnel endpoint)
                         Default: 2001:db8:ffff::100
-  --ipv4 IPV4
-                        Public IPv4. Used as source for IPv4 traffic and
+
+  --ipv4 IPV4           Public IPv4. Used as source for IPv4 traffic and
                         as destination in IPv6 packets from B4
                         Default: 8.8.8.8
-  --count COUNT
-                        Number of B4 clients to simulate. 
+
+  --count COUNT         Number of B4 clients to simulate. 
                         Default: 1
-  --rate RATE
-                        Rate in MPPS for the generated traffic. Fractions are
+
+  --rate RATE           Rate in MPPS for the generated traffic. Fractions are
                         allowed (e.g. 3.148 for IMIX line rate). If set too high,
                         the actual transmitted rate depends on the interfaces capacity.
                         Setting rate to 0 turns it to listening only mode while
                         reporting on incoming packets
                         Default: 1 MPPS
-  --v4only, -4
-                        Generate only IPv4 packets from the Internet towards lwaftr
-  --v6only, -6
-                        Generate only IPv6 packets from B4 to lwaftr
-  --duration DURATION
-                        Run for DURATION seconds.
+
+  --v4only, -4          Generate only IPv4 packets from the Internet towards lwaftr
+
+  --v6only, -6          Generate only IPv6 packets from B4 to lwaftr
+
+  --duration DURATION   Run for DURATION seconds.
 			Default: unlimited
-  -V, --verbose
-                        Display verbose link information every second
-  -h, --help
-                        Print usage information.
+
+  -V, --verbose         Display verbose link information every second
+
+  -h, --help            Print usage information.
 
 
 This tool generates two types of traffic according to RFC7596:
