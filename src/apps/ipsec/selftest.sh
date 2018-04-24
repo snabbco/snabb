@@ -3,10 +3,7 @@
 
 SKIPPED_CODE=43
 
-# Temporary disabled test.
-exit $SKIPPED_CODE
-
-if [ "$SNABB_IPSEC_SKIP_E2E_TEST" = yes ]; then
+if [ "$SNABB_IPSEC_ENABLE_E2E_TEST" != yes ]; then
     exit $SKIPPED_CODE
 fi
 
