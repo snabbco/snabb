@@ -100,6 +100,8 @@ function Worker:main ()
    engine.setvmprofile("engine")
    vmprofile.start()
 
+   if not engine.auditlog_enabled then engine.enable_auditlog() end
+
    repeat
       self.breathe()
       if next_time < engine.now() then
@@ -108,7 +110,6 @@ function Worker:main ()
          timer.run()
       end
       if not engine.busywait then engine.pace_breathing() end
-      if not engine.auditlog_enabled then engine.enable_auditlog() end
    until stop < engine.now()
    counter.commit()
    if not self.no_report then engine.report(self.report) end
