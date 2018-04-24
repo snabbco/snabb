@@ -20,7 +20,7 @@
   different kinds of paths.
 
 * Fix alarm notification (accidentally disabled during refactor).
-  Update documentation for `snabb alarms set-operator-state.
+  Update documentation for `snabb alarms set-operator-state`.
 
 * Fix lwAFTR to claim name when run with empty configuration (no
   workers).
