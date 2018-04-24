@@ -92,8 +92,14 @@ function Worker:handle_actions_from_manager()
 end
 
 function Worker:main ()
+   local vmprofile = require("jit.vmprofile")
    local stop = engine.now() + self.duration
    local next_time = engine.now()
+
+   -- Setup vmprofile.
+   engine.setvmprofile("engine")
+   vmprofile.start()
+
    repeat
       self.breathe()
       if next_time < engine.now() then
@@ -102,6 +108,7 @@ function Worker:main ()
          timer.run()
       end
       if not engine.busywait then engine.pace_breathing() end
+      if not engine.auditlog_enabled then engine.enable_auditlog() end
    until stop < engine.now()
    counter.commit()
    if not self.no_report then engine.report(self.report) end
