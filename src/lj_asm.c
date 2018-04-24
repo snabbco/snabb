@@ -2057,7 +2057,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
       RA_DBG_REF();
       checkmclim(as);
       asm_ir(as, ir);
-      T->szirmcode[as->curins] = (uint16_t)(end - as->mcp);
+      T->szirmcode[as->curins - REF_BIAS] = (uint16_t)((intptr_t)end - (intptr_t)as->mcp);
     }
 
     if (as->realign && J->curfinal->nins >= T->nins)
