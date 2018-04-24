@@ -68,6 +68,8 @@ release:
 Thanks to Marcel Wiget, Alexander Gall, Max Rottenkolber, and Luke
 Gorrie for upstream work in this period.
 
+## [2018.01.2.1]
+
 ### Features
 
 * Added limit-finding loadtester.  See:
