@@ -1,6 +1,72 @@
 # Change Log
 
-## [2018.01.2.1]
+## [2018.04.01] (unreleased)
+
+### Features
+
+* Implement alarm shelving.  For documentation, see:
+
+    https://github.com/Igalia/snabb/blob/lwaftr/src/program/alarms/README.md
+
+* Extend `snabb loadtest find-limit` to handle multiple NICs, as in a
+  lwAFTR bump-in-the-wire configuration.  For documentation, see:
+
+    https://github.com/Igalia/snabb/blob/lwaftr/src/program/loadtest/find-limit/README
+
+### Bug fixes
+
+* Fix the `--format xpath` output for `snabb config get`; broken in
+  the switch to the `snabb-softwire-v2` model, which exercises
+  different kinds of paths.
+
+* Fix alarm notification (accidentally disabled during refactor).
+  Update documentation for `snabb alarms set-operator-state.
+
+* Fix lwAFTR to claim name when run with empty configuration (no
+  workers).
+
+* Fix `--verbose` lwAFTR mode when run on-a-stick.
+
+* Improve reliability of unit and integration tests.
+
+* Fix bug that can cause the lwAFTR to run out of file descriptors in
+  some circumstances (https://github.com/snabbco/snabb/pull/1325).
+
+* Fix documentation for ARP snabb component.
+
+* Improve self-tests for unified Intel NIC driver.
+
+* Improve reliability when piping `snabb config` output to files in the
+  shell.  (https://github.com/snabbco/snabb/pull/1300).
+
+* Make necessary modifications to support 64-bit Lua allocations, as
+  will be the case with RaptorJIT.
+
+### Other enhancements from upstream
+
+From the
+[2018.04](https://github.com/snabbco/snabb/releases/tag/v2018.04)
+release:
+
+* Add `snabb dnnsd` tool for browsing local DNS-SD records.  See:
+
+    https://github.com/snabbco/snabb/blob/next/src/program/dnssd/README.md
+
+* Add `snabb unhexdump` tool for converting packet dumps to pcap files.
+  See:
+
+    https://github.com/snabbco/snabb/blob/next/src/program/unhexdump/README
+
+* Improve performance when using non-busy-wait mode.
+
+* Add `Makefile` target to build Docker image.  See:
+
+    https://github.com/snabbco/snabb/blob/next/README.md#snabb-container
+
+* Improve output from `snabb top`.
+
+Thanks to Marcel Wiget, Alexander Gall, Max Rottenkolber, and Luke
+Gorrie for upstream work in this period.
 
 ### Features
 
