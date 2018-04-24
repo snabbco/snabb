@@ -164,6 +164,7 @@ static void log_GCtrace(GCtrace *T)
   log_mem("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
   log_mem("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
   log_mem("IRIns[]", &T->ir[T->nk], (T->nins - T->nk + 1) * sizeof(IRIns));
+  log_mem("uint16_t[]", &T->szirmcode, (T->nins - REF_BIAS - 1) * sizeof(uint16_t));
   for (ref = T->nk; ref < REF_TRUE; ref++) {
     IRIns *ir = &T->ir[ref];
     if (ir->o == IR_KGC) {
@@ -220,8 +221,8 @@ static void log_GCobj(GCobj *o)
 void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 {
   if (ensure_log_started()) {
-    log_jit_State(J);
     log_GCtrace(T);
+    log_jit_State(J);
     log_event("trace_stop", 2);
     str_16("GCtrace");   /* = */ uint_64((uint64_t)T);
     str_16("jit_State"); /* = */ uint_64((uint64_t)J);
