@@ -3,7 +3,7 @@
 
 SKIPPED_CODE=43
 
-if [ "$SNABB_IPSEC_ENABLE_E2E_TEST" != yes ]; then
+if [ -n "$SNABB_IPSEC_ENABLE_E2E_TEST" ]; then
     exit $SKIPPED_CODE
 fi
 
