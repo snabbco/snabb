@@ -25,6 +25,7 @@ function parse_args (args)
    local handlers = {}
    function handlers.n (arg) opts.name = assert(arg) end
    function handlers.v () opts.verbosity = opts.verbosity + 1 end
+   function handlers.t (arg) opts.trace = assert(arg) end
    function handlers.D (arg)
       opts.duration = assert(tonumber(arg), "duration must be a number")
       assert(opts.duration >= 0, "duration can't be negative")
@@ -48,8 +49,8 @@ function parse_args (args)
    function handlers.j (arg) scheduling.j = arg end
    function handlers.h () show_usage(0) end
 
-   args = lib.dogetopt(args, handlers, "vD:hn:j:",
-     { verbose = "v", duration = "D", help = "h", cpu = 1,
+   args = lib.dogetopt(args, handlers, "vD:hn:j:t:",
+     { verbose = "v", duration = "D", help = "h", cpu = 1, trace = "t",
        ["real-time"] = 0, ["on-ingress-drop"] = 1,
        name="n" })
 
@@ -78,6 +79,7 @@ function run (args)
       schema_name = schema_name,
       worker_default_scheduling = scheduling,
       log_level = ({"WARN","INFO","DEBUG"})[opts.verbosity or 1] or "DEBUG",
+      rpc_trace_file = opts.trace,
    }
 
    manager:main(opts.duration)

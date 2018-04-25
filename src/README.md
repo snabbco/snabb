@@ -725,10 +725,6 @@ Returns the filename of the first file in *directory*.
 
 Returns the first line of file at *filename* as a string.
 
-— Function **lib.files_in_directory** *directory*
-
-Returns an array of filenames in *directory*.
-
 — Function **lib.load_string** *string*
 
 Evaluates and returns the value of the Lua expression in *string*.

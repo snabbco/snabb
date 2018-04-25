@@ -10,6 +10,7 @@ import socket
 from subprocess import PIPE, Popen
 import time
 import unittest
+import re
 
 from test_env import BENCHDATA_DIR, DATA_DIR, ENC, SNABB_CMD, \
                      DAEMON_STARTUP_WAIT, BaseTestCase, nic_names
@@ -23,7 +24,20 @@ DAEMON_ARGS = [
     str(BENCHDATA_DIR / 'ipv4-0550.pcap'),
     str(BENCHDATA_DIR / 'ipv6-0550.pcap'),
 ]
-SOCKET_PATH = '/tmp/snabb-lwaftr-listen-sock-%s' % DAEMON_PROC_NAME
+LISTEN_SOCKET_PATH = '/tmp/snabb-lwaftr-listen-sock-%s' % DAEMON_PROC_NAME
+MANAGER_SOCKET_PATH = '/var/run/snabb/by-name/%s/config-leader-socket' % DAEMON_PROC_NAME
+
+def wait_for_socket(socket_path, timeout=5, step=0.1):
+    for i in range(0, int(timeout/step)):
+        if os.access(socket_path, os.F_OK):
+            return True
+        time.sleep(step)
+    return False
+
+def wait_for_listen_socket(**kwargs):
+    return wait_for_socket(LISTEN_SOCKET_PATH, **kwargs)
+def wait_for_manager_socket(**kwargs):
+    return wait_for_socket(MANAGER_SOCKET_PATH, **kwargs)
 
 class TestConfigGet(BaseTestCase):
     """
@@ -33,6 +47,13 @@ class TestConfigGet(BaseTestCase):
 
     daemon_args = DAEMON_ARGS
     config_args = (str(SNABB_CMD), 'config', 'get', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME)
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if not wait_for_manager_socket():
+            cls.daemon.terminate()
+            cls.reportAndFail('Config manager socket not present', None)
 
     def test_get_internal_iface(self):
         cmd_args = list(self.config_args)
@@ -109,15 +130,13 @@ class TestConfigMultiproc(BaseTestCase):
 
         # Start the daemon itself
         self.daemon = Popen(daemon_args, stdout=PIPE, stderr=PIPE)
-        time.sleep(DAEMON_STARTUP_WAIT)
-        return_code = self.daemon.poll()
-        if return_code is not None:
+        if not wait_for_manager_socket():
+            self.daemon.terminate()
             stdout = self.daemon.stdout.read().decode(ENC)
             stderr = self.daemon.stderr.read().decode(ENC)
             self.fail("\n".join((
                 "Failed starting daemon",
                 "Command:", " ".join(daemon_args),
-                "Exit code: {0}".format(return_code),
                 "STDOUT", stdout,
                 "STDOUT", stderr,
             )))
@@ -239,14 +258,13 @@ class TestConfigMultiproc(BaseTestCase):
         for line in state:
             if "softwire-state" not in line:
                 continue
+            [cname, cvalue] = line.split(" ")
+            cname = os.path.basename(cname)
+            cvalue = int(cvalue)
 
-            path = [elem for elem in line.split("/") if elem]
-            cname = path[-1].split()[0]
-            cvalue = int(path[-1].split()[1])
-
-            if path[0].startswith("instance"):
+            if line.startswith("/softwire-config"):
                 instance[cname] = instance.get(cname, 0) + cvalue
-            elif len(path) < 3:
+            elif line.startswith("/softwire-state"):
                 summed[cname] = cvalue
 
         # Now assert they're the same :)
@@ -268,12 +286,13 @@ class TestConfigMultiproc(BaseTestCase):
 
         instances = set()
         for line in state:
-            path = [elem for elem in line.split("/") if elem]
-            if not path[0].startswith("instance"):
+            [key, value] = line.split(" ")
+            if key.startswith("/softwire-config") and "instance" not in key:
                 continue
-
-            device_name = path[0][path[0].find("=")+1:-1]
-            instances.add(device_name)
+            m = re.search(r"\[device=(.*)\]", key)
+            if m:
+                device_name = m.group(1)
+                instances.add(device_name)
 
         self.assertTrue(len(instances) == 2)
         self.assertTrue("test" in instances)
@@ -289,20 +308,36 @@ class TestConfigListen(BaseTestCase):
 
     daemon_args = DAEMON_ARGS
     listen_args = (str(SNABB_CMD), 'config', 'listen',
-        '--socket', SOCKET_PATH, DAEMON_PROC_NAME)
+        '--socket', LISTEN_SOCKET_PATH, DAEMON_PROC_NAME)
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if not wait_for_manager_socket():
+            cls.daemon.terminate()
+            cls.reportAndFail('Config manager socket not present', None)
 
     def test_listen(self):
         # Start the listen command with a socket.
         listen_daemon = Popen(self.listen_args, stdout=PIPE, stderr=PIPE)
-        # Wait a short while for the socket to be created.
-        time.sleep(1)
+        if not wait_for_listen_socket():
+            listen_daemon.terminate()
+            listen_daemon.wait()
+            stdout = listen_daemon.stdout.read().decode(ENC)
+            stderr = listen_daemon.stderr.read().decode(ENC)
+            self.fail("\n".join((
+                "Failed to run 'snabb listen'",
+                "Command:", " ".join(daemon_args),
+                "STDOUT", stdout,
+                "STDOUT", stderr,
+            )))
         # Send command to and receive response from the listen command.
         # (Implicit string concatenation, no summing needed.)
         get_cmd = (b'{ "id": "0", "verb": "get",'
             b' "path": "/routes/route[addr=1.2.3.4]/port" }\n')
         sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         try:
-            sock.connect(SOCKET_PATH)
+            sock.connect(LISTEN_SOCKET_PATH)
             sock.sendall(get_cmd)
             resp = str(sock.recv(200), ENC)
         finally:
@@ -319,12 +354,19 @@ class TestConfigListen(BaseTestCase):
             print('STDERR\n', str(listen_daemon.stderr.read(), ENC))
         listen_daemon.stdout.close()
         listen_daemon.stderr.close()
-        os.unlink(SOCKET_PATH)
+        os.unlink(LISTEN_SOCKET_PATH)
 
 
 class TestConfigMisc(BaseTestCase):
 
     daemon_args = DAEMON_ARGS
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        if not wait_for_manager_socket():
+            cls.daemon.terminate()
+            cls.reportAndFail('Config manager socket not present', None)
 
     def get_cmd_args(self, action):
         cmd_args = list((str(SNABB_CMD), 'config', 'XXX', '--schema=snabb-softwire-v2', DAEMON_PROC_NAME))

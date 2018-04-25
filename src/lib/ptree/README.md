@@ -103,6 +103,9 @@ Optional entries that may be present in the *parameters* table include:
    address being used by the worker.
  * `Hz`: Frequency at which to poll the config socket.  Default is
    1000.
+ * `rpc_trace_file`: File to which to write a trace of incoming RPCs
+   from "snabb config".  The trace is written in a format that can later
+   be piped to "snabb config listen" to replay the trace.
 
 The return value is a ptree manager object, whose public methods are as
 follows:
