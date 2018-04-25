@@ -152,6 +152,8 @@ local function printer_for_grammar(grammar, path, format, print_default)
    local printer
    if format == "xpath" then
       printer = data.xpath_printer_from_grammar(subgrammar, print_default, path)
+   elseif format == "influxdb" then
+      printer = data.influxdb_printer_from_grammar(subgrammar, print_default, path)
    else
       printer = data.data_printer_from_grammar(subgrammar, print_default)
    end
