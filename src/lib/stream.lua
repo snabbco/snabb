@@ -126,6 +126,86 @@ function Stream:read_bytes_or_error(buf, count)
    end
 end
 
+function Stream:read_all_bytes()
+   local head, count, block_size = nil, 0, 1024
+   while true do
+      local buf = ffi.new('uint8_t[?]', count + block_size)
+      if head then ffi.copy(buf, head, count) end
+      local did_read = self:read_bytes(buf + count, block_size)
+      count = count + did_read
+      if did_read < block_size then return buf, count end
+      head, block_size = buf, block_size * 2
+   end
+end
+
+function Stream:read_struct(buf, type)
+   if buf == nil then buf = type() end
+   self:read_bytes_or_error(buf, ffi.sizeof(type))
+   return buf
+end
+
+function Stream:read_array(buf, type, count)
+   if buf == nil then buf = ffi.typeof('$[?]', type)(count) end
+   self:read_bytes_or_error(buf, ffi.sizeof(type) * count)
+   return buf
+end
+
+function Stream:read_scalar(buf, type)
+   return self:read_array(buf, type, 1)[0]
+end
+
+function Stream:peek_byte()
+   if self.rx:is_empty() then
+      -- Return nil on EOF.
+      if self:fill_rx_buffer() == 0 then return nil end
+   end
+   return self.rx.buf[self.rx:read_pos()]
+end
+
+function Stream:peek_char()
+   local byte = self:peek_byte()
+   if byte == nil then return nil end
+   return string.char(byte)
+end
+
+function Stream:read_byte()
+   local byte = self:peek_byte()
+   if byte ~= nil then self.rx:advance_read(1) end
+   return byte
+end
+
+function Stream:read_char()
+   local byte = self:read_byte()
+   if byte ~= nil then return string.char(byte) end
+end
+
+-- Read up to COUNT characters from a stream and return them as a
+-- string.  Blocks until at least one character is available, or the
+-- stream reaches EOF, in which case return nil instead.  If COUNT is
+-- not given, it defaults to the current read buffer size.
+function Stream:read_some_chars(count)
+   if count == nil then count = self.rx.size end
+   if self.rx:is_empty() then
+      if self:fill_rx_buffer() == 0 then return nil end
+   end
+   local buf, avail = self.rx:peek()
+   count = math.min(count, avail)
+   local ret = ffi.string(buf, count)
+   self.rx:advance_read(count)
+   return ret
+end
+
+-- Unlike read_bytes, always reads COUNT bytes.
+function Stream:read_chars(count)
+   local buf = ffi.new('uint8_t[?]', count)
+   self:read_bytes_or_error(buf, count)
+   return ffi.string(buf, count)
+end
+
+function Stream:read_all_chars()
+   return ffi.string(self:read_all_bytes())
+end
+
 function Stream:write_bytes(buf, count)
    if self.tx:read_avail() == 0 then self:flush_input() end
    buf = ffi.cast('uint8_t*', buf)
@@ -157,6 +237,19 @@ function Stream:write_chars(str)
    if needs_flush then self:flush_output() end
 end
 
+function Stream:write_struct(type, ptr)
+   self:write_bytes(ptr, ffi.sizeof(type))
+end
+
+function Stream:write_array(type, ptr, count)
+   self:write_bytes(ptr, ffi.sizeof(type) * count)
+end
+
+function Stream:write_scalar(type, value)
+   local ptr = ffi.typeof('$[1]', type)(value)
+   self:write_array(type, ptr, 1)
+end
+
 function Stream:close()
    self:flush_output(); self.rx, self.tx = nil, nil
    self.io:close(); self.io = nil
@@ -176,32 +269,16 @@ function Stream:read_number()
    error('unimplemented')
 end
 
--- Read up to COUNT characters from a stream and return them as a
--- string.  Blocks until at least one character is available, or the
--- stream reaches EOF, in which case return nil instead.  If COUNT is
--- not given, it defaults to the current read buffer size.
-function Stream:read_some_chars(count)
-   if count == nil then count = self.rx.size end
-   if self.rx:is_empty() then
-      if self:fill_rx_buffer() == 0 then return nil end
-   end
-   local buf, avail = self.rx:peek()
-   count = math.min(count, avail)
-   local ret = ffi.string(buf, count)
-   self.rx:advance_read(count)
-   return ret
-end
-
-function Stream:read_all_chars()
-   error('unimplemented')
-end
-
 function Stream:read_line(eol_style) -- 'discard' or 'keep'
    local head = {}
    local add_lf = assert(({discard=0, keep=1})[eol_style])
    while true do
       if self.rx:is_empty() then
-         if self:fill_rx_buffer() == 0 then return nil end
+         if self:fill_rx_buffer() == 0 then
+            -- EOF.
+            if #head == 0 then return nil end
+            return table.concat(head)
+         end
       end
       local buf, avail = self.rx:peek()
       local lf = string.byte("\n")
