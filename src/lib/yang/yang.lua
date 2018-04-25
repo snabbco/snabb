@@ -5,7 +5,7 @@ local lib = require("core.lib")
 local schema = require("lib.yang.schema")
 local data = require("lib.yang.data")
 local binary = require("lib.yang.binary")
-local stream = require("lib.yang.stream")
+local file = require("lib.stream.file")
 local util = require("lib.yang.util")
 
 load_schema = schema.load_schema
@@ -96,17 +96,17 @@ function load_configuration(filename, opts)
       return compiled.data
    end
 
-   local source = stream.open_input_byte_stream(filename)
+   local source = assert(file.open(filename))
    if binary.has_magic(source) then return load_compiled(source) end
 
    -- If the file doesn't have the magic, assume it's a source file.
    -- First, see if we compiled it previously and saved a compiled file
    -- in a well-known place.
+   local stat = source.io.fd:stat()
+   local source_mtime = { sec=stat.st_mtime, nsec=stat.st_mtime_nsec }
    local compiled_filename = filename:gsub("%.conf$", "")..'.o'
-   local source_mtime = {sec=source.mtime_sec, nsec=source.mtime_nsec}
    local use_compiled_cache = not lib.getenv("SNABB_RANDOM_SEED")
-   local compiled_stream = maybe(stream.open_input_byte_stream,
-                                 compiled_filename)
+   local compiled_stream = maybe(file.open, compiled_filename)
    if compiled_stream then
       if binary.has_magic(compiled_stream) and use_compiled_cache then
          log('loading compiled configuration from %s', compiled_filename)
@@ -117,7 +117,7 @@ function load_configuration(filename, opts)
    end
 
    -- Load and compile it.
-   local source_str = source:read_string()
+   local source_str = source:read_all_chars()
    source:close()
    log('loading source configuration')
    local conf = load_config_for_schema_by_name(opts.schema_name, source_str,

@@ -5,108 +5,54 @@ local S = require("syscall")
 local lib = require("core.lib")
 local file = require("lib.stream.file")
 
-local function new_output_byte_stream(stream, filename)
-   local ret = { written = 0, name = filename }
-   function ret:close()
-      stream:close()
-   end
-   function ret:error(msg)
-      self:close()
-      error('while writing file '..filename..': '..msg)
-   end
-   function ret:write(ptr, size)
-      stream:write_bytes(ptr, size)
-      self.written = self.written + size
-   end
-   function ret:write_ptr(ptr, type)
-      assert(ffi.sizeof(ptr) == ffi.sizeof(type))
-      self:write(ptr, ffi.sizeof(type))
-   end
-   function ret:rewind()
-      stream:seek('set', 0)
-      ret.written = 0 -- more of a position at this point
-   end
-   function ret:write_array(ptr, type, count)
-      self:write(ptr, ffi.sizeof(type) * count)
-   end
-   return ret
-end
-
-function open_temporary_output_byte_stream(target)
-   local tmp, tmpnam = file.tmpfile("rusr,wusr,rgrp,roth", lib.dirname(target))
-   local ret = new_output_byte_stream(tmp, tmpnam)
-   function ret:close_and_rename()
-      tmp:rename(target)
-      self:close()
-   end
-   return ret
-end
-
 -- FIXME: Try to copy file into huge pages?
 function open_input_byte_stream(filename)
-   local fd, err = S.open(filename, "rdonly")
-   if not fd then return 
+   local stream, err = file.open(filename, "r")
+   if not stream then
       error("error opening "..filename..": "..tostring(err))
    end
-   local stat = S.fstat(fd)
-   local size = stat.size
-   local mem, err = S.mmap(nil, size, 'read, write', 'private', fd, 0)
-   fd:close()
-   if not mem then error("mmap failed: " .. tostring(err)) end
-   mem = ffi.cast("uint8_t*", mem)
-   local pos = 0
+   local stat = stream.io.fd:stat()
    local ret = {
       name=filename,
       mtime_sec=stat.st_mtime,
       mtime_nsec=stat.st_mtime_nsec
    }
    function ret:close()
-      -- FIXME: Currently we don't unmap any memory.
-      -- S.munmap(mem, size)
-      mem, pos = nil, nil
+      stream:close()
    end
    function ret:error(msg)
       error('while reading file '..filename..': '..msg)
    end
    function ret:read(count)
-      assert(count >= 0)
-      local ptr = mem + pos
-      pos = pos + count
-      if pos > size then
-         self:error('unexpected EOF')
-      end
-      return ptr
+      local buf = ffi.new('uint8_t[?]', count)
+      stream:read_bytes_or_error(buf, count)
+      return buf
    end
-   function ret:seek(new_pos)
-      if new_pos == nil then return pos end
-      assert(new_pos >= 0)
-      assert(new_pos <= size)
-      pos = new_pos
+   function ret:seek(whence, new_pos)
+      return stream:seek(whence, new_pos)
    end
-   function ret:read_ptr(type)
-      return ffi.cast(ffi.typeof('$*', type), ret:read(ffi.sizeof(type)))
+   function ret:read_struct(type)
+      return stream:read_struct(nil, type)
    end
    function ret:read_array(type, count)
-      return ffi.cast(ffi.typeof('$*', type),
-                      ret:read(ffi.sizeof(type) * count))
+      return stream:read_array(nil, type, count)
+   end
+   function ret:read_scalar(type)
+      return stream:read_scalar(nil, type)
    end
    function ret:read_char()
-      return ffi.string(ret:read(1), 1)
+      return stream:read_char()
    end
    function ret:read_string()
-      local count = size - pos
-      return ffi.string(ret:read(count), count)
+      return stream:read_all_chars()
    end
-   function ret:as_text_stream(len)
-      local end_pos = size
-      if len then end_pos = pos + len end
+   function ret:as_text_stream()
       return {
          name = ret.name,
          mtime_sec = ret.mtime_sec,
          mtime_nsec = ret.mtime_nsec,
          read = function(self, n)
             assert(n==1)
-            if pos == end_pos then return nil end
             return ret:read_char()
          end,
          close = function() ret:close() end
