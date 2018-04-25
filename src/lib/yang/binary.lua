@@ -14,7 +14,7 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
-local VERSION = 0x00008000
+local VERSION = 0x00008001
 
 local header_t = ffi.typeof([[
 struct {
@@ -47,7 +47,6 @@ local function string_table_builder()
    function strtab:emit(stream)
       local by_index = {}
       for str, idx in pairs(strings) do by_index[idx] = str end
-      stream:align(4)
       local strtab_start = stream.written
       stream:write_uint32(count)
       local str_end = 0

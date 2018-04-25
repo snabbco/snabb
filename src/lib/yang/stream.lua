@@ -5,8 +5,6 @@ local S = require("syscall")
 local lib = require("core.lib")
 local file = require("lib.stream.file")
 
-local function round_up(x, y) return y*math.ceil(x/y) end
-
 local function new_output_byte_stream(stream, filename)
    local ret = { written = 0, name = filename }
    function ret:close()
@@ -22,7 +20,6 @@ local function new_output_byte_stream(stream, filename)
    end
    function ret:write_ptr(ptr, type)
       assert(ffi.sizeof(ptr) == ffi.sizeof(type))
-      self:align(ffi.alignof(type))
       self:write(ptr, ffi.sizeof(type))
    end
    function ret:rewind()
@@ -30,12 +27,7 @@ local function new_output_byte_stream(stream, filename)
       ret.written = 0 -- more of a position at this point
    end
    function ret:write_array(ptr, type, count)
-      self:align(ffi.alignof(type))
       self:write(ptr, ffi.sizeof(type) * count)
-   end
-   function ret:align(alignment)
-      local padding = round_up(self.written, alignment) - self.written
-      self:write(string.rep(' ', padding), padding)
    end
    return ret
 end
@@ -93,9 +85,6 @@ function open_input_byte_stream(filename)
       end
       return ptr
    end
-   function ret:align(alignment)
-      self:read(round_up(pos, alignment) - pos)
-   end
    function ret:seek(new_pos)
       if new_pos == nil then return pos end
       assert(new_pos >= 0)
@@ -103,11 +92,9 @@ function open_input_byte_stream(filename)
       pos = new_pos
    end
    function ret:read_ptr(type)
-      ret:align(ffi.alignof(type))
       return ffi.cast(ffi.typeof('$*', type), ret:read(ffi.sizeof(type)))
    end
    function ret:read_array(type, count)
-      ret:align(ffi.alignof(type))
       return ffi.cast(ffi.typeof('$*', type),
                       ret:read(ffi.sizeof(type) * count))
    end
