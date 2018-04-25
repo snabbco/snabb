@@ -32,14 +32,6 @@ local function new_output_byte_stream(stream, filename)
    return ret
 end
 
-function open_output_byte_stream(filename)
-   local stream, err = file.open(filename, 'w', "rusr, wusr, rgrp, roth")
-   if not stream then
-      error("error opening output file "..filename..": "..tostring(err))
-   end
-   return new_output_byte_stream(stream, filename)
-end
-
 function open_temporary_output_byte_stream(target)
    local tmp, tmpnam = file.tmpfile("rusr,wusr,rgrp,roth", lib.dirname(target))
    local ret = new_output_byte_stream(tmp, tmpnam)
