@@ -1074,7 +1074,9 @@ function influxdb_printer_from_grammar(production, print_default, root)
          local ret = {}
          for i=1,#self.t,2 do
             local key, value = self.t[i], self.t[i+1]
-            table.insert(ret, '['..key.."="..value..']')
+            if key and value then
+               table.insert(ret, '['..key.."="..value..']')
+            end
          end
          self.t = {}
          return table.concat(ret, '')
