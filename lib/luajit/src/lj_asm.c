@@ -1958,7 +1958,7 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
 {
   ASMState as_;
   ASMState *as = &as_;
-  MCode *origtop;
+  MCode *origtop, *firstins;
 
   /* Remove nops/renames left over from ASM restart due to LJ_TRERR_MCODELM. */
   {
@@ -1986,8 +1986,8 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
   as->parent = J->parent ? traceref(J, J->parent) : NULL;
 
   /* Initialize mcode size of IR instructions array. */
-  T->szirmcode = lj_mem_new(J->L, T->nins * sizeof(*T->szirmcode));
-  memset(T->szirmcode, 0, T->nins * sizeof(*T->szirmcode));
+  T->szirmcode = lj_mem_new(J->L, (T->nins + 1) * sizeof(*T->szirmcode));
+  memset(T->szirmcode, 0, (T->nins + 1) * sizeof(*T->szirmcode));
 
   /* Reserve MCode memory. */
   as->mctop = origtop = lj_mcode_reserve(J, &as->mcbot);
@@ -2057,8 +2057,10 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
       RA_DBG_REF();
       checkmclim(as);
       asm_ir(as, ir);
-      T->szirmcode[as->curins] = (uint16_t)(end - as->mcp);
+      T->szirmcode[as->curins - REF_BIAS] = (uint16_t)((intptr_t)end - (intptr_t)as->mcp);
     }
+
+    firstins = as->mcp;	/* MCode assembled for IR instructions. */
 
     if (as->realign && J->curfinal->nins >= T->nins)
       continue;  /* Retry in case only the MCode needs to be realigned. */
@@ -2084,6 +2086,8 @@ void lj_asm_trace(jit_State *J, GCtrace *T)
       memcpy(J->curfinal->ir + as->orignins, T->ir + as->orignins,
 	     (T->nins - as->orignins) * sizeof(IRIns));  /* Copy RENAMEs. */
       T->nins = J->curfinal->nins;
+      /* Log size of trace head */
+      T->szirmcode[0] = (uint16_t)((intptr_t)firstins - (intptr_t)as->mcp);
       break;  /* Done. */
     }
 

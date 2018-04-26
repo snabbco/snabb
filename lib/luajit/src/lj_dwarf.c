@@ -11,6 +11,7 @@
 #include "lj_state.h"
 #include "lj_bc.h"
 #include "lj_ir.h"
+#include "lj_ircall.h"
 #include "lj_jit.h"
 #include "lj_iropt.h"
 #include "lj_mcode.h"
@@ -22,3 +23,5 @@
 #include "lj_dispatch.h"
 #include "lj_vm.h"
 #include "lj_target.h"
+#include "lj_ff.h"
+

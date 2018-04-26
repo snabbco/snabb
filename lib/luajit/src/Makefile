@@ -237,6 +237,7 @@ LJCORE_O= lj_gc.o lj_err.o lj_char.o lj_bc.o lj_obj.o lj_buf.o \
 	  lj_ctype.o lj_cdata.o lj_cconv.o lj_ccall.o lj_ccallback.o \
 	  lj_carith.o lj_clib.o lj_cparse.o \
 	  lj_lib.o lj_alloc.o lib_aux.o \
+	  lj_dwarf_dwo.o \
 	  $(LJLIB_O) lib_init.o
 
 DWARF_DWO= lj_dwarf.dwo
@@ -382,6 +383,12 @@ $(HOST_O): %.o: %.c
 $(DWARF_DWO): %.dwo: %.c
 	$(E) "CC(debug) $@"
 	$(Q)$(TARGET_CC) -g3 -fno-eliminate-unused-debug-types -gsplit-dwarf -c $<
+
+# Embed DWARF debug information as binary data available to raptorjit.
+lj_dwarf_dwo.o lj_dwarf_dwo_dyn.o: $(DWARF_DWO)
+	$(E) "EMBED     $@"
+	$(Q)$(LD) -r -b binary -o $@ $<
+	$(Q)$(LD) -shared -b binary -o $(@:.o=_dyn.o) $<
 
 include Makefile.dep
 
