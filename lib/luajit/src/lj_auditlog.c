@@ -186,6 +186,10 @@ static void log_GCtrace(GCtrace *T)
         break;
       }
     }
+    if (irt_is64(ir->t) && ir->o != IR_KNULL) {
+      /* Skip over 64-bit inline operand for this instruction. */
+      ref++;
+    }
   }
   log_mem("GCtrace", T, sizeof(*T));
 }
