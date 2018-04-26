@@ -10,6 +10,7 @@
 #include "lj_trace.h"
 #include "lj_ctype.h"
 #include "lj_auditlog.h"
+#include "lj_debuginfo.h"
 
 /* Maximum data to buffer in memory before file is opened. */
 #define MAX_MEM_BUFFER 10*1024*1024
@@ -61,7 +62,7 @@ static void uint_64(uint64_t n) {
   cfwrite(&big, sizeof(big), 1, fp); /* value */
 }
 
-static void bin_32(void *ptr, int n) {
+static void bin_32(const void *ptr, int n) {
   uint32_t biglen = __builtin_bswap32(n);
   cfputc(0xc6, fp);                        /* array 32 header */
   cfwrite(&biglen, sizeof(biglen), 1, fp); /* length */
@@ -90,10 +91,18 @@ static void log_event(const char *type, int nattributes) {
   /* Caller fills in the further nattributes... */
 }
 
+static void log_blob(const char *name, const char *ptr, int size) {
+  fixmap(3);
+  str_16("type"); /* = */ str_16("blob");
+  str_16("name"); /* = */ str_16(name);
+  str_16("data"); /* = */ bin_32(ptr, size);
+}
+
 /* Log objects that define the virtual machine. */
 static void lj_auditlog_vm_definitions()
 {
   log_mem("lj_ir_mode", (void*)&lj_ir_mode, sizeof(lj_ir_mode));
+  log_blob("lj_dwarf.dwo", &_binary_lj_dwarf_dwo_start, &_binary_lj_dwarf_dwo_end - &_binary_lj_dwarf_dwo_start);
 }
 
 /* Check that the log is open before logging a message. */
@@ -164,6 +173,7 @@ static void log_GCtrace(GCtrace *T)
   log_mem("SnapShot[]", T->snap, T->nsnap * sizeof(*T->snap));
   log_mem("SnapEntry[]", T->snapmap, T->nsnapmap * sizeof(*T->snapmap));
   log_mem("IRIns[]", &T->ir[T->nk], (T->nins - T->nk + 1) * sizeof(IRIns));
+  log_mem("uint16_t[]", T->szirmcode, (T->nins - REF_BIAS - 1) * sizeof(uint16_t));
   for (ref = T->nk; ref < REF_TRUE; ref++) {
     IRIns *ir = &T->ir[ref];
     if (ir->o == IR_KGC) {
@@ -220,8 +230,8 @@ static void log_GCobj(GCobj *o)
 void lj_auditlog_trace_stop(jit_State *J, GCtrace *T)
 {
   if (ensure_log_started()) {
-    log_jit_State(J);
     log_GCtrace(T);
+    log_jit_State(J);
     log_event("trace_stop", 2);
     str_16("GCtrace");   /* = */ uint_64((uint64_t)T);
     str_16("jit_State"); /* = */ uint_64((uint64_t)J);
