@@ -475,6 +475,7 @@ static int runargs(lua_State *L, char **argv, int argn)
         fprintf(stderr, "unable to open auditlog\n");
         fflush(stderr);
       }
+      break;
     }
     case 'p': {
       const char *filename = argv[i] + 2;
