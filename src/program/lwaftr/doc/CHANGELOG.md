@@ -1,6 +1,6 @@
 # Change Log
 
-## [2018.04.01] (unreleased)
+## [2018.04.01]
 
 ### Features
 
