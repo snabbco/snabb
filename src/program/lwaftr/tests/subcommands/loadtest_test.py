@@ -1,5 +1,5 @@
 """
-Test the "snabb lwaftr loadtest" subcommand. Needs NIC names.
+Test the "snabb loadtest transient" subcommand. Needs NIC names.
 
 Since there are only two NIC names available in snabb-bot, and we need to
 execute two programs networked to each other ("run" and "loadtest"), they
@@ -23,7 +23,7 @@ class TestLoadtest(BaseTestCase):
         '--on-a-stick', SNABB_PCI0,
     )
     loadtest_args = (
-        str(SNABB_CMD), 'lwaftr', 'loadtest',
+        str(SNABB_CMD), 'loadtest', 'transient',
         '--bench-file', '/dev/null',
         # Something quick and easy.
         '--program', 'ramp_up',

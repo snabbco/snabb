@@ -32,6 +32,7 @@ Optional arguments:
                                 Default is "flush".
        -D       <seconds>       Duration in seconds.
        -v                       Verbose (repeat for more verbosity).
+       -t FILE, --trace FILE    File to which to write a trace of incoming RPCs.
 
 Optional arguments for debugging and profiling:
        -jv, -jv=FILE            Print out when traces are recorded

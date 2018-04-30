@@ -10,16 +10,19 @@ local main = require("core.main")
 local PcapReader = require("apps.pcap.pcap").PcapReader
 local lib = require("core.lib")
 local numa = require("lib.numa")
-local promise = require("program.lwaftr.loadtest.promise")
+local promise = require("program.loadtest.promise")
 local lwutil = require("apps.lwaftr.lwutil")
-
-local fatal = lwutil.fatal
 
 local WARM_UP_BIT_RATE = 5e9
 local WARM_UP_TIME = 2
 
+local function fatal (msg)
+   print(msg)
+   main.exit(1)
+end
+
 local function show_usage(code)
-   print(require("program.lwaftr.loadtest.README_inc"))
+   print(require("program.loadtest.transient.README_inc"))
    main.exit(code)
 end
 
@@ -50,36 +53,53 @@ end
 local programs = {}
 
 function programs.ramp_up(tester, opts)
-   local head = promise.new()
-   local tail = head
-   for step = 1, math.ceil(opts.bitrate / opts.step) do
-      tail = tail:and_then(tester.measure,
-                           math.min(opts.bitrate, opts.step * step),
-                           opts.duration,
-                           opts.bench_file,
-                           opts.hydra)
+   local function next(step)
+      if step <= math.ceil(opts.bitrate / opts.step) then
+         return tester.measure(math.min(opts.bitrate, opts.step * step),
+                               opts.duration,
+                               opts.bench_file,
+                               opts.hydra):
+            and_then(next, step + 1)
+      end
    end
-   head:resolve()
-   return tail
+   return next(1)
 end
 
 function programs.ramp_down(tester, opts)
-   local head = promise.new()
-   local tail = head
-   for step = math.ceil(opts.bitrate / opts.step), 1, -1 do
-      tail = tail:and_then(tester.measure,
-                           math.min(opts.bitrate, opts.step * step),
-                           opts.duration,
-                           opts.bench_file,
-                           opts.hydra)
+   local function next(step)
+      if step >= 1 then
+         return tester.measure(math.min(opts.bitrate, opts.step * step),
+                               opts.duration,
+                               opts.bench_file,
+                               opts.hydra):
+            and_then(next, step - 1)
+      end
    end
-   head:resolve()
-   return tail
+   return next(math.ceil(opts.bitrate / opts.step))
 end
 
 function programs.ramp_up_down(tester, opts)
    return programs.ramp_up(tester, opts)
       :and_then(programs.ramp_down, tester, opts)
+end
+
+function programs.constant(tester, opts)
+   local function step()
+      local gbps_bitrate = opts.bitrate/1e9
+      local start_counters = tester.record_counters()
+      local function report()
+         local end_counters = tester.record_counters()
+         tester.print_counter_diff(start_counters, end_counters,
+                                   opts.duration, gbps_bitrate,
+                                   opts.bench_file, opts.hydra_mode)
+      end
+      -- No quiet period; keep the packets going!
+      return tester.generate_load(opts.bitrate, opts.duration):
+         and_then(report):
+         and_then(step)
+   end
+   print(string.format('Applying %f Gbps of load.', opts.bitrate/1e9))
+   return step()
 end
 
 function parse_args(args)
@@ -324,13 +344,11 @@ function run(args)
       return bench_file
    end
 
-   local function run_engine(head, tail)
+   local function run_engine(tail)
       local is_done = false
       local function mark_done() is_done = true end
       tail:and_then(mark_done)
-
       local function done() return is_done end
-      head:resolve()
       engine.main({done=done})
    end
 
@@ -339,7 +357,6 @@ function run(args)
    end
    engine.busywait = true
    local head = promise.new()
-   run_engine(head,
-              head:and_then(tester.warm_up)
+   run_engine(tester.warm_up()
                  :and_then(opts.program, tester, opts))
 end

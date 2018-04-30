@@ -47,4 +47,9 @@ dist: all
 	cd "$(DISTDIR)/.." && tar cJvf "`basename '$(DISTDIR)'`.tar.xz" "`basename '$(DISTDIR)'`"
 	rm -rf "$(DISTDIR)"
 
+docker:
+	docker build -t snabb .
+	@ln -sf ../src/scripts/dock.sh src/snabb
+	@echo "Usage: docker run -ti --rm snabb <program> ..."
+	@echo "or simply call 'src/snabb <program> ...'"
 .SERIAL: all
