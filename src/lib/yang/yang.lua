@@ -53,8 +53,10 @@ function load_configuration(filename, opts)
    end
    local function err(msg, ...) error(err_msg(msg, ...)) end
    local function log(msg, ...)
-      io.stderr:write(err_msg(msg, ...)..'\n')
-      io.stderr:flush()
+      if opts.verbose then
+         io.stderr:write(err_msg(msg, ...)..'\n')
+         io.stderr:flush()
+      end
    end
    local function assert(exp, msg, ...)
       if exp then return exp else err(msg, ...) end

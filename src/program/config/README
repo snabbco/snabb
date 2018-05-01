@@ -4,6 +4,7 @@ Usage:
   snabb config get-state
   snabb config listen
   snabb config load
+  snabb config test
   snabb config remove
   snabb config set
 
