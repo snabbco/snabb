@@ -27,6 +27,7 @@ local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
 local trace = require("lib.ptree.trace")
 local alarms = require("lib.yang.alarms")
+local json_lib = require("lib.ptree.json")
 
 local call_with_output_string = mem.call_with_output_string
 
@@ -538,17 +539,20 @@ local function send_message(socket, msg_str)
 end
 
 function Manager:push_notifications_to_peers()
-   local peers = self.peers
-   local i = 1
    local notifications = alarms.notifications()
-   while i <= #peers do
-      local peer = peers[i]
-      for _, each in ipairs(notifications) do
-         send_message(peer.fd, each)
+   if #notifications > 0 then
+      -- Build notifications message.
+      local output = json_lib.buffered_output()
+      for _,each in ipairs(notifications) do
+         json_lib.write_json_object(output, each)
       end
-      i = i + 1
+      local msg = output:flush()
+      -- Broadcast to peers.
+      for _,peer in ipairs(self.peers) do
+         send_message(peer.fd, msg)
+      end
+      alarms.clear_notifications()
    end
-   alarms.clear_notifications()
 end
 
 function Manager:handle_calls_from_peers()

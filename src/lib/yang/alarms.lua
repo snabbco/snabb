@@ -36,15 +36,14 @@ local state = {
 function notifications ()
    local ret = {}
    local notifications = state.notifications
-   -- TODO: Actually insert notifications.
    for k,v in pairs(notifications.alarm) do
-      table.insert(ret, 'alarm_notification')
+      table.insert(ret, v)
    end
    for k,v in pairs(notifications.alarm_inventory_changed) do
-      table.insert(ret, 'alarm_inventory_changed_notification')
+      table.insert(ret, v)
    end
    for k,v in pairs(notifications.operator_action) do
-      table.insert(ret, 'operator_action_notification')
+      table.insert(ret, v)
    end
    return ret
 end
