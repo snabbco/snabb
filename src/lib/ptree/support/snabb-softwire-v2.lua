@@ -5,13 +5,14 @@ local app = require('core.app')
 local corelib = require('core.lib')
 local equal = require('core.lib').equal
 local dirname = require('core.lib').dirname
+local mem = require('lib.stream.mem')
+local ipv6 = require('lib.protocol.ipv6')
+local ctable = require('lib.ctable')
+local cltable = require('lib.cltable')
 local data = require('lib.yang.data')
 local state = require('lib.yang.state')
 local ipv4_ntop = require('lib.yang.util').ipv4_ntop
-local ipv6 = require('lib.protocol.ipv6')
 local yang = require('lib.yang.yang')
-local ctable = require('lib.ctable')
-local cltable = require('lib.cltable')
 local path_mod = require('lib.yang.path')
 local path_data = require('lib.yang.path_data')
 local generic = require('lib.ptree.support').generic_schema_config_support
@@ -252,7 +253,7 @@ end
 local function serialize_binding_table(bt)
    local _, grammar = snabb_softwire_getter('/softwire-config/binding-table')
    local printer = data.data_printer_from_grammar(grammar)
-   return printer(bt, yang.string_io_file())
+   return mem.call_with_output_string(printer, bt)
 end
 
 local uint64_ptr_t = ffi.typeof('uint64_t*')

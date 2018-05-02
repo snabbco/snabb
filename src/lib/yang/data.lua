@@ -2,6 +2,7 @@
 -- COPYING.
 module(..., package.seeall)
 
+local mem = require("lib.stream.mem")
 local parser_mod = require("lib.yang.parser")
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
@@ -1309,7 +1310,7 @@ function selftest()
    assert(parse_uint32('1') == 1)
    assert(parse_uint32('"1"') == 1)
    assert(parse_uint32('    "1"   \n  ') == 1)
-   assert(print_uint32(1, util.string_io_file()) == '1')
+   assert(mem.call_with_output_string(print_uint32, 1) == '1')
 
    -- Verify that lists can lack keys when "config false;" is set.
    local list_wo_key_config_false = [[module config-false-schema {

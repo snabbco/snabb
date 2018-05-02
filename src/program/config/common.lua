@@ -5,6 +5,7 @@ local S = require("syscall")
 local ffi = require("ffi")
 local lib = require("core.lib")
 local shm = require("core.shm")
+local mem = require("lib.stream.mem")
 local rpc = require("lib.yang.rpc")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
@@ -147,7 +148,7 @@ end
 
 function serialize_data(data, schema_name, path, is_config)
    local printer = data_serializer(schema_name, path, is_config)
-   return printer(data, yang.string_io_file())
+   return mem.call_with_output_string(printer, data)
 end
 
 function serialize_config(config, schema_name, path)

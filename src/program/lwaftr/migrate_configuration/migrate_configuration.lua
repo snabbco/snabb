@@ -6,6 +6,7 @@ local ipv4 = require("lib.protocol.ipv4")
 local rangemap = require("apps.lwaftr.rangemap")
 local ctable = require("lib.ctable")
 local cltable = require('lib.cltable')
+local mem = require('lib.stream.mem')
 local util = require('lib.yang.util')
 local yang = require('lib.yang.yang')
 local binding_table = require("apps.lwaftr.binding_table")
@@ -272,15 +273,8 @@ local function config_to_string(schema, conf)
    if type(schema) == "string" then
       schema = yang.load_schema_by_name(schema)
    end
-   -- To keep memory usage as low as possible write it out to a temp file.
-   local memfile = util.string_io_file()
-   yang.print_config_for_schema(schema, conf, memfile)
-   conf = memfile:flush()
-
-   -- Do best to remove things manually which take a lot of memory
-   memfile:clear()
-   memfile = nil
-   return conf
+   return mem.call_with_output_string(
+      yang.print_config_for_schema, schema, conf)
 end
 
 

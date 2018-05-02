@@ -13,6 +13,7 @@ local worker = require("core.worker")
 local cltable = require("lib.cltable")
 local cpuset = require("lib.cpuset")
 local scheduling = require("lib.scheduling")
+local mem = require("lib.stream.mem")
 local yang = require("lib.yang.yang")
 local util = require("lib.yang.util")
 local schema = require("lib.yang.schema")
@@ -26,6 +27,8 @@ local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
 local trace = require("lib.ptree.trace")
 local alarms = require("lib.yang.alarms")
+
+local call_with_output_string = mem.call_with_output_string
 
 local Manager = {}
 
@@ -87,8 +90,8 @@ function new_manager (conf)
       -- Start trace with initial configuration.
       local p = path_data.printer_for_schema_by_name(
          ret.schema_name, "/", true, "yang", false)
-      local conf_str = p(conf.initial_configuration, yang.string_io_file())
-      ret.trace:record('set-config', {schema=ret.schema_name, config=conf_str})
+      local str = call_with_output_string(p, conf.initial_configuration)
+      ret.trace:record('set-config', {schema=ret.schema_name, config=str})
    end
 
    ret.rpc_callee = rpc.prepare_callee('snabb-config-leader-v1')
@@ -280,8 +283,8 @@ function Manager:rpc_get_config (args)
       end
       local printer = path_data.printer_for_schema_by_name(
          args.schema, args.path, true, args.format, args.print_default)
-      local config = printer(self.current_configuration, yang.string_io_file())
-      return { config = config }
+      local str = call_with_output_string(printer, self.current_configuration)
+      return { config = str }
    end
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end
@@ -398,8 +401,7 @@ function Manager:foreign_rpc_get_config (schema_name, path, format,
    local foreign_config = translate.get_config(self.current_configuration)
    local printer = path_data.printer_for_schema_by_name(
       schema_name, path, true, format, print_default)
-   local config = printer(foreign_config, yang.string_io_file())
-   return { config = config }
+   return { config = call_with_output_string(printer, foreign_config) }
 end
 function Manager:foreign_rpc_get_state (schema_name, path, format,
                                        print_default)
@@ -408,8 +410,7 @@ function Manager:foreign_rpc_get_state (schema_name, path, format,
    local foreign_state = translate.get_state(self:get_native_state())
    local printer = path_data.printer_for_schema_by_name(
       schema_name, path, false, format, print_default)
-   local state = printer(foreign_state, yang.string_io_file())
-   return { state = state }
+   return { state = call_with_output_string(printer, foreign_state) }
 end
 function Manager:foreign_rpc_set_config (schema_name, path, config_str)
    path = path_mod.normalize_path(path)
@@ -500,7 +501,7 @@ function Manager:rpc_get_state (args)
       local state = self:get_native_state()
       local printer = path_data.printer_for_schema_by_name(
          self.schema_name, args.path, false, args.format, args.print_default)
-      return { state = printer(state, yang.string_io_file()) }
+      return { state = call_with_output_string(printer, state) }
    end
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end
@@ -514,8 +515,7 @@ function Manager:rpc_get_alarms_state (args)
       local state = {
          alarms = alarms.get_state()
       }
-      state = printer(state, yang.string_io_file())
-      return { state = state }
+      return { state = call_with_output_string(printer, state) }
    end
    local success, response = pcall(getter)
    if success then return response else return {status=1, error=response} end

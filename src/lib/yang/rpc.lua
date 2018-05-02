@@ -4,7 +4,7 @@ module(..., package.seeall)
 
 local schema = require("lib.yang.schema")
 local data = require("lib.yang.data")
-local util = require("lib.yang.util")
+local mem = require("lib.stream.mem")
 
 function prepare_callee(schema_name)
    local schema = schema.load_schema_by_name(schema_name)
@@ -23,7 +23,7 @@ function prepare_caller(schema_name)
 end
 
 function prepare_calls(caller, calls)
-   local str = caller.print_input(calls, util.string_io_file())
+   local str = mem.call_with_output_string(caller.print_input, calls)
    local function parse_responses(str)
       local responses = caller.parse_output(str)
       assert(#responses == #calls)
@@ -49,7 +49,7 @@ function handle_calls(callee, str, handle)
       table.insert(responses,
                    { id=call.id, data=handle(call.id, call.data) })
    end
-   return callee.print_output(responses, util.string_io_file())
+   return mem.call_with_output_string(callee.print_output, responses)
 end
 
 function dispatch_handler(obj, prefix, trace)
