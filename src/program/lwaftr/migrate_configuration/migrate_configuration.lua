@@ -8,7 +8,6 @@ local ctable = require("lib.ctable")
 local cltable = require('lib.cltable')
 local util = require('lib.yang.util')
 local yang = require('lib.yang.yang')
-local stream = require('lib.yang.stream')
 local binding_table = require("apps.lwaftr.binding_table")
 local Parser = require("program.lwaftr.migrate_configuration.conf_parser").Parser
 local data = require('lib.yang.data')
@@ -264,9 +263,8 @@ local function parse_binding_table(parser)
             softwires = softwires }
 end
 
-function load_binding_table(file)
-   local source = stream.open_input_byte_stream(file)
-   return parse_binding_table(Parser.new(source:as_text_stream()))
+function load_binding_table(filename)
+   return parse_binding_table(Parser.new(filename))
 end
 
 
