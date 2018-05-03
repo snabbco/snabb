@@ -187,7 +187,7 @@ function call_leader(instance_id, method, args)
    local caller = rpc.prepare_caller('snabb-config-leader-v1')
    local socket = open_socket_or_die(instance_id)
    -- FIXME: stream call and response.
-   local msg, parse_reply = rpc.prepare_call(caller, method, args, out)
+   local msg, parse_reply = rpc.prepare_call(caller, method, args)
    send_message(socket, msg)
    local reply = recv_message(socket)
    socket:close()
