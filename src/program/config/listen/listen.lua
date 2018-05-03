@@ -18,7 +18,7 @@ local function open_socket(file)
    local sa = S.t.sockaddr_un(file)
    assert(socket:bind(sa))
    assert(socket:listen())
-   return file.fdopen(socket, 'rdwr')
+   return socket
 end
 
 local function validate_config(schema_name, revision_date, path, value_str)
