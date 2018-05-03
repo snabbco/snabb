@@ -327,7 +327,7 @@ class TestConfigListen(BaseTestCase):
             stderr = listen_daemon.stderr.read().decode(ENC)
             self.fail("\n".join((
                 "Failed to run 'snabb listen'",
-                "Command:", " ".join(daemon_args),
+                "Command:", " ".join(self.daemon_args),
                 "STDOUT", stdout,
                 "STDOUT", stderr,
             )))
