@@ -2,6 +2,7 @@
 module(..., package.seeall)
 
 local lib = require("core.lib")
+local mem = require("lib.stream.mem")
 local parser = require("lib.yang.parser")
 local util = require("lib.yang.util")
 
@@ -918,10 +919,10 @@ local function primitivize(schema)
 end
 
 function parse_schema(src, filename)
-   return schema_from_ast(parser.parse(src, filename))
+   return schema_from_ast(parser.parse(mem.open_input_string(src, filename)))
 end
 function parse_schema_file(filename)
-   return schema_from_ast(parser.parse_file(filename))
+   return schema_from_ast(parser.parse(assert(file.open(filename))))
 end
 
 function load_schema(src, filename)

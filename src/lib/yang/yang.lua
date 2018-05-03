@@ -115,12 +115,8 @@ function load_configuration(filename, opts)
    end
 
    -- Load and compile it.
-   local source_str = source:read_all_chars()
-   source:close()
    log('loading source configuration')
-   local conf = load_config_for_schema_by_name(opts.schema_name, source_str,
-                                               filename)
-
+   local conf = load_config_for_schema_by_name(opts.schema_name, source)
    if use_compiled_cache then
       -- Save it, if we can.
       local success, err = pcall(binary.compile_config_for_schema_by_name,

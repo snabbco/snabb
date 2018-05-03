@@ -640,8 +640,8 @@ function data_parser_from_grammar(production)
    function top_parsers.struct(production)
       local struct_t = production.ctype and typeof(production.ctype)
       local members = visitn(production.members)
-      return function(str, filename)
-         local P = parser_mod.Parser.new(str, filename)
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
          local ret = {}
          for k,sub in pairs(members) do ret[normalize_id(k)] = sub.init() end
          while true do
@@ -662,8 +662,8 @@ function data_parser_from_grammar(production)
    end
    function top_parsers.sequence(production)
       local members = visitn(production.members)
-      return function(str, filename)
-         local P = parser_mod.Parser.new(str, filename)
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
          local ret = {}
          while true do
             P:skip_whitespace()
@@ -679,8 +679,8 @@ function data_parser_from_grammar(production)
    end
    function top_parsers.array(production)
       local parser = visit1('[bare array]', production)
-      return function(str, filename)
-         local P = parser_mod.Parser.new(str, filename)
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
          local out = parser.init()
          while true do
             P:skip_whitespace()
@@ -692,8 +692,8 @@ function data_parser_from_grammar(production)
    end
    function top_parsers.table(production)
       local parser = visit1('[bare table]', production)
-      return function(str, filename)
-         local P = parser_mod.Parser.new(str, filename)
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
          local out = parser.init()
          while true do
             P:skip_whitespace()
@@ -726,29 +726,29 @@ function state_parser_from_schema(schema)
    return data_parser_from_schema(schema, false)
 end
 
-function load_data_for_schema(schema, str, filename, is_config)
-   return data_parser_from_schema(schema, is_config)(str, filename)
+function load_data_for_schema(schema, stream, is_config)
+   return data_parser_from_schema(schema, is_config)(stream)
 end
 
-function load_config_for_schema(schema, str, filename)
-   return load_data_for_schema(schema, str, filename, true)
+function load_config_for_schema(schema, stream)
+   return load_data_for_schema(schema, stream, true)
 end
 
-function load_state_for_schema(schema, str, filename)
-   return load_data_for_schema(schema, str, filename, false)
+function load_state_for_schema(schema, stream)
+   return load_data_for_schema(schema, stream, false)
 end
 
-function load_data_for_schema_by_name(schema_name, str, filename, is_config)
+function load_data_for_schema_by_name(schema_name, stream, is_config)
    local schema = schema.load_schema_by_name(schema_name)
-   return load_data_for_schema(schema, str, filename, is_config)
+   return load_data_for_schema(schema, stream, is_config)
 end
 
-function load_config_for_schema_by_name(schema_name, str, filename)
-   return load_data_for_schema_by_name(schema_name, str, filename, true)
+function load_config_for_schema_by_name(schema_name, stream)
+   return load_data_for_schema_by_name(schema_name, stream, true)
 end
 
-function load_state_for_schema_by_name(schema_name, str, filename)
-   return load_data_for_schema_by_name(schema_name, str, filename, false)
+function load_state_for_schema_by_name(schema_name, stream)
+   return load_data_for_schema_by_name(schema_name, stream, false)
 end
 
 function rpc_input_parser_from_schema(schema)
@@ -1274,7 +1274,8 @@ function selftest()
       }
    }]])
 
-   local data = load_config_for_schema(test_schema, [[
+   local data = load_config_for_schema(test_schema,
+                                       mem.open_input_string [[
      fruit-bowl {
        description 'ohai';
        contents { name foo; score 7; }
@@ -1294,14 +1295,10 @@ function selftest()
       assert(contents.baz.tree_grown == true)
       assert(data.addr == util.ipv4_pton('1.2.3.4'))
 
-      local tmp = os.tmpname()
-      local file = io.open(tmp, 'w')
-      print_config_for_schema(test_schema, data, file)
-      file:close()
-      local file = io.open(tmp, 'r')
-      data = load_config_for_schema(test_schema, file:read('*a'), tmp)
-      file:close()
-      os.remove(tmp)
+      local stream = mem.tmpfile()
+      print_config_for_schema(test_schema, data, stream)
+      stream:seek('set', 0)
+      data = load_config_for_schema(test_schema, stream)
    end
    local scalar_uint32 =
       { type='scalar', argument_type={primitive_type='uint32'} }
@@ -1327,7 +1324,8 @@ function selftest()
       }
    }]]
    local keyless_schema = schema.load_schema(list_wo_key_config_false)
-   local keyless_list_data = load_state_for_schema(keyless_schema, [[
+   local keyless_list_data = load_state_for_schema(keyless_schema,
+                                                   mem.open_input_string [[
    test {
       node {
          name "hello";
@@ -1345,7 +1343,8 @@ function selftest()
       }
    }]]
    local loaded_schema = schema.load_schema(test_schema)
-   local object = load_config_for_schema(loaded_schema, [[
+   local object = load_config_for_schema(loaded_schema,
+                                         mem.open_input_string [[
       summary {
          shelves-active;
       }
@@ -1371,7 +1370,8 @@ function selftest()
          }
       }
    }]])
-   local choice_data = load_config_for_schema(choice_schema, [[
+   local choice_data = load_config_for_schema(choice_schema,
+                                              mem.open_input_string [[
       boat {
          name "Boaty McBoatFace";
          country-name "United Kingdom";
@@ -1385,7 +1385,8 @@ function selftest()
    assert(choice_data.boat["Vasa"].country_code == "SE")
 
    -- Test mandatory true on choice statement. (should fail)
-   local success, err = pcall(load_config_for_schema, choice_schema, [[
+   local success, err = pcall(load_config_for_schema, choice_schema,
+                              mem.open_input_string [[
       boat {
          name "Boaty McBoatFace";
       }
@@ -1412,7 +1413,8 @@ function selftest()
       }
    }]])
 
-   local choice_data_with_default = load_config_for_schema(choice_default_schema, [[
+   local choice_data_with_default = load_config_for_schema(choice_default_schema,
+                                                           mem.open_input_string [[
       boat {
          name "Kronan";
       }
@@ -1420,7 +1422,8 @@ function selftest()
    assert(choice_data_with_default.boat["Kronan"].country_code == "SE")
 
    -- Check that we can't specify both of the choice fields. (should fail)
-   local success, err = pcall(load_config_for_schema, choice_schema, [[
+   local success, err = pcall(load_config_for_schema, choice_schema,
+                              mem.open_input_string [[
       boat {
          name "Boaty McBoatFace";
          country-name "United Kingdom";

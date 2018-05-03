@@ -3,6 +3,7 @@ module(..., package.seeall)
 
 local S = require("syscall")
 local ffi = require("ffi")
+local mem = require("lib.stream.mem")
 local rpc = require("lib.yang.rpc")
 local data = require("lib.yang.data")
 local path_lib = require("lib.yang.path")
@@ -21,7 +22,7 @@ end
 
 local function validate_config(schema_name, revision_date, path, value_str)
    local parser = common.config_parser(schema_name, path)
-   local value = parser(value_str)
+   local value = parser(mem.open_input_string(value_str))
    return common.serialize_config(value, schema_name, path)
 end
 

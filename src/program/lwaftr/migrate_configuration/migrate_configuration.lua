@@ -463,7 +463,8 @@ local function multiprocess_migration(src, conf_file)
    -- Extract the grammar, load the config and find the key
    local hybridgmr = data.config_grammar_from_schema(hybridscm)
    local instgmr = hybridgmr.members["softwire-config"].members.instance
-   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
+   local conf = yang.load_config_for_schema(
+      hybridscm, mem.open_input_string(src, conf_file))
    local queue_key = ffi.typeof(instgmr.values.queue.key_ctype)
    local global_external_if = conf.softwire_config.external_interface
    local global_internal_if = conf.softwire_config.internal_interface
@@ -546,7 +547,8 @@ local function v2_migration(src, conf_file)
    -- Remove the mandatory requirement on softwire.br-address for the migration
    binding_table.body["softwire"].body["br-address"].mandatory = false
 
-   local conf = yang.load_config_for_schema(hybridscm, src, conf_file)
+   local conf = yang.load_config_for_schema(
+      hybridscm, mem.open_input_string(src, conf_file))
 
    -- Remove the br-address leaf-list and add it onto the softwire.
    conf = remove_address_list(conf)
@@ -576,8 +578,8 @@ end
 
 local function migrate_3_0_1bis(conf_file, src)
    return increment_br(
-      yang.load_config_for_schema_by_name('snabb-softwire-v1', src, conf_file)
-   )
+      yang.load_config_for_schema_by_name(
+         'snabb-softwire-v1', mem.open_input_string(src, conf_file)))
 end
 
 local function migrate_3_2_0(conf_file, src)

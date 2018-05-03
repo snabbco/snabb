@@ -561,7 +561,9 @@ function selftest()
          }
       }
    }]])
-   local data = data.load_config_for_schema(test_schema, [[
+   local mem = require('lib.stream.mem')
+   local data = data.load_config_for_schema(test_schema,
+                                            mem.open_input_string [[
       is-active true;
       integers 1;
       integers 2;
