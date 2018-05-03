@@ -5,6 +5,7 @@ module(...,package.seeall)
 local app = require("core.app")
 local app_graph_mod = require("core.config")
 local path_mod = require("lib.yang.path")
+local path_data = require("lib.yang.path_data")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local cltable = require("lib.cltable")
@@ -78,9 +79,9 @@ local function compute_objects_maybe_updated_in_place (schema_name, config,
    for _,path in ipairs(compute_parent_paths(changed_path)) do
       -- Calling the getter is avg O(N) in depth, so that makes the
       -- loop O(N^2), though it is generally bounded at a shallow
-      -- level so perhaps it's OK.  path_mod.resolver is O(N) too but
+      -- level so perhaps it's OK.  path_data.resolver is O(N) too but
       -- memoization makes it O(1).
-      getter, subgrammar = path_mod.resolver(grammar, path)
+      getter, subgrammar = path_data.resolver(grammar, path)
       -- Scalars can't be updated in place.
       if subgrammar.type == 'scalar' then return objs end
       table.insert(objs, getter(config))

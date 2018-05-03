@@ -6,8 +6,8 @@ local ffi = require("ffi")
 local rpc = require("lib.yang.rpc")
 local data = require("lib.yang.data")
 local path_lib = require("lib.yang.path")
+local json_lib = require("lib.ptree.json")
 local common = require("program.config.common")
-local json_lib = require("program.config.json")
 
 local function open_socket(file)
    S.signal('pipe', 'ign')
@@ -55,8 +55,10 @@ end
 
 local function read_request(client, schema_name, revision_date)
    local json = json_lib.read_json_object(client)
-   local id, verb, path = assert(json.id), assert(json.verb), assert(json.path)
+   local id, verb, path = assert(json.id), assert(json.verb), json.path or '/'
    path = path_lib.normalize_path(path)
+   if json.schema then schema_name = json.schema end
+   if json.revision then revision_date = json.revision end
    local handler = assert(request_handlers[data.normalize_id(verb)])
    local req = handler(schema_name, revision_date, path, json.value)
    local function print_reply(reply, fd)

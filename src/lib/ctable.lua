@@ -7,7 +7,7 @@ local lib = require("core.lib")
 local binary_search = require("lib.binary_search")
 local multi_copy = require("lib.multi_copy")
 local siphash = require("lib.hash.siphash")
-local max, floor, ceil = math.max, math.floor, math.ceil
+local min, max, floor, ceil = math.min, math.max, math.floor, math.ceil
 
 CTable = {}
 LookupStreamer = {}
@@ -154,6 +154,7 @@ end
 local try_huge_pages = true
 local huge_page_threshold = 1e6
 local function calloc(t, count)
+   if count == 0 then return 0, 0 end
    local byte_size = ffi.sizeof(t) * count
    local mem, err
    if try_huge_pages and byte_size > huge_page_threshold then
@@ -204,6 +205,7 @@ end
 
 function CTable:resize(size)
    assert(size >= (self.occupancy / self.max_occupancy_rate))
+   assert(size == floor(size))
    local old_entries = self.entries
    local old_size = self.size
    local old_max_displacement = self.max_displacement
@@ -280,7 +282,7 @@ function CTable:add(key, value, updates_allowed)
    if self.occupancy + 1 > self.occupancy_hi then
       -- Note that resizing will invalidate all hash keys, so we need
       -- to hash the key after resizing.
-      self:resize(self.size * 2)
+      self:resize(max(self.size * 2, 1)) -- Could be current size is 0.
    end
 
    local hash = self.hash_fn(key)
@@ -402,7 +404,7 @@ function CTable:remove_ptr(entry)
    end
 
    if self.occupancy < self.occupancy_lo then
-      self:resize(self.size / 2)
+      self:resize(max(ceil(self.size / 2), 1))
    end
 end
 
@@ -589,7 +591,7 @@ function CTable:next_entry(offset, limit)
    elseif limit == nil then
       limit = self.size + self.max_displacement
    else
-      limit = math.min(limit, self.size + self.max_displacement)
+      limit = min(limit, self.size + self.max_displacement)
    end
    for offset=offset, limit-1 do
       if self.entries[offset].hash ~= HASH_MAX then
@@ -612,7 +614,6 @@ function selftest()
       initial_size = ceil(occupancy / 0.4)
    }
    local ctab = new(params)
-   ctab:resize(occupancy / 0.4 + 1)
 
    -- Fill with {i} -> { bnot(i), ... }.
    local k = ffi.new('uint32_t[1]');
@@ -707,7 +708,7 @@ function selftest()
    repeat
       local streamer = ctab:make_lookup_streamer(width)
       for i = 1, occupancy, width do
-         local n = math.min(width, occupancy-i+1)
+         local n = min(width, occupancy-i+1)
          for j = 0, n-1 do
             streamer.entries[j].key[0] = i + j
          end

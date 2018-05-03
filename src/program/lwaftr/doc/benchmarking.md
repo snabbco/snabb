@@ -26,7 +26,7 @@ NIC.
 In the other server, run the `loadtest` command:
 
 ```
-$ sudo numactl -m 0 taskset -c 1 ./snabb lwaftr loadtest -D 1 -b 10e9 -s 0.2e9 \
+$ sudo numactl -m 0 taskset -c 1 ./snabb loadtest transient -D 1 -b 10e9 -s 0.2e9 \
     program/lwaftr/tests/benchdata/ipv4-0550.pcap "NIC 0" "NIC 1" 02:00.0 \
     program/lwaftr/tests/benchdata/ipv6-0550.pcap "NIC 1" "NIC 0" 02:00.1
 ```

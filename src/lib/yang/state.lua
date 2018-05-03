@@ -3,7 +3,6 @@ module(..., package.seeall)
 
 local lib = require("core.lib")
 local shm = require("core.shm")
-local xpath = require("lib.yang.path")
 local yang = require("lib.yang.yang")
 local data = require("lib.yang.data")
 local util = require("lib.yang.util")
