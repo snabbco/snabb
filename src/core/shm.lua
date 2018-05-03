@@ -74,6 +74,10 @@ function resolve (name)
    return result
 end
 
+function path (name)
+   return root..'/'..resolve(name)
+end
+
 -- Make the named subdirectory in the shm folder.
 function mkdir (name)
    -- Create root with mode "rwxr-xr-x" if it does not exist yet.

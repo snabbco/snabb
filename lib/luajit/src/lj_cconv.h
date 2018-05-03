@@ -9,7 +9,6 @@
 #include "lj_obj.h"
 #include "lj_ctype.h"
 
-#if LJ_HASFFI
 
 /* Compressed C type index. ORDER CCX. */
 enum {
@@ -28,11 +27,7 @@ static LJ_AINLINE uint32_t cconv_idx(CTInfo info)
 {
   uint32_t idx = ((info >> 26) & 15u);  /* Dispatch bits. */
   lua_assert(ctype_type(info) <= CT_MAYCONVERT);
-#if LJ_64
   idx = ((uint32_t)(U64x(f436fff5,fff7f021) >> 4*idx) & 15u);
-#else
-  idx = (((idx < 8 ? 0xfff7f021u : 0xf436fff5) >> 4*(idx & 7u)) & 15u);
-#endif
   lua_assert(idx < 8);
   return idx;
 }
@@ -65,6 +60,5 @@ LJ_FUNC int lj_cconv_multi_init(CTState *cts, CType *d, TValue *o);
 LJ_FUNC void lj_cconv_ct_init(CTState *cts, CType *d, CTSize sz,
 			      uint8_t *dp, TValue *o, MSize len);
 
-#endif
 
 #endif

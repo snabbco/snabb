@@ -33,11 +33,6 @@ Optional arguments:
        -n NAME, --name NAME     Sets the name as the identifier of this program.
                                 This must be unique amongst other snab programs.
 
-Optional arguments for debugging and profiling:
-       -jv, -jv=FILE            Print out when traces are recorded
-       -jp, -jp=MODE,FILE       Profile the system by method
-       -jtprof                  Profile the system by trace
-
 When the -v option is used at least once, packets on the network interfaces are
 counted and recorded, and the corresponding incoming and outgoing packet rates
 are written to stdout in CSV format, suitable for passing to a graphing program.

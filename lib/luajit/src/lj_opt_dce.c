@@ -8,7 +8,6 @@
 
 #include "lj_obj.h"
 
-#if LJ_HASJIT
 
 #include "lj_ir.h"
 #include "lj_jit.h"
@@ -75,4 +74,3 @@ void lj_opt_dce(jit_State *J)
 
 #undef IR
 
-#endif
