@@ -78,6 +78,7 @@ function new_manager (conf)
    ret.default_schema = conf.default_schema or conf.schema_name
    ret.support = support.load_schema_config_support(conf.schema_name)
    ret.peers = {}
+   ret.notification_peers = {}
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
    ret.worker_default_scheduling = conf.worker_default_scheduling
@@ -496,6 +497,29 @@ function Manager:rpc_attach_listener (args)
    if success then return response else return {status=1, error=response} end
 end
 
+function Manager:add_notification_peer (peer)
+   local i, peers = 1, self.peers
+   while i <= #peers do
+      if peers[i] == peer then break end
+      i = i + 1
+   end
+   if i <= #peers then
+      table.insert(self.notification_peers, peer)
+      table.remove(self.peers, i)
+   end
+end
+
+function Manager:rpc_attach_notification_listener (args)
+   local function attacher()
+      if self.listen_peer ~= nil then error('Listener already attached') end
+      self.listen_peer = self.rpc_peer
+      self:add_notification_peer(self.listen_peer)
+      return {}
+   end
+   local success, response = pcall(attacher)
+   if success then return response else return {status=1, error=response} end
+end
+
 function Manager:rpc_get_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
@@ -547,8 +571,8 @@ function Manager:push_notifications_to_peers()
          json_lib.write_json_object(output, each)
       end
       local msg = output:flush()
-      -- Broadcast to peers.
-      for _,peer in ipairs(self.peers) do
+      -- Broadcast to notification peers.
+      for _,peer in ipairs(self.notification_peers) do
          send_message(peer.fd, msg)
       end
       alarms.clear_notifications()
