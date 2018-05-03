@@ -7,14 +7,19 @@ local interlink = require("lib.interlink")
 
 local Receiver = {name="apps.interlink.Receiver"}
 
-function Receiver:new (_, name)
+function Receiver:new ()
    packet.enable_group_freelist()
-   local self = {}
-   self.shm_name = "group/interlink/"..name..".interlink"
-   self.backlink = "interlink/receiver/"..name..".interlink"
-   self.interlink = interlink.attach_receiver(self.shm_name)
-   shm.alias(self.backlink, self.shm_name)
-   return setmetatable(self, {__index=Receiver})
+   return setmetatable({attached=false}, {__index=Receiver})
+end
+
+function Receiver:link ()
+   if not self.attached then
+      self.shm_name = "group/interlink/"..self.appname..".interlink"
+      self.backlink = "interlink/receiver/"..self.appname..".interlink"
+      self.interlink = interlink.attach_receiver(self.shm_name)
+      shm.alias(self.backlink, self.shm_name)
+      self.attached = true
+   end
 end
 
 function Receiver:pull ()
@@ -28,8 +33,10 @@ function Receiver:pull ()
 end
 
 function Receiver:stop ()
-   interlink.detach_receiver(self.interlink, self.shm_name)
-   shm.unlink(self.backlink)
+   if self.attached then
+      interlink.detach_receiver(self.interlink, self.shm_name)
+      shm.unlink(self.backlink)
+   end
 end
 
 -- Detach receivers to prevent leaking interlinks opened by pid.
