@@ -271,7 +271,7 @@ end
 
 function Stream:read_line(eol_style) -- 'discard' or 'keep'
    local head = {}
-   local add_lf = assert(({discard=0, keep=1})[eol_style])
+   local add_lf = assert(({discard=0, keep=1})[eol_style or 'discard'])
    while true do
       if self.rx:is_empty() then
          if self:fill_rx_buffer() == 0 then
