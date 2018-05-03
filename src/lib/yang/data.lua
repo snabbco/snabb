@@ -705,8 +705,13 @@ function data_parser_from_grammar(production)
    end
    function top_parsers.scalar(production)
       local parse = value_parser(production.argument_type)
-      return function(str, filename)
-         return parse(parser_mod.parse_string(str, filename), '[bare scalar]')
+      return function(stream)
+         local P = parser_mod.Parser.new(stream)
+         P:skip_whitespace()
+         local str = P:parse_string()
+         P:skip_whitespace()
+         if not P:is_eof() then P:error("Not end of file") end
+         return parse(str, '[bare scalar]')
       end
    end
    return assert(top_parsers[production.type])(production)
@@ -1304,9 +1309,9 @@ function selftest()
       { type='scalar', argument_type={primitive_type='uint32'} }
    local parse_uint32 = data_parser_from_grammar(scalar_uint32)
    local print_uint32 = data_printer_from_grammar(scalar_uint32)
-   assert(parse_uint32('1') == 1)
-   assert(parse_uint32('"1"') == 1)
-   assert(parse_uint32('    "1"   \n  ') == 1)
+   assert(parse_uint32(mem.open_input_string('1')) == 1)
+   assert(parse_uint32(mem.open_input_string('"1"')) == 1)
+   assert(parse_uint32(mem.open_input_string('    "1"   \n  ')) == 1)
    assert(mem.call_with_output_string(print_uint32, 1) == '1')
 
    -- Verify that lists can lack keys when "config false;" is set.
