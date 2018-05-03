@@ -431,6 +431,7 @@ remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
 
 function selftest()
    print("selftest: lib.yang.path_data")
+   local mem = require('lib.stream.mem')
    local schema_src = [[module snabb-simple-router {
       namespace snabb:simple-router;
       prefix simple-router;
@@ -452,7 +453,7 @@ function selftest()
    local grammar = data.config_grammar_from_schema(scm)
 
    -- Test resolving a key to a path.
-   local data_src = [[
+   local data_src = mem.open_input_string [[
       active true;
 
       blocked-ips 8.8.8.8;
@@ -496,7 +497,7 @@ function selftest()
             }
          }
       }}]]
-   local fruit_data_src = [[
+   local fruit_data_src = mem.open_input_string [[
       bowl {
          fruit { name "banana"; rating 10; }
          fruit { name "pear"; rating 2; }

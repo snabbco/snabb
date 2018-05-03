@@ -5,16 +5,16 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local lib = require("core.lib")
 local shm = require("core.shm")
+local file = require("lib.stream.file")
 local schema = require("lib.yang.schema")
 local util = require("lib.yang.util")
 local value = require("lib.yang.value")
-local stream = require("lib.yang.stream")
 local data = require('lib.yang.data')
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
-local VERSION = 0x00008000
+local VERSION = 0x00009000
 
 local header_t = ffi.typeof([[
 struct {
@@ -30,6 +30,7 @@ struct {
    uint32_t strtab_len;
 }
 ]])
+local uint32_t = ffi.typeof('uint32_t')
 
 -- A string table is written out as a uint32 count, followed by that
 -- many offsets indicating where the Nth string ends, followed by the
@@ -47,35 +48,34 @@ local function string_table_builder()
    function strtab:emit(stream)
       local by_index = {}
       for str, idx in pairs(strings) do by_index[idx] = str end
-      stream:align(4)
-      local strtab_start = stream.written
-      stream:write_uint32(count)
+      local strtab_start = assert(stream:seek())
+      stream:write_scalar(uint32_t, count)
       local str_end = 0
       for i=0,count-1 do
          str_end = str_end + by_index[i]:len()
-         stream:write_uint32(str_end)
+         stream:write_scalar(uint32_t, str_end)
       end
       for i=0,count-1 do
          str_end = str_end + by_index[i]:len()
-         stream:write(by_index[i], by_index[i]:len())
+         stream:write_bytes(by_index[i], by_index[i]:len())
       end
-      return strtab_start, stream.written - strtab_start
+      return strtab_start, assert(stream:seek()) - strtab_start
    end
    return strtab
 end
 
 local function read_string_table(stream, strtab_len)
    assert(strtab_len >= 4)
-   local count = stream:read_uint32()
+   local count = stream:read_scalar(nil, uint32_t)
    assert(strtab_len >= (4 * (count + 1)))
-   local offsets = stream:read_array(ffi.typeof('uint32_t'), count)
+   local offsets = stream:read_array(nil, ffi.typeof('uint32_t'), count)
    assert(strtab_len == (4 * (count + 1)) + offsets[count-1])
    local strings = {}
    local offset = 0
    for i=0,count-1 do
       local len = offsets[i] - offset
       assert(len >= 0)
-      strings[i] = ffi.string(stream:read(len), len)
+      strings[i] = stream:read_chars(len)
       offset = offset + len
    end
    return strings
@@ -90,7 +90,7 @@ local function value_emitter(ctype)
    local buf = ffi.typeof('$[1]', type)()
    local function emit(val, stream)
       buf[0] = val
-      stream:write_ptr(buf, type)
+      stream:write_array(type, buf, 1)
    end
    value_emitters[ctype] = emit
    return emit
@@ -144,11 +144,11 @@ local function data_emitter(production)
       for k,_ in pairs(production.members) do table.insert(member_names, k) end
       table.sort(member_names)
       if production.ctype then
-         local typeof = data.typeof
+         local data_t = data.typeof(production.ctype)
          return function(data, stream)
-            stream:write_stringref('cdata')
+            stream:write_stringref('cstruct')
             stream:write_stringref(production.ctype)
-            stream:write_ptr(data, typeof(production.ctype))
+            stream:write_struct(data_t, data)
          end
       else
          local emit_member = visitn(production.members)
@@ -162,7 +162,7 @@ local function data_emitter(production)
                   table.insert(out, {id, emit_member[k], data[id]})
                end
             end
-            stream:write_uint32(#out)
+            stream:write_scalar(uint32_t, #out)
             for _,elt in ipairs(out) do
                local id, emit, data = unpack(elt)
                stream:write_stringref(id)
@@ -173,19 +173,19 @@ local function data_emitter(production)
    end
    function handlers.array(production)
       if production.ctype then
-         local typeof = data.typeof
+         local data_t = data.typeof(production.ctype)
          return function(data, stream)
             stream:write_stringref('carray')
             stream:write_stringref(production.ctype)
-            stream:write_uint32(#data)
-            stream:write_array(data.ptr, typeof(production.ctype), #data)
+            stream:write_scalar(uint32_t, #data)
+            stream:write_array(data_t, data.ptr, #data)
          end
       else
          local emit_tagged_value = visit1(
             {type='scalar', argument_type=production.element_type})
          return function(data, stream)
             stream:write_stringref('larray')
-            stream:write_uint32(#data)
+            stream:write_scalar(uint32_t, #data)
             for i=1,#data do emit_tagged_value(data[i], stream) end
          end
       end
@@ -205,7 +205,7 @@ local function data_emitter(production)
          return function(data, stream)
             -- A string-keyed table is the same as a tagged struct.
             stream:write_stringref('lstruct')
-            stream:write_uint32(table_size(data))
+            stream:write_scalar(uint32_t, table_size(data))
             for k,v in pairs(data) do
                stream:write_stringref(k)
                emit_value(v, stream)
@@ -219,10 +219,10 @@ local function data_emitter(production)
             stream:write_stringref('cltable')
             emit_keys(data.keys, stream)
             for i, value in pairs(data.values) do
-               stream:write_uint32(i)
+               stream:write_scalar(uint32_t, i)
                emit_value(value, stream)
             end
-            stream:write_uint32(SPARSE_ARRAY_END)
+            stream:write_scalar(uint32_t, SPARSE_ARRAY_END)
          end
       else
          local emit_key = visit1({type='struct', members=production.keys,
@@ -232,7 +232,7 @@ local function data_emitter(production)
          -- FIXME: lctable if production.value_ctype?
          return function(data, stream)
             stream:write_stringref('lltable')
-            stream:write_uint32(table_size(data))
+            stream:write_scalar(uint32_t, table_size(data))
             for k,v in pairs(data) do
                emit_key(k, stream)
                emit_value(v, stream)
@@ -253,13 +253,13 @@ local function data_emitter(production)
       elseif primitive_type == 'empty' then
          return function (data, stream)
             stream:write_stringref('flag')
-            stream:write_uint32(data and 1 or 0)
+            stream:write_scalar(uint32_t, data and 1 or 0)
          end
       elseif type.ctype then
          local ctype = type.ctype
          local emit_value = value_emitter(ctype)
          return function(data, stream)
-            stream:write_stringref('cdata')
+            stream:write_stringref('cscalar')
             stream:write_stringref(ctype)
             emit_value(data, stream)
          end
@@ -274,29 +274,25 @@ end
 function data_compiler_from_grammar(emit_data, schema_name, schema_revision)
    return function(data, filename, source_mtime)
       source_mtime = source_mtime or {sec=0, nsec=0}
-      local stream = stream.open_temporary_output_byte_stream(filename)
+      local stream = file.tmpfile("rusr,wusr,rgrp,roth", lib.dirname(filename))
       local strtab = string_table_builder()
       local header = header_t(
          MAGIC, VERSION, source_mtime.sec, source_mtime.nsec,
          strtab:intern(schema_name), strtab:intern(schema_revision or ''))
       -- Write with empty data_len etc, fix it later.
-      stream:write_ptr(header, header_t)
-      header.data_start = stream.written
-      local u32buf = ffi.new('uint32_t[1]')
-      function stream:write_uint32(val)
-         u32buf[0] = val
-         return self:write_ptr(u32buf, 'uint32_t')
-      end
+      stream:write_struct(header_t, header)
+      header.data_start = assert(stream:seek())
       function stream:write_stringref(str)
-         return self:write_uint32(strtab:intern(str))
+         return self:write_scalar(uint32_t, strtab:intern(str))
       end
       emit_data(data, stream)
-      header.data_len = stream.written - header.data_start
+      header.data_len = assert(stream:seek()) - header.data_start
       header.strtab_start, header.strtab_len = strtab:emit(stream)
-      stream:rewind()
+      assert(stream:seek('set', 0))
       -- Fix up header.
-      stream:write_ptr(header, header_t)
-      stream:close_and_rename()
+      stream:write_struct(header_t, header)
+      stream:rename(filename)
+      stream:close()
    end
 end
 
@@ -375,12 +371,7 @@ end
 
 local function read_compiled_data(stream, strtab)
    local function read_string()
-      return assert(strtab[stream:read_uint32()])
-   end
-   local ctypes = {}
-   local function scalar_type(ctype)
-      if not ctypes[ctype] then ctypes[ctype] = data.typeof(ctype) end
-      return ctypes[ctype]
+      return assert(strtab[stream:read_scalar(nil, uint32_t)])
    end
 
    local readers = {}
@@ -390,20 +381,20 @@ local function read_compiled_data(stream, strtab)
    end
    function readers.lstruct()
       local ret = {}
-      for i=1,stream:read_uint32() do
+      for i=1,stream:read_scalar(nil, uint32_t) do
          local k = read_string()
          ret[k] = read1()
       end
       return ret
    end
    function readers.carray()
-      local ctype = scalar_type(read_string())
-      local count = stream:read_uint32()
-      return util.ffi_array(stream:read_array(ctype, count), ctype, count)
+      local ctype = data.typeof(read_string())
+      local count = stream:read_scalar(nil, uint32_t)
+      return util.ffi_array(stream:read_array(nil, ctype, count), ctype, count)
    end
    function readers.larray()
       local ret = {}
-      for i=1,stream:read_uint32() do table.insert(ret, read1()) end
+      for i=1,stream:read_scalar(nil, uint32_t) do table.insert(ret, read1()) end
       return ret
    end
    function readers.ctable()
@@ -416,7 +407,7 @@ local function read_compiled_data(stream, strtab)
       local keys = read1()
       local values = {}
       while true do
-         local i = stream:read_uint32()
+         local i = stream:read_scalar(nil, uint32_t)
          if i == SPARSE_ARRAY_END then break end
          values[i] = read1()
       end
@@ -424,7 +415,7 @@ local function read_compiled_data(stream, strtab)
    end
    function readers.lltable()
       local ret = {}
-      for i=1,stream:read_uint32() do
+      for i=1,stream:read_scalar(nil, uint32_t) do
          local k = read1()
          ret[k] = read1()
       end
@@ -433,48 +424,49 @@ local function read_compiled_data(stream, strtab)
    function readers.stringref()
       return read_string()
    end
-   function readers.cdata()
-      local ctype = scalar_type(read_string())
-      return stream:read_ptr(ctype)[0]
+   function readers.cstruct()
+      local ctype = data.typeof(read_string())
+      return stream:read_struct(nil, ctype)
+   end
+   function readers.cscalar()
+      local ctype = data.typeof(read_string())
+      return stream:read_scalar(nil, ctype)
    end
    function readers.flag()
-      if stream:read_uint32() ~= 0 then return true end
+      if stream:read_scalar(nil, uint32_t) ~= 0 then return true end
       return nil
    end
    return read1()
 end
 
 function has_magic(stream)
-   local success, header = pcall(stream.read_ptr, stream, header_t)
-   stream:seek(0)
+   local success, header = pcall(stream.read_struct, stream, nil, header_t)
+   if success then assert(stream:seek('cur', 0) == ffi.sizeof(header_t)) end
+   assert(stream:seek('set', 0))
    return success and ffi.string(header.magic, ffi.sizeof(header.magic)) == MAGIC
 end
 
 function load_compiled_data(stream)
-   local uint32_t = ffi.typeof('uint32_t')
-   function stream:read_uint32()
-      return stream:read_ptr(uint32_t)[0]
-   end
-   local header = stream:read_ptr(header_t)
+   local header = stream:read_struct(nil, header_t)
    assert(ffi.string(header.magic, ffi.sizeof(header.magic)) == MAGIC,
           "expected file to begin with "..MAGIC)
    assert(header.version == VERSION,
           "incompatible version: "..header.version)
-   stream:seek(header.strtab_start)
+   assert(stream:seek('set', header.strtab_start))
    local strtab = read_string_table(stream, header.strtab_len)
    local ret = {}
    ret.schema_name = strtab[header.schema_name]
    ret.revision_date = strtab[header.revision_date]
    ret.source_mtime = {sec=header.source_mtime_sec,
                        nsec=header.source_mtime_nsec}
-   stream:seek(header.data_start)
+   assert(stream:seek('set', header.data_start))
    ret.data = read_compiled_data(stream, strtab)
-   assert(stream:seek() == header.data_start + header.data_len)
+   assert(assert(stream:seek()) == header.data_start + header.data_len)
    return ret
 end
 
 function load_compiled_data_file(filename)
-   return load_compiled_data(stream.open_input_byte_stream(filename))
+   return load_compiled_data(assert(file.open(filename)))
 end
 
 function data_copier_from_grammar(production)
@@ -569,7 +561,9 @@ function selftest()
          }
       }
    }]])
-   local data = data.load_config_for_schema(test_schema, [[
+   local mem = require('lib.stream.mem')
+   local data = data.load_config_for_schema(test_schema,
+                                            mem.open_input_string [[
       is-active true;
       integers 1;
       integers 2;

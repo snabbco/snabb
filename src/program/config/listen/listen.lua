@@ -3,6 +3,8 @@ module(..., package.seeall)
 
 local S = require("syscall")
 local ffi = require("ffi")
+local mem = require("lib.stream.mem")
+local file = require("lib.stream.file")
 local rpc = require("lib.yang.rpc")
 local data = require("lib.yang.data")
 local path_lib = require("lib.yang.path")
@@ -21,7 +23,7 @@ end
 
 local function validate_config(schema_name, revision_date, path, value_str)
    local parser = common.config_parser(schema_name, path)
-   local value = parser(value_str)
+   local value = parser(mem.open_input_string(value_str))
    return common.serialize_config(value, schema_name, path)
 end
 
@@ -77,7 +79,7 @@ local function attach_listener(leader, caller, schema_name, revision_date)
    local msg, parse_reply = rpc.prepare_call(
       caller, 'attach-listener', {schema=schema_name, revision=revision_date})
    common.send_message(leader, msg)
-   return parse_reply(common.recv_message(leader))
+   return parse_reply(mem.open_input_string(common.recv_message(leader)))
 end
 
 function run(args)
@@ -106,7 +108,7 @@ function run(args)
       
    local client = json_lib.buffered_input(fd)
    local pollfds = S.types.t.pollfds({
-         {fd=leader, events="in"},
+         {fd=leader.io.fd, events="in"},
          {fd=client, events="in"}})
    local pending_replies = {}
    while true do
@@ -114,7 +116,7 @@ function run(args)
          assert(S.poll(pollfds, -1))
       end
       for _,pfd in ipairs(pollfds) do
-         if pfd.fd == leader:getfd() then
+         if pfd.fd == leader.io.fd:getfd() then
             if pfd.ERR or pfd.HUP then
                while #pending_replies > 0 do
                   local have_reply = table.remove(pending_replies)
@@ -150,6 +152,7 @@ function run(args)
                local msg, parse_reply = rpc.prepare_call(
                   caller, request.method, request.args)
                local function have_reply(msg)
+                  msg = mem.open_input_string(msg)
                   return print_reply(parse_reply(msg), fd)
                end
                common.send_message(leader, msg)

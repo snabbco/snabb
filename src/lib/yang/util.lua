@@ -92,45 +92,6 @@ void* malloc (size_t);
 void free (void*);
 ]]
 
-function string_io_file()
-   local function alloc(n)
-      return ffi.gc(ffi.cast('char*', ffi.C.malloc(n)), ffi.C.free)
-   end
-
-   local file = {}
-   local size = 1024
-   local buf = alloc(size)
-   local written = 0
-   local read = 0
-   function file:write(str)
-      while size - written < #str do
-         if 0 < read then
-            ffi.copy(buf, buf + read, written - read)
-            read, written = 0, written - read
-         else
-            local old_buf, old_written = buf, written
-            size = size * 2
-            buf = alloc(size)
-            ffi.copy(buf, old_buf, written)
-         end
-      end
-      ffi.copy(buf + written, str, #str)
-      written = written + #str
-   end
-   function file:peek()
-      return buf + read, written - read
-   end
-   function file:flush()
-      local ptr, len = buf + read, written - read
-      return ffi.string(ptr, len)
-   end
-   function file:clear(str)
-      size, written, read = 1024, 0, 0
-      buf = alloc(size)
-   end
-   return file
-end
-
 function memoize(f, max_occupancy)
    local cache = {}
    local occupancy = 0
