@@ -107,7 +107,8 @@ function fdopen(fd, flags, filename)
    local mode = bit.band(flags, S.c.O.ACCMODE)
    if mode == S.c.O.RDONLY or mode == S.c.O.RDWR then readable = true end
    if mode == S.c.O.WRONLY or mode == S.c.O.RDWR then writable = true end
-   return stream.open(io, readable, writable)
+   local stat = fd:fstat()
+   return stream.open(io, readable, writable, stat and stat.st_blksize)
 end
 
 local modes = {
