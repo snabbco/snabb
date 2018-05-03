@@ -52,10 +52,12 @@ nd_light = subClass(nil)
 nd_light._name = "Partial IPv6 neighbor discovery"
 nd_light.config = {
    local_mac = {required=true},
+   remote_mac = {},
    local_ip = {required=true},
    next_hop =  {required=true},
    delay = {default=1000},
-   retrans = {}
+   retrans = {},
+   quiet = {default=false}
 }
 nd_light.shm = {
    status                   = {counter, 2}, -- Link down
@@ -83,10 +85,11 @@ nd_light.shm = {
 --                a Lus string of length 16.
 --   next_hop   IPv6 address of next-hop for all packets to south.  Accepted
 --              formats as for local_ip.
+--   remote_mac Optional MAC address of next_hop in case dynamic ND is not
+--              available on the link
 --   delay      NS retransmit delay in ms (default 1000ms)
 --   retrans    Number of NS retransmits (default 10)
-local function check_ip_address(ip, desc)
-   assert(ip, "nd_light: missing "..desc.." IP address")
+local function check_ip_address (ip, desc)
    if type(ip) == "string" and string.len(ip) ~= 16 then
       ip = ipv6:pton(ip)
    else
@@ -97,31 +100,38 @@ local function check_ip_address(ip, desc)
    return ip
 end
 
-function nd_light:new (conf)
-   local o = nd_light:superClass().new(self)
-   if type(conf.local_mac) == "string" and string.len(conf.local_mac) ~= 6 then
-      conf.local_mac = ethernet:pton(conf.local_mac)
+local function check_mac_address (mac, desc)
+   if type(mac) == "string" and string.len(mac) ~= 6 then
+      mac = ethernet:pton(mac)
    else
-      assert(type(conf.local_mac) == "cdata",
-             "nd_light: invalid type for local MAC address, expected cdata, got "
-                ..type(conf.local_mac))
+      assert(type(mac) == "cdata",
+             "nd_light: invalid type of "..desc.." MAC address, expected cdata, got "
+                ..type(mac))
    end
+   return mac
+end
+
+function _new (self, conf)
    conf.local_ip = check_ip_address(conf.local_ip, "local")
    conf.next_hop = check_ip_address(conf.next_hop, "next-hop")
+   conf.local_mac = check_mac_address(conf.local_mac, "local")
+   if conf.remote_mac then
+      conf.remote_mac = check_mac_address(conf.remote_mac, "remote")
+      self._eth_header = ethernet:new({ src = conf.local_mac,
+                                        dst = conf.remote_mac,
+                                        type = 0x86dd })
+   end
 
-   o._config = conf
-   o._match_ns = function(ns)
+   self._config = conf
+   self._match_ns = function(ns)
                     return(ns:target_eq(conf.local_ip))
                  end
-   o._match_na = function(na)
-                    return(na:target_eq(conf.next_hop) and na:solicited())
+   self._match_na = function(na)
+                    return(na:target_eq(conf.next_hop) and na:solicited() == 1)
                  end
-   local errmsg
-   o._filter, errmsg = filter:new("icmp6 and ( ip6[40] = 135 or ip6[40] = 136 )")
-   assert(o._filter, errmsg and ffi.string(errmsg))
 
    -- Prepare packet for solicitation of next hop
-   local nh = { nsent = 0 }
+   local nh = self._next_hop
    local dgram = datagram:new()
    local sol_node_mcast = ipv6:solicited_node_mcast(conf.next_hop)
    local ipv6 = ipv6:new({ next_header = 58, -- ICMP6
@@ -150,37 +160,14 @@ function nd_light:new (conf)
    nh.packet = dgram:packet()
    dgram:free()
 
-   -- Timer for retransmits of neighbor solicitations
-   nh.timer_cb = function (t)
-                    local nh = o._next_hop
-                    -- If nh.packet is nil the app was stopped and we
-                    -- bail out.
-                    if not nh.packet then return nil end
-                    o._logger:log(string.format("Sending neighbor solicitation for next-hop %s",
-                                                ipv6:ntop(conf.next_hop)))
-                    link.transmit(o.output.south, packet.clone(nh.packet))
-                    nh.nsent = nh.nsent + 1
-                    if (not o._config.retrans or nh.nsent <= o._config.retrans)
-                       and not o._eth_header
-                    then
-                       timer.activate(nh.timer)
-                    end
-                    if o._config.retrans and nh.nsent > o._config.retrans then
-                       error(string.format("ND for next hop %s has failed",
-                                           ipv6:ntop(conf.next_hop)))
-                    end
-                 end
-   nh.timer = timer.new("ns retransmit", nh.timer_cb, 1e6 * conf.delay)
-   o._next_hop = nh
-
    -- Prepare packet for solicited neighbor advertisement
-   local sna = {}
+   local sna = self._sna
    dgram = datagram:new()
    -- Leave dst address unspecified.  It will be set to the source of
    -- the incoming solicitation
    ipv6 = ipv6:new({ next_header = 58, -- ICMP6
-         hop_limit = 255,
-         src = conf.local_ip })
+                     hop_limit = 255,
+                     src = conf.local_ip })
    icmp = icmp:new(136, 0)
    -- Construct a neighbor solicitation with a target link-layer
    -- option.
@@ -204,7 +191,44 @@ function nd_light:new (conf)
    dgram:parse_n(3)
    sna.eth, sna.ipv6, sna.icmp = unpack(dgram:stack())
    sna.dgram = dgram
-   o._sna = sna
+   return self
+end
+
+function nd_light:new (arg)
+   local o = nd_light:superClass().new(self)
+   local nh = { nsent = 0 }
+   o._next_hop = nh
+   o._sna = {}
+   local errmsg
+   o._filter, errmsg = filter:new("icmp6 and ( ip6[40] = 135 or ip6[40] = 136 )")
+   assert(o._filter, errmsg and ffi.string(errmsg))
+
+   _new(o, arg)
+
+   -- Timer for retransmits of neighbor solicitations
+   nh.timer_cb = function (t)
+      local nh = o._next_hop
+      -- If nh.packet is nil the app was stopped and we
+      -- bail out.
+      if not nh.packet then return nil end
+      if not o._config.quiet then
+         o._logger:log(string.format("Sending neighbor solicitation for next-hop %s",
+                                     ipv6:ntop(o._config.next_hop)))
+      end
+      link.transmit(o.output.south, packet.clone(nh.packet))
+      nh.nsent = nh.nsent + 1
+      if (not o._config.retrans or nh.nsent <= o._config.retrans)
+         and not o._eth_header
+      then
+         timer.activate(nh.timer)
+      end
+      if o._config.retrans and nh.nsent > o._config.retrans then
+         error(string.format("ND for next hop %s has failed",
+                             ipv6:ntop(o._config.next_hop)))
+      end
+   end
+   nh.timer = timer.new("ns retransmit",
+                        nh.timer_cb, 1e6 * o._config.delay)
 
    -- Caches for for various cdata pointer objects to avoid boxing in
    -- the push() loop
@@ -215,6 +239,12 @@ function nd_light:new (conf)
    o._logger = lib.logger_new({ module = 'nd_light' })
 
    return o
+end
+
+function nd_light:reconfig (arg)
+   -- Free static packets
+   self:stop()
+   return _new(self, arg)
 end
 
 -- Process neighbor solicitation
@@ -272,7 +302,8 @@ local function na (self, dgram, eth, ipv6, icmp)
    self._eth_header = ethernet:new({ src = self._config.local_mac,
                                      dst = option[1]:option():addr(),
                                      type = 0x86dd })
-   self._logger:log(string.format("Resolved next-hop %s to %s", ipv6:ntop(self._config.next_hop),
+   self._logger:log(string.format("Resolved next-hop %s to %s",
+                                  ipv6:ntop(self._config.next_hop),
                                   ethernet:ntop(option[1]:option():addr())))
    counter.set(self.shm.status, 1) -- Link up
    return nil
@@ -303,7 +334,7 @@ local function from_south (self, p)
 end
 
 function nd_light:push ()
-   if self._next_hop.nsent == 0 then
+   if self._next_hop.nsent == 0 and self._eth_header == nil then
       -- Kick off address resolution
       self._next_hop.timer_cb()
    end

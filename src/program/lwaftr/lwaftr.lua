@@ -2,8 +2,16 @@ module(..., package.seeall)
 
 local lib = require("core.lib")
 
+local function latest_version()
+   local v = require('core.version')
+   return v.version, v.extra_version
+end
+
 local function show_usage(exit_code)
-   print(require("program.lwaftr.README_inc"))
+   local content = require("program.lwaftr.README_inc")
+   require('core.main').version()
+   print('')
+   print(content)
    main.exit(exit_code)
 end
 

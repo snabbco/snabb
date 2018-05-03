@@ -3,9 +3,8 @@ module(..., package.seeall)
 local counter = require("core.counter")
 local ffi = require("ffi")
 local lib = require("core.lib")
-local lwcounter = require("apps.lwaftr.lwcounter")
+local counters = require("program.lwaftr.counters")
 local lwutil = require("apps.lwaftr.lwutil")
-local lwtypes = require("apps.lwaftr.lwtypes")
 local shm = require("core.shm")
 local top = require("program.top.top")
 
@@ -13,33 +12,11 @@ local C = ffi.C
 local fatal = lwutil.fatal
 
 local long_opts = {
-   help = "h"
+   help = "h",
+   name = "n"
 }
 
 local function clearterm () io.write('\027[2J') end
-
-local function select_snabb_instance_by_id (target_id)
-   local pids = shm.children("/")
-   for _, pid in ipairs(pids) do
-      local path = "/"..pid.."/nic/id"
-      if shm.exists(path) then
-         local lwaftr_id = shm.open(path, lwtypes.lwaftr_id_type)
-         if ffi.string(lwaftr_id.value) == target_id then
-            return pid
-         end
-      end
-   end
-   print(("Couldn't find instance with id '%s'"):format(target_id))
-   main.exit(1)
-end
-
-local function select_snabb_instance (id)
-   if not id or tonumber(id) then
-      return top.select_snabb_instance(id)
-   else
-      return select_snabb_instance_by_id(id)
-   end
-end
 
 local counter_names = (function ()
    local counters = {
@@ -68,12 +45,13 @@ local counter_names = (function ()
 end)()
 
 local function has_lwaftr_app (tree)
-   return shm.exists(tree.."/"..lwcounter.counters_dir)
+   return shm.exists(tree.."/apps/lwaftr")
 end
 
 local function open_counters (tree)
    local function open_counter (name)
-      return counter.open(tree.."/"..lwcounter.counters_dir..name..".counter", 'readonly')
+      local path = tree.."/apps/lwaftr/"..name..".counter"
+      return shm.exists(path) and counter.open(path, 'readonly')
    end
    local function open_counter_list (t)
       local ret = {}
@@ -134,8 +112,9 @@ end
 local lwaftr_metrics_row = {51, 7, 7, 7, 7, 11}
 local function print_lwaftr_metrics (new_stats, last_stats, time_delta)
    local function delta(t, s, name)
-      assert(t[name] and s[name])
-      return tonumber(t[name] - s[name])
+      if t[name] and s[name] then
+         return tonumber(t[name] - s[name])
+      end
    end
    local function delta_v6 (t, s)
       local rx = delta(t, s, "in-ipv6-packets")
@@ -187,13 +166,17 @@ local function print_lwaftr_metrics (new_stats, last_stats, time_delta)
          if lwaftrspec == "nic" then
             local name = "ifInDiscards"
             local diff = delta(t, s, name)
-            print_row(metrics_row, { lwaftrspec .. " " .. name,
-               int_s(t[name]), int_s(diff)})
+            if diff then
+               print_row(metrics_row, { lwaftrspec .. " " .. name,
+                  int_s(t[name]), int_s(diff)})
+            end
          else
             for _, name in ipairs(counter_names(lwaftrspec)) do
                local diff = delta(t, s, name)
-               print_row(metrics_row, { lwaftrspec .. " " .. name,
-                  int_s(t[name]), int_s(diff)})
+               if diff then
+                  print_row(metrics_row, { lwaftrspec .. " " .. name,
+                     int_s(t[name]), int_s(diff)})
+               end
             end
          end
       end
@@ -207,17 +190,28 @@ end
 
 local function parse_args (args)
    local handlers = {}
+   local opts = {}
    function handlers.h ()
       show_usage(0)
    end
-   args = lib.dogetopt(args, handlers, "h", long_opts)
+   function handlers.n (arg)
+      opts.name = assert(arg)
+   end
+   args = lib.dogetopt(args, handlers, "hn:", long_opts)
    if #args > 1 then show_usage(1) end
-   return args[1]
+   return opts, args[1]
 end
 
 function run (args)
-   local target_pid = parse_args(args)
-   local instance_tree = "/"..select_snabb_instance(target_pid)
+   local opts, target_pid = parse_args(args)
+   if opts.name then
+      local programs = engine.enumerate_named_programs(opts.name)
+      target_pid = programs[opts.name]
+      if not target_pid then
+         fatal(("Couldn't find process with name '%s'"):format(opts.name))
+      end
+   end
+   local instance_tree = "/" .. top.select_snabb_instance(target_pid)
    if not has_lwaftr_app(instance_tree) then
       fatal("Selected instance doesn't include lwaftr app")
    end

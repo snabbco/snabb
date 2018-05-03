@@ -5,7 +5,6 @@ local ffi = require("ffi")
 local lib = require("core.lib")
 local ipv4 = require("lib.protocol.ipv4")
 local ethernet = require("lib.protocol.ethernet")
-local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
 
@@ -31,7 +30,6 @@ local function parse_args (raw_args)
    local args = lib.dogetopt(raw_args, handlers, "h",
                              { help="h" })
    if #args > 0 then show_usage(1) end
-   return nil
 end
 
 local function read_counters (tree, app_name)
@@ -98,15 +96,22 @@ local function print_counters (pid, dir)
   print(("   </%s>"):format(dir))
 end
 
+local function transpose (t)
+   local ret = {}
+   for k, v in pairs(t) do ret[v] = k end
+   return ret
+end
+
 function run (raw_args)
    parse_args(raw_args)
    print("<snabb>")
    local pids = {}
    local pids_name = {}
+   local named_programs = transpose(engine.enumerate_named_programs())
+
    for _, pid in ipairs(shm.children("/")) do
-     if shm.exists("/"..pid.."/nic/id") then
-       local lwaftr_id = shm.open("/"..pid.."/nic/id", lwtypes.lwaftr_id_type)
-       local instance_id_name = ffi.string(lwaftr_id.value)
+     if shm.exists("/"..pid.."/name") then
+       local instance_id_name = named_programs[tonumber(pid)]
        local instance_id = instance_id_name and instance_id_name:match("(%d+)")
        if instance_id then
          pids[instance_id] = pid

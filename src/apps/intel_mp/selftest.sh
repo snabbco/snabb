@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 cd $(dirname $0)
-[ -z $SNABB_PCI_INTEL1G0 ] && exit $TEST_SKIPPED
-[ -z $SNABB_PCI_INTEL1G1 ] && exit $TEST_SKIPPED
-[ -z $SNABB_PCI_INTEL0 ] && exit $TEST_SKIPPED
-[ -z $SNABB_PCI_INTEL1 ] && exit $TEST_SKIPPED
+if [ $SNABB_PCI_INTEL1G0 ] && [ $SNABB_PCI_INTEL1G1 ]; then
+   TESTS1G=$(find . -executable | grep -e 'test_1g')
+fi
+if [ $SNABB_PCI_INTEL0 ] && [ $SNABB_PCI_INTEL1 ]; then
+   TESTS10G=$(find . -executable | grep -e 'test_10g')
+fi
+if [ -z "$TESTS1G" ] && [ -z "$TESTS10G" ]; then
+   exit $TEST_SKIPPED
+fi
 FILTER=${1:-.*}
-TESTS=$(find . -executable | grep -e 'test[0-9]' -e 'test_' | grep -e "$FILTER" | sort)
+TESTS=$(echo "$TESTS1G" "$TESTS10G" | grep -e "$FILTER" | sort)
 ESTATUS=0
 export SNABB_RECV_DEBUG=true
 export SNABB_RECV_MASTER_STATS=true
+export SNABB_RANDOM_SEED=0xacabba9e
 for i in $TESTS; do
    pkill -P $$ -f snabb
    sleep 1
@@ -19,9 +25,9 @@ for i in $TESTS; do
       echo "PASSED: $i"
    else
       for res in `ls results.*`; do
-	      echo $res;
-	      cat $res
-	      echo
+         echo $res;
+         cat $res
+         echo
       done
       echo "FAILED: $i"
       ESTATUS=-1

@@ -89,7 +89,15 @@ function ipv4:ntop (n)
    return ffi.string(c_str)
 end
 
+function ipv4:set(addr)
+   return ipv4:pton(addr)
+end
+
 -- Instance methods
+
+function ipv4:get()
+   return ipv4:ntop(self)
+end
 
 function ipv4:version (v)
    return lib.bitfield(16, self:header(), 'ihl_v_tos', 0, 4, v)
@@ -214,6 +222,7 @@ local function test_ipv4_checksum ()
    ]], 66))
 
    local ip_hdr = ipv4:new_from_mem(p.data + IP_BASE, IP_HDR_SIZE)
+   assert(ip_hdr)
    local csum = ip_hdr:checksum()
    assert(csum == 0xb08e, "Wrong IPv4 checksum")
 end

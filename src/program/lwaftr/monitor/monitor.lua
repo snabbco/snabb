@@ -3,14 +3,17 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local ipv4 = require("lib.protocol.ipv4")
 local lib = require("core.lib")
-local lwtypes = require("apps.lwaftr.lwtypes")
 local lwutil = require("apps.lwaftr.lwutil")
 local shm = require("core.shm")
+local top = require("program.top.top")
+local engine = require("core.app")
 
 local fatal = lwutil.fatal
+local select_snabb_instance = top.select_snabb_instance
 
 local long_opts = {
-   help = "h"
+   help = "h",
+   name = "n",
 }
 
 local MIRROR_NOTHING = "0.0.0.0"
@@ -23,64 +26,24 @@ end
 
 local function parse_args (args)
    local handlers = {}
+   local opts = {}
    function handlers.h ()
       usage(0)
    end
-   args = lib.dogetopt(args, handlers, "h", long_opts)
+   function handlers.n (arg)
+      opts.name = assert(arg)
+   end
+   args = lib.dogetopt(args, handlers, "hn:", long_opts)
    if #args < 1 or #args > 2 then usage(1) end
-
-   -- Return address and pid.
-   if #args == 1 then
-      local maybe_pid = tonumber(args[1])
-      if maybe_pid then
-         return MIRROR_NOTHING, maybe_pid
-      end
-      return args[1]
-   end
-   return args[1], args[2]
-end
-
-local function find_pid_by_id (id)
-   for _, pid in ipairs(shm.children("/")) do
-      local path = "/"..pid.."/nic/id"
-      if shm.exists(path) then
-         local lwaftr_id = shm.open(path, lwtypes.lwaftr_id_type)
-         if ffi.string(lwaftr_id.value) == id then
-            return pid
-         end
-      end
-   end
+   return opts, unpack(args)
 end
 
 local function find_mirror_path (pid)
-   -- Check process has v4v6_mirror defined.
-   if pid then
-      -- Pid is an id.
-      if not tonumber(pid) then
-         pid = find_pid_by_id(pid)
-         if not pid then
-            fatal("Invalid lwAFTR id '%s'"):format(pid)
-         end
-      end
-      -- Pid exists?
-      if not shm.exists("/"..pid) then
-         fatal(("No Snabb instance with pid '%d'"):format(pid))
-      end
-      -- Check process has v4v6_mirror defined.
-      local path = "/"..pid.."/v4v6_mirror"
-      if not shm.exists(path) then
-         fatal(("lwAFTR process '%d' is not running in mirroring mode"):format(pid))
-      end
-      return path, pid
+   local path = "/"..pid.."/v4v6_mirror"
+   if not shm.exists(path) then
+      fatal(("lwAFTR process '%d' is not running in mirroring mode"):format(pid))
    end
-
-   -- Return first process which has v4v6_mirror defined.
-   for _, pid in ipairs(shm.children("/")) do
-      local path = "/"..pid.."/v4v6_mirror"
-      if shm.exists(path) then
-         return path, pid
-      end
-   end
+   return path, pid
 end
 
 local function set_mirror_address (address, path)
@@ -91,10 +54,8 @@ local function set_mirror_address (address, path)
 
    -- Validate address.
    if address == "none" then
-      print("Monitor none")
       address = MIRROR_NOTHING
    elseif address == "all" then
-      print("Monitor all")
       address = MIRROR_EVERYTHING
    else
       if not ipv4:pton(address) then
@@ -107,19 +68,20 @@ local function set_mirror_address (address, path)
    local v4v6_mirror = shm.open(path, "struct { uint32_t ipv4; }")
    v4v6_mirror.ipv4 = ipv4_num
    shm.unmap(v4v6_mirror)
+
+   return address
 end
 
 function run (args)
-   local address, pid = parse_args(args)
-   local path, pid_number = find_mirror_path(pid)
-   if not path then
-      fatal("Couldn't find lwAFTR process running in mirroring mode")
+   local opts, address, pid = parse_args(args)
+   if opts.name then
+      local programs = engine.enumerate_named_programs(opts.name)
+      pid = programs[opts.name]
+      if not pid then
+         fatal(("Couldn't find process with name '%s'"):format(opts.name))
+      end
    end
-
-   set_mirror_address(address, path)
-   io.write(("Mirror address set to '%s'"):format(address))
-   if not tonumber(pid) then
-      io.write((" in PID '%d'"):format(pid_number))
-   end
-   io.write("\n")
+   local path, pid = find_mirror_path(top.select_snabb_instance(pid))
+   address = set_mirror_address(address, path)
+   print(("Mirror address set to '%s' in PID '%s'"):format(address, pid))
 end

@@ -25,6 +25,8 @@ function equal (x, y)
       end
       return true
    elseif type(x) == 'cdata' then
+      if x == y then return true end
+      if ffi.typeof(x) ~= ffi.typeof(y) then return false end
       local size = ffi.sizeof(x)
       if ffi.sizeof(y) ~= size then return false end
       return C.memcmp(x, y, size) == 0
@@ -104,14 +106,6 @@ function firstfile (dir)
 end
 
 function firstline (filename) return readfile(filename, "*l") end
-
-function files_in_directory (dir)
-   local files = {}
-   for line in io.popen('ls -1 "'..dir..'" 2>/dev/null'):lines() do
-      table.insert(files, line)
-   end
-   return files
-end
 
 -- Load Lua value from string.
 function load_string (string)
@@ -220,15 +214,6 @@ function comma_value(n) -- credit http://richard.warburton.it
    if n ~= n then return "NaN" end
    local left,num,right = string.match(n,'^([^%d]*%d)(%d*)(.-)$')
    return left..(num:reverse():gsub('(%d%d%d)','%1,'):reverse())..right
-end
-
-function random_data(length)
-   result = ""
-   math.randomseed(os.time())
-   for i=1,length do
-      result = result..string.char(math.random(0, 255))
-   end
-   return result
 end
 
 -- Return a table for bounds-checked array access.
@@ -381,8 +366,13 @@ if ffi.abi("be") then
    function htons(b) return b end
 else
   -- htonl is unsigned, matching the C version and expectations.
-   function htonl(b) return tonumber(cast('uint32_t', bswap(b))) end
-   function htons(b) return rshift(bswap(b), 16) end
+  -- Wrapping the return call in parenthesis avoids the compiler to do
+  -- a tail call optimization.  In LuaJIT when the number of successive
+  -- tail calls is higher than the loop unroll threshold, the
+  -- compilation of a trace is aborted.  If the trace was long that
+  -- can result in poor performance.
+   function htonl(b) return (tonumber(cast('uint32_t', bswap(b)))) end
+   function htons(b) return (rshift(bswap(b), 16)) end
 end
 ntohl = htonl
 ntohs = htons
@@ -713,6 +703,68 @@ function getenv (name)
    else return nil end
 end
 
+-- Wrapper around execve.
+function execv(path, argv)
+   local env = {}
+   for k, v in pairs(syscall.environ()) do table.insert(env, k.."="..v) end
+   return syscall.execve(path, argv or {}, env)
+end
+
+-- Return an array of random bytes.
+function random_bytes_from_dev_urandom (count)
+   local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
+   local f = syscall.open('/dev/urandom', 'rdonly')
+   local written = 0
+   while written < count do
+      written = written + assert(f:read(bytes, count-written))
+   end
+   f:close()
+   return bytes
+end
+
+function random_bytes_from_math_random (count)
+   local bytes = ffi.new(ffi.typeof('uint8_t[$]', count))
+   for i = 0,count-1 do bytes[i] = math.random(0, 255) end
+   return bytes
+end
+
+function randomseed (seed)
+   seed = tonumber(seed)
+   if seed then
+      local msg = 'Using deterministic random numbers, SNABB_RANDOM_SEED=%d.\n'
+      io.stderr:write(msg:format(seed))
+      -- When setting a seed, use deterministic random bytes.
+      random_bytes = random_bytes_from_math_random
+   else
+      -- Otherwise use /dev/urandom.
+      seed = ffi.cast('uint32_t*', random_bytes_from_dev_urandom(4))[0]
+      random_bytes = random_bytes_from_dev_urandom
+   end
+   math.randomseed(seed)
+   return seed
+end
+
+function random_data (length)
+   return ffi.string(random_bytes(length), length)
+end
+
+local lower_case = "abcdefghijklmnopqrstuvwxyz"
+local upper_case = lower_case:upper()
+local extra = "0123456789_-"
+local alphabet = table.concat({lower_case, upper_case, extra})
+assert(#alphabet == 64)
+function random_printable_string (entropy)
+   -- 64 choices in our alphabet, so 6 bits of entropy per byte.
+   entropy = entropy or 160
+   local length = math.floor((entropy - 1) / 6) + 1
+   local bytes = random_data(length)
+   local out = {}
+   for i=1,length do
+      out[i] = alphabet:byte(bytes:byte(i) % 64 + 1)
+   end
+   return string.char(unpack(out))
+end
+
 -- Compiler barrier.
 -- Prevents LuaJIT from moving load/store operations over this call.
 -- Any FFI call is sufficient to achieve this, see:
@@ -740,6 +792,12 @@ function parse (arg, config)
    for k, o in pairs(config) do
       if ret[k] == nil then ret[k] = o.default end
    end
+   return ret
+end
+
+function set(...)
+   local ret = {}
+   for k, v in pairs({...}) do ret[v] = true end
    return ret
 end
 

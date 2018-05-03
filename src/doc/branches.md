@@ -32,14 +32,14 @@ The current state of each branch with respect to master is visible here:
 
 #### fixes
 
-    BRANCH: fixes git://github.com/lukego/snabbswitch
+    BRANCH: fixes git://github.com/snabbco/snabb
     Test and integration branch for bug fixes.
 
     - Contains the changes for the next weekly maintenance release.
     - Merges Pull Requests that fix bugs in the latest release.
     - Generally stable.
 
-    Maintainer: Luke Gorrie <luke@snabb.co>
+    Maintainer: Max Rottenkolber <max@mr.gy>
 
 #### kbara-next
 
@@ -166,7 +166,7 @@ The current state of each branch with respect to master is visible here:
     - See snabbwall.org for more info
 
     Maintainer: Collectively maintained by Snabbwall application developers.
-    Next hop: kbara-next
+    Next hop: wingo-next
 
 #### aarch64
 

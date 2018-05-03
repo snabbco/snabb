@@ -1,0 +1,298 @@
+module ietf-softwire-common {
+  yang-version 1.1;
+  namespace "urn:ietf:params:xml:ns:yang:ietf-softwire-common";
+  prefix "softwire-common";
+
+  import ietf-inet-types { prefix inet; }
+  import ietf-yang-types { prefix yang; }
+
+  organization "Softwire Working Group";
+
+  contact
+    "
+    Qi Sun <sunqi.ietf@gmail.com>
+    Hao Wang <wangh13@mails.tsinghua.edu.cn>
+    Yong Cui <yong@csnet1.cs.tsinghua.edu.cn>
+    Ian <Farrer ian.farrer@telekom.de>
+    Sladjana Zoric <sladjana.zoric@telekom.de>
+    Mohamed Boucadair <mohamed.boucadair@orange.com>
+    Rajiv <Asati rajiva@cisco.com>
+    ";
+
+  description
+    "This document defines a YANG data model for the configuration and
+    management of A+P Softwire Customer Premises Equipment (CEs). It
+    covers Lightweight 4over6, MAP-E and MAP-T mechanisms.
+
+    Copyright (c) 2017 IETF Trust and the persons identified
+    as authors of the code. All rights reserved.
+    This version of this YANG module is part of RFC XXX; see the RFC
+    itself for full legal notices.";
+
+  revision 2017-10-19 {
+    description
+      "Initial version of containing a model for common softwire elements.";
+    reference "-02";
+  }
+
+  /*
+   * Grouping
+   */
+
+  grouping port-set {
+    description
+      "Indicates a set of ports.
+      It may be a simple port range, or use the PSID algorithm
+      to represent a range of transport layer ports which will
+      be used by a NAPT.";
+
+    leaf psid-offset {
+      type uint8 {
+        range 0..16;
+      }
+      description
+        "The number of offset bits. In Lightweight 4over6,
+        the default value is 0 for assigning one contiguous
+          port range. In MAP-E/T, the default value is 6,
+        which means the system ports (0-1023) are excluded by
+        default and assigns port ranges distributed across the
+        entire port space, depending on either psid-len or the
+        number of contiguous ports.";
+    }
+
+    leaf psid-len {
+      type uint8 {
+        range 0..15;
+      }
+      mandatory true;
+      description
+        "The length of PSID, representing the sharing
+        ratio for an IPv4 address. This, along with ea-len, also
+        helps to calculate the number of contiguous ports per
+        port range";
+    }
+
+    leaf psid {
+      type uint16;
+      mandatory true;
+      description
+        "Port Set Identifier (PSID) value, which
+        identifies a set of ports algorithmically.";
+    }
+  }
+
+  grouping binding-entry {
+    description
+      "The lwAFTR maintains an address binding table that contains
+      the binding between the lwB4's IPv6 address, the allocated IPv4
+      address and restricted port-set.";
+    leaf binding-ipv6info {
+      type union {
+        type inet:ipv6-address;
+        type inet:ipv6-prefix;
+      }
+      description
+        "The IPv6 information for a binding entry.
+        If this is an IPv6 prefix, it indicates that
+        the IPv6 source address of the CE is constructed
+        according to the description in RFC7596;
+      if it is an IPv6 address, it means the CE uses
+        any /128 address from the assigned CE prefix.
+          ";
+    }
+    leaf binding-ipv4-addr {
+      type inet:ipv4-address;
+      description
+        "The IPv4 address assigned to the lwB4, which is
+        used as the IPv4 external address
+        for lwB4 local NAPT44.";
+    }
+    container port-set {
+      description
+        "For Lightweight 4over6, the default value
+        of offset should be 0, to configure one contiguous
+        port range.";
+      uses port-set {
+        refine "psid-offset" {
+          default "0";
+        }
+      }
+    }
+    leaf br-ipv6-addr {
+      type inet:ipv6-address;
+      description
+        "The IPv6 address for lwaftr.";
+    }
+  }
+
+  grouping algorithm {
+    description
+      "Indicate the instances support the MAP-E and MAP-T function.
+      The instances advertise the map-e feature through the
+      capability exchange mechanism when a NETCONF session is
+      established.";
+    container algo-instances {
+      description
+        "A set of MAP-E or MAP-T instances to be configured,
+        applying to BRs and CEs. A MAP-E/T instance defines a MAP
+          domain comprising one or more MAP-CE and MAP-BR";
+      list algo-instance {
+        key "id";
+        description "MAP forwarding rule instance for MAP-E/MAP-T";
+        leaf enable {
+          type boolean;
+          description
+            "Enable/disable individual MAP-E or MAP-T rule.";
+        }
+        container algo-versioning {
+          description "algorithm's version";
+          leaf version {
+            type uint64;
+            description "Incremental version number for the algorithm";
+          }
+          leaf date {
+            type yang:date-and-time;
+            description "Timestamp to the algorithm";
+          }
+        }
+        leaf id {
+          type uint32;
+          mandatory true;
+          description "Algorithm Instance ID";
+        }
+        leaf name {
+          type string;
+          description "The name for the instance.";
+        }
+        choice data-plane {
+          description "Selects MAP-E (encapsulation) or MAP-T (translation)";
+          case encapsulation {
+            description "encapsulation for MAP-E";
+            leaf br-ipv6-addr {
+              type inet:ipv6-address;
+              mandatory true;
+              description
+                "The IPv6 address of the MAP-E BR.";
+            }
+          }
+          case translation {
+            description "translation for MAP-T";
+            leaf dmr-ipv6-prefix {
+              type inet:ipv6-prefix;
+              description
+                "The IPv6 prefix of the MAP-T BR. ";
+            }
+          }
+        }
+        leaf ea-len {
+          type uint8;
+          mandatory true;
+          description
+            "Embedded Address (EA) bits are the IPv4 EA-bits in the IPv6
+            address identify an IPv4 prefix/address (or part thereof) or
+            a shared IPv4 address (or part thereof) and a port-set identifier.
+            The length of the EA-bits is defined as part of a MAP rule for a
+            MAP domain.";
+        }
+        leaf rule-ipv6-prefix {
+          type inet:ipv6-prefix;
+          mandatory true;
+          description
+            "The Rule IPv6 prefix defined in the mapping rule.";
+        }
+        leaf rule-ipv4-prefix {
+          type inet:ipv4-prefix;
+          mandatory true;
+          description
+            "The Rule IPv4 prefix defined in the mapping rule.";
+        }
+        leaf forwarding {
+          type boolean;
+          mandatory true;
+          description
+            "This parameter specifies whether the rule may be used for
+            forwarding (FMR). If set, this rule is used as an FMR;
+          if not set, this rule is a BMR only and must not be used
+            for forwarding.";
+        }
+      }
+    }
+  }
+
+  grouping traffic-stat {
+    description "Traffic statistics";
+    leaf sent-ipv4-packet {
+      type yang:zero-based-counter64;
+      description "Number of decapsulated/translated IPv4 packets sent.";
+    }
+    leaf sent-ipv4-byte {
+      type yang:zero-based-counter64;
+      description "Decapsulated/translated IPv4 traffic sent, in bytes";
+    }
+    leaf sent-ipv6-packet {
+      type yang:zero-based-counter64;
+      description "Number of encapsulated/translated IPv6 packets sent.";
+    }
+    leaf sent-ipv6-byte {
+      type yang:zero-based-counter64;
+      description "Encapsulated/translated IPv6 traffic sent, in bytes";
+    }
+    leaf rcvd-ipv4-packet {
+      type yang:zero-based-counter64;
+      description "Number of IPv4 packets received for processing.";
+    }
+    leaf rcvd-ipv4-byte {
+      type yang:zero-based-counter64;
+      description "IPv4 traffic received for processing, in bytes";
+    }
+    leaf rcvd-ipv6-packet {
+      type yang:zero-based-counter64;
+      description "Number of IPv6 packets received for processing.";
+    }
+    leaf rcvd-ipv6-byte {
+      type yang:zero-based-counter64;
+      config false;
+      description "IPv6 traffic received for processing, in bytes";
+    }
+    leaf dropped-ipv4-packet {
+      type yang:zero-based-counter64;
+      description "Number of IPv4 packets dropped.";
+    }
+    leaf dropped-ipv4-byte {
+      type yang:zero-based-counter64;
+      description "IPv4traffic dropped, in bytes";
+    }
+    leaf dropped-ipv6-packet {
+      type yang:zero-based-counter64;
+      description "Number of IPv4 packets dropped.";
+    }
+    leaf dropped-ipv6-byte {
+      type yang:zero-based-counter64;
+      description "IPv4 traffic dropped, in bytes";
+    }
+    leaf dropped-ipv4-fragments {
+      type yang:zero-based-counter64;
+      description "Number of fragmented IPv4 packets dropped";
+    }
+    leaf dropped-ipv4-bytes {
+      type yang:zero-based-counter64;
+      description "Fragmented IPv4 traffic dropped, in bytes";
+    }
+    leaf ipv6-fragments-reassembled {
+      type yang:zero-based-counter64;
+      description "Number of IPv6 fragments successfully reassembled";
+    }
+    leaf ipv6-fragments-bytes-reassembled {
+      type yang:zero-based-counter64;
+      description "IPv6 fragments successfully reassembled, in bytes";
+    }
+    leaf out-icmpv4-error-packets {
+      type yang:zero-based-counter64;
+      description "Internally generated ICMPv4 error packets.";
+    }
+    leaf out-icmpv6-error-packets {
+      type yang:zero-based-counter64;
+      description "Internally generted ICMPv6 error packets.";
+    }
+  }
+}

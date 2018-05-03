@@ -47,9 +47,6 @@ function run (args)
    function opt.i (arg) conf["SYNC_INTERVAL"]     = arg end
    function opt.h (arg) print(usage) main.exit(1)       end
    args = lib.dogetopt(args, opt, "u:p:t:i:d:m:M:l:L:D:h", long_opts)
-   local env = {}
-   for key, value in pairs(conf) do
-      table.insert(env, key.."="..value) 
-   end
-   syscall.execve("/bin/bash", {"/bin/bash", "-c", script}, env)
+   for key, value in pairs(conf) do S.setenv(key, value, true) end
+   lib.execv("/bin/bash", {"/bin/bash", "-c", script})
 end

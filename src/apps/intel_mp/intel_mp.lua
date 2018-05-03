@@ -1,4 +1,4 @@
--- intel1g: Device driver app for Intel 1G and 10G network cards
+-- intel_mp: Device driver app for Intel 1G and 10G network cards
 -- It supports
 --    - Intel1G i210 and i350 based 1G network cards
 --    - Intel82599 82599 based 10G network cards
@@ -25,7 +25,11 @@ local register    = require("lib.hardware.register")
 local counter     = require("core.counter")
 local macaddress  = require("lib.macaddress")
 local shm         = require("core.shm")
-local counter = require("core.counter")
+local alarms      = require("lib.yang.alarms")
+local S           = require("syscall")
+
+local CallbackAlarm = alarms.CallbackAlarm
+local transmit, receive, empty = link.transmit, link.receive, link.empty
 
 -- It's not clear what address to use for EEMNGCTL_i210 DPDK PMD / linux e1000
 -- both use 1010 but the docs say 12030
@@ -62,17 +66,29 @@ ALLRXDCTL   0x01028 +0x40*0..63     RW Receive Descriptor Control
 ALLRXDCTL   0x0D028 +0x40*64..127   RW Receive Descriptor Control
 DAQF        0x0E200 +0x04*0..127    RW Destination Address Queue Filter
 FTQF        0x0E600 +0x04*0..127    RW Five Tuple Queue Filter
+ETQF        0x05128 +0x04*0..7      RW EType Queue Filter
+ETQS        0x0EC00 +0x04*0..7      RW EType Queue Select
 MPSAR       0x0A600 +0x04*0..255    RW MAC Pool Select Array
 PFUTA       0X0F400 +0x04*0..127    RW PF Unicast Table Array
 PFVLVF      0x0F100 +0x04*0..63     RW PF VM VLAN Pool Filter
 PFVLVFB     0x0F200 +0x04*0..127    RW PF VM VLAN Pool Filter Bitmap
+PFMRCTL     0x0F600 +0x04*0..3      RW PF Mirror Rule Control
+PFMRVLAN    0x0F610 +0x04*0..7      RW PF Mirror Rule VLAN
+PFMRVM      0x0F630 +0x04*0..7      RW PF Mirror Rule Pool
+PFVFRE      0x051E0 +0x04*0..1      RW PF VF Receive Enable
+PFVFTE      0x08110 +0x04*0..1      RW PF VF Transmit Enable
+PFVMTXSW    0x05180 +0x04*0..1      RW PF VM Tx Switch Loopback Enable
+PFVFSPOOF   0x08200 +0x04*0..7      RW PF VF Anti Spoof Control
+PFVMVIR     0x08000 +0x04*0..63     RW PF VM VLAN Insert Register
+PFVML2FLT   0x0F000 +0x04*0..63     RW PF VM L2 Control Register
 QPRC        0x01030 +0x40*0..15     RC Queue Packets Received Count
 QPRDC       0x01430 +0x40*0..15     RC Queue Packets Received Drop Count
 QBRC64      0x01034 +0x40*0..15     RC64 Queue Bytes Received Count
-QPTC        0x08680 +0x40*0..15     RC Queue Packets Transmitted Count
-QBTC64      0x08700 +0x40*0..15     RC64 Queue Bytes Transmitted Count Low
+QPTC        0x08680 +0x04*0..15     RC Queue Packets Transmitted Count
+QBTC64      0x08700 +0x08*0..15     RC64 Queue Bytes Transmitted Count Low
 SAQF        0x0E000 +0x04*0..127    RW Source Address Queue Filter
 SDPQF       0x0E400 +0x04*0..127    RW Source Destination Port Queue Filter
+PSRTYPE     0x0EA00 +0x04*0..63     RW Packet Split Receive Type Register
 RAH         0x0A204 +0x08*0..127    RW Receive Address High
 RAL         0x0A200 +0x08*0..127    RW Receive Address Low
 RAL64       0x0A200 +0x08*0..127    RW64 Receive Address Low and High
@@ -81,11 +97,13 @@ RTTDT2C     0x04910 +0x04*0..7      RW DCB Transmit Descriptor Plane T2 Config
 RTTPT2C     0x0CD20 +0x04*0..7      RW DCB Transmit Packet Plane T2 Config
 RTRPT4C     0x02140 +0x04*0..7      RW DCB Receive Packet Plane T4 Config
 RXPBSIZE    0x03C00 +0x04*0..7      RW Receive Packet Buffer Size
+RQSMR       0x02300 +0x04*0..31     RW Receive Queue Statistic Mapping Registers
 TQSM        0x08600 +0x04*0..31     RW Transmit Queue Statistic Mapping Registers
 TXPBSIZE    0x0CC00 +0x04*0..7      RW Transmit Packet Buffer Size
 TXPBTHRESH  0x04950 +0x04*0..7      RW Tx Packet Buffer Threshold
 VFTA        0x0A000 +0x04*0..127    RW VLAN Filter Table Array
 QPRDC       0x01430 +0x40*0..15     RC Queue Packets Received Drop Count
+FCRTH       0x03260 +0x40*0..7      RW Flow Control Receive Threshold High
 ]],
    inherit = "gbl",
    rxq = [[
@@ -124,13 +142,22 @@ MFLCN       0x04294 -               RW MAC Flow Control Register
 MRQC        0x0EC80 -               RW Multiple Receive Queues Command Register
 MTQC        0x08120 -               RW Multiple Transmit Queues Command Register
 PFVTCTL     0x051B0 -               RW PF Virtual Control Register
+PFQDE       0x02F04 -               RW PF Queue Drop Enable Register
+PFDTXGSWC   0x08220 -               RW PF DMA Tx General Switch Control
 RDRXCTL     0x02F00 -               RW Receive DMA Control Register
+RTRPCS      0x02430 -               RW DCB Receive Packet plane Control and Status
+RTTDCS      0x04900 -               RW DCB Transmit Descriptor Plane Control and Status
+RTTPCS      0x0CD00 -               RW DCB Transmit Packet Plane Control and Status
 RTRUP2TC    0x03020 -            RW DCB Receive Use rPriority to Traffic Class
 RTTUP2TC    0x0C800 -            RW DCB Transmit User Priority to Traffic Class
+RTTDQSEL    0x04904 -               RW DCB Transmit Descriptor Plane Queue Select
+RTTDT1C     0x04908 -               RW DCB Transmit Descriptor Plane T1 Config
 RTTBCNRC    0x04984 -            RW DCB Transmit Rate-Scheduler Config
 RXCSUM      0x05000 -               RW Receive Checksum Control
+RFCTL       0x05008 -               RW Receive Filter Control Register
 RXCTRL      0x03000 -               RW Receive Control
 RXDGPC      0x02F50 -               RC DMA Good Rx Packet Counter
+TXDGPC      0x087A0 -               RC DMA Good Tx Packet Counter
 RXDSTATCTRL 0x02F40 -               RW Rx DMA Statistic Counter Control
 RUC         0x040A4 -               RC Receive Undersize Count
 RFC         0x040A8 -               RC Receive Fragment Count
@@ -146,15 +173,19 @@ RUC         0x040A4 -               RC Receive Undersize Count
 RFC         0x040A8 -               RC Receive Fragment Count
 ROC         0x040AC -               RC Receive Oversize Count
 RJC         0x040B0 -               RC Receive Jabber Count
+GORCL       0x04088 -               RC Good Octets Received Count Low
+GOTCL       0x04090 -               RC Good Octets Transmitted Count Low
 ]],
    txq = [[
 DCA_TXCTRL  0x0600C +0x40*0..127    RW Tx DCA Control Register
 TDBAL       0x06000 +0x40*0..127    RW Transmit Descriptor Base Address Low
 TDBAH       0x06004 +0x40*0..127    RW Transmit Descriptor Base Address High
+TDLEN       0x06008 +0x40*0..127    RW Transmit Descriptor Length
 TDH         0x06010 +0x40*0..127    RW Transmit Descriptor Head
 TDT         0x06018 +0x40*0..127    RW Transmit Descriptor Tail
-TDLEN       0x06008 +0x40*0..127    RW Transmit Descriptor Length
 TXDCTL      0x06028 +0x40*0..127    RW Transmit Descriptor Control
+TDWBAL      0x06038 +0x40*0..127    RW Tx Descriptor Completion Write Back Address Low
+TDWBAH      0x0603C +0x40*0..127    RW Tx Descriptor Completion Write Back Address High
 ]]
 }
 reg['1000BaseX'] = {
@@ -245,26 +276,33 @@ PQMPRC      0x10038 +0x100*0..7     RCR Per Queue Multicast Packets Received
    singleton = [[
 EEMNGCTL  0x01010 -            RW Manageability EEPROM-Mode Control Register
 EEC       0x00010 -            RW EEPROM-Mode Control Register
+FACTPS	  0x05B30 -            Function Active and Power State to MNG
 ]]
 }
 
 Intel = {
    config = {
       pciaddr = {required=true},
-      ndescriptors = {default=2048},
-      txq = {},
-      rxq = {},
+      ring_buffer_size = {default=2048},
+      vmdq = {default=false},
+      vmdq_queuing_mode = {default="rss-64-2"},
+      macaddr = {},
+      poolnum = {},
+      vlan = {},
+      mirror = {},
+      rxcounter = {},
+      txcounter = {},
+      rate_limit = {default=0},
+      priority = {default=1.0},
+      txq = {default=0},
+      rxq = {default=0},
       mtu = {default=9014},
-      rssseed = {default=314159},
       linkup_wait = {default=120},
+      linkup_wait_recheck = {default=0.1},
       wait_for_link = {default=false},
       master_stats = {default=true},
       run_stats = {default=false}
    },
-   shm = {
-      mtu    = {counter},
-      txdrop = {counter}
-   }
 }
 Intel1g = setmetatable({}, {__index = Intel })
 Intel82599 = setmetatable({}, {__index = Intel})
@@ -276,7 +314,7 @@ byPciID = {
 }
 
 -- The `driver' variable is used as a reference to the driver class in
--- order to interchangably use NIC drivers.
+-- order to interchangeably use NIC drivers.
 driver = Intel
 
 function Intel:new (conf)
@@ -284,14 +322,28 @@ function Intel:new (conf)
       r = {},
       pciaddress = conf.pciaddr,
       path = pci.path(conf.pciaddr),
-      -- falling back to defaults for selftest bypassing config.app
-      ndesc = conf.ndescriptors or self.config.ndescriptors.default,
+      ndesc = conf.ring_buffer_size,
       txq = conf.txq,
       rxq = conf.rxq,
-      mtu = conf.mtu or self.config.mtu.default,
-      rssseed = conf.rssseed or self.config.mtu.default,
-      linkup_wait = conf.linkup_wait or self.config.linkup_wait.default,
-      wait_for_link = conf.wait_for_link
+      mtu = conf.mtu,
+      linkup_wait = conf.linkup_wait,
+      linkup_wait_recheck = conf.linkup_wait_recheck,
+      wait_for_link = conf.wait_for_link,
+      vmdq = conf.vmdq,
+      poolnum = conf.poolnum,
+      macaddr = conf.macaddr,
+      vlan = conf.vlan,
+      want_mirror = conf.mirror,
+      rxcounter = conf.rxcounter,
+      txcounter = conf.txcounter,
+      rate_limit = conf.rate_limit,
+      priority = conf.priority,
+      -- a path used for shm operations on NIC-global state
+      -- canonicalize to ensure the reference is the same from all
+      -- processes
+      shm_root = "/intel-mp/" .. pci.canonical(conf.pciaddr) .. "/",
+      -- only used for main process, affects max pool number
+      vmdq_queuing_mode = conf.vmdq_queuing_mode
    }
 
    local vendor = lib.firstline(self.path .. "/vendor")
@@ -311,11 +363,25 @@ function Intel:new (conf)
 
    self:init()
    self.fd:flock("sh")
+   self:check_vmdq()
+   -- this needs to happen before register loading for rxq/txq
+   -- because it determines the queue numbers
+   self:select_pool()
+   self:load_queue_registers(byid.registers)
    self:init_tx_q()
    self:init_rx_q()
+   self:set_MAC()
+   self:set_VLAN()
+   self:set_mirror()
+   self:set_rxstats()
+   self:set_txstats()
+   self:set_tx_rate()
 
    -- Initialize per app statistics
-   counter.set(self.shm.mtu, self.mtu)
+   self.shm = {
+      mtu    = {counter, self.mtu},
+      txdrop = {counter}
+   }
 
    -- Figure out if we are supposed to collect device statistics
    self.run_stats = conf.run_stats or (self.master and conf.master_stats)
@@ -324,8 +390,12 @@ function Intel:new (conf)
    if self.run_stats then
       local frame = {
          dtime     = {counter, C.get_unix_time()},
+         -- Keep a copy of the mtu here to have all
+         -- data available in a single shm frame
+         mtu       = {counter, self.mtu},
          speed     = {counter},
          status    = {counter, 2}, -- Link down
+         type      = {counter, 0x1000}, -- ethernetCsmacd
          promisc   = {counter},
          macaddr   = {counter, self.r.RAL64[0]:bits(0,48)},
          rxbytes   = {counter},
@@ -347,12 +417,64 @@ function Intel:new (conf)
       self.sync_timer = lib.throttle(0.01)
    end
 
+   alarms.add_to_inventory {
+      [{alarm_type_id='ingress-bandwith'}] = {
+         resource=tostring(S.getpid()),
+         has_clear=true,
+         description='Ingress bandwith exceeds N Gbps',
+      }
+   }
+   local ingress_bandwith = alarms.declare_alarm {
+      [{resource=tostring(S.getpid()),alarm_type_id='ingress-bandwith'}] = {
+         perceived_severity='major',
+         alarm_text='Ingress bandwith exceeds 1e9 bytes/s which can cause packet drops.'
+      }
+   }
+   self.ingress_bandwith_alarm = CallbackAlarm.new(ingress_bandwith,
+      1, 1e9, function() return self:rxbytes() end)
+
+   alarms.add_to_inventory {
+      [{alarm_type_id='ingress-packet-rate'}] = {
+         resource=tostring(S.getpid()),
+         has_clear=true,
+         description='Ingress packet-rate exceeds N Gbps',
+      }
+   }
+   local ingress_packet_rate = alarms.declare_alarm {
+      [{resource=tostring(S.getpid()),alarm_type_id='ingress-packet-rate'}] = {
+         perceived_severity='major',
+         alarm_text='Ingress packet-rate exceeds 2MPPS which can cause packet drops.'
+      }
+   }
+   self.ingress_packet_rate_alarm = CallbackAlarm.new(ingress_packet_rate,
+      1, 2e6, function() return self:rxpackets() end)
+
    return self
 end
 
 function Intel:disable_interrupts ()
    self.r.EIMC(0xffffffff)
 end
+
+function Intel:wait_linkup (timeout)
+   if timeout == nil then timeout = self.linkup_wait end
+   if self:link_status() then return true end
+   for i=1,math.max(math.floor(timeout/self.linkup_wait_recheck), 1) do
+      C.usleep(math.floor(self.linkup_wait_recheck * 1e6))
+      if self:link_status() then return true end
+   end
+   return false
+end
+
+rxdesc_t = ffi.typeof([[
+struct {
+   uint64_t address;
+   uint16_t length, cksum;
+   uint8_t status, errors;
+   uint16_t vlan;
+} __attribute__((packed))
+]])
+
 function Intel:init_rx_q ()
    if not self.rxq then return end
    assert((self.rxq >=0) and (self.rxq < self.max_q),
@@ -364,17 +486,22 @@ function Intel:init_rx_q ()
    self.rdh = 0
    self.rdt = 0
    -- setup 4.5.9
-   local rxdesc_t = ffi.typeof([[
-   struct {
-      uint64_t address;
-      uint16_t length, cksum;
-      uint8_t status, errors;
-      uint16_t vlan;
-   } __attribute__((packed))
-   ]])
    local rxdesc_ring_t = ffi.typeof("$[$]", rxdesc_t, self.ndesc)
    self.rxdesc = ffi.cast(ffi.typeof("$&", rxdesc_ring_t),
    memory.dma_alloc(ffi.sizeof(rxdesc_ring_t)))
+
+   -- VMDq pool state (4.6.10.1.4)
+   if self.vmdq then
+      -- packet splitting none, enable 4 or 2 RSS queues per pool
+      if self.max_pool == 32 then
+         self.r.PSRTYPE[self.poolnum](bits { RQPL=30 })
+      else
+         self.r.PSRTYPE[self.poolnum](bits { RQPL=29 })
+      end
+      -- multicast promiscuous, broadcast accept, accept untagged pkts
+      self.r.PFVML2FLT[self.poolnum]:set(bits { MPE=28, BAM=27, AUPE=24 })
+   end
+
    -- Receive state
    self.r.RDBAL(tophysical(self.rxdesc) % 2^32)
    self.r.RDBAH(tophysical(self.rxdesc) / 2^32)
@@ -388,13 +515,18 @@ function Intel:init_rx_q ()
    end
    self.r.SRRCTL(0)
    self.r.SRRCTL:set(bits {
-      -- Set packet buff size to 0b1010 kbytes
-      BSIZEPACKET1 = 1,
-      BSIZEPACKET3 = 3,
+      -- Set packet buff size to 0b10000 kbytes (max)
+      BSIZEPACKET4 = 4,
       -- Drop packets when no descriptors
       Drop_En = self:offset("SRRCTL", "Drop_En")
    })
    self:lock_sw_sem()
+
+   -- enable VLAN tag stripping in VMDq mode
+   if self.vmdq then
+      self.r.RXDCTL:set(bits { VME = 30 })
+   end
+
    self.r.RXDCTL:set( bits { Enable = 25 })
    self.r.RXDCTL:wait( bits { Enable = 25 })
    C.full_memory_barrier()
@@ -404,6 +536,10 @@ function Intel:init_rx_q ()
    if self.driver == "Intel82599" then
       self.r.RXCTRL:set(bits{ RXEN=0 })
       self.r.DCA_RXCTRL:clr(bits{RxCTRL=12})
+      if self.vmdq then
+         -- enable packet reception for this pool/VF (4.6.10.1.4)
+         self.r.PFVFRE[math.floor(self.poolnum/32)]:set(bits{VFRE=self.poolnum%32})
+      end
    elseif self.driver == "Intel1g" then
       self.r.RCTL:set(bits { RXEN = 1 })
    end
@@ -437,6 +573,17 @@ function Intel:init_tx_q ()                               -- 4.5.10
    self.r.TDBAH(tophysical(self.txdesc) / 2^32)
    self.r.TDLEN(self.ndesc * ffi.sizeof(txdesc_t))
 
+   -- for VMDq need some additional pool configs
+   if self.vmdq then
+      self.r.RTTDQSEL(self.poolnum)
+      -- set baseline value for credit refill for tx bandwidth algorithm
+      self.r.RTTDT1C(0x80)
+      -- enables packet Tx for this VF's pool
+      self.r.PFVFTE[math.floor(self.poolnum/32)]:set(bits{VFTE=self.poolnum%32})
+      -- enable TX loopback
+      self.r.PFVMTXSW[math.floor(self.poolnum/32)]:clr(bits{LLE=self.poolnum%32})
+   end
+
    if self.r.DMATXCTL then
       self.r.DMATXCTL:set(bits { TE = 0 })
       self.r.TXDCTL:set(bits{SWFLSH=26, hthresh=8} + 32)
@@ -454,12 +601,16 @@ function Intel:load_registers(key)
    if v.inherit then self:load_registers(v.inherit) end
    if v.singleton then register.define(v.singleton, self.r, self.base) end
    if v.array then register.define_array(v.array, self.r, self.base) end
-   if v.txq and self.txq then
-      register.define(v.txq, self.r, self.base, self.txq)
-   end
-   if v.rxq and self.rxq then
-      register.define(v.rxq, self.r, self.base, self.rxq)
-   end
+end
+function Intel:load_queue_registers(key)
+  local v = reg[key]
+  if v.inherit then self:load_queue_registers(v.inherit) end
+  if v.txq and self.txq then
+    register.define(v.txq, self.r, self.base, self.txq)
+  end
+  if v.rxq and self.rxq then
+    register.define(v.rxq, self.r, self.base, self.rxq)
+  end
 end
 function Intel:lock_sw_sem()
    for i=1,50,1 do
@@ -476,21 +627,24 @@ function Intel:offset(reg, key)
 end
 function Intel:push ()
    if not self.txq then return end
-   local li = self.input["input"]
-   assert(li, "intel1g:push: no input link")
+   local li = self.input.input
+   if li == nil then return end
 
-   while not link.empty(li) and self:ringnext(self.tdt) ~= self.tdh do
-      local p = link.receive(li)
-      if p.length > self.mtu then
-         packet.free(p)
-         counter.add(self.shm.txdrop)
-      else
-         self.txdesc[self.tdt].address = tophysical(p.data)
-         self.txdesc[self.tdt].flags =
-            bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
-         self.txqueue[self.tdt] = p
-         self.tdt = self:ringnext(self.tdt)
-      end
+   self.ingress_packet_rate_alarm:check()
+   self.ingress_bandwith_alarm:check()
+
+   while not empty(li) and self:can_transmit() do
+      local p = receive(li)
+      -- NB: the comment below is taken from intel_mp.lua, which disables
+      -- this check for the same reason.
+      --   We must not send packets that are bigger than the MTU.  This
+      --   check is currently disabled to satisfy some selftests until
+      --   agreement on this strategy is reached.
+      --if p.length > self.mtu then
+      --   packet.free(p)
+      --   counter.add(self.shm.txdrop)
+      --end
+      self:transmit(p)
    end
    -- Reclaim transmit contexts
    local cursor = self.tdh
@@ -504,18 +658,25 @@ function Intel:push ()
       cursor = self:ringnext(cursor)
    end
    self.r.TDT(self.tdt)
+
+   -- same code as in pull, but we only call it in case the rxq
+   -- is disabled for this app
+   if self.rxq and self.output.output then return end
+   if self.run_stats and self.sync_timer() then
+      self:sync_stats()
+   end
 end
 
 function Intel:pull ()
    if not self.rxq then return end
-   local lo = self.output["output"]
-   assert(lo, "intel1g: output link required")
+   local lo = self.output.output
+   if lo == nil then return end
 
    local pkts = 0
    while band(self.rxdesc[self.rdt].status, 0x01) == 1 and pkts < engine.pull_npackets do
       local p = self.rxqueue[self.rdt]
       p.length = self.rxdesc[self.rdt].length
-      link.transmit(lo, p)
+      transmit(lo, p)
 
       local np = packet.allocate()
       self.rxqueue[self.rdt] = np
@@ -541,6 +702,19 @@ end
 function Intel:ringnext (index)
    return band(index+1, self.ndesc-1)
 end
+
+function Intel:can_transmit ()
+   return self:ringnext(self.tdt) ~= self.tdh
+end
+
+function Intel:transmit (p)
+   self.txdesc[self.tdt].address = tophysical(p.data)
+   self.txdesc[self.tdt].flags =
+      bor(p.length, self.txdesc_flags, lshift(p.length+0ULL, 46))
+   self.txqueue[self.tdt] = p
+   self.tdt = self:ringnext(self.tdt)
+end
+
 function Intel:rss_enable ()
    -- set default q = 0 on i350,i210 noop on 82599
    self.r.MRQC(0)
@@ -554,11 +728,16 @@ function Intel:rss_enable ()
    self:rss_key()
 end
 function Intel:rss_key ()
-   math.randomseed(self.rssseed)
    for i=0,9,1 do
       self.r.RSSRK[i](math.random(2^32))
    end
 end
+
+-- Set RSS redirection table, which has 64 * 2 entries which contain
+-- RSS indices, the lower 4 bits (or fewer) of which are used to
+-- select an RSS queue.
+--
+-- Also returns the current state of the redirection table
 function Intel:rss_tab (newtab)
    local current = {}
    local pos = 0
@@ -576,10 +755,6 @@ function Intel:rss_tab (newtab)
    return current
 end
 function Intel:rss_tab_build ()
-   -- noop if rss is not enabled
-   local b = bits { RSS = self:offset("MRQC", "RSS") }
-   if bit.band(self.r.MRQC(), b) ~= b then return end
-
    local tab = {}
    for i=0,self.max_q-1,1 do
       if band(self.r.ALLRXDCTL[i](), bits { Enable = 25 }) > 0 then
@@ -619,16 +794,20 @@ function Intel:stop ()
       --TXDCTL[n].SWFLSH and wait
       --wait until tdh == tdt
       --wait on rxd[tdh].status = dd
+      self:discard_unsent_packets()
       self.r.TXDCTL(0)
       self.r.TXDCTL:wait(bits { ENABLE = 25 }, 0)
-      for i = 0, self.ndesc-1 do
-         if self.txqueue[i] then
-            packet.free(self.txqueue[i])
-            self.txqueue[i] = nil
-         end
-      end
    end
+   if self.vmdq then
+      self:unset_MAC()
+      self:unset_VLAN()
+      self:unset_mirror()
+      self:unset_pool()
+   end
+   self:unset_tx_rate()
    if self.fd:flock("nb, ex") then
+      -- delete shm state for this NIC
+      shm.unlink(self.shm_root)
       self.r.CTRL:clr( bits { SETLINKUP = 6 } )
       --self.r.CTRL_EXT:clear( bits { DriverLoaded = 28 })
       pci.set_bus_master(self.pciaddress, false)
@@ -637,6 +816,20 @@ function Intel:stop ()
    if self.run_stats then
       shm.delete_frame(self.stats)
    end
+end
+
+function Intel:discard_unsent_packets ()
+   local old_tdt = self.tdt
+   self.tdt = self.r.TDT()
+   self.tdh = self.r.TDH()
+   self.r.TDT(self.tdh)
+   while old_tdt ~= self.tdh do
+      old_tdt = band(old_tdt - 1, self.ndesc - 1)
+      packet.free(self.txqueue[old_tdt])
+      self.txdesc[old_tdt].address = -1
+      self.txdesc[old_tdt].flags = 0
+   end
+   self.tdt = self.tdh
 end
 
 function Intel:sync_stats ()
@@ -657,8 +850,206 @@ function Intel:sync_stats ()
    set(stats.txdrop, self:txdrop())
    set(stats.txerrors, self:txerrors())
    set(stats.rxdmapackets, self:rxdmapackets())
-   for name, register in pairs(self.queue_stats) do
+   for idx = 1, #self.queue_stats, 2 do
+      local name, register = self.queue_stats[idx], self.queue_stats[idx+1]
       set(stats[name], register())
+   end
+end
+
+-- set MAC address (4.6.10.1.4)
+function Intel:set_MAC ()
+   if not self.macaddr then return end
+   local mac = macaddress:new(self.macaddr)
+   self:add_receive_MAC(mac)
+   self:set_transmit_MAC(mac)
+end
+
+function Intel:add_receive_MAC (mac)
+   local mac_index
+
+   -- scan to see if the MAC is already recorded or find the
+   -- first free MAC index
+   --
+   -- the lock protects the critical section so that driver apps on
+   -- separate processes do not use conflicting registers
+   self:lock_sw_sem()
+   for idx=1, self.max_mac_addr do
+      local valid = self.r.RAH[idx]:bits(31, 1)
+
+      if valid == 0 then
+         mac_index = idx
+         self.r.RAL[mac_index](mac:subbits(0,32))
+         self.r.RAH[mac_index](bits({AV=31},mac:subbits(32,48)))
+         break
+      else
+         if self.r.RAL[idx]() == mac:subbits(0, 32) and
+            self.r.RAH[idx]:bits(0, 15) == mac:subbits(32, 48) then
+            mac_index = idx
+            break
+         end
+      end
+   end
+   self:unlock_sw_sem()
+
+   assert(mac_index, "Max number of MAC addresses reached")
+
+   -- associate MAC with the app's VMDq pool
+   self:enable_MAC_for_pool(mac_index)
+end
+
+function Intel:set_transmit_MAC (mac)
+   local poolnum = self.poolnum or 0
+   self.r.PFVFSPOOF[math.floor(poolnum/8)]:set(bits{MACAS=poolnum%8})
+end
+
+-- set VLAN for the driver instance
+function Intel:set_VLAN ()
+   local vlan = self.vlan
+   if not vlan then return end
+   assert(vlan>=0 and vlan<4096, "bad VLAN number")
+   self:add_receive_VLAN(vlan)
+   self:set_tag_VLAN(vlan)
+end
+
+function Intel:add_receive_VLAN (vlan)
+   assert(vlan>=0 and vlan<4096, "bad VLAN number")
+   local vlan_index, first_empty
+
+   -- works the same as add_receive_MAC
+   self:lock_sw_sem()
+   for idx=0, self.max_vlan-1 do
+      local valid = self.r.PFVLVF[idx]:bits(31, 1)
+
+      if valid == 0 then
+         if not first_empty then
+            first_empty = idx
+         end
+      elseif self.r.PFVLVF[idx]:bits(0, 11) == vlan then
+         vlan_index = idx
+         break
+      end
+   end
+   self:unlock_sw_sem()
+
+   if not vlan_index and first_empty then
+      vlan_index = first_empty
+      self.r.VFTA[math.floor(vlan/32)]:set(bits{Ena=vlan%32})
+      self.r.PFVLVF[vlan_index](bits({Vl_En=31},vlan))
+   end
+
+   assert(vlan_index, "Max number of VLAN IDs reached")
+
+   self.r.PFVLVFB[2*vlan_index + math.floor(self.poolnum/32)]
+      :set(bits{PoolEna=self.poolnum%32})
+end
+
+function Intel:set_tag_VLAN (vlan)
+   local poolnum = self.poolnum or 0
+   self.r.PFVFSPOOF[math.floor(poolnum/8)]:set(bits{VLANAS=poolnum%8+8})
+   -- set Port VLAN ID & VLANA to always add VLAN tag
+   -- TODO: on i350 it's the VMVIR register
+   self.r.PFVMVIR[poolnum](bits({VLANA=30}, vlan))
+end
+
+function Intel:unset_VLAN ()
+   local r = self.r
+   local offs, mask = math.floor(self.poolnum/32), bits{PoolEna=self.poolnum%32}
+
+   for vln_ndx = 0, 63 do
+      if band(r.PFVLVFB[2*vln_ndx+offs](), mask) ~= 0 then
+         -- found a vlan this pool belongs to
+         r.PFVLVFB[2*vln_ndx+offs]:clr(mask)
+         if r.PFVLVFB[2*vln_ndx+offs]() == 0 then
+            -- it was the last pool of the vlan
+            local vlan = tonumber(band(r.PFVLVF[vln_ndx](), 0xFFF))
+            r.PFVLVF[vln_ndx](0x0)
+            r.VFTA[math.floor(vlan/32)]:clr(bits{Ena=vlan%32})
+         end
+      end
+   end
+end
+
+function Intel:set_mirror ()
+   if not self.want_mirror then return end
+   want_mirror = self.want_mirror
+
+   -- set MAC promiscuous
+   self.r.PFVML2FLT[self.poolnum]:set(bits{
+      AUPE=24, ROMPE=25, ROPE=26, BAM=27, MPE=28})
+
+   -- pick one of a limited (4) number of mirroring rules
+   for idx=0, 3 do
+      -- check if no mirroring enable bits (3:0) are set
+      -- (i.e., this rule is unused and available)
+      if self.r.PFMRCTL[idx]:bits(0, 4) == 0 then
+         mirror_ndx = idx
+         break
+      -- there's already a rule for this pool, overwrite
+      elseif self.r.PFMRCTL[idx]:bits(8, 5) == self.poolnum then
+         mirror_ndx = idx
+         break
+      end
+   end
+
+   assert(mirror_ndx, "Max number of mirroring rules reached")
+
+   local mirror_rule = 0ULL
+
+   -- mirror some or all pools
+   if want_mirror.pool then
+      mirror_rule = bor(bits{VPME=0}, mirror_rule)
+      if want_mirror.pool == true then -- mirror all pools
+         self.r.PFMRVM[mirror_ndx](0xFFFFFFFF)
+         self.r.PFMRVM[mirror_ndx+4](0xFFFFFFFF)
+      elseif type(want_mirror.pool) == 'table' then
+         local bm0 = self.r.PFMRVM[mirror_ndx]()
+         local bm1 = self.r.PFMRVM[mirror_ndx+4]()
+         for _, pool in ipairs(want_mirror.pool) do
+            if pool <= 64 then
+               bm0 = bor(lshift(1, pool), bm0)
+            else
+               bm1 = bor(lshift(1, pool-64), bm1)
+            end
+         end
+         self.r.PFMRVM[mirror_ndx](bm0)
+         self.r.PFMRVM[mirror_ndx+4](bm1)
+      end
+   end
+
+   -- mirror hardware port
+   if want_mirror.port then
+      if want_mirror.port == true or
+            want_mirror.port == 'in' or
+            want_mirror.port == 'inout' then
+         mirror_rule = bor(bits{UPME=1}, mirror_rule)
+      end
+      if want_mirror.port == true or
+            want_mirror.port == 'out' or
+            want_mirror.port == 'inout' then
+         mirror_rule = bor(bits{DPME=2}, mirror_rule)
+      end
+   end
+
+   -- TODO: implement VLAN mirroring
+
+   if mirror_rule ~= 0 then
+      mirror_rule = bor(mirror_rule, lshift(self.poolnum, 8))
+      self.r.PFMRCTL[mirror_ndx]:set(mirror_rule)
+   end
+end
+
+function Intel:unset_mirror ()
+   for rule_i = 0, 3 do
+      -- check if any mirror rule points here
+      local rule_dest = band(bit.rshift(self.r.PFMRCTL[rule_i](), 8), 63)
+      local bits = band(self.r.PFMRCTL[rule_i](), 0x07)
+      if bits ~= 0 and rule_dest == self.poolnum then
+         self.r.PFMRCTL[rule_i](0x0)     -- clear rule
+         self.r.PFMRVLAN[rule_i](0x0)    -- clear VLANs mirrored
+         self.r.PFMRVLAN[rule_i+4](0x0)
+         self.r.PFMRVM[rule_i](0x0)      -- clear pools mirrored
+         self.r.PFMRVM[rule_i+4](0x0)
+      end
    end
 end
 
@@ -678,6 +1069,8 @@ Intel1g.offsets = {
        RSS = 1
     }
 }
+Intel1g.max_mac_addr = 15
+Intel1g.max_vlan = 8
 function Intel1g:init_phy ()
    -- 4.3.1.4 PHY Reset
    self.r.MANC:wait(bits { BLK_Phy_Rst_On_IDE = 18 }, 0)
@@ -697,7 +1090,9 @@ function Intel1g:init_phy ()
    self.r.SW_FW_SYNC:clr(bits { SW_PHY_SM = 1 })
    self:unlock_fw_sem()
 
-   self.r.EEMNGCTL:wait(bits { CFG_DONE0 = 18 })
+   -- Determine PCI function to physical port mapping
+   local lan_id = self.r.STATUS:bits(2,2)
+   self.r.EEMNGCTL:wait(bits { CFG_DONE = 18 + lan_id })
 
    --[[
    self:lock_fw_sem()
@@ -726,6 +1121,7 @@ function Intel1g:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
+   pci.disable_bus_master_cleanup(self.pciaddress)
 
    -- 4.5.3  Initialization Sequence
    self:disable_interrupts()
@@ -757,22 +1153,18 @@ function Intel1g:init ()
    self.r.CTRL_EXT:set( bits { AutoSpeedDetect = 12, DriverLoaded = 28 })
    self.r.RLPML(self.mtu + 4) -- mtu + crc
    self:unlock_sw_sem()
-   for i=1, math.floor(self.linkup_wait/2) do
-      if self:link_status() then break end
-      if not self.wait_for_link then break end
-      C.usleep(2000000)
-   end
+   if self.wait_for_link then self:wait_linkup() end
 end
 
 function Intel1g:link_status ()
-   local mask = bits { Link_up = 1 }
+   local mask = lshift(1, 1)
    return bit.band(self.r.STATUS(), mask) == mask
 end
 function Intel1g:link_speed ()
    return ({10000,100000,1000000,1000000})[1+bit.band(bit.rshift(self.r.STATUS(), 6),3)]
 end
 function Intel1g:promisc ()
-   return band(self.r.RCTL(), bits{UPE=3}) ~= 0ULL
+   return band(self.r.RCTL(), lshift(1, 3)) ~= 0ULL
 end
 function Intel1g:rxbytes   () return self.r.GORCH()*2^32 + self.r.GORCL() end
 function Intel1g:rxdrop    () return self.r.MPC() + self.r.RNBC()         end
@@ -801,11 +1193,60 @@ function Intel1g:init_queue_stats (frame)
    for i=0,self.max_q-1 do
       for k,v in pairs(perqregs) do
          local name = "q" .. i .. "_" .. k
-         self.queue_stats[name] = self.r[v][i]
+         table.insert(self.queue_stats, name)
+         table.insert(self.queue_stats, self.r[v][i])
          frame[name] = {counter}
       end
    end
 end
+
+function Intel1g:get_rxstats ()
+   assert(self.rxq, "cannot retrieve rxstats without rxq")
+   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local rxc   = self.rxq
+   return {
+      counter_id = rxc,
+      packets = counter.read(frame["q"..rxc.."_rxpackets"]),
+      dropped = counter.read(frame["q"..rxc.."_rxdrops"]),
+      bytes = counter.read(frame["q"..rxc.."_rxbytes"])
+   }
+end
+
+function Intel1g:get_txstats ()
+   assert(self.txq, "cannot retrieve rxstats without txq")
+   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local txc   = self.txq
+   return {
+      counter_id = txc,
+      packets = counter.read(frame["q"..txc.."_txpackets"]),
+      bytes = counter.read(frame["q"..txc.."_txbytes"])
+   }
+end
+
+-- noop because 1g NICs have per-queue counters that aren't
+-- configurable
+function Intel1g:set_rxstats () return end
+function Intel1g:set_txstats () return end
+
+function Intel1g:check_vmdq () return end
+function Intel1g:vmdq_enable ()
+   error("unimplemented")
+end
+function Intel1g:select_pool () return end
+
+function Intel1g:enable_MAC_for_pool(mac_index)
+   self.r.RAH[mac_index]:set(bits { Ena = 18 + self.poolnum })
+end
+
+function Intel1g:unset_MAC ()
+   local msk = bits { Ena = 18 + self.poolnum }
+   for mac_index = 0, self.max_mac_addr do
+      pf.r.RAH[mac_index]:clr(msk)
+   end
+end
+
+function Intel1g:set_tx_rate () return end
+function Intel1g:unset_tx_rate () return end
 
 Intel82599.driver = "Intel82599"
 Intel82599.offsets = {
@@ -816,8 +1257,11 @@ Intel82599.offsets = {
        RSS = 0
    }
 }
+Intel82599.max_mac_addr = 127
+Intel82599.max_vlan = 64
+
 function Intel82599:link_status ()
-   local mask = bits { Link_up = 30 }
+   local mask = lshift(1, 30)
    return bit.band(self.r.LINKS(), mask) == mask
 end
 function Intel82599:link_speed ()
@@ -828,7 +1272,7 @@ function Intel82599:link_speed ()
       or  1000000                                -- 100 Mb/s
 end
 function Intel82599:promisc ()
-   return band(self.r.FCTRL(), bits{UPE=9}) ~= 0ULL
+   return band(self.r.FCTRL(), lshift(1, 9)) ~= 0ULL
 end
 function Intel82599:rxbytes  () return self.r.GORC64()   end
 function Intel82599:rxdrop   () return self.r.QPRDC[0]() end
@@ -855,18 +1299,28 @@ function Intel82599:init_queue_stats (frame)
    for i=0,15 do
       for k,v in pairs(perqregs) do
          local name = "q" .. i .. "_" .. k
-         self.queue_stats[name] = self.r[v][i]
+         table.insert(self.queue_stats, name)
+         table.insert(self.queue_stats, self.r[v][i])
          frame[name] = {counter}
       end
    end
 end
 
+-- C type for VMDq enabled state
+vmdq_enabled_t = ffi.typeof("struct { uint8_t enabled; }")
+
 function Intel82599:init ()
    if not self.master then return end
    pci.unbind_device_from_linux(self.pciaddress)
    pci.set_bus_master(self.pciaddress, true)
+   pci.disable_bus_master_cleanup(self.pciaddress)
 
-   for i=1,math.floor(self.linkup_wait/2) do
+   -- The 82599 devices sometimes just don't come up, especially when
+   -- there is traffic already on the link.  If 2s have passed and the
+   -- link is still not up, loop and retry.
+   local reset_timeout = math.max(self.linkup_wait_recheck, 2)
+   local reset_count = math.max(math.floor(self.linkup_wait / reset_timeout), 1)
+   for i=1,reset_count do
       self:disable_interrupts()
       local reset = bits{ LinkReset=3, DeviceReset=26 }
       self.r.CTRL(reset)
@@ -881,9 +1335,9 @@ function Intel82599:init ()
       self.r.AUTOC2(0)
       self.r.AUTOC2:set(bits { tenG_PMA_PMD_Serial = 17 })
       self.r.AUTOC:set(bits{restart_AN=12})
-      C.usleep(2000000)
-      if self:link_status() then break end
+
       if not self.wait_for_link then break end
+      if self:wait_linkup(reset_timeout) then break end
    end
 
    -- 4.6.7
@@ -919,12 +1373,12 @@ function Intel82599:init ()
    self.r.VLNCTRL(0x8100)                    -- explicity set default
    self.r.RXCSUM(0)                          -- turn off all checksum offload
 
-   self.r.RXPBSIZE[0]:bits(10,19, 0x200)
-   self.r.TXPBSIZE[0]:bits(10,19, 0xA0)
+   self.r.RXPBSIZE[0]:bits(10,10, 0x200)
+   self.r.TXPBSIZE[0]:bits(10,10, 0xA0)
    self.r.TXPBTHRESH[0](0xA0)
    for i=1,7 do
-      self.r.RXPBSIZE[i]:bits(10,19, 0)
-      self.r.TXPBSIZE[i]:bits(10,19, 0)
+      self.r.RXPBSIZE[i]:bits(10,10, 0)
+      self.r.TXPBSIZE[i]:bits(10,10, 0)
       self.r.TXPBTHRESH[i](0)
    end
 
@@ -941,6 +1395,8 @@ function Intel82599:init ()
       self.r.RTTDT2C[i](0)
       self.r.RTTPT2C[i](0)
       self.r.RTRPT4C[i](0)
+      self.r.ETQF[i](0)
+      self.r.ETQS[i](0)
    end
 
    self.r.HLREG0(bits{
@@ -953,7 +1409,282 @@ function Intel82599:init ()
    self.r.CTRL_EXT:set(bits {NS_DIS = 1})
 
    self:rss_enable()
+
+   -- set shm to indicate whether the NIC is in VMDq mode
+   local vmdq_shm = shm.create(self.shm_root .. "vmdq_enabled", vmdq_enabled_t)
+   vmdq_shm.enabled = self.vmdq
+   shm.unmap(vmdq_shm)
+
+   if self.vmdq then
+      self:vmdq_enable()
+   end
+
    self:unlock_sw_sem()
+end
+
+-- Implements various status checks related to VMDq configuration.
+-- Also checks that the main process used the same VMDq setting if
+-- this is a worker process
+function Intel82599:check_vmdq ()
+   local vmdq_shm = shm.open(self.shm_root .. "vmdq_enabled", vmdq_enabled_t)
+
+   if not self.vmdq then
+      assert(not self.macaddr, "VMDq must be set to use MAC address")
+      assert(not self.mirror, "VMDq must be set to specify mirroring rules")
+
+      if not self.master then
+         assert(vmdq_shm.enabled == 0,
+                "VMDq was set by the main process for this NIC")
+      end
+   else
+      assert(self.driver == "Intel82599", "VMDq only supported on 82599")
+      assert(self.macaddr, "MAC address must be set in VMDq mode")
+
+      if not self.master then
+         assert(vmdq_shm.enabled == 1,
+                "VMDq not set by the main process for this NIC")
+      end
+   end
+end
+
+-- C type for shared memory indicating which pools are used
+local vmdq_pools_t = ffi.typeof("struct { uint8_t pools[64]; }")
+-- C type for VMDq queuing mode
+-- mode = 0 for 32 pools/4 queues, 1 for 64 pools/2 queues
+local vmdq_queuing_mode_t = ffi.typeof("struct { uint8_t mode; }")
+
+-- enable VMDq mode, see 4.6.10.1
+-- follows the configuration flow in 4.6.11.3.3
+-- (should only be called on the master instance)
+function Intel82599:vmdq_enable ()
+   -- create shared memory for tracking VMDq pools
+   local vmdq_shm = shm.create(self.shm_root .. "vmdq_pools", vmdq_pools_t)
+   -- explicitly initialize to 0 since we can't rely on cleanup
+   for i=0, 63 do vmdq_shm.pools[i] = 0 end
+   shm.unmap(vmdq_shm)
+
+   -- set VMDq queuing mode for all instances on this NIC
+   local mode_shm = shm.create(self.shm_root .. "vmdq_queuing_mode",
+                               vmdq_queuing_mode_t)
+   if self.vmdq_queuing_mode == "rss-32-4" then
+      mode_shm.mode = 0
+   elseif self.vmdq_queuing_mode == "rss-64-2" then
+      mode_shm.mode = 1
+   else
+      error("Invalid VMDq queuing mode")
+   end
+   shm.unmap(mode_shm)
+
+   -- must be set prior to setting MTQC (7.2.1.2.1)
+   self.r.RTTDCS:set(bits { ARBDIS=6 })
+
+   if self.vmdq_queuing_mode == "rss-32-4" then
+      -- 1010 -> 32 pools, 4 RSS queues each
+      self.r.MRQC:bits(0, 4, 0xA)
+      -- Num_TC_OR_Q=10b -> 32 pools (4.6.11.3.3 and 8.2.3.9.15)
+      self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=3 })
+   else
+      -- 1011 -> 64 pools, 2 RSS queues each
+      self.r.MRQC:bits(0, 4, 0xB)
+      -- Num_TC_OR_Q=01b -> 64 pools
+      self.r.MTQC(bits { VT_Ena=1, Num_TC_OR_Q=2 })
+   end
+
+   -- TODO: not sure this is needed, but it's in intel10g
+   -- disable RSC (7.11)
+   self.r.RFCTL:set(bits { RSC_Dis=5 })
+
+   -- enable virtualization, replication enabled, disable default pool
+   self.r.PFVTCTL(bits { VT_Ena=0, Rpl_En=30, DisDefPool=29 })
+
+   -- enable VMDq Tx to Rx loopback
+   self.r.PFDTXGSWC:set(bits { LBE=0 })
+
+   -- needs to be set for loopback (7.10.3.4)
+   self.r.FCRTH[0](0x10000)
+
+   -- enable vlan filter (4.6.7, 7.1.1.2)
+   self.r.VLNCTRL:set(bits { VFE=30 })
+
+   -- RTRUP2TC/RTTUP2TC cleared above in init
+
+   -- DMA TX TCP max allowed size requests (set to 1MB)
+   self.r.DTXMXSZRQ(0xFFF)
+
+   -- disable PFC, enable legacy control flow
+   self.r.MFLCN(bits { RFCE=3 })
+   self.r.FCCFG(bits { TFCE=3 })
+
+   -- RTTDT2C, RTTPT2C, RTRPT4C cleared above in init()
+
+   -- QDE bit = 0 for all queues
+   for i = 0, 127 do
+      self.r.PFQDE(bor(lshift(1,16), lshift(i,8)))
+   end
+
+   -- clear RTTDT1C, PFVLVF for all pools, set them later
+   for i = 0, 63 do
+      self.r.RTTDQSEL(i)
+      self.r.RTTDT1C(0x00)
+   end
+
+   -- disable TC arbitrations, enable packet buffer free space monitor
+   self.r.RTTDCS:clr(bits { TDPAC=0, TDRM=4, BPBFSM=23 })
+   self.r.RTTDCS:set(bits { VMPAC=1, BDPM=22 })
+   self.r.RTTPCS:clr(bits { TPPAC=5, TPRM=8 })
+   -- set RTTPCS.ARBD
+   self.r.RTTPCS:bits(22, 10, 0x244)
+   self.r.RTRPCS:clr(bits { RAC=2, RRM=1 })
+
+   -- must be cleared after MTQC configuration (7.2.1.2.1)
+   self.r.RTTDCS:clr(bits { ARBDIS=6 })
+end
+
+-- In VMDq mode, selects an available pool if one isn't provided by the user.
+--
+-- This method runs before rxq/txq registers are loaded, because the rxq/txq registers
+-- depend on the pool number prior to loading.
+function Intel82599:select_pool()
+   if not self.vmdq then return end
+
+   self:lock_sw_sem()
+
+   -- check the queueing mode in shm, adjust max pools based on that
+   local mode_shm = shm.open(self.shm_root .. "vmdq_queuing_mode", vmdq_queuing_mode_t)
+   if mode_shm.mode == 0 then
+      self.max_pool = 32
+   else
+      self.max_pool = 64
+   end
+   shm.unmap(mode_shm)
+
+   -- We use some shared memory to track which pool numbers are claimed
+   local pool_shm = shm.open(self.shm_root .. "vmdq_pools", vmdq_pools_t)
+
+   -- if the poolnum was set manually in the config, just use that
+   if not self.poolnum then
+      local available_pool
+
+      for poolnum = 0, self.max_pool-1 do
+         if pool_shm.pools[poolnum] == 0 then
+            available_pool = poolnum
+            break
+         end
+      end
+
+      assert(available_pool, "No free VMDq pools are available")
+      self.poolnum = available_pool
+   else
+      assert(self.poolnum < self.max_pool,
+             string.format("Pool overflow: Intel 82599 supports up to %d VMDq pools",
+                           self.max_pool))
+   end
+
+   pool_shm.pools[self.poolnum] = 1
+   shm.unmap(pool_shm)
+
+   self:unlock_sw_sem()
+
+   -- Once we know the pool number, figure out txq and rxq numbers. This
+   -- needs to be done prior to loading registers.
+   --
+   -- for VMDq, make rxq/txq relative to the pool number
+   local max_rxq_or_txq = 128 / self.max_pool
+   assert(self.rxq >= 0 and self.rxq < max_rxq_or_txq,
+          "rxqueue must be in 0.." .. max_rxq_or_txq-1)
+   self.rxq = self.rxq + max_rxq_or_txq * self.poolnum
+   assert(self.txq >= 0 and self.txq < max_rxq_or_txq,
+          "txqueue must be in 0.." .. max_rxq_or_txq-1)
+   self.txq = self.txq + max_rxq_or_txq * self.poolnum
+
+   -- max queue number is different in VMDq mode
+   self.max_q = 128
+end
+
+-- used to disable the pool number for this instance on stop()
+function Intel82599:unset_pool ()
+  self:lock_sw_sem()
+
+  local pool_shm = shm.open(self.shm_root .. "vmdq_pools", vmdq_pools_t)
+  pool_shm.pools[self.poolnum] = 0
+  shm.unmap(pool_shm)
+
+  self:unlock_sw_sem()
+end
+
+function Intel82599:enable_MAC_for_pool (mac_index)
+   self.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]
+      :set(bits{Ena=self.poolnum%32})
+end
+
+function Intel82599:unset_MAC ()
+   local msk = bits { Ena=self.poolnum%32 }
+   for mac_index = 0, self.max_mac_addr do
+      self.r.MPSAR[2*mac_index + math.floor(self.poolnum/32)]:clr(msk)
+   end
+end
+
+function Intel82599:set_tx_rate ()
+   if not self.txq then return end
+   self.r.RTTDQSEL(self.poolnum or self.txq)
+   if self.rate_limit >= 10 then
+      -- line rate = 10,000 Mb/s
+      local factor = 10000 / tonumber(self.rate_limit)
+      -- 10.14 bits
+      factor = bit.band(math.floor(factor*2^14+0.5), 2^24-1)
+      self.r.RTTBCNRC(bits({RS_ENA=31}, factor))
+   else
+      self.r.RTTBCNRC(0x00)
+   end
+   self.r.RTTDT1C(bit.band(math.floor(self.priority * 0x80), 0x3FF))
+end
+
+function Intel82599:unset_tx_rate ()
+   self.rate_limit = 0
+   self.priority = 0
+   self:set_tx_rate()
+end
+
+-- return rxstats for the counter assigned to this queue
+-- the data has to be read from the shm frame since the main instance
+-- is in control of the counter registers (and clears them on read)
+function Intel82599:get_rxstats ()
+   assert(self.rxcounter and self.rxq, "cannot retrieve rxstats")
+   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local rxc   = self.rxcounter
+   return {
+      counter_id = rxc,
+      packets = counter.read(frame["q"..rxc.."_rxpackets"]),
+      dropped = counter.read(frame["q"..rxc.."_rxdrops"]),
+      bytes = counter.read(frame["q"..rxc.."_rxbytes"])
+   }
+end
+
+function Intel82599:get_txstats ()
+   assert(self.txcounter and self.txq, "cannot retrieve txstats")
+   local frame = shm.open_frame("pci/"..self.pciaddress)
+   local txc   = self.txcounter
+   return {
+      counter_id = txc,
+      packets = counter.read(frame["q"..txc.."_txpackets"]),
+      bytes = counter.read(frame["q"..txc.."_txbytes"])
+   }
+end
+
+-- enable the given counter for this app's rx queue
+function Intel82599:set_rxstats ()
+   if not self.rxcounter or not self.rxq then return end
+   local counter = self.rxcounter
+   assert(counter>=0 and counter<16, "bad Rx counter")
+   self.r.RQSMR[math.floor(self.rxq/4)]:set(lshift(counter,8*(self.rxq%4)))
+end
+
+-- enable the given counter for this app's tx queue
+function Intel82599:set_txstats ()
+   if not self.txcounter or not self.txq then return end
+   local counter = self.txcounter
+   assert(counter>=0 and counter<16, "bad Tx counter")
+   self.r.TQSM[math.floor(self.txq/4)]:set(lshift(counter,8*(self.txq%4)))
 end
 
 function Intel:debug (args)
@@ -1013,8 +1744,13 @@ function Intel:debug (args)
    end
 
    if prnt then
-     for k,v in pairs(r) do
-        print(pfx..k,v)
+     local keys = {}
+     for k,_ in pairs(r) do
+       table.insert(keys, k)
+     end
+     table.sort(keys)
+     for _,k in ipairs(keys) do
+        print(pfx..k, r[k])
      end
    end
    return r

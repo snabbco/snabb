@@ -25,7 +25,8 @@ Intel82599 = {
       rxcounter  = {default=0},
       txcounter  = {default=0},
       rate_limit = {default=0},
-      priority   = {default=1.0}
+      priority   = {default=1.0},
+      ring_buffer_size = {default=intel10g.ring_buffer_size()}
    }
 }
 Intel82599.__index = Intel82599
@@ -52,6 +53,10 @@ end
 function Intel82599:new (conf)
    local self = {}
 
+   -- FIXME: ring_buffer_size is really a global variable for this
+   -- driver; taking the parameter as an initarg is just to make the
+   -- intel_mp transition easier.
+   intel10g.ring_buffer_size(conf.ring_buffer_size)
    if conf.vmdq then
       if devices[conf.pciaddr] == nil then
          local pf = intel10g.new_pf(conf):open()
@@ -155,8 +160,8 @@ function Intel82599:pull ()
    end
 end
 
-function Intel82599:ingress_packet_drops ()
-   return self.dev:ingress_packet_drops()
+function Intel82599:rxdrop ()
+   return self.dev:rxdrop()
 end
 
 function Intel82599:add_receive_buffers ()
@@ -247,14 +252,10 @@ end
 function selftest ()
    print("selftest: intel_app")
 
-   local pcideva = lib.getenv("SNABB_PCI_INTEL0") or lib.getenv("SNABB_PCI0")
-   local pcidevb = lib.getenv("SNABB_PCI_INTEL1") or lib.getenv("SNABB_PCI1")
-   if not pcideva
-      or pci.device_info(pcideva).driver ~= 'apps.intel.intel_app'
-      or not pcidevb
-      or pci.device_info(pcidevb).driver ~= 'apps.intel.intel_app'
-   then
-      print("SNABB_PCI_INTEL[0|1]/SNABB_PCI[0|1] not set or not suitable.")
+   local pcideva = lib.getenv("SNABB_PCI_INTEL0")
+   local pcidevb = lib.getenv("SNABB_PCI_INTEL1")
+   if not pcideva or not pcidevb then
+      print("SNABB_PCI_INTEL[0|1] not set or not suitable.")
       os.exit(engine.test_skipped_code)
    end
 
