@@ -246,7 +246,7 @@ struct {
 ]]
 
 function load(stream, params)
-   local header = stream:read_ptr(header_t)
+   local header = stream:read_struct(nil, header_t)
    local params_copy = {}
    for k,v in pairs(params) do params_copy[k] = v end
    params_copy.initial_size = header.size
@@ -262,19 +262,19 @@ function load(stream, params)
    -- Slurp the entries directly into the ctable's backing store.
    -- This ensures that the ctable is in hugepages.
    C.memcpy(ctab.entries,
-            stream:read_array(ctab.entry_type, entry_count),
+            stream:read_array(nil, ctab.entry_type, entry_count),
             ffi.sizeof(ctab.entry_type) * entry_count)
 
    return ctab
 end
 
 function CTable:save(stream)
-   stream:write_ptr(header_t(self.size, self.occupancy, self.max_displacement,
-                             self.hash_seed, self.max_occupancy_rate,
-                             self.min_occupancy_rate),
-                    header_t)
-   stream:write_array(self.entries,
-                      self.entry_type,
+   stream:write_struct(header_t,
+                       header_t(self.size, self.occupancy, self.max_displacement,
+                                self.hash_seed, self.max_occupancy_rate,
+                                self.min_occupancy_rate))
+   stream:write_array(self.entry_type,
+                      self.entries,
                       self.size + self.max_displacement)
 end
 
@@ -662,42 +662,16 @@ function selftest()
       -- Save the table out to disk, reload it, and run the same
       -- checks.
       local tmp = os.tmpname()
+      local file = require("lib.stream.file")
       do
-         local file = io.open(tmp, 'wb')
-         local function write(ptr, size)
-            file:write(ffi.string(ptr, size))
-         end
-         local stream = {}
-         function stream:write_ptr(ptr, type)
-            assert(ffi.sizeof(ptr) == ffi.sizeof(type))
-            write(ptr, ffi.sizeof(type))
-         end
-         function stream:write_array(ptr, type, count)
-            write(ptr, ffi.sizeof(type) * count)
-         end
+         local stream = file.open(tmp, 'wb')
          ctab:save(stream)
-         file:close()
+         stream:close()
       end
       do
-         local file = io.open(tmp, 'rb')
-         -- keep references to avoid GCing too early
-         local handle = {}
-         local function read(size)
-            local buf = ffi.new('uint8_t[?]', size)
-            ffi.copy(buf, file:read(size), size)
-            table.insert(handle, buf)
-            return buf
-         end
-         local stream = {}
-         function stream:read_ptr(type)
-            return ffi.cast(ffi.typeof('$*', type), read(ffi.sizeof(type)))
-         end
-         function stream:read_array(type, count)
-            return ffi.cast(ffi.typeof('$*', type),
-                            read(ffi.sizeof(type) * count))
-         end
+         local stream = file.open(tmp, 'rb')
          ctab = load(stream, params)
-         file:close()
+         stream:close()
       end         
       os.remove(tmp)
    end

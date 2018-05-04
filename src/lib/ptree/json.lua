@@ -1,81 +1,44 @@
 -- Use of this source code is governed by the Apache 2.0 license; see COPYING.
 module(..., package.seeall)
 
-local S = require("syscall")
-local ffi = require("ffi")
-
--- A very limited json library that only does objects of strings,
--- designed to integrate well with poll(2) loops.
-
-function buffered_input(fd)
-   local buf_size = 4096
-   local buf = ffi.new('uint8_t[?]', buf_size)
-   local buf_end = 0
-   local pos = 0
-   local ret = {}
-   local eof = false
-   local function fill()
-      assert(pos == buf_end)
-      if eof then return 0 end
-      pos = 0
-      buf_end = assert(fd:read(buf, buf_size))
-      assert(0 <= buf_end and buf_end <= buf_size)
-      if buf_end == 0 then eof = true end
-      return buf_end
-   end
-   function ret:avail() return buf_end - pos end
-   function ret:getfd() return fd:getfd() end
-   function ret:eof() return eof end
-   function ret:peek()
-      if pos == buf_end and fill() == 0 then return nil end
-      return string.char(buf[pos])
-   end
-   function ret:discard()
-      assert(pos < buf_end)
-      pos = pos + 1
-   end
-   return ret
-end
-
-local whitespace_pat = '[ \n\r\t]'
-
-function drop_buffered_whitespace(input)
-   while input:avail() > 0 and input:peek():match(whitespace_pat) do
-      input:discard()
-   end
-end
+-- A very limited json library that only does objects of strings.
 
 local function take_while(input, pat)
    local out = {}
-   while input:peek() and input:peek():match(pat) do
-      table.insert(out, input:peek())
-      input:discard()
+   while input:peek_char() and input:peek_char():match(pat) do
+      table.insert(out, input:read_char())
    end
    return table.concat(out)
 end
 
+local function drop_while(input, pat)
+   take_while(input, pat)
+end
+
+local function skip_whitespace(input)
+   local whitespace_pat = '[ \n\r\t]'
+   drop_while(input, whitespace_pat)
+end
+
 local function check(input, ch)
-   if input:peek() ~= ch then return false end
-   input:discard()
+   if input:peek_char() ~= ch then return false end
+   input:read_char()
    return true
 end
 
-local function consume(input, ch)
-   if not check(input, ch) then
-      if input:eof() then error('unexpected EOF') end
-      error('expected '..ch..', got '..input:peek())
-   end
+local function consume(input, expected)
+   local ch = input:read_char()
+   if ch == expected then return end
+   if ch == nil then error('unexpected EOF') end
+   error('expected '..expected..', got '..ch)
 end
 
 local function consume_pat(input, pat)
-   local ch = input:peek()
+   local ch = input:read_char()
+   if ch:match(pat) then return ch end
    if ch == nil then error('unexpected EOF') end
-   if not ch:match(pat) then error('unexpected character '..ch) end
-   input:discard()
-   return ch
+   error('unexpected character '..ch)
 end
-
-function skip_whitespace(input) take_while(input, whitespace_pat) end
 
 -- Pattern describing characters that can appear literally in a JSON
 -- string.
@@ -124,6 +87,9 @@ local function read_json_string(input)
 end
 
 function read_json_object(input)
+   skip_whitespace(input)
+   -- Return nil on EOF.
+   if input:peek_byte() == nil then return nil end
    consume(input, "{")
    skip_whitespace(input)
    local ret = {}
@@ -145,29 +111,13 @@ function read_json_object(input)
    return ret
 end
 
-function buffered_output()
-   local ret = { buf = {} }
-   function ret:write(str) table.insert(self.buf, str) end
-   function ret:flush(fd)
-      local str = table.concat(self.buf)
-      if fd == nil then return str end
-      local bytes = ffi.cast('const char*', str)
-      local written = 0
-      while written < #str do
-         local wrote = assert(fd:write(bytes + written, #str - written))
-         written = written + wrote
-      end
-   end
-   return ret
-end
-
 local function write_json_string(output, str)
-   output:write('"')
+   output:write_chars('"')
    local pos = 1
    while pos <= #str do
       local head = str:match('^('..literal_string_chars_pat..'+)', pos)
       if head then
-         output:write(head)
+         output:write_chars(head)
          pos = pos + #head
       else
          head = str:sub(pos, pos)
@@ -178,53 +128,44 @@ local function write_json_string(output, str)
          if not escaped then
             escaped = string.format("u00%.2x", head:byte(1))
          end
-         output:write('\\'..escaped)
+         output:write_chars('\\'..escaped)
          pos = pos + 1
       end
    end
-   output:write('"')
+   output:write_chars('"')
 end
 
 function write_json_object(output, obj)
-   output:write('{')
+   output:write_chars('{')
    local comma = false
    for k,v in pairs(obj) do
-      if comma then output:write(',') else comma = true end
+      if comma then output:write_chars(',') else comma = true end
       write_json_string(output, k)
-      output:write(':')
+      output:write_chars(':')
       write_json_string(output, v)
    end
-   output:write('}')
+   output:write_chars('}')
 end
 
 function selftest ()
    print('selftest: lib.ptree.json')
    local equal = require('core.lib').equal
+   local tmpfile = require('lib.stream.mem').tmpfile
    local function test_json(str, obj)
-      local tmp = os.tmpname()
-      local f = io.open(tmp, 'w')
-      f:write(str)
-      f:write(" ") -- whitespace sentinel on the end.
-      f:close()
+      local tmp = tmpfile()
+      tmp:write(str)
+      tmp:write(" ") -- whitespace sentinel on the end.
       for i = 1,2 do
-         local fd = S.open(tmp, 'rdonly')
-         local input = buffered_input(fd)
-         local parsed = read_json_object(input)
+         tmp:seek('set', 0)
+         local parsed = read_json_object(tmp)
          assert(equal(parsed, obj))
-         assert(not input:eof())
-         assert(check(input, " "))
-         assert(not input:peek())
-         assert(input:eof())
-         fd:close()
+         assert(read_json_object(tmp) == nil)
+         assert(tmp:read_char() == nil)
 
-         local fd = assert(S.open(tmp, 'wronly, trunc'))
-         local output = buffered_output()
-         write_json_object(output, parsed)
-         output:write(' ') -- sentinel
-         output:flush(fd)
-         fd:close()
+         tmp = tmpfile()
+         write_json_object(tmp, parsed)
+         tmp:write(' ') -- sentinel
       end
-      os.remove(tmp)
    end
    test_json('{}', {})
    test_json('{"foo":"bar"}', {foo='bar'})
