@@ -88,6 +88,8 @@ end
 
 function read_json_object(input)
    skip_whitespace(input)
+   -- Return nil on EOF.
+   if input:peek_byte() == nil then return nil end
    consume(input, "{")
    skip_whitespace(input)
    local ret = {}
@@ -157,7 +159,7 @@ function selftest ()
          tmp:seek('set', 0)
          local parsed = read_json_object(tmp)
          assert(equal(parsed, obj))
-         assert(tmp:read_char() == " ")
+         assert(read_json_object(tmp) == nil)
          assert(tmp:read_char() == nil)
 
          tmp = tmpfile()

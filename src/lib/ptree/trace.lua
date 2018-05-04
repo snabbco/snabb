@@ -81,7 +81,7 @@ function selftest ()
    parsed = json.read_json_object(tmp)
    assert(lib.equal(parsed, {id="1", verb="set", path="/",
                              schema="foo", revision="bar", value="baz"}))
-   assert(tmp:read_char() == '\n')
+   assert(json.read_json_object(tmp) == nil)
    assert(tmp:read_char() == nil)
 
    print('selftest: ok')

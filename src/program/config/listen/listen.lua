@@ -59,6 +59,12 @@ end
 
 local function read_request(client, schema_name, revision_date)
    local json = json_lib.read_json_object(client)
+   if json == nil then
+      -- The input pipe is closed.  FIXME: there could still be buffered
+      -- responses; we should exit only once we've received them.
+      io.stderr:write('Input pipe closed.\n')
+      os.exit(0)
+   end
    local id, verb, path = assert(json.id), assert(json.verb), json.path or '/'
    path = path_lib.normalize_path(path)
    if json.schema then schema_name = json.schema end
