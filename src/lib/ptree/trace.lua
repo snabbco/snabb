@@ -5,7 +5,7 @@ module(...,package.seeall)
 local lib = require('core.lib')
 local stream = require("lib.stream")
 local file = require("lib.stream.file")
-local json = require("lib.ptree.json2")
+local json = require("lib.ptree.json")
 
 local Trace = {}
 local trace_config_spec = {

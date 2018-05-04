@@ -7,7 +7,7 @@ local ffi = require("ffi")
 local file = require("lib.stream.file")
 local mem = require("lib.stream.mem")
 local fiber = require("lib.fibers.fiber")
-local json_lib = require("lib.ptree.json2")
+local json_lib = require("lib.ptree.json")
 
 function show_usage(command, status, err_msg)
    if err_msg then print('error: '..err_msg) end

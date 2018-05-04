@@ -10,7 +10,7 @@ local file = require("lib.stream.file")
 local rpc = require("lib.yang.rpc")
 local data = require("lib.yang.data")
 local path_lib = require("lib.yang.path")
-local json_lib = require("lib.ptree.json2")
+local json_lib = require("lib.ptree.json")
 local common = require("program.config.common")
 
 local function open_socket(file)
