@@ -51,8 +51,7 @@ function selftest()
       fiber.spawn(fn)
    end
    for t=now(),now()+1.5,0.01 do
-      fiber.current_scheduler:schedule_expired_timers(t)
-      fiber.current_scheduler:run()
+      fiber.current_scheduler:run(t)
    end
    assert(#done == count)
    print('selftest: ok')
