@@ -174,6 +174,10 @@ end
 function shutdown (pid)
    -- Parent process performs additional cleanup steps.
    -- (Parent is the process whose 'group' folder is not a symlink.)
+
+   -- Restore non-blocking flags on file descriptions, as these are
+   -- shared with the parent.
+   S.stdin:block(); S.stdout:block(); S.stderr:block()
    local st, err = S.lstat(shm.root.."/"..pid.."/group")
    local is_parent = st and st.isdir
    if is_parent then
