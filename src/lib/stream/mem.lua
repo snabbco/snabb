@@ -104,6 +104,7 @@ function call_with_output_string(f, ...)
    local args = {...}
    table.insert(args, out)
    f(unpack(args))
+   out:flush_output()
    -- Can take advantage of internals to read directly.
    return ffi.string(out.io.buf, out.io.len)
 end
