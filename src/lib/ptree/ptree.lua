@@ -497,27 +497,17 @@ function Manager:rpc_attach_listener (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Manager:add_notification_peer (peer)
+function Manager:rpc_attach_notification_listener ()
    local i, peers = 1, self.peers
    while i <= #peers do
-      if peers[i] == peer then break end
+      if peers[i] == self.rpc_peer then break end
       i = i + 1
    end
    if i <= #peers then
-      table.insert(self.notification_peers, peer)
+      table.insert(self.notification_peers, self.rpc_peer)
       table.remove(self.peers, i)
    end
-end
-
-function Manager:rpc_attach_notification_listener (args)
-   local function attacher()
-      if self.listen_peer ~= nil then error('Listener already attached') end
-      self.listen_peer = self.rpc_peer
-      self:add_notification_peer(self.listen_peer)
-      return {}
-   end
-   local success, response = pcall(attacher)
-   if success then return response else return {status=1, error=response} end
+   return {}
 end
 
 function Manager:rpc_get_state (args)
@@ -558,24 +548,58 @@ end
 
 local dummy_unix_sockaddr = S.t.sockaddr_un()
 
-local function send_message(socket, msg_str)
-   socket:write(tostring(#msg_str)..'\n'..msg_str)
-end
-
 function Manager:push_notifications_to_peers()
    local notifications = alarms.notifications()
-   if #notifications > 0 then
-      -- Build notifications message.
-      local output = json_lib.buffered_output()
-      for _,each in ipairs(notifications) do
-         json_lib.write_json_object(output, each)
-      end
+   if #notifications == 0 then return end
+   local function head (queue)
+      local msg = assert(queue[1])
+      local len = #msg
+      return ffi.cast('uint8_t*', msg), len
+   end
+   local function tojson (output, str)
+      json_lib.write_json_object(output, str)
       local msg = output:flush()
-      -- Broadcast to notification peers.
-      for _,peer in ipairs(self.notification_peers) do
-         send_message(peer.fd, msg)
+      return tostring(#msg)..'\n'..msg
+   end
+   -- Enqueue notifications into each peer queue.
+   local peers = self.notification_peers
+   for _,peer in ipairs(peers) do
+      local output = json_lib.buffered_output()
+      peer.queue = peer.queue or {}
+      for _,each in ipairs(notifications) do
+         table.insert(peer.queue, tojson(output, each))
       end
-      alarms.clear_notifications()
+   end
+   -- Iterate peers and send enqueued messages.
+   for i,peer in ipairs(peers) do
+      local queue = peer.queue
+      while #queue > 0 do
+         local buf, len = head(peer.queue)
+         peer.pos = peer.pos or 0
+         local count, err = peer.fd:write(buf + peer.pos,
+                                          len - peer.pos)
+         if not count then
+            if err.AGAIN then break end
+            peer.state = 'error'
+            peer.msg = tostring(err)
+         elseif count == 0 then
+            peer.state = 'error'
+            peer.msg = 'short write'
+         else
+            peer.pos = peer.pos + count
+            assert(peer.pos <= len)
+            if peer.pos == len then
+               peer.pos = 0
+               table.remove(peer.queue, 1)
+            end
+         end
+
+         if peer.state == 'error' then
+            if peer.state == 'error' then self:warn('%s', peer.msg) end
+            peer.fd:close()
+            table.remove(peers, i)
+         end
+      end
    end
 end
 
