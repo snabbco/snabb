@@ -25,8 +25,35 @@ local state = {
    },
    shelved_alarms = {
       shelved_alarms = {}
+   },
+   notifications = {
+      alarm = {},
+      alarm_inventory_changed = {},
+      operator_action = {}
    }
 }
+
+local function clear_notifications ()
+   state.notifications.alarm = {}
+   state.notifications.alarm_inventory_changed = {}
+   state.notifications.operator_action = {}
+end
+
+function notifications ()
+   local ret = {}
+   local notifications = state.notifications
+   for k,v in pairs(notifications.alarm) do
+      table.insert(ret, v)
+   end
+   for k,v in pairs(notifications.alarm_inventory_changed) do
+      table.insert(ret, v)
+   end
+   for k,v in pairs(notifications.operator_action) do
+      table.insert(ret, v)
+   end
+   clear_notifications()
+   return ret
+end
 
 local function table_size (t)
    local size = 0
@@ -171,6 +198,11 @@ function do_add_to_inventory (k, v)
    end
    state.alarm_inventory.alarm_type[key] = v
    state.alarm_inventory.alarm_type[key].resource = resource
+   alarm_inventory_changed()
+end
+
+function alarm_inventory_changed()
+   table.insert(state.notifications.alarm_inventory_changed, {})
 end
 
 -- Single point to access alarm keys.
@@ -284,13 +316,19 @@ end
 -- The entry with latest time-stamp in this list MUST correspond to the leafs
 -- 'is-cleared', 'perceived-severity' and 'alarm-text' for the alarm.
 -- The time-stamp for that entry MUST be equal to the 'last-changed' leaf.
-local function add_status_change (alarm, status)
+local function add_status_change (key, alarm, status)
    alarm.status_change = alarm.status_change or {}
    alarm.perceived_severity = status.perceived_severity
    alarm.alarm_text = status.alarm_text
    alarm.last_changed = status.time
    state.alarm_list.last_changed = status.time
    table.insert(alarm.status_change, status)
+   add_alarm_notification(key, status)
+end
+
+function add_alarm_notification (key, status)
+   local notifications = state.notifications.alarm
+   notifications[key] = status
 end
 
 -- Creates a new alarm.
@@ -305,7 +343,7 @@ local function new_alarm (key, args)
       perceived_severity = args.perceived_severity or ret.perceived_severity,
       alarm_text = args.alarm_text or ret.alarm_text,
    }
-   add_status_change(ret, status)
+   add_status_change(key, ret, status)
    ret.last_changed = assert(status.time)
    ret.time_created = assert(ret.last_changed)
    ret.is_cleared = args.is_cleared
@@ -339,14 +377,14 @@ end
 -- An alarm gets updated if it needs a status change.  A status change implies
 -- to add a new status change to the alarm and update the alarm 'is_cleared'
 -- flag.
-local function update_alarm (alarm, args)
+local function update_alarm (key, alarm, args)
    if needs_status_change(alarm, args) then
       local status = {
          time = assert(format_date_as_iso_8601()),
          perceived_severity = assert(args.perceived_severity or alarm.perceived_severity),
          alarm_text = assert(args.alarm_text or alarm.alarm_text),
       }
-      add_status_change(alarm, status)
+      add_status_change(key, alarm, status)
       alarm.is_cleared = args.is_cleared
    end
 end
@@ -364,6 +402,8 @@ local function lookup_alarm (key)
    end
 end
 
+-- Notifications are only sent when a new alarm is raised, re-raised after being
+-- cleared and when an alarm is cleared.
 function raise_alarm (key, args)
    assert(key)
    args = args or {}
@@ -373,7 +413,7 @@ function raise_alarm (key, args)
    if not alarm then
       create_alarm(key, args)
    else
-      update_alarm(alarm, args)
+      update_alarm(key, alarm, args)
    end
 end
 
@@ -385,7 +425,7 @@ function clear_alarm (key)
    key = alarm_keys:normalize(key)
    local alarm = lookup_alarm(key)
    if alarm then
-      update_alarm(alarm, args)
+      update_alarm(key, alarm, args)
    end
 end
 
@@ -424,18 +464,25 @@ function set_operator_state (key, args)
       alarm.operator_state_change = {}
    end
    local time = format_date_as_iso_8601()
-   table.insert(alarm.operator_state_change, {
+   local status = {
       time = time,
       operator = 'admin',
       state = args.state,
       text = args.text,
-   })
+   }
+   table.insert(alarm.operator_state_change, status)
    if args.state == 'shelved' then
       shelve_alarm(key, alarm)
    elseif args.state == 'un-shelved' then
       unshelve_alarm(key, alarm)
    end
+   add_operator_action_notification(key, status)
    return true
+end
+
+function add_operator_action_notification (key, status)
+   local operator_action = state.notifications.operator_action
+   operator_action[key] = status
 end
 
 -- Purge alarms.

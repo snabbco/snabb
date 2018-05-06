@@ -27,6 +27,7 @@ local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
 local trace = require("lib.ptree.trace")
 local alarms = require("lib.yang.alarms")
+local json_lib = require("lib.ptree.json")
 
 local call_with_output_string = mem.call_with_output_string
 
@@ -77,6 +78,7 @@ function new_manager (conf)
    ret.default_schema = conf.default_schema or conf.schema_name
    ret.support = support.load_schema_config_support(conf.schema_name)
    ret.peers = {}
+   ret.notification_peers = {}
    ret.setup_fn = conf.setup_fn
    ret.period = 1/conf.Hz
    ret.worker_default_scheduling = conf.worker_default_scheduling
@@ -495,6 +497,19 @@ function Manager:rpc_attach_listener (args)
    if success then return response else return {status=1, error=response} end
 end
 
+function Manager:rpc_attach_notification_listener ()
+   local i, peers = 1, self.peers
+   while i <= #peers do
+      if peers[i] == self.rpc_peer then break end
+      i = i + 1
+   end
+   if i <= #peers then
+      table.insert(self.notification_peers, self.rpc_peer)
+      table.remove(self.peers, i)
+   end
+   return {}
+end
+
 function Manager:rpc_get_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
@@ -532,6 +547,61 @@ function Manager:handle (payload)
 end
 
 local dummy_unix_sockaddr = S.t.sockaddr_un()
+
+function Manager:push_notifications_to_peers()
+   local notifications = alarms.notifications()
+   if #notifications == 0 then return end
+   local function head (queue)
+      local msg = assert(queue[1])
+      local len = #msg
+      return ffi.cast('uint8_t*', msg), len
+   end
+   local function tojson (output, str)
+      json_lib.write_json_object(output, str)
+      local msg = output:flush()
+      return tostring(#msg)..'\n'..msg
+   end
+   -- Enqueue notifications into each peer queue.
+   local peers = self.notification_peers
+   for _,peer in ipairs(peers) do
+      local output = json_lib.buffered_output()
+      peer.queue = peer.queue or {}
+      for _,each in ipairs(notifications) do
+         table.insert(peer.queue, tojson(output, each))
+      end
+   end
+   -- Iterate peers and send enqueued messages.
+   for i,peer in ipairs(peers) do
+      local queue = peer.queue
+      while #queue > 0 do
+         local buf, len = head(peer.queue)
+         peer.pos = peer.pos or 0
+         local count, err = peer.fd:write(buf + peer.pos,
+                                          len - peer.pos)
+         if not count then
+            if err.AGAIN then break end
+            peer.state = 'error'
+            peer.msg = tostring(err)
+         elseif count == 0 then
+            peer.state = 'error'
+            peer.msg = 'short write'
+         else
+            peer.pos = peer.pos + count
+            assert(peer.pos <= len)
+            if peer.pos == len then
+               peer.pos = 0
+               table.remove(peer.queue, 1)
+            end
+         end
+
+         if peer.state == 'error' then
+            if peer.state == 'error' then self:warn('%s', peer.msg) end
+            peer.fd:close()
+            table.remove(peers, i)
+         end
+      end
+   end
+end
 
 function Manager:handle_calls_from_peers()
    local peers = self.peers
@@ -756,6 +826,7 @@ function Manager:main (duration)
       if timer.ticks then timer.run_to_time(now * 1e9) end
       self:remove_stale_workers()
       self:handle_calls_from_peers()
+      self:push_notifications_to_peers()
       self:send_messages_to_workers()
       self:receive_alarms_from_workers()
       now = C.get_monotonic_time()

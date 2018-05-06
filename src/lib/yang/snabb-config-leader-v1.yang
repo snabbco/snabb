@@ -138,6 +138,12 @@ module snabb-config-leader-v1 {
     }
   }
 
+  rpc attach-notification-listener {
+    output {
+      uses error-reporting;
+    }
+  }
+
   rpc set-alarm-operator-state {
     description
       "This is a means for the operator to indicate
