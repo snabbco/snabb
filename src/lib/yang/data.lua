@@ -792,6 +792,7 @@ local function print_yang_string(str, file)
 end
 
 function xpath_printer_from_grammar(production, print_default, root)
+   if not root then root = '' end
    if #root == 1 and root:sub(1, 1) == '/' then
       root = ''
    end
@@ -1013,7 +1014,8 @@ end
 xpath_printer_from_grammar = util.memoize(xpath_printer_from_grammar)
 
 function influxdb_printer_from_grammar(production, print_default, root)
-   if #root == 1 and root:sub(1, 1) == '/' then
+   if not root then root = '' end
+   if root and #root == 1 and root:sub(1, 1) == '/' then
       root = ''
    end
    local handlers = {}
