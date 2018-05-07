@@ -14,6 +14,9 @@ local cltable = require("lib.cltable")
 local cpuset = require("lib.cpuset")
 local scheduling = require("lib.scheduling")
 local mem = require("lib.stream.mem")
+local socket = require("lib.stream.socket")
+local fiber = require("lib.fibers.fiber")
+local sched = require("lib.fibers.sched")
 local yang = require("lib.yang.yang")
 local util = require("lib.yang.util")
 local schema = require("lib.yang.schema")
@@ -164,7 +167,54 @@ end
 function Manager:start ()
    if self.name then engine.claim_name(self.name) end
    self.cpuset:bind_to_numa_node()
-   self.socket = open_socket(self.socket_file_name)
+   require('lib.fibers.file').install_poll_io_handler()
+   self.sched = fiber.current_scheduler
+   local sockname = self.socket_file_name
+   local sock = socket.listen_unix(sockname)
+   local parent_close = sock.close
+   function sock:close()
+      parent_close(sock)
+      S.unlink(sockname)
+   end
+   fiber.spawn(function () self:accept_peers(sock) end)
+end
+
+function Manager:call_with_cleanup(closeable, f, ...)
+   local ok, err = pcall(f, ...)
+   closeable:close()
+   if not ok then self:warn('%s', tostring(err)) end
+end
+
+function Manager:accept_peers (sock)
+   self:call_with_cleanup(sock, function()
+      while true do
+         local peer = sock:accept()
+         fiber.spawn(function() self:handle_peer(peer) end)
+      end
+   end)
+end
+
+function Manager:handle_peer(peer)
+   self:call_with_cleanup(peer, function()
+      while true do
+         local prefix = peer:read_line('discard')
+         if prefix == nil then return end -- EOF.
+         local len = assert(tonumber(prefix), 'not a number: '..prefix)
+         assert(tostring(len) == prefix, 'bad number: '..prefix)
+         -- FIXME: Use a streaming parse.
+         local request = peer:read_chars(len)
+         local reply = self:handle(peer, request)
+         peer:write_chars(tostring(#reply))
+         peer:write_chars('\n')
+         peer:write_chars(reply)
+         peer:flush_output()
+      end
+   end)
+   if self.listen_peer == peer then self.listen_peer = nil end
+end
+
+function Manager:run_scheduler()
+   self.sched:run(engine.now())
 end
 
 function Manager:start_worker(sched_opts)
@@ -539,14 +589,15 @@ function Manager:rpc_get_alarms_state (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Manager:handle (payload)
+function Manager:handle (peer, payload)
    -- FIXME: Stream call and response instead of building strings.
-   return mem.call_with_output_string(
+   self.rpc_peer = peer
+   local ret = mem.call_with_output_string(
       rpc.handle_calls, self.rpc_callee, mem.open_input_string(payload),
       self.rpc_handler)
+   self.rpc_peer = nil
+   return ret
 end
-
-local dummy_unix_sockaddr = S.t.sockaddr_un()
 
 function Manager:push_notifications_to_peers()
    local notifications = alarms.notifications()
@@ -599,122 +650,6 @@ function Manager:push_notifications_to_peers()
             peer.fd:close()
             table.remove(peers, i)
          end
-      end
-   end
-end
-
-function Manager:handle_calls_from_peers()
-   local peers = self.peers
-   while true do
-      local fd, err = self.socket:accept(dummy_unix_sockaddr)
-      if not fd then
-         if err.AGAIN then break end
-         assert(nil, err)
-      end
-      fd:nonblock()
-      table.insert(peers, { state='length', len=0, fd=fd })
-   end
-   local i = 1
-   while i <= #peers do
-      local peer = peers[i]
-      local visit_peer_again = false
-      while peer.state == 'length' do
-         local ch, err = peer.fd:read(nil, 1)
-         if not ch then
-            if err.AGAIN then break end
-            peer.state = 'error'
-            peer.msg = tostring(err)
-         elseif ch == '\n' then
-            peer.pos = 0
-            peer.buf = ffi.new('uint8_t[?]', peer.len)
-            peer.state = 'payload'
-         elseif tonumber(ch) then
-            peer.len = peer.len * 10 + tonumber(ch)
-            if peer.len > 1e8 then
-               peer.state = 'error'
-               peer.msg = 'length too long: '..peer.len
-            end
-         elseif ch == '' then
-            if peer.len == 0 then
-               peer.state = 'done'
-            else
-               peer.state = 'error'
-               peer.msg = 'unexpected EOF'
-            end
-         else
-            peer.state = 'error'
-            peer.msg = 'unexpected character: '..ch
-         end
-      end
-      while peer.state == 'payload' do
-         if peer.pos == peer.len then
-            peer.state = 'ready'
-            peer.payload = ffi.string(peer.buf, peer.len)
-            peer.buf, peer.len = nil, nil
-         else
-            local count, err = peer.fd:read(peer.buf + peer.pos,
-                                            peer.len - peer.pos)
-            if not count then
-               if err.AGAIN then break end
-               peer.state = 'error'
-               peer.msg = tostring(err)
-            elseif count == 0 then
-               peer.state = 'error'
-               peer.msg = 'short read'
-            else
-               peer.pos = peer.pos + count
-               assert(peer.pos <= peer.len)
-            end
-         end
-      end
-      while peer.state == 'ready' do
-         -- Uncomment to get backtraces.
-         self.rpc_peer = peer
-         -- local success, reply = true, self:handle(peer.payload)
-         local success, reply = pcall(self.handle, self, peer.payload)
-         self.rpc_peer = nil
-         peer.payload = nil
-         if success then
-            assert(type(reply) == 'string')
-            reply = #reply..'\n'..reply
-            peer.state = 'reply'
-            peer.buf = ffi.new('uint8_t[?]', #reply+1, reply)
-            peer.pos = 0
-            peer.len = #reply
-         else
-            peer.state = 'error'
-            peer.msg = reply
-         end
-      end
-      while peer.state == 'reply' do
-         if peer.pos == peer.len then
-            visit_peer_again = true
-            peer.state = 'length'
-            peer.buf, peer.pos = nil, nil
-            peer.len = 0
-         else
-            local count, err = peer.fd:write(peer.buf + peer.pos,
-                                             peer.len - peer.pos)
-            if not count then
-               if err.AGAIN then break end
-               peer.state = 'error'
-               peer.msg = tostring(err)
-            elseif count == 0 then
-               peer.state = 'error'
-               peer.msg = 'short write'
-            else
-               peer.pos = peer.pos + count
-               assert(peer.pos <= peer.len)
-            end
-         end
-      end
-      if peer.state == 'done' or peer.state == 'error' then
-         if peer.state == 'error' then self:warn('%s', peer.msg) end
-         peer.fd:close()
-         table.remove(peers, i)
-         if self.listen_peer == peer then self.listen_peer = nil end
-      elseif not visit_peer_again then
-         i = i + 1
       end
    end
 end
@@ -789,10 +724,8 @@ function Manager:handle_alarm (worker, alarm)
 end
 
 function Manager:stop ()
-   for _,peer in ipairs(self.peers) do peer.fd:close() end
-   self.peers = {}
-   self.socket:close()
-   S.unlink(self.socket_file_name)
+   assert(self.sched:shutdown())
+   require('lib.fibers.file').uninstall_poll_io_handler()
 
    for id, worker in pairs(self.workers) do
       if not worker.shutting_down then self:stop_worker(id) end
@@ -825,7 +758,7 @@ function Manager:main (duration)
       next_time = now + self.period
       if timer.ticks then timer.run_to_time(now * 1e9) end
       self:remove_stale_workers()
-      self:handle_calls_from_peers()
+      self:run_scheduler()
       self:push_notifications_to_peers()
       self:send_messages_to_workers()
       self:receive_alarms_from_workers()
