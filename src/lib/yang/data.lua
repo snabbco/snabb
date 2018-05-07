@@ -1498,6 +1498,100 @@ function rpc_output_printer_from_schema(schema)
    return data_printer_from_grammar(rpc_output_grammar_from_schema(schema))
 end
 
+local function influxdb_printer_tests ()
+   local function lint (text)
+      local ret = {}
+      for line in text:gmatch("[^\n]+") do
+         table.insert(ret, (line:gsub("^%s+", "")))
+      end
+      return table.concat(ret, "\n")
+   end
+   local function influxdb_printer_test (test)
+      local schema_str, data_str, expected = unpack(test)
+      local format = 'influxdb'
+      local is_config, print_default = true, true
+      local schema = schema.load_schema(schema_str)
+      local data = load_config_for_schema(schema, mem.open_input_string(data_str))
+      local grammar = data_grammar_from_schema(schema, is_config, format)
+      local printer = influxdb_printer_from_grammar(grammar, print_default)
+      local actual = mem.call_with_output_string(printer, data)
+      assert(actual == lint(expected))
+   end
+   local test_schema = [[
+      module test {
+         namespace test;
+         prefix test;
+
+         container foo {
+            leaf x { type string; }
+            leaf y { type string; }
+            list bar {
+               key baz;
+               leaf baz { type string; }
+               leaf y { type string; }
+               leaf z { type string; }
+            }
+         }
+
+         container users {
+            leaf-list allow-user {
+               type string;
+            }
+         }
+
+         container nested-list {
+            leaf-list foo {
+               type string;
+            }
+            list bar {
+               leaf-list foo {
+                  type string;
+               }
+            }
+         }
+      }
+   ]]
+
+   local tests = {
+      {test_schema,
+      [[
+         foo {
+            x "x";
+            y "y";
+            bar {baz "baz"; y "y"; z "z";}
+         }
+      ]], [[
+         foo/bar/y,baz=baz value="y"
+         z,baz=baz value="z"
+         x value="x"
+         y value="y"
+      ]]},
+      {test_schema,
+      [[
+         users {
+            allow-user "jane";
+         }
+      ]], [[
+         users/allow-user,position=1 value=jane
+      ]]},
+      {test_schema,
+      [[
+         nested-list {
+            foo "jane";
+            bar {
+               foo "john";
+            }
+         }
+      ]], [[
+         nested-list/bar/foo,position=1 value=john
+         nested-list/foo,position=1 value=jane
+      ]]},
+   }
+   for _, each in ipairs(tests) do
+      influxdb_printer_test(each)
+   end
+end
+
 function selftest()
    print('selfcheck: lib.yang.data')
    local test_schema = schema.load_schema([[module fruit {
@@ -1690,6 +1784,8 @@ function selftest()
       }
    ]])
    assert(success == false)
+
+   influxdb_printer_tests()
 
    print('selfcheck: ok')
 end
