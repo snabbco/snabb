@@ -39,11 +39,15 @@ end
 
 set_blocking_handler()
 
+function init_nonblocking(fd)  blocking_handler:init_nonblocking(fd) end
+function wait_for_readable(fd) blocking_handler:wait_for_readable(fd) end
+function wait_for_writable(fd) blocking_handler:wait_for_writable(fd) end
+
 local File = {}
 local File_mt = {__index = File}
 
 local function new_file_io(fd, filename)
-   blocking_handler:init_nonblocking(fd)
+   init_nonblocking(fd)
    return setmetatable({fd=fd, filename=filename}, File_mt)
 end
 
@@ -88,8 +92,8 @@ function File:seek(whence, offset)
    return self.fd:lseek(offset, whence)
 end
 
-function File:wait_for_readable() blocking_handler:wait_for_readable(self.fd) end
-function File:wait_for_writable() blocking_handler:wait_for_writable(self.fd) end
+function File:wait_for_readable() wait_for_readable(self.fd) end
+function File:wait_for_writable() wait_for_writable(self.fd) end
 
 function File:close()
    self.fd:close()
