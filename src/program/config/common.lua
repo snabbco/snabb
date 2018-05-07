@@ -170,6 +170,7 @@ end
 
 local function read_length(socket)
    local line = socket:read_line()
+   if line == nil then error('unexpected EOF when reading length') end
    local len = assert(tonumber(line), 'not a number: '..line)
    assert(len >= 0 and len == math.floor(len), 'bad length: '..len)
    return len
