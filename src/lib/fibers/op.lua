@@ -52,6 +52,14 @@ function CompleteTask:run()
    end
 end
 
+-- A complete task can also be cancelled, which makes it complete with a
+-- call to "error".
+function CompleteTask:cancel(reason)
+   if self.suspension:waiting() then
+      self.suspension:complete(error, reason or 'cancelled')
+   end
+end
+
 -- An operation represents the potential for synchronization with some
 -- external party.  An operation has to be instantiated by its "perform"
 -- method, as if it were a thunk.  Note that Concurrent ML uses the term

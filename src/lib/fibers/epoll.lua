@@ -52,6 +52,11 @@ function Epoll:poll(timeout)
    return reviter, events, count
 end
 
+function Epoll:close()
+   self.fd:close()
+   self.fd = nil
+end
+
 function selftest()
    print('selftest: lib.fibers.epoll')
    local lib = require('core.lib')

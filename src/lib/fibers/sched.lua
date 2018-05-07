@@ -15,6 +15,9 @@ function new()
    function timer_task_source:schedule_tasks(sched, now)
       self.wheel:advance(now, sched)
    end
+   function timer_task_source:cancel_all_tasks(sched)
+      -- Implement me!
+   end
    ret:add_task_source(timer_task_source)
    return ret
 end
@@ -50,6 +53,15 @@ function Scheduler:run(now)
       self.cur[i] = nil
       task:run()
    end
+end
+
+function Scheduler:shutdown()
+   for i=1,100 do
+      for i=1,#self.sources do self.sources[i]:cancel_all_tasks(self) end
+      if #self.next == 0 then return true end
+      self:run()
+   end
+   return false
 end
 
 function selftest ()

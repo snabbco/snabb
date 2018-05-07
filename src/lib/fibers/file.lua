@@ -11,12 +11,13 @@ local file = require('lib.stream.file')
 local bit = require('bit')
 
 local PollIOHandler = {}
+local PollIOHandler_mt = { __index=PollIOHandler }
 function new_poll_io_handler()
    return setmetatable(
       { epoll=epoll.new(),
         waiting_for_readable={},   -- sock descriptor => array of task
         waiting_for_writable={} }, -- sock descriptor => array of task
-      { __index=PollIOHandler })
+      PollIOHandler_mt)
 end
 
 -- These three methods are "blocking handler" methods and are called by
@@ -81,6 +82,52 @@ function PollIOHandler:schedule_tasks(sched, now, timeout)
       if bit.band(event.events, epoll.WR + epoll.ERR) ~= 0 then
          local tasks = self.waiting_for_writable[event.data.fd]
          schedule_tasks(sched, tasks)
+      end
+   end
+end
+
+function PollIOHandler:cancel_tasks_for_fd(fd)
+   local function cancel_tasks(waiting)
+      local tasks = waiting[fd]
+      if tasks ~= nil then
+         for i=1,#tasks do tasks[i]:cancel() end
+         waiting[fd] = nil
+      end
+   end
+   cancel_tasks(self.waiting_for_readable)
+   cancel_tasks(self.waiting_for_writable)
+end
+
+function PollIOHandler:cancel_all_tasks()
+   for fd,_ in pairs(self.waiting_for_readable) do
+      self:cancel_tasks_for_fd(fd)
+   end
+   for fd,_ in pairs(self.waiting_for_writable) do
+      self:cancel_tasks_for_fd(fd)
+   end
+end
+
+local installed = 0
+function install_poll_io_handler()
+   installed = installed + 1
+   if installed == 1 then
+      local handler = new_poll_io_handler()
+      file.set_blocking_handler(handler)
+      fiber.current_scheduler:add_task_source(handler)
+   end
+end
+
+function uninstall_poll_io_handler()
+   installed = installed - 1
+   if installed == 0 then
+      file.set_blocking_handler(nil)
+      -- FIXME: Remove task source.
+      for i,source in ipairs(fiber.current_scheduler.sources) do
+         if getmetatable(source) == PollIOHandler_mt then
+            table.remove(fiber.current_scheduler.sources, i)
+            source.epoll:close()
+            break
+         end
       end
    end
 end
