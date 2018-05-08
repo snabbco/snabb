@@ -14,12 +14,13 @@ Making performance predictable for application developers brings new requirement
 The development process has to support moving quickly in these directions:
 
 - Quality assurance based on repeatable standard benchmarks executed by CI.
-- Streamlined codebase: x86-64 architecture, 64-bit heap (GC64), "no `#ifdef`."
-- Distributed development ("Linux-style") with many maintainers, forks, and merges.
+- Streamlined codebase: x86-64 architecture, Linux kernel, 64-bit heap (GC64), "no `#ifdef`."
+- Distributed development with many maintainers, forks, and merges.
 
 Once these requirements have been thoroughly satisfied then new
-requirements can be introduced. For example, ARM64 and other platforms
-can be supported as the project matures.
+requirements can be introduced. For example, new architectures like
+ARM64 and operating systems like MacOS can be supported as the project
+matures.
 
 ### Performance
 

@@ -311,6 +311,7 @@ typedef struct GCproto {
   GCRef chunkname;	/* Name of the chunk this function was defined in. */
   BCLine firstline;	/* First line of the function definition. */
   BCLine numline;	/* Number of lines for the function definition. */
+  MRef declname;	/* Declared name of function (null-terminated). */
   MRef lineinfo;	/* Map from bytecode ins. to source line. */
   MRef uvinfo;		/* Upvalue names. */
   MRef varinfo;		/* Names and compressed extents of local variables. */
@@ -344,6 +345,7 @@ typedef struct GCproto {
 
 #define proto_chunkname(pt)	(strref((pt)->chunkname))
 #define proto_chunknamestr(pt)	(strdata(proto_chunkname((pt))))
+#define proto_declname(pt)	(mref((pt)->declname, const char))
 #define proto_lineinfo(pt)	(mref((pt)->lineinfo, const uint32_t))
 #define proto_uvinfo(pt)	(mref((pt)->uvinfo, const uint8_t))
 #define proto_varinfo(pt)	(mref((pt)->varinfo, const uint8_t))
