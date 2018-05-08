@@ -2206,7 +2206,6 @@ static void parse_func(LexState *ls, BCLine line)
   ExpDesc v, b;
   int needself = 0;
   char log[128];
-  log[0] = 'c';
   memset(log, 0, sizeof(log));
   lj_lex_log(ls, log, sizeof(log)-1);
   lj_lex_next(ls);  /* Skip 'function'. */
