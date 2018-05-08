@@ -212,6 +212,7 @@ static void bcwrite_proto(BCWriteCtx *ctx, GCproto *pt)
 {
   MSize sizedbg = 0;
   char *p;
+  const char *declname = pt->declname ? proto_declname(pt) : "";
 
   /* Recursively write children of prototype. */
   if ((pt->flags & PROTO_CHILD)) {
@@ -239,9 +240,10 @@ static void bcwrite_proto(BCWriteCtx *ctx, GCproto *pt)
   p = lj_strfmt_wuleb128(p, pt->sizebc-1);
   if (!ctx->strip) {
     if (proto_lineinfo(pt))
-      sizedbg = pt->sizept - (MSize)((char *)proto_lineinfo(pt) - (char *)pt);
+      sizedbg = pt->sizept - (MSize)((char *)proto_declname(pt) - (char *)pt);
     p = lj_strfmt_wuleb128(p, sizedbg);
     if (sizedbg) {
+      p = lj_strfmt_wuleb128(p, strlen(declname)+1);
       p = lj_strfmt_wuleb128(p, pt->firstline);
       p = lj_strfmt_wuleb128(p, pt->numline);
     }
@@ -259,7 +261,7 @@ static void bcwrite_proto(BCWriteCtx *ctx, GCproto *pt)
   /* Write debug info, if not stripped. */
   if (sizedbg) {
     p = lj_buf_more(&ctx->sb, sizedbg);
-    p = lj_buf_wmem(p, proto_lineinfo(pt), sizedbg);
+    p = lj_buf_wmem(p, declname, sizedbg);
     setsbufP(&ctx->sb, p);
   }
 
