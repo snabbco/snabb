@@ -165,9 +165,7 @@ static void bcread_dbg(LexState *ls, GCproto *pt, MSize sizedbg)
 static const void *bcread_varinfo(GCproto *pt)
 {
   const uint8_t *p = proto_uvinfo(pt);
-  MSize n = pt->sizeuv;
-  if (n) while (*p++ || --n) ;
-  return p;
+  return p + pt->sizeuv;
 }
 
 /* Read a single constant key/value of a template table. */
