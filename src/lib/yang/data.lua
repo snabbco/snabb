@@ -272,12 +272,6 @@ function rpc_output_grammar_from_schema(schema)
    return rpc_grammar_from_schema(schema).output
 end
 
-local function integer_type(min, max)
-   return function(str, k)
-      return util.tointeger(str, k, min, max)
-   end
-end
-
 local function range_predicate(range, val)
    return function(val)
       for _,part in ipairs(range) do
