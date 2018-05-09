@@ -212,7 +212,6 @@ static void bcwrite_proto(BCWriteCtx *ctx, GCproto *pt)
 {
   MSize sizedbg = 0, ofsdeclname = 0;
   char *p;
-  const char *declname = pt->declname ? proto_declname(pt) : "";
 
   /* Recursively write children of prototype. */
   if ((pt->flags & PROTO_CHILD)) {
