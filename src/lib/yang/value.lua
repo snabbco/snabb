@@ -143,12 +143,12 @@ types['mac-address'] = {
 }
 
 types['ipv4-prefix'] = {
-   ctype = 'struct { uint8_t prefix[4]; uint8_t len; }',
+   ctype = 'struct { uint32_t prefix; uint8_t len; }',
    parse = function(str, what)
       local prefix, len = str:match('^([^/]+)/(.*)$')
-      return { ipv4_pton(prefix), util.tointeger(len, nil, 1, 32) }
+      return { prefix=ipv4_pton(prefix), len=util.tointeger(len, nil, 1, 32) }
    end,
-   tostring = function(val) return ipv4_ntop(val[1])..'/'..tostring(val[2]) end
+   tostring = function(val) return ipv4_ntop(val.prefix)..'/'..tostring(val.len) end
 }
 
 types['ipv6-prefix'] = {
