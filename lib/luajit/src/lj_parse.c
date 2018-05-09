@@ -1367,7 +1367,8 @@ static void fs_fixup_line(FuncState *fs, GCproto *pt,
 }
 
 /* Prepare variable info for prototype. */
-static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar)
+static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar,
+                          size_t *ofsdeclname, const char *declname)
 {
   VarInfo *vs =ls->vstack, *ve;
   MSize i, n;
@@ -1405,14 +1406,24 @@ static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar)
     }
   }
   lj_buf_putb(&ls->sb, '\0');  /* Terminator for varinfo. */
+  /* Store function declaration name. */
+  *ofsdeclname = sbuflen(&ls->sb);
+  {
+    char *p;
+    int len = strlen(declname) + 1;
+    p = lj_buf_more(&ls->sb, len);
+    p = lj_buf_wmem(p, declname, len);
+    setsbufP(&ls->sb, p);
+  }
   return sbuflen(&ls->sb);
 }
 
 /* Fixup variable info for prototype. */
-static void fs_fixup_var(LexState *ls, GCproto *pt, uint8_t *p, size_t ofsvar)
+static void fs_fixup_var(LexState *ls, GCproto *pt, uint8_t *p, size_t ofsvar, size_t ofsdeclname)
 {
   setmref(pt->uvinfo, p);
   setmref(pt->varinfo, (char *)p + ofsvar);
+  setmref(pt->declname, (char*)p + ofsdeclname);
   memcpy(p, sbufB(&ls->sb), sbuflen(&ls->sb));  /* Copy from temp. buffer. */
 }
 
@@ -1467,12 +1478,12 @@ static void fs_fixup_ret(FuncState *fs)
 }
 
 /* Finish a FuncState and return the new prototype. */
-static GCproto *fs_finish(LexState *ls, BCLine line)
+static GCproto *fs_finish(LexState *ls, BCLine line, char *declname)
 {
   lua_State *L = ls->L;
   FuncState *fs = ls->fs;
   BCLine numline = line - fs->linedefined;
-  size_t sizept, ofsk, ofsuv, ofsli, ofsdbg, ofsvar;
+  size_t sizept, ofsk, ofsuv, ofsli, ofsdbg, ofsvar, ofsdeclname;
   GCproto *pt;
 
   /* Apply final fixups. */
@@ -1484,7 +1495,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
   ofsk = sizept; sizept += fs->nkn*sizeof(TValue);
   ofsuv = sizept; sizept += ((fs->nuv+1)&~1)*2;
   ofsli = sizept; sizept += fs_prep_line(fs, numline);
-  ofsdbg = sizept; sizept += fs_prep_var(ls, fs, &ofsvar);
+  ofsdbg = sizept; sizept += fs_prep_var(ls, fs, &ofsvar, &ofsdeclname, declname);
 
   /* Allocate prototype and initialize its fields. */
   pt = (GCproto *)lj_mem_newgco(L, (MSize)sizept);
@@ -1502,7 +1513,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line)
   fs_fixup_k(fs, pt, (void *)((char *)pt + ofsk));
   fs_fixup_uv1(fs, pt, (uint16_t *)((char *)pt + ofsuv));
   fs_fixup_line(fs, pt, (void *)((char *)pt + ofsli), numline);
-  fs_fixup_var(ls, pt, (uint8_t *)((char *)pt + ofsdbg), ofsvar);
+  fs_fixup_var(ls, pt, (uint8_t *)((char *)pt + ofsdbg), ofsvar, ofsdeclname);
 
   L->top--;  /* Pop table of constants. */
   ls->vtop = fs->vbase;  /* Reset variable stack. */
@@ -1744,7 +1755,8 @@ static BCReg parse_params(LexState *ls, int needself)
 static void parse_chunk(LexState *ls);
 
 /* Parse body of a function. */
-static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line)
+static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line,
+                       char *declname)
 {
   FuncState fs, *pfs = ls->fs;
   FuncScope bl;
@@ -1759,7 +1771,7 @@ static void parse_body(LexState *ls, ExpDesc *e, int needself, BCLine line)
   bcemit_AD(&fs, BC_FUNCF, 0, 0);  /* Placeholder. */
   parse_chunk(ls);
   if (ls->tok != TK_end) lex_match(ls, TK_end, TK_function, line);
-  pt = fs_finish(ls, (ls->lastline = ls->linenumber));
+  pt = fs_finish(ls, (ls->lastline = ls->linenumber), declname);
   pfs->bcbase = ls->bcstack + oldbase;  /* May have been reallocated. */
   pfs->bclim = (BCPos)(ls->sizebcstack - oldbase);
   /* Store new prototype in the constant array of the parent. */
@@ -1910,7 +1922,7 @@ static void expr_simple(LexState *ls, ExpDesc *v)
     return;
   case TK_function:
     lj_lex_next(ls);
-    parse_body(ls, v, 0, ls->linenumber);
+    parse_body(ls, v, 0, ls->linenumber, "");
     return;
   default:
     expr_primary(ls, v);
@@ -2139,9 +2151,24 @@ static void parse_call_assign(LexState *ls)
   }
 }
 
+/* Convert the logged input into a canonical function declaration name. */
+static char *log_declname(char *log)
+{
+  char *end = log + strlen(log) - 1;
+  /* Strip off trailing chars e.g. change "myfunc (X" to "myfunc". */
+  while (end > log && *end != '(')  end--;	/* Rewind to '('. */
+  if (*end != '(') return log; else end--;	/* Skip '(' if present. */
+  while (end > log && *end == ' ')  end--;	/* Rewind over spaces. */
+  *(end+1) = '\0';				/* Truncate. */
+  return log;
+}
+
 /* Parse 'local' statement. */
 static void parse_local(LexState *ls)
 {
+  char log[128];
+  memset(&log[0], 0, sizeof(log));
+  lj_lex_log(ls, &log[0], sizeof(log)-1);
   if (lex_opt(ls, TK_function)) {  /* Local function declaration. */
     ExpDesc v, b;
     FuncState *fs = ls->fs;
@@ -2150,7 +2177,8 @@ static void parse_local(LexState *ls)
     v.u.s.aux = fs->varmap[fs->freereg];
     bcreg_reserve(fs, 1);
     var_add(ls, 1);
-    parse_body(ls, &b, 0, ls->linenumber);
+    lj_lex_endlog(ls);          /* Captured declared function name. */
+    parse_body(ls, &b, 0, ls->linenumber, log_declname(log));
     /* bcemit_store(fs, &v, &b) without setting VSTACK_VAR_RW. */
     expr_free(fs, &b);
     expr_toreg(fs, &b, v.u.s.info);
@@ -2159,6 +2187,7 @@ static void parse_local(LexState *ls)
   } else {  /* Local variable declaration. */
     ExpDesc e;
     BCReg nexps, nvars = 0;
+    lj_lex_endlog(ls);          /* Not used for variables. */
     do {  /* Collect LHS. */
       var_new(ls, nvars++, lex_str(ls));
     } while (lex_opt(ls, ','));
@@ -2179,6 +2208,9 @@ static void parse_func(LexState *ls, BCLine line)
   FuncState *fs;
   ExpDesc v, b;
   int needself = 0;
+  char log[128];
+  memset(log, 0, sizeof(log));
+  lj_lex_log(ls, log, sizeof(log)-1);
   lj_lex_next(ls);  /* Skip 'function'. */
   /* Parse function name. */
   var_lookup(ls, &v);
@@ -2188,7 +2220,8 @@ static void parse_func(LexState *ls, BCLine line)
     needself = 1;
     expr_field(ls, &v);
   }
-  parse_body(ls, &b, needself, line);
+  lj_lex_endlog(ls);
+  parse_body(ls, &b, needself, line, log_declname(log));
   fs = ls->fs;
   bcemit_store(fs, &v, &b);
   fs->bcbase[fs->pc - 1].line = line;  /* Set line for the store. */
@@ -2618,7 +2651,7 @@ GCproto *lj_parse(LexState *ls)
   parse_chunk(ls);
   if (ls->tok != TK_eof)
     err_token(ls, TK_eof);
-  pt = fs_finish(ls, ls->linenumber);
+  pt = fs_finish(ls, ls->linenumber, "");
   L->top--;  /* Drop chunkname. */
   lua_assert(fs.prev == NULL);
   lua_assert(ls->fs == NULL);

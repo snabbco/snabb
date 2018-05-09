@@ -314,6 +314,7 @@ typedef struct GCproto {
   MRef lineinfo;	/* Map from bytecode ins. to source line. */
   MRef uvinfo;		/* Upvalue names. */
   MRef varinfo;		/* Names and compressed extents of local variables. */
+  MRef declname;	/* Declared name of function (null-terminated). */
 } GCproto;
 
 /* Flags for prototype. */
@@ -347,6 +348,7 @@ typedef struct GCproto {
 #define proto_lineinfo(pt)	(mref((pt)->lineinfo, const uint32_t))
 #define proto_uvinfo(pt)	(mref((pt)->uvinfo, const uint8_t))
 #define proto_varinfo(pt)	(mref((pt)->varinfo, const uint8_t))
+#define proto_declname(pt)	(mref((pt)->declname, const char))
 
 /* -- Upvalue object ------------------------------------------------------ */
 
