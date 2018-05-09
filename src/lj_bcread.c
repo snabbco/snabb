@@ -153,7 +153,7 @@ static uint32_t bcread_uleb128_33(LexState *ls)
 static void bcread_dbg(LexState *ls, GCproto *pt, MSize sizedbg)
 {
   uint32_t *lineinfo = (uint32_t*)proto_lineinfo(pt);
-  bcread_block(ls, (void*)proto_declname(pt), sizedbg);
+  bcread_block(ls, (void*)lineinfo, sizedbg);
   /* Swap lineinfo if the endianess differs. */
   if (bcread_swap(ls)) {
     int i;
@@ -299,9 +299,9 @@ GCproto *lj_bcread_proto(LexState *ls)
 {
   GCproto *pt;
   MSize framesize, numparams, flags, sizeuv, sizekgc, sizekn, sizebc, sizept;
-  MSize ofsk, ofsuv, ofsdbg;
+  MSize ofsk, ofsuv, ofsdbg, ofsdeclname = 0;
   MSize sizedbg = 0;
-  BCLine firstline = 0, numline = 0, ndeclname = 0;
+  BCLine firstline = 0, numline = 0;
 
   /* Read prototype header. */
   flags = bcread_byte(ls);
@@ -314,9 +314,9 @@ GCproto *lj_bcread_proto(LexState *ls)
   if (!(bcread_flags(ls) & BCDUMP_F_STRIP)) {
     sizedbg = bcread_uleb128(ls);
     if (sizedbg) {
-      ndeclname = bcread_uleb128(ls);
       firstline = bcread_uleb128(ls);
       numline = bcread_uleb128(ls);
+      ofsdeclname = bcread_uleb128(ls);
     }
   }
 
@@ -362,17 +362,16 @@ GCproto *lj_bcread_proto(LexState *ls)
   pt->numline = numline;
   if (sizedbg) {
     MSize sizeli = (sizebc-1) * sizeof(BCLine);
-    setmref(pt->declname, (char *)pt + ofsdbg);
-    setmref(pt->lineinfo, (char *)pt + ofsdbg + ndeclname);
-    setmref(pt->uvinfo, (char *)pt + ofsdbg + ndeclname + sizeli);
+    setmref(pt->lineinfo, (char *)pt + ofsdbg);
+    setmref(pt->uvinfo, (char *)pt + ofsdbg + sizeli);
+    setmref(pt->declname, (char *)pt + ofsdbg + ofsdeclname);
     bcread_dbg(ls, pt, sizedbg);
     setmref(pt->varinfo, bcread_varinfo(pt));
-    lua_assert(strlen(pt->declname)+1 == ndeclname);
   } else {
-    setmref(pt->declname, NULL);
     setmref(pt->lineinfo, NULL);
     setmref(pt->uvinfo, NULL);
     setmref(pt->varinfo, NULL);
+    setmref(pt->declname, NULL);
   }
   lj_auditlog_new_prototype(pt);
   return pt;
