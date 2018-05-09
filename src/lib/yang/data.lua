@@ -1271,6 +1271,12 @@ function selftest()
          description "internet of fruit";
          type inet:ipv4-address;
       }
+
+      leaf-list address {
+         type inet:ip-prefix;
+         description
+         "Address prefixes bound to this interface.";
+      }
    }]])
 
    local data = load_config_for_schema(test_schema,
@@ -1282,6 +1288,7 @@ function selftest()
        contents { name baz; score 9; tree-grown true; }
      }
      addr 1.2.3.4;
+     address 1.2.3.4/24;
    ]])
    for i =1,2 do
       assert(data.fruit_bowl.description == 'ohai')
