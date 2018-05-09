@@ -1366,20 +1366,13 @@ static void fs_fixup_line(FuncState *fs, GCproto *pt,
 }
 
 /* Prepare variable info for prototype. */
-static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar, const char *declname)
+static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar,
+                          size_t *ofsdeclname, const char *declname)
 {
   VarInfo *vs =ls->vstack, *ve;
   MSize i, n;
   BCPos lastpc;
   lj_buf_reset(&ls->sb);  /* Copy to temp. string buffer. */
-  /* Store function declaration name. */
-  {
-    char *p;
-    int len = strlen(declname) + 1;
-    p = lj_buf_more(&ls->sb, len);
-    p = lj_buf_wmem(p, declname, len);
-    setsbufP(&ls->sb, p);
-  }
   /* Store upvalue names. */
   for (i = 0, n = fs->nuv; i < n; i++) {
     GCstr *s = strref(vs[fs->uvmap[i]].name);
@@ -1412,16 +1405,24 @@ static size_t fs_prep_var(LexState *ls, FuncState *fs, size_t *ofsvar, const cha
     }
   }
   lj_buf_putb(&ls->sb, '\0');  /* Terminator for varinfo. */
+  /* Store function declaration name. */
+  *ofsdeclname = sbuflen(&ls->sb);
+  {
+    char *p;
+    int len = strlen(declname) + 1;
+    p = lj_buf_more(&ls->sb, len);
+    p = lj_buf_wmem(p, declname, len);
+    setsbufP(&ls->sb, p);
+  }
   return sbuflen(&ls->sb);
 }
 
 /* Fixup variable info for prototype. */
-static void fs_fixup_var(LexState *ls, GCproto *pt, uint8_t *p, size_t ofsvar)
+static void fs_fixup_var(LexState *ls, GCproto *pt, uint8_t *p, size_t ofsvar, size_t ofsdeclname)
 {
-  int ndeclname = strlen((char*)p)+1;
-  setmref(pt->declname, p);
-  setmref(pt->uvinfo, p + ndeclname);
+  setmref(pt->uvinfo, p);
   setmref(pt->varinfo, (char *)p + ofsvar);
+  setmref(pt->declname, (char*)p + ofsdeclname);
   memcpy(p, sbufB(&ls->sb), sbuflen(&ls->sb));  /* Copy from temp. buffer. */
 }
 
@@ -1481,7 +1482,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line, char *declname)
   lua_State *L = ls->L;
   FuncState *fs = ls->fs;
   BCLine numline = line - fs->linedefined;
-  size_t sizept, ofsk, ofsuv, ofsli, ofsdbg, ofsvar;
+  size_t sizept, ofsk, ofsuv, ofsli, ofsdbg, ofsvar, ofsdeclname;
   GCproto *pt;
 
   /* Apply final fixups. */
@@ -1493,7 +1494,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line, char *declname)
   ofsk = sizept; sizept += fs->nkn*sizeof(TValue);
   ofsuv = sizept; sizept += ((fs->nuv+1)&~1)*2;
   ofsli = sizept; sizept += fs_prep_line(fs, numline);
-  ofsdbg = sizept; sizept += fs_prep_var(ls, fs, &ofsvar, declname);
+  ofsdbg = sizept; sizept += fs_prep_var(ls, fs, &ofsvar, &ofsdeclname, declname);
 
   /* Allocate prototype and initialize its fields. */
   pt = (GCproto *)lj_mem_newgco(L, (MSize)sizept);
@@ -1511,7 +1512,7 @@ static GCproto *fs_finish(LexState *ls, BCLine line, char *declname)
   fs_fixup_k(fs, pt, (void *)((char *)pt + ofsk));
   fs_fixup_uv1(fs, pt, (uint16_t *)((char *)pt + ofsuv));
   fs_fixup_line(fs, pt, (void *)((char *)pt + ofsli), numline);
-  fs_fixup_var(ls, pt, (uint8_t *)((char *)pt + ofsdbg), ofsvar);
+  fs_fixup_var(ls, pt, (uint8_t *)((char *)pt + ofsdbg), ofsvar, ofsdeclname);
 
   L->top--;  /* Pop table of constants. */
   ls->vtop = fs->vbase;  /* Reset variable stack. */
