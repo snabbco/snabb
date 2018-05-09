@@ -153,7 +153,7 @@ static uint32_t bcread_uleb128_33(LexState *ls)
 static void bcread_dbg(LexState *ls, GCproto *pt, MSize sizedbg)
 {
   uint32_t *lineinfo = (uint32_t*)proto_lineinfo(pt);
-  bcread_block(ls, lineinfo, sizedbg);
+  bcread_block(ls, (void*)lineinfo, sizedbg);
   /* Swap lineinfo if the endianess differs. */
   if (bcread_swap(ls)) {
     int i;
@@ -165,9 +165,7 @@ static void bcread_dbg(LexState *ls, GCproto *pt, MSize sizedbg)
 static const void *bcread_varinfo(GCproto *pt)
 {
   const uint8_t *p = proto_uvinfo(pt);
-  MSize n = pt->sizeuv;
-  if (n) while (*p++ || --n) ;
-  return p;
+  return p + pt->sizeuv;
 }
 
 /* Read a single constant key/value of a template table. */
@@ -301,7 +299,7 @@ GCproto *lj_bcread_proto(LexState *ls)
 {
   GCproto *pt;
   MSize framesize, numparams, flags, sizeuv, sizekgc, sizekn, sizebc, sizept;
-  MSize ofsk, ofsuv, ofsdbg;
+  MSize ofsk, ofsuv, ofsdbg, ofsdeclname = 0;
   MSize sizedbg = 0;
   BCLine firstline = 0, numline = 0;
 
@@ -318,6 +316,7 @@ GCproto *lj_bcread_proto(LexState *ls)
     if (sizedbg) {
       firstline = bcread_uleb128(ls);
       numline = bcread_uleb128(ls);
+      ofsdeclname = bcread_uleb128(ls);
     }
   }
 
@@ -365,12 +364,14 @@ GCproto *lj_bcread_proto(LexState *ls)
     MSize sizeli = (sizebc-1) * sizeof(BCLine);
     setmref(pt->lineinfo, (char *)pt + ofsdbg);
     setmref(pt->uvinfo, (char *)pt + ofsdbg + sizeli);
+    setmref(pt->declname, (char *)pt + ofsdbg + ofsdeclname);
     bcread_dbg(ls, pt, sizedbg);
     setmref(pt->varinfo, bcread_varinfo(pt));
   } else {
     setmref(pt->lineinfo, NULL);
     setmref(pt->uvinfo, NULL);
     setmref(pt->varinfo, NULL);
+    setmref(pt->declname, NULL);
   }
   lj_auditlog_new_prototype(pt);
   return pt;
