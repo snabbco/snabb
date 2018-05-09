@@ -14,7 +14,7 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
-local VERSION = 0x0000c000
+local VERSION = 0x0000d000
 
 local header_t = ffi.typeof([[
 struct {
@@ -24,10 +24,10 @@ struct {
    uint32_t source_mtime_nsec;
    uint32_t schema_name;
    uint32_t revision_date;
-   uint32_t data_start;
-   uint32_t data_len;
-   uint32_t strtab_start;
-   uint32_t strtab_len;
+   uint64_t data_start;
+   uint64_t data_len;
+   uint64_t strtab_start;
+   uint64_t strtab_len;
 }
 ]])
 local uint32_t = ffi.typeof('uint32_t')
