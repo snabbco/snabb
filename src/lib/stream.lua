@@ -247,6 +247,7 @@ end
 
 function Stream:write_scalar(type, value)
    local ptr = ffi.typeof('$[1]', type)(value)
+   assert(ptr[0] == value, "value out of range")
    self:write_array(type, ptr, 1)
 end
 
