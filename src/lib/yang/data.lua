@@ -1132,7 +1132,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
       return function(data, file, path, tags)
          local count = 1
          for _,v in ipairs(data) do
-            local tag, value = 'position='..count, serialize(v)
+            local tag, value = '%position='..count, serialize(v)
             local tags = tags and tags..','..tag or tag
             print_entry(file, {keyword=keyword, tags=tags, value=value,
                                path=path, is_unique=production.is_unique,
@@ -1249,7 +1249,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
       return function(data, file, path, tags)
          local count = 1
          for _,v in ipairs(data) do
-            local tag, value = 'position='..count, serialize(v)
+            local tag, value = '%position='..count, serialize(v)
             local tags = tags and tags..','..tag or tag
             print_entry(file, {keyword=keyword, tags=tags, value=value,
                                path=path, is_unique=production.is_unique,
@@ -1604,7 +1604,7 @@ local function influxdb_printer_tests ()
             allow-user "jane";
          }
       ]], [[
-         users/allow-user,position=1 value=jane
+         users/allow-user,%position=1 value=jane
       ]]},
       {test_schema,
       [[
@@ -1615,8 +1615,8 @@ local function influxdb_printer_tests ()
             }
          }
       ]], [[
-         nested-list/bar/foo,position=1 value=john
-         nested-list/foo,position=1 value=jane
+         nested-list/bar/foo,%position=1 value=john
+         nested-list/foo,%position=1 value=jane
       ]]},
    }
    for _, each in ipairs(tests) do
