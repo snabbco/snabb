@@ -2651,7 +2651,7 @@ GCproto *lj_parse(LexState *ls)
   parse_chunk(ls);
   if (ls->tok != TK_eof)
     err_token(ls, TK_eof);
-  pt = fs_finish(ls, ls->linenumber, "");
+  pt = fs_finish(ls, ls->linenumber, "<toplevel>");
   L->top--;  /* Drop chunkname. */
   lua_assert(fs.prev == NULL);
   lua_assert(ls->fs == NULL);
