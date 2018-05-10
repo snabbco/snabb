@@ -1023,8 +1023,25 @@ function influxdb_printer_from_grammar(production, print_default, root)
    local function printer(keyword, production, printers)
       return assert(handlers[production.type])(keyword, production, printers)
    end
+   local function escape_double_quotes (value)
+      assert(type(value) == 'string')
+      return value:gsub('"', '\\"')
+   end
+   local function escape_value (primitive_type, value)
+      if primitive_type == 'decimal64' then
+         return ("%.2f"):format(value)
+      elseif primitive_type == 'string' then
+         return '"'..escape_double_quotes(value)..'"'
+      elseif primitive_type == 'boolean' then
+         return value and 'true' or 'false'
+      else
+         return value
+      end
+   end
    local function print_entry (file, entry)
-      local path, keyword, value = entry.path, entry.keyword, entry.value
+      local path, keyword = entry.path, entry.keyword
+      local value = entry.value
+      if not file.is_tag then value = escape_value(entry.primitive_type, value) end
       file:write(entry.is_unique and keyword or path..keyword)
       if entry.tags then file:write(','..entry.tags) end
       file:write(file.is_tag and value or ' value='..value)
@@ -1064,6 +1081,11 @@ function influxdb_printer_from_grammar(production, print_default, root)
          end
       end
    end
+   local function escape_tag (tag)
+      return tag:gsub('=', '\\=')
+                :gsub(',', '\\,')
+                :gsub(' ', '\\ ')
+   end
    local function key_composer (productions, order)
       local printer = body_printer(productions, order)
       local file = {t={}, is_tag=true}
@@ -1078,7 +1100,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
          for i=1,#self.t,2 do
             local key, value = self.t[i], self.t[i+1]
             if key and value then
-               table.insert(ret, key.."="..value)
+               table.insert(ret, escape_tag(key).."="..escape_tag(value))
             end
          end
          self.t = {}
