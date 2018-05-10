@@ -529,8 +529,8 @@ static void ctype_repr(CTRepr *ctr, CTypeID id)
       ctype_appc(ctr, ')');
       break;
     default:
-      lua_assert(0);
-      break;
+      ctr->ok = 0;
+      return;
     }
     ct = ctype_get(ctr->cts, ctype_cid(info));
   }
