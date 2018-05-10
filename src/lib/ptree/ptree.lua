@@ -31,6 +31,8 @@ local channel = require("lib.ptree.channel")
 local trace = require("lib.ptree.trace")
 local alarms = require("lib.yang.alarms")
 local json_lib = require("lib.ptree.json")
+local queue = require('lib.fibers.queue')
+local fiber_sleep = require('lib.fibers.sleep').sleep
 
 local call_with_output_string = mem.call_with_output_string
 
@@ -177,6 +179,7 @@ function Manager:start ()
       S.unlink(sockname)
    end
    fiber.spawn(function () self:accept_peers(sock) end)
+   fiber.spawn(function () self:notification_poller() end)
 end
 
 function Manager:call_with_cleanup(closeable, f, ...)
@@ -548,15 +551,10 @@ function Manager:rpc_attach_listener (args)
 end
 
 function Manager:rpc_attach_notification_listener ()
-   local i, peers = 1, self.peers
-   while i <= #peers do
-      if peers[i] == self.rpc_peer then break end
-      i = i + 1
-   end
-   if i <= #peers then
-      table.insert(self.notification_peers, self.rpc_peer)
-      table.remove(self.peers, i)
-   end
+   local peer = self.rpc_peer
+   peer.queue = queue.new()
+   table.insert(self.notification_peers, peer)
+   fiber.spawn(function() self:send_notifications_to_peer(peer) end)
    return {}
 end
 
@@ -599,59 +597,39 @@ function Manager:handle (peer, payload)
    return ret
 end
 
-function Manager:push_notifications_to_peers()
-   local notifications = alarms.notifications()
-   if #notifications == 0 then return end
-   local function head (queue)
-      local msg = assert(queue[1])
-      local len = #msg
-      return ffi.cast('uint8_t*', msg), len
-   end
-   local function tojson (output, str)
+local function tojson (str)
+   local msg = mem.call_with_output_string(function(output)
       json_lib.write_json_object(output, str)
-      local msg = output:flush()
-      return tostring(#msg)..'\n'..msg
-   end
-   -- Enqueue notifications into each peer queue.
-   local peers = self.notification_peers
-   for _,peer in ipairs(peers) do
-      local output = json_lib.buffered_output()
-      peer.queue = peer.queue or {}
-      for _,each in ipairs(notifications) do
-         table.insert(peer.queue, tojson(output, each))
-      end
-   end
-   -- Iterate peers and send enqueued messages.
-   for i,peer in ipairs(peers) do
-      local queue = peer.queue
-      while #queue > 0 do
-         local buf, len = head(peer.queue)
-         peer.pos = peer.pos or 0
-         local count, err = peer.fd:write(buf + peer.pos,
-                                          len - peer.pos)
-         if not count then
-            if err.AGAIN then break end
-            peer.state = 'error'
-            peer.msg = tostring(err)
-         elseif count == 0 then
-            peer.state = 'error'
-            peer.msg = 'short write'
-         else
-            peer.pos = peer.pos + count
-            assert(peer.pos <= len)
-            if peer.pos == len then
-               peer.pos = 0
-               table.remove(peer.queue, 1)
+      return output:flush()
+   end)
+   return tostring(#msg)..'\n'..msg
+end
+
+
+-- Spawn in a fiber.
+function Manager:notification_poller ()
+   while true do
+      local notifications = alarms.notifications()
+      if #notifications == 0 then
+         fiber_sleep(1/50) -- poll at 50 Hz.
+      else
+         for _, peer in ipairs(self.notification_peers) do
+            for _,each in ipairs(notifications) do
+               peer.queue:put(tojson(each))
             end
          end
-
-         if peer.state == 'error' then
-            if peer.state == 'error' then self:warn('%s', peer.msg) end
-            peer.fd:close()
-            table.remove(peers, i)
-         end
       end
    end
+end
+
+function Manager:send_notifications_to_peer (peer)
+   self:call_with_cleanup(peer, function()
+      while true do
+         local msg = peer.queue:get()
+         peer:write_chars(msg)
+         peer:flush_output()
+      end
+   end)
 end
 
 function Manager:send_messages_to_workers()
@@ -759,7 +737,6 @@ function Manager:main (duration)
       if timer.ticks then timer.run_to_time(now * 1e9) end
       self:remove_stale_workers()
       self:run_scheduler()
-      self:push_notifications_to_peers()
       self:send_messages_to_workers()
       self:receive_alarms_from_workers()
       now = C.get_monotonic_time()
