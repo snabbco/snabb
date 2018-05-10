@@ -201,8 +201,18 @@ function do_add_to_inventory (k, v)
    alarm_inventory_changed()
 end
 
+
+local function new_notification (event, value)
+   value = value or {}
+   assert(type(value) == "table")
+   local ret = {event=event}
+   for k,v in pairs(value) do ret[k] = v end
+   return ret
+end
+
 function alarm_inventory_changed()
-   table.insert(state.notifications.alarm_inventory_changed, {})
+   table.insert(state.notifications.alarm_inventory_changed,
+                new_notification('alarm-inventory-changed'))
 end
 
 -- Single point to access alarm keys.
@@ -328,7 +338,7 @@ end
 
 function add_alarm_notification (key, status)
    local notifications = state.notifications.alarm
-   notifications[key] = status
+   notifications[key] = new_notification('alarm-notification', status)
 end
 
 -- Creates a new alarm.
@@ -482,7 +492,7 @@ end
 
 function add_operator_action_notification (key, status)
    local operator_action = state.notifications.operator_action
-   operator_action[key] = status
+   operator_action[key] = new_notification('operator-action', status)
 end
 
 -- Purge alarms.
