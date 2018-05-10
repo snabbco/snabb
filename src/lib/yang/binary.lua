@@ -68,7 +68,7 @@ local function read_string_table(stream, strtab_len)
    assert(strtab_len >= 4)
    local count = stream:read_scalar(nil, uint32_t)
    assert(strtab_len >= (4 * (count + 1)))
-   local offsets = stream:read_array(nil, ffi.typeof('uint32_t'), count)
+   local offsets = stream:read_array(nil, uint32_t, count)
    assert(strtab_len == (4 * (count + 1)) + offsets[count-1])
    local strings = {}
    local offset = 0
