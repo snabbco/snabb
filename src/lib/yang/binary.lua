@@ -14,7 +14,7 @@ local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
 
 local MAGIC = "yangconf"
-local VERSION = 0x00009000
+local VERSION = 0x0000c000
 
 local header_t = ffi.typeof([[
 struct {
@@ -68,7 +68,7 @@ local function read_string_table(stream, strtab_len)
    assert(strtab_len >= 4)
    local count = stream:read_scalar(nil, uint32_t)
    assert(strtab_len >= (4 * (count + 1)))
-   local offsets = stream:read_array(nil, ffi.typeof('uint32_t'), count)
+   local offsets = stream:read_array(nil, uint32_t, count)
    assert(strtab_len == (4 * (count + 1)) + offsets[count-1])
    local strings = {}
    local offset = 0
@@ -258,8 +258,10 @@ local function data_emitter(production)
       elseif type.ctype then
          local ctype = type.ctype
          local emit_value = value_emitter(ctype)
+         local serialization = 'cscalar'
+         if ctype:match('[{%[]') then serialization = 'cstruct' end
          return function(data, stream)
-            stream:write_stringref('cscalar')
+            stream:write_stringref(serialization)
             stream:write_stringref(ctype)
             emit_value(data, stream)
          end
