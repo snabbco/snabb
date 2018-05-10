@@ -230,7 +230,7 @@ function data_grammar_from_schema(schema, is_config)
       if node.default or node.mandatory then ctype=value_ctype(t) end
       return {type='scalar', argument_type=t,
               default=node.default, mandatory=node.mandatory,
-              ctype=ctype}
+              is_unique = node.is_unique, ctype=ctype}
    end
    local members = visit_body(schema)
    return {type="struct", members=members, ctype=struct_ctype(members)}
@@ -1023,11 +1023,12 @@ function influxdb_printer_from_grammar(production, print_default, root)
    local function printer(keyword, production, printers)
       return assert(handlers[production.type])(keyword, production, printers)
    end
-   local function print_keyword(k, file, path)
-      path = path:sub(1, 1) ~= '[' and root..'/'..path or root..path
-      file:write(path)
-      print_yang_string(k, file)
-      file:write(' ')
+   local function print_entry (file, entry)
+      local path, keyword, value = entry.path, entry.keyword, entry.value
+      file:write(entry.is_unique and keyword or path..keyword)
+      if entry.tags then file:write(','..entry.tags) end
+      file:write(file.is_tag and value or ' value='..value)
+      file:write('\n')
    end
    local function body_printer(productions, order)
       -- Iterate over productions trying to translate to other statements. This
@@ -1056,16 +1057,16 @@ function influxdb_printer_from_grammar(production, print_default, root)
             printers[keyword] = printer
          end
       end
-      return function(data, file, indent)
+      return function(data, file, path, tags)
          for _,k in ipairs(order) do
             local v = data[normalize_id(k)]
-            if v ~= nil then printers[k](v, file, indent) end
+            if v ~= nil then printers[k](v, file, path, tags) end
          end
       end
    end
    local function key_composer (productions, order)
       local printer = body_printer(productions, order)
-      local file = {t={}}
+      local file = {t={}, is_tag=true}
       function file:write (str)
          str = str:match("([^%s]+)")
          if str and #str > 0 and str ~= ";" and str ~= root..'/' then
@@ -1077,15 +1078,15 @@ function influxdb_printer_from_grammar(production, print_default, root)
          for i=1,#self.t,2 do
             local key, value = self.t[i], self.t[i+1]
             if key and value then
-               table.insert(ret, '['..key.."="..value..']')
+               table.insert(ret, key.."="..value)
             end
          end
          self.t = {}
-         return table.concat(ret, '')
+         return table.concat(ret, ',')
       end
-      return function (data, path)
+      return function (data, path, tags)
          path = path or ''
-         printer(data, file, path)
+         printer(data, file, path, tags)
          return file:flush()
       end
    end
@@ -1100,18 +1101,19 @@ function influxdb_printer_from_grammar(production, print_default, root)
    end
    function handlers.struct(keyword, production)
       local print_body = body_printer(production.members)
-      return function(data, file, path)
-         print_body(data, file, path..keyword..'/')
+      return function(data, file, path, tags)
+         print_body(data, file, path..keyword..'/', tags)
       end
    end
    function handlers.array(keyword, production)
       local serialize = value_serializer(production.element_type)
-      return function(data, file, indent)
+      return function(data, file, path, tags)
          local count = 1
          for _,v in ipairs(data) do
-            print_keyword(keyword.."[position()="..count.."]", file, '')
-            print_yang_string(serialize(v), file)
-            file:write('\n')
+            local tag, value = 'position='..count, serialize(v)
+            if production.is_unique then tag = path..tag end
+            print_entry(file, {keyword=keyword, tags=tags..','..tag, value=value,
+                               path=path, is_unique=is_unique})
             count = count + 1
          end
       end
@@ -1131,8 +1133,8 @@ function influxdb_printer_from_grammar(production, print_default, root)
             path = path or ''
             for entry in data:iterate() do
                local key = compose_key(entry.key)
-               local path = path..(keyword or '')..key..'/'
-               print_value(entry.value, file, path)
+               local path = path..(keyword or '')..'/'
+               print_value(entry.value, file, path, key)
             end
          end
       elseif production.string_key then
@@ -1141,8 +1143,8 @@ function influxdb_printer_from_grammar(production, print_default, root)
             path = path or ''
             for key, value in pairs(data) do
                local key = compose_key({[id]=key})
-               local path = path..(keyword or '')..key..'/'
-               print_value(value, file, path)
+               local path = path..(keyword or '')..'/'
+               print_value(value, file, path, key)
             end
          end
       elseif production.key_ctype then
@@ -1150,8 +1152,8 @@ function influxdb_printer_from_grammar(production, print_default, root)
             path = path or ''
             for key, value in cltable.pairs(data) do
                local key = compose_key(key)
-               local path = path..(keyword or '')..key..'/'
-               print_value(value, file, path)
+               local path = path..(keyword or '')..'/'
+               print_value(value, file, path, key)
             end
          end
       else
@@ -1159,20 +1161,19 @@ function influxdb_printer_from_grammar(production, print_default, root)
             path = path or ''
             for key, value in pairs(data) do
                local key = compose_key(key)
-               local path = path..(keyword or '')..key..'/'
-               print_value(value, file, path)
+               local path = path..(keyword or '')..'/'
+               print_value(value, file, path, key)
             end
          end
       end
    end
    function handlers.scalar(keyword, production)
       local serialize = value_serializer(production.argument_type)
-      return function(data, file, path)
+      return function(data, file, path, tags)
          local str = serialize(data)
          if print_default or str ~= production.default then
-            print_keyword(keyword, file, path)
-            print_yang_string(str, file)
-            file:write('\n')
+            print_entry(file, {keyword=keyword, tags=tags, value=str,
+                               path=path, is_unique=production.is_unique})
          end
       end
    end
@@ -1207,13 +1208,13 @@ function influxdb_printer_from_grammar(production, print_default, root)
    end
    function top_printers.array(production)
       local serialize = value_serializer(production.element_type)
-      return function(data, file, indent)
+      return function(data, file, path, tags)
          local count = 1
          for _,v in ipairs(data) do
-            file:write(root.."[position()="..count.."]")
-            file:write(' ')
-            print_yang_string(serialize(v), file)
-            file:write('\n')
+            local tag, value = 'position='..count, serialize(v)
+            if production.is_unique then tag = path..tag end
+            print_entry(file, {keyword=keyword, tags=tags..','..tag, value=value,
+                               path=path, is_unique=is_unique})
             count = count + 1
          end
          return file:flush()
@@ -1221,13 +1222,11 @@ function influxdb_printer_from_grammar(production, print_default, root)
    end
    function top_printers.scalar(production)
       local serialize = value_serializer(production.argument_type)
-      return function(data, file)
+      return function(data, file, path, tags)
          local str = serialize(data)
          if print_default or str ~= production.default then
-            file:write(root)
-            file:write(' ')
-            print_yang_string(str, file)
-            file:write('\n')
+            print_entry(file, {keyword=root, tags=tags, value=str,
+                               path=path, is_unique=production.is_unique})
             return file:flush()
          end
       end
