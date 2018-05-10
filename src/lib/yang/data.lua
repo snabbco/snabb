@@ -1141,6 +1141,13 @@ function influxdb_printer_from_grammar(production, print_default, root)
          end
       end
    end
+   local function is_key_unique (node)
+      if not node.keys then return true end
+      for k,v in pairs(node.keys) do
+         if not v.is_unique then return false end
+      end
+      return true
+   end
    -- As a special case, the table handler allows the keyword to be nil,
    -- for printing tables at the top level without keywords.
    function handlers.table(keyword, production)
@@ -1149,6 +1156,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
       for k,_ in pairs(production.values) do table.insert(value_order, k) end
       table.sort(key_order)
       table.sort(value_order)
+      local is_key_unique = is_key_unique(production)
       local compose_key = key_composer(production.keys, key_order)
       local print_value = body_printer(production.values, value_order)
       if production.key_ctype and production.value_ctype then
@@ -1157,6 +1165,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
             for entry in data:iterate() do
                local key = compose_key(entry.key)
                local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
                print_value(entry.value, file, path, key)
             end
          end
@@ -1167,6 +1176,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
             for key, value in pairs(data) do
                local key = compose_key({[id]=key})
                local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
                print_value(value, file, path, key)
             end
          end
@@ -1176,6 +1186,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
             for key, value in cltable.pairs(data) do
                local key = compose_key(key)
                local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
                print_value(value, file, path, key)
             end
          end
@@ -1185,6 +1196,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
             for key, value in pairs(data) do
                local key = compose_key(key)
                local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
                print_value(value, file, path, key)
             end
          end
@@ -1532,13 +1544,23 @@ local function influxdb_printer_tests ()
                leaf z { type string; }
             }
          }
-
+         container continents {
+            list europe {
+               key country;
+               leaf country { type string; }
+               leaf capital { type string; }
+            }
+            list asia {
+               key country;
+               leaf country { type string; }
+               leaf capital { type string; }
+            }
+         }
          container users {
             leaf-list allow-user {
                type string;
             }
          }
-
          container nested-list {
             leaf-list foo {
                type string;
@@ -1565,6 +1587,16 @@ local function influxdb_printer_tests ()
          z,baz=baz value="z"
          x value="x"
          y value="y"
+      ]]},
+      {test_schema,
+      [[
+         continents {
+            europe {country "uk"; capital "london";}
+            asia   {country "japan"; capital "tokyo";}
+         }
+      ]], [[
+         continents/asia/capital,continents/asia/country=japan value="tokyo"
+         continents/europe/capital,continents/europe/country=uk value="london"
       ]]},
       {test_schema,
       [[
