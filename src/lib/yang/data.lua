@@ -1082,7 +1082,7 @@ function influxdb_printer_from_grammar(production, print_default, root)
             end
          end
          self.t = {}
-         return table.concat(ret, ',')
+         return #ret > 0 and table.concat(ret, ',')
       end
       return function (data, path, tags)
          path = path or ''
@@ -1111,9 +1111,10 @@ function influxdb_printer_from_grammar(production, print_default, root)
          local count = 1
          for _,v in ipairs(data) do
             local tag, value = 'position='..count, serialize(v)
-            if production.is_unique then tag = path..tag end
-            print_entry(file, {keyword=keyword, tags=tags..','..tag, value=value,
-                               path=path, is_unique=is_unique})
+            local tags = tags and tags..','..tag or tag
+            print_entry(file, {keyword=keyword, tags=tags, value=value,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=production.primitive_type})
             count = count + 1
          end
       end
@@ -1168,12 +1169,14 @@ function influxdb_printer_from_grammar(production, print_default, root)
       end
    end
    function handlers.scalar(keyword, production)
+      local primitive_type = production.argument_type.primitive_type
       local serialize = value_serializer(production.argument_type)
       return function(data, file, path, tags)
          local str = serialize(data)
          if print_default or str ~= production.default then
             print_entry(file, {keyword=keyword, tags=tags, value=str,
-                               path=path, is_unique=production.is_unique})
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=primitive_type})
          end
       end
    end
@@ -1207,26 +1210,30 @@ function influxdb_printer_from_grammar(production, print_default, root)
       end
    end
    function top_printers.array(production)
+      local primitive_type = production.argument_type.primitive_type
       local serialize = value_serializer(production.element_type)
       return function(data, file, path, tags)
          local count = 1
          for _,v in ipairs(data) do
             local tag, value = 'position='..count, serialize(v)
-            if production.is_unique then tag = path..tag end
-            print_entry(file, {keyword=keyword, tags=tags..','..tag, value=value,
-                               path=path, is_unique=is_unique})
+            local tags = tags and tags..','..tag or tag
+            print_entry(file, {keyword=keyword, tags=tags, value=value,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=production.primitive_type})
             count = count + 1
          end
          return file:flush()
       end
    end
    function top_printers.scalar(production)
+      local primitive_type = production.argument_type.primitive_type
       local serialize = value_serializer(production.argument_type)
       return function(data, file, path, tags)
          local str = serialize(data)
          if print_default or str ~= production.default then
             print_entry(file, {keyword=root, tags=tags, value=str,
-                               path=path, is_unique=production.is_unique})
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=primitive_type})
             return file:flush()
          end
       end
