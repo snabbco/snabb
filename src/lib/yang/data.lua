@@ -1047,7 +1047,13 @@ function influxdb_printer_from_grammar(production, print_default, root)
       local path, keyword = entry.path, entry.keyword
       local value = entry.value
       if not file.is_tag then value = escape_value(entry.primitive_type, value) end
-      file:write(entry.is_unique and keyword or path..keyword)
+      if entry.is_unique then
+         file:write(keyword)
+      else
+         path = path..keyword
+         if not file.is_tag then path = '/'..path end
+         file:write(path)
+      end
       if entry.tags then file:write(','..entry.tags) end
       file:write(file.is_tag and value or ' value='..value)
       file:write('\n')
@@ -1595,7 +1601,7 @@ local function influxdb_printer_tests ()
             bar {baz "baz"; y "y"; z "z";}
          }
       ]], [[
-         foo/bar/y,baz=baz value="y"
+         /foo/bar/y,baz=baz value="y"
          z,baz=baz value="z"
          x value="x"
          y value="y"
@@ -1621,12 +1627,12 @@ local function influxdb_printer_tests ()
             }
          }
       ]], [[
-         continents/asia/country/capital,continents/asia/country/name=japan value="tokyo"
-         continents/europe/country/capital,continents/europe/country/name=uk value="london"
-         continents/europe/country/eu-member,continents/europe/country/name=uk value=true
-         continents/europe/country/gdp,continents/europe/country/name=uk value=2914000000
-         continents/europe/country/main-cities,continents/europe/country/name=uk value="\"Manchester\", \"Bristol\", \"Liverpool\""
-         continents/europe/country/population,continents/europe/country/name=uk value=65000000i
+         /continents/asia/country/capital,continents/asia/country/name=japan value="tokyo"
+         /continents/europe/country/capital,continents/europe/country/name=uk value="london"
+         /continents/europe/country/eu-member,continents/europe/country/name=uk value=true
+         /continents/europe/country/gdp,continents/europe/country/name=uk value=2914000000
+         /continents/europe/country/main-cities,continents/europe/country/name=uk value="\"Manchester\", \"Bristol\", \"Liverpool\""
+         /continents/europe/country/population,continents/europe/country/name=uk value=65000000i
       ]]},
       {test_schema,
       [[
@@ -1634,7 +1640,7 @@ local function influxdb_printer_tests ()
             allow-user "jane";
          }
       ]], [[
-         users/allow-user,%position=1 value=jane
+         /users/allow-user,%position=1 value=jane
       ]]},
       {test_schema,
       [[
@@ -1645,8 +1651,8 @@ local function influxdb_printer_tests ()
             }
          }
       ]], [[
-         nested-list/bar/foo,%position=1 value=john
-         nested-list/foo,%position=1 value=jane
+         /nested-list/bar/foo,%position=1 value=john
+         /nested-list/foo,%position=1 value=jane
       ]]},
    }
    for _, each in ipairs(tests) do
