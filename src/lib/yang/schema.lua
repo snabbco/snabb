@@ -309,17 +309,23 @@ local Marker = {}
 function Marker.new ()
    return setmetatable({keys={}}, {__index = Marker})
 end
+function Marker:reset ()
+   self.keys = {}
+end
 function Marker:is_unique (id)
    if self.keys[id] then return false end
    self.keys[id] = true
    return true
 end
 
-local leaves_marker = Marker.new()
+local marker = {
+   leaf = Marker.new(),
+   uses = Marker.new(),
+}
 
 local function init_leaf(node, loc, argument, children)
    node.id = require_argument(loc, argument)
-   node.is_unique = leaves_marker:is_unique(node.id)
+   node.is_unique = marker.leaf:is_unique(node.id)
    node.when = maybe_child_property(loc, children, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.type = require_child(loc, children, 'type')
@@ -665,7 +671,8 @@ end
 -- Warn on any "when", resolving them as being true.
 -- Resolve all augment nodes. (TODO)
 function resolve(schema, features)
-   local uses_marker = Marker.new()
+   marker.leaf:reset()
+   marker.uses:reset()
    if features == nil then features = default_features end
    local function pop_prop(node, prop)
       local val = node[prop]
@@ -830,7 +837,7 @@ function resolve(schema, features)
             if v.kind == 'uses' then
                -- Inline "grouping" into "uses".
                local grouping = lookup_lazy(env, 'groupings', v.id)
-               local is_unique = uses_marker:is_unique(v.id)
+               local is_unique = marker.uses:is_unique(v.id)
                for k,v in pairs(grouping.body) do
                   assert(not node.body[k], 'duplicate identifier: '..k)
                   node.body[k] = v
