@@ -305,27 +305,8 @@ local function init_input(node, loc, argument, children)
    node.body = collect_body_children_at_least_1(loc, children)
 end
 
-local Marker = {}
-function Marker.new ()
-   return setmetatable({keys={}}, {__index = Marker})
-end
-function Marker:reset ()
-   self.keys = {}
-end
-function Marker:is_unique (id)
-   if self.keys[id] then return false end
-   self.keys[id] = true
-   return true
-end
-
-local marker = {
-   leaf = Marker.new(),
-   uses = Marker.new(),
-}
-
 local function init_leaf(node, loc, argument, children)
    node.id = require_argument(loc, argument)
-   node.is_unique = marker.leaf:is_unique(node.id)
    node.when = maybe_child_property(loc, children, 'when', 'value')
    node.if_features = collect_child_properties(children, 'if-feature', 'value')
    node.type = require_child(loc, children, 'type')
@@ -630,7 +611,6 @@ local function inherit_config(schema)
       end
       return node
    end
-
    return visit(schema, true)
 end
 
@@ -656,13 +636,6 @@ function set_default_capabilities(capabilities)
    end
 end
 
-local function leaves (node, fn)
-   if node.kind == 'leaf' then fn(node) end
-   for _, v in pairs(node.body or {}) do
-      leaves(v, fn)
-   end
-end
-
 -- Inline "grouping" into "uses".
 -- Inline "submodule" into "include".
 -- Inline "imports" into "module".
@@ -671,8 +644,6 @@ end
 -- Warn on any "when", resolving them as being true.
 -- Resolve all augment nodes. (TODO)
 function resolve(schema, features)
-   marker.leaf:reset()
-   marker.uses:reset()
    if features == nil then features = default_features end
    local function pop_prop(node, prop)
       local val = node[prop]
@@ -837,13 +808,9 @@ function resolve(schema, features)
             if v.kind == 'uses' then
                -- Inline "grouping" into "uses".
                local grouping = lookup_lazy(env, 'groupings', v.id)
-               local is_unique = marker.uses:is_unique(v.id)
                for k,v in pairs(grouping.body) do
                   assert(not node.body[k], 'duplicate identifier: '..k)
                   node.body[k] = v
-                  if not is_unique then
-                     leaves(node, function(leaf) leaf.is_unique = false end)
-                  end
                end
                for _,refine in ipairs(v.refines) do
                   local target = node.body[refine.node_id]
@@ -958,13 +925,36 @@ function parse_schema_file(filename)
    return schema_from_ast(parser.parse(assert(file.open(filename))))
 end
 
+local function collect_uniqueness (s)
+   local leaves = {}
+   local function mark (id)
+      if leaves[id] then return false end
+      leaves[id] = true
+      return true
+   end
+   local function visit (node)
+      if not node then return end
+      for k,v in pairs(node) do
+         if type(v) == 'table' then
+            visit(v)
+         else
+            if k == 'kind' and v == 'leaf' then
+               node.is_unique = mark(node.id)
+            end
+         end
+      end
+   end
+   visit(s)
+   return s
+end
+
 function load_schema(src, filename)
    local s, e = resolve(primitivize(parse_schema(src, filename)))
-   return inherit_config(s), e
+   return collect_uniqueness(inherit_config(s)), e
 end
 function load_schema_file(filename)
    local s, e = resolve(primitivize(parse_schema_file(filename)))
-   return inherit_config(s), e
+   return collect_uniqueness(inherit_config(s)), e
 end
 load_schema_file = util.memoize(load_schema_file)
 

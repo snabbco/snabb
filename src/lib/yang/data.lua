@@ -1627,7 +1627,7 @@ local function influxdb_printer_tests ()
             }
          }
       ]], [[
-         /continents/asia/country/capital,continents/asia/country/name=japan value="tokyo"
+         capital,name=japan value="tokyo"
          /continents/europe/country/capital,continents/europe/country/name=uk value="london"
          /continents/europe/country/eu-member,continents/europe/country/name=uk value=true
          /continents/europe/country/gdp,continents/europe/country/name=uk value=2914000000
