@@ -10,6 +10,7 @@ local value = require("lib.yang.value")
 local ffi = require("ffi")
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
+local lib = require('core.lib')
 
 function normalize_id(id)
    return id:gsub('[^%w_]', '_')
@@ -230,7 +231,7 @@ function data_grammar_from_schema(schema, is_config)
       if node.default or node.mandatory then ctype=value_ctype(t) end
       return {type='scalar', argument_type=t,
               default=node.default, mandatory=node.mandatory,
-              ctype=ctype}
+              is_unique = node.is_unique, ctype=ctype}
    end
    local members = visit_body(schema)
    return {type="struct", members=members, ctype=struct_ctype(members)}
@@ -792,6 +793,7 @@ local function print_yang_string(str, file)
 end
 
 function xpath_printer_from_grammar(production, print_default, root)
+   if not root then root = '' end
    if #root == 1 and root:sub(1, 1) == '/' then
       root = ''
    end
@@ -1011,6 +1013,280 @@ function xpath_printer_from_grammar(production, print_default, root)
    return assert(top_printers[production.type])(production)
 end
 xpath_printer_from_grammar = util.memoize(xpath_printer_from_grammar)
+
+function influxdb_printer_from_grammar(production, print_default, root)
+   if not root then root = '' end
+   if root and #root == 1 and root:sub(1, 1) == '/' then
+      root = ''
+   end
+   local handlers = {}
+   local translators = {}
+   local function printer(keyword, production, printers)
+      return assert(handlers[production.type])(keyword, production, printers)
+   end
+   local function escape_double_quotes (value)
+      assert(type(value) == 'string')
+      return value:gsub('"', '\\"')
+   end
+   local integers = lib.set('int8','int16','int32','int64',
+                            'uint8','uint16','uint32','uint64')
+   local function escape_value (primitive_type, val)
+      if integers[primitive_type] then
+         return tostring(val).."i"
+      elseif primitive_type == 'decimal64' then
+         return tostring(val)
+      elseif primitive_type == 'string' then
+         return '"'..escape_double_quotes(val)..'"'
+      elseif primitive_type == 'boolean' then
+         return val and 'true' or 'false'
+      else
+         return val
+      end
+   end
+   local function print_entry (file, entry)
+      local path, keyword = entry.path, entry.keyword
+      local value = entry.value
+      if not file.is_tag then value = escape_value(entry.primitive_type, value) end
+      if entry.is_unique then
+         file:write(keyword)
+      else
+         path = path..keyword
+         if not file.is_tag then path = '/'..path end
+         file:write(path)
+      end
+      if entry.tags then file:write(','..entry.tags) end
+      file:write(file.is_tag and value or ' value='..value)
+      file:write('\n')
+   end
+   local function body_printer(productions, order)
+      -- Iterate over productions trying to translate to other statements. This
+      -- is used for example in choice statements raising the lower statements
+      -- in case blocks up to the level of the choice, in place of the choice.
+      local translated = {}
+      for keyword,production in pairs(productions) do
+         local translator = translators[production.type]
+         if translator ~= nil then
+            local statements = translator(keyword, production)
+            for k,v in pairs(statements) do translated[k] = v end
+         else
+            translated[keyword] = production
+         end
+      end
+      productions = translated
+      if not order then
+         order = {}
+         for k,_ in pairs(productions) do table.insert(order, k) end
+         table.sort(order)
+      end
+      local printers = {}
+      for keyword,production in pairs(productions) do
+         local printer = printer(keyword, production, printers)
+         if printer ~= nil then
+            printers[keyword] = printer
+         end
+      end
+      return function(data, file, path, tags)
+         for _,k in ipairs(order) do
+            local v = data[normalize_id(k)]
+            if v ~= nil then printers[k](v, file, path, tags) end
+         end
+      end
+   end
+   local function escape_tag (tag)
+      return tag:gsub('=', '\\=')
+                :gsub(',', '\\,')
+                :gsub(' ', '\\ ')
+   end
+   local function key_composer (productions, order)
+      local printer = body_printer(productions, order)
+      local file = {t={}, is_tag=true}
+      function file:write (str)
+         str = str:match("([^%s]+)")
+         if str and #str > 0 and str ~= ";" and str ~= root..'/' then
+            table.insert(self.t, str)
+         end
+      end
+      function file:flush ()
+         local ret = {}
+         for i=1,#self.t,2 do
+            local key, value = self.t[i], self.t[i+1]
+            if key and value then
+               table.insert(ret, escape_tag(key).."="..escape_tag(value))
+            end
+         end
+         self.t = {}
+         return #ret > 0 and table.concat(ret, ',')
+      end
+      return function (data, path, tags)
+         path = path or ''
+         printer(data, file, path, tags)
+         return file:flush()
+      end
+   end
+   function translators.choice(keyword, production)
+      local rtn = {}
+      for case, body in pairs(production.choices) do
+         for name, statement in pairs(body) do
+            rtn[name] = statement
+         end
+      end
+      return rtn
+   end
+   function handlers.struct(keyword, production)
+      local print_body = body_printer(production.members)
+      return function(data, file, path, tags)
+         print_body(data, file, path..keyword..'/', tags)
+      end
+   end
+   function handlers.array(keyword, production)
+      local serialize = value_serializer(production.element_type)
+      return function(data, file, path, tags)
+         local count = 1
+         for _,v in ipairs(data) do
+            local tag, value = '%position='..count, serialize(v)
+            local tags = tags and tags..','..tag or tag
+            print_entry(file, {keyword=keyword, tags=tags, value=value,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=production.primitive_type})
+            count = count + 1
+         end
+      end
+   end
+   local function is_key_unique (node)
+      if not node.keys then return true end
+      for k,v in pairs(node.keys) do
+         if not v.is_unique then return false end
+      end
+      return true
+   end
+   -- As a special case, the table handler allows the keyword to be nil,
+   -- for printing tables at the top level without keywords.
+   function handlers.table(keyword, production)
+      local key_order, value_order = {}, {}
+      for k,_ in pairs(production.keys) do table.insert(key_order, k) end
+      for k,_ in pairs(production.values) do table.insert(value_order, k) end
+      table.sort(key_order)
+      table.sort(value_order)
+      local is_key_unique = is_key_unique(production)
+      local compose_key = key_composer(production.keys, key_order)
+      local print_value = body_printer(production.values, value_order)
+      if production.key_ctype and production.value_ctype then
+         return function(data, file, path)
+            path = path or ''
+            for entry in data:iterate() do
+               local key = compose_key(entry.key)
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(entry.value, file, path, key)
+            end
+         end
+      elseif production.string_key then
+         local id = normalize_id(production.string_key)
+         return function(data, file, path)
+            path = path or ''
+            for key, value in pairs(data) do
+               local key = compose_key({[id]=key})
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(value, file, path, key)
+            end
+         end
+      elseif production.key_ctype then
+         return function(data, file, path)
+            path = path or ''
+            for key, value in cltable.pairs(data) do
+               local key = compose_key(key)
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(value, file, path, key)
+            end
+         end
+      else
+         return function(data, file, path)
+            path = path or ''
+            for key, value in pairs(data) do
+               local key = compose_key(key)
+               local path = path..(keyword or '')..'/'
+               if not is_key_unique then key = path..key end
+               print_value(value, file, path, key)
+            end
+         end
+      end
+   end
+   function handlers.scalar(keyword, production)
+      local primitive_type = production.argument_type.primitive_type
+      local serialize = value_serializer(production.argument_type)
+      return function(data, file, path, tags)
+         local str = serialize(data)
+         if print_default or str ~= production.default then
+            print_entry(file, {keyword=keyword, tags=tags, value=str,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=primitive_type})
+         end
+      end
+   end
+
+   local top_printers = {}
+   function top_printers.struct(production)
+      local printer = body_printer(production.members)
+      return function(data, file)
+         printer(data, file, '')
+         return file:flush()
+      end
+   end
+   function top_printers.sequence(production)
+      local printers = {}
+      for k,v in pairs(production.members) do
+         printers[k] = printer(k, v)
+      end
+      return function(data, file)
+         for _,elt in ipairs(data) do
+            local id = assert(elt.id)
+            assert(printers[id])(elt.data, file, '')
+         end
+         return file:flush()
+      end
+   end
+   function top_printers.table(production)
+      local printer = handlers.table(nil, production)
+      return function(data, file)
+         printer(data, file, '')
+         return file:flush()
+      end
+   end
+   function top_printers.array(production)
+      local primitive_type = production.argument_type.primitive_type
+      local serialize = value_serializer(production.element_type)
+      return function(data, file, path, tags)
+         local count = 1
+         for _,v in ipairs(data) do
+            local tag, value = '%position='..count, serialize(v)
+            local tags = tags and tags..','..tag or tag
+            print_entry(file, {keyword=keyword, tags=tags, value=value,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=production.primitive_type})
+            count = count + 1
+         end
+         return file:flush()
+      end
+   end
+   function top_printers.scalar(production)
+      local primitive_type = production.argument_type.primitive_type
+      local serialize = value_serializer(production.argument_type)
+      return function(data, file, path, tags)
+         local str = serialize(data)
+         if print_default or str ~= production.default then
+            print_entry(file, {keyword=root, tags=tags, value=str,
+                               path=path, is_unique=production.is_unique,
+                               primitive_type=primitive_type})
+            return file:flush()
+         end
+      end
+   end
+
+   return assert(top_printers[production.type])(production)
+end
+influxdb_printer_from_grammar = util.memoize(influxdb_printer_from_grammar)
 
 function data_printer_from_grammar(production, print_default)
    local handlers = {}
@@ -1245,6 +1521,145 @@ function rpc_output_printer_from_schema(schema)
    return data_printer_from_grammar(rpc_output_grammar_from_schema(schema))
 end
 
+local function influxdb_printer_tests ()
+   local function lint (text)
+      local ret = {}
+      for line in text:gmatch("[^\n]+") do
+         table.insert(ret, (line:gsub("^%s+", "")))
+      end
+      return table.concat(ret, "\n")
+   end
+   local function influxdb_printer_test (test)
+      local schema_str, data_str, expected = unpack(test)
+      local format = 'influxdb'
+      local is_config, print_default = true, true
+      local schema = schema.load_schema(schema_str)
+      local data = load_config_for_schema(schema, mem.open_input_string(data_str))
+      local grammar = data_grammar_from_schema(schema, is_config, format)
+      local printer = influxdb_printer_from_grammar(grammar, print_default)
+      local actual = mem.call_with_output_string(printer, data)
+      assert(actual == lint(expected))
+   end
+   local test_schema = [[
+      module test {
+         namespace test;
+         prefix test;
+
+         container foo {
+            leaf x { type string; }
+            leaf y { type string; }
+            list bar {
+               key baz;
+               leaf baz { type string; }
+               leaf y { type string; }
+               leaf z { type string; }
+            }
+         }
+         container continents {
+            grouping country {
+               list country {
+                  key name;
+                  leaf name { type string; mandatory true; }
+                  leaf capital { type string; }
+                  leaf gdp { type decimal64; }
+                  leaf eu-member { type boolean; }
+                  leaf main-cities { type string; }
+                  leaf population { type uint32; }
+               }
+            }
+            container europe {
+               uses country;
+            }
+            container asia {
+               uses country;
+            }
+         }
+         container users {
+            leaf-list allow-user {
+               type string;
+            }
+         }
+         container nested-list {
+            leaf-list foo {
+               type string;
+            }
+            list bar {
+               leaf-list foo {
+                  type string;
+               }
+            }
+         }
+      }
+   ]]
+
+   local tests = {
+      {test_schema,
+      [[
+         foo {
+            x "x";
+            y "y";
+            bar {baz "baz"; y "y"; z "z";}
+         }
+      ]], [[
+         /foo/bar/y,baz=baz value="y"
+         z,baz=baz value="z"
+         x value="x"
+         y value="y"
+      ]]},
+      {test_schema,
+      [[
+         continents {
+            europe {
+               country {
+                  name "uk";
+                  capital "london";
+                  eu-member true;
+                  main-cities "\"Manchester\", \"Bristol\", \"Liverpool\"";
+                  gdp 2.914e9;
+                  population 65000000;
+               }
+            }
+            asia {
+               country {
+                  name "japan";
+                  capital "tokyo";
+               }
+            }
+         }
+      ]], [[
+         capital,name=japan value="tokyo"
+         /continents/europe/country/capital,continents/europe/country/name=uk value="london"
+         /continents/europe/country/eu-member,continents/europe/country/name=uk value=true
+         /continents/europe/country/gdp,continents/europe/country/name=uk value=2914000000
+         /continents/europe/country/main-cities,continents/europe/country/name=uk value="\"Manchester\", \"Bristol\", \"Liverpool\""
+         /continents/europe/country/population,continents/europe/country/name=uk value=65000000i
+      ]]},
+      {test_schema,
+      [[
+         users {
+            allow-user "jane";
+         }
+      ]], [[
+         /users/allow-user,%position=1 value=jane
+      ]]},
+      {test_schema,
+      [[
+         nested-list {
+            foo "jane";
+            bar {
+               foo "john";
+            }
+         }
+      ]], [[
+         /nested-list/bar/foo,%position=1 value=john
+         /nested-list/foo,%position=1 value=jane
+      ]]},
+   }
+   for _, each in ipairs(tests) do
+      influxdb_printer_test(each)
+   end
+end
+
 function selftest()
    print('selfcheck: lib.yang.data')
    local test_schema = schema.load_schema([[module fruit {
@@ -1437,6 +1852,8 @@ function selftest()
       }
    ]])
    assert(success == false)
+
+   influxdb_printer_tests()
 
    print('selfcheck: ok')
 end

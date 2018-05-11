@@ -304,6 +304,7 @@ local function init_input(node, loc, argument, children)
    node.groupings = collect_children_by_id(loc, children, 'grouping')
    node.body = collect_body_children_at_least_1(loc, children)
 end
+
 local function init_leaf(node, loc, argument, children)
    node.id = require_argument(loc, argument)
    node.when = maybe_child_property(loc, children, 'when', 'value')
@@ -610,7 +611,6 @@ local function inherit_config(schema)
       end
       return node
    end
-
    return visit(schema, true)
 end
 
@@ -925,13 +925,36 @@ function parse_schema_file(filename)
    return schema_from_ast(parser.parse(assert(file.open(filename))))
 end
 
+local function collect_uniqueness (s)
+   local leaves = {}
+   local function mark (id)
+      if leaves[id] then return false end
+      leaves[id] = true
+      return true
+   end
+   local function visit (node)
+      if not node then return end
+      for k,v in pairs(node) do
+         if type(v) == 'table' then
+            visit(v)
+         else
+            if k == 'kind' and v == 'leaf' then
+               node.is_unique = mark(node.id)
+            end
+         end
+      end
+   end
+   visit(s)
+   return s
+end
+
 function load_schema(src, filename)
    local s, e = resolve(primitivize(parse_schema(src, filename)))
-   return inherit_config(s), e
+   return collect_uniqueness(inherit_config(s)), e
 end
 function load_schema_file(filename)
    local s, e = resolve(primitivize(parse_schema_file(filename)))
-   return inherit_config(s), e
+   return collect_uniqueness(inherit_config(s)), e
 end
 load_schema_file = util.memoize(load_schema_file)
 
