@@ -1545,15 +1545,21 @@ local function influxdb_printer_tests ()
             }
          }
          container continents {
-            list europe {
-               key country;
-               leaf country { type string; }
-               leaf capital { type string; }
+            grouping country {
+               list country {
+                  key name;
+                  leaf name { type string; mandatory true; }
+                  leaf capital { type string; }
+                  leaf gdp { type decimal64; }
+                  leaf eu-member { type boolean; }
+                  leaf main-cities { type string; }
+               }
             }
-            list asia {
-               key country;
-               leaf country { type string; }
-               leaf capital { type string; }
+            container europe {
+               uses country;
+            }
+            container asia {
+               uses country;
             }
          }
          container users {
@@ -1591,12 +1597,28 @@ local function influxdb_printer_tests ()
       {test_schema,
       [[
          continents {
-            europe {country "uk"; capital "london";}
-            asia   {country "japan"; capital "tokyo";}
+            europe {
+               country {
+                  name "uk";
+                  capital "london";
+                  eu-member true;
+                  main-cities "\"Manchester\", \"Bristol\", \"Liverpool\"";
+                  gdp 2.914e9;
+               }
+            }
+            asia {
+               country {
+                  name "japan";
+                  capital "tokyo";
+               }
+            }
          }
       ]], [[
-         continents/asia/capital,continents/asia/country=japan value="tokyo"
-         continents/europe/capital,continents/europe/country=uk value="london"
+         continents/asia/country/capital,continents/asia/country/name=japan value="tokyo"
+         continents/europe/country/capital,continents/europe/country/name=uk value="london"
+         continents/europe/country/eu-member,continents/europe/country/name=uk value=true
+         continents/europe/country/gdp,continents/europe/country/name=uk value=2914000000.00
+         continents/europe/country/main-cities,continents/europe/country/name=uk value="\"Manchester\", \"Bristol\", \"Liverpool\""
       ]]},
       {test_schema,
       [[
