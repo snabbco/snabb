@@ -261,9 +261,7 @@ function load(stream, params)
 
    -- Slurp the entries directly into the ctable's backing store.
    -- This ensures that the ctable is in hugepages.
-   C.memcpy(ctab.entries,
-            stream:read_array(nil, ctab.entry_type, entry_count),
-            ffi.sizeof(ctab.entry_type) * entry_count)
+   stream:read_array(ctab.entries, ctab.entry_type, entry_count)
 
    return ctab
 end
