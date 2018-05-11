@@ -10,6 +10,7 @@ local value = require("lib.yang.value")
 local ffi = require("ffi")
 local ctable = require('lib.ctable')
 local cltable = require('lib.cltable')
+local lib = require('core.lib')
 
 function normalize_id(id)
    return id:gsub('[^%w_]', '_')
@@ -1027,15 +1028,19 @@ function influxdb_printer_from_grammar(production, print_default, root)
       assert(type(value) == 'string')
       return value:gsub('"', '\\"')
    end
-   local function escape_value (primitive_type, value)
-      if primitive_type == 'decimal64' then
-         return ("%.2f"):format(value)
+   local integers = lib.set('int8','int16','int32','int64',
+                            'uint8','uint16','uint32','uint64')
+   local function escape_value (primitive_type, val)
+      if integers[primitive_type] then
+         return tostring(val).."i"
+      elseif primitive_type == 'decimal64' then
+         return tostring(val)
       elseif primitive_type == 'string' then
-         return '"'..escape_double_quotes(value)..'"'
+         return '"'..escape_double_quotes(val)..'"'
       elseif primitive_type == 'boolean' then
-         return value and 'true' or 'false'
+         return val and 'true' or 'false'
       else
-         return value
+         return val
       end
    end
    local function print_entry (file, entry)
@@ -1553,6 +1558,7 @@ local function influxdb_printer_tests ()
                   leaf gdp { type decimal64; }
                   leaf eu-member { type boolean; }
                   leaf main-cities { type string; }
+                  leaf population { type uint32; }
                }
             }
             container europe {
@@ -1604,6 +1610,7 @@ local function influxdb_printer_tests ()
                   eu-member true;
                   main-cities "\"Manchester\", \"Bristol\", \"Liverpool\"";
                   gdp 2.914e9;
+                  population 65000000;
                }
             }
             asia {
@@ -1617,8 +1624,9 @@ local function influxdb_printer_tests ()
          continents/asia/country/capital,continents/asia/country/name=japan value="tokyo"
          continents/europe/country/capital,continents/europe/country/name=uk value="london"
          continents/europe/country/eu-member,continents/europe/country/name=uk value=true
-         continents/europe/country/gdp,continents/europe/country/name=uk value=2914000000.00
+         continents/europe/country/gdp,continents/europe/country/name=uk value=2914000000
          continents/europe/country/main-cities,continents/europe/country/name=uk value="\"Manchester\", \"Bristol\", \"Liverpool\""
+         continents/europe/country/population,continents/europe/country/name=uk value=65000000i
       ]]},
       {test_schema,
       [[
