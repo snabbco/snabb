@@ -243,7 +243,7 @@ function selftest ()
    local addr_ip = ffi.new("uint8_t[4]")
    local addr_ip6 = ffi.new("uint8_t[16]")
    local function random_ip(addr)
-      for i = 1, ffi.sizeof(addr) do
+      for i = 0, ffi.sizeof(addr) - 1 do
          addr[i] = math.random(255)
       end
       return addr
