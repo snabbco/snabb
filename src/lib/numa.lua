@@ -108,16 +108,21 @@ function unbind_numa_node ()
    bound_numa_node = nil
 end
 
-function bind_to_numa_node (node)
+function bind_to_numa_node (node, policy)
    if node == bound_numa_node then return end
    if not node then return unbind_numa_node() end
    assert(not bound_numa_node, "already bound")
 
-   assert(S.set_mempolicy('bind', node))
+   assert(S.set_mempolicy(policy or 'preferred', node))
 
    -- Migrate any pages that might have the wrong affinity.
    local from_mask = assert(S.get_mempolicy(nil, nil, nil, 'mems_allowed')).mask
-   assert(S.migrate_pages(0, from_mask, node))
+   local ok, err = S.migrate_pages(0, from_mask, node)
+   if not ok then
+      io.stderr:write(
+         string.format("Warning: Failed to migrate pages to NUMA node %d: %s\n",
+                       node, tostring(err)))
+   end
 
    bound_numa_node = node
 end
