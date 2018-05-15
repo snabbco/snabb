@@ -7,13 +7,19 @@ local interlink = require("lib.interlink")
 
 local Transmitter = {name="apps.interlink.Transmitter"}
 
-function Transmitter:new (_, name)
-   local self = {}
-   self.shm_name = "group/interlink/"..name..".interlink"
-   self.backlink = "interlink/transmitter/"..name..".interlink"
-   self.interlink = interlink.attach_transmitter(self.shm_name)
-   shm.alias(self.backlink, self.shm_name)
-   return setmetatable(self, {__index=Transmitter})
+function Transmitter:new ()
+   packet.enable_group_freelist()
+   return setmetatable({attached=false}, {__index=Transmitter})
+end
+
+function Transmitter:link ()
+   if not self.attached then
+      self.shm_name = "group/interlink/"..self.appname..".interlink"
+      self.backlink = "interlink/transmitter/"..self.appname..".interlink"
+      self.interlink = interlink.attach_transmitter(self.shm_name)
+      shm.alias(self.backlink, self.shm_name)
+      self.attached = true
+   end
 end
 
 function Transmitter:push ()
@@ -27,8 +33,10 @@ function Transmitter:push ()
 end
 
 function Transmitter:stop ()
-   interlink.detach_transmitter(self.interlink, self.shm_name)
-   shm.unlink(self.backlink)
+   if self.attached then
+      interlink.detach_transmitter(self.interlink, self.shm_name)
+      shm.unlink(self.backlink)
+   end
 end
 
 -- Detach transmitters to prevent leaking interlinks opened by pid.
