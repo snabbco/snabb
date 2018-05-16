@@ -137,7 +137,7 @@ function run(args)
 
    -- Fetch and parse the schema module.
    local s = schema.parse_schema_file(yang_module)
-   local grammar = yang_data.data_grammar_from_schema(s)
+   local grammar = yang_data.config_grammar_from_schema(s)
 
    describe_members(grammar)
 end

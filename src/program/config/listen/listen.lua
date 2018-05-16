@@ -6,8 +6,8 @@ local ffi = require("ffi")
 local rpc = require("lib.yang.rpc")
 local data = require("lib.yang.data")
 local path_lib = require("lib.yang.path")
+local json_lib = require("lib.ptree.json")
 local common = require("program.config.common")
-local json_lib = require("program.config.json")
 
 local function open_socket(file)
    S.signal('pipe', 'ign')
@@ -19,8 +19,8 @@ local function open_socket(file)
    return socket
 end
 
-local function validate_value(schema_name, revision_date, path, value_str)
-   local parser = common.data_parser(schema_name, path)
+local function validate_config(schema_name, revision_date, path, value_str)
+   local parser = common.config_parser(schema_name, path)
    local value = parser(value_str)
    return common.serialize_config(value, schema_name, path)
 end
@@ -36,14 +36,14 @@ function request_handlers.get_state(schema_name, revision_date, path)
 end
 function request_handlers.set(schema_name, revision_date, path, value)
    assert(value ~= nil)
-   local config = validate_value(schema_name, revision_date, path, value)
+   local config = validate_config(schema_name, revision_date, path, value)
    return {method='set-config',
            args={schema=schema_name, revision=revision_date, path=path,
                  config=config}}
 end
 function request_handlers.add(schema_name, revision_date, path, value)
    assert(value ~= nil)
-   local config = validate_value(schema_name, revision_date, path, value)
+   local config = validate_config(schema_name, revision_date, path, value)
    return {method='add-config',
            args={schema=schema_name, revision=revision_date, path=path,
                  config=config}}
@@ -55,8 +55,10 @@ end
 
 local function read_request(client, schema_name, revision_date)
    local json = json_lib.read_json_object(client)
-   local id, verb, path = assert(json.id), assert(json.verb), assert(json.path)
+   local id, verb, path = assert(json.id), assert(json.verb), json.path or '/'
    path = path_lib.normalize_path(path)
+   if json.schema then schema_name = json.schema end
+   if json.revision then revision_date = json.revision end
    local handler = assert(request_handlers[data.normalize_id(verb)])
    local req = handler(schema_name, revision_date, path, json.value)
    local function print_reply(reply, fd)

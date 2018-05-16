@@ -6,6 +6,7 @@ local S = require("syscall")
 local bit = require("bit")
 local ffi = require("ffi")
 local lib = require("core.lib")
+local cltable = require("lib.cltable")
 
 local band = bit.band
 local cast = ffi.cast
@@ -17,6 +18,23 @@ local constants_ipv6_frag = constants.ipv6_frag
 local ehs = constants.ethernet_header_size
 local o_ipv4_flags = constants.o_ipv4_flags
 local ntohs = lib.ntohs
+
+-- Return device PCI address, queue ID, and queue configuration.
+function parse_instance(conf)
+   local device, instance
+   for k, v in pairs(conf.softwire_config.instance) do
+      assert(device == nil, "configuration has more than one instance")
+      device, instance = k, v
+   end
+   assert(device ~= nil, "configuration has no instance")
+   local id, queue
+   for k, v in cltable.pairs(instance.queue) do
+      assert(id == nil, "configuration has more than one RSS queue")
+      id, queue = k.id, v
+   end
+   assert(id ~= nil, "configuration has no RSS queues")
+   return device, id, queue
+end
 
 function get_ihl_from_offset(pkt, offset)
    local ver_and_ihl = pkt.data[offset]
@@ -83,10 +101,6 @@ function is_ipv4_fragment(pkt)
    local flags_and_frag_offset = ntohs(rd16(pkt.data + ehs + o_ipv4_flags))
    return band(flags_and_frag_offset, flag_more_fragments_mask) ~= 0 or
       band(flags_and_frag_offset, non_zero_offset) ~= 0
-end
-
-function set_dst_ethernet(pkt, dst_eth)
-   ffi.copy(pkt.data, dst_eth, 6)
 end
 
 function write_to_file(filename, content)

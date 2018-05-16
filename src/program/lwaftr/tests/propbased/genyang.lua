@@ -3,22 +3,28 @@ module(..., package.seeall)
 -- This module provides functions for generating snabb config
 -- commands with random path queries and values
 
-local ffi    = require("ffi")
-local schema = require("lib.yang.schema")
+local ffi       = require("ffi")
+local schema    = require("lib.yang.schema")
+local data      = require("lib.yang.data")
+local path_data = require("lib.yang.path_data")
+local util      = require("lib.yang.util")
 
-local capabilities = {['ietf-softwire']={feature={'binding', 'br'}}}
+local capabilities = {['ietf-softwire-br']={feature={'binding'}},}
 require('lib.yang.schema').set_default_capabilities(capabilities)
 
-local schemas = { "ietf-softwire", "snabb-softwire-v1" }
-
--- toggles whether functions should intentionally generate invalid
--- values for fuzzing purposes
-local generate_invalid = true
+local schemas = { "ietf-softwire-br", "snabb-softwire-v2" }
 
 -- choose an element of an array randomly
 local function choose(choices)
    local idx = math.random(#choices)
    return choices[idx]
+end
+
+local function maybe(f, default, prob)
+   return function(...)
+      if math.random() < (prob or 0.8) then return f(...) end
+      return default
+   end
 end
 
 -- Generate a get/set/add/remove string given a pid string and optional schema
@@ -36,26 +42,11 @@ function generate_any(pid, schema)
    -- leaf-list cases (for remove, we need a case with a selector too)
    -- Note: this assumes a list or leaf-list case exists in the schema at all
    elseif cmd == "add" then
-      local query, val, schema
-      local ok = false
-      while not ok do
-         query, val, schema = generate_config_xpath_and_val(schema)
-         if string.match(tostring(val), "^{.*}$") then
-            ok = true
-         end
-      end
-      --local query, val, schema = generate_config_xpath_and_val(schema)
+      local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config add -s %s %s \"%s\" \"%s\"",
                            schema, pid, query, val)
    else
-      local query, val, schema
-      local ok = false
-      while not ok do
-         query, val, schema = generate_config_xpath_and_val(schema)
-         if string.match(query, "[]]$") then
-            ok = true
-         end
-      end
+      local query, val, schema = generate_config_xpath_and_val(schema)
       return string.format("./snabb config remove -s %s %s \"%s\"",
                            schema, pid, query)
    end
@@ -72,7 +63,7 @@ end
 -- Like generate_get but for state queries
 function generate_get_state(pid, schema, query)
    if not query then
-      query, schema = generate_config_xpath_state(schema)
+      query, schema = generate_state_xpath(schema)
    end
    return string.format("./snabb config get-state -s %s %s \"%s\"", schema, pid, query)
 end
@@ -135,7 +126,7 @@ end
 
 -- return a random number, preferring boundary values and
 -- sometimes returning results out of range
-local function choose_bounded(lo, hi)
+local function choose_bounded(lo, hi, generate_invalid)
    local r = math.random()
    -- occasionally return values that are invalid for type
    -- to provoke crashes
@@ -150,59 +141,46 @@ local function choose_bounded(lo, hi)
    end
 end
 
--- choose a random number, taking range statements into account
-local function choose_range(rng, lo, hi)
+-- Choose a random number from within a range of valid value.  RANGES
+-- is an array of {LO, HI} arrays; each of LO and HI can be numbers.
+-- LO can additionally be "min" and HI can be "max".
+local function choose_value_from_ranges(ranges, type_min, type_max, generate_invalid)
    local r = math.random()
 
-   if #rng == 0 or (generate_invalid and r < 0.1) then
-      return choose_bounded(lo, hi)
-   elseif rng[1] == "or" then
-      local intervals = {}
-      local num_intervals = (#rng - 1) / 2
-
-      for i=1, num_intervals do
-         intervals[i] = { rng[2*i], rng[2*i+1] }
-      end
-
-      return choose_range(choose(intervals), lo, hi)
+   if #ranges == 0 or (generate_invalid and r < 0.1) then
+      return choose_bounded(type_min, type_max, generate_invalid)
    else
-      local lo_rng, hi_rng = rng[1], rng[2]
-
-      if lo_rng == "min" then
-         lo_rng = lo
-      end
-      if hi_rng == "max" then
-         hi_rng = hi
-      end
-
-      return choose_bounded(math.max(lo_rng, lo), math.min(hi_rng, hi))
+      local lo, hi = unpack(ranges[math.random(1,#ranges)])
+      if lo == "min" then lo = type_min end
+      if hi == "max" then hi = type_max end
+      return choose_bounded(lo, hi, generate_invalid)
    end
 end
 
-local function value_from_type(a_type)
+local function value_from_type(a_type, generate_invalid)
    local prim = a_type.primitive_type
-   local rng
+   local ranges
 
    if a_type.range then
-      rng = a_type.range.value
+      ranges = a_type.range.value
    else
-      rng = {}
+      ranges = {}
    end
 
    if prim == "int8" then
-      return choose_range(rng, -128, 127)
+      return choose_value_from_ranges(ranges, -128, 127, generate_invalid)
    elseif prim == "int16" then
-      return choose_range(rng, -32768, 32767)
+      return choose_value_from_ranges(ranges, -32768, 32767, generate_invalid)
    elseif prim == "int32" then
-      return choose_range(rng, -2147483648, 2147483647)
+      return choose_value_from_ranges(ranges, -2147483648, 2147483647, generate_invalid)
    elseif prim == "int64" then
       return ffi.cast("int64_t", random64())
    elseif prim == "uint8" then
-      return choose_range(rng, 0, 255)
+      return choose_value_from_ranges(ranges, 0, 255, generate_invalid)
    elseif prim == "uint16" then
-      return choose_range(rng, 0, 65535)
+      return choose_value_from_ranges(ranges, 0, 65535, generate_invalid)
    elseif prim == "uint32" then
-      return choose_range(rng, 0, 4294967295)
+      return choose_value_from_ranges(ranges, 0, 4294967295, generate_invalid)
    elseif prim == "uint64" then
       return random64()
    -- TODO: account for fraction-digits and range
@@ -213,9 +191,16 @@ local function value_from_type(a_type)
       return string.format("%f", tonumber(int64 * (10 ^ -exp)))
    elseif prim == "boolean" then
       return choose({ true, false })
-   elseif prim == "ipv4-address" then
-      return math.random(0, 255) .. "." .. math.random(0, 255) .. "." ..
-             math.random(0, 255) .. "." .. math.random(0, 255)
+   elseif prim == "ipv4-address" or prim == "ipv4-prefix" then
+      local addr = {}
+      for i=1,4 do
+         table.insert(addr, math.random(255))
+      end
+      addr = table.concat(addr, ".")
+      if prim == "ipv4-prefix" then
+         return ("%s/%d"):format(addr, math.random(32))
+      end
+      return addr
    elseif prim == "ipv6-address" or prim == "ipv6-prefix" then
       local addr = random_hexes()
       for i=1, 7 do
@@ -234,7 +219,7 @@ local function value_from_type(a_type)
       end
       return addr
    elseif prim == "union" then
-      return value_from_type(choose(a_type.union))
+      return value_from_type(choose(a_type.union), generate_invalid)
    -- TODO: follow pattern statement
    elseif prim == "string" then
       local len = choose_nat()
@@ -285,197 +270,204 @@ local function value_from_type(a_type)
    -- instance-identifier
    -- leafref
 
-   error("NYI or unknown type")
+   error("NYI or unknown type: "..prim)
 end
 
--- from a config schema, generate an xpath query string
--- this code is patterned off of the visitor used in lib.yang.data
-local function generate_xpath_and_node_info(schema, for_state)
-   local path = ""
+local function value_generator(typ, generate_invalid)
+   -- FIXME: memoize dispatch.
+   return function() return tostring(value_from_type(typ), generate_invalid) end
+end
+
+local function data_generator_from_grammar(production, generate_invalid)
    local handlers = {}
-
-   -- data describing how to generate a value for the chosen path
-   -- it's a table with `node` and possibly-nil `selector` keys
-   local gen_info
-
-   local function visit(node)
-      local handler = handlers[node.kind]
-      if handler then handler(node) end
+   local function visit1(keyword, production)
+      return assert(handlers[production.type])(keyword, production)
    end
-   local function visit_body(node)
-      local ids = {}
-      for id, node in pairs(node.body) do
-         -- only choose nodes that are used in configs unless
-         -- for_state is passed
-         if for_state or node.config ~= false then
-            table.insert(ids, id)
+   local function body_generator(productions)
+      local order = {}
+      local gens = {}
+      for k,v in pairs(productions) do
+         table.insert(order, k)
+         gens[k] = visit1(k, v)
+         if not v.mandatory then gens[k] = maybe(gens[k]) end
+      end
+      table.sort(order)
+      return function()
+         local ret = {}
+         for _,k in ipairs(order) do
+            local v = gens[k]()
+            if v ~= nil then table.insert(ret, v) end
          end
-      end
-
-      local id = choose(ids)
-      if id then
-         visit(node.body[id])
-      else
-         gen_info = { node = node }
+         return table.concat(ret, ' ')
       end
    end
-   function handlers.container(node)
-      path = path .. "/" .. node.id
-
-      -- don't always go into containers, since we need to test
-      -- fetching all sub-items too
-      if math.random() < 0.9 then
-         visit_body(node)
-      else
-         gen_info = { node = node }
+   function handlers.struct(keyword, production)
+      local gen = body_generator(production.members)
+      local prefix, suffix = '', ''
+      if keyword then prefix, suffix = keyword..' {', '}' end
+      return function()
+         return table.concat({prefix, gen(), suffix}, " ")
       end
    end
-   handlers['leaf-list'] = function(node)
-      if math.random() < 0.7 then
-         local idx      = choose_nat()
-         local selector = string.format("[position()=%d]", idx)
-         path = path .. "/" .. node.id .. selector
-         gen_info = { node = node, selector = idx }
-      -- sometimes omit the selector, for the benefit of commands
-      -- like add where a selector is not useful
-      else
-         path = path .. "/" .. node.id
-         gen_info = { node = node }
-      end
-   end
-   function handlers.list(node)
-      local key_types = {}
-      local r = math.random()
-
-      path = path .. "/" .. node.id
-
-      -- occasionally drop the selectors
-      if r < 0.7 then
-         for key in (node.key):split(" +") do
-            key_types[key] =  node.body[key].type
+   function handlers.array(keyword, production)
+      local gen = value_generator(production.element_type, generate_invalid)
+      local prefix, suffix = '', ';'
+      if keyword then prefix = keyword..' '..prefix end
+      return function()
+         local ret = {}
+         while math.random() < 0.9 do
+            table.insert(ret, prefix..gen()..suffix)
          end
-
-         for key, type in pairs(key_types) do
-            local val = assert(value_from_type(type), type.primitive_type)
-            path = path .. string.format("[%s=%s]", key, val)
-         end
-
-         -- continue path for child nodes
-         if math.random() < 0.5 then
-            visit_body(node)
-         else
-            gen_info = { node = node, selector = key_types }
-         end
-      else
-         gen_info = { node = node }
+         return table.concat(ret, " ")
       end
    end
-   function handlers.leaf(node)
-      path = path .. "/" .. node.id
-      val  = value_from_type(node.type)
-      gen_info = { node = node }
+   local function shallow_copy(t)
+      local ret = {}
+      for k,v in pairs(t) do ret[k]=v end
+      return ret
    end
-
-   -- just produce "/" on rare occasions
-   if math.random() > 0.01 then
-      visit_body(schema)
+   function handlers.table(keyword, production)
+      local keys = {}
+      for k,v in pairs(production.keys) do
+         keys[k] = shallow_copy(v)
+         keys[k].mandatory = true
+      end
+      local gen_key = body_generator(production.keys)
+      local gen_value = body_generator(production.values)
+      local prefix, suffix = '{', '}'
+      if keyword then prefix = keyword..' '..prefix end
+      return function()
+         local ret = {}
+         while math.random() < 0.9 do
+            local x = table.concat({prefix,gen_key(),gen_value(),suffix}, " ")
+            table.insert(ret, x)
+         end
+         return table.concat(ret, " ")
+      end
    end
+   function handlers.scalar(keyword, production)
+      local prefix, suffix = '', ''
+      if keyword then
+         prefix, suffix = keyword..' '..prefix, ';'
+      end
+      local gen = value_generator(production.argument_type, generate_invalid)
+      return function()
+         return prefix..gen()..suffix
+      end
+   end
+   function handlers.choice(keyword, production)
+      local choices = {}
+      local cases = {}
+      for case, choice in pairs(production.choices) do
+         table.insert(cases, case)
+         choices[case] = body_generator(choice)
+      end
+      table.sort(cases)
+      return function ()
+         return choices[choose(cases)]()
+      end
+   end
+   return visit1(nil, production)
+end
+data_generator_from_grammar = util.memoize(data_generator_from_grammar)
 
-   return path, gen_info
+local function path_generator_from_grammar(production, generate_invalid)
+   local handlers = {}
+   local function visit1(keyword, production)
+      return assert(handlers[production.type])(keyword, production)
+   end
+   function handlers.struct(keyword, production)
+      local members, gen_tail = {}, {}
+      for k,v in pairs(production.members) do
+         table.insert(members, k)
+         gen_tail[k] = assert(visit1(k, v))
+      end
+      table.sort(members)
+      return function ()
+         local head = keyword or ''
+         if math.random() < 0.1 then return head end
+         if head ~= '' then head = head..'/' end
+         local k = choose(members)
+         return head..gen_tail[k]()
+      end
+   end
+   function handlers.array(keyword, production)
+      return function ()
+         local head = keyword
+         if math.random() < 0.3 then return head end
+         return head..'[position()='..math.random(1,100)..']'
+      end
+   end
+   function handlers.table(keyword, production)
+      local keys, values, gen_key, gen_tail = {}, {}, {}, {}
+      for k,v in pairs(production.keys) do
+         table.insert(keys, k)
+         gen_key[k] = data_generator_from_grammar(v, generate_invalid)
+      end
+      for k,v in pairs(production.values) do
+         table.insert(values, k)
+         gen_tail[k] = visit1(k, v)
+      end
+      table.sort(keys)
+      table.sort(values)
+      return function ()
+         local head = keyword
+         if math.random() < 0.1 then return head end
+         for _,k in ipairs(keys) do
+            head = head..'['..k..'='..gen_key[k]()..']'
+         end
+         if math.random() < 0.1 then return head end
+         return head..'/'..gen_tail[choose(values)]()
+      end
+   end
+   function handlers.scalar(keyword, production)
+      assert(keyword)
+      return function() return keyword end
+   end
+   function handlers.choice(keyword, production)
+      local choices, cases = {}, {}
+      for case, choice in pairs(production.choices) do
+         table.insert(cases, case)
+         choices[case] = visit1(nil, {type='struct',members=choice})
+      end
+      table.sort(cases)
+      return function() return choices[choose(cases)]() end
+   end
+   local gen = visit1(nil, production)
+   return function() return '/'..gen() end
+end
+path_generator_from_grammar = util.memoize(path_generator_from_grammar)
+
+local function choose_path_for_grammar(grammar, generate_invalid)
+   return path_generator_from_grammar(grammar, generate_invalid)()
 end
 
--- similar to generating a query path like the function above, but
--- generates a compound value for `snabb config set` at some schema
--- node
-local function generate_value_for_node(gen_info)
-   -- hack for mutual recursion
-   local generate_compound
-
-   local function generate(node)
-      if node.kind == "container" or node.kind == "list" then
-         return generate_compound(node)
-      elseif node.kind == "leaf-list" or node.kind == "leaf" then
-         return value_from_type(node.type)
-      end
-   end
-
-   -- take a node and (optional) keys and generate a compound value
-   -- the keys are only provided for a list node
-   generate_compound = function(node, keys)
-      local ids = {}
-      for id, node in pairs(node.body) do
-         -- only choose nodes that are used in configs
-         if node.config ~= false then
-            table.insert(ids, id)
-         end
-      end
-
-      local val = ""
-
-      for _, id in ipairs(ids) do
-         local subnode = node.body[id]
-         local r = math.random()
-         if (subnode.mandatory or r > 0.5) and
-            (not keys or not keys[id]) then
-
-            if subnode.kind == "leaf-list" then
-               local count = choose_nat()
-               for i=0, count do
-                  local subval = generate(subnode)
-                  val = val .. string.format("%s %s; ", id, subval)
-               end
-            elseif subnode.kind == "container" or subnode.kind == "list" then
-               local subval = generate(subnode)
-               val = val .. string.format("%s {%s} ", id, subval)
-            else
-               local subval = generate(subnode)
-               val = val .. string.format("%s %s; ", id, subval)
-            end
-         end
-      end
-
-      return val
-   end
-
-   local node = gen_info.node
-   if node.kind == "list" and gen_info.selector then
-      generate_compound(node, gen_info.selector)
-   else
-      -- a top-level list needs the brackets, e.g., as in
-      -- snabb config add /routes/route { addr 1.2.3.4; port 1; }
-      if node.kind == "list" then
-         return "{" .. generate(node) .. "}"
-      else
-         return generate(node)
-      end
-   end
+local function choose_path_and_value_generator_for_grammar(grammar, generate_invalid)
+   local path = choose_path_for_grammar(grammar, generate_invalid)
+   local getter, subgrammar = path_data.resolver(grammar, path)
+   return path, data_generator_from_grammar(subgrammar, generate_invalid)
 end
 
-local function generate_xpath(schema, for_state)
-   local path = generate_xpath_and_node_info(schema, for_state)
-   return path
+local function choose_path_and_value_generator(schema, is_config, generate_invalid)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
+   return choose_path_and_value_generator_for_grammar(grammar, generate_invalid)
 end
 
-local function generate_xpath_and_val(schema)
-   local val, path, gen_info
-
-   while not val do
-      path, gen_info = generate_xpath_and_node_info(schema)
-
-      if gen_info then
-         val = generate_value_for_node(gen_info)
-      end
-   end
-
-   return path, val
+local function generate_xpath(schema, is_config, generate_invalid)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
+   return choose_path_for_grammar(grammar, generate_invalid)
 end
 
-function generate_config_xpath(schema_name)
-   if not schema_name then
-      schema_name = choose(schemas)
-   end
-   local schema      = schema.load_schema_by_name(schema_name)
-   return generate_xpath(schema, false), schema_name
+local function generate_xpath_and_val(schema, is_config, generate_invalid)
+   local path, gen_value = choose_path_and_value_generator(
+      schema, is_config, generate_invalid)
+   return path, gen_value()
+end
+
+function generate_config_xpath(schema_name, generate_invalid)
+   schema_name = schema_name or choose(schemas)
+   local schema = schema.load_schema_by_name(schema_name)
+   return generate_xpath(schema, true, generate_invalid), schema_name
 end
 
 -- types that may be randomly picked for a fuzzed test case
@@ -484,53 +476,45 @@ local types = { "int8", "int16", "int32", "int64", "uint8", "uint16",
                 "ipv6-address", "ipv6-prefix", "mac-address", "string",
                 "binary" }
 
-function generate_config_xpath_and_val(schema_name)
-   if not schema_name then
-      schema_name = choose(schemas)
-   end
+function generate_config_xpath_and_val(schema_name, generate_invalid)
+   schema_name = schema_name or choose(schemas)
    local schema = schema.load_schema_by_name(schema_name)
    local r = math.random()
    local path, val
 
    -- once in a while, generate a nonsense value
    if generate_invalid and r < 0.05 then
-     path = generate_xpath(schema, false)
-     val = value_from_type({ primitive_type=choose(types) })
+     path = generate_xpath(schema, true)
+     val = value_from_type({ primitive_type=choose(types) }, generate_invalid)
    else
-     path, val = generate_xpath_and_val(schema)
+     path, val = generate_xpath_and_val(schema, true, generate_invalid)
    end
 
    return path, val, schema_name
 end
 
-function generate_config_xpath_state(schema_name)
-   if not schema_name then
-      schema_name = choose(schemas)
-   end
-   local schema      = schema.load_schema_by_name(schema_name)
-   local path = generate_xpath(schema.body["softwire-state"], true)
-   return "/softwire-state" .. path, schema_name
+function generate_state_xpath(schema_name, generate_invalid)
+   schema_name = schema_name or choose(schemas)
+   local schema = schema.load_schema_by_name(schema_name)
+   return generate_xpath(schema, false, generate_invalid), schema_name
 end
 
 function selftest()
-   local data = require("lib.yang.data")
-   local path = require("lib.yang.path")
-   local schema = schema.load_schema_by_name("snabb-softwire-v1")
-   local grammar = data.data_grammar_from_schema(schema)
+   print('selftest: program.lwaftr.tests.propbased.genyang')
+   local schema = schema.load_schema_by_name("snabb-softwire-v2")
+   local grammar = data.config_grammar_from_schema(schema)
 
-   path.convert_path(grammar, generate_xpath(schema))
-
-   -- set flag to false to make tests predictable
-   generate_invalid = false
+   for i=1,1000 do generate_xpath_and_val(schema, true) end
+   for i=1,1000 do generate_xpath_and_val(schema, false) end
 
    -- check some int types with range statements
    for i=1, 100 do
       local val1 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {1, 16} } })
+                                     range={ value = {{1, 16}} } })
       local val2 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {"or", 1, 16, 18, 32} } })
+                                     range={ value = {{1, 16}, {18, 32}} } })
       local val3 = value_from_type({ primitive_type="uint8",
-                                     range={ value = {"or", "min", 10, 250, "max"} } })
+                                     range={ value = {{"min", 10}, {250, "max"}} } })
       assert(val1 >= 1 and val1 <= 16, string.format("test value: %d", val1))
       assert(val2 >= 1 and val2 <= 32 and val2 ~= 17,
              string.format("test value: %d", val2))
@@ -552,4 +536,5 @@ function selftest()
       local cmd = string.format("echo \"%s\" | base64 -d > /dev/null", val)
       assert(os.execute(cmd) == 0, string.format("test value: %s", val))
    end
+   print('selftest: ok')
 end

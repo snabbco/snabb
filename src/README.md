@@ -725,10 +725,6 @@ Returns the filename of the first file in *directory*.
 
 Returns the first line of file at *filename* as a string.
 
-— Function **lib.files_in_directory** *directory*
-
-Returns an array of filenames in *directory*.
-
 — Function **lib.load_string** *string*
 
 Evaluates and returns the value of the Lua expression in *string*.
@@ -953,6 +949,19 @@ lib.parse({foo=42, bar=43}, {foo={required=true}, bar={}, baz={default=44}})
   => {foo=42, bar=43, baz=44}
 ```
 
+- Function **lib.set** *vargs*
+
+Reads a variable number of arguments and returns a table representing a set.
+The returned value can be used to query whether an element belongs or not to
+the set.
+
+Example:
+
+```
+local t = set('foo', 'bar')
+t['foo']  -- yields true.
+t['quax'] -- yields false.
+```
 
 ## Multiprocess operation (core.worker)
 

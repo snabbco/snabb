@@ -33,6 +33,7 @@ local function call_timers (l)
       if debug then
          print(string.format("running timer %s at tick %s", timer.name, ticks))
       end
+      timer.next_tick = nil
       timer.fn(timer)
       if timer.repeating then activate(timer) end
    end
@@ -49,6 +50,7 @@ function run_to_time (ns)
 end
 
 function activate (t)
+   assert(t.next_tick == nil, "timer already activated")
    -- Initialize time
    if not ticks then
       ticks = math.floor(tonumber(C.get_time_ns() / ns_per_tick))
@@ -58,6 +60,19 @@ function activate (t)
       table.insert(timers[tick], t)
    else
       timers[tick] = {t}
+   end
+   t.next_tick = tick
+end
+
+function cancel (t)
+   if t.next_tick then
+      for idx, timer in ipairs(timers[t.next_tick]) do
+         if timer == t then
+            table.remove(timers[t.next_tick], idx)
+            t.next_tick = nil
+            return true
+         end
+      end
    end
 end
 

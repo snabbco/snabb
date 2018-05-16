@@ -114,6 +114,27 @@ $ cp src/snabb /usr/local/bin/
 $ sudo snabb packetblaster replay capture.pcap 01:00.0
 ```
 
+### snabb container
+
+Basic support for building and running snabb in a Docker container is available via
+
+```
+$ make docker
+```
+
+This will build a tiny snabb container (8MB), ready to be used:
+
+```
+$ docker run -ti --rm snabb --help
+```
+
+Or simply run snabb, as you would under linux. This is made possible by using a wrapper shell script that
+gets linked to as part of 'make docker':
+
+```
+$ src/snabb --help
+```
+
 ## How do I get involved?
 
 Here are the ways you can get involved:
@@ -121,5 +142,5 @@ Here are the ways you can get involved:
 - Use the Snabb applications in your network.
 - Create your very own application: [Getting Started](src/doc/getting-started.md).
 - Create Github Issues with your ideas and questions and problems.
-- Hang out on the [Snabb Slack chat](https://snabb.slack.com/). You can get a no-questions-asked invitation by mailing `luke@snabb.co` with the addresses/domains you want invited.
+- [Join](https://join.slack.com/t/snabb/shared_invite/enQtMzIyOTIwMTg5ODYyLTMzY2FjMGEzM2QzNDlhMDYxNzU0M2UyNjQ1MDc4MDRjY2Q3MWMwY2Q4YWQ1NDllY2E3NTZkZGUyZTQxNzgyNjc) the [Snabb Slack chat](https://snabb.slack.com/) to hang out and shoot the breeze.
 
