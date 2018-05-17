@@ -123,7 +123,14 @@ function init_snmp (objs, name, counters, directory, interval)
          local rxmcast = get_counter('rxmcast')
          if rxmcast and rxbcast then
             local inMcast = rxmcast - rxbcast
-            inUcast = rxpackets - rxmcast
+            -- Avoid underflow. This can happen if all traffic is
+            -- multicast/broadcast and the hardware counters are not
+            -- perfectly in sync.
+            if rxpackets > rxmcast then
+               inUcast = rxpackets - rxmcast
+            else
+               inUcast = 0
+            end
             ifTable:set('ifHCInMulticastPkts', inMcast)
             ifTable:set('ifInMulticastPkts', inMcast)
             ifTable:set('ifHCInBroadcastPkts', rxbcast)
@@ -148,7 +155,11 @@ function init_snmp (objs, name, counters, directory, interval)
          local txmcast = get_counter('txmcast')
          if txmcast and txbcast then
             local outMcast = txmcast - txbcast
-            outUcast = txpackets - txmcast
+            if txpackets > txmcast then
+               outUcast = txpackets - txmcast
+            else
+               outUcast = 0
+            end
             ifTable:set('ifHCOutMulticastPkts', outMcast)
             ifTable:set('ifOutMulticastPkts', outMcast)
             ifTable:set('ifHCOutBroadcastPkts', txbcast)
