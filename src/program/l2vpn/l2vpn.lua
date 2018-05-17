@@ -155,7 +155,6 @@ local shm = require("core.shm")
 local const = require("syscall.linux.constants")
 local S = require("syscall")
 local app_graph = require("core.config")
-local leader = require("apps.config.leader").Leader
 local ipv6 = require("lib.protocol.ipv6")
 local dipatch = require("program.l2vpn.dispatch").dispatch
 local Tap = require("apps.tap.tap").Tap
