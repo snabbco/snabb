@@ -685,9 +685,11 @@ local function setup_shm_and_snmp (main_config)
                error("No links match pattern: "..pattern)
             end
             local tstats = shm.open_frame(
-               find_linkspec('^'..intf.vmux_connector.output()))
+               'links/'..
+                  find_linkspec('^'..intf.vmux_connector.output()))
             local rstats = shm.open_frame(
-               find_linkspec(intf.vmux_connector.input()..'$'))
+               'links/'..
+                  find_linkspec(intf.vmux_connector.input()..'$'))
             counters.rxpackets = map(tstats.txpackets)
             counters.rxbytes = map(tstats.txbytes)
             counters.rxdrop = map(tstats.txdrop)
