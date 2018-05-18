@@ -62,6 +62,7 @@ function Socket:connect_unix(file, stype)
 end
 
 function listen_unix(file, args)
+   args = args or {}
    local s = socket('unix', args.stype or "stream", args.protocol)
    s:listen_unix(file)
    if args.ephemeral then
