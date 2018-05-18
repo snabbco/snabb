@@ -30,7 +30,7 @@ local support = require("lib.ptree.support")
 local channel = require("lib.ptree.channel")
 local trace = require("lib.ptree.trace")
 local alarms = require("lib.yang.alarms")
-local json_lib = require("lib.ptree.json")
+local json = require("lib.ptree.json")
 local queue = require('lib.fibers.queue')
 local fiber_sleep = require('lib.fibers.sleep').sleep
 
@@ -44,7 +44,8 @@ if os.getenv('SNABB_MANAGER_VERBOSE') then default_log_level = "DEBUG" end
 
 local manager_config_spec = {
    name = {},
-   socket_file_name = {default='config-leader-socket'},
+   rpc_socket_file_name = {default='config-leader-socket'},
+   notification_socket_file_name = {default='notifications'},
    setup_fn = {required=true},
    -- Could relax this requirement.
    initial_configuration = {required=true},
@@ -57,14 +58,12 @@ local manager_config_spec = {
    Hz = {default=100},
 }
 
-local function open_socket (file)
-   S.signal('pipe', 'ign')
-   local socket = assert(S.socket("unix", "stream, nonblock"))
-   S.unlink(file) --unlink to avoid EINVAL on bind()
-   local sa = S.t.sockaddr_un(file)
-   assert(socket:bind(sa))
-   assert(socket:listen())
-   return socket
+local function ensure_absolute(file_name)
+   if file_name:match('^/') then
+      return file_name
+   else
+      return shm.root..'/'..tostring(S.getpid())..'/'..file_name
+   end
 end
 
 function new_manager (conf)
@@ -74,11 +73,9 @@ function new_manager (conf)
    ret.name = conf.name
    ret.log_level = assert(log_levels[conf.log_level])
    ret.cpuset = conf.cpuset
-   ret.socket_file_name = conf.socket_file_name
-   if not ret.socket_file_name:match('^/') then
-      local instance_dir = shm.root..'/'..tostring(S.getpid())
-      ret.socket_file_name = instance_dir..'/'..ret.socket_file_name
-   end
+   ret.rpc_socket_file_name = ensure_absolute(conf.rpc_socket_file_name)
+   ret.notification_socket_file_name = ensure_absolute(
+      conf.notification_socket_file_name)
    ret.schema_name = conf.schema_name
    ret.default_schema = conf.default_schema or conf.schema_name
    ret.support = support.load_schema_config_support(conf.schema_name)
@@ -171,14 +168,8 @@ function Manager:start ()
    self.cpuset:bind_to_numa_node()
    require('lib.fibers.file').install_poll_io_handler()
    self.sched = fiber.current_scheduler
-   local sockname = self.socket_file_name
-   local sock = socket.listen_unix(sockname)
-   local parent_close = sock.close
-   function sock:close()
-      parent_close(sock)
-      S.unlink(sockname)
-   end
-   fiber.spawn(function () self:accept_peers(sock) end)
+   fiber.spawn(function () self:accept_rpc_peers() end)
+   fiber.spawn(function () self:accept_notification_peers() end)
    fiber.spawn(function () self:notification_poller() end)
 end
 
@@ -188,16 +179,28 @@ function Manager:call_with_cleanup(closeable, f, ...)
    if not ok then self:warn('%s', tostring(err)) end
 end
 
-function Manager:accept_peers (sock)
+function Manager:accept_rpc_peers ()
+   local sock = socket.listen_unix(self.rpc_socket_file_name, {ephemeral=true})
    self:call_with_cleanup(sock, function()
       while true do
          local peer = sock:accept()
-         fiber.spawn(function() self:handle_peer(peer) end)
+         fiber.spawn(function() self:handle_rpc_peer(peer) end)
       end
    end)
 end
 
-function Manager:handle_peer(peer)
+function Manager:accept_notification_peers ()
+   local sock = socket.listen_unix(self.notification_socket_file_name,
+                                   {ephemeral=true})
+   fiber.spawn(function()
+      while true do
+         local peer = sock:accept()
+         fiber.spawn(function() self:handle_notification_peer(peer) end)
+      end
+   end)
+end
+
+function Manager:handle_rpc_peer(peer)
    self:call_with_cleanup(peer, function()
       while true do
          local prefix = peer:read_line('discard')
@@ -214,6 +217,22 @@ function Manager:handle_peer(peer)
       end
    end)
    if self.listen_peer == peer then self.listen_peer = nil end
+end
+
+function Manager:handle_notification_peer(peer)
+   local q = queue.new()
+   self.notification_peers[q] = true
+   function q:close()
+      self.notification_peers[q] = nil
+      peer:close()
+   end
+   self:call_with_cleanup(q, function()
+      while true do
+         json.write_json_object(peer, q:get())
+         peer:write_chars("\n")
+         peer:flush_output()
+      end
+   end)
 end
 
 function Manager:run_scheduler()
@@ -550,14 +569,6 @@ function Manager:rpc_attach_listener (args)
    if success then return response else return {status=1, error=response} end
 end
 
-function Manager:rpc_attach_notification_listener ()
-   local peer = self.rpc_peer
-   peer.queue = queue.new()
-   table.insert(self.notification_peers, peer)
-   fiber.spawn(function() self:send_notifications_to_peer(peer) end)
-   return {}
-end
-
 function Manager:rpc_get_state (args)
    local function getter()
       if args.schema ~= self.schema_name then
@@ -597,15 +608,6 @@ function Manager:handle (peer, payload)
    return ret
 end
 
-local function tojson (str)
-   local msg = mem.call_with_output_string(function(output)
-      json_lib.write_json_object(output, str)
-      return output:flush()
-   end)
-   return tostring(#msg)..'\n'..msg
-end
-
-
 -- Spawn in a fiber.
 function Manager:notification_poller ()
    while true do
@@ -613,23 +615,13 @@ function Manager:notification_poller ()
       if #notifications == 0 then
          fiber_sleep(1/50) -- poll at 50 Hz.
       else
-         for _, peer in ipairs(self.notification_peers) do
-            for _,each in ipairs(notifications) do
-               peer.queue:put(tojson(each))
+         for q,_ in pairs(self.notification_peers) do
+            for _,notification in ipairs(notifications) do
+               q:put(notification)
             end
          end
       end
    end
-end
-
-function Manager:send_notifications_to_peer (peer)
-   self:call_with_cleanup(peer, function()
-      while true do
-         local msg = peer.queue:get()
-         peer:write_chars(msg)
-         peer:flush_output()
-      end
-   end)
 end
 
 function Manager:send_messages_to_workers()
