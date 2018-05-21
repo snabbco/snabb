@@ -74,12 +74,17 @@ is a table of key/value pairs.  The following keys are required:
 
 Optional entries that may be present in the *parameters* table include:
 
- * `socket_file_name`: The name of the socket on which to listen for
+ * `rpc_socket_file_name`: The name of the socket on which to listen for
    incoming connections from `snabb config` clients.  See [the `snabb
    config` documentation](../../program/config/README.md) for more
    information.  Default is `$SNABB_SHM_ROOT/PID/config-leader-socket`,
    where the `$SNABB_SHM_ROOT` environment variable defaults to
    `/var/run/snabb`.
+ * `notification_socket_file_name`: The name of the socket on which to
+   listen for incoming connections from `snabb alarms` clients.  See
+   [the `snabb alarms` documentation](../../program/alarms/README.md)
+   for more information.  Default is
+   `$SNABB_SHM_ROOT/PID/notifications`.
  * `name`: A name to claim for this process tree.  `snabb config` can
    address network functions by name in addition to PID.  If the name is
    already claimed on the local machine, an error will be signalled.

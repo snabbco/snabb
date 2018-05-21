@@ -61,9 +61,17 @@ function Socket:connect_unix(file, stype)
    return self:connect(sa)
 end
 
-function listen_unix(file, stype, protocol)
-   local s = socket('unix', stype or 'stream', protocol)
+function listen_unix(file, args)
+   args = args or {}
+   local s = socket('unix', args.stype or "stream", args.protocol)
    s:listen_unix(file)
+   if args.ephemeral then
+      local parent_close = s.close
+      function s:close()
+         parent_close(s)
+         S.unlink(file)
+      end
+   end
    return s
 end
 

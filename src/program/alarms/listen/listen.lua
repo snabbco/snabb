@@ -2,56 +2,56 @@
 module(..., package.seeall)
 
 local S = require("syscall")
-local common = require("program.config.common")
-local data = require("lib.yang.data")
-local fiber = require("lib.fibers.fiber")
+local lib = require("core.lib")
+local shm = require("core.shm")
 local file = require("lib.stream.file")
-local mem = require("lib.stream.mem")
-local path_lib = require("lib.yang.path")
-local rpc = require("lib.yang.rpc")
+local socket = require("lib.stream.socket")
+local fiber = require("lib.fibers.fiber")
+local json = require("lib.ptree.json")
 
-local function open_socket(file)
-   S.signal('pipe', 'ign')
-   local socket = assert(S.socket("unix", "stream"))
-   S.unlink(file)
-   local sa = S.t.sockaddr_un(file)
-   assert(socket:bind(sa))
-   assert(socket:listen())
-   return socket
+function show_usage(status, err_msg)
+   if err_msg then print('error: '..err_msg) end
+   print(require("program.alarms.listen.README_inc"))
+   main.exit(status)
 end
 
-local function attach_listener(leader, caller)
-   local msg, parse_reply = rpc.prepare_call(
-      caller, 'attach-notification-listener', {})
-   common.send_message(leader, msg)
-   return parse_reply(mem.open_input_string(common.recv_message(leader)))
+local function parse_command_line(args)
+   local handlers = {}
+   function handlers.h() show_usage(0) end
+   args = lib.dogetopt(args, handlers, "h", {help="h"})
+   if #args ~= 1 then show_usage(1, msg) end
+   return unpack(args)
+end
+
+local function connect(instance_id)
+   local tail = instance_id..'/notifications'
+   local ok, ret = pcall(socket.connect_unix, shm.root..'/by-name/'..tail)
+   if not ok then
+      ok, ret = pcall(socket.connect_unix, shm.root..'/'..tail)
+   end
+   if ok then return ret end
+   error("Could not connect to notifications socket on Snabb instance '"..
+            instance_id.."'.\n")
 end
 
 function run(args)
-   args = common.parse_command_line(args, { command='listen' })
-   local caller = rpc.prepare_caller('snabb-config-leader-v1')
-   local leader = common.open_socket_or_die(args.instance_id)
-   attach_listener(leader, caller)
-   
+   local instance_id = parse_command_line(args)
    local handler = require('lib.fibers.file').new_poll_io_handler()
    file.set_blocking_handler(handler)
    fiber.current_scheduler:add_task_source(handler)
-   -- Leader was blocking in call to attach_listener.
-   leader:nonblock()
+   require('lib.stream.compat').install()
 
-   -- Check if there is a socket path specified, if so use that as method
-   -- to communicate, otherwise use stdin and stdout.
-   local client_tx
-   if args.socket then
-      local sockfd = open_socket(args.socket)
-      local addr = S.t.sockaddr_un()
-      -- Wait for a connection
-      print("Listening for clients on socket: "..args.socket)
-      client_tx = file.fdopen(assert(sockfd:accept(addr)))
-   else
-      client_tx = file.fdopen(S.stdout)
+   local function print_notifications()
+      local socket = connect(instance_id)
+      while true do
+         local obj = json.read_json_object(socket)
+         if obj == nil then return end
+         json.write_json_object(io.stdout, obj)
+         io.stdout:write_chars("\n")
+         io.stdout:flush_output()
+      end
    end
-      
+
    local function exit_when_finished(f)
       return function()
          local success, res = pcall(f)
@@ -59,18 +59,8 @@ function run(args)
          os.exit(success and 0 or 1)
       end
    end
-   local function print_notification (output, msg)
-      output:write_chars(msg)
-      output:flush()
-   end
-   local function handle_outgoing ()
-      while true do
-         local msg = common.recv_message(leader)
-         print_notification(client_tx, msg)
-      end
-   end
 
-   fiber.spawn(exit_when_finished(handle_outgoing))
+   fiber.spawn(exit_when_finished(print_notifications))
 
    while true do
       local sched = fiber.current_scheduler
