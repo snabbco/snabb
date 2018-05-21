@@ -26,10 +26,10 @@ function PollIOHandler:init_nonblocking(fd)
    fd:nonblock()
 end
 function PollIOHandler:wait_for_readable(fd)
-   self:wait_for_readable_op(fd):perform()
+   self:fd_readable_op(fd):perform()
 end
 function PollIOHandler:wait_for_writable(fd)
-   self:wait_for_writable_op(fd):perform()
+   self:fd_writable_op(fd):perform()
 end
 
 local function add_waiter(fd, waiters, task)
@@ -38,26 +38,44 @@ local function add_waiter(fd, waiters, task)
    table.insert(tasks, task)
 end
 
-function PollIOHandler:wait_for_readable_op(fd)
-   local function try() return false end
-   local function block(suspension, wrap_fn)
+local function make_block_fn(fd, waiting, epoll, events)
+   return function(suspension, wrap_fn)
       local task = suspension:complete_task(wrap_fn)
       local fd = fd:getfd()
-      add_waiter(fd, self.waiting_for_readable, task)
-      self.epoll:add(fd, epoll.RD)
+      add_waiter(fd, waiting, task)
+      epoll:add(fd, events)
    end
+end
+
+function PollIOHandler:fd_readable_op(fd)
+   local function try() return false end
+   local block = make_block_fn(
+      fd, self.waiting_for_readable, self.epoll, epoll.RD)
    return op.new_base_op(nil, try, block)
 end
 
-function PollIOHandler:wait_for_writable_op(fd)
+function PollIOHandler:fd_writable_op(fd)
    local function try() return false end
-   local function block(suspension, wrap_fn)
-      local task = suspension:complete_task(wrap_fn)
-      local fd = fd:getfd()
-      add_waiter(fd, self.waiting_for_writable, task)
-      self.epoll:add(fd, epoll.WR)
-   end
+   local block = make_block_fn(
+      fd, self.waiting_for_writable, self.epoll, epoll.WR)
    return op.new_base_op(nil, try, block)
+end
+
+function PollIOHandler:stream_readable_op(stream)
+   local fd = assert(stream.io.fd)
+   local function try() return not stream.rx:is_empty() end
+   local block = make_block_fn(
+      fd, self.waiting_for_readable, self.epoll, epoll.RD)
+   return op.new_base_op(nil, try, block)
+end
+
+-- A stream_writable_op is the same as fd_writable_op, as a stream's
+-- buffer is never left full -- any stream method that fills the buffer
+-- flushes it directly.  Knowing something about the buffer state
+-- doesn't tell us anything useful.
+function PollIOHandler:stream_writable_op(stream)
+   local fd = assert(stream.io.fd)
+   return self:fd_writable_op(fd)
 end
 
 local function schedule_tasks(sched, tasks)
@@ -108,13 +126,15 @@ function PollIOHandler:cancel_all_tasks()
 end
 
 local installed = 0
+local installed_poll_handler
 function install_poll_io_handler()
    installed = installed + 1
    if installed == 1 then
-      local handler = new_poll_io_handler()
-      file.set_blocking_handler(handler)
-      fiber.current_scheduler:add_task_source(handler)
+      installed_poll_handler = new_poll_io_handler()
+      file.set_blocking_handler(installed_poll_handler)
+      fiber.current_scheduler:add_task_source(installed_poll_handler)
    end
+   return installed_poll_handler
 end
 
 function uninstall_poll_io_handler()
@@ -123,13 +143,27 @@ function uninstall_poll_io_handler()
       file.set_blocking_handler(nil)
       -- FIXME: Remove task source.
       for i,source in ipairs(fiber.current_scheduler.sources) do
-         if getmetatable(source) == PollIOHandler_mt then
+         if source == installed_poll_handler then
             table.remove(fiber.current_scheduler.sources, i)
-            source.epoll:close()
             break
          end
       end
+      installed_poll_handler.epoll:close()
+      installed_poll_handler = nil
    end
+end
+
+function fd_readable_op(fd)
+   return assert(installed_poll_handler):fd_readable_op(fd)
+end
+function fd_writable_op(fd)
+   return assert(installed_poll_handler):fd_writable_op(fd)
+end
+function stream_readable_op(stream)
+   return assert(installed_poll_handler):stream_readable_op(stream)
+end
+function stream_writable_op(stream)
+   return assert(installed_poll_handler):stream_writable_op(stream)
 end
 
 function selftest()
