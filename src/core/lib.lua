@@ -801,6 +801,17 @@ function set(...)
    return ret
 end
 
+-- Check if 'name' is a networking interface.
+function is_iface (name)
+   local fd = io.popen("ifconfig -a | cut -d ' ' -f 1 | sort -u")
+   local text = fd:read("*all")
+   fd:close()
+   for l in text:gmatch("[^\n]+") do
+      if l:match(name) then return true end
+   end
+   return false
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")
