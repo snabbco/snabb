@@ -252,6 +252,38 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
    link_sink(c,   v4_nic_name..'.'..v4_info.rx, v6_nic_name..'.'..v6_info.rx)
 end
 
+function load_on_a_stick_tap (c, conf, args)
+   local Tap = require("apps.tap.tap").Tap
+   local pciaddr, id, queue = lwutil.parse_instance(conf)
+   local device = {tx = 'output', rx = 'input'}
+   lwaftr_app(c, conf, pciaddr)
+   local v4_nic_name, v6_nic_name, v4v6, mirror = args.v4_nic_name,
+      args.v6_nic_name, args.v4v6, args.mirror
+
+   if v4v6 then
+      assert(queue.external_interface.vlan_tag == queue.internal_interface.vlan_tag)
+      config.app(c, 'nic', Tap, {name=pciaddr})
+      if mirror then
+         config.app(c, 'mirror', Tap, {name=mirror})
+         config.app(c, v4v6, V4V6, {mirror=true})
+         config.link(c, v4v6..'.mirror -> mirror.input')
+      else
+         config.app(c, v4v6, V4V6)
+      end
+      config.link(c, 'nic.'..device.tx..' -> '..v4v6..'.input')
+      config.link(c, v4v6..'.output -> nic.'..device.rx)
+
+      link_source(c, v4v6..'.v4', v4v6..'.v6')
+      link_sink(c, v4v6..'.v4', v4v6..'.v6')
+   else
+      config.app(c, v4_nic_name, driver, {name=pciaddr})
+      config.app(c, v6_nic_name, driver, {name=pciaddr})
+
+      link_source(c, v4_nic_name..'.'..device.tx, v6_nic_name..'.'..device.tx)
+      link_sink(c,   v4_nic_name..'.'..device.rx, v6_nic_name..'.'..device.rx)
+   end
+end
+
 function load_on_a_stick(c, conf, args)
    local pciaddr, id, queue = lwutil.parse_instance(conf)
    local device = pci.device_info(pciaddr)

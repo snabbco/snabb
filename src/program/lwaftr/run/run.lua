@@ -75,10 +75,11 @@ function parse_args(args)
       ring_buffer_size = tonumber(arg)
    end
    handlers["on-a-stick"] = function(arg)
-      opts["on-a-stick"] = true
-      v4 = arg
-      if not nic_exists(v4) then
-         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
+      if lib.is_iface(arg) or nic_exists(arg) then
+         v4 = arg
+         opts['on-a-stick'] = arg
+      else
+         fatal(("Couldn't locate NIC with PCI address '%s'"):format(arg))
       end
    end
    handlers["mirror"] = function (ifname)
@@ -173,7 +174,11 @@ function run(args)
             v4v6 = use_splitter and 'v4v6', mirror = opts.mirror,
             ring_buffer_size = opts.ring_buffer_size
          }
-         return setup.load_on_a_stick(graph, lwconfig, options)
+         if lib.is_iface(opts['on-a-stick']) then
+            return setup.load_on_a_stick_tap(graph, lwconfig, options)
+         else
+            return setup.load_on_a_stick(graph, lwconfig, options)
+         end
       end
    end
 
