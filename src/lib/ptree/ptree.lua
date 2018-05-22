@@ -281,7 +281,9 @@ function Manager:acquire_cpu_for_worker(id, app_graph)
    for name, init in pairs(app_graph.apps) do
       if type(init.arg) == 'table' then
          for k, v in pairs(init.arg) do
-            if k == 'pciaddr' then table.insert(pci_addresses, v) end
+            if k == 'pciaddr' and not lib.is_iface(v) then
+               table.insert(pci_addresses, v)
+            end
          end
       end
    end

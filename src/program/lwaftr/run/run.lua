@@ -160,8 +160,12 @@ function run(args)
       -- otherwise configure it in on-a-stick mode.
       local device, id, queue = lwutil.parse_instance(lwconfig)
       if queue.external_interface.device then
-         return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
-                               opts.ring_buffer_size)
+         if lib.is_iface(queue.external_interface.device) then
+            return setup.load_tap(graph, lwconfig, 'inetNic', 'b4sideNic')
+         else
+            return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
+                                  opts.ring_buffer_size)
+         end
       else
          local use_splitter = requires_splitter(opts, lwconfig)
          local options = {
