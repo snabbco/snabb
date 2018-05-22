@@ -98,7 +98,7 @@ function Channel:get()
 end
 
 function selftest()
-   print('selftest: lib.fibers.channels')
+   print('selftest: lib.fibers.channel')
    local lib = require('core.lib')
    local fiber = require('lib.fibers.fiber')
    local ch, log = new(), {}
