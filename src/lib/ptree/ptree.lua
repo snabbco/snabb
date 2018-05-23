@@ -33,6 +33,8 @@ local alarms = require("lib.yang.alarms")
 local json = require("lib.ptree.json")
 local queue = require('lib.fibers.queue')
 local fiber_sleep = require('lib.fibers.sleep').sleep
+local file_op = require("lib.fibers.file")
+local inotify = require("lib.ptree.inotify")
 
 local call_with_output_string = mem.call_with_output_string
 
@@ -171,6 +173,7 @@ function Manager:start ()
    fiber.spawn(function () self:accept_rpc_peers() end)
    fiber.spawn(function () self:accept_notification_peers() end)
    fiber.spawn(function () self:notification_poller() end)
+   fiber.spawn(function () self:dir_events_listener() end)
 end
 
 function Manager:call_with_cleanup(closeable, f, ...)
@@ -308,6 +311,12 @@ function Manager:start_worker_for_graph(id, graph)
    local actions = self.support.compute_config_actions(
       app_graph.new(), self.workers[id].graph, {}, 'load')
    self:enqueue_config_actions_for_worker(id, actions)
+
+   -- Create channel for listening to directory events.
+   file_op.install_poll_io_handler()
+   local dir = shm.root..'/'..self.workers[id].pid
+   self.workers[id].dir_events_channel = inotify.recursive_directory_inventory_events(dir)
+
    return self.workers[id]
 end
 
@@ -621,6 +630,22 @@ function Manager:notification_poller ()
             for _,notification in ipairs(notifications) do
                q:put(notification)
             end
+         end
+      end
+   end
+end
+
+function Manager:dir_events_listener ()
+   local function serialize (event)
+      local t = {}
+      for k,v in pairs(event) do table.insert(t, k..': '..v) end
+      return table.concat(t, '; ')
+   end
+   while true do
+      for id, worker in pairs(self.workers) do
+         local channel = worker.dir_events_channel
+         if channel then
+            for event in channel.get, channel do print(serialize(event)) end
          end
       end
    end
