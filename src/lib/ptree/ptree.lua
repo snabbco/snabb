@@ -636,19 +636,24 @@ function Manager:notification_poller ()
    end
 end
 
-local counters = {}
+local counters = {active={}, archived={}}
 
 function Manager:dir_events_listener ()
    local function is_counter (name)
       return lib.basename(name):match("%.counter$")
    end
    local function read_counter (name)
-      if not counters[name] then counters[name] = counter.open(name) end
-      return counter.read(counters[name])
+      if not counters.active[name] then counters.active[name] = counter.open(name) end
+      return counter.read(counters.active[name])
    end
    local function write_counter (name, val)
-      if not counters[name] then counters[name] = counter.open(name) end
-      counter.add(counters[name], val)
+      if not counters.active[name] then counters.active[name] = counter.open(name) end
+      counter.add(counters.active[name], val)
+   end
+   local function archive_counter (name)
+      local c = assert(counters.active[name])
+      counter.archived[name] = c
+      counters.active[name] = nil
    end
    while true do
       for id, worker in pairs(self.workers) do
@@ -656,14 +661,17 @@ function Manager:dir_events_listener ()
          if channel then
             for event in channel.get, channel do
                if is_counter(event.name) then
+                  local cname = event.name:gsub(shm.root, '')
                   if event.kind == 'creat' then
                      -- Create aggregated counter in manager process.
-                     local cname = event.name:gsub(shm.root, '')
                      local aggregated = cname:gsub(worker.pid, S.getpid())
                      if not shm.exists(aggregated) then
                         counter.create(aggregated)
                         write_counter(aggregated, read_counter(cname))
                      end
+                  elseif event.kind == 'rm' then
+                     -- Move counter from active to archive.
+                     archive_counter(cname)
                   end
                end
             end
