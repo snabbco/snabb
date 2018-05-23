@@ -35,6 +35,7 @@ local queue = require('lib.fibers.queue')
 local fiber_sleep = require('lib.fibers.sleep').sleep
 local file_op = require("lib.fibers.file")
 local inotify = require("lib.ptree.inotify")
+local counter = require("core.counter")
 
 local call_with_output_string = mem.call_with_output_string
 
@@ -636,16 +637,32 @@ function Manager:notification_poller ()
 end
 
 function Manager:dir_events_listener ()
-   local function serialize (event)
-      local t = {}
-      for k,v in pairs(event) do table.insert(t, k..': '..v) end
-      return table.concat(t, '; ')
+   local function is_counter (name)
+      return lib.basename(name):match("%.counter$")
+   end
+   local function read_counter (name)
+      local c = counter.open(name)
+      return counter.read(c)
+   end
+   local function write_counter (name, val)
+      local ca = counter.open(name)
+      counter.set(ca, val)
    end
    while true do
       for id, worker in pairs(self.workers) do
          local channel = worker.dir_events_channel
          if channel then
-            for event in channel.get, channel do print(serialize(event)) end
+            for event in channel.get, channel do
+               if is_counter(event.name) and event.kind == 'creat' then
+                  -- Create aggregated counter in manager process.
+                  local cname = event.name:gsub(shm.root, '')
+                  local aggregated = cname:gsub(worker.pid, S.getpid())
+                  if not shm.exists(aggregated) then
+                     counter.create(aggregated)
+                     write_counter(aggregated, read_counter(cname))
+                  end
+               end
+            end
          end
       end
    end
