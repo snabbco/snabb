@@ -636,30 +636,34 @@ function Manager:notification_poller ()
    end
 end
 
+local counters = {}
+
 function Manager:dir_events_listener ()
    local function is_counter (name)
       return lib.basename(name):match("%.counter$")
    end
    local function read_counter (name)
-      local c = counter.open(name)
-      return counter.read(c)
+      if not counters[name] then counters[name] = counter.open(name) end
+      return counter.read(counters[name])
    end
    local function write_counter (name, val)
-      local ca = counter.open(name)
-      counter.set(ca, val)
+      if not counters[name] then counters[name] = counter.open(name) end
+      counter.add(counters[name], val)
    end
    while true do
       for id, worker in pairs(self.workers) do
          local channel = worker.dir_events_channel
          if channel then
             for event in channel.get, channel do
-               if is_counter(event.name) and event.kind == 'creat' then
-                  -- Create aggregated counter in manager process.
-                  local cname = event.name:gsub(shm.root, '')
-                  local aggregated = cname:gsub(worker.pid, S.getpid())
-                  if not shm.exists(aggregated) then
-                     counter.create(aggregated)
-                     write_counter(aggregated, read_counter(cname))
+               if is_counter(event.name) then
+                  if event.kind == 'creat' then
+                     -- Create aggregated counter in manager process.
+                     local cname = event.name:gsub(shm.root, '')
+                     local aggregated = cname:gsub(worker.pid, S.getpid())
+                     if not shm.exists(aggregated) then
+                        counter.create(aggregated)
+                        write_counter(aggregated, read_counter(cname))
+                     end
                   end
                end
             end
