@@ -93,6 +93,35 @@ function TimerWheel:add_absolute(t, obj)
    end
 end
 
+local function slot_min_time(head)
+   local min = 1/0
+   local ent = head.next
+   while ent ~= head do
+      min = math.min(ent.time, min)
+      ent = ent.next
+   end
+   return min
+end
+
+function TimerWheel:next_entry_time()
+   for offset=0,WHEEL_SLOTS-1 do
+      local idx = band(self.cur + offset, SLOT_INDEX_MASK)
+      local head = self.slots[idx]
+      if head ~= head.next then
+         local t = slot_min_time(head)
+         if self.outer then
+            -- Unless we just migrated entries from outer to inner wheel
+            -- on the last tick, outer wheel overlaps with inner.
+            local outer_idx = band(self.outer.cur + offset, SLOT_INDEX_MASK)
+            t = math.min(t, slot_min_time(self.outer.slots[outer_idx]))
+         end
+         return t
+      end
+   end
+   if self.outer then return self.outer:next_entry_time() end
+   return 1/0
+end
+
 local function tick_outer(inner, outer)
    if not outer then return end
    local head = outer.slots[outer.cur]
