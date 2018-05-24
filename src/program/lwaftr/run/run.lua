@@ -175,7 +175,7 @@ function run(args)
             ring_buffer_size = opts.ring_buffer_size
          }
          if lib.is_iface(opts['on-a-stick']) then
-            return setup.load_on_a_stick_tap(graph, lwconfig, options)
+            return setup.load_on_a_stick_iface(graph, lwconfig, options)
          else
             return setup.load_on_a_stick(graph, lwconfig, options)
          end
