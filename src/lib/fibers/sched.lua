@@ -47,10 +47,7 @@ end
 function Scheduler:run(now)
    if now == nil then now = self:now() end
    for i=1,#self.sources do
-      -- The wait_for_events method should schedule tasks too.
-      if self.sources[i] ~= self.event_waiter then
-         self.sources[i]:schedule_tasks(self, now)
-      end
+      self.sources[i]:schedule_tasks(self, now)
    end
    self.cur, self.next = self.next, self.cur
    for i=1,#self.cur do
