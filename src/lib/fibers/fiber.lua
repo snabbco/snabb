@@ -74,6 +74,9 @@ function suspend(block_fn, ...) return current_fiber:suspend(block_fn, ...) end
 local function schedule(sched, fiber) sched:schedule(fiber) end
 function yield() return suspend(schedule) end
 
+function stop() current_scheduler:stop() end
+function main() return current_scheduler:main() end
+
 function selftest()
    print('selftest: lib.fibers.fiber')
    local lib = require('core.lib')

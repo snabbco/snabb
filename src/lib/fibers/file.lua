@@ -104,6 +104,24 @@ function PollIOHandler:schedule_tasks(sched, now, timeout)
    end
 end
 
+-- These method is called by the fibers scheduler.
+function PollIOHandler:schedule_tasks(sched, now, timeout)
+   if timeout == nil then timeout = 0 end
+   if timeout >= 0 then timeout = timeout * 1e3 end
+   for _, event in self.epoll:poll(timeout) do
+      if bit.band(event.events, epoll.RD + epoll.ERR) ~= 0 then
+         local tasks = self.waiting_for_readable[event.data.fd]
+         schedule_tasks(sched, tasks)
+      end
+      if bit.band(event.events, epoll.WR + epoll.ERR) ~= 0 then
+         local tasks = self.waiting_for_writable[event.data.fd]
+         schedule_tasks(sched, tasks)
+      end
+   end
+end
+
+PollIOHandler.wait_for_events = PollIOHandler.schedule_tasks
+
 function PollIOHandler:cancel_tasks_for_fd(fd)
    local function cancel_tasks(waiting)
       local tasks = waiting[fd]
