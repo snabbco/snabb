@@ -103,7 +103,6 @@ function run(args)
       end
    end
 
-   local done = false
    local function send_requests()
       for i,command in ipairs(commands) do
          tx:write_chars(command)
@@ -119,14 +118,14 @@ function run(args)
          if not obj then error('unexpected EOF while reading response') end
          io.stdout:write("r")
       end
-      done = true
+      fiber.stop()
    end
 
    fiber.spawn(exit_if_error(send_requests))
    fiber.spawn(exit_if_error(read_replies))
 
    local start = engine.now()
-   while not done do fiber.current_scheduler:run() end
+   fiber.main()
    local elapsed = engine.now() - start
    io.stdout:write("\n")
    print(string.format("Issued %s commands in %.2f seconds (%.2f commands/s)",
