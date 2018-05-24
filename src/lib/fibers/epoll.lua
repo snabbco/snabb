@@ -39,7 +39,11 @@ end
 function Epoll:poll(timeout)
    -- Returns iterator.
    local reviter, events, count = self.fd:epoll_wait(self.events, timeout or 0)
-   if not reviter then error(events) end
+   if not reviter then
+      local err = events
+      if err.INTR then return function() end, nil, nil end
+      error(err)
+   end
    -- Since we add fd's with EPOLL_ONESHOT, now that the event has
    -- fired, the fd is now deactivated.  Record that fact.
    for i=0, count-1 do self.active_events[events[i].data.fd] = 0 end
