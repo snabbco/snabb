@@ -162,7 +162,7 @@ function run(args)
       local device, id, queue = lwutil.parse_instance(lwconfig)
       if queue.external_interface.device then
          if lib.is_iface(queue.external_interface.device) then
-            return setup.load_tap(graph, lwconfig, 'inetNic', 'b4sideNic')
+            return setup.load_iface(graph, lwconfig, 'inetNic', 'b4sideNic')
          else
             return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
                                   opts.ring_buffer_size)

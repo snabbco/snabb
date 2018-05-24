@@ -204,19 +204,19 @@ local function link_sink(c, v4_out, v6_out)
    config.link(c, 'fragmenterv6.output -> '..v6_out)
 end
 
-function load_tap(c, conf, v4_nic_name, v6_nic_name)
-   local Tap = require("apps.tap.tap").Tap
-   local v4_pci, id, queue = lwutil.parse_instance(conf)
-   local v6_pci = queue.external_interface.device
-   local tap_info = { rx = "input", tx = "output" }
+function load_iface(c, conf, v4_nic_name, v6_nic_name)
+   local RawSocket = require("apps.socket.raw").RawSocket
+   local v4_iface, id, queue = lwutil.parse_instance(conf)
+   local v6_iface = queue.external_interface.dev_info
+   local dev_info = {rx = "rx", tx = "tx"}
 
-   lwaftr_app(c, conf, v4_pci)
+   lwaftr_app(c, conf, v6_iface)
 
-   config.app(c, v4_nic_name, Tap, {name=v4_pci})
-   config.app(c, v6_nic_name, Tap, {name=v6_pci})
+   config.app(c, v4_nic_name, RawSocket, v4_iface)
+   config.app(c, v6_nic_name, RawSocket, v6_iface)
 
-   link_source(c, v4_nic_name..'.'..tap_info.tx, v6_nic_name..'.'..tap_info.tx)
-   link_sink(c,   v4_nic_name..'.'..tap_info.rx, v6_nic_name..'.'..tap_info.rx)
+   link_source(c, v4_nic_name..'.'..dev_info.tx, v6_nic_name..'.'..dev_info.tx)
+   link_sink(c,   v4_nic_name..'.'..dev_info.rx, v6_nic_name..'.'..dev_info.rx)
 end
 
 function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
