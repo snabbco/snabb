@@ -12,7 +12,6 @@ local histogram = require('core.histogram')
 local counter   = require("core.counter")
 local jit       = require("jit")
 local S         = require("syscall")
-local vmprofile = require("jit.vmprofile")
 local ffi       = require("ffi")
 local C         = ffi.C
 require("core.packet_h")
@@ -89,7 +88,7 @@ local function getvmprofile (name)
    return vmprofiles[name]
 end
 
-local function setvmprofile (name)
+function setvmprofile (name)
    C.vmprofile_set_profile(getvmprofile(name))
 end
 
@@ -503,7 +502,6 @@ function main (options)
 
    -- Setup vmprofile
    setvmprofile("engine")
-   vmprofile.start()
 
    local breathe = breathe
    if options.measure_latency or options.measure_latency == nil then
@@ -519,6 +517,9 @@ function main (options)
    until done and done()
    counter.commit()
    if not options.no_report then report(options.report) end
+
+   -- Switch to catch-all profile
+   setvmprofile("program")
 end
 
 local nextbreath

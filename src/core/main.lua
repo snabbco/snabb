@@ -8,6 +8,7 @@ package.path = ''
 
 local STP = require("lib.lua.StackTracePlus")
 local ffi = require("ffi")
+local vmprofile = require("jit.vmprofile")
 local lib = require("core.lib")
 local shm = require("core.shm")
 local C   = ffi.C
@@ -53,6 +54,8 @@ function main ()
       if f == nil then
          error(("Failed to load $SNABB_PROGRAM_LUACODE: %q"):format(expr))
       else
+         engine.setvmprofile("program")
+         vmprofile.start()
          f()
       end
    else
@@ -62,9 +65,12 @@ function main ()
          print("unsupported program: "..program:gsub("_", "-"))
          usage(1)
       else
+         engine.setvmprofile("program")
+         vmprofile.start()
          require(modulename(program)).run(args)
       end
    end
+   vmprofile.stop()
 end
 
 -- Take the program name from the first argument, unless the first
