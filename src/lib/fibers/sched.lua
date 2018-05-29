@@ -44,11 +44,15 @@ function Scheduler:schedule_after_sleep(dt, task)
    self.wheel:add_delta(dt, task)
 end
 
-function Scheduler:run(now)
-   if now == nil then now = self:now() end
+function Scheduler:schedule_tasks_from_sources(now)
    for i=1,#self.sources do
       self.sources[i]:schedule_tasks(self, now)
    end
+end
+
+function Scheduler:run(now)
+   if now == nil then now = self:now() end
+   self:schedule_tasks_from_sources(now)
    self.cur, self.next = self.next, self.cur
    for i=1,#self.cur do
       local task = self.cur[i]
