@@ -4,6 +4,7 @@
 
 module(..., package.seeall)
 
+local C = require('ffi').C -- for usleep
 local timer = require('lib.fibers.timer')
 
 local Scheduler = {}
@@ -24,6 +25,7 @@ end
 
 function Scheduler:add_task_source(source)
    table.insert(self.sources, source)
+   if source.wait_for_events then self.event_waiter = source end
 end
 
 function Scheduler:schedule(task)
@@ -53,6 +55,36 @@ function Scheduler:run(now)
       self.cur[i] = nil
       task:run()
    end
+end
+
+function Scheduler:next_wake_time()
+   if #self.next > 0 then return self:now() end
+   return self.wheel:next_entry_time()
+end
+
+function Scheduler:wait_for_events()
+   local now, next_time = C.get_monotonic_time(), self:next_wake_time()
+   -- Limit the sleep to 10 seconds to ensure that our timeout can be
+   -- represented as a u32 in microseconds, and also for strace
+   -- debugging.
+   local timeout = math.min(10, next_time - now)
+   if self.event_waiter then
+      self.event_waiter:wait_for_events(self, now, timeout)
+   else
+      C.usleep(timeout * 1e6)
+   end
+end
+
+function Scheduler:stop()
+   self.done = true
+end
+
+function Scheduler:main()
+   self.done = false
+   repeat
+      self:wait_for_events()
+      self:run(C.get_monotonic_time())
+   until self.done
 end
 
 function Scheduler:shutdown()

@@ -151,14 +151,5 @@ function run(args)
 
    fiber.spawn(exit_when_finished(handle_requests))
    fiber.spawn(exit_when_finished(handle_replies))
-
-   while true do
-      local sched = fiber.current_scheduler
-      sched:run()
-      -- FIXME: If we want to wait until tasks are runnable, the
-      -- scheduler should handle that.
-      if #sched.next == 0 then
-         handler:schedule_tasks(sched, sched:now(), -1)
-      end
-   end
+   fiber.main()
 end
