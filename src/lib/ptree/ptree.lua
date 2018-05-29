@@ -321,6 +321,15 @@ local function archive_counter (name)
    counters.archived[name] = c
    counters.active[name] = nil
 end
+local function update_counter (worker_pid, name)
+   local aggregated = name:gsub(worker_pid, S.getpid())
+   if shm.exists(aggregated) then
+      local val = read_counter(name)
+      if val ~= 0 then
+         counter.add(counters.active[aggregated], val)
+      end
+   end
+end
 
 function Manager:start_worker_for_graph(id, graph)
    local scheduling = self:compute_scheduling_for_worker(id, graph)
@@ -354,6 +363,20 @@ function Manager:start_worker_for_graph(id, graph)
                archive_counter(cname)
             end
          end
+      end
+   end)
+
+   -- Update aggregated counters.
+   fiber.spawn(function ()
+      local worker = self.workers[id]
+      while true do
+         for cname, c in pairs(counters.active) do
+            -- TODO: Store aggregated counters in an separated table?
+            if not cname:match("/"..worker.pid) then
+               update_counter(worker.pid, cname)
+            end
+         end
+         fiber_sleep(1)
       end
    end)
 
