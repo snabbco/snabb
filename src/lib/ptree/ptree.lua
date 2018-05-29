@@ -33,7 +33,6 @@ local alarms = require("lib.yang.alarms")
 local json = require("lib.ptree.json")
 local queue = require('lib.fibers.queue')
 local fiber_sleep = require('lib.fibers.sleep').sleep
-local file_op = require("lib.fibers.file")
 local inotify = require("lib.ptree.inotify")
 local counter = require("core.counter")
 
@@ -174,7 +173,6 @@ function Manager:start ()
    fiber.spawn(function () self:accept_rpc_peers() end)
    fiber.spawn(function () self:accept_notification_peers() end)
    fiber.spawn(function () self:notification_poller() end)
-   fiber.spawn(function () self:dir_events_listener() end)
 end
 
 function Manager:call_with_cleanup(closeable, f, ...)
@@ -301,6 +299,29 @@ function Manager:compute_scheduling_for_worker(id, app_graph)
    return ret
 end
 
+local counters = {active={}, archived={}}
+
+local function is_counter (name)
+   return lib.basename(name):match("%.counter$")
+end
+local function read_counter (name)
+   if not counters.active[name] then counters.active[name] = counter.open(name) end
+   return counter.read(counters.active[name])
+end
+local function write_counter (name, val)
+   if not counters.active[name] then counters.active[name] = counter.open(name) end
+   counter.add(counters.active[name], val)
+end
+local function create_counter (name)
+   assert(not counters.active[name])
+   counter.create(name)
+end
+local function archive_counter (name)
+   local c = assert(counters.active[name])
+   counters.archived[name] = c
+   counters.active[name] = nil
+end
+
 function Manager:start_worker_for_graph(id, graph)
    local scheduling = self:compute_scheduling_for_worker(id, graph)
    self:info('Starting worker %s.', id)
@@ -313,10 +334,28 @@ function Manager:start_worker_for_graph(id, graph)
       app_graph.new(), self.workers[id].graph, {}, 'load')
    self:enqueue_config_actions_for_worker(id, actions)
 
-   -- Create channel for listening to directory events.
-   file_op.install_poll_io_handler()
-   local dir = shm.root..'/'..self.workers[id].pid
-   self.workers[id].dir_events_channel = inotify.recursive_directory_inventory_events(dir)
+   -- Manage aggregated counters (creation and removal).
+   fiber.spawn(function ()
+      local worker = self.workers[id]
+      local dir = shm.root..'/'..worker.pid
+      local rx = inotify.recursive_directory_inventory_events(dir)
+      for event in rx.get, rx do
+         if is_counter(event.name) then
+            local cname = event.name:gsub(shm.root, '')
+            if event.kind == 'creat' then
+               -- Create aggregated counter in manager process.
+               local aggregated = cname:gsub(worker.pid, S.getpid())
+               if not shm.exists(aggregated) then
+                  create_counter(aggregated)
+                  write_counter(aggregated, read_counter(cname))
+               end
+            elseif event.kind == 'rm' then
+               -- Move counter from active to archive.
+               archive_counter(cname)
+            end
+         end
+      end
+   end)
 
    return self.workers[id]
 end
@@ -630,50 +669,6 @@ function Manager:notification_poller ()
          for q,_ in pairs(self.notification_peers) do
             for _,notification in ipairs(notifications) do
                q:put(notification)
-            end
-         end
-      end
-   end
-end
-
-local counters = {active={}, archived={}}
-
-function Manager:dir_events_listener ()
-   local function is_counter (name)
-      return lib.basename(name):match("%.counter$")
-   end
-   local function read_counter (name)
-      if not counters.active[name] then counters.active[name] = counter.open(name) end
-      return counter.read(counters.active[name])
-   end
-   local function write_counter (name, val)
-      if not counters.active[name] then counters.active[name] = counter.open(name) end
-      counter.add(counters.active[name], val)
-   end
-   local function archive_counter (name)
-      local c = assert(counters.active[name])
-      counter.archived[name] = c
-      counters.active[name] = nil
-   end
-   while true do
-      for id, worker in pairs(self.workers) do
-         local channel = worker.dir_events_channel
-         if channel then
-            for event in channel.get, channel do
-               if is_counter(event.name) then
-                  local cname = event.name:gsub(shm.root, '')
-                  if event.kind == 'creat' then
-                     -- Create aggregated counter in manager process.
-                     local aggregated = cname:gsub(worker.pid, S.getpid())
-                     if not shm.exists(aggregated) then
-                        counter.create(aggregated)
-                        write_counter(aggregated, read_counter(cname))
-                     end
-                  elseif event.kind == 'rm' then
-                     -- Move counter from active to archive.
-                     archive_counter(cname)
-                  end
-               end
             end
          end
       end
