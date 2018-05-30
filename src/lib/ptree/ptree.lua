@@ -308,13 +308,12 @@ local function read_counter (name)
    if not counters.active[name] then counters.active[name] = counter.open(name) end
    return counter.read(counters.active[name])
 end
-local function write_counter (name, val)
-   if not counters.active[name] then counters.active[name] = counter.open(name) end
-   counter.add(counters.active[name], val)
+local function update_counter (name, val)
+   local c = assert(counters.active[name])
+   counter.add(c, val)
 end
-local function create_counter (name)
-   assert(not counters.active[name])
-   counter.create(name)
+local function create_counter (name, val)
+   counters.active[name] = counter.create(name, val)
 end
 local function archive_counter (name)
    local c = assert(counters.active[name])
@@ -322,13 +321,13 @@ local function archive_counter (name)
    counters.archived[name] = c
    counters.active[name] = nil
 end
-local function update_counter (worker_pid, name)
+local function create_or_update_counter (worker_pid, name)
    local aggregated = name:gsub(worker_pid, S.getpid())
-   if shm.exists(aggregated) then
-      local val = read_counter(name)
-      if val ~= 0 then
-         counter.add(counters.active[aggregated], val)
-      end
+   local val = read_counter(name)
+   if not counters.active[aggregated] then
+      create_counter(aggregated, val)
+   else
+      update_counter(aggregated, val)
    end
 end
 
@@ -353,12 +352,7 @@ function Manager:start_worker_for_graph(id, graph)
          if is_counter(event.name) then
             local cname = event.name:gsub(shm.root, '')
             if event.kind == 'creat' then
-               -- Create aggregated counter in manager process.
-               local aggregated = cname:gsub(worker.pid, S.getpid())
-               if not shm.exists(aggregated) then
-                  create_counter(aggregated)
-                  write_counter(aggregated, read_counter(cname))
-               end
+               create_or_update_counter(worker.pid, cname)
             elseif event.kind == 'rm' then
                -- Move counter from active to archive.
                archive_counter(cname)
@@ -374,7 +368,7 @@ function Manager:start_worker_for_graph(id, graph)
          for cname, c in pairs(counters.active) do
             -- TODO: Store aggregated counters in an separated table?
             if not cname:match("/"..worker.pid) then
-               update_counter(worker.pid, cname)
+               create_or_update_counter(worker.pid, cname)
             end
          end
          fiber_sleep(1)
