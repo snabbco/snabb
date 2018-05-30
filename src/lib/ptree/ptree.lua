@@ -318,6 +318,7 @@ local function create_counter (name)
 end
 local function archive_counter (name)
    local c = assert(counters.active[name])
+   counter.delete(c)
    counters.archived[name] = c
    counters.active[name] = nil
 end
