@@ -768,7 +768,16 @@ function Manager:handle_alarm (worker, alarm)
 end
 
 function Manager:stop ()
-   assert(self.sched:shutdown())
+   -- Call shutdown for 0.1s or until it returns true (all tasks cancelled).
+   local now = C.get_monotonic_time()
+   local threshold = now + 0.1
+   while now < threshold do
+      if self.sched:shutdown() then break end
+   end
+   if now >= threshold then
+      io.stderr:write("Warning: there are still tasks pending\n")
+   end
+
    require('lib.fibers.file').uninstall_poll_io_handler()
 
    for id, worker in pairs(self.workers) do
