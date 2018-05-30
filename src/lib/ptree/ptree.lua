@@ -363,14 +363,14 @@ function Manager:start_worker_for_graph(id, graph)
 
    -- Update aggregated counters.
    fiber.spawn(function ()
-      local worker = self.workers[id]
       while true do
          for cname, c in pairs(counters.active) do
-            -- TODO: Store aggregated counters in an separated table?
-            if not cname:match("/"..worker.pid) then
-               create_or_update_counter(worker.pid, cname)
+            local pid = tonumber(cname:match("/(%d+)"))
+            if pid ~= S.getpid() then
+               create_or_update_counter(pid, cname)
             end
          end
+         counter.commit()
          fiber_sleep(1)
       end
    end)
