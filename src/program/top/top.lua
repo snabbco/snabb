@@ -303,7 +303,7 @@ end
 local function summarize_histogram(histogram, prev)
    local total = histogram.total
    if prev then total = total - prev.total end
-   if total == 0 then return '(no data)' end
+   if total == 0 then return 0, 0, 0 end
    local min, max, cumulative = nil, 0, 0
    for count, lo, hi in histogram:iterate(prev) do
       if count ~= 0 then
