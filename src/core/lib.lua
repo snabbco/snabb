@@ -801,14 +801,14 @@ function set(...)
    return ret
 end
 
--- Check if 'name' is a network interface.
+-- Check if 'name' is a kernel network interface.
 function is_iface (name)
-   local fd = io.popen("ifconfig -a | cut -d ' ' -f 1 | sort -u")
-   local text = fd:read("*all")
-   fd:close()
-   for l in text:gmatch("[^\n]+") do
-      if l:match(name) then return true end
+   local f = io.open('/proc/net/dev')
+   for line in f:lines() do
+      local iface = line:match("^%s*(%w+):")
+      if iface and iface == name then f:close() return true end
    end
+   f:close()
    return false
 end
 
