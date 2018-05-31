@@ -120,43 +120,6 @@ $ sudo ./snabb packetblaster lwaftr --src_mac 02:02:02:02:02:02 \
         --pci 0000:02:00.0
 ```
 
-## SnabbVMX top
-
-`snabbvmx top` prints out information about a running SnabbVMX instance. There
-might be more than one Snabb process running:
-
-```bash
-$ sudo ./snabb top
-Multiple Snabb instances found. Select one:
-11963
-11958
-```
-
-Which one is my SnabbVMX process? Luckily, SnabbVMX top allows to query by "id":
-
-```bash
-$ sudo ./snabb snabbvmx top xe0
-lwaftr (rx/tx/txdrop in Mpps)            rx      tx    rxGb    txGb    txdrop
-lwaftr_v6                              1.53    1.53    4.80    4.80    0.000022
-lwaftr_v4                              1.53    1.53    4.31    4.31    0.000022
-
-lwaftr_v6 in-ipv6-packets                      211,255,481            1,526,560
-lwaftr_v6 in-ipv6-bytes                     83,036,588,870          600,074,786
-lwaftr_v6 out-ipv6-packets                     211,255,393            1,526,538
-lwaftr_v6 out-ipv6-bytes                    83,036,242,914          600,061,830
-lwaftr_v6 drop-all-ipv6-iface-packets                3,537                   22
-lwaftr_v6 in-ipv6-frag-reassembled                       0                    0
-lwaftr_v6 drop-ipv6-frag-invalid-reassembly              0                    0
-lwaftr_v6 out-ipv6-frag                                  0                    0
-lwaftr_v6 out-ipv6-frag-not                              0                    0
-
-                                                     Total           per second
-nic ifInDiscards                                 1,547,333               47,449
-```
-
-1.53 MPPS in both rx/tx interfaces. We are running at line-rate, although there
-are packet drops.
-
 ## SnabbVMX query
 
 SnabbVMX query prints out all the counters of a SnabbVMX instance in XML format:
