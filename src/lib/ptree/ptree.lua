@@ -35,6 +35,7 @@ local queue = require('lib.fibers.queue')
 local fiber_sleep = require('lib.fibers.sleep').sleep
 local inotify = require("lib.ptree.inotify")
 local counter = require("core.counter")
+local cond = require("lib.fibers.cond")
 
 local call_with_output_string = mem.call_with_output_string
 
@@ -256,6 +257,7 @@ function Manager:stop_worker(id)
    self:enqueue_config_actions_for_worker(id, stop_actions)
    self:send_messages_to_workers()
    self.workers[id].shutting_down = true
+   self.workers[id].cancel:signal()
 end
 
 function Manager:remove_stale_workers()
@@ -336,7 +338,8 @@ function Manager:start_worker_for_graph(id, graph)
    self:info('Starting worker %s.', id)
    self.workers[id] = { scheduling=scheduling,
                         pid=self:start_worker(scheduling),
-                        queue={}, graph=graph }
+                        queue={}, graph=graph,
+                        cancel = cond.new() }
    self:state_change_event('worker_starting', id)
    self:debug('Worker %s has PID %s.', id, self.workers[id].pid)
    local actions = self.support.compute_config_actions(
@@ -347,7 +350,7 @@ function Manager:start_worker_for_graph(id, graph)
    fiber.spawn(function ()
       local worker = self.workers[id]
       local dir = shm.root..'/'..worker.pid
-      local rx = inotify.recursive_directory_inventory_events(dir)
+      local rx = inotify.recursive_directory_inventory_events(dir, worker.cancel:wait_operation())
       for event in rx.get, rx do
          if is_counter(event.name) then
             local cname = event.name:gsub(shm.root, '')
