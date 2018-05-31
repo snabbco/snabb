@@ -204,7 +204,7 @@ local function link_sink(c, v4_out, v6_out)
    config.link(c, 'fragmenterv6.output -> '..v6_out)
 end
 
-function load_iface(c, conf, v4_nic_name, v6_nic_name)
+function load_kernel_iface (c, conf, v4_nic_name, v6_nic_name)
    local RawSocket = require("apps.socket.raw").RawSocket
    local v4_iface, id, queue = lwutil.parse_instance(conf)
    local v6_iface = queue.external_interface.dev_info
@@ -252,7 +252,7 @@ function load_phy(c, conf, v4_nic_name, v6_nic_name, ring_buffer_size)
    link_sink(c,   v4_nic_name..'.'..v4_info.rx, v6_nic_name..'.'..v6_info.rx)
 end
 
-function load_on_a_stick_iface (c, conf, args)
+function load_on_a_stick_kernel_iface (c, conf, args)
    local RawSocket = require("apps.socket.raw").RawSocket
    local iface, id, queue = lwutil.parse_instance(conf)
    local device = {tx = 'tx', rx = 'rx'}

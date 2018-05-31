@@ -162,7 +162,7 @@ function run(args)
       local device, id, queue = lwutil.parse_instance(lwconfig)
       if queue.external_interface.device then
          if lib.is_iface(queue.external_interface.device) then
-            return setup.load_iface(graph, lwconfig, 'inetNic', 'b4sideNic')
+            return setup.load_kernel_iface(graph, lwconfig, 'inetNic', 'b4sideNic')
          else
             return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
                                   opts.ring_buffer_size)
@@ -175,7 +175,7 @@ function run(args)
             ring_buffer_size = opts.ring_buffer_size
          }
          if lib.is_iface(opts['on-a-stick']) then
-            return setup.load_on_a_stick_iface(graph, lwconfig, options)
+            return setup.load_on_a_stick_kernel_iface(graph, lwconfig, options)
          else
             return setup.load_on_a_stick(graph, lwconfig, options)
          end
