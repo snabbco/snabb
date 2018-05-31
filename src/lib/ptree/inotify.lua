@@ -120,7 +120,7 @@ function directory_inventory_events(dir, cancel_op)
 end
 
 local function is_dir(name)
-   local stat = S.stat(name)
+   local stat = S.lstat(name)
    return stat and stat.isdir
 end
 
