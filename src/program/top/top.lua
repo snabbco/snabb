@@ -767,8 +767,9 @@ bind_keys(" ", toggle(ui, 'paused'))
 bind_keys("u", unfocus)
 bind_keys("<", focus_prev)
 bind_keys(">", focus_next)
--- Bind C-d, C-/, q, and C-c to fiber.stop.
-bind_keys("q\3\31\4", fiber.stop)
+bind_keys("AD", focus_prev, csi_key_bindings) -- Left and up arrow.
+bind_keys("BC", focus_next, csi_key_bindings) -- Right and down arrow.
+bind_keys("q\3\31\4", fiber.stop) -- C-d, C-/, q, and C-c.
 
 local function handle_input ()
    for c in io.stdin.read_char, io.stdin do
