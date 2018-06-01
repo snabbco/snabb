@@ -22,6 +22,8 @@ local header = require("lib.protocol.header")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
+local esp = require("lib.protocol.esp")
+local esp_tail = require("lib.protocol.esp_tail")
 local aes_128_gcm = require("lib.ipsec.aes_128_gcm")
 local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
@@ -39,26 +41,13 @@ PROTOCOL = 50 -- https://tools.ietf.org/html/rfc4303#section-2
 local ipv6_ptr_t = ffi.typeof("$ *", ipv6:ctype())
 local function ipv6_fl (ip) return bit.lshift(ntohl(ip.v_tc_fl), 12) end
 
-local esp_header_t = ffi.typeof(
-   [[struct {
-      uint32_t spi;
-      uint32_t seq_no;
-   } __attribute__((packed))]]
-)
-local esp_header_ptr_t = ffi.typeof("$ *", esp_header_t)
-
-local esp_trailer_t = ffi.typeof(
-   [[struct {
-      uint8_t pad_length;
-      uint8_t next_header;
-   } __attribute__((packed))]]
-)
-local esp_trailer_ptr_t = ffi.typeof("$ *", esp_trailer_t)
+local esp_header_ptr_t = ffi.typeof("$ *", esp:ctype())
+local esp_trailer_ptr_t = ffi.typeof("$ *", esp_tail:ctype())
 
 local ETHERNET_SIZE = ethernet:sizeof()
 local IPV6_SIZE = ipv6:sizeof()
-local ESP_SIZE = ffi.sizeof(esp_header_t)
-local ESP_TAIL_SIZE = ffi.sizeof(esp_trailer_t)
+local ESP_SIZE = esp:sizeof()
+local ESP_TAIL_SIZE = esp_tail:sizeof()
 
 local TRANSPORT6_PAYLOAD_OFFSET = ETHERNET_SIZE + IPV6_SIZE
 
