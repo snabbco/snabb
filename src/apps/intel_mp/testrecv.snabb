@@ -1,0 +1,10 @@
+#!../../snabb snsh
+
+local args = main.parameters
+assert(#args == 2, "testrecv.snabb pciaddr qno")
+local pciaddr = table.remove(args, 1)
+local qno = tonumber(table.remove(args,1))
+
+local test = require("apps.intel_mp.testrecv").test
+
+test(pciaddr, qno, false)

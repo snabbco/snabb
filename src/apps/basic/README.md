@@ -6,8 +6,10 @@ functionality for use in you app networks.
 ## Source
 
 The `Source` app is a synthetic packet generator. On each breath it fills
-each attached output link with new packets. The packet data is
-uninitialized garbage and each packet is 60 bytes long.
+each attached output link with new packets. It accepts a number as its
+configuration argument which is the byte size of the generated packets. By
+default, each packet is 60 bytes long. The packet data is initialized with
+zero bytes.
 
     DIAGRAM: Source
     +--------+
@@ -102,3 +104,29 @@ link. The packets are transmitted in the order they were received.
               |          |
               +----------+
 
+## Truncate
+
+The `Truncate` app sends all packets received from the `input` to the `output`
+link and truncates or zero pads each packet to a given length. It accepts a
+number as its configuration argument which is the length of the truncated or
+padded packets.
+
+    DIAGRAM: Truncate
+              +----------+
+              |          |
+    input ----* Truncate *---- output
+              |          |
+              +----------+
+
+## Sample
+
+The `Sample` app forwards packets every *n*th packet from the `input` link to
+the `output` link, and drops all others packets. It accepts a number as its
+configuration argument which is *n*.
+
+    DIAGRAM: Sample
+              +--------+
+              |        |
+    input ----* Sample *---- output
+              |        |
+              +--------+

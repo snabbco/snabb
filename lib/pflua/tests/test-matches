@@ -57,20 +57,24 @@ function run_tests(pcap, tests)
    write('Running tests on ', pcap, ':\n')
    local packets = savefile.load_packets(pcap)
    for _,test in ipairs(tests) do
-      write('  ', test.description, ': ')
-      local pred = pf.compile_filter(test.filter)
-      local count = 0
-      for _, packet in ipairs(packets) do
-         if pred(packet.packet, packet.len) then
-            count = count + 1
+      local preds = { lua = pf.compile_filter(test.filter),
+                      asm = pf.compile_filter(test.filter, { native = true }) }
+      for name, pred in pairs(preds) do
+         write(name, ':')
+         write('  ', test.description, ': ')
+         local count = 0
+         for _, packet in ipairs(packets) do
+            if pred(packet.packet, packet.len) then
+               count = count + 1
+            end
          end
-      end
-      write(count, ' matches: ')
-      if count == test.count then
-         write('PASS\n')
-      else
-         write('FAIL: expected ', test.count, ' matches.\n')
-         os.exit(1)
+         write(count, ' matches: ')
+         if count == test.count then
+            write('PASS\n')
+         else
+            write('FAIL: expected ', test.count, ' matches.\n')
+            os.exit(1)
+         end
       end
    end
    write('All pass.\n\n')

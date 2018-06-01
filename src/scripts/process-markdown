@@ -34,5 +34,9 @@ awk '/^    DIAGRAM:/ { diagram = $2;
                        system("mkdir .images 2>/dev/null || true")
                        system("ditaa " diagram " .images/" diagram ".png > /dev/null");
                        system("rm " diagram)
-                       diagram = 0 }' < $input > $output
-
+                       diagram = 0 }
+     END             { if (diagram != 0) {
+                         system("mkdir .images 2>/dev/null || true")
+                         system("ditaa " diagram " .images/" diagram ".png > /dev/null");
+                         system("rm " diagram)
+                     } }' < $input > $output

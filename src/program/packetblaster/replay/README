@@ -2,7 +2,9 @@ Usage: packetblaster replay [OPTIONS] <PCAPFILE> <PCI>...
 
   -D DURATION, --duration DURATION
                              Run for DURATION seconds.
-			     Default: unlimited
+                             Default: unlimited
+  --no-loop                  Do not loop through <PCAPFILE>.
+                             Duration is one second if not set.
   -h, --help
                              Print usage information.
 

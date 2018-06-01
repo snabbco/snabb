@@ -1,3 +1,5 @@
+![Snabb](snabb.png)
+
 # Snabb
 
 Snabb (formerly "Snabb Switch") is a simple and fast packet networking toolkit.
@@ -10,17 +12,18 @@ ways to do things.
 The Snabb community are active in
 [applying modern programming techniques](http://blog.ipspace.net/2014/09/snabb-switch-deep-dive-on-software-gone.html),
 [do-it-yourself operator networking](http://blog.ipspace.net/2014/12/l2vpn-over-ipv6-with-snabb-switch-on.html),
-[high-level device drivers](https://github.com/SnabbCo/snabbswitch/blob/master/src/apps/intel/intel10g.lua),
+[high-level device drivers](https://github.com/snabbco/snabb/blob/master/src/apps/intel/intel10g.lua),
 [fast userspace virtio networking](http://www.virtualopensystems.com/en/solutions/guides/snabbswitch-qemu/),
 [universal SIMD protocol offloads](https://groups.google.com/d/msg/snabb-devel/aez4pEnd4ow/WrXi5N7nxfkJ), and
-[applying compiler technology to networking](https://fosdem.org/2015/schedule/event/packet_filtering_pflua/).
+[applying compiler technology to networking](https://archive.fosdem.org/2015/schedule/event/packet_filtering_pflua/).
 
-You are welcome to join our community. If you have an application that
-you want to build, or you want to use one that we are already
-developing, or you want to contribute in some other way, then please
-join the [snabb-devel mailing
-list](https://groups.google.com/forum/#!forum/snabb-devel) and read
-on.
+You are welcome to join our community! Scroll down to the bottom for
+tips on how you can get involved.
+
+## Documentation
+
+- [API Reference](http://snabbco.github.io/)
+- [Contributor Hints](https://github.com/snabbco/snabb/blob/master/CONTRIBUTING.md#hints-for-contributors)
 
 ## How does it work?
 
@@ -32,8 +35,9 @@ Snabb is written using these main techniques:
 
 Snabb compiles into a stand-alone executable called
 `snabb`. This single binary includes multiple applications and runs on
-any modern Linux distribution. (You could think of it as a
-[busybox](http://en.wikipedia.org/wiki/BusyBox#Single_binary) for
+any modern [Linux/x86-64](src/doc/porting.md) distribution. (You could
+think of it as a
+[busybox](https://en.wikipedia.org/wiki/BusyBox#Single_binary) for
 networking.)
 
 ## How is it being used?
@@ -67,14 +71,14 @@ documentation](src/program/lwaftr/doc/) for more details.
 ### VPWS
 
 VPWS (Virtual Private Wire Service) is a Layer-2 VPN application being
-developed by Alexander Gall at [SWITCH](http://switch.ch). His Github
+developed by Alexander Gall at [SWITCH](http://www.switch.ch/). His Github
 [`vpn` branch](https://github.com/alexandergall/snabbswitch/tree/vpn)
 is the master line of development.
 
 ### packetblaster
 
 [packetblaster](src/program/packetblaster/) generates load by
-replaying a [pcap format](http://en.wikipedia.org/wiki/Pcap) trace
+replaying a [pcap format](https://en.wikipedia.org/wiki/Pcap) trace
 file or synthesizing customizable packets onto any number of Intel 82599 10-Gigabit network
 interfaces. This is very efficient: only a small % of one core per CPU
 is required even for hundreds of Gbps of traffic. Because so little
@@ -94,10 +98,10 @@ Setting up a Snabb development environment takes around one
 minute:
 
 ```
-$ git clone https://github.com/SnabbCo/snabbswitch
-$ cd snabbswitch
+$ git clone https://github.com/SnabbCo/snabb
+$ cd snabb
 $ make -j
-$ src/snabb --help
+$ sudo src/snabb --help
 ```
 
 The `snabb` binary is stand-alone, includes all of the applications,
@@ -110,12 +114,33 @@ $ cp src/snabb /usr/local/bin/
 $ sudo snabb packetblaster replay capture.pcap 01:00.0
 ```
 
+### snabb container
+
+Basic support for building and running snabb in a Docker container is available via
+
+```
+$ make docker
+```
+
+This will build a tiny snabb container (8MB), ready to be used:
+
+```
+$ docker run -ti --rm snabb --help
+```
+
+Or simply run snabb, as you would under linux. This is made possible by using a wrapper shell script that
+gets linked to as part of 'make docker':
+
+```
+$ src/snabb --help
+```
+
 ## How do I get involved?
 
 Here are the ways you can get involved:
 
 - Use the Snabb applications in your network.
-- Join the [snabb-devel mailing list](https://groups.google.com/forum/#!forum/snabb-devel).
-- Send a mail to [introduce yourself](https://groups.google.com/forum/#!searchin/snabb-devel/introduce/snabb-devel/d8t6hGClnQY/flztyLiIGzoJ) to the community (don't be shy!).
 - Create your very own application: [Getting Started](src/doc/getting-started.md).
+- Create Github Issues with your ideas and questions and problems.
+- [Join](https://join.slack.com/t/snabb/shared_invite/enQtMzIyOTIwMTg5ODYyLTMzY2FjMGEzM2QzNDlhMDYxNzU0M2UyNjQ1MDc4MDRjY2Q3MWMwY2Q4YWQ1NDllY2E3NTZkZGUyZTQxNzgyNjc) the [Snabb Slack chat](https://snabb.slack.com/) to hang out and shoot the breeze.
 

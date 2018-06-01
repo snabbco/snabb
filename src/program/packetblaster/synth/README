@@ -2,17 +2,17 @@ Usage: packetblaster synth [OPTIONS] <PCI>...
 
   -s SOURCE, --src SOURCE
                              Source MAC-Address.
-			     Default: 00:00:00:00:00:00
+                             Default: 00:00:00:00:00:00
   -d DESTINATION, --dst DESTINATION
                              Destination MAC-Address.
-			     Default: 00:00:00:00:00:00
+                             Default: 00:00:00:00:00:00
   -S SIZES, --sizes SIZES
                              A comma separated list of numbers. Send packets of
                              SIZES bytes.
                              Default: 64
   -D DURATION, --duration DURATION
                              Run for DURATION seconds.
-			     Default: unlimited
+                             Default: unlimited
   -h, --help
                              Print usage information.
 

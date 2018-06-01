@@ -1,0 +1,10 @@
+Usage:
+    snabbvmx check
+    snabbvmx lwaftr
+    snabbvmx query
+    snabbvmx top
+
+Use --help for per-command usage.
+
+Example:
+    snabbvmx lwaftr --help

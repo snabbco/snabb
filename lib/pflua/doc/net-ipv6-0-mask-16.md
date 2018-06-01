@@ -49,6 +49,27 @@ return function(P,length)
    if band(cast("uint32_t*", P+22)[0],65535) == 0 then return true end
    return band(cast("uint32_t*", P+38)[0],65535) == 0
 end
+```
 
+## Native pflang compilation
+
+```
+7f505b47e000  4883FE36          cmp rsi, +0x36
+7f505b47e004  7C2D              jl 0x7f505b47e033
+7f505b47e006  0FB7770C          movzx esi, word [rdi+0xc]
+7f505b47e00a  4881FE86DD0000    cmp rsi, 0xdd86
+7f505b47e011  7520              jnz 0x7f505b47e033
+7f505b47e013  8B7716            mov esi, [rdi+0x16]
+7f505b47e016  4881E6FFFF0000    and rsi, 0xffff
+7f505b47e01d  4883FE00          cmp rsi, +0x00
+7f505b47e021  7413              jz 0x7f505b47e036
+7f505b47e023  8B7726            mov esi, [rdi+0x26]
+7f505b47e026  4881E6FFFF0000    and rsi, 0xffff
+7f505b47e02d  4883FE00          cmp rsi, +0x00
+7f505b47e031  7403              jz 0x7f505b47e036
+7f505b47e033  B000              mov al, 0x0
+7f505b47e035  C3                ret
+7f505b47e036  B001              mov al, 0x1
+7f505b47e038  C3                ret
 ```
 

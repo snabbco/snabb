@@ -74,12 +74,15 @@ Enables or disables PCI bus mastering for device identified by
 value. PCI bus mastering must be enabled in order to perform DMA on the
 PCI device.
 
-— Function **pci.map_pci_memory** *pciaddress*, *n*
+— Function **pci.map_pci_memory_unlocked** *pciaddress*, *n*
+— Function **pci.map_pci_memory_locked** *pciaddress*, *n*
 
 Memory maps configuration space *n* of PCI device identified by
 *pciaddress*. Returns a pointer to the memory mapped region and a file
 descriptor of the opened sysfs resource file. PCI bus mastering must be
-enabled on device identified by *pciaddress* before calling his function.
+enabled on the device identified by *pciaddress* before calling this function.
+The 2 variants indicate if the underlying memory mapped file should be
+exclusively `flocked` or not.
 
 — Function **pci.close_pci_resource** *file_descriptor*, *pointer*
 
@@ -108,7 +111,7 @@ Register   ::= Name Offset Indexing Mode Longname
 Name       ::= <identifier>
 Indexing   ::= "-"
            ::= "+" OffsetStep "*" Min ".." Max
-Mode       ::= "RO" | "RW" | "RC"
+Mode       ::= "RO" | "RW" | "RC" | "RCR" | "RW64" | "RO64" | "RC64" | "RCR64"
 Longname   ::= <string>
 Offset ::= OffsetStep ::= Min ::= Max ::= <number>
 ```
@@ -121,9 +124,10 @@ A `Register` object definition is made up of the following properties:
   supplied to `register.define` and `register.define_array`).
 * *Indexing*—Optional. Three integers specifying the offset step as well
   as minimum and maximum indexes in bytes.
-* *Mode*—One of `"RO"`, `"RW"` or `"RC"` standing for *read-only*,
-  *read-write* and *counter* modes respectively. Counter mode is for
-  counter registers that clear back to zero when read.
+* *Mode*—One of `"RO"`, `"RW"`, `"RC"`, `"RCR"` `"RO64"`, `"RW64"`, `"RC64"`,
+  `"RCR64"` standing for *read-only*, *read-write* and *counter* modes in 32bit
+  and 64bit modes respectively. Counter mode is for counter registers that
+  clear back to zero when read, RCR is for counters that wrap.
 * *Longname*—A string describing the register (used for
   self-documentation).
 
@@ -190,6 +194,19 @@ in read-write mode.
 
 Clears bits of register according to *bitmask*. Only available on
 registers in read-write mode.
+
+- Method **Register:bits** *offset*, *length*, *bits*
+
+Get or set *length* bits at *offset* in register. Sets *length* bits at
+*offset* in register to *bits* if *bits* is supplied. Returns *length* bits at
+*offset* in register otherwise. Setting is only available on registers in
+read-write mode.
+
+- Method **Register:byte** *offset*, *byte*
+
+Get or set byte at *offset* in register. Sets byte at *offset* in register to
+*byte* if *byte* is supplied. Returns byte at *offset* in register otherwise.
+Setting is only available on registers in read-write mode.
 
 — Method **Register:wait**  *bitmask*, *value*
 

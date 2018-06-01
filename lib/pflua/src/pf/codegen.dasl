@@ -1,0 +1,830 @@
+-- This module implements code generation for the dynasm backend of
+-- Pflua. It takes the result of instruction selection (selection.lua)
+-- and register allocation (regalloc.lua) and generates a function with
+-- x64 assembly.
+--
+-- Currently assumes a Unix ABI/calling convention.
+
+module(..., package.seeall)
+
+local ffi = require("ffi")
+local bit = require("bit")
+local C = ffi.C
+
+local dasm = require("dasm")
+
+local sel   = require("pf.selection")
+local ra    = require("pf.regalloc")
+local utils = require("pf.utils")
+
+|.arch x64
+|.actionlist actions
+
+-- Table keeping machine code alive to the GC.
+local anchor = {}
+
+local debug = false
+
+-- handle spilling in a generic way for these instructions
+local handle_spill = utils.set("cmp", "add", "add-i", "sub", "sub-i",
+                               "mul", "mul-i", "div", "and", "and-i", "or", "or-i",
+                               "xor", "xor-i", "shl", "shl-i", "shr", "shr-i",
+                               "ntohs", "ntohl", "uint32")
+
+-- in bytes
+local stack_slot_size = 8
+
+-- amount to add to convert IR label into asm label
+local label_offset = 2
+
+local function compile_cjmp(Dst, op, target)
+   if target == "true-label" then
+      target = 0
+   elseif target == "false-label" then
+      target = 1
+   else
+      target = target + label_offset
+   end
+
+   if op == "=" then
+      | je   =>(target)
+   elseif op == "!=" then
+      | jne  =>(target)
+   elseif op == ">=" then
+      | jge  =>(target)
+   elseif op == "<=" then
+      | jle  =>(target)
+   elseif op == ">" then
+      | jg   =>(target)
+   elseif op == "<" then
+      | jl   =>(target)
+   end
+end
+
+local function compile(instructions, alloc, dump)
+   local Dst = dasm.new(actions)
+
+   -- number of =>(...) style labels
+   -- reserve three labels 0-2 for return cases
+   local maxpc = label_offset + instructions.max_label + 1
+   Dst:growpc(maxpc)
+
+   -- push callee-save registers if we use any
+   local to_pop = {}
+   for reg, _ in pairs(alloc.callee_saves) do
+      | push Rq(reg)
+      -- we need to record the order in which to pop
+      -- b/c while the push order doesn't matter, the
+      -- pop order must be reverse (and callee_saves
+      -- is an unordered set)
+      table.insert(to_pop, reg)
+   end
+
+   -- allocate space for all spilled vars
+   local spilled_space = 0
+   for _, _ in pairs(alloc.spills) do
+      spilled_space = spilled_space + stack_slot_size
+   end
+   if spilled_space > 0 then
+      | sub rsp, spilled_space
+   end
+
+   -- if the length variable got spilled, we need to explicitly initialize
+   -- the stack slot for it
+   if alloc.spills["len"] then
+      | mov [rsp + alloc.spills["len"] * stack_slot_size], rsi
+   end
+
+   for idx, instr in ipairs(instructions) do
+      local itype = instr[1]
+
+      -- If we have spilled registers, we potentially need to do some work
+      -- to prep for reading from a stack slot.
+      --
+      -- Spilling is implemented in a very expensive way, but the expectation
+      -- is that it happens rarely. Implementing it in a cheaper way with
+      -- memory operands is hard due to the extreme boilerplate that it requires
+      -- for each instruction type.
+      local spill_post_reg, spill_post_slot
+      if spilled_space > 0 and handle_spill[itype] then
+         for i = 2, #instr do
+            if type(instr[i]) == "string" then
+               if alloc.spills[instr[i]] then
+                  local reg  = assert(alloc.spill_registers[i - 1])
+                  local slot = assert(alloc.spills[instr[i]])
+
+                  | mov Rq(reg), [rsp + slot * stack_slot_size]
+                  -- if we need to write, record that and do it later
+                  if i == 2 then
+                     spill_post_reg, spill_post_slot = reg, slot
+                  end
+                  -- so that code generation below uses the right register
+                  alloc[instr[i]] = reg
+               end
+            end
+         end
+      end
+
+      -- the core code generation logic starts here
+      if itype == "label" then
+         local lnum = instr[2] + label_offset
+         |=>(lnum):
+
+      elseif itype == "cjmp" then
+         compile_cjmp(Dst, instr[2], instr[3])
+
+      elseif itype == "jmp" then
+         local next_instr = instructions[idx+1]
+         -- if the jump target is immediately after this in the instruction
+         -- sequence then don't generate the jump
+         if (type(instr[2]) == "number" and
+             next_instr[1] == "label" and
+             next_instr[2] == instr[2]) then
+            -- don't output anything
+         else
+            if instr[2] == "true-label" then
+               if next_instr[1] ~= "ret-true" then
+                  | jmp =>(0)
+               end
+            elseif instr[2] == "false-label" then
+               if next_instr[1] ~= "ret-false" then
+                  | jmp =>(1)
+               end
+            else
+               | jmp =>(instr[2] + label_offset)
+            end
+         end
+
+      elseif itype == "cmp" then
+         -- the lhs should never be an immediate so this should be non-nil
+         local lhs_reg = assert(alloc[instr[2]])
+         local rhs = instr[3]
+
+         if type(rhs) == "number" then
+            | cmp Rq(lhs_reg), rhs
+         else
+            local rhs_reg = alloc[rhs]
+            | cmp Rq(lhs_reg), Rq(rhs_reg)
+         end
+
+      elseif itype == "load" then
+         local target = alloc[instr[2]]
+         local spill  = alloc.spills[instr[2]]
+         local offset = instr[3]
+         local bytes  = instr[4]
+
+         if not spill then
+            if type(offset) == "number" then
+               if bytes == 1 then
+                  | movzx Rd(target), byte [rdi + offset]
+               elseif bytes == 2 then
+                  | movzx Rd(target), word [rdi + offset]
+               else
+                  | mov   Rd(target), dword [rdi + offset]
+               end
+            else
+               local reg = alloc[offset]
+               local spill_offset = alloc.spills[offset]
+
+               if spill_offset then
+                  local sreg = alloc.spill_registers[1]
+                  | mov Rq(sreg), [rsp + spill_offset * stack_slot_size]
+                  reg = sreg
+               end
+
+               if bytes == 1 then
+                  | movzx Rd(target), byte [rdi + Rd(reg)]
+               elseif bytes == 2 then
+                  | movzx Rd(target), word [rdi + Rd(reg)]
+               else
+                  | mov   Rd(target), dword [rdi + Rd(reg)]
+               end
+            end
+         else
+            local reg = alloc.spill_registers[1]
+            if type(offset) == "number" then
+               -- can't directly mov from memory to memory so
+               -- there's some indirection here
+               if bytes == 1 then
+                  | movzx Rd(reg), byte [rdi + offset]
+               elseif bytes == 2 then
+                  | movzx Rd(reg), word [rdi + offset]
+               else
+                  | mov   Rd(reg), dword [rdi + offset]
+               end
+               | mov [rsp + spill * stack_slot_size], Rd(reg)
+            else
+               local off_reg = alloc[offset]
+               local spill_offset = alloc.spills[offset]
+
+               if spill_offset then
+                  local sreg = alloc.spill_registers[2]
+                  | mov Rq(sreg), [rsp + spill_offset * stack_slot_size]
+                  off_reg = sreg
+               end
+
+               if bytes == 1 then
+                  | movzx Rd(reg), byte [rdi + Rd(off_reg)]
+               elseif bytes == 2 then
+                  | movzx Rd(reg), word [rdi + Rd(off_reg)]
+               else
+                  | mov   Rd(reg), dword [rdi + Rd(off_reg)]
+               end
+               | mov [rsp + spill * stack_slot_size], Rd(reg)
+            end
+         end
+
+      elseif itype == "mov" then
+         local dst   = alloc[instr[2]]
+         local spill = alloc.spills[instr[2]]
+         local arg   = instr[3]
+
+         if not spill then
+            if type(arg) == "number" then
+               | mov Rd(dst), arg
+            else
+               local spill_arg = alloc.spills[arg]
+               if not spill_arg then
+                  | mov Rq(dst), Rq(alloc[arg])
+               else
+                  | mov Rq(dst), [rsp + spill_arg * stack_slot_size]
+               end
+            end
+         else
+            if type(arg) == "number" then
+               | mov [rsp + spill * stack_slot_size], dword arg
+            else
+               local spill_arg = alloc.spills[arg]
+               if not spill_arg then
+                  | mov [rsp + spill * stack_slot_size], Rq(alloc[arg])
+               else
+                  local spill_reg = alloc.spill_registers[1]
+                  | mov Rq(spill_reg), [rsp + spill_arg * stack_slot_size]
+                  | mov [rsp + spill * stack_slot_size], Rq(spill_reg)
+               end
+            end
+         end
+
+      elseif itype == "mov64" then
+         local dst = alloc[instr[2]]
+         local imm = instr[3]
+         | mov64 Rq(dst), imm
+
+      elseif itype == "add" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         | add Rq(reg1), Rq(reg2)
+
+      elseif itype == "sub" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         | sub Rq(reg1), Rq(reg2)
+
+      elseif itype == "mul" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         | imul Rq(reg1), Rq(reg2)
+
+      -- For division we use floating point division to avoid having
+      -- to deal with the %eax register for the div instruction.
+      elseif itype == "div" then
+         local reg0, reg1 = alloc[instr[2]], alloc[instr[3]]
+         | cvtsi2sd xmm(0), Rq(reg0)
+         | cvtsi2sd xmm(1), Rq(reg1)
+         | divsd xmm(0), xmm(1)
+         | cvttsd2si Rq(reg0), xmm(0)
+
+      elseif itype == "and" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         | and Rq(reg1), Rq(reg2)
+
+      elseif itype == "or" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         | or Rq(reg1), Rq(reg2)
+
+      elseif itype == "or" then
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+         | xor Rq(reg1), Rq(reg2)
+
+      elseif itype == "shl" or itype == "shr" then
+         local do_push = true
+         local reg1, reg2 = alloc[instr[2]], alloc[instr[3]]
+
+         -- shl/shr only accept %cl as the count register, so we
+         -- potentially need to save %rcx on the stack (unless/until
+         -- register allocation can take this into account)
+         | push rcx
+         | mov cl, Rb(reg2)
+         -- when the shift was going to write to %rcx, we need
+         -- to switch to writing to the stack
+         if reg1 == 1 then
+         else
+            if itype == "shl" then
+               | shl qword [rsp], cl
+            else
+               | shr qword [rsp], cl
+            end
+         end
+            if itype == "shl" then
+               | shl Rq(reg1), cl
+            else
+               | shr Rq(reg1), cl
+            end
+         | pop rcx
+
+      elseif itype == "add-i" then
+         local reg = alloc[instr[2]]
+         | add Rq(reg), instr[3]
+
+      elseif itype == "sub-i" then
+         local reg = alloc[instr[2]]
+         | sub Rq(reg), instr[3]
+
+      elseif itype == "mul-i" then
+         local r = alloc[instr[2]]
+         local const = instr[3]
+
+         if const == 2 then
+            | lea Rq(r), [Rq(r)*2]
+         elseif const == 4 then
+            | lea Rq(r), [Rq(r)*4]
+         elseif const == 8 then
+            | lea Rq(r), [Rq(r)*8]
+         elseif const == 3 then
+            | lea Rq(r), [Rq(r)+Rq(r)*2]
+         elseif const == 5 then
+            | lea Rq(r), [Rq(r)+Rq(r)*4]
+         elseif const == 7 then
+            | lea Rq(r), [Rq(r)+Rq(r)*8]
+         else
+            | imul Rq(r), const
+         end
+
+      elseif itype == "and-i" then
+         local reg = alloc[instr[2]]
+         assert(type(reg) == "number")
+         assert(type(instr[3]) == "number")
+         | and Rq(reg), instr[3]
+
+      elseif itype == "or-i" then
+         local reg = alloc[instr[2]]
+         assert(type(reg) == "number")
+         assert(type(instr[3]) == "number")
+         | or Rq(reg), instr[3]
+
+      elseif itype == "xor-i" then
+         local reg = alloc[instr[2]]
+         assert(type(reg) == "number")
+         assert(type(instr[3]) == "number")
+         | xor Rq(reg), instr[3]
+
+      elseif itype == "shl-i" then
+         local reg = alloc[instr[2]]
+         -- mask to five bits since shl ignores the rest
+         | shl Rq(reg), bit.band(instr[3], 31)
+
+      elseif itype == "shr-i" then
+         local reg = alloc[instr[2]]
+         | shr Rq(reg), bit.band(instr[3], 31)
+
+      elseif itype == "ntohs" then
+         local reg = alloc[instr[2]]
+         | ror Rw(reg), 8
+         | movzx Rq(reg), Rw(reg)
+
+      elseif itype == "ntohl" then
+         local reg = alloc[instr[2]]
+         | bswap Rd(reg)
+
+      elseif itype == "uint32" then
+         local reg = alloc[instr[2]]
+         | mov Rd(reg), Rd(reg)
+
+      elseif itype == "ret-true" or itype == "ret-false" then
+         if itype == "ret-true" then
+            | =>(0):
+            | mov al, 0x1
+         elseif itype == "ret-false" then
+            | =>(1):
+            | mov al, 0x0
+         end
+
+         if idx ~= #instructions then
+            -- if there's no cleanup required due to spilling or callee
+            -- save registers, then just return instead of jmping
+            if spilled_space == 0 and #to_pop == 0 then
+               | ret
+            else
+               | jmp =>(2)
+            end
+         end
+
+      elseif itype == "nop" then
+         -- don't output anything
+
+      else
+	 error(string.format("NYI instruction %s", itype))
+      end
+
+      if spill_post_slot then
+         | mov [rsp + spill_post_slot * stack_slot_size], Rq(spill_post_reg)
+      end
+   end
+
+   -- cleanup code & return
+   |=>(2):
+
+   -- fix stack
+   if spilled_space > 0 then
+      | add rsp, spilled_space
+   end
+
+   -- pop callee-save registers if we use any
+   for i=1, #to_pop do
+      | pop Rq(to_pop[#to_pop - i + 1])
+   end
+
+   | ret
+
+   local mcode, size = Dst:build()
+   local dumpstr = ""
+   table.insert(anchor, mcode)
+
+   if dump or debug then
+      dasm.dump(mcode, size, function(str) dumpstr = dumpstr..str end)
+   end
+
+   if debug then
+      print("mcode dump:")
+      io.write(dumpstr)
+   elseif dump then
+      return dumpstr
+   end
+
+   return ffi.cast(ffi.typeof("bool(*)(unsigned char*, uint16_t)"),
+                   mcode)
+end
+
+function load(ssa, dump)
+   local ir = sel.select(ssa)
+   local alloc = ra.allocate(ir)
+   local fun = compile(ir, alloc, dump)
+
+   return fun
+end
+
+function selftest()
+   local savefile = require("pf.savefile")
+   local parse = require('pf.parse').parse
+   local expand = require('pf.expand').expand
+   local optimize = require('pf.optimize').optimize
+   local convert_anf = require('pf.anf').convert_anf
+   local convert_ssa = require('pf.ssa').convert_ssa
+   local sel = require("pf.selection")
+   local ra = require("pf.regalloc")
+
+   -- `ip`
+   local example_1 =
+      { start = "L1",
+	order = { "L1", "L4", "L5" },
+	blocks =
+	   { L1 = { label = "L1",
+		    bindings = {},
+		    control = { "if", { ">=", "len", 14 }, "L4", "L5" } },
+	     L4 = { label = "L4",
+		    bindings = {},
+		    control = { "return", { "=", { "[]", 12, 2 }, 8 } } },
+	     L5 = { label = "L5",
+		    bindings = {},
+		    control = { "return", { "false" } } } } }
+
+   -- `arp`
+   local example_2 =
+      { start = "L1",
+	order = { "L1", "L4", "L5" },
+	blocks =
+	   { L1 = { label = "L1",
+		    bindings = {},
+		    control = { "if", { ">=", "len", 14 }, "L4", "L5" } },
+	     L4 = { label = "L4",
+		    bindings = {},
+		    control = { "return", { "=", { "[]", 12, 2 }, 1544 } } },
+	     L5 = { label = "L5",
+		    bindings = {},
+		    control = { "return", { "false" } } } } }
+
+   -- `tcp`
+   local example_3 =
+      { start = "L1",
+	order = { "L1", "L4", "L6", "L7", "L8", "L10", "L12", "L13",
+		  "L14", "L16", "L17", "L15", "L11", "L9", "L5" },
+	blocks =
+	   { L1 = { label = "L1",
+	            bindings = {},
+	            control = { "if", { ">=", "len", 34 }, "L4", "L5" } },
+	     L4 = { label = "L4",
+	            bindings = { { name = "v1", value = { "[]", 12, 2 } } },
+	            control = { "if", { "=", "v1", 8 }, "L6", "L7" } },
+	     L6 = { label = "L6",
+	            bindings = {},
+	            control = { "return", { "=", { "[]", 23, 1 }, 6 } } },
+	     L7 = { label = "L7",
+	            bindings = {},
+	            control = { "if", { ">=", "len", 54 }, "L8", "L9" } },
+	     L8 = { label = "L8",
+	            bindings = {},
+	            control = { "if", { "=", "v1", 56710 }, "L10", "L11" } },
+	     L10 = { label = "L10",
+	             bindings = { { name = "v2", value = { "[]", 20, 1 } } },
+	             control = { "if", { "=", "v2", 6 }, "L12", "L13" } },
+	     L12 = { label = "L12",
+	             bindings = {},
+	             control = { "return", { "true" } } },
+	     L13 = { label = "L13",
+	             bindings = {},
+	             control = { "if", { ">=", "len", 55 }, "L14", "L15" } },
+	     L14 = { label = "L14",
+	             bindings = {},
+	             control = { "if", { "=", "v2", 44 }, "L16", "L17" } },
+	     L16 = { label = "L16",
+	             bindings = {},
+	             control = { "return", { "=", { "[]", 54, 1 }, 6 } } },
+	     L17 = { label = "L17",
+	             bindings = {},
+	             control = { "return", { "false" } } },
+	     L15 = { label = "L15",
+	             bindings = {},
+	             control = { "return", { "false" } } },
+	     L11 = { label = "L11",
+	             bindings = {},
+	             control = { "return", { "false" } } },
+	     L9 = { label = "L9",
+	            bindings = {},
+	            control = { "return", { "false" } } },
+	     L5 = { label = "L5",
+	            bindings = {},
+	            control = { "return", { "false" } } } } }
+
+   -- `ip[1] + ip[2] + ip[3] == 1`
+   example_4 =
+      { start = "L1",
+        order = { "L1", "L4", "L6", "L7", "L5" },
+        blocks =
+           { L1 = { label = "L1",
+                    bindings = {},
+                    control = { "if", { ">=", "len", 34 }, "L4", "L5" } },
+             L4 = { label = "L4",
+                    bindings = {},
+                    control = { "if", { "=", { "[]", 12, 2 }, 8 }, "L6", "L7" } },
+             L6 = { label = "L6",
+                    bindings = {},
+		    control = { "return",
+                                { "=", { "+", { "+", { "[]", 15, 1 }, { "[]", 16, 1 } },
+                                         { "[]", 17, 1 } }, 1 } } },
+             L7 = { label = "L7",
+                    bindings = {},
+                    control = { "return", { "false" } } },
+             L5 = { label = "L5",
+                    bindings = {},
+                    control = { "return", { "false" } } } } }
+
+   local function test(ssa, pkt, alloc)
+      -- Compile and then call native function on the given packet
+      local instr = sel.select(ssa)
+
+      if not alloc then
+         alloc = ra.allocate(instr)
+      end
+
+      local f = compile(instr, alloc)
+      return f(pkt.packet, pkt.len)
+   end
+
+   arp_pkts = savefile.load_packets("../tests/data/arp.pcap")
+   v4_pkts = savefile.load_packets("../tests/data/v4.pcap")
+   v6_pkts = savefile.load_packets("../tests/data/v6.pcap")
+   telnet_pkts = savefile.load_packets("../tests/data/telnet-cooked.pcap")
+
+   -- not an arp packet
+   local alloc_1 = { len = 6, r1 = 0, callee_saves = {}, spills = {} }
+   assert(not test(example_1, arp_pkts[1], alloc_1))
+   assert(not test(example_1, arp_pkts[2], alloc_1))
+   assert(not test(example_1, arp_pkts[1]))
+   assert(not test(example_1, arp_pkts[2]))
+   -- yay arp
+   assert(test(example_2, arp_pkts[1], alloc_1))
+   assert(test(example_2, arp_pkts[2], alloc_1))
+   assert(test(example_2, arp_pkts[1]))
+   assert(test(example_2, arp_pkts[2]))
+
+   assert(not test(example_3,
+                   arp_pkts[1]))
+   assert(test(example_3,
+               -- this one is a TCP packet
+               v4_pkts[1]))
+   assert(test(example_3,
+               -- this one is also a TCP packet
+               v6_pkts[16]))
+
+   assert(not test(example_4, arp_pkts[1]))
+
+   -- test starting with results of instruction selection
+   local function test(instructions, pkt)
+      local alloc = ra.allocate(instructions)
+      local f = compile(instructions, alloc)
+      return f(pkt.packet, pkt.len)
+   end
+
+   example_5 = { { "label", 1 },
+                 { "cmp", "len", 4 },
+                 { "cjmp", "<", "false-label" },
+                 { "jmp", 4 },
+                 { "label", 4 },
+                 { "load", "r1", 0, 4 },
+                 { "mov", "r2", "r1" },
+                 { "ntohs", "r2" },
+                 { "cmp", "r2", 0 },
+                 { "cjmp", ">", "true-label" },
+                 { "jmp", "false-label" },
+                 { "ret-false" },
+                 { "ret-true" } }
+   example_5.max_label = 4
+
+   assert(test(example_5, arp_pkts[1]))
+
+   -- test starting with expression IR (this is helpful for testing
+   -- the outputs of random test generation)
+   --
+   -- also doesn't optimize
+   local function test(ir, pkt)
+      local ssa = convert_ssa(convert_anf(ir))
+      local instr = sel.select(ssa)
+      local alloc = ra.allocate(instr)
+      local f = compile(instr, alloc)
+      return f(pkt.packet, pkt.len)
+   end
+
+   assert(test({ "=", { "uint32", { "/", 4214967296, 4294967295 } }, 0 },
+               v4_pkts[1]))
+
+   -- test starting from parsing all the way to codegen
+
+   local function test(expr, pkt, no_optimize)
+      local expanded = expand(parse(expr), "EN10MB")
+      local optimized
+
+      if no_optimize ~= nil then
+         optimized = expanded
+      else
+         optimized = optimize(expanded)
+      end
+
+      local ssa = convert_ssa(convert_anf(optimized))
+      local instr = sel.select(ssa)
+      local alloc = ra.allocate(instr)
+      local f = compile(instr, alloc)
+      return f(pkt.packet, pkt.len)
+   end
+
+   -- some sanity checks
+   assert(test('ip[0]=0x45', v4_pkts[1]))
+   assert(test('ip[14]=0xa0', v4_pkts[1]))
+
+   assert(not test("tcp port 3372", arp_pkts[1]))
+   assert(test("tcp port 3372", v4_pkts[1]))
+   assert(test("tcp port 3372", v4_pkts[2]))
+   assert(not test("tcp port 3372", v4_pkts[13]))
+   assert(not test("tcp port 3372", v4_pkts[18]))
+   assert(not test("tcp port 3372", v4_pkts[24]))
+
+   assert(not test("portrange 0-6000", arp_pkts[1]))
+   assert(test("portrange 0-6000", v4_pkts[1]))
+   assert(test("portrange 0-80", v4_pkts[1]))
+   assert(not test("portrange 100-2000", v4_pkts[1]))
+   assert(test("portrange 0-6000", v4_pkts[2]))
+   assert(test("portrange 0-6000", v4_pkts[13]))
+   assert(not test("portrange 0-30", v4_pkts[13]))
+   assert(not test("portrange 4000-9000", v4_pkts[13]))
+   assert(test("portrange 0-6000", v4_pkts[18]))
+   assert(test("portrange 0-6000", v4_pkts[24]))
+
+   assert(test("net 145.254.160.237", v4_pkts[1]))
+   assert(not test("net 178.79.150.233", v4_pkts[1]))
+   assert(test("net 145.254.160.0/24", v4_pkts[1]))
+   assert(not test("net 178.79.150.0/24", v4_pkts[1]))
+
+   -- test ntohl
+   assert(test('ip[0:4] + 1 = 0x45000031', v4_pkts[1]))
+
+   -- make sure addition of three registers is handled
+   -- correctly
+   assert(test('ip[0]+ip[1]+ip[3]=0x75', v4_pkts[1]))
+
+   assert(test("ip[0:1] - 100 = 4294967265", v4_pkts[1]))
+   assert(test("ip[0:1] - 68 = 1", v4_pkts[1]))
+   assert(not test("ip[0:1] - 68 = 2", v4_pkts[1]))
+   assert(test("35 - 20 = 15", v4_pkts[1], "no optimize"))
+   assert(not test("124124 - 12412 = 15", v4_pkts[1], "no optimize"))
+
+   assert(test("ip[0:1] * 2 == 0x8A", v4_pkts[1]))
+   assert(not test("ip[0] * 2 == 0x8B", v4_pkts[1]))
+
+   assert(test("ip[0:1] / 2 == 0x22", v4_pkts[1]))
+   assert(test("ip[0:1] / 3 == 0x17", v4_pkts[1]))
+   assert(not test("ip[0] / 2 == 0x21", v4_pkts[1]))
+   assert(test("ip[0:1] / ip[9:1] == 0x0B", v4_pkts[1]))
+   assert(test("4214967296 / 4294967295 == 0", v4_pkts[1], "no optimize"))
+   assert(test("4294967294 / 4294967295 == 0", v4_pkts[1], "no optimize"))
+   assert(test("4294967295 / 4294967295 == 1", v4_pkts[1], "no optimize"))
+
+   assert(test("ip[0:1] | 2 == 0x47", v4_pkts[1]))
+   assert(not test("ip[0] | 2 == 0x48", v4_pkts[1]))
+
+   assert(test("ip[0:1] ^ 3 == 0x46", v4_pkts[1]))
+   assert(not test("ip[0:1] ^ 3 == 0x45", v4_pkts[1]))
+
+   assert(test("ip[0:1] << 1 == 0x8A", v4_pkts[1]))
+   assert(not test("ip[0:1] << 1 == 0x8B", v4_pkts[1]))
+
+   assert(test("ip[0:1] >> 1 == 0x22", v4_pkts[1]))
+   assert(not test("ip[0:1] >> 1 == 0x21", v4_pkts[1]))
+
+   -- test for a bug where large shift rhs was a problem
+   assert(not test("ip[0] << 1 - 2 == 0", v4_pkts[1]))
+   assert(not test("ip[0] << 1 - 2 == 0", v4_pkts[1], "no optimize"))
+   assert(test("ip[0] >> 1 - 2 == 0", v4_pkts[1]))
+
+   -- tests for >>/<< with register args
+   assert(test("ip[0] << ip[9] == 4416", v4_pkts[1]))
+   assert(test("ip[0] >> ip[9] == 0x1", v4_pkts[1]))
+   assert(test("ip[0] >> ip[1] == 0x45", v4_pkts[1]))
+
+   -- test that shifts mask the count appropriately
+   assert(test("ip[0] >> ip[5] == 34", v4_pkts[1]))
+   assert(test("ip[0] << ip[5] == 138", v4_pkts[1]))
+
+   assert(test("", v4_pkts[1]))
+   assert(test("", arp_pkts[1]))
+   assert(test("", v6_pkts[1]))
+   assert(not test("1 == 0", v4_pkts[1]))
+   assert(not test("1 == 0", arp_pkts[1]))
+   assert(not test("1 == 0", v6_pkts[1]))
+
+   -- test to make sure we handle spills in code generation
+   assert(test('ip[0]+ip[1]+ip[2]+ip[3]+ip[4]+ip[5]+ip[6]+ip[7]+\
+                ip[8]+ip[9]+ip[10]+ip[11]+ip[12]+ip[13]+ip[14]=1334 and\
+                ip[0]-ip[1]-ip[2]-ip[3]-ip[4]-ip[5]-ip[6]-ip[7]-\
+                ip[8]-ip[9]-ip[10]-ip[11]-ip[12]-ip[13]-ip[14]=4294966100',
+               v4_pkts[1]))
+
+   -- make sure multiple callee-save registers are handled correctly
+   assert(test('ip[0]+ip[1]+ip[2]+ip[3]+ip[4]+ip[5]+ip[6]+ip[7]+\
+                ip[8]+ip[9]+ip[10]+ip[11]=775',
+               v4_pkts[1]))
+
+   -- this test (from issue #215) exposed some bugs in spill handling and
+   -- pretty thoroughly exercises spilling too
+   local test_file = io.open("../tests/test-215.pflang")
+   local test_filter = test_file:read()
+   assert(test(test_filter, telnet_pkts[1]))
+   assert(not test(test_filter, telnet_pkts[3]))
+
+   -- test to make sure that callee-save registers work properly and
+   -- don't interfere with context
+   local function test(expr)
+      local Dst = dasm.new(actions)
+
+      local ssa = convert_ssa(convert_anf(optimize(expand(parse(expr), "EN10MB"))))
+      local instr = sel.select(ssa)
+      local alloc = ra.allocate(instr)
+      local f = compile(instr, alloc)
+      local pkt = v4_pkts[1]
+
+      | push rbx
+      -- we want to make sure %rbx still contains this later
+      | mov rbx, 0xdeadbeef
+      -- args to 'f'
+      | mov64 rdi, ffi.cast(ffi.typeof("uint64_t"), pkt.packet)
+      | mov rsi, pkt.len
+      -- call 'f'
+      | mov64 rax, ffi.cast(ffi.typeof("uint64_t"), f)
+      | call rax
+      -- make sure it's still there
+      | cmp rbx, 0xdeadbeef
+      -- put a bool in return register
+      | sete al
+      | pop rbx
+      | ret
+
+      local mcode, size = Dst:build()
+      table.insert(anchor, mcode)
+      local f = ffi.cast(ffi.typeof("bool(*)()"), mcode)
+      return f()
+   end
+
+   assert(test('ip[0]+ip[1]+ip[2]+ip[3]+ip[4]+ip[5]+ip[6] =\
+                ip[0]-ip[1]-ip[2]-ip[3]-ip[4]-ip[5]-ip[6]'))
+   -- if this fails, it likely means we aren't handling callee-save
+   -- registers properly
+   assert(test('ip[0]+ip[1]+ip[2]+ip[3]+ip[4]+ip[5]+ip[6]+ip[7] =\
+                ip[0]-ip[1]-ip[2]-ip[3]-ip[4]-ip[5]-ip[6]-ip[7]'))
+
+   print("OK")
+end

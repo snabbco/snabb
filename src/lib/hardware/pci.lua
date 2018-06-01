@@ -5,10 +5,9 @@ module(...,package.seeall)
 local ffi = require("ffi")
 local C = ffi.C
 local S = require("syscall")
+local shm = require("core.shm")
 
 local lib = require("core.lib")
-
-require("lib.hardware.pci_h")
 
 --- ### Hardware device information
 
@@ -23,14 +22,16 @@ devices = {}
 --- * `device` id hex string e.g. `"0x10fb"` for 82599 chip.
 --- * `interface` name of Linux interface using this device e.g. `"eth0"`.
 --- * `status` string Linux operational status, or `nil` if not known.
---- * `driver` Lua module that supports this hardware e.g. `"intel10g"`.
+--- * `driver` Lua module that supports this hardware e.g. `"intel_mp"`.
 --- * `usable` device was suitable to use when scanned? `yes` or `no`
 
 --- Initialize (or re-initialize) the `devices` table.
 function scan_devices ()
-   for _,device in ipairs(lib.files_in_directory("/sys/bus/pci/devices")) do
-      local info = device_info(device)
-      if info.driver then table.insert(devices, info) end
+   for device in assert(S.util.ls("/sys/bus/pci/devices")) do
+      if device ~= '.' and device ~= '..' then
+         local info = device_info(device)
+         if info.driver then table.insert(devices, info) end
+      end
    end
 end
 
@@ -44,6 +45,7 @@ function device_info (pciaddress)
    info.model = which_model(info.vendor, info.device)
    info.driver = which_driver(info.vendor, info.device)
    if info.driver then
+      info.rx, info.tx = which_link_names(info.driver)
       info.interface = lib.firstfile(p.."/net")
       if info.interface then
          info.status = lib.firstline(p.."/net/"..info.interface.."/operstate")
@@ -70,18 +72,25 @@ model = {
 -- Supported cards indexed by vendor and device id.
 local cards = {
    ["0x8086"] =  {
-      ["0x10fb"] = {model = model["82599_SFP"], driver = 'apps.intel.intel_app'},
-      ["0x10d3"] = {model = model["82574L"],    driver = 'apps.intel.intel_app'},
-      ["0x105e"] = {model = model["82571"],     driver = 'apps.intel.intel_app'},
-      ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel.intel_app'},
-      ["0x1528"] = {model = model["X540"],      driver = 'apps.intel.intel_app'},
-      ["0x154d"] = {model = model["X520"],      driver = 'apps.intel.intel_app'},
-      ["0x1521"] = {model = model["i350"],      driver = 'apps.intel.intel1g'},
-      ["0x157b"] = {model = model["i210"],      driver = 'apps.intel.intel1g'},
+      ["0x10fb"] = {model = model["82599_SFP"], driver = 'apps.intel_mp.intel_mp'},
+      ["0x10d3"] = {model = model["82574L"],    driver = 'apps.intel_mp.intel_mp'},
+      ["0x105e"] = {model = model["82571"],     driver = 'apps.intel_mp.intel_mp'},
+      ["0x151c"] = {model = model["82599_T3"],  driver = 'apps.intel_mp.intel_mp'},
+      ["0x1528"] = {model = model["X540"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x154d"] = {model = model["X520"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x1521"] = {model = model["i350"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x1533"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
+      ["0x157b"] = {model = model["i210"],      driver = 'apps.intel_mp.intel_mp'},
    },
    ["0x1924"] =  {
       ["0x0903"] = {model = 'SFN7122F', driver = 'apps.solarflare.solarflare'}
    },
+}
+
+local link_names = {
+   ['apps.solarflare.solarflare'] = { "rx", "tx" },
+   ['apps.intel_mp.intel_mp']     = { "input", "output" },
+   ['apps.intel.intel_app']       = { "rx", "tx" }
 }
 
 -- Return the name of the Lua module that implements support for this device.
@@ -93,6 +102,10 @@ end
 function which_model (vendor, device)
    local card = cards[vendor] and cards[vendor][device]
    return card and card.model
+end
+
+function which_link_names (driver)
+   return unpack(assert(link_names[driver]))
 end
 
 --- ### Device manipulation.
@@ -113,39 +126,84 @@ function unbind_device_from_linux (pciaddress)
    end
 end
 
+-- ### Access PCI devices using Linux sysfs (`/sys`) filesystem
+-- sysfs is an interface towards the Linux kernel based on special
+-- files that are implemented as callbacks into the kernel. Here are
+-- some background links about sysfs:
+-- - High-level: <http://en.wikipedia.org/wiki/Sysfs>
+-- - Low-level:  <https://www.kernel.org/doc/Documentation/filesystems/sysfs.txt>
+
+-- PCI hardware device registers can be memory-mapped via sysfs for
+-- "Memory-Mapped I/O" by device drivers. The trick is to `mmap()` a file
+-- such as:
+--    /sys/bus/pci/devices/0000:00:04.0/resource0
+-- and then read and write that memory to access the device.
+
 -- Memory map PCI device configuration space.
 -- Return two values:
 --   Pointer for memory-mapped access.
 --   File descriptor for the open sysfs resource file.
-function map_pci_memory (device, n)
+
+
+function map_pci_memory_locked(device,n) return map_pci_memory (device, n, true) end
+function map_pci_memory_unlocked(device,n) return map_pci_memory (device, n, false) end
+
+function map_pci_memory (device, n, lock)
+   assert(lock == true or lock == false, "Explicit lock status required")
    root_check()
    local filepath = path(device).."/resource"..n
-   local fd = C.open_pci_resource(filepath)
-   assert(fd >= 0)
-   local addr = C.map_pci_resource(fd)
-   assert( addr ~= 0 )
-   return addr, fd
+   local f,err  = S.open(filepath, "rdwr, sync")
+   assert(f, "failed to open resource " .. filepath .. ": " .. tostring(err))
+   if lock then
+     assert(f:flock("ex, nb"), "failed to lock " .. filepath)
+   end
+   local st = assert(f:stat())
+   local mem = assert(f:mmap(nil, st.size, "read, write", "shared", 0))
+   return ffi.cast("uint32_t *", mem), f
 end
 
--- Close a file descriptor opened by map_pci_memory().
 function close_pci_resource (fd, base)
-   C.close_pci_resource(fd, base)
+   local st = assert(fd:stat())
+   S.munmap(base, st.size)
+   fd:close()
 end
 
 --- Enable or disable PCI bus mastering. DMA only works when bus
 --- mastering is enabled.
 function set_bus_master (device, enable)
    root_check()
-   local fd = C.open_pcie_config(path(device).."/config")
+   local f = assert(S.open(path(device).."/config", "rdwr"))
+   local fd = f:getfd()
+
    local value = ffi.new("uint16_t[1]")
    assert(C.pread(fd, value, 2, 0x4) == 2)
    if enable then
+      shm.create('group/dma/pci/'..canonical(device), 'uint64_t')
       value[0] = bit.bor(value[0], lib.bits({Master=2}))
    else
+      shm.unlink('group/dma/pci/'..canonical(device))
       value[0] = bit.band(value[0], bit.bnot(lib.bits({Master=2})))
    end
    assert(C.pwrite(fd, value, 2, 0x4) == 2)
-   C.close(fd)
+   f:close()
+end
+
+-- For devices used by some Snabb apps, PCI bus mastering should
+-- outlive the life of the process.
+function disable_bus_master_cleanup (device)
+   shm.unlink('group/dma/pci/'..canonical(device))
+end
+
+-- Shutdown DMA to prevent "dangling" requests for PCI devices opened
+-- by pid (or other processes in its process group).
+--
+-- This is an internal API function provided for cleanup during
+-- process termination.
+function shutdown (pid)
+   local dma = shm.children("/"..pid.."/group/dma/pci")
+   for _, device in ipairs(dma) do
+      set_bus_master(device, false)
+   end
 end
 
 function root_check ()
@@ -153,7 +211,7 @@ function root_check ()
 end
 
 -- Return the canonical (abbreviated) representation of the PCI address.
--- 
+--
 -- example: canonical("0000:01:00.0") -> "01:00.0"
 function canonical (address)
    return address:gsub("^0000:", "")
@@ -163,7 +221,7 @@ end
 --
 -- example: qualified("01:00.0") -> "0000:01:00.0"
 function qualified (address)
-   return address:gsub("^%d%d:%d%d[.]%d+$", "0000:%1")
+   return address:gsub("^%x%x:%x%x[.]%x+$", "0000:%1")
 end
 
 --- ### Selftest
@@ -175,6 +233,8 @@ function selftest ()
    print("selftest: pci")
    assert(qualified("0000:01:00.0") == "0000:01:00.0", "qualified 1")
    assert(qualified(     "01:00.0") == "0000:01:00.0", "qualified 2")
+   assert(qualified(     "0a:00.0") == "0000:0a:00.0", "qualified 3")
+   assert(qualified(     "0A:00.0") == "0000:0A:00.0", "qualified 4")
    assert(canonical("0000:01:00.0") ==      "01:00.0", "canonical 1")
    assert(canonical(     "01:00.0") ==      "01:00.0", "canonical 2")
    scan_devices()

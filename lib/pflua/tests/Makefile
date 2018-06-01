@@ -15,9 +15,11 @@ all:
 check:
 	$(MAKE) $(TEST_SAVEFILE)
 	$(MAKE) regression quickcheck
+	PF_QUICKCHECK_NATIVE=1 $(MAKE) quickcheck
 	./test-matches data
 	# Make sure PF_VERBOSE isn't causing crashes
 	PF_VERBOSE=1 $(ABS_TOP_SRCDIR)/tools/pflua-compile "ip" >/dev/null 2>&1
+	PF_VERBOSE=1 $(ABS_TOP_SRCDIR)/tools/pflua-compile --native "ip" >/dev/null 2>&1
 
 $(TEST_SAVEFILE):
 	wget --output-document $@ $(TEST_SAVEFILE_URL)

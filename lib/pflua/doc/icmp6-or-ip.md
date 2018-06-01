@@ -63,6 +63,34 @@ return function(P,length)
 ::L7::
    return cast("uint16_t*", P+12)[0] == 8
 end
+```
 
+## Native pflang compilation
+
+```
+7f1c0b4a5000  4883FE0E          cmp rsi, +0x0e
+7f1c0b4a5004  7C3D              jl 0x7f1c0b4a5043
+7f1c0b4a5006  4883FE36          cmp rsi, +0x36
+7f1c0b4a500a  7C2D              jl 0x7f1c0b4a5039
+7f1c0b4a500c  0FB7470C          movzx eax, word [rdi+0xc]
+7f1c0b4a5010  4881F886DD0000    cmp rax, 0xdd86
+7f1c0b4a5017  7520              jnz 0x7f1c0b4a5039
+7f1c0b4a5019  0FB64714          movzx eax, byte [rdi+0x14]
+7f1c0b4a501d  4883F83A          cmp rax, +0x3a
+7f1c0b4a5021  7423              jz 0x7f1c0b4a5046
+7f1c0b4a5023  4883FE37          cmp rsi, +0x37
+7f1c0b4a5027  7C10              jl 0x7f1c0b4a5039
+7f1c0b4a5029  4883F82C          cmp rax, +0x2c
+7f1c0b4a502d  750A              jnz 0x7f1c0b4a5039
+7f1c0b4a502f  0FB64736          movzx eax, byte [rdi+0x36]
+7f1c0b4a5033  4883F83A          cmp rax, +0x3a
+7f1c0b4a5037  740D              jz 0x7f1c0b4a5046
+7f1c0b4a5039  0FB7470C          movzx eax, word [rdi+0xc]
+7f1c0b4a503d  4883F808          cmp rax, +0x08
+7f1c0b4a5041  7403              jz 0x7f1c0b4a5046
+7f1c0b4a5043  B000              mov al, 0x0
+7f1c0b4a5045  C3                ret
+7f1c0b4a5046  B001              mov al, 0x1
+7f1c0b4a5048  C3                ret
 ```
 

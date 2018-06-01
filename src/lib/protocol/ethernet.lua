@@ -81,6 +81,12 @@ function ethernet:is_mcast (addr)
    return band(addr[0], 0x01) ~= 0
 end
 
+local bcast_address = ethernet:pton("FF:FF:FF:FF:FF:FF")
+-- Check whether a MAC address is the broadcast address
+function ethernet:is_bcast (addr)
+   return C.memcmp(addr, bcast_address, 6) == 0
+end
+
 -- Instance methods
 
 function ethernet:src (a)

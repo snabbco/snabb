@@ -106,7 +106,7 @@ void checksum_update_incremental_32(uint16_t* checksum_cell,
 // 0xFFFF0002 : bad header
 uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
 {
-  const uint16_t const *hwbuf = (const uint16_t *)buf;
+  const uint16_t *hwbuf = (const uint16_t *)buf;
   int8_t ipv = (buf[0] & 0xF0) >> 4;
   int8_t proto = 0;
   int headersize = 0;

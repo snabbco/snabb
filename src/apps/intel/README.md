@@ -1,19 +1,19 @@
 # Intel 82599 Ethernet Controller Apps
 
-## Intel10G (apps.intel.intel_app)
+## Intel82599 (apps.intel.intel_app)
 
-The `Intel10G` drives one port of an Intel 82599 Ethernet controller.
+The `Intel82599` drives one port of an Intel 82599 Ethernet controller.
 Packets taken from the `rx` port are transmitted onto the network.
 Packets received from the network are put on the `tx` port.
 
-    DIAGRAM: Intel10G
-              +----------+
-              |          |
-      rx ---->* Intel10G *----> tx
-              |          |
-              +----------+
+    DIAGRAM: Intel82599
+              +------------+
+              |            |
+      rx ---->* Intel82599 *----> tx
+              |            |
+              +------------+
 
-— Method **Intel10G.dev:get_rxstats**
+— Method **Intel82599.dev:get_rxstats**
 
 Returns a table with the following keys:
 
@@ -22,7 +22,7 @@ Returns a table with the following keys:
 * `dropped` - Number of packets dropped
 * `bytes` - Total bytes received
 
-— Method **Intel10G.dev:get_txstats**
+— Method **Intel82599.dev:get_txstats**
 
 Returns a table with the following keys:
 
@@ -32,7 +32,7 @@ Returns a table with the following keys:
 
 ### Configuration
 
-The `Intel10G` app accepts a table as its configuration argument. The
+The `Intel82599` app accepts a table as its configuration argument. The
 following keys are defined:
 
 — Key **pciaddr**
@@ -53,7 +53,7 @@ header.
 — Key **vmdq**
 
 *Optional*. Boolean, defaults to false. Enables interface
-virtualization. Allows to have multiple `Intel10G` apps per port. If
+virtualization. Allows to have multiple `Intel82599` apps per port. If
 enabled, *macaddr* must be specified.
 
 — Key **mirror**
@@ -78,7 +78,7 @@ the physical port.
 *Optional*. Four bit integers (0-15). If set, incoming/outgoing packets
 will be counted in the selected statistics counter respectively. Multiple
 apps can share a counter. To retrieve counter statistics use
-`Intel10G.dev:get_rxstats()` and `Intel10G.dev:get_txstats()`.
+`Intel82599.dev:get_rxstats()` and `Intel82599.dev:get_txstats()`.
 
 — Key **rate_limit**
 
@@ -105,70 +105,17 @@ Note that even a low-priority app can use the whole line rate unless other
 
 ### Performance
 
-The `Intel10G` app can transmit and receive at approximately 10 Mpps per
+The `Intel82599` app can transmit and receive at approximately 10 Mpps per
 processor core.
 
 ### Hardware limits
 
 Each physical Intel 82599 port supports the use of up to:
 
-* 64 *pools* (virtualized `Intel10G` app instances)
+* 64 *pools* (virtualized `Intel82599` app instances)
 * 127 MAC addresses (see the `macaddr` configuration option)
 * 64 VLANs (see the `vlan` configuration option)
 * 4 *mirror pools* (see the `mirror` configuration option)
-
-## Intel1G (apps.intel.intel1g.intel1g)
-
-The `intel1g` app drives one port of an Intel Gigabit Ethernet
-controller.
-
-Hardware support:
-- Intel i210, i350 (in progress)
-
-Features:
-- Optionally attach to a pre-initialized NIC.
-- Optionally use specific TX and RX queue numbers (or none).
-- Configuration and statistics registers are mirrored to shared memory objects (NYI).
-- Receive and transmit links are optional and can have any name.
-
-    DIAGRAM: Intel1g
-              +----------+
-              |          |
-         -=-->* Intel1g  *--=->
-              |          |
-              +----------+
-
-### Configuration
-
-— Key **pciaddr**
-
-*Required*. The PCI address of the NIC as a string.
-
-— Key **attach**
-
-*Optional*. True means attach to a transmit and/or receive queue of an already-initialized NIC.
-
-— Key **txq**
-
-*Optional*. Transmit queue number to use. `false` means no transmit function. Default: 0.
-
-— Key **rxq**
-
-*Optional*. Receive queue number to use. `false` means no receive function. Default: 0.
-
-— Key **ndesc**
-
-*Optional*. Number of DMA descriptors to use i.e. size of the DMA
-transmit and receive queues. Must be a multiple of 128. Default is not 
-specified but assumed to be broadly applicable.
-
-— Key **rxburst**
-
-*Optional*. Maximum number of packets to receive on one
-breath. Default is not specified but assumed to be broadly applicable.
-
-+— Key **loopback**
-*Optional*. Set to `"MAC"` for MAC loopback, or to `"PHY"` for PHY loopback modes.
 
 ## LoadGen (apps.intel.loadgen)
 

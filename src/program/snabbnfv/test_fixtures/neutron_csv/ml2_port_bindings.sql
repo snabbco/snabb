@@ -24,15 +24,11 @@ CREATE TABLE `ml2_port_bindings` (
   `port_id` varchar(36) NOT NULL,
   `host` varchar(255) NOT NULL,
   `vif_type` varchar(64) NOT NULL,
-  `driver` varchar(64) DEFAULT NULL,
-  `segment` varchar(36) DEFAULT NULL,
   `vnic_type` varchar(64) NOT NULL DEFAULT 'normal',
-  `vif_details` varchar(4095) NOT NULL DEFAULT '',
   `profile` varchar(4095) NOT NULL DEFAULT '',
+  `vif_details` varchar(4095) NOT NULL DEFAULT '',
   PRIMARY KEY (`port_id`),
-  KEY `segment` (`segment`),
   CONSTRAINT `ml2_port_bindings_ibfk_1` FOREIGN KEY (`port_id`) REFERENCES `ports` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `ml2_port_bindings_ibfk_2` FOREIGN KEY (`segment`) REFERENCES `ml2_network_segments` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

@@ -75,7 +75,13 @@ local function retiter(ret, err, array)
 end
 
 -- generic system calls
-function S.close(fd) return retbool(C.close(getfd(fd))) end
+function S.close(fd)
+  if fd == getfd(fd) then -- fd number
+    return retbool(C.close(getfd(fd)))
+  else                    -- fd object: avoid mulitple close
+    return fd:close()
+  end
+end
 function S.chdir(path) return retbool(C.chdir(path)) end
 function S.fchdir(fd) return retbool(C.fchdir(getfd(fd))) end
 function S.fchmod(fd, mode) return retbool(C.fchmod(getfd(fd), c.MODE[mode])) end
@@ -734,6 +740,7 @@ if C.getdents then
     buf = buf or t.buffer(size)
     local ret, err = C.getdents(getfd(fd), buf, size)
     if ret == -1 then return nil, t.error(err or errno()) end
+    if ret == 0 then return nil, nil end
     return t.dirents(buf, ret)
   end
 end

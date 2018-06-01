@@ -1,7 +1,7 @@
 return {
   {
-    rx_police_gbps = 3,
     stateful_filter = true,
+    tx_police = 1,
     vlan = 243,
     ingress_filter = "((arp or ip) or ip6)",
     egress_filter = "(ip6 or (arp or ip))",
@@ -16,6 +16,6 @@ return {
       remote_ip = "1:2:3:4:5:6:7:8",
     },
     port_id = "523276c7-73e3-4154-8b67-9c7199bdbb8c",
-    tx_police_gbps = 1,
+    rx_police = 3,
   },
 }

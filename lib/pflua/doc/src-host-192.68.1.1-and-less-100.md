@@ -77,6 +77,34 @@ return function(P,length)
 ::L7::
    return false
 end
+```
 
+## Native pflang compilation
+
+```
+7f09d5ee8000  4883FE22          cmp rsi, +0x22
+7f09d5ee8004  7C42              jl 0x7f09d5ee8048
+7f09d5ee8006  0FB7470C          movzx eax, word [rdi+0xc]
+7f09d5ee800a  4883F808          cmp rax, +0x08
+7f09d5ee800e  750E              jnz 0x7f09d5ee801e
+7f09d5ee8010  8B4F1A            mov ecx, [rdi+0x1a]
+7f09d5ee8013  4881F9C0440101    cmp rcx, 0x010144c0
+7f09d5ee801a  7426              jz 0x7f09d5ee8042
+7f09d5ee801c  EB2A              jmp 0x7f09d5ee8048
+7f09d5ee801e  4883FE2A          cmp rsi, +0x2a
+7f09d5ee8022  7C24              jl 0x7f09d5ee8048
+7f09d5ee8024  4881F808060000    cmp rax, 0x608
+7f09d5ee802b  7409              jz 0x7f09d5ee8036
+7f09d5ee802d  4881F880350000    cmp rax, 0x3580
+7f09d5ee8034  7512              jnz 0x7f09d5ee8048
+7f09d5ee8036  8B471C            mov eax, [rdi+0x1c]
+7f09d5ee8039  4881F8C0440101    cmp rax, 0x010144c0
+7f09d5ee8040  7506              jnz 0x7f09d5ee8048
+7f09d5ee8042  4883FE64          cmp rsi, +0x64
+7f09d5ee8046  7E03              jle 0x7f09d5ee804b
+7f09d5ee8048  B000              mov al, 0x0
+7f09d5ee804a  C3                ret
+7f09d5ee804b  B001              mov al, 0x1
+7f09d5ee804d  C3                ret
 ```
 

@@ -2,7 +2,9 @@
 
 SKIPPED_CODE=43
 
-if [ -z "$SNABB_PCI0" ]; then echo "Need SNABB_PCI0"; exit $SKIPPED_CODE; fi
+if [ -z "$SNABB_PCI0" ]; then
+    export SNABB_PCI0=soft
+fi
 if [ -z "$SNABB_TELNET0" ]; then
     export SNABB_TELNET0=5000
     echo "Defaulting to SNABB_TELNET0=$SNABB_TELNET0"
@@ -11,17 +13,13 @@ if [ -z "$SNABB_TELNET1" ]; then
     export SNABB_TELNET1=5001
     echo "Defaulting to SNABB_TELNET1=$SNABB_TELNET1"
 fi
+if [ -z "$SNABB_IPERF_BENCH_CONF" ]; then
+    export SNABB_IPERF_BENCH_CONF=program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports
+    echo "Defaulting to SNABB_IPERF_BENCH_CONF=$SNABB_IPERF_BENCH_CONF"
+fi
 
 TESTCONFPATH="/tmp/snabb_nfv_selftest_ports.$$"
 FUZZCONFPATH="/tmp/snabb_nfv_selftest_fuzz$$.ports"
-
-# Usage: run_telnet <port> <command> [<sleep>]
-# Runs <command> on VM listening on telnet <port>. Waits <sleep> seconds
-# for before closing connection. The default of <sleep> is 2.
-function run_telnet {
-    (echo "$2"; sleep ${3:-2}) \
-        | telnet localhost $1 2>&1
-}
 
 # Usage: agrep <pattern>
 # Like grep from standard input except that if <pattern> doesn't match
@@ -79,25 +77,6 @@ function cleanup {
 
 # Set up graceful `exit'.
 trap cleanup EXIT HUP INT QUIT TERM
-
-# Usage: wait_vm_up <port>
-# Blocks until ping to 0::0 suceeds.
-function wait_vm_up {
-    local timeout_counter=0
-    local timeout_max=50
-    echo -n "Waiting for VM listening on telnet port $1 to get ready..."
-    while ( ! (run_telnet $1 "ping6 -c 1 0::0" | grep "1 received" \
-        >/dev/null) ); do
-        # Time out eventually.
-        if [ $timeout_counter -gt $timeout_max ]; then
-            echo " [TIMEOUT]"
-            exit 1
-        fi
-        timeout_counter=$(expr $timeout_counter + 1)
-        sleep 2
-    done
-    echo " [OK]"
-}
 
 function assert {
     if [ $2 == "0" ]; then echo "$1 succeded."
@@ -288,10 +267,21 @@ function filter_tests {
     assert FILTER $?
 }
 
-# Usage: iperf_bench [<mode>]
+function crypto_tests {
+    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/crypto.ports
+
+    test_ping $SNABB_TELNET0 "$(ip 1)%eth0"
+    test_iperf $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0"
+    test_jumboping $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0"
+    # Repeat iperf test now that jumbo frames are enabled
+    test_iperf $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0"
+}
+
+# Usage: iperf_bench [<mode>] [<config>]
 # Run iperf benchmark. If <mode> is "jumbo", jumboframes will be enabled.
+# <config> defaults to same_vlan.ports.
 function iperf_bench {
-    load_config program/snabbnfv/test_fixtures/nfvconfig/test_functions/same_vlan.ports    
+    load_config "$SNABB_IPERF_BENCH_CONF"
 
     if [ "$1" = "jumbo" ]; then
         test_jumboping $SNABB_TELNET0 $SNABB_TELNET1 "$(ip 1)%eth0" \
@@ -324,7 +314,7 @@ start_test_env
 # Decide which mode to run (`test', `bench' or `fuzz').
 case $1 in
     bench)
-        iperf_bench "$2"
+        iperf_bench "$2" "$3"
         ;;
     fuzz)
         fuzz_tests "$2"
@@ -334,6 +324,7 @@ case $1 in
         rate_limited_tests
         tunnel_tests
         filter_tests
+        crypto_tests
 esac
 
 exit 0

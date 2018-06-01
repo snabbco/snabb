@@ -32,14 +32,14 @@ The current state of each branch with respect to master is visible here:
 
 #### fixes
 
-    BRANCH: fixes git://github.com/lukego/snabbswitch
+    BRANCH: fixes git://github.com/snabbco/snabb
     Test and integration branch for bug fixes.
 
     - Contains the changes for the next weekly maintenance release.
     - Merges Pull Requests that fix bugs in the latest release.
     - Generally stable.
 
-    Maintainer: Luke Gorrie <luke@snabb.co>
+    Maintainer: Max Rottenkolber <max@mr.gy>
 
 #### kbara-next
 
@@ -96,6 +96,18 @@ The current state of each branch with respect to master is visible here:
     Maintainer: Collectively maintained by lwAFTR application developers.
     Next hop: kbara-next
 
+#### luajit
+
+    BRANCH: luajit git://github.com/snabbco/luajit
+    LuaJIT v2.1 updates branch.
+
+    - Pulls changes from LuaJIT v2.1 upstream.
+    - Pulls special features & fixes needed by Snabb.
+    - Resolves conflicts due to upstream rebases of PRs.
+
+    Maintainer: Luke Gorrie <luke@snabb.co>
+    Next hop: next
+
 #### mellanox
 
     BRANCH: mellanox git://github.com/lukego/snabbswitch
@@ -145,4 +157,21 @@ The current state of each branch with respect to master is visible here:
     - Feeds upstream to kbara-next.
 
     Maintainer: Domen Kožar <domen@dev.si>
+
+#### snabbwall
+
+    BRANCH: snabbwall git://github.com/Igalia/snabb
+    Snabbwall (layer 7 firewall) application development branch.
+
+    - See snabbwall.org for more info
+
+    Maintainer: Collectively maintained by Snabbwall application developers.
+    Next hop: wingo-next
+
+#### aarch64
+
+    BRANCH: aarch64 git://github.com/jialiu02/snabb
+    Development branch for ARM aarch64 platform.
+
+    Maintainer: Jianbo Liu <jianbo.liu@linaro.org>
 

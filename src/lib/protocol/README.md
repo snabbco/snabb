@@ -7,7 +7,8 @@ protocol subclasses.
 — Method **header:new_from_mem** *memory*, *length*
 
 Creates and returns a header object by "overlaying" the respective header
-structure over *length* bytes of *memory*.
+structure over *length* bytes of *memory*. Returns `nil` if *length* is
+too small to contain the header.
 
 — Method **header:header**
 
@@ -72,11 +73,11 @@ is given the current value is returned.
 Example:
 
 ```
-local eth = ethernet:new({src = ethernet:pton("00:00:00:00"),
-                          dst = ethernet:pton("00:00:00:00"),
+local eth = ethernet:new({src = ethernet:pton("00:00:00:00:00:00"),
+                          dst = ethernet:pton("00:00:00:00:00:00"),
                           type = 0x86dd})
-eth:dst(ethernet:pton("54:52:00:01"))
-ethernet:ntop(eth:dst()) => "54:52:00:01"
+eth:dst(ethernet:pton("54:52:00:01:00:00"))
+ethernet:ntop(eth:dst()) => "54:52:00:01:00:00"
 ```
 
 — Method **ethernet:src_eq** *mac*
@@ -97,6 +98,14 @@ Returns the binary representation of MAC address denoted by *string*.
 — Function **ethernet:ntop** *mac*
 
 Returns the string representation of *mac* address.
+
+— Function **ethernet:is_mcast** *mac*
+
+Returns a true value if *mac* address denotes a [Multicast address](https://en.wikipedia.org/wiki/Multicast_address#Ethernet).
+
+— Function **ethernet:is_bcast** *mac*
+
+Returns a true value if *mac* address denotes a [Broadcast address](https://en.wikipedia.org/wiki/Broadcast_address#Ethernet).
 
 — Function **ethernet:ipv6_mcast** *ip*
 
@@ -241,7 +250,7 @@ the current value is returned.
 — Method **ipv6:version** *version*
 
 Combined accessor and setter method for the version field (4 bit unsigned
-integer). Defaults to 4 (set automatically by `new`). Sets the "Version"
+integer). Defaults to 6 (set automatically by `new`). Sets the "Version"
 field to *version*. If no argument is given the current value is returned.
 
 — Method **ipv6:dscp** *dscp*
@@ -804,9 +813,7 @@ If *pointer* and *length* are supplied then *length* bytes starting from
 
 — Method **datagram:data**
 
-Returns the location and size of the buffer of the underlying packet.
-This is a shortcut to *datagram:packet* followed by calls to
-*packet.data* and *pakcet.length*.
+Returns `data` and `length` of the underlying packet.
 
 - Method **datagram:commit**
 
