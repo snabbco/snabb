@@ -73,7 +73,7 @@ The `crypto` section allows configuration of traffic encryption based on
 
 ```
 crypto := { type          = "esp-aes-128-gcm", -- The only type (for now)
-            spi           = <spi>,             -- As for AES128gcm
+            spi           = <spi>,             -- As for apps.ipsec.esp
             transmit_key  = <key>,
             transmit_salt = <salt>,
             receive_key   = <key>,
