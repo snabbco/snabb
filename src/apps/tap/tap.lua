@@ -249,6 +249,6 @@ function selftest()
    config.link(c, "source.output->tap_in.input")
    config.link(c, "tap_out.output->match.rx")
    engine.configure(c)
-   engine.main({duration = 0.01, report = {showapps=true,showlinks=true}})
+   engine.main({duration = 0.05, report = {showapps=true,showlinks=true}})
    assert(#engine.app_table.match:errors() == 0)
 end
