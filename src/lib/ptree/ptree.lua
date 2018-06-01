@@ -322,8 +322,10 @@ local function archive_counter (name)
    local val = counter.read(c)
    counter.delete(name)
    counters.active[name] = nil
-   counters.archived[name] = counters.archived[name] and counter.set(name, val)
-                                                     or counter.create(name, val)
+   if not counters.archived[name] then
+      counters.archived[name] = ffi.new("uint64_t[1]")
+   end
+   counters.archived[name][0] = counters.archived[name][0] + val
 end
 local function create_or_update_counter (worker_pid, name)
    local aggregated = name:gsub(worker_pid, S.getpid())
