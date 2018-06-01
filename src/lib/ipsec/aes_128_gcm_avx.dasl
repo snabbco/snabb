@@ -1,3 +1,5 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
 -- Selected AES GCM routines, based heavily on the Intel IPsec code from:
 -- https://github.com/lukego/intel-ipsec/blob/master/code/avx2/gcm_avx_gen4.asm
 -- https://github.com/lukego/intel-ipsec/blob/master/code/gcm_defines.asm

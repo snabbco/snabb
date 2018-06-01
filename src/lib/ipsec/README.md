@@ -6,6 +6,8 @@ transport modes. Currently, the only supported cipher is AES-GCM with 128‑bit
 keys, 4 bytes of salt, and a 16 byte authentication code. These classes do not
 implement any key exchange protocol.
 
+Note: the classes in this module do not reject IP fragments of any sort.
+
 References:
 
 - [IPsec Wikipedia page](https://en.wikipedia.org/wiki/IPsec).
@@ -40,7 +42,8 @@ be a table with the following keys:
   default is 8. (`decrypt` only.)
 * `auditing` - *Optional.* A boolean value indicating whether to enable or
   disable “Auditing” as specified in RFC 4303. The default is `nil` (no
-  auditing). (`decrypt` only.)
+  auditing). (`decrypt` only. Note: source address, destination address and
+  flow ID are only logged when using `decapsulate_transport6`.)
 
 #### Tunnel mode
 

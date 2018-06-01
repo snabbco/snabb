@@ -1,4 +1,7 @@
-module(..., package.seeall)
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(...,package.seeall)
+
 local ffi = require("ffi")
 local C = ffi.C
 local ASM = require("lib.ipsec.aes_128_gcm_avx")

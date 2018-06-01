@@ -359,7 +359,7 @@ function esp (npackets, packet_size, mode, direction, profile)
    ip:payload_length(payload_size)
    d:payload(payload, payload_size)
    d:push(ip)
-   if not mode == "tunnel" then
+   if not (mode == "tunnel") then
       local eth = ethernet:new({type=0x86dd})
       d:push(eth)
    end
@@ -372,7 +372,7 @@ function esp (npackets, packet_size, mode, direction, profile)
    local encap, decap
    if mode == "tunnel" then
       encap = function (p) return enc:encapsulate_tunnel(p, 41) end
-      decap = function (p) return dec:decapsulate_tunnel(p) end
+      decap = function (p) return (dec:decapsulate_tunnel(p))   end
    else
       encap = function (p) return enc:encapsulate_transport6(p) end
       decap = function (p) return dec:decapsulate_transport6(p) end

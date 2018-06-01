@@ -1,3 +1,7 @@
+-- Use of this source code is governed by the Apache 2.0 license; see COPYING.
+
+module(...,package.seeall)
+
 -- Implementation of IPsec ESP using AES-GCM with 128-bit keys, 16 byte ICV and
 -- “Extended Sequence Numbers” (see RFC 4303 and RFC 4106). Provides
 -- address-family independent encapsulation/decapsulation routines for “tunnel
@@ -9,21 +13,15 @@
 --    it is assumed to be an unrealistic scenario as it would take 584 years to
 --    overflow the counter when transmitting 10^9 packets per second.
 --
---  * decapsulate_transport6: Rejection of IP fragments is *not* implemented
---    because `lib.protocol.ipv6' does not support fragmentation. E.g.
---    fragments will be rejected because they can not be parsed as IPv6
---    packets. If however `lib.protocol.ipv6' were to be updated to be able to
---    parse IP fragments this implementation would have to be updated as well
---    to remain correct. See the “Reassembly” section of RFC 4303 for details:
+--  * IP fragments are *not* rejected by the routines in this library, and are
+--    expected to be handled prior to encapsulation/decapsulation.
+--    See the “Reassembly” section of RFC 4303 for details:
 --    https://tools.ietf.org/html/rfc4303#section-3.4.1
---
-module(..., package.seeall)
+
 local header = require("lib.protocol.header")
 local datagram = require("lib.protocol.datagram")
 local ethernet = require("lib.protocol.ethernet")
 local ipv6 = require("lib.protocol.ipv6")
-local esp = require("lib.protocol.esp")
-local esp_tail = require("lib.protocol.esp_tail")
 local aes_128_gcm = require("lib.ipsec.aes_128_gcm")
 local seq_no_t = require("lib.ipsec.seq_no_t")
 local lib = require("core.lib")
@@ -31,15 +29,36 @@ local ffi = require("ffi")
 local C = ffi.C
 local logger = lib.logger_new({ rate = 32, module = 'esp' })
 
+local htons, htonl, ntohl = lib.htons, lib.htonl, lib.ntohl
+
 require("lib.ipsec.track_seq_no_h")
 local window_t = ffi.typeof("uint8_t[?]")
 
 PROTOCOL = 50 -- https://tools.ietf.org/html/rfc4303#section-2
 
+local ipv6_ptr_t = ffi.typeof("$ *", ipv6:ctype())
+local function ipv6_fl (ip) return bit.lshift(ntohl(ip.v_tc_fl), 12) end
+
+local esp_header_t = ffi.typeof(
+   [[struct {
+      uint32_t spi;
+      uint32_t seq_no;
+   } __attribute__((packed))]]
+)
+local esp_header_ptr_t = ffi.typeof("$ *", esp_header_t)
+
+local esp_trailer_t = ffi.typeof(
+   [[struct {
+      uint8_t pad_length;
+      uint8_t next_header;
+   } __attribute__((packed))]]
+)
+local esp_trailer_ptr_t = ffi.typeof("$ *", esp_trailer_t)
+
 local ETHERNET_SIZE = ethernet:sizeof()
 local IPV6_SIZE = ipv6:sizeof()
-local ESP_SIZE = esp:sizeof()
-local ESP_TAIL_SIZE = esp_tail:sizeof()
+local ESP_SIZE = ffi.sizeof(esp_header_t)
+local ESP_TAIL_SIZE = ffi.sizeof(esp_trailer_t)
 
 local TRANSPORT6_PAYLOAD_OFFSET = ETHERNET_SIZE + IPV6_SIZE
 
@@ -56,10 +75,7 @@ function esp_new (conf)
       cipher = aes_128_gcm:new(conf.spi, conf.key, conf.salt),
       spi = conf.spi,
       seq = ffi.new(seq_no_t),
-      pad_to = 4, -- minimal padding
-      esp = esp:new({}),
-      esp_tail = esp_tail:new({}),
-      ip = ipv6:new({}) -- for transport mode
+      pad_to = 4 -- minimal padding
    }
 
    o.ESP_CTEXT_OVERHEAD = o.cipher.IV_SIZE + ESP_TAIL_SIZE
@@ -85,9 +101,9 @@ function encrypt:padding (length)
 end
 
 function encrypt:encode_esp_trailer (ptr, next_header, pad_length)
-   self.esp_tail:new_from_mem(ptr, ESP_TAIL_SIZE)
-   self.esp_tail:next_header(next_header)
-   self.esp_tail:pad_length(pad_length)
+   local esp_trailer = ffi.cast(esp_trailer_ptr_t, ptr)
+   esp_trailer.next_header = next_header
+   esp_trailer.pad_length = pad_length
 end
 
 function encrypt:encrypt_payload (ptr, length)
@@ -97,9 +113,9 @@ function encrypt:encrypt_payload (ptr, length)
 end
 
 function encrypt:encode_esp_header (ptr)
-   self.esp:new_from_mem(ptr, ESP_SIZE)
-   self.esp:spi(self.spi)
-   self.esp:seq_no(self.seq:low())
+   local esp_header = ffi.cast(esp_header_ptr_t, ptr)
+   esp_header.spi = htonl(self.spi)
+   esp_header.seq_no = htonl(self.seq:low())
    ffi.copy(ptr + ESP_SIZE, self.seq, self.cipher.IV_SIZE)
 end
 
@@ -112,16 +128,16 @@ end
 function encrypt:encapsulate_transport6 (p)
    if p.length < TRANSPORT6_PAYLOAD_OFFSET then return nil end
 
+   local ip = ffi.cast(ipv6_ptr_t, p.data + ETHERNET_SIZE)
+
    local payload = p.data + TRANSPORT6_PAYLOAD_OFFSET
    local payload_length = p.length - TRANSPORT6_PAYLOAD_OFFSET
    local pad_length = self:padding(payload_length)
    local overhead = self.ESP_OVERHEAD + pad_length
    p = packet.resize(p, p.length + overhead)
 
-   self.ip:new_from_mem(p.data + ETHERNET_SIZE, IPV6_SIZE)
-
    local tail = payload + payload_length + pad_length
-   self:encode_esp_trailer(tail, self.ip:next_header(), pad_length)
+   self:encode_esp_trailer(tail, ip.next_header, pad_length)
 
    local ctext_length = payload_length + pad_length + ESP_TAIL_SIZE
    self:encrypt_payload(payload, ctext_length)
@@ -131,8 +147,8 @@ function encrypt:encapsulate_transport6 (p)
 
    self:encode_esp_header(payload)
 
-   self.ip:next_header(PROTOCOL)
-   self.ip:payload_length(payload_length + overhead)
+   ip.next_header = PROTOCOL
+   ip.payload_length = htons(payload_length + overhead)
 
    return p
 end
@@ -190,14 +206,14 @@ function decrypt:new (conf)
    return setmetatable(o, {__index=decrypt})
 end
 
-function decrypt:decrypt_payload (ptr, length)
+function decrypt:decrypt_payload (ptr, length, ip)
    -- NB: bounds check is performed by caller
-   local esp = self.esp:new_from_mem(ptr, esp:sizeof())
+   local esp_header = ffi.cast(esp_header_ptr_t, ptr)
    local iv_start = ptr + ESP_SIZE
    local ctext_start = ptr + self.CTEXT_OFFSET
    local ctext_length = length - self.PLAIN_OVERHEAD
 
-   local seq_low = esp:seq_no()
+   local seq_low = ntohl(esp_header.seq_no)
    local seq_high = tonumber(
       C.check_seq_no(seq_low, self.seq.no, self.window, self.window_size)
    )
@@ -217,7 +233,7 @@ function decrypt:decrypt_payload (ptr, length)
    end
 
    if error then
-      self:audit(error)
+      self:audit(error, ntohl(esp_header.spi), seq_low, ip)
       return nil
    end
 
@@ -226,12 +242,11 @@ function decrypt:decrypt_payload (ptr, length)
       seq_high, seq_low, self.seq.no, self.window, self.window_size
    )
 
-   local esp_tail_start = ctext_start + ctext_length - ESP_TAIL_SIZE
-   self.esp_tail:new_from_mem(esp_tail_start, ESP_TAIL_SIZE)
+   local esp_trailer_start = ctext_start + ctext_length - ESP_TAIL_SIZE
+   local esp_trailer = ffi.cast(esp_trailer_ptr_t, esp_trailer_start)
 
-   local ptext_length =
-      ctext_length - self.esp_tail:pad_length() - ESP_TAIL_SIZE
-   return ctext_start, ptext_length
+   local ptext_length = ctext_length - esp_trailer.pad_length - ESP_TAIL_SIZE
+   return ctext_start, ptext_length, esp_trailer.next_header
 end
 
 -- Decapsulation in transport mode is performed as follows:
@@ -243,18 +258,18 @@ end
 function decrypt:decapsulate_transport6 (p)
    if p.length - TRANSPORT6_PAYLOAD_OFFSET < self.MIN_SIZE then return nil end
 
-   self.ip:new_from_mem(p.data + ETHERNET_SIZE, IPV6_SIZE)
+   local ip = ffi.cast(ipv6_ptr_t, p.data + ETHERNET_SIZE)
 
    local payload = p.data + TRANSPORT6_PAYLOAD_OFFSET
    local payload_length = p.length - TRANSPORT6_PAYLOAD_OFFSET
 
-   local ptext_start, ptext_length =
-      self:decrypt_payload(payload, payload_length)
+   local ptext_start, ptext_length, next_header =
+      self:decrypt_payload(payload, payload_length, ip)
 
    if not ptext_start then return nil end
 
-   self.ip:next_header(self.esp_tail:next_header())
-   self.ip:payload_length(ptext_length)
+   ip.next_header = next_header
+   ip.payload_length = htons(ptext_length)
 
    C.memmove(payload, ptext_start, ptext_length)
    p = packet.resize(p, TRANSPORT6_PAYLOAD_OFFSET + ptext_length)
@@ -273,27 +288,28 @@ end
 function decrypt:decapsulate_tunnel (p)
    if p.length < self.MIN_SIZE then return nil end
 
-   local ptext_start, ptext_length = self:decrypt_payload(p.data, p.length)
+   local ptext_start, ptext_length, next_header =
+      self:decrypt_payload(p.data, p.length)
 
    if not ptext_start then return nil end
 
    p = packet.shiftleft(p, self.CTEXT_OFFSET)
    p = packet.resize(p, ptext_length)
 
-   return p, self.esp_tail:next_header()
+   return p, next_header
 end
 
-function decrypt:audit (reason)
+function decrypt:audit (reason, spi, seq, ip)
    if not self.auditing then return end
-   -- This is the information RFC4303 says we SHOULD log
-   logger:log("Rejecting packet (" ..
-              "SPI=" .. self.spi .. ", " ..
-              "src_addr='" .. self.ip:ntop(self.ip:src()) .. "', " ..
-              "dst_addr='" .. self.ip:ntop(self.ip:dst()) .. "', " ..
-              "seq_low=" .. self.esp:seq_no() .. ", " ..
-              "flow_id=" .. self.ip:flow_label() .. ", " ..
-              "reason='" .. reason .. "'" ..
-              ")")
+   -- The information RFC4303 says we SHOULD log:
+   logger:log(("Rejected packet (spi=%d, seq=%d, "
+                  .."src_ip=%s, dst_ip=%s, flow_id=0x%x, "
+                  .."reason=%q)")
+         :format(spi, seq,
+                 ip and ipv6:ntop(ip.src_ip) or "unknown",
+                 ip and ipv6:ntop(ip.dst_ip) or "unknown",
+                 ip and ipv6_fl(ip) or 0,
+                 reason))
 end
 
 function decrypt:resync (ptr, length, seq_low, seq_high)
@@ -334,7 +350,7 @@ function selftest ()
                   key = "00112233445566778899AABBCCDDEEFF",
                   salt = "00112233",
                   resync_threshold = 16,
-                  resync_attempts = 8}
+                  resync_attempts = 8 }
    local enc, dec = encrypt:new(conf), decrypt:new(conf)
    local payload = packet.from_string(
 [[abcdefghijklmnopqrstuvwxyz
@@ -417,10 +433,12 @@ ABCDEFGHIJKLMNOPQRSTUVWXYZ
       enc.seq.no = 2^32
       dec.seq.no = 2^32 + dec.window_size + 1
       local px = op.encap(packet.clone(p))
+      dec.auditing = true
       assert(not op.decap(px),
              "Accepted out of window Sequence Number.")
       assert(dec.seq:high() == 1 and dec.seq:low() == dec.window_size+1,
              "Corrupted Sequence Number.")
+      dec.auditing = false
       -- Test anti-replay: From a set of 15 packets, first send all those
       -- that have an even sequence number.  Then, send all 15.  Verify that
       -- in the 2nd run, packets with even sequence numbers are rejected while
