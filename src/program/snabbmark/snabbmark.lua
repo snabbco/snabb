@@ -11,6 +11,14 @@ local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 
+local pmu = require('lib.pmu')
+local has_pmu_counters, err = pmu.is_available()
+if not has_pmu_counters then
+   io.stderr:write('No PMU available: '..err..'\n')
+else
+   pmu.setup()
+end
+
 function run (args)
    local command = table.remove(args, 1)
    if command == 'basic1' and #args == 1 then
@@ -371,9 +379,16 @@ function esp (npackets, packet_size, mode, direction, profile)
    end
    if direction == "encapsulate" then
       if profile then profiler.start(profile) end
+      local function test_encapsulate ()
+         for i = 1, npackets do
+            packet.free(encap(packet.clone(plain)))
+         end
+      end
       local start = C.get_monotonic_time()
-      for i = 1, npackets do
-         packet.free(encap(packet.clone(plain)))
+      if has_pmu_counters then
+         pmu.profile(test_encapsulate)
+      else
+         test_encapsulate()
       end
       local finish = C.get_monotonic_time()
       if profile then profiler.stop() end
@@ -382,12 +397,19 @@ function esp (npackets, packet_size, mode, direction, profile)
             :format(packet_size, gbits(bps)))
    else
       local encapsulated = encap(packet.clone(plain))
+      local function test_decapsulate ()
+         for i = 1, npackets do
+            packet.free(decap(packet.clone(encapsulated)))
+            dec.seq.no = 0
+            dec.window[0] = 0
+         end
+      end
       if profile then profiler.start(profile) end
       local start = C.get_monotonic_time()
-      for i = 1, npackets do
-         packet.free(decap(packet.clone(encapsulated)))
-         dec.seq.no = 0
-         dec.window[0] = 0
+      if has_pmu_counters then
+         pmu.profile(test_decapsulate)
+      else
+         test_decapsulate()
       end
       local finish = C.get_monotonic_time()
       if profile then profiler.stop() end
@@ -396,14 +418,6 @@ function esp (npackets, packet_size, mode, direction, profile)
             :format(packet_size, gbits(bps)))
    end
 end
-
-local pmu = require('lib.pmu')
-local has_pmu_counters, err = pmu.is_available()
-if not has_pmu_counters then
-   io.stderr:write('No PMU available: '..err..'\n')
-end
-
-if has_pmu_counters then pmu.setup() end
 
 local function measure(f, iterations)
    local set
