@@ -33,7 +33,11 @@ local named_program_root = shm.root .. "/" .. "by-name"
 program_name = false
 
 -- Auditlog state
-local auditlog_enabled = false
+auditlog_enabled = false
+function enable_auditlog ()
+   jit.auditlog(shm.path("audit.log"))
+   auditlog_enabled = true
+end
 
 -- The set of all active apps and links in the system, indexed by name.
 app_table, link_table = {}, {}
@@ -89,7 +93,7 @@ local function getvmprofile (name)
    return vmprofiles[name]
 end
 
-local function setvmprofile (name)
+function setvmprofile (name)
    C.vmprofile_set_profile(getvmprofile(name))
 end
 
@@ -497,8 +501,7 @@ function main (options)
 
    -- Enable auditlog
    if not auditlog_enabled then
-      jit.auditlog(shm.path("audit.log"))
-      auditlog_enabled = true
+      enable_auditlog()
    end
 
    -- Setup vmprofile
