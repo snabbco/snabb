@@ -75,10 +75,11 @@ function parse_args(args)
       ring_buffer_size = tonumber(arg)
    end
    handlers["on-a-stick"] = function(arg)
-      opts["on-a-stick"] = true
-      v4 = arg
-      if not nic_exists(v4) then
-         fatal(("Couldn't locate NIC with PCI address '%s'"):format(v4))
+      if lib.is_iface(arg) or nic_exists(arg) then
+         v4 = arg
+         opts['on-a-stick'] = arg
+      else
+         fatal(("Couldn't locate NIC with PCI address '%s'"):format(arg))
       end
    end
    handlers["mirror"] = function (ifname)
@@ -153,23 +154,31 @@ function run(args)
    local function setup_fn(graph, lwconfig)
       -- If --virtio has been specified, always use this.
       if opts.virtio_net then
-	 return setup_fn(graph, lwconfig, 'inetNic', 'b4sideNic')
+         return setup_fn(graph, lwconfig, 'inetNic', 'b4sideNic')
       end
 
       -- If instance has external-interface.device configure as bump-in-the-wire
       -- otherwise configure it in on-a-stick mode.
       local device, id, queue = lwutil.parse_instance(lwconfig)
       if queue.external_interface.device then
-	 return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
-			       opts.ring_buffer_size)
+         if lib.is_iface(queue.external_interface.device) then
+            return setup.load_kernel_iface(graph, lwconfig, 'inetNic', 'b4sideNic')
+         else
+            return setup.load_phy(graph, lwconfig, 'inetNic', 'b4sideNic',
+                                  opts.ring_buffer_size)
+         end
       else
-	 local use_splitter = requires_splitter(opts, lwconfig)
-	 local options = {
-	    v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
-	    v4v6 = use_splitter and 'v4v6', mirror = opts.mirror,
-	    ring_buffer_size = opts.ring_buffer_size
-	 }
-	 return setup.load_on_a_stick(graph, lwconfig, options)
+         local use_splitter = requires_splitter(opts, lwconfig)
+         local options = {
+            v4_nic_name = 'inetNic', v6_nic_name = 'b4sideNic',
+            v4v6 = use_splitter and 'v4v6', mirror = opts.mirror,
+            ring_buffer_size = opts.ring_buffer_size
+         }
+         if lib.is_iface(opts['on-a-stick']) then
+            return setup.load_on_a_stick_kernel_iface(graph, lwconfig, options)
+         else
+            return setup.load_on_a_stick(graph, lwconfig, options)
+         end
       end
    end
 

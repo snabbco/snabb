@@ -801,6 +801,17 @@ function set(...)
    return ret
 end
 
+-- Check if 'name' is a kernel network interface.
+function is_iface (name)
+   local f = io.open('/proc/net/dev')
+   for line in f:lines() do
+      local iface = line:match("^%s*(%w+):")
+      if iface and iface == name then f:close() return true end
+   end
+   f:close()
+   return false
+end
+
 function selftest ()
    print("selftest: lib")
    print("Testing equal")
