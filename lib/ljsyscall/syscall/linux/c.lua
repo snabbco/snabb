@@ -171,7 +171,7 @@ else -- 64 bit
   function C.fstatfs(fd, buf) return syscall(sys.fstatfs, int(fd), void(buf)) end
   function C.preadv(fd, iov, iovcnt, offset) return syscall_long(sys.preadv, int(fd), void(iov), long(iovcnt), ulong(offset)) end
   function C.pwritev(fd, iov, iovcnt, offset) return syscall_long(sys.pwritev, int(fd), void(iov), long(iovcnt), ulong(offset)) end
-  function C.lseek(fd, offset, whence) return syscall_off(sys.lseek, int(fd), ulong(offset), int(whence)) end
+  function C.lseek(fd, offset, whence) return syscall_off(sys.lseek, int(fd), long(offset), int(whence)) end
   function C.sendfile(outfd, infd, offset, count)
     return syscall_long(sys.sendfile, int(outfd), int(infd), void(offset), ulong(count))
   end
