@@ -160,6 +160,7 @@ function allocate_huge_page (size,  persistent)
    else
       assert(syscall.unlink(tmpfile))
    end
+   syscall.munmap(tmpptr, size)
    syscall.close(fd)
    return ptr, filename
 end
