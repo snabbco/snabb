@@ -119,7 +119,7 @@ function benchmark_results { echo $tmpdir/$1_benchmarks; }
 function benchmark_target1 {
     git checkout --force $(target_head $1) \
         && build \
-        && dock_make benchmarks > $(benchmark_results $1)
+        && dock_make benchmarks > $(benchmark_results $(pull_request_target $1))
 }
 function benchmark_target { benchmark_target1 $1 >/dev/null 2>&1; }
 
@@ -146,7 +146,7 @@ function check_for_performance_regressions {
     dock_make benchmarks > $(benchmark_results pr)
     for bench in $(cut -d " " -f 1 $(benchmark_results pr)); do
         if grep $bench $(benchmark_results current) >/dev/null 2>&1; then
-            echo $(grep "$bench " $(benchmark_results current)) \
+            echo $(grep "$bench " $(benchmark_results $1)) \
                  $(grep "$bench " $(benchmark_results pr)) \
                 | awk '
 BEGIN {
@@ -228,7 +228,7 @@ for id in $(pull_request_ids); do
             || benchmark_target $id
         log_header $id
         if merge_pr_with_target $id; then
-            check_for_performance_regressions $id
+            check_for_performance_regressions $(pull_request_target $id)
             check_test_suite
         fi) 2>&1 > $(pull_request_log $id)
     [ ! -z "$GITHUB_CREDENTIALS" ] || continue
