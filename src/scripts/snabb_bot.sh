@@ -117,14 +117,16 @@ function log_header {
 function benchmark_results { echo $tmpdir/$1_benchmarks; }
 
 function benchmark_target1 {
-    git checkout --force $(target_head $1) \
+    git clean -f -f \
+        && git checkout --force $(target_head $1) \
         && build \
         && dock_make benchmarks > $(benchmark_results $(pull_request_target $1))
 }
 function benchmark_target { benchmark_target1 $1 >/dev/null 2>&1; }
 
 function merge_pr_with_target1 {
-    git fetch origin pull/$1/head:pr$1 \
+    git clean -f -f \
+        && git fetch origin pull/$1/head:pr$1 \
         && git checkout --force pr$1 \
         && git merge $(target_head $1) \
         && build
@@ -134,6 +136,7 @@ function merge_pr_with_target {
     if [ "$?" != 0 ]; then
         echo "ERROR: Failed to build $1"
         echo "$out"
+        git status
         echo
         return 1
     fi
