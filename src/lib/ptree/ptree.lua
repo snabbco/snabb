@@ -335,7 +335,8 @@ end
 -- accumulative sum.  Accumulative sum is initialized to aggregated counter
 -- value if any.
 local function compute_aggregated_value (k)
-   local ret = counters.archived[k][0] or 0
+   if not counters.archived[k] then return 0 end
+   local ret = counters.archived[k][0]
    for _,c in pairs(counters.active[k]) do
       ret = ret + counter.read(c)
    end
