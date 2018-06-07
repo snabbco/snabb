@@ -16,6 +16,8 @@ function normalize_id(id)
    return id:gsub('[^%w_]', '_')
 end
 
+local path_data = require('lib.yang.path_data')
+
 -- Helper for parsing C type declarations.
 local function parse_type(str, start, is_member)
    local function err(msg, pos)
@@ -1492,6 +1494,94 @@ function print_data_for_schema(schema, data, file, is_config)
    return data_printer_from_schema(schema, is_config)(data, file)
 end
 
+function consistency_checker_from_grammar(grammar)
+   -- Returns the corresponding data path for a grammar node.
+   local function data_path (root, node)
+      local ret = {}
+      local function visit (root)
+         for k,v in pairs(root) do
+            if k == 'members' then
+               visit(v)
+            elseif v.members then
+               table.insert(ret, k)
+               visit(v.members)
+            elseif root == node then
+               table.insert(ret, k)
+               return
+            end
+         end
+      end
+      visit(root)
+      return ret
+   end
+   -- Converts a relative path to an absolute path.
+   local function to_absolute_path (path, node)
+      local path_to_node = data_path(grammar, node)
+      if path:sub(1, 2) == './' then
+         return '/'..table.concat(path_to_node, '/')..'/'..path
+      end
+      while path:sub(1, 3) == '../' do
+         path = path:sub(4)
+         table.remove(path_to_node, #path_to_node)
+      end
+      return '/'..table.concat(path_to_node, '/')..'/'..path
+   end
+   -- Collects leafrefs in grammar tree.
+   local function collect_leafrefs (node)
+      local ret = {}
+      local function visit (node)
+         for k,v in pairs(node) do
+            if type(v) == 'table' then
+               if v.members then
+                  visit(v.members)
+               elseif v.argument_type and v.argument_type.leafref then
+                  local leafref = to_absolute_path(v.argument_type.leafref, node)
+                  table.insert(ret, {node=node, attr=k, leafref=leafref})
+               else
+                  visit(v)
+               end
+            end
+         end
+      end
+      visit(node)
+      return ret
+   end
+   -- Traverse parts starting in data to return target node.
+   local function data_node (data, parts)
+      local ret = data
+      for _,k in ipairs(parts) do ret = ret[k] end
+      return ret
+   end
+   local function parent (path)
+      assert(type(path) == 'table')
+      table.remove(path, #path)
+      return path
+   end
+
+   local leafrefs = collect_leafrefs(grammar)
+   if #leafrefs == 0 then return function(data) end end
+   return function (data)
+      for _,v in ipairs(leafrefs) do
+         local node, attr, leafref = v.node, v.attr, v.leafref
+         local getter = path_data.resolver(grammar, leafref)
+         local results = assert(getter(data),
+                                'Wrong XPath expression: '..leafref)
+         local data_path = data_path(grammar, node)
+         local data_node = data_node(data, parent(data_path))
+         local val = data_node[attr]
+         assert(results[val],
+               ("Broken leafref integrity in '%s' when referencing '%s'"):format(
+               table.concat(data_path, '.'), leafref))
+      end
+   end
+end
+
+function consistency_checker_from_schema(schema, is_config)
+   local grammar = data_grammar_from_schema(schema, is_config)
+   return consistency_checker_from_grammar(grammar)
+end
+consistency_checker_from_schema = util.memoize(consistency_checker_from_schema)
+
 function print_config_for_schema(schema, data, file)
    return config_printer_from_schema(schema)(data, file)
 end
@@ -1901,9 +1991,8 @@ function selftest()
       mgmt "eth0";
    }
    ]]))
-   assert(my_schema.body.test.body['mgmt'].type.leafref)
-   assert(loaded_data.test.interface['eth0'])
-   assert(loaded_data.test.mgmt)
+   local checker = consistency_checker_from_schema(my_schema, true)
+   checker(loaded_data)
 
    print('selfcheck: ok')
 end
