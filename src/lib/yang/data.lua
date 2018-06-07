@@ -1855,5 +1855,55 @@ function selftest()
 
    influxdb_printer_tests()
 
+   -- Test leafref.
+   local leafref_schema = [[module test-schema {
+      yang-version 1.1;
+      namespace urn:ietf:params:xml:ns:yang:test-schema;
+      prefix test;
+
+      import ietf-inet-types { prefix inet; }
+      import ietf-yang-types { prefix yang; }
+
+      container test {
+         list interface {
+            key "name";
+            leaf name {
+               type string;
+            }
+            leaf admin-status {
+               type boolean;
+               default false;
+            }
+            list address {
+               key "ip";
+               leaf ip {
+                  type inet:ipv4-address;
+               }
+            }
+         }
+         leaf mgmt {
+            type leafref {
+               path "../interface";
+            }
+         }
+      }
+   }]]
+   local my_schema = schema.load_schema(leafref_schema)
+   local loaded_data = load_config_for_schema(my_schema, mem.open_input_string([[
+   test {
+      interface {
+         name "eth0";
+         admin-status true;
+         address {
+            ip 192.168.0.1;
+         }
+      }
+      mgmt "eth0";
+   }
+   ]]))
+   assert(my_schema.body.test.body['mgmt'].type.leafref)
+   assert(loaded_data.test.interface['eth0'])
+   assert(loaded_data.test.mgmt)
+
    print('selfcheck: ok')
 end
