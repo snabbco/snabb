@@ -431,6 +431,94 @@ function remover_for_schema_by_name (schema_name, path)
 end
 remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
 
+function consistency_checker_from_grammar(grammar)
+   -- Returns the corresponding data path for a grammar node.
+   local function data_path (root, node)
+      local ret = {}
+      local function visit (root)
+         for k,v in pairs(root) do
+            if k == 'members' then
+               visit(v)
+            elseif v.members then
+               table.insert(ret, k)
+               visit(v.members)
+            elseif root == node then
+               table.insert(ret, k)
+               return
+            end
+         end
+      end
+      visit(root)
+      return ret
+   end
+   -- Converts a relative path to an absolute path.
+   local function to_absolute_path (path, node)
+      local path_to_node = data_path(grammar, node)
+      if path:sub(1, 2) == './' then
+         return '/'..table.concat(path_to_node, '/')..'/'..path
+      end
+      while path:sub(1, 3) == '../' do
+         path = path:sub(4)
+         table.remove(path_to_node, #path_to_node)
+      end
+      return '/'..table.concat(path_to_node, '/')..'/'..path
+   end
+   -- Collects leafrefs in grammar tree.
+   local function collect_leafrefs (node)
+      local ret = {}
+      local function visit (node)
+         for k,v in pairs(node) do
+            if type(v) == 'table' then
+               if v.members then
+                  visit(v.members)
+               elseif v.argument_type and v.argument_type.leafref then
+                  local leafref = to_absolute_path(v.argument_type.leafref, node)
+                  table.insert(ret, {node=node, attr=k, leafref=leafref})
+               else
+                  visit(v)
+               end
+            end
+         end
+      end
+      visit(node)
+      return ret
+   end
+   -- Traverse parts starting in data to return target node.
+   local function data_node (data, parts)
+      local ret = data
+      for _,k in ipairs(parts) do ret = ret[k] end
+      return ret
+   end
+   local function parent (path)
+      assert(type(path) == 'table')
+      table.remove(path, #path)
+      return path
+   end
+
+   local leafrefs = collect_leafrefs(grammar)
+   if #leafrefs == 0 then return function(data) end end
+   return function (data)
+      for _,v in ipairs(leafrefs) do
+         local node, attr, leafref = v.node, v.attr, v.leafref
+         local getter = resolver(grammar, leafref)
+         local results = assert(getter(data),
+                                'Wrong XPath expression: '..leafref)
+         local data_path = data_path(grammar, node)
+         local data_node = data_node(data, parent(data_path))
+         local val = data_node[attr]
+         assert(results[val],
+               ("Broken leafref integrity in '%s' when referencing '%s'"):format(
+               table.concat(data_path, '.'), leafref))
+      end
+   end
+end
+
+function consistency_checker_from_schema(schema, is_config)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
+   return consistency_checker_from_grammar(grammar)
+end
+consistency_checker_from_schema = util.memoize(consistency_checker_from_schema)
+
 function selftest()
    print("selftest: lib.yang.path_data")
    local mem = require('lib.stream.mem')
@@ -524,6 +612,55 @@ function selftest()
 
    local getter = resolver(fruit_prod, "/bowl/fruit[name=tangerine]/BB")
    assert(getter(fruit_data) == 'bb')
+
+   -- Test leafref.
+   local leafref_schema = [[module test-schema {
+      yang-version 1.1;
+      namespace urn:ietf:params:xml:ns:yang:test-schema;
+      prefix test;
+
+      import ietf-inet-types { prefix inet; }
+      import ietf-yang-types { prefix yang; }
+
+      container test {
+         list interface {
+            key "name";
+            leaf name {
+               type string;
+            }
+            leaf admin-status {
+               type boolean;
+               default false;
+            }
+            list address {
+               key "ip";
+               leaf ip {
+                  type inet:ipv4-address;
+               }
+            }
+         }
+         leaf mgmt {
+            type leafref {
+               path "../interface";
+            }
+         }
+      }
+   }]]
+   local my_schema = schema.load_schema(leafref_schema)
+   local loaded_data = data.load_config_for_schema(my_schema, mem.open_input_string([[
+   test {
+      interface {
+         name "eth0";
+         admin-status true;
+         address {
+            ip 192.168.0.1;
+         }
+      }
+      mgmt "eth0";
+   }
+   ]]))
+   local checker = consistency_checker_from_schema(my_schema, true)
+   checker(loaded_data)
 
    print("selftest: ok")
 end
