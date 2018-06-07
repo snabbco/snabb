@@ -98,7 +98,14 @@ function types.identityref.tostring(val)
 end
 
 types['instance-identifier'] = unimplemented('instance-identifier')
-types.leafref = unimplemented('leafref')
+
+types.leafref = {}
+function types.leafref.parse(str, what)
+   return assert(str, 'missing value for '..what)
+end
+function types.leafref.tostring(val)
+   return val
+end
 
 types.string = {}
 function types.string.parse(str, what)
