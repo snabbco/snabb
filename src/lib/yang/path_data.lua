@@ -479,16 +479,23 @@ function consistency_checker_from_grammar(grammar)
       for k in path:gmatch("[^/]+") do ret = ret[k] end
       return ret
    end
+   -- If not present, should be true.
+   local function require_instance (node)
+      if node.argument_type.require_instances == nil then return true end
+      return node.argument_type.require_instances
+   end
    return function (data)
       for path, node in visit_leafref_paths(grammar) do
-         local leafref = to_absolute_path(leafref(node), path)
-         local getter = resolver(grammar, leafref)
-         local results = assert(getter(data),
-                                'Wrong XPath expression: '..leafref)
-         local val = resolve(data, path)
-         assert(type(results) == 'table' and results[val],
-               ("Broken leafref integrity in '%s' when referencing '%s'"):format(
-               path, leafref))
+         if require_instance(node) then
+            local leafref = to_absolute_path(leafref(node), path)
+            local getter = resolver(grammar, leafref)
+            local results = assert(getter(data),
+                                   'Wrong XPath expression: '..leafref)
+            local val = resolve(data, path)
+            assert(type(results) == 'table' and results[val],
+                  ("Broken leafref integrity in '%s' when referencing '%s'"):format(
+                  path, leafref))
+         end
       end
    end
 end
