@@ -432,83 +432,63 @@ end
 remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
 
 function consistency_checker_from_grammar(grammar)
-   -- Returns the corresponding data path for a grammar node.
-   local function data_path (root, node)
-      local ret = {}
-      local function visit (root)
-         for k,v in pairs(root) do
-            if k == 'members' then
-               visit(v)
-            elseif v.members then
-               table.insert(ret, k)
-               visit(v.members)
-            elseif root == node then
-               table.insert(ret, k)
-               return
-            end
-         end
-      end
-      visit(root)
-      return ret
-   end
    -- Converts a relative path to an absolute path.
-   local function to_absolute_path (path, node)
-      local path_to_node = data_path(grammar, node)
-      if path:sub(1, 2) == './' then
-         return '/'..table.concat(path_to_node, '/')..'/'..path
+   local function to_absolute_path (leafref, path)
+      if leafref:sub(1, 2) == './' then
+         leafref = leafref:sub(3)
+         return path..'/'..leafref
       end
-      while path:sub(1, 3) == '../' do
-         path = path:sub(4)
-         table.remove(path_to_node, #path_to_node)
+      while leafref:sub(1, 3) == '../' do
+         leafref = leafref:sub(4)
+         path = lib.dirname(path)
       end
-      return '/'..table.concat(path_to_node, '/')..'/'..path
+      return path..'/'..leafref
    end
-   -- Collects leafrefs in grammar tree.
-   local function collect_leafrefs (node)
-      local ret = {}
-      local function visit (node)
-         for k,v in pairs(node) do
-            if type(v) == 'table' then
-               if v.members then
-                  visit(v.members)
-               elseif v.argument_type and v.argument_type.leafref then
-                  local leafref = to_absolute_path(v.argument_type.leafref, node)
-                  table.insert(ret, {node=node, attr=k, leafref=leafref})
-               else
-                  visit(v)
-               end
+   local function leafref (node)
+      return node.argument_type and node.argument_type.leafref
+   end
+   -- Leafref nodes iterator. Returns node as value and full data path as key.
+   local function visit_leafref_paths (root)
+      local function visit (path, node)
+         if node.type == 'struct' then
+            for k,v in pairs(node.members) do visit(path..'/'..k, v) end
+         elseif node.type == 'array' then
+            -- Pass.
+         elseif node.type == 'scalar' then
+            if leafref(node) then
+               coroutine.yield(path, node)
+            else
+               -- Pass.
             end
+         elseif node.type == 'table' then
+            for k,v in pairs(node.keys) do visit(path..'/'..k, v) end
+            for k,v in pairs(node.values) do visit(path..'/'..k, v) end
+         elseif node.type == 'choice' then
+            for _,choice in pairs(node.choices) do
+               for k,v in pairs(choice) do visit(path..'/'..k, v) end
+            end
+         else
+            error('unexpected kind', node.kind)
          end
       end
-      visit(node)
-      return ret
+      return coroutine.wrap(function() visit('', root) end), true
    end
-   -- Traverse parts starting in data to return target node.
-   local function data_node (data, parts)
+   -- Fetch value of path in data tree.
+   local function resolve (data, path)
       local ret = data
-      for _,k in ipairs(parts) do ret = ret[k] end
+      for k in path:gmatch("[^/]+") do ret = ret[k] end
       return ret
    end
-   local function parent (path)
-      assert(type(path) == 'table')
-      table.remove(path, #path)
-      return path
-   end
-
-   local leafrefs = collect_leafrefs(grammar)
-   if #leafrefs == 0 then return function(data) end end
    return function (data)
-      for _,v in ipairs(leafrefs) do
-         local node, attr, leafref = v.node, v.attr, v.leafref
+      for path, node in visit_leafref_paths(grammar) do
+         local leafref = to_absolute_path(leafref(node), path)
          local getter = resolver(grammar, leafref)
          local results = assert(getter(data),
                                 'Wrong XPath expression: '..leafref)
-         local data_path = data_path(grammar, node)
-         local data_node = data_node(data, parent(data_path))
-         local val = data_node[attr]
-         assert(results[val],
+         local val = resolve(data, path)
+         assert(type(results) == 'table' and results[val],
                ("Broken leafref integrity in '%s' when referencing '%s'"):format(
-               table.concat(data_path, '.'), leafref))
+               path, leafref))
       end
    end
 end
