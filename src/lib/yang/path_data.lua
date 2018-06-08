@@ -484,18 +484,24 @@ function consistency_checker_from_grammar(grammar)
       if node.argument_type.require_instances == nil then return true end
       return node.argument_type.require_instances
    end
+   local leafrefs = {}
+   for path, node in visit_leafref_paths(grammar) do
+      if require_instance(node) then
+         local leafref = to_absolute_path(leafref(node), path)
+         local getter = resolver(grammar, leafref)
+         table.insert(leafrefs, {path=path, leafref=leafref, getter=getter})
+      end
+   end
+   if #leafrefs == 0 then return function(data) end end
    return function (data)
-      for path, node in visit_leafref_paths(grammar) do
-         if require_instance(node) then
-            local leafref = to_absolute_path(leafref(node), path)
-            local getter = resolver(grammar, leafref)
-            local results = assert(getter(data),
-                                   'Wrong XPath expression: '..leafref)
-            local val = resolve(data, path)
-            assert(type(results) == 'table' and results[val],
-                  ("Broken leafref integrity in '%s' when referencing '%s'"):format(
-                  path, leafref))
-         end
+      for _,v in ipairs(leafrefs) do
+         local path, leafref, getter = v.path, v.leafref, v.getter
+         local results = assert(getter(data),
+                                'Wrong XPath expression: '..leafref)
+         local val = resolve(data, path)
+         assert(type(results) == 'table' and results[val],
+               ("Broken leafref integrity in '%s' when referencing '%s'"):format(
+                path, leafref))
       end
    end
 end
