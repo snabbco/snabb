@@ -850,7 +850,8 @@ function selftest ()
    -- Test toseconds.
    assert(toseconds({age_spec='weeks', value=1}) == 3600*24*7)
    local now = os.time()
-   assert(now == toseconds(format_date_as_iso_8601(now)))
+   assert(now == toseconds(format_date_as_iso_8601(now)),
+          now.." != "..toseconds(format_date_as_iso_8601(now)))
 
    -- Purge alarms by status.
    assert(table_size(state.alarm_list.alarm) == 1)

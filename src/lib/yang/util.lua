@@ -129,6 +129,8 @@ function timezone ()
    local now = os.time()
    local utctime = os.date("!*t", now)
    local localtime = os.date("*t", now)
+   -- Synchronize daylight-saving flags.
+   utctime.isdst = localtime.isdst
    local timediff = os.difftime(os.time(localtime), os.time(utctime))
    if timediff ~= 0 then
       local sign = timediff > 0 and "+" or "-"
@@ -151,10 +153,18 @@ end
 -- by 'format_date_as_iso8601'.
 function parse_date_as_iso_8601 (date)
    assert(type(date) == 'string')
-   local gmtdate = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)Z"
+   local gmtdate = "(%d%d%d%d)-(%d%d)-(%d%d)T(%d%d):(%d%d):(%d%d)"
    local year, month, day, hour, min, sec = assert(date:match(gmtdate))
-   local tz_sign, tz_hour, tz_min = date:match("Z([+-]?)(%d%d):(%d%d)")
-   return {year=year, month=month, day=day, hour=hour, min=min, sec=sec, tz_sign=tz_sign, tz_hour=tz_hour, tz_min=tz_min}
+   local ret = {year=year, month=month, day=day, hour=hour, min=min, sec=sec}
+   if date:match("Z$") then
+      return ret
+   else
+      local tz_sign, tz_hour, tz_min = date:match("([+-]?)(%d%d):(%d%d)$")
+      ret.tz_sign = tz_sign
+      ret.tz_hour = tz_hour
+      ret.tz_min = tz_min
+      return ret
+   end
 end
 
 function selftest()
