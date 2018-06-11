@@ -129,6 +129,8 @@ function timezone ()
    local now = os.time()
    local utctime = os.date("!*t", now)
    local localtime = os.date("*t", now)
+   -- Synchronize daylight-saving flags.
+   utctime.isdst = localtime.isdst
    local timediff = os.difftime(os.time(localtime), os.time(utctime))
    if timediff ~= 0 then
       local sign = timediff > 0 and "+" or "-"
