@@ -153,7 +153,7 @@ function Reassembler:new(conf)
             uint16_t final_start;
             uint16_t reassembly_base;
             uint32_t running_length; // bytes copied so far
-            struct packet packet;
+            struct packet *packet;
          } __attribute((packed))]],
          o.max_fragments_per_reassembly,
          o.max_fragments_per_reassembly),
@@ -193,13 +193,14 @@ function Reassembler:record_eviction()
    counter.add(self.shm["drop-ipv6-frag-random-evicted"])
 end
 
-function Reassembler:reassembly_success(entry, pkt)
-   self.ctab:remove_ptr(entry)
+function Reassembler:reassembly_success(entry)
    counter.add(self.shm["in-ipv6-frag-reassembled"])
-   link.transmit(self.output.output, pkt)
+   link.transmit(self.output.output, entry.value.packet)
+   self.ctab:remove_ptr(entry)
 end
 
 function Reassembler:reassembly_error(entry, icmp_error)
+   packet.free(entry.value.packet)
    self.ctab:remove_ptr(entry)
    counter.add(self.shm["drop-ipv6-frag-invalid-reassembly"])
    if icmp_error then -- This is an ICMP packet
@@ -218,8 +219,10 @@ function Reassembler:lookup_reassembly(src_ip, dst_ip, fragment_id)
    ffi.fill(reassembly, ffi.sizeof(reassembly))
    reassembly.reassembly_base = ether_ipv6_header_len
    reassembly.running_length = ether_ipv6_header_len
+
+   reassembly.packet = packet.allocate()
    -- Fragment 0 will fill in the contents of this data.
-   packet.length = ether_ipv6_header_len
+   reassembly.packet.length = ether_ipv6_header_len
 
    local did_evict = false
    entry, did_evict = self.ctab:add(key, reassembly, false)
@@ -292,10 +295,9 @@ function Reassembler:handle_fragment(h)
    elseif not verify_valid_offsets(reassembly) then
       return self:reassembly_error(entry)
    else
-      local out = packet.clone(reassembly.packet)
-      local header = ffi.cast(ether_ipv6_header_ptr_t, out.data)
-      header.ipv6.payload_length = htons(out.length - ether_ipv6_header_len)
-      return self:reassembly_success(entry, out)
+      local header = ffi.cast(ether_ipv6_header_ptr_t, reassembly.packet.data)
+      header.ipv6.payload_length = htons(reassembly.packet.length - ether_ipv6_header_len)
+      return self:reassembly_success(entry)
    end
 end
 
