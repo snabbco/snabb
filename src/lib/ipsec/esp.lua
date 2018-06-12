@@ -30,6 +30,7 @@ local lib = require("core.lib")
 local ffi = require("ffi")
 local C = ffi.C
 local logger = lib.logger_new({ rate = 32, module = 'esp' })
+local band = bit.band
 
 local htons, htonl, ntohl = lib.htons, lib.htonl, lib.ntohl
 
@@ -51,7 +52,8 @@ local ESP_TAIL_SIZE = esp_tail:sizeof()
 
 local TRANSPORT6_PAYLOAD_OFFSET = ETHERNET_SIZE + IPV6_SIZE
 
-local function padding (a, l) return (a - l%a) % a end
+-- NB: `a' must be a power of two
+local function padding (a, l) return bit.band(-l, a-1) end
 
 -- AEAD identifier from:
 --   https://github.com/YangModels/yang/blob/master/experimental/ietf-extracted-YANG-modules/ietf-ipsec@2018-01-08.yang
