@@ -18,7 +18,7 @@ end
 local RRD = {}
 
 local rrd_cookie = "RRD\0"
-local rrd_version = "0005\0"
+local rrd_version = "0003\0"
 local float_cookie = 8.642135E130
 
 local fixed_header_t = ffi.typeof [[struct {
@@ -298,7 +298,7 @@ function dump(rrd, stream)
 end
 
 function dump_file(rrd, filename)
-   local f = file:open(filename, 'w')
+   local f = file.open(filename, 'w')
    dump(rrd, f)
    f:close()
 end
