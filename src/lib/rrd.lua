@@ -274,7 +274,7 @@ function new(arg)
    return open_mem(ptr, len)
 end
 
-function create_file(arg, filename)
+function create_file(filename, arg)
    local rrd = new(arg)
    local fd = assert(S.open(filename, "creat, rdwr, excl", '0664'))
    local f = file.fdopen(fd, 'wronly', filename)
@@ -286,10 +286,10 @@ function create_file(arg, filename)
    return open_mem(ptr, rrd.size)
 end
 
-function create_shm(arg, name)
+function create_shm(name, arg)
    local path = shm.resolve(name)
    shm.mkdir(lib.dirname(path))
-   return create_file(arg, shm.root..'/'..path)
+   return create_file(shm.root..'/'..path, name)
 end
 
 function dump(rrd, stream)

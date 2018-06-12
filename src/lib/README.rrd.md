@@ -108,13 +108,13 @@ following keys defined:
    to be marked as known.  Defaults to `0.5`, indicating that at least
    half of corresponding PDPs must be marked as known.
 
-— Function **rrd.create_file** *arg* *filename*
+— Function **rrd.create_file** *filename* *arg*
 
 Create a new round-robin database as if calling `rrd.new` on *arg*, and
 then arrange for it to be mapped directly to *filename*.  Any subsequent
 update to the returned RRD database will be written to the file.
 
-— Function **rrd.create_shm** *arg* *name*
+— Function **rrd.create_shm** *name* *arg*
 
 Like **rrd.create_file**, but determining the file name by passing
 *name* to the `resolve` function of `core.shm`.
