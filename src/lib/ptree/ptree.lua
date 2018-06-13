@@ -12,6 +12,7 @@ local timer = require("core.timer")
 local worker = require("core.worker")
 local cltable = require("lib.cltable")
 local cpuset = require("lib.cpuset")
+local rrd = require("lib.rrd")
 local scheduling = require("lib.scheduling")
 local mem = require("lib.stream.mem")
 local socket = require("lib.stream.socket")
@@ -176,7 +177,7 @@ function Manager:start ()
    fiber.spawn(function () self:accept_rpc_peers() end)
    fiber.spawn(function () self:accept_notification_peers() end)
    fiber.spawn(function () self:notification_poller() end)
-   fiber.spawn(function () self:update_aggregated_counters() end)
+   fiber.spawn(function () self:sample_active_counters() end)
 end
 
 function Manager:call_with_cleanup(closeable, f, ...)
@@ -310,6 +311,28 @@ local function strip_prefix(a, b)
    assert(has_prefix(a, b))
    return a:sub(#b+1)
 end
+local function strip_suffix(a, b)
+   assert(has_suffix(a, b))
+   return a:sub(1,-(#b+1))
+end
+
+function Manager:make_rrd(counter_name)
+   local name = strip_suffix(counter_name, ".counter")..'.rrd'
+   return rrd.create_shm(name, {
+      sources={{name='value', type='counter'}},
+      -- NOTE: The default heartbeat interval is 1s, so relax
+      -- base_interval to 2s as we're only polling every 1s (and we'll
+      -- be slightly late).  Also note that these settings correspond to
+      -- about 100 KB of data for each counter.  On a box with 1000
+      -- counters, that's 100 MB, which seems reasonable for such a
+      -- facility.
+      archives={{cf='average', duration='2h', interval='2s'},
+                {cf='average', duration='24h', interval='30s'},
+                {cf='max', duration='24h', interval='30s'},
+                {cf='average', duration='7d', interval='5m'},
+                {cf='max', duration='7d', interval='5m'}},
+      base_interval='2s' })
+end
 
 function Manager:monitor_worker_counters(id)
    local worker = self.workers[id]
@@ -325,28 +348,35 @@ function Manager:monitor_worker_counters(id)
          if ev.kind == 'creat' then
             if not counters then
                counters = { aggregated=counter.create(name), active={},
+                            rrd={}, aggregated_rrd=self:make_rrd(name),
                             archived=ffi.new('uint64_t[1]') }
                self.counters[name] = counters
             end
             counters.active[pid] = counter.open(qualified_name)
+            counters.rrd[pid] = self:make_rrd(qualified_name)
          elseif ev.kind == 'rm' then
             local val = counter.read(assert(counters.active[pid]))
             counters.active[pid] = nil
+            counters.rrd[pid] = nil
             counters.archived[0] = counters.archived[0] + val
             counter.delete(qualified_name)
+            S.unlink(strip_suffix(qualified_name, ".counter")..".rrd")
          end
       end
    end
-   print('finished monitoring', id)
 end
 
-function Manager:update_aggregated_counters()
+function Manager:sample_active_counters()
    while true do
+      local now = rrd.now()
       for name, counters in pairs(self.counters) do
          local sum = counters.archived[0]
          for pid, active in pairs(counters.active) do
-            sum = sum + counter.read(active)
+            local v = counter.read(active)
+            counters.rrd[pid]:add({value=v}, now)
+            sum = sum + v
          end
+         counters.aggregated_rrd:add({value=sum}, now)
          counter.set(counters.aggregated, sum)
       end
       counter.commit()
