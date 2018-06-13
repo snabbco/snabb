@@ -118,7 +118,7 @@ function parse_command_line(args, opts)
       local parser = data_parser(ret.schema_name, ret.path, opts.is_config)
       local stream
       if #args == 0 then
-         stream = file.fdopen(0, 'r')
+         stream = file.fdopen(S.stdin, 'rdonly')
       else
          stream = mem.open_input_string(table.remove(args, 1))
       end
