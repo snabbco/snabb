@@ -147,7 +147,9 @@ function recursive_directory_inventory_events(dir, cancel_op)
          return op.choice(unpack(ops))
       end
       local rx_op = recompute_rx_op()
-      while true do
+      local occupancy = 0
+      local stopping = false
+      while not (stopping and occupancy == 0) do
          local event = rx_op:perform()
          if event == nil then
             -- Just pass.  Seems the two remove notifications have raced
@@ -166,9 +168,11 @@ function recursive_directory_inventory_events(dir, cancel_op)
                   warn('unexpected double-add for %s', name)
                end
             else
+               occupancy = occupancy + 1
                tx:put({kind='creat', name=event.name})
             end
          elseif event.kind == 'mkdir' then
+            occupancy = occupancy + 1
             tx:put(event)
          elseif event.kind == 'remove' then
             local name = event.name
@@ -177,23 +181,32 @@ function recursive_directory_inventory_events(dir, cancel_op)
                -- send rmdir.
                subdirs[name].cancel:signal()
             else
+               occupancy = occupancy - 1
                tx:put({kind='rm', name=name})
             end
          elseif event.kind == 'rmdir' then
-            tx:put(event)
+            occupancy = occupancy - 1
             local name = event.name
             if name == dir then
-               break
-            elseif subdirs[name] then
-               subdirs[name] = nil
-               rx_op = recompute_rx_op()
+               stopping = true
+            else
+               tx:put(event)
+               if subdirs[name] then
+                  subdirs[name] = nil
+                  rx_op = recompute_rx_op()
+               end
             end
-         elseif event.kind == 'creat' or event.kind == 'rm' then
+         elseif event.kind == 'creat' then
+            occupancy = occupancy + 1
+            tx:put(event)
+         elseif event.kind == 'rm' then
+            occupancy = occupancy - 1
             tx:put(event)
          else
             warn('unexpected event kind on %s: %s', event.name, event.kind)
          end
       end
+      tx:put({kind='rmdir', name=dir})
       tx:put(nil)
    end)
    return tx
