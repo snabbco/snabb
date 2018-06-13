@@ -6,6 +6,7 @@ local schema = require("lib.yang.schema")
 local data = require("lib.yang.data")
 local binary = require("lib.yang.binary")
 local file = require("lib.stream.file")
+local path_data = require("lib.yang.path_data")
 
 load_schema = schema.load_schema
 load_schema_file = schema.load_schema_file
@@ -14,8 +15,16 @@ load_schema_by_name = schema.load_schema_by_name
 add_schema = schema.add_schema
 add_schema_file = schema.add_schema_file
 
-load_config_for_schema = data.load_config_for_schema
-load_config_for_schema_by_name = data.load_config_for_schema_by_name
+function load_config_for_schema (schema, stream)
+   local data = data.load_config_for_schema(schema, stream)
+   path_data.consistency_checker_from_schema(schema, true)(data)
+   return data
+end
+function load_config_for_schema_by_name(schema_name, stream)
+   local data = data.load_config_for_schema_by_name(schema_name, stream)
+   path_data.consistency_checker_from_schema_by_name(schema_name, true)(data)
+   return data
+end
 
 print_config_for_schema = data.print_config_for_schema
 print_config_for_schema_by_name = data.print_config_for_schema_by_name
