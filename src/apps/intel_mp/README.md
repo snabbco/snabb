@@ -72,18 +72,19 @@ For a given NIC, all driver instances should have this parameter either
 enabled or disabled uniformly. If this is enabled, *macaddr* must be
 specified.
 
-— Key **vmdq_queuing_mode**
+— Key **vmdq_queueing_mode**
 
-*Optional*. Sets the queuing mode to use in VMDq mode. Has no effect when
-VMDq is disabled. The available queuing modes are `"rss-64-2"`
+*Optional*. Sets the queueing mode to use in VMDq mode. Has no effect when
+VMDq is disabled. The available queueing modes for the 82599 are `"rss-64-2"`
 (the default with 64 pools, 2 queues each) and `"rss-32-4"`
-(32 pools, 4 queues each).
+(32 pools, 4 queues each). The i350 provides only a single mode (8 pools, 2
+queues each) and hence ignores this option.
 
 — Key **poolnum**
 
 *Optional*. The VMDq pool to associate with, numbered from 0. The default
 is to select a pool number automatically. The maximum pool number depends
-on the queuing mode.
+on the queueing mode.
 
 — Key **macaddr**
 
@@ -203,4 +204,5 @@ Each chipset supports a differing number of receive / transmit queues:
 
 The Intel82599 supports both VMDq and RSS with 32/64 pools and 4/2 RSS queues for
 each pool.
-While the i350 supports VMDq, this driver does not currently support it.
+Intel1g i350 supports both VMDq and RSS with 8 pools 2 queues for each pool.
+Intel1g i210 does not support VMDq.
