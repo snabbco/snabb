@@ -7,6 +7,7 @@ module(..., package.seeall)
 local ffi = require("ffi")
 local S = require("syscall")
 local lib = require("core.lib")
+local shm = require("core.shm")
 local mem = require("lib.stream.mem")
 local file = require("lib.stream.file")
 
@@ -32,7 +33,7 @@ local fixed_header_t = ffi.typeof [[struct {
 }]]
 
 local source_types = lib.set('COUNTER', 'GAUGE')
-local consolidation_functions = lib.set('AVERAGE', 'MINIMUM', 'MAXIMUM', 'LAST')
+local consolidation_functions = lib.set('AVERAGE', 'MIN', 'MAX', 'LAST')
 
 -- The bit that's after the header, that depends on the shape of the RRD
 -- file.
@@ -274,7 +275,7 @@ function new(arg)
    return open_mem(ptr, len)
 end
 
-function create_file(arg, filename)
+function create_file(filename, arg)
    local rrd = new(arg)
    local fd = assert(S.open(filename, "creat, rdwr, excl", '0664'))
    local f = file.fdopen(fd, 'wronly', filename)
@@ -286,10 +287,10 @@ function create_file(arg, filename)
    return open_mem(ptr, rrd.size)
 end
 
-function create_shm(arg, name)
+function create_shm(name, arg)
    local path = shm.resolve(name)
    shm.mkdir(lib.dirname(path))
-   return create_file(arg, shm.root..'/'..path)
+   return create_file(shm.root..'/'..path, arg)
 end
 
 function dump(rrd, stream)
@@ -412,11 +413,11 @@ local function update_cdp(cdp, pdp_value, cf, pdp_pre, pdp_advance,
          if isnan(cdp.value) then cdp.value = 0 end
          cdp.value = cdp.value + pdp_value * pdp_advance_in_cdp
       end
-   elseif cf == 'maximum' then
+   elseif cf == 'max' then
       if isnan(cdp.value) then cdp.value = pdp_value
       elseif isnan(pdp_value) then -- pass
       else cdp.value = math.max(cdp.value, pdp_value) end
-   elseif cf == 'minimum' then
+   elseif cf == 'min' then
       if isnan(cdp.value) then cdp.value = pdp_value
       elseif isnan(pdp_value) then -- pass
       else cdp.value = math.min(cdp.value, pdp_value) end

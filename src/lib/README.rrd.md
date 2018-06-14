@@ -27,9 +27,9 @@ primary data points per source.
 Primary data points are just the start, however; the actual long-term
 storage is made up of *consolidated data points* (CDPs).  A CDP is
 constructed from one or more PDPs via a *consolidation function* (CF).
-Snabb supports four consolidation functions: `average`, `minimum`,
-`maximum`, and `last`.  Average takes the average of the PDPs within
-range, minimum and maximum take the lowest or highest values
+Snabb supports four consolidation functions: `average`, `min`,
+`max`, and `last`.  Average takes the average of the PDPs within
+range, min and max take the lowest or highest values
 respectively, and last takes the last one.  An archive also specifies
 its own parameters for how many unknown PDPs should cause the CDP to be
 considered unknown as well.
@@ -94,8 +94,8 @@ are defined in a source definition:
 An archive definition is also a table of key/value pairs, with the
 following keys defined:
 
- * `cf`: The consolidation function; either `average`, `minimum`,
-   `maximum`, or `last`.  The default is `average`.  See the discussion
+ * `cf`: The consolidation function; either `average`, `min`,
+   `max`, or `last`.  The default is `average`.  See the discussion
    above for more on consolidation functions.
  * `duration`: How much data to store, in terms of time.  Required.
    As with `base_interval`, can be expressed in terms of hours, weeks,
@@ -108,13 +108,13 @@ following keys defined:
    to be marked as known.  Defaults to `0.5`, indicating that at least
    half of corresponding PDPs must be marked as known.
 
-— Function **rrd.create_file** *arg* *filename*
+— Function **rrd.create_file** *filename* *arg*
 
 Create a new round-robin database as if calling `rrd.new` on *arg*, and
 then arrange for it to be mapped directly to *filename*.  Any subsequent
 update to the returned RRD database will be written to the file.
 
-— Function **rrd.create_shm** *arg* *name*
+— Function **rrd.create_shm** *name* *arg*
 
 Like **rrd.create_file**, but determining the file name by passing
 *name* to the `resolve` function of `core.shm`.
