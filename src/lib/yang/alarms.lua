@@ -333,12 +333,19 @@ local function add_status_change (key, alarm, status)
    alarm.last_changed = status.time
    state.alarm_list.last_changed = status.time
    table.insert(alarm.status_change, status)
-   add_alarm_notification(key, status)
+   add_alarm_notification(key, alarm)
 end
 
-function add_alarm_notification (key, status)
-   local notifications = state.notifications.alarm
-   notifications[key] = new_notification('alarm-notification', status)
+function add_alarm_notification (key, alarm)
+   local notification = {
+      time                 = alarm.time,
+      resource             = key.resource,
+      alarm_type_id        = key.alarm_type_id,
+      alarm_type_qualifier = key.alarm_type_qualifier,
+      perceived_severity   = alarm.perceived_severity,
+      alarm_text           = alarm.alarm_text
+   }
+   state.notifications.alarm[key] = new_notification('alarm-notification', notification)
 end
 
 -- Creates a new alarm.
