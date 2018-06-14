@@ -488,7 +488,7 @@ function consistency_checker_from_grammar(grammar)
    for path, node in visit_leafref_paths(grammar) do
       if require_instance(node) then
          local leafref = to_absolute_path(leafref(node), path)
-         local getter = resolver(grammar, leafref)
+         local getter = resolver(grammar, lib.dirname(leafref))
          table.insert(leafrefs, {path=path, leafref=leafref, getter=getter})
       end
    end
@@ -641,7 +641,7 @@ function selftest()
          }
          leaf mgmt {
             type leafref {
-               path "../interface";
+               path "../interface/name";
             }
          }
       }
