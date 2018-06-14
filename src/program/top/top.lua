@@ -13,14 +13,15 @@ local usage = require("program.top.README_inc")
 local file = require("lib.stream.file")
 local fiber = require("lib.fibers.fiber")
 local sleep = require("lib.fibers.sleep")
-local inotify = require("lib.ptree.inotify")
 local op = require("lib.fibers.op")
 local cond = require("lib.fibers.cond")
 local channel = require("lib.fibers.channel")
+local inotify = require("lib.ptree.inotify")
+local rrd = require("lib.rrd")
 
 -- First, the global state for the app.
 --
-local snabb_state = { instances={}, counters={}, histograms={} }
+local snabb_state = { instances={}, counters={}, histograms={}, rrds={} }
 local ui = {
    tree=nil, focus=nil, wake=cond.new(), rows=24, cols=80,
    show_empty=false, show_rates=true,
@@ -97,7 +98,7 @@ local function instance_monitor()
    return tx
 end
 
-local function monitor_snabb_instance(pid, instance, counters, histograms)
+local function monitor_snabb_instance(pid, instance, counters, histograms, rrds)
    local dir = shm.root..'/'..pid
    local rx = inotify.recursive_directory_inventory_events(dir)
    fiber.spawn(function ()
@@ -135,6 +136,16 @@ local function monitor_snabb_instance(pid, instance, counters, histograms)
                histograms[name] = nil
                needs_redisplay()
             end
+         elseif event.name:match('%.rrd') then
+            local name = event.name:sub(#dir + 2):match('^(.*)%.rrd')
+            if event.kind == 'creat' then
+               local ok, r = pcall(rrd.open_file, event.name)
+               if ok then rrds[name] = r end
+               needs_redisplay()
+            elseif event.kind == 'rm' then
+               rrds[name] = nil
+               needs_redisplay()
+            end
          end
       end
    end)
@@ -145,16 +156,17 @@ local function update_snabb_state()
    local pending = {}
    local instances = snabb_state.instances
    local counters, histograms = snabb_state.counters, snabb_state.histograms
+   local rrds = snabb_state.rrds
    for event in rx.get, rx do
       local kind, name, pid = event.kind, event.name, event.pid
       if kind == 'new-instance' then
          instances[pid], pending[pid] = { name = pending[pid] }, nil
-         counters[pid], histograms[pid] = {}, {}
+         counters[pid], histograms[pid], rrds[pid] = {}, {}, {}
          monitor_snabb_instance(pid, instances[pid], counters[pid],
-                                histograms[pid])
+                                histograms[pid], rrds[pid])
       elseif kind == 'instance-gone' then
          instances[pid], pending[pid] = nil, nil
-         counters[pid], histograms[pid] = nil, nil
+         counters[pid], histograms[pid], rrds[pid] = nil, nil, nil
          if ui.focus == pid then ui.focus = nil end
       elseif kind == 'new-name' then
          if instances[pid] then instances[pid].name = name
@@ -317,7 +329,7 @@ local function summarize_histogram(histogram, prev)
 end
 
 local function compute_histograms_tree(histograms)
-   if histograms == nil then return nil end
+   if histograms == nil then return {} end
    local ret = {}
    for k,v in pairs(histograms) do
       local branches, leaf = dirsplit(k)
@@ -332,7 +344,7 @@ local function compute_histograms_tree(histograms)
 end
 
 local function compute_counters_tree(counters)
-   if counters == nil then return nil end
+   if counters == nil then return {} end
    local ret = {}
    for k,v in pairs(counters) do
       local branches, leaf = dirsplit(k)
