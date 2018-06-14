@@ -434,6 +434,7 @@ remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
 function consistency_checker_from_grammar(grammar)
    -- Converts a relative path to an absolute path.
    local function to_absolute_path (leafref, path)
+      if leafref:sub(1, 1) == '/' then return leafref end
       if leafref:sub(1, 2) == './' then
          leafref = leafref:sub(3)
          return path..'/'..leafref
