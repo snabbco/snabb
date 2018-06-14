@@ -60,7 +60,7 @@ local function instance_monitor()
             local dirname, basename = dirsplit(event.name)
             if dirname == shm.root then
                local pid = tonumber(basename)
-               if pid and is_dir(event.name) and not by_pid[pid] then
+               if pid and is_dir(event.name) and not by_pid[pid] and pid ~= S.getpid() then
                   by_pid[pid] = {name=nil}
                   tx:put({kind="new-instance", pid=pid})
                end
