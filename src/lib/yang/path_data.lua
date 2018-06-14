@@ -512,6 +512,13 @@ function consistency_checker_from_schema(schema, is_config)
 end
 consistency_checker_from_schema = util.memoize(consistency_checker_from_schema)
 
+function consistency_checker_from_schema_by_name (schema_name, is_config)
+   local schema = schema.load_schema_by_name(schema_name)
+   local grammar = data.data_grammar_from_schema(schema, is_config)
+   return consistency_checker_from_grammar(grammar)
+end
+consistency_checker_from_schema = util.memoize(consistency_checker_from_schema)
+
 function selftest()
    print("selftest: lib.yang.path_data")
    local mem = require('lib.stream.mem')
