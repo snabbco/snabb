@@ -667,5 +667,8 @@ function selftest()
    local checker = consistency_checker_from_schema(my_schema, true)
    checker(loaded_data)
 
+   local checker = consistency_checker_from_schema_by_name('ietf-alarms', false)
+   assert(checker)
+
    print("selftest: ok")
 end
