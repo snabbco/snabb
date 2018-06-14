@@ -229,7 +229,7 @@ end
 function Manager:handle_notification_peer(peer)
    local q = queue.new()
    self.notification_peers[q] = true
-   function q:close()
+   function q.close()
       self.notification_peers[q] = nil
       peer:close()
    end
