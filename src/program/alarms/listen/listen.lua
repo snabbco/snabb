@@ -44,9 +44,9 @@ function run(args)
    local function print_notifications()
       local socket = connect(instance_id)
       while true do
-         local obj = json.read_json_object(socket)
+         local obj = json.read_json(socket)
          if obj == nil then return end
-         json.write_json_object(io.stdout, obj)
+         json.write_json(io.stdout, obj)
          io.stdout:write_chars("\n")
          io.stdout:flush_output()
       end

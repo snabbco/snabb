@@ -35,10 +35,10 @@ local function read_commands(filename)
    local input = assert(file.open(filename, 'r'))
    local ret = {}
    while true do
-      local obj = json_lib.read_json_object(input)
+      local obj = json_lib.read_json(input)
       if obj == nil then break end
       local function write_json(out)
-         json_lib.write_json_object(out, obj)
+         json_lib.write_json(out, obj)
       end
       table.insert(ret, mem.call_with_output_string(write_json))
    end
@@ -113,7 +113,7 @@ function run(args)
    end
    local function read_replies()
       for i=1,#commands do
-         local ok, obj = pcall(json_lib.read_json_object, rx)
+         local ok, obj = pcall(json_lib.read_json, rx)
          if not ok then error('failed to read json obj: '..tostring(obj)) end
          if not obj then error('unexpected EOF while reading response') end
          io.stdout:write("r")
