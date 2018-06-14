@@ -491,8 +491,10 @@ function consistency_checker_from_grammar(grammar)
    for path, node in visit_leafref_paths(grammar) do
       if require_instance(node) then
          local leafref = to_absolute_path(leafref(node), path)
-         local getter = resolver(grammar, lib.dirname(leafref))
-         table.insert(leafrefs, {path=path, leafref=leafref, getter=getter})
+         local success, getter = pcall(resolver, grammar, lib.dirname(leafref))
+         if success then
+            table.insert(leafrefs, {path=path, leafref=leafref, getter=getter})
+         end
       end
    end
    if #leafrefs == 0 then return function(data) end end
