@@ -433,18 +433,19 @@ remover_for_schema_by_name = util.memoize(remover_for_schema_by_name)
 
 function consistency_checker_from_grammar(grammar)
    -- Converts a relative path to an absolute path.
-   local function to_absolute_path (leafref, path)
-      leafref = leafref:gsub("current%(%)", path)
-      if leafref:sub(1, 1) == '/' then return leafref end
-      if leafref:sub(1, 2) == './' then
-         leafref = leafref:sub(3)
-         return path..'/'..leafref
+   -- TODO: Consider moving it to /lib/yang/path.lua.
+   local function to_absolute_path (path, node_path)
+      path = path:gsub("current%(%)", node_path)
+      if path:sub(1, 1) == '/' then return path end
+      if path:sub(1, 2) == './' then
+         path = path:sub(3)
+         return node_path..'/'..path
       end
-      while leafref:sub(1, 3) == '../' do
-         leafref = leafref:sub(4)
-         path = lib.dirname(path)
+      while path:sub(1, 3) == '../' do
+         path = path:sub(4)
+         node_path = lib.dirname(node_path)
       end
-      return path..'/'..leafref
+      return node_path..'/'..path
    end
    local function leafref (node)
       return node.argument_type and node.argument_type.leafref
