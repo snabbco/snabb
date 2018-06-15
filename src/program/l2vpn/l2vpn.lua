@@ -166,6 +166,8 @@ local nd_light = require("apps.ipv6.nd_light").nd_light
 local dispatch = require("program.l2vpn.dispatch").dispatch
 local pseudowire = require("program.l2vpn.pseudowire").pseudowire
 local ifmib = require("lib.ipc.shmem.iftable_mib")
+local frag_ipv6 = require("apps.ipv6.fragment").Fragmenter
+local reass_ipv6 = require("apps.ipv6.reassemble").Reassembler
 
 local bridge_types = { flooding = true, learning = true }
 
@@ -442,8 +444,8 @@ function parse_intf(config)
          print("        VLAN ID: "..(vid > 0 and vid or "<untagged>"))
          local connector = vmux:connector((vid == 0 and 'native') or 'vlan'..vid)
          if vlan.afs then
-            subintf.connector = process_afs(vlan.afs, vid, connector
-                                            , "    ")
+            subintf.connector = process_afs(vlan.afs, vid,
+                                            connector, "    ")
             subintf.l3 = true
          else
             subintf.connector = connector
@@ -483,7 +485,7 @@ function parse_config (main_config)
    local vpls_config = main_config.vpls
    assert(vpls_config, "Missing VPLS configuration")
 
-   local dispatchers = {}
+   local dispatchers, fragmenters = {}, {}
    local bridge_groups = {}
    for vpls_name, vpls in pairs(vpls_config) do
       local function assert_vpls (cond, msg)
@@ -516,13 +518,31 @@ function parse_config (main_config)
       local cc = vpls.cc
 
       local dispatcher = dispatchers[uplink]
+      local fragmenter = fragmenters[uplink]
       if not dispatcher then
          dispatcher = App:new('disp_'..normalize_name(uplink),
                               dispatch, {})
          dispatchers[uplink] = dispatcher
          local south = dispatcher:connector('south')
-         connect(intf.connector, south)
-         connect(south, intf.connector)
+
+         -- Insert a fragmenter/reassembler between the interface and
+         -- the dispatcher
+         fragmenter = App:new('frag_'..intf.nname,
+                              frag_ipv6,
+                              { mtu = intf.mtu - 14, pmtud = true,
+                                pmtu_local_addresses = {} })
+         fragmenters[uplink] = fragmenter
+         local reassembler = App:new('reass_'..intf.nname,
+                                     reass_ipv6,
+                                     {})
+
+         connect(intf.connector, fragmenter:connector('south'))
+         connect(fragmenter:connector('north'),
+                 reassembler:connector('input'))
+         connect(reassembler:connector('output'), south)
+
+         connect(south, fragmenter:connector('input'))
+         connect(fragmenter:connector('output'), intf.connector)
       end
       local bridge_group = {
          config = vpls.bridge or { type = 'flooding' },
@@ -545,7 +565,7 @@ function parse_config (main_config)
                                          destination = ipv6:pton(vpls.address) }
          local app = App:new('pw_'..vpls_name..'_'..name,
                              pseudowire,
-                             { name = vpls_name..'_'..name,
+                             { name = link_name,
                                vc_id = vpls.vc_id,
                                mtu = vpls.mtu,
                                shmem_dir = main_config.shmem_dir,
@@ -558,6 +578,7 @@ function parse_config (main_config)
          connect_duplex(dispatcher:connector(link_name), app:connector('uplink'))
          table.insert(bridge_group.pws, app)
       end
+      table.insert(fragmenter:arg().pmtu_local_addresses, vpls.address)
 
       print("  Creating attachment circuits")
       for name, ac in pairs(vpls.ac) do
