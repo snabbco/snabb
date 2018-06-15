@@ -449,7 +449,7 @@ end
 local compute_display_tree = {}
 
 -- The state renders to a nested display tree, consisting of "group",
--- "rows", "columns", and "chars" elements.
+-- "rows", "grid", and "chars" elements.
 function compute_display_tree.tree(tree, prev, dt)
    local ret = {kind='rows', contents={}}
    for k, v in sortedpairs(tree) do
@@ -499,19 +499,21 @@ do
 end
 
 function compute_display_tree.interface(tree, prev, dt, t)
-   local rows = {}
-   local function write(x) table.insert(rows, x) end
-   local function chars(fmt, ...)
-      return {kind='chars', contents=fmt:format(...)}
+   local function chars(align, fmt, ...)
+      return {kind='chars', align=align, contents=fmt:format(...)}
    end
-   local function cols(...)
-      local contents = {...}
-      return {kind='columns', contents=contents, width=#contents}
-   end
-   local function writeln(fmt, ...) write(chars(fmt, ...)) end
-   local function writecols(...) write(cols(...)) end
-   writeln('snabb top: %s', os.date('%Y-%m-%d %H:%M:%S', t))
-   writeln('----')
+   local function lchars(fmt, ...) return chars('left', fmt, ...) end
+   local function cchars(fmt, ...) return chars('center', fmt, ...) end
+   local function rchars(fmt, ...) return chars('right', fmt, ...) end
+   local grid = {}
+   local rows = {
+      kind='rows',
+      contents = {
+         lchars('snabb top: %s', os.date('%Y-%m-%d %H:%M:%S', t)),
+         lchars('----'),
+         {kind='grid', width=6, shrink={true,true}, contents=grid}
+   }}
+   local function gridrow(...) table.insert(grid, {...}) end
    --  name or \---, pid, breaths/s, latency
    --            \-  pci device, macaddr, mtu, speed
    --                  RX:       PPS, bps, %, [drops/s]
@@ -539,24 +541,24 @@ function compute_display_tree.interface(tree, prev, dt, t)
       local overhead = (7 + 1 + 4 + 12) * pps
       local bps = (bytes + overhead) * 8
       local max = tonumber(pci.speed) or 0
-      writecols(chars(''),
-                chars('%s:', tag:upper()),
-                chars('%.3f %sPPS', scale(pps)),
-                chars('%.3f %sbps', scale(bps)),
-                chars('%.2f%%', bps/max*100),
-                drops == 0 and chars('') or chars('%.3f %sPPS dropped', drops))
+      gridrow(nil,
+              rchars('%s:', tag:upper()),
+              lchars('%.3f %sPPS', scale(pps)),
+              lchars('%.3f %sbps', scale(bps)),
+              lchars('%.2f%%', bps/max*100),
+              drops > 0 and rchars('%.3f %sPPS dropped', drops) or nil)
    end
    local function show_pci(addr, pci, prev)
-      writecols(chars('    \\-'),
-                chars('%s', addr),
-                chars('%s', macaddr_string(pci.macaddr or 0)),
-                chars('MTU: %d', tonumber(pci.mtu) or 0),
-                chars('%d %sbps', scale(pci.speed or 0)),
-                chars(''))
+      local bps, tag = scale(pci.speed or 0)
+      gridrow(rchars('| '), lchars(''))
+      gridrow(rchars('\\-'),
+              rchars('%s:', addr),
+              lchars('%d %sbE, MAC: %s', bps, tag,
+                     macaddr_string(pci.macaddr or 0)))
       show_traffic('rx', pci, prev)
       show_traffic('tx', pci, prev)
    end
-   local function show_instance(name, instance, prev)
+   local function show_instance(label, instance, prev)
       local engine, prev_engine = instance.engine, prev and prev.engine
       local latency = engine and engine.latency
       local latency_str = ''
@@ -565,16 +567,16 @@ function compute_display_tree.interface(tree, prev, dt, t)
          latency_str = string.format('latency: %.2f min, %.2f avg, %.2f max',
                                      summarize_histogram(latency, prev))
       end
-      writecols(chars('%s', name),
-                chars('PID %s', instance.pid),
-                chars('%.2f %sbreaths/s',
-                      scale(rate('breaths', engine, prev_engine))),
-                chars('%s', latency_str),
-                chars(''), chars(''))
+      gridrow(label,
+              lchars('PID %s:', instance.pid),
+              lchars('%.2f %sbreaths/s',
+                     scale(rate('breaths', engine, prev_engine))),
+              lchars('%s', latency_str))
       if instance.workers then
          for pid, instance in sortedpairs(instance.workers) do
             local prev = prev and prev.workers and prev.workers[pid]
-            show_instance('  \\---', instance, prev)
+            gridrow(rchars('|   '), lchars(''))
+            show_instance(rchars('\\---'), instance, prev)
          end
       else
          -- Note, PCI tree only shown on instances without workers.
@@ -585,30 +587,48 @@ function compute_display_tree.interface(tree, prev, dt, t)
       end
    end
    for name, instance in sortedpairs(tree) do
-      show_instance(name, instance, prev and prev[name])
+      gridrow(lchars(''))
+      show_instance(lchars('%s', name), instance, prev and prev[name])
    end
-   return {kind='rows', contents=rows}
+   return rows
+end
+
+local function compute_span(row, j, columns)
+   local span = 1
+   while j + span <= columns and row[j+1] == nil do
+      span = span + 1
+   end
+   return span
 end
 
 -- A tree is nice for data but we have so many counters that really we
 -- need to present them as a grid.  So, the next few functions try to
--- reorient "rows" display tree instances into a combination of "rows"
--- and "columns".
-local function compute_width(tree)
+-- reorient "rows" display tree instances into "grid".
+local function compute_min_width(tree)
    if tree.kind == 'group' then
-      return 2 + compute_width(tree.contents)
+      return 2 + compute_min_width(tree.contents)
    elseif tree.kind == 'rows' then
       local width = 0
       for _,tree in ipairs(tree.contents) do
-         width = math.max(width, compute_width(tree))
+         width = math.max(width, compute_min_width(tree))
       end
       return width
-   elseif tree.kind == 'columns' then
-      local width = 0
-      for _,tree in ipairs(tree.contents) do
-         width = math.max(width, compute_width(tree))
+   elseif tree.kind == 'grid' then
+      local columns, width = tree.width, 0
+      for j=1,columns do
+         local col_width = 0
+         for i=1,#tree.contents do
+            local row = tree.contents[i]
+            local tree = row[j]
+            if tree then
+               local span = compute_span(row, j, columns)
+               local item_width = compute_min_width(tree)
+               col_width = math.max(col_width, math.ceil(item_width / span))
+            end
+         end
+         width = width + col_width
       end
-      return width * tree.width
+      return width
    else
       assert(tree.kind == 'chars')
       return #tree.contents
@@ -624,10 +644,15 @@ local function compute_height(tree)
          height = height + compute_height(tree)
       end
       return height
-   elseif tree.kind == 'columns' then
+   elseif tree.kind == 'grid' then
       local height = 0
-      for _,tree in ipairs(tree.contents) do
-         height = math.max(height, compute_height(tree))
+      for i=1,#tree.contents do
+         local row_height = 0
+         for j=1,tree.width do
+            local tree = tree.contents[i][j]
+            row_height = math.max(row_height, compute_height(tree))
+         end
+         height = height + row_height
       end
       return height
    else
@@ -656,7 +681,7 @@ end
 
 local function should_make_grid(tree, indent)
    if #tree.contents <= 1 then return 1 end
-   local width = compute_width(tree) + indent
+   local width = compute_min_width(tree) + indent
    -- Maximum column width of 80.
    if width > 80 then return 1 end
    -- Minimum column width of 50.
@@ -681,14 +706,13 @@ local function create_grids(tree, indent)
          local rows = math.ceil(#tree.contents/columns)
          local contents = {}
          for i=1,rows do
-            contents[i] = {kind='columns', width=columns, contents={}}
+            contents[i] = {}
          end
          for i,tree in ipairs(tree.contents) do
             local row, col = ((i-1)%rows)+1, math.ceil(i/rows)
-            contents[row].contents[col] = tree
+            contents[row][col] = tree
          end
-         if rows == 1 then return contents[1] end
-         return {kind='rows', contents=contents}
+         return {kind='grid', width=columns, contents=contents}
       else
          local contents = {}
          for i,tree in ipairs(tree.contents) do
@@ -729,20 +753,73 @@ function render.rows(tree, row, col, width)
    end
    return row
 end
-function render.columns(tree, row, col, width)
-   local width = math.floor(width / tree.width)
-   local next_row = row
-   for i,tree in ipairs(tree.contents) do
-      next_row = math.max(next_row, render_display_tree(tree, row, col, width))
-      col = col + width
+local function allocate_column_widths(rows, cols, shrink, width)
+   local widths, expand, total = {}, 0, 0
+   for j=1,cols do
+      local col_width = 0
+      for _,row in ipairs(rows) do
+         if row[j] then
+            local span = compute_span(row, j, cols)
+            local item_width = compute_min_width(row[j])
+            col_width = math.max(col_width, math.ceil(item_width / span))
+         end
+      end
+      widths[j], total = col_width, total + col_width
+      if not shrink[j] then expand = expand + 1 end
    end
-   return next_row
+   -- Truncate from the right.
+   for j=1,cols do
+      -- Inter-column spacing before this column.
+      local spacing = j - 1
+      if total + spacing <= width then break end
+      local trim = math.min(widths[j], total + spacing - width)
+      widths[j], total = widths[j] - trim, total - trim
+   end
+   -- Allocate slack to non-shrinking columns.
+   for j=1,cols do
+      if not shrink[j] then
+         local spacing = j - 1
+         local pad = math.floor((width-total-spacing)/expand)
+         widths[j], total, expand = widths[j] + pad, total + pad, expand - 1
+      end
+   end
+   return widths
+end
+function render.grid(tree, row, col, width)
+   local widths = allocate_column_widths(
+      tree.contents, tree.width, tree.shrink or {}, width)
+   for i=1,#tree.contents do
+      local next_row = row
+      local endcol = col + width
+      local col = endcol
+      for j=tree.width,1,-1 do
+         local tree = tree.contents[i][j]
+         col = col - widths[j]
+         if tree then
+            local width = endcol - col
+            next_row = math.max(
+               next_row, render_display_tree(tree, row, col, endcol - col))
+            -- Spacing.
+            endcol = col - 1
+         end
+         -- Spacing.
+         col = col - 1
+      end
+      row = next_row
+   end
+   return row
 end
 function render.chars(tree, row, col, width)
-   move(row, col)
-   if #tree.contents > width then
-      io.write(tree.contents:sub(1,width))
+   local str = tree.contents
+   if #str > width then
+      move(row, col)
+      io.write(str:sub(1,width))
    else
+      local advance = 0
+      if tree.align=='right' then advance = width - #str
+      elseif tree.align=='center' then advance = math.floor((width - #str)/2)
+      else advance = 0 end
+      move(row, col + advance)
       io.write(tree.contents)
    end
    return row + 1
