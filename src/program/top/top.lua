@@ -10,18 +10,21 @@ local shm = require("core.shm")
 local counter = require("core.counter")
 local histogram = require("core.histogram")
 local usage = require("program.top.README_inc")
+local ethernet = require("lib.protocol.ethernet")
 local file = require("lib.stream.file")
 local fiber = require("lib.fibers.fiber")
 local sleep = require("lib.fibers.sleep")
-local inotify = require("lib.ptree.inotify")
 local op = require("lib.fibers.op")
 local cond = require("lib.fibers.cond")
 local channel = require("lib.fibers.channel")
+local inotify = require("lib.ptree.inotify")
+local rrd = require("lib.rrd")
 
 -- First, the global state for the app.
 --
-local snabb_state = { instances={}, counters={}, histograms={} }
+local snabb_state = { instances={}, counters={}, histograms={}, rrds={} }
 local ui = {
+   view='interface',
    tree=nil, focus=nil, wake=cond.new(), rows=24, cols=80,
    show_empty=false, show_rates=true,
    show_links=true, show_apps=true, show_engine=true,
@@ -59,7 +62,7 @@ local function instance_monitor()
             local dirname, basename = dirsplit(event.name)
             if dirname == shm.root then
                local pid = tonumber(basename)
-               if pid and is_dir(event.name) and not by_pid[pid] then
+               if pid and is_dir(event.name) and not by_pid[pid] and pid ~= S.getpid() then
                   by_pid[pid] = {name=nil}
                   tx:put({kind="new-instance", pid=pid})
                end
@@ -97,7 +100,7 @@ local function instance_monitor()
    return tx
 end
 
-local function monitor_snabb_instance(pid, instance, counters, histograms)
+local function monitor_snabb_instance(pid, instance, counters, histograms, rrds)
    local dir = shm.root..'/'..pid
    local rx = inotify.recursive_directory_inventory_events(dir)
    fiber.spawn(function ()
@@ -135,6 +138,16 @@ local function monitor_snabb_instance(pid, instance, counters, histograms)
                histograms[name] = nil
                needs_redisplay()
             end
+         elseif event.name:match('%.rrd') then
+            local name = event.name:sub(#dir + 2):match('^(.*)%.rrd')
+            if event.kind == 'creat' then
+               local ok, r = pcall(rrd.open_file, event.name)
+               if ok then rrds[name] = r end
+               needs_redisplay()
+            elseif event.kind == 'rm' then
+               rrds[name] = nil
+               needs_redisplay()
+            end
          end
       end
    end)
@@ -145,16 +158,17 @@ local function update_snabb_state()
    local pending = {}
    local instances = snabb_state.instances
    local counters, histograms = snabb_state.counters, snabb_state.histograms
+   local rrds = snabb_state.rrds
    for event in rx.get, rx do
       local kind, name, pid = event.kind, event.name, event.pid
       if kind == 'new-instance' then
          instances[pid], pending[pid] = { name = pending[pid] }, nil
-         counters[pid], histograms[pid] = {}, {}
+         counters[pid], histograms[pid], rrds[pid] = {}, {}, {}
          monitor_snabb_instance(pid, instances[pid], counters[pid],
-                                histograms[pid])
+                                histograms[pid], rrds[pid])
       elseif kind == 'instance-gone' then
          instances[pid], pending[pid] = nil, nil
-         counters[pid], histograms[pid] = nil, nil
+         counters[pid], histograms[pid], rrds[pid] = nil, nil, nil
          if ui.focus == pid then ui.focus = nil end
       elseif kind == 'new-name' then
          if instances[pid] then instances[pid].name = name
@@ -317,7 +331,7 @@ local function summarize_histogram(histogram, prev)
 end
 
 local function compute_histograms_tree(histograms)
-   if histograms == nil then return nil end
+   if histograms == nil then return {} end
    local ret = {}
    for k,v in pairs(histograms) do
       local branches, leaf = dirsplit(k)
@@ -332,7 +346,7 @@ local function compute_histograms_tree(histograms)
 end
 
 local function compute_counters_tree(counters)
-   if counters == nil then return nil end
+   if counters == nil then return {} end
    local ret = {}
    for k,v in pairs(counters) do
       local branches, leaf = dirsplit(k)
@@ -432,9 +446,11 @@ local function sample_tree(tree)
    return ret
 end
 
+local compute_display_tree = {}
+
 -- The state renders to a nested display tree, consisting of "group",
 -- "rows", "columns", and "chars" elements.
-local function compute_display_tree(tree, prev, dt)
+function compute_display_tree.tree(tree, prev, dt)
    local ret = {kind='rows', contents={}}
    for k, v in sortedpairs(tree) do
       if type(v) ~= 'table' then
@@ -463,11 +479,115 @@ local function compute_display_tree(tree, prev, dt)
    for k, v in sortedpairs(tree) do
       if type(v) == 'table' then
          local has_prev = prev and type(prev[k]) == type(v)
-         local rows = compute_display_tree(v, has_prev and prev[k], dt)
+         local rows = compute_display_tree.tree(v, has_prev and prev[k], dt)
          table.insert(ret.contents, {kind='group', label=k, contents=rows})
       end
    end
    return ret
+end
+
+local macaddr_string
+do
+   local buf = ffi.new('union { uint64_t u64; uint8_t bytes[6]; }')
+   function macaddr_string(n)
+      -- The app read out the address and wrote it to the counter as a
+      -- uint64, just as if it aliased the address.  So, to get the
+      -- right byte sequence, we can do the same, without swapping.
+      buf.u64 = n
+      return ethernet:ntop(buf.bytes)
+   end
+end
+
+function compute_display_tree.interface(tree, prev, dt, t)
+   local rows = {}
+   local function write(x) table.insert(rows, x) end
+   local function chars(fmt, ...)
+      return {kind='chars', contents=fmt:format(...)}
+   end
+   local function cols(...)
+      local contents = {...}
+      return {kind='columns', contents=contents, width=#contents}
+   end
+   local function writeln(fmt, ...) write(chars(fmt, ...)) end
+   local function writecols(...) write(cols(...)) end
+   writeln('snabb top: %s', os.date('%Y-%m-%d %H:%M:%S', t))
+   writeln('----')
+   --  name or \---, pid, breaths/s, latency
+   --            \-  pci device, macaddr, mtu, speed
+   --                  RX:       PPS, bps, %, [drops/s]
+   --                  TX:       PPS, bps, %, [drops/s]
+   local function rate(key, counters, prev)
+      if counters and counters[key] and prev and prev[key] then
+         return tonumber(counters[key] - prev[key])/dt
+      else
+         return 0
+      end
+   end
+   local function scale(x)
+      x=tonumber(x)
+      for _,scale in ipairs {{'T', 1e12}, {'G', 1e9}, {'M', 1e6}, {'k', 1e3}} do
+         local tag, base = unpack(scale)
+         if x > base then return x/base, tag end
+      end
+      return x, ''
+   end
+   local function show_traffic(tag, pci, prev)
+      local pps = rate(tag..'packets', pci, prev)
+      local bytes = rate(tag..'bytes', pci, prev)
+      local drops = rate(tag..'drop', pci, prev)
+      -- 7 bytes preamble, 1 start-of-frame, 4 CRC, 12 interframe gap.
+      local overhead = (7 + 1 + 4 + 12) * pps
+      local bps = (bytes + overhead) * 8
+      local max = tonumber(pci.speed) or 0
+      writecols(chars(''),
+                chars('%s:', tag:upper()),
+                chars('%.3f %sPPS', scale(pps)),
+                chars('%.3f %sbps', scale(bps)),
+                chars('%.2f%%', bps/max*100),
+                drops == 0 and chars('') or chars('%.3f %sPPS dropped', drops))
+   end
+   local function show_pci(addr, pci, prev)
+      writecols(chars('    \\-'),
+                chars('%s', addr),
+                chars('%s', macaddr_string(pci.macaddr or 0)),
+                chars('MTU: %d', tonumber(pci.mtu) or 0),
+                chars('%d %sbps', scale(pci.speed or 0)),
+                chars(''))
+      show_traffic('rx', pci, prev)
+      show_traffic('tx', pci, prev)
+   end
+   local function show_instance(name, instance, prev)
+      local engine, prev_engine = instance.engine, prev and prev.engine
+      local latency = engine and engine.latency
+      local latency_str = ''
+      if latency then 
+         local prev = prev_engine and prev_engine.latency
+         latency_str = string.format('latency: %.2f min, %.2f avg, %.2f max',
+                                     summarize_histogram(latency, prev))
+      end
+      writecols(chars('%s', name),
+                chars('PID %s', instance.pid),
+                chars('%.2f %sbreaths/s',
+                      scale(rate('breaths', engine, prev_engine))),
+                chars('%s', latency_str),
+                chars(''), chars(''))
+      if instance.workers then
+         for pid, instance in sortedpairs(instance.workers) do
+            local prev = prev and prev.workers and prev.workers[pid]
+            show_instance('  \\---', instance, prev)
+         end
+      else
+         -- Note, PCI tree only shown on instances without workers.
+         for addr, pci in sortedpairs(instance.pci or {}) do
+            local prev = prev and prev.pci and prev.pci[addr]
+            show_pci(addr, pci, prev)
+         end
+      end
+   end
+   for name, instance in sortedpairs(tree) do
+      show_instance(name, instance, prev and prev[name])
+   end
+   return {kind='rows', contents=rows}
 end
 
 -- A tree is nice for data but we have so many counters that really we
@@ -636,18 +756,24 @@ local function render_status_line()
       return key..'=show '..what
    end
    local entries = { ui.paused and 'SPACE=unpause' or 'SPACE=pause',
-                     'q=quit',
-                     showhide('a', 'apps'), showhide('l', 'links'),
-                     showhide('e', 'engine'), showhide('0', 'empty'),
-                     showhide('r', 'rates') }
-   local instances = 0
-   for pid, _ in sortedpairs(snabb_state.instances) do
-      instances = instances + 1
-   end
-   if instances > 1 then
-      if ui.focus then table.insert(entries, 'u=unfocus '..ui.focus) end
-      table.insert(entries, '<=focus prev')
-      table.insert(entries, '>=focus next')
+                     'q=quit' }
+   if ui.view == 'interface' then
+      table.insert(entries, 't=tree view')
+   else
+      for _,e in ipairs { 'i=interface view', showhide('a', 'apps'),
+                          showhide('l', 'links'), showhide('e', 'engine'),
+                          showhide('0', 'empty'), showhide('r', 'rates') } do
+         table.insert(entries, e)
+      end
+      local instances = 0
+      for pid, _ in sortedpairs(snabb_state.instances) do
+         instances = instances + 1
+      end
+      if instances > 1 then
+         if ui.focus then table.insert(entries, 'u=unfocus '..ui.focus) end
+         table.insert(entries, '<=focus prev')
+         table.insert(entries, '>=focus next')
+      end
    end
 
    local col_width, count = 0, 0
@@ -670,7 +796,8 @@ local function refresh()
    clearterm()
    local dt
    if ui.prev_sample_time then dt = ui.sample_time - ui.prev_sample_time end
-   local tree = compute_display_tree(ui.sample, ui.prev_sample, dt)
+   local tree = compute_display_tree[ui.view](
+      ui.sample, ui.prev_sample, dt, ui.sample_time)
    tree = create_grids(tree)
    render_display_tree(tree, 1, 1, ui.cols)
    render_status_line()
@@ -688,7 +815,7 @@ local function show_ui()
       end
       if not ui.paused then
          ui.prev_sample_time, ui.prev_sample = ui.sample_time, ui.sample
-         ui.sample_time, ui.sample = C.get_monotonic_time(), sample_tree(ui.tree) or {}
+         ui.sample_time, ui.sample = rrd.now(), sample_tree(ui.tree) or {}
       end
       refresh()
       ui.wake:wait()
@@ -707,6 +834,10 @@ local function refresh_display()
 end
 
 -- Here we wire up some more key bindings.
+local function in_view(view, f)
+   return function() if ui.view == view then f() end end
+end
+
 local function toggle(tab, k)
    return function() tab[k] = not tab[k]; needs_redisplay(true) end
 end
@@ -758,17 +889,30 @@ local function unfocus()
    needs_redisplay()
 end
 
-bind_keys("0", toggle(ui, 'show_empty'))
-bind_keys("r", toggle(ui, 'show_rates'))
-bind_keys("l", toggle(ui, 'show_links'))
-bind_keys("a", toggle(ui, 'show_apps'))
-bind_keys("e", toggle(ui, 'show_engine'))
+local function tree_view()
+   ui.view = 'tree'
+   needs_redisplay()
+end
+
+local function interface_view()
+   ui.view = 'interface'
+   ui.focus = nil
+   needs_redisplay()
+end
+
+bind_keys("0", in_view('tree', toggle(ui, 'show_empty')))
+bind_keys("r", in_view('tree', toggle(ui, 'show_rates')))
+bind_keys("l", in_view('tree', toggle(ui, 'show_links')))
+bind_keys("a", in_view('tree', toggle(ui, 'show_apps')))
+bind_keys("e", in_view('tree', toggle(ui, 'show_engine')))
 bind_keys(" ", toggle(ui, 'paused'))
-bind_keys("u", unfocus)
-bind_keys("<", focus_prev)
-bind_keys(">", focus_next)
-bind_keys("AD", focus_prev, csi_key_bindings) -- Left and up arrow.
-bind_keys("BC", focus_next, csi_key_bindings) -- Right and down arrow.
+bind_keys("u", in_view('tree', unfocus))
+bind_keys("t", in_view('interface', tree_view))
+bind_keys("i", in_view('tree', interface_view))
+bind_keys("<", in_view('tree', focus_prev))
+bind_keys(">", in_view('tree', focus_next))
+bind_keys("AD", global_key_bindings['<'], csi_key_bindings) -- Left and up arrow.
+bind_keys("BC", global_key_bindings['>'], csi_key_bindings) -- Right and down arrow.
 bind_keys("q\3\31\4", fiber.stop) -- C-d, C-/, q, and C-c.
 
 local function handle_input ()
