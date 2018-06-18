@@ -403,27 +403,19 @@ local function compute_tree()
          parent_node.workers[pid] = node
       end
       node.pid = pid
-      if ui.focus == nil or ui.focus == pid then
-         for k,v in pairs(compute_histograms_tree(snabb_state.histograms[pid])) do
-            adjoin(node, k, v)
-         end
-         for k,v in pairs(compute_counters_tree(snabb_state.counters[pid])) do
-            adjoin(node, k, v)
-         end
+      for k,v in pairs(compute_histograms_tree(snabb_state.histograms[pid])) do
+         adjoin(node, k, v)
+      end
+      for k,v in pairs(compute_counters_tree(snabb_state.counters[pid])) do
+         adjoin(node, k, v)
       end
    end
    return root
 end
 
-local function isempty(x)
-   for k,v in pairs(x) do return false end
-   return true
-end
-
-local function maybe_hide(tab, ...)
-   for _,k in ipairs{...} do
-      if tab[k] and not ui['show_'..k] then tab[k] = nil end
-   end
+local function nil_if_empty(x)
+   for k,v in pairs(x) do return x end
+   return nil
 end
 
 -- The ui.tree just represents the structure of the state.  Before we go
@@ -434,15 +426,44 @@ local function sample_tree(tree)
    local ret = {}
    for k,v in pairs(tree) do
       if type(v) == 'function' then v = v() end
-      if type(v) == 'table' then ret[k] = sample_tree(v)
-      elseif not ui.show_empty and tonumber(v) == 0 then
-         -- Pass.
-      else
-         ret[k] = v
-      end
+      if type(v) == 'table' then v = sample_tree(v) end
+      ret[k] = v
    end
-   maybe_hide(ret, 'apps', 'links', 'engine')
-   if isempty(ret) then return end
+   return nil_if_empty(ret)
+end
+
+local function prune_sample(tree)
+   local function prune(name, tree)
+      if name == 'apps' and not ui.show_apps then return nil end
+      if name == 'links' and not ui.show_links then return nil end
+      if name == 'engine' and not ui.show_engine then return nil end
+      if type(tree) == 'table' then
+         local ret = {}
+         for k,v in pairs(tree) do ret[k] = prune(k, v) end
+         return nil_if_empty(ret)
+      elseif not ui.show_empty and tonumber(tree) == 0 then
+         return nil
+      end
+      return tree
+   end
+   local function prune_instance(instance)
+      local ret = {}
+      if instance.workers then
+         ret.workers = {}
+         for k,v in pairs(instance.workers) do
+            ret.workers[k] = prune_instance(v)
+         end
+         ret.workers = nil_if_empty(ret.workers)
+      end
+      if ui.focus == nil or ui.focus == instance.pid then
+         for k,v in pairs(instance) do
+            if k ~= 'workers' then ret[k] = prune(k, v) end
+         end
+      end
+      return nil_if_empty(ret)
+   end
+   local ret = {}
+   for k,v in pairs(tree) do ret[k] = prune_instance(v) end
    return ret
 end
 
@@ -451,39 +472,44 @@ local compute_display_tree = {}
 -- The state renders to a nested display tree, consisting of "group",
 -- "rows", "grid", and "chars" elements.
 function compute_display_tree.tree(tree, prev, dt)
-   local ret = {kind='rows', contents={}}
-   for k, v in sortedpairs(tree) do
-      if type(v) ~= 'table' then
-         local prev = prev and type(prev[k]) == type(v) and prev[k]
-         if type(v) == 'cdata' and tonumber(v) then
-            if ui.show_rates and prev and tonumber(v) ~= tonumber(prev) then
-               if k:match('packets') then units = 'PPS'
-               elseif k:match('bytes') then units = 'bytes/s'
-               elseif k:match('bits') then units = 'bits/s'
-               else units = 'per second' end
-               local rate = math.floor(tonumber(v-prev)/dt)
-               str = string.format("%s: %s %s", k, lib.comma_value(rate), units)
+   tree = prune_sample(tree)
+   local function visit(tree, prev)
+      local ret = {kind='rows', contents={}}
+      for k, v in sortedpairs(tree) do
+         if type(v) ~= 'table' then
+            local prev = prev and type(prev[k]) == type(v) and prev[k]
+            if type(v) == 'cdata' and tonumber(v) then
+               if ui.show_rates and prev and tonumber(v) ~= tonumber(prev) then
+                  if k:match('packets') then units = 'PPS'
+                  elseif k:match('bytes') then units = 'bytes/s'
+                  elseif k:match('bits') then units = 'bits/s'
+                  else units = 'per second' end
+                  local rate = math.floor(tonumber(v-prev)/dt)
+                  str = string.format(
+                     "%s: %s %s", k, lib.comma_value(rate), units)
+               else
+                  str = string.format("%s: %s", k, lib.comma_value(v))
+               end
+            elseif type(v) == 'cdata' then
+               -- Hackily, assume that the value is a histogram.
+               str = string.format('%s: %.2f min, %.2f avg, %.2f max',
+                                   k, summarize_histogram(v, prev))
             else
-               str = string.format("%s: %s", k, lib.comma_value(v))
+               str = string.format("%s: %s", k, tostring(v))
             end
-         elseif type(v) == 'cdata' then
-            -- Hackily, assume that the value is a histogram.
-            str = string.format('%s: %.2f min, %.2f avg, %.2f max',
-                                k, summarize_histogram(v, prev))
-         else
-            str = string.format("%s: %s", k, tostring(v))
+            table.insert(ret.contents, {kind='chars', contents=str})
          end
-         table.insert(ret.contents, {kind='chars', contents=str})
       end
-   end
-   for k, v in sortedpairs(tree) do
-      if type(v) == 'table' then
-         local has_prev = prev and type(prev[k]) == type(v)
-         local rows = compute_display_tree.tree(v, has_prev and prev[k], dt)
-         table.insert(ret.contents, {kind='group', label=k, contents=rows})
+      for k, v in sortedpairs(tree) do
+         if type(v) == 'table' then
+            local has_prev = prev and type(prev[k]) == type(v)
+            local rows = visit(v, has_prev and prev[k])
+            table.insert(ret.contents, {kind='group', label=k, contents=rows})
+         end
       end
+      return ret
    end
-   return ret
+   return visit(tree, prev)
 end
 
 local macaddr_string
@@ -919,11 +945,6 @@ local function toggle(tab, k)
    return function() tab[k] = not tab[k]; needs_redisplay(true) end
 end
 
-local function unfocus()
-   ui.focus = nil
-   needs_redisplay(true)
-end
-
 local function sortedkeys(t)
    local ret = {}
    for k,v in sortedpairs(t) do table.insert(ret, k) end
@@ -942,7 +963,7 @@ local function focus_prev()
          end
       end
    end
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 local function focus_next()
@@ -958,23 +979,22 @@ local function focus_next()
          end
       end
    end
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 local function unfocus()
    ui.focus = nil
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 local function tree_view()
    ui.view = 'tree'
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 local function interface_view()
    ui.view = 'interface'
-   ui.focus = nil
-   needs_redisplay()
+   needs_redisplay(true)
 end
 
 bind_keys("0", in_view('tree', toggle(ui, 'show_empty')))
